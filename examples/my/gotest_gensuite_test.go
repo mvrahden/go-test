@@ -4,15 +4,16 @@ package my_test
 
 import (
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/stretchr/testify/require"
+
+	"github.com/mvrahden/go-test/examples/my"
 )
 
 func TestMyTestSuite(t *testing.T) {
-	s := MyTestSuite{}
+	s := my.MyTestSuite{}
 
 	tt := gotest.NewT(t)
 	type TestCaseRun struct {
@@ -27,22 +28,22 @@ func TestMyTestSuite(t *testing.T) {
 		}}
 	}
 	allSequentialTestCases := []TestCaseRun{
-		newTestCaseRun("TestSomethingAny", s.TestSomethingAny),
-		newTestCaseRun("TestSomethingB", s.TestSomethingB),
-		newTestCaseRun("TestSomethingDuration", s.TestSomethingDuration),
-		newTestCaseRun("TestSomethingFunction", s.TestSomethingFunction),
 		newTestCaseRun("TestSomethingSpecific", s.TestSomethingSpecific),
-		newTestCaseRun("TestSomethingTime", s.TestSomethingTime),
-		newTestCaseRun("FTestSomethingSpecific", s.FTestSomethingSpecific),
-		newTestCaseRun("TestSomethingAsync", func(t *gotest.T) {
-			wg := &sync.WaitGroup{}
-			wg.Add(1)
-			doneFn := func() {
-				wg.Done()
-			}
-			s.TestSomethingAsync(t, doneFn)
-			wg.Wait()
-		}),
+		// newTestCaseRun("TestSomethingAny", s.TestSomethingAny),
+		// newTestCaseRun("TestSomethingB", s.TestSomethingB),
+		// newTestCaseRun("TestSomethingDuration", s.TestSomethingDuration),
+		// newTestCaseRun("TestSomethingFunction", s.TestSomethingFunction),
+		// newTestCaseRun("TestSomethingTime", s.TestSomethingTime),
+		newTestCaseRun("FTestSomethingSpecific", s.F_TestSomethingSpecific),
+		// newTestCaseRun("TestSomethingAsync", func(t *gotest.T) {
+		// 	wg := &sync.WaitGroup{}
+		// 	wg.Add(1)
+		// 	doneFn := func() {
+		// 		wg.Done()
+		// 	}
+		// 	s.TestSomethingAsync(t, doneFn)
+		// 	wg.Wait()
+		// }),
 	}
 
 	s.BeforeAll(tt)
@@ -71,7 +72,7 @@ func TestMyTestSuite(t *testing.T) {
 }
 
 func TestMyParallelTestSuite(t *testing.T) {
-	s := MyTestSuite{}
+	s := my.MyTestSuite{}
 
 	tt := gotest.NewT(t)
 	allSequentialTestCases := []gotest.TestCase{

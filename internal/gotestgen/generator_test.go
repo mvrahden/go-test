@@ -21,12 +21,13 @@ const (
 	packageBase = "github.com/mvrahden/go-test"
 )
 
-func TestGeneratorExamples(t *testing.T) {
+func TestGeneratorGoldenExamples(t *testing.T) {
 	for _, tC := range []struct {
 		directory   string
 		description string
 	}{
-		{"my", "standard test harness"},
+		{"my", "standard test suites"},
+		{"focus_suite", "focus test suites"},
 	} {
 		pkg := path.Join(packageBase, "examples", tC.directory)
 		testdatadir := filepath.Join("..", "..", "examples", tC.directory)

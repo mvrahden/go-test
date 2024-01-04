@@ -1,11 +1,10 @@
 package gotestgen
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/samber/lo"
+	"github.com/mvrahden/go-test/internal/x/slices"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -16,14 +15,13 @@ const (
 func Generate() error {
 	srcs, err := generateFile(".")
 	if err != nil {
-
 		return err
 	}
 	fmt.Printf("sources: %s\n", srcs)
-	return errors.New("not implemented yet")
+	return nil
 }
 
-func loadPackage(targetPkg string) ([]*packages.Package, error) {
+func loadPackages(targetPkg string) ([]*packages.Package, error) {
 	p, err := packages.Load(&packages.Config{
 		Mode:  packageEvalMode,
 		Tests: true,
@@ -31,8 +29,10 @@ func loadPackage(targetPkg string) ([]*packages.Package, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed loading packages. err: %w", err)
 	}
-	p = lo.Filter(p, func(item *packages.Package, index int) bool {
-		return strings.HasSuffix(item.PkgPath, ".test") || strings.HasSuffix(item.PkgPath, "_test")
+
+	// filter all test-related packages
+	p = slices.Filter(p, func(item *packages.Package, index int) bool {
+		return strings.HasSuffix(item.ID, ".test]")
 	})
 	if len(p) == 0 {
 		return nil, fmt.Errorf("no tests or test package found")
@@ -44,17 +44,26 @@ func loadPackage(targetPkg string) ([]*packages.Package, error) {
 }
 
 func generateFile(targetPkg string) ([]byte, error) {
-	pkg, err := loadPackage(targetPkg)
+	pkgs, err := loadPackages(targetPkg)
 	if err != nil {
 		return nil, err
 	}
 	c := collector{}
-	specs, err := c.CollectSuiteSpecs(pkg)
-	fmt.Printf("specs: %+v\n", specs)
+	result := c.CollectSuiteSpecs(pkgs)
+	if len(result.Errs) > 0 {
+		return nil, result.Errs[0].Err
+	}
+
+	out, err := c.ApplyGoTestSpecs(result.Suites)
 	if err != nil {
 		return nil, err
 	}
 
+	r := renderer{}
+	buf, err := r.RenderGoTestSpec(pkgs, out)
+	if err != nil {
+		return nil, err
+	}
 	// out, err := g.i.Inspect(pkg)
 	// if err != nil {
 	// 	return nil, err
@@ -66,5 +75,5 @@ func generateFile(targetPkg string) ([]byte, error) {
 	// if err != nil {
 	// 	return nil, err
 	// }
-	return nil, nil
+	return buf, nil
 }

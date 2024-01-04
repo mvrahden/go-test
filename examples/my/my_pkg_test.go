@@ -1,8 +1,10 @@
-package my
+package my_test
 
 import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
+
+//go:generate github.com/mvrahden/go-test/cmd/testgen -skip-autogen
 
 type X_MySkippedTestSuite struct{}
 type MyNoopTestSuite struct{}

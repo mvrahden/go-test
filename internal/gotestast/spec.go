@@ -6,26 +6,127 @@ import (
 	"go/token"
 	"go/types"
 	"regexp"
+	"strings"
 
+	"github.com/dlclark/regexp2"
+
+	"github.com/mvrahden/go-test/about"
+	"github.com/mvrahden/go-test/internal/x/slices"
 	"golang.org/x/tools/go/packages"
 )
 
 var (
-	IS_TEST_SUITE          = regexp.MustCompile(`^([X|F]_)?.+TestSuite$`)
-	IS_TEST_HARNESS_METHOD = regexp.MustCompile(`^(BeforeAll|AfterAll|BeforeEach|AfterEach|Test.+|TestParallel.+)$`)
+	IS_TEST_SUITE          = regexp.MustCompile(`^(?:X_|F_)?.+TestSuite$`)
+	IS_TEST_HARNESS_METHOD = regexp2.MustCompile(`^(?:BeforeAll|AfterAll|BeforeEach|AfterEach|(?:X_|F_)?(Test(?!Parallel)|TestParallel).+)$`, regexp2.ECMAScript)
 	IS_BEFORE_ALL          = regexp.MustCompile(`^BeforeAll$`)
 	IS_AFTER_ALL           = regexp.MustCompile(`^AfterAll$`)
 	IS_BEFORE_EACH         = regexp.MustCompile(`^BeforeEach$`)
 	IS_AFTER_EACH          = regexp.MustCompile(`^AfterEach$`)
-	IS_TEST_CASE           = regexp.MustCompile(`^([X|F]_)?Test.+`)
-	IS_TEST_CASE_PARALLEL  = regexp.MustCompile(`^([X|F]_)?TestParallel.+`)
+	// IS_TEST_CASE           = regexp.MustCompile(`^(?:X_|F_)?Test(?:Parallel)?.+$`) // matches all test cases (incl. parallel)
+	// ^(Foo(?!Bar)|FooBar){1}\S+$
+	IS_TEST_CASE = regexp2.MustCompile(`^(?:X_|F_)?(Test(?!Parallel)|TestParallel).+$`, regexp2.ECMAScript) // matches all test cases (incl. parallel)
+	// IS_TEST_CASE = func() bool {                                           // regex workaround: matches all test cases (incl. parallel)
+	// }
+	IS_TEST_CASE_PARALLEL = regexp.MustCompile(`^(?:X_|F_)?TestParallel.+$`) // matches only parallel test cases
+	IS_TEST_CASE_ASYNC    = regexp.MustCompile(`^(?:X_|F_)?Test.+Async$`)    // matches all test cases (incl. parallel) with async suffix
 )
 
+type TestSuiteSpecSet []*TestSuiteSpec
+type SkippedTestSuites []*TestSuiteSpec
+type SkippedTestCases map[*TestSuiteSpec][]*TestHarnessMethod
+
+func (ts TestSuiteSpecSet) ReduceToEffectiveSet() (TestSuiteSpecSet, SkippedTestSuites, SkippedTestCases) {
+	effectiveSet := append((TestSuiteSpecSet)(nil), ts...)
+
+	var skippedTestSuites SkippedTestSuites
+	skippedTestCases := SkippedTestCases{}
+	{ // split focused from unfocused
+		focused, unfocused := slices.SplitBy(effectiveSet, func(v *TestSuiteSpec, _ int) bool {
+			return v.isFocused()
+		})
+		effectiveSet = unfocused
+		if len(focused) > 0 {
+			effectiveSet, skippedTestSuites = focused, append(skippedTestSuites, unfocused...)
+		}
+	}
+
+	{ // split excluded from included
+		excluded, included := slices.SplitBy(effectiveSet, func(v *TestSuiteSpec, _ int) bool {
+			return v.isExcluded()
+		})
+		effectiveSet = included
+		if len(excluded) > 0 {
+			skippedTestSuites = append(skippedTestSuites, excluded...)
+		}
+	}
+
+	slices.Range(effectiveSet, func(v *TestSuiteSpec, _ int) {
+		skippedTestCases[v] = nil
+	})
+
+	{ // reduce SEQUENTIAL test cases
+		slices.Range(effectiveSet, func(v *TestSuiteSpec, _ int) {
+			// split focused from unfocused
+			focused, unfocused := slices.SplitBy(v.th.TestCases, func(v *TestHarnessMethod, _ int) bool {
+				return v.isFocused()
+			})
+			v.th.TestCases = unfocused
+			if len(focused) > 0 {
+				v.th.TestCases = focused
+				skippedTestCases[v] = append(skippedTestCases[v], unfocused...)
+			}
+
+			// split excluded from included
+			excluded, included := slices.SplitBy(v.th.TestCases, func(v *TestHarnessMethod, _ int) bool {
+				return v.isExcluded()
+			})
+			v.th.TestCases = included
+			if len(excluded) > 0 {
+				skippedTestCases[v] = append(skippedTestCases[v], excluded...)
+			}
+		})
+	}
+
+	{ // reduce PARALLEL test cases
+		slices.Range(effectiveSet, func(v *TestSuiteSpec, _ int) {
+			// split focused from unfocused
+			focused, unfocused := slices.SplitBy(v.th.TestCasesParallel, func(v *TestHarnessMethod, _ int) bool {
+				return v.isFocused()
+			})
+			v.th.TestCasesParallel = unfocused
+			if len(focused) > 0 {
+				v.th.TestCasesParallel = focused
+				skippedTestCases[v] = append(skippedTestCases[v], unfocused...)
+			}
+
+			// split excluded from included
+			excluded, included := slices.SplitBy(v.th.TestCasesParallel, func(v *TestHarnessMethod, _ int) bool {
+				return v.isExcluded()
+			})
+			v.th.TestCasesParallel = included
+			if len(excluded) > 0 {
+				skippedTestCases[v] = append(skippedTestCases[v], excluded...)
+			}
+		})
+	}
+
+	return effectiveSet, skippedTestSuites, skippedTestCases
+}
+
 type TestSuiteSpec struct {
+	pkg *packages.Package
 	n   ast.Node
 	ts  *ast.TypeSpec
 	typ *types.Struct
 	th  *TestHarness
+}
+
+func (ts *TestSuiteSpec) isFocused() bool {
+	return strings.HasPrefix(ts.ts.Name.Name, "F_")
+}
+
+func (ts *TestSuiteSpec) isExcluded() bool {
+	return strings.HasPrefix(ts.ts.Name.Name, "X_")
 }
 
 type TestHarness struct {
@@ -38,7 +139,17 @@ type TestHarness struct {
 }
 
 type TestHarnessMethod struct {
-	n ast.Node
+	n   ast.Node
+	m   *types.Func
+	sig *types.Signature
+}
+
+func (m *TestHarnessMethod) isFocused() bool {
+	return strings.HasPrefix(m.m.Name(), "F_")
+}
+
+func (m *TestHarnessMethod) isExcluded() bool {
+	return strings.HasPrefix(m.m.Name(), "X_")
 }
 
 func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, token.Pos, error) {
@@ -67,7 +178,7 @@ func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, toke
 		return nil, -1, nil
 	}
 
-	return &TestSuiteSpec{n, ts, typ, &TestHarness{}}, -1, nil
+	return &TestSuiteSpec{pkg, n, ts, typ, &TestHarness{}}, -1, nil
 }
 
 func DetermineTestHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSpec) (token.Pos, error) {
@@ -83,7 +194,12 @@ func DetermineTestHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSpec) (
 	if !ok {
 		return decl.Name.Pos(), fmt.Errorf("no signature found for method %s", decl.Name)
 	}
-	if !IS_TEST_HARNESS_METHOD.MatchString(m.Name()) {
+	// methodID is a readable name, e.g. "MyTestSuite.BeforeAll" for improved debug output
+	methodID := s.ts.Name.Name + "." + m.Name()
+	if methodID == "MyTestSuite.TestSomethingSpecific" {
+		fmt.Printf("%s\n", methodID)
+	}
+	if ok, _ := IS_TEST_HARNESS_METHOD.MatchString(m.Name()); !ok {
 		return -1, nil
 	}
 
@@ -116,23 +232,70 @@ func DetermineTestHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSpec) (
 		return decl.Name.Pos(), nil // no receiver
 	}
 
+	tm := &TestHarnessMethod{n: n, m: m, sig: sig}
+
+	isTestCase, _ := IS_TEST_CASE.MatchString(m.Name())
 	switch {
 	case IS_BEFORE_ALL.MatchString(m.Name()):
-		s.th.BeforeAll = &TestHarnessMethod{n: n}
+		s.th.BeforeAll = tm
 	case IS_AFTER_ALL.MatchString(m.Name()):
-		s.th.AfterAll = &TestHarnessMethod{n: n}
+		s.th.AfterAll = tm
 	case IS_BEFORE_EACH.MatchString(m.Name()):
-		s.th.BeforeEach = &TestHarnessMethod{n: n}
+		s.th.BeforeEach = tm
 	case IS_AFTER_EACH.MatchString(m.Name()):
-		s.th.AfterEach = &TestHarnessMethod{n: n}
-	case IS_TEST_CASE.MatchString(m.Name()):
-		if IS_TEST_CASE_PARALLEL.MatchString(m.Name()) {
-			s.th.TestCasesParallel = append(s.th.TestCasesParallel, &TestHarnessMethod{n: n})
-			break
-		}
-		s.th.TestCases = append(s.th.TestCases, &TestHarnessMethod{n: n})
+		s.th.AfterEach = tm
+	case isTestCase:
+		// pass-through: these will be handled further down the line
 	default:
-		return decl.Name.Pos(), fmt.Errorf("detected unhandled test harness method %q", m.Name())
+		return decl.Name.Pos(), fmt.Errorf("detected unhandled test harness method %q", methodID)
+	}
+
+	hasParamT := func(sig *types.Signature, idx int) error {
+		pT := sig.Params().At(0).Type().String()
+		if !strings.HasPrefix(pT, "*"+about.Repo) || !strings.HasSuffix(pT, "/gotest.T") {
+			return fmt.Errorf("unsupported param type for signature of %q", methodID)
+		}
+		return nil
+	}
+
+	if !isTestCase {
+		// assert harness methods correct params
+		if sig.Params().Len() != 1 || sig.Results().Len() != 0 {
+			return m.Pos(), fmt.Errorf("unsupported signature for %q", methodID)
+		}
+
+		err := hasParamT(sig, 0)
+		if err != nil {
+			return m.Pos(), err
+		}
+		return -1, nil
+	}
+
+	switch {
+	case IS_TEST_CASE_PARALLEL.MatchString(m.Name()):
+		s.th.TestCasesParallel = append(s.th.TestCasesParallel, tm)
+	default:
+		s.th.TestCases = append(s.th.TestCases, tm)
+	}
+
+	maxParams := 1
+
+	// end with `done func()` IF test case IS ASYNC
+	if IS_TEST_CASE_ASYNC.MatchString(m.Name()) {
+		lastParam := sig.Params().At(sig.Params().Len() - 1)
+		if lastParam.String() != "var done func()" {
+			return lastParam.Pos(), fmt.Errorf("unsupported last argument for %q", methodID)
+		}
+		maxParams += 1
+	}
+
+	if sig.Params().Len() != maxParams {
+		return m.Pos(), fmt.Errorf("unsupported number of params for signature of %q", methodID)
+	}
+
+	err := hasParamT(sig, 0)
+	if err != nil {
+		return m.Pos(), err
 	}
 
 	return -1, nil
