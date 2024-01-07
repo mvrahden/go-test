@@ -49,7 +49,7 @@ func (collector) CollectSuiteSpecs(pkgs []*packages.Package) CollectorResult {
 		// find methods
 		for _, s := range suites {
 			insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
-				pos, err := gotestast.DetermineTestHarness(n, pkg, s)
+				pos, err := gotestast.DetermineTestSuiteHarness(n, pkg, s)
 				if err != nil {
 					errs = append(errs, CollectorError{Err: err, Pos: pos})
 				}
@@ -76,6 +76,8 @@ type SpecOutcome struct {
 
 func (collector) ApplyGoTestSpecs(suites gotestast.TestSuiteSpecSet) (SpecOutcome, error) {
 	suites, skippedTestSuites, skippedTestCases := suites.ReduceToEffectiveSet()
+
+	// TODO: sort all by name
 
 	return SpecOutcome{
 		EffectiveTestSuites: suites,

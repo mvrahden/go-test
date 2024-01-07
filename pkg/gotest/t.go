@@ -17,6 +17,7 @@ type T struct {
 	Assert asserter.Asserter
 }
 
+func (t *T) T() *testing.T                              { return t.t }
 func (t *T) It(description string, testFn func(it *T))  {}
 func (t *T) XIt(description string, testFn func(it *T)) {} // skips
 func (t *T) FIt(description string, testFn func(it *T)) {} // skips

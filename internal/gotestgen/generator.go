@@ -64,16 +64,5 @@ func generateFile(targetPkg string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// out, err := g.i.Inspect(pkg)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if len(out.TypeSpecs) == 0 {
-	// 	return nil, fmt.Errorf("no enums detected.")
-	// }
-	// buf, err := g.r.Render(out)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	return buf, nil
 }

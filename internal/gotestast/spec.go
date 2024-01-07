@@ -15,16 +15,25 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
+type regexpW struct {
+	*regexp2.Regexp
+}
+
+func (r *regexpW) MatchString(s string) bool {
+	res, _ := r.Regexp.MatchString(s)
+	return res
+}
+
 var (
-	IS_TEST_SUITE          = regexp.MustCompile(`^(?:X_|F_)?.+TestSuite$`)
-	IS_TEST_HARNESS_METHOD = regexp2.MustCompile(`^(?:BeforeAll|AfterAll|BeforeEach|AfterEach|(?:X_|F_)?(Test(?!Parallel)|TestParallel).+)$`, regexp2.ECMAScript)
-	IS_BEFORE_ALL          = regexp.MustCompile(`^BeforeAll$`)
-	IS_AFTER_ALL           = regexp.MustCompile(`^AfterAll$`)
-	IS_BEFORE_EACH         = regexp.MustCompile(`^BeforeEach$`)
-	IS_AFTER_EACH          = regexp.MustCompile(`^AfterEach$`)
+	IS_TEST_SUITE        = &regexpW{regexp2.MustCompile(`^(?!ƒƒ_GOTEST_)(?:X_|F_)?.+((?!Parallel)TestSuite|ParallelTestSuite)$`, regexp2.ECMAScript)}
+	IS_TEST_SUITE_METHOD = &regexpW{regexp2.MustCompile(`^(?:BeforeAll|AfterAll|BeforeEach|AfterEach|(?:X_|F_)?(Test(?!Parallel)|TestParallel).+)$`, regexp2.ECMAScript)}
+	IS_BEFORE_ALL        = regexp.MustCompile(`^BeforeAll$`)
+	IS_AFTER_ALL         = regexp.MustCompile(`^AfterAll$`)
+	IS_BEFORE_EACH       = regexp.MustCompile(`^BeforeEach$`)
+	IS_AFTER_EACH        = regexp.MustCompile(`^AfterEach$`)
 	// IS_TEST_CASE           = regexp.MustCompile(`^(?:X_|F_)?Test(?:Parallel)?.+$`) // matches all test cases (incl. parallel)
 	// ^(Foo(?!Bar)|FooBar){1}\S+$
-	IS_TEST_CASE = regexp2.MustCompile(`^(?:X_|F_)?(Test(?!Parallel)|TestParallel).+$`, regexp2.ECMAScript) // matches all test cases (incl. parallel)
+	IS_TEST_CASE = &regexpW{regexp2.MustCompile(`^(?:X_|F_)?(Test(?!Parallel)|TestParallel).+$`, regexp2.ECMAScript)} // matches all test cases (incl. parallel)
 	// IS_TEST_CASE = func() bool {                                           // regex workaround: matches all test cases (incl. parallel)
 	// }
 	IS_TEST_CASE_PARALLEL = regexp.MustCompile(`^(?:X_|F_)?TestParallel.+$`) // matches only parallel test cases
@@ -33,7 +42,7 @@ var (
 
 type TestSuiteSpecSet []*TestSuiteSpec
 type SkippedTestSuites []*TestSuiteSpec
-type SkippedTestCases map[*TestSuiteSpec][]*TestHarnessMethod
+type SkippedTestCases map[*TestSuiteSpec][]*TestSuiteMethod
 
 func (ts TestSuiteSpecSet) ReduceToEffectiveSet() (TestSuiteSpecSet, SkippedTestSuites, SkippedTestCases) {
 	effectiveSet := append((TestSuiteSpecSet)(nil), ts...)
@@ -67,7 +76,7 @@ func (ts TestSuiteSpecSet) ReduceToEffectiveSet() (TestSuiteSpecSet, SkippedTest
 	{ // reduce SEQUENTIAL test cases
 		slices.Range(effectiveSet, func(v *TestSuiteSpec, _ int) {
 			// split focused from unfocused
-			focused, unfocused := slices.SplitBy(v.th.TestCases, func(v *TestHarnessMethod, _ int) bool {
+			focused, unfocused := slices.SplitBy(v.th.TestCases, func(v *TestSuiteMethod, _ int) bool {
 				return v.isFocused()
 			})
 			v.th.TestCases = unfocused
@@ -77,33 +86,10 @@ func (ts TestSuiteSpecSet) ReduceToEffectiveSet() (TestSuiteSpecSet, SkippedTest
 			}
 
 			// split excluded from included
-			excluded, included := slices.SplitBy(v.th.TestCases, func(v *TestHarnessMethod, _ int) bool {
+			excluded, included := slices.SplitBy(v.th.TestCases, func(v *TestSuiteMethod, _ int) bool {
 				return v.isExcluded()
 			})
 			v.th.TestCases = included
-			if len(excluded) > 0 {
-				skippedTestCases[v] = append(skippedTestCases[v], excluded...)
-			}
-		})
-	}
-
-	{ // reduce PARALLEL test cases
-		slices.Range(effectiveSet, func(v *TestSuiteSpec, _ int) {
-			// split focused from unfocused
-			focused, unfocused := slices.SplitBy(v.th.TestCasesParallel, func(v *TestHarnessMethod, _ int) bool {
-				return v.isFocused()
-			})
-			v.th.TestCasesParallel = unfocused
-			if len(focused) > 0 {
-				v.th.TestCasesParallel = focused
-				skippedTestCases[v] = append(skippedTestCases[v], unfocused...)
-			}
-
-			// split excluded from included
-			excluded, included := slices.SplitBy(v.th.TestCasesParallel, func(v *TestHarnessMethod, _ int) bool {
-				return v.isExcluded()
-			})
-			v.th.TestCasesParallel = included
 			if len(excluded) > 0 {
 				skippedTestCases[v] = append(skippedTestCases[v], excluded...)
 			}
@@ -118,7 +104,82 @@ type TestSuiteSpec struct {
 	n   ast.Node
 	ts  *ast.TypeSpec
 	typ *types.Struct
-	th  *TestHarness
+	th  *TestSuiteHarness
+}
+
+// Identifier returns the Types Name.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) PackageName() string {
+	return ts.pkg.Name
+}
+
+// Identifier returns the Types Name.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) Identifier() string {
+	return ts.ts.Name.Name
+}
+
+// FullIdentifier returns the Types Name plus it's package identifier with dot-notation.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) FullIdentifier() string {
+	if ts.IsTestPackageSuite() {
+		return ts.Identifier()
+	}
+	return ts.pkg.Name + "." + ts.Identifier()
+}
+
+// IsTestPackageSuite gives info about the test suites declarated package.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) IsTestPackageSuite() bool {
+	return strings.HasSuffix(ts.pkg.Name, "_test")
+}
+
+// BeforeAll returns the method pointer.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) BeforeAll() *TestSuiteMethod {
+	return ts.th.BeforeAll
+}
+
+// AfterAll returns the method pointer.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) AfterAll() *TestSuiteMethod {
+	return ts.th.AfterAll
+}
+
+// BeforeEach returns the method pointer.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) BeforeEach() *TestSuiteMethod {
+	return ts.th.BeforeEach
+}
+
+// AfterEach returns the method pointer.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) AfterEach() *TestSuiteMethod {
+	return ts.th.AfterEach
+}
+
+// TestCases returns the sequential test cases slice.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) TestCases() []*TestSuiteMethod {
+	return ts.th.TestCases
+}
+
+// HasParallelTestCases tests for parallel test cases.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) HasParallelTestCases() bool {
+	return slices.Any(ts.th.TestCases, func(v *TestSuiteMethod, idx int) bool {
+		return v.IsParallel()
+	})
 }
 
 func (ts *TestSuiteSpec) isFocused() bool {
@@ -129,27 +190,37 @@ func (ts *TestSuiteSpec) isExcluded() bool {
 	return strings.HasPrefix(ts.ts.Name.Name, "X_")
 }
 
-type TestHarness struct {
-	BeforeAll         *TestHarnessMethod
-	BeforeEach        *TestHarnessMethod
-	AfterAll          *TestHarnessMethod
-	AfterEach         *TestHarnessMethod
-	TestCases         []*TestHarnessMethod
-	TestCasesParallel []*TestHarnessMethod
+type TestSuiteHarness struct {
+	BeforeAll  *TestSuiteMethod
+	BeforeEach *TestSuiteMethod
+	AfterAll   *TestSuiteMethod
+	AfterEach  *TestSuiteMethod
+	TestCases  []*TestSuiteMethod
 }
 
-type TestHarnessMethod struct {
+type TestSuiteMethod struct {
 	n   ast.Node
 	m   *types.Func
 	sig *types.Signature
 }
 
-func (m *TestHarnessMethod) isFocused() bool {
+func (m *TestSuiteMethod) IsParallel() bool {
+	return IS_TEST_CASE_PARALLEL.MatchString(m.m.Name())
+}
+
+func (m *TestSuiteMethod) isFocused() bool {
 	return strings.HasPrefix(m.m.Name(), "F_")
 }
 
-func (m *TestHarnessMethod) isExcluded() bool {
+func (m *TestSuiteMethod) isExcluded() bool {
 	return strings.HasPrefix(m.m.Name(), "X_")
+}
+
+// Identifier returns the test methods identifier.
+//
+// FOR RENDERING
+func (m *TestSuiteMethod) Identifier() string {
+	return m.m.Name()
 }
 
 func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, token.Pos, error) {
@@ -178,10 +249,10 @@ func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, toke
 		return nil, -1, nil
 	}
 
-	return &TestSuiteSpec{pkg, n, ts, typ, &TestHarness{}}, -1, nil
+	return &TestSuiteSpec{pkg, n, ts, typ, &TestSuiteHarness{}}, -1, nil
 }
 
-func DetermineTestHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSpec) (token.Pos, error) {
+func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSpec) (token.Pos, error) {
 	decl, ok := n.(*ast.FuncDecl)
 	if !ok {
 		// we only care about method declarations
@@ -192,20 +263,18 @@ func DetermineTestHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSpec) (
 	}
 	m, ok := pkg.TypesInfo.ObjectOf(decl.Name).(*types.Func)
 	if !ok {
-		return decl.Name.Pos(), fmt.Errorf("no signature found for method %s", decl.Name)
+		return -1, nil
 	}
 	// methodID is a readable name, e.g. "MyTestSuite.BeforeAll" for improved debug output
 	methodID := s.ts.Name.Name + "." + m.Name()
-	if methodID == "MyTestSuite.TestSomethingSpecific" {
-		fmt.Printf("%s\n", methodID)
-	}
-	if ok, _ := IS_TEST_HARNESS_METHOD.MatchString(m.Name()); !ok {
+
+	if ok := IS_TEST_SUITE_METHOD.MatchString(m.Name()); !ok {
 		return -1, nil
 	}
 
 	sig, ok := pkg.TypesInfo.TypeOf(decl.Name).(*types.Signature)
 	if !ok {
-		return decl.Name.Pos(), fmt.Errorf("no signature found for method %s", decl.Name)
+		return -1, nil
 	}
 	recv := sig.Recv()
 	if recv == nil {
@@ -232,9 +301,9 @@ func DetermineTestHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSpec) (
 		return decl.Name.Pos(), nil // no receiver
 	}
 
-	tm := &TestHarnessMethod{n: n, m: m, sig: sig}
+	tm := &TestSuiteMethod{n: n, m: m, sig: sig}
 
-	isTestCase, _ := IS_TEST_CASE.MatchString(m.Name())
+	isTestCase := IS_TEST_CASE.MatchString(m.Name())
 	switch {
 	case IS_BEFORE_ALL.MatchString(m.Name()):
 		s.th.BeforeAll = tm
@@ -247,7 +316,7 @@ func DetermineTestHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSpec) (
 	case isTestCase:
 		// pass-through: these will be handled further down the line
 	default:
-		return decl.Name.Pos(), fmt.Errorf("detected unhandled test harness method %q", methodID)
+		return decl.Name.Pos(), fmt.Errorf("detected unhandled test suite method %q", methodID)
 	}
 
 	hasParamT := func(sig *types.Signature, idx int) error {
@@ -259,7 +328,7 @@ func DetermineTestHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSpec) (
 	}
 
 	if !isTestCase {
-		// assert harness methods correct params
+		// assert test suite methods use correct params
 		if sig.Params().Len() != 1 || sig.Results().Len() != 0 {
 			return m.Pos(), fmt.Errorf("unsupported signature for %q", methodID)
 		}
@@ -271,12 +340,7 @@ func DetermineTestHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSpec) (
 		return -1, nil
 	}
 
-	switch {
-	case IS_TEST_CASE_PARALLEL.MatchString(m.Name()):
-		s.th.TestCasesParallel = append(s.th.TestCasesParallel, tm)
-	default:
-		s.th.TestCases = append(s.th.TestCases, tm)
-	}
+	s.th.TestCases = append(s.th.TestCases, tm)
 
 	maxParams := 1
 

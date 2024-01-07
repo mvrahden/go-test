@@ -3,31 +3,85 @@
 package focussuite_test
 
 import (
-	"testing"
-
 	"github.com/mvrahden/go-test/examples/focus_suite"
+	"github.com/mvrahden/go-test/pkg/gotest"
+	"testing"
 )
 
-func Test_F_FocusedTestSuite(t *testing.T) {
-	_ = F_FocusedTestSuite{}
+type ƒƒ_GOTEST_focussuite_F_FocusedTestSuite struct {
+	focussuite.F_FocusedTestSuite
 }
 
-func Test__F_FocusedTestSuite(t *testing.T) {
-	_ = focussuite.F_FocusedTestSuite{}
+func (ts *ƒƒ_GOTEST_focussuite_F_FocusedTestSuite) BeforeAll(it *gotest.T)  {}
+func (ts *ƒƒ_GOTEST_focussuite_F_FocusedTestSuite) AfterAll(it *gotest.T)   {}
+func (ts *ƒƒ_GOTEST_focussuite_F_FocusedTestSuite) BeforeEach(it *gotest.T) {}
+func (ts *ƒƒ_GOTEST_focussuite_F_FocusedTestSuite) AfterEach(it *gotest.T)  {}
+
+func Test_focussuite_F_FocusedTestSuite(t *testing.T) {
+	s := &ƒƒ_GOTEST_focussuite_F_FocusedTestSuite{}
+
+	testCases := []gotest.TestCase{}
+
+	tt := gotest.NewT(t)
+	t.Cleanup(func() {
+		s.AfterAll(tt)
+	})
+	s.BeforeAll(tt)
+	for _, tc := range testCases {
+		tc(tt)
+	}
 }
 
-func Test_X_ExcludedTestSuite(t *testing.T) {
+type ƒƒ_GOTEST_F_FocusedTestSuite struct {
+	F_FocusedTestSuite
+}
+
+func (ts *ƒƒ_GOTEST_F_FocusedTestSuite) BeforeAll(it *gotest.T)  {}
+func (ts *ƒƒ_GOTEST_F_FocusedTestSuite) AfterAll(it *gotest.T)   {}
+func (ts *ƒƒ_GOTEST_F_FocusedTestSuite) BeforeEach(it *gotest.T) {}
+func (ts *ƒƒ_GOTEST_F_FocusedTestSuite) AfterEach(it *gotest.T)  {}
+
+func TestF_FocusedTestSuite(t *testing.T) {
+	s := &ƒƒ_GOTEST_F_FocusedTestSuite{}
+
+	newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
+		return func(tt *gotest.T) {
+			t := tt.T()
+			t.Run(desc, func(it *testing.T) {
+				ttt := gotest.NewT(it)
+				s.BeforeEach(ttt)
+				testFn(ttt)
+				s.AfterEach(ttt)
+			})
+		}
+	}
+
+	testCases := []gotest.TestCase{
+		newTestCase("TestSomething", s.TestSomething),
+	}
+
+	tt := gotest.NewT(t)
+	t.Cleanup(func() {
+		s.AfterAll(tt)
+	})
+	s.BeforeAll(tt)
+	for _, tc := range testCases {
+		tc(tt)
+	}
+}
+
+func Test_focussuite_X_ExcludedTestSuite(t *testing.T) {
 	t.Skipf("test suite was excluded by user")
 }
 
-func Test__X_ExcludedTestSuite(t *testing.T) {
+func Test_focussuite_NoopTestSuite(t *testing.T) {
 	t.Skipf("test suite was excluded by user")
 }
 
-func Test_NoopTestSuite(t *testing.T) {
+func TestNoopTestSuite(t *testing.T) {
 	t.Skipf("test suite was excluded by user")
 }
 
-func Test__NoopTestSuite(t *testing.T) {
+func TestX_ExcludedTestSuite(t *testing.T) {
 	t.Skipf("test suite was excluded by user")
 }
