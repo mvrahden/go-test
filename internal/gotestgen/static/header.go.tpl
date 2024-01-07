@@ -8,9 +8,8 @@ package {{ .PackageName }}
 {{- if .Imports -}}
 import (
 {{- range $i := .Imports }}
-	{{ if $i.Name }}{{ $i.Name }} {{ end }}{{ printf "%q" $i.Path }}
+  {{ if $i.Name }}{{ $i.Name }} {{ end }}{{ printf "%q" $i.Path }}
 {{- end }}
 )
 {{- end }}
-
 {{ end -}}

@@ -3,19 +3,19 @@
 package my_test
 
 import (
-	"fmt"
+	// "fmt"
 	"os"
 	"testing"
 
-	"github.com/mvrahden/go-test/cmd/gotestgen"
+	// "github.com/mvrahden/go-test/cmd/gotestgen"
 )
 
 func TestMain(m *testing.M) {
-	err := gotestgen.Generate() // auto-generate before running all tests
-	if err != nil {
-		fmt.Printf("failed generating test harness: %s\n", err)
-		os.Exit(1)
-	}
+	// err := gotestgen.Generate() // auto-generate before running all tests
+	// if err != nil {
+	// 	fmt.Printf("failed generating test harness: %s\n", err)
+	// 	os.Exit(1)
+	// }
 
 	os.Exit(m.Run())
 }

@@ -3,97 +3,182 @@
 package my_test
 
 import (
-	"strings"
-	"testing"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-	"github.com/stretchr/testify/require"
-
 	"github.com/mvrahden/go-test/examples/my"
+	"github.com/mvrahden/go-test/pkg/gotest"
+	"sync"
+	"testing"
 )
 
-func TestMyTestSuite(t *testing.T) {
-	s := my.MyTestSuite{}
-
-	tt := gotest.NewT(t)
-	type TestCaseRun struct {
-		Name  string
-		RunFn gotest.TestCase
-	}
-	newTestCaseRun := func(desc string, testFn gotest.TestCase) TestCaseRun {
-		return TestCaseRun{desc, func(it *gotest.T) {
-			s.BeforeEach(it)
-			testFn(it)
-			s.AfterEach(it)
-		}}
-	}
-	allSequentialTestCases := []TestCaseRun{
-		newTestCaseRun("TestSomethingSpecific", s.TestSomethingSpecific),
-		// newTestCaseRun("TestSomethingAny", s.TestSomethingAny),
-		// newTestCaseRun("TestSomethingB", s.TestSomethingB),
-		// newTestCaseRun("TestSomethingDuration", s.TestSomethingDuration),
-		// newTestCaseRun("TestSomethingFunction", s.TestSomethingFunction),
-		// newTestCaseRun("TestSomethingTime", s.TestSomethingTime),
-		newTestCaseRun("FTestSomethingSpecific", s.F_TestSomethingSpecific),
-		// newTestCaseRun("TestSomethingAsync", func(t *gotest.T) {
-		// 	wg := &sync.WaitGroup{}
-		// 	wg.Add(1)
-		// 	doneFn := func() {
-		// 		wg.Done()
-		// 	}
-		// 	s.TestSomethingAsync(t, doneFn)
-		// 	wg.Wait()
-		// }),
-	}
-
-	s.BeforeAll(tt)
-	for _, tc := range allSequentialTestCases {
-		t.Run(tc.Name, func(t *testing.T) {
-			tc.RunFn(tt)
-		})
-	}
-	s.AfterAll(tt)
-
-	var actualSequence string
-	for v := range s.ExecutedC {
-		actualSequence += v + ":"
-	}
-	require.GreaterOrEqual(t, len(actualSequence), 100)
-	require.True(t, strings.HasPrefix(actualSequence, "BeforeAll:"))
-	require.True(t, strings.HasSuffix(actualSequence, ":AfterAll:"))
-	require.Contains(t, actualSequence, "BeforeEach:TestSomethingAny:AfterEach")
-	require.Contains(t, actualSequence, "BeforeEach:TestSomethingB:AfterEach")
-	require.Contains(t, actualSequence, "BeforeEach:TestSomethingDuration:AfterEach")
-	require.Contains(t, actualSequence, "BeforeEach:TestSomethingFunction:AfterEach")
-	require.Contains(t, actualSequence, "BeforeEach:TestSomethingSpecific:AfterEach")
-	require.Contains(t, actualSequence, "BeforeEach:TestSomethingTime:AfterEach")
-	require.Contains(t, actualSequence, "BeforeEach:FTestSomethingSpecific:AfterEach")
-	require.NotContains(t, actualSequence, "XTestSomethingSpecific")
+type ƒƒ_GOTEST_my_MyNoopTestSuite struct {
+	my.MyNoopTestSuite
 }
 
-func TestMyParallelTestSuite(t *testing.T) {
-	s := my.MyTestSuite{}
+func (ts *ƒƒ_GOTEST_my_MyNoopTestSuite) BeforeAll(it *gotest.T)  {}
+func (ts *ƒƒ_GOTEST_my_MyNoopTestSuite) AfterAll(it *gotest.T)   {}
+func (ts *ƒƒ_GOTEST_my_MyNoopTestSuite) BeforeEach(it *gotest.T) {}
+func (ts *ƒƒ_GOTEST_my_MyNoopTestSuite) AfterEach(it *gotest.T)  {}
+
+func Test_my_MyNoopTestSuite(t *testing.T) {
+	s := &ƒƒ_GOTEST_my_MyNoopTestSuite{}
+
+	testCases := []gotest.TestCase{}
 
 	tt := gotest.NewT(t)
-	allSequentialTestCases := []gotest.TestCase{
-		s.TestParallelSomethingC,
-		s.TestParallelSomethingD,
-		s.TestParallelSomethingE,
-	}
+	t.Cleanup(func() {
+		s.AfterAll(tt)
+	})
 	s.BeforeAll(tt)
-	for _, tc := range allSequentialTestCases {
-		s.BeforeEach(tt)
+	for _, tc := range testCases {
 		tc(tt)
-		s.AfterEach(tt)
 	}
-	s.AfterAll(tt)
+}
 
-	var actualSequence string
-	for v := range s.ExecutedC {
-		actualSequence += v + ":"
+type ƒƒ_GOTEST_my_MyNoopParallelTestSuite struct {
+	my.MyNoopParallelTestSuite
+}
+
+func (ts *ƒƒ_GOTEST_my_MyNoopParallelTestSuite) BeforeAll(it *gotest.T)  {}
+func (ts *ƒƒ_GOTEST_my_MyNoopParallelTestSuite) AfterAll(it *gotest.T)   {}
+func (ts *ƒƒ_GOTEST_my_MyNoopParallelTestSuite) BeforeEach(it *gotest.T) {}
+func (ts *ƒƒ_GOTEST_my_MyNoopParallelTestSuite) AfterEach(it *gotest.T)  {}
+
+func Test_my_MyNoopParallelTestSuite(t *testing.T) {
+	s := &ƒƒ_GOTEST_my_MyNoopParallelTestSuite{}
+	t.Parallel()
+
+	testCases := []gotest.TestCase{}
+
+	tt := gotest.NewT(t)
+	t.Cleanup(func() {
+		s.AfterAll(tt)
+	})
+	s.BeforeAll(tt)
+	for _, tc := range testCases {
+		tc(tt)
 	}
-	require.GreaterOrEqual(t, len(actualSequence), 100)
-	require.Contains(t, actualSequence, "TestParallelSomethingC")
-	require.Contains(t, actualSequence, "TestParallelSomethingD")
-	require.Contains(t, actualSequence, "TestParallelSomethingE")
+}
+
+type ƒƒ_GOTEST_my_MyTestSuite struct {
+	my.MyTestSuite
+}
+
+func (ts *ƒƒ_GOTEST_my_MyTestSuite) BeforeAll(it *gotest.T)  { ts.MyTestSuite.BeforeAll(it) }
+func (ts *ƒƒ_GOTEST_my_MyTestSuite) AfterAll(it *gotest.T)   { ts.MyTestSuite.AfterAll(it) }
+func (ts *ƒƒ_GOTEST_my_MyTestSuite) BeforeEach(it *gotest.T) { ts.MyTestSuite.BeforeEach(it) }
+func (ts *ƒƒ_GOTEST_my_MyTestSuite) AfterEach(it *gotest.T)  { ts.MyTestSuite.AfterEach(it) }
+
+func Test_my_MyTestSuite(t *testing.T) {
+	s := &ƒƒ_GOTEST_my_MyTestSuite{}
+
+	newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
+		return func(tt *gotest.T) {
+			t := tt.T()
+			t.Run(desc, func(it *testing.T) {
+				ttt := gotest.NewT(it)
+				s.BeforeEach(ttt)
+				testFn(ttt)
+				s.AfterEach(ttt)
+			})
+		}
+	}
+	newParallelTestCase := func(desc string, wg *sync.WaitGroup, testFn gotest.TestCase) gotest.TestCase {
+		wg.Add(1)
+		return func(tt *gotest.T) {
+			t := tt.T()
+			t.Run(desc, func(it *testing.T) {
+				it.Parallel()
+				ttt := gotest.NewT(it)
+				s.BeforeEach(ttt)
+				testFn(ttt)
+				s.AfterEach(ttt)
+				wg.Done()
+			})
+		}
+	}
+	wg := &sync.WaitGroup{}
+
+	testCases := []gotest.TestCase{
+		newTestCase("F_TestSomethingSpecific", s.F_TestSomethingSpecific),
+		newParallelTestCase("F_TestParallelSomethingC", wg, s.F_TestParallelSomethingC),
+	}
+
+	tt := gotest.NewT(t)
+	t.Cleanup(func() {
+		wg.Wait()
+		s.AfterAll(tt)
+	})
+	s.BeforeAll(tt)
+	for _, tc := range testCases {
+		tc(tt)
+	}
+}
+
+type ƒƒ_GOTEST_MyNoopTestSuite struct {
+	MyNoopTestSuite
+}
+
+func (ts *ƒƒ_GOTEST_MyNoopTestSuite) BeforeAll(it *gotest.T)  {}
+func (ts *ƒƒ_GOTEST_MyNoopTestSuite) AfterAll(it *gotest.T)   {}
+func (ts *ƒƒ_GOTEST_MyNoopTestSuite) BeforeEach(it *gotest.T) {}
+func (ts *ƒƒ_GOTEST_MyNoopTestSuite) AfterEach(it *gotest.T)  {}
+
+func TestMyNoopTestSuite(t *testing.T) {
+	s := &ƒƒ_GOTEST_MyNoopTestSuite{}
+
+	testCases := []gotest.TestCase{}
+
+	tt := gotest.NewT(t)
+	t.Cleanup(func() {
+		s.AfterAll(tt)
+	})
+	s.BeforeAll(tt)
+	for _, tc := range testCases {
+		tc(tt)
+	}
+}
+
+type ƒƒ_GOTEST_MyTestSuite struct {
+	MyTestSuite
+}
+
+func (ts *ƒƒ_GOTEST_MyTestSuite) BeforeAll(it *gotest.T)  { ts.MyTestSuite.BeforeAll(it) }
+func (ts *ƒƒ_GOTEST_MyTestSuite) AfterAll(it *gotest.T)   { ts.MyTestSuite.AfterAll(it) }
+func (ts *ƒƒ_GOTEST_MyTestSuite) BeforeEach(it *gotest.T) { ts.MyTestSuite.BeforeEach(it) }
+func (ts *ƒƒ_GOTEST_MyTestSuite) AfterEach(it *gotest.T)  { ts.MyTestSuite.AfterEach(it) }
+
+func TestMyTestSuite(t *testing.T) {
+	s := &ƒƒ_GOTEST_MyTestSuite{}
+
+	newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
+		return func(tt *gotest.T) {
+			t := tt.T()
+			t.Run(desc, func(it *testing.T) {
+				ttt := gotest.NewT(it)
+				s.BeforeEach(ttt)
+				testFn(ttt)
+				s.AfterEach(ttt)
+			})
+		}
+	}
+
+	testCases := []gotest.TestCase{
+		newTestCase("F_TestSomethingSpecific", s.F_TestSomethingSpecific),
+	}
+
+	tt := gotest.NewT(t)
+	t.Cleanup(func() {
+		s.AfterAll(tt)
+	})
+	s.BeforeAll(tt)
+	for _, tc := range testCases {
+		tc(tt)
+	}
+}
+
+func Test_my_X_MySkippedTestSuite(t *testing.T) {
+	t.Skipf("test suite was excluded by user")
+}
+
+func TestX_MySkippedTestSuite(t *testing.T) {
+	t.Skipf("test suite was excluded by user")
 }
