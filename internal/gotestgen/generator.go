@@ -12,13 +12,12 @@ const (
 	packageEvalMode = packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo
 )
 
-func Generate() error {
-	srcs, err := generateFile(".")
+func Generate(targetPath string) ([]byte, error) {
+	srcs, err := generateFile(targetPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	fmt.Printf("sources: %s\n", srcs)
-	return nil
+	return srcs, nil
 }
 
 func loadPackages(targetPkg string) ([]*packages.Package, error) {
@@ -35,7 +34,7 @@ func loadPackages(targetPkg string) ([]*packages.Package, error) {
 		return strings.HasSuffix(item.ID, ".test]")
 	})
 	if len(p) == 0 {
-		return nil, fmt.Errorf("no tests or test package found")
+		return nil, fmt.Errorf("no test files found")
 	}
 	if len(p) > 2 {
 		return nil, fmt.Errorf("loaded unexpected amount of packages. want: n <= 2, got: %d", len(p))

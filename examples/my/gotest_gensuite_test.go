@@ -163,6 +163,7 @@ func TestMyTestSuite(t *testing.T) {
 
 	testCases := []gotest.TestCase{
 		newTestCase("F_TestSomethingSpecific", s.F_TestSomethingSpecific),
+		newTestCase("F_TestSomethingSpecificA", s.F_TestSomethingSpecificA),
 	}
 
 	tt := gotest.NewT(t)

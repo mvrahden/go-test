@@ -1,6 +1,8 @@
 package focussuite_test
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type NoopTestSuite struct{}
 type X_ExcludedTestSuite struct{}
