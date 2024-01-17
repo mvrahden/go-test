@@ -76,7 +76,6 @@ func (r *renderer) renderTestSuites(buf *bytes.Buffer, pkgs []*packages.Package,
 }
 
 func (renderer) formatOutput(buf *bytes.Buffer) ([]byte, error) {
-	fmt.Printf("%s\n", buf)
 	srcs, err := format.Source(buf.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("failed formatting the generated sources. err: %w", err)

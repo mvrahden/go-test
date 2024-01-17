@@ -34,7 +34,7 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Generate for package %q with %s", tC.directory, tC.description), func(t *testing.T) {
 			expected := getExpectedOutputFile(t, testdatadir, "gotest_gensuite_test.go")
-			buf, err := generateFile(pkg)
+			buf, err := Generate(pkg)
 			require.NoError(t, err)
 			require.Equal(t, expected, string(buf))
 		})

@@ -30,7 +30,7 @@ func (s *MyTestSuite) F_TestSomethingSpecific(t *gotest.T) {
 	s.ExecutedC <- "FTestSomethingSpecific"
 } // focus
 
-func (s *MyTestSuite) TestSomethingSpecific(t *gotest.T) {
+func (s *MyTestSuite) F_TestSomethingSpecificA(t *gotest.T) {
 	s.ExecutedC <- "TestSomethingSpecific"
 }
 
