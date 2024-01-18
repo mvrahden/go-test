@@ -1,4 +1,4 @@
-package gotestgen
+package main
 
 import (
 	"bytes"

@@ -1,4 +1,4 @@
-package gotestgen_test
+package main_test
 
 import (
 	"fmt"
@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mvrahden/go-test/cmd/gotestgen"
+	testgen "github.com/mvrahden/go-test/cmd/testgen"
 	"github.com/stretchr/testify/require"
 )
 
 func TestE2E_CLI(t *testing.T) {
-	gotestgen.PatchDeleteOldGeneratedFileFunc(t)
+	testgen.PatchDeleteOldGeneratedFileFunc(t)
 
 	testcases := []struct {
 		desc                   string
@@ -27,13 +27,13 @@ func TestE2E_CLI(t *testing.T) {
 		t.Run(fmt.Sprintf("Generate (idx: %d %q)", idx, tC.desc), func(t *testing.T) {
 
 			tmpDir := t.TempDir()
-			gotestgen.PatchTargetFilenameFunc(t, tmpDir)
+			testgen.PatchTargetFilenameFunc(t, tmpDir)
 			tmpFile := filepath.Join(tmpDir, tC.expectedOutputFilename)
 
 			args := []string{
 				"-dir=" + filepath.Join("testdata", tC.dirName)}
 			args = append(args, tC.args...)
-			err := gotestgen.Execute(args)
+			err := testgen.Execute(args)
 			require.NoError(t, err)
 			require.FileExists(t, tmpFile)
 
@@ -58,7 +58,7 @@ func TestE2E_Errors(t *testing.T) {
 	}
 	for _, tC := range testcases {
 		t.Run(tC.desc, func(t *testing.T) {
-			err := gotestgen.Execute(tC.args)
+			err := testgen.Execute(tC.args)
 			require.ErrorContains(t, err, tC.msg)
 		})
 	}
