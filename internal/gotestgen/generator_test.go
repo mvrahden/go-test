@@ -24,18 +24,20 @@ const (
 func TestGeneratorGoldenExamples(t *testing.T) {
 	for _, tC := range []struct {
 		directory   string
+		pkgName     string
 		description string
 	}{
-		{"my", "standard test suites"},
-		{"focus_suite", "focus test suites"},
+		{"my", "my", "standard test suites"},
+		{"focus_suite", "focussuite", "focus test suites"},
 	} {
 		pkg := path.Join(packageBase, "examples", tC.directory)
 		testdatadir := filepath.Join("..", "..", "examples", tC.directory)
 
 		t.Run(fmt.Sprintf("Generate for package %q with %s", tC.directory, tC.description), func(t *testing.T) {
 			expected := getExpectedOutputFile(t, testdatadir, "gotest_gensuite_test.go")
-			buf, err := Generate(pkg)
+			pkgName, buf, err := Generate(pkg)
 			require.NoError(t, err)
+			require.Equal(t, tC.pkgName, pkgName)
 			require.Equal(t, expected, string(buf))
 		})
 	}

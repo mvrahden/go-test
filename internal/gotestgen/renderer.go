@@ -49,6 +49,7 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkgs []*packages.Package,
 		Imports     []Import
 	}
 	imports := []Import{
+		{Path: "os"},
 		{Path: "testing"},
 		{Path: about.Repo + "/pkg/gotest"},
 		{Path: strings.TrimSuffix(pkgs[0].PkgPath, "_test")},

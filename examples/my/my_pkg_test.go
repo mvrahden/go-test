@@ -4,7 +4,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-//go:generate github.com/mvrahden/go-test/cmd/testgen -skip-autogen
+//go:generate go run github.com/mvrahden/go-test/cmd/testgen -skip-autogen
 
 type X_MySkippedTestSuite struct{}
 type MyNoopTestSuite struct{}
@@ -22,15 +22,15 @@ func (s *MyTestSuite) BeforeEach(t *gotest.T) {
 	s.ExecutedC <- "BeforeEach"
 }
 
-func (s *MyTestSuite) X_TestSomethingSpecific(t *gotest.T) {
+func (s *MyTestSuite) F_TestSomethingSpecific(t *gotest.T) {
 	s.ExecutedC <- "XTestSomethingSpecific"
 } // skip
 
-func (s *MyTestSuite) F_TestSomethingSpecific(t *gotest.T) {
+func (s *MyTestSuite) TestSomethingSpecific(t *gotest.T) {
 	s.ExecutedC <- "FTestSomethingSpecific"
 } // focus
 
-func (s *MyTestSuite) F_TestSomethingSpecificA(t *gotest.T) {
+func (s *MyTestSuite) TestSomethingSpecificA(t *gotest.T) {
 	s.ExecutedC <- "TestSomethingSpecific"
 }
 
@@ -57,9 +57,9 @@ func (s *MyTestSuite) F_TestSomethingSpecificA(t *gotest.T) {
 // 	}()
 // }
 
-// func (s *MyTestSuite) TestSomethingB(t *gotest.T) {
-// 	s.ExecutedC <- "TestSomethingB"
-// }
+func (s *MyTestSuite) TestSomethingB(t *gotest.T) {
+	s.ExecutedC <- "TestSomethingB"
+}
 
 func (s *MyTestSuite) TestParallelSomethingC(t *gotest.T) {
 	s.ExecutedC <- "TestParallelSomethingC"

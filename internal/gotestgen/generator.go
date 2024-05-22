@@ -12,12 +12,12 @@ const (
 	packageEvalMode = packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo
 )
 
-func Generate(targetPath string) ([]byte, error) {
-	srcs, err := generateFile(targetPath)
+func Generate(targetPath string) (string, []byte, error) {
+	pkgName, srcs, err := generateFile(targetPath)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	return srcs, nil
+	return pkgName, srcs, nil
 }
 
 func loadPackages(targetPkg string) ([]*packages.Package, error) {
@@ -42,26 +42,26 @@ func loadPackages(targetPkg string) ([]*packages.Package, error) {
 	return p, nil
 }
 
-func generateFile(targetPkg string) ([]byte, error) {
+func generateFile(targetPkg string) (string, []byte, error) {
 	pkgs, err := loadPackages(targetPkg)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkgs)
 	if len(result.Errs) > 0 {
-		return nil, result.Errs[0].Err
+		return "", nil, result.Errs[0].Err
 	}
 
 	out, err := c.ApplyGoTestSpecs(result.Suites)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	r := renderer{}
 	buf, err := r.RenderGoTestSpec(pkgs, out)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	return buf, nil
+	return strings.TrimSuffix(pkgs[0].Name, "_test"), buf, nil
 }
