@@ -17,42 +17,31 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestgen"
 )
 
-func Execute(args []string) error {
-	var scanPath, outputFile string // TODO: parse from args
-	var keepFile, skipAutogen bool
-	err := parseFlags(args, &scanPath, &outputFile, &skipAutogen, &keepFile)
+func Execute(args []string) ([]byte, error) {
+	var scanPath string // TODO: parse from args
+	err := parseFlags(args, &scanPath)
 	if err != nil {
-		return fmt.Errorf("failed parsing flags. err: %w", err)
+		return nil, fmt.Errorf("failed parsing flags. err: %w", err)
 	}
 
 	targetDir := getTargetDir(scanPath)
 
 	err = findAndDeleteOldGeneratedFile(targetDir)
 	if os.IsNotExist(err) {
-		return fmt.Errorf("failed generating code. err: no such directory %q", targetDir)
+		return nil, fmt.Errorf("failed generating code. err: no such directory %q", targetDir)
 	}
 	if err != nil {
-		return fmt.Errorf("failed inspecting directory %q. err: %w", targetDir, err)
+		return nil, fmt.Errorf("failed inspecting directory %q. err: %w", targetDir, err)
 	}
 
-	pkgName, srcs, err := gotestgen.Generate(targetDir)
+	_, srcs, err := gotestgen.Generate(targetDir)
 	if err != nil {
-		return fmt.Errorf("failed generating code. err: %w", err)
+		return nil, fmt.Errorf("failed generating code. err: %w", err)
 	}
 	if len(srcs) == 0 {
-		return fmt.Errorf("failed generating code: no sources to generate\n")
+		return nil, fmt.Errorf("failed generating code: no sources to generate\n")
 	}
-
-	filePath := targetFilename(targetDir, outputFile)
-	err = os.WriteFile(filePath, srcs, os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("failed writing %q. err: %w", filePath, err)
-	}
-	if skipAutogen {
-		return nil
-	}
-	// generate auto-gen
-	return generateAutogen(targetDir, pkgName)
+	return srcs, nil
 }
 
 //go:embed static
@@ -62,22 +51,17 @@ var (
 	autogenTpl = template.Must(template.New("autogen").ParseFS(templates, "static/autogen.*"))
 )
 
-var generateAutogen = func(targetDir, pkgName string) error {
-	buf := bytes.NewBuffer(nil)
+var generateAutogen = func(pkgName string) ([]byte, error) {
+	buf := bytes.NewBufferString("")
 	err := autogenTpl.ExecuteTemplate(buf, "autogen.go.tpl", map[string]any{
 		"RepoName":    about.ShortInfo(),
 		"PackageName": pkgName,
 	})
 	if err != nil {
-		return fmt.Errorf("failed templating autogen file. err: %w", err)
+		return nil, fmt.Errorf("failed templating autogen file. err: %w", err)
 	}
 
-	filePath := targetFilename(targetDir, "gotest_autogen_test.go")
-	err = os.WriteFile(filePath, buf.Bytes(), os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("failed writing %q. err: %w", filePath, err)
-	}
-	return nil
+	return buf.Bytes(), nil
 }
 
 var targetFilename = func(dir, filename string) string {
@@ -87,14 +71,11 @@ var targetFilename = func(dir, filename string) string {
 	return filepath.Join(dir, filename)
 }
 
-func parseFlags(args []string, scanPath, outputFile *string, skipAutogen, keepFile *bool) error {
+func parseFlags(args []string, scanPath *string) error {
 	// setup flags
 	flags := flag.NewFlagSet("", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
-	flags.StringVar(outputFile, "out", "gotest_gensuite_test", "the filename of the generated file; defaults to \"gotest_gensuite_test.go\".")
 	flags.StringVar(scanPath, "dir", "", "directory of target package; defaults to CWD.")
-	flags.BoolVar(skipAutogen, "skip-autogen", false, "for testing purposes: prevents deleting existing testsuite file; defaults to `false`.")
-	flags.BoolVar(keepFile, "test.keepfile", false, "for testing purposes: prevents deleting existing testsuite file; defaults to `false`.")
 	return flags.Parse(args)
 }
 
