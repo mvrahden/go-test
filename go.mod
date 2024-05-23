@@ -1,8 +1,8 @@
 module github.com/mvrahden/go-test
 
-go 1.21
+go 1.22
 
-toolchain go1.21.0
+toolchain go1.22.3
 
 require (
 	github.com/dlclark/regexp2 v1.10.0

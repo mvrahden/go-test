@@ -1,15 +1,17 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"os"
 
 	"github.com/mvrahden/go-test/internal/cmd/testgen"
 )
 
 func main() {
-	err := testgen.Execute(os.Args[1:])
+	data, err := testgen.Execute(os.Args[1:])
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprint(os.Stderr, err)
+		os.Exit(2)
 	}
+	fmt.Fprint(os.Stdout, string(data))
 }
