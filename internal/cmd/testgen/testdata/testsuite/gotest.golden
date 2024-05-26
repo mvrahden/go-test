@@ -5,7 +5,6 @@ package e2epkg_test
 import (
 	"github.com/mvrahden/go-test/internal/cmd/testgen/testdata/testsuite"
 	"github.com/mvrahden/go-test/pkg/gotest"
-	"os"
 	"testing"
 )
 
@@ -18,13 +17,7 @@ func (ts *ƒƒ_GOTEST_e2epkg_MyE2ETestSuite) AfterAll(it *gotest.T)   {}
 func (ts *ƒƒ_GOTEST_e2epkg_MyE2ETestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_e2epkg_MyE2ETestSuite) AfterEach(it *gotest.T)  {}
 
-func Test_e2epkg_MyE2ETestSuite(t *testing.T) {
-	t.Cleanup(func() {
-		err := os.Remove("./gotest_gensuite_test.go")
-		if err != nil {
-			t.Logf("failed removing test suite: %s", err.Error())
-		}
-	})
+func Test_MyE2ETestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_e2epkg_MyE2ETestSuite{}
 
 	newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {

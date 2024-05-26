@@ -1,0 +1,21 @@
+package gotest_test
+
+import (
+	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+func Test_HelloWorld(t *testing.T) {
+	t.Errorf("failed for reasons")
+}
+
+type TTestSuite struct{}
+
+func (s *TTestSuite) BeforeAll(t *gotest.T) {}
+
+func (s *TTestSuite) TestT(t *gotest.T) {
+	t.It("should perform the test case", func(it *gotest.T) {
+		it.T().Errorf("failed for reasons")
+	})
+}

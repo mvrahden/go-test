@@ -10,15 +10,7 @@ func (ts *ƒƒ_GOTEST_{{ if not $ts.IsTestPackageSuite }}{{ $ts.PackageName }}_{
 func (ts *ƒƒ_GOTEST_{{ if not $ts.IsTestPackageSuite }}{{ $ts.PackageName }}_{{ end -}}{{ $ts.Identifier }}) BeforeEach(it *gotest.T) { {{ if $ts.BeforeEach -}} ts.{{ $ts.Identifier }}.BeforeEach(it) {{ end }}}
 func (ts *ƒƒ_GOTEST_{{ if not $ts.IsTestPackageSuite }}{{ $ts.PackageName }}_{{ end -}}{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.AfterEach -}} ts.{{ $ts.Identifier }}.AfterEach(it) {{ end }}}
 
-func Test{{ if not $ts.IsTestPackageSuite }}_{{ $ts.PackageName }}_{{ end -}}{{ $ts.Identifier }}(t *testing.T) {
-  {{ if (eq $i 0) -}}
-  t.Cleanup(func() {
-    err := os.Remove("./gotest_gensuite_test.go")
-    if err != nil {
-      t.Logf("failed removing test suite: %s", err.Error())
-    }
-  })
-  {{ end -}}
+func Test{{ if not $ts.IsTestPackageSuite }}_{{ end -}}{{ $ts.Identifier }}(t *testing.T) {
   s := &ƒƒ_GOTEST_{{- if not $ts.IsTestPackageSuite -}}{{ $ts.PackageName }}_{{- end -}}{{ $ts.Identifier }}{}
 {{- if (hasSuffix $ts.FullIdentifier "ParallelTestSuite") }}
   t.Parallel()
