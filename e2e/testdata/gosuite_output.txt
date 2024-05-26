@@ -1,0 +1,8 @@
+executing go test at <REPLACED>/examples/gosuite github.com/mvrahden/go-test/examples/gosuite
+--- FAIL: Test_UnitTestSuite (<TIMESTAMP>)
+    --- FAIL: Test_UnitTestSuite/TestUnitFails (<TIMESTAMP>)
+FAIL
+FAIL	github.com/mvrahden/go-test/examples/gosuite	<TIMESTAMP>
+FAIL
+
+exit status 1

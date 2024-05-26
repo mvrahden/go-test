@@ -1,0 +1,12 @@
+executing go test at <REPLACED>/pkg/gotest github.com/mvrahden/go-test/pkg/gotest
+--- FAIL: Test_HelloWorld (<TIMESTAMP>)
+    t_test.go:10: failed for reasons
+--- FAIL: TestTTestSuite (<TIMESTAMP>)
+    --- FAIL: TestTTestSuite/TestT (<TIMESTAMP>)
+        --- FAIL: TestTTestSuite/TestT/should_perform_the_test_case (<TIMESTAMP>)
+            t_test.go:19: failed for reasons
+FAIL
+FAIL	github.com/mvrahden/go-test/pkg/gotest	<TIMESTAMP>
+FAIL
+
+exit status 1
