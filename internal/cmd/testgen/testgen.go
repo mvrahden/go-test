@@ -17,31 +17,37 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestgen"
 )
 
-func Execute(args []string) ([]byte, error) {
+type Args struct {
+	AbsPath string
+	Package string
+}
+
+func Execute(args []string) (_ Args, data []byte, _ error) {
 	var scanPath string // TODO: parse from args
 	err := parseFlags(args, &scanPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed parsing flags. err: %w", err)
+		return Args{}, nil, fmt.Errorf("failed parsing flags. err: %w", err)
 	}
 
-	targetDir := getTargetDir(scanPath)
+	scanDir := getTargetDir(scanPath)
 
-	err = findAndDeleteOldGeneratedFile(targetDir)
+	err = findAndDeleteOldGeneratedFile(scanDir)
 	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("failed generating code. err: no such directory %q", targetDir)
+		return Args{}, nil, fmt.Errorf("failed generating code. err: no such directory %q", scanDir)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed inspecting directory %q. err: %w", targetDir, err)
+		return Args{}, nil, fmt.Errorf("failed inspecting directory %q. err: %w", scanDir, err)
 	}
 
-	_, srcs, err := gotestgen.Generate(targetDir)
+	pkgName, srcs, err := gotestgen.Generate(scanDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed generating code. err: %w", err)
+		return Args{}, nil, fmt.Errorf("failed generating code. err: %w", err)
 	}
 	if len(srcs) == 0 {
-		return nil, fmt.Errorf("failed generating code: no sources to generate\n")
+		return Args{}, nil, fmt.Errorf("failed generating code: no sources to generate\n")
 	}
-	return srcs, nil
+
+	return Args{AbsPath: scanDir, Package: pkgName}, srcs, nil
 }
 
 //go:embed static
@@ -81,12 +87,13 @@ func parseFlags(args []string, scanPath *string) error {
 
 func getTargetDir(scanPath string) string {
 	targetDir, _ := os.Getwd() // hint: fallback value
-	if len(scanPath) > 0 {
-		if filepath.IsAbs(scanPath) {
-			targetDir = filepath.Clean(scanPath)
-		} else {
-			targetDir = filepath.Join(targetDir, scanPath)
-		}
+	if len(scanPath) == 0 {
+		return targetDir
+	}
+	if filepath.IsAbs(scanPath) {
+		targetDir = filepath.Clean(scanPath)
+	} else {
+		targetDir = filepath.Join(targetDir, scanPath)
 	}
 	return targetDir
 }

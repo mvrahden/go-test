@@ -21,7 +21,7 @@ func Generate(targetPath string) (string, []byte, error) {
 }
 
 func loadPackages(targetPkg string) ([]*packages.Package, error) {
-	p, err := packages.Load(&packages.Config{
+	totalFoundPkgs, err := packages.Load(&packages.Config{
 		Mode:  packageEvalMode,
 		Tests: true,
 	}, targetPkg)
@@ -30,16 +30,16 @@ func loadPackages(targetPkg string) ([]*packages.Package, error) {
 	}
 
 	// filter all test-related packages
-	p = slices.Filter(p, func(item *packages.Package, index int) bool {
+	testPkgs := slices.Filter(totalFoundPkgs, func(item *packages.Package, index int) bool {
 		return strings.HasSuffix(item.ID, ".test]")
 	})
-	if len(p) == 0 {
+	if len(testPkgs) == 0 {
 		return nil, fmt.Errorf("no test files found")
 	}
-	if len(p) > 2 {
-		return nil, fmt.Errorf("loaded unexpected amount of packages. want: n <= 2, got: %d", len(p))
+	if len(testPkgs) > 2 {
+		return nil, fmt.Errorf("loaded unexpected amount of packages. want: n <= 2, got: %d", len(testPkgs))
 	}
-	return p, nil
+	return testPkgs, nil
 }
 
 func generateFile(targetPkg string) (string, []byte, error) {
@@ -63,5 +63,5 @@ func generateFile(targetPkg string) (string, []byte, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	return strings.TrimSuffix(pkgs[0].Name, "_test"), buf, nil
+	return strings.TrimSuffix(pkgs[0].PkgPath, "_test"), buf, nil
 }

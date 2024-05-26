@@ -30,7 +30,7 @@ func TestE2E_CLI(t *testing.T) {
 			args := []string{
 				"-dir=" + filepath.Join("testdata", tC.dirName)}
 			args = append(args, tC.args...)
-			actual, err := testgen.Execute(args)
+			_, actual, err := testgen.Execute(args)
 			require.NoError(t, err)
 
 			// Assert generate suite
@@ -53,7 +53,7 @@ func TestE2E_Errors(t *testing.T) {
 	}
 	for _, tC := range testcases {
 		t.Run(tC.desc, func(t *testing.T) {
-			data, err := testgen.Execute(tC.args)
+			_, data, err := testgen.Execute(tC.args)
 			require.ErrorContains(t, err, tC.msg)
 			require.Zero(t, data)
 		})

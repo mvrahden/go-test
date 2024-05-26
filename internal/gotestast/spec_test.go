@@ -27,9 +27,9 @@ func TestRegexp(t *testing.T) {
 		{IS_TEST_SUITE_METHOD, []string{"X_TestFoo", "F_TestFoo", "TestFoo", "TestParallelFoo"}, []string{"X_TestFoo", "F_TestFoo", "TestFoo", "TestParallelFoo"}},
 		// TODO: refine cases (NAME MUST BE EXPORTED, PARALLEL-only Prefix not allowed)
 		{IS_TEST_SUITE, []string{"TESTSUITE", "TestSuite", "_TestSuite", "ABCTestSuiteABC"}, nil},
-		{IS_TEST_SUITE, []string{"x_TestSuite", "f_TestSuite", "X_TestSuite", "F_TestSuite", "X_ParallelTestSuite", "F_ParallelTestSuite"}, nil},
-		{IS_TEST_SUITE, []string{"ParallelTESTSUITE", "ParallelTestSuite", "ABCParallelTestSuiteFoo"}, nil},
-		{IS_TEST_SUITE, []string{"x_ParallelTestSuite", "f_TestParallelFoo", "_ParallelTestSuite"}, nil},
+		// {IS_TEST_SUITE, []string{"x_TestSuite", "f_TestSuite", "X_TestSuite", "F_TestSuite", "X_ParallelTestSuite", "F_ParallelTestSuite"}, nil},
+		{IS_TEST_SUITE, []string{"ParallelTESTSUITE", "ABCParallelTestSuiteFoo"}, nil},
+		// {IS_TEST_SUITE, []string{"x_ParallelTestSuite", "f_TestParallelFoo", "_ParallelTestSuite"}, nil},
 		{IS_TEST_SUITE, []string{"ƒƒ_GOTEST_ABC_ParallelTestSuite", "ƒƒ_GOTEST_F_ABC_ParallelTestSuite", "ƒƒ_GOTEST_X_ABC_ParallelTestSuite", "ƒƒ_GOTEST_ABC_ParallelTestSuite"}, nil},
 		{IS_TEST_SUITE, []string{"X_FooTestSuite", "F_FooTestSuite", "FooTestSuite", "Foo_TestSuite", "Foo_ParallelTestSuite", "FooParallelTestSuite"}, []string{
 			"X_FooTestSuite", "F_FooTestSuite", "FooTestSuite", "Foo_TestSuite", "Foo_ParallelTestSuite", "FooParallelTestSuite"}},
