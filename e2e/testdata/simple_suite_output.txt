@@ -1,0 +1,12 @@
+=== RUN   Test_SimpleTestSuite
+=== RUN   Test_SimpleTestSuite/TestSucceeds
+=== RUN   Test_SimpleTestSuite/TestFails
+    suite_test.go:34: assertion failed: got: "+ 1 line\n+ 1 line\n"
+--- FAIL: Test_SimpleTestSuite (<TIMESTAMP>)
+    --- PASS: Test_SimpleTestSuite/TestSucceeds (<TIMESTAMP>)
+    --- FAIL: Test_SimpleTestSuite/TestFails (<TIMESTAMP>)
+FAIL
+FAIL	github.com/mvrahden/go-test/examples/simple_suite	<TIMESTAMP>
+FAIL
+
+exit status 1

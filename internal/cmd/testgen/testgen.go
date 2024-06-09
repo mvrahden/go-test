@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -17,14 +18,19 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestgen"
 )
 
+// DEBUG is a hook to help debug generated code
+var DEBUG bool
+
 type Args struct {
-	AbsPath string
-	Package string
+	AbsPath        string
+	Package        string
+	SkipAutoDelete bool // internal feature to skip deletion of test suite file
+	Args           []string
 }
 
 func Execute(args []string) (_ Args, data []byte, _ error) {
 	var scanPath string // TODO: parse from args
-	err := parseFlags(args, &scanPath)
+	args, err := parseFlags(args, &scanPath)
 	if err != nil {
 		return Args{}, nil, fmt.Errorf("failed parsing flags. err: %w", err)
 	}
@@ -47,7 +53,7 @@ func Execute(args []string) (_ Args, data []byte, _ error) {
 		return Args{}, nil, fmt.Errorf("failed generating code: no sources to generate\n")
 	}
 
-	return Args{AbsPath: scanDir, Package: pkgName}, srcs, nil
+	return Args{AbsPath: scanDir, Package: pkgName, SkipAutoDelete: DEBUG, Args: args}, srcs, nil
 }
 
 //go:embed static
@@ -77,12 +83,31 @@ var targetFilename = func(dir, filename string) string {
 	return filepath.Join(dir, filename)
 }
 
-func parseFlags(args []string, scanPath *string) error {
+func parseFlags(args []string, scanPath *string) ([]string, error) {
+	DEBUG = slices.Contains(args, "-internal.debug")
+	if DEBUG {
+		args = slices.DeleteFunc(args, func(v string) bool {
+			return v == "-internal.debug"
+		})
+	}
 	// setup flags
 	flags := flag.NewFlagSet("", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	flags.StringVar(scanPath, "dir", "", "directory of target package; defaults to CWD.")
-	return flags.Parse(args)
+	err := flags.Parse(args)
+	if err != nil {
+		return nil, err
+	}
+	// return non-args
+	var nargs []string
+	for idx, v := range flags.Args() {
+		if idx == 0 {
+			continue
+		}
+		nargs = append(nargs, v)
+	}
+
+	return nargs, nil
 }
 
 func getTargetDir(scanPath string) string {
