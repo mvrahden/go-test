@@ -19,6 +19,9 @@ func main() {
 	os.WriteFile(testsuiteFile, data, os.ModePerm)
 	// fmt.Println("executing go test at", args.AbsPath, args.Package)
 	cmd := exec.Command("go", "test", "-count", "1", args.AbsPath)
+	if len(args.Args) > 0 {
+		cmd.Args = append(cmd.Args, args.Args...)
+	}
 	out, _ := cmd.CombinedOutput()
 	switch cmd.ProcessState.ExitCode() {
 	case 0:
@@ -26,6 +29,8 @@ func main() {
 	default:
 		fmt.Fprintln(os.Stderr, string(out))
 	}
-	os.Remove(testsuiteFile)
+	if !args.SkipAutoDelete {
+		os.Remove(testsuiteFile)
+	}
 	os.Exit(cmd.ProcessState.ExitCode())
 }
