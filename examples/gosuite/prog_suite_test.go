@@ -4,13 +4,22 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-type UnitTestSuite struct{}
+type UnitTestSuite struct {
+	sut *Unit
+}
 
-func (s *UnitTestSuite) BeforeAll(t *gotest.T)  {}
-func (s *UnitTestSuite) BeforeEach(t *gotest.T) {}
+func (s *UnitTestSuite) BeforeAll(t *gotest.T) {
+	t.T().Logf("BeforeAll")
+}
+func (s *UnitTestSuite) BeforeEach(t *gotest.T) {
+	t.T().Logf("BeforeEach")
+	s.sut = NewUnit()
+}
 
-// func (s *UnitTestSuite) fTestSomethingSpecific(t *gotest.T)      {} // focus
 func (s *UnitTestSuite) xTestUnit(t *gotest.T) {} // skip
-func (s *UnitTestSuite) TestUnitFails(t *gotest.T) {
+func (s *UnitTestSuite) TestUnitSuccess(t *gotest.T) {
+	t.T().Logf("TestUnitSuccess")
+}
+func (s *UnitTestSuite) F_TestUnitFails(t *gotest.T) {
 	t.T().Fail()
 }
