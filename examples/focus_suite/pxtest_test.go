@@ -12,7 +12,5 @@ type F_FocusedTestSuite struct{}
 
 func (ts *F_FocusedTestSuite) TestSomething(t *gotest.T) {}
 
-//go:embed my.go
+//go:embed main.go
 var a []byte
-
-//go:testgen echo "hello world"
