@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	_, data, err := testgen.Execute(os.Args[1:])
+	_, data, _, err := testgen.Execute(os.Args[1:])
 	if err != nil {
 		fmt.Fprint(os.Stderr, err)
 		os.Exit(2)

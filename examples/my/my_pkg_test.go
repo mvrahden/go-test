@@ -1,6 +1,7 @@
 package my_test
 
 import (
+	"github.com/mvrahden/go-test/examples/my"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -58,6 +59,7 @@ func (s *MyTestSuite) TestSomethingSpecificA(t *gotest.T) {
 // }
 
 func (s *MyTestSuite) TestSomethingB(t *gotest.T) {
+	my.Exported()
 	s.ExecutedC <- "TestSomethingB"
 }
 

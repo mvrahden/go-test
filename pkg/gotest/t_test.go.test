@@ -6,7 +6,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-func Test_HelloWorld(t *testing.T) {
+func Test_Stdlib_HelloWorld(t *testing.T) {
 	t.Errorf("failed for reasons")
 }
 

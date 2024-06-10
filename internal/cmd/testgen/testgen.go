@@ -2,7 +2,6 @@ package testgen
 
 import (
 	"bytes"
-	"embed"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,9 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"text/template"
 
-	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 )
@@ -28,52 +25,32 @@ type Args struct {
 	Args           []string
 }
 
-func Execute(args []string) (_ Args, data []byte, _ error) {
+func Execute(args []string) (_ Args, ptest, pxtest []byte, _ error) {
 	var scanPath string // TODO: parse from args
 	args, err := parseFlags(args, &scanPath)
 	if err != nil {
-		return Args{}, nil, fmt.Errorf("failed parsing flags. err: %w", err)
+		return Args{}, nil, nil, fmt.Errorf("failed parsing flags. err: %w", err)
 	}
 
 	scanDir := getTargetDir(scanPath)
 
 	err = findAndDeleteOldGeneratedFile(scanDir)
 	if os.IsNotExist(err) {
-		return Args{}, nil, fmt.Errorf("failed generating code. err: no such directory %q", scanDir)
+		return Args{}, nil, nil, fmt.Errorf("failed generating code. err: no such directory %q", scanDir)
 	}
 	if err != nil {
-		return Args{}, nil, fmt.Errorf("failed inspecting directory %q. err: %w", scanDir, err)
+		return Args{}, nil, nil, fmt.Errorf("failed inspecting directory %q. err: %w", scanDir, err)
 	}
 
-	pkgName, srcs, err := gotestgen.Generate(scanDir)
+	pkgName, ptestSrcs, pxtestSrcs, err := gotestgen.Generate(scanDir)
 	if err != nil {
-		return Args{}, nil, fmt.Errorf("failed generating code. err: %w", err)
+		return Args{}, nil, nil, fmt.Errorf("failed generating code. err: %w", err)
 	}
-	if len(srcs) == 0 {
-		return Args{}, nil, fmt.Errorf("failed generating code: no sources to generate\n")
-	}
-
-	return Args{AbsPath: scanDir, Package: pkgName, SkipAutoDelete: DEBUG, Args: args}, srcs, nil
-}
-
-//go:embed static
-var templates embed.FS
-
-var (
-	autogenTpl = template.Must(template.New("autogen").ParseFS(templates, "static/autogen.*"))
-)
-
-var generateAutogen = func(pkgName string) ([]byte, error) {
-	buf := bytes.NewBufferString("")
-	err := autogenTpl.ExecuteTemplate(buf, "autogen.go.tpl", map[string]any{
-		"RepoName":    about.ShortInfo(),
-		"PackageName": pkgName,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed templating autogen file. err: %w", err)
+	if len(ptestSrcs)+len(pxtestSrcs) == 0 {
+		return Args{}, nil, nil, fmt.Errorf("failed generating code: no sources to generate\n")
 	}
 
-	return buf.Bytes(), nil
+	return Args{AbsPath: scanDir, Package: pkgName, SkipAutoDelete: DEBUG, Args: args}, ptestSrcs, pxtestSrcs, nil
 }
 
 var targetFilename = func(dir, filename string) string {

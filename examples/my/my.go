@@ -1,5 +1,9 @@
 package my
 
-func ABC() bool {
+func Exported() bool {
+	return true
+}
+
+func unexported() bool {
 	return true
 }
