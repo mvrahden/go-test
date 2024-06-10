@@ -2,8 +2,8 @@ package gosuite
 
 import "testing"
 
-// Test_Unit_Legacy is a simple test of the rolling list index.
-func Test_Unit_Legacy(t *testing.T) {
+// Test_Unit_Stdlib is a simple stdlib-style test of the rolling list.
+func Test_Unit_Stdlib(t *testing.T) {
 	sut := NewUnit()
 	for idx, expected := range []string{"hello", "world", "foo", "bar", "baz"} {
 		actual := sut.DoSomething()

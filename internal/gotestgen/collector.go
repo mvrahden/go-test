@@ -8,7 +8,6 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
-	"github.com/mvrahden/go-test/internal/x/slices"
 )
 
 type CollectorError struct {
@@ -23,49 +22,45 @@ type CollectorResult struct {
 
 type collector struct{}
 
-func (collector) CollectSuiteSpecs(pkgs []*packages.Package) CollectorResult {
-	acc := slices.Reduce(pkgs, func(pkg *packages.Package, acc CollectorResult) CollectorResult {
-		insp := goinspect.New(pkg.Syntax)
+func (collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
+	if pkg == nil {
+		return CollectorResult{}
+	}
+	insp := goinspect.New(pkg.Syntax)
 
-		var suites gotestast.TestSuiteSpecSet
-		var errs []CollectorError
-		// find suites
-		insp.Preorder([]ast.Node{(*ast.GenDecl)(nil)}, func(n ast.Node) {
-			s, pos, err := gotestast.DetermineTestSuite(n, pkg)
+	var suites gotestast.TestSuiteSpecSet
+	var errs []CollectorError
+	// find suites
+	insp.Preorder([]ast.Node{(*ast.GenDecl)(nil)}, func(n ast.Node) {
+		s, pos, err := gotestast.DetermineTestSuite(n, pkg)
+		if err != nil {
+			errs = append(errs, CollectorError{Err: err, Pos: pos})
+			return
+		}
+		if s == nil {
+			return
+		}
+		suites = append(suites, s)
+	})
+	if len(errs) > 0 {
+		return CollectorResult{Errs: errs}
+	}
+
+	// find methods
+	for _, s := range suites {
+		insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
+			pos, err := gotestast.DetermineTestSuiteHarness(n, pkg, s)
 			if err != nil {
 				errs = append(errs, CollectorError{Err: err, Pos: pos})
-				return
 			}
-			if s == nil {
-				return
-			}
-			suites = append(suites, s)
 		})
-		if len(errs) > 0 {
-			acc.Errs = append(acc.Errs, errs...)
-			return acc
-		}
+	}
+	if len(errs) > 0 {
+		return CollectorResult{Errs: errs}
+	}
 
-		// find methods
-		for _, s := range suites {
-			insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
-				pos, err := gotestast.DetermineTestSuiteHarness(n, pkg, s)
-				if err != nil {
-					errs = append(errs, CollectorError{Err: err, Pos: pos})
-				}
-			})
-		}
-		if len(errs) > 0 {
-			acc.Errs = append(acc.Errs, errs...)
-			return acc
-		}
-
-		// add suites to result
-		acc.Suites = append(acc.Suites, suites...)
-		return acc
-	})
-
-	return acc
+	// add suites to result
+	return CollectorResult{Suites: suites}
 }
 
 type SpecOutcome struct {
@@ -74,7 +69,7 @@ type SpecOutcome struct {
 	SkippedTestCases    gotestast.SkippedTestCases  // skipped == unfocused + excluded
 }
 
-func (collector) ApplyGoTestSpecs(suites gotestast.TestSuiteSpecSet) (SpecOutcome, error) {
+func (collector) ApplyGoTestSpecs(suites gotestast.TestSuiteSpecSet) (spec SpecOutcome, _ error) {
 	suites, skippedTestSuites, skippedTestCases := suites.ReduceToEffectiveSet()
 
 	// TODO: sort all by name
@@ -82,6 +77,6 @@ func (collector) ApplyGoTestSpecs(suites gotestast.TestSuiteSpecSet) (SpecOutcom
 	return SpecOutcome{
 		EffectiveTestSuites: suites,
 		SkippedTestSuites:   skippedTestSuites,
-		SkippedTestCases:    skippedTestCases,
+		SkippedTestCases:    skippedTestCases, // map of both
 	}, nil
 }

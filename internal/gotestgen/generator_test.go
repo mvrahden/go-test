@@ -34,11 +34,13 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 		testdatadir := filepath.Join("..", "..", "examples", tC.directory)
 
 		t.Run(fmt.Sprintf("Generate for package %q with %s", tC.directory, tC.description), func(t *testing.T) {
-			expected := getExpectedOutputFile(t, testdatadir, "gotest_gensuite_test.golden")
-			pkgName, buf, err := Generate(pkg)
+			pkgName, ptest, pxtest, err := Generate(pkg)
 			require.NoError(t, err)
 			require.Equal(t, tC.pkgName, pkgName)
-			require.Equal(t, expected, string(buf))
+			ptestExpected := getExpectedOutputFile(t, testdatadir, "gotest_gensuite_ptest.golden")
+			require.Equal(t, ptestExpected, string(ptest))
+			pxtestExpected := getExpectedOutputFile(t, testdatadir, "gotest_gensuite_pxtest.golden")
+			require.Equal(t, pxtestExpected, string(pxtest))
 		})
 	}
 }

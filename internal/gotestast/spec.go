@@ -126,16 +126,16 @@ func (ts *TestSuiteSpec) Identifier() string {
 //
 // FOR RENDERING
 func (ts *TestSuiteSpec) FullIdentifier() string {
-	if ts.IsTestPackageSuite() {
+	if ts.IsPxTestSuite() {
 		return ts.Identifier()
 	}
 	return ts.pkg.Name + "." + ts.Identifier()
 }
 
-// IsTestPackageSuite gives info about the test suites declarated package.
+// IsPxTestSuite gives info about the test suites declarated package.
 //
 // FOR RENDERING
-func (ts *TestSuiteSpec) IsTestPackageSuite() bool {
+func (ts *TestSuiteSpec) IsPxTestSuite() bool {
 	return strings.HasSuffix(ts.pkg.Name, "_test")
 }
 

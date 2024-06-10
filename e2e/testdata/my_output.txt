@@ -1,29 +1,25 @@
-=== RUN   Test_MyNoopTestSuite
---- PASS: Test_MyNoopTestSuite (<TIMESTAMP>)
-=== RUN   Test_MyNoopParallelTestSuite
-=== PAUSE Test_MyNoopParallelTestSuite
-=== RUN   Test_MyTestSuite
-=== RUN   Test_MyTestSuite/F_TestSomethingSpecific
-=== RUN   Test_MyTestSuite/F_TestParallelSomethingC
-=== PAUSE Test_MyTestSuite/F_TestParallelSomethingC
-=== CONT  Test_MyTestSuite/F_TestParallelSomethingC
---- PASS: Test_MyTestSuite (<TIMESTAMP>)
-    --- PASS: Test_MyTestSuite/F_TestSomethingSpecific (<TIMESTAMP>)
-    --- PASS: Test_MyTestSuite/F_TestParallelSomethingC (<TIMESTAMP>)
 === RUN   TestMyNoopTestSuite
 --- PASS: TestMyNoopTestSuite (<TIMESTAMP>)
 === RUN   TestMyTestSuite
 === RUN   TestMyTestSuite/F_TestSomethingSpecific
+=== RUN   TestMyTestSuite/F_TestParallelSomethingC
+=== PAUSE TestMyTestSuite/F_TestParallelSomethingC
+=== CONT  TestMyTestSuite/F_TestParallelSomethingC
 --- PASS: TestMyTestSuite (<TIMESTAMP>)
     --- PASS: TestMyTestSuite/F_TestSomethingSpecific (<TIMESTAMP>)
-=== RUN   Test_my_X_MySkippedTestSuite
-    ƒƒ_suite_test.go:179: test suite was excluded by user
---- SKIP: Test_my_X_MySkippedTestSuite (<TIMESTAMP>)
+    --- PASS: TestMyTestSuite/F_TestParallelSomethingC (<TIMESTAMP>)
 === RUN   TestX_MySkippedTestSuite
-    ƒƒ_suite_test.go:183: test suite was excluded by user
+    ƒƒ_psuite_test.go:91: test suite was excluded by user
 --- SKIP: TestX_MySkippedTestSuite (<TIMESTAMP>)
-=== CONT  Test_MyNoopParallelTestSuite
---- PASS: Test_MyNoopParallelTestSuite (<TIMESTAMP>)
+=== RUN   TestMyNoopTestSuite
+--- PASS: TestMyNoopTestSuite (<TIMESTAMP>)
+=== RUN   TestMyTestSuite
+=== RUN   TestMyTestSuite/F_TestSomethingSpecific#01
+--- PASS: TestMyTestSuite (<TIMESTAMP>)
+    --- PASS: TestMyTestSuite/F_TestSomethingSpecific#01 (<TIMESTAMP>)
+=== RUN   TestX_MySkippedTestSuite
+    ƒƒ_pxsuite_test.go:73: test suite was excluded by user
+--- SKIP: TestX_MySkippedTestSuite (<TIMESTAMP>)
 PASS
 ok  	github.com/mvrahden/go-test/examples/my	<TIMESTAMP>
 

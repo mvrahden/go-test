@@ -27,9 +27,12 @@ var (
 
 type renderer struct{}
 
-func (r renderer) RenderGoTestSpec(pkgs []*packages.Package, spec SpecOutcome) ([]byte, error) {
+func (r renderer) RenderGoTestSpec(pkg *packages.Package, spec SpecOutcome) ([]byte, error) {
+	if pkg == nil {
+		return nil, nil
+	}
 	buf := bytes.NewBuffer(nil)
-	if err := r.renderFileHeader(buf, pkgs, spec); err != nil {
+	if err := r.renderFileHeader(buf, pkg, spec); err != nil {
 		return nil, fmt.Errorf("failed rendering file header. err: %w", err)
 	}
 	if err := r.renderTestSuites(buf, spec); err != nil {
@@ -38,7 +41,7 @@ func (r renderer) RenderGoTestSpec(pkgs []*packages.Package, spec SpecOutcome) (
 	return r.formatOutput(buf)
 }
 
-func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkgs []*packages.Package, spec SpecOutcome) error {
+func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome) error {
 	type Import struct {
 		Name string
 		Path string
@@ -52,11 +55,6 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkgs []*packages.Package,
 		{Path: "testing"},
 		{Path: about.Repo + "/pkg/gotest"},
 	}
-	for _, v := range pkgs {
-		if !strings.HasSuffix(v.PkgPath, "_test") {
-			imports = append(imports, Import{Path: v.PkgPath})
-		}
-	}
 	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
 		return v.HasParallelTestCases()
 	}) {
@@ -64,7 +62,7 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkgs []*packages.Package,
 	}
 	data := TplData{
 		RepoName:    about.ShortInfo(),
-		PackageName: strings.TrimSuffix(pkgs[0].Name, "_test") + "_test",
+		PackageName: pkg.Name,
 		Imports:     imports,
 	}
 	return headerTpl.ExecuteTemplate(buf, "header.go.tpl", map[string]any{"Header": data})

@@ -12,21 +12,21 @@ const (
 	packageEvalMode = packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo
 )
 
-func Generate(targetPath string) (string, []byte, error) {
-	pkgName, srcs, err := generateFile(targetPath)
+func Generate(targetPath string) (string, []byte, []byte, error) {
+	pkgName, ptestSrcs, pxtestSrcs, err := generateSrcs(targetPath)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
-	return pkgName, srcs, nil
+	return pkgName, ptestSrcs, pxtestSrcs, nil
 }
 
-func loadPackages(targetPkg string) ([]*packages.Package, error) {
+func loadPackages(targetPkg string) (ptest *packages.Package, pxtest *packages.Package, _ error) {
 	totalFoundPkgs, err := packages.Load(&packages.Config{
 		Mode:  packageEvalMode,
 		Tests: true,
 	}, targetPkg)
 	if err != nil {
-		return nil, fmt.Errorf("failed loading packages. err: %w", err)
+		return nil, nil, fmt.Errorf("failed loading packages. err: %w", err)
 	}
 
 	// filter all test-related packages
@@ -34,34 +34,66 @@ func loadPackages(targetPkg string) ([]*packages.Package, error) {
 		return strings.HasSuffix(item.ID, ".test]")
 	})
 	if len(testPkgs) == 0 {
-		return nil, fmt.Errorf("no test files found")
+		return nil, nil, fmt.Errorf("no test files found")
 	}
 	if len(testPkgs) > 2 {
-		return nil, fmt.Errorf("loaded unexpected amount of packages. want: n <= 2, got: %d", len(testPkgs))
+		return nil, nil, fmt.Errorf("loaded unexpected amount of packages. want: n <= 2, got: %d", len(testPkgs))
 	}
-	return testPkgs, nil
+	_ptest, _pxtest := slices.SplitBy(testPkgs, func(p *packages.Package, _ int) bool {
+		return !strings.HasSuffix(p.Name, "_test")
+	})
+	if len(_ptest) == 1 {
+		ptest = _ptest[0]
+	}
+	if len(_pxtest) == 1 {
+		pxtest = _pxtest[0]
+	}
+	return ptest, pxtest, nil
 }
 
-func generateFile(targetPkg string) (string, []byte, error) {
-	pkgs, err := loadPackages(targetPkg)
+func generateSrcs(targetPkg string) (string, []byte, []byte, error) {
+	ptest, pxtest, err := loadPackages(targetPkg)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 	c := collector{}
-	result := c.CollectSuiteSpecs(pkgs)
-	if len(result.Errs) > 0 {
-		return "", nil, result.Errs[0].Err
+	ptestCollected := c.CollectSuiteSpecs(ptest)
+	if len(ptestCollected.Errs) > 0 {
+		return "", nil, nil, ptestCollected.Errs[0].Err
+	}
+	pxtestCollected := c.CollectSuiteSpecs(pxtest)
+	if len(pxtestCollected.Errs) > 0 {
+		return "", nil, nil, ptestCollected.Errs[0].Err
 	}
 
-	out, err := c.ApplyGoTestSpecs(result.Suites)
+	ptestSpec, err := c.ApplyGoTestSpecs(ptestCollected.Suites)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
+	}
+
+	pxtestSpec, err := c.ApplyGoTestSpecs(pxtestCollected.Suites)
+	if err != nil {
+		return "", nil, nil, err
 	}
 
 	r := renderer{}
-	buf, err := r.RenderGoTestSpec(pkgs, out)
+	ptestBuf, err := r.RenderGoTestSpec(ptest, ptestSpec)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
-	return strings.TrimSuffix(pkgs[0].PkgPath, "_test"), buf, nil
+	pxtestBuf, err := r.RenderGoTestSpec(pxtest, pxtestSpec)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	pkgPath := strings.TrimSuffix(takeNonNil(ptest, pxtest).PkgPath, "_test")
+	return pkgPath, ptestBuf, pxtestBuf, nil
+}
+
+func takeNonNil(pkgs ...*packages.Package) *packages.Package {
+	for _, v := range pkgs {
+		if v != nil {
+			return v
+		}
+	}
+	panic("no test package found")
 }
