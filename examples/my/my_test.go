@@ -9,7 +9,7 @@ import (
 
 type X_MySkippedTestSuite struct{}
 type MyNoopTestSuite struct{}
-type MyNoopParallelTestSuite struct{}
+type MyNoopTestSuiteParallel struct{}
 
 type MyTestSuite struct {
 	ExecutedC chan string
@@ -29,6 +29,8 @@ func (s *MyTestSuite) X_TestSomethingSpecific(t *gotest.T) {
 } // skip
 
 func (s *MyTestSuite) F_TestSomethingSpecific(t *gotest.T) {
+	Exported()   // include exported
+	unexported() // include unexported
 	s.ExecutedC <- "F_TestSomethingSpecific"
 } // focus
 

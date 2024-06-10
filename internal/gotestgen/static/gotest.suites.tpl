@@ -1,18 +1,18 @@
 {{- /* Declare compile time assertion of enum set constants */ -}}
 {{ range $i, $ts := .Spec.EffectiveTestSuites }}
 
-type ƒƒ_GOTEST_{{ if not $ts.IsTestPackageSuite }}{{ $ts.PackageName }}_{{ end -}}{{ $ts.Identifier }} struct {
-  {{ $ts.FullIdentifier }}
+type ƒƒ_GOTEST_{{ $ts.Identifier }} struct {
+  {{ $ts.Identifier }}
 }
 
-func (ts *ƒƒ_GOTEST_{{ if not $ts.IsTestPackageSuite }}{{ $ts.PackageName }}_{{ end -}}{{ $ts.Identifier }}) BeforeAll(it *gotest.T) { {{ if $ts.BeforeAll -}} ts.{{ $ts.Identifier }}.BeforeAll(it) {{ end }}}
-func (ts *ƒƒ_GOTEST_{{ if not $ts.IsTestPackageSuite }}{{ $ts.PackageName }}_{{ end -}}{{ $ts.Identifier }}) AfterAll(it *gotest.T) { {{ if $ts.AfterAll -}} ts.{{ $ts.Identifier }}.AfterAll(it) {{ end }}}
-func (ts *ƒƒ_GOTEST_{{ if not $ts.IsTestPackageSuite }}{{ $ts.PackageName }}_{{ end -}}{{ $ts.Identifier }}) BeforeEach(it *gotest.T) { {{ if $ts.BeforeEach -}} ts.{{ $ts.Identifier }}.BeforeEach(it) {{ end }}}
-func (ts *ƒƒ_GOTEST_{{ if not $ts.IsTestPackageSuite }}{{ $ts.PackageName }}_{{ end -}}{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.AfterEach -}} ts.{{ $ts.Identifier }}.AfterEach(it) {{ end }}}
+func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) BeforeAll(it *gotest.T) { {{ if $ts.BeforeAll -}} ts.{{ $ts.Identifier }}.BeforeAll(it) {{ end }}}
+func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterAll(it *gotest.T) { {{ if $ts.AfterAll -}} ts.{{ $ts.Identifier }}.AfterAll(it) {{ end }}}
+func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) BeforeEach(it *gotest.T) { {{ if $ts.BeforeEach -}} ts.{{ $ts.Identifier }}.BeforeEach(it) {{ end }}}
+func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.AfterEach -}} ts.{{ $ts.Identifier }}.AfterEach(it) {{ end }}}
 
-func Test{{ if not $ts.IsTestPackageSuite }}_{{ end -}}{{ $ts.Identifier }}(t *testing.T) {
-  s := &ƒƒ_GOTEST_{{- if not $ts.IsTestPackageSuite -}}{{ $ts.PackageName }}_{{- end -}}{{ $ts.Identifier }}{}
-{{- if (hasSuffix $ts.FullIdentifier "ParallelTestSuite") }}
+func Test{{ $ts.Identifier }}(t *testing.T) {
+  s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
+{{- if (hasSuffix $ts.FullIdentifier "TestSuiteParallel") }}
   t.Parallel()
 {{- end }}
 
@@ -73,7 +73,7 @@ func Test{{ if not $ts.IsTestPackageSuite }}_{{ end -}}{{ $ts.Identifier }}(t *t
 {{- end }}
 
 {{ range $ts := .Spec.SkippedTestSuites }}
-func Test{{ if not $ts.IsTestPackageSuite }}_{{ $ts.PackageName }}_{{ end -}}{{ $ts.Identifier }}(t *testing.T) {
+func Test{{ $ts.Identifier }}(t *testing.T) {
   t.Skipf("test suite was excluded by user")
 }
 
