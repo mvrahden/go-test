@@ -1,4 +1,4 @@
-package simplesuite
+package simplesuite_test
 
 import (
 	"bytes"
@@ -19,6 +19,17 @@ func (s *SimpleTestSuite) BeforeEach(t *gotest.T) {
 	if err != nil {
 		t.T().Errorf("failed writing to buffer: %s", err)
 	}
+}
+
+func (s *SimpleTestSuite) AfterEach(t *gotest.T) {
+	_, err := s.buf.WriteString("- 1 line\n")
+	if err != nil {
+		t.T().Errorf("failed writing to buffer: %s", err)
+	}
+}
+
+func (s *SimpleTestSuite) AfterAll(t *gotest.T) {
+	t.T().Fail()
 }
 
 func (s *SimpleTestSuite) TestSucceeds(t *gotest.T) {

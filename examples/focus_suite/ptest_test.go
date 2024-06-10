@@ -8,7 +8,5 @@ type F_FocusedTestSuite struct{}
 type X_ExcludedTestSuite struct{}
 type NoopTestSuite struct{}
 
-//go:testgen echo "hello world"
-
-//go:embed my.go
+//go:embed main.go
 var a []byte

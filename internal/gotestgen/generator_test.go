@@ -27,6 +27,7 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 		pkgName     string
 		description string
 	}{
+		{"simple_suite", "github.com/mvrahden/go-test/examples/simple_suite", "simple test suites"},
 		{"my", "github.com/mvrahden/go-test/examples/my", "standard test suites"},
 		{"focus_suite", "github.com/mvrahden/go-test/examples/focus_suite", "focus test suites"},
 	} {
@@ -37,9 +38,9 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 			pkgName, ptest, pxtest, err := Generate(pkg)
 			require.NoError(t, err)
 			require.Equal(t, tC.pkgName, pkgName)
-			ptestExpected := getExpectedOutputFile(t, testdatadir, "gotest_gensuite_ptest.golden")
+			ptestExpected := getExpectedOutputFile(t, testdatadir, "gotestgen_ptest.golden")
 			require.Equal(t, ptestExpected, string(ptest))
-			pxtestExpected := getExpectedOutputFile(t, testdatadir, "gotest_gensuite_pxtest.golden")
+			pxtestExpected := getExpectedOutputFile(t, testdatadir, "gotestgen_pxtest.golden")
 			require.Equal(t, pxtestExpected, string(pxtest))
 		})
 	}
