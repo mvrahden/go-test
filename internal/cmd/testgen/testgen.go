@@ -3,7 +3,6 @@ package testgen
 import (
 	"bytes"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -21,13 +20,13 @@ var DEBUG bool
 type Args struct {
 	AbsPath        string
 	Package        string
-	SkipAutoDelete bool // internal feature to skip deletion of test suite file
-	Args           []string
+	SkipAutoDelete bool     // internal feature to skip deletion of test suite file
+	NArgs          []string // NArgs are unparsed args
 }
 
 func Execute(args []string) (_ Args, ptest, pxtest []byte, _ error) {
 	var scanPath string // TODO: parse from args
-	args, err := parseFlags(args, &scanPath)
+	nargs, err := parseFlags(args, &scanPath)
 	if err != nil {
 		return Args{}, nil, nil, fmt.Errorf("failed parsing flags. err: %w", err)
 	}
@@ -50,7 +49,7 @@ func Execute(args []string) (_ Args, ptest, pxtest []byte, _ error) {
 		return Args{}, nil, nil, fmt.Errorf("failed generating code: no sources to generate\n")
 	}
 
-	return Args{AbsPath: scanDir, Package: pkgName, SkipAutoDelete: DEBUG, Args: args}, ptestSrcs, pxtestSrcs, nil
+	return Args{AbsPath: scanDir, Package: pkgName, SkipAutoDelete: DEBUG, NArgs: nargs}, ptestSrcs, pxtestSrcs, nil
 }
 
 func parseFlags(args []string, scanPath *string) ([]string, error) {
@@ -60,23 +59,25 @@ func parseFlags(args []string, scanPath *string) ([]string, error) {
 			return v == "-internal.debug"
 		})
 	}
-	// setup flags
-	flags := flag.NewFlagSet("", flag.ContinueOnError)
-	flags.SetOutput(io.Discard)
-	flags.StringVar(scanPath, "dir", "", "directory of target package; defaults to CWD.")
-	err := flags.Parse(args)
-	if err != nil {
-		return nil, err
-	}
-	// return non-args
-	var nargs []string
-	for idx, v := range flags.Args() {
-		if idx == 0 {
-			continue
-		}
-		nargs = append(nargs, v)
-	}
 
+	// determine nargs
+	var nargs []string
+	idx := slices.Index(args, "-")
+	if idx == -1 {
+		idx = slices.Index(args, "--")
+	}
+	if idx > -1 {
+		if idx == 0 {
+			return nil, fmt.Errorf("given \"-\", must provide further nargs")
+		}
+
+		nargs = args[idx+1:]
+		args = args[:idx]
+	}
+	*scanPath = "." // default: current dir
+	if len(args) > 0 {
+		*scanPath = args[len(args)-1]
+	}
 	return nargs, nil
 }
 

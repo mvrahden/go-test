@@ -32,10 +32,10 @@ func main() {
 		testsuiteFile := filepath.Join(args.AbsPath, about.PXSuite)
 		onErrFail("failed writing pxtest", os.WriteFile(testsuiteFile, pxtest, os.ModePerm))
 	}
-	// fmt.Println("executing go test at", args.AbsPath, args.Package)
+	// fmt.Println("executing go test at", args.AbsPath, args.Package, args.NArgs)
 	cmd := exec.Command("go", "test", "-count", "1", args.AbsPath)
-	if len(args.Args) > 0 {
-		cmd.Args = append(cmd.Args, args.Args...)
+	if len(args.NArgs) > 0 {
+		cmd.Args = append(cmd.Args, args.NArgs...)
 	}
 	out, _ := cmd.CombinedOutput()
 	if !args.SkipAutoDelete {
