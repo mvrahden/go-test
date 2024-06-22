@@ -19,29 +19,30 @@ func TestE2E_CLI(t *testing.T) {
 		goldenFiles []string
 		args        []string
 	}{
-		{"no args", "testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}, nil},
+		{"no test files", "no_testfiles", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}, nil},
+		{"no testsuite", "no_testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}, nil},
+		{"simple testsuite", "testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}, nil},
 	}
 	for idx, tC := range testcases {
 		t.Run(fmt.Sprintf("Generate (idx: %d %q)", idx, tC.desc), func(t *testing.T) {
-			args := []string{
-				filepath.Join("testdata", tC.dirName)}
-			args = append(args, tC.args...)
-			retArgs, ptestActual, pxtestActual, err := testgen.Execute(args)
+			cwd, err := os.Getwd()
 			require.NoError(t, err)
-			require.True(t, strings.HasSuffix(retArgs.AbsPath, "/go-test/internal/cmd/testgen/testdata/testsuite"))
-			require.Equal(t, "github.com/mvrahden/go-test/internal/cmd/testgen/testdata/testsuite", retArgs.Package)
-			require.Zero(t, retArgs.NArgs)
-			require.False(t, retArgs.SkipAutoDelete)
+
+			path := filepath.Join(cwd, "testdata", tC.dirName)
+			result, err := testgen.GenerateSuites(path)
+			require.NoError(t, err)
+			require.True(t, strings.HasSuffix(result.AbsPath, "go-test/internal/cmd/testgen/testdata/"+tC.dirName))
+			require.Equal(t, "github.com/mvrahden/go-test/internal/cmd/testgen/testdata/"+tC.dirName, result.Package)
 
 			// Assert generate suite
 			for idx, golden := range tC.goldenFiles {
 				expected, err := os.ReadFile(filepath.Join("testdata", tC.dirName, golden))
 				require.NoError(t, err)
 				if idx == 0 {
-					require.Equal(t, string(expected), string(ptestActual))
+					require.Equal(t, string(expected), string(result.PTest))
 				}
 				if idx == 1 {
-					require.Equal(t, string(expected), string(pxtestActual))
+					require.Equal(t, string(expected), string(result.PXTest))
 				}
 			}
 		})
@@ -50,20 +51,42 @@ func TestE2E_CLI(t *testing.T) {
 
 func TestE2E_Errors(t *testing.T) {
 	testcases := []struct {
-		desc string
-		args []string
-		msg  string
+		desc     string
+		args     []string
+		errorMsg string
 	}{
 		{
-			"on no enums in given directory (wrong path)", []string{"-dir=testdata/nothing-here"}, "no such directory",
+			"not a Go package (no sources)", []string{"testdata/nothing-here"}, "not a Go package",
 		},
 	}
 	for _, tC := range testcases {
 		t.Run(tC.desc, func(t *testing.T) {
-			_, ptest, pxtest, err := testgen.Execute(tC.args)
-			require.ErrorContains(t, err, tC.msg)
-			require.Zero(t, ptest)
-			require.Zero(t, pxtest)
+			res, err := testgen.GenerateSuites(tC.args[0])
+			require.ErrorContains(t, err, tC.errorMsg)
+			require.Zero(t, res)
+		})
+	}
+}
+
+func TestE2E_NoTestSuites(t *testing.T) {
+	testcases := []struct {
+		desc   string
+		args   []string
+		result testgen.GenerateResult
+	}{
+		{
+			"nothing to generate", []string{"strings"}, testgen.GenerateResult{AbsPath: "strings", Package: "strings"},
+		},
+		{
+			"nothing to generate", []string{"net/http"}, testgen.GenerateResult{AbsPath: "net/http", Package: "net/http"},
+		},
+	}
+	for _, tC := range testcases {
+		t.Run(tC.desc, func(t *testing.T) {
+			res, err := testgen.GenerateSuites(tC.args[0])
+			require.NoError(t, err)
+			require.Equal(t, string(tC.result.PTest), string(res.PTest))
+			require.Equal(t, tC.result, res)
 		})
 	}
 }

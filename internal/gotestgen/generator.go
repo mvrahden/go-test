@@ -13,31 +13,35 @@ const (
 )
 
 func Generate(targetPath string) (string, []byte, []byte, error) {
-	pkgName, ptestSrcs, pxtestSrcs, err := generateSrcs(targetPath)
+	pkgPath, ptestSrcs, pxtestSrcs, err := generateSrcs(targetPath)
 	if err != nil {
 		return "", nil, nil, err
 	}
-	return pkgName, ptestSrcs, pxtestSrcs, nil
+	return pkgPath, ptestSrcs, pxtestSrcs, nil
 }
 
-func loadPackages(targetPkg string) (ptest *packages.Package, pxtest *packages.Package, _ error) {
+func loadPackages(targetPkg string) (pkgPath string, ptest *packages.Package, pxtest *packages.Package, _ error) {
 	totalFoundPkgs, err := packages.Load(&packages.Config{
 		Mode:  packageEvalMode,
 		Tests: true,
 	}, targetPkg)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed loading packages. err: %w", err)
+		return "", nil, nil, fmt.Errorf("failed loading packages. err: %w", err)
 	}
+	if len(totalFoundPkgs) == 0 || totalFoundPkgs[0].Name == "" {
+		return "", nil, nil, fmt.Errorf("not a Go package") // nothing found
+	}
+	pkgPath = strings.TrimSuffix(totalFoundPkgs[0].PkgPath, "_test")
 
 	// filter all test-related packages
 	testPkgs := slices.Filter(totalFoundPkgs, func(item *packages.Package, index int) bool {
 		return strings.HasSuffix(item.ID, ".test]")
 	})
 	if len(testPkgs) == 0 {
-		return nil, nil, fmt.Errorf("no test files found")
+		return pkgPath, nil, nil, nil // no test files found
 	}
 	if len(testPkgs) > 2 {
-		return nil, nil, fmt.Errorf("loaded unexpected amount of packages. want: n <= 2, got: %d", len(testPkgs))
+		return "", nil, nil, fmt.Errorf("loaded unexpected amount of packages. want: n <= 2, got: %d", len(testPkgs))
 	}
 	_ptest, _pxtest := slices.SplitBy(testPkgs, func(p *packages.Package, _ int) bool {
 		return !strings.HasSuffix(p.Name, "_test")
@@ -48,11 +52,11 @@ func loadPackages(targetPkg string) (ptest *packages.Package, pxtest *packages.P
 	if len(_pxtest) == 1 {
 		pxtest = _pxtest[0]
 	}
-	return ptest, pxtest, nil
+	return pkgPath, ptest, pxtest, nil
 }
 
 func generateSrcs(targetPkg string) (string, []byte, []byte, error) {
-	ptest, pxtest, err := loadPackages(targetPkg)
+	pkgPath, ptest, pxtest, err := loadPackages(targetPkg)
 	if err != nil {
 		return "", nil, nil, err
 	}
@@ -66,34 +70,33 @@ func generateSrcs(targetPkg string) (string, []byte, []byte, error) {
 		return "", nil, nil, ptestCollected.Errs[0].Err
 	}
 
-	ptestSpec, err := c.ApplyGoTestSpecs(ptestCollected.Suites)
+	ptestSpec, err := c.ApplyTestSuiteSpecs(ptestCollected.Suites)
 	if err != nil {
 		return "", nil, nil, err
 	}
 
-	pxtestSpec, err := c.ApplyGoTestSpecs(pxtestCollected.Suites)
+	pxtestSpec, err := c.ApplyTestSuiteSpecs(pxtestCollected.Suites)
 	if err != nil {
 		return "", nil, nil, err
 	}
 
 	r := renderer{}
-	ptestBuf, err := r.RenderGoTestSpec(ptest, ptestSpec)
+	ptestBuf, err := r.RenderTestSuiteSpec(ptest, ptestSpec)
 	if err != nil {
 		return "", nil, nil, err
 	}
-	pxtestBuf, err := r.RenderGoTestSpec(pxtest, pxtestSpec)
+	pxtestBuf, err := r.RenderTestSuiteSpec(pxtest, pxtestSpec)
 	if err != nil {
 		return "", nil, nil, err
 	}
-	pkgPath := strings.TrimSuffix(takeNonNil(ptest, pxtest).PkgPath, "_test")
 	return pkgPath, ptestBuf, pxtestBuf, nil
 }
 
-func takeNonNil(pkgs ...*packages.Package) *packages.Package {
-	for _, v := range pkgs {
-		if v != nil {
-			return v
+func getPkgPathOrDefault(ptest, pxtest *packages.Package, dflt string) string {
+	for _, pkg := range []*packages.Package{ptest, pxtest} {
+		if pkg != nil {
+			return pkg.PkgPath
 		}
 	}
-	panic("no test package found")
+	return dflt
 }
