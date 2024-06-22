@@ -7,95 +7,38 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 )
 
-// DEBUG is a hook to help debug generated code
-var DEBUG bool
-
-type Args struct {
-	AbsPath        string
-	Package        string
-	SkipAutoDelete bool     // internal feature to skip deletion of test suite file
-	NArgs          []string // NArgs are unparsed args
+type GenerateResult struct {
+	AbsPath string
+	Package string
+	PTest   []byte
+	PXTest  []byte
 }
 
-func Execute(args []string) (_ Args, ptest, pxtest []byte, _ error) {
-	var scanPath string // TODO: parse from args
-	nargs, err := parseFlags(args, &scanPath)
+func GenerateSuites(path string) (GenerateResult, error) {
+	err := findAndDeleteOldGeneratedFile(path)
 	if err != nil {
-		return Args{}, nil, nil, fmt.Errorf("failed parsing flags. err: %w", err)
+		return GenerateResult{}, fmt.Errorf("failed inspecting directory %q: %w", path, err)
 	}
 
-	scanDir := getTargetDir(scanPath)
-
-	err = findAndDeleteOldGeneratedFile(scanDir)
-	if os.IsNotExist(err) {
-		return Args{}, nil, nil, fmt.Errorf("failed generating code. err: no such directory %q", scanDir)
-	}
+	pkgName, ptestSrcs, pxtestSrcs, err := gotestgen.Generate(path)
 	if err != nil {
-		return Args{}, nil, nil, fmt.Errorf("failed inspecting directory %q. err: %w", scanDir, err)
+		return GenerateResult{}, fmt.Errorf("failed generating code: %w", err)
 	}
 
-	pkgName, ptestSrcs, pxtestSrcs, err := gotestgen.Generate(scanDir)
-	if err != nil {
-		return Args{}, nil, nil, fmt.Errorf("failed generating code. err: %w", err)
-	}
-	if len(ptestSrcs)+len(pxtestSrcs) == 0 {
-		return Args{}, nil, nil, fmt.Errorf("failed generating code: no sources to generate\n")
-	}
-
-	return Args{AbsPath: scanDir, Package: pkgName, SkipAutoDelete: DEBUG, NArgs: nargs}, ptestSrcs, pxtestSrcs, nil
-}
-
-func parseFlags(args []string, scanPath *string) ([]string, error) {
-	DEBUG = slices.Contains(args, "-internal.debug")
-	if DEBUG {
-		args = slices.DeleteFunc(args, func(v string) bool {
-			return v == "-internal.debug"
-		})
-	}
-
-	// determine nargs
-	var nargs []string
-	idx := slices.Index(args, "-")
-	if idx == -1 {
-		idx = slices.Index(args, "--")
-	}
-	if idx > -1 {
-		if idx == 0 {
-			return nil, fmt.Errorf("given \"-\", must provide further nargs")
-		}
-
-		nargs = args[idx+1:]
-		args = args[:idx]
-	}
-	*scanPath = "." // default: current dir
-	if len(args) > 0 {
-		*scanPath = args[len(args)-1]
-	}
-	return nargs, nil
-}
-
-func getTargetDir(scanPath string) string {
-	targetDir, _ := os.Getwd() // hint: fallback value
-	if len(scanPath) == 0 {
-		return targetDir
-	}
-	if filepath.IsAbs(scanPath) {
-		targetDir = filepath.Clean(scanPath)
-	} else {
-		targetDir = filepath.Join(targetDir, scanPath)
-	}
-	return targetDir
+	return GenerateResult{AbsPath: path, Package: pkgName, PTest: ptestSrcs, PXTest: pxtestSrcs}, nil
 }
 
 var findAndDeleteOldGeneratedFile = func(dir string) error {
 	files, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}

@@ -69,7 +69,7 @@ type SpecOutcome struct {
 	SkippedTestCases    gotestast.SkippedTestCases  // skipped == unfocused + excluded
 }
 
-func (collector) ApplyGoTestSpecs(suites gotestast.TestSuiteSpecSet) (spec SpecOutcome, _ error) {
+func (collector) ApplyTestSuiteSpecs(suites gotestast.TestSuiteSpecSet) (spec SpecOutcome, _ error) {
 	suites, skippedTestSuites, skippedTestCases := suites.ReduceToEffectiveSet()
 
 	// TODO: sort all by name
