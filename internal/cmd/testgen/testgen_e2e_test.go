@@ -24,13 +24,13 @@ func TestE2E_CLI(t *testing.T) {
 	for idx, tC := range testcases {
 		t.Run(fmt.Sprintf("Generate (idx: %d %q)", idx, tC.desc), func(t *testing.T) {
 			args := []string{
-				"-dir=" + filepath.Join("testdata", tC.dirName)}
+				filepath.Join("testdata", tC.dirName)}
 			args = append(args, tC.args...)
 			retArgs, ptestActual, pxtestActual, err := testgen.Execute(args)
 			require.NoError(t, err)
 			require.True(t, strings.HasSuffix(retArgs.AbsPath, "/go-test/internal/cmd/testgen/testdata/testsuite"))
 			require.Equal(t, "github.com/mvrahden/go-test/internal/cmd/testgen/testdata/testsuite", retArgs.Package)
-			require.Zero(t, retArgs.Args)
+			require.Zero(t, retArgs.NArgs)
 			require.False(t, retArgs.SkipAutoDelete)
 
 			// Assert generate suite

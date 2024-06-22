@@ -63,7 +63,7 @@ func Test_TestsuiteCLI(t *testing.T) {
 func performTest(t *testing.T, tmpDir, pkgPath, goldenName string, debug bool) {
 	tmpCurrentPackage := filepath.Join(tmpDir, pkgPath)
 	cmd := exec.
-		Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite", "-dir", tmpCurrentPackage)
+		Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite", tmpCurrentPackage)
 	if debug {
 		cmd.Args = append(cmd.Args, "-internal.debug")
 		exec.Command("sh", "-c", `echo "`+tmpCurrentPackage+`" >> debug_dirs`).CombinedOutput()
