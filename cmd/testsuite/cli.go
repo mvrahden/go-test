@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/internal/cmd/testgen"
 )
 
@@ -24,11 +25,11 @@ func main() {
 	args, ptest, pxtest, err := testgen.Execute(os.Args[1:])
 	onErrFail("", err)
 	if len(ptest) > 0 {
-		testsuiteFile := filepath.Join(args.AbsPath, "ƒƒ_psuite_test.go")
+		testsuiteFile := filepath.Join(args.AbsPath, about.PSuite)
 		onErrFail("failed writing ptest", os.WriteFile(testsuiteFile, ptest, os.ModePerm))
 	}
 	if len(pxtest) > 0 {
-		testsuiteFile := filepath.Join(args.AbsPath, "ƒƒ_pxsuite_test.go")
+		testsuiteFile := filepath.Join(args.AbsPath, about.PXSuite)
 		onErrFail("failed writing pxtest", os.WriteFile(testsuiteFile, pxtest, os.ModePerm))
 	}
 	// fmt.Println("executing go test at", args.AbsPath, args.Package)
@@ -38,8 +39,8 @@ func main() {
 	}
 	out, _ := cmd.CombinedOutput()
 	if !args.SkipAutoDelete {
-		os.Remove(filepath.Join(args.AbsPath, "ƒƒ_psuite_test.go"))
-		os.Remove(filepath.Join(args.AbsPath, "ƒƒ_pxsuite_test.go"))
+		os.Remove(filepath.Join(args.AbsPath, about.PSuite))
+		os.Remove(filepath.Join(args.AbsPath, about.PXSuite))
 	}
 	switch cmd.ProcessState.ExitCode() {
 	case 0:

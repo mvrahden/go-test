@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/internal/testutils"
 )
 
@@ -32,7 +33,8 @@ func Test_TestsuiteCLI(t *testing.T) {
 
 	unexpectedFiles := []string{
 		"go.work",
-		"examples/gosuite/ff_suite_test.go",
+		"examples/gosuite/ƒƒ_psuite_test.go",
+		"examples/gosuite/ƒƒ_pxsuite_test.go",
 	}
 	testutils.AssertFilesNotInTmp(t, tmp, unexpectedFiles...)
 	// assert package to test is in tmp
@@ -45,12 +47,13 @@ func Test_TestsuiteCLI(t *testing.T) {
 
 	testCases := []struct {
 		pkgName    string
+		args       []string
 		goldenName string
 		debug      bool
 	}{
-		{pkgName: "examples/gosuite", goldenName: "gosuite_output.txt"},
-		{pkgName: "examples/my", goldenName: "my_output.txt"},
-		{pkgName: "examples/simple_suite", goldenName: "simple_suite_output.txt"},
+		{pkgName: "examples/gosuite", goldenName: "gosuite_output.txt", args: []string{"-dir", ""}, debug: false},
+		{pkgName: "examples/my", goldenName: "my_output.txt", args: []string{"-dir", ""}, debug: false},
+		{pkgName: "examples/simple_suite", goldenName: "simple_suite_output.txt", args: []string{"-dir", ""}, debug: false},
 	}
 	for _, tc := range testCases {
 		performTest(t, tmp, tc.pkgName, tc.goldenName, tc.debug)
@@ -63,6 +66,7 @@ func performTest(t *testing.T, tmpDir, pkgPath, goldenName string, debug bool) {
 		Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite", "-dir", tmpCurrentPackage)
 	if debug {
 		cmd.Args = append(cmd.Args, "-internal.debug")
+		exec.Command("sh", "-c", `echo "`+tmpCurrentPackage+`" >> debug_dirs`).CombinedOutput()
 	}
 	cmd.Args = append(cmd.Args, "-", "-v")
 	cmd.Dir = tmpDir
@@ -77,15 +81,17 @@ func performTest(t *testing.T, tmpDir, pkgPath, goldenName string, debug bool) {
 		goldenName,
 	)
 
-	// assert testsuite was removed during execution
-	file, err := os.Stat(filepath.Join(tmpDir, pkgPath, "ƒƒ_suite_test.go"))
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return
+	// assert testsuite was removed after execution
+	for _, suiteName := range []string{about.PSuite, about.PXSuite} {
+		file, err := os.Stat(filepath.Join(tmpDir, pkgPath, suiteName))
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return
+			}
+			t.Errorf("failed asserting file: %s", file.Name())
 		}
-		t.Errorf("failed asserting file: %s", file)
-	}
-	if file.Size() > 0 {
-		t.Errorf("failed asserting file: %s", file)
+		if file.Size() > 0 {
+			t.Errorf("failed asserting file: %s", file.Name())
+		}
 	}
 }

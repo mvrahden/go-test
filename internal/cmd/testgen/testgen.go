@@ -53,13 +53,6 @@ func Execute(args []string) (_ Args, ptest, pxtest []byte, _ error) {
 	return Args{AbsPath: scanDir, Package: pkgName, SkipAutoDelete: DEBUG, Args: args}, ptestSrcs, pxtestSrcs, nil
 }
 
-var targetFilename = func(dir, filename string) string {
-	if !strings.HasSuffix(filename, ".go") {
-		filename = fmt.Sprintf("%s.go", filename)
-	}
-	return filepath.Join(dir, filename)
-}
-
 func parseFlags(args []string, scanPath *string) ([]string, error) {
 	DEBUG = slices.Contains(args, "-internal.debug")
 	if DEBUG {
