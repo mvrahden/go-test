@@ -6,6 +6,11 @@ import (
 )
 
 const (
+	PSuite  = "ƒƒ_psuite_test.go"
+	PXSuite = "ƒƒ_pxsuite_test.go"
+)
+
+const (
 	Application = "go-test"
 	Repo        = "github.com/mvrahden/go-test"
 )

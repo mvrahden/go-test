@@ -7,27 +7,22 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/internal/cmd/testgen"
 	"github.com/stretchr/testify/require"
 )
 
 func TestE2E_CLI(t *testing.T) {
-	testgen.PatchDeleteOldGeneratedFileFunc(t)
-
 	testcases := []struct {
 		desc        string
 		dirName     string
 		goldenFiles []string
 		args        []string
 	}{
-		{"no args", "testsuite", []string{"ptest_gotest.golden", "pxtest_gotest.golden"}, nil},
+		{"no args", "testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}, nil},
 	}
 	for idx, tC := range testcases {
 		t.Run(fmt.Sprintf("Generate (idx: %d %q)", idx, tC.desc), func(t *testing.T) {
-
-			tmpDir := t.TempDir()
-			testgen.PatchTargetFilenameFunc(t, tmpDir)
-
 			args := []string{
 				"-dir=" + filepath.Join("testdata", tC.dirName)}
 			args = append(args, tC.args...)
