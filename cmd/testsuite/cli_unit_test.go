@@ -1,4 +1,4 @@
-package testgen
+package main
 
 import (
 	"fmt"

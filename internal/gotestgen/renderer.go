@@ -27,8 +27,11 @@ var (
 
 type renderer struct{}
 
-func (r renderer) RenderGoTestSpec(pkg *packages.Package, spec SpecOutcome) ([]byte, error) {
+func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome) ([]byte, error) {
 	if pkg == nil {
+		return nil, nil
+	}
+	if len(spec.EffectiveTestSuites) == 0 {
 		return nil, nil
 	}
 	buf := bytes.NewBuffer(nil)
