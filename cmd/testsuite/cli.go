@@ -31,5 +31,5 @@ func main() {
 
 	scanPaths := getTargetDirs(cfg)
 
-	os.Exit(PerformTests(cfg, scanPaths, nargs))
+	os.Exit(RunTests(cfg, scanPaths, nargs))
 }

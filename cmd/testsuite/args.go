@@ -6,13 +6,23 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/mvrahden/go-test/internal/cmd/testgen"
 )
 
+type SuiteGenerator func(scanDir string) (testgen.GenerateResult, error)
+type SuiteRunner func(args []string) (out []byte, code int, err error)
+type SuiteCleanup func(scanDir string)
+
 type ExecConfig struct {
-	MaxConcurrency int
-	TestRecursive  bool // wether to walk the directory tree (./...) -> if not set, test single package
-	CWD            string
-	RawPath        string // raw path argument (e.g.: "./...", "net/http" ...)
+	MaxConcurrency  int
+	IsRecursiveWalk bool // wether to walk the directory tree (./...) -> if not set, test single package
+	CWD             string
+	PackagePath     string
+	RawPath         string // raw path argument (e.g.: "./...", "net/http" ...)
+	SuitesGenerate  SuiteGenerator
+	SuitesRun       SuiteRunner
+	SuitesCleanup   SuiteCleanup
 }
 
 func ParseArgs(inArgs []string) (_ ExecConfig, nargs []string, _ error) {
