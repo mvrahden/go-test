@@ -9,5 +9,4 @@
 FAIL
 FAIL	github.com/mvrahden/go-test/examples/gosuite	<TIMESTAMP>
 FAIL
-
 exit status 1
