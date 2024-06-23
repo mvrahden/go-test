@@ -15,5 +15,4 @@
 FAIL
 FAIL	github.com/mvrahden/go-test/examples/simple_suite	<TIMESTAMP>
 FAIL
-
 exit status 1

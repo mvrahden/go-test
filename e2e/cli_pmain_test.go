@@ -1,9 +1,10 @@
-package gosuite
+package e2e
 
 import (
 	"bytes"
 	"embed"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,8 +56,10 @@ func Test_TestsuiteCLI(t *testing.T) {
 		{pkgName: "examples/my", goldenName: "my_output.txt", args: []string{"-dir", ""}, debug: false},
 		{pkgName: "examples/simple_suite", goldenName: "simple_suite_output.txt", args: []string{"-dir", ""}, debug: false},
 	}
-	for _, tc := range testCases {
-		performTest(t, tmp, tc.pkgName, tc.goldenName, tc.debug)
+	for idx, tc := range testCases {
+		t.Run(fmt.Sprintf("idx %d", idx), func(t *testing.T) {
+			performTest(t, tmp, tc.pkgName, tc.goldenName, tc.debug)
+		})
 	}
 }
 

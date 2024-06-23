@@ -22,4 +22,3 @@
 --- SKIP: TestX_MySkippedTestSuite (<TIMESTAMP>)
 PASS
 ok  	github.com/mvrahden/go-test/examples/my	<TIMESTAMP>
-
