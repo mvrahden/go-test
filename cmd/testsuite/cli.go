@@ -24,12 +24,10 @@ var onErrFail = func(msg string, err error) {
 func main() {
 	args := os.Args[1:]
 
-	cfg, nargs, err := ParseArgs(args)
+	cfg, err := ParseArgs(args, true)
 	if err != nil {
 		onErrFail(fmt.Sprintf("failed parsing args: %s", err), err)
 	}
 
-	scanPaths := getTargetDirs(cfg)
-
-	os.Exit(RunTests(cfg, scanPaths, nargs))
+	os.Exit(RunTests(cfg))
 }

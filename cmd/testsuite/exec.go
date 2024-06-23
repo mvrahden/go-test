@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-func RunTests(cfg ExecConfig, scanDirs []string, nargs []string) (code int) {
+func RunTests(cfg ExecConfig) (code int) {
 	type jobRes struct {
 		Dir    string
 		Stdout []byte
@@ -26,7 +26,7 @@ func RunTests(cfg ExecConfig, scanDirs []string, nargs []string) (code int) {
 				continue
 			}
 
-			nargs = append(nargs, res.AbsPath)
+			nargs := append(cfg.NArgs, res.AbsPath)
 			out, code, err := cfg.SuitesRun(nargs)
 			resC <- jobRes{j, out, code, err}
 
@@ -40,8 +40,8 @@ func RunTests(cfg ExecConfig, scanDirs []string, nargs []string) (code int) {
 	for range cfg.MaxConcurrency {
 		go workerFunc()
 	}
-	for _, dir := range scanDirs {
-		jobC <- dir
+	for _, pkgName := range cfg.PackageNameList {
+		jobC <- pkgName.Name
 	}
 
 	wg2 := sync.WaitGroup{}

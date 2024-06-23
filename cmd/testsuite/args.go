@@ -1,100 +1,113 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/cmd/testgen"
+	"github.com/mvrahden/go-test/internal/gotestrunner"
+	xslices "github.com/mvrahden/go-test/internal/x/slices"
 )
 
-type SuiteGenerator func(scanDir string) (testgen.GenerateResult, error)
-type SuiteRunner func(args []string) (out []byte, code int, err error)
-type SuiteCleanup func(scanDir string)
+type SuiteGeneratorFunc func(pkgName string) (testgen.GenerateResult, error)
+type SuiteRunnerFunc func(args []string) (out []byte, code int, err error)
+type SuiteCleanupFunc func(scanDir string)
+
+type PkgNameExec struct {
+	Name string // raw path argument (e.g.: "./...", "net/http" ...)
+	// Dir             string
+	IsRecursiveWalk bool
+}
 
 type ExecConfig struct {
 	MaxConcurrency  int
-	IsRecursiveWalk bool // wether to walk the directory tree (./...) -> if not set, test single package
 	CWD             string
-	PackagePath     string
-	RawPath         string // raw path argument (e.g.: "./...", "net/http" ...)
-	SuitesGenerate  SuiteGenerator
-	SuitesRun       SuiteRunner
-	SuitesCleanup   SuiteCleanup
+	NArgs           []string // args per pacakge name job (excluding package names)
+	PackageNameList []PkgNameExec
+	SuitesGenerate  SuiteGeneratorFunc
+	SuitesRun       SuiteRunnerFunc
+	SuitesCleanup   SuiteCleanupFunc
 }
 
-func ParseArgs(inArgs []string) (_ ExecConfig, nargs []string, _ error) {
-	args, nargs, err := splitArgs(inArgs)
+func ParseArgs(inArgs []string, isStdlib bool) (_ ExecConfig, _ error) {
+	args, nargs := splitArgs(inArgs)
+
+	err := parseArgs(args)
 	if err != nil {
-		return ExecConfig{}, nil, err
+		return ExecConfig{}, err
 	}
-	cfg, err := parseArgs(args)
+	cfg, err := parseNArgs(nargs)
 	if err != nil {
-		return ExecConfig{}, nil, err
+		return ExecConfig{}, err
 	}
-	return cfg, nargs, nil
+	return cfg, nil
 }
 
-func parseArgs(args []string) (ExecConfig, error) {
-	if len(args) == 0 {
-		return ExecConfig{}, fmt.Errorf("missing args")
-	}
+func splitArgs(in []string) (args, nargs []string) {
+	return xslices.SplitBy(in, func(v string, _ int) bool {
+		return strings.HasPrefix(v, "-ƒƒ.")
+	})
+}
+
+func parseArgs(args []string) error {
+	DEBUG = slices.Contains(args, "-ƒƒ.internal.debug")
+	return nil
+}
+
+func parseNArgs(nargs []string) (ExecConfig, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return ExecConfig{}, err
 	}
+
 	cfg := ExecConfig{
 		MaxConcurrency: 8, // TODO: Determine
 		CWD:            cwd,
-		RawPath:        args[len(args)-1], // always last arg
+		SuitesGenerate: gotestrunner.SuitesGenerate,
+		SuitesRun:      gotestrunner.StdlibRunTests,
+		SuitesCleanup:  gotestrunner.SuitesCleanup,
 	}
-	cfg.IsRecursiveWalk = strings.HasSuffix(cfg.RawPath, filepath.Base("..."))
+
+	// Search for Package Name List entries in nargs, collect and clear them.
+
+	var sawFlagKey bool
+	var pkgNames []string
+	var pkgNameIndexes []int
+	for idx, v := range nargs {
+		if sawFlagKey { // current is a flag value
+			sawFlagKey = false
+			continue
+		}
+		isInFlagDeclaration := sawFlagKey
+		declaresValue := strings.Contains(v, "=")
+		sawFlagKey = v[0] == '-' && !declaresValue              // current is flag key and next is a flag value
+		if sawFlagKey || isInFlagDeclaration || declaresValue { // current is either a flag key, a flag value or a flag declaring its value
+			continue
+		}
+		// not a flag
+		pkgNames = append(pkgNames, v)
+		pkgNameIndexes = append(pkgNameIndexes, idx)
+	}
+
+	// clear the findings (set empty, delete empty entries)
+	for _, v := range pkgNameIndexes {
+		nargs[v] = "" // empty the findings
+	}
+	nargs = slices.DeleteFunc(nargs, func(v string) bool {
+		return v == ""
+	})
+	cfg.NArgs = nargs
+
+	for _, v := range pkgNames {
+		isRecursiveWalk := strings.HasSuffix(v, filepath.Base("..."))
+		pkgCfg := PkgNameExec{
+			Name: v,
+			// Dir:             getPkgTargetDir(cfg.CWD, v, isRecursiveWalk),
+			IsRecursiveWalk: isRecursiveWalk}
+		cfg.PackageNameList = append(cfg.PackageNameList, pkgCfg)
+	}
 
 	return cfg, nil
-}
-
-func splitArgs(inArgs []string) (args, nargs []string, _ error) {
-	args = inArgs
-
-	DEBUG = slices.Contains(args, "-internal.debug")
-	if DEBUG {
-		args = slices.DeleteFunc(args, func(v string) bool {
-			return v == "-internal.debug"
-		})
-	}
-
-	// determine nargs
-	idx := slices.Index(args, "-")
-	if idx == -1 {
-		idx = slices.Index(args, "--")
-	}
-	if idx > -1 {
-		if idx == 0 {
-			return nil, nil, fmt.Errorf("given \"-\", must provide further nargs")
-		}
-
-		nargs = args[idx+1:]
-		args = args[:idx]
-	}
-
-	return args, nargs, nil
-}
-
-func getTargetDirs(cfg ExecConfig) []string {
-	if cfg.IsRecursiveWalk {
-		// TODO: perform Dir-Walk
-		panic("not yet supported")
-	}
-	targetDir := cfg.CWD
-	if len(cfg.RawPath) == 0 {
-		return []string{targetDir}
-	}
-	if filepath.IsAbs(cfg.RawPath) {
-		targetDir = filepath.Clean(cfg.RawPath)
-	} else {
-		targetDir = filepath.Join(targetDir, cfg.RawPath)
-	}
-	return []string{targetDir}
 }
