@@ -3,15 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"sync"
-
-	"github.com/mvrahden/go-test/about"
-	"github.com/mvrahden/go-test/internal/cmd/testgen"
 )
 
-func PerformTests(cfg ExecConfig, scanDirs []string, nargs []string) (code int) {
+func RunTests(cfg ExecConfig, scanDirs []string, nargs []string) (code int) {
 	type jobRes struct {
 		Dir    string
 		Stdout []byte
@@ -25,8 +20,20 @@ func PerformTests(cfg ExecConfig, scanDirs []string, nargs []string) (code int) 
 
 	workerFunc := func() {
 		for j := range jobC {
-			out, code, err := TestPackage(j, nargs)
+			res, err := cfg.SuitesGenerate(j)
+			if err != nil {
+				resC <- jobRes{j, nil, 2, err}
+				continue
+			}
+
+			nargs = append(nargs, res.AbsPath)
+			out, code, err := cfg.SuitesRun(nargs)
 			resC <- jobRes{j, out, code, err}
+
+			if DEBUG {
+				continue // skip cleanup on debug
+			}
+			cfg.SuitesCleanup(j)
 		}
 		wg.Done()
 	}
@@ -71,38 +78,4 @@ func PerformTests(cfg ExecConfig, scanDirs []string, nargs []string) (code int) 
 	wg2.Wait()
 
 	return maxCode
-}
-
-func TestPackage(scanDir string, nargs []string) (out []byte, code int, err error) {
-	result, err := testgen.GenerateSuites(scanDir)
-	if err != nil {
-		return nil, 2, fmt.Errorf("failed generating suites: %w", err)
-	}
-
-	if len(result.PTest) > 0 {
-		testsuiteFile := filepath.Join(result.AbsPath, about.PSuite)
-		err := os.WriteFile(testsuiteFile, result.PTest, os.ModePerm)
-		if err != nil {
-			return nil, 2, fmt.Errorf("failed writing ptest: %w", err)
-		}
-	}
-	if len(result.PXTest) > 0 {
-		testsuiteFile := filepath.Join(result.AbsPath, about.PXSuite)
-		err := os.WriteFile(testsuiteFile, result.PXTest, os.ModePerm)
-		if err != nil {
-			return nil, 2, fmt.Errorf("failed writing pxtest: %w", err)
-		}
-	}
-
-	nargs = append(nargs, result.AbsPath)
-	cmd := exec.Command("go", append([]string{"test"}, nargs...)...)
-	if len(nargs) > 0 {
-		cmd.Args = append(cmd.Args, nargs...)
-	}
-	out, _ = cmd.CombinedOutput()
-	if !DEBUG { // skip to debug
-		os.Remove(filepath.Join(result.AbsPath, about.PSuite))
-		os.Remove(filepath.Join(result.AbsPath, about.PXSuite))
-	}
-	return out, cmd.ProcessState.ExitCode(), nil
 }
