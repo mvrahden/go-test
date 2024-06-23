@@ -23,7 +23,7 @@ func Test_ArgsParse(t *testing.T) {
 		{givenArgs: []string{"abc"}, expectedCfg: ExecConfig{MaxConcurrency: 8, RawPath: "abc", CWD: cwd}, expectedNargs: []string(nil)},
 		{givenArgs: []string{".", "-", "def"}, expectedCfg: ExecConfig{MaxConcurrency: 8, RawPath: ".", CWD: cwd}, expectedNargs: []string{"def"}},
 		{givenArgs: []string{"abc", "-", "def"}, expectedCfg: ExecConfig{MaxConcurrency: 8, RawPath: "abc", CWD: cwd}, expectedNargs: []string{"def"}},
-		{givenArgs: []string{"./..."}, expectedCfg: ExecConfig{TestRecursive: true, MaxConcurrency: 8, RawPath: "./...", CWD: cwd}, expectedNargs: []string(nil)},
+		{givenArgs: []string{"./..."}, expectedCfg: ExecConfig{IsRecursiveWalk: true, MaxConcurrency: 8, RawPath: "./...", CWD: cwd}, expectedNargs: []string(nil)},
 	}
 
 	for idx, tC := range testCases {

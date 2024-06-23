@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
 type ExecConfig struct {
@@ -39,7 +40,7 @@ func parseArgs(args []string) (ExecConfig, error) {
 		CWD:            cwd,
 		RawPath:        args[len(args)-1], // always last arg
 	}
-	cfg.TestRecursive = cfg.RawPath == "./..."
+	cfg.IsRecursiveWalk = strings.HasSuffix(cfg.RawPath, filepath.Base("..."))
 
 	return cfg, nil
 }
@@ -72,7 +73,7 @@ func splitArgs(inArgs []string) (args, nargs []string, _ error) {
 }
 
 func getTargetDirs(cfg ExecConfig) []string {
-	if cfg.RawPath == "./..." {
+	if cfg.IsRecursiveWalk {
 		// TODO: perform Dir-Walk
 		panic("not yet supported")
 	}
