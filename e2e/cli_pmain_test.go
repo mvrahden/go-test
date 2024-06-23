@@ -48,13 +48,12 @@ func Test_TestsuiteCLI(t *testing.T) {
 
 	testCases := []struct {
 		pkgName    string
-		args       []string
 		goldenName string
 		debug      bool
 	}{
-		{pkgName: "examples/gosuite", goldenName: "gosuite_output.txt", args: []string{"-dir", ""}, debug: false},
-		{pkgName: "examples/my", goldenName: "my_output.txt", args: []string{"-dir", ""}, debug: false},
-		{pkgName: "examples/simple_suite", goldenName: "simple_suite_output.txt", args: []string{"-dir", ""}, debug: false},
+		{pkgName: "examples/gosuite", goldenName: "gosuite_output.txt", debug: false},
+		{pkgName: "examples/my", goldenName: "my_output.txt", debug: false},
+		{pkgName: "examples/simple_suite", goldenName: "simple_suite_output.txt", debug: false},
 	}
 	for idx, tc := range testCases {
 		t.Run(fmt.Sprintf("idx %d", idx), func(t *testing.T) {
@@ -68,10 +67,10 @@ func performTest(t *testing.T, tmpDir, pkgPath, goldenName string, debug bool) {
 	cmd := exec.
 		Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite", tmpCurrentPackage)
 	if debug {
-		cmd.Args = append(cmd.Args, "-internal.debug")
+		cmd.Args = append(cmd.Args, "-ƒƒ.internal.debug")
 		exec.Command("sh", "-c", `echo "`+tmpCurrentPackage+`" >> debug_dirs`).CombinedOutput()
 	}
-	cmd.Args = append(cmd.Args, "-", "-v")
+	cmd.Args = append(cmd.Args, "-v")
 	cmd.Dir = tmpDir
 	out, _ := cmd.CombinedOutput()
 
