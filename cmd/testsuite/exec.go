@@ -6,42 +6,17 @@ import (
 	"sync"
 )
 
-func RunTests(cfg ExecConfig) (code int) {
-	type jobRes struct {
-		Dir    string
-		Stdout []byte
-		Code   int
-		Error  error
-	}
-	jobC := make(chan string, 100)
-	resC := make(chan jobRes, 100)
-	wg := &sync.WaitGroup{}
-	wg.Add(cfg.MaxConcurrency)
+type runJobRes struct {
+	Dir    string
+	Stdout []byte
+	Code   int
+	Error  error
+}
 
-	workerFunc := func() {
-		for j := range jobC {
-			err := cfg.SuitesGenerate(j)
-			if err != nil {
-				resC <- jobRes{j, nil, 2, err}
-				continue
-			}
-
-			out, code, err := cfg.SuitesRun(cfg.NArgs)
-			resC <- jobRes{j, out, code, err}
-
-			if DEBUG {
-				continue // skip cleanup on debug
-			}
-			cfg.SuitesCleanup(j)
-		}
-		wg.Done()
-	}
-	for range cfg.MaxConcurrency {
-		go workerFunc()
-	}
-	for _, pkgName := range cfg.PackageNameList {
-		jobC <- pkgName.Name
-	}
+// RunStdlibTests runs pre-test generation and post-test cleanup in
+// a fan-out mode and uses `go test` as is.
+func RunStdlibTests(cfg ExecConfig) (code int) {
+	resC := make(chan runJobRes, 2*cfg.MaxConcurrency)
 
 	wg2 := sync.WaitGroup{}
 	wg2.Add(1)
@@ -68,13 +43,57 @@ func RunTests(cfg ExecConfig) (code int) {
 	}
 	go collectorFunc()
 
-	// finish jobs
-	close(jobC)
-	wg.Wait()
+	executeTestrunSequence := func() {
+		fanOutJob(cfg, resC, func(pkgName string) error {
+			return cfg.SuitesGenerate(pkgName)
+		})
+
+		out, code, err := cfg.SuitesRun(cfg.NArgs)
+		resC <- runJobRes{
+			Stdout: out,
+			Code:   code,
+			Error:  err,
+		}
+
+		if !DEBUG {
+			fanOutJob(cfg, resC, func(pkgName string) error {
+				cfg.SuitesCleanup(pkgName)
+				return nil
+			})
+		}
+	}
+	executeTestrunSequence()
 
 	// finish collection
 	close(resC)
 	wg2.Wait()
 
 	return maxCode
+}
+
+func fanOutJob(cfg ExecConfig, resC chan<- runJobRes, fn func(string) error) {
+	jobC := make(chan string, 100)
+	wg := &sync.WaitGroup{}
+	wg.Add(cfg.MaxConcurrency)
+
+	workerFunc := func() {
+		for j := range jobC {
+			err := fn(j)
+			if err != nil {
+				resC <- runJobRes{j, nil, 2, err}
+				continue
+			}
+		}
+		wg.Done()
+	}
+	for range cfg.MaxConcurrency {
+		go workerFunc()
+	}
+	for _, pkgName := range cfg.PackageNameList {
+		jobC <- pkgName.Name
+	}
+
+	// finish jobs
+	close(jobC)
+	wg.Wait()
 }
