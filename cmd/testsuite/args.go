@@ -6,12 +6,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/mvrahden/go-test/internal/cmd/testgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	xslices "github.com/mvrahden/go-test/internal/x/slices"
 )
 
-type SuiteGeneratorFunc func(pkgName string) (testgen.GenerateResult, error)
+type SuiteGeneratorFunc func(pkgName string) error
 type SuiteRunnerFunc func(args []string) (out []byte, code int, err error)
 type SuiteCleanupFunc func(scanDir string)
 
@@ -68,6 +67,7 @@ func parseNArgs(nargs []string) (ExecConfig, error) {
 		SuitesGenerate: gotestrunner.SuitesGenerate,
 		SuitesRun:      gotestrunner.StdlibRunTests,
 		SuitesCleanup:  gotestrunner.SuitesCleanup,
+		NArgs:          nargs,
 	}
 
 	// Search for Package Name List entries in nargs, collect and clear them.
@@ -90,15 +90,6 @@ func parseNArgs(nargs []string) (ExecConfig, error) {
 		pkgNames = append(pkgNames, v)
 		pkgNameIndexes = append(pkgNameIndexes, idx)
 	}
-
-	// clear the findings (set empty, delete empty entries)
-	for _, v := range pkgNameIndexes {
-		nargs[v] = "" // empty the findings
-	}
-	nargs = slices.DeleteFunc(nargs, func(v string) bool {
-		return v == ""
-	})
-	cfg.NArgs = nargs
 
 	for _, v := range pkgNames {
 		isRecursiveWalk := strings.HasSuffix(v, filepath.Base("..."))
