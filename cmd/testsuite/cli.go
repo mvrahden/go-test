@@ -29,5 +29,5 @@ func main() {
 		onErrFail(fmt.Sprintf("failed parsing args: %s", err), err)
 	}
 
-	os.Exit(RunTests(cfg))
+	os.Exit(RunStdlibTests(cfg))
 }
