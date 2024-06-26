@@ -19,7 +19,7 @@ func Test_ArgsParse(t *testing.T) {
 	}{
 		// stdlib drop-in replacement
 		{givenArgs: []string{"-ƒƒ.internal.debug", "-abc"}, expectedCfg: ExecConfig{MaxConcurrency: 8, CWD: cwd, NArgs: []string{"-abc"}}},
-		{givenArgs: []string{"abc"}, expectedCfg: ExecConfig{MaxConcurrency: 8, CWD: cwd, PackageNameList: []PkgNameExec{{Name: "abc"}}, NArgs: []string{}}},
+		{givenArgs: []string{"abc"}, expectedCfg: ExecConfig{MaxConcurrency: 8, CWD: cwd, PackageNameList: []PkgNameExec{{Name: "abc"}}, NArgs: []string{"abc"}}},
 		{
 			givenArgs: []string{"-timeout", "30s", "-coverprofile=/var/folders/tv/76j4l4z95m7bqj6vrq2qbyk00000gn/T/vscode-gobSiwCA/go-code-cover", "-run", "^Test_ArgsParse$", "github.com/mvrahden/go-test/cmd/testsuite", "-count=1"},
 			expectedCfg: ExecConfig{
@@ -28,7 +28,7 @@ func Test_ArgsParse(t *testing.T) {
 				PackageNameList: []PkgNameExec{
 					{Name: "github.com/mvrahden/go-test/cmd/testsuite"},
 				},
-				NArgs: []string{"-timeout", "30s", "-coverprofile=/var/folders/tv/76j4l4z95m7bqj6vrq2qbyk00000gn/T/vscode-gobSiwCA/go-code-cover", "-run", "^Test_ArgsParse$", "-count=1"}},
+				NArgs: []string{"-timeout", "30s", "-coverprofile=/var/folders/tv/76j4l4z95m7bqj6vrq2qbyk00000gn/T/vscode-gobSiwCA/go-code-cover", "-run", "^Test_ArgsParse$", "github.com/mvrahden/go-test/cmd/testsuite", "-count=1"}},
 		},
 		{ // with recursive walk from CWD
 			givenArgs: []string{"-timeout", "30s", "-coverprofile=/var/folders/tv/76j4l4z95m7bqj6vrq2qbyk00000gn/T/vscode-gobSiwCA/go-code-cover", "-run", "^Test_ArgsParse$", "./...", "-count=1"},
@@ -36,9 +36,9 @@ func Test_ArgsParse(t *testing.T) {
 				MaxConcurrency: 8,
 				CWD:            cwd,
 				PackageNameList: []PkgNameExec{
-					{Name: "./...", IsRecursiveWalk: true}, //TODO: PkgName incorrect, PkgNameList not final (due to runner orchestration, need to determine each package individually)
+					{Name: "./...", IsRecursiveWalk: true},
 				},
-				NArgs: []string{"-timeout", "30s", "-coverprofile=/var/folders/tv/76j4l4z95m7bqj6vrq2qbyk00000gn/T/vscode-gobSiwCA/go-code-cover", "-run", "^Test_ArgsParse$", "-count=1"}},
+				NArgs: []string{"-timeout", "30s", "-coverprofile=/var/folders/tv/76j4l4z95m7bqj6vrq2qbyk00000gn/T/vscode-gobSiwCA/go-code-cover", "-run", "^Test_ArgsParse$", "./...", "-count=1"}},
 		},
 		{ // with recursive walk from pkgName
 			givenArgs: []string{"-timeout", "30s", "-coverprofile=/var/folders/tv/76j4l4z95m7bqj6vrq2qbyk00000gn/T/vscode-gobSiwCA/go-code-cover", "-run", "^Test_ArgsParse$", "github.com/mvrahden/go-test/cmd/testsuite/...", "-count=1"},
@@ -46,9 +46,9 @@ func Test_ArgsParse(t *testing.T) {
 				MaxConcurrency: 8,
 				CWD:            cwd,
 				PackageNameList: []PkgNameExec{
-					{Name: "github.com/mvrahden/go-test/cmd/testsuite/...", IsRecursiveWalk: true}, //TODO: PkgName incorrect, PkgNameList not final
+					{Name: "github.com/mvrahden/go-test/cmd/testsuite/...", IsRecursiveWalk: true},
 				},
-				NArgs: []string{"-timeout", "30s", "-coverprofile=/var/folders/tv/76j4l4z95m7bqj6vrq2qbyk00000gn/T/vscode-gobSiwCA/go-code-cover", "-run", "^Test_ArgsParse$", "-count=1"}},
+				NArgs: []string{"-timeout", "30s", "-coverprofile=/var/folders/tv/76j4l4z95m7bqj6vrq2qbyk00000gn/T/vscode-gobSiwCA/go-code-cover", "-run", "^Test_ArgsParse$", "github.com/mvrahden/go-test/cmd/testsuite/...", "-count=1"}},
 		},
 		// {givenArgs: []string{"abc", "-", "def"}, expectedCfg: ExecConfig{MaxConcurrency: 8, CWD: cwd, NArgs: []string{"def"}}},
 		// {givenArgs: []string{"./..."}, expectedCfg: ExecConfig{IsRecursiveWalk: true, MaxConcurrency: 8, RawPath: "./...", CWD: cwd}},

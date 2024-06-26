@@ -20,14 +20,13 @@ func RunTests(cfg ExecConfig) (code int) {
 
 	workerFunc := func() {
 		for j := range jobC {
-			res, err := cfg.SuitesGenerate(j)
+			err := cfg.SuitesGenerate(j)
 			if err != nil {
 				resC <- jobRes{j, nil, 2, err}
 				continue
 			}
 
-			nargs := append(cfg.NArgs, res.AbsPath)
-			out, code, err := cfg.SuitesRun(nargs)
+			out, code, err := cfg.SuitesRun(cfg.NArgs)
 			resC <- jobRes{j, out, code, err}
 
 			if DEBUG {
