@@ -57,8 +57,7 @@ func RunStdlibTests(cfg ExecConfig) (code int) {
 
 		if !DEBUG {
 			fanOutJob(cfg, resC, func(pkgName string) error {
-				cfg.SuitesCleanup(pkgName)
-				return nil
+				return cfg.SuitesCleanup(pkgName)
 			})
 		}
 	}

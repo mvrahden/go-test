@@ -3,8 +3,8 @@ package e2e
 import (
 	"bytes"
 	"embed"
-	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/internal/testutils"
+	"github.com/stretchr/testify/require"
 )
 
 //go:embed testdata
@@ -47,31 +48,40 @@ func Test_TestsuiteCLI(t *testing.T) {
 	testutils.HackGoWork(t, tmp)
 
 	testCases := []struct {
+		basedir    string
 		pkgName    string
+		pkgPath    string
 		goldenName string
 		debug      bool
 	}{
-		{pkgName: "examples/gosuite", goldenName: "gosuite_output.txt", debug: false},
-		{pkgName: "examples/my", goldenName: "my_output.txt", debug: false},
-		{pkgName: "examples/simple_suite", goldenName: "simple_suite_output.txt", debug: false},
+		{basedir: "examples", pkgPath: "gosuite", goldenName: "gosuite_output.txt", debug: false},
+		{basedir: "examples", pkgPath: "my", goldenName: "my_output.txt", debug: false},
+		{basedir: "examples", pkgPath: "simple_suite", goldenName: "simple_suite_output.txt", debug: false},
+		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/gosuite", goldenName: "gosuite_output.txt", debug: false},
+		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/my", goldenName: "my_output.txt", debug: false},
+		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/simple_suite", goldenName: "simple_suite_output.txt", debug: false},
 	}
 	for idx, tc := range testCases {
 		t.Run(fmt.Sprintf("idx %d", idx), func(t *testing.T) {
-			performTest(t, tmp, tc.pkgName, tc.goldenName, tc.debug)
+			performTest(t, tmp, tc.basedir, tc.pkgPath, tc.pkgName, tc.goldenName, tc.debug)
 		})
 	}
 }
 
-func performTest(t *testing.T, tmpDir, pkgPath, goldenName string, debug bool) {
-	tmpCurrentPackage := filepath.Join(tmpDir, pkgPath)
+func performTest(t *testing.T, tmpDir, basedir, inPkgPath, inPkgName, goldenName string, debug bool) {
+	unifiedPkgDesciptor := inPkgName // either pkgName or absolute path
+	if unifiedPkgDesciptor == "" {
+		unifiedPkgDesciptor = filepath.Join(tmpDir, basedir, inPkgPath)
+	}
+
 	cmd := exec.
-		Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite", tmpCurrentPackage)
+		Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite", unifiedPkgDesciptor)
 	if debug {
 		cmd.Args = append(cmd.Args, "-ƒƒ.internal.debug")
-		exec.Command("sh", "-c", `echo "`+tmpCurrentPackage+`" >> debug_dirs`).CombinedOutput()
+		exec.Command("sh", "-c", `echo "`+unifiedPkgDesciptor+`" >> debug_dirs`).CombinedOutput()
 	}
 	cmd.Args = append(cmd.Args, "-v")
-	cmd.Dir = tmpDir
+	cmd.Dir = filepath.Join(tmpDir, basedir)
 	out, _ := cmd.CombinedOutput()
 
 	// assert output
@@ -84,16 +94,10 @@ func performTest(t *testing.T, tmpDir, pkgPath, goldenName string, debug bool) {
 	)
 
 	// assert testsuite was removed after execution
-	for _, suiteName := range []string{about.PSuite, about.PXSuite} {
-		file, err := os.Stat(filepath.Join(tmpDir, pkgPath, suiteName))
-		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				return
-			}
-			t.Errorf("failed asserting file: %s", file.Name())
+	fs.WalkDir(os.DirFS(tmpDir), basedir, func(path string, d fs.DirEntry, err error) error {
+		if about.PSuiteRegex.MatchString(path) {
+			require.FailNow(t, "found test suite after executions")
 		}
-		if file.Size() > 0 {
-			t.Errorf("failed asserting file: %s", file.Name())
-		}
-	}
+		return nil
+	})
 }
