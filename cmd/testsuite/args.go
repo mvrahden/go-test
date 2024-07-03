@@ -12,7 +12,7 @@ import (
 
 type SuiteGeneratorFunc func(pkgName string) error
 type SuiteRunnerFunc func(args []string) (out []byte, code int, err error)
-type SuiteCleanupFunc func(scanDir string)
+type SuiteCleanupFunc func(scanDir string) error
 
 type PkgNameExec struct {
 	Name string // raw path argument (e.g.: "./...", "net/http" ...)
