@@ -35,9 +35,12 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 		testdatadir := filepath.Join("..", "..", "examples", tC.directory)
 
 		t.Run(fmt.Sprintf("Generate for package %q with %s", tC.directory, tC.description), func(t *testing.T) {
-			pkgName, ptest, pxtest, err := Generate(pkg)
+			pkgDir, pkgPath, ptest, pxtest, err := Generate(pkg)
 			require.NoError(t, err)
-			require.Equal(t, tC.pkgName, pkgName)
+			require.Equal(t, tC.pkgName, pkgPath)
+			require.NotEqual(t, tC.pkgName, pkgDir)
+			require.NotZero(t, pkgDir)
+			require.True(t, filepath.IsAbs(pkgDir))
 			ptestExpected := getExpectedOutputFile(t, testdatadir, "gotestgen_ptest.golden")
 			require.Equal(t, ptestExpected, string(ptest))
 			pxtestExpected := getExpectedOutputFile(t, testdatadir, "gotestgen_pxtest.golden")

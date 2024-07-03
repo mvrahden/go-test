@@ -26,12 +26,12 @@ func GenerateSuites(path string) (GenerateResult, error) {
 		return GenerateResult{}, fmt.Errorf("failed inspecting directory %q: %w", path, err)
 	}
 
-	pkgName, ptestSrcs, pxtestSrcs, err := gotestgen.Generate(path)
+	pkgDir, pkgPath, ptestSrcs, pxtestSrcs, err := gotestgen.Generate(path)
 	if err != nil {
 		return GenerateResult{}, fmt.Errorf("failed generating code: %w", err)
 	}
 
-	return GenerateResult{AbsPath: path, Package: pkgName, PTest: ptestSrcs, PXTest: pxtestSrcs}, nil
+	return GenerateResult{AbsPath: pkgDir, Package: pkgPath, PTest: ptestSrcs, PXTest: pxtestSrcs}, nil
 }
 
 var findAndDeleteOldGeneratedFile = func(dir string) error {
