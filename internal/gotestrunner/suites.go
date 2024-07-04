@@ -9,7 +9,7 @@ import (
 
 	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/internal/cmd/testgen"
-	"golang.org/x/tools/go/packages"
+	"github.com/mvrahden/go-test/internal/gotestgen"
 )
 
 func SuitesGenerate(scanDir string) error {
@@ -36,9 +36,7 @@ func SuitesGenerate(scanDir string) error {
 }
 
 func SuitesCleanup(pkgPath string) error {
-	pkgs, err := packages.Load(&packages.Config{
-		Mode: packages.NeedModule,
-	}, pkgPath)
+	pkgs, err := gotestgen.LoadCached(pkgPath)
 	if err != nil {
 		return fmt.Errorf("failed cleaning suites: %w", err)
 	}

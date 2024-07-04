@@ -21,15 +21,9 @@ func Generate(targetPath string) (string, string, []byte, []byte, error) {
 }
 
 func loadPackages(targetPkg string) (pkgDir, pkgPath string, ptest *packages.Package, pxtest *packages.Package, _ error) {
-	totalFoundPkgs, err := packages.Load(&packages.Config{
-		Mode:  packageEvalMode,
-		Tests: true,
-	}, targetPkg)
+	totalFoundPkgs, err := LoadCached(targetPkg)
 	if err != nil {
-		return "", "", nil, nil, fmt.Errorf("failed loading packages. err: %w", err)
-	}
-	if len(totalFoundPkgs) == 0 || totalFoundPkgs[0].Name == "" {
-		return "", "", nil, nil, fmt.Errorf("not a Go package") // nothing found
+		return "", "", nil, nil, err
 	}
 
 	determinePkgDir := func(modDir, modPath, pkgPath string) string {
