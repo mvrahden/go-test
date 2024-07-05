@@ -49,6 +49,19 @@ func Map[T, R any](in []T, fn func(v T, idx int) R) []R {
 	return out
 }
 
+// MapErr will apply a map operation on the input and will terminate on first error.
+func MapErr[T, R any](in []T, fn func(v T, idx int) (R, error)) ([]R, error) {
+	out := make([]R, len(in))
+	for idx, v := range in {
+		var err error
+		out[idx], err = fn(v, idx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
 // Reduce will apply a reduce operation on the input.
 // The seed value of the accumulator will be its zero value.
 func Reduce[T, R any](in []T, fn func(v T, acc R) R) R {

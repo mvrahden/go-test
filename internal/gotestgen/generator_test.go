@@ -35,16 +35,18 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 		testdatadir := filepath.Join("..", "..", "examples", tC.directory)
 
 		t.Run(fmt.Sprintf("Generate for package %q with %s", tC.directory, tC.description), func(t *testing.T) {
-			pkgDir, pkgPath, ptest, pxtest, err := Generate(pkg)
-			require.NoError(t, err)
-			require.Equal(t, tC.pkgName, pkgPath)
-			require.NotEqual(t, tC.pkgName, pkgDir)
-			require.NotZero(t, pkgDir)
-			require.True(t, filepath.IsAbs(pkgDir))
-			ptestExpected := getExpectedOutputFile(t, testdatadir, "gotestgen_ptest.golden")
-			require.Equal(t, ptestExpected, string(ptest))
-			pxtestExpected := getExpectedOutputFile(t, testdatadir, "gotestgen_pxtest.golden")
-			require.Equal(t, pxtestExpected, string(pxtest))
+			res, err := Generate(pkg)
+			for _, v := range res {
+				require.NoError(t, err)
+				require.Equal(t, tC.pkgName, v.Package)
+				require.NotEqual(t, tC.pkgName, v.AbsPath)
+				require.NotZero(t, v.AbsPath)
+				require.True(t, filepath.IsAbs(v.AbsPath))
+				ptestExpected := getExpectedOutputFile(t, testdatadir, "gotestgen_ptest.golden")
+				require.Equal(t, ptestExpected, string(v.PTest))
+				pxtestExpected := getExpectedOutputFile(t, testdatadir, "gotestgen_pxtest.golden")
+				require.Equal(t, pxtestExpected, string(v.PXTest))
+			}
 		})
 	}
 }

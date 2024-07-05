@@ -13,11 +13,12 @@ import (
 )
 
 func SuitesGenerate(scanDir string) error {
-	result, err := testgen.GenerateSuites(scanDir)
+	results, err := testgen.GenerateSuites(scanDir)
 	if err != nil {
 		return fmt.Errorf("failed generating suites: %w", err)
 	}
 
+	for _, result := range results {
 	if len(result.PTest) > 0 {
 		testsuiteFile := filepath.Join(result.AbsPath, about.PSuite)
 		err := os.WriteFile(testsuiteFile, result.PTest, os.ModePerm)
@@ -30,6 +31,7 @@ func SuitesGenerate(scanDir string) error {
 		err := os.WriteFile(testsuiteFile, result.PXTest, os.ModePerm)
 		if err != nil {
 			return fmt.Errorf("failed writing pxtest: %w", err)
+			}
 		}
 	}
 	return nil
