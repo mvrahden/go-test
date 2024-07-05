@@ -44,9 +44,7 @@ func RunStdlibTests(cfg ExecConfig) (code int) {
 	go collectorFunc()
 
 	executeTestrunSequence := func() {
-		fanOutJob(cfg, resC, func(pkgName string) error {
-			return cfg.SuitesGenerate(pkgName)
-		})
+		fanOutJob(cfg, resC, cfg.SuitesGenerate)
 
 		out, code, err := cfg.SuitesRun(cfg.NArgs)
 		resC <- runJobRes{
@@ -56,9 +54,7 @@ func RunStdlibTests(cfg ExecConfig) (code int) {
 		}
 
 		if !DEBUG {
-			fanOutJob(cfg, resC, func(pkgName string) error {
-				return cfg.SuitesCleanup(pkgName)
-			})
+			fanOutJob(cfg, resC, cfg.SuitesCleanup)
 		}
 	}
 	executeTestrunSequence()

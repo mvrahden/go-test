@@ -1,0 +1,72 @@
+=== RUN   TestF_FocusedTestSuite
+--- PASS: TestF_FocusedTestSuite (<TIMESTAMP>)
+=== RUN   TestX_ExcludedTestSuite
+    ƒƒ_psuite_test.go:35: test suite was excluded by user
+--- SKIP: TestX_ExcludedTestSuite (<TIMESTAMP>)
+=== RUN   TestNoopTestSuite
+    ƒƒ_psuite_test.go:39: test suite was excluded by user
+--- SKIP: TestNoopTestSuite (<TIMESTAMP>)
+=== RUN   TestF_FocusedTestSuite
+=== RUN   TestF_FocusedTestSuite/TestSomething
+--- PASS: TestF_FocusedTestSuite (<TIMESTAMP>)
+    --- PASS: TestF_FocusedTestSuite/TestSomething (<TIMESTAMP>)
+=== RUN   TestNoopTestSuite
+    ƒƒ_pxsuite_test.go:49: test suite was excluded by user
+--- SKIP: TestNoopTestSuite (<TIMESTAMP>)
+=== RUN   TestX_ExcludedTestSuite
+    ƒƒ_pxsuite_test.go:53: test suite was excluded by user
+--- SKIP: TestX_ExcludedTestSuite (<TIMESTAMP>)
+PASS
+ok  	github.com/mvrahden/go-test/examples/focus_suite	<TIMESTAMP>
+=== RUN   Test_Unit_Stdlib
+--- PASS: Test_Unit_Stdlib (<TIMESTAMP>)
+=== RUN   TestUnitTestSuite
+    prog_suite_test.go:12: BeforeAll
+=== RUN   TestUnitTestSuite/F_TestUnitFails
+    prog_suite_test.go:15: BeforeEach
+--- FAIL: TestUnitTestSuite (<TIMESTAMP>)
+    --- FAIL: TestUnitTestSuite/F_TestUnitFails (<TIMESTAMP>)
+FAIL
+FAIL	github.com/mvrahden/go-test/examples/gosuite	<TIMESTAMP>
+=== RUN   TestMyNoopTestSuite
+--- PASS: TestMyNoopTestSuite (<TIMESTAMP>)
+=== RUN   TestMyTestSuite
+=== RUN   TestMyTestSuite/F_TestSomethingSpecific
+=== RUN   TestMyTestSuite/F_TestParallelSomethingC
+=== PAUSE TestMyTestSuite/F_TestParallelSomethingC
+=== CONT  TestMyTestSuite/F_TestParallelSomethingC
+--- PASS: TestMyTestSuite (<TIMESTAMP>)
+    --- PASS: TestMyTestSuite/F_TestSomethingSpecific (<TIMESTAMP>)
+    --- PASS: TestMyTestSuite/F_TestParallelSomethingC (<TIMESTAMP>)
+=== RUN   TestX_MySkippedTestSuite
+    ƒƒ_psuite_test.go:91: test suite was excluded by user
+--- SKIP: TestX_MySkippedTestSuite (<TIMESTAMP>)
+=== RUN   TestMyNoopTestSuite
+--- PASS: TestMyNoopTestSuite (<TIMESTAMP>)
+=== RUN   TestMyTestSuite
+=== RUN   TestMyTestSuite/F_TestSomethingSpecific#01
+--- PASS: TestMyTestSuite (<TIMESTAMP>)
+    --- PASS: TestMyTestSuite/F_TestSomethingSpecific#01 (<TIMESTAMP>)
+=== RUN   TestX_MySkippedTestSuite
+    ƒƒ_pxsuite_test.go:73: test suite was excluded by user
+--- SKIP: TestX_MySkippedTestSuite (<TIMESTAMP>)
+PASS
+ok  	github.com/mvrahden/go-test/examples/my	<TIMESTAMP>
+=== RUN   TestSimpleTestSuite
+=== RUN   TestSimpleTestSuite/TestSucceeds
+=== RUN   TestSimpleTestSuite/TestFails
+    ptest_test.go:45: assertion failed: got: "+ 1 line\n- 1 line\n+ 1 line\n"
+--- FAIL: TestSimpleTestSuite (<TIMESTAMP>)
+    --- PASS: TestSimpleTestSuite/TestSucceeds (<TIMESTAMP>)
+    --- FAIL: TestSimpleTestSuite/TestFails (<TIMESTAMP>)
+=== RUN   TestSimpleTestSuite
+=== RUN   TestSimpleTestSuite/TestSucceeds#01
+=== RUN   TestSimpleTestSuite/TestFails#01
+    pxtest_test.go:45: assertion failed: got: "+ 1 line\n- 1 line\n+ 1 line\n"
+--- FAIL: TestSimpleTestSuite (<TIMESTAMP>)
+    --- PASS: TestSimpleTestSuite/TestSucceeds#01 (<TIMESTAMP>)
+    --- FAIL: TestSimpleTestSuite/TestFails#01 (<TIMESTAMP>)
+FAIL
+FAIL	github.com/mvrahden/go-test/examples/simple_suite	<TIMESTAMP>
+FAIL
+exit status 1
