@@ -40,12 +40,6 @@ func loadPackages(targetPkg string) ([]*loadResult, error) {
 		return nil, err
 	}
 
-	determinePkgDir := func(modDir, modPath, pkgPath string) string {
-		commonPrefix := len(modPath) + 1
-		path := pkgPath[commonPrefix:]
-		return modDir + "/" + path
-	}
-
 	// filter all packages with Go-Module support
 	loadedTestPkgs := slices.Filter(totalFoundPkgs, func(item *packages.Package, index int) bool {
 		return item.Module != nil
@@ -62,7 +56,7 @@ func loadPackages(targetPkg string) ([]*loadResult, error) {
 		}
 		_, ok := acc[pkgPath]
 		if !ok {
-			acc[pkgPath] = &loadResult{pkgPath: pkgPath, pkgDir: determinePkgDir(p.Module.Dir, p.Module.Path, pkgPath)}
+			acc[pkgPath] = &loadResult{pkgPath: pkgPath, pkgDir: DeterminePkgDir(p)}
 		}
 		if !isPxTest {
 			acc[pkgPath].ptest = p
