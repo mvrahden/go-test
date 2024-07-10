@@ -49,8 +49,7 @@ func TestT(t *testing.T) {
 
 	// perform testsuite command
 	// testsuite command algo:
-	// - cleanup generated sources
-	// - create suite from source
+	// - create suite from loaded sources
 	// - perform "go test" command
 	// - cleanup generated sources
 	tmpCurrentPackage := filepath.Join(tmp, "/pkg/gotest")
