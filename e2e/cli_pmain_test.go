@@ -70,7 +70,7 @@ func Test_TestsuiteCLI(t *testing.T) {
 }
 
 func performTest(t *testing.T, tmpDir, basedir, inPkgPath, inPkgName, goldenName string, debug bool) {
-	unifiedPkgDesciptor := inPkgName // either pkgName or absolute path
+	unifiedPkgDesciptor := inPkgName // either pkgName or build absolute path
 	if unifiedPkgDesciptor == "" {
 		unifiedPkgDesciptor = filepath.Join(tmpDir, basedir, inPkgPath)
 	}
