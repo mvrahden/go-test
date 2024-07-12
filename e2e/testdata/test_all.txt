@@ -18,16 +18,6 @@
 --- SKIP: TestX_ExcludedTestSuite (<TIMESTAMP>)
 PASS
 ok  	github.com/mvrahden/go-test/examples/focus_suite	<TIMESTAMP>
-=== RUN   Test_Unit_Stdlib
---- PASS: Test_Unit_Stdlib (<TIMESTAMP>)
-=== RUN   TestUnitTestSuite
-    prog_suite_test.go:12: BeforeAll
-=== RUN   TestUnitTestSuite/F_TestUnitFails
-    prog_suite_test.go:15: BeforeEach
---- FAIL: TestUnitTestSuite (<TIMESTAMP>)
-    --- FAIL: TestUnitTestSuite/F_TestUnitFails (<TIMESTAMP>)
-FAIL
-FAIL	github.com/mvrahden/go-test/examples/gosuite	<TIMESTAMP>
 === RUN   TestMyNoopTestSuite
 --- PASS: TestMyNoopTestSuite (<TIMESTAMP>)
 === RUN   TestMyTestSuite

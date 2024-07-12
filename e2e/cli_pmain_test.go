@@ -26,23 +26,23 @@ func Test_TestsuiteCLI(t *testing.T) {
 
 	// clone module into tmp
 	excludedPaths := []string{
-		".git",                    // entire .git dir
-		"go.work",                 // no go.work reference
-		"pkg/gotest/main_test.go", // this file
+		".git",    // entire .git dir
+		"go.work", // no go.work reference
 	}
 	testutils.CopyModuleUnderTestToTmp(t, tmp, "./..", excludedPaths...)
 	testutils.ActivateTests(t, tmp)
 
 	unexpectedFiles := []string{
 		"go.work",
-		"examples/gosuite/ƒƒ_psuite_test.go",
-		"examples/gosuite/ƒƒ_pxsuite_test.go",
+		"examples/stdlib/ƒƒ_psuite_test.go",
+		"examples/stdlib/ƒƒ_pxsuite_test.go",
 	}
 	testutils.AssertFilesNotInTmp(t, tmp, unexpectedFiles...)
 	// assert package to test is in tmp
 	expectedFiles := []string{
 		"go.mod",
-		"examples/gosuite/prog_suite_test.go",
+		"examples/stdlib/unit.go",
+		"examples/stdlib/unit_suite_ptest_test.go",
 	}
 	testutils.AssertFilesInTmp(t, tmp, expectedFiles...)
 	testutils.HackGoWork(t, tmp)
@@ -55,11 +55,9 @@ func Test_TestsuiteCLI(t *testing.T) {
 		debug      bool
 	}{
 		{basedir: "examples", pkgPath: "stdlib", goldenName: "stdlib_output.txt", debug: false},
-		{basedir: "examples", pkgPath: "gosuite", goldenName: "gosuite_output.txt", debug: false},
 		{basedir: "examples", pkgPath: "my", goldenName: "my_output.txt", debug: false},
 		{basedir: "examples", pkgPath: "simple_suite", goldenName: "simple_suite_output.txt", debug: false},
 		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/stdlib", goldenName: "stdlib_output.txt", debug: false},
-		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/gosuite", goldenName: "gosuite_output.txt", debug: false},
 		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/my", goldenName: "my_output.txt", debug: false},
 		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/simple_suite", goldenName: "simple_suite_output.txt", debug: false},
 		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/...", goldenName: "test_all.txt", debug: false},
