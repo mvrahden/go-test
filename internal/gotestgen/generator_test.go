@@ -32,7 +32,7 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 		{"focus_suite", "github.com/mvrahden/go-test/examples/focus_suite", "focus test suites"},
 	} {
 		pkg := path.Join("..", "..", "examples", tC.directory)
-		testdatadir := filepath.Join("..", "..", "examples", tC.directory)
+		testdatadir := filepath.Join("..", "..", "examples", tC.directory, "testdata")
 
 		t.Run(fmt.Sprintf("Generate for package %q with %s", tC.directory, tC.description), func(t *testing.T) {
 			res, err := Generate(pkg)
