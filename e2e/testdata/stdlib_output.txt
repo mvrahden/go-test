@@ -1,0 +1,14 @@
+=== RUN   Test_Unit_Stdlib
+--- PASS: Test_Unit_Stdlib (<TIMESTAMP>)
+=== RUN   TestUnitTestSuite
+=== RUN   TestUnitTestSuite/TestUnitSuccess
+--- PASS: TestUnitTestSuite (<TIMESTAMP>)
+    --- PASS: TestUnitTestSuite/TestUnitSuccess (<TIMESTAMP>)
+=== RUN   Test_Unit_Stdlib
+--- PASS: Test_Unit_Stdlib (<TIMESTAMP>)
+=== RUN   TestUnitTestSuite
+=== RUN   TestUnitTestSuite/TestUnitSuccess#01
+--- PASS: TestUnitTestSuite (<TIMESTAMP>)
+    --- PASS: TestUnitTestSuite/TestUnitSuccess#01 (<TIMESTAMP>)
+PASS
+ok  	github.com/mvrahden/go-test/examples/stdlib	<TIMESTAMP>
