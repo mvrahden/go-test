@@ -27,6 +27,7 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 		pkgName     string
 		description string
 	}{
+		{"stdlib", "github.com/mvrahden/go-test/examples/stdlib", "stdlib and testsuites"},
 		{"simple_suite", "github.com/mvrahden/go-test/examples/simple_suite", "simple test suites"},
 		{"my", "github.com/mvrahden/go-test/examples/my", "standard test suites"},
 		{"focus_suite", "github.com/mvrahden/go-test/examples/focus_suite", "focus test suites"},
