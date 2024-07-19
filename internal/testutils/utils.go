@@ -47,6 +47,7 @@ func CopyModuleUnderTestToTmp(t *testing.T, tmp string, modPath string, skipByPr
 	}
 }
 
+// ActivateTests replaces ".go.test" suffix of file names to ".go".
 func ActivateTests(t *testing.T, tmp string) {
 	t.Helper()
 	tmpFS := os.DirFS(tmp)

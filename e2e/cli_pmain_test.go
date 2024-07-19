@@ -12,7 +12,6 @@ import (
 
 	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/internal/testutils"
-	"github.com/stretchr/testify/require"
 )
 
 //go:embed testdata
@@ -95,7 +94,7 @@ func performTest(t *testing.T, tmpDir, basedir, inPkgPath, inPkgName, goldenName
 	// assert testsuite was removed after execution
 	fs.WalkDir(os.DirFS(tmpDir), basedir, func(path string, d fs.DirEntry, err error) error {
 		if about.PSuiteRegex.MatchString(path) {
-			require.FailNow(t, "found test suite after executions")
+			t.Fatalf("found test suite after executions")
 		}
 		return nil
 	})
