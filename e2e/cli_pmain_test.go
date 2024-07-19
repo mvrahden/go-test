@@ -55,10 +55,8 @@ func Test_TestsuiteCLI(t *testing.T) {
 		debug      bool
 	}{
 		{basedir: "examples", pkgPath: "stdlib", goldenName: "stdlib_output.txt", debug: false},
-		{basedir: "examples", pkgPath: "my", goldenName: "my_output.txt", debug: false},
 		{basedir: "examples", pkgPath: "simple_suite", goldenName: "simple_suite_output.txt", debug: false},
 		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/stdlib", goldenName: "stdlib_output.txt", debug: false},
-		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/my", goldenName: "my_output.txt", debug: false},
 		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/simple_suite", goldenName: "simple_suite_output.txt", debug: false},
 		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/...", goldenName: "test_all.txt", debug: false},
 	}
