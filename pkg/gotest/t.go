@@ -2,6 +2,8 @@ package gotest
 
 import (
 	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 )
 
 type TestCase func(*T)
@@ -19,4 +21,8 @@ func (t *T) It(description string, testFn func(it *T)) {
 	t.t.Run(description, func(t *testing.T) {
 		testFn(NewT(t))
 	})
+}
+func (t *T) Assert(v any) *assert.BaseAssertionContext {
+	fmtFn := t.T().Fatalf
+	return assert.New(fmtFn).Assert(v)
 }
