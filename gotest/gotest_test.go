@@ -120,6 +120,80 @@ func TestRun_no_tests_still_runs_hooks(t *testing.T) {
 	}
 }
 
+func TestRun_BeforeEach_runs_before_each_test(t *testing.T) {
+	var order []string
+	gotest.Run(t, func(s *gotest.S) {
+		s.BeforeEach(func(t *gotest.T) {
+			order = append(order, "beforeEach")
+		})
+		s.Test("a", func(t *gotest.T) {
+			order = append(order, "testA")
+		})
+		s.Test("b", func(t *gotest.T) {
+			order = append(order, "testB")
+		})
+	})
+	expected := []string{"beforeEach", "testA", "beforeEach", "testB"}
+	if !slicesEqual(order, expected) {
+		t.Fatalf("expected %v, got %v", expected, order)
+	}
+}
+
+func TestRun_AfterEach_runs_after_each_test(t *testing.T) {
+	var order []string
+	gotest.Run(t, func(s *gotest.S) {
+		s.AfterEach(func(t *gotest.T) {
+			order = append(order, "afterEach")
+		})
+		s.Test("a", func(t *gotest.T) {
+			order = append(order, "testA")
+		})
+		s.Test("b", func(t *gotest.T) {
+			order = append(order, "testB")
+		})
+	})
+	expected := []string{"testA", "afterEach", "testB", "afterEach"}
+	if !slicesEqual(order, expected) {
+		t.Fatalf("expected %v, got %v", expected, order)
+	}
+}
+
+func TestRun_full_lifecycle_ordering(t *testing.T) {
+	var order []string
+	gotest.Run(t, func(s *gotest.S) {
+		s.BeforeAll(func(t *gotest.T) { order = append(order, "beforeAll") })
+		s.AfterAll(func(t *gotest.T) { order = append(order, "afterAll") })
+		s.BeforeEach(func(t *gotest.T) { order = append(order, "beforeEach") })
+		s.AfterEach(func(t *gotest.T) { order = append(order, "afterEach") })
+		s.Test("a", func(t *gotest.T) { order = append(order, "testA") })
+		s.Test("b", func(t *gotest.T) { order = append(order, "testB") })
+	})
+	expected := []string{
+		"beforeAll",
+		"beforeEach", "testA", "afterEach",
+		"beforeEach", "testB", "afterEach",
+		"afterAll",
+	}
+	if !slicesEqual(order, expected) {
+		t.Fatalf("expected %v, got %v", expected, order)
+	}
+}
+
+func TestRun_AfterEach_runs_even_when_test_fails(t *testing.T) {
+	var afterEachRan bool
+	gotest.Run(t, func(s *gotest.S) {
+		s.AfterEach(func(t *gotest.T) {
+			afterEachRan = true
+		})
+		s.Test("fails", func(t *gotest.T) {
+			t.T().Fail()
+		})
+	})
+	if !afterEachRan {
+		t.Fatal("AfterEach should run even when test fails")
+	}
+}
+
 // slicesEqual is a test helper — compares two string slices.
 func slicesEqual(a, b []string) bool {
 	if len(a) != len(b) {
