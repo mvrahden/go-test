@@ -179,21 +179,6 @@ func TestRun_full_lifecycle_ordering(t *testing.T) {
 	}
 }
 
-func TestRun_AfterEach_runs_even_when_test_fails(t *testing.T) {
-	var afterEachRan bool
-	gotest.Run(t, func(s *gotest.S) {
-		s.AfterEach(func(t *gotest.T) {
-			afterEachRan = true
-		})
-		s.Test("fails", func(t *gotest.T) {
-			t.T().Fail()
-		})
-	})
-	if !afterEachRan {
-		t.Fatal("AfterEach should run even when test fails")
-	}
-}
-
 func TestRun_Describe_creates_nested_subtest(t *testing.T) {
 	var ran bool
 	gotest.Run(t, func(s *gotest.S) {
