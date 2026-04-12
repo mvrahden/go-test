@@ -15,6 +15,19 @@ func NewT(t *testing.T) *T {
 // T returns the underlying *testing.T.
 func (t *T) T() *testing.T { return t.t }
 
+// Assert returns an AssertContext for fluent assertions on the given value.
+// Assertion failures are reported via t.Errorf (non-fatal).
+func (t *T) Assert(v any) *AssertContext {
+	t.t.Helper()
+	return &AssertContext{
+		v: v,
+		failf: func(format string, args ...any) {
+			t.t.Helper()
+			t.t.Errorf(format, args...)
+		},
+	}
+}
+
 // It runs a named subtest within the current test context.
 func (t *T) It(description string, fn func(*T)) {
 	t.t.Run(description, func(sub *testing.T) {
