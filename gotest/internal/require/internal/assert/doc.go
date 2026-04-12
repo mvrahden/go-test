@@ -10,7 +10,7 @@
 //
 //	import (
 //	  "testing"
-//	  "github.com/mvrahden/go-test/gotest/require/internal/assert"
+//	  "github.com/mvrahden/go-test/gotest/internal/require/internal/assert"
 //	)
 //
 //	func TestSomething(t *testing.T) {
@@ -26,7 +26,7 @@
 //
 //	import (
 //	  "testing"
-//	  "github.com/mvrahden/go-test/gotest/require/internal/assert"
+//	  "github.com/mvrahden/go-test/gotest/internal/require/internal/assert"
 //	)
 //
 //	func TestSomething(t *testing.T) {

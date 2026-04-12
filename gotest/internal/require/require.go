@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	assert "github.com/mvrahden/go-test/gotest/require/internal/assert"
+	assert "github.com/mvrahden/go-test/gotest/internal/require/internal/assert"
 )
 
 // check stops the test if pass is false.

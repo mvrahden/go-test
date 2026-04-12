@@ -6,7 +6,7 @@
 //
 //	import (
 //	  "testing"
-//	  "github.com/mvrahden/go-test/gotest/require"
+//	  "github.com/mvrahden/go-test/gotest/internal/require"
 //	)
 //
 //	func TestSomething(t *testing.T) {
