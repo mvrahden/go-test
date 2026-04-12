@@ -19,11 +19,8 @@ import (
 // 1. Basic suite with lifecycle hooks
 // ---------------------------------------------------------------------------
 
-// TestLifecycleHooks demonstrates BeforeAll, AfterAll, BeforeEach, AfterEach
-// and the order in which they execute.
 func TestLifecycleHooks(t *testing.T) {
 	gotest.Run(t, func(s *gotest.S) {
-		// Shared state lives in closure scope — no struct needed.
 		var log []string
 
 		s.BeforeAll(func(t *gotest.T) {
@@ -32,33 +29,26 @@ func TestLifecycleHooks(t *testing.T) {
 
 		s.AfterAll(func(t *gotest.T) {
 			log = append(log, "AfterAll")
-			// At this point the full log is:
-			// [BeforeAll, BeforeEach, test-a, AfterEach, BeforeEach, test-b, AfterEach, AfterAll]
-			t.Assert(len(log)).Equals(8)
-			t.Assert(log[0]).Equals("BeforeAll")
-			t.Assert(log[len(log)-1]).Equals("AfterAll")
+			gotest.Equal(t, 8, len(log))
+			gotest.Equal(t, "BeforeAll", log[0])
+			gotest.Equal(t, "AfterAll", log[len(log)-1])
 		})
 
-		s.BeforeEach(func(t *gotest.T) {
-			log = append(log, "BeforeEach")
-		})
-
-		s.AfterEach(func(t *gotest.T) {
-			log = append(log, "AfterEach")
-		})
+		s.BeforeEach(func(t *gotest.T) { log = append(log, "BeforeEach") })
+		s.AfterEach(func(t *gotest.T) { log = append(log, "AfterEach") })
 
 		s.Test("test-a", func(t *gotest.T) {
 			log = append(log, "test-a")
-			t.Assert(log).Equals([]string{"BeforeAll", "BeforeEach", "test-a"})
+			gotest.Equal(t, []string{"BeforeAll", "BeforeEach", "test-a"}, log)
 		})
 
 		s.Test("test-b", func(t *gotest.T) {
 			log = append(log, "test-b")
-			t.Assert(log).Equals([]string{
+			gotest.Equal(t, []string{
 				"BeforeAll",
 				"BeforeEach", "test-a", "AfterEach",
 				"BeforeEach", "test-b",
-			})
+			}, log)
 		})
 	})
 }
@@ -67,11 +57,8 @@ func TestLifecycleHooks(t *testing.T) {
 // 2. Shared mutable state via closures
 // ---------------------------------------------------------------------------
 
-// TestSharedState shows how closure-scoped variables replace struct fields
-// for sharing state between hooks and tests.
 func TestSharedState(t *testing.T) {
 	gotest.Run(t, func(s *gotest.S) {
-		// This is the equivalent of struct fields in a traditional test suite.
 		var (
 			users  map[string]string
 			nextID int
@@ -82,7 +69,6 @@ func TestSharedState(t *testing.T) {
 		})
 
 		s.BeforeEach(func(t *gotest.T) {
-			// Reset to a known state before each test.
 			for k := range users {
 				delete(users, k)
 			}
@@ -98,18 +84,17 @@ func TestSharedState(t *testing.T) {
 
 		s.Test("add a user", func(t *gotest.T) {
 			id := addUser("Alice")
-			t.Assert(id).Equals("user-1")
-			t.Assert(users).HasLength(1)
+			gotest.Equal(t, "user-1", id)
+			gotest.Len(t, users, 1)
 		})
 
 		s.Test("each test starts fresh", func(t *gotest.T) {
-			// BeforeEach cleared the map, so it's empty again.
-			t.Assert(users).IsEmpty()
-			t.Assert(nextID).Equals(1)
+			gotest.Empty(t, users)
+			gotest.Equal(t, 1, nextID)
 
 			addUser("Bob")
 			addUser("Carol")
-			t.Assert(users).HasLength(2)
+			gotest.Len(t, users, 2)
 		})
 	})
 }
@@ -118,49 +103,37 @@ func TestSharedState(t *testing.T) {
 // 3. Nested Describe with hook inheritance
 // ---------------------------------------------------------------------------
 
-// TestNestedDescribe shows how Describe blocks create nested scopes.
-// Child scopes inherit parent BeforeEach/AfterEach hooks.
 func TestNestedDescribe(t *testing.T) {
 	gotest.Run(t, func(s *gotest.S) {
 		var role string
 
-		s.BeforeEach(func(t *gotest.T) {
-			role = "guest"
-		})
+		s.BeforeEach(func(t *gotest.T) { role = "guest" })
 
 		s.Test("default role is guest", func(t *gotest.T) {
-			t.Assert(role).Equals("guest")
+			gotest.Equal(t, "guest", role)
 		})
 
 		s.Describe("authenticated user", func(s *gotest.S) {
-			s.BeforeEach(func(t *gotest.T) {
-				// Runs AFTER parent BeforeEach, so role is already "guest".
-				role = "user"
-			})
+			s.BeforeEach(func(t *gotest.T) { role = "user" })
 
 			s.Test("role is user", func(t *gotest.T) {
-				t.Assert(role).Equals("user")
+				gotest.Equal(t, "user", role)
 			})
 
 			s.Describe("with admin privileges", func(s *gotest.S) {
-				s.BeforeEach(func(t *gotest.T) {
-					role = "admin"
-				})
+				s.BeforeEach(func(t *gotest.T) { role = "admin" })
 
 				s.Test("role is admin", func(t *gotest.T) {
-					t.Assert(role).Equals("admin")
+					gotest.Equal(t, "admin", role)
 				})
 			})
 		})
 
 		s.Describe("API key auth", func(s *gotest.S) {
-			s.BeforeEach(func(t *gotest.T) {
-				role = "service"
-			})
+			s.BeforeEach(func(t *gotest.T) { role = "service" })
 
 			s.Test("role is service", func(t *gotest.T) {
-				// Parent BeforeEach set "guest", then this scope's BeforeEach set "service".
-				t.Assert(role).Equals("service")
+				gotest.Equal(t, "service", role)
 			})
 		})
 	})
@@ -170,8 +143,6 @@ func TestNestedDescribe(t *testing.T) {
 // 4. Deep nesting — hook execution order
 // ---------------------------------------------------------------------------
 
-// TestDeepNesting verifies that hooks execute in the correct order
-// across three levels of nesting.
 func TestDeepNesting(t *testing.T) {
 	gotest.Run(t, func(s *gotest.S) {
 		var trace []string
@@ -189,21 +160,18 @@ func TestDeepNesting(t *testing.T) {
 
 				s.Test("deep test", func(t *gotest.T) {
 					trace = append(trace, "test")
-
-					// BeforeEach hooks run parent-first.
-					t.Assert(trace).Equals([]string{
+					gotest.Equal(t, []string{
 						"L0-setup", "L1-setup", "L2-setup", "test",
-					})
+					}, trace)
 				})
 			})
 		})
 
 		s.AfterAll(func(t *gotest.T) {
-			// AfterEach hooks unwind child-first.
-			t.Assert(trace).Equals([]string{
+			gotest.Equal(t, []string{
 				"L0-setup", "L1-setup", "L2-setup", "test",
 				"L2-teardown", "L1-teardown", "L0-teardown",
-			})
+			}, trace)
 		})
 	})
 }
@@ -212,7 +180,6 @@ func TestDeepNesting(t *testing.T) {
 // 5. Focus and Exclude
 // ---------------------------------------------------------------------------
 
-// TestFocusWithFTest demonstrates that FTest runs only the focused test.
 func TestFocusWithFTest(t *testing.T) {
 	var ran []string
 	gotest.Run(t, func(s *gotest.S) {
@@ -220,12 +187,9 @@ func TestFocusWithFTest(t *testing.T) {
 		s.FTest("focused-b", func(t *gotest.T) { ran = append(ran, "b") })
 		s.Test("normal-c", func(t *gotest.T) { ran = append(ran, "c") })
 	})
-	if len(ran) != 1 || ran[0] != "b" {
-		t.Fatalf("only focused test should run, got %v", ran)
-	}
+	gotest.Equal(t, []string{"b"}, ran)
 }
 
-// TestExcludeWithXTest demonstrates that XTest skips the excluded test.
 func TestExcludeWithXTest(t *testing.T) {
 	var ran []string
 	gotest.Run(t, func(s *gotest.S) {
@@ -233,12 +197,9 @@ func TestExcludeWithXTest(t *testing.T) {
 		s.XTest("b-excluded", func(t *gotest.T) { ran = append(ran, "b") })
 		s.Test("c", func(t *gotest.T) { ran = append(ran, "c") })
 	})
-	if len(ran) != 2 || ran[0] != "a" || ran[1] != "c" {
-		t.Fatalf("excluded test should be skipped, got %v", ran)
-	}
+	gotest.Equal(t, []string{"a", "c"}, ran)
 }
 
-// TestFocusDescribe demonstrates that FDescribe runs only the focused group.
 func TestFocusDescribe(t *testing.T) {
 	var ran []string
 	gotest.Run(t, func(s *gotest.S) {
@@ -253,12 +214,9 @@ func TestFocusDescribe(t *testing.T) {
 			s.Test("c1", func(t *gotest.T) { ran = append(ran, "c1") })
 		})
 	})
-	if len(ran) != 2 || ran[0] != "b1" || ran[1] != "b2" {
-		t.Fatalf("only focused group should run, got %v", ran)
-	}
+	gotest.Equal(t, []string{"b1", "b2"}, ran)
 }
 
-// TestExcludeDescribe demonstrates that XDescribe skips the entire group.
 func TestExcludeDescribe(t *testing.T) {
 	var ran []string
 	gotest.Run(t, func(s *gotest.S) {
@@ -269,16 +227,13 @@ func TestExcludeDescribe(t *testing.T) {
 			s.Test("b", func(t *gotest.T) { ran = append(ran, "b") })
 		})
 	})
-	if len(ran) != 1 || ran[0] != "a" {
-		t.Fatalf("excluded group should be skipped, got %v", ran)
-	}
+	gotest.Equal(t, []string{"a"}, ran)
 }
 
 // ---------------------------------------------------------------------------
 // 6. Parallel tests
 // ---------------------------------------------------------------------------
 
-// TestParallelExecution demonstrates TestParallel for concurrent test execution.
 func TestParallelExecution(t *testing.T) {
 	gotest.Run(t, func(s *gotest.S) {
 		var mu sync.Mutex
@@ -289,7 +244,7 @@ func TestParallelExecution(t *testing.T) {
 			mu.Lock()
 			results["a"] = val
 			mu.Unlock()
-			t.Assert(val).Equals(1)
+			gotest.Equal(t, 1, val)
 		})
 
 		s.TestParallel("compute-b", func(t *gotest.T) {
@@ -297,7 +252,7 @@ func TestParallelExecution(t *testing.T) {
 			mu.Lock()
 			results["b"] = val
 			mu.Unlock()
-			t.Assert(val).Equals(2)
+			gotest.Equal(t, 2, val)
 		})
 
 		s.TestParallel("compute-c", func(t *gotest.T) {
@@ -305,7 +260,7 @@ func TestParallelExecution(t *testing.T) {
 			mu.Lock()
 			results["c"] = val
 			mu.Unlock()
-			t.Assert(val).Equals(3)
+			gotest.Equal(t, 3, val)
 		})
 	})
 }
@@ -318,8 +273,6 @@ func expensiveComputation(key string) int {
 // 7. Parallel tests with BeforeEach hooks
 // ---------------------------------------------------------------------------
 
-// TestParallelWithHooks shows that BeforeEach runs before the parallel barrier,
-// so setup completes synchronously before tests fan out.
 func TestParallelWithHooks(t *testing.T) {
 	gotest.Run(t, func(s *gotest.S) {
 		var mu sync.Mutex
@@ -336,118 +289,106 @@ func TestParallelWithHooks(t *testing.T) {
 		s.TestParallel("p3", func(t *gotest.T) {})
 
 		s.AfterAll(func(t *gotest.T) {
-			t.Assert(setupCount).Equals(3)
+			gotest.Equal(t, 3, setupCount)
 		})
 	})
 }
 
 // ---------------------------------------------------------------------------
-// 8. Fluent assertions — comprehensive showcase
+// 8. Assertions — comprehensive showcase
 // ---------------------------------------------------------------------------
 
-// TestAssertions demonstrates every assertion method available on AssertContext.
 func TestAssertions(t *testing.T) {
 	gotest.Run(t, func(s *gotest.S) {
 
 		s.Describe("boolean", func(s *gotest.S) {
-			s.Test("IsTrue", func(t *gotest.T) {
-				t.Assert(true).IsTrue()
-				t.Assert(2 > 1).IsTrue()
-			})
-
-			s.Test("IsFalse", func(t *gotest.T) {
-				t.Assert(false).IsFalse()
-				t.Assert(1 > 2).IsFalse()
+			s.Test("True and False", func(t *gotest.T) {
+				gotest.True(t, 2 > 1)
+				gotest.False(t, 1 > 2)
 			})
 		})
 
 		s.Describe("equality", func(s *gotest.S) {
 			s.Test("primitives", func(t *gotest.T) {
-				t.Assert(42).Equals(42)
-				t.Assert(3.14).Equals(3.14)
-				t.Assert("hello").Equals("hello")
+				gotest.Equal(t, 42, 42)
+				gotest.Equal(t, 3.14, 3.14)
+				gotest.Equal(t, "hello", "hello")
 			})
 
 			s.Test("slices", func(t *gotest.T) {
-				t.Assert([]int{1, 2, 3}).Equals([]int{1, 2, 3})
-				t.Assert([]string{"a", "b"}).Equals([]string{"a", "b"})
+				gotest.Equal(t, []int{1, 2, 3}, []int{1, 2, 3})
 			})
 
 			s.Test("maps", func(t *gotest.T) {
-				t.Assert(map[string]int{"a": 1}).Equals(map[string]int{"a": 1})
+				gotest.Equal(t, map[string]int{"a": 1}, map[string]int{"a": 1})
 			})
 
 			s.Test("structs", func(t *gotest.T) {
 				type Point struct{ X, Y int }
-				t.Assert(Point{1, 2}).Equals(Point{1, 2})
+				gotest.Equal(t, Point{1, 2}, Point{1, 2})
 			})
 		})
 
-		s.Describe("nil checks", func(s *gotest.S) {
-			s.Test("IsNil", func(t *gotest.T) {
-				t.Assert(nil).IsNil()
-
-				var p *int
-				t.Assert(p).IsNil()
-
-				var err error
-				t.Assert(err).IsNil()
-
-				var s []int
-				t.Assert(s).IsNil()
+		s.Describe("error handling", func(s *gotest.S) {
+			s.Test("NoError and Error", func(t *gotest.T) {
+				gotest.NoError(t, nil)
+				gotest.Error(t, fmt.Errorf("oops"))
 			})
 
-			s.Test("IsNotNil", func(t *gotest.T) {
-				t.Assert(42).IsNotNil()
-				t.Assert("").IsNotNil()
-				t.Assert([]int{}).IsNotNil()
-				t.Assert(fmt.Errorf("oops")).IsNotNil()
+			s.Test("ErrorContains", func(t *gotest.T) {
+				gotest.ErrorContains(t, fmt.Errorf("not found: user 42"), "not found")
 			})
 		})
 
 		s.Describe("zero value", func(s *gotest.S) {
-			s.Test("IsZero", func(t *gotest.T) {
-				t.Assert(0).IsZero()
-				t.Assert("").IsZero()
-				t.Assert(false).IsZero()
-				t.Assert(0.0).IsZero()
-
-				type Config struct{ Port int }
-				t.Assert(Config{}).IsZero()
+			s.Test("Zero and NotZero", func(t *gotest.T) {
+				gotest.Zero(t, 0)
+				gotest.Zero(t, "")
+				gotest.NotZero(t, 1)
+				gotest.NotZero(t, "x")
 			})
 		})
 
-		s.Describe("length and emptiness", func(s *gotest.S) {
-			s.Test("HasLength on slices", func(t *gotest.T) {
+		s.Describe("collections", func(s *gotest.S) {
+			s.Test("Len and Empty", func(t *gotest.T) {
+				gotest.Len(t, []int{1, 2, 3}, 3)
+				gotest.Empty(t, []int{})
+				gotest.NotEmpty(t, []int{1})
+			})
+
+			s.Test("Contains", func(t *gotest.T) {
+				gotest.Contains(t, []string{"go", "rust", "zig"}, "rust")
+				gotest.Contains(t, "hello world", "world")
+				gotest.NotContains(t, []int{1, 2}, 99)
+			})
+
+			s.Test("ElementsMatch", func(t *gotest.T) {
+				gotest.ElementsMatch(t, []int{3, 1, 2}, []int{1, 2, 3})
+			})
+
+			s.Test("Subset", func(t *gotest.T) {
+				gotest.Subset(t, []int{1, 2, 3, 4}, []int{2, 4})
+			})
+		})
+
+		s.Describe("comparison", func(s *gotest.S) {
+			s.Test("Greater and Less", func(t *gotest.T) {
+				gotest.Greater(t, 2, 1)
+				gotest.Less(t, 1, 2)
+				gotest.GreaterOrEqual(t, 2, 2)
+				gotest.LessOrEqual(t, 1, 2)
+			})
+		})
+
+		s.Describe("fluent API", func(s *gotest.S) {
+			s.Test("Assert chain", func(t *gotest.T) {
+				t.Assert(true).IsTrue()
+				t.Assert(false).IsFalse()
+				t.Assert(42).Equal(42)
 				t.Assert([]int{1, 2, 3}).HasLength(3)
-				t.Assert([]int{}).HasLength(0)
-			})
-
-			s.Test("HasLength on strings", func(t *gotest.T) {
-				t.Assert("hello").HasLength(5)
-				t.Assert("").HasLength(0)
-			})
-
-			s.Test("HasLength on maps", func(t *gotest.T) {
-				t.Assert(map[string]int{"a": 1, "b": 2}).HasLength(2)
-			})
-
-			s.Test("IsEmpty", func(t *gotest.T) {
-				t.Assert([]int{}).IsEmpty()
-				t.Assert("").IsEmpty()
-				t.Assert(map[string]int{}).IsEmpty()
-			})
-		})
-
-		s.Describe("containment", func(s *gotest.S) {
-			s.Test("slice contains element", func(t *gotest.T) {
-				t.Assert([]int{10, 20, 30}).Contains(20)
-				t.Assert([]string{"go", "rust", "zig"}).Contains("rust")
-			})
-
-			s.Test("string contains substring", func(t *gotest.T) {
+				t.Assert([]int{}).Empty()
+				t.Assert([]int{1, 2, 3}).Contains(2)
 				t.Assert("hello world").Contains("world")
-				t.Assert("foo-bar-baz").Contains("-bar-")
 			})
 		})
 	})
@@ -457,10 +398,7 @@ func TestAssertions(t *testing.T) {
 // 9. Mixing with stdlib testing
 // ---------------------------------------------------------------------------
 
-// TestMixedWithStdlib shows gotest suites coexisting with regular Go tests
-// in the same file. This is a standard test function — no gotest involved.
 func TestMixedWithStdlib(t *testing.T) {
-	// Regular table-driven test.
 	cases := []struct {
 		input    string
 		expected string
@@ -478,11 +416,10 @@ func TestMixedWithStdlib(t *testing.T) {
 	}
 }
 
-// TestStdlibAlongsideSuite shows a gotest suite right next to the stdlib test above.
 func TestStdlibAlongsideSuite(t *testing.T) {
 	gotest.Run(t, func(s *gotest.S) {
 		s.Test("strings.ToUpper via suite", func(t *gotest.T) {
-			t.Assert(strings.ToUpper("hello")).Equals("HELLO")
+			gotest.Equal(t, "HELLO", strings.ToUpper("hello"))
 		})
 	})
 }
@@ -491,8 +428,6 @@ func TestStdlibAlongsideSuite(t *testing.T) {
 // 10. It() for BDD-style sub-descriptions
 // ---------------------------------------------------------------------------
 
-// TestItSubtests demonstrates the It() method on T for BDD-style nesting
-// within a single test case.
 func TestItSubtests(t *testing.T) {
 	gotest.Run(t, func(s *gotest.S) {
 		s.Test("sorting algorithms", func(t *gotest.T) {
@@ -502,14 +437,14 @@ func TestItSubtests(t *testing.T) {
 				data := make([]int, len(input))
 				copy(data, input)
 				sort.Ints(data)
-				t.Assert(data).Equals([]int{1, 1, 2, 3, 4, 5, 6, 9})
+				gotest.Equal(t, []int{1, 1, 2, 3, 4, 5, 6, 9}, data)
 			})
 
 			t.It("sorts descending", func(t *gotest.T) {
 				data := make([]int, len(input))
 				copy(data, input)
 				sort.Sort(sort.Reverse(sort.IntSlice(data)))
-				t.Assert(data).Equals([]int{9, 6, 5, 4, 3, 2, 1, 1})
+				gotest.Equal(t, []int{9, 6, 5, 4, 3, 2, 1, 1}, data)
 			})
 		})
 	})
@@ -519,8 +454,6 @@ func TestItSubtests(t *testing.T) {
 // 11. Accessing the underlying *testing.T
 // ---------------------------------------------------------------------------
 
-// TestAccessUnderlyingT shows how to use t.T() to access stdlib methods
-// like Skip, Helper, or Logf.
 func TestAccessUnderlyingT(t *testing.T) {
 	gotest.Run(t, func(s *gotest.S) {
 		s.Test("log and skip", func(t *gotest.T) {
@@ -532,8 +465,7 @@ func TestAccessUnderlyingT(t *testing.T) {
 		})
 
 		s.Test("test name", func(t *gotest.T) {
-			name := t.T().Name()
-			t.Assert(strings.Contains(name, "test_name")).IsTrue()
+			gotest.True(t, strings.Contains(t.T().Name(), "test_name"))
 		})
 	})
 }
@@ -542,7 +474,6 @@ func TestAccessUnderlyingT(t *testing.T) {
 // 12. Real-world pattern: in-memory repository
 // ---------------------------------------------------------------------------
 
-// A minimal in-memory repository to demonstrate a realistic test pattern.
 type UserRepo struct {
 	users map[string]string
 }
@@ -563,13 +494,13 @@ func TestUserRepository(t *testing.T) {
 		})
 
 		s.Test("starts empty", func(t *gotest.T) {
-			t.Assert(repo.Count()).Equals(0)
+			gotest.Equal(t, 0, repo.Count())
 		})
 
 		s.Test("add and retrieve", func(t *gotest.T) {
 			repo.Add("1", "Alice")
-			t.Assert(repo.Get("1")).Equals("Alice")
-			t.Assert(repo.Count()).Equals(1)
+			gotest.Equal(t, "Alice", repo.Get("1"))
+			gotest.Equal(t, 1, repo.Count())
 		})
 
 		s.Describe("with seeded data", func(s *gotest.S) {
@@ -579,17 +510,17 @@ func TestUserRepository(t *testing.T) {
 			})
 
 			s.Test("has two users", func(t *gotest.T) {
-				t.Assert(repo.Count()).Equals(2)
+				gotest.Equal(t, 2, repo.Count())
 			})
 
 			s.Test("delete removes user", func(t *gotest.T) {
 				repo.Delete("1")
-				t.Assert(repo.Has("1")).IsFalse()
-				t.Assert(repo.Count()).Equals(1)
+				gotest.False(t, repo.Has("1"))
+				gotest.Equal(t, 1, repo.Count())
 			})
 
 			s.Test("get returns correct user", func(t *gotest.T) {
-				t.Assert(repo.Get("2")).Equals("Bob")
+				gotest.Equal(t, "Bob", repo.Get("2"))
 			})
 
 			s.Describe("after clearing all", func(s *gotest.S) {
@@ -599,7 +530,7 @@ func TestUserRepository(t *testing.T) {
 				})
 
 				s.Test("repo is empty again", func(t *gotest.T) {
-					t.Assert(repo.Count()).Equals(0)
+					gotest.Equal(t, 0, repo.Count())
 				})
 			})
 		})
