@@ -1,125 +1,139 @@
 package gotest
 
 import (
+	"fmt"
 	"reflect"
-	"strings"
+
+	"github.com/mvrahden/go-test/gotest/require"
 )
 
 // AssertContext provides fluent assertion methods for a single value.
+// Assertion failures stop the test immediately (via FailNow).
 type AssertContext struct {
-	v     any
-	failf func(format string, args ...any)
+	v any
+	t TestingT
 }
 
-// NewAssertContext creates an AssertContext with a custom failure function.
-// This is primarily useful for testing assertions themselves.
-func NewAssertContext(v any, failf func(format string, args ...any)) *AssertContext {
-	return &AssertContext{v: v, failf: failf}
+// NewAssertContext creates an AssertContext with a custom TestingT.
+// Useful for testing assertions themselves.
+func NewAssertContext(v any, t TestingT) *AssertContext {
+	return &AssertContext{v: v, t: t}
 }
 
-// IsTrue asserts the value is boolean true.
-func (a *AssertContext) IsTrue() {
+func (a *AssertContext) fail(msg string, msgAndArgs ...any) {
+	a.t.Helper()
+	if len(msgAndArgs) > 0 {
+		if fmtStr, ok := msgAndArgs[0].(string); ok {
+			msg += "\n\tMessage: " + fmt.Sprintf(fmtStr, msgAndArgs[1:]...)
+		}
+	}
+	a.t.Errorf(msg)
+	a.t.FailNow()
+}
+
+// Equal checks that the value deeply equals expected.
+func (a *AssertContext) Equal(expected any, msgAndArgs ...any) {
+	a.t.Helper()
+	require.Equal(a.t, expected, a.v, msgAndArgs...)
+}
+
+// NotEqual checks that the value does not deeply equal expected.
+func (a *AssertContext) NotEqual(expected any, msgAndArgs ...any) {
+	a.t.Helper()
+	require.NotEqual(a.t, expected, a.v, msgAndArgs...)
+}
+
+// IsTrue checks that the value is boolean true.
+func (a *AssertContext) IsTrue(msgAndArgs ...any) {
+	a.t.Helper()
 	v, ok := a.v.(bool)
-	if !ok || !v {
-		a.failf("expected true, got %v", a.v)
+	if !ok {
+		a.fail(fmt.Sprintf("IsTrue requires a bool value, got %T", a.v), msgAndArgs...)
+		return
 	}
+	require.True(a.t, v, msgAndArgs...)
 }
 
-// IsFalse asserts the value is boolean false.
-func (a *AssertContext) IsFalse() {
+// IsFalse checks that the value is boolean false.
+func (a *AssertContext) IsFalse(msgAndArgs ...any) {
+	a.t.Helper()
 	v, ok := a.v.(bool)
-	if !ok || v {
-		a.failf("expected false, got %v", a.v)
+	if !ok {
+		a.fail(fmt.Sprintf("IsFalse requires a bool value, got %T", a.v), msgAndArgs...)
+		return
 	}
+	require.False(a.t, v, msgAndArgs...)
 }
 
-// Equals asserts the value deeply equals the expected value.
-func (a *AssertContext) Equals(expected any) {
-	if !reflect.DeepEqual(a.v, expected) {
-		a.failf("expected %v (%T), got %v (%T)", expected, expected, a.v, a.v)
-	}
-}
-
-// IsNil asserts the value is nil.
-func (a *AssertContext) IsNil() {
-	if !isNil(a.v) {
-		a.failf("expected nil, got %v (%T)", a.v, a.v)
-	}
-}
-
-// IsNotNil asserts the value is not nil.
-func (a *AssertContext) IsNotNil() {
-	if isNil(a.v) {
-		a.failf("expected non-nil, got nil")
-	}
-}
-
-// IsZero asserts the value is the zero value for its type.
-func (a *AssertContext) IsZero() {
+// IsZero checks that the value is the zero value for its type.
+func (a *AssertContext) IsZero(msgAndArgs ...any) {
+	a.t.Helper()
 	rv := reflect.ValueOf(a.v)
-	if !rv.IsValid() {
-		return // nil is zero
-	}
-	if !rv.IsZero() {
-		a.failf("expected zero value, got %v", a.v)
+	if rv.IsValid() && !rv.IsZero() {
+		a.fail(fmt.Sprintf("Should be zero value, got: %v (%T)", a.v, a.v), msgAndArgs...)
 	}
 }
 
-// HasLength asserts the value (string, slice, map, array, or channel) has the given length.
-func (a *AssertContext) HasLength(expected int) {
+// IsNotZero checks that the value is not the zero value for its type.
+func (a *AssertContext) IsNotZero(msgAndArgs ...any) {
+	a.t.Helper()
 	rv := reflect.ValueOf(a.v)
-	switch rv.Kind() {
-	case reflect.String, reflect.Slice, reflect.Array, reflect.Map, reflect.Chan:
-		actual := rv.Len()
-		if actual != expected {
-			a.failf("expected length %d, got %d", expected, actual)
-		}
-	default:
-		a.failf("HasLength not supported for type %T", a.v)
+	if !rv.IsValid() || rv.IsZero() {
+		a.fail(fmt.Sprintf("Should not be zero value, got: %v (%T)", a.v, a.v), msgAndArgs...)
 	}
 }
 
-// IsEmpty asserts the value (string, slice, map, array, or channel) has length 0.
-func (a *AssertContext) IsEmpty() {
-	a.HasLength(0)
+// NoError checks that the value is a nil error.
+func (a *AssertContext) NoError(msgAndArgs ...any) {
+	a.t.Helper()
+	if a.v == nil {
+		return
+	}
+	err, ok := a.v.(error)
+	if !ok {
+		a.fail(fmt.Sprintf("NoError requires an error value, got %T", a.v), msgAndArgs...)
+		return
+	}
+	require.NoError(a.t, err, msgAndArgs...)
 }
 
-// Contains asserts the value contains the given element.
-// For strings: checks substring containment.
-// For slices/arrays: checks element presence via DeepEqual.
-func (a *AssertContext) Contains(element any) {
-	rv := reflect.ValueOf(a.v)
-	switch rv.Kind() {
-	case reflect.String:
-		s := rv.String()
-		sub, ok := element.(string)
-		if !ok {
-			a.failf("Contains on string requires a string argument, got %T", element)
-			return
-		}
-		if !strings.Contains(s, sub) {
-			a.failf("expected %q to contain %q", s, sub)
-		}
-	case reflect.Slice, reflect.Array:
-		for i := 0; i < rv.Len(); i++ {
-			if reflect.DeepEqual(rv.Index(i).Interface(), element) {
-				return
-			}
-		}
-		a.failf("expected %v to contain %v", a.v, element)
-	default:
-		a.failf("Contains not supported for type %T", a.v)
+// IsError checks that the value is a non-nil error.
+func (a *AssertContext) IsError(msgAndArgs ...any) {
+	a.t.Helper()
+	err, ok := a.v.(error)
+	if !ok {
+		a.fail(fmt.Sprintf("IsError requires an error value, got %T", a.v), msgAndArgs...)
+		return
 	}
+	require.Error(a.t, err, msgAndArgs...)
 }
 
-func isNil(v any) bool {
-	if v == nil {
-		return true
-	}
-	rv := reflect.ValueOf(v)
-	switch rv.Kind() {
-	case reflect.Pointer, reflect.Interface, reflect.Slice, reflect.Map, reflect.Chan, reflect.Func:
-		return rv.IsNil()
-	}
-	return false
+// Empty checks that the value has zero length or is nil.
+func (a *AssertContext) Empty(msgAndArgs ...any) {
+	a.t.Helper()
+	require.Empty(a.t, a.v, msgAndArgs...)
+}
+
+// NotEmpty checks that the value has non-zero length.
+func (a *AssertContext) NotEmpty(msgAndArgs ...any) {
+	a.t.Helper()
+	require.NotEmpty(a.t, a.v, msgAndArgs...)
+}
+
+// Contains checks that the value contains the element or substring.
+func (a *AssertContext) Contains(element any, msgAndArgs ...any) {
+	a.t.Helper()
+	require.Contains(a.t, a.v, element, msgAndArgs...)
+}
+
+// NotContains checks that the value does not contain the element or substring.
+func (a *AssertContext) NotContains(element any, msgAndArgs ...any) {
+	a.t.Helper()
+	require.NotContains(a.t, a.v, element, msgAndArgs...)
+}
+
+// HasLength checks that the value has the specified length.
+func (a *AssertContext) HasLength(expected int, msgAndArgs ...any) {
+	a.t.Helper()
+	require.Len(a.t, a.v, expected, msgAndArgs...)
 }
