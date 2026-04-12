@@ -109,7 +109,6 @@ func (s *S) run(inheritedBeforeEach, inheritedAfterEach []hookFn) {
 	effectiveTests, effectiveDescs := resolveFocus(s.tests, s.describes)
 
 	for _, test := range effectiveTests {
-		test := test
 		s.t.Run(test.name, func(sub *testing.T) {
 			if test.excluded {
 				sub.Skip("excluded")
@@ -133,7 +132,6 @@ func (s *S) run(inheritedBeforeEach, inheritedAfterEach []hookFn) {
 
 	// Execute child describes.
 	for _, desc := range effectiveDescs {
-		desc := desc
 		s.t.Run(desc.name, func(sub *testing.T) {
 			if desc.excluded {
 				sub.Skip("excluded")
