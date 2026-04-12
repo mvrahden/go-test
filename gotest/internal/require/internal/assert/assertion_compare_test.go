@@ -173,7 +173,7 @@ func TestGreater(t *testing.T) {
 		}
 		False(t, Greater(out, currCase.less, currCase.greater))
 		Contains(t, out.buf.String(), currCase.msg)
-		Contains(t, out.helpers, "github.com/mvrahden/go-test/gotest/require/internal/assert.Greater")
+		Contains(t, out.helpers, "github.com/mvrahden/go-test/gotest/internal/require/internal/assert.Greater")
 	}
 }
 
@@ -222,7 +222,7 @@ func TestGreaterOrEqual(t *testing.T) {
 		}
 		False(t, GreaterOrEqual(out, currCase.less, currCase.greater))
 		Contains(t, out.buf.String(), currCase.msg)
-		Contains(t, out.helpers, "github.com/mvrahden/go-test/gotest/require/internal/assert.GreaterOrEqual")
+		Contains(t, out.helpers, "github.com/mvrahden/go-test/gotest/internal/require/internal/assert.GreaterOrEqual")
 	}
 }
 
@@ -271,7 +271,7 @@ func TestLess(t *testing.T) {
 		}
 		False(t, Less(out, currCase.greater, currCase.less))
 		Contains(t, out.buf.String(), currCase.msg)
-		Contains(t, out.helpers, "github.com/mvrahden/go-test/gotest/require/internal/assert.Less")
+		Contains(t, out.helpers, "github.com/mvrahden/go-test/gotest/internal/require/internal/assert.Less")
 	}
 }
 
@@ -320,7 +320,7 @@ func TestLessOrEqual(t *testing.T) {
 		}
 		False(t, LessOrEqual(out, currCase.greater, currCase.less))
 		Contains(t, out.buf.String(), currCase.msg)
-		Contains(t, out.helpers, "github.com/mvrahden/go-test/gotest/require/internal/assert.LessOrEqual")
+		Contains(t, out.helpers, "github.com/mvrahden/go-test/gotest/internal/require/internal/assert.LessOrEqual")
 	}
 }
 
@@ -364,7 +364,7 @@ func TestPositive(t *testing.T) {
 		}
 		False(t, Positive(out, currCase.e))
 		Contains(t, out.buf.String(), currCase.msg)
-		Contains(t, out.helpers, "github.com/mvrahden/go-test/gotest/require/internal/assert.Positive")
+		Contains(t, out.helpers, "github.com/mvrahden/go-test/gotest/internal/require/internal/assert.Positive")
 	}
 }
 
@@ -408,7 +408,7 @@ func TestNegative(t *testing.T) {
 		}
 		False(t, Negative(out, currCase.e))
 		Contains(t, out.buf.String(), currCase.msg)
-		Contains(t, out.helpers, "github.com/mvrahden/go-test/gotest/require/internal/assert.Negative")
+		Contains(t, out.helpers, "github.com/mvrahden/go-test/gotest/internal/require/internal/assert.Negative")
 	}
 }
 

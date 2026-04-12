@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/mvrahden/go-test/gotest/require"
+	"github.com/mvrahden/go-test/gotest/internal/require"
 )
 
 // AssertContext provides fluent assertion methods for a single value.

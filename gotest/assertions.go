@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/mvrahden/go-test/gotest/require"
+	"github.com/mvrahden/go-test/gotest/internal/require"
 )
 
 // TestingT is the interface satisfied by *testing.T, *testing.B, and *T.

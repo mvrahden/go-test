@@ -21,7 +21,7 @@ import (
 	"github.com/pmezard/go-difflib/difflib"
 
 	// Wrapper around gopkg.in/yaml.v3
-	"github.com/mvrahden/go-test/gotest/require/internal/assert/yaml"
+	"github.com/mvrahden/go-test/gotest/internal/require/internal/assert/yaml"
 )
 
 // TestingT is an interface wrapper around *testing.T
