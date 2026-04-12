@@ -66,6 +66,22 @@ func (s *S) Describe(name string, fn func(*S)) {
 	s.describes = append(s.describes, describeEntry{name: name, fn: fn})
 }
 
+func (s *S) FTest(name string, fn func(*T)) {
+	s.tests = append(s.tests, testEntry{name: name, fn: fn, focused: true})
+}
+
+func (s *S) XTest(name string, fn func(*T)) {
+	s.tests = append(s.tests, testEntry{name: name, fn: fn, excluded: true})
+}
+
+func (s *S) FDescribe(name string, fn func(*S)) {
+	s.describes = append(s.describes, describeEntry{name: name, fn: fn, focused: true})
+}
+
+func (s *S) XDescribe(name string, fn func(*S)) {
+	s.describes = append(s.describes, describeEntry{name: name, fn: fn, excluded: true})
+}
+
 func (s *S) run(inheritedBeforeEach, inheritedAfterEach []hookFn) {
 	tt := NewT(s.t)
 
@@ -86,8 +102,15 @@ func (s *S) run(inheritedBeforeEach, inheritedAfterEach []hookFn) {
 	allAfterEach = append(allAfterEach, inheritedAfterEach...)
 	allAfterEach = append(allAfterEach, s.afterEach...)
 
-	for _, test := range s.tests {
+	effectiveTests, effectiveDescs := resolveFocus(s.tests, s.describes)
+
+	for _, test := range effectiveTests {
+		test := test
 		s.t.Run(test.name, func(sub *testing.T) {
+			if test.excluded {
+				sub.Skip("excluded")
+				return
+			}
 			ttt := NewT(sub)
 			for _, fn := range allBeforeEach {
 				fn(ttt)
@@ -102,9 +125,13 @@ func (s *S) run(inheritedBeforeEach, inheritedAfterEach []hookFn) {
 	}
 
 	// Execute child describes.
-	for _, desc := range s.describes {
+	for _, desc := range effectiveDescs {
 		desc := desc
 		s.t.Run(desc.name, func(sub *testing.T) {
+			if desc.excluded {
+				sub.Skip("excluded")
+				return
+			}
 			child := &S{t: sub}
 			desc.fn(child)
 			child.run(allBeforeEach, allAfterEach)

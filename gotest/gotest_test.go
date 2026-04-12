@@ -300,6 +300,60 @@ func TestRun_Describe_double_nesting(t *testing.T) {
 	}
 }
 
+func TestRun_XTest_is_skipped(t *testing.T) {
+	var order []string
+	gotest.Run(t, func(s *gotest.S) {
+		s.Test("a", func(t *gotest.T) { order = append(order, "a") })
+		s.XTest("b", func(t *gotest.T) { order = append(order, "b") })
+		s.Test("c", func(t *gotest.T) { order = append(order, "c") })
+	})
+	expected := []string{"a", "c"}
+	if !slicesEqual(order, expected) {
+		t.Fatalf("expected %v, got %v", expected, order)
+	}
+}
+
+func TestRun_FTest_only_runs_focused(t *testing.T) {
+	var order []string
+	gotest.Run(t, func(s *gotest.S) {
+		s.Test("a", func(t *gotest.T) { order = append(order, "a") })
+		s.FTest("b", func(t *gotest.T) { order = append(order, "b") })
+		s.Test("c", func(t *gotest.T) { order = append(order, "c") })
+	})
+	expected := []string{"b"}
+	if !slicesEqual(order, expected) {
+		t.Fatalf("expected %v, got %v", expected, order)
+	}
+}
+
+func TestRun_XDescribe_is_skipped(t *testing.T) {
+	var ran bool
+	gotest.Run(t, func(s *gotest.S) {
+		s.XDescribe("skipped", func(s *gotest.S) {
+			s.Test("inner", func(t *gotest.T) { ran = true })
+		})
+	})
+	if ran {
+		t.Fatal("XDescribe tests should not run")
+	}
+}
+
+func TestRun_FDescribe_only_runs_focused_group(t *testing.T) {
+	var order []string
+	gotest.Run(t, func(s *gotest.S) {
+		s.Describe("normal", func(s *gotest.S) {
+			s.Test("a", func(t *gotest.T) { order = append(order, "a") })
+		})
+		s.FDescribe("focused", func(s *gotest.S) {
+			s.Test("b", func(t *gotest.T) { order = append(order, "b") })
+		})
+	})
+	expected := []string{"b"}
+	if !slicesEqual(order, expected) {
+		t.Fatalf("expected %v, got %v", expected, order)
+	}
+}
+
 // slicesEqual is a test helper — compares two string slices.
 func slicesEqual(a, b []string) bool {
 	if len(a) != len(b) {
