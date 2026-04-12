@@ -44,6 +44,55 @@ func Run(t *testing.T, fn func(*S)) {
 	s.run(nil, nil)
 }
 
+// BeforeAll registers a hook that runs once before all tests in this suite.
+func (s *S) BeforeAll(fn hookFn) { s.beforeAll = append(s.beforeAll, fn) }
+
+// AfterAll registers a hook that runs once after all tests in this suite.
+func (s *S) AfterAll(fn hookFn) { s.afterAll = append(s.afterAll, fn) }
+
+// BeforeEach registers a hook that runs before each test in this suite.
+func (s *S) BeforeEach(fn hookFn) { s.beforeEach = append(s.beforeEach, fn) }
+
+// AfterEach registers a hook that runs after each test in this suite.
+func (s *S) AfterEach(fn hookFn) { s.afterEach = append(s.afterEach, fn) }
+
+// Test registers a named test case.
+func (s *S) Test(name string, fn func(*T)) {
+	s.tests = append(s.tests, testEntry{name: name, fn: fn})
+}
+
 func (s *S) run(inheritedBeforeEach, inheritedAfterEach []hookFn) {
-	// Will be implemented in subsequent tasks.
+	tt := NewT(s.t)
+
+	for _, fn := range s.beforeAll {
+		fn(tt)
+	}
+	defer func() {
+		for i := len(s.afterAll) - 1; i >= 0; i-- {
+			s.afterAll[i](tt)
+		}
+	}()
+
+	allBeforeEach := make([]hookFn, 0, len(inheritedBeforeEach)+len(s.beforeEach))
+	allBeforeEach = append(allBeforeEach, inheritedBeforeEach...)
+	allBeforeEach = append(allBeforeEach, s.beforeEach...)
+
+	allAfterEach := make([]hookFn, 0, len(s.afterEach)+len(inheritedAfterEach))
+	allAfterEach = append(allAfterEach, s.afterEach...)
+	allAfterEach = append(allAfterEach, inheritedAfterEach...)
+
+	for _, test := range s.tests {
+		s.t.Run(test.name, func(sub *testing.T) {
+			ttt := NewT(sub)
+			for _, fn := range allBeforeEach {
+				fn(ttt)
+			}
+			defer func() {
+				for i := len(allAfterEach) - 1; i >= 0; i-- {
+					allAfterEach[i](ttt)
+				}
+			}()
+			test.fn(ttt)
+		})
+	}
 }
