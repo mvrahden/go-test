@@ -354,6 +354,28 @@ func TestRun_FDescribe_only_runs_focused_group(t *testing.T) {
 	}
 }
 
+func TestRun_TestParallel_calls_t_Parallel(t *testing.T) {
+	gotest.Run(t, func(s *gotest.S) {
+		s.TestParallel("parallel_test", func(t *gotest.T) {
+			// Verifies this compiles and doesn't panic
+		})
+	})
+}
+
+func TestRun_TestParallel_still_runs_hooks(t *testing.T) {
+	var count int32
+	gotest.Run(t, func(s *gotest.S) {
+		s.BeforeEach(func(t *gotest.T) {
+			count++
+		})
+		s.TestParallel("p1", func(t *gotest.T) {})
+		s.TestParallel("p2", func(t *gotest.T) {})
+	})
+	if count != 2 {
+		t.Fatalf("expected BeforeEach to run twice, ran %d times", count)
+	}
+}
+
 // slicesEqual is a test helper — compares two string slices.
 func slicesEqual(a, b []string) bool {
 	if len(a) != len(b) {

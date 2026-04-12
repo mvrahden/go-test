@@ -82,6 +82,10 @@ func (s *S) XDescribe(name string, fn func(*S)) {
 	s.describes = append(s.describes, describeEntry{name: name, fn: fn, excluded: true})
 }
 
+func (s *S) TestParallel(name string, fn func(*T)) {
+	s.tests = append(s.tests, testEntry{name: name, fn: fn, parallel: true})
+}
+
 func (s *S) run(inheritedBeforeEach, inheritedAfterEach []hookFn) {
 	tt := NewT(s.t)
 
@@ -114,6 +118,9 @@ func (s *S) run(inheritedBeforeEach, inheritedAfterEach []hookFn) {
 			ttt := NewT(sub)
 			for _, fn := range allBeforeEach {
 				fn(ttt)
+			}
+			if test.parallel {
+				sub.Parallel()
 			}
 			defer func() {
 				for i := len(allAfterEach) - 1; i >= 0; i-- {
