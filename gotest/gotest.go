@@ -61,6 +61,11 @@ func (s *S) Test(name string, fn func(*T)) {
 	s.tests = append(s.tests, testEntry{name: name, fn: fn})
 }
 
+// Describe registers a nested test group with its own hooks.
+func (s *S) Describe(name string, fn func(*S)) {
+	s.describes = append(s.describes, describeEntry{name: name, fn: fn})
+}
+
 func (s *S) run(inheritedBeforeEach, inheritedAfterEach []hookFn) {
 	tt := NewT(s.t)
 
@@ -77,9 +82,9 @@ func (s *S) run(inheritedBeforeEach, inheritedAfterEach []hookFn) {
 	allBeforeEach = append(allBeforeEach, inheritedBeforeEach...)
 	allBeforeEach = append(allBeforeEach, s.beforeEach...)
 
-	allAfterEach := make([]hookFn, 0, len(s.afterEach)+len(inheritedAfterEach))
-	allAfterEach = append(allAfterEach, s.afterEach...)
+	allAfterEach := make([]hookFn, 0, len(inheritedAfterEach)+len(s.afterEach))
 	allAfterEach = append(allAfterEach, inheritedAfterEach...)
+	allAfterEach = append(allAfterEach, s.afterEach...)
 
 	for _, test := range s.tests {
 		s.t.Run(test.name, func(sub *testing.T) {
@@ -93,6 +98,16 @@ func (s *S) run(inheritedBeforeEach, inheritedAfterEach []hookFn) {
 				}
 			}()
 			test.fn(ttt)
+		})
+	}
+
+	// Execute child describes.
+	for _, desc := range s.describes {
+		desc := desc
+		s.t.Run(desc.name, func(sub *testing.T) {
+			child := &S{t: sub}
+			desc.fn(child)
+			child.run(allBeforeEach, allAfterEach)
 		})
 	}
 }

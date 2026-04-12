@@ -194,6 +194,112 @@ func TestRun_AfterEach_runs_even_when_test_fails(t *testing.T) {
 	}
 }
 
+func TestRun_Describe_creates_nested_subtest(t *testing.T) {
+	var ran bool
+	gotest.Run(t, func(s *gotest.S) {
+		s.Describe("group", func(s *gotest.S) {
+			s.Test("inner", func(t *gotest.T) {
+				ran = true
+			})
+		})
+	})
+	if !ran {
+		t.Fatal("nested test should have executed")
+	}
+}
+
+func TestRun_Describe_inherits_parent_BeforeEach(t *testing.T) {
+	var order []string
+	gotest.Run(t, func(s *gotest.S) {
+		s.BeforeEach(func(t *gotest.T) {
+			order = append(order, "parentBeforeEach")
+		})
+		s.Describe("child", func(s *gotest.S) {
+			s.BeforeEach(func(t *gotest.T) {
+				order = append(order, "childBeforeEach")
+			})
+			s.Test("inner", func(t *gotest.T) {
+				order = append(order, "test")
+			})
+		})
+	})
+	expected := []string{"parentBeforeEach", "childBeforeEach", "test"}
+	if !slicesEqual(order, expected) {
+		t.Fatalf("expected %v, got %v", expected, order)
+	}
+}
+
+func TestRun_Describe_AfterEach_unwinds_in_reverse(t *testing.T) {
+	var order []string
+	gotest.Run(t, func(s *gotest.S) {
+		s.AfterEach(func(t *gotest.T) {
+			order = append(order, "parentAfterEach")
+		})
+		s.Describe("child", func(s *gotest.S) {
+			s.AfterEach(func(t *gotest.T) {
+				order = append(order, "childAfterEach")
+			})
+			s.Test("inner", func(t *gotest.T) {
+				order = append(order, "test")
+			})
+		})
+	})
+	expected := []string{"test", "childAfterEach", "parentAfterEach"}
+	if !slicesEqual(order, expected) {
+		t.Fatalf("expected %v, got %v", expected, order)
+	}
+}
+
+func TestRun_Describe_full_nested_lifecycle(t *testing.T) {
+	var order []string
+	gotest.Run(t, func(s *gotest.S) {
+		s.BeforeAll(func(t *gotest.T) { order = append(order, "parentBeforeAll") })
+		s.AfterAll(func(t *gotest.T) { order = append(order, "parentAfterAll") })
+		s.BeforeEach(func(t *gotest.T) { order = append(order, "parentBE") })
+		s.AfterEach(func(t *gotest.T) { order = append(order, "parentAE") })
+
+		s.Test("top", func(t *gotest.T) { order = append(order, "topTest") })
+
+		s.Describe("child", func(s *gotest.S) {
+			s.BeforeAll(func(t *gotest.T) { order = append(order, "childBeforeAll") })
+			s.AfterAll(func(t *gotest.T) { order = append(order, "childAfterAll") })
+			s.BeforeEach(func(t *gotest.T) { order = append(order, "childBE") })
+			s.AfterEach(func(t *gotest.T) { order = append(order, "childAE") })
+
+			s.Test("nested", func(t *gotest.T) { order = append(order, "nestedTest") })
+		})
+	})
+	expected := []string{
+		"parentBeforeAll",
+		"parentBE", "topTest", "parentAE",
+		"childBeforeAll",
+		"parentBE", "childBE", "nestedTest", "childAE", "parentAE",
+		"childAfterAll",
+		"parentAfterAll",
+	}
+	if !slicesEqual(order, expected) {
+		t.Fatalf("expected:\n  %v\ngot:\n  %v", expected, order)
+	}
+}
+
+func TestRun_Describe_double_nesting(t *testing.T) {
+	var order []string
+	gotest.Run(t, func(s *gotest.S) {
+		s.BeforeEach(func(t *gotest.T) { order = append(order, "L0-BE") })
+		s.Describe("L1", func(s *gotest.S) {
+			s.BeforeEach(func(t *gotest.T) { order = append(order, "L1-BE") })
+			s.Describe("L2", func(s *gotest.S) {
+				s.BeforeEach(func(t *gotest.T) { order = append(order, "L2-BE") })
+				s.Test("deep", func(t *gotest.T) { order = append(order, "test") })
+			})
+		})
+	})
+	expected := []string{"L0-BE", "L1-BE", "L2-BE", "test"}
+	if !slicesEqual(order, expected) {
+		t.Fatalf("expected %v, got %v", expected, order)
+	}
+}
+
 // slicesEqual is a test helper — compares two string slices.
 func slicesEqual(a, b []string) bool {
 	if len(a) != len(b) {
