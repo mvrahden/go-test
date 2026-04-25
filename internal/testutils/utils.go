@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	timestampRegex = regexp.MustCompile(`(\d\.\d+s)`)
+	timestampRegex = regexp.MustCompile(`(\d+\.\d+s|\(cached\))`)
 )
 
 func CompareTestOutputWithGolden(t *testing.T, tmp string, actual *bytes.Buffer, testFS embed.FS, goldenName string) {
