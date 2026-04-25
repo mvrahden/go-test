@@ -26,9 +26,10 @@ func TestT(t *testing.T) {
 
 	// clone module into tmp
 	excludedPaths := []string{
-		".git",                    // entire .git dir
-		"go.work",                 // no go.work reference
-		"pkg/gotest/main_test.go", // this file
+		".git",                         // entire .git dir
+		"go.work",                      // no go.work reference
+		"pkg/gotest/main_test.go",      // this file
+		"pkg/gotest/assertions_test.go", // functional API tests (not part of golden)
 	}
 	testutils.CopyModuleUnderTestToTmp(t, tmp, "./../..", excludedPaths...)
 	testutils.ActivateTests(t, tmp)
