@@ -264,20 +264,29 @@ func (f *DBFixture) BeforeAll(t *gotest.T) {}
 
 // --- Validation: Multiple package fixtures ---
 
-func TestValidation_MultiplePackageFixtures(t *testing.T) {
+func TestValidation_MultipleRootPackageFixtures(t *testing.T) {
 	fixtures := []*gotestast.FixtureSpec{
 		makeFixtureSpec("Fix1", gotestast.PackageFixture, true),
 		makeFixtureSpec("Fix2", gotestast.PackageFixture, true),
 	}
 	err := validateFixtures(fixtures)
 	gotest.Error(t, err)
-	gotest.Contains(t, err.Error(), "at most one package fixture")
+	gotest.Contains(t, err.Error(), "at most one root package fixture")
 }
 
 func TestValidation_SinglePackageFixture_OK(t *testing.T) {
 	fixtures := []*gotestast.FixtureSpec{
 		makeFixtureSpec("Fix1", gotestast.PackageFixture, true),
 	}
+	err := validateFixtures(fixtures)
+	gotest.NoError(t, err)
+}
+
+func TestValidation_NestedPackageFixtures_OK(t *testing.T) {
+	root := makeFixtureSpec("Root", gotestast.PackageFixture, true)
+	child := makeFixtureSpec("Child", gotestast.PackageFixture, true)
+	child.ParentFixture = root
+	fixtures := []*gotestast.FixtureSpec{root, child}
 	err := validateFixtures(fixtures)
 	gotest.NoError(t, err)
 }
@@ -421,7 +430,7 @@ func (s *MyTestSuite) TestSomething(t *gotest.T) {}
 
 // --- Validation: ApplyTestSuiteSpecs ---
 
-func TestApplyTestSuiteSpecs_MultiplePackageFixturesError(t *testing.T) {
+func TestApplyTestSuiteSpecs_MultipleRootPackageFixturesError(t *testing.T) {
 	fixtures := []*gotestast.FixtureSpec{
 		makeFixtureSpec("Fix1", gotestast.PackageFixture, true),
 		makeFixtureSpec("Fix2", gotestast.PackageFixture, true),
@@ -429,7 +438,7 @@ func TestApplyTestSuiteSpecs_MultiplePackageFixturesError(t *testing.T) {
 	c := collector{}
 	_, err := c.ApplyTestSuiteSpecs(CollectorResult{Fixtures: fixtures})
 	gotest.Error(t, err)
-	gotest.Contains(t, err.Error(), "at most one package fixture")
+	gotest.Contains(t, err.Error(), "at most one root package fixture")
 }
 
 func TestApplyTestSuiteSpecs_CycleError(t *testing.T) {
