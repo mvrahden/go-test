@@ -16,7 +16,7 @@ func newFormatSpy(t *testing.T) (*bytes.Buffer, func(format string, args ...any)
 		buf.Reset()
 	})
 	return buf, func(format string, args ...any) {
-		_, err := buf.WriteString(fmt.Sprintf(format, args...))
+		_, err := fmt.Fprintf(buf, format, args...)
 		if err != nil {
 			t.Fatalf("failed writing to buffer: %s", err)
 		}
