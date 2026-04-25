@@ -14,12 +14,14 @@ import (
 var (
 	DEBUG bool
 	CLEAN bool
+	CI    bool
 )
 
 func main() {
 	ownArgs, goTestArgs := SplitArgs(os.Args[1:])
 	DEBUG = slices.Contains(ownArgs, "-ƒƒ.internal.debug")
 	CLEAN = slices.Contains(ownArgs, "-ƒƒ.clean")
+	CI = slices.Contains(ownArgs, "--ci")
 
 	if CLEAN {
 		runClean(goTestArgs)

@@ -11,7 +11,7 @@ type ExecConfig struct {
 
 func SplitArgs(inArgs []string) (ownArgs, goTestArgs []string) {
 	for _, arg := range inArgs {
-		if strings.HasPrefix(arg, "-ƒƒ.") {
+		if strings.HasPrefix(arg, "-ƒƒ.") || arg == "--ci" {
 			ownArgs = append(ownArgs, arg)
 		} else {
 			goTestArgs = append(goTestArgs, arg)

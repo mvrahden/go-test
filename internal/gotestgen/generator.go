@@ -3,6 +3,7 @@ package gotestgen
 import (
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/x/slices"
 	"golang.org/x/tools/go/packages"
 )
@@ -25,6 +26,28 @@ func Generate(targetPath string) (GenerateResults, error) {
 		return nil, err
 	}
 	return res, nil
+}
+
+func Collect(targetPath string) (gotestast.TestSuiteSpecSet, error) {
+	loadResults, err := loadPackages(targetPath)
+	if err != nil {
+		return nil, err
+	}
+	var allSuites gotestast.TestSuiteSpecSet
+	c := collector{}
+	for _, lr := range loadResults {
+		ptestCollected := c.CollectSuiteSpecs(lr.ptest)
+		if len(ptestCollected.Errs) > 0 {
+			return nil, ptestCollected.Errs[0].Err
+		}
+		pxtestCollected := c.CollectSuiteSpecs(lr.pxtest)
+		if len(pxtestCollected.Errs) > 0 {
+			return nil, pxtestCollected.Errs[0].Err
+		}
+		allSuites = append(allSuites, ptestCollected.Suites...)
+		allSuites = append(allSuites, pxtestCollected.Suites...)
+	}
+	return allSuites, nil
 }
 
 type loadResult struct {

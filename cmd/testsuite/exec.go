@@ -13,6 +13,21 @@ import (
 )
 
 func Run(cfg ExecConfig) int {
+	if CI {
+		violations, err := RunFocusGuard(cfg.PackagePatterns)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+			return 2
+		}
+		if len(violations) > 0 {
+			fmt.Fprintln(os.Stderr, "FAIL: focus prefix detected — remove F_ before merging:")
+			for _, v := range violations {
+				fmt.Fprintln(os.Stderr, v.String())
+			}
+			return 1
+		}
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(),
 		os.Interrupt, syscall.SIGTERM)
 	defer stop()
