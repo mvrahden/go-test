@@ -69,14 +69,12 @@ Usage:
 Subcommands:
   generate    Generate test code (default behavior)
   clean       Remove generated test files
-  scaffold    Scaffold a new test suite (not yet implemented)
-  migrate     Migrate from testify/suite (not yet implemented)
+  scaffold    Generate test suite skeleton from a Go type
+  migrate     Convert testify/suite tests to go-test format
   version     Print version information
   help        Show this help message
 
 Flags:
-  -ƒƒ.clean            Remove generated files only
-  -ƒƒ.internal.debug   Keep generated files after test run
   --ci                  Enable focus guard (fail on F_ prefixes)
 
 All other flags and arguments are forwarded to "go test".
