@@ -26,11 +26,14 @@ func TestT(t *testing.T) {
 
 	// clone module into tmp
 	excludedPaths := []string{
-		".git",                         // entire .git dir
-		"go.work",                      // no go.work reference
-		"pkg/gotest/main_test.go",      // this file
+		".git",                          // entire .git dir
+		"go.work",                       // no go.work reference
+		"pkg/gotest/main_test.go",       // this file
 		"pkg/gotest/assertions_test.go", // functional API tests (not part of golden)
-		"pkg/gotest/must_test.go",      // Must tests (not part of golden)
+		"pkg/gotest/must_test.go",       // Must tests (not part of golden)
+		"pkg/gotest/each_test.go",       // Each tests (not part of golden)
+		"pkg/gotest/eventually_test.go", // Eventually/Consistently tests (not part of golden)
+		"pkg/gotest/snapshot_test.go",    // Snapshot tests (not part of golden)
 	}
 	testutils.CopyModuleUnderTestToTmp(t, tmp, "./../..", excludedPaths...)
 	testutils.ActivateTests(t, tmp)
