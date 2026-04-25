@@ -1,0 +1,3 @@
+package genericsuite
+
+func Noop() {}

@@ -101,11 +101,12 @@ func (ts TestSuiteSpecSet) ReduceToEffectiveSet() (TestSuiteSpecSet, SkippedTest
 }
 
 type TestSuiteSpec struct {
-	pkg *packages.Package
-	n   ast.Node
-	ts  *ast.TypeSpec
-	typ *types.Struct
-	th  *TestSuiteHarness
+	pkg                *packages.Package
+	n                  ast.Node
+	ts                 *ast.TypeSpec
+	typ                *types.Struct
+	underlyingTypeName string // non-empty for aliases of generic types (e.g. "GenericTestSuite")
+	th                 *TestSuiteHarness
 }
 
 // Identifier returns the Types Name.
@@ -246,15 +247,25 @@ func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, toke
 	}
 
 	if ts.TypeParams != nil && ts.TypeParams.NumFields() > 0 {
-		return nil, ts.Pos(), fmt.Errorf("test suite %q must not have type parameters (generics are not supported)", ts.Name.Name)
+		return nil, -1, nil // generic definitions are not generation targets; their aliases are
 	}
 
-	typ, ok := pkg.TypesInfo.TypeOf(ts.Type).(*types.Struct)
-	if !ok {
+	var typ *types.Struct
+	var underlyingTypeName string
+	rawType := pkg.TypesInfo.TypeOf(ts.Type)
+	if t, ok := rawType.(*types.Struct); ok {
+		typ = t
+	} else if named, ok := rawType.(*types.Named); ok {
+		if t, ok := named.Underlying().(*types.Struct); ok {
+			typ = t
+			underlyingTypeName = named.Obj().Name()
+		}
+	}
+	if typ == nil {
 		return nil, -1, nil
 	}
 
-	return &TestSuiteSpec{pkg, n, ts, typ, &TestSuiteHarness{}}, -1, nil
+	return &TestSuiteSpec{pkg: pkg, n: n, ts: ts, typ: typ, underlyingTypeName: underlyingTypeName, th: &TestSuiteHarness{}}, -1, nil
 }
 
 func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSpec) (token.Pos, error) {
@@ -302,8 +313,12 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 	}
 
 	recvType := recvPtr.Elem().(*types.Named)
-	if recvType == nil || recvType.Obj().Name() != s.ts.Name.Name {
-		return decl.Name.Pos(), nil // no receiver
+	if recvType == nil {
+		return decl.Name.Pos(), nil
+	}
+	recvName := recvType.Obj().Name()
+	if recvName != s.ts.Name.Name && (s.underlyingTypeName == "" || recvName != s.underlyingTypeName) {
+		return decl.Name.Pos(), nil
 	}
 
 	tm := &TestSuiteMethod{n: n, m: m, sig: sig}

@@ -32,6 +32,7 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 		{"simple_suite", "github.com/mvrahden/go-test/examples/simple_suite", "simple test suites"},
 		{"focus_exclude", "github.com/mvrahden/go-test/examples/focus_exclude", "focus and exclude semantics"},
 		{"parallel_suite", "github.com/mvrahden/go-test/examples/parallel_suite", "parallel test suites"},
+		{"generic_suite", "github.com/mvrahden/go-test/examples/generic_suite", "generic test suites via type aliases"},
 	} {
 		pkg := path.Join("..", "..", "examples", tC.directory)
 		testdatadir := filepath.Join("..", "..", "examples", tC.directory, "testdata")

@@ -88,6 +88,27 @@ func Test_TestsuiteCLI_ParallelSuite(t *testing.T) {
 	require.Contains(t, output, "PASS")
 }
 
+func Test_TestsuiteCLI_GenericSuite(t *testing.T) {
+	tmp := t.TempDir()
+	testutils.CopyModuleUnderTestToTmp(t, tmp, "./..", ".git", "go.work")
+	testutils.ActivateTests(t, tmp)
+	testutils.HackGoWork(t, tmp)
+
+	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite",
+		filepath.Join(tmp, "examples", "generic_suite"), "-v")
+	cmd.Dir = filepath.Join(tmp, "examples")
+	out, err := cmd.CombinedOutput()
+	output := string(out)
+
+	require.NoError(t, err, "generic suite should pass: %s", output)
+	require.Contains(t, output, "TestStringTestSuite")
+	require.Contains(t, output, "TestIntTestSuite")
+	require.Contains(t, output, "TestSimpleExtTestSuite")
+	require.Contains(t, output, "TestAlpha")
+	require.Contains(t, output, "TestBeta")
+	require.Contains(t, output, "PASS")
+}
+
 func Test_TestsuiteCLI_AllPackages(t *testing.T) {
 	tmp := t.TempDir()
 	testutils.CopyModuleUnderTestToTmp(t, tmp, "./..", ".git", "go.work")
@@ -104,9 +125,11 @@ func Test_TestsuiteCLI_AllPackages(t *testing.T) {
 	require.Contains(t, output, "examples/simple_suite")
 	require.Contains(t, output, "examples/focus_exclude")
 	require.Contains(t, output, "examples/parallel_suite")
+	require.Contains(t, output, "examples/generic_suite")
 	require.Contains(t, output, "TestUnitTestSuite")
 	require.Contains(t, output, "TestF_FocusedTestSuite")
 	require.Contains(t, output, "TestParallelTestSuiteParallel")
+	require.Contains(t, output, "TestStringTestSuite")
 }
 
 func Test_TestsuiteCLI_ExitCode(t *testing.T) {
