@@ -19,14 +19,14 @@ func SuitesGenerate(scanDir string) error {
 	for _, result := range results {
 		if len(result.PTest) > 0 {
 			testsuiteFile := filepath.Join(result.AbsPath, about.PSuite)
-			err := os.WriteFile(testsuiteFile, result.PTest, os.ModePerm)
+			err := os.WriteFile(testsuiteFile, result.PTest, 0644)
 			if err != nil {
 				return fmt.Errorf("failed writing ptest: %w", err)
 			}
 		}
 		if len(result.PXTest) > 0 {
 			testsuiteFile := filepath.Join(result.AbsPath, about.PXSuite)
-			err := os.WriteFile(testsuiteFile, result.PXTest, os.ModePerm)
+			err := os.WriteFile(testsuiteFile, result.PXTest, 0644)
 			if err != nil {
 				return fmt.Errorf("failed writing pxtest: %w", err)
 			}
