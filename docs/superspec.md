@@ -148,64 +148,147 @@ FAIL: focus prefix detected — remove F_ before merging:
 
 5 lines of code to implement. Prevents hours of debugging.
 
-### 1.2 Assertion API: Complete and Type-Safe
+### 1.2 Assertion Library: Zero Dependencies, Full Type Safety
 
-**Why:** The current fluent API (`t.Assert(v).IsEqualTo(w)`) is expressive but untyped — comparing a `string` to an `int` compiles. The `Contains` string case is a no-op. `ContainsAll`/`ContainsAny` panic. Developers won't trust an assertion library that's half-built.
+**Why:** The current fluent API (`t.Assert(v).IsEqualTo(w)`) is expressive but untyped — comparing a `string` to an `int` compiles. `ContainsAll`/`ContainsAny` panic. Meanwhile, `origin/main` has a generic typed assertion layer with excellent API design, but it vendors 2,300 lines of testify internals and pulls `go-spew` + `go-difflib` into `go.mod` — leaking transitive dependencies to every consumer of the module.
 
-**What:** Two complementary APIs, both complete:
+**Decision: Adopt the API design from `origin/main`. Rewrite the core from scratch.**
 
-**Fluent API** — discoverable, reads like prose, for quick assertions:
+The generic typed signatures from `origin/main`'s `require` layer are the right API. The underlying assertion logic is reimplemented using Go stdlib only — no vendored testify, no `go-spew`, no `go-difflib`. ~300 lines of core logic replace ~3,000 lines of vendored code. Zero external dependencies.
+
+**Architecture:**
+
+```
+pkg/gotest/                              ← public API (functional + fluent)
+  internal/
+    assert/                              ← core implementation (~300 lines, pure stdlib)
+      equal.go                           ← reflect.DeepEqual + diff rendering
+      compare.go                         ← cmp.Compare for ordered types
+      format.go                          ← value formatting + minimal unified diff
+```
+
+The implementation uses only stdlib:
+
+| Concern | testify/main approach | Reimplemented with |
+|---------|----------------------|--------------------|
+| Deep equality | `objectsAreEqual` (reflect.DeepEqual + wrappers) | `reflect.DeepEqual` directly |
+| Ordered comparison | 500-line type switch (`assertion_compare.go`) | `cmp.Compare[T]` (Go 1.21) |
+| Value formatting | `go-spew` (abandoned since 2018) | `fmt.Sprintf("%#v", v)` |
+| Diff output | `go-difflib` | Minimal unified diff (~50 lines) |
+| JSON comparison | `encoding/json` | `encoding/json` (same) |
+| HTTP assertions | 165 lines | Not included (out of scope) |
+| YAML comparison | vendored yaml shim | Not included (out of scope) |
+
+**Functional API** — type-safe, one import, identical names to testify's `require`:
 
 ```go
-t.Assert(result).IsEqualTo(expected)
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+// Equality — [T any] catches cross-type comparison at compile time
+gotest.Equal[T any](t, expected, actual T, msgAndArgs ...any)
+gotest.NotEqual[T any](t, expected, actual T, msgAndArgs ...any)
+
+// Zero / Empty
+gotest.Zero[T comparable](t, value T, msgAndArgs ...any)
+gotest.NotZero[T comparable](t, value T, msgAndArgs ...any)
+gotest.Empty(t, object any, msgAndArgs ...any)
+gotest.NotEmpty(t, object any, msgAndArgs ...any)
+
+// Bool
+gotest.True(t, value bool, msgAndArgs ...any)
+gotest.False(t, value bool, msgAndArgs ...any)
+
+// Error
+gotest.NoError(t, err error, msgAndArgs ...any)
+gotest.Error(t, err error, msgAndArgs ...any)
+gotest.ErrorIs(t, err, target error, msgAndArgs ...any)
+gotest.ErrorAs[E error](t, err error, msgAndArgs ...any) E     // returns matched error
+gotest.ErrorContains(t, err error, contains string, msgAndArgs ...any)
+
+// Collection
+gotest.Contains(t, s, contains any, msgAndArgs ...any)
+gotest.NotContains(t, s, contains any, msgAndArgs ...any)
+gotest.Len(t, object any, length int, msgAndArgs ...any)
+gotest.ElementsMatch[T comparable](t, listA, listB []T, msgAndArgs ...any)
+gotest.Subset[T comparable](t, list, subset []T, msgAndArgs ...any)
+
+// Comparison — [T cmp.Ordered] prevents comparing incomparable types
+gotest.Greater[T cmp.Ordered](t, a, b T, msgAndArgs ...any)
+gotest.GreaterOrEqual[T cmp.Ordered](t, a, b T, msgAndArgs ...any)
+gotest.Less[T cmp.Ordered](t, a, b T, msgAndArgs ...any)
+gotest.LessOrEqual[T cmp.Ordered](t, a, b T, msgAndArgs ...any)
+
+// String / Regex
+gotest.Regexp[P regexpPattern](t, rx P, str string, msgAndArgs ...any)
+
+// Numeric
+gotest.InDelta[T numeric](t, expected, actual T, delta float64, msgAndArgs ...any)
+
+// Serialization — accepts string, []byte, json.RawMessage, io.Reader, or any marshalable value
+gotest.JSONEq(t, expected, actual any, msgAndArgs ...any)
+
+// Time
+gotest.TimeWithin(t, expected, actual time.Time, tolerance time.Duration, msgAndArgs ...any)
+gotest.TimeIsNow(t, ts time.Time, tolerance time.Duration, msgAndArgs ...any)
+
+// Panic
+gotest.Panics(t, f func(), msgAndArgs ...any) any
+
+// Async
+gotest.Eventually(t, condition func() bool, waitFor, tick time.Duration, msgAndArgs ...any)
+
+// Unwrap — works with multi-return: gotest.Must(fn()) where fn returns (T, error) or (T, bool)
+gotest.Must[T any](val T, ok any) T
+```
+
+All functions accept any type implementing `testingT` (`Helper()` + `Errorf()` + `FailNow()`) — this includes both `*gotest.T` and `*testing.T`, so the assertions work in suites and in standalone `func Test*` functions alike.
+
+**Fluent API** — discoverable via autocomplete, delegates to the functional layer:
+
+```go
+t.Assert(result).Equal(expected)
 t.Assert(items).HasLength(3)
 t.Assert(err).IsZero()
+t.Assert(ok).IsTrue()
+t.Assert(output).Contains("expected")
 ```
 
-Complete the existing methods:
-- `Contains(v)` — fix the string case (use `strings.Contains`)
-- `ContainsAll(v...)` — check all elements are present
-- `ContainsAny(v...)` — check at least one element is present
-- `IsNotEqualTo(v)` — negated equality
-- `IsNotZero()` — negated zero check
-- `IsNotEmpty()` — negated empty check
-- `IsNil()` / `IsNotNil()` — nil checks with proper pointer/interface handling
-- `IsError(target)` — `errors.Is` check
-- `ErrorContains(substr)` — error message substring check
-- `Panics()` / `PanicsWithValue(v)` — panic recovery assertions
-- `Satisfies(func(v any) bool)` — custom predicate
-
-**Functional API** — type-safe, familiar to testify users, for production test suites:
-
-```go
-require.Equal(t, got, want)           // T constrained to comparable
-require.DeepEqual(t, got, want)       // any type, uses reflect.DeepEqual
-require.Contains(t, haystack, needle) // generic over slice element type
-require.ErrorIs(t, err, target)
-require.NoError(t, err)
-require.Len(t, collection, expected)
-require.True(t, condition)
-require.Nil(t, value)
-```
-
-Both APIs accept `*gotest.T`. The functional API uses Go generics for compile-time type safety — `require.Equal[int](t, "foo", 42)` is a compile error, not a runtime surprise.
+The fluent API accepts `any`, trading compile-time type safety for discoverability. It complements the functional API — use fluent for quick exploration, functional for production test suites.
 
 **Diff output for equality failures:**
 
 ```
-require.Equal failed:
+Equal failed:
   expected: map[string]int{"a": 1, "b": 2, "c": 3}
   actual:   map[string]int{"a": 1, "b": 5, "c": 3}
   diff:
     map[string]int{
-        "a": 1,
     -   "b": 2,
     +   "b": 5,
-        "c": 3,
     }
 ```
 
-Implementation: `require` functions use `t.Helper()` to report the caller's file:line. The diff renderer handles strings, structs, maps, and slices. Pointer addresses are never shown in diffs.
+All functions call `t.Helper()` so failures report the caller's file:line, not the assertion library's internals. The diff renderer uses `%#v` for Go-syntax formatting. Pointer addresses are never shown. For strings, a line-by-line unified diff. For structs/maps/slices, field-level `-`/`+` markers.
+
+**Migration from testify:** Function names are identical — `Equal`, `NoError`, `ErrorIs`, `Contains`, `Len`, etc. Migration is an import path change plus a receiver rename:
+
+```diff
+- import "github.com/stretchr/testify/require"
++ import "github.com/mvrahden/go-test/pkg/gotest"
+
+- require.Equal(t, expected, actual)
++ gotest.Equal(t, expected, actual)
+```
+
+**Dogfooding:** The project's own tests use this assertion library instead of `stretchr/testify`, eliminating the last external test dependency.
+
+**Deliberately excluded:**
+
+- HTTP-specific assertions (out of scope for a test suite framework)
+- YAML comparison (niche, adds dependency or complexity)
+- `go-spew` pretty-printing (`%#v` is sufficient; `go-spew` is unmaintained since 2018)
+- The 2,272-line vendored testify `assertions.go` (reimplemented in ~300 lines)
+- `go-difflib` (replaced by ~50-line inline diff renderer)
 
 ### 1.3 CLI Distribution
 
@@ -364,7 +447,7 @@ The migration:
 1. Finds `suite.Run(t, &MySuite{})` / `suite.Run(t, new(MySuite))` patterns
 2. Renames the suite struct to end in `TestSuite` (if it doesn't already)
 3. Renames `SetupSuite` → `BeforeAll`, `TearDownSuite` → `AfterAll`, `SetupTest` → `BeforeEach`, `TearDownTest` → `AfterEach`
-4. Changes `s.T()` → `t.T()` and `s.Require().Equal(a, b)` → `require.Equal(t, a, b)`
+4. Changes `s.T()` → `t.T()` and `s.Require().Equal(a, b)` → `gotest.Equal(t, a, b)`
 5. Removes the `func Test*(t *testing.T) { suite.Run(...) }` boilerplate
 6. Removes the `testify/suite` import
 
@@ -381,12 +464,12 @@ func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
     t.When("email is valid", func(w *gotest.T) {
         w.It("creates the user", func(it *gotest.T) {
             err := s.svc.Create(ctx, validUser)
-            require.NoError(it, err)
+            gotest.NoError(it, err)
         })
         w.It("sends a welcome email", func(it *gotest.T) {
-            require.Eventually(it, 2*time.Second, 50*time.Millisecond, func(poll *gotest.T) {
-                require.True(poll, s.mailer.HasMessage(validUser.Email))
-            })
+            gotest.Eventually(it, func() bool {
+                return s.mailer.HasMessage(validUser.Email)
+            }, 2*time.Second, 50*time.Millisecond)
         })
     })
 
@@ -394,7 +477,7 @@ func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
         w.It("returns ErrDuplicate", func(it *gotest.T) {
             s.svc.Create(ctx, validUser)
             err := s.svc.Create(ctx, validUser)
-            require.ErrorIs(it, err, ErrDuplicate)
+            gotest.ErrorIs(it, err, ErrDuplicate)
         })
     })
 }
@@ -437,7 +520,7 @@ UserService
   GetByID
     ✓ returns the user (3ms)
     ✗ returns error when not found (2ms)
-        require.ErrorIs failed:
+        ErrorIs failed:
           expected: ErrNotFound
           actual:   <nil>
           location: user_service_test.go:72
@@ -563,7 +646,7 @@ func (s *Suite) TestValidation(t *gotest.T) {
             {"rejects missing @", "userexample.com", false},
             {"rejects empty string", "", false},
         }, func(tt *gotest.T, tc struct{ Desc, Email string; Valid bool }) {
-            require.Equal(tt, s.validator.IsValid(tc.Email), tc.Valid)
+            gotest.Equal(tt, s.validator.IsValid(tc.Email), tc.Valid)
         })
     })
 }
@@ -596,8 +679,8 @@ func (s *Suite) TestAsyncProcessing(t *gotest.T) {
 
     t.Eventually(5*time.Second, 100*time.Millisecond, func(poll *gotest.T) {
         result, err := s.store.Get("key")
-        require.NoError(poll, err)
-        require.Equal(poll, result.Status, "completed")
+        gotest.NoError(poll, err)
+        gotest.Equal(poll, result.Status, "completed")
     })
 }
 ```
@@ -608,7 +691,7 @@ func (s *Suite) TestAsyncProcessing(t *gotest.T) {
 
 ```go
 t.Consistently(2*time.Second, 100*time.Millisecond, func(poll *gotest.T) {
-    require.Equal(poll, s.counter.Value(), 0) // must stay zero
+    gotest.Equal(poll, s.counter.Value(), 0) // must stay zero
 })
 ```
 
@@ -769,7 +852,7 @@ func (s *UserCreateTestSuite) BeforeEach(t *gotest.T) {
 func (s *UserCreateTestSuite) TestCreatesUser(t *gotest.T) {
     t.It("persists the user", func(it *gotest.T) {
         err := s.svc.Create(s.user)
-        require.NoError(it, err)
+        gotest.NoError(it, err)
     })
 }
 ```
@@ -820,15 +903,15 @@ func (s *StorageTestSuite[T]) TestPutAndGet(t *gotest.T) {
         w.It("returns the value", func(it *gotest.T) {
             s.store.Put("key", "value")
             result, err := s.store.Get("key")
-            require.NoError(it, err)
-            require.Equal(it, result, "value")
+            gotest.NoError(it, err)
+            gotest.Equal(it, result, "value")
         })
     })
 
     t.When("key does not exist", func(w *gotest.T) {
         w.It("returns ErrNotFound", func(it *gotest.T) {
             _, err := s.store.Get("nonexistent")
-            require.ErrorIs(it, err, ErrNotFound)
+            gotest.ErrorIs(it, err, ErrNotFound)
         })
     })
 }
@@ -907,10 +990,13 @@ The `spec` subcommand and `--spec` flag are post-processing views over `go test 
 ```
 cmd/gotest → gotestrunner → gotestgen → gotestast
                                          └── templates
-pkg/gotest (T, Assert, It)
+pkg/gotest
+  ├── T, Assert (fluent), It
+  ├── Equal, NoError, ErrorIs, ... (functional assertions)
+  └── internal/assert (~300 lines, pure stdlib, zero deps)
 ```
 
-Single pipeline: load → collect → reduce → render. Templates are Go `text/template`. Package loading via `golang.org/x/tools/go/packages`.
+Single pipeline: load → collect → reduce ��� render. Templates are Go `text/template`. Package loading via `golang.org/x/tools/go/packages`. Assertion library reimplemented from scratch — no vendored testify, no `go-spew`, no `go-difflib`.
 
 ### Phase 2: Scaffold + Spec + CLI Redesign
 
@@ -924,7 +1010,7 @@ cmd/gotest
   ├── generate        → gotestgen (no test execution)
   └── migrate         → AST transform (testify → go-test)
 
-pkg/gotest (T, Assert, It, When, Each, Eventually, MatchSnapshot)
+pkg/gotest (T, Assert, It, When, Each, Eventually, Consistently, MatchSnapshot + assertion functions)
 ```
 
 The `scaffold` subcommand reuses the same `packages.Load` infrastructure as the generator but produces skeleton test files instead of harness files. The `spec` subcommand wraps `go test -json` and maps results back to the suite→method→It/When hierarchy. The `coverage` subcommand compares production API surfaces against suite inventories.
