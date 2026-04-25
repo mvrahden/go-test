@@ -107,6 +107,7 @@ type TestSuiteSpec struct {
 	typ                *types.Struct
 	underlyingTypeName string // non-empty for aliases of generic types (e.g. "GenericTestSuite")
 	th                 *TestSuiteHarness
+	fixture            *FixtureSpec
 }
 
 // Identifier returns the Types Name.
@@ -122,6 +123,17 @@ func (ts *TestSuiteSpec) PackageName() string {
 func (ts *TestSuiteSpec) Identifier() string {
 	return ts.ts.Name.Name
 }
+
+// StructType returns the underlying *types.Struct for field inspection.
+func (ts *TestSuiteSpec) StructType() *types.Struct { return ts.typ }
+
+// Fixture returns the fixture spec embedded in this test suite, or nil.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) Fixture() *FixtureSpec { return ts.fixture }
+
+// SetFixture sets the fixture spec for this test suite.
+func (ts *TestSuiteSpec) SetFixture(f *FixtureSpec) { ts.fixture = f }
 
 // FullIdentifier returns the Types Name plus it's package identifier with dot-notation.
 //

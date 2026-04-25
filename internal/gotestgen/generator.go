@@ -115,12 +115,12 @@ func generateSrcs(targetPkg string) (GenerateResults, error) {
 			return nil, pxtestCollected.Errs[0].Err
 		}
 
-		ptestSpec, err := c.ApplyTestSuiteSpecs(ptestCollected.Suites)
+		ptestSpec, err := c.ApplyTestSuiteSpecs(ptestCollected)
 		if err != nil {
 			return nil, err
 		}
 
-		pxtestSpec, err := c.ApplyTestSuiteSpecs(pxtestCollected.Suites)
+		pxtestSpec, err := c.ApplyTestSuiteSpecs(pxtestCollected)
 		if err != nil {
 			return nil, err
 		}
