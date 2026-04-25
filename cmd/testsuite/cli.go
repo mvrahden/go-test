@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/mvrahden/go-test/about"
 )
@@ -37,7 +38,11 @@ func main() {
 func runClean(goTestArgs []string) {
 	patterns := ExtractPackagePatterns(goTestArgs)
 	for _, pattern := range patterns {
-		filepath.WalkDir(pattern, func(path string, d fs.DirEntry, err error) error {
+		dir := strings.TrimSuffix(pattern, "/...")
+		if dir == "" {
+			dir = "."
+		}
+		filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return nil
 			}
