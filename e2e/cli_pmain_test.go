@@ -12,6 +12,7 @@ import (
 
 	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/internal/testutils"
+	"github.com/stretchr/testify/require"
 )
 
 //go:embed testdata
@@ -57,13 +58,55 @@ func Test_TestsuiteCLI(t *testing.T) {
 		{basedir: "examples", pkgPath: "simple_suite", goldenName: "simple_suite_output.txt", debug: false},
 		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/stdlib", goldenName: "stdlib_output.txt", debug: false},
 		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/simple_suite", goldenName: "simple_suite_output.txt", debug: false},
-		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/...", goldenName: "test_all.txt", debug: false},
+		{basedir: "examples", pkgPath: "focus_exclude", goldenName: "focus_exclude_output.txt", debug: false},
 	}
 	for idx, tc := range testCases {
 		t.Run(fmt.Sprintf("idx %d", idx), func(t *testing.T) {
 			performTest(t, tmp, tc.basedir, tc.pkgPath, tc.pkgName, tc.goldenName, tc.debug)
 		})
 	}
+}
+
+func Test_TestsuiteCLI_ParallelSuite(t *testing.T) {
+	tmp := t.TempDir()
+	testutils.CopyModuleUnderTestToTmp(t, tmp, "./..", ".git", "go.work")
+	testutils.ActivateTests(t, tmp)
+	testutils.HackGoWork(t, tmp)
+
+	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite",
+		filepath.Join(tmp, "examples", "parallel_suite"), "-v")
+	cmd.Dir = filepath.Join(tmp, "examples")
+	out, err := cmd.CombinedOutput()
+	output := string(out)
+
+	require.NoError(t, err, "parallel suite should pass: %s", output)
+	require.Contains(t, output, "TestParallelTestSuiteParallel")
+	require.Contains(t, output, "TestParallelAlpha")
+	require.Contains(t, output, "TestParallelBeta")
+	require.Contains(t, output, "TestSequentialGamma")
+	require.Contains(t, output, "PAUSE")
+	require.Contains(t, output, "PASS")
+}
+
+func Test_TestsuiteCLI_AllPackages(t *testing.T) {
+	tmp := t.TempDir()
+	testutils.CopyModuleUnderTestToTmp(t, tmp, "./..", ".git", "go.work")
+	testutils.ActivateTests(t, tmp)
+	testutils.HackGoWork(t, tmp)
+
+	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite",
+		"github.com/mvrahden/go-test/examples/...", "-v")
+	cmd.Dir = filepath.Join(tmp, "examples")
+	out, _ := cmd.CombinedOutput()
+	output := string(out)
+
+	require.Contains(t, output, "examples/stdlib")
+	require.Contains(t, output, "examples/simple_suite")
+	require.Contains(t, output, "examples/focus_exclude")
+	require.Contains(t, output, "examples/parallel_suite")
+	require.Contains(t, output, "TestUnitTestSuite")
+	require.Contains(t, output, "TestF_FocusedTestSuite")
+	require.Contains(t, output, "TestParallelTestSuiteParallel")
 }
 
 func Test_TestsuiteCLI_ExitCode(t *testing.T) {
