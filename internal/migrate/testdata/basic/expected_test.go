@@ -1,0 +1,31 @@
+package basic
+
+import (
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type UserTestSuite struct {
+	db string
+}
+
+func (s *UserTestSuite) BeforeAll(t *gotest.T) {
+	s.db = "connected"
+}
+
+func (s *UserTestSuite) AfterAll(t *gotest.T) {
+	s.db = ""
+}
+
+func (s *UserTestSuite) BeforeEach(t *gotest.T) {}
+
+func (s *UserTestSuite) AfterEach(t *gotest.T) {}
+
+func (s *UserTestSuite) TestCreate(t *gotest.T) {
+	gotest.Equal(t, "connected", s.db)
+	gotest.NoError(t, nil)
+	gotest.True(t, true)
+}
+
+func (s *UserTestSuite) TestDelete(t *gotest.T) {
+	gotest.NotEmpty(t, s.db)
+}
