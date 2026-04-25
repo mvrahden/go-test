@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/mvrahden/go-test/about"
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
@@ -32,18 +33,36 @@ func Run(cfg ExecConfig) int {
 		os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// 1. Generate test code
 	var allDirs []string
+	var allCollectorResults []gotestgen.CollectorResult
 	for _, pattern := range cfg.PackagePatterns {
-		dirs, err := gotestrunner.SuitesGenerate(pattern)
+		dirs, collectorResults, err := gotestrunner.SuitesGenerateWithCollectorResults(pattern)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2
 		}
 		allDirs = append(allDirs, dirs...)
+		allCollectorResults = append(allCollectorResults, collectorResults...)
 	}
 
 	if !DEBUG {
 		defer cleanupGeneratedFiles(allDirs)
+	}
+
+	// 2. Discover shared fixtures from collector results
+	sharedFixtures := gotestgen.DiscoverSharedFixtures(allCollectorResults)
+
+	// 3. If any shared fixtures, start setup subprocess
+	var setupProc *SharedFixtureProcess
+	if len(sharedFixtures) > 0 {
+		var err error
+		setupProc, err = startSharedFixtures(ctx, sharedFixtures)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", err)
+			return 2
+		}
+		defer setupProc.Teardown()
 	}
 
 	select {
@@ -52,7 +71,12 @@ func Run(cfg ExecConfig) int {
 	default:
 	}
 
-	code, err := gotestrunner.StdlibRunTests(cfg.GoTestArgs)
+	// 4. Run tests with env vars from shared fixtures
+	var extraEnv map[string]string
+	if setupProc != nil {
+		extraEnv = setupProc.Env()
+	}
+	code, err := gotestrunner.StdlibRunTests(cfg.GoTestArgs, extraEnv)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
