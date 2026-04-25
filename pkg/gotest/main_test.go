@@ -30,6 +30,7 @@ func TestT(t *testing.T) {
 		"go.work",                      // no go.work reference
 		"pkg/gotest/main_test.go",      // this file
 		"pkg/gotest/assertions_test.go", // functional API tests (not part of golden)
+		"pkg/gotest/must_test.go",      // Must tests (not part of golden)
 	}
 	testutils.CopyModuleUnderTestToTmp(t, tmp, "./../..", excludedPaths...)
 	testutils.ActivateTests(t, tmp)
