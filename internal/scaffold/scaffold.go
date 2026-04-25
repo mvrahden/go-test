@@ -115,10 +115,10 @@ func IntrospectType(pkgPattern, typeName string) (*TypeInfo, error) {
 	underlying := named.Underlying()
 	if iface, ok := underlying.(*types.Interface); ok {
 		info.IsInterface = true
-		info.Methods = extractInterfaceMethods(iface, typeName)
+		info.Methods = extractInterfaceMethods(iface)
 	} else {
 		info.IsInterface = false
-		info.Methods = extractStructMethods(named, typeName)
+		info.Methods = extractStructMethods(named)
 	}
 
 	sort.Slice(info.Methods, func(i, j int) bool {
@@ -147,7 +147,7 @@ func determinePkgDir(pkg *packages.Package) string {
 	return ""
 }
 
-func extractStructMethods(named *types.Named, typeName string) []MethodInfo {
+func extractStructMethods(named *types.Named) []MethodInfo {
 	// Get pointer receiver methods (includes value receiver methods)
 	mset := types.NewMethodSet(types.NewPointer(named))
 	var methods []MethodInfo
@@ -175,7 +175,7 @@ func extractStructMethods(named *types.Named, typeName string) []MethodInfo {
 	return methods
 }
 
-func extractInterfaceMethods(iface *types.Interface, typeName string) []MethodInfo {
+func extractInterfaceMethods(iface *types.Interface) []MethodInfo {
 	var methods []MethodInfo
 	for i := 0; i < iface.NumMethods(); i++ {
 		fn := iface.Method(i)
