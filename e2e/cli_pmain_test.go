@@ -73,7 +73,7 @@ func Test_TestsuiteCLI_ParallelSuite(t *testing.T) {
 	testutils.ActivateTests(t, tmp)
 	testutils.HackGoWork(t, tmp)
 
-	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite",
+	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/gotest",
 		filepath.Join(tmp, "examples", "parallel_suite"), "-v")
 	cmd.Dir = filepath.Join(tmp, "examples")
 	out, err := cmd.CombinedOutput()
@@ -94,7 +94,7 @@ func Test_TestsuiteCLI_GenericSuite(t *testing.T) {
 	testutils.ActivateTests(t, tmp)
 	testutils.HackGoWork(t, tmp)
 
-	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite",
+	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/gotest",
 		filepath.Join(tmp, "examples", "generic_suite"), "-v")
 	cmd.Dir = filepath.Join(tmp, "examples")
 	out, err := cmd.CombinedOutput()
@@ -115,7 +115,7 @@ func Test_TestsuiteCLI_AllPackages(t *testing.T) {
 	testutils.ActivateTests(t, tmp)
 	testutils.HackGoWork(t, tmp)
 
-	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite",
+	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/gotest",
 		"github.com/mvrahden/go-test/examples/...", "-v")
 	cmd.Dir = filepath.Join(tmp, "examples")
 	out, _ := cmd.CombinedOutput()
@@ -138,7 +138,7 @@ func Test_TestsuiteCLI_ExitCode(t *testing.T) {
 	testutils.ActivateTests(t, tmp)
 	testutils.HackGoWork(t, tmp)
 
-	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite",
+	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/gotest",
 		filepath.Join(tmp, "examples", "simple_suite"), "-v")
 	cmd.Dir = filepath.Join(tmp, "examples")
 	_, err := cmd.CombinedOutput()
@@ -162,7 +162,7 @@ func performTest(t *testing.T, tmpDir, basedir, inPkgPath, inPkgName, goldenName
 	}
 
 	cmd := exec.
-		Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite", unifiedPkgDesciptor)
+		Command("go", "run", "github.com/mvrahden/go-test/cmd/gotest", unifiedPkgDesciptor)
 	if debug {
 		cmd.Args = append(cmd.Args, "-ƒƒ.internal.debug")
 		exec.Command("sh", "-c", `echo "`+unifiedPkgDesciptor+`" >> debug_dirs`).CombinedOutput()

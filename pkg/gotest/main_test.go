@@ -56,7 +56,7 @@ func TestT(t *testing.T) {
 	// - cleanup generated sources
 	tmpCurrentPackage := filepath.Join(tmp, "/pkg/gotest")
 	cmd := exec.
-		Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite", tmpCurrentPackage, "-v")
+		Command("go", "run", "github.com/mvrahden/go-test/cmd/gotest", tmpCurrentPackage, "-v")
 	cmd.Dir = tmp
 	out, _ := cmd.CombinedOutput()
 
