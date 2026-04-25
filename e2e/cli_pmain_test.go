@@ -66,6 +66,29 @@ func Test_TestsuiteCLI(t *testing.T) {
 	}
 }
 
+func Test_TestsuiteCLI_ExitCode(t *testing.T) {
+	tmp := t.TempDir()
+	testutils.CopyModuleUnderTestToTmp(t, tmp, "./..", ".git", "go.work")
+	testutils.ActivateTests(t, tmp)
+	testutils.HackGoWork(t, tmp)
+
+	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/testsuite",
+		filepath.Join(tmp, "examples", "simple_suite"), "-v")
+	cmd.Dir = filepath.Join(tmp, "examples")
+	_, err := cmd.CombinedOutput()
+
+	if err == nil {
+		t.Fatal("expected non-zero exit code for failing tests")
+	}
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok {
+		t.Fatalf("expected *exec.ExitError, got %T: %v", err, err)
+	}
+	if exitErr.ExitCode() == 0 {
+		t.Fatal("expected non-zero exit code")
+	}
+}
+
 func performTest(t *testing.T, tmpDir, basedir, inPkgPath, inPkgName, goldenName string, debug bool) {
 	unifiedPkgDesciptor := inPkgName // either pkgName or build absolute path
 	if unifiedPkgDesciptor == "" {
