@@ -1,0 +1,40 @@
+package sampletype
+
+import (
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type UserServiceTestSuite struct {
+	sut *UserService
+}
+
+func (s *UserServiceTestSuite) BeforeEach(t *gotest.T) {
+	s.sut = nil // TODO: initialize UserService
+}
+
+func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
+	t.It("succeeds", func(it *gotest.T) {
+		// TODO: test UserService.Create(ctx context.Context, name string) error
+	})
+	t.It("returns error", func(it *gotest.T) {
+		// TODO: test error case
+	})
+}
+
+func (s *UserServiceTestSuite) TestDelete(t *gotest.T) {
+	t.It("succeeds", func(it *gotest.T) {
+		// TODO: test UserService.Delete(ctx context.Context, id string) error
+	})
+	t.It("returns error", func(it *gotest.T) {
+		// TODO: test error case
+	})
+}
+
+func (s *UserServiceTestSuite) TestGetByID(t *gotest.T) {
+	t.It("succeeds", func(it *gotest.T) {
+		// TODO: test UserService.GetByID(ctx context.Context, id string) (*sampletype.UserService, error)
+	})
+	t.It("returns error", func(it *gotest.T) {
+		// TODO: test error case
+	})
+}
