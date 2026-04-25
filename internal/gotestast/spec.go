@@ -245,6 +245,10 @@ func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, toke
 		return nil, -1, nil // not a test suite
 	}
 
+	if ts.TypeParams != nil && ts.TypeParams.NumFields() > 0 {
+		return nil, ts.Pos(), fmt.Errorf("test suite %q must not have type parameters (generics are not supported)", ts.Name.Name)
+	}
+
 	typ, ok := pkg.TypesInfo.TypeOf(ts.Type).(*types.Struct)
 	if !ok {
 		return nil, -1, nil
