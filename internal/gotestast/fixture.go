@@ -47,6 +47,9 @@ func (f *FixtureSpec) Identifier() string { return f.ts.Name.Name }
 // PackageName returns the package name of the fixture type.
 func (f *FixtureSpec) PackageName() string { return f.pkg.Name }
 
+// PackagePath returns the import path of the package that defines this fixture.
+func (f *FixtureSpec) PackagePath() string { return f.pkg.PkgPath }
+
 // StructType returns the underlying *types.Struct for field inspection.
 func (f *FixtureSpec) StructType() *types.Struct { return f.typ }
 
@@ -195,6 +198,17 @@ func DetermineFixtureHarness(n ast.Node, pkg *packages.Package, f *FixtureSpec) 
 func NewFixtureSpecForTest(name string, kind FixtureKind) *FixtureSpec {
 	return &FixtureSpec{
 		Kind: kind,
+		pkg:  &packages.Package{},
+		ts:   &ast.TypeSpec{Name: ast.NewIdent(name)},
+	}
+}
+
+// NewFixtureSpecForTestWithPkg creates a minimal FixtureSpec for use in unit tests,
+// including a package path so that PackagePath() works.
+func NewFixtureSpecForTestWithPkg(name string, kind FixtureKind, pkgPath string) *FixtureSpec {
+	return &FixtureSpec{
+		Kind: kind,
+		pkg:  &packages.Package{PkgPath: pkgPath},
 		ts:   &ast.TypeSpec{Name: ast.NewIdent(name)},
 	}
 }

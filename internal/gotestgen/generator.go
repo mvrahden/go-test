@@ -21,11 +21,17 @@ const (
 )
 
 func Generate(targetPath string) (GenerateResults, error) {
-	res, err := generateSrcs(targetPath)
+	res, _, err := generateSrcs(targetPath)
 	if err != nil {
 		return nil, err
 	}
 	return res, nil
+}
+
+// GenerateWithCollectorResults generates test suite sources and also returns
+// the raw collector results, which can be used to discover shared fixtures.
+func GenerateWithCollectorResults(targetPath string) (GenerateResults, []CollectorResult, error) {
+	return generateSrcs(targetPath)
 }
 
 func Collect(targetPath string) (gotestast.TestSuiteSpecSet, error) {
@@ -98,13 +104,14 @@ func loadPackages(targetPkg string) ([]*loadResult, error) {
 	return res, nil
 }
 
-func generateSrcs(targetPkg string) (GenerateResults, error) {
+func generateSrcs(targetPkg string) (GenerateResults, []CollectorResult, error) {
 	loadResults, err := loadPackages(targetPkg)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return slices.MapErr(loadResults, func(lr *loadResult, _ int) (*GenerateResult, error) {
+	var allCollectorResults []CollectorResult
+	results, err := slices.MapErr(loadResults, func(lr *loadResult, _ int) (*GenerateResult, error) {
 		c := collector{}
 		ptestCollected := c.CollectSuiteSpecs(lr.ptest)
 		if len(ptestCollected.Errs) > 0 {
@@ -114,6 +121,8 @@ func generateSrcs(targetPkg string) (GenerateResults, error) {
 		if len(pxtestCollected.Errs) > 0 {
 			return nil, pxtestCollected.Errs[0].Err
 		}
+
+		allCollectorResults = append(allCollectorResults, ptestCollected, pxtestCollected)
 
 		ptestSpec, err := c.ApplyTestSuiteSpecs(ptestCollected)
 		if err != nil {
@@ -136,5 +145,9 @@ func generateSrcs(targetPkg string) (GenerateResults, error) {
 		}
 		return &GenerateResult{AbsPath: lr.pkgDir, Package: lr.pkgPath, PTest: ptestBuf, PXTest: pxtestBuf}, nil
 	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return results, allCollectorResults, nil
 }
 
