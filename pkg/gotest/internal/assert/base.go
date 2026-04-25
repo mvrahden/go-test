@@ -56,8 +56,7 @@ func (b *BaseAssertionContext) IsEqualTo(v any) {
 	b.asserterFunc(func() error {
 		ok := reflect.DeepEqual(b.v, v)
 		if !ok {
-			fmtStr := applyFmtTokens("{{FMT}} is not equal to {{FMT}}", b.v, v)
-			return fmt.Errorf(fmtStr, b.v, v)
+			return fmt.Errorf("%v is not equal to %v", fmtForEq(b.v), fmtForEq(v))
 		}
 		return nil
 	})
@@ -66,8 +65,7 @@ func (b *BaseAssertionContext) IsZero() {
 	b.asserterFunc(func() error {
 		rVal := reflect.ValueOf(b.v)
 		if !rVal.IsValid() {
-			fmtStr := applyFmtTokens("%v can not be zero", b.v)
-			return fmt.Errorf(fmtStr, b.v)
+			return fmt.Errorf("%v can not be zero", b.v)
 		}
 		ok := rVal.IsZero()
 		if !ok {
@@ -84,7 +82,7 @@ func (b *BaseAssertionContext) IsEmpty() {
 			}
 			return nil
 		}
-		rVal := unwrapPtr(reflect.ValueOf(b.v))
+		rVal := derefPtr(reflect.ValueOf(b.v))
 
 		switch k := rVal.Kind(); k {
 		case reflect.String, reflect.Map, reflect.Array, reflect.Slice, reflect.Chan:
@@ -102,7 +100,7 @@ func (b *BaseAssertionContext) HasLength(l int) {
 			}
 			return nil
 		}
-		rVal := unwrapPtr(reflect.ValueOf(b.v))
+		rVal := derefPtr(reflect.ValueOf(b.v))
 
 		switch k := rVal.Kind(); k {
 		case reflect.String, reflect.Map, reflect.Array, reflect.Slice, reflect.Chan:
@@ -157,3 +155,27 @@ func (b *BaseAssertionContext) Contains(v any) {
 }
 func (b *BaseAssertionContext) ContainsAll(v ...any) { panic("not implemented yet") }
 func (b *BaseAssertionContext) ContainsAny(v ...any) { panic("not implemented yet") }
+
+// fmtForEq formats a value for use in IsEqualTo error messages.
+// Pointer, chan, and func kinds are rendered as "Type<T>"; others use their %v representation.
+func fmtForEq(v any) any {
+	switch reflect.ValueOf(v).Kind() {
+	case reflect.Pointer, reflect.Chan, reflect.Func:
+		return fmt.Sprintf("Type<%T>", v)
+	default:
+		return v
+	}
+}
+
+// derefPtr recursively dereferences pointers and interfaces, matching the
+// old unwrapPtr behaviour used by IsEmpty and HasLength.
+func derefPtr(r reflect.Value) reflect.Value {
+	k := r.Kind()
+	if k != reflect.Pointer && k != reflect.Interface {
+		return r
+	}
+	if !r.IsNil() {
+		return derefPtr(r.Elem())
+	}
+	return r
+}
