@@ -20,6 +20,7 @@ func (m *mockT) Errorf(format string, args ...any) {
 	m.failed = true
 	m.message = fmt.Sprintf(format, args...)
 }
+func (m *mockT) Helper() {}
 func (m *mockT) FailNow() {
 	m.failed = true
 }
