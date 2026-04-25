@@ -78,18 +78,17 @@ All hooks are optional. `AfterAll` runs via `t.Cleanup` (LIFO). `AfterEach` is d
 
 ### Fixtures
 
-Fixtures replace `TestMain` + package-level singletons with directive-driven setup that composes via Go embedding.
+Fixtures replace `TestMain` + package-level singletons with convention-driven setup that composes via Go embedding. Any struct ending in `Fixture` is a package fixture; ending in `SharedFixture` is a cross-package shared fixture.
 
 ```go
 // fixture_test.go
 
-//go:test fixture
-type E2ESetup struct {
+type E2ESetupFixture struct {
     Pool      *pgxpool.Pool
     ServerURL string
 }
 
-func (s *E2ESetup) BeforeAll(t *gotest.T) {
+func (s *E2ESetupFixture) BeforeAll(t *gotest.T) {
     pg, err := testhelper.StartPostgres(ctx)
     gotest.NoError(t, err)
     t.T().Cleanup(func() { pg.Container.Terminate(ctx) })
@@ -101,21 +100,19 @@ Test suites embed the fixture via pointer embedding to get access to shared stat
 
 ```go
 type BatchTestSuite struct {
-    *E2ESetup // s.Pool, s.ServerURL available
+    *E2ESetupFixture // s.Pool, s.ServerURL available
 }
 
 func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
-    // s.Pool is populated by E2ESetup.BeforeAll
+    // s.Pool is populated by E2ESetupFixture.BeforeAll
 }
 ```
 
 Fixtures can nest — a root fixture's `BeforeAll` runs first, then each child's:
 
 ```go
-//go:test fixture
 type InfraFixture struct { Pool *pgxpool.Pool }
 
-//go:test fixture
 type APIFixture struct {
     *InfraFixture // f.Pool available from parent
     ServerURL string
@@ -124,7 +121,7 @@ type APIFixture struct {
 
 Output nests naturally: `Test_InfraFixture/APIFixture/BatchTestSuite/TestDispatch`.
 
-For cross-package shared state (e.g. a database container shared across integration test packages), use `//go:test shared-fixture` — see [docs/fixtures.md](docs/fixtures.md) for the full reference.
+For cross-package shared state (e.g. a database container shared across integration test packages), use `*SharedFixture` suffix — see [docs/fixtures.md](docs/fixtures.md) for the full reference.
 
 ### Focus and Exclude
 
@@ -286,8 +283,8 @@ The generated code is what a careful developer would write by hand: `t.Run`, `t.
 | `TestParallel*` method | Parallel test case |
 | `F_` prefix | Focus (run only this) |
 | `X_` prefix | Exclude (skip this) |
-| `//go:test fixture` | Package-scoped fixture |
-| `//go:test shared-fixture` | Cross-package shared fixture |
+| `*Fixture` suffix | Package-scoped fixture |
+| `*SharedFixture` suffix | Cross-package shared fixture |
 
 ## Commands
 

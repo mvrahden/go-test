@@ -22,9 +22,9 @@ func (ts *ƒƒ_GOTEST_DemoTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestMain(m *testing.M) { os.Exit(m.Run()) }
 
-func Test_Setup(t *testing.T) {
+func Test_SetupFixture(t *testing.T) {
 
-	fixture := &Setup{}
+	fixture := &SetupFixture{}
 	ft := gotest.NewT(t)
 	t.Cleanup(func() {
 		fixture.AfterAll(ft)
@@ -33,7 +33,7 @@ func Test_Setup(t *testing.T) {
 	t.Run("DemoTestSuite", func(t *testing.T) {
 		s := &ƒƒ_GOTEST_DemoTestSuite{
 			DemoTestSuite: DemoTestSuite{
-				Setup: fixture,
+				SetupFixture: fixture,
 			},
 		}
 

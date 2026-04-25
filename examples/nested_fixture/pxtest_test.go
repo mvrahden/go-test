@@ -2,7 +2,6 @@ package nestedfixture_test
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test fixture
 type ExternalInfraFixture struct {
 	Value string
 }

@@ -209,7 +209,7 @@ func validateFixtures(fixtures []*gotestast.FixtureSpec) error {
 		}
 	}
 	if rootPkgFixtureCount > 1 {
-		return fmt.Errorf("at most one root package fixture (//go:test fixture without parent) is allowed per package, found %d", rootPkgFixtureCount)
+		return fmt.Errorf("at most one root package fixture (*Fixture without parent) is allowed per package, found %d", rootPkgFixtureCount)
 	}
 
 	for _, f := range fixtures {

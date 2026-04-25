@@ -81,12 +81,11 @@ func TestSharedFixture_Integration_GeneratedSetupBinary(t *testing.T) {
 func TestSharedFixture_Integration_DiscoverFromRealPackage(t *testing.T) {
 	src := `package testpkg
 
-//go:test shared-fixture
-type PostgresFixture struct {
+type PostgresSharedFixture struct {
 	DSN string ` + "`" + `gotest:"env=E2E_POSTGRES_DSN"` + "`" + `
 }
 
-func (f *PostgresFixture) BeforeAll() error { return nil }
+func (f *PostgresSharedFixture) BeforeAll() error { return nil }
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -96,11 +95,10 @@ func (f *PostgresFixture) BeforeAll() error { return nil }
 	gotest.Equal(t, 1, len(result.Fixtures), "expected one fixture")
 	gotest.Equal(t, gotestast.SharedFixture, result.Fixtures[0].Kind)
 
-	// Run DiscoverSharedFixtures on the collector result
 	shared := DiscoverSharedFixtures([]CollectorResult{result})
 
 	gotest.Equal(t, 1, len(shared), "expected one shared fixture")
-	gotest.Equal(t, "PostgresFixture", shared[0].Identifier)
+	gotest.Equal(t, "PostgresSharedFixture", shared[0].Identifier)
 	gotest.Equal(t, "E2E_POSTGRES_DSN", shared[0].EnvTags["DSN"],
 		"env tag for DSN field should be E2E_POSTGRES_DSN")
 }
@@ -111,21 +109,19 @@ func (f *PostgresFixture) BeforeAll() error { return nil }
 func TestSharedFixture_Integration_DiscoverFromRealPackage_MultipleFixtures(t *testing.T) {
 	src1 := `package testpkg
 
-//go:test shared-fixture
-type PostgresFixture struct {
+type PostgresSharedFixture struct {
 	DSN string ` + "`" + `gotest:"env=E2E_POSTGRES_DSN"` + "`" + `
 }
 
-func (f *PostgresFixture) BeforeAll() error { return nil }
+func (f *PostgresSharedFixture) BeforeAll() error { return nil }
 `
 	src2 := `package testpkg
 
-//go:test shared-fixture
-type RedisFixture struct {
+type RedisSharedFixture struct {
 	Addr string ` + "`" + `gotest:"env=E2E_REDIS_ADDR"` + "`" + `
 }
 
-func (f *RedisFixture) BeforeAll() error { return nil }
+func (f *RedisSharedFixture) BeforeAll() error { return nil }
 `
 	pkg1 := loadTestPkgWithGotest(t, src1)
 	pkg2 := loadTestPkgWithGotest(t, src2)
@@ -141,17 +137,16 @@ func (f *RedisFixture) BeforeAll() error { return nil }
 
 	gotest.Equal(t, 2, len(shared), "expected two shared fixtures")
 
-	// Find each by identifier
 	found := map[string]SharedFixtureInfo{}
 	for _, sf := range shared {
 		found[sf.Identifier] = sf
 	}
 
-	pg, ok := found["PostgresFixture"]
-	gotest.True(t, ok, "expected PostgresFixture in discovered fixtures")
+	pg, ok := found["PostgresSharedFixture"]
+	gotest.True(t, ok, "expected PostgresSharedFixture in discovered fixtures")
 	gotest.Equal(t, "E2E_POSTGRES_DSN", pg.EnvTags["DSN"])
 
-	redis, ok := found["RedisFixture"]
-	gotest.True(t, ok, "expected RedisFixture in discovered fixtures")
+	redis, ok := found["RedisSharedFixture"]
+	gotest.True(t, ok, "expected RedisSharedFixture in discovered fixtures")
 	gotest.Equal(t, "E2E_REDIS_ADDR", redis.EnvTags["Addr"])
 }

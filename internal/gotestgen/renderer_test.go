@@ -12,7 +12,6 @@ func TestRenderer_FixtureWithChildSuite(t *testing.T) {
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test fixture
 type DBFixture struct {
 	Conn string
 }
@@ -78,7 +77,6 @@ func TestRenderer_FixtureWithoutAfterAll(t *testing.T) {
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test fixture
 type SimpleFixture struct {}
 
 func (f *SimpleFixture) BeforeAll(t *gotest.T) {}
@@ -114,7 +112,6 @@ func TestRenderer_MixedFixtureBoundAndStandalone(t *testing.T) {
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test fixture
 type AppFixture struct {}
 
 func (f *AppFixture) BeforeAll(t *gotest.T) {}
@@ -157,7 +154,6 @@ func TestRenderer_FixtureWithBeforeAfterEach(t *testing.T) {
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test fixture
 type EachFixture struct {}
 
 func (f *EachFixture) BeforeAll(t *gotest.T)  {}
@@ -204,7 +200,6 @@ func TestBuildFixtureViewModels_RootFixtureOnly(t *testing.T) {
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test fixture
 type MyFixture struct {}
 
 func (f *MyFixture) BeforeAll(t *gotest.T) {}
