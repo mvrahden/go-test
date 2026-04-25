@@ -25,9 +25,12 @@ func RunStdlibTests(cfg ExecConfig) (code int) {
 	collectorFunc := func() {
 		for r := range resC {
 			if r.Error != nil {
-				fmt.Fprintf(os.Stdout, "FAIL  in:     %s\n", r.Dir)
-				fmt.Fprintf(os.Stdout, "      due to the following error:\n")
-				fmt.Fprintf(os.Stdout, " -->  %s\n", r.Error)
+				fmt.Fprintf(os.Stderr, "FAIL  in:     %s\n", r.Dir)
+				fmt.Fprintf(os.Stderr, "      due to the following error:\n")
+				fmt.Fprintf(os.Stderr, " -->  %s\n", r.Error)
+				if maxCode < r.Code {
+					maxCode = r.Code
+				}
 				continue
 			}
 			if r.Code != 0 {
