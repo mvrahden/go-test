@@ -198,18 +198,18 @@ func (collector) ApplyTestSuiteSpecs(result CollectorResult) (spec SpecOutcome, 
 }
 
 // validateFixtures validates fixture constraints:
-// - At most one package fixture per package
+// - At most one root package fixture per package (root = no parent fixture)
 // - Package fixture MUST have BeforeAll method
 // - Shared fixture MUST have BeforeAll method (with () error signature)
 func validateFixtures(fixtures []*gotestast.FixtureSpec) error {
-	var pkgFixtureCount int
+	var rootPkgFixtureCount int
 	for _, f := range fixtures {
-		if f.Kind == gotestast.PackageFixture {
-			pkgFixtureCount++
+		if f.Kind == gotestast.PackageFixture && f.ParentFixture == nil {
+			rootPkgFixtureCount++
 		}
 	}
-	if pkgFixtureCount > 1 {
-		return fmt.Errorf("at most one package fixture (//go:test fixture) is allowed per package, found %d", pkgFixtureCount)
+	if rootPkgFixtureCount > 1 {
+		return fmt.Errorf("at most one root package fixture (//go:test fixture without parent) is allowed per package, found %d", rootPkgFixtureCount)
 	}
 
 	for _, f := range fixtures {
