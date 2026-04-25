@@ -15,6 +15,7 @@ var (
 	DEBUG bool
 	CLEAN bool
 	CI    bool
+	SPEC  bool
 )
 
 func main() {
@@ -25,6 +26,10 @@ func main() {
 		os.Exit(runScaffold(remaining))
 	case "migrate":
 		os.Exit(runMigrate(remaining))
+	case "spec":
+		os.Exit(runSpec(remaining))
+	case "watch":
+		os.Exit(runWatch(remaining))
 	case "version":
 		fmt.Println(about.LongInfo())
 		return
@@ -44,6 +49,7 @@ func main() {
 		DEBUG = slices.Contains(ownArgs, "-ƒƒ.internal.debug")
 		CLEAN = slices.Contains(ownArgs, "-ƒƒ.clean")
 		CI = slices.Contains(ownArgs, "--ci")
+		SPEC = slices.Contains(ownArgs, "--spec")
 
 		if CLEAN {
 			runClean(goTestArgs)
@@ -67,7 +73,8 @@ Usage:
   gotest [subcommand] [flags] [packages...]
 
 Subcommands:
-  generate    Generate test code (default behavior)
+  spec        Render behavioral specification from test suites
+  watch       Watch for file changes and re-run tests
   clean       Remove generated test files
   scaffold    Generate test suite skeleton from a Go type
   migrate     Convert testify/suite tests to go-test format
@@ -76,6 +83,7 @@ Subcommands:
 
 Flags:
   --ci                  Enable focus guard (fail on F_ prefixes)
+  --spec                Append spec view after normal test output
 
 All other flags and arguments are forwarded to "go test".
 `, about.ShortInfo())

@@ -43,7 +43,7 @@ func ParseSubcommand(args []string) (subcmd string, remaining []string) {
 
 func SplitArgs(inArgs []string) (ownArgs, goTestArgs []string) {
 	for _, arg := range inArgs {
-		if strings.HasPrefix(arg, "-ƒƒ.") || arg == "--ci" {
+		if strings.HasPrefix(arg, "-ƒƒ.") || arg == "--ci" || arg == "--spec" {
 			ownArgs = append(ownArgs, arg)
 		} else {
 			goTestArgs = append(goTestArgs, arg)

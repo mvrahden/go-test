@@ -286,10 +286,58 @@ The generated code is what a careful developer would write by hand: `t.Run`, `t.
 | `*Fixture` suffix | Package-scoped fixture |
 | `*SharedFixture` suffix | Cross-package shared fixture |
 
+### Behavior Specification
+
+View test suites as a readable behavioral specification:
+
+```bash
+gotest spec ./pkg/user -v
+```
+
+```
+UserService
+  Create
+    when email is valid
+      ✓ creates the user (8ms)
+      ✓ sends a welcome email (120ms)
+    when email already exists
+      ✓ returns ErrDuplicate (<1ms)
+  Delete
+    ✓ soft-deletes the user (5ms)
+    ~ hard-deletes after 30 days — SKIPPED
+
+2 suites, 5 behaviors: 4 passed, 0 failed, 1 skipped
+```
+
+Generate a markdown specification document:
+
+```bash
+gotest spec ./... --format=md --output=docs/behavior-spec.md
+```
+
+Append spec view after normal test output:
+
+```bash
+gotest ./... -v --spec
+```
+
+### Watch Mode
+
+Re-run tests on file changes with 200ms debounce:
+
+```bash
+gotest watch ./... -v
+gotest watch ./... --spec     # watch + spec view
+```
+
+Only the affected package is re-run. Combine with `F_` prefix for a tight feedback loop — only focused tests run on each save.
+
 ## Commands
 
 ```bash
 gotest ./... -v -race          # generate, test, cleanup (default)
+gotest spec ./...              # behavioral specification view
+gotest watch ./... -v          # watch mode with auto-rerun
 gotest clean ./...             # remove orphaned generated files
 gotest scaffold ./pkg/user.Svc # generate suite skeleton from type
 gotest migrate ./...           # convert testify/suite to go-test

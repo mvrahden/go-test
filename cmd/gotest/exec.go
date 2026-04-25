@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/gotestspec"
 )
 
 func Run(cfg ExecConfig) int {
@@ -76,11 +78,44 @@ func Run(cfg ExecConfig) int {
 	if setupProc != nil {
 		extraEnv = setupProc.Env()
 	}
+
+	if SPEC {
+		return runWithSpec(cfg.GoTestArgs, extraEnv)
+	}
+
 	code, err := gotestrunner.StdlibRunTests(cfg.GoTestArgs, extraEnv)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
+	return code
+}
+
+func runWithSpec(goTestArgs []string, extraEnv map[string]string) int {
+	jsonData, code, err := gotestrunner.StdlibRunTestsJSON(goTestArgs, extraEnv)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+
+	events, err := gotestspec.ParseEvents(bytes.NewReader(jsonData))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
+		return 2
+	}
+
+	// Replay normal output
+	for _, ev := range events {
+		if ev.Output != "" {
+			fmt.Print(ev.Output)
+		}
+	}
+
+	// Render spec view
+	fmt.Println()
+	tree := gotestspec.BuildTree(events)
+	gotestspec.RenderTerminal(os.Stdout, tree)
+
 	return code
 }
 
