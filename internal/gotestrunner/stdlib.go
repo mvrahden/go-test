@@ -1,11 +1,20 @@
 package gotestrunner
 
 import (
+	"os"
 	"os/exec"
 )
 
-func StdlibRunTests(args []string) (out []byte, code int, err error) {
+func StdlibRunTests(args []string) (int, error) {
 	cmd := exec.Command("go", append([]string{"test"}, args...)...)
-	out, _ = cmd.CombinedOutput()
-	return out, cmd.ProcessState.ExitCode(), nil
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if cmd.ProcessState != nil {
+		return cmd.ProcessState.ExitCode(), nil
+	}
+	if err != nil {
+		return 2, err
+	}
+	return 0, nil
 }

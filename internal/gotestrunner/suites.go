@@ -7,49 +7,31 @@ import (
 
 	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/internal/cmd/testgen"
-	"github.com/mvrahden/go-test/internal/gotestgen"
 )
 
-func SuitesGenerate(scanDir string) error {
-	results, err := testgen.GenerateSuites(scanDir)
+func SuitesGenerate(pkgPattern string) ([]string, error) {
+	results, err := testgen.GenerateSuites(pkgPattern)
 	if err != nil {
-		return fmt.Errorf("failed generating suites: %w", err)
+		return nil, fmt.Errorf("failed generating suites: %w", err)
 	}
 
+	var dirs []string
 	for _, result := range results {
 		if len(result.PTest) > 0 {
 			testsuiteFile := filepath.Join(result.AbsPath, about.PSuite)
 			err := os.WriteFile(testsuiteFile, result.PTest, 0644)
 			if err != nil {
-				return fmt.Errorf("failed writing ptest: %w", err)
+				return dirs, fmt.Errorf("failed writing ptest: %w", err)
 			}
 		}
 		if len(result.PXTest) > 0 {
 			testsuiteFile := filepath.Join(result.AbsPath, about.PXSuite)
 			err := os.WriteFile(testsuiteFile, result.PXTest, 0644)
 			if err != nil {
-				return fmt.Errorf("failed writing pxtest: %w", err)
+				return dirs, fmt.Errorf("failed writing pxtest: %w", err)
 			}
 		}
+		dirs = append(dirs, result.AbsPath)
 	}
-	return nil
-}
-
-func SuitesCleanup(pkgPath string) error {
-	pkgs, err := gotestgen.LoadCached(pkgPath)
-	if err != nil {
-		return fmt.Errorf("failed cleaning suites: %w", err)
-	}
-	if len(pkgs) == 0 {
-		return nil
-	}
-	for _, pkg := range pkgs {
-		if pkg.Module == nil {
-			continue
-		}
-		pkgPath := gotestgen.DeterminePkgDir(pkg)
-		os.Remove(filepath.Join(pkgPath, about.PSuite))
-		os.Remove(filepath.Join(pkgPath, about.PXSuite))
-	}
-	return nil
+	return dirs, nil
 }

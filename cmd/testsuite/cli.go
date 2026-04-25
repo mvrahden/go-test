@@ -2,32 +2,50 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"slices"
+
+	"github.com/mvrahden/go-test/about"
 )
 
-// DEBUG is a hook to help debug generated code.
-// It is defined by "-internal.debug" arg.
-var DEBUG bool
-
-var onErrFail = func(msg string, err error) {
-	if err == nil {
-		return
-	}
-	format := "%s: %s"
-	if msg == "" {
-		format = "%s%s"
-	}
-	fmt.Fprint(os.Stderr, fmt.Sprintf(format, msg, err))
-	os.Exit(2)
-}
+var (
+	DEBUG bool
+	CLEAN bool
+)
 
 func main() {
-	args := os.Args[1:]
+	ownArgs, goTestArgs := SplitArgs(os.Args[1:])
+	DEBUG = slices.Contains(ownArgs, "-ƒƒ.internal.debug")
+	CLEAN = slices.Contains(ownArgs, "-ƒƒ.clean")
 
-	cfg, err := ParseArgs(args, true)
-	if err != nil {
-		onErrFail(fmt.Sprintf("failed parsing args: %s", err), err)
+	if CLEAN {
+		runClean(goTestArgs)
+		return
 	}
 
-	os.Exit(RunStdlibTests(cfg))
+	patterns := ExtractPackagePatterns(goTestArgs)
+	cfg := ExecConfig{
+		GoTestArgs:      goTestArgs,
+		PackagePatterns: patterns,
+	}
+
+	os.Exit(Run(cfg))
+}
+
+func runClean(goTestArgs []string) {
+	patterns := ExtractPackagePatterns(goTestArgs)
+	for _, pattern := range patterns {
+		filepath.WalkDir(pattern, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			if !d.IsDir() && about.PSuiteRegex.MatchString(d.Name()) {
+				fmt.Fprintf(os.Stdout, "removing %s\n", path)
+				os.Remove(path)
+			}
+			return nil
+		})
+	}
 }

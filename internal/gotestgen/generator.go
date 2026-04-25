@@ -35,7 +35,10 @@ type loadResult struct {
 }
 
 func loadPackages(targetPkg string) ([]*loadResult, error) {
-	totalFoundPkgs, err := LoadCached(targetPkg)
+	totalFoundPkgs, err := packages.Load(&packages.Config{
+		Mode:  packageEvalMode,
+		Tests: true,
+	}, targetPkg)
 	if err != nil {
 		return nil, err
 	}
@@ -112,11 +115,3 @@ func generateSrcs(targetPkg string) (GenerateResults, error) {
 	})
 }
 
-func getPkgPathOrDefault(ptest, pxtest *packages.Package, dflt string) string {
-	for _, pkg := range []*packages.Package{ptest, pxtest} {
-		if pkg != nil {
-			return pkg.PkgPath
-		}
-	}
-	return dflt
-}
