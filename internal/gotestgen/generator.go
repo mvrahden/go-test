@@ -16,7 +16,7 @@ type GenerateResult struct {
 }
 
 const (
-	packageEvalMode = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo
+	packageEvalMode = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps
 )
 
 func Generate(targetPath string) (GenerateResults, error) {
