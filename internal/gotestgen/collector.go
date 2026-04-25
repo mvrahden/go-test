@@ -171,6 +171,7 @@ type SpecOutcome struct {
 	EffectiveTestSuites gotestast.TestSuiteSpecSet
 	SkippedTestSuites   gotestast.SkippedTestSuites // skipped == unfocused + excluded
 	SkippedTestCases    gotestast.SkippedTestCases  // skipped == unfocused + excluded
+	Fixtures            []*gotestast.FixtureSpec
 }
 
 func (collector) ApplyTestSuiteSpecs(result CollectorResult) (spec SpecOutcome, _ error) {
@@ -192,6 +193,7 @@ func (collector) ApplyTestSuiteSpecs(result CollectorResult) (spec SpecOutcome, 
 		EffectiveTestSuites: suites,
 		SkippedTestSuites:   skippedTestSuites,
 		SkippedTestCases:    skippedTestCases,
+		Fixtures:            result.Fixtures,
 	}, nil
 }
 
