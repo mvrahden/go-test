@@ -5,5 +5,5 @@ func ShortInfo() string {
 }
 
 func LongInfo() string {
-	return Repo + " (" + GitTag + "/" + GoVersion + " " + GoOS + " " + GoArch + ")"
+	return Repo + " (" + Version + ")"
 }
