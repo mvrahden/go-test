@@ -1,22 +1,21 @@
 # Fixtures
 
-Fixtures replace `TestMain` + package-level singletons with directive-driven setup that composes via Go embedding.
+Fixtures replace `TestMain` + package-level singletons with convention-driven setup that composes via Go embedding. Any struct whose name ends in `Fixture` is a package fixture; any struct ending in `SharedFixture` is a cross-package shared fixture.
 
-## Package Fixture (`//go:test fixture`)
+## Package Fixture (`*Fixture` suffix)
 
 A package fixture runs `BeforeAll` once per package, then injects state into child test suites via pointer embedding.
 
 ```go
 // fixture_test.go
 
-//go:test fixture
-type E2ESetup struct {
+type E2ESetupFixture struct {
     Pool      *pgxpool.Pool
     ServerURL string
     OrgID     uuid.UUID
 }
 
-func (s *E2ESetup) BeforeAll(t *gotest.T) {
+func (s *E2ESetupFixture) BeforeAll(t *gotest.T) {
     pg, err := testhelper.StartPostgres(ctx)
     gotest.NoError(t, err)
     t.T().Cleanup(func() { pg.Container.Terminate(ctx) })
@@ -24,7 +23,7 @@ func (s *E2ESetup) BeforeAll(t *gotest.T) {
     // ... wire API, seed fixtures ...
 }
 
-func (s *E2ESetup) AfterAll(t *gotest.T) {
+func (s *E2ESetupFixture) AfterAll(t *gotest.T) {
     s.Pool.Close()
 }
 ```
@@ -33,37 +32,36 @@ func (s *E2ESetup) AfterAll(t *gotest.T) {
 // batch_test.go
 
 type BatchTestSuite struct {
-    *E2ESetup // s.Pool, s.ServerURL, s.OrgID available via embedding
+    *E2ESetupFixture // s.Pool, s.ServerURL, s.OrgID available via embedding
 }
 
 func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
-    // s.Pool is populated by E2ESetup.BeforeAll
+    // s.Pool is populated by E2ESetupFixture.BeforeAll
 }
 ```
 
 ### Rules
 
-- One root `//go:test fixture` per package (nested child fixtures are allowed).
+- One root `*Fixture` per package (nested child fixtures are allowed).
 - The fixture struct must have `BeforeAll(t *gotest.T)`. `AfterAll(t *gotest.T)` is optional.
 - `BeforeEach(t *gotest.T)` and `AfterEach(t *gotest.T)` are optional and run around every test case in all child suites.
-- TestSuites embed the fixture via pointer embedding (`*E2ESetup`).
+- TestSuites embed the fixture via pointer embedding (`*E2ESetupFixture`).
 - The code generator owns `TestMain` when a fixture is present. Remove any user-defined `TestMain`.
 
 ### Generated test output
 
 ```
-Test_E2ESetup/BatchTestSuite/TestDispatch        PASS
-Test_E2ESetup/KeyTestSuite/TestCreate             PASS
+Test_E2ESetupFixture/BatchTestSuite/TestDispatch        PASS
+Test_E2ESetupFixture/KeyTestSuite/TestCreate             PASS
 ```
 
-Filter with `-run Test_E2ESetup/BatchTestSuite` to run only batch tests.
+Filter with `-run Test_E2ESetupFixture/BatchTestSuite` to run only batch tests.
 
 ## Nested Fixtures (Level 2)
 
 Fixtures can embed other fixtures to form a dependency tree. The root fixture's `BeforeAll` runs first, then each child fixture's `BeforeAll`.
 
 ```go
-//go:test fixture
 type InfraFixture struct {
     Pool *pgxpool.Pool
 }
@@ -71,7 +69,6 @@ type InfraFixture struct {
 func (f *InfraFixture) BeforeAll(t *gotest.T) { /* start containers */ }
 func (f *InfraFixture) AfterAll(t *gotest.T)  { /* terminate containers */ }
 
-//go:test fixture
 type APIFixture struct {
     *InfraFixture  // f.Pool available from parent
     ServerURL string
@@ -95,20 +92,19 @@ Test_InfraFixture/APIFixture/BatchTestSuite/TestDispatch PASS
 
 Filter with `-run Test_InfraFixture/ReconcilerTestSuite` to skip the API stack entirely.
 
-## Shared Fixtures (Level 3, `//go:test shared-fixture`)
+## Shared Fixtures (Level 3, `*SharedFixture` suffix)
 
-Shared fixtures run in a subprocess managed by the `testsuite` CLI. They start once per CLI invocation and are shared across all packages.
+Shared fixtures run in a subprocess managed by the `gotest` CLI. They start once per CLI invocation and are shared across all packages.
 
 ```go
 // tests/fixtures/postgres.go
 
-//go:test shared-fixture
-type PostgresFixture struct {
+type PostgresSharedFixture struct {
     DSN       string `gotest:"env=E2E_POSTGRES_DSN"`
     container testcontainers.Container
 }
 
-func (f *PostgresFixture) BeforeAll() error {
+func (f *PostgresSharedFixture) BeforeAll() error {
     c, err := testhelper.StartPostgres(context.Background())
     if err != nil {
         return err
@@ -118,7 +114,7 @@ func (f *PostgresFixture) BeforeAll() error {
     return nil
 }
 
-func (f *PostgresFixture) AfterAll() error {
+func (f *PostgresSharedFixture) AfterAll() error {
     return f.container.Terminate(context.Background())
 }
 ```
@@ -134,13 +130,12 @@ func (f *PostgresFixture) AfterAll() error {
 Package fixtures embed shared fixture types. The code generator resolves tagged fields from env vars:
 
 ```go
-//go:test fixture
-type E2ESetup struct {
-    *fixtures.PostgresFixture // DSN populated from E2E_POSTGRES_DSN env var
+type E2ESetupFixture struct {
+    *fixtures.PostgresSharedFixture // DSN populated from E2E_POSTGRES_DSN env var
     Pool *pgxpool.Pool
 }
 
-func (s *E2ESetup) BeforeAll(t *gotest.T) {
+func (s *E2ESetupFixture) BeforeAll(t *gotest.T) {
     pool, err := pgxpool.New(ctx, s.DSN) // s.DSN comes from shared fixture
     gotest.NoError(t, err)
     s.Pool = pool
@@ -150,7 +145,7 @@ func (s *E2ESetup) BeforeAll(t *gotest.T) {
 ### CLI flow
 
 ```
-testsuite ./tests/e2e ./tests/integration -v
+gotest ./tests/e2e ./tests/integration -v
 ```
 
 1. Scan target packages for shared fixtures
@@ -183,17 +178,16 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 ### After
 
 ```go
-//go:test fixture
-type E2ESetup struct {
+type E2ESetupFixture struct {
     testhelper.Suite
 }
 
-func (s *E2ESetup) BeforeAll(t *gotest.T) {
+func (s *E2ESetupFixture) BeforeAll(t *gotest.T) {
     // Same setup, but t.Fatal() works and no os.Exit needed
 }
 
 type BatchTestSuite struct {
-    *E2ESetup // s.POST(), s.Pool — via embedding
+    *E2ESetupFixture // s.POST(), s.Pool — via embedding
 }
 
 func (s *BatchTestSuite) TestDispatch(t *gotest.T) {

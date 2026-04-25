@@ -22,11 +22,11 @@ const (
 )
 
 const (
-	directiveFixture       = "//go:test fixture"
-	directiveSharedFixture = "//go:test shared-fixture"
+	suffixFixture       = "Fixture"
+	suffixSharedFixture = "SharedFixture"
 )
 
-// FixtureSpec describes a fixture type annotated with a //go:test directive.
+// FixtureSpec describes a fixture type identified by naming convention.
 type FixtureSpec struct {
 	Kind          FixtureKind
 	pkg           *packages.Package
@@ -53,29 +53,13 @@ func (f *FixtureSpec) PackagePath() string { return f.pkg.PkgPath }
 // StructType returns the underlying *types.Struct for field inspection.
 func (f *FixtureSpec) StructType() *types.Struct { return f.typ }
 
-// DetermineFixture inspects an AST node for a //go:test fixture or //go:test shared-fixture
-// directive. It returns the FixtureSpec if found, nil if no directive is present, or an error
-// if the directive is applied to a non-struct type.
+// DetermineFixture inspects an AST node for a struct type whose name ends in
+// "SharedFixture" (→ SharedFixture kind) or "Fixture" (→ PackageFixture kind).
+// Returns nil if the type name doesn't match either suffix, or an error if
+// the matching type is not a struct.
 func DetermineFixture(n ast.Node, pkg *packages.Package) (*FixtureSpec, error) {
 	decl, ok := n.(*ast.GenDecl)
 	if !ok || decl.Tok != token.TYPE || len(decl.Specs) != 1 {
-		return nil, nil
-	}
-
-	// Check doc comment for directive
-	kind := FixtureKind(-1)
-	if decl.Doc != nil {
-		for _, c := range decl.Doc.List {
-			text := strings.TrimSpace(c.Text)
-			switch text {
-			case directiveFixture:
-				kind = PackageFixture
-			case directiveSharedFixture:
-				kind = SharedFixture
-			}
-		}
-	}
-	if kind < 0 {
 		return nil, nil
 	}
 
@@ -84,17 +68,33 @@ func DetermineFixture(n ast.Node, pkg *packages.Package) (*FixtureSpec, error) {
 		return nil, nil
 	}
 
+	name := ts.Name.Name
+	// Check SharedFixture first (it also ends in "Fixture")
+	kind := FixtureKind(-1)
+	switch {
+	case strings.HasSuffix(name, suffixSharedFixture):
+		kind = SharedFixture
+	case strings.HasSuffix(name, suffixFixture):
+		kind = PackageFixture
+	}
+	if kind < 0 {
+		return nil, nil
+	}
+
+	// Avoid matching *TestSuite types that happen to embed a fixture
+	// (e.g. "MyTestSuiteFixture" shouldn't match as a suite)
+	// — but any standalone struct ending in Fixture is a fixture.
+
 	rawType := pkg.TypesInfo.TypeOf(ts.Type)
 	typ, ok := rawType.(*types.Struct)
 	if !ok {
-		return nil, fmt.Errorf("%s: fixture must be a struct type", ts.Name.Name)
+		return nil, fmt.Errorf("%s: fixture must be a struct type", name)
 	}
 
 	spec := &FixtureSpec{
 		Kind: kind, pkg: pkg, n: n, ts: ts, typ: typ,
 	}
 
-	// For shared fixtures, parse gotest:"env=..." struct tags
 	if kind == SharedFixture {
 		spec.EnvTags = parseEnvTags(typ)
 	}

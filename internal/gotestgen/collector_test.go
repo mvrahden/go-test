@@ -88,7 +88,6 @@ func TestCollector_FixtureCollection_PackageFixture(t *testing.T) {
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test fixture
 type DBFixture struct {
 	Conn string
 }
@@ -111,7 +110,6 @@ func TestCollector_FixtureCollection_PackageFixtureAllMethods(t *testing.T) {
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test fixture
 type DBFixture struct {
 	Conn string
 }
@@ -137,12 +135,11 @@ func (f *DBFixture) AfterEach(t *gotest.T)  {}
 func TestCollector_FixtureCollection_SharedFixture(t *testing.T) {
 	src := `package testpkg
 
-//go:test shared-fixture
-type RedisFixture struct {
+type RedisSharedFixture struct {
 	Addr string
 }
 
-func (f *RedisFixture) BeforeAll() error { return nil }
+func (f *RedisSharedFixture) BeforeAll() error { return nil }
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -156,13 +153,12 @@ func (f *RedisFixture) BeforeAll() error { return nil }
 func TestCollector_FixtureCollection_SharedFixtureWithAfterAll(t *testing.T) {
 	src := `package testpkg
 
-//go:test shared-fixture
-type RedisFixture struct {
+type RedisSharedFixture struct {
 	Addr string
 }
 
-func (f *RedisFixture) BeforeAll() error { return nil }
-func (f *RedisFixture) AfterAll() error  { return nil }
+func (f *RedisSharedFixture) BeforeAll() error { return nil }
+func (f *RedisSharedFixture) AfterAll() error  { return nil }
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -182,7 +178,6 @@ func TestCollector_FixtureEmbeddingInTestSuite(t *testing.T) {
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test fixture
 type DBFixture struct {
 	Conn string
 }
@@ -229,12 +224,10 @@ func TestCollector_FixtureToFixtureEmbedding(t *testing.T) {
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test fixture
 type BaseFixture struct{}
 
 func (f *BaseFixture) BeforeAll(t *gotest.T) {}
 
-//go:test fixture
 type DBFixture struct {
 	*BaseFixture
 }
@@ -349,11 +342,10 @@ func TestCollector_SharedFixture_BeforeEachDisallowed(t *testing.T) {
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test shared-fixture
-type RedisFixture struct{}
+type RedisSharedFixture struct{}
 
-func (f *RedisFixture) BeforeAll() error        { return nil }
-func (f *RedisFixture) BeforeEach(t *gotest.T)  {}
+func (f *RedisSharedFixture) BeforeAll() error        { return nil }
+func (f *RedisSharedFixture) BeforeEach(t *gotest.T)  {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -367,11 +359,10 @@ func TestCollector_SharedFixture_AfterEachDisallowed(t *testing.T) {
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test shared-fixture
-type RedisFixture struct{}
+type RedisSharedFixture struct{}
 
-func (f *RedisFixture) BeforeAll() error       { return nil }
-func (f *RedisFixture) AfterEach(t *gotest.T)  {}
+func (f *RedisSharedFixture) BeforeAll() error       { return nil }
+func (f *RedisSharedFixture) AfterEach(t *gotest.T)  {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -385,10 +376,9 @@ func TestCollector_SharedFixture_WrongBeforeAllSignature(t *testing.T) {
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test shared-fixture
-type RedisFixture struct{}
+type RedisSharedFixture struct{}
 
-func (f *RedisFixture) BeforeAll(t *gotest.T) {}
+func (f *RedisSharedFixture) BeforeAll(t *gotest.T) {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -404,17 +394,15 @@ func TestCollector_SuiteEmbedsMultipleFixtures(t *testing.T) {
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test fixture
-type Fix1 struct{}
-func (f *Fix1) BeforeAll(t *gotest.T) {}
+type OneFixture struct{}
+func (f *OneFixture) BeforeAll(t *gotest.T) {}
 
-//go:test fixture
-type Fix2 struct{}
-func (f *Fix2) BeforeAll(t *gotest.T) {}
+type TwoFixture struct{}
+func (f *TwoFixture) BeforeAll(t *gotest.T) {}
 
 type MyTestSuite struct {
-	*Fix1
-	*Fix2
+	*OneFixture
+	*TwoFixture
 }
 
 func (s *MyTestSuite) TestSomething(t *gotest.T) {}
@@ -480,7 +468,6 @@ func TestApplyTestSuiteSpecs_OK(t *testing.T) {
 func TestCollector_PackageFixture_WrongBeforeAllSignature(t *testing.T) {
 	src := `package testpkg
 
-//go:test fixture
 type DBFixture struct{}
 
 func (f *DBFixture) BeforeAll() error { return nil }

@@ -43,7 +43,6 @@ func loadFixtureAST(t *testing.T, src string) (*packages.Package, []*ast.GenDecl
 func TestDetermineFixture_PackageFixture(t *testing.T) {
 	src := `package testpkg
 
-//go:test fixture
 type DBFixture struct {
 	Conn string
 }
@@ -62,8 +61,7 @@ type DBFixture struct {
 func TestDetermineFixture_SharedFixture(t *testing.T) {
 	src := `package testpkg
 
-//go:test shared-fixture
-type RedisFixture struct {
+type RedisSharedFixture struct {
 	Addr string
 }
 `
@@ -74,14 +72,13 @@ type RedisFixture struct {
 	gotest.NoError(t, err)
 	gotest.True(t, spec != nil, "expected non-nil FixtureSpec")
 	gotest.Equal(t, SharedFixture, spec.Kind)
-	gotest.Equal(t, "RedisFixture", spec.Identifier())
+	gotest.Equal(t, "RedisSharedFixture", spec.Identifier())
 	gotest.Equal(t, 0, len(spec.EnvTags))
 }
 
 func TestDetermineFixture_EnvTags(t *testing.T) {
 	src := "package testpkg\n\n" +
-		"//go:test shared-fixture\n" +
-		"type EnvFixture struct {\n" +
+		"type EnvSharedFixture struct {\n" +
 		"\tHost string `gotest:\"env=DB_HOST\"`\n" +
 		"\tPort int    `gotest:\"env=DB_PORT\"`\n" +
 		"\tlocal string\n" +
@@ -101,7 +98,7 @@ func TestDetermineFixture_EnvTags(t *testing.T) {
 	gotest.Equal(t, "DB_PORT", spec.EnvTags["Port"])
 }
 
-func TestDetermineFixture_NoDirective(t *testing.T) {
+func TestDetermineFixture_NoSuffix(t *testing.T) {
 	src := `package testpkg
 
 type PlainStruct struct {
@@ -113,13 +110,12 @@ type PlainStruct struct {
 
 	spec, err := DetermineFixture(decls[0], pkg)
 	gotest.NoError(t, err)
-	gotest.True(t, spec == nil, "expected nil FixtureSpec for struct without directive")
+	gotest.True(t, spec == nil, "expected nil FixtureSpec for struct without Fixture suffix")
 }
 
 func TestDetermineFixture_NonStruct(t *testing.T) {
 	src := `package testpkg
 
-//go:test fixture
 type BadFixture int
 `
 	pkg, decls := loadFixtureAST(t, src)

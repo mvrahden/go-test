@@ -2,7 +2,6 @@ package nestedfixture
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test fixture
 type InfraFixture struct {
 	DBValue string
 }
@@ -13,7 +12,6 @@ func (f *InfraFixture) BeforeAll(t *gotest.T) {
 
 func (f *InfraFixture) AfterAll(t *gotest.T) {}
 
-//go:test fixture
 type APIFixture struct {
 	*InfraFixture
 	APIValue string

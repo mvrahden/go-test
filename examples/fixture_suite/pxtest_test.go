@@ -2,17 +2,16 @@ package fixturesuite_test
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-//go:test fixture
-type ExternalSetup struct {
+type ExternalSetupFixture struct {
 	Ready bool
 }
 
-func (s *ExternalSetup) BeforeAll(t *gotest.T) {
+func (s *ExternalSetupFixture) BeforeAll(t *gotest.T) {
 	s.Ready = true
 }
 
 type ExternalDemoTestSuite struct {
-	*ExternalSetup
+	*ExternalSetupFixture
 }
 
 func (s *ExternalDemoTestSuite) TestReady(t *gotest.T) {}
