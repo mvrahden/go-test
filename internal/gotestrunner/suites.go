@@ -44,6 +44,9 @@ func SuitesCleanup(pkgPath string) error {
 		return nil
 	}
 	for _, pkg := range pkgs {
+		if pkg.Module == nil {
+			continue
+		}
 		pkgPath := gotestgen.DeterminePkgDir(pkg)
 		os.Remove(filepath.Join(pkgPath, about.PSuite))
 		os.Remove(filepath.Join(pkgPath, about.PXSuite))
