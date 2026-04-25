@@ -22,6 +22,8 @@ func Test(t *testing.T) {
 		{desc: "PXTest with low version", ModuleDir: "/user/xyz/projects", ModulePath: "github.com/user_xyz/module-abc/v2", PackagePath: "github.com/user_xyz/module-abc/v2/pkg_def_test", PackageName: "pkg_def_test", Expected: "/user/xyz/projects/pkg_def"},
 		{desc: "PTest with higher version", ModuleDir: "/user/xyz/projects", ModulePath: "github.com/user_xyz/module-abc/v99", PackagePath: "github.com/user_xyz/module-abc/v99/pkg_def", PackageName: "pkg_def", Expected: "/user/xyz/projects/pkg_def"},
 		{desc: "PXTest with higher version", ModuleDir: "/user/xyz/projects", ModulePath: "github.com/user_xyz/module-abc/v99", PackagePath: "github.com/user_xyz/module-abc/v99/pkg_def_test", PackageName: "pkg_def_test", Expected: "/user/xyz/projects/pkg_def"},
+		{desc: "PTest at module root", ModuleDir: "/user/xyz/projects", ModulePath: "github.com/user_xyz/module-abc", PackagePath: "github.com/user_xyz/module-abc", PackageName: "module_abc", Expected: "/user/xyz/projects"},
+		{desc: "PXTest at module root", ModuleDir: "/user/xyz/projects", ModulePath: "github.com/user_xyz/module-abc", PackagePath: "github.com/user_xyz/module-abc_test", PackageName: "module_abc_test", Expected: "/user/xyz/projects"},
 	}
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {

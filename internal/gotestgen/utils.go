@@ -15,6 +15,10 @@ func DeterminePkgDir(p *packages.Package) string {
 		pkgPath = pkgPath[:len(pkgPath)-5] // trim "_test"
 	}
 
+	if pkgPath == modPath {
+		return modDir
+	}
+
 	commonPrefix := len(modPath) + 1
 	path := pkgPath[commonPrefix:]
 	return filepath.Join(modDir, path)
