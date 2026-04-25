@@ -15,31 +15,39 @@ import (
 )
 
 type testingT interface {
-	Helper()
 	Errorf(format string, args ...any)
 	FailNow()
 }
 
 func fail(t testingT, msg string, msgAndArgs []any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if userMsg := assert.FormatMessage(msgAndArgs); userMsg != "" {
 		msg = msg + "\n  message: " + userMsg
+	}
+	if trace := assert.CallerTrace(); trace != "" {
+		msg += trace
 	}
 	t.Errorf(msg)
 	t.FailNow()
 }
 
 // Equal asserts that expected and actual are deeply equal.
-func Equal[T any](t testingT, expected, actual T, msgAndArgs ...any) {
-	t.Helper()
+func Equal[V any](t testingT, expected, actual V, msgAndArgs ...any) {
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if msg := assert.CheckEqual(expected, actual); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
 }
 
 // NotEqual asserts that expected and actual are NOT deeply equal.
-func NotEqual[T any](t testingT, expected, actual T, msgAndArgs ...any) {
-	t.Helper()
+func NotEqual[V any](t testingT, expected, actual V, msgAndArgs ...any) {
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if msg := assert.CheckNotEqual(expected, actual); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
@@ -47,7 +55,9 @@ func NotEqual[T any](t testingT, expected, actual T, msgAndArgs ...any) {
 
 // True asserts that value is true.
 func True(t testingT, value bool, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if !value {
 		fail(t, "True failed:\n  expected: true\n  actual:   false", msgAndArgs)
 	}
@@ -55,25 +65,31 @@ func True(t testingT, value bool, msgAndArgs ...any) {
 
 // False asserts that value is false.
 func False(t testingT, value bool, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if value {
 		fail(t, "False failed:\n  expected: false\n  actual:   true", msgAndArgs)
 	}
 }
 
 // Zero asserts that value is the zero value for its type.
-func Zero[T comparable](t testingT, value T, msgAndArgs ...any) {
-	t.Helper()
-	var zero T
+func Zero[V comparable](t testingT, value V, msgAndArgs ...any) {
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
+	var zero V
 	if value != zero {
 		fail(t, fmt.Sprintf("Zero failed:\n  expected: %#v (zero value)\n  actual:   %#v", zero, value), msgAndArgs)
 	}
 }
 
 // NotZero asserts that value is NOT the zero value for its type.
-func NotZero[T comparable](t testingT, value T, msgAndArgs ...any) {
-	t.Helper()
-	var zero T
+func NotZero[V comparable](t testingT, value V, msgAndArgs ...any) {
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
+	var zero V
 	if value == zero {
 		fail(t, fmt.Sprintf("NotZero failed:\n  value is the zero value: %#v", value), msgAndArgs)
 	}
@@ -98,7 +114,9 @@ func isEmpty(object any) bool {
 
 // Empty asserts that object is empty (nil, or has length 0).
 func Empty(t testingT, object any, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if !isEmpty(object) {
 		fail(t, fmt.Sprintf("Empty failed:\n  object is not empty: %#v", object), msgAndArgs)
 	}
@@ -106,7 +124,9 @@ func Empty(t testingT, object any, msgAndArgs ...any) {
 
 // NotEmpty asserts that object is NOT empty.
 func NotEmpty(t testingT, object any, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if isEmpty(object) {
 		fail(t, fmt.Sprintf("NotEmpty failed:\n  object is empty: %#v", object), msgAndArgs)
 	}
@@ -114,7 +134,9 @@ func NotEmpty(t testingT, object any, msgAndArgs ...any) {
 
 // NoError asserts that err is nil.
 func NoError(t testingT, err error, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if err != nil {
 		fail(t, fmt.Sprintf("NoError failed:\n  unexpected error: %s", err.Error()), msgAndArgs)
 	}
@@ -122,7 +144,9 @@ func NoError(t testingT, err error, msgAndArgs ...any) {
 
 // Error asserts that err is not nil.
 func Error(t testingT, err error, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if err == nil {
 		fail(t, "Error failed:\n  expected an error but got nil", msgAndArgs)
 	}
@@ -130,7 +154,9 @@ func Error(t testingT, err error, msgAndArgs ...any) {
 
 // ErrorIs asserts that errors.Is(err, target) is true.
 func ErrorIs(t testingT, err, target error, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if !errors.Is(err, target) {
 		fail(t, fmt.Sprintf("ErrorIs failed:\n  error: %v\n  target: %v", err, target), msgAndArgs)
 	}
@@ -138,7 +164,9 @@ func ErrorIs(t testingT, err, target error, msgAndArgs ...any) {
 
 // ErrorAs asserts that errors.As(err, &target) is true and returns the matched error.
 func ErrorAs[E error](t testingT, err error, msgAndArgs ...any) E {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	var target E
 	if !errors.As(err, &target) {
 		fail(t, fmt.Sprintf("ErrorAs failed:\n  error %v does not match expected type", err), msgAndArgs)
@@ -148,7 +176,9 @@ func ErrorAs[E error](t testingT, err error, msgAndArgs ...any) E {
 
 // ErrorContains asserts that err is not nil and err.Error() contains the given substring.
 func ErrorContains(t testingT, err error, contains string, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if err == nil {
 		fail(t, "ErrorContains failed:\n  expected an error but got nil", msgAndArgs)
 		return
@@ -161,7 +191,9 @@ func ErrorContains(t testingT, err error, contains string, msgAndArgs ...any) {
 // Contains asserts that s contains the element `contains`.
 // For strings, checks substring. For slices/arrays, checks element presence. For maps, checks key presence.
 func Contains(t testingT, s, contains any, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if !includesElement(s, contains) {
 		fail(t, fmt.Sprintf("Contains failed:\n  %#v does not contain %#v", s, contains), msgAndArgs)
 	}
@@ -169,7 +201,9 @@ func Contains(t testingT, s, contains any, msgAndArgs ...any) {
 
 // NotContains asserts that s does NOT contain the element `contains`.
 func NotContains(t testingT, s, contains any, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if includesElement(s, contains) {
 		fail(t, fmt.Sprintf("NotContains failed:\n  %#v should not contain %#v", s, contains), msgAndArgs)
 	}
@@ -209,7 +243,9 @@ func includesElement(s, element any) bool {
 
 // Len asserts that object has the given length.
 func Len(t testingT, object any, length int, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if object == nil {
 		fail(t, fmt.Sprintf("Len failed:\n  object is nil, expected length %d", length), msgAndArgs)
 		return
@@ -226,13 +262,15 @@ func Len(t testingT, object any, length int, msgAndArgs ...any) {
 }
 
 // ElementsMatch asserts that listA and listB contain the same elements regardless of order.
-func ElementsMatch[T comparable](t testingT, listA, listB []T, msgAndArgs ...any) {
-	t.Helper()
+func ElementsMatch[V comparable](t testingT, listA, listB []V, msgAndArgs ...any) {
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if len(listA) != len(listB) {
 		fail(t, fmt.Sprintf("ElementsMatch failed:\n  lists have different lengths: %d vs %d", len(listA), len(listB)), msgAndArgs)
 		return
 	}
-	counts := make(map[T]int, len(listA))
+	counts := make(map[V]int, len(listA))
 	for _, v := range listA {
 		counts[v]++
 	}
@@ -246,9 +284,11 @@ func ElementsMatch[T comparable](t testingT, listA, listB []T, msgAndArgs ...any
 }
 
 // Subset asserts that every element of subset exists in list.
-func Subset[T comparable](t testingT, list, subset []T, msgAndArgs ...any) {
-	t.Helper()
-	set := make(map[T]struct{}, len(list))
+func Subset[V comparable](t testingT, list, subset []V, msgAndArgs ...any) {
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
+	set := make(map[V]struct{}, len(list))
 	for _, v := range list {
 		set[v] = struct{}{}
 	}
@@ -261,32 +301,40 @@ func Subset[T comparable](t testingT, list, subset []T, msgAndArgs ...any) {
 }
 
 // Greater asserts that a > b.
-func Greater[T cmp.Ordered](t testingT, a, b T, msgAndArgs ...any) {
-	t.Helper()
+func Greater[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if msg := assert.CheckGreater(a, b); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
 }
 
 // GreaterOrEqual asserts that a >= b.
-func GreaterOrEqual[T cmp.Ordered](t testingT, a, b T, msgAndArgs ...any) {
-	t.Helper()
+func GreaterOrEqual[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if msg := assert.CheckGreaterOrEqual(a, b); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
 }
 
 // Less asserts that a < b.
-func Less[T cmp.Ordered](t testingT, a, b T, msgAndArgs ...any) {
-	t.Helper()
+func Less[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if msg := assert.CheckLess(a, b); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
 }
 
 // LessOrEqual asserts that a <= b.
-func LessOrEqual[T cmp.Ordered](t testingT, a, b T, msgAndArgs ...any) {
-	t.Helper()
+func LessOrEqual[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	if msg := assert.CheckLessOrEqual(a, b); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
@@ -299,7 +347,9 @@ type regexpPattern interface {
 
 // Regexp asserts that str matches the regular expression rx.
 func Regexp[P regexpPattern](t testingT, rx P, str string, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	var re *regexp.Regexp
 	switch v := any(rx).(type) {
 	case string:
@@ -325,8 +375,10 @@ type numeric interface {
 }
 
 // InDelta asserts that expected and actual are within delta of each other.
-func InDelta[T numeric](t testingT, expected, actual T, delta float64, msgAndArgs ...any) {
-	t.Helper()
+func InDelta[V numeric](t testingT, expected, actual V, delta float64, msgAndArgs ...any) {
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	diff := math.Abs(float64(expected) - float64(actual))
 	if diff > delta {
 		fail(t, fmt.Sprintf("InDelta failed:\n  |%v - %v| = %v exceeds delta %v", expected, actual, diff, delta), msgAndArgs)
@@ -359,7 +411,9 @@ func normalizeJSON(v any) (any, error) {
 // JSONEq asserts that expected and actual represent the same JSON structure.
 // Both values may be string, []byte, or any JSON-marshalable value.
 func JSONEq(t testingT, expected, actual any, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	expNorm, err := normalizeJSON(expected)
 	if err != nil {
 		fail(t, fmt.Sprintf("JSONEq failed:\n  could not normalize expected: %v", err), msgAndArgs)
@@ -379,7 +433,9 @@ func JSONEq(t testingT, expected, actual any, msgAndArgs ...any) {
 
 // TimeWithin asserts that expected and actual are within the given tolerance of each other.
 func TimeWithin(t testingT, expected, actual time.Time, tolerance time.Duration, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	diff := expected.Sub(actual)
 	if diff < 0 {
 		diff = -diff
@@ -391,13 +447,17 @@ func TimeWithin(t testingT, expected, actual time.Time, tolerance time.Duration,
 
 // TimeIsNow asserts that ts is within tolerance of time.Now().
 func TimeIsNow(t testingT, ts time.Time, tolerance time.Duration, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	TimeWithin(t, time.Now(), ts, tolerance, msgAndArgs...)
 }
 
 // Panics asserts that f panics when called. It returns the recovered value.
 func Panics(t testingT, f func(), msgAndArgs ...any) any {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	recovered, didPanic := didPanic(f)
 	if !didPanic {
 		fail(t, "Panics failed:\n  expected the function to panic but it did not", msgAndArgs)
@@ -419,7 +479,9 @@ func didPanic(f func()) (recovered any, panicked bool) {
 
 // Eventually asserts that condition returns true within waitFor, polling every tick.
 func Eventually(t testingT, condition func() bool, waitFor, tick time.Duration, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	timer := time.NewTimer(waitFor)
 	defer timer.Stop()
 	ticker := time.NewTicker(tick)
@@ -439,7 +501,9 @@ func Eventually(t testingT, condition func() bool, waitFor, tick time.Duration, 
 
 // Consistently asserts that condition returns true for the entire waitFor duration, polling every tick.
 func Consistently(t testingT, condition func() bool, waitFor, tick time.Duration, msgAndArgs ...any) {
-	t.Helper()
+	if gt, ok := t.(*T); ok {
+		gt.t.Helper()
+	}
 	timer := time.NewTimer(waitFor)
 	defer timer.Stop()
 	ticker := time.NewTicker(tick)

@@ -1,4 +1,3 @@
-{{- /* Declare compile time assertion of enum set constants */ -}}
 {{ range $i, $ts := .Spec.EffectiveTestSuites }}
 
 type ƒƒ_GOTEST_{{ $ts.Identifier }} struct {
@@ -24,7 +23,7 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
         ttt := gotest.NewT(it)
         defer s.AfterEach(ttt)
         s.BeforeEach(ttt)
-        testFn(ttt)
+        ƒƒ_GOTEST_exec(testFn, ttt)
       })
     }}
 {{- end }}
@@ -39,7 +38,7 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
         ttt := gotest.NewT(it)
         defer s.AfterEach(ttt)
         s.BeforeEach(ttt)
-        testFn(ttt)
+        ƒƒ_GOTEST_exec(testFn, ttt)
       })
     }}
   wg := &sync.WaitGroup{}

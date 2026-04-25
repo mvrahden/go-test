@@ -12,4 +12,7 @@ import (
 {{- end }}
 )
 {{- end }}
+
+//go:noinline
+func ƒƒ_GOTEST_exec(fn gotest.TestCase, t *gotest.T) { fn(t) }
 {{ end -}}

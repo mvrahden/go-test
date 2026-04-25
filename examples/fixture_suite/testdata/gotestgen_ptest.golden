@@ -8,6 +8,9 @@ import (
 	"testing"
 )
 
+//go:noinline
+func ƒƒ_GOTEST_exec(fn gotest.TestCase, t *gotest.T) { fn(t) }
+
 type ƒƒ_GOTEST_DemoTestSuite struct {
 	DemoTestSuite
 }
@@ -41,7 +44,7 @@ func Test_Setup(t *testing.T) {
 					ttt := gotest.NewT(it)
 					defer s.AfterEach(ttt)
 					s.BeforeEach(ttt)
-					testFn(ttt)
+					ƒƒ_GOTEST_exec(testFn, ttt)
 				})
 			}
 		}

@@ -83,3 +83,13 @@ func (s *SimpleTestSuite) TestHasCapacity(t *gotest.T) {
 		it.Assert(&[1]string{}).HasCapacity(1)
 	})
 }
+
+func helperAssert(t *gotest.T) {
+	t.Assert("wrong").IsTrue()
+}
+
+func (s *SimpleTestSuite) TestHelperTrace(t *gotest.T) {
+	t.It("shows called from trace", func(it *gotest.T) {
+		helperAssert(it)
+	})
+}

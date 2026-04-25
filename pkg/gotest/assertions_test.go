@@ -16,7 +16,6 @@ type mockT struct {
 	message string
 }
 
-func (m *mockT) Helper() {}
 func (m *mockT) Errorf(format string, args ...any) {
 	m.failed = true
 	m.message = fmt.Sprintf(format, args...)

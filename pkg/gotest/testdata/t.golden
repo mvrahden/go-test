@@ -7,42 +7,47 @@
     t_test.go:17: failed for reasons
 === RUN   TestSimpleTestSuite/TestIsTrue
 === RUN   TestSimpleTestSuite/TestIsTrue/fails
-    base.go:31: True failed:
+    t_test.go:23: True failed:
           got: abc
 === RUN   TestSimpleTestSuite/TestIsTrue/succeeds
 === RUN   TestSimpleTestSuite/TestIsFalse
 === RUN   TestSimpleTestSuite/TestIsFalse/fails
-    base.go:39: False failed:
+    t_test.go:32: False failed:
           got: abc
 === RUN   TestSimpleTestSuite/TestIsFalse/succeeds
 === RUN   TestSimpleTestSuite/TestIsEqualTo
 === RUN   TestSimpleTestSuite/TestIsEqualTo/fails
-    base.go:23: Equal failed:
+    t_test.go:41: Equal failed:
           expected: []string{"def"}
           actual:   []string{"abc"}
 === RUN   TestSimpleTestSuite/TestIsEqualTo/succeeds
 === RUN   TestSimpleTestSuite/TestIsZero
 === RUN   TestSimpleTestSuite/TestIsZero/fails
-    base.go:52: Zero failed:
+    t_test.go:50: Zero failed:
           got: []string{"abc"}
 === RUN   TestSimpleTestSuite/TestIsZero/succeeds
 === RUN   TestSimpleTestSuite/TestIsEmpty
 === RUN   TestSimpleTestSuite/TestIsEmpty/fails
-    base.go:75: Empty failed:
+    t_test.go:59: Empty failed:
           got length: 1
 === RUN   TestSimpleTestSuite/TestIsEmpty/succeeds
 === RUN   TestSimpleTestSuite/TestHasLength
 === RUN   TestSimpleTestSuite/TestHasLength/fails
-    base.go:89: HasLength failed:
+    t_test.go:69: HasLength failed:
           expected length: 3
           actual length:   1
 === RUN   TestSimpleTestSuite/TestHasLength/succeeds
 === RUN   TestSimpleTestSuite/TestHasCapacity
 === RUN   TestSimpleTestSuite/TestHasCapacity/fails
-    base.go:103: HasCapacity failed:
+    t_test.go:79: HasCapacity failed:
           expected capacity: 3
           actual capacity:   1
 === RUN   TestSimpleTestSuite/TestHasCapacity/succeeds
+=== RUN   TestSimpleTestSuite/TestHelperTrace
+=== RUN   TestSimpleTestSuite/TestHelperTrace/shows_called_from_trace
+    t_test.go:88: True failed:
+          got: wrong
+          called from: t_test.go:93
 --- FAIL: TestSimpleTestSuite (<TIMESTAMP>)
     --- FAIL: TestSimpleTestSuite/TestT (<TIMESTAMP>)
         --- FAIL: TestSimpleTestSuite/TestT/should_perform_the_test_case (<TIMESTAMP>)
@@ -67,6 +72,8 @@
     --- FAIL: TestSimpleTestSuite/TestHasCapacity (<TIMESTAMP>)
         --- FAIL: TestSimpleTestSuite/TestHasCapacity/fails (<TIMESTAMP>)
         --- PASS: TestSimpleTestSuite/TestHasCapacity/succeeds (<TIMESTAMP>)
+    --- FAIL: TestSimpleTestSuite/TestHelperTrace (<TIMESTAMP>)
+        --- FAIL: TestSimpleTestSuite/TestHelperTrace/shows_called_from_trace (<TIMESTAMP>)
 FAIL
 FAIL	github.com/mvrahden/go-test/pkg/gotest	<TIMESTAMP>
 FAIL

@@ -55,7 +55,7 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                     ttt := gotest.NewT(it)
                     defer s.AfterEach(ttt)
                     s.BeforeEach(ttt)
-                    testFn(ttt)
+                    ƒƒ_GOTEST_exec(testFn, ttt)
                 })
             }}
 {{- end }}
@@ -70,7 +70,7 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                     ttt := gotest.NewT(it)
                     defer s.AfterEach(ttt)
                     s.BeforeEach(ttt)
-                    testFn(ttt)
+                    ƒƒ_GOTEST_exec(testFn, ttt)
                 })
             }}
         wg := &sync.WaitGroup{}
@@ -133,7 +133,7 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                         ttt := gotest.NewT(it)
                         defer s.AfterEach(ttt)
                         s.BeforeEach(ttt)
-                        testFn(ttt)
+                        ƒƒ_GOTEST_exec(testFn, ttt)
                     })
                 }}
 {{- end }}
@@ -148,7 +148,7 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                         ttt := gotest.NewT(it)
                         defer s.AfterEach(ttt)
                         s.BeforeEach(ttt)
-                        testFn(ttt)
+                        ƒƒ_GOTEST_exec(testFn, ttt)
                     })
                 }}
             wg := &sync.WaitGroup{}
