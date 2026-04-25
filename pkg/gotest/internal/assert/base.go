@@ -1,174 +1,180 @@
 package assert
 
 import (
-	"fmt"
 	"reflect"
+	"strings"
 )
 
 type formatF func(format string, args ...any)
 
-func New(fmtFn formatF) *BaseAsserter {
-	return &BaseAsserter{asserterFunc: defaultAsserterFunc(fmtFn)}
-}
-
-func defaultAsserterFunc(fmtFn formatF) func(func() error) {
-	return func(testFn func() error) {
-		err := testFn()
-		if err != nil {
-			fmtFn(err.Error())
-		}
-	}
-}
-
-type BaseAsserter struct {
-	asserterFunc func(func() error)
-}
-
-func (b *BaseAsserter) Assert(v any) *BaseAssertionContext {
-	return &BaseAssertionContext{v: v, asserterFunc: b.asserterFunc}
-}
-
 type BaseAssertionContext struct {
-	v            any
-	asserterFunc func(func() error)
+	v    any
+	fail formatF
 }
 
-func (b *BaseAssertionContext) IsTrue() {
-	b.asserterFunc(func() error {
-		v, ok := b.v.(bool)
-		if !ok || !v {
-			return fmt.Errorf("%v is not true", b.v)
-		}
-		return nil
-	})
-}
-func (b *BaseAssertionContext) IsFalse() {
-	b.asserterFunc(func() error {
-		v, ok := b.v.(bool)
-		if !ok || v {
-			return fmt.Errorf("%v is not false", b.v)
-		}
-		return nil
-	})
+func NewAssertionContext(v any, fail formatF) *BaseAssertionContext {
+	return &BaseAssertionContext{v: v, fail: fail}
 }
 
-func (b *BaseAssertionContext) IsEqualTo(v any) {
-	b.asserterFunc(func() error {
-		ok := reflect.DeepEqual(b.v, v)
-		if !ok {
-			return fmt.Errorf("%v is not equal to %v", fmtForEq(b.v), fmtForEq(v))
-		}
-		return nil
-	})
-}
-func (b *BaseAssertionContext) IsZero() {
-	b.asserterFunc(func() error {
-		rVal := reflect.ValueOf(b.v)
-		if !rVal.IsValid() {
-			return fmt.Errorf("%v can not be zero", b.v)
-		}
-		ok := rVal.IsZero()
-		if !ok {
-			return fmt.Errorf("%v is not zero", b.v)
-		}
-		return nil
-	})
-}
-func (b *BaseAssertionContext) IsEmpty() {
-	b.asserterFunc(func() error {
-		cmpFn := func(actual int) error {
-			if actual != 0 {
-				return fmt.Errorf("is not empty (actual length = %d)", actual)
-			}
-			return nil
-		}
-		rVal := derefPtr(reflect.ValueOf(b.v))
-
-		switch k := rVal.Kind(); k {
-		case reflect.String, reflect.Map, reflect.Array, reflect.Slice, reflect.Chan:
-			return cmpFn(rVal.Len())
-		default:
-			return fmt.Errorf("value of type <%s> can not be empty", k.String())
-		}
-	})
-}
-func (b *BaseAssertionContext) HasLength(l int) {
-	b.asserterFunc(func() error {
-		cmpFn := func(actual, expected int) error {
-			if actual != expected {
-				return fmt.Errorf("is not of length %d (actual length = %d)", expected, actual)
-			}
-			return nil
-		}
-		rVal := derefPtr(reflect.ValueOf(b.v))
-
-		switch k := rVal.Kind(); k {
-		case reflect.String, reflect.Map, reflect.Array, reflect.Slice, reflect.Chan:
-			return cmpFn(rVal.Len(), l)
-		default:
-			return fmt.Errorf("value of type <%s> does not have a length", k.String())
-		}
-	})
-}
-func (b *BaseAssertionContext) HasCapacity(c int) {
-	b.asserterFunc(func() error {
-		cmpFn := func(actual, expected int) error {
-			if actual != expected {
-				return fmt.Errorf("is not of capacity %d (actual capacity = %d)", expected, actual)
-			}
-			return nil
-		}
-		rVal := reflect.ValueOf(b.v)
-		if rVal.Kind() == reflect.Ptr && !rVal.IsNil() {
-			rVal = rVal.Elem()
-		}
-
-		switch k := rVal.Kind(); k {
-		case reflect.Array, reflect.Slice, reflect.Chan:
-			return cmpFn(rVal.Cap(), c)
-		default:
-			return fmt.Errorf("value of type <%s> does not have a capacity", k.String())
-		}
-	})
-}
-func (b *BaseAssertionContext) Contains(v any) {
-	b.asserterFunc(func() error {
-		rVal := reflect.ValueOf(b.v)
-		vVal := reflect.ValueOf(v)
-		// vK := vVal.Kind()
-
-		switch k := rVal.Kind(); k {
-		case reflect.String:
-
-		case reflect.Array, reflect.Slice:
-			for i := range rVal.Len() {
-				ok := reflect.DeepEqual(rVal.Index(i), vVal)
-				if ok {
-					return nil
-				}
-			}
-		default:
-			return fmt.Errorf("value of type <%s> does not have a capacity", k.String())
-		}
-		return fmt.Errorf("")
-	})
-}
-func (b *BaseAssertionContext) ContainsAll(v ...any) { panic("not implemented yet") }
-func (b *BaseAssertionContext) ContainsAny(v ...any) { panic("not implemented yet") }
-
-// fmtForEq formats a value for use in IsEqualTo error messages.
-// Pointer, chan, and func kinds are rendered as "Type<T>"; others use their %v representation.
-func fmtForEq(v any) any {
-	switch reflect.ValueOf(v).Kind() {
-	case reflect.Pointer, reflect.Chan, reflect.Func:
-		return fmt.Sprintf("Type<%T>", v)
-	default:
-		return v
+// Equal delegates to CheckEqual(expected, b.v).
+func (b *BaseAssertionContext) Equal(expected any) {
+	msg := CheckEqual(expected, b.v)
+	if msg != "" {
+		b.fail("%s", msg)
 	}
 }
 
-// derefPtr recursively dereferences pointers and interfaces, matching the
-// old unwrapPtr behaviour used by IsEmpty and HasLength.
+// IsTrue checks that b.v is bool true.
+func (b *BaseAssertionContext) IsTrue() {
+	v, ok := b.v.(bool)
+	if !ok || !v {
+		b.fail("True failed:\n  got: %v", b.v)
+	}
+}
+
+// IsFalse checks that b.v is bool false.
+func (b *BaseAssertionContext) IsFalse() {
+	v, ok := b.v.(bool)
+	if !ok || v {
+		b.fail("False failed:\n  got: %v", b.v)
+	}
+}
+
+// IsZero checks that b.v is the zero value for its type.
+// nil (invalid reflect.Value) is treated as an error, not as zero.
+func (b *BaseAssertionContext) IsZero() {
+	rVal := reflect.ValueOf(b.v)
+	if !rVal.IsValid() {
+		b.fail("Zero failed:\n  nil is not a typed zero value")
+		return
+	}
+	if !rVal.IsZero() {
+		b.fail("Zero failed:\n  got: %s", FormatValue(b.v))
+	}
+}
+
+// IsNotZero checks that b.v is not the zero value for its type.
+func (b *BaseAssertionContext) IsNotZero() {
+	rVal := reflect.ValueOf(b.v)
+	if !rVal.IsValid() {
+		b.fail("NotZero failed:\n  nil is not a typed zero value")
+		return
+	}
+	if rVal.IsZero() {
+		b.fail("NotZero failed:\n  got: %s", FormatValue(b.v))
+	}
+}
+
+// IsEmpty checks that b.v has length 0 (string, slice, map, array, chan),
+// or is nil. Pointer types are recursively dereferenced.
+func (b *BaseAssertionContext) IsEmpty() {
+	if !checkIsEmpty(b.v) {
+		rVal := derefPtr(reflect.ValueOf(b.v))
+		switch k := rVal.Kind(); k {
+		case reflect.String, reflect.Map, reflect.Array, reflect.Slice, reflect.Chan:
+			b.fail("Empty failed:\n  got length: %d", rVal.Len())
+		default:
+			b.fail("Empty failed:\n  value of type <%s> cannot be empty", k.String())
+		}
+	}
+}
+
+// HasLength asserts that b.v has the given length.
+// Supports String/Map/Array/Slice/Chan; dereferences pointers.
+func (b *BaseAssertionContext) HasLength(l int) {
+	rVal := derefPtr(reflect.ValueOf(b.v))
+	switch k := rVal.Kind(); k {
+	case reflect.String, reflect.Map, reflect.Array, reflect.Slice, reflect.Chan:
+		if actual := rVal.Len(); actual != l {
+			b.fail("HasLength failed:\n  expected length: %d\n  actual length:   %d", l, actual)
+		}
+	default:
+		b.fail("HasLength failed:\n  value of type <%s> does not have a length", k.String())
+	}
+}
+
+// HasCapacity asserts that b.v has the given capacity.
+// Supports Array/Slice/Chan; dereferences pointers.
+func (b *BaseAssertionContext) HasCapacity(c int) {
+	rVal := derefPtr(reflect.ValueOf(b.v))
+	switch k := rVal.Kind(); k {
+	case reflect.Array, reflect.Slice, reflect.Chan:
+		if actual := rVal.Cap(); actual != c {
+			b.fail("HasCapacity failed:\n  expected capacity: %d\n  actual capacity:   %d", c, actual)
+		}
+	default:
+		b.fail("HasCapacity failed:\n  value of type <%s> does not have a capacity", k.String())
+	}
+}
+
+// Contains checks that b.v contains v.
+// For strings: substring search. For slices/arrays: element search via reflect.DeepEqual.
+func (b *BaseAssertionContext) Contains(v any) {
+	rVal := reflect.ValueOf(b.v)
+	switch k := rVal.Kind(); k {
+	case reflect.String:
+		substr, ok := v.(string)
+		if !ok {
+			b.fail("Contains failed:\n  string container requires string element, got %T", v)
+			return
+		}
+		if !strings.Contains(rVal.String(), substr) {
+			b.fail("Contains failed:\n  %q does not contain %q", b.v, substr)
+		}
+	case reflect.Array, reflect.Slice:
+		vVal := reflect.ValueOf(v)
+		for i := range rVal.Len() {
+			if reflect.DeepEqual(rVal.Index(i).Interface(), vVal.Interface()) {
+				return
+			}
+		}
+		b.fail("Contains failed:\n  %v does not contain %v", b.v, v)
+	default:
+		b.fail("Contains failed:\n  value of type <%s> does not support Contains", k.String())
+	}
+}
+
+// NoError checks that b.v is nil or is an error interface holding nil.
+func (b *BaseAssertionContext) NoError() {
+	if b.v == nil {
+		return
+	}
+	if err, ok := b.v.(error); ok {
+		if err == nil {
+			return
+		}
+		b.fail("NoError failed:\n  got: %v", err)
+		return
+	}
+	b.fail("NoError failed:\n  value of type %T is not an error", b.v)
+}
+
+// checkIsEmpty returns true if v is considered empty.
+// nil → true. string/slice/map/array/chan with Len()==0 → true.
+// Pointers are recursively dereferenced; a nil pointer at any level → true.
+func checkIsEmpty(v any) bool {
+	if v == nil {
+		return true
+	}
+	rVal := reflect.ValueOf(v)
+	return checkIsEmptyValue(rVal)
+}
+
+func checkIsEmptyValue(rVal reflect.Value) bool {
+	switch k := rVal.Kind(); k {
+	case reflect.Pointer, reflect.Interface:
+		if rVal.IsNil() {
+			return true
+		}
+		return checkIsEmptyValue(rVal.Elem())
+	case reflect.String, reflect.Map, reflect.Array, reflect.Slice, reflect.Chan:
+		return rVal.Len() == 0
+	default:
+		return false
+	}
+}
+
+// derefPtr recursively dereferences non-nil pointers and interfaces.
 func derefPtr(r reflect.Value) reflect.Value {
 	k := r.Kind()
 	if k != reflect.Pointer && k != reflect.Interface {
@@ -178,4 +184,9 @@ func derefPtr(r reflect.Value) reflect.Value {
 		return derefPtr(r.Elem())
 	}
 	return r
+}
+
+// IsEqualTo is a legacy alias for Equal, kept for backwards compatibility.
+func (b *BaseAssertionContext) IsEqualTo(v any) {
+	b.Equal(v)
 }

@@ -7,31 +7,41 @@
     t_test.go:17: failed for reasons
 === RUN   TestSimpleTestSuite/TestIsTrue
 === RUN   TestSimpleTestSuite/TestIsTrue/fails
-    base.go:18: abc is not true
+    base.go:31: True failed:
+          got: abc
 === RUN   TestSimpleTestSuite/TestIsTrue/succeeds
 === RUN   TestSimpleTestSuite/TestIsFalse
 === RUN   TestSimpleTestSuite/TestIsFalse/fails
-    base.go:18: abc is not false
+    base.go:39: False failed:
+          got: abc
 === RUN   TestSimpleTestSuite/TestIsFalse/succeeds
 === RUN   TestSimpleTestSuite/TestIsEqualTo
 === RUN   TestSimpleTestSuite/TestIsEqualTo/fails
-    base.go:18: [abc] is not equal to [def]
+    base.go:23: Equal failed:
+          expected: []string{"def"}
+          actual:   []string{"abc"}
 === RUN   TestSimpleTestSuite/TestIsEqualTo/succeeds
 === RUN   TestSimpleTestSuite/TestIsZero
 === RUN   TestSimpleTestSuite/TestIsZero/fails
-    base.go:18: [abc] is not zero
+    base.go:52: Zero failed:
+          got: []string{"abc"}
 === RUN   TestSimpleTestSuite/TestIsZero/succeeds
 === RUN   TestSimpleTestSuite/TestIsEmpty
 === RUN   TestSimpleTestSuite/TestIsEmpty/fails
-    base.go:18: is not empty (actual length = 1)
+    base.go:75: Empty failed:
+          got length: 1
 === RUN   TestSimpleTestSuite/TestIsEmpty/succeeds
 === RUN   TestSimpleTestSuite/TestHasLength
 === RUN   TestSimpleTestSuite/TestHasLength/fails
-    base.go:18: is not of length 3 (actual length = 1)
+    base.go:89: HasLength failed:
+          expected length: 3
+          actual length:   1
 === RUN   TestSimpleTestSuite/TestHasLength/succeeds
 === RUN   TestSimpleTestSuite/TestHasCapacity
 === RUN   TestSimpleTestSuite/TestHasCapacity/fails
-    base.go:18: is not of capacity 3 (actual capacity = 1)
+    base.go:103: HasCapacity failed:
+          expected capacity: 3
+          actual capacity:   1
 === RUN   TestSimpleTestSuite/TestHasCapacity/succeeds
 --- FAIL: TestSimpleTestSuite (<TIMESTAMP>)
     --- FAIL: TestSimpleTestSuite/TestT (<TIMESTAMP>)
