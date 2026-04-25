@@ -9,7 +9,7 @@ import (
 
 	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/internal/cmd/testgen"
-	"github.com/stretchr/testify/require"
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 func TestE2E_CLI(t *testing.T) {
@@ -25,23 +25,23 @@ func TestE2E_CLI(t *testing.T) {
 	for idx, tC := range testcases {
 		t.Run(fmt.Sprintf("Generate (idx: %d %q)", idx, tC.desc), func(t *testing.T) {
 			cwd, err := os.Getwd()
-			require.NoError(t, err)
+			gotest.NoError(t, err)
 
 			path := filepath.Join(cwd, "testdata", tC.dirName)
 			results, err := testgen.GenerateSuites(path)
-			require.NoError(t, err)
-			require.True(t, strings.HasSuffix(results[0].AbsPath, "go-test/internal/cmd/testgen/testdata/"+tC.dirName))
-			require.Equal(t, "github.com/mvrahden/go-test/internal/cmd/testgen/testdata/"+tC.dirName, results[0].Package)
+			gotest.NoError(t, err)
+			gotest.True(t, strings.HasSuffix(results[0].AbsPath, "go-test/internal/cmd/testgen/testdata/"+tC.dirName))
+			gotest.Equal(t, "github.com/mvrahden/go-test/internal/cmd/testgen/testdata/"+tC.dirName, results[0].Package)
 
 			// Assert generate suite
 			for idx, golden := range tC.goldenFiles {
 				expected, err := os.ReadFile(filepath.Join("testdata", tC.dirName, golden))
-				require.NoError(t, err)
+				gotest.NoError(t, err)
 				if idx == 0 {
-					require.Equal(t, string(expected), string(results[0].PTest))
+					gotest.Equal(t, string(expected), string(results[0].PTest))
 				}
 				if idx == 1 {
-					require.Equal(t, string(expected), string(results[0].PXTest))
+					gotest.Equal(t, string(expected), string(results[0].PXTest))
 				}
 			}
 		})
@@ -61,8 +61,8 @@ func TestE2E_NoTestSuites(t *testing.T) {
 	for _, tC := range testcases {
 		t.Run(tC.desc, func(t *testing.T) {
 			res, err := testgen.GenerateSuites(tC.args[0])
-			require.NoError(t, err)
-			require.Empty(t, res)
+			gotest.NoError(t, err)
+			gotest.Empty(t, res)
 		})
 	}
 }

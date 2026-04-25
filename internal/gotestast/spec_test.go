@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 func TestRegexp(t *testing.T) {
@@ -43,7 +43,7 @@ func TestRegexp(t *testing.T) {
 					actualMatches = append(actualMatches, v)
 				}
 			}
-			require.Equal(t, tC.out, actualMatches)
+			gotest.Equal(t, tC.out, actualMatches)
 		})
 	}
 }

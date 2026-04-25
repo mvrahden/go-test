@@ -12,7 +12,7 @@ import (
 
 	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/internal/testutils"
-	"github.com/stretchr/testify/require"
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 //go:embed testdata
@@ -79,13 +79,13 @@ func Test_TestsuiteCLI_ParallelSuite(t *testing.T) {
 	out, err := cmd.CombinedOutput()
 	output := string(out)
 
-	require.NoError(t, err, "parallel suite should pass: %s", output)
-	require.Contains(t, output, "TestParallelTestSuiteParallel")
-	require.Contains(t, output, "TestParallelAlpha")
-	require.Contains(t, output, "TestParallelBeta")
-	require.Contains(t, output, "TestSequentialGamma")
-	require.Contains(t, output, "PAUSE")
-	require.Contains(t, output, "PASS")
+	gotest.NoError(t, err, "parallel suite should pass: %s", output)
+	gotest.Contains(t, output, "TestParallelTestSuiteParallel")
+	gotest.Contains(t, output, "TestParallelAlpha")
+	gotest.Contains(t, output, "TestParallelBeta")
+	gotest.Contains(t, output, "TestSequentialGamma")
+	gotest.Contains(t, output, "PAUSE")
+	gotest.Contains(t, output, "PASS")
 }
 
 func Test_TestsuiteCLI_GenericSuite(t *testing.T) {
@@ -100,13 +100,13 @@ func Test_TestsuiteCLI_GenericSuite(t *testing.T) {
 	out, err := cmd.CombinedOutput()
 	output := string(out)
 
-	require.NoError(t, err, "generic suite should pass: %s", output)
-	require.Contains(t, output, "TestStringTestSuite")
-	require.Contains(t, output, "TestIntTestSuite")
-	require.Contains(t, output, "TestSimpleExtTestSuite")
-	require.Contains(t, output, "TestAlpha")
-	require.Contains(t, output, "TestBeta")
-	require.Contains(t, output, "PASS")
+	gotest.NoError(t, err, "generic suite should pass: %s", output)
+	gotest.Contains(t, output, "TestStringTestSuite")
+	gotest.Contains(t, output, "TestIntTestSuite")
+	gotest.Contains(t, output, "TestSimpleExtTestSuite")
+	gotest.Contains(t, output, "TestAlpha")
+	gotest.Contains(t, output, "TestBeta")
+	gotest.Contains(t, output, "PASS")
 }
 
 func Test_TestsuiteCLI_AllPackages(t *testing.T) {
@@ -121,15 +121,15 @@ func Test_TestsuiteCLI_AllPackages(t *testing.T) {
 	out, _ := cmd.CombinedOutput()
 	output := string(out)
 
-	require.Contains(t, output, "examples/stdlib")
-	require.Contains(t, output, "examples/simple_suite")
-	require.Contains(t, output, "examples/focus_exclude")
-	require.Contains(t, output, "examples/parallel_suite")
-	require.Contains(t, output, "examples/generic_suite")
-	require.Contains(t, output, "TestUnitTestSuite")
-	require.Contains(t, output, "TestF_FocusedTestSuite")
-	require.Contains(t, output, "TestParallelTestSuiteParallel")
-	require.Contains(t, output, "TestStringTestSuite")
+	gotest.Contains(t, output, "examples/stdlib")
+	gotest.Contains(t, output, "examples/simple_suite")
+	gotest.Contains(t, output, "examples/focus_exclude")
+	gotest.Contains(t, output, "examples/parallel_suite")
+	gotest.Contains(t, output, "examples/generic_suite")
+	gotest.Contains(t, output, "TestUnitTestSuite")
+	gotest.Contains(t, output, "TestF_FocusedTestSuite")
+	gotest.Contains(t, output, "TestParallelTestSuiteParallel")
+	gotest.Contains(t, output, "TestStringTestSuite")
 }
 
 func Test_TestsuiteCLI_ExitCode(t *testing.T) {
