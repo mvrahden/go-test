@@ -24,9 +24,9 @@ func TestSimpleTestSuite(t *testing.T) {
 			t := tt.T()
 			t.Run(desc, func(it *testing.T) {
 				ttt := gotest.NewT(it)
+				defer s.AfterEach(ttt)
 				s.BeforeEach(ttt)
 				testFn(ttt)
-				s.AfterEach(ttt)
 			})
 		}
 	}

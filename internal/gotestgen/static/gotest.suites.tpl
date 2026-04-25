@@ -22,9 +22,9 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
       t := tt.T()
       t.Run(desc, func(it *testing.T) {
         ttt := gotest.NewT(it)
+        defer s.AfterEach(ttt)
         s.BeforeEach(ttt)
         testFn(ttt)
-        s.AfterEach(ttt)
       })
     }}
 {{- end }}
@@ -35,11 +35,11 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
       t := tt.T()
       t.Run(desc, func(it *testing.T) {
         it.Parallel()
+        defer wg.Done()
         ttt := gotest.NewT(it)
+        defer s.AfterEach(ttt)
         s.BeforeEach(ttt)
         testFn(ttt)
-        s.AfterEach(ttt)
-        wg.Done()
       })
     }}
   wg := &sync.WaitGroup{}
