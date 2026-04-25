@@ -2,7 +2,9 @@
 
 ## Vision
 
-Go's testing framework is deliberately minimal — and that's a strength. But the gap between `func TestX(t *testing.T)` and a well-organized, maintainable test suite is filled entirely by manual boilerplate. `go-test` closes that gap through code generation: you write structs, name them well, and the tool handles the rest. No runtime dependencies. No reflection. No lock-in. Just standard Go tests with lifecycle management, structured organization, and development-time ergonomics that make testing a pleasure rather than a chore.
+Go tests that write themselves, organize themselves, and explain themselves.
+
+Go's testing framework is deliberately minimal — and that's a strength. But the gap between `func TestX(t *testing.T)` and a well-organized, maintainable test suite is filled entirely by manual boilerplate. `go-test` closes that gap through code generation: you write structs, name them well, and the tool handles the rest. No runtime dependencies. No reflection. No lock-in. Just standard Go tests with lifecycle management, structured organization, and development-time ergonomics that make testing feel effortless.
 
 The north star: **a Go developer should be able to `go install` this tool and immediately write better-organized tests without learning a framework.** The naming conventions are the API. The generated code is the implementation. The output is `go test` output. Nothing is hidden.
 
@@ -34,11 +36,119 @@ Existing `func Test*` tests coexist with suites in the same package. Removing th
 
 ---
 
-## Tier 1 — Complete the Foundation
+## Conceptual Model
 
-*What's needed to call this "production-ready."*
+The project's identity rests on a single insight: **test suites are behavioral specifications.** Every level of the test hierarchy maps to a specification concept:
 
-### 1.1 Assertion API: Complete and Type-Safe
+```
+struct  = Subject     "UserService"
+method  = Capability  "Create"
+When()  = Context     "when email is valid"
+It()    = Behavior    "creates the user"
+Each()  = Variants    "standard format", "missing @", "empty string"
+```
+
+The naming conventions at the struct/method level and the string descriptions at the `It`/`When` level together form a complete behavioral specification. The tool generates the bridge code (lifecycle, parallel coordination, focus/exclude) and can render the full specification in human-readable form.
+
+This framing drives every feature decision: if a feature doesn't help tests **write themselves**, **organize themselves**, or **explain themselves**, it doesn't belong.
+
+---
+
+## CLI Interface
+
+The `ƒƒ` Unicode prefix is kept for generated filenames and internal types (machine-only, collision-resistant), but removed entirely from the CLI interface. The CLI uses standard subcommands and flags — zero special characters:
+
+```
+gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
+```
+
+### Subcommands (operational modes)
+
+| Command | Effect |
+|---------|--------|
+| *(default)* | Generate suites, run `go test`, cleanup |
+| `watch` | Re-run on file changes |
+| `clean` | Remove orphaned generated files |
+| `generate` | Generate suite files without running tests |
+| `scaffold` | Generate test suite skeleton from a Go type |
+| `migrate` | Convert testify/suite tests to go-test suites |
+| `spec` | Run tests and render behavioral specification |
+| `coverage` | Report semantic test coverage |
+| `version` | Print version information |
+| `help` | Show help |
+
+### Flags (options, apply in any mode)
+
+| Flag | Effect |
+|------|--------|
+| `--debug` | Keep generated files after run |
+| `--ci` | Fail if `F_` focus prefixes exist |
+| `--spec` | Append spec summary after normal output |
+| `--update-snapshots` | Regenerate snapshot files |
+| `--format=<fmt>` | Output format for `spec` / `coverage` (terminal, md) |
+| `--output=<path>` | Write formatted output to file |
+| `--min=<pct>` | Minimum semantic coverage threshold for `coverage` |
+
+### Disambiguation
+
+The first positional arg is checked against the known subcommand set. If it matches, it's consumed. Otherwise, it's a package pattern. `gotest ./watch` builds the `watch` package; `gotest watch` enters watch mode. This is the same pattern as the `go` tool itself.
+
+### Examples
+
+```bash
+gotest ./... -v -race                    # run tests (default mode)
+gotest watch ./... -v                    # watch mode with verbose output
+gotest clean ./...                       # remove orphaned generated files
+gotest generate ./...                    # generate only, no test execution
+gotest scaffold ./pkg/user.UserService   # generate suite skeleton
+gotest spec ./...                        # run tests, show behavioral spec
+gotest spec ./... --format=md --output=docs/spec.md
+gotest coverage ./pkg/user --min=90      # semantic coverage check
+gotest ./... --ci -v -race               # CI mode (fail on F_ prefixes)
+gotest ./... --debug                     # keep generated files for inspection
+```
+
+### Migration from `-ƒƒ.*` flags
+
+| Old | New | Notes |
+|-----|-----|-------|
+| `-ƒƒ.clean` | `gotest clean` | Subcommand |
+| `-ƒƒ.internal.debug` | `--debug` | Flag |
+| `-ƒƒ.ci` | `--ci` | Flag |
+| `-ƒƒ.watch` | `gotest watch` | Subcommand |
+| `-ƒƒ.generate` | `gotest generate` | Subcommand |
+| `-ƒƒ.version` | `gotest version` | Subcommand |
+| `-ƒƒ.update-snapshots` | `--update-snapshots` | Flag |
+
+The old `-ƒƒ.*` forms are recognized as deprecated aliases during a transition period, then removed.
+
+---
+
+## Tier 1 — Ship It
+
+*Production-ready core. What's needed before anyone outside the team uses this.*
+
+### 1.1 Focus Guard: `--ci`
+
+**Why:** Without `--ci`, the `F_` prefix is a footgun — a developer forgets to remove it, commits, and CI runs only one suite while reporting "all tests pass." This is a silent, catastrophic failure. With `--ci`, `F_` becomes a **safe, default development workflow:**
+
+1. Prefix with `F_` — instant focused feedback during development
+2. Remove `F_` — full suite confirmation before commit
+3. `--ci` in CI — safety net catches any `F_` that slipped through
+4. **Zero risk, maximum speed**
+
+**What:** A static analysis scan before generation — no test execution needed:
+
+```
+$ gotest --ci ./...
+FAIL: focus prefix detected — remove F_ before merging:
+  pkg/user/user_test.go:12    type F_UserServiceTestSuite
+  pkg/payment/pay_test.go:28  func (s *PaymentTestSuite) F_TestCharge
+```
+
+5 lines of code to implement. Prevents hours of debugging.
+
+### 1.2 Assertion API: Complete and Type-Safe
 
 **Why:** The current fluent API (`t.Assert(v).IsEqualTo(w)`) is expressive but untyped — comparing a `string` to an `int` compiles. The `Contains` string case is a no-op. `ContainsAll`/`ContainsAny` panic. Developers won't trust an assertion library that's half-built.
 
@@ -95,22 +205,22 @@ require.Equal failed:
     }
 ```
 
-Use `go-cmp` or a minimal built-in differ for structured diff output. Pointer addresses and unexported fields are handled gracefully.
+Implementation: `require` functions use `t.Helper()` to report the caller's file:line. The diff renderer handles strings, structs, maps, and slices. Pointer addresses are never shown in diffs.
 
-### 1.2 CLI Distribution
+### 1.3 CLI Distribution
 
 **Why:** `go run github.com/mvrahden/go-test/cmd/testsuite ./...` is 40 characters of incantation. Developers need `gotest ./...`.
 
 **What:**
 
-- **Binary name:** `gotest` (or `go-test` if `gotest` conflicts)
+- **Binary name:** `gotest`
 - **Install:** `go install github.com/mvrahden/go-test/cmd/gotest@latest`
 - **Invocation:** `gotest ./... -v -race -count=1` — identical argument order to `go test`
 - **Shell alias guidance:** `alias got='gotest'` for the truly lazy
-- **Version:** `gotest -ƒƒ.version` prints version, Go version, OS/arch
+- **Version:** `gotest version` prints version, Go version, OS/arch
 - **goreleaser** for cross-platform binaries and GitHub releases
 
-### 1.3 README and Examples
+### 1.4 README and Examples
 
 **Why:** No README = no adoption. The README is the product for open-source tools.
 
@@ -119,7 +229,7 @@ Use `go-cmp` or a minimal built-in differ for structured diff output. Pointer ad
 ```
 # gotest
 
-Structured test suites for Go. Zero runtime dependencies.
+Go tests that write themselves, organize themselves, and explain themselves.
 
 ## Install
   go install github.com/mvrahden/go-test/cmd/gotest@latest
@@ -141,18 +251,279 @@ No walls of text. Code-heavy. A developer should go from "what is this" to "runn
 
 ---
 
-## Tier 2 — Developer Experience
+## Tier 2 — Adopt It
 
-*What makes developers choose this over testify/suite.*
+*Zero-friction onboarding. Meet developers where they are.*
 
-### 2.1 Watch Mode
+### 2.1 Auto-Scaffolding: `gotest scaffold`
+
+**Why:** The #1 adoption barrier is the cold start. A developer stares at a new type and spends 20-40 minutes writing test boilerplate before the first real assertion. The tool already has `packages.Load` with full type information — running the pipeline in reverse (from production code to test skeletons) is the natural dual of what it already does.
+
+**What:**
+
+```
+$ gotest scaffold ./pkg/user.UserService
+
+Generated: pkg/user/user_service_suite_ptest_test.go
+```
+
+```go
+type UserServiceTestSuite struct {
+    sut *UserService
+}
+
+func (s *UserServiceTestSuite) BeforeEach(t *gotest.T) {
+    s.sut = NewUserService( /* TODO: dependencies */ )
+}
+
+func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
+    t.It("succeeds with valid input", func(it *gotest.T) {
+        // TODO: test UserService.Create(ctx context.Context, user *User) error
+    })
+
+    t.It("returns error with invalid input", func(it *gotest.T) {
+        // TODO
+    })
+}
+
+func (s *UserServiceTestSuite) TestGetByID(t *gotest.T) {
+    t.It("returns the user", func(it *gotest.T) {
+        // TODO: test UserService.GetByID(ctx context.Context, id string) (*User, error)
+    })
+
+    t.It("returns error when not found", func(it *gotest.T) {
+        // TODO
+    })
+}
+
+func (s *UserServiceTestSuite) TestUpdate(t *gotest.T) {
+    t.It("updates the user", func(it *gotest.T) {
+        // TODO: test UserService.Update(ctx context.Context, user *User) error
+    })
+}
+
+func (s *UserServiceTestSuite) TestDelete(t *gotest.T) {
+    t.It("deletes the user", func(it *gotest.T) {
+        // TODO: test UserService.Delete(ctx context.Context, id string) error
+    })
+}
+```
+
+**How it works:** The scaffolder uses `packages.Load` to introspect the target type. For each exported method, it generates a `Test*` method with `t.It()` blocks. The method signature is included as a comment. Return types inform the `It` block stubs — methods returning `error` get a happy-path and an error-case stub.
+
+**Interface scaffolding** generates a generic contract suite:
+
+```
+$ gotest scaffold --contract io.ReadCloser
+```
+
+```go
+type ReadCloserContractTestSuite[T io.ReadCloser] struct {
+    factory func() T
+    sut     T
+}
+
+func (s *ReadCloserContractTestSuite[T]) BeforeEach(t *gotest.T) {
+    s.sut = s.factory()
+}
+
+func (s *ReadCloserContractTestSuite[T]) TestRead(t *gotest.T) {
+    t.It("reads bytes into buffer", func(it *gotest.T) {
+        // TODO: test Read(p []byte) (n int, err error)
+    })
+}
+
+func (s *ReadCloserContractTestSuite[T]) TestClose(t *gotest.T) {
+    t.It("releases resources", func(it *gotest.T) {
+        // TODO: test Close() error
+    })
+}
+
+// Instantiate for your implementation:
+// type MyReaderTestSuite = ReadCloserContractTestSuite[*MyReader]
+```
+
+**Why this is transformative:** The 20-40 minute cold start becomes 5 seconds. The naming conventions are learned by example, not documentation. The developer's first interaction with go-test is `scaffold` producing working code — not reading a README.
+
+### 2.2 Migration Path: `gotest migrate`
+
+**Why:** Teams with hundreds of testify/suite tests won't switch if it means rewriting. A migration tool removes this barrier entirely.
+
+**What:**
+
+```
+$ gotest migrate ./...
+
+Migrated 12 suites across 8 packages:
+  pkg/user/user_test.go:   suite.Run(t, new(UserSuite))  → UserTestSuite
+  pkg/order/order_test.go: suite.Run(t, new(OrderSuite)) → OrderTestSuite
+  ...
+```
+
+The migration:
+1. Finds `suite.Run(t, &MySuite{})` / `suite.Run(t, new(MySuite))` patterns
+2. Renames the suite struct to end in `TestSuite` (if it doesn't already)
+3. Renames `SetupSuite` → `BeforeAll`, `TearDownSuite` → `AfterAll`, `SetupTest` → `BeforeEach`, `TearDownTest` → `AfterEach`
+4. Changes `s.T()` → `t.T()` and `s.Require().Equal(a, b)` → `require.Equal(t, a, b)`
+5. Removes the `func Test*(t *testing.T) { suite.Run(...) }` boilerplate
+6. Removes the `testify/suite` import
+
+This is a one-time AST transformation. It handles the 90% case and leaves `// TODO: manual review` comments for edge cases.
+
+### 2.3 BDD Vocabulary: `t.When()`
+
+**Why:** `t.It()` already exists for specifying behaviors. But test cases need context grouping — "when the user is authenticated", "when the database is empty." Nesting `It` inside `It` reads poorly (`it.It(...)`). A `When` primitive provides semantic clarity and makes the spec output readable.
+
+**What:**
+
+```go
+func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
+    t.When("email is valid", func(w *gotest.T) {
+        w.It("creates the user", func(it *gotest.T) {
+            err := s.svc.Create(ctx, validUser)
+            require.NoError(it, err)
+        })
+        w.It("sends a welcome email", func(it *gotest.T) {
+            require.Eventually(it, 2*time.Second, 50*time.Millisecond, func(poll *gotest.T) {
+                require.True(poll, s.mailer.HasMessage(validUser.Email))
+            })
+        })
+    })
+
+    t.When("email already exists", func(w *gotest.T) {
+        w.It("returns ErrDuplicate", func(it *gotest.T) {
+            s.svc.Create(ctx, validUser)
+            err := s.svc.Create(ctx, validUser)
+            require.ErrorIs(it, err, ErrDuplicate)
+        })
+    })
+}
+```
+
+**Implementation:** One method on `gotest.T`:
+
+```go
+func (t *T) When(description string, fn func(w *T)) {
+    t.t.Run(description, func(tt *testing.T) {
+        fn(NewT(tt))
+    })
+}
+```
+
+Identical to `t.It()` under the hood — both map to `t.T().Run()`. The distinction is purely semantic: `When` provides context (grouping node), `It` specifies an expectation (leaf node). The spec renderer uses this to produce structured output.
+
+---
+
+## Tier 3 — Love It
+
+*Daily workflow features. What makes developers choose this over everything else.*
+
+### 3.1 Behavior Specification: `gotest spec`
+
+**Why:** Test suites ARE behavioral specifications — but only if you can read them as such. Raw `go test -v` output is optimized for machines. The spec view presents the same information as a readable, structured behavioral document.
+
+**What:**
+
+```
+$ gotest spec ./pkg/user -v
+
+UserService
+  Create
+    when email is valid
+      ✓ creates the user (8ms)
+      ✓ sends a welcome email (120ms)
+    when email already exists
+      ✓ returns ErrDuplicate (<1ms)
+  GetByID
+    ✓ returns the user (3ms)
+    ✗ returns error when not found (2ms)
+        require.ErrorIs failed:
+          expected: ErrNotFound
+          actual:   <nil>
+          location: user_service_test.go:72
+  Delete
+    ✓ soft-deletes the user (5ms)
+    ~ hard-deletes after 30 days — SKIPPED
+
+F_PaymentService — FOCUSED
+  Charge
+    ✓ processes valid amount (45ms)
+
+3 suites, 8 behaviors: 6 passed, 1 failed, 1 skipped
+```
+
+**How it works:**
+
+1. Run `go test -json ./...` internally
+2. Parse the JSON event stream — every `t.Run` (including `t.It` and `t.When`) produces events with `/`-separated paths
+3. Reconstruct the hierarchy: first segment = suite (`TestUserServiceTestSuite`), second = method (`TestCreate`), rest = `When`/`It` blocks
+4. Strip Go naming conventions: `TestUserServiceTestSuite` → `UserService`, `TestCreate` → `Create`
+5. Render as a behavioral specification tree
+
+**The full test hierarchy:**
+
+```
+Package
+  Suite (struct name, strip "TestSuite" suffix)
+    Test Case (method name, strip "Test" prefix)
+      When block (description string — context)
+        It block (description string — expectation)
+          Each entries (Desc field or index — variants)
+```
+
+**Output formats:**
+
+```bash
+# Terminal: color-coded tree (default for spec subcommand)
+gotest spec ./...
+
+# Markdown: living specification document
+gotest spec ./... --format=md --output=docs/behavior-spec.md
+
+# Append spec summary after normal go test output
+gotest ./... -v --spec
+```
+
+**Markdown output:**
+
+```markdown
+# Behavior Specification
+
+Generated from test suites on 2026-04-25. 47 behaviors: 45 passed, 1 failed, 1 skipped.
+
+## UserService
+
+### Create
+
+| Behavior | Status | Duration |
+|----------|--------|----------|
+| **when email is valid** | | |
+| creates the user | PASS | 8ms |
+| sends a welcome email | PASS | 120ms |
+| **when email already exists** | | |
+| returns ErrDuplicate | PASS | <1ms |
+
+### Delete
+
+| Behavior | Status | Duration |
+|----------|--------|----------|
+| soft-deletes the user | PASS | 5ms |
+| hard-deletes after 30 days | SKIP | — |
+```
+
+PRs can include a spec diff: "this PR adds 3 new behaviors to UserService and removes 1 from OrderService." Code reviewers see behavioral intent, not just line changes.
+
+**Why this is NOT a "custom test reporter" (non-goal):** The spec view does not replace `go test` output. It post-processes `go test -json` — the same data that `gotestfmt` and `tparse` consume. The unique value is the structural mapping from suite hierarchy to behavioral specification, which only this tool can provide because it understands the suite→method→It/When model.
+
+### 3.2 Watch Mode
 
 **Why:** The tightest feedback loop wins. A developer iterating on a feature wants to save a file and see test results instantly, without switching windows to run a command.
 
 **What:**
 
-```
-gotest -ƒƒ.watch ./...
+```bash
+gotest watch ./... -v
+gotest watch ./... --spec     # watch + spec view
 ```
 
 Behavior:
@@ -164,17 +535,17 @@ Behavior:
 
 **Package-scoped re-runs:** When `pkg/foo/bar.go` changes, re-run `./pkg/foo/...` not the entire pattern. Use Go's package graph to determine the minimal affected set.
 
-**Focus integration:** During watch mode, `F_`-prefixed suites create an extremely tight loop — only the focused tests re-run on every save. The workflow:
+**Focus integration:** During watch mode, `F_`-prefixed suites create an extremely tight loop — only the focused tests re-run on every save:
 
-1. `gotest -ƒƒ.watch ./...` in a terminal
+1. `gotest watch ./...` in a terminal
 2. Prefix the suite you're working on with `F_`
 3. Save → only that suite runs → instant feedback
 4. Remove the `F_` prefix → all suites run → confirm nothing broke
-5. Commit
+5. Commit (with `--ci` in CI to catch any remaining `F_` prefix)
 
 **Debouncing:** Multiple rapid file saves (e.g., editor auto-save, `goimports`) trigger a single re-run after 200ms of quiet.
 
-### 2.2 Data-Driven Testing: `t.Each()`
+### 3.3 Data-Driven Testing: `t.Each()`
 
 **Why:** Table-driven tests are Go's most common pattern but require verbose boilerplate: define a struct, build a slice, range over it, call `t.Run`. `t.Each` reduces this to two lines.
 
@@ -182,49 +553,70 @@ Behavior:
 
 ```go
 func (s *Suite) TestValidation(t *gotest.T) {
-    t.Each([]struct {
-        Input    string
-        Expected bool
-    }{
-        {"valid@email.com", true},
-        {"not-an-email", false},
-        {"", false},
-    }, func(it *gotest.T, tc struct{ Input string; Expected bool }) {
-        result := s.validator.IsValid(tc.Input)
-        require.Equal(it, result, tc.Expected)
+    t.It("validates email format", func(it *gotest.T) {
+        it.Each([]struct {
+            Desc  string
+            Email string
+            Valid bool
+        }{
+            {"accepts standard format", "user@example.com", true},
+            {"rejects missing @", "userexample.com", false},
+            {"rejects empty string", "", false},
+        }, func(tt *gotest.T, tc struct{ Desc, Email string; Valid bool }) {
+            require.Equal(tt, s.validator.IsValid(tc.Email), tc.Valid)
+        })
     })
 }
 ```
 
-Each table entry becomes a `t.Run` subtest named by index (or by a `Name` field if present in the struct). This is a runtime feature on `gotest.T` — no code generation changes needed.
+Each table entry becomes a `t.Run` subtest. If the table struct has a `Desc` or `Name` field, it's used as the subtest name. Otherwise, entries are indexed.
 
-**Named entries:** If the table struct has a `Name string` or `Desc string` field, use it as the subtest name:
+**Spec output:**
+
+```
+UserService
+  Validation
+    validates email format
+      ✓ accepts standard format
+      ✗ rejects missing @
+      ✓ rejects empty string
+```
+
+This is a runtime feature on `gotest.T` — no code generation changes needed.
+
+### 3.4 Async Assertions: `t.Eventually()` / `t.Consistently()`
+
+**Why:** The `time.Sleep` anti-pattern is the #1 source of flaky integration tests. Every team writes their own polling helper. This should be a primitive.
+
+**What:**
 
 ```go
-t.Each([]struct {
-    Desc     string
-    Input    int
-    Expected int
-}{
-    {"zero", 0, 0},
-    {"positive", 5, 25},
-    {"negative", -3, 9},
-}, func(it *gotest.T, tc struct{ Desc string; Input, Expected int }) {
-    require.Equal(it, s.square(tc.Input), tc.Expected)
+func (s *Suite) TestAsyncProcessing(t *gotest.T) {
+    s.svc.TriggerAsync()
+
+    t.Eventually(5*time.Second, 100*time.Millisecond, func(poll *gotest.T) {
+        result, err := s.store.Get("key")
+        require.NoError(poll, err)
+        require.Equal(poll, result.Status, "completed")
+    })
+}
+```
+
+`Eventually` retries the function until it passes or the timeout expires. Failures during polling are suppressed; only the final failure is reported with the full assertion context.
+
+`Consistently` is the dual — asserts the function passes for the entire duration (detects flicker):
+
+```go
+t.Consistently(2*time.Second, 100*time.Millisecond, func(poll *gotest.T) {
+    require.Equal(poll, s.counter.Value(), 0) // must stay zero
 })
 ```
 
-Produces:
+Both are runtime features on `gotest.T`. No code generation changes.
 
-```
-=== RUN   TestMathTestSuite/TestSquare/zero
-=== RUN   TestMathTestSuite/TestSquare/positive
-=== RUN   TestMathTestSuite/TestSquare/negative
-```
+### 3.5 Snapshot Testing: `t.MatchSnapshot()`
 
-### 2.3 Snapshot Testing: `t.MatchSnapshot()`
-
-**Why:** Golden-file testing is powerful but manual. Developers copy-paste expected output, and it drifts. Snapshot testing auto-manages expectations: the first run creates the snapshot, subsequent runs compare against it, and a flag updates them.
+**Why:** Golden-file testing is powerful but manual. Developers copy-paste expected output, and it drifts. Snapshot testing auto-manages expectations.
 
 **What:**
 
@@ -236,53 +628,119 @@ func (s *Suite) TestJSONOutput(t *gotest.T) {
 ```
 
 Behavior:
-- Snapshots stored in `testdata/__snapshots__/<TestName>.snap` (per-suite directory)
+- Snapshots stored in `testdata/__snapshots__/<TestName>.snap`
 - First run with no snapshot: create it, pass the test, print "created snapshot"
 - Subsequent runs: compare against snapshot, fail with diff on mismatch
-- Update: `gotest -ƒƒ.update-snapshots ./...` regenerates all snapshots
-- Format: snapshots are plain text (strings) or formatted Go values (structs, maps)
+- Update: `gotest ./... --update-snapshots` regenerates all snapshots
 
 **Multi-snapshot per test:**
 
 ```go
-func (s *Suite) TestMultiFormat(t *gotest.T) {
-    t.MatchSnapshot(s.sut.ToJSON(), "json")
-    t.MatchSnapshot(s.sut.ToYAML(), "yaml")
-}
+t.MatchSnapshot(s.sut.ToJSON(), "json")
+t.MatchSnapshot(s.sut.ToYAML(), "yaml")
 ```
-
-Each call gets a unique snapshot file keyed by the optional name parameter.
-
-### 2.4 Improved Error Context
-
-**Why:** When a test fails deep in a suite lifecycle, the developer needs to know which suite, which test case, and which assertion failed — without reading a stack trace.
-
-**What:**
-
-Assertion failures include full context:
-
-```
---- FAIL: TestUserServiceTestSuite/TestCreateUser (0.003s)
-    require.Equal failed:
-      location:  user_service_test.go:47
-      expected:  "active"
-      actual:    "pending"
-      diff:      -"active" +"pending"
-```
-
-Implementation: `require` functions use `t.Helper()` to report the caller's file:line. The diff renderer handles strings, structs, maps, and slices. Pointer addresses are never shown in diffs.
 
 ---
 
-## Tier 3 — Advanced Patterns
+## Tier 4 — Depend On It
 
-*What makes this the definitive Go testing tool.*
+*Organizational value. Why teams standardize on this tool.*
 
-### 3.1 Nested Suites via Embedding
+### 4.1 Semantic Test Coverage: `gotest coverage`
 
-**Why:** Real-world test organization is hierarchical. Testing a `UserService` involves "create," "update," "delete" — each with their own setup. Flat suites force either one mega-struct or scattered independent suites with duplicated setup.
+**Why:** Line coverage answers "which code ran?" Semantic coverage answers "which behaviors are verified?" The tool knows the public API surface of every type (via `packages.Load`) and which methods have corresponding test cases (via suite analysis). The gap between these two sets is the semantic coverage gap.
 
-**What:** A suite that embeds another suite inherits its lifecycle hooks:
+**What:**
+
+```
+$ gotest coverage ./pkg/user
+
+UserService: 4/5 methods covered (80%)
+  ✓ Create         — TestCreate (3 behaviors)
+  ✓ GetByID        — TestGetByID (2 behaviors)
+  ✓ Update         — TestUpdate (1 behavior)
+  ✗ Delete         — no test case
+  ✓ ListByOrg      — TestListByOrg (2 behaviors)
+
+User: 2/3 exported methods covered (67%)
+  ✓ Validate       — TestValidate (5 behaviors via Each)
+  ✓ FullName       — TestFullName (1 behavior)
+  ✗ MarshalJSON    — no test case
+
+Overall: 6/8 methods covered (75%)
+```
+
+**This doesn't require running tests.** It's a static analysis step that compares the production API surface against the suite test method inventory. It can run in CI as a quality gate:
+
+```bash
+$ gotest coverage ./... --min=90
+FAIL: pkg/user has 75% semantic coverage (minimum 90%)
+  missing: UserService.Delete, User.MarshalJSON
+```
+
+**Behavior count:** When tests are actually run (`gotest coverage ./... -v`), the tool also counts `t.It()` blocks per method, giving a deeper view of behavioral coverage.
+
+### 4.2 CI Integration
+
+**Why:** The tool must work in CI without special configuration.
+
+**What:**
+
+- **GitHub Actions action:** `uses: mvrahden/setup-gotest@v1` installs the binary and caches it
+- **Exit codes:** Match `go test` exit codes exactly (0 = pass, 1 = test failure, 2 = build error)
+- **`--ci` flag:** Fails on `F_` prefixes (see Tier 1)
+- **Spec report in CI:** `gotest spec ./... --format=md --output=spec.md` produces an artifact
+
+```yaml
+# .github/workflows/test.yml
+- uses: mvrahden/setup-gotest@v1
+- run: gotest --ci ./... -v -race
+- run: gotest coverage ./... --min=80
+- run: gotest spec ./... --format=md --output=behavior-spec.md
+- uses: actions/upload-artifact@v4
+  with:
+    name: behavior-spec
+    path: behavior-spec.md
+```
+
+### 4.3 Go Generate Integration
+
+**Why:** Some teams prefer `go generate` workflows over custom CLI wrappers.
+
+**What:**
+
+```go
+//go:generate gotest generate ./...
+```
+
+The `generate` subcommand runs only the generation step (no test execution, no cleanup). The developer then runs `go test` normally. Useful for:
+- Teams that want generated files checked in (inspectable, diffable)
+- Pre-commit hooks that validate generated files are up-to-date
+- Build systems that separate generation from execution
+
+### 4.4 Linter: `gotest-lint`
+
+**Why:** Naming conventions are the API, but naming mistakes are silent. A method named `BeforAll` (typo) is just a regular method — the generator ignores it, and the developer's setup code never runs.
+
+**What:**
+
+A static analysis tool (standalone or `golangci-lint` plugin) that warns about:
+
+- **Likely typos:** `BeforAll`, `AfterEeach`, `Testfoo` — methods on suite structs that are close to but don't match known patterns
+- **Wrong receiver type:** Value receivers on suite methods
+- **Missing lifecycle hook:** A suite with `BeforeAll` but no `AfterAll` — may leak resources (warning, not error)
+- **Focused tests committed:** `F_` prefix in non-test-infrastructure code (overlaps with `--ci` but runs without the CLI)
+- **Orphaned generated files:** `ƒƒ_*` files checked into version control
+
+---
+
+## Advanced Patterns
+
+*Capabilities that emerge from the core model.*
+
+### Nested Suites via Embedding
+
+A suite that embeds another suite inherits its lifecycle hooks:
 
 ```go
 type UserServiceTestSuite struct {
@@ -299,7 +757,6 @@ func (s *UserServiceTestSuite) AfterAll(t *gotest.T) {
     s.db.Close()
 }
 
-// Nested suite — inherits db and svc from parent
 type UserCreateTestSuite struct {
     UserServiceTestSuite
     user *User
@@ -310,14 +767,10 @@ func (s *UserCreateTestSuite) BeforeEach(t *gotest.T) {
 }
 
 func (s *UserCreateTestSuite) TestCreatesUser(t *gotest.T) {
-    err := s.svc.Create(s.user)
-    require.NoError(t, err)
-}
-
-func (s *UserCreateTestSuite) TestRejectsDuplicate(t *gotest.T) {
-    s.svc.Create(s.user)
-    err := s.svc.Create(s.user)
-    require.ErrorIs(t, err, ErrDuplicate)
+    t.It("persists the user", func(it *gotest.T) {
+        err := s.svc.Create(s.user)
+        require.NoError(it, err)
+    })
 }
 ```
 
@@ -335,20 +788,24 @@ UserServiceTestSuite.BeforeAll (parent)
 UserServiceTestSuite.AfterAll (parent)
 ```
 
-**Detection:** The generator inspects struct fields. If a field's type is another recognized test suite, it's a parent-child relationship. The child suite's generated `Test*` function chains the parent's lifecycle hooks.
+**Spec output:**
 
-**Naming:** The generated test function is `TestUserCreateTestSuite`. The parent suite does NOT generate its own `Test*` function unless it has its own test case methods (methods not inherited by children).
+```
+UserService
+  Create
+    ✓ persists the user (12ms)
+    ✓ rejects duplicate (3ms)
+  Update
+    ...
+```
 
-**Constraint:** Only single-level embedding is supported initially. Multi-level embedding (grandparent → parent → child) is a natural extension but not required for v1.
+The spec renderer understands the parent-child relationship and nests the child suite under the parent's name when the child's name extends the parent's name.
 
-### 3.2 Contract Testing via Generic Suites
+### Contract Testing via Generic Suites
 
-**Why:** Go interfaces define contracts. Testing those contracts against every implementation is tedious — the same tests are copy-pasted with different concrete types. Generic suites + type aliases solve this.
-
-**What:**
+Generic type definitions + instantiated aliases = reusable behavioral specifications:
 
 ```go
-// Define the contract test suite once
 type StorageTestSuite[T Storage] struct {
     factory func() T
     store   T
@@ -359,173 +816,63 @@ func (s *StorageTestSuite[T]) BeforeEach(t *gotest.T) {
 }
 
 func (s *StorageTestSuite[T]) TestPutAndGet(t *gotest.T) {
-    s.store.Put("key", "value")
-    result, err := s.store.Get("key")
-    require.NoError(t, err)
-    require.Equal(t, result, "value")
+    t.When("key exists", func(w *gotest.T) {
+        w.It("returns the value", func(it *gotest.T) {
+            s.store.Put("key", "value")
+            result, err := s.store.Get("key")
+            require.NoError(it, err)
+            require.Equal(it, result, "value")
+        })
+    })
+
+    t.When("key does not exist", func(w *gotest.T) {
+        w.It("returns ErrNotFound", func(it *gotest.T) {
+            _, err := s.store.Get("nonexistent")
+            require.ErrorIs(it, err, ErrNotFound)
+        })
+    })
 }
 
-func (s *StorageTestSuite[T]) TestGetMissing(t *gotest.T) {
-    _, err := s.store.Get("nonexistent")
-    require.ErrorIs(t, err, ErrNotFound)
-}
-
-func (s *StorageTestSuite[T]) TestDelete(t *gotest.T) {
-    s.store.Put("key", "value")
-    s.store.Delete("key")
-    _, err := s.store.Get("key")
-    require.ErrorIs(t, err, ErrNotFound)
-}
-
-// Instantiate for each implementation — each gets the full test battery
 type MemoryStorageTestSuite = StorageTestSuite[*MemoryStorage]
 type RedisStorageTestSuite = StorageTestSuite[*RedisStorage]
-type SQLStorageTestSuite = StorageTestSuite[*SQLStorage]
 ```
 
-This pattern is already supported by the current generic suite implementation. The superspec contribution is recognizing this as a first-class use case and providing:
+**Spec output:**
 
-- **Factory initialization:** A convention for setting the `factory` field. Options:
-  - Constructor function: `func NewMemoryStorageTestSuite() *MemoryStorageTestSuite`
-  - BeforeAll hook on the alias (not possible with Go aliases)
-  - Embedding with a constructor struct
+```
+MemoryStorage (conformance: Storage)
+  PutAndGet
+    when key exists
+      ✓ returns the value
+    when key does not exist
+      ✓ returns ErrNotFound
 
-- **Documentation and examples:** The `examples/contract_suite/` package demonstrates the pattern with a minimal `Storage` interface and two implementations.
-
-### 3.3 Suite-Scoped Context and Shared Resources
-
-**Why:** Database connections, HTTP servers, Docker containers are expensive. Suites need to share resources across tests without recreating them per test case. The current `BeforeAll`/`AfterAll` handles this, but the pattern should be explicit and safe.
-
-**What:**
-
-A convention for suite-scoped resources:
-
-```go
-type IntegrationTestSuite struct {
-    db     *sql.DB
-    server *httptest.Server
-}
-
-func (s *IntegrationTestSuite) BeforeAll(t *gotest.T) {
-    var err error
-    s.db, err = sql.Open("postgres", os.Getenv("TEST_DATABASE_URL"))
-    require.NoError(t, err)
-
-    handler := NewHandler(s.db)
-    s.server = httptest.NewServer(handler)
-}
-
-func (s *IntegrationTestSuite) AfterAll(t *gotest.T) {
-    s.server.Close()
-    s.db.Close()
-}
+RedisStorage (conformance: Storage)
+  PutAndGet
+    when key exists
+      ✓ returns the value
+    when key does not exist
+      ✓ returns ErrNotFound
 ```
 
-The generated code guarantees `AfterAll` runs via `t.Cleanup` even if `BeforeAll` panics partway through (cleanup for the already-initialized resources). This is already the behavior — the superspec contribution is documenting the resource lifecycle guarantees:
+Each alias produces an independent conformance report. A failing test in one implementation doesn't affect others.
+
+### Resource Lifecycle Guarantees
+
+The generated code provides iron-clad guarantees:
 
 1. `AfterAll` is registered via `t.Cleanup` BEFORE `BeforeAll` runs
 2. `t.Cleanup` runs in LIFO order, so user-registered cleanups in `BeforeAll` run before `AfterAll`
 3. `AfterEach` is `defer`-ed, so it runs even on `t.Fatal()` / `runtime.Goexit()`
 4. In parallel suites, `wg.Wait()` completes before `AfterAll` — all tests finish before shared resources are torn down
-
-### 3.4 Setup Validation
-
-**Why:** A suite with `BeforeAll` that fails silently (returns without error, but the resource is nil) causes cryptic nil-pointer panics in every test case. The developer debugs 20 test failures when the root cause is one setup failure.
-
-**What:**
-
-If `BeforeAll` calls `t.Fatal()` or `t.Skip()`, the generated code skips all test cases in the suite. This is already the behavior (since `t.Fatal` in a parent test prevents subtests from running). The superspec makes it explicit and adds guidance:
-
-- Document that `t.Fatal()` in `BeforeAll` skips the entire suite (standard Go behavior via `runtime.Goexit()`)
-- Document that `t.Skip()` in `BeforeAll` marks the suite as skipped
-- Recommend `require.NoError(t, err)` in `BeforeAll` for setup validation
-
----
-
-## Tier 4 — Ecosystem
-
-*What makes this indispensable in the Go community.*
-
-### 4.1 CI Integration
-
-**Why:** The tool must work in CI without special configuration. `go install` + `gotest ./...` should be the entire CI test step.
-
-**What:**
-
-- **GitHub Actions action:** `uses: mvrahden/setup-gotest@v1` installs the binary and caches it
-- **Exit codes:** Match `go test` exit codes exactly (0 = pass, 1 = test failure, 2 = build error)
-- **`-ƒƒ.ci` flag:** Fails if any `F_`-prefixed suites or test cases exist — prevents focused tests from being committed. This is the CI safety net for the focus workflow.
-
-```yaml
-# .github/workflows/test.yml
-- uses: mvrahden/setup-gotest@v1
-- run: gotest -ƒƒ.ci ./... -v -race
-```
-
-The `-ƒƒ.ci` check is a static analysis step that runs before generation. It scans for `F_` prefixes in suite names and method names and fails immediately with a clear message:
-
-```
-FAIL: focus prefix detected — remove F_ before committing:
-  pkg/user/user_test.go:12  type F_UserTestSuite
-  pkg/user/user_test.go:28  func F_TestCreate
-```
-
-### 4.2 IDE Experience
-
-**Why:** Developers live in their editor. If the IDE can't run a single suite method with one click, adoption suffers.
-
-**What:**
-
-The generated `func Test*(t *testing.T)` functions are already discovered by every Go IDE. The subtest names match method names exactly, so `-run TestMyTestSuite/TestCreate` works from the IDE's test runner.
-
-Additional opportunities:
-- **VS Code snippet:** `gotest-suite` scaffold that expands to a complete suite struct
-- **LSP-aware naming:** Suite method names follow patterns that `gopls` auto-completes (all exported, all start with known prefixes)
-- **Stale file detection:** If a generated `ƒƒ_*` file exists in the working tree (left by `-ƒƒ.internal.debug` or a crash), the tool prints a warning at startup rather than silently using stale code
-
-### 4.3 Go Generate Integration
-
-**Why:** Some teams prefer `go generate` workflows over custom CLI wrappers. The tool should support both.
-
-**What:**
-
-```go
-//go:generate gotest -ƒƒ.generate ./...
-```
-
-The `-ƒƒ.generate` flag runs only the generation step (no test execution, no cleanup). The developer then runs `go test` normally. This is useful for:
-- Teams that want generated files checked in (inspectable, diffable)
-- Pre-commit hooks that validate generated files are up-to-date
-- Build systems that separate generation from execution
-
-The `-ƒƒ.generate` and `-ƒƒ.clean` flags are complementary:
-- `gotest -ƒƒ.generate ./...` — generate files, leave them
-- `go test ./...` — run tests (generated files are present)
-- `gotest -ƒƒ.clean ./...` — remove generated files
-
-### 4.4 Linter: `gotest-lint`
-
-**Why:** Naming conventions are the API, but naming mistakes are silent. A method named `BeforAll` (typo) is just a regular method — the generator ignores it, and the developer's setup code never runs.
-
-**What:**
-
-A static analysis tool (standalone or `golangci-lint` plugin) that warns about:
-
-- **Likely typos:** `BeforAll`, `AfterEeach`, `Testfoo` — methods on suite structs that are close to but don't match known patterns
-- **Wrong receiver type:** Value receivers on suite methods (already caught by generator, but the linter catches it before running)
-- **Missing lifecycle hook:** A suite with `BeforeAll` but no `AfterAll` — may leak resources (warning, not error)
-- **Focused tests committed:** `F_` prefix in non-test-infrastructure code
-- **Orphaned generated files:** `ƒƒ_*` files checked into version control
+5. `t.Fatal()` in `BeforeAll` skips the entire suite (standard Go behavior)
+6. `t.Skip()` in `BeforeAll` marks the suite as skipped
 
 ---
 
 ## Non-Goals
 
 These are features we deliberately will not build. Each has a reason.
-
-### Custom test reporters
-
-`go test -json` produces machine-readable output. Tools like `gotestfmt`, `tparse`, and IDE integrations consume it. Building a custom reporter means either replacing `go test` output (breaks principle 1) or post-processing it (already solved by the ecosystem). We pass through and stay invisible.
 
 ### Test dependency ordering
 
@@ -547,6 +894,10 @@ Go doesn't have decorators or annotations. Struct tags could work (`gotest:"para
 
 A suite in package `bar` embedding a suite from package `foo` would inherit `foo`'s lifecycle hooks. This breaks Go's package isolation model, creates import cycles, and makes test behavior depend on transitive dependencies. Suite inheritance works within a package (including test packages). Cross-package sharing should use helper functions, not suite embedding.
 
+### Replacing `go test` output
+
+The `spec` subcommand and `--spec` flag are post-processing views over `go test -json` data. They add a layer on top; they never suppress or replace the underlying `go test` output. When `gotest ./... -v` runs in default mode, the output is byte-identical to what `go test ./... -v` would produce.
+
 ---
 
 ## Architecture Evolution
@@ -555,40 +906,47 @@ A suite in package `bar` embedding a suite from package `foo` would inherit `foo
 
 ```
 cmd/gotest → gotestrunner → gotestgen → gotestast
-                                        └── templates
+                                         └── templates
 pkg/gotest (T, Assert, It)
 ```
 
 Single pipeline: load → collect → reduce → render. Templates are Go `text/template`. Package loading via `golang.org/x/tools/go/packages`.
 
-### Phase 2: Watch Mode + Linter
+### Phase 2: Scaffold + Spec + CLI Redesign
 
 ```
-cmd/gotest → gotestrunner → gotestgen → gotestast
-    │                                    └── templates
-    ├── watcher (fsnotify)
-    └── linter (go/analysis)
+cmd/gotest
+  ├── run (default)   → gotestrunner → gotestgen → gotestast
+  ├── scaffold        → gotestast (reverse: type → suite skeleton)
+  ├── spec            → go test -json → spec renderer
+  ├── coverage        → gotestast + packages.Load (static comparison)
+  ├── clean           → filesystem scan
+  ├── generate        → gotestgen (no test execution)
+  └── migrate         → AST transform (testify → go-test)
 
-pkg/gotest (T, Assert, It, Each, MatchSnapshot)
+pkg/gotest (T, Assert, It, When, Each, Eventually, MatchSnapshot)
 ```
 
-The watcher wraps the existing pipeline in a file-change loop. The linter is a standalone `go/analysis` analyzer that can run independently or as a `golangci-lint` plugin.
+The `scaffold` subcommand reuses the same `packages.Load` infrastructure as the generator but produces skeleton test files instead of harness files. The `spec` subcommand wraps `go test -json` and maps results back to the suite→method→It/When hierarchy. The `coverage` subcommand compares production API surfaces against suite inventories.
 
-`pkg/gotest` grows with `Each()` and `MatchSnapshot()` — these are runtime features that don't affect code generation.
+`pkg/gotest` grows with `When()`, `Each()`, `Eventually()`, `Consistently()`, and `MatchSnapshot()` — all runtime features that don't affect code generation.
 
-### Phase 3: Nested Suites
+### Phase 3: Watch Mode + Linter + Nested Suites
 
 ```
+cmd/gotest
+  └── watch → fsnotify → re-run pipeline on change
+
+cmd/gotest-lint → go/analysis analyzers
+
 gotestast: DetermineTestSuite learns embedding detection
 gotestgen: renderer chains parent/child lifecycle hooks
 templates: nested lifecycle template variant
 ```
 
-The AST analysis phase detects struct fields whose types are other recognized suites. The renderer produces chained lifecycle calls. The template gains a `{{ if $ts.ParentSuite }}` branch.
-
 ### Key Architectural Invariant
 
-The pipeline is always: **static analysis → code generation → standard `go test`**. No runtime component grows beyond the thin `gotest.T` wrapper. If a feature can't be implemented as either (a) generated code or (b) a method on `gotest.T`, it doesn't belong in this project.
+The pipeline is always: **static analysis → code generation → standard `go test`**. No runtime component grows beyond the thin `gotest.T` wrapper. If a feature can't be implemented as either (a) generated code, (b) a method on `gotest.T`, or (c) post-processing of `go test -json`, it doesn't belong in this project.
 
 ---
 
@@ -596,9 +954,10 @@ The pipeline is always: **static analysis → code generation → standard `go t
 
 How we know the project is achieving its vision:
 
-1. **Adoption:** A developer can go from `go install` to running their first suite in under 2 minutes with no documentation beyond the README
+1. **Adoption:** A developer can go from `go install` to running their first suite in under 2 minutes — `gotest scaffold` makes this possible without reading docs
 2. **Transparency:** Running `go test` directly on a package with generated files produces identical output to running via `gotest` — the tool is truly a wrapper, not a replacement
 3. **Trust:** The generated code is readable enough that developers can debug test failures by reading it — it should look like code they would write, not compiler output
-4. **Performance:** The generation + cleanup overhead is under 500ms for a 100-package project — the tool should feel instant
-5. **Safety:** There is no scenario where generated files are orphaned without a warning on next run — the cleanup guarantees are iron-clad
-6. **Compatibility:** Every `go test` flag works identically through `gotest` — `-race`, `-cover`, `-count`, `-run`, `-json`, `-short`, `-timeout`, `-cpu`, `-parallel`, `-bench`, `-v` — all of them, without the tool knowing about them
+4. **Specification:** `gotest spec ./...` produces a behavioral document that a non-developer (PM, QA) can read and understand what the system does
+5. **Performance:** The generation + cleanup overhead is under 500ms for a 100-package project — the tool should feel instant
+6. **Safety:** There is no scenario where generated files are orphaned without a warning on next run — the cleanup guarantees are iron-clad
+7. **Compatibility:** Every `go test` flag works identically through `gotest` — `-race`, `-cover`, `-count`, `-run`, `-json`, `-short`, `-timeout`, `-cpu`, `-parallel`, `-bench`, `-v` — all of them, without the tool knowing about them
