@@ -234,26 +234,34 @@ gotest.TimeIsNow(t, ts time.Time, tolerance time.Duration, msgAndArgs ...any)
 // Panic
 gotest.Panics(t, f func(), msgAndArgs ...any) any
 
-// Async
+// Async — simple boolean polling (see Tier 3 for rich assertion polling via t.Eventually)
 gotest.Eventually(t, condition func() bool, waitFor, tick time.Duration, msgAndArgs ...any)
+gotest.Consistently(t, condition func() bool, waitFor, tick time.Duration, msgAndArgs ...any)
 
-// Unwrap — works with multi-return: gotest.Must(fn()) where fn returns (T, error) or (T, bool)
+// Unwrap — panics on failure (no t parameter, so Go's multi-return expansion works)
 gotest.Must[T any](val T, ok any) T
 ```
 
 All functions accept any type implementing `testingT` (`Helper()` + `Errorf()` + `FailNow()`) — this includes both `*gotest.T` and `*testing.T`, so the assertions work in suites and in standalone `func Test*` functions alike.
 
+**Design notes:**
+
+- **`Eventually` vs `Consistently`:** `Eventually` polls until the condition returns `true` or the timeout expires. `Consistently` asserts the condition stays `true` for the entire duration — it fails on the first `false`. These are the simple boolean forms; for rich assertion blocks with detailed failure messages on timeout, use `t.Eventually` / `t.Consistently` (Tier 3 — methods on `*gotest.T` that accept `func(poll *gotest.T)` instead of `func() bool`).
+- **`Must` panics** instead of calling `t.FailNow()` because it takes no `t` parameter — this is what enables `gotest.Must(fn())` with Go's multi-return expansion. The test runner catches the panic and reports it as a test failure with a full stack trace. Don't use `Must` when you need a custom failure message — use `gotest.NoError` or `gotest.True` instead.
+
 **Fluent API** — discoverable via autocomplete, delegates to the functional layer:
 
 ```go
-t.Assert(result).Equal(expected)
-t.Assert(items).HasLength(3)
-t.Assert(err).IsZero()
-t.Assert(ok).IsTrue()
-t.Assert(output).Contains("expected")
+t.Assert(result).Equal(expected)       // same as gotest.Equal(t, expected, result)
+t.Assert(items).HasLength(3)           // same as gotest.Len(t, items, 3)
+t.Assert(items).Contains("needle")     // same as gotest.Contains(t, items, "needle")
+t.Assert(err).IsZero()                 // same as gotest.Zero(t, err)
+t.Assert(ok).IsTrue()                  // same as gotest.True(t, ok)
+t.Assert(err).NoError()                // same as gotest.NoError(t, err)
+t.Assert(count).IsNotZero()            // same as gotest.NotZero(t, count)
 ```
 
-The fluent API accepts `any`, trading compile-time type safety for discoverability. It complements the functional API — use fluent for quick exploration, functional for production test suites.
+The fluent API accepts `any`, trading compile-time type safety for discoverability — `gotest.Equal(t, 42, "hello")` is a compile error, but `t.Assert(42).Equal("hello")` compiles and fails at runtime. Use fluent for quick exploration and autocomplete-driven discovery; use functional for production test suites where type safety matters.
 
 **Diff output for equality failures:**
 
@@ -671,7 +679,16 @@ This is a runtime feature on `gotest.T` — no code generation changes needed.
 
 **Why:** The `time.Sleep` anti-pattern is the #1 source of flaky integration tests. Every team writes their own polling helper. This should be a primitive.
 
-**What:**
+**Two tiers of async assertion:**
+
+The functional API (Tier 1) provides simple boolean polling:
+
+```go
+// Simple: "wait until ready"
+gotest.Eventually(t, func() bool { return s.svc.IsReady() }, 5*time.Second, 100*time.Millisecond)
+```
+
+When this fails, the message is "Condition never satisfied" — adequate for one-liners, but useless for multi-step checks. The T method (this tier) provides **rich assertion polling** — full assertion context inside the callback, with detailed failure messages on timeout:
 
 ```go
 func (s *Suite) TestAsyncProcessing(t *gotest.T) {
@@ -685,15 +702,38 @@ func (s *Suite) TestAsyncProcessing(t *gotest.T) {
 }
 ```
 
-`Eventually` retries the function until it passes or the timeout expires. Failures during polling are suppressed; only the final failure is reported with the full assertion context.
+**Signatures:**
 
-`Consistently` is the dual — asserts the function passes for the entire duration (detects flicker):
+```go
+// Methods on *gotest.T — rich assertion callback
+func (t *T) Eventually(waitFor, tick time.Duration, fn func(poll *T))
+func (t *T) Consistently(waitFor, tick time.Duration, fn func(poll *T))
+```
+
+Configuration (timeout, tick) comes first; the closure goes last — so multi-line bodies close naturally without trailing arguments buried after the `}`.
+
+**Failure suppression mechanism:** The `poll *gotest.T` parameter is a collecting wrapper — assertion failures during intermediate polls are captured but not propagated to the test. Only when the timeout expires does the method report the **last poll's assertion failures** as the test failure. This means:
+
+```
+Eventually failed after 5s (50 polls):
+  last failure:
+    Equal failed:
+      expected: "completed"
+      actual:   "pending"
+      location: async_test.go:42
+```
+
+The developer sees exactly what condition wasn't met, not just "timed out."
+
+**`Consistently`** is the dual — asserts the function passes on **every** poll for the entire duration. It detects flicker: a condition that's usually true but occasionally false.
 
 ```go
 t.Consistently(2*time.Second, 100*time.Millisecond, func(poll *gotest.T) {
-    gotest.Equal(poll, s.counter.Value(), 0) // must stay zero
+    gotest.Equal(poll, s.counter.Value(), 0) // must stay zero for 2 full seconds
 })
 ```
+
+On failure, `Consistently` reports which poll first failed and what the assertion said — "passed 15 times then failed on poll 16."
 
 Both are runtime features on `gotest.T`. No code generation changes.
 
