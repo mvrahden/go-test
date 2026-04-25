@@ -86,7 +86,7 @@ func generateSrcs(targetPkg string) (GenerateResults, error) {
 		}
 		pxtestCollected := c.CollectSuiteSpecs(lr.pxtest)
 		if len(pxtestCollected.Errs) > 0 {
-			return nil, ptestCollected.Errs[0].Err
+			return nil, pxtestCollected.Errs[0].Err
 		}
 
 		ptestSpec, err := c.ApplyTestSuiteSpecs(ptestCollected.Suites)
