@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 func TestSplitArgs(t *testing.T) {
@@ -20,8 +20,8 @@ func TestSplitArgs(t *testing.T) {
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			own, goTest := SplitArgs(tc.inArgs)
-			require.Equal(t, tc.expectOwn, own)
-			require.Equal(t, tc.expectGoTest, goTest)
+			gotest.Equal(t, tc.expectOwn, own)
+			gotest.Equal(t, tc.expectGoTest, goTest)
 		})
 	}
 }
@@ -42,7 +42,7 @@ func TestExtractPackagePatterns(t *testing.T) {
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			result := ExtractPackagePatterns(tc.args)
-			require.Equal(t, tc.expected, result)
+			gotest.Equal(t, tc.expected, result)
 		})
 	}
 }

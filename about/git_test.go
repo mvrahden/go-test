@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/mvrahden/go-test/about"
-	"github.com/stretchr/testify/require"
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 func Test_Regex(t *testing.T) {
@@ -15,7 +15,7 @@ func Test_Regex(t *testing.T) {
 			"gosuite/ƒƒ_psuite_test.go",
 			"gosuite/ƒƒ_pxsuite_test.go",
 		} {
-			require.True(t, about.PSuiteRegex.Match([]byte(v)), "failed for %q", v)
+			gotest.True(t, about.PSuiteRegex.Match([]byte(v)), "failed for %q", v)
 		}
 	})
 	t.Run("fails", func(t *testing.T) {
@@ -28,7 +28,7 @@ func Test_Regex(t *testing.T) {
 			"focus_suite/gotestgen_ptest.golden",
 			"focus_suite/gotestgen_pxtest.golden",
 		} {
-			require.False(t, about.PSuiteRegex.Match([]byte(v)), "failed for %q", v)
+			gotest.False(t, about.PSuiteRegex.Match([]byte(v)), "failed for %q", v)
 		}
 	})
 }

@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 var (
@@ -39,17 +39,17 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Generate for package %q with %s", tC.directory, tC.description), func(t *testing.T) {
 			res, err := Generate(pkg)
-			require.NoError(t, err)
-			require.NotEmpty(t, res, "expected non-empty results for %s", tC.directory)
+			gotest.NoError(t, err)
+			gotest.NotEmpty(t, res, "expected non-empty results for %s", tC.directory)
 			for _, v := range res {
-				require.Equal(t, tC.pkgName, v.Package)
-				require.NotEqual(t, tC.pkgName, v.AbsPath)
-				require.NotZero(t, v.AbsPath)
-				require.True(t, filepath.IsAbs(v.AbsPath))
+				gotest.Equal(t, tC.pkgName, v.Package)
+				gotest.NotEqual(t, tC.pkgName, v.AbsPath)
+				gotest.NotZero(t, v.AbsPath)
+				gotest.True(t, filepath.IsAbs(v.AbsPath))
 				ptestExpected := getExpectedOutputFile(t, testdatadir, "gotestgen_ptest.golden")
-				require.Equal(t, ptestExpected, string(v.PTest))
+				gotest.Equal(t, ptestExpected, string(v.PTest))
 				pxtestExpected := getExpectedOutputFile(t, testdatadir, "gotestgen_pxtest.golden")
-				require.Equal(t, pxtestExpected, string(v.PXTest))
+				gotest.Equal(t, pxtestExpected, string(v.PXTest))
 			}
 		})
 	}
@@ -57,14 +57,14 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 
 func getExpectedOutputFile(t *testing.T, testdatadir, fileName string) string {
 	f, err := os.Open(filepath.Join(testdatadir, fileName))
-	require.NoError(t, err)
+	gotest.NoError(t, err)
 	defer f.Close()
 
 	buf, err := io.ReadAll(f)
-	require.NoError(t, err)
+	gotest.NoError(t, err)
 	els := bytes.SplitN(buf, []byte("\n"), 2)
-	require.Len(t, els, 2)
+	gotest.Len(t, els, 2)
 	firstLine := els[0]
-	require.True(t, IS_GEN_FILE.Match(firstLine), "Must be a generated file!")
+	gotest.True(t, IS_GEN_FILE.Match(firstLine), "Must be a generated file!")
 	return string(buf)
 }

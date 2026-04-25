@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 var (
@@ -28,7 +28,7 @@ func CompareTestOutputWithGolden(t *testing.T, tmp string, actual *bytes.Buffer,
 	actualStr := actual.String()
 	actualStr = strings.ReplaceAll(actualStr, tmp, "<REPLACED>")
 	actualStr = timestampRegex.ReplaceAllString(actualStr, "<TIMESTAMP>")
-	require.Equal(t, expected.String(), actualStr)
+	gotest.Equal(t, expected.String(), actualStr)
 }
 
 func openGolden(t *testing.T, testFS embed.FS, name string) *bytes.Buffer {
