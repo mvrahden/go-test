@@ -12,7 +12,7 @@ import (
 
 var (
 	// 0x1041b9c10
-	PtrRegex = regexp.MustCompile(`0x[[:alnum:]]{9,11}`)
+	PtrRegex = regexp.MustCompile(`0x[0-9a-f]{4,16}`)
 )
 
 func maskPtr(v string) string {
