@@ -23,6 +23,6 @@ func (t *T) It(description string, testFn func(it *T)) {
 	})
 }
 func (t *T) Assert(v any) *assert.BaseAssertionContext {
-	fmtFn := t.T().Fatalf
-	return assert.New(fmtFn).Assert(v)
+	t.t.Helper()
+	return assert.NewAssertionContext(v, t.t.Fatalf)
 }
