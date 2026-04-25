@@ -1,10 +1,15 @@
 package gotest
 
 import (
+	"cmp"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 )
@@ -150,5 +155,304 @@ func ErrorContains(t testingT, err error, contains string, msgAndArgs ...any) {
 	}
 	if !strings.Contains(err.Error(), contains) {
 		fail(t, fmt.Sprintf("ErrorContains failed:\n  error: %q\n  does not contain: %q", err.Error(), contains), msgAndArgs)
+	}
+}
+
+// Contains asserts that s contains the element `contains`.
+// For strings, checks substring. For slices/arrays, checks element presence. For maps, checks key presence.
+func Contains(t testingT, s, contains any, msgAndArgs ...any) {
+	t.Helper()
+	if !includesElement(s, contains) {
+		fail(t, fmt.Sprintf("Contains failed:\n  %#v does not contain %#v", s, contains), msgAndArgs)
+	}
+}
+
+// NotContains asserts that s does NOT contain the element `contains`.
+func NotContains(t testingT, s, contains any, msgAndArgs ...any) {
+	t.Helper()
+	if includesElement(s, contains) {
+		fail(t, fmt.Sprintf("NotContains failed:\n  %#v should not contain %#v", s, contains), msgAndArgs)
+	}
+}
+
+// includesElement checks whether s contains the given element.
+func includesElement(s, element any) bool {
+	if s == nil {
+		return false
+	}
+	// string substring check
+	if str, ok := s.(string); ok {
+		sub, ok := element.(string)
+		if !ok {
+			return false
+		}
+		return strings.Contains(str, sub)
+	}
+	rv := reflect.ValueOf(s)
+	switch rv.Kind() {
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < rv.Len(); i++ {
+			if reflect.DeepEqual(rv.Index(i).Interface(), element) {
+				return true
+			}
+		}
+		return false
+	case reflect.Map:
+		mapKey := reflect.ValueOf(element)
+		if !mapKey.IsValid() {
+			return false
+		}
+		return rv.MapIndex(mapKey).IsValid()
+	}
+	return false
+}
+
+// Len asserts that object has the given length.
+func Len(t testingT, object any, length int, msgAndArgs ...any) {
+	t.Helper()
+	if object == nil {
+		fail(t, fmt.Sprintf("Len failed:\n  object is nil, expected length %d", length), msgAndArgs)
+		return
+	}
+	rv := reflect.ValueOf(object)
+	switch rv.Kind() {
+	case reflect.Slice, reflect.Array, reflect.Map, reflect.Chan, reflect.String:
+		if rv.Len() != length {
+			fail(t, fmt.Sprintf("Len failed:\n  expected length %d\n  actual length %d", length, rv.Len()), msgAndArgs)
+		}
+	default:
+		fail(t, fmt.Sprintf("Len failed:\n  object of type %T does not have a length", object), msgAndArgs)
+	}
+}
+
+// ElementsMatch asserts that listA and listB contain the same elements regardless of order.
+func ElementsMatch[T comparable](t testingT, listA, listB []T, msgAndArgs ...any) {
+	t.Helper()
+	if len(listA) != len(listB) {
+		fail(t, fmt.Sprintf("ElementsMatch failed:\n  lists have different lengths: %d vs %d", len(listA), len(listB)), msgAndArgs)
+		return
+	}
+	counts := make(map[T]int, len(listA))
+	for _, v := range listA {
+		counts[v]++
+	}
+	for _, v := range listB {
+		counts[v]--
+		if counts[v] < 0 {
+			fail(t, fmt.Sprintf("ElementsMatch failed:\n  element %#v is in listB but not enough times in listA", v), msgAndArgs)
+			return
+		}
+	}
+}
+
+// Subset asserts that every element of subset exists in list.
+func Subset[T comparable](t testingT, list, subset []T, msgAndArgs ...any) {
+	t.Helper()
+	set := make(map[T]struct{}, len(list))
+	for _, v := range list {
+		set[v] = struct{}{}
+	}
+	for _, v := range subset {
+		if _, ok := set[v]; !ok {
+			fail(t, fmt.Sprintf("Subset failed:\n  element %#v from subset not found in list", v), msgAndArgs)
+			return
+		}
+	}
+}
+
+// Greater asserts that a > b.
+func Greater[T cmp.Ordered](t testingT, a, b T, msgAndArgs ...any) {
+	t.Helper()
+	if msg := assert.CheckGreater(a, b); msg != "" {
+		fail(t, msg, msgAndArgs)
+	}
+}
+
+// GreaterOrEqual asserts that a >= b.
+func GreaterOrEqual[T cmp.Ordered](t testingT, a, b T, msgAndArgs ...any) {
+	t.Helper()
+	if msg := assert.CheckGreaterOrEqual(a, b); msg != "" {
+		fail(t, msg, msgAndArgs)
+	}
+}
+
+// Less asserts that a < b.
+func Less[T cmp.Ordered](t testingT, a, b T, msgAndArgs ...any) {
+	t.Helper()
+	if msg := assert.CheckLess(a, b); msg != "" {
+		fail(t, msg, msgAndArgs)
+	}
+}
+
+// LessOrEqual asserts that a <= b.
+func LessOrEqual[T cmp.Ordered](t testingT, a, b T, msgAndArgs ...any) {
+	t.Helper()
+	if msg := assert.CheckLessOrEqual(a, b); msg != "" {
+		fail(t, msg, msgAndArgs)
+	}
+}
+
+// regexpPattern constrains Regexp to accept string or *regexp.Regexp.
+type regexpPattern interface {
+	~string | *regexp.Regexp
+}
+
+// Regexp asserts that str matches the regular expression rx.
+func Regexp[P regexpPattern](t testingT, rx P, str string, msgAndArgs ...any) {
+	t.Helper()
+	var re *regexp.Regexp
+	switch v := any(rx).(type) {
+	case string:
+		var err error
+		re, err = regexp.Compile(v)
+		if err != nil {
+			fail(t, fmt.Sprintf("Regexp failed:\n  invalid pattern %q: %v", v, err), msgAndArgs)
+			return
+		}
+	case *regexp.Regexp:
+		re = v
+	}
+	if !re.MatchString(str) {
+		fail(t, fmt.Sprintf("Regexp failed:\n  %q does not match pattern %q", str, re.String()), msgAndArgs)
+	}
+}
+
+// numeric constrains InDelta to numeric types.
+type numeric interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+		~float32 | ~float64
+}
+
+// InDelta asserts that expected and actual are within delta of each other.
+func InDelta[T numeric](t testingT, expected, actual T, delta float64, msgAndArgs ...any) {
+	t.Helper()
+	diff := math.Abs(float64(expected) - float64(actual))
+	if diff > delta {
+		fail(t, fmt.Sprintf("InDelta failed:\n  |%v - %v| = %v exceeds delta %v", expected, actual, diff, delta), msgAndArgs)
+	}
+}
+
+// normalizeJSON converts a value to a JSON-comparable form (map/slice/etc.).
+// Accepts string, []byte, or any JSON-marshalable value.
+func normalizeJSON(v any) (any, error) {
+	var raw []byte
+	switch val := v.(type) {
+	case string:
+		raw = []byte(val)
+	case []byte:
+		raw = val
+	default:
+		var err error
+		raw, err = json.Marshal(val)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal value: %w", err)
+		}
+	}
+	var out any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
+	return out, nil
+}
+
+// JSONEq asserts that expected and actual represent the same JSON structure.
+// Both values may be string, []byte, or any JSON-marshalable value.
+func JSONEq(t testingT, expected, actual any, msgAndArgs ...any) {
+	t.Helper()
+	expNorm, err := normalizeJSON(expected)
+	if err != nil {
+		fail(t, fmt.Sprintf("JSONEq failed:\n  could not normalize expected: %v", err), msgAndArgs)
+		return
+	}
+	actNorm, err := normalizeJSON(actual)
+	if err != nil {
+		fail(t, fmt.Sprintf("JSONEq failed:\n  could not normalize actual: %v", err), msgAndArgs)
+		return
+	}
+	if !reflect.DeepEqual(expNorm, actNorm) {
+		expJSON, _ := json.Marshal(expNorm)
+		actJSON, _ := json.Marshal(actNorm)
+		fail(t, fmt.Sprintf("JSONEq failed:\n  expected: %s\n  actual:   %s", expJSON, actJSON), msgAndArgs)
+	}
+}
+
+// TimeWithin asserts that expected and actual are within the given tolerance of each other.
+func TimeWithin(t testingT, expected, actual time.Time, tolerance time.Duration, msgAndArgs ...any) {
+	t.Helper()
+	diff := expected.Sub(actual)
+	if diff < 0 {
+		diff = -diff
+	}
+	if diff > tolerance {
+		fail(t, fmt.Sprintf("TimeWithin failed:\n  |%v - %v| = %v exceeds tolerance %v", expected, actual, diff, tolerance), msgAndArgs)
+	}
+}
+
+// TimeIsNow asserts that ts is within tolerance of time.Now().
+func TimeIsNow(t testingT, ts time.Time, tolerance time.Duration, msgAndArgs ...any) {
+	t.Helper()
+	TimeWithin(t, time.Now(), ts, tolerance, msgAndArgs...)
+}
+
+// Panics asserts that f panics when called. It returns the recovered value.
+func Panics(t testingT, f func(), msgAndArgs ...any) any {
+	t.Helper()
+	recovered, didPanic := didPanic(f)
+	if !didPanic {
+		fail(t, "Panics failed:\n  expected the function to panic but it did not", msgAndArgs)
+	}
+	return recovered
+}
+
+// didPanic runs f and reports whether it panicked, along with the recovered value.
+func didPanic(f func()) (recovered any, panicked bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			recovered = r
+			panicked = true
+		}
+	}()
+	f()
+	return nil, false
+}
+
+// Eventually asserts that condition returns true within waitFor, polling every tick.
+func Eventually(t testingT, condition func() bool, waitFor, tick time.Duration, msgAndArgs ...any) {
+	t.Helper()
+	timer := time.NewTimer(waitFor)
+	defer timer.Stop()
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-timer.C:
+			fail(t, fmt.Sprintf("Eventually failed:\n  condition did not become true within %v", waitFor), msgAndArgs)
+			return
+		case <-ticker.C:
+			if condition() {
+				return
+			}
+		}
+	}
+}
+
+// Consistently asserts that condition returns true for the entire waitFor duration, polling every tick.
+func Consistently(t testingT, condition func() bool, waitFor, tick time.Duration, msgAndArgs ...any) {
+	t.Helper()
+	timer := time.NewTimer(waitFor)
+	defer timer.Stop()
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-timer.C:
+			return
+		case <-ticker.C:
+			if !condition() {
+				fail(t, fmt.Sprintf("Consistently failed:\n  condition returned false before %v elapsed", waitFor), msgAndArgs)
+				return
+			}
+		}
 	}
 }
