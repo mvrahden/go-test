@@ -27,7 +27,7 @@ func FormatValue(v any) string {
 // Returns "" if values are identical or if both strings are single-line.
 // Uses - for removed lines (expected), + for added lines (actual),
 // space for common lines.
-func diff(expected, actual string) string {
+func Diff(expected, actual string) string {
 	if expected == actual {
 		return ""
 	}

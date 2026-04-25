@@ -22,7 +22,7 @@ func CheckEqual(expected, actual any) string {
 	fmt.Fprintf(&sb, "  expected: %s\n", fmtExpected)
 	fmt.Fprintf(&sb, "  actual:   %s", fmtActual)
 
-	d := diff(fmtExpected, fmtActual)
+	d := Diff(fmtExpected, fmtActual)
 	if d != "" {
 		fmt.Fprintf(&sb, "\n  diff:\n")
 		for _, line := range strings.Split(strings.TrimRight(d, "\n"), "\n") {

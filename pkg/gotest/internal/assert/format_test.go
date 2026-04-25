@@ -60,33 +60,33 @@ func Test_FormatValue_PlainValues(t *testing.T) {
 }
 
 func Test_diff_IdenticalStrings(t *testing.T) {
-	got := diff("hello", "hello")
+	got := Diff("hello", "hello")
 	if got != "" {
-		t.Fatalf("diff(identical) = %q; want empty string", got)
+		t.Fatalf("Diff(identical) = %q; want empty string", got)
 	}
 }
 
 func Test_diff_BothSingleLine(t *testing.T) {
-	got := diff("foo", "bar")
+	got := Diff("foo", "bar")
 	if got != "" {
-		t.Fatalf("diff(both single-line) = %q; want empty string (no diff for single-line)", got)
+		t.Fatalf("Diff(both single-line) = %q; want empty string (no diff for single-line)", got)
 	}
 }
 
 func Test_diff_MultilineIdentical(t *testing.T) {
 	s := "line1\nline2\nline3"
-	got := diff(s, s)
+	got := Diff(s, s)
 	if got != "" {
-		t.Fatalf("diff(identical multiline) = %q; want empty string", got)
+		t.Fatalf("Diff(identical multiline) = %q; want empty string", got)
 	}
 }
 
 func Test_diff_MultilineAddedLine(t *testing.T) {
 	expected := "line1\nline2"
 	actual := "line1\nline2\nline3"
-	got := diff(expected, actual)
+	got := Diff(expected, actual)
 	if got == "" {
-		t.Fatal("diff(multiline with added line) returned empty; want non-empty diff")
+		t.Fatal("Diff(multiline with added line) returned empty; want non-empty diff")
 	}
 	// "line3" should appear as added
 	if !containsSubstring(got, "+ line3") {
@@ -104,9 +104,9 @@ func Test_diff_MultilineAddedLine(t *testing.T) {
 func Test_diff_MultilineRemovedLine(t *testing.T) {
 	expected := "line1\nline2\nline3"
 	actual := "line1\nline3"
-	got := diff(expected, actual)
+	got := Diff(expected, actual)
 	if got == "" {
-		t.Fatal("diff(multiline with removed line) returned empty; want non-empty diff")
+		t.Fatal("Diff(multiline with removed line) returned empty; want non-empty diff")
 	}
 	// "line2" should appear as removed
 	if !containsSubstring(got, "- line2") {
@@ -117,9 +117,9 @@ func Test_diff_MultilineRemovedLine(t *testing.T) {
 func Test_diff_MultilineChangedLine(t *testing.T) {
 	expected := "line1\nlineA\nline3"
 	actual := "line1\nlineB\nline3"
-	got := diff(expected, actual)
+	got := Diff(expected, actual)
 	if got == "" {
-		t.Fatal("diff(multiline changed line) returned empty; want non-empty diff")
+		t.Fatal("Diff(multiline changed line) returned empty; want non-empty diff")
 	}
 	if !containsSubstring(got, "- lineA") {
 		t.Errorf("diff output %q missing '- lineA'", got)
