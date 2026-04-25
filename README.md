@@ -76,6 +76,56 @@ func (s *MySuite) AfterEach(t *gotest.T)  {} // after each test method
 
 All hooks are optional. `AfterAll` runs via `t.Cleanup` (LIFO). `AfterEach` is deferred, so it runs even on `t.Fatal()`.
 
+### Fixtures
+
+Fixtures replace `TestMain` + package-level singletons with directive-driven setup that composes via Go embedding.
+
+```go
+// fixture_test.go
+
+//go:test fixture
+type E2ESetup struct {
+    Pool      *pgxpool.Pool
+    ServerURL string
+}
+
+func (s *E2ESetup) BeforeAll(t *gotest.T) {
+    pg, err := testhelper.StartPostgres(ctx)
+    gotest.NoError(t, err)
+    t.T().Cleanup(func() { pg.Container.Terminate(ctx) })
+    s.Pool = pg.Pool
+}
+```
+
+Test suites embed the fixture via pointer embedding to get access to shared state:
+
+```go
+type BatchTestSuite struct {
+    *E2ESetup // s.Pool, s.ServerURL available
+}
+
+func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
+    // s.Pool is populated by E2ESetup.BeforeAll
+}
+```
+
+Fixtures can nest — a root fixture's `BeforeAll` runs first, then each child's:
+
+```go
+//go:test fixture
+type InfraFixture struct { Pool *pgxpool.Pool }
+
+//go:test fixture
+type APIFixture struct {
+    *InfraFixture // f.Pool available from parent
+    ServerURL string
+}
+```
+
+Output nests naturally: `Test_InfraFixture/APIFixture/BatchTestSuite/TestDispatch`.
+
+For cross-package shared state (e.g. a database container shared across integration test packages), use `//go:test shared-fixture` — see [docs/fixtures.md](docs/fixtures.md) for the full reference.
+
 ### Focus and Exclude
 
 ```go
@@ -140,6 +190,56 @@ t.Assert(ok).IsTrue()
 
 Works with both `*gotest.T` (suites) and `*testing.T` (standalone tests).
 
+### Data-Driven Tests
+
+```go
+func (s *Suite) TestParsing(t *gotest.T) {
+    t.Each([]struct {
+        Desc  string
+        Input string
+        Want  int
+    }{
+        {Desc: "single digit", Input: "5", Want: 5},
+        {Desc: "negative",     Input: "-3", Want: -3},
+    }, func(it *gotest.T, e struct{ Desc, Input string; Want int }) {
+        gotest.Equal(it, e.Want, parse(e.Input))
+    })
+}
+```
+
+Each entry becomes a subtest. Uses `Desc` or `Name` field for the test name, falls back to `#0`, `#1`, etc.
+
+### Async Assertions
+
+```go
+// Poll until condition is met (or timeout)
+t.Eventually(5*time.Second, 100*time.Millisecond, func(poll *gotest.T) {
+    gotest.Equal(poll, "ready", getStatus())
+})
+
+// Assert condition holds for the full duration
+t.Consistently(500*time.Millisecond, 50*time.Millisecond, func(poll *gotest.T) {
+    gotest.True(poll, cache.IsValid())
+})
+```
+
+Poll callbacks receive a `*gotest.T` — use the full assertion library inside. Failures during polling are collected, not propagated, until the timeout.
+
+### Snapshot Testing
+
+```go
+func (s *Suite) TestRender(t *gotest.T) {
+    t.MatchSnapshot(render(input))           // auto-named from test
+    t.MatchSnapshot(render(other), "variant") // custom snapshot name
+}
+```
+
+Snapshots are stored in `testdata/__snapshots__/`. On first run, the snapshot is created. On subsequent runs, the output is compared. Update all snapshots with:
+
+```bash
+GOTEST_UPDATE_SNAPSHOTS=1 gotest ./... -v
+```
+
 ### Scaffold
 
 Generate a test suite skeleton from any Go type:
@@ -186,6 +286,8 @@ The generated code is what a careful developer would write by hand: `t.Run`, `t.
 | `TestParallel*` method | Parallel test case |
 | `F_` prefix | Focus (run only this) |
 | `X_` prefix | Exclude (skip this) |
+| `//go:test fixture` | Package-scoped fixture |
+| `//go:test shared-fixture` | Cross-package shared fixture |
 
 ## Commands
 
