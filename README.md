@@ -338,7 +338,6 @@ Only the affected package is re-run. Combine with `F_` prefix for a tight feedba
 gotest ./... -v -race          # generate, test, cleanup (default)
 gotest spec ./...              # behavioral specification view
 gotest watch ./... -v          # watch mode with auto-rerun
-gotest clean ./...             # remove orphaned generated files
 gotest scaffold ./pkg/user.Svc # generate suite skeleton from type
 gotest migrate ./...           # convert testify/suite to go-test
 gotest version                 # print version
