@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
 import type { DiscoverMethod, DiscoverSuite } from "./types.js";
 
@@ -20,14 +21,18 @@ export class FocusExcludeProvider
     }
 
     const line = range.start.line + 1; // convert to 1-based
+    const docBasename = path.basename(document.fileName);
 
     for (const pkg of this.cache.packages) {
+      if (!document.fileName.startsWith(pkg.dir)) {
+        continue;
+      }
       for (const suite of pkg.suites) {
-        if (suite.file === document.fileName && suite.line === line) {
+        if (suite.file === docBasename && suite.line === line) {
           return this.actionsForSuite(suite, document);
         }
         for (const method of suite.methods) {
-          if (method.file === document.fileName && method.line === line) {
+          if (method.file === docBasename && method.line === line) {
             return this.actionsForMethod(method, document);
           }
         }

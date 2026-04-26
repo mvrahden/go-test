@@ -65,11 +65,11 @@ export class GoTestController implements vscode.Disposable {
         const suiteId = `${pkgId}/${suite.name}`;
         seenSuiteIds.add(suiteId);
 
+        const suiteUri = vscode.Uri.file(`${pkg.dir}/${suite.file}`);
         let suiteItem = pkgItem.children.get(suiteId);
         if (!suiteItem) {
-          suiteItem = this.controller.createTestItem(suiteId, suite.name);
+          suiteItem = this.controller.createTestItem(suiteId, suite.name, suiteUri);
         }
-        suiteItem.uri = vscode.Uri.file(suite.file);
         suiteItem.range = new vscode.Range(
           new vscode.Position(suite.line - 1, suite.col - 1),
           new vscode.Position(suite.line - 1, suite.col - 1),
@@ -87,14 +87,15 @@ export class GoTestController implements vscode.Disposable {
           const methodId = `${suiteId}/${method.name}`;
           seenMethodIds.add(methodId);
 
+          const methodUri = vscode.Uri.file(`${pkg.dir}/${method.file}`);
           let methodItem = suiteItem.children.get(methodId);
           if (!methodItem) {
             methodItem = this.controller.createTestItem(
               methodId,
               method.name,
+              methodUri,
             );
           }
-          methodItem.uri = vscode.Uri.file(method.file);
           methodItem.range = new vscode.Range(
             new vscode.Position(method.line - 1, method.col - 1),
             new vscode.Position(method.line - 1, method.col - 1),
@@ -145,8 +146,7 @@ export class GoTestController implements vscode.Disposable {
       return existing;
     }
 
-    const item = this.controller.createTestItem(id, label);
-    item.uri = parentItem.uri;
+    const item = this.controller.createTestItem(id, label, parentItem.uri);
     parentItem.children.add(item);
     return item;
   }

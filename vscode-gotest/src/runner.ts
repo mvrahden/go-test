@@ -365,7 +365,7 @@ export class TestRunner {
       const subtestLabel = segments[i];
       const subtestPath = segments.slice(2, i + 1).join("/");
       parentItem = this.controller.createDynamicSubtest(
-        methodItem,
+        parentItem,
         subtestPath,
         subtestLabel,
       );
