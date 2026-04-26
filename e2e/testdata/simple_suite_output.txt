@@ -1,0 +1,18 @@
+=== RUN   TestSimpleTestSuite
+=== RUN   TestSimpleTestSuite/TestSucceeds
+=== RUN   TestSimpleTestSuite/TestFails
+    ptest_test.go:45: assertion failed: got: "+ 1 line\n- 1 line\n+ 1 line\n"
+--- FAIL: TestSimpleTestSuite (<TIMESTAMP>)
+    --- PASS: TestSimpleTestSuite/TestSucceeds (<TIMESTAMP>)
+    --- FAIL: TestSimpleTestSuite/TestFails (<TIMESTAMP>)
+=== RUN   TestSimpleTestSuite
+=== RUN   TestSimpleTestSuite/TestSucceeds#01
+=== RUN   TestSimpleTestSuite/TestFails#01
+    pxtest_test.go:45: assertion failed: got: "+ 1 line\n- 1 line\n+ 1 line\n"
+--- FAIL: TestSimpleTestSuite (<TIMESTAMP>)
+    --- PASS: TestSimpleTestSuite/TestSucceeds#01 (<TIMESTAMP>)
+    --- FAIL: TestSimpleTestSuite/TestFails#01 (<TIMESTAMP>)
+FAIL
+FAIL	github.com/mvrahden/go-test/examples/simple_suite	<TIMESTAMP>
+FAIL
+exit status 1

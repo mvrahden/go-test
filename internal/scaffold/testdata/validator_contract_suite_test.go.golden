@@ -1,0 +1,32 @@
+package sampletype
+
+import (
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type ValidatorContractTestSuite[T Validator] struct {
+	factory func() T
+	sut     T
+}
+
+func (s *ValidatorContractTestSuite[T]) BeforeEach(t *gotest.T) {
+	s.sut = s.factory()
+}
+
+func (s *ValidatorContractTestSuite[T]) TestIsValid(t *gotest.T) {
+	t.It("works", func(it *gotest.T) {
+		// TODO: test Validator.IsValid(input string) bool
+	})
+}
+
+func (s *ValidatorContractTestSuite[T]) TestValidate(t *gotest.T) {
+	t.It("succeeds", func(it *gotest.T) {
+		// TODO: test Validator.Validate(input string) error
+	})
+	t.It("returns error", func(it *gotest.T) {
+		// TODO: test error case
+	})
+}
+
+// Instantiate the contract for a concrete implementation:
+// type MyValidatorTestSuite = ValidatorContractTestSuite[*MyImpl]

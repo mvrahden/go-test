@@ -1,0 +1,95 @@
+package gotest_test
+
+import (
+	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+func Test_Stdlib_HelloWorld(t *testing.T) {
+	t.Errorf("failed for reasons")
+}
+
+type SimpleTestSuite struct{}
+
+func (s *SimpleTestSuite) TestT(t *gotest.T) {
+	t.It("should perform the test case", func(it *gotest.T) {
+		it.T().Fatalf("failed for reasons")
+	})
+}
+
+func (s *SimpleTestSuite) TestIsTrue(t *gotest.T) {
+	t.It("fails", func(it *gotest.T) {
+		it.Assert("abc").IsTrue()
+	})
+	t.It("succeeds", func(it *gotest.T) {
+		it.Assert(true).IsTrue()
+	})
+}
+
+func (s *SimpleTestSuite) TestIsFalse(t *gotest.T) {
+	t.It("fails", func(it *gotest.T) {
+		it.Assert("abc").IsFalse()
+	})
+	t.It("succeeds", func(it *gotest.T) {
+		it.Assert(false).IsFalse()
+	})
+}
+
+func (s *SimpleTestSuite) TestIsEqualTo(t *gotest.T) {
+	t.It("fails", func(it *gotest.T) {
+		it.Assert([]string{"abc"}).IsEqualTo([]string{"def"})
+	})
+	t.It("succeeds", func(it *gotest.T) {
+		it.Assert([]string{"abc"}).IsEqualTo([]string{"abc"})
+	})
+}
+
+func (s *SimpleTestSuite) TestIsZero(t *gotest.T) {
+	t.It("fails", func(it *gotest.T) {
+		it.Assert([]string{"abc"}).IsZero()
+	})
+	t.It("succeeds", func(it *gotest.T) {
+		it.Assert("").IsZero()
+	})
+}
+
+func (s *SimpleTestSuite) TestIsEmpty(t *gotest.T) {
+	t.It("fails", func(it *gotest.T) {
+		it.Assert([]string{"abc"}).IsEmpty()
+	})
+	t.It("succeeds", func(it *gotest.T) {
+		it.Assert("").IsEmpty()
+		it.Assert(&[0]string{}).IsEmpty()
+	})
+}
+
+func (s *SimpleTestSuite) TestHasLength(t *gotest.T) {
+	t.It("fails", func(it *gotest.T) {
+		it.Assert([]string{"abc"}).HasLength(3)
+	})
+	t.It("succeeds", func(it *gotest.T) {
+		it.Assert("abc").HasLength(3)
+		it.Assert(&[1]string{}).HasLength(1)
+	})
+}
+
+func (s *SimpleTestSuite) TestHasCapacity(t *gotest.T) {
+	t.It("fails", func(it *gotest.T) {
+		it.Assert([]string{"abc"}).HasCapacity(3)
+	})
+	t.It("succeeds", func(it *gotest.T) {
+		it.Assert([]string{"abc"}).HasCapacity(1)
+		it.Assert(&[1]string{}).HasCapacity(1)
+	})
+}
+
+func helperAssert(t *gotest.T) {
+	t.Assert("wrong").IsTrue()
+}
+
+func (s *SimpleTestSuite) TestHelperTrace(t *gotest.T) {
+	t.It("shows called from trace", func(it *gotest.T) {
+		helperAssert(it)
+	})
+}
