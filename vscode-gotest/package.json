@@ -1,0 +1,66 @@
+{
+  "name": "vscode-gotest",
+  "displayName": "Go Test Suites",
+  "description": "Test Explorer, CodeLens, and debug integration for go-test suites",
+  "version": "0.1.0",
+  "publisher": "mvrahden",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": ["Testing"],
+  "activationEvents": [
+    "workspaceContains:**/*_test.go"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Go Test Suites",
+      "properties": {
+        "gotest.cliPath": {
+          "type": "string",
+          "default": "gotest",
+          "description": "Path to the gotest CLI binary"
+        },
+        "gotest.discoverOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Re-run discovery when a _test.go file is saved"
+        },
+        "gotest.showCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Run/Debug CodeLens above suites and methods"
+        },
+        "gotest.showFocusWarnings": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show diagnostics for F_ prefixed tests"
+        },
+        "gotest.testFlags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Additional flags passed to gotest test"
+        },
+        "gotest.buildFlags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Additional build flags passed to dlv"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.95.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  }
+}
