@@ -7,16 +7,41 @@ import (
 	"time"
 )
 
-const (
-	colorReset  = "\033[0m"
-	colorRed    = "\033[31m"
-	colorGreen  = "\033[32m"
-	colorYellow = "\033[33m"
-	colorBold   = "\033[1m"
-	colorDim    = "\033[2m"
-)
+type colors struct {
+	reset, red, green, yellow, bold, dim string
+}
 
-func RenderTerminal(w io.Writer, packages []*Package) {
+var ansiColors = colors{
+	reset:  "\033[0m",
+	red:    "\033[31m",
+	green:  "\033[32m",
+	yellow: "\033[33m",
+	bold:   "\033[1m",
+	dim:    "\033[2m",
+}
+
+var noColors = colors{}
+
+type renderConfig struct {
+	color bool
+}
+
+type RenderOption func(*renderConfig)
+
+func WithNoColor() RenderOption {
+	return func(c *renderConfig) { c.color = false }
+}
+
+func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
+	cfg := renderConfig{color: true}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	c := ansiColors
+	if !cfg.color {
+		c = noColors
+	}
+
 	multiPkg := len(packages) > 1
 
 	for i, pkg := range packages {
@@ -24,25 +49,25 @@ func RenderTerminal(w io.Writer, packages []*Package) {
 			if i > 0 {
 				fmt.Fprintln(w)
 			}
-			fmt.Fprintf(w, "%s=== %s ===%s\n", colorDim, pkg.Path, colorReset)
+			fmt.Fprintf(w, "%s=== %s ===%s\n", c.dim, pkg.Path, c.reset)
 			fmt.Fprintln(w)
 		}
 		for _, node := range pkg.Nodes {
-			renderNode(w, node, 0)
+			renderNode(w, node, 0, c)
 		}
 	}
 
 	fmt.Fprintln(w)
 	stats := CollectStats(packages)
-	renderSummary(w, stats)
+	renderSummary(w, stats, c)
 }
 
-func renderNode(w io.Writer, n *Node, depth int) {
+func renderNode(w io.Writer, n *Node, depth int, c colors) {
 	indent := strings.Repeat("  ", depth)
 	isLeaf := len(n.Children) == 0
 
 	if isLeaf {
-		icon, color := statusIcon(n.Status)
+		icon, clr := statusIcon(n.Status, c)
 		dur := formatDuration(n.Duration)
 
 		suffix := ""
@@ -51,26 +76,26 @@ func renderNode(w io.Writer, n *Node, depth int) {
 		}
 
 		fmt.Fprintf(w, "%s%s%s%s %s%s %s(%s)%s\n",
-			indent, color, icon, colorReset,
+			indent, clr, icon, c.reset,
 			n.Display, suffix,
-			colorDim, dur, colorReset)
+			c.dim, dur, c.reset)
 
 		if n.Status == StatusFail {
-			renderErrorOutput(w, n.Output, depth+2)
+			renderErrorOutput(w, n.Output, depth+2, c)
 		}
 		return
 	}
 
 	label := n.Display
 	if n.Kind == KindSuite || n.Kind == KindFixture || n.Kind == KindMethod || n.Kind == KindTest {
-		label = colorBold + label + colorReset
+		label = c.bold + label + c.reset
 	}
 
 	suffix := ""
 	if n.Focused {
-		suffix = fmt.Sprintf(" %s— FOCUSED%s", colorYellow, colorReset)
+		suffix = fmt.Sprintf(" %s— FOCUSED%s", c.yellow, c.reset)
 	} else if n.Excluded {
-		suffix = fmt.Sprintf(" %s— SKIPPED%s", colorYellow, colorReset)
+		suffix = fmt.Sprintf(" %s— SKIPPED%s", c.yellow, c.reset)
 	}
 
 	if depth > 0 || n.Kind != KindFixture {
@@ -80,20 +105,20 @@ func renderNode(w io.Writer, n *Node, depth int) {
 	}
 
 	for _, child := range n.Children {
-		renderNode(w, child, depth+1)
+		renderNode(w, child, depth+1, c)
 	}
 }
 
-func statusIcon(s Status) (string, string) {
+func statusIcon(s Status, c colors) (string, string) {
 	switch s {
 	case StatusPass:
-		return "✓", colorGreen
+		return "✓", c.green
 	case StatusFail:
-		return "✗", colorRed
+		return "✗", c.red
 	case StatusSkip:
-		return "~", colorYellow
+		return "~", c.yellow
 	default:
-		return "?", colorDim
+		return "?", c.dim
 	}
 }
 
@@ -108,7 +133,7 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%.1fs", d.Seconds())
 }
 
-func renderErrorOutput(w io.Writer, output []string, depth int) {
+func renderErrorOutput(w io.Writer, output []string, depth int, c colors) {
 	indent := strings.Repeat("  ", depth)
 	for _, line := range output {
 		trimmed := strings.TrimSpace(line)
@@ -118,20 +143,20 @@ func renderErrorOutput(w io.Writer, output []string, depth int) {
 		if strings.HasPrefix(trimmed, "=== ") || strings.HasPrefix(trimmed, "--- ") {
 			continue
 		}
-		fmt.Fprintf(w, "%s%s%s%s\n", indent, colorRed, trimmed, colorReset)
+		fmt.Fprintf(w, "%s%s%s%s\n", indent, c.red, trimmed, c.reset)
 	}
 }
 
-func renderSummary(w io.Writer, stats Stats) {
+func renderSummary(w io.Writer, stats Stats, c colors) {
 	var parts []string
 	if stats.Passed > 0 {
-		parts = append(parts, fmt.Sprintf("%s%d passed%s", colorGreen, stats.Passed, colorReset))
+		parts = append(parts, fmt.Sprintf("%s%d passed%s", c.green, stats.Passed, c.reset))
 	}
 	if stats.Failed > 0 {
-		parts = append(parts, fmt.Sprintf("%s%d failed%s", colorRed, stats.Failed, colorReset))
+		parts = append(parts, fmt.Sprintf("%s%d failed%s", c.red, stats.Failed, c.reset))
 	}
 	if stats.Skipped > 0 {
-		parts = append(parts, fmt.Sprintf("%s%d skipped%s", colorYellow, stats.Skipped, colorReset))
+		parts = append(parts, fmt.Sprintf("%s%d skipped%s", c.yellow, stats.Skipped, c.reset))
 	}
 
 	var counts []string

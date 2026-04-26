@@ -15,7 +15,7 @@ import (
 )
 
 func runSpec(args []string) int {
-	format, output, remaining := parseSpecFlags(args)
+	format, output, noColor, remaining := parseSpecFlags(args)
 
 	ownArgs, goTestArgs := SplitArgs(remaining)
 	DEBUG = slices.Contains(ownArgs, "-ƒƒ.internal.debug")
@@ -70,17 +70,22 @@ func runSpec(args []string) int {
 		w = f
 	}
 
+	var renderOpts []gotestspec.RenderOption
+	if noColor {
+		renderOpts = append(renderOpts, gotestspec.WithNoColor())
+	}
+
 	switch format {
 	case "md", "markdown":
 		gotestspec.RenderMarkdown(w, tree)
 	default:
-		gotestspec.RenderTerminal(w, tree)
+		gotestspec.RenderTerminal(w, tree, renderOpts...)
 	}
 
 	return code
 }
 
-func parseSpecFlags(args []string) (format, output string, remaining []string) {
+func parseSpecFlags(args []string) (format, output string, noColor bool, remaining []string) {
 	format = "terminal"
 	for i := 0; i < len(args); i++ {
 		switch {
@@ -94,6 +99,8 @@ func parseSpecFlags(args []string) (format, output string, remaining []string) {
 			i++
 		case strings.HasPrefix(args[i], "--output="):
 			output = strings.TrimPrefix(args[i], "--output=")
+		case args[i] == "--no-color":
+			noColor = true
 		default:
 			remaining = append(remaining, args[i])
 		}

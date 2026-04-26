@@ -125,7 +125,7 @@ func TestRenderTerminal_SummaryLine(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			renderSummary(&buf, tt.stats)
+			renderSummary(&buf, tt.stats, ansiColors)
 			got := stripANSI(buf.String())
 			got = strings.TrimSpace(got)
 			if got != tt.want {
