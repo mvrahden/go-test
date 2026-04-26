@@ -189,19 +189,29 @@ Works with both `*gotest.T` (suites) and `*testing.T` (standalone tests).
 
 ### Data-Driven Tests
 
+Iterator API with compile-time type safety (recommended):
+
 ```go
 func (s *Suite) TestParsing(t *gotest.T) {
-    t.Each([]struct {
+    for it, tc := range gotest.Each(t, []struct {
         Desc  string
         Input string
         Want  int
     }{
         {Desc: "single digit", Input: "5", Want: 5},
         {Desc: "negative",     Input: "-3", Want: -3},
-    }, func(it *gotest.T, e struct{ Desc, Input string; Want int }) {
-        gotest.Equal(it, e.Want, parse(e.Input))
-    })
+    }) {
+        gotest.Equal(it, tc.Want, parse(tc.Input))
+    }
 }
+```
+
+Callback API also available via `t.Each(entries, fn)`:
+
+```go
+t.Each(cases, func(it *gotest.T, tc Case) {
+    gotest.Equal(it, tc.Want, parse(tc.Input))
+})
 ```
 
 Each entry becomes a subtest. Uses `Desc` or `Name` field for the test name, falls back to `#0`, `#1`, etc.
