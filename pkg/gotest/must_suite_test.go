@@ -46,4 +46,12 @@ func (s *MustTestSuite) TestMust(t *gotest.T) {
 			gotest.Equal(it, "value", result)
 		})
 	})
+
+	t.When("ok is an unknown type", func(w *gotest.T) {
+		w.It("panics", func(it *gotest.T) {
+			gotest.Panics(it, func() {
+				gotest.Must(42, 123)
+			})
+		})
+	})
 }

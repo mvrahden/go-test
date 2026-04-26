@@ -29,7 +29,7 @@ func TestT(t *testing.T) {
 		".git",                               // entire .git dir
 		"go.work",                            // no go.work reference
 		"pkg/gotest/main_test.go",            // this file
-		"pkg/gotest/assertions_test.go",      // functional API tests (not part of golden)
+		"pkg/gotest/assertions_suite_test.go", // functional API tests (not part of golden)
 		"pkg/gotest/helpers_test.go",         // shared test helpers (not part of golden)
 		"pkg/gotest/each_suite_test.go",      // Each suite (not part of golden)
 		"pkg/gotest/eventually_suite_test.go", // Eventually suite (not part of golden)
