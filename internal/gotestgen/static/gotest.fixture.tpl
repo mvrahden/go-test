@@ -53,6 +53,12 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                 t := tt.T()
                 t.Run(desc, func(it *testing.T) {
                     ttt := gotest.NewT(it)
+{{- if $f.AfterEach }}
+                    defer fixture.AfterEach(ttt)
+{{- end }}
+{{- if $f.BeforeEach }}
+                    fixture.BeforeEach(ttt)
+{{- end }}
                     defer s.AfterEach(ttt)
                     s.BeforeEach(ttt)
                     ƒƒ_GOTEST_exec(testFn, ttt)
@@ -68,6 +74,12 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                     it.Parallel()
                     defer wg.Done()
                     ttt := gotest.NewT(it)
+{{- if $f.AfterEach }}
+                    defer fixture.AfterEach(ttt)
+{{- end }}
+{{- if $f.BeforeEach }}
+                    fixture.BeforeEach(ttt)
+{{- end }}
                     defer s.AfterEach(ttt)
                     s.BeforeEach(ttt)
                     ƒƒ_GOTEST_exec(testFn, ttt)
@@ -131,6 +143,18 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                     t := tt.T()
                     t.Run(desc, func(it *testing.T) {
                         ttt := gotest.NewT(it)
+{{- if $f.AfterEach }}
+                        defer fixture.AfterEach(ttt)
+{{- end }}
+{{- if $f.BeforeEach }}
+                        fixture.BeforeEach(ttt)
+{{- end }}
+{{- if $cf.AfterEach }}
+                        defer child.AfterEach(ttt)
+{{- end }}
+{{- if $cf.BeforeEach }}
+                        child.BeforeEach(ttt)
+{{- end }}
                         defer s.AfterEach(ttt)
                         s.BeforeEach(ttt)
                         ƒƒ_GOTEST_exec(testFn, ttt)
@@ -146,6 +170,18 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                         it.Parallel()
                         defer wg.Done()
                         ttt := gotest.NewT(it)
+{{- if $f.AfterEach }}
+                        defer fixture.AfterEach(ttt)
+{{- end }}
+{{- if $f.BeforeEach }}
+                        fixture.BeforeEach(ttt)
+{{- end }}
+{{- if $cf.AfterEach }}
+                        defer child.AfterEach(ttt)
+{{- end }}
+{{- if $cf.BeforeEach }}
+                        child.BeforeEach(ttt)
+{{- end }}
                         defer s.AfterEach(ttt)
                         s.BeforeEach(ttt)
                         ƒƒ_GOTEST_exec(testFn, ttt)

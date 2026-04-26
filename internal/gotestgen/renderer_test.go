@@ -192,6 +192,116 @@ func (s *EachTestSuite) TestCase(t *gotest.T)   {}
 	gotest.True(t, strings.Contains(output, "ts.EachTestSuite.AfterAll(it)"), "expected suite AfterAll delegation")
 	gotest.True(t, strings.Contains(output, "ts.EachTestSuite.BeforeEach(it)"), "expected suite BeforeEach delegation")
 	gotest.True(t, strings.Contains(output, "ts.EachTestSuite.AfterEach(it)"), "expected suite AfterEach delegation")
+
+	// Fixture-level BeforeEach/AfterEach should appear in the test case closure
+	gotest.True(t, strings.Contains(output, "fixture.BeforeEach(ttt)"), "expected fixture BeforeEach in test case")
+	gotest.True(t, strings.Contains(output, "defer fixture.AfterEach(ttt)"), "expected fixture AfterEach defer in test case")
+
+	// Verify ordering: fixture AfterEach deferred before suite AfterEach (LIFO)
+	fixtureAfterIdx := strings.Index(output, "defer fixture.AfterEach(ttt)")
+	suiteAfterIdx := strings.Index(output, "defer s.AfterEach(ttt)")
+	gotest.True(t, fixtureAfterIdx < suiteAfterIdx, "fixture AfterEach should be deferred before suite AfterEach (LIFO)")
+
+	fixtureBeforeIdx := strings.Index(output, "fixture.BeforeEach(ttt)")
+	suiteBeforeIdx := strings.Index(output, "s.BeforeEach(ttt)")
+	gotest.True(t, fixtureBeforeIdx < suiteBeforeIdx, "fixture BeforeEach should run before suite BeforeEach")
+}
+
+func TestRenderer_FixtureWithoutBeforeAfterEach(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type MinimalFixture struct {}
+
+func (f *MinimalFixture) BeforeAll(t *gotest.T) {}
+
+type MinimalTestSuite struct {
+	*MinimalFixture
+}
+
+func (s *MinimalTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+
+	output := string(out)
+
+	// Fixture without BeforeEach/AfterEach should NOT emit those calls
+	gotest.True(t, !strings.Contains(output, "fixture.BeforeEach"), "should NOT have fixture BeforeEach")
+	gotest.True(t, !strings.Contains(output, "fixture.AfterEach"), "should NOT have fixture AfterEach")
+}
+
+func TestRenderer_NestedFixtureWithBeforeAfterEach(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type InfraFixture struct {}
+
+func (f *InfraFixture) BeforeAll(t *gotest.T)  {}
+func (f *InfraFixture) BeforeEach(t *gotest.T) {}
+func (f *InfraFixture) AfterEach(t *gotest.T)  {}
+
+type APIFixture struct {
+	*InfraFixture
+}
+
+func (f *APIFixture) BeforeAll(t *gotest.T)  {}
+func (f *APIFixture) BeforeEach(t *gotest.T) {}
+func (f *APIFixture) AfterEach(t *gotest.T)  {}
+
+type HandlerTestSuite struct {
+	*APIFixture
+}
+
+func (s *HandlerTestSuite) BeforeEach(t *gotest.T) {}
+func (s *HandlerTestSuite) AfterEach(t *gotest.T)  {}
+func (s *HandlerTestSuite) TestGet(t *gotest.T)    {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+
+	output := string(out)
+
+	// Nested fixture: parent (fixture) and child hooks should both appear
+	gotest.True(t, strings.Contains(output, "defer fixture.AfterEach(ttt)"), "expected parent fixture AfterEach")
+	gotest.True(t, strings.Contains(output, "fixture.BeforeEach(ttt)"), "expected parent fixture BeforeEach")
+	gotest.True(t, strings.Contains(output, "defer child.AfterEach(ttt)"), "expected child fixture AfterEach")
+	gotest.True(t, strings.Contains(output, "child.BeforeEach(ttt)"), "expected child fixture BeforeEach")
+
+	// Verify ordering: parent deferred first (runs last), then child, then suite
+	parentAfterIdx := strings.Index(output, "defer fixture.AfterEach(ttt)")
+	childAfterIdx := strings.Index(output, "defer child.AfterEach(ttt)")
+	suiteAfterIdx := strings.Index(output, "defer s.AfterEach(ttt)")
+	gotest.True(t, parentAfterIdx < childAfterIdx, "parent AfterEach deferred before child (LIFO)")
+	gotest.True(t, childAfterIdx < suiteAfterIdx, "child AfterEach deferred before suite (LIFO)")
+
+	parentBeforeIdx := strings.Index(output, "fixture.BeforeEach(ttt)")
+	childBeforeIdx := strings.Index(output, "child.BeforeEach(ttt)")
+	suiteBeforeIdx := strings.Index(output, "s.BeforeEach(ttt)")
+	gotest.True(t, parentBeforeIdx < childBeforeIdx, "parent BeforeEach before child")
+	gotest.True(t, childBeforeIdx < suiteBeforeIdx, "child BeforeEach before suite")
 }
 
 func TestBuildFixtureViewModels_RootFixtureOnly(t *testing.T) {
