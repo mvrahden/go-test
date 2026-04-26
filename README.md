@@ -76,7 +76,7 @@ func (s *MySuite) BeforeEach(t *gotest.T) {} // before each test method
 func (s *MySuite) AfterEach(t *gotest.T)  {} // after each test method
 ```
 
-Use `*gotest.T` for the full DSL (`t.It()`, `t.When()`, `t.Assert()`, `t.MatchSnapshot()`). Use `*testing.T` for plain stdlib tests — the functional assertions (`gotest.Equal(t, ...)`) still work with either type. You can mix freely within a single suite:
+`*gotest.T` exposes `t.Context()` (mirrors Go 1.24's `testing.T.Context()`), plus the full DSL (`t.It()`, `t.When()`, `t.Assert()`, `t.MatchSnapshot()`). Use `*testing.T` for plain stdlib tests — the functional assertions (`gotest.Equal(t, ...)`) still work with either type. You can mix freely within a single suite:
 
 ```go
 func (s *MySuite) BeforeEach(t *testing.T) {} // stdlib is fine here
@@ -221,11 +221,24 @@ Functional API with compile-time type safety:
 gotest.Equal(t, expected, actual)            // [T any] — cross-type comparison is a compile error
 gotest.NoError(t, err)
 gotest.ErrorIs(t, err, target)
+gotest.ErrorAs[*MyError](t, err)             // returns the matched error
+gotest.ErrorContains(t, err, "not found")
 gotest.Contains(t, haystack, needle)
 gotest.Greater(t, a, b)                      // [T cmp.Ordered]
 gotest.Len(t, collection, 3)
 gotest.True(t, condition)
+gotest.Panics(t, func() { ... })
+gotest.Regexp(t, `^start`, str)
+gotest.InDelta(t, 3.14, pi, 0.01)
+gotest.JSONEq(t, expected, actual)           // string, []byte, io.Reader, or any marshalable value
 gotest.Eventually(t, func() bool { ... }, 5*time.Second, 100*time.Millisecond)
+```
+
+Unwrap `(T, error)` or `(T, bool)` pairs in test setup:
+
+```go
+conn := gotest.Must(db.Connect(ctx))
+val  := gotest.Must(cache.Get(key))
 ```
 
 Fluent API for quick exploration:
