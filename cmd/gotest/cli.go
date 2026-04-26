@@ -36,6 +36,8 @@ func main() {
 		os.Exit(runClean(remaining))
 	case "spec":
 		os.Exit(runSpec(remaining))
+	case "discover":
+		os.Exit(runDiscover(remaining))
 	case "watch":
 		os.Exit(runWatch(remaining))
 	case "version":
