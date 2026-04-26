@@ -75,7 +75,7 @@ func BuildTree(events []TestEvent) []*Package {
 			continue
 		}
 
-		segments := strings.Split(ev.Test, "/")
+		segments := splitTestPath(ev.Test)
 		nmap := nodes[ev.Package]
 
 		for i := range segments {
@@ -215,6 +215,28 @@ func classify(n *Node, topLevel bool) {
 	for _, c := range n.Children {
 		classify(c, false)
 	}
+}
+
+// splitTestPath splits a go test -json Test field into subtest segments.
+// Go uses "/" as the subtest separator, but description strings may contain
+// "/" too (e.g. "https:// URI"). We treat consecutive slashes as literal
+// characters within a segment rather than multiple separators.
+func splitTestPath(path string) []string {
+	var segments []string
+	var cur strings.Builder
+	for i := 0; i < len(path); i++ {
+		if path[i] == '/' && (i+1 >= len(path) || path[i+1] != '/') &&
+			(i == 0 || path[i-1] != '/') {
+			segments = append(segments, cur.String())
+			cur.Reset()
+		} else {
+			cur.WriteByte(path[i])
+		}
+	}
+	if cur.Len() > 0 {
+		segments = append(segments, cur.String())
+	}
+	return segments
 }
 
 func statusFrom(a Action) Status {
