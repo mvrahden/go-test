@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
@@ -20,20 +22,30 @@ func runSpec(args []string) int {
 
 	patterns := ExtractPackagePatterns(goTestArgs)
 
-	var allDirs []string
+	var allResults gotestgen.GenerateResults
 	for _, pattern := range patterns {
-		dirs, _, err := gotestrunner.SuitesGenerateWithCollectorResults(pattern)
+		results, _, err := gotestrunner.SuitesGenerateWithCollectorResults(pattern)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2
 		}
-		allDirs = append(allDirs, dirs...)
-	}
-	if !DEBUG {
-		defer cleanupGeneratedFiles(allDirs)
+		allResults = append(allResults, results...)
 	}
 
-	jsonData, code, err := gotestrunner.StdlibRunTestsJSON(goTestArgs)
+	tmpDir, err := gotestrunner.WriteOverlay(allResults)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if DEBUG {
+		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s\n", tmpDir)
+	} else {
+		defer os.RemoveAll(tmpDir)
+	}
+
+	overlayArgs := append([]string{"-overlay=" + filepath.Join(tmpDir, "overlay.json")}, goTestArgs...)
+
+	jsonData, code, err := gotestrunner.StdlibRunTestsJSON(overlayArgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
