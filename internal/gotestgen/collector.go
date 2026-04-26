@@ -25,6 +25,11 @@ type CollectorResult struct {
 
 type collector struct{}
 
+// NewCollector returns a new collector instance for use outside this package.
+func NewCollector() collector {
+	return collector{}
+}
+
 func (collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 	if pkg == nil {
 		return CollectorResult{}
