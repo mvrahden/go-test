@@ -12,8 +12,18 @@ func RenderMarkdown(w io.Writer, packages []*Package) {
 
 	fmt.Fprintln(w, "# Behavior Specification")
 	fmt.Fprintln(w)
-	fmt.Fprintf(w, "%d behaviors: %d passed, %d failed, %d skipped.\n",
-		stats.Total(), stats.Passed, stats.Failed, stats.Skipped)
+	var counts []string
+	if stats.Suites > 0 {
+		counts = append(counts, fmt.Sprintf("%d suites", stats.Suites))
+	}
+	if stats.Behaviors > 0 {
+		counts = append(counts, fmt.Sprintf("%d behaviors", stats.Behaviors))
+	}
+	if stats.Tests > 0 {
+		counts = append(counts, fmt.Sprintf("%d stdlib tests", stats.Tests))
+	}
+	fmt.Fprintf(w, "%s: %d passed, %d failed, %d skipped.\n",
+		strings.Join(counts, ", "), stats.Passed, stats.Failed, stats.Skipped)
 	fmt.Fprintln(w)
 
 	for _, pkg := range packages {
@@ -68,7 +78,7 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int) {
 			renderMarkdownNode(w, c, headingLevel+1)
 		}
 
-	case KindMethod:
+	case KindMethod, KindTest:
 		if len(n.Children) == 0 {
 			return
 		}

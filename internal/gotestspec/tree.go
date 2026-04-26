@@ -23,6 +23,7 @@ const (
 	KindSuite
 	KindMethod
 	KindBlock
+	KindTest
 )
 
 type Node struct {
@@ -45,10 +46,12 @@ type Package struct {
 }
 
 type Stats struct {
-	Suites  int
-	Passed  int
-	Failed  int
-	Skipped int
+	Suites    int
+	Behaviors int
+	Tests     int
+	Passed    int
+	Failed    int
+	Skipped   int
 }
 
 func (s Stats) Total() int {
@@ -126,17 +129,22 @@ func CollectStats(packages []*Package) Stats {
 	var s Stats
 	for _, pkg := range packages {
 		for _, n := range pkg.Nodes {
-			collectStats(n, &s)
+			collectStats(n, &s, n.Kind == KindTest)
 		}
 	}
 	return s
 }
 
-func collectStats(n *Node, s *Stats) {
+func collectStats(n *Node, s *Stats, inStdlib bool) {
 	if n.Kind == KindSuite {
 		s.Suites++
 	}
 	if len(n.Children) == 0 {
+		if inStdlib {
+			s.Tests++
+		} else {
+			s.Behaviors++
+		}
 		switch n.Status {
 		case StatusPass:
 			s.Passed++
@@ -147,7 +155,7 @@ func collectStats(n *Node, s *Stats) {
 		}
 	}
 	for _, c := range n.Children {
-		collectStats(c, s)
+		collectStats(c, s, inStdlib)
 	}
 }
 
@@ -175,7 +183,7 @@ func classify(n *Node, topLevel bool) {
 			n.Kind = KindSuite
 			n.Display = strings.TrimSuffix(raw, "TestSuite")
 		} else {
-			n.Kind = KindMethod
+			n.Kind = KindTest
 			n.Display = strings.TrimPrefix(raw, "_")
 		}
 	} else {

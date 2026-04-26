@@ -62,7 +62,7 @@ func renderNode(w io.Writer, n *Node, depth int) {
 	}
 
 	label := n.Display
-	if n.Kind == KindSuite || n.Kind == KindFixture || n.Kind == KindMethod {
+	if n.Kind == KindSuite || n.Kind == KindFixture || n.Kind == KindMethod || n.Kind == KindTest {
 		label = colorBold + label + colorReset
 	}
 
@@ -123,8 +123,6 @@ func renderErrorOutput(w io.Writer, output []string, depth int) {
 }
 
 func renderSummary(w io.Writer, stats Stats) {
-	total := stats.Total()
-
 	var parts []string
 	if stats.Passed > 0 {
 		parts = append(parts, fmt.Sprintf("%s%d passed%s", colorGreen, stats.Passed, colorReset))
@@ -136,5 +134,16 @@ func renderSummary(w io.Writer, stats Stats) {
 		parts = append(parts, fmt.Sprintf("%s%d skipped%s", colorYellow, stats.Skipped, colorReset))
 	}
 
-	fmt.Fprintf(w, "%d suites, %d behaviors: %s\n", stats.Suites, total, strings.Join(parts, ", "))
+	var counts []string
+	if stats.Suites > 0 {
+		counts = append(counts, fmt.Sprintf("%d suites", stats.Suites))
+	}
+	if stats.Behaviors > 0 {
+		counts = append(counts, fmt.Sprintf("%d behaviors", stats.Behaviors))
+	}
+	if stats.Tests > 0 {
+		counts = append(counts, fmt.Sprintf("%d stdlib tests", stats.Tests))
+	}
+
+	fmt.Fprintf(w, "%s: %s\n", strings.Join(counts, ", "), strings.Join(parts, ", "))
 }

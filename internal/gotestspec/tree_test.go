@@ -188,6 +188,12 @@ func TestCollectStats(t *testing.T) {
 	if stats.Suites != 2 {
 		t.Errorf("suites = %d, want 2", stats.Suites)
 	}
+	if stats.Behaviors != 3 {
+		t.Errorf("behaviors = %d, want 3", stats.Behaviors)
+	}
+	if stats.Tests != 0 {
+		t.Errorf("tests = %d, want 0", stats.Tests)
+	}
 	if stats.Passed != 1 {
 		t.Errorf("passed = %d, want 1", stats.Passed)
 	}
@@ -196,6 +202,100 @@ func TestCollectStats(t *testing.T) {
 	}
 	if stats.Skipped != 1 {
 		t.Errorf("skipped = %d, want 1", stats.Skipped)
+	}
+}
+
+func TestBuildTree_StdlibTest(t *testing.T) {
+	input := `{"Action":"run","Package":"example.com/pkg","Test":"TestCreateUser"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestCreateUser/valid_email"}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestCreateUser/valid_email","Elapsed":0.003}
+{"Action":"run","Package":"example.com/pkg","Test":"TestCreateUser/duplicate_email"}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestCreateUser/duplicate_email","Elapsed":0.002}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestCreateUser","Elapsed":0.006}
+{"Action":"pass","Package":"example.com/pkg","Elapsed":0.01}`
+
+	events, err := ParseEvents(strings.NewReader(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tree := BuildTree(events)
+	pkg := tree[0]
+	if len(pkg.Nodes) != 1 {
+		t.Fatalf("expected 1 root node, got %d", len(pkg.Nodes))
+	}
+
+	test := pkg.Nodes[0]
+	if test.Kind != KindTest {
+		t.Errorf("root kind = %d, want KindTest", test.Kind)
+	}
+	if test.Display != "CreateUser" {
+		t.Errorf("display = %q, want CreateUser", test.Display)
+	}
+	if len(test.Children) != 2 {
+		t.Fatalf("expected 2 subtests, got %d", len(test.Children))
+	}
+	if test.Children[0].Kind != KindBlock {
+		t.Errorf("subtest kind = %d, want KindBlock", test.Children[0].Kind)
+	}
+	if test.Children[0].Display != "valid email" {
+		t.Errorf("subtest display = %q, want 'valid email'", test.Children[0].Display)
+	}
+}
+
+func TestCollectStats_Mixed(t *testing.T) {
+	input := `{"Action":"run","Package":"p","Test":"TestFooTestSuite"}
+{"Action":"run","Package":"p","Test":"TestFooTestSuite/TestA"}
+{"Action":"pass","Package":"p","Test":"TestFooTestSuite/TestA","Elapsed":0.01}
+{"Action":"pass","Package":"p","Test":"TestFooTestSuite","Elapsed":0.02}
+{"Action":"run","Package":"p","Test":"TestHelper"}
+{"Action":"run","Package":"p","Test":"TestHelper/returns_ok"}
+{"Action":"pass","Package":"p","Test":"TestHelper/returns_ok","Elapsed":0.001}
+{"Action":"run","Package":"p","Test":"TestHelper/handles_error"}
+{"Action":"pass","Package":"p","Test":"TestHelper/handles_error","Elapsed":0.001}
+{"Action":"pass","Package":"p","Test":"TestHelper","Elapsed":0.003}
+{"Action":"pass","Package":"p","Elapsed":0.05}`
+
+	events, _ := ParseEvents(strings.NewReader(input))
+	tree := BuildTree(events)
+	stats := CollectStats(tree)
+
+	if stats.Suites != 1 {
+		t.Errorf("suites = %d, want 1", stats.Suites)
+	}
+	if stats.Behaviors != 1 {
+		t.Errorf("behaviors = %d, want 1", stats.Behaviors)
+	}
+	if stats.Tests != 2 {
+		t.Errorf("tests = %d, want 2", stats.Tests)
+	}
+	if stats.Passed != 3 {
+		t.Errorf("passed = %d, want 3", stats.Passed)
+	}
+}
+
+func TestCollectStats_StdlibOnly(t *testing.T) {
+	input := `{"Action":"run","Package":"p","Test":"TestFoo"}
+{"Action":"pass","Package":"p","Test":"TestFoo","Elapsed":0.01}
+{"Action":"run","Package":"p","Test":"TestBar"}
+{"Action":"pass","Package":"p","Test":"TestBar","Elapsed":0.02}
+{"Action":"pass","Package":"p","Elapsed":0.05}`
+
+	events, _ := ParseEvents(strings.NewReader(input))
+	tree := BuildTree(events)
+	stats := CollectStats(tree)
+
+	if stats.Suites != 0 {
+		t.Errorf("suites = %d, want 0", stats.Suites)
+	}
+	if stats.Behaviors != 0 {
+		t.Errorf("behaviors = %d, want 0", stats.Behaviors)
+	}
+	if stats.Tests != 2 {
+		t.Errorf("tests = %d, want 2", stats.Tests)
+	}
+	if stats.Passed != 2 {
+		t.Errorf("passed = %d, want 2", stats.Passed)
 	}
 }
 
