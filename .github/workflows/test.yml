@@ -13,4 +13,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24"
-      - run: go test -race ./...
+      - name: Test
+        run: go run ./cmd/gotest spec --format=md --output=spec.md ./... -race
+      - name: Behavior spec
+        if: always()
+        run: |
+          if [ -f spec.md ]; then
+            cat spec.md >> "$GITHUB_STEP_SUMMARY"
+          fi
