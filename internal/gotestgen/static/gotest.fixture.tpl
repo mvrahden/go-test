@@ -27,13 +27,16 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
 {{ end }}
 
     fixture := &{{ $f.Identifier }}{}
-    ft := gotest.NewT(t)
     t.Cleanup(func() {
 {{- if $f.AfterAll }}
-        fixture.AfterAll(ft)
+        if err := fixture.AfterAll(context.Background()); err != nil {
+            t.Errorf("{{ $f.Identifier }}.AfterAll failed: %v", err)
+        }
 {{- end }}
     })
-    fixture.BeforeAll(ft)
+    if err := fixture.BeforeAll(t.Context()); err != nil {
+        t.Fatalf("{{ $f.Identifier }}.BeforeAll failed: %v", err)
+    }
 
 {{- /* Render child suites */ -}}
 {{ range $ts := $f.ChildSuites }}
@@ -54,10 +57,16 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                 t.Run(desc, func(it *testing.T) {
                     ttt := gotest.NewT(it)
 {{- if $f.AfterEach }}
-                    defer fixture.AfterEach(ttt)
+                    defer func() {
+                        if err := fixture.AfterEach(context.Background()); err != nil {
+                            it.Errorf("{{ $f.Identifier }}.AfterEach failed: %v", err)
+                        }
+                    }()
 {{- end }}
 {{- if $f.BeforeEach }}
-                    fixture.BeforeEach(ttt)
+                    if err := fixture.BeforeEach(it.Context()); err != nil {
+                        it.Fatalf("{{ $f.Identifier }}.BeforeEach failed: %v", err)
+                    }
 {{- end }}
                     defer s.AfterEach(ttt)
                     s.BeforeEach(ttt)
@@ -75,10 +84,16 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                     defer wg.Done()
                     ttt := gotest.NewT(it)
 {{- if $f.AfterEach }}
-                    defer fixture.AfterEach(ttt)
+                    defer func() {
+                        if err := fixture.AfterEach(context.Background()); err != nil {
+                            it.Errorf("{{ $f.Identifier }}.AfterEach failed: %v", err)
+                        }
+                    }()
 {{- end }}
 {{- if $f.BeforeEach }}
-                    fixture.BeforeEach(ttt)
+                    if err := fixture.BeforeEach(it.Context()); err != nil {
+                        it.Fatalf("{{ $f.Identifier }}.BeforeEach failed: %v", err)
+                    }
 {{- end }}
                     defer s.AfterEach(ttt)
                     s.BeforeEach(ttt)
@@ -118,13 +133,16 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
         child := &{{ $cf.Identifier }}{
             {{ $f.Identifier }}: fixture,
         }
-        ct := gotest.NewT(t)
         t.Cleanup(func() {
 {{- if $cf.AfterAll }}
-            child.AfterAll(ct)
+            if err := child.AfterAll(context.Background()); err != nil {
+                t.Errorf("{{ $cf.Identifier }}.AfterAll failed: %v", err)
+            }
 {{- end }}
         })
-        child.BeforeAll(ct)
+        if err := child.BeforeAll(t.Context()); err != nil {
+            t.Fatalf("{{ $cf.Identifier }}.BeforeAll failed: %v", err)
+        }
 
 {{- range $ts := $cf.ChildSuites }}
         t.Run("{{ $ts.Identifier }}", func(t *testing.T) {
@@ -144,16 +162,28 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                     t.Run(desc, func(it *testing.T) {
                         ttt := gotest.NewT(it)
 {{- if $f.AfterEach }}
-                        defer fixture.AfterEach(ttt)
+                        defer func() {
+                            if err := fixture.AfterEach(context.Background()); err != nil {
+                                it.Errorf("{{ $f.Identifier }}.AfterEach failed: %v", err)
+                            }
+                        }()
 {{- end }}
 {{- if $f.BeforeEach }}
-                        fixture.BeforeEach(ttt)
+                        if err := fixture.BeforeEach(it.Context()); err != nil {
+                            it.Fatalf("{{ $f.Identifier }}.BeforeEach failed: %v", err)
+                        }
 {{- end }}
 {{- if $cf.AfterEach }}
-                        defer child.AfterEach(ttt)
+                        defer func() {
+                            if err := child.AfterEach(context.Background()); err != nil {
+                                it.Errorf("{{ $cf.Identifier }}.AfterEach failed: %v", err)
+                            }
+                        }()
 {{- end }}
 {{- if $cf.BeforeEach }}
-                        child.BeforeEach(ttt)
+                        if err := child.BeforeEach(it.Context()); err != nil {
+                            it.Fatalf("{{ $cf.Identifier }}.BeforeEach failed: %v", err)
+                        }
 {{- end }}
                         defer s.AfterEach(ttt)
                         s.BeforeEach(ttt)
@@ -171,16 +201,28 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                         defer wg.Done()
                         ttt := gotest.NewT(it)
 {{- if $f.AfterEach }}
-                        defer fixture.AfterEach(ttt)
+                        defer func() {
+                            if err := fixture.AfterEach(context.Background()); err != nil {
+                                it.Errorf("{{ $f.Identifier }}.AfterEach failed: %v", err)
+                            }
+                        }()
 {{- end }}
 {{- if $f.BeforeEach }}
-                        fixture.BeforeEach(ttt)
+                        if err := fixture.BeforeEach(it.Context()); err != nil {
+                            it.Fatalf("{{ $f.Identifier }}.BeforeEach failed: %v", err)
+                        }
 {{- end }}
 {{- if $cf.AfterEach }}
-                        defer child.AfterEach(ttt)
+                        defer func() {
+                            if err := child.AfterEach(context.Background()); err != nil {
+                                it.Errorf("{{ $cf.Identifier }}.AfterEach failed: %v", err)
+                            }
+                        }()
 {{- end }}
 {{- if $cf.BeforeEach }}
-                        child.BeforeEach(ttt)
+                        if err := child.BeforeEach(it.Context()); err != nil {
+                            it.Fatalf("{{ $cf.Identifier }}.BeforeEach failed: %v", err)
+                        }
 {{- end }}
                         defer s.AfterEach(ttt)
                         s.BeforeEach(ttt)

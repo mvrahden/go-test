@@ -1,6 +1,6 @@
 module github.com/mvrahden/go-test/examples
 
-go 1.23
+go 1.24
 
 replace github.com/mvrahden/go-test => ../
 

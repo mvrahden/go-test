@@ -1,16 +1,21 @@
 package fixturesuite
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type SetupFixture struct {
 	Value string
 }
 
-func (s *SetupFixture) BeforeAll(t *gotest.T) {
+func (s *SetupFixture) BeforeAll(ctx context.Context) error {
 	s.Value = "initialized"
+	return nil
 }
 
-func (s *SetupFixture) AfterAll(t *gotest.T) {}
+func (s *SetupFixture) AfterAll(ctx context.Context) error { return nil }
 
 type DemoTestSuite struct {
 	*SetupFixture

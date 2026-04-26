@@ -3,6 +3,7 @@
 package fixturesuite
 
 import (
+	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"os"
 	"testing"
@@ -25,11 +26,14 @@ func TestMain(m *testing.M) { os.Exit(m.Run()) }
 func Test_SetupFixture(t *testing.T) {
 
 	fixture := &SetupFixture{}
-	ft := gotest.NewT(t)
 	t.Cleanup(func() {
-		fixture.AfterAll(ft)
+		if err := fixture.AfterAll(context.Background()); err != nil {
+			t.Errorf("SetupFixture.AfterAll failed: %v", err)
+		}
 	})
-	fixture.BeforeAll(ft)
+	if err := fixture.BeforeAll(t.Context()); err != nil {
+		t.Fatalf("SetupFixture.BeforeAll failed: %v", err)
+	}
 	t.Run("DemoTestSuite", func(t *testing.T) {
 		s := &ƒƒ_GOTEST_DemoTestSuite{
 			DemoTestSuite: DemoTestSuite{

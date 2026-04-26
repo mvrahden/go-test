@@ -216,7 +216,7 @@ func validateFixtures(fixtures []*gotestast.FixtureSpec) error {
 		switch f.Kind {
 		case gotestast.PackageFixture:
 			if f.BeforeAll == nil {
-				return fmt.Errorf("package fixture %q must have a BeforeAll(t *gotest.T) method", f.Identifier())
+				return fmt.Errorf("package fixture %q must have a BeforeAll(ctx context.Context) error method", f.Identifier())
 			}
 		case gotestast.SharedFixture:
 			if f.BeforeAll == nil {

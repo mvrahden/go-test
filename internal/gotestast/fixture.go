@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/mvrahden/go-test/about"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -153,15 +152,16 @@ func DetermineFixtureHarness(n ast.Node, pkg *packages.Package, f *FixtureSpec) 
 
 	switch f.Kind {
 	case PackageFixture:
-		// Package fixture lifecycle methods: (t *gotest.T), no results
-		if name == "BeforeEach" || name == "AfterEach" || name == "BeforeAll" || name == "AfterAll" {
-			if sig.Params().Len() != 1 || sig.Results().Len() != 0 {
-				return m.Pos(), fmt.Errorf("unsupported signature for %q: expected (t *gotest.T)", methodID)
-			}
-			pT := sig.Params().At(0).Type().String()
-			if !strings.HasPrefix(pT, "*"+about.Repo) || !strings.HasSuffix(pT, "/gotest.T") {
-				return m.Pos(), fmt.Errorf("unsupported param type for signature of %q: expected *gotest.T", methodID)
-			}
+		if sig.Params().Len() != 1 || sig.Results().Len() != 1 {
+			return m.Pos(), fmt.Errorf("unsupported signature for %q: expected (ctx context.Context) error", methodID)
+		}
+		pT := sig.Params().At(0).Type().String()
+		if pT != "context.Context" {
+			return m.Pos(), fmt.Errorf("unsupported param type for %q: expected context.Context, got %s", methodID, pT)
+		}
+		resType := sig.Results().At(0).Type().String()
+		if resType != "error" {
+			return m.Pos(), fmt.Errorf("unsupported return type for %q: expected error, got %s", methodID, resType)
 		}
 	case SharedFixture:
 		// Shared fixture: BeforeAll/AfterAll must be () error, no BeforeEach/AfterEach

@@ -102,6 +102,7 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		imports = append(imports, Import{Path: "sync"})
 	}
 	if len(spec.Fixtures) > 0 {
+		imports = append(imports, Import{Path: "context"})
 		imports = append(imports, Import{Path: "os"})
 	}
 	data := TplData{

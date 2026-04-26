@@ -67,12 +67,25 @@ No generated code leaks into your workflow. `gotest` generates it before tests r
 
 ### Lifecycle Hooks
 
+Suite hooks receive `*gotest.T` for assertions:
+
 ```go
 func (s *MySuite) BeforeAll(t *gotest.T)  {} // once before all tests
 func (s *MySuite) AfterAll(t *gotest.T)   {} // once after all tests
 func (s *MySuite) BeforeEach(t *gotest.T) {} // before each test method
 func (s *MySuite) AfterEach(t *gotest.T)  {} // after each test method
 ```
+
+Fixture hooks receive `context.Context` and return `error` — the generated wrapper reports failures with automatic attribution:
+
+```go
+func (f *MyFixture) BeforeAll(ctx context.Context) error  { return nil }
+func (f *MyFixture) AfterAll(ctx context.Context) error   { return nil }
+func (f *MyFixture) BeforeEach(ctx context.Context) error { return nil }
+func (f *MyFixture) AfterEach(ctx context.Context) error  { return nil }
+```
+
+Setup hooks (`BeforeAll`, `BeforeEach`) receive `t.Context()` — cancelled when the test ends, carries the test deadline. Cleanup hooks (`AfterAll`, `AfterEach`) receive `context.Background()` — cleanup must proceed even after the test context is cancelled. Requires Go 1.24+.
 
 All hooks are optional. `AfterAll` runs via `t.Cleanup` (LIFO). `AfterEach` is deferred, so it runs even on `t.Fatal()`.
 
@@ -88,13 +101,22 @@ type E2ESetupFixture struct {
     ServerURL string
 }
 
-func (s *E2ESetupFixture) BeforeAll(t *gotest.T) {
+func (f *E2ESetupFixture) BeforeAll(ctx context.Context) error {
     pg, err := testhelper.StartPostgres(ctx)
-    gotest.NoError(t, err)
-    t.T().Cleanup(func() { pg.Container.Terminate(ctx) })
-    s.Pool = pg.Pool
+    if err != nil {
+        return fmt.Errorf("start postgres: %w", err)
+    }
+    f.Pool = pg.Pool
+    return nil
+}
+
+func (f *E2ESetupFixture) AfterAll(ctx context.Context) error {
+    f.Pool.Close()
+    return nil
 }
 ```
+
+Fixture hooks return `error` — the generated wrapper handles reporting with automatic attribution (e.g., `E2ESetupFixture.BeforeAll failed: start postgres: connection refused`).
 
 Test suites embed the fixture via pointer embedding to get access to shared state:
 

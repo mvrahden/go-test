@@ -10,14 +10,18 @@ import (
 func TestRenderer_FixtureWithChildSuite(t *testing.T) {
 	src := `package testpkg
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type DBFixture struct {
 	Conn string
 }
 
-func (f *DBFixture) BeforeAll(t *gotest.T)  {}
-func (f *DBFixture) AfterAll(t *gotest.T)   {}
+func (f *DBFixture) BeforeAll(ctx context.Context) error  { return nil }
+func (f *DBFixture) AfterAll(ctx context.Context) error   { return nil }
 
 type QueryTestSuite struct {
 	*DBFixture
@@ -54,8 +58,10 @@ func (s *QueryTestSuite) TestSelect(t *gotest.T) {}
 	gotest.True(t, strings.Contains(output, "func Test_DBFixture(t *testing.T)"), "expected Test_DBFixture")
 	gotest.True(t, strings.Contains(output, `"os"`), "expected os import")
 	gotest.True(t, strings.Contains(output, "fixture := &DBFixture{}"), "expected fixture instantiation")
-	gotest.True(t, strings.Contains(output, "fixture.BeforeAll(ft)"), "expected BeforeAll call")
-	gotest.True(t, strings.Contains(output, "fixture.AfterAll(ft)"), "expected AfterAll in cleanup")
+	gotest.True(t, strings.Contains(output, "fixture.BeforeAll(t.Context())"), "expected BeforeAll call")
+	gotest.True(t, strings.Contains(output, `"DBFixture.BeforeAll failed:`), "expected BeforeAll error attribution")
+	gotest.True(t, strings.Contains(output, "fixture.AfterAll(context.Background())"), "expected AfterAll in cleanup")
+	gotest.True(t, strings.Contains(output, `"DBFixture.AfterAll failed:`), "expected AfterAll error attribution")
 	gotest.True(t, strings.Contains(output, `t.Run("QueryTestSuite"`), "expected t.Run for child suite")
 	gotest.True(t, strings.Contains(output, "ƒƒ_GOTEST_QueryTestSuite"), "expected wrapper struct")
 	gotest.True(t, strings.Contains(output, "DBFixture: fixture"), "expected fixture injection")
@@ -75,11 +81,15 @@ func (s *QueryTestSuite) TestSelect(t *gotest.T) {}
 func TestRenderer_FixtureWithoutAfterAll(t *testing.T) {
 	src := `package testpkg
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type SimpleFixture struct {}
 
-func (f *SimpleFixture) BeforeAll(t *gotest.T) {}
+func (f *SimpleFixture) BeforeAll(ctx context.Context) error { return nil }
 
 type BasicTestSuite struct {
 	*SimpleFixture
@@ -110,11 +120,15 @@ func (s *BasicTestSuite) TestOne(t *gotest.T) {}
 func TestRenderer_MixedFixtureBoundAndStandalone(t *testing.T) {
 	src := `package testpkg
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type AppFixture struct {}
 
-func (f *AppFixture) BeforeAll(t *gotest.T) {}
+func (f *AppFixture) BeforeAll(ctx context.Context) error { return nil }
 
 type BoundTestSuite struct {
 	*AppFixture
@@ -152,14 +166,18 @@ func (s *StandaloneTestSuite) TestFree(t *gotest.T) {}
 func TestRenderer_FixtureWithBeforeAfterEach(t *testing.T) {
 	src := `package testpkg
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type EachFixture struct {}
 
-func (f *EachFixture) BeforeAll(t *gotest.T)  {}
-func (f *EachFixture) AfterAll(t *gotest.T)   {}
-func (f *EachFixture) BeforeEach(t *gotest.T) {}
-func (f *EachFixture) AfterEach(t *gotest.T)  {}
+func (f *EachFixture) BeforeAll(ctx context.Context) error  { return nil }
+func (f *EachFixture) AfterAll(ctx context.Context) error   { return nil }
+func (f *EachFixture) BeforeEach(ctx context.Context) error { return nil }
+func (f *EachFixture) AfterEach(ctx context.Context) error  { return nil }
 
 type EachTestSuite struct {
 	*EachFixture
@@ -193,16 +211,18 @@ func (s *EachTestSuite) TestCase(t *gotest.T)   {}
 	gotest.True(t, strings.Contains(output, "ts.EachTestSuite.BeforeEach(it)"), "expected suite BeforeEach delegation")
 	gotest.True(t, strings.Contains(output, "ts.EachTestSuite.AfterEach(it)"), "expected suite AfterEach delegation")
 
-	// Fixture-level BeforeEach/AfterEach should appear in the test case closure
-	gotest.True(t, strings.Contains(output, "fixture.BeforeEach(ttt)"), "expected fixture BeforeEach in test case")
-	gotest.True(t, strings.Contains(output, "defer fixture.AfterEach(ttt)"), "expected fixture AfterEach defer in test case")
+	// Fixture-level BeforeEach/AfterEach should appear in the test case closure with error handling
+	gotest.True(t, strings.Contains(output, "fixture.BeforeEach(it.Context())"), "expected fixture BeforeEach in test case")
+	gotest.True(t, strings.Contains(output, `"EachFixture.BeforeEach failed:`), "expected BeforeEach error attribution")
+	gotest.True(t, strings.Contains(output, "fixture.AfterEach(context.Background())"), "expected fixture AfterEach in test case")
+	gotest.True(t, strings.Contains(output, `"EachFixture.AfterEach failed:`), "expected AfterEach error attribution")
 
 	// Verify ordering: fixture AfterEach deferred before suite AfterEach (LIFO)
-	fixtureAfterIdx := strings.Index(output, "defer fixture.AfterEach(ttt)")
+	fixtureAfterIdx := strings.Index(output, "fixture.AfterEach(context.Background())")
 	suiteAfterIdx := strings.Index(output, "defer s.AfterEach(ttt)")
 	gotest.True(t, fixtureAfterIdx < suiteAfterIdx, "fixture AfterEach should be deferred before suite AfterEach (LIFO)")
 
-	fixtureBeforeIdx := strings.Index(output, "fixture.BeforeEach(ttt)")
+	fixtureBeforeIdx := strings.Index(output, "fixture.BeforeEach(it.Context())")
 	suiteBeforeIdx := strings.Index(output, "s.BeforeEach(ttt)")
 	gotest.True(t, fixtureBeforeIdx < suiteBeforeIdx, "fixture BeforeEach should run before suite BeforeEach")
 }
@@ -210,11 +230,15 @@ func (s *EachTestSuite) TestCase(t *gotest.T)   {}
 func TestRenderer_FixtureWithoutBeforeAfterEach(t *testing.T) {
 	src := `package testpkg
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type MinimalFixture struct {}
 
-func (f *MinimalFixture) BeforeAll(t *gotest.T) {}
+func (f *MinimalFixture) BeforeAll(ctx context.Context) error { return nil }
 
 type MinimalTestSuite struct {
 	*MinimalFixture
@@ -245,21 +269,25 @@ func (s *MinimalTestSuite) TestOne(t *gotest.T) {}
 func TestRenderer_NestedFixtureWithBeforeAfterEach(t *testing.T) {
 	src := `package testpkg
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type InfraFixture struct {}
 
-func (f *InfraFixture) BeforeAll(t *gotest.T)  {}
-func (f *InfraFixture) BeforeEach(t *gotest.T) {}
-func (f *InfraFixture) AfterEach(t *gotest.T)  {}
+func (f *InfraFixture) BeforeAll(ctx context.Context) error  { return nil }
+func (f *InfraFixture) BeforeEach(ctx context.Context) error { return nil }
+func (f *InfraFixture) AfterEach(ctx context.Context) error  { return nil }
 
 type APIFixture struct {
 	*InfraFixture
 }
 
-func (f *APIFixture) BeforeAll(t *gotest.T)  {}
-func (f *APIFixture) BeforeEach(t *gotest.T) {}
-func (f *APIFixture) AfterEach(t *gotest.T)  {}
+func (f *APIFixture) BeforeAll(ctx context.Context) error  { return nil }
+func (f *APIFixture) BeforeEach(ctx context.Context) error { return nil }
+func (f *APIFixture) AfterEach(ctx context.Context) error  { return nil }
 
 type HandlerTestSuite struct {
 	*APIFixture
@@ -284,21 +312,25 @@ func (s *HandlerTestSuite) TestGet(t *gotest.T)    {}
 
 	output := string(out)
 
-	// Nested fixture: parent (fixture) and child hooks should both appear
-	gotest.True(t, strings.Contains(output, "defer fixture.AfterEach(ttt)"), "expected parent fixture AfterEach")
-	gotest.True(t, strings.Contains(output, "fixture.BeforeEach(ttt)"), "expected parent fixture BeforeEach")
-	gotest.True(t, strings.Contains(output, "defer child.AfterEach(ttt)"), "expected child fixture AfterEach")
-	gotest.True(t, strings.Contains(output, "child.BeforeEach(ttt)"), "expected child fixture BeforeEach")
+	// Nested fixture: parent (fixture) and child hooks should both appear with error handling
+	gotest.True(t, strings.Contains(output, "fixture.AfterEach(context.Background())"), "expected parent fixture AfterEach")
+	gotest.True(t, strings.Contains(output, `"InfraFixture.AfterEach failed:`), "expected parent AfterEach attribution")
+	gotest.True(t, strings.Contains(output, "fixture.BeforeEach(it.Context())"), "expected parent fixture BeforeEach")
+	gotest.True(t, strings.Contains(output, `"InfraFixture.BeforeEach failed:`), "expected parent BeforeEach attribution")
+	gotest.True(t, strings.Contains(output, "child.AfterEach(context.Background())"), "expected child fixture AfterEach")
+	gotest.True(t, strings.Contains(output, `"APIFixture.AfterEach failed:`), "expected child AfterEach attribution")
+	gotest.True(t, strings.Contains(output, "child.BeforeEach(it.Context())"), "expected child fixture BeforeEach")
+	gotest.True(t, strings.Contains(output, `"APIFixture.BeforeEach failed:`), "expected child BeforeEach attribution")
 
 	// Verify ordering: parent deferred first (runs last), then child, then suite
-	parentAfterIdx := strings.Index(output, "defer fixture.AfterEach(ttt)")
-	childAfterIdx := strings.Index(output, "defer child.AfterEach(ttt)")
+	parentAfterIdx := strings.Index(output, "fixture.AfterEach(context.Background())")
+	childAfterIdx := strings.Index(output, "child.AfterEach(context.Background())")
 	suiteAfterIdx := strings.Index(output, "defer s.AfterEach(ttt)")
 	gotest.True(t, parentAfterIdx < childAfterIdx, "parent AfterEach deferred before child (LIFO)")
 	gotest.True(t, childAfterIdx < suiteAfterIdx, "child AfterEach deferred before suite (LIFO)")
 
-	parentBeforeIdx := strings.Index(output, "fixture.BeforeEach(ttt)")
-	childBeforeIdx := strings.Index(output, "child.BeforeEach(ttt)")
+	parentBeforeIdx := strings.Index(output, "fixture.BeforeEach(it.Context())")
+	childBeforeIdx := strings.Index(output, "child.BeforeEach(it.Context())")
 	suiteBeforeIdx := strings.Index(output, "s.BeforeEach(ttt)")
 	gotest.True(t, parentBeforeIdx < childBeforeIdx, "parent BeforeEach before child")
 	gotest.True(t, childBeforeIdx < suiteBeforeIdx, "child BeforeEach before suite")
@@ -308,12 +340,16 @@ func TestBuildFixtureViewModels_RootFixtureOnly(t *testing.T) {
 	c := collector{}
 	src := `package testpkg
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type MyFixture struct {}
 
-func (f *MyFixture) BeforeAll(t *gotest.T) {}
-func (f *MyFixture) AfterAll(t *gotest.T)  {}
+func (f *MyFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *MyFixture) AfterAll(ctx context.Context) error  { return nil }
 
 type MyTestSuite struct {
 	*MyFixture

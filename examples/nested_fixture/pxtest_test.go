@@ -1,13 +1,18 @@
 package nestedfixture_test
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type ExternalInfraFixture struct {
 	Value string
 }
 
-func (f *ExternalInfraFixture) BeforeAll(t *gotest.T) {
+func (f *ExternalInfraFixture) BeforeAll(ctx context.Context) error {
 	f.Value = "infra-ready"
+	return nil
 }
 
 type ExternalLightTestSuite struct {

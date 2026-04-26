@@ -1,24 +1,30 @@
 package nestedfixture
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type InfraFixture struct {
 	DBValue string
 }
 
-func (f *InfraFixture) BeforeAll(t *gotest.T) {
+func (f *InfraFixture) BeforeAll(ctx context.Context) error {
 	f.DBValue = "db-ready"
+	return nil
 }
 
-func (f *InfraFixture) AfterAll(t *gotest.T) {}
+func (f *InfraFixture) AfterAll(ctx context.Context) error { return nil }
 
 type APIFixture struct {
 	*InfraFixture
 	APIValue string
 }
 
-func (f *APIFixture) BeforeAll(t *gotest.T) {
+func (f *APIFixture) BeforeAll(ctx context.Context) error {
 	f.APIValue = "api-ready"
+	return nil
 }
 
 type LightTestSuite struct {
