@@ -166,14 +166,12 @@ function buildRunFilter(items: readonly vscode.TestItem[]): string | undefined {
 
   if (depth === 1) {
     // suite level
-    const suiteName = item.label.replace(/^(F_|X_)/, "");
-    return `^Test${suiteName}$`;
+    return `^Test${item.label}$`;
   }
 
   // method level or deeper
   const suite = item.parent!;
-  const suiteName = suite.label.replace(/^(F_|X_)/, "");
-  return `^Test${suiteName}$/^${item.label}$`;
+  return `^Test${suite.label}$/^${item.label}$`;
 }
 
 function getPackageDir(item: vscode.TestItem, cache: DiscoveryCache): string | undefined {
