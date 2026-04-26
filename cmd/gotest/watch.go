@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
@@ -86,24 +87,34 @@ func runWatch(args []string) int {
 }
 
 func watchRunOnce(goTestArgs []string, patterns []string) int {
-	var allDirs []string
+	var allResults gotestgen.GenerateResults
 	for _, pattern := range patterns {
-		dirs, _, err := gotestrunner.SuitesGenerateWithCollectorResults(pattern)
+		results, _, err := gotestrunner.SuitesGenerateWithCollectorResults(pattern)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2
 		}
-		allDirs = append(allDirs, dirs...)
+		allResults = append(allResults, results...)
 	}
-	if !DEBUG {
-		defer cleanupGeneratedFiles(allDirs)
+
+	tmpDir, err := gotestrunner.WriteOverlay(allResults)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
 	}
+	if DEBUG {
+		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s\n", tmpDir)
+	} else {
+		defer os.RemoveAll(tmpDir)
+	}
+
+	overlayArgs := append([]string{"-overlay=" + filepath.Join(tmpDir, "overlay.json")}, goTestArgs...)
 
 	if SPEC {
-		return runWithSpec(goTestArgs, nil)
+		return runWithSpec(overlayArgs, nil)
 	}
 
-	code, err := gotestrunner.StdlibRunTests(goTestArgs)
+	code, err := gotestrunner.StdlibRunTests(overlayArgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
@@ -36,26 +35,36 @@ func Run(cfg ExecConfig) int {
 	defer stop()
 
 	// 1. Generate test code
-	var allDirs []string
+	var allResults gotestgen.GenerateResults
 	var allCollectorResults []gotestgen.CollectorResult
 	for _, pattern := range cfg.PackagePatterns {
-		dirs, collectorResults, err := gotestrunner.SuitesGenerateWithCollectorResults(pattern)
+		results, collectorResults, err := gotestrunner.SuitesGenerateWithCollectorResults(pattern)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2
 		}
-		allDirs = append(allDirs, dirs...)
+		allResults = append(allResults, results...)
 		allCollectorResults = append(allCollectorResults, collectorResults...)
 	}
 
-	if !DEBUG {
-		defer cleanupGeneratedFiles(allDirs)
+	// 2. Write overlay
+	tmpDir, err := gotestrunner.WriteOverlay(allResults)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if DEBUG {
+		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s\n", tmpDir)
+	} else {
+		defer os.RemoveAll(tmpDir)
 	}
 
-	// 2. Discover shared fixtures from collector results
+	goTestArgs := append([]string{"-overlay=" + filepath.Join(tmpDir, "overlay.json")}, cfg.GoTestArgs...)
+
+	// 3. Discover shared fixtures from collector results
 	sharedFixtures := gotestgen.DiscoverSharedFixtures(allCollectorResults)
 
-	// 3. If any shared fixtures, start setup subprocess
+	// 4. If any shared fixtures, start setup subprocess
 	var setupProc *SharedFixtureProcess
 	if len(sharedFixtures) > 0 {
 		var err error
@@ -73,17 +82,17 @@ func Run(cfg ExecConfig) int {
 	default:
 	}
 
-	// 4. Run tests with env vars from shared fixtures
+	// 5. Run tests with env vars from shared fixtures
 	var extraEnv map[string]string
 	if setupProc != nil {
 		extraEnv = setupProc.Env()
 	}
 
 	if SPEC {
-		return runWithSpec(cfg.GoTestArgs, extraEnv)
+		return runWithSpec(goTestArgs, extraEnv)
 	}
 
-	code, err := gotestrunner.StdlibRunTests(cfg.GoTestArgs, extraEnv)
+	code, err := gotestrunner.StdlibRunTests(goTestArgs, extraEnv)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -117,11 +126,4 @@ func runWithSpec(goTestArgs []string, extraEnv map[string]string) int {
 	gotestspec.RenderTerminal(os.Stdout, tree)
 
 	return code
-}
-
-func cleanupGeneratedFiles(dirs []string) {
-	for _, dir := range dirs {
-		os.Remove(filepath.Join(dir, about.PSuite))
-		os.Remove(filepath.Join(dir, about.PXSuite))
-	}
 }
