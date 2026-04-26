@@ -108,7 +108,19 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 }
 ```
 
-Fixtures can nest — a root fixture's `BeforeAll` runs first, then each child's:
+Fixtures support the same lifecycle hooks as suites. `BeforeAll`/`AfterAll` run once around all suites bound to the fixture. `BeforeEach`/`AfterEach` wrap every individual test case, running outside the suite's own hooks:
+
+```
+Fixture.BeforeEach
+  Suite.BeforeEach
+    TestCase
+  Suite.AfterEach
+Fixture.AfterEach
+```
+
+All four hooks are optional (only `BeforeAll` is required).
+
+Fixtures can nest — a root fixture's hooks run first, wrapping the child's:
 
 ```go
 type InfraFixture struct { Pool *pgxpool.Pool }
@@ -117,6 +129,16 @@ type APIFixture struct {
     *InfraFixture // f.Pool available from parent
     ServerURL string
 }
+```
+
+```
+InfraFixture.BeforeEach
+  APIFixture.BeforeEach
+    Suite.BeforeEach
+      TestCase
+    Suite.AfterEach
+  APIFixture.AfterEach
+InfraFixture.AfterEach
 ```
 
 Output nests naturally: `Test_InfraFixture/APIFixture/BatchTestSuite/TestDispatch`.
