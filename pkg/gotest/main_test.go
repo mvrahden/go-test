@@ -35,6 +35,7 @@ func TestT(t *testing.T) {
 		"pkg/gotest/eventually_suite_test.go", // Eventually suite (not part of golden)
 		"pkg/gotest/must_suite_test.go",      // Must suite (not part of golden)
 		"pkg/gotest/snapshot_suite_test.go",  // Snapshot suite (not part of golden)
+		"pkg/gotest/collecting_test.go",     // internal tests (not part of golden)
 	}
 	testutils.CopyModuleUnderTestToTmp(t, tmp, "./../..", excludedPaths...)
 	testutils.ActivateTests(t, tmp)

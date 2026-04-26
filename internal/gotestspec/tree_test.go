@@ -299,6 +299,39 @@ func TestCollectStats_StdlibOnly(t *testing.T) {
 	}
 }
 
+func TestSplitTestPath(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want []string
+	}{
+		{"single segment", "TestFoo", []string{"TestFoo"}},
+		{"two segments", "TestFoo/bar", []string{"TestFoo", "bar"}},
+		{"three segments", "TestFoo/bar/baz", []string{"TestFoo", "bar", "baz"}},
+		{"consecutive double slash preserved", "TestFoo/https://example.com", []string{"TestFoo", "https://example.com"}},
+		{"consecutive triple slash preserved", "TestFoo/a///b", []string{"TestFoo", "a///b"}},
+		{"empty string", "", []string{}},
+		{"trailing slash", "TestFoo/bar/", []string{"TestFoo", "bar"}},
+		{"mixed normal and double slash", "TestSuite/method/https://host/path", []string{"TestSuite", "method", "https://host", "path"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitTestPath(tt.path)
+			if len(got) == 0 && len(tt.want) == 0 {
+				return
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("splitTestPath(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("splitTestPath(%q)[%d] = %q, want %q", tt.path, i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestClassify_ParallelMethod(t *testing.T) {
 	input := `{"Action":"run","Package":"p","Test":"TestMyTestSuite"}
 {"Action":"run","Package":"p","Test":"TestMyTestSuite/TestParallelCreate"}
