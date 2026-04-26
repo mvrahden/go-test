@@ -36,7 +36,6 @@ func TestParseSubcommand(t *testing.T) {
 		{desc: "empty args", args: nil, expectSubcmd: "", expectRemaining: nil},
 		{desc: "no subcommand, just flags", args: []string{"-v", "./..."}, expectSubcmd: "", expectRemaining: []string{"-v", "./..."}},
 		{desc: "version subcommand", args: []string{"version"}, expectSubcmd: "version", expectRemaining: nil},
-		{desc: "clean subcommand with remaining", args: []string{"clean", "./pkg/..."}, expectSubcmd: "clean", expectRemaining: []string{"./pkg/..."}},
 		{desc: "scaffold subcommand", args: []string{"scaffold", "-v"}, expectSubcmd: "scaffold", expectRemaining: []string{"-v"}},
 		{desc: "migrate subcommand", args: []string{"migrate"}, expectSubcmd: "migrate", expectRemaining: nil},
 		{desc: "help subcommand", args: []string{"help"}, expectSubcmd: "help", expectRemaining: nil},

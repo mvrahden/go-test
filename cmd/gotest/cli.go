@@ -2,18 +2,14 @@ package main
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"slices"
-	"strings"
 
 	"github.com/mvrahden/go-test/about"
 )
 
 var (
 	DEBUG bool
-	CLEAN bool
 	CI    bool
 	SPEC  bool
 )
@@ -33,12 +29,6 @@ func main() {
 	case "version":
 		fmt.Println(about.LongInfo())
 		return
-	case "clean":
-		// Extract own flags from remaining
-		ownArgs, goTestArgs := SplitArgs(remaining)
-		DEBUG = slices.Contains(ownArgs, "-ƒƒ.internal.debug")
-		runClean(goTestArgs)
-		return
 	case "help":
 		printUsage()
 		return
@@ -47,14 +37,8 @@ func main() {
 		args := os.Args[1:]
 		ownArgs, goTestArgs := SplitArgs(args)
 		DEBUG = slices.Contains(ownArgs, "-ƒƒ.internal.debug")
-		CLEAN = slices.Contains(ownArgs, "-ƒƒ.clean")
 		CI = slices.Contains(ownArgs, "--ci")
 		SPEC = slices.Contains(ownArgs, "--spec")
-
-		if CLEAN {
-			runClean(goTestArgs)
-			return
-		}
 
 		patterns := ExtractPackagePatterns(goTestArgs)
 		cfg := ExecConfig{
@@ -75,7 +59,6 @@ Usage:
 Subcommands:
   spec        Render behavioral specification from test suites
   watch       Watch for file changes and re-run tests
-  clean       Remove generated test files
   scaffold    Generate test suite skeleton from a Go type
   migrate     Convert testify/suite tests to go-test format
   version     Print version information
@@ -89,22 +72,3 @@ All other flags and arguments are forwarded to "go test".
 `, about.ShortInfo())
 }
 
-func runClean(goTestArgs []string) {
-	patterns := ExtractPackagePatterns(goTestArgs)
-	for _, pattern := range patterns {
-		dir := strings.TrimSuffix(pattern, "/...")
-		if dir == "" {
-			dir = "."
-		}
-		filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return nil
-			}
-			if !d.IsDir() && about.PSuiteRegex.MatchString(d.Name()) {
-				fmt.Fprintf(os.Stdout, "removing %s\n", path)
-				os.Remove(path)
-			}
-			return nil
-		})
-	}
-}
