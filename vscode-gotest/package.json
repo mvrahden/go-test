@@ -14,6 +14,24 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "gotest.runTest",
+        "title": "Go Test: Run"
+      },
+      {
+        "command": "gotest.debugTest",
+        "title": "Go Test: Debug"
+      },
+      {
+        "command": "gotest.refreshTests",
+        "title": "Go Test: Refresh"
+      },
+      {
+        "command": "gotest.showFocusedTests",
+        "title": "Go Test: Show Focused Tests"
+      }
+    ],
     "configuration": {
       "title": "Go Test Suites",
       "properties": {
