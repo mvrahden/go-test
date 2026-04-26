@@ -8,11 +8,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ["1.24", "1.25", "1.26"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: ${{ matrix.go-version }}
       - name: Test
         run: go run ./cmd/gotest spec --format=md --output=spec.md ./... -race
       - name: Behavior spec
