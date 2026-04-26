@@ -1,6 +1,7 @@
 package gotest
 
 import (
+	"context"
 	"fmt"
 	"iter"
 	"os"
@@ -25,7 +26,8 @@ type T struct {
 	collector *collectingT
 }
 
-func (t *T) T() *testing.T { return t.t }
+func (t *T) T() *testing.T           { return t.t }
+func (t *T) Context() context.Context { return t.t.Context() }
 func (t *T) Errorf(format string, args ...any) {
 	if t.collector != nil {
 		t.collector.Errorf(format, args...)
