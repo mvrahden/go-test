@@ -26,11 +26,6 @@ type T struct {
 }
 
 func (t *T) T() *testing.T { return t.t }
-func (t *T) Helper() {
-	if t.t != nil {
-		t.t.Helper()
-	}
-}
 func (t *T) Errorf(format string, args ...any) {
 	if t.collector != nil {
 		t.collector.Errorf(format, args...)
