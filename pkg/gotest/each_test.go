@@ -88,3 +88,59 @@ func TestEach_EmptySlice_RunsNothing(t *testing.T) {
 		t.Fatalf("expected 0 entries, got %d", count)
 	}
 }
+
+func TestEach_Iterator_WithDescField(t *testing.T) {
+	gt := gotest.NewT(t)
+
+	type entry struct {
+		Desc  string
+		Value int
+	}
+
+	var ran []string
+	for it, tc := range gotest.Each(gt, []entry{
+		{"first entry", 1},
+		{"second entry", 2},
+		{"third entry", 3},
+	}) {
+		ran = append(ran, tc.Desc)
+		gotest.Greater(it, tc.Value, 0)
+	}
+
+	if len(ran) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(ran))
+	}
+	if ran[0] != "first entry" {
+		t.Errorf("first ran = %q, want %q", ran[0], "first entry")
+	}
+}
+
+func TestEach_Iterator_EmptySlice(t *testing.T) {
+	gt := gotest.NewT(t)
+
+	count := 0
+	for range gotest.Each(gt, []struct{ X int }{}) {
+		count++
+	}
+
+	if count != 0 {
+		t.Fatalf("expected 0 entries, got %d", count)
+	}
+}
+
+func TestEach_Iterator_TypeSafe(t *testing.T) {
+	gt := gotest.NewT(t)
+
+	type testCase struct {
+		Name   string
+		Input  int
+		Expect int
+	}
+
+	for it, tc := range gotest.Each(gt, []testCase{
+		{"double 2", 2, 4},
+		{"double 5", 5, 10},
+	}) {
+		gotest.Equal(it, tc.Expect, tc.Input*2)
+	}
+}

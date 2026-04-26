@@ -2,6 +2,7 @@ package gotest
 
 import (
 	"fmt"
+	"iter"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -84,6 +85,17 @@ func (t *T) Each(entries any, fn any) {
 		t.t.Run(name, func(tt *testing.T) {
 			fv.Call([]reflect.Value{reflect.ValueOf(NewT(tt)), entry})
 		})
+	}
+}
+
+func Each[E any](t *T, entries []E) iter.Seq2[*T, E] {
+	return func(yield func(*T, E) bool) {
+		for i, entry := range entries {
+			name := eachEntryName(reflect.ValueOf(entry), i)
+			t.t.Run(name, func(tt *testing.T) {
+				yield(NewT(tt), entry)
+			})
+		}
 	}
 }
 

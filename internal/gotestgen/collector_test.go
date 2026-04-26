@@ -60,7 +60,7 @@ func loadTestPkgWithGotest(t *testing.T, src string) *packages.Package {
 
 	goMod := `module testpkg
 
-go 1.22
+go 1.23
 
 require github.com/mvrahden/go-test v0.0.0
 

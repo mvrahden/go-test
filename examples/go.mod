@@ -1,8 +1,6 @@
 module github.com/mvrahden/go-test/examples
 
-go 1.22
-
-toolchain go1.22.3
+go 1.23
 
 replace github.com/mvrahden/go-test => ../
 
