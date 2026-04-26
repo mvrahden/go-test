@@ -485,6 +485,118 @@ func (f *DBFixture) BeforeAll(t *gotest.T) {} // wrong: should be (ctx context.C
 	gotest.Contains(t, result.Errs[0].Err.Error(), "unsupported signature")
 }
 
+// --- *testing.T suite support ---
+
+func TestCollector_StdlibT_SuiteDetected(t *testing.T) {
+	src := `package testpkg
+
+import "testing"
+
+type PlainTestSuite struct{}
+
+func (s *PlainTestSuite) TestFoo(t *testing.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Suites))
+	gotest.Equal(t, "PlainTestSuite", result.Suites[0].Identifier())
+	gotest.Equal(t, 1, len(result.Suites[0].TestCases()))
+	gotest.True(t, result.Suites[0].TestCases()[0].UsesStdlibT(), "expected UsesStdlibT for *testing.T method")
+}
+
+func TestCollector_StdlibT_LifecycleHooks(t *testing.T) {
+	src := `package testpkg
+
+import "testing"
+
+type HookTestSuite struct{}
+
+func (s *HookTestSuite) BeforeAll(t *testing.T)  {}
+func (s *HookTestSuite) AfterAll(t *testing.T)   {}
+func (s *HookTestSuite) BeforeEach(t *testing.T) {}
+func (s *HookTestSuite) AfterEach(t *testing.T)  {}
+func (s *HookTestSuite) TestOne(t *testing.T)    {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Suites))
+
+	s := result.Suites[0]
+	gotest.True(t, s.BeforeAll() != nil, "expected BeforeAll")
+	gotest.True(t, s.BeforeAll().UsesStdlibT(), "expected BeforeAll UsesStdlibT")
+	gotest.True(t, s.AfterAll() != nil, "expected AfterAll")
+	gotest.True(t, s.AfterAll().UsesStdlibT(), "expected AfterAll UsesStdlibT")
+	gotest.True(t, s.BeforeEach() != nil, "expected BeforeEach")
+	gotest.True(t, s.BeforeEach().UsesStdlibT(), "expected BeforeEach UsesStdlibT")
+	gotest.True(t, s.AfterEach() != nil, "expected AfterEach")
+	gotest.True(t, s.AfterEach().UsesStdlibT(), "expected AfterEach UsesStdlibT")
+}
+
+func TestCollector_StdlibT_MixedMethodSignatures(t *testing.T) {
+	src := `package testpkg
+
+import (
+	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type MixedTestSuite struct{}
+
+func (s *MixedTestSuite) TestStdlib(t *testing.T) {}
+func (s *MixedTestSuite) TestGotest(t *gotest.T)  {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Suites))
+	gotest.Equal(t, 2, len(result.Suites[0].TestCases()))
+
+	cases := result.Suites[0].TestCases()
+	gotest.Equal(t, "TestStdlib", cases[0].Identifier())
+	gotest.True(t, cases[0].UsesStdlibT(), "expected TestStdlib UsesStdlibT")
+	gotest.Equal(t, "TestGotest", cases[1].Identifier())
+	gotest.True(t, !cases[1].UsesStdlibT(), "expected TestGotest NOT UsesStdlibT")
+}
+
+func TestCollector_StdlibT_WrongParamType(t *testing.T) {
+	src := `package testpkg
+
+import "fmt"
+
+type BadTestSuite struct{}
+
+func (s *BadTestSuite) TestBad(f fmt.Stringer) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.True(t, len(result.Errs) > 0, "expected error for unsupported param type")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "must be *gotest.T or *testing.T")
+}
+
+func TestCollector_GotestT_NotUsesStdlibT(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type GotestTestSuite struct{}
+
+func (s *GotestTestSuite) TestFoo(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Suites[0].TestCases()))
+	gotest.True(t, !result.Suites[0].TestCases()[0].UsesStdlibT(), "expected NOT UsesStdlibT for *gotest.T")
+}
+
 // --- Nil package ---
 
 func TestCollector_NilPackage(t *testing.T) {

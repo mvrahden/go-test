@@ -377,3 +377,126 @@ func (s *MyTestSuite) TestOne(t *gotest.T) {}
 	gotest.Equal(t, "MyTestSuite", vms[0].ChildSuites[0].Identifier())
 	gotest.Equal(t, 0, len(vms[0].ChildFixtures))
 }
+
+// --- *testing.T support tests ---
+
+func TestRenderer_StdlibT_StandaloneSuite(t *testing.T) {
+	src := `package testpkg
+
+import "testing"
+
+type PlainTestSuite struct{}
+
+func (s *PlainTestSuite) BeforeEach(t *testing.T) {}
+func (s *PlainTestSuite) AfterEach(t *testing.T)  {}
+func (s *PlainTestSuite) TestFoo(t *testing.T)    {}
+func (s *PlainTestSuite) TestBar(t *testing.T)    {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Suites))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+
+	output := string(out)
+
+	// Wrapper lifecycle methods should unwrap via .T()
+	gotest.True(t, strings.Contains(output, "ts.PlainTestSuite.BeforeEach(it.T())"), "expected BeforeEach unwrap to .T()")
+	gotest.True(t, strings.Contains(output, "ts.PlainTestSuite.AfterEach(it.T())"), "expected AfterEach unwrap to .T()")
+
+	// Test cases should use adapter lambda
+	gotest.True(t, strings.Contains(output, `func(t *gotest.T) { s.TestFoo(t.T()) }`), "expected TestFoo adapter")
+	gotest.True(t, strings.Contains(output, `func(t *gotest.T) { s.TestBar(t.T()) }`), "expected TestBar adapter")
+}
+
+func TestRenderer_StdlibT_MixedSuite(t *testing.T) {
+	src := `package testpkg
+
+import (
+	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type MixedTestSuite struct{}
+
+func (s *MixedTestSuite) BeforeEach(t *testing.T) {}
+func (s *MixedTestSuite) TestStdlib(t *testing.T)  {}
+func (s *MixedTestSuite) TestGotest(t *gotest.T)   {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+
+	output := string(out)
+
+	// BeforeEach uses *testing.T → unwrap
+	gotest.True(t, strings.Contains(output, "ts.MixedTestSuite.BeforeEach(it.T())"), "expected BeforeEach unwrap")
+
+	// TestStdlib uses *testing.T → adapter
+	gotest.True(t, strings.Contains(output, `func(t *gotest.T) { s.TestStdlib(t.T()) }`), "expected TestStdlib adapter")
+
+	// TestGotest uses *gotest.T → direct
+	gotest.True(t, strings.Contains(output, `s.TestGotest),`), "expected TestGotest direct reference")
+	gotest.True(t, !strings.Contains(output, `s.TestGotest(t.T())`), "TestGotest should NOT have adapter")
+}
+
+func TestRenderer_StdlibT_FixtureBoundSuite(t *testing.T) {
+	src := `package testpkg
+
+import (
+	"context"
+	"testing"
+)
+
+type DBFixture struct{}
+
+func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
+
+type StdlibTestSuite struct {
+	*DBFixture
+}
+
+func (s *StdlibTestSuite) BeforeAll(t *testing.T)  {}
+func (s *StdlibTestSuite) AfterEach(t *testing.T)  {}
+func (s *StdlibTestSuite) TestQuery(t *testing.T)  {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+
+	output := string(out)
+
+	// Wrapper lifecycle should unwrap
+	gotest.True(t, strings.Contains(output, "ts.StdlibTestSuite.BeforeAll(it.T())"), "expected BeforeAll unwrap")
+	gotest.True(t, strings.Contains(output, "ts.StdlibTestSuite.AfterEach(it.T())"), "expected AfterEach unwrap")
+
+	// Test case should use adapter
+	gotest.True(t, strings.Contains(output, `func(t *gotest.T) { s.TestQuery(t.T()) }`), "expected TestQuery adapter")
+}

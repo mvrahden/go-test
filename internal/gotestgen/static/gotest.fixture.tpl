@@ -5,10 +5,10 @@ type ƒƒ_GOTEST_{{ $ts.Identifier }} struct {
   {{ $ts.Identifier }}
 }
 
-func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) BeforeAll(it *gotest.T) { {{ if $ts.BeforeAll -}} ts.{{ $ts.Identifier }}.BeforeAll(it) {{ end }}}
-func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterAll(it *gotest.T) { {{ if $ts.AfterAll -}} ts.{{ $ts.Identifier }}.AfterAll(it) {{ end }}}
-func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) BeforeEach(it *gotest.T) { {{ if $ts.BeforeEach -}} ts.{{ $ts.Identifier }}.BeforeEach(it) {{ end }}}
-func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.AfterEach -}} ts.{{ $ts.Identifier }}.AfterEach(it) {{ end }}}
+func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) BeforeAll(it *gotest.T) { {{ if $ts.BeforeAll -}} ts.{{ $ts.Identifier }}.BeforeAll({{ if $ts.BeforeAll.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
+func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterAll(it *gotest.T) { {{ if $ts.AfterAll -}} ts.{{ $ts.Identifier }}.AfterAll({{ if $ts.AfterAll.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
+func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) BeforeEach(it *gotest.T) { {{ if $ts.BeforeEach -}} ts.{{ $ts.Identifier }}.BeforeEach({{ if $ts.BeforeEach.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
+func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.AfterEach -}} ts.{{ $ts.Identifier }}.AfterEach({{ if $ts.AfterEach.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
 {{- end }}
 
 func TestMain(m *testing.M) { os.Exit(m.Run()) }
@@ -106,9 +106,17 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
         testCases := []gotest.TestCase{
 {{- range $tc := $ts.TestCases }}
   {{- if not $tc.IsParallel }}
+    {{- if $tc.UsesStdlibT }}
+            newTestCase("{{ $tc.Identifier }}", func(t *gotest.T) { s.{{ $tc.Identifier }}(t.T()) }),
+    {{- else }}
             newTestCase("{{ $tc.Identifier }}", s.{{ $tc.Identifier }}),
+    {{- end }}
   {{- else }}
+    {{- if $tc.UsesStdlibT }}
+            newParallelTestCase("{{ $tc.Identifier }}", wg, func(t *gotest.T) { s.{{ $tc.Identifier }}(t.T()) }),
+    {{- else }}
             newParallelTestCase("{{ $tc.Identifier }}", wg, s.{{ $tc.Identifier }}),
+    {{- end }}
   {{- end }}
 {{- end }}
         }
@@ -235,9 +243,17 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
             testCases := []gotest.TestCase{
 {{- range $tc := $ts.TestCases }}
   {{- if not $tc.IsParallel }}
+    {{- if $tc.UsesStdlibT }}
+                newTestCase("{{ $tc.Identifier }}", func(t *gotest.T) { s.{{ $tc.Identifier }}(t.T()) }),
+    {{- else }}
                 newTestCase("{{ $tc.Identifier }}", s.{{ $tc.Identifier }}),
+    {{- end }}
   {{- else }}
+    {{- if $tc.UsesStdlibT }}
+                newParallelTestCase("{{ $tc.Identifier }}", wg, func(t *gotest.T) { s.{{ $tc.Identifier }}(t.T()) }),
+    {{- else }}
                 newParallelTestCase("{{ $tc.Identifier }}", wg, s.{{ $tc.Identifier }}),
+    {{- end }}
   {{- end }}
 {{- end }}
             }

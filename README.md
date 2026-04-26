@@ -67,13 +67,21 @@ No generated code leaks into your workflow. `gotest` generates it before tests r
 
 ### Lifecycle Hooks
 
-Suite hooks receive `*gotest.T` for assertions:
+Suite hooks accept either `*gotest.T` or `*testing.T` — you choose per method:
 
 ```go
 func (s *MySuite) BeforeAll(t *gotest.T)  {} // once before all tests
 func (s *MySuite) AfterAll(t *gotest.T)   {} // once after all tests
 func (s *MySuite) BeforeEach(t *gotest.T) {} // before each test method
 func (s *MySuite) AfterEach(t *gotest.T)  {} // after each test method
+```
+
+Use `*gotest.T` for the full DSL (`t.It()`, `t.When()`, `t.Assert()`, `t.MatchSnapshot()`). Use `*testing.T` for plain stdlib tests — the functional assertions (`gotest.Equal(t, ...)`) still work with either type. You can mix freely within a single suite:
+
+```go
+func (s *MySuite) BeforeEach(t *testing.T) {} // stdlib is fine here
+func (s *MySuite) TestPlain(t *testing.T)  {} // no gotest import needed
+func (s *MySuite) TestRich(t *gotest.T)    {} // full DSL available
 ```
 
 Fixture hooks receive `context.Context` and return `error` — the generated wrapper reports failures with automatic attribution:

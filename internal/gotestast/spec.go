@@ -213,14 +213,18 @@ type TestSuiteHarness struct {
 }
 
 type TestSuiteMethod struct {
-	n   ast.Node
-	m   *types.Func
-	sig *types.Signature
+	n           ast.Node
+	m           *types.Func
+	sig         *types.Signature
+	usesStdlibT bool
 }
 
 func (m *TestSuiteMethod) IsParallel() bool {
 	return IS_TEST_CASE_PARALLEL.MatchString(m.m.Name())
 }
+
+// UsesStdlibT returns true if the method's parameter is *testing.T instead of *gotest.T.
+func (m *TestSuiteMethod) UsesStdlibT() bool { return m.usesStdlibT }
 
 func (m *TestSuiteMethod) isFocused() bool {
 	return strings.HasPrefix(m.m.Name(), "F_")
@@ -351,12 +355,16 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 		return decl.Name.Pos(), fmt.Errorf("detected unhandled test suite method %q", methodID)
 	}
 
-	hasParamT := func(sig *types.Signature, _ int) error {
+	detectParamT := func(sig *types.Signature) (usesStdlib bool, err error) {
 		pT := sig.Params().At(0).Type().String()
-		if !strings.HasPrefix(pT, "*"+about.Repo) || !strings.HasSuffix(pT, "/gotest.T") {
-			return fmt.Errorf("unsupported param type for signature of %q", methodID)
+		switch {
+		case pT == "*testing.T":
+			return true, nil
+		case strings.HasPrefix(pT, "*"+about.Repo) && strings.HasSuffix(pT, "/gotest.T"):
+			return false, nil
+		default:
+			return false, fmt.Errorf("unsupported param type for signature of %q: must be *gotest.T or *testing.T", methodID)
 		}
-		return nil
 	}
 
 	if !isTestCase {
@@ -365,10 +373,11 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 			return m.Pos(), fmt.Errorf("unsupported signature for %q", methodID)
 		}
 
-		err := hasParamT(sig, 0)
+		usesStdlib, err := detectParamT(sig)
 		if err != nil {
 			return m.Pos(), err
 		}
+		tm.usesStdlibT = usesStdlib
 		return -1, nil
 	}
 
@@ -389,10 +398,11 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 		return m.Pos(), fmt.Errorf("unsupported number of params for signature of %q", methodID)
 	}
 
-	err := hasParamT(sig, 0)
+	usesStdlib, err := detectParamT(sig)
 	if err != nil {
 		return m.Pos(), err
 	}
+	tm.usesStdlibT = usesStdlib
 
 	return -1, nil
 }
