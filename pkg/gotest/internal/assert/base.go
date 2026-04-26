@@ -234,6 +234,71 @@ func derefPtr(r reflect.Value) reflect.Value {
 	return r
 }
 
+// NotEqual delegates to CheckNotEqual(expected, b.v).
+func (b *BaseAssertionContext) NotEqual(expected any) {
+	if b.t != nil {
+		b.t.Helper()
+	}
+	msg := CheckNotEqual(expected, b.v)
+	if msg != "" {
+		b.fail("%s", msg)
+	}
+}
+
+// NotContains checks that b.v does NOT contain v.
+func (b *BaseAssertionContext) NotContains(v any) {
+	if b.t != nil {
+		b.t.Helper()
+	}
+	rVal := reflect.ValueOf(b.v)
+	switch k := rVal.Kind(); k {
+	case reflect.String:
+		substr, ok := v.(string)
+		if !ok {
+			b.fail("NotContains failed:\n  string container requires string element, got %T", v)
+			return
+		}
+		if strings.Contains(rVal.String(), substr) {
+			b.fail("NotContains failed:\n  %q contains %q", b.v, substr)
+		}
+	case reflect.Array, reflect.Slice:
+		vVal := reflect.ValueOf(v)
+		for i := range rVal.Len() {
+			if reflect.DeepEqual(rVal.Index(i).Interface(), vVal.Interface()) {
+				b.fail("NotContains failed:\n  %v contains %v", b.v, v)
+				return
+			}
+		}
+	default:
+		b.fail("NotContains failed:\n  value of type <%s> does not support NotContains", k.String())
+	}
+}
+
+// NotEmpty checks that b.v is NOT empty.
+func (b *BaseAssertionContext) NotEmpty() {
+	if b.t != nil {
+		b.t.Helper()
+	}
+	if checkIsEmpty(b.v) {
+		b.fail("NotEmpty failed:\n  value is empty: %v", b.v)
+	}
+}
+
+// IsError checks that b.v is a non-nil error.
+func (b *BaseAssertionContext) IsError() {
+	if b.t != nil {
+		b.t.Helper()
+	}
+	if b.v == nil {
+		b.fail("IsError failed:\n  expected an error but got nil")
+		return
+	}
+	if _, ok := b.v.(error); !ok {
+		b.fail("IsError failed:\n  value of type %T is not an error", b.v)
+		return
+	}
+}
+
 // IsEqualTo is a legacy alias for Equal, kept for backwards compatibility.
 func (b *BaseAssertionContext) IsEqualTo(v any) {
 	if b.t != nil {

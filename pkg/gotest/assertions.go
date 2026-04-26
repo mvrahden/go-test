@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"reflect"
 	"regexp"
@@ -411,7 +412,7 @@ func InDelta[V numeric](t testingT, expected, actual V, delta float64, msgAndArg
 }
 
 // normalizeJSON converts a value to a JSON-comparable form (map/slice/etc.).
-// Accepts string, []byte, or any JSON-marshalable value.
+// Accepts string, []byte, json.RawMessage, io.Reader, or any JSON-marshalable value.
 func normalizeJSON(v any) (any, error) {
 	var raw []byte
 	switch val := v.(type) {
@@ -419,6 +420,14 @@ func normalizeJSON(v any) (any, error) {
 		raw = []byte(val)
 	case []byte:
 		raw = val
+	case json.RawMessage:
+		raw = []byte(val)
+	case io.Reader:
+		b, err := io.ReadAll(val)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read value: %w", err)
+		}
+		raw = b
 	default:
 		var err error
 		raw, err = json.Marshal(val)
@@ -434,7 +443,7 @@ func normalizeJSON(v any) (any, error) {
 }
 
 // JSONEq asserts that expected and actual represent the same JSON structure.
-// Both values may be string, []byte, or any JSON-marshalable value.
+// Accepts string, []byte, json.RawMessage, io.Reader, or any JSON-marshalable value.
 func JSONEq(t testingT, expected, actual any, msgAndArgs ...any) {
 	// stdlib compat: mark frame as helper when t is *testing.T or similar
 	if h, ok := t.(interface{ Helper() }); ok {
