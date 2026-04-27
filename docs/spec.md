@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`go-test` is a code-generation tool that adds xUnit-style test suite semantics to Go's testing framework. It operates as a transparent wrapper around `go test`: users define test suites as Go structs following naming conventions, and the tool generates the standard `func Test*(t *testing.T)` entry points that Go requires — then cleans them up after the run.
+`gotest` is a code-generation tool that adds xUnit-style test suite semantics to Go's testing framework. It operates as a transparent wrapper around `go test`: users define test suites as Go structs following naming conventions, and the tool generates the standard `func Test*(t *testing.T)` entry points that Go requires — then cleans them up after the run.
 
 The result is structured, lifecycle-managed test suites that produce standard `go test` output, work with all existing Go tooling, and require zero runtime dependencies.
 
