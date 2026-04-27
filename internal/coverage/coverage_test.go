@@ -132,6 +132,51 @@ func (s *NotASuite) DoStuff() {}
 	}
 }
 
+func TestFindStdlibTests(t *testing.T) {
+	dir := t.TempDir()
+	src := `package foo
+
+import "testing"
+
+func TestCreate(t *testing.T)      {}
+func F_TestDelete(t *testing.T)    {}
+func X_TestSkipped(t *testing.T)   {}
+func TestParallelFetch(t *testing.T) {}
+func helperFunc()                  {}
+`
+	if err := os.WriteFile(filepath.Join(dir, "foo_test.go"), []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := findStdlibTests(dir)
+	sort.Strings(tests)
+	want := []string{"F_TestDelete", "TestCreate", "TestParallelFetch", "X_TestSkipped"}
+	if strings.Join(tests, ",") != strings.Join(want, ",") {
+		t.Errorf("stdlib tests = %v, want %v", tests, want)
+	}
+}
+
+func TestFindStdlibTestsIgnoresMethods(t *testing.T) {
+	dir := t.TempDir()
+	src := `package foo
+
+import "testing"
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) TestCreate() {}
+func TestTopLevel(t *testing.T)    {}
+`
+	if err := os.WriteFile(filepath.Join(dir, "foo_test.go"), []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := findStdlibTests(dir)
+	if len(tests) != 1 || tests[0] != "TestTopLevel" {
+		t.Errorf("expected [TestTopLevel], got %v", tests)
+	}
+}
+
 func TestRender(t *testing.T) {
 	report := &Report{
 		Packages: []PackageReport{
