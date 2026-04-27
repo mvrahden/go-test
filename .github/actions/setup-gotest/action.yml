@@ -1,0 +1,15 @@
+name: "Setup gotest"
+description: "Install the gotest CLI for Go test suite management"
+
+inputs:
+  version:
+    description: "Version tag (e.g. v1.0.0) or 'latest'"
+    required: false
+    default: "latest"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install gotest
+      shell: bash
+      run: go install github.com/mvrahden/go-test/cmd/gotest@${{ inputs.version }}
