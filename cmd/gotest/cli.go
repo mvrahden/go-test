@@ -9,9 +9,10 @@ import (
 )
 
 var (
-	DEBUG bool
-	CI    bool
-	SPEC  bool
+	DEBUG            bool
+	CI               bool
+	SPEC             bool
+	UPDATE_SNAPSHOTS bool
 )
 
 func main() {
@@ -39,6 +40,7 @@ func main() {
 		DEBUG = slices.Contains(ownArgs, "-ƒƒ.internal.debug")
 		CI = slices.Contains(ownArgs, "--ci")
 		SPEC = slices.Contains(ownArgs, "--spec")
+		UPDATE_SNAPSHOTS = slices.Contains(ownArgs, "--update-snapshots")
 
 		patterns := ExtractPackagePatterns(goTestArgs)
 		cfg := ExecConfig{
@@ -67,6 +69,7 @@ Subcommands:
 Flags:
   --ci                  Enable focus guard (fail on F_ prefixes)
   --spec                Append spec view after normal test output
+  --update-snapshots    Regenerate snapshot files
 
 All other flags and arguments are forwarded to "go test".
 `, about.ShortInfo())
