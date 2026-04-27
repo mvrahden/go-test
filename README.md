@@ -309,7 +309,7 @@ func (s *Suite) TestRender(t *gotest.T) {
 Snapshots are stored in `testdata/__snapshots__/`. On first run, the snapshot is created. On subsequent runs, the output is compared. Update all snapshots with:
 
 ```bash
-GOTEST_UPDATE_SNAPSHOTS=1 gotest ./... -v
+gotest --update-snapshots ./...
 ```
 
 ### Scaffold

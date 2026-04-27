@@ -10,7 +10,7 @@ const (
 var PSuiteRegex = regexp.MustCompile(`ƒƒ_p(x)?suite_test\.go$`)
 
 const (
-	Application = "go-test"
+	Application = "gotest"
 	Repo        = "github.com/mvrahden/go-test"
 )
 

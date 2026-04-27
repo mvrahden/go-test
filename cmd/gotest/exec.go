@@ -83,9 +83,14 @@ func Run(cfg ExecConfig) int {
 	}
 
 	// 5. Run tests with env vars from shared fixtures
-	var extraEnv map[string]string
+	extraEnv := make(map[string]string)
 	if setupProc != nil {
-		extraEnv = setupProc.Env()
+		for k, v := range setupProc.Env() {
+			extraEnv[k] = v
+		}
+	}
+	if UPDATE_SNAPSHOTS {
+		extraEnv["GOTEST_UPDATE_SNAPSHOTS"] = "1"
 	}
 
 	if SPEC {

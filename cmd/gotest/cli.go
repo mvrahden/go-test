@@ -9,9 +9,10 @@ import (
 )
 
 var (
-	DEBUG bool
-	CI    bool
-	SPEC  bool
+	DEBUG            bool
+	CI               bool
+	SPEC             bool
+	UPDATE_SNAPSHOTS bool
 )
 
 func main() {
@@ -22,6 +23,8 @@ func main() {
 		os.Exit(runScaffold(remaining))
 	case "migrate":
 		os.Exit(runMigrate(remaining))
+	case "coverage":
+		os.Exit(runCoverage(remaining))
 	case "spec":
 		os.Exit(runSpec(remaining))
 	case "watch":
@@ -39,6 +42,7 @@ func main() {
 		DEBUG = slices.Contains(ownArgs, "-ƒƒ.internal.debug")
 		CI = slices.Contains(ownArgs, "--ci")
 		SPEC = slices.Contains(ownArgs, "--spec")
+		UPDATE_SNAPSHOTS = slices.Contains(ownArgs, "--update-snapshots")
 
 		patterns := ExtractPackagePatterns(goTestArgs)
 		cfg := ExecConfig{
@@ -57,6 +61,7 @@ Usage:
   gotest [subcommand] [flags] [packages...]
 
 Subcommands:
+  coverage    Report semantic test coverage (--min=<pct> for threshold)
   spec        Render behavioral specification from test suites
   watch       Watch for file changes and re-run tests
   scaffold    Generate test suite skeleton from a Go type
@@ -67,6 +72,7 @@ Subcommands:
 Flags:
   --ci                  Enable focus guard (fail on F_ prefixes)
   --spec                Append spec view after normal test output
+  --update-snapshots    Regenerate snapshot files
 
 All other flags and arguments are forwarded to "go test".
 `, about.ShortInfo())
