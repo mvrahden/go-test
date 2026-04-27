@@ -10,17 +10,26 @@ import {
 } from "./outputParser.js";
 
 export class TestRunner {
+  private _lastJsonOutput = "";
+  private readonly _onDidComplete = new vscode.EventEmitter<string>();
+  readonly onDidComplete: vscode.Event<string> = this._onDidComplete.event;
+
   constructor(
     private readonly controller: GoTestController,
     private readonly cache: DiscoveryCache,
     private readonly outputChannel: vscode.OutputChannel,
   ) {}
 
+  dispose(): void {
+    this._onDidComplete.dispose();
+  }
+
   async run(
     request: vscode.TestRunRequest,
     token: vscode.CancellationToken,
   ): Promise<void> {
     const run = this.controller.createTestRun(request, "Go Test Run");
+    this._lastJsonOutput = "";
 
     try {
       const items = this.collectItems(request);
@@ -70,6 +79,7 @@ export class TestRunner {
         );
 
         const stdout = await this.spawnProcess(cliPath, args, pkg.dir, token);
+        this._lastJsonOutput += stdout;
 
         if (token.isCancellationRequested) {
           for (const item of groupItems) {
@@ -82,6 +92,9 @@ export class TestRunner {
         this.applyResults(run, events, importPath, pkg.dir);
       }
     } finally {
+      if (this._lastJsonOutput) {
+        this._onDidComplete.fire(this._lastJsonOutput);
+      }
       run.end();
     }
   }

@@ -6,6 +6,7 @@ import { GoTestCodeLensProvider } from "./codeLens.js";
 import { DebugLauncher } from "./debug.js";
 import { FocusExcludeProvider } from "./focusExclude.js";
 import { FocusDiagnostics } from "./diagnostics.js";
+import { SpecViewPanel } from "./specView.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Go Test Suites");
@@ -38,6 +39,12 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   runner = new TestRunner(controller, cache, outputChannel);
+
+  const specView = new SpecViewPanel(outputChannel);
+
+  const specViewRefreshDisposable = runner.onDidComplete((jsonOutput) => {
+    specView.refresh(jsonOutput);
+  });
 
   // Register CodeLens provider
   const codeLensProvider = new GoTestCodeLensProvider(cache);
@@ -106,6 +113,13 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   );
 
+  const showSpecViewCmd = vscode.commands.registerCommand(
+    "gotest.showSpecView",
+    () => {
+      specView.show();
+    },
+  );
+
   // Set up FileSystemWatcher for *_test.go files
   const watcher = vscode.workspace.createFileSystemWatcher("**/*_test.go");
   const onFileChange = () => {
@@ -130,10 +144,14 @@ export function activate(context: vscode.ExtensionContext): void {
     codeActionsDisposable,
     diagnostics,
     debugLauncher,
+    runner,
+    specView,
+    specViewRefreshDisposable,
     runTestCmd,
     debugTestCmd,
     refreshTestsCmd,
     showFocusedTestsCmd,
+    showSpecViewCmd,
     watcher,
     watcherChangeDisposable,
     watcherCreateDisposable,
