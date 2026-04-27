@@ -4,177 +4,132 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"testing"
+
+	"golang.org/x/tools/cover"
 )
 
-func TestExtractTypeName(t *testing.T) {
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"UserServiceTestSuite", "UserService"},
-		{"F_UserServiceTestSuite", "UserService"},
-		{"X_UserServiceTestSuite", "UserService"},
-		{"BatchTestSuiteParallel", "Batch"},
-		{"F_BatchTestSuiteParallel", "Batch"},
-		{"NotASuite", ""},
-		{"TestSuite", ""},
-		{"FooBar", ""},
+func TestFindMethodPositions(t *testing.T) {
+	dir := t.TempDir()
+	src := `package foo
+
+type UserService struct{}
+
+func (s *UserService) Create() {}
+func (s *UserService) Delete() {}
+func (s UserService) Get() {}
+func NotAMethod() {}
+`
+	file := filepath.Join(dir, "user.go")
+	if err := os.WriteFile(file, []byte(src), 0644); err != nil {
+		t.Fatal(err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := extractTypeName(tt.input)
-			if got != tt.want {
-				t.Errorf("extractTypeName(%q) = %q, want %q", tt.input, got, tt.want)
-			}
-		})
+
+	positions := findMethodPositions([]string{file})
+
+	if _, ok := positions["UserService.Create"]; !ok {
+		t.Error("expected UserService.Create")
+	}
+	if _, ok := positions["UserService.Delete"]; !ok {
+		t.Error("expected UserService.Delete")
+	}
+	if _, ok := positions["UserService.Get"]; !ok {
+		t.Error("expected UserService.Get (value receiver)")
+	}
+	if _, ok := positions["NotAMethod"]; ok {
+		t.Error("top-level function should not appear")
 	}
 }
 
-func TestFindMatchingTestMethod(t *testing.T) {
-	methods := []string{"TestCreate", "TestGetByID", "F_TestDelete", "TestParallelFetch"}
+func TestFindMethodPositionsSkipsTestFiles(t *testing.T) {
+	dir := t.TempDir()
+	src := `package foo
 
-	tests := []struct {
-		method string
-		want   string
-	}{
-		{"Create", "TestCreate"},
-		{"GetByID", "TestGetByID"},
-		{"Delete", "F_TestDelete"},
-		{"Fetch", "TestParallelFetch"},
-		{"Update", ""},
-		{"Nonexistent", ""},
+type Helper struct{}
+
+func (h *Helper) DoStuff() {}
+`
+	file := filepath.Join(dir, "helper_test.go")
+	if err := os.WriteFile(file, []byte(src), 0644); err != nil {
+		t.Fatal(err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.method, func(t *testing.T) {
-			got := findMatchingTestMethod(tt.method, methods)
-			if got != tt.want {
-				t.Errorf("findMatchingTestMethod(%q) = %q, want %q", tt.method, got, tt.want)
-			}
-		})
+
+	positions := findMethodPositions([]string{file})
+	if len(positions) != 0 {
+		t.Errorf("expected 0 positions from test file, got %d", len(positions))
 	}
 }
 
-func TestFindMatchingSuite(t *testing.T) {
-	suites := []testSuite{
-		{name: "UserServiceTestSuite", typeName: "UserService"},
-		{name: "OrderTestSuite", typeName: "Order"},
+func TestFindMethodPositionsLineRanges(t *testing.T) {
+	dir := t.TempDir()
+	src := `package foo
+
+type Svc struct{}
+
+func (s *Svc) Short() { return }
+
+func (s *Svc) Long() {
+	_ = 1
+	_ = 2
+	_ = 3
+}
+`
+	file := filepath.Join(dir, "svc.go")
+	if err := os.WriteFile(file, []byte(src), 0644); err != nil {
+		t.Fatal(err)
 	}
 
-	t.Run("matches by type name", func(t *testing.T) {
-		got := findMatchingSuite("UserService", suites)
-		if got == nil || got.name != "UserServiceTestSuite" {
-			t.Errorf("expected UserServiceTestSuite, got %v", got)
+	positions := findMethodPositions([]string{file})
+
+	short := positions["Svc.Short"]
+	if short.startLine != short.endLine {
+		t.Errorf("Short: expected single-line body, got %d-%d", short.startLine, short.endLine)
+	}
+
+	long := positions["Svc.Long"]
+	if long.endLine-long.startLine < 3 {
+		t.Errorf("Long: expected multi-line body, got %d-%d", long.startLine, long.endLine)
+	}
+}
+
+func TestCoverageBlockMatching(t *testing.T) {
+	blocks := []cover.ProfileBlock{
+		{StartLine: 5, StartCol: 1, EndLine: 7, EndCol: 1, NumStmt: 1, Count: 1},
+		{StartLine: 10, StartCol: 1, EndLine: 15, EndCol: 1, NumStmt: 3, Count: 0},
+	}
+
+	t.Run("covered block overlaps method", func(t *testing.T) {
+		pos := methodPos{startLine: 5, endLine: 7}
+		covered := isBlockCovered(blocks, pos)
+		if !covered {
+			t.Error("expected covered")
 		}
 	})
 
-	t.Run("returns nil for no match", func(t *testing.T) {
-		got := findMatchingSuite("Payment", suites)
-		if got != nil {
-			t.Errorf("expected nil, got %v", got)
+	t.Run("uncovered block does not match", func(t *testing.T) {
+		pos := methodPos{startLine: 10, endLine: 15}
+		covered := isBlockCovered(blocks, pos)
+		if covered {
+			t.Error("expected uncovered")
 		}
 	})
-}
 
-func TestFindTestSuites(t *testing.T) {
-	dir := t.TempDir()
-	src := `package foo
+	t.Run("partial overlap counts as covered", func(t *testing.T) {
+		pos := methodPos{startLine: 6, endLine: 9}
+		covered := isBlockCovered(blocks, pos)
+		if !covered {
+			t.Error("expected covered (partial overlap)")
+		}
+	})
 
-type UserServiceTestSuite struct{}
-
-func (s *UserServiceTestSuite) TestCreate()      {}
-func (s *UserServiceTestSuite) F_TestDelete()    {}
-func (s *UserServiceTestSuite) X_TestSkipped()   {}
-func (s *UserServiceTestSuite) TestParallelFetch() {}
-func (s *UserServiceTestSuite) BeforeEach()      {}
-`
-	if err := os.WriteFile(filepath.Join(dir, "foo_test.go"), []byte(src), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	suites := findTestSuites(dir)
-	if len(suites) != 1 {
-		t.Fatalf("expected 1 suite, got %d", len(suites))
-	}
-
-	s := suites[0]
-	if s.name != "UserServiceTestSuite" {
-		t.Errorf("name = %q, want UserServiceTestSuite", s.name)
-	}
-	if s.typeName != "UserService" {
-		t.Errorf("typeName = %q, want UserService", s.typeName)
-	}
-
-	sort.Strings(s.methods)
-	want := []string{"F_TestDelete", "TestCreate", "TestParallelFetch", "X_TestSkipped"}
-	if strings.Join(s.methods, ",") != strings.Join(want, ",") {
-		t.Errorf("methods = %v, want %v", s.methods, want)
-	}
-}
-
-func TestFindTestSuitesEmptyDir(t *testing.T) {
-	dir := t.TempDir()
-	src := `package foo
-
-type NotASuite struct{}
-
-func (s *NotASuite) DoStuff() {}
-`
-	if err := os.WriteFile(filepath.Join(dir, "foo_test.go"), []byte(src), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	suites := findTestSuites(dir)
-	if len(suites) != 0 {
-		t.Errorf("expected 0 suites, got %d", len(suites))
-	}
-}
-
-func TestFindStdlibTests(t *testing.T) {
-	dir := t.TempDir()
-	src := `package foo
-
-import "testing"
-
-func TestCreate(t *testing.T)      {}
-func F_TestDelete(t *testing.T)    {}
-func X_TestSkipped(t *testing.T)   {}
-func TestParallelFetch(t *testing.T) {}
-func helperFunc()                  {}
-`
-	if err := os.WriteFile(filepath.Join(dir, "foo_test.go"), []byte(src), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	tests := findStdlibTests(dir)
-	sort.Strings(tests)
-	want := []string{"F_TestDelete", "TestCreate", "TestParallelFetch", "X_TestSkipped"}
-	if strings.Join(tests, ",") != strings.Join(want, ",") {
-		t.Errorf("stdlib tests = %v, want %v", tests, want)
-	}
-}
-
-func TestFindStdlibTestsIgnoresMethods(t *testing.T) {
-	dir := t.TempDir()
-	src := `package foo
-
-import "testing"
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) TestCreate() {}
-func TestTopLevel(t *testing.T)    {}
-`
-	if err := os.WriteFile(filepath.Join(dir, "foo_test.go"), []byte(src), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	tests := findStdlibTests(dir)
-	if len(tests) != 1 || tests[0] != "TestTopLevel" {
-		t.Errorf("expected [TestTopLevel], got %v", tests)
-	}
+	t.Run("no overlap means uncovered", func(t *testing.T) {
+		pos := methodPos{startLine: 20, endLine: 25}
+		covered := isBlockCovered(blocks, pos)
+		if covered {
+			t.Error("expected uncovered (no overlap)")
+		}
+	})
 }
 
 func TestRender(t *testing.T) {
@@ -186,9 +141,9 @@ func TestRender(t *testing.T) {
 					{
 						Name: "UserService",
 						Methods: []MethodReport{
-							{Name: "Create", Covered: true, TestMethod: "TestCreate"},
+							{Name: "Create", Covered: true},
 							{Name: "Delete", Covered: false},
-							{Name: "Get", Covered: true, TestMethod: "TestGet"},
+							{Name: "Get", Covered: true},
 						},
 					},
 				},
@@ -213,5 +168,27 @@ func TestRender(t *testing.T) {
 	}
 	if !strings.Contains(out, "Overall: 2/3 methods covered (66%)") {
 		t.Errorf("expected overall summary, got:\n%s", out)
+	}
+}
+
+func TestRenderMultiPackage(t *testing.T) {
+	report := &Report{
+		Packages: []PackageReport{
+			{Path: "pkg/a", Types: []TypeReport{{Name: "A", Methods: []MethodReport{{Name: "Do", Covered: true}}}}},
+			{Path: "pkg/b", Types: []TypeReport{{Name: "B", Methods: []MethodReport{{Name: "Run", Covered: false}}}}},
+		},
+		Total:   2,
+		Covered: 1,
+	}
+
+	var buf bytes.Buffer
+	Render(&buf, report)
+	out := buf.String()
+
+	if !strings.Contains(out, "=== pkg/a ===") {
+		t.Errorf("expected package header for pkg/a, got:\n%s", out)
+	}
+	if !strings.Contains(out, "=== pkg/b ===") {
+		t.Errorf("expected package header for pkg/b, got:\n%s", out)
 	}
 }
