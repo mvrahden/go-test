@@ -1,7 +1,6 @@
 package testgen_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,8 +21,8 @@ func TestE2E_CLI(t *testing.T) {
 		{"no testsuite", "no_testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}, nil},
 		{"simple testsuite", "testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}, nil},
 	}
-	for idx, tC := range testcases {
-		t.Run(fmt.Sprintf("Generate (idx: %d %q)", idx, tC.desc), func(t *testing.T) {
+	for _, tC := range testcases {
+		t.Run(tC.desc, func(t *testing.T) {
 			cwd, err := os.Getwd()
 			gotest.NoError(t, err)
 
@@ -54,9 +53,9 @@ func TestE2E_NoTestSuites(t *testing.T) {
 		args []string
 	}{
 		{"no test files", []string{"no_testfiles"}},
-		{"Not exist: nothing to generate", []string{"testdata/nothing-here"}},
-		{"No Go-Module support: nothing to generate", []string{"strings"}},
-		{"No Go-Module support: nothing to generate", []string{"net/http"}},
+		{"non-existent path returns empty", []string{"testdata/nothing-here"}},
+		{"stdlib package returns empty", []string{"strings"}},
+		{"stdlib nested package returns empty", []string{"net/http"}},
 	}
 	for _, tC := range testcases {
 		t.Run(tC.desc, func(t *testing.T) {

@@ -3,7 +3,6 @@ package e2e
 import (
 	"bytes"
 	"embed"
-	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -48,20 +47,21 @@ func Test_TestsuiteCLI(t *testing.T) {
 	testutils.HackGoWork(t, tmp)
 
 	testCases := []struct {
+		desc       string
 		basedir    string
 		pkgName    string
 		pkgPath    string
 		goldenName string
 		debug      bool
 	}{
-		{basedir: "examples", pkgPath: "stdlib", goldenName: "stdlib_output.txt", debug: false},
-		{basedir: "examples", pkgPath: "simple_suite", goldenName: "simple_suite_output.txt", debug: false},
-		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/stdlib", goldenName: "stdlib_output.txt", debug: false},
-		{basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/simple_suite", goldenName: "simple_suite_output.txt", debug: false},
-		{basedir: "examples", pkgPath: "focus_exclude", goldenName: "focus_exclude_output.txt", debug: false},
+		{desc: "stdlib by relative path", basedir: "examples", pkgPath: "stdlib", goldenName: "stdlib_output.txt"},
+		{desc: "simple suite by relative path", basedir: "examples", pkgPath: "simple_suite", goldenName: "simple_suite_output.txt"},
+		{desc: "stdlib by package name", basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/stdlib", goldenName: "stdlib_output.txt"},
+		{desc: "simple suite by package name", basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/simple_suite", goldenName: "simple_suite_output.txt"},
+		{desc: "focus and exclude directives", basedir: "examples", pkgPath: "focus_exclude", goldenName: "focus_exclude_output.txt"},
 	}
-	for idx, tc := range testCases {
-		t.Run(fmt.Sprintf("idx %d", idx), func(t *testing.T) {
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
 			performTest(t, tmp, tc.basedir, tc.pkgPath, tc.pkgName, tc.goldenName, tc.debug)
 		})
 	}
