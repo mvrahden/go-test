@@ -7,11 +7,11 @@ import (
 	"go/token"
 	"go/types"
 	"io"
-	"io/fs"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"golang.org/x/tools/cover"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -32,12 +32,18 @@ type TypeReport struct {
 }
 
 type MethodReport struct {
-	Name       string
-	Covered    bool
-	TestMethod string
+	Name    string
+	Covered bool
 }
 
-func Analyze(patterns []string) (*Report, error) {
+func Analyze(profilePath string, patterns []string) (*Report, error) {
+	profiles, err := cover.ParseProfiles(profilePath)
+	if err != nil {
+		return nil, fmt.Errorf("parsing cover profile: %w", err)
+	}
+
+	profileIndex := indexProfiles(profiles)
+
 	pkgs, err := packages.Load(&packages.Config{
 		Mode: packages.NeedName | packages.NeedTypes | packages.NeedFiles,
 	}, patterns...)
@@ -53,7 +59,7 @@ func Analyze(patterns []string) (*Report, error) {
 		if len(pkg.Errors) > 0 {
 			return nil, fmt.Errorf("package %s: %v", pkg.PkgPath, pkg.Errors[0])
 		}
-		pr := analyzePackage(pkg)
+		pr := analyzePackage(pkg, profileIndex)
 		if len(pr.Types) > 0 {
 			report.Packages = append(report.Packages, pr)
 		}
@@ -95,9 +101,9 @@ func Render(w io.Writer, report *Report) {
 			fmt.Fprintf(w, "%s: %d/%d methods covered (%d%%)\n", tr.Name, covered, total, pct)
 			for _, mr := range tr.Methods {
 				if mr.Covered {
-					fmt.Fprintf(w, "  ✓ %-24s — %s\n", mr.Name, mr.TestMethod)
+					fmt.Fprintf(w, "  ✓ %s\n", mr.Name)
 				} else {
-					fmt.Fprintf(w, "  ✗ %-24s — no test case\n", mr.Name)
+					fmt.Fprintf(w, "  ✗ %s\n", mr.Name)
 				}
 			}
 			fmt.Fprintln(w)
@@ -110,33 +116,33 @@ func Render(w io.Writer, report *Report) {
 	}
 }
 
-func analyzePackage(pkg *packages.Package) PackageReport {
+func indexProfiles(profiles []*cover.Profile) map[string][]cover.ProfileBlock {
+	index := make(map[string][]cover.ProfileBlock, len(profiles))
+	for _, p := range profiles {
+		index[p.FileName] = p.Blocks
+	}
+	return index
+}
+
+func analyzePackage(pkg *packages.Package, profileIndex map[string][]cover.ProfileBlock) PackageReport {
 	pr := PackageReport{Path: pkg.PkgPath}
 
 	prodTypes := findProductionTypes(pkg)
-	dir := filepath.Dir(pkg.GoFiles[0])
-	suites := findTestSuites(dir)
-	stdlibTests := findStdlibTests(dir)
-
-	if len(suites) == 0 && len(stdlibTests) == 0 {
+	if len(prodTypes) == 0 {
 		return pr
 	}
 
+	methodPositions := findMethodPositions(pkg.GoFiles)
+
 	for _, pt := range prodTypes {
 		tr := TypeReport{Name: pt.name}
-		matching := findMatchingSuite(pt.name, suites)
 		for _, methodName := range pt.methods {
 			mr := MethodReport{Name: methodName}
-			if matching != nil {
-				if tm := findMatchingTestMethod(methodName, matching.methods); tm != "" {
-					mr.Covered = true
-					mr.TestMethod = tm
-				}
-			}
-			if !mr.Covered {
-				if tm := findMatchingTestMethod(methodName, stdlibTests); tm != "" {
-					mr.Covered = true
-					mr.TestMethod = tm
+			key := pt.name + "." + methodName
+			if pos, ok := methodPositions[key]; ok {
+				profileKey := pkg.PkgPath + "/" + filepath.Base(pos.file)
+				if blocks, ok := profileIndex[profileKey]; ok {
+					mr.Covered = isBlockCovered(blocks, pos)
 				}
 			}
 			tr.Methods = append(tr.Methods, mr)
@@ -194,113 +200,52 @@ func findProductionTypes(pkg *packages.Package) []prodType {
 	return result
 }
 
-type testSuite struct {
-	name     string
-	typeName string
-	methods  []string
+type methodPos struct {
+	file      string
+	startLine int
+	endLine   int
 }
 
-func findTestSuites(dir string) []testSuite {
+func findMethodPositions(files []string) map[string]methodPos {
+	positions := make(map[string]methodPos)
 	fset := token.NewFileSet()
-	filter := func(fi fs.FileInfo) bool {
-		return strings.HasSuffix(fi.Name(), "_test.go")
-	}
 
-	pkgMap, err := parser.ParseDir(fset, dir, filter, 0)
-	if err != nil {
-		return nil
-	}
-
-	suiteTypes := make(map[string]*testSuite)
-
-	for _, astPkg := range pkgMap {
-		for _, file := range astPkg.Files {
-			for _, decl := range file.Decls {
-				gd, ok := decl.(*ast.GenDecl)
-				if !ok || gd.Tok != token.TYPE {
-					continue
-				}
-				for _, spec := range gd.Specs {
-					ts, ok := spec.(*ast.TypeSpec)
-					if !ok {
-						continue
-					}
-					name := ts.Name.Name
-					typeName := extractTypeName(name)
-					if typeName != "" {
-						suiteTypes[name] = &testSuite{
-							name:     name,
-							typeName: typeName,
-						}
-					}
-				}
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, file, nil, 0)
+		if err != nil {
+			continue
+		}
+		for _, decl := range f.Decls {
+			fd, ok := decl.(*ast.FuncDecl)
+			if !ok || fd.Recv == nil || fd.Body == nil {
+				continue
 			}
-
-			for _, decl := range file.Decls {
-				fd, ok := decl.(*ast.FuncDecl)
-				if !ok || fd.Recv == nil {
-					continue
-				}
-				recvName := receiverTypeName(fd.Recv)
-				if suite, exists := suiteTypes[recvName]; exists {
-					methodName := fd.Name.Name
-					stripped := strings.TrimPrefix(strings.TrimPrefix(methodName, "F_"), "X_")
-					if strings.HasPrefix(stripped, "Test") {
-						suite.methods = append(suite.methods, methodName)
-					}
-				}
+			recvType := receiverTypeName(fd.Recv)
+			if recvType == "" {
+				continue
+			}
+			key := recvType + "." + fd.Name.Name
+			positions[key] = methodPos{
+				file:      file,
+				startLine: fset.Position(fd.Body.Pos()).Line,
+				endLine:   fset.Position(fd.Body.End()).Line,
 			}
 		}
 	}
 
-	var result []testSuite
-	for _, s := range suiteTypes {
-		result = append(result, *s)
-	}
-	sort.Slice(result, func(i, j int) bool { return result[i].name < result[j].name })
-	return result
+	return positions
 }
 
-func findStdlibTests(dir string) []string {
-	fset := token.NewFileSet()
-	filter := func(fi fs.FileInfo) bool {
-		return strings.HasSuffix(fi.Name(), "_test.go")
-	}
-
-	pkgMap, err := parser.ParseDir(fset, dir, filter, 0)
-	if err != nil {
-		return nil
-	}
-
-	var tests []string
-	for _, astPkg := range pkgMap {
-		for _, file := range astPkg.Files {
-			for _, decl := range file.Decls {
-				fd, ok := decl.(*ast.FuncDecl)
-				if !ok || fd.Recv != nil {
-					continue
-				}
-				name := fd.Name.Name
-				stripped := strings.TrimPrefix(strings.TrimPrefix(name, "F_"), "X_")
-				if strings.HasPrefix(stripped, "Test") {
-					tests = append(tests, name)
-				}
-			}
+func isBlockCovered(blocks []cover.ProfileBlock, pos methodPos) bool {
+	for _, b := range blocks {
+		if b.Count > 0 && b.StartLine <= pos.endLine && b.EndLine >= pos.startLine {
+			return true
 		}
 	}
-	return tests
-}
-
-func extractTypeName(suiteName string) string {
-	name := strings.TrimPrefix(suiteName, "F_")
-	name = strings.TrimPrefix(name, "X_")
-	if strings.HasSuffix(name, "TestSuiteParallel") {
-		return strings.TrimSuffix(name, "TestSuiteParallel")
-	}
-	if strings.HasSuffix(name, "TestSuite") {
-		return strings.TrimSuffix(name, "TestSuite")
-	}
-	return ""
+	return false
 }
 
 func receiverTypeName(recv *ast.FieldList) string {
@@ -314,26 +259,6 @@ func receiverTypeName(recv *ast.FieldList) string {
 		}
 	case *ast.Ident:
 		return t.Name
-	}
-	return ""
-}
-
-func findMatchingSuite(typeName string, suites []testSuite) *testSuite {
-	for i := range suites {
-		if suites[i].typeName == typeName {
-			return &suites[i]
-		}
-	}
-	return nil
-}
-
-func findMatchingTestMethod(methodName string, testMethods []string) string {
-	for _, tm := range testMethods {
-		stripped := strings.TrimPrefix(strings.TrimPrefix(tm, "F_"), "X_")
-		if strings.TrimPrefix(stripped, "TestParallel") == methodName ||
-			strings.TrimPrefix(stripped, "Test") == methodName {
-			return tm
-		}
 	}
 	return ""
 }

@@ -2,17 +2,70 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/coverage"
+	"github.com/mvrahden/go-test/internal/gotestgen"
+	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
 func runCoverage(args []string) int {
 	minPct, patterns := parseCoverageFlags(args)
 
-	report, err := coverage.Analyze(patterns)
+	// 1. Generate test overlay
+	var allResults gotestgen.GenerateResults
+	for _, pattern := range patterns {
+		results, _, err := gotestrunner.SuitesGenerateWithCollectorResults(pattern)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+			return 2
+		}
+		allResults = append(allResults, results...)
+	}
+
+	tmpDir, err := gotestrunner.WriteOverlay(allResults)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	defer os.RemoveAll(tmpDir)
+
+	overlayPath := filepath.Join(tmpDir, "overlay.json")
+
+	// 2. Run tests with coverage profiling
+	coverFile, err := os.CreateTemp("", "gotest-cover-*.out")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	coverPath := coverFile.Name()
+	coverFile.Close()
+	defer os.Remove(coverPath)
+
+	goTestArgs := []string{"test",
+		"-overlay=" + overlayPath,
+		"-coverprofile=" + coverPath,
+	}
+	goTestArgs = append(goTestArgs, patterns...)
+
+	cmd := exec.Command("go", goTestArgs...)
+	cmd.Stdout = io.Discard
+	cmd.Stderr = os.Stderr
+	cmd.Run() // profile may still be usable even if some tests fail
+
+	info, err := os.Stat(coverPath)
+	if err != nil || info.Size() == 0 {
+		fmt.Fprintf(os.Stderr, "FAIL: no coverage data collected (tests may have failed to compile)\n")
+		return 2
+	}
+
+	// 3. Analyze coverage
+	report, err := coverage.Analyze(coverPath, patterns)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
