@@ -1,5 +1,7 @@
 # go-test Specification
 
+> **Deprecated:** This document reflects an earlier version of the project. See [superspec.md](superspec.md) for the canonical reference.
+
 ## Purpose
 
 `gotest` is a code-generation tool that adds xUnit-style test suite semantics to Go's testing framework. It operates as a transparent wrapper around `go test`: users define test suites as Go structs following naming conventions, and the tool generates the standard `func Test*(t *testing.T)` entry points that Go requires — then cleans them up after the run.

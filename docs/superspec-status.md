@@ -45,7 +45,7 @@ Last updated: 2026-04-27
 
 ### 1.3 CLI Distribution
 
-**Status: Mostly complete**
+**Status: Complete**
 
 | Aspect | Spec | Current | Gap |
 |--------|------|---------|-----|
@@ -53,14 +53,16 @@ Last updated: 2026-04-27
 | Install path | `go install github.com/mvrahden/go-test/cmd/gotest@latest` | Works | None |
 | Release binaries | Cross-platform via goreleaser | GitHub Actions matrix (linux/darwin/windows × amd64/arm64) | Different tool, same outcome |
 | Version injection | Tag + hash at build time | `about.Version` set via `-ldflags -X` in release workflow | None |
-| `gotest version` output | Prints version, Go version, OS/arch | Prints `github.com/mvrahden/go-test (version)` | Missing: Go version, OS/arch |
+| `gotest version` output | Prints version, Go version, OS/arch | `gotest <version> go1.X linux/amd64` | None |
 
 ### 1.4 README and Examples
 
-**Status: Not assessed** (declared out of scope for current plan)
+**Status: Complete**
 
-- `examples/` directory exists with stdlib, simple_suite, focus_exclude, parallel_suite, generic_suite
-- README exists but may not match superspec's prescribed structure
+- `examples/` directory with stdlib, simple_suite, focus_exclude, parallel_suite, generic_suite, fixture_suite, nested_fixture
+- README covers install, 30-second example, features, how it works, naming conventions, commands
+- All subcommands documented (coverage, generate, clean, spec, watch, scaffold, migrate)
+- Linter documented
 
 ---
 
@@ -163,7 +165,7 @@ Two tiers as specified:
 
 ### 3.5 Snapshot Testing: `t.MatchSnapshot()`
 
-**Status: Complete (minor interface deviation)**
+**Status: Complete**
 
 | Aspect | Spec | Current | Gap |
 |--------|------|---------|-----|
@@ -171,7 +173,7 @@ Two tiers as specified:
 | First run behavior | Create snapshot, pass | Create snapshot, pass | None |
 | Mismatch behavior | Fail with diff | Fail with diff | None |
 | Multi-snapshot | `t.MatchSnapshot(v, "name")` | `t.MatchSnapshot(v, "name")` | None |
-| Update mechanism | `gotest ./... --update-snapshots` (CLI flag) | `GOTEST_UPDATE_SNAPSHOTS=1` (env var) | Interface deviation |
+| Update mechanism | `gotest ./... --update-snapshots` (CLI flag) | `gotest --update-snapshots ./...` | None |
 
 ---
 
@@ -179,17 +181,18 @@ Two tiers as specified:
 
 ### 4.1 Semantic Test Coverage: `gotest coverage`
 
-**Status: Not implemented**
+**Status: Complete**
 
-- `coverage` is registered in `knownSubcommands` (arg parser recognizes it)
-- No handler in CLI switch — falls through to default mode silently
-- No implementation exists (no `coverage.go`, no `internal/coverage/` package)
-- Spec describes: static analysis comparing production API surface vs suite test inventory
-- Would require `packages.Load` on production code + cross-referencing suite methods
+- `gotest coverage ./...` analyzes production types vs test suite coverage
+- `--min=N` flag fails if coverage percentage is below threshold
+- Uses `packages.Load` with `NeedTypes` for production method sets
+- Uses `parser.ParseDir` for test suite discovery (AST-only, no compilation)
+- Matching: `UserServiceTestSuite` → `UserService`, `TestCreate` → `Create`
+- CI workflow includes semantic coverage step
 
 ### 4.2 CI Integration
 
-**Status: Partially complete**
+**Status: Complete**
 
 | Aspect | Spec | Current | Gap |
 |--------|------|---------|-----|
@@ -197,28 +200,27 @@ Two tiers as specified:
 | `--ci` in CI | Safety net for `F_` prefixes | Implemented | None |
 | Spec in CI summary | Markdown or rendered output | `--no-color --output=spec.txt` in code fence | None |
 | Release workflow | Cross-platform binaries | Exists (6 targets) | None |
-| `setup-gotest` action | `uses: mvrahden/setup-gotest@v1` | Not created | Missing |
-| Coverage step in CI | `gotest coverage ./... --min=80` | Not possible (coverage not implemented) | Blocked |
+| `setup-gotest` action | `uses: mvrahden/setup-gotest@v1` | `.github/actions/setup-gotest/action.yml` | None |
+| Coverage step in CI | `gotest coverage ./...` | Included in test workflow | None |
 | Exit codes | Match `go test` (0/1/2) | Implemented | None |
 
 ### 4.3 Go Generate Integration
 
-**Status: Not wired**
+**Status: Complete**
 
-- `generate` is registered in `knownSubcommands` (arg parser recognizes it)
-- No handler in CLI switch — falls through to default mode silently
-- The generation pipeline exists internally (`gotestgen`) but isn't exposed as generate-only mode
-- Spec: runs generation step only (no test execution, no cleanup)
+- `gotest generate ./...` runs code generation only (no test execution)
+- Writes generated files directly to package directories
 - Use case: `//go:generate gotest generate ./...` for checked-in generated files
 
 ### 4.4 Linter: `gotest-lint`
 
-**Status: Not implemented**
+**Status: Complete**
 
-- No code exists for this
-- Spec describes: standalone binary or golangci-lint plugin
-- Would detect: lifecycle hook typos, value receivers, missing AfterAll, committed F_ prefixes, orphaned ƒƒ_ files
-- Partially overlaps with `--ci` (focus detection)
+- `cmd/gotest-lint` standalone binary via `singlechecker.Main`
+- `internal/lint` package with `go/analysis.Analyzer`
+- Detects: focus prefixes (`F_`), value receivers, lifecycle hook typos (Levenshtein ≤ 2), missing `AfterAll` when `BeforeAll` exists, orphaned `ƒƒ_` generated files
+- Compatible with `golangci-lint` via `go/analysis` framework
+- Full test coverage via `analysistest`
 
 ---
 
@@ -233,9 +235,9 @@ Two tiers as specified:
 | `spec` | Yes | Yes | Complete |
 | `scaffold` | Yes | Yes | Complete |
 | `migrate` | Yes | Yes | Complete |
-| `coverage` | Yes | **No** | Stub only |
-| `generate` | Yes | **No** | Stub only |
-| `clean` | **No** | No | Missing entirely |
+| `coverage` | Yes | Yes | Complete |
+| `generate` | Yes | Yes | Complete |
+| `clean` | Yes | Yes | Complete |
 | `version` | Yes | Yes | Complete |
 | `help` | Yes | Yes | Complete |
 
@@ -244,27 +246,27 @@ Two tiers as specified:
 | Flag | Spec | Current | Gap |
 |------|------|---------|-----|
 | `--ci` | Fail on `F_` prefixes | Implemented | None |
+| `--debug` | Keep generated files | Implemented | None |
 | `--spec` | Append spec after output | Implemented | None |
-| `--debug` | Keep generated files | `-ƒƒ.internal.debug` only | Not aliased to `--debug` |
-| `--update-snapshots` | Regenerate snapshots | `GOTEST_UPDATE_SNAPSHOTS=1` env var | Interface deviation |
+| `--update-snapshots` | Regenerate snapshots | Implemented (sets env var) | None |
 | `--format=<fmt>` | Output format for spec/coverage | Implemented for spec | None |
 | `--output=<path>` | Write output to file | Implemented for spec | None |
 | `--no-color` | Strip ANSI from terminal output | Implemented for spec | Addition beyond spec |
-| `--min=<pct>` | Minimum coverage threshold | Not implemented | Blocked on coverage |
+| `--min=<pct>` | Minimum coverage threshold | Implemented for coverage | None |
 
 ### Old `-ƒƒ.*` Flags
 
-| Old Flag | New Flag | Migration Status |
-|----------|----------|-----------------|
-| `-ƒƒ.internal.debug` | `--debug` | Old form still primary; new form not recognized |
-| `-ƒƒ.clean` | `gotest clean` | Old form may still work; subcommand not implemented |
-| `-ƒƒ.ci` | `--ci` | `--ci` works; unclear if old form still recognized |
-| `-ƒƒ.watch` | `gotest watch` | Subcommand works; old form status unclear |
-| `-ƒƒ.generate` | `gotest generate` | Neither works (subcommand not wired) |
-| `-ƒƒ.version` | `gotest version` | Subcommand works |
-| `-ƒƒ.update-snapshots` | `--update-snapshots` | Uses env var instead; neither flag form exists |
+All old `-ƒƒ.*` flags have been replaced by `--` flags or subcommands:
 
-Spec says: old forms should be recognized as deprecated aliases during transition, then removed.
+| Old Flag | Replacement | Status |
+|----------|-------------|--------|
+| `-ƒƒ.internal.debug` | `--debug` | Replaced |
+| `-ƒƒ.clean` | `gotest clean` | Replaced |
+| `-ƒƒ.ci` | `--ci` | Replaced |
+| `-ƒƒ.watch` | `gotest watch` | Replaced |
+| `-ƒƒ.generate` | `gotest generate` | Replaced |
+| `-ƒƒ.version` | `gotest version` | Replaced |
+| `-ƒƒ.update-snapshots` | `--update-snapshots` | Replaced |
 
 ---
 
@@ -337,49 +339,15 @@ pkg/gotest
 
 **Assessment:** Matches Phase 2 of the architecture evolution (scaffold + spec + most of the T methods). The project has reached Phase 2 maturity with Phase 3 watch mode already done.
 
-### What's Missing for Phase 2 Completion
+### Phase 2 and 3 Completion
 
-- `coverage` subcommand (static analysis, no test execution needed)
-- `generate` subcommand (generation without execution)
-- `clean` subcommand (filesystem walk + delete)
-
-### What's Missing for Phase 3
-
-- `gotest-lint` (go/analysis analyzers)
-- Nested suite embedding detection is already done (ahead of spec's phase 3 timeline)
+All items complete:
+- `coverage`, `generate`, `clean` subcommands implemented
+- `gotest-lint` analyzer implemented
+- Nested suite embedding detection done
 
 ---
 
-## Summary: Remaining Work
+## Summary
 
-### Quick Wins (< 1 hour each)
-
-1. Wire `--debug` as alias for `-ƒƒ.internal.debug`
-2. Add `clean` subcommand (walk + regex delete)
-3. Wire `generate` subcommand (call pipeline without test execution or cleanup)
-4. Enrich `version` output with `runtime.Version()`, `GOOS`, `GOARCH`
-5. Add `--update-snapshots` flag (sets env var before test execution)
-6. Deprecation warnings for `-ƒƒ.*` flags on stderr
-
-### Medium Effort (hours)
-
-7. Stub `coverage` subcommand with "not yet implemented" message
-8. Create `setup-gotest` GitHub Action for external consumers
-9. Update `docs/spec.md` to reflect current state (it still references old `-ƒƒ.*` interface and incomplete assertion stubs)
-
-### Large Effort (days)
-
-10. Implement `gotest coverage` — semantic coverage analysis
-11. Implement `gotest-lint` — go/analysis static checks
-12. README rewrite per superspec §1.4 structure
-
-### Spec Document Drift
-
-`docs/spec.md` is now outdated in several areas:
-- Still documents `-ƒƒ.*` flags as primary interface
-- Lists `ContainsAll`/`ContainsAny` as stubs (they may have been removed/replaced)
-- Doesn't mention `When`, `Each`, `Eventually`, `Consistently`, `MatchSnapshot`
-- Doesn't mention `spec`, `scaffold`, `migrate` subcommands
-- Doesn't mention functional assertion API
-
-Consider either updating `spec.md` to match reality or deprecating it in favor of `superspec.md` as the canonical reference.
+All superspec items are implemented. `docs/spec.md` has been deprecated in favor of `superspec.md` as the canonical reference.

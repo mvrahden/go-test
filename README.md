@@ -413,13 +413,35 @@ Only the affected package is re-run. Combine with `F_` prefix for a tight feedba
 gotest ./... -v -race          # generate, test, cleanup (default)
 gotest spec ./...              # behavioral specification view
 gotest watch ./... -v          # watch mode with auto-rerun
+gotest coverage ./...          # semantic test coverage report
 gotest scaffold ./pkg/user.Svc # generate suite skeleton from type
 gotest migrate ./...           # convert testify/suite to go-test
+gotest generate ./...          # run code generation only (no tests)
+gotest clean ./...             # remove orphaned generated files
 gotest version                 # print version
 gotest help                    # show help
 ```
 
 All `go test` flags work unchanged: `-race`, `-cover`, `-count`, `-run`, `-json`, `-short`, `-timeout`, `-v`.
+
+### Semantic Coverage
+
+Analyze how well your test suites cover production type methods:
+
+```bash
+gotest coverage ./...
+gotest coverage ./... --min=80   # fail if coverage below 80%
+```
+
+### Linter
+
+Catch common mistakes in test suites with static analysis:
+
+```bash
+go run github.com/mvrahden/go-test/cmd/gotest-lint ./...
+```
+
+Detects: lifecycle hook typos, value receivers on suite methods, missing `AfterAll` when `BeforeAll` exists, committed `F_` prefixes, and orphaned generated files. Compatible with `golangci-lint` via `go/analysis`.
 
 ## License
 
