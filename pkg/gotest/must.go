@@ -14,6 +14,6 @@ func Must[T any](val T, ok any) T {
 	case error:
 		panic(fmt.Sprintf("Must: got error: %v", v))
 	default:
-		return val
+		panic(fmt.Sprintf("Must: unsupported ok type %T", v))
 	}
 }

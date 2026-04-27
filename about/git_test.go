@@ -8,7 +8,7 @@ import (
 )
 
 func Test_Regex(t *testing.T) {
-	t.Run("succeeds", func(t *testing.T) {
+	t.Run("matches generated suite filenames", func(t *testing.T) {
 		for _, v := range []string{
 			"ƒƒ_psuite_test.go",
 			"ƒƒ_pxsuite_test.go",
@@ -18,7 +18,7 @@ func Test_Regex(t *testing.T) {
 			gotest.True(t, about.PSuiteRegex.Match([]byte(v)), "failed for %q", v)
 		}
 	})
-	t.Run("fails", func(t *testing.T) {
+	t.Run("rejects non-suite filenames", func(t *testing.T) {
 		for _, v := range []string{
 			"ptest_test.go",
 			"pxtest_test.go",
