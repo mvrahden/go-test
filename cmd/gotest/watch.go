@@ -19,7 +19,7 @@ import (
 
 func runWatch(args []string) int {
 	ownArgs, goTestArgs := SplitArgs(args)
-	DEBUG = slices.Contains(ownArgs, "-ƒƒ.internal.debug")
+	DEBUG = slices.Contains(ownArgs, "--debug")
 	SPEC = slices.Contains(ownArgs, "--spec")
 	patterns := ExtractPackagePatterns(goTestArgs)
 

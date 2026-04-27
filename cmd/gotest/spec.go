@@ -18,7 +18,7 @@ func runSpec(args []string) int {
 	format, output, noColor, remaining := parseSpecFlags(args)
 
 	ownArgs, goTestArgs := SplitArgs(remaining)
-	DEBUG = slices.Contains(ownArgs, "-ƒƒ.internal.debug")
+	DEBUG = slices.Contains(ownArgs, "--debug")
 
 	patterns := ExtractPackagePatterns(goTestArgs)
 

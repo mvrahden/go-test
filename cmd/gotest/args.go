@@ -17,6 +17,7 @@ var knownSubcommands = map[string]bool{
 	"spec":     true,
 	"watch":    true,
 	"coverage": true,
+	"clean":    true,
 	"version":  true,
 	"help":     true,
 }
@@ -42,7 +43,7 @@ func ParseSubcommand(args []string) (subcmd string, remaining []string) {
 
 func SplitArgs(inArgs []string) (ownArgs, goTestArgs []string) {
 	for _, arg := range inArgs {
-		if strings.HasPrefix(arg, "-ƒƒ.") || arg == "--ci" || arg == "--spec" || arg == "--update-snapshots" {
+		if arg == "--debug" || arg == "--ci" || arg == "--spec" || arg == "--update-snapshots" {
 			ownArgs = append(ownArgs, arg)
 		} else {
 			goTestArgs = append(goTestArgs, arg)

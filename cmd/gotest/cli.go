@@ -25,6 +25,10 @@ func main() {
 		os.Exit(runMigrate(remaining))
 	case "coverage":
 		os.Exit(runCoverage(remaining))
+	case "generate":
+		os.Exit(runGenerate(remaining))
+	case "clean":
+		os.Exit(runClean(remaining))
 	case "spec":
 		os.Exit(runSpec(remaining))
 	case "watch":
@@ -39,7 +43,7 @@ func main() {
 		// Default run mode: use original args (no subcommand consumed)
 		args := os.Args[1:]
 		ownArgs, goTestArgs := SplitArgs(args)
-		DEBUG = slices.Contains(ownArgs, "-ƒƒ.internal.debug")
+		DEBUG = slices.Contains(ownArgs, "--debug")
 		CI = slices.Contains(ownArgs, "--ci")
 		SPEC = slices.Contains(ownArgs, "--spec")
 		UPDATE_SNAPSHOTS = slices.Contains(ownArgs, "--update-snapshots")
@@ -62,6 +66,8 @@ Usage:
 
 Subcommands:
   coverage    Report semantic test coverage (--min=<pct> for threshold)
+  generate    Run code generation only (no test execution)
+  clean       Remove orphaned generated files
   spec        Render behavioral specification from test suites
   watch       Watch for file changes and re-run tests
   scaffold    Generate test suite skeleton from a Go type
@@ -71,6 +77,7 @@ Subcommands:
 
 Flags:
   --ci                  Enable focus guard (fail on F_ prefixes)
+  --debug               Keep generated overlay for inspection
   --spec                Append spec view after normal test output
   --update-snapshots    Regenerate snapshot files
 
