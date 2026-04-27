@@ -7,6 +7,7 @@ import { DebugLauncher } from "./debug.js";
 import { FocusExcludeProvider } from "./focusExclude.js";
 import { FocusDiagnostics } from "./diagnostics.js";
 import { SpecViewPanel } from "./specView.js";
+import { WatchManager } from "./watch.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Go Test Suites");
@@ -43,6 +44,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const specView = new SpecViewPanel(outputChannel);
 
   const specViewRefreshDisposable = runner.onDidComplete((jsonOutput) => {
+    specView.refresh(jsonOutput);
+  });
+
+  const watchManager = new WatchManager(controller, outputChannel, (jsonOutput) => {
     specView.refresh(jsonOutput);
   });
 
@@ -120,6 +125,37 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   );
 
+  const startWatchCmd = vscode.commands.registerCommand(
+    "gotest.startWatch",
+    async () => {
+      const defaultScope = vscode.workspace
+        .getConfiguration("gotest")
+        .get<string>("watch.scope") ?? "./...";
+
+      const scope = await vscode.window.showInputBox({
+        prompt: "Package scope to watch",
+        value: defaultScope,
+        placeHolder: "./...",
+      });
+
+      if (scope) {
+        watchManager.start(scope, workspaceDir);
+      }
+    },
+  );
+
+  const stopWatchCmd = vscode.commands.registerCommand(
+    "gotest.stopWatch",
+    async () => {
+      if (watchManager.activeCount === 0) {
+        vscode.window.showInformationMessage("No active watchers.");
+        return;
+      }
+      watchManager.stopAll();
+      vscode.window.showInformationMessage("All watchers stopped.");
+    },
+  );
+
   // Set up FileSystemWatcher for *_test.go files
   const watcher = vscode.workspace.createFileSystemWatcher("**/*_test.go");
   const onFileChange = () => {
@@ -147,11 +183,14 @@ export function activate(context: vscode.ExtensionContext): void {
     runner,
     specView,
     specViewRefreshDisposable,
+    watchManager,
     runTestCmd,
     debugTestCmd,
     refreshTestsCmd,
     showFocusedTestsCmd,
     showSpecViewCmd,
+    startWatchCmd,
+    stopWatchCmd,
     watcher,
     watcherChangeDisposable,
     watcherCreateDisposable,

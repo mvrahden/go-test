@@ -34,6 +34,14 @@
       {
         "command": "gotest.showSpecView",
         "title": "Go Test: Show Spec View"
+      },
+      {
+        "command": "gotest.startWatch",
+        "title": "Go Test: Start Watch"
+      },
+      {
+        "command": "gotest.stopWatch",
+        "title": "Go Test: Stop Watch"
       }
     ],
     "configuration": {
@@ -75,6 +83,16 @@
           "type": "boolean",
           "default": true,
           "description": "Auto-refresh spec view panel after test runs"
+        },
+        "gotest.watch.autoRestart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-restart watch process on crash"
+        },
+        "gotest.watch.scope": {
+          "type": "string",
+          "default": "./...",
+          "description": "Default package scope for watch mode"
         }
       }
     }
