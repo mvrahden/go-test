@@ -2,6 +2,9 @@ package coverage
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -73,6 +76,60 @@ func TestFindMatchingSuite(t *testing.T) {
 			t.Errorf("expected nil, got %v", got)
 		}
 	})
+}
+
+func TestFindTestSuites(t *testing.T) {
+	dir := t.TempDir()
+	src := `package foo
+
+type UserServiceTestSuite struct{}
+
+func (s *UserServiceTestSuite) TestCreate()      {}
+func (s *UserServiceTestSuite) F_TestDelete()    {}
+func (s *UserServiceTestSuite) X_TestSkipped()   {}
+func (s *UserServiceTestSuite) TestParallelFetch() {}
+func (s *UserServiceTestSuite) BeforeEach()      {}
+`
+	if err := os.WriteFile(filepath.Join(dir, "foo_test.go"), []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	suites := findTestSuites(dir)
+	if len(suites) != 1 {
+		t.Fatalf("expected 1 suite, got %d", len(suites))
+	}
+
+	s := suites[0]
+	if s.name != "UserServiceTestSuite" {
+		t.Errorf("name = %q, want UserServiceTestSuite", s.name)
+	}
+	if s.typeName != "UserService" {
+		t.Errorf("typeName = %q, want UserService", s.typeName)
+	}
+
+	sort.Strings(s.methods)
+	want := []string{"F_TestDelete", "TestCreate", "TestParallelFetch", "X_TestSkipped"}
+	if strings.Join(s.methods, ",") != strings.Join(want, ",") {
+		t.Errorf("methods = %v, want %v", s.methods, want)
+	}
+}
+
+func TestFindTestSuitesEmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	src := `package foo
+
+type NotASuite struct{}
+
+func (s *NotASuite) DoStuff() {}
+`
+	if err := os.WriteFile(filepath.Join(dir, "foo_test.go"), []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	suites := findTestSuites(dir)
+	if len(suites) != 0 {
+		t.Errorf("expected 0 suites, got %d", len(suites))
+	}
 }
 
 func TestRender(t *testing.T) {

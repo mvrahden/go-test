@@ -117,6 +117,10 @@ func analyzePackage(pkg *packages.Package) PackageReport {
 	dir := filepath.Dir(pkg.GoFiles[0])
 	suites := findTestSuites(dir)
 
+	if len(suites) == 0 {
+		return pr
+	}
+
 	for _, pt := range prodTypes {
 		tr := TypeReport{Name: pt.name}
 		matching := findMatchingSuite(pt.name, suites)
@@ -233,7 +237,8 @@ func findTestSuites(dir string) []testSuite {
 				recvName := receiverTypeName(fd.Recv)
 				if suite, exists := suiteTypes[recvName]; exists {
 					methodName := fd.Name.Name
-					if strings.HasPrefix(methodName, "Test") {
+					stripped := strings.TrimPrefix(strings.TrimPrefix(methodName, "F_"), "X_")
+					if strings.HasPrefix(stripped, "Test") {
 						suite.methods = append(suite.methods, methodName)
 					}
 				}
