@@ -116,8 +116,9 @@ func analyzePackage(pkg *packages.Package) PackageReport {
 	prodTypes := findProductionTypes(pkg)
 	dir := filepath.Dir(pkg.GoFiles[0])
 	suites := findTestSuites(dir)
+	stdlibTests := findStdlibTests(dir)
 
-	if len(suites) == 0 {
+	if len(suites) == 0 && len(stdlibTests) == 0 {
 		return pr
 	}
 
@@ -128,6 +129,12 @@ func analyzePackage(pkg *packages.Package) PackageReport {
 			mr := MethodReport{Name: methodName}
 			if matching != nil {
 				if tm := findMatchingTestMethod(methodName, matching.methods); tm != "" {
+					mr.Covered = true
+					mr.TestMethod = tm
+				}
+			}
+			if !mr.Covered {
+				if tm := findMatchingTestMethod(methodName, stdlibTests); tm != "" {
 					mr.Covered = true
 					mr.TestMethod = tm
 				}
@@ -252,6 +259,36 @@ func findTestSuites(dir string) []testSuite {
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].name < result[j].name })
 	return result
+}
+
+func findStdlibTests(dir string) []string {
+	fset := token.NewFileSet()
+	filter := func(fi fs.FileInfo) bool {
+		return strings.HasSuffix(fi.Name(), "_test.go")
+	}
+
+	pkgMap, err := parser.ParseDir(fset, dir, filter, 0)
+	if err != nil {
+		return nil
+	}
+
+	var tests []string
+	for _, astPkg := range pkgMap {
+		for _, file := range astPkg.Files {
+			for _, decl := range file.Decls {
+				fd, ok := decl.(*ast.FuncDecl)
+				if !ok || fd.Recv != nil {
+					continue
+				}
+				name := fd.Name.Name
+				stripped := strings.TrimPrefix(strings.TrimPrefix(name, "F_"), "X_")
+				if strings.HasPrefix(stripped, "Test") {
+					tests = append(tests, name)
+				}
+			}
+		}
+	}
+	return tests
 }
 
 func extractTypeName(suiteName string) string {
