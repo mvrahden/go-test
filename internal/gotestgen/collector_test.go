@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"go/types"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -68,6 +69,11 @@ replace github.com/mvrahden/go-test => ` + modRoot + `
 `
 	err = os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0644)
 	gotest.NoError(t, err)
+
+	cmd := exec.Command("go", "mod", "tidy")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	gotest.True(t, err == nil, "go mod tidy failed: %s\n%s", err, out)
 
 	pkgs, err := packages.Load(&packages.Config{
 		Mode: packageEvalMode,

@@ -8,9 +8,21 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ["1.24", "1.25", "1.26"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
-      - run: go test -race ./...
+          go-version: ${{ matrix.go-version }}
+      - name: Test
+        run: go run ./cmd/gotest spec --no-color --output=spec.txt ./... -race
+      - name: Behavior spec
+        if: always()
+        run: |
+          if [ -f spec.txt ]; then
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat spec.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
