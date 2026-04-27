@@ -16,7 +16,19 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
+func parseWatchFlags(args []string) (jsonMode bool, remaining []string) {
+	for _, arg := range args {
+		if arg == "-json" {
+			jsonMode = true
+		} else {
+			remaining = append(remaining, arg)
+		}
+	}
+	return
+}
+
 func runWatch(args []string) int {
+	jsonMode, args := parseWatchFlags(args)
 	ownArgs, goTestArgs := SplitArgs(args)
 	DEBUG = slices.Contains(ownArgs, "--debug")
 	CI = slices.Contains(ownArgs, "--ci")
@@ -28,9 +40,13 @@ func runWatch(args []string) int {
 	defer stop()
 
 	// Initial run
-	fmt.Printf("\033[2m  running tests...\033[0m\n")
-	watchRunOnce(goTestArgs, patterns)
-	fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
+	if !jsonMode {
+		fmt.Printf("\033[2m  running tests...\033[0m\n")
+	}
+	watchRunOnce(goTestArgs, patterns, jsonMode)
+	if !jsonMode {
+		fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
+	}
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -71,12 +87,16 @@ func runWatch(args []string) int {
 			debounce.Reset(200 * time.Millisecond)
 
 		case <-debounce.C:
-			clearTerminal()
+			if !jsonMode {
+				clearTerminal()
+			}
 			pkgPatterns := dirsToPatterns(changedDirs)
 			pkgArgs := replacePatterns(goTestArgs, pkgPatterns)
-			watchRunOnce(pkgArgs, pkgPatterns)
+			watchRunOnce(pkgArgs, pkgPatterns, jsonMode)
 			changedDirs = nil
-			fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
+			if !jsonMode {
+				fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
+			}
 
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -87,11 +107,15 @@ func runWatch(args []string) int {
 	}
 }
 
-func watchRunOnce(goTestArgs []string, patterns []string) int {
+func watchRunOnce(goTestArgs []string, patterns []string, jsonMode bool) int {
 	if CI {
 		violations, err := RunFocusGuard(patterns)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+			if jsonMode {
+				fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
+			} else {
+				fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+			}
 			return 2
 		}
 		if len(violations) > 0 {
@@ -105,13 +129,28 @@ func watchRunOnce(goTestArgs []string, patterns []string) int {
 
 	overlay, cleanup, err := generateOverlay(patterns)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		if jsonMode {
+			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
+		} else {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		}
 		return 2
 	}
 	defer cleanup()
 
 	overlayArgs := append([]string{overlay.overlayFlag}, goTestArgs...)
 	extraEnv := buildExtraEnv()
+
+	if jsonMode {
+		fmt.Printf("{\"Action\":\"watch-start\",\"Package\":%q}\n", strings.Join(patterns, ","))
+		output, code, err := gotestrunner.StdlibRunTestsJSON(overlayArgs, extraEnv)
+		if err != nil {
+			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
+			return 2
+		}
+		os.Stdout.Write(output)
+		return code
+	}
 
 	if SPEC {
 		return runWithSpec(overlayArgs, extraEnv)
