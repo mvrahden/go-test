@@ -11,6 +11,8 @@ type ExecConfig struct {
 
 // knownSubcommands is the set of recognized subcommands.
 var knownSubcommands = map[string]bool{
+	"discover": true,
+	"overlay":  true,
 	"generate": true,
 	"scaffold": true,
 	"migrate":  true,
