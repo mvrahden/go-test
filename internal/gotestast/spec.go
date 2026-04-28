@@ -216,10 +216,6 @@ func (ts *TestSuiteSpec) Package() *packages.Package {
 	return ts.pkg
 }
 
-func (ts *TestSuiteSpec) IsParallel() bool {
-	return strings.HasSuffix(ts.ts.Name.Name, "TestSuiteParallel")
-}
-
 // IsParallelSuite returns true if the suite name ends with "TestSuiteParallel".
 func (ts *TestSuiteSpec) IsParallelSuite() bool {
 	return strings.HasSuffix(ts.ts.Name.Name, "TestSuiteParallel")

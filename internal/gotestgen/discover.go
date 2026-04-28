@@ -90,8 +90,8 @@ func addSuites(pkg *DiscoverPackage, suites gotestast.TestSuiteSpecSet) {
 }
 
 func convertSuite(suite *gotestast.TestSuiteSpec) DiscoverSuite {
-	fset := suite.FileSet()
-	pos := fset.Position(suite.Pos())
+	fset := suite.Package().Fset
+	pos := fset.Position(suite.TypeSpecPos())
 
 	lifecycle := collectLifecycle(suite)
 	fixtures := make([]string, 0)
@@ -105,7 +105,7 @@ func convertSuite(suite *gotestast.TestSuiteSpec) DiscoverSuite {
 
 	ds := DiscoverSuite{
 		Name:      suite.Identifier(),
-		Parallel:  suite.IsParallel(),
+		Parallel:  suite.IsParallelSuite(),
 		Focused:   suite.IsFocused(),
 		Excluded:  suite.IsExcluded(),
 		File:      pos.Filename,
