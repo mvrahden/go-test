@@ -15,8 +15,10 @@ func TestSplitArgs(t *testing.T) {
 	}{
 		{desc: "empty", inArgs: nil, expectOwn: nil, expectGoTest: nil},
 		{desc: "only go test args", inArgs: []string{"-v", "./...", "-race", "-count=1"}, expectOwn: nil, expectGoTest: []string{"-v", "./...", "-race", "-count=1"}},
-		{desc: "only own args", inArgs: []string{"-ƒƒ.internal.debug"}, expectOwn: []string{"-ƒƒ.internal.debug"}, expectGoTest: nil},
-		{desc: "mixed args", inArgs: []string{"-ƒƒ.internal.debug", "-v", "./...", "-race"}, expectOwn: []string{"-ƒƒ.internal.debug"}, expectGoTest: []string{"-v", "./...", "-race"}},
+		{desc: "only own args", inArgs: []string{"--debug"}, expectOwn: []string{"--debug"}, expectGoTest: nil},
+		{desc: "mixed args", inArgs: []string{"--debug", "-v", "./...", "-race"}, expectOwn: []string{"--debug"}, expectGoTest: []string{"-v", "./...", "-race"}},
+		{desc: "min flag with equals", inArgs: []string{"--min=80", "-v"}, expectOwn: []string{"--min=80"}, expectGoTest: []string{"-v"}},
+		{desc: "min flag with space", inArgs: []string{"--min", "90", "-v"}, expectOwn: []string{"--min", "90"}, expectGoTest: []string{"-v"}},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			own, goTest := SplitArgs(tc.inArgs)
@@ -41,10 +43,10 @@ func TestParseSubcommand(t *testing.T) {
 		{desc: "help subcommand", args: []string{"help"}, expectSubcmd: "help", expectRemaining: nil},
 		{desc: "generate subcommand", args: []string{"generate", "./..."}, expectSubcmd: "generate", expectRemaining: []string{"./..."}},
 		{desc: "watch subcommand", args: []string{"watch"}, expectSubcmd: "watch", expectRemaining: nil},
-		{desc: "coverage subcommand", args: []string{"coverage"}, expectSubcmd: "coverage", expectRemaining: nil},
+{desc: "clean subcommand", args: []string{"clean", "./..."}, expectSubcmd: "clean", expectRemaining: []string{"./..."}},
 		{desc: "spec subcommand", args: []string{"spec"}, expectSubcmd: "spec", expectRemaining: nil},
 		{desc: "unknown first arg is not consumed", args: []string{"./...", "-v"}, expectSubcmd: "", expectRemaining: []string{"./...", "-v"}},
-		{desc: "flag first arg is not consumed", args: []string{"-ƒƒ.clean", "./..."}, expectSubcmd: "", expectRemaining: []string{"-ƒƒ.clean", "./..."}},
+		{desc: "flag first arg is not consumed", args: []string{"-v", "./..."}, expectSubcmd: "", expectRemaining: []string{"-v", "./..."}},
 		{desc: "package pattern not consumed", args: []string{"github.com/foo/bar"}, expectSubcmd: "", expectRemaining: []string{"github.com/foo/bar"}},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
