@@ -8,6 +8,7 @@ import {
   type TestEvent,
   type TestMessage,
 } from "./outputParser.js";
+import { buildCliCommand, formatCliCommand } from "./cli.js";
 
 export class TestRunner {
   private _lastJsonOutput = "";
@@ -59,26 +60,21 @@ export class TestRunner {
         }
 
         const filter = this.buildRunFilter(groupItems, importPath);
-        const cliPath =
-          vscode.workspace
-            .getConfiguration("gotest")
-            .get<string>("cliPath") ?? "gotest";
         const testFlags =
           vscode.workspace
             .getConfiguration("gotest")
             .get<string[]>("testFlags") ?? [];
 
-        const args = ["test", pkg.dir, "-json"];
+        const subArgs = ["test", pkg.dir, "-json"];
         if (filter) {
-          args.push("-run", filter);
+          subArgs.push("-run", filter);
         }
-        args.push(...testFlags);
+        subArgs.push(...testFlags);
 
-        this.outputChannel.appendLine(
-          `[runner] ${cliPath} ${args.join(" ")}`,
-        );
+        const cmd = buildCliCommand(subArgs);
+        this.outputChannel.appendLine(`[runner] ${formatCliCommand(cmd)}`);
 
-        const stdout = await this.spawnProcess(cliPath, args, pkg.dir, token);
+        const stdout = await this.spawnProcess(cmd.bin, cmd.args, pkg.dir, token);
         this._lastJsonOutput += stdout;
 
         if (token.isCancellationRequested) {

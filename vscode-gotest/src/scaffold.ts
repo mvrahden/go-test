@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
+import { buildCliCommand, formatCliCommand } from "./cli.js";
 
 export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vscode.Disposable {
   static readonly providedCodeActionKinds = [vscode.CodeActionKind.RefactorExtract];
@@ -95,13 +96,11 @@ export async function executeScaffold(
     return;
   }
 
-  const cliPath =
-    vscode.workspace.getConfiguration("gotest").get<string>("cliPath") ?? "gotest";
-
-  outputChannel.appendLine(`[scaffold] ${cliPath} scaffold ${target}`);
+  const cmd = buildCliCommand(["scaffold", target]);
+  outputChannel.appendLine(`[scaffold] ${formatCliCommand(cmd)}`);
 
   try {
-    const stdout = await spawnScaffold(cliPath, target, workspaceDir);
+    const stdout = await spawnScaffold(cmd, workspaceDir);
     const match = /^Generated:\s*(.+)$/m.exec(stdout);
     if (match) {
       const generatedPath = match[1];
@@ -118,9 +117,9 @@ export async function executeScaffold(
   }
 }
 
-function spawnScaffold(cliPath: string, target: string, cwd: string): Promise<string> {
+function spawnScaffold(cmd: { bin: string; args: string[] }, cwd: string): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    const child = spawn(cliPath, ["scaffold", target], { cwd });
+    const child = spawn(cmd.bin, cmd.args, { cwd });
     let stdout = "";
     let stderr = "";
 

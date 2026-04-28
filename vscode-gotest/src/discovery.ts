@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { DiscoverOutput, DiscoverPackage } from "./types.js";
+import { buildCliCommand, formatCliCommand } from "./cli.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -56,13 +57,10 @@ export class DiscoveryService {
 
     this.running = true;
     try {
-      const cliPath =
-        vscode.workspace.getConfiguration("gotest").get<string>("cliPath") ??
-        "gotest";
+      const cmd = buildCliCommand(["discover", ...(patterns ?? ["./..."])]);
+      this.outputChannel.appendLine(`[discovery] ${formatCliCommand(cmd)}`);
 
-      const args = ["discover", ...(patterns ?? ["./..."])];
-
-      const { stdout } = await execFileAsync(cliPath, args, {
+      const { stdout } = await execFileAsync(cmd.bin, cmd.args, {
         cwd: workspaceDir,
         timeout: 30_000,
       });

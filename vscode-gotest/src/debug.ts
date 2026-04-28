@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { rm } from "node:fs/promises";
 import type { OverlayOutput } from "./types.js";
+import { buildCliCommand, formatCliCommand } from "./cli.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -33,15 +34,12 @@ export class DebugLauncher implements vscode.Disposable {
       return;
     }
 
-    const cliPath = vscode.workspace
-      .getConfiguration("gotest")
-      .get<string>("cliPath", "gotest");
-
     // Generate overlay
     let overlay: OverlayOutput;
     try {
-      this.outputChannel.appendLine(`[debug] ${cliPath} overlay ${pkgDir}`);
-      const { stdout } = await execFileAsync(cliPath, ["overlay", pkgDir], {
+      const cmd = buildCliCommand(["overlay", pkgDir]);
+      this.outputChannel.appendLine(`[debug] ${formatCliCommand(cmd)}`);
+      const { stdout } = await execFileAsync(cmd.bin, cmd.args, {
         cwd: workspaceFolder.uri.fsPath,
       });
       overlay = JSON.parse(stdout) as OverlayOutput;

@@ -55,10 +55,15 @@
     "configuration": {
       "title": "Go Test Suites",
       "properties": {
+        "gotest.modulePath": {
+          "type": "string",
+          "default": "github.com/mvrahden/go-test/cmd/gotest",
+          "description": "Go module path for gotest CLI (used with 'go run')"
+        },
         "gotest.cliPath": {
           "type": "string",
-          "default": "gotest",
-          "description": "Path to the gotest CLI binary"
+          "default": "",
+          "description": "Override: path to a pre-installed gotest binary (bypasses 'go run')"
         },
         "gotest.discoverOnSave": {
           "type": "boolean",

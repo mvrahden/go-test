@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { spawn } from "node:child_process";
+import { buildCliCommand } from "./cli.js";
 
 /**
  * Convert ANSI escape codes to HTML spans with CSS classes.
@@ -119,13 +120,8 @@ export class SpecViewPanel implements vscode.Disposable {
       return;
     }
 
-    const cliPath =
-      vscode.workspace
-        .getConfiguration("gotest")
-        .get<string>("cliPath") ?? "gotest";
-
     try {
-      const stdout = await this.runSpecFromInput(cliPath, jsonOutput);
+      const stdout = await this.runSpecFromInput(jsonOutput);
       const content = ansiToHtml(stdout);
       this.lastHtml = content;
       this.panel.webview.html = this.buildHtml(content);
@@ -163,9 +159,10 @@ export class SpecViewPanel implements vscode.Disposable {
 </html>`;
   }
 
-  private runSpecFromInput(cliPath: string, jsonInput: string): Promise<string> {
+  private runSpecFromInput(jsonInput: string): Promise<string> {
+    const cmd = buildCliCommand(["spec", "--input=-", "--format=terminal"]);
     return new Promise<string>((resolve, reject) => {
-      const child = spawn(cliPath, ["spec", "--input=-", "--format=terminal"]);
+      const child = spawn(cmd.bin, cmd.args);
       let stdout = "";
       let stderr = "";
 

@@ -12,6 +12,7 @@ import {
   extractTestMessages,
   type TestEvent,
 } from "./outputParser.js";
+import { buildCliCommand, formatCliCommand } from "./cli.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -117,8 +118,6 @@ export class CoverageRunner implements vscode.Disposable {
           continue;
         }
 
-        const cliPath =
-          vscode.workspace.getConfiguration("gotest").get<string>("cliPath") ?? "gotest";
         const testFlags =
           vscode.workspace.getConfiguration("gotest").get<string[]>("testFlags") ?? [];
 
@@ -126,10 +125,11 @@ export class CoverageRunner implements vscode.Disposable {
         let coverFile: string | undefined;
 
         try {
-          this.outputChannel.appendLine(`[coverage] ${cliPath} overlay ${pkg.dir}`);
+          const overlayCmd = buildCliCommand(["overlay", pkg.dir]);
+          this.outputChannel.appendLine(`[coverage] ${formatCliCommand(overlayCmd)}`);
           const { stdout: overlayStdout } = await execFileAsync(
-            cliPath,
-            ["overlay", pkg.dir],
+            overlayCmd.bin,
+            overlayCmd.args,
             { cwd: workspaceDir },
           );
           const overlay = JSON.parse(overlayStdout) as OverlayOutput;

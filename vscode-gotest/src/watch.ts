@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { spawn, type ChildProcess } from "node:child_process";
 import type { GoTestController } from "./testController.js";
 import { parseTestEvents } from "./outputParser.js";
+import { buildCliCommand, formatCliCommand, type CliCommand } from "./cli.js";
 
 /**
  * Wraps a single `gotest watch -json <scope>` child process.
@@ -19,7 +20,7 @@ class WatchProcess implements vscode.Disposable {
   constructor(
     private readonly pkgScope: string,
     private readonly cwd: string,
-    private readonly cliPath: string,
+    private readonly cmd: CliCommand,
     private readonly outputChannel: vscode.OutputChannel,
     private readonly onCycleStart: () => void,
     private readonly onEvents: (jsonLines: string) => void,
@@ -30,12 +31,11 @@ class WatchProcess implements vscode.Disposable {
   }
 
   private start(): void {
-    const args = ["watch", "-json", this.pkgScope];
     this.outputChannel.appendLine(
-      `[watch] spawning: ${this.cliPath} ${args.join(" ")} (cwd: ${this.cwd})`,
+      `[watch] spawning: ${formatCliCommand(this.cmd)} (cwd: ${this.cwd})`,
     );
 
-    this.child = spawn(this.cliPath, args, { cwd: this.cwd });
+    this.child = spawn(this.cmd.bin, this.cmd.args, { cwd: this.cwd });
     this.buffer = "";
     this.cycleBuffer = "";
 
@@ -199,17 +199,14 @@ export class WatchManager implements vscode.Disposable {
       this.stop(pkgScope);
     }
 
-    const cliPath =
-      vscode.workspace
-        .getConfiguration("gotest")
-        .get<string>("cliPath") ?? "gotest";
+    const cmd = buildCliCommand(["watch", "-json", pkgScope]);
 
     let cycleJsonAccumulator = "";
 
     const watcher = new WatchProcess(
       pkgScope,
       cwd,
-      cliPath,
+      cmd,
       this.outputChannel,
       // onCycleStart
       () => {
