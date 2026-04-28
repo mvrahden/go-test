@@ -17,12 +17,16 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Test
-        run: go run ./cmd/gotest spec --no-color --output=spec.txt ./... -race
-      - name: Behavior spec
+        run: go run ./cmd/gotest spec --no-color --output=spec.txt ./... -race -coverprofile=coverage.out
+      - name: Summary
         if: always()
         run: |
           if [ -f spec.txt ]; then
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             cat spec.txt >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f coverage.out ]; then
+            pct=$(go tool cover -func=coverage.out | tail -1 | awk '{print $NF}')
+            echo "**Coverage: ${pct}**" >> "$GITHUB_STEP_SUMMARY"
           fi
