@@ -613,6 +613,54 @@ func TestCollector_NilPackage(t *testing.T) {
 	gotest.True(t, result.Fixtures == nil, "expected nil fixtures")
 }
 
+// --- Shared fixture embedding: not treated as parent ---
+
+func TestCollector_SharedFixtureNotTreatedAsParent(t *testing.T) {
+	src := "package testpkg\n\n" +
+		"import (\n" +
+		"\t\"context\"\n\n" +
+		"\t\"github.com/mvrahden/go-test/pkg/gotest\"\n" +
+		")\n\n" +
+		"type PGSharedFixture struct {\n" +
+		"\tDSN string `gotest:\"env=PG_DSN\"`\n" +
+		"}\n\n" +
+		"func (f *PGSharedFixture) BeforeAll() error { return nil }\n\n" +
+		"type E2EFixture struct {\n" +
+		"\t*PGSharedFixture\n" +
+		"}\n\n" +
+		"func (f *E2EFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
+		"type QueryTestSuite struct {\n" +
+		"\t*E2EFixture\n" +
+		"}\n\n" +
+		"func (s *QueryTestSuite) TestInsert(t *gotest.T) {}\n"
+
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
+	gotest.Equal(t, 1, len(result.Suites))
+	gotest.Equal(t, 2, len(result.Fixtures))
+
+	var e2eFix *gotestast.FixtureSpec
+	for _, f := range result.Fixtures {
+		if f.Identifier() == "E2EFixture" {
+			e2eFix = f
+		}
+	}
+	gotest.True(t, e2eFix != nil, "expected E2EFixture")
+	gotest.True(t, e2eFix.ParentFixture == nil,
+		"shared fixture should NOT be treated as parent; ParentFixture should be nil")
+
+	// Suite should be linked to the package fixture
+	gotest.True(t, result.Suites[0].Fixture() != nil, "expected suite to have fixture")
+	gotest.Equal(t, "E2EFixture", result.Suites[0].Fixture().Identifier())
+
+	// Validation should pass (single root package fixture)
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+	gotest.Equal(t, 1, len(spec.EffectiveTestSuites))
+}
+
 // --- helpers ---
 
 // makeFixtureSpec creates a minimal FixtureSpec for validation testing.
