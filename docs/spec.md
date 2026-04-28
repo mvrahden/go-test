@@ -585,7 +585,7 @@ Detects:
 
 ```yaml
 - uses: mvrahden/setup-gotest@v1
-- run: gotest --ci ./... -v -race
+- run: gotest --ci ./... -v -race -coverprofile=coverage.out
 - run: gotest spec ./... --format=md --output=behavior-spec.md
 ```
 
