@@ -22,6 +22,10 @@ func main() {
 	subcmd, remaining := ParseSubcommand(os.Args[1:])
 
 	switch subcmd {
+	case "discover":
+		os.Exit(runDiscover(remaining))
+	case "overlay":
+		os.Exit(runOverlay(remaining))
 	case "scaffold":
 		os.Exit(runScaffold(remaining))
 	case "migrate":
@@ -134,6 +138,8 @@ Usage:
   gotest [subcommand] [flags] [packages...]
 
 Subcommands:
+  discover    Discover test suites and output JSON metadata
+  overlay     Generate overlay files and output overlay path as JSON
   generate    Run code generation only (no test execution)
   clean       Remove orphaned generated files
   spec        Render behavioral specification from test suites

@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"go/format"
+	"go/types"
 	"strings"
 	"text/template"
 
@@ -39,10 +40,11 @@ type FixtureViewModel struct {
 
 // SharedFixtureRef describes a shared fixture embedded in a package fixture.
 type SharedFixtureRef struct {
-	LocalVar      string            // e.g. "pgFixture"
-	QualifiedType string            // e.g. "fixtures.PostgresFixture"
-	FieldName     string            // e.g. "PostgresFixture"
+	LocalVar      string            // e.g. "sf0"
+	QualifiedType string            // e.g. "fixtures.PostgresSharedFixture"
+	FieldName     string            // e.g. "PostgresSharedFixture"
 	EnvTags       map[string]string // field -> env var
+	PkgPath       string            // import path, empty if same package
 }
 
 type renderer struct{}
@@ -54,16 +56,23 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome) (
 	if len(spec.EffectiveTestSuites) == 0 {
 		return nil, nil
 	}
-	buf := bytes.NewBuffer(nil)
-	if err := r.renderFileHeader(buf, pkg, spec); err != nil {
-		return nil, fmt.Errorf("failed rendering file header. err: %w", err)
-	}
 
 	// Split suites into fixture-bound and standalone
 	fixtureBound, standalone := splitSuitesByFixture(spec)
 
+	// Build fixture view models before rendering header (shared fixture imports needed)
+	var viewModels []*FixtureViewModel
 	if len(fixtureBound) > 0 {
-		if err := r.renderFixtures(buf, spec, fixtureBound); err != nil {
+		viewModels = buildFixtureViewModels(spec.Fixtures, fixtureBound)
+	}
+
+	buf := bytes.NewBuffer(nil)
+	if err := r.renderFileHeader(buf, pkg, spec, viewModels); err != nil {
+		return nil, fmt.Errorf("failed rendering file header. err: %w", err)
+	}
+
+	if len(fixtureBound) > 0 {
+		if err := r.renderFixtures(buf, fixtureBound, viewModels); err != nil {
 			return nil, fmt.Errorf("failed rendering fixture suites. err: %w", err)
 		}
 	}
@@ -82,7 +91,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome) (
 	return r.formatOutput(buf)
 }
 
-func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome) error {
+func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, viewModels []*FixtureViewModel) error {
 	type Import struct {
 		Name string
 		Path string
@@ -105,6 +114,15 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		imports = append(imports, Import{Path: "context"})
 		imports = append(imports, Import{Path: "os"})
 	}
+	seenPkg := map[string]bool{}
+	for _, vm := range viewModels {
+		for _, sf := range vm.SharedFixtures {
+			if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
+				imports = append(imports, Import{Path: sf.PkgPath})
+				seenPkg[sf.PkgPath] = true
+			}
+		}
+	}
 	data := TplData{
 		RepoName:    about.ShortInfo(),
 		PackageName: pkg.Name,
@@ -122,16 +140,13 @@ func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome) error {
 	})
 }
 
-func (r *renderer) renderFixtures(buf *bytes.Buffer, spec SpecOutcome, fixtureBound []*gotestast.TestSuiteSpec) error {
-	// Build fixture view models from the spec's fixtures and fixture-bound suites
-	viewModels := buildFixtureViewModels(spec.Fixtures, fixtureBound)
+func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, viewModels []*FixtureViewModel) error {
 	if len(viewModels) == 0 {
 		return nil
 	}
 
-	// Collect all fixture-bound suites for wrapper struct generation
 	return gotestTpl.ExecuteTemplate(buf, "gotest.fixture.tpl", map[string]any{
-		"RootFixtures":     viewModels,
+		"RootFixtures":       viewModels,
 		"FixtureBoundSuites": fixtureBound,
 	})
 }
@@ -166,11 +181,12 @@ func buildFixtureViewModels(fixtures []*gotestast.FixtureSpec, fixtureBound []*g
 			continue
 		}
 		vm := &FixtureViewModel{
-			Identifier: f.Identifier(),
-			BeforeAll:  f.BeforeAll != nil,
-			AfterAll:   f.AfterAll != nil,
-			BeforeEach: f.BeforeEach != nil,
-			AfterEach:  f.AfterEach != nil,
+			Identifier:     f.Identifier(),
+			BeforeAll:      f.BeforeAll != nil,
+			AfterAll:       f.AfterAll != nil,
+			BeforeEach:     f.BeforeEach != nil,
+			AfterEach:      f.AfterEach != nil,
+			SharedFixtures: detectSharedFixtureEmbeddings(f),
 		}
 		vmMap[f.Identifier()] = vm
 	}
@@ -221,4 +237,58 @@ func buildFixtureViewModels(fixtures []*gotestast.FixtureSpec, fixtureBound []*g
 	}
 
 	return roots
+}
+
+// detectSharedFixtureEmbeddings inspects a package fixture's struct type for
+// embedded pointer fields whose type name ends in "SharedFixture". For each
+// match, it parses the env tags and builds a SharedFixtureRef.
+func detectSharedFixtureEmbeddings(pkgFixture *gotestast.FixtureSpec) []SharedFixtureRef {
+	typ := pkgFixture.StructType()
+	if typ == nil {
+		return nil
+	}
+
+	var refs []SharedFixtureRef
+	sfIdx := 0
+	for i := 0; i < typ.NumFields(); i++ {
+		field := typ.Field(i)
+		if !field.Anonymous() {
+			continue
+		}
+		ptr, ok := field.Type().(*types.Pointer)
+		if !ok {
+			continue
+		}
+		named, ok := ptr.Elem().(*types.Named)
+		if !ok {
+			continue
+		}
+		name := named.Obj().Name()
+		if !strings.HasSuffix(name, "SharedFixture") {
+			continue
+		}
+
+		underlying, ok := named.Underlying().(*types.Struct)
+		if !ok {
+			continue
+		}
+		envTags := gotestast.ParseEnvTags(underlying)
+
+		qualifiedType := name
+		var pkgPath string
+		if pkg := named.Obj().Pkg(); pkg != nil && pkg.Path() != pkgFixture.PackagePath() {
+			qualifiedType = pkg.Name() + "." + name
+			pkgPath = pkg.Path()
+		}
+
+		refs = append(refs, SharedFixtureRef{
+			LocalVar:      fmt.Sprintf("sf%d", sfIdx),
+			QualifiedType: qualifiedType,
+			FieldName:     name,
+			EnvTags:       envTags,
+			PkgPath:       pkgPath,
+		})
+		sfIdx++
+	}
+	return refs
 }
