@@ -42,6 +42,10 @@
       {
         "command": "gotest.stopWatch",
         "title": "Go Test: Stop Watch"
+      },
+      {
+        "command": "gotest.scaffold",
+        "title": "Go Test: Scaffold Suite"
       }
     ],
     "configuration": {

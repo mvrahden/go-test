@@ -8,6 +8,8 @@ import { FocusExcludeProvider } from "./focusExclude.js";
 import { FocusDiagnostics } from "./diagnostics.js";
 import { SpecViewPanel } from "./specView.js";
 import { WatchManager } from "./watch.js";
+import { ScaffoldCodeActionProvider, runScaffoldCommand, executeScaffold } from "./scaffold.js";
+import { CoverageRunner } from "./coverage.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Go Test Suites");
@@ -25,6 +27,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Create controller with inline handlers that close over runner
   let runner: TestRunner;
+  let coverageRunner: CoverageRunner;
 
   const controller = new GoTestController(
     cache,
@@ -37,11 +40,16 @@ export function activate(context: vscode.ExtensionContext): void {
         (items) => buildRunFilter(items),
         (item) => getPackageDir(item, cache),
       ),
+    (request, token) => coverageRunner.run(request, token),
   );
 
   runner = new TestRunner(controller, cache, outputChannel);
 
   const specView = new SpecViewPanel(outputChannel);
+
+  coverageRunner = new CoverageRunner(controller, cache, outputChannel, (jsonOutput) => {
+    specView.refresh(jsonOutput);
+  });
 
   const specViewRefreshDisposable = runner.onDidComplete((jsonOutput) => {
     specView.refresh(jsonOutput);
@@ -64,6 +72,14 @@ export function activate(context: vscode.ExtensionContext): void {
     { language: "go", pattern: "**/*_test.go" },
     focusExcludeProvider,
     { providedCodeActionKinds: FocusExcludeProvider.providedCodeActionKinds },
+  );
+
+  // Register scaffold Code Action provider
+  const scaffoldProvider = new ScaffoldCodeActionProvider();
+  const scaffoldCodeActionsDisposable = vscode.languages.registerCodeActionsProvider(
+    { language: "go", pattern: "**/*.go" },
+    scaffoldProvider,
+    { providedCodeActionKinds: ScaffoldCodeActionProvider.providedCodeActionKinds },
   );
 
   // Create FocusDiagnostics
@@ -156,6 +172,16 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   );
 
+  const scaffoldCmd = vscode.commands.registerCommand(
+    "gotest.scaffold",
+    () => runScaffoldCommand(outputChannel, () => discoveryService.discover(workspaceDir)),
+  );
+
+  const scaffoldTargetCmd = vscode.commands.registerCommand(
+    "gotest.scaffoldTarget",
+    (target: string) => executeScaffold(target, outputChannel, () => discoveryService.discover(workspaceDir)),
+  );
+
   // Set up FileSystemWatcher for *_test.go files
   const watcher = vscode.workspace.createFileSystemWatcher("**/*_test.go");
   const onFileChange = () => {
@@ -181,6 +207,7 @@ export function activate(context: vscode.ExtensionContext): void {
     diagnostics,
     debugLauncher,
     runner,
+    coverageRunner,
     specView,
     specViewRefreshDisposable,
     watchManager,
@@ -191,6 +218,10 @@ export function activate(context: vscode.ExtensionContext): void {
     showSpecViewCmd,
     startWatchCmd,
     stopWatchCmd,
+    scaffoldProvider,
+    scaffoldCodeActionsDisposable,
+    scaffoldCmd,
+    scaffoldTargetCmd,
     watcher,
     watcherChangeDisposable,
     watcherCreateDisposable,
