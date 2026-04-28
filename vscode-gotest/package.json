@@ -46,6 +46,10 @@
       {
         "command": "gotest.scaffold",
         "title": "Go Test: Scaffold Suite"
+      },
+      {
+        "command": "gotest.scaffoldTarget",
+        "title": "Go Test: Scaffold Target"
       }
     ],
     "configuration": {

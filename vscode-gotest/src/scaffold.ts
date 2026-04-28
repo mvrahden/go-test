@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "node:path";
 import { spawn } from "node:child_process";
 
 export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vscode.Disposable {
@@ -53,9 +54,8 @@ export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vs
     if (!workspaceFolder) {
       return "";
     }
-    const relDir = document.uri.fsPath
-      .slice(workspaceFolder.uri.fsPath.length + 1)
-      .replace(/\/[^/]+$/, "");
+    const relPath = path.relative(workspaceFolder.uri.fsPath, document.uri.fsPath);
+    const relDir = path.posix.normalize(path.dirname(relPath).split(path.sep).join("/"));
     return `./${relDir}.${typeName}`;
   }
 
@@ -64,8 +64,8 @@ export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vs
     if (!workspaceFolder) {
       return "";
     }
-    const relPath = document.uri.fsPath.slice(workspaceFolder.uri.fsPath.length + 1);
-    return `./${relPath}`;
+    const relPath = path.relative(workspaceFolder.uri.fsPath, document.uri.fsPath);
+    return `./${relPath.split(path.sep).join("/")}`;
   }
 }
 
