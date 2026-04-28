@@ -93,30 +93,35 @@ func (collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 		return CollectorResult{Errs: errs}
 	}
 
-	// detect fixture embedding in test suites
+	// detect fixture embedding in test suites (only package fixtures, not shared fixtures)
 	for _, s := range suites {
 		embedded := findEmbeddedFixtures(s.StructType(), fixtures)
-		if len(embedded) > 1 {
+		var pkgFixtures []*gotestast.FixtureSpec
+		for _, e := range embedded {
+			if e.Kind == gotestast.PackageFixture {
+				pkgFixtures = append(pkgFixtures, e)
+			}
+		}
+		if len(pkgFixtures) > 1 {
 			errs = append(errs, CollectorError{
 				Err: fmt.Errorf("test suite %q embeds multiple fixtures; at most one is allowed", s.Identifier()),
 			})
 			continue
 		}
-		if len(embedded) == 1 {
-			s.SetFixture(embedded[0])
+		if len(pkgFixtures) == 1 {
+			s.SetFixture(pkgFixtures[0])
 		}
 	}
 	if len(errs) > 0 {
 		return CollectorResult{Errs: errs}
 	}
 
-	// detect fixture-to-fixture embedding (parent fixture)
+	// detect fixture-to-fixture embedding (parent fixture, skip shared fixtures)
 	for _, f := range fixtures {
 		embedded := findEmbeddedFixtures(f.StructType(), fixtures)
-		// exclude self
 		var parents []*gotestast.FixtureSpec
 		for _, e := range embedded {
-			if e != f {
+			if e != f && e.Kind != gotestast.SharedFixture {
 				parents = append(parents, e)
 			}
 		}

@@ -27,6 +27,9 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
 {{ end }}
 
     fixture := &{{ $f.Identifier }}{}
+{{- range $sf := $f.SharedFixtures }}
+    fixture.{{ $sf.FieldName }} = {{ $sf.LocalVar }}
+{{- end }}
     t.Cleanup(func() {
 {{- if $f.AfterAll }}
         if err := fixture.AfterAll(context.Background()); err != nil {

@@ -95,7 +95,7 @@ func DetermineFixture(n ast.Node, pkg *packages.Package) (*FixtureSpec, error) {
 	}
 
 	if kind == SharedFixture {
-		spec.EnvTags = parseEnvTags(typ)
+		spec.EnvTags = ParseEnvTags(typ)
 	}
 
 	return spec, nil
@@ -213,7 +213,7 @@ func NewFixtureSpecForTestWithPkg(name string, kind FixtureKind, pkgPath string)
 	}
 }
 
-func parseEnvTags(typ *types.Struct) map[string]string {
+func ParseEnvTags(typ *types.Struct) map[string]string {
 	tags := make(map[string]string)
 	for i := 0; i < typ.NumFields(); i++ {
 		f := typ.Field(i)

@@ -500,3 +500,153 @@ func (s *StdlibTestSuite) TestQuery(t *testing.T)  {}
 	// Test case should use adapter
 	gotest.True(t, strings.Contains(output, `func(t *gotest.T) { s.TestQuery(t.T()) }`), "expected TestQuery adapter")
 }
+
+func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
+	src := "package testpkg\n\n" +
+		"import (\n" +
+		"\t\"context\"\n\n" +
+		"\t\"github.com/mvrahden/go-test/pkg/gotest\"\n" +
+		")\n\n" +
+		"type PostgresSharedFixture struct {\n" +
+		"\tDSN string `gotest:\"env=E2E_POSTGRES_DSN\"`\n" +
+		"}\n\n" +
+		"func (f *PostgresSharedFixture) BeforeAll() error { return nil }\n\n" +
+		"type E2EFixture struct {\n" +
+		"\t*PostgresSharedFixture\n" +
+		"\tPool string\n" +
+		"}\n\n" +
+		"func (f *E2EFixture) BeforeAll(ctx context.Context) error { return nil }\n" +
+		"func (f *E2EFixture) AfterAll(ctx context.Context) error  { return nil }\n\n" +
+		"type QueryTestSuite struct {\n" +
+		"\t*E2EFixture\n" +
+		"}\n\n" +
+		"func (s *QueryTestSuite) TestInsert(t *gotest.T) {}\n"
+
+	pkg := loadTestPkgWithGotest(t, src)
+
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
+	gotest.Equal(t, 1, len(result.Suites))
+	gotest.Equal(t, 2, len(result.Fixtures))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+	gotest.Equal(t, 1, len(spec.EffectiveTestSuites))
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+	gotest.True(t, len(out) > 0, "expected non-empty output")
+
+	output := string(out)
+
+	// Shared fixture local var should be created with env var resolution
+	gotest.Contains(t, output, "sf0 := &PostgresSharedFixture{}")
+	gotest.Contains(t, output, `os.Getenv("E2E_POSTGRES_DSN")`)
+	gotest.Contains(t, output, `t.Fatal("E2E_POSTGRES_DSN not set`)
+
+	// Shared fixture should be assigned to the package fixture
+	gotest.Contains(t, output, "fixture.PostgresSharedFixture = sf0")
+
+	// Package fixture lifecycle should still work
+	gotest.Contains(t, output, "func Test_E2EFixture(t *testing.T)")
+	gotest.Contains(t, output, "fixture := &E2EFixture{}")
+	gotest.Contains(t, output, "fixture.BeforeAll(t.Context())")
+	gotest.Contains(t, output, "fixture.AfterAll(context.Background())")
+
+	// Suite should be nested under fixture
+	gotest.Contains(t, output, `t.Run("QueryTestSuite"`)
+	gotest.Contains(t, output, "E2EFixture: fixture")
+
+	// Shared fixture env var resolution should appear before fixture.BeforeAll
+	sfIdx := strings.Index(output, "sf0.DSN = os.Getenv")
+	beforeAllIdx := strings.Index(output, "fixture.BeforeAll(t.Context())")
+	gotest.True(t, sfIdx < beforeAllIdx, "shared fixture env resolution must precede fixture.BeforeAll")
+}
+
+func TestRenderer_SharedFixtureNoEnvTags(t *testing.T) {
+	src := "package testpkg\n\n" +
+		"import (\n" +
+		"\t\"context\"\n\n" +
+		"\t\"github.com/mvrahden/go-test/pkg/gotest\"\n" +
+		")\n\n" +
+		"type SetupSharedFixture struct{}\n\n" +
+		"func (f *SetupSharedFixture) BeforeAll() error { return nil }\n\n" +
+		"type AppFixture struct {\n" +
+		"\t*SetupSharedFixture\n" +
+		"}\n\n" +
+		"func (f *AppFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
+		"type AppTestSuite struct {\n" +
+		"\t*AppFixture\n" +
+		"}\n\n" +
+		"func (s *AppTestSuite) TestRun(t *gotest.T) {}\n"
+
+	pkg := loadTestPkgWithGotest(t, src)
+
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+
+	output := string(out)
+
+	// Shared fixture should be created and assigned even without env tags
+	gotest.Contains(t, output, "sf0 := &SetupSharedFixture{}")
+	gotest.Contains(t, output, "fixture.SetupSharedFixture = sf0")
+
+	// No os.Getenv calls since there are no env tags
+	gotest.True(t, !strings.Contains(output, "os.Getenv"), "should not have os.Getenv without env tags")
+}
+
+func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
+	src := "package testpkg\n\n" +
+		"import (\n" +
+		"\t\"context\"\n\n" +
+		"\t\"github.com/mvrahden/go-test/pkg/gotest\"\n" +
+		")\n\n" +
+		"type PGSharedFixture struct {\n" +
+		"\tDSN  string `gotest:\"env=PG_DSN\"`\n" +
+		"\tHost string `gotest:\"env=PG_HOST\"`\n" +
+		"}\n\n" +
+		"func (f *PGSharedFixture) BeforeAll() error { return nil }\n\n" +
+		"type DBFixture struct {\n" +
+		"\t*PGSharedFixture\n" +
+		"}\n\n" +
+		"func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
+		"type DBTestSuite struct {\n" +
+		"\t*DBFixture\n" +
+		"}\n\n" +
+		"func (s *DBTestSuite) TestQuery(t *gotest.T) {}\n"
+
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	fixtureBound, _ := splitSuitesByFixture(spec)
+	vms := buildFixtureViewModels(spec.Fixtures, fixtureBound)
+	gotest.Equal(t, 1, len(vms))
+
+	vm := vms[0]
+	gotest.Equal(t, "DBFixture", vm.Identifier)
+	gotest.Equal(t, 1, len(vm.SharedFixtures))
+
+	sf := vm.SharedFixtures[0]
+	gotest.Equal(t, "sf0", sf.LocalVar)
+	gotest.Equal(t, "PGSharedFixture", sf.QualifiedType)
+	gotest.Equal(t, "PGSharedFixture", sf.FieldName)
+	gotest.Equal(t, "", sf.PkgPath, "same-package shared fixture should have empty PkgPath")
+	gotest.Equal(t, 2, len(sf.EnvTags))
+	gotest.Equal(t, "PG_DSN", sf.EnvTags["DSN"])
+	gotest.Equal(t, "PG_HOST", sf.EnvTags["Host"])
+}

@@ -196,6 +196,15 @@ func (ts *TestSuiteSpec) HasParallelTestCases() bool {
 	})
 }
 
+func (ts *TestSuiteSpec) FileSet() *token.FileSet { return ts.pkg.Fset }
+func (ts *TestSuiteSpec) Pos() token.Pos           { return ts.ts.Name.Pos() }
+func (ts *TestSuiteSpec) IsFocused() bool           { return strings.HasPrefix(ts.ts.Name.Name, "F_") }
+func (ts *TestSuiteSpec) IsExcluded() bool          { return strings.HasPrefix(ts.ts.Name.Name, "X_") }
+
+func (ts *TestSuiteSpec) IsParallel() bool {
+	return strings.HasSuffix(ts.ts.Name.Name, "TestSuiteParallel")
+}
+
 func (ts *TestSuiteSpec) isFocused() bool {
 	return strings.HasPrefix(ts.ts.Name.Name, "F_")
 }
@@ -225,6 +234,10 @@ func (m *TestSuiteMethod) IsParallel() bool {
 
 // UsesStdlibT returns true if the method's parameter is *testing.T instead of *gotest.T.
 func (m *TestSuiteMethod) UsesStdlibT() bool { return m.usesStdlibT }
+
+func (m *TestSuiteMethod) Pos() token.Pos  { return m.m.Pos() }
+func (m *TestSuiteMethod) IsFocused() bool { return strings.HasPrefix(m.m.Name(), "F_") }
+func (m *TestSuiteMethod) IsExcluded() bool { return strings.HasPrefix(m.m.Name(), "X_") }
 
 func (m *TestSuiteMethod) isFocused() bool {
 	return strings.HasPrefix(m.m.Name(), "F_")
