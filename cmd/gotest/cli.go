@@ -3,7 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/mvrahden/go-test/about"
 )
@@ -23,8 +26,6 @@ func main() {
 		os.Exit(runScaffold(remaining))
 	case "migrate":
 		os.Exit(runMigrate(remaining))
-	case "coverage":
-		os.Exit(runCoverage(remaining))
 	case "generate":
 		os.Exit(runGenerate(remaining))
 	case "clean":
@@ -47,6 +48,28 @@ func main() {
 		CI = slices.Contains(ownArgs, "--ci")
 		SPEC = slices.Contains(ownArgs, "--spec")
 		UPDATE_SNAPSHOTS = slices.Contains(ownArgs, "--update-snapshots")
+		minCoverage := parseMinFlag(ownArgs)
+
+		var coverProfile string
+		if minCoverage > 0 {
+			// Check if user already provided -coverprofile
+			for _, arg := range goTestArgs {
+				if strings.HasPrefix(arg, "-coverprofile=") {
+					coverProfile = strings.TrimPrefix(arg, "-coverprofile=")
+				}
+			}
+			if coverProfile == "" {
+				f, err := os.CreateTemp("", "gotest-cover-*.out")
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+					os.Exit(2)
+				}
+				coverProfile = f.Name()
+				f.Close()
+				defer os.Remove(coverProfile)
+				goTestArgs = append(goTestArgs, "-coverprofile="+coverProfile)
+			}
+		}
 
 		patterns := ExtractPackagePatterns(goTestArgs)
 		cfg := ExecConfig{
@@ -54,8 +77,54 @@ func main() {
 			PackagePatterns: patterns,
 		}
 
-		os.Exit(Run(cfg))
+		code := Run(cfg)
+
+		if code == 0 && minCoverage > 0 {
+			pct, err := readCoverageTotal(coverProfile)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "FAIL: reading coverage: %s\n", err)
+				os.Exit(2)
+			}
+			if pct < float64(minCoverage) {
+				fmt.Fprintf(os.Stderr, "\nFAIL: %.1f%% coverage (minimum %d%%)\n", pct, minCoverage)
+				os.Exit(1)
+			}
+		}
+
+		os.Exit(code)
 	}
+}
+
+func parseMinFlag(args []string) int {
+	for i, arg := range args {
+		if strings.HasPrefix(arg, "--min=") {
+			v, _ := strconv.Atoi(strings.TrimPrefix(arg, "--min="))
+			return v
+		}
+		if arg == "--min" && i+1 < len(args) {
+			v, _ := strconv.Atoi(args[i+1])
+			return v
+		}
+	}
+	return 0
+}
+
+func readCoverageTotal(profilePath string) (float64, error) {
+	out, err := exec.Command("go", "tool", "cover", "-func="+profilePath).Output()
+	if err != nil {
+		return 0, fmt.Errorf("go tool cover: %w", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) == 0 {
+		return 0, fmt.Errorf("empty coverage output")
+	}
+	last := lines[len(lines)-1]
+	fields := strings.Fields(last)
+	if len(fields) == 0 {
+		return 0, fmt.Errorf("unexpected coverage format")
+	}
+	pctStr := strings.TrimSuffix(fields[len(fields)-1], "%")
+	return strconv.ParseFloat(pctStr, 64)
 }
 
 func printUsage() {
@@ -65,7 +134,6 @@ Usage:
   gotest [subcommand] [flags] [packages...]
 
 Subcommands:
-  coverage    Report semantic test coverage (--min=<pct> for threshold)
   generate    Run code generation only (no test execution)
   clean       Remove orphaned generated files
   spec        Render behavioral specification from test suites
@@ -80,8 +148,8 @@ Flags:
   --debug               Keep generated overlay for inspection
   --spec                Append spec view after normal test output
   --update-snapshots    Regenerate snapshot files
+  --min=<pct>           Fail if coverage below threshold (enables -coverprofile)
 
 All other flags and arguments are forwarded to "go test".
 `, about.ShortInfo())
 }
-

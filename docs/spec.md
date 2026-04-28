@@ -67,7 +67,6 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `scaffold` | Generate test suite skeleton from a Go type |
 | `migrate` | Convert testify/suite tests to go-test suites |
 | `spec` | Run tests and render behavioral specification |
-| `coverage` | Report semantic test coverage |
 | `version` | Print version information |
 | `help` | Show help |
 
@@ -79,10 +78,10 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--ci` | Fail if `F_` focus prefixes exist |
 | `--spec` | Append spec summary after normal output |
 | `--update-snapshots` | Regenerate snapshot files |
-| `--format=<fmt>` | Output format for `spec` / `coverage` (terminal, md) |
+| `--format=<fmt>` | Output format for `spec` (terminal, md) |
 | `--output=<path>` | Write formatted output to file |
 | `--no-color` | Strip ANSI codes from terminal output |
-| `--min=<pct>` | Minimum semantic coverage threshold for `coverage` |
+| `--min=<pct>` | Fail if coverage below threshold (enables `-coverprofile`) |
 
 ### Disambiguation
 
@@ -98,7 +97,7 @@ gotest generate ./...                    # generate only, no test execution
 gotest scaffold ./pkg/user.UserService   # generate suite skeleton
 gotest spec ./...                        # run tests, show behavioral spec
 gotest spec ./... --format=md --output=docs/spec.md
-gotest coverage ./pkg/user --min=90      # semantic coverage check
+gotest ./... --min=80                    # fail if coverage below 80%
 gotest ./... --ci -v -race               # CI mode (fail on F_ prefixes)
 gotest ./... --debug                     # keep generated files for inspection
 ```
@@ -517,29 +516,6 @@ Focus integration: `F_`-prefixed suites during watch mode create a tight feedbac
 
 ---
 
-## Semantic Coverage
-
-```
-$ gotest coverage ./pkg/user
-
-UserService: 4/5 methods covered (80%)
-  ✓ Create         — TestCreate
-  ✓ GetByID        — TestGetByID
-  ✓ Update         — TestUpdate
-  ✗ Delete         — no test case
-  ✓ ListByOrg      — TestListByOrg
-
-Overall: 4/5 methods covered (80%)
-```
-
-Static analysis comparing the production API surface (via `packages.Load`) against the suite test method inventory. Does not require running tests.
-
-```bash
-gotest coverage ./... --min=90    # fail if below threshold
-```
-
----
-
 ## Code Generation
 
 **Generate only** (no test execution):
@@ -610,7 +586,6 @@ Detects:
 ```yaml
 - uses: mvrahden/setup-gotest@v1
 - run: gotest --ci ./... -v -race
-- run: gotest coverage ./...
 - run: gotest spec ./... --format=md --output=behavior-spec.md
 ```
 
@@ -708,7 +683,6 @@ cmd/gotest/                  CLI entrypoint, subcommands, arg handling
 cmd/gotest-lint/             Standalone linter binary (singlechecker)
   └── internal/lint/           go/analysis analyzer
 
-internal/coverage/           Semantic coverage analysis
 internal/gotestspec/         Spec tree builder and renderers (terminal, markdown)
 internal/scaffold/           Type-to-suite skeleton generator
 internal/migrate/            testify/suite AST transformer

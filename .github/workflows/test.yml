@@ -26,5 +26,3 @@ jobs:
             cat spec.txt >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
-      - name: Semantic coverage
-        run: go run ./cmd/gotest coverage ./...
