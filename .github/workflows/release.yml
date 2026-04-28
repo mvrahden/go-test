@@ -39,7 +39,7 @@ jobs:
           ext=""
           if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
           version="${{ github.event.release.tag_name }} ($(git rev-parse --short HEAD))"
-          go build -ldflags="-s -w -X github.com/mvrahden/go-test/about.Version=${version}" -o "gotest-${GOOS}-${GOARCH}${ext}" ./cmd/gotest
+          go build -ldflags="-s -w -X 'github.com/mvrahden/go-test/about.Version=${version}'" -o "gotest-${GOOS}-${GOARCH}${ext}" ./cmd/gotest
       - name: Upload to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
