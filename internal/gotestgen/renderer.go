@@ -29,6 +29,7 @@ var (
 // FixtureViewModel is the view model passed to the fixture template.
 type FixtureViewModel struct {
 	Identifier     string
+	HasConfig      bool
 	BeforeAll      bool
 	AfterAll       bool
 	BeforeEach     bool
@@ -103,6 +104,7 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	}
 	imports := []Import{
 		{Path: "testing"},
+		{Path: "time"},
 		{Path: about.Repo + "/pkg/gotest"},
 	}
 	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
@@ -182,6 +184,7 @@ func buildFixtureViewModels(fixtures []*gotestast.FixtureSpec, fixtureBound []*g
 		}
 		vm := &FixtureViewModel{
 			Identifier:     f.Identifier(),
+			HasConfig:      f.Config != nil,
 			BeforeAll:      f.BeforeAll != nil,
 			AfterAll:       f.AfterAll != nil,
 			BeforeEach:     f.BeforeEach != nil,
