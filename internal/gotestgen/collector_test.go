@@ -741,6 +741,82 @@ func (s *PlainTestSuite) TestFoo(t *gotest.T) {}
 	gotest.True(t, !result.Suites[0].HasConfig(), "expected HasConfig() to be false")
 }
 
+func TestCollector_FixtureConfig_InvalidSignature_WithParams(t *testing.T) {
+	src := `package testpkg
+
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type BadFixture struct{}
+
+func (f *BadFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *BadFixture) FixtureConfig(x int) gotest.FixtureConfig {
+	return gotest.DefaultFixtureConfig()
+}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error for invalid FixtureConfig signature")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "unsupported signature")
+}
+
+func TestCollector_FixtureConfig_InvalidSignature_WrongReturnType(t *testing.T) {
+	src := `package testpkg
+
+import "context"
+
+type BadFixture struct{}
+
+func (f *BadFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *BadFixture) FixtureConfig() string { return "" }
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error for wrong FixtureConfig return type")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "unsupported return type")
+}
+
+func TestCollector_SuiteConfig_InvalidSignature_WithParams(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type BadTestSuite struct{}
+
+func (s *BadTestSuite) SuiteConfig(x int) gotest.SuiteConfig {
+	return gotest.DefaultSuiteConfig()
+}
+func (s *BadTestSuite) TestFoo(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error for invalid SuiteConfig signature")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "unsupported signature")
+}
+
+func TestCollector_SuiteConfig_InvalidSignature_WrongReturnType(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type BadTestSuite struct{}
+
+func (s *BadTestSuite) SuiteConfig() int { return 0 }
+func (s *BadTestSuite) TestFoo(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error for wrong SuiteConfig return type")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "unsupported return type")
+}
+
 // --- helpers ---
 
 // makeFixtureSpec creates a minimal FixtureSpec for validation testing.
