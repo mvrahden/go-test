@@ -30,15 +30,45 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
 {{- range $sf := $f.SharedFixtures }}
     fixture.{{ $sf.FieldName }} = {{ $sf.LocalVar }}
 {{- end }}
+    ƒcfg := gotest.DefaultFixtureConfig()
+{{- if $f.HasConfig }}
+    gotest.OverlayFixtureConfig(&ƒcfg, fixture.FixtureConfig())
+{{- end }}
     t.Cleanup(func() {
 {{- if $f.AfterAll }}
-        if err := fixture.AfterAll(context.Background()); err != nil {
+        ctx := context.Background()
+        if ƒcfg.Timeout > 0 {
+            var cancel context.CancelFunc
+            ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
+            defer cancel()
+        }
+        if err := fixture.AfterAll(ctx); err != nil {
             t.Errorf("{{ $f.Identifier }}.AfterAll failed: %v", err)
         }
 {{- end }}
     })
-    if err := fixture.BeforeAll(t.Context()); err != nil {
-        t.Fatalf("{{ $f.Identifier }}.BeforeAll failed: %v", err)
+    var ƒerr error
+    ƒattempts := 1 + ƒcfg.Retries
+    for ƒi := range ƒattempts {
+        ctx := t.Context()
+        if ƒcfg.Timeout > 0 {
+            var cancel context.CancelFunc
+            ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
+            defer cancel()
+        }
+        ƒerr = fixture.BeforeAll(ctx)
+        if ƒerr == nil {
+            break
+        }
+        if ƒi < ƒattempts-1 {
+            t.Logf("{{ $f.Identifier }}.BeforeAll attempt %d/%d failed: %v", ƒi+1, ƒattempts, ƒerr)
+            if ƒcfg.RetryDelay > 0 {
+                time.Sleep(ƒcfg.RetryDelay)
+            }
+        }
+    }
+    if ƒerr != nil {
+        t.Fatalf("{{ $f.Identifier }}.BeforeAll failed after %d attempt(s): %v", ƒattempts, ƒerr)
     }
 
 {{- /* Render child suites */ -}}
@@ -52,6 +82,10 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
 {{- if (hasSuffix $ts.FullIdentifier "TestSuiteParallel") }}
         t.Parallel()
 {{- end }}
+        ƒscfg := gotest.DefaultSuiteConfig()
+{{- if $ts.HasConfig }}
+        gotest.OverlaySuiteConfig(&ƒscfg, s.{{ $ts.Identifier }}.SuiteConfig())
+{{- end }}
 
 {{ if $ts.TestCases -}}
         newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
@@ -59,6 +93,9 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                 t := tt.T()
                 t.Run(desc, func(it *testing.T) {
                     ttt := gotest.NewT(it)
+                    if ƒscfg.Timeout > 0 {
+                        ttt = gotest.NewTWithDeadline(it, ƒscfg.Timeout)
+                    }
 {{- if $f.AfterEach }}
                     defer func() {
                         if err := fixture.AfterEach(context.Background()); err != nil {
@@ -86,6 +123,9 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                     it.Parallel()
                     defer wg.Done()
                     ttt := gotest.NewT(it)
+                    if ƒscfg.Timeout > 0 {
+                        ttt = gotest.NewTWithDeadline(it, ƒscfg.Timeout)
+                    }
 {{- if $f.AfterEach }}
                     defer func() {
                         if err := fixture.AfterEach(context.Background()); err != nil {
@@ -134,6 +174,9 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
         s.BeforeAll(tt)
         for _, tc := range testCases {
             tc(tt)
+            if ƒscfg.FailFast && t.Failed() {
+                break
+            }
         }
     })
 {{ end }}
@@ -144,15 +187,45 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
         child := &{{ $cf.Identifier }}{
             {{ $f.Identifier }}: fixture,
         }
+        ƒcfg_child := gotest.DefaultFixtureConfig()
+{{- if $cf.HasConfig }}
+        gotest.OverlayFixtureConfig(&ƒcfg_child, child.FixtureConfig())
+{{- end }}
         t.Cleanup(func() {
 {{- if $cf.AfterAll }}
-            if err := child.AfterAll(context.Background()); err != nil {
+            ctx := context.Background()
+            if ƒcfg_child.Timeout > 0 {
+                var cancel context.CancelFunc
+                ctx, cancel = context.WithTimeout(ctx, ƒcfg_child.Timeout)
+                defer cancel()
+            }
+            if err := child.AfterAll(ctx); err != nil {
                 t.Errorf("{{ $cf.Identifier }}.AfterAll failed: %v", err)
             }
 {{- end }}
         })
-        if err := child.BeforeAll(t.Context()); err != nil {
-            t.Fatalf("{{ $cf.Identifier }}.BeforeAll failed: %v", err)
+        var ƒerr_child error
+        ƒattempts_child := 1 + ƒcfg_child.Retries
+        for ƒi := range ƒattempts_child {
+            ctx := t.Context()
+            if ƒcfg_child.Timeout > 0 {
+                var cancel context.CancelFunc
+                ctx, cancel = context.WithTimeout(ctx, ƒcfg_child.Timeout)
+                defer cancel()
+            }
+            ƒerr_child = child.BeforeAll(ctx)
+            if ƒerr_child == nil {
+                break
+            }
+            if ƒi < ƒattempts_child-1 {
+                t.Logf("{{ $cf.Identifier }}.BeforeAll attempt %d/%d failed: %v", ƒi+1, ƒattempts_child, ƒerr_child)
+                if ƒcfg_child.RetryDelay > 0 {
+                    time.Sleep(ƒcfg_child.RetryDelay)
+                }
+            }
+        }
+        if ƒerr_child != nil {
+            t.Fatalf("{{ $cf.Identifier }}.BeforeAll failed after %d attempt(s): %v", ƒattempts_child, ƒerr_child)
         }
 
 {{- range $ts := $cf.ChildSuites }}
@@ -165,6 +238,10 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
 {{- if (hasSuffix $ts.FullIdentifier "TestSuiteParallel") }}
             t.Parallel()
 {{- end }}
+            ƒscfg := gotest.DefaultSuiteConfig()
+{{- if $ts.HasConfig }}
+            gotest.OverlaySuiteConfig(&ƒscfg, s.{{ $ts.Identifier }}.SuiteConfig())
+{{- end }}
 
 {{ if $ts.TestCases -}}
             newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
@@ -172,6 +249,9 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                     t := tt.T()
                     t.Run(desc, func(it *testing.T) {
                         ttt := gotest.NewT(it)
+                        if ƒscfg.Timeout > 0 {
+                            ttt = gotest.NewTWithDeadline(it, ƒscfg.Timeout)
+                        }
 {{- if $f.AfterEach }}
                         defer func() {
                             if err := fixture.AfterEach(context.Background()); err != nil {
@@ -211,6 +291,9 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
                         it.Parallel()
                         defer wg.Done()
                         ttt := gotest.NewT(it)
+                        if ƒscfg.Timeout > 0 {
+                            ttt = gotest.NewTWithDeadline(it, ƒscfg.Timeout)
+                        }
 {{- if $f.AfterEach }}
                         defer func() {
                             if err := fixture.AfterEach(context.Background()); err != nil {
@@ -271,6 +354,9 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
             s.BeforeAll(tt)
             for _, tc := range testCases {
                 tc(tt)
+                if ƒscfg.FailFast && t.Failed() {
+                    break
+                }
             }
         })
 {{- end }}

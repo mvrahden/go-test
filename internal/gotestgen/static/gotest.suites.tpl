@@ -14,6 +14,10 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
 {{- if (hasSuffix $ts.FullIdentifier "TestSuiteParallel") }}
   t.Parallel()
 {{- end }}
+  ƒcfg := gotest.DefaultSuiteConfig()
+{{- if $ts.HasConfig }}
+  gotest.OverlaySuiteConfig(&ƒcfg, s.{{ $ts.Identifier }}.SuiteConfig())
+{{- end }}
 
 {{ if $ts.TestCases -}}
   newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
@@ -21,6 +25,9 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
       t := tt.T()
       t.Run(desc, func(it *testing.T) {
         ttt := gotest.NewT(it)
+        if ƒcfg.Timeout > 0 {
+            ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+        }
         defer s.AfterEach(ttt)
         s.BeforeEach(ttt)
         ƒƒ_GOTEST_exec(testFn, ttt)
@@ -36,6 +43,9 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
         it.Parallel()
         defer wg.Done()
         ttt := gotest.NewT(it)
+        if ƒcfg.Timeout > 0 {
+            ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+        }
         defer s.AfterEach(ttt)
         s.BeforeEach(ttt)
         ƒƒ_GOTEST_exec(testFn, ttt)
@@ -75,6 +85,9 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
   s.BeforeAll(tt)
   for _, tc := range testCases {
     tc(tt)
+    if ƒcfg.FailFast && t.Failed() {
+      break
+    }
   }
 }
 {{- end }}
