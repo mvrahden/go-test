@@ -57,7 +57,7 @@ export class DiscoveryService {
 
     this.running = true;
     try {
-      const cmd = buildCliCommand(["discover", ...(patterns ?? ["./..."])]);
+      const cmd = await buildCliCommand(["discover", ...(patterns ?? ["./..."])]);
       this.outputChannel.appendLine(`[discovery] ${formatCliCommand(cmd)}`);
 
       const { stdout } = await execFileAsync(cmd.bin, cmd.args, {

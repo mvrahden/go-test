@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { promisify } from "node:util";
+import { rm } from "node:fs/promises";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import {
@@ -9,6 +11,8 @@ import {
   type TestMessage,
 } from "./outputParser.js";
 import { buildCliCommand, formatCliCommand } from "./cli.js";
+
+const execFileAsync = promisify(execFile);
 
 export class TestRunner {
   private _lastJsonOutput = "";
@@ -59,33 +63,65 @@ export class TestRunner {
           continue;
         }
 
+        const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspaceDir) {
+          continue;
+        }
+
         const filter = this.buildRunFilter(groupItems, importPath);
         const testFlags =
           vscode.workspace
             .getConfiguration("gotest")
             .get<string[]>("testFlags") ?? [];
 
-        const subArgs = ["test", pkg.dir, "-json"];
-        if (filter) {
-          subArgs.push("-run", filter);
-        }
-        subArgs.push(...testFlags);
+        let overlayDir: string | undefined;
+        try {
+          const overlayCmd = await buildCliCommand(["overlay", pkg.dir]);
+          this.outputChannel.appendLine(`[runner] ${formatCliCommand(overlayCmd)}`);
+          const { stdout: overlayStdout } = await execFileAsync(
+            overlayCmd.bin,
+            overlayCmd.args,
+            { cwd: workspaceDir },
+          );
+          const overlay = JSON.parse(overlayStdout) as { overlayFile: string; dir: string };
+          overlayDir = overlay.dir;
 
-        const cmd = buildCliCommand(subArgs);
-        this.outputChannel.appendLine(`[runner] ${formatCliCommand(cmd)}`);
-
-        const stdout = await this.spawnProcess(cmd.bin, cmd.args, pkg.dir, token);
-        this._lastJsonOutput += stdout;
-
-        if (token.isCancellationRequested) {
-          for (const item of groupItems) {
-            run.skipped(item);
+          const goTestArgs = [
+            "test",
+            `-overlay=${overlay.overlayFile}`,
+            "-count=1",
+            "-json",
+            pkg.dir,
+          ];
+          if (filter) {
+            goTestArgs.push("-run", filter);
           }
-          continue;
-        }
+          goTestArgs.push(...testFlags);
 
-        const events = parseTestEvents(stdout);
-        this.applyResults(run, events, importPath, pkg.dir);
+          this.outputChannel.appendLine(`[runner] go ${goTestArgs.join(" ")}`);
+          const stdout = await this.spawnProcess("go", goTestArgs, workspaceDir, token);
+          this._lastJsonOutput += stdout;
+
+          if (token.isCancellationRequested) {
+            for (const item of groupItems) {
+              run.skipped(item);
+            }
+            continue;
+          }
+
+          const events = parseTestEvents(stdout);
+          this.applyResults(run, events, importPath, pkg.dir);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          this.outputChannel.appendLine(`[runner] error: ${message}`);
+          for (const item of groupItems) {
+            run.errored(item, new vscode.TestMessage(message));
+          }
+        } finally {
+          if (overlayDir) {
+            rm(overlayDir, { recursive: true, force: true }).catch(() => {});
+          }
+        }
       }
     } finally {
       if (this._lastJsonOutput) {
@@ -245,8 +281,12 @@ export class TestRunner {
         child.kill("SIGTERM");
       });
 
-      child.on("close", () => {
+      child.on("close", (code) => {
         cancelListener.dispose();
+        this.outputChannel.appendLine(`[runner] exited code=${code} stdout=${stdout.length}b stderr=${stderr.length}b`);
+        if (stdout.length < 1000) {
+          this.outputChannel.appendLine(`[runner] stdout: ${stdout}`);
+        }
         if (stderr) {
           this.outputChannel.appendLine(`[runner] stderr: ${stderr}`);
         }

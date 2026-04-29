@@ -159,8 +159,8 @@ export class SpecViewPanel implements vscode.Disposable {
 </html>`;
   }
 
-  private runSpecFromInput(jsonInput: string): Promise<string> {
-    const cmd = buildCliCommand(["spec", "--input=-", "--format=terminal"]);
+  private async runSpecFromInput(jsonInput: string): Promise<string> {
+    const cmd = await buildCliCommand(["spec", "--input=-", "--format=terminal"]);
     return new Promise<string>((resolve, reject) => {
       const child = spawn(cmd.bin, cmd.args);
       let stdout = "";

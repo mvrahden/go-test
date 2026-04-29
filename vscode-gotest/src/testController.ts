@@ -76,7 +76,7 @@ export class GoTestController implements vscode.Disposable {
         const suiteId = `${pkgId}/${suite.name}`;
         seenSuiteIds.add(suiteId);
 
-        const suiteUri = vscode.Uri.file(`${pkg.dir}/${suite.file}`);
+        const suiteUri = vscode.Uri.file(suite.file);
         let suiteItem = pkgItem.children.get(suiteId);
         if (!suiteItem) {
           suiteItem = this.controller.createTestItem(suiteId, suite.name, suiteUri);
@@ -98,7 +98,7 @@ export class GoTestController implements vscode.Disposable {
           const methodId = `${suiteId}/${method.name}`;
           seenMethodIds.add(methodId);
 
-          const methodUri = vscode.Uri.file(`${pkg.dir}/${method.file}`);
+          const methodUri = vscode.Uri.file(method.file);
           let methodItem = suiteItem.children.get(methodId);
           if (!methodItem) {
             methodItem = this.controller.createTestItem(

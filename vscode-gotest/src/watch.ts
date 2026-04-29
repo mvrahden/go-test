@@ -193,13 +193,13 @@ export class WatchManager implements vscode.Disposable {
     this.statusBar.command = "gotest.stopWatch";
   }
 
-  start(pkgScope: string, cwd: string): void {
+  async start(pkgScope: string, cwd: string): Promise<void> {
     // Kill existing watcher for same scope
     if (this.watchers.has(pkgScope)) {
       this.stop(pkgScope);
     }
 
-    const cmd = buildCliCommand(["watch", "-json", pkgScope]);
+    const cmd = await buildCliCommand(["watch", "-json", pkgScope]);
 
     let cycleJsonAccumulator = "";
 

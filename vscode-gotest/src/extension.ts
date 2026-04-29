@@ -155,7 +155,7 @@ export function activate(context: vscode.ExtensionContext): void {
       });
 
       if (scope) {
-        watchManager.start(scope, workspaceDir);
+        await watchManager.start(scope, workspaceDir);
       }
     },
   );
