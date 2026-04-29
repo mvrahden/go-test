@@ -76,7 +76,7 @@ export class TestRunner {
 
         let overlayDir: string | undefined;
         try {
-          const overlayCmd = await buildCliCommand(["overlay", pkg.dir]);
+          const overlayCmd = await buildCliCommand(["overlay", importPath]);
           this.outputChannel.appendLine(`[runner] ${formatCliCommand(overlayCmd)}`);
           const { stdout: overlayStdout } = await execFileAsync(
             overlayCmd.bin,
@@ -91,7 +91,7 @@ export class TestRunner {
             `-overlay=${overlay.overlayFile}`,
             "-count=1",
             "-json",
-            pkg.dir,
+            importPath,
           ];
           if (filter) {
             goTestArgs.push("-run", filter);
@@ -186,6 +186,15 @@ export class TestRunner {
     return depth;
   }
 
+  private suiteHasFixtures(suiteName: string, importPath: string): boolean {
+    const pkg = this.cache.getPackage(importPath);
+    if (!pkg) {
+      return false;
+    }
+    const suite = pkg.suites.find((s) => s.name === suiteName);
+    return suite !== undefined && suite.fixtures.length > 0;
+  }
+
   private buildRunFilter(
     items: vscode.TestItem[],
     importPath: string,
@@ -207,16 +216,21 @@ export class TestRunner {
       const depth = this.getItemDepth(item);
 
       if (depth === 1) {
-        // Suite-level: run all methods in that suite
         const suiteName = item.label;
+        if (this.suiteHasFixtures(suiteName, importPath)) {
+          return undefined;
+        }
         return `^Test${suiteName}$`;
       }
 
       if (depth === 2) {
-        // Method-level
         const suiteItem = item.parent!;
         const suiteName = suiteItem.label;
         const methodName = item.label;
+
+        if (this.suiteHasFixtures(suiteName, importPath)) {
+          return undefined;
+        }
 
         let group = suiteGroups.get(suiteName);
         if (!group) {
@@ -227,7 +241,6 @@ export class TestRunner {
       }
 
       if (depth >= 3) {
-        // Dynamic subtest: walk up to find suite and method
         let current = item;
         const subtestParts: string[] = [];
         while (this.getItemDepth(current) > 2) {
@@ -237,6 +250,11 @@ export class TestRunner {
         const methodName = current.label;
         const suiteItem = current.parent!;
         const suiteName = suiteItem.label;
+
+        if (this.suiteHasFixtures(suiteName, importPath)) {
+          return undefined;
+        }
+
         const subtestPath = subtestParts.join("/");
         return `^Test${suiteName}$/^${methodName}$/^${subtestPath}$`;
       }
@@ -245,6 +263,9 @@ export class TestRunner {
     // Multiple methods case
     const filters: string[] = [];
     for (const [, group] of suiteGroups) {
+      if (this.suiteHasFixtures(group.suiteName, importPath)) {
+        return undefined;
+      }
       if (group.methods.length === 1) {
         filters.push(`^Test${group.suiteName}$/^${group.methods[0]}$`);
       } else {
