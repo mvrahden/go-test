@@ -188,6 +188,10 @@ func (f *InfraFixture) FixtureConfig() gotest.FixtureConfig {
     }
 }
 
+func (f *PostgresSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
+    return gotest.ContainerFixtureConfig()
+}
+
 func (s *BatchTestSuite) SuiteConfig() gotest.SuiteConfig {
     return gotest.SuiteConfig{
         Timeout:  1 * time.Minute,
@@ -393,7 +397,9 @@ The generated code is what a careful developer would write by hand: `t.Run`, `t.
 | `*Fixture` suffix | Package-scoped fixture |
 | `*SharedFixture` suffix | Cross-package shared fixture |
 | `FixtureConfig()` method | Fixture timeout/retry config |
+| `SharedFixtureConfig()` method | Shared fixture timeout/retry config |
 | `SuiteConfig()` method | Suite timeout/failfast config |
+| `Hydrate` / `Dehydrate` | SharedFixture test-process resource reconstruction |
 
 ### Behavior Specification
 
