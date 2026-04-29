@@ -14,10 +14,20 @@ Go's test runner has a single global `-timeout` knob. Jest solves this with per-
 
 ## Design Principles
 
-1. **Sensible defaults always applied.** Every fixture and suite gets framework defaults (`DefaultFixtureConfig()` / `DefaultSuiteConfig()`) — no test runs without timeouts. The optional marker method overrides them.
+1. **Sensible defaults always applied.** Every fixture and suite gets framework defaults (`DefaultFixtureConfig()` / `DefaultSuiteConfig()`). The optional marker method overlays on top — only non-zero fields override.
 2. **The naming IS the API.** A single well-named marker method (`FixtureConfig`, `SuiteConfig`) — no struct tags, no registration calls, no config files.
 3. **Runtime-computable.** Config methods return structs, so values can depend on environment (`os.Getenv("CI")`) or other runtime state.
-4. **Incremental adoption.** A developer can add `FixtureConfig()` to one fixture to override the defaults. The marker method is never required.
+4. **Incremental adoption.** A developer can add `FixtureConfig()` to one fixture to override specific defaults. The marker method is never required.
+
+## Value semantics for `time.Duration` fields
+
+| Value | Meaning |
+|-------|---------|
+| `> 0` | Use this duration |
+| `0`   | Keep default (field not overridden) |
+| `< 0` | Explicitly disabled (no timeout) |
+
+This applies to `Timeout`, `SetupTimeout`, and `RetryDelay`. The `int` and `bool` fields use standard zero-means-default semantics (zero retries = keep default retries; to explicitly set zero retries, the default is already zero).
 
 ## API Surface
 
@@ -244,14 +254,15 @@ vm := &FixtureViewModel{
 
 ### Fixture generated code
 
-The generated code always applies config. When the user defines `FixtureConfig()`, it calls that method. Otherwise, it calls `gotest.DefaultFixtureConfig()`.
+The generated code always starts with defaults. When the user defines `FixtureConfig()`, non-zero fields are overlaid.
 
 ```go
 func Test_InfraFixture(t *testing.T) {
     fixture := &InfraFixture{}
-    // With FixtureConfig() marker:   ƒcfg := fixture.FixtureConfig()
-    // Without marker (default):      ƒcfg := gotest.DefaultFixtureConfig()
-    ƒcfg := fixture.FixtureConfig()
+    ƒcfg := gotest.DefaultFixtureConfig()
+    // With FixtureConfig() marker → overlay non-zero fields:
+    gotest.OverlayFixtureConfig(&ƒcfg, fixture.FixtureConfig())
+    // Without marker → just uses defaults as-is
     t.Cleanup(func() {
         ctx := context.Background()
         if ƒcfg.Timeout > 0 {
@@ -292,14 +303,15 @@ func Test_InfraFixture(t *testing.T) {
 
 ### Suite generated code
 
-The generated code always applies config. When the user defines `SuiteConfig()`, it calls that method. Otherwise, it calls `gotest.DefaultSuiteConfig()`.
+The generated code always starts with defaults. When the user defines `SuiteConfig()`, non-zero fields are overlaid.
 
 ```go
 t.Run("BatchTestSuite", func(t *testing.T) {
     s := &ƒƒ_GOTEST_BatchTestSuite{...}
-    // With SuiteConfig() marker:   ƒcfg := s.BatchTestSuite.SuiteConfig()
-    // Without marker (default):    ƒcfg := gotest.DefaultSuiteConfig()
-    ƒcfg := s.BatchTestSuite.SuiteConfig()
+    ƒcfg := gotest.DefaultSuiteConfig()
+    // With SuiteConfig() marker → overlay non-zero fields:
+    gotest.OverlaySuiteConfig(&ƒcfg, s.BatchTestSuite.SuiteConfig())
+    // Without marker → just uses defaults as-is
 
     newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
         return func(tt *gotest.T) {
@@ -369,15 +381,14 @@ This is the minimal API surface change. Existing `NewT` callers are unaffected (
 
 ### `gotest.fixture.tpl`
 
-The fixture template always emits config-aware code. The `FixtureViewModel` carries `HasConfig bool` to choose between `fixture.FixtureConfig()` (user-defined) and `gotest.DefaultFixtureConfig()` (framework default).
+The fixture template always emits config-aware code. It always starts with `gotest.DefaultFixtureConfig()`. When `HasConfig` is true, it overlays with the user's method.
 
 ```
   func Test_{{ $f.Identifier }}(t *testing.T) {
       fixture := &{{ $f.Identifier }}{}
-+ {{- if $f.HasConfig }}
-+     ƒcfg := fixture.FixtureConfig()
-+ {{- else }}
 +     ƒcfg := gotest.DefaultFixtureConfig()
++ {{- if $f.HasConfig }}
++     gotest.OverlayFixtureConfig(&ƒcfg, fixture.FixtureConfig())
 + {{- end }}
       t.Cleanup(func() {
 +         ctx := context.Background()
@@ -390,7 +401,7 @@ The BeforeAll section always uses the retry loop pattern with `ƒcfg`.
 
 ### `gotest.suites.tpl`
 
-Suite template always emits config-aware code. The `TestSuiteSpec` exposes `HasConfig()` to choose between `s.{{ Identifier }}.SuiteConfig()` and `gotest.DefaultSuiteConfig()`.
+Suite template always emits config-aware code. It always starts with `gotest.DefaultSuiteConfig()`. When `HasConfig()` is true, it overlays with the user's method.
 
 ## Interaction with Existing Features
 

@@ -71,6 +71,33 @@ func DefaultSuiteConfig() SuiteConfig {
 func IntegrationSuiteConfig() SuiteConfig {
 	return SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 5 * time.Minute}
 }
+
+func OverlayFixtureConfig(base *FixtureConfig, overlay FixtureConfig) {
+	if overlay.Timeout != 0 {
+		base.Timeout = overlay.Timeout
+	}
+	if overlay.Retries != 0 {
+		base.Retries = overlay.Retries
+	}
+	if overlay.RetryDelay != 0 {
+		base.RetryDelay = overlay.RetryDelay
+	}
+}
+
+func OverlaySuiteConfig(base *SuiteConfig, overlay SuiteConfig) {
+	if overlay.Timeout != 0 {
+		base.Timeout = overlay.Timeout
+	}
+	if overlay.SetupTimeout != 0 {
+		base.SetupTimeout = overlay.SetupTimeout
+	}
+	if overlay.Retries != 0 {
+		base.Retries = overlay.Retries
+	}
+	if overlay.FailFast {
+		base.FailFast = true
+	}
+}
 ```
 
 - [ ] **Step 2: Build**
@@ -426,10 +453,9 @@ Replace the root fixture function (lines 17-43 approximately) to always emit con
 
 After `fixture := &{{ $f.Identifier }}{}`:
 ```
-{{- if $f.HasConfig }}
-    ƒcfg := fixture.FixtureConfig()
-{{- else }}
     ƒcfg := gotest.DefaultFixtureConfig()
+{{- if $f.HasConfig }}
+    gotest.OverlayFixtureConfig(&ƒcfg, fixture.FixtureConfig())
 {{- end }}
 ```
 
@@ -482,10 +508,9 @@ Replace the `BeforeAll` call with retry loop:
 Apply the same pattern to the child fixture section (lines 142-278). Use `child` instead of `fixture`:
 
 ```
-{{- if $cf.HasConfig }}
-        ƒcfg_child := child.FixtureConfig()
-{{- else }}
         ƒcfg_child := gotest.DefaultFixtureConfig()
+{{- if $cf.HasConfig }}
+        gotest.OverlayFixtureConfig(&ƒcfg_child, child.FixtureConfig())
 {{- end }}
 ```
 
@@ -516,10 +541,9 @@ git commit -m "feat: config-aware fixture template with retry and timeout"
 After `s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}`, add config resolution:
 
 ```
-{{- if $ts.HasConfig }}
-  ƒcfg := s.{{ $ts.Identifier }}.SuiteConfig()
-{{- else }}
   ƒcfg := gotest.DefaultSuiteConfig()
+{{- if $ts.HasConfig }}
+  gotest.OverlaySuiteConfig(&ƒcfg, s.{{ $ts.Identifier }}.SuiteConfig())
 {{- end }}
 ```
 
@@ -658,9 +682,9 @@ func (s *CFGTestSuite) TestOne(t *gotest.T) {}
 
 	output := string(out)
 
-	// Should call user's FixtureConfig(), not DefaultFixtureConfig()
-	gotest.Contains(t, output, "fixture.FixtureConfig()")
-	gotest.True(t, !strings.Contains(output, "gotest.DefaultFixtureConfig()"), "should use user config, not default")
+	// Should have default + overlay with user's FixtureConfig()
+	gotest.Contains(t, output, "gotest.DefaultFixtureConfig()")
+	gotest.Contains(t, output, "gotest.OverlayFixtureConfig(&ƒcfg, fixture.FixtureConfig())")
 
 	// Should have retry loop
 	gotest.Contains(t, output, "ƒattempts := 1 + ƒcfg.Retries")
@@ -707,9 +731,9 @@ func (s *PlainTestSuite) TestOne(t *gotest.T) {}
 
 	output := string(out)
 
-	// Should call DefaultFixtureConfig()
+	// Should call DefaultFixtureConfig() without overlay
 	gotest.Contains(t, output, "gotest.DefaultFixtureConfig()")
-	gotest.True(t, !strings.Contains(output, "fixture.FixtureConfig()"), "should use default, not user config")
+	gotest.True(t, !strings.Contains(output, "OverlayFixtureConfig"), "should not have overlay call")
 }
 ```
 
@@ -742,9 +766,9 @@ func (s *ConfiguredTestSuite) TestOne(t *gotest.T) {}
 
 	output := string(out)
 
-	// Should call user's SuiteConfig()
-	gotest.Contains(t, output, "s.ConfiguredTestSuite.SuiteConfig()")
-	gotest.True(t, !strings.Contains(output, "gotest.DefaultSuiteConfig()"), "should use user config")
+	// Should have default + overlay with user's SuiteConfig()
+	gotest.Contains(t, output, "gotest.DefaultSuiteConfig()")
+	gotest.Contains(t, output, "gotest.OverlaySuiteConfig(&ƒcfg, s.ConfiguredTestSuite.SuiteConfig())")
 
 	// Should have timeout wrapping and failfast
 	gotest.Contains(t, output, "gotest.NewTWithDeadline(it, ƒcfg.Timeout)")
@@ -831,4 +855,65 @@ Expected: All tests pass
 ```bash
 git add -A
 git commit -m "fix: end-to-end adjustments for config marker methods"
+```
+
+---
+
+### Task 11: README update
+
+**Files:**
+- Modify: `README.md`
+
+- [ ] **Step 1: Add Config section to README**
+
+Add a new `### Configuration` section after the `### Fixtures` section (before `### Focus and Exclude`). Content:
+
+```markdown
+### Configuration
+
+Every fixture and suite runs with sensible defaults — 2-minute fixture timeout, 30-second per-test timeout. Override with optional marker methods:
+
+```go
+func (f *InfraFixture) FixtureConfig() gotest.FixtureConfig {
+    return gotest.FixtureConfig{
+        Timeout:    5 * time.Minute,
+        Retries:    1,
+        RetryDelay: 5 * time.Second,
+    }
+}
+
+func (s *BatchTestSuite) SuiteConfig() gotest.SuiteConfig {
+    return gotest.SuiteConfig{
+        Timeout:  1 * time.Minute,
+        FailFast: true,
+    }
+}
+```
+
+Only non-zero fields override. Use negative duration to explicitly disable a timeout (`Timeout: -1`).
+
+Preset constructors for common scenarios:
+
+| Preset | Timeout | Retries | Use case |
+|--------|---------|---------|----------|
+| `DefaultFixtureConfig()` | 2 min | 0 | Standard fixtures |
+| `ContainerFixtureConfig()` | 5 min | 1 | Testcontainers, image pulls |
+| `DefaultSuiteConfig()` | 30 sec | 0 | Unit/integration tests |
+| `IntegrationSuiteConfig()` | 2 min | 0 | Heavier integration tests |
+```
+
+- [ ] **Step 2: Add `FixtureConfig` / `SuiteConfig` to Naming Conventions table**
+
+Add rows:
+
+```markdown
+| `FixtureConfig()` method | Fixture timeout/retry config |
+| `SuiteConfig()` method | Suite timeout/failfast config |
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add README.md
+git commit -m "docs: add Configuration section to README"
 ```
