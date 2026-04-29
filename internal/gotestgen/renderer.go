@@ -104,8 +104,10 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	}
 	imports := []Import{
 		{Path: "testing"},
-		{Path: "time"},
 		{Path: about.Repo + "/pkg/gotest"},
+	}
+	if len(spec.Fixtures) > 0 {
+		imports = append(imports, Import{Path: "time"})
 	}
 	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
 		return v.HasParallelTestCases()

@@ -6,7 +6,6 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"sync"
 	"testing"
-	"time"
 )
 
 //go:noinline
