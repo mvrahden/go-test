@@ -661,6 +661,86 @@ func TestCollector_SharedFixtureNotTreatedAsParent(t *testing.T) {
 	gotest.Equal(t, 1, len(spec.EffectiveTestSuites))
 }
 
+// --- Config marker method tests ---
+
+func TestCollector_FixtureConfig_Detected(t *testing.T) {
+	src := `package testpkg
+
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type DBFixture struct{}
+
+func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *DBFixture) FixtureConfig() gotest.FixtureConfig {
+	return gotest.DefaultFixtureConfig()
+}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Fixtures))
+	gotest.True(t, result.Fixtures[0].Config != nil, "expected Config to be set")
+}
+
+func TestCollector_FixtureConfig_AbsentIsNil(t *testing.T) {
+	src := `package testpkg
+
+import "context"
+
+type PlainFixture struct{}
+
+func (f *PlainFixture) BeforeAll(ctx context.Context) error { return nil }
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Fixtures))
+	gotest.True(t, result.Fixtures[0].Config == nil, "expected Config to be nil")
+}
+
+func TestCollector_SuiteConfig_Detected(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.DefaultSuiteConfig()
+}
+func (s *MyTestSuite) TestFoo(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Suites))
+	gotest.True(t, result.Suites[0].HasConfig(), "expected HasConfig() to be true")
+}
+
+func TestCollector_SuiteConfig_AbsentIsFalse(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type PlainTestSuite struct{}
+
+func (s *PlainTestSuite) TestFoo(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Suites))
+	gotest.True(t, !result.Suites[0].HasConfig(), "expected HasConfig() to be false")
+}
+
 // --- helpers ---
 
 // makeFixtureSpec creates a minimal FixtureSpec for validation testing.
