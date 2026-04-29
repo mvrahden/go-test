@@ -21,12 +21,16 @@ func (ts *ƒƒ_GOTEST_MyE2ETestSuite) AfterEach(it *gotest.T)  {}
 
 func TestMyE2ETestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_MyE2ETestSuite{}
+	ƒcfg := gotest.DefaultSuiteConfig()
 
 	newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
 		return func(tt *gotest.T) {
 			t := tt.T()
 			t.Run(desc, func(it *testing.T) {
 				ttt := gotest.NewT(it)
+				if ƒcfg.Timeout > 0 {
+					ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+				}
 				defer s.AfterEach(ttt)
 				s.BeforeEach(ttt)
 				ƒƒ_GOTEST_exec(testFn, ttt)
@@ -48,5 +52,8 @@ func TestMyE2ETestSuite(t *testing.T) {
 	s.BeforeAll(tt)
 	for _, tc := range testCases {
 		tc(tt)
+		if ƒcfg.FailFast && t.Failed() {
+			break
+		}
 	}
 }
