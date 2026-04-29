@@ -650,3 +650,143 @@ func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
 	gotest.Equal(t, "PG_DSN", sf.EnvTags["DSN"])
 	gotest.Equal(t, "PG_HOST", sf.EnvTags["Host"])
 }
+
+func TestRenderer_FixtureWithConfig(t *testing.T) {
+	src := `package testpkg
+
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type CFGFixture struct{}
+
+func (f *CFGFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *CFGFixture) AfterAll(ctx context.Context) error  { return nil }
+func (f *CFGFixture) FixtureConfig() gotest.FixtureConfig {
+	return gotest.ContainerFixtureConfig()
+}
+
+type CFGTestSuite struct {
+	*CFGFixture
+}
+
+func (s *CFGTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+
+	output := string(out)
+
+	gotest.Contains(t, output, "gotest.DefaultFixtureConfig()")
+	gotest.Contains(t, output, "gotest.OverlayFixtureConfig(&ƒcfg, fixture.FixtureConfig())")
+	gotest.Contains(t, output, "ƒattempts := 1 + ƒcfg.Retries")
+	gotest.Contains(t, output, "fixture.BeforeAll(ctx)")
+	gotest.Contains(t, output, "context.WithTimeout(ctx, ƒcfg.Timeout)")
+}
+
+func TestRenderer_FixtureWithoutConfig_UsesDefault(t *testing.T) {
+	src := `package testpkg
+
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type PlainFixture struct{}
+
+func (f *PlainFixture) BeforeAll(ctx context.Context) error { return nil }
+
+type PlainTestSuite struct {
+	*PlainFixture
+}
+
+func (s *PlainTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+
+	output := string(out)
+
+	gotest.Contains(t, output, "gotest.DefaultFixtureConfig()")
+	gotest.True(t, !strings.Contains(output, "OverlayFixtureConfig"), "should not have overlay call")
+}
+
+func TestRenderer_SuiteWithConfig(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type ConfiguredTestSuite struct{}
+
+func (s *ConfiguredTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Timeout: 10_000_000_000, FailFast: true}
+}
+func (s *ConfiguredTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+
+	output := string(out)
+
+	gotest.Contains(t, output, "gotest.DefaultSuiteConfig()")
+	gotest.Contains(t, output, "gotest.OverlaySuiteConfig(&ƒcfg, s.ConfiguredTestSuite.SuiteConfig())")
+	gotest.Contains(t, output, "gotest.NewTWithDeadline(it, ƒcfg.Timeout)")
+	gotest.Contains(t, output, "ƒcfg.FailFast && t.Failed()")
+}
+
+func TestRenderer_SuiteWithoutConfig_UsesDefault(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type PlainTestSuite struct{}
+
+func (s *PlainTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+
+	output := string(out)
+
+	gotest.Contains(t, output, "gotest.DefaultSuiteConfig()")
+	gotest.True(t, !strings.Contains(output, "OverlaySuiteConfig"), "should not have overlay call")
+}
