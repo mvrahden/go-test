@@ -14,10 +14,10 @@ Go's test runner has a single global `-timeout` knob. Jest solves this with per-
 
 ## Design Principles
 
-1. **Zero-value = unchanged behavior.** No existing test breaks. Config is purely opt-in.
+1. **Sensible defaults always applied.** Every fixture and suite gets framework defaults (`DefaultFixtureConfig()` / `DefaultSuiteConfig()`) — no test runs without timeouts. The optional marker method overrides them.
 2. **The naming IS the API.** A single well-named marker method (`FixtureConfig`, `SuiteConfig`) — no struct tags, no registration calls, no config files.
 3. **Runtime-computable.** Config methods return structs, so values can depend on environment (`os.Getenv("CI")`) or other runtime state.
-4. **Incremental adoption.** A developer can add `FixtureConfig()` to one fixture without touching anything else. Suites without config behave exactly as before.
+4. **Incremental adoption.** A developer can add `FixtureConfig()` to one fixture to override the defaults. The marker method is never required.
 
 ## API Surface
 
@@ -29,38 +29,35 @@ package gotest
 import "time"
 
 // FixtureConfig controls timeout, retry, and lifecycle behavior for package fixtures.
-// All fields are optional; zero values mean "no framework-level override" (inherits Go's global -timeout).
+// The framework always applies DefaultFixtureConfig(). The optional FixtureConfig()
+// marker method overrides these defaults.
 type FixtureConfig struct {
     // Timeout applied to BeforeAll and AfterAll calls via context.WithTimeout.
     // The fixture's ctx parameter will carry this deadline.
-    // Zero = no additional timeout beyond Go's global -timeout.
     Timeout time.Duration
 
     // Retries for BeforeAll. On transient failure, BeforeAll is retried up to this
     // many additional times. AfterAll is NOT retried.
-    // Zero = no retries (fail on first error).
     Retries int
 
     // RetryDelay is the pause between retry attempts.
-    // Zero = no delay between retries.
     RetryDelay time.Duration
 }
 
 // SuiteConfig controls timeout, retry, and execution behavior for test suites.
-// All fields are optional; zero values preserve current behavior.
+// The framework always applies DefaultSuiteConfig(). The optional SuiteConfig()
+// marker method overrides these defaults.
 type SuiteConfig struct {
     // Timeout applied to each test case. The test receives a context with this deadline
     // via t.Context(). Tests that pass ctx to I/O operations will fail cleanly on expiry.
-    // Zero = no per-test timeout.
     Timeout time.Duration
 
     // SetupTimeout applied to suite-level BeforeAll and AfterAll.
-    // Zero = inherits Timeout, or no timeout if Timeout is also zero.
+    // Zero = inherits Timeout.
     SetupTimeout time.Duration
 
     // Retries for failed test methods. On failure, the individual test is re-run
     // up to this many additional times. A test that passes on retry is reported as passed.
-    // Zero = no retries.
     Retries int
 
     // FailFast stops executing remaining test cases in this suite after the first failure.
@@ -242,32 +239,19 @@ vm := &FixtureViewModel{
 }
 ```
 
-**Import management:** When any fixture or suite has config, add `"time"` to the imports list in `renderFileHeader`.
+**Import management:** Always add `"time"` to the imports list in `renderFileHeader` (config is always applied).
 
 ## Generated Code
 
-### Fixture with `FixtureConfig()`
+### Fixture generated code
 
-**Before** (current, no config):
+The generated code always applies config. When the user defines `FixtureConfig()`, it calls that method. Otherwise, it calls `gotest.DefaultFixtureConfig()`.
+
 ```go
 func Test_InfraFixture(t *testing.T) {
     fixture := &InfraFixture{}
-    t.Cleanup(func() {
-        if err := fixture.AfterAll(context.Background()); err != nil {
-            t.Errorf("InfraFixture.AfterAll failed: %v", err)
-        }
-    })
-    if err := fixture.BeforeAll(t.Context()); err != nil {
-        t.Fatalf("InfraFixture.BeforeAll failed: %v", err)
-    }
-    // ... subtests ...
-}
-```
-
-**After** (with config):
-```go
-func Test_InfraFixture(t *testing.T) {
-    fixture := &InfraFixture{}
+    // With FixtureConfig() marker:   ƒcfg := fixture.FixtureConfig()
+    // Without marker (default):      ƒcfg := gotest.DefaultFixtureConfig()
     ƒcfg := fixture.FixtureConfig()
     t.Cleanup(func() {
         ctx := context.Background()
@@ -307,16 +291,16 @@ func Test_InfraFixture(t *testing.T) {
 }
 ```
 
-When `FixtureConfig()` is absent, the template emits the current code unchanged (the `{{ if }}` guard ensures backward compatibility).
+### Suite generated code
 
-### Suite with `SuiteConfig()`
-
-**Per-test timeout** — The generated `newTestCase` wraps the test's context with a deadline:
+The generated code always applies config. When the user defines `SuiteConfig()`, it calls that method. Otherwise, it calls `gotest.DefaultSuiteConfig()`.
 
 ```go
 t.Run("BatchTestSuite", func(t *testing.T) {
     s := &ƒƒ_GOTEST_BatchTestSuite{...}
-    ƒcfg := s.SuiteConfig()
+    // With SuiteConfig() marker:   ƒcfg := s.BatchTestSuite.SuiteConfig()
+    // Without marker (default):    ƒcfg := gotest.DefaultSuiteConfig()
+    ƒcfg := s.BatchTestSuite.SuiteConfig()
 
     newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
         return func(tt *gotest.T) {
@@ -386,36 +370,28 @@ This is the minimal API surface change. Existing `NewT` callers are unaffected (
 
 ### `gotest.fixture.tpl`
 
-The fixture template needs conditional blocks around the config-aware code. The FixtureViewModel already carries `HasConfig bool`. Template pseudo-diff:
+The fixture template always emits config-aware code. The `FixtureViewModel` carries `HasConfig bool` to choose between `fixture.FixtureConfig()` (user-defined) and `gotest.DefaultFixtureConfig()` (framework default).
 
 ```
   func Test_{{ $f.Identifier }}(t *testing.T) {
       fixture := &{{ $f.Identifier }}{}
 + {{- if $f.HasConfig }}
 +     ƒcfg := fixture.FixtureConfig()
++ {{- else }}
++     ƒcfg := gotest.DefaultFixtureConfig()
 + {{- end }}
       t.Cleanup(func() {
-+ {{- if $f.HasConfig }}
 +         ctx := context.Background()
-+         if ƒcfg.Timeout > 0 {
-+             var cancel context.CancelFunc
-+             ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
-+             defer cancel()
-+         }
-+ {{- else }}
-+         ctx := context.Background()
-+ {{- end }}
++         if ƒcfg.Timeout > 0 { ... WithTimeout ... }
   {{- if $f.AfterAll }}
--         if err := fixture.AfterAll(context.Background()); err != nil {
-+         if err := fixture.AfterAll(ctx); err != nil {
-              ...
++         if err := fixture.AfterAll(ctx); err != nil { ... }
 ```
 
-The BeforeAll section follows the retry pattern shown above, wrapped in `{{ if $f.HasConfig }}`.
+The BeforeAll section always uses the retry loop pattern with `ƒcfg`.
 
 ### `gotest.suites.tpl`
 
-Suite template needs `SuiteConfig` awareness. The `TestSuiteSpec` exposes `Config()` which is non-nil when the method exists. Template checks `{{ if $ts.Config }}`.
+Suite template always emits config-aware code. The `TestSuiteSpec` exposes `HasConfig()` to choose between `s.{{ Identifier }}.SuiteConfig()` and `gotest.DefaultSuiteConfig()`.
 
 ## Interaction with Existing Features
 
