@@ -53,7 +53,6 @@ type SuiteConfig struct {
     Timeout time.Duration
 
     // SetupTimeout applied to suite-level BeforeAll and AfterAll.
-    // Zero = inherits Timeout.
     SetupTimeout time.Duration
 
     // Retries for failed test methods. On failure, the individual test is re-run
@@ -79,9 +78,9 @@ func ContainerFixtureConfig() FixtureConfig {
     return FixtureConfig{Timeout: 5 * time.Minute, Retries: 1, RetryDelay: 5 * time.Second}
 }
 
-// DefaultSuiteConfig returns config with a 30-second per-test timeout.
+// DefaultSuiteConfig returns config with a 30-second per-test timeout and 30-second setup timeout.
 func DefaultSuiteConfig() SuiteConfig {
-    return SuiteConfig{Timeout: 30 * time.Second}
+    return SuiteConfig{Timeout: 30 * time.Second, SetupTimeout: 30 * time.Second}
 }
 
 // IntegrationSuiteConfig returns config suited for integration test suites

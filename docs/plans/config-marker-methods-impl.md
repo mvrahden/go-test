@@ -65,7 +65,7 @@ func ContainerFixtureConfig() FixtureConfig {
 }
 
 func DefaultSuiteConfig() SuiteConfig {
-	return SuiteConfig{Timeout: 30 * time.Second}
+	return SuiteConfig{Timeout: 30 * time.Second, SetupTimeout: 30 * time.Second}
 }
 
 func IntegrationSuiteConfig() SuiteConfig {
