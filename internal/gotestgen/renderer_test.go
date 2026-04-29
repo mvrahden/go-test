@@ -58,9 +58,9 @@ func (s *QueryTestSuite) TestSelect(t *gotest.T) {}
 	gotest.True(t, strings.Contains(output, "func Test_DBFixture(t *testing.T)"), "expected Test_DBFixture")
 	gotest.True(t, strings.Contains(output, `"os"`), "expected os import")
 	gotest.True(t, strings.Contains(output, "fixture := &DBFixture{}"), "expected fixture instantiation")
-	gotest.True(t, strings.Contains(output, "fixture.BeforeAll(t.Context())"), "expected BeforeAll call")
-	gotest.True(t, strings.Contains(output, `"DBFixture.BeforeAll failed:`), "expected BeforeAll error attribution")
-	gotest.True(t, strings.Contains(output, "fixture.AfterAll(context.Background())"), "expected AfterAll in cleanup")
+	gotest.True(t, strings.Contains(output, "fixture.BeforeAll(ctx)"), "expected BeforeAll call")
+	gotest.True(t, strings.Contains(output, `"DBFixture.BeforeAll failed after`), "expected BeforeAll error attribution")
+	gotest.True(t, strings.Contains(output, "fixture.AfterAll(ctx)"), "expected AfterAll in cleanup")
 	gotest.True(t, strings.Contains(output, `"DBFixture.AfterAll failed:`), "expected AfterAll error attribution")
 	gotest.True(t, strings.Contains(output, `t.Run("QueryTestSuite"`), "expected t.Run for child suite")
 	gotest.True(t, strings.Contains(output, "ƒƒ_GOTEST_QueryTestSuite"), "expected wrapper struct")
@@ -552,8 +552,8 @@ func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
 	// Package fixture lifecycle should still work
 	gotest.Contains(t, output, "func Test_E2EFixture(t *testing.T)")
 	gotest.Contains(t, output, "fixture := &E2EFixture{}")
-	gotest.Contains(t, output, "fixture.BeforeAll(t.Context())")
-	gotest.Contains(t, output, "fixture.AfterAll(context.Background())")
+	gotest.Contains(t, output, "fixture.BeforeAll(ctx)")
+	gotest.Contains(t, output, "fixture.AfterAll(ctx)")
 
 	// Suite should be nested under fixture
 	gotest.Contains(t, output, `t.Run("QueryTestSuite"`)
@@ -561,7 +561,7 @@ func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
 
 	// Shared fixture env var resolution should appear before fixture.BeforeAll
 	sfIdx := strings.Index(output, "sf0.DSN = os.Getenv")
-	beforeAllIdx := strings.Index(output, "fixture.BeforeAll(t.Context())")
+	beforeAllIdx := strings.Index(output, "fixture.BeforeAll(ctx)")
 	gotest.True(t, sfIdx < beforeAllIdx, "shared fixture env resolution must precede fixture.BeforeAll")
 }
 
