@@ -307,7 +307,7 @@ func (f *DBFixture) Hydrate(ctx context.Context) error   { return nil }
 	}
 }
 
-func TestDetermineFixtureHarness_SharedFixtureConfig(t *testing.T) {
+func TestDetermineFixtureHarness_FixtureConfigType_NoInterference(t *testing.T) {
 	src := `package testpkg
 
 import "context"
@@ -324,7 +324,6 @@ func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 `
 	fm := loadFixtureWithMethods(t, src)
 
-	// Find the PGSharedFixture GenDecl (skip FixtureConfig)
 	var spec *FixtureSpec
 	for _, gd := range fm.genDecls {
 		s, err := DetermineFixture(gd, fm.pkg)
@@ -343,6 +342,32 @@ func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 	}
 
 	gotest.True(t, spec.BeforeAll != nil)
+}
+
+func TestDetermineFixtureHarness_Dehydrate_OnPackageFixture_Rejected(t *testing.T) {
+	src := `package testpkg
+
+import "context"
+
+type DBFixture struct {
+	Conn string
+}
+
+func (f *DBFixture) BeforeAll(ctx context.Context) error  { return nil }
+func (f *DBFixture) Dehydrate(ctx context.Context) error  { return nil }
+`
+	fm := loadFixtureWithMethods(t, src)
+	spec, err := DetermineFixture(fm.genDecls[0], fm.pkg)
+	gotest.NoError(t, err)
+
+	for _, fd := range fm.funcDecls {
+		pos, err := DetermineFixtureHarness(fd, fm.pkg, spec)
+		if fd.Name.Name == "Dehydrate" {
+			gotest.True(t, err != nil, "Dehydrate should be rejected on package fixture")
+			gotest.Contains(t, err.Error(), "Hydrate/Dehydrate are for shared fixtures only")
+			gotest.True(t, pos > 0)
+		}
+	}
 }
 
 func TestDetermineFixtureHarness_FixtureConfig_OnSharedFixture_Rejected(t *testing.T) {

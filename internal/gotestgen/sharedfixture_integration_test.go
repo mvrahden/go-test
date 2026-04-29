@@ -144,3 +144,46 @@ func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 	gotest.Equal(t, 1, len(redis.TransferFields))
 	gotest.Equal(t, "Addr", redis.TransferFields[0])
 }
+
+func TestSharedFixture_Integration_DiscoverWithHydrate(t *testing.T) {
+	src := `package testpkg
+
+import "context"
+
+type PGSharedFixture struct {
+	ConnStr string
+	Port    int
+	Pool    int
+}
+
+func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *PGSharedFixture) Hydrate(ctx context.Context) error {
+	return f.connect(ctx)
+}
+func (f *PGSharedFixture) Dehydrate(ctx context.Context) error { return nil }
+func (f *PGSharedFixture) connect(ctx context.Context) error {
+	f.Pool = 42
+	return nil
+}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
+	gotest.Equal(t, 1, len(result.Fixtures))
+
+	shared := DiscoverSharedFixtures([]CollectorResult{result})
+	gotest.Equal(t, 1, len(shared))
+
+	sf := shared[0]
+	gotest.Equal(t, "PGSharedFixture", sf.Identifier)
+	gotest.True(t, sf.HasHydrate, "HasHydrate should be true")
+	gotest.True(t, sf.HasDehydrate, "HasDehydrate should be true")
+
+	gotest.Equal(t, 2, len(sf.TransferFields), "ConnStr and Port should be transferable")
+	gotest.Equal(t, "ConnStr", sf.TransferFields[0])
+	gotest.Equal(t, "Port", sf.TransferFields[1])
+
+	gotest.Equal(t, 1, len(sf.LocalFields), "Pool should be local (assigned in connect helper)")
+	gotest.Equal(t, "Pool", sf.LocalFields[0])
+}

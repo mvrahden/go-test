@@ -308,3 +308,31 @@ func (f *PGSharedFixture) Hydrate(ctx context.Context) error {
 	gotest.True(t, local != nil)
 	gotest.True(t, local["Pool"], "Pool should be local inside switch")
 }
+
+func TestClassifyLocalFields_TwoLevelDepth_NotFollowed(t *testing.T) {
+	src := `package testpkg
+
+import "context"
+
+type PGSharedFixture struct {
+	ConnStr string
+	Pool    int
+}
+
+func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *PGSharedFixture) Hydrate(ctx context.Context) error {
+	return f.setupA(ctx)
+}
+func (f *PGSharedFixture) setupA(ctx context.Context) error {
+	return f.setupB(ctx)
+}
+func (f *PGSharedFixture) setupB(ctx context.Context) error {
+	f.Pool = 42
+	return nil
+}
+`
+	spec := buildFixtureSpec(t, src)
+	local := ClassifyLocalFields(spec)
+
+	gotest.True(t, local == nil, "two-level-deep assignments should NOT be classified as local")
+}

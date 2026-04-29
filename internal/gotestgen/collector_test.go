@@ -695,6 +695,30 @@ func (f *DBFixture) FixtureConfig() gotest.FixtureConfig {
 	gotest.True(t, result.Fixtures[0].Config != nil, "expected Config to be set")
 }
 
+func TestCollector_SharedFixtureConfig_Detected(t *testing.T) {
+	src := `package testpkg
+
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type PGSharedFixture struct{}
+
+func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *PGSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
+	return gotest.ContainerFixtureConfig()
+}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
+	gotest.Equal(t, 1, len(result.Fixtures))
+	gotest.True(t, result.Fixtures[0].Config != nil, "expected Config to be set via SharedFixtureConfig")
+}
+
 func TestCollector_FixtureConfig_AbsentIsNil(t *testing.T) {
 	src := `package testpkg
 
