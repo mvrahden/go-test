@@ -141,11 +141,13 @@ func (f *DBFixture) AfterEach(ctx context.Context) error  { return nil }
 func TestCollector_FixtureCollection_SharedFixture(t *testing.T) {
 	src := `package testpkg
 
+import "context"
+
 type RedisSharedFixture struct {
 	Addr string
 }
 
-func (f *RedisSharedFixture) BeforeAll() error { return nil }
+func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -159,12 +161,14 @@ func (f *RedisSharedFixture) BeforeAll() error { return nil }
 func TestCollector_FixtureCollection_SharedFixtureWithAfterAll(t *testing.T) {
 	src := `package testpkg
 
+import "context"
+
 type RedisSharedFixture struct {
 	Addr string
 }
 
-func (f *RedisSharedFixture) BeforeAll() error { return nil }
-func (f *RedisSharedFixture) AfterAll() error  { return nil }
+func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *RedisSharedFixture) AfterAll(ctx context.Context) error  { return nil }
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -350,10 +354,12 @@ func TestValidation_SelfCycle(t *testing.T) {
 func TestCollector_SharedFixture_BeforeEachDisallowed(t *testing.T) {
 	src := `package testpkg
 
+import "context"
+
 type RedisSharedFixture struct{}
 
-func (f *RedisSharedFixture) BeforeAll() error    { return nil }
-func (f *RedisSharedFixture) BeforeEach() error   { return nil }
+func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error    { return nil }
+func (f *RedisSharedFixture) BeforeEach(ctx context.Context) error   { return nil }
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -365,10 +371,12 @@ func (f *RedisSharedFixture) BeforeEach() error   { return nil }
 func TestCollector_SharedFixture_AfterEachDisallowed(t *testing.T) {
 	src := `package testpkg
 
+import "context"
+
 type RedisSharedFixture struct{}
 
-func (f *RedisSharedFixture) BeforeAll() error  { return nil }
-func (f *RedisSharedFixture) AfterEach() error  { return nil }
+func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error  { return nil }
+func (f *RedisSharedFixture) AfterEach(ctx context.Context) error  { return nil }
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -384,7 +392,7 @@ import "github.com/mvrahden/go-test/pkg/gotest"
 
 type RedisSharedFixture struct{}
 
-func (f *RedisSharedFixture) BeforeAll(t *gotest.T) {} // wrong: should be () error
+func (f *RedisSharedFixture) BeforeAll(t *gotest.T) {} // wrong: should be (ctx context.Context) error
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -624,7 +632,7 @@ func TestCollector_SharedFixtureNotTreatedAsParent(t *testing.T) {
 		"type PGSharedFixture struct {\n" +
 		"\tDSN string `gotest:\"env=PG_DSN\"`\n" +
 		"}\n\n" +
-		"func (f *PGSharedFixture) BeforeAll() error { return nil }\n\n" +
+		"func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
 		"type E2EFixture struct {\n" +
 		"\t*PGSharedFixture\n" +
 		"}\n\n" +

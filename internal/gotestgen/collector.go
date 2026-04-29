@@ -225,7 +225,7 @@ func validateFixtures(fixtures []*gotestast.FixtureSpec) error {
 			}
 		case gotestast.SharedFixture:
 			if f.BeforeAll == nil {
-				return fmt.Errorf("shared fixture %q must have a BeforeAll() error method", f.Identifier())
+				return fmt.Errorf("shared fixture %q must have a BeforeAll(ctx context.Context) error method", f.Identifier())
 			}
 		}
 	}

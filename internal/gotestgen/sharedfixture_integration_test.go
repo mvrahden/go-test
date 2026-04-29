@@ -12,65 +12,51 @@ import (
 
 // TestSharedFixture_Integration_GeneratedSetupBinary verifies that
 // GenerateSharedSetup produces a valid, correctly structured Go program
-// when given multiple fixtures with env tags.
+// with context-aware lifecycle calls and field-level JSON serialization.
 func TestSharedFixture_Integration_GeneratedSetupBinary(t *testing.T) {
-	// Given two shared fixtures with env tags
 	fixtures := []SharedFixtureInfo{
 		{
-			Identifier: "PostgresFixture",
-			PkgPath:    "github.com/example/project/tests/fixtures",
-			EnvTags:    map[string]string{"DSN": "E2E_POSTGRES_DSN"},
+			Identifier:     "PostgresFixture",
+			PkgPath:        "github.com/example/project/tests/fixtures",
+			TransferFields: []string{"DSN"},
 		},
 		{
-			Identifier: "GCSFixture",
-			PkgPath:    "github.com/example/project/tests/gcs",
-			EnvTags: map[string]string{
-				"Endpoint": "E2E_GCS_ENDPOINT",
-				"Bucket":   "E2E_GCS_BUCKET",
-			},
+			Identifier:     "GCSFixture",
+			PkgPath:        "github.com/example/project/tests/gcs",
+			TransferFields: []string{"Endpoint", "Bucket"},
 		},
 	}
 
-	// When generating the setup binary
 	src, err := GenerateSharedSetup(fixtures)
 	gotest.NoError(t, err)
 
 	code := string(src)
 
-	// Verify it is valid Go source
 	fset := token.NewFileSet()
 	_, parseErr := parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
 	gotest.NoError(t, parseErr, "generated code should be valid Go: %s", code)
 
-	// Verify it has package main
 	gotest.Contains(t, code, "package main")
-
-	// Verify correct imports
+	gotest.Contains(t, code, `"context"`)
 	gotest.Contains(t, code, `"github.com/example/project/tests/fixtures"`)
 	gotest.Contains(t, code, `"github.com/example/project/tests/gcs"`)
 
-	// Verify correct fixture initialization
 	gotest.Contains(t, code, "PostgresFixture{}")
 	gotest.Contains(t, code, "GCSFixture{}")
 
-	// Verify correct env var mapping
-	gotest.Contains(t, code, `"E2E_POSTGRES_DSN"`)
-	gotest.Contains(t, code, `"E2E_GCS_ENDPOINT"`)
-	gotest.Contains(t, code, `"E2E_GCS_BUCKET"`)
+	gotest.Contains(t, code, "ctx := context.Background()")
+	gotest.Contains(t, code, "sf0.BeforeAll(ctx)")
+	gotest.Contains(t, code, "sf1.BeforeAll(ctx)")
 
-	// Verify proper signal handling
 	gotest.Contains(t, code, "syscall.SIGTERM")
-	gotest.Contains(t, code, "json.NewEncoder(os.Stdout)")
+	gotest.Contains(t, code, "json.NewEncoder(os.Stdout).Encode(state)")
 
-	// Verify BeforeAll calls are present
-	gotest.Contains(t, code, "sf0.BeforeAll()")
-	gotest.Contains(t, code, "sf1.BeforeAll()")
+	gotest.True(t, strings.Contains(code, "sf0.DSN"), "DSN should be serialized")
+	gotest.True(t, strings.Contains(code, "sf1.Endpoint"), "Endpoint should be serialized")
+	gotest.True(t, strings.Contains(code, "sf1.Bucket"), "Bucket should be serialized")
 
-	// Verify reverse-order teardown:
-	// sf1.AfterAll() (GCSFixture) should appear before sf0.AfterAll() (PostgresFixture)
-	// in the final teardown block at the end of main.
-	gcsAfterAllIdx := strings.LastIndex(code, "sf1.AfterAll()")
-	pgAfterAllIdx := strings.LastIndex(code, "sf0.AfterAll()")
+	gcsAfterAllIdx := strings.LastIndex(code, "sf1.AfterAll(ctx)")
+	pgAfterAllIdx := strings.LastIndex(code, "sf0.AfterAll(ctx)")
 	gotest.True(t, gcsAfterAllIdx < pgAfterAllIdx,
 		"expected reverse teardown order: sf1 (GCSFixture) before sf0 (PostgresFixture)")
 }
@@ -81,11 +67,13 @@ func TestSharedFixture_Integration_GeneratedSetupBinary(t *testing.T) {
 func TestSharedFixture_Integration_DiscoverFromRealPackage(t *testing.T) {
 	src := `package testpkg
 
+import "context"
+
 type PostgresSharedFixture struct {
-	DSN string ` + "`" + `gotest:"env=E2E_POSTGRES_DSN"` + "`" + `
+	DSN string
 }
 
-func (f *PostgresSharedFixture) BeforeAll() error { return nil }
+func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -99,8 +87,8 @@ func (f *PostgresSharedFixture) BeforeAll() error { return nil }
 
 	gotest.Equal(t, 1, len(shared), "expected one shared fixture")
 	gotest.Equal(t, "PostgresSharedFixture", shared[0].Identifier)
-	gotest.Equal(t, "E2E_POSTGRES_DSN", shared[0].EnvTags["DSN"],
-		"env tag for DSN field should be E2E_POSTGRES_DSN")
+	gotest.Equal(t, 1, len(shared[0].TransferFields), "DSN should be transferable")
+	gotest.Equal(t, "DSN", shared[0].TransferFields[0])
 }
 
 // TestSharedFixture_Integration_DiscoverFromRealPackage_MultipleFixtures verifies
@@ -109,19 +97,23 @@ func (f *PostgresSharedFixture) BeforeAll() error { return nil }
 func TestSharedFixture_Integration_DiscoverFromRealPackage_MultipleFixtures(t *testing.T) {
 	src1 := `package testpkg
 
+import "context"
+
 type PostgresSharedFixture struct {
-	DSN string ` + "`" + `gotest:"env=E2E_POSTGRES_DSN"` + "`" + `
+	DSN string
 }
 
-func (f *PostgresSharedFixture) BeforeAll() error { return nil }
+func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 `
 	src2 := `package testpkg
 
+import "context"
+
 type RedisSharedFixture struct {
-	Addr string ` + "`" + `gotest:"env=E2E_REDIS_ADDR"` + "`" + `
+	Addr string
 }
 
-func (f *RedisSharedFixture) BeforeAll() error { return nil }
+func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 `
 	pkg1 := loadTestPkgWithGotest(t, src1)
 	pkg2 := loadTestPkgWithGotest(t, src2)
@@ -144,9 +136,11 @@ func (f *RedisSharedFixture) BeforeAll() error { return nil }
 
 	pg, ok := found["PostgresSharedFixture"]
 	gotest.True(t, ok, "expected PostgresSharedFixture in discovered fixtures")
-	gotest.Equal(t, "E2E_POSTGRES_DSN", pg.EnvTags["DSN"])
+	gotest.Equal(t, 1, len(pg.TransferFields))
+	gotest.Equal(t, "DSN", pg.TransferFields[0])
 
 	redis, ok := found["RedisSharedFixture"]
 	gotest.True(t, ok, "expected RedisSharedFixture in discovered fixtures")
-	gotest.Equal(t, "E2E_REDIS_ADDR", redis.EnvTags["Addr"])
+	gotest.Equal(t, 1, len(redis.TransferFields))
+	gotest.Equal(t, "Addr", redis.TransferFields[0])
 }

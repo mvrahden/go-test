@@ -510,7 +510,7 @@ func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
 		"type PostgresSharedFixture struct {\n" +
 		"\tDSN string `gotest:\"env=E2E_POSTGRES_DSN\"`\n" +
 		"}\n\n" +
-		"func (f *PostgresSharedFixture) BeforeAll() error { return nil }\n\n" +
+		"func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
 		"type E2EFixture struct {\n" +
 		"\t*PostgresSharedFixture\n" +
 		"\tPool string\n" +
@@ -572,7 +572,7 @@ func TestRenderer_SharedFixtureNoEnvTags(t *testing.T) {
 		"\t\"github.com/mvrahden/go-test/pkg/gotest\"\n" +
 		")\n\n" +
 		"type SetupSharedFixture struct{}\n\n" +
-		"func (f *SetupSharedFixture) BeforeAll() error { return nil }\n\n" +
+		"func (f *SetupSharedFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
 		"type AppFixture struct {\n" +
 		"\t*SetupSharedFixture\n" +
 		"}\n\n" +
@@ -615,7 +615,7 @@ func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
 		"\tDSN  string `gotest:\"env=PG_DSN\"`\n" +
 		"\tHost string `gotest:\"env=PG_HOST\"`\n" +
 		"}\n\n" +
-		"func (f *PGSharedFixture) BeforeAll() error { return nil }\n\n" +
+		"func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
 		"type DBFixture struct {\n" +
 		"\t*PGSharedFixture\n" +
 		"}\n\n" +

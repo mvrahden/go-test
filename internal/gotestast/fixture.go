@@ -32,12 +32,15 @@ type FixtureSpec struct {
 	n             ast.Node
 	ts            *ast.TypeSpec
 	typ           *types.Struct
-	Config        *types.Func // FixtureConfig() method, may be nil
+	Config        *types.Func      // FixtureConfig()/SharedFixtureConfig() method, may be nil
 	BeforeAll     *types.Func
-	AfterAll      *types.Func // may be nil
-	BeforeEach    *types.Func // may be nil
-	AfterEach     *types.Func // may be nil
-	EnvTags       map[string]string // field name -> env var (shared fixtures only)
+	AfterAll      *types.Func      // may be nil
+	BeforeEach    *types.Func      // may be nil
+	AfterEach     *types.Func      // may be nil
+	Hydrate       *types.Func      // shared fixtures only, may be nil
+	Dehydrate     *types.Func      // shared fixtures only, may be nil
+	HydrateDecl   *ast.FuncDecl    // AST for Hydrate body analysis, may be nil
+	EnvTags       map[string]string // field name -> env var (shared fixtures only, deprecated)
 	ParentFixture *FixtureSpec      // pointer to parent fixture (via embedding), may be nil
 }
 
@@ -52,6 +55,27 @@ func (f *FixtureSpec) PackagePath() string { return f.pkg.PkgPath }
 
 // StructType returns the underlying *types.Struct for field inspection.
 func (f *FixtureSpec) StructType() *types.Struct { return f.typ }
+
+// PackageSyntax returns the parsed AST files for the fixture's package.
+func (f *FixtureSpec) PackageSyntax() []*ast.File { return f.pkg.Syntax }
+
+// PackageTypesInfo returns the type-checking results for the fixture's package.
+func (f *FixtureSpec) PackageTypesInfo() *types.Info { return f.pkg.TypesInfo }
+
+// ExportedFieldNames returns the names of all exported fields on the fixture struct.
+func (f *FixtureSpec) ExportedFieldNames() []string {
+	if f.typ == nil {
+		return nil
+	}
+	var names []string
+	for i := 0; i < f.typ.NumFields(); i++ {
+		field := f.typ.Field(i)
+		if field.Exported() && !field.Anonymous() {
+			names = append(names, field.Name())
+		}
+	}
+	return names
+}
 
 // DetermineFixture inspects an AST node for a struct type whose name ends in
 // "SharedFixture" (→ SharedFixture kind) or "Fixture" (→ PackageFixture kind).
@@ -120,8 +144,12 @@ func DetermineFixtureHarness(n ast.Node, pkg *packages.Package, f *FixtureSpec) 
 	}
 
 	name := m.Name()
-	// Only care about lifecycle methods and config
-	if name != "BeforeAll" && name != "AfterAll" && name != "BeforeEach" && name != "AfterEach" && name != "FixtureConfig" {
+	// Only care about lifecycle methods, config, and hydrate/dehydrate
+	switch name {
+	case "BeforeAll", "AfterAll", "BeforeEach", "AfterEach",
+		"FixtureConfig", "SharedFixtureConfig",
+		"Hydrate", "Dehydrate":
+	default:
 		return -1, nil
 	}
 
@@ -151,7 +179,25 @@ func DetermineFixtureHarness(n ast.Node, pkg *packages.Package, f *FixtureSpec) 
 
 	methodID := f.ts.Name.Name + "." + name
 
+	// Config marker methods — dispatch by kind
 	if name == "FixtureConfig" {
+		if f.Kind == SharedFixture {
+			return m.Pos(), fmt.Errorf("shared fixture %q should use SharedFixtureConfig(), not FixtureConfig()", f.ts.Name.Name)
+		}
+		if sig.Params().Len() != 0 || sig.Results().Len() != 1 {
+			return m.Pos(), fmt.Errorf("unsupported signature for %q: expected () gotest.FixtureConfig", methodID)
+		}
+		resType := sig.Results().At(0).Type().String()
+		if !strings.HasSuffix(resType, "/gotest.FixtureConfig") {
+			return m.Pos(), fmt.Errorf("unsupported return type for %q: expected gotest.FixtureConfig, got %s", methodID, resType)
+		}
+		f.Config = m
+		return -1, nil
+	}
+	if name == "SharedFixtureConfig" {
+		if f.Kind == PackageFixture {
+			return m.Pos(), fmt.Errorf("package fixture %q should use FixtureConfig(), not SharedFixtureConfig()", f.ts.Name.Name)
+		}
 		if sig.Params().Len() != 0 || sig.Results().Len() != 1 {
 			return m.Pos(), fmt.Errorf("unsupported signature for %q: expected () gotest.FixtureConfig", methodID)
 		}
@@ -163,30 +209,35 @@ func DetermineFixtureHarness(n ast.Node, pkg *packages.Package, f *FixtureSpec) 
 		return -1, nil
 	}
 
+	// Hydrate/Dehydrate — shared fixtures only
+	if name == "Hydrate" || name == "Dehydrate" {
+		if f.Kind != SharedFixture {
+			return m.Pos(), fmt.Errorf("package fixture %q must not have %s method; Hydrate/Dehydrate are for shared fixtures only", f.ts.Name.Name, name)
+		}
+		if err := validateContextErrorSig(sig, methodID); err != nil {
+			return m.Pos(), err
+		}
+		if name == "Hydrate" {
+			f.Hydrate = m
+			f.HydrateDecl = decl
+		} else {
+			f.Dehydrate = m
+		}
+		return -1, nil
+	}
+
+	// Lifecycle methods — validate per kind
 	switch f.Kind {
 	case PackageFixture:
-		if sig.Params().Len() != 1 || sig.Results().Len() != 1 {
-			return m.Pos(), fmt.Errorf("unsupported signature for %q: expected (ctx context.Context) error", methodID)
-		}
-		pT := sig.Params().At(0).Type().String()
-		if pT != "context.Context" {
-			return m.Pos(), fmt.Errorf("unsupported param type for %q: expected context.Context, got %s", methodID, pT)
-		}
-		resType := sig.Results().At(0).Type().String()
-		if resType != "error" {
-			return m.Pos(), fmt.Errorf("unsupported return type for %q: expected error, got %s", methodID, resType)
+		if err := validateContextErrorSig(sig, methodID); err != nil {
+			return m.Pos(), err
 		}
 	case SharedFixture:
-		// Shared fixture: BeforeAll/AfterAll must be () error, no BeforeEach/AfterEach
 		if name == "BeforeEach" || name == "AfterEach" {
 			return m.Pos(), fmt.Errorf("shared fixture %q must not have %s method", f.ts.Name.Name, name)
 		}
-		if sig.Params().Len() != 0 || sig.Results().Len() != 1 {
-			return m.Pos(), fmt.Errorf("unsupported signature for %q: expected () error", methodID)
-		}
-		resType := sig.Results().At(0).Type().String()
-		if resType != "error" {
-			return m.Pos(), fmt.Errorf("unsupported return type for %q: expected error, got %s", methodID, resType)
+		if err := validateContextErrorSig(sig, methodID); err != nil {
+			return m.Pos(), err
 		}
 	default:
 		return m.Pos(), fmt.Errorf("unknown fixture kind for %q", methodID)
@@ -224,6 +275,21 @@ func NewFixtureSpecForTestWithPkg(name string, kind FixtureKind, pkgPath string)
 		pkg:  &packages.Package{PkgPath: pkgPath},
 		ts:   &ast.TypeSpec{Name: ast.NewIdent(name)},
 	}
+}
+
+func validateContextErrorSig(sig *types.Signature, methodID string) error {
+	if sig.Params().Len() != 1 || sig.Results().Len() != 1 {
+		return fmt.Errorf("unsupported signature for %q: expected (context.Context) error", methodID)
+	}
+	paramType := sig.Params().At(0).Type().String()
+	if paramType != "context.Context" {
+		return fmt.Errorf("unsupported param type for %q: expected context.Context, got %s", methodID, paramType)
+	}
+	resType := sig.Results().At(0).Type().String()
+	if resType != "error" {
+		return fmt.Errorf("unsupported return type for %q: expected error, got %s", methodID, resType)
+	}
+	return nil
 }
 
 func ParseEnvTags(typ *types.Struct) map[string]string {
