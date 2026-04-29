@@ -175,6 +175,38 @@ Output nests naturally: `Test_InfraFixture/APIFixture/BatchTestSuite/TestDispatc
 
 For cross-package shared state (e.g. a database container shared across integration test packages), use `*SharedFixture` suffix — see [docs/fixtures.md](docs/fixtures.md) for the full reference.
 
+### Configuration
+
+Every fixture and suite runs with sensible defaults — 2-minute fixture timeout, 30-second per-test timeout. Override with optional marker methods:
+
+```go
+func (f *InfraFixture) FixtureConfig() gotest.FixtureConfig {
+    return gotest.FixtureConfig{
+        Timeout:    5 * time.Minute,
+        Retries:    1,
+        RetryDelay: 5 * time.Second,
+    }
+}
+
+func (s *BatchTestSuite) SuiteConfig() gotest.SuiteConfig {
+    return gotest.SuiteConfig{
+        Timeout:  1 * time.Minute,
+        FailFast: true,
+    }
+}
+```
+
+Only non-zero fields override. Use negative duration to explicitly disable a timeout (`Timeout: -1`).
+
+Preset constructors for common scenarios:
+
+| Preset | Timeout | Retries | Use case |
+|--------|---------|---------|----------|
+| `DefaultFixtureConfig()` | 2 min | 0 | Standard fixtures |
+| `ContainerFixtureConfig()` | 5 min | 1 | Testcontainers, image pulls |
+| `DefaultSuiteConfig()` | 30 sec | 0 | Unit/integration tests |
+| `IntegrationSuiteConfig()` | 2 min | 0 | Heavier integration tests |
+
 ### Focus and Exclude
 
 ```go
@@ -360,6 +392,8 @@ The generated code is what a careful developer would write by hand: `t.Run`, `t.
 | `X_` prefix | Exclude (skip this) |
 | `*Fixture` suffix | Package-scoped fixture |
 | `*SharedFixture` suffix | Cross-package shared fixture |
+| `FixtureConfig()` method | Fixture timeout/retry config |
+| `SuiteConfig()` method | Suite timeout/failfast config |
 
 ### Behavior Specification
 
