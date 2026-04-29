@@ -245,6 +245,97 @@ InfraFixture.BeforeAll
 InfraFixture.AfterAll
 ```
 
+### Configuration
+
+Every fixture and suite runs with sensible defaults. Optional marker methods override specific fields via overlay semantics — only non-zero fields replace the default.
+
+#### Config Types
+
+```go
+type FixtureConfig struct {
+    Timeout    time.Duration // applied to BeforeAll/AfterAll via context.WithTimeout
+    Retries    int           // additional BeforeAll attempts on failure
+    RetryDelay time.Duration // pause between retry attempts
+}
+
+type SuiteConfig struct {
+    Timeout      time.Duration // per-test-case deadline via t.Context()
+    SetupTimeout time.Duration // BeforeAll/AfterAll deadline
+    Retries      int           // per-test-case retry attempts
+    FailFast     bool          // stop suite on first failure
+}
+```
+
+#### Value Semantics
+
+| Value | Meaning |
+|-------|---------|
+| `> 0` | Use this duration |
+| `0`   | Keep default (field not overridden) |
+| `< 0` | Explicitly disabled (no timeout) |
+
+This applies to `Timeout`, `SetupTimeout`, and `RetryDelay`. `FailFast` only overrides to `true` — a false overlay does not reset a true base.
+
+#### Marker Methods
+
+The code generator recognizes these exact signatures:
+
+```go
+func (f *MyFixture) FixtureConfig() gotest.FixtureConfig
+func (s *MySuite)   SuiteConfig()   gotest.SuiteConfig
+```
+
+Requirements (same conventions as lifecycle hooks):
+- Pointer receiver matching the fixture/suite type name
+- No parameters
+- Single return value of the exact config struct type
+- Invalid signatures produce a collector error
+
+#### Presets
+
+| Preset | Timeout | Retries | Use case |
+|--------|---------|---------|----------|
+| `DefaultFixtureConfig()` | 2 min | 0 | Standard fixtures |
+| `ContainerFixtureConfig()` | 5 min | 1 (5s delay) | Testcontainers, image pulls |
+| `DefaultSuiteConfig()` | 30s (+ 30s setup) | 0 | Unit/integration tests |
+| `IntegrationSuiteConfig()` | 2 min (+ 5 min setup) | 0 | Heavier integration tests |
+
+#### Overlay Functions
+
+```go
+func OverlayFixtureConfig(base *FixtureConfig, overlay FixtureConfig)
+func OverlaySuiteConfig(base *SuiteConfig, overlay SuiteConfig)
+```
+
+Enables composable configuration — start with a preset, override individual fields:
+
+```go
+func (f *InfraFixture) FixtureConfig() gotest.FixtureConfig {
+    cfg := gotest.ContainerFixtureConfig()
+    if os.Getenv("CI") != "" {
+        cfg.Timeout = 10 * time.Minute
+        cfg.Retries = 2
+    }
+    return cfg
+}
+```
+
+#### Generated Behavior
+
+**Fixtures:** The harness always resolves `DefaultFixtureConfig()`, overlays when the marker is present, then uses the config to wrap `BeforeAll` in a retry loop with `context.WithTimeout` and wrap `AfterAll` cleanup with timeout. Retry attempts are logged with attempt number.
+
+**Suites:** The harness always resolves `DefaultSuiteConfig()`, overlays when the marker is present, then wraps each test case with `NewTWithDeadline` when timeout > 0, and breaks the test case loop on first failure when `FailFast` is set.
+
+**`NewTWithDeadline`:** Creates a `*gotest.T` with a context deadline. `t.Context()` returns the deadline-aware context. Existing `NewT` callers are unaffected.
+
+#### Feature Interactions
+
+- **Parallel suites:** `FailFast` only applies to sequential execution. Parallel test cases (WaitGroup-coordinated) complete or hit the global timeout.
+- **Focus/Exclude:** Config applies after focus/exclude filtering. Skipped suites get unchanged skip stubs.
+- **Global `-timeout`:** `FixtureConfig.Timeout` is bounded by Go's global timeout via `context.WithTimeout` inheriting the parent's shorter deadline.
+- **SharedFixtures:** `FixtureConfig` does not apply. SharedFixtures have `() error` signatures with no context parameter.
+- **Nested fixtures:** Each level resolves config independently — no inheritance between fixture levels.
+
 ---
 
 ## Assertions
