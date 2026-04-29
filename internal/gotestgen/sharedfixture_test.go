@@ -112,7 +112,6 @@ func TestGenerateSharedSetup_NoTransferFields(t *testing.T) {
 
 func TestDiscoverSharedFixtures_Basic(t *testing.T) {
 	sf := gotestast.NewFixtureSpecForTestWithPkg("RedisFixture", gotestast.SharedFixture, "github.com/example/fixtures")
-	sf.EnvTags = map[string]string{"Addr": "REDIS_ADDR"}
 
 	results := []CollectorResult{
 		{
@@ -124,7 +123,6 @@ func TestDiscoverSharedFixtures_Basic(t *testing.T) {
 	gotest.Equal(t, 1, len(shared))
 	gotest.Equal(t, "RedisFixture", shared[0].Identifier)
 	gotest.Equal(t, "github.com/example/fixtures", shared[0].PkgPath)
-	gotest.Equal(t, "REDIS_ADDR", shared[0].EnvTags["Addr"])
 	gotest.True(t, !shared[0].HasConfig)
 	gotest.True(t, !shared[0].HasHydrate)
 	gotest.True(t, !shared[0].HasDehydrate)
@@ -231,6 +229,37 @@ func TestGenerateSharedSetup_StateKeyUsesFullyQualifiedName(t *testing.T) {
 
 	code := string(src)
 	gotest.Contains(t, code, `state["github.com/example/fixtures.PGFixture"]`)
+}
+
+func TestGenerateSharedSetup_SamePackageDeduplicatesImport(t *testing.T) {
+	fixtures := []SharedFixtureInfo{
+		{
+			Identifier:     "PostgresFixture",
+			PkgPath:        "github.com/example/shared",
+			TransferFields: []string{"DSN"},
+		},
+		{
+			Identifier:     "RedisFixture",
+			PkgPath:        "github.com/example/shared",
+			TransferFields: []string{"Addr"},
+		},
+	}
+
+	src, err := GenerateSharedSetup(fixtures)
+	gotest.NoError(t, err)
+
+	code := string(src)
+	fset := token.NewFileSet()
+	_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
+	gotest.NoError(t, err, "generated code should be valid Go: %s", code)
+
+	gotest.Equal(t, 1, strings.Count(code, `"github.com/example/shared"`),
+		"same-package fixtures should produce exactly one import")
+
+	gotest.Contains(t, code, "sfpkg0.PostgresFixture{}")
+	gotest.Contains(t, code, "sfpkg0.RedisFixture{}")
+	gotest.True(t, !strings.Contains(code, "sfpkg1"),
+		"should not have sfpkg1 alias when both fixtures share the same package")
 }
 
 func TestGenerateSharedSetup_ReverseOrderTeardown_OnError(t *testing.T) {

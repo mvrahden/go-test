@@ -111,7 +111,7 @@ func Test_TestsuiteCLI_GenericSuite(t *testing.T) {
 
 func Test_TestsuiteCLI_AllPackages(t *testing.T) {
 	tmp := t.TempDir()
-	testutils.CopyModuleUnderTestToTmp(t, tmp, "./..", ".git", "go.work")
+	testutils.CopyModuleUnderTestToTmp(t, tmp, "./..", ".git", "go.work", "examples/shared_fixture")
 	testutils.ActivateTests(t, tmp)
 	testutils.HackGoWork(t, tmp)
 

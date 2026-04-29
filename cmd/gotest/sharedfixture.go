@@ -13,16 +13,16 @@ import (
 )
 
 // SharedFixtureProcess manages a running shared fixture setup subprocess.
-// The subprocess starts shared fixtures, writes env vars as JSON to stdout,
+// The subprocess starts shared fixtures, writes JSON state to stdout,
 // then blocks until SIGTERM/SIGINT triggers teardown.
 type SharedFixtureProcess struct {
-	cmd  *exec.Cmd
-	env  map[string]string
-	done chan struct{}
+	cmd       *exec.Cmd
+	stateJSON string
+	done      chan struct{}
 }
 
-// Env returns the environment variables exported by the shared fixtures.
-func (p *SharedFixtureProcess) Env() map[string]string { return p.env }
+// StateJSON returns the serialized shared fixture state as a JSON string.
+func (p *SharedFixtureProcess) StateJSON() string { return p.stateJSON }
 
 // Teardown signals the shared fixture subprocess to shut down and waits
 // for it to complete. If the process doesn't exit within 30 seconds,
@@ -69,11 +69,17 @@ func startSharedFixtures(ctx context.Context, fixtures []gotestgen.SharedFixture
 		return nil, fmt.Errorf("start shared fixture process: %w", err)
 	}
 
-	// Read env vars from stdout (JSON)
-	var env map[string]string
-	if err := json.NewDecoder(stdout).Decode(&env); err != nil {
+	// Read JSON state from stdout (map[string]json.RawMessage)
+	var state map[string]json.RawMessage
+	if err := json.NewDecoder(stdout).Decode(&state); err != nil {
 		cmd.Process.Kill()
-		return nil, fmt.Errorf("read shared fixture env: %w", err)
+		return nil, fmt.Errorf("read shared fixture state: %w", err)
+	}
+
+	stateBytes, err := json.Marshal(state)
+	if err != nil {
+		cmd.Process.Kill()
+		return nil, fmt.Errorf("re-marshal shared fixture state: %w", err)
 	}
 
 	done := make(chan struct{})
@@ -82,5 +88,5 @@ func startSharedFixtures(ctx context.Context, fixtures []gotestgen.SharedFixture
 		close(done)
 	}()
 
-	return &SharedFixtureProcess{cmd: cmd, env: env, done: done}, nil
+	return &SharedFixtureProcess{cmd: cmd, stateJSON: string(stateBytes), done: done}, nil
 }

@@ -41,11 +41,13 @@ type FixtureViewModel struct {
 
 // SharedFixtureRef describes a shared fixture embedded in a package fixture.
 type SharedFixtureRef struct {
-	LocalVar      string            // e.g. "sf0"
-	QualifiedType string            // e.g. "fixtures.PostgresSharedFixture"
-	FieldName     string            // e.g. "PostgresSharedFixture"
-	EnvTags       map[string]string // field -> env var
-	PkgPath       string            // import path, empty if same package
+	LocalVar      string // e.g. "sf0"
+	QualifiedType string // e.g. "fixtures.PostgresSharedFixture"
+	FieldName     string // e.g. "PostgresSharedFixture"
+	StateKey      string // e.g. "github.com/example/fixtures.PostgresSharedFixture"
+	HasHydrate    bool
+	HasDehydrate  bool
+	PkgPath       string // import path, empty if same package
 }
 
 type renderer struct{}
@@ -118,14 +120,19 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		imports = append(imports, Import{Path: "context"})
 		imports = append(imports, Import{Path: "os"})
 	}
+	hasSharedFixtures := false
 	seenPkg := map[string]bool{}
 	for _, vm := range viewModels {
 		for _, sf := range vm.SharedFixtures {
+			hasSharedFixtures = true
 			if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
 				imports = append(imports, Import{Path: sf.PkgPath})
 				seenPkg[sf.PkgPath] = true
 			}
 		}
+	}
+	if hasSharedFixtures {
+		imports = append(imports, Import{Path: "encoding/json"})
 	}
 	data := TplData{
 		RepoName:    about.ShortInfo(),
@@ -246,7 +253,7 @@ func buildFixtureViewModels(fixtures []*gotestast.FixtureSpec, fixtureBound []*g
 
 // detectSharedFixtureEmbeddings inspects a package fixture's struct type for
 // embedded pointer fields whose type name ends in "SharedFixture". For each
-// match, it parses the env tags and builds a SharedFixtureRef.
+// match, it computes the state key and checks for Hydrate/Dehydrate methods.
 func detectSharedFixtureEmbeddings(pkgFixture *gotestast.FixtureSpec) []SharedFixtureRef {
 	typ := pkgFixture.StructType()
 	if typ == nil {
@@ -273,24 +280,27 @@ func detectSharedFixtureEmbeddings(pkgFixture *gotestast.FixtureSpec) []SharedFi
 			continue
 		}
 
-		underlying, ok := named.Underlying().(*types.Struct)
-		if !ok {
-			continue
-		}
-		envTags := gotestast.ParseEnvTags(underlying)
-
 		qualifiedType := name
-		var pkgPath string
-		if pkg := named.Obj().Pkg(); pkg != nil && pkg.Path() != pkgFixture.PackagePath() {
-			qualifiedType = pkg.Name() + "." + name
-			pkgPath = pkg.Path()
+		var pkgPath, stateKey string
+		if pkg := named.Obj().Pkg(); pkg != nil {
+			stateKey = pkg.Path() + "." + name
+			if pkg.Path() != pkgFixture.PackagePath() {
+				qualifiedType = pkg.Name() + "." + name
+				pkgPath = pkg.Path()
+			}
 		}
+
+		mset := types.NewMethodSet(types.NewPointer(named))
+		hasHydrate := mset.Lookup(named.Obj().Pkg(), "Hydrate") != nil
+		hasDehydrate := mset.Lookup(named.Obj().Pkg(), "Dehydrate") != nil
 
 		refs = append(refs, SharedFixtureRef{
 			LocalVar:      fmt.Sprintf("sf%d", sfIdx),
 			QualifiedType: qualifiedType,
 			FieldName:     name,
-			EnvTags:       envTags,
+			StateKey:      stateKey,
+			HasHydrate:    hasHydrate,
+			HasDehydrate:  hasDehydrate,
 			PkgPath:       pkgPath,
 		})
 		sfIdx++

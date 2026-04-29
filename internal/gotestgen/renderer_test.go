@@ -508,7 +508,7 @@ func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
 		"\t\"github.com/mvrahden/go-test/pkg/gotest\"\n" +
 		")\n\n" +
 		"type PostgresSharedFixture struct {\n" +
-		"\tDSN string `gotest:\"env=E2E_POSTGRES_DSN\"`\n" +
+		"\tDSN string\n" +
 		"}\n\n" +
 		"func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
 		"type E2EFixture struct {\n" +
@@ -541,10 +541,11 @@ func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
 
 	output := string(out)
 
-	// Shared fixture local var should be created with env var resolution
+	// Shared fixture deserialized from JSON state
 	gotest.Contains(t, output, "sf0 := &PostgresSharedFixture{}")
-	gotest.Contains(t, output, `os.Getenv("E2E_POSTGRES_DSN")`)
-	gotest.Contains(t, output, `t.Fatal("E2E_POSTGRES_DSN not set`)
+	gotest.Contains(t, output, `os.Getenv("GOTEST_SHARED_STATE")`)
+	gotest.Contains(t, output, `t.Fatal("GOTEST_SHARED_STATE not set`)
+	gotest.Contains(t, output, `json.Unmarshal`)
 
 	// Shared fixture should be assigned to the package fixture
 	gotest.Contains(t, output, "fixture.PostgresSharedFixture = sf0")
@@ -559,13 +560,13 @@ func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
 	gotest.Contains(t, output, `t.Run("QueryTestSuite"`)
 	gotest.Contains(t, output, "E2EFixture: fixture")
 
-	// Shared fixture env var resolution should appear before fixture.BeforeAll
-	sfIdx := strings.Index(output, "sf0.DSN = os.Getenv")
+	// JSON state deserialization should appear before fixture.BeforeAll
+	sfIdx := strings.Index(output, "json.Unmarshal(ƒb, sf0)")
 	beforeAllIdx := strings.Index(output, "fixture.BeforeAll(ctx)")
-	gotest.True(t, sfIdx < beforeAllIdx, "shared fixture env resolution must precede fixture.BeforeAll")
+	gotest.True(t, sfIdx < beforeAllIdx, "shared fixture JSON deserialization must precede fixture.BeforeAll")
 }
 
-func TestRenderer_SharedFixtureNoEnvTags(t *testing.T) {
+func TestRenderer_SharedFixtureEmptyStruct(t *testing.T) {
 	src := "package testpkg\n\n" +
 		"import (\n" +
 		"\t\"context\"\n\n" +
@@ -597,12 +598,10 @@ func TestRenderer_SharedFixtureNoEnvTags(t *testing.T) {
 
 	output := string(out)
 
-	// Shared fixture should be created and assigned even without env tags
+	// Shared fixture should be created and assigned via JSON state
 	gotest.Contains(t, output, "sf0 := &SetupSharedFixture{}")
 	gotest.Contains(t, output, "fixture.SetupSharedFixture = sf0")
-
-	// No os.Getenv calls since there are no env tags
-	gotest.True(t, !strings.Contains(output, "os.Getenv"), "should not have os.Getenv without env tags")
+	gotest.Contains(t, output, `os.Getenv("GOTEST_SHARED_STATE")`)
 }
 
 func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
@@ -612,8 +611,8 @@ func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
 		"\t\"github.com/mvrahden/go-test/pkg/gotest\"\n" +
 		")\n\n" +
 		"type PGSharedFixture struct {\n" +
-		"\tDSN  string `gotest:\"env=PG_DSN\"`\n" +
-		"\tHost string `gotest:\"env=PG_HOST\"`\n" +
+		"\tDSN  string\n" +
+		"\tHost string\n" +
 		"}\n\n" +
 		"func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
 		"type DBFixture struct {\n" +
@@ -646,9 +645,7 @@ func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
 	gotest.Equal(t, "PGSharedFixture", sf.QualifiedType)
 	gotest.Equal(t, "PGSharedFixture", sf.FieldName)
 	gotest.Equal(t, "", sf.PkgPath, "same-package shared fixture should have empty PkgPath")
-	gotest.Equal(t, 2, len(sf.EnvTags))
-	gotest.Equal(t, "PG_DSN", sf.EnvTags["DSN"])
-	gotest.Equal(t, "PG_HOST", sf.EnvTags["Host"])
+	gotest.Equal(t, "testpkg.PGSharedFixture", sf.StateKey)
 }
 
 func TestRenderer_FixtureWithConfig(t *testing.T) {

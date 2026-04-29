@@ -5,7 +5,6 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
-	"reflect"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
@@ -37,11 +36,10 @@ type FixtureSpec struct {
 	AfterAll      *types.Func      // may be nil
 	BeforeEach    *types.Func      // may be nil
 	AfterEach     *types.Func      // may be nil
-	Hydrate       *types.Func      // shared fixtures only, may be nil
-	Dehydrate     *types.Func      // shared fixtures only, may be nil
-	HydrateDecl   *ast.FuncDecl    // AST for Hydrate body analysis, may be nil
-	EnvTags       map[string]string // field name -> env var (shared fixtures only, deprecated)
-	ParentFixture *FixtureSpec      // pointer to parent fixture (via embedding), may be nil
+	Hydrate       *types.Func   // shared fixtures only, may be nil
+	Dehydrate     *types.Func   // shared fixtures only, may be nil
+	HydrateDecl   *ast.FuncDecl // AST for Hydrate body analysis, may be nil
+	ParentFixture *FixtureSpec  // pointer to parent fixture (via embedding), may be nil
 }
 
 // Identifier returns the fixture type name.
@@ -117,10 +115,6 @@ func DetermineFixture(n ast.Node, pkg *packages.Package) (*FixtureSpec, error) {
 
 	spec := &FixtureSpec{
 		Kind: kind, pkg: pkg, n: n, ts: ts, typ: typ,
-	}
-
-	if kind == SharedFixture {
-		spec.EnvTags = ParseEnvTags(typ)
 	}
 
 	return spec, nil
@@ -292,22 +286,3 @@ func validateContextErrorSig(sig *types.Signature, methodID string) error {
 	return nil
 }
 
-func ParseEnvTags(typ *types.Struct) map[string]string {
-	tags := make(map[string]string)
-	for i := 0; i < typ.NumFields(); i++ {
-		f := typ.Field(i)
-		rawTag := typ.Tag(i)
-		if !f.Exported() || rawTag == "" {
-			continue
-		}
-		st := reflect.StructTag(rawTag)
-		val, ok := st.Lookup("gotest")
-		if !ok {
-			continue
-		}
-		if strings.HasPrefix(val, "env=") {
-			tags[f.Name()] = val[4:]
-		}
-	}
-	return tags
-}

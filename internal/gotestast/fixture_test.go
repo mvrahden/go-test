@@ -74,29 +74,6 @@ type RedisSharedFixture struct {
 	gotest.True(t, spec != nil, "expected non-nil FixtureSpec")
 	gotest.Equal(t, SharedFixture, spec.Kind)
 	gotest.Equal(t, "RedisSharedFixture", spec.Identifier())
-	gotest.Equal(t, 0, len(spec.EnvTags))
-}
-
-func TestDetermineFixture_EnvTags(t *testing.T) {
-	src := "package testpkg\n\n" +
-		"type EnvSharedFixture struct {\n" +
-		"\tHost string `gotest:\"env=DB_HOST\"`\n" +
-		"\tPort int    `gotest:\"env=DB_PORT\"`\n" +
-		"\tlocal string\n" +
-		"\tNoTag string\n" +
-		"}\n"
-
-	pkg, decls := loadFixtureAST(t, src)
-	gotest.Equal(t, 1, len(decls))
-
-	spec, err := DetermineFixture(decls[0], pkg)
-	gotest.NoError(t, err)
-	gotest.True(t, spec != nil, "expected non-nil FixtureSpec")
-	gotest.Equal(t, SharedFixture, spec.Kind)
-
-	gotest.Equal(t, 2, len(spec.EnvTags))
-	gotest.Equal(t, "DB_HOST", spec.EnvTags["Host"])
-	gotest.Equal(t, "DB_PORT", spec.EnvTags["Port"])
 }
 
 func TestDetermineFixture_NoSuffix(t *testing.T) {

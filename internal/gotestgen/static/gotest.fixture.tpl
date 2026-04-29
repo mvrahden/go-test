@@ -15,15 +15,32 @@ func TestMain(m *testing.M) { os.Exit(m.Run()) }
 
 {{ range $f := .RootFixtures }}
 func Test_{{ $f.Identifier }}(t *testing.T) {
-{{- /* Resolve shared fixture embeddings from env */ -}}
+{{- /* Resolve shared fixture embeddings from JSON state */ -}}
+{{ if $f.SharedFixtures }}
+    ƒsharedRaw := os.Getenv("GOTEST_SHARED_STATE")
+    if ƒsharedRaw == "" {
+        t.Fatal("GOTEST_SHARED_STATE not set — run via gotest CLI")
+    }
+    ƒsharedState := map[string]json.RawMessage{}
+    if err := json.Unmarshal([]byte(ƒsharedRaw), &ƒsharedState); err != nil {
+        t.Fatalf("unmarshal GOTEST_SHARED_STATE: %v", err)
+    }
 {{ range $sf := $f.SharedFixtures }}
     {{ $sf.LocalVar }} := &{{ $sf.QualifiedType }}{}
-{{- range $field, $env := $sf.EnvTags }}
-    {{ $sf.LocalVar }}.{{ $field }} = os.Getenv("{{ $env }}")
-    if {{ $sf.LocalVar }}.{{ $field }} == "" {
-        t.Fatal("{{ $env }} not set — run via testsuite CLI")
+    if ƒb, ok := ƒsharedState["{{ $sf.StateKey }}"]; ok {
+        if err := json.Unmarshal(ƒb, {{ $sf.LocalVar }}); err != nil {
+            t.Fatalf("unmarshal {{ $sf.FieldName }} state: %v", err)
+        }
+    }
+{{- if $sf.HasHydrate }}
+    if err := {{ $sf.LocalVar }}.Hydrate(context.Background()); err != nil {
+        t.Fatalf("{{ $sf.FieldName }}.Hydrate: %v", err)
     }
 {{- end }}
+{{- if $sf.HasDehydrate }}
+    t.Cleanup(func() { {{ $sf.LocalVar }}.Dehydrate(context.Background()) })
+{{- end }}
+{{ end }}
 {{ end }}
 
     fixture := &{{ $f.Identifier }}{}
