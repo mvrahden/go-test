@@ -7,6 +7,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"os"
 	"testing"
+	"time"
 )
 
 //go:noinline
@@ -26,10 +27,31 @@ func TestMain(m *testing.M) { os.Exit(m.Run()) }
 func Test_ExternalSetupFixture(t *testing.T) {
 
 	fixture := &ExternalSetupFixture{}
+	ƒcfg := gotest.DefaultFixtureConfig()
 	t.Cleanup(func() {
 	})
-	if err := fixture.BeforeAll(t.Context()); err != nil {
-		t.Fatalf("ExternalSetupFixture.BeforeAll failed: %v", err)
+	var ƒerr error
+	ƒattempts := 1 + ƒcfg.Retries
+	for ƒi := range ƒattempts {
+		ctx := t.Context()
+		if ƒcfg.Timeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
+			defer cancel()
+		}
+		ƒerr = fixture.BeforeAll(ctx)
+		if ƒerr == nil {
+			break
+		}
+		if ƒi < ƒattempts-1 {
+			t.Logf("ExternalSetupFixture.BeforeAll attempt %d/%d failed: %v", ƒi+1, ƒattempts, ƒerr)
+			if ƒcfg.RetryDelay > 0 {
+				time.Sleep(ƒcfg.RetryDelay)
+			}
+		}
+	}
+	if ƒerr != nil {
+		t.Fatalf("ExternalSetupFixture.BeforeAll failed after %d attempt(s): %v", ƒattempts, ƒerr)
 	}
 	t.Run("ExternalDemoTestSuite", func(t *testing.T) {
 		s := &ƒƒ_GOTEST_ExternalDemoTestSuite{
@@ -37,12 +59,16 @@ func Test_ExternalSetupFixture(t *testing.T) {
 				ExternalSetupFixture: fixture,
 			},
 		}
+		ƒscfg := gotest.DefaultSuiteConfig()
 
 		newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
 			return func(tt *gotest.T) {
 				t := tt.T()
 				t.Run(desc, func(it *testing.T) {
 					ttt := gotest.NewT(it)
+					if ƒscfg.Timeout > 0 {
+						ttt = gotest.NewTWithDeadline(it, ƒscfg.Timeout)
+					}
 					defer s.AfterEach(ttt)
 					s.BeforeEach(ttt)
 					ƒƒ_GOTEST_exec(testFn, ttt)
@@ -61,6 +87,9 @@ func Test_ExternalSetupFixture(t *testing.T) {
 		s.BeforeAll(tt)
 		for _, tc := range testCases {
 			tc(tt)
+			if ƒscfg.FailFast && t.Failed() {
+				break
+			}
 		}
 	})
 
