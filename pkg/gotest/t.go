@@ -23,11 +23,23 @@ func NewT(t *testing.T) *T {
 
 type T struct {
 	t         *testing.T
+	ctx       context.Context
 	collector *collectingT
 }
 
-func (t *T) T() *testing.T           { return t.t }
-func (t *T) Context() context.Context { return t.t.Context() }
+func (t *T) T() *testing.T { return t.t }
+func (t *T) Context() context.Context {
+	if t.ctx != nil {
+		return t.ctx
+	}
+	return t.t.Context()
+}
+
+func NewTWithDeadline(t *testing.T, timeout time.Duration) *T {
+	ctx, cancel := context.WithTimeout(t.Context(), timeout)
+	t.Cleanup(cancel)
+	return &T{t: t, ctx: ctx}
+}
 func (t *T) Errorf(format string, args ...any) {
 	if t.collector != nil {
 		t.collector.Errorf(format, args...)
