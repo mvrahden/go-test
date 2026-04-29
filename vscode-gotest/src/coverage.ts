@@ -125,7 +125,7 @@ export class CoverageRunner implements vscode.Disposable {
         let coverFile: string | undefined;
 
         try {
-          const overlayCmd = await buildCliCommand(["overlay", pkg.dir]);
+          const overlayCmd = await buildCliCommand(["overlay", importPath]);
           this.outputChannel.appendLine(`[coverage] ${formatCliCommand(overlayCmd)}`);
           const { stdout: overlayStdout } = await execFileAsync(
             overlayCmd.bin,
@@ -146,7 +146,7 @@ export class CoverageRunner implements vscode.Disposable {
             `-coverprofile=${coverFile}`,
             "-count=1",
             "-json",
-            pkg.dir,
+            importPath,
           ];
           if (filter) {
             args.push("-run", filter);
