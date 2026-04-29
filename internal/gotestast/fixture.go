@@ -32,6 +32,7 @@ type FixtureSpec struct {
 	n             ast.Node
 	ts            *ast.TypeSpec
 	typ           *types.Struct
+	Config        *types.Func // FixtureConfig() method, may be nil
 	BeforeAll     *types.Func
 	AfterAll      *types.Func // may be nil
 	BeforeEach    *types.Func // may be nil
@@ -119,8 +120,8 @@ func DetermineFixtureHarness(n ast.Node, pkg *packages.Package, f *FixtureSpec) 
 	}
 
 	name := m.Name()
-	// Only care about lifecycle methods
-	if name != "BeforeAll" && name != "AfterAll" && name != "BeforeEach" && name != "AfterEach" {
+	// Only care about lifecycle methods and config
+	if name != "BeforeAll" && name != "AfterAll" && name != "BeforeEach" && name != "AfterEach" && name != "FixtureConfig" {
 		return -1, nil
 	}
 
@@ -149,6 +150,18 @@ func DetermineFixtureHarness(n ast.Node, pkg *packages.Package, f *FixtureSpec) 
 	}
 
 	methodID := f.ts.Name.Name + "." + name
+
+	if name == "FixtureConfig" {
+		if sig.Params().Len() != 0 || sig.Results().Len() != 1 {
+			return m.Pos(), fmt.Errorf("unsupported signature for %q: expected () gotest.FixtureConfig", methodID)
+		}
+		resType := sig.Results().At(0).Type().String()
+		if !strings.HasSuffix(resType, "/gotest.FixtureConfig") {
+			return m.Pos(), fmt.Errorf("unsupported return type for %q: expected gotest.FixtureConfig, got %s", methodID, resType)
+		}
+		f.Config = m
+		return -1, nil
+	}
 
 	switch f.Kind {
 	case PackageFixture:
