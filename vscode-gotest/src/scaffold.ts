@@ -6,7 +6,8 @@ import { buildCliCommand, formatCliCommand } from "./cli.js";
 export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vscode.Disposable {
   static readonly providedCodeActionKinds = [vscode.CodeActionKind.RefactorExtract];
 
-  private static readonly structPattern = /^\s*type\s+([A-Z]\w*)\s+struct/;
+  private static readonly typePattern = /^\s*type\s+([A-Z]\w*)\s+(struct|interface)\b/;
+  private static readonly exportedFuncPattern = /^func\s+([A-Z]\w*)\s*\(/;
 
   provideCodeActions(
     document: vscode.TextDocument,
@@ -18,10 +19,10 @@ export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vs
 
     const actions: vscode.CodeAction[] = [];
     const line = document.lineAt(range.start.line);
-    const structMatch = ScaffoldCodeActionProvider.structPattern.exec(line.text);
+    const typeMatch = ScaffoldCodeActionProvider.typePattern.exec(line.text);
 
-    if (structMatch) {
-      const typeName = structMatch[1];
+    if (typeMatch) {
+      const typeName = typeMatch[1];
       const action = new vscode.CodeAction(
         `Generate test suite for ${typeName}`,
         vscode.CodeActionKind.RefactorExtract,
@@ -34,21 +35,36 @@ export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vs
       actions.push(action);
     }
 
-    const fileAction = new vscode.CodeAction(
-      "Generate test suite for this file",
-      vscode.CodeActionKind.RefactorExtract,
-    );
-    fileAction.command = {
-      command: "gotest.scaffoldTarget",
-      title: "Scaffold file",
-      arguments: [this.buildFileTarget(document)],
-    };
-    actions.push(fileAction);
+    if (this.hasScaffoldableDeclarations(document)) {
+      const fileAction = new vscode.CodeAction(
+        "Generate test suite for this file",
+        vscode.CodeActionKind.RefactorExtract,
+      );
+      fileAction.command = {
+        command: "gotest.scaffoldTarget",
+        title: "Scaffold file",
+        arguments: [this.buildFileTarget(document)],
+      };
+      actions.push(fileAction);
+    }
 
-    return actions;
+    return actions.length > 0 ? actions : undefined;
   }
 
   dispose(): void {}
+
+  private hasScaffoldableDeclarations(document: vscode.TextDocument): boolean {
+    for (let i = 0; i < document.lineCount; i++) {
+      const text = document.lineAt(i).text;
+      if (ScaffoldCodeActionProvider.typePattern.test(text)) {
+        return true;
+      }
+      if (ScaffoldCodeActionProvider.exportedFuncPattern.test(text)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   private buildTypeTarget(document: vscode.TextDocument, typeName: string): string {
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
@@ -96,7 +112,7 @@ export async function executeScaffold(
     return;
   }
 
-  const cmd = buildCliCommand(["scaffold", target]);
+  const cmd = await buildCliCommand(["scaffold", target]);
   outputChannel.appendLine(`[scaffold] ${formatCliCommand(cmd)}`);
 
   try {

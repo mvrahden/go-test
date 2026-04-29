@@ -37,7 +37,7 @@ export class DebugLauncher implements vscode.Disposable {
     // Generate overlay
     let overlay: OverlayOutput;
     try {
-      const cmd = buildCliCommand(["overlay", pkgDir]);
+      const cmd = await buildCliCommand(["overlay", pkgDir]);
       this.outputChannel.appendLine(`[debug] ${formatCliCommand(cmd)}`);
       const { stdout } = await execFileAsync(cmd.bin, cmd.args, {
         cwd: workspaceFolder.uri.fsPath,

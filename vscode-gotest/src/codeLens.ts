@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
 
 export class GoTestCodeLensProvider
@@ -34,15 +33,15 @@ export class GoTestCodeLensProvider
 
     const lenses: vscode.CodeLens[] = [];
 
-    const docBasename = path.basename(document.fileName);
+    const docPath = document.fileName;
 
     for (const pkg of this.cache.packages) {
-      if (!document.fileName.startsWith(pkg.dir)) {
+      if (!docPath.startsWith(pkg.dir)) {
         continue;
       }
 
       for (const suite of pkg.suites) {
-        if (suite.file === docBasename) {
+        if (suite.file === docPath) {
           const range = new vscode.Range(
             suite.line - 1,
             0,
@@ -66,7 +65,7 @@ export class GoTestCodeLensProvider
         }
 
         for (const method of suite.methods) {
-          if (method.file === docBasename) {
+          if (method.file === docPath) {
             const range = new vscode.Range(
               method.line - 1,
               0,
