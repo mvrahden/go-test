@@ -141,11 +141,13 @@ func (f *DBFixture) AfterEach(ctx context.Context) error  { return nil }
 func TestCollector_FixtureCollection_SharedFixture(t *testing.T) {
 	src := `package testpkg
 
+import "context"
+
 type RedisSharedFixture struct {
 	Addr string
 }
 
-func (f *RedisSharedFixture) BeforeAll() error { return nil }
+func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -159,12 +161,14 @@ func (f *RedisSharedFixture) BeforeAll() error { return nil }
 func TestCollector_FixtureCollection_SharedFixtureWithAfterAll(t *testing.T) {
 	src := `package testpkg
 
+import "context"
+
 type RedisSharedFixture struct {
 	Addr string
 }
 
-func (f *RedisSharedFixture) BeforeAll() error { return nil }
-func (f *RedisSharedFixture) AfterAll() error  { return nil }
+func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *RedisSharedFixture) AfterAll(ctx context.Context) error  { return nil }
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -350,10 +354,12 @@ func TestValidation_SelfCycle(t *testing.T) {
 func TestCollector_SharedFixture_BeforeEachDisallowed(t *testing.T) {
 	src := `package testpkg
 
+import "context"
+
 type RedisSharedFixture struct{}
 
-func (f *RedisSharedFixture) BeforeAll() error    { return nil }
-func (f *RedisSharedFixture) BeforeEach() error   { return nil }
+func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error    { return nil }
+func (f *RedisSharedFixture) BeforeEach(ctx context.Context) error   { return nil }
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -365,10 +371,12 @@ func (f *RedisSharedFixture) BeforeEach() error   { return nil }
 func TestCollector_SharedFixture_AfterEachDisallowed(t *testing.T) {
 	src := `package testpkg
 
+import "context"
+
 type RedisSharedFixture struct{}
 
-func (f *RedisSharedFixture) BeforeAll() error  { return nil }
-func (f *RedisSharedFixture) AfterEach() error  { return nil }
+func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error  { return nil }
+func (f *RedisSharedFixture) AfterEach(ctx context.Context) error  { return nil }
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -384,7 +392,7 @@ import "github.com/mvrahden/go-test/pkg/gotest"
 
 type RedisSharedFixture struct{}
 
-func (f *RedisSharedFixture) BeforeAll(t *gotest.T) {} // wrong: should be () error
+func (f *RedisSharedFixture) BeforeAll(t *gotest.T) {} // wrong: should be (ctx context.Context) error
 `
 	pkg := loadTestPkgWithGotest(t, src)
 	c := collector{}
@@ -624,7 +632,7 @@ func TestCollector_SharedFixtureNotTreatedAsParent(t *testing.T) {
 		"type PGSharedFixture struct {\n" +
 		"\tDSN string `gotest:\"env=PG_DSN\"`\n" +
 		"}\n\n" +
-		"func (f *PGSharedFixture) BeforeAll() error { return nil }\n\n" +
+		"func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
 		"type E2EFixture struct {\n" +
 		"\t*PGSharedFixture\n" +
 		"}\n\n" +
@@ -659,6 +667,186 @@ func TestCollector_SharedFixtureNotTreatedAsParent(t *testing.T) {
 	spec, err := c.ApplyTestSuiteSpecs(result)
 	gotest.NoError(t, err)
 	gotest.Equal(t, 1, len(spec.EffectiveTestSuites))
+}
+
+// --- Config marker method tests ---
+
+func TestCollector_FixtureConfig_Detected(t *testing.T) {
+	src := `package testpkg
+
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type DBFixture struct{}
+
+func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *DBFixture) FixtureConfig() gotest.FixtureConfig {
+	return gotest.DefaultFixtureConfig()
+}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Fixtures))
+	gotest.True(t, result.Fixtures[0].Config != nil, "expected Config to be set")
+}
+
+func TestCollector_SharedFixtureConfig_Detected(t *testing.T) {
+	src := `package testpkg
+
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type PGSharedFixture struct{}
+
+func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *PGSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
+	return gotest.ContainerFixtureConfig()
+}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
+	gotest.Equal(t, 1, len(result.Fixtures))
+	gotest.True(t, result.Fixtures[0].Config != nil, "expected Config to be set via SharedFixtureConfig")
+}
+
+func TestCollector_FixtureConfig_AbsentIsNil(t *testing.T) {
+	src := `package testpkg
+
+import "context"
+
+type PlainFixture struct{}
+
+func (f *PlainFixture) BeforeAll(ctx context.Context) error { return nil }
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Fixtures))
+	gotest.True(t, result.Fixtures[0].Config == nil, "expected Config to be nil")
+}
+
+func TestCollector_SuiteConfig_Detected(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.DefaultSuiteConfig()
+}
+func (s *MyTestSuite) TestFoo(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Suites))
+	gotest.True(t, result.Suites[0].HasConfig(), "expected HasConfig() to be true")
+}
+
+func TestCollector_SuiteConfig_AbsentIsFalse(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type PlainTestSuite struct{}
+
+func (s *PlainTestSuite) TestFoo(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Suites))
+	gotest.True(t, !result.Suites[0].HasConfig(), "expected HasConfig() to be false")
+}
+
+func TestCollector_FixtureConfig_InvalidSignature_WithParams(t *testing.T) {
+	src := `package testpkg
+
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type BadFixture struct{}
+
+func (f *BadFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *BadFixture) FixtureConfig(x int) gotest.FixtureConfig {
+	return gotest.DefaultFixtureConfig()
+}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error for invalid FixtureConfig signature")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "unsupported signature")
+}
+
+func TestCollector_FixtureConfig_InvalidSignature_WrongReturnType(t *testing.T) {
+	src := `package testpkg
+
+import "context"
+
+type BadFixture struct{}
+
+func (f *BadFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *BadFixture) FixtureConfig() string { return "" }
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error for wrong FixtureConfig return type")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "unsupported return type")
+}
+
+func TestCollector_SuiteConfig_InvalidSignature_WithParams(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type BadTestSuite struct{}
+
+func (s *BadTestSuite) SuiteConfig(x int) gotest.SuiteConfig {
+	return gotest.DefaultSuiteConfig()
+}
+func (s *BadTestSuite) TestFoo(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error for invalid SuiteConfig signature")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "unsupported signature")
+}
+
+func TestCollector_SuiteConfig_InvalidSignature_WrongReturnType(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type BadTestSuite struct{}
+
+func (s *BadTestSuite) SuiteConfig() int { return 0 }
+func (s *BadTestSuite) TestFoo(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error for wrong SuiteConfig return type")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "unsupported return type")
 }
 
 // --- helpers ---

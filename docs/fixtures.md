@@ -94,51 +94,88 @@ Filter with `-run Test_InfraFixture/ReconcilerTestSuite` to skip the API stack e
 
 ## Shared Fixtures (Level 3, `*SharedFixture` suffix)
 
-Shared fixtures run in a subprocess managed by the `gotest` CLI. They start once per CLI invocation and are shared across all packages.
+Shared fixtures run in a subprocess managed by the `gotest` CLI. They start once per CLI invocation and are shared across all packages. State crosses the process boundary via JSON serialization, with `Hydrate` handling reconstruction of non-serializable resources.
 
 ```go
 // tests/fixtures/postgres.go
 
 type PostgresSharedFixture struct {
-    DSN       string `gotest:"env=E2E_POSTGRES_DSN"`
-    container testcontainers.Container
+    ConnStr string
+    Port    int
+    Pool    *pgxpool.Pool
 }
 
-func (f *PostgresSharedFixture) BeforeAll() error {
-    c, err := testhelper.StartPostgres(context.Background())
+func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error {
+    c, err := postgres.Run(ctx, "postgres:16")
     if err != nil {
         return err
     }
-    f.container = c.Container
-    f.DSN = c.ConnectionString
+    f.ConnStr = c.MustConnectionString(ctx)
+    f.Port = c.MappedPort(ctx, "5432").Int()
+    return f.connect(ctx)
+}
+
+func (f *PostgresSharedFixture) AfterAll(ctx context.Context) error {
+    f.Pool.Close()
     return nil
 }
 
-func (f *PostgresSharedFixture) AfterAll() error {
-    return f.container.Terminate(context.Background())
+func (f *PostgresSharedFixture) Hydrate(ctx context.Context) error {
+    return f.connect(ctx)
+}
+
+func (f *PostgresSharedFixture) Dehydrate(ctx context.Context) error {
+    f.Pool.Close()
+    return nil
+}
+
+func (f *PostgresSharedFixture) connect(ctx context.Context) error {
+    var err error
+    f.Pool, err = pgxpool.New(ctx, f.ConnStr)
+    return err
 }
 ```
 
 ### Rules
 
-- `BeforeAll() error` and `AfterAll() error` — no `*gotest.T` (runs outside test context).
-- Exported fields with `gotest:"env=VAR_NAME"` tags transfer state as environment variables.
+- `BeforeAll(ctx context.Context) error` and `AfterAll(ctx context.Context) error` — runs in the subprocess.
+- `Hydrate(ctx context.Context) error` and `Dehydrate(ctx context.Context) error` — runs in the test process, optional.
 - `BeforeEach`/`AfterEach` are not allowed on shared fixtures.
+- Exported fields are serialized as JSON and transferred to the test process.
+- Fields assigned in `Hydrate` (directly, or in receiver methods called from `Hydrate`, one level deep) are **local** — excluded from serialization and reconstructed by `Hydrate`.
 
-### Using shared fixtures in package fixtures
+### State transfer
 
-Package fixtures embed shared fixture types. The code generator resolves tagged fields from env vars:
+In the example above, `ConnStr` and `Port` are transferable (not assigned in `Hydrate`'s call chain). `Pool` is local (assigned in `connect()`, which is called from `Hydrate`).
+
+Convention: in `Hydrate`, assign to local fields. Read transferred fields but do not reassign them — use local variables for any transformation.
+
+### Using shared fixtures in test suites
+
+Test suites embed shared fixtures directly — `Pool` is available after `Hydrate` runs:
+
+```go
+type UserTestSuite struct {
+    *fixtures.PostgresSharedFixture // s.ConnStr, s.Port, s.Pool all available
+}
+
+func (s *UserTestSuite) TestCreate(t *gotest.T) {
+    // s.Pool is a real, local *pgxpool.Pool — created by Hydrate
+}
+```
+
+Package fixtures can also embed shared fixtures to add package-specific resources:
 
 ```go
 type E2ESetupFixture struct {
-    *fixtures.PostgresSharedFixture // DSN populated from E2E_POSTGRES_DSN env var
-    Pool *pgxpool.Pool
+    *fixtures.PostgresSharedFixture // Pool, ConnStr available via embedding
+    ServerURL string
 }
 
-func (s *E2ESetupFixture) BeforeAll(t *gotest.T) {
-    pool, err := pgxpool.New(ctx, s.DSN) // s.DSN comes from shared fixture
-    gotest.NoError(t, err)
-    s.Pool = pool
+func (f *E2ESetupFixture) BeforeAll(ctx context.Context) error {
+    srv := api.NewServer(":0", api.Dependencies{Pool: f.Pool})
+    f.ServerURL = srv.URL
+    return nil
 }
 ```
 
@@ -149,9 +186,9 @@ gotest ./tests/e2e ./tests/integration -v
 ```
 
 1. Scan target packages for shared fixtures
-2. Generate and start a setup subprocess (calls `BeforeAll`, exports env vars as JSON)
+2. Generate and start a setup subprocess (calls `BeforeAll`, serializes transferable fields as JSON to stdout)
 3. Generate test code for each package
-4. Run `go test` with shared fixture env vars in the environment
+4. Run `go test` — test harness deserializes fixture state, calls `Hydrate` if present
 5. Send SIGTERM to the setup subprocess (calls `AfterAll` in reverse order)
 
 ## Migrating from TestMain

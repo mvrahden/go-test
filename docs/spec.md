@@ -216,14 +216,21 @@ Each alias produces an independent test suite. Generic aliases only work in same
 
 ### Fixtures
 
-Structs ending in `Fixture` are package fixtures. Structs ending in `SharedFixture` are cross-package shared fixtures. Fixture hooks receive `context.Context` and return `error`:
+Structs ending in `Fixture` are package fixtures. Structs ending in `SharedFixture` are cross-package shared fixtures. Both use `(ctx context.Context) error` lifecycle signatures:
 
 ```go
+// Package fixtures — run in test process
 func (f *MyFixture) BeforeAll(ctx context.Context) error  { return nil }
 func (f *MyFixture) AfterAll(ctx context.Context) error   { return nil }
+
+// Shared fixtures — run in subprocess, shared across packages
+func (f *MySharedFixture) BeforeAll(ctx context.Context) error  { return nil }
+func (f *MySharedFixture) AfterAll(ctx context.Context) error   { return nil }
 ```
 
-Setup hooks receive `t.Context()` (cancelled when the test ends). Cleanup hooks receive `context.Background()` (cleanup must proceed after test context cancellation).
+Package fixture setup hooks receive `t.Context()` (cancelled when the test ends). Cleanup hooks receive `context.Background()` (cleanup must proceed after test context cancellation). Shared fixture hooks receive a context with the configured timeout (from `SharedFixtureConfig()` or defaults).
+
+Package fixtures additionally support `BeforeEach`/`AfterEach`. Shared fixtures do not — they run once in the subprocess, not per test case.
 
 Test suites embed fixtures via pointer embedding:
 
@@ -244,6 +251,186 @@ InfraFixture.BeforeAll
   APIFixture.AfterAll
 InfraFixture.AfterAll
 ```
+
+#### SharedFixture State Transfer
+
+SharedFixtures run in a generated subprocess. State crosses the process boundary via JSON serialization. The `Hydrate` method determines which fields are local (reconstructed in the test process) versus transferable (serialized from the subprocess).
+
+**Additional lifecycle hooks for shared fixtures:**
+
+| Method | Runs in | Signature | Semantics |
+|--------|---------|-----------|-----------|
+| `Hydrate` | Test process | `(ctx context.Context) error` | Reconstruct local resources from transferred state |
+| `Dehydrate` | Test process | `(ctx context.Context) error` | Clean up locally-created resources |
+
+`Hydrate` and `Dehydrate` are optional. If a SharedFixture has only JSON-serializable exported fields, all fields transfer automatically and no `Hydrate` is needed.
+
+**Field classification:**
+
+Fields assigned to the receiver in `Hydrate` — directly, or in receiver methods called from `Hydrate` (one level deep) — are **local**. They are excluded from serialization and reconstructed in the test process. All other exported fields are **transferable**.
+
+```go
+type PostgresSharedFixture struct {
+    ConnStr string            // transferable — read in Hydrate, not assigned
+    Pool    *pgxpool.Pool     // local — assigned in connect(), called from Hydrate
+}
+
+func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error {
+    container, err := postgres.Run(ctx, "postgres:16")
+    if err != nil {
+        return err
+    }
+    f.ConnStr = container.MustConnectionString(ctx)
+    return f.connect(ctx)
+}
+
+func (f *PostgresSharedFixture) AfterAll(ctx context.Context) error {
+    f.Pool.Close()
+    return nil
+}
+
+func (f *PostgresSharedFixture) Hydrate(ctx context.Context) error {
+    return f.connect(ctx)
+}
+
+func (f *PostgresSharedFixture) Dehydrate(ctx context.Context) error {
+    f.Pool.Close()
+    return nil
+}
+
+func (f *PostgresSharedFixture) connect(ctx context.Context) error {
+    var err error
+    f.Pool, err = pgxpool.New(ctx, f.ConnStr)
+    return err
+}
+```
+
+**Convention:** In `Hydrate`, assign to local fields. Read transferred fields but do not reassign them — use local variables for any transformation.
+
+**Classification algorithm:**
+
+1. Parse `Hydrate`'s function body AST
+2. Walk all statements (including inside `if`/`for`/`switch` blocks) to find receiver field assignments: `f.FieldName = expr` or `f.FieldName, _ = expr`
+3. For method calls on the receiver (`f.methodName(...)`), look up the method on the same type and walk its body (same as step 2, without recursing further)
+4. Fields found in steps 2–3 are **local**. All other exported fields are **transferable**
+
+**Transfer lifecycle:**
+
+```
+Subprocess:
+  sf.BeforeAll(ctx)              → provisions infrastructure, populates all fields
+  serialize transferable fields  → JSON (local fields excluded)
+  write to stdout, wait for SIGTERM
+  sf.AfterAll(ctx)               → tears down infrastructure
+
+Test process:
+  deserialize into struct        → transferable fields populated, local fields zero-valued
+  sf.Hydrate(ctx)                → reconstructs local resources from transferred state
+  ... run test suites ...
+  sf.Dehydrate(ctx)              → cleans up local resources
+```
+
+**Validation at generation time:**
+
+- If a transferable field's type has zero exported fields and does not implement `json.Marshaler`/`encoding.TextMarshaler`, the generator emits an error suggesting the field be handled in `Hydrate`
+- If `Hydrate` exists without `Dehydrate`, the generator emits an error
+- `Hydrate`/`Dehydrate` signatures must be `(ctx context.Context) error` with pointer receiver
+
+### Configuration
+
+Every fixture and suite runs with sensible defaults. Optional marker methods override specific fields via overlay semantics — only non-zero fields replace the default.
+
+#### Config Types
+
+```go
+type FixtureConfig struct {
+    Timeout    time.Duration // applied to BeforeAll/AfterAll via context.WithTimeout
+    Retries    int           // additional BeforeAll attempts on failure
+    RetryDelay time.Duration // pause between retry attempts
+}
+
+type SuiteConfig struct {
+    Timeout      time.Duration // per-test-case deadline via t.Context()
+    SetupTimeout time.Duration // BeforeAll/AfterAll deadline
+    Retries      int           // per-test-case retry attempts
+    FailFast     bool          // stop suite on first failure
+}
+```
+
+#### Value Semantics
+
+| Value | Meaning |
+|-------|---------|
+| `> 0` | Use this duration |
+| `0`   | Keep default (field not overridden) |
+| `< 0` | Explicitly disabled (no timeout) |
+
+This applies to `Timeout`, `SetupTimeout`, and `RetryDelay`. `FailFast` only overrides to `true` — a false overlay does not reset a true base.
+
+#### Marker Methods
+
+The code generator recognizes these exact signatures:
+
+```go
+func (f *MyFixture)       FixtureConfig()       gotest.FixtureConfig
+func (f *MySharedFixture) SharedFixtureConfig()  gotest.FixtureConfig
+func (s *MySuite)         SuiteConfig()          gotest.SuiteConfig
+```
+
+All three return the same `FixtureConfig` type for fixtures (package and shared) and `SuiteConfig` for suites. The method name follows the type suffix convention.
+
+Requirements (same conventions as lifecycle hooks):
+- Pointer receiver matching the fixture/suite type name
+- No parameters
+- Single return value of the exact config struct type
+- Invalid signatures produce a collector error
+
+#### Presets
+
+| Preset | Timeout | Retries | Use case |
+|--------|---------|---------|----------|
+| `DefaultFixtureConfig()` | 2 min | 0 | Standard fixtures |
+| `ContainerFixtureConfig()` | 5 min | 1 (5s delay) | Testcontainers, image pulls |
+| `DefaultSuiteConfig()` | 30s (+ 30s setup) | 0 | Unit/integration tests |
+| `IntegrationSuiteConfig()` | 2 min (+ 5 min setup) | 0 | Heavier integration tests |
+
+#### Overlay Functions
+
+```go
+func OverlayFixtureConfig(base *FixtureConfig, overlay FixtureConfig)
+func OverlaySuiteConfig(base *SuiteConfig, overlay SuiteConfig)
+```
+
+Enables composable configuration — start with a preset, override individual fields:
+
+```go
+func (f *InfraFixture) FixtureConfig() gotest.FixtureConfig {
+    cfg := gotest.ContainerFixtureConfig()
+    if os.Getenv("CI") != "" {
+        cfg.Timeout = 10 * time.Minute
+        cfg.Retries = 2
+    }
+    return cfg
+}
+```
+
+#### Generated Behavior
+
+**Package fixtures:** The test harness always resolves `DefaultFixtureConfig()`, overlays when the marker is present, then uses the config to wrap `BeforeAll` in a retry loop with `context.WithTimeout` and wrap `AfterAll` cleanup with timeout. Retry attempts are logged with attempt number.
+
+**Shared fixtures:** The generated subprocess resolves `DefaultFixtureConfig()`, overlays when `SharedFixtureConfig()` is present, then wraps each SharedFixture's `BeforeAll(ctx)` in the same retry loop with `context.WithTimeout`. After `BeforeAll`, transferable fields (determined by Hydrate-assignment analysis) are serialized to stdout as JSON. `AfterAll(ctx)` gets timeout wrapping in the teardown handler. In the test harness, the deserialized fixture is hydrated via `Hydrate(ctx)` if present, and `Dehydrate(ctx)` is deferred for cleanup.
+
+**Suites:** The test harness always resolves `DefaultSuiteConfig()`, overlays when the marker is present, then wraps each test case with `NewTWithDeadline` when timeout > 0, and breaks the test case loop on first failure when `FailFast` is set.
+
+**`NewTWithDeadline`:** Creates a `*gotest.T` with a context deadline. `t.Context()` returns the deadline-aware context. Existing `NewT` callers are unaffected.
+
+#### Feature Interactions
+
+- **Parallel suites:** `FailFast` only applies to sequential execution. Parallel test cases (WaitGroup-coordinated) complete or hit the global timeout.
+- **Focus/Exclude:** Config applies after focus/exclude filtering. Skipped suites get unchanged skip stubs.
+- **Global `-timeout`:** `FixtureConfig.Timeout` is bounded by Go's global timeout via `context.WithTimeout` inheriting the parent's shorter deadline.
+- **Nested fixtures:** Each level resolves config independently — no inheritance between fixture levels.
+- **Hydrate/Dehydrate:** SharedFixture state is deserialized and hydrated before any test suites run. `Dehydrate` is deferred, running after all suites complete. `Hydrate` receives a context with the SharedFixture's configured timeout. `Dehydrate` receives `context.Background()`.
 
 ---
 
@@ -717,3 +904,5 @@ The pipeline is always: **static analysis → code generation → standard `go t
 2. **`go.work` required for cross-module tests:** The generator golden tests require `go.work` (`go work init . && go work use ./examples`). Tests skip gracefully when absent.
 
 3. **No incremental generation:** The tool regenerates all suite files on every run. There is no staleness detection.
+
+4. **Hydrate method walking depth:** The generator follows receiver method calls from `Hydrate` one level deep to classify local fields. Assignments hidden behind two or more levels of indirection are not detected. Opaque types (zero exported fields) are unaffected — they serialize harmlessly as `{}` and `Hydrate` overwrites the value.

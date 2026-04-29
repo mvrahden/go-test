@@ -58,9 +58,9 @@ func (s *QueryTestSuite) TestSelect(t *gotest.T) {}
 	gotest.True(t, strings.Contains(output, "func Test_DBFixture(t *testing.T)"), "expected Test_DBFixture")
 	gotest.True(t, strings.Contains(output, `"os"`), "expected os import")
 	gotest.True(t, strings.Contains(output, "fixture := &DBFixture{}"), "expected fixture instantiation")
-	gotest.True(t, strings.Contains(output, "fixture.BeforeAll(t.Context())"), "expected BeforeAll call")
-	gotest.True(t, strings.Contains(output, `"DBFixture.BeforeAll failed:`), "expected BeforeAll error attribution")
-	gotest.True(t, strings.Contains(output, "fixture.AfterAll(context.Background())"), "expected AfterAll in cleanup")
+	gotest.True(t, strings.Contains(output, "fixture.BeforeAll(ctx)"), "expected BeforeAll call")
+	gotest.True(t, strings.Contains(output, `"DBFixture.BeforeAll failed after`), "expected BeforeAll error attribution")
+	gotest.True(t, strings.Contains(output, "fixture.AfterAll(ctx)"), "expected AfterAll in cleanup")
 	gotest.True(t, strings.Contains(output, `"DBFixture.AfterAll failed:`), "expected AfterAll error attribution")
 	gotest.True(t, strings.Contains(output, `t.Run("QueryTestSuite"`), "expected t.Run for child suite")
 	gotest.True(t, strings.Contains(output, "ƒƒ_GOTEST_QueryTestSuite"), "expected wrapper struct")
@@ -508,9 +508,9 @@ func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
 		"\t\"github.com/mvrahden/go-test/pkg/gotest\"\n" +
 		")\n\n" +
 		"type PostgresSharedFixture struct {\n" +
-		"\tDSN string `gotest:\"env=E2E_POSTGRES_DSN\"`\n" +
+		"\tDSN string\n" +
 		"}\n\n" +
-		"func (f *PostgresSharedFixture) BeforeAll() error { return nil }\n\n" +
+		"func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
 		"type E2EFixture struct {\n" +
 		"\t*PostgresSharedFixture\n" +
 		"\tPool string\n" +
@@ -541,10 +541,11 @@ func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
 
 	output := string(out)
 
-	// Shared fixture local var should be created with env var resolution
+	// Shared fixture deserialized from JSON state
 	gotest.Contains(t, output, "sf0 := &PostgresSharedFixture{}")
-	gotest.Contains(t, output, `os.Getenv("E2E_POSTGRES_DSN")`)
-	gotest.Contains(t, output, `t.Fatal("E2E_POSTGRES_DSN not set`)
+	gotest.Contains(t, output, `os.Getenv("GOTEST_SHARED_STATE")`)
+	gotest.Contains(t, output, `t.Fatal("GOTEST_SHARED_STATE not set`)
+	gotest.Contains(t, output, `json.Unmarshal`)
 
 	// Shared fixture should be assigned to the package fixture
 	gotest.Contains(t, output, "fixture.PostgresSharedFixture = sf0")
@@ -552,27 +553,27 @@ func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
 	// Package fixture lifecycle should still work
 	gotest.Contains(t, output, "func Test_E2EFixture(t *testing.T)")
 	gotest.Contains(t, output, "fixture := &E2EFixture{}")
-	gotest.Contains(t, output, "fixture.BeforeAll(t.Context())")
-	gotest.Contains(t, output, "fixture.AfterAll(context.Background())")
+	gotest.Contains(t, output, "fixture.BeforeAll(ctx)")
+	gotest.Contains(t, output, "fixture.AfterAll(ctx)")
 
 	// Suite should be nested under fixture
 	gotest.Contains(t, output, `t.Run("QueryTestSuite"`)
 	gotest.Contains(t, output, "E2EFixture: fixture")
 
-	// Shared fixture env var resolution should appear before fixture.BeforeAll
-	sfIdx := strings.Index(output, "sf0.DSN = os.Getenv")
-	beforeAllIdx := strings.Index(output, "fixture.BeforeAll(t.Context())")
-	gotest.True(t, sfIdx < beforeAllIdx, "shared fixture env resolution must precede fixture.BeforeAll")
+	// JSON state deserialization should appear before fixture.BeforeAll
+	sfIdx := strings.Index(output, "json.Unmarshal(ƒb, sf0)")
+	beforeAllIdx := strings.Index(output, "fixture.BeforeAll(ctx)")
+	gotest.True(t, sfIdx < beforeAllIdx, "shared fixture JSON deserialization must precede fixture.BeforeAll")
 }
 
-func TestRenderer_SharedFixtureNoEnvTags(t *testing.T) {
+func TestRenderer_SharedFixtureEmptyStruct(t *testing.T) {
 	src := "package testpkg\n\n" +
 		"import (\n" +
 		"\t\"context\"\n\n" +
 		"\t\"github.com/mvrahden/go-test/pkg/gotest\"\n" +
 		")\n\n" +
 		"type SetupSharedFixture struct{}\n\n" +
-		"func (f *SetupSharedFixture) BeforeAll() error { return nil }\n\n" +
+		"func (f *SetupSharedFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
 		"type AppFixture struct {\n" +
 		"\t*SetupSharedFixture\n" +
 		"}\n\n" +
@@ -597,12 +598,10 @@ func TestRenderer_SharedFixtureNoEnvTags(t *testing.T) {
 
 	output := string(out)
 
-	// Shared fixture should be created and assigned even without env tags
+	// Shared fixture should be created and assigned via JSON state
 	gotest.Contains(t, output, "sf0 := &SetupSharedFixture{}")
 	gotest.Contains(t, output, "fixture.SetupSharedFixture = sf0")
-
-	// No os.Getenv calls since there are no env tags
-	gotest.True(t, !strings.Contains(output, "os.Getenv"), "should not have os.Getenv without env tags")
+	gotest.Contains(t, output, `os.Getenv("GOTEST_SHARED_STATE")`)
 }
 
 func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
@@ -612,10 +611,10 @@ func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
 		"\t\"github.com/mvrahden/go-test/pkg/gotest\"\n" +
 		")\n\n" +
 		"type PGSharedFixture struct {\n" +
-		"\tDSN  string `gotest:\"env=PG_DSN\"`\n" +
-		"\tHost string `gotest:\"env=PG_HOST\"`\n" +
+		"\tDSN  string\n" +
+		"\tHost string\n" +
 		"}\n\n" +
-		"func (f *PGSharedFixture) BeforeAll() error { return nil }\n\n" +
+		"func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
 		"type DBFixture struct {\n" +
 		"\t*PGSharedFixture\n" +
 		"}\n\n" +
@@ -646,7 +645,145 @@ func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
 	gotest.Equal(t, "PGSharedFixture", sf.QualifiedType)
 	gotest.Equal(t, "PGSharedFixture", sf.FieldName)
 	gotest.Equal(t, "", sf.PkgPath, "same-package shared fixture should have empty PkgPath")
-	gotest.Equal(t, 2, len(sf.EnvTags))
-	gotest.Equal(t, "PG_DSN", sf.EnvTags["DSN"])
-	gotest.Equal(t, "PG_HOST", sf.EnvTags["Host"])
+	gotest.Equal(t, "testpkg.PGSharedFixture", sf.StateKey)
+}
+
+func TestRenderer_FixtureWithConfig(t *testing.T) {
+	src := `package testpkg
+
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type CFGFixture struct{}
+
+func (f *CFGFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *CFGFixture) AfterAll(ctx context.Context) error  { return nil }
+func (f *CFGFixture) FixtureConfig() gotest.FixtureConfig {
+	return gotest.ContainerFixtureConfig()
+}
+
+type CFGTestSuite struct {
+	*CFGFixture
+}
+
+func (s *CFGTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+
+	output := string(out)
+
+	gotest.Contains(t, output, "gotest.DefaultFixtureConfig()")
+	gotest.Contains(t, output, "gotest.OverlayFixtureConfig(&ƒcfg, fixture.FixtureConfig())")
+	gotest.Contains(t, output, "ƒattempts := 1 + ƒcfg.Retries")
+	gotest.Contains(t, output, "fixture.BeforeAll(ctx)")
+	gotest.Contains(t, output, "context.WithTimeout(ctx, ƒcfg.Timeout)")
+}
+
+func TestRenderer_FixtureWithoutConfig_UsesDefault(t *testing.T) {
+	src := `package testpkg
+
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type PlainFixture struct{}
+
+func (f *PlainFixture) BeforeAll(ctx context.Context) error { return nil }
+
+type PlainTestSuite struct {
+	*PlainFixture
+}
+
+func (s *PlainTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+
+	output := string(out)
+
+	gotest.Contains(t, output, "gotest.DefaultFixtureConfig()")
+	gotest.True(t, !strings.Contains(output, "OverlayFixtureConfig"), "should not have overlay call")
+}
+
+func TestRenderer_SuiteWithConfig(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type ConfiguredTestSuite struct{}
+
+func (s *ConfiguredTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Timeout: 10_000_000_000, FailFast: true}
+}
+func (s *ConfiguredTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+
+	output := string(out)
+
+	gotest.Contains(t, output, "gotest.DefaultSuiteConfig()")
+	gotest.Contains(t, output, "gotest.OverlaySuiteConfig(&ƒcfg, s.ConfiguredTestSuite.SuiteConfig())")
+	gotest.Contains(t, output, "gotest.NewTWithDeadline(it, ƒcfg.Timeout)")
+	gotest.Contains(t, output, "ƒcfg.FailFast && t.Failed()")
+}
+
+func TestRenderer_SuiteWithoutConfig_UsesDefault(t *testing.T) {
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type PlainTestSuite struct{}
+
+func (s *PlainTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec)
+	gotest.NoError(t, err)
+
+	output := string(out)
+
+	gotest.Contains(t, output, "gotest.DefaultSuiteConfig()")
+	gotest.True(t, !strings.Contains(output, "OverlaySuiteConfig"), "should not have overlay call")
 }
