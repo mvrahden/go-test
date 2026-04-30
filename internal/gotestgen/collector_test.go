@@ -1,6 +1,7 @@
 package gotestgen
 
 import (
+	"fmt"
 	"go/ast"
 	"go/importer"
 	"go/parser"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
@@ -46,38 +48,70 @@ func loadTestPkg(t *testing.T, src string) *packages.Package {
 	}
 }
 
-// loadTestPkgWithGotest loads a package that imports gotest.T using the full
-// packages.Load machinery. This writes source to a temp directory and loads it.
-func loadTestPkgWithGotest(t *testing.T, src string) *packages.Package {
-	t.Helper()
+var sharedMod struct {
+	once  sync.Once
+	goMod []byte
+	goSum []byte
+	err   error
+}
 
-	// Find the module root for replace directive
+func initSharedMod() {
 	modRoot, err := filepath.Abs(filepath.Join("..", ".."))
-	gotest.NoError(t, err)
+	if err != nil {
+		sharedMod.err = err
+		return
+	}
 
-	dir := t.TempDir()
-	err = os.WriteFile(filepath.Join(dir, "test.go"), []byte(src), 0644)
-	gotest.NoError(t, err)
+	dir, err := os.MkdirTemp("", "gotest-shared-mod-*")
+	if err != nil {
+		sharedMod.err = err
+		return
+	}
+	defer os.RemoveAll(dir)
 
-	goMod := `module testpkg
-
-go 1.24
-
-require github.com/mvrahden/go-test v0.0.0
-
-replace github.com/mvrahden/go-test => ` + modRoot + `
-`
-	err = os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0644)
-	gotest.NoError(t, err)
+	goMod := []byte("module testpkg\n\ngo 1.24\n\nrequire github.com/mvrahden/go-test v0.0.0\n\nreplace github.com/mvrahden/go-test => " + modRoot + "\n")
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), goMod, 0644); err != nil {
+		sharedMod.err = err
+		return
+	}
+	if err := os.WriteFile(filepath.Join(dir, "stub.go"), []byte("package testpkg\n\nimport _ \"github.com/mvrahden/go-test/pkg/gotest\"\n"), 0644); err != nil {
+		sharedMod.err = err
+		return
+	}
 
 	cmd := exec.Command("go", "mod", "tidy")
 	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	gotest.True(t, err == nil, "go mod tidy failed: %s\n%s", err, out)
+	cmd.Env = append(os.Environ(), "GOWORK=off")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		sharedMod.err = fmt.Errorf("go mod tidy: %w\n%s", err, out)
+		return
+	}
+
+	sharedMod.goMod, _ = os.ReadFile(filepath.Join(dir, "go.mod"))
+	sharedMod.goSum, _ = os.ReadFile(filepath.Join(dir, "go.sum"))
+}
+
+// loadTestPkgWithGotest loads a package that imports gotest.T using the full
+// packages.Load machinery. Module resolution is cached across tests.
+func loadTestPkgWithGotest(t *testing.T, src string) *packages.Package {
+	t.Helper()
+
+	sharedMod.once.Do(initSharedMod)
+	if sharedMod.err != nil {
+		t.Fatal(sharedMod.err)
+	}
+
+	dir := t.TempDir()
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "test.go"), []byte(src), 0644))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), sharedMod.goMod, 0644))
+	if len(sharedMod.goSum) > 0 {
+		gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.sum"), sharedMod.goSum, 0644))
+	}
 
 	pkgs, err := packages.Load(&packages.Config{
 		Mode: packageEvalMode,
 		Dir:  dir,
+		Env:  append(os.Environ(), "GOWORK=off"),
 	}, ".")
 	gotest.NoError(t, err)
 	gotest.True(t, len(pkgs) > 0, "expected at least one package loaded")
