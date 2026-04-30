@@ -32,7 +32,7 @@ func TestRunOverlay_ProducesValidOutput(t *testing.T) {
 	// Use the same logic as runOverlay to generate overlay
 	results, err := gotestgen.Generate("./simple_suite")
 	if err != nil {
-		t.Fatalf("SuitesGenerate: %v", err)
+		t.Fatalf("Generate: %v", err)
 	}
 	if len(results) == 0 {
 		t.Fatal("expected at least one generate result")
@@ -111,10 +111,10 @@ func TestRunOverlay_NoSuitesReturnsOne(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	// SuitesGenerate on a package without suites should return empty results
+	// Generate on a package without suites should return empty results
 	results, err := gotestgen.Generate(".")
 	if err != nil {
-		t.Fatalf("SuitesGenerate: %v", err)
+		t.Fatalf("Generate: %v", err)
 	}
 
 	// Verify behavior: no suites means empty results
