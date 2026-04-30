@@ -8,6 +8,7 @@ import (
 )
 
 func TestRenderer_FixtureWithChildSuite(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -79,6 +80,7 @@ func (s *QueryTestSuite) TestSelect(t *gotest.T) {}
 }
 
 func TestRenderer_FixtureWithoutAfterAll(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -118,6 +120,7 @@ func (s *BasicTestSuite) TestOne(t *gotest.T) {}
 }
 
 func TestRenderer_MixedFixtureBoundAndStandalone(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -164,6 +167,7 @@ func (s *StandaloneTestSuite) TestFree(t *gotest.T) {}
 }
 
 func TestRenderer_FixtureWithBeforeAfterEach(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -228,6 +232,7 @@ func (s *EachTestSuite) TestCase(t *gotest.T)   {}
 }
 
 func TestRenderer_FixtureWithoutBeforeAfterEach(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -267,6 +272,7 @@ func (s *MinimalTestSuite) TestOne(t *gotest.T) {}
 }
 
 func TestRenderer_NestedFixtureWithBeforeAfterEach(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -337,6 +343,7 @@ func (s *HandlerTestSuite) TestGet(t *gotest.T)    {}
 }
 
 func TestBuildFixtureViewModels_RootFixtureOnly(t *testing.T) {
+	t.Parallel()
 	c := collector{}
 	src := `package testpkg
 
@@ -381,6 +388,7 @@ func (s *MyTestSuite) TestOne(t *gotest.T) {}
 // --- *testing.T support tests ---
 
 func TestRenderer_StdlibT_StandaloneSuite(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "testing"
@@ -418,6 +426,7 @@ func (s *PlainTestSuite) TestBar(t *testing.T)    {}
 }
 
 func TestRenderer_StdlibT_MixedSuite(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -459,6 +468,7 @@ func (s *MixedTestSuite) TestGotest(t *gotest.T)   {}
 }
 
 func TestRenderer_StdlibT_FixtureBoundSuite(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -502,6 +512,7 @@ func (s *StdlibTestSuite) TestQuery(t *testing.T)  {}
 }
 
 func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
+	t.Parallel()
 	src := "package testpkg\n\n" +
 		"import (\n" +
 		"\t\"context\"\n\n" +
@@ -567,6 +578,7 @@ func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
 }
 
 func TestRenderer_SharedFixtureEmptyStruct(t *testing.T) {
+	t.Parallel()
 	src := "package testpkg\n\n" +
 		"import (\n" +
 		"\t\"context\"\n\n" +
@@ -605,6 +617,7 @@ func TestRenderer_SharedFixtureEmptyStruct(t *testing.T) {
 }
 
 func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
+	t.Parallel()
 	src := "package testpkg\n\n" +
 		"import (\n" +
 		"\t\"context\"\n\n" +
@@ -649,6 +662,7 @@ func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
 }
 
 func TestRenderer_FixtureWithConfig(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -693,6 +707,7 @@ func (s *CFGTestSuite) TestOne(t *gotest.T) {}
 }
 
 func TestRenderer_FixtureWithoutConfig_UsesDefault(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -730,6 +745,7 @@ func (s *PlainTestSuite) TestOne(t *gotest.T) {}
 }
 
 func TestRenderer_SuiteWithConfig(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "github.com/mvrahden/go-test/pkg/gotest"
@@ -762,6 +778,7 @@ func (s *ConfiguredTestSuite) TestOne(t *gotest.T) {}
 }
 
 func TestRenderer_SuiteWithoutConfig_UsesDefault(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "github.com/mvrahden/go-test/pkg/gotest"
