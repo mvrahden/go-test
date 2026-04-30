@@ -76,6 +76,9 @@ func loadPackages(targetPkg string) ([]*loadResult, error) {
 	loadedTestPkgs := slices.Filter(totalFoundPkgs, func(item *packages.Package, index int) bool {
 		return item.Module != nil
 	})
+	if len(loadedTestPkgs) == 0 {
+		return nil, nil
+	}
 	// filter all test-related packages
 	loadedTestPkgs = slices.Filter(loadedTestPkgs, func(item *packages.Package, index int) bool {
 		return strings.HasSuffix(item.ID, ".test]")

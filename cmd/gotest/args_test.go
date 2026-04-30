@@ -77,3 +77,23 @@ func TestExtractPackagePatterns(t *testing.T) {
 		})
 	}
 }
+
+func TestLooksLikePackagePattern(t *testing.T) {
+	for _, tc := range []struct {
+		desc   string
+		input  string
+		expect bool
+	}{
+		{desc: "relative path", input: "./pkg/foo", expect: true},
+		{desc: "absolute path", input: "/usr/local/pkg", expect: true},
+		{desc: "named package", input: "github.com/foo/bar", expect: true},
+		{desc: "flag", input: "-v", expect: false},
+		{desc: "bare word", input: "strings", expect: false},
+		{desc: "dot only", input: ".", expect: true},
+		{desc: "dot-slash", input: "./...", expect: true},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			gotest.Equal(t, tc.expect, looksLikePackagePattern(tc.input))
+		})
+	}
+}
