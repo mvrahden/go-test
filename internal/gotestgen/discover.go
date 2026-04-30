@@ -40,7 +40,7 @@ type DiscoverMethod struct {
 }
 
 func Discover(targetPath string) (*DiscoverOutput, error) {
-	loadResults, err := loadPackages(targetPath)
+	loadResults, err := LoadPackages(targetPath)
 	if err != nil {
 		return nil, err
 	}
@@ -50,23 +50,23 @@ func Discover(targetPath string) (*DiscoverOutput, error) {
 
 	c := collector{}
 	for _, lr := range loadResults {
-		ptestCollected := c.CollectSuiteSpecs(lr.ptest)
+		ptestCollected := c.CollectSuiteSpecs(lr.Ptest)
 		if len(ptestCollected.Errs) > 0 {
 			return nil, ptestCollected.Errs[0].Err
 		}
-		pxtestCollected := c.CollectSuiteSpecs(lr.pxtest)
+		pxtestCollected := c.CollectSuiteSpecs(lr.Pxtest)
 		if len(pxtestCollected.Errs) > 0 {
 			return nil, pxtestCollected.Errs[0].Err
 		}
 
-		pkg, ok := pkgMap[lr.pkgPath]
+		pkg, ok := pkgMap[lr.PkgPath]
 		if !ok {
 			pkg = &DiscoverPackage{
-				ImportPath: lr.pkgPath,
-				Dir:        lr.pkgDir,
+				ImportPath: lr.PkgPath,
+				Dir:        lr.PkgDir,
 			}
-			pkgMap[lr.pkgPath] = pkg
-			pkgOrder = append(pkgOrder, lr.pkgPath)
+			pkgMap[lr.PkgPath] = pkg
+			pkgOrder = append(pkgOrder, lr.PkgPath)
 		}
 
 		addSuites(pkg, ptestCollected.Suites)

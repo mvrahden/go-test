@@ -36,10 +36,6 @@ func main() {
 		os.Exit(runClean(remaining))
 	case "spec":
 		os.Exit(runSpec(remaining))
-	case "discover":
-		os.Exit(runDiscover(remaining))
-	case "overlay":
-		os.Exit(runOverlay(remaining))
 	case "watch":
 		os.Exit(runWatch(remaining))
 	case "version":
@@ -150,8 +146,6 @@ Subcommands:
   watch       Watch for file changes and re-run tests
   scaffold    Generate test suite skeleton from a type or file
   migrate     Convert testify/suite tests to go-test format
-  discover    Output test suite metadata as JSON (for IDE integration)
-  overlay     Generate overlay filesystem and print path as JSON
   version     Print version information
   help        Show this help message
 

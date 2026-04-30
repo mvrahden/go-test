@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
@@ -119,9 +120,9 @@ func TestRunSpec_InputStdin(t *testing.T) {
 	defer os.Chdir(origDir)
 
 	// Generate overlay and run tests to get JSON output
-	results, _, err := gotestrunner.SuitesGenerateWithCollectorResults("./simple_suite")
+	results, _, err := gotestgen.GenerateWithCollectorResults("./simple_suite")
 	if err != nil {
-		t.Fatalf("SuitesGenerateWithCollectorResults: %v", err)
+		t.Fatalf("GenerateWithCollectorResults: %v", err)
 	}
 
 	tmpDir, err := gotestrunner.WriteOverlay(results)

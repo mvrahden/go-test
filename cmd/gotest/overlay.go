@@ -10,8 +10,6 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
-
-
 type overlayOutput struct {
 	OverlayFile string `json:"overlayFile"`
 	Dir         string `json:"dir"`
@@ -30,6 +28,11 @@ func runOverlay(args []string) int {
 		allResults = append(allResults, results...)
 	}
 
+	if len(allResults) == 0 {
+		fmt.Fprintf(os.Stderr, "no suites found\n")
+		return 1
+	}
+
 	tmpDir, err := gotestrunner.WriteOverlay(allResults)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -40,12 +43,12 @@ func runOverlay(args []string) int {
 		OverlayFile: filepath.Join(tmpDir, "overlay.json"),
 		Dir:         tmpDir,
 	}
-	data, err := json.Marshal(out)
-	if err != nil {
-		os.RemoveAll(tmpDir)
+
+	enc := json.NewEncoder(os.Stdout)
+	if err := enc.Encode(out); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	fmt.Println(string(data))
+
 	return 0
 }
