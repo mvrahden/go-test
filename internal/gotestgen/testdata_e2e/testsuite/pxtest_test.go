@@ -1,7 +1,7 @@
 package e2epkg_test
 
 import (
-	e2epkg "github.com/mvrahden/go-test/internal/cmd/testgen/testdata/testsuite"
+	e2epkg "github.com/mvrahden/go-test/internal/gotestgen/testdata_e2e/testsuite"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 

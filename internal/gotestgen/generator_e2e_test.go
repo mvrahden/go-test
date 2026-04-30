@@ -1,4 +1,4 @@
-package testgen_test
+package gotestgen
 
 import (
 	"os"
@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/mvrahden/go-test/about"
-	"github.com/mvrahden/go-test/internal/cmd/testgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -16,25 +15,23 @@ func TestE2E_CLI(t *testing.T) {
 		desc        string
 		dirName     string
 		goldenFiles []string
-		args        []string
 	}{
-		{"no testsuite", "no_testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}, nil},
-		{"simple testsuite", "testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}, nil},
+		{"no testsuite", "no_testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}},
+		{"simple testsuite", "testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}},
 	}
 	for _, tC := range testcases {
 		t.Run(tC.desc, func(t *testing.T) {
 			cwd, err := os.Getwd()
 			gotest.NoError(t, err)
 
-			path := filepath.Join(cwd, "testdata", tC.dirName)
-			results, err := testgen.GenerateSuites(path)
+			path := filepath.Join(cwd, "testdata_e2e", tC.dirName)
+			results, err := Generate(path)
 			gotest.NoError(t, err)
-			gotest.True(t, strings.HasSuffix(results[0].AbsPath, "go-test/internal/cmd/testgen/testdata/"+tC.dirName))
-			gotest.Equal(t, "github.com/mvrahden/go-test/internal/cmd/testgen/testdata/"+tC.dirName, results[0].Package)
+			gotest.True(t, strings.HasSuffix(results[0].AbsPath, "go-test/internal/gotestgen/testdata_e2e/"+tC.dirName))
+			gotest.Equal(t, "github.com/mvrahden/go-test/internal/gotestgen/testdata_e2e/"+tC.dirName, results[0].Package)
 
-			// Assert generate suite
 			for idx, golden := range tC.goldenFiles {
-				expected, err := os.ReadFile(filepath.Join("testdata", tC.dirName, golden))
+				expected, err := os.ReadFile(filepath.Join("testdata_e2e", tC.dirName, golden))
 				gotest.NoError(t, err)
 				if idx == 0 {
 					gotest.Equal(t, string(expected), string(results[0].PTest))
@@ -53,13 +50,13 @@ func TestE2E_NoTestSuites(t *testing.T) {
 		args []string
 	}{
 		{"no test files", []string{"no_testfiles"}},
-		{"non-existent path returns empty", []string{"testdata/nothing-here"}},
+		{"non-existent path returns empty", []string{"testdata_e2e/nothing-here"}},
 		{"stdlib package returns empty", []string{"strings"}},
 		{"stdlib nested package returns empty", []string{"net/http"}},
 	}
 	for _, tC := range testcases {
 		t.Run(tC.desc, func(t *testing.T) {
-			res, err := testgen.GenerateSuites(tC.args[0])
+			res, err := Generate(tC.args[0])
 			gotest.NoError(t, err)
 			gotest.Empty(t, res)
 		})

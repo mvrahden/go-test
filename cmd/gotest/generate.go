@@ -6,14 +6,14 @@ import (
 	"path/filepath"
 
 	"github.com/mvrahden/go-test/about"
-	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/gotestgen"
 )
 
 func runGenerate(args []string) int {
 	patterns := ExtractPackagePatterns(args)
 
 	for _, pattern := range patterns {
-		results, err := gotestrunner.SuitesGenerate(pattern)
+		results, err := gotestgen.Generate(pattern)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2

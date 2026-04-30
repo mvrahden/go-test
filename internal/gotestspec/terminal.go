@@ -98,11 +98,7 @@ func renderNode(w io.Writer, n *Node, depth int, c colors) {
 		suffix = fmt.Sprintf(" %s— SKIPPED%s", c.yellow, c.reset)
 	}
 
-	if depth > 0 || n.Kind != KindFixture {
-		fmt.Fprintf(w, "%s%s%s\n", indent, label, suffix)
-	} else {
-		fmt.Fprintf(w, "%s%s%s\n", indent, label, suffix)
-	}
+	fmt.Fprintf(w, "%s%s%s\n", indent, label, suffix)
 
 	for _, child := range n.Children {
 		renderNode(w, child, depth+1, c)

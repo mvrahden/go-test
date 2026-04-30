@@ -52,7 +52,7 @@ func (ts TestSuiteSpecSet) ReduceToEffectiveSet() (TestSuiteSpecSet, SkippedTest
 	skippedTestCases := SkippedTestCases{}
 	{ // split focused from unfocused
 		focused, unfocused := slices.SplitBy(effectiveSet, func(v *TestSuiteSpec, _ int) bool {
-			return v.isFocused()
+			return v.IsFocused()
 		})
 		effectiveSet = unfocused
 		if len(focused) > 0 {
@@ -62,7 +62,7 @@ func (ts TestSuiteSpecSet) ReduceToEffectiveSet() (TestSuiteSpecSet, SkippedTest
 
 	{ // split excluded from included
 		excluded, included := slices.SplitBy(effectiveSet, func(v *TestSuiteSpec, _ int) bool {
-			return v.isExcluded()
+			return v.IsExcluded()
 		})
 		effectiveSet = included
 		if len(excluded) > 0 {
@@ -78,7 +78,7 @@ func (ts TestSuiteSpecSet) ReduceToEffectiveSet() (TestSuiteSpecSet, SkippedTest
 		slices.Range(effectiveSet, func(v *TestSuiteSpec, _ int) {
 			// split focused from unfocused
 			focused, unfocused := slices.SplitBy(v.th.TestCases, func(v *TestSuiteMethod, _ int) bool {
-				return v.isFocused()
+				return v.IsFocused()
 			})
 			v.th.TestCases = unfocused
 			if len(focused) > 0 {
@@ -88,7 +88,7 @@ func (ts TestSuiteSpecSet) ReduceToEffectiveSet() (TestSuiteSpecSet, SkippedTest
 
 			// split excluded from included
 			excluded, included := slices.SplitBy(v.th.TestCases, func(v *TestSuiteMethod, _ int) bool {
-				return v.isExcluded()
+				return v.IsExcluded()
 			})
 			v.th.TestCases = included
 			if len(excluded) > 0 {
@@ -210,14 +210,6 @@ func (ts *TestSuiteSpec) IsParallel() bool {
 	return strings.HasSuffix(ts.ts.Name.Name, "TestSuiteParallel")
 }
 
-func (ts *TestSuiteSpec) isFocused() bool {
-	return strings.HasPrefix(ts.ts.Name.Name, "F_")
-}
-
-func (ts *TestSuiteSpec) isExcluded() bool {
-	return strings.HasPrefix(ts.ts.Name.Name, "X_")
-}
-
 type TestSuiteHarness struct {
 	BeforeAll  *TestSuiteMethod
 	BeforeEach *TestSuiteMethod
@@ -244,14 +236,6 @@ func (m *TestSuiteMethod) UsesStdlibT() bool { return m.usesStdlibT }
 func (m *TestSuiteMethod) Pos() token.Pos  { return m.m.Pos() }
 func (m *TestSuiteMethod) IsFocused() bool { return strings.HasPrefix(m.m.Name(), "F_") }
 func (m *TestSuiteMethod) IsExcluded() bool { return strings.HasPrefix(m.m.Name(), "X_") }
-
-func (m *TestSuiteMethod) isFocused() bool {
-	return strings.HasPrefix(m.m.Name(), "F_")
-}
-
-func (m *TestSuiteMethod) isExcluded() bool {
-	return strings.HasPrefix(m.m.Name(), "X_")
-}
 
 // Identifier returns the test methods identifier.
 //
