@@ -14,6 +14,51 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
 
+type overlayResult struct {
+	tmpDir           string
+	overlayFlag      string
+	collectorResults []gotestgen.CollectorResult
+}
+
+func generateOverlay(patterns []string) (*overlayResult, func(), error) {
+	var allResults gotestgen.GenerateResults
+	var allCollectorResults []gotestgen.CollectorResult
+	for _, pattern := range patterns {
+		results, collectorResults, err := gotestgen.GenerateWithCollectorResults(pattern)
+		if err != nil {
+			return nil, nil, err
+		}
+		allResults = append(allResults, results...)
+		allCollectorResults = append(allCollectorResults, collectorResults...)
+	}
+
+	tmpDir, err := gotestrunner.WriteOverlay(allResults)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cleanup := func() {}
+	if DEBUG {
+		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s\n", tmpDir)
+	} else {
+		cleanup = func() { os.RemoveAll(tmpDir) }
+	}
+
+	return &overlayResult{
+		tmpDir:           tmpDir,
+		overlayFlag:      "-overlay=" + filepath.Join(tmpDir, "overlay.json"),
+		collectorResults: allCollectorResults,
+	}, cleanup, nil
+}
+
+func buildExtraEnv() map[string]string {
+	env := make(map[string]string)
+	if UPDATE_SNAPSHOTS {
+		env["GOTEST_UPDATE_SNAPSHOTS"] = "1"
+	}
+	return env
+}
+
 func Run(cfg ExecConfig) int {
 	if CI {
 		violations, err := RunFocusGuard(cfg.PackagePatterns)
@@ -34,37 +79,19 @@ func Run(cfg ExecConfig) int {
 		os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// 1. Generate test code
-	var allResults gotestgen.GenerateResults
-	var allCollectorResults []gotestgen.CollectorResult
-	for _, pattern := range cfg.PackagePatterns {
-		results, collectorResults, err := gotestrunner.SuitesGenerateWithCollectorResults(pattern)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-			return 2
-		}
-		allResults = append(allResults, results...)
-		allCollectorResults = append(allCollectorResults, collectorResults...)
-	}
-
-	// 2. Write overlay
-	tmpDir, err := gotestrunner.WriteOverlay(allResults)
+	overlay, cleanup, err := generateOverlay(cfg.PackagePatterns)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	if DEBUG {
-		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s\n", tmpDir)
-	} else {
-		defer os.RemoveAll(tmpDir)
-	}
+	defer cleanup()
 
-	goTestArgs := append([]string{"-overlay=" + filepath.Join(tmpDir, "overlay.json")}, cfg.GoTestArgs...)
+	goTestArgs := append([]string{overlay.overlayFlag}, cfg.GoTestArgs...)
 
-	// 3. Discover shared fixtures from collector results
-	sharedFixtures := gotestgen.DiscoverSharedFixtures(allCollectorResults)
+	// Discover shared fixtures from collector results
+	sharedFixtures := gotestgen.DiscoverSharedFixtures(overlay.collectorResults)
 
-	// 4. If any shared fixtures, start setup subprocess
+	// If any shared fixtures, start setup subprocess
 	var setupProc *SharedFixtureProcess
 	if len(sharedFixtures) > 0 {
 		var err error
@@ -82,13 +109,9 @@ func Run(cfg ExecConfig) int {
 	default:
 	}
 
-	// 5. Run tests with shared fixture state
-	extraEnv := make(map[string]string)
+	extraEnv := buildExtraEnv()
 	if setupProc != nil {
 		extraEnv["GOTEST_SHARED_STATE"] = setupProc.StateJSON()
-	}
-	if UPDATE_SNAPSHOTS {
-		extraEnv["GOTEST_UPDATE_SNAPSHOTS"] = "1"
 	}
 
 	if SPEC {

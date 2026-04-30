@@ -13,14 +13,15 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
 func runWatch(args []string) int {
 	ownArgs, goTestArgs := SplitArgs(args)
 	DEBUG = slices.Contains(ownArgs, "--debug")
+	CI = slices.Contains(ownArgs, "--ci")
 	SPEC = slices.Contains(ownArgs, "--spec")
+	UPDATE_SNAPSHOTS = slices.Contains(ownArgs, "--update-snapshots")
 	patterns := ExtractPackagePatterns(goTestArgs)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -87,34 +88,36 @@ func runWatch(args []string) int {
 }
 
 func watchRunOnce(goTestArgs []string, patterns []string) int {
-	var allResults gotestgen.GenerateResults
-	for _, pattern := range patterns {
-		results, _, err := gotestrunner.SuitesGenerateWithCollectorResults(pattern)
+	if CI {
+		violations, err := RunFocusGuard(patterns)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2
 		}
-		allResults = append(allResults, results...)
+		if len(violations) > 0 {
+			fmt.Fprintln(os.Stderr, "FAIL: focus prefix detected — remove F_ before merging:")
+			for _, v := range violations {
+				fmt.Fprintln(os.Stderr, v.String())
+			}
+			return 1
+		}
 	}
 
-	tmpDir, err := gotestrunner.WriteOverlay(allResults)
+	overlay, cleanup, err := generateOverlay(patterns)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	if DEBUG {
-		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s\n", tmpDir)
-	} else {
-		defer os.RemoveAll(tmpDir)
-	}
+	defer cleanup()
 
-	overlayArgs := append([]string{"-overlay=" + filepath.Join(tmpDir, "overlay.json")}, goTestArgs...)
+	overlayArgs := append([]string{overlay.overlayFlag}, goTestArgs...)
+	extraEnv := buildExtraEnv()
 
 	if SPEC {
-		return runWithSpec(overlayArgs, nil)
+		return runWithSpec(overlayArgs, extraEnv)
 	}
 
-	code, err := gotestrunner.StdlibRunTests(overlayArgs)
+	code, err := gotestrunner.StdlibRunTests(overlayArgs, extraEnv)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 )
 
 func RenderMarkdown(w io.Writer, packages []*Package) {
@@ -69,7 +68,7 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int) {
 			fmt.Fprintln(w, "|----------|--------|----------|")
 			for _, c := range leafChildren {
 				fmt.Fprintf(w, "| %s | %s | %s |\n",
-					c.Display, statusText(c.Status), mdDuration(c.Duration))
+					c.Display, statusText(c.Status), formatDuration(c.Duration))
 			}
 			fmt.Fprintln(w)
 		}
@@ -91,7 +90,7 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int) {
 
 	default:
 		if len(n.Children) == 0 {
-			fmt.Fprintf(w, "- %s %s (%s)\n", statusText(n.Status), n.Display, mdDuration(n.Duration))
+			fmt.Fprintf(w, "- %s %s (%s)\n", statusText(n.Status), n.Display, formatDuration(n.Duration))
 		}
 	}
 }
@@ -104,7 +103,7 @@ func renderMarkdownTable(w io.Writer, nodes []*Node, depth int) {
 			renderMarkdownTable(w, n.Children, depth+1)
 		} else {
 			fmt.Fprintf(w, "| %s%s | %s | %s |\n",
-				indent, n.Display, statusText(n.Status), mdDuration(n.Duration))
+				indent, n.Display, statusText(n.Status), formatDuration(n.Duration))
 		}
 	}
 }
@@ -122,13 +121,3 @@ func statusText(s Status) string {
 	}
 }
 
-func mdDuration(d time.Duration) string {
-	ms := d.Milliseconds()
-	if ms < 1 {
-		return "<1ms"
-	}
-	if ms < 1000 {
-		return fmt.Sprintf("%dms", ms)
-	}
-	return fmt.Sprintf("%.1fs", d.Seconds())
-}
