@@ -10,6 +10,7 @@ import { SpecViewPanel } from "./specView.js";
 import { WatchManager } from "./watch.js";
 import { ScaffoldCodeActionProvider, runScaffoldCommand, executeScaffold } from "./scaffold.js";
 import { CoverageRunner } from "./coverage.js";
+import { CoverageStore } from "./coverageStore.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Go Test Suites");
@@ -47,7 +48,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const specView = new SpecViewPanel(outputChannel);
 
-  coverageRunner = new CoverageRunner(controller, cache, outputChannel, (jsonOutput) => {
+  const coverageStore = new CoverageStore(context.storageUri);
+
+  coverageRunner = new CoverageRunner(controller, cache, coverageStore, outputChannel, (jsonOutput) => {
     specView.refresh(jsonOutput);
   });
 
@@ -182,6 +185,11 @@ export function activate(context: vscode.ExtensionContext): void {
     (target: string) => executeScaffold(target, outputChannel, () => discoveryService.discover(workspaceDir)),
   );
 
+  const copyCoverageCmd = vscode.commands.registerCommand(
+    "gotest.copyCoverage",
+    () => coverageRunner.copyCoverageSummary(),
+  );
+
   // Set up FileSystemWatcher for *_test.go files
   const watcher = vscode.workspace.createFileSystemWatcher("**/*_test.go");
   const onFileChange = () => {
@@ -194,6 +202,22 @@ export function activate(context: vscode.ExtensionContext): void {
   const watcherChangeDisposable = watcher.onDidChange(onFileChange);
   const watcherCreateDisposable = watcher.onDidCreate(onFileChange);
   const watcherDeleteDisposable = watcher.onDidDelete(onFileChange);
+
+  // Invalidate coverage when source files change
+  const goSourceWatcher = vscode.workspace.createFileSystemWatcher("**/*.go");
+  const onSourceChange = (uri: vscode.Uri) => {
+    if (uri.fsPath.endsWith("_test.go")) {
+      return;
+    }
+    const importPath = cache.resolveFileToPackage(uri.fsPath);
+    if (importPath && coverageStore.invalidate(importPath)) {
+      outputChannel.appendLine(`[coverage] invalidated ${importPath}`);
+      coverageStore.save();
+    }
+  };
+  const sourceChangeDisposable = goSourceWatcher.onDidChange(onSourceChange);
+  const sourceCreateDisposable = goSourceWatcher.onDidCreate(onSourceChange);
+  const sourceDeleteDisposable = goSourceWatcher.onDidDelete(onSourceChange);
 
   // Push all disposables to context.subscriptions
   context.subscriptions.push(
@@ -208,6 +232,7 @@ export function activate(context: vscode.ExtensionContext): void {
     debugLauncher,
     runner,
     coverageRunner,
+    coverageStore,
     specView,
     specViewRefreshDisposable,
     watchManager,
@@ -222,14 +247,33 @@ export function activate(context: vscode.ExtensionContext): void {
     scaffoldCodeActionsDisposable,
     scaffoldCmd,
     scaffoldTargetCmd,
+    copyCoverageCmd,
     watcher,
     watcherChangeDisposable,
     watcherCreateDisposable,
     watcherDeleteDisposable,
+    goSourceWatcher,
+    sourceChangeDisposable,
+    sourceCreateDisposable,
+    sourceDeleteDisposable,
   );
 
-  // Run initial discovery
-  discoveryService.discover(workspaceDir);
+  // Run initial discovery, then restore persisted coverage
+  discoveryService.discover(workspaceDir).then(async () => {
+    await coverageStore.load();
+    if (coverageStore.size > 0) {
+      const coverages = coverageStore.buildFileCoverages(cache);
+      if (coverages.length > 0) {
+        const request = new vscode.TestRunRequest();
+        const run = controller.createTestRun(request, "Restored Coverage");
+        for (const fc of coverages) {
+          run.addCoverage(fc);
+        }
+        run.end();
+        outputChannel.appendLine(`[coverage] restored ${coverages.length} file(s) from storage`);
+      }
+    }
+  });
 }
 
 export function deactivate(): void {}

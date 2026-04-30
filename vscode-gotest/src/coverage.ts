@@ -6,6 +6,7 @@ import { rm, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
+import type { CoverageStore } from "./coverageStore.js";
 import type { OverlayOutput } from "./types.js";
 import {
   parseTestEvents,
@@ -74,9 +75,12 @@ export function parseCoverProfile(
 }
 
 export class CoverageRunner implements vscode.Disposable {
+  private activeRun: vscode.CancellationTokenSource | undefined;
+
   constructor(
     private readonly controller: GoTestController,
     private readonly cache: DiscoveryCache,
+    private readonly store: CoverageStore,
     private readonly outputChannel: vscode.OutputChannel,
     private readonly onJsonOutput: (json: string) => void,
   ) {}
@@ -85,6 +89,15 @@ export class CoverageRunner implements vscode.Disposable {
     request: vscode.TestRunRequest,
     token: vscode.CancellationToken,
   ): Promise<void> {
+    if (this.activeRun) {
+      this.outputChannel.appendLine("[coverage] cancelling previous run");
+      this.activeRun.cancel();
+    }
+    const cts = new vscode.CancellationTokenSource();
+    this.activeRun = cts;
+    token.onCancellationRequested(() => cts.cancel());
+    const effectiveToken = cts.token;
+
     const run = this.controller.createTestRun(request, "Go Test Coverage");
 
     try {
@@ -102,6 +115,13 @@ export class CoverageRunner implements vscode.Disposable {
       let allJsonOutput = "";
 
       for (const [importPath, groupItems] of groups) {
+        if (effectiveToken.isCancellationRequested) {
+          for (const item of groupItems) {
+            run.skipped(item);
+          }
+          continue;
+        }
+
         const pkg = this.cache.getPackage(importPath);
         if (!pkg) {
           for (const item of groupItems) {
@@ -154,10 +174,10 @@ export class CoverageRunner implements vscode.Disposable {
           args.push(...testFlags);
 
           this.outputChannel.appendLine(`[coverage] go ${args.join(" ")}`);
-          const stdout = await this.spawnGoTest(args, workspaceDir, token);
+          const stdout = await this.spawnGoTest(args, workspaceDir, effectiveToken);
           allJsonOutput += stdout;
 
-          if (token.isCancellationRequested) {
+          if (effectiveToken.isCancellationRequested) {
             for (const item of groupItems) {
               run.skipped(item);
             }
@@ -169,13 +189,7 @@ export class CoverageRunner implements vscode.Disposable {
 
           try {
             const coverContent = await readFile(coverFile, "utf-8");
-            const moduleToDir = (importDir: string) => {
-              return this.cache.resolveImportPath(importDir);
-            };
-            const fileCoverages = parseCoverProfile(coverContent, moduleToDir);
-            for (const fc of fileCoverages) {
-              run.addCoverage(fc);
-            }
+            this.store.update(importPath, coverContent);
           } catch {
             this.outputChannel.appendLine("[coverage] no coverprofile generated");
           }
@@ -190,12 +204,72 @@ export class CoverageRunner implements vscode.Disposable {
         }
       }
 
+      const allCoverages = this.store.buildFileCoverages(this.cache);
+      for (const fc of allCoverages) {
+        run.addCoverage(fc);
+      }
+      await this.store.save();
+
       if (allJsonOutput) {
         this.onJsonOutput(allJsonOutput);
       }
     } finally {
+      if (this.activeRun === cts) {
+        this.activeRun = undefined;
+      }
+      cts.dispose();
       run.end();
     }
+  }
+
+  async copyCoverageSummary(): Promise<void> {
+    const coverages = this.store.buildFileCoverages(this.cache);
+    if (coverages.length === 0) {
+      vscode.window.showInformationMessage("No coverage data available. Run tests with coverage first.");
+      return;
+    }
+
+    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
+    const rows: { file: string; covered: number; total: number }[] = [];
+
+    for (const fc of coverages) {
+      let filePath = fc.uri.fsPath;
+      if (workspaceDir && filePath.startsWith(workspaceDir)) {
+        filePath = filePath.slice(workspaceDir.length + 1);
+      }
+      rows.push({
+        file: filePath,
+        covered: fc.statementCoverage.covered,
+        total: fc.statementCoverage.total,
+      });
+    }
+
+    rows.sort((a, b) => a.file.localeCompare(b.file));
+
+    const maxFileLen = Math.max(4, ...rows.map((r) => r.file.length));
+    const header = `${"File".padEnd(maxFileLen)}  Stmts      Cover`;
+    const separator = "-".repeat(header.length);
+
+    const lines = [header, separator];
+    let totalCovered = 0;
+    let totalStmts = 0;
+
+    for (const row of rows) {
+      totalCovered += row.covered;
+      totalStmts += row.total;
+      const pct = row.total > 0 ? ((row.covered / row.total) * 100).toFixed(1) + "%" : "N/A";
+      const stmts = `${row.covered}/${row.total}`;
+      lines.push(`${row.file.padEnd(maxFileLen)}  ${stmts.padEnd(9)}  ${pct}`);
+    }
+
+    lines.push(separator);
+    const totalPct = totalStmts > 0 ? ((totalCovered / totalStmts) * 100).toFixed(1) + "%" : "N/A";
+    const totalStmtsStr = `${totalCovered}/${totalStmts}`;
+    lines.push(`${"Total".padEnd(maxFileLen)}  ${totalStmtsStr.padEnd(9)}  ${totalPct}`);
+
+    const text = lines.join("\n");
+    await vscode.env.clipboard.writeText(text);
+    vscode.window.showInformationMessage("Coverage summary copied to clipboard.");
   }
 
   dispose(): void {}

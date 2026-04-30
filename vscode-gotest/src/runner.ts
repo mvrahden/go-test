@@ -18,6 +18,7 @@ export class TestRunner {
   private _lastJsonOutput = "";
   private readonly _onDidComplete = new vscode.EventEmitter<string>();
   readonly onDidComplete: vscode.Event<string> = this._onDidComplete.event;
+  private activeRun: vscode.CancellationTokenSource | undefined;
 
   constructor(
     private readonly controller: GoTestController,
@@ -33,6 +34,15 @@ export class TestRunner {
     request: vscode.TestRunRequest,
     token: vscode.CancellationToken,
   ): Promise<void> {
+    if (this.activeRun) {
+      this.outputChannel.appendLine("[runner] cancelling previous run");
+      this.activeRun.cancel();
+    }
+    const cts = new vscode.CancellationTokenSource();
+    this.activeRun = cts;
+    token.onCancellationRequested(() => cts.cancel());
+    const effectiveToken = cts.token;
+
     const run = this.controller.createTestRun(request, "Go Test Run");
     this._lastJsonOutput = "";
 
@@ -52,6 +62,13 @@ export class TestRunner {
       const groups = this.groupByPackage(items);
 
       for (const [importPath, groupItems] of groups) {
+        if (effectiveToken.isCancellationRequested) {
+          for (const item of groupItems) {
+            run.skipped(item);
+          }
+          continue;
+        }
+
         const pkg = this.cache.getPackage(importPath);
         if (!pkg) {
           for (const item of groupItems) {
@@ -99,10 +116,10 @@ export class TestRunner {
           goTestArgs.push(...testFlags);
 
           this.outputChannel.appendLine(`[runner] go ${goTestArgs.join(" ")}`);
-          const stdout = await this.spawnProcess("go", goTestArgs, workspaceDir, token);
+          const stdout = await this.spawnProcess("go", goTestArgs, workspaceDir, effectiveToken);
           this._lastJsonOutput += stdout;
 
-          if (token.isCancellationRequested) {
+          if (effectiveToken.isCancellationRequested) {
             for (const item of groupItems) {
               run.skipped(item);
             }
@@ -124,6 +141,10 @@ export class TestRunner {
         }
       }
     } finally {
+      if (this.activeRun === cts) {
+        this.activeRun = undefined;
+      }
+      cts.dispose();
       if (this._lastJsonOutput) {
         this._onDidComplete.fire(this._lastJsonOutput);
       }

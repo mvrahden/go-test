@@ -50,8 +50,22 @@
       {
         "command": "gotest.scaffoldTarget",
         "title": "Go Test: Scaffold Target"
+      },
+      {
+        "command": "gotest.copyCoverage",
+        "title": "Go Test: Copy Coverage Summary",
+        "icon": "$(copy)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "gotest.copyCoverage",
+          "when": "view == workbench.view.testCoverage",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "Go Test Suites",
       "properties": {
