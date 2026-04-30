@@ -57,6 +57,12 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 	}
 }
 
+func TestGenerate_StdlibPackage_ReturnsEmpty(t *testing.T) {
+	res, err := Generate("strings")
+	gotest.NoError(t, err)
+	gotest.Empty(t, res)
+}
+
 func getExpectedOutputFile(t *testing.T, testdatadir, fileName string) string {
 	f, err := os.Open(filepath.Join(testdatadir, fileName))
 	gotest.NoError(t, err)
