@@ -10,6 +10,8 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
+
+
 type overlayOutput struct {
 	OverlayFile string `json:"overlayFile"`
 	Dir         string `json:"dir"`
@@ -20,7 +22,7 @@ func runOverlay(args []string) int {
 
 	var allResults gotestgen.GenerateResults
 	for _, pattern := range patterns {
-		results, err := gotestrunner.SuitesGenerate(pattern)
+		results, err := gotestgen.Generate(pattern)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2
