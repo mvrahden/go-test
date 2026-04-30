@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
+      - name: Init workspace
+        run: go work init . ./examples
       - name: Test
         run: go run ./cmd/gotest spec --no-color --output=spec.txt ./... -race -coverprofile=coverage.out
       - name: Summary
