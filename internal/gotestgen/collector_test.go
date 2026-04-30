@@ -124,6 +124,7 @@ func loadTestPkgWithGotest(t *testing.T, src string) *packages.Package {
 // --- Fixture collection tests ---
 
 func TestCollector_FixtureCollection_PackageFixture(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "context"
@@ -146,6 +147,7 @@ func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
 }
 
 func TestCollector_FixtureCollection_PackageFixtureAllMethods(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "context"
@@ -173,6 +175,7 @@ func (f *DBFixture) AfterEach(ctx context.Context) error  { return nil }
 }
 
 func TestCollector_FixtureCollection_SharedFixture(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "context"
@@ -193,6 +196,7 @@ func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 }
 
 func TestCollector_FixtureCollection_SharedFixtureWithAfterAll(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "context"
@@ -218,6 +222,7 @@ func (f *RedisSharedFixture) AfterAll(ctx context.Context) error  { return nil }
 // --- Fixture embedding in test suites ---
 
 func TestCollector_FixtureEmbeddingInTestSuite(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -249,6 +254,7 @@ func (s *MyTestSuite) TestSomething(t *gotest.T) {}
 }
 
 func TestCollector_NoFixtureEmbedding(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "github.com/mvrahden/go-test/pkg/gotest"
@@ -268,6 +274,7 @@ func (s *MyTestSuite) TestSomething(t *gotest.T) {}
 // --- Fixture-to-fixture embedding ---
 
 func TestCollector_FixtureToFixtureEmbedding(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "context"
@@ -386,6 +393,7 @@ func TestValidation_SelfCycle(t *testing.T) {
 // --- Validation: shared fixture wrong signature ---
 
 func TestCollector_SharedFixture_BeforeEachDisallowed(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "context"
@@ -403,6 +411,7 @@ func (f *RedisSharedFixture) BeforeEach(ctx context.Context) error   { return ni
 }
 
 func TestCollector_SharedFixture_AfterEachDisallowed(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "context"
@@ -420,6 +429,7 @@ func (f *RedisSharedFixture) AfterEach(ctx context.Context) error  { return nil 
 }
 
 func TestCollector_SharedFixture_WrongBeforeAllSignature(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "github.com/mvrahden/go-test/pkg/gotest"
@@ -438,6 +448,7 @@ func (f *RedisSharedFixture) BeforeAll(t *gotest.T) {} // wrong: should be (ctx 
 // --- Validation: suite embeds multiple fixtures ---
 
 func TestCollector_SuiteEmbedsMultipleFixtures(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -518,6 +529,7 @@ func TestApplyTestSuiteSpecs_OK(t *testing.T) {
 // --- Package fixture wrong method signature ---
 
 func TestCollector_PackageFixture_WrongBeforeAllSignature(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "github.com/mvrahden/go-test/pkg/gotest"
@@ -536,6 +548,7 @@ func (f *DBFixture) BeforeAll(t *gotest.T) {} // wrong: should be (ctx context.C
 // --- *testing.T suite support ---
 
 func TestCollector_StdlibT_SuiteDetected(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "testing"
@@ -555,6 +568,7 @@ func (s *PlainTestSuite) TestFoo(t *testing.T) {}
 }
 
 func TestCollector_StdlibT_LifecycleHooks(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "testing"
@@ -585,6 +599,7 @@ func (s *HookTestSuite) TestOne(t *testing.T)    {}
 }
 
 func TestCollector_StdlibT_MixedMethodSignatures(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -613,6 +628,7 @@ func (s *MixedTestSuite) TestGotest(t *gotest.T)  {}
 }
 
 func TestCollector_StdlibT_WrongParamType(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "fmt"
@@ -629,6 +645,7 @@ func (s *BadTestSuite) TestBad(f fmt.Stringer) {}
 }
 
 func TestCollector_GotestT_NotUsesStdlibT(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "github.com/mvrahden/go-test/pkg/gotest"
@@ -658,6 +675,7 @@ func TestCollector_NilPackage(t *testing.T) {
 // --- Shared fixture embedding: not treated as parent ---
 
 func TestCollector_SharedFixtureNotTreatedAsParent(t *testing.T) {
+	t.Parallel()
 	src := "package testpkg\n\n" +
 		"import (\n" +
 		"\t\"context\"\n\n" +
@@ -706,6 +724,7 @@ func TestCollector_SharedFixtureNotTreatedAsParent(t *testing.T) {
 // --- Config marker method tests ---
 
 func TestCollector_FixtureConfig_Detected(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -730,6 +749,7 @@ func (f *DBFixture) FixtureConfig() gotest.FixtureConfig {
 }
 
 func TestCollector_SharedFixtureConfig_Detected(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -754,6 +774,7 @@ func (f *PGSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 }
 
 func TestCollector_FixtureConfig_AbsentIsNil(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "context"
@@ -771,6 +792,7 @@ func (f *PlainFixture) BeforeAll(ctx context.Context) error { return nil }
 }
 
 func TestCollector_SuiteConfig_Detected(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "github.com/mvrahden/go-test/pkg/gotest"
@@ -791,6 +813,7 @@ func (s *MyTestSuite) TestFoo(t *gotest.T) {}
 }
 
 func TestCollector_SuiteConfig_AbsentIsFalse(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "github.com/mvrahden/go-test/pkg/gotest"
@@ -808,6 +831,7 @@ func (s *PlainTestSuite) TestFoo(t *gotest.T) {}
 }
 
 func TestCollector_FixtureConfig_InvalidSignature_WithParams(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import (
@@ -831,6 +855,7 @@ func (f *BadFixture) FixtureConfig(x int) gotest.FixtureConfig {
 }
 
 func TestCollector_FixtureConfig_InvalidSignature_WrongReturnType(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "context"
@@ -848,6 +873,7 @@ func (f *BadFixture) FixtureConfig() string { return "" }
 }
 
 func TestCollector_SuiteConfig_InvalidSignature_WithParams(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "github.com/mvrahden/go-test/pkg/gotest"
@@ -867,6 +893,7 @@ func (s *BadTestSuite) TestFoo(t *gotest.T) {}
 }
 
 func TestCollector_SuiteConfig_InvalidSignature_WrongReturnType(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "github.com/mvrahden/go-test/pkg/gotest"

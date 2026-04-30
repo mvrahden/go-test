@@ -65,6 +65,7 @@ func TestSharedFixture_Integration_GeneratedSetupBinary(t *testing.T) {
 // DiscoverSharedFixtures correctly finds shared fixtures collected from
 // a real package loaded via packages.Load.
 func TestSharedFixture_Integration_DiscoverFromRealPackage(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "context"
@@ -95,6 +96,7 @@ func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error { return ni
 // that DiscoverSharedFixtures collects multiple shared fixtures from multiple
 // collector results and deduplicates correctly.
 func TestSharedFixture_Integration_DiscoverFromRealPackage_MultipleFixtures(t *testing.T) {
+	t.Parallel()
 	src1 := `package testpkg
 
 import "context"
@@ -146,6 +148,7 @@ func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 }
 
 func TestSharedFixture_Integration_DiscoverWithHydrate(t *testing.T) {
+	t.Parallel()
 	src := `package testpkg
 
 import "context"
