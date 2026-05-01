@@ -100,8 +100,13 @@ export function activate(context: vscode.ExtensionContext): void {
         outputChannel.appendLine(`[command] runTest: item not found: ${testId}`);
         return;
       }
-      const request = new vscode.TestRunRequest([item]);
-      await runner.run(request, new vscode.CancellationTokenSource().token);
+      const cts = new vscode.CancellationTokenSource();
+      try {
+        const request = new vscode.TestRunRequest([item]);
+        await runner.run(request, cts.token);
+      } finally {
+        cts.dispose();
+      }
     },
   );
 
@@ -113,13 +118,18 @@ export function activate(context: vscode.ExtensionContext): void {
         outputChannel.appendLine(`[command] debugTest: item not found: ${testId}`);
         return;
       }
-      const request = new vscode.TestRunRequest([item]);
-      await debugLauncher.debug(
-        request,
-        new vscode.CancellationTokenSource().token,
-        (items) => buildRunFilter(items),
-        (i) => getPackageDir(i, cache),
-      );
+      const cts = new vscode.CancellationTokenSource();
+      try {
+        const request = new vscode.TestRunRequest([item]);
+        await debugLauncher.debug(
+          request,
+          cts.token,
+          (items) => buildRunFilter(items),
+          (i) => getPackageDir(i, cache),
+        );
+      } finally {
+        cts.dispose();
+      }
     },
   );
 
