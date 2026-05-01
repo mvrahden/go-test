@@ -77,3 +77,23 @@ func TestReplacePatterns(t *testing.T) {
 		})
 	}
 }
+
+func TestParseWatchFlags(t *testing.T) {
+	for _, tc := range []struct {
+		desc     string
+		args     []string
+		wantJSON bool
+		wantRest []string
+	}{
+		{"no flags", []string{"./pkg/..."}, false, []string{"./pkg/..."}},
+		{"json flag first", []string{"-json", "./pkg/..."}, true, []string{"./pkg/..."}},
+		{"json flag after package", []string{"./pkg/...", "-json"}, true, []string{"./pkg/..."}},
+		{"json with other flags", []string{"-json", "--spec", "./..."}, true, []string{"--spec", "./..."}},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			jsonMode, remaining := parseWatchFlags(tc.args)
+			gotest.Equal(t, tc.wantJSON, jsonMode)
+			gotest.Equal(t, tc.wantRest, remaining)
+		})
+	}
+}

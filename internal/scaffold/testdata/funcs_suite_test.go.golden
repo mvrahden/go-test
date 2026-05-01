@@ -1,0 +1,21 @@
+package sampletype
+
+import (
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type FuncsTestSuite struct {
+	gotest.TestSuite
+}
+
+func (s *FuncsTestSuite) TestApplyTax(t *gotest.T) {
+	t.It("works", func(it *gotest.T) {
+		// TODO: test ApplyTax(amount float64, region string) float64
+	})
+}
+
+func (s *FuncsTestSuite) TestCalculateDiscount(t *gotest.T) {
+	t.It("works", func(it *gotest.T) {
+		// TODO: test CalculateDiscount(amount float64, tier string) float64
+	})
+}

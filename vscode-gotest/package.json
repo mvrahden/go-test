@@ -1,0 +1,138 @@
+{
+  "name": "vscode-gotest",
+  "displayName": "Go Test Suites",
+  "description": "Test Explorer, CodeLens, and debug integration for go-test suites",
+  "version": "0.1.0",
+  "publisher": "mvrahden",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": ["Testing"],
+  "activationEvents": [
+    "workspaceContains:**/*_test.go"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "gotest.runTest",
+        "title": "Go Test: Run"
+      },
+      {
+        "command": "gotest.debugTest",
+        "title": "Go Test: Debug"
+      },
+      {
+        "command": "gotest.refreshTests",
+        "title": "Go Test: Refresh"
+      },
+      {
+        "command": "gotest.showFocusedTests",
+        "title": "Go Test: Show Focused Tests"
+      },
+      {
+        "command": "gotest.showSpecView",
+        "title": "Go Test: Show Spec View"
+      },
+      {
+        "command": "gotest.startWatch",
+        "title": "Go Test: Start Watch"
+      },
+      {
+        "command": "gotest.stopWatch",
+        "title": "Go Test: Stop Watch"
+      },
+      {
+        "command": "gotest.scaffold",
+        "title": "Go Test: Scaffold Suite"
+      },
+      {
+        "command": "gotest.scaffoldTarget",
+        "title": "Go Test: Scaffold Target"
+      },
+      {
+        "command": "gotest.copyCoverage",
+        "title": "Go Test: Copy Coverage Summary",
+        "icon": "$(copy)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "gotest.copyCoverage",
+          "when": "view == workbench.view.testCoverage",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Go Test Suites",
+      "properties": {
+        "gotest.modulePath": {
+          "type": "string",
+          "default": "github.com/mvrahden/go-test/cmd/gotest",
+          "description": "Go module path for gotest CLI (used with 'go run')"
+        },
+        "gotest.cliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Override: path to a pre-installed gotest binary (bypasses 'go run')"
+        },
+        "gotest.discoverOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Re-run discovery when a _test.go file is saved"
+        },
+        "gotest.showCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Run/Debug CodeLens above suites and methods"
+        },
+        "gotest.showFocusWarnings": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show diagnostics for F_ prefixed tests"
+        },
+        "gotest.testFlags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Additional flags passed to gotest test"
+        },
+        "gotest.buildFlags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Additional build flags passed to dlv"
+        },
+        "gotest.specView.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-refresh spec view panel after test runs"
+        },
+        "gotest.watch.autoRestart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-restart watch process on crash"
+        },
+        "gotest.watch.scope": {
+          "type": "string",
+          "default": "./...",
+          "description": "Default package scope for watch mode"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.95.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  }
+}

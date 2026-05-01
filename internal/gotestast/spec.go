@@ -206,7 +206,18 @@ func (ts *TestSuiteSpec) Pos() token.Pos           { return ts.ts.Name.Pos() }
 func (ts *TestSuiteSpec) IsFocused() bool           { return strings.HasPrefix(ts.ts.Name.Name, "F_") }
 func (ts *TestSuiteSpec) IsExcluded() bool          { return strings.HasPrefix(ts.ts.Name.Name, "X_") }
 
-func (ts *TestSuiteSpec) IsParallel() bool {
+// TypeSpecPos returns the token position of the test suite type name.
+func (ts *TestSuiteSpec) TypeSpecPos() token.Pos {
+	return ts.ts.Name.Pos()
+}
+
+// Package returns the underlying *packages.Package.
+func (ts *TestSuiteSpec) Package() *packages.Package {
+	return ts.pkg
+}
+
+// IsParallelSuite returns true if the suite name ends with "TestSuiteParallel".
+func (ts *TestSuiteSpec) IsParallelSuite() bool {
 	return strings.HasSuffix(ts.ts.Name.Name, "TestSuiteParallel")
 }
 
@@ -233,9 +244,9 @@ func (m *TestSuiteMethod) IsParallel() bool {
 // UsesStdlibT returns true if the method's parameter is *testing.T instead of *gotest.T.
 func (m *TestSuiteMethod) UsesStdlibT() bool { return m.usesStdlibT }
 
-func (m *TestSuiteMethod) Pos() token.Pos  { return m.m.Pos() }
-func (m *TestSuiteMethod) IsFocused() bool { return strings.HasPrefix(m.m.Name(), "F_") }
-func (m *TestSuiteMethod) IsExcluded() bool { return strings.HasPrefix(m.m.Name(), "X_") }
+func (m *TestSuiteMethod) Pos() token.Pos    { return m.n.Pos() }
+func (m *TestSuiteMethod) IsFocused() bool    { return strings.HasPrefix(m.m.Name(), "F_") }
+func (m *TestSuiteMethod) IsExcluded() bool   { return strings.HasPrefix(m.m.Name(), "X_") }
 
 // Identifier returns the test methods identifier.
 //

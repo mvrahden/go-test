@@ -144,7 +144,7 @@ Subcommands:
   clean       Remove orphaned generated files
   spec        Render behavioral specification from test suites
   watch       Watch for file changes and re-run tests
-  scaffold    Generate test suite skeleton from a Go type
+  scaffold    Generate test suite skeleton from a type or file
   migrate     Convert testify/suite tests to go-test format
   version     Print version information
   help        Show this help message
