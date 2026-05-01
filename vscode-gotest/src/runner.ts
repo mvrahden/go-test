@@ -82,7 +82,7 @@ export class TestRunner {
           continue;
         }
 
-        const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const workspaceDir = this.cache.getWorkspaceDir(importPath);
         if (!workspaceDir) {
           continue;
         }
@@ -95,7 +95,7 @@ export class TestRunner {
 
         let overlayDir: string | undefined;
         try {
-          const overlayCmd = await buildCliCommand(["overlay", importPath]);
+          const overlayCmd = await buildCliCommand(["overlay", importPath], workspaceDir);
           this.outputChannel.appendLine(`[runner] ${formatCliCommand(overlayCmd)}`);
           const { stdout: overlayStdout } = await execFileAsync(
             overlayCmd.bin,

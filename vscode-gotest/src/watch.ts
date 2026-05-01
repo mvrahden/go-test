@@ -202,7 +202,7 @@ export class WatchManager implements vscode.Disposable {
       this.stop(pkgScope);
     }
 
-    const cmd = await buildCliCommand(["watch", "-json", pkgScope]);
+    const cmd = await buildCliCommand(["watch", "-json", pkgScope], cwd);
 
     let cycleJsonAccumulator = "";
 

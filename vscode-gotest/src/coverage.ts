@@ -136,7 +136,7 @@ export class CoverageRunner implements vscode.Disposable {
           continue;
         }
 
-        const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const workspaceDir = this.cache.getWorkspaceDir(importPath);
         if (!workspaceDir) {
           continue;
         }
@@ -148,7 +148,7 @@ export class CoverageRunner implements vscode.Disposable {
         let coverFile: string | undefined;
 
         try {
-          const overlayCmd = await buildCliCommand(["overlay", importPath]);
+          const overlayCmd = await buildCliCommand(["overlay", importPath], workspaceDir);
           this.outputChannel.appendLine(`[coverage] ${formatCliCommand(overlayCmd)}`);
           const { stdout: overlayStdout } = await execFileAsync(
             overlayCmd.bin,
@@ -232,13 +232,13 @@ export class CoverageRunner implements vscode.Disposable {
       return;
     }
 
-    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
     const rows: { file: string; covered: number; total: number }[] = [];
 
     for (const fc of coverages) {
       let filePath = fc.uri.fsPath;
-      if (workspaceDir && filePath.startsWith(workspaceDir)) {
-        filePath = filePath.slice(workspaceDir.length + 1);
+      const folder = vscode.workspace.getWorkspaceFolder(fc.uri);
+      if (folder && filePath.startsWith(folder.uri.fsPath)) {
+        filePath = filePath.slice(folder.uri.fsPath.length + 1);
       }
       rows.push({
         file: filePath,

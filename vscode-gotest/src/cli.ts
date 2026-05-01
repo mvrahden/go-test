@@ -9,7 +9,7 @@ export interface CliCommand {
   args: string[];
 }
 
-export async function buildCliCommand(subcommandArgs: string[]): Promise<CliCommand> {
+export async function buildCliCommand(subcommandArgs: string[], workspaceDir?: string): Promise<CliCommand> {
   const cliPath = vscode.workspace
     .getConfiguration("gotest")
     .get<string>("cliPath");
@@ -22,22 +22,22 @@ export async function buildCliCommand(subcommandArgs: string[]): Promise<CliComm
     .getConfiguration("gotest")
     .get<string>("modulePath") ?? DEFAULT_MODULE_PATH;
 
-  const qualified = await qualifyModulePath(modulePath);
+  const qualified = await qualifyModulePath(modulePath, workspaceDir);
   return { bin: "go", args: ["run", qualified, ...subcommandArgs] };
 }
 
 
-async function qualifyModulePath(modulePath: string): Promise<string> {
+async function qualifyModulePath(modulePath: string, workspaceDir?: string): Promise<string> {
   if (modulePath.includes("@")) {
     return modulePath;
   }
 
-  const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!workspaceDir) {
+  const effectiveDir = workspaceDir ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!effectiveDir) {
     return `${modulePath}@latest`;
   }
 
-  const version = await extractVersionFromGoMod(workspaceDir, modulePath);
+  const version = await extractVersionFromGoMod(effectiveDir, modulePath);
   return `${modulePath}@${version}`;
 }
 

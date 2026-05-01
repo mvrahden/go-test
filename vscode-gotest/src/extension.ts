@@ -16,8 +16,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Go Test Suites");
   outputChannel.appendLine("Go Test Suites extension activated");
 
-  const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!workspaceDir) {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders || workspaceFolders.length === 0) {
     outputChannel.appendLine("[activate] No workspace folder found, skipping activation.");
     return;
   }
@@ -135,7 +135,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const refreshTestsCmd = vscode.commands.registerCommand(
     "gotest.refreshTests",
     async () => {
-      await discoveryService.discover(workspaceDir);
+      for (const folder of vscode.workspace.workspaceFolders ?? []) {
+        await discoveryService.discover(folder.uri.fsPath);
+      }
     },
   );
 
@@ -167,7 +169,10 @@ export function activate(context: vscode.ExtensionContext): void {
       });
 
       if (scope) {
-        await watchManager.start(scope, workspaceDir);
+        const wsDir = resolveActiveWorkspaceDir();
+        if (wsDir) {
+          await watchManager.start(scope, wsDir);
+        }
       }
     },
   );
@@ -186,12 +191,27 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const scaffoldCmd = vscode.commands.registerCommand(
     "gotest.scaffold",
-    () => runScaffoldCommand(outputChannel, () => discoveryService.discover(workspaceDir)),
+    () => {
+      const wsDir = resolveActiveWorkspaceDir();
+      return runScaffoldCommand(
+        outputChannel,
+        () => { if (wsDir) discoveryService.discover(wsDir); },
+        wsDir,
+      );
+    },
   );
 
   const scaffoldTargetCmd = vscode.commands.registerCommand(
     "gotest.scaffoldTarget",
-    (target: string) => executeScaffold(target, outputChannel, () => discoveryService.discover(workspaceDir)),
+    (target: string, workspaceDir?: string) => {
+      const wsDir = workspaceDir ?? resolveActiveWorkspaceDir();
+      return executeScaffold(
+        target,
+        outputChannel,
+        () => { if (wsDir) discoveryService.discover(wsDir); },
+        wsDir,
+      );
+    },
   );
 
   const copyCoverageCmd = vscode.commands.registerCommand(
@@ -207,18 +227,27 @@ export function activate(context: vscode.ExtensionContext): void {
     if (!discoverOnSave) {
       return;
     }
+    const folder = vscode.workspace.getWorkspaceFolder(uri);
+    if (!folder) {
+      return;
+    }
+    const wsDir = folder.uri.fsPath;
     const importPath = cache.resolveFileToPackage(uri.fsPath);
     if (importPath) {
-      discoveryService.discoverPackage(workspaceDir, importPath);
+      discoveryService.discoverPackage(wsDir, importPath);
     } else {
-      discoveryService.discover(workspaceDir);
+      discoveryService.discover(wsDir);
     }
   };
-  const onFileDelete = () => {
+  const onFileDelete = (uri: vscode.Uri) => {
     const discoverOnSave =
       vscode.workspace.getConfiguration("gotest").get<boolean>("discoverOnSave") ?? true;
-    if (discoverOnSave) {
-      discoveryService.discover(workspaceDir);
+    if (!discoverOnSave) {
+      return;
+    }
+    const folder = vscode.workspace.getWorkspaceFolder(uri);
+    if (folder) {
+      discoveryService.discover(folder.uri.fsPath);
     }
   };
   const watcherChangeDisposable = watcher.onDidChange(onFileChange);
@@ -281,7 +310,10 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   // Run initial discovery, then restore persisted coverage
-  discoveryService.discover(workspaceDir).then(async () => {
+  (async () => {
+    for (const folder of workspaceFolders) {
+      await discoveryService.discover(folder.uri.fsPath);
+    }
     await coverageStore.load();
     if (coverageStore.size > 0) {
       const coverages = coverageStore.buildFileCoverages(cache);
@@ -295,7 +327,7 @@ export function activate(context: vscode.ExtensionContext): void {
         outputChannel.appendLine(`[coverage] restored ${coverages.length} file(s) from storage`);
       }
     }
-  });
+  })();
 }
 
 export function deactivate(): void {}
@@ -326,6 +358,14 @@ function buildRunFilter(items: readonly vscode.TestItem[]): string | undefined {
   // method level or deeper
   const suite = item.parent!;
   return `^Test${suite.label}$/^${item.label}$`;
+}
+
+function resolveActiveWorkspaceDir(): string | undefined {
+  const activeUri = vscode.window.activeTextEditor?.document.uri;
+  const folder = activeUri
+    ? vscode.workspace.getWorkspaceFolder(activeUri) ?? vscode.workspace.workspaceFolders?.[0]
+    : vscode.workspace.workspaceFolders?.[0];
+  return folder?.uri.fsPath;
 }
 
 function getPackageDir(item: vscode.TestItem, cache: DiscoveryCache): string | undefined {
