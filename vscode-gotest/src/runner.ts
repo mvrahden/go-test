@@ -220,17 +220,13 @@ export class TestRunner {
     items: vscode.TestItem[],
     importPath: string,
   ): string | undefined {
-    // If any item is the package itself (depth 0), run everything
-    for (const item of items) {
-      if (this.getItemDepth(item) === 0) {
-        return undefined;
-      }
+    if (items.some((item) => this.getItemDepth(item) === 0)) {
+      return undefined;
     }
 
-    // Group by suite
     const suiteGroups = new Map<
       string,
-      { suiteName: string; methods: string[] }
+      { wholeSuite: boolean; methods: string[]; subtests: string[] }
     >();
 
     for (const item of items) {
@@ -241,27 +237,24 @@ export class TestRunner {
         if (this.suiteHasFixtures(suiteName, importPath)) {
           return undefined;
         }
-        return `^Test${suiteName}$`;
-      }
-
-      if (depth === 2) {
-        const suiteItem = item.parent!;
-        const suiteName = suiteItem.label;
-        const methodName = item.label;
-
+        let group = suiteGroups.get(suiteName);
+        if (!group) {
+          group = { wholeSuite: false, methods: [], subtests: [] };
+          suiteGroups.set(suiteName, group);
+        }
+        group.wholeSuite = true;
+      } else if (depth === 2) {
+        const suiteName = item.parent!.label;
         if (this.suiteHasFixtures(suiteName, importPath)) {
           return undefined;
         }
-
         let group = suiteGroups.get(suiteName);
         if (!group) {
-          group = { suiteName, methods: [] };
+          group = { wholeSuite: false, methods: [], subtests: [] };
           suiteGroups.set(suiteName, group);
         }
-        group.methods.push(methodName);
-      }
-
-      if (depth >= 3) {
+        group.methods.push(item.label);
+      } else if (depth >= 3) {
         let current = item;
         const subtestParts: string[] = [];
         while (this.getItemDepth(current) > 2) {
@@ -269,35 +262,33 @@ export class TestRunner {
           current = current.parent!;
         }
         const methodName = current.label;
-        const suiteItem = current.parent!;
-        const suiteName = suiteItem.label;
-
+        const suiteName = current.parent!.label;
         if (this.suiteHasFixtures(suiteName, importPath)) {
           return undefined;
         }
-
-        const subtestPath = subtestParts.join("/");
-        return `^Test${suiteName}$/^${methodName}$/^${subtestPath}$`;
+        let group = suiteGroups.get(suiteName);
+        if (!group) {
+          group = { wholeSuite: false, methods: [], subtests: [] };
+          suiteGroups.set(suiteName, group);
+        }
+        group.subtests.push(`^Test${suiteName}$/^${methodName}$/^${subtestParts.join("/")}$`);
       }
     }
 
-    // Multiple methods case
     const filters: string[] = [];
-    for (const [, group] of suiteGroups) {
-      if (this.suiteHasFixtures(group.suiteName, importPath)) {
-        return undefined;
-      }
-      if (group.methods.length === 1) {
-        filters.push(`^Test${group.suiteName}$/^${group.methods[0]}$`);
-      } else {
-        const methodsPattern = group.methods.join("|");
-        filters.push(
-          `^Test${group.suiteName}$/^(${methodsPattern})$`,
-        );
+    for (const [suiteName, group] of suiteGroups) {
+      if (group.wholeSuite) {
+        filters.push(`^Test${suiteName}$`);
+      } else if (group.subtests.length > 0) {
+        filters.push(...group.subtests);
+      } else if (group.methods.length === 1) {
+        filters.push(`^Test${suiteName}$/^${group.methods[0]}$`);
+      } else if (group.methods.length > 1) {
+        filters.push(`^Test${suiteName}$/^(${group.methods.join("|")})$`);
       }
     }
 
-    return filters.length === 1 ? filters[0] : filters.join("|");
+    return filters.length === 0 ? undefined : filters.length === 1 ? filters[0] : filters.join("|");
   }
 
   private spawnProcess(
