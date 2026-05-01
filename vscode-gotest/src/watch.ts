@@ -229,7 +229,7 @@ export class WatchManager implements vscode.Disposable {
         cycleJsonAccumulator += jsonLines;
         const run = this.activeRuns.get(pkgScope);
         if (run) {
-          this.applyWatchEvents(run, jsonLines, pkgScope);
+          this.applyWatchEvents(run, jsonLines);
         }
       },
       // onError
@@ -322,7 +322,6 @@ export class WatchManager implements vscode.Disposable {
   private applyWatchEvents(
     run: vscode.TestRun,
     jsonLines: string,
-    importPath: string,
   ): void {
     const events = parseTestEvents(jsonLines);
     for (const event of events) {
@@ -330,7 +329,7 @@ export class WatchManager implements vscode.Disposable {
         continue;
       }
 
-      const item = this.resolveTestItem(event.Test, importPath);
+      const item = this.resolveTestItem(event.Test, event.Package);
       if (!item) {
         continue;
       }
