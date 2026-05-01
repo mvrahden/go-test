@@ -63,6 +63,7 @@ export class DiscoveryCache implements vscode.Disposable {
 export class DiscoveryService {
   private running = false;
   private pending: { workspaceDir: string; patterns?: string[] } | undefined;
+  private hasShownError = false;
 
   constructor(
     private readonly cache: DiscoveryCache,
@@ -96,6 +97,17 @@ export class DiscoveryService {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.outputChannel.appendLine(`[discovery] error: ${message}`);
+      if (!this.hasShownError) {
+        this.hasShownError = true;
+        vscode.window.showWarningMessage(
+          `Go Test Suites: discovery failed. Ensure 'go' is installed and the gotest module is accessible.`,
+          "Open Output",
+        ).then((choice) => {
+          if (choice === "Open Output") {
+            this.outputChannel.show();
+          }
+        });
+      }
     } finally {
       this.running = false;
       if (this.pending) {
