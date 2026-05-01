@@ -1,0 +1,44 @@
+name: extension
+
+on:
+  push:
+    branches: [main]
+    paths: [vscode-gotest/**]
+  pull_request:
+    paths: [vscode-gotest/**]
+
+defaults:
+  run:
+    working-directory: vscode-gotest
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: vscode-gotest/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npm run compile
+
+  package:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: vscode-gotest/package-lock.json
+      - run: npm ci
+      - run: npx vsce package --no-dependencies
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vscode-gotest-vsix
+          path: vscode-gotest/*.vsix
