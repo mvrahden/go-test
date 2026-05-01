@@ -321,22 +321,21 @@ export class CoverageRunner implements vscode.Disposable {
   }
 
   private buildRunFilter(items: vscode.TestItem[]): string | undefined {
+    if (items.some((item) => this.getItemDepth(item) === 0)) {
+      return undefined;
+    }
+
+    const filters: string[] = [];
     for (const item of items) {
-      if (this.getItemDepth(item) === 0) {
-        return undefined;
+      const depth = this.getItemDepth(item);
+      if (depth === 1) {
+        filters.push(`^Test${item.label}$`);
+      } else if (depth === 2) {
+        filters.push(`^Test${item.parent!.label}$/^${item.label}$`);
       }
     }
 
-    const item = items[0];
-    const depth = this.getItemDepth(item);
-    if (depth === 1) {
-      return `^Test${item.label}$`;
-    }
-    if (depth === 2) {
-      const suite = item.parent!;
-      return `^Test${suite.label}$/^${item.label}$`;
-    }
-    return undefined;
+    return filters.length === 0 ? undefined : filters.length === 1 ? filters[0] : filters.join("|");
   }
 
   private spawnGoTest(
