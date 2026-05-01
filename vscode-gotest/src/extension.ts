@@ -201,7 +201,20 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Set up FileSystemWatcher for *_test.go files
   const watcher = vscode.workspace.createFileSystemWatcher("**/*_test.go");
-  const onFileChange = () => {
+  const onFileChange = (uri: vscode.Uri) => {
+    const discoverOnSave =
+      vscode.workspace.getConfiguration("gotest").get<boolean>("discoverOnSave") ?? true;
+    if (!discoverOnSave) {
+      return;
+    }
+    const importPath = cache.resolveFileToPackage(uri.fsPath);
+    if (importPath) {
+      discoveryService.discoverPackage(workspaceDir, importPath);
+    } else {
+      discoveryService.discover(workspaceDir);
+    }
+  };
+  const onFileDelete = () => {
     const discoverOnSave =
       vscode.workspace.getConfiguration("gotest").get<boolean>("discoverOnSave") ?? true;
     if (discoverOnSave) {
@@ -210,7 +223,7 @@ export function activate(context: vscode.ExtensionContext): void {
   };
   const watcherChangeDisposable = watcher.onDidChange(onFileChange);
   const watcherCreateDisposable = watcher.onDidCreate(onFileChange);
-  const watcherDeleteDisposable = watcher.onDidDelete(onFileChange);
+  const watcherDeleteDisposable = watcher.onDidDelete(onFileDelete);
 
   // Invalidate coverage when source files change
   const goSourceWatcher = vscode.workspace.createFileSystemWatcher("**/*.go");
