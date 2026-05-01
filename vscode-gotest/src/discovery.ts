@@ -35,7 +35,15 @@ export class DiscoveryCache implements vscode.Disposable {
     return undefined;
   }
 
-  update(packages: DiscoverPackage[]): void {
+  update(packages: DiscoverPackage[], fullScan: boolean): void {
+    if (fullScan) {
+      const resultPaths = new Set(packages.map((p) => p.importPath));
+      for (const key of this.cache.keys()) {
+        if (!resultPaths.has(key)) {
+          this.cache.delete(key);
+        }
+      }
+    }
     for (const pkg of packages) {
       this.cache.set(pkg.importPath, pkg);
     }
@@ -76,8 +84,12 @@ export class DiscoveryService {
       });
 
       const output: DiscoverOutput = JSON.parse(stdout);
+      const effectivePatterns = patterns ?? ["./..."];
+      const fullScan = effectivePatterns.some((p) => p.includes("..."));
       if (output.packages && output.packages.length > 0) {
-        this.cache.update(output.packages);
+        this.cache.update(output.packages, fullScan);
+      } else if (fullScan) {
+        this.cache.clear();
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
