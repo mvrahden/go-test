@@ -62,6 +62,7 @@ export class DiscoveryCache implements vscode.Disposable {
 
 export class DiscoveryService {
   private running = false;
+  private pending: { workspaceDir: string; patterns?: string[] } | undefined;
 
   constructor(
     private readonly cache: DiscoveryCache,
@@ -70,6 +71,7 @@ export class DiscoveryService {
 
   async discover(workspaceDir: string, patterns?: string[]): Promise<void> {
     if (this.running) {
+      this.pending = { workspaceDir, patterns };
       return;
     }
 
@@ -96,6 +98,11 @@ export class DiscoveryService {
       this.outputChannel.appendLine(`[discovery] error: ${message}`);
     } finally {
       this.running = false;
+      if (this.pending) {
+        const next = this.pending;
+        this.pending = undefined;
+        this.discover(next.workspaceDir, next.patterns);
+      }
     }
   }
 
