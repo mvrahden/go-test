@@ -162,18 +162,6 @@ export class GoTestController implements vscode.Disposable {
     return item;
   }
 
-  clearDynamicSubtests(parentItem: vscode.TestItem): void {
-    const toDelete: string[] = [];
-    parentItem.children.forEach((child) => {
-      if (child.id.includes("/dynamic/")) {
-        toDelete.push(child.id);
-      }
-    });
-    for (const id of toDelete) {
-      parentItem.children.delete(id);
-    }
-  }
-
   createTestRun(
     request: vscode.TestRunRequest,
     name: string,
