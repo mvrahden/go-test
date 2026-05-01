@@ -218,6 +218,10 @@ export class WatchManager implements vscode.Disposable {
         if (existingRun) {
           existingRun.end();
         }
+
+        if (cycleJsonAccumulator) {
+          this.onCycleComplete(cycleJsonAccumulator);
+        }
         cycleJsonAccumulator = "";
 
         // Create new TestRun
