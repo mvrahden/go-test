@@ -26,9 +26,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const discoveryService = new DiscoveryService(cache, outputChannel);
   const debugLauncher = new DebugLauncher(outputChannel);
 
-  // Create controller with inline handlers that close over runner
-  let runner: TestRunner;
-  let coverageRunner: CoverageRunner;
+  let runner!: TestRunner;
+  let coverageRunner!: CoverageRunner;
 
   const controller = new GoTestController(
     cache,
