@@ -89,7 +89,7 @@ export class SpecViewPanel implements vscode.Disposable {
       "gotestSpecView",
       "Go Test: Spec View",
       vscode.ViewColumn.Beside,
-      { enableScripts: true },
+      {},
     );
 
     this.panel.onDidDispose(
