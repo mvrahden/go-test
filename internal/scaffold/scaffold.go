@@ -2,6 +2,7 @@ package scaffold
 
 import (
 	"fmt"
+	"go/ast"
 	"go/format"
 	"go/types"
 	"path/filepath"
@@ -28,6 +29,20 @@ type MethodInfo struct {
 	Name         string
 	Signature    string // human-readable param/return description for TODO comment
 	ReturnsError bool
+}
+
+// FuncInfo describes an exported package-level function.
+type FuncInfo struct {
+	Name      string
+	Signature string
+}
+
+// FileInfo describes a Go source file's exported functions for scaffold generation.
+type FileInfo struct {
+	SuiteName string
+	PkgName   string
+	PkgDir    string
+	Funcs     []FuncInfo
 }
 
 // ParseTarget parses a target string like "./pkg/user.UserService" into
@@ -130,122 +145,96 @@ func IntrospectType(pkgPattern, typeName string) (*TypeInfo, error) {
 	return info, nil
 }
 
-// IntrospectFile loads the package containing the given file and returns
-// TypeInfo for each exported struct/interface type, or a single TypeInfo
-// representing exported functions if no types are found.
-func IntrospectFile(filePath string) ([]*TypeInfo, error) {
-	absPath, err := filepath.Abs(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve path %q: %w", filePath, err)
-	}
-
-	dir := filepath.Dir(absPath)
+// IntrospectFile loads a package and extracts exported package-level functions
+// from the specified file. It returns a FileInfo suitable for file-scoped scaffold generation.
+func IntrospectFile(pkgPattern, filename string) (*FileInfo, error) {
 	cfg := &packages.Config{
-		Mode:  packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps | packages.NeedFiles | packages.NeedSyntax,
-		Dir:   dir,
+		Mode:  packages.NeedName | packages.NeedTypes | packages.NeedSyntax | packages.NeedFiles,
 		Tests: false,
 	}
 
-	pkgs, err := packages.Load(cfg, ".")
+	pkgs, err := packages.Load(cfg, pkgPattern)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load package in %q: %w", dir, err)
+		return nil, fmt.Errorf("failed to load package %q: %w", pkgPattern, err)
 	}
+
 	if len(pkgs) == 0 {
-		return nil, fmt.Errorf("no packages found in %q", dir)
+		return nil, fmt.Errorf("no packages found for pattern %q", pkgPattern)
+	}
+
+	for _, pkg := range pkgs {
+		if len(pkg.Errors) > 0 {
+			return nil, fmt.Errorf("package %q has errors: %v", pkgPattern, pkg.Errors[0])
+		}
 	}
 
 	pkg := pkgs[0]
-	if len(pkg.Errors) > 0 {
-		return nil, fmt.Errorf("package has errors: %v", pkg.Errors[0])
+
+	// Find the AST file matching filename by comparing base names from pkg.GoFiles
+	var astFile *ast.File
+	for i, goFile := range pkg.GoFiles {
+		if filepath.Base(goFile) == filename {
+			astFile = pkg.Syntax[i]
+			break
+		}
+	}
+	if astFile == nil {
+		return nil, fmt.Errorf("file %q not found in package %q", filename, pkgPattern)
 	}
 
 	scope := pkg.Types.Scope()
-	var results []*TypeInfo
-	var funcs []MethodInfo
+	var funcs []FuncInfo
 
-	for _, name := range scope.Names() {
-		obj := scope.Lookup(name)
-		if !obj.Exported() {
+	for _, decl := range astFile.Decls {
+		fd, ok := decl.(*ast.FuncDecl)
+		if !ok {
+			continue
+		}
+		if fd.Recv != nil {
+			continue
+		}
+		if !ast.IsExported(fd.Name.Name) {
 			continue
 		}
 
-		pos := pkg.Fset.Position(obj.Pos())
-		if pos.Filename != absPath {
+		obj := scope.Lookup(fd.Name.Name)
+		if obj == nil {
 			continue
 		}
-
-		switch o := obj.(type) {
-		case *types.TypeName:
-			named, ok := o.Type().(*types.Named)
-			if !ok {
-				continue
-			}
-			info := &TypeInfo{
-				Name:    name,
-				PkgName: pkg.Name,
-				PkgDir:  determinePkgDir(pkg),
-			}
-			underlying := named.Underlying()
-			if iface, ok := underlying.(*types.Interface); ok {
-				info.IsInterface = true
-				info.Methods = extractInterfaceMethods(iface)
-			} else if _, ok := underlying.(*types.Struct); ok {
-				info.Methods = extractStructMethods(named)
-			} else {
-				continue
-			}
-			sort.Slice(info.Methods, func(i, j int) bool {
-				return info.Methods[i].Name < info.Methods[j].Name
-			})
-			results = append(results, info)
-
-		case *types.Func:
-			sig := o.Type().(*types.Signature)
-			if sig.Recv() != nil {
-				continue
-			}
-			funcs = append(funcs, MethodInfo{
-				Name:         name,
-				Signature:    formatSignature(sig),
-				ReturnsError: returnsError(sig),
-			})
+		fn, ok := obj.(*types.Func)
+		if !ok {
+			continue
 		}
+		sig := fn.Type().(*types.Signature)
+		funcs = append(funcs, FuncInfo{
+			Name:      fn.Name(),
+			Signature: formatSignature(sig),
+		})
 	}
 
-	if len(results) > 0 {
-		sort.Slice(results, func(i, j int) bool {
-			return results[i].Name < results[j].Name
-		})
-		return results, nil
-	}
+	sort.Slice(funcs, func(i, j int) bool {
+		return funcs[i].Name < funcs[j].Name
+	})
 
-	if len(funcs) > 0 {
-		sort.Slice(funcs, func(i, j int) bool {
-			return funcs[i].Name < funcs[j].Name
-		})
-		suiteName := fileToSuiteName(filepath.Base(absPath))
-		results = append(results, &TypeInfo{
-			Name:        suiteName,
-			PkgName:     pkg.Name,
-			PkgDir:      determinePkgDir(pkg),
-			IsFuncBased: true,
-			Methods:     funcs,
-		})
-		return results, nil
-	}
+	base := strings.TrimSuffix(filename, ".go")
+	suiteName := toPascalCase(base) + "TestSuite"
 
-	return nil, fmt.Errorf("no exported types or functions found in %q", filePath)
+	return &FileInfo{
+		SuiteName: suiteName,
+		PkgName:   pkg.Name,
+		PkgDir:    determinePkgDir(pkg),
+		Funcs:     funcs,
+	}, nil
 }
 
-func fileToSuiteName(filename string) string {
-	name := strings.TrimSuffix(filename, ".go")
-	parts := strings.Split(name, "_")
+func toPascalCase(s string) string {
+	parts := strings.Split(s, "_")
 	var result strings.Builder
 	for _, p := range parts {
-		if len(p) > 0 {
-			result.WriteString(strings.ToUpper(p[:1]))
-			result.WriteString(p[1:])
+		if len(p) == 0 {
+			continue
 		}
+		result.WriteString(strings.ToUpper(p[:1]) + p[1:])
 	}
 	return result.String()
 }
@@ -453,42 +442,33 @@ func (s *{{$.Name}}ContractTestSuite[T]) Test{{.Name}}(t *gotest.T) {
 // type My{{.Name}}TestSuite = {{.Name}}ContractTestSuite[*MyImpl]
 `))
 
-var funcTemplate = template.Must(template.New("func").Parse(`package {{.PkgName}}
+var fileTemplate = template.Must(template.New("file").Parse(`package {{.PkgName}}
 
 import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-type {{.Name}}TestSuite struct{}
-{{range .Methods}}
-func (s *{{$.Name}}TestSuite) Test{{.Name}}(t *gotest.T) {
-{{- if .ReturnsError}}
-	t.It("succeeds", func(it *gotest.T) {
-		// TODO: test {{.Name}}{{.Signature}}
-	})
-	t.It("returns error", func(it *gotest.T) {
-		// TODO: test error case
-	})
-{{- else}}
+type {{.SuiteName}} struct {
+	gotest.TestSuite
+}
+{{range .Funcs}}
+func (s *{{$.SuiteName}}) Test{{.Name}}(t *gotest.T) {
 	t.It("works", func(it *gotest.T) {
 		// TODO: test {{.Name}}{{.Signature}}
 	})
-{{- end}}
 }
 {{end}}`))
 
-// GenerateFuncScaffold generates a test suite scaffold for standalone functions.
-func GenerateFuncScaffold(info *TypeInfo) ([]byte, error) {
+// GenerateFileScaffold generates a test suite scaffold for package-level functions.
+func GenerateFileScaffold(info *FileInfo) ([]byte, error) {
 	var buf strings.Builder
-	if err := funcTemplate.Execute(&buf, info); err != nil {
+	if err := fileTemplate.Execute(&buf, info); err != nil {
 		return nil, fmt.Errorf("template execution failed: %w", err)
 	}
-
 	formatted, err := format.Source([]byte(buf.String()))
 	if err != nil {
 		return nil, fmt.Errorf("go/format failed: %w", err)
 	}
-
 	return formatted, nil
 }
 

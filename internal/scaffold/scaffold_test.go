@@ -288,6 +288,119 @@ func TestToSnakeCase(t *testing.T) {
 	}
 }
 
+func TestIntrospectFile_Funcs(t *testing.T) {
+	info, err := IntrospectFile("./testdata/sampletype", "funcs.go")
+	if err != nil {
+		t.Fatalf("IntrospectFile failed: %v", err)
+	}
+
+	if info.SuiteName != "FuncsTestSuite" {
+		t.Errorf("SuiteName: want %q, got %q", "FuncsTestSuite", info.SuiteName)
+	}
+	if info.PkgName != "sampletype" {
+		t.Errorf("PkgName: want %q, got %q", "sampletype", info.PkgName)
+	}
+	if info.PkgDir == "" {
+		t.Error("PkgDir should not be empty")
+	}
+	if len(info.Funcs) != 2 {
+		t.Fatalf("expected 2 funcs, got %d: %+v", len(info.Funcs), info.Funcs)
+	}
+	wantNames := []string{"ApplyTax", "CalculateDiscount"}
+	for i, want := range wantNames {
+		if info.Funcs[i].Name != want {
+			t.Errorf("func[%d]: want %q, got %q", i, want, info.Funcs[i].Name)
+		}
+	}
+}
+
+func TestIntrospectFile_NoExported(t *testing.T) {
+	info, err := IntrospectFile("./testdata/sampletype", "types.go")
+	if err != nil {
+		t.Fatalf("IntrospectFile failed: %v", err)
+	}
+	if len(info.Funcs) != 1 {
+		t.Fatalf("expected 1 exported func (NewUserService), got %d: %+v", len(info.Funcs), info.Funcs)
+	}
+	if info.Funcs[0].Name != "NewUserService" {
+		t.Errorf("func[0]: want %q, got %q", "NewUserService", info.Funcs[0].Name)
+	}
+}
+
+func TestGenerateFileScaffold(t *testing.T) {
+	info := &FileInfo{
+		SuiteName: "CalcTestSuite",
+		PkgName:   "pricing",
+		Funcs: []FuncInfo{
+			{Name: "ApplyTax", Signature: "(amount float64, region string) float64"},
+			{Name: "CalculateDiscount", Signature: "(amount float64, tier string) float64"},
+		},
+	}
+
+	out, err := GenerateFileScaffold(info)
+	if err != nil {
+		t.Fatalf("GenerateFileScaffold failed: %v", err)
+	}
+
+	src := string(out)
+
+	if !strings.Contains(src, "package pricing") {
+		t.Error("missing package declaration")
+	}
+	if !strings.Contains(src, `"github.com/mvrahden/go-test/pkg/gotest"`) {
+		t.Error("missing gotest import")
+	}
+	if !strings.Contains(src, "type CalcTestSuite struct") {
+		t.Error("missing test suite struct")
+	}
+	if !strings.Contains(src, "gotest.TestSuite") {
+		t.Error("missing embedded TestSuite")
+	}
+	if strings.Contains(src, "sut") {
+		t.Error("file-scoped scaffold should NOT have sut field")
+	}
+	if strings.Contains(src, "BeforeEach") {
+		t.Error("file-scoped scaffold should NOT have BeforeEach")
+	}
+	if !strings.Contains(src, "func (s *CalcTestSuite) TestApplyTax(t *gotest.T)") {
+		t.Error("missing TestApplyTax method")
+	}
+	if !strings.Contains(src, "func (s *CalcTestSuite) TestCalculateDiscount(t *gotest.T)") {
+		t.Error("missing TestCalculateDiscount method")
+	}
+}
+
+func TestScaffoldIntegration_File(t *testing.T) {
+	info, err := IntrospectFile("./testdata/sampletype", "funcs.go")
+	if err != nil {
+		t.Fatalf("IntrospectFile failed: %v", err)
+	}
+
+	out, err := GenerateFileScaffold(info)
+	if err != nil {
+		t.Fatalf("GenerateFileScaffold failed: %v", err)
+	}
+
+	goldenPath := filepath.Join("testdata", "funcs_suite_test.go.golden")
+
+	if os.Getenv("UPDATE_GOLDEN") != "" {
+		if err := os.WriteFile(goldenPath, out, 0644); err != nil {
+			t.Fatalf("failed to write golden file: %v", err)
+		}
+		t.Log("golden file updated")
+		return
+	}
+
+	golden, err := os.ReadFile(goldenPath)
+	if err != nil {
+		t.Fatalf("golden file not found (run with UPDATE_GOLDEN=1 to create): %v", err)
+	}
+
+	if string(out) != string(golden) {
+		t.Errorf("output does not match golden file.\n--- got ---\n%s\n--- want ---\n%s", string(out), string(golden))
+	}
+}
+
 func TestScaffoldIntegration(t *testing.T) {
 	// Full pipeline: introspect -> generate -> verify against golden file
 	info, err := IntrospectType("./testdata/sampletype", "UserService")
