@@ -58,7 +58,7 @@ export function activate(context: vscode.ExtensionContext): void {
     specView.refresh(jsonOutput);
   });
 
-  const watchManager = new WatchManager(controller, outputChannel, (jsonOutput) => {
+  const watchManager = new WatchManager(controller, cache, outputChannel, (jsonOutput) => {
     specView.refresh(jsonOutput);
   });
 
