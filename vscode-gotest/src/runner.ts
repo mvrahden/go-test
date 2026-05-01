@@ -44,7 +44,7 @@ export class TestRunner {
     }
     const cts = new vscode.CancellationTokenSource();
     this.activeRun = cts;
-    token.onCancellationRequested(() => cts.cancel());
+    const cancelSub = token.onCancellationRequested(() => cts.cancel());
     const effectiveToken = cts.token;
 
     const run = this.controller.createTestRun(request, "Go Test Run");
@@ -84,6 +84,12 @@ export class TestRunner {
 
         const workspaceDir = this.cache.getWorkspaceDir(importPath);
         if (!workspaceDir) {
+          for (const item of groupItems) {
+            run.errored(
+              item,
+              new vscode.TestMessage(`Workspace folder not found for: ${importPath}`),
+            );
+          }
           continue;
         }
 
@@ -143,6 +149,7 @@ export class TestRunner {
         }
       }
     } finally {
+      cancelSub.dispose();
       if (this.activeRun === cts) {
         this.activeRun = undefined;
       }

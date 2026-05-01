@@ -186,7 +186,7 @@ export function spawnTestProcess(
   outputChannel: vscode.OutputChannel,
   label: string,
 ): Promise<string> {
-  return new Promise<string>((resolve) => {
+  return new Promise<string>((resolve, reject) => {
     const child = spawn(bin, args, { cwd });
     let stdout = "";
     let stderr = "";
@@ -214,7 +214,7 @@ export function spawnTestProcess(
     child.on("error", (err: Error) => {
       cancelListener.dispose();
       outputChannel.appendLine(`[${label}] error: ${err.message}`);
-      resolve(stdout);
+      reject(err);
     });
   });
 }

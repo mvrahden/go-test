@@ -31,7 +31,8 @@ export class DiscoveryCache implements vscode.Disposable {
   }
 
   resolveFileToPackage(filePath: string): string | undefined {
-    const dir = filePath.substring(0, filePath.lastIndexOf("/"));
+    const lastSep = Math.max(filePath.lastIndexOf("/"), filePath.lastIndexOf("\\"));
+    const dir = lastSep >= 0 ? filePath.substring(0, lastSep) : filePath;
     for (const pkg of this.cache.values()) {
       if (pkg.dir === dir) {
         return pkg.importPath;
