@@ -11,6 +11,35 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
 
 func Test{{ $ts.Identifier }}(t *testing.T) {
   s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
+{{- /* Wire up shared fixtures from GOTEST_SHARED_STATE if present */ -}}
+{{- $sfRefs := index $.SuiteSharedFixtures $ts.Identifier }}
+{{- if $sfRefs }}
+  ƒsharedRaw := os.Getenv("GOTEST_SHARED_STATE")
+  if ƒsharedRaw == "" {
+      t.Fatal("GOTEST_SHARED_STATE not set — run via gotest CLI")
+  }
+  ƒsharedState := map[string]json.RawMessage{}
+  if err := json.Unmarshal([]byte(ƒsharedRaw), &ƒsharedState); err != nil {
+      t.Fatalf("unmarshal GOTEST_SHARED_STATE: %v", err)
+  }
+{{ range $sf := $sfRefs }}
+  {{ $sf.LocalVar }} := &{{ $sf.QualifiedType }}{}
+  if ƒb, ok := ƒsharedState["{{ $sf.StateKey }}"]; ok {
+      if err := json.Unmarshal(ƒb, {{ $sf.LocalVar }}); err != nil {
+          t.Fatalf("unmarshal {{ $sf.FieldName }} state: %v", err)
+      }
+  }
+{{- if $sf.HasHydrate }}
+  if err := {{ $sf.LocalVar }}.Hydrate(context.Background()); err != nil {
+      t.Fatalf("{{ $sf.FieldName }}.Hydrate: %v", err)
+  }
+{{- end }}
+{{- if $sf.HasDehydrate }}
+  t.Cleanup(func() { {{ $sf.LocalVar }}.Dehydrate(context.Background()) })
+{{- end }}
+  s.{{ $sf.FieldName }} = {{ $sf.LocalVar }}
+{{ end }}
+{{- end }}
 {{- if (hasSuffix $ts.FullIdentifier "TestSuiteParallel") }}
   t.Parallel()
 {{- end }}

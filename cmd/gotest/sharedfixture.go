@@ -50,7 +50,7 @@ func startSharedFixtures(ctx context.Context, fixtures []gotestgen.SharedFixture
 	}
 
 	// Write to temp file
-	tmpFile := "_gotest_shared_setup.go"
+	tmpFile := "gotest_shared_setup_.go"
 	if err := os.WriteFile(tmpFile, src, 0644); err != nil {
 		return nil, err
 	}
