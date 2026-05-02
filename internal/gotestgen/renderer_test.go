@@ -642,3 +642,103 @@ func (s *PlainTestSuite) TestOne(t *gotest.T) {}
 	gotest.Contains(t, output, "gotest.DefaultSuiteConfig()")
 	gotest.True(t, !strings.Contains(output, "OverlaySuiteConfig"), "should not have overlay call")
 }
+
+func TestRenderer_NamedField_SuiteToFixture(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import (
+	"context"
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type DBFixture struct{ Conn string }
+func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
+
+type QueryTestSuite struct { db *DBFixture }
+func (s *QueryTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	output, _ := renderTestPkg(t, pkg)
+
+	gotest.Contains(t, output, "db: fixture", "suite struct literal should use named field")
+	gotest.True(t, !strings.Contains(output, "DBFixture: fixture"), "should NOT use type name as field name")
+}
+
+func TestRenderer_NamedField_ChildToParentFixture(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import (
+	"context"
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type InfraFixture struct{ Val string }
+func (f *InfraFixture) BeforeAll(ctx context.Context) error { return nil }
+
+type APIFixture struct { infra *InfraFixture }
+func (f *APIFixture) BeforeAll(ctx context.Context) error { return nil }
+
+type LightTestSuite struct { *InfraFixture }
+func (s *LightTestSuite) TestOne(t *gotest.T) {}
+
+type FullTestSuite struct { *APIFixture }
+func (s *FullTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	output, _ := renderTestPkg(t, pkg)
+
+	gotest.Contains(t, output, "infra: fixture", "child fixture struct literal should use named parent field")
+}
+
+func TestRenderer_NamedField_SharedFixtureInFixture(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import (
+	"context"
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type PGSharedFixture struct{ ConnStr string }
+func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *PGSharedFixture) AfterAll(ctx context.Context) error  { return nil }
+
+type AppFixture struct { pg *PGSharedFixture }
+func (f *AppFixture) BeforeAll(ctx context.Context) error { return nil }
+
+type UserTestSuite struct { *AppFixture }
+func (s *UserTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	output, _ := renderTestPkg(t, pkg)
+
+	gotest.Contains(t, output, "fixture.pg = sf0", "shared fixture injection should use named field")
+	gotest.True(t, !strings.Contains(output, "fixture.PGSharedFixture"), "should NOT use type name for shared fixture field")
+}
+
+func TestRenderer_MixedFieldStyles_SameFixture(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import (
+	"context"
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type DBFixture struct{ Conn string }
+func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
+
+type EmbeddedTestSuite struct { *DBFixture }
+func (s *EmbeddedTestSuite) TestOne(t *gotest.T) {}
+
+type NamedTestSuite struct { db *DBFixture }
+func (s *NamedTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	output, _ := renderTestPkg(t, pkg)
+
+	gotest.Contains(t, output, "DBFixture: fixture", "embedded suite should use type name")
+	gotest.Contains(t, output, "db: fixture", "named-field suite should use custom field name")
+}

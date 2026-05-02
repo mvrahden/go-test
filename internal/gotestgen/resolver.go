@@ -13,12 +13,12 @@ import (
 // ResolvedFixture represents a fixture resolved from the type graph.
 // It carries all data needed for rendering and setup subprocess generation.
 type ResolvedFixture struct {
-	Kind          gotestast.FixtureKind
-	Identifier    string // unqualified type name, e.g. "InfraFixture"
-	QualifiedType string // "pkg.Name" for cross-package, "Name" for same
-	FieldName     string // unqualified, for struct literal field names
-	PkgPath       string // import path, empty if same package
-	PkgName       string // package name for qualified refs, empty if same package
+	Kind            gotestast.FixtureKind
+	Identifier      string // unqualified type name, e.g. "InfraFixture"
+	QualifiedType   string // "pkg.Name" for cross-package, "Name" for same
+	ParentFieldName string // field name in this fixture's struct that holds the parent fixture pointer
+	PkgPath         string // import path, empty if same package
+	PkgName         string // package name for qualified refs, empty if same package
 
 	Pkg   *packages.Package
 	Named *types.Named
@@ -43,10 +43,11 @@ type ResolvedFixture struct {
 
 // ResolveResult is the output of fixture resolution for a target package.
 type ResolveResult struct {
-	RootFixtures       []*ResolvedFixture
+	RootFixtures           []*ResolvedFixture
 	RequiredSharedFixtures []SharedFixtureInfo // deduplicated, for setup subprocess
-	FixtureBound       []*gotestast.TestSuiteSpec
-	Standalone         []*gotestast.TestSuiteSpec
+	FixtureBound           []*gotestast.TestSuiteSpec
+	Standalone             []*gotestast.TestSuiteSpec
+	SuiteSharedFixtures    map[string][]SharedFixtureRef // suite identifier → direct shared fixture refs
 }
 
 type resolver struct {
@@ -55,21 +56,22 @@ type resolver struct {
 	resolved      map[*types.Named]*ResolvedFixture
 	resolving     map[*types.Named]bool // cycle detection
 	sharedSeen    map[string]*SharedFixtureInfo // key: pkgPath.Name
+	result        *ResolveResult
 }
 
 // Resolve performs demand-driven fixture resolution starting from targeted test
 // suites. It walks the type graph recursively to discover all required fixtures
 // (both package and shared), validates constraints, and builds the fixture tree.
 func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, localFixtures []*gotestast.FixtureSpec) (*ResolveResult, error) {
+	result := &ResolveResult{}
 	r := &resolver{
 		targetPkg:     targetPkg,
 		localFixtures: localFixtures,
 		resolved:      make(map[*types.Named]*ResolvedFixture),
 		resolving:     make(map[*types.Named]bool),
 		sharedSeen:    make(map[string]*SharedFixtureInfo),
+		result:        result,
 	}
-
-	result := &ResolveResult{}
 
 	for _, suite := range suites {
 		fixture, err := r.resolveFixtureForSuite(suite)
@@ -132,46 +134,62 @@ func hasChildSuitesRecursive(rf *ResolvedFixture) bool {
 	return false
 }
 
+type suiteFixtureMatch struct {
+	resolved  *ResolvedFixture
+	fieldName string
+}
+
 func (r *resolver) resolveFixtureForSuite(suite *gotestast.TestSuiteSpec) (*ResolvedFixture, error) {
 	typ := suite.StructType()
 	if typ == nil {
 		return nil, nil
 	}
 
-	var fixtures []*ResolvedFixture
+	var fixtures []suiteFixtureMatch
+	var sharedRefs []SharedFixtureRef
+	sfIdx := 0
+
 	for i := 0; i < typ.NumFields(); i++ {
 		field := typ.Field(i)
-		if !field.Anonymous() {
-			continue
-		}
-		named := embeddedPointerNamed(field)
+		named := pointerNamed(field)
 		if named == nil {
 			continue
 		}
 		name := named.Obj().Name()
 
 		if strings.HasSuffix(name, "SharedFixture") {
-			return nil, fmt.Errorf(
-				"test suite %q directly embeds shared fixture %q; wrap it in a package fixture "+
-					"(e.g., type MyFixture struct { *%s })",
-				suite.Identifier(), name, name)
-		}
-		if strings.HasSuffix(name, "Fixture") {
+			ref, err := r.buildSharedFixtureRef(named, sfIdx)
+			if err != nil {
+				return nil, err
+			}
+			ref.FieldName = field.Name()
+			sharedRefs = append(sharedRefs, ref)
+			sfIdx++
+		} else if strings.HasSuffix(name, "Fixture") {
 			rf, err := r.resolveFixture(named)
 			if err != nil {
 				return nil, err
 			}
-			fixtures = append(fixtures, rf)
+			fixtures = append(fixtures, suiteFixtureMatch{resolved: rf, fieldName: field.Name()})
 		}
 	}
 
 	if len(fixtures) > 1 {
 		return nil, fmt.Errorf("test suite %q embeds multiple fixtures; at most one is allowed", suite.Identifier())
 	}
+
+	if len(sharedRefs) > 0 {
+		if r.result.SuiteSharedFixtures == nil {
+			r.result.SuiteSharedFixtures = make(map[string][]SharedFixtureRef)
+		}
+		r.result.SuiteSharedFixtures[suite.Identifier()] = sharedRefs
+	}
+
 	if len(fixtures) == 0 {
 		return nil, nil
 	}
-	return fixtures[0], nil
+	suite.SetFixtureFieldName(fixtures[0].fieldName)
+	return fixtures[0].resolved, nil
 }
 
 func (r *resolver) resolveFixture(named *types.Named) (*ResolvedFixture, error) {
@@ -215,10 +233,9 @@ func (r *resolver) resolveFixture(named *types.Named) (*ResolvedFixture, error) 
 	typePkg := named.Obj().Pkg()
 
 	rf := &ResolvedFixture{
-		Kind:         kind,
-		Identifier:   name,
-		FieldName:    name,
-		Named:        named,
+		Kind:       kind,
+		Identifier: name,
+		Named:      named,
 		Pkg:          pkg,
 		Spec:         spec,
 		BeforeAll:    mset.Lookup(typePkg, "BeforeAll") != nil,
@@ -246,40 +263,38 @@ func (r *resolver) resolveFixture(named *types.Named) (*ResolvedFixture, error) 
 		return nil, fmt.Errorf("%s %q must have a BeforeAll(ctx context.Context) error method", kindStr, name)
 	}
 
-	r.resolved[named] = rf
-
 	if kind == gotestast.PackageFixture {
 		if err := r.resolvePackageFixtureFields(rf, st); err != nil {
 			return nil, err
 		}
 	}
 
+	r.resolved[named] = rf
 	return rf, nil
 }
 
 func (r *resolver) resolvePackageFixtureFields(rf *ResolvedFixture, st *types.Struct) error {
 	var parent *ResolvedFixture
+	var parentFieldName string
 	sfIdx := 0
 
 	for i := 0; i < st.NumFields(); i++ {
 		field := st.Field(i)
-		if !field.Anonymous() {
-			continue
-		}
-		named := embeddedPointerNamed(field)
+		named := pointerNamed(field)
 		if named == nil {
 			continue
 		}
-		fieldName := named.Obj().Name()
+		typeName := named.Obj().Name()
 
-		if strings.HasSuffix(fieldName, "SharedFixture") {
+		if strings.HasSuffix(typeName, "SharedFixture") {
 			sfRef, err := r.buildSharedFixtureRef(named, sfIdx)
 			if err != nil {
 				return err
 			}
+			sfRef.FieldName = field.Name()
 			rf.SharedFixtures = append(rf.SharedFixtures, sfRef)
 			sfIdx++
-		} else if strings.HasSuffix(fieldName, "Fixture") {
+		} else if strings.HasSuffix(typeName, "Fixture") {
 			if parent != nil {
 				return fmt.Errorf("fixture %q embeds multiple fixtures; at most one parent is allowed", rf.Identifier)
 			}
@@ -288,11 +303,13 @@ func (r *resolver) resolvePackageFixtureFields(rf *ResolvedFixture, st *types.St
 			if err != nil {
 				return err
 			}
+			parentFieldName = field.Name()
 		}
 	}
 
 	if parent != nil {
 		rf.Parent = parent
+		rf.ParentFieldName = parentFieldName
 		parent.Children = append(parent.Children, rf)
 	}
 	return nil
@@ -475,7 +492,7 @@ func detectConfigMethod(mset *types.MethodSet, typePkg *types.Package, kind gote
 	return false
 }
 
-func embeddedPointerNamed(field *types.Var) *types.Named {
+func pointerNamed(field *types.Var) *types.Named {
 	ptr, ok := field.Type().(*types.Pointer)
 	if !ok {
 		return nil
