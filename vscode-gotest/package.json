@@ -112,6 +112,11 @@
           "default": [],
           "description": "Additional build flags passed to dlv"
         },
+        "gotest.buildTags": {
+          "type": "string",
+          "default": "",
+          "description": "Comma-separated Go build tags (e.g. 'integration,e2e'). Passed to discovery, test runs, and overlays."
+        },
         "gotest.specView.autoRefresh": {
           "type": "boolean",
           "default": true,

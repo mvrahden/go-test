@@ -21,8 +21,8 @@ const (
 	packageEvalMode = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps
 )
 
-func Generate(targetPath string) (GenerateResults, error) {
-	res, _, err := generateSrcs(targetPath)
+func Generate(targetPath string, buildFlags ...string) (GenerateResults, error) {
+	res, _, err := generateSrcs(targetPath, buildFlags...)
 	if err != nil {
 		return nil, err
 	}
@@ -31,12 +31,12 @@ func Generate(targetPath string) (GenerateResults, error) {
 
 // GenerateWithSharedFixtures generates test suite sources and also returns
 // the deduplicated shared fixtures discovered via demand-driven resolution.
-func GenerateWithSharedFixtures(targetPath string) (GenerateResults, []SharedFixtureInfo, error) {
-	return generateSrcs(targetPath)
+func GenerateWithSharedFixtures(targetPath string, buildFlags ...string) (GenerateResults, []SharedFixtureInfo, error) {
+	return generateSrcs(targetPath, buildFlags...)
 }
 
-func Collect(targetPath string) (gotestast.TestSuiteSpecSet, error) {
-	loadResults, err := LoadPackages(targetPath)
+func Collect(targetPath string, buildFlags ...string) (gotestast.TestSuiteSpecSet, error) {
+	loadResults, err := LoadPackages(targetPath, buildFlags...)
 	if err != nil {
 		return nil, err
 	}
@@ -67,17 +67,24 @@ type LoadResult struct {
 }
 
 // LoadPackages loads and groups test packages for the given target pattern.
-func LoadPackages(targetPkg string) ([]*LoadResult, error) {
-	totalFoundPkgs, err := packages.Load(&packages.Config{
+func LoadPackages(targetPkg string, buildFlags ...string) ([]*LoadResult, error) {
+	cfg := &packages.Config{
 		Mode:  packageEvalMode,
 		Tests: true,
-	}, targetPkg)
+	}
+	if len(buildFlags) > 0 {
+		cfg.BuildFlags = buildFlags
+	}
+	totalFoundPkgs, err := packages.Load(cfg, targetPkg)
 	if err != nil {
 		return nil, err
 	}
 
-	// filter all packages with Go-Module support
+	// filter all packages with Go-Module support, skip packages with load errors
 	loadedTestPkgs := slices.Filter(totalFoundPkgs, func(item *packages.Package, index int) bool {
+		if len(item.Errors) > 0 {
+			return false
+		}
 		return item.Module != nil
 	})
 	if len(loadedTestPkgs) == 0 {
@@ -111,8 +118,8 @@ func LoadPackages(targetPkg string) ([]*LoadResult, error) {
 	return res, nil
 }
 
-func generateSrcs(targetPkg string) (GenerateResults, []SharedFixtureInfo, error) {
-	loadResults, err := LoadPackages(targetPkg)
+func generateSrcs(targetPkg string, buildFlags ...string) (GenerateResults, []SharedFixtureInfo, error) {
+	loadResults, err := LoadPackages(targetPkg, buildFlags...)
 	if err != nil {
 		return nil, nil, err
 	}

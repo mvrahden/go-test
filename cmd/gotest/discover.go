@@ -47,12 +47,17 @@ type discoverMethod struct {
 }
 
 func runDiscover(args []string) int {
-	patterns := ExtractPackagePatterns(args)
+	tags, remaining := extractTagsFlag(args)
+	patterns := ExtractPackagePatterns(remaining)
+	var buildFlags []string
+	if tags != "" {
+		buildFlags = append(buildFlags, "-tags="+tags)
+	}
 
 	out := discoverOutput{}
 
 	for _, pattern := range patterns {
-		loadResults, err := gotestgen.LoadPackages(pattern)
+		loadResults, err := gotestgen.LoadPackages(pattern, buildFlags...)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2

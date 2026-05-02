@@ -169,6 +169,11 @@ export class CoverageRunner implements vscode.Disposable {
 
           const filter = this.buildRunFilter(groupItems, importPath);
 
+          const buildTags =
+            vscode.workspace
+              .getConfiguration("gotest")
+              .get<string>("buildTags", "")
+              .trim();
           const args = [
             "test",
             `-overlay=${overlay.overlayFile}`,
@@ -177,12 +182,15 @@ export class CoverageRunner implements vscode.Disposable {
             "-json",
             importPath,
           ];
+          if (buildTags) {
+            args.push(`-tags=${buildTags}`);
+          }
           if (filter) {
             args.push("-run", filter);
           }
           args.push(...testFlags);
 
-          const goBin = await resolveGoBinary(this.outputChannel);
+          const goBin = await resolveGoBinary(this.outputChannel, workspaceDir);
           this.outputChannel.appendLine(`[coverage] ${goBin} ${args.join(" ")}`);
           const stdout = await spawnTestProcess(goBin, args, workspaceDir, effectiveToken, this.outputChannel, "coverage");
           allJsonOutput += stdout;

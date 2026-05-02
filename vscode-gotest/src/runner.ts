@@ -111,6 +111,11 @@ export class TestRunner {
           const overlay = JSON.parse(overlayStdout) as { overlayFile: string; dir: string };
           overlayDir = overlay.dir;
 
+          const buildTags =
+            vscode.workspace
+              .getConfiguration("gotest")
+              .get<string>("buildTags", "")
+              .trim();
           const goTestArgs = [
             "test",
             `-overlay=${overlay.overlayFile}`,
@@ -118,12 +123,15 @@ export class TestRunner {
             "-json",
             importPath,
           ];
+          if (buildTags) {
+            goTestArgs.push(`-tags=${buildTags}`);
+          }
           if (filter) {
             goTestArgs.push("-run", filter);
           }
           goTestArgs.push(...testFlags);
 
-          const goBin = await resolveGoBinary(this.outputChannel);
+          const goBin = await resolveGoBinary(this.outputChannel, workspaceDir);
           this.outputChannel.appendLine(`[runner] ${goBin} ${goTestArgs.join(" ")}`);
           const stdout = await spawnTestProcess(goBin, goTestArgs, workspaceDir, effectiveToken, this.outputChannel, "runner");
           this._lastJsonOutput += stdout;

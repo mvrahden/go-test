@@ -82,3 +82,18 @@ func ExtractPackagePatterns(goTestArgs []string) []string {
 func looksLikePackagePattern(s string) bool {
 	return strings.HasPrefix(s, ".") || strings.HasPrefix(s, "/") || strings.Contains(s, "/")
 }
+
+func extractTagsFlag(args []string) (tags string, remaining []string) {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "-tags=") {
+			tags = strings.TrimPrefix(arg, "-tags=")
+		} else if arg == "-tags" && i+1 < len(args) {
+			tags = args[i+1]
+			i++
+		} else {
+			remaining = append(remaining, arg)
+		}
+	}
+	return tags, remaining
+}
