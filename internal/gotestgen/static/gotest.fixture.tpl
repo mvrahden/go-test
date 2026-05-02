@@ -93,7 +93,7 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
     t.Run("{{ $ts.Identifier }}", func(t *testing.T) {
         s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{
             {{ $ts.Identifier }}: {{ $ts.Identifier }}{
-                {{ $f.FieldName }}: fixture,
+                {{ $ts.FixtureFieldName }}: fixture,
             },
         }
 {{- if (hasSuffix $ts.FullIdentifier "TestSuiteParallel") }}
@@ -202,7 +202,7 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
 {{ range $cf := $f.ChildFixtures }}
     t.Run("{{ $cf.Identifier }}", func(t *testing.T) {
         child := &{{ $cf.QualifiedIdentifier }}{
-            {{ $f.FieldName }}: fixture,
+            {{ $cf.ParentFieldName }}: fixture,
         }
         ƒcfg_child := gotest.DefaultFixtureConfig()
 {{- if $cf.HasConfig }}
@@ -249,7 +249,7 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
         t.Run("{{ $ts.Identifier }}", func(t *testing.T) {
             s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{
                 {{ $ts.Identifier }}: {{ $ts.Identifier }}{
-                    {{ $cf.FieldName }}: child,
+                    {{ $ts.FixtureFieldName }}: child,
                 },
             }
 {{- if (hasSuffix $ts.FullIdentifier "TestSuiteParallel") }}

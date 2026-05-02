@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"go/format"
-	"go/types"
 	"strings"
 	"text/template"
 
@@ -30,7 +29,7 @@ var (
 type FixtureViewModel struct {
 	Identifier          string
 	QualifiedIdentifier string // "pkg.Name" for cross-package, "Name" for same
-	FieldName           string // unqualified, for struct literal field names
+	ParentFieldName     string // field name in this fixture's struct for the parent fixture pointer
 	PkgPath             string // import path, empty if same package
 	HasConfig           bool
 	BeforeAll           bool
@@ -70,21 +69,10 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 		return nil, nil
 	}
 
-	var fixtureBound, standalone []*gotestast.TestSuiteSpec
-	var viewModels []*FixtureViewModel
-
-	if resolved != nil {
-		fixtureBound = resolved.FixtureBound
-		standalone = resolved.Standalone
-		viewModels = buildFixtureViewModelsFromResolved(resolved.RootFixtures)
-	} else {
-		fixtureBound, standalone = splitSuitesByFixture(spec)
-		if len(fixtureBound) > 0 {
-			viewModels = buildFixtureViewModels(spec.Fixtures, fixtureBound)
-		}
-	}
-
-	hasFixtures := resolved != nil && len(resolved.RootFixtures) > 0
+	fixtureBound := resolved.FixtureBound
+	standalone := resolved.Standalone
+	viewModels := buildFixtureViewModelsFromResolved(resolved.RootFixtures)
+	hasFixtures := len(resolved.RootFixtures) > 0
 
 	buf := bytes.NewBuffer(nil)
 	if err := r.renderFileHeader(buf, pkg, spec, viewModels, hasFixtures); err != nil {
@@ -198,87 +186,6 @@ func (renderer) formatOutput(buf *bytes.Buffer) ([]byte, error) {
 	return srcs, nil
 }
 
-// splitSuitesByFixture splits effective test suites into fixture-bound and standalone.
-func splitSuitesByFixture(spec SpecOutcome) (fixtureBound, standalone []*gotestast.TestSuiteSpec) {
-	for _, ts := range spec.EffectiveTestSuites {
-		if ts.Fixture() != nil {
-			fixtureBound = append(fixtureBound, ts)
-		} else {
-			standalone = append(standalone, ts)
-		}
-	}
-	return
-}
-
-// buildFixtureViewModels constructs the fixture tree view model from flat lists
-// of fixtures and fixture-bound suites.
-func buildFixtureViewModels(fixtures []*gotestast.FixtureSpec, fixtureBound []*gotestast.TestSuiteSpec) []*FixtureViewModel {
-	// Build a map of fixture identifier -> view model
-	vmMap := make(map[string]*FixtureViewModel)
-	for _, f := range fixtures {
-		if f.Kind != gotestast.PackageFixture {
-			continue
-		}
-		vm := &FixtureViewModel{
-			Identifier:     f.Identifier(),
-			HasConfig:      f.Config != nil,
-			BeforeAll:      f.BeforeAll != nil,
-			AfterAll:       f.AfterAll != nil,
-			BeforeEach:     f.BeforeEach != nil,
-			AfterEach:      f.AfterEach != nil,
-			SharedFixtures: detectSharedFixtureEmbeddings(f),
-		}
-		vmMap[f.Identifier()] = vm
-	}
-
-	// Assign child suites to their fixture
-	for _, ts := range fixtureBound {
-		fix := ts.Fixture()
-		if fix == nil {
-			continue
-		}
-		vm, ok := vmMap[fix.Identifier()]
-		if !ok {
-			continue
-		}
-		vm.ChildSuites = append(vm.ChildSuites, ts)
-	}
-
-	// Build parent-child fixture relationships
-	for _, f := range fixtures {
-		if f.Kind != gotestast.PackageFixture {
-			continue
-		}
-		if f.ParentFixture == nil {
-			continue
-		}
-		childVM, ok := vmMap[f.Identifier()]
-		if !ok {
-			continue
-		}
-		parentVM, ok := vmMap[f.ParentFixture.Identifier()]
-		if !ok {
-			continue
-		}
-		parentVM.ChildFixtures = append(parentVM.ChildFixtures, childVM)
-	}
-
-	// Collect root fixtures (those without a parent fixture)
-	var roots []*FixtureViewModel
-	for _, f := range fixtures {
-		if f.Kind != gotestast.PackageFixture {
-			continue
-		}
-		if f.ParentFixture != nil {
-			continue
-		}
-		vm := vmMap[f.Identifier()]
-		roots = append(roots, vm)
-	}
-
-	return roots
-}
-
 func buildFixtureViewModelsFromResolved(roots []*ResolvedFixture) []*FixtureViewModel {
 	var vms []*FixtureViewModel
 	for _, rf := range roots {
@@ -291,7 +198,7 @@ func resolvedToViewModel(rf *ResolvedFixture) *FixtureViewModel {
 	vm := &FixtureViewModel{
 		Identifier:          rf.Identifier,
 		QualifiedIdentifier: rf.QualifiedType,
-		FieldName:           rf.FieldName,
+		ParentFieldName:     rf.ParentFieldName,
 		PkgPath:             rf.PkgPath,
 		HasConfig:           rf.HasConfig,
 		BeforeAll:           rf.BeforeAll,
@@ -309,59 +216,3 @@ func resolvedToViewModel(rf *ResolvedFixture) *FixtureViewModel {
 	return vm
 }
 
-// detectSharedFixtureEmbeddings inspects a package fixture's struct type for
-// embedded pointer fields whose type name ends in "SharedFixture". For each
-// match, it computes the state key and checks for Hydrate/Dehydrate methods.
-func detectSharedFixtureEmbeddings(pkgFixture *gotestast.FixtureSpec) []SharedFixtureRef {
-	typ := pkgFixture.StructType()
-	if typ == nil {
-		return nil
-	}
-
-	var refs []SharedFixtureRef
-	sfIdx := 0
-	for i := 0; i < typ.NumFields(); i++ {
-		field := typ.Field(i)
-		if !field.Anonymous() {
-			continue
-		}
-		ptr, ok := field.Type().(*types.Pointer)
-		if !ok {
-			continue
-		}
-		named, ok := ptr.Elem().(*types.Named)
-		if !ok {
-			continue
-		}
-		name := named.Obj().Name()
-		if !strings.HasSuffix(name, "SharedFixture") {
-			continue
-		}
-
-		qualifiedType := name
-		var pkgPath, stateKey string
-		if pkg := named.Obj().Pkg(); pkg != nil {
-			stateKey = pkg.Path() + "." + name
-			if pkg.Path() != pkgFixture.PackagePath() {
-				qualifiedType = pkg.Name() + "." + name
-				pkgPath = pkg.Path()
-			}
-		}
-
-		mset := types.NewMethodSet(types.NewPointer(named))
-		hasHydrate := mset.Lookup(named.Obj().Pkg(), "Hydrate") != nil
-		hasDehydrate := mset.Lookup(named.Obj().Pkg(), "Dehydrate") != nil
-
-		refs = append(refs, SharedFixtureRef{
-			LocalVar:      fmt.Sprintf("sf%d", sfIdx),
-			QualifiedType: qualifiedType,
-			FieldName:     name,
-			StateKey:      stateKey,
-			HasHydrate:    hasHydrate,
-			HasDehydrate:  hasDehydrate,
-			PkgPath:       pkgPath,
-		})
-		sfIdx++
-	}
-	return refs
-}

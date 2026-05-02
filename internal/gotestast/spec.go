@@ -108,6 +108,7 @@ type TestSuiteSpec struct {
 	underlyingTypeName string // non-empty for aliases of generic types (e.g. "GenericTestSuite")
 	th                 *TestSuiteHarness
 	fixture            *FixtureSpec
+	fixtureFieldName   string // field name used in the suite struct to hold the fixture pointer
 }
 
 // Identifier returns the Types Name.
@@ -134,6 +135,12 @@ func (ts *TestSuiteSpec) Fixture() *FixtureSpec { return ts.fixture }
 
 // SetFixture sets the fixture spec for this test suite.
 func (ts *TestSuiteSpec) SetFixture(f *FixtureSpec) { ts.fixture = f }
+
+// FixtureFieldName returns the field name used in the suite struct for the fixture pointer.
+func (ts *TestSuiteSpec) FixtureFieldName() string { return ts.fixtureFieldName }
+
+// SetFixtureFieldName sets the field name used in the suite struct for the fixture pointer.
+func (ts *TestSuiteSpec) SetFixtureFieldName(name string) { ts.fixtureFieldName = name }
 
 // FullIdentifier returns the Types Name plus it's package identifier with dot-notation.
 //
