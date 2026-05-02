@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { rm } from "node:fs/promises";
 import type { OverlayOutput } from "./types.js";
-import { buildCliCommand, formatCliCommand } from "./cli.js";
+import { buildCliCommand, formatCliCommand, scopedConfig } from "./cli.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -56,9 +56,7 @@ export class DebugLauncher implements vscode.Disposable {
     // Build run filter
     const runFilter = buildRunFilter(items);
 
-    // Build extra build flags
-    const extraBuildFlags = vscode.workspace
-      .getConfiguration("gotest")
+    const extraBuildFlags = scopedConfig(workspaceFolder.uri.fsPath)
       .get<string[]>("buildFlags", []);
 
     // Construct debug configuration
