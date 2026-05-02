@@ -1,6 +1,7 @@
 package gotestgen
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
@@ -28,9 +29,9 @@ func Generate(targetPath string) (GenerateResults, error) {
 	return res, nil
 }
 
-// GenerateWithCollectorResults generates test suite sources and also returns
-// the raw collector results, which can be used to discover shared fixtures.
-func GenerateWithCollectorResults(targetPath string) (GenerateResults, []CollectorResult, error) {
+// GenerateWithSharedFixtures generates test suite sources and also returns
+// the deduplicated shared fixtures discovered via demand-driven resolution.
+func GenerateWithSharedFixtures(targetPath string) (GenerateResults, []SharedFixtureInfo, error) {
 	return generateSrcs(targetPath)
 }
 
@@ -110,13 +111,15 @@ func LoadPackages(targetPkg string) ([]*LoadResult, error) {
 	return res, nil
 }
 
-func generateSrcs(targetPkg string) (GenerateResults, []CollectorResult, error) {
+func generateSrcs(targetPkg string) (GenerateResults, []SharedFixtureInfo, error) {
 	loadResults, err := LoadPackages(targetPkg)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	var allCollectorResults []CollectorResult
+	sharedSeen := map[string]bool{}
+	var allSharedFixtures []SharedFixtureInfo
+
 	results, err := slices.MapErr(loadResults, func(lr *LoadResult, _ int) (*GenerateResult, error) {
 		c := collector{}
 		ptestCollected := c.CollectSuiteSpecs(lr.Ptest)
@@ -128,32 +131,57 @@ func generateSrcs(targetPkg string) (GenerateResults, []CollectorResult, error) 
 			return nil, pxtestCollected.Errs[0].Err
 		}
 
-		allCollectorResults = append(allCollectorResults, ptestCollected, pxtestCollected)
-
 		ptestSpec, err := c.ApplyTestSuiteSpecs(ptestCollected)
 		if err != nil {
 			return nil, err
 		}
-
 		pxtestSpec, err := c.ApplyTestSuiteSpecs(pxtestCollected)
 		if err != nil {
 			return nil, err
 		}
 
-		r := renderer{}
-		ptestBuf, err := r.RenderTestSuiteSpec(lr.Ptest, ptestSpec)
+		ptestBuf, err := generateForPkg(lr.Ptest, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures)
 		if err != nil {
 			return nil, err
 		}
-		pxtestBuf, err := r.RenderTestSuiteSpec(lr.Pxtest, pxtestSpec)
+		pxtestBuf, err := generateForPkg(lr.Pxtest, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures)
 		if err != nil {
 			return nil, err
 		}
+
 		return &GenerateResult{AbsPath: lr.PkgDir, Package: lr.PkgPath, PTest: ptestBuf, PXTest: pxtestBuf}, nil
 	})
 	if err != nil {
 		return nil, nil, err
 	}
-	return results, allCollectorResults, nil
+	sort.Slice(allSharedFixtures, func(i, j int) bool {
+		if allSharedFixtures[i].PkgPath != allSharedFixtures[j].PkgPath {
+			return allSharedFixtures[i].PkgPath < allSharedFixtures[j].PkgPath
+		}
+		return allSharedFixtures[i].Identifier < allSharedFixtures[j].Identifier
+	})
+	return results, allSharedFixtures, nil
+}
+
+func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo) ([]byte, error) {
+	if pkg == nil || len(spec.EffectiveTestSuites) == 0 {
+		return nil, nil
+	}
+
+	resolved, err := Resolve(pkg, spec.EffectiveTestSuites, collected.Fixtures)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, sf := range resolved.RequiredSharedFixtures {
+		key := sf.PkgPath + "." + sf.Identifier
+		if !sharedSeen[key] {
+			sharedSeen[key] = true
+			*allShared = append(*allShared, sf)
+		}
+	}
+
+	r := renderer{}
+	return r.RenderTestSuiteSpec(pkg, spec, resolved)
 }
 

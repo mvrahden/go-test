@@ -43,7 +43,7 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
 {{ end }}
 {{ end }}
 
-    fixture := &{{ $f.Identifier }}{}
+    fixture := &{{ $f.QualifiedIdentifier }}{}
 {{- range $sf := $f.SharedFixtures }}
     fixture.{{ $sf.FieldName }} = {{ $sf.LocalVar }}
 {{- end }}
@@ -93,7 +93,7 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
     t.Run("{{ $ts.Identifier }}", func(t *testing.T) {
         s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{
             {{ $ts.Identifier }}: {{ $ts.Identifier }}{
-                {{ $f.Identifier }}: fixture,
+                {{ $f.FieldName }}: fixture,
             },
         }
 {{- if (hasSuffix $ts.FullIdentifier "TestSuiteParallel") }}
@@ -201,8 +201,8 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
 {{- /* Render child fixtures (Level 2 nesting) */ -}}
 {{ range $cf := $f.ChildFixtures }}
     t.Run("{{ $cf.Identifier }}", func(t *testing.T) {
-        child := &{{ $cf.Identifier }}{
-            {{ $f.Identifier }}: fixture,
+        child := &{{ $cf.QualifiedIdentifier }}{
+            {{ $f.FieldName }}: fixture,
         }
         ƒcfg_child := gotest.DefaultFixtureConfig()
 {{- if $cf.HasConfig }}
@@ -249,7 +249,7 @@ func Test_{{ $f.Identifier }}(t *testing.T) {
         t.Run("{{ $ts.Identifier }}", func(t *testing.T) {
             s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{
                 {{ $ts.Identifier }}: {{ $ts.Identifier }}{
-                    {{ $cf.Identifier }}: child,
+                    {{ $cf.FieldName }}: child,
                 },
             }
 {{- if (hasSuffix $ts.FullIdentifier "TestSuiteParallel") }}

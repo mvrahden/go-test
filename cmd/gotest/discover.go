@@ -66,7 +66,6 @@ func runDiscover(args []string) int {
 				Dir:        lr.PkgDir,
 			}
 
-			// Collect suites from both ptest and pxtest
 			pkgs := []*packages.Package{lr.Ptest, lr.Pxtest}
 			for _, pkg := range pkgs {
 				if pkg == nil {
@@ -75,6 +74,11 @@ func runDiscover(args []string) int {
 				result := c.CollectSuiteSpecs(pkg)
 				if len(result.Errs) > 0 {
 					fmt.Fprintf(os.Stderr, "FAIL: %s\n", result.Errs[0].Err)
+					return 2
+				}
+
+				if _, err := gotestgen.Resolve(pkg, result.Suites, result.Fixtures); err != nil {
+					fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 					return 2
 				}
 
