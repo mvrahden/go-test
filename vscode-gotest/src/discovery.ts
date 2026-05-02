@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { DiscoverOutput, DiscoverPackage } from "./types.js";
+import type { DiscoverOutput, DiscoverPackage, DiscoverWarning } from "./types.js";
 import { buildCliCommand, formatCliCommand } from "./cli.js";
 
 const execFileAsync = promisify(execFile);
@@ -9,12 +9,17 @@ const execFileAsync = promisify(execFile);
 export class DiscoveryCache implements vscode.Disposable {
   private cache = new Map<string, DiscoverPackage>();
   private workspaceDirs = new Map<string, string>();
+  private _warnings: (DiscoverWarning & { _wsDir: string })[] = [];
   private _onDidUpdate = new vscode.EventEmitter<void>();
 
   readonly onDidUpdate: vscode.Event<void> = this._onDidUpdate.event;
 
   get packages(): DiscoverPackage[] {
     return Array.from(this.cache.values());
+  }
+
+  get warnings(): DiscoverWarning[] {
+    return this._warnings;
   }
 
   getPackage(importPath: string): DiscoverPackage | undefined {
@@ -41,7 +46,7 @@ export class DiscoveryCache implements vscode.Disposable {
     return undefined;
   }
 
-  update(packages: DiscoverPackage[], fullScan: boolean, workspaceDir: string): void {
+  update(packages: DiscoverPackage[], fullScan: boolean, workspaceDir: string, warnings?: DiscoverWarning[]): void {
     if (fullScan) {
       const resultPaths = new Set(packages.map((p) => p.importPath));
       for (const [key, dir] of this.workspaceDirs) {
@@ -55,12 +60,19 @@ export class DiscoveryCache implements vscode.Disposable {
       this.cache.set(pkg.importPath, pkg);
       this.workspaceDirs.set(pkg.importPath, workspaceDir);
     }
+    if (warnings !== undefined) {
+      this._warnings = this._warnings.filter((w) => w._wsDir !== workspaceDir);
+      for (const w of warnings) {
+        this._warnings.push({ ...w, _wsDir: workspaceDir });
+      }
+    }
     this._onDidUpdate.fire();
   }
 
   clear(): void {
     this.cache.clear();
     this.workspaceDirs.clear();
+    this._warnings = [];
     this._onDidUpdate.fire();
   }
 
@@ -98,10 +110,12 @@ export class DiscoveryService {
       const output: DiscoverOutput = JSON.parse(stdout);
       const effectivePatterns = patterns ?? ["./..."];
       const fullScan = effectivePatterns.some((p) => p.includes("..."));
-      if (output.packages && output.packages.length > 0) {
-        this.cache.update(output.packages, fullScan, workspaceDir);
-      } else if (fullScan) {
-        this.cache.update([], true, workspaceDir);
+      const warnings = output.warnings ?? [];
+      const packages = output.packages ?? [];
+      this.cache.update(packages, fullScan, workspaceDir, warnings);
+      for (const w of warnings) {
+        const loc = w.file ? ` (${w.file}:${w.line ?? 0})` : "";
+        this.outputChannel.appendLine(`[discovery] warning: ${w.importPath}${loc}: ${w.message}`);
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

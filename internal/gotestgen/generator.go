@@ -1,6 +1,7 @@
 package gotestgen
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -55,6 +56,12 @@ func Collect(targetPath string, buildFlags ...string) (gotestast.TestSuiteSpecSe
 		allSuites = append(allSuites, pxtestCollected.Suites...)
 	}
 	return allSuites, nil
+}
+
+// LoadWarning represents a non-fatal issue found during package loading.
+type LoadWarning struct {
+	PkgPath string
+	Message string
 }
 
 // LoadResult holds the parsed packages for a given import path,
@@ -116,6 +123,74 @@ func LoadPackages(targetPkg string, buildFlags ...string) ([]*LoadResult, error)
 		res = append(res, v)
 	}
 	return res, nil
+}
+
+// LoadPackagesWithWarnings is like LoadPackages but also returns warnings
+// for packages that were skipped due to load errors (e.g. build constraints).
+func LoadPackagesWithWarnings(targetPkg string, buildFlags ...string) ([]*LoadResult, []LoadWarning, error) {
+	cfg := &packages.Config{
+		Mode:  packageEvalMode,
+		Tests: true,
+	}
+	if len(buildFlags) > 0 {
+		cfg.BuildFlags = buildFlags
+	}
+	totalFoundPkgs, err := packages.Load(cfg, targetPkg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var warnings []LoadWarning
+	seen := make(map[string]bool)
+	var loadedTestPkgs []*packages.Package
+	for _, p := range totalFoundPkgs {
+		if len(p.Errors) > 0 {
+			pkgPath := p.PkgPath
+			pkgPath = strings.TrimSuffix(pkgPath, "_test")
+			if strings.HasSuffix(pkgPath, ".test") {
+				continue
+			}
+			if !seen[pkgPath] {
+				seen[pkgPath] = true
+				for _, e := range p.Errors {
+					warnings = append(warnings, LoadWarning{PkgPath: pkgPath, Message: fmt.Sprintf("%s", e)})
+				}
+			}
+			continue
+		}
+		if p.Module != nil {
+			loadedTestPkgs = append(loadedTestPkgs, p)
+		}
+	}
+	if len(loadedTestPkgs) == 0 {
+		return nil, warnings, nil
+	}
+
+	loadedTestPkgs = slices.Filter(loadedTestPkgs, func(item *packages.Package, index int) bool {
+		return strings.HasSuffix(item.ID, ".test]")
+	})
+	testPkgs := slices.ReduceSeed(loadedTestPkgs, map[string]*LoadResult{}, func(p *packages.Package, acc map[string]*LoadResult) map[string]*LoadResult {
+		isPxTest := strings.HasSuffix(p.Name, "_test")
+		pkgPath := p.PkgPath
+		if isPxTest {
+			pkgPath = strings.TrimSuffix(pkgPath, "_test")
+		}
+		_, ok := acc[pkgPath]
+		if !ok {
+			acc[pkgPath] = &LoadResult{PkgPath: pkgPath, PkgDir: DeterminePkgDir(p)}
+		}
+		if !isPxTest {
+			acc[pkgPath].Ptest = p
+		} else {
+			acc[pkgPath].Pxtest = p
+		}
+		return acc
+	})
+	var res []*LoadResult
+	for _, v := range testPkgs {
+		res = append(res, v)
+	}
+	return res, warnings, nil
 }
 
 func generateSrcs(targetPkg string, buildFlags ...string) (GenerateResults, []SharedFixtureInfo, error) {
