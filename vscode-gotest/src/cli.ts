@@ -48,28 +48,45 @@ export async function buildCliCommand(
     subcommandArgs = [...subcommandArgs, `-tags=${buildTags}`];
   }
 
+  // 1. Explicit cliPath override (highest priority)
   const cliPath = config.get<string>("cliPath", "").trim();
-
   if (cliPath) {
     const resolved = resolveCliPath(cliPath, workspaceDir);
-    const exists = await fileExists(resolved);
-    if (exists) {
+    if (await fileExists(resolved)) {
       log?.appendLine(`[cli] cliPath override: ${resolved}`);
       return { bin: resolved, args: subcommandArgs };
     }
-    log?.appendLine(`[cli] cliPath setting "${resolved}" not found, probing alternatives`);
+    log?.appendLine(`[cli] cliPath "${resolved}" not found, probing alternatives`);
   }
 
+  // 2. Project-pinned version from go.mod
+  const modulePath = config.get<string>("modulePath") ?? DEFAULT_MODULE_PATH;
+  const effectiveDir = workspaceDir ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (effectiveDir && !modulePath.includes("@")) {
+    const version = await extractVersionFromGoMod(effectiveDir, modulePath);
+    if (version !== "latest") {
+      if (compareVersions(version, MIN_CLI_VERSION) >= 0) {
+        const goBin = await resolveGoBinary(log, workspaceDir);
+        const qualified = `${modulePath}@${version}`;
+        log?.appendLine(`[cli] using go.mod: ${goBin} run ${qualified}`);
+        return { bin: goBin, args: ["run", qualified, "--", ...subcommandArgs] };
+      }
+      log?.appendLine(`[cli] go.mod pins ${version}, requires >= ${MIN_CLI_VERSION}`);
+      showVersionWarning(version, effectiveDir, log);
+    }
+  }
+
+  // 3. Globally installed binary
   const gotest = await findInstalledGotest(workspaceDir, log);
   if (gotest) {
     log?.appendLine(`[cli] using installed binary: ${gotest}`);
     return { bin: gotest, args: subcommandArgs };
   }
 
+  // 4. Fallback: go run @latest
   const goBin = await resolveGoBinary(log, workspaceDir);
-  const modulePath = config.get<string>("modulePath") ?? DEFAULT_MODULE_PATH;
-  const qualified = await qualifyModulePath(modulePath, workspaceDir, log);
-  log?.appendLine(`[cli] using: ${goBin} run ${qualified}`);
+  const qualified = modulePath.includes("@") ? modulePath : `${modulePath}@latest`;
+  log?.appendLine(`[cli] using fallback: ${goBin} run ${qualified}`);
   return { bin: goBin, args: ["run", qualified, "--", ...subcommandArgs] };
 }
 
@@ -260,47 +277,33 @@ function resolveCliPath(cliPath: string, workspaceDir?: string): string {
   return cliPath;
 }
 
-async function qualifyModulePath(
-  modulePath: string,
-  workspaceDir?: string,
+function showVersionWarning(
+  version: string,
+  effectiveDir: string,
   log?: vscode.OutputChannel,
-): Promise<string> {
-  if (modulePath.includes("@")) {
-    return modulePath;
+): void {
+  if (versionWarningShown) {
+    return;
   }
-
-  const effectiveDir = workspaceDir ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!effectiveDir) {
-    return `${modulePath}@latest`;
-  }
-
-  const version = await extractVersionFromGoMod(effectiveDir, modulePath);
-  if (version !== "latest" && compareVersions(version, MIN_CLI_VERSION) < 0) {
-    log?.appendLine(`[cli] go.mod pins ${version}, but extension requires >= ${MIN_CLI_VERSION}; using @latest`);
-    if (!versionWarningShown) {
-      versionWarningShown = true;
-      vscode.window.showWarningMessage(
-        `Go Test Suites: go.mod pins gotest ${version}, but this extension requires >= ${MIN_CLI_VERSION}. Using @latest instead.`,
-        "Upgrade",
-      ).then(async (choice) => {
-        if (choice !== "Upgrade") return;
-        try {
-          const goBin = await resolveGoBinary(log, effectiveDir);
-          const args = ["get", `${DEFAULT_MODULE_PATH}@latest`];
-          log?.appendLine(`[cli] upgrading: ${goBin} ${args.join(" ")}`);
-          await execFileAsync(goBin, args, { cwd: effectiveDir, timeout: 30_000 });
-          log?.appendLine("[cli] upgrade complete");
-          vscode.window.showInformationMessage("Go Test Suites: gotest dependency upgraded to latest.");
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          log?.appendLine(`[cli] upgrade failed: ${msg}`);
-          vscode.window.showErrorMessage(`Go Test Suites: upgrade failed. ${msg}`);
-        }
-      });
+  versionWarningShown = true;
+  vscode.window.showWarningMessage(
+    `Go Test Suites: go.mod pins gotest ${version}, but >= ${MIN_CLI_VERSION} is required.`,
+    "Upgrade",
+  ).then(async (choice) => {
+    if (choice !== "Upgrade") return;
+    try {
+      const goBin = await resolveGoBinary(log, effectiveDir);
+      const args = ["get", `${DEFAULT_MODULE_PATH}@latest`];
+      log?.appendLine(`[cli] upgrading: ${goBin} ${args.join(" ")}`);
+      await execFileAsync(goBin, args, { cwd: effectiveDir, timeout: 30_000 });
+      log?.appendLine("[cli] upgrade complete");
+      vscode.window.showInformationMessage("Go Test Suites: gotest dependency upgraded to latest.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log?.appendLine(`[cli] upgrade failed: ${msg}`);
+      vscode.window.showErrorMessage(`Go Test Suites: upgrade failed. ${msg}`);
     }
-    return `${modulePath}@latest`;
-  }
-  return `${modulePath}@${version}`;
+  });
 }
 
 async function extractVersionFromGoMod(workspaceDir: string, modulePath: string): Promise<string> {
