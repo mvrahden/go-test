@@ -134,7 +134,7 @@
         "gotest.watch.autoRestart": {
           "type": "boolean",
           "default": true,
-          "scope": "resource",
+          "scope": "window",
           "description": "Auto-restart watch process on crash"
         },
         "gotest.watch.scope": {

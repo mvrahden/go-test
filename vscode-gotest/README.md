@@ -26,7 +26,7 @@ This extension makes that workflow native to VS Code:
 - **VS Code** (1.101+)
 - **[Delve](https://github.com/go-delve/delve)** (for debugging only)
 
-The extension uses `go run` to invoke the gotest CLI automatically — no separate install needed. It resolves the version from your `go.mod`.
+The extension invokes the gotest CLI automatically — no separate install needed. It resolves the version from your `go.mod` and uses `go run` to execute it.
 
 ### Install
 
@@ -89,7 +89,7 @@ The generated file opens automatically and discovery refreshes.
 
 ### Multi-root workspaces
 
-Fully supported. Each workspace folder is discovered independently. Commands resolve the correct workspace folder from the active editor, and file watchers trigger per-folder discovery.
+Fully supported. Each workspace folder is discovered independently. Commands resolve the correct workspace folder from the active editor, and file watchers trigger per-folder discovery. Per-project settings like `cliPath`, `testFlags`, and `buildTags` can be configured per folder via `.vscode/settings.json`.
 
 ## Commands
 
@@ -107,18 +107,64 @@ Fully supported. Each workspace folder is discovered independently. Commands res
 
 ## Settings
 
+### Per-project settings (resource scope)
+
+These can be set in `.vscode/settings.json` per workspace folder:
+
 | Setting | Default | Description |
 |---------|---------|-------------|
+| `gotest.cliPath` | `""` | Path to a gotest binary (overrides all other resolution) |
 | `gotest.modulePath` | `github.com/mvrahden/go-test/cmd/gotest` | Go module path for the gotest CLI |
-| `gotest.cliPath` | `""` | Path to a pre-installed gotest binary (bypasses `go run`) |
-| `gotest.discoverOnSave` | `true` | Re-discover tests when `_test.go` files change |
-| `gotest.showCodeLens` | `true` | Show Run/Debug CodeLens above suites and methods |
-| `gotest.showFocusWarnings` | `true` | Show diagnostics for `F_` prefixed (focused) tests |
+| `gotest.buildTags` | `""` | Comma-separated Go build tags (e.g. `integration,e2e`) |
 | `gotest.testFlags` | `[]` | Additional flags passed to `go test` |
 | `gotest.buildFlags` | `[]` | Additional build flags passed to Delve |
+| `gotest.discoverOnSave` | `true` | Re-discover tests when `_test.go` files change |
+| `gotest.watch.scope` | `./...` | Default package scope for watch mode |
+
+### Global settings (window scope)
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `gotest.showCodeLens` | `true` | Show Run/Debug CodeLens above suites and methods |
+| `gotest.showFocusWarnings` | `true` | Show diagnostics for `F_` prefixed (focused) tests |
 | `gotest.specView.autoRefresh` | `true` | Auto-refresh Spec View after test runs |
 | `gotest.watch.autoRestart` | `true` | Auto-restart watch process on crash |
-| `gotest.watch.scope` | `./...` | Default package scope for watch mode |
+
+### Example `.vscode/settings.json`
+
+```jsonc
+{
+  // Use a local gotest binary instead of go run
+  "gotest.cliPath": "./bin/gotest",
+
+  // Pass build tags to discovery, overlays, and test runs
+  "gotest.buildTags": "integration,e2e",
+
+  // Extra flags for go test (e.g. timeout, verbose)
+  "gotest.testFlags": ["-timeout=120s", "-v"],
+
+  // Extra build flags for Delve debug sessions
+  "gotest.buildFlags": ["-gcflags=all=-N -l"]
+}
+```
+
+### Gotest CLI resolution
+
+The extension resolves the gotest binary in this order:
+
+1. **`gotest.cliPath`** — Explicit path to a binary. Highest priority; always used when set.
+2. **`go.mod` version** — If your project's `go.mod` references the gotest module, the pinned version is used via `go run pkg@version`.
+3. **Installed binary** — A `gotest` binary found in `GOBIN`, `GOPATH/bin`, or on `PATH`.
+4. **`go run @latest`** — Fallback when none of the above apply.
+
+### Go binary resolution
+
+The extension resolves the Go toolchain per workspace folder:
+
+1. **`go.mod` go directive** — If `go.mod` declares `go 1.26.2`, the extension looks for `~/sdk/go1.26.2/bin/go` or `go1.26.2` on PATH.
+2. **`GOROOT`** — `$GOROOT/bin/go` if set.
+3. **Login shell** — Runs `bash -lc 'command -v go'` to find Go on the user's full PATH.
+4. **Common paths** — `/usr/local/go/bin/go`, `~/go/bin/go`, `/usr/bin/go`, `~/sdk/go*/bin/go`.
 
 ## Requirements
 
