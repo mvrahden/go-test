@@ -41,18 +41,14 @@ export async function buildCliCommand(
   workspaceDir?: string,
   log?: vscode.OutputChannel,
 ): Promise<CliCommand> {
-  const buildTags = vscode.workspace
-    .getConfiguration("gotest")
-    .get<string>("buildTags", "")
-    .trim();
+  const config = scopedConfig(workspaceDir);
+
+  const buildTags = config.get<string>("buildTags", "").trim();
   if (buildTags) {
     subcommandArgs = [...subcommandArgs, `-tags=${buildTags}`];
   }
 
-  const cliPath = vscode.workspace
-    .getConfiguration("gotest")
-    .get<string>("cliPath", "")
-    .trim();
+  const cliPath = config.get<string>("cliPath", "").trim();
 
   if (cliPath) {
     const resolved = resolveCliPath(cliPath, workspaceDir);
@@ -71,9 +67,7 @@ export async function buildCliCommand(
   }
 
   const goBin = await resolveGoBinary(log, workspaceDir);
-  const modulePath = vscode.workspace
-    .getConfiguration("gotest")
-    .get<string>("modulePath") ?? DEFAULT_MODULE_PATH;
+  const modulePath = config.get<string>("modulePath") ?? DEFAULT_MODULE_PATH;
   const qualified = await qualifyModulePath(modulePath, workspaceDir, log);
   log?.appendLine(`[cli] using: ${goBin} run ${qualified}`);
   return { bin: goBin, args: ["run", qualified, "--", ...subcommandArgs] };
@@ -353,6 +347,11 @@ function escapeRegExp(s: string): string {
 
 export function formatCliCommand(cmd: CliCommand): string {
   return `${cmd.bin} ${cmd.args.join(" ")}`;
+}
+
+export function scopedConfig(workspaceDir?: string): vscode.WorkspaceConfiguration {
+  const scope = workspaceDir ? vscode.Uri.file(workspaceDir) : undefined;
+  return vscode.workspace.getConfiguration("gotest", scope);
 }
 
 async function fileExists(p: string): Promise<boolean> {

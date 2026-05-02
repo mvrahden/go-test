@@ -5,7 +5,7 @@ import { rm } from "node:fs/promises";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import { parseTestEvents } from "./outputParser.js";
-import { buildCliCommand, formatCliCommand, resolveGoBinary } from "./cli.js";
+import { buildCliCommand, formatCliCommand, resolveGoBinary, scopedConfig } from "./cli.js";
 import {
   collectItems,
   groupByPackage,
@@ -94,10 +94,8 @@ export class TestRunner {
         }
 
         const filter = this.buildRunFilter(groupItems, importPath);
-        const testFlags =
-          vscode.workspace
-            .getConfiguration("gotest")
-            .get<string[]>("testFlags") ?? [];
+        const config = scopedConfig(workspaceDir);
+        const testFlags = config.get<string[]>("testFlags") ?? [];
 
         let overlayDir: string | undefined;
         try {
@@ -111,11 +109,7 @@ export class TestRunner {
           const overlay = JSON.parse(overlayStdout) as { overlayFile: string; dir: string };
           overlayDir = overlay.dir;
 
-          const buildTags =
-            vscode.workspace
-              .getConfiguration("gotest")
-              .get<string>("buildTags", "")
-              .trim();
+          const buildTags = config.get<string>("buildTags", "").trim();
           const goTestArgs = [
             "test",
             `-overlay=${overlay.overlayFile}`,
