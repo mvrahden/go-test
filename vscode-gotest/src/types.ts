@@ -1,5 +1,14 @@
+export interface DiscoverWarning {
+  importPath: string;
+  file?: string;
+  line?: number;
+  col?: number;
+  message: string;
+}
+
 export interface DiscoverOutput {
   packages: DiscoverPackage[];
+  warnings?: DiscoverWarning[];
 }
 
 export interface DiscoverPackage {
