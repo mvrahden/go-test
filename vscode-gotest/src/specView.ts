@@ -76,7 +76,6 @@ export function ansiToHtml(text: string): string {
 export class SpecViewPanel implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private disposables: vscode.Disposable[] = [];
-  private lastHtml = "";
 
   constructor(private readonly outputChannel: vscode.OutputChannel) {}
 
@@ -90,7 +89,7 @@ export class SpecViewPanel implements vscode.Disposable {
       "gotestSpecView",
       "Go Test: Spec View",
       vscode.ViewColumn.Beside,
-      { enableScripts: true },
+      {},
     );
 
     this.panel.onDidDispose(
@@ -123,7 +122,6 @@ export class SpecViewPanel implements vscode.Disposable {
     try {
       const stdout = await this.runSpecFromInput(jsonOutput);
       const content = ansiToHtml(stdout);
-      this.lastHtml = content;
       this.panel.webview.html = this.buildHtml(content);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

@@ -7,8 +7,6 @@ export class FocusExcludeProvider
 {
   static readonly providedCodeActionKinds = [vscode.CodeActionKind.QuickFix];
 
-  private disposables: vscode.Disposable[] = [];
-
   constructor(private readonly cache: DiscoveryCache) {}
 
   provideCodeActions(
@@ -41,11 +39,7 @@ export class FocusExcludeProvider
     return [];
   }
 
-  dispose(): void {
-    for (const d of this.disposables) {
-      d.dispose();
-    }
-  }
+  dispose(): void {}
 
   private actionsForMethod(
     method: DiscoverMethod,
