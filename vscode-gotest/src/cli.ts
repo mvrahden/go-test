@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { readFile, readdir, access, constants } from "node:fs/promises";
+import * as os from "node:os";
+import { readFile, readdir, access, mkdir, stat, constants } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -67,6 +69,16 @@ export async function buildCliCommand(
     if (version !== "latest") {
       if (compareVersions(version, MIN_CLI_VERSION) >= 0) {
         const goBin = await resolveGoBinary(log, workspaceDir);
+
+        if (await hasReplaceDirective(effectiveDir, modulePath)) {
+          const bin = await buildCachedBinary(goBin, effectiveDir, modulePath, log);
+          if (bin) {
+            log?.appendLine(`[cli] using go.mod (replace): ${bin}`);
+            return { bin, args: subcommandArgs };
+          }
+          log?.appendLine(`[cli] replace build failed, falling back to go run`);
+        }
+
         const qualified = `${modulePath}@${version}`;
         log?.appendLine(`[cli] using go.mod: ${goBin} run ${qualified}`);
         return { bin: goBin, args: ["run", qualified, "--", ...subcommandArgs] };
@@ -306,6 +318,77 @@ function showVersionWarning(
   });
 }
 
+async function hasReplaceDirective(workspaceDir: string, modulePath: string): Promise<boolean> {
+  try {
+    const content = await readFile(path.join(workspaceDir, "go.mod"), "utf-8");
+    let candidate = modulePath;
+    while (candidate) {
+      const pattern = new RegExp(`^\\s*replace\\s+${escapeRegExp(candidate)}\\b`, "m");
+      if (pattern.test(content)) {
+        return true;
+      }
+      const lastSlash = candidate.lastIndexOf("/");
+      if (lastSlash <= 0) break;
+      candidate = candidate.substring(0, lastSlash);
+    }
+  } catch {
+    // go.mod not found
+  }
+  return false;
+}
+
+const replaceBinaryCache = new Map<string, { hash: string; binPath: string }>();
+
+async function buildCachedBinary(
+  goBin: string,
+  workspaceDir: string,
+  modulePath: string,
+  log?: vscode.OutputChannel,
+): Promise<string | undefined> {
+  const goModPath = path.join(workspaceDir, "go.mod");
+  let goModContent: string;
+  try {
+    goModContent = await readFile(goModPath, "utf-8");
+  } catch {
+    return undefined;
+  }
+
+  const hash = createHash("sha256").update(goModContent).digest("hex").substring(0, 16);
+  const cached = replaceBinaryCache.get(workspaceDir);
+  if (cached?.hash === hash) {
+    try {
+      await access(cached.binPath, constants.X_OK);
+      return cached.binPath;
+    } catch {
+      // binary removed, rebuild
+    }
+  }
+
+  const cacheDir = path.join(os.tmpdir(), "vscode-gotest");
+  try {
+    await mkdir(cacheDir, { recursive: true });
+  } catch {
+    return undefined;
+  }
+
+  const dirHash = createHash("sha256").update(workspaceDir).digest("hex").substring(0, 12);
+  const binPath = path.join(cacheDir, `gotest-${dirHash}`);
+
+  try {
+    log?.appendLine(`[cli] building gotest from replace directive...`);
+    await execFileAsync(goBin, ["build", "-o", binPath, modulePath], {
+      cwd: workspaceDir,
+      timeout: 60_000,
+    });
+    replaceBinaryCache.set(workspaceDir, { hash, binPath });
+    return binPath;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log?.appendLine(`[cli] replace build error: ${msg}`);
+    return undefined;
+  }
+}
+
 async function extractVersionFromGoMod(workspaceDir: string, modulePath: string): Promise<string> {
   try {
     const goModPath = path.join(workspaceDir, "go.mod");
@@ -413,5 +496,6 @@ async function commonGoPaths(): Promise<string[]> {
 export function clearBinaryCache(): void {
   goBinaryCache.clear();
   cachedGotestBinary = undefined;
+  replaceBinaryCache.clear();
   versionWarningShown = false;
 }
