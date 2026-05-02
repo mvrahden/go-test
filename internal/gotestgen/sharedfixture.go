@@ -6,7 +6,6 @@ import (
 	"go/format"
 
 	"github.com/mvrahden/go-test/about"
-	"github.com/mvrahden/go-test/internal/gotestast"
 )
 
 // SharedFixtureInfo describes a shared fixture to be run in a setup subprocess.
@@ -18,48 +17,6 @@ type SharedFixtureInfo struct {
 	HasDehydrate   bool
 	TransferFields []string // exported fields that are serialized (all exported minus local)
 	LocalFields    []string // exported fields assigned in Hydrate
-}
-
-// DiscoverSharedFixtures scans CollectorResults for shared fixtures that are
-// embedded in package fixtures. Returns deduplicated list.
-func DiscoverSharedFixtures(results []CollectorResult) []SharedFixtureInfo {
-	seen := map[string]bool{}
-	var shared []SharedFixtureInfo
-	for _, cr := range results {
-		for _, f := range cr.Fixtures {
-			if f.Kind != gotestast.SharedFixture {
-				continue
-			}
-			key := f.PackagePath() + "." + f.Identifier()
-			if seen[key] {
-				continue
-			}
-			seen[key] = true
-
-			localFields := gotestast.ClassifyLocalFields(f)
-			allExported := f.ExportedFieldNames()
-
-			var transferFields, localFieldList []string
-			for _, name := range allExported {
-				if localFields[name] {
-					localFieldList = append(localFieldList, name)
-				} else {
-					transferFields = append(transferFields, name)
-				}
-			}
-
-			shared = append(shared, SharedFixtureInfo{
-				Identifier:     f.Identifier(),
-				PkgPath:        f.PackagePath(),
-				HasConfig:      f.Config != nil,
-				HasHydrate:     f.Hydrate != nil,
-				HasDehydrate:   f.Dehydrate != nil,
-				TransferFields: transferFields,
-				LocalFields:    localFieldList,
-			})
-		}
-	}
-	return shared
 }
 
 // GenerateSharedSetup generates a standalone Go main package source that

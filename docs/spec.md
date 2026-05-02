@@ -240,6 +240,8 @@ type BatchTestSuite struct {
 }
 ```
 
+Fixtures may be defined in a different package from the suite. The resolver walks the type graph from targeted suites to discover all required fixtures, including cross-package dependencies.
+
 Fixtures nest — a root fixture's hooks run first, wrapping the child's:
 
 ```
@@ -864,7 +866,7 @@ The `spec` subcommand and `--spec` flag are post-processing views over `go test 
 cmd/gotest/                  CLI entrypoint, subcommands, arg handling
   └── internal/gotestrunner/   Suite generation I/O, go test execution, overlay
         └── internal/cmd/testgen/   Generation orchestration
-              └── internal/gotestgen/   Package loading, collection, rendering
+              └── internal/gotestgen/   Package loading, collection, fixture resolution, rendering
                     └── internal/gotestast/   AST analysis, spec model, regex classification
 
 cmd/gotest-lint/             Standalone linter binary (singlechecker)
@@ -885,11 +887,12 @@ about/                       Build metadata, file naming constants
 | Stage | Input | Output |
 |-------|-------|--------|
 | **Load** | Package pattern (e.g., `./...`) | `[]*packages.Package` with syntax, types, module info |
-| **Collect** | Package AST | `TestSuiteSpecSet` — suites with attached methods |
+| **Collect** | Package AST | `TestSuiteSpecSet` — suites with attached methods, local fixture specs |
 | **Reduce** | `TestSuiteSpecSet` | Effective set after focus/exclude applied |
-| **Render** | Reduced spec | Formatted Go source bytes |
+| **Resolve** | Effective suites + local fixtures | `ResolveResult` — fixture trees, shared fixture info, suite→fixture bindings |
+| **Render** | Reduced spec + resolve result | Formatted Go source bytes |
 
-Collection is a two-pass AST traversal: find type declarations matching suite patterns, then attach methods by matching receiver types.
+Collection is a two-pass AST traversal: find type declarations matching suite patterns, then attach methods by matching receiver types. Resolution is demand-driven: it starts from targeted suites and walks the Go type graph recursively (via `types.Named`, `types.Struct`, `types.MethodSet`) to discover all required fixtures, including cross-package dependencies.
 
 ### Key Invariant
 

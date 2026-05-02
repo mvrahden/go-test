@@ -11,6 +11,7 @@ import { WatchManager } from "./watch.js";
 import { ScaffoldCodeActionProvider, runScaffoldCommand, executeScaffold } from "./scaffold.js";
 import { CoverageRunner } from "./coverage.js";
 import { CoverageStore } from "./coverageStore.js";
+import { validateGoBinary } from "./cli.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Go Test Suites");
@@ -309,8 +310,21 @@ export function activate(context: vscode.ExtensionContext): void {
     sourceDeleteDisposable,
   );
 
-  // Run initial discovery, then restore persisted coverage
+  // Validate go binary, then run initial discovery and restore persisted coverage
   (async () => {
+    const firstDir = workspaceFolders[0].uri.fsPath;
+    const goBin = await validateGoBinary(outputChannel, firstDir);
+    if (!goBin) {
+      outputChannel.appendLine("[activate] Go binary not found or not working");
+      vscode.window.showErrorMessage(
+        "Go Test Suites: could not find a working 'go' installation. Ensure Go is installed and on your PATH.",
+        "Open Output",
+      ).then((choice) => {
+        if (choice === "Open Output") outputChannel.show();
+      });
+      return;
+    }
+
     for (const folder of workspaceFolders) {
       await discoveryService.discover(folder.uri.fsPath);
     }

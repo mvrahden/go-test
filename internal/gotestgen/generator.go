@@ -1,6 +1,8 @@
 package gotestgen
 
 import (
+	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
@@ -20,22 +22,22 @@ const (
 	packageEvalMode = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps
 )
 
-func Generate(targetPath string) (GenerateResults, error) {
-	res, _, err := generateSrcs(targetPath)
+func Generate(targetPath string, buildFlags ...string) (GenerateResults, error) {
+	res, _, err := generateSrcs(targetPath, buildFlags...)
 	if err != nil {
 		return nil, err
 	}
 	return res, nil
 }
 
-// GenerateWithCollectorResults generates test suite sources and also returns
-// the raw collector results, which can be used to discover shared fixtures.
-func GenerateWithCollectorResults(targetPath string) (GenerateResults, []CollectorResult, error) {
-	return generateSrcs(targetPath)
+// GenerateWithSharedFixtures generates test suite sources and also returns
+// the deduplicated shared fixtures discovered via demand-driven resolution.
+func GenerateWithSharedFixtures(targetPath string, buildFlags ...string) (GenerateResults, []SharedFixtureInfo, error) {
+	return generateSrcs(targetPath, buildFlags...)
 }
 
-func Collect(targetPath string) (gotestast.TestSuiteSpecSet, error) {
-	loadResults, err := LoadPackages(targetPath)
+func Collect(targetPath string, buildFlags ...string) (gotestast.TestSuiteSpecSet, error) {
+	loadResults, err := LoadPackages(targetPath, buildFlags...)
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +58,12 @@ func Collect(targetPath string) (gotestast.TestSuiteSpecSet, error) {
 	return allSuites, nil
 }
 
+// LoadWarning represents a non-fatal issue found during package loading.
+type LoadWarning struct {
+	PkgPath string
+	Message string
+}
+
 // LoadResult holds the parsed packages for a given import path,
 // split into internal-test (ptest) and external-test (pxtest) packages.
 type LoadResult struct {
@@ -66,17 +74,24 @@ type LoadResult struct {
 }
 
 // LoadPackages loads and groups test packages for the given target pattern.
-func LoadPackages(targetPkg string) ([]*LoadResult, error) {
-	totalFoundPkgs, err := packages.Load(&packages.Config{
+func LoadPackages(targetPkg string, buildFlags ...string) ([]*LoadResult, error) {
+	cfg := &packages.Config{
 		Mode:  packageEvalMode,
 		Tests: true,
-	}, targetPkg)
+	}
+	if len(buildFlags) > 0 {
+		cfg.BuildFlags = buildFlags
+	}
+	totalFoundPkgs, err := packages.Load(cfg, targetPkg)
 	if err != nil {
 		return nil, err
 	}
 
-	// filter all packages with Go-Module support
+	// filter all packages with Go-Module support, skip packages with load errors
 	loadedTestPkgs := slices.Filter(totalFoundPkgs, func(item *packages.Package, index int) bool {
+		if len(item.Errors) > 0 {
+			return false
+		}
 		return item.Module != nil
 	})
 	if len(loadedTestPkgs) == 0 {
@@ -110,13 +125,83 @@ func LoadPackages(targetPkg string) ([]*LoadResult, error) {
 	return res, nil
 }
 
-func generateSrcs(targetPkg string) (GenerateResults, []CollectorResult, error) {
-	loadResults, err := LoadPackages(targetPkg)
+// LoadPackagesWithWarnings is like LoadPackages but also returns warnings
+// for packages that were skipped due to load errors (e.g. build constraints).
+func LoadPackagesWithWarnings(targetPkg string, buildFlags ...string) ([]*LoadResult, []LoadWarning, error) {
+	cfg := &packages.Config{
+		Mode:  packageEvalMode,
+		Tests: true,
+	}
+	if len(buildFlags) > 0 {
+		cfg.BuildFlags = buildFlags
+	}
+	totalFoundPkgs, err := packages.Load(cfg, targetPkg)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	var allCollectorResults []CollectorResult
+	var warnings []LoadWarning
+	seen := make(map[string]bool)
+	var loadedTestPkgs []*packages.Package
+	for _, p := range totalFoundPkgs {
+		if len(p.Errors) > 0 {
+			pkgPath := p.PkgPath
+			pkgPath = strings.TrimSuffix(pkgPath, "_test")
+			if strings.HasSuffix(pkgPath, ".test") {
+				continue
+			}
+			if !seen[pkgPath] {
+				seen[pkgPath] = true
+				for _, e := range p.Errors {
+					warnings = append(warnings, LoadWarning{PkgPath: pkgPath, Message: fmt.Sprintf("%s", e)})
+				}
+			}
+			continue
+		}
+		if p.Module != nil {
+			loadedTestPkgs = append(loadedTestPkgs, p)
+		}
+	}
+	if len(loadedTestPkgs) == 0 {
+		return nil, warnings, nil
+	}
+
+	loadedTestPkgs = slices.Filter(loadedTestPkgs, func(item *packages.Package, index int) bool {
+		return strings.HasSuffix(item.ID, ".test]")
+	})
+	testPkgs := slices.ReduceSeed(loadedTestPkgs, map[string]*LoadResult{}, func(p *packages.Package, acc map[string]*LoadResult) map[string]*LoadResult {
+		isPxTest := strings.HasSuffix(p.Name, "_test")
+		pkgPath := p.PkgPath
+		if isPxTest {
+			pkgPath = strings.TrimSuffix(pkgPath, "_test")
+		}
+		_, ok := acc[pkgPath]
+		if !ok {
+			acc[pkgPath] = &LoadResult{PkgPath: pkgPath, PkgDir: DeterminePkgDir(p)}
+		}
+		if !isPxTest {
+			acc[pkgPath].Ptest = p
+		} else {
+			acc[pkgPath].Pxtest = p
+		}
+		return acc
+	})
+	var res []*LoadResult
+	for _, v := range testPkgs {
+		res = append(res, v)
+	}
+	return res, warnings, nil
+}
+
+func generateSrcs(targetPkg string, buildFlags ...string) (GenerateResults, []SharedFixtureInfo, error) {
+	loadResults, err := LoadPackages(targetPkg, buildFlags...)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sharedSeen := map[string]bool{}
+	var allSharedFixtures []SharedFixtureInfo
+
 	results, err := slices.MapErr(loadResults, func(lr *LoadResult, _ int) (*GenerateResult, error) {
 		c := collector{}
 		ptestCollected := c.CollectSuiteSpecs(lr.Ptest)
@@ -128,32 +213,57 @@ func generateSrcs(targetPkg string) (GenerateResults, []CollectorResult, error) 
 			return nil, pxtestCollected.Errs[0].Err
 		}
 
-		allCollectorResults = append(allCollectorResults, ptestCollected, pxtestCollected)
-
 		ptestSpec, err := c.ApplyTestSuiteSpecs(ptestCollected)
 		if err != nil {
 			return nil, err
 		}
-
 		pxtestSpec, err := c.ApplyTestSuiteSpecs(pxtestCollected)
 		if err != nil {
 			return nil, err
 		}
 
-		r := renderer{}
-		ptestBuf, err := r.RenderTestSuiteSpec(lr.Ptest, ptestSpec)
+		ptestBuf, err := generateForPkg(lr.Ptest, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures)
 		if err != nil {
 			return nil, err
 		}
-		pxtestBuf, err := r.RenderTestSuiteSpec(lr.Pxtest, pxtestSpec)
+		pxtestBuf, err := generateForPkg(lr.Pxtest, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures)
 		if err != nil {
 			return nil, err
 		}
+
 		return &GenerateResult{AbsPath: lr.PkgDir, Package: lr.PkgPath, PTest: ptestBuf, PXTest: pxtestBuf}, nil
 	})
 	if err != nil {
 		return nil, nil, err
 	}
-	return results, allCollectorResults, nil
+	sort.Slice(allSharedFixtures, func(i, j int) bool {
+		if allSharedFixtures[i].PkgPath != allSharedFixtures[j].PkgPath {
+			return allSharedFixtures[i].PkgPath < allSharedFixtures[j].PkgPath
+		}
+		return allSharedFixtures[i].Identifier < allSharedFixtures[j].Identifier
+	})
+	return results, allSharedFixtures, nil
+}
+
+func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo) ([]byte, error) {
+	if pkg == nil || len(spec.EffectiveTestSuites) == 0 {
+		return nil, nil
+	}
+
+	resolved, err := Resolve(pkg, spec.EffectiveTestSuites, collected.Fixtures)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, sf := range resolved.RequiredSharedFixtures {
+		key := sf.PkgPath + "." + sf.Identifier
+		if !sharedSeen[key] {
+			sharedSeen[key] = true
+			*allShared = append(*allShared, sf)
+		}
+	}
+
+	r := renderer{}
+	return r.RenderTestSuiteSpec(pkg, spec, resolved)
 }
 

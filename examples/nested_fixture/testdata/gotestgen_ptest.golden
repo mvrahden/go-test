@@ -117,6 +117,15 @@ func Test_InfraFixture(t *testing.T) {
 		}
 		ƒcfg_child := gotest.DefaultFixtureConfig()
 		t.Cleanup(func() {
+			ctx := context.Background()
+			if ƒcfg_child.Timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, ƒcfg_child.Timeout)
+				defer cancel()
+			}
+			if err := child.AfterAll(ctx); err != nil {
+				t.Errorf("APIFixture.AfterAll failed: %v", err)
+			}
 		})
 		var ƒerr_child error
 		ƒattempts_child := 1 + ƒcfg_child.Retries

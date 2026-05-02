@@ -51,6 +51,15 @@ func Test_WebFixture(t *testing.T) {
 	fixture.PostgresSharedFixture = sf0
 	ƒcfg := gotest.DefaultFixtureConfig()
 	t.Cleanup(func() {
+		ctx := context.Background()
+		if ƒcfg.Timeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
+			defer cancel()
+		}
+		if err := fixture.AfterAll(ctx); err != nil {
+			t.Errorf("WebFixture.AfterAll failed: %v", err)
+		}
 	})
 	var ƒerr error
 	ƒattempts := 1 + ƒcfg.Retries

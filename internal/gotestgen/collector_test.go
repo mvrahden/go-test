@@ -249,8 +249,7 @@ func (s *MyTestSuite) TestSomething(t *gotest.T) {}
 	gotest.Equal(t, 0, len(result.Errs))
 	gotest.Equal(t, 1, len(result.Suites))
 	gotest.Equal(t, 1, len(result.Fixtures))
-	gotest.True(t, result.Suites[0].Fixture() != nil, "expected fixture to be linked to suite")
-	gotest.Equal(t, "DBFixture", result.Suites[0].Fixture().Identifier())
+	gotest.Equal(t, "DBFixture", result.Fixtures[0].Identifier())
 }
 
 func TestCollector_NoFixtureEmbedding(t *testing.T) {
@@ -296,99 +295,8 @@ func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
 	// For this test we just verify collection worked up to that point
 	gotest.Equal(t, 0, len(result.Errs))
 	gotest.Equal(t, 2, len(result.Fixtures))
-
-	// Find the DBFixture (it embeds BaseFixture)
-	var dbFix *gotestast.FixtureSpec
-	for _, f := range result.Fixtures {
-		if f.Identifier() == "DBFixture" {
-			dbFix = f
-			break
-		}
-	}
-	gotest.True(t, dbFix != nil, "expected to find DBFixture")
-	gotest.True(t, dbFix.ParentFixture != nil, "expected parent fixture to be set")
-	gotest.Equal(t, "BaseFixture", dbFix.ParentFixture.Identifier())
 }
 
-// --- Validation: Multiple package fixtures ---
-
-func TestValidation_MultipleRootPackageFixtures(t *testing.T) {
-	fixtures := []*gotestast.FixtureSpec{
-		makeFixtureSpec("Fix1", gotestast.PackageFixture, true),
-		makeFixtureSpec("Fix2", gotestast.PackageFixture, true),
-	}
-	err := validateFixtures(fixtures)
-	gotest.Error(t, err)
-	gotest.Contains(t, err.Error(), "at most one root package fixture")
-}
-
-func TestValidation_SinglePackageFixture_OK(t *testing.T) {
-	fixtures := []*gotestast.FixtureSpec{
-		makeFixtureSpec("Fix1", gotestast.PackageFixture, true),
-	}
-	err := validateFixtures(fixtures)
-	gotest.NoError(t, err)
-}
-
-func TestValidation_NestedPackageFixtures_OK(t *testing.T) {
-	root := makeFixtureSpec("Root", gotestast.PackageFixture, true)
-	child := makeFixtureSpec("Child", gotestast.PackageFixture, true)
-	child.ParentFixture = root
-	fixtures := []*gotestast.FixtureSpec{root, child}
-	err := validateFixtures(fixtures)
-	gotest.NoError(t, err)
-}
-
-// --- Validation: Missing BeforeAll ---
-
-func TestValidation_PackageFixtureMissingBeforeAll(t *testing.T) {
-	fixtures := []*gotestast.FixtureSpec{
-		makeFixtureSpec("Fix1", gotestast.PackageFixture, false),
-	}
-	err := validateFixtures(fixtures)
-	gotest.Error(t, err)
-	gotest.Contains(t, err.Error(), "must have a BeforeAll")
-}
-
-func TestValidation_SharedFixtureMissingBeforeAll(t *testing.T) {
-	fixtures := []*gotestast.FixtureSpec{
-		makeFixtureSpec("Fix1", gotestast.SharedFixture, false),
-	}
-	err := validateFixtures(fixtures)
-	gotest.Error(t, err)
-	gotest.Contains(t, err.Error(), "must have a BeforeAll")
-}
-
-// --- Validation: Fixture cycles ---
-
-func TestValidation_FixtureCycle(t *testing.T) {
-	a := makeFixtureSpec("A", gotestast.PackageFixture, true)
-	b := makeFixtureSpec("B", gotestast.PackageFixture, true)
-	a.ParentFixture = b
-	b.ParentFixture = a
-
-	err := validateFixtureCycles([]*gotestast.FixtureSpec{a, b})
-	gotest.Error(t, err)
-	gotest.Contains(t, err.Error(), "cycle detected")
-}
-
-func TestValidation_NoCycle(t *testing.T) {
-	a := makeFixtureSpec("A", gotestast.PackageFixture, true)
-	b := makeFixtureSpec("B", gotestast.PackageFixture, true)
-	b.ParentFixture = a
-
-	err := validateFixtureCycles([]*gotestast.FixtureSpec{a, b})
-	gotest.NoError(t, err)
-}
-
-func TestValidation_SelfCycle(t *testing.T) {
-	a := makeFixtureSpec("A", gotestast.PackageFixture, true)
-	a.ParentFixture = a
-
-	err := validateFixtureCycles([]*gotestast.FixtureSpec{a})
-	gotest.Error(t, err)
-	gotest.Contains(t, err.Error(), "cycle detected")
-}
 
 // --- Validation: shared fixture wrong signature ---
 
@@ -445,75 +353,7 @@ func (f *RedisSharedFixture) BeforeAll(t *gotest.T) {} // wrong: should be (ctx 
 	gotest.Contains(t, result.Errs[0].Err.Error(), "unsupported signature")
 }
 
-// --- Validation: suite embeds multiple fixtures ---
-
-func TestCollector_SuiteEmbedsMultipleFixtures(t *testing.T) {
-	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type OneFixture struct{}
-func (f *OneFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type TwoFixture struct{}
-func (f *TwoFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type MyTestSuite struct {
-	*OneFixture
-	*TwoFixture
-}
-
-func (s *MyTestSuite) TestSomething(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	// There are 2 package fixtures which would fail validation in ApplyTestSuiteSpecs,
-	// but the embedding check happens first in CollectSuiteSpecs
-	gotest.True(t, len(result.Errs) > 0, "expected error for multiple fixture embeddings")
-	gotest.Contains(t, result.Errs[0].Err.Error(), "embeds multiple fixtures")
-}
-
 // --- Validation: ApplyTestSuiteSpecs ---
-
-func TestApplyTestSuiteSpecs_MultipleRootPackageFixturesError(t *testing.T) {
-	fixtures := []*gotestast.FixtureSpec{
-		makeFixtureSpec("Fix1", gotestast.PackageFixture, true),
-		makeFixtureSpec("Fix2", gotestast.PackageFixture, true),
-	}
-	c := collector{}
-	_, err := c.ApplyTestSuiteSpecs(CollectorResult{Fixtures: fixtures})
-	gotest.Error(t, err)
-	gotest.Contains(t, err.Error(), "at most one root package fixture")
-}
-
-func TestApplyTestSuiteSpecs_CycleError(t *testing.T) {
-	a := makeFixtureSpec("A", gotestast.PackageFixture, true)
-	b := makeFixtureSpec("B", gotestast.SharedFixture, true)
-	a.ParentFixture = b
-	b.ParentFixture = a
-
-	c := collector{}
-	_, err := c.ApplyTestSuiteSpecs(CollectorResult{Fixtures: []*gotestast.FixtureSpec{a, b}})
-	gotest.Error(t, err)
-	gotest.Contains(t, err.Error(), "cycle detected")
-}
-
-func TestApplyTestSuiteSpecs_MissingBeforeAllError(t *testing.T) {
-	c := collector{}
-	_, err := c.ApplyTestSuiteSpecs(CollectorResult{
-		Fixtures: []*gotestast.FixtureSpec{
-			makeFixtureSpec("Fix1", gotestast.PackageFixture, false),
-		},
-	})
-	gotest.Error(t, err)
-	gotest.Contains(t, err.Error(), "must have a BeforeAll")
-}
 
 func TestApplyTestSuiteSpecs_OK(t *testing.T) {
 	c := collector{}
@@ -701,24 +541,13 @@ func TestCollector_SharedFixtureNotTreatedAsParent(t *testing.T) {
 	gotest.Equal(t, 1, len(result.Suites))
 	gotest.Equal(t, 2, len(result.Fixtures))
 
-	var e2eFix *gotestast.FixtureSpec
+	// Verify both fixtures were collected
+	names := map[string]bool{}
 	for _, f := range result.Fixtures {
-		if f.Identifier() == "E2EFixture" {
-			e2eFix = f
-		}
+		names[f.Identifier()] = true
 	}
-	gotest.True(t, e2eFix != nil, "expected E2EFixture")
-	gotest.True(t, e2eFix.ParentFixture == nil,
-		"shared fixture should NOT be treated as parent; ParentFixture should be nil")
-
-	// Suite should be linked to the package fixture
-	gotest.True(t, result.Suites[0].Fixture() != nil, "expected suite to have fixture")
-	gotest.Equal(t, "E2EFixture", result.Suites[0].Fixture().Identifier())
-
-	// Validation should pass (single root package fixture)
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-	gotest.Equal(t, 1, len(spec.EffectiveTestSuites))
+	gotest.True(t, names["E2EFixture"], "expected E2EFixture")
+	gotest.True(t, names["PGSharedFixture"], "expected PGSharedFixture")
 }
 
 // --- Config marker method tests ---

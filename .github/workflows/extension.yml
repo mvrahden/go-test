@@ -37,7 +37,8 @@ jobs:
           cache: npm
           cache-dependency-path: vscode-gotest/package-lock.json
       - run: npm ci
-      - run: npx vsce package --no-dependencies
+      - run: npm run compile
+      - run: npx @vscode/vsce package --no-dependencies
       - uses: actions/upload-artifact@v4
         with:
           name: vscode-gotest-vsix

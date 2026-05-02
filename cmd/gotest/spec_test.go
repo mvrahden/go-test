@@ -120,9 +120,9 @@ func TestRunSpec_InputStdin(t *testing.T) {
 	defer os.Chdir(origDir)
 
 	// Generate overlay and run tests to get JSON output
-	results, _, err := gotestgen.GenerateWithCollectorResults("./simple_suite")
+	results, _, err := gotestgen.GenerateWithSharedFixtures("./simple_suite")
 	if err != nil {
-		t.Fatalf("GenerateWithCollectorResults: %v", err)
+		t.Fatalf("GenerateWithSharedFixtures: %v", err)
 	}
 
 	tmpDir, err := gotestrunner.WriteOverlay(results)
