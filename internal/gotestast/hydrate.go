@@ -13,18 +13,28 @@ func ClassifyLocalFields(f *FixtureSpec) map[string]bool {
 	if f.HydrateDecl == nil || f.HydrateDecl.Body == nil {
 		return nil
 	}
+	return ClassifyLocalFieldsRaw(f.HydrateDecl, f.Identifier(), f.PackageSyntax(), f.PackageTypesInfo())
+}
 
-	recvName := receiverName(f.HydrateDecl)
+// ClassifyLocalFieldsRaw performs the same analysis as ClassifyLocalFields but
+// accepts raw inputs instead of a FixtureSpec. This supports cross-package
+// fixture resolution where no FixtureSpec exists.
+func ClassifyLocalFieldsRaw(hydrateDecl *ast.FuncDecl, fixtureName string, syntax []*ast.File, info *types.Info) map[string]bool {
+	if hydrateDecl == nil || hydrateDecl.Body == nil {
+		return nil
+	}
+
+	recvName := receiverName(hydrateDecl)
 	if recvName == "" {
 		return nil
 	}
 
 	local := make(map[string]bool)
 
-	collectAssignments(f.HydrateDecl.Body, recvName, local)
+	collectAssignments(hydrateDecl.Body, recvName, local)
 
-	for _, name := range collectReceiverMethodCalls(f.HydrateDecl.Body, recvName) {
-		body := findMethodBody(f, name)
+	for _, name := range collectReceiverMethodCalls(hydrateDecl.Body, recvName) {
+		body := findMethodBodyInSyntax(syntax, info, fixtureName, name)
 		if body == nil {
 			continue
 		}
@@ -96,17 +106,14 @@ func collectReceiverMethodCalls(block *ast.BlockStmt, recvName string) []string 
 	return names
 }
 
-// findMethodBody searches the fixture's package for a method with the given
-// name on the fixture type and returns its body.
-func findMethodBody(f *FixtureSpec, methodName string) *ast.BlockStmt {
-	fixtureName := f.Identifier()
-	for _, file := range f.PackageSyntax() {
+func findMethodBodyInSyntax(syntax []*ast.File, info *types.Info, fixtureName, methodName string) *ast.BlockStmt {
+	for _, file := range syntax {
 		for _, decl := range file.Decls {
 			fd, ok := decl.(*ast.FuncDecl)
 			if !ok || fd.Recv == nil || fd.Name.Name != methodName {
 				continue
 			}
-			obj := f.PackageTypesInfo().ObjectOf(fd.Name)
+			obj := info.ObjectOf(fd.Name)
 			fn, ok := obj.(*types.Func)
 			if !ok {
 				continue

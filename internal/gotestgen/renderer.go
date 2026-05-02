@@ -28,15 +28,20 @@ var (
 
 // FixtureViewModel is the view model passed to the fixture template.
 type FixtureViewModel struct {
-	Identifier     string
-	HasConfig      bool
-	BeforeAll      bool
-	AfterAll       bool
-	BeforeEach     bool
-	AfterEach      bool
-	ChildSuites    []*gotestast.TestSuiteSpec
-	ChildFixtures  []*FixtureViewModel
-	SharedFixtures []SharedFixtureRef
+	Identifier          string
+	QualifiedIdentifier string // "pkg.Name" for cross-package, "Name" for same
+	FieldName           string // unqualified, for struct literal field names
+	PkgPath             string // import path, empty if same package
+	HasConfig           bool
+	BeforeAll           bool
+	AfterAll            bool
+	BeforeEach          bool
+	AfterEach           bool
+	HasHydrate          bool
+	HasDehydrate        bool
+	ChildSuites         []*gotestast.TestSuiteSpec
+	ChildFixtures       []*FixtureViewModel
+	SharedFixtures      []SharedFixtureRef
 }
 
 // SharedFixtureRef describes a shared fixture embedded in a package fixture.
@@ -50,9 +55,14 @@ type SharedFixtureRef struct {
 	PkgPath       string // import path, empty if same package
 }
 
+type headerImport struct {
+	Name string
+	Path string
+}
+
 type renderer struct{}
 
-func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome) ([]byte, error) {
+func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, resolved *ResolveResult) ([]byte, error) {
 	if pkg == nil {
 		return nil, nil
 	}
@@ -60,17 +70,24 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome) (
 		return nil, nil
 	}
 
-	// Split suites into fixture-bound and standalone
-	fixtureBound, standalone := splitSuitesByFixture(spec)
-
-	// Build fixture view models before rendering header (shared fixture imports needed)
+	var fixtureBound, standalone []*gotestast.TestSuiteSpec
 	var viewModels []*FixtureViewModel
-	if len(fixtureBound) > 0 {
-		viewModels = buildFixtureViewModels(spec.Fixtures, fixtureBound)
+
+	if resolved != nil {
+		fixtureBound = resolved.FixtureBound
+		standalone = resolved.Standalone
+		viewModels = buildFixtureViewModelsFromResolved(resolved.RootFixtures)
+	} else {
+		fixtureBound, standalone = splitSuitesByFixture(spec)
+		if len(fixtureBound) > 0 {
+			viewModels = buildFixtureViewModels(spec.Fixtures, fixtureBound)
+		}
 	}
 
+	hasFixtures := resolved != nil && len(resolved.RootFixtures) > 0
+
 	buf := bytes.NewBuffer(nil)
-	if err := r.renderFileHeader(buf, pkg, spec, viewModels); err != nil {
+	if err := r.renderFileHeader(buf, pkg, spec, viewModels, hasFixtures); err != nil {
 		return nil, fmt.Errorf("failed rendering file header. err: %w", err)
 	}
 
@@ -94,45 +111,39 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome) (
 	return r.formatOutput(buf)
 }
 
-func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, viewModels []*FixtureViewModel) error {
-	type Import struct {
-		Name string
-		Path string
-	}
+func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, viewModels []*FixtureViewModel, hasFixtures bool) error {
 	type TplData struct {
 		RepoName    string
 		PackageName string
-		Imports     []Import
+		Imports     []headerImport
 	}
-	imports := []Import{
+	imports := []headerImport{
 		{Path: "testing"},
 		{Path: about.Repo + "/pkg/gotest"},
 	}
-	if len(spec.Fixtures) > 0 {
-		imports = append(imports, Import{Path: "time"})
+	if hasFixtures {
+		imports = append(imports, headerImport{Path: "time"})
 	}
 	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
 		return v.HasParallelTestCases()
 	}) {
-		imports = append(imports, Import{Path: "sync"})
+		imports = append(imports, headerImport{Path: "sync"})
 	}
-	if len(spec.Fixtures) > 0 {
-		imports = append(imports, Import{Path: "context"})
-		imports = append(imports, Import{Path: "os"})
+	if hasFixtures {
+		imports = append(imports, headerImport{Path: "context"})
+		imports = append(imports, headerImport{Path: "os"})
 	}
 	hasSharedFixtures := false
 	seenPkg := map[string]bool{}
 	for _, vm := range viewModels {
-		for _, sf := range vm.SharedFixtures {
-			hasSharedFixtures = true
-			if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
-				imports = append(imports, Import{Path: sf.PkgPath})
-				seenPkg[sf.PkgPath] = true
-			}
+		if vm.PkgPath != "" && !seenPkg[vm.PkgPath] {
+			imports = append(imports, headerImport{Path: vm.PkgPath})
+			seenPkg[vm.PkgPath] = true
 		}
+		collectFixtureImports(vm, &imports, seenPkg, &hasSharedFixtures)
 	}
 	if hasSharedFixtures {
-		imports = append(imports, Import{Path: "encoding/json"})
+		imports = append(imports, headerImport{Path: "encoding/json"})
 	}
 	data := TplData{
 		RepoName:    about.ShortInfo(),
@@ -140,6 +151,23 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		Imports:     imports,
 	}
 	return headerTpl.ExecuteTemplate(buf, "header.go.tpl", map[string]any{"Header": data})
+}
+
+func collectFixtureImports(vm *FixtureViewModel, imports *[]headerImport, seenPkg map[string]bool, hasSharedFixtures *bool) {
+	for _, sf := range vm.SharedFixtures {
+		*hasSharedFixtures = true
+		if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
+			*imports = append(*imports, headerImport{Path: sf.PkgPath})
+			seenPkg[sf.PkgPath] = true
+		}
+	}
+	for _, child := range vm.ChildFixtures {
+		if child.PkgPath != "" && !seenPkg[child.PkgPath] {
+			*imports = append(*imports, headerImport{Path: child.PkgPath})
+			seenPkg[child.PkgPath] = true
+		}
+		collectFixtureImports(child, imports, seenPkg, hasSharedFixtures)
+	}
 }
 
 func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome) error {
@@ -249,6 +277,36 @@ func buildFixtureViewModels(fixtures []*gotestast.FixtureSpec, fixtureBound []*g
 	}
 
 	return roots
+}
+
+func buildFixtureViewModelsFromResolved(roots []*ResolvedFixture) []*FixtureViewModel {
+	var vms []*FixtureViewModel
+	for _, rf := range roots {
+		vms = append(vms, resolvedToViewModel(rf))
+	}
+	return vms
+}
+
+func resolvedToViewModel(rf *ResolvedFixture) *FixtureViewModel {
+	vm := &FixtureViewModel{
+		Identifier:          rf.Identifier,
+		QualifiedIdentifier: rf.QualifiedType,
+		FieldName:           rf.FieldName,
+		PkgPath:             rf.PkgPath,
+		HasConfig:           rf.HasConfig,
+		BeforeAll:           rf.BeforeAll,
+		AfterAll:            rf.AfterAll,
+		BeforeEach:          rf.BeforeEach,
+		AfterEach:           rf.AfterEach,
+		HasHydrate:          rf.HasHydrate,
+		HasDehydrate:        rf.HasDehydrate,
+		ChildSuites:         rf.ChildSuites,
+		SharedFixtures:      rf.SharedFixtures,
+	}
+	for _, child := range rf.Children {
+		vm.ChildFixtures = append(vm.ChildFixtures, resolvedToViewModel(child))
+	}
+	return vm
 }
 
 // detectSharedFixtureEmbeddings inspects a package fixture's struct type for

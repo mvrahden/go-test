@@ -185,11 +185,12 @@ func (f *E2ESetupFixture) BeforeAll(ctx context.Context) error {
 gotest ./tests/e2e ./tests/integration -v
 ```
 
-1. Scan target packages for shared fixtures
-2. Generate and start a setup subprocess (calls `BeforeAll`, serializes transferable fields as JSON to stdout)
-3. Generate test code for each package
-4. Run `go test` — test harness deserializes fixture state, calls `Hydrate` if present
-5. Send SIGTERM to the setup subprocess (calls `AfterAll` in reverse order)
+1. Load target packages, collect test suites and fixtures from AST
+2. Resolve fixtures demand-driven: walk the type graph from targeted suites to discover all required package and shared fixtures (including cross-package)
+3. If shared fixtures are needed, generate and start a setup subprocess (calls `BeforeAll`, serializes transferable fields as JSON to stdout)
+4. Generate test code for each package
+5. Run `go test` — test harness deserializes fixture state, calls `Hydrate` if present
+6. Send SIGTERM to the setup subprocess (calls `AfterAll` in reverse order)
 
 ## Migrating from TestMain
 
