@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 
 const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 
@@ -9,15 +9,7 @@ export interface CliCommand {
   args: string[];
 }
 
-/**
- * Build a CLI command for invoking gotest.
- *
- * Resolution order:
- * 1. gotest.cliPath setting (explicit binary)
- * 2. ./bin/gotest in workspace (local dev binary)
- * 3. go run <modulePath>@<version> (version from go.mod, fallback @latest)
- */
-export async function buildCliCommand(subcommandArgs: string[]): Promise<CliCommand> {
+export async function buildCliCommand(subcommandArgs: string[], workspaceDir?: string): Promise<CliCommand> {
   const cliPath = vscode.workspace
     .getConfiguration("gotest")
     .get<string>("cliPath");
@@ -26,35 +18,26 @@ export async function buildCliCommand(subcommandArgs: string[]): Promise<CliComm
     return { bin: cliPath, args: subcommandArgs };
   }
 
-  // TODO: remove once discover/overlay are published in a tagged release
-  const localBin = "/home/ubuntu/projects/mvrahden/go-test/bin/gotest";
-  try {
-    await access(localBin);
-    return { bin: localBin, args: subcommandArgs };
-  } catch {
-    // fall through to go run
-  }
-
   const modulePath = vscode.workspace
     .getConfiguration("gotest")
     .get<string>("modulePath") ?? DEFAULT_MODULE_PATH;
 
-  const qualified = await qualifyModulePath(modulePath);
+  const qualified = await qualifyModulePath(modulePath, workspaceDir);
   return { bin: "go", args: ["run", qualified, ...subcommandArgs] };
 }
 
 
-async function qualifyModulePath(modulePath: string): Promise<string> {
+async function qualifyModulePath(modulePath: string, workspaceDir?: string): Promise<string> {
   if (modulePath.includes("@")) {
     return modulePath;
   }
 
-  const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!workspaceDir) {
+  const effectiveDir = workspaceDir ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!effectiveDir) {
     return `${modulePath}@latest`;
   }
 
-  const version = await extractVersionFromGoMod(workspaceDir, modulePath);
+  const version = await extractVersionFromGoMod(effectiveDir, modulePath);
   return `${modulePath}@${version}`;
 }
 

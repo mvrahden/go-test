@@ -1,13 +1,5 @@
 import * as vscode from "vscode";
 import type { DiscoveryCache } from "./discovery.js";
-import type { DiscoverMethod, DiscoverSuite } from "./types.js";
-
-interface FocusedItem {
-  label: string;
-  description: string;
-  file: string;
-  line: number;
-}
 
 export class FocusDiagnostics implements vscode.Disposable {
   private readonly diagnosticCollection: vscode.DiagnosticCollection;

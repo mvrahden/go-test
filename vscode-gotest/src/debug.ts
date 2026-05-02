@@ -29,7 +29,7 @@ export class DebugLauncher implements vscode.Disposable {
       return;
     }
 
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(pkgDir));
     if (!workspaceFolder) {
       return;
     }
@@ -37,7 +37,7 @@ export class DebugLauncher implements vscode.Disposable {
     // Generate overlay
     let overlay: OverlayOutput;
     try {
-      const cmd = await buildCliCommand(["overlay", pkgDir]);
+      const cmd = await buildCliCommand(["overlay", pkgDir], workspaceFolder.uri.fsPath);
       this.outputChannel.appendLine(`[debug] ${formatCliCommand(cmd)}`);
       const { stdout } = await execFileAsync(cmd.bin, cmd.args, {
         cwd: workspaceFolder.uri.fsPath,

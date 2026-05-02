@@ -23,6 +23,7 @@ export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vs
 
     if (typeMatch) {
       const typeName = typeMatch[1];
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
       const action = new vscode.CodeAction(
         `Generate test suite for ${typeName}`,
         vscode.CodeActionKind.RefactorExtract,
@@ -30,12 +31,13 @@ export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vs
       action.command = {
         command: "gotest.scaffoldTarget",
         title: `Scaffold ${typeName}`,
-        arguments: [this.buildTypeTarget(document, typeName)],
+        arguments: [this.buildTypeTarget(document, typeName), workspaceFolder?.uri.fsPath],
       };
       actions.push(action);
     }
 
     if (this.hasScaffoldableDeclarations(document)) {
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
       const fileAction = new vscode.CodeAction(
         "Generate test suite for this file",
         vscode.CodeActionKind.RefactorExtract,
@@ -43,7 +45,7 @@ export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vs
       fileAction.command = {
         command: "gotest.scaffoldTarget",
         title: "Scaffold file",
-        arguments: [this.buildFileTarget(document)],
+        arguments: [this.buildFileTarget(document), workspaceFolder?.uri.fsPath],
       };
       actions.push(fileAction);
     }
@@ -89,6 +91,7 @@ export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vs
 export async function runScaffoldCommand(
   outputChannel: vscode.OutputChannel,
   discoverCallback: () => void,
+  workspaceDir?: string,
 ): Promise<void> {
   const target = await vscode.window.showInputBox({
     prompt: "Scaffold target",
@@ -99,30 +102,31 @@ export async function runScaffoldCommand(
     return;
   }
 
-  await executeScaffold(target, outputChannel, discoverCallback);
+  await executeScaffold(target, outputChannel, discoverCallback, workspaceDir);
 }
 
 export async function executeScaffold(
   target: string,
   outputChannel: vscode.OutputChannel,
   discoverCallback: () => void,
+  workspaceDir?: string,
 ): Promise<void> {
-  const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!workspaceDir) {
+  const effectiveDir = workspaceDir ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!effectiveDir) {
     return;
   }
 
-  const cmd = await buildCliCommand(["scaffold", target]);
+  const cmd = await buildCliCommand(["scaffold", target], effectiveDir);
   outputChannel.appendLine(`[scaffold] ${formatCliCommand(cmd)}`);
 
   try {
-    const stdout = await spawnScaffold(cmd, workspaceDir);
+    const stdout = await spawnScaffold(cmd, effectiveDir);
     const match = /^Generated:\s*(.+)$/m.exec(stdout);
     if (match) {
       const generatedPath = match[1];
       const fullPath = generatedPath.startsWith("/")
         ? generatedPath
-        : `${workspaceDir}/${generatedPath}`;
+        : `${effectiveDir}/${generatedPath}`;
       const doc = await vscode.workspace.openTextDocument(fullPath);
       await vscode.window.showTextDocument(doc);
     }

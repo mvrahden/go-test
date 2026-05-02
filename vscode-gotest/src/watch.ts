@@ -1,8 +1,10 @@
 import * as vscode from "vscode";
 import { spawn, type ChildProcess } from "node:child_process";
 import type { GoTestController } from "./testController.js";
-import { parseTestEvents } from "./outputParser.js";
+import type { DiscoveryCache } from "./discovery.js";
+import { parseTestEvents, type TestEvent } from "./outputParser.js";
 import { buildCliCommand, formatCliCommand, type CliCommand } from "./cli.js";
+import { resolveTestItem, applyResults } from "./runnerUtils.js";
 
 /**
  * Wraps a single `gotest watch -json <scope>` child process.
@@ -183,6 +185,7 @@ export class WatchManager implements vscode.Disposable {
 
   constructor(
     private readonly controller: GoTestController,
+    private readonly cache: DiscoveryCache,
     private readonly outputChannel: vscode.OutputChannel,
     private readonly onCycleComplete: (jsonOutput: string) => void,
   ) {
@@ -199,7 +202,7 @@ export class WatchManager implements vscode.Disposable {
       this.stop(pkgScope);
     }
 
-    const cmd = await buildCliCommand(["watch", "-json", pkgScope]);
+    const cmd = await buildCliCommand(["watch", "-json", pkgScope], cwd);
 
     let cycleJsonAccumulator = "";
 
@@ -215,6 +218,10 @@ export class WatchManager implements vscode.Disposable {
         if (existingRun) {
           existingRun.end();
         }
+
+        if (cycleJsonAccumulator) {
+          this.onCycleComplete(cycleJsonAccumulator);
+        }
         cycleJsonAccumulator = "";
 
         // Create new TestRun
@@ -229,7 +236,7 @@ export class WatchManager implements vscode.Disposable {
         cycleJsonAccumulator += jsonLines;
         const run = this.activeRuns.get(pkgScope);
         if (run) {
-          this.applyWatchEvents(run, jsonLines, pkgScope);
+          this.applyWatchEvents(run, jsonLines);
         }
       },
       // onError
@@ -322,97 +329,24 @@ export class WatchManager implements vscode.Disposable {
   private applyWatchEvents(
     run: vscode.TestRun,
     jsonLines: string,
-    importPath: string,
   ): void {
     const events = parseTestEvents(jsonLines);
+
+    const byPackage = new Map<string, TestEvent[]>();
     for (const event of events) {
-      if (!event.Test) {
-        continue;
+      let group = byPackage.get(event.Package);
+      if (!group) {
+        group = [];
+        byPackage.set(event.Package, group);
       }
+      group.push(event);
+    }
 
-      const item = this.resolveTestItem(event.Test, importPath);
-      if (!item) {
-        continue;
-      }
-
-      switch (event.Action) {
-        case "pass":
-          run.passed(item, event.Elapsed ? event.Elapsed * 1000 : undefined);
-          break;
-        case "fail":
-          run.failed(
-            item,
-            [new vscode.TestMessage("Test failed")],
-            event.Elapsed ? event.Elapsed * 1000 : undefined,
-          );
-          break;
-        case "skip":
-          run.skipped(item);
-          break;
-        case "run":
-          run.started(item);
-          break;
+    for (const [importPath, pkgEvents] of byPackage) {
+      const pkgDir = this.cache.resolveImportPath(importPath);
+      if (pkgDir) {
+        applyResults(this.controller, run, pkgEvents, importPath, pkgDir);
       }
     }
-  }
-
-  /**
-   * Resolve a test event's Test field to a TestItem.
-   *
-   * The Test field format is: TestSuiteName/MethodName/SubtestPath
-   * The generated code wraps suites as `func TestSuiteName(t)`,
-   * so we strip the "Test" prefix from the first segment to find the suite.
-   */
-  private resolveTestItem(
-    testPath: string,
-    importPath: string,
-  ): vscode.TestItem | undefined {
-    const segments = testPath.split("/");
-    if (segments.length === 0) {
-      return undefined;
-    }
-
-    // First segment is "TestSuiteName" — strip "Test" prefix to get suite name
-    const firstSegment = segments[0];
-    const suiteName = firstSegment.startsWith("Test")
-      ? firstSegment.slice(4)
-      : firstSegment;
-
-    // Find suite item
-    const suiteId = `${importPath}/${suiteName}`;
-    const suiteItem = this.controller.findItem(suiteId);
-    if (!suiteItem) {
-      return undefined;
-    }
-
-    if (segments.length === 1) {
-      return suiteItem;
-    }
-
-    // Second segment is the method name
-    const methodName = segments[1];
-    const methodId = `${suiteId}/${methodName}`;
-    const methodItem = this.controller.findItem(methodId);
-    if (!methodItem) {
-      return undefined;
-    }
-
-    if (segments.length === 2) {
-      return methodItem;
-    }
-
-    // Deeper segments are dynamic subtests
-    let parentItem = methodItem;
-    for (let i = 2; i < segments.length; i++) {
-      const subtestLabel = segments[i];
-      const subtestPath = segments.slice(2, i + 1).join("/");
-      parentItem = this.controller.createDynamicSubtest(
-        parentItem,
-        subtestPath,
-        subtestLabel,
-      );
-    }
-
-    return parentItem;
   }
 }
