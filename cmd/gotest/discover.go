@@ -78,13 +78,13 @@ func runDiscover(args []string) int {
 				}
 				result := c.CollectSuiteSpecs(pkg)
 				if len(result.Errs) > 0 {
-					fmt.Fprintf(os.Stderr, "FAIL: %s\n", result.Errs[0].Err)
-					return 2
+					fmt.Fprintf(os.Stderr, "WARN: %s: %s\n", lr.PkgPath, result.Errs[0].Err)
+					continue
 				}
 
 				if _, err := gotestgen.Resolve(pkg, result.Suites, result.Fixtures); err != nil {
-					fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-					return 2
+					fmt.Fprintf(os.Stderr, "WARN: %s: %s\n", lr.PkgPath, err)
+					continue
 				}
 
 				for _, suite := range result.Suites {

@@ -74,26 +74,31 @@
         "gotest.modulePath": {
           "type": "string",
           "default": "github.com/mvrahden/go-test/cmd/gotest",
+          "scope": "resource",
           "description": "Go module path for gotest CLI (used with 'go run')"
         },
         "gotest.cliPath": {
           "type": "string",
           "default": "",
+          "scope": "resource",
           "description": "Override: path to a pre-installed gotest binary (bypasses 'go run')"
         },
         "gotest.discoverOnSave": {
           "type": "boolean",
           "default": true,
+          "scope": "resource",
           "description": "Re-run discovery when a _test.go file is saved"
         },
         "gotest.showCodeLens": {
           "type": "boolean",
           "default": true,
+          "scope": "window",
           "description": "Show Run/Debug CodeLens above suites and methods"
         },
         "gotest.showFocusWarnings": {
           "type": "boolean",
           "default": true,
+          "scope": "window",
           "description": "Show diagnostics for F_ prefixed tests"
         },
         "gotest.testFlags": {
@@ -102,6 +107,7 @@
             "type": "string"
           },
           "default": [],
+          "scope": "resource",
           "description": "Additional flags passed to gotest test"
         },
         "gotest.buildFlags": {
@@ -110,26 +116,31 @@
             "type": "string"
           },
           "default": [],
+          "scope": "resource",
           "description": "Additional build flags passed to dlv"
         },
         "gotest.buildTags": {
           "type": "string",
           "default": "",
+          "scope": "resource",
           "description": "Comma-separated Go build tags (e.g. 'integration,e2e'). Passed to discovery, test runs, and overlays."
         },
         "gotest.specView.autoRefresh": {
           "type": "boolean",
           "default": true,
+          "scope": "window",
           "description": "Auto-refresh spec view panel after test runs"
         },
         "gotest.watch.autoRestart": {
           "type": "boolean",
           "default": true,
+          "scope": "resource",
           "description": "Auto-restart watch process on crash"
         },
         "gotest.watch.scope": {
           "type": "string",
           "default": "./...",
+          "scope": "resource",
           "description": "Default package scope for watch mode"
         }
       }
