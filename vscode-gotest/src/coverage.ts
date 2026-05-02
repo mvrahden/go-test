@@ -9,7 +9,7 @@ import type { DiscoveryCache } from "./discovery.js";
 import type { CoverageStore } from "./coverageStore.js";
 import type { OverlayOutput } from "./types.js";
 import { parseTestEvents } from "./outputParser.js";
-import { buildCliCommand, formatCliCommand } from "./cli.js";
+import { buildCliCommand, formatCliCommand, resolveGoBinary } from "./cli.js";
 import {
   collectItems,
   groupByPackage,
@@ -154,7 +154,7 @@ export class CoverageRunner implements vscode.Disposable {
         let coverFile: string | undefined;
 
         try {
-          const overlayCmd = await buildCliCommand(["overlay", importPath], workspaceDir);
+          const overlayCmd = await buildCliCommand(["overlay", importPath], workspaceDir, this.outputChannel);
           this.outputChannel.appendLine(`[coverage] ${formatCliCommand(overlayCmd)}`);
           const { stdout: overlayStdout } = await execFileAsync(
             overlayCmd.bin,
@@ -182,8 +182,9 @@ export class CoverageRunner implements vscode.Disposable {
           }
           args.push(...testFlags);
 
-          this.outputChannel.appendLine(`[coverage] go ${args.join(" ")}`);
-          const stdout = await spawnTestProcess("go", args, workspaceDir, effectiveToken, this.outputChannel, "coverage");
+          const goBin = await resolveGoBinary(this.outputChannel);
+          this.outputChannel.appendLine(`[coverage] ${goBin} ${args.join(" ")}`);
+          const stdout = await spawnTestProcess(goBin, args, workspaceDir, effectiveToken, this.outputChannel, "coverage");
           allJsonOutput += stdout;
 
           if (effectiveToken.isCancellationRequested) {
