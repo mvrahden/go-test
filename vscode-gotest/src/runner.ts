@@ -5,7 +5,7 @@ import { rm } from "node:fs/promises";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import { parseTestEvents } from "./outputParser.js";
-import { buildCliCommand, formatCliCommand } from "./cli.js";
+import { buildCliCommand, formatCliCommand, resolveGoBinary, scopedConfig } from "./cli.js";
 import {
   collectItems,
   groupByPackage,
@@ -94,14 +94,12 @@ export class TestRunner {
         }
 
         const filter = this.buildRunFilter(groupItems, importPath);
-        const testFlags =
-          vscode.workspace
-            .getConfiguration("gotest")
-            .get<string[]>("testFlags") ?? [];
+        const config = scopedConfig(workspaceDir);
+        const testFlags = config.get<string[]>("testFlags") ?? [];
 
         let overlayDir: string | undefined;
         try {
-          const overlayCmd = await buildCliCommand(["overlay", importPath], workspaceDir);
+          const overlayCmd = await buildCliCommand(["overlay", importPath], workspaceDir, this.outputChannel);
           this.outputChannel.appendLine(`[runner] ${formatCliCommand(overlayCmd)}`);
           const { stdout: overlayStdout } = await execFileAsync(
             overlayCmd.bin,
@@ -111,6 +109,7 @@ export class TestRunner {
           const overlay = JSON.parse(overlayStdout) as { overlayFile: string; dir: string };
           overlayDir = overlay.dir;
 
+          const buildTags = config.get<string>("buildTags", "").trim();
           const goTestArgs = [
             "test",
             `-overlay=${overlay.overlayFile}`,
@@ -118,13 +117,17 @@ export class TestRunner {
             "-json",
             importPath,
           ];
+          if (buildTags) {
+            goTestArgs.push(`-tags=${buildTags}`);
+          }
           if (filter) {
             goTestArgs.push("-run", filter);
           }
           goTestArgs.push(...testFlags);
 
-          this.outputChannel.appendLine(`[runner] go ${goTestArgs.join(" ")}`);
-          const stdout = await spawnTestProcess("go", goTestArgs, workspaceDir, effectiveToken, this.outputChannel, "runner");
+          const goBin = await resolveGoBinary(this.outputChannel, workspaceDir);
+          this.outputChannel.appendLine(`[runner] ${goBin} ${goTestArgs.join(" ")}`);
+          const stdout = await spawnTestProcess(goBin, goTestArgs, workspaceDir, effectiveToken, this.outputChannel, "runner");
           this._lastJsonOutput += stdout;
 
           if (effectiveToken.isCancellationRequested) {

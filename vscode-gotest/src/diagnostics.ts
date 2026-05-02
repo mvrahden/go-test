@@ -51,6 +51,29 @@ export class FocusDiagnostics implements vscode.Disposable {
       }
     }
 
+    for (const warning of this.cache.warnings) {
+      if (!warning.file) {
+        continue;
+      }
+      const pkg = this.cache.getPackage(warning.importPath);
+      if (!pkg) {
+        continue;
+      }
+      const absFile = `${pkg.dir}/${warning.file}`;
+      const line = (warning.line ?? 1) - 1;
+      const col = (warning.col ?? 1) - 1;
+      const range = new vscode.Range(line, col, line, col + 1);
+      const diagnostic = new vscode.Diagnostic(
+        range,
+        warning.message,
+        vscode.DiagnosticSeverity.Warning,
+      );
+      diagnostic.source = "gotest";
+      const existing = diagnosticsMap.get(absFile) ?? [];
+      existing.push(diagnostic);
+      diagnosticsMap.set(absFile, existing);
+    }
+
     for (const [file, diagnostics] of diagnosticsMap) {
       this.diagnosticCollection.set(vscode.Uri.file(file), diagnostics);
     }

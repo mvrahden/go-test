@@ -9,7 +9,7 @@ import type { DiscoveryCache } from "./discovery.js";
 import type { CoverageStore } from "./coverageStore.js";
 import type { OverlayOutput } from "./types.js";
 import { parseTestEvents } from "./outputParser.js";
-import { buildCliCommand, formatCliCommand } from "./cli.js";
+import { buildCliCommand, formatCliCommand, resolveGoBinary, scopedConfig } from "./cli.js";
 import {
   collectItems,
   groupByPackage,
@@ -147,14 +147,14 @@ export class CoverageRunner implements vscode.Disposable {
           continue;
         }
 
-        const testFlags =
-          vscode.workspace.getConfiguration("gotest").get<string[]>("testFlags") ?? [];
+        const config = scopedConfig(workspaceDir);
+        const testFlags = config.get<string[]>("testFlags") ?? [];
 
         let overlayDir: string | undefined;
         let coverFile: string | undefined;
 
         try {
-          const overlayCmd = await buildCliCommand(["overlay", importPath], workspaceDir);
+          const overlayCmd = await buildCliCommand(["overlay", importPath], workspaceDir, this.outputChannel);
           this.outputChannel.appendLine(`[coverage] ${formatCliCommand(overlayCmd)}`);
           const { stdout: overlayStdout } = await execFileAsync(
             overlayCmd.bin,
@@ -169,6 +169,7 @@ export class CoverageRunner implements vscode.Disposable {
 
           const filter = this.buildRunFilter(groupItems, importPath);
 
+          const buildTags = config.get<string>("buildTags", "").trim();
           const args = [
             "test",
             `-overlay=${overlay.overlayFile}`,
@@ -177,13 +178,17 @@ export class CoverageRunner implements vscode.Disposable {
             "-json",
             importPath,
           ];
+          if (buildTags) {
+            args.push(`-tags=${buildTags}`);
+          }
           if (filter) {
             args.push("-run", filter);
           }
           args.push(...testFlags);
 
-          this.outputChannel.appendLine(`[coverage] go ${args.join(" ")}`);
-          const stdout = await spawnTestProcess("go", args, workspaceDir, effectiveToken, this.outputChannel, "coverage");
+          const goBin = await resolveGoBinary(this.outputChannel, workspaceDir);
+          this.outputChannel.appendLine(`[coverage] ${goBin} ${args.join(" ")}`);
+          const stdout = await spawnTestProcess(goBin, args, workspaceDir, effectiveToken, this.outputChannel, "coverage");
           allJsonOutput += stdout;
 
           if (effectiveToken.isCancellationRequested) {

@@ -5,7 +5,29 @@ import (
 	"testing"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"golang.org/x/tools/go/packages"
 )
+
+func renderTestPkg(t *testing.T, pkg *packages.Package) (string, SpecOutcome) {
+	t.Helper()
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs), "expected no collection errors, got: %v", result.Errs)
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	var resolved *ResolveResult
+	if len(spec.EffectiveTestSuites) > 0 {
+		resolved, err = Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+		gotest.NoError(t, err)
+	}
+
+	r := renderer{}
+	out, err := r.RenderTestSuiteSpec(pkg, spec, resolved)
+	gotest.NoError(t, err)
+	return string(out), spec
+}
 
 func TestRenderer_FixtureWithChildSuite(t *testing.T) {
 	t.Parallel()
@@ -34,24 +56,8 @@ func (s *QueryTestSuite) TestInsert(t *gotest.T) {}
 func (s *QueryTestSuite) TestSelect(t *gotest.T) {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
-
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs))
-	gotest.Equal(t, 1, len(result.Suites))
-	gotest.Equal(t, 1, len(result.Fixtures))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-	gotest.Equal(t, 1, len(spec.EffectiveTestSuites))
-	gotest.Equal(t, 1, len(spec.Fixtures))
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-	gotest.True(t, len(out) > 0, "expected non-empty output")
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
+	gotest.True(t, len(output) > 0, "expected non-empty output")
 
 	// Verify the output contains key structural elements
 	gotest.True(t, strings.Contains(output, "func TestMain(m *testing.M)"), "expected TestMain")
@@ -100,19 +106,7 @@ type BasicTestSuite struct {
 func (s *BasicTestSuite) TestOne(t *gotest.T) {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
-
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
 
 	// AfterAll should NOT be in the cleanup since the fixture has no AfterAll
 	gotest.True(t, strings.Contains(output, "func Test_SimpleFixture(t *testing.T)"), "expected Test_SimpleFixture")
@@ -144,20 +138,7 @@ type StandaloneTestSuite struct {}
 func (s *StandaloneTestSuite) TestFree(t *gotest.T) {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
-
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-	gotest.Equal(t, 2, len(spec.EffectiveTestSuites))
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
 
 	// Should have both fixture-bound and standalone
 	gotest.True(t, strings.Contains(output, "func TestMain(m *testing.M)"), "expected TestMain for fixture")
@@ -194,19 +175,7 @@ func (s *EachTestSuite) AfterEach(t *gotest.T)  {}
 func (s *EachTestSuite) TestCase(t *gotest.T)   {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
-
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
 	gotest.True(t, len(output) > 0, "expected non-empty output")
 
 	// Should have the suite wrapper with lifecycle methods delegating
@@ -252,19 +221,7 @@ type MinimalTestSuite struct {
 func (s *MinimalTestSuite) TestOne(t *gotest.T) {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
-
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
 
 	// Fixture without BeforeEach/AfterEach should NOT emit those calls
 	gotest.True(t, !strings.Contains(output, "fixture.BeforeEach"), "should NOT have fixture BeforeEach")
@@ -304,19 +261,7 @@ func (s *HandlerTestSuite) AfterEach(t *gotest.T)  {}
 func (s *HandlerTestSuite) TestGet(t *gotest.T)    {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
-
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
 
 	// Nested fixture: parent (fixture) and child hooks should both appear with error handling
 	gotest.True(t, strings.Contains(output, "fixture.AfterEach(context.Background())"), "expected parent fixture AfterEach")
@@ -344,7 +289,6 @@ func (s *HandlerTestSuite) TestGet(t *gotest.T)    {}
 
 func TestBuildFixtureViewModels_RootFixtureOnly(t *testing.T) {
 	t.Parallel()
-	c := collector{}
 	src := `package testpkg
 
 import (
@@ -365,17 +309,17 @@ type MyTestSuite struct {
 func (s *MyTestSuite) TestOne(t *gotest.T) {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
 
 	spec, err := c.ApplyTestSuiteSpecs(result)
 	gotest.NoError(t, err)
 
-	fixtureBound, standalone := splitSuitesByFixture(spec)
-	gotest.Equal(t, 1, len(fixtureBound))
-	gotest.Equal(t, 0, len(standalone))
+	resolved, err := Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+	gotest.NoError(t, err)
 
-	vms := buildFixtureViewModels(spec.Fixtures, fixtureBound)
+	vms := buildFixtureViewModelsFromResolved(resolved.RootFixtures)
 	gotest.Equal(t, 1, len(vms))
 	gotest.Equal(t, "MyFixture", vms[0].Identifier)
 	gotest.True(t, vms[0].BeforeAll, "expected BeforeAll")
@@ -401,20 +345,7 @@ func (s *PlainTestSuite) TestFoo(t *testing.T)    {}
 func (s *PlainTestSuite) TestBar(t *testing.T)    {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
-
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs))
-	gotest.Equal(t, 1, len(result.Suites))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
 
 	// Wrapper lifecycle methods should unwrap via .T()
 	gotest.True(t, strings.Contains(output, "ts.PlainTestSuite.BeforeEach(it.T())"), "expected BeforeEach unwrap to .T()")
@@ -442,19 +373,7 @@ func (s *MixedTestSuite) TestStdlib(t *testing.T)  {}
 func (s *MixedTestSuite) TestGotest(t *gotest.T)   {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
-
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
 
 	// BeforeEach uses *testing.T → unwrap
 	gotest.True(t, strings.Contains(output, "ts.MixedTestSuite.BeforeEach(it.T())"), "expected BeforeEach unwrap")
@@ -489,19 +408,7 @@ func (s *StdlibTestSuite) AfterEach(t *testing.T)  {}
 func (s *StdlibTestSuite) TestQuery(t *testing.T)  {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
-
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
 
 	// Wrapper lifecycle should unwrap
 	gotest.True(t, strings.Contains(output, "ts.StdlibTestSuite.BeforeAll(it.T())"), "expected BeforeAll unwrap")
@@ -534,23 +441,8 @@ func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
 		"func (s *QueryTestSuite) TestInsert(t *gotest.T) {}\n"
 
 	pkg := loadTestPkgWithGotest(t, src)
-
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
-	gotest.Equal(t, 1, len(result.Suites))
-	gotest.Equal(t, 2, len(result.Fixtures))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-	gotest.Equal(t, 1, len(spec.EffectiveTestSuites))
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-	gotest.True(t, len(out) > 0, "expected non-empty output")
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
+	gotest.True(t, len(output) > 0, "expected non-empty output")
 
 	// Shared fixture deserialized from JSON state
 	gotest.Contains(t, output, "sf0 := &PostgresSharedFixture{}")
@@ -596,19 +488,7 @@ func TestRenderer_SharedFixtureEmptyStruct(t *testing.T) {
 		"func (s *AppTestSuite) TestRun(t *gotest.T) {}\n"
 
 	pkg := loadTestPkgWithGotest(t, src)
-
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
 
 	// Shared fixture should be created and assigned via JSON state
 	gotest.Contains(t, output, "sf0 := &SetupSharedFixture{}")
@@ -645,8 +525,10 @@ func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
 	spec, err := c.ApplyTestSuiteSpecs(result)
 	gotest.NoError(t, err)
 
-	fixtureBound, _ := splitSuitesByFixture(spec)
-	vms := buildFixtureViewModels(spec.Fixtures, fixtureBound)
+	resolved, err := Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+	gotest.NoError(t, err)
+
+	vms := buildFixtureViewModelsFromResolved(resolved.RootFixtures)
 	gotest.Equal(t, 1, len(vms))
 
 	vm := vms[0]
@@ -686,18 +568,7 @@ type CFGTestSuite struct {
 func (s *CFGTestSuite) TestOne(t *gotest.T) {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
 
 	gotest.Contains(t, output, "gotest.DefaultFixtureConfig()")
 	gotest.Contains(t, output, "gotest.OverlayFixtureConfig(&ƒcfg, fixture.FixtureConfig())")
@@ -727,18 +598,7 @@ type PlainTestSuite struct {
 func (s *PlainTestSuite) TestOne(t *gotest.T) {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
 
 	gotest.Contains(t, output, "gotest.DefaultFixtureConfig()")
 	gotest.True(t, !strings.Contains(output, "OverlayFixtureConfig"), "should not have overlay call")
@@ -758,18 +618,7 @@ func (s *ConfiguredTestSuite) SuiteConfig() gotest.SuiteConfig {
 func (s *ConfiguredTestSuite) TestOne(t *gotest.T) {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
 
 	gotest.Contains(t, output, "gotest.DefaultSuiteConfig()")
 	gotest.Contains(t, output, "gotest.OverlaySuiteConfig(&ƒcfg, s.ConfiguredTestSuite.SuiteConfig())")
@@ -788,19 +637,108 @@ type PlainTestSuite struct{}
 func (s *PlainTestSuite) TestOne(t *gotest.T) {}
 `
 	pkg := loadTestPkgWithGotest(t, src)
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs))
-
-	spec, err := c.ApplyTestSuiteSpecs(result)
-	gotest.NoError(t, err)
-
-	r := renderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec)
-	gotest.NoError(t, err)
-
-	output := string(out)
+	output, _ := renderTestPkg(t, pkg)
 
 	gotest.Contains(t, output, "gotest.DefaultSuiteConfig()")
 	gotest.True(t, !strings.Contains(output, "OverlaySuiteConfig"), "should not have overlay call")
+}
+
+func TestRenderer_NamedField_SuiteToFixture(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import (
+	"context"
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type DBFixture struct{ Conn string }
+func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
+
+type QueryTestSuite struct { db *DBFixture }
+func (s *QueryTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	output, _ := renderTestPkg(t, pkg)
+
+	gotest.Contains(t, output, "db: fixture", "suite struct literal should use named field")
+	gotest.True(t, !strings.Contains(output, "DBFixture: fixture"), "should NOT use type name as field name")
+}
+
+func TestRenderer_NamedField_ChildToParentFixture(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import (
+	"context"
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type InfraFixture struct{ Val string }
+func (f *InfraFixture) BeforeAll(ctx context.Context) error { return nil }
+
+type APIFixture struct { infra *InfraFixture }
+func (f *APIFixture) BeforeAll(ctx context.Context) error { return nil }
+
+type LightTestSuite struct { *InfraFixture }
+func (s *LightTestSuite) TestOne(t *gotest.T) {}
+
+type FullTestSuite struct { *APIFixture }
+func (s *FullTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	output, _ := renderTestPkg(t, pkg)
+
+	gotest.Contains(t, output, "infra: fixture", "child fixture struct literal should use named parent field")
+}
+
+func TestRenderer_NamedField_SharedFixtureInFixture(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import (
+	"context"
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type PGSharedFixture struct{ ConnStr string }
+func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *PGSharedFixture) AfterAll(ctx context.Context) error  { return nil }
+
+type AppFixture struct { pg *PGSharedFixture }
+func (f *AppFixture) BeforeAll(ctx context.Context) error { return nil }
+
+type UserTestSuite struct { *AppFixture }
+func (s *UserTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	output, _ := renderTestPkg(t, pkg)
+
+	gotest.Contains(t, output, "fixture.pg = sf0", "shared fixture injection should use named field")
+	gotest.True(t, !strings.Contains(output, "fixture.PGSharedFixture"), "should NOT use type name for shared fixture field")
+}
+
+func TestRenderer_MixedFieldStyles_SameFixture(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import (
+	"context"
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type DBFixture struct{ Conn string }
+func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
+
+type EmbeddedTestSuite struct { *DBFixture }
+func (s *EmbeddedTestSuite) TestOne(t *gotest.T) {}
+
+type NamedTestSuite struct { db *DBFixture }
+func (s *NamedTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	output, _ := renderTestPkg(t, pkg)
+
+	gotest.Contains(t, output, "DBFixture: fixture", "embedded suite should use type name")
+	gotest.Contains(t, output, "db: fixture", "named-field suite should use custom field name")
 }

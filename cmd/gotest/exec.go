@@ -15,21 +15,28 @@ import (
 )
 
 type overlayResult struct {
-	tmpDir           string
-	overlayFlag      string
-	collectorResults []gotestgen.CollectorResult
+	tmpDir         string
+	overlayFlag    string
+	sharedFixtures []gotestgen.SharedFixtureInfo
 }
 
 func generateOverlay(patterns []string) (*overlayResult, func(), error) {
 	var allResults gotestgen.GenerateResults
-	var allCollectorResults []gotestgen.CollectorResult
+	sharedSeen := map[string]bool{}
+	var allSharedFixtures []gotestgen.SharedFixtureInfo
 	for _, pattern := range patterns {
-		results, collectorResults, err := gotestgen.GenerateWithCollectorResults(pattern)
+		results, sharedFixtures, err := gotestgen.GenerateWithSharedFixtures(pattern)
 		if err != nil {
 			return nil, nil, err
 		}
 		allResults = append(allResults, results...)
-		allCollectorResults = append(allCollectorResults, collectorResults...)
+		for _, sf := range sharedFixtures {
+			key := sf.PkgPath + "." + sf.Identifier
+			if !sharedSeen[key] {
+				sharedSeen[key] = true
+				allSharedFixtures = append(allSharedFixtures, sf)
+			}
+		}
 	}
 
 	tmpDir, err := gotestrunner.WriteOverlay(allResults)
@@ -45,9 +52,9 @@ func generateOverlay(patterns []string) (*overlayResult, func(), error) {
 	}
 
 	return &overlayResult{
-		tmpDir:           tmpDir,
-		overlayFlag:      "-overlay=" + filepath.Join(tmpDir, "overlay.json"),
-		collectorResults: allCollectorResults,
+		tmpDir:         tmpDir,
+		overlayFlag:    "-overlay=" + filepath.Join(tmpDir, "overlay.json"),
+		sharedFixtures: allSharedFixtures,
 	}, cleanup, nil
 }
 
@@ -88,14 +95,11 @@ func Run(cfg ExecConfig) int {
 
 	goTestArgs := append([]string{overlay.overlayFlag}, cfg.GoTestArgs...)
 
-	// Discover shared fixtures from collector results
-	sharedFixtures := gotestgen.DiscoverSharedFixtures(overlay.collectorResults)
-
 	// If any shared fixtures, start setup subprocess
 	var setupProc *SharedFixtureProcess
-	if len(sharedFixtures) > 0 {
+	if len(overlay.sharedFixtures) > 0 {
 		var err error
-		setupProc, err = startSharedFixtures(ctx, sharedFixtures)
+		setupProc, err = startSharedFixtures(ctx, overlay.sharedFixtures)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", err)
 			return 2

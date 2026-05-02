@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -108,53 +107,6 @@ func TestGenerateSharedSetup_NoTransferFields(t *testing.T) {
 
 	gotest.Contains(t, code, "sf0.BeforeAll(ctx)")
 	gotest.Contains(t, code, "sf0.AfterAll(ctx)")
-}
-
-func TestDiscoverSharedFixtures_Basic(t *testing.T) {
-	sf := gotestast.NewFixtureSpecForTestWithPkg("RedisFixture", gotestast.SharedFixture, "github.com/example/fixtures")
-
-	results := []CollectorResult{
-		{
-			Fixtures: []*gotestast.FixtureSpec{sf},
-		},
-	}
-
-	shared := DiscoverSharedFixtures(results)
-	gotest.Equal(t, 1, len(shared))
-	gotest.Equal(t, "RedisFixture", shared[0].Identifier)
-	gotest.Equal(t, "github.com/example/fixtures", shared[0].PkgPath)
-	gotest.True(t, !shared[0].HasConfig)
-	gotest.True(t, !shared[0].HasHydrate)
-	gotest.True(t, !shared[0].HasDehydrate)
-}
-
-func TestDiscoverSharedFixtures_Deduplication(t *testing.T) {
-	sf1 := gotestast.NewFixtureSpecForTestWithPkg("RedisFixture", gotestast.SharedFixture, "github.com/example/fixtures")
-	sf2 := gotestast.NewFixtureSpecForTestWithPkg("RedisFixture", gotestast.SharedFixture, "github.com/example/fixtures")
-
-	results := []CollectorResult{
-		{Fixtures: []*gotestast.FixtureSpec{sf1}},
-		{Fixtures: []*gotestast.FixtureSpec{sf2}},
-	}
-
-	shared := DiscoverSharedFixtures(results)
-	gotest.Equal(t, 1, len(shared), "should deduplicate same shared fixture")
-}
-
-func TestDiscoverSharedFixtures_IgnoresPackageFixtures(t *testing.T) {
-	pf := gotestast.NewFixtureSpecForTestWithPkg("DBFixture", gotestast.PackageFixture, "github.com/example/pkg")
-
-	results := []CollectorResult{
-		{Fixtures: []*gotestast.FixtureSpec{pf}},
-	}
-
-	shared := DiscoverSharedFixtures(results)
-	gotest.Equal(t, 0, len(shared), "should not include package fixtures")
-}
-
-func TestDiscoverSharedFixtures_Empty(t *testing.T) {
-	shared := DiscoverSharedFixtures(nil)
-	gotest.Equal(t, 0, len(shared))
 }
 
 func TestGenerateSharedSetup_MultipleTransferFields(t *testing.T) {

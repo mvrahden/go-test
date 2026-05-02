@@ -57,6 +57,43 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 	}
 }
 
+func TestGeneratorGoldenExamples_DumpGolden(t *testing.T) {
+	if os.Getenv("DUMP_GOLDEN") != "1" {
+		t.Skip("set DUMP_GOLDEN=1 to regenerate golden files")
+	}
+
+	for _, tC := range []struct {
+		directory string
+	}{
+		{"stdlib"},
+		{"simple_suite"},
+		{"focus_exclude"},
+		{"parallel_suite"},
+		{"generic_suite"},
+		{"fixture_suite"},
+		{"nested_fixture"},
+	} {
+		pkg := path.Join("..", "..", "examples", tC.directory)
+		testdatadir := filepath.Join("..", "..", "examples", tC.directory, "testdata")
+
+		res, err := Generate(pkg)
+		if err != nil {
+			t.Fatalf("Generate %s: %v", tC.directory, err)
+		}
+		for _, v := range res {
+			if len(v.PTest) > 0 {
+				os.WriteFile(filepath.Join(testdatadir, "gotestgen_ptest.golden"), v.PTest, 0644)
+				fmt.Fprintf(os.Stderr, "wrote %s/gotestgen_ptest.golden\n", testdatadir)
+			}
+			if len(v.PXTest) > 0 {
+				os.WriteFile(filepath.Join(testdatadir, "gotestgen_pxtest.golden"), v.PXTest, 0644)
+				fmt.Fprintf(os.Stderr, "wrote %s/gotestgen_pxtest.golden\n", testdatadir)
+			}
+		}
+	}
+	t.Log("Golden files regenerated. Re-run TestGeneratorGoldenExamples to verify.")
+}
+
 func TestGenerate_StdlibPackage_ReturnsEmpty(t *testing.T) {
 	res, err := Generate("strings")
 	gotest.NoError(t, err)

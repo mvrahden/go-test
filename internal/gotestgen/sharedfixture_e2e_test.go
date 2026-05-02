@@ -20,7 +20,7 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 	}
 
 	pkg := "../../examples/shared_fixture/..."
-	results, collectorResults, err := GenerateWithCollectorResults(pkg)
+	results, sharedFixtures, err := GenerateWithSharedFixtures(pkg)
 	gotest.NoError(t, err)
 
 	sort.Slice(results, func(i, j int) bool {
@@ -107,7 +107,7 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 	})
 
 	t.Run("SharedFixtureDiscovery", func(t *testing.T) {
-		shared := DiscoverSharedFixtures(collectorResults)
+		shared := sharedFixtures
 		gotest.Equal(t, 2, len(shared), "expected two shared fixtures discovered")
 
 		found := map[string]SharedFixtureInfo{}
@@ -143,9 +143,7 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 	})
 
 	t.Run("SetupBinaryGeneration", func(t *testing.T) {
-		shared := DiscoverSharedFixtures(collectorResults)
-
-		setupSrc, err := GenerateSharedSetup(shared)
+		setupSrc, err := GenerateSharedSetup(sharedFixtures)
 		gotest.NoError(t, err)
 
 		fset := token.NewFileSet()
@@ -209,7 +207,7 @@ func TestSharedFixture_E2E_DumpGolden(t *testing.T) {
 	}
 
 	pkg := "../../examples/shared_fixture/..."
-	results, collectorResults, err := GenerateWithCollectorResults(pkg)
+	results, sharedFixtures, err := GenerateWithSharedFixtures(pkg)
 	gotest.NoError(t, err)
 
 	for _, r := range results {
@@ -231,9 +229,8 @@ func TestSharedFixture_E2E_DumpGolden(t *testing.T) {
 		}
 	}
 
-	shared := DiscoverSharedFixtures(collectorResults)
-	if len(shared) > 0 {
-		setupSrc, err := GenerateSharedSetup(shared)
+	if len(sharedFixtures) > 0 {
+		setupSrc, err := GenerateSharedSetup(sharedFixtures)
 		gotest.NoError(t, err)
 		setupDir := filepath.Join("..", "..", "examples", "shared_fixture", "testdata")
 		os.MkdirAll(setupDir, 0755)

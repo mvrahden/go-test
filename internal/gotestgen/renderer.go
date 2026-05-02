@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"go/format"
-	"go/types"
 	"strings"
 	"text/template"
 
@@ -28,15 +27,20 @@ var (
 
 // FixtureViewModel is the view model passed to the fixture template.
 type FixtureViewModel struct {
-	Identifier     string
-	HasConfig      bool
-	BeforeAll      bool
-	AfterAll       bool
-	BeforeEach     bool
-	AfterEach      bool
-	ChildSuites    []*gotestast.TestSuiteSpec
-	ChildFixtures  []*FixtureViewModel
-	SharedFixtures []SharedFixtureRef
+	Identifier          string
+	QualifiedIdentifier string // "pkg.Name" for cross-package, "Name" for same
+	ParentFieldName     string // field name in this fixture's struct for the parent fixture pointer
+	PkgPath             string // import path, empty if same package
+	HasConfig           bool
+	BeforeAll           bool
+	AfterAll            bool
+	BeforeEach          bool
+	AfterEach           bool
+	HasHydrate          bool
+	HasDehydrate        bool
+	ChildSuites         []*gotestast.TestSuiteSpec
+	ChildFixtures       []*FixtureViewModel
+	SharedFixtures      []SharedFixtureRef
 }
 
 // SharedFixtureRef describes a shared fixture embedded in a package fixture.
@@ -50,9 +54,14 @@ type SharedFixtureRef struct {
 	PkgPath       string // import path, empty if same package
 }
 
+type headerImport struct {
+	Name string
+	Path string
+}
+
 type renderer struct{}
 
-func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome) ([]byte, error) {
+func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, resolved *ResolveResult) ([]byte, error) {
 	if pkg == nil {
 		return nil, nil
 	}
@@ -60,17 +69,13 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome) (
 		return nil, nil
 	}
 
-	// Split suites into fixture-bound and standalone
-	fixtureBound, standalone := splitSuitesByFixture(spec)
-
-	// Build fixture view models before rendering header (shared fixture imports needed)
-	var viewModels []*FixtureViewModel
-	if len(fixtureBound) > 0 {
-		viewModels = buildFixtureViewModels(spec.Fixtures, fixtureBound)
-	}
+	fixtureBound := resolved.FixtureBound
+	standalone := resolved.Standalone
+	viewModels := buildFixtureViewModelsFromResolved(resolved.RootFixtures)
+	hasFixtures := len(resolved.RootFixtures) > 0
 
 	buf := bytes.NewBuffer(nil)
-	if err := r.renderFileHeader(buf, pkg, spec, viewModels); err != nil {
+	if err := r.renderFileHeader(buf, pkg, spec, viewModels, hasFixtures); err != nil {
 		return nil, fmt.Errorf("failed rendering file header. err: %w", err)
 	}
 
@@ -94,45 +99,39 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome) (
 	return r.formatOutput(buf)
 }
 
-func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, viewModels []*FixtureViewModel) error {
-	type Import struct {
-		Name string
-		Path string
-	}
+func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, viewModels []*FixtureViewModel, hasFixtures bool) error {
 	type TplData struct {
 		RepoName    string
 		PackageName string
-		Imports     []Import
+		Imports     []headerImport
 	}
-	imports := []Import{
+	imports := []headerImport{
 		{Path: "testing"},
 		{Path: about.Repo + "/pkg/gotest"},
 	}
-	if len(spec.Fixtures) > 0 {
-		imports = append(imports, Import{Path: "time"})
+	if hasFixtures {
+		imports = append(imports, headerImport{Path: "time"})
 	}
 	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
 		return v.HasParallelTestCases()
 	}) {
-		imports = append(imports, Import{Path: "sync"})
+		imports = append(imports, headerImport{Path: "sync"})
 	}
-	if len(spec.Fixtures) > 0 {
-		imports = append(imports, Import{Path: "context"})
-		imports = append(imports, Import{Path: "os"})
+	if hasFixtures {
+		imports = append(imports, headerImport{Path: "context"})
+		imports = append(imports, headerImport{Path: "os"})
 	}
 	hasSharedFixtures := false
 	seenPkg := map[string]bool{}
 	for _, vm := range viewModels {
-		for _, sf := range vm.SharedFixtures {
-			hasSharedFixtures = true
-			if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
-				imports = append(imports, Import{Path: sf.PkgPath})
-				seenPkg[sf.PkgPath] = true
-			}
+		if vm.PkgPath != "" && !seenPkg[vm.PkgPath] {
+			imports = append(imports, headerImport{Path: vm.PkgPath})
+			seenPkg[vm.PkgPath] = true
 		}
+		collectFixtureImports(vm, &imports, seenPkg, &hasSharedFixtures)
 	}
 	if hasSharedFixtures {
-		imports = append(imports, Import{Path: "encoding/json"})
+		imports = append(imports, headerImport{Path: "encoding/json"})
 	}
 	data := TplData{
 		RepoName:    about.ShortInfo(),
@@ -140,6 +139,23 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		Imports:     imports,
 	}
 	return headerTpl.ExecuteTemplate(buf, "header.go.tpl", map[string]any{"Header": data})
+}
+
+func collectFixtureImports(vm *FixtureViewModel, imports *[]headerImport, seenPkg map[string]bool, hasSharedFixtures *bool) {
+	for _, sf := range vm.SharedFixtures {
+		*hasSharedFixtures = true
+		if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
+			*imports = append(*imports, headerImport{Path: sf.PkgPath})
+			seenPkg[sf.PkgPath] = true
+		}
+	}
+	for _, child := range vm.ChildFixtures {
+		if child.PkgPath != "" && !seenPkg[child.PkgPath] {
+			*imports = append(*imports, headerImport{Path: child.PkgPath})
+			seenPkg[child.PkgPath] = true
+		}
+		collectFixtureImports(child, imports, seenPkg, hasSharedFixtures)
+	}
 }
 
 func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome) error {
@@ -170,140 +186,33 @@ func (renderer) formatOutput(buf *bytes.Buffer) ([]byte, error) {
 	return srcs, nil
 }
 
-// splitSuitesByFixture splits effective test suites into fixture-bound and standalone.
-func splitSuitesByFixture(spec SpecOutcome) (fixtureBound, standalone []*gotestast.TestSuiteSpec) {
-	for _, ts := range spec.EffectiveTestSuites {
-		if ts.Fixture() != nil {
-			fixtureBound = append(fixtureBound, ts)
-		} else {
-			standalone = append(standalone, ts)
-		}
+func buildFixtureViewModelsFromResolved(roots []*ResolvedFixture) []*FixtureViewModel {
+	var vms []*FixtureViewModel
+	for _, rf := range roots {
+		vms = append(vms, resolvedToViewModel(rf))
 	}
-	return
+	return vms
 }
 
-// buildFixtureViewModels constructs the fixture tree view model from flat lists
-// of fixtures and fixture-bound suites.
-func buildFixtureViewModels(fixtures []*gotestast.FixtureSpec, fixtureBound []*gotestast.TestSuiteSpec) []*FixtureViewModel {
-	// Build a map of fixture identifier -> view model
-	vmMap := make(map[string]*FixtureViewModel)
-	for _, f := range fixtures {
-		if f.Kind != gotestast.PackageFixture {
-			continue
-		}
-		vm := &FixtureViewModel{
-			Identifier:     f.Identifier(),
-			HasConfig:      f.Config != nil,
-			BeforeAll:      f.BeforeAll != nil,
-			AfterAll:       f.AfterAll != nil,
-			BeforeEach:     f.BeforeEach != nil,
-			AfterEach:      f.AfterEach != nil,
-			SharedFixtures: detectSharedFixtureEmbeddings(f),
-		}
-		vmMap[f.Identifier()] = vm
+func resolvedToViewModel(rf *ResolvedFixture) *FixtureViewModel {
+	vm := &FixtureViewModel{
+		Identifier:          rf.Identifier,
+		QualifiedIdentifier: rf.QualifiedType,
+		ParentFieldName:     rf.ParentFieldName,
+		PkgPath:             rf.PkgPath,
+		HasConfig:           rf.HasConfig,
+		BeforeAll:           rf.BeforeAll,
+		AfterAll:            rf.AfterAll,
+		BeforeEach:          rf.BeforeEach,
+		AfterEach:           rf.AfterEach,
+		HasHydrate:          rf.HasHydrate,
+		HasDehydrate:        rf.HasDehydrate,
+		ChildSuites:         rf.ChildSuites,
+		SharedFixtures:      rf.SharedFixtures,
 	}
-
-	// Assign child suites to their fixture
-	for _, ts := range fixtureBound {
-		fix := ts.Fixture()
-		if fix == nil {
-			continue
-		}
-		vm, ok := vmMap[fix.Identifier()]
-		if !ok {
-			continue
-		}
-		vm.ChildSuites = append(vm.ChildSuites, ts)
+	for _, child := range rf.Children {
+		vm.ChildFixtures = append(vm.ChildFixtures, resolvedToViewModel(child))
 	}
-
-	// Build parent-child fixture relationships
-	for _, f := range fixtures {
-		if f.Kind != gotestast.PackageFixture {
-			continue
-		}
-		if f.ParentFixture == nil {
-			continue
-		}
-		childVM, ok := vmMap[f.Identifier()]
-		if !ok {
-			continue
-		}
-		parentVM, ok := vmMap[f.ParentFixture.Identifier()]
-		if !ok {
-			continue
-		}
-		parentVM.ChildFixtures = append(parentVM.ChildFixtures, childVM)
-	}
-
-	// Collect root fixtures (those without a parent fixture)
-	var roots []*FixtureViewModel
-	for _, f := range fixtures {
-		if f.Kind != gotestast.PackageFixture {
-			continue
-		}
-		if f.ParentFixture != nil {
-			continue
-		}
-		vm := vmMap[f.Identifier()]
-		roots = append(roots, vm)
-	}
-
-	return roots
+	return vm
 }
 
-// detectSharedFixtureEmbeddings inspects a package fixture's struct type for
-// embedded pointer fields whose type name ends in "SharedFixture". For each
-// match, it computes the state key and checks for Hydrate/Dehydrate methods.
-func detectSharedFixtureEmbeddings(pkgFixture *gotestast.FixtureSpec) []SharedFixtureRef {
-	typ := pkgFixture.StructType()
-	if typ == nil {
-		return nil
-	}
-
-	var refs []SharedFixtureRef
-	sfIdx := 0
-	for i := 0; i < typ.NumFields(); i++ {
-		field := typ.Field(i)
-		if !field.Anonymous() {
-			continue
-		}
-		ptr, ok := field.Type().(*types.Pointer)
-		if !ok {
-			continue
-		}
-		named, ok := ptr.Elem().(*types.Named)
-		if !ok {
-			continue
-		}
-		name := named.Obj().Name()
-		if !strings.HasSuffix(name, "SharedFixture") {
-			continue
-		}
-
-		qualifiedType := name
-		var pkgPath, stateKey string
-		if pkg := named.Obj().Pkg(); pkg != nil {
-			stateKey = pkg.Path() + "." + name
-			if pkg.Path() != pkgFixture.PackagePath() {
-				qualifiedType = pkg.Name() + "." + name
-				pkgPath = pkg.Path()
-			}
-		}
-
-		mset := types.NewMethodSet(types.NewPointer(named))
-		hasHydrate := mset.Lookup(named.Obj().Pkg(), "Hydrate") != nil
-		hasDehydrate := mset.Lookup(named.Obj().Pkg(), "Dehydrate") != nil
-
-		refs = append(refs, SharedFixtureRef{
-			LocalVar:      fmt.Sprintf("sf%d", sfIdx),
-			QualifiedType: qualifiedType,
-			FieldName:     name,
-			StateKey:      stateKey,
-			HasHydrate:    hasHydrate,
-			HasDehydrate:  hasDehydrate,
-			PkgPath:       pkgPath,
-		})
-		sfIdx++
-	}
-	return refs
-}

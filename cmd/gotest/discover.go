@@ -14,7 +14,16 @@ import (
 
 // discoverOutput is the top-level JSON structure emitted by "gotest discover".
 type discoverOutput struct {
-	Packages []discoverPackage `json:"packages"`
+	Packages []discoverPackage  `json:"packages"`
+	Warnings []discoverWarning  `json:"warnings,omitempty"`
+}
+
+type discoverWarning struct {
+	ImportPath string `json:"importPath"`
+	File       string `json:"file,omitempty"`
+	Line       int    `json:"line,omitempty"`
+	Col        int    `json:"col,omitempty"`
+	Message    string `json:"message"`
 }
 
 type discoverPackage struct {
@@ -47,15 +56,26 @@ type discoverMethod struct {
 }
 
 func runDiscover(args []string) int {
-	patterns := ExtractPackagePatterns(args)
+	tags, remaining := extractTagsFlag(args)
+	patterns := ExtractPackagePatterns(remaining)
+	var buildFlags []string
+	if tags != "" {
+		buildFlags = append(buildFlags, "-tags="+tags)
+	}
 
 	out := discoverOutput{}
 
 	for _, pattern := range patterns {
-		loadResults, err := gotestgen.LoadPackages(pattern)
+		loadResults, loadWarnings, err := gotestgen.LoadPackagesWithWarnings(pattern, buildFlags...)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2
+		}
+		for _, w := range loadWarnings {
+			out.Warnings = append(out.Warnings, discoverWarning{
+				ImportPath: w.PkgPath,
+				Message:    w.Message,
+			})
 		}
 
 		c := gotestgen.NewCollector()
@@ -66,7 +86,6 @@ func runDiscover(args []string) int {
 				Dir:        lr.PkgDir,
 			}
 
-			// Collect suites from both ptest and pxtest
 			pkgs := []*packages.Package{lr.Ptest, lr.Pxtest}
 			for _, pkg := range pkgs {
 				if pkg == nil {
@@ -74,8 +93,28 @@ func runDiscover(args []string) int {
 				}
 				result := c.CollectSuiteSpecs(pkg)
 				if len(result.Errs) > 0 {
-					fmt.Fprintf(os.Stderr, "FAIL: %s\n", result.Errs[0].Err)
-					return 2
+					for _, ce := range result.Errs {
+						w := discoverWarning{
+							ImportPath: lr.PkgPath,
+							Message:    ce.Err.Error(),
+						}
+						if ce.Pos.IsValid() {
+							pos := pkg.Fset.Position(ce.Pos)
+							w.File = filepath.Base(pos.Filename)
+							w.Line = pos.Line
+							w.Col = pos.Column
+						}
+						out.Warnings = append(out.Warnings, w)
+					}
+					continue
+				}
+
+				if _, err := gotestgen.Resolve(pkg, result.Suites, result.Fixtures); err != nil {
+					out.Warnings = append(out.Warnings, discoverWarning{
+						ImportPath: lr.PkgPath,
+						Message:    err.Error(),
+					})
+					continue
 				}
 
 				for _, suite := range result.Suites {
