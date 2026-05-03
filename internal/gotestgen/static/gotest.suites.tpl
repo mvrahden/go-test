@@ -11,7 +11,7 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
 
 func Test{{ $ts.Identifier }}(t *testing.T) {
   s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
-{{- /* Wire up shared fixtures from GOTEST_SHARED_STATE if present */ -}}
+{{- /* Wire up shared fixtures from GOTEST_SHARED_STATE_FILE if present */ -}}
 {{- $sfRefs := index $.SuiteSharedFixtures $ts.Identifier }}
 {{- if $sfRefs }}
   ƒsharedFile := os.Getenv("GOTEST_SHARED_STATE_FILE")
