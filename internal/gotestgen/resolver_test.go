@@ -6,6 +6,23 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+func TestIsInternalPkgPath(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		path     string
+		expected bool
+	}{
+		{"github.com/foo/internal/bar", true},
+		{"github.com/foo/internal", true},
+		{"internal/bar", true},
+		{"github.com/foo/bar", false},
+		{"github.com/foo/internalize", false},
+		{"github.com/foo/pkg/bar", false},
+	} {
+		gotest.Equal(t, tc.expected, isInternalPkgPath(tc.path), tc.path)
+	}
+}
+
 func TestResolve_Embedding_SuiteToFixture(t *testing.T) {
 	t.Parallel()
 	src := `package testpkg

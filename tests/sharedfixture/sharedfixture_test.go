@@ -15,16 +15,9 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-func findModuleRoot(t *testing.T) string {
-	t.Helper()
-	out, err := exec.Command("go", "env", "GOMOD").Output()
-	gotest.NoError(t, err, "go env GOMOD")
-	return filepath.Dir(strings.TrimSpace(string(out)))
-}
-
 func TestSharedFixtureIntegration(t *testing.T) {
-	standalonePattern := "github.com/mvrahden/go-test/internal/integration/sharedfixture/standalone/..."
-	fixtureboundPattern := "github.com/mvrahden/go-test/internal/integration/sharedfixture/fixturebound/..."
+	standalonePattern := "github.com/mvrahden/go-test/tests/sharedfixture/standalone/..."
+	fixtureboundPattern := "github.com/mvrahden/go-test/tests/sharedfixture/fixturebound/..."
 
 	var allResults gotestgen.GenerateResults
 	sharedSeen := map[string]bool{}
@@ -78,22 +71,13 @@ func TestSharedFixtureIntegration(t *testing.T) {
 
 		sharedDir := filepath.Join(tmpDir, "shared")
 		gotest.NoError(t, os.MkdirAll(sharedDir, 0755))
-
-		// Build setup binary as a real module-internal package so it can
-		// import internal/ packages (go run file.go treats it as
-		// command-line-arguments which blocks internal imports).
-		modRoot := findModuleRoot(t)
-		setupPkgDir := filepath.Join(modRoot, "gotest_shared_setup_")
-		gotest.NoError(t, os.MkdirAll(setupPkgDir, 0755))
-		gotest.NoError(t, os.WriteFile(filepath.Join(setupPkgDir, "main.go"), setupSrc, 0644))
-		t.Cleanup(func() { os.RemoveAll(setupPkgDir) })
+		setupFile := filepath.Join(sharedDir, "setup.go")
+		gotest.NoError(t, os.WriteFile(setupFile, setupSrc, 0644))
 
 		setupBin := filepath.Join(sharedDir, "setup")
-		buildCmd := exec.Command("go", "build", "-o", setupBin, "./gotest_shared_setup_/")
-		buildCmd.Dir = modRoot
+		buildCmd := exec.Command("go", "build", "-o", setupBin, setupFile)
 		buildCmd.Stderr = os.Stderr
 		gotest.NoError(t, buildCmd.Run(), "build shared fixture setup binary")
-		os.RemoveAll(setupPkgDir)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
@@ -122,8 +106,8 @@ func TestSharedFixtureIntegration(t *testing.T) {
 		t.Run("StateContent", func(t *testing.T) {
 			gotest.Equal(t, 2, len(state), "expected entries for Alpha and Beta")
 
-			alphaKey := "github.com/mvrahden/go-test/internal/integration/sharedfixture/fixtures.AlphaSharedFixture"
-			betaKey := "github.com/mvrahden/go-test/internal/integration/sharedfixture/fixtures.BetaSharedFixture"
+			alphaKey := "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.AlphaSharedFixture"
+			betaKey := "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.BetaSharedFixture"
 
 			_, hasAlpha := state[alphaKey]
 			gotest.True(t, hasAlpha, "state should contain AlphaSharedFixture")

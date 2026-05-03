@@ -55,31 +55,17 @@ func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		return nil, fmt.Errorf("create shared fixture dir: %w", err)
 	}
 
-	// Write setup source as a real package inside the module tree so that
-	// `go build` treats it as a module-internal package, allowing imports
-	// of internal/ packages.  We remove the directory after building.
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("getwd: %w", err)
-	}
-	setupPkgDir := filepath.Join(cwd, "gotest_shared_setup_")
-	if err := os.MkdirAll(setupPkgDir, 0755); err != nil {
-		return nil, fmt.Errorf("create setup pkg dir: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(setupPkgDir, "main.go"), src, 0644); err != nil {
-		os.RemoveAll(setupPkgDir)
+	setupFile := filepath.Join(sharedDir, "setup.go")
+	if err := os.WriteFile(setupFile, src, 0644); err != nil {
 		return nil, err
 	}
 
 	setupBin := filepath.Join(sharedDir, "setup")
-	buildCmd := exec.CommandContext(ctx, "go", "build", "-o", setupBin, "./gotest_shared_setup_/")
-	buildCmd.Dir = cwd
+	buildCmd := exec.CommandContext(ctx, "go", "build", "-o", setupBin, setupFile)
 	buildCmd.Stderr = os.Stderr
 	if err := buildCmd.Run(); err != nil {
-		os.RemoveAll(setupPkgDir)
 		return nil, fmt.Errorf("build shared fixture setup: %w", err)
 	}
-	os.RemoveAll(setupPkgDir)
 
 	cmd := exec.CommandContext(ctx, setupBin)
 	cmd.Stderr = os.Stderr

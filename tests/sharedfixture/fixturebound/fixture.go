@@ -3,7 +3,7 @@ package fixturebound
 import (
 	"context"
 
-	"github.com/mvrahden/go-test/internal/integration/sharedfixture/fixtures"
+	"github.com/mvrahden/go-test/tests/sharedfixture/fixtures"
 )
 
 type InfraFixture struct {
