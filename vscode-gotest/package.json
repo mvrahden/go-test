@@ -125,6 +125,18 @@
           "scope": "resource",
           "description": "Comma-separated Go build tags (e.g. 'integration,e2e'). Passed to discovery, test runs, and overlays."
         },
+        "gotest.coverOnRun": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Collect coverage data alongside normal test runs"
+        },
+        "gotest.coverOnSave": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "Re-run package coverage when a .go file is saved (opt-in)"
+        },
         "gotest.specView.autoRefresh": {
           "type": "boolean",
           "default": true,

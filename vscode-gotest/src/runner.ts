@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { rm } from "node:fs/promises";
+import * as path from "node:path";
+import { rm, mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import { parseTestEvents } from "./outputParser.js";
@@ -13,6 +15,8 @@ import {
   applyResults,
   spawnTestProcess,
 } from "./runnerUtils.js";
+import { runGoToolCoverFunc } from "./coverage.js";
+import type { CoverageStore } from "./coverageStore.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -26,6 +30,7 @@ export class TestRunner {
     private readonly controller: GoTestController,
     private readonly cache: DiscoveryCache,
     private readonly outputChannel: vscode.OutputChannel,
+    private readonly coverageStore?: CoverageStore,
   ) {}
 
   dispose(): void {
@@ -49,6 +54,7 @@ export class TestRunner {
 
     const run = this.controller.createTestRun(request, "Go Test Run");
     this._lastJsonOutput = "";
+    let anyCoverOnRun = false;
 
     try {
       const items = collectItems(this.controller, request);
@@ -96,8 +102,11 @@ export class TestRunner {
         const filter = this.buildRunFilter(groupItems, importPath);
         const config = scopedConfig(workspaceDir);
         const testFlags = config.get<string[]>("testFlags") ?? [];
+        const coverOnRun = this.coverageStore !== undefined && (config.get<boolean>("coverOnRun") ?? true);
+        if (coverOnRun) anyCoverOnRun = true;
 
         let overlayDir: string | undefined;
+        let coverFile: string | undefined;
         try {
           const overlayCmd = await buildCliCommand(["overlay", importPath], workspaceDir, this.outputChannel);
           this.outputChannel.appendLine(`[runner] ${formatCliCommand(overlayCmd)}`);
@@ -109,6 +118,11 @@ export class TestRunner {
           const overlay = JSON.parse(overlayStdout) as { overlayFile: string; dir: string };
           overlayDir = overlay.dir;
 
+          if (coverOnRun) {
+            const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
+            coverFile = path.join(tmpDir, "cover.out");
+          }
+
           const buildTags = config.get<string>("buildTags", "").trim();
           const goTestArgs = [
             "test",
@@ -117,6 +131,9 @@ export class TestRunner {
             "-json",
             importPath,
           ];
+          if (coverFile) {
+            goTestArgs.push(`-coverprofile=${coverFile}`);
+          }
           if (buildTags) {
             goTestArgs.push(`-tags=${buildTags}`);
           }
@@ -139,6 +156,21 @@ export class TestRunner {
 
           const events = parseTestEvents(stdout);
           applyResults(this.controller, run, events, importPath, pkg.dir);
+
+          if (coverFile) {
+            try {
+              const coverContent = await readFile(coverFile, "utf-8");
+              let funcOutput: string | undefined;
+              try {
+                funcOutput = await runGoToolCoverFunc(goBin, coverFile, workspaceDir);
+              } catch {
+                this.outputChannel.appendLine("[runner] go tool cover -func failed");
+              }
+              this.coverageStore!.update(importPath, coverContent, funcOutput);
+            } catch {
+              this.outputChannel.appendLine("[runner] no coverprofile generated");
+            }
+          }
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
           this.outputChannel.appendLine(`[runner] error: ${message}`);
@@ -149,7 +181,18 @@ export class TestRunner {
           if (overlayDir) {
             rm(overlayDir, { recursive: true, force: true }).catch(() => {});
           }
+          if (coverFile) {
+            rm(path.dirname(coverFile), { recursive: true, force: true }).catch(() => {});
+          }
         }
+      }
+
+      if (anyCoverOnRun) {
+        const allCoverages = this.coverageStore!.buildFileCoverages(this.cache);
+        for (const fc of allCoverages) {
+          run.addCoverage(fc);
+        }
+        await this.coverageStore!.save();
       }
     } finally {
       cancelSub.dispose();

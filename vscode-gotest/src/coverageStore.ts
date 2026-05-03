@@ -1,11 +1,12 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { parseCoverProfile } from "./coverage.js";
+import { parseCoverProfile, parseFuncCoverage, buildFileCoverages } from "./coverage.js";
 import type { DiscoveryCache } from "./discovery.js";
 
 interface StoredPackageCoverage {
   coverprofile: string;
+  funcCoverage?: string;
   timestamp: number;
 }
 
@@ -30,8 +31,12 @@ export class CoverageStore implements vscode.Disposable {
     return this.packages.size;
   }
 
-  update(importPath: string, coverprofile: string): void {
-    this.packages.set(importPath, { coverprofile, timestamp: Date.now() });
+  has(importPath: string): boolean {
+    return this.packages.has(importPath);
+  }
+
+  update(importPath: string, coverprofile: string, funcCoverage?: string): void {
+    this.packages.set(importPath, { coverprofile, funcCoverage, timestamp: Date.now() });
     this._onDidChange.fire();
   }
 
@@ -55,11 +60,24 @@ export class CoverageStore implements vscode.Disposable {
     cache: DiscoveryCache,
   ): vscode.FileCoverage[] {
     const moduleToDir = (importPath: string) => cache.resolveImportPath(importPath);
-    const result: vscode.FileCoverage[] = [];
+    const allDeclarations = new Map<string, vscode.DeclarationCoverage[]>();
+
     for (const [, pkg] of this.packages) {
-      result.push(...parseCoverProfile(pkg.coverprofile, moduleToDir));
+      if (pkg.funcCoverage) {
+        const decls = parseFuncCoverage(pkg.funcCoverage, moduleToDir);
+        for (const [filePath, declarations] of decls) {
+          const existing = allDeclarations.get(filePath) ?? [];
+          existing.push(...declarations);
+          allDeclarations.set(filePath, existing);
+        }
+      }
     }
-    return result;
+
+    const allParsed = [];
+    for (const [, pkg] of this.packages) {
+      allParsed.push(...parseCoverProfile(pkg.coverprofile, moduleToDir));
+    }
+    return buildFileCoverages(allParsed, allDeclarations);
   }
 
   async load(): Promise<void> {

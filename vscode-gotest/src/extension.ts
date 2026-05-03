@@ -11,7 +11,7 @@ import { WatchManager } from "./watch.js";
 import { ScaffoldCodeActionProvider, runScaffoldCommand, executeScaffold } from "./scaffold.js";
 import { CoverageRunner } from "./coverage.js";
 import { CoverageStore } from "./coverageStore.js";
-import { validateGoBinary } from "./cli.js";
+import { validateGoBinary, scopedConfig } from "./cli.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Go Test Suites");
@@ -44,11 +44,11 @@ export function activate(context: vscode.ExtensionContext): void {
     (request, token) => coverageRunner.run(request, token),
   );
 
-  runner = new TestRunner(controller, cache, outputChannel);
+  const coverageStore = new CoverageStore(context.storageUri);
+
+  runner = new TestRunner(controller, cache, outputChannel, coverageStore);
 
   const specView = new SpecViewPanel(outputChannel);
-
-  const coverageStore = new CoverageStore(context.storageUri);
 
   coverageRunner = new CoverageRunner(controller, cache, coverageStore, outputChannel, (jsonOutput) => {
     specView.refresh(jsonOutput);
@@ -220,25 +220,41 @@ export function activate(context: vscode.ExtensionContext): void {
     () => coverageRunner.copyCoverageSummary(),
   );
 
+  // Cover on save: debounced per-package trigger
+  const coverOnSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const triggerCoverOnSave = (importPath: string, uri: vscode.Uri) => {
+    const folder = vscode.workspace.getWorkspaceFolder(uri);
+    if (!folder) return;
+    const config = scopedConfig(folder.uri.fsPath);
+    if (!(config.get<boolean>("coverOnSave") ?? false)) return;
+
+    const existing = coverOnSaveTimers.get(importPath);
+    if (existing) clearTimeout(existing);
+    coverOnSaveTimers.set(importPath, setTimeout(() => {
+      coverOnSaveTimers.delete(importPath);
+      coverageRunner.runPackage(importPath);
+    }, 500));
+  };
+
   // Set up FileSystemWatcher for *_test.go files
   const watcher = vscode.workspace.createFileSystemWatcher("**/*_test.go");
   const onFileChange = (uri: vscode.Uri) => {
-    const discoverOnSave =
-      vscode.workspace.getConfiguration("gotest").get<boolean>("discoverOnSave") ?? true;
-    if (!discoverOnSave) {
-      return;
-    }
     const folder = vscode.workspace.getWorkspaceFolder(uri);
-    if (!folder) {
-      return;
-    }
+    if (!folder) return;
     const wsDir = folder.uri.fsPath;
     const importPath = cache.resolveFileToPackage(uri.fsPath);
-    if (importPath) {
-      discoveryService.discoverPackage(wsDir, importPath);
-    } else {
-      discoveryService.discover(wsDir);
+
+    const discoverOnSave =
+      vscode.workspace.getConfiguration("gotest").get<boolean>("discoverOnSave") ?? true;
+    if (discoverOnSave) {
+      if (importPath) {
+        discoveryService.discoverPackage(wsDir, importPath);
+      } else {
+        discoveryService.discover(wsDir);
+      }
     }
+
+    if (importPath) triggerCoverOnSave(importPath, uri);
   };
   const onFileDelete = (uri: vscode.Uri) => {
     const discoverOnSave =
@@ -258,14 +274,16 @@ export function activate(context: vscode.ExtensionContext): void {
   // Invalidate coverage when source files change
   const goSourceWatcher = vscode.workspace.createFileSystemWatcher("**/*.go");
   const onSourceChange = (uri: vscode.Uri) => {
-    if (uri.fsPath.endsWith("_test.go")) {
-      return;
-    }
+    if (uri.fsPath.endsWith("_test.go")) return;
     const importPath = cache.resolveFileToPackage(uri.fsPath);
-    if (importPath && coverageStore.invalidate(importPath)) {
+    if (!importPath) return;
+
+    if (coverageStore.invalidate(importPath)) {
       outputChannel.appendLine(`[coverage] invalidated ${importPath}`);
       coverageStore.save();
     }
+
+    triggerCoverOnSave(importPath, uri);
   };
   const sourceChangeDisposable = goSourceWatcher.onDidChange(onSourceChange);
   const sourceCreateDisposable = goSourceWatcher.onDidCreate(onSourceChange);
@@ -308,6 +326,7 @@ export function activate(context: vscode.ExtensionContext): void {
     sourceChangeDisposable,
     sourceCreateDisposable,
     sourceDeleteDisposable,
+    { dispose() { for (const t of coverOnSaveTimers.values()) clearTimeout(t); } },
   );
 
   // Validate go binary, then run initial discovery and restore persisted coverage

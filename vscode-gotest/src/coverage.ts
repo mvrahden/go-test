@@ -20,10 +20,15 @@ import {
 
 const execFileAsync = promisify(execFile);
 
+export interface ParsedFileCoverage {
+  absPath: string;
+  statements: vscode.StatementCoverage[];
+}
+
 export function parseCoverProfile(
   content: string,
   moduleToDir: (importPath: string) => string | undefined,
-): vscode.FileCoverage[] {
+): ParsedFileCoverage[] {
   const lines = content.split("\n");
   const fileEntries = new Map<string, vscode.StatementCoverage[]>();
 
@@ -58,7 +63,7 @@ export function parseCoverProfile(
     statements.push(new vscode.StatementCoverage(count > 0 ? count : false, range));
   }
 
-  const result: vscode.FileCoverage[] = [];
+  const result: ParsedFileCoverage[] = [];
   for (const [importFilePath, statements] of fileEntries) {
     const lastSlash = importFilePath.lastIndexOf("/");
     const fileName = importFilePath.slice(lastSlash + 1);
@@ -68,13 +73,82 @@ export function parseCoverProfile(
       continue;
     }
     const absPath = path.join(absDir, fileName);
-    const uri = vscode.Uri.file(absPath);
-
-    const fileCoverage = vscode.FileCoverage.fromDetails(uri, statements);
-    result.push(fileCoverage);
+    result.push({ absPath, statements });
   }
 
   return result;
+}
+
+export function buildFileCoverages(
+  parsed: ParsedFileCoverage[],
+  declarations?: Map<string, vscode.DeclarationCoverage[]>,
+): vscode.FileCoverage[] {
+  return parsed.map((entry) => {
+    const uri = vscode.Uri.file(entry.absPath);
+    const decls = declarations?.get(entry.absPath);
+    if (decls && decls.length > 0) {
+      const details: (vscode.StatementCoverage | vscode.DeclarationCoverage)[] = [...entry.statements, ...decls];
+      return vscode.FileCoverage.fromDetails(uri, details);
+    }
+    return vscode.FileCoverage.fromDetails(uri, entry.statements);
+  });
+}
+
+export function parseFuncCoverage(
+  content: string,
+  moduleToDir: (importPath: string) => string | undefined,
+): Map<string, vscode.DeclarationCoverage[]> {
+  const result = new Map<string, vscode.DeclarationCoverage[]>();
+
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("total:")) {
+      continue;
+    }
+
+    const match = /^(.+):(\d+):\s+(\S+)\s+(\d+(?:\.\d+)?)%$/.exec(trimmed);
+    if (!match) {
+      continue;
+    }
+
+    const filePath = match[1];
+    const lineNum = parseInt(match[2], 10) - 1;
+    const funcName = match[3];
+    const pct = parseFloat(match[4]);
+
+    const lastSlash = filePath.lastIndexOf("/");
+    const fileName = filePath.slice(lastSlash + 1);
+    const importDir = filePath.slice(0, lastSlash);
+    const absDir = moduleToDir(importDir);
+    if (!absDir) {
+      continue;
+    }
+    const absPath = path.join(absDir, fileName);
+
+    let declarations = result.get(absPath);
+    if (!declarations) {
+      declarations = [];
+      result.set(absPath, declarations);
+    }
+
+    const executed = pct > 0 ? pct / 100 : false;
+    const position = new vscode.Position(lineNum, 0);
+    declarations.push(new vscode.DeclarationCoverage(funcName, executed, position));
+  }
+
+  return result;
+}
+
+export async function runGoToolCoverFunc(
+  goBin: string,
+  coverFile: string,
+  workspaceDir: string,
+): Promise<string> {
+  const { stdout } = await execFileAsync(goBin, ["tool", "cover", `-func=${coverFile}`], {
+    cwd: workspaceDir,
+    timeout: 10_000,
+  });
+  return stdout;
 }
 
 export class CoverageRunner implements vscode.Disposable {
@@ -203,7 +277,13 @@ export class CoverageRunner implements vscode.Disposable {
 
           try {
             const coverContent = await readFile(coverFile, "utf-8");
-            this.store.update(importPath, coverContent);
+            let funcOutput: string | undefined;
+            try {
+              funcOutput = await runGoToolCoverFunc(goBin, coverFile, workspaceDir);
+            } catch {
+              this.outputChannel.appendLine("[coverage] go tool cover -func failed, skipping declaration coverage");
+            }
+            this.store.update(importPath, coverContent, funcOutput);
           } catch {
             this.outputChannel.appendLine("[coverage] no coverprofile generated");
           }
@@ -285,6 +365,78 @@ export class CoverageRunner implements vscode.Disposable {
     const text = lines.join("\n");
     await vscode.env.clipboard.writeText(text);
     vscode.window.showInformationMessage("Coverage summary copied to clipboard.");
+  }
+
+  async runPackage(importPath: string): Promise<void> {
+    const pkg = this.cache.getPackage(importPath);
+    if (!pkg) return;
+    const workspaceDir = this.cache.getWorkspaceDir(importPath);
+    if (!workspaceDir) return;
+
+    const config = scopedConfig(workspaceDir);
+    const testFlags = config.get<string[]>("testFlags") ?? [];
+    let overlayDir: string | undefined;
+    let coverFile: string | undefined;
+
+    try {
+      const overlayCmd = await buildCliCommand(["overlay", importPath], workspaceDir, this.outputChannel);
+      const { stdout: overlayStdout } = await execFileAsync(
+        overlayCmd.bin,
+        overlayCmd.args,
+        { cwd: workspaceDir },
+      );
+      const overlay = JSON.parse(overlayStdout) as OverlayOutput;
+      overlayDir = overlay.dir;
+
+      const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
+      coverFile = path.join(tmpDir, "cover.out");
+
+      const buildTags = config.get<string>("buildTags", "").trim();
+      const args = [
+        "test",
+        `-overlay=${overlay.overlayFile}`,
+        `-coverprofile=${coverFile}`,
+        "-count=1",
+        importPath,
+      ];
+      if (buildTags) args.push(`-tags=${buildTags}`);
+      args.push(...testFlags);
+
+      const goBin = await resolveGoBinary(this.outputChannel, workspaceDir);
+      this.outputChannel.appendLine(`[coverage:save] ${goBin} ${args.join(" ")}`);
+
+      const cts = new vscode.CancellationTokenSource();
+      try {
+        await spawnTestProcess(goBin, args, workspaceDir, cts.token, this.outputChannel, "coverage");
+      } finally {
+        cts.dispose();
+      }
+
+      const coverContent = await readFile(coverFile, "utf-8");
+      let funcOutput: string | undefined;
+      try {
+        funcOutput = await runGoToolCoverFunc(goBin, coverFile, workspaceDir);
+      } catch {
+        this.outputChannel.appendLine("[coverage:save] go tool cover -func failed");
+      }
+      this.store.update(importPath, coverContent, funcOutput);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.outputChannel.appendLine(`[coverage:save] failed: ${message}`);
+      return;
+    } finally {
+      if (overlayDir) rm(overlayDir, { recursive: true, force: true }).catch(() => {});
+      if (coverFile) rm(path.dirname(coverFile), { recursive: true, force: true }).catch(() => {});
+    }
+
+    const request = new vscode.TestRunRequest();
+    const run = this.controller.createTestRun(request, "Cover on Save");
+    const allCoverages = this.store.buildFileCoverages(this.cache);
+    for (const fc of allCoverages) {
+      run.addCoverage(fc);
+    }
+    run.end();
+    await this.store.save();
   }
 
   dispose(): void {
