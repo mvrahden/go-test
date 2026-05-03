@@ -1,6 +1,64 @@
 import * as vscode from "vscode";
 import type { DiscoveryCache } from "./discovery.js";
 
+export interface PathNode {
+  segment: string;
+  children: Map<string, PathNode>;
+  importPath?: string;
+}
+
+export function buildPathTrie(
+  entries: { relativePath: string; importPath: string }[],
+): PathNode {
+  const root: PathNode = { segment: "", children: new Map() };
+
+  for (const entry of entries) {
+    if (entry.relativePath === ".") {
+      root.importPath = entry.importPath;
+      continue;
+    }
+    const parts = entry.relativePath.split("/");
+    let current = root;
+    for (const part of parts) {
+      let child = current.children.get(part);
+      if (!child) {
+        child = { segment: part, children: new Map() };
+        current.children.set(part, child);
+      }
+      current = child;
+    }
+    current.importPath = entry.importPath;
+  }
+
+  return root;
+}
+
+export function collapsePathTrie(node: PathNode): void {
+  const collapsed = new Map<string, PathNode>();
+  for (const [, child] of node.children) {
+    collapseNode(child);
+    collapsed.set(child.segment, child);
+  }
+  node.children = collapsed;
+}
+
+function collapseNode(node: PathNode): void {
+  while (node.children.size === 1 && !node.importPath) {
+    const [, child] = [...node.children.entries()][0];
+    node.segment = node.segment
+      ? `${node.segment}/${child.segment}`
+      : child.segment;
+    node.importPath = child.importPath;
+    node.children = child.children;
+  }
+  const collapsed = new Map<string, PathNode>();
+  for (const [, child] of node.children) {
+    collapseNode(child);
+    collapsed.set(child.segment, child);
+  }
+  node.children = collapsed;
+}
+
 export class GoTestController implements vscode.Disposable {
   private controller: vscode.TestController;
   private disposables: vscode.Disposable[] = [];
@@ -56,91 +114,180 @@ export class GoTestController implements vscode.Disposable {
 
   rebuild(): void {
     const packages = this.cache.packages;
-    const seenPackageIds = new Set<string>();
+    const wsGroups = new Map<
+      string,
+      { relativePath: string; importPath: string }[]
+    >();
 
     for (const pkg of packages) {
-      const pkgId = pkg.importPath;
-      seenPackageIds.add(pkgId);
+      const wsDir = this.cache.getWorkspaceDir(pkg.importPath);
+      if (!wsDir) continue;
 
-      let pkgItem = this.controller.items.get(pkgId);
-      if (!pkgItem) {
-        pkgItem = this.controller.createTestItem(pkgId, pkgId);
+      let relativePath = pkg.dir.startsWith(wsDir)
+        ? pkg.dir.slice(wsDir.length).replace(/^[/\\]+/, "")
+        : pkg.dir;
+      if (!relativePath) relativePath = ".";
+
+      let group = wsGroups.get(wsDir);
+      if (!group) {
+        group = [];
+        wsGroups.set(wsDir, group);
       }
-      this.controller.items.add(pkgItem);
+      group.push({ relativePath, importPath: pkg.importPath });
+    }
 
-      const seenSuiteIds = new Set<string>();
+    const seenIds = new Set<string>();
 
-      for (const suite of pkg.suites) {
-        const suiteId = `${pkgId}/${suite.name}`;
-        seenSuiteIds.add(suiteId);
+    for (const [_wsDir, entries] of wsGroups) {
+      const trie = buildPathTrie(entries);
+      collapsePathTrie(trie);
 
-        const suiteUri = vscode.Uri.file(suite.file);
-        let suiteItem = pkgItem.children.get(suiteId);
-        if (!suiteItem) {
-          suiteItem = this.controller.createTestItem(
-            suiteId,
-            suite.name,
-            suiteUri,
+      if (trie.importPath && trie.children.size === 0) {
+        this.addPackageItem(trie.importPath, this.controller.items, seenIds);
+      } else if (trie.importPath) {
+        this.addPackageItem(trie.importPath, this.controller.items, seenIds);
+        for (const child of trie.children.values()) {
+          this.addTrieNode(child, this.controller.items, seenIds);
+        }
+      } else {
+        for (const child of trie.children.values()) {
+          this.addTrieNode(child, this.controller.items, seenIds);
+        }
+      }
+    }
+
+    this.controller.items.forEach((child) => {
+      if (!seenIds.has(child.id) && !child.id.includes("/dynamic/")) {
+        this.controller.items.delete(child.id);
+      }
+    });
+  }
+
+  private addTrieNode(
+    node: PathNode,
+    parent: vscode.TestItemCollection,
+    seenIds: Set<string>,
+  ): void {
+    if (node.importPath && node.children.size === 0) {
+      this.addPackageItem(node.importPath, parent, seenIds);
+      return;
+    }
+
+    const dirId = `dir:${node.segment}`;
+    seenIds.add(dirId);
+
+    let dirItem = parent.get(dirId);
+    if (!dirItem) {
+      dirItem = this.controller.createTestItem(dirId, node.segment);
+    }
+    parent.add(dirItem);
+
+    if (node.importPath) {
+      this.addPackageItem(node.importPath, dirItem.children, seenIds);
+    }
+
+    const seenChildIds = new Set<string>();
+    for (const child of node.children.values()) {
+      this.addTrieNode(child, dirItem.children, seenIds);
+      const childId =
+        child.importPath && child.children.size === 0
+          ? child.importPath
+          : `dir:${child.segment}`;
+      seenChildIds.add(childId);
+    }
+
+    dirItem.children.forEach((child) => {
+      if (!seenChildIds.has(child.id) && !child.id.includes("/dynamic/")) {
+        dirItem.children.delete(child.id);
+      }
+    });
+  }
+
+  private addPackageItem(
+    importPath: string,
+    parent: vscode.TestItemCollection,
+    seenIds: Set<string>,
+  ): void {
+    const pkg = this.cache.getPackage(importPath);
+    if (!pkg) return;
+
+    seenIds.add(importPath);
+
+    let pkgItem = parent.get(importPath);
+    if (!pkgItem) {
+      const label = pkg.dir.split("/").pop() || importPath;
+      pkgItem = this.controller.createTestItem(importPath, label);
+    }
+    pkgItem.tags = [
+      new vscode.TestTag("package"),
+      ...this.buildTags(false, false, false),
+    ];
+    pkgItem.description = importPath;
+    parent.add(pkgItem);
+
+    const seenSuiteIds = new Set<string>();
+
+    for (const suite of pkg.suites) {
+      const suiteId = `${importPath}/${suite.name}`;
+      seenSuiteIds.add(suiteId);
+
+      const suiteUri = vscode.Uri.file(suite.file);
+      let suiteItem = pkgItem.children.get(suiteId);
+      if (!suiteItem) {
+        suiteItem = this.controller.createTestItem(
+          suiteId,
+          suite.name,
+          suiteUri,
+        );
+      }
+      suiteItem.range = new vscode.Range(
+        new vscode.Position(suite.line - 1, suite.col - 1),
+        new vscode.Position(suite.line - 1, suite.col - 1),
+      );
+      suiteItem.tags = this.buildTags(
+        suite.focused,
+        suite.excluded,
+        suite.parallel,
+      );
+      pkgItem.children.add(suiteItem);
+
+      const seenMethodIds = new Set<string>();
+
+      for (const method of suite.methods) {
+        const methodId = `${suiteId}/${method.name}`;
+        seenMethodIds.add(methodId);
+
+        const methodUri = vscode.Uri.file(method.file);
+        let methodItem = suiteItem.children.get(methodId);
+        if (!methodItem) {
+          methodItem = this.controller.createTestItem(
+            methodId,
+            method.name,
+            methodUri,
           );
         }
-        suiteItem.range = new vscode.Range(
-          new vscode.Position(suite.line - 1, suite.col - 1),
-          new vscode.Position(suite.line - 1, suite.col - 1),
+        methodItem.range = new vscode.Range(
+          new vscode.Position(method.line - 1, method.col - 1),
+          new vscode.Position(method.line - 1, method.col - 1),
         );
-        suiteItem.tags = this.buildTags(
-          suite.focused,
-          suite.excluded,
-          suite.parallel,
+        methodItem.tags = this.buildTags(
+          method.focused,
+          method.excluded,
+          method.parallel,
         );
-        pkgItem.children.add(suiteItem);
-
-        const seenMethodIds = new Set<string>();
-
-        for (const method of suite.methods) {
-          const methodId = `${suiteId}/${method.name}`;
-          seenMethodIds.add(methodId);
-
-          const methodUri = vscode.Uri.file(method.file);
-          let methodItem = suiteItem.children.get(methodId);
-          if (!methodItem) {
-            methodItem = this.controller.createTestItem(
-              methodId,
-              method.name,
-              methodUri,
-            );
-          }
-          methodItem.range = new vscode.Range(
-            new vscode.Position(method.line - 1, method.col - 1),
-            new vscode.Position(method.line - 1, method.col - 1),
-          );
-          methodItem.tags = this.buildTags(
-            method.focused,
-            method.excluded,
-            method.parallel,
-          );
-          suiteItem.children.add(methodItem);
-        }
-
-        // Remove stale methods, but preserve dynamic subtests
-        suiteItem.children.forEach((child) => {
-          if (!seenMethodIds.has(child.id) && !child.id.includes("/dynamic/")) {
-            suiteItem.children.delete(child.id);
-          }
-        });
+        suiteItem.children.add(methodItem);
       }
 
-      // Remove stale suites, but preserve dynamic subtests
-      pkgItem.children.forEach((child) => {
-        if (!seenSuiteIds.has(child.id) && !child.id.includes("/dynamic/")) {
-          pkgItem.children.delete(child.id);
+      suiteItem.children.forEach((child) => {
+        if (!seenMethodIds.has(child.id) && !child.id.includes("/dynamic/")) {
+          suiteItem.children.delete(child.id);
         }
       });
     }
 
-    // Remove stale packages, but preserve dynamic subtests
-    this.controller.items.forEach((child) => {
-      if (!seenPackageIds.has(child.id) && !child.id.includes("/dynamic/")) {
-        this.controller.items.delete(child.id);
+    pkgItem.children.forEach((child) => {
+      if (!seenSuiteIds.has(child.id) && !child.id.includes("/dynamic/")) {
+        pkgItem.children.delete(child.id);
       }
     });
   }

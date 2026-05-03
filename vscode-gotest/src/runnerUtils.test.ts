@@ -16,6 +16,11 @@ import {
   getPackageItem,
   expandToPackages,
 } from "./runnerUtils.js";
+import {
+  buildPathTrie,
+  collapsePathTrie,
+  type PathNode,
+} from "./testController.js";
 
 interface MockTestItem {
   id: string;
@@ -340,5 +345,69 @@ describe("expandToPackages", () => {
     const result = expandToPackages([suite as any]);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("example.com/pkg/S");
+  });
+});
+
+describe("buildPathTrie", () => {
+  it("builds a trie from workspace-relative paths", () => {
+    const entries = [
+      { relativePath: "pkg/auth", importPath: "example.com/pkg/auth" },
+      { relativePath: "pkg/store", importPath: "example.com/pkg/store" },
+      { relativePath: "internal/svc", importPath: "example.com/internal/svc" },
+    ];
+    const root = buildPathTrie(entries);
+    expect(root.children.size).toBe(2);
+    expect(root.children.has("pkg")).toBe(true);
+    expect(root.children.has("internal")).toBe(true);
+
+    const pkg = root.children.get("pkg")!;
+    expect(pkg.children.size).toBe(2);
+    expect(pkg.children.has("auth")).toBe(true);
+    expect(pkg.children.has("store")).toBe(true);
+    expect(pkg.children.get("auth")!.importPath).toBe("example.com/pkg/auth");
+  });
+
+  it("handles a single package at workspace root", () => {
+    const entries = [{ relativePath: ".", importPath: "example.com/root" }];
+    const root = buildPathTrie(entries);
+    expect(root.importPath).toBe("example.com/root");
+  });
+});
+
+describe("collapsePathTrie", () => {
+  it("collapses single-child directory chains", () => {
+    const entries = [
+      { relativePath: "internal/svc", importPath: "example.com/internal/svc" },
+    ];
+    const root = buildPathTrie(entries);
+    collapsePathTrie(root);
+    expect(root.children.size).toBe(1);
+    const collapsed = root.children.get("internal/svc")!;
+    expect(collapsed.importPath).toBe("example.com/internal/svc");
+  });
+
+  it("does not collapse nodes with multiple children", () => {
+    const entries = [
+      { relativePath: "pkg/auth", importPath: "example.com/pkg/auth" },
+      { relativePath: "pkg/store", importPath: "example.com/pkg/store" },
+    ];
+    const root = buildPathTrie(entries);
+    collapsePathTrie(root);
+    expect(root.children.has("pkg")).toBe(true);
+    const pkg = root.children.get("pkg")!;
+    expect(pkg.children.size).toBe(2);
+  });
+
+  it("does not collapse a node that is itself a package", () => {
+    const entries = [
+      { relativePath: "pkg", importPath: "example.com/pkg" },
+      { relativePath: "pkg/sub", importPath: "example.com/pkg/sub" },
+    ];
+    const root = buildPathTrie(entries);
+    collapsePathTrie(root);
+    expect(root.children.has("pkg")).toBe(true);
+    const pkg = root.children.get("pkg")!;
+    expect(pkg.importPath).toBe("example.com/pkg");
+    expect(pkg.children.size).toBe(1);
   });
 });
