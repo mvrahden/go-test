@@ -99,7 +99,7 @@ All hooks are optional. `AfterAll` runs via `t.Cleanup` (LIFO). `AfterEach` is d
 
 ### Fixtures
 
-Fixtures replace `TestMain` + package-level singletons with convention-driven setup that composes via Go embedding. Any struct ending in `Fixture` is a package fixture; ending in `SharedFixture` is a cross-package shared fixture.
+Fixtures replace `TestMain` + package-level singletons with convention-driven setup. Any struct ending in `Fixture` is a package fixture; ending in `SharedFixture` is a cross-package shared fixture.
 
 ```go
 // fixture_test.go
@@ -126,15 +126,15 @@ func (f *E2ESetupFixture) AfterAll(ctx context.Context) error {
 
 Fixture hooks return `error` — the generated wrapper handles reporting with automatic attribution (e.g., `E2ESetupFixture.BeforeAll failed: start postgres: connection refused`).
 
-Test suites embed the fixture via pointer embedding to get access to shared state:
+Test suites reference the fixture via a named pointer field:
 
 ```go
 type BatchTestSuite struct {
-    *E2ESetupFixture // s.Pool, s.ServerURL available
+    Fixture *E2ESetupFixture
 }
 
 func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
-    // s.Pool is populated by E2ESetupFixture.BeforeAll
+    // s.Fixture.Pool is populated by E2ESetupFixture.BeforeAll
 }
 ```
 
@@ -156,7 +156,7 @@ Fixtures can nest — a root fixture's hooks run first, wrapping the child's:
 type InfraFixture struct { Pool *pgxpool.Pool }
 
 type APIFixture struct {
-    *InfraFixture // f.Pool available from parent
+    Infra     *InfraFixture
     ServerURL string
 }
 ```

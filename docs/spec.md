@@ -232,28 +232,28 @@ Package fixture setup hooks receive `t.Context()` (cancelled when the test ends)
 
 Package fixtures additionally support `BeforeEach`/`AfterEach`. Shared fixtures do not — they run once in the subprocess, not per test case.
 
-Test suites embed fixtures via pointer embedding:
+Test suites reference fixtures via named pointer fields:
 
 ```go
 type BatchTestSuite struct {
-    *E2ESetupFixture
+    Fixture *E2ESetupFixture
 }
 ```
 
-Shared fixtures can be embedded directly in standalone suites (without a package fixture) or in package fixtures:
+Shared fixtures can be wired directly into standalone suites (without a package fixture) or into package fixtures:
 
 ```go
 // Standalone — shared fixture wired directly into suite
 type UserTestSuite struct {
-    *PostgresSharedFixture
+    Postgres *PostgresSharedFixture
 }
 
 // Fixture-bound — shared fixture wired into package fixture, suite accesses it via fixture chain
 type E2EFixture struct {
-    *PostgresSharedFixture
+    Postgres *PostgresSharedFixture
 }
 type BatchTestSuite struct {
-    *E2EFixture
+    Fixture *E2EFixture
 }
 ```
 
@@ -811,9 +811,9 @@ The `setup-gotest` composite action installs the binary via `go install`.
 
 ## Advanced Patterns
 
-### Nested Suites via Embedding
+### Nested Suites
 
-A suite embedding another suite inherits its lifecycle hooks. The generator chains parent/child hooks:
+A suite referencing another suite via a named pointer field inherits its lifecycle hooks. The generator chains parent/child hooks:
 
 ```
 ParentTestSuite.BeforeAll
@@ -875,7 +875,7 @@ Go doesn't have decorators. Naming conventions are grepped, autocompleted, and u
 
 ### Cross-package suite inheritance
 
-Breaks Go's package isolation model. Cross-package sharing uses helper functions, not suite embedding.
+Breaks Go's package isolation model. Cross-package sharing uses helper functions or fixtures, not suite inheritance.
 
 ### Replacing `go test` output
 

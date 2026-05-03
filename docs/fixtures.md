@@ -1,10 +1,10 @@
 # Fixtures
 
-Fixtures replace `TestMain` + package-level singletons with convention-driven setup that composes via Go embedding. Any struct whose name ends in `Fixture` is a package fixture; any struct ending in `SharedFixture` is a cross-package shared fixture.
+Fixtures replace `TestMain` + package-level singletons with convention-driven setup. Any struct whose name ends in `Fixture` is a package fixture; any struct ending in `SharedFixture` is a cross-package shared fixture.
 
 ## Package Fixture (`*Fixture` suffix)
 
-A package fixture runs `BeforeAll` once per package, then injects state into child test suites via pointer embedding.
+A package fixture runs `BeforeAll` once per package, then injects state into child test suites via named pointer fields.
 
 ```go
 // fixture_test.go
@@ -32,11 +32,11 @@ func (s *E2ESetupFixture) AfterAll(t *gotest.T) {
 // batch_test.go
 
 type BatchTestSuite struct {
-    *E2ESetupFixture // s.Pool, s.ServerURL, s.OrgID available via embedding
+    Fixture *E2ESetupFixture
 }
 
 func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
-    // s.Pool is populated by E2ESetupFixture.BeforeAll
+    // s.Fixture.Pool is populated by E2ESetupFixture.BeforeAll
 }
 ```
 
@@ -45,7 +45,7 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 - One root `*Fixture` per package (nested child fixtures are allowed).
 - The fixture struct must have `BeforeAll(t *gotest.T)`. `AfterAll(t *gotest.T)` is optional.
 - `BeforeEach(t *gotest.T)` and `AfterEach(t *gotest.T)` are optional and run around every test case in all child suites.
-- TestSuites embed the fixture via pointer embedding (`*E2ESetupFixture`).
+- TestSuites reference the fixture via a named pointer field (`Fixture *E2ESetupFixture`).
 - The code generator owns `TestMain` when a fixture is present. Remove any user-defined `TestMain`.
 
 ### Generated test output
@@ -59,7 +59,7 @@ Filter with `-run Test_E2ESetupFixture/BatchTestSuite` to run only batch tests.
 
 ## Nested Fixtures (Level 2)
 
-Fixtures can embed other fixtures to form a dependency tree. The root fixture's `BeforeAll` runs first, then each child fixture's `BeforeAll`.
+Fixtures can reference other fixtures via named pointer fields to form a dependency tree. The root fixture's `BeforeAll` runs first, then each child fixture's `BeforeAll`.
 
 ```go
 type InfraFixture struct {
@@ -70,17 +70,17 @@ func (f *InfraFixture) BeforeAll(t *gotest.T) { /* start containers */ }
 func (f *InfraFixture) AfterAll(t *gotest.T)  { /* terminate containers */ }
 
 type APIFixture struct {
-    *InfraFixture  // f.Pool available from parent
+    Infra     *InfraFixture
     ServerURL string
 }
 
 func (f *APIFixture) BeforeAll(t *gotest.T) {
-    srv := api.NewServer(":0", api.Dependencies{Pool: f.Pool})
+    srv := api.NewServer(":0", api.Dependencies{Pool: f.Infra.Pool})
     f.ServerURL = srv.URL
 }
 
-type ReconcilerTestSuite struct { *InfraFixture }  // only needs DB
-type BatchTestSuite struct { *APIFixture }          // needs full API
+type ReconcilerTestSuite struct { Infra *InfraFixture }  // only needs DB
+type BatchTestSuite struct { API *APIFixture }            // needs full API
 ```
 
 ### Generated test output
@@ -155,30 +155,30 @@ Convention: in `Hydrate`, assign to local fields. Read transferred fields but do
 
 Shared fixtures work with both standalone suites (no package fixture) and fixture-bound suites.
 
-**Standalone suites** embed shared fixtures directly — `Pool` is available after `Hydrate` runs:
+**Standalone suites** reference shared fixtures via named pointer fields — `Pool` is available after `Hydrate` runs:
 
 ```go
 type UserTestSuite struct {
-    *fixtures.PostgresSharedFixture // s.ConnStr, s.Port, s.Pool all available
+    Postgres *fixtures.PostgresSharedFixture
 }
 
 func (s *UserTestSuite) TestCreate(t *gotest.T) {
-    // s.Pool is a real, local *pgxpool.Pool — created by Hydrate
+    // s.Postgres.Pool is a real, local *pgxpool.Pool — created by Hydrate
 }
 ```
 
-A standalone suite can embed multiple shared fixtures. Suites without any shared fixture fields coexist in the same package without issue.
+A standalone suite can reference multiple shared fixtures. Suites without any shared fixture fields coexist in the same package without issue.
 
-**Fixture-bound suites** embed shared fixtures via a package fixture to add package-specific resources:
+**Fixture-bound suites** wire shared fixtures through a package fixture to add package-specific resources:
 
 ```go
 type E2ESetupFixture struct {
-    *fixtures.PostgresSharedFixture // Pool, ConnStr available via embedding
+    Postgres  *fixtures.PostgresSharedFixture
     ServerURL string
 }
 
 func (f *E2ESetupFixture) BeforeAll(ctx context.Context) error {
-    srv := api.NewServer(":0", api.Dependencies{Pool: f.Pool})
+    srv := api.NewServer(":0", api.Dependencies{Pool: f.Postgres.Pool})
     f.ServerURL = srv.URL
     return nil
 }
@@ -230,11 +230,11 @@ func (s *E2ESetupFixture) BeforeAll(t *gotest.T) {
 }
 
 type BatchTestSuite struct {
-    *E2ESetupFixture // s.POST(), s.Pool — via embedding
+    Fixture *E2ESetupFixture
 }
 
 func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
-    resp := s.POST(t.T(), "/v1/batch", ..., s.SKKeyFull)
+    resp := s.Fixture.POST(t.T(), "/v1/batch", ..., s.Fixture.SKKeyFull)
 }
 ```
 
@@ -242,4 +242,4 @@ Key improvements:
 - `t.Fatal()` works in setup (runs in test context)
 - `t.T().Cleanup()` for teardown (no manual defer chains)
 - No package-level singletons
-- Type-safe field access via embedding
+- Type-safe field access via named fields
