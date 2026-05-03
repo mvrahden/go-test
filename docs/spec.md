@@ -232,13 +232,32 @@ Package fixture setup hooks receive `t.Context()` (cancelled when the test ends)
 
 Package fixtures additionally support `BeforeEach`/`AfterEach`. Shared fixtures do not — they run once in the subprocess, not per test case.
 
-Test suites embed fixtures via pointer embedding:
+Test suites reference fixtures via named pointer fields:
 
 ```go
 type BatchTestSuite struct {
-    *E2ESetupFixture
+    Fixture *E2ESetupFixture
 }
 ```
+
+Shared fixtures can be wired directly into standalone suites (without a package fixture) or into package fixtures:
+
+```go
+// Standalone — shared fixture wired directly into suite
+type UserTestSuite struct {
+    Postgres *PostgresSharedFixture
+}
+
+// Fixture-bound — shared fixture wired into package fixture, suite accesses it via fixture chain
+type E2EFixture struct {
+    Postgres *PostgresSharedFixture
+}
+type BatchTestSuite struct {
+    Fixture *E2EFixture
+}
+```
+
+Both paths produce the same lifecycle: deserialize from state file, call `Hydrate`, run tests, call `Dehydrate`.
 
 Fixtures may be defined in a different package from the suite. The resolver walks the type graph from targeted suites to discover all required fixtures, including cross-package dependencies.
 
@@ -319,14 +338,19 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
 **Transfer lifecycle:**
 
 ```
-Subprocess:
+Subprocess (compiled binary):
   sf.BeforeAll(ctx)              → provisions infrastructure, populates all fields
   serialize transferable fields  → JSON (local fields excluded)
   write to stdout, wait for SIGTERM
   sf.AfterAll(ctx)               → tears down infrastructure
 
+CLI (gotest):
+  read JSON from subprocess stdout
+  write to shared/state.json in overlay temp dir
+  set GOTEST_SHARED_STATE_FILE env var for test process
+
 Test process:
-  deserialize into struct        → transferable fields populated, local fields zero-valued
+  read shared/state.json         → deserialize into struct (transferable fields populated, local fields zero-valued)
   sf.Hydrate(ctx)                → reconstructs local resources from transferred state
   ... run test suites ...
   sf.Dehydrate(ctx)              → cleans up local resources
@@ -334,6 +358,7 @@ Test process:
 
 **Validation at generation time:**
 
+- Shared fixture types must not live in `internal/` packages. The setup subprocess compiles outside the module tree and cannot import `internal/` paths. Shared fixtures may freely depend on `internal/` packages — only the fixture type's own package path is restricted.
 - If a transferable field's type has zero exported fields and does not implement `json.Marshaler`/`encoding.TextMarshaler`, the generator emits an error suggesting the field be handled in `Hydrate`
 - If `Hydrate` exists without `Dehydrate`, the generator emits an error
 - `Hydrate`/`Dehydrate` signatures must be `(ctx context.Context) error` with pointer receiver
@@ -786,9 +811,9 @@ The `setup-gotest` composite action installs the binary via `go install`.
 
 ## Advanced Patterns
 
-### Nested Suites via Embedding
+### Nested Suites
 
-A suite embedding another suite inherits its lifecycle hooks. The generator chains parent/child hooks:
+A suite referencing another suite via a named pointer field inherits its lifecycle hooks. The generator chains parent/child hooks:
 
 ```
 ParentTestSuite.BeforeAll
@@ -850,7 +875,7 @@ Go doesn't have decorators. Naming conventions are grepped, autocompleted, and u
 
 ### Cross-package suite inheritance
 
-Breaks Go's package isolation model. Cross-package sharing uses helper functions, not suite embedding.
+Breaks Go's package isolation model. Cross-package sharing uses helper functions or fixtures, not suite inheritance.
 
 ### Replacing `go test` output
 

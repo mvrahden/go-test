@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
@@ -50,6 +53,20 @@ func runSpec(args []string) int {
 
 	overlayArgs := append([]string{overlay.overlayFlag}, goTestArgs...)
 	extraEnv := buildExtraEnv()
+
+	var setupProc *SharedFixtureProcess
+	if len(overlay.sharedFixtures) > 0 {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
+		var serr error
+		setupProc, serr = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures)
+		if serr != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", serr)
+			return 2
+		}
+		defer setupProc.Teardown()
+		extraEnv["GOTEST_SHARED_STATE_FILE"] = setupProc.StateFile()
+	}
 
 	jsonData, code, err := gotestrunner.StdlibRunTestsJSON(overlayArgs, extraEnv)
 	if err != nil {

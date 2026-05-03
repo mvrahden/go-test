@@ -99,7 +99,7 @@ func Run(cfg ExecConfig) int {
 	var setupProc *SharedFixtureProcess
 	if len(overlay.sharedFixtures) > 0 {
 		var err error
-		setupProc, err = startSharedFixtures(ctx, overlay.sharedFixtures)
+		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", err)
 			return 2
@@ -115,7 +115,7 @@ func Run(cfg ExecConfig) int {
 
 	extraEnv := buildExtraEnv()
 	if setupProc != nil {
-		extraEnv["GOTEST_SHARED_STATE"] = setupProc.StateJSON()
+		extraEnv["GOTEST_SHARED_STATE_FILE"] = setupProc.StateFile()
 	}
 
 	if SPEC {

@@ -75,7 +75,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	hasFixtures := len(resolved.RootFixtures) > 0
 
 	buf := bytes.NewBuffer(nil)
-	if err := r.renderFileHeader(buf, pkg, spec, viewModels, hasFixtures); err != nil {
+	if err := r.renderFileHeader(buf, pkg, spec, viewModels, hasFixtures, resolved.SuiteSharedFixtures); err != nil {
 		return nil, fmt.Errorf("failed rendering file header. err: %w", err)
 	}
 
@@ -91,7 +91,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 			SkippedTestSuites:   spec.SkippedTestSuites,
 			SkippedTestCases:    spec.SkippedTestCases,
 		}
-		if err := r.renderTestSuites(buf, standaloneSpec); err != nil {
+		if err := r.renderTestSuites(buf, standaloneSpec, resolved.SuiteSharedFixtures); err != nil {
 			return nil, fmt.Errorf("failed rendering test suites. err: %w", err)
 		}
 	}
@@ -99,7 +99,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	return r.formatOutput(buf)
 }
 
-func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, viewModels []*FixtureViewModel, hasFixtures bool) error {
+func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, viewModels []*FixtureViewModel, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef) error {
 	type TplData struct {
 		RepoName    string
 		PackageName string
@@ -109,6 +109,7 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		{Path: "testing"},
 		{Path: about.Repo + "/pkg/gotest"},
 	}
+	hasSuiteSharedFixtures := len(suiteSharedFixtures) > 0
 	if hasFixtures {
 		imports = append(imports, headerImport{Path: "time"})
 	}
@@ -117,11 +118,11 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	}) {
 		imports = append(imports, headerImport{Path: "sync"})
 	}
-	if hasFixtures {
+	if hasFixtures || hasSuiteSharedFixtures {
 		imports = append(imports, headerImport{Path: "context"})
 		imports = append(imports, headerImport{Path: "os"})
 	}
-	hasSharedFixtures := false
+	hasSharedFixtures := hasSuiteSharedFixtures
 	seenPkg := map[string]bool{}
 	for _, vm := range viewModels {
 		if vm.PkgPath != "" && !seenPkg[vm.PkgPath] {
@@ -129,6 +130,14 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 			seenPkg[vm.PkgPath] = true
 		}
 		collectFixtureImports(vm, &imports, seenPkg, &hasSharedFixtures)
+	}
+	for _, refs := range suiteSharedFixtures {
+		for _, sf := range refs {
+			if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
+				imports = append(imports, headerImport{Path: sf.PkgPath})
+				seenPkg[sf.PkgPath] = true
+			}
+		}
 	}
 	if hasSharedFixtures {
 		imports = append(imports, headerImport{Path: "encoding/json"})
@@ -158,12 +167,10 @@ func collectFixtureImports(vm *FixtureViewModel, imports *[]headerImport, seenPk
 	}
 }
 
-func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome) error {
-	type TplData struct{}
-	data := TplData{}
+func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef) error {
 	return gotestTpl.ExecuteTemplate(buf, "gotest.suites.tpl", map[string]any{
-		"Spec": spec,
-		"Data": data,
+		"Spec":                spec,
+		"SuiteSharedFixtures": suiteSharedFixtures,
 	})
 }
 
