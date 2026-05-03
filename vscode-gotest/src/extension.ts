@@ -16,6 +16,7 @@ import {
 import { CoverageRunner } from "./coverage.js";
 import { CoverageStore } from "./coverageStore.js";
 import { validateGoBinary, scopedConfig } from "./cli.js";
+import { buildRunFilter, getPackageDir } from "./runnerUtils.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Go Test Suites");
@@ -44,7 +45,12 @@ export function activate(context: vscode.ExtensionContext): void {
       debugLauncher.debug(
         request,
         token,
-        (items) => buildRunFilter(items),
+        (items) => {
+          if (!items || items.length === 0) return undefined;
+          let current: vscode.TestItem | undefined = items[0];
+          while (current?.parent) current = current.parent;
+          return buildRunFilter(Array.from(items), current!.id, cache);
+        },
         (item) => getPackageDir(item, cache),
       ),
     (request, token) => coverageRunner.run(request, token),
@@ -155,7 +161,12 @@ export function activate(context: vscode.ExtensionContext): void {
         await debugLauncher.debug(
           request,
           cts.token,
-          (items) => buildRunFilter(items),
+          (items) => {
+            if (!items || items.length === 0) return undefined;
+            let current: vscode.TestItem | undefined = items[0];
+            while (current?.parent) current = current.parent;
+            return buildRunFilter(Array.from(items), current!.id, cache);
+          },
           (i) => getPackageDir(i, cache),
         );
       } finally {
@@ -413,34 +424,6 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {}
 
-function buildRunFilter(items: readonly vscode.TestItem[]): string | undefined {
-  if (!items || items.length === 0) {
-    return undefined;
-  }
-  const item = items[0];
-
-  // Determine depth: 0=package, 1=suite, 2=method, 3+=dynamic
-  let depth = 0;
-  let current: vscode.TestItem | undefined = item.parent;
-  while (current) {
-    depth++;
-    current = current.parent;
-  }
-
-  if (depth === 0) {
-    return undefined; // package level — run all
-  }
-
-  if (depth === 1) {
-    // suite level
-    return `^Test${item.label}$`;
-  }
-
-  // method level or deeper
-  const suite = item.parent!;
-  return `^Test${suite.label}$/^${item.label}$`;
-}
-
 function resolveActiveWorkspaceDir(): string | undefined {
   const activeUri = vscode.window.activeTextEditor?.document.uri;
   const folder = activeUri
@@ -450,13 +433,4 @@ function resolveActiveWorkspaceDir(): string | undefined {
   return folder?.uri.fsPath;
 }
 
-function getPackageDir(
-  item: vscode.TestItem,
-  cache: DiscoveryCache,
-): string | undefined {
-  let current: vscode.TestItem | undefined = item;
-  while (current?.parent) {
-    current = current.parent;
-  }
-  return cache.getPackage(current?.id || "")?.dir;
-}
+
