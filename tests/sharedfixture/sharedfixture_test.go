@@ -140,7 +140,7 @@ func TestSharedFixtureIntegration(t *testing.T) {
 				"GOTEST_SHARED_STATE_FILE": stateFile,
 			}
 
-			code, err := gotestrunner.StdlibRunTests(goTestArgs, extraEnv)
+			code, err := gotestrunner.StdlibRunTests(context.Background(), goTestArgs, extraEnv)
 			gotest.NoError(t, err)
 			gotest.Equal(t, 0, code, "all tests should pass")
 		})
@@ -156,7 +156,7 @@ func TestSharedFixtureIntegration(t *testing.T) {
 				"GOTEST_SHARED_STATE_FILE": stateFile,
 			}
 
-			jsonData, code, err := gotestrunner.StdlibRunTestsJSON(goTestArgs, extraEnv)
+			jsonData, code, err := gotestrunner.StdlibRunTestsJSON(context.Background(), goTestArgs, extraEnv)
 			gotest.NoError(t, err)
 			gotest.Equal(t, 0, code, "all tests should pass via JSON runner")
 
