@@ -7,8 +7,6 @@ import { tmpdir } from "node:os";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import type { CoverageStore } from "./coverageStore.js";
-import type { OverlayOutput } from "./types.js";
-import { startSharedSetup, type SharedSetupProcess } from "./sharedFixtures.js";
 import { parseTestEvents } from "./outputParser.js";
 import {
   buildCliCommand,
@@ -153,10 +151,10 @@ export function parseFuncCoverage(
 }
 
 export async function runGoToolCoverFunc(
-  goBin: string,
   coverFile: string,
   workspaceDir: string,
 ): Promise<string> {
+  const goBin = await resolveGoBinary(undefined, workspaceDir);
   const { stdout } = await execFileAsync(
     goBin,
     ["tool", "cover", `-func=${coverFile}`],
@@ -244,83 +242,41 @@ export class CoverageRunner implements vscode.Disposable {
         const config = scopedConfig(workspaceDir);
         const testFlags = config.get<string[]>("testFlags") ?? [];
 
-        let overlayDir: string | undefined;
         let coverFile: string | undefined;
-        let sharedSetup: SharedSetupProcess | undefined;
 
         try {
-          const overlayCmd = await buildCliCommand(
-            ["overlay", importPath],
-            workspaceDir,
-            this.outputChannel,
-          );
-          this.outputChannel.appendLine(
-            `[coverage] ${formatCliCommand(overlayCmd)}`,
-          );
-          const { stdout: overlayStdout } = await execFileAsync(
-            overlayCmd.bin,
-            overlayCmd.args,
-            { cwd: workspaceDir },
-          );
-          const overlay = JSON.parse(overlayStdout) as OverlayOutput;
-          overlayDir = overlay.dir;
-          if (overlay.sharedFixtures && overlay.sharedFixtures.length > 0) {
-            const setupCmd = await buildCliCommand(
-              ["shared-setup", `--dir=${overlay.dir}`],
-              workspaceDir,
-              this.outputChannel,
-            );
-            this.outputChannel.appendLine(
-              `[coverage] ${formatCliCommand(setupCmd)}`,
-            );
-            sharedSetup = await startSharedSetup(
-              setupCmd,
-              workspaceDir,
-              overlay.sharedFixtures,
-              this.outputChannel,
-            );
-          }
-
           const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
           coverFile = path.join(tmpDir, "cover.out");
 
           const filter = buildRunFilter(groupItems, importPath, this.cache);
 
-          const buildTags = config.get<string>("buildTags", "").trim();
-          const args = [
-            "test",
-            `-overlay=${overlay.overlayFile}`,
-            `-coverprofile=${coverFile}`,
-            "-count=1",
+          const cliArgs: string[] = [
             "-json",
+            "-count=1",
+            `-coverprofile=${coverFile}`,
             importPath,
           ];
-          if (buildTags) {
-            args.push(`-tags=${buildTags}`);
-          }
           if (filter) {
-            args.push("-run", filter);
+            cliArgs.push("-run", filter);
           }
-          args.push(...testFlags);
+          cliArgs.push(...testFlags);
 
-          const testEnv: Record<string, string> | undefined = sharedSetup
-            ? { GOTEST_SHARED_STATE_FILE: sharedSetup.stateFile }
-            : undefined;
-
-          const goBin = await resolveGoBinary(this.outputChannel, workspaceDir);
-          this.outputChannel.appendLine(
-            `[coverage] ${goBin} ${args.join(" ")}`,
+          const cmd = await buildCliCommand(
+            cliArgs,
+            workspaceDir,
+            this.outputChannel,
           );
-          const stdout = await spawnTestProcess(
-            goBin,
-            args,
+          this.outputChannel.appendLine(`[coverage] ${formatCliCommand(cmd)}`);
+
+          const result = await spawnTestProcess(
+            cmd.bin,
+            cmd.args,
             workspaceDir,
             effectiveToken,
             this.outputChannel,
             "coverage",
-            testEnv,
           );
-          allJsonOutput += stdout;
+          allJsonOutput += result.stdout;
 
           if (effectiveToken.isCancellationRequested) {
             for (const item of groupItems) {
@@ -329,18 +285,23 @@ export class CoverageRunner implements vscode.Disposable {
             continue;
           }
 
-          const events = parseTestEvents(stdout);
-          applyResults(this.controller, run, events, importPath, pkg.dir);
+          if (result.stdout) {
+            const events = parseTestEvents(result.stdout);
+            applyResults(this.controller, run, events, importPath, pkg.dir);
+          } else if (result.exitCode !== 0) {
+            const message =
+              result.stderr.trim() ||
+              `gotest exited with code ${result.exitCode}`;
+            for (const item of groupItems) {
+              run.errored(item, new vscode.TestMessage(message));
+            }
+          }
 
           try {
             const coverContent = await readFile(coverFile, "utf-8");
             let funcOutput: string | undefined;
             try {
-              funcOutput = await runGoToolCoverFunc(
-                goBin,
-                coverFile,
-                workspaceDir,
-              );
+              funcOutput = await runGoToolCoverFunc(coverFile, workspaceDir);
             } catch {
               this.outputChannel.appendLine(
                 "[coverage] go tool cover -func failed, skipping declaration coverage",
@@ -353,10 +314,6 @@ export class CoverageRunner implements vscode.Disposable {
             );
           }
         } finally {
-          sharedSetup?.dispose();
-          if (overlayDir) {
-            rm(overlayDir, { recursive: true, force: true }).catch(() => {});
-          }
           if (coverFile) {
             const coverDir = path.dirname(coverFile);
             rm(coverDir, { recursive: true, force: true }).catch(() => {});
@@ -457,69 +414,33 @@ export class CoverageRunner implements vscode.Disposable {
 
     const config = scopedConfig(workspaceDir);
     const testFlags = config.get<string[]>("testFlags") ?? [];
-    let overlayDir: string | undefined;
     let coverFile: string | undefined;
-    let sharedSetup: SharedSetupProcess | undefined;
 
     try {
-      const overlayCmd = await buildCliCommand(
-        ["overlay", importPath],
-        workspaceDir,
-        this.outputChannel,
-      );
-      const { stdout: overlayStdout } = await execFileAsync(
-        overlayCmd.bin,
-        overlayCmd.args,
-        { cwd: workspaceDir },
-      );
-      const overlay = JSON.parse(overlayStdout) as OverlayOutput;
-      overlayDir = overlay.dir;
-
-      if (overlay.sharedFixtures && overlay.sharedFixtures.length > 0) {
-        const setupCmd = await buildCliCommand(
-          ["shared-setup", `--dir=${overlay.dir}`],
-          workspaceDir,
-          this.outputChannel,
-        );
-        sharedSetup = await startSharedSetup(
-          setupCmd,
-          workspaceDir,
-          overlay.sharedFixtures,
-          this.outputChannel,
-        );
-      }
-
       const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
       coverFile = path.join(tmpDir, "cover.out");
 
-      const buildTags = config.get<string>("buildTags", "").trim();
-      const args = [
-        "test",
-        `-overlay=${overlay.overlayFile}`,
-        `-coverprofile=${coverFile}`,
+      const cliArgs: string[] = [
         "-count=1",
+        `-coverprofile=${coverFile}`,
         importPath,
       ];
-      if (buildTags) args.push(`-tags=${buildTags}`);
-      args.push(...testFlags);
+      cliArgs.push(...testFlags);
 
-      const testEnv: Record<string, string> | undefined = sharedSetup
-        ? { GOTEST_SHARED_STATE_FILE: sharedSetup.stateFile }
-        : undefined;
-
-      const goBin = await resolveGoBinary(this.outputChannel, workspaceDir);
-      this.outputChannel.appendLine(
-        `[coverage:save] ${goBin} ${args.join(" ")}`,
+      const cmd = await buildCliCommand(
+        cliArgs,
+        workspaceDir,
+        this.outputChannel,
       );
+      this.outputChannel.appendLine(`[coverage:save] ${formatCliCommand(cmd)}`);
 
       await spawnTestProcess(
-        goBin,
-        args,
+        cmd.bin,
+        cmd.args,
         workspaceDir,
         cts.token,
         this.outputChannel,
         "coverage",
-        testEnv,
       );
 
       if (cts.token.isCancellationRequested) return;
@@ -527,7 +448,7 @@ export class CoverageRunner implements vscode.Disposable {
       const coverContent = await readFile(coverFile, "utf-8");
       let funcOutput: string | undefined;
       try {
-        funcOutput = await runGoToolCoverFunc(goBin, coverFile, workspaceDir);
+        funcOutput = await runGoToolCoverFunc(coverFile, workspaceDir);
       } catch {
         this.outputChannel.appendLine(
           "[coverage:save] go tool cover -func failed",
@@ -539,11 +460,8 @@ export class CoverageRunner implements vscode.Disposable {
       this.outputChannel.appendLine(`[coverage:save] failed: ${message}`);
       return;
     } finally {
-      sharedSetup?.dispose();
       if (this.activePackageRun === cts) this.activePackageRun = undefined;
       cts.dispose();
-      if (overlayDir)
-        rm(overlayDir, { recursive: true, force: true }).catch(() => {});
       if (coverFile)
         rm(path.dirname(coverFile), { recursive: true, force: true }).catch(
           () => {},

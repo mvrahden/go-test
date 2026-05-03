@@ -1,20 +1,11 @@
 import * as vscode from "vscode";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import * as path from "node:path";
 import { rm, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import { parseTestEvents } from "./outputParser.js";
-import {
-  buildCliCommand,
-  formatCliCommand,
-  resolveGoBinary,
-  scopedConfig,
-} from "./cli.js";
-import { startSharedSetup, type SharedSetupProcess } from "./sharedFixtures.js";
-import type { OverlayOutput } from "./types.js";
+import { buildCliCommand, formatCliCommand, scopedConfig } from "./cli.js";
 import {
   collectItems,
   groupByPackage,
@@ -24,8 +15,6 @@ import {
 } from "./runnerUtils.js";
 import { runGoToolCoverFunc } from "./coverage.js";
 import type { CoverageStore } from "./coverageStore.js";
-
-const execFileAsync = promisify(execFile);
 
 export class TestRunner {
   private _lastJsonOutput = "";
@@ -116,84 +105,38 @@ export class TestRunner {
           (config.get<boolean>("coverOnRun") ?? true);
         if (coverOnRun) anyCoverOnRun = true;
 
-        let overlayDir: string | undefined;
         let coverFile: string | undefined;
-        let sharedSetup: SharedSetupProcess | undefined;
         try {
-          const overlayCmd = await buildCliCommand(
-            ["overlay", importPath],
-            workspaceDir,
-            this.outputChannel,
-          );
-          this.outputChannel.appendLine(
-            `[runner] ${formatCliCommand(overlayCmd)}`,
-          );
-          const { stdout: overlayStdout } = await execFileAsync(
-            overlayCmd.bin,
-            overlayCmd.args,
-            { cwd: workspaceDir },
-          );
-          const overlay = JSON.parse(overlayStdout) as OverlayOutput;
-          overlayDir = overlay.dir;
-          if (overlay.sharedFixtures && overlay.sharedFixtures.length > 0) {
-            const setupCmd = await buildCliCommand(
-              ["shared-setup", `--dir=${overlay.dir}`],
-              workspaceDir,
-              this.outputChannel,
-            );
-            this.outputChannel.appendLine(
-              `[runner] ${formatCliCommand(setupCmd)}`,
-            );
-            sharedSetup = await startSharedSetup(
-              setupCmd,
-              workspaceDir,
-              overlay.sharedFixtures,
-              this.outputChannel,
-            );
-          }
-
           if (coverOnRun) {
             const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
             coverFile = path.join(tmpDir, "cover.out");
           }
 
-          const buildTags = config.get<string>("buildTags", "").trim();
-          const goTestArgs = [
-            "test",
-            `-overlay=${overlay.overlayFile}`,
-            "-count=1",
-            "-json",
-            importPath,
-          ];
+          const cliArgs: string[] = ["-json", "-count=1", importPath];
           if (coverFile) {
-            goTestArgs.push(`-coverprofile=${coverFile}`);
-          }
-          if (buildTags) {
-            goTestArgs.push(`-tags=${buildTags}`);
+            cliArgs.push(`-coverprofile=${coverFile}`);
           }
           if (filter) {
-            goTestArgs.push("-run", filter);
+            cliArgs.push("-run", filter);
           }
-          goTestArgs.push(...testFlags);
+          cliArgs.push(...testFlags);
 
-          const testEnv: Record<string, string> | undefined = sharedSetup
-            ? { GOTEST_SHARED_STATE_FILE: sharedSetup.stateFile }
-            : undefined;
-
-          const goBin = await resolveGoBinary(this.outputChannel, workspaceDir);
-          this.outputChannel.appendLine(
-            `[runner] ${goBin} ${goTestArgs.join(" ")}`,
+          const cmd = await buildCliCommand(
+            cliArgs,
+            workspaceDir,
+            this.outputChannel,
           );
-          const stdout = await spawnTestProcess(
-            goBin,
-            goTestArgs,
+          this.outputChannel.appendLine(`[runner] ${formatCliCommand(cmd)}`);
+
+          const result = await spawnTestProcess(
+            cmd.bin,
+            cmd.args,
             workspaceDir,
             effectiveToken,
             this.outputChannel,
             "runner",
-            testEnv,
           );
-          this._lastJsonOutput += stdout;
+          this._lastJsonOutput += result.stdout;
 
           if (effectiveToken.isCancellationRequested) {
             for (const item of groupItems) {
@@ -202,19 +145,24 @@ export class TestRunner {
             continue;
           }
 
-          const events = parseTestEvents(stdout);
-          applyResults(this.controller, run, events, importPath, pkg.dir);
+          if (result.stdout) {
+            const events = parseTestEvents(result.stdout);
+            applyResults(this.controller, run, events, importPath, pkg.dir);
+          } else if (result.exitCode !== 0) {
+            const message =
+              result.stderr.trim() ||
+              `gotest exited with code ${result.exitCode}`;
+            for (const item of groupItems) {
+              run.errored(item, new vscode.TestMessage(message));
+            }
+          }
 
           if (coverFile) {
             try {
               const coverContent = await readFile(coverFile, "utf-8");
               let funcOutput: string | undefined;
               try {
-                funcOutput = await runGoToolCoverFunc(
-                  goBin,
-                  coverFile,
-                  workspaceDir,
-                );
+                funcOutput = await runGoToolCoverFunc(coverFile, workspaceDir);
               } catch {
                 this.outputChannel.appendLine(
                   "[runner] go tool cover -func failed",
@@ -234,10 +182,6 @@ export class TestRunner {
             run.errored(item, new vscode.TestMessage(message));
           }
         } finally {
-          sharedSetup?.dispose();
-          if (overlayDir) {
-            rm(overlayDir, { recursive: true, force: true }).catch(() => {});
-          }
           if (coverFile) {
             rm(path.dirname(coverFile), { recursive: true, force: true }).catch(
               () => {},
