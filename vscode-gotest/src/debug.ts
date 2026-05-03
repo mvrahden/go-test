@@ -56,8 +56,9 @@ export class DebugLauncher implements vscode.Disposable {
       return;
     }
 
-    const sessionName = `Go Test Suite Debug`;
-    this.prepareProcesses.set(sessionName, child);
+    const prepareKey = `gotest-prepare:${pkgDir}`;
+    this.killPrepareProcess(prepareKey);
+    this.prepareProcesses.set(prepareKey, child);
 
     const runFilter = buildRunFilter(items);
 
@@ -67,13 +68,14 @@ export class DebugLauncher implements vscode.Disposable {
 
     const debugConfig: vscode.DebugConfiguration = {
       type: "go",
-      name: sessionName,
+      name: "Go Test Suite Debug",
       request: "launch",
       mode: "test",
       program: pkgDir,
       buildFlags:
         `-overlay=${prepare.overlayFile} ${extraBuildFlags.join(" ")}`.trim(),
       args: runFilter ? ["-test.run", runFilter] : [],
+      __prepareKey: prepareKey,
     };
 
     if (prepare.stateFile) {
@@ -90,14 +92,18 @@ export class DebugLauncher implements vscode.Disposable {
     );
 
     if (!started) {
-      this.killPrepareProcess(sessionName);
+      this.killPrepareProcess(prepareKey);
     }
   }
 
   registerCleanupOnSessionEnd(context: vscode.ExtensionContext): void {
     this.sessionListener = vscode.debug.onDidTerminateDebugSession(
       (session) => {
-        this.killPrepareProcess(session.name);
+        const key = (session.configuration as Record<string, unknown>)
+          ?.__prepareKey;
+        if (typeof key === "string") {
+          this.killPrepareProcess(key);
+        }
       },
     );
     context.subscriptions.push(this.sessionListener);
