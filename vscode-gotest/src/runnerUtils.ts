@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { spawn } from "node:child_process";
 import type { GoTestController } from "./testController.js";
+import type { DiscoveryCache } from "./discovery.js";
 import {
   parseTestEvents,
   extractTestMessages,
@@ -215,4 +216,110 @@ export function spawnTestProcess(
       reject(err);
     });
   });
+}
+
+export function suiteHasFixtures(
+  suiteName: string,
+  importPath: string,
+  cache: DiscoveryCache,
+): boolean {
+  const pkg = cache.getPackage(importPath);
+  if (!pkg) {
+    return false;
+  }
+  const suite = pkg.suites.find((s) => s.name === suiteName);
+  return suite !== undefined && suite.fixtures.length > 0;
+}
+
+export function buildRunFilter(
+  items: vscode.TestItem[],
+  importPath: string,
+  cache: DiscoveryCache,
+): string | undefined {
+  if (items.some((item) => getItemDepth(item) === 0)) {
+    return undefined;
+  }
+
+  const suiteGroups = new Map<
+    string,
+    { wholeSuite: boolean; methods: string[]; subtests: string[] }
+  >();
+
+  for (const item of items) {
+    const depth = getItemDepth(item);
+
+    if (depth === 1) {
+      const suiteName = item.label;
+      if (suiteHasFixtures(suiteName, importPath, cache)) {
+        return undefined;
+      }
+      let group = suiteGroups.get(suiteName);
+      if (!group) {
+        group = { wholeSuite: false, methods: [], subtests: [] };
+        suiteGroups.set(suiteName, group);
+      }
+      group.wholeSuite = true;
+    } else if (depth === 2) {
+      const suiteName = item.parent!.label;
+      if (suiteHasFixtures(suiteName, importPath, cache)) {
+        return undefined;
+      }
+      let group = suiteGroups.get(suiteName);
+      if (!group) {
+        group = { wholeSuite: false, methods: [], subtests: [] };
+        suiteGroups.set(suiteName, group);
+      }
+      group.methods.push(item.label);
+    } else if (depth >= 3) {
+      let current = item;
+      const subtestParts: string[] = [];
+      while (getItemDepth(current) > 2) {
+        subtestParts.unshift(current.label);
+        current = current.parent!;
+      }
+      const methodName = current.label;
+      const suiteName = current.parent!.label;
+      if (suiteHasFixtures(suiteName, importPath, cache)) {
+        return undefined;
+      }
+      let group = suiteGroups.get(suiteName);
+      if (!group) {
+        group = { wholeSuite: false, methods: [], subtests: [] };
+        suiteGroups.set(suiteName, group);
+      }
+      group.subtests.push(
+        `^Test${suiteName}$/^${methodName}$/^${subtestParts.join("/")}$`,
+      );
+    }
+  }
+
+  const filters: string[] = [];
+  for (const [suiteName, group] of suiteGroups) {
+    if (group.wholeSuite) {
+      filters.push(`^Test${suiteName}$`);
+    } else if (group.subtests.length > 0) {
+      filters.push(...group.subtests);
+    } else if (group.methods.length === 1) {
+      filters.push(`^Test${suiteName}$/^${group.methods[0]}$`);
+    } else if (group.methods.length > 1) {
+      filters.push(`^Test${suiteName}$/^(${group.methods.join("|")})$`);
+    }
+  }
+
+  return filters.length === 0
+    ? undefined
+    : filters.length === 1
+      ? filters[0]
+      : filters.join("|");
+}
+
+export function getPackageDir(
+  item: vscode.TestItem,
+  cache: DiscoveryCache,
+): string | undefined {
+  let current: vscode.TestItem | undefined = item;
+  while (current?.parent) {
+    current = current.parent;
+  }
+  return cache.getPackage(current?.id || "")?.dir;
 }
