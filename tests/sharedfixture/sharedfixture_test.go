@@ -1,6 +1,7 @@
 package sharedfixture_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -141,6 +143,34 @@ func TestSharedFixtureIntegration(t *testing.T) {
 			code, err := gotestrunner.StdlibRunTests(goTestArgs, extraEnv)
 			gotest.NoError(t, err)
 			gotest.Equal(t, 0, code, "all tests should pass")
+		})
+
+		t.Run("RunSpecJSON", func(t *testing.T) {
+			overlayFlag := "-overlay=" + filepath.Join(tmpDir, "overlay.json")
+			goTestArgs := []string{
+				overlayFlag,
+				standalonePattern,
+				fixtureboundPattern,
+			}
+			extraEnv := map[string]string{
+				"GOTEST_SHARED_STATE_FILE": stateFile,
+			}
+
+			jsonData, code, err := gotestrunner.StdlibRunTestsJSON(goTestArgs, extraEnv)
+			gotest.NoError(t, err)
+			gotest.Equal(t, 0, code, "all tests should pass via JSON runner")
+
+			events, err := gotestspec.ParseEvents(bytes.NewReader(jsonData))
+			gotest.NoError(t, err)
+
+			tree := gotestspec.BuildTree(events)
+			var buf bytes.Buffer
+			gotestspec.RenderTerminal(&buf, tree, gotestspec.WithNoColor())
+			output := buf.String()
+
+			gotest.Contains(t, output, "Alpha")
+			gotest.Contains(t, output, "Multi")
+			gotest.Contains(t, output, "Infra")
 		})
 
 		cmd.Process.Signal(os.Interrupt)
