@@ -22,7 +22,7 @@ export function collectItems(
       items.push(item);
     });
   }
-  return items;
+  return expandToPackages(items);
 }
 
 export function groupByPackage(
@@ -30,7 +30,7 @@ export function groupByPackage(
 ): Map<string, vscode.TestItem[]> {
   const groups = new Map<string, vscode.TestItem[]>();
   for (const item of items) {
-    const root = getRootItem(item);
+    const root = getPackageItem(item);
     let group = groups.get(root.id);
     if (!group) {
       group = [];
@@ -57,6 +57,50 @@ export function getItemDepth(item: vscode.TestItem): number {
     depth++;
   }
   return depth;
+}
+
+const PACKAGE_TAG = "package";
+
+export function getPackageItem(item: vscode.TestItem): vscode.TestItem {
+  let current: vscode.TestItem = item;
+  if (current.tags.some((t) => t.id === PACKAGE_TAG)) {
+    return current;
+  }
+  while (current.parent) {
+    current = current.parent;
+    if (current.tags.some((t) => t.id === PACKAGE_TAG)) {
+      return current;
+    }
+  }
+  return current;
+}
+
+export function getPackageDepth(item: vscode.TestItem): number {
+  let depth = 0;
+  let current: vscode.TestItem | undefined = item;
+  while (current) {
+    if (current.tags.some((t) => t.id === PACKAGE_TAG)) {
+      return depth;
+    }
+    depth++;
+    current = current.parent;
+  }
+  return -1;
+}
+
+export function expandToPackages(items: vscode.TestItem[]): vscode.TestItem[] {
+  const result: vscode.TestItem[] = [];
+  const visit = (item: vscode.TestItem) => {
+    if (item.tags.some((t) => t.id === PACKAGE_TAG)) {
+      result.push(item);
+      return;
+    }
+    item.children.forEach((child) => visit(child));
+  };
+  for (const item of items) {
+    visit(item);
+  }
+  return result.length > 0 ? result : items;
 }
 
 export function resolveTestItem(
@@ -236,7 +280,7 @@ export function buildRunFilter(
   importPath: string,
   cache: DiscoveryCache,
 ): string | undefined {
-  if (items.some((item) => getItemDepth(item) === 0)) {
+  if (items.some((item) => getPackageDepth(item) === 0)) {
     return undefined;
   }
 
@@ -246,7 +290,7 @@ export function buildRunFilter(
   >();
 
   for (const item of items) {
-    const depth = getItemDepth(item);
+    const depth = getPackageDepth(item);
 
     if (depth === 1) {
       const suiteName = item.label;
@@ -273,7 +317,7 @@ export function buildRunFilter(
     } else if (depth >= 3) {
       let current = item;
       const subtestParts: string[] = [];
-      while (getItemDepth(current) > 2) {
+      while (getPackageDepth(current) > 2) {
         subtestParts.unshift(current.label);
         current = current.parent!;
       }
@@ -317,9 +361,6 @@ export function getPackageDir(
   item: vscode.TestItem,
   cache: DiscoveryCache,
 ): string | undefined {
-  let current: vscode.TestItem | undefined = item;
-  while (current?.parent) {
-    current = current.parent;
-  }
-  return cache.getPackage(current?.id || "")?.dir;
+  const pkg = getPackageItem(item);
+  return cache.getPackage(pkg.id)?.dir;
 }

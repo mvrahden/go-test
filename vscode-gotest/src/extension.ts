@@ -16,7 +16,11 @@ import {
 import { CoverageRunner } from "./coverage.js";
 import { CoverageStore } from "./coverageStore.js";
 import { validateGoBinary, scopedConfig } from "./cli.js";
-import { buildRunFilter, getPackageDir } from "./runnerUtils.js";
+import {
+  buildRunFilter,
+  getPackageDir,
+  getPackageItem,
+} from "./runnerUtils.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Go Test Suites");
@@ -47,9 +51,8 @@ export function activate(context: vscode.ExtensionContext): void {
         token,
         (items) => {
           if (!items || items.length === 0) return undefined;
-          let current: vscode.TestItem | undefined = items[0];
-          while (current?.parent) current = current.parent;
-          return buildRunFilter(Array.from(items), current!.id, cache);
+          const pkg = getPackageItem(items[0]);
+          return buildRunFilter(Array.from(items), pkg.id, cache);
         },
         (item) => getPackageDir(item, cache),
       ),
@@ -163,9 +166,8 @@ export function activate(context: vscode.ExtensionContext): void {
           cts.token,
           (items) => {
             if (!items || items.length === 0) return undefined;
-            let current: vscode.TestItem | undefined = items[0];
-            while (current?.parent) current = current.parent;
-            return buildRunFilter(Array.from(items), current!.id, cache);
+            const pkg = getPackageItem(items[0]);
+            return buildRunFilter(Array.from(items), pkg.id, cache);
           },
           (i) => getPackageDir(i, cache),
         );
@@ -432,5 +434,3 @@ function resolveActiveWorkspaceDir(): string | undefined {
     : vscode.workspace.workspaceFolders?.[0];
   return folder?.uri.fsPath;
 }
-
-
