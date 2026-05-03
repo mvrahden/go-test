@@ -21,10 +21,10 @@ func runPrepare(args []string) int {
 
 	ctx, stop := signal.NotifyContext(context.Background(),
 		os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	overlay, cleanup, err := generateOverlay(patterns)
 	if err != nil {
+		stop()
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
@@ -33,11 +33,15 @@ func runPrepare(args []string) int {
 	if len(overlay.sharedFixtures) > 0 {
 		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures)
 		if err != nil {
+			stop()
 			cleanup()
 			fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", err)
 			return 2
 		}
 	}
+
+	// Stop the context-based listener before switching to channel-based blocking.
+	stop()
 
 	out := prepareOutput{
 		OverlayFile: filepath.Join(overlay.tmpDir, "overlay.json"),
