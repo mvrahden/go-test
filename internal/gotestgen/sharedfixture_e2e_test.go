@@ -177,7 +177,7 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 			"reverse teardown: Redis (sf1) should tear down before Postgres (sf0)")
 
 		// Cascading teardown on BeforeAll failure
-		gotest.True(t, strings.Contains(code, "sf0.AfterAll(ctx)\n\t\tfmt.Fprintf(os.Stderr, \"RedisSharedFixture.BeforeAll"),
+		gotest.True(t, strings.Contains(code, "sf0.AfterAll(context.Background())\n\t\t\tfmt.Fprintf(os.Stderr, \"RedisSharedFixture.BeforeAll failed after"),
 			"Redis BeforeAll failure should tear down Postgres first")
 
 		// Golden file comparison
