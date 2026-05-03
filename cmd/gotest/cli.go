@@ -141,14 +141,13 @@ Usage:
 
 Subcommands:
   discover    Discover test suites and output JSON metadata
-  overlay     Generate overlay files and output overlay path as JSON
+  prepare     Generate overlay and start shared fixtures for debug (blocks until SIGTERM)
   generate    Run code generation only (no test execution)
   clean       Remove orphaned generated files
   spec        Render behavioral specification from test suites
   watch       Watch for file changes and re-run tests
   scaffold    Generate test suite skeleton from a type or file
   migrate     Convert testify/suite tests to go-test format
-  shared-setup  Start shared fixtures (used by IDE extensions)
   version     Print version information
   help        Show this help message
 

@@ -147,7 +147,7 @@ Change: return a result object `{ stdout: string; stderr: string; exitCode: numb
 | `cmd/gotest/overlay.go` | Delete |
 | `cmd/gotest/sharedsetup.go` | Delete |
 | `cmd/gotest/args.go` | Modify (remove overlay/shared-setup, add prepare) |
-| `cmd/gotest/cli.go` | Modify (remove overlay/shared-setup cases, add prepare) |
+| `cmd/gotest/cli.go` | Modify (remove overlay/shared-setup cases, add prepare, update printUsage) |
 | `cmd/gotest/watch.go` | Modify (wire shared fixtures in watchRunOnce) |
 | `cmd/gotest/overlay_test.go` | Rename to `generate_test.go`, replace `overlayOutput` with inline struct |
 | `internal/gotestrunner/stdlib.go` | Modify (add context parameter) |
@@ -163,6 +163,12 @@ Change: return a result object `{ stdout: string; stderr: string; exitCode: numb
 | `src/sharedFixtures.ts` | Delete |
 | `src/types.ts` | Modify (drop SharedFixtureInfo/OverlayOutput, add PrepareOutput) |
 | `src/runnerUtils.ts` | Modify (improve spawnTestProcess return type) |
+
+### Documentation
+| File | Action |
+|------|--------|
+| `cmd/gotest/cli.go` | `printUsage()`: remove overlay/shared-setup, add prepare |
+| `vscode-gotest/README.md` | Remove "overlays" from buildTags setting comment |
 
 ### No change
 `extension.ts`, `cli.ts`, `testController.ts`, `coverageStore.ts`, `outputParser.ts`, `discovery.ts`, `watch.ts`
