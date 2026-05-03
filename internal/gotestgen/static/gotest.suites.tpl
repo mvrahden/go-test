@@ -14,13 +14,17 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
 {{- /* Wire up shared fixtures from GOTEST_SHARED_STATE if present */ -}}
 {{- $sfRefs := index $.SuiteSharedFixtures $ts.Identifier }}
 {{- if $sfRefs }}
-  ƒsharedRaw := os.Getenv("GOTEST_SHARED_STATE")
-  if ƒsharedRaw == "" {
-      t.Fatal("GOTEST_SHARED_STATE not set — run via gotest CLI")
+  ƒsharedFile := os.Getenv("GOTEST_SHARED_STATE_FILE")
+  if ƒsharedFile == "" {
+      t.Fatal("GOTEST_SHARED_STATE_FILE not set — run via gotest CLI")
+  }
+  ƒsharedRaw, ƒsharedErr := os.ReadFile(ƒsharedFile)
+  if ƒsharedErr != nil {
+      t.Fatalf("read shared state file: %v", ƒsharedErr)
   }
   ƒsharedState := map[string]json.RawMessage{}
-  if err := json.Unmarshal([]byte(ƒsharedRaw), &ƒsharedState); err != nil {
-      t.Fatalf("unmarshal GOTEST_SHARED_STATE: %v", err)
+  if err := json.Unmarshal(ƒsharedRaw, &ƒsharedState); err != nil {
+      t.Fatalf("unmarshal shared state: %v", err)
   }
 {{ range $sf := $sfRefs }}
   {{ $sf.LocalVar }} := &{{ $sf.QualifiedType }}{}
