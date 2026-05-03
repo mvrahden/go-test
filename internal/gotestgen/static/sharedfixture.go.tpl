@@ -8,22 +8,50 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	gotest {{ printf "%q" .GotestImportPath }}
 {{ range .Imports }}
 	{{ .Alias }} {{ printf "%q" .Path }}
 {{- end }}
 )
 
 func main() {
-	ctx := context.Background()
 	state := map[string]json.RawMessage{}
 {{ range $f := .Fixtures }}
 	{{ $f.VarName }} := &{{ $f.QualifiedType }}{}
-	if err := {{ $f.VarName }}.BeforeAll(ctx); err != nil {
-{{- range $f.BeforeAllRollbackVars }}
-		{{ . }}.AfterAll(ctx)
+	ƒcfg_{{ $f.VarName }} := gotest.DefaultFixtureConfig()
+{{- if $f.HasConfig }}
+	gotest.OverlayFixtureConfig(&ƒcfg_{{ $f.VarName }}, {{ $f.VarName }}.SharedFixtureConfig())
 {{- end }}
-		fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.BeforeAll: %v\n", err)
-		os.Exit(1)
+	{
+		var ƒerr error
+		ƒattempts := 1 + ƒcfg_{{ $f.VarName }}.Retries
+		for ƒi := range ƒattempts {
+			ctx := context.Background()
+			if ƒcfg_{{ $f.VarName }}.Timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, ƒcfg_{{ $f.VarName }}.Timeout)
+				defer cancel()
+			}
+			ƒerr = {{ $f.VarName }}.BeforeAll(ctx)
+			if ƒerr == nil {
+				break
+			}
+			if ƒi < ƒattempts-1 {
+				fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.BeforeAll attempt %d/%d failed: %v\n", ƒi+1, ƒattempts, ƒerr)
+				if ƒcfg_{{ $f.VarName }}.RetryDelay > 0 {
+					time.Sleep(ƒcfg_{{ $f.VarName }}.RetryDelay)
+				}
+			}
+		}
+		if ƒerr != nil {
+{{- range $f.BeforeAllRollbackVars }}
+			{{ . }}.AfterAll(context.Background())
+{{- end }}
+			fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.BeforeAll failed after %d attempt(s): %v\n", ƒattempts, ƒerr)
+			os.Exit(1)
+		}
 	}
 {{- if $f.TransferFields }}
 	{
@@ -39,7 +67,7 @@ func main() {
 		})
 		if err != nil {
 {{- range $f.MarshalRollbackVars }}
-			{{ . }}.AfterAll(ctx)
+			{{ . }}.AfterAll(context.Background())
 {{- end }}
 			fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}: marshal: %v\n", err)
 			os.Exit(1)
@@ -54,6 +82,14 @@ func main() {
 	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
 	<-sig
 {{ range .TeardownVars }}
-	{{ . }}.AfterAll(ctx)
+	{
+		ctx := context.Background()
+		if ƒcfg_{{ . }}.Timeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, ƒcfg_{{ . }}.Timeout)
+			defer cancel()
+		}
+		{{ . }}.AfterAll(ctx)
+	}
 {{- end }}
 }
