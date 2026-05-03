@@ -108,6 +108,29 @@ export async function buildCliCommand(
     }
   }
 
+  // 2b. Workspace IS the gotest module (development / go.work overlap)
+  if (effectiveDir) {
+    const declaredModule = await readModuleDeclaration(effectiveDir);
+    if (
+      declaredModule &&
+      (modulePath === declaredModule ||
+        modulePath.startsWith(declaredModule + "/"))
+    ) {
+      const goBin = await resolveGoBinary(log, workspaceDir);
+      const bin = await buildCachedBinary(
+        goBin,
+        effectiveDir,
+        modulePath,
+        log,
+      );
+      if (bin) {
+        log?.appendLine(`[cli] using local module: ${bin}`);
+        return { bin, args: subcommandArgs };
+      }
+      log?.appendLine(`[cli] local module build failed, continuing`);
+    }
+  }
+
   // 3. Globally installed binary
   const gotest = await findInstalledGotest(workspaceDir, log);
   if (gotest) {
@@ -225,6 +248,19 @@ async function resolveGenericGoBinary(
 
   log?.appendLine("[go] could not resolve binary, using bare 'go'");
   return "go";
+}
+
+async function readModuleDeclaration(
+  workspaceDir: string,
+): Promise<string | undefined> {
+  try {
+    const goModPath = path.join(workspaceDir, "go.mod");
+    const content = await readFile(goModPath, "utf-8");
+    const match = /^\s*module\s+(\S+)/m.exec(content);
+    return match?.[1];
+  } catch {
+    return undefined;
+  }
 }
 
 async function readGoVersionFromMod(

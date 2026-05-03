@@ -50,6 +50,12 @@ export function activate(context: vscode.ExtensionContext): void {
     (request, token) => coverageRunner.run(request, token),
   );
 
+  controller.testController.refreshHandler = async () => {
+    for (const folder of vscode.workspace.workspaceFolders ?? []) {
+      await discoveryService.discover(folder.uri.fsPath);
+    }
+  };
+
   const coverageStore = new CoverageStore(context.storageUri);
 
   runner = new TestRunner(controller, cache, outputChannel, coverageStore);

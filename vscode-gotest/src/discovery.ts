@@ -95,7 +95,11 @@ export class DiscoveryCache implements vscode.Disposable {
 
 export class DiscoveryService {
   private running = false;
-  private pending: { workspaceDir: string; patterns?: string[] }[] = [];
+  private pending: {
+    workspaceDir: string;
+    patterns?: string[];
+    resolve: () => void;
+  }[] = [];
   private hasShownError = false;
 
   constructor(
@@ -105,11 +109,34 @@ export class DiscoveryService {
 
   async discover(workspaceDir: string, patterns?: string[]): Promise<void> {
     if (this.running) {
-      this.pending.push({ workspaceDir, patterns });
-      return;
+      return new Promise<void>((resolve) => {
+        this.pending.push({ workspaceDir, patterns, resolve });
+      });
     }
 
     this.running = true;
+    try {
+      await this.execute(workspaceDir, patterns);
+    } finally {
+      this.running = false;
+      const next = this.pending.shift();
+      if (next) {
+        this.discover(next.workspaceDir, next.patterns).then(next.resolve);
+      }
+    }
+  }
+
+  async discoverPackage(
+    workspaceDir: string,
+    pkgPattern: string,
+  ): Promise<void> {
+    return this.discover(workspaceDir, [pkgPattern]);
+  }
+
+  private async execute(
+    workspaceDir: string,
+    patterns?: string[],
+  ): Promise<void> {
     try {
       const cmd = await buildCliCommand(
         ["discover", ...(patterns ?? ["./..."])],
@@ -151,19 +178,6 @@ export class DiscoveryService {
             }
           });
       }
-    } finally {
-      this.running = false;
-      const next = this.pending.shift();
-      if (next) {
-        this.discover(next.workspaceDir, next.patterns);
-      }
     }
-  }
-
-  async discoverPackage(
-    workspaceDir: string,
-    pkgPattern: string,
-  ): Promise<void> {
-    return this.discover(workspaceDir, [pkgPattern]);
   }
 }
