@@ -221,6 +221,12 @@ export function applyResults(
   }
 }
 
+export interface SpawnResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
 export function spawnTestProcess(
   bin: string,
   args: string[],
@@ -229,8 +235,8 @@ export function spawnTestProcess(
   outputChannel: vscode.OutputChannel,
   label: string,
   env?: Record<string, string>,
-): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
+): Promise<SpawnResult> {
+  return new Promise<SpawnResult>((resolve, reject) => {
     const child = spawn(bin, args, {
       cwd,
       env: env ? { ...process.env, ...env } : undefined,
@@ -255,7 +261,7 @@ export function spawnTestProcess(
       if (stderr) {
         outputChannel.appendLine(`[${label}] stderr: ${stderr}`);
       }
-      resolve(stdout);
+      resolve({ stdout, stderr, exitCode: code ?? 1 });
     });
 
     child.on("error", (err: Error) => {
