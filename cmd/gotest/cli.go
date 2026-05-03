@@ -34,6 +34,8 @@ func main() {
 		os.Exit(runGenerate(remaining))
 	case "clean":
 		os.Exit(runClean(remaining))
+	case "shared-setup":
+		os.Exit(runSharedSetup(remaining))
 	case "spec":
 		os.Exit(runSpec(remaining))
 	case "watch":
@@ -146,6 +148,7 @@ Subcommands:
   watch       Watch for file changes and re-run tests
   scaffold    Generate test suite skeleton from a type or file
   migrate     Convert testify/suite tests to go-test format
+  shared-setup  Start shared fixtures (used by IDE extensions)
   version     Print version information
   help        Show this help message
 

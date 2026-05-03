@@ -8,6 +8,7 @@ import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import type { CoverageStore } from "./coverageStore.js";
 import type { OverlayOutput } from "./types.js";
+import { startSharedSetup, type SharedSetupProcess } from "./sharedFixtures.js";
 import { parseTestEvents } from "./outputParser.js";
 import {
   buildCliCommand,
@@ -245,6 +246,7 @@ export class CoverageRunner implements vscode.Disposable {
 
         let overlayDir: string | undefined;
         let coverFile: string | undefined;
+        let sharedSetup: SharedSetupProcess | undefined;
 
         try {
           const overlayCmd = await buildCliCommand(
@@ -262,6 +264,22 @@ export class CoverageRunner implements vscode.Disposable {
           );
           const overlay = JSON.parse(overlayStdout) as OverlayOutput;
           overlayDir = overlay.dir;
+          if (overlay.sharedFixtures && overlay.sharedFixtures.length > 0) {
+            const setupCmd = await buildCliCommand(
+              ["shared-setup", `--dir=${overlay.dir}`],
+              workspaceDir,
+              this.outputChannel,
+            );
+            this.outputChannel.appendLine(
+              `[coverage] ${formatCliCommand(setupCmd)}`,
+            );
+            sharedSetup = await startSharedSetup(
+              setupCmd,
+              workspaceDir,
+              overlay.sharedFixtures,
+              this.outputChannel,
+            );
+          }
 
           const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
           coverFile = path.join(tmpDir, "cover.out");
@@ -285,6 +303,10 @@ export class CoverageRunner implements vscode.Disposable {
           }
           args.push(...testFlags);
 
+          const testEnv: Record<string, string> | undefined = sharedSetup
+            ? { GOTEST_SHARED_STATE_FILE: sharedSetup.stateFile }
+            : undefined;
+
           const goBin = await resolveGoBinary(this.outputChannel, workspaceDir);
           this.outputChannel.appendLine(
             `[coverage] ${goBin} ${args.join(" ")}`,
@@ -296,6 +318,7 @@ export class CoverageRunner implements vscode.Disposable {
             effectiveToken,
             this.outputChannel,
             "coverage",
+            testEnv,
           );
           allJsonOutput += stdout;
 
@@ -330,6 +353,7 @@ export class CoverageRunner implements vscode.Disposable {
             );
           }
         } finally {
+          sharedSetup?.dispose();
           if (overlayDir) {
             rm(overlayDir, { recursive: true, force: true }).catch(() => {});
           }
@@ -435,6 +459,7 @@ export class CoverageRunner implements vscode.Disposable {
     const testFlags = config.get<string[]>("testFlags") ?? [];
     let overlayDir: string | undefined;
     let coverFile: string | undefined;
+    let sharedSetup: SharedSetupProcess | undefined;
 
     try {
       const overlayCmd = await buildCliCommand(
@@ -450,6 +475,20 @@ export class CoverageRunner implements vscode.Disposable {
       const overlay = JSON.parse(overlayStdout) as OverlayOutput;
       overlayDir = overlay.dir;
 
+      if (overlay.sharedFixtures && overlay.sharedFixtures.length > 0) {
+        const setupCmd = await buildCliCommand(
+          ["shared-setup", `--dir=${overlay.dir}`],
+          workspaceDir,
+          this.outputChannel,
+        );
+        sharedSetup = await startSharedSetup(
+          setupCmd,
+          workspaceDir,
+          overlay.sharedFixtures,
+          this.outputChannel,
+        );
+      }
+
       const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
       coverFile = path.join(tmpDir, "cover.out");
 
@@ -464,6 +503,10 @@ export class CoverageRunner implements vscode.Disposable {
       if (buildTags) args.push(`-tags=${buildTags}`);
       args.push(...testFlags);
 
+      const testEnv: Record<string, string> | undefined = sharedSetup
+        ? { GOTEST_SHARED_STATE_FILE: sharedSetup.stateFile }
+        : undefined;
+
       const goBin = await resolveGoBinary(this.outputChannel, workspaceDir);
       this.outputChannel.appendLine(
         `[coverage:save] ${goBin} ${args.join(" ")}`,
@@ -476,6 +519,7 @@ export class CoverageRunner implements vscode.Disposable {
         cts.token,
         this.outputChannel,
         "coverage",
+        testEnv,
       );
 
       if (cts.token.isCancellationRequested) return;
@@ -495,6 +539,7 @@ export class CoverageRunner implements vscode.Disposable {
       this.outputChannel.appendLine(`[coverage:save] failed: ${message}`);
       return;
     } finally {
+      sharedSetup?.dispose();
       if (this.activePackageRun === cts) this.activePackageRun = undefined;
       cts.dispose();
       if (overlayDir)

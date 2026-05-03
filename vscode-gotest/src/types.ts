@@ -40,7 +40,18 @@ export interface DiscoverMethod {
   col: number;
 }
 
+export interface SharedFixtureInfo {
+  Identifier: string;
+  PkgPath: string;
+  HasConfig: boolean;
+  HasHydrate: boolean;
+  HasDehydrate: boolean;
+  TransferFields: string[];
+  LocalFields: string[];
+}
+
 export interface OverlayOutput {
   overlayFile: string;
   dir: string;
+  sharedFixtures?: SharedFixtureInfo[];
 }

@@ -13,6 +13,8 @@ import {
   resolveGoBinary,
   scopedConfig,
 } from "./cli.js";
+import { startSharedSetup, type SharedSetupProcess } from "./sharedFixtures.js";
+import type { OverlayOutput } from "./types.js";
 import {
   collectItems,
   groupByPackage,
@@ -116,6 +118,7 @@ export class TestRunner {
 
         let overlayDir: string | undefined;
         let coverFile: string | undefined;
+        let sharedSetup: SharedSetupProcess | undefined;
         try {
           const overlayCmd = await buildCliCommand(
             ["overlay", importPath],
@@ -130,11 +133,24 @@ export class TestRunner {
             overlayCmd.args,
             { cwd: workspaceDir },
           );
-          const overlay = JSON.parse(overlayStdout) as {
-            overlayFile: string;
-            dir: string;
-          };
+          const overlay = JSON.parse(overlayStdout) as OverlayOutput;
           overlayDir = overlay.dir;
+          if (overlay.sharedFixtures && overlay.sharedFixtures.length > 0) {
+            const setupCmd = await buildCliCommand(
+              ["shared-setup", `--dir=${overlay.dir}`],
+              workspaceDir,
+              this.outputChannel,
+            );
+            this.outputChannel.appendLine(
+              `[runner] ${formatCliCommand(setupCmd)}`,
+            );
+            sharedSetup = await startSharedSetup(
+              setupCmd,
+              workspaceDir,
+              overlay.sharedFixtures,
+              this.outputChannel,
+            );
+          }
 
           if (coverOnRun) {
             const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
@@ -160,6 +176,10 @@ export class TestRunner {
           }
           goTestArgs.push(...testFlags);
 
+          const testEnv: Record<string, string> | undefined = sharedSetup
+            ? { GOTEST_SHARED_STATE_FILE: sharedSetup.stateFile }
+            : undefined;
+
           const goBin = await resolveGoBinary(this.outputChannel, workspaceDir);
           this.outputChannel.appendLine(
             `[runner] ${goBin} ${goTestArgs.join(" ")}`,
@@ -171,6 +191,7 @@ export class TestRunner {
             effectiveToken,
             this.outputChannel,
             "runner",
+            testEnv,
           );
           this._lastJsonOutput += stdout;
 
@@ -213,6 +234,7 @@ export class TestRunner {
             run.errored(item, new vscode.TestMessage(message));
           }
         } finally {
+          sharedSetup?.dispose();
           if (overlayDir) {
             rm(overlayDir, { recursive: true, force: true }).catch(() => {});
           }

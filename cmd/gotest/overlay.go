@@ -11,21 +11,31 @@ import (
 )
 
 type overlayOutput struct {
-	OverlayFile string `json:"overlayFile"`
-	Dir         string `json:"dir"`
+	OverlayFile    string                       `json:"overlayFile"`
+	Dir            string                       `json:"dir"`
+	SharedFixtures []gotestgen.SharedFixtureInfo `json:"sharedFixtures,omitempty"`
 }
 
 func runOverlay(args []string) int {
 	patterns := ExtractPackagePatterns(args)
 
 	var allResults gotestgen.GenerateResults
+	sharedSeen := map[string]bool{}
+	var allSharedFixtures []gotestgen.SharedFixtureInfo
 	for _, pattern := range patterns {
-		results, err := gotestgen.Generate(pattern)
+		results, sharedFixtures, err := gotestgen.GenerateWithSharedFixtures(pattern)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2
 		}
 		allResults = append(allResults, results...)
+		for _, sf := range sharedFixtures {
+			key := sf.PkgPath + "." + sf.Identifier
+			if !sharedSeen[key] {
+				sharedSeen[key] = true
+				allSharedFixtures = append(allSharedFixtures, sf)
+			}
+		}
 	}
 
 	if len(allResults) == 0 {
@@ -40,8 +50,9 @@ func runOverlay(args []string) int {
 	}
 
 	out := overlayOutput{
-		OverlayFile: filepath.Join(tmpDir, "overlay.json"),
-		Dir:         tmpDir,
+		OverlayFile:    filepath.Join(tmpDir, "overlay.json"),
+		Dir:            tmpDir,
+		SharedFixtures: allSharedFixtures,
 	}
 
 	enc := json.NewEncoder(os.Stdout)

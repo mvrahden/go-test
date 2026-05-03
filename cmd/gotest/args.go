@@ -11,16 +11,17 @@ type ExecConfig struct {
 
 // knownSubcommands is the set of recognized subcommands.
 var knownSubcommands = map[string]bool{
-	"discover": true,
-	"overlay":  true,
-	"generate": true,
-	"scaffold": true,
-	"migrate":  true,
-	"spec":     true,
-	"watch":    true,
-	"clean":    true,
-	"version":  true,
-	"help":     true,
+	"discover":     true,
+	"overlay":      true,
+	"generate":     true,
+	"scaffold":     true,
+	"migrate":      true,
+	"spec":         true,
+	"watch":        true,
+	"clean":        true,
+	"shared-setup": true,
+	"version":      true,
+	"help":         true,
 }
 
 // ParseSubcommand checks the first positional argument against known

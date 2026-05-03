@@ -228,9 +228,13 @@ export function spawnTestProcess(
   token: vscode.CancellationToken,
   outputChannel: vscode.OutputChannel,
   label: string,
+  env?: Record<string, string>,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    const child = spawn(bin, args, { cwd });
+    const child = spawn(bin, args, {
+      cwd,
+      env: env ? { ...process.env, ...env } : undefined,
+    });
     let stdout = "";
     let stderr = "";
 
