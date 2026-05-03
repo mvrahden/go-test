@@ -138,8 +138,25 @@ func watchRunOnce(ctx context.Context, goTestArgs []string, patterns []string, j
 	}
 	defer cleanup()
 
+	var setupProc *SharedFixtureProcess
+	if len(overlay.sharedFixtures) > 0 {
+		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures)
+		if err != nil {
+			if jsonMode {
+				fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
+			} else {
+				fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", err)
+			}
+			return 2
+		}
+		defer setupProc.Teardown()
+	}
+
 	overlayArgs := append([]string{overlay.overlayFlag}, goTestArgs...)
 	extraEnv := buildExtraEnv()
+	if setupProc != nil {
+		extraEnv["GOTEST_SHARED_STATE_FILE"] = setupProc.StateFile()
+	}
 
 	if jsonMode {
 		fmt.Printf("{\"Action\":\"watch-start\",\"Package\":%q}\n", strings.Join(patterns, ","))
