@@ -1,6 +1,7 @@
 package scaffold
 
 import (
+	"embed"
 	"fmt"
 	"go/ast"
 	"go/format"
@@ -13,6 +14,9 @@ import (
 
 	"golang.org/x/tools/go/packages"
 )
+
+//go:embed static
+var templates embed.FS
 
 // TypeInfo describes a Go type extracted from a package.
 type TypeInfo struct {
@@ -378,91 +382,16 @@ func ToSnakeCase(s string) string {
 	return toSnakeCase(s)
 }
 
-var structTemplate = template.Must(template.New("struct").Parse(`package {{.PkgName}}
-
-import (
-	"github.com/mvrahden/go-test/pkg/gotest"
+var (
+	structTemplate   = template.Must(template.New("struct").ParseFS(templates, "static/scaffold.struct.go.tpl"))
+	contractTemplate = template.Must(template.New("contract").ParseFS(templates, "static/scaffold.contract.go.tpl"))
+	fileTemplate     = template.Must(template.New("file").ParseFS(templates, "static/scaffold.file.go.tpl"))
 )
-
-type {{.Name}}TestSuite struct {
-	sut *{{.Name}}
-}
-
-func (s *{{.Name}}TestSuite) BeforeEach(t *gotest.T) {
-	s.sut = nil // TODO: initialize {{.Name}}
-}
-{{range .Methods}}
-func (s *{{$.Name}}TestSuite) Test{{.Name}}(t *gotest.T) {
-{{- if .ReturnsError}}
-	t.It("succeeds", func(it *gotest.T) {
-		// TODO: test {{$.Name}}.{{.Name}}{{.Signature}}
-	})
-	t.It("returns error", func(it *gotest.T) {
-		// TODO: test error case
-	})
-{{- else}}
-	t.It("works", func(it *gotest.T) {
-		// TODO: test {{$.Name}}.{{.Name}}{{.Signature}}
-	})
-{{- end}}
-}
-{{end}}`))
-
-var contractTemplate = template.Must(template.New("contract").Parse(`package {{.PkgName}}
-
-import (
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type {{.Name}}ContractTestSuite[T {{.Name}}] struct {
-	factory func() T
-	sut     T
-}
-
-func (s *{{.Name}}ContractTestSuite[T]) BeforeEach(t *gotest.T) {
-	s.sut = s.factory()
-}
-{{range .Methods}}
-func (s *{{$.Name}}ContractTestSuite[T]) Test{{.Name}}(t *gotest.T) {
-{{- if .ReturnsError}}
-	t.It("succeeds", func(it *gotest.T) {
-		// TODO: test {{$.Name}}.{{.Name}}{{.Signature}}
-	})
-	t.It("returns error", func(it *gotest.T) {
-		// TODO: test error case
-	})
-{{- else}}
-	t.It("works", func(it *gotest.T) {
-		// TODO: test {{$.Name}}.{{.Name}}{{.Signature}}
-	})
-{{- end}}
-}
-{{end}}
-// Instantiate the contract for a concrete implementation:
-// type My{{.Name}}TestSuite = {{.Name}}ContractTestSuite[*MyImpl]
-`))
-
-var fileTemplate = template.Must(template.New("file").Parse(`package {{.PkgName}}
-
-import (
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type {{.SuiteName}} struct {
-	gotest.TestSuite
-}
-{{range .Funcs}}
-func (s *{{$.SuiteName}}) Test{{.Name}}(t *gotest.T) {
-	t.It("works", func(it *gotest.T) {
-		// TODO: test {{.Name}}{{.Signature}}
-	})
-}
-{{end}}`))
 
 // GenerateFileScaffold generates a test suite scaffold for package-level functions.
 func GenerateFileScaffold(info *FileInfo) ([]byte, error) {
 	var buf strings.Builder
-	if err := fileTemplate.Execute(&buf, info); err != nil {
+	if err := fileTemplate.ExecuteTemplate(&buf, "scaffold.file.go.tpl", info); err != nil {
 		return nil, fmt.Errorf("template execution failed: %w", err)
 	}
 	formatted, err := format.Source([]byte(buf.String()))
@@ -475,7 +404,7 @@ func GenerateFileScaffold(info *FileInfo) ([]byte, error) {
 // GenerateScaffold generates a test suite scaffold for a struct type.
 func GenerateScaffold(info *TypeInfo) ([]byte, error) {
 	var buf strings.Builder
-	if err := structTemplate.Execute(&buf, info); err != nil {
+	if err := structTemplate.ExecuteTemplate(&buf, "scaffold.struct.go.tpl", info); err != nil {
 		return nil, fmt.Errorf("template execution failed: %w", err)
 	}
 
@@ -491,7 +420,7 @@ func GenerateScaffold(info *TypeInfo) ([]byte, error) {
 // for an interface type.
 func GenerateContractScaffold(info *TypeInfo) ([]byte, error) {
 	var buf strings.Builder
-	if err := contractTemplate.Execute(&buf, info); err != nil {
+	if err := contractTemplate.ExecuteTemplate(&buf, "scaffold.contract.go.tpl", info); err != nil {
 		return nil, fmt.Errorf("template execution failed: %w", err)
 	}
 
