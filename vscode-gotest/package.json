@@ -162,12 +162,15 @@
     "compile": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
     "test": "vitest run",
+    "format": "prettier --write 'src/**/*.ts'",
+    "format:check": "prettier --check 'src/**/*.ts'",
     "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/vscode": "^1.101.0",
     "esbuild": "^0.28.0",
+    "prettier": "^3.8.3",
     "typescript": "^5.7.0",
     "vitest": "^4.1.5"
   }

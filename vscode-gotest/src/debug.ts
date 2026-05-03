@@ -29,7 +29,9 @@ export class DebugLauncher implements vscode.Disposable {
       return;
     }
 
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(pkgDir));
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(
+      vscode.Uri.file(pkgDir),
+    );
     if (!workspaceFolder) {
       return;
     }
@@ -37,7 +39,10 @@ export class DebugLauncher implements vscode.Disposable {
     // Generate overlay
     let overlay: OverlayOutput;
     try {
-      const cmd = await buildCliCommand(["overlay", pkgDir], workspaceFolder.uri.fsPath);
+      const cmd = await buildCliCommand(
+        ["overlay", pkgDir],
+        workspaceFolder.uri.fsPath,
+      );
       this.outputChannel.appendLine(`[debug] ${formatCliCommand(cmd)}`);
       const { stdout } = await execFileAsync(cmd.bin, cmd.args, {
         cwd: workspaceFolder.uri.fsPath,
@@ -56,8 +61,9 @@ export class DebugLauncher implements vscode.Disposable {
     // Build run filter
     const runFilter = buildRunFilter(items);
 
-    const extraBuildFlags = scopedConfig(workspaceFolder.uri.fsPath)
-      .get<string[]>("buildFlags", []);
+    const extraBuildFlags = scopedConfig(workspaceFolder.uri.fsPath).get<
+      string[]
+    >("buildFlags", []);
 
     // Construct debug configuration
     const debugConfig: vscode.DebugConfiguration = {
@@ -66,7 +72,8 @@ export class DebugLauncher implements vscode.Disposable {
       request: "launch",
       mode: "test",
       program: pkgDir,
-      buildFlags: `-overlay=${overlay.overlayFile} ${extraBuildFlags.join(" ")}`.trim(),
+      buildFlags:
+        `-overlay=${overlay.overlayFile} ${extraBuildFlags.join(" ")}`.trim(),
       args: runFilter ? ["-test.run", runFilter] : [],
     };
 
@@ -87,11 +94,13 @@ export class DebugLauncher implements vscode.Disposable {
   }
 
   registerCleanupOnSessionEnd(context: vscode.ExtensionContext): void {
-    this.sessionListener = vscode.debug.onDidTerminateDebugSession((session) => {
-      if (session.name === "Go Test Suite Debug") {
-        this.cleanupAllOverlays();
-      }
-    });
+    this.sessionListener = vscode.debug.onDidTerminateDebugSession(
+      (session) => {
+        if (session.name === "Go Test Suite Debug") {
+          this.cleanupAllOverlays();
+        }
+      },
+    );
     context.subscriptions.push(this.sessionListener);
   }
 

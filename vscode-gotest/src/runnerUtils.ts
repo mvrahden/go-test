@@ -161,9 +161,7 @@ export function applyResults(
           return message;
         });
         if (vscodeMessages.length === 0) {
-          vscodeMessages.push(
-            new vscode.TestMessage(output || "Test failed"),
-          );
+          vscodeMessages.push(new vscode.TestMessage(output || "Test failed"));
         }
         run.failed(item, vscodeMessages, duration);
         break;

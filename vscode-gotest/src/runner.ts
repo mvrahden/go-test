@@ -7,7 +7,12 @@ import { tmpdir } from "node:os";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import { parseTestEvents } from "./outputParser.js";
-import { buildCliCommand, formatCliCommand, resolveGoBinary, scopedConfig } from "./cli.js";
+import {
+  buildCliCommand,
+  formatCliCommand,
+  resolveGoBinary,
+  scopedConfig,
+} from "./cli.js";
 import {
   collectItems,
   groupByPackage,
@@ -93,7 +98,9 @@ export class TestRunner {
           for (const item of groupItems) {
             run.errored(
               item,
-              new vscode.TestMessage(`Workspace folder not found for: ${importPath}`),
+              new vscode.TestMessage(
+                `Workspace folder not found for: ${importPath}`,
+              ),
             );
           }
           continue;
@@ -102,20 +109,31 @@ export class TestRunner {
         const filter = this.buildRunFilter(groupItems, importPath);
         const config = scopedConfig(workspaceDir);
         const testFlags = config.get<string[]>("testFlags") ?? [];
-        const coverOnRun = this.coverageStore !== undefined && (config.get<boolean>("coverOnRun") ?? true);
+        const coverOnRun =
+          this.coverageStore !== undefined &&
+          (config.get<boolean>("coverOnRun") ?? true);
         if (coverOnRun) anyCoverOnRun = true;
 
         let overlayDir: string | undefined;
         let coverFile: string | undefined;
         try {
-          const overlayCmd = await buildCliCommand(["overlay", importPath], workspaceDir, this.outputChannel);
-          this.outputChannel.appendLine(`[runner] ${formatCliCommand(overlayCmd)}`);
+          const overlayCmd = await buildCliCommand(
+            ["overlay", importPath],
+            workspaceDir,
+            this.outputChannel,
+          );
+          this.outputChannel.appendLine(
+            `[runner] ${formatCliCommand(overlayCmd)}`,
+          );
           const { stdout: overlayStdout } = await execFileAsync(
             overlayCmd.bin,
             overlayCmd.args,
             { cwd: workspaceDir },
           );
-          const overlay = JSON.parse(overlayStdout) as { overlayFile: string; dir: string };
+          const overlay = JSON.parse(overlayStdout) as {
+            overlayFile: string;
+            dir: string;
+          };
           overlayDir = overlay.dir;
 
           if (coverOnRun) {
@@ -143,8 +161,17 @@ export class TestRunner {
           goTestArgs.push(...testFlags);
 
           const goBin = await resolveGoBinary(this.outputChannel, workspaceDir);
-          this.outputChannel.appendLine(`[runner] ${goBin} ${goTestArgs.join(" ")}`);
-          const stdout = await spawnTestProcess(goBin, goTestArgs, workspaceDir, effectiveToken, this.outputChannel, "runner");
+          this.outputChannel.appendLine(
+            `[runner] ${goBin} ${goTestArgs.join(" ")}`,
+          );
+          const stdout = await spawnTestProcess(
+            goBin,
+            goTestArgs,
+            workspaceDir,
+            effectiveToken,
+            this.outputChannel,
+            "runner",
+          );
           this._lastJsonOutput += stdout;
 
           if (effectiveToken.isCancellationRequested) {
@@ -162,13 +189,21 @@ export class TestRunner {
               const coverContent = await readFile(coverFile, "utf-8");
               let funcOutput: string | undefined;
               try {
-                funcOutput = await runGoToolCoverFunc(goBin, coverFile, workspaceDir);
+                funcOutput = await runGoToolCoverFunc(
+                  goBin,
+                  coverFile,
+                  workspaceDir,
+                );
               } catch {
-                this.outputChannel.appendLine("[runner] go tool cover -func failed");
+                this.outputChannel.appendLine(
+                  "[runner] go tool cover -func failed",
+                );
               }
               this.coverageStore!.update(importPath, coverContent, funcOutput);
             } catch {
-              this.outputChannel.appendLine("[runner] no coverprofile generated");
+              this.outputChannel.appendLine(
+                "[runner] no coverprofile generated",
+              );
             }
           }
         } catch (err: unknown) {
@@ -182,7 +217,9 @@ export class TestRunner {
             rm(overlayDir, { recursive: true, force: true }).catch(() => {});
           }
           if (coverFile) {
-            rm(path.dirname(coverFile), { recursive: true, force: true }).catch(() => {});
+            rm(path.dirname(coverFile), { recursive: true, force: true }).catch(
+              () => {},
+            );
           }
         }
       }
@@ -271,7 +308,9 @@ export class TestRunner {
           group = { wholeSuite: false, methods: [], subtests: [] };
           suiteGroups.set(suiteName, group);
         }
-        group.subtests.push(`^Test${suiteName}$/^${methodName}$/^${subtestParts.join("/")}$`);
+        group.subtests.push(
+          `^Test${suiteName}$/^${methodName}$/^${subtestParts.join("/")}$`,
+        );
       }
     }
 
@@ -288,6 +327,10 @@ export class TestRunner {
       }
     }
 
-    return filters.length === 0 ? undefined : filters.length === 1 ? filters[0] : filters.join("|");
+    return filters.length === 0
+      ? undefined
+      : filters.length === 1
+        ? filters[0]
+        : filters.join("|");
   }
 }

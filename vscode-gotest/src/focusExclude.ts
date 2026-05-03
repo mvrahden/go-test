@@ -55,12 +55,7 @@ export class FocusExcludeProvider
     } else if (method.excluded) {
       const newName = method.name.replace(/^X_/, "");
       actions.push(
-        this.createMethodAction(
-          "Include this test",
-          method,
-          newName,
-          document,
-        ),
+        this.createMethodAction("Include this test", method, newName, document),
       );
     } else {
       actions.push(
@@ -98,12 +93,7 @@ export class FocusExcludeProvider
     } else if (suite.excluded) {
       const newName = suite.name.replace(/^X_/, "");
       actions.push(
-        this.createSuiteAction(
-          "Include this suite",
-          suite,
-          newName,
-          document,
-        ),
+        this.createSuiteAction("Include this suite", suite, newName, document),
       );
     } else {
       actions.push(
@@ -133,10 +123,7 @@ export class FocusExcludeProvider
     newName: string,
     document: vscode.TextDocument,
   ): vscode.CodeAction {
-    const action = new vscode.CodeAction(
-      title,
-      vscode.CodeActionKind.QuickFix,
-    );
+    const action = new vscode.CodeAction(title, vscode.CodeActionKind.QuickFix);
     const edit = new vscode.WorkspaceEdit();
 
     const lineIndex = method.line - 1;
@@ -162,10 +149,7 @@ export class FocusExcludeProvider
     newName: string,
     document: vscode.TextDocument,
   ): vscode.CodeAction {
-    const action = new vscode.CodeAction(
-      title,
-      vscode.CodeActionKind.QuickFix,
-    );
+    const action = new vscode.CodeAction(title, vscode.CodeActionKind.QuickFix);
     const edit = new vscode.WorkspaceEdit();
 
     // Replace at the struct type declaration line

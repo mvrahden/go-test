@@ -47,9 +47,7 @@ export class GoTestController implements vscode.Disposable {
       false,
     );
 
-    this.disposables.push(
-      this.cache.onDidUpdate(() => this.rebuild()),
-    );
+    this.disposables.push(this.cache.onDidUpdate(() => this.rebuild()));
   }
 
   get testController(): vscode.TestController {
@@ -79,7 +77,11 @@ export class GoTestController implements vscode.Disposable {
         const suiteUri = vscode.Uri.file(suite.file);
         let suiteItem = pkgItem.children.get(suiteId);
         if (!suiteItem) {
-          suiteItem = this.controller.createTestItem(suiteId, suite.name, suiteUri);
+          suiteItem = this.controller.createTestItem(
+            suiteId,
+            suite.name,
+            suiteUri,
+          );
         }
         suiteItem.range = new vscode.Range(
           new vscode.Position(suite.line - 1, suite.col - 1),
@@ -137,10 +139,7 @@ export class GoTestController implements vscode.Disposable {
 
     // Remove stale packages, but preserve dynamic subtests
     this.controller.items.forEach((child) => {
-      if (
-        !seenPackageIds.has(child.id) &&
-        !child.id.includes("/dynamic/")
-      ) {
+      if (!seenPackageIds.has(child.id) && !child.id.includes("/dynamic/")) {
         this.controller.items.delete(child.id);
       }
     });
@@ -162,10 +161,7 @@ export class GoTestController implements vscode.Disposable {
     return item;
   }
 
-  createTestRun(
-    request: vscode.TestRunRequest,
-    name: string,
-  ): vscode.TestRun {
+  createTestRun(request: vscode.TestRunRequest, name: string): vscode.TestRun {
     return this.controller.createTestRun(request, name);
   }
 

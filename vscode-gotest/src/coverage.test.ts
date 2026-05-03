@@ -2,24 +2,45 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("vscode", () => {
   class Position {
-    constructor(public line: number, public character: number) {}
+    constructor(
+      public line: number,
+      public character: number,
+    ) {}
   }
   class Range {
-    constructor(public start: Position, public end: Position) {}
+    constructor(
+      public start: Position,
+      public end: Position,
+    ) {}
   }
   class Uri {
     constructor(public fsPath: string) {}
-    static file(path: string) { return new Uri(path); }
+    static file(path: string) {
+      return new Uri(path);
+    }
   }
   class StatementCoverage {
-    constructor(public executed: number | boolean, public location: Range) {}
+    constructor(
+      public executed: number | boolean,
+      public location: Range,
+    ) {}
   }
   class DeclarationCoverage {
-    constructor(public name: string, public executed: number | boolean, public location: Position | Range) {}
+    constructor(
+      public name: string,
+      public executed: number | boolean,
+      public location: Position | Range,
+    ) {}
   }
   class FileCoverage {
-    constructor(public uri: Uri, public statementCoverage: { covered: number; total: number }) {}
-    static fromDetails(uri: Uri, details: (StatementCoverage | DeclarationCoverage)[]) {
+    constructor(
+      public uri: Uri,
+      public statementCoverage: { covered: number; total: number },
+    ) {}
+    static fromDetails(
+      uri: Uri,
+      details: (StatementCoverage | DeclarationCoverage)[],
+    ) {
       let covered = 0;
       for (const d of details) {
         if ("executed" in d) {
@@ -30,10 +51,21 @@ vi.mock("vscode", () => {
       return new FileCoverage(uri, { covered, total: details.length });
     }
   }
-  return { Position, Range, Uri, StatementCoverage, DeclarationCoverage, FileCoverage };
+  return {
+    Position,
+    Range,
+    Uri,
+    StatementCoverage,
+    DeclarationCoverage,
+    FileCoverage,
+  };
 });
 
-import { parseCoverProfile, parseFuncCoverage, buildFileCoverages } from "./coverage.js";
+import {
+  parseCoverProfile,
+  parseFuncCoverage,
+  buildFileCoverages,
+} from "./coverage.js";
 
 describe("parseCoverProfile", () => {
   const moduleToDir = (importPath: string) => {
@@ -72,10 +104,9 @@ describe("parseCoverProfile", () => {
   });
 
   it("skips files with unresolvable import paths", () => {
-    const content = [
-      "mode: set",
-      "unknown.com/nope/file.go:1.1,2.2 1 1",
-    ].join("\n");
+    const content = ["mode: set", "unknown.com/nope/file.go:1.1,2.2 1 1"].join(
+      "\n",
+    );
 
     const result = parseCoverProfile(content, moduleToDir);
     expect(result).toHaveLength(0);

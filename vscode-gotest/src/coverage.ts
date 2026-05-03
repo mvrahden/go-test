@@ -9,7 +9,12 @@ import type { DiscoveryCache } from "./discovery.js";
 import type { CoverageStore } from "./coverageStore.js";
 import type { OverlayOutput } from "./types.js";
 import { parseTestEvents } from "./outputParser.js";
-import { buildCliCommand, formatCliCommand, resolveGoBinary, scopedConfig } from "./cli.js";
+import {
+  buildCliCommand,
+  formatCliCommand,
+  resolveGoBinary,
+  scopedConfig,
+} from "./cli.js";
 import {
   collectItems,
   groupByPackage,
@@ -38,7 +43,9 @@ export function parseCoverProfile(
       continue;
     }
 
-    const match = /^(.+):(\d+)\.(\d+),(\d+)\.(\d+)\s+(\d+)\s+(\d+)$/.exec(trimmed);
+    const match = /^(.+):(\d+)\.(\d+),(\d+)\.(\d+)\s+(\d+)\s+(\d+)$/.exec(
+      trimmed,
+    );
     if (!match) {
       continue;
     }
@@ -60,7 +67,9 @@ export function parseCoverProfile(
       new vscode.Position(startLine, startCol),
       new vscode.Position(endLine, endCol),
     );
-    statements.push(new vscode.StatementCoverage(count > 0 ? count : false, range));
+    statements.push(
+      new vscode.StatementCoverage(count > 0 ? count : false, range),
+    );
   }
 
   const result: ParsedFileCoverage[] = [];
@@ -87,7 +96,8 @@ export function buildFileCoverages(
     const uri = vscode.Uri.file(entry.absPath);
     const decls = declarations?.get(entry.absPath);
     if (decls && decls.length > 0) {
-      const details: (vscode.StatementCoverage | vscode.DeclarationCoverage)[] = [...entry.statements, ...decls];
+      const details: (vscode.StatementCoverage | vscode.DeclarationCoverage)[] =
+        [...entry.statements, ...decls];
       return vscode.FileCoverage.fromDetails(uri, details);
     }
     return vscode.FileCoverage.fromDetails(uri, entry.statements);
@@ -133,7 +143,9 @@ export function parseFuncCoverage(
 
     const executed = pct > 0 ? pct / 100 : false;
     const position = new vscode.Position(lineNum, 0);
-    declarations.push(new vscode.DeclarationCoverage(funcName, executed, position));
+    declarations.push(
+      new vscode.DeclarationCoverage(funcName, executed, position),
+    );
   }
 
   return result;
@@ -144,10 +156,14 @@ export async function runGoToolCoverFunc(
   coverFile: string,
   workspaceDir: string,
 ): Promise<string> {
-  const { stdout } = await execFileAsync(goBin, ["tool", "cover", `-func=${coverFile}`], {
-    cwd: workspaceDir,
-    timeout: 10_000,
-  });
+  const { stdout } = await execFileAsync(
+    goBin,
+    ["tool", "cover", `-func=${coverFile}`],
+    {
+      cwd: workspaceDir,
+      timeout: 10_000,
+    },
+  );
   return stdout;
 }
 
@@ -215,7 +231,9 @@ export class CoverageRunner implements vscode.Disposable {
           for (const item of groupItems) {
             run.errored(
               item,
-              new vscode.TestMessage(`Workspace folder not found for: ${importPath}`),
+              new vscode.TestMessage(
+                `Workspace folder not found for: ${importPath}`,
+              ),
             );
           }
           continue;
@@ -228,8 +246,14 @@ export class CoverageRunner implements vscode.Disposable {
         let coverFile: string | undefined;
 
         try {
-          const overlayCmd = await buildCliCommand(["overlay", importPath], workspaceDir, this.outputChannel);
-          this.outputChannel.appendLine(`[coverage] ${formatCliCommand(overlayCmd)}`);
+          const overlayCmd = await buildCliCommand(
+            ["overlay", importPath],
+            workspaceDir,
+            this.outputChannel,
+          );
+          this.outputChannel.appendLine(
+            `[coverage] ${formatCliCommand(overlayCmd)}`,
+          );
           const { stdout: overlayStdout } = await execFileAsync(
             overlayCmd.bin,
             overlayCmd.args,
@@ -261,8 +285,17 @@ export class CoverageRunner implements vscode.Disposable {
           args.push(...testFlags);
 
           const goBin = await resolveGoBinary(this.outputChannel, workspaceDir);
-          this.outputChannel.appendLine(`[coverage] ${goBin} ${args.join(" ")}`);
-          const stdout = await spawnTestProcess(goBin, args, workspaceDir, effectiveToken, this.outputChannel, "coverage");
+          this.outputChannel.appendLine(
+            `[coverage] ${goBin} ${args.join(" ")}`,
+          );
+          const stdout = await spawnTestProcess(
+            goBin,
+            args,
+            workspaceDir,
+            effectiveToken,
+            this.outputChannel,
+            "coverage",
+          );
           allJsonOutput += stdout;
 
           if (effectiveToken.isCancellationRequested) {
@@ -279,13 +312,21 @@ export class CoverageRunner implements vscode.Disposable {
             const coverContent = await readFile(coverFile, "utf-8");
             let funcOutput: string | undefined;
             try {
-              funcOutput = await runGoToolCoverFunc(goBin, coverFile, workspaceDir);
+              funcOutput = await runGoToolCoverFunc(
+                goBin,
+                coverFile,
+                workspaceDir,
+              );
             } catch {
-              this.outputChannel.appendLine("[coverage] go tool cover -func failed, skipping declaration coverage");
+              this.outputChannel.appendLine(
+                "[coverage] go tool cover -func failed, skipping declaration coverage",
+              );
             }
             this.store.update(importPath, coverContent, funcOutput);
           } catch {
-            this.outputChannel.appendLine("[coverage] no coverprofile generated");
+            this.outputChannel.appendLine(
+              "[coverage] no coverprofile generated",
+            );
           }
         } finally {
           if (overlayDir) {
@@ -320,7 +361,9 @@ export class CoverageRunner implements vscode.Disposable {
   async copyCoverageSummary(): Promise<void> {
     const coverages = this.store.buildFileCoverages(this.cache);
     if (coverages.length === 0) {
-      vscode.window.showInformationMessage("No coverage data available. Run tests with coverage first.");
+      vscode.window.showInformationMessage(
+        "No coverage data available. Run tests with coverage first.",
+      );
       return;
     }
 
@@ -352,19 +395,29 @@ export class CoverageRunner implements vscode.Disposable {
     for (const row of rows) {
       totalCovered += row.covered;
       totalStmts += row.total;
-      const pct = row.total > 0 ? ((row.covered / row.total) * 100).toFixed(1) + "%" : "N/A";
+      const pct =
+        row.total > 0
+          ? ((row.covered / row.total) * 100).toFixed(1) + "%"
+          : "N/A";
       const stmts = `${row.covered}/${row.total}`;
       lines.push(`${row.file.padEnd(maxFileLen)}  ${stmts.padEnd(9)}  ${pct}`);
     }
 
     lines.push(separator);
-    const totalPct = totalStmts > 0 ? ((totalCovered / totalStmts) * 100).toFixed(1) + "%" : "N/A";
+    const totalPct =
+      totalStmts > 0
+        ? ((totalCovered / totalStmts) * 100).toFixed(1) + "%"
+        : "N/A";
     const totalStmtsStr = `${totalCovered}/${totalStmts}`;
-    lines.push(`${"Total".padEnd(maxFileLen)}  ${totalStmtsStr.padEnd(9)}  ${totalPct}`);
+    lines.push(
+      `${"Total".padEnd(maxFileLen)}  ${totalStmtsStr.padEnd(9)}  ${totalPct}`,
+    );
 
     const text = lines.join("\n");
     await vscode.env.clipboard.writeText(text);
-    vscode.window.showInformationMessage("Coverage summary copied to clipboard.");
+    vscode.window.showInformationMessage(
+      "Coverage summary copied to clipboard.",
+    );
   }
 
   async runPackage(importPath: string): Promise<void> {
@@ -379,7 +432,11 @@ export class CoverageRunner implements vscode.Disposable {
     let coverFile: string | undefined;
 
     try {
-      const overlayCmd = await buildCliCommand(["overlay", importPath], workspaceDir, this.outputChannel);
+      const overlayCmd = await buildCliCommand(
+        ["overlay", importPath],
+        workspaceDir,
+        this.outputChannel,
+      );
       const { stdout: overlayStdout } = await execFileAsync(
         overlayCmd.bin,
         overlayCmd.args,
@@ -403,11 +460,20 @@ export class CoverageRunner implements vscode.Disposable {
       args.push(...testFlags);
 
       const goBin = await resolveGoBinary(this.outputChannel, workspaceDir);
-      this.outputChannel.appendLine(`[coverage:save] ${goBin} ${args.join(" ")}`);
+      this.outputChannel.appendLine(
+        `[coverage:save] ${goBin} ${args.join(" ")}`,
+      );
 
       const cts = new vscode.CancellationTokenSource();
       try {
-        await spawnTestProcess(goBin, args, workspaceDir, cts.token, this.outputChannel, "coverage");
+        await spawnTestProcess(
+          goBin,
+          args,
+          workspaceDir,
+          cts.token,
+          this.outputChannel,
+          "coverage",
+        );
       } finally {
         cts.dispose();
       }
@@ -417,7 +483,9 @@ export class CoverageRunner implements vscode.Disposable {
       try {
         funcOutput = await runGoToolCoverFunc(goBin, coverFile, workspaceDir);
       } catch {
-        this.outputChannel.appendLine("[coverage:save] go tool cover -func failed");
+        this.outputChannel.appendLine(
+          "[coverage:save] go tool cover -func failed",
+        );
       }
       this.store.update(importPath, coverContent, funcOutput);
     } catch (err) {
@@ -425,8 +493,12 @@ export class CoverageRunner implements vscode.Disposable {
       this.outputChannel.appendLine(`[coverage:save] failed: ${message}`);
       return;
     } finally {
-      if (overlayDir) rm(overlayDir, { recursive: true, force: true }).catch(() => {});
-      if (coverFile) rm(path.dirname(coverFile), { recursive: true, force: true }).catch(() => {});
+      if (overlayDir)
+        rm(overlayDir, { recursive: true, force: true }).catch(() => {});
+      if (coverFile)
+        rm(path.dirname(coverFile), { recursive: true, force: true }).catch(
+          () => {},
+        );
     }
 
     const request = new vscode.TestRunRequest();
@@ -453,7 +525,10 @@ export class CoverageRunner implements vscode.Disposable {
     return suite !== undefined && suite.fixtures.length > 0;
   }
 
-  private buildRunFilter(items: vscode.TestItem[], importPath: string): string | undefined {
+  private buildRunFilter(
+    items: vscode.TestItem[],
+    importPath: string,
+  ): string | undefined {
     if (items.some((item) => getItemDepth(item) === 0)) {
       return undefined;
     }
@@ -505,7 +580,9 @@ export class CoverageRunner implements vscode.Disposable {
           group = { wholeSuite: false, methods: [], subtests: [] };
           suiteGroups.set(suiteName, group);
         }
-        group.subtests.push(`^Test${suiteName}$/^${methodName}$/^${subtestParts.join("/")}$`);
+        group.subtests.push(
+          `^Test${suiteName}$/^${methodName}$/^${subtestParts.join("/")}$`,
+        );
       }
     }
 
@@ -522,6 +599,10 @@ export class CoverageRunner implements vscode.Disposable {
       }
     }
 
-    return filters.length === 0 ? undefined : filters.length === 1 ? filters[0] : filters.join("|");
+    return filters.length === 0
+      ? undefined
+      : filters.length === 1
+        ? filters[0]
+        : filters.join("|");
   }
 }

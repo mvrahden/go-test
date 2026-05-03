@@ -1,7 +1,14 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import * as os from "node:os";
-import { readFile, readdir, access, mkdir, stat, constants } from "node:fs/promises";
+import {
+  readFile,
+  readdir,
+  access,
+  mkdir,
+  stat,
+  constants,
+} from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -58,12 +65,15 @@ export async function buildCliCommand(
       log?.appendLine(`[cli] cliPath override: ${resolved}`);
       return { bin: resolved, args: subcommandArgs };
     }
-    log?.appendLine(`[cli] cliPath "${resolved}" not found, probing alternatives`);
+    log?.appendLine(
+      `[cli] cliPath "${resolved}" not found, probing alternatives`,
+    );
   }
 
   // 2. Project-pinned version from go.mod
   const modulePath = config.get<string>("modulePath") ?? DEFAULT_MODULE_PATH;
-  const effectiveDir = workspaceDir ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const effectiveDir =
+    workspaceDir ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (effectiveDir && !modulePath.includes("@")) {
     const version = await extractVersionFromGoMod(effectiveDir, modulePath);
     if (version !== "latest") {
@@ -71,7 +81,12 @@ export async function buildCliCommand(
         const goBin = await resolveGoBinary(log, workspaceDir);
 
         if (await hasReplaceDirective(effectiveDir, modulePath)) {
-          const bin = await buildCachedBinary(goBin, effectiveDir, modulePath, log);
+          const bin = await buildCachedBinary(
+            goBin,
+            effectiveDir,
+            modulePath,
+            log,
+          );
           if (bin) {
             log?.appendLine(`[cli] using go.mod (replace): ${bin}`);
             return { bin, args: subcommandArgs };
@@ -81,9 +96,14 @@ export async function buildCliCommand(
 
         const qualified = `${modulePath}@${version}`;
         log?.appendLine(`[cli] using go.mod: ${goBin} run ${qualified}`);
-        return { bin: goBin, args: ["run", qualified, "--", ...subcommandArgs] };
+        return {
+          bin: goBin,
+          args: ["run", qualified, "--", ...subcommandArgs],
+        };
       }
-      log?.appendLine(`[cli] go.mod pins ${version}, requires >= ${MIN_CLI_VERSION}`);
+      log?.appendLine(
+        `[cli] go.mod pins ${version}, requires >= ${MIN_CLI_VERSION}`,
+      );
       showVersionWarning(version, effectiveDir, log);
     }
   }
@@ -97,7 +117,9 @@ export async function buildCliCommand(
 
   // 4. Fallback: go run @latest
   const goBin = await resolveGoBinary(log, workspaceDir);
-  const qualified = modulePath.includes("@") ? modulePath : `${modulePath}@latest`;
+  const qualified = modulePath.includes("@")
+    ? modulePath
+    : `${modulePath}@latest`;
   log?.appendLine(`[cli] using fallback: ${goBin} run ${qualified}`);
   return { bin: goBin, args: ["run", qualified, "--", ...subcommandArgs] };
 }
@@ -150,21 +172,29 @@ async function resolveProjectGoBinary(
   const versionedName = `go${goVersion}`;
   const shellVersioned = await whichFromShell(versionedName);
   if (shellVersioned) {
-    log?.appendLine(`[go] resolved go ${goVersion} via shell: ${shellVersioned}`);
+    log?.appendLine(
+      `[go] resolved go ${goVersion} via shell: ${shellVersioned}`,
+    );
     return shellVersioned;
   }
 
   const whichVersioned = await which(versionedName);
   if (whichVersioned) {
-    log?.appendLine(`[go] resolved go ${goVersion} via PATH: ${whichVersioned}`);
+    log?.appendLine(
+      `[go] resolved go ${goVersion} via PATH: ${whichVersioned}`,
+    );
     return whichVersioned;
   }
 
-  log?.appendLine(`[go] go ${goVersion} not found, falling back to generic detection`);
+  log?.appendLine(
+    `[go] go ${goVersion} not found, falling back to generic detection`,
+  );
   return undefined;
 }
 
-async function resolveGenericGoBinary(log?: vscode.OutputChannel): Promise<string> {
+async function resolveGenericGoBinary(
+  log?: vscode.OutputChannel,
+): Promise<string> {
   const goroot = process.env.GOROOT;
   if (goroot) {
     const goBin = path.join(goroot, "bin", "go");
@@ -197,7 +227,9 @@ async function resolveGenericGoBinary(log?: vscode.OutputChannel): Promise<strin
   return "go";
 }
 
-async function readGoVersionFromMod(workspaceDir: string): Promise<string | undefined> {
+async function readGoVersionFromMod(
+  workspaceDir: string,
+): Promise<string | undefined> {
   try {
     const goModPath = path.join(workspaceDir, "go.mod");
     const content = await readFile(goModPath, "utf-8");
@@ -298,32 +330,47 @@ function showVersionWarning(
     return;
   }
   versionWarningShown = true;
-  vscode.window.showWarningMessage(
-    `Go Test Suites: go.mod pins gotest ${version}, but >= ${MIN_CLI_VERSION} is required.`,
-    "Upgrade",
-  ).then(async (choice) => {
-    if (choice !== "Upgrade") return;
-    try {
-      const goBin = await resolveGoBinary(log, effectiveDir);
-      const args = ["get", `${DEFAULT_MODULE_PATH}@latest`];
-      log?.appendLine(`[cli] upgrading: ${goBin} ${args.join(" ")}`);
-      await execFileAsync(goBin, args, { cwd: effectiveDir, timeout: 30_000 });
-      log?.appendLine("[cli] upgrade complete");
-      vscode.window.showInformationMessage("Go Test Suites: gotest dependency upgraded to latest.");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      log?.appendLine(`[cli] upgrade failed: ${msg}`);
-      vscode.window.showErrorMessage(`Go Test Suites: upgrade failed. ${msg}`);
-    }
-  });
+  vscode.window
+    .showWarningMessage(
+      `Go Test Suites: go.mod pins gotest ${version}, but >= ${MIN_CLI_VERSION} is required.`,
+      "Upgrade",
+    )
+    .then(async (choice) => {
+      if (choice !== "Upgrade") return;
+      try {
+        const goBin = await resolveGoBinary(log, effectiveDir);
+        const args = ["get", `${DEFAULT_MODULE_PATH}@latest`];
+        log?.appendLine(`[cli] upgrading: ${goBin} ${args.join(" ")}`);
+        await execFileAsync(goBin, args, {
+          cwd: effectiveDir,
+          timeout: 30_000,
+        });
+        log?.appendLine("[cli] upgrade complete");
+        vscode.window.showInformationMessage(
+          "Go Test Suites: gotest dependency upgraded to latest.",
+        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        log?.appendLine(`[cli] upgrade failed: ${msg}`);
+        vscode.window.showErrorMessage(
+          `Go Test Suites: upgrade failed. ${msg}`,
+        );
+      }
+    });
 }
 
-async function hasReplaceDirective(workspaceDir: string, modulePath: string): Promise<boolean> {
+async function hasReplaceDirective(
+  workspaceDir: string,
+  modulePath: string,
+): Promise<boolean> {
   try {
     const content = await readFile(path.join(workspaceDir, "go.mod"), "utf-8");
     let candidate = modulePath;
     while (candidate) {
-      const pattern = new RegExp(`^\\s*replace\\s+${escapeRegExp(candidate)}\\b`, "m");
+      const pattern = new RegExp(
+        `^\\s*replace\\s+${escapeRegExp(candidate)}\\b`,
+        "m",
+      );
       if (pattern.test(content)) {
         return true;
       }
@@ -353,7 +400,10 @@ async function buildCachedBinary(
     return undefined;
   }
 
-  const hash = createHash("sha256").update(goModContent).digest("hex").substring(0, 16);
+  const hash = createHash("sha256")
+    .update(goModContent)
+    .digest("hex")
+    .substring(0, 16);
   const cached = replaceBinaryCache.get(workspaceDir);
   if (cached?.hash === hash) {
     try {
@@ -371,7 +421,10 @@ async function buildCachedBinary(
     return undefined;
   }
 
-  const dirHash = createHash("sha256").update(workspaceDir).digest("hex").substring(0, 12);
+  const dirHash = createHash("sha256")
+    .update(workspaceDir)
+    .digest("hex")
+    .substring(0, 12);
   const binPath = path.join(cacheDir, `gotest-${dirHash}`);
 
   try {
@@ -389,7 +442,10 @@ async function buildCachedBinary(
   }
 }
 
-async function extractVersionFromGoMod(workspaceDir: string, modulePath: string): Promise<string> {
+async function extractVersionFromGoMod(
+  workspaceDir: string,
+  modulePath: string,
+): Promise<string> {
   try {
     const goModPath = path.join(workspaceDir, "go.mod");
     const content = await readFile(goModPath, "utf-8");
@@ -435,7 +491,9 @@ export function formatCliCommand(cmd: CliCommand): string {
   return `${cmd.bin} ${cmd.args.join(" ")}`;
 }
 
-export function scopedConfig(workspaceDir?: string): vscode.WorkspaceConfiguration {
+export function scopedConfig(
+  workspaceDir?: string,
+): vscode.WorkspaceConfiguration {
   const scope = workspaceDir ? vscode.Uri.file(workspaceDir) : undefined;
   return vscode.workspace.getConfiguration("gotest", scope);
 }
@@ -462,7 +520,11 @@ async function which(name: string): Promise<string | undefined> {
 async function whichFromShell(name: string): Promise<string | undefined> {
   const shell = process.env.SHELL ?? "/bin/bash";
   try {
-    const { stdout } = await execFileAsync(shell, ["-lc", `command -v ${name}`], { timeout: 5_000 });
+    const { stdout } = await execFileAsync(
+      shell,
+      ["-lc", `command -v ${name}`],
+      { timeout: 5_000 },
+    );
     const resolved = stdout.trim();
     return resolved || undefined;
   } catch {
@@ -482,7 +544,10 @@ async function commonGoPaths(): Promise<string[]> {
   const sdkDir = path.join(home, "sdk");
   try {
     const entries = await readdir(sdkDir);
-    const goDirs = entries.filter((e) => e.startsWith("go")).sort().reverse();
+    const goDirs = entries
+      .filter((e) => e.startsWith("go"))
+      .sort()
+      .reverse();
     for (const dir of goDirs) {
       paths.push(path.join(sdkDir, dir, "bin", "go"));
     }

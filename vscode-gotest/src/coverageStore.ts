@@ -1,7 +1,11 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { parseCoverProfile, parseFuncCoverage, buildFileCoverages } from "./coverage.js";
+import {
+  parseCoverProfile,
+  parseFuncCoverage,
+  buildFileCoverages,
+} from "./coverage.js";
 import type { DiscoveryCache } from "./discovery.js";
 
 interface StoredPackageCoverage {
@@ -35,8 +39,16 @@ export class CoverageStore implements vscode.Disposable {
     return this.packages.has(importPath);
   }
 
-  update(importPath: string, coverprofile: string, funcCoverage?: string): void {
-    this.packages.set(importPath, { coverprofile, funcCoverage, timestamp: Date.now() });
+  update(
+    importPath: string,
+    coverprofile: string,
+    funcCoverage?: string,
+  ): void {
+    this.packages.set(importPath, {
+      coverprofile,
+      funcCoverage,
+      timestamp: Date.now(),
+    });
     this._onDidChange.fire();
   }
 
@@ -56,10 +68,9 @@ export class CoverageStore implements vscode.Disposable {
     this._onDidChange.fire();
   }
 
-  buildFileCoverages(
-    cache: DiscoveryCache,
-  ): vscode.FileCoverage[] {
-    const moduleToDir = (importPath: string) => cache.resolveImportPath(importPath);
+  buildFileCoverages(cache: DiscoveryCache): vscode.FileCoverage[] {
+    const moduleToDir = (importPath: string) =>
+      cache.resolveImportPath(importPath);
     const allDeclarations = new Map<string, vscode.DeclarationCoverage[]>();
 
     for (const [, pkg] of this.packages) {
