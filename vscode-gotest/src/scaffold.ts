@@ -3,10 +3,15 @@ import * as path from "node:path";
 import { spawn } from "node:child_process";
 import { buildCliCommand, formatCliCommand } from "./cli.js";
 
-export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vscode.Disposable {
-  static readonly providedCodeActionKinds = [vscode.CodeActionKind.RefactorExtract];
+export class ScaffoldCodeActionProvider
+  implements vscode.CodeActionProvider, vscode.Disposable
+{
+  static readonly providedCodeActionKinds = [
+    vscode.CodeActionKind.RefactorExtract,
+  ];
 
-  private static readonly typePattern = /^\s*type\s+([A-Z]\w*)\s+(struct|interface)\b/;
+  private static readonly typePattern =
+    /^\s*type\s+([A-Z]\w*)\s+(struct|interface)\b/;
   private static readonly exportedFuncPattern = /^func\s+([A-Z]\w*)\s*\(/;
 
   provideCodeActions(
@@ -31,7 +36,10 @@ export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vs
       action.command = {
         command: "gotest.scaffoldTarget",
         title: `Scaffold ${typeName}`,
-        arguments: [this.buildTypeTarget(document, typeName), workspaceFolder?.uri.fsPath],
+        arguments: [
+          this.buildTypeTarget(document, typeName),
+          workspaceFolder?.uri.fsPath,
+        ],
       };
       actions.push(action);
     }
@@ -45,7 +53,10 @@ export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vs
       fileAction.command = {
         command: "gotest.scaffoldTarget",
         title: "Scaffold file",
-        arguments: [this.buildFileTarget(document), workspaceFolder?.uri.fsPath],
+        arguments: [
+          this.buildFileTarget(document),
+          workspaceFolder?.uri.fsPath,
+        ],
       };
       actions.push(fileAction);
     }
@@ -68,13 +79,21 @@ export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vs
     return false;
   }
 
-  private buildTypeTarget(document: vscode.TextDocument, typeName: string): string {
+  private buildTypeTarget(
+    document: vscode.TextDocument,
+    typeName: string,
+  ): string {
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
     if (!workspaceFolder) {
       return "";
     }
-    const relPath = path.relative(workspaceFolder.uri.fsPath, document.uri.fsPath);
-    const relDir = path.posix.normalize(path.dirname(relPath).split(path.sep).join("/"));
+    const relPath = path.relative(
+      workspaceFolder.uri.fsPath,
+      document.uri.fsPath,
+    );
+    const relDir = path.posix.normalize(
+      path.dirname(relPath).split(path.sep).join("/"),
+    );
     return `./${relDir}.${typeName}`;
   }
 
@@ -83,7 +102,10 @@ export class ScaffoldCodeActionProvider implements vscode.CodeActionProvider, vs
     if (!workspaceFolder) {
       return "";
     }
-    const relPath = path.relative(workspaceFolder.uri.fsPath, document.uri.fsPath);
+    const relPath = path.relative(
+      workspaceFolder.uri.fsPath,
+      document.uri.fsPath,
+    );
     return `./${relPath.split(path.sep).join("/")}`;
   }
 }
@@ -111,7 +133,8 @@ export async function executeScaffold(
   discoverCallback: () => void,
   workspaceDir?: string,
 ): Promise<void> {
-  const effectiveDir = workspaceDir ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const effectiveDir =
+    workspaceDir ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!effectiveDir) {
     return;
   }
@@ -137,7 +160,10 @@ export async function executeScaffold(
   }
 }
 
-function spawnScaffold(cmd: { bin: string; args: string[] }, cwd: string): Promise<string> {
+function spawnScaffold(
+  cmd: { bin: string; args: string[] },
+  cwd: string,
+): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const child = spawn(cmd.bin, cmd.args, { cwd });
     let stdout = "";

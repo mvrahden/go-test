@@ -8,7 +8,11 @@ import { FocusExcludeProvider } from "./focusExclude.js";
 import { FocusDiagnostics } from "./diagnostics.js";
 import { SpecViewPanel } from "./specView.js";
 import { WatchManager } from "./watch.js";
-import { ScaffoldCodeActionProvider, runScaffoldCommand, executeScaffold } from "./scaffold.js";
+import {
+  ScaffoldCodeActionProvider,
+  runScaffoldCommand,
+  executeScaffold,
+} from "./scaffold.js";
 import { CoverageRunner } from "./coverage.js";
 import { CoverageStore } from "./coverageStore.js";
 import { validateGoBinary, scopedConfig } from "./cli.js";
@@ -19,7 +23,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) {
-    outputChannel.appendLine("[activate] No workspace folder found, skipping activation.");
+    outputChannel.appendLine(
+      "[activate] No workspace folder found, skipping activation.",
+    );
     return;
   }
 
@@ -50,17 +56,28 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const specView = new SpecViewPanel(outputChannel);
 
-  coverageRunner = new CoverageRunner(controller, cache, coverageStore, outputChannel, (jsonOutput) => {
-    specView.refresh(jsonOutput);
-  });
+  coverageRunner = new CoverageRunner(
+    controller,
+    cache,
+    coverageStore,
+    outputChannel,
+    (jsonOutput) => {
+      specView.refresh(jsonOutput);
+    },
+  );
 
   const specViewRefreshDisposable = runner.onDidComplete((jsonOutput) => {
     specView.refresh(jsonOutput);
   });
 
-  const watchManager = new WatchManager(controller, cache, outputChannel, (jsonOutput) => {
-    specView.refresh(jsonOutput);
-  });
+  const watchManager = new WatchManager(
+    controller,
+    cache,
+    outputChannel,
+    (jsonOutput) => {
+      specView.refresh(jsonOutput);
+    },
+  );
 
   // Register CodeLens provider
   const codeLensProvider = new GoTestCodeLensProvider(cache);
@@ -79,11 +96,15 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register scaffold Code Action provider
   const scaffoldProvider = new ScaffoldCodeActionProvider();
-  const scaffoldCodeActionsDisposable = vscode.languages.registerCodeActionsProvider(
-    { language: "go", pattern: "**/*.go" },
-    scaffoldProvider,
-    { providedCodeActionKinds: ScaffoldCodeActionProvider.providedCodeActionKinds },
-  );
+  const scaffoldCodeActionsDisposable =
+    vscode.languages.registerCodeActionsProvider(
+      { language: "go", pattern: "**/*.go" },
+      scaffoldProvider,
+      {
+        providedCodeActionKinds:
+          ScaffoldCodeActionProvider.providedCodeActionKinds,
+      },
+    );
 
   // Create FocusDiagnostics
   const diagnostics = new FocusDiagnostics(cache);
@@ -97,7 +118,9 @@ export function activate(context: vscode.ExtensionContext): void {
     async (testId: string) => {
       const item = controller.findItem(testId);
       if (!item) {
-        outputChannel.appendLine(`[command] runTest: item not found: ${testId}`);
+        outputChannel.appendLine(
+          `[command] runTest: item not found: ${testId}`,
+        );
         return;
       }
       const cts = new vscode.CancellationTokenSource();
@@ -115,7 +138,9 @@ export function activate(context: vscode.ExtensionContext): void {
     async (testId: string) => {
       const item = controller.findItem(testId);
       if (!item) {
-        outputChannel.appendLine(`[command] debugTest: item not found: ${testId}`);
+        outputChannel.appendLine(
+          `[command] debugTest: item not found: ${testId}`,
+        );
         return;
       }
       const cts = new vscode.CancellationTokenSource();
@@ -159,9 +184,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const startWatchCmd = vscode.commands.registerCommand(
     "gotest.startWatch",
     async () => {
-      const defaultScope = vscode.workspace
-        .getConfiguration("gotest")
-        .get<string>("watch.scope") ?? "./...";
+      const defaultScope =
+        vscode.workspace
+          .getConfiguration("gotest")
+          .get<string>("watch.scope") ?? "./...";
 
       const scope = await vscode.window.showInputBox({
         prompt: "Package scope to watch",
@@ -190,17 +216,16 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   );
 
-  const scaffoldCmd = vscode.commands.registerCommand(
-    "gotest.scaffold",
-    () => {
-      const wsDir = resolveActiveWorkspaceDir();
-      return runScaffoldCommand(
-        outputChannel,
-        () => { if (wsDir) discoveryService.discover(wsDir); },
-        wsDir,
-      );
-    },
-  );
+  const scaffoldCmd = vscode.commands.registerCommand("gotest.scaffold", () => {
+    const wsDir = resolveActiveWorkspaceDir();
+    return runScaffoldCommand(
+      outputChannel,
+      () => {
+        if (wsDir) discoveryService.discover(wsDir);
+      },
+      wsDir,
+    );
+  });
 
   const scaffoldTargetCmd = vscode.commands.registerCommand(
     "gotest.scaffoldTarget",
@@ -209,7 +234,9 @@ export function activate(context: vscode.ExtensionContext): void {
       return executeScaffold(
         target,
         outputChannel,
-        () => { if (wsDir) discoveryService.discover(wsDir); },
+        () => {
+          if (wsDir) discoveryService.discover(wsDir);
+        },
         wsDir,
       );
     },
@@ -230,10 +257,13 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const existing = coverOnSaveTimers.get(importPath);
     if (existing) clearTimeout(existing);
-    coverOnSaveTimers.set(importPath, setTimeout(() => {
-      coverOnSaveTimers.delete(importPath);
-      coverageRunner.runPackage(importPath);
-    }, 500));
+    coverOnSaveTimers.set(
+      importPath,
+      setTimeout(() => {
+        coverOnSaveTimers.delete(importPath);
+        coverageRunner.runPackage(importPath);
+      }, 500),
+    );
   };
 
   // Set up FileSystemWatcher for *_test.go files
@@ -245,7 +275,9 @@ export function activate(context: vscode.ExtensionContext): void {
     const importPath = cache.resolveFileToPackage(uri.fsPath);
 
     const discoverOnSave =
-      vscode.workspace.getConfiguration("gotest").get<boolean>("discoverOnSave") ?? true;
+      vscode.workspace
+        .getConfiguration("gotest")
+        .get<boolean>("discoverOnSave") ?? true;
     if (discoverOnSave) {
       if (importPath) {
         discoveryService.discoverPackage(wsDir, importPath);
@@ -258,7 +290,9 @@ export function activate(context: vscode.ExtensionContext): void {
   };
   const onFileDelete = (uri: vscode.Uri) => {
     const discoverOnSave =
-      vscode.workspace.getConfiguration("gotest").get<boolean>("discoverOnSave") ?? true;
+      vscode.workspace
+        .getConfiguration("gotest")
+        .get<boolean>("discoverOnSave") ?? true;
     if (!discoverOnSave) {
       return;
     }
@@ -326,7 +360,11 @@ export function activate(context: vscode.ExtensionContext): void {
     sourceChangeDisposable,
     sourceCreateDisposable,
     sourceDeleteDisposable,
-    { dispose() { for (const t of coverOnSaveTimers.values()) clearTimeout(t); } },
+    {
+      dispose() {
+        for (const t of coverOnSaveTimers.values()) clearTimeout(t);
+      },
+    },
   );
 
   // Validate go binary, then run initial discovery and restore persisted coverage
@@ -335,12 +373,14 @@ export function activate(context: vscode.ExtensionContext): void {
     const goBin = await validateGoBinary(outputChannel, firstDir);
     if (!goBin) {
       outputChannel.appendLine("[activate] Go binary not found or not working");
-      vscode.window.showErrorMessage(
-        "Go Test Suites: could not find a working 'go' installation. Ensure Go is installed and on your PATH.",
-        "Open Output",
-      ).then((choice) => {
-        if (choice === "Open Output") outputChannel.show();
-      });
+      vscode.window
+        .showErrorMessage(
+          "Go Test Suites: could not find a working 'go' installation. Ensure Go is installed and on your PATH.",
+          "Open Output",
+        )
+        .then((choice) => {
+          if (choice === "Open Output") outputChannel.show();
+        });
       return;
     }
 
@@ -357,7 +397,9 @@ export function activate(context: vscode.ExtensionContext): void {
           run.addCoverage(fc);
         }
         run.end();
-        outputChannel.appendLine(`[coverage] restored ${coverages.length} file(s) from storage`);
+        outputChannel.appendLine(
+          `[coverage] restored ${coverages.length} file(s) from storage`,
+        );
       }
     }
   })();
@@ -396,12 +438,16 @@ function buildRunFilter(items: readonly vscode.TestItem[]): string | undefined {
 function resolveActiveWorkspaceDir(): string | undefined {
   const activeUri = vscode.window.activeTextEditor?.document.uri;
   const folder = activeUri
-    ? vscode.workspace.getWorkspaceFolder(activeUri) ?? vscode.workspace.workspaceFolders?.[0]
+    ? (vscode.workspace.getWorkspaceFolder(activeUri) ??
+      vscode.workspace.workspaceFolders?.[0])
     : vscode.workspace.workspaceFolders?.[0];
   return folder?.uri.fsPath;
 }
 
-function getPackageDir(item: vscode.TestItem, cache: DiscoveryCache): string | undefined {
+function getPackageDir(
+  item: vscode.TestItem,
+  cache: DiscoveryCache,
+): string | undefined {
   let current: vscode.TestItem | undefined = item;
   while (current?.parent) {
     current = current.parent;

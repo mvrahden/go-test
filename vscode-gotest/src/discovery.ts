@@ -1,7 +1,11 @@
 import * as vscode from "vscode";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { DiscoverOutput, DiscoverPackage, DiscoverWarning } from "./types.js";
+import type {
+  DiscoverOutput,
+  DiscoverPackage,
+  DiscoverWarning,
+} from "./types.js";
 import { buildCliCommand, formatCliCommand } from "./cli.js";
 
 const execFileAsync = promisify(execFile);
@@ -36,7 +40,10 @@ export class DiscoveryCache implements vscode.Disposable {
   }
 
   resolveFileToPackage(filePath: string): string | undefined {
-    const lastSep = Math.max(filePath.lastIndexOf("/"), filePath.lastIndexOf("\\"));
+    const lastSep = Math.max(
+      filePath.lastIndexOf("/"),
+      filePath.lastIndexOf("\\"),
+    );
     const dir = lastSep >= 0 ? filePath.substring(0, lastSep) : filePath;
     for (const pkg of this.cache.values()) {
       if (pkg.dir === dir) {
@@ -46,7 +53,12 @@ export class DiscoveryCache implements vscode.Disposable {
     return undefined;
   }
 
-  update(packages: DiscoverPackage[], fullScan: boolean, workspaceDir: string, warnings?: DiscoverWarning[]): void {
+  update(
+    packages: DiscoverPackage[],
+    fullScan: boolean,
+    workspaceDir: string,
+    warnings?: DiscoverWarning[],
+  ): void {
     if (fullScan) {
       const resultPaths = new Set(packages.map((p) => p.importPath));
       for (const [key, dir] of this.workspaceDirs) {
@@ -99,7 +111,11 @@ export class DiscoveryService {
 
     this.running = true;
     try {
-      const cmd = await buildCliCommand(["discover", ...(patterns ?? ["./..."])], workspaceDir, this.outputChannel);
+      const cmd = await buildCliCommand(
+        ["discover", ...(patterns ?? ["./..."])],
+        workspaceDir,
+        this.outputChannel,
+      );
       this.outputChannel.appendLine(`[discovery] ${formatCliCommand(cmd)}`);
 
       const { stdout } = await execFileAsync(cmd.bin, cmd.args, {
@@ -115,21 +131,25 @@ export class DiscoveryService {
       this.cache.update(packages, fullScan, workspaceDir, warnings);
       for (const w of warnings) {
         const loc = w.file ? ` (${w.file}:${w.line ?? 0})` : "";
-        this.outputChannel.appendLine(`[discovery] warning: ${w.importPath}${loc}: ${w.message}`);
+        this.outputChannel.appendLine(
+          `[discovery] warning: ${w.importPath}${loc}: ${w.message}`,
+        );
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.outputChannel.appendLine(`[discovery] error: ${message}`);
       if (!this.hasShownError) {
         this.hasShownError = true;
-        vscode.window.showWarningMessage(
-          `Go Test Suites: discovery failed. Ensure 'go' is installed and the gotest module is accessible.`,
-          "Open Output",
-        ).then((choice) => {
-          if (choice === "Open Output") {
-            this.outputChannel.show();
-          }
-        });
+        vscode.window
+          .showWarningMessage(
+            `Go Test Suites: discovery failed. Ensure 'go' is installed and the gotest module is accessible.`,
+            "Open Output",
+          )
+          .then((choice) => {
+            if (choice === "Open Output") {
+              this.outputChannel.show();
+            }
+          });
       }
     } finally {
       this.running = false;

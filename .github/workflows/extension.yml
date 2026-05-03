@@ -22,6 +22,7 @@ jobs:
           cache: npm
           cache-dependency-path: vscode-gotest/package-lock.json
       - run: npm ci
+      - run: npm run format:check
       - run: npx tsc --noEmit
       - run: npm test
       - run: npm run compile

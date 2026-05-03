@@ -25,8 +25,9 @@ export class GoTestCodeLensProvider
     }
 
     const enabled =
-      vscode.workspace.getConfiguration("gotest").get<boolean>("showCodeLens") ??
-      true;
+      vscode.workspace
+        .getConfiguration("gotest")
+        .get<boolean>("showCodeLens") ?? true;
     if (!enabled) {
       return [];
     }
@@ -42,12 +43,7 @@ export class GoTestCodeLensProvider
 
       for (const suite of pkg.suites) {
         if (suite.file === docPath) {
-          const range = new vscode.Range(
-            suite.line - 1,
-            0,
-            suite.line - 1,
-            0,
-          );
+          const range = new vscode.Range(suite.line - 1, 0, suite.line - 1, 0);
           const testPath = `${pkg.importPath}/${suite.name}`;
 
           lenses.push(
