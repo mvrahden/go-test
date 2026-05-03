@@ -17,13 +17,17 @@ func TestMain(m *testing.M) { os.Exit(m.Run()) }
 func Test_{{ $f.Identifier }}(t *testing.T) {
 {{- /* Resolve shared fixture embeddings from JSON state */ -}}
 {{ if $f.SharedFixtures }}
-    ƒsharedRaw := os.Getenv("GOTEST_SHARED_STATE")
-    if ƒsharedRaw == "" {
-        t.Fatal("GOTEST_SHARED_STATE not set — run via gotest CLI")
+    ƒsharedFile := os.Getenv("GOTEST_SHARED_STATE_FILE")
+    if ƒsharedFile == "" {
+        t.Fatal("GOTEST_SHARED_STATE_FILE not set — run via gotest CLI")
+    }
+    ƒsharedRaw, ƒsharedErr := os.ReadFile(ƒsharedFile)
+    if ƒsharedErr != nil {
+        t.Fatalf("read shared state file: %v", ƒsharedErr)
     }
     ƒsharedState := map[string]json.RawMessage{}
-    if err := json.Unmarshal([]byte(ƒsharedRaw), &ƒsharedState); err != nil {
-        t.Fatalf("unmarshal GOTEST_SHARED_STATE: %v", err)
+    if err := json.Unmarshal(ƒsharedRaw, &ƒsharedState); err != nil {
+        t.Fatalf("unmarshal shared state: %v", err)
     }
 {{ range $sf := $f.SharedFixtures }}
     {{ $sf.LocalVar }} := &{{ $sf.QualifiedType }}{}

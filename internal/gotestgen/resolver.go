@@ -315,10 +315,25 @@ func (r *resolver) resolvePackageFixtureFields(rf *ResolvedFixture, st *types.St
 	return nil
 }
 
+func isInternalPkgPath(pkgPath string) bool {
+	return strings.HasPrefix(pkgPath, "internal/") ||
+		strings.HasSuffix(pkgPath, "/internal") ||
+		strings.Contains(pkgPath, "/internal/")
+}
+
 func (r *resolver) buildSharedFixtureRef(named *types.Named, idx int) (SharedFixtureRef, error) {
 	name := named.Obj().Name()
 	typePkg := named.Obj().Pkg()
 	typePkgPath := typePkg.Path()
+
+	if isInternalPkgPath(typePkgPath) {
+		return SharedFixtureRef{}, fmt.Errorf(
+			"shared fixture %q is in an internal package (%s); "+
+				"shared fixtures must live in a non-internal package so the setup subprocess can import them",
+			name, typePkgPath,
+		)
+	}
+
 	isLocal := typePkgPath == r.targetPkg.PkgPath
 
 	mset := types.NewMethodSet(types.NewPointer(named))
