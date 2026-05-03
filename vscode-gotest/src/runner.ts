@@ -16,7 +16,6 @@ import {
 import {
   collectItems,
   groupByPackage,
-  getItemDepth,
   applyResults,
   spawnTestProcess,
   buildRunFilter,
@@ -244,5 +243,4 @@ export class TestRunner {
       run.end();
     }
   }
-
 }

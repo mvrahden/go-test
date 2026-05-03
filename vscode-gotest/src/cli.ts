@@ -117,12 +117,7 @@ export async function buildCliCommand(
         modulePath.startsWith(declaredModule + "/"))
     ) {
       const goBin = await resolveGoBinary(log, workspaceDir);
-      const bin = await buildCachedBinary(
-        goBin,
-        effectiveDir,
-        modulePath,
-        log,
-      );
+      const bin = await buildCachedBinary(goBin, effectiveDir, modulePath, log);
       if (bin) {
         log?.appendLine(`[cli] using local module: ${bin}`);
         return { bin, args: subcommandArgs };

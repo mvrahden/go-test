@@ -18,7 +18,6 @@ import {
 import {
   collectItems,
   groupByPackage,
-  getItemDepth,
   applyResults,
   spawnTestProcess,
   buildRunFilter,
@@ -522,5 +521,4 @@ export class CoverageRunner implements vscode.Disposable {
     this.activePackageRun?.cancel();
     this.activePackageRun = undefined;
   }
-
 }
