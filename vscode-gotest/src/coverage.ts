@@ -169,6 +169,7 @@ export async function runGoToolCoverFunc(
 
 export class CoverageRunner implements vscode.Disposable {
   private activeRun: vscode.CancellationTokenSource | undefined;
+  private activePackageRun: vscode.CancellationTokenSource | undefined;
 
   constructor(
     private readonly controller: GoTestController,
@@ -421,6 +422,10 @@ export class CoverageRunner implements vscode.Disposable {
   }
 
   async runPackage(importPath: string): Promise<void> {
+    this.activePackageRun?.cancel();
+    const cts = new vscode.CancellationTokenSource();
+    this.activePackageRun = cts;
+
     const pkg = this.cache.getPackage(importPath);
     if (!pkg) return;
     const workspaceDir = this.cache.getWorkspaceDir(importPath);
@@ -464,19 +469,16 @@ export class CoverageRunner implements vscode.Disposable {
         `[coverage:save] ${goBin} ${args.join(" ")}`,
       );
 
-      const cts = new vscode.CancellationTokenSource();
-      try {
-        await spawnTestProcess(
-          goBin,
-          args,
-          workspaceDir,
-          cts.token,
-          this.outputChannel,
-          "coverage",
-        );
-      } finally {
-        cts.dispose();
-      }
+      await spawnTestProcess(
+        goBin,
+        args,
+        workspaceDir,
+        cts.token,
+        this.outputChannel,
+        "coverage",
+      );
+
+      if (cts.token.isCancellationRequested) return;
 
       const coverContent = await readFile(coverFile, "utf-8");
       let funcOutput: string | undefined;
@@ -493,6 +495,8 @@ export class CoverageRunner implements vscode.Disposable {
       this.outputChannel.appendLine(`[coverage:save] failed: ${message}`);
       return;
     } finally {
+      if (this.activePackageRun === cts) this.activePackageRun = undefined;
+      cts.dispose();
       if (overlayDir)
         rm(overlayDir, { recursive: true, force: true }).catch(() => {});
       if (coverFile)
@@ -514,6 +518,8 @@ export class CoverageRunner implements vscode.Disposable {
   dispose(): void {
     this.activeRun?.cancel();
     this.activeRun = undefined;
+    this.activePackageRun?.cancel();
+    this.activePackageRun = undefined;
   }
 
   private suiteHasFixtures(suiteName: string, importPath: string): boolean {
