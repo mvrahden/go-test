@@ -240,6 +240,25 @@ type BatchTestSuite struct {
 }
 ```
 
+Shared fixtures can be embedded directly in standalone suites (without a package fixture) or in package fixtures:
+
+```go
+// Standalone — shared fixture wired directly into suite
+type UserTestSuite struct {
+    *PostgresSharedFixture
+}
+
+// Fixture-bound — shared fixture wired into package fixture, suite accesses it via fixture chain
+type E2EFixture struct {
+    *PostgresSharedFixture
+}
+type BatchTestSuite struct {
+    *E2EFixture
+}
+```
+
+Both paths produce the same lifecycle: deserialize from state file, call `Hydrate`, run tests, call `Dehydrate`.
+
 Fixtures may be defined in a different package from the suite. The resolver walks the type graph from targeted suites to discover all required fixtures, including cross-package dependencies.
 
 Fixtures nest — a root fixture's hooks run first, wrapping the child's:
@@ -319,14 +338,19 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
 **Transfer lifecycle:**
 
 ```
-Subprocess:
+Subprocess (compiled binary):
   sf.BeforeAll(ctx)              → provisions infrastructure, populates all fields
   serialize transferable fields  → JSON (local fields excluded)
   write to stdout, wait for SIGTERM
   sf.AfterAll(ctx)               → tears down infrastructure
 
+CLI (gotest):
+  read JSON from subprocess stdout
+  write to shared/state.json in overlay temp dir
+  set GOTEST_SHARED_STATE_FILE env var for test process
+
 Test process:
-  deserialize into struct        → transferable fields populated, local fields zero-valued
+  read shared/state.json         → deserialize into struct (transferable fields populated, local fields zero-valued)
   sf.Hydrate(ctx)                → reconstructs local resources from transferred state
   ... run test suites ...
   sf.Dehydrate(ctx)              → cleans up local resources
@@ -334,6 +358,7 @@ Test process:
 
 **Validation at generation time:**
 
+- Shared fixture types must not live in `internal/` packages. The setup subprocess compiles outside the module tree and cannot import `internal/` paths. Shared fixtures may freely depend on `internal/` packages — only the fixture type's own package path is restricted.
 - If a transferable field's type has zero exported fields and does not implement `json.Marshaler`/`encoding.TextMarshaler`, the generator emits an error suggesting the field be handled in `Hydrate`
 - If `Hydrate` exists without `Dehydrate`, the generator emits an error
 - `Hydrate`/`Dehydrate` signatures must be `(ctx context.Context) error` with pointer receiver

@@ -138,10 +138,11 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
 
 ### Rules
 
+- Shared fixture types must live in a **non-internal** package (not under `internal/`). The setup subprocess compiles outside the module tree and cannot import `internal/` paths. Shared fixtures may freely import and depend on `internal/` packages — only the fixture type's own package path is restricted.
 - `BeforeAll(ctx context.Context) error` and `AfterAll(ctx context.Context) error` — runs in the subprocess.
 - `Hydrate(ctx context.Context) error` and `Dehydrate(ctx context.Context) error` — runs in the test process, optional.
 - `BeforeEach`/`AfterEach` are not allowed on shared fixtures.
-- Exported fields are serialized as JSON and transferred to the test process.
+- Exported fields are serialized as JSON and transferred to the test process via a state file (`GOTEST_SHARED_STATE_FILE`).
 - Fields assigned in `Hydrate` (directly, or in receiver methods called from `Hydrate`, one level deep) are **local** — excluded from serialization and reconstructed by `Hydrate`.
 
 ### State transfer
@@ -152,7 +153,9 @@ Convention: in `Hydrate`, assign to local fields. Read transferred fields but do
 
 ### Using shared fixtures in test suites
 
-Test suites embed shared fixtures directly — `Pool` is available after `Hydrate` runs:
+Shared fixtures work with both standalone suites (no package fixture) and fixture-bound suites.
+
+**Standalone suites** embed shared fixtures directly — `Pool` is available after `Hydrate` runs:
 
 ```go
 type UserTestSuite struct {
@@ -164,7 +167,9 @@ func (s *UserTestSuite) TestCreate(t *gotest.T) {
 }
 ```
 
-Package fixtures can also embed shared fixtures to add package-specific resources:
+A standalone suite can embed multiple shared fixtures. Suites without any shared fixture fields coexist in the same package without issue.
+
+**Fixture-bound suites** embed shared fixtures via a package fixture to add package-specific resources:
 
 ```go
 type E2ESetupFixture struct {
