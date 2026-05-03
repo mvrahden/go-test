@@ -446,8 +446,8 @@ func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
 
 	// Shared fixture deserialized from JSON state
 	gotest.Contains(t, output, "sf0 := &PostgresSharedFixture{}")
-	gotest.Contains(t, output, `os.Getenv("GOTEST_SHARED_STATE")`)
-	gotest.Contains(t, output, `t.Fatal("GOTEST_SHARED_STATE not set`)
+	gotest.Contains(t, output, `os.Getenv("GOTEST_SHARED_STATE_FILE")`)
+	gotest.Contains(t, output, `t.Fatal("GOTEST_SHARED_STATE_FILE not set`)
 	gotest.Contains(t, output, `json.Unmarshal`)
 
 	// Shared fixture should be assigned to the package fixture
@@ -493,7 +493,7 @@ func TestRenderer_SharedFixtureEmptyStruct(t *testing.T) {
 	// Shared fixture should be created and assigned via JSON state
 	gotest.Contains(t, output, "sf0 := &SetupSharedFixture{}")
 	gotest.Contains(t, output, "fixture.SetupSharedFixture = sf0")
-	gotest.Contains(t, output, `os.Getenv("GOTEST_SHARED_STATE")`)
+	gotest.Contains(t, output, `os.Getenv("GOTEST_SHARED_STATE_FILE")`)
 }
 
 func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {

@@ -70,7 +70,7 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 		gotest.Contains(t, code, `"encoding/json"`)
 
 		gotest.Contains(t, code, "sf0 := &sharedfixture.PostgresSharedFixture{}")
-		gotest.Contains(t, code, `os.Getenv("GOTEST_SHARED_STATE")`)
+		gotest.Contains(t, code, `os.Getenv("GOTEST_SHARED_STATE_FILE")`)
 		gotest.Contains(t, code, "fixture.PostgresSharedFixture = sf0")
 
 		gotest.Contains(t, code, "sf1 := &sharedfixture.RedisSharedFixture{}")
