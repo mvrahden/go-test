@@ -2,16 +2,17 @@ package gotestrunner
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 )
 
-func StdlibRunTestsJSON(args []string, extraEnv ...map[string]string) ([]byte, int, error) {
+func StdlibRunTestsJSON(ctx context.Context, args []string, extraEnv ...map[string]string) ([]byte, int, error) {
 	jsonArgs := make([]string, 0, len(args)+2)
 	jsonArgs = append(jsonArgs, "test", "-json")
 	jsonArgs = append(jsonArgs, args...)
 
-	cmd := exec.Command("go", jsonArgs...)
+	cmd := exec.CommandContext(ctx, "go", jsonArgs...)
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr

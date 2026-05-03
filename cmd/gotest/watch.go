@@ -43,7 +43,7 @@ func runWatch(args []string) int {
 	if !jsonMode {
 		fmt.Printf("\033[2m  running tests...\033[0m\n")
 	}
-	watchRunOnce(goTestArgs, patterns, jsonMode)
+	watchRunOnce(ctx, goTestArgs, patterns, jsonMode)
 	if !jsonMode {
 		fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
 	}
@@ -92,7 +92,7 @@ func runWatch(args []string) int {
 			}
 			pkgPatterns := dirsToPatterns(changedDirs)
 			pkgArgs := replacePatterns(goTestArgs, pkgPatterns)
-			watchRunOnce(pkgArgs, pkgPatterns, jsonMode)
+			watchRunOnce(ctx, pkgArgs, pkgPatterns, jsonMode)
 			changedDirs = nil
 			if !jsonMode {
 				fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
@@ -107,7 +107,7 @@ func runWatch(args []string) int {
 	}
 }
 
-func watchRunOnce(goTestArgs []string, patterns []string, jsonMode bool) int {
+func watchRunOnce(ctx context.Context, goTestArgs []string, patterns []string, jsonMode bool) int {
 	if CI {
 		violations, err := RunFocusGuard(patterns)
 		if err != nil {
@@ -143,7 +143,7 @@ func watchRunOnce(goTestArgs []string, patterns []string, jsonMode bool) int {
 
 	if jsonMode {
 		fmt.Printf("{\"Action\":\"watch-start\",\"Package\":%q}\n", strings.Join(patterns, ","))
-		output, code, err := gotestrunner.StdlibRunTestsJSON(overlayArgs, extraEnv)
+		output, code, err := gotestrunner.StdlibRunTestsJSON(ctx, overlayArgs, extraEnv)
 		if err != nil {
 			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
 			return 2
@@ -153,10 +153,10 @@ func watchRunOnce(goTestArgs []string, patterns []string, jsonMode bool) int {
 	}
 
 	if SPEC {
-		return runWithSpec(overlayArgs, extraEnv)
+		return runWithSpec(ctx, overlayArgs, extraEnv)
 	}
 
-	code, err := gotestrunner.StdlibRunTests(overlayArgs, extraEnv)
+	code, err := gotestrunner.StdlibRunTests(ctx, overlayArgs, extraEnv)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

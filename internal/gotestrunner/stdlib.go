@@ -1,12 +1,13 @@
 package gotestrunner
 
 import (
+	"context"
 	"os"
 	"os/exec"
 )
 
-func StdlibRunTests(args []string, extraEnv ...map[string]string) (int, error) {
-	cmd := exec.Command("go", append([]string{"test"}, args...)...)
+func StdlibRunTests(ctx context.Context, args []string, extraEnv ...map[string]string) (int, error) {
+	cmd := exec.CommandContext(ctx, "go", append([]string{"test"}, args...)...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

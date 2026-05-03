@@ -119,10 +119,10 @@ func Run(cfg ExecConfig) int {
 	}
 
 	if SPEC {
-		return runWithSpec(goTestArgs, extraEnv)
+		return runWithSpec(ctx, goTestArgs, extraEnv)
 	}
 
-	code, err := gotestrunner.StdlibRunTests(goTestArgs, extraEnv)
+	code, err := gotestrunner.StdlibRunTests(ctx, goTestArgs, extraEnv)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -130,8 +130,8 @@ func Run(cfg ExecConfig) int {
 	return code
 }
 
-func runWithSpec(goTestArgs []string, extraEnv map[string]string) int {
-	jsonData, code, err := gotestrunner.StdlibRunTestsJSON(goTestArgs, extraEnv)
+func runWithSpec(ctx context.Context, goTestArgs []string, extraEnv map[string]string) int {
+	jsonData, code, err := gotestrunner.StdlibRunTestsJSON(ctx, goTestArgs, extraEnv)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
