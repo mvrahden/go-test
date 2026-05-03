@@ -24,8 +24,8 @@ func main() {
 	switch subcmd {
 	case "discover":
 		os.Exit(runDiscover(remaining))
-	case "overlay":
-		os.Exit(runOverlay(remaining))
+	case "prepare":
+		os.Exit(runPrepare(remaining))
 	case "scaffold":
 		os.Exit(runScaffold(remaining))
 	case "migrate":
@@ -34,8 +34,6 @@ func main() {
 		os.Exit(runGenerate(remaining))
 	case "clean":
 		os.Exit(runClean(remaining))
-	case "shared-setup":
-		os.Exit(runSharedSetup(remaining))
 	case "spec":
 		os.Exit(runSpec(remaining))
 	case "watch":
