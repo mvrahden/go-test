@@ -233,7 +233,6 @@ export class TestRunner {
       );
       this.outputChannel.appendLine(`[runner] ${formatCliCommand(cmd)}`);
 
-      const t0 = Date.now();
       const result = await spawnTestProcess(
         cmd.bin,
         cmd.args,
@@ -241,9 +240,6 @@ export class TestRunner {
         token,
         this.outputChannel,
         "runner",
-      );
-      this.outputChannel.appendLine(
-        `[runner:timing] gotest process: ${((Date.now() - t0) / 1000).toFixed(1)}s`,
       );
       this._lastJsonOutput += result.stdout;
 
@@ -256,7 +252,6 @@ export class TestRunner {
         return;
       }
 
-      const t1 = Date.now();
       if (result.stdout) {
         const events = parseTestEvents(result.stdout);
         const eventsByPkg = groupEventsByPackage(events);
@@ -280,10 +275,6 @@ export class TestRunner {
           }
         }
       }
-      this.outputChannel.appendLine(
-        `[runner:timing] parse+apply results: ${((Date.now() - t1) / 1000).toFixed(1)}s`,
-      );
-
       if (coverFile) {
         try {
           const coverContent = await readFile(coverFile, "utf-8");

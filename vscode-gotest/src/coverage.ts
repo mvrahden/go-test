@@ -429,7 +429,6 @@ export class CoverageRunner implements vscode.Disposable {
       );
       this.outputChannel.appendLine(`[coverage] ${formatCliCommand(cmd)}`);
 
-      const t0 = Date.now();
       const result = await spawnTestProcess(
         cmd.bin,
         cmd.args,
@@ -437,9 +436,6 @@ export class CoverageRunner implements vscode.Disposable {
         token,
         this.outputChannel,
         "coverage",
-      );
-      this.outputChannel.appendLine(
-        `[coverage:timing] gotest process: ${((Date.now() - t0) / 1000).toFixed(1)}s`,
       );
 
       if (token.isCancellationRequested) {
@@ -451,7 +447,6 @@ export class CoverageRunner implements vscode.Disposable {
         return result.stdout;
       }
 
-      const t1 = Date.now();
       if (result.stdout) {
         const events = parseTestEvents(result.stdout);
         const eventsByPkg = groupEventsByPackage(events);
@@ -475,11 +470,6 @@ export class CoverageRunner implements vscode.Disposable {
           }
         }
       }
-      this.outputChannel.appendLine(
-        `[coverage:timing] parse+apply results: ${((Date.now() - t1) / 1000).toFixed(1)}s`,
-      );
-
-      const t2 = Date.now();
       try {
         const coverContent = await readFile(coverFile, "utf-8");
         let funcOutput: string | undefined;
@@ -509,10 +499,6 @@ export class CoverageRunner implements vscode.Disposable {
       } catch {
         this.outputChannel.appendLine("[coverage] no coverprofile generated");
       }
-      this.outputChannel.appendLine(
-        `[coverage:timing] cover profile processing: ${((Date.now() - t2) / 1000).toFixed(1)}s`,
-      );
-
       return result.stdout;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
