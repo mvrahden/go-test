@@ -259,7 +259,11 @@ export function spawnTestProcess(
     child.on("close", (code) => {
       cancelListener.dispose();
       if (stderr) {
-        outputChannel.appendLine(`[${label}] stderr: ${stderr}`);
+        for (const line of stderr.split("\n")) {
+          if (line.trim()) {
+            outputChannel.appendLine(`[${label}] stderr: ${line}`);
+          }
+        }
       }
       resolve({ stdout, stderr, exitCode: code ?? 1 });
     });

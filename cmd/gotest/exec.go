@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
-	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -70,15 +69,11 @@ func Run(cfg ExecConfig) int {
 		}
 	}
 
-	tRun := time.Now()
-
 	ctx, stop := signal.NotifyContext(context.Background(),
 		os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	tOverlay := time.Now()
 	overlay, cleanup, err := generateOverlay(cfg.PackagePatterns)
-	fmt.Fprintf(os.Stderr, "[gotest:timing] overlay generation: %s\n", time.Since(tOverlay))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -90,19 +85,13 @@ func Run(cfg ExecConfig) int {
 	// If any shared fixtures, start setup subprocess
 	var setupProc *SharedFixtureProcess
 	if len(overlay.sharedFixtures) > 0 {
-		tSetup := time.Now()
 		var err error
 		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures)
-		fmt.Fprintf(os.Stderr, "[gotest:timing] shared fixture setup: %s\n", time.Since(tSetup))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", err)
 			return 2
 		}
-		defer func() {
-			tTeardown := time.Now()
-			setupProc.Teardown()
-			fmt.Fprintf(os.Stderr, "[gotest:timing] shared fixture teardown: %s\n", time.Since(tTeardown))
-		}()
+		defer setupProc.Teardown()
 	}
 
 	select {
@@ -120,10 +109,7 @@ func Run(cfg ExecConfig) int {
 		return runWithSpec(ctx, goTestArgs, extraEnv)
 	}
 
-	tTest := time.Now()
 	code, err := gotestrunner.StdlibRunTests(ctx, goTestArgs, extraEnv)
-	fmt.Fprintf(os.Stderr, "[gotest:timing] go test execution: %s\n", time.Since(tTest))
-	fmt.Fprintf(os.Stderr, "[gotest:timing] total Run(): %s\n", time.Since(tRun))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

@@ -2,10 +2,8 @@ package gotestgen
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/x/slices"
@@ -196,9 +194,7 @@ func LoadPackagesWithWarnings(targetPkgs []string, buildFlags []string) ([]*Load
 }
 
 func generateSrcs(targetPkgs []string, buildFlags []string) (GenerateResults, []SharedFixtureInfo, error) {
-	tLoad := time.Now()
 	loadResults, err := LoadPackages(targetPkgs, buildFlags)
-	fmt.Fprintf(os.Stderr, "[gotest:timing]   packages.Load: %s\n", time.Since(tLoad))
 	if err != nil {
 		return nil, nil, err
 	}
