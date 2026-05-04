@@ -29,7 +29,7 @@ func TestGenerateOverlay_ProducesValidOutput(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	results, err := gotestgen.Generate("./simple_suite")
+	results, err := gotestgen.Generate([]string{"./simple_suite"}, nil)
 	if err != nil {
 		t.Fatalf("Generate: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestGenerateOverlay_NoSuitesReturnsEmpty(t *testing.T) {
 	defer os.Chdir(origDir)
 
 	// Generate on a package without suites should return empty results
-	results, err := gotestgen.Generate(".")
+	results, err := gotestgen.Generate([]string{"."}, nil)
 	if err != nil {
 		t.Fatalf("Generate: %v", err)
 	}

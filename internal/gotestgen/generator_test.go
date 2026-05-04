@@ -40,7 +40,7 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 		testdatadir := filepath.Join("..", "..", "examples", tC.directory, "testdata")
 
 		t.Run(fmt.Sprintf("Generate for package %q with %s", tC.directory, tC.description), func(t *testing.T) {
-			res, err := Generate(pkg)
+			res, err := Generate([]string{pkg}, nil)
 			gotest.NoError(t, err)
 			gotest.NotEmpty(t, res, "expected non-empty results for %s", tC.directory)
 			for _, v := range res {
@@ -76,7 +76,7 @@ func TestGeneratorGoldenExamples_DumpGolden(t *testing.T) {
 		pkg := path.Join("..", "..", "examples", tC.directory)
 		testdatadir := filepath.Join("..", "..", "examples", tC.directory, "testdata")
 
-		res, err := Generate(pkg)
+		res, err := Generate([]string{pkg}, nil)
 		if err != nil {
 			t.Fatalf("Generate %s: %v", tC.directory, err)
 		}
@@ -95,7 +95,7 @@ func TestGeneratorGoldenExamples_DumpGolden(t *testing.T) {
 }
 
 func TestGenerate_StdlibPackage_ReturnsEmpty(t *testing.T) {
-	res, err := Generate("strings")
+	res, err := Generate([]string{"strings"}, nil)
 	gotest.NoError(t, err)
 	gotest.Empty(t, res)
 }
