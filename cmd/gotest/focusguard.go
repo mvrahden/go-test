@@ -20,22 +20,20 @@ func (v FocusViolation) String() string {
 }
 
 func RunFocusGuard(patterns []string) ([]FocusViolation, error) {
+	suites, err := gotestgen.Collect(patterns, nil)
+	if err != nil {
+		return nil, err
+	}
 	var violations []FocusViolation
-	for _, pattern := range patterns {
-		suites, err := gotestgen.Collect(pattern)
-		if err != nil {
-			return nil, err
+	for _, s := range suites {
+		name := s.Identifier()
+		if strings.HasPrefix(name, "F_") {
+			violations = append(violations, FocusViolation{SuiteName: name})
 		}
-		for _, s := range suites {
-			name := s.Identifier()
-			if strings.HasPrefix(name, "F_") {
-				violations = append(violations, FocusViolation{SuiteName: name})
-			}
-			for _, tc := range s.TestCases() {
-				tcName := tc.Identifier()
-				if strings.HasPrefix(tcName, "F_") {
-					violations = append(violations, FocusViolation{SuiteName: name, MethodName: tcName})
-				}
+		for _, tc := range s.TestCases() {
+			tcName := tc.Identifier()
+			if strings.HasPrefix(tcName, "F_") {
+				violations = append(violations, FocusViolation{SuiteName: name, MethodName: tcName})
 			}
 		}
 	}

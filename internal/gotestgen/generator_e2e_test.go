@@ -25,7 +25,7 @@ func TestE2E_CLI(t *testing.T) {
 			gotest.NoError(t, err)
 
 			path := filepath.Join(cwd, "testdata_e2e", tC.dirName)
-			results, err := Generate(path)
+			results, err := Generate([]string{path}, nil)
 			gotest.NoError(t, err)
 			gotest.True(t, strings.HasSuffix(results[0].AbsPath, "go-test/internal/gotestgen/testdata_e2e/"+tC.dirName))
 			gotest.Equal(t, "github.com/mvrahden/go-test/internal/gotestgen/testdata_e2e/"+tC.dirName, results[0].Package)
@@ -56,7 +56,7 @@ func TestE2E_NoTestSuites(t *testing.T) {
 	}
 	for _, tC := range testcases {
 		t.Run(tC.desc, func(t *testing.T) {
-			res, err := Generate(tC.args[0])
+			res, err := Generate([]string{tC.args[0]}, nil)
 			gotest.NoError(t, err)
 			gotest.Empty(t, res)
 		})

@@ -2,8 +2,10 @@ package gotestgen
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/x/slices"
@@ -22,8 +24,8 @@ const (
 	packageEvalMode = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps
 )
 
-func Generate(targetPath string, buildFlags ...string) (GenerateResults, error) {
-	res, _, err := generateSrcs(targetPath, buildFlags...)
+func Generate(targetPkgs []string, buildFlags []string) (GenerateResults, error) {
+	res, _, err := generateSrcs(targetPkgs, buildFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -32,12 +34,12 @@ func Generate(targetPath string, buildFlags ...string) (GenerateResults, error) 
 
 // GenerateWithSharedFixtures generates test suite sources and also returns
 // the deduplicated shared fixtures discovered via demand-driven resolution.
-func GenerateWithSharedFixtures(targetPath string, buildFlags ...string) (GenerateResults, []SharedFixtureInfo, error) {
-	return generateSrcs(targetPath, buildFlags...)
+func GenerateWithSharedFixtures(targetPkgs []string, buildFlags []string) (GenerateResults, []SharedFixtureInfo, error) {
+	return generateSrcs(targetPkgs, buildFlags)
 }
 
-func Collect(targetPath string, buildFlags ...string) (gotestast.TestSuiteSpecSet, error) {
-	loadResults, err := LoadPackages(targetPath, buildFlags...)
+func Collect(targetPkgs []string, buildFlags []string) (gotestast.TestSuiteSpecSet, error) {
+	loadResults, err := LoadPackages(targetPkgs, buildFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -73,8 +75,8 @@ type LoadResult struct {
 	Pxtest  *packages.Package
 }
 
-// LoadPackages loads and groups test packages for the given target pattern.
-func LoadPackages(targetPkg string, buildFlags ...string) ([]*LoadResult, error) {
+// LoadPackages loads and groups test packages for the given target patterns.
+func LoadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, error) {
 	cfg := &packages.Config{
 		Mode:  packageEvalMode,
 		Tests: true,
@@ -82,7 +84,7 @@ func LoadPackages(targetPkg string, buildFlags ...string) ([]*LoadResult, error)
 	if len(buildFlags) > 0 {
 		cfg.BuildFlags = buildFlags
 	}
-	totalFoundPkgs, err := packages.Load(cfg, targetPkg)
+	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +129,7 @@ func LoadPackages(targetPkg string, buildFlags ...string) ([]*LoadResult, error)
 
 // LoadPackagesWithWarnings is like LoadPackages but also returns warnings
 // for packages that were skipped due to load errors (e.g. build constraints).
-func LoadPackagesWithWarnings(targetPkg string, buildFlags ...string) ([]*LoadResult, []LoadWarning, error) {
+func LoadPackagesWithWarnings(targetPkgs []string, buildFlags []string) ([]*LoadResult, []LoadWarning, error) {
 	cfg := &packages.Config{
 		Mode:  packageEvalMode,
 		Tests: true,
@@ -135,7 +137,7 @@ func LoadPackagesWithWarnings(targetPkg string, buildFlags ...string) ([]*LoadRe
 	if len(buildFlags) > 0 {
 		cfg.BuildFlags = buildFlags
 	}
-	totalFoundPkgs, err := packages.Load(cfg, targetPkg)
+	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -193,8 +195,10 @@ func LoadPackagesWithWarnings(targetPkg string, buildFlags ...string) ([]*LoadRe
 	return res, warnings, nil
 }
 
-func generateSrcs(targetPkg string, buildFlags ...string) (GenerateResults, []SharedFixtureInfo, error) {
-	loadResults, err := LoadPackages(targetPkg, buildFlags...)
+func generateSrcs(targetPkgs []string, buildFlags []string) (GenerateResults, []SharedFixtureInfo, error) {
+	tLoad := time.Now()
+	loadResults, err := LoadPackages(targetPkgs, buildFlags)
+	fmt.Fprintf(os.Stderr, "[gotest:timing]   packages.Load: %s\n", time.Since(tLoad))
 	if err != nil {
 		return nil, nil, err
 	}

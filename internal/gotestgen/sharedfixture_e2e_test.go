@@ -20,7 +20,7 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 	}
 
 	pkg := "../../examples/shared_fixture/..."
-	results, sharedFixtures, err := GenerateWithSharedFixtures(pkg)
+	results, sharedFixtures, err := GenerateWithSharedFixtures([]string{pkg}, nil)
 	gotest.NoError(t, err)
 
 	sort.Slice(results, func(i, j int) bool {
@@ -207,7 +207,7 @@ func TestSharedFixture_E2E_DumpGolden(t *testing.T) {
 	}
 
 	pkg := "../../examples/shared_fixture/..."
-	results, sharedFixtures, err := GenerateWithSharedFixtures(pkg)
+	results, sharedFixtures, err := GenerateWithSharedFixtures([]string{pkg}, nil)
 	gotest.NoError(t, err)
 
 	for _, r := range results {

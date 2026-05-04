@@ -65,67 +65,65 @@ func runDiscover(args []string) int {
 
 	out := discoverOutput{}
 
-	for _, pattern := range patterns {
-		loadResults, loadWarnings, err := gotestgen.LoadPackagesWithWarnings(pattern, buildFlags...)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-			return 2
-		}
-		for _, w := range loadWarnings {
-			out.Warnings = append(out.Warnings, discoverWarning{
-				ImportPath: w.PkgPath,
-				Message:    w.Message,
-			})
+	loadResults, loadWarnings, err := gotestgen.LoadPackagesWithWarnings(patterns, buildFlags)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	for _, w := range loadWarnings {
+		out.Warnings = append(out.Warnings, discoverWarning{
+			ImportPath: w.PkgPath,
+			Message:    w.Message,
+		})
+	}
+
+	c := gotestgen.NewCollector()
+
+	for _, lr := range loadResults {
+		pkgEntry := discoverPackage{
+			ImportPath: lr.PkgPath,
+			Dir:        lr.PkgDir,
 		}
 
-		c := gotestgen.NewCollector()
-
-		for _, lr := range loadResults {
-			pkgEntry := discoverPackage{
-				ImportPath: lr.PkgPath,
-				Dir:        lr.PkgDir,
+		pkgs := []*packages.Package{lr.Ptest, lr.Pxtest}
+		for _, pkg := range pkgs {
+			if pkg == nil {
+				continue
 			}
-
-			pkgs := []*packages.Package{lr.Ptest, lr.Pxtest}
-			for _, pkg := range pkgs {
-				if pkg == nil {
-					continue
-				}
-				result := c.CollectSuiteSpecs(pkg)
-				if len(result.Errs) > 0 {
-					for _, ce := range result.Errs {
-						w := discoverWarning{
-							ImportPath: lr.PkgPath,
-							Message:    ce.Err.Error(),
-						}
-						if ce.Pos.IsValid() {
-							pos := pkg.Fset.Position(ce.Pos)
-							w.File = filepath.Base(pos.Filename)
-							w.Line = pos.Line
-							w.Col = pos.Column
-						}
-						out.Warnings = append(out.Warnings, w)
-					}
-					continue
-				}
-
-				if _, err := gotestgen.Resolve(pkg, result.Suites, result.Fixtures); err != nil {
-					out.Warnings = append(out.Warnings, discoverWarning{
+			result := c.CollectSuiteSpecs(pkg)
+			if len(result.Errs) > 0 {
+				for _, ce := range result.Errs {
+					w := discoverWarning{
 						ImportPath: lr.PkgPath,
-						Message:    err.Error(),
-					})
-					continue
+						Message:    ce.Err.Error(),
+					}
+					if ce.Pos.IsValid() {
+						pos := pkg.Fset.Position(ce.Pos)
+						w.File = filepath.Base(pos.Filename)
+						w.Line = pos.Line
+						w.Col = pos.Column
+					}
+					out.Warnings = append(out.Warnings, w)
 				}
-
-				for _, suite := range result.Suites {
-					ds := buildDiscoverSuite(suite)
-					pkgEntry.Suites = append(pkgEntry.Suites, ds)
-				}
+				continue
 			}
 
-			if len(pkgEntry.Suites) > 0 {
-				out.Packages = append(out.Packages, pkgEntry)
+			if _, err := gotestgen.Resolve(pkg, result.Suites, result.Fixtures); err != nil {
+				out.Warnings = append(out.Warnings, discoverWarning{
+					ImportPath: lr.PkgPath,
+					Message:    err.Error(),
+				})
+				continue
 			}
+
+			for _, suite := range result.Suites {
+				ds := buildDiscoverSuite(suite)
+				pkgEntry.Suites = append(pkgEntry.Suites, ds)
+			}
+		}
+
+		if len(pkgEntry.Suites) > 0 {
+			out.Packages = append(out.Packages, pkgEntry)
 		}
 	}
 

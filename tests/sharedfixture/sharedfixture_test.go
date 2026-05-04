@@ -21,22 +21,10 @@ func TestSharedFixtureIntegration(t *testing.T) {
 	standalonePattern := "github.com/mvrahden/go-test/tests/sharedfixture/standalone/..."
 	fixtureboundPattern := "github.com/mvrahden/go-test/tests/sharedfixture/fixturebound/..."
 
-	var allResults gotestgen.GenerateResults
-	sharedSeen := map[string]bool{}
-	var allSharedFixtures []gotestgen.SharedFixtureInfo
-
-	for _, pattern := range []string{standalonePattern, fixtureboundPattern} {
-		results, sharedFixtures, err := gotestgen.GenerateWithSharedFixtures(pattern)
-		gotest.NoError(t, err)
-		allResults = append(allResults, results...)
-		for _, sf := range sharedFixtures {
-			key := sf.PkgPath + "." + sf.Identifier
-			if !sharedSeen[key] {
-				sharedSeen[key] = true
-				allSharedFixtures = append(allSharedFixtures, sf)
-			}
-		}
-	}
+	allResults, allSharedFixtures, err := gotestgen.GenerateWithSharedFixtures(
+		[]string{standalonePattern, fixtureboundPattern}, nil,
+	)
+	gotest.NoError(t, err)
 
 	t.Run("Discovery", func(t *testing.T) {
 		gotest.Equal(t, 2, len(allSharedFixtures), "expected Alpha and Beta shared fixtures")
