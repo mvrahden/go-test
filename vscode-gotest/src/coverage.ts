@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import type { CoverageStore } from "./coverageStore.js";
-import { parseTestEvents } from "./outputParser.js";
+import { parseTestEvents, groupEventsByPackage } from "./outputParser.js";
 import {
   buildCliCommand,
   formatCliCommand,
@@ -150,6 +150,71 @@ export function parseFuncCoverage(
   return result;
 }
 
+export function splitCoverByPackage(
+  content: string,
+  importPaths: string[],
+): Map<string, string> {
+  const lines = content.split("\n");
+  const buckets = new Map<string, string[]>();
+  let modeLine = "";
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("mode:")) {
+      modeLine = trimmed;
+      continue;
+    }
+    for (const ip of importPaths) {
+      if (trimmed.startsWith(ip + "/")) {
+        let bucket = buckets.get(ip);
+        if (!bucket) {
+          bucket = [];
+          buckets.set(ip, bucket);
+        }
+        bucket.push(trimmed);
+        break;
+      }
+    }
+  }
+
+  const result = new Map<string, string>();
+  for (const [ip, pkgLines] of buckets) {
+    result.set(ip, modeLine + "\n" + pkgLines.join("\n") + "\n");
+  }
+  return result;
+}
+
+export function splitFuncCoverageByPackage(
+  content: string,
+  importPaths: string[],
+): Map<string, string> {
+  const lines = content.split("\n");
+  const buckets = new Map<string, string[]>();
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("total:")) continue;
+    for (const ip of importPaths) {
+      if (trimmed.startsWith(ip + "/")) {
+        let bucket = buckets.get(ip);
+        if (!bucket) {
+          bucket = [];
+          buckets.set(ip, bucket);
+        }
+        bucket.push(trimmed);
+        break;
+      }
+    }
+  }
+
+  const result = new Map<string, string>();
+  for (const [ip, pkgLines] of buckets) {
+    result.set(ip, pkgLines.join("\n") + "\n");
+  }
+  return result;
+}
+
 export async function runGoToolCoverFunc(
   coverFile: string,
   workspaceDir: string,
@@ -207,14 +272,17 @@ export class CoverageRunner implements vscode.Disposable {
       const groups = groupByPackage(items);
       let allJsonOutput = "";
 
-      for (const [importPath, groupItems] of groups) {
-        if (effectiveToken.isCancellationRequested) {
-          for (const item of groupItems) {
-            run.skipped(item);
-          }
-          continue;
-        }
+      interface PkgInfo {
+        importPath: string;
+        items: vscode.TestItem[];
+        dir: string;
+        workspaceDir: string;
+        filter: string | undefined;
+      }
 
+      const validPkgs: PkgInfo[] = [];
+
+      for (const [importPath, groupItems] of groups) {
         const pkg = this.cache.getPackage(importPath);
         if (!pkg) {
           for (const item of groupItems) {
@@ -239,85 +307,68 @@ export class CoverageRunner implements vscode.Disposable {
           continue;
         }
 
+        const filter = buildRunFilter(groupItems, importPath, this.cache);
+        validPkgs.push({
+          importPath,
+          items: groupItems,
+          dir: pkg.dir,
+          workspaceDir,
+          filter,
+        });
+      }
+
+      const byWorkspace = new Map<string, PkgInfo[]>();
+      for (const info of validPkgs) {
+        let list = byWorkspace.get(info.workspaceDir);
+        if (!list) {
+          list = [];
+          byWorkspace.set(info.workspaceDir, list);
+        }
+        list.push(info);
+      }
+
+      for (const [workspaceDir, pkgInfos] of byWorkspace) {
+        if (effectiveToken.isCancellationRequested) {
+          for (const info of pkgInfos) {
+            for (const item of info.items) {
+              run.skipped(item);
+            }
+          }
+          continue;
+        }
+
         const config = scopedConfig(workspaceDir);
         const testFlags = config.get<string[]>("testFlags") ?? [];
 
-        let coverFile: string | undefined;
+        const unfiltered = pkgInfos.filter((p) => !p.filter);
+        const filtered = pkgInfos.filter((p) => p.filter);
 
-        try {
-          const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
-          coverFile = path.join(tmpDir, "cover.out");
-
-          const filter = buildRunFilter(groupItems, importPath, this.cache);
-
-          const cliArgs: string[] = [
-            "-json",
-            "-count=1",
-            `-coverprofile=${coverFile}`,
-            importPath,
-          ];
-          if (filter) {
-            cliArgs.push("-run", filter);
-          }
-          cliArgs.push(...testFlags);
-
-          const cmd = await buildCliCommand(
-            cliArgs,
+        if (unfiltered.length > 0) {
+          allJsonOutput += await this.runCoverageBatch(
+            unfiltered,
+            undefined,
             workspaceDir,
-            this.outputChannel,
-          );
-          this.outputChannel.appendLine(`[coverage] ${formatCliCommand(cmd)}`);
-
-          const result = await spawnTestProcess(
-            cmd.bin,
-            cmd.args,
-            workspaceDir,
+            testFlags,
+            run,
             effectiveToken,
-            this.outputChannel,
-            "coverage",
           );
-          allJsonOutput += result.stdout;
+        }
 
+        for (const info of filtered) {
           if (effectiveToken.isCancellationRequested) {
-            for (const item of groupItems) {
+            for (const item of info.items) {
               run.skipped(item);
             }
             continue;
           }
-
-          if (result.stdout) {
-            const events = parseTestEvents(result.stdout);
-            applyResults(this.controller, run, events, importPath, pkg.dir);
-          } else if (result.exitCode !== 0) {
-            const message =
-              result.stderr.trim() ||
-              `gotest exited with code ${result.exitCode}`;
-            for (const item of groupItems) {
-              run.errored(item, new vscode.TestMessage(message));
-            }
-          }
-
-          try {
-            const coverContent = await readFile(coverFile, "utf-8");
-            let funcOutput: string | undefined;
-            try {
-              funcOutput = await runGoToolCoverFunc(coverFile, workspaceDir);
-            } catch {
-              this.outputChannel.appendLine(
-                "[coverage] go tool cover -func failed, skipping declaration coverage",
-              );
-            }
-            this.store.update(importPath, coverContent, funcOutput);
-          } catch {
-            this.outputChannel.appendLine(
-              "[coverage] no coverprofile generated",
-            );
-          }
-        } finally {
-          if (coverFile) {
-            const coverDir = path.dirname(coverFile);
-            rm(coverDir, { recursive: true, force: true }).catch(() => {});
-          }
+          allJsonOutput += await this.runCoverageBatch(
+            [info],
+            info.filter,
+            workspaceDir,
+            testFlags,
+            run,
+            effectiveToken,
+          );
         }
       }
 
@@ -337,6 +388,134 @@ export class CoverageRunner implements vscode.Disposable {
       }
       cts.dispose();
       run.end();
+    }
+  }
+
+  private async runCoverageBatch(
+    pkgInfos: {
+      importPath: string;
+      items: vscode.TestItem[];
+      dir: string;
+    }[],
+    filter: string | undefined,
+    workspaceDir: string,
+    testFlags: string[],
+    run: vscode.TestRun,
+    token: vscode.CancellationToken,
+  ): Promise<string> {
+    const importPaths = pkgInfos.map((p) => p.importPath);
+    let coverFile: string | undefined;
+
+    try {
+      const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
+      coverFile = path.join(tmpDir, "cover.out");
+
+      const cliArgs: string[] = [
+        "-json",
+        "-count=1",
+        `-coverprofile=${coverFile}`,
+        ...importPaths,
+      ];
+      if (filter) {
+        cliArgs.push("-run", filter);
+      }
+      cliArgs.push(...testFlags);
+
+      const cmd = await buildCliCommand(
+        cliArgs,
+        workspaceDir,
+        this.outputChannel,
+      );
+      this.outputChannel.appendLine(`[coverage] ${formatCliCommand(cmd)}`);
+
+      const result = await spawnTestProcess(
+        cmd.bin,
+        cmd.args,
+        workspaceDir,
+        token,
+        this.outputChannel,
+        "coverage",
+      );
+
+      if (token.isCancellationRequested) {
+        for (const info of pkgInfos) {
+          for (const item of info.items) {
+            run.skipped(item);
+          }
+        }
+        return result.stdout;
+      }
+
+      if (result.stdout) {
+        const events = parseTestEvents(result.stdout);
+        const eventsByPkg = groupEventsByPackage(events);
+
+        for (const info of pkgInfos) {
+          const pkgEvents = eventsByPkg.get(info.importPath) ?? [];
+          applyResults(
+            this.controller,
+            run,
+            pkgEvents,
+            info.importPath,
+            info.dir,
+          );
+        }
+      } else if (result.exitCode !== 0) {
+        const message =
+          result.stderr.trim() || `gotest exited with code ${result.exitCode}`;
+        for (const info of pkgInfos) {
+          for (const item of info.items) {
+            run.errored(item, new vscode.TestMessage(message));
+          }
+        }
+      }
+
+      try {
+        const coverContent = await readFile(coverFile, "utf-8");
+        let funcOutput: string | undefined;
+        try {
+          funcOutput = await runGoToolCoverFunc(coverFile, workspaceDir);
+        } catch {
+          this.outputChannel.appendLine(
+            "[coverage] go tool cover -func failed, skipping declaration coverage",
+          );
+        }
+
+        const coverByPkg = splitCoverByPackage(coverContent, importPaths);
+        const funcByPkg = funcOutput
+          ? splitFuncCoverageByPackage(funcOutput, importPaths)
+          : undefined;
+
+        for (const info of pkgInfos) {
+          const pkgCover = coverByPkg.get(info.importPath);
+          if (pkgCover) {
+            this.store.update(
+              info.importPath,
+              pkgCover,
+              funcByPkg?.get(info.importPath),
+            );
+          }
+        }
+      } catch {
+        this.outputChannel.appendLine("[coverage] no coverprofile generated");
+      }
+
+      return result.stdout;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.outputChannel.appendLine(`[coverage] error: ${message}`);
+      for (const info of pkgInfos) {
+        for (const item of info.items) {
+          run.errored(item, new vscode.TestMessage(message));
+        }
+      }
+      return "";
+    } finally {
+      if (coverFile) {
+        rm(path.dirname(coverFile), { recursive: true, force: true }).catch(
+          () => {},
+        );
+      }
     }
   }
 
