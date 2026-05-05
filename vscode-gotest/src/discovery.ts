@@ -13,6 +13,7 @@ const execFileAsync = promisify(execFile);
 export class DiscoveryCache implements vscode.Disposable {
   private cache = new Map<string, DiscoverPackage>();
   private workspaceDirs = new Map<string, string>();
+  private dirIndex = new Map<string, string>();
   private _warnings: (DiscoverWarning & { _wsDir: string })[] = [];
   private _onDidUpdate = new vscode.EventEmitter<void>();
 
@@ -45,12 +46,7 @@ export class DiscoveryCache implements vscode.Disposable {
       filePath.lastIndexOf("\\"),
     );
     const dir = lastSep >= 0 ? filePath.substring(0, lastSep) : filePath;
-    for (const pkg of this.cache.values()) {
-      if (pkg.dir === dir) {
-        return pkg.importPath;
-      }
-    }
-    return undefined;
+    return this.dirIndex.get(dir);
   }
 
   update(
@@ -61,15 +57,20 @@ export class DiscoveryCache implements vscode.Disposable {
   ): void {
     if (fullScan) {
       const resultPaths = new Set(packages.map((p) => p.importPath));
-      for (const [key, dir] of this.workspaceDirs) {
-        if (dir === workspaceDir && !resultPaths.has(key)) {
+      for (const [key, wsDir] of this.workspaceDirs) {
+        if (wsDir === workspaceDir && !resultPaths.has(key)) {
+          const pkg = this.cache.get(key);
+          if (pkg) this.dirIndex.delete(pkg.dir);
           this.cache.delete(key);
           this.workspaceDirs.delete(key);
         }
       }
     }
     for (const pkg of packages) {
+      const prev = this.cache.get(pkg.importPath);
+      if (prev && prev.dir !== pkg.dir) this.dirIndex.delete(prev.dir);
       this.cache.set(pkg.importPath, pkg);
+      this.dirIndex.set(pkg.dir, pkg.importPath);
       this.workspaceDirs.set(pkg.importPath, workspaceDir);
     }
     if (warnings !== undefined) {
@@ -83,6 +84,7 @@ export class DiscoveryCache implements vscode.Disposable {
 
   clear(): void {
     this.cache.clear();
+    this.dirIndex.clear();
     this.workspaceDirs.clear();
     this._warnings = [];
     this._onDidUpdate.fire();

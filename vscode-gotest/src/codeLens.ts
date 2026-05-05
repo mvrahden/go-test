@@ -32,57 +32,56 @@ export class GoTestCodeLensProvider
       return [];
     }
 
+    const docPath = document.fileName;
+    const importPath = this.cache.resolveFileToPackage(docPath);
+    if (!importPath) return [];
+
+    const pkg = this.cache.getPackage(importPath);
+    if (!pkg) return [];
+
     const lenses: vscode.CodeLens[] = [];
 
-    const docPath = document.fileName;
+    for (const suite of pkg.suites) {
+      if (suite.file === docPath) {
+        const range = new vscode.Range(suite.line - 1, 0, suite.line - 1, 0);
+        const testPath = `${importPath}/${suite.name}`;
 
-    for (const pkg of this.cache.packages) {
-      if (!docPath.startsWith(pkg.dir)) {
-        continue;
+        lenses.push(
+          new vscode.CodeLens(range, {
+            title: "▶ Run Suite",
+            command: "gotest.runTest",
+            arguments: [testPath],
+          }),
+          new vscode.CodeLens(range, {
+            title: "Debug Suite",
+            command: "gotest.debugTest",
+            arguments: [testPath],
+          }),
+        );
       }
 
-      for (const suite of pkg.suites) {
-        if (suite.file === docPath) {
-          const range = new vscode.Range(suite.line - 1, 0, suite.line - 1, 0);
-          const testPath = `${pkg.importPath}/${suite.name}`;
+      for (const method of suite.methods) {
+        if (method.file === docPath) {
+          const range = new vscode.Range(
+            method.line - 1,
+            0,
+            method.line - 1,
+            0,
+          );
+          const testPath = `${importPath}/${suite.name}/${method.name}`;
 
           lenses.push(
             new vscode.CodeLens(range, {
-              title: "▶ Run Suite",
+              title: "▶ Run",
               command: "gotest.runTest",
               arguments: [testPath],
             }),
             new vscode.CodeLens(range, {
-              title: "Debug Suite",
+              title: "Debug",
               command: "gotest.debugTest",
               arguments: [testPath],
             }),
           );
-        }
-
-        for (const method of suite.methods) {
-          if (method.file === docPath) {
-            const range = new vscode.Range(
-              method.line - 1,
-              0,
-              method.line - 1,
-              0,
-            );
-            const testPath = `${pkg.importPath}/${suite.name}/${method.name}`;
-
-            lenses.push(
-              new vscode.CodeLens(range, {
-                title: "▶ Run",
-                command: "gotest.runTest",
-                arguments: [testPath],
-              }),
-              new vscode.CodeLens(range, {
-                title: "Debug",
-                command: "gotest.debugTest",
-                arguments: [testPath],
-              }),
-            );
-          }
         }
       }
     }
