@@ -29,7 +29,7 @@ type T struct {
 
 func (t *T) T() *testing.T {
 	if t.t == nil {
-		panic("gotest: T() is not available during Eventually/Consistently polling — use the poll parameter's assertion methods instead")
+		panic("gotest: T() called on a polling context which has no underlying *testing.T")
 	}
 	return t.t
 }
