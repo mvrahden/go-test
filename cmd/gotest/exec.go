@@ -25,7 +25,18 @@ func generateOverlay(patterns []string) (*overlayResult, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	return buildOverlay(allResults, allSharedFixtures)
+}
 
+func generateOverlayFromLoaded(loaded []*gotestgen.LoadResult) (*overlayResult, func(), error) {
+	allResults, allSharedFixtures, err := gotestgen.GenerateFromLoaded(loaded)
+	if err != nil {
+		return nil, nil, err
+	}
+	return buildOverlay(allResults, allSharedFixtures)
+}
+
+func buildOverlay(allResults gotestgen.GenerateResults, allSharedFixtures []gotestgen.SharedFixtureInfo) (*overlayResult, func(), error) {
 	tmpDir, err := gotestrunner.WriteOverlay(allResults)
 	if err != nil {
 		return nil, nil, err
@@ -54,12 +65,21 @@ func buildExtraEnv() map[string]string {
 }
 
 func Run(cfg ExecConfig) int {
+	var overlay *overlayResult
+	var cleanup func()
+
 	if CI {
-		violations, err := RunFocusGuard(cfg.PackagePatterns)
+		loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, nil)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2
 		}
+		suites, err := gotestgen.CollectFromLoaded(loaded)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+			return 2
+		}
+		violations := CheckFocusViolations(suites)
 		if len(violations) > 0 {
 			fmt.Fprintln(os.Stderr, "FAIL: focus prefix detected — remove F_ before merging:")
 			for _, v := range violations {
@@ -67,17 +87,23 @@ func Run(cfg ExecConfig) int {
 			}
 			return 1
 		}
+		overlay, cleanup, err = generateOverlayFromLoaded(loaded)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+			return 2
+		}
+	} else {
+		var err error
+		overlay, cleanup, err = generateOverlay(cfg.PackagePatterns)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+			return 2
+		}
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(),
 		os.Interrupt, syscall.SIGTERM)
 	defer stop()
-
-	overlay, cleanup, err := generateOverlay(cfg.PackagePatterns)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2
-	}
 	defer cleanup()
 
 	goTestArgs := append([]string{overlay.overlayFlag}, cfg.GoTestArgs...)
