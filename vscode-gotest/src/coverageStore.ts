@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as path from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import {
+  type ParsedFileCoverage,
   parseCoverProfile,
   parseFuncCoverage,
   buildFileCoverages,
@@ -19,8 +20,14 @@ interface StoredData {
   packages: Record<string, StoredPackageCoverage>;
 }
 
+interface ParsedPackageCache {
+  profiles: ParsedFileCoverage[];
+  declarations: Map<string, vscode.DeclarationCoverage[]>;
+}
+
 export class CoverageStore implements vscode.Disposable {
   private packages = new Map<string, StoredPackageCoverage>();
+  private parsed = new Map<string, ParsedPackageCache>();
   private readonly storagePath: string | undefined;
   private readonly _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChange: vscode.Event<void> = this._onDidChange.event;
@@ -49,12 +56,14 @@ export class CoverageStore implements vscode.Disposable {
       funcCoverage,
       timestamp: Date.now(),
     });
+    this.parsed.delete(importPath);
     this._onDidChange.fire();
   }
 
   invalidate(importPath: string): boolean {
     const deleted = this.packages.delete(importPath);
     if (deleted) {
+      this.parsed.delete(importPath);
       this._onDidChange.fire();
     }
     return deleted;
@@ -65,6 +74,7 @@ export class CoverageStore implements vscode.Disposable {
       return;
     }
     this.packages.clear();
+    this.parsed.clear();
     this._onDidChange.fire();
   }
 
@@ -72,23 +82,29 @@ export class CoverageStore implements vscode.Disposable {
     const moduleToDir = (importPath: string) =>
       cache.resolveImportPath(importPath);
     const allDeclarations = new Map<string, vscode.DeclarationCoverage[]>();
+    const allProfiles: ParsedFileCoverage[] = [];
 
-    for (const [, pkg] of this.packages) {
-      if (pkg.funcCoverage) {
-        const decls = parseFuncCoverage(pkg.funcCoverage, moduleToDir);
-        for (const [filePath, declarations] of decls) {
-          const existing = allDeclarations.get(filePath) ?? [];
-          existing.push(...declarations);
-          allDeclarations.set(filePath, existing);
-        }
+    for (const [importPath, pkg] of this.packages) {
+      let entry = this.parsed.get(importPath);
+      if (!entry) {
+        entry = {
+          profiles: parseCoverProfile(pkg.coverprofile, moduleToDir),
+          declarations: pkg.funcCoverage
+            ? parseFuncCoverage(pkg.funcCoverage, moduleToDir)
+            : new Map(),
+        };
+        this.parsed.set(importPath, entry);
+      }
+
+      allProfiles.push(...entry.profiles);
+      for (const [filePath, declarations] of entry.declarations) {
+        const existing = allDeclarations.get(filePath) ?? [];
+        existing.push(...declarations);
+        allDeclarations.set(filePath, existing);
       }
     }
 
-    const allParsed = [];
-    for (const [, pkg] of this.packages) {
-      allParsed.push(...parseCoverProfile(pkg.coverprofile, moduleToDir));
-    }
-    return buildFileCoverages(allParsed, allDeclarations);
+    return buildFileCoverages(allProfiles, allDeclarations);
   }
 
   async load(): Promise<void> {
@@ -102,6 +118,7 @@ export class CoverageStore implements vscode.Disposable {
         return;
       }
       this.packages.clear();
+      this.parsed.clear();
       for (const [importPath, pkg] of Object.entries(data.packages)) {
         this.packages.set(importPath, pkg);
       }
