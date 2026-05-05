@@ -366,8 +366,9 @@ export class GoTestController implements vscode.Disposable {
       item.children.forEach((child) => walkItem(child, indent + 1));
     };
 
-    if (rootItem) {
-      walkItem(rootItem, 0);
+    const resolved = rootItem ? this.findItem(rootItem.id) : undefined;
+    if (resolved) {
+      walkItem(resolved, 0);
     } else {
       this.controller.items.forEach((item) => walkItem(item, 0));
     }
