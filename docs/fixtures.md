@@ -15,17 +15,20 @@ type E2ESetupFixture struct {
     OrgID     uuid.UUID
 }
 
-func (f *E2ESetupFixture) BeforeAll(t *gotest.T) {
-    pg, err := testhelper.StartPostgres(t.Context())
-    gotest.NoError(t, err)
+func (f *E2ESetupFixture) BeforeAll(ctx context.Context) error {
+    pg, err := testhelper.StartPostgres(ctx)
+    if err != nil {
+        return err
+    }
     f.container = pg.Container
     f.Pool = pg.Pool
     // ... wire API, seed fixtures ...
+    return nil
 }
 
-func (f *E2ESetupFixture) AfterAll(t *gotest.T) {
+func (f *E2ESetupFixture) AfterAll(ctx context.Context) error {
     f.Pool.Close()
-    f.container.Terminate(context.Background())
+    return f.container.Terminate(ctx)
 }
 ```
 
@@ -44,7 +47,7 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 ### Rules
 
 - One root `*Fixture` per package (nested child fixtures are allowed).
-- The fixture struct must have `BeforeAll(t *gotest.T)`. `AfterAll(t *gotest.T)` is optional.
+- The fixture struct must have `BeforeAll(ctx context.Context) error`. `AfterAll(ctx context.Context) error` is optional.
 - `BeforeEach(t *gotest.T)` and `AfterEach(t *gotest.T)` are optional and run around every test case in all child suites.
 - TestSuites reference the fixture via a named pointer field (`Fixture *E2ESetupFixture`).
 - The code generator owns `TestMain` when a fixture is present. Remove any user-defined `TestMain`.
@@ -67,17 +70,18 @@ type InfraFixture struct {
     Pool *pgxpool.Pool
 }
 
-func (f *InfraFixture) BeforeAll(t *gotest.T) { /* start containers */ }
-func (f *InfraFixture) AfterAll(t *gotest.T)  { /* terminate containers */ }
+func (f *InfraFixture) BeforeAll(ctx context.Context) error { /* start containers */ return nil }
+func (f *InfraFixture) AfterAll(ctx context.Context) error  { /* terminate containers */ return nil }
 
 type APIFixture struct {
     Infra     *InfraFixture
     ServerURL string
 }
 
-func (f *APIFixture) BeforeAll(t *gotest.T) {
+func (f *APIFixture) BeforeAll(ctx context.Context) error {
     srv := api.NewServer(":0", api.Dependencies{Pool: f.Infra.Pool})
     f.ServerURL = srv.URL
+    return nil
 }
 
 type ReconcilerTestSuite struct { Infra *InfraFixture }  // only needs DB
@@ -226,8 +230,9 @@ type E2ESetupFixture struct {
     testhelper.Suite
 }
 
-func (s *E2ESetupFixture) BeforeAll(t *gotest.T) {
-    // Same setup, but t.Fatal() works and no os.Exit needed
+func (s *E2ESetupFixture) BeforeAll(ctx context.Context) error {
+    // Same setup, but errors are returned and cleanup is automatic
+    return nil
 }
 
 type BatchTestSuite struct {
@@ -240,7 +245,7 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 ```
 
 Key improvements:
-- `t.Fatal()` works in setup (runs in test context)
+- `BeforeAll` returns `error` — no `os.Exit` needed
 - `AfterAll` handles teardown (no manual defer chains)
 - No package-level singletons
 - Type-safe field access via named fields
