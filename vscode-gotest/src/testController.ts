@@ -112,7 +112,16 @@ export class GoTestController implements vscode.Disposable {
       false,
     );
 
-    this.disposables.push(this.cache.onDidUpdate(() => this.rebuild()));
+    let rebuildTimer: ReturnType<typeof setTimeout> | undefined;
+    this.disposables.push(
+      this.cache.onDidUpdate(() => {
+        if (rebuildTimer) clearTimeout(rebuildTimer);
+        rebuildTimer = setTimeout(() => {
+          rebuildTimer = undefined;
+          this.rebuild();
+        }, 50);
+      }),
+    );
   }
 
   get testController(): vscode.TestController {
