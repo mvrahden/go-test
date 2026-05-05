@@ -155,7 +155,7 @@ func parseSetupTimeoutFlag(args []string) (time.Duration, error) {
 		}
 		return d, nil
 	}
-	return 5 * time.Minute, nil
+	return time.Minute, nil
 }
 
 func readCoverageTotal(profilePath string) (float64, error) {
@@ -202,7 +202,7 @@ Flags:
   --spec                    Append spec view after normal test output
   --update-snapshots        Regenerate snapshot files
   --min=<pct>               Fail if coverage below threshold (enables -coverprofile)
-  --setup-timeout=<dur>     Shared fixture setup deadline (default 5m)
+  --setup-timeout=<dur>     Shared fixture setup deadline (default 1m)
   --debounce=<dur>          Watch mode debounce interval (default 200ms)
 
 All other flags and arguments are forwarded to "go test".
