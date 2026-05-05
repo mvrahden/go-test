@@ -29,7 +29,7 @@ type T struct {
 
 func (t *T) T() *testing.T {
 	if t.t == nil {
-		panic("gotest: T() called on a polling context which has no underlying *testing.T")
+		panic("gotest: T() called but no underlying *testing.T is available")
 	}
 	return t.t
 }
