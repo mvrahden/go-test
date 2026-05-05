@@ -86,7 +86,7 @@ func Run(cfg ExecConfig) int {
 	var setupProc *SharedFixtureProcess
 	if len(overlay.sharedFixtures) > 0 {
 		var err error
-		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures)
+		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, cfg.SetupTimeout)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", err)
 			return 2
