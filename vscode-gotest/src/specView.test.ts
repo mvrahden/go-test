@@ -51,7 +51,37 @@ describe("ansiToHtml", () => {
     expect(result).toBe('<span class="ansi-green">no reset</span>');
   });
 
-  it("ignores unknown escape codes", () => {
+  it("handles multi-parameter sequences", () => {
+    const result = ansiToHtml("\x1b[1;31mbold red\x1b[0m");
+    expect(result).toBe(
+      '<span class="ansi-bold"><span class="ansi-red">bold red</span></span>',
+    );
+  });
+
+  it("converts additional color codes", () => {
+    expect(ansiToHtml("\x1b[34mblue\x1b[0m")).toBe(
+      '<span class="ansi-blue">blue</span>',
+    );
+    expect(ansiToHtml("\x1b[35mmagenta\x1b[0m")).toBe(
+      '<span class="ansi-magenta">magenta</span>',
+    );
+    expect(ansiToHtml("\x1b[36mcyan\x1b[0m")).toBe(
+      '<span class="ansi-cyan">cyan</span>',
+    );
+  });
+
+  it("converts bright color codes", () => {
+    expect(ansiToHtml("\x1b[91mbright red\x1b[0m")).toBe(
+      '<span class="ansi-bright-red">bright red</span>',
+    );
+  });
+
+  it("handles reset via code 39 (default fg)", () => {
+    const result = ansiToHtml("\x1b[31mred\x1b[39mnormal");
+    expect(result).toBe('<span class="ansi-red">red</span>normal');
+  });
+
+  it("strips unknown escape codes", () => {
     expect(ansiToHtml("\x1b[99munknown\x1b[0m")).toBe("unknown");
   });
 
