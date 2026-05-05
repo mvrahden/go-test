@@ -19,7 +19,8 @@ type GenerateResult struct {
 }
 
 const (
-	packageEvalMode = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps
+	packageEvalMode    = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps
+	discoveryEvalMode  = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports
 )
 
 func Generate(targetPkgs []string, buildFlags []string) (GenerateResults, error) {
@@ -130,6 +131,74 @@ func LoadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, erro
 func LoadPackagesWithWarnings(targetPkgs []string, buildFlags []string) ([]*LoadResult, []LoadWarning, error) {
 	cfg := &packages.Config{
 		Mode:  packageEvalMode,
+		Tests: true,
+	}
+	if len(buildFlags) > 0 {
+		cfg.BuildFlags = buildFlags
+	}
+	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var warnings []LoadWarning
+	seen := make(map[string]bool)
+	var loadedTestPkgs []*packages.Package
+	for _, p := range totalFoundPkgs {
+		if len(p.Errors) > 0 {
+			pkgPath := p.PkgPath
+			pkgPath = strings.TrimSuffix(pkgPath, "_test")
+			if strings.HasSuffix(pkgPath, ".test") {
+				continue
+			}
+			if !seen[pkgPath] {
+				seen[pkgPath] = true
+				for _, e := range p.Errors {
+					warnings = append(warnings, LoadWarning{PkgPath: pkgPath, Message: fmt.Sprintf("%s", e)})
+				}
+			}
+			continue
+		}
+		if p.Module != nil {
+			loadedTestPkgs = append(loadedTestPkgs, p)
+		}
+	}
+	if len(loadedTestPkgs) == 0 {
+		return nil, warnings, nil
+	}
+
+	loadedTestPkgs = slices.Filter(loadedTestPkgs, func(item *packages.Package, index int) bool {
+		return strings.HasSuffix(item.ID, ".test]")
+	})
+	testPkgs := slices.ReduceSeed(loadedTestPkgs, map[string]*LoadResult{}, func(p *packages.Package, acc map[string]*LoadResult) map[string]*LoadResult {
+		isPxTest := strings.HasSuffix(p.Name, "_test")
+		pkgPath := p.PkgPath
+		if isPxTest {
+			pkgPath = strings.TrimSuffix(pkgPath, "_test")
+		}
+		_, ok := acc[pkgPath]
+		if !ok {
+			acc[pkgPath] = &LoadResult{PkgPath: pkgPath, PkgDir: DeterminePkgDir(p)}
+		}
+		if !isPxTest {
+			acc[pkgPath].Ptest = p
+		} else {
+			acc[pkgPath].Pxtest = p
+		}
+		return acc
+	})
+	var res []*LoadResult
+	for _, v := range testPkgs {
+		res = append(res, v)
+	}
+	return res, warnings, nil
+}
+
+// LoadPackagesForDiscovery loads packages using a lightweight mode without
+// NeedDeps, avoiding type-checking of the entire transitive dependency graph.
+func LoadPackagesForDiscovery(targetPkgs []string, buildFlags []string) ([]*LoadResult, []LoadWarning, error) {
+	cfg := &packages.Config{
+		Mode:  discoveryEvalMode,
 		Tests: true,
 	}
 	if len(buildFlags) > 0 {

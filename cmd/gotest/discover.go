@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"go/types"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/tools/go/packages"
 
@@ -65,7 +67,7 @@ func runDiscover(args []string) int {
 
 	out := discoverOutput{}
 
-	loadResults, loadWarnings, err := gotestgen.LoadPackagesWithWarnings(patterns, buildFlags)
+	loadResults, loadWarnings, err := gotestgen.LoadPackagesForDiscovery(patterns, buildFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -108,16 +110,9 @@ func runDiscover(args []string) int {
 				continue
 			}
 
-			if _, err := gotestgen.Resolve(pkg, result.Suites, result.Fixtures); err != nil {
-				out.Warnings = append(out.Warnings, discoverWarning{
-					ImportPath: lr.PkgPath,
-					Message:    err.Error(),
-				})
-				continue
-			}
-
 			for _, suite := range result.Suites {
 				ds := buildDiscoverSuite(suite)
+				ds.Fixtures = discoverFixtureNames(suite)
 				pkgEntry.Suites = append(pkgEntry.Suites, ds)
 			}
 		}
@@ -170,15 +165,7 @@ func buildDiscoverSuite(suite *gotestast.TestSuiteSpec) discoverSuite {
 	}
 	ds.Lifecycle = lifecycle
 
-	// Fixtures
-	var fixtures []string
-	if f := suite.Fixture(); f != nil {
-		fixtures = append(fixtures, f.Identifier())
-	}
-	if fixtures == nil {
-		fixtures = []string{}
-	}
-	ds.Fixtures = fixtures
+	ds.Fixtures = []string{}
 
 	// Methods (test cases)
 	var methods []discoverMethod
@@ -200,4 +187,31 @@ func buildDiscoverSuite(suite *gotestast.TestSuiteSpec) discoverSuite {
 	ds.Methods = methods
 
 	return ds
+}
+
+func discoverFixtureNames(suite *gotestast.TestSuiteSpec) []string {
+	st := suite.StructType()
+	if st == nil {
+		return []string{}
+	}
+	var names []string
+	for i := 0; i < st.NumFields(); i++ {
+		field := st.Field(i)
+		ptr, ok := field.Type().(*types.Pointer)
+		if !ok {
+			continue
+		}
+		named, ok := ptr.Elem().(*types.Named)
+		if !ok {
+			continue
+		}
+		name := named.Obj().Name()
+		if strings.HasSuffix(name, "Fixture") && !strings.HasSuffix(name, "SharedFixture") {
+			names = append(names, name)
+		}
+	}
+	if names == nil {
+		return []string{}
+	}
+	return names
 }
