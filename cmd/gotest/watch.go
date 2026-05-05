@@ -27,6 +27,28 @@ func parseWatchFlags(args []string) (jsonMode bool, remaining []string) {
 	return
 }
 
+func parseDebounceFlag(args []string) (time.Duration, error) {
+	for i, arg := range args {
+		var raw string
+		if v, ok := strings.CutPrefix(arg, "--debounce="); ok {
+			raw = v
+		} else if arg == "--debounce" && i+1 < len(args) {
+			raw = args[i+1]
+		} else {
+			continue
+		}
+		d, err := time.ParseDuration(raw)
+		if err != nil {
+			return 0, fmt.Errorf("invalid --debounce value %q: %w", raw, err)
+		}
+		if d <= 0 {
+			return 0, fmt.Errorf("invalid --debounce value %q: must be positive", raw)
+		}
+		return d, nil
+	}
+	return 200 * time.Millisecond, nil
+}
+
 func runWatch(args []string) int {
 	jsonMode, args := parseWatchFlags(args)
 	ownArgs, goTestArgs := SplitArgs(args)
@@ -35,6 +57,11 @@ func runWatch(args []string) int {
 	SPEC = slices.Contains(ownArgs, "--spec")
 	UPDATE_SNAPSHOTS = slices.Contains(ownArgs, "--update-snapshots")
 	setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	debounceDuration, err := parseDebounceFlag(ownArgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -89,7 +116,7 @@ func runWatch(args []string) int {
 				changedDirs = map[string]bool{}
 			}
 			changedDirs[filepath.Dir(event.Name)] = true
-			debounce.Reset(200 * time.Millisecond)
+			debounce.Reset(debounceDuration)
 
 		case <-debounce.C:
 			if !jsonMode {
