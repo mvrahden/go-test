@@ -52,14 +52,18 @@ func main() {
 		CI = slices.Contains(ownArgs, "--ci")
 		SPEC = slices.Contains(ownArgs, "--spec")
 		UPDATE_SNAPSHOTS = slices.Contains(ownArgs, "--update-snapshots")
-		minCoverage := parseMinFlag(ownArgs)
+		minCoverage, err := parseMinFlag(ownArgs)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+			os.Exit(2)
+		}
 
 		var coverProfile string
 		if minCoverage > 0 {
 			// Check if user already provided -coverprofile
 			for _, arg := range goTestArgs {
-				if strings.HasPrefix(arg, "-coverprofile=") {
-					coverProfile = strings.TrimPrefix(arg, "-coverprofile=")
+				if v, ok := strings.CutPrefix(arg, "-coverprofile="); ok {
+					coverProfile = v
 				}
 			}
 			if coverProfile == "" {
@@ -99,18 +103,26 @@ func main() {
 	}
 }
 
-func parseMinFlag(args []string) int {
+func parseMinFlag(args []string) (int, error) {
 	for i, arg := range args {
-		if strings.HasPrefix(arg, "--min=") {
-			v, _ := strconv.Atoi(strings.TrimPrefix(arg, "--min="))
-			return v
+		var raw string
+		if v, ok := strings.CutPrefix(arg, "--min="); ok {
+			raw = v
+		} else if arg == "--min" && i+1 < len(args) {
+			raw = args[i+1]
+		} else {
+			continue
 		}
-		if arg == "--min" && i+1 < len(args) {
-			v, _ := strconv.Atoi(args[i+1])
-			return v
+		v, err := strconv.Atoi(raw)
+		if err != nil {
+			return 0, fmt.Errorf("invalid --min value %q: must be an integer percentage", raw)
 		}
+		if v < 0 || v > 100 {
+			return 0, fmt.Errorf("invalid --min value %d: must be 0-100", v)
+		}
+		return v, nil
 	}
-	return 0
+	return 0, nil
 }
 
 func readCoverageTotal(profilePath string) (float64, error) {
