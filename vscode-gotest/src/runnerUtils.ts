@@ -160,6 +160,24 @@ export function applyResults(
   importPath: string,
   pkgDir: string,
 ): void {
+  const clearedMethods = new Set<string>();
+  for (const event of events) {
+    if (!event.Test) continue;
+    const segments = event.Test.split("/");
+    if (segments.length < 2) continue;
+    const suiteName = segments[0].startsWith("Test")
+      ? segments[0].slice(4)
+      : segments[0];
+    const methodId = `${importPath}/${suiteName}/${segments[1]}`;
+    if (!clearedMethods.has(methodId)) {
+      clearedMethods.add(methodId);
+      const methodItem = controller.findItem(methodId);
+      if (methodItem) {
+        controller.clearDynamicChildren(methodItem);
+      }
+    }
+  }
+
   const outputMap = new Map<string, string>();
 
   for (const event of events) {
