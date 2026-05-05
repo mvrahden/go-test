@@ -21,6 +21,7 @@ var knownSubcommands = map[string]bool{
 	"spec":     true,
 	"watch":    true,
 	"clean":    true,
+	"refactor": true,
 	"version":  true,
 	"help":     true,
 }
@@ -58,6 +59,11 @@ func SplitArgs(inArgs []string) (ownArgs, goTestArgs []string) {
 		case strings.HasPrefix(arg, "--setup-timeout="):
 			ownArgs = append(ownArgs, arg)
 		case arg == "--setup-timeout" && i+1 < len(inArgs):
+			ownArgs = append(ownArgs, arg, inArgs[i+1])
+			i++
+		case strings.HasPrefix(arg, "--debounce="):
+			ownArgs = append(ownArgs, arg)
+		case arg == "--debounce" && i+1 < len(inArgs):
 			ownArgs = append(ownArgs, arg, inArgs[i+1])
 			i++
 		default:

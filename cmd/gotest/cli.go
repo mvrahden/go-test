@@ -200,6 +200,7 @@ Flags:
   --update-snapshots        Regenerate snapshot files
   --min=<pct>               Fail if coverage below threshold (enables -coverprofile)
   --setup-timeout=<dur>     Shared fixture setup deadline (default 5m)
+  --debounce=<dur>          Watch mode debounce interval (default 200ms)
 
 All other flags and arguments are forwarded to "go test".
 `, about.ShortInfo())
