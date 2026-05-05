@@ -146,7 +146,7 @@ export class DebugLauncher implements vscode.Disposable {
         settle(() => {
           child.kill("SIGTERM");
           reject(
-            new Error(`prepare timed out after ${timeoutSeconds}s`),
+            new Error(`timed out after ${timeoutSeconds}s`),
           );
         });
       }, timeoutSeconds * 1000);
@@ -154,7 +154,7 @@ export class DebugLauncher implements vscode.Disposable {
       const cancelListener = token.onCancellationRequested(() => {
         settle(() => {
           child.kill("SIGTERM");
-          reject(new Error("debug preparation cancelled"));
+          reject(new Error("cancelled"));
         });
       });
 
