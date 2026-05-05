@@ -354,8 +354,7 @@ export class GoTestController implements vscode.Disposable {
 
     const walkItem = (item: vscode.TestItem, indent: number) => {
       const structural =
-        item.id.startsWith("dir:") ||
-        item.tags.some((t) => t.id === "package");
+        item.id.startsWith("dir:") || item.tags.some((t) => t.id === "package");
       const result = structural ? undefined : this.results.get(item.id);
       rows.push({
         label: "  ".repeat(indent) + item.label,
