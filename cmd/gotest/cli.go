@@ -39,6 +39,8 @@ func main() {
 		os.Exit(runSpec(remaining))
 	case "watch":
 		os.Exit(runWatch(remaining))
+	case "refactor":
+		os.Exit(runRefactor(remaining))
 	case "version":
 		fmt.Println(about.LongInfo())
 		return
@@ -187,6 +189,7 @@ Subcommands:
   watch       Watch for file changes and re-run tests
   scaffold    Generate test suite skeleton from a type or file
   migrate     Convert testify/suite tests to go-test format
+  refactor    Source code refactoring tools (toggle-focus)
   version     Print version information
   help        Show this help message
 
