@@ -34,6 +34,11 @@ func runWatch(args []string) int {
 	CI = slices.Contains(ownArgs, "--ci")
 	SPEC = slices.Contains(ownArgs, "--spec")
 	UPDATE_SNAPSHOTS = slices.Contains(ownArgs, "--update-snapshots")
+	setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 	patterns := ExtractPackagePatterns(goTestArgs)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -43,7 +48,7 @@ func runWatch(args []string) int {
 	if !jsonMode {
 		fmt.Printf("\033[2m  running tests...\033[0m\n")
 	}
-	watchRunOnce(ctx, goTestArgs, patterns, jsonMode)
+	watchRunOnce(ctx, goTestArgs, patterns, jsonMode, setupTimeout)
 	if !jsonMode {
 		fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
 	}
@@ -92,7 +97,7 @@ func runWatch(args []string) int {
 			}
 			pkgPatterns := dirsToPatterns(changedDirs)
 			pkgArgs := replacePatterns(goTestArgs, pkgPatterns)
-			watchRunOnce(ctx, pkgArgs, pkgPatterns, jsonMode)
+			watchRunOnce(ctx, pkgArgs, pkgPatterns, jsonMode, setupTimeout)
 			changedDirs = nil
 			if !jsonMode {
 				fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
@@ -107,7 +112,7 @@ func runWatch(args []string) int {
 	}
 }
 
-func watchRunOnce(ctx context.Context, goTestArgs []string, patterns []string, jsonMode bool) int {
+func watchRunOnce(ctx context.Context, goTestArgs []string, patterns []string, jsonMode bool, setupTimeout time.Duration) int {
 	if CI {
 		violations, err := RunFocusGuard(patterns)
 		if err != nil {
@@ -140,7 +145,7 @@ func watchRunOnce(ctx context.Context, goTestArgs []string, patterns []string, j
 
 	var setupProc *SharedFixtureProcess
 	if len(overlay.sharedFixtures) > 0 {
-		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures)
+		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, setupTimeout)
 		if err != nil {
 			if jsonMode {
 				fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())

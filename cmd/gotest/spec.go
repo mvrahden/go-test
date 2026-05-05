@@ -26,6 +26,11 @@ func runSpec(args []string) int {
 	DEBUG = slices.Contains(ownArgs, "--debug")
 	CI = slices.Contains(ownArgs, "--ci")
 	UPDATE_SNAPSHOTS = slices.Contains(ownArgs, "--update-snapshots")
+	setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 
 	patterns := ExtractPackagePatterns(goTestArgs)
 
@@ -60,7 +65,7 @@ func runSpec(args []string) int {
 	var setupProc *SharedFixtureProcess
 	if len(overlay.sharedFixtures) > 0 {
 		var serr error
-		setupProc, serr = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures)
+		setupProc, serr = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, setupTimeout)
 		if serr != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", serr)
 			return 2

@@ -2,11 +2,13 @@ package main
 
 import (
 	"strings"
+	"time"
 )
 
 type ExecConfig struct {
 	GoTestArgs      []string
 	PackagePatterns []string
+	SetupTimeout    time.Duration
 }
 
 // knownSubcommands is the set of recognized subcommands.
@@ -53,6 +55,11 @@ func SplitArgs(inArgs []string) (ownArgs, goTestArgs []string) {
 		case arg == "--min" && i+1 < len(inArgs):
 			ownArgs = append(ownArgs, arg, inArgs[i+1])
 			i++
+		case strings.HasPrefix(arg, "--setup-timeout="):
+			ownArgs = append(ownArgs, arg)
+		case arg == "--setup-timeout" && i+1 < len(inArgs):
+			ownArgs = append(ownArgs, arg, inArgs[i+1])
+			i++
 		default:
 			goTestArgs = append(goTestArgs, arg)
 		}
@@ -86,8 +93,8 @@ func looksLikePackagePattern(s string) bool {
 func extractTagsFlag(args []string) (tags string, remaining []string) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
-		if strings.HasPrefix(arg, "-tags=") {
-			tags = strings.TrimPrefix(arg, "-tags=")
+		if v, ok := strings.CutPrefix(arg, "-tags="); ok {
+			tags = v
 		} else if arg == "-tags" && i+1 < len(args) {
 			tags = args[i+1]
 			i++

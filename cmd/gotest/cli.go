@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/about"
 )
@@ -57,6 +58,11 @@ func main() {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			os.Exit(2)
 		}
+		setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+			os.Exit(2)
+		}
 
 		var coverProfile string
 		if minCoverage > 0 {
@@ -83,6 +89,7 @@ func main() {
 		cfg := ExecConfig{
 			GoTestArgs:      goTestArgs,
 			PackagePatterns: patterns,
+			SetupTimeout:    setupTimeout,
 		}
 
 		code := Run(cfg)
@@ -125,6 +132,28 @@ func parseMinFlag(args []string) (int, error) {
 	return 0, nil
 }
 
+func parseSetupTimeoutFlag(args []string) (time.Duration, error) {
+	for i, arg := range args {
+		var raw string
+		if v, ok := strings.CutPrefix(arg, "--setup-timeout="); ok {
+			raw = v
+		} else if arg == "--setup-timeout" && i+1 < len(args) {
+			raw = args[i+1]
+		} else {
+			continue
+		}
+		d, err := time.ParseDuration(raw)
+		if err != nil {
+			return 0, fmt.Errorf("invalid --setup-timeout value %q: %w", raw, err)
+		}
+		if d <= 0 {
+			return 0, fmt.Errorf("invalid --setup-timeout value %q: must be positive", raw)
+		}
+		return d, nil
+	}
+	return 5 * time.Minute, nil
+}
+
 func readCoverageTotal(profilePath string) (float64, error) {
 	out, err := exec.Command("go", "tool", "cover", "-func="+profilePath).Output()
 	if err != nil {
@@ -162,11 +191,12 @@ Subcommands:
   help        Show this help message
 
 Flags:
-  --ci                  Enable focus guard (fail on F_ prefixes)
-  --debug               Keep generated overlay for inspection
-  --spec                Append spec view after normal test output
-  --update-snapshots    Regenerate snapshot files
-  --min=<pct>           Fail if coverage below threshold (enables -coverprofile)
+  --ci                      Enable focus guard (fail on F_ prefixes)
+  --debug                   Keep generated overlay for inspection
+  --spec                    Append spec view after normal test output
+  --update-snapshots        Regenerate snapshot files
+  --min=<pct>               Fail if coverage below threshold (enables -coverprofile)
+  --setup-timeout=<dur>     Shared fixture setup deadline (default 5m)
 
 All other flags and arguments are forwarded to "go test".
 `, about.ShortInfo())
