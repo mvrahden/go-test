@@ -101,11 +101,11 @@ func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		state = res.state
 	case <-ctx.Done():
 		cmd.Process.Kill()
-		return nil, fmt.Errorf("shared fixture setup cancelled: %w", ctx.Err())
+		return nil, fmt.Errorf("cancelled: %w", ctx.Err())
 	case <-time.After(setupTimeout):
 		cmd.Process.Kill()
 		io.Copy(io.Discard, stdout)
-		return nil, fmt.Errorf("shared fixture setup timed out after %v", setupTimeout)
+		return nil, fmt.Errorf("timed out after %v", setupTimeout)
 	}
 
 	stateBytes, err := json.Marshal(state)
