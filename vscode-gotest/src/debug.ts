@@ -1,14 +1,10 @@
 import * as vscode from "vscode";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { rm } from "node:fs/promises";
-import type { OverlayOutput } from "./types.js";
+import { spawn, type ChildProcess } from "node:child_process";
+import type { PrepareOutput } from "./types.js";
 import { buildCliCommand, formatCliCommand, scopedConfig } from "./cli.js";
 
-const execFileAsync = promisify(execFile);
-
 export class DebugLauncher implements vscode.Disposable {
-  private readonly overlayDirs = new Set<string>();
+  private readonly prepareProcesses = new Map<string, ChildProcess>();
   private sessionListener: vscode.Disposable | undefined;
 
   constructor(private readonly outputChannel: vscode.OutputChannel) {}
@@ -29,89 +25,150 @@ export class DebugLauncher implements vscode.Disposable {
       return;
     }
 
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(pkgDir));
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(
+      vscode.Uri.file(pkgDir),
+    );
     if (!workspaceFolder) {
       return;
     }
 
-    // Generate overlay
-    let overlay: OverlayOutput;
+    let prepare: PrepareOutput;
+    let child: ChildProcess;
     try {
-      const cmd = await buildCliCommand(["overlay", pkgDir], workspaceFolder.uri.fsPath);
+      const cmd = await buildCliCommand(
+        ["prepare", pkgDir],
+        workspaceFolder.uri.fsPath,
+        this.outputChannel,
+      );
       this.outputChannel.appendLine(`[debug] ${formatCliCommand(cmd)}`);
-      const { stdout } = await execFileAsync(cmd.bin, cmd.args, {
-        cwd: workspaceFolder.uri.fsPath,
-      });
-      overlay = JSON.parse(stdout) as OverlayOutput;
+
+      const result = await this.spawnPrepare(
+        cmd.bin,
+        cmd.args,
+        workspaceFolder.uri.fsPath,
+      );
+      prepare = result.output;
+      child = result.child;
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : "Unknown error generating overlay";
-      vscode.window.showErrorMessage(`gotest overlay failed: ${message}`);
+        err instanceof Error ? err.message : "Unknown error running prepare";
+      vscode.window.showErrorMessage(`gotest prepare failed: ${message}`);
       return;
     }
 
-    // Track overlay dir for cleanup
-    this.overlayDirs.add(overlay.dir);
+    const prepareKey = `gotest-prepare:${pkgDir}`;
+    this.killPrepareProcess(prepareKey);
+    this.prepareProcesses.set(prepareKey, child);
 
-    // Build run filter
     const runFilter = buildRunFilter(items);
 
-    const extraBuildFlags = scopedConfig(workspaceFolder.uri.fsPath)
-      .get<string[]>("buildFlags", []);
+    const extraBuildFlags = scopedConfig(workspaceFolder.uri.fsPath).get<
+      string[]
+    >("buildFlags", []);
 
-    // Construct debug configuration
     const debugConfig: vscode.DebugConfiguration = {
       type: "go",
       name: "Go Test Suite Debug",
       request: "launch",
       mode: "test",
       program: pkgDir,
-      buildFlags: `-overlay=${overlay.overlayFile} ${extraBuildFlags.join(" ")}`.trim(),
+      buildFlags:
+        `-overlay=${prepare.overlayFile} ${extraBuildFlags.join(" ")}`.trim(),
       args: runFilter ? ["-test.run", runFilter] : [],
+      __prepareKey: prepareKey,
     };
+
+    if (prepare.stateFile) {
+      debugConfig.env = { GOTEST_SHARED_STATE_FILE: prepare.stateFile };
+    }
 
     this.outputChannel.appendLine(
       `[debug] launching: ${JSON.stringify(debugConfig)}`,
     );
 
-    // Launch debug session
     const started = await vscode.debug.startDebugging(
       workspaceFolder,
       debugConfig,
     );
 
     if (!started) {
-      // Clean up overlay immediately on failure
-      this.cleanupOverlayDir(overlay.dir);
+      this.killPrepareProcess(prepareKey);
     }
   }
 
   registerCleanupOnSessionEnd(context: vscode.ExtensionContext): void {
-    this.sessionListener = vscode.debug.onDidTerminateDebugSession((session) => {
-      if (session.name === "Go Test Suite Debug") {
-        this.cleanupAllOverlays();
-      }
-    });
+    this.sessionListener = vscode.debug.onDidTerminateDebugSession(
+      (session) => {
+        const key = (session.configuration as Record<string, unknown>)
+          ?.__prepareKey;
+        if (typeof key === "string") {
+          this.killPrepareProcess(key);
+        }
+      },
+    );
     context.subscriptions.push(this.sessionListener);
   }
 
   dispose(): void {
     this.sessionListener?.dispose();
-    this.cleanupAllOverlays();
-  }
-
-  private cleanupAllOverlays(): void {
-    for (const dir of this.overlayDirs) {
-      this.cleanupOverlayDir(dir);
+    for (const [name] of this.prepareProcesses) {
+      this.killPrepareProcess(name);
     }
   }
 
-  private cleanupOverlayDir(dir: string): void {
-    this.overlayDirs.delete(dir);
-    rm(dir, { recursive: true, force: true }).catch((err: unknown) => {
-      this.outputChannel.appendLine(
-        `[debug] failed to clean up overlay dir ${dir}: ${err}`,
-      );
+  private spawnPrepare(
+    bin: string,
+    args: string[],
+    cwd: string,
+  ): Promise<{ output: PrepareOutput; child: ChildProcess }> {
+    return new Promise((resolve, reject) => {
+      const child = spawn(bin, args, { cwd });
+      let stdout = "";
+      let settled = false;
+
+      child.stdout.on("data", (data: Buffer) => {
+        stdout += data.toString();
+        if (!settled && stdout.includes("\n")) {
+          settled = true;
+          try {
+            const output = JSON.parse(stdout.split("\n")[0]) as PrepareOutput;
+            resolve({ output, child });
+          } catch {
+            child.kill("SIGTERM");
+            reject(
+              new Error(`Failed to parse prepare output: ${stdout.trim()}`),
+            );
+          }
+        }
+      });
+
+      child.stderr.on("data", (data: Buffer) => {
+        this.outputChannel.appendLine(
+          `[debug:prepare] ${data.toString().trimEnd()}`,
+        );
+      });
+
+      child.on("error", (err: Error) => {
+        if (!settled) {
+          settled = true;
+          reject(err);
+        }
+      });
+
+      child.on("close", (code) => {
+        if (!settled) {
+          settled = true;
+          reject(new Error(`prepare exited with code ${code} before ready`));
+        }
+      });
     });
+  }
+
+  private killPrepareProcess(sessionName: string): void {
+    const child = this.prepareProcesses.get(sessionName);
+    if (child) {
+      this.prepareProcesses.delete(sessionName);
+      child.kill("SIGTERM");
+    }
   }
 }

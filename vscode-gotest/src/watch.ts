@@ -326,10 +326,7 @@ export class WatchManager implements vscode.Disposable {
     }
   }
 
-  private applyWatchEvents(
-    run: vscode.TestRun,
-    jsonLines: string,
-  ): void {
+  private applyWatchEvents(run: vscode.TestRun, jsonLines: string): void {
     const events = parseTestEvents(jsonLines);
 
     const byPackage = new Map<string, TestEvent[]>();

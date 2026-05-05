@@ -19,11 +19,12 @@ type GenerateResult struct {
 }
 
 const (
-	packageEvalMode = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps
+	packageEvalMode    = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps
+	discoveryEvalMode  = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports
 )
 
-func Generate(targetPath string, buildFlags ...string) (GenerateResults, error) {
-	res, _, err := generateSrcs(targetPath, buildFlags...)
+func Generate(targetPkgs []string, buildFlags []string) (GenerateResults, error) {
+	res, _, err := generateSrcs(targetPkgs, buildFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -32,12 +33,12 @@ func Generate(targetPath string, buildFlags ...string) (GenerateResults, error) 
 
 // GenerateWithSharedFixtures generates test suite sources and also returns
 // the deduplicated shared fixtures discovered via demand-driven resolution.
-func GenerateWithSharedFixtures(targetPath string, buildFlags ...string) (GenerateResults, []SharedFixtureInfo, error) {
-	return generateSrcs(targetPath, buildFlags...)
+func GenerateWithSharedFixtures(targetPkgs []string, buildFlags []string) (GenerateResults, []SharedFixtureInfo, error) {
+	return generateSrcs(targetPkgs, buildFlags)
 }
 
-func Collect(targetPath string, buildFlags ...string) (gotestast.TestSuiteSpecSet, error) {
-	loadResults, err := LoadPackages(targetPath, buildFlags...)
+func Collect(targetPkgs []string, buildFlags []string) (gotestast.TestSuiteSpecSet, error) {
+	loadResults, err := LoadPackages(targetPkgs, buildFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -73,8 +74,8 @@ type LoadResult struct {
 	Pxtest  *packages.Package
 }
 
-// LoadPackages loads and groups test packages for the given target pattern.
-func LoadPackages(targetPkg string, buildFlags ...string) ([]*LoadResult, error) {
+// LoadPackages loads and groups test packages for the given target patterns.
+func LoadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, error) {
 	cfg := &packages.Config{
 		Mode:  packageEvalMode,
 		Tests: true,
@@ -82,7 +83,7 @@ func LoadPackages(targetPkg string, buildFlags ...string) ([]*LoadResult, error)
 	if len(buildFlags) > 0 {
 		cfg.BuildFlags = buildFlags
 	}
-	totalFoundPkgs, err := packages.Load(cfg, targetPkg)
+	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +128,7 @@ func LoadPackages(targetPkg string, buildFlags ...string) ([]*LoadResult, error)
 
 // LoadPackagesWithWarnings is like LoadPackages but also returns warnings
 // for packages that were skipped due to load errors (e.g. build constraints).
-func LoadPackagesWithWarnings(targetPkg string, buildFlags ...string) ([]*LoadResult, []LoadWarning, error) {
+func LoadPackagesWithWarnings(targetPkgs []string, buildFlags []string) ([]*LoadResult, []LoadWarning, error) {
 	cfg := &packages.Config{
 		Mode:  packageEvalMode,
 		Tests: true,
@@ -135,7 +136,7 @@ func LoadPackagesWithWarnings(targetPkg string, buildFlags ...string) ([]*LoadRe
 	if len(buildFlags) > 0 {
 		cfg.BuildFlags = buildFlags
 	}
-	totalFoundPkgs, err := packages.Load(cfg, targetPkg)
+	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -193,8 +194,76 @@ func LoadPackagesWithWarnings(targetPkg string, buildFlags ...string) ([]*LoadRe
 	return res, warnings, nil
 }
 
-func generateSrcs(targetPkg string, buildFlags ...string) (GenerateResults, []SharedFixtureInfo, error) {
-	loadResults, err := LoadPackages(targetPkg, buildFlags...)
+// LoadPackagesForDiscovery loads packages using a lightweight mode without
+// NeedDeps, avoiding type-checking of the entire transitive dependency graph.
+func LoadPackagesForDiscovery(targetPkgs []string, buildFlags []string) ([]*LoadResult, []LoadWarning, error) {
+	cfg := &packages.Config{
+		Mode:  discoveryEvalMode,
+		Tests: true,
+	}
+	if len(buildFlags) > 0 {
+		cfg.BuildFlags = buildFlags
+	}
+	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var warnings []LoadWarning
+	seen := make(map[string]bool)
+	var loadedTestPkgs []*packages.Package
+	for _, p := range totalFoundPkgs {
+		if len(p.Errors) > 0 {
+			pkgPath := p.PkgPath
+			pkgPath = strings.TrimSuffix(pkgPath, "_test")
+			if strings.HasSuffix(pkgPath, ".test") {
+				continue
+			}
+			if !seen[pkgPath] {
+				seen[pkgPath] = true
+				for _, e := range p.Errors {
+					warnings = append(warnings, LoadWarning{PkgPath: pkgPath, Message: fmt.Sprintf("%s", e)})
+				}
+			}
+			continue
+		}
+		if p.Module != nil {
+			loadedTestPkgs = append(loadedTestPkgs, p)
+		}
+	}
+	if len(loadedTestPkgs) == 0 {
+		return nil, warnings, nil
+	}
+
+	loadedTestPkgs = slices.Filter(loadedTestPkgs, func(item *packages.Package, index int) bool {
+		return strings.HasSuffix(item.ID, ".test]")
+	})
+	testPkgs := slices.ReduceSeed(loadedTestPkgs, map[string]*LoadResult{}, func(p *packages.Package, acc map[string]*LoadResult) map[string]*LoadResult {
+		isPxTest := strings.HasSuffix(p.Name, "_test")
+		pkgPath := p.PkgPath
+		if isPxTest {
+			pkgPath = strings.TrimSuffix(pkgPath, "_test")
+		}
+		_, ok := acc[pkgPath]
+		if !ok {
+			acc[pkgPath] = &LoadResult{PkgPath: pkgPath, PkgDir: DeterminePkgDir(p)}
+		}
+		if !isPxTest {
+			acc[pkgPath].Ptest = p
+		} else {
+			acc[pkgPath].Pxtest = p
+		}
+		return acc
+	})
+	var res []*LoadResult
+	for _, v := range testPkgs {
+		res = append(res, v)
+	}
+	return res, warnings, nil
+}
+
+func generateSrcs(targetPkgs []string, buildFlags []string) (GenerateResults, []SharedFixtureInfo, error) {
+	loadResults, err := LoadPackages(targetPkgs, buildFlags)
 	if err != nil {
 		return nil, nil, err
 	}

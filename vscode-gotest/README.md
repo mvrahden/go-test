@@ -137,7 +137,7 @@ These can be set in `.vscode/settings.json` per workspace folder:
   // Use a local gotest binary instead of go run
   "gotest.cliPath": "./bin/gotest",
 
-  // Pass build tags to discovery, overlays, and test runs
+  // Pass build tags to discovery and test runs
   "gotest.buildTags": "integration,e2e",
 
   // Extra flags for go test (e.g. timeout, verbose)

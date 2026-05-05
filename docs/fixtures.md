@@ -15,16 +15,17 @@ type E2ESetupFixture struct {
     OrgID     uuid.UUID
 }
 
-func (s *E2ESetupFixture) BeforeAll(t *gotest.T) {
-    pg, err := testhelper.StartPostgres(ctx)
+func (f *E2ESetupFixture) BeforeAll(t *gotest.T) {
+    pg, err := testhelper.StartPostgres(t.Context())
     gotest.NoError(t, err)
-    t.T().Cleanup(func() { pg.Container.Terminate(ctx) })
-    s.Pool = pg.Pool
+    f.container = pg.Container
+    f.Pool = pg.Pool
     // ... wire API, seed fixtures ...
 }
 
-func (s *E2ESetupFixture) AfterAll(t *gotest.T) {
-    s.Pool.Close()
+func (f *E2ESetupFixture) AfterAll(t *gotest.T) {
+    f.Pool.Close()
+    f.container.Terminate(context.Background())
 }
 ```
 
@@ -240,6 +241,39 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 
 Key improvements:
 - `t.Fatal()` works in setup (runs in test context)
-- `t.T().Cleanup()` for teardown (no manual defer chains)
+- `AfterAll` handles teardown (no manual defer chains)
 - No package-level singletons
 - Type-safe field access via named fields
+
+## Resource Management
+
+Test resources that need setup and teardown (database connections, caches, services) should be stored as suite fields and managed through lifecycle hooks. Avoid using `defer` or `t.T().Cleanup()` in test methods — these bypass the suite lifecycle.
+
+```go
+type OrderTestSuite struct {
+    Fixture *E2ESetupFixture
+    cache   *OrderCache
+    svc     *OrderService
+}
+
+func (s *OrderTestSuite) BeforeEach(t *gotest.T) {
+    s.cache = NewOrderCache(s.Fixture.Pool, 5*time.Minute)
+    s.svc = NewOrderService(s.Fixture.Pool, s.cache)
+}
+
+func (s *OrderTestSuite) AfterEach(t *gotest.T) {
+    s.cache.Shutdown()
+}
+
+func (s *OrderTestSuite) TestCreate(t *gotest.T) {
+    t.When("valid order data", func(w *gotest.T) {
+        w.It("persists the order", func(it *gotest.T) {
+            // s.svc and s.cache are ready — no setup/cleanup in test code
+            err := s.svc.Create(context.Background(), order)
+            gotest.NoError(it, err)
+        })
+    })
+}
+```
+
+When different test methods need fundamentally different service configurations, split them into separate suites — each with its own `BeforeEach`/`AfterEach`. This keeps resource management declarative and co-located.

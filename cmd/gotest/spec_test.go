@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -120,7 +121,7 @@ func TestRunSpec_InputStdin(t *testing.T) {
 	defer os.Chdir(origDir)
 
 	// Generate overlay and run tests to get JSON output
-	results, _, err := gotestgen.GenerateWithSharedFixtures("./simple_suite")
+	results, _, err := gotestgen.GenerateWithSharedFixtures([]string{"./simple_suite"}, nil)
 	if err != nil {
 		t.Fatalf("GenerateWithSharedFixtures: %v", err)
 	}
@@ -132,7 +133,7 @@ func TestRunSpec_InputStdin(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	overlayArgs := []string{"-overlay=" + filepath.Join(tmpDir, "overlay.json"), "./simple_suite"}
-	jsonData, _, err := gotestrunner.StdlibRunTestsJSON(overlayArgs)
+	jsonData, _, err := gotestrunner.StdlibRunTestsJSON(context.Background(), overlayArgs)
 	if err != nil {
 		t.Fatalf("StdlibRunTestsJSON: %v", err)
 	}

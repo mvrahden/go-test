@@ -8,18 +8,43 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	gotest "github.com/mvrahden/go-test/pkg/gotest"
 
 	sfpkg0 "github.com/mvrahden/go-test/examples/shared_fixture"
 )
 
 func main() {
-	ctx := context.Background()
 	state := map[string]json.RawMessage{}
 
 	sf0 := &sfpkg0.PostgresSharedFixture{}
-	if err := sf0.BeforeAll(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "PostgresSharedFixture.BeforeAll: %v\n", err)
-		os.Exit(1)
+	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	{
+		var ƒerr error
+		ƒattempts := 1 + ƒcfg_sf0.Retries
+		for ƒi := range ƒattempts {
+			ctx := context.Background()
+			if ƒcfg_sf0.Timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+				defer cancel()
+			}
+			ƒerr = sf0.BeforeAll(ctx)
+			if ƒerr == nil {
+				break
+			}
+			if ƒi < ƒattempts-1 {
+				fmt.Fprintf(os.Stderr, "PostgresSharedFixture.BeforeAll attempt %d/%d failed: %v\n", ƒi+1, ƒattempts, ƒerr)
+				if ƒcfg_sf0.RetryDelay > 0 {
+					time.Sleep(ƒcfg_sf0.RetryDelay)
+				}
+			}
+		}
+		if ƒerr != nil {
+			fmt.Fprintf(os.Stderr, "PostgresSharedFixture.BeforeAll failed after %d attempt(s): %v\n", ƒattempts, ƒerr)
+			os.Exit(1)
+		}
 	}
 	{
 		type transfer struct {
@@ -35,7 +60,7 @@ func main() {
 			Tags: sf0.Tags,
 		})
 		if err != nil {
-			sf0.AfterAll(ctx)
+			sf0.AfterAll(context.Background())
 			fmt.Fprintf(os.Stderr, "PostgresSharedFixture: marshal: %v\n", err)
 			os.Exit(1)
 		}
@@ -43,10 +68,33 @@ func main() {
 	}
 
 	sf1 := &sfpkg0.RedisSharedFixture{}
-	if err := sf1.BeforeAll(ctx); err != nil {
-		sf0.AfterAll(ctx)
-		fmt.Fprintf(os.Stderr, "RedisSharedFixture.BeforeAll: %v\n", err)
-		os.Exit(1)
+	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
+	{
+		var ƒerr error
+		ƒattempts := 1 + ƒcfg_sf1.Retries
+		for ƒi := range ƒattempts {
+			ctx := context.Background()
+			if ƒcfg_sf1.Timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf1.Timeout)
+				defer cancel()
+			}
+			ƒerr = sf1.BeforeAll(ctx)
+			if ƒerr == nil {
+				break
+			}
+			if ƒi < ƒattempts-1 {
+				fmt.Fprintf(os.Stderr, "RedisSharedFixture.BeforeAll attempt %d/%d failed: %v\n", ƒi+1, ƒattempts, ƒerr)
+				if ƒcfg_sf1.RetryDelay > 0 {
+					time.Sleep(ƒcfg_sf1.RetryDelay)
+				}
+			}
+		}
+		if ƒerr != nil {
+			sf0.AfterAll(context.Background())
+			fmt.Fprintf(os.Stderr, "RedisSharedFixture.BeforeAll failed after %d attempt(s): %v\n", ƒattempts, ƒerr)
+			os.Exit(1)
+		}
 	}
 	{
 		type transfer struct {
@@ -62,8 +110,8 @@ func main() {
 			Replicas: sf1.Replicas,
 		})
 		if err != nil {
-			sf1.AfterAll(ctx)
-			sf0.AfterAll(ctx)
+			sf1.AfterAll(context.Background())
+			sf0.AfterAll(context.Background())
 			fmt.Fprintf(os.Stderr, "RedisSharedFixture: marshal: %v\n", err)
 			os.Exit(1)
 		}
@@ -76,6 +124,22 @@ func main() {
 	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
 	<-sig
 
-	sf1.AfterAll(ctx)
-	sf0.AfterAll(ctx)
+	{
+		ctx := context.Background()
+		if ƒcfg_sf1.Timeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf1.Timeout)
+			defer cancel()
+		}
+		sf1.AfterAll(ctx)
+	}
+	{
+		ctx := context.Background()
+		if ƒcfg_sf0.Timeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+			defer cancel()
+		}
+		sf0.AfterAll(ctx)
+	}
 }

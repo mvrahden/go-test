@@ -10,7 +10,9 @@ describe("ansiToHtml", () => {
   });
 
   it("escapes HTML entities", () => {
-    expect(ansiToHtml("<div>&test</div>")).toBe("&lt;div&gt;&amp;test&lt;/div&gt;");
+    expect(ansiToHtml("<div>&test</div>")).toBe(
+      "&lt;div&gt;&amp;test&lt;/div&gt;",
+    );
   });
 
   it("converts bold escape to span", () => {
@@ -26,14 +28,22 @@ describe("ansiToHtml", () => {
   });
 
   it("converts color codes", () => {
-    expect(ansiToHtml("\x1b[31mred\x1b[0m")).toBe('<span class="ansi-red">red</span>');
-    expect(ansiToHtml("\x1b[32mgreen\x1b[0m")).toBe('<span class="ansi-green">green</span>');
-    expect(ansiToHtml("\x1b[33myellow\x1b[0m")).toBe('<span class="ansi-yellow">yellow</span>');
+    expect(ansiToHtml("\x1b[31mred\x1b[0m")).toBe(
+      '<span class="ansi-red">red</span>',
+    );
+    expect(ansiToHtml("\x1b[32mgreen\x1b[0m")).toBe(
+      '<span class="ansi-green">green</span>',
+    );
+    expect(ansiToHtml("\x1b[33myellow\x1b[0m")).toBe(
+      '<span class="ansi-yellow">yellow</span>',
+    );
   });
 
   it("handles nested styles", () => {
     const result = ansiToHtml("\x1b[1m\x1b[31mbold red\x1b[0m");
-    expect(result).toBe('<span class="ansi-bold"><span class="ansi-red">bold red</span></span>');
+    expect(result).toBe(
+      '<span class="ansi-bold"><span class="ansi-red">bold red</span></span>',
+    );
   });
 
   it("closes unclosed spans at end", () => {

@@ -54,10 +54,11 @@ func runSpec(args []string) int {
 	overlayArgs := append([]string{overlay.overlayFlag}, goTestArgs...)
 	extraEnv := buildExtraEnv()
 
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
 	var setupProc *SharedFixtureProcess
 	if len(overlay.sharedFixtures) > 0 {
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-		defer cancel()
 		var serr error
 		setupProc, serr = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures)
 		if serr != nil {
@@ -68,7 +69,7 @@ func runSpec(args []string) int {
 		extraEnv["GOTEST_SHARED_STATE_FILE"] = setupProc.StateFile()
 	}
 
-	jsonData, code, err := gotestrunner.StdlibRunTestsJSON(overlayArgs, extraEnv)
+	jsonData, code, err := gotestrunner.StdlibRunTestsJSON(ctx, overlayArgs, extraEnv)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

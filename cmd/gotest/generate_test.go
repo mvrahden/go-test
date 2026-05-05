@@ -10,7 +10,7 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
-func TestRunOverlay_ProducesValidOutput(t *testing.T) {
+func TestGenerateOverlay_ProducesValidOutput(t *testing.T) {
 	examplesDir := filepath.Join("..", "..", "examples")
 	if _, err := os.Stat(filepath.Join(examplesDir, "go.mod")); err != nil {
 		t.Skipf("examples directory not found: %v", err)
@@ -29,8 +29,7 @@ func TestRunOverlay_ProducesValidOutput(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	// Use the same logic as runOverlay to generate overlay
-	results, err := gotestgen.Generate("./simple_suite")
+	results, err := gotestgen.Generate([]string{"./simple_suite"}, nil)
 	if err != nil {
 		t.Fatalf("Generate: %v", err)
 	}
@@ -44,13 +43,11 @@ func TestRunOverlay_ProducesValidOutput(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Verify the overlay file exists
 	overlayFile := filepath.Join(tmpDir, "overlay.json")
 	if _, err := os.Stat(overlayFile); err != nil {
 		t.Fatalf("overlay.json not found: %v", err)
 	}
 
-	// Verify it is valid JSON
 	data, err := os.ReadFile(overlayFile)
 	if err != nil {
 		t.Fatalf("reading overlay.json: %v", err)
@@ -64,29 +61,9 @@ func TestRunOverlay_ProducesValidOutput(t *testing.T) {
 	if len(overlayContent.Replace) == 0 {
 		t.Fatal("overlay.json Replace map is empty")
 	}
-
-	// Verify the output struct serializes correctly
-	out := overlayOutput{
-		OverlayFile: overlayFile,
-		Dir:         tmpDir,
-	}
-	outData, err := json.Marshal(out)
-	if err != nil {
-		t.Fatalf("json.Marshal: %v", err)
-	}
-	var roundtrip overlayOutput
-	if err := json.Unmarshal(outData, &roundtrip); err != nil {
-		t.Fatalf("json.Unmarshal: %v", err)
-	}
-	if roundtrip.OverlayFile != overlayFile {
-		t.Errorf("overlayFile = %q, want %q", roundtrip.OverlayFile, overlayFile)
-	}
-	if roundtrip.Dir != tmpDir {
-		t.Errorf("dir = %q, want %q", roundtrip.Dir, tmpDir)
-	}
 }
 
-func TestRunOverlay_NoSuitesReturnsOne(t *testing.T) {
+func TestGenerateOverlay_NoSuitesReturnsEmpty(t *testing.T) {
 	// Create a temp directory with a valid Go package that has no suites
 	tmpDir, err := os.MkdirTemp("", "overlay-test-nosuite-*")
 	if err != nil {
@@ -112,7 +89,7 @@ func TestRunOverlay_NoSuitesReturnsOne(t *testing.T) {
 	defer os.Chdir(origDir)
 
 	// Generate on a package without suites should return empty results
-	results, err := gotestgen.Generate(".")
+	results, err := gotestgen.Generate([]string{"."}, nil)
 	if err != nil {
 		t.Fatalf("Generate: %v", err)
 	}
