@@ -57,6 +57,11 @@
         "command": "gotest.copyCoverage",
         "title": "Go Test: Copy Coverage Summary",
         "icon": "$(copy)"
+      },
+      {
+        "command": "gotest.copyTestResults",
+        "title": "Go Test: Copy Test Results",
+        "icon": "$(copy)"
       }
     ],
     "menus": {
@@ -65,6 +70,13 @@
           "command": "gotest.copyCoverage",
           "when": "view == workbench.view.testCoverage",
           "group": "navigation"
+        }
+      ],
+      "testing/item/context": [
+        {
+          "command": "gotest.copyTestResults",
+          "when": "controllerId == gotest",
+          "group": "inline"
         }
       ]
     },
@@ -125,6 +137,18 @@
           "scope": "resource",
           "description": "Comma-separated Go build tags (e.g. 'integration,e2e'). Passed to discovery, test runs, and overlays."
         },
+        "gotest.coverOnRun": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Collect coverage data alongside normal test runs"
+        },
+        "gotest.coverOnSave": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "Re-run package coverage when a .go file is saved (opt-in)"
+        },
         "gotest.specView.autoRefresh": {
           "type": "boolean",
           "default": true,
@@ -150,12 +174,16 @@
     "compile": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
     "test": "vitest run",
+    "format": "prettier --write 'src/**/*.ts'",
+    "format:check": "prettier --check 'src/**/*.ts'",
+    "vscode:prepublish": "node esbuild.config.mjs",
     "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/vscode": "^1.101.0",
     "esbuild": "^0.28.0",
+    "prettier": "^3.8.3",
     "typescript": "^5.7.0",
     "vitest": "^4.1.5"
   }

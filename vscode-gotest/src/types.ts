@@ -40,7 +40,8 @@ export interface DiscoverMethod {
   col: number;
 }
 
-export interface OverlayOutput {
+export interface PrepareOutput {
   overlayFile: string;
   dir: string;
+  stateFile?: string;
 }

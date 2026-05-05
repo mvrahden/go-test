@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"go/types"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/tools/go/packages"
 
@@ -65,67 +67,58 @@ func runDiscover(args []string) int {
 
 	out := discoverOutput{}
 
-	for _, pattern := range patterns {
-		loadResults, loadWarnings, err := gotestgen.LoadPackagesWithWarnings(pattern, buildFlags...)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-			return 2
-		}
-		for _, w := range loadWarnings {
-			out.Warnings = append(out.Warnings, discoverWarning{
-				ImportPath: w.PkgPath,
-				Message:    w.Message,
-			})
+	loadResults, loadWarnings, err := gotestgen.LoadPackagesForDiscovery(patterns, buildFlags)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	for _, w := range loadWarnings {
+		out.Warnings = append(out.Warnings, discoverWarning{
+			ImportPath: w.PkgPath,
+			Message:    w.Message,
+		})
+	}
+
+	c := gotestgen.NewCollector()
+
+	for _, lr := range loadResults {
+		pkgEntry := discoverPackage{
+			ImportPath: lr.PkgPath,
+			Dir:        lr.PkgDir,
 		}
 
-		c := gotestgen.NewCollector()
-
-		for _, lr := range loadResults {
-			pkgEntry := discoverPackage{
-				ImportPath: lr.PkgPath,
-				Dir:        lr.PkgDir,
+		pkgs := []*packages.Package{lr.Ptest, lr.Pxtest}
+		for _, pkg := range pkgs {
+			if pkg == nil {
+				continue
 			}
-
-			pkgs := []*packages.Package{lr.Ptest, lr.Pxtest}
-			for _, pkg := range pkgs {
-				if pkg == nil {
-					continue
-				}
-				result := c.CollectSuiteSpecs(pkg)
-				if len(result.Errs) > 0 {
-					for _, ce := range result.Errs {
-						w := discoverWarning{
-							ImportPath: lr.PkgPath,
-							Message:    ce.Err.Error(),
-						}
-						if ce.Pos.IsValid() {
-							pos := pkg.Fset.Position(ce.Pos)
-							w.File = filepath.Base(pos.Filename)
-							w.Line = pos.Line
-							w.Col = pos.Column
-						}
-						out.Warnings = append(out.Warnings, w)
-					}
-					continue
-				}
-
-				if _, err := gotestgen.Resolve(pkg, result.Suites, result.Fixtures); err != nil {
-					out.Warnings = append(out.Warnings, discoverWarning{
+			result := c.CollectSuiteSpecs(pkg)
+			if len(result.Errs) > 0 {
+				for _, ce := range result.Errs {
+					w := discoverWarning{
 						ImportPath: lr.PkgPath,
-						Message:    err.Error(),
-					})
-					continue
+						Message:    ce.Err.Error(),
+					}
+					if ce.Pos.IsValid() {
+						pos := pkg.Fset.Position(ce.Pos)
+						w.File = filepath.Base(pos.Filename)
+						w.Line = pos.Line
+						w.Col = pos.Column
+					}
+					out.Warnings = append(out.Warnings, w)
 				}
-
-				for _, suite := range result.Suites {
-					ds := buildDiscoverSuite(suite)
-					pkgEntry.Suites = append(pkgEntry.Suites, ds)
-				}
+				continue
 			}
 
-			if len(pkgEntry.Suites) > 0 {
-				out.Packages = append(out.Packages, pkgEntry)
+			for _, suite := range result.Suites {
+				ds := buildDiscoverSuite(suite)
+				ds.Fixtures = discoverFixtureNames(suite)
+				pkgEntry.Suites = append(pkgEntry.Suites, ds)
 			}
+		}
+
+		if len(pkgEntry.Suites) > 0 {
+			out.Packages = append(out.Packages, pkgEntry)
 		}
 	}
 
@@ -172,15 +165,7 @@ func buildDiscoverSuite(suite *gotestast.TestSuiteSpec) discoverSuite {
 	}
 	ds.Lifecycle = lifecycle
 
-	// Fixtures
-	var fixtures []string
-	if f := suite.Fixture(); f != nil {
-		fixtures = append(fixtures, f.Identifier())
-	}
-	if fixtures == nil {
-		fixtures = []string{}
-	}
-	ds.Fixtures = fixtures
+	ds.Fixtures = []string{}
 
 	// Methods (test cases)
 	var methods []discoverMethod
@@ -202,4 +187,31 @@ func buildDiscoverSuite(suite *gotestast.TestSuiteSpec) discoverSuite {
 	ds.Methods = methods
 
 	return ds
+}
+
+func discoverFixtureNames(suite *gotestast.TestSuiteSpec) []string {
+	st := suite.StructType()
+	if st == nil {
+		return []string{}
+	}
+	var names []string
+	for i := 0; i < st.NumFields(); i++ {
+		field := st.Field(i)
+		ptr, ok := field.Type().(*types.Pointer)
+		if !ok {
+			continue
+		}
+		named, ok := ptr.Elem().(*types.Named)
+		if !ok {
+			continue
+		}
+		name := named.Obj().Name()
+		if strings.HasSuffix(name, "Fixture") && !strings.HasSuffix(name, "SharedFixture") {
+			names = append(names, name)
+		}
+	}
+	if names == nil {
+		return []string{}
+	}
+	return names
 }

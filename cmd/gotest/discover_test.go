@@ -31,7 +31,7 @@ func TestRunDiscover_SimpleSuite(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	loadResults, err := gotestgen.LoadPackages("./simple_suite")
+	loadResults, err := gotestgen.LoadPackages([]string{"./simple_suite"}, nil)
 	if err != nil {
 		t.Fatalf("LoadPackages: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestRunDiscover_FocusExclude(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	loadResults, err := gotestgen.LoadPackages("./focus_exclude")
+	loadResults, err := gotestgen.LoadPackages([]string{"./focus_exclude"}, nil)
 	if err != nil {
 		t.Fatalf("LoadPackages: %v", err)
 	}

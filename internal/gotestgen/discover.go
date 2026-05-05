@@ -39,8 +39,8 @@ type DiscoverMethod struct {
 	Col      int    `json:"col"`
 }
 
-func Discover(targetPath string) (*DiscoverOutput, error) {
-	loadResults, err := LoadPackages(targetPath)
+func Discover(targetPkgs []string) (*DiscoverOutput, error) {
+	loadResults, err := LoadPackages(targetPkgs, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -23,10 +23,11 @@ type SharedFixtureInfo struct {
 }
 
 type sharedSetupData struct {
-	RepoInfo     string
-	Imports      []sharedSetupImport
-	Fixtures     []sharedSetupFixture
-	TeardownVars []string
+	RepoInfo         string
+	GotestImportPath string
+	Imports          []sharedSetupImport
+	Fixtures         []sharedSetupFixture
+	TeardownVars     []string
 }
 
 type sharedSetupImport struct {
@@ -39,6 +40,7 @@ type sharedSetupFixture struct {
 	QualifiedType         string
 	Identifier            string
 	StateKey              string
+	HasConfig             bool
 	TransferFields        []string
 	BeforeAllRollbackVars []string
 	MarshalRollbackVars   []string
@@ -82,6 +84,7 @@ func GenerateSharedSetup(fixtures []SharedFixtureInfo) ([]byte, error) {
 			QualifiedType:         alias + "." + sf.Identifier,
 			Identifier:            sf.Identifier,
 			StateKey:              sf.PkgPath + "." + sf.Identifier,
+			HasConfig:             sf.HasConfig,
 			TransferFields:        sf.TransferFields,
 			BeforeAllRollbackVars: beforeAllRollback,
 			MarshalRollbackVars:   marshalRollback,
@@ -94,10 +97,11 @@ func GenerateSharedSetup(fixtures []SharedFixtureInfo) ([]byte, error) {
 	}
 
 	data := sharedSetupData{
-		RepoInfo:     about.ShortInfo(),
-		Imports:      imports,
-		Fixtures:     fixtureVMs,
-		TeardownVars: teardownVars,
+		RepoInfo:         about.ShortInfo(),
+		GotestImportPath: about.Repo + "/pkg/gotest",
+		Imports:          imports,
+		Fixtures:         fixtureVMs,
+		TeardownVars:     teardownVars,
 	}
 
 	var buf bytes.Buffer

@@ -24,8 +24,8 @@ func main() {
 	switch subcmd {
 	case "discover":
 		os.Exit(runDiscover(remaining))
-	case "overlay":
-		os.Exit(runOverlay(remaining))
+	case "prepare":
+		os.Exit(runPrepare(remaining))
 	case "scaffold":
 		os.Exit(runScaffold(remaining))
 	case "migrate":
@@ -139,7 +139,7 @@ Usage:
 
 Subcommands:
   discover    Discover test suites and output JSON metadata
-  overlay     Generate overlay files and output overlay path as JSON
+  prepare     Generate overlay and start shared fixtures for debug (blocks until SIGTERM)
   generate    Run code generation only (no test execution)
   clean       Remove orphaned generated files
   spec        Render behavioral specification from test suites

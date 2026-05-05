@@ -150,6 +150,72 @@ func TestGenerateSharedSetup_ContextCalls(t *testing.T) {
 	gotest.Contains(t, code, "sf0.AfterAll(ctx)")
 }
 
+func TestGenerateSharedSetup_DefaultTimeout(t *testing.T) {
+	fixtures := []SharedFixtureInfo{
+		{
+			Identifier:     "PGFixture",
+			PkgPath:        "github.com/example/fixtures",
+			TransferFields: []string{"ConnStr"},
+		},
+	}
+
+	src, err := GenerateSharedSetup(fixtures)
+	gotest.NoError(t, err)
+
+	code := string(src)
+	fset := token.NewFileSet()
+	_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
+	gotest.NoError(t, err, "generated code should be valid Go: %s", code)
+
+	gotest.Contains(t, code, `gotest "github.com/mvrahden/go-test/pkg/gotest"`)
+	gotest.Contains(t, code, "gotest.DefaultFixtureConfig()")
+	gotest.Contains(t, code, "context.WithTimeout(ctx,")
+	gotest.True(t, !strings.Contains(code, "SharedFixtureConfig()"),
+		"should not call SharedFixtureConfig when HasConfig is false")
+}
+
+func TestGenerateSharedSetup_WithConfig(t *testing.T) {
+	fixtures := []SharedFixtureInfo{
+		{
+			Identifier:     "PGFixture",
+			PkgPath:        "github.com/example/fixtures",
+			HasConfig:      true,
+			TransferFields: []string{"ConnStr"},
+		},
+	}
+
+	src, err := GenerateSharedSetup(fixtures)
+	gotest.NoError(t, err)
+
+	code := string(src)
+	fset := token.NewFileSet()
+	_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
+	gotest.NoError(t, err, "generated code should be valid Go: %s", code)
+
+	gotest.Contains(t, code, "gotest.DefaultFixtureConfig()")
+	gotest.Contains(t, code, "sf0.SharedFixtureConfig()")
+	gotest.Contains(t, code, "gotest.OverlayFixtureConfig(")
+	gotest.Contains(t, code, "context.WithTimeout(ctx,")
+}
+
+func TestGenerateSharedSetup_RetryLogic(t *testing.T) {
+	fixtures := []SharedFixtureInfo{
+		{
+			Identifier:     "PGFixture",
+			PkgPath:        "github.com/example/fixtures",
+			TransferFields: []string{"ConnStr"},
+		},
+	}
+
+	src, err := GenerateSharedSetup(fixtures)
+	gotest.NoError(t, err)
+
+	code := string(src)
+	gotest.Contains(t, code, "1 + ƒcfg_sf0.Retries")
+	gotest.Contains(t, code, "time.Sleep(ƒcfg_sf0.RetryDelay)")
+	gotest.Contains(t, code, "BeforeAll failed after")
+}
+
 func TestGenerateSharedSetup_MarshalErrorHandling(t *testing.T) {
 	fixtures := []SharedFixtureInfo{
 		{

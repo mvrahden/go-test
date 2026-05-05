@@ -1,5 +1,9 @@
 # gotest
 
+<p align="center">
+  <img src="static/gopher.png" alt="gotest gopher" width="360" />
+</p>
+
 Go tests that write themselves, organize themselves, and explain themselves.
 
 `gotest` closes the gap between `func TestX(t *testing.T)` and a well-organized test suite through code generation. You write structs, name them well, and the tool handles the rest. No runtime dependencies. No reflection. No lock-in. Just standard Go tests with lifecycle management and structured organization.
@@ -83,6 +87,40 @@ func (s *MySuite) BeforeEach(t *testing.T) {} // stdlib is fine here
 func (s *MySuite) TestPlain(t *testing.T)  {} // no gotest import needed
 func (s *MySuite) TestRich(t *gotest.T)    {} // full DSL available
 ```
+
+**Resource management through suite fields.** Resources that need setup and teardown (database pools, caches, services) should be stored as suite fields and managed through `BeforeEach`/`AfterEach`. Avoid using `defer` or `t.T().Cleanup()` in test methods — these bypass the suite lifecycle and scatter resource management across test code:
+
+```go
+type AuthServiceTestSuite struct {
+    Postgres *fixtures.PostgresSharedFixture
+    pool     *pgxpool.Pool
+    cache    *OrgConfigCache
+    svc      *AuthService
+}
+
+func (s *AuthServiceTestSuite) BeforeEach(t *gotest.T) {
+    s.pool = s.Postgres.NewPool(t)
+    s.cache = NewOrgConfigCache(s.pool, 5*time.Minute)
+    s.svc = NewAuthService(s.pool, s.cache)
+}
+
+func (s *AuthServiceTestSuite) AfterEach(t *gotest.T) {
+    s.cache.Shutdown()
+}
+
+func (s *AuthServiceTestSuite) TestPermissions(t *gotest.T) {
+    t.When("user has admin role", func(w *gotest.T) {
+        w.It("allows write access", func(it *gotest.T) {
+            // s.pool and s.svc are ready — no setup/cleanup here
+            allowed, err := s.svc.Check(ctx, orgID, "write")
+            gotest.NoError(it, err)
+            gotest.True(it, allowed)
+        })
+    })
+}
+```
+
+When different test methods need fundamentally different service configurations, split them into separate suites — each with its own `BeforeEach`/`AfterEach`. This keeps resource management declarative and predictable.
 
 Fixture hooks receive `context.Context` and return `error` — the generated wrapper reports failures with automatic attribution:
 
