@@ -69,44 +69,6 @@ function makeTree() {
   return { pkg, suite, method, dynamic };
 }
 
-const mockCache = {
-  getPackage: (importPath: string) => {
-    if (importPath === "example.com/pkg") {
-      return {
-        importPath: "example.com/pkg",
-        dir: "/abs/pkg",
-        suites: [
-          {
-            name: "MySuite",
-            fixtures: [],
-            methods: [],
-            lifecycle: [],
-            parallel: false,
-            focused: false,
-            excluded: false,
-            file: "t.go",
-            line: 1,
-            col: 1,
-          },
-          {
-            name: "FixtureSuite",
-            fixtures: ["SomeFixture"],
-            methods: [],
-            lifecycle: [],
-            parallel: false,
-            focused: false,
-            excluded: false,
-            file: "t.go",
-            line: 10,
-            col: 1,
-          },
-        ],
-      };
-    }
-    return undefined;
-  },
-} as any;
-
 describe("getItemDepth", () => {
   it("returns 0 for a root item", () => {
     const { pkg } = makeTree();
@@ -171,33 +133,27 @@ describe("groupByPackage", () => {
 describe("buildRunFilter", () => {
   it("returns undefined for package-level items (depth 0)", () => {
     const { pkg } = makeTree();
-    expect(
-      buildRunFilter([pkg as any], "example.com/pkg", mockCache),
-    ).toBeUndefined();
+    expect(buildRunFilter([pkg as any])).toBeUndefined();
   });
 
   it("returns suite filter for depth-1 items", () => {
     const { suite } = makeTree();
-    expect(buildRunFilter([suite as any], "example.com/pkg", mockCache)).toBe(
-      "^TestMySuite$",
-    );
+    expect(buildRunFilter([suite as any])).toBe("^TestMySuite$");
   });
 
   it("returns suite/method filter for depth-2 items", () => {
     const { method } = makeTree();
-    expect(buildRunFilter([method as any], "example.com/pkg", mockCache)).toBe(
-      "^TestMySuite$/^TestFoo$",
-    );
+    expect(buildRunFilter([method as any])).toBe("^TestMySuite$/^TestFoo$");
   });
 
   it("returns suite/method/subtest filter for depth-3 items", () => {
     const { dynamic } = makeTree();
-    expect(buildRunFilter([dynamic as any], "example.com/pkg", mockCache)).toBe(
+    expect(buildRunFilter([dynamic as any])).toBe(
       "^TestMySuite$/^TestFoo$/^sub1$",
     );
   });
 
-  it("returns undefined for suite with fixtures", () => {
+  it("returns suite filter for suite with fixtures", () => {
     const pkg = createItem("example.com/pkg", "example.com/pkg", undefined, [
       { id: "package" },
     ]);
@@ -206,9 +162,7 @@ describe("buildRunFilter", () => {
       "FixtureSuite",
       pkg,
     );
-    expect(
-      buildRunFilter([suite as any], "example.com/pkg", mockCache),
-    ).toBeUndefined();
+    expect(buildRunFilter([suite as any])).toBe("^TestFixtureSuite$");
   });
 
   it("joins multiple methods with alternation", () => {
@@ -218,9 +172,9 @@ describe("buildRunFilter", () => {
     const suite = createItem("example.com/pkg/MySuite", "MySuite", pkg);
     const m1 = createItem("example.com/pkg/MySuite/TestA", "TestA", suite);
     const m2 = createItem("example.com/pkg/MySuite/TestB", "TestB", suite);
-    expect(
-      buildRunFilter([m1 as any, m2 as any], "example.com/pkg", mockCache),
-    ).toBe("^TestMySuite$/^(TestA|TestB)$");
+    expect(buildRunFilter([m1 as any, m2 as any])).toBe(
+      "^TestMySuite$/^(TestA|TestB)$",
+    );
   });
 });
 

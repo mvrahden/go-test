@@ -158,7 +158,7 @@ func TestSharedFixtureIntegration(t *testing.T) {
 
 			gotest.Contains(t, output, "Alpha")
 			gotest.Contains(t, output, "Multi")
-			gotest.Contains(t, output, "Infra")
+			gotest.Contains(t, output, "Service")
 		})
 
 		cmd.Process.Signal(os.Interrupt)
@@ -196,7 +196,7 @@ func TestSharedFixtureIntegration(t *testing.T) {
 				t.Run("fixturebound", func(t *testing.T) {
 					gotest.Contains(t, code, `os.Getenv("GOTEST_SHARED_STATE_FILE")`)
 					gotest.Contains(t, code, "os.ReadFile(ƒsharedFile)")
-					gotest.Contains(t, code, "fixture.Alpha = sf0")
+					gotest.Contains(t, code, "ƒ_InfraFixture.Alpha = sf0")
 					gotest.Contains(t, code, "sf0.Hydrate(context.Background())")
 				})
 			}

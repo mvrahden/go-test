@@ -160,24 +160,6 @@ export function applyResults(
   importPath: string,
   pkgDir: string,
 ): void {
-  const clearedMethods = new Set<string>();
-  for (const event of events) {
-    if (!event.Test) continue;
-    const segments = event.Test.split("/");
-    if (segments.length < 2) continue;
-    const suiteName = segments[0].startsWith("Test")
-      ? segments[0].slice(4)
-      : segments[0];
-    const methodId = `${importPath}/${suiteName}/${segments[1]}`;
-    if (!clearedMethods.has(methodId)) {
-      clearedMethods.add(methodId);
-      const methodItem = controller.findItem(methodId);
-      if (methodItem) {
-        controller.clearDynamicChildren(methodItem);
-      }
-    }
-  }
-
   const outputMap = new Map<string, string>();
 
   for (const event of events) {
@@ -297,24 +279,7 @@ export function spawnTestProcess(
   });
 }
 
-export function suiteHasFixtures(
-  suiteName: string,
-  importPath: string,
-  cache: DiscoveryCache,
-): boolean {
-  const pkg = cache.getPackage(importPath);
-  if (!pkg) {
-    return false;
-  }
-  const suite = pkg.suites.find((s) => s.name === suiteName);
-  return suite !== undefined && suite.fixtures.length > 0;
-}
-
-export function buildRunFilter(
-  items: vscode.TestItem[],
-  importPath: string,
-  cache: DiscoveryCache,
-): string | undefined {
+export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
   if (items.some((item) => getPackageDepth(item) === 0)) {
     return undefined;
   }
@@ -329,9 +294,6 @@ export function buildRunFilter(
 
     if (depth === 1) {
       const suiteName = item.label;
-      if (suiteHasFixtures(suiteName, importPath, cache)) {
-        return undefined;
-      }
       let group = suiteGroups.get(suiteName);
       if (!group) {
         group = { wholeSuite: false, methods: [], subtests: [] };
@@ -340,9 +302,6 @@ export function buildRunFilter(
       group.wholeSuite = true;
     } else if (depth === 2) {
       const suiteName = item.parent!.label;
-      if (suiteHasFixtures(suiteName, importPath, cache)) {
-        return undefined;
-      }
       let group = suiteGroups.get(suiteName);
       if (!group) {
         group = { wholeSuite: false, methods: [], subtests: [] };
@@ -358,9 +317,6 @@ export function buildRunFilter(
       }
       const methodName = current.label;
       const suiteName = current.parent!.label;
-      if (suiteHasFixtures(suiteName, importPath, cache)) {
-        return undefined;
-      }
       let group = suiteGroups.get(suiteName);
       if (!group) {
         group = { wholeSuite: false, methods: [], subtests: [] };

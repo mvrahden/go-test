@@ -309,7 +309,7 @@ export class CoverageRunner implements vscode.Disposable {
           continue;
         }
 
-        const filter = buildRunFilter(groupItems, importPath, this.cache);
+        const filter = buildRunFilter(groupItems);
         validPkgs.push({
           importPath,
           items: groupItems,

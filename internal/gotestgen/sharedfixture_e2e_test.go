@@ -71,10 +71,10 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 
 		gotest.Contains(t, code, "sf0 := &sharedfixture.PostgresSharedFixture{}")
 		gotest.Contains(t, code, `os.Getenv("GOTEST_SHARED_STATE_FILE")`)
-		gotest.Contains(t, code, "fixture.PostgresSharedFixture = sf0")
+		gotest.Contains(t, code, "ƒ_APIFixture.PostgresSharedFixture = sf0")
 
 		gotest.Contains(t, code, "sf1 := &sharedfixture.RedisSharedFixture{}")
-		gotest.Contains(t, code, "fixture.RedisSharedFixture = sf1")
+		gotest.Contains(t, code, "ƒ_APIFixture.RedisSharedFixture = sf1")
 
 		// Hydrate should be called for Postgres (has Hydrate method)
 		gotest.Contains(t, code, "sf0.Hydrate(context.Background())")
@@ -84,7 +84,7 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 		gotest.True(t, !strings.Contains(code, "sf1.Hydrate"), "Redis should not have Hydrate call")
 		gotest.True(t, !strings.Contains(code, "sf1.Dehydrate"), "Redis should not have Dehydrate call")
 
-		sfResolvedBeforeFixture(t, code, "json.Unmarshal(ƒb, sf0)", "fixture.BeforeAll")
+		sfResolvedBeforeFixture(t, code, "json.Unmarshal(ƒb, sf0)", "ƒ_APIFixture.BeforeAll")
 	})
 
 	t.Run("WebPackage_SingleFixtureEmbedding", func(t *testing.T) {
@@ -99,7 +99,7 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 		code := string(webResult.PTest)
 
 		gotest.Contains(t, code, "sf0 := &sharedfixture.PostgresSharedFixture{}")
-		gotest.Contains(t, code, "fixture.PostgresSharedFixture = sf0")
+		gotest.Contains(t, code, "ƒ_WebFixture.PostgresSharedFixture = sf0")
 		gotest.Contains(t, code, "sf0.Hydrate(context.Background())")
 
 		gotest.True(t, !strings.Contains(code, "RedisSharedFixture"),
