@@ -60,9 +60,15 @@ function collapseNode(node: PathNode): void {
   node.children = collapsed;
 }
 
+export interface TestResult {
+  status: "pass" | "fail" | "skip";
+  duration?: number;
+}
+
 export class GoTestController implements vscode.Disposable {
   private controller: vscode.TestController;
   private disposables: vscode.Disposable[] = [];
+  private results = new Map<string, TestResult>();
 
   constructor(
     private readonly cache: DiscoveryCache,
@@ -138,6 +144,7 @@ export class GoTestController implements vscode.Disposable {
     }
 
     const seenIds = new Set<string>();
+    const rootIds = new Set<string>();
 
     for (const [_wsDir, entries] of wsGroups) {
       const trie = buildPathTrie(entries);
@@ -145,20 +152,32 @@ export class GoTestController implements vscode.Disposable {
 
       if (trie.importPath && trie.children.size === 0) {
         this.addPackageItem(trie.importPath, this.controller.items, seenIds);
+        rootIds.add(trie.importPath);
       } else if (trie.importPath) {
         this.addPackageItem(trie.importPath, this.controller.items, seenIds);
+        rootIds.add(trie.importPath);
         for (const child of trie.children.values()) {
           this.addTrieNode(child, this.controller.items, seenIds);
+          rootIds.add(
+            child.importPath && child.children.size === 0
+              ? child.importPath
+              : `dir:${child.segment}`,
+          );
         }
       } else {
         for (const child of trie.children.values()) {
           this.addTrieNode(child, this.controller.items, seenIds);
+          rootIds.add(
+            child.importPath && child.children.size === 0
+              ? child.importPath
+              : `dir:${child.segment}`,
+          );
         }
       }
     }
 
     this.controller.items.forEach((child) => {
-      if (!seenIds.has(child.id) && !child.id.includes("/dynamic/")) {
+      if (!rootIds.has(child.id) && !child.id.includes("/dynamic/")) {
         this.controller.items.delete(child.id);
       }
     });
@@ -315,6 +334,96 @@ export class GoTestController implements vscode.Disposable {
 
   findItem(id: string): vscode.TestItem | undefined {
     return this.findItemRecursive(this.controller.items, id);
+  }
+
+  recordResult(
+    itemId: string,
+    status: TestResult["status"],
+    duration?: number,
+  ): void {
+    this.results.set(itemId, { status, duration });
+  }
+
+  async copyTestResults(): Promise<void> {
+    const rows: {
+      label: string;
+      structural: boolean;
+      duration?: number;
+      status?: string;
+    }[] = [];
+
+    const walk = (items: vscode.TestItemCollection, indent: number) => {
+      items.forEach((item) => {
+        const structural =
+          item.id.startsWith("dir:") ||
+          item.tags.some((t) => t.id === "package");
+        const result = structural ? undefined : this.results.get(item.id);
+        rows.push({
+          label: "  ".repeat(indent) + item.label,
+          structural,
+          duration: result?.duration,
+          status: result?.status,
+        });
+        walk(item.children, indent + 1);
+      });
+    };
+
+    walk(this.controller.items, 0);
+
+    if (rows.length === 0) {
+      vscode.window.showInformationMessage(
+        "No test items available. Run discovery first.",
+      );
+      return;
+    }
+
+    const maxLabelLen = Math.max(4, ...rows.map((r) => r.label.length));
+    const header = `${"Test".padEnd(maxLabelLen)}  Time       Result`;
+    const separator = "-".repeat(header.length);
+
+    const lines = [header, separator];
+    let totalPassed = 0;
+    let totalFailed = 0;
+    let totalSkipped = 0;
+    let totalDuration = 0;
+
+    for (const row of rows) {
+      if (row.structural) {
+        lines.push(row.label);
+        continue;
+      }
+      const time =
+        row.duration !== undefined
+          ? (row.duration / 1000).toFixed(3) + "s"
+          : "-";
+      const status = row.status ?? "-";
+      lines.push(
+        `${row.label.padEnd(maxLabelLen)}  ${time.padEnd(9)}  ${status}`,
+      );
+
+      if (row.status === "pass") totalPassed++;
+      else if (row.status === "fail") totalFailed++;
+      else if (row.status === "skip") totalSkipped++;
+      if (row.duration) totalDuration += row.duration;
+    }
+
+    lines.push(separator);
+    const hasResults = totalPassed + totalFailed + totalSkipped > 0;
+    if (hasResults) {
+      const parts: string[] = [];
+      if (totalPassed > 0) parts.push(`${totalPassed} passed`);
+      if (totalFailed > 0) parts.push(`${totalFailed} failed`);
+      if (totalSkipped > 0) parts.push(`${totalSkipped} skipped`);
+      lines.push(
+        `Total: ${parts.join(", ")} (${(totalDuration / 1000).toFixed(3)}s)`,
+      );
+    } else {
+      lines.push("Total: no results");
+    }
+
+    const text = lines.join("\n");
+    await vscode.env.clipboard.writeText(text);
+    vscode.window.showInformationMessage("Test results copied to clipboard.");
   }
 
   dispose(): void {

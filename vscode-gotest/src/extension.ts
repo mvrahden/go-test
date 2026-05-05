@@ -266,6 +266,11 @@ export function activate(context: vscode.ExtensionContext): void {
     () => coverageRunner.copyCoverageSummary(),
   );
 
+  const copyTestResultsCmd = vscode.commands.registerCommand(
+    "gotest.copyTestResults",
+    () => controller.copyTestResults(),
+  );
+
   // Cover on save: debounced per-package trigger
   const coverOnSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const triggerCoverOnSave = (importPath: string, uri: vscode.Uri) => {
@@ -371,6 +376,7 @@ export function activate(context: vscode.ExtensionContext): void {
     scaffoldCmd,
     scaffoldTargetCmd,
     copyCoverageCmd,
+    copyTestResultsCmd,
     watcher,
     watcherChangeDisposable,
     watcherCreateDisposable,

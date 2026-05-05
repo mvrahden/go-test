@@ -193,6 +193,7 @@ export function applyResults(
     switch (event.Action) {
       case "pass":
         run.passed(item, duration);
+        controller.recordResult(item.id, "pass", duration);
         break;
       case "fail": {
         const output = outputMap.get(event.Test) ?? "";
@@ -209,10 +210,12 @@ export function applyResults(
           vscodeMessages.push(new vscode.TestMessage(output || "Test failed"));
         }
         run.failed(item, vscodeMessages, duration);
+        controller.recordResult(item.id, "fail", duration);
         break;
       }
       case "skip":
         run.skipped(item);
+        controller.recordResult(item.id, "skip");
         break;
       case "run":
         run.started(item);

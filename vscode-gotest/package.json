@@ -57,6 +57,11 @@
         "command": "gotest.copyCoverage",
         "title": "Go Test: Copy Coverage Summary",
         "icon": "$(copy)"
+      },
+      {
+        "command": "gotest.copyTestResults",
+        "title": "Go Test: Copy Test Results",
+        "icon": "$(copy)"
       }
     ],
     "menus": {
@@ -65,6 +70,13 @@
           "command": "gotest.copyCoverage",
           "when": "view == workbench.view.testCoverage",
           "group": "navigation"
+        }
+      ],
+      "testing/item/context": [
+        {
+          "command": "gotest.copyTestResults",
+          "when": "controllerId == gotest",
+          "group": "inline"
         }
       ]
     },
@@ -164,6 +176,7 @@
     "test": "vitest run",
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",
+    "vscode:prepublish": "node esbuild.config.mjs",
     "package": "vsce package"
   },
   "devDependencies": {
