@@ -27,7 +27,12 @@ type T struct {
 	collector *collectingT
 }
 
-func (t *T) T() *testing.T { return t.t }
+func (t *T) T() *testing.T {
+	if t.t == nil {
+		panic("gotest: T() is not available during Eventually/Consistently polling — use the poll parameter's assertion methods instead")
+	}
+	return t.t
+}
 func (t *T) Context() context.Context {
 	if t.ctx != nil {
 		return t.ctx
@@ -127,7 +132,6 @@ type collectingT struct {
 	message string
 }
 
-func (c *collectingT) T() *testing.T { return nil }
 func (c *collectingT) Errorf(format string, args ...any) {
 	c.failed = true
 	c.message = fmt.Sprintf(format, args...)
