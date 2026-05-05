@@ -21,6 +21,7 @@ var knownSubcommands = map[string]bool{
 	"spec":     true,
 	"watch":    true,
 	"clean":    true,
+	"lint":     true,
 	"refactor": true,
 	"version":  true,
 	"help":     true,

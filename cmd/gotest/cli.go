@@ -41,6 +41,8 @@ func main() {
 		os.Exit(runWatch(remaining))
 	case "refactor":
 		os.Exit(runRefactor(remaining))
+	case "lint":
+		os.Exit(runLint(remaining))
 	case "version":
 		fmt.Println(about.LongInfo())
 		return
@@ -190,6 +192,7 @@ Subcommands:
   scaffold    Generate test suite skeleton from a type or file
   migrate     Convert testify/suite tests to go-test format
   refactor    Source code refactoring tools (toggle-focus)
+  lint        Run gotest-specific linter checks
   version     Print version information
   help        Show this help message
 
