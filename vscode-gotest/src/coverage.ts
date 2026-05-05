@@ -234,6 +234,8 @@ export async function runGoToolCoverFunc(
 export class CoverageRunner implements vscode.Disposable {
   private activeRun: vscode.CancellationTokenSource | undefined;
   private activePackageRun: vscode.CancellationTokenSource | undefined;
+  private packageRunQueue = Promise.resolve();
+  private pendingPackages = new Set<string>();
 
   constructor(
     private readonly controller: GoTestController,
@@ -581,6 +583,16 @@ export class CoverageRunner implements vscode.Disposable {
   }
 
   async runPackage(importPath: string): Promise<void> {
+    if (this.pendingPackages.has(importPath)) return;
+    this.pendingPackages.add(importPath);
+    this.packageRunQueue = this.packageRunQueue.then(async () => {
+      this.pendingPackages.delete(importPath);
+      await this.executePackageRun(importPath);
+    });
+    return this.packageRunQueue;
+  }
+
+  private async executePackageRun(importPath: string): Promise<void> {
     this.activePackageRun?.cancel();
     const cts = new vscode.CancellationTokenSource();
     this.activePackageRun = cts;

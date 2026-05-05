@@ -111,6 +111,13 @@ export class DiscoveryService {
 
   async discover(workspaceDir: string, patterns?: string[]): Promise<void> {
     if (this.running) {
+      const existing = this.pending.findIndex(
+        (p) => p.workspaceDir === workspaceDir,
+      );
+      if (existing >= 0) {
+        this.pending[existing].resolve();
+        this.pending.splice(existing, 1);
+      }
       return new Promise<void>((resolve) => {
         this.pending.push({ workspaceDir, patterns, resolve });
       });
