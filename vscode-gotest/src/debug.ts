@@ -145,9 +145,7 @@ export class DebugLauncher implements vscode.Disposable {
       const timer = setTimeout(() => {
         settle(() => {
           child.kill("SIGTERM");
-          reject(
-            new Error(`timed out after ${timeoutSeconds}s`),
-          );
+          reject(new Error(`timed out after ${timeoutSeconds}s`));
         });
       }, timeoutSeconds * 1000);
 
@@ -163,16 +161,12 @@ export class DebugLauncher implements vscode.Disposable {
         if (!settled && stdout.includes("\n")) {
           settle(() => {
             try {
-              const output = JSON.parse(
-                stdout.split("\n")[0],
-              ) as PrepareOutput;
+              const output = JSON.parse(stdout.split("\n")[0]) as PrepareOutput;
               resolve({ output, child });
             } catch {
               child.kill("SIGTERM");
               reject(
-                new Error(
-                  `Failed to parse prepare output: ${stdout.trim()}`,
-                ),
+                new Error(`Failed to parse prepare output: ${stdout.trim()}`),
               );
             }
           });
