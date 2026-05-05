@@ -158,6 +158,7 @@ export class DiscoveryService {
       const warnings = output.warnings ?? [];
       const packages = output.packages ?? [];
       this.cache.update(packages, fullScan, workspaceDir, warnings);
+      this.hasShownError = false;
       for (const w of warnings) {
         const loc = w.file ? ` (${w.file}:${w.line ?? 0})` : "";
         this.outputChannel.appendLine(
