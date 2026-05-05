@@ -268,7 +268,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const copyTestResultsCmd = vscode.commands.registerCommand(
     "gotest.copyTestResults",
-    () => controller.copyTestResults(),
+    (item?: vscode.TestItem) => controller.copyTestResults(item),
   );
 
   // Cover on save: debounced per-package trigger

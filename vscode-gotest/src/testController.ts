@@ -344,7 +344,7 @@ export class GoTestController implements vscode.Disposable {
     this.results.set(itemId, { status, duration });
   }
 
-  async copyTestResults(): Promise<void> {
+  async copyTestResults(rootItem?: vscode.TestItem): Promise<void> {
     const rows: {
       label: string;
       structural: boolean;
@@ -352,23 +352,25 @@ export class GoTestController implements vscode.Disposable {
       status?: string;
     }[] = [];
 
-    const walk = (items: vscode.TestItemCollection, indent: number) => {
-      items.forEach((item) => {
-        const structural =
-          item.id.startsWith("dir:") ||
-          item.tags.some((t) => t.id === "package");
-        const result = structural ? undefined : this.results.get(item.id);
-        rows.push({
-          label: "  ".repeat(indent) + item.label,
-          structural,
-          duration: result?.duration,
-          status: result?.status,
-        });
-        walk(item.children, indent + 1);
+    const walkItem = (item: vscode.TestItem, indent: number) => {
+      const structural =
+        item.id.startsWith("dir:") ||
+        item.tags.some((t) => t.id === "package");
+      const result = structural ? undefined : this.results.get(item.id);
+      rows.push({
+        label: "  ".repeat(indent) + item.label,
+        structural,
+        duration: result?.duration,
+        status: result?.status,
       });
+      item.children.forEach((child) => walkItem(child, indent + 1));
     };
 
-    walk(this.controller.items, 0);
+    if (rootItem) {
+      walkItem(rootItem, 0);
+    } else {
+      this.controller.items.forEach((item) => walkItem(item, 0));
+    }
 
     if (rows.length === 0) {
       vscode.window.showInformationMessage(
