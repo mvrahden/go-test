@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -18,6 +19,7 @@ type overlayResult struct {
 	tmpDir         string
 	overlayFlag    string
 	sharedFixtures []gotestgen.SharedFixtureInfo
+	suitePackages  []string
 }
 
 func generateOverlay(patterns []string) (*overlayResult, func(), error) {
@@ -49,10 +51,18 @@ func buildOverlay(allResults gotestgen.GenerateResults, allSharedFixtures []gote
 		cleanup = func() { os.RemoveAll(tmpDir) }
 	}
 
+	var suitePkgs []string
+	for _, r := range allResults {
+		if len(r.PTest) > 0 || len(r.PXTest) > 0 {
+			suitePkgs = append(suitePkgs, r.Package)
+		}
+	}
+
 	return &overlayResult{
 		tmpDir:         tmpDir,
 		overlayFlag:    "-overlay=" + filepath.Join(tmpDir, "overlay.json"),
 		sharedFixtures: allSharedFixtures,
+		suitePackages:  suitePkgs,
 	}, cleanup, nil
 }
 
@@ -68,12 +78,13 @@ func Run(cfg ExecConfig) int {
 	var overlay *overlayResult
 	var cleanup func()
 
+	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+
 	if CI {
-		loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, nil)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-			return 2
-		}
 		suites, err := gotestgen.CollectFromLoaded(loaded)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -87,19 +98,18 @@ func Run(cfg ExecConfig) int {
 			}
 			return 1
 		}
+	}
+
+	{
+		var err error
 		overlay, cleanup, err = generateOverlayFromLoaded(loaded)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2
 		}
-	} else {
-		var err error
-		overlay, cleanup, err = generateOverlay(cfg.PackagePatterns)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-			return 2
-		}
 	}
+
+	cfg.GoTestArgs = resolveWildcardArgs(cfg.GoTestArgs, cfg.PackagePatterns, loaded, overlay)
 
 	ctx, stop := signal.NotifyContext(context.Background(),
 		os.Interrupt, syscall.SIGTERM)
@@ -141,6 +151,55 @@ func Run(cfg ExecConfig) int {
 		return 2
 	}
 	return code
+}
+
+func resolveWildcardArgs(goTestArgs []string, patterns []string, loaded []*gotestgen.LoadResult, overlay *overlayResult) []string {
+	hasWildcard := false
+	for _, p := range patterns {
+		if strings.HasSuffix(p, "/...") || p == "./..." || p == "..." {
+			hasWildcard = true
+			break
+		}
+	}
+	if !hasWildcard {
+		return goTestArgs
+	}
+
+	suitePkgs := make(map[string]bool, len(overlay.suitePackages))
+	for _, pkg := range overlay.suitePackages {
+		suitePkgs[pkg] = true
+	}
+
+	allHaveSuites := len(loaded) > 0
+	for _, lr := range loaded {
+		if !suitePkgs[lr.PkgPath] {
+			allHaveSuites = false
+			break
+		}
+	}
+	if allHaveSuites {
+		return goTestArgs
+	}
+
+	var result []string
+	seenArgs := false
+	for _, arg := range goTestArgs {
+		if arg == "-args" {
+			seenArgs = true
+		}
+		if !seenArgs && looksLikePackagePattern(arg) && isWildcard(arg) {
+			continue
+		}
+		result = append(result, arg)
+	}
+	for _, pkg := range overlay.suitePackages {
+		result = append(result, pkg)
+	}
+	return result
+}
+
+func isWildcard(s string) bool {
+	return strings.HasSuffix(s, "/...") || s == "./..." || s == "..."
 }
 
 func runWithSpec(ctx context.Context, goTestArgs []string, extraEnv map[string]string) int {
