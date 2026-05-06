@@ -1,0 +1,258 @@
+# gotest — Agent Reference
+
+gotest is a code-generation framework for Go test suites. You write suite structs with lifecycle methods and test cases; the `gotest generate` command produces the test harness (TestMain, test functions, lifecycle wiring). The generated code is not hand-edited.
+
+All assertions accept both `*gotest.T` and `*testing.T` as first argument.
+
+## Rules
+
+These override any default instincts from stdlib `testing` or other Go test frameworks.
+
+**Never call `t.T().Helper()`.** gotest uses `CallerTrace` to automatically walk the call stack and attribute assertion failures to the correct user code location. Calling `t.T().Helper()` is harmless but unnecessary noise — it's already handled by the framework. Same applies to `t.Helper()` in methods that accept `*testing.T` directly.
+
+**Never call `t.T().Cleanup()` inside suite methods.** Use `BeforeAll`/`AfterAll` for suite-level resources and `BeforeEach`/`AfterEach` for per-test resources. The generated harness manages cleanup ordering (LIFO). Calling `t.T().Cleanup()` inside suite methods breaks the predictable lifecycle.
+
+**Never call `t.T().Fatalf()` in reusable test helpers.** Use gotest assertions instead. Helpers that call `t.T()` panic inside `Eventually`/`Consistently` because the collecting T has no underlying `*testing.T`. This is the most common source of runtime panics in gotest code.
+
+**Never use `t.T().Skip()` for environment gating.** Use `SuiteGuard() string` instead. SuiteGuard runs before shared fixture wiring and `t.Parallel()`, avoiding wasted work. `t.T().Skip()` inside `BeforeAll` runs after those expensive operations.
+
+**`Nil`/`NotNil` assertions do not exist.** This is deliberate. Go generics cannot constrain to "nillable types", so a generic `NotNil(t, x)` would silently accept non-nillable types (e.g. `int`, `struct{}`), creating logical bugs with no compile-time warning. Use `NotZero`/`Zero` for pointer, interface, and channel nil checks (these types satisfy `comparable`). For slices, maps, and channels, prefer `Empty`/`NotEmpty` — a nil slice and an empty slice are equivalent for most test intent. Use `True(t, x != nil)` only when the nil vs empty distinction actually matters.
+
+**`HasPrefix`/`HasSuffix` assertions do not exist.** Use `Regexp(t, "^prefix", str)` or `Regexp(t, "suffix$", str)`.
+
+## Assertions
+
+All assertion functions call `FailNow()` on failure (fatal — test stops immediately). All accept optional trailing `msgAndArgs ...any` for custom error messages.
+
+### Unconditional Failure
+
+```go
+gotest.Fail(t, msgAndArgs ...any)                    // immediately fails with message
+```
+
+Use in unreachable branches (`default` in exhaustive switches, after calls that must not return). Prefer over `gotest.True(t, false, "msg")`.
+
+### Equality
+
+```go
+gotest.Equal[V any](t, expected, actual V)          // deep equality (reflect.DeepEqual)
+gotest.NotEqual[V any](t, expected, actual V)        // deep inequality
+```
+
+### Boolean
+
+```go
+gotest.True(t, value bool)
+gotest.False(t, value bool)
+```
+
+### Zero Value (also covers nil)
+
+```go
+gotest.Zero[V comparable](t, value V)               // value == zero value for type
+gotest.NotZero[V comparable](t, value V)             // value != zero value for type
+```
+
+`comparable` includes: pointers, interfaces, channels, numerics, strings, bools, structs of comparables, arrays of comparables. It excludes: slices, maps, functions.
+
+For nil checks on slices, maps, or functions: `gotest.True(t, x != nil)`.
+
+### Collections
+
+```go
+gotest.Empty(t, object any)                          // nil, or len == 0 (string, slice, map, chan, array)
+gotest.NotEmpty(t, object any)
+gotest.Len(t, object any, length int)                // exact length check
+gotest.Contains(t, haystack, needle any)             // substring (string), element (slice/array), key (map)
+gotest.NotContains(t, haystack, needle any)
+gotest.ElementsMatch[V comparable](t, a, b []V)     // same elements, any order
+gotest.Subset[V comparable](t, list, subset []V)     // every subset element exists in list
+```
+
+### Errors
+
+```go
+gotest.NoError(t, err error)                         // err == nil
+gotest.Error(t, err error)                           // err != nil
+gotest.ErrorIs(t, err, target error)                 // errors.Is(err, target)
+gotest.ErrorAs[E error](t, err error) E              // errors.As — returns matched error
+gotest.ErrorContains(t, err error, substr string)    // err != nil && strings.Contains(err.Error(), substr)
+```
+
+### Comparison
+
+```go
+gotest.Greater[V cmp.Ordered](t, a, b V)            // a > b
+gotest.GreaterOrEqual[V cmp.Ordered](t, a, b V)     // a >= b
+gotest.Less[V cmp.Ordered](t, a, b V)               // a < b
+gotest.LessOrEqual[V cmp.Ordered](t, a, b V)        // a <= b
+```
+
+### Strings & Patterns
+
+```go
+gotest.Regexp[P regexpPattern](t, rx P, str string)  // accepts string pattern or *regexp.Regexp
+```
+
+Use `"^prefix"` for HasPrefix, `"suffix$"` for HasSuffix, `"^exact$"` for exact match.
+
+### Numeric
+
+```go
+gotest.InDelta[V numeric](t, expected, actual V, delta float64)
+```
+
+### JSON
+
+```go
+gotest.JSONEq(t, expected, actual any)  // structural JSON equality
+                                         // accepts: string, []byte, json.RawMessage, io.Reader, or any marshalable value
+```
+
+### Time
+
+```go
+gotest.TimeWithin(t, expected, actual time.Time, tolerance time.Duration)
+gotest.TimeIsNow(t, ts time.Time, tolerance time.Duration)
+```
+
+### Panics
+
+```go
+gotest.Panics(t, f func()) any  // asserts f panics, returns recovered value
+```
+
+## Eventually & Consistently
+
+Two forms exist for each:
+
+### Standalone (simple bool polling)
+
+```go
+gotest.Eventually(t, func() bool { return ready() }, 5*time.Second, 100*time.Millisecond)
+gotest.Consistently(t, func() bool { return stable() }, 2*time.Second, 100*time.Millisecond)
+```
+
+### Method form (full assertion support)
+
+```go
+t.Eventually(5*time.Second, 100*time.Millisecond, func(poll *gotest.T) {
+    gotest.Equal(poll, "ready", getStatus())
+})
+
+t.Consistently(2*time.Second, 100*time.Millisecond, func(poll *gotest.T) {
+    gotest.True(poll, isHealthy())
+})
+```
+
+The method form creates a **collecting T** with `t: nil`. On each tick, the callback runs; if any assertion fails, it retries on the next tick. On timeout, the last failure is reported.
+
+**Critical constraint:** Inside the callback, `poll.T()` panics. All code in the callback must use gotest assertions only. Any helper that calls `t.T()` will panic. This is by design — the collecting T intercepts failures without aborting, enabling retry semantics.
+
+## Suite Conventions
+
+### Suite types
+
+```go
+type MyServiceTestSuite struct { /* state */ }           // sequential suite
+type MyServiceTestSuiteParallel struct { /* state */ }   // runs parallel with other suites
+```
+
+- Name must end with `TestSuite` or `TestSuiteParallel`
+- All methods must use pointer receivers
+- Must have at least one `Test*` method
+
+### Test methods
+
+```go
+func (s *MyTestSuite) TestCreate(t *gotest.T) {}                 // sequential
+func (s *MyTestSuite) TestParallelRead(t *gotest.T) {}           // parallel within suite (concurrent with other TestParallel* methods)
+func (s *MyTestSuite) TestLongPollAsync(t *gotest.T, done func()) {} // async (call done() when finished)
+```
+
+Methods can also accept `*testing.T` for stdlib compatibility.
+
+### Lifecycle methods
+
+```go
+func (s *MyTestSuite) BeforeAll(t *gotest.T)  {}  // once before all tests
+func (s *MyTestSuite) AfterAll(t *gotest.T)   {}  // once after all tests (including parallel)
+func (s *MyTestSuite) BeforeEach(t *gotest.T) {}  // before each test
+func (s *MyTestSuite) AfterEach(t *gotest.T)  {}  // after each test
+```
+
+All are optional. Execution order: BeforeAll -> (BeforeEach -> Test -> AfterEach)* -> AfterAll.
+For parallel test cases, AfterAll waits for all parallel tests to complete.
+
+### SuiteConfig (optional)
+
+```go
+func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
+    return gotest.IntegrationSuiteConfig() // Timeout: 2m, SetupTimeout: 5m
+}
+```
+
+Fields: `Timeout` (per-test deadline), `SetupTimeout`, `Retries`, `FailFast` (stop on first failure).
+Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
+
+### SuiteGuard (optional)
+
+```go
+func (s *MyTestSuite) SuiteGuard() string {
+    if os.Getenv("DATABASE_URL") == "" {
+        return "DATABASE_URL not set"
+    }
+    return "" // empty = run the suite
+}
+```
+
+Returns empty string to run, non-empty to skip with that reason. Runs before shared fixture wiring, before `t.Parallel()`, before any expensive work.
+
+### Focus & Exclude prefixes
+
+```go
+type F_DebugThisTestSuite struct {}     // FOCUSED: only F_ suites run; all others skipped
+type X_BrokenTestSuite struct {}        // EXCLUDED: never runs
+
+func (s *MyTestSuite) F_TestSpecific(t *gotest.T) {}  // FOCUSED test case
+func (s *MyTestSuite) X_TestBroken(t *gotest.T) {}    // EXCLUDED test case
+```
+
+- `F_` — focus. If any `F_` suite or test case exists, only focused items run. Causes CI failure with `gotest --ci`.
+- `X_` — exclude. Always skipped. Compile-time decision (AST level). Use for permanently/temporarily disabled tests.
+
+Focus and exclude apply independently at both suite and test case levels.
+
+## Parallel Semantics
+
+**Suite-level** (`*TestSuiteParallel` suffix): The entire suite runs concurrently with other top-level tests. Methods within the suite run sequentially relative to each other. Safe to share suite struct state `s` across methods.
+
+**Method-level** (`TestParallel*` prefix): Individual test cases run concurrently within the same suite. Suite struct state `s` is shared — writing to `s` fields from parallel methods is a data race. Use method-local variables or synchronization.
+
+These are independent. A `TestSuiteParallel` can also have `TestParallel*` methods (suite runs parallel with others AND methods run parallel within it).
+
+## Other T Methods
+
+```go
+t.T() *testing.T                                    // access underlying testing.T (panics inside Eventually)
+t.Context() context.Context                          // test context (respects deadline from SuiteConfig)
+t.It("description", func(it *gotest.T) { ... })     // BDD-style subtest
+t.When("condition", func(w *gotest.T) { ... })       // BDD-style subtest
+t.Each(entries, func(t *gotest.T, entry E) { ... })  // table-driven iteration (reflection-based)
+t.MatchSnapshot(value any, name ...string)           // snapshot testing (testdata/__snapshots__/)
+t.Assert(v any).Equal(expected)                      // fluent assertion chain (alternative style)
+```
+
+Generic `Each` (preferred over method form):
+```go
+for t, entry := range gotest.Each(t, entries) {
+    gotest.Equal(t, entry.Expected, Compute(entry.Input))
+}
+```
+
+## Utilities
+
+```go
+gotest.Must[T any](val T, ok any) T  // panics if ok is error/false; returns val otherwise
+                                      // useful in test setup: db := gotest.Must(sql.Open(...))
+```

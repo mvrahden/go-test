@@ -35,6 +35,15 @@ func fail(t testingT, msg string, msgAndArgs []any) {
 	t.FailNow()
 }
 
+// Fail immediately fails the test with the given message.
+func Fail(t testingT, msgAndArgs ...any) {
+	// stdlib compat: mark frame as helper when t is *testing.T or similar
+	if h, ok := t.(interface{ Helper() }); ok {
+		h.Helper()
+	}
+	fail(t, "Fail", msgAndArgs)
+}
+
 // Equal asserts that expected and actual are deeply equal.
 func Equal[V any](t testingT, expected, actual V, msgAndArgs ...any) {
 	// stdlib compat: mark frame as helper when t is *testing.T or similar

@@ -21,6 +21,21 @@ func (e *myError) Error() string { return fmt.Sprintf("myError: code=%d", e.Code
 
 type AssertionsTestSuite struct{}
 
+func (s *AssertionsTestSuite) TestFail(t *gotest.T) {
+	t.It("always fails", func(it *gotest.T) {
+		m := newMock()
+		gotest.Fail(m)
+		gotest.True(it, m.failed)
+	})
+
+	t.It("includes custom message", func(it *gotest.T) {
+		m := newMock()
+		gotest.Fail(m, "something went wrong: %d", 42)
+		gotest.True(it, m.failed)
+		gotest.Contains(it, m.message, "something went wrong: 42")
+	})
+}
+
 func (s *AssertionsTestSuite) TestEqual(t *gotest.T) {
 	t.When("values are deeply equal", func(w *gotest.T) {
 		w.It("passes for ints", func(it *gotest.T) {
