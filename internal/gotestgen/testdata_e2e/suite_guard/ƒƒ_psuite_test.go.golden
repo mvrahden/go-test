@@ -15,7 +15,7 @@ type ƒƒ_GOTEST_GuardedTestSuite struct {
 }
 
 func (ts *ƒƒ_GOTEST_GuardedTestSuite) BeforeAll(it *gotest.T)  { ts.GuardedTestSuite.BeforeAll(it) }
-func (ts *ƒƒ_GOTEST_GuardedTestSuite) AfterAll(it *gotest.T)   {}
+func (ts *ƒƒ_GOTEST_GuardedTestSuite) AfterAll(it *gotest.T)   { ts.GuardedTestSuite.AfterAll(it) }
 func (ts *ƒƒ_GOTEST_GuardedTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_GuardedTestSuite) AfterEach(it *gotest.T)  {}
 

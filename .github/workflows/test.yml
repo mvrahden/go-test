@@ -18,6 +18,10 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Init workspace
         run: go work init . ./examples
+      - name: Vet
+        run: go vet ./...
+      - name: Lint
+        run: go run ./cmd/gotest-lint ./...
       - name: Test
         run: go run ./cmd/gotest spec --no-color --output=spec.txt ./... -race -coverprofile=coverage.out
       - name: Summary

@@ -445,3 +445,134 @@ func Test_BaseAssertionContext_NoError_Fail_ExactMessage(t *testing.T) {
 	assert.NewAssertionContextForTest(fmt.Errorf("oops"), fmtFn).NoError()
 	assertFailMsg(t, buf, "NoError failed:\n  got: oops")
 }
+
+func Test_BaseAssertionContext_NoError_Fail_NonErrorType(t *testing.T) {
+	buf, fmtFn := newFormatSpy(t)
+
+	assert.NewAssertionContextForTest("not an error", fmtFn).NoError()
+	assertFailMsg(t, buf, "NoError failed:\n  value of type string is not an error")
+}
+
+// ---------------------------------------------------------------------------
+// NotEqual
+// ---------------------------------------------------------------------------
+
+func Test_BaseAssertionContext_NotEqual_Success(t *testing.T) {
+	buf, fmtFn := newFormatSpy(t)
+
+	testCases := []struct{ v1, v2 any }{
+		{1, 2},
+		{"abc", "def"},
+		{true, false},
+	}
+	for _, tc := range testCases {
+		assert.NewAssertionContextForTest(tc.v1, fmtFn).NotEqual(tc.v2)
+		assertSuccess(t, buf)
+	}
+}
+
+func Test_BaseAssertionContext_NotEqual_Fail(t *testing.T) {
+	buf, fmtFn := newFormatSpy(t)
+
+	for _, v := range []any{42, "abc", true} {
+		assert.NewAssertionContextForTest(v, fmtFn).NotEqual(v)
+		assertFail(t, buf)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// NotContains
+// ---------------------------------------------------------------------------
+
+func Test_BaseAssertionContext_NotContains_Success(t *testing.T) {
+	buf, fmtFn := newFormatSpy(t)
+
+	assert.NewAssertionContextForTest("hello", fmtFn).NotContains("xyz")
+	assertSuccess(t, buf)
+
+	assert.NewAssertionContextForTest([]int{1, 2, 3}, fmtFn).NotContains(99)
+	assertSuccess(t, buf)
+}
+
+func Test_BaseAssertionContext_NotContains_Fail(t *testing.T) {
+	buf, fmtFn := newFormatSpy(t)
+
+	assert.NewAssertionContextForTest("hello world", fmtFn).NotContains("world")
+	assertFail(t, buf)
+
+	assert.NewAssertionContextForTest([]int{1, 2, 3}, fmtFn).NotContains(2)
+	assertFail(t, buf)
+}
+
+func Test_BaseAssertionContext_NotContains_Fail_InvalidType(t *testing.T) {
+	buf, fmtFn := newFormatSpy(t)
+
+	assert.NewAssertionContextForTest(123, fmtFn).NotContains("a")
+	assertFail(t, buf)
+}
+
+func Test_BaseAssertionContext_NotContains_Fail_StringNonStringElement(t *testing.T) {
+	buf, fmtFn := newFormatSpy(t)
+
+	assert.NewAssertionContextForTest("hello", fmtFn).NotContains(123)
+	assertFail(t, buf)
+}
+
+// ---------------------------------------------------------------------------
+// NotEmpty
+// ---------------------------------------------------------------------------
+
+func Test_BaseAssertionContext_NotEmpty_Success(t *testing.T) {
+	buf, fmtFn := newFormatSpy(t)
+
+	for _, v := range []any{"abc", []byte{1, 2}, map[string]any{"a": 1}} {
+		assert.NewAssertionContextForTest(v, fmtFn).NotEmpty()
+		assertSuccess(t, buf)
+	}
+}
+
+func Test_BaseAssertionContext_NotEmpty_Fail(t *testing.T) {
+	buf, fmtFn := newFormatSpy(t)
+
+	for _, v := range []any{nil, "", []byte(nil), make([]byte, 0)} {
+		assert.NewAssertionContextForTest(v, fmtFn).NotEmpty()
+		assertFail(t, buf)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// IsError
+// ---------------------------------------------------------------------------
+
+func Test_BaseAssertionContext_IsError_Success(t *testing.T) {
+	buf, fmtFn := newFormatSpy(t)
+
+	assert.NewAssertionContextForTest(fmt.Errorf("boom"), fmtFn).IsError()
+	assertSuccess(t, buf)
+}
+
+func Test_BaseAssertionContext_IsError_Fail_Nil(t *testing.T) {
+	buf, fmtFn := newFormatSpy(t)
+
+	assert.NewAssertionContextForTest(nil, fmtFn).IsError()
+	assertFailMsg(t, buf, "IsError failed:\n  expected an error but got nil")
+}
+
+func Test_BaseAssertionContext_IsError_Fail_NonError(t *testing.T) {
+	buf, fmtFn := newFormatSpy(t)
+
+	assert.NewAssertionContextForTest("not an error", fmtFn).IsError()
+	assertFailMsg(t, buf, "IsError failed:\n  value of type string is not an error")
+}
+
+// ---------------------------------------------------------------------------
+// NewAssertionContext (via *testing.T)
+// ---------------------------------------------------------------------------
+
+func Test_NewAssertionContext_Equal_Success(t *testing.T) {
+	assert.NewAssertionContext(42, t).Equal(42)
+}
+
+func Test_NewAssertionContext_Contains_String(t *testing.T) {
+	assert.NewAssertionContext("hello world", t).Contains("world")
+}

@@ -1,5 +1,10 @@
 src/**
 test/**
 node_modules/**
+docs/**
 tsconfig.json
 esbuild.config.mjs
+vitest.config.ts
+package-lock.json
+.gitignore
+*.vsix
