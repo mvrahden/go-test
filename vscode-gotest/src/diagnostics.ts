@@ -42,7 +42,7 @@ export class FocusDiagnostics implements vscode.Disposable {
           focusCount++;
           this.addDiagnostic(
             diagnosticsMap,
-            suite.file,
+            `${pkg.dir}/${suite.file}`,
             suite.line,
             suite.name,
             true,
@@ -53,7 +53,7 @@ export class FocusDiagnostics implements vscode.Disposable {
             focusCount++;
             this.addDiagnostic(
               diagnosticsMap,
-              method.file,
+              `${pkg.dir}/${method.file}`,
               method.line,
               method.name,
               false,
@@ -109,7 +109,7 @@ export class FocusDiagnostics implements vscode.Disposable {
             label: suite.name,
             description: `${suite.file}:${suite.line}`,
             detail: "Focused suite",
-            file: suite.file,
+            file: `${pkg.dir}/${suite.file}`,
             line: suite.line,
           });
         }
@@ -119,7 +119,7 @@ export class FocusDiagnostics implements vscode.Disposable {
               label: method.name,
               description: `${method.file}:${method.line}`,
               detail: `Focused method in ${suite.name}`,
-              file: method.file,
+              file: `${pkg.dir}/${method.file}`,
               line: method.line,
             });
           }
