@@ -4,6 +4,7 @@ package nestedfixture
 
 import (
 	"context"
+	"fmt"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"os"
 	"testing"
@@ -31,165 +32,183 @@ func (ts *ƒƒ_GOTEST_FullTestSuite) AfterAll(it *gotest.T)   {}
 func (ts *ƒƒ_GOTEST_FullTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_FullTestSuite) AfterEach(it *gotest.T)  {}
 
-func TestMain(m *testing.M) { os.Exit(m.Run()) }
+var ƒ_InfraFixture *InfraFixture
 
-func Test_InfraFixture(t *testing.T) {
+var ƒ_APIFixture *APIFixture
 
-	fixture := &InfraFixture{}
-	ƒcfg := gotest.DefaultFixtureConfig()
+func TestMain(m *testing.M) { os.Exit(ƒƒ_GOTEST_main(m)) }
+
+func ƒƒ_GOTEST_main(m *testing.M) (ƒcode int) {
+
+	{
+
+		ƒ_InfraFixture = &InfraFixture{}
+		ƒcfg := gotest.DefaultFixtureConfig()
+		var ƒerr error
+		ƒattempts := 1 + ƒcfg.Retries
+		for ƒi := range ƒattempts {
+			ctx := context.Background()
+			if ƒcfg.Timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
+				defer cancel()
+			}
+			ƒerr = ƒ_InfraFixture.BeforeAll(ctx)
+			if ƒerr == nil {
+				break
+			}
+			if ƒi < ƒattempts-1 {
+				fmt.Fprintf(os.Stderr, "InfraFixture.BeforeAll attempt %d/%d failed: %v\n", ƒi+1, ƒattempts, ƒerr)
+				if ƒcfg.RetryDelay > 0 {
+					time.Sleep(ƒcfg.RetryDelay)
+				}
+			}
+		}
+		if ƒerr != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: InfraFixture.BeforeAll failed after %d attempt(s): %v\n", ƒattempts, ƒerr)
+			return 2
+		}
+		defer func() {
+			ctx := context.Background()
+			if ƒcfg.Timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
+				defer cancel()
+			}
+			if err := ƒ_InfraFixture.AfterAll(ctx); err != nil {
+				fmt.Fprintf(os.Stderr, "InfraFixture.AfterAll failed: %v\n", err)
+				if ƒcode == 0 {
+					ƒcode = 1
+				}
+			}
+		}()
+	}
+	{
+		ƒ_APIFixture = &APIFixture{
+			InfraFixture: ƒ_InfraFixture,
+		}
+		ƒcfg := gotest.DefaultFixtureConfig()
+		var ƒerr error
+		ƒattempts := 1 + ƒcfg.Retries
+		for ƒi := range ƒattempts {
+			ctx := context.Background()
+			if ƒcfg.Timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
+				defer cancel()
+			}
+			ƒerr = ƒ_APIFixture.BeforeAll(ctx)
+			if ƒerr == nil {
+				break
+			}
+			if ƒi < ƒattempts-1 {
+				fmt.Fprintf(os.Stderr, "APIFixture.BeforeAll attempt %d/%d failed: %v\n", ƒi+1, ƒattempts, ƒerr)
+				if ƒcfg.RetryDelay > 0 {
+					time.Sleep(ƒcfg.RetryDelay)
+				}
+			}
+		}
+		if ƒerr != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: APIFixture.BeforeAll failed after %d attempt(s): %v\n", ƒattempts, ƒerr)
+			return 2
+		}
+		defer func() {
+			ctx := context.Background()
+			if ƒcfg.Timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
+				defer cancel()
+			}
+			if err := ƒ_APIFixture.AfterAll(ctx); err != nil {
+				fmt.Fprintf(os.Stderr, "APIFixture.AfterAll failed: %v\n", err)
+				if ƒcode == 0 {
+					ƒcode = 1
+				}
+			}
+		}()
+	}
+
+	ƒcode = m.Run()
+	return
+}
+
+func TestLightTestSuite(t *testing.T) {
+	s := &ƒƒ_GOTEST_LightTestSuite{
+		LightTestSuite: LightTestSuite{
+			InfraFixture: ƒ_InfraFixture,
+		},
+	}
+	ƒcfg := gotest.DefaultSuiteConfig()
+
+	newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
+		return func(tt *gotest.T) {
+			t := tt.T()
+			t.Run(desc, func(it *testing.T) {
+				ttt := gotest.NewT(it)
+				if ƒcfg.Timeout > 0 {
+					ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+				}
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				ƒƒ_GOTEST_exec(testFn, ttt)
+			})
+		}
+	}
+
+	testCases := []gotest.TestCase{
+		newTestCase("TestDBAccess", s.TestDBAccess),
+	}
+
+	tt := gotest.NewT(t)
 	t.Cleanup(func() {
-		ctx := context.Background()
-		if ƒcfg.Timeout > 0 {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
-			defer cancel()
-		}
-		if err := fixture.AfterAll(ctx); err != nil {
-			t.Errorf("InfraFixture.AfterAll failed: %v", err)
-		}
+		s.AfterAll(tt)
 	})
-	var ƒerr error
-	ƒattempts := 1 + ƒcfg.Retries
-	for ƒi := range ƒattempts {
-		ctx := t.Context()
-		if ƒcfg.Timeout > 0 {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
-			defer cancel()
-		}
-		ƒerr = fixture.BeforeAll(ctx)
-		if ƒerr == nil {
+	s.BeforeAll(tt)
+	for _, tc := range testCases {
+		tc(tt)
+		if ƒcfg.FailFast && t.Failed() {
 			break
 		}
-		if ƒi < ƒattempts-1 {
-			t.Logf("InfraFixture.BeforeAll attempt %d/%d failed: %v", ƒi+1, ƒattempts, ƒerr)
-			if ƒcfg.RetryDelay > 0 {
-				time.Sleep(ƒcfg.RetryDelay)
-			}
-		}
 	}
-	if ƒerr != nil {
-		t.Fatalf("InfraFixture.BeforeAll failed after %d attempt(s): %v", ƒattempts, ƒerr)
+}
+
+func TestFullTestSuite(t *testing.T) {
+	s := &ƒƒ_GOTEST_FullTestSuite{
+		FullTestSuite: FullTestSuite{
+			APIFixture: ƒ_APIFixture,
+		},
 	}
-	t.Run("LightTestSuite", func(t *testing.T) {
-		s := &ƒƒ_GOTEST_LightTestSuite{
-			LightTestSuite: LightTestSuite{
-				InfraFixture: fixture,
-			},
-		}
-		ƒscfg := gotest.DefaultSuiteConfig()
+	ƒcfg := gotest.DefaultSuiteConfig()
 
-		newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
-			return func(tt *gotest.T) {
-				t := tt.T()
-				t.Run(desc, func(it *testing.T) {
-					ttt := gotest.NewT(it)
-					if ƒscfg.Timeout > 0 {
-						ttt = gotest.NewTWithDeadline(it, ƒscfg.Timeout)
-					}
-					defer s.AfterEach(ttt)
-					s.BeforeEach(ttt)
-					ƒƒ_GOTEST_exec(testFn, ttt)
-				})
-			}
-		}
-
-		testCases := []gotest.TestCase{
-			newTestCase("TestDBAccess", s.TestDBAccess),
-		}
-
-		tt := gotest.NewT(t)
-		t.Cleanup(func() {
-			s.AfterAll(tt)
-		})
-		s.BeforeAll(tt)
-		for _, tc := range testCases {
-			tc(tt)
-			if ƒscfg.FailFast && t.Failed() {
-				break
-			}
-		}
-	})
-
-	t.Run("APIFixture", func(t *testing.T) {
-		child := &APIFixture{
-			InfraFixture: fixture,
-		}
-		ƒcfg_child := gotest.DefaultFixtureConfig()
-		t.Cleanup(func() {
-			ctx := context.Background()
-			if ƒcfg_child.Timeout > 0 {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, ƒcfg_child.Timeout)
-				defer cancel()
-			}
-			if err := child.AfterAll(ctx); err != nil {
-				t.Errorf("APIFixture.AfterAll failed: %v", err)
-			}
-		})
-		var ƒerr_child error
-		ƒattempts_child := 1 + ƒcfg_child.Retries
-		for ƒi := range ƒattempts_child {
-			ctx := t.Context()
-			if ƒcfg_child.Timeout > 0 {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, ƒcfg_child.Timeout)
-				defer cancel()
-			}
-			ƒerr_child = child.BeforeAll(ctx)
-			if ƒerr_child == nil {
-				break
-			}
-			if ƒi < ƒattempts_child-1 {
-				t.Logf("APIFixture.BeforeAll attempt %d/%d failed: %v", ƒi+1, ƒattempts_child, ƒerr_child)
-				if ƒcfg_child.RetryDelay > 0 {
-					time.Sleep(ƒcfg_child.RetryDelay)
+	newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
+		return func(tt *gotest.T) {
+			t := tt.T()
+			t.Run(desc, func(it *testing.T) {
+				ttt := gotest.NewT(it)
+				if ƒcfg.Timeout > 0 {
+					ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
 				}
-			}
-		}
-		if ƒerr_child != nil {
-			t.Fatalf("APIFixture.BeforeAll failed after %d attempt(s): %v", ƒattempts_child, ƒerr_child)
-		}
-		t.Run("FullTestSuite", func(t *testing.T) {
-			s := &ƒƒ_GOTEST_FullTestSuite{
-				FullTestSuite: FullTestSuite{
-					APIFixture: child,
-				},
-			}
-			ƒscfg := gotest.DefaultSuiteConfig()
-
-			newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
-				return func(tt *gotest.T) {
-					t := tt.T()
-					t.Run(desc, func(it *testing.T) {
-						ttt := gotest.NewT(it)
-						if ƒscfg.Timeout > 0 {
-							ttt = gotest.NewTWithDeadline(it, ƒscfg.Timeout)
-						}
-						defer s.AfterEach(ttt)
-						s.BeforeEach(ttt)
-						ƒƒ_GOTEST_exec(testFn, ttt)
-					})
-				}
-			}
-
-			testCases := []gotest.TestCase{
-				newTestCase("TestAPIAccess", s.TestAPIAccess),
-				newTestCase("TestAPIHealth", s.TestAPIHealth),
-			}
-
-			tt := gotest.NewT(t)
-			t.Cleanup(func() {
-				s.AfterAll(tt)
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				ƒƒ_GOTEST_exec(testFn, ttt)
 			})
-			s.BeforeAll(tt)
-			for _, tc := range testCases {
-				tc(tt)
-				if ƒscfg.FailFast && t.Failed() {
-					break
-				}
-			}
-		})
-	})
+		}
+	}
 
+	testCases := []gotest.TestCase{
+		newTestCase("TestAPIAccess", s.TestAPIAccess),
+		newTestCase("TestAPIHealth", s.TestAPIHealth),
+	}
+
+	tt := gotest.NewT(t)
+	t.Cleanup(func() {
+		s.AfterAll(tt)
+	})
+	s.BeforeAll(tt)
+	for _, tc := range testCases {
+		tc(tt)
+		if ƒcfg.FailFast && t.Failed() {
+			break
+		}
+	}
 }

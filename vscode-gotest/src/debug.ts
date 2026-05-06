@@ -42,10 +42,16 @@ export class DebugLauncher implements vscode.Disposable {
       );
       this.outputChannel.appendLine(`[debug] ${formatCliCommand(cmd)}`);
 
+      const timeout =
+        scopedConfig(workspaceFolder.uri.fsPath).get<number>(
+          "debug.prepareTimeout",
+        ) ?? 60;
       const result = await this.spawnPrepare(
         cmd.bin,
         cmd.args,
         workspaceFolder.uri.fsPath,
+        timeout,
+        token,
       );
       prepare = result.output;
       child = result.child;
@@ -120,25 +126,50 @@ export class DebugLauncher implements vscode.Disposable {
     bin: string,
     args: string[],
     cwd: string,
+    timeoutSeconds: number,
+    token: vscode.CancellationToken,
   ): Promise<{ output: PrepareOutput; child: ChildProcess }> {
     return new Promise((resolve, reject) => {
       const child = spawn(bin, args, { cwd });
       let stdout = "";
       let settled = false;
+      const settle = (fn: () => void) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          cancelListener.dispose();
+          fn();
+        }
+      };
+
+      const timer = setTimeout(() => {
+        settle(() => {
+          child.kill("SIGTERM");
+          reject(new Error(`timed out after ${timeoutSeconds}s`));
+        });
+      }, timeoutSeconds * 1000);
+
+      const cancelListener = token.onCancellationRequested(() => {
+        settle(() => {
+          child.kill("SIGTERM");
+          reject(new Error("cancelled"));
+        });
+      });
 
       child.stdout.on("data", (data: Buffer) => {
         stdout += data.toString();
         if (!settled && stdout.includes("\n")) {
-          settled = true;
-          try {
-            const output = JSON.parse(stdout.split("\n")[0]) as PrepareOutput;
-            resolve({ output, child });
-          } catch {
-            child.kill("SIGTERM");
-            reject(
-              new Error(`Failed to parse prepare output: ${stdout.trim()}`),
-            );
-          }
+          settle(() => {
+            try {
+              const output = JSON.parse(stdout.split("\n")[0]) as PrepareOutput;
+              resolve({ output, child });
+            } catch {
+              child.kill("SIGTERM");
+              reject(
+                new Error(`Failed to parse prepare output: ${stdout.trim()}`),
+              );
+            }
+          });
         }
       });
 
@@ -149,17 +180,13 @@ export class DebugLauncher implements vscode.Disposable {
       });
 
       child.on("error", (err: Error) => {
-        if (!settled) {
-          settled = true;
-          reject(err);
-        }
+        settle(() => reject(err));
       });
 
       child.on("close", (code) => {
-        if (!settled) {
-          settled = true;
-          reject(new Error(`prepare exited with code ${code} before ready`));
-        }
+        settle(() =>
+          reject(new Error(`prepare exited with code ${code} before ready`)),
+        );
       });
     });
   }

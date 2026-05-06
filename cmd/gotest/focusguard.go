@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 )
 
@@ -24,6 +25,10 @@ func RunFocusGuard(patterns []string) ([]FocusViolation, error) {
 	if err != nil {
 		return nil, err
 	}
+	return CheckFocusViolations(suites), nil
+}
+
+func CheckFocusViolations(suites gotestast.TestSuiteSpecSet) []FocusViolation {
 	var violations []FocusViolation
 	for _, s := range suites {
 		name := s.Identifier()
@@ -37,5 +42,5 @@ func RunFocusGuard(patterns []string) ([]FocusViolation, error) {
 			}
 		}
 	}
-	return violations, nil
+	return violations
 }

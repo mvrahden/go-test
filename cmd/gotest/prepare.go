@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 )
 
 type prepareOutput struct {
@@ -31,7 +32,7 @@ func runPrepare(args []string) int {
 
 	var setupProc *SharedFixtureProcess
 	if len(overlay.sharedFixtures) > 0 {
-		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures)
+		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, time.Minute)
 		if err != nil {
 			stop()
 			cleanup()

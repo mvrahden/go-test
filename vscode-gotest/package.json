@@ -131,6 +131,12 @@
           "scope": "resource",
           "description": "Additional build flags passed to dlv"
         },
+        "gotest.debug.prepareTimeout": {
+          "type": "number",
+          "default": 60,
+          "scope": "resource",
+          "description": "Seconds to wait for debug preparation (overlay generation + shared fixture setup) before timing out"
+        },
         "gotest.buildTags": {
           "type": "string",
           "default": "",

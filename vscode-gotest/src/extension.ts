@@ -16,11 +16,7 @@ import {
 import { CoverageRunner } from "./coverage.js";
 import { CoverageStore } from "./coverageStore.js";
 import { validateGoBinary, scopedConfig } from "./cli.js";
-import {
-  buildRunFilter,
-  getPackageDir,
-  getPackageItem,
-} from "./runnerUtils.js";
+import { buildRunFilter, getPackageDir } from "./runnerUtils.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Go Test Suites");
@@ -51,8 +47,7 @@ export function activate(context: vscode.ExtensionContext): void {
         token,
         (items) => {
           if (!items || items.length === 0) return undefined;
-          const pkg = getPackageItem(items[0]);
-          return buildRunFilter(Array.from(items), pkg.id, cache);
+          return buildRunFilter(Array.from(items));
         },
         (item) => getPackageDir(item, cache),
       ),
@@ -166,8 +161,7 @@ export function activate(context: vscode.ExtensionContext): void {
           cts.token,
           (items) => {
             if (!items || items.length === 0) return undefined;
-            const pkg = getPackageItem(items[0]);
-            return buildRunFilter(Array.from(items), pkg.id, cache);
+            return buildRunFilter(Array.from(items));
           },
           (i) => getPackageDir(i, cache),
         );

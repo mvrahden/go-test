@@ -431,10 +431,17 @@ async function buildCachedBinary(
     return undefined;
   }
 
-  const hash = createHash("sha256")
-    .update(goModContent)
-    .digest("hex")
-    .substring(0, 16);
+  const h = createHash("sha256").update(goModContent).update(modulePath);
+  try {
+    const goSumContent = await readFile(
+      path.join(workspaceDir, "go.sum"),
+      "utf-8",
+    );
+    h.update(goSumContent);
+  } catch {
+    // go.sum may not exist
+  }
+  const hash = h.digest("hex").substring(0, 16);
   const cached = replaceBinaryCache.get(workspaceDir);
   if (cached?.hash === hash) {
     try {

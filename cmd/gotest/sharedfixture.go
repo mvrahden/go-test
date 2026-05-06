@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,7 +45,7 @@ func (p *SharedFixtureProcess) Teardown() error {
 // startSharedFixtures generates a shared setup binary in the overlay temp dir,
 // starts it as a subprocess, reads JSON state from stdout, writes it to a state
 // file, and returns a SharedFixtureProcess.
-func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestgen.SharedFixtureInfo) (*SharedFixtureProcess, error) {
+func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestgen.SharedFixtureInfo, setupTimeout time.Duration) (*SharedFixtureProcess, error) {
 	src, err := gotestgen.GenerateSharedSetup(fixtures)
 	if err != nil {
 		return nil, fmt.Errorf("generate shared setup: %w", err)
@@ -79,10 +80,32 @@ func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		return nil, fmt.Errorf("start shared fixture process: %w", err)
 	}
 
+	type decodeResult struct {
+		state map[string]json.RawMessage
+		err   error
+	}
+	decoded := make(chan decodeResult, 1)
+	go func() {
+		var state map[string]json.RawMessage
+		err := json.NewDecoder(stdout).Decode(&state)
+		decoded <- decodeResult{state, err}
+	}()
+
 	var state map[string]json.RawMessage
-	if err := json.NewDecoder(stdout).Decode(&state); err != nil {
+	select {
+	case res := <-decoded:
+		if res.err != nil {
+			cmd.Process.Kill()
+			return nil, fmt.Errorf("read shared fixture state: %w", res.err)
+		}
+		state = res.state
+	case <-ctx.Done():
 		cmd.Process.Kill()
-		return nil, fmt.Errorf("read shared fixture state: %w", err)
+		return nil, fmt.Errorf("cancelled: %w", ctx.Err())
+	case <-time.After(setupTimeout):
+		cmd.Process.Kill()
+		io.Copy(io.Discard, stdout)
+		return nil, fmt.Errorf("timed out after %v", setupTimeout)
 	}
 
 	stateBytes, err := json.Marshal(state)
