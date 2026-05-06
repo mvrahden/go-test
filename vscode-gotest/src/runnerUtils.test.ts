@@ -15,6 +15,7 @@ import {
   getPackageDepth,
   getPackageItem,
   expandToPackages,
+  computeWildcard,
 } from "./runnerUtils.js";
 import {
   buildPathTrie,
@@ -363,5 +364,52 @@ describe("collapsePathTrie", () => {
     const pkg = root.children.get("pkg")!;
     expect(pkg.importPath).toBe("example.com/pkg");
     expect(pkg.children.size).toBe(1);
+  });
+});
+
+describe("computeWildcard", () => {
+  it("returns undefined for a single path", () => {
+    expect(computeWildcard(["example.com/pkg/a"])).toBeUndefined();
+  });
+
+  it("returns undefined for empty array", () => {
+    expect(computeWildcard([])).toBeUndefined();
+  });
+
+  it("returns wildcard for two paths with common prefix", () => {
+    expect(
+      computeWildcard(["example.com/pkg/a", "example.com/pkg/b"]),
+    ).toBe("example.com/pkg/...");
+  });
+
+  it("finds deep common prefix", () => {
+    expect(
+      computeWildcard([
+        "example.com/pkg/platform/billing",
+        "example.com/pkg/platform/cluster",
+        "example.com/pkg/platform/auth",
+      ]),
+    ).toBe("example.com/pkg/platform/...");
+  });
+
+  it("stops at segment boundary", () => {
+    expect(
+      computeWildcard(["example.com/foo/bar", "example.com/foo/baz"]),
+    ).toBe("example.com/foo/...");
+  });
+
+  it("handles divergence at top level", () => {
+    expect(
+      computeWildcard([
+        "example.com/pkg/a",
+        "example.com/internal/b",
+      ]),
+    ).toBe("example.com/...");
+  });
+
+  it("returns undefined when all paths are identical", () => {
+    expect(
+      computeWildcard(["example.com/pkg", "example.com/pkg"]),
+    ).toBeUndefined();
   });
 });

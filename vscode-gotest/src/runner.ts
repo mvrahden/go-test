@@ -12,6 +12,7 @@ import {
   applyResults,
   spawnTestProcess,
   buildRunFilter,
+  computeWildcard,
 } from "./runnerUtils.js";
 import {
   runGoToolCoverFunc,
@@ -209,6 +210,8 @@ export class TestRunner {
     token: vscode.CancellationToken,
   ): Promise<void> {
     const importPaths = pkgInfos.map((p) => p.importPath);
+    const wildcard = filter ? undefined : computeWildcard(importPaths);
+    const cliPkgArgs = wildcard ? [wildcard] : importPaths;
     let coverFile: string | undefined;
 
     try {
@@ -217,7 +220,7 @@ export class TestRunner {
         coverFile = path.join(tmpDir, "cover.out");
       }
 
-      const cliArgs: string[] = ["-json", "-count=1", ...importPaths];
+      const cliArgs: string[] = ["-json", "-count=1", ...cliPkgArgs];
       if (coverFile) {
         cliArgs.push("-covermode=atomic", `-coverprofile=${coverFile}`);
       }

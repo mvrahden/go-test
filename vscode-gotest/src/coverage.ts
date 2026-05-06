@@ -20,6 +20,7 @@ import {
   applyResults,
   spawnTestProcess,
   buildRunFilter,
+  computeWildcard,
 } from "./runnerUtils.js";
 
 const execFileAsync = promisify(execFile);
@@ -406,6 +407,8 @@ export class CoverageRunner implements vscode.Disposable {
     token: vscode.CancellationToken,
   ): Promise<string> {
     const importPaths = pkgInfos.map((p) => p.importPath);
+    const wildcard = filter ? undefined : computeWildcard(importPaths);
+    const cliPkgArgs = wildcard ? [wildcard] : importPaths;
     let coverFile: string | undefined;
 
     try {
@@ -417,7 +420,7 @@ export class CoverageRunner implements vscode.Disposable {
         "-count=1",
         "-covermode=atomic",
         `-coverprofile=${coverFile}`,
-        ...importPaths,
+        ...cliPkgArgs,
       ];
       if (filter) {
         cliArgs.push("-run", filter);

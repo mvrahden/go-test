@@ -348,6 +348,27 @@ export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
       : filters.join("|");
 }
 
+export function computeWildcard(importPaths: string[]): string | undefined {
+  if (importPaths.length <= 1) return undefined;
+
+  const split = importPaths.map((p) => p.split("/"));
+  const first = split[0];
+  let prefixLen = 0;
+  for (let i = 0; i < first.length; i++) {
+    if (split.every((s) => s[i] === first[i])) {
+      prefixLen = i + 1;
+    } else {
+      break;
+    }
+  }
+  if (prefixLen === 0) return undefined;
+
+  const prefix = first.slice(0, prefixLen).join("/");
+  if (importPaths.every((p) => p === prefix)) return undefined;
+
+  return prefix + "/...";
+}
+
 export function getPackageDir(
   item: vscode.TestItem,
   cache: DiscoveryCache,
