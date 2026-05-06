@@ -78,10 +78,10 @@ type LoadResult struct {
 	Pxtest  *packages.Package
 }
 
-// LoadPackages loads and groups test packages for the given target patterns.
-func LoadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, error) {
+// loadPackages is the shared core for all package-loading variants.
+func loadPackages(mode packages.LoadMode, targetPkgs []string, buildFlags []string, collectWarnings bool) ([]*LoadResult, []LoadWarning, error) {
 	cfg := &packages.Config{
-		Mode:  packageEvalMode,
+		Mode:  mode,
 		Tests: true,
 	}
 	if len(buildFlags) > 0 {
@@ -89,20 +89,36 @@ func LoadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, erro
 	}
 	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	// filter all packages with Go-Module support, skip packages with load errors
-	loadedTestPkgs := slices.Filter(totalFoundPkgs, func(item *packages.Package, index int) bool {
-		if len(item.Errors) > 0 {
-			return false
+	var warnings []LoadWarning
+	seen := make(map[string]bool)
+	var loadedTestPkgs []*packages.Package
+	for _, p := range totalFoundPkgs {
+		if len(p.Errors) > 0 {
+			if collectWarnings {
+				pkgPath := strings.TrimSuffix(p.PkgPath, "_test")
+				if strings.HasSuffix(pkgPath, ".test") {
+					continue
+				}
+				if !seen[pkgPath] {
+					seen[pkgPath] = true
+					for _, e := range p.Errors {
+						warnings = append(warnings, LoadWarning{PkgPath: pkgPath, Message: fmt.Sprintf("%s", e)})
+					}
+				}
+			}
+			continue
 		}
-		return item.Module != nil
-	})
-	if len(loadedTestPkgs) == 0 {
-		return nil, nil
+		if p.Module != nil {
+			loadedTestPkgs = append(loadedTestPkgs, p)
+		}
 	}
-	// filter all test-related packages
+	if len(loadedTestPkgs) == 0 {
+		return nil, warnings, nil
+	}
+
 	loadedTestPkgs = slices.Filter(loadedTestPkgs, func(item *packages.Package, index int) bool {
 		return strings.HasSuffix(item.ID, ".test]")
 	})
@@ -127,143 +143,25 @@ func LoadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, erro
 	for _, v := range testPkgs {
 		res = append(res, v)
 	}
-	return res, nil
+	return res, warnings, nil
+}
+
+// LoadPackages loads and groups test packages for the given target patterns.
+func LoadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, error) {
+	res, _, err := loadPackages(packageEvalMode, targetPkgs, buildFlags, false)
+	return res, err
 }
 
 // LoadPackagesWithWarnings is like LoadPackages but also returns warnings
 // for packages that were skipped due to load errors (e.g. build constraints).
 func LoadPackagesWithWarnings(targetPkgs []string, buildFlags []string) ([]*LoadResult, []LoadWarning, error) {
-	cfg := &packages.Config{
-		Mode:  packageEvalMode,
-		Tests: true,
-	}
-	if len(buildFlags) > 0 {
-		cfg.BuildFlags = buildFlags
-	}
-	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var warnings []LoadWarning
-	seen := make(map[string]bool)
-	var loadedTestPkgs []*packages.Package
-	for _, p := range totalFoundPkgs {
-		if len(p.Errors) > 0 {
-			pkgPath := p.PkgPath
-			pkgPath = strings.TrimSuffix(pkgPath, "_test")
-			if strings.HasSuffix(pkgPath, ".test") {
-				continue
-			}
-			if !seen[pkgPath] {
-				seen[pkgPath] = true
-				for _, e := range p.Errors {
-					warnings = append(warnings, LoadWarning{PkgPath: pkgPath, Message: fmt.Sprintf("%s", e)})
-				}
-			}
-			continue
-		}
-		if p.Module != nil {
-			loadedTestPkgs = append(loadedTestPkgs, p)
-		}
-	}
-	if len(loadedTestPkgs) == 0 {
-		return nil, warnings, nil
-	}
-
-	loadedTestPkgs = slices.Filter(loadedTestPkgs, func(item *packages.Package, index int) bool {
-		return strings.HasSuffix(item.ID, ".test]")
-	})
-	testPkgs := slices.ReduceSeed(loadedTestPkgs, map[string]*LoadResult{}, func(p *packages.Package, acc map[string]*LoadResult) map[string]*LoadResult {
-		isPxTest := strings.HasSuffix(p.Name, "_test")
-		pkgPath := p.PkgPath
-		if isPxTest {
-			pkgPath = strings.TrimSuffix(pkgPath, "_test")
-		}
-		_, ok := acc[pkgPath]
-		if !ok {
-			acc[pkgPath] = &LoadResult{PkgPath: pkgPath, PkgDir: DeterminePkgDir(p)}
-		}
-		if !isPxTest {
-			acc[pkgPath].Ptest = p
-		} else {
-			acc[pkgPath].Pxtest = p
-		}
-		return acc
-	})
-	var res []*LoadResult
-	for _, v := range testPkgs {
-		res = append(res, v)
-	}
-	return res, warnings, nil
+	return loadPackages(packageEvalMode, targetPkgs, buildFlags, true)
 }
 
 // LoadPackagesForDiscovery loads packages using a lightweight mode without
 // NeedDeps, avoiding type-checking of the entire transitive dependency graph.
 func LoadPackagesForDiscovery(targetPkgs []string, buildFlags []string) ([]*LoadResult, []LoadWarning, error) {
-	cfg := &packages.Config{
-		Mode:  discoveryEvalMode,
-		Tests: true,
-	}
-	if len(buildFlags) > 0 {
-		cfg.BuildFlags = buildFlags
-	}
-	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var warnings []LoadWarning
-	seen := make(map[string]bool)
-	var loadedTestPkgs []*packages.Package
-	for _, p := range totalFoundPkgs {
-		if len(p.Errors) > 0 {
-			pkgPath := p.PkgPath
-			pkgPath = strings.TrimSuffix(pkgPath, "_test")
-			if strings.HasSuffix(pkgPath, ".test") {
-				continue
-			}
-			if !seen[pkgPath] {
-				seen[pkgPath] = true
-				for _, e := range p.Errors {
-					warnings = append(warnings, LoadWarning{PkgPath: pkgPath, Message: fmt.Sprintf("%s", e)})
-				}
-			}
-			continue
-		}
-		if p.Module != nil {
-			loadedTestPkgs = append(loadedTestPkgs, p)
-		}
-	}
-	if len(loadedTestPkgs) == 0 {
-		return nil, warnings, nil
-	}
-
-	loadedTestPkgs = slices.Filter(loadedTestPkgs, func(item *packages.Package, index int) bool {
-		return strings.HasSuffix(item.ID, ".test]")
-	})
-	testPkgs := slices.ReduceSeed(loadedTestPkgs, map[string]*LoadResult{}, func(p *packages.Package, acc map[string]*LoadResult) map[string]*LoadResult {
-		isPxTest := strings.HasSuffix(p.Name, "_test")
-		pkgPath := p.PkgPath
-		if isPxTest {
-			pkgPath = strings.TrimSuffix(pkgPath, "_test")
-		}
-		_, ok := acc[pkgPath]
-		if !ok {
-			acc[pkgPath] = &LoadResult{PkgPath: pkgPath, PkgDir: DeterminePkgDir(p)}
-		}
-		if !isPxTest {
-			acc[pkgPath].Ptest = p
-		} else {
-			acc[pkgPath].Pxtest = p
-		}
-		return acc
-	})
-	var res []*LoadResult
-	for _, v := range testPkgs {
-		res = append(res, v)
-	}
-	return res, warnings, nil
+	return loadPackages(discoveryEvalMode, targetPkgs, buildFlags, true)
 }
 
 func GenerateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {

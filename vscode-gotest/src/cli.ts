@@ -510,7 +510,7 @@ async function extractVersionFromGoMod(
   return "latest";
 }
 
-function compareVersions(a: string, b: string): number {
+export function compareVersions(a: string, b: string): number {
   const parse = (v: string) => v.replace(/^v/, "").split(".").map(Number);
   const pa = parse(a);
   const pb = parse(b);
@@ -521,7 +521,7 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-function escapeRegExp(s: string): string {
+export function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
