@@ -11,6 +11,12 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
 
 func Test{{ $ts.Identifier }}(t *testing.T) {
   s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
+{{- if $ts.HasGuard }}
+  if ƒreason := s.{{ $ts.Identifier }}.SuiteGuard(); ƒreason != "" {
+    t.Skipf("suite guard: %s", ƒreason)
+    return
+  }
+{{- end }}
 {{- /* Wire up shared fixtures from GOTEST_SHARED_STATE_FILE if present */ -}}
 {{- $sfRefs := index $.SuiteSharedFixtures $ts.Identifier }}
 {{- if $sfRefs }}

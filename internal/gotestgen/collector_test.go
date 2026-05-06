@@ -739,6 +739,79 @@ func (s *BadTestSuite) TestFoo(t *gotest.T) {}
 	gotest.Contains(t, result.Errs[0].Err.Error(), "unsupported return type")
 }
 
+func TestCollector_SuiteGuard_Detected(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) SuiteGuard() string { return "" }
+func (s *MyTestSuite) TestFoo(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Suites))
+	gotest.True(t, result.Suites[0].HasGuard(), "expected HasGuard() to be true")
+}
+
+func TestCollector_SuiteGuard_AbsentIsFalse(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type PlainTestSuite struct{}
+
+func (s *PlainTestSuite) TestFoo(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+	gotest.Equal(t, 1, len(result.Suites))
+	gotest.True(t, !result.Suites[0].HasGuard(), "expected HasGuard() to be false")
+}
+
+func TestCollector_SuiteGuard_InvalidSignature_WithParams(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type BadTestSuite struct{}
+
+func (s *BadTestSuite) SuiteGuard(x int) string { return "" }
+func (s *BadTestSuite) TestFoo(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error for invalid SuiteGuard signature")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "unsupported signature")
+}
+
+func TestCollector_SuiteGuard_InvalidSignature_WrongReturnType(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type BadTestSuite struct{}
+
+func (s *BadTestSuite) SuiteGuard() int { return 0 }
+func (s *BadTestSuite) TestFoo(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error for wrong SuiteGuard return type")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "unsupported return type")
+}
+
 // --- helpers ---
 
 // makeFixtureSpec creates a minimal FixtureSpec for validation testing.

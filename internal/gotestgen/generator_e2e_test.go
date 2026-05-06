@@ -18,6 +18,7 @@ func TestE2E_CLI(t *testing.T) {
 	}{
 		{"no testsuite", "no_testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}},
 		{"simple testsuite", "testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}},
+		{"suite guard", "suite_guard", []string{about.PSuite + ".golden"}},
 	}
 	for _, tC := range testcases {
 		t.Run(tC.desc, func(t *testing.T) {

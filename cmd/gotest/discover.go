@@ -39,6 +39,7 @@ type discoverSuite struct {
 	Parallel  bool             `json:"parallel"`
 	Focused   bool             `json:"focused"`
 	Excluded  bool             `json:"excluded"`
+	Guarded   bool             `json:"guarded"`
 	File      string           `json:"file"`
 	Line      int              `json:"line"`
 	Col       int              `json:"col"`
@@ -141,6 +142,7 @@ func buildDiscoverSuite(suite *gotestast.TestSuiteSpec) discoverSuite {
 		Parallel: suite.IsParallelSuite(),
 		Focused:  suite.IsFocused(),
 		Excluded: suite.IsExcluded(),
+		Guarded:  suite.HasGuard(),
 		File:     filepath.Base(pos.Filename),
 		Line:     pos.Line,
 		Col:      pos.Column,

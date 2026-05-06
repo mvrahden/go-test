@@ -277,7 +277,9 @@ export class GoTestController implements vscode.Disposable {
         suite.focused,
         suite.excluded,
         suite.parallel,
+        suite.guarded,
       );
+      suiteItem.description = suite.guarded ? "guarded" : undefined;
       pkgItem.children.add(suiteItem);
 
       const seenMethodIds = new Set<string>();
@@ -478,6 +480,7 @@ export class GoTestController implements vscode.Disposable {
     focused: boolean,
     excluded: boolean,
     parallel: boolean,
+    guarded?: boolean,
   ): readonly vscode.TestTag[] {
     const tags: vscode.TestTag[] = [];
     if (focused) {
@@ -488,6 +491,9 @@ export class GoTestController implements vscode.Disposable {
     }
     if (parallel) {
       tags.push(new vscode.TestTag("parallel"));
+    }
+    if (guarded) {
+      tags.push(new vscode.TestTag("guarded"));
     }
     return tags;
   }

@@ -22,6 +22,7 @@ export interface DiscoverSuite {
   parallel: boolean;
   focused: boolean;
   excluded: boolean;
+  guarded: boolean;
   file: string;
   line: number;
   col: number;
