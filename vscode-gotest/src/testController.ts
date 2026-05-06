@@ -112,7 +112,16 @@ export class GoTestController implements vscode.Disposable {
       false,
     );
 
-    this.disposables.push(this.cache.onDidUpdate(() => this.rebuild()));
+    let rebuildTimer: ReturnType<typeof setTimeout> | undefined;
+    this.disposables.push(
+      this.cache.onDidUpdate(() => {
+        if (rebuildTimer) clearTimeout(rebuildTimer);
+        rebuildTimer = setTimeout(() => {
+          rebuildTimer = undefined;
+          this.rebuild();
+        }, 50);
+      }),
+    );
   }
 
   get testController(): vscode.TestController {
@@ -310,6 +319,18 @@ export class GoTestController implements vscode.Disposable {
         pkgItem.children.delete(child.id);
       }
     });
+  }
+
+  clearDynamicChildren(item: vscode.TestItem): void {
+    const toDelete: string[] = [];
+    item.children.forEach((child) => {
+      if (child.id.includes("/dynamic/")) {
+        toDelete.push(child.id);
+      }
+    });
+    for (const id of toDelete) {
+      item.children.delete(id);
+    }
   }
 
   createDynamicSubtest(

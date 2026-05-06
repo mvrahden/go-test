@@ -42,6 +42,10 @@ func Collect(targetPkgs []string, buildFlags []string) (gotestast.TestSuiteSpecS
 	if err != nil {
 		return nil, err
 	}
+	return CollectFromLoaded(loadResults)
+}
+
+func CollectFromLoaded(loadResults []*LoadResult) (gotestast.TestSuiteSpecSet, error) {
 	var allSuites gotestast.TestSuiteSpecSet
 	c := collector{}
 	for _, lr := range loadResults {
@@ -262,12 +266,19 @@ func LoadPackagesForDiscovery(targetPkgs []string, buildFlags []string) ([]*Load
 	return res, warnings, nil
 }
 
+func GenerateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {
+	return generateSrcsFromLoaded(loadResults)
+}
+
 func generateSrcs(targetPkgs []string, buildFlags []string) (GenerateResults, []SharedFixtureInfo, error) {
 	loadResults, err := LoadPackages(targetPkgs, buildFlags)
 	if err != nil {
 		return nil, nil, err
 	}
+	return generateSrcsFromLoaded(loadResults)
+}
 
+func generateSrcsFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {
 	sharedSeen := map[string]bool{}
 	var allSharedFixtures []SharedFixtureInfo
 

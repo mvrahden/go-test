@@ -111,6 +111,7 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	}
 	hasSuiteSharedFixtures := len(suiteSharedFixtures) > 0
 	if hasFixtures {
+		imports = append(imports, headerImport{Path: "fmt"})
 		imports = append(imports, headerImport{Path: "time"})
 	}
 	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
