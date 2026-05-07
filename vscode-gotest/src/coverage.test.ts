@@ -42,6 +42,8 @@ vi.mock("vscode", () => {
     constructor(
       public uri: Uri,
       public statementCoverage: { covered: number; total: number },
+      public branchCoverage?: { covered: number; total: number },
+      public declarationCoverage?: { covered: number; total: number },
     ) {}
     static fromDetails(
       uri: Uri,
@@ -218,27 +220,53 @@ describe("buildFileCoverages", () => {
     return undefined;
   };
 
-  it("overrides statementCoverage with statement-weighted metrics", () => {
+  it("returns statement-weighted metrics via constructor", () => {
     const parsed = parseCoverProfile(
       "mode: set\nexample.com/pkg/main.go:1.1,2.2 5 1\nexample.com/pkg/main.go:3.1,4.2 3 0\n",
       moduleToDir,
     );
-    const result = buildFileCoverages(parsed);
-    expect(result).toHaveLength(1);
-    expect(result[0].uri.fsPath).toBe("/abs/pkg/main.go");
-    expect(result[0].statementCoverage.covered).toBe(5);
-    expect(result[0].statementCoverage.total).toBe(8);
+    const { coverages, details } = buildFileCoverages(parsed);
+    expect(coverages).toHaveLength(1);
+    expect(coverages[0].uri.fsPath).toBe("/abs/pkg/main.go");
+    expect(coverages[0].statementCoverage.covered).toBe(5);
+    expect(coverages[0].statementCoverage.total).toBe(8);
+    expect(details.get("/abs/pkg/main.go")).toHaveLength(2);
   });
 
-  it("merges declarations when provided", () => {
+  it("computes declarationCoverage counts when declarations provided", () => {
     const parsed = parseCoverProfile(
       "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
       moduleToDir,
     );
-    const funcContent = "example.com/pkg/main.go:1:\tMyFunc\t\t100.0%\n";
+    const funcContent = [
+      "example.com/pkg/main.go:1:\tMyFunc\t\t100.0%",
+      "example.com/pkg/main.go:10:\tOther\t\t0.0%",
+    ].join("\n");
     const declarations = parseFuncCoverage(funcContent, moduleToDir);
-    const result = buildFileCoverages(parsed, declarations);
-    expect(result).toHaveLength(1);
+    const { coverages, details } = buildFileCoverages(parsed, declarations);
+    expect(coverages).toHaveLength(1);
+    expect(coverages[0].declarationCoverage?.covered).toBe(1);
+    expect(coverages[0].declarationCoverage?.total).toBe(2);
+    expect(details.get("/abs/pkg/main.go")).toHaveLength(3);
+  });
+
+  it("omits declarationCoverage when no declarations", () => {
+    const parsed = parseCoverProfile(
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
+      moduleToDir,
+    );
+    const { coverages } = buildFileCoverages(parsed);
+    expect(coverages[0].declarationCoverage).toBeUndefined();
+  });
+
+  it("returns details keyed by absolute path", () => {
+    const parsed = parseCoverProfile(
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\nexample.com/pkg/main.go:3.1,4.2 1 0\n",
+      moduleToDir,
+    );
+    const { details } = buildFileCoverages(parsed);
+    const d = details.get("/abs/pkg/main.go")!;
+    expect(d).toHaveLength(2);
   });
 });
 
