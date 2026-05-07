@@ -31,73 +31,6 @@ export interface ParsedFileCoverage {
   numStatements: number[];
 }
 
-export interface FileProfileMetrics {
-  absPath: string;
-  covered: number;
-  total: number;
-}
-
-export function parseProfileMetrics(
-  coverprofiles: string[],
-  moduleToDir: (importPath: string) => string | undefined,
-): FileProfileMetrics[] {
-  const blocks = new Map<
-    string,
-    { absPath: string; numStatements: number; count: number }
-  >();
-
-  for (const content of coverprofiles) {
-    for (const line of content.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("mode:")) continue;
-
-      const match = /^(.+):(\d+)\.(\d+),(\d+)\.(\d+)\s+(\d+)\s+(\d+)$/.exec(
-        trimmed,
-      );
-      if (!match) continue;
-
-      const filePath = match[1];
-      const blockRange = `${match[2]}.${match[3]},${match[4]}.${match[5]}`;
-      const numStatements = parseInt(match[6], 10);
-      const count = parseInt(match[7], 10);
-
-      const lastSlash = filePath.lastIndexOf("/");
-      const fileName = filePath.slice(lastSlash + 1);
-      const importDir = filePath.slice(0, lastSlash);
-      const absDir = moduleToDir(importDir);
-      if (!absDir) continue;
-      const absPath = path.join(absDir, fileName);
-
-      const key = `${absPath}\0${blockRange}`;
-      const existing = blocks.get(key);
-      if (existing) {
-        existing.count = Math.max(existing.count, count);
-      } else {
-        blocks.set(key, { absPath, numStatements, count });
-      }
-    }
-  }
-
-  const fileMetrics = new Map<string, { covered: number; total: number }>();
-  for (const block of blocks.values()) {
-    let metrics = fileMetrics.get(block.absPath);
-    if (!metrics) {
-      metrics = { covered: 0, total: 0 };
-      fileMetrics.set(block.absPath, metrics);
-    }
-    metrics.total += block.numStatements;
-    if (block.count > 0) {
-      metrics.covered += block.numStatements;
-    }
-  }
-
-  return Array.from(fileMetrics, ([absPath, m]) => ({
-    absPath,
-    covered: m.covered,
-    total: m.total,
-  }));
-}
-
 export function parseCoverProfile(
   content: string,
   moduleToDir: (importPath: string) => string | undefined,
@@ -704,20 +637,20 @@ export class CoverageRunner implements vscode.Disposable {
   }
 
   async copyCoverageSummary(): Promise<void> {
-    const metrics = this.store.buildProfileMetrics(this.cache);
+    const coverages = this.store.buildFileCoverages(this.cache);
     const sourceUris = await vscode.workspace.findFiles(
       "**/*.go",
       "**/*_test.go",
     );
 
-    if (metrics.length === 0 && sourceUris.length === 0) {
+    if (coverages.length === 0 && sourceUris.length === 0) {
       vscode.window.showInformationMessage(
         "No coverage data available. Run tests with coverage first.",
       );
       return;
     }
 
-    const profileAbsPaths = new Set(metrics.map((m) => m.absPath));
+    const profileAbsPaths = new Set(coverages.map((fc) => fc.uri.fsPath));
 
     type Node = {
       children: Map<string, Node>;
@@ -770,15 +703,15 @@ export class CoverageRunner implements vscode.Disposable {
       }
     }
 
-    for (const m of metrics) {
-      const relPath = relativize(m.absPath);
+    for (const fc of coverages) {
+      const relPath = relativize(fc.uri.fsPath);
       const parts = relPath.split("/");
       const fileName = parts.pop()!;
       const dir = ensureDir(parts);
       dir.children.set(fileName, {
         ...mkNode(true),
-        covered: m.covered,
-        total: m.total,
+        covered: fc.statementCoverage.covered,
+        total: fc.statementCoverage.total,
       });
     }
 

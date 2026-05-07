@@ -3,10 +3,8 @@ import * as path from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import {
   type ParsedFileCoverage,
-  type FileProfileMetrics,
   parseCoverProfile,
   parseFuncCoverage,
-  parseProfileMetrics,
   buildFileCoverages,
   deduplicateProfiles,
 } from "./coverage.js";
@@ -111,16 +109,6 @@ export class CoverageStore implements vscode.Disposable {
       deduplicateProfiles(allProfiles),
       allDeclarations,
     );
-  }
-
-  buildProfileMetrics(cache: DiscoveryCache): FileProfileMetrics[] {
-    const moduleToDir = (importPath: string) =>
-      cache.resolveImportPath(importPath);
-    const profiles: string[] = [];
-    for (const pkg of this.packages.values()) {
-      profiles.push(pkg.coverprofile);
-    }
-    return parseProfileMetrics(profiles, moduleToDir);
   }
 
   async load(): Promise<void> {
