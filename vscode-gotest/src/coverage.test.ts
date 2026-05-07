@@ -73,6 +73,7 @@ import {
   parseFuncCoverage,
   buildFileCoverages,
   deduplicateProfiles,
+  splitCoverByPackage,
 } from "./coverage.js";
 
 describe("parseCoverProfile", () => {
@@ -317,5 +318,45 @@ describe("deduplicateProfiles", () => {
 
   it("returns empty array for empty input", () => {
     expect(deduplicateProfiles([])).toHaveLength(0);
+  });
+});
+
+describe("splitCoverByPackage", () => {
+  it("assigns lines to matching import path prefixes", () => {
+    const content = [
+      "mode: atomic",
+      "example.com/pkg/a.go:1.1,2.2 3 1",
+      "example.com/pkg/b.go:3.1,4.2 2 0",
+      "example.com/other/c.go:5.1,6.2 1 1",
+    ].join("\n");
+
+    const result = splitCoverByPackage(content, [
+      "example.com/pkg",
+      "example.com/other",
+    ]);
+    expect(result.size).toBe(2);
+    expect(result.get("example.com/pkg")).toContain("example.com/pkg/a.go");
+    expect(result.get("example.com/pkg")).toContain("example.com/pkg/b.go");
+    expect(result.get("example.com/other")).toContain("example.com/other/c.go");
+  });
+
+  it("drops lines that match no import path", () => {
+    const content = [
+      "mode: set",
+      "example.com/unknown/x.go:1.1,2.2 1 1",
+    ].join("\n");
+
+    const result = splitCoverByPackage(content, ["example.com/pkg"]);
+    expect(result.size).toBe(0);
+  });
+
+  it("preserves mode line in each bucket", () => {
+    const content = [
+      "mode: atomic",
+      "example.com/pkg/a.go:1.1,2.2 3 1",
+    ].join("\n");
+
+    const result = splitCoverByPackage(content, ["example.com/pkg"]);
+    expect(result.get("example.com/pkg")).toMatch(/^mode: atomic\n/);
   });
 });
