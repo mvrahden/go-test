@@ -281,6 +281,7 @@ export class CoverageRunner implements vscode.Disposable {
         dir: string;
         workspaceDir: string;
         filter: string | undefined;
+        testOnly: boolean;
       }
 
       const validPkgs: PkgInfo[] = [];
@@ -317,6 +318,7 @@ export class CoverageRunner implements vscode.Disposable {
           dir: pkg.dir,
           workspaceDir,
           filter,
+          testOnly: pkg.testOnly ?? false,
         });
       }
 
@@ -343,7 +345,10 @@ export class CoverageRunner implements vscode.Disposable {
         const config = scopedConfig(workspaceDir);
         const testFlags = config.get<string[]>("testFlags") ?? [];
 
-        const unfiltered = pkgInfos.filter((p) => !p.filter);
+        const unfiltered = pkgInfos.filter((p) => !p.filter && !p.testOnly);
+        const unfilteredTestOnly = pkgInfos.filter(
+          (p) => !p.filter && p.testOnly,
+        );
         const filtered = pkgInfos.filter((p) => p.filter);
 
         if (unfiltered.length > 0) {
@@ -354,6 +359,18 @@ export class CoverageRunner implements vscode.Disposable {
             testFlags,
             run,
             effectiveToken,
+          );
+        }
+
+        if (unfilteredTestOnly.length > 0) {
+          allJsonOutput += await this.runCoverageBatch(
+            unfilteredTestOnly,
+            undefined,
+            workspaceDir,
+            testFlags,
+            run,
+            effectiveToken,
+            true,
           );
         }
 
@@ -371,6 +388,7 @@ export class CoverageRunner implements vscode.Disposable {
             testFlags,
             run,
             effectiveToken,
+            info.testOnly,
           );
         }
       }
@@ -405,6 +423,7 @@ export class CoverageRunner implements vscode.Disposable {
     testFlags: string[],
     run: vscode.TestRun,
     token: vscode.CancellationToken,
+    testOnly?: boolean,
   ): Promise<string> {
     const importPaths = pkgInfos.map((p) => p.importPath);
     const wildcard = filter ? undefined : computeWildcard(importPaths);
@@ -422,6 +441,9 @@ export class CoverageRunner implements vscode.Disposable {
         `-coverprofile=${coverFile}`,
         ...cliPkgArgs,
       ];
+      if (testOnly) {
+        cliArgs.push("-coverpkg=./...");
+      }
       if (filter) {
         cliArgs.push("-run", filter);
       }
@@ -486,19 +508,31 @@ export class CoverageRunner implements vscode.Disposable {
           );
         }
 
-        const coverByPkg = splitCoverByPackage(coverContent, importPaths);
-        const funcByPkg = funcOutput
-          ? splitFuncCoverageByPackage(funcOutput, importPaths)
-          : undefined;
+        if (testOnly) {
+          const moduleToDir = (ip: string) => this.cache.resolveImportPath(ip);
+          const parsed = parseCoverProfile(coverContent, moduleToDir);
+          const declarations = funcOutput
+            ? parseFuncCoverage(funcOutput, moduleToDir)
+            : undefined;
+          const coverages = buildFileCoverages(parsed, declarations);
+          for (const fc of coverages) {
+            run.addCoverage(fc);
+          }
+        } else {
+          const coverByPkg = splitCoverByPackage(coverContent, importPaths);
+          const funcByPkg = funcOutput
+            ? splitFuncCoverageByPackage(funcOutput, importPaths)
+            : undefined;
 
-        for (const info of pkgInfos) {
-          const pkgCover = coverByPkg.get(info.importPath);
-          if (pkgCover) {
-            this.store.update(
-              info.importPath,
-              pkgCover,
-              funcByPkg?.get(info.importPath),
-            );
+          for (const info of pkgInfos) {
+            const pkgCover = coverByPkg.get(info.importPath);
+            if (pkgCover) {
+              this.store.update(
+                info.importPath,
+                pkgCover,
+                funcByPkg?.get(info.importPath),
+              );
+            }
           }
         }
       } catch {

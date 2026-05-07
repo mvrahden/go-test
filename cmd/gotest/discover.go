@@ -31,6 +31,7 @@ type discoverWarning struct {
 type discoverPackage struct {
 	ImportPath string          `json:"importPath"`
 	Dir        string          `json:"dir"`
+	TestOnly   bool            `json:"testOnly,omitempty"`
 	Suites     []discoverSuite `json:"suites"`
 }
 
@@ -86,6 +87,7 @@ func runDiscover(args []string) int {
 		pkgEntry := discoverPackage{
 			ImportPath: lr.PkgPath,
 			Dir:        lr.PkgDir,
+			TestOnly:   lr.IsTestOnly(),
 		}
 
 		pkgs := []*packages.Package{lr.Ptest, lr.Pxtest}

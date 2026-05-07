@@ -20,7 +20,7 @@ type GenerateResult struct {
 
 const (
 	packageEvalMode    = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps
-	discoveryEvalMode  = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports
+	discoveryEvalMode  = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedFiles
 )
 
 func Generate(targetPkgs []string, buildFlags []string) (GenerateResults, error) {
@@ -76,6 +76,18 @@ type LoadResult struct {
 	PkgPath string
 	Ptest   *packages.Package
 	Pxtest  *packages.Package
+}
+
+func (lr *LoadResult) IsTestOnly() bool {
+	if lr.Ptest == nil {
+		return true
+	}
+	for _, f := range lr.Ptest.GoFiles {
+		if !strings.HasSuffix(f, "_test.go") {
+			return false
+		}
+	}
+	return true
 }
 
 // loadPackages is the shared core for all package-loading variants.
