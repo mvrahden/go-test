@@ -1,5 +1,9 @@
 # Go Test Suites
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mvrahden/go-test/main/static/gopher.png" alt="gotest gopher" width="360" />
+</p>
+
 First-class VS Code integration for [go-test](https://github.com/mvrahden/go-test) — suite-based, BDD-style testing for Go.
 
 Run, debug, and watch your test suites directly from the editor. See structured results in Test Explorer, get coverage gutters, and scaffold new suites without leaving VS Code.
