@@ -336,6 +336,7 @@ export class CoverageRunner implements vscode.Disposable {
       }
 
       for (const item of items) {
+        this.controller.clearResults(item);
         run.started(item);
       }
 
