@@ -355,6 +355,12 @@ export class CoverageRunner implements vscode.Disposable {
     return this.coverageDetails.get(uri.fsPath) ?? [];
   }
 
+  mergeDetails(details: Map<string, vscode.FileCoverageDetail[]>): void {
+    for (const [key, value] of details) {
+      this.coverageDetails.set(key, value);
+    }
+  }
+
   async run(
     request: vscode.TestRunRequest,
     token: vscode.CancellationToken,
