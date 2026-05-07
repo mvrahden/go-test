@@ -30,6 +30,73 @@ export interface ParsedFileCoverage {
   statements: vscode.StatementCoverage[];
 }
 
+export interface FileProfileMetrics {
+  absPath: string;
+  covered: number;
+  total: number;
+}
+
+export function parseProfileMetrics(
+  coverprofiles: string[],
+  moduleToDir: (importPath: string) => string | undefined,
+): FileProfileMetrics[] {
+  const blocks = new Map<
+    string,
+    { absPath: string; numStatements: number; count: number }
+  >();
+
+  for (const content of coverprofiles) {
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("mode:")) continue;
+
+      const match = /^(.+):(\d+)\.(\d+),(\d+)\.(\d+)\s+(\d+)\s+(\d+)$/.exec(
+        trimmed,
+      );
+      if (!match) continue;
+
+      const filePath = match[1];
+      const blockRange = `${match[2]}.${match[3]},${match[4]}.${match[5]}`;
+      const numStatements = parseInt(match[6], 10);
+      const count = parseInt(match[7], 10);
+
+      const lastSlash = filePath.lastIndexOf("/");
+      const fileName = filePath.slice(lastSlash + 1);
+      const importDir = filePath.slice(0, lastSlash);
+      const absDir = moduleToDir(importDir);
+      if (!absDir) continue;
+      const absPath = path.join(absDir, fileName);
+
+      const key = `${absPath}\0${blockRange}`;
+      const existing = blocks.get(key);
+      if (existing) {
+        existing.count = Math.max(existing.count, count);
+      } else {
+        blocks.set(key, { absPath, numStatements, count });
+      }
+    }
+  }
+
+  const fileMetrics = new Map<string, { covered: number; total: number }>();
+  for (const block of blocks.values()) {
+    let metrics = fileMetrics.get(block.absPath);
+    if (!metrics) {
+      metrics = { covered: 0, total: 0 };
+      fileMetrics.set(block.absPath, metrics);
+    }
+    metrics.total += block.numStatements;
+    if (block.count > 0) {
+      metrics.covered += block.numStatements;
+    }
+  }
+
+  return Array.from(fileMetrics, ([absPath, m]) => ({
+    absPath,
+    covered: m.covered,
+    total: m.total,
+  }));
+}
+
 export function parseCoverProfile(
   content: string,
   moduleToDir: (importPath: string) => string | undefined,
@@ -558,64 +625,103 @@ export class CoverageRunner implements vscode.Disposable {
   }
 
   async copyCoverageSummary(): Promise<void> {
-    const coverages = this.store.buildFileCoverages(this.cache);
-    if (coverages.length === 0) {
+    const metrics = this.store.buildProfileMetrics(this.cache);
+    const sourceUris = await vscode.workspace.findFiles(
+      "**/*.go",
+      "**/*_test.go",
+    );
+
+    if (metrics.length === 0 && sourceUris.length === 0) {
       vscode.window.showInformationMessage(
         "No coverage data available. Run tests with coverage first.",
       );
       return;
     }
 
+    const profileAbsPaths = new Set(metrics.map((m) => m.absPath));
+
     type Node = {
       children: Map<string, Node>;
       covered: number;
       total: number;
       isFile: boolean;
+      sourceFiles: number;
+      profileFiles: number;
     };
-    const root: Node = {
+
+    const mkNode = (isFile = false): Node => ({
       children: new Map(),
       covered: 0,
       total: 0,
-      isFile: false,
-    };
+      isFile,
+      sourceFiles: 0,
+      profileFiles: 0,
+    });
 
-    for (const fc of coverages) {
-      let filePath = fc.uri.fsPath;
-      const folder = vscode.workspace.getWorkspaceFolder(fc.uri);
-      if (folder && filePath.startsWith(folder.uri.fsPath)) {
-        filePath = filePath.slice(folder.uri.fsPath.length + 1);
-      }
-      const parts = filePath.split("/");
-      const fileName = parts.pop()!;
+    const root = mkNode();
+
+    const ensureDir = (parts: string[]): Node => {
       let node = root;
       for (const part of parts) {
         if (!node.children.has(part)) {
-          node.children.set(part, {
-            children: new Map(),
-            covered: 0,
-            total: 0,
-            isFile: false,
-          });
+          node.children.set(part, mkNode());
         }
         node = node.children.get(part)!;
       }
-      node.children.set(fileName, {
-        children: new Map(),
-        covered: fc.statementCoverage.covered,
-        total: fc.statementCoverage.total,
-        isFile: true,
+      return node;
+    };
+
+    const relativize = (fsPath: string): string => {
+      const uri = vscode.Uri.file(fsPath);
+      const folder = vscode.workspace.getWorkspaceFolder(uri);
+      if (folder && fsPath.startsWith(folder.uri.fsPath)) {
+        return fsPath.slice(folder.uri.fsPath.length + 1);
+      }
+      return fsPath;
+    };
+
+    for (const uri of sourceUris) {
+      const relPath = relativize(uri.fsPath);
+      const parts = relPath.split("/");
+      parts.pop();
+      const dir = ensureDir(parts);
+      dir.sourceFiles++;
+      if (profileAbsPaths.has(uri.fsPath)) {
+        dir.profileFiles++;
+      }
+    }
+
+    for (const m of metrics) {
+      const relPath = relativize(m.absPath);
+      const parts = relPath.split("/");
+      const fileName = parts.pop()!;
+      const dir = ensureDir(parts);
+      dir.children.set(fileName, {
+        ...mkNode(true),
+        covered: m.covered,
+        total: m.total,
       });
     }
 
     const computeAggregates = (node: Node): void => {
       if (node.isFile) return;
-      node.covered = 0;
-      node.total = 0;
+      let covered = 0;
+      let total = 0;
+      let srcFiles = node.sourceFiles;
+      let profFiles = node.profileFiles;
       for (const child of node.children.values()) {
         computeAggregates(child);
-        node.covered += child.covered;
-        node.total += child.total;
+        covered += child.covered;
+        total += child.total;
+        if (!child.isFile) {
+          srcFiles += child.sourceFiles;
+          profFiles += child.profileFiles;
+        }
       }
+      node.covered = covered;
+      node.total = total;
+      node.sourceFiles = srcFiles;
+      node.profileFiles = profFiles;
     };
     computeAggregates(root);
 
@@ -628,6 +734,10 @@ export class CoverageRunner implements vscode.Disposable {
             const [gKey, grandchild] = [...child.children][0];
             if (!grandchild.isFile) {
               node.children.delete(key);
+              grandchild.covered = child.covered;
+              grandchild.total = child.total;
+              grandchild.sourceFiles = child.sourceFiles;
+              grandchild.profileFiles = child.profileFiles;
               node.children.set(key + "/" + gKey, grandchild);
               changed = true;
               break;
@@ -641,10 +751,17 @@ export class CoverageRunner implements vscode.Disposable {
     };
     compress(root);
 
-    type OutputRow = { label: string; stmts: string; pct: string };
+    type OutputRow = {
+      label: string;
+      stmts: string;
+      pct: string;
+      files: string;
+    };
     const outputRows: OutputRow[] = [];
     const fmtPct = (covered: number, total: number): string =>
-      total > 0 ? ((covered / total) * 100).toFixed(1) + "%" : "N/A";
+      total > 0 ? ((covered / total) * 100).toFixed(1) + "%" : "—";
+    const fmtFiles = (profile: number, source: number): string =>
+      source > 0 ? `(${profile} of ${source} files)` : "";
 
     const renderNode = (node: Node, indent: number): void => {
       const sorted = [...node.children.entries()].sort((a, b) => {
@@ -656,6 +773,9 @@ export class CoverageRunner implements vscode.Disposable {
           label: "  ".repeat(indent) + name,
           stmts: `${child.covered}/${child.total}`,
           pct: fmtPct(child.covered, child.total),
+          files: child.isFile
+            ? ""
+            : fmtFiles(child.profileFiles, child.sourceFiles),
         });
         if (!child.isFile) {
           renderNode(child, indent + 1);
@@ -666,20 +786,25 @@ export class CoverageRunner implements vscode.Disposable {
 
     const maxLabelLen = Math.max(4, ...outputRows.map((r) => r.label.length));
     const maxStmtsLen = Math.max(5, ...outputRows.map((r) => r.stmts.length));
-    const header = `${"File".padEnd(maxLabelLen)}  ${"Stmts".padEnd(maxStmtsLen)}  Cover`;
+    const maxPctLen = Math.max(5, ...outputRows.map((r) => r.pct.length));
+    const header = `${"File".padEnd(maxLabelLen)}  ${"Stmts".padEnd(maxStmtsLen)}  ${"Cover".padEnd(maxPctLen)}  Files`;
     const separator = "-".repeat(header.length);
 
     const lines = [header, separator];
     for (const row of outputRows) {
-      lines.push(
-        `${row.label.padEnd(maxLabelLen)}  ${row.stmts.padEnd(maxStmtsLen)}  ${row.pct}`,
-      );
+      let line = `${row.label.padEnd(maxLabelLen)}  ${row.stmts.padEnd(maxStmtsLen)}  ${row.pct.padEnd(maxPctLen)}`;
+      if (row.files) line += `  ${row.files}`;
+      lines.push(line);
     }
 
     lines.push(separator);
-    lines.push(
-      `${"Total".padEnd(maxLabelLen)}  ${`${root.covered}/${root.total}`.padEnd(maxStmtsLen)}  ${fmtPct(root.covered, root.total)}`,
-    );
+    const totalFiles =
+      root.sourceFiles > 0
+        ? fmtFiles(root.profileFiles, root.sourceFiles)
+        : "";
+    let totalLine = `${"Total".padEnd(maxLabelLen)}  ${`${root.covered}/${root.total}`.padEnd(maxStmtsLen)}  ${fmtPct(root.covered, root.total).padEnd(maxPctLen)}`;
+    if (totalFiles) totalLine += `  ${totalFiles}`;
+    lines.push(totalLine);
 
     const text = lines.join("\n");
     await vscode.env.clipboard.writeText(text);

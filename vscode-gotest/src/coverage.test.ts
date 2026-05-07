@@ -64,6 +64,7 @@ vi.mock("vscode", () => {
 import {
   parseCoverProfile,
   parseFuncCoverage,
+  parseProfileMetrics,
   buildFileCoverages,
 } from "./coverage.js";
 
@@ -216,5 +217,111 @@ describe("buildFileCoverages", () => {
     const declarations = parseFuncCoverage(funcContent, moduleToDir);
     const result = buildFileCoverages(parsed, declarations);
     expect(result).toHaveLength(1);
+  });
+});
+
+describe("parseProfileMetrics", () => {
+  const moduleToDir = (importPath: string) => {
+    if (importPath === "example.com/pkg") return "/abs/pkg";
+    if (importPath === "example.com/other") return "/abs/other";
+    return undefined;
+  };
+
+  it("computes statement-weighted metrics from numStatements", () => {
+    const profiles = [
+      [
+        "mode: set",
+        "example.com/pkg/main.go:10.2,15.3 5 1",
+        "example.com/pkg/main.go:20.5,25.10 3 0",
+      ].join("\n"),
+    ];
+
+    const result = parseProfileMetrics(profiles, moduleToDir);
+    expect(result).toHaveLength(1);
+    expect(result[0].absPath).toBe("/abs/pkg/main.go");
+    expect(result[0].covered).toBe(5);
+    expect(result[0].total).toBe(8);
+  });
+
+  it("aggregates multiple blocks per file", () => {
+    const profiles = [
+      [
+        "mode: atomic",
+        "example.com/pkg/a.go:1.1,2.2 4 3",
+        "example.com/pkg/a.go:5.1,6.2 2 0",
+        "example.com/pkg/a.go:9.1,10.2 6 1",
+      ].join("\n"),
+    ];
+
+    const result = parseProfileMetrics(profiles, moduleToDir);
+    const a = result.find((r) => r.absPath === "/abs/pkg/a.go")!;
+    expect(a.covered).toBe(10);
+    expect(a.total).toBe(12);
+  });
+
+  it("handles multiple files", () => {
+    const profiles = [
+      [
+        "mode: set",
+        "example.com/pkg/a.go:1.1,2.2 3 1",
+        "example.com/other/b.go:1.1,2.2 5 0",
+      ].join("\n"),
+    ];
+
+    const result = parseProfileMetrics(profiles, moduleToDir);
+    expect(result).toHaveLength(2);
+    const a = result.find((r) => r.absPath === "/abs/pkg/a.go")!;
+    const b = result.find((r) => r.absPath === "/abs/other/b.go")!;
+    expect(a).toEqual({ absPath: "/abs/pkg/a.go", covered: 3, total: 3 });
+    expect(b).toEqual({ absPath: "/abs/other/b.go", covered: 0, total: 5 });
+  });
+
+  it("deduplicates blocks across profiles by taking max(count)", () => {
+    const profiles = [
+      ["mode: set", "example.com/pkg/a.go:1.1,2.2 4 0"].join("\n"),
+      ["mode: set", "example.com/pkg/a.go:1.1,2.2 4 5"].join("\n"),
+    ];
+
+    const result = parseProfileMetrics(profiles, moduleToDir);
+    expect(result).toHaveLength(1);
+    expect(result[0].covered).toBe(4);
+    expect(result[0].total).toBe(4);
+  });
+
+  it("deduplication keeps higher count", () => {
+    const profiles = [
+      ["mode: atomic", "example.com/pkg/a.go:1.1,2.2 3 10"].join("\n"),
+      ["mode: atomic", "example.com/pkg/a.go:1.1,2.2 3 2"].join("\n"),
+    ];
+
+    const result = parseProfileMetrics(profiles, moduleToDir);
+    expect(result[0].covered).toBe(3);
+    expect(result[0].total).toBe(3);
+  });
+
+  it("skips unresolvable import paths", () => {
+    const profiles = [
+      ["mode: set", "unknown.com/nope/file.go:1.1,2.2 3 1"].join("\n"),
+    ];
+    expect(parseProfileMetrics(profiles, moduleToDir)).toHaveLength(0);
+  });
+
+  it("returns empty array for empty input", () => {
+    expect(parseProfileMetrics([], moduleToDir)).toHaveLength(0);
+    expect(parseProfileMetrics([""], moduleToDir)).toHaveLength(0);
+    expect(parseProfileMetrics(["mode: set\n"], moduleToDir)).toHaveLength(0);
+  });
+
+  it("skips malformed lines", () => {
+    const profiles = [
+      [
+        "mode: set",
+        "not a valid line",
+        "example.com/pkg/a.go:1.1,2.2 5 1",
+      ].join("\n"),
+    ];
+    const result = parseProfileMetrics(profiles, moduleToDir);
+    expect(result).toHaveLength(1);
+    expect(result[0].total).toBe(5);
   });
 });

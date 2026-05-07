@@ -809,6 +809,51 @@ The `setup-gotest` composite action installs the binary via `go install`.
 
 ---
 
+## Coverage Aggregation
+
+The Go coverage profile is the single source of truth at every level of aggregation. No filesystem scanning, line counting heuristics, or mixed data sources.
+
+### Statement-Weighted Metrics
+
+Each profile entry has the form:
+
+```
+file:startLine.startCol,endLine.endCol numStatements count
+```
+
+`numStatements` is the number of Go statements in a basic block as determined by the compiler's instrumentation. Coverage at any scope (file, directory, workspace) is:
+
+```
+covered = sum of numStatements for all blocks in scope where count > 0
+total   = sum of numStatements for all blocks in scope
+percentage = covered / total (or 0% if total == 0)
+```
+
+A directory's percentage is the weighted sum of its children (weighted by statement count, not an average of percentages). A parent's number is always derivable from its children.
+
+### Block Deduplication
+
+When `-coverpkg` is used, each file may appear in multiple test binary profiles. Blocks are deduplicated by `file + startLine.startCol,endLine.endCol` identity: for each unique block, take `max(count)` across all entries. This matches `go tool cover` behavior.
+
+### Breadth Indicator
+
+A supplementary signal showing how many source files have coverage data vs. how many exist:
+
+- **Source files:** Non-test Go files (`*.go` excluding `*_test.go`) per directory, from the filesystem.
+- **Profile files:** Files from the source file set with at least one entry in the coverage profile, regardless of whether that entry has `count > 0`. A file at 0% was instrumented and counts as reached.
+
+The percentage answers: *"How well-tested is the code my tests reach?"*
+The file count answers: *"How much of my codebase do my tests reach at all?"*
+
+### What NOT to Do
+
+- Do not count lines of code, lines with tokens, or non-blank lines as a denominator. The profile's `numStatements` is the only valid statement metric.
+- Do not include `_test.go` files in any denominator.
+- Do not average per-file percentages to compute a directory percentage. Use weighted sums by statement count.
+- Do not invent a filesystem-based metric as a fallback when the profile is sparse. A sparse profile is honest.
+
+---
+
 ## Advanced Patterns
 
 ### Nested Suites
