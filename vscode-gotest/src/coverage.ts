@@ -587,30 +587,29 @@ export class CoverageRunner implements vscode.Disposable {
           );
         }
 
-        if (testOnly) {
-          const moduleToDir = (ip: string) => this.cache.resolveImportPath(ip);
-          const parsed = parseCoverProfile(coverContent, moduleToDir);
-          const declarations = funcOutput
-            ? parseFuncCoverage(funcOutput, moduleToDir)
-            : undefined;
-          const coverages = buildFileCoverages(parsed, declarations);
-          for (const fc of coverages) {
-            run.addCoverage(fc);
-          }
-        } else {
-          const coverByPkg = splitCoverByPackage(coverContent, importPaths);
-          const funcByPkg = funcOutput
-            ? splitFuncCoverageByPackage(funcOutput, importPaths)
-            : undefined;
+        const splitPaths = testOnly
+          ? this.cache.packages.map((p) => p.importPath)
+          : importPaths;
+        const coverByPkg = splitCoverByPackage(coverContent, splitPaths);
+        const funcByPkg = funcOutput
+          ? splitFuncCoverageByPackage(funcOutput, splitPaths)
+          : undefined;
 
-          for (const info of pkgInfos) {
-            const pkgCover = coverByPkg.get(info.importPath);
-            if (pkgCover) {
-              this.store.update(
-                info.importPath,
-                pkgCover,
-                funcByPkg?.get(info.importPath),
-              );
+        for (const info of pkgInfos) {
+          const pkgCover = coverByPkg.get(info.importPath);
+          if (pkgCover) {
+            this.store.update(
+              info.importPath,
+              pkgCover,
+              funcByPkg?.get(info.importPath),
+            );
+          }
+        }
+
+        if (testOnly) {
+          for (const [ip, cover] of coverByPkg) {
+            if (!importPaths.includes(ip)) {
+              this.store.update(ip, cover, funcByPkg?.get(ip));
             }
           }
         }
