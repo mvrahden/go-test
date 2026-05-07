@@ -8,6 +8,7 @@ import {
   parseFuncCoverage,
   parseProfileMetrics,
   buildFileCoverages,
+  deduplicateProfiles,
 } from "./coverage.js";
 import type { DiscoveryCache } from "./discovery.js";
 
@@ -106,7 +107,10 @@ export class CoverageStore implements vscode.Disposable {
       }
     }
 
-    return buildFileCoverages(allProfiles, allDeclarations);
+    return buildFileCoverages(
+      deduplicateProfiles(allProfiles),
+      allDeclarations,
+    );
   }
 
   buildProfileMetrics(cache: DiscoveryCache): FileProfileMetrics[] {
