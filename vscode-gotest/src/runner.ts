@@ -178,7 +178,7 @@ export class TestRunner {
       }
 
       if (anyCoverOnRun) {
-        const allCoverages = this.coverageStore!.buildFileCoverages(this.cache);
+        const { coverages: allCoverages } = this.coverageStore!.buildFileCoverages(this.cache);
         for (const fc of allCoverages) {
           run.addCoverage(fc);
         }

@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import {
   type ParsedFileCoverage,
+  type CoverageResult,
   parseCoverProfile,
   parseFuncCoverage,
   buildFileCoverages,
@@ -79,7 +80,7 @@ export class CoverageStore implements vscode.Disposable {
     this._onDidChange.fire();
   }
 
-  buildFileCoverages(cache: DiscoveryCache): vscode.FileCoverage[] {
+  buildFileCoverages(cache: DiscoveryCache): CoverageResult {
     const moduleToDir = (importPath: string) =>
       cache.resolveImportPath(importPath);
     const allDeclarations = new Map<string, vscode.DeclarationCoverage[]>();

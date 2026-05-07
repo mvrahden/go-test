@@ -178,7 +178,7 @@ export function deduplicateProfiles(
       for (let i = 0; i < entry.statements.length; i++) {
         const stmt = entry.statements[i];
         const ns = entry.numStatements[i];
-        const r = stmt.location;
+        const r = stmt.location as vscode.Range;
         const key = `${r.start.line}:${r.start.character},${r.end.line}:${r.end.character}`;
 
         const prev = blocks.get(key);
@@ -498,7 +498,7 @@ export class CoverageRunner implements vscode.Disposable {
         }
       }
 
-      const allCoverages = this.store.buildFileCoverages(this.cache);
+      const { coverages: allCoverages } = this.store.buildFileCoverages(this.cache);
       for (const fc of allCoverages) {
         run.addCoverage(fc);
       }
@@ -662,7 +662,7 @@ export class CoverageRunner implements vscode.Disposable {
   }
 
   async copyCoverageSummary(): Promise<void> {
-    const coverages = this.store.buildFileCoverages(this.cache);
+    const { coverages } = this.store.buildFileCoverages(this.cache);
     const sourceUris = await vscode.workspace.findFiles(
       "**/*.go",
       "**/*_test.go",
@@ -929,7 +929,7 @@ export class CoverageRunner implements vscode.Disposable {
 
     const request = new vscode.TestRunRequest();
     const run = this.controller.createTestRun(request, "Cover on Save");
-    const allCoverages = this.store.buildFileCoverages(this.cache);
+    const { coverages: allCoverages } = this.store.buildFileCoverages(this.cache);
     for (const fc of allCoverages) {
       run.addCoverage(fc);
     }
