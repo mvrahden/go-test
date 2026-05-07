@@ -14,6 +14,7 @@ export interface DiscoverOutput {
 export interface DiscoverPackage {
   importPath: string;
   dir: string;
+  testOnly?: boolean;
   suites: DiscoverSuite[];
 }
 
