@@ -28,6 +28,7 @@ const execFileAsync = promisify(execFile);
 export interface ParsedFileCoverage {
   absPath: string;
   statements: vscode.StatementCoverage[];
+  numStatements: number[];
 }
 
 export interface FileProfileMetrics {
@@ -102,7 +103,10 @@ export function parseCoverProfile(
   moduleToDir: (importPath: string) => string | undefined,
 ): ParsedFileCoverage[] {
   const lines = content.split("\n");
-  const fileEntries = new Map<string, vscode.StatementCoverage[]>();
+  const fileEntries = new Map<
+    string,
+    { statements: vscode.StatementCoverage[]; numStatements: number[] }
+  >();
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -122,25 +126,27 @@ export function parseCoverProfile(
     const startCol = parseInt(match[3], 10) - 1;
     const endLine = parseInt(match[4], 10) - 1;
     const endCol = parseInt(match[5], 10) - 1;
+    const numStatements = parseInt(match[6], 10);
     const count = parseInt(match[7], 10);
 
-    let statements = fileEntries.get(filePath);
-    if (!statements) {
-      statements = [];
-      fileEntries.set(filePath, statements);
+    let entry = fileEntries.get(filePath);
+    if (!entry) {
+      entry = { statements: [], numStatements: [] };
+      fileEntries.set(filePath, entry);
     }
 
     const range = new vscode.Range(
       new vscode.Position(startLine, startCol),
       new vscode.Position(endLine, endCol),
     );
-    statements.push(
+    entry.statements.push(
       new vscode.StatementCoverage(count > 0 ? count : false, range),
     );
+    entry.numStatements.push(numStatements);
   }
 
   const result: ParsedFileCoverage[] = [];
-  for (const [importFilePath, statements] of fileEntries) {
+  for (const [importFilePath, entry] of fileEntries) {
     const lastSlash = importFilePath.lastIndexOf("/");
     const fileName = importFilePath.slice(lastSlash + 1);
     const importDir = importFilePath.slice(0, lastSlash);
@@ -149,7 +155,11 @@ export function parseCoverProfile(
       continue;
     }
     const absPath = path.join(absDir, fileName);
-    result.push({ absPath, statements });
+    result.push({
+      absPath,
+      statements: entry.statements,
+      numStatements: entry.numStatements,
+    });
   }
 
   return result;

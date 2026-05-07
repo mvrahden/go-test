@@ -88,6 +88,18 @@ describe("parseCoverProfile", () => {
     expect(result[0].statements).toHaveLength(2);
   });
 
+  it("captures numStatements from profile entries", () => {
+    const content = [
+      "mode: atomic",
+      "example.com/pkg/main.go:10.2,15.3 5 3",
+      "example.com/pkg/main.go:20.5,25.10 3 0",
+    ].join("\n");
+
+    const result = parseCoverProfile(content, moduleToDir);
+    expect(result).toHaveLength(1);
+    expect(result[0].numStatements).toEqual([5, 3]);
+  });
+
   it("groups statements by file", () => {
     const content = [
       "mode: atomic",
