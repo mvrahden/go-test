@@ -144,7 +144,7 @@ export function buildFileCoverages(
     coverages.push(fc);
 
     const fileDetails: vscode.FileCoverageDetail[] = [...entry.statements];
-    if (decls) {
+    if (decls && decls.length > 0) {
       fileDetails.push(...decls);
     }
     details.set(entry.absPath, fileDetails);

@@ -412,7 +412,8 @@ export function activate(context: vscode.ExtensionContext): void {
     }
     await coverageStore.load();
     if (coverageStore.size > 0) {
-      const { coverages } = coverageStore.buildFileCoverages(cache);
+      const { coverages, details } = coverageStore.buildFileCoverages(cache);
+      coverageRunner.mergeDetails(details);
       if (coverages.length > 0) {
         const request = new vscode.TestRunRequest();
         const run = controller.createTestRun(request, "Restored Coverage");
