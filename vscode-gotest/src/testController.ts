@@ -367,6 +367,12 @@ export class GoTestController implements vscode.Disposable {
     this.results.set(itemId, { status, duration });
   }
 
+  clearResults(item: vscode.TestItem): void {
+    this.results.delete(item.id);
+    item.children.forEach((child) => this.clearResults(child));
+    this.clearDynamicChildren(item);
+  }
+
   async copyTestResults(rootItem?: vscode.TestItem): Promise<void> {
     type Agg = {
       passed: number;

@@ -65,6 +65,7 @@ export class TestRunner {
       }
 
       for (const item of items) {
+        this.controller.clearResults(item);
         run.started(item);
       }
 
