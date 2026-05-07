@@ -566,7 +566,18 @@ export class CoverageRunner implements vscode.Disposable {
       return;
     }
 
-    const rows: { file: string; covered: number; total: number }[] = [];
+    type Node = {
+      children: Map<string, Node>;
+      covered: number;
+      total: number;
+      isFile: boolean;
+    };
+    const root: Node = {
+      children: new Map(),
+      covered: 0,
+      total: 0,
+      isFile: false,
+    };
 
     for (const fc of coverages) {
       let filePath = fc.uri.fsPath;
@@ -574,42 +585,100 @@ export class CoverageRunner implements vscode.Disposable {
       if (folder && filePath.startsWith(folder.uri.fsPath)) {
         filePath = filePath.slice(folder.uri.fsPath.length + 1);
       }
-      rows.push({
-        file: filePath,
+      const parts = filePath.split("/");
+      const fileName = parts.pop()!;
+      let node = root;
+      for (const part of parts) {
+        if (!node.children.has(part)) {
+          node.children.set(part, {
+            children: new Map(),
+            covered: 0,
+            total: 0,
+            isFile: false,
+          });
+        }
+        node = node.children.get(part)!;
+      }
+      node.children.set(fileName, {
+        children: new Map(),
         covered: fc.statementCoverage.covered,
         total: fc.statementCoverage.total,
+        isFile: true,
       });
     }
 
-    rows.sort((a, b) => a.file.localeCompare(b.file));
+    const computeAggregates = (node: Node): void => {
+      if (node.isFile) return;
+      node.covered = 0;
+      node.total = 0;
+      for (const child of node.children.values()) {
+        computeAggregates(child);
+        node.covered += child.covered;
+        node.total += child.total;
+      }
+    };
+    computeAggregates(root);
 
-    const maxFileLen = Math.max(4, ...rows.map((r) => r.file.length));
-    const header = `${"File".padEnd(maxFileLen)}  Stmts      Cover`;
+    const compress = (node: Node): void => {
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const [key, child] of [...node.children]) {
+          if (!child.isFile && child.children.size === 1) {
+            const [gKey, grandchild] = [...child.children][0];
+            if (!grandchild.isFile) {
+              node.children.delete(key);
+              node.children.set(key + "/" + gKey, grandchild);
+              changed = true;
+              break;
+            }
+          }
+        }
+      }
+      for (const child of node.children.values()) {
+        if (!child.isFile) compress(child);
+      }
+    };
+    compress(root);
+
+    type OutputRow = { label: string; stmts: string; pct: string };
+    const outputRows: OutputRow[] = [];
+    const fmtPct = (covered: number, total: number): string =>
+      total > 0 ? ((covered / total) * 100).toFixed(1) + "%" : "N/A";
+
+    const renderNode = (node: Node, indent: number): void => {
+      const sorted = [...node.children.entries()].sort((a, b) => {
+        if (a[1].isFile !== b[1].isFile) return a[1].isFile ? 1 : -1;
+        return a[0].localeCompare(b[0]);
+      });
+      for (const [name, child] of sorted) {
+        outputRows.push({
+          label: "  ".repeat(indent) + name,
+          stmts: `${child.covered}/${child.total}`,
+          pct: fmtPct(child.covered, child.total),
+        });
+        if (!child.isFile) {
+          renderNode(child, indent + 1);
+        }
+      }
+    };
+    renderNode(root, 0);
+
+    const maxLabelLen = Math.max(4, ...outputRows.map((r) => r.label.length));
+    const maxStmtsLen = Math.max(5, ...outputRows.map((r) => r.stmts.length));
+    const header = `${"File".padEnd(maxLabelLen)}  ${"Stmts".padEnd(maxStmtsLen)}  Cover`;
     const separator = "-".repeat(header.length);
 
     const lines = [header, separator];
-    let totalCovered = 0;
-    let totalStmts = 0;
-
-    for (const row of rows) {
-      totalCovered += row.covered;
-      totalStmts += row.total;
-      const pct =
-        row.total > 0
-          ? ((row.covered / row.total) * 100).toFixed(1) + "%"
-          : "N/A";
-      const stmts = `${row.covered}/${row.total}`;
-      lines.push(`${row.file.padEnd(maxFileLen)}  ${stmts.padEnd(9)}  ${pct}`);
+    for (const row of outputRows) {
+      lines.push(
+        `${row.label.padEnd(maxLabelLen)}  ${row.stmts.padEnd(maxStmtsLen)}  ${row.pct}`,
+      );
     }
 
     lines.push(separator);
-    const totalPct =
-      totalStmts > 0
-        ? ((totalCovered / totalStmts) * 100).toFixed(1) + "%"
-        : "N/A";
-    const totalStmtsStr = `${totalCovered}/${totalStmts}`;
     lines.push(
-      `${"Total".padEnd(maxFileLen)}  ${totalStmtsStr.padEnd(9)}  ${totalPct}`,
+      `${"Total".padEnd(maxLabelLen)}  ${`${root.covered}/${root.total}`.padEnd(maxStmtsLen)}  ${fmtPct(root.covered, root.total)}`,
     );
 
     const text = lines.join("\n");

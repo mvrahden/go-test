@@ -368,24 +368,52 @@ export class GoTestController implements vscode.Disposable {
   }
 
   async copyTestResults(rootItem?: vscode.TestItem): Promise<void> {
-    const rows: {
+    type Agg = {
+      passed: number;
+      failed: number;
+      skipped: number;
+      duration: number;
+    };
+    type Row = {
       label: string;
-      structural: boolean;
       duration?: number;
       status?: string;
-    }[] = [];
+      agg?: Agg;
+    };
+    const rows: Row[] = [];
 
-    const walkItem = (item: vscode.TestItem, indent: number) => {
+    const walkItem = (item: vscode.TestItem, indent: number): Agg => {
       const structural =
         item.id.startsWith("dir:") || item.tags.some((t) => t.id === "package");
       const result = structural ? undefined : this.results.get(item.id);
+
+      const rowIdx = rows.length;
       rows.push({
         label: "  ".repeat(indent) + item.label,
-        structural,
         duration: result?.duration,
         status: result?.status,
       });
-      item.children.forEach((child) => walkItem(child, indent + 1));
+
+      const childAgg: Agg = { passed: 0, failed: 0, skipped: 0, duration: 0 };
+      item.children.forEach((child) => {
+        const ca = walkItem(child, indent + 1);
+        childAgg.passed += ca.passed;
+        childAgg.failed += ca.failed;
+        childAgg.skipped += ca.skipped;
+        childAgg.duration += ca.duration;
+      });
+
+      if (item.children.size > 0) {
+        rows[rowIdx].agg = childAgg;
+        return childAgg;
+      }
+
+      const leafAgg: Agg = { passed: 0, failed: 0, skipped: 0, duration: 0 };
+      if (result?.status === "pass") leafAgg.passed = 1;
+      else if (result?.status === "fail") leafAgg.failed = 1;
+      else if (result?.status === "skip") leafAgg.skipped = 1;
+      if (result?.duration) leafAgg.duration = result.duration;
+      return leafAgg;
     };
 
     const resolved = rootItem ? this.findItem(rootItem.id) : undefined;
@@ -413,10 +441,21 @@ export class GoTestController implements vscode.Disposable {
     let totalDuration = 0;
 
     for (const row of rows) {
-      if (row.structural) {
-        lines.push(row.label);
+      if (row.agg) {
+        const a = row.agg;
+        const aggTime =
+          a.duration > 0 ? (a.duration / 1000).toFixed(3) + "s" : "-";
+        const parts: string[] = [];
+        if (a.passed > 0) parts.push(`${a.passed} passed`);
+        if (a.failed > 0) parts.push(`${a.failed} failed`);
+        if (a.skipped > 0) parts.push(`${a.skipped} skipped`);
+        const aggSummary = parts.length > 0 ? parts.join(", ") : "-";
+        lines.push(
+          `${row.label.padEnd(maxLabelLen)}  ${aggTime.padEnd(9)}  ${aggSummary}`,
+        );
         continue;
       }
+
       const time =
         row.duration !== undefined
           ? (row.duration / 1000).toFixed(3) + "s"
