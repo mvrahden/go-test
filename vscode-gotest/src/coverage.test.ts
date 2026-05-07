@@ -73,6 +73,7 @@ import {
   parseFuncCoverage,
   parseProfileMetrics,
   buildFileCoverages,
+  deduplicateProfiles,
 } from "./coverage.js";
 
 describe("parseCoverProfile", () => {
@@ -344,5 +345,84 @@ describe("parseProfileMetrics", () => {
     const result = parseProfileMetrics(profiles, moduleToDir);
     expect(result).toHaveLength(1);
     expect(result[0].total).toBe(5);
+  });
+});
+
+describe("deduplicateProfiles", () => {
+  const moduleToDir = (importPath: string) => {
+    if (importPath === "example.com/pkg") return "/abs/pkg";
+    return undefined;
+  };
+
+  it("passes through non-overlapping profiles unchanged", () => {
+    const parsed = parseCoverProfile(
+      [
+        "mode: set",
+        "example.com/pkg/a.go:1.1,2.2 3 1",
+        "example.com/pkg/b.go:1.1,2.2 5 0",
+      ].join("\n"),
+      moduleToDir,
+    );
+    const result = deduplicateProfiles(parsed);
+    expect(result).toHaveLength(2);
+    const a = result.find((r) => r.absPath === "/abs/pkg/a.go")!;
+    const b = result.find((r) => r.absPath === "/abs/pkg/b.go")!;
+    expect(a.statements).toHaveLength(1);
+    expect(b.statements).toHaveLength(1);
+  });
+
+  it("deduplicates same-file blocks by range, taking max(count)", () => {
+    const profileA = parseCoverProfile(
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 4 0\n",
+      moduleToDir,
+    );
+    const profileB = parseCoverProfile(
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 4 5\n",
+      moduleToDir,
+    );
+    const combined = [...profileA, ...profileB];
+    const result = deduplicateProfiles(combined);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].absPath).toBe("/abs/pkg/main.go");
+    expect(result[0].statements).toHaveLength(1);
+    expect(result[0].statements[0].executed).toBe(5);
+    expect(result[0].numStatements).toEqual([4]);
+  });
+
+  it("keeps distinct blocks within same file after merge", () => {
+    const profileA = parseCoverProfile(
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 3 1\n",
+      moduleToDir,
+    );
+    const profileB = parseCoverProfile(
+      "mode: set\nexample.com/pkg/main.go:5.1,6.2 2 1\n",
+      moduleToDir,
+    );
+    const combined = [...profileA, ...profileB];
+    const result = deduplicateProfiles(combined);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].statements).toHaveLength(2);
+    expect(result[0].numStatements).toEqual([3, 2]);
+  });
+
+  it("picks higher count when both entries are nonzero", () => {
+    const profileA = parseCoverProfile(
+      "mode: atomic\nexample.com/pkg/main.go:1.1,2.2 3 10\n",
+      moduleToDir,
+    );
+    const profileB = parseCoverProfile(
+      "mode: atomic\nexample.com/pkg/main.go:1.1,2.2 3 2\n",
+      moduleToDir,
+    );
+    const combined = [...profileA, ...profileB];
+    const result = deduplicateProfiles(combined);
+
+    expect(result[0].statements[0].executed).toBe(10);
+  });
+
+  it("returns empty array for empty input", () => {
+    expect(deduplicateProfiles([])).toHaveLength(0);
   });
 });

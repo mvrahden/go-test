@@ -194,6 +194,61 @@ export function buildFileCoverages(
   });
 }
 
+export function deduplicateProfiles(
+  profiles: ParsedFileCoverage[],
+): ParsedFileCoverage[] {
+  const byFile = new Map<string, ParsedFileCoverage[]>();
+  for (const p of profiles) {
+    const list = byFile.get(p.absPath) ?? [];
+    list.push(p);
+    byFile.set(p.absPath, list);
+  }
+
+  const result: ParsedFileCoverage[] = [];
+  for (const [absPath, entries] of byFile) {
+    if (entries.length === 1) {
+      result.push(entries[0]);
+      continue;
+    }
+
+    const blocks = new Map<
+      string,
+      { stmt: vscode.StatementCoverage; numStmts: number }
+    >();
+    for (const entry of entries) {
+      for (let i = 0; i < entry.statements.length; i++) {
+        const stmt = entry.statements[i];
+        const ns = entry.numStatements[i];
+        const r = stmt.location;
+        const key = `${r.start.line}:${r.start.character},${r.end.line}:${r.end.character}`;
+
+        const prev = blocks.get(key);
+        if (
+          !prev ||
+          executedToCount(stmt.executed) > executedToCount(prev.stmt.executed)
+        ) {
+          blocks.set(key, { stmt, numStmts: ns });
+        }
+      }
+    }
+
+    const statements: vscode.StatementCoverage[] = [];
+    const numStatements: number[] = [];
+    for (const { stmt, numStmts } of blocks.values()) {
+      statements.push(stmt);
+      numStatements.push(numStmts);
+    }
+    result.push({ absPath, statements, numStatements });
+  }
+
+  return result;
+}
+
+function executedToCount(executed: number | boolean): number {
+  if (typeof executed === "number") return executed;
+  return executed ? 1 : 0;
+}
+
 export function parseFuncCoverage(
   content: string,
   moduleToDir: (importPath: string) => string | undefined,
