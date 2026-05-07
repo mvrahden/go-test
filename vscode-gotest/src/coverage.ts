@@ -98,18 +98,21 @@ export function parseCoverProfile(
   return result;
 }
 
+export interface CoverageResult {
+  coverages: vscode.FileCoverage[];
+  details: Map<string, vscode.FileCoverageDetail[]>;
+}
+
 export function buildFileCoverages(
   parsed: ParsedFileCoverage[],
   declarations?: Map<string, vscode.DeclarationCoverage[]>,
-): vscode.FileCoverage[] {
-  return parsed.map((entry) => {
+): CoverageResult {
+  const coverages: vscode.FileCoverage[] = [];
+  const details = new Map<string, vscode.FileCoverageDetail[]>();
+
+  for (const entry of parsed) {
     const uri = vscode.Uri.file(entry.absPath);
     const decls = declarations?.get(entry.absPath);
-    const details: (vscode.StatementCoverage | vscode.DeclarationCoverage)[] =
-      decls && decls.length > 0
-        ? [...entry.statements, ...decls]
-        : [...entry.statements];
-    const fc = vscode.FileCoverage.fromDetails(uri, details);
 
     let covered = 0;
     let total = 0;
@@ -121,10 +124,33 @@ export function buildFileCoverages(
         covered += ns;
       }
     }
-    fc.statementCoverage = new vscode.TestCoverageCount(covered, total);
+    const stmtCount = new vscode.TestCoverageCount(covered, total);
 
-    return fc;
-  });
+    let declCount: vscode.TestCoverageCount | undefined;
+    if (decls && decls.length > 0) {
+      let declCovered = 0;
+      for (const d of decls) {
+        if (
+          (typeof d.executed === "number" && d.executed > 0) ||
+          d.executed === true
+        ) {
+          declCovered++;
+        }
+      }
+      declCount = new vscode.TestCoverageCount(declCovered, decls.length);
+    }
+
+    const fc = new vscode.FileCoverage(uri, stmtCount, undefined, declCount);
+    coverages.push(fc);
+
+    const fileDetails: vscode.FileCoverageDetail[] = [...entry.statements];
+    if (decls) {
+      fileDetails.push(...decls);
+    }
+    details.set(entry.absPath, fileDetails);
+  }
+
+  return { coverages, details };
 }
 
 export function deduplicateProfiles(
