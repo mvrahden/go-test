@@ -32,6 +32,12 @@ vi.mock("vscode", () => {
       public location: Position | Range,
     ) {}
   }
+  class TestCoverageCount {
+    constructor(
+      public covered: number,
+      public total: number,
+    ) {}
+  }
   class FileCoverage {
     constructor(
       public uri: Uri,
@@ -57,6 +63,7 @@ vi.mock("vscode", () => {
     Uri,
     StatementCoverage,
     DeclarationCoverage,
+    TestCoverageCount,
     FileCoverage,
   };
 });
@@ -210,14 +217,16 @@ describe("buildFileCoverages", () => {
     return undefined;
   };
 
-  it("builds FileCoverage from parsed data", () => {
+  it("overrides statementCoverage with statement-weighted metrics", () => {
     const parsed = parseCoverProfile(
-      "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 5 1\nexample.com/pkg/main.go:3.1,4.2 3 0\n",
       moduleToDir,
     );
     const result = buildFileCoverages(parsed);
     expect(result).toHaveLength(1);
     expect(result[0].uri.fsPath).toBe("/abs/pkg/main.go");
+    expect(result[0].statementCoverage.covered).toBe(5);
+    expect(result[0].statementCoverage.total).toBe(8);
   });
 
   it("merges declarations when provided", () => {
