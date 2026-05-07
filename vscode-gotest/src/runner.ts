@@ -20,6 +20,7 @@ import {
   splitFuncCoverageByPackage,
 } from "./coverage.js";
 import type { CoverageStore } from "./coverageStore.js";
+import type { CoverageRunner } from "./coverage.js";
 
 export class TestRunner {
   private _lastJsonOutput = "";
@@ -32,6 +33,7 @@ export class TestRunner {
     private readonly cache: DiscoveryCache,
     private readonly outputChannel: vscode.OutputChannel,
     private readonly coverageStore?: CoverageStore,
+    private readonly coverageRunner?: CoverageRunner,
   ) {}
 
   dispose(): void {
@@ -178,7 +180,8 @@ export class TestRunner {
       }
 
       if (anyCoverOnRun) {
-        const { coverages: allCoverages } = this.coverageStore!.buildFileCoverages(this.cache);
+        const { coverages: allCoverages, details } = this.coverageStore!.buildFileCoverages(this.cache);
+        this.coverageRunner?.mergeDetails(details);
         for (const fc of allCoverages) {
           run.addCoverage(fc);
         }

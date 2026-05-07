@@ -62,8 +62,6 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const coverageStore = new CoverageStore(context.storageUri);
 
-  runner = new TestRunner(controller, cache, outputChannel, coverageStore);
-
   const specView = new SpecViewPanel(outputChannel);
 
   coverageRunner = new CoverageRunner(
@@ -79,6 +77,8 @@ export function activate(context: vscode.ExtensionContext): void {
   controller.setCoverageDetailProvider((uri) =>
     coverageRunner.getDetailedCoverage(uri),
   );
+
+  runner = new TestRunner(controller, cache, outputChannel, coverageStore, coverageRunner);
 
   const specViewRefreshDisposable = runner.onDidComplete((jsonOutput) => {
     specView.refresh(jsonOutput);
