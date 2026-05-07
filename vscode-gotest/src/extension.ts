@@ -76,6 +76,10 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   );
 
+  controller.setCoverageDetailProvider((uri) =>
+    coverageRunner.getDetailedCoverage(uri),
+  );
+
   const specViewRefreshDisposable = runner.onDidComplete((jsonOutput) => {
     specView.refresh(jsonOutput);
   });

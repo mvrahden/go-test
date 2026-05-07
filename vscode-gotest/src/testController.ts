@@ -69,6 +69,7 @@ export class GoTestController implements vscode.Disposable {
   private controller: vscode.TestController;
   private disposables: vscode.Disposable[] = [];
   private results = new Map<string, TestResult>();
+  private coverageProfile: vscode.TestRunProfile | undefined;
 
   constructor(
     private readonly cache: DiscoveryCache,
@@ -105,7 +106,7 @@ export class GoTestController implements vscode.Disposable {
       true,
     );
 
-    this.controller.createRunProfile(
+    this.coverageProfile = this.controller.createRunProfile(
       "Coverage",
       vscode.TestRunProfileKind.Coverage,
       (request, token) => coverageHandler(request, token),
@@ -349,6 +350,18 @@ export class GoTestController implements vscode.Disposable {
     const item = this.controller.createTestItem(id, label, parentItem.uri);
     parentItem.children.add(item);
     return item;
+  }
+
+  setCoverageDetailProvider(
+    provider: (uri: vscode.Uri) => vscode.FileCoverageDetail[],
+  ): void {
+    if (this.coverageProfile) {
+      this.coverageProfile.loadDetailedCoverage = async (
+        _testRun,
+        fileCoverage,
+        _token,
+      ) => provider(fileCoverage.uri);
+    }
   }
 
   createTestRun(request: vscode.TestRunRequest, name: string): vscode.TestRun {
