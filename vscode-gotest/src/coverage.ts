@@ -592,13 +592,16 @@ export class CoverageRunner implements vscode.Disposable {
       for (const info of pkgInfos) {
         const pkgEvents = eventsByPkg.get(info.importPath) ?? [];
         if (pkgEvents.length > 0) {
-          applyResults(
+          const applied = applyResults(
             this.controller,
             run,
             pkgEvents,
             info.importPath,
             info.dir,
           );
+          for (const r of applied) {
+            this.controller.recordResult(r.itemId, r.status, r.duration);
+          }
         }
       }
 
