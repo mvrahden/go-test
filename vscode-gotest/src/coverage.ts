@@ -126,21 +126,7 @@ export function buildFileCoverages(
     }
     const stmtCount = new vscode.TestCoverageCount(covered, total);
 
-    let declCount: vscode.TestCoverageCount | undefined;
-    if (decls && decls.length > 0) {
-      let declCovered = 0;
-      for (const d of decls) {
-        if (
-          (typeof d.executed === "number" && d.executed > 0) ||
-          d.executed === true
-        ) {
-          declCovered++;
-        }
-      }
-      declCount = new vscode.TestCoverageCount(declCovered, decls.length);
-    }
-
-    const fc = new vscode.FileCoverage(uri, stmtCount, undefined, declCount);
+    const fc = new vscode.FileCoverage(uri, stmtCount);
     coverages.push(fc);
 
     const fileDetails: vscode.FileCoverageDetail[] = [...entry.statements];

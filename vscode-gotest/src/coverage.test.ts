@@ -234,7 +234,7 @@ describe("buildFileCoverages", () => {
     expect(details.get("/abs/pkg/main.go")).toHaveLength(2);
   });
 
-  it("computes declarationCoverage counts when declarations provided", () => {
+  it("includes declarations in details but not in sidebar metric", () => {
     const parsed = parseCoverProfile(
       "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
       moduleToDir,
@@ -246,12 +246,11 @@ describe("buildFileCoverages", () => {
     const declarations = parseFuncCoverage(funcContent, moduleToDir);
     const { coverages, details } = buildFileCoverages(parsed, declarations);
     expect(coverages).toHaveLength(1);
-    expect(coverages[0].declarationCoverage?.covered).toBe(1);
-    expect(coverages[0].declarationCoverage?.total).toBe(2);
+    expect(coverages[0].declarationCoverage).toBeUndefined();
     expect(details.get("/abs/pkg/main.go")).toHaveLength(3);
   });
 
-  it("omits declarationCoverage when no declarations", () => {
+  it("has no declarationCoverage regardless of input", () => {
     const parsed = parseCoverProfile(
       "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
       moduleToDir,
