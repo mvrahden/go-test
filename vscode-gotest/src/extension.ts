@@ -18,6 +18,7 @@ import { CoverageStore } from "./coverageStore.js";
 import { TestResultStore } from "./testResultStore.js";
 import { validateGoBinary, scopedConfig } from "./cli.js";
 import { buildRunFilter, getPackageDir } from "./runnerUtils.js";
+import { copyCoverageSummary, copyTestResults } from "./reporting.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Go Test Suites");
@@ -265,12 +266,18 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const copyCoverageCmd = vscode.commands.registerCommand(
     "gotest.copyCoverage",
-    () => coverageRunner.copyCoverageSummary(),
+    () => copyCoverageSummary(coverageStore, cache),
   );
 
   const copyTestResultsCmd = vscode.commands.registerCommand(
     "gotest.copyTestResults",
-    (item?: vscode.TestItem) => controller.copyTestResults(item),
+    (item?: vscode.TestItem) =>
+      copyTestResults(
+        controller.testController.items,
+        testResultStore,
+        (id) => controller.findItem(id),
+        item,
+      ),
   );
 
   // Cover on save: debounced per-package trigger
