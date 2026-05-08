@@ -89,9 +89,9 @@ import {
   parseFuncCoverage,
   buildFileCoverages,
   deduplicateProfiles,
-  splitCoverByPackage,
   filterSupplementaryProfiles,
 } from "./coverage.js";
+import { splitCoverByPackage } from "./coverageUtils.js";
 
 describe("parseCoverProfile", () => {
   const moduleToDir = (importPath: string) => {
