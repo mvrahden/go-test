@@ -43,7 +43,7 @@ import {
   buildPathTrie,
   collapsePathTrie,
   type PathNode,
-} from "./testController.js";
+} from "./pathTrie.js";
 
 interface MockTestItem {
   id: string;
