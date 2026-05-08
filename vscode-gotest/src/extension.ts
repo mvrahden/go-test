@@ -14,6 +14,7 @@ import {
   executeScaffold,
 } from "./scaffold.js";
 import { CoverageRunner } from "./coverage.js";
+import { CoverOnSave } from "./coverOnSave.js";
 import { CoverageStore } from "./coverageStore.js";
 import { TestResultStore } from "./testResultStore.js";
 import { validateGoBinary, scopedConfig } from "./cli.js";
@@ -66,6 +67,8 @@ export function activate(context: vscode.ExtensionContext): void {
   };
 
   const coverageStore = new CoverageStore(context.storageUri);
+
+  const coverOnSave = new CoverOnSave(controller, cache, coverageStore, outputChannel);
 
   const specView = new SpecViewPanel(outputChannel);
 
@@ -294,7 +297,7 @@ export function activate(context: vscode.ExtensionContext): void {
       importPath,
       setTimeout(() => {
         coverOnSaveTimers.delete(importPath);
-        coverageRunner.runPackage(importPath);
+        coverOnSave.run(importPath);
       }, 500),
     );
   };
@@ -370,6 +373,7 @@ export function activate(context: vscode.ExtensionContext): void {
     debugLauncher,
     runner,
     coverageRunner,
+    coverOnSave,
     coverageStore,
     specView,
     specViewRefreshDisposable,
