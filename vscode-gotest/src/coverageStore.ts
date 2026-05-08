@@ -8,6 +8,7 @@ import {
   parseFuncCoverage,
   buildFileCoverages,
   deduplicateProfiles,
+  filterSupplementaryProfiles,
 } from "./coverage.js";
 import type { DiscoveryCache } from "./discovery.js";
 
@@ -15,6 +16,7 @@ interface StoredPackageCoverage {
   coverprofile: string;
   funcCoverage?: string;
   timestamp: number;
+  supplementary?: boolean;
 }
 
 interface StoredData {
@@ -52,11 +54,13 @@ export class CoverageStore implements vscode.Disposable {
     importPath: string,
     coverprofile: string,
     funcCoverage?: string,
+    supplementary?: boolean,
   ): void {
     this.packages.set(importPath, {
       coverprofile,
       funcCoverage,
       timestamp: Date.now(),
+      supplementary: supplementary || undefined,
     });
     this.parsed.delete(importPath);
     this._onDidChange.fire();
@@ -84,7 +88,9 @@ export class CoverageStore implements vscode.Disposable {
     const moduleToDir = (importPath: string) =>
       cache.resolveImportPath(importPath);
     const allDeclarations = new Map<string, vscode.DeclarationCoverage[]>();
-    const allProfiles: ParsedFileCoverage[] = [];
+
+    const primaryProfiles: ParsedFileCoverage[] = [];
+    const supplementaryProfiles: ParsedFileCoverage[] = [];
 
     for (const [importPath, pkg] of this.packages) {
       let entry = this.parsed.get(importPath);
@@ -98,13 +104,24 @@ export class CoverageStore implements vscode.Disposable {
         this.parsed.set(importPath, entry);
       }
 
-      allProfiles.push(...entry.profiles);
+      if (pkg.supplementary) {
+        supplementaryProfiles.push(...entry.profiles);
+      } else {
+        primaryProfiles.push(...entry.profiles);
+      }
+
       for (const [filePath, declarations] of entry.declarations) {
         const existing = allDeclarations.get(filePath) ?? [];
         existing.push(...declarations);
         allDeclarations.set(filePath, existing);
       }
     }
+
+    const filtered = filterSupplementaryProfiles(
+      primaryProfiles,
+      supplementaryProfiles,
+    );
+    const allProfiles = [...primaryProfiles, ...filtered];
 
     return buildFileCoverages(
       deduplicateProfiles(allProfiles),
