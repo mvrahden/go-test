@@ -634,29 +634,29 @@ export class CoverageRunner implements vscode.Disposable {
           );
         }
 
-        const splitPaths = testOnly
-          ? this.cache.packages.map((p) => p.importPath)
-          : importPaths;
-        const coverByPkg = splitCoverByPackage(coverContent, splitPaths);
-        const funcByPkg = funcOutput
-          ? splitFuncCoverageByPackage(funcOutput, splitPaths)
-          : undefined;
-
-        for (const info of pkgInfos) {
-          const pkgCover = coverByPkg.get(info.importPath);
-          if (pkgCover) {
+        if (testOnly) {
+          for (const info of pkgInfos) {
             this.store.update(
               info.importPath,
-              pkgCover,
-              funcByPkg?.get(info.importPath),
+              coverContent,
+              funcOutput,
+              true,
             );
           }
-        }
+        } else {
+          const coverByPkg = splitCoverByPackage(coverContent, importPaths);
+          const funcByPkg = funcOutput
+            ? splitFuncCoverageByPackage(funcOutput, importPaths)
+            : undefined;
 
-        if (testOnly) {
-          for (const [ip, cover] of coverByPkg) {
-            if (!importPaths.includes(ip)) {
-              this.store.update(ip, cover, funcByPkg?.get(ip));
+          for (const info of pkgInfos) {
+            const pkgCover = coverByPkg.get(info.importPath);
+            if (pkgCover) {
+              this.store.update(
+                info.importPath,
+                pkgCover,
+                funcByPkg?.get(info.importPath),
+              );
             }
           }
         }
