@@ -75,10 +75,10 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   controller.setCoverageDetailProvider((uri) =>
-    coverageRunner.getDetailedCoverage(uri),
+    coverageStore.getDetails(uri.fsPath),
   );
 
-  runner = new TestRunner(controller, cache, outputChannel, coverageStore, coverageRunner);
+  runner = new TestRunner(controller, cache, outputChannel, coverageStore);
 
   const specViewRefreshDisposable = runner.onDidComplete((jsonOutput) => {
     specView.refresh(jsonOutput);
@@ -412,8 +412,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }
     await coverageStore.load();
     if (coverageStore.size > 0) {
-      const { coverages, details } = coverageStore.buildFileCoverages(cache);
-      coverageRunner.mergeDetails(details);
+      const { coverages } = coverageStore.buildFileCoverages(cache);
       if (coverages.length > 0) {
         const request = new vscode.TestRunRequest();
         const run = controller.createTestRun(request, "Restored Coverage");

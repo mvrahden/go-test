@@ -336,7 +336,6 @@ export class CoverageRunner implements vscode.Disposable {
   private activePackageRun: vscode.CancellationTokenSource | undefined;
   private packageRunQueue = Promise.resolve();
   private pendingPackages = new Set<string>();
-  private coverageDetails = new Map<string, vscode.FileCoverageDetail[]>();
 
   constructor(
     private readonly controller: GoTestController,
@@ -345,16 +344,6 @@ export class CoverageRunner implements vscode.Disposable {
     private readonly outputChannel: vscode.OutputChannel,
     private readonly onJsonOutput: (json: string) => void,
   ) {}
-
-  getDetailedCoverage(uri: vscode.Uri): vscode.FileCoverageDetail[] {
-    return this.coverageDetails.get(uri.fsPath) ?? [];
-  }
-
-  mergeDetails(details: Map<string, vscode.FileCoverageDetail[]>): void {
-    for (const [key, value] of details) {
-      this.coverageDetails.set(key, value);
-    }
-  }
 
   async run(
     request: vscode.TestRunRequest,
@@ -504,8 +493,7 @@ export class CoverageRunner implements vscode.Disposable {
         }
       }
 
-      const { coverages: allCoverages, details } = this.store.buildFileCoverages(this.cache);
-      this.coverageDetails = details;
+      const { coverages: allCoverages } = this.store.buildFileCoverages(this.cache);
       for (const fc of allCoverages) {
         run.addCoverage(fc);
       }
@@ -947,8 +935,7 @@ export class CoverageRunner implements vscode.Disposable {
 
     const request = new vscode.TestRunRequest();
     const run = this.controller.createTestRun(request, "Cover on Save");
-    const { coverages: allCoverages, details } = this.store.buildFileCoverages(this.cache);
-    this.coverageDetails = details;
+    const { coverages: allCoverages } = this.store.buildFileCoverages(this.cache);
     for (const fc of allCoverages) {
       run.addCoverage(fc);
     }

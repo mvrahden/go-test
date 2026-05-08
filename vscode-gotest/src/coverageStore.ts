@@ -32,6 +32,7 @@ interface ParsedPackageCache {
 export class CoverageStore implements vscode.Disposable {
   private packages = new Map<string, StoredPackageCoverage>();
   private parsed = new Map<string, ParsedPackageCache>();
+  private cachedDetails = new Map<string, vscode.FileCoverageDetail[]>();
   private readonly storagePath: string | undefined;
   private readonly _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChange: vscode.Event<void> = this._onDidChange.event;
@@ -44,6 +45,10 @@ export class CoverageStore implements vscode.Disposable {
 
   get size(): number {
     return this.packages.size;
+  }
+
+  getDetails(absPath: string): vscode.FileCoverageDetail[] {
+    return this.cachedDetails.get(absPath) ?? [];
   }
 
   has(importPath: string): boolean {
@@ -63,6 +68,7 @@ export class CoverageStore implements vscode.Disposable {
       supplementary: supplementary || undefined,
     });
     this.parsed.delete(importPath);
+    this.cachedDetails.clear();
     this._onDidChange.fire();
   }
 
@@ -70,6 +76,7 @@ export class CoverageStore implements vscode.Disposable {
     const deleted = this.packages.delete(importPath);
     if (deleted) {
       this.parsed.delete(importPath);
+      this.cachedDetails.clear();
       this._onDidChange.fire();
     }
     return deleted;
@@ -81,6 +88,7 @@ export class CoverageStore implements vscode.Disposable {
     }
     this.packages.clear();
     this.parsed.clear();
+    this.cachedDetails.clear();
     this._onDidChange.fire();
   }
 
@@ -123,10 +131,12 @@ export class CoverageStore implements vscode.Disposable {
     );
     const allProfiles = [...primaryProfiles, ...filtered];
 
-    return buildFileCoverages(
+    const result = buildFileCoverages(
       deduplicateProfiles(allProfiles),
       allDeclarations,
     );
+    this.cachedDetails = result.details;
+    return result;
   }
 
   async load(): Promise<void> {
@@ -166,6 +176,7 @@ export class CoverageStore implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.cachedDetails.clear();
     this._onDidChange.dispose();
   }
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll } from "vitest";
 
 vi.mock("vscode", () => {
   class Position {
@@ -59,6 +59,19 @@ vi.mock("vscode", () => {
       return new FileCoverage(uri, { covered, total: details.length });
     }
   }
+  class EventEmitter<T> {
+    private listeners: ((e: T) => void)[] = [];
+    event = (listener: (e: T) => void) => {
+      this.listeners.push(listener);
+      return { dispose: () => {} };
+    };
+    fire(e: T) {
+      for (const l of this.listeners) l(e);
+    }
+    dispose() {
+      this.listeners = [];
+    }
+  }
   return {
     Position,
     Range,
@@ -67,6 +80,7 @@ vi.mock("vscode", () => {
     DeclarationCoverage,
     TestCoverageCount,
     FileCoverage,
+    EventEmitter,
   };
 });
 
@@ -434,5 +448,54 @@ describe("filterSupplementaryProfiles", () => {
 
   it("returns empty when both inputs are empty", () => {
     expect(filterSupplementaryProfiles([], [])).toHaveLength(0);
+  });
+});
+
+describe("CoverageStore.getDetails", () => {
+  let CoverageStoreCls: typeof import("./coverageStore.js").CoverageStore;
+
+  beforeAll(async () => {
+    const mod = await import("./coverageStore.js");
+    CoverageStoreCls = mod.CoverageStore;
+  });
+
+  it("returns details for a file after buildFileCoverages", () => {
+    const store = new CoverageStoreCls(undefined);
+    store.update("example.com/pkg", "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n");
+    const mockCache = {
+      resolveImportPath: (ip: string) => ip === "example.com/pkg" ? "/abs/pkg" : undefined,
+    };
+    store.buildFileCoverages(mockCache as any);
+    const details = store.getDetails("/abs/pkg/main.go");
+    expect(details.length).toBeGreaterThan(0);
+  });
+
+  it("returns empty array for unknown path", () => {
+    const store = new CoverageStoreCls(undefined);
+    expect(store.getDetails("/no/such/file.go")).toEqual([]);
+  });
+
+  it("clears cached details on invalidate", () => {
+    const store = new CoverageStoreCls(undefined);
+    store.update("example.com/pkg", "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n");
+    const mockCache = {
+      resolveImportPath: (ip: string) => ip === "example.com/pkg" ? "/abs/pkg" : undefined,
+    };
+    store.buildFileCoverages(mockCache as any);
+    expect(store.getDetails("/abs/pkg/main.go").length).toBeGreaterThan(0);
+    store.invalidate("example.com/pkg");
+    expect(store.getDetails("/abs/pkg/main.go")).toEqual([]);
+  });
+
+  it("clears cached details on clear", () => {
+    const store = new CoverageStoreCls(undefined);
+    store.update("example.com/pkg", "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n");
+    const mockCache = {
+      resolveImportPath: (ip: string) => ip === "example.com/pkg" ? "/abs/pkg" : undefined,
+    };
+    store.buildFileCoverages(mockCache as any);
+    expect(store.getDetails("/abs/pkg/main.go").length).toBeGreaterThan(0);
+    store.clear();
+    expect(store.getDetails("/abs/pkg/main.go")).toEqual([]);
   });
 });
