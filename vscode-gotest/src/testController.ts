@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
+import { TestResultStore } from "./testResultStore.js";
+export type { TestResult } from "./testResultStore.js";
 
 export interface PathNode {
   segment: string;
@@ -60,19 +62,14 @@ function collapseNode(node: PathNode): void {
   node.children = collapsed;
 }
 
-export interface TestResult {
-  status: "pass" | "fail" | "skip";
-  duration?: number;
-}
-
 export class GoTestController implements vscode.Disposable {
   private controller: vscode.TestController;
   private disposables: vscode.Disposable[] = [];
-  private results = new Map<string, TestResult>();
   private coverageProfile: vscode.TestRunProfile | undefined;
 
   constructor(
     private readonly cache: DiscoveryCache,
+    private readonly resultStore: TestResultStore,
     private readonly outputChannel: vscode.OutputChannel,
     runHandler: (
       request: vscode.TestRunRequest,
@@ -374,16 +371,20 @@ export class GoTestController implements vscode.Disposable {
 
   recordResult(
     itemId: string,
-    status: TestResult["status"],
+    status: "pass" | "fail" | "skip",
     duration?: number,
   ): void {
-    this.results.set(itemId, { status, duration });
+    this.resultStore.record(itemId, status, duration);
   }
 
   clearResults(item: vscode.TestItem): void {
-    this.results.delete(item.id);
+    this.resultStore.delete(item.id);
     item.children.forEach((child) => this.clearResults(child));
     this.clearDynamicChildren(item);
+  }
+
+  async saveResults(): Promise<void> {
+    await this.resultStore.save();
   }
 
   async copyTestResults(rootItem?: vscode.TestItem): Promise<void> {
@@ -404,7 +405,7 @@ export class GoTestController implements vscode.Disposable {
     const walkItem = (item: vscode.TestItem, indent: number): Agg => {
       const structural =
         item.id.startsWith("dir:") || item.tags.some((t) => t.id === "package");
-      const result = structural ? undefined : this.results.get(item.id);
+      const result = structural ? undefined : this.resultStore.get(item.id);
 
       const rowIdx = rows.length;
       rows.push({

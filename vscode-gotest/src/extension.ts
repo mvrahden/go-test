@@ -15,6 +15,7 @@ import {
 } from "./scaffold.js";
 import { CoverageRunner } from "./coverage.js";
 import { CoverageStore } from "./coverageStore.js";
+import { TestResultStore } from "./testResultStore.js";
 import { validateGoBinary, scopedConfig } from "./cli.js";
 import { buildRunFilter, getPackageDir } from "./runnerUtils.js";
 
@@ -37,8 +38,11 @@ export function activate(context: vscode.ExtensionContext): void {
   let runner!: TestRunner;
   let coverageRunner!: CoverageRunner;
 
+  const testResultStore = new TestResultStore(context.storageUri);
+
   const controller = new GoTestController(
     cache,
+    testResultStore,
     outputChannel,
     (request, token) => runner.run(request, token),
     (request, token) =>
@@ -350,6 +354,7 @@ export function activate(context: vscode.ExtensionContext): void {
     outputChannel,
     cache,
     controller,
+    testResultStore,
     codeLensProvider,
     codeLensDisposable,
     focusExcludeProvider,
@@ -424,6 +429,22 @@ export function activate(context: vscode.ExtensionContext): void {
           `[coverage] restored ${coverages.length} file(s) from storage`,
         );
       }
+    }
+
+    await testResultStore.load();
+    if (testResultStore.size > 0) {
+      const resultRequest = new vscode.TestRunRequest();
+      const resultRun = controller.createTestRun(resultRequest, "Restored Results");
+      testResultStore.forEach((result, itemId) => {
+        const item = controller.findItem(itemId);
+        if (!item) return;
+        if (result.status === "pass") resultRun.passed(item, result.duration);
+        else if (result.status === "fail")
+          resultRun.failed(item, [new vscode.TestMessage("(restored from previous session)")]);
+        else if (result.status === "skip") resultRun.skipped(item);
+      });
+      resultRun.end();
+      outputChannel.appendLine(`[results] restored ${testResultStore.size} result(s) from storage`);
     }
   })();
 }

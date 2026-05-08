@@ -184,6 +184,7 @@ export class TestRunner {
         }
         await this.coverageStore!.save();
       }
+      await this.controller.saveResults();
     } finally {
       cancelSub.dispose();
       if (this.activeRun === cts) {
