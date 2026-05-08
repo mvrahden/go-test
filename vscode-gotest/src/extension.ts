@@ -440,7 +440,7 @@ export function activate(context: vscode.ExtensionContext): void {
         if (!item) return;
         if (result.status === "pass") resultRun.passed(item, result.duration);
         else if (result.status === "fail")
-          resultRun.failed(item, [new vscode.TestMessage("(restored from previous session)")]);
+          resultRun.failed(item, [new vscode.TestMessage("(restored from previous session)")], result.duration);
         else if (result.status === "skip") resultRun.skipped(item);
       });
       resultRun.end();

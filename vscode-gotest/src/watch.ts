@@ -222,6 +222,7 @@ export class WatchManager implements vscode.Disposable {
         if (cycleJsonAccumulator) {
           this.onCycleComplete(cycleJsonAccumulator);
         }
+        void this.controller.saveResults();
         cycleJsonAccumulator = "";
 
         // Create new TestRun
@@ -252,6 +253,7 @@ export class WatchManager implements vscode.Disposable {
           run.end();
           this.activeRuns.delete(pkgScope);
         }
+        void this.controller.saveResults();
 
         // Fire cycle complete with accumulated JSON
         if (cycleJsonAccumulator) {
