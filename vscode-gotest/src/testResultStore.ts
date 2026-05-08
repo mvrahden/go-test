@@ -15,12 +15,19 @@ interface StoredData {
   results: Record<string, StoredTestResult>;
 }
 
+const DEFAULT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 export class TestResultStore {
   private results = new Map<string, StoredTestResult>();
   private readonly storagePath: string | undefined;
   private saveChain = Promise.resolve();
+  private readonly maxAge: number;
 
-  constructor(storageUri: { fsPath: string } | undefined) {
+  constructor(
+    storageUri: { fsPath: string } | undefined,
+    maxAge = DEFAULT_MAX_AGE_MS,
+  ) {
+    this.maxAge = maxAge;
     if (storageUri) {
       this.storagePath = path.join(storageUri.fsPath, "testResults.json");
     }
@@ -50,6 +57,15 @@ export class TestResultStore {
     this.results.forEach((result, id) => callback(result, id));
   }
 
+  private evictStale(): void {
+    const cutoff = Date.now() - this.maxAge;
+    for (const [id, result] of this.results) {
+      if (result.timestamp < cutoff) {
+        this.results.delete(id);
+      }
+    }
+  }
+
   async load(): Promise<void> {
     if (!this.storagePath) return;
     try {
@@ -60,6 +76,7 @@ export class TestResultStore {
       for (const [id, result] of Object.entries(data.results)) {
         this.results.set(id, result);
       }
+      this.evictStale();
     } catch { /* No stored data or corrupt — start fresh */ }
   }
 
@@ -75,6 +92,7 @@ export class TestResultStore {
 
   private async writeToDisk(): Promise<void> {
     if (!this.storagePath) return;
+    this.evictStale();
     const data: StoredData = {
       version: 1,
       results: Object.fromEntries(this.results),

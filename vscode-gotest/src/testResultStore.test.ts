@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { TestResultStore } from "./testResultStore.js";
@@ -106,6 +106,47 @@ describe("TestResultStore", () => {
       const s = new TestResultStore({ fsPath: tmpDir });
       await expect(s.load()).resolves.toBeUndefined();
       expect(s.size).toBe(0);
+    });
+
+    it("evicts stale entries on load", async () => {
+      const writer = new TestResultStore({ fsPath: tmpDir });
+      writer.record("pkg/fresh", "pass");
+      writer.record("pkg/stale", "fail");
+      await writer.save();
+
+      const filePath = path.join(tmpDir, "testResults.json");
+      const raw = await readFile(filePath, "utf-8");
+      const data = JSON.parse(raw);
+      data.results["pkg/stale"].timestamp =
+        Date.now() - 8 * 24 * 60 * 60 * 1000;
+      await writeFile(filePath, JSON.stringify(data), "utf-8");
+
+      const reader = new TestResultStore({ fsPath: tmpDir });
+      await reader.load();
+      expect(reader.get("pkg/fresh")).toBeDefined();
+      expect(reader.get("pkg/stale")).toBeUndefined();
+    });
+
+    it("evicts stale entries on save", async () => {
+      const store = new TestResultStore({ fsPath: tmpDir }, 0);
+      store.record("pkg/a", "pass");
+      await new Promise((r) => setTimeout(r, 10));
+      await store.save();
+
+      const reader = new TestResultStore({ fsPath: tmpDir });
+      await reader.load();
+      expect(reader.size).toBe(0);
+    });
+
+    it("preserves fresh entries during eviction", async () => {
+      const store = new TestResultStore({ fsPath: tmpDir }, 60_000);
+      store.record("pkg/a", "pass");
+      store.record("pkg/b", "fail");
+      await store.save();
+
+      const reader = new TestResultStore({ fsPath: tmpDir });
+      await reader.load();
+      expect(reader.size).toBe(2);
     });
 
     afterEach(async () => {
