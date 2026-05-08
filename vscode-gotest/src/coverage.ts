@@ -153,6 +153,15 @@ export function buildFileCoverages(
   return { coverages, details };
 }
 
+export function filterSupplementaryProfiles(
+  primary: ParsedFileCoverage[],
+  supplementary: ParsedFileCoverage[],
+): ParsedFileCoverage[] {
+  if (primary.length === 0) return supplementary;
+  const scope = new Set(primary.map((p) => p.absPath));
+  return supplementary.filter((p) => scope.has(p.absPath));
+}
+
 export function deduplicateProfiles(
   profiles: ParsedFileCoverage[],
 ): ParsedFileCoverage[] {

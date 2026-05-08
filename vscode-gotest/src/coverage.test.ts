@@ -76,6 +76,7 @@ import {
   buildFileCoverages,
   deduplicateProfiles,
   splitCoverByPackage,
+  filterSupplementaryProfiles,
 } from "./coverage.js";
 
 describe("parseCoverProfile", () => {
@@ -386,5 +387,53 @@ describe("splitCoverByPackage", () => {
 
     const result = splitCoverByPackage(content, ["example.com/pkg"]);
     expect(result.get("example.com/pkg")).toMatch(/^mode: atomic\n/);
+  });
+});
+
+describe("filterSupplementaryProfiles", () => {
+  const moduleToDir = (importPath: string) => {
+    if (importPath === "example.com/pkg") return "/abs/pkg";
+    if (importPath === "example.com/other") return "/abs/other";
+    return undefined;
+  };
+
+  it("keeps supplementary entries that match primary file scope", () => {
+    const primary = parseCoverProfile(
+      "mode: set\nexample.com/pkg/a.go:1.1,2.2 3 5\n",
+      moduleToDir,
+    );
+    const supplementary = parseCoverProfile(
+      "mode: set\nexample.com/pkg/a.go:1.1,2.2 3 0\nexample.com/other/b.go:1.1,2.2 2 1\n",
+      moduleToDir,
+    );
+    const result = filterSupplementaryProfiles(primary, supplementary);
+    expect(result).toHaveLength(1);
+    expect(result[0].absPath).toBe("/abs/pkg/a.go");
+  });
+
+  it("returns empty when no supplementary files match primary scope", () => {
+    const primary = parseCoverProfile(
+      "mode: set\nexample.com/pkg/a.go:1.1,2.2 3 1\n",
+      moduleToDir,
+    );
+    const supplementary = parseCoverProfile(
+      "mode: set\nexample.com/other/b.go:1.1,2.2 2 1\n",
+      moduleToDir,
+    );
+    const result = filterSupplementaryProfiles(primary, supplementary);
+    expect(result).toHaveLength(0);
+  });
+
+  it("returns all supplementary when primary is empty (fallback)", () => {
+    const supplementary = parseCoverProfile(
+      "mode: set\nexample.com/pkg/a.go:1.1,2.2 3 1\nexample.com/other/b.go:1.1,2.2 2 1\n",
+      moduleToDir,
+    );
+    const result = filterSupplementaryProfiles([], supplementary);
+    expect(result).toHaveLength(2);
+  });
+
+  it("returns empty when both inputs are empty", () => {
+    expect(filterSupplementaryProfiles([], [])).toHaveLength(0);
   });
 });
