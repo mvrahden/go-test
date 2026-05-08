@@ -1,25 +1,14 @@
 import * as vscode from "vscode";
-import * as path from "node:path";
-import { rm, mkdtemp, readFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
-import { parseTestEvents, groupEventsByPackage } from "./outputParser.js";
-import { buildCliCommand, formatCliCommand, scopedConfig } from "./cli.js";
+import { scopedConfig } from "./cli.js";
 import {
   collectItems,
   groupByPackage,
-  applyResults,
-  spawnTestProcess,
   buildRunFilter,
-  computeWildcard,
 } from "./runnerUtils.js";
-import {
-  runGoToolCoverFunc,
-  splitCoverByPackage,
-  splitFuncCoverageByPackage,
-} from "./coverage.js";
 import type { CoverageStore } from "./coverageStore.js";
+import { executeBatch } from "./batchRunner.js";
 
 export class TestRunner {
   private _lastJsonOutput = "";
@@ -211,131 +200,23 @@ export class TestRunner {
     run: vscode.TestRun,
     token: vscode.CancellationToken,
   ): Promise<void> {
-    const importPaths = pkgInfos.map((p) => p.importPath);
-    const wildcard = filter ? undefined : computeWildcard(importPaths);
-    const cliPkgArgs = wildcard ? [wildcard] : importPaths;
-    let coverFile: string | undefined;
-
-    try {
-      if (coverOnRun) {
-        const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
-        coverFile = path.join(tmpDir, "cover.out");
-      }
-
-      const cliArgs: string[] = ["-json", "-count=1", ...cliPkgArgs];
-      if (coverFile) {
-        cliArgs.push("-covermode=atomic", `-coverprofile=${coverFile}`);
-      }
-      if (filter) {
-        cliArgs.push("-run", filter);
-      }
-      cliArgs.push(...testFlags);
-
-      const cmd = await buildCliCommand(
-        cliArgs,
-        workspaceDir,
-        this.outputChannel,
-      );
-      this.outputChannel.appendLine(`[runner] ${formatCliCommand(cmd)}`);
-
-      const result = await spawnTestProcess(
-        cmd.bin,
-        cmd.args,
-        workspaceDir,
-        token,
-        this.outputChannel,
-        "runner",
-      );
-      this._lastJsonOutput += result.stdout;
-
-      if (token.isCancellationRequested) {
-        for (const info of pkgInfos) {
-          for (const item of info.items) {
-            run.skipped(item);
-          }
+    const result = await executeBatch({
+      pkgInfos,
+      filter,
+      workspaceDir,
+      testFlags,
+      run,
+      token,
+      controller: this.controller,
+      outputChannel: this.outputChannel,
+      label: "runner",
+      coverage: coverOnRun ? { store: this.coverageStore! } : undefined,
+      onResults: (applied) => {
+        for (const r of applied) {
+          this.controller.recordResult(r.itemId, r.status, r.duration);
         }
-        return;
-      }
-
-      const events = result.stdout ? parseTestEvents(result.stdout) : [];
-      const eventsByPkg = groupEventsByPackage(events);
-
-      for (const info of pkgInfos) {
-        const pkgEvents = eventsByPkg.get(info.importPath) ?? [];
-        if (pkgEvents.length > 0) {
-          const applied = applyResults(
-            this.controller,
-            run,
-            pkgEvents,
-            info.importPath,
-            info.dir,
-          );
-          for (const r of applied) {
-            this.controller.recordResult(r.itemId, r.status, r.duration);
-          }
-        }
-      }
-
-      if (result.exitCode !== 0) {
-        const diagnostic = [
-          result.stderr.trim(),
-          result.stdout.trim(),
-          `exit code ${result.exitCode}`,
-        ].filter(Boolean).join("\n\n");
-
-        for (const info of pkgInfos) {
-          if ((eventsByPkg.get(info.importPath) ?? []).length === 0) {
-            for (const item of info.items) {
-              run.errored(item, new vscode.TestMessage(diagnostic));
-            }
-          }
-        }
-      }
-      if (coverFile) {
-        try {
-          const coverContent = await readFile(coverFile, "utf-8");
-          let funcOutput: string | undefined;
-          try {
-            funcOutput = await runGoToolCoverFunc(coverFile, workspaceDir);
-          } catch {
-            this.outputChannel.appendLine(
-              "[runner] go tool cover -func failed",
-            );
-          }
-
-          const coverByPkg = splitCoverByPackage(coverContent, importPaths);
-          const funcByPkg = funcOutput
-            ? splitFuncCoverageByPackage(funcOutput, importPaths)
-            : undefined;
-
-          for (const info of pkgInfos) {
-            const pkgCover = coverByPkg.get(info.importPath);
-            if (pkgCover) {
-              this.coverageStore!.update(
-                info.importPath,
-                pkgCover,
-                funcByPkg?.get(info.importPath),
-              );
-            }
-          }
-        } catch {
-          this.outputChannel.appendLine("[runner] no coverprofile generated");
-        }
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.outputChannel.appendLine(`[runner] error: ${message}`);
-      for (const info of pkgInfos) {
-        for (const item of info.items) {
-          run.errored(item, new vscode.TestMessage(message));
-        }
-      }
-    } finally {
-      if (coverFile) {
-        rm(path.dirname(coverFile), { recursive: true, force: true }).catch(
-          () => {},
-        );
-      }
-    }
+      },
+    });
+    this._lastJsonOutput += result.stdout;
   }
 }
