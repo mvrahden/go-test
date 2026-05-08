@@ -34,8 +34,6 @@ export class CoverageStore implements vscode.Disposable {
   private parsed = new Map<string, ParsedPackageCache>();
   private cachedDetails = new Map<string, vscode.FileCoverageDetail[]>();
   private readonly storagePath: string | undefined;
-  private readonly _onDidChange = new vscode.EventEmitter<void>();
-  readonly onDidChange: vscode.Event<void> = this._onDidChange.event;
 
   constructor(storageUri: vscode.Uri | undefined) {
     if (storageUri) {
@@ -69,7 +67,6 @@ export class CoverageStore implements vscode.Disposable {
     });
     this.parsed.delete(importPath);
     this.cachedDetails.clear();
-    this._onDidChange.fire();
   }
 
   invalidate(importPath: string): boolean {
@@ -77,7 +74,6 @@ export class CoverageStore implements vscode.Disposable {
     if (deleted) {
       this.parsed.delete(importPath);
       this.cachedDetails.clear();
-      this._onDidChange.fire();
     }
     return deleted;
   }
@@ -89,7 +85,6 @@ export class CoverageStore implements vscode.Disposable {
     this.packages.clear();
     this.parsed.clear();
     this.cachedDetails.clear();
-    this._onDidChange.fire();
   }
 
   buildFileCoverages(cache: DiscoveryCache): CoverageResult {
@@ -177,6 +172,5 @@ export class CoverageStore implements vscode.Disposable {
 
   dispose(): void {
     this.cachedDetails.clear();
-    this._onDidChange.dispose();
   }
 }
