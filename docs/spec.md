@@ -813,7 +813,7 @@ The `setup-gotest` composite action installs the binary via `go install`.
 
 The Go coverage profile is the single source of truth at every level of aggregation. No filesystem scanning, line counting heuristics, or mixed data sources.
 
-### Statement-Weighted Metrics
+### Primary Metric: Statement-Weighted Coverage
 
 Each profile entry has the form:
 
@@ -831,16 +831,28 @@ percentage = covered / total (or 0% if total == 0)
 
 A directory's percentage is the weighted sum of its children (weighted by statement count, not an average of percentages). A parent's number is always derivable from its children.
 
+This is the sole numeric metric displayed in both the Test Coverage sidebar bar and the Copy Coverage report. The sidebar and report must always show identical `covered/total` values for the same scope.
+
+Declaration (function) coverage is not a sidebar or report metric. Function-level annotations are available in the editor gutter via `loadDetailedCoverage` for navigation purposes only.
+
 ### Block Deduplication
 
 When `-coverpkg` is used, each file may appear in multiple test binary profiles. Blocks are deduplicated by `file + startLine.startCol,endLine.endCol` identity: for each unique block, take `max(count)` across all entries. This matches `go tool cover` behavior.
+
+### Supplementary Coverage (Cross-Package Profiles)
+
+Test-only packages (packages with no production `.go` files) run with `-coverpkg=./...`, which instruments all packages in the module. This cross-package profile is **supplementary**: it can increase block counts for files that primary profiles already cover, but does not add new files to the aggregate.
+
+- **Primary profiles** come from a package's own `go test` run. They define the file scope.
+- **Supplementary profiles** come from test-only packages with `-coverpkg=./...`. After block deduplication, only files present in the primary scope are retained.
+- If no primary profiles exist, supplementary profiles are treated as primary (fallback).
 
 ### Breadth Indicator
 
 A supplementary signal showing how many source files have coverage data vs. how many exist:
 
 - **Source files:** Non-test Go files (`*.go` excluding `*_test.go`) per directory, from the filesystem.
-- **Profile files:** Files from the source file set with at least one entry in the coverage profile, regardless of whether that entry has `count > 0`. A file at 0% was instrumented and counts as reached.
+- **Profile files:** Files from the source file set with at least one entry in the primary coverage scope, regardless of whether that entry has `count > 0`. A file at 0% was instrumented and counts as profiled.
 
 The percentage answers: *"How well-tested is the code my tests reach?"*
 The file count answers: *"How much of my codebase do my tests reach at all?"*
@@ -851,6 +863,8 @@ The file count answers: *"How much of my codebase do my tests reach at all?"*
 - Do not include `_test.go` files in any denominator.
 - Do not average per-file percentages to compute a directory percentage. Use weighted sums by statement count.
 - Do not invent a filesystem-based metric as a fallback when the profile is sparse. A sparse profile is honest.
+- Do not display declaration/function coverage as a separate metric in the sidebar or report.
+- Do not let supplementary (cross-package) profiles expand the file scope beyond what primary profiles define.
 
 ---
 
