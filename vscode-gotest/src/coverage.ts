@@ -586,12 +586,12 @@ export class CoverageRunner implements vscode.Disposable {
         return result.stdout;
       }
 
-      if (result.stdout) {
-        const events = parseTestEvents(result.stdout);
-        const eventsByPkg = groupEventsByPackage(events);
+      const events = result.stdout ? parseTestEvents(result.stdout) : [];
+      const eventsByPkg = groupEventsByPackage(events);
 
-        for (const info of pkgInfos) {
-          const pkgEvents = eventsByPkg.get(info.importPath) ?? [];
+      for (const info of pkgInfos) {
+        const pkgEvents = eventsByPkg.get(info.importPath) ?? [];
+        if (pkgEvents.length > 0) {
           applyResults(
             this.controller,
             run,
@@ -600,12 +600,20 @@ export class CoverageRunner implements vscode.Disposable {
             info.dir,
           );
         }
-      } else if (result.exitCode !== 0) {
-        const message =
-          result.stderr.trim() || `gotest exited with code ${result.exitCode}`;
+      }
+
+      if (result.exitCode !== 0) {
+        const diagnostic = [
+          result.stderr.trim(),
+          result.stdout.trim(),
+          `exit code ${result.exitCode}`,
+        ].filter(Boolean).join("\n\n");
+
         for (const info of pkgInfos) {
-          for (const item of info.items) {
-            run.errored(item, new vscode.TestMessage(message));
+          if ((eventsByPkg.get(info.importPath) ?? []).length === 0) {
+            for (const item of info.items) {
+              run.errored(item, new vscode.TestMessage(diagnostic));
+            }
           }
         }
       }
