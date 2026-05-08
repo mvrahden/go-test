@@ -16,7 +16,7 @@ import {
   runGoToolCoverFunc,
   splitCoverByPackage,
   splitFuncCoverageByPackage,
-} from "./coverage.js";
+} from "./coverageUtils.js";
 
 export interface BatchConfig {
   pkgInfos: {
