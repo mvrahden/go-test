@@ -4,7 +4,28 @@ vi.mock("vscode", () => {
   class TestTag {
     constructor(public readonly id: string) {}
   }
-  return { TestTag };
+  class Position {
+    constructor(
+      public readonly line: number,
+      public readonly character: number,
+    ) {}
+  }
+  class Uri {
+    static file(path: string) {
+      return { fsPath: path, toString: () => path };
+    }
+  }
+  class TestMessage {
+    location?: unknown;
+    constructor(public readonly message: string) {}
+  }
+  class Location {
+    constructor(
+      public readonly uri: unknown,
+      public readonly range: unknown,
+    ) {}
+  }
+  return { TestTag, Position, Uri, TestMessage, Location };
 });
 
 import {
@@ -16,6 +37,7 @@ import {
   getPackageItem,
   expandToPackages,
   computeWildcard,
+  applyResults,
 } from "./runnerUtils.js";
 import {
   buildPathTrie,
@@ -364,6 +386,92 @@ describe("collapsePathTrie", () => {
     const pkg = root.children.get("pkg")!;
     expect(pkg.importPath).toBe("example.com/pkg");
     expect(pkg.children.size).toBe(1);
+  });
+});
+
+describe("applyResults", () => {
+  function makeApplyResultsFixture() {
+    const suiteItem = createItem("example.com/pkg/MySuite", "MySuite");
+    const passItem = createItem(
+      "example.com/pkg/MySuite/TestPass",
+      "TestPass",
+      suiteItem,
+    );
+    const failItem = createItem(
+      "example.com/pkg/MySuite/TestFail",
+      "TestFail",
+      suiteItem,
+    );
+    const skipItem = createItem(
+      "example.com/pkg/MySuite/TestSkip",
+      "TestSkip",
+      suiteItem,
+    );
+
+    const itemMap = new Map<string, MockTestItem>([
+      ["example.com/pkg/MySuite", suiteItem],
+      ["example.com/pkg/MySuite/TestPass", passItem],
+      ["example.com/pkg/MySuite/TestFail", failItem],
+      ["example.com/pkg/MySuite/TestSkip", skipItem],
+    ]);
+
+    const controller = {
+      findItem: vi.fn((id: string) => itemMap.get(id) ?? undefined),
+      recordResult: vi.fn(),
+      createDynamicSubtest: vi.fn(),
+    };
+
+    const run = {
+      passed: vi.fn(),
+      failed: vi.fn(),
+      skipped: vi.fn(),
+      started: vi.fn(),
+      appendOutput: vi.fn(),
+    };
+
+    return { controller, run, passItem, failItem, skipItem };
+  }
+
+  it("returns AppliedResult[] and does NOT call controller.recordResult", () => {
+    const { controller, run, passItem, failItem, skipItem } =
+      makeApplyResultsFixture();
+
+    const events = [
+      { Action: "run" as const, Test: "MySuite/TestPass", Package: "example.com/pkg" },
+      { Action: "run" as const, Test: "MySuite/TestFail", Package: "example.com/pkg" },
+      { Action: "run" as const, Test: "MySuite/TestSkip", Package: "example.com/pkg" },
+      { Action: "pass" as const, Test: "MySuite/TestPass", Package: "example.com/pkg", Elapsed: 0.1 },
+      { Action: "fail" as const, Test: "MySuite/TestFail", Package: "example.com/pkg", Elapsed: 0.2 },
+      { Action: "skip" as const, Test: "MySuite/TestSkip", Package: "example.com/pkg" },
+    ];
+
+    const applied = applyResults(
+      controller as any,
+      run as any,
+      events as any,
+      "example.com/pkg",
+      "/some/dir",
+    );
+
+    // Returns 3 AppliedResult entries
+    expect(applied).toHaveLength(3);
+
+    const passResult = applied.find((r) => r.itemId === passItem.id);
+    expect(passResult).toEqual({ itemId: passItem.id, status: "pass", duration: 100 });
+
+    const failResult = applied.find((r) => r.itemId === failItem.id);
+    expect(failResult).toEqual({ itemId: failItem.id, status: "fail", duration: 200 });
+
+    const skipResult = applied.find((r) => r.itemId === skipItem.id);
+    expect(skipResult).toEqual({ itemId: skipItem.id, status: "skip", duration: undefined });
+
+    // Does NOT call controller.recordResult
+    expect(controller.recordResult).not.toHaveBeenCalled();
+
+    // Does call run methods
+    expect(run.passed).toHaveBeenCalledWith(passItem, 100);
+    expect(run.failed).toHaveBeenCalledWith(failItem, expect.any(Array), 200);
+    expect(run.skipped).toHaveBeenCalledWith(skipItem);
   });
 });
 

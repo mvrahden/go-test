@@ -153,13 +153,19 @@ export function resolveTestItem(
   return parentItem;
 }
 
+export interface AppliedResult {
+  itemId: string;
+  status: "pass" | "fail" | "skip";
+  duration?: number;
+}
+
 export function applyResults(
   controller: GoTestController,
   run: vscode.TestRun,
   events: TestEvent[],
   importPath: string,
   pkgDir: string,
-): void {
+): AppliedResult[] {
   const outputMap = new Map<string, string>();
 
   for (const event of events) {
@@ -168,6 +174,8 @@ export function applyResults(
       outputMap.set(event.Test, existing + (event.Output ?? ""));
     }
   }
+
+  const applied: AppliedResult[] = [];
 
   for (const event of events) {
     if (event.Action === "output" && event.Output) {
@@ -193,7 +201,7 @@ export function applyResults(
     switch (event.Action) {
       case "pass":
         run.passed(item, duration);
-        controller.recordResult(item.id, "pass", duration);
+        applied.push({ itemId: item.id, status: "pass", duration });
         break;
       case "fail": {
         const output = outputMap.get(event.Test) ?? "";
@@ -210,18 +218,20 @@ export function applyResults(
           vscodeMessages.push(new vscode.TestMessage(output || "Test failed"));
         }
         run.failed(item, vscodeMessages, duration);
-        controller.recordResult(item.id, "fail", duration);
+        applied.push({ itemId: item.id, status: "fail", duration });
         break;
       }
       case "skip":
         run.skipped(item);
-        controller.recordResult(item.id, "skip");
+        applied.push({ itemId: item.id, status: "skip", duration: undefined });
         break;
       case "run":
         run.started(item);
         break;
     }
   }
+
+  return applied;
 }
 
 export interface SpawnResult {
