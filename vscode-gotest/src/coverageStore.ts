@@ -34,6 +34,7 @@ export class CoverageStore implements vscode.Disposable {
   private parsed = new Map<string, ParsedPackageCache>();
   private cachedDetails = new Map<string, vscode.FileCoverageDetail[]>();
   private readonly storagePath: string | undefined;
+  private saveChain = Promise.resolve();
 
   constructor(storageUri: vscode.Uri | undefined) {
     if (storageUri) {
@@ -154,20 +155,24 @@ export class CoverageStore implements vscode.Disposable {
     }
   }
 
-  async save(): Promise<void> {
-    if (!this.storagePath) {
-      return;
-    }
+  save(): Promise<void> {
+    const op = this.saveChain.then(() => this.writeToDisk());
+    this.saveChain = op.catch(() => {});
+    return op;
+  }
+
+  flush(): Promise<void> {
+    return this.saveChain;
+  }
+
+  private async writeToDisk(): Promise<void> {
+    if (!this.storagePath) return;
     const data: StoredData = {
       version: 1,
       packages: Object.fromEntries(this.packages),
     };
-    try {
-      await mkdir(path.dirname(this.storagePath), { recursive: true });
-      await writeFile(this.storagePath, JSON.stringify(data), "utf-8");
-    } catch {
-      // Best-effort persistence
-    }
+    await mkdir(path.dirname(this.storagePath), { recursive: true });
+    await writeFile(this.storagePath, JSON.stringify(data), "utf-8");
   }
 
   dispose(): void {

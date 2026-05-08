@@ -21,6 +21,8 @@ import { validateGoBinary, scopedConfig } from "./cli.js";
 import { buildRunFilter, getPackageDir } from "./runnerUtils.js";
 import { copyCoverageSummary, copyTestResults } from "./reporting.js";
 
+let flushOnDeactivate: (() => Promise<void>) | undefined;
+
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Go Test Suites");
   outputChannel.appendLine("Go Test Suites extension activated");
@@ -350,7 +352,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
     if (coverageStore.invalidate(importPath)) {
       outputChannel.appendLine(`[coverage] invalidated ${importPath}`);
-      coverageStore.save();
+      coverageStore.save().catch((err) => {
+        outputChannel.appendLine(`[coverage] save after invalidate failed: ${err}`);
+      });
     }
 
     triggerCoverOnSave(importPath, uri);
@@ -406,6 +410,11 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   );
 
+  flushOnDeactivate = async () => {
+    await coverageStore.flush();
+    await testResultStore.flush();
+  };
+
   // Validate go binary, then run initial discovery and restore persisted coverage
   (async () => {
     const firstDir = workspaceFolders[0].uri.fsPath;
@@ -457,10 +466,14 @@ export function activate(context: vscode.ExtensionContext): void {
       resultRun.end();
       outputChannel.appendLine(`[results] restored ${testResultStore.size} result(s) from storage`);
     }
-  })();
+  })().catch((err) => {
+    outputChannel.appendLine(`[activate] async initialization failed: ${err}`);
+  });
 }
 
-export function deactivate(): void {}
+export async function deactivate(): Promise<void> {
+  await flushOnDeactivate?.();
+}
 
 function resolveActiveWorkspaceDir(): string | undefined {
   const activeUri = vscode.window.activeTextEditor?.document.uri;

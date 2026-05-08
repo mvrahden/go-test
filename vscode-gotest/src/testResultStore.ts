@@ -18,6 +18,7 @@ interface StoredData {
 export class TestResultStore {
   private results = new Map<string, StoredTestResult>();
   private readonly storagePath: string | undefined;
+  private saveChain = Promise.resolve();
 
   constructor(storageUri: { fsPath: string } | undefined) {
     if (storageUri) {
@@ -62,13 +63,24 @@ export class TestResultStore {
     } catch { /* No stored data or corrupt — start fresh */ }
   }
 
-  async save(): Promise<void> {
+  save(): Promise<void> {
+    const op = this.saveChain.then(() => this.writeToDisk());
+    this.saveChain = op.catch(() => {});
+    return op;
+  }
+
+  flush(): Promise<void> {
+    return this.saveChain;
+  }
+
+  private async writeToDisk(): Promise<void> {
     if (!this.storagePath) return;
-    const data: StoredData = { version: 1, results: Object.fromEntries(this.results) };
-    try {
-      await mkdir(path.dirname(this.storagePath), { recursive: true });
-      await writeFile(this.storagePath, JSON.stringify(data), "utf-8");
-    } catch { /* Best-effort persistence */ }
+    const data: StoredData = {
+      version: 1,
+      results: Object.fromEntries(this.results),
+    };
+    await mkdir(path.dirname(this.storagePath), { recursive: true });
+    await writeFile(this.storagePath, JSON.stringify(data), "utf-8");
   }
 
   dispose(): void {

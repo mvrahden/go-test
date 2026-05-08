@@ -179,6 +179,7 @@ class WatchProcess implements vscode.Disposable {
 export class WatchManager implements vscode.Disposable {
   private watchers = new Map<string, WatchProcess>();
   private activeRuns = new Map<string, vscode.TestRun>();
+  private pendingSave: Promise<void> = Promise.resolve();
   private readonly _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChange: vscode.Event<void> = this._onDidChange.event;
   private readonly statusBar: vscode.StatusBarItem;
@@ -222,7 +223,9 @@ export class WatchManager implements vscode.Disposable {
         if (cycleJsonAccumulator) {
           this.onCycleComplete(cycleJsonAccumulator);
         }
-        void this.controller.saveResults();
+        this.pendingSave = this.controller.saveResults().catch((err) => {
+          this.outputChannel.appendLine(`[watch] save failed: ${err}`);
+        });
         cycleJsonAccumulator = "";
 
         // Create new TestRun
@@ -253,7 +256,9 @@ export class WatchManager implements vscode.Disposable {
           run.end();
           this.activeRuns.delete(pkgScope);
         }
-        void this.controller.saveResults();
+        this.pendingSave = this.controller.saveResults().catch((err) => {
+          this.outputChannel.appendLine(`[watch] save failed: ${err}`);
+        });
 
         // Fire cycle complete with accumulated JSON
         if (cycleJsonAccumulator) {
