@@ -19,7 +19,8 @@ import (
 )
 
 var (
-	timestampRegex = regexp.MustCompile(`(\d+\.\d+s|\(cached\))`)
+	timestampRegex     = regexp.MustCompile(`(\d+\.\d+s|\(cached\))`)
+	assertionLineRegex = regexp.MustCompile(`assertions\.go:\d+:`)
 )
 
 func CompareTestOutputWithGolden(t *testing.T, tmp string, actual *bytes.Buffer, testFS embed.FS, goldenName string) {
@@ -28,6 +29,7 @@ func CompareTestOutputWithGolden(t *testing.T, tmp string, actual *bytes.Buffer,
 	actualStr := actual.String()
 	actualStr = strings.ReplaceAll(actualStr, tmp, "<REPLACED>")
 	actualStr = timestampRegex.ReplaceAllString(actualStr, "<TIMESTAMP>")
+	actualStr = assertionLineRegex.ReplaceAllString(actualStr, "assertions.go:<LINE>:")
 	gotest.Equal(t, expected.String(), actualStr)
 }
 
