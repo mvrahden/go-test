@@ -617,6 +617,11 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 	ae := ts.th.AfterEach
 	suiteName := ts.ts.Name.Name
 
+	// Parallel and Sequential are mutually exclusive
+	if ts.th.ConfigParallel && ts.th.ConfigSequential {
+		return fmt.Errorf("%s: SuiteConfig has both Parallel: true and Sequential: true — these are mutually exclusive", suiteName)
+	}
+
 	// Rule 1/7: Parallel requires returning BeforeEach (void BeforeEach forbidden)
 	if ts.th.ConfigParallel && be != nil && !be.HasReturn() {
 		return fmt.Errorf("%s: SuiteConfig has Parallel: true, but BeforeEach has no return value. Parallel methods require per-test isolation — move per-test fields to a context struct and return it from BeforeEach", suiteName)

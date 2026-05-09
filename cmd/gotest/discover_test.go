@@ -137,8 +137,8 @@ func TestRunDiscover_SimpleSuite(t *testing.T) {
 	if s.Methods[0].Name != "TestSucceeds" {
 		t.Errorf("method[0] name = %q, want TestSucceeds", s.Methods[0].Name)
 	}
-	if s.Methods[0].Line != 35 {
-		t.Errorf("method[0] line = %d, want 35", s.Methods[0].Line)
+	if s.Methods[0].Line != 39 {
+		t.Errorf("method[0] line = %d, want 39", s.Methods[0].Line)
 	}
 	if s.Methods[0].Col != 1 {
 		t.Errorf("method[0] col = %d, want 1", s.Methods[0].Col)

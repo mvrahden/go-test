@@ -21,8 +21,8 @@ func (ts *ƒƒ_GOTEST_SimpleTestSuite) AfterEach(it *gotest.T)  { ts.SimpleTestS
 
 func TestSimpleTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_SimpleTestSuite{}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
+	gotest.OverlaySuiteConfig(&ƒcfg, s.SimpleTestSuite.SuiteConfig())
 
 	tt := gotest.NewT(t)
 	t.Cleanup(func() {
