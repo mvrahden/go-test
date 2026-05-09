@@ -24,10 +24,10 @@ func fail(t testingT, msg string, msgAndArgs []any) {
 	if userMsg := assert.FormatMessage(msgAndArgs); userMsg != "" {
 		msg = msg + "\n  message: " + userMsg
 	}
-	if trace := assert.CallerTrace(); trace != "" {
-		msg += trace
+	if frame := assert.CallerFrame(); frame != "" {
+		msg = frame + ": " + msg
 	}
-	t.Errorf(msg)
+	t.Errorf("%s", msg)
 	t.FailNow()
 }
 
