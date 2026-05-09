@@ -629,7 +629,7 @@ import "github.com/mvrahden/go-test/pkg/gotest"
 type MyTestSuite struct{}
 
 func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.DefaultSuiteConfig()
+	return gotest.SuiteConfig{}
 }
 func (s *MyTestSuite) TestFoo(t *gotest.T) {}
 `
@@ -943,6 +943,213 @@ func (s *MyTestSuite) TestOneAsync(t *gotest.T, ctx *myCtx, done func()) {}
 	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
 	gotest.Equal(t, 1, len(result.Suites[0].TestCases()))
 	gotest.True(t, result.Suites[0].TestCases()[0].HasContextParam(), "expected context param")
+}
+
+func TestCollector_SuiteConfig_ParallelParsed(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type myCtx struct{}
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
+func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
+	gotest.True(t, result.Suites[0].IsMethodParallel(), "expected IsMethodParallel to be true")
+}
+
+func TestCollector_SuiteConfig_SequentialParsed(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Sequential: true}
+}
+func (s *MyTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
+	gotest.True(t, result.Suites[0].IsSequentialSuite(), "expected IsSequentialSuite to be true")
+}
+
+func TestCollector_SuiteConfig_NonLiteralBody_Error(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type MyTestSuite struct{}
+
+var cfg = gotest.SuiteConfig{Parallel: true}
+
+func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return cfg
+}
+func (s *MyTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error for non-literal SuiteConfig body")
+}
+
+func TestCollector_Validation_ParallelRequiresReturningBeforeEach(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+func (s *MyTestSuite) BeforeEach(t *gotest.T) {}
+func (s *MyTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error: parallel requires returning BeforeEach")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "Parallel")
+}
+
+func TestCollector_Validation_ParallelWithoutBeforeEach_Allowed(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+func (s *MyTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs), "parallel with no BeforeEach should be allowed")
+}
+
+func TestCollector_Validation_MethodMissingContextParam(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type myCtx struct{}
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
+func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
+func (s *MyTestSuite) TestTwo(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error: TestTwo missing context param")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "TestTwo")
+}
+
+func TestCollector_Validation_AfterEachMissingContextParam(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type myCtx struct{}
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
+func (s *MyTestSuite) AfterEach(t *gotest.T) {}
+func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error: AfterEach missing context param")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "AfterEach")
+}
+
+func TestCollector_Validation_OrphanContextAfterEach(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type myCtx struct{}
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) AfterEach(t *gotest.T, ctx *myCtx) {}
+func (s *MyTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error: orphan context AfterEach")
+}
+
+func TestCollector_Validation_TypeMismatch(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type myCtx struct{}
+type otherCtx struct{}
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
+func (s *MyTestSuite) TestOne(t *gotest.T, ctx *otherCtx) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error: type mismatch")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "does not match")
+}
+
+func TestCollector_Validation_ReturningBeforeEach_FullyConsistent_OK(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type myCtx struct{}
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
+func (s *MyTestSuite) AfterEach(t *gotest.T, ctx *myCtx) {}
+func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
+func (s *MyTestSuite) TestTwo(t *gotest.T, _ *myCtx) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
 }
 
 // --- helpers ---

@@ -213,6 +213,57 @@ func (ts *TestSuiteSpec) HasParallelTestCases() bool {
 	})
 }
 
+// IsMethodParallel returns true when SuiteConfig has Parallel: true.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) IsMethodParallel() bool { return ts.th.ConfigParallel }
+
+// IsSequentialSuite returns true when SuiteConfig has Sequential: true.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) IsSequentialSuite() bool { return ts.th.ConfigSequential }
+
+// HasReturningBeforeEach returns true when BeforeEach is defined and returns a context value.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) HasReturningBeforeEach() bool {
+	return ts.th.BeforeEach != nil && ts.th.BeforeEach.HasReturn()
+}
+
+// ContextTypeName returns the rendered type name of the BeforeEach return type.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) ContextTypeName() string {
+	if !ts.HasReturningBeforeEach() {
+		return ""
+	}
+	return ts.th.BeforeEach.ReturnTypeName(ts.pkg.Types)
+}
+
+// ContextTypePkgPath returns the import path of the package containing the context type,
+// or empty string if the type is in the same package.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) ContextTypePkgPath() string {
+	if !ts.HasReturningBeforeEach() {
+		return ""
+	}
+	rt := ts.th.BeforeEach.returnType
+	ptr, ok := rt.(*types.Pointer)
+	if !ok {
+		return ""
+	}
+	named, ok := ptr.Elem().(*types.Named)
+	if !ok {
+		return ""
+	}
+	p := named.Obj().Pkg()
+	if p == nil || p == ts.pkg.Types {
+		return ""
+	}
+	return p.Path()
+}
+
 func (ts *TestSuiteSpec) FileSet() *token.FileSet { return ts.pkg.Fset }
 func (ts *TestSuiteSpec) Pos() token.Pos           { return ts.ts.Name.Pos() }
 func (ts *TestSuiteSpec) IsFocused() bool           { return strings.HasPrefix(ts.ts.Name.Name, "F_") }
@@ -234,13 +285,15 @@ func (ts *TestSuiteSpec) IsParallelSuite() bool {
 }
 
 type TestSuiteHarness struct {
-	BeforeAll  *TestSuiteMethod
-	BeforeEach *TestSuiteMethod
-	AfterAll   *TestSuiteMethod
-	AfterEach  *TestSuiteMethod
-	TestCases  []*TestSuiteMethod
-	Config     *types.Func // SuiteConfig() method, may be nil
-	Guard      *types.Func // SuiteGuard() method, may be nil
+	BeforeAll        *TestSuiteMethod
+	BeforeEach       *TestSuiteMethod
+	AfterAll         *TestSuiteMethod
+	AfterEach        *TestSuiteMethod
+	TestCases        []*TestSuiteMethod
+	Config           *types.Func // SuiteConfig() method, may be nil
+	Guard            *types.Func // SuiteGuard() method, may be nil
+	ConfigParallel   bool
+	ConfigSequential bool
 }
 
 type TestSuiteMethod struct {
@@ -294,6 +347,52 @@ func (m *TestSuiteMethod) IsExcluded() bool { return strings.HasPrefix(m.m.Name(
 // FOR RENDERING
 func (m *TestSuiteMethod) Identifier() string {
 	return m.m.Name()
+}
+
+func parseSuiteConfigAST(_ *packages.Package, funcDecl *ast.FuncDecl) (parallel, sequential bool, err error) {
+	if funcDecl.Body == nil || len(funcDecl.Body.List) != 1 {
+		return false, false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
+	}
+	retStmt, ok := funcDecl.Body.List[0].(*ast.ReturnStmt)
+	if !ok || len(retStmt.Results) != 1 {
+		return false, false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
+	}
+	// If the return value is a plain identifier (variable reference), that is not statically
+	// parseable and we treat it as an error. If it is a call expression (e.g. a helper
+	// function), we accept it but cannot determine parallel/sequential statically.
+	switch result := retStmt.Results[0].(type) {
+	case *ast.CompositeLit:
+		for _, elt := range result.Elts {
+			kv, ok := elt.(*ast.KeyValueExpr)
+			if !ok {
+				continue
+			}
+			key, ok := kv.Key.(*ast.Ident)
+			if !ok {
+				continue
+			}
+			switch key.Name {
+			case "Parallel":
+				ident, ok := kv.Value.(*ast.Ident)
+				if ok && ident.Name == "true" {
+					parallel = true
+				}
+			case "Sequential":
+				ident, ok := kv.Value.(*ast.Ident)
+				if ok && ident.Name == "true" {
+					sequential = true
+				}
+			}
+		}
+		return parallel, sequential, nil
+	case *ast.CallExpr:
+		// helper function call: static values are unknown, treat as false
+		return false, false, nil
+	case *ast.Ident:
+		return false, false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
+	default:
+		return false, false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
+	}
 }
 
 func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, token.Pos, error) {
@@ -401,6 +500,12 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 			return m.Pos(), fmt.Errorf("unsupported return type for %q: expected gotest.SuiteConfig, got %s", methodID, resType)
 		}
 		s.th.Config = m
+		parallel, sequential, err := parseSuiteConfigAST(pkg, decl)
+		if err != nil {
+			return m.Pos(), fmt.Errorf("%s.SuiteConfig: %w", s.ts.Name.Name, err)
+		}
+		s.th.ConfigParallel = parallel
+		s.th.ConfigSequential = sequential
 		return -1, nil
 	}
 
@@ -526,4 +631,56 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 	tm.usesStdlibT = usesStdlib
 
 	return -1, nil
+}
+
+// ValidateContextConsistency checks that all methods in the suite agree on whether
+// they accept a context parameter, and that context types match BeforeEach's return type.
+func ValidateContextConsistency(ts *TestSuiteSpec) error {
+	be := ts.th.BeforeEach
+	ae := ts.th.AfterEach
+	suiteName := ts.ts.Name.Name
+
+	// Rule 1/7: Parallel requires returning BeforeEach (void BeforeEach forbidden)
+	if ts.th.ConfigParallel && be != nil && !be.HasReturn() {
+		return fmt.Errorf("%s: SuiteConfig has Parallel: true, but BeforeEach has no return value. Parallel methods require per-test isolation — move per-test fields to a context struct and return it from BeforeEach", suiteName)
+	}
+
+	if be == nil || !be.HasReturn() {
+		// Void or absent BeforeEach — no methods should have context param
+		for _, tc := range ts.th.TestCases {
+			if tc.HasContextParam() {
+				return fmt.Errorf("%s.%s: has context parameter but BeforeEach does not return a context", suiteName, tc.Identifier())
+			}
+		}
+		// Rule 4: No orphan context AfterEach
+		if ae != nil && ae.HasContextParam() {
+			return fmt.Errorf("%s.AfterEach: accepts a context parameter but BeforeEach does not return one", suiteName)
+		}
+		return nil
+	}
+
+	// Returning BeforeEach — ALL methods must have context param
+	ctxType := be.returnType.String()
+
+	for _, tc := range ts.th.TestCases {
+		if !tc.HasContextParam() {
+			return fmt.Errorf("%s.%s: suite has a returning BeforeEach but this method does not accept the context parameter. All methods in a returning-BeforeEach suite must consistently include the context parameter", suiteName, tc.Identifier())
+		}
+		// Rule 6: Type consistency
+		if tc.contextParam.Type().String() != ctxType {
+			return fmt.Errorf("%s.%s: context parameter type %s does not match BeforeEach return type %s", suiteName, tc.Identifier(), tc.contextParam.Type(), be.returnType)
+		}
+	}
+
+	// Rule 3: AfterEach matches BeforeEach
+	if ae != nil {
+		if !ae.HasContextParam() {
+			return fmt.Errorf("%s.AfterEach: suite has a returning BeforeEach but AfterEach does not accept the context. Add the context as the second parameter", suiteName)
+		}
+		if ae.contextParam.Type().String() != ctxType {
+			return fmt.Errorf("%s.AfterEach: context type %s does not match BeforeEach return type %s", suiteName, ae.contextParam.Type(), be.returnType)
+		}
+	}
+
+	return nil
 }
