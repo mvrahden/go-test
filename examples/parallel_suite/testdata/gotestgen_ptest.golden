@@ -4,6 +4,7 @@ package parallelsuite
 
 import (
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"sync"
 	"testing"
 )
 
@@ -66,6 +67,67 @@ func TestParallelTestSuite(t *testing.T) {
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
 		ƒƒ_GOTEST_exec(s.TestGamma, ttt)
+	})
+	if ƒcfg.FailFast && t.Failed() {
+		return
+	}
+
+}
+
+type ƒƒ_GOTEST_MethodParallelTestSuite struct {
+	MethodParallelTestSuite
+}
+
+func (ts *ƒƒ_GOTEST_MethodParallelTestSuite) BeforeAll(it *gotest.T) {}
+func (ts *ƒƒ_GOTEST_MethodParallelTestSuite) AfterAll(it *gotest.T)  {}
+func (ts *ƒƒ_GOTEST_MethodParallelTestSuite) BeforeEach(it *gotest.T) *MethodParallelCtx {
+	return ts.MethodParallelTestSuite.BeforeEach(it)
+}
+func (ts *ƒƒ_GOTEST_MethodParallelTestSuite) AfterEach(it *gotest.T, ctx *MethodParallelCtx) {
+	ts.MethodParallelTestSuite.AfterEach(it, ctx)
+}
+
+func TestMethodParallelTestSuite(t *testing.T) {
+	s := &ƒƒ_GOTEST_MethodParallelTestSuite{}
+	t.Parallel()
+	ƒcfg := gotest.DefaultSuiteConfig()
+	gotest.OverlaySuiteConfig(&ƒcfg, s.MethodParallelTestSuite.SuiteConfig())
+	wg := &sync.WaitGroup{}
+
+	tt := gotest.NewT(t)
+	t.Cleanup(func() {
+		wg.Wait()
+		s.AfterAll(tt)
+	})
+	s.BeforeAll(tt)
+
+	wg.Add(1)
+	t.Run("TestOne", func(it *testing.T) {
+		it.Parallel()
+		defer wg.Done()
+		ttt := gotest.NewT(it)
+		if ƒcfg.Timeout > 0 {
+			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+		}
+		ctx := s.BeforeEach(ttt)
+		defer s.AfterEach(ttt, ctx)
+		s.TestOne(ttt, ctx)
+	})
+	if ƒcfg.FailFast && t.Failed() {
+		return
+	}
+
+	wg.Add(1)
+	t.Run("TestTwo", func(it *testing.T) {
+		it.Parallel()
+		defer wg.Done()
+		ttt := gotest.NewT(it)
+		if ƒcfg.Timeout > 0 {
+			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+		}
+		ctx := s.BeforeEach(ttt)
+		defer s.AfterEach(ttt, ctx)
+		s.TestTwo(ttt, ctx)
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return

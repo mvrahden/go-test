@@ -10,6 +10,10 @@ type UnitTestSuite struct {
 	sut *stdlib.Unit
 }
 
+func (s *UnitTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Sequential: true}
+}
+
 func (s *UnitTestSuite) BeforeEach(t *gotest.T) {
 	s.sut = stdlib.NewUnit()
 }

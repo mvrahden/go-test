@@ -346,7 +346,7 @@ func TestClassify_ParallelMethod(t *testing.T) {
 	if method.Kind != KindMethod {
 		t.Errorf("kind = %d, want KindMethod", method.Kind)
 	}
-	if method.Display != "Create" {
-		t.Errorf("display = %q, want Create", method.Display)
+	if method.Display != "ParallelCreate" {
+		t.Errorf("display = %q, want ParallelCreate", method.Display)
 	}
 }

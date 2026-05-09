@@ -19,6 +19,10 @@ func (s *NormalTestSuite) TestAlpha(t *gotest.T) {
 // focused suites run and unfocused suites are skipped.
 type F_FocusedTestSuite struct{}
 
+func (s *F_FocusedTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Sequential: true}
+}
+
 func (s *F_FocusedTestSuite) BeforeEach(t *gotest.T) {
 	Noop()
 }

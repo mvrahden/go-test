@@ -80,10 +80,13 @@ func Test_TestsuiteCLI_ParallelSuite(t *testing.T) {
 	output := string(out)
 
 	gotest.NoError(t, err, "parallel suite should pass: %s", output)
-	gotest.Contains(t, output, "TestParallelTestSuiteParallel")
-	gotest.Contains(t, output, "TestParallelAlpha")
-	gotest.Contains(t, output, "TestParallelBeta")
-	gotest.Contains(t, output, "TestSequentialGamma")
+	gotest.Contains(t, output, "TestParallelTestSuite")
+	gotest.Contains(t, output, "TestAlpha")
+	gotest.Contains(t, output, "TestBeta")
+	gotest.Contains(t, output, "TestGamma")
+	gotest.Contains(t, output, "TestMethodParallelTestSuite")
+	gotest.Contains(t, output, "TestOne")
+	gotest.Contains(t, output, "TestTwo")
 	gotest.Contains(t, output, "PAUSE")
 	gotest.Contains(t, output, "PASS")
 }
@@ -128,7 +131,7 @@ func Test_TestsuiteCLI_AllPackages(t *testing.T) {
 	gotest.Contains(t, output, "examples/generic_suite")
 	gotest.Contains(t, output, "TestUnitTestSuite")
 	gotest.Contains(t, output, "TestF_FocusedTestSuite")
-	gotest.Contains(t, output, "TestParallelTestSuiteParallel")
+	gotest.Contains(t, output, "TestParallelTestSuite")
 	gotest.Contains(t, output, "TestStringTestSuite")
 }
 

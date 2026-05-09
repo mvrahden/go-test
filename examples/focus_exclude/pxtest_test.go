@@ -21,6 +21,10 @@ func (s *NormalExtTestSuite) TestAlpha(t *gotest.T) {
 // suite exists, only focused suites run and unfocused suites are skipped.
 type F_FocusedExtTestSuite struct{}
 
+func (s *F_FocusedExtTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Sequential: true}
+}
+
 func (s *F_FocusedExtTestSuite) BeforeEach(t *gotest.T) {
 	focusexclude.Noop()
 }
