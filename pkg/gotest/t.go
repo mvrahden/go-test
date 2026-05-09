@@ -51,7 +51,7 @@ func (t *T) Errorf(format string, args ...any) {
 		t.collector.Errorf(format, args...)
 		return
 	}
-	t.t.Helper()
+	assert.SkipInternalFrames(t.t)
 	t.t.Errorf(format, args...)
 }
 func (t *T) FailNow() {
