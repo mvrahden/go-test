@@ -72,8 +72,8 @@ func (s *QueryTestSuite) TestSelect(t *gotest.T) {}
 	gotest.True(t, strings.Contains(output, "func TestQueryTestSuite(t *testing.T)"), "expected top-level TestQueryTestSuite func")
 	gotest.True(t, strings.Contains(output, "ƒƒ_GOTEST_QueryTestSuite"), "expected wrapper struct")
 	gotest.True(t, strings.Contains(output, "DBFixture: ƒ_DBFixture"), "expected fixture injection")
-	gotest.True(t, strings.Contains(output, `newTestCase("TestInsert"`), "expected TestInsert test case")
-	gotest.True(t, strings.Contains(output, `newTestCase("TestSelect"`), "expected TestSelect test case")
+	gotest.True(t, strings.Contains(output, `t.Run("TestInsert"`), "expected TestInsert test case")
+	gotest.True(t, strings.Contains(output, `t.Run("TestSelect"`), "expected TestSelect test case")
 
 	// Verify it does NOT contain old-style Test_DBFixture or t.Run for suites
 	gotest.True(t, !strings.Contains(output, "func Test_DBFixture("), "should NOT have old-style Test_DBFixture")
@@ -382,7 +382,7 @@ func (s *MixedTestSuite) TestGotest(t *gotest.T)   {}
 	gotest.True(t, strings.Contains(output, `func(t *gotest.T) { s.TestStdlib(t.T()) }`), "expected TestStdlib adapter")
 
 	// TestGotest uses *gotest.T → direct
-	gotest.True(t, strings.Contains(output, `s.TestGotest),`), "expected TestGotest direct reference")
+	gotest.True(t, strings.Contains(output, `ƒƒ_GOTEST_exec(s.TestGotest, ttt)`), "expected TestGotest direct reference")
 	gotest.True(t, !strings.Contains(output, `s.TestGotest(t.T())`), "TestGotest should NOT have adapter")
 }
 
@@ -741,4 +741,136 @@ func (s *NamedTestSuite) TestOne(t *gotest.T) {}
 
 	gotest.Contains(t, output, "DBFixture: ƒ_DBFixture", "embedded suite should use type name")
 	gotest.Contains(t, output, "db: ƒ_DBFixture", "named-field suite should use custom field name")
+}
+
+func TestRenderer_VoidBeforeEach_Sequential(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type OrderTestSuite struct{}
+
+func (s *OrderTestSuite) BeforeEach(t *gotest.T) {}
+func (s *OrderTestSuite) AfterEach(t *gotest.T)  {}
+func (s *OrderTestSuite) TestOne(t *gotest.T)    {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	output, _ := renderTestPkg(t, pkg)
+
+	gotest.Contains(t, output, "t.Parallel()")
+	gotest.Contains(t, output, "s.BeforeEach(ttt)")
+	gotest.Contains(t, output, "defer s.AfterEach(ttt)")
+	gotest.True(t, !strings.Contains(output, "sync.WaitGroup"), "sequential suite should not use WaitGroup")
+	gotest.True(t, !strings.Contains(output, "it.Parallel()"), "sequential suite should not call it.Parallel()")
+}
+
+func TestRenderer_SequentialSuite_NoSuiteParallel(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type OrderTestSuite struct{}
+
+func (s *OrderTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Sequential: true}
+}
+func (s *OrderTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	output, _ := renderTestPkg(t, pkg)
+
+	gotest.True(t, !strings.Contains(output, "t.Parallel()"), "sequential suite should NOT call t.Parallel()")
+}
+
+func TestRenderer_ReturningBeforeEach_Sequential(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type myCtx struct{ val string }
+
+type OrderTestSuite struct{}
+
+func (s *OrderTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
+func (s *OrderTestSuite) AfterEach(t *gotest.T, ctx *myCtx) {}
+func (s *OrderTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
+func (s *OrderTestSuite) TestTwo(t *gotest.T, _ *myCtx)   {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	output, _ := renderTestPkg(t, pkg)
+
+	gotest.Contains(t, output, "t.Parallel()")
+	gotest.Contains(t, output, "ctx := s.BeforeEach(ttt)")
+	gotest.Contains(t, output, "defer s.AfterEach(ttt, ctx)")
+	gotest.Contains(t, output, "s.TestOne(ttt, ctx)")
+	gotest.Contains(t, output, "s.TestTwo(ttt, ctx)")
+	gotest.Contains(t, output, "func (ts *ƒƒ_GOTEST_OrderTestSuite) BeforeEach(it *gotest.T) *myCtx")
+	gotest.Contains(t, output, "func (ts *ƒƒ_GOTEST_OrderTestSuite) AfterEach(it *gotest.T, ctx *myCtx)")
+}
+
+func TestRenderer_ReturningBeforeEach_Parallel(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type myCtx struct{ val string }
+
+type OrderTestSuite struct{}
+
+func (s *OrderTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+func (s *OrderTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
+func (s *OrderTestSuite) AfterEach(t *gotest.T, ctx *myCtx) {}
+func (s *OrderTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	output, _ := renderTestPkg(t, pkg)
+
+	gotest.Contains(t, output, "t.Parallel()")
+	gotest.Contains(t, output, "it.Parallel()")
+	gotest.Contains(t, output, "wg.Add(1)")
+	gotest.Contains(t, output, "defer wg.Done()")
+	gotest.Contains(t, output, "wg.Wait()")
+	gotest.Contains(t, output, "ctx := s.BeforeEach(ttt)")
+	gotest.Contains(t, output, "defer s.AfterEach(ttt, ctx)")
+	gotest.Contains(t, output, "s.TestOne(ttt, ctx)")
+}
+
+func TestRenderer_FixtureBound_ReturningBeforeEach(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type DBFixture struct{ Conn string }
+
+func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
+
+type myCtx struct{ pool string }
+
+type QueryTestSuite struct {
+	*DBFixture
+}
+
+func (s *QueryTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
+func (s *QueryTestSuite) AfterEach(t *gotest.T, ctx *myCtx) {}
+func (s *QueryTestSuite) TestInsert(t *gotest.T, ctx *myCtx) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	output, _ := renderTestPkg(t, pkg)
+
+	gotest.Contains(t, output, "t.Parallel()")
+	gotest.Contains(t, output, "ctx := s.BeforeEach(ttt)")
+	gotest.Contains(t, output, "defer s.AfterEach(ttt, ctx)")
+	gotest.Contains(t, output, "s.TestInsert(ttt, ctx)")
+	gotest.Contains(t, output, "func (ts *ƒƒ_GOTEST_QueryTestSuite) BeforeEach(it *gotest.T) *myCtx")
 }

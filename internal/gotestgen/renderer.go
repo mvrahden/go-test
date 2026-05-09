@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"go/format"
-	"strings"
 	"text/template"
 
 	"github.com/mvrahden/go-test/about"
@@ -19,10 +18,7 @@ var templates embed.FS
 
 var (
 	headerTpl = template.Must(template.New("header").ParseFS(templates, "static/header.*"))
-	gotestTpl = template.Must(template.New("gotest").Funcs(tplFuncs).ParseFS(templates, "static/gotest.*"))
-	tplFuncs  = map[string]any{
-		"hasSuffix": strings.HasSuffix,
-	}
+	gotestTpl = template.Must(template.New("gotest").ParseFS(templates, "static/gotest.*"))
 )
 
 // FixtureViewModel is the view model passed to the fixture template.
@@ -138,6 +134,12 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 				imports = append(imports, headerImport{Path: sf.PkgPath})
 				seenPkg[sf.PkgPath] = true
 			}
+		}
+	}
+	for _, ts := range spec.EffectiveTestSuites {
+		if pkgPath := ts.ContextTypePkgPath(); pkgPath != "" && !seenPkg[pkgPath] {
+			imports = append(imports, headerImport{Path: pkgPath})
+			seenPkg[pkgPath] = true
 		}
 	}
 	if hasSharedFixtures {

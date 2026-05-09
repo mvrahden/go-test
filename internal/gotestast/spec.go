@@ -199,11 +199,6 @@ func (ts *TestSuiteSpec) HasConfig() bool { return ts.th.Config != nil }
 // FOR RENDERING
 func (ts *TestSuiteSpec) HasGuard() bool { return ts.th.Guard != nil }
 
-// HasParallelTestCases is a stub retained for template compatibility; always returns false.
-//
-// FOR RENDERING
-func (ts *TestSuiteSpec) HasParallelTestCases() bool { return false }
-
 // IsMethodParallel returns true when SuiteConfig has Parallel: true.
 //
 // FOR RENDERING
@@ -270,9 +265,6 @@ func (ts *TestSuiteSpec) Package() *packages.Package {
 	return ts.pkg
 }
 
-// IsParallelSuite is a stub retained for backward compatibility; always returns false.
-func (ts *TestSuiteSpec) IsParallelSuite() bool { return false }
-
 type TestSuiteHarness struct {
 	BeforeAll        *TestSuiteMethod
 	BeforeEach       *TestSuiteMethod
@@ -293,9 +285,6 @@ type TestSuiteMethod struct {
 	contextParam *types.Var // non-nil if method has a context parameter (2nd param)
 	returnType   types.Type // non-nil if method returns a value (BeforeEach only)
 }
-
-// IsParallel is a stub retained for template compatibility; always returns false.
-func (m *TestSuiteMethod) IsParallel() bool { return false }
 
 // UsesStdlibT returns true if the method's parameter is *testing.T instead of *gotest.T.
 func (m *TestSuiteMethod) UsesStdlibT() bool { return m.usesStdlibT }

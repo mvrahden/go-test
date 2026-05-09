@@ -23,38 +23,52 @@ func (ts *ƒƒ_GOTEST_ParallelTestSuite) AfterEach(it *gotest.T) {}
 
 func TestParallelTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_ParallelTestSuite{}
+	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
-
-	newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
-		return func(tt *gotest.T) {
-			t := tt.T()
-			t.Run(desc, func(it *testing.T) {
-				ttt := gotest.NewT(it)
-				if ƒcfg.Timeout > 0 {
-					ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-				}
-				defer s.AfterEach(ttt)
-				s.BeforeEach(ttt)
-				ƒƒ_GOTEST_exec(testFn, ttt)
-			})
-		}
-	}
-
-	testCases := []gotest.TestCase{
-		newTestCase("TestAlpha", s.TestAlpha),
-		newTestCase("TestBeta", s.TestBeta),
-		newTestCase("TestGamma", s.TestGamma),
-	}
 
 	tt := gotest.NewT(t)
 	t.Cleanup(func() {
 		s.AfterAll(tt)
 	})
 	s.BeforeAll(tt)
-	for _, tc := range testCases {
-		tc(tt)
-		if ƒcfg.FailFast && t.Failed() {
-			break
+
+	t.Run("TestAlpha", func(it *testing.T) {
+		ttt := gotest.NewT(it)
+		if ƒcfg.Timeout > 0 {
+			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
 		}
+		defer s.AfterEach(ttt)
+		s.BeforeEach(ttt)
+		ƒƒ_GOTEST_exec(s.TestAlpha, ttt)
+	})
+	if ƒcfg.FailFast && t.Failed() {
+		return
 	}
+
+	t.Run("TestBeta", func(it *testing.T) {
+		ttt := gotest.NewT(it)
+		if ƒcfg.Timeout > 0 {
+			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+		}
+		defer s.AfterEach(ttt)
+		s.BeforeEach(ttt)
+		ƒƒ_GOTEST_exec(s.TestBeta, ttt)
+	})
+	if ƒcfg.FailFast && t.Failed() {
+		return
+	}
+
+	t.Run("TestGamma", func(it *testing.T) {
+		ttt := gotest.NewT(it)
+		if ƒcfg.Timeout > 0 {
+			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+		}
+		defer s.AfterEach(ttt)
+		s.BeforeEach(ttt)
+		ƒƒ_GOTEST_exec(s.TestGamma, ttt)
+	})
+	if ƒcfg.FailFast && t.Failed() {
+		return
+	}
+
 }
