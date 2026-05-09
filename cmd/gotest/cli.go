@@ -12,13 +12,6 @@ import (
 	"github.com/mvrahden/go-test/about"
 )
 
-var (
-	DEBUG            bool
-	CI               bool
-	SPEC             bool
-	UPDATE_SNAPSHOTS bool
-)
-
 func main() {
 	subcmd, remaining := ParseSubcommand(os.Args[1:])
 
@@ -50,13 +43,8 @@ func main() {
 		printUsage()
 		return
 	default:
-		// Default run mode: use original args (no subcommand consumed)
 		args := os.Args[1:]
 		ownArgs, goTestArgs := SplitArgs(args)
-		DEBUG = slices.Contains(ownArgs, "--debug")
-		CI = slices.Contains(ownArgs, "--ci")
-		SPEC = slices.Contains(ownArgs, "--spec")
-		UPDATE_SNAPSHOTS = slices.Contains(ownArgs, "--update-snapshots")
 		minCoverage, err := parseMinFlag(ownArgs)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -70,7 +58,6 @@ func main() {
 
 		var coverProfile string
 		if minCoverage > 0 {
-			// Check if user already provided -coverprofile
 			for _, arg := range goTestArgs {
 				if v, ok := strings.CutPrefix(arg, "-coverprofile="); ok {
 					coverProfile = v
@@ -94,6 +81,10 @@ func main() {
 			GoTestArgs:      goTestArgs,
 			PackagePatterns: patterns,
 			SetupTimeout:    setupTimeout,
+			Debug:           slices.Contains(ownArgs, "--debug"),
+			CI:              slices.Contains(ownArgs, "--ci"),
+			Spec:            slices.Contains(ownArgs, "--spec"),
+			UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
 		}
 
 		code := Run(cfg)

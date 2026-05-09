@@ -10,8 +10,7 @@ import (
 const gotestDirMarker = "/pkg/gotest/"
 
 // CallerTrace walks the call stack and returns a "called from: file:line"
-// annotation if the assertion was invoked through a user-written helper.
-// Returns "" when the assertion was called directly from test code.
+// annotation pointing to the user's call site.
 //
 // It skips gotest-internal frames (assertion mechanics), collects user
 // frames, and stops at the first boundary sentinel (execTestFn from
@@ -35,7 +34,7 @@ func CallerTrace() string {
 			strings.HasPrefix(frame.Function, "runtime.") {
 			break
 		}
-		if isGotestSource(frame.File) {
+		if isGotestSource(frame.File) || isGeneratedBridge(frame.File) {
 			if !more {
 				break
 			}
@@ -48,7 +47,7 @@ func CallerTrace() string {
 		}
 	}
 
-	if len(userFrames) <= 1 {
+	if len(userFrames) == 0 {
 		return ""
 	}
 
@@ -64,4 +63,8 @@ func isBoundary(fn string) bool {
 func isGotestSource(file string) bool {
 	return !strings.HasSuffix(file, "_test.go") &&
 		strings.Contains(file, gotestDirMarker)
+}
+
+func isGeneratedBridge(file string) bool {
+	return strings.HasPrefix(filepath.Base(file), "ƒƒ_")
 }

@@ -11,7 +11,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
 
@@ -23,9 +22,6 @@ func runSpec(args []string) int {
 	}
 
 	ownArgs, goTestArgs := SplitArgs(remaining)
-	DEBUG = slices.Contains(ownArgs, "--debug")
-	CI = slices.Contains(ownArgs, "--ci")
-	UPDATE_SNAPSHOTS = slices.Contains(ownArgs, "--update-snapshots")
 	setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -34,7 +30,16 @@ func runSpec(args []string) int {
 
 	patterns := ExtractPackagePatterns(goTestArgs)
 
-	if CI {
+	cfg := ExecConfig{
+		GoTestArgs:      goTestArgs,
+		PackagePatterns: patterns,
+		SetupTimeout:    setupTimeout,
+		Debug:           slices.Contains(ownArgs, "--debug"),
+		CI:              slices.Contains(ownArgs, "--ci"),
+		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
+	}
+
+	if cfg.CI {
 		violations, err := RunFocusGuard(patterns)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -49,7 +54,7 @@ func runSpec(args []string) int {
 		}
 	}
 
-	overlay, cleanup, err := generateOverlay(patterns)
+	overlay, cleanup, err := generateOverlay(patterns, cfg.Debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -57,24 +62,11 @@ func runSpec(args []string) int {
 	defer cleanup()
 
 	overlayArgs := append([]string{overlay.overlayFlag}, goTestArgs...)
-	extraEnv := buildExtraEnv()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	var setupProc *SharedFixtureProcess
-	if len(overlay.sharedFixtures) > 0 {
-		var serr error
-		setupProc, serr = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, setupTimeout)
-		if serr != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", serr)
-			return 2
-		}
-		defer setupProc.Teardown()
-		extraEnv["GOTEST_SHARED_STATE_FILE"] = setupProc.StateFile()
-	}
-
-	jsonData, code, err := gotestrunner.StdlibRunTestsJSON(ctx, overlayArgs, extraEnv)
+	jsonData, code, err := executeTestsJSON(ctx, cfg, overlay, overlayArgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

@@ -23,7 +23,7 @@ func runPrepare(args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(),
 		os.Interrupt, syscall.SIGTERM)
 
-	overlay, cleanup, err := generateOverlay(patterns)
+	overlay, cleanup, err := generateOverlay(patterns, false)
 	if err != nil {
 		stop()
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

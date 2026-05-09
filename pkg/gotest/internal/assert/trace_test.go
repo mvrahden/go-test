@@ -7,10 +7,13 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 )
 
-func TestCallerTrace_DirectCall_ReturnsEmpty(t *testing.T) {
+func TestCallerTrace_DirectCall_ReturnsTrace(t *testing.T) {
 	trace := assert.CallerTrace()
-	if trace != "" {
-		t.Fatalf("expected empty trace for direct call, got: %q", trace)
+	if trace == "" {
+		t.Fatalf("expected non-empty trace for direct call, got empty")
+	}
+	if !strings.Contains(trace, "called from:") {
+		t.Fatalf("expected 'called from:' in trace, got: %q", trace)
 	}
 }
 

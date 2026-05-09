@@ -9,6 +9,10 @@ type ExecConfig struct {
 	GoTestArgs      []string
 	PackagePatterns []string
 	SetupTimeout    time.Duration
+	Debug           bool
+	CI              bool
+	Spec            bool
+	UpdateSnapshots bool
 }
 
 // knownSubcommands is the set of recognized subcommands.

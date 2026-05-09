@@ -7,47 +7,62 @@
     t_test.go:17: failed for reasons
 === RUN   TestSimpleTestSuite/TestIsTrue
 === RUN   TestSimpleTestSuite/TestIsTrue/fails
-    t_test.go:23: True failed:
-          got: abc
+    assertions.go:30: True failed:
+          expected: true
+          actual:   false
+          called from: t_test.go:23
 === RUN   TestSimpleTestSuite/TestIsTrue/succeeds
 === RUN   TestSimpleTestSuite/TestIsFalse
 === RUN   TestSimpleTestSuite/TestIsFalse/fails
-    t_test.go:32: False failed:
-          got: abc
+    assertions.go:30: False failed:
+          expected: false
+          actual:   true
+          called from: t_test.go:32
 === RUN   TestSimpleTestSuite/TestIsFalse/succeeds
 === RUN   TestSimpleTestSuite/TestIsEqualTo
 === RUN   TestSimpleTestSuite/TestIsEqualTo/fails
-    t_test.go:41: Equal failed:
+    assertions.go:30: Equal failed:
           expected: []string{"def"}
           actual:   []string{"abc"}
+          called from: t_test.go:41
 === RUN   TestSimpleTestSuite/TestIsEqualTo/succeeds
 === RUN   TestSimpleTestSuite/TestIsZero
 === RUN   TestSimpleTestSuite/TestIsZero/fails
-    t_test.go:50: Zero failed:
-          got: []string{"abc"}
+    assertions.go:30: Zero failed:
+          expected: "" (zero value)
+          actual:   "abc"
+          called from: t_test.go:50
 === RUN   TestSimpleTestSuite/TestIsZero/succeeds
 === RUN   TestSimpleTestSuite/TestIsEmpty
 === RUN   TestSimpleTestSuite/TestIsEmpty/fails
-    t_test.go:59: Empty failed:
-          got length: 1
+    assertions.go:30: Empty failed:
+          object is not empty: []string{"abc"}
+          called from: t_test.go:59
 === RUN   TestSimpleTestSuite/TestIsEmpty/succeeds
 === RUN   TestSimpleTestSuite/TestHasLength
 === RUN   TestSimpleTestSuite/TestHasLength/fails
-    t_test.go:69: HasLength failed:
-          expected length: 3
-          actual length:   1
+    assertions.go:30: Len failed:
+          expected length 3
+          actual length 1
+          called from: t_test.go:69
 === RUN   TestSimpleTestSuite/TestHasLength/succeeds
-=== RUN   TestSimpleTestSuite/TestHasCapacity
-=== RUN   TestSimpleTestSuite/TestHasCapacity/fails
-    t_test.go:79: HasCapacity failed:
-          expected capacity: 3
-          actual capacity:   1
-=== RUN   TestSimpleTestSuite/TestHasCapacity/succeeds
+=== RUN   TestSimpleTestSuite/TestContains
+=== RUN   TestSimpleTestSuite/TestContains/fails
+    assertions.go:30: Contains failed:
+          "hello" does not contain "xyz"
+          called from: t_test.go:79
+=== RUN   TestSimpleTestSuite/TestContains/succeeds
+=== RUN   TestSimpleTestSuite/TestStdlibCompat
+    assertions.go:30: True failed:
+          expected: true
+          actual:   false
+          called from: t_test.go:88
 === RUN   TestSimpleTestSuite/TestHelperTrace
 === RUN   TestSimpleTestSuite/TestHelperTrace/shows_called_from_trace
-    t_test.go:88: True failed:
-          got: wrong
-          called from: t_test.go:93
+    assertions.go:30: True failed:
+          expected: true
+          actual:   false
+          called from: t_test.go:97
 --- FAIL: TestSimpleTestSuite (<TIMESTAMP>)
     --- FAIL: TestSimpleTestSuite/TestT (<TIMESTAMP>)
         --- FAIL: TestSimpleTestSuite/TestT/should_perform_the_test_case (<TIMESTAMP>)
@@ -69,9 +84,10 @@
     --- FAIL: TestSimpleTestSuite/TestHasLength (<TIMESTAMP>)
         --- FAIL: TestSimpleTestSuite/TestHasLength/fails (<TIMESTAMP>)
         --- PASS: TestSimpleTestSuite/TestHasLength/succeeds (<TIMESTAMP>)
-    --- FAIL: TestSimpleTestSuite/TestHasCapacity (<TIMESTAMP>)
-        --- FAIL: TestSimpleTestSuite/TestHasCapacity/fails (<TIMESTAMP>)
-        --- PASS: TestSimpleTestSuite/TestHasCapacity/succeeds (<TIMESTAMP>)
+    --- FAIL: TestSimpleTestSuite/TestContains (<TIMESTAMP>)
+        --- FAIL: TestSimpleTestSuite/TestContains/fails (<TIMESTAMP>)
+        --- PASS: TestSimpleTestSuite/TestContains/succeeds (<TIMESTAMP>)
+    --- FAIL: TestSimpleTestSuite/TestStdlibCompat (<TIMESTAMP>)
     --- FAIL: TestSimpleTestSuite/TestHelperTrace (<TIMESTAMP>)
         --- FAIL: TestSimpleTestSuite/TestHelperTrace/shows_called_from_trace (<TIMESTAMP>)
 FAIL
