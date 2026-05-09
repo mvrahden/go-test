@@ -170,7 +170,7 @@ When `BeforeEach` returns a value, the following rules are enforced at generatio
 3. **AfterEach must accept context** — if `BeforeEach` returns a context and `AfterEach` exists, it must accept the context as its second parameter
 4. **No orphan context** — `AfterEach` cannot accept a context parameter if `BeforeEach` does not return one
 5. **Type consistency** — context parameter types must match `BeforeEach`'s return type across all methods
-6. **Parallel and Sequential are mutually exclusive** — `SuiteConfig` cannot have both `Parallel: true` and `Sequential: true`
+6. **Context type must be a pointer** — the context return/parameter type must be a pointer type
 
 ### Test Cases
 
@@ -214,7 +214,7 @@ FAIL: focus prefix detected — remove F_ before merging:
 
 ### Parallel Execution
 
-**Suite-level parallelism** is always on. Every generated `func Test*` calls `t.Parallel()` unless the suite opts out via `SuiteConfig{Sequential: true}`. This enables Go's test runner to execute independent suites concurrently.
+**Suite-level parallelism** is always on. Every generated `func Test*` calls `t.Parallel()` unconditionally. This enables Go's test runner to execute independent suites concurrently. There is no opt-out.
 
 **Method-level parallelism** is opt-in via `SuiteConfig{Parallel: true}`. Each generated subtest calls `it.Parallel()` and coordinates via `sync.WaitGroup`. Method-level parallelism requires a returning `BeforeEach` — per-test state lives in the returned context, not on the shared suite struct.
 
@@ -224,13 +224,6 @@ type MyTestSuite struct{}
 
 func (s *MyTestSuite) TestAlpha(t *gotest.T) {}
 func (s *MyTestSuite) TestBeta(t *gotest.T)  {}
-
-// Opt-out: sequential suite (no t.Parallel)
-type OrderDependentTestSuite struct{}
-
-func (s *OrderDependentTestSuite) SuiteConfig() gotest.SuiteConfig {
-    return gotest.SuiteConfig{Sequential: true}
-}
 
 // Opt-in: method-level parallel (requires returning BeforeEach)
 type ParallelMethodTestSuite struct{}
@@ -251,8 +244,6 @@ func (s *ParallelMethodTestSuite) TestDelete(t *gotest.T, ctx *TestCtx) {}
 ```
 
 When method-level parallelism is enabled, the generated code uses a `sync.WaitGroup` to ensure `AfterAll` waits for all parallel subtests to complete. `wg.Done()` is `defer`-ed to prevent deadlocks on `t.Fatal()`.
-
-`Parallel` and `Sequential` are mutually exclusive — setting both produces a generation-time error.
 
 ### Generic Suites
 
@@ -437,7 +428,6 @@ type SuiteConfig struct {
     Retries      int           // per-test-case retry attempts
     FailFast     bool          // stop suite on first failure
     Parallel     bool          // method-level parallelism (requires returning BeforeEach)
-    Sequential   bool          // opt-out of suite-level parallelism
 }
 ```
 
@@ -449,7 +439,7 @@ type SuiteConfig struct {
 | `0`   | Keep default (field not overridden) |
 | `< 0` | Explicitly disabled (no timeout) |
 
-This applies to `Timeout`, `SetupTimeout`, and `RetryDelay`. Boolean fields (`FailFast`, `Parallel`, `Sequential`) only override to `true` — a false overlay does not reset a true base. `Parallel` and `Sequential` are mutually exclusive — setting both produces a generation-time error.
+This applies to `Timeout`, `SetupTimeout`, and `RetryDelay`. Boolean fields (`FailFast`, `Parallel`) only override to `true` — a false overlay does not reset a true base.
 
 #### Marker Methods
 

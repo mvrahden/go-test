@@ -10,10 +10,6 @@ type SimpleTestSuite struct {
 	buf *bytes.Buffer
 }
 
-func (s *SimpleTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Sequential: true}
-}
-
 func (s *SimpleTestSuite) BeforeAll(t *gotest.T) {
 	s.buf = bytes.NewBufferString("")
 }

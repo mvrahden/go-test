@@ -14,7 +14,6 @@ type SuiteConfig struct {
 	Retries      int
 	FailFast     bool
 	Parallel     bool
-	Sequential   bool
 }
 
 func DefaultFixtureConfig() FixtureConfig {
@@ -60,8 +59,5 @@ func OverlaySuiteConfig(base *SuiteConfig, overlay SuiteConfig) {
 	}
 	if overlay.Parallel {
 		base.Parallel = true
-	}
-	if overlay.Sequential {
-		base.Sequential = true
 	}
 }

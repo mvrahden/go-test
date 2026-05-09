@@ -204,11 +204,6 @@ func (ts *TestSuiteSpec) HasGuard() bool { return ts.th.Guard != nil }
 // FOR RENDERING
 func (ts *TestSuiteSpec) IsMethodParallel() bool { return ts.th.ConfigParallel }
 
-// IsSequentialSuite returns true when SuiteConfig has Sequential: true.
-//
-// FOR RENDERING
-func (ts *TestSuiteSpec) IsSequentialSuite() bool { return ts.th.ConfigSequential }
-
 // HasReturningBeforeEach returns true when BeforeEach is defined and returns a context value.
 //
 // FOR RENDERING
@@ -273,8 +268,7 @@ type TestSuiteHarness struct {
 	TestCases        []*TestSuiteMethod
 	Config           *types.Func // SuiteConfig() method, may be nil
 	Guard            *types.Func // SuiteGuard() method, may be nil
-	ConfigParallel   bool
-	ConfigSequential bool
+	ConfigParallel bool
 }
 
 type TestSuiteMethod struct {
@@ -326,17 +320,14 @@ func (m *TestSuiteMethod) Identifier() string {
 	return m.m.Name()
 }
 
-func parseSuiteConfigAST(_ *packages.Package, funcDecl *ast.FuncDecl) (parallel, sequential bool, err error) {
+func parseSuiteConfigAST(_ *packages.Package, funcDecl *ast.FuncDecl) (parallel bool, err error) {
 	if funcDecl.Body == nil || len(funcDecl.Body.List) != 1 {
-		return false, false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
+		return false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
 	}
 	retStmt, ok := funcDecl.Body.List[0].(*ast.ReturnStmt)
 	if !ok || len(retStmt.Results) != 1 {
-		return false, false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
+		return false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
 	}
-	// If the return value is a plain identifier (variable reference), that is not statically
-	// parseable and we treat it as an error. If it is a call expression (e.g. a helper
-	// function), we accept it but cannot determine parallel/sequential statically.
 	switch result := retStmt.Results[0].(type) {
 	case *ast.CompositeLit:
 		for _, elt := range result.Elts {
@@ -348,27 +339,20 @@ func parseSuiteConfigAST(_ *packages.Package, funcDecl *ast.FuncDecl) (parallel,
 			if !ok {
 				continue
 			}
-			switch key.Name {
-			case "Parallel":
+			if key.Name == "Parallel" {
 				ident, ok := kv.Value.(*ast.Ident)
 				if ok && ident.Name == "true" {
 					parallel = true
 				}
-			case "Sequential":
-				ident, ok := kv.Value.(*ast.Ident)
-				if ok && ident.Name == "true" {
-					sequential = true
-				}
 			}
 		}
-		return parallel, sequential, nil
+		return parallel, nil
 	case *ast.CallExpr:
-		// helper function call: static values are unknown, treat as false
-		return false, false, nil
+		return false, nil
 	case *ast.Ident:
-		return false, false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
+		return false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
 	default:
-		return false, false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
+		return false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
 	}
 }
 
@@ -477,12 +461,11 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 			return m.Pos(), fmt.Errorf("unsupported return type for %q: expected gotest.SuiteConfig, got %s", methodID, resType)
 		}
 		s.th.Config = m
-		parallel, sequential, err := parseSuiteConfigAST(pkg, decl)
+		parallel, err := parseSuiteConfigAST(pkg, decl)
 		if err != nil {
 			return m.Pos(), fmt.Errorf("%s.SuiteConfig: %w", s.ts.Name.Name, err)
 		}
 		s.th.ConfigParallel = parallel
-		s.th.ConfigSequential = sequential
 		return -1, nil
 	}
 
@@ -616,11 +599,6 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 	be := ts.th.BeforeEach
 	ae := ts.th.AfterEach
 	suiteName := ts.ts.Name.Name
-
-	// Parallel and Sequential are mutually exclusive
-	if ts.th.ConfigParallel && ts.th.ConfigSequential {
-		return fmt.Errorf("%s: SuiteConfig has both Parallel: true and Sequential: true — these are mutually exclusive", suiteName)
-	}
 
 	// Rule 1/7: Parallel requires returning BeforeEach (void BeforeEach forbidden)
 	if ts.th.ConfigParallel && be != nil && !be.HasReturn() {

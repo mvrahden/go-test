@@ -1,7 +1,5 @@
 === RUN   TestF_FocusedTestSuite
-=== RUN   TestF_FocusedTestSuite/TestBeta
---- PASS: TestF_FocusedTestSuite (<TIMESTAMP>)
-    --- PASS: TestF_FocusedTestSuite/TestBeta (<TIMESTAMP>)
+=== PAUSE TestF_FocusedTestSuite
 === RUN   TestNormalTestSuite
     ƒƒ_psuite_test.go:51: test suite was excluded by user
 --- SKIP: TestNormalTestSuite (<TIMESTAMP>)
@@ -9,14 +7,20 @@
     ƒƒ_psuite_test.go:55: test suite was excluded by user
 --- SKIP: TestX_ExcludedTestSuite (<TIMESTAMP>)
 === RUN   TestF_FocusedExtTestSuite
-=== RUN   TestF_FocusedExtTestSuite/TestBeta
---- PASS: TestF_FocusedExtTestSuite (<TIMESTAMP>)
-    --- PASS: TestF_FocusedExtTestSuite/TestBeta (<TIMESTAMP>)
+=== PAUSE TestF_FocusedExtTestSuite
 === RUN   TestNormalExtTestSuite
     ƒƒ_pxsuite_test.go:51: test suite was excluded by user
 --- SKIP: TestNormalExtTestSuite (<TIMESTAMP>)
 === RUN   TestX_ExcludedExtTestSuite
     ƒƒ_pxsuite_test.go:55: test suite was excluded by user
 --- SKIP: TestX_ExcludedExtTestSuite (<TIMESTAMP>)
+=== CONT  TestF_FocusedTestSuite
+=== RUN   TestF_FocusedTestSuite/TestBeta
+--- PASS: TestF_FocusedTestSuite (<TIMESTAMP>)
+    --- PASS: TestF_FocusedTestSuite/TestBeta (<TIMESTAMP>)
+=== CONT  TestF_FocusedExtTestSuite
+=== RUN   TestF_FocusedExtTestSuite/TestBeta
+--- PASS: TestF_FocusedExtTestSuite (<TIMESTAMP>)
+    --- PASS: TestF_FocusedExtTestSuite/TestBeta (<TIMESTAMP>)
 PASS
 ok  	github.com/mvrahden/go-test/examples/focus_exclude	<TIMESTAMP>

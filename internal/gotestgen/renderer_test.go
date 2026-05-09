@@ -765,25 +765,6 @@ func (s *OrderTestSuite) TestOne(t *gotest.T)    {}
 	gotest.True(t, !strings.Contains(output, "it.Parallel()"), "sequential suite should not call it.Parallel()")
 }
 
-func TestRenderer_SequentialSuite_NoSuiteParallel(t *testing.T) {
-	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type OrderTestSuite struct{}
-
-func (s *OrderTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Sequential: true}
-}
-func (s *OrderTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
-	output, _ := renderTestPkg(t, pkg)
-
-	gotest.True(t, !strings.Contains(output, "t.Parallel()"), "sequential suite should NOT call t.Parallel()")
-}
-
 func TestRenderer_ReturningBeforeEach_Sequential(t *testing.T) {
 	t.Parallel()
 	src := `package testpkg

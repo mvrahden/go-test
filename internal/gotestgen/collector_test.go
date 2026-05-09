@@ -968,26 +968,6 @@ func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
 	gotest.True(t, result.Suites[0].IsMethodParallel(), "expected IsMethodParallel to be true")
 }
 
-func TestCollector_SuiteConfig_SequentialParsed(t *testing.T) {
-	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Sequential: true}
-}
-func (s *MyTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
-	gotest.True(t, result.Suites[0].IsSequentialSuite(), "expected IsSequentialSuite to be true")
-}
-
 func TestCollector_SuiteConfig_NonLiteralBody_Error(t *testing.T) {
 	t.Parallel()
 	src := `package testpkg
@@ -1047,26 +1027,6 @@ func (s *MyTestSuite) TestOne(t *gotest.T) {}
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs), "parallel with no BeforeEach should be allowed")
-}
-
-func TestCollector_Validation_ParallelAndSequentialMutuallyExclusive(t *testing.T) {
-	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Sequential: true}
-}
-func (s *MyTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
-	c := collector{}
-	result := c.CollectSuiteSpecs(pkg)
-	gotest.NotEmpty(t, result.Errs, "expected error: parallel and sequential are mutually exclusive")
-	gotest.Contains(t, result.Errs[0].Err.Error(), "mutually exclusive")
 }
 
 func TestCollector_Validation_MethodMissingContextParam(t *testing.T) {

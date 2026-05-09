@@ -180,9 +180,7 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
             {{ $ts.FixtureFieldName }}: ƒ_{{ $f.Identifier }},
         },
     }
-{{- if not $ts.IsSequentialSuite }}
     t.Parallel()
-{{- end }}
     ƒcfg := gotest.DefaultSuiteConfig()
 {{- if $ts.HasConfig }}
     gotest.OverlaySuiteConfig(&ƒcfg, s.{{ $ts.Identifier }}.SuiteConfig())
@@ -253,9 +251,7 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
             {{ $ts.FixtureFieldName }}: ƒ_{{ $cf.Identifier }},
         },
     }
-{{- if not $ts.IsSequentialSuite }}
     t.Parallel()
-{{- end }}
     ƒcfg := gotest.DefaultSuiteConfig()
 {{- if $ts.HasConfig }}
     gotest.OverlaySuiteConfig(&ƒcfg, s.{{ $ts.Identifier }}.SuiteConfig())

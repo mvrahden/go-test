@@ -170,7 +170,7 @@ func performTest(t *testing.T, tmpDir, basedir, inPkgPath, inPkgName, goldenName
 		cmd.Args = append(cmd.Args, "-ƒƒ.internal.debug")
 		exec.Command("sh", "-c", `echo "`+unifiedPkgDesciptor+`" >> debug_dirs`).CombinedOutput()
 	}
-	cmd.Args = append(cmd.Args, "-v")
+	cmd.Args = append(cmd.Args, "-v", "-parallel", "1")
 	cmd.Dir = filepath.Join(tmpDir, basedir)
 	out, _ := cmd.CombinedOutput()
 
