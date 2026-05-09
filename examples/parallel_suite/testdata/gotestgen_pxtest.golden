@@ -4,27 +4,25 @@ package parallelsuite_test
 
 import (
 	"github.com/mvrahden/go-test/pkg/gotest"
-	"sync"
 	"testing"
 )
 
 //go:noinline
 func ƒƒ_GOTEST_exec(fn gotest.TestCase, t *gotest.T) { fn(t) }
 
-type ƒƒ_GOTEST_ParallelExtTestSuiteParallel struct {
-	ParallelExtTestSuiteParallel
+type ƒƒ_GOTEST_ParallelExtTestSuite struct {
+	ParallelExtTestSuite
 }
 
-func (ts *ƒƒ_GOTEST_ParallelExtTestSuiteParallel) BeforeAll(it *gotest.T) {}
-func (ts *ƒƒ_GOTEST_ParallelExtTestSuiteParallel) AfterAll(it *gotest.T)  {}
-func (ts *ƒƒ_GOTEST_ParallelExtTestSuiteParallel) BeforeEach(it *gotest.T) {
-	ts.ParallelExtTestSuiteParallel.BeforeEach(it)
+func (ts *ƒƒ_GOTEST_ParallelExtTestSuite) BeforeAll(it *gotest.T) {}
+func (ts *ƒƒ_GOTEST_ParallelExtTestSuite) AfterAll(it *gotest.T)  {}
+func (ts *ƒƒ_GOTEST_ParallelExtTestSuite) BeforeEach(it *gotest.T) {
+	ts.ParallelExtTestSuite.BeforeEach(it)
 }
-func (ts *ƒƒ_GOTEST_ParallelExtTestSuiteParallel) AfterEach(it *gotest.T) {}
+func (ts *ƒƒ_GOTEST_ParallelExtTestSuite) AfterEach(it *gotest.T) {}
 
-func TestParallelExtTestSuiteParallel(t *testing.T) {
-	s := &ƒƒ_GOTEST_ParallelExtTestSuiteParallel{}
-	t.Parallel()
+func TestParallelExtTestSuite(t *testing.T) {
+	s := &ƒƒ_GOTEST_ParallelExtTestSuite{}
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
@@ -41,34 +39,15 @@ func TestParallelExtTestSuiteParallel(t *testing.T) {
 			})
 		}
 	}
-	newParallelTestCase := func(desc string, wg *sync.WaitGroup, testFn gotest.TestCase) gotest.TestCase {
-		wg.Add(1)
-		return func(tt *gotest.T) {
-			t := tt.T()
-			t.Run(desc, func(it *testing.T) {
-				it.Parallel()
-				defer wg.Done()
-				ttt := gotest.NewT(it)
-				if ƒcfg.Timeout > 0 {
-					ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-				}
-				defer s.AfterEach(ttt)
-				s.BeforeEach(ttt)
-				ƒƒ_GOTEST_exec(testFn, ttt)
-			})
-		}
-	}
-	wg := &sync.WaitGroup{}
 
 	testCases := []gotest.TestCase{
-		newParallelTestCase("TestParallelDelta", wg, s.TestParallelDelta),
-		newParallelTestCase("TestParallelEpsilon", wg, s.TestParallelEpsilon),
-		newTestCase("TestSequentialZeta", s.TestSequentialZeta),
+		newTestCase("TestDelta", s.TestDelta),
+		newTestCase("TestEpsilon", s.TestEpsilon),
+		newTestCase("TestZeta", s.TestZeta),
 	}
 
 	tt := gotest.NewT(t)
 	t.Cleanup(func() {
-		wg.Wait()
 		s.AfterAll(tt)
 	})
 	s.BeforeAll(tt)

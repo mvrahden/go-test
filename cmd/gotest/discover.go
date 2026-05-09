@@ -141,7 +141,7 @@ func buildDiscoverSuite(suite *gotestast.TestSuiteSpec) discoverSuite {
 
 	ds := discoverSuite{
 		Name:     suite.Identifier(),
-		Parallel: suite.IsParallelSuite(),
+		Parallel: suite.IsMethodParallel(),
 		Focused:  suite.IsFocused(),
 		Excluded: suite.IsExcluded(),
 		Guarded:  suite.HasGuard(),
@@ -177,7 +177,7 @@ func buildDiscoverSuite(suite *gotestast.TestSuiteSpec) discoverSuite {
 		mPos := fset.Position(tc.Pos())
 		methods = append(methods, discoverMethod{
 			Name:     tc.Identifier(),
-			Parallel: tc.IsParallel(),
+			Parallel: false,
 			Focused:  tc.IsFocused(),
 			Excluded: tc.IsExcluded(),
 			File:     filepath.Base(mPos.Filename),

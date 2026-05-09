@@ -4,27 +4,25 @@ package parallelsuite
 
 import (
 	"github.com/mvrahden/go-test/pkg/gotest"
-	"sync"
 	"testing"
 )
 
 //go:noinline
 func ƒƒ_GOTEST_exec(fn gotest.TestCase, t *gotest.T) { fn(t) }
 
-type ƒƒ_GOTEST_ParallelTestSuiteParallel struct {
-	ParallelTestSuiteParallel
+type ƒƒ_GOTEST_ParallelTestSuite struct {
+	ParallelTestSuite
 }
 
-func (ts *ƒƒ_GOTEST_ParallelTestSuiteParallel) BeforeAll(it *gotest.T) {}
-func (ts *ƒƒ_GOTEST_ParallelTestSuiteParallel) AfterAll(it *gotest.T)  {}
-func (ts *ƒƒ_GOTEST_ParallelTestSuiteParallel) BeforeEach(it *gotest.T) {
-	ts.ParallelTestSuiteParallel.BeforeEach(it)
+func (ts *ƒƒ_GOTEST_ParallelTestSuite) BeforeAll(it *gotest.T) {}
+func (ts *ƒƒ_GOTEST_ParallelTestSuite) AfterAll(it *gotest.T)  {}
+func (ts *ƒƒ_GOTEST_ParallelTestSuite) BeforeEach(it *gotest.T) {
+	ts.ParallelTestSuite.BeforeEach(it)
 }
-func (ts *ƒƒ_GOTEST_ParallelTestSuiteParallel) AfterEach(it *gotest.T) {}
+func (ts *ƒƒ_GOTEST_ParallelTestSuite) AfterEach(it *gotest.T) {}
 
-func TestParallelTestSuiteParallel(t *testing.T) {
-	s := &ƒƒ_GOTEST_ParallelTestSuiteParallel{}
-	t.Parallel()
+func TestParallelTestSuite(t *testing.T) {
+	s := &ƒƒ_GOTEST_ParallelTestSuite{}
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
@@ -41,34 +39,15 @@ func TestParallelTestSuiteParallel(t *testing.T) {
 			})
 		}
 	}
-	newParallelTestCase := func(desc string, wg *sync.WaitGroup, testFn gotest.TestCase) gotest.TestCase {
-		wg.Add(1)
-		return func(tt *gotest.T) {
-			t := tt.T()
-			t.Run(desc, func(it *testing.T) {
-				it.Parallel()
-				defer wg.Done()
-				ttt := gotest.NewT(it)
-				if ƒcfg.Timeout > 0 {
-					ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-				}
-				defer s.AfterEach(ttt)
-				s.BeforeEach(ttt)
-				ƒƒ_GOTEST_exec(testFn, ttt)
-			})
-		}
-	}
-	wg := &sync.WaitGroup{}
 
 	testCases := []gotest.TestCase{
-		newParallelTestCase("TestParallelAlpha", wg, s.TestParallelAlpha),
-		newParallelTestCase("TestParallelBeta", wg, s.TestParallelBeta),
-		newTestCase("TestSequentialGamma", s.TestSequentialGamma),
+		newTestCase("TestAlpha", s.TestAlpha),
+		newTestCase("TestBeta", s.TestBeta),
+		newTestCase("TestGamma", s.TestGamma),
 	}
 
 	tt := gotest.NewT(t)
 	t.Cleanup(func() {
-		wg.Wait()
 		s.AfterAll(tt)
 	})
 	s.BeforeAll(tt)

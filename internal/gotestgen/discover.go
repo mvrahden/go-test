@@ -105,7 +105,7 @@ func convertSuite(suite *gotestast.TestSuiteSpec) DiscoverSuite {
 
 	ds := DiscoverSuite{
 		Name:      suite.Identifier(),
-		Parallel:  suite.IsParallelSuite(),
+		Parallel:  suite.IsMethodParallel(),
 		Focused:   suite.IsFocused(),
 		Excluded:  suite.IsExcluded(),
 		File:      pos.Filename,
@@ -140,7 +140,7 @@ func convertMethod(m *gotestast.TestSuiteMethod, fset *token.FileSet) DiscoverMe
 	pos := fset.Position(m.Pos())
 	return DiscoverMethod{
 		Name:     m.Identifier(),
-		Parallel: m.IsParallel(),
+		Parallel: false,
 		Focused:  m.IsFocused(),
 		Excluded: m.IsExcluded(),
 		File:     pos.Filename,

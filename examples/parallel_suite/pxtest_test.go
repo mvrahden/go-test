@@ -5,26 +5,24 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// ParallelExtTestSuiteParallel is a parallel external-package suite; the
-// generated test function calls t.Parallel() so it runs concurrently with
-// other top-level tests.
-type ParallelExtTestSuiteParallel struct{}
+// ParallelExtTestSuite demonstrates the new parallel suite convention using SuiteConfig.
+type ParallelExtTestSuite struct{}
 
-func (s *ParallelExtTestSuiteParallel) BeforeEach(t *gotest.T) {
+func (s *ParallelExtTestSuite) BeforeEach(t *gotest.T) {
 	parallelsuite.Increment()
 }
 
-// TestParallelDelta runs as a parallel subtest within the suite.
-func (s *ParallelExtTestSuiteParallel) TestParallelDelta(t *gotest.T) {
+// TestDelta runs within the suite.
+func (s *ParallelExtTestSuite) TestDelta(t *gotest.T) {
 	parallelsuite.Increment()
 }
 
-// TestParallelEpsilon runs as a parallel subtest within the suite.
-func (s *ParallelExtTestSuiteParallel) TestParallelEpsilon(t *gotest.T) {
+// TestEpsilon runs within the suite.
+func (s *ParallelExtTestSuite) TestEpsilon(t *gotest.T) {
 	parallelsuite.Increment()
 }
 
-// TestSequentialZeta runs sequentially within the parallel suite.
-func (s *ParallelExtTestSuiteParallel) TestSequentialZeta(t *gotest.T) {
+// TestZeta runs within the suite.
+func (s *ParallelExtTestSuite) TestZeta(t *gotest.T) {
 	parallelsuite.Increment()
 }

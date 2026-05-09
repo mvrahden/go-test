@@ -4,25 +4,24 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// ParallelTestSuiteParallel is a parallel suite; the generated test function
-// calls t.Parallel() so it runs concurrently with other top-level tests.
-type ParallelTestSuiteParallel struct{}
+// ParallelTestSuite demonstrates the new parallel suite convention using SuiteConfig.
+type ParallelTestSuite struct{}
 
-func (s *ParallelTestSuiteParallel) BeforeEach(t *gotest.T) {
+func (s *ParallelTestSuite) BeforeEach(t *gotest.T) {
 	Increment()
 }
 
-// TestParallelAlpha runs as a parallel subtest within the suite.
-func (s *ParallelTestSuiteParallel) TestParallelAlpha(t *gotest.T) {
+// TestAlpha runs within the suite.
+func (s *ParallelTestSuite) TestAlpha(t *gotest.T) {
 	Increment()
 }
 
-// TestParallelBeta runs as a parallel subtest within the suite.
-func (s *ParallelTestSuiteParallel) TestParallelBeta(t *gotest.T) {
+// TestBeta runs within the suite.
+func (s *ParallelTestSuite) TestBeta(t *gotest.T) {
 	Increment()
 }
 
-// TestSequentialGamma runs sequentially within the parallel suite.
-func (s *ParallelTestSuiteParallel) TestSequentialGamma(t *gotest.T) {
+// TestGamma runs within the suite.
+func (s *ParallelTestSuite) TestGamma(t *gotest.T) {
 	Increment()
 }
