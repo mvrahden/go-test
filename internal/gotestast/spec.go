@@ -244,10 +244,12 @@ type TestSuiteHarness struct {
 }
 
 type TestSuiteMethod struct {
-	n           ast.Node
-	m           *types.Func
-	sig         *types.Signature
-	usesStdlibT bool
+	n            ast.Node
+	m            *types.Func
+	sig          *types.Signature
+	usesStdlibT  bool
+	contextParam *types.Var // non-nil if method has a context parameter (2nd param)
+	returnType   types.Type // non-nil if method returns a value (BeforeEach only)
 }
 
 func (m *TestSuiteMethod) IsParallel() bool {
@@ -257,9 +259,35 @@ func (m *TestSuiteMethod) IsParallel() bool {
 // UsesStdlibT returns true if the method's parameter is *testing.T instead of *gotest.T.
 func (m *TestSuiteMethod) UsesStdlibT() bool { return m.usesStdlibT }
 
-func (m *TestSuiteMethod) Pos() token.Pos    { return m.n.Pos() }
-func (m *TestSuiteMethod) IsFocused() bool    { return strings.HasPrefix(m.m.Name(), "F_") }
-func (m *TestSuiteMethod) IsExcluded() bool   { return strings.HasPrefix(m.m.Name(), "X_") }
+func (m *TestSuiteMethod) HasContextParam() bool { return m.contextParam != nil }
+func (m *TestSuiteMethod) HasReturn() bool       { return m.returnType != nil }
+
+func (m *TestSuiteMethod) ContextTypeName(pkg *types.Package) string {
+	if m.contextParam == nil {
+		return ""
+	}
+	return types.TypeString(m.contextParam.Type(), qualifier(pkg))
+}
+
+func (m *TestSuiteMethod) ReturnTypeName(pkg *types.Package) string {
+	if m.returnType == nil {
+		return ""
+	}
+	return types.TypeString(m.returnType, qualifier(pkg))
+}
+
+func qualifier(pkg *types.Package) types.Qualifier {
+	return func(other *types.Package) string {
+		if other == pkg {
+			return ""
+		}
+		return other.Name()
+	}
+}
+
+func (m *TestSuiteMethod) Pos() token.Pos  { return m.n.Pos() }
+func (m *TestSuiteMethod) IsFocused() bool  { return strings.HasPrefix(m.m.Name(), "F_") }
+func (m *TestSuiteMethod) IsExcluded() bool { return strings.HasPrefix(m.m.Name(), "X_") }
 
 // Identifier returns the test methods identifier.
 //
@@ -419,11 +447,43 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 	}
 
 	if !isTestCase {
-		// assert test suite methods use correct params
+		if IS_BEFORE_EACH.MatchString(m.Name()) {
+			if sig.Params().Len() != 1 {
+				return m.Pos(), fmt.Errorf("unsupported signature for %q: expected exactly 1 parameter", methodID)
+			}
+			if sig.Results().Len() > 1 {
+				return m.Pos(), fmt.Errorf("unsupported signature for %q: expected 0 or 1 return values, got %d", methodID, sig.Results().Len())
+			}
+			usesStdlib, err := detectParamT(sig)
+			if err != nil {
+				return m.Pos(), err
+			}
+			tm.usesStdlibT = usesStdlib
+			if sig.Results().Len() == 1 {
+				tm.returnType = sig.Results().At(0).Type()
+			}
+			return -1, nil
+		}
+
+		if IS_AFTER_EACH.MatchString(m.Name()) {
+			if sig.Params().Len() < 1 || sig.Params().Len() > 2 || sig.Results().Len() != 0 {
+				return m.Pos(), fmt.Errorf("unsupported signature for %q: expected 1 or 2 parameters and no return values", methodID)
+			}
+			usesStdlib, err := detectParamT(sig)
+			if err != nil {
+				return m.Pos(), err
+			}
+			tm.usesStdlibT = usesStdlib
+			if sig.Params().Len() == 2 {
+				tm.contextParam = sig.Params().At(1)
+			}
+			return -1, nil
+		}
+
+		// BeforeAll, AfterAll — unchanged: exactly 1 param, 0 return values
 		if sig.Params().Len() != 1 || sig.Results().Len() != 0 {
 			return m.Pos(), fmt.Errorf("unsupported signature for %q", methodID)
 		}
-
 		usesStdlib, err := detectParamT(sig)
 		if err != nil {
 			return m.Pos(), err
@@ -435,6 +495,16 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 	s.th.TestCases = append(s.th.TestCases, tm)
 
 	maxParams := 1
+
+	// optional context parameter (second position, before optional done func())
+	if sig.Params().Len() >= 2 {
+		secondParam := sig.Params().At(1)
+		secondType := secondParam.Type().String()
+		if secondType != "func()" {
+			tm.contextParam = secondParam
+			maxParams += 1
+		}
+	}
 
 	// end with `done func()` IF test case IS ASYNC
 	if IS_TEST_CASE_ASYNC.MatchString(m.Name()) {

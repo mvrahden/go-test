@@ -812,6 +812,139 @@ func (s *BadTestSuite) TestFoo(t *gotest.T) {}
 	gotest.Contains(t, result.Errs[0].Err.Error(), "unsupported return type")
 }
 
+// --- Context param and return type tests ---
+
+func TestCollector_BeforeEach_ReturningForm(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type myCtx struct{ val string }
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
+func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
+	gotest.Equal(t, 1, len(result.Suites))
+
+	be := result.Suites[0].BeforeEach()
+	gotest.True(t, be != nil, "expected BeforeEach")
+	gotest.True(t, be.HasReturn(), "expected BeforeEach to have return type")
+}
+
+func TestCollector_BeforeEach_TooManyReturns(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type myCtx struct{}
+
+type BadTestSuite struct{}
+
+func (s *BadTestSuite) BeforeEach(t *gotest.T) (*myCtx, error) { return nil, nil }
+func (s *BadTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error for 2 return values")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "expected 0 or 1 return values")
+}
+
+func TestCollector_AfterEach_WithContextParam(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type myCtx struct{ val string }
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
+func (s *MyTestSuite) AfterEach(t *gotest.T, ctx *myCtx) {}
+func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
+
+	ae := result.Suites[0].AfterEach()
+	gotest.True(t, ae != nil, "expected AfterEach")
+	gotest.True(t, ae.HasContextParam(), "expected AfterEach to have context param")
+}
+
+func TestCollector_AfterEach_TooManyParams(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type myCtx struct{}
+
+type BadTestSuite struct{}
+
+func (s *BadTestSuite) AfterEach(t *gotest.T, ctx *myCtx, extra int) {}
+func (s *BadTestSuite) TestOne(t *gotest.T) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error for 3 params")
+}
+
+func TestCollector_TestMethod_WithContextParam(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type myCtx struct{}
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
+func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
+func (s *MyTestSuite) TestTwo(t *gotest.T, _ *myCtx) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
+	gotest.Equal(t, 2, len(result.Suites[0].TestCases()))
+	gotest.True(t, result.Suites[0].TestCases()[0].HasContextParam(), "expected TestOne to have context param")
+	gotest.True(t, result.Suites[0].TestCases()[1].HasContextParam(), "expected TestTwo to have context param")
+}
+
+func TestCollector_TestMethod_AsyncWithContext(t *testing.T) {
+	t.Parallel()
+	src := `package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type myCtx struct{}
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
+func (s *MyTestSuite) TestOneAsync(t *gotest.T, ctx *myCtx, done func()) {}
+`
+	pkg := loadTestPkgWithGotest(t, src)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
+	gotest.Equal(t, 1, len(result.Suites[0].TestCases()))
+	gotest.True(t, result.Suites[0].TestCases()[0].HasContextParam(), "expected context param")
+}
+
 // --- helpers ---
 
 // makeFixtureSpec creates a minimal FixtureSpec for validation testing.
