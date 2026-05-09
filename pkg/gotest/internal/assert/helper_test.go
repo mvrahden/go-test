@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 )
 
 func TestGoTestingInternalsCompatible(t *testing.T) {
@@ -24,4 +26,13 @@ func TestGoTestingInternalsCompatible(t *testing.T) {
 	check("mu", reflect.TypeFor[sync.RWMutex]())
 	check("helperPCs", reflect.TypeFor[map[uintptr]struct{}]())
 	check("helperNames", reflect.TypeFor[map[string]struct{}]())
+}
+
+func TestSkipInternalFrames_NilT_NoPanic(t *testing.T) {
+	assert.SkipInternalFrames(nil)
+}
+
+func TestSkipInternalFrames_MarksCallerAsHelper(t *testing.T) {
+	sub := testing.T{}
+	assert.SkipInternalFrames(&sub)
 }
