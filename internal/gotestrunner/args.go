@@ -95,6 +95,13 @@ func ClassifyGoTestArgs(args []string) ClassifiedArgs {
 
 		name, _, hasEquals := strings.Cut(arg, "=")
 
+		// -json is intercepted at the CLI level; drop it here to prevent
+		// misclassification as a build flag.
+		if name == "-json" {
+			i++
+			continue
+		}
+
 		if buildOnlyFlags[name] || buildOnlyFlags[arg] {
 			result.BuildFlags = append(result.BuildFlags, arg)
 			i++

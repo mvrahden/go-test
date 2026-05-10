@@ -191,6 +191,93 @@ func writePackageSummary(pkg string, failed bool, d time.Duration) {
 	}
 }
 
+// RunSuitesTest2JSON executes each suite target wrapped with `go tool test2json`
+// to produce proper JSON test events. Output is written directly to stdout.
+func RunSuitesTest2JSON(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int) ([]SuiteResult, int) {
+	if maxParallel <= 0 {
+		maxParallel = runtime.GOMAXPROCS(0)
+	}
+
+	results := make([]SuiteResult, len(targets))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, maxParallel)
+
+	env := os.Environ()
+	for k, v := range extraEnv {
+		env = append(env, k+"="+v)
+	}
+
+	for i, target := range targets {
+		wg.Add(1)
+		go func(idx int, t SuiteTarget) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			results[idx] = runSingleSuiteTest2JSON(ctx, t, env)
+		}(i, target)
+	}
+	wg.Wait()
+
+	worstCode := 0
+	for _, r := range results {
+		os.Stdout.Write(r.Stdout)
+		if len(r.Stderr) > 0 {
+			os.Stderr.Write(r.Stderr)
+		}
+		if r.ExitCode > worstCode {
+			worstCode = r.ExitCode
+		}
+	}
+
+	return results, worstCode
+}
+
+func runSingleSuiteTest2JSON(ctx context.Context, target SuiteTarget, env []string) SuiteResult {
+	var testArgs []string
+	if target.RunFilter != "" {
+		testArgs = append(testArgs, "-test.run="+target.RunFilter)
+	} else {
+		testArgs = append(testArgs, fmt.Sprintf("-test.run=^%s$", regexp.QuoteMeta(target.SuiteName)))
+	}
+	testArgs = append(testArgs, "-test.v=test2json")
+	for _, f := range target.RunFlags {
+		if f == "-test.v" || strings.HasPrefix(f, "-test.v=") {
+			continue
+		}
+		testArgs = append(testArgs, f)
+	}
+
+	args := []string{"tool", "test2json", "-p", target.Package, "-t", target.BinaryPath}
+	args = append(args, testArgs...)
+
+	cmd := exec.CommandContext(ctx, "go", args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	cmd.Env = env
+
+	start := time.Now()
+	err := cmd.Run()
+	duration := time.Since(start)
+
+	exitCode := 0
+	if err != nil {
+		if cmd.ProcessState != nil {
+			exitCode = cmd.ProcessState.ExitCode()
+		} else {
+			exitCode = 2
+		}
+	}
+
+	return SuiteResult{
+		Target:   target,
+		Stdout:   stdout.Bytes(),
+		Stderr:   stderr.Bytes(),
+		ExitCode: exitCode,
+		Duration: duration,
+	}
+}
+
 // BuildSuiteTargets constructs SuiteTarget entries from compiled binaries
 // and suite names. suitesByPkg maps import path to a list of suite struct
 // names (e.g., "FooTestSuite"). The generated test function name is
@@ -252,12 +339,16 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 			if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, testFuncName) {
 				continue
 			}
-			targets = append(targets, SuiteTarget{
+			target := SuiteTarget{
 				Package:    pkg,
 				BinaryPath: bin,
 				SuiteName:  testFuncName,
 				RunFlags:   translatedFlags,
-			})
+			}
+			if rf := suiteRunFilter(userRunFilter, testFuncName); rf != "" {
+				target.RunFilter = rf
+			}
+			targets = append(targets, target)
 		}
 	}
 	return targets
@@ -290,4 +381,76 @@ func matchesSuiteFunc(runRegex string, funcName string) bool {
 		return true // let the test binary report the invalid regex
 	}
 	return re.MatchString(funcName)
+}
+
+// suiteRunFilter extracts the portion of userRunFilter that applies to
+// testFuncName and includes a subtest component. Returns empty string when
+// the filter has no subtest part (suite-name-only matching suffices).
+func suiteRunFilter(userRunFilter, testFuncName string) string {
+	if userRunFilter == "" || !strings.Contains(userRunFilter, "/") {
+		return ""
+	}
+
+	alts := splitTopLevelOr(userRunFilter)
+	if len(alts) == 1 {
+		return userRunFilter
+	}
+
+	var matching []string
+	for _, alt := range alts {
+		if matchesSuiteFunc(alt, testFuncName) {
+			matching = append(matching, alt)
+		}
+	}
+	if len(matching) == 0 {
+		return ""
+	}
+	return strings.Join(matching, "|")
+}
+
+// splitTopLevelOr splits a regex pattern on | that is not inside parentheses
+// or character classes.
+func splitTopLevelOr(pattern string) []string {
+	var result []string
+	depth := 0
+	start := 0
+	escaped := false
+	inBracket := false
+
+	for i := 0; i < len(pattern); i++ {
+		c := pattern[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if c == '\\' {
+			escaped = true
+			continue
+		}
+		if c == '[' && !inBracket {
+			inBracket = true
+			continue
+		}
+		if c == ']' && inBracket {
+			inBracket = false
+			continue
+		}
+		if inBracket {
+			continue
+		}
+		switch c {
+		case '(':
+			depth++
+		case ')':
+			if depth > 0 {
+				depth--
+			}
+		case '|':
+			if depth == 0 {
+				result = append(result, pattern[start:i])
+				start = i + 1
+			}
+		}
+	}
+	return append(result, pattern[start:])
 }

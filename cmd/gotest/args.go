@@ -11,6 +11,7 @@ type ExecConfig struct {
 	SetupTimeout    time.Duration
 	Debug           bool
 	CI              bool
+	JSON            bool
 	Spec            bool
 	UpdateSnapshots bool
 }

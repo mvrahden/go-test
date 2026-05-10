@@ -64,7 +64,7 @@ func runSpec(args []string) int {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	jsonData, code, err := executeTestsJSON(ctx, cfg, overlay)
+	jsonData, code, err := executeTestsCaptured(ctx, cfg, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

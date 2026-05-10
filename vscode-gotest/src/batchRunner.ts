@@ -120,18 +120,33 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     }
 
     if (result.exitCode !== 0) {
-      const diagnostic = [
-        result.stderr.trim(),
-        result.stdout.trim(),
-        `exit code ${result.exitCode}`,
-      ]
-        .filter(Boolean)
-        .join("\n\n");
+      const stderrTrimmed = result.stderr.trim();
+
+      if (stderrTrimmed) {
+        run.appendOutput(stderrTrimmed.replace(/\n/g, "\r\n") + "\r\n");
+      }
 
       for (const info of pkgInfos) {
-        if ((eventsByPkg.get(info.importPath) ?? []).length === 0) {
+        const pkgEvents = eventsByPkg.get(info.importPath) ?? [];
+
+        if (pkgEvents.length === 0) {
+          const diagnostic = [
+            stderrTrimmed,
+            result.stdout.trim(),
+            `exit code ${result.exitCode}`,
+          ]
+            .filter(Boolean)
+            .join("\n\n");
           for (const item of info.items) {
             run.errored(item, new vscode.TestMessage(diagnostic));
+          }
+        } else if (stderrTrimmed) {
+          for (const item of info.items) {
+            run.appendOutput(
+              stderrTrimmed.replace(/\n/g, "\r\n") + "\r\n",
+              undefined,
+              item,
+            );
           }
         }
       }

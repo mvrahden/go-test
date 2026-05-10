@@ -155,7 +155,43 @@ func executeTests(ctx context.Context, cfg ExecConfig, overlay *overlayResult) (
 	return code, nil
 }
 
-func executeTestsJSON(ctx context.Context, cfg ExecConfig, overlay *overlayResult) ([]byte, int, error) {
+func executeTestsJSON(ctx context.Context, cfg ExecConfig, overlay *overlayResult) (int, error) {
+	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
+	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
+	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
+
+	compiled, err := gotestrunner.CompilePackages(ctx, overlay.suitePackages, overlay.overlayFlag, classified.BuildFlags, overlay.tmpDir)
+	if err != nil {
+		return 2, err
+	}
+
+	var setupProc *SharedFixtureProcess
+	if len(overlay.sharedFixtures) > 0 {
+		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, cfg.SetupTimeout)
+		if err != nil {
+			return 2, fmt.Errorf("shared fixture setup: %w", err)
+		}
+		defer setupProc.Teardown()
+	}
+
+	select {
+	case <-ctx.Done():
+		return 130, nil
+	default:
+	}
+
+	extraEnv := buildExtraEnv(cfg, setupProc)
+	targets := gotestrunner.BuildSuiteTargets(compiled, overlay.suitesByPkg, runFlags, userRunFilter)
+
+	if len(targets) == 0 {
+		return 0, nil
+	}
+
+	_, code := gotestrunner.RunSuitesTest2JSON(ctx, targets, extraEnv, 0)
+	return code, nil
+}
+
+func executeTestsCaptured(ctx context.Context, cfg ExecConfig, overlay *overlayResult) ([]byte, int, error) {
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
 	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
@@ -181,8 +217,6 @@ func executeTestsJSON(ctx context.Context, cfg ExecConfig, overlay *overlayResul
 	}
 
 	extraEnv := buildExtraEnv(cfg, setupProc)
-
-	// Add -json flag to each subprocess via -test.v (JSON output requires verbose)
 	runFlags = append(runFlags, "-v")
 	targets := gotestrunner.BuildSuiteTargets(compiled, overlay.suitesByPkg, runFlags, userRunFilter)
 
@@ -190,8 +224,8 @@ func executeTestsJSON(ctx context.Context, cfg ExecConfig, overlay *overlayResul
 		return nil, 0, nil
 	}
 
-	jsonData, code := gotestrunner.RunSuitesJSON(ctx, targets, extraEnv, 0)
-	return jsonData, code, nil
+	data, code := gotestrunner.RunSuitesJSON(ctx, targets, extraEnv, 0)
+	return data, code, nil
 }
 
 func Run(cfg ExecConfig) int {
@@ -228,9 +262,15 @@ func Run(cfg ExecConfig) int {
 		os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	code, err := executeTests(ctx, cfg, overlay)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+	var code int
+	var execErr error
+	if cfg.JSON {
+		code, execErr = executeTestsJSON(ctx, cfg, overlay)
+	} else {
+		code, execErr = executeTests(ctx, cfg, overlay)
+	}
+	if execErr != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", execErr)
 		return 2
 	}
 	return code
