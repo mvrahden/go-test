@@ -1,10 +1,8 @@
 package main
 
 import (
-	"sort"
 	"testing"
 
-	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -100,61 +98,3 @@ func TestLooksLikePackagePattern(t *testing.T) {
 	}
 }
 
-func TestResolveWildcardArgs(t *testing.T) {
-	t.Run("no wildcard returns args unchanged", func(t *testing.T) {
-		args := []string{"-v", "example.com/pkg/a", "example.com/pkg/b"}
-		loaded := []*gotestgen.LoadResult{
-			{PkgPath: "example.com/pkg/a"},
-			{PkgPath: "example.com/pkg/b"},
-		}
-		overlay := &overlayResult{suitePackages: []string{"example.com/pkg/a", "example.com/pkg/b"}}
-		result := resolveWildcardArgs(args, []string{"example.com/pkg/a", "example.com/pkg/b"}, loaded, overlay)
-		gotest.Equal(t, args, result)
-	})
-
-	t.Run("wildcard kept when all packages have suites", func(t *testing.T) {
-		args := []string{"-v", "example.com/pkg/..."}
-		loaded := []*gotestgen.LoadResult{
-			{PkgPath: "example.com/pkg/a"},
-			{PkgPath: "example.com/pkg/b"},
-		}
-		overlay := &overlayResult{suitePackages: []string{"example.com/pkg/a", "example.com/pkg/b"}}
-		result := resolveWildcardArgs(args, []string{"example.com/pkg/..."}, loaded, overlay)
-		gotest.Equal(t, args, result)
-	})
-
-	t.Run("wildcard expanded when some packages lack suites", func(t *testing.T) {
-		args := []string{"-v", "example.com/pkg/...", "-count=1"}
-		loaded := []*gotestgen.LoadResult{
-			{PkgPath: "example.com/pkg/a"},
-			{PkgPath: "example.com/pkg/b"},
-			{PkgPath: "example.com/pkg/c"},
-		}
-		overlay := &overlayResult{suitePackages: []string{"example.com/pkg/a", "example.com/pkg/b"}}
-		result := resolveWildcardArgs(args, []string{"example.com/pkg/..."}, loaded, overlay)
-		sort.Strings(result[2:])
-		gotest.Equal(t, []string{"-v", "-count=1", "example.com/pkg/a", "example.com/pkg/b"}, result)
-	})
-
-	t.Run("./... expanded when mixed", func(t *testing.T) {
-		args := []string{"./...", "-v"}
-		loaded := []*gotestgen.LoadResult{
-			{PkgPath: "example.com/a"},
-			{PkgPath: "example.com/b"},
-		}
-		overlay := &overlayResult{suitePackages: []string{"example.com/a"}}
-		result := resolveWildcardArgs(args, []string{"./..."}, loaded, overlay)
-		gotest.Equal(t, []string{"-v", "example.com/a"}, result)
-	})
-
-	t.Run("args after -args preserved", func(t *testing.T) {
-		args := []string{"example.com/pkg/...", "-args", "-custom=val"}
-		loaded := []*gotestgen.LoadResult{
-			{PkgPath: "example.com/pkg/a"},
-			{PkgPath: "example.com/pkg/b"},
-		}
-		overlay := &overlayResult{suitePackages: []string{"example.com/pkg/a"}}
-		result := resolveWildcardArgs(args, []string{"example.com/pkg/..."}, loaded, overlay)
-		gotest.Equal(t, []string{"-args", "-custom=val", "example.com/pkg/a"}, result)
-	})
-}

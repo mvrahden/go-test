@@ -23,7 +23,6 @@ func (ts *ƒƒ_GOTEST_F_FocusedTestSuite) AfterEach(it *gotest.T) {}
 
 func TestF_FocusedTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_F_FocusedTestSuite{}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	tt := gotest.NewT(t)

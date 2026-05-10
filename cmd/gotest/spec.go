@@ -61,12 +61,10 @@ func runSpec(args []string) int {
 	}
 	defer cleanup()
 
-	overlayArgs := append([]string{overlay.overlayFlag}, goTestArgs...)
-
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	jsonData, code, err := executeTestsJSON(ctx, cfg, overlay, overlayArgs)
+	jsonData, code, err := executeTestsJSON(ctx, cfg, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

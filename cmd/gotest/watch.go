@@ -177,11 +177,9 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
 	}
 	defer cleanup()
 
-	overlayArgs := append([]string{overlay.overlayFlag}, cfg.GoTestArgs...)
-
 	if jsonMode {
 		fmt.Printf("{\"Action\":\"watch-start\",\"Package\":%q}\n", strings.Join(cfg.PackagePatterns, ","))
-		jsonData, code, err := executeTestsJSON(ctx, cfg, overlay, overlayArgs)
+		jsonData, code, err := executeTestsJSON(ctx, cfg, overlay)
 		if err != nil {
 			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
 			return 2
@@ -190,7 +188,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
 		return code
 	}
 
-	code, err := executeTests(ctx, cfg, overlay, overlayArgs)
+	code, err := executeTests(ctx, cfg, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

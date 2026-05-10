@@ -1,0 +1,293 @@
+package gotestrunner
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"regexp"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
+)
+
+// SuiteTarget identifies a single test suite (or group of standalone tests)
+// to run in its own subprocess.
+type SuiteTarget struct {
+	Package    string   // import path (for reporting)
+	BinaryPath string   // path to compiled test binary
+	SuiteName  string   // test function name, e.g., "TestFooTestSuite"
+	RunFilter  string   // raw -test.run value (overrides SuiteName if set)
+	RunFlags   []string // test binary flags (with -test. prefix)
+}
+
+// SuiteResult holds the output from running a single suite subprocess.
+type SuiteResult struct {
+	Target   SuiteTarget
+	Stdout   []byte
+	Stderr   []byte
+	ExitCode int
+	Duration time.Duration
+}
+
+// RunSuites executes each suite target in its own subprocess with bounded
+// concurrency. It streams combined output to the writer and returns the
+// worst exit code across all suites.
+func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int) ([]SuiteResult, int) {
+	if maxParallel <= 0 {
+		maxParallel = runtime.GOMAXPROCS(0)
+	}
+
+	results := make([]SuiteResult, len(targets))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, maxParallel)
+
+	env := os.Environ()
+	for k, v := range extraEnv {
+		env = append(env, k+"="+v)
+	}
+
+	for i, target := range targets {
+		wg.Add(1)
+		go func(idx int, t SuiteTarget) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			results[idx] = runSingleSuite(ctx, t, env)
+		}(i, target)
+	}
+	wg.Wait()
+
+	worstCode := 0
+	currentPkg := ""
+	pkgFailed := false
+	var pkgDuration time.Duration
+
+	for _, r := range results {
+		if r.Target.Package != currentPkg {
+			if currentPkg != "" {
+				writePackageSummary(currentPkg, pkgFailed, pkgDuration)
+			}
+			currentPkg = r.Target.Package
+			pkgFailed = false
+			pkgDuration = 0
+		}
+
+		os.Stdout.Write(stripTrailingStatus(r.Stdout))
+		if len(r.Stderr) > 0 {
+			os.Stderr.Write(r.Stderr)
+		}
+
+		if r.ExitCode != 0 {
+			pkgFailed = true
+		}
+		pkgDuration += r.Duration
+		if r.ExitCode > worstCode {
+			worstCode = r.ExitCode
+		}
+	}
+	if currentPkg != "" {
+		writePackageSummary(currentPkg, pkgFailed, pkgDuration)
+	}
+
+	return results, worstCode
+}
+
+// RunSuitesJSON is like RunSuites but captures JSON output for programmatic
+// consumption instead of streaming to stdout.
+func RunSuitesJSON(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int) ([]byte, int) {
+	if maxParallel <= 0 {
+		maxParallel = runtime.GOMAXPROCS(0)
+	}
+
+	results := make([]SuiteResult, len(targets))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, maxParallel)
+
+	env := os.Environ()
+	for k, v := range extraEnv {
+		env = append(env, k+"="+v)
+	}
+
+	for i, target := range targets {
+		wg.Add(1)
+		go func(idx int, t SuiteTarget) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			results[idx] = runSingleSuite(ctx, t, env)
+		}(i, target)
+	}
+	wg.Wait()
+
+	var merged bytes.Buffer
+	worstCode := 0
+	for _, r := range results {
+		merged.Write(r.Stdout)
+		if r.ExitCode > worstCode {
+			worstCode = r.ExitCode
+		}
+	}
+	return merged.Bytes(), worstCode
+}
+
+func runSingleSuite(ctx context.Context, target SuiteTarget, env []string) SuiteResult {
+	args := make([]string, 0, len(target.RunFlags)+1)
+	if target.RunFilter != "" {
+		args = append(args, "-test.run="+target.RunFilter)
+	} else {
+		args = append(args, fmt.Sprintf("-test.run=^%s$", regexp.QuoteMeta(target.SuiteName)))
+	}
+	args = append(args, target.RunFlags...)
+
+	cmd := exec.CommandContext(ctx, target.BinaryPath, args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	cmd.Env = env
+
+	start := time.Now()
+	err := cmd.Run()
+	duration := time.Since(start)
+
+	exitCode := 0
+	if err != nil {
+		if cmd.ProcessState != nil {
+			exitCode = cmd.ProcessState.ExitCode()
+		} else {
+			exitCode = 2
+		}
+	}
+
+	return SuiteResult{
+		Target:   target,
+		Stdout:   stdout.Bytes(),
+		Stderr:   stderr.Bytes(),
+		ExitCode: exitCode,
+		Duration: duration,
+	}
+}
+
+func stripTrailingStatus(data []byte) []byte {
+	s := bytes.TrimRight(data, "\n")
+	idx := bytes.LastIndex(s, []byte("\n"))
+	if idx < 0 {
+		return nil
+	}
+	lastLine := string(s[idx+1:])
+	if lastLine == "PASS" || lastLine == "FAIL" {
+		return s[:idx+1]
+	}
+	return data
+}
+
+func writePackageSummary(pkg string, failed bool, d time.Duration) {
+	if failed {
+		fmt.Fprintf(os.Stdout, "FAIL\nFAIL\t%s\t%.3fs\n", pkg, d.Seconds())
+	} else {
+		fmt.Fprintf(os.Stdout, "PASS\nok  \t%s\t%.3fs\n", pkg, d.Seconds())
+	}
+}
+
+// BuildSuiteTargets constructs SuiteTarget entries from compiled binaries
+// and suite names. suitesByPkg maps import path to a list of suite struct
+// names (e.g., "FooTestSuite"). The generated test function name is
+// "Test" + suite struct name.
+//
+// If userRunFilter is non-empty, only suites whose test function name
+// matches the filter regex are included.
+//
+// Non-suite test functions are discovered via -test.list and grouped into
+// a single additional target per package so they are not silently skipped.
+func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, runFlags []string, userRunFilter string) []SuiteTarget {
+	binByPkg := make(map[string]string, len(compiled))
+	for _, cr := range compiled {
+		binByPkg[cr.Package] = cr.BinaryPath
+	}
+
+	translatedFlags := TranslateToTestBinaryFlags(runFlags)
+
+	var targets []SuiteTarget
+	for pkg, suites := range suitesByPkg {
+		bin, ok := binByPkg[pkg]
+		if !ok {
+			continue
+		}
+
+		suiteSet := make(map[string]bool, len(suites))
+		for _, suiteName := range suites {
+			suiteSet["Test"+suiteName] = true
+		}
+
+		allFuncs := listTestFuncs(bin)
+		var standalone []string
+		for _, fn := range allFuncs {
+			if suiteSet[fn] {
+				continue
+			}
+			if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, fn) {
+				continue
+			}
+			standalone = append(standalone, fn)
+		}
+		if len(standalone) > 0 {
+			escaped := make([]string, len(standalone))
+			for i, fn := range standalone {
+				escaped[i] = regexp.QuoteMeta(fn)
+			}
+			pattern := "^(" + strings.Join(escaped, "|") + ")$"
+			targets = append(targets, SuiteTarget{
+				Package:    pkg,
+				BinaryPath: bin,
+				SuiteName:  "(standalone)",
+				RunFilter:  pattern,
+				RunFlags:   translatedFlags,
+			})
+		}
+
+		for _, suiteName := range suites {
+			testFuncName := "Test" + suiteName
+			if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, testFuncName) {
+				continue
+			}
+			targets = append(targets, SuiteTarget{
+				Package:    pkg,
+				BinaryPath: bin,
+				SuiteName:  testFuncName,
+				RunFlags:   translatedFlags,
+			})
+		}
+	}
+	return targets
+}
+
+func listTestFuncs(binaryPath string) []string {
+	cmd := exec.Command(binaryPath, "-test.list", ".*")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	var funcs []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			funcs = append(funcs, line)
+		}
+	}
+	return funcs
+}
+
+// matchesSuiteFunc checks if the user's -run regex could match a given
+// test function name. The first segment (before /) of the regex is tested
+// against the function name.
+func matchesSuiteFunc(runRegex string, funcName string) bool {
+	parts := strings.SplitN(runRegex, "/", 2)
+	topLevel := parts[0]
+	re, err := regexp.Compile(topLevel)
+	if err != nil {
+		return true // let the test binary report the invalid regex
+	}
+	return re.MatchString(funcName)
+}

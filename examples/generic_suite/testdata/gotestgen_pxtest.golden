@@ -23,7 +23,6 @@ func (ts *ƒƒ_GOTEST_SimpleExtTestSuite) AfterEach(it *gotest.T) {}
 
 func TestSimpleExtTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_SimpleExtTestSuite{}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	tt := gotest.NewT(t)

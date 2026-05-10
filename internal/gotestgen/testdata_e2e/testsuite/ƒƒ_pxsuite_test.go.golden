@@ -21,7 +21,6 @@ func (ts *ƒƒ_GOTEST_MyE2ETestSuite) AfterEach(it *gotest.T)  {}
 
 func TestMyE2ETestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_MyE2ETestSuite{}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	tt := gotest.NewT(t)

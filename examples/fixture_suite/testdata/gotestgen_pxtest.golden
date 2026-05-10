@@ -69,7 +69,6 @@ func TestExternalDemoTestSuite(t *testing.T) {
 			ExternalSetupFixture: ƒ_ExternalSetupFixture,
 		},
 	}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	tt := gotest.NewT(t)

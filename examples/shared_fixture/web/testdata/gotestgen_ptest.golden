@@ -114,7 +114,6 @@ func TestPageTestSuite(t *testing.T) {
 			WebFixture: ƒ_WebFixture,
 		},
 	}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	tt := gotest.NewT(t)

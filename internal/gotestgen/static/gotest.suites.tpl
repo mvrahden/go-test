@@ -54,7 +54,6 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
   s.{{ $sf.FieldName }} = {{ $sf.LocalVar }}
 {{ end }}
 {{- end }}
-  t.Parallel()
   ƒcfg := gotest.DefaultSuiteConfig()
 {{- if $ts.HasConfig }}
   gotest.OverlaySuiteConfig(&ƒcfg, s.{{ $ts.Identifier }}.SuiteConfig())

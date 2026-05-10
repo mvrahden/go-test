@@ -69,7 +69,6 @@ func TestExternalLightTestSuite(t *testing.T) {
 			ExternalInfraFixture: ƒ_ExternalInfraFixture,
 		},
 	}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	tt := gotest.NewT(t)

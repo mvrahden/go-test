@@ -84,7 +84,6 @@ func TestAppTestSuite(t *testing.T) {
 			App: ƒ_AppFixture,
 		},
 	}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 	gotest.OverlaySuiteConfig(&ƒcfg, s.AppTestSuite.SuiteConfig())
 

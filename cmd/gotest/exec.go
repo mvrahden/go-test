@@ -20,6 +20,7 @@ type overlayResult struct {
 	overlayFlag    string
 	sharedFixtures []gotestgen.SharedFixtureInfo
 	suitePackages  []string
+	suitesByPkg    map[string][]string // import path → suite struct names
 }
 
 func generateOverlay(patterns []string, debug bool) (*overlayResult, func(), error) {
@@ -27,7 +28,15 @@ func generateOverlay(patterns []string, debug bool) (*overlayResult, func(), err
 	if err != nil {
 		return nil, nil, err
 	}
-	return buildOverlay(allResults, allSharedFixtures, debug)
+	loaded, err := gotestgen.LoadPackages(patterns, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	suitesByPkg, err := collectSuiteNames(loaded)
+	if err != nil {
+		return nil, nil, err
+	}
+	return buildOverlay(allResults, allSharedFixtures, suitesByPkg, debug)
 }
 
 func generateOverlayFromLoaded(loaded []*gotestgen.LoadResult, debug bool) (*overlayResult, func(), error) {
@@ -35,10 +44,37 @@ func generateOverlayFromLoaded(loaded []*gotestgen.LoadResult, debug bool) (*ove
 	if err != nil {
 		return nil, nil, err
 	}
-	return buildOverlay(allResults, allSharedFixtures, debug)
+	suitesByPkg, err := collectSuiteNames(loaded)
+	if err != nil {
+		return nil, nil, err
+	}
+	return buildOverlay(allResults, allSharedFixtures, suitesByPkg, debug)
 }
 
-func buildOverlay(allResults gotestgen.GenerateResults, allSharedFixtures []gotestgen.SharedFixtureInfo, debug bool) (*overlayResult, func(), error) {
+func collectSuiteNames(loaded []*gotestgen.LoadResult) (map[string][]string, error) {
+	allSuites, err := gotestgen.CollectFromLoaded(loaded)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]map[string]bool{}
+	suitesByPkg := map[string][]string{}
+	for _, s := range allSuites {
+		pkgPath := s.Package().PkgPath
+		pkgPath = strings.TrimSuffix(pkgPath, "_test")
+		if seen[pkgPath] == nil {
+			seen[pkgPath] = map[string]bool{}
+		}
+		id := s.Identifier()
+		if seen[pkgPath][id] {
+			continue
+		}
+		seen[pkgPath][id] = true
+		suitesByPkg[pkgPath] = append(suitesByPkg[pkgPath], id)
+	}
+	return suitesByPkg, nil
+}
+
+func buildOverlay(allResults gotestgen.GenerateResults, allSharedFixtures []gotestgen.SharedFixtureInfo, suitesByPkg map[string][]string, debug bool) (*overlayResult, func(), error) {
 	tmpDir, err := gotestrunner.WriteOverlay(allResults)
 	if err != nil {
 		return nil, nil, err
@@ -63,6 +99,7 @@ func buildOverlay(allResults gotestgen.GenerateResults, allSharedFixtures []gote
 		overlayFlag:    "-overlay=" + filepath.Join(tmpDir, "overlay.json"),
 		sharedFixtures: allSharedFixtures,
 		suitePackages:  suitePkgs,
+		suitesByPkg:    suitesByPkg,
 	}, cleanup, nil
 }
 
@@ -77,10 +114,18 @@ func buildExtraEnv(cfg ExecConfig, proc *SharedFixtureProcess) map[string]string
 	return env
 }
 
-func executeTests(ctx context.Context, cfg ExecConfig, overlay *overlayResult, goTestArgs []string) (int, error) {
+func executeTests(ctx context.Context, cfg ExecConfig, overlay *overlayResult) (int, error) {
+	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
+	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
+	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
+
+	compiled, err := gotestrunner.CompilePackages(ctx, overlay.suitePackages, overlay.overlayFlag, classified.BuildFlags, overlay.tmpDir)
+	if err != nil {
+		return 2, err
+	}
+
 	var setupProc *SharedFixtureProcess
 	if len(overlay.sharedFixtures) > 0 {
-		var err error
 		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, cfg.SetupTimeout)
 		if err != nil {
 			return 2, fmt.Errorf("shared fixture setup: %w", err)
@@ -95,18 +140,33 @@ func executeTests(ctx context.Context, cfg ExecConfig, overlay *overlayResult, g
 	}
 
 	extraEnv := buildExtraEnv(cfg, setupProc)
+	targets := gotestrunner.BuildSuiteTargets(compiled, overlay.suitesByPkg, runFlags, userRunFilter)
 
-	if cfg.Spec {
-		return runWithSpec(ctx, goTestArgs, extraEnv), nil
+	if len(targets) == 0 {
+		fmt.Fprintln(os.Stderr, "no test suites to run")
+		return 0, nil
 	}
 
-	return gotestrunner.StdlibRunTests(ctx, goTestArgs, extraEnv)
+	if cfg.Spec {
+		return runWithSpec(ctx, targets, extraEnv), nil
+	}
+
+	_, code := gotestrunner.RunSuites(ctx, targets, extraEnv, 0)
+	return code, nil
 }
 
-func executeTestsJSON(ctx context.Context, cfg ExecConfig, overlay *overlayResult, goTestArgs []string) ([]byte, int, error) {
+func executeTestsJSON(ctx context.Context, cfg ExecConfig, overlay *overlayResult) ([]byte, int, error) {
+	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
+	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
+	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
+
+	compiled, err := gotestrunner.CompilePackages(ctx, overlay.suitePackages, overlay.overlayFlag, classified.BuildFlags, overlay.tmpDir)
+	if err != nil {
+		return nil, 2, err
+	}
+
 	var setupProc *SharedFixtureProcess
 	if len(overlay.sharedFixtures) > 0 {
-		var err error
 		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, cfg.SetupTimeout)
 		if err != nil {
 			return nil, 2, fmt.Errorf("shared fixture setup: %w", err)
@@ -121,7 +181,17 @@ func executeTestsJSON(ctx context.Context, cfg ExecConfig, overlay *overlayResul
 	}
 
 	extraEnv := buildExtraEnv(cfg, setupProc)
-	return gotestrunner.StdlibRunTestsJSON(ctx, goTestArgs, extraEnv)
+
+	// Add -json flag to each subprocess via -test.v (JSON output requires verbose)
+	runFlags = append(runFlags, "-v")
+	targets := gotestrunner.BuildSuiteTargets(compiled, overlay.suitesByPkg, runFlags, userRunFilter)
+
+	if len(targets) == 0 {
+		return nil, 0, nil
+	}
+
+	jsonData, code := gotestrunner.RunSuitesJSON(ctx, targets, extraEnv, 0)
+	return jsonData, code, nil
 }
 
 func Run(cfg ExecConfig) int {
@@ -154,15 +224,11 @@ func Run(cfg ExecConfig) int {
 	}
 	defer cleanup()
 
-	cfg.GoTestArgs = resolveWildcardArgs(cfg.GoTestArgs, cfg.PackagePatterns, loaded, overlay)
-
 	ctx, stop := signal.NotifyContext(context.Background(),
 		os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	goTestArgs := append([]string{overlay.overlayFlag}, cfg.GoTestArgs...)
-
-	code, err := executeTests(ctx, cfg, overlay, goTestArgs)
+	code, err := executeTests(ctx, cfg, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -170,61 +236,22 @@ func Run(cfg ExecConfig) int {
 	return code
 }
 
-func resolveWildcardArgs(goTestArgs []string, patterns []string, loaded []*gotestgen.LoadResult, overlay *overlayResult) []string {
-	hasWildcard := false
-	for _, p := range patterns {
-		if strings.HasSuffix(p, "/...") || p == "./..." || p == "..." {
-			hasWildcard = true
-			break
+func runWithSpec(ctx context.Context, targets []gotestrunner.SuiteTarget, extraEnv map[string]string) int {
+	// Ensure -test.v for JSON parsing
+	for i := range targets {
+		hasV := false
+		for _, f := range targets[i].RunFlags {
+			if f == "-test.v" {
+				hasV = true
+				break
+			}
+		}
+		if !hasV {
+			targets[i].RunFlags = append(targets[i].RunFlags, "-test.v")
 		}
 	}
-	if !hasWildcard {
-		return goTestArgs
-	}
 
-	suitePkgs := make(map[string]bool, len(overlay.suitePackages))
-	for _, pkg := range overlay.suitePackages {
-		suitePkgs[pkg] = true
-	}
-
-	allHaveSuites := len(loaded) > 0
-	for _, lr := range loaded {
-		if !suitePkgs[lr.PkgPath] {
-			allHaveSuites = false
-			break
-		}
-	}
-	if allHaveSuites {
-		return goTestArgs
-	}
-
-	var result []string
-	seenArgs := false
-	for _, arg := range goTestArgs {
-		if arg == "-args" {
-			seenArgs = true
-		}
-		if !seenArgs && looksLikePackagePattern(arg) && isWildcard(arg) {
-			continue
-		}
-		result = append(result, arg)
-	}
-	for _, pkg := range overlay.suitePackages {
-		result = append(result, pkg)
-	}
-	return result
-}
-
-func isWildcard(s string) bool {
-	return strings.HasSuffix(s, "/...") || s == "./..." || s == "..."
-}
-
-func runWithSpec(ctx context.Context, goTestArgs []string, extraEnv map[string]string) int {
-	jsonData, code, err := gotestrunner.StdlibRunTestsJSON(ctx, goTestArgs, extraEnv)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2
-	}
+	jsonData, code := gotestrunner.RunSuitesJSON(ctx, targets, extraEnv, 0)
 
 	events, err := gotestspec.ParseEvents(bytes.NewReader(jsonData))
 	if err != nil {

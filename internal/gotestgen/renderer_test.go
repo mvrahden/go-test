@@ -758,7 +758,7 @@ func (s *OrderTestSuite) TestOne(t *gotest.T)    {}
 	pkg := loadTestPkgWithGotest(t, src)
 	output, _ := renderTestPkg(t, pkg)
 
-	gotest.Contains(t, output, "t.Parallel()")
+	gotest.True(t, !strings.Contains(output, "t.Parallel()"), "suite-level t.Parallel() should not be emitted — isolation is subprocess-level")
 	gotest.Contains(t, output, "s.BeforeEach(ttt)")
 	gotest.Contains(t, output, "defer s.AfterEach(ttt)")
 	gotest.True(t, !strings.Contains(output, "sync.WaitGroup"), "sequential suite should not use WaitGroup")
@@ -783,7 +783,7 @@ func (s *OrderTestSuite) TestTwo(t *gotest.T, _ *myCtx)   {}
 	pkg := loadTestPkgWithGotest(t, src)
 	output, _ := renderTestPkg(t, pkg)
 
-	gotest.Contains(t, output, "t.Parallel()")
+	gotest.True(t, !strings.Contains(output, "t.Parallel()"), "suite-level t.Parallel() should not be emitted")
 	gotest.Contains(t, output, "ctx := s.BeforeEach(ttt)")
 	gotest.Contains(t, output, "defer s.AfterEach(ttt, ctx)")
 	gotest.Contains(t, output, "s.TestOne(ttt, ctx)")
@@ -812,7 +812,8 @@ func (s *OrderTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
 	pkg := loadTestPkgWithGotest(t, src)
 	output, _ := renderTestPkg(t, pkg)
 
-	gotest.Contains(t, output, "t.Parallel()")
+	stripped := strings.ReplaceAll(output, "it.Parallel()", "")
+	gotest.True(t, !strings.Contains(stripped, "t.Parallel()"), "suite-level t.Parallel() should not be emitted")
 	gotest.Contains(t, output, "it.Parallel()")
 	gotest.Contains(t, output, "wg.Add(1)")
 	gotest.Contains(t, output, "defer wg.Done()")
@@ -849,7 +850,7 @@ func (s *QueryTestSuite) TestInsert(t *gotest.T, ctx *myCtx) {}
 	pkg := loadTestPkgWithGotest(t, src)
 	output, _ := renderTestPkg(t, pkg)
 
-	gotest.Contains(t, output, "t.Parallel()")
+	gotest.True(t, !strings.Contains(output, "t.Parallel()"), "suite-level t.Parallel() should not be emitted")
 	gotest.Contains(t, output, "ctx := s.BeforeEach(ttt)")
 	gotest.Contains(t, output, "defer s.AfterEach(ttt, ctx)")
 	gotest.Contains(t, output, "s.TestInsert(ttt, ctx)")
