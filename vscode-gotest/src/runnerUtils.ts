@@ -386,3 +386,31 @@ export function getPackageDir(
   const pkg = getPackageItem(item);
   return cache.getPackage(pkg.id)?.dir;
 }
+
+export function resolvePackageItems(
+  run: vscode.TestRun,
+  items: vscode.TestItem[],
+  controller: GoTestController,
+): void {
+  for (const item of items) {
+    let anyFailed = false;
+    let anyResolved = false;
+    const visit = (child: vscode.TestItem) => {
+      const result = controller.getResult(child.id);
+      if (result) {
+        anyResolved = true;
+        if (result.status === "fail") anyFailed = true;
+      }
+      child.children.forEach(visit);
+    };
+    item.children.forEach(visit);
+
+    if (!anyResolved) continue;
+
+    if (anyFailed) {
+      run.failed(item, []);
+    } else {
+      run.passed(item);
+    }
+  }
+}

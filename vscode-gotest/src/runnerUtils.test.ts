@@ -38,6 +38,7 @@ import {
   expandToPackages,
   computeWildcard,
   applyResults,
+  resolvePackageItems,
 } from "./runnerUtils.js";
 import {
   buildPathTrie,
@@ -519,5 +520,78 @@ describe("computeWildcard", () => {
     expect(
       computeWildcard(["example.com/pkg", "example.com/pkg"]),
     ).toBeUndefined();
+  });
+});
+
+describe("resolvePackageItems", () => {
+  function makeResolveFixture() {
+    const pkg = createItem("example.com/pkg", "pkg", undefined, [
+      { id: "package" },
+    ]);
+    const suiteA = createItem("example.com/pkg/SuiteA", "SuiteA", pkg);
+    const methodA1 = createItem(
+      "example.com/pkg/SuiteA/TestOne",
+      "TestOne",
+      suiteA,
+    );
+    const methodA2 = createItem(
+      "example.com/pkg/SuiteA/TestTwo",
+      "TestTwo",
+      suiteA,
+    );
+
+    const run = {
+      passed: vi.fn(),
+      failed: vi.fn(),
+    };
+
+    return { pkg, suiteA, methodA1, methodA2, run };
+  }
+
+  it("marks package as passed when all children pass", () => {
+    const { pkg, run } = makeResolveFixture();
+    const controller = {
+      getResult: vi.fn((id: string) => {
+        if (id === "example.com/pkg/SuiteA")
+          return { status: "pass" as const, duration: 100 };
+        if (id === "example.com/pkg/SuiteA/TestOne")
+          return { status: "pass" as const, duration: 50 };
+        if (id === "example.com/pkg/SuiteA/TestTwo")
+          return { status: "pass" as const, duration: 50 };
+        return undefined;
+      }),
+    };
+
+    resolvePackageItems(run as any, [pkg as any], controller as any);
+    expect(run.passed).toHaveBeenCalledWith(pkg);
+    expect(run.failed).not.toHaveBeenCalled();
+  });
+
+  it("marks package as failed when any child fails", () => {
+    const { pkg, run } = makeResolveFixture();
+    const controller = {
+      getResult: vi.fn((id: string) => {
+        if (id === "example.com/pkg/SuiteA/TestOne")
+          return { status: "pass" as const, duration: 50 };
+        if (id === "example.com/pkg/SuiteA/TestTwo")
+          return { status: "fail" as const, duration: 30 };
+        return undefined;
+      }),
+    };
+
+    resolvePackageItems(run as any, [pkg as any], controller as any);
+    expect(run.failed).toHaveBeenCalledWith(pkg, []);
+    expect(run.passed).not.toHaveBeenCalled();
+  });
+
+  it("skips package when no children have results", () => {
+    const { pkg, run } = makeResolveFixture();
+    const controller = {
+      getResult: vi.fn(() => undefined),
+    };
+
+    resolvePackageItems(run as any, [pkg as any], controller as any);
+    expect(run.passed).not.toHaveBeenCalled();
+    expect(run.failed).not.toHaveBeenCalled();
   });
 });

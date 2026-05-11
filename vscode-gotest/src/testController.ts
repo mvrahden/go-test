@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
-import { TestResultStore } from "./testResultStore.js";
+import { TestResultStore, type TestResult } from "./testResultStore.js";
 export type { TestResult } from "./testResultStore.js";
 import { type PathNode, buildPathTrie, collapsePathTrie } from "./pathTrie.js";
 
@@ -318,6 +318,10 @@ export class GoTestController implements vscode.Disposable {
     duration?: number,
   ): void {
     this.resultStore.record(itemId, status, duration);
+  }
+
+  getResult(itemId: string): TestResult | undefined {
+    return this.resultStore.get(itemId);
   }
 
   clearResults(item: vscode.TestItem): void {

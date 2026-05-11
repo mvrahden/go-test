@@ -4,7 +4,7 @@ import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import type { CoverageStore } from "./coverageStore.js";
 import { scopedConfig } from "./cli.js";
-import { collectItems, groupByPackage, buildRunFilter } from "./runnerUtils.js";
+import { collectItems, groupByPackage, buildRunFilter, resolvePackageItems } from "./runnerUtils.js";
 import { executeBatch } from "./batchRunner.js";
 
 export interface ParsedFileCoverage {
@@ -261,7 +261,6 @@ export class CoverageRunner implements vscode.Disposable {
     try {
       const items = collectItems(this.controller, request);
       if (items.length === 0) {
-        run.end();
         return;
       }
 
@@ -390,6 +389,8 @@ export class CoverageRunner implements vscode.Disposable {
           );
         }
       }
+
+      resolvePackageItems(run, items, this.controller);
 
       const { coverages: allCoverages } = this.store.buildFileCoverages(this.cache);
       for (const fc of allCoverages) {
