@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -24,35 +25,55 @@ func main() {
 {{- if $f.HasConfig }}
 	gotest.OverlayFixtureConfig(&ƒcfg_{{ $f.VarName }}, {{ $f.VarName }}.SharedFixtureConfig())
 {{- end }}
-	{
-		var ƒerr error
+{{ end }}
+	ƒerrs := make([]error, {{ len .Fixtures }})
+	var ƒwg sync.WaitGroup
+{{ range $i, $f := .Fixtures }}
+	ƒwg.Add(1)
+	go func() {
+		defer ƒwg.Done()
 		ƒattempts := 1 + ƒcfg_{{ $f.VarName }}.Retries
-		for ƒi := range ƒattempts {
+		for ƒj := range ƒattempts {
 			ctx := context.Background()
 			if ƒcfg_{{ $f.VarName }}.Timeout > 0 {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithTimeout(ctx, ƒcfg_{{ $f.VarName }}.Timeout)
 				defer cancel()
 			}
-			ƒerr = {{ $f.VarName }}.BeforeAll(ctx)
-			if ƒerr == nil {
+			ƒerrs[{{ $i }}] = {{ $f.VarName }}.BeforeAll(ctx)
+			if ƒerrs[{{ $i }}] == nil {
 				break
 			}
-			if ƒi < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.BeforeAll attempt %d/%d failed: %v\n", ƒi+1, ƒattempts, ƒerr)
+			if ƒj < ƒattempts-1 {
+				fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[{{ $i }}])
 				if ƒcfg_{{ $f.VarName }}.RetryDelay > 0 {
 					time.Sleep(ƒcfg_{{ $f.VarName }}.RetryDelay)
 				}
 			}
 		}
-		if ƒerr != nil {
-{{- range $f.BeforeAllRollbackVars }}
-			{{ . }}.AfterAll(context.Background())
-{{- end }}
-			fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.BeforeAll failed after %d attempt(s): %v\n", ƒattempts, ƒerr)
-			os.Exit(1)
+		if ƒerrs[{{ $i }}] != nil {
+			fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_{{ $f.VarName }}.Retries, ƒerrs[{{ $i }}])
+		}
+	}()
+{{ end }}
+	ƒwg.Wait()
+
+	ƒanyFailed := false
+	for _, e := range ƒerrs {
+		if e != nil {
+			ƒanyFailed = true
+			break
 		}
 	}
+	if ƒanyFailed {
+{{ range $i, $f := .Fixtures }}
+		if ƒerrs[{{ $i }}] == nil {
+			{{ $f.VarName }}.AfterAll(context.Background())
+		}
+{{ end }}
+		os.Exit(1)
+	}
+{{ range $f := .Fixtures }}
 {{- if $f.TransferFields }}
 	{
 		type transfer struct {
@@ -66,7 +87,7 @@ func main() {
 {{- end }}
 		})
 		if err != nil {
-{{- range $f.MarshalRollbackVars }}
+{{ range $.TeardownVars }}
 			{{ . }}.AfterAll(context.Background())
 {{- end }}
 			fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}: marshal: %v\n", err)

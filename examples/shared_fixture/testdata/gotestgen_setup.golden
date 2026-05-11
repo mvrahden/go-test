@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -20,32 +21,89 @@ func main() {
 
 	sf0 := &sfpkg0.PostgresSharedFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
-	{
-		var ƒerr error
+
+	sf1 := &sfpkg0.RedisSharedFixture{}
+	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
+
+	ƒerrs := make([]error, 2)
+	var ƒwg sync.WaitGroup
+
+	ƒwg.Add(1)
+	go func() {
+		defer ƒwg.Done()
 		ƒattempts := 1 + ƒcfg_sf0.Retries
-		for ƒi := range ƒattempts {
+		for ƒj := range ƒattempts {
 			ctx := context.Background()
 			if ƒcfg_sf0.Timeout > 0 {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
 				defer cancel()
 			}
-			ƒerr = sf0.BeforeAll(ctx)
-			if ƒerr == nil {
+			ƒerrs[0] = sf0.BeforeAll(ctx)
+			if ƒerrs[0] == nil {
 				break
 			}
-			if ƒi < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "PostgresSharedFixture.BeforeAll attempt %d/%d failed: %v\n", ƒi+1, ƒattempts, ƒerr)
+			if ƒj < ƒattempts-1 {
+				fmt.Fprintf(os.Stderr, "PostgresSharedFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
 				if ƒcfg_sf0.RetryDelay > 0 {
 					time.Sleep(ƒcfg_sf0.RetryDelay)
 				}
 			}
 		}
-		if ƒerr != nil {
-			fmt.Fprintf(os.Stderr, "PostgresSharedFixture.BeforeAll failed after %d attempt(s): %v\n", ƒattempts, ƒerr)
-			os.Exit(1)
+		if ƒerrs[0] != nil {
+			fmt.Fprintf(os.Stderr, "PostgresSharedFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf0.Retries, ƒerrs[0])
+		}
+	}()
+
+	ƒwg.Add(1)
+	go func() {
+		defer ƒwg.Done()
+		ƒattempts := 1 + ƒcfg_sf1.Retries
+		for ƒj := range ƒattempts {
+			ctx := context.Background()
+			if ƒcfg_sf1.Timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf1.Timeout)
+				defer cancel()
+			}
+			ƒerrs[1] = sf1.BeforeAll(ctx)
+			if ƒerrs[1] == nil {
+				break
+			}
+			if ƒj < ƒattempts-1 {
+				fmt.Fprintf(os.Stderr, "RedisSharedFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[1])
+				if ƒcfg_sf1.RetryDelay > 0 {
+					time.Sleep(ƒcfg_sf1.RetryDelay)
+				}
+			}
+		}
+		if ƒerrs[1] != nil {
+			fmt.Fprintf(os.Stderr, "RedisSharedFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf1.Retries, ƒerrs[1])
+		}
+	}()
+
+	ƒwg.Wait()
+
+	ƒanyFailed := false
+	for _, e := range ƒerrs {
+		if e != nil {
+			ƒanyFailed = true
+			break
 		}
 	}
+	if ƒanyFailed {
+
+		if ƒerrs[0] == nil {
+			sf0.AfterAll(context.Background())
+		}
+
+		if ƒerrs[1] == nil {
+			sf1.AfterAll(context.Background())
+		}
+
+		os.Exit(1)
+	}
+
 	{
 		type transfer struct {
 			DSN  interface{} `json:"DSN"`
@@ -60,6 +118,8 @@ func main() {
 			Tags: sf0.Tags,
 		})
 		if err != nil {
+
+			sf1.AfterAll(context.Background())
 			sf0.AfterAll(context.Background())
 			fmt.Fprintf(os.Stderr, "PostgresSharedFixture: marshal: %v\n", err)
 			os.Exit(1)
@@ -67,35 +127,6 @@ func main() {
 		state["github.com/mvrahden/go-test/examples/shared_fixture.PostgresSharedFixture"] = b
 	}
 
-	sf1 := &sfpkg0.RedisSharedFixture{}
-	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
-	{
-		var ƒerr error
-		ƒattempts := 1 + ƒcfg_sf1.Retries
-		for ƒi := range ƒattempts {
-			ctx := context.Background()
-			if ƒcfg_sf1.Timeout > 0 {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf1.Timeout)
-				defer cancel()
-			}
-			ƒerr = sf1.BeforeAll(ctx)
-			if ƒerr == nil {
-				break
-			}
-			if ƒi < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "RedisSharedFixture.BeforeAll attempt %d/%d failed: %v\n", ƒi+1, ƒattempts, ƒerr)
-				if ƒcfg_sf1.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf1.RetryDelay)
-				}
-			}
-		}
-		if ƒerr != nil {
-			sf0.AfterAll(context.Background())
-			fmt.Fprintf(os.Stderr, "RedisSharedFixture.BeforeAll failed after %d attempt(s): %v\n", ƒattempts, ƒerr)
-			os.Exit(1)
-		}
-	}
 	{
 		type transfer struct {
 			Addr     interface{} `json:"Addr"`
@@ -110,6 +141,7 @@ func main() {
 			Replicas: sf1.Replicas,
 		})
 		if err != nil {
+
 			sf1.AfterAll(context.Background())
 			sf0.AfterAll(context.Background())
 			fmt.Fprintf(os.Stderr, "RedisSharedFixture: marshal: %v\n", err)

@@ -83,8 +83,6 @@ func buildOverlay(allResults gotestgen.GenerateResults, allSharedFixtures []gote
 	cleanup := func() {}
 	if debug {
 		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s\n", tmpDir)
-	} else {
-		cleanup = func() { os.RemoveAll(tmpDir) }
 	}
 
 	var suitePkgs []string
