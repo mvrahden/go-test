@@ -187,6 +187,15 @@ export function applyResults(
     }
 
     if (!event.Test) {
+      if (
+        event.Action === "pass" ||
+        event.Action === "fail" ||
+        event.Action === "skip"
+      ) {
+        const duration =
+          event.Elapsed !== undefined ? event.Elapsed * 1000 : undefined;
+        applied.push({ itemId: importPath, status: event.Action, duration });
+      }
       continue;
     }
 
@@ -393,6 +402,16 @@ export function resolvePackageItems(
   controller: GoTestController,
 ): void {
   for (const item of items) {
+    const pkgResult = controller.getResult(item.id);
+    if (pkgResult) {
+      if (pkgResult.status === "fail") {
+        run.failed(item, [], pkgResult.duration);
+      } else {
+        run.passed(item, pkgResult.duration);
+      }
+      continue;
+    }
+
     let anyFailed = false;
     let anyResolved = false;
     const visit = (child: vscode.TestItem) => {
