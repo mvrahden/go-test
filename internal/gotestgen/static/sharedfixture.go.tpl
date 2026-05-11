@@ -27,6 +27,8 @@ func main() {
 {{- end }}
 {{ end }}
 	ƒerrs := make([]error, {{ len .Fixtures }})
+	ƒctx, ƒcancel := context.WithCancel(context.Background())
+	defer ƒcancel()
 	var ƒwg sync.WaitGroup
 {{ range $i, $f := .Fixtures }}
 	ƒwg.Add(1)
@@ -34,16 +36,19 @@ func main() {
 		defer ƒwg.Done()
 		ƒattempts := 1 + ƒcfg_{{ $f.VarName }}.Retries
 		for ƒj := range ƒattempts {
-			ctx := context.Background()
+			ctx := ƒctx
+			var cancel context.CancelFunc
 			if ƒcfg_{{ $f.VarName }}.Timeout > 0 {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, ƒcfg_{{ $f.VarName }}.Timeout)
-				defer cancel()
+				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_{{ $f.VarName }}.Timeout)
 			}
 			ƒerrs[{{ $i }}] = {{ $f.VarName }}.BeforeAll(ctx)
+			if cancel != nil {
+				cancel()
+			}
 			if ƒerrs[{{ $i }}] == nil {
 				break
 			}
+			ƒcancel()
 			if ƒj < ƒattempts-1 {
 				fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[{{ $i }}])
 				if ƒcfg_{{ $f.VarName }}.RetryDelay > 0 {

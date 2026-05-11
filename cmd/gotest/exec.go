@@ -8,7 +8,9 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -112,22 +114,61 @@ func buildExtraEnv(cfg ExecConfig, proc *SharedFixtureProcess) map[string]string
 	return env
 }
 
+func prepareTestRun(ctx context.Context, overlay *overlayResult, buildFlags []string, setupTimeout time.Duration) ([]gotestrunner.CompileResult, *SharedFixtureProcess, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var compiled []gotestrunner.CompileResult
+	var compileErr error
+	var setupProc *SharedFixtureProcess
+	var setupErr error
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		compiled, compileErr = gotestrunner.CompilePackages(ctx, overlay.suitePackages, overlay.overlayFlag, buildFlags, overlay.tmpDir)
+		if compileErr != nil {
+			cancel()
+		}
+	}()
+
+	if len(overlay.sharedFixtures) > 0 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			setupProc, setupErr = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, setupTimeout)
+			if setupErr != nil {
+				cancel()
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	if compileErr != nil || setupErr != nil {
+		if setupProc != nil {
+			setupProc.Teardown()
+		}
+		if compileErr != nil {
+			return nil, nil, compileErr
+		}
+		return nil, nil, fmt.Errorf("shared fixture setup: %w", setupErr)
+	}
+
+	return compiled, setupProc, nil
+}
+
 func executeTests(ctx context.Context, cfg ExecConfig, overlay *overlayResult) (int, error) {
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
 	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
 
-	compiled, err := gotestrunner.CompilePackages(ctx, overlay.suitePackages, overlay.overlayFlag, classified.BuildFlags, overlay.tmpDir)
+	compiled, setupProc, err := prepareTestRun(ctx, overlay, classified.BuildFlags, cfg.SetupTimeout)
 	if err != nil {
 		return 2, err
 	}
-
-	var setupProc *SharedFixtureProcess
-	if len(overlay.sharedFixtures) > 0 {
-		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, cfg.SetupTimeout)
-		if err != nil {
-			return 2, fmt.Errorf("shared fixture setup: %w", err)
-		}
+	if setupProc != nil {
 		defer setupProc.Teardown()
 	}
 
@@ -158,17 +199,11 @@ func executeTestsJSON(ctx context.Context, cfg ExecConfig, overlay *overlayResul
 	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
 	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
 
-	compiled, err := gotestrunner.CompilePackages(ctx, overlay.suitePackages, overlay.overlayFlag, classified.BuildFlags, overlay.tmpDir)
+	compiled, setupProc, err := prepareTestRun(ctx, overlay, classified.BuildFlags, cfg.SetupTimeout)
 	if err != nil {
 		return 2, err
 	}
-
-	var setupProc *SharedFixtureProcess
-	if len(overlay.sharedFixtures) > 0 {
-		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, cfg.SetupTimeout)
-		if err != nil {
-			return 2, fmt.Errorf("shared fixture setup: %w", err)
-		}
+	if setupProc != nil {
 		defer setupProc.Teardown()
 	}
 
@@ -194,17 +229,11 @@ func executeTestsCaptured(ctx context.Context, cfg ExecConfig, overlay *overlayR
 	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
 	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
 
-	compiled, err := gotestrunner.CompilePackages(ctx, overlay.suitePackages, overlay.overlayFlag, classified.BuildFlags, overlay.tmpDir)
+	compiled, setupProc, err := prepareTestRun(ctx, overlay, classified.BuildFlags, cfg.SetupTimeout)
 	if err != nil {
 		return nil, 2, err
 	}
-
-	var setupProc *SharedFixtureProcess
-	if len(overlay.sharedFixtures) > 0 {
-		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, cfg.SetupTimeout)
-		if err != nil {
-			return nil, 2, fmt.Errorf("shared fixture setup: %w", err)
-		}
+	if setupProc != nil {
 		defer setupProc.Teardown()
 	}
 
