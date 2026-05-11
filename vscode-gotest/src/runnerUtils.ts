@@ -3,10 +3,19 @@ import { spawn } from "node:child_process";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import {
-  parseTestEvents,
   extractTestMessages,
   type TestEvent,
 } from "./outputParser.js";
+
+export function enqueueDescendants(
+  run: vscode.TestRun,
+  item: vscode.TestItem,
+): void {
+  item.children.forEach((child) => {
+    run.enqueued(child);
+    enqueueDescendants(run, child);
+  });
+}
 
 export function collectItems(
   controller: GoTestController,

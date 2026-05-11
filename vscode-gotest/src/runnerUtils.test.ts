@@ -38,6 +38,7 @@ import {
   expandToPackages,
   computeWildcard,
   applyResults,
+  enqueueDescendants,
   resolvePackageItems,
 } from "./runnerUtils.js";
 import {
@@ -387,6 +388,43 @@ describe("collapsePathTrie", () => {
     const pkg = root.children.get("pkg")!;
     expect(pkg.importPath).toBe("example.com/pkg");
     expect(pkg.children.size).toBe(1);
+  });
+});
+
+describe("enqueueDescendants", () => {
+  it("enqueues all descendants recursively", () => {
+    const pkg = createItem("example.com/pkg", "pkg", undefined, [
+      { id: "package" },
+    ]);
+    const suite = createItem("example.com/pkg/SuiteA", "SuiteA", pkg);
+    const method1 = createItem(
+      "example.com/pkg/SuiteA/Test1",
+      "Test1",
+      suite,
+    );
+    const method2 = createItem(
+      "example.com/pkg/SuiteA/Test2",
+      "Test2",
+      suite,
+    );
+
+    const run = { enqueued: vi.fn() };
+
+    enqueueDescendants(run as any, pkg as any);
+
+    expect(run.enqueued).toHaveBeenCalledTimes(3);
+    expect(run.enqueued).toHaveBeenCalledWith(suite);
+    expect(run.enqueued).toHaveBeenCalledWith(method1);
+    expect(run.enqueued).toHaveBeenCalledWith(method2);
+  });
+
+  it("does nothing for leaf items", () => {
+    const method = createItem("example.com/pkg/Suite/Test1", "Test1");
+    const run = { enqueued: vi.fn() };
+
+    enqueueDescendants(run as any, method as any);
+
+    expect(run.enqueued).not.toHaveBeenCalled();
   });
 });
 

@@ -4,6 +4,7 @@ import type { DiscoveryCache } from "./discovery.js";
 import { scopedConfig } from "./cli.js";
 import {
   collectItems,
+  enqueueDescendants,
   groupByPackage,
   buildRunFilter,
   resolvePackageItems,
@@ -56,6 +57,7 @@ export class TestRunner {
       for (const item of items) {
         this.controller.clearResults(item);
         run.started(item);
+        enqueueDescendants(run, item);
       }
 
       const groups = groupByPackage(items);
