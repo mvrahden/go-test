@@ -36,14 +36,12 @@ type sharedSetupImport struct {
 }
 
 type sharedSetupFixture struct {
-	VarName               string
-	QualifiedType         string
-	Identifier            string
-	StateKey              string
-	HasConfig             bool
-	TransferFields        []string
-	BeforeAllRollbackVars []string
-	MarshalRollbackVars   []string
+	VarName        string
+	QualifiedType  string
+	Identifier     string
+	StateKey       string
+	HasConfig      bool
+	TransferFields []string
 }
 
 // GenerateSharedSetup generates a standalone Go main package source that
@@ -69,25 +67,13 @@ func GenerateSharedSetup(fixtures []SharedFixtureInfo) ([]byte, error) {
 		varName := fmt.Sprintf("sf%d", i)
 		alias := pkgAlias[sf.PkgPath]
 
-		beforeAllRollback := make([]string, 0, i)
-		for j := i - 1; j >= 0; j-- {
-			beforeAllRollback = append(beforeAllRollback, fmt.Sprintf("sf%d", j))
-		}
-
-		marshalRollback := make([]string, 0, i+1)
-		for j := i; j >= 0; j-- {
-			marshalRollback = append(marshalRollback, fmt.Sprintf("sf%d", j))
-		}
-
 		fixtureVMs = append(fixtureVMs, sharedSetupFixture{
-			VarName:               varName,
-			QualifiedType:         alias + "." + sf.Identifier,
-			Identifier:            sf.Identifier,
-			StateKey:              sf.PkgPath + "." + sf.Identifier,
-			HasConfig:             sf.HasConfig,
-			TransferFields:        sf.TransferFields,
-			BeforeAllRollbackVars: beforeAllRollback,
-			MarshalRollbackVars:   marshalRollback,
+			VarName:        varName,
+			QualifiedType:  alias + "." + sf.Identifier,
+			Identifier:     sf.Identifier,
+			StateKey:       sf.PkgPath + "." + sf.Identifier,
+			HasConfig:      sf.HasConfig,
+			TransferFields: sf.TransferFields,
 		})
 	}
 

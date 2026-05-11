@@ -35,7 +35,7 @@ func CompilePackages(ctx context.Context, packages []string, overlayFlag string,
 
 	results := make([]result, len(packages))
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, min(runtime.NumCPU(), 4))
+	sem := make(chan struct{}, runtime.NumCPU())
 
 	for i, pkg := range packages {
 		wg.Add(1)
