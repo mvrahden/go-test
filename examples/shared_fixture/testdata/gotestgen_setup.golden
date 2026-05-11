@@ -26,6 +26,8 @@ func main() {
 	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
 
 	ƒerrs := make([]error, 2)
+	ƒctx, ƒcancel := context.WithCancel(context.Background())
+	defer ƒcancel()
 	var ƒwg sync.WaitGroup
 
 	ƒwg.Add(1)
@@ -33,16 +35,19 @@ func main() {
 		defer ƒwg.Done()
 		ƒattempts := 1 + ƒcfg_sf0.Retries
 		for ƒj := range ƒattempts {
-			ctx := context.Background()
+			ctx := ƒctx
+			var cancel context.CancelFunc
 			if ƒcfg_sf0.Timeout > 0 {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
-				defer cancel()
+				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf0.Timeout)
 			}
 			ƒerrs[0] = sf0.BeforeAll(ctx)
+			if cancel != nil {
+				cancel()
+			}
 			if ƒerrs[0] == nil {
 				break
 			}
+			ƒcancel()
 			if ƒj < ƒattempts-1 {
 				fmt.Fprintf(os.Stderr, "PostgresSharedFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
 				if ƒcfg_sf0.RetryDelay > 0 {
@@ -60,16 +65,19 @@ func main() {
 		defer ƒwg.Done()
 		ƒattempts := 1 + ƒcfg_sf1.Retries
 		for ƒj := range ƒattempts {
-			ctx := context.Background()
+			ctx := ƒctx
+			var cancel context.CancelFunc
 			if ƒcfg_sf1.Timeout > 0 {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf1.Timeout)
-				defer cancel()
+				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf1.Timeout)
 			}
 			ƒerrs[1] = sf1.BeforeAll(ctx)
+			if cancel != nil {
+				cancel()
+			}
 			if ƒerrs[1] == nil {
 				break
 			}
+			ƒcancel()
 			if ƒj < ƒattempts-1 {
 				fmt.Fprintf(os.Stderr, "RedisSharedFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[1])
 				if ƒcfg_sf1.RetryDelay > 0 {
