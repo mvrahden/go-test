@@ -266,6 +266,7 @@ export function spawnTestProcess(
   outputChannel: vscode.OutputChannel,
   label: string,
   env?: Record<string, string>,
+  onStdoutLine?: (line: string) => void,
 ): Promise<SpawnResult> {
   return new Promise<SpawnResult>((resolve, reject) => {
     const child = spawn(bin, args, {
@@ -274,9 +275,23 @@ export function spawnTestProcess(
     });
     let stdout = "";
     let stderr = "";
+    let lineBuffer = "";
 
     child.stdout.on("data", (data: Buffer) => {
-      stdout += data.toString();
+      const chunk = data.toString();
+      stdout += chunk;
+
+      if (onStdoutLine) {
+        lineBuffer += chunk;
+        const lines = lineBuffer.split("\n");
+        lineBuffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed) {
+            onStdoutLine(trimmed);
+          }
+        }
+      }
     });
 
     child.stderr.on("data", (data: Buffer) => {

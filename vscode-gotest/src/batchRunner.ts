@@ -4,7 +4,7 @@ import { rm, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import type { GoTestController } from "./testController.js";
 import type { CoverageStore } from "./coverageStore.js";
-import { parseTestEvents, groupEventsByPackage } from "./outputParser.js";
+import { type TestEvent } from "./outputParser.js";
 import { buildCliCommand, formatCliCommand } from "./cli.js";
 import {
   applyResults,
@@ -84,6 +84,48 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     const cmd = await buildCliCommand(cliArgs, workspaceDir, outputChannel);
     outputChannel.appendLine(`[${label}] ${formatCliCommand(cmd)}`);
 
+    const streamedPkgs = new Set<string>();
+    const pkgEventBuffers = new Map<string, TestEvent[]>();
+    const pkgDirMap = new Map(pkgInfos.map((p) => [p.importPath, p.dir]));
+
+    const handleStdoutLine = (line: string) => {
+      let event: TestEvent;
+      try {
+        event = JSON.parse(line) as TestEvent;
+        if (!event.Action) return;
+      } catch {
+        return;
+      }
+
+      let buffer = pkgEventBuffers.get(event.Package);
+      if (!buffer) {
+        buffer = [];
+        pkgEventBuffers.set(event.Package, buffer);
+      }
+      buffer.push(event);
+
+      const isTerminal =
+        !event.Test &&
+        (event.Action === "pass" ||
+          event.Action === "fail" ||
+          event.Action === "skip");
+      if (isTerminal) {
+        const dir = pkgDirMap.get(event.Package);
+        if (dir) {
+          const applied = applyResults(
+            controller,
+            run,
+            buffer,
+            event.Package,
+            dir,
+          );
+          onResults?.(applied);
+          streamedPkgs.add(event.Package);
+        }
+        pkgEventBuffers.set(event.Package, []);
+      }
+    };
+
     const result = await spawnTestProcess(
       cmd.bin,
       cmd.args,
@@ -91,7 +133,20 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       token,
       outputChannel,
       label,
+      undefined,
+      handleStdoutLine,
     );
+
+    for (const [pkg, buffer] of pkgEventBuffers) {
+      if (buffer.length > 0) {
+        const dir = pkgDirMap.get(pkg);
+        if (dir) {
+          const applied = applyResults(controller, run, buffer, pkg, dir);
+          onResults?.(applied);
+          streamedPkgs.add(pkg);
+        }
+      }
+    }
 
     if (token.isCancellationRequested) {
       for (const info of pkgInfos) {
@@ -102,23 +157,6 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       return { stdout: result.stdout };
     }
 
-    const events = result.stdout ? parseTestEvents(result.stdout) : [];
-    const eventsByPkg = groupEventsByPackage(events);
-
-    for (const info of pkgInfos) {
-      const pkgEvents = eventsByPkg.get(info.importPath) ?? [];
-      if (pkgEvents.length > 0) {
-        const applied = applyResults(
-          controller,
-          run,
-          pkgEvents,
-          info.importPath,
-          info.dir,
-        );
-        onResults?.(applied);
-      }
-    }
-
     if (result.exitCode !== 0) {
       const stderrTrimmed = result.stderr.trim();
 
@@ -127,27 +165,28 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       }
 
       for (const info of pkgInfos) {
-        const pkgEvents = eventsByPkg.get(info.importPath) ?? [];
+        if (streamedPkgs.has(info.importPath)) {
+          if (stderrTrimmed) {
+            for (const item of info.items) {
+              run.appendOutput(
+                stderrTrimmed.replace(/\n/g, "\r\n") + "\r\n",
+                undefined,
+                item,
+              );
+            }
+          }
+          continue;
+        }
 
-        if (pkgEvents.length === 0) {
-          const diagnostic = [
-            stderrTrimmed,
-            result.stdout.trim(),
-            `exit code ${result.exitCode}`,
-          ]
-            .filter(Boolean)
-            .join("\n\n");
-          for (const item of info.items) {
-            run.errored(item, new vscode.TestMessage(diagnostic));
-          }
-        } else if (stderrTrimmed) {
-          for (const item of info.items) {
-            run.appendOutput(
-              stderrTrimmed.replace(/\n/g, "\r\n") + "\r\n",
-              undefined,
-              item,
-            );
-          }
+        const diagnostic = [
+          stderrTrimmed,
+          result.stdout.trim(),
+          `exit code ${result.exitCode}`,
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+        for (const item of info.items) {
+          run.errored(item, new vscode.TestMessage(diagnostic));
         }
       }
     }

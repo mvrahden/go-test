@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -18,11 +19,12 @@ import (
 )
 
 type overlayResult struct {
-	tmpDir         string
-	overlayFlag    string
-	sharedFixtures []gotestgen.SharedFixtureInfo
-	suitePackages  []string
-	suitesByPkg    map[string][]string // import path → suite struct names
+	tmpDir           string
+	overlayFlag      string
+	sharedFixtures   []gotestgen.SharedFixtureInfo
+	suitePackages    []string
+	suitesByPkg      map[string][]string          // import path → suite struct names
+	fixtureDepSuites map[string]map[string]bool   // import path → set of test func names needing shared fixtures
 }
 
 func generateOverlay(patterns []string, debug bool) (*overlayResult, func(), error) {
@@ -88,18 +90,27 @@ func buildOverlay(allResults gotestgen.GenerateResults, allSharedFixtures []gote
 	}
 
 	var suitePkgs []string
+	fixtureDepSuites := map[string]map[string]bool{}
 	for _, r := range allResults {
 		if len(r.PTest) > 0 || len(r.PXTest) > 0 {
 			suitePkgs = append(suitePkgs, r.Package)
 		}
+		if len(r.FixtureDepSuites) > 0 {
+			s := make(map[string]bool, len(r.FixtureDepSuites))
+			for _, fn := range r.FixtureDepSuites {
+				s[fn] = true
+			}
+			fixtureDepSuites[r.Package] = s
+		}
 	}
 
 	return &overlayResult{
-		tmpDir:         tmpDir,
-		overlayFlag:    "-overlay=" + filepath.Join(tmpDir, "overlay.json"),
-		sharedFixtures: allSharedFixtures,
-		suitePackages:  suitePkgs,
-		suitesByPkg:    suitesByPkg,
+		tmpDir:           tmpDir,
+		overlayFlag:      "-overlay=" + filepath.Join(tmpDir, "overlay.json"),
+		sharedFixtures:   allSharedFixtures,
+		suitePackages:    suitePkgs,
+		suitesByPkg:      suitesByPkg,
+		fixtureDepSuites: fixtureDepSuites,
 	}, cleanup, nil
 }
 
@@ -227,6 +238,188 @@ func executeTestsJSON(ctx context.Context, cfg ExecConfig, overlay *overlayResul
 	return code, nil
 }
 
+func executeTestsStreaming(ctx context.Context, cfg ExecConfig, overlay *overlayResult) (int, error) {
+	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
+	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
+	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
+
+	baseEnv := os.Environ()
+	if cfg.UpdateSnapshots {
+		baseEnv = append(baseEnv, "GOTEST_UPDATE_SNAPSHOTS=1")
+	}
+
+	// Start fixture setup and compilation concurrently.
+	fixtureReady := make(chan struct{})
+	var setupProc *SharedFixtureProcess
+	var setupErr error
+
+	streamCtx, streamCancel := context.WithCancel(ctx)
+	defer streamCancel()
+
+	if len(overlay.sharedFixtures) > 0 {
+		go func() {
+			setupProc, setupErr = startSharedFixtures(streamCtx, overlay.tmpDir, overlay.sharedFixtures, cfg.SetupTimeout)
+			close(fixtureReady)
+		}()
+	} else {
+		close(fixtureReady)
+	}
+
+	compileCh := gotestrunner.CompilePackagesStream(streamCtx, overlay.suitePackages, overlay.overlayFlag, classified.BuildFlags, overlay.tmpDir)
+
+	maxParallel := 2 * runtime.GOMAXPROCS(0)
+	sem := make(chan struct{}, maxParallel)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	worstCode := 0
+	anyTargets := false
+
+	// Lazy fixture env resolution — first caller blocks until fixtures are ready.
+	var fixtureEnv []string
+	var fixtureEnvErr error
+	var fixtureOnce sync.Once
+
+	resolveFixtureEnv := func() ([]string, error) {
+		fixtureOnce.Do(func() {
+			select {
+			case <-fixtureReady:
+			case <-streamCtx.Done():
+				fixtureEnvErr = streamCtx.Err()
+				return
+			}
+			if setupErr != nil {
+				fixtureEnvErr = fmt.Errorf("shared fixture setup: %w", setupErr)
+				streamCancel()
+				return
+			}
+			fixtureEnv = make([]string, len(baseEnv))
+			copy(fixtureEnv, baseEnv)
+			if setupProc != nil {
+				fixtureEnv = append(fixtureEnv, "GOTEST_SHARED_STATE_FILE="+setupProc.StateFile())
+			}
+		})
+		return fixtureEnv, fixtureEnvErr
+	}
+
+	// Per-package state for CLI output batching (non-JSON mode).
+	// Results are stored at their target index to preserve deterministic ordering.
+	type pkgState struct {
+		expected  int
+		completed int
+		results   []gotestrunner.SuiteResult
+	}
+	pkgStates := map[string]*pkgState{}
+
+loop:
+	for cr := range compileCh {
+		select {
+		case <-streamCtx.Done():
+			break loop
+		default:
+		}
+
+		singleCompiled := []gotestrunner.CompileResult{cr}
+		singleSuites := map[string][]string{cr.Package: overlay.suitesByPkg[cr.Package]}
+		targets := gotestrunner.BuildSuiteTargets(singleCompiled, singleSuites, runFlags, userRunFilter)
+
+		if len(targets) == 0 {
+			continue
+		}
+		anyTargets = true
+
+		if !cfg.JSON {
+			mu.Lock()
+			pkgStates[cr.Package] = &pkgState{
+				expected: len(targets),
+				results:  make([]gotestrunner.SuiteResult, len(targets)),
+			}
+			mu.Unlock()
+		}
+
+		for i, target := range targets {
+			wg.Add(1)
+			go func(t gotestrunner.SuiteTarget, idx int) {
+				defer wg.Done()
+
+				needsFixture := overlay.fixtureDepSuites[t.Package][t.SuiteName]
+				var env []string
+				if needsFixture {
+					var err error
+					env, err = resolveFixtureEnv()
+					if err != nil {
+						return
+					}
+				} else {
+					env = baseEnv
+				}
+
+				sem <- struct{}{}
+				defer func() { <-sem }()
+
+				mu.Lock()
+				if streamCtx.Err() != nil {
+					mu.Unlock()
+					return
+				}
+				mu.Unlock()
+
+				if cfg.JSON {
+					r := gotestrunner.RunSingleSuiteTest2JSON(streamCtx, t, env)
+					mu.Lock()
+					os.Stdout.Write(r.Stdout)
+					if len(r.Stderr) > 0 {
+						os.Stderr.Write(r.Stderr)
+					}
+					if r.ExitCode > worstCode {
+						worstCode = r.ExitCode
+					}
+					mu.Unlock()
+				} else {
+					r := gotestrunner.RunSingleSuite(streamCtx, t, env)
+					mu.Lock()
+					s := pkgStates[t.Package]
+					s.results[idx] = r
+					s.completed++
+					if r.ExitCode > worstCode {
+						worstCode = r.ExitCode
+					}
+					if s.completed == s.expected {
+						pkgFailed := false
+						var pkgDuration time.Duration
+						for _, pr := range s.results {
+							os.Stdout.Write(gotestrunner.StripTrailingStatus(pr.Stdout))
+							if len(pr.Stderr) > 0 {
+								os.Stderr.Write(pr.Stderr)
+							}
+							if pr.ExitCode != 0 {
+								pkgFailed = true
+							}
+							pkgDuration += pr.Duration
+						}
+						gotestrunner.WritePackageSummary(t.Package, pkgFailed, pkgDuration)
+					}
+					mu.Unlock()
+				}
+			}(target, i)
+		}
+	}
+
+	wg.Wait()
+
+	if setupProc != nil {
+		setupProc.Teardown()
+	}
+
+	if !anyTargets {
+		if !cfg.JSON {
+			fmt.Fprintln(os.Stderr, "no test suites to run")
+		}
+		return 0, nil
+	}
+
+	return worstCode, nil
+}
+
 func executeTestsCaptured(ctx context.Context, cfg ExecConfig, overlay *overlayResult) ([]byte, int, error) {
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
@@ -294,10 +487,10 @@ func Run(cfg ExecConfig) int {
 
 	var code int
 	var execErr error
-	if cfg.JSON {
-		code, execErr = executeTestsJSON(ctx, cfg, overlay)
-	} else {
+	if cfg.Spec {
 		code, execErr = executeTests(ctx, cfg, overlay)
+	} else {
+		code, execErr = executeTestsStreaming(ctx, cfg, overlay)
 	}
 	if execErr != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", execErr)

@@ -64,7 +64,7 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			r := runSingleSuite(ctx, t, env)
+			r := RunSingleSuite(ctx, t, env)
 
 			mu.Lock()
 			results[idx] = r
@@ -74,7 +74,7 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 				var pkgDuration time.Duration
 				for _, j := range pkgIndices[t.Package] {
 					pr := results[j]
-					os.Stdout.Write(stripTrailingStatus(pr.Stdout))
+					os.Stdout.Write(StripTrailingStatus(pr.Stdout))
 					if len(pr.Stderr) > 0 {
 						os.Stderr.Write(pr.Stderr)
 					}
@@ -83,7 +83,7 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 					}
 					pkgDuration += pr.Duration
 				}
-				writePackageSummary(t.Package, pkgFailed, pkgDuration)
+				WritePackageSummary(t.Package, pkgFailed, pkgDuration)
 			}
 			mu.Unlock()
 		}(i, target)
@@ -124,7 +124,7 @@ func RunSuitesJSON(ctx context.Context, targets []SuiteTarget, extraEnv map[stri
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			r := runSingleSuite(ctx, t, env)
+			r := RunSingleSuite(ctx, t, env)
 
 			mu.Lock()
 			results[idx] = r
@@ -143,7 +143,9 @@ func RunSuitesJSON(ctx context.Context, targets []SuiteTarget, extraEnv map[stri
 	return merged.Bytes(), worstCode
 }
 
-func runSingleSuite(ctx context.Context, target SuiteTarget, env []string) SuiteResult {
+// RunSingleSuite executes a single suite subprocess.
+// Exported for use by the streaming execution pipeline.
+func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string) SuiteResult {
 	args := make([]string, 0, len(target.RunFlags)+1)
 	if target.RunFilter != "" {
 		args = append(args, "-test.run="+target.RunFilter)
@@ -180,7 +182,7 @@ func runSingleSuite(ctx context.Context, target SuiteTarget, env []string) Suite
 	}
 }
 
-func stripTrailingStatus(data []byte) []byte {
+func StripTrailingStatus(data []byte) []byte {
 	s := bytes.TrimRight(data, "\n")
 	idx := bytes.LastIndex(s, []byte("\n"))
 	if idx < 0 {
@@ -193,7 +195,7 @@ func stripTrailingStatus(data []byte) []byte {
 	return data
 }
 
-func writePackageSummary(pkg string, failed bool, d time.Duration) {
+func WritePackageSummary(pkg string, failed bool, d time.Duration) {
 	if failed {
 		fmt.Fprintf(os.Stdout, "FAIL\nFAIL\t%s\t%.3fs\n", pkg, d.Seconds())
 	} else {
@@ -225,7 +227,7 @@ func RunSuitesTest2JSON(ctx context.Context, targets []SuiteTarget, extraEnv map
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			r := runSingleSuiteTest2JSON(ctx, t, env)
+			r := RunSingleSuiteTest2JSON(ctx, t, env)
 
 			mu.Lock()
 			results[idx] = r
@@ -248,7 +250,9 @@ func RunSuitesTest2JSON(ctx context.Context, targets []SuiteTarget, extraEnv map
 	return results, worstCode
 }
 
-func runSingleSuiteTest2JSON(ctx context.Context, target SuiteTarget, env []string) SuiteResult {
+// RunSingleSuiteTest2JSON executes a single suite via `go tool test2json`.
+// Exported for use by the streaming execution pipeline.
+func RunSingleSuiteTest2JSON(ctx context.Context, target SuiteTarget, env []string) SuiteResult {
 	var testArgs []string
 	if target.RunFilter != "" {
 		testArgs = append(testArgs, "-test.run="+target.RunFilter)

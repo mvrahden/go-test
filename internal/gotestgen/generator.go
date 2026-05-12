@@ -12,10 +12,11 @@ import (
 
 type GenerateResults []*GenerateResult
 type GenerateResult struct {
-	AbsPath string // Abs Package Path
-	Package string // Package name
-	PTest   []byte // Test Suite PTest
-	PXTest  []byte // Test Suite PXTest
+	AbsPath          string   // Abs Package Path
+	Package          string   // Package name
+	PTest            []byte   // Test Suite PTest
+	PXTest           []byte   // Test Suite PXTest
+	FixtureDepSuites []string // test function names that depend on shared fixtures (e.g. "TestFooSuite")
 }
 
 const (
@@ -212,16 +213,22 @@ func generateSrcsFromLoaded(loadResults []*LoadResult) (GenerateResults, []Share
 			return nil, err
 		}
 
-		ptestBuf, err := generateForPkg(lr.Ptest, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures)
+		ptestBuf, ptestFixtureDeps, err := generateForPkg(lr.Ptest, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures)
 		if err != nil {
 			return nil, err
 		}
-		pxtestBuf, err := generateForPkg(lr.Pxtest, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures)
+		pxtestBuf, pxtestFixtureDeps, err := generateForPkg(lr.Pxtest, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures)
 		if err != nil {
 			return nil, err
 		}
 
-		return &GenerateResult{AbsPath: lr.PkgDir, Package: lr.PkgPath, PTest: ptestBuf, PXTest: pxtestBuf}, nil
+		return &GenerateResult{
+			AbsPath:          lr.PkgDir,
+			Package:          lr.PkgPath,
+			PTest:            ptestBuf,
+			PXTest:           pxtestBuf,
+			FixtureDepSuites: append(ptestFixtureDeps, pxtestFixtureDeps...),
+		}, nil
 	})
 	if err != nil {
 		return nil, nil, err
@@ -235,14 +242,14 @@ func generateSrcsFromLoaded(loadResults []*LoadResult) (GenerateResults, []Share
 	return results, allSharedFixtures, nil
 }
 
-func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo) ([]byte, error) {
+func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo) ([]byte, []string, error) {
 	if pkg == nil || len(spec.EffectiveTestSuites) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	resolved, err := Resolve(pkg, spec.EffectiveTestSuites, collected.Fixtures)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for _, sf := range resolved.RequiredSharedFixtures {
@@ -253,7 +260,15 @@ func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected Collector
 		}
 	}
 
+	var fixtureDeps []string
+	for id, refs := range resolved.SuiteSharedFixtures {
+		if len(refs) > 0 {
+			fixtureDeps = append(fixtureDeps, "Test"+id)
+		}
+	}
+
 	r := renderer{}
-	return r.RenderTestSuiteSpec(pkg, spec, resolved)
+	buf, err := r.RenderTestSuiteSpec(pkg, spec, resolved)
+	return buf, fixtureDeps, err
 }
 
