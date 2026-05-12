@@ -152,6 +152,19 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       }
     }
 
+    for (const info of pkgInfos) {
+      const pkgResult = controller.getResult(info.importPath);
+      if (pkgResult) {
+        for (const item of info.items) {
+          if (pkgResult.status === "fail") {
+            run.failed(item, [], pkgResult.duration);
+          } else {
+            run.passed(item, pkgResult.duration);
+          }
+        }
+      }
+    }
+
     if (coverFile && coverage) {
       try {
         const coverContent = await readFile(coverFile, "utf-8");
