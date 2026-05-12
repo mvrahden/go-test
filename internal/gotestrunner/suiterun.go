@@ -33,14 +33,23 @@ type SuiteResult struct {
 }
 
 // RunSuites executes each suite target in its own subprocess with bounded
-// concurrency. It streams combined output to the writer and returns the
-// worst exit code across all suites.
+// concurrency. Output is streamed per-package: when all suites for a package
+// complete, their output is written to stdout followed by a package summary.
 func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int) ([]SuiteResult, int) {
 	if maxParallel <= 0 {
-		maxParallel = runtime.GOMAXPROCS(0)
+		maxParallel = 2 * runtime.GOMAXPROCS(0)
+	}
+
+	pkgSuiteCount := map[string]int{}
+	pkgIndices := map[string][]int{}
+	for i, t := range targets {
+		pkgSuiteCount[t.Package]++
+		pkgIndices[t.Package] = append(pkgIndices[t.Package], i)
 	}
 
 	results := make([]SuiteResult, len(targets))
+	pkgCompleted := map[string]int{}
+	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, maxParallel)
 
@@ -55,54 +64,52 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			results[idx] = runSingleSuite(ctx, t, env)
+			r := runSingleSuite(ctx, t, env)
+
+			mu.Lock()
+			results[idx] = r
+			pkgCompleted[t.Package]++
+			if pkgCompleted[t.Package] == pkgSuiteCount[t.Package] {
+				pkgFailed := false
+				var pkgDuration time.Duration
+				for _, j := range pkgIndices[t.Package] {
+					pr := results[j]
+					os.Stdout.Write(stripTrailingStatus(pr.Stdout))
+					if len(pr.Stderr) > 0 {
+						os.Stderr.Write(pr.Stderr)
+					}
+					if pr.ExitCode != 0 {
+						pkgFailed = true
+					}
+					pkgDuration += pr.Duration
+				}
+				writePackageSummary(t.Package, pkgFailed, pkgDuration)
+			}
+			mu.Unlock()
 		}(i, target)
 	}
 	wg.Wait()
 
 	worstCode := 0
-	currentPkg := ""
-	pkgFailed := false
-	var pkgDuration time.Duration
-
 	for _, r := range results {
-		if r.Target.Package != currentPkg {
-			if currentPkg != "" {
-				writePackageSummary(currentPkg, pkgFailed, pkgDuration)
-			}
-			currentPkg = r.Target.Package
-			pkgFailed = false
-			pkgDuration = 0
-		}
-
-		os.Stdout.Write(stripTrailingStatus(r.Stdout))
-		if len(r.Stderr) > 0 {
-			os.Stderr.Write(r.Stderr)
-		}
-
-		if r.ExitCode != 0 {
-			pkgFailed = true
-		}
-		pkgDuration += r.Duration
 		if r.ExitCode > worstCode {
 			worstCode = r.ExitCode
 		}
-	}
-	if currentPkg != "" {
-		writePackageSummary(currentPkg, pkgFailed, pkgDuration)
 	}
 
 	return results, worstCode
 }
 
-// RunSuitesJSON is like RunSuites but captures JSON output for programmatic
-// consumption instead of streaming to stdout.
+// RunSuitesJSON is like RunSuites but captures output for programmatic
+// consumption. Each suite's output is merged as it completes.
 func RunSuitesJSON(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int) ([]byte, int) {
 	if maxParallel <= 0 {
-		maxParallel = runtime.GOMAXPROCS(0)
+		maxParallel = 2 * runtime.GOMAXPROCS(0)
 	}
 
 	results := make([]SuiteResult, len(targets))
+	var mu sync.Mutex
+	var merged bytes.Buffer
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, maxParallel)
 
@@ -117,15 +124,18 @@ func RunSuitesJSON(ctx context.Context, targets []SuiteTarget, extraEnv map[stri
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			results[idx] = runSingleSuite(ctx, t, env)
+			r := runSingleSuite(ctx, t, env)
+
+			mu.Lock()
+			results[idx] = r
+			merged.Write(r.Stdout)
+			mu.Unlock()
 		}(i, target)
 	}
 	wg.Wait()
 
-	var merged bytes.Buffer
 	worstCode := 0
 	for _, r := range results {
-		merged.Write(r.Stdout)
 		if r.ExitCode > worstCode {
 			worstCode = r.ExitCode
 		}
@@ -192,13 +202,15 @@ func writePackageSummary(pkg string, failed bool, d time.Duration) {
 }
 
 // RunSuitesTest2JSON executes each suite target wrapped with `go tool test2json`
-// to produce proper JSON test events. Output is written directly to stdout.
+// to produce proper JSON test events. Each suite's events are written to stdout
+// as soon as the suite completes, enabling real-time progress in the test explorer.
 func RunSuitesTest2JSON(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int) ([]SuiteResult, int) {
 	if maxParallel <= 0 {
-		maxParallel = runtime.GOMAXPROCS(0)
+		maxParallel = 2 * runtime.GOMAXPROCS(0)
 	}
 
 	results := make([]SuiteResult, len(targets))
+	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, maxParallel)
 
@@ -213,17 +225,21 @@ func RunSuitesTest2JSON(ctx context.Context, targets []SuiteTarget, extraEnv map
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			results[idx] = runSingleSuiteTest2JSON(ctx, t, env)
+			r := runSingleSuiteTest2JSON(ctx, t, env)
+
+			mu.Lock()
+			results[idx] = r
+			os.Stdout.Write(r.Stdout)
+			if len(r.Stderr) > 0 {
+				os.Stderr.Write(r.Stderr)
+			}
+			mu.Unlock()
 		}(i, target)
 	}
 	wg.Wait()
 
 	worstCode := 0
 	for _, r := range results {
-		os.Stdout.Write(r.Stdout)
-		if len(r.Stderr) > 0 {
-			os.Stderr.Write(r.Stderr)
-		}
 		if r.ExitCode > worstCode {
 			worstCode = r.ExitCode
 		}
