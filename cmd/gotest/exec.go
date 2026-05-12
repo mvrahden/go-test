@@ -115,8 +115,10 @@ func buildExtraEnv(cfg ExecConfig, proc *SharedFixtureProcess) map[string]string
 }
 
 func prepareTestRun(ctx context.Context, overlay *overlayResult, buildFlags []string, setupTimeout time.Duration) ([]gotestrunner.CompileResult, *SharedFixtureProcess, error) {
+	// Child context for cross-cancellation: if either goroutine fails, cancel()
+	// aborts the other. Do NOT defer cancel — the shared fixture subprocess is
+	// started with exec.CommandContext(ctx) and must survive until Teardown.
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
 	var compiled []gotestrunner.CompileResult
 	var compileErr error
@@ -147,6 +149,7 @@ func prepareTestRun(ctx context.Context, overlay *overlayResult, buildFlags []st
 	wg.Wait()
 
 	if compileErr != nil || setupErr != nil {
+		cancel()
 		if setupProc != nil {
 			setupProc.Teardown()
 		}
