@@ -75,6 +75,58 @@ func CompilePackages(ctx context.Context, packages []string, overlayFlag string,
 	return compiled, nil
 }
 
+// CompilePackagesStream is like CompilePackages but sends results to a
+// channel as each package finishes compiling, enabling execution to overlap
+// with compilation. The channel is closed when all packages are done.
+func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir string) <-chan CompileResult {
+	ch := make(chan CompileResult)
+
+	binDir := filepath.Join(outputDir, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "create bin dir: %s\n", err)
+		close(ch)
+		return ch
+	}
+
+	go func() {
+		defer close(ch)
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, runtime.NumCPU())
+
+		for _, pkg := range packages {
+			wg.Add(1)
+			go func(pkgPath string) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+
+				binaryName := sanitizePkgName(pkgPath) + ".test"
+				binaryPath := filepath.Join(binDir, binaryName)
+
+				args := []string{"test", "-c", overlayFlag, "-o", binaryPath}
+				args = append(args, buildFlags...)
+				args = append(args, pkgPath)
+
+				cmd := exec.CommandContext(ctx, "go", args...)
+				cmd.Stderr = os.Stderr
+
+				if err := cmd.Run(); err != nil {
+					fmt.Fprintf(os.Stderr, "compile %s: %s\n", pkgPath, err)
+					return
+				}
+
+				select {
+				case ch <- CompileResult{Package: pkgPath, BinaryPath: binaryPath}:
+				case <-ctx.Done():
+				}
+			}(pkg)
+		}
+		wg.Wait()
+	}()
+
+	return ch
+}
+
 func sanitizePkgName(pkgPath string) string {
 	h := sha256.Sum256([]byte(pkgPath))
 	parts := strings.Split(pkgPath, "/")
