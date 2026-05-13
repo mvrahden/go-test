@@ -157,10 +157,33 @@ func prepareTestRun(ctx context.Context, overlay *overlayResult, buildFlags []st
 	return compiled, setupProc, nil
 }
 
+func assignCoverProfiles(targets []gotestrunner.SuiteTarget, coverDir string) {
+	for i := range targets {
+		targets[i].CoverProfile = filepath.Join(coverDir, fmt.Sprintf("%d.out", i))
+	}
+}
+
+func mergeCoverProfiles(targets []gotestrunner.SuiteTarget, userProfile string) {
+	var profiles []string
+	for _, t := range targets {
+		if t.CoverProfile != "" {
+			profiles = append(profiles, t.CoverProfile)
+		}
+	}
+	if len(profiles) == 0 {
+		return
+	}
+	if err := gotestrunner.MergeCoverProfiles(profiles, userProfile); err != nil {
+		fmt.Fprintf(os.Stderr, "WARN: merge cover profiles: %s\n", err)
+	}
+}
+
 func executeTests(ctx context.Context, cfg ExecConfig, overlay *overlayResult) (int, error) {
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
 	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
+	userCoverProfile := gotestrunner.ExtractCoverProfile(runFlags)
+	runFlags = gotestrunner.StripCoverProfile(runFlags)
 
 	compiled, setupProc, err := prepareTestRun(ctx, overlay, classified.BuildFlags, cfg.SetupTimeout)
 	if err != nil {
@@ -184,6 +207,13 @@ func executeTests(ctx context.Context, cfg ExecConfig, overlay *overlayResult) (
 		return 0, nil
 	}
 
+	if userCoverProfile != "" {
+		coverDir := filepath.Join(overlay.tmpDir, "cover")
+		os.MkdirAll(coverDir, 0o755)
+		assignCoverProfiles(targets, coverDir)
+		defer mergeCoverProfiles(targets, userCoverProfile)
+	}
+
 	if cfg.Spec {
 		return runWithSpec(ctx, targets, extraEnv), nil
 	}
@@ -196,6 +226,8 @@ func executeTestsJSON(ctx context.Context, cfg ExecConfig, overlay *overlayResul
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
 	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
+	userCoverProfile := gotestrunner.ExtractCoverProfile(runFlags)
+	runFlags = gotestrunner.StripCoverProfile(runFlags)
 
 	compiled, setupProc, err := prepareTestRun(ctx, overlay, classified.BuildFlags, cfg.SetupTimeout)
 	if err != nil {
@@ -218,6 +250,13 @@ func executeTestsJSON(ctx context.Context, cfg ExecConfig, overlay *overlayResul
 		return 0, nil
 	}
 
+	if userCoverProfile != "" {
+		coverDir := filepath.Join(overlay.tmpDir, "cover")
+		os.MkdirAll(coverDir, 0o755)
+		assignCoverProfiles(targets, coverDir)
+		defer mergeCoverProfiles(targets, userCoverProfile)
+	}
+
 	_, code := gotestrunner.RunSuitesTest2JSON(ctx, targets, extraEnv, 0)
 	return code, nil
 }
@@ -226,6 +265,14 @@ func executeTestsStreaming(ctx context.Context, cfg ExecConfig, overlay *overlay
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
 	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
+	userCoverProfile := gotestrunner.ExtractCoverProfile(runFlags)
+	runFlags = gotestrunner.StripCoverProfile(runFlags)
+
+	var coverDir string
+	if userCoverProfile != "" {
+		coverDir = filepath.Join(overlay.tmpDir, "cover")
+		os.MkdirAll(coverDir, 0o755)
+	}
 
 	baseEnv := os.Environ()
 	if cfg.UpdateSnapshots {
@@ -257,6 +304,7 @@ func executeTestsStreaming(ctx context.Context, cfg ExecConfig, overlay *overlay
 	var wg sync.WaitGroup
 	worstCode := 0
 	anyTargets := false
+	var allTargets []gotestrunner.SuiteTarget
 
 	// Lazy fixture env resolution — first caller blocks until fixtures are ready.
 	var fixtureEnv []string
@@ -310,6 +358,14 @@ loop:
 			continue
 		}
 		anyTargets = true
+
+		if userCoverProfile != "" {
+			baseIdx := len(allTargets)
+			for j := range targets {
+				targets[j].CoverProfile = filepath.Join(coverDir, fmt.Sprintf("%d.out", baseIdx+j))
+			}
+			allTargets = append(allTargets, targets...)
+		}
 
 		if !cfg.JSON {
 			mu.Lock()
@@ -394,6 +450,10 @@ loop:
 		setupProc.Teardown()
 	}
 
+	if userCoverProfile != "" {
+		mergeCoverProfiles(allTargets, userCoverProfile)
+	}
+
 	if !anyTargets {
 		if !cfg.JSON {
 			fmt.Fprintln(os.Stderr, "no test suites to run")
@@ -408,6 +468,8 @@ func executeTestsCaptured(ctx context.Context, cfg ExecConfig, overlay *overlayR
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
 	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
+	userCoverProfile := gotestrunner.ExtractCoverProfile(runFlags)
+	runFlags = gotestrunner.StripCoverProfile(runFlags)
 
 	compiled, setupProc, err := prepareTestRun(ctx, overlay, classified.BuildFlags, cfg.SetupTimeout)
 	if err != nil {
@@ -429,6 +491,13 @@ func executeTestsCaptured(ctx context.Context, cfg ExecConfig, overlay *overlayR
 
 	if len(targets) == 0 {
 		return nil, 0, nil
+	}
+
+	if userCoverProfile != "" {
+		coverDir := filepath.Join(overlay.tmpDir, "cover")
+		os.MkdirAll(coverDir, 0o755)
+		assignCoverProfiles(targets, coverDir)
+		defer mergeCoverProfiles(targets, userCoverProfile)
 	}
 
 	data, code := gotestrunner.RunSuitesJSON(ctx, targets, extraEnv, 0)
