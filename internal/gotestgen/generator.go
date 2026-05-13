@@ -12,10 +12,11 @@ import (
 
 type GenerateResults []*GenerateResult
 type GenerateResult struct {
-	AbsPath          string   // Abs Package Path
-	Package          string   // Package name
-	PTest            []byte   // Test Suite PTest
-	PXTest           []byte   // Test Suite PXTest
+	AbsPath          string   // absolute directory path of the package
+	PkgPath          string   // import path (e.g. "github.com/foo/bar")
+	PTest            []byte   // generated internal test source
+	PXTest           []byte   // generated external test source
+	SuiteNames       []string // suite struct identifiers (e.g. "FooTestSuite")
 	FixtureDepSuites []string // test function names that depend on shared fixtures (e.g. "TestFooSuite")
 }
 
@@ -23,20 +24,6 @@ const (
 	packageEvalMode    = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps
 	discoveryEvalMode  = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedFiles
 )
-
-func Generate(targetPkgs []string, buildFlags []string) (GenerateResults, error) {
-	res, _, err := generateSrcs(targetPkgs, buildFlags)
-	if err != nil {
-		return nil, err
-	}
-	return res, nil
-}
-
-// GenerateWithSharedFixtures generates test suite sources and also returns
-// the deduplicated shared fixtures discovered via demand-driven resolution.
-func GenerateWithSharedFixtures(targetPkgs []string, buildFlags []string) (GenerateResults, []SharedFixtureInfo, error) {
-	return generateSrcs(targetPkgs, buildFlags)
-}
 
 func CollectFromLoaded(loadResults []*LoadResult) (gotestast.TestSuiteSpecSet, error) {
 	var allSuites gotestast.TestSuiteSpecSet
@@ -164,18 +151,10 @@ func LoadPackagesForDiscovery(targetPkgs []string, buildFlags []string) ([]*Load
 }
 
 func GenerateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {
-	return generateSrcsFromLoaded(loadResults)
+	return generateFromLoaded(loadResults)
 }
 
-func generateSrcs(targetPkgs []string, buildFlags []string) (GenerateResults, []SharedFixtureInfo, error) {
-	loadResults, err := LoadPackages(targetPkgs, buildFlags)
-	if err != nil {
-		return nil, nil, err
-	}
-	return generateSrcsFromLoaded(loadResults)
-}
-
-func generateSrcsFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {
+func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {
 	sharedSeen := map[string]bool{}
 	var allSharedFixtures []SharedFixtureInfo
 
@@ -208,11 +187,29 @@ func generateSrcsFromLoaded(loadResults []*LoadResult) (GenerateResults, []Share
 			return nil, err
 		}
 
+		seen := map[string]bool{}
+		var suiteNames []string
+		for _, s := range ptestSpec.EffectiveTestSuites {
+			id := s.Identifier()
+			if !seen[id] {
+				seen[id] = true
+				suiteNames = append(suiteNames, id)
+			}
+		}
+		for _, s := range pxtestSpec.EffectiveTestSuites {
+			id := s.Identifier()
+			if !seen[id] {
+				seen[id] = true
+				suiteNames = append(suiteNames, id)
+			}
+		}
+
 		return &GenerateResult{
 			AbsPath:          lr.PkgDir,
-			Package:          lr.PkgPath,
+			PkgPath:          lr.PkgPath,
 			PTest:            ptestBuf,
 			PXTest:           pxtestBuf,
+			SuiteNames:       suiteNames,
 			FixtureDepSuites: append(ptestFixtureDeps, pxtestFixtureDeps...),
 		}, nil
 	})
