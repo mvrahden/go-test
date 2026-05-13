@@ -38,14 +38,6 @@ func GenerateWithSharedFixtures(targetPkgs []string, buildFlags []string) (Gener
 	return generateSrcs(targetPkgs, buildFlags)
 }
 
-func Collect(targetPkgs []string, buildFlags []string) (gotestast.TestSuiteSpecSet, error) {
-	loadResults, err := LoadPackages(targetPkgs, buildFlags)
-	if err != nil {
-		return nil, err
-	}
-	return CollectFromLoaded(loadResults)
-}
-
 func CollectFromLoaded(loadResults []*LoadResult) (gotestast.TestSuiteSpecSet, error) {
 	var allSuites gotestast.TestSuiteSpecSet
 	c := collector{}
@@ -163,12 +155,6 @@ func loadPackages(mode packages.LoadMode, targetPkgs []string, buildFlags []stri
 func LoadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, error) {
 	res, _, err := loadPackages(packageEvalMode, targetPkgs, buildFlags, false)
 	return res, err
-}
-
-// LoadPackagesWithWarnings is like LoadPackages but also returns warnings
-// for packages that were skipped due to load errors (e.g. build constraints).
-func LoadPackagesWithWarnings(targetPkgs []string, buildFlags []string) ([]*LoadResult, []LoadWarning, error) {
-	return loadPackages(packageEvalMode, targetPkgs, buildFlags, true)
 }
 
 // LoadPackagesForDiscovery loads packages using a lightweight mode without
