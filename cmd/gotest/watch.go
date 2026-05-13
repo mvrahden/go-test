@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/mvrahden/go-test/internal/gotestgen"
+	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
 func parseWatchFlags(args []string) (jsonMode bool, remaining []string) {
@@ -147,8 +149,18 @@ func runWatch(args []string) int {
 }
 
 func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
+	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, nil)
+	if err != nil {
+		if jsonMode {
+			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
+		} else {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		}
+		return 2
+	}
+
 	if cfg.CI {
-		violations, err := RunFocusGuard(cfg.PackagePatterns)
+		suites, err := gotestgen.CollectFromLoaded(loaded)
 		if err != nil {
 			if jsonMode {
 				fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
@@ -157,6 +169,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
 			}
 			return 2
 		}
+		violations := CheckFocusViolations(suites)
 		if len(violations) > 0 {
 			fmt.Fprintln(os.Stderr, "FAIL: focus prefix detected — remove F_ before merging:")
 			for _, v := range violations {
@@ -166,7 +179,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
 		}
 	}
 
-	overlay, cleanup, err := generateOverlay(cfg.PackagePatterns, cfg.Debug)
+	overlay, cleanup, err := generateOverlayFromLoaded(loaded, cfg.Debug)
 	if err != nil {
 		if jsonMode {
 			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
@@ -234,7 +247,7 @@ func dirsToPatterns(dirs map[string]bool) []string {
 func replacePatterns(originalArgs []string, newPatterns []string) []string {
 	var args []string
 	for _, arg := range originalArgs {
-		if looksLikePackagePattern(arg) {
+		if gotestrunner.LooksLikePackagePattern(arg) {
 			continue
 		}
 		args = append(args, arg)

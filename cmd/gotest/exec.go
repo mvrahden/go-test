@@ -27,22 +27,6 @@ type overlayResult struct {
 	fixtureDepSuites map[string]map[string]bool   // import path → set of test func names needing shared fixtures
 }
 
-func generateOverlay(patterns []string, debug bool) (*overlayResult, func(), error) {
-	allResults, allSharedFixtures, err := gotestgen.GenerateWithSharedFixtures(patterns, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	loaded, err := gotestgen.LoadPackages(patterns, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	suitesByPkg, err := collectSuiteNames(loaded)
-	if err != nil {
-		return nil, nil, err
-	}
-	return buildOverlay(allResults, allSharedFixtures, suitesByPkg, debug)
-}
-
 func generateOverlayFromLoaded(loaded []*gotestgen.LoadResult, debug bool) (*overlayResult, func(), error) {
 	allResults, allSharedFixtures, err := gotestgen.GenerateFromLoaded(loaded)
 	if err != nil {

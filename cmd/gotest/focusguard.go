@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
-	"github.com/mvrahden/go-test/internal/gotestgen"
 )
 
 type FocusViolation struct {
@@ -18,14 +17,6 @@ func (v FocusViolation) String() string {
 		return fmt.Sprintf("  %s.%s", v.SuiteName, v.MethodName)
 	}
 	return fmt.Sprintf("  type %s", v.SuiteName)
-}
-
-func RunFocusGuard(patterns []string) ([]FocusViolation, error) {
-	suites, err := gotestgen.Collect(patterns, nil)
-	if err != nil {
-		return nil, err
-	}
-	return CheckFocusViolations(suites), nil
 }
 
 func CheckFocusViolations(suites gotestast.TestSuiteSpecSet) []FocusViolation {
