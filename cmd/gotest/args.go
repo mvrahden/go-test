@@ -14,7 +14,6 @@ type ExecConfig struct {
 	Debug           bool
 	CI              bool
 	JSON            bool
-	Spec            bool
 	UpdateSnapshots bool
 }
 

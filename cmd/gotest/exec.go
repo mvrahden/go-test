@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
-	"github.com/mvrahden/go-test/internal/gotestspec"
 )
 
 type overlayResult struct {
@@ -79,6 +77,14 @@ func buildExtraEnv(cfg ExecConfig, proc *SharedFixtureProcess) map[string]string
 	}
 	if proc != nil {
 		env["GOTEST_SHARED_STATE_FILE"] = proc.StateFile()
+	}
+	return env
+}
+
+func buildBaseEnv(cfg ExecConfig) []string {
+	env := os.Environ()
+	if cfg.UpdateSnapshots {
+		env = append(env, "GOTEST_UPDATE_SNAPSHOTS=1")
 	}
 	return env
 }
@@ -212,10 +218,6 @@ func executeTests(ctx context.Context, cfg ExecConfig, overlay *overlayResult) (
 		defer mergeCoverProfiles(targets, pf.userCoverProfile)
 	}
 
-	if cfg.Spec {
-		return runWithSpec(ctx, targets, extraEnv), nil
-	}
-
 	if cfg.JSON {
 		_, code := gotestrunner.RunSuitesTest2JSON(ctx, targets, extraEnv, 0)
 		return code, nil
@@ -234,10 +236,7 @@ func executeTestsStreaming(ctx context.Context, cfg ExecConfig, overlay *overlay
 		os.MkdirAll(coverDir, 0o755)
 	}
 
-	baseEnv := os.Environ()
-	if cfg.UpdateSnapshots {
-		baseEnv = append(baseEnv, "GOTEST_UPDATE_SNAPSHOTS=1")
-	}
+	baseEnv := buildBaseEnv(cfg)
 
 	// Start fixture setup and compilation concurrently.
 	fixtureReady := make(chan struct{})
@@ -461,25 +460,19 @@ func executeTestsCaptured(ctx context.Context, cfg ExecConfig, overlay *overlayR
 }
 
 func Run(cfg ExecConfig) int {
-	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, nil)
+	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
+	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, classified.BuildFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
 	if cfg.CI {
-		suites, err := gotestgen.CollectFromLoaded(loaded)
-		if err != nil {
+		if code, err := enforceFocusGuard(loaded); err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2
-		}
-		violations := CheckFocusViolations(suites)
-		if len(violations) > 0 {
-			fmt.Fprintln(os.Stderr, "FAIL: focus prefix detected — remove F_ before merging:")
-			for _, v := range violations {
-				fmt.Fprintln(os.Stderr, v.String())
-			}
-			return 1
+		} else if code != 0 {
+			return code
 		}
 	}
 
@@ -494,13 +487,7 @@ func Run(cfg ExecConfig) int {
 		os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	var code int
-	var execErr error
-	if cfg.Spec {
-		code, execErr = executeTests(ctx, cfg, overlay)
-	} else {
-		code, execErr = executeTestsStreaming(ctx, cfg, overlay)
-	}
+	code, execErr := executeTestsStreaming(ctx, cfg, overlay)
 	if execErr != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", execErr)
 		return 2
@@ -508,38 +495,3 @@ func Run(cfg ExecConfig) int {
 	return code
 }
 
-func runWithSpec(ctx context.Context, targets []gotestrunner.SuiteTarget, extraEnv map[string]string) int {
-	// Ensure -test.v for JSON parsing
-	for i := range targets {
-		hasV := false
-		for _, f := range targets[i].RunFlags {
-			if f == "-test.v" {
-				hasV = true
-				break
-			}
-		}
-		if !hasV {
-			targets[i].RunFlags = append(targets[i].RunFlags, "-test.v")
-		}
-	}
-
-	jsonData, code := gotestrunner.RunSuitesJSON(ctx, targets, extraEnv, 0)
-
-	events, err := gotestspec.ParseEvents(bytes.NewReader(jsonData))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
-		return 2
-	}
-
-	for _, ev := range events {
-		if ev.Output != "" {
-			fmt.Print(ev.Output)
-		}
-	}
-
-	fmt.Println()
-	tree := gotestspec.BuildTree(events)
-	gotestspec.RenderTerminal(os.Stdout, tree)
-
-	return code
-}

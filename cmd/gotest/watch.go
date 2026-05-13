@@ -71,7 +71,6 @@ func runWatch(args []string) int {
 		SetupTimeout:    setupTimeout,
 		Debug:           slices.Contains(ownArgs, "--debug"),
 		CI:              slices.Contains(ownArgs, "--ci"),
-		Spec:            slices.Contains(ownArgs, "--spec"),
 		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
 	}
 
@@ -149,7 +148,8 @@ func runWatch(args []string) int {
 }
 
 func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
-	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, nil)
+	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
+	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, classified.BuildFlags)
 	if err != nil {
 		if jsonMode {
 			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
@@ -160,22 +160,15 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
 	}
 
 	if cfg.CI {
-		suites, err := gotestgen.CollectFromLoaded(loaded)
-		if err != nil {
+		if code, err := enforceFocusGuard(loaded); err != nil {
 			if jsonMode {
 				fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
 			} else {
 				fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			}
 			return 2
-		}
-		violations := CheckFocusViolations(suites)
-		if len(violations) > 0 {
-			fmt.Fprintln(os.Stderr, "FAIL: focus prefix detected — remove F_ before merging:")
-			for _, v := range violations {
-				fmt.Fprintln(os.Stderr, v.String())
-			}
-			return 1
+		} else if code != 0 {
+			return code
 		}
 	}
 
