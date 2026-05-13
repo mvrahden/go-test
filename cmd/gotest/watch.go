@@ -192,12 +192,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
 
 	if jsonMode {
 		fmt.Printf("{\"Action\":\"watch-start\",\"Package\":%q}\n", strings.Join(cfg.PackagePatterns, ","))
-		code, err := executeTestsJSON(ctx, cfg, overlay)
-		if err != nil {
-			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
-			return 2
-		}
-		return code
+		cfg.JSON = true
 	}
 
 	code, err := executeTests(ctx, cfg, overlay)

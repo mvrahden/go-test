@@ -12,7 +12,12 @@ import (
 func runGenerate(args []string) int {
 	patterns := ExtractPackagePatterns(args)
 
-	results, err := gotestgen.Generate(patterns, nil)
+	loaded, err := gotestgen.LoadPackages(patterns, nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	results, _, err := gotestgen.GenerateFromLoaded(loaded)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

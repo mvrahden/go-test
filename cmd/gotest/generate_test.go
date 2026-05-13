@@ -29,9 +29,13 @@ func TestGenerateOverlay_ProducesValidOutput(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	results, err := gotestgen.Generate([]string{"./simple_suite"}, nil)
+	loaded, err := gotestgen.LoadPackages([]string{"./simple_suite"}, nil)
 	if err != nil {
-		t.Fatalf("Generate: %v", err)
+		t.Fatalf("LoadPackages: %v", err)
+	}
+	results, _, err := gotestgen.GenerateFromLoaded(loaded)
+	if err != nil {
+		t.Fatalf("GenerateFromLoaded: %v", err)
 	}
 	if len(results) == 0 {
 		t.Fatal("expected at least one generate result")
@@ -88,10 +92,13 @@ func TestGenerateOverlay_NoSuitesReturnsEmpty(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	// Generate on a package without suites should return empty results
-	results, err := gotestgen.Generate([]string{"."}, nil)
+	loaded, err := gotestgen.LoadPackages([]string{"."}, nil)
 	if err != nil {
-		t.Fatalf("Generate: %v", err)
+		t.Fatalf("LoadPackages: %v", err)
+	}
+	results, _, err := gotestgen.GenerateFromLoaded(loaded)
+	if err != nil {
+		t.Fatalf("GenerateFromLoaded: %v", err)
 	}
 
 	// Verify behavior: no suites means empty results
