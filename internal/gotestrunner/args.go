@@ -86,7 +86,7 @@ func ClassifyGoTestArgs(args []string) ClassifiedArgs {
 		}
 
 		if !strings.HasPrefix(arg, "-") {
-			if looksLikePackagePattern(arg) {
+			if LooksLikePackagePattern(arg) {
 				result.PkgPatterns = append(result.PkgPatterns, arg)
 			}
 			i++
@@ -235,6 +235,6 @@ func StripRunFilter(runFlags []string) []string {
 	return out
 }
 
-func looksLikePackagePattern(s string) bool {
+func LooksLikePackagePattern(s string) bool {
 	return strings.HasPrefix(s, ".") || strings.HasPrefix(s, "/") || strings.Contains(s, "/")
 }
