@@ -24,9 +24,9 @@ func MergeCoverProfiles(profiles []string, output string) error {
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
 			line := scanner.Text()
-			if strings.HasPrefix(line, "mode:") {
+			if after, ok := strings.CutPrefix(line, "mode:"); ok {
 				if mode == "" {
-					mode = strings.TrimSpace(strings.TrimPrefix(line, "mode:"))
+					mode = strings.TrimSpace(after)
 				}
 				continue
 			}
@@ -39,7 +39,7 @@ func MergeCoverProfiles(profiles []string, output string) error {
 			if err != nil {
 				continue
 			}
-			if count > merged[key] {
+			if existing, ok := merged[key]; !ok || count > existing {
 				merged[key] = count
 			}
 		}
