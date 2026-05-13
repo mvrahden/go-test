@@ -235,6 +235,43 @@ func StripRunFilter(runFlags []string) []string {
 	return out
 }
 
+// ExtractCoverProfile returns the value of -coverprofile from run flags, if present.
+func ExtractCoverProfile(runFlags []string) string {
+	for i, f := range runFlags {
+		if f == "-args" {
+			return ""
+		}
+		if v, ok := strings.CutPrefix(f, "-coverprofile="); ok {
+			return v
+		}
+		if f == "-coverprofile" && i+1 < len(runFlags) {
+			return runFlags[i+1]
+		}
+	}
+	return ""
+}
+
+// StripCoverProfile removes -coverprofile and its value from run flags.
+func StripCoverProfile(runFlags []string) []string {
+	var out []string
+	for i := 0; i < len(runFlags); i++ {
+		f := runFlags[i]
+		if f == "-args" {
+			out = append(out, runFlags[i:]...)
+			return out
+		}
+		if strings.HasPrefix(f, "-coverprofile=") {
+			continue
+		}
+		if f == "-coverprofile" {
+			i++ // skip value
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
 func LooksLikePackagePattern(s string) bool {
 	return strings.HasPrefix(s, ".") || strings.HasPrefix(s, "/") || strings.Contains(s, "/")
 }

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -57,8 +58,18 @@ func MergeCoverProfiles(profiles []string, output string) error {
 
 	w := bufio.NewWriter(out)
 	fmt.Fprintf(w, "mode: %s\n", mode)
-	for key, count := range merged {
-		fmt.Fprintf(w, "%s %s %d\n", key.file, key.block, count)
+	keys := make([]stmtKey, 0, len(merged))
+	for k := range merged {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].file != keys[j].file {
+			return keys[i].file < keys[j].file
+		}
+		return keys[i].block < keys[j].block
+	})
+	for _, key := range keys {
+		fmt.Fprintf(w, "%s %s %d\n", key.file, key.block, merged[key])
 	}
 	return w.Flush()
 }
