@@ -12,12 +12,15 @@ import { resolveTestItem, applyResults } from "./runnerUtils.js";
  * cycle boundary detection, and auto-restart on crash.
  */
 class WatchProcess implements vscode.Disposable {
+  private static readonly MAX_CONSECUTIVE_CRASHES = 5;
+  private static readonly BASE_RESTART_DELAY_MS = 2000;
+  private static readonly MAX_RESTART_DELAY_MS = 30_000;
+
   private child: ChildProcess | undefined;
   private buffer = "";
   private cycleBuffer = "";
   private disposed = false;
-  private restartCount = 0;
-  private lastCrashTime = 0;
+  private consecutiveCrashes = 0;
 
   constructor(
     private readonly pkgScope: string,
@@ -79,7 +82,7 @@ class WatchProcess implements vscode.Disposable {
         const event = JSON.parse(trimmed);
 
         if (event.Action === "watch-start") {
-          // Flush any accumulated cycle events before starting new cycle
+          this.consecutiveCrashes = 0;
           if (this.cycleBuffer) {
             this.onEvents(this.cycleBuffer);
             this.cycleBuffer = "";
@@ -123,29 +126,36 @@ class WatchProcess implements vscode.Disposable {
       return;
     }
 
-    const now = Date.now();
-    if (now - this.lastCrashTime < 10_000) {
+    this.consecutiveCrashes++;
+
+    if (
+      this.consecutiveCrashes >= WatchProcess.MAX_CONSECUTIVE_CRASHES
+    ) {
       this.outputChannel.appendLine(
-        `[watch] process crashed too quickly, not restarting (scope: ${this.pkgScope})`,
+        `[watch] ${this.consecutiveCrashes} consecutive crashes, stopping (scope: ${this.pkgScope})`,
       );
       this.onError(
-        `Watch process for "${this.pkgScope}" crashed repeatedly. Stopping.`,
+        `Watch process for "${this.pkgScope}" crashed ${this.consecutiveCrashes} times. Stopping.`,
       );
       this.onExit();
       return;
     }
 
-    this.lastCrashTime = now;
-    this.restartCount++;
+    const delay = Math.min(
+      WatchProcess.BASE_RESTART_DELAY_MS *
+        Math.pow(2, this.consecutiveCrashes - 1),
+      WatchProcess.MAX_RESTART_DELAY_MS,
+    );
+
     this.outputChannel.appendLine(
-      `[watch] restarting in 2s (attempt ${this.restartCount}, scope: ${this.pkgScope})`,
+      `[watch] restarting in ${delay / 1000}s (crash ${this.consecutiveCrashes}/${WatchProcess.MAX_CONSECUTIVE_CRASHES}, scope: ${this.pkgScope})`,
     );
 
     setTimeout(() => {
       if (!this.disposed) {
         this.start();
       }
-    }, 2000);
+    }, delay);
   }
 
   dispose(): void {
@@ -179,7 +189,6 @@ class WatchProcess implements vscode.Disposable {
 export class WatchManager implements vscode.Disposable {
   private watchers = new Map<string, WatchProcess>();
   private activeRuns = new Map<string, vscode.TestRun>();
-  private pendingSave: Promise<void> = Promise.resolve();
   private readonly _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChange: vscode.Event<void> = this._onDidChange.event;
   private readonly statusBar: vscode.StatusBarItem;
@@ -223,9 +232,7 @@ export class WatchManager implements vscode.Disposable {
         if (cycleJsonAccumulator) {
           this.onCycleComplete(cycleJsonAccumulator);
         }
-        this.pendingSave = this.controller.saveResults().catch((err) => {
-          this.outputChannel.appendLine(`[watch] save failed: ${err}`);
-        });
+        this.controller.saveResults();
         cycleJsonAccumulator = "";
 
         // Create new TestRun
@@ -250,15 +257,15 @@ export class WatchManager implements vscode.Disposable {
       },
       // onExit
       () => {
-        // End current TestRun
         const run = this.activeRuns.get(pkgScope);
         if (run) {
+          run.appendOutput(
+            "\r\n[watch] Process exited unexpectedly — results may be incomplete\r\n",
+          );
           run.end();
           this.activeRuns.delete(pkgScope);
         }
-        this.pendingSave = this.controller.saveResults().catch((err) => {
-          this.outputChannel.appendLine(`[watch] save failed: ${err}`);
-        });
+        this.controller.saveResults();
 
         // Fire cycle complete with accumulated JSON
         if (cycleJsonAccumulator) {
