@@ -342,11 +342,15 @@ export class CoverageRunner implements vscode.Disposable {
 
         const config = scopedConfig(workspaceDir);
         const testFlags = config.get<string[]>("testFlags") ?? [];
+        const coverTestOnly =
+          config.get<boolean>("coverTestOnlyPackages") ?? false;
 
-        const unfiltered = pkgInfos.filter((p) => !p.filter && !p.testOnly);
-        const unfilteredTestOnly = pkgInfos.filter(
-          (p) => !p.filter && p.testOnly,
-        );
+        const unfiltered = coverTestOnly
+          ? pkgInfos.filter((p) => !p.filter && !p.testOnly)
+          : pkgInfos.filter((p) => !p.filter);
+        const unfilteredTestOnly = coverTestOnly
+          ? pkgInfos.filter((p) => !p.filter && p.testOnly)
+          : [];
         const filtered = pkgInfos.filter((p) => p.filter);
 
         if (unfiltered.length > 0) {
@@ -386,7 +390,7 @@ export class CoverageRunner implements vscode.Disposable {
             testFlags,
             run,
             effectiveToken,
-            info.testOnly,
+            coverTestOnly && info.testOnly,
           );
         }
       }

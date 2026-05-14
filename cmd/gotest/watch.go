@@ -149,7 +149,8 @@ func runWatch(args []string) int {
 
 func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
-	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, classified.BuildFlags)
+	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
+	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
 	if err != nil {
 		if jsonMode {
 			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())

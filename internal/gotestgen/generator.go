@@ -52,22 +52,15 @@ type LoadWarning struct {
 // LoadResult holds the parsed packages for a given import path,
 // split into internal-test (ptest) and external-test (pxtest) packages.
 type LoadResult struct {
-	PkgDir  string
-	PkgPath string
-	Ptest   *packages.Package
-	Pxtest  *packages.Package
+	PkgDir       string
+	PkgPath      string
+	Ptest        *packages.Package
+	Pxtest       *packages.Package
+	hasProdFiles bool
 }
 
 func (lr *LoadResult) IsTestOnly() bool {
-	if lr.Ptest == nil {
-		return true
-	}
-	for _, f := range lr.Ptest.GoFiles {
-		if !strings.HasSuffix(f, "_test.go") {
-			return false
-		}
-	}
-	return true
+	return !lr.hasProdFiles
 }
 
 // loadPackages is the shared core for all package-loading variants.
@@ -111,6 +104,19 @@ func loadPackages(mode packages.LoadMode, targetPkgs []string, buildFlags []stri
 		return nil, warnings, nil
 	}
 
+	prodPkgs := make(map[string]bool)
+	for _, p := range loadedTestPkgs {
+		if strings.Contains(p.ID, "[") || strings.HasSuffix(p.ID, ".test") {
+			continue
+		}
+		for _, f := range p.GoFiles {
+			if !strings.HasSuffix(f, "_test.go") {
+				prodPkgs[p.PkgPath] = true
+				break
+			}
+		}
+	}
+
 	loadedTestPkgs = slices.Filter(loadedTestPkgs, func(item *packages.Package, index int) bool {
 		return strings.HasSuffix(item.ID, ".test]")
 	})
@@ -122,7 +128,7 @@ func loadPackages(mode packages.LoadMode, targetPkgs []string, buildFlags []stri
 		}
 		_, ok := acc[pkgPath]
 		if !ok {
-			acc[pkgPath] = &LoadResult{PkgPath: pkgPath, PkgDir: DeterminePkgDir(p)}
+			acc[pkgPath] = &LoadResult{PkgPath: pkgPath, PkgDir: DeterminePkgDir(p), hasProdFiles: prodPkgs[pkgPath]}
 		}
 		if !isPxTest {
 			acc[pkgPath].Ptest = p

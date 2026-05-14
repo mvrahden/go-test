@@ -83,7 +83,8 @@ describe("TestResultStore", () => {
       writer.record("pkg/suite/a", "pass", 42);
       writer.record("pkg/suite/b", "fail");
       writer.record("pkg/suite/c", "skip", 7);
-      await writer.save();
+      writer.save();
+      await writer.flush();
 
       const reader = new TestResultStore({ fsPath: tmpDir });
       await reader.load();
@@ -112,7 +113,8 @@ describe("TestResultStore", () => {
       const writer = new TestResultStore({ fsPath: tmpDir });
       writer.record("pkg/fresh", "pass");
       writer.record("pkg/stale", "fail");
-      await writer.save();
+      writer.save();
+      await writer.flush();
 
       const filePath = path.join(tmpDir, "testResults.json");
       const raw = await readFile(filePath, "utf-8");
@@ -131,7 +133,8 @@ describe("TestResultStore", () => {
       const store = new TestResultStore({ fsPath: tmpDir }, 0);
       store.record("pkg/a", "pass");
       await new Promise((r) => setTimeout(r, 10));
-      await store.save();
+      store.save();
+      await store.flush();
 
       const reader = new TestResultStore({ fsPath: tmpDir });
       await reader.load();
@@ -142,7 +145,8 @@ describe("TestResultStore", () => {
       const store = new TestResultStore({ fsPath: tmpDir }, 60_000);
       store.record("pkg/a", "pass");
       store.record("pkg/b", "fail");
-      await store.save();
+      store.save();
+      await store.flush();
 
       const reader = new TestResultStore({ fsPath: tmpDir });
       await reader.load();

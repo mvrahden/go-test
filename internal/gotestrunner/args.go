@@ -272,6 +272,27 @@ func StripCoverProfile(runFlags []string) []string {
 	return out
 }
 
+// StripCoverBuildFlags removes coverage-related build flags (-cover,
+// -covermode, -coverpkg) that break packages.Load when passed as BuildFlags.
+func StripCoverBuildFlags(flags []string) []string {
+	var out []string
+	for i := 0; i < len(flags); i++ {
+		f := flags[i]
+		name, _, hasEquals := strings.Cut(f, "=")
+		if name == "-cover" {
+			continue
+		}
+		if name == "-covermode" || name == "-coverpkg" {
+			if !hasEquals && i+1 < len(flags) {
+				i++
+			}
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
 func LooksLikePackagePattern(s string) bool {
 	return strings.HasPrefix(s, ".") || strings.HasPrefix(s, "/") || strings.Contains(s, "/")
 }
