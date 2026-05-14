@@ -255,9 +255,42 @@ func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected Collector
 			fixtureDeps = append(fixtureDeps, "Test"+id)
 		}
 	}
+	if fixtureTreeHasSharedFixtures(resolved.RootFixtures) {
+		seen := make(map[string]bool, len(fixtureDeps))
+		for _, d := range fixtureDeps {
+			seen[d] = true
+		}
+		for _, ts := range resolved.FixtureBound {
+			name := "Test" + ts.Identifier()
+			if !seen[name] {
+				fixtureDeps = append(fixtureDeps, name)
+			}
+		}
+	}
 
 	r := renderer{}
 	buf, err := r.RenderTestSuiteSpec(pkg, spec, resolved)
 	return buf, fixtureDeps, err
+}
+
+func fixtureTreeHasSharedFixtures(roots []*ResolvedFixture) bool {
+	for _, rf := range roots {
+		if fixtureHasSharedFixtures(rf) {
+			return true
+		}
+	}
+	return false
+}
+
+func fixtureHasSharedFixtures(rf *ResolvedFixture) bool {
+	if len(rf.SharedFixtures) > 0 {
+		return true
+	}
+	for _, child := range rf.Children {
+		if fixtureHasSharedFixtures(child) {
+			return true
+		}
+	}
+	return false
 }
 
