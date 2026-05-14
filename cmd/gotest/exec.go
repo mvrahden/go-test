@@ -461,7 +461,8 @@ func executeTestsCaptured(ctx context.Context, cfg ExecConfig, overlay *overlayR
 
 func Run(cfg ExecConfig) int {
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
-	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, classified.BuildFlags)
+	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
+	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
