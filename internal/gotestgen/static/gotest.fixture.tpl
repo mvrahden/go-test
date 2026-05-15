@@ -199,11 +199,9 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
     s.BeforeAll(tt)
 
 {{ range $tc := $ts.TestCases }}
-{{- if $ts.IsMethodParallel }}
-    wg.Add(1)
-{{- end }}
     t.Run("{{ $tc.Identifier }}", func(it *testing.T) {
 {{- if $ts.IsMethodParallel }}
+        wg.Add(1)
         it.Parallel()
         defer wg.Done()
 {{- end }}
@@ -269,11 +267,9 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
     s.BeforeAll(tt)
 
 {{ range $tc := $ts.TestCases }}
-{{- if $ts.IsMethodParallel }}
-    wg.Add(1)
-{{- end }}
     t.Run("{{ $tc.Identifier }}", func(it *testing.T) {
 {{- if $ts.IsMethodParallel }}
+        wg.Add(1)
         it.Parallel()
         defer wg.Done()
 {{- end }}

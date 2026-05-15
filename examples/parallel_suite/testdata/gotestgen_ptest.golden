@@ -99,8 +99,8 @@ func TestMethodParallelTestSuite(t *testing.T) {
 	})
 	s.BeforeAll(tt)
 
-	wg.Add(1)
 	t.Run("TestOne", func(it *testing.T) {
+		wg.Add(1)
 		it.Parallel()
 		defer wg.Done()
 		ttt := gotest.NewT(it)
@@ -115,8 +115,8 @@ func TestMethodParallelTestSuite(t *testing.T) {
 		return
 	}
 
-	wg.Add(1)
 	t.Run("TestTwo", func(it *testing.T) {
+		wg.Add(1)
 		it.Parallel()
 		defer wg.Done()
 		ttt := gotest.NewT(it)
