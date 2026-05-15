@@ -31,11 +31,18 @@ type LightTestSuite struct {
 	*InfraFixture
 }
 
-func (s *LightTestSuite) TestDBAccess(t *gotest.T) {}
+func (s *LightTestSuite) TestDBAccess(t *gotest.T) {
+	gotest.Equal(t, "db-ready", s.InfraFixture.DBValue)
+}
 
 type FullTestSuite struct {
 	*APIFixture
 }
 
-func (s *FullTestSuite) TestAPIAccess(t *gotest.T) {}
-func (s *FullTestSuite) TestAPIHealth(t *gotest.T) {}
+func (s *FullTestSuite) TestAPIAccess(t *gotest.T) {
+	gotest.Equal(t, "api-ready", s.APIFixture.APIValue)
+}
+
+func (s *FullTestSuite) TestAPIHealth(t *gotest.T) {
+	gotest.Equal(t, "db-ready", s.APIFixture.InfraFixture.DBValue)
+}

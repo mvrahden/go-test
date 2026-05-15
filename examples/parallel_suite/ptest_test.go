@@ -1,34 +1,21 @@
 package parallelsuite
 
 import (
+	"sync/atomic"
+
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// ParallelTestSuite demonstrates default suite-level parallelism (always-on).
-type ParallelTestSuite struct{}
+var idSeq atomic.Int64
 
-func (s *ParallelTestSuite) BeforeEach(t *gotest.T) {
-	Increment()
-}
-
-func (s *ParallelTestSuite) TestAlpha(t *gotest.T) {
-	Increment()
-}
-
-func (s *ParallelTestSuite) TestBeta(t *gotest.T) {
-	Increment()
-}
-
-func (s *ParallelTestSuite) TestGamma(t *gotest.T) {
-	Increment()
-}
-
-// MethodParallelCtx is the per-test context returned by BeforeEach.
+// MethodParallelCtx holds per-test state for parallel execution.
 type MethodParallelCtx struct {
 	Value int64
 }
 
-// MethodParallelTestSuite demonstrates method-level parallelism with typed context.
+// MethodParallelTestSuite demonstrates method-level parallelism.
+// SuiteConfig{Parallel: true} makes each test method run concurrently.
+// A returning BeforeEach provides per-test state isolation.
 type MethodParallelTestSuite struct{}
 
 func (s *MethodParallelTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -36,16 +23,15 @@ func (s *MethodParallelTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func (s *MethodParallelTestSuite) BeforeEach(t *gotest.T) *MethodParallelCtx {
-	return &MethodParallelCtx{Value: Increment()}
+	return &MethodParallelCtx{Value: idSeq.Add(1)}
 }
 
-func (s *MethodParallelTestSuite) AfterEach(t *gotest.T, ctx *MethodParallelCtx) {
-}
+func (s *MethodParallelTestSuite) AfterEach(t *gotest.T, ctx *MethodParallelCtx) {}
 
 func (s *MethodParallelTestSuite) TestOne(t *gotest.T, ctx *MethodParallelCtx) {
-	Increment()
+	gotest.NotZero(t, ctx.Value)
 }
 
 func (s *MethodParallelTestSuite) TestTwo(t *gotest.T, ctx *MethodParallelCtx) {
-	Increment()
+	gotest.NotZero(t, ctx.Value)
 }

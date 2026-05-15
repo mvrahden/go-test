@@ -19,4 +19,6 @@ type ExternalLightTestSuite struct {
 	*ExternalInfraFixture
 }
 
-func (s *ExternalLightTestSuite) TestSimple(t *gotest.T) {}
+func (s *ExternalLightTestSuite) TestSimple(t *gotest.T) {
+	gotest.Equal(t, "infra-ready", s.ExternalInfraFixture.Value)
+}

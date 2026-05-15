@@ -33,6 +33,7 @@ func ƒƒ_GOTEST_main(m *testing.M) (ƒcode int) {
 
 		ƒ_SetupFixture = &SetupFixture{}
 		ƒcfg := gotest.DefaultFixtureConfig()
+		gotest.OverlayFixtureConfig(&ƒcfg, ƒ_SetupFixture.FixtureConfig())
 		var ƒerr error
 		ƒattempts := 1 + ƒcfg.Retries
 		for ƒi := range ƒattempts {

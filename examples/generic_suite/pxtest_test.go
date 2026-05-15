@@ -1,16 +1,15 @@
 package genericsuite_test
 
-import (
-	genericsuite "github.com/mvrahden/go-test/examples/generic_suite"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
+import "github.com/mvrahden/go-test/pkg/gotest"
 
-type SimpleExtTestSuite struct{}
+type SimpleExtTestSuite struct {
+	count int
+}
 
 func (s *SimpleExtTestSuite) BeforeEach(t *gotest.T) {
-	genericsuite.Noop()
+	s.count = 0
 }
 
 func (s *SimpleExtTestSuite) TestAlpha(t *gotest.T) {
-	genericsuite.Noop()
+	gotest.Zero(t, s.count)
 }

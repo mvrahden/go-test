@@ -80,13 +80,12 @@ func Test_TestsuiteCLI_ParallelSuite(t *testing.T) {
 	output := string(out)
 
 	gotest.NoError(t, err, "parallel suite should pass: %s", output)
-	gotest.Contains(t, output, "TestParallelTestSuite")
-	gotest.Contains(t, output, "TestAlpha")
-	gotest.Contains(t, output, "TestBeta")
-	gotest.Contains(t, output, "TestGamma")
 	gotest.Contains(t, output, "TestMethodParallelTestSuite")
 	gotest.Contains(t, output, "TestOne")
 	gotest.Contains(t, output, "TestTwo")
+	gotest.Contains(t, output, "TestParallelExtTestSuite")
+	gotest.Contains(t, output, "TestDelta")
+	gotest.Contains(t, output, "TestEpsilon")
 	gotest.Contains(t, output, "PAUSE")
 	gotest.Contains(t, output, "PASS")
 }
@@ -127,7 +126,7 @@ func Test_TestsuiteCLI_AllPackages(t *testing.T) {
 	gotest.Contains(t, output, "TestUnitTestSuite")
 	gotest.Contains(t, output, "TestSimpleTestSuite")
 	gotest.Contains(t, output, "TestF_FocusedTestSuite")
-	gotest.Contains(t, output, "TestParallelTestSuite")
+	gotest.Contains(t, output, "TestMethodParallelTestSuite")
 	gotest.Contains(t, output, "TestStringTestSuite")
 }
 
@@ -137,8 +136,12 @@ func Test_TestsuiteCLI_ExitCode(t *testing.T) {
 	testutils.ActivateTests(t, tmp)
 	testutils.HackGoWork(t, tmp)
 
+	failDir := filepath.Join(tmp, "examples", "fail_suite")
+	os.MkdirAll(failDir, 0o755)
+	os.WriteFile(filepath.Join(failDir, "ptest_test.go"), []byte("package failsuite\n\nimport \"github.com/mvrahden/go-test/pkg/gotest\"\n\ntype FailTestSuite struct{}\n\nfunc (s *FailTestSuite) TestAlwaysFails(t *gotest.T) { t.FailNow() }\n"), 0o644)
+
 	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/gotest",
-		filepath.Join(tmp, "examples", "simple_suite"), "-v")
+		failDir, "-v")
 	cmd.Dir = filepath.Join(tmp, "examples")
 	_, err := cmd.CombinedOutput()
 
