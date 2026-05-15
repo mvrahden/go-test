@@ -33,6 +33,7 @@ func ƒƒ_GOTEST_main(m *testing.M) (ƒcode int) {
 
 		ƒ_SetupFixture = &SetupFixture{}
 		ƒcfg := gotest.DefaultFixtureConfig()
+		gotest.OverlayFixtureConfig(&ƒcfg, ƒ_SetupFixture.FixtureConfig())
 		var ƒerr error
 		ƒattempts := 1 + ƒcfg.Retries
 		for ƒi := range ƒattempts {
@@ -85,11 +86,18 @@ func TestDemoTestSuite(t *testing.T) {
 	}
 	ƒcfg := gotest.DefaultSuiteConfig()
 
-	tt := gotest.NewT(t)
+	ƒsetupT := gotest.NewT(t)
+	if ƒcfg.SetupTimeout > 0 {
+		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+	}
 	t.Cleanup(func() {
-		s.AfterAll(tt)
+		ƒteardownT := gotest.NewT(t)
+		if ƒcfg.SetupTimeout > 0 {
+			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+		}
+		s.AfterAll(ƒteardownT)
 	})
-	s.BeforeAll(tt)
+	s.BeforeAll(ƒsetupT)
 
 	t.Run("TestValueSet", func(it *testing.T) {
 		ttt := gotest.NewT(it)

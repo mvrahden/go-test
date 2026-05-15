@@ -18,5 +18,10 @@ type UserTestSuite struct {
 	*APIFixture
 }
 
-func (s *UserTestSuite) TestCreateUser(t *gotest.T) {}
-func (s *UserTestSuite) TestListUsers(t *gotest.T)  {}
+func (s *UserTestSuite) TestCreateUser(t *gotest.T) {
+	gotest.NotEmpty(t, s.APIFixture.PostgresSharedFixture.DSN)
+}
+
+func (s *UserTestSuite) TestListUsers(t *gotest.T) {
+	gotest.NotEmpty(t, s.APIFixture.RedisSharedFixture.Addr)
+}

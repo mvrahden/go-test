@@ -14,42 +14,49 @@ type ƒƒ_GOTEST_SimpleTestSuite struct {
 	SimpleTestSuite
 }
 
-func (ts *ƒƒ_GOTEST_SimpleTestSuite) BeforeAll(it *gotest.T)  { ts.SimpleTestSuite.BeforeAll(it) }
-func (ts *ƒƒ_GOTEST_SimpleTestSuite) AfterAll(it *gotest.T)   { ts.SimpleTestSuite.AfterAll(it) }
+func (ts *ƒƒ_GOTEST_SimpleTestSuite) BeforeAll(it *gotest.T)  {}
+func (ts *ƒƒ_GOTEST_SimpleTestSuite) AfterAll(it *gotest.T)   {}
 func (ts *ƒƒ_GOTEST_SimpleTestSuite) BeforeEach(it *gotest.T) { ts.SimpleTestSuite.BeforeEach(it) }
-func (ts *ƒƒ_GOTEST_SimpleTestSuite) AfterEach(it *gotest.T)  { ts.SimpleTestSuite.AfterEach(it) }
+func (ts *ƒƒ_GOTEST_SimpleTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestSimpleTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_SimpleTestSuite{}
 	ƒcfg := gotest.DefaultSuiteConfig()
 
-	tt := gotest.NewT(t)
+	ƒsetupT := gotest.NewT(t)
+	if ƒcfg.SetupTimeout > 0 {
+		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+	}
 	t.Cleanup(func() {
-		s.AfterAll(tt)
+		ƒteardownT := gotest.NewT(t)
+		if ƒcfg.SetupTimeout > 0 {
+			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+		}
+		s.AfterAll(ƒteardownT)
 	})
-	s.BeforeAll(tt)
+	s.BeforeAll(ƒsetupT)
 
-	t.Run("TestSucceeds", func(it *testing.T) {
+	t.Run("TestLength", func(it *testing.T) {
 		ttt := gotest.NewT(it)
 		if ƒcfg.Timeout > 0 {
 			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
 		}
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestSucceeds, ttt)
+		ƒƒ_GOTEST_exec(s.TestLength, ttt)
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
 	}
 
-	t.Run("TestFails", func(it *testing.T) {
+	t.Run("TestContains", func(it *testing.T) {
 		ttt := gotest.NewT(it)
 		if ƒcfg.Timeout > 0 {
 			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
 		}
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestFails, ttt)
+		ƒƒ_GOTEST_exec(s.TestContains, ttt)
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return

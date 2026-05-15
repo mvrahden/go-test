@@ -1,23 +1,41 @@
 package stdlib
 
 import (
+	"testing"
+
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// UnitTestSuite is a testsuite-style test of the Unit.
 type UnitTestSuite struct {
-	sut *Unit
+	sut   *Unit
+	ready bool
 }
 
-func (s *UnitTestSuite) BeforeEach(t *gotest.T) {
+func (s *UnitTestSuite) BeforeAll(t *testing.T) {
+	s.ready = true
+}
+
+func (s *UnitTestSuite) AfterAll(t *testing.T) {
+	s.ready = false
+}
+
+func (s *UnitTestSuite) BeforeEach(t *testing.T) {
 	s.sut = NewUnit()
 }
 
-func (s *UnitTestSuite) TestUnitSuccess(t *gotest.T) {
-	for idx, expected := range []string{"hello", "world", "foo", "bar", "baz"} {
+func (s *UnitTestSuite) AfterEach(t *testing.T) {
+	s.sut = nil
+}
+
+func (s *UnitTestSuite) TestUnitSuccess(t *testing.T) {
+	for _, expected := range []string{"hello", "world", "foo", "bar", "baz"} {
 		actual := s.sut.DoSomething()
 		if actual != expected {
-			t.T().Fatalf("not equal@%d. wanted %q; got %q", idx, expected, actual)
+			t.Fatalf("wanted %q; got %q", expected, actual)
 		}
 	}
+}
+
+func (s *UnitTestSuite) TestReady(t *testing.T) {
+	gotest.True(t, s.ready)
 }

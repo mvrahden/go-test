@@ -4,6 +4,7 @@ package parallelsuite_test
 
 import (
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"sync"
 	"testing"
 )
 
@@ -16,55 +17,60 @@ type ƒƒ_GOTEST_ParallelExtTestSuite struct {
 
 func (ts *ƒƒ_GOTEST_ParallelExtTestSuite) BeforeAll(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_ParallelExtTestSuite) AfterAll(it *gotest.T)  {}
-func (ts *ƒƒ_GOTEST_ParallelExtTestSuite) BeforeEach(it *gotest.T) {
-	ts.ParallelExtTestSuite.BeforeEach(it)
+func (ts *ƒƒ_GOTEST_ParallelExtTestSuite) BeforeEach(it *gotest.T) *ExtParallelCtx {
+	return ts.ParallelExtTestSuite.BeforeEach(it)
 }
-func (ts *ƒƒ_GOTEST_ParallelExtTestSuite) AfterEach(it *gotest.T) {}
+func (ts *ƒƒ_GOTEST_ParallelExtTestSuite) AfterEach(it *gotest.T, ctx *ExtParallelCtx) {
+	ts.ParallelExtTestSuite.AfterEach(it, ctx)
+}
 
 func TestParallelExtTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_ParallelExtTestSuite{}
 	ƒcfg := gotest.DefaultSuiteConfig()
+	gotest.OverlaySuiteConfig(&ƒcfg, s.ParallelExtTestSuite.SuiteConfig())
+	wg := &sync.WaitGroup{}
 
-	tt := gotest.NewT(t)
+	ƒsetupT := gotest.NewT(t)
+	if ƒcfg.SetupTimeout > 0 {
+		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+	}
 	t.Cleanup(func() {
-		s.AfterAll(tt)
+		wg.Wait()
+		ƒteardownT := gotest.NewT(t)
+		if ƒcfg.SetupTimeout > 0 {
+			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+		}
+		s.AfterAll(ƒteardownT)
 	})
-	s.BeforeAll(tt)
+	s.BeforeAll(ƒsetupT)
 
 	t.Run("TestDelta", func(it *testing.T) {
+		wg.Add(1)
+		it.Parallel()
+		defer wg.Done()
 		ttt := gotest.NewT(it)
 		if ƒcfg.Timeout > 0 {
 			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
 		}
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestDelta, ttt)
+		ctx := s.BeforeEach(ttt)
+		defer s.AfterEach(ttt, ctx)
+		s.TestDelta(ttt, ctx)
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
 	}
 
 	t.Run("TestEpsilon", func(it *testing.T) {
+		wg.Add(1)
+		it.Parallel()
+		defer wg.Done()
 		ttt := gotest.NewT(it)
 		if ƒcfg.Timeout > 0 {
 			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
 		}
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestEpsilon, ttt)
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("TestZeta", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestZeta, ttt)
+		ctx := s.BeforeEach(ttt)
+		defer s.AfterEach(ttt, ctx)
+		s.TestEpsilon(ttt, ctx)
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return

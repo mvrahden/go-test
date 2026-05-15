@@ -1,3 +1,0 @@
-package focusexclude
-
-func Noop() {}

@@ -17,4 +17,6 @@ type PageTestSuite struct {
 	*WebFixture
 }
 
-func (s *PageTestSuite) TestRenderHome(t *gotest.T) {}
+func (s *PageTestSuite) TestRenderHome(t *gotest.T) {
+	gotest.NotEmpty(t, s.WebFixture.PostgresSharedFixture.DSN)
+}

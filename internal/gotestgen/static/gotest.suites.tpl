@@ -63,21 +63,26 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
   wg := &sync.WaitGroup{}
 {{- end }}
 
-  tt := gotest.NewT(t)
+  ƒsetupT := gotest.NewT(t)
+  if ƒcfg.SetupTimeout > 0 {
+    ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+  }
   t.Cleanup(func() {
 {{- if $ts.IsMethodParallel }}
     wg.Wait()
 {{- end }}
-    s.AfterAll(tt)
+    ƒteardownT := gotest.NewT(t)
+    if ƒcfg.SetupTimeout > 0 {
+        ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+    }
+    s.AfterAll(ƒteardownT)
   })
-  s.BeforeAll(tt)
+  s.BeforeAll(ƒsetupT)
 
 {{ range $tc := $ts.TestCases }}
-{{- if $ts.IsMethodParallel }}
-  wg.Add(1)
-{{- end }}
   t.Run("{{ $tc.Identifier }}", func(it *testing.T) {
 {{- if $ts.IsMethodParallel }}
+    wg.Add(1)
     it.Parallel()
     defer wg.Done()
 {{- end }}

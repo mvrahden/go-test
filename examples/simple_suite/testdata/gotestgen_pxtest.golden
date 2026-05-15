@@ -10,46 +10,42 @@ import (
 //go:noinline
 func ƒƒ_GOTEST_exec(fn gotest.TestCase, t *gotest.T) { fn(t) }
 
-type ƒƒ_GOTEST_SimpleTestSuite struct {
-	SimpleTestSuite
+type ƒƒ_GOTEST_SimpleExtTestSuite struct {
+	SimpleExtTestSuite
 }
 
-func (ts *ƒƒ_GOTEST_SimpleTestSuite) BeforeAll(it *gotest.T)  { ts.SimpleTestSuite.BeforeAll(it) }
-func (ts *ƒƒ_GOTEST_SimpleTestSuite) AfterAll(it *gotest.T)   { ts.SimpleTestSuite.AfterAll(it) }
-func (ts *ƒƒ_GOTEST_SimpleTestSuite) BeforeEach(it *gotest.T) { ts.SimpleTestSuite.BeforeEach(it) }
-func (ts *ƒƒ_GOTEST_SimpleTestSuite) AfterEach(it *gotest.T)  { ts.SimpleTestSuite.AfterEach(it) }
+func (ts *ƒƒ_GOTEST_SimpleExtTestSuite) BeforeAll(it *gotest.T) {}
+func (ts *ƒƒ_GOTEST_SimpleExtTestSuite) AfterAll(it *gotest.T)  {}
+func (ts *ƒƒ_GOTEST_SimpleExtTestSuite) BeforeEach(it *gotest.T) {
+	ts.SimpleExtTestSuite.BeforeEach(it)
+}
+func (ts *ƒƒ_GOTEST_SimpleExtTestSuite) AfterEach(it *gotest.T) {}
 
-func TestSimpleTestSuite(t *testing.T) {
-	s := &ƒƒ_GOTEST_SimpleTestSuite{}
+func TestSimpleExtTestSuite(t *testing.T) {
+	s := &ƒƒ_GOTEST_SimpleExtTestSuite{}
 	ƒcfg := gotest.DefaultSuiteConfig()
 
-	tt := gotest.NewT(t)
-	t.Cleanup(func() {
-		s.AfterAll(tt)
-	})
-	s.BeforeAll(tt)
-
-	t.Run("TestSucceeds", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestSucceeds, ttt)
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
+	ƒsetupT := gotest.NewT(t)
+	if ƒcfg.SetupTimeout > 0 {
+		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
 	}
+	t.Cleanup(func() {
+		ƒteardownT := gotest.NewT(t)
+		if ƒcfg.SetupTimeout > 0 {
+			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+		}
+		s.AfterAll(ƒteardownT)
+	})
+	s.BeforeAll(ƒsetupT)
 
-	t.Run("TestFails", func(it *testing.T) {
+	t.Run("TestValueIsSet", func(it *testing.T) {
 		ttt := gotest.NewT(it)
 		if ƒcfg.Timeout > 0 {
 			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
 		}
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestFails, ttt)
+		ƒƒ_GOTEST_exec(s.TestValueIsSet, ttt)
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
