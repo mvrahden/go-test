@@ -5,11 +5,7 @@ import { tmpdir } from "node:os";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import type { CoverageStore } from "./coverageStore.js";
-import {
-  buildCliCommand,
-  formatCliCommand,
-  scopedConfig,
-} from "./cli.js";
+import { buildCliCommand, formatCliCommand, scopedConfig } from "./cli.js";
 import { spawnTestProcess } from "./runnerUtils.js";
 import { runGoToolCoverFunc } from "./coverageUtils.js";
 
@@ -104,7 +100,9 @@ export class CoverOnSave implements vscode.Disposable {
 
     const request = new vscode.TestRunRequest();
     const run = this.controller.createTestRun(request, "Cover on Save");
-    const { coverages: allCoverages } = this.store.buildFileCoverages(this.cache);
+    const { coverages: allCoverages } = this.store.buildFileCoverages(
+      this.cache,
+    );
     for (const fc of allCoverages) {
       run.addCoverage(fc);
     }

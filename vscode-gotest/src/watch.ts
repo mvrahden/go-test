@@ -128,9 +128,7 @@ class WatchProcess implements vscode.Disposable {
 
     this.consecutiveCrashes++;
 
-    if (
-      this.consecutiveCrashes >= WatchProcess.MAX_CONSECUTIVE_CRASHES
-    ) {
+    if (this.consecutiveCrashes >= WatchProcess.MAX_CONSECUTIVE_CRASHES) {
       this.outputChannel.appendLine(
         `[watch] ${this.consecutiveCrashes} consecutive crashes, stopping (scope: ${this.pkgScope})`,
       );
@@ -356,7 +354,13 @@ export class WatchManager implements vscode.Disposable {
     for (const [importPath, pkgEvents] of byPackage) {
       const pkgDir = this.cache.resolveImportPath(importPath);
       if (pkgDir) {
-        const applied = applyResults(this.controller, run, pkgEvents, importPath, pkgDir);
+        const applied = applyResults(
+          this.controller,
+          run,
+          pkgEvents,
+          importPath,
+          pkgDir,
+        );
         for (const r of applied) {
           this.controller.recordResult(r.itemId, r.status, r.duration);
         }

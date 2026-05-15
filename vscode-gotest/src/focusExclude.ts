@@ -30,7 +30,10 @@ export class FocusExcludeProvider
           return this.actionsForSuite(suite, document);
         }
         for (const method of suite.methods) {
-          if (path.join(pkg.dir, method.file) === docPath && method.line === line) {
+          if (
+            path.join(pkg.dir, method.file) === docPath &&
+            method.line === line
+          ) {
             return this.actionsForMethod(method, document);
           }
         }

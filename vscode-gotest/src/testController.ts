@@ -293,12 +293,8 @@ export class GoTestController implements vscode.Disposable {
       return existing;
     }
 
-    if (
-      parentItem.children.size >=
-      GoTestController.MAX_DYNAMIC_SUBTESTS
-    ) {
-      const overflow =
-        (this.dynamicOverflow.get(parentItem.id) ?? 0) + 1;
+    if (parentItem.children.size >= GoTestController.MAX_DYNAMIC_SUBTESTS) {
+      const overflow = (this.dynamicOverflow.get(parentItem.id) ?? 0) + 1;
       this.dynamicOverflow.set(parentItem.id, overflow);
       parentItem.description = `${parentItem.children.size + overflow} subtests (${parentItem.children.size} shown)`;
       return parentItem;

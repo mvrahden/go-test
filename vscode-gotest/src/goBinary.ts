@@ -1,12 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import * as os from "node:os";
-import {
-  readFile,
-  readdir,
-  access,
-  constants,
-} from "node:fs/promises";
+import { readFile, readdir, access, constants } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 

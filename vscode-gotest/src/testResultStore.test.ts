@@ -90,9 +90,15 @@ describe("TestResultStore", () => {
       await reader.load();
 
       expect(reader.size).toBe(3);
-      expect(reader.get("pkg/suite/a")).toMatchObject({ status: "pass", duration: 42 });
+      expect(reader.get("pkg/suite/a")).toMatchObject({
+        status: "pass",
+        duration: 42,
+      });
       expect(reader.get("pkg/suite/b")).toMatchObject({ status: "fail" });
-      expect(reader.get("pkg/suite/c")).toMatchObject({ status: "skip", duration: 7 });
+      expect(reader.get("pkg/suite/c")).toMatchObject({
+        status: "skip",
+        duration: 7,
+      });
     });
 
     it("load handles missing file gracefully", async () => {

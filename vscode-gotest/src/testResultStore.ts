@@ -38,7 +38,11 @@ export class TestResultStore {
     return this.results.size;
   }
 
-  record(itemId: string, status: TestResult["status"], duration?: number): void {
+  record(
+    itemId: string,
+    status: TestResult["status"],
+    duration?: number,
+  ): void {
     this.results.set(itemId, { status, duration, timestamp: Date.now() });
   }
 
@@ -78,7 +82,9 @@ export class TestResultStore {
         this.results.set(id, result);
       }
       this.evictStale();
-    } catch { /* No stored data or corrupt — start fresh */ }
+    } catch {
+      /* No stored data or corrupt — start fresh */
+    }
   }
 
   save(): void {

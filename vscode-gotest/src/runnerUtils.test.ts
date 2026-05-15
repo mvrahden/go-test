@@ -41,11 +41,7 @@ import {
   enqueueDescendants,
   resolvePackageItems,
 } from "./runnerUtils.js";
-import {
-  buildPathTrie,
-  collapsePathTrie,
-  type PathNode,
-} from "./pathTrie.js";
+import { buildPathTrie, collapsePathTrie, type PathNode } from "./pathTrie.js";
 
 interface MockTestItem {
   id: string;
@@ -397,16 +393,8 @@ describe("enqueueDescendants", () => {
       { id: "package" },
     ]);
     const suite = createItem("example.com/pkg/SuiteA", "SuiteA", pkg);
-    const method1 = createItem(
-      "example.com/pkg/SuiteA/Test1",
-      "Test1",
-      suite,
-    );
-    const method2 = createItem(
-      "example.com/pkg/SuiteA/Test2",
-      "Test2",
-      suite,
-    );
+    const method1 = createItem("example.com/pkg/SuiteA/Test1", "Test1", suite);
+    const method2 = createItem("example.com/pkg/SuiteA/Test2", "Test2", suite);
 
     const run = { enqueued: vi.fn() };
 
@@ -476,12 +464,38 @@ describe("applyResults", () => {
       makeApplyResultsFixture();
 
     const events = [
-      { Action: "run" as const, Test: "MySuite/TestPass", Package: "example.com/pkg" },
-      { Action: "run" as const, Test: "MySuite/TestFail", Package: "example.com/pkg" },
-      { Action: "run" as const, Test: "MySuite/TestSkip", Package: "example.com/pkg" },
-      { Action: "pass" as const, Test: "MySuite/TestPass", Package: "example.com/pkg", Elapsed: 0.1 },
-      { Action: "fail" as const, Test: "MySuite/TestFail", Package: "example.com/pkg", Elapsed: 0.2 },
-      { Action: "skip" as const, Test: "MySuite/TestSkip", Package: "example.com/pkg" },
+      {
+        Action: "run" as const,
+        Test: "MySuite/TestPass",
+        Package: "example.com/pkg",
+      },
+      {
+        Action: "run" as const,
+        Test: "MySuite/TestFail",
+        Package: "example.com/pkg",
+      },
+      {
+        Action: "run" as const,
+        Test: "MySuite/TestSkip",
+        Package: "example.com/pkg",
+      },
+      {
+        Action: "pass" as const,
+        Test: "MySuite/TestPass",
+        Package: "example.com/pkg",
+        Elapsed: 0.1,
+      },
+      {
+        Action: "fail" as const,
+        Test: "MySuite/TestFail",
+        Package: "example.com/pkg",
+        Elapsed: 0.2,
+      },
+      {
+        Action: "skip" as const,
+        Test: "MySuite/TestSkip",
+        Package: "example.com/pkg",
+      },
     ];
 
     const applied = applyResults(
@@ -496,13 +510,25 @@ describe("applyResults", () => {
     expect(applied).toHaveLength(3);
 
     const passResult = applied.find((r) => r.itemId === passItem.id);
-    expect(passResult).toEqual({ itemId: passItem.id, status: "pass", duration: 100 });
+    expect(passResult).toEqual({
+      itemId: passItem.id,
+      status: "pass",
+      duration: 100,
+    });
 
     const failResult = applied.find((r) => r.itemId === failItem.id);
-    expect(failResult).toEqual({ itemId: failItem.id, status: "fail", duration: 200 });
+    expect(failResult).toEqual({
+      itemId: failItem.id,
+      status: "fail",
+      duration: 200,
+    });
 
     const skipResult = applied.find((r) => r.itemId === skipItem.id);
-    expect(skipResult).toEqual({ itemId: skipItem.id, status: "skip", duration: undefined });
+    expect(skipResult).toEqual({
+      itemId: skipItem.id,
+      status: "skip",
+      duration: undefined,
+    });
 
     // Does NOT call controller.recordResult
     expect(controller.recordResult).not.toHaveBeenCalled();
@@ -517,7 +543,12 @@ describe("applyResults", () => {
     const { controller, run } = makeApplyResultsFixture();
 
     const events = [
-      { Action: "pass" as const, Test: "MySuite/TestPass", Package: "example.com/pkg", Elapsed: 0.1 },
+      {
+        Action: "pass" as const,
+        Test: "MySuite/TestPass",
+        Package: "example.com/pkg",
+        Elapsed: 0.1,
+      },
       { Action: "pass" as const, Package: "example.com/pkg", Elapsed: 1.5 },
     ];
 
@@ -530,14 +561,23 @@ describe("applyResults", () => {
     );
 
     const pkgResult = applied.find((r) => r.itemId === "example.com/pkg");
-    expect(pkgResult).toEqual({ itemId: "example.com/pkg", status: "pass", duration: 1500 });
+    expect(pkgResult).toEqual({
+      itemId: "example.com/pkg",
+      status: "pass",
+      duration: 1500,
+    });
   });
 
   it("captures package-level fail event with Elapsed", () => {
     const { controller, run } = makeApplyResultsFixture();
 
     const events = [
-      { Action: "fail" as const, Test: "MySuite/TestFail", Package: "example.com/pkg", Elapsed: 0.2 },
+      {
+        Action: "fail" as const,
+        Test: "MySuite/TestFail",
+        Package: "example.com/pkg",
+        Elapsed: 0.2,
+      },
       { Action: "fail" as const, Package: "example.com/pkg", Elapsed: 2.3 },
     ];
 
@@ -550,7 +590,11 @@ describe("applyResults", () => {
     );
 
     const pkgResult = applied.find((r) => r.itemId === "example.com/pkg");
-    expect(pkgResult).toEqual({ itemId: "example.com/pkg", status: "fail", duration: 2300 });
+    expect(pkgResult).toEqual({
+      itemId: "example.com/pkg",
+      status: "fail",
+      duration: 2300,
+    });
   });
 });
 
@@ -564,9 +608,9 @@ describe("computeWildcard", () => {
   });
 
   it("returns wildcard for two paths with common prefix", () => {
-    expect(
-      computeWildcard(["example.com/pkg/a", "example.com/pkg/b"]),
-    ).toBe("example.com/pkg/...");
+    expect(computeWildcard(["example.com/pkg/a", "example.com/pkg/b"])).toBe(
+      "example.com/pkg/...",
+    );
   });
 
   it("finds deep common prefix", () => {
@@ -587,10 +631,7 @@ describe("computeWildcard", () => {
 
   it("handles divergence at top level", () => {
     expect(
-      computeWildcard([
-        "example.com/pkg/a",
-        "example.com/internal/b",
-      ]),
+      computeWildcard(["example.com/pkg/a", "example.com/internal/b"]),
     ).toBe("example.com/...");
   });
 
