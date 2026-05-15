@@ -221,9 +221,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         try {
           funcOutput = await runGoToolCoverFunc(coverFile, workspaceDir);
         } catch {
-          outputChannel.appendLine(
-            `[${label}] go tool cover -func failed`,
-          );
+          outputChannel.appendLine(`[${label}] go tool cover -func failed`);
         }
 
         if (coverage.testOnly) {

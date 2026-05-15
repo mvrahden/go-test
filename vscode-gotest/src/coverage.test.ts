@@ -383,20 +383,18 @@ describe("splitCoverByPackage", () => {
   });
 
   it("drops lines that match no import path", () => {
-    const content = [
-      "mode: set",
-      "example.com/unknown/x.go:1.1,2.2 1 1",
-    ].join("\n");
+    const content = ["mode: set", "example.com/unknown/x.go:1.1,2.2 1 1"].join(
+      "\n",
+    );
 
     const result = splitCoverByPackage(content, ["example.com/pkg"]);
     expect(result.size).toBe(0);
   });
 
   it("preserves mode line in each bucket", () => {
-    const content = [
-      "mode: atomic",
-      "example.com/pkg/a.go:1.1,2.2 3 1",
-    ].join("\n");
+    const content = ["mode: atomic", "example.com/pkg/a.go:1.1,2.2 3 1"].join(
+      "\n",
+    );
 
     const result = splitCoverByPackage(content, ["example.com/pkg"]);
     expect(result.get("example.com/pkg")).toMatch(/^mode: atomic\n/);
@@ -461,9 +459,13 @@ describe("CoverageStore.getDetails", () => {
 
   it("returns details for a file after buildFileCoverages", () => {
     const store = new CoverageStoreCls(undefined);
-    store.update("example.com/pkg", "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n");
+    store.update(
+      "example.com/pkg",
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
+    );
     const mockCache = {
-      resolveImportPath: (ip: string) => ip === "example.com/pkg" ? "/abs/pkg" : undefined,
+      resolveImportPath: (ip: string) =>
+        ip === "example.com/pkg" ? "/abs/pkg" : undefined,
     };
     store.buildFileCoverages(mockCache as any);
     const details = store.getDetails("/abs/pkg/main.go");
@@ -477,9 +479,13 @@ describe("CoverageStore.getDetails", () => {
 
   it("clears cached details on invalidate", () => {
     const store = new CoverageStoreCls(undefined);
-    store.update("example.com/pkg", "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n");
+    store.update(
+      "example.com/pkg",
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
+    );
     const mockCache = {
-      resolveImportPath: (ip: string) => ip === "example.com/pkg" ? "/abs/pkg" : undefined,
+      resolveImportPath: (ip: string) =>
+        ip === "example.com/pkg" ? "/abs/pkg" : undefined,
     };
     store.buildFileCoverages(mockCache as any);
     expect(store.getDetails("/abs/pkg/main.go").length).toBeGreaterThan(0);
@@ -489,9 +495,13 @@ describe("CoverageStore.getDetails", () => {
 
   it("clears cached details on clear", () => {
     const store = new CoverageStoreCls(undefined);
-    store.update("example.com/pkg", "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n");
+    store.update(
+      "example.com/pkg",
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
+    );
     const mockCache = {
-      resolveImportPath: (ip: string) => ip === "example.com/pkg" ? "/abs/pkg" : undefined,
+      resolveImportPath: (ip: string) =>
+        ip === "example.com/pkg" ? "/abs/pkg" : undefined,
     };
     store.buildFileCoverages(mockCache as any);
     expect(store.getDetails("/abs/pkg/main.go").length).toBeGreaterThan(0);

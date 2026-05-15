@@ -11,11 +11,7 @@ vi.mock("vscode", () => ({
   window: { showWarningMessage: vi.fn(), showErrorMessage: vi.fn() },
 }));
 
-import {
-  compareVersions,
-  escapeRegExp,
-  formatCliCommand,
-} from "./cli.js";
+import { compareVersions, escapeRegExp, formatCliCommand } from "./cli.js";
 
 describe("compareVersions", () => {
   it("returns 0 for equal versions", () => {
@@ -54,9 +50,7 @@ describe("escapeRegExp", () => {
   });
 
   it("escapes module paths", () => {
-    expect(escapeRegExp("github.com/foo/bar")).toBe(
-      "github\\.com/foo/bar",
-    );
+    expect(escapeRegExp("github.com/foo/bar")).toBe("github\\.com/foo/bar");
   });
 });
 

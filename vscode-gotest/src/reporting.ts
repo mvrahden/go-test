@@ -181,18 +181,14 @@ export async function copyCoverageSummary(
 
   lines.push(separator);
   const totalFiles =
-    root.sourceFiles > 0
-      ? fmtFiles(root.profileFiles, root.sourceFiles)
-      : "";
+    root.sourceFiles > 0 ? fmtFiles(root.profileFiles, root.sourceFiles) : "";
   let totalLine = `${"Total".padEnd(maxLabelLen)}  ${`${root.covered}/${root.total}`.padEnd(maxStmtsLen)}  ${fmtPct(root.covered, root.total).padEnd(maxPctLen)}`;
   if (totalFiles) totalLine += `  ${totalFiles}`;
   lines.push(totalLine);
 
   const text = lines.join("\n");
   await vscode.env.clipboard.writeText(text);
-  vscode.window.showInformationMessage(
-    "Coverage summary copied to clipboard.",
-  );
+  vscode.window.showInformationMessage("Coverage summary copied to clipboard.");
 }
 
 export async function copyTestResults(
@@ -290,9 +286,7 @@ export async function copyTestResults(
     }
 
     const time =
-      row.duration !== undefined
-        ? (row.duration / 1000).toFixed(3) + "s"
-        : "-";
+      row.duration !== undefined ? (row.duration / 1000).toFixed(3) + "s" : "-";
     const status = row.status ?? "-";
     lines.push(
       `${row.label.padEnd(maxLabelLen)}  ${time.padEnd(9)}  ${status}`,
