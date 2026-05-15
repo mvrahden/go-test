@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/mvrahden/go-test/internal/gotestgen"
 )
 
 type prepareOutput struct {
@@ -19,11 +21,22 @@ type prepareOutput struct {
 
 func runPrepare(args []string) int {
 	patterns := ExtractPackagePatterns(args)
+	tags, _ := extractTagsFlag(args)
+	var buildFlags []string
+	if tags != "" {
+		buildFlags = append(buildFlags, "-tags="+tags)
+	}
+
+	loaded, err := gotestgen.LoadPackages(patterns, buildFlags)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(),
 		os.Interrupt, syscall.SIGTERM)
 
-	overlay, cleanup, err := generateOverlay(patterns)
+	overlay, cleanup, err := generateOverlayFromLoaded(loaded, false)
 	if err != nil {
 		stop()
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

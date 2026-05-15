@@ -59,7 +59,7 @@ func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
 			}
 			name := ts.Name.Name
 			stripped := strings.TrimPrefix(strings.TrimPrefix(name, "F_"), "X_")
-			if strings.HasSuffix(stripped, "TestSuite") || strings.HasSuffix(stripped, "TestSuiteParallel") {
+			if strings.HasSuffix(stripped, "TestSuite") {
 				suites[name] = &suiteInfo{
 					name:    name,
 					pos:     ts.Pos(),

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
@@ -52,10 +53,6 @@ func parseDebounceFlag(args []string) (time.Duration, error) {
 func runWatch(args []string) int {
 	jsonMode, args := parseWatchFlags(args)
 	ownArgs, goTestArgs := SplitArgs(args)
-	DEBUG = slices.Contains(ownArgs, "--debug")
-	CI = slices.Contains(ownArgs, "--ci")
-	SPEC = slices.Contains(ownArgs, "--spec")
-	UPDATE_SNAPSHOTS = slices.Contains(ownArgs, "--update-snapshots")
 	setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -68,14 +65,22 @@ func runWatch(args []string) int {
 	}
 	patterns := ExtractPackagePatterns(goTestArgs)
 
+	cfg := ExecConfig{
+		GoTestArgs:      goTestArgs,
+		PackagePatterns: patterns,
+		SetupTimeout:    setupTimeout,
+		Debug:           slices.Contains(ownArgs, "--debug"),
+		CI:              slices.Contains(ownArgs, "--ci"),
+		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// Initial run
 	if !jsonMode {
 		fmt.Printf("\033[2m  running tests...\033[0m\n")
 	}
-	watchRunOnce(ctx, goTestArgs, patterns, jsonMode, setupTimeout)
+	watchRunOnce(ctx, cfg, jsonMode)
 	if !jsonMode {
 		fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
 	}
@@ -124,7 +129,10 @@ func runWatch(args []string) int {
 			}
 			pkgPatterns := dirsToPatterns(changedDirs)
 			pkgArgs := replacePatterns(goTestArgs, pkgPatterns)
-			watchRunOnce(ctx, pkgArgs, pkgPatterns, jsonMode, setupTimeout)
+			changedCfg := cfg
+			changedCfg.GoTestArgs = pkgArgs
+			changedCfg.PackagePatterns = pkgPatterns
+			watchRunOnce(ctx, changedCfg, jsonMode)
 			changedDirs = nil
 			if !jsonMode {
 				fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
@@ -139,27 +147,33 @@ func runWatch(args []string) int {
 	}
 }
 
-func watchRunOnce(ctx context.Context, goTestArgs []string, patterns []string, jsonMode bool, setupTimeout time.Duration) int {
-	if CI {
-		violations, err := RunFocusGuard(patterns)
-		if err != nil {
+func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
+	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
+	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
+	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
+	if err != nil {
+		if jsonMode {
+			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
+		} else {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		}
+		return 2
+	}
+
+	if cfg.CI {
+		if code, err := enforceFocusGuard(loaded); err != nil {
 			if jsonMode {
 				fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
 			} else {
 				fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			}
 			return 2
-		}
-		if len(violations) > 0 {
-			fmt.Fprintln(os.Stderr, "FAIL: focus prefix detected — remove F_ before merging:")
-			for _, v := range violations {
-				fmt.Fprintln(os.Stderr, v.String())
-			}
-			return 1
+		} else if code != 0 {
+			return code
 		}
 	}
 
-	overlay, cleanup, err := generateOverlay(patterns)
+	overlay, cleanup, err := generateOverlayFromLoaded(loaded, cfg.Debug)
 	if err != nil {
 		if jsonMode {
 			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
@@ -170,42 +184,12 @@ func watchRunOnce(ctx context.Context, goTestArgs []string, patterns []string, j
 	}
 	defer cleanup()
 
-	var setupProc *SharedFixtureProcess
-	if len(overlay.sharedFixtures) > 0 {
-		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, setupTimeout)
-		if err != nil {
-			if jsonMode {
-				fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
-			} else {
-				fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", err)
-			}
-			return 2
-		}
-		defer setupProc.Teardown()
-	}
-
-	overlayArgs := append([]string{overlay.overlayFlag}, goTestArgs...)
-	extraEnv := buildExtraEnv()
-	if setupProc != nil {
-		extraEnv["GOTEST_SHARED_STATE_FILE"] = setupProc.StateFile()
-	}
-
 	if jsonMode {
-		fmt.Printf("{\"Action\":\"watch-start\",\"Package\":%q}\n", strings.Join(patterns, ","))
-		output, code, err := gotestrunner.StdlibRunTestsJSON(ctx, overlayArgs, extraEnv)
-		if err != nil {
-			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
-			return 2
-		}
-		os.Stdout.Write(output)
-		return code
+		fmt.Printf("{\"Action\":\"watch-start\",\"Package\":%q}\n", strings.Join(cfg.PackagePatterns, ","))
+		cfg.JSON = true
 	}
 
-	if SPEC {
-		return runWithSpec(ctx, overlayArgs, extraEnv)
-	}
-
-	code, err := gotestrunner.StdlibRunTests(ctx, overlayArgs, extraEnv)
+	code, err := executeTests(ctx, cfg, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -252,7 +236,7 @@ func dirsToPatterns(dirs map[string]bool) []string {
 func replacePatterns(originalArgs []string, newPatterns []string) []string {
 	var args []string
 	for _, arg := range originalArgs {
-		if looksLikePackagePattern(arg) {
+		if gotestrunner.LooksLikePackagePattern(arg) {
 			continue
 		}
 		args = append(args, arg)

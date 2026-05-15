@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -93,7 +94,8 @@ func TestLooksLikePackagePattern(t *testing.T) {
 		{desc: "dot-slash", input: "./...", expect: true},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			gotest.Equal(t, tc.expect, looksLikePackagePattern(tc.input))
+			gotest.Equal(t, tc.expect, gotestrunner.LooksLikePackagePattern(tc.input))
 		})
 	}
 }
+

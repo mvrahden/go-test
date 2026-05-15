@@ -1,77 +1,21 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
-
-export interface PathNode {
-  segment: string;
-  children: Map<string, PathNode>;
-  importPath?: string;
-}
-
-export function buildPathTrie(
-  entries: { relativePath: string; importPath: string }[],
-): PathNode {
-  const root: PathNode = { segment: "", children: new Map() };
-
-  for (const entry of entries) {
-    if (entry.relativePath === ".") {
-      root.importPath = entry.importPath;
-      continue;
-    }
-    const parts = entry.relativePath.split("/");
-    let current = root;
-    for (const part of parts) {
-      let child = current.children.get(part);
-      if (!child) {
-        child = { segment: part, children: new Map() };
-        current.children.set(part, child);
-      }
-      current = child;
-    }
-    current.importPath = entry.importPath;
-  }
-
-  return root;
-}
-
-export function collapsePathTrie(node: PathNode): void {
-  const collapsed = new Map<string, PathNode>();
-  for (const [, child] of node.children) {
-    collapseNode(child);
-    collapsed.set(child.segment, child);
-  }
-  node.children = collapsed;
-}
-
-function collapseNode(node: PathNode): void {
-  while (node.children.size === 1 && !node.importPath) {
-    const [, child] = [...node.children.entries()][0];
-    node.segment = node.segment
-      ? `${node.segment}/${child.segment}`
-      : child.segment;
-    node.importPath = child.importPath;
-    node.children = child.children;
-  }
-  const collapsed = new Map<string, PathNode>();
-  for (const [, child] of node.children) {
-    collapseNode(child);
-    collapsed.set(child.segment, child);
-  }
-  node.children = collapsed;
-}
-
-export interface TestResult {
-  status: "pass" | "fail" | "skip";
-  duration?: number;
-}
+import { TestResultStore, type TestResult } from "./testResultStore.js";
+export type { TestResult } from "./testResultStore.js";
+import { type PathNode, buildPathTrie, collapsePathTrie } from "./pathTrie.js";
 
 export class GoTestController implements vscode.Disposable {
+  private static readonly MAX_DYNAMIC_SUBTESTS = 100;
+
   private controller: vscode.TestController;
   private disposables: vscode.Disposable[] = [];
-  private results = new Map<string, TestResult>();
+  private coverageProfile: vscode.TestRunProfile | undefined;
+  private dynamicOverflow = new Map<string, number>();
 
   constructor(
     private readonly cache: DiscoveryCache,
+    private readonly resultStore: TestResultStore,
     private readonly outputChannel: vscode.OutputChannel,
     runHandler: (
       request: vscode.TestRunRequest,
@@ -105,7 +49,7 @@ export class GoTestController implements vscode.Disposable {
       true,
     );
 
-    this.controller.createRunProfile(
+    this.coverageProfile = this.controller.createRunProfile(
       "Coverage",
       vscode.TestRunProfileKind.Coverage,
       (request, token) => coverageHandler(request, token),
@@ -333,6 +277,9 @@ export class GoTestController implements vscode.Disposable {
     for (const id of toDelete) {
       item.children.delete(id);
     }
+    if (this.dynamicOverflow.delete(item.id)) {
+      item.description = undefined;
+    }
   }
 
   createDynamicSubtest(
@@ -346,9 +293,28 @@ export class GoTestController implements vscode.Disposable {
       return existing;
     }
 
+    if (parentItem.children.size >= GoTestController.MAX_DYNAMIC_SUBTESTS) {
+      const overflow = (this.dynamicOverflow.get(parentItem.id) ?? 0) + 1;
+      this.dynamicOverflow.set(parentItem.id, overflow);
+      parentItem.description = `${parentItem.children.size + overflow} subtests (${parentItem.children.size} shown)`;
+      return parentItem;
+    }
+
     const item = this.controller.createTestItem(id, label, parentItem.uri);
     parentItem.children.add(item);
     return item;
+  }
+
+  setCoverageDetailProvider(
+    provider: (uri: vscode.Uri) => vscode.FileCoverageDetail[],
+  ): void {
+    if (this.coverageProfile) {
+      this.coverageProfile.loadDetailedCoverage = async (
+        _testRun,
+        fileCoverage,
+        _token,
+      ) => provider(fileCoverage.uri);
+    }
   }
 
   createTestRun(request: vscode.TestRunRequest, name: string): vscode.TestRun {
@@ -361,94 +327,24 @@ export class GoTestController implements vscode.Disposable {
 
   recordResult(
     itemId: string,
-    status: TestResult["status"],
+    status: "pass" | "fail" | "skip",
     duration?: number,
   ): void {
-    this.results.set(itemId, { status, duration });
+    this.resultStore.record(itemId, status, duration);
   }
 
-  async copyTestResults(rootItem?: vscode.TestItem): Promise<void> {
-    const rows: {
-      label: string;
-      structural: boolean;
-      duration?: number;
-      status?: string;
-    }[] = [];
+  getResult(itemId: string): TestResult | undefined {
+    return this.resultStore.get(itemId);
+  }
 
-    const walkItem = (item: vscode.TestItem, indent: number) => {
-      const structural =
-        item.id.startsWith("dir:") || item.tags.some((t) => t.id === "package");
-      const result = structural ? undefined : this.results.get(item.id);
-      rows.push({
-        label: "  ".repeat(indent) + item.label,
-        structural,
-        duration: result?.duration,
-        status: result?.status,
-      });
-      item.children.forEach((child) => walkItem(child, indent + 1));
-    };
+  clearResults(item: vscode.TestItem): void {
+    this.resultStore.delete(item.id);
+    item.children.forEach((child) => this.clearResults(child));
+    this.clearDynamicChildren(item);
+  }
 
-    const resolved = rootItem ? this.findItem(rootItem.id) : undefined;
-    if (resolved) {
-      walkItem(resolved, 0);
-    } else {
-      this.controller.items.forEach((item) => walkItem(item, 0));
-    }
-
-    if (rows.length === 0) {
-      vscode.window.showInformationMessage(
-        "No test items available. Run discovery first.",
-      );
-      return;
-    }
-
-    const maxLabelLen = Math.max(4, ...rows.map((r) => r.label.length));
-    const header = `${"Test".padEnd(maxLabelLen)}  Time       Result`;
-    const separator = "-".repeat(header.length);
-
-    const lines = [header, separator];
-    let totalPassed = 0;
-    let totalFailed = 0;
-    let totalSkipped = 0;
-    let totalDuration = 0;
-
-    for (const row of rows) {
-      if (row.structural) {
-        lines.push(row.label);
-        continue;
-      }
-      const time =
-        row.duration !== undefined
-          ? (row.duration / 1000).toFixed(3) + "s"
-          : "-";
-      const status = row.status ?? "-";
-      lines.push(
-        `${row.label.padEnd(maxLabelLen)}  ${time.padEnd(9)}  ${status}`,
-      );
-
-      if (row.status === "pass") totalPassed++;
-      else if (row.status === "fail") totalFailed++;
-      else if (row.status === "skip") totalSkipped++;
-      if (row.duration) totalDuration += row.duration;
-    }
-
-    lines.push(separator);
-    const hasResults = totalPassed + totalFailed + totalSkipped > 0;
-    if (hasResults) {
-      const parts: string[] = [];
-      if (totalPassed > 0) parts.push(`${totalPassed} passed`);
-      if (totalFailed > 0) parts.push(`${totalFailed} failed`);
-      if (totalSkipped > 0) parts.push(`${totalSkipped} skipped`);
-      lines.push(
-        `Total: ${parts.join(", ")} (${(totalDuration / 1000).toFixed(3)}s)`,
-      );
-    } else {
-      lines.push("Total: no results");
-    }
-
-    const text = lines.join("\n");
-    await vscode.env.clipboard.writeText(text);
-    vscode.window.showInformationMessage("Test results copied to clipboard.");
+  saveResults(): void {
+    this.resultStore.save();
   }
 
   dispose(): void {

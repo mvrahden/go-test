@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
 import type { DiscoverMethod, DiscoverSuite } from "./types.js";
 
@@ -25,11 +26,14 @@ export class FocusExcludeProvider
         continue;
       }
       for (const suite of pkg.suites) {
-        if (suite.file === docPath && suite.line === line) {
+        if (path.join(pkg.dir, suite.file) === docPath && suite.line === line) {
           return this.actionsForSuite(suite, document);
         }
         for (const method of suite.methods) {
-          if (method.file === docPath && method.line === line) {
+          if (
+            path.join(pkg.dir, method.file) === docPath &&
+            method.line === line
+          ) {
             return this.actionsForMethod(method, document);
           }
         }

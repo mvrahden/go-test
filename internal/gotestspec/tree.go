@@ -176,9 +176,6 @@ func classify(n *Node, topLevel bool) {
 		if strings.HasPrefix(raw, "_") && strings.HasSuffix(raw, "Fixture") {
 			n.Kind = KindFixture
 			n.Display = strings.TrimSuffix(strings.TrimPrefix(raw, "_"), "Fixture")
-		} else if strings.HasSuffix(raw, "TestSuiteParallel") {
-			n.Kind = KindSuite
-			n.Display = strings.TrimSuffix(raw, "TestSuiteParallel")
 		} else if strings.HasSuffix(raw, "TestSuite") {
 			n.Kind = KindSuite
 			n.Display = strings.TrimSuffix(raw, "TestSuite")
@@ -198,15 +195,9 @@ func classify(n *Node, topLevel bool) {
 		if strings.HasSuffix(name, "Fixture") && !strings.HasSuffix(name, "TestSuite") {
 			n.Kind = KindFixture
 			n.Display = strings.TrimSuffix(name, "Fixture")
-		} else if strings.HasSuffix(name, "TestSuiteParallel") {
-			n.Kind = KindSuite
-			n.Display = strings.TrimSuffix(name, "TestSuiteParallel")
 		} else if strings.HasSuffix(name, "TestSuite") {
 			n.Kind = KindSuite
 			n.Display = strings.TrimSuffix(name, "TestSuite")
-		} else if strings.HasPrefix(name, "TestParallel") {
-			n.Kind = KindMethod
-			n.Display = strings.TrimPrefix(name, "TestParallel")
 		} else if strings.HasPrefix(name, "Test") {
 			n.Kind = KindMethod
 			n.Display = strings.TrimPrefix(name, "Test")

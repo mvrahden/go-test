@@ -2,11 +2,17 @@ import * as vscode from "vscode";
 import { spawn } from "node:child_process";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
-import {
-  parseTestEvents,
-  extractTestMessages,
-  type TestEvent,
-} from "./outputParser.js";
+import { extractTestMessages, type TestEvent } from "./outputParser.js";
+
+export function enqueueDescendants(
+  run: vscode.TestRun,
+  item: vscode.TestItem,
+): void {
+  item.children.forEach((child) => {
+    run.enqueued(child);
+    enqueueDescendants(run, child);
+  });
+}
 
 export function collectItems(
   controller: GoTestController,
@@ -153,13 +159,19 @@ export function resolveTestItem(
   return parentItem;
 }
 
+export interface AppliedResult {
+  itemId: string;
+  status: "pass" | "fail" | "skip";
+  duration?: number;
+}
+
 export function applyResults(
   controller: GoTestController,
   run: vscode.TestRun,
   events: TestEvent[],
   importPath: string,
   pkgDir: string,
-): void {
+): AppliedResult[] {
   const outputMap = new Map<string, string>();
 
   for (const event of events) {
@@ -168,6 +180,8 @@ export function applyResults(
       outputMap.set(event.Test, existing + (event.Output ?? ""));
     }
   }
+
+  const applied: AppliedResult[] = [];
 
   for (const event of events) {
     if (event.Action === "output" && event.Output) {
@@ -179,6 +193,15 @@ export function applyResults(
     }
 
     if (!event.Test) {
+      if (
+        event.Action === "pass" ||
+        event.Action === "fail" ||
+        event.Action === "skip"
+      ) {
+        const duration =
+          event.Elapsed !== undefined ? event.Elapsed * 1000 : undefined;
+        applied.push({ itemId: importPath, status: event.Action, duration });
+      }
       continue;
     }
 
@@ -193,7 +216,7 @@ export function applyResults(
     switch (event.Action) {
       case "pass":
         run.passed(item, duration);
-        controller.recordResult(item.id, "pass", duration);
+        applied.push({ itemId: item.id, status: "pass", duration });
         break;
       case "fail": {
         const output = outputMap.get(event.Test) ?? "";
@@ -210,18 +233,20 @@ export function applyResults(
           vscodeMessages.push(new vscode.TestMessage(output || "Test failed"));
         }
         run.failed(item, vscodeMessages, duration);
-        controller.recordResult(item.id, "fail", duration);
+        applied.push({ itemId: item.id, status: "fail", duration });
         break;
       }
       case "skip":
         run.skipped(item);
-        controller.recordResult(item.id, "skip");
+        applied.push({ itemId: item.id, status: "skip", duration: undefined });
         break;
       case "run":
         run.started(item);
         break;
     }
   }
+
+  return applied;
 }
 
 export interface SpawnResult {
@@ -238,6 +263,7 @@ export function spawnTestProcess(
   outputChannel: vscode.OutputChannel,
   label: string,
   env?: Record<string, string>,
+  onStdoutLine?: (line: string) => void,
 ): Promise<SpawnResult> {
   return new Promise<SpawnResult>((resolve, reject) => {
     const child = spawn(bin, args, {
@@ -246,9 +272,23 @@ export function spawnTestProcess(
     });
     let stdout = "";
     let stderr = "";
+    let lineBuffer = "";
 
     child.stdout.on("data", (data: Buffer) => {
-      stdout += data.toString();
+      const chunk = data.toString();
+      stdout += chunk;
+
+      if (onStdoutLine) {
+        lineBuffer += chunk;
+        const lines = lineBuffer.split("\n");
+        lineBuffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed) {
+            onStdoutLine(trimmed);
+          }
+        }
+      }
     });
 
     child.stderr.on("data", (data: Buffer) => {
@@ -348,10 +388,69 @@ export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
       : filters.join("|");
 }
 
+export function computeWildcard(importPaths: string[]): string | undefined {
+  if (importPaths.length <= 1) return undefined;
+
+  const split = importPaths.map((p) => p.split("/"));
+  const first = split[0];
+  let prefixLen = 0;
+  for (let i = 0; i < first.length; i++) {
+    if (split.every((s) => s[i] === first[i])) {
+      prefixLen = i + 1;
+    } else {
+      break;
+    }
+  }
+  if (prefixLen === 0) return undefined;
+
+  const prefix = first.slice(0, prefixLen).join("/");
+  if (importPaths.every((p) => p === prefix)) return undefined;
+
+  return prefix + "/...";
+}
+
 export function getPackageDir(
   item: vscode.TestItem,
   cache: DiscoveryCache,
 ): string | undefined {
   const pkg = getPackageItem(item);
   return cache.getPackage(pkg.id)?.dir;
+}
+
+export function resolvePackageItems(
+  run: vscode.TestRun,
+  items: vscode.TestItem[],
+  controller: GoTestController,
+): void {
+  for (const item of items) {
+    const pkgResult = controller.getResult(item.id);
+    if (pkgResult) {
+      if (pkgResult.status === "fail") {
+        run.failed(item, [], pkgResult.duration);
+      } else {
+        run.passed(item, pkgResult.duration);
+      }
+      continue;
+    }
+
+    let anyFailed = false;
+    let anyResolved = false;
+    const visit = (child: vscode.TestItem) => {
+      const result = controller.getResult(child.id);
+      if (result) {
+        anyResolved = true;
+        if (result.status === "fail") anyFailed = true;
+      }
+      child.children.forEach(visit);
+    };
+    item.children.forEach(visit);
+
+    if (!anyResolved) continue;
+
+    if (anyFailed) {
+      run.failed(item, []);
+    } else {
+      run.passed(item);
+    }
+  }
 }

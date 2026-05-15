@@ -45,12 +45,13 @@ func NewTWithDeadline(t *testing.T, timeout time.Duration) *T {
 	t.Cleanup(cancel)
 	return &T{t: t, ctx: ctx}
 }
+
 func (t *T) Errorf(format string, args ...any) {
 	if t.collector != nil {
 		t.collector.Errorf(format, args...)
 		return
 	}
-	t.t.Helper()
+	assert.SkipInternalFrames(t.t)
 	t.t.Errorf(format, args...)
 }
 func (t *T) FailNow() {
@@ -60,6 +61,7 @@ func (t *T) FailNow() {
 	}
 	t.t.FailNow()
 }
+
 //go:noinline
 func execTestFn(testFn func(it *T), it *T) { testFn(it) }
 
@@ -73,10 +75,6 @@ func (t *T) When(description string, fn func(w *T)) {
 		execTestFn(fn, NewT(tt))
 	})
 }
-func (t *T) Assert(v any) *assert.BaseAssertionContext {
-	return assert.NewAssertionContext(v, t.t)
-}
-
 func (t *T) Each(entries any, fn any) {
 	ev := reflect.ValueOf(entries)
 	if ev.Kind() != reflect.Slice {

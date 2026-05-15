@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
@@ -23,58 +24,65 @@ func runSpec(args []string) int {
 	}
 
 	ownArgs, goTestArgs := SplitArgs(remaining)
-	DEBUG = slices.Contains(ownArgs, "--debug")
-	CI = slices.Contains(ownArgs, "--ci")
-	UPDATE_SNAPSHOTS = slices.Contains(ownArgs, "--update-snapshots")
 	setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
+	minCoverage, err := parseMinFlag(ownArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 
-	patterns := ExtractPackagePatterns(goTestArgs)
-
-	if CI {
-		violations, err := RunFocusGuard(patterns)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-			return 2
-		}
-		if len(violations) > 0 {
-			fmt.Fprintln(os.Stderr, "FAIL: focus prefix detected — remove F_ before merging:")
-			for _, v := range violations {
-				fmt.Fprintln(os.Stderr, v.String())
+	var coverProfile string
+	if minCoverage > 0 {
+		for _, arg := range goTestArgs {
+			if v, ok := strings.CutPrefix(arg, "-coverprofile="); ok {
+				coverProfile = v
 			}
-			return 1
 		}
 	}
 
-	overlay, cleanup, err := generateOverlay(patterns)
+	patterns := ExtractPackagePatterns(goTestArgs)
+
+	cfg := ExecConfig{
+		GoTestArgs:      goTestArgs,
+		PackagePatterns: patterns,
+		SetupTimeout:    setupTimeout,
+		Debug:           slices.Contains(ownArgs, "--debug"),
+		CI:              slices.Contains(ownArgs, "--ci"),
+		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
+	}
+
+	classified := gotestrunner.ClassifyGoTestArgs(goTestArgs)
+	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
+	loaded, err := gotestgen.LoadPackages(patterns, loadFlags)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+
+	if cfg.CI {
+		if code, err := enforceFocusGuard(loaded); err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+			return 2
+		} else if code != 0 {
+			return code
+		}
+	}
+
+	overlay, cleanup, err := generateOverlayFromLoaded(loaded, cfg.Debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 	defer cleanup()
 
-	overlayArgs := append([]string{overlay.overlayFlag}, goTestArgs...)
-	extraEnv := buildExtraEnv()
-
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	var setupProc *SharedFixtureProcess
-	if len(overlay.sharedFixtures) > 0 {
-		var serr error
-		setupProc, serr = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, setupTimeout)
-		if serr != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", serr)
-			return 2
-		}
-		defer setupProc.Teardown()
-		extraEnv["GOTEST_SHARED_STATE_FILE"] = setupProc.StateFile()
-	}
-
-	jsonData, code, err := gotestrunner.StdlibRunTestsJSON(ctx, overlayArgs, extraEnv)
+	jsonData, code, err := executeTestsCaptured(ctx, cfg, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -109,6 +117,18 @@ func runSpec(args []string) int {
 		gotestspec.RenderMarkdown(w, tree)
 	default:
 		gotestspec.RenderTerminal(w, tree, renderOpts...)
+	}
+
+	if code == 0 && minCoverage > 0 && coverProfile != "" {
+		pct, err := readCoverageTotal(coverProfile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: reading coverage: %s\n", err)
+			return 2
+		}
+		if pct < float64(minCoverage) {
+			fmt.Fprintf(os.Stderr, "\nFAIL: %.1f%% coverage (minimum %d%%)\n", pct, minCoverage)
+			return 1
+		}
 	}
 
 	return code

@@ -20,72 +20,76 @@ func (s *SimpleTestSuite) TestT(t *gotest.T) {
 
 func (s *SimpleTestSuite) TestIsTrue(t *gotest.T) {
 	t.It("fails", func(it *gotest.T) {
-		it.Assert("abc").IsTrue()
+		gotest.True(it, false)
 	})
 	t.It("succeeds", func(it *gotest.T) {
-		it.Assert(true).IsTrue()
+		gotest.True(it, true)
 	})
 }
 
 func (s *SimpleTestSuite) TestIsFalse(t *gotest.T) {
 	t.It("fails", func(it *gotest.T) {
-		it.Assert("abc").IsFalse()
+		gotest.False(it, true)
 	})
 	t.It("succeeds", func(it *gotest.T) {
-		it.Assert(false).IsFalse()
+		gotest.False(it, false)
 	})
 }
 
 func (s *SimpleTestSuite) TestIsEqualTo(t *gotest.T) {
 	t.It("fails", func(it *gotest.T) {
-		it.Assert([]string{"abc"}).IsEqualTo([]string{"def"})
+		gotest.Equal(it, []string{"def"}, []string{"abc"})
 	})
 	t.It("succeeds", func(it *gotest.T) {
-		it.Assert([]string{"abc"}).IsEqualTo([]string{"abc"})
+		gotest.Equal(it, []string{"abc"}, []string{"abc"})
 	})
 }
 
 func (s *SimpleTestSuite) TestIsZero(t *gotest.T) {
 	t.It("fails", func(it *gotest.T) {
-		it.Assert([]string{"abc"}).IsZero()
+		gotest.Zero(it, "abc")
 	})
 	t.It("succeeds", func(it *gotest.T) {
-		it.Assert("").IsZero()
+		gotest.Zero(it, "")
 	})
 }
 
 func (s *SimpleTestSuite) TestIsEmpty(t *gotest.T) {
 	t.It("fails", func(it *gotest.T) {
-		it.Assert([]string{"abc"}).IsEmpty()
+		gotest.Empty(it, []string{"abc"})
 	})
 	t.It("succeeds", func(it *gotest.T) {
-		it.Assert("").IsEmpty()
-		it.Assert(&[0]string{}).IsEmpty()
+		gotest.Empty(it, "")
+		gotest.Empty(it, []string{})
 	})
 }
 
 func (s *SimpleTestSuite) TestHasLength(t *gotest.T) {
 	t.It("fails", func(it *gotest.T) {
-		it.Assert([]string{"abc"}).HasLength(3)
+		gotest.Len(it, []string{"abc"}, 3)
 	})
 	t.It("succeeds", func(it *gotest.T) {
-		it.Assert("abc").HasLength(3)
-		it.Assert(&[1]string{}).HasLength(1)
+		gotest.Len(it, "abc", 3)
+		gotest.Len(it, [1]string{}, 1)
 	})
 }
 
-func (s *SimpleTestSuite) TestHasCapacity(t *gotest.T) {
+func (s *SimpleTestSuite) TestContains(t *gotest.T) {
 	t.It("fails", func(it *gotest.T) {
-		it.Assert([]string{"abc"}).HasCapacity(3)
+		gotest.Contains(it, "hello", "xyz")
 	})
 	t.It("succeeds", func(it *gotest.T) {
-		it.Assert([]string{"abc"}).HasCapacity(1)
-		it.Assert(&[1]string{}).HasCapacity(1)
+		gotest.Contains(it, "hello", "ell")
+		gotest.Contains(it, []string{"a", "b"}, "b")
 	})
+}
+
+func (s *SimpleTestSuite) TestStdlibCompat(t *testing.T) {
+	gotest.True(t, false)
 }
 
 func helperAssert(t *gotest.T) {
-	t.Assert("wrong").IsTrue()
+	gotest.True(t, false)
 }
 
 func (s *SimpleTestSuite) TestHelperTrace(t *gotest.T) {

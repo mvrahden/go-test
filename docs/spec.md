@@ -110,7 +110,7 @@ All `go test` flags pass through verbatim.
 
 ### Definition
 
-A test suite is a Go struct whose name ends in `TestSuite` (or `TestSuiteParallel` for parallel suites):
+A test suite is a Go struct whose name ends in `TestSuite`:
 
 ```go
 type MyTestSuite struct {
@@ -119,7 +119,7 @@ type MyTestSuite struct {
 ```
 
 Requirements:
-- Name matches `^(?!ƒƒ_GOTEST_|_)(?:X_|F_)?.+(TestSuite|TestSuiteParallel)$`
+- Name matches `^(?!ƒƒ_GOTEST_|_)(?:X_|F_)?.+TestSuite$`
 - Methods use pointer receivers (`*MyTestSuite`, not `MyTestSuite`)
 - Each suite must be its own `type` declaration (not block-style)
 - Unexported type names are silently ignored
@@ -132,10 +132,12 @@ All hooks are optional. Unimplemented hooks become no-ops in the generated code.
 |--------|-----------|-----------|
 | `BeforeAll` | `func (s *Suite) BeforeAll(t *gotest.T)` | Once before the first test case |
 | `AfterAll` | `func (s *Suite) AfterAll(t *gotest.T)` | Once after the last test case (via `t.Cleanup`) |
-| `BeforeEach` | `func (s *Suite) BeforeEach(t *gotest.T)` | Before each test case |
-| `AfterEach` | `func (s *Suite) AfterEach(t *gotest.T)` | After each test case (via `defer`) |
+| `BeforeEach` | `func (s *Suite) BeforeEach(t *gotest.T)` | Before each test case (void form) |
+| `BeforeEach` | `func (s *Suite) BeforeEach(t *gotest.T) *Ctx` | Before each test case (returning form — typed per-test context) |
+| `AfterEach` | `func (s *Suite) AfterEach(t *gotest.T)` | After each test case (void form, via `defer`) |
+| `AfterEach` | `func (s *Suite) AfterEach(t *gotest.T, ctx *Ctx)` | After each test case (context-aware form, via `defer`) |
 
-Execution order:
+**Void BeforeEach** (legacy form):
 
 ```
 BeforeAll
@@ -144,17 +146,44 @@ BeforeAll
 AfterAll (via t.Cleanup — LIFO, runs after all subtests)
 ```
 
+**Returning BeforeEach** (per-test context form):
+
+```
+BeforeAll
+├── ctx := BeforeEach → Test A(ctx) → AfterEach(ctx) (deferred)
+├── ctx := BeforeEach → Test B(ctx) → AfterEach(ctx) (deferred)
+AfterAll (via t.Cleanup — LIFO, runs after all subtests)
+```
+
+The returning form creates a typed per-test context that flows through the lifecycle bracket. Each test method receives its own context instance, enabling safe method-level parallelism without shared mutable state on the suite struct.
+
 `AfterAll` is registered via `t.Cleanup` before `BeforeAll` runs, ensuring it executes even if `BeforeAll` registers its own cleanup functions (LIFO ordering). `AfterEach` is `defer`-ed, ensuring it runs even when `t.Fatal()` triggers `runtime.Goexit()`.
 
 Hooks accept either `*gotest.T` or `*testing.T`.
 
+#### Context Consistency Rules
+
+When `BeforeEach` returns a value, the following rules are enforced at generation time:
+
+1. **Parallel requires returning BeforeEach** — `SuiteConfig{Parallel: true}` with a void `BeforeEach` is an error (parallel methods need per-test isolation)
+2. **All methods must accept context** — if `BeforeEach` returns a context, every test method must accept it as its second parameter
+3. **AfterEach must accept context** — if `BeforeEach` returns a context and `AfterEach` exists, it must accept the context as its second parameter
+4. **No orphan context** — `AfterEach` cannot accept a context parameter if `BeforeEach` does not return one
+5. **Type consistency** — context parameter types must match `BeforeEach`'s return type across all methods
+6. **Context type must be a pointer** — the context return/parameter type must be a pointer type
+
 ### Test Cases
 
-Any exported method matching `^(?:X_|F_)?(Test(?!Parallel)|TestParallel).+$` is a test case. Each becomes a `t.Run` subtest in the generated code.
+Any exported method matching `^(?:X_|F_)?Test.+$` is a test case. Each becomes a `t.Run` subtest in the generated code.
 
 ```go
-func (s *Suite) TestSomething(t *gotest.T)   {} // sequential test
-func (s *Suite) TestParallelFoo(t *gotest.T) {} // parallel test
+func (s *Suite) TestSomething(t *gotest.T) {}
+```
+
+Test methods accept an optional typed context parameter as their second argument when the suite uses a returning `BeforeEach`:
+
+```go
+func (s *Suite) TestSomething(t *gotest.T, ctx *MyCtx) {}
 ```
 
 ### Focus and Exclude
@@ -185,19 +214,36 @@ FAIL: focus prefix detected — remove F_ before merging:
 
 ### Parallel Execution
 
-**Suite-level:** Struct name ends in `TestSuiteParallel`. The generated `func Test*` calls `t.Parallel()`.
+**Suite-level parallelism** is always on. Every generated `func Test*` calls `t.Parallel()` unconditionally. This enables Go's test runner to execute independent suites concurrently. There is no opt-out.
 
-**Test-case-level:** Method name starts with `TestParallel`. The generated subtest calls `it.Parallel()` and coordinates via `sync.WaitGroup`.
+**Method-level parallelism** is opt-in via `SuiteConfig{Parallel: true}`. Each generated subtest calls `it.Parallel()` and coordinates via `sync.WaitGroup`. Method-level parallelism requires a returning `BeforeEach` — per-test state lives in the returned context, not on the shared suite struct.
 
 ```go
-type MyTestSuiteParallel struct{}
+// Default: suite-level parallel (always-on), methods run sequentially
+type MyTestSuite struct{}
 
-func (s *MyTestSuiteParallel) TestParallelAlpha(t *gotest.T)  {} // parallel
-func (s *MyTestSuiteParallel) TestParallelBeta(t *gotest.T)   {} // parallel
-func (s *MyTestSuiteParallel) TestSequentialGamma(t *gotest.T) {} // sequential
+func (s *MyTestSuite) TestAlpha(t *gotest.T) {}
+func (s *MyTestSuite) TestBeta(t *gotest.T)  {}
+
+// Opt-in: method-level parallel (requires returning BeforeEach)
+type ParallelMethodTestSuite struct{}
+
+type TestCtx struct{ conn *sql.Conn }
+
+func (s *ParallelMethodTestSuite) SuiteConfig() gotest.SuiteConfig {
+    return gotest.SuiteConfig{Parallel: true}
+}
+func (s *ParallelMethodTestSuite) BeforeEach(t *gotest.T) *TestCtx {
+    return &TestCtx{conn: s.pool.Acquire()}
+}
+func (s *ParallelMethodTestSuite) AfterEach(t *gotest.T, ctx *TestCtx) {
+    ctx.conn.Release()
+}
+func (s *ParallelMethodTestSuite) TestCreate(t *gotest.T, ctx *TestCtx) {}
+func (s *ParallelMethodTestSuite) TestDelete(t *gotest.T, ctx *TestCtx) {}
 ```
 
-When parallel test cases exist, the generated code uses a `sync.WaitGroup` to ensure `AfterAll` waits for all parallel subtests to complete. `wg.Done()` is `defer`-ed to prevent deadlocks on `t.Fatal()`.
+When method-level parallelism is enabled, the generated code uses a `sync.WaitGroup` to ensure `AfterAll` waits for all parallel subtests to complete. `wg.Done()` is `defer`-ed to prevent deadlocks on `t.Fatal()`.
 
 ### Generic Suites
 
@@ -381,6 +427,7 @@ type SuiteConfig struct {
     SetupTimeout time.Duration // BeforeAll/AfterAll deadline
     Retries      int           // per-test-case retry attempts
     FailFast     bool          // stop suite on first failure
+    Parallel     bool          // method-level parallelism (requires returning BeforeEach)
 }
 ```
 
@@ -392,7 +439,7 @@ type SuiteConfig struct {
 | `0`   | Keep default (field not overridden) |
 | `< 0` | Explicitly disabled (no timeout) |
 
-This applies to `Timeout`, `SetupTimeout`, and `RetryDelay`. `FailFast` only overrides to `true` — a false overlay does not reset a true base.
+This applies to `Timeout`, `SetupTimeout`, and `RetryDelay`. Boolean fields (`FailFast`, `Parallel`) only override to `true` — a false overlay does not reset a true base.
 
 #### Marker Methods
 
@@ -453,7 +500,7 @@ func (f *InfraFixture) FixtureConfig() gotest.FixtureConfig {
 
 #### Feature Interactions
 
-- **Parallel suites:** `FailFast` only applies to sequential execution. Parallel test cases (WaitGroup-coordinated) complete or hit the global timeout.
+- **Parallel suites:** `FailFast` checks run between subtests — in method-parallel suites, all parallel subtests complete before `FailFast` is evaluated. Suite-level parallelism does not affect `FailFast` (each suite's subtests are independent).
 - **Focus/Exclude:** Config applies after focus/exclude filtering. Skipped suites get unchanged skip stubs.
 - **Global `-timeout`:** `FixtureConfig.Timeout` is bounded by Go's global timeout via `context.WithTimeout` inheriting the parent's shorter deadline.
 - **Nested fixtures:** Each level resolves config independently — no inheritance between fixture levels.
@@ -761,18 +808,26 @@ The `ƒƒ` Unicode prefix prevents naming collisions with user code. Files conta
 
 ### Generated Structure
 
-For each suite, the generated code creates a wrapper struct with no-op fallbacks for unimplemented hooks, then a `func Test*` that wires lifecycle and test cases:
+For each suite, the generated code creates a wrapper struct with no-op fallbacks for unimplemented hooks, then a `func Test*` that wires lifecycle and inline `t.Run` blocks:
 
 ```go
 type ƒƒ_GOTEST_MyTestSuite struct { MyTestSuite }
 
 func TestMyTestSuite(t *testing.T) {
     s := &ƒƒ_GOTEST_MyTestSuite{}
-    // ...
+    t.Parallel()
+    ƒcfg := gotest.DefaultSuiteConfig()
+
     tt := gotest.NewT(t)
     t.Cleanup(func() { s.AfterAll(tt) })
     s.BeforeAll(tt)
-    for _, tc := range testCases { tc(tt) }
+
+    t.Run("TestSomething", func(it *testing.T) {
+        ttt := gotest.NewT(it)
+        defer s.AfterEach(ttt)
+        s.BeforeEach(ttt)
+        ƒƒ_GOTEST_exec(s.TestSomething, ttt)
+    })
 }
 ```
 
@@ -806,6 +861,65 @@ Detects:
 Exit codes match `go test`: 0 = pass, 1 = test failure, 2 = build error.
 
 The `setup-gotest` composite action installs the binary via `go install`.
+
+---
+
+## Coverage Aggregation
+
+The Go coverage profile is the single source of truth at every level of aggregation. No filesystem scanning, line counting heuristics, or mixed data sources.
+
+### Primary Metric: Statement-Weighted Coverage
+
+Each profile entry has the form:
+
+```
+file:startLine.startCol,endLine.endCol numStatements count
+```
+
+`numStatements` is the number of Go statements in a basic block as determined by the compiler's instrumentation. Coverage at any scope (file, directory, workspace) is:
+
+```
+covered = sum of numStatements for all blocks in scope where count > 0
+total   = sum of numStatements for all blocks in scope
+percentage = covered / total (or 0% if total == 0)
+```
+
+A directory's percentage is the weighted sum of its children (weighted by statement count, not an average of percentages). A parent's number is always derivable from its children.
+
+This is the sole numeric metric displayed in both the Test Coverage sidebar bar and the Copy Coverage report. The sidebar and report must always show identical `covered/total` values for the same scope.
+
+Declaration (function) coverage is not a sidebar or report metric. Function-level annotations are available in the editor gutter via `loadDetailedCoverage` for navigation purposes only.
+
+### Block Deduplication
+
+When `-coverpkg` is used, each file may appear in multiple test binary profiles. Blocks are deduplicated by `file + startLine.startCol,endLine.endCol` identity: for each unique block, take `max(count)` across all entries. This matches `go tool cover` behavior.
+
+### Supplementary Coverage (Cross-Package Profiles)
+
+Test-only packages (packages with no production `.go` files) run with `-coverpkg=./...`, which instruments all packages in the module. This cross-package profile is **supplementary**: it can increase block counts for files that primary profiles already cover, but does not add new files to the aggregate.
+
+- **Primary profiles** come from a package's own `go test` run. They define the file scope.
+- **Supplementary profiles** come from test-only packages with `-coverpkg=./...`. After block deduplication, only files present in the primary scope are retained.
+- If no primary profiles exist, supplementary profiles are treated as primary (fallback).
+
+### Breadth Indicator
+
+A supplementary signal showing how many source files have coverage data vs. how many exist:
+
+- **Source files:** Non-test Go files (`*.go` excluding `*_test.go`) per directory, from the filesystem.
+- **Profile files:** Files from the source file set with at least one entry in the primary coverage scope, regardless of whether that entry has `count > 0`. A file at 0% was instrumented and counts as profiled.
+
+The percentage answers: *"How well-tested is the code my tests reach?"*
+The file count answers: *"How much of my codebase do my tests reach at all?"*
+
+### What NOT to Do
+
+- Do not count lines of code, lines with tokens, or non-blank lines as a denominator. The profile's `numStatements` is the only valid statement metric.
+- Do not include `_test.go` files in any denominator.
+- Do not average per-file percentages to compute a directory percentage. Use weighted sums by statement count.
+- Do not invent a filesystem-based metric as a fallback when the profile is sparse. A sparse profile is honest.
+- Do not display declaration/function coverage as a separate metric in the sidebar or report.
+- Do not let supplementary (cross-package) profiles expand the file scope beyond what primary profiles define.
 
 ---
 
@@ -849,9 +963,10 @@ Each alias produces an independent conformance report.
 1. `AfterAll` is registered via `t.Cleanup` BEFORE `BeforeAll` runs
 2. `t.Cleanup` runs in LIFO order — user cleanups in `BeforeAll` run before `AfterAll`
 3. `AfterEach` is `defer`-ed — runs even on `t.Fatal()` / `runtime.Goexit()`
-4. In parallel suites, `wg.Wait()` completes before `AfterAll`
+4. In method-parallel suites (`Parallel: true`), `wg.Wait()` completes before `AfterAll`
 5. `t.Fatal()` in `BeforeAll` skips the entire suite
 6. `t.Skip()` in `BeforeAll` marks the suite as skipped
+7. In context-aware suites (returning `BeforeEach`), each test receives its own context — `AfterEach` receives the same context for cleanup
 
 ---
 

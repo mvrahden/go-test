@@ -7,6 +7,10 @@ on:
   pull_request:
     paths: [vscode-gotest/**]
 
+concurrency:
+  group: extension-${{ github.ref }}
+  cancel-in-progress: true
+
 defaults:
   run:
     working-directory: vscode-gotest

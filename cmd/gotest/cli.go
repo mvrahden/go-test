@@ -12,13 +12,6 @@ import (
 	"github.com/mvrahden/go-test/about"
 )
 
-var (
-	DEBUG            bool
-	CI               bool
-	SPEC             bool
-	UPDATE_SNAPSHOTS bool
-)
-
 func main() {
 	subcmd, remaining := ParseSubcommand(os.Args[1:])
 
@@ -50,13 +43,20 @@ func main() {
 		printUsage()
 		return
 	default:
-		// Default run mode: use original args (no subcommand consumed)
 		args := os.Args[1:]
+		if slices.Contains(args, "--spec") {
+			var specArgs []string
+			for _, a := range args {
+				if a != "--spec" {
+					specArgs = append(specArgs, a)
+				}
+			}
+			os.Exit(runSpec(specArgs))
+		}
 		ownArgs, goTestArgs := SplitArgs(args)
-		DEBUG = slices.Contains(ownArgs, "--debug")
-		CI = slices.Contains(ownArgs, "--ci")
-		SPEC = slices.Contains(ownArgs, "--spec")
-		UPDATE_SNAPSHOTS = slices.Contains(ownArgs, "--update-snapshots")
+
+		jsonMode, goTestArgs := stripJSONFlag(goTestArgs)
+
 		minCoverage, err := parseMinFlag(ownArgs)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -70,7 +70,6 @@ func main() {
 
 		var coverProfile string
 		if minCoverage > 0 {
-			// Check if user already provided -coverprofile
 			for _, arg := range goTestArgs {
 				if v, ok := strings.CutPrefix(arg, "-coverprofile="); ok {
 					coverProfile = v
@@ -94,6 +93,10 @@ func main() {
 			GoTestArgs:      goTestArgs,
 			PackagePatterns: patterns,
 			SetupTimeout:    setupTimeout,
+			Debug:           slices.Contains(ownArgs, "--debug"),
+			CI:              slices.Contains(ownArgs, "--ci"),
+			JSON:            jsonMode,
+			UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
 		}
 
 		code := Run(cfg)
@@ -174,6 +177,19 @@ func readCoverageTotal(profilePath string) (float64, error) {
 	}
 	pctStr := strings.TrimSuffix(fields[len(fields)-1], "%")
 	return strconv.ParseFloat(pctStr, 64)
+}
+
+func stripJSONFlag(args []string) (bool, []string) {
+	found := false
+	var out []string
+	for _, arg := range args {
+		if arg == "-json" {
+			found = true
+			continue
+		}
+		out = append(out, arg)
+	}
+	return found, out
 }
 
 func printUsage() {

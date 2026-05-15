@@ -83,6 +83,16 @@ func (collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 		return CollectorResult{Errs: errs}
 	}
 
+	// validate context consistency
+	for _, s := range suites {
+		if err := gotestast.ValidateContextConsistency(s); err != nil {
+			errs = append(errs, CollectorError{Err: err, Pos: s.Pos()})
+		}
+	}
+	if len(errs) > 0 {
+		return CollectorResult{Errs: errs}
+	}
+
 	// find fixture methods
 	for _, f := range fixtures {
 		insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
