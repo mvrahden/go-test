@@ -80,7 +80,7 @@ func (s *MySuite) BeforeEach(t *gotest.T) {} // before each test method
 func (s *MySuite) AfterEach(t *gotest.T)  {} // after each test method
 ```
 
-`*gotest.T` exposes `t.Context()` (mirrors Go 1.24's `testing.T.Context()`), plus the full DSL (`t.It()`, `t.When()`, `t.Assert()`, `t.MatchSnapshot()`). Use `*testing.T` for plain stdlib tests — the functional assertions (`gotest.Equal(t, ...)`) still work with either type. You can mix freely within a single suite:
+`*gotest.T` exposes `t.Context()` (mirrors Go 1.24's `testing.T.Context()`), plus the full DSL (`t.It()`, `t.When()`, `t.MatchSnapshot()`). Use `*testing.T` for plain stdlib tests — the functional assertions (`gotest.Equal(t, ...)`) still work with either type. You can mix freely within a single suite:
 
 ```go
 func (s *MySuite) BeforeEach(t *testing.T) {} // stdlib is fine here
@@ -265,6 +265,21 @@ Use `--ci` in CI to fail the build if any `F_` prefix slipped through:
 gotest --ci ./... -v -race
 ```
 
+### SuiteGuard
+
+Skip a suite at runtime based on environment conditions:
+
+```go
+func (s *IntegrationTestSuite) SuiteGuard() string {
+    if os.Getenv("DATABASE_URL") == "" {
+        return "DATABASE_URL not set"
+    }
+    return "" // empty = run
+}
+```
+
+Returns a non-empty reason to skip the entire suite. Unlike `X_` (static exclude), `SuiteGuard` makes the decision at runtime — useful for integration tests that need external services.
+
 ### BDD Vocabulary
 
 ```go
@@ -281,10 +296,12 @@ func (s *Suite) TestCreate(t *gotest.T) {
 
 ### Parallel Tests
 
-```go
-type UserServiceTestSuiteParallel struct { ... } // suite-level parallel
+Suite-level parallelism runs each suite in its own subprocess, providing full process isolation with zero shared state:
 
-func (s *Suite) TestParallelCreate(t *gotest.T) {} // TestParallel prefix: test-level parallel
+```go
+func (s *Suite) SuiteConfig() gotest.SuiteConfig {
+    return gotest.SuiteConfig{Parallel: true} // requires returning BeforeEach
+}
 ```
 
 ### Type-Safe Assertions
@@ -315,16 +332,7 @@ conn := gotest.Must(db.Connect(ctx))
 val  := gotest.Must(cache.Get(key))
 ```
 
-Fluent API for quick exploration:
-
-```go
-t.Assert(result).Equal(expected)
-t.Assert(items).HasLength(3)
-t.Assert(err).NoError()
-t.Assert(ok).IsTrue()
-```
-
-Works with both `*gotest.T` (suites) and `*testing.T` (standalone tests).
+All assertions work with both `*gotest.T` (suites) and `*testing.T` (standalone tests).
 
 ### Data-Driven Tests
 
@@ -425,13 +433,12 @@ The generated code is what a careful developer would write by hand: `t.Run`, `t.
 | Convention | Meaning |
 |---|---|
 | `*TestSuite` suffix | Test suite struct |
-| `*TestSuiteParallel` suffix | Parallel test suite |
 | `BeforeAll` / `AfterAll` | Suite-level lifecycle |
 | `BeforeEach` / `AfterEach` | Test-level lifecycle |
 | `Test*` method | Test case |
-| `TestParallel*` method | Parallel test case |
 | `F_` prefix | Focus (run only this) |
 | `X_` prefix | Exclude (skip this) |
+| `SuiteGuard()` method | Runtime-conditional suite skipping |
 | `*Fixture` suffix | Package-scoped fixture |
 | `*SharedFixture` suffix | Cross-package shared fixture |
 | `FixtureConfig()` method | Fixture timeout/retry config |
@@ -492,6 +499,8 @@ gotest ./... -v -race          # generate, test, cleanup (default)
 gotest spec ./...              # behavioral specification view
 gotest watch ./... -v          # watch mode with auto-rerun
 gotest scaffold ./pkg/user.Svc # generate suite skeleton from type
+gotest lint ./...              # static analysis for test suites
+gotest refactor toggle-focus . # toggle F_/X_ prefixes programmatically
 gotest migrate ./...           # convert testify/suite to go-test
 gotest generate ./...          # run code generation only (no tests)
 gotest clean ./...             # remove orphaned generated files
@@ -506,10 +515,14 @@ All `go test` flags work unchanged: `-race`, `-cover`, `-count`, `-run`, `-json`
 Catch common mistakes in test suites with static analysis:
 
 ```bash
-go run github.com/mvrahden/go-test/cmd/gotest-lint ./...
+gotest lint ./...
 ```
 
-Detects: lifecycle hook typos, value receivers on suite methods, missing `AfterAll` when `BeforeAll` exists, committed `F_` prefixes, and orphaned generated files. Compatible with `golangci-lint` via `go/analysis`.
+Detects: lifecycle hook typos, value receivers on suite methods, missing `AfterAll` when `BeforeAll` exists, committed `F_` prefixes, and orphaned generated files. Also available as a standalone binary (`gotest-lint`) compatible with `golangci-lint` via `go/analysis`.
+
+## VS Code Extension
+
+The **[Go Test Suites](vscode-gotest/)** extension brings first-class IDE support: suite-aware Test Explorer, CodeLens run/debug buttons, coverage gutters, watch mode, spec view, focus/exclude quick fixes, and suite scaffolding. Install via `code --install-extension mvrahden.vscode-gotest`.
 
 ## License
 
