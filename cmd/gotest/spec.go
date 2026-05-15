@@ -29,6 +29,20 @@ func runSpec(args []string) int {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
+	minCoverage, err := parseMinFlag(ownArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+
+	var coverProfile string
+	if minCoverage > 0 {
+		for _, arg := range goTestArgs {
+			if v, ok := strings.CutPrefix(arg, "-coverprofile="); ok {
+				coverProfile = v
+			}
+		}
+	}
 
 	patterns := ExtractPackagePatterns(goTestArgs)
 
@@ -42,7 +56,8 @@ func runSpec(args []string) int {
 	}
 
 	classified := gotestrunner.ClassifyGoTestArgs(goTestArgs)
-	loaded, err := gotestgen.LoadPackages(patterns, classified.BuildFlags)
+	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
+	loaded, err := gotestgen.LoadPackages(patterns, loadFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -102,6 +117,18 @@ func runSpec(args []string) int {
 		gotestspec.RenderMarkdown(w, tree)
 	default:
 		gotestspec.RenderTerminal(w, tree, renderOpts...)
+	}
+
+	if code == 0 && minCoverage > 0 && coverProfile != "" {
+		pct, err := readCoverageTotal(coverProfile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: reading coverage: %s\n", err)
+			return 2
+		}
+		if pct < float64(minCoverage) {
+			fmt.Fprintf(os.Stderr, "\nFAIL: %.1f%% coverage (minimum %d%%)\n", pct, minCoverage)
+			return 1
+		}
 	}
 
 	return code
