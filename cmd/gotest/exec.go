@@ -218,12 +218,11 @@ func executeTests(ctx context.Context, cfg ExecConfig, overlay *overlayResult) (
 		defer mergeCoverProfiles(targets, pf.userCoverProfile)
 	}
 
+	mode := gotestrunner.RunBatchText
 	if cfg.JSON {
-		_, code := gotestrunner.RunSuitesTest2JSON(ctx, targets, extraEnv, 0)
-		return code, nil
+		mode = gotestrunner.RunStreamJSON
 	}
-
-	_, code := gotestrunner.RunSuites(ctx, targets, extraEnv, 0)
+	_, code := gotestrunner.RunSuites(ctx, targets, extraEnv, 0, mode)
 	return code, nil
 }
 
@@ -363,7 +362,7 @@ loop:
 				mu.Unlock()
 
 				if cfg.JSON {
-					r := gotestrunner.RunSingleSuiteTest2JSON(streamCtx, t, env)
+					r := gotestrunner.RunSingleSuite(streamCtx, t, env, true)
 					mu.Lock()
 					os.Stdout.Write(r.Stdout)
 					if len(r.Stderr) > 0 {
@@ -374,7 +373,7 @@ loop:
 					}
 					mu.Unlock()
 				} else {
-					r := gotestrunner.RunSingleSuite(streamCtx, t, env)
+					r := gotestrunner.RunSingleSuite(streamCtx, t, env, false)
 					mu.Lock()
 					s := pkgStates[t.Package]
 					s.results[idx] = r
@@ -455,7 +454,7 @@ func executeTestsCaptured(ctx context.Context, cfg ExecConfig, overlay *overlayR
 		defer mergeCoverProfiles(targets, pf.userCoverProfile)
 	}
 
-	data, code := gotestrunner.RunSuitesJSON(ctx, targets, extraEnv, 0)
+	data, code := gotestrunner.RunSuites(ctx, targets, extraEnv, 0, gotestrunner.RunCaptureJSON)
 	return data, code, nil
 }
 

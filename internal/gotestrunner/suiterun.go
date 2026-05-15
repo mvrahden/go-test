@@ -33,23 +33,50 @@ type SuiteResult struct {
 	Duration time.Duration
 }
 
+// RunMode controls how RunSuites executes and collects output.
+type RunMode int
+
+const (
+	// RunBatchText runs suites directly (no test2json). Output is batched
+	// per-package: when all suites for a package complete, their output is
+	// written to stdout followed by a package summary line.
+	RunBatchText RunMode = iota
+
+	// RunStreamJSON wraps each suite with test2json and streams its JSON
+	// events to stdout as soon as it completes.
+	RunStreamJSON
+
+	// RunCaptureJSON wraps each suite with test2json and captures all JSON
+	// events into a buffer (nothing written to stdout).
+	RunCaptureJSON
+)
+
 // RunSuites executes each suite target in its own subprocess with bounded
-// concurrency. Output is streamed per-package: when all suites for a package
-// complete, their output is written to stdout followed by a package summary.
-func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int) ([]SuiteResult, int) {
+// concurrency. The mode parameter controls output format and delivery.
+// The returned []byte is non-nil only for RunCaptureJSON.
+func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int, mode RunMode) ([]byte, int) {
 	if maxParallel <= 0 {
 		maxParallel = 2 * runtime.GOMAXPROCS(0)
 	}
 
-	pkgSuiteCount := map[string]int{}
-	pkgIndices := map[string][]int{}
-	for i, t := range targets {
-		pkgSuiteCount[t.Package]++
-		pkgIndices[t.Package] = append(pkgIndices[t.Package], i)
+	useTest2JSON := mode != RunBatchText
+
+	// Per-package batching state (RunBatchText only).
+	var pkgSuiteCount map[string]int
+	var pkgIndices map[string][]int
+	var pkgCompleted map[string]int
+	if mode == RunBatchText {
+		pkgSuiteCount = map[string]int{}
+		pkgIndices = map[string][]int{}
+		pkgCompleted = map[string]int{}
+		for i, t := range targets {
+			pkgSuiteCount[t.Package]++
+			pkgIndices[t.Package] = append(pkgIndices[t.Package], i)
+		}
 	}
 
 	results := make([]SuiteResult, len(targets))
-	pkgCompleted := map[string]int{}
+	var merged bytes.Buffer
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, maxParallel)
@@ -65,26 +92,36 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			r := RunSingleSuite(ctx, t, env)
+			r := RunSingleSuite(ctx, t, env, useTest2JSON)
 
 			mu.Lock()
 			results[idx] = r
-			pkgCompleted[t.Package]++
-			if pkgCompleted[t.Package] == pkgSuiteCount[t.Package] {
-				pkgFailed := false
-				var pkgDuration time.Duration
-				for _, j := range pkgIndices[t.Package] {
-					pr := results[j]
-					os.Stdout.Write(StripTrailingStatus(pr.Stdout))
-					if len(pr.Stderr) > 0 {
-						os.Stderr.Write(pr.Stderr)
+			switch mode {
+			case RunBatchText:
+				pkgCompleted[t.Package]++
+				if pkgCompleted[t.Package] == pkgSuiteCount[t.Package] {
+					pkgFailed := false
+					var pkgDuration time.Duration
+					for _, j := range pkgIndices[t.Package] {
+						pr := results[j]
+						os.Stdout.Write(StripTrailingStatus(pr.Stdout))
+						if len(pr.Stderr) > 0 {
+							os.Stderr.Write(pr.Stderr)
+						}
+						if pr.ExitCode != 0 {
+							pkgFailed = true
+						}
+						pkgDuration += pr.Duration
 					}
-					if pr.ExitCode != 0 {
-						pkgFailed = true
-					}
-					pkgDuration += pr.Duration
+					WritePackageSummary(t.Package, pkgFailed, pkgDuration)
 				}
-				WritePackageSummary(t.Package, pkgFailed, pkgDuration)
+			case RunStreamJSON:
+				os.Stdout.Write(r.Stdout)
+				if len(r.Stderr) > 0 {
+					os.Stderr.Write(r.Stderr)
+				}
+			case RunCaptureJSON:
+				merged.Write(r.Stdout)
 			}
 			mu.Unlock()
 		}(i, target)
@@ -98,71 +135,56 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 		}
 	}
 
-	return results, worstCode
-}
-
-// RunSuitesJSON runs suites through test2json and captures the merged
-// JSON output for programmatic consumption (e.g. the spec renderer).
-func RunSuitesJSON(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int) ([]byte, int) {
-	if maxParallel <= 0 {
-		maxParallel = 2 * runtime.GOMAXPROCS(0)
-	}
-
-	results := make([]SuiteResult, len(targets))
-	var mu sync.Mutex
-	var merged bytes.Buffer
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, maxParallel)
-
-	env := os.Environ()
-	for k, v := range extraEnv {
-		env = append(env, k+"="+v)
-	}
-
-	for i, target := range targets {
-		wg.Add(1)
-		go func(idx int, t SuiteTarget) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			r := RunSingleSuiteTest2JSON(ctx, t, env)
-
-			mu.Lock()
-			results[idx] = r
-			merged.Write(r.Stdout)
-			mu.Unlock()
-		}(i, target)
-	}
-	wg.Wait()
-
-	worstCode := 0
-	for _, r := range results {
-		if r.ExitCode > worstCode {
-			worstCode = r.ExitCode
-		}
-	}
 	return merged.Bytes(), worstCode
 }
 
-// RunSingleSuite executes a single suite subprocess.
-// Exported for use by the streaming execution pipeline.
-func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string) SuiteResult {
-	args := make([]string, 0, len(target.RunFlags)+1)
+func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2json bool) *exec.Cmd {
+	var runArg string
 	if target.RunFilter != "" {
-		args = append(args, "-test.run="+target.RunFilter)
+		runArg = "-test.run=" + target.RunFilter
 	} else {
-		args = append(args, fmt.Sprintf("-test.run=^%s$", regexp.QuoteMeta(target.SuiteName)))
-	}
-	args = append(args, target.RunFlags...)
-	if target.CoverProfile != "" {
-		args = append(args, "-test.coverprofile="+target.CoverProfile)
+		runArg = fmt.Sprintf("-test.run=^%s$", regexp.QuoteMeta(target.SuiteName))
 	}
 
-	cmd := exec.CommandContext(ctx, target.BinaryPath, args...)
+	var testArgs []string
+	testArgs = append(testArgs, runArg)
+
+	if test2json {
+		testArgs = append(testArgs, "-test.v=test2json")
+		for _, f := range target.RunFlags {
+			if f == "-test.v" || strings.HasPrefix(f, "-test.v=") {
+				continue
+			}
+			testArgs = append(testArgs, f)
+		}
+	} else {
+		testArgs = append(testArgs, target.RunFlags...)
+	}
+
+	if target.CoverProfile != "" {
+		testArgs = append(testArgs, "-test.coverprofile="+target.CoverProfile)
+	}
+
+	if test2json {
+		args := []string{"tool", "test2json", "-p", target.Package, "-t", target.BinaryPath}
+		args = append(args, testArgs...)
+		cmd := exec.CommandContext(ctx, "go", args...)
+		cmd.Env = env
+		return cmd
+	}
+
+	cmd := exec.CommandContext(ctx, target.BinaryPath, testArgs...)
+	cmd.Env = env
+	return cmd
+}
+
+// RunSingleSuite executes a single suite subprocess.
+// When test2json is true, the binary is wrapped with `go tool test2json`.
+func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult {
+	cmd := buildSuiteCmd(ctx, target, env, test2json)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	cmd.Env = env
 
 	start := time.Now()
 	err := cmd.Run()
@@ -204,104 +226,6 @@ func WritePackageSummary(pkg string, failed bool, d time.Duration) {
 		fmt.Fprintf(os.Stdout, "FAIL\nFAIL\t%s\t%.3fs\n", pkg, d.Seconds())
 	} else {
 		fmt.Fprintf(os.Stdout, "PASS\nok  \t%s\t%.3fs\n", pkg, d.Seconds())
-	}
-}
-
-// RunSuitesTest2JSON executes each suite target wrapped with `go tool test2json`
-// to produce proper JSON test events. Each suite's events are written to stdout
-// as soon as the suite completes, enabling real-time progress in the test explorer.
-func RunSuitesTest2JSON(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int) ([]SuiteResult, int) {
-	if maxParallel <= 0 {
-		maxParallel = 2 * runtime.GOMAXPROCS(0)
-	}
-
-	results := make([]SuiteResult, len(targets))
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, maxParallel)
-
-	env := os.Environ()
-	for k, v := range extraEnv {
-		env = append(env, k+"="+v)
-	}
-
-	for i, target := range targets {
-		wg.Add(1)
-		go func(idx int, t SuiteTarget) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			r := RunSingleSuiteTest2JSON(ctx, t, env)
-
-			mu.Lock()
-			results[idx] = r
-			os.Stdout.Write(r.Stdout)
-			if len(r.Stderr) > 0 {
-				os.Stderr.Write(r.Stderr)
-			}
-			mu.Unlock()
-		}(i, target)
-	}
-	wg.Wait()
-
-	worstCode := 0
-	for _, r := range results {
-		if r.ExitCode > worstCode {
-			worstCode = r.ExitCode
-		}
-	}
-
-	return results, worstCode
-}
-
-// RunSingleSuiteTest2JSON executes a single suite via `go tool test2json`.
-// Exported for use by the streaming execution pipeline.
-func RunSingleSuiteTest2JSON(ctx context.Context, target SuiteTarget, env []string) SuiteResult {
-	var testArgs []string
-	if target.RunFilter != "" {
-		testArgs = append(testArgs, "-test.run="+target.RunFilter)
-	} else {
-		testArgs = append(testArgs, fmt.Sprintf("-test.run=^%s$", regexp.QuoteMeta(target.SuiteName)))
-	}
-	testArgs = append(testArgs, "-test.v=test2json")
-	for _, f := range target.RunFlags {
-		if f == "-test.v" || strings.HasPrefix(f, "-test.v=") {
-			continue
-		}
-		testArgs = append(testArgs, f)
-	}
-	if target.CoverProfile != "" {
-		testArgs = append(testArgs, "-test.coverprofile="+target.CoverProfile)
-	}
-
-	args := []string{"tool", "test2json", "-p", target.Package, "-t", target.BinaryPath}
-	args = append(args, testArgs...)
-
-	cmd := exec.CommandContext(ctx, "go", args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	cmd.Env = env
-
-	start := time.Now()
-	err := cmd.Run()
-	duration := time.Since(start)
-
-	exitCode := 0
-	if err != nil {
-		if cmd.ProcessState != nil {
-			exitCode = cmd.ProcessState.ExitCode()
-		} else {
-			exitCode = 2
-		}
-	}
-
-	return SuiteResult{
-		Target:   target,
-		Stdout:   stdout.Bytes(),
-		Stderr:   stderr.Bytes(),
-		ExitCode: exitCode,
-		Duration: duration,
 	}
 }
 
