@@ -1,20 +1,42 @@
 package stdlib_test
 
 import (
+	"testing"
+
 	"github.com/mvrahden/go-test/examples/stdlib"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 type UnitTestSuite struct {
-	sut *stdlib.Unit
+	sut   *stdlib.Unit
+	ready bool
 }
 
-func (s *UnitTestSuite) BeforeEach(t *gotest.T) {
+func (s *UnitTestSuite) BeforeAll(t *testing.T) {
+	s.ready = true
+}
+
+func (s *UnitTestSuite) AfterAll(t *testing.T) {
+	s.ready = false
+}
+
+func (s *UnitTestSuite) BeforeEach(t *testing.T) {
 	s.sut = stdlib.NewUnit()
 }
 
-func (s *UnitTestSuite) TestUnitSuccess(t *gotest.T) {
+func (s *UnitTestSuite) AfterEach(t *testing.T) {
+	s.sut = nil
+}
+
+func (s *UnitTestSuite) TestUnitSuccess(t *testing.T) {
 	for _, expected := range []string{"hello", "world", "foo", "bar", "baz"} {
-		gotest.Equal(t, expected, s.sut.DoSomething())
+		actual := s.sut.DoSomething()
+		if actual != expected {
+			t.Fatalf("wanted %q; got %q", expected, actual)
+		}
 	}
+}
+
+func (s *UnitTestSuite) TestReady(t *testing.T) {
+	gotest.True(t, s.ready)
 }
