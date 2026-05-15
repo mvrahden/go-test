@@ -17,6 +17,7 @@ import (
 // to run in its own subprocess.
 type SuiteTarget struct {
 	Package      string   // import path (for reporting)
+	Dir          string   // package source directory (working dir for the binary)
 	BinaryPath   string   // path to compiled test binary
 	SuiteName    string   // test function name, e.g., "TestFooTestSuite"
 	RunFilter    string   // raw -test.run value (overrides SuiteName if set)
@@ -170,11 +171,13 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 		args = append(args, testArgs...)
 		cmd := exec.CommandContext(ctx, "go", args...)
 		cmd.Env = env
+		cmd.Dir = target.Dir
 		return cmd
 	}
 
 	cmd := exec.CommandContext(ctx, target.BinaryPath, testArgs...)
 	cmd.Env = env
+	cmd.Dir = target.Dir
 	return cmd
 }
 
@@ -239,7 +242,7 @@ func WritePackageSummary(pkg string, failed bool, d time.Duration) {
 //
 // Non-suite test functions are discovered via -test.list and grouped into
 // a single additional target per package so they are not silently skipped.
-func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, runFlags []string, userRunFilter string) []SuiteTarget {
+func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, runFlags []string, userRunFilter string) []SuiteTarget {
 	binByPkg := make(map[string]string, len(compiled))
 	for _, cr := range compiled {
 		binByPkg[cr.Package] = cr.BinaryPath
@@ -253,6 +256,8 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 		if !ok {
 			continue
 		}
+
+		pkgDir := dirsByPkg[pkg]
 
 		suiteSet := make(map[string]bool, len(suites))
 		for _, suiteName := range suites {
@@ -278,6 +283,7 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 			pattern := "^(" + strings.Join(escaped, "|") + ")$"
 			targets = append(targets, SuiteTarget{
 				Package:    pkg,
+				Dir:        pkgDir,
 				BinaryPath: bin,
 				SuiteName:  "(standalone)",
 				RunFilter:  pattern,
@@ -292,6 +298,7 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 			}
 			target := SuiteTarget{
 				Package:    pkg,
+				Dir:        pkgDir,
 				BinaryPath: bin,
 				SuiteName:  testFuncName,
 				RunFlags:   translatedFlags,

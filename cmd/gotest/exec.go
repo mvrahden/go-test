@@ -21,6 +21,7 @@ type overlayResult struct {
 	sharedFixtures   []gotestgen.SharedFixtureInfo
 	suitePackages    []string
 	suitesByPkg      map[string][]string          // import path → suite struct names
+	dirsByPkg        map[string]string             // import path → package source directory
 	fixtureDepSuites map[string]map[string]bool   // import path → set of test func names needing shared fixtures
 }
 
@@ -43,6 +44,7 @@ func generateOverlayFromLoaded(loaded []*gotestgen.LoadResult, debug bool) (*ove
 
 	var suitePkgs []string
 	suitesByPkg := map[string][]string{}
+	dirsByPkg := map[string]string{}
 	fixtureDepSuites := map[string]map[string]bool{}
 	for _, r := range allResults {
 		if len(r.PTest) > 0 || len(r.PXTest) > 0 {
@@ -50,6 +52,9 @@ func generateOverlayFromLoaded(loaded []*gotestgen.LoadResult, debug bool) (*ove
 		}
 		if len(r.SuiteNames) > 0 {
 			suitesByPkg[r.PkgPath] = r.SuiteNames
+		}
+		if r.AbsPath != "" {
+			dirsByPkg[r.PkgPath] = r.AbsPath
 		}
 		if len(r.FixtureDepSuites) > 0 {
 			s := make(map[string]bool, len(r.FixtureDepSuites))
@@ -66,6 +71,7 @@ func generateOverlayFromLoaded(loaded []*gotestgen.LoadResult, debug bool) (*ove
 		sharedFixtures:   allSharedFixtures,
 		suitePackages:    suitePkgs,
 		suitesByPkg:      suitesByPkg,
+		dirsByPkg:        dirsByPkg,
 		fixtureDepSuites: fixtureDepSuites,
 	}, cleanup, nil
 }
@@ -206,7 +212,7 @@ func executeTests(ctx context.Context, cfg ExecConfig, overlay *overlayResult) (
 	}
 
 	extraEnv := buildExtraEnv(cfg, setupProc)
-	targets := gotestrunner.BuildSuiteTargets(compiled, overlay.suitesByPkg, pf.runFlags, pf.userRunFilter)
+	targets := gotestrunner.BuildSuiteTargets(compiled, overlay.suitesByPkg, overlay.dirsByPkg, pf.runFlags, pf.userRunFilter)
 
 	if len(targets) == 0 {
 		fmt.Fprintln(os.Stderr, "no test suites to run")
@@ -310,7 +316,7 @@ loop:
 
 		singleCompiled := []gotestrunner.CompileResult{cr}
 		singleSuites := map[string][]string{cr.Package: overlay.suitesByPkg[cr.Package]}
-		targets := gotestrunner.BuildSuiteTargets(singleCompiled, singleSuites, pf.runFlags, pf.userRunFilter)
+		targets := gotestrunner.BuildSuiteTargets(singleCompiled, singleSuites, overlay.dirsByPkg, pf.runFlags, pf.userRunFilter)
 
 		if len(targets) == 0 {
 			continue
@@ -441,7 +447,7 @@ func executeTestsCaptured(ctx context.Context, cfg ExecConfig, overlay *overlayR
 
 	extraEnv := buildExtraEnv(cfg, setupProc)
 	runFlags := append(pf.runFlags, "-v")
-	targets := gotestrunner.BuildSuiteTargets(compiled, overlay.suitesByPkg, runFlags, pf.userRunFilter)
+	targets := gotestrunner.BuildSuiteTargets(compiled, overlay.suitesByPkg, overlay.dirsByPkg, runFlags, pf.userRunFilter)
 
 	if len(targets) == 0 {
 		return nil, 0, nil
