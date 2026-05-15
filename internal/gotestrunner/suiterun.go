@@ -101,8 +101,8 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 	return results, worstCode
 }
 
-// RunSuitesJSON is like RunSuites but captures output for programmatic
-// consumption. Each suite's output is merged as it completes.
+// RunSuitesJSON runs suites through test2json and captures the merged
+// JSON output for programmatic consumption (e.g. the spec renderer).
 func RunSuitesJSON(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int) ([]byte, int) {
 	if maxParallel <= 0 {
 		maxParallel = 2 * runtime.GOMAXPROCS(0)
@@ -125,7 +125,7 @@ func RunSuitesJSON(ctx context.Context, targets []SuiteTarget, extraEnv map[stri
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			r := RunSingleSuite(ctx, t, env)
+			r := RunSingleSuiteTest2JSON(ctx, t, env)
 
 			mu.Lock()
 			results[idx] = r
