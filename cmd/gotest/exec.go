@@ -297,14 +297,10 @@ func executeTestsStreaming(ctx context.Context, cfg ExecConfig, overlay *overlay
 		return fixtureEnv, fixtureEnvErr
 	}
 
-	// Per-package state for CLI output batching (non-JSON mode).
-	// Results are stored at their target index to preserve deterministic ordering.
-	type pkgState struct {
-		expected  int
-		completed int
-		results   []gotestrunner.SuiteResult
+	var batcher *gotestrunner.PackageBatcher
+	if !cfg.JSON {
+		batcher = gotestrunner.NewPackageBatcher()
 	}
-	pkgStates := map[string]*pkgState{}
 
 loop:
 	for cr := range compileCh {
@@ -331,12 +327,9 @@ loop:
 			allTargets = append(allTargets, targets...)
 		}
 
-		if !cfg.JSON {
+		if batcher != nil {
 			mu.Lock()
-			pkgStates[cr.Package] = &pkgState{
-				expected: len(targets),
-				results:  make([]gotestrunner.SuiteResult, len(targets)),
-			}
+			batcher.Register(cr.Package, len(targets))
 			mu.Unlock()
 		}
 
@@ -367,43 +360,20 @@ loop:
 				}
 				mu.Unlock()
 
+				r := gotestrunner.RunSingleSuite(streamCtx, t, env, cfg.JSON)
+				mu.Lock()
+				if r.ExitCode > worstCode {
+					worstCode = r.ExitCode
+				}
 				if cfg.JSON {
-					r := gotestrunner.RunSingleSuite(streamCtx, t, env, true)
-					mu.Lock()
 					os.Stdout.Write(r.Stdout)
 					if len(r.Stderr) > 0 {
 						os.Stderr.Write(r.Stderr)
 					}
-					if r.ExitCode > worstCode {
-						worstCode = r.ExitCode
-					}
-					mu.Unlock()
-				} else {
-					r := gotestrunner.RunSingleSuite(streamCtx, t, env, false)
-					mu.Lock()
-					s := pkgStates[t.Package]
-					s.results[idx] = r
-					s.completed++
-					if r.ExitCode > worstCode {
-						worstCode = r.ExitCode
-					}
-					if s.completed == s.expected {
-						pkgFailed := false
-						var pkgDuration time.Duration
-						for _, pr := range s.results {
-							os.Stdout.Write(gotestrunner.StripTrailingStatus(pr.Stdout))
-							if len(pr.Stderr) > 0 {
-								os.Stderr.Write(pr.Stderr)
-							}
-							if pr.ExitCode != 0 {
-								pkgFailed = true
-							}
-							pkgDuration += pr.Duration
-						}
-						gotestrunner.WritePackageSummary(t.Package, pkgFailed, pkgDuration)
-					}
-					mu.Unlock()
+				} else if batcher.Record(t.Package, idx, r) {
+					batcher.Flush(t.Package)
 				}
+				mu.Unlock()
 			}(target, i)
 		}
 	}

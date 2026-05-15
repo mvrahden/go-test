@@ -374,6 +374,105 @@ func TestBuildSuiteCmd_Test2JSON_ResolvesGoBinary(t *testing.T) {
 	}
 }
 
+// --- PackageBatcher tests ---
+
+func TestPackageBatcher_Record(t *testing.T) {
+	b := NewPackageBatcher()
+	b.Register("pkg/a", 3)
+	b.Register("pkg/b", 1)
+
+	r := SuiteResult{ExitCode: 0}
+
+	if b.Record("pkg/a", 0, r) {
+		t.Error("expected false after 1 of 3")
+	}
+	if b.Record("pkg/a", 2, r) {
+		t.Error("expected false after 2 of 3")
+	}
+	if !b.Record("pkg/a", 1, r) {
+		t.Error("expected true after 3 of 3")
+	}
+
+	if !b.Record("pkg/b", 0, r) {
+		t.Error("expected true after 1 of 1")
+	}
+}
+
+func TestPackageBatcher_Flush(t *testing.T) {
+	b := NewPackageBatcher()
+	b.Register("example.com/pkg", 2)
+
+	b.Record("example.com/pkg", 0, SuiteResult{
+		Stdout:   []byte("=== RUN   TestA\n--- PASS: TestA (0.00s)\nPASS\n"),
+		ExitCode: 0,
+		Duration: 100 * time.Millisecond,
+	})
+	b.Record("example.com/pkg", 1, SuiteResult{
+		Stdout:   []byte("=== RUN   TestB\n--- FAIL: TestB (0.00s)\nFAIL\n"),
+		Stderr:   []byte("some error\n"),
+		ExitCode: 1,
+		Duration: 200 * time.Millisecond,
+	})
+
+	// Capture stdout and stderr.
+	oldOut, oldErr := os.Stdout, os.Stderr
+	rOut, wOut, _ := os.Pipe()
+	rErr, wErr, _ := os.Pipe()
+	os.Stdout = wOut
+	os.Stderr = wErr
+
+	b.Flush("example.com/pkg")
+
+	wOut.Close()
+	wErr.Close()
+	os.Stdout = oldOut
+	os.Stderr = oldErr
+
+	var bufOut, bufErr bytes.Buffer
+	bufOut.ReadFrom(rOut)
+	bufErr.ReadFrom(rErr)
+	rOut.Close()
+	rErr.Close()
+
+	wantOut := "=== RUN   TestA\n--- PASS: TestA (0.00s)\n" +
+		"=== RUN   TestB\n--- FAIL: TestB (0.00s)\n" +
+		"FAIL\nFAIL\texample.com/pkg\t0.300s\n"
+	if bufOut.String() != wantOut {
+		t.Errorf("stdout:\ngot:  %q\nwant: %q", bufOut.String(), wantOut)
+	}
+	if bufErr.String() != "some error\n" {
+		t.Errorf("stderr: got %q, want %q", bufErr.String(), "some error\n")
+	}
+}
+
+func TestPackageBatcher_Flush_AllPassing(t *testing.T) {
+	b := NewPackageBatcher()
+	b.Register("example.com/ok", 1)
+	b.Record("example.com/ok", 0, SuiteResult{
+		Stdout:   []byte("=== RUN   TestOK\n--- PASS: TestOK (0.00s)\nPASS\n"),
+		ExitCode: 0,
+		Duration: 50 * time.Millisecond,
+	})
+
+	oldOut := os.Stdout
+	rOut, wOut, _ := os.Pipe()
+	os.Stdout = wOut
+
+	b.Flush("example.com/ok")
+
+	wOut.Close()
+	os.Stdout = oldOut
+	var buf bytes.Buffer
+	buf.ReadFrom(rOut)
+	rOut.Close()
+
+	wantOut := "=== RUN   TestOK\n--- PASS: TestOK (0.00s)\n" +
+		"PASS\nok  \texample.com/ok\t0.050s\n"
+	if buf.String() != wantOut {
+		t.Errorf("stdout:\ngot:  %q\nwant: %q", buf.String(), wantOut)
+	}
+}
+
 // --- StripTrailingStatus tests ---
 
 func TestStripTrailingStatus(t *testing.T) {
