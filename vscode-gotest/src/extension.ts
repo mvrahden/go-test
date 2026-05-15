@@ -24,14 +24,14 @@ import { copyCoverageSummary, copyTestResults } from "./reporting.js";
 let flushOnDeactivate: (() => Promise<void>) | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
-  const outputChannel = vscode.window.createOutputChannel("Go Test Suites");
-  outputChannel.appendLine("Go Test Suites extension activated");
+  const outputChannel = vscode.window.createOutputChannel("Go Test Suites", {
+    log: true,
+  });
+  outputChannel.info("[activate] extension activated");
 
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) {
-    outputChannel.appendLine(
-      "[activate] No workspace folder found, skipping activation.",
-    );
+    outputChannel.info("[activate] no workspace folder, skipping activation");
     return;
   }
 
@@ -163,7 +163,7 @@ export function activate(context: vscode.ExtensionContext): void {
     controller,
     cache,
   }).catch((err) => {
-    outputChannel.appendLine(`[activate] async initialization failed: ${err}`);
+    outputChannel.error(`[activate] async initialization failed: ${err}`);
   });
 }
 
@@ -226,7 +226,7 @@ function registerCommands(deps: {
   coverageStore: CoverageStore;
   testResultStore: TestResultStore;
   cache: DiscoveryCache;
-  outputChannel: vscode.OutputChannel;
+  outputChannel: vscode.LogOutputChannel;
 }): vscode.Disposable[] {
   const {
     controller,
@@ -248,9 +248,7 @@ function registerCommands(deps: {
       async (testId: string) => {
         const item = controller.findItem(testId);
         if (!item) {
-          outputChannel.appendLine(
-            `[command] runTest: item not found: ${testId}`,
-          );
+          outputChannel.warn(`[command] runTest: item not found: ${testId}`);
           return;
         }
         const cts = new vscode.CancellationTokenSource();
@@ -268,9 +266,7 @@ function registerCommands(deps: {
       async (testId: string) => {
         const item = controller.findItem(testId);
         if (!item) {
-          outputChannel.appendLine(
-            `[command] debugTest: item not found: ${testId}`,
-          );
+          outputChannel.warn(`[command] debugTest: item not found: ${testId}`);
           return;
         }
         const cts = new vscode.CancellationTokenSource();
@@ -382,7 +378,7 @@ function setupFileWatchers(
   discoveryService: DiscoveryService,
   coverageStore: CoverageStore,
   coverOnSave: CoverOnSave,
-  outputChannel: vscode.OutputChannel,
+  outputChannel: vscode.LogOutputChannel,
 ): vscode.Disposable[] {
   const coverOnSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const triggerCoverOnSave = (importPath: string, uri: vscode.Uri) => {
@@ -444,11 +440,9 @@ function setupFileWatchers(
     if (!importPath) return;
 
     if (coverageStore.invalidate(importPath)) {
-      outputChannel.appendLine(`[coverage] invalidated ${importPath}`);
+      outputChannel.debug(`[coverage] invalidated ${importPath}`);
       coverageStore.save().catch((err) => {
-        outputChannel.appendLine(
-          `[coverage] save after invalidate failed: ${err}`,
-        );
+        outputChannel.error(`[coverage] save after invalidate failed: ${err}`);
       });
     }
 
@@ -474,7 +468,7 @@ function setupFileWatchers(
 
 async function initializeAsync(deps: {
   workspaceFolders: readonly vscode.WorkspaceFolder[];
-  outputChannel: vscode.OutputChannel;
+  outputChannel: vscode.LogOutputChannel;
   discoveryService: DiscoveryService;
   coverageStore: CoverageStore;
   testResultStore: TestResultStore;
@@ -494,7 +488,7 @@ async function initializeAsync(deps: {
   const firstDir = workspaceFolders[0].uri.fsPath;
   const goBin = await validateGoBinary(outputChannel, firstDir);
   if (!goBin) {
-    outputChannel.appendLine("[activate] Go binary not found or not working");
+    outputChannel.error("[activate] Go binary not found or not working");
     const choice = await vscode.window.showErrorMessage(
       "Go Test Suites: could not find a working 'go' installation. Ensure Go is installed and on your PATH.",
       "Open Output",
@@ -517,7 +511,7 @@ async function initializeAsync(deps: {
         run.addCoverage(fc);
       }
       run.end();
-      outputChannel.appendLine(
+      outputChannel.info(
         `[coverage] restored ${coverages.length} file(s) from storage`,
       );
     }
@@ -543,7 +537,7 @@ async function initializeAsync(deps: {
       else if (result.status === "skip") resultRun.skipped(item);
     });
     resultRun.end();
-    outputChannel.appendLine(
+    outputChannel.info(
       `[results] restored ${testResultStore.size} result(s) from storage`,
     );
   }
