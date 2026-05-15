@@ -21,6 +21,15 @@ import (
 var (
 	timestampRegex     = regexp.MustCompile(`(\d+\.\d+s|\(cached\))`)
 	assertionLineRegex = regexp.MustCompile(`assertions\.go:\d+:`)
+
+	DefaultExcludePaths = []string{
+		".git",
+		"go.work",
+		"tests/e2e",
+		"vscode-gotest",
+		"node_modules",
+		".worktrees",
+	}
 )
 
 func CompareTestOutputWithGolden(t *testing.T, tmp string, actual *bytes.Buffer, testFS embed.FS, goldenName string) {
@@ -174,6 +183,9 @@ func copyFS(dir string, fsys fs.FS, skipRootLevels ...string) error {
 			if err := os.MkdirAll(targ, 0777); err != nil {
 				return err
 			}
+			return nil
+		}
+		if !d.Type().IsRegular() {
 			return nil
 		}
 		if slices.Contains(skipRootLevels, path) {
