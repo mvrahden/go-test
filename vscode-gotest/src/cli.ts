@@ -3,6 +3,8 @@ import * as path from "node:path";
 import * as os from "node:os";
 import {
   readFile,
+  readdir,
+  stat,
   access,
   mkdir,
   constants,
@@ -237,6 +239,56 @@ async function hasReplaceDirective(
   return false;
 }
 
+async function collectGoFileMtimes(dir: string): Promise<number[]> {
+  const mtimes: number[] = [];
+  const entries = await readdir(dir, { withFileTypes: true, recursive: true });
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    if (!entry.name.endsWith(".go")) continue;
+    const rel = entry.parentPath ?? entry.path ?? "";
+    // skip vendor, testdata, hidden dirs
+    if (
+      rel.includes("/vendor/") ||
+      rel.includes("/testdata/") ||
+      /\/\./.test(rel)
+    )
+      continue;
+    const fullPath = path.join(rel, entry.name);
+    try {
+      const s = await stat(fullPath);
+      mtimes.push(s.mtimeMs);
+    } catch {
+      // skip unreadable files
+    }
+  }
+  return mtimes.sort();
+}
+
+function extractLocalReplacePath(
+  goModContent: string,
+  modulePath: string,
+): string | undefined {
+  let candidate = modulePath;
+  while (candidate) {
+    const pattern = new RegExp(
+      `^\\s*replace\\s+${escapeRegExp(candidate)}\\s+\\S*\\s*=>\\s*(\\S+)`,
+      "m",
+    );
+    const match = pattern.exec(goModContent);
+    if (match) {
+      const target = match[1];
+      if (target.startsWith(".") || target.startsWith("/")) {
+        return target;
+      }
+      return undefined; // remote replace, no local path
+    }
+    const lastSlash = candidate.lastIndexOf("/");
+    if (lastSlash <= 0) break;
+    candidate = candidate.substring(0, lastSlash);
+  }
+  return undefined;
+}
+
 async function buildCachedBinary(
   goBin: string,
   workspaceDir: string,
@@ -261,6 +313,23 @@ async function buildCachedBinary(
   } catch {
     // go.sum may not exist
   }
+
+  const localReplace = extractLocalReplacePath(goModContent, modulePath);
+  if (localReplace) {
+    const resolvedReplace = path.isAbsolute(localReplace)
+      ? localReplace
+      : path.resolve(workspaceDir, localReplace);
+    try {
+      const mtimes = await collectGoFileMtimes(resolvedReplace);
+      for (const mt of mtimes) {
+        h.update(String(mt));
+      }
+    } catch {
+      // if we can't read the replace dir, don't cache at all
+      h.update(String(Date.now()));
+    }
+  }
+
   const hash = h.digest("hex").substring(0, 16);
   const cached = replaceBinaryCache.get(workspaceDir);
   if (cached?.hash === hash) {

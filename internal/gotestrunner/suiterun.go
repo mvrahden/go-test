@@ -16,11 +16,12 @@ import (
 // SuiteTarget identifies a single test suite (or group of standalone tests)
 // to run in its own subprocess.
 type SuiteTarget struct {
-	Package    string   // import path (for reporting)
-	BinaryPath string   // path to compiled test binary
-	SuiteName  string   // test function name, e.g., "TestFooTestSuite"
-	RunFilter  string   // raw -test.run value (overrides SuiteName if set)
-	RunFlags   []string // test binary flags (with -test. prefix)
+	Package      string   // import path (for reporting)
+	BinaryPath   string   // path to compiled test binary
+	SuiteName    string   // test function name, e.g., "TestFooTestSuite"
+	RunFilter    string   // raw -test.run value (overrides SuiteName if set)
+	RunFlags     []string // test binary flags (with -test. prefix)
+	CoverProfile string   // per-suite cover profile path (empty if no -coverprofile)
 }
 
 // SuiteResult holds the output from running a single suite subprocess.
@@ -153,6 +154,9 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string) Suite
 		args = append(args, fmt.Sprintf("-test.run=^%s$", regexp.QuoteMeta(target.SuiteName)))
 	}
 	args = append(args, target.RunFlags...)
+	if target.CoverProfile != "" {
+		args = append(args, "-test.coverprofile="+target.CoverProfile)
+	}
 
 	cmd := exec.CommandContext(ctx, target.BinaryPath, args...)
 	var stdout, stderr bytes.Buffer
@@ -265,6 +269,9 @@ func RunSingleSuiteTest2JSON(ctx context.Context, target SuiteTarget, env []stri
 			continue
 		}
 		testArgs = append(testArgs, f)
+	}
+	if target.CoverProfile != "" {
+		testArgs = append(testArgs, "-test.coverprofile="+target.CoverProfile)
 	}
 
 	args := []string{"tool", "test2json", "-p", target.Package, "-t", target.BinaryPath}

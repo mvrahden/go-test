@@ -11,6 +11,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/mvrahden/go-test/internal/gotestgen"
+	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
 
@@ -39,22 +41,23 @@ func runSpec(args []string) int {
 		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
 	}
 
+	classified := gotestrunner.ClassifyGoTestArgs(goTestArgs)
+	loaded, err := gotestgen.LoadPackages(patterns, classified.BuildFlags)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+
 	if cfg.CI {
-		violations, err := RunFocusGuard(patterns)
-		if err != nil {
+		if code, err := enforceFocusGuard(loaded); err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2
-		}
-		if len(violations) > 0 {
-			fmt.Fprintln(os.Stderr, "FAIL: focus prefix detected — remove F_ before merging:")
-			for _, v := range violations {
-				fmt.Fprintln(os.Stderr, v.String())
-			}
-			return 1
+		} else if code != 0 {
+			return code
 		}
 	}
 
-	overlay, cleanup, err := generateOverlay(patterns, cfg.Debug)
+	overlay, cleanup, err := generateOverlayFromLoaded(loaded, cfg.Debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

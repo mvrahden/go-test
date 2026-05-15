@@ -86,7 +86,7 @@ func ClassifyGoTestArgs(args []string) ClassifiedArgs {
 		}
 
 		if !strings.HasPrefix(arg, "-") {
-			if looksLikePackagePattern(arg) {
+			if LooksLikePackagePattern(arg) {
 				result.PkgPatterns = append(result.PkgPatterns, arg)
 			}
 			i++
@@ -235,6 +235,64 @@ func StripRunFilter(runFlags []string) []string {
 	return out
 }
 
-func looksLikePackagePattern(s string) bool {
+// ExtractCoverProfile returns the value of -coverprofile from run flags, if present.
+func ExtractCoverProfile(runFlags []string) string {
+	for i, f := range runFlags {
+		if f == "-args" {
+			return ""
+		}
+		if v, ok := strings.CutPrefix(f, "-coverprofile="); ok {
+			return v
+		}
+		if f == "-coverprofile" && i+1 < len(runFlags) {
+			return runFlags[i+1]
+		}
+	}
+	return ""
+}
+
+// StripCoverProfile removes -coverprofile and its value from run flags.
+func StripCoverProfile(runFlags []string) []string {
+	var out []string
+	for i := 0; i < len(runFlags); i++ {
+		f := runFlags[i]
+		if f == "-args" {
+			out = append(out, runFlags[i:]...)
+			return out
+		}
+		if strings.HasPrefix(f, "-coverprofile=") {
+			continue
+		}
+		if f == "-coverprofile" {
+			i++ // skip value
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
+// StripCoverBuildFlags removes coverage-related build flags (-cover,
+// -covermode, -coverpkg) that break packages.Load when passed as BuildFlags.
+func StripCoverBuildFlags(flags []string) []string {
+	var out []string
+	for i := 0; i < len(flags); i++ {
+		f := flags[i]
+		name, _, hasEquals := strings.Cut(f, "=")
+		if name == "-cover" {
+			continue
+		}
+		if name == "-covermode" || name == "-coverpkg" {
+			if !hasEquals && i+1 < len(flags) {
+				i++
+			}
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
+func LooksLikePackagePattern(s string) bool {
 	return strings.HasPrefix(s, ".") || strings.HasPrefix(s, "/") || strings.Contains(s, "/")
 }
