@@ -38,6 +38,8 @@ import {
   expandToPackages,
   computeWildcard,
   applyResults,
+  enqueueDescendants,
+  resolvePackageItems,
 } from "./runnerUtils.js";
 import {
   buildPathTrie,
@@ -389,6 +391,43 @@ describe("collapsePathTrie", () => {
   });
 });
 
+describe("enqueueDescendants", () => {
+  it("enqueues all descendants recursively", () => {
+    const pkg = createItem("example.com/pkg", "pkg", undefined, [
+      { id: "package" },
+    ]);
+    const suite = createItem("example.com/pkg/SuiteA", "SuiteA", pkg);
+    const method1 = createItem(
+      "example.com/pkg/SuiteA/Test1",
+      "Test1",
+      suite,
+    );
+    const method2 = createItem(
+      "example.com/pkg/SuiteA/Test2",
+      "Test2",
+      suite,
+    );
+
+    const run = { enqueued: vi.fn() };
+
+    enqueueDescendants(run as any, pkg as any);
+
+    expect(run.enqueued).toHaveBeenCalledTimes(3);
+    expect(run.enqueued).toHaveBeenCalledWith(suite);
+    expect(run.enqueued).toHaveBeenCalledWith(method1);
+    expect(run.enqueued).toHaveBeenCalledWith(method2);
+  });
+
+  it("does nothing for leaf items", () => {
+    const method = createItem("example.com/pkg/Suite/Test1", "Test1");
+    const run = { enqueued: vi.fn() };
+
+    enqueueDescendants(run as any, method as any);
+
+    expect(run.enqueued).not.toHaveBeenCalled();
+  });
+});
+
 describe("applyResults", () => {
   function makeApplyResultsFixture() {
     const suiteItem = createItem("example.com/pkg/MySuite", "MySuite");
@@ -453,7 +492,7 @@ describe("applyResults", () => {
       "/some/dir",
     );
 
-    // Returns 3 AppliedResult entries
+    // Returns 3 test-level + 0 package-level entries (no pkg event in fixture)
     expect(applied).toHaveLength(3);
 
     const passResult = applied.find((r) => r.itemId === passItem.id);
@@ -472,6 +511,46 @@ describe("applyResults", () => {
     expect(run.passed).toHaveBeenCalledWith(passItem, 100);
     expect(run.failed).toHaveBeenCalledWith(failItem, expect.any(Array), 200);
     expect(run.skipped).toHaveBeenCalledWith(skipItem);
+  });
+
+  it("captures package-level pass event with Elapsed", () => {
+    const { controller, run } = makeApplyResultsFixture();
+
+    const events = [
+      { Action: "pass" as const, Test: "MySuite/TestPass", Package: "example.com/pkg", Elapsed: 0.1 },
+      { Action: "pass" as const, Package: "example.com/pkg", Elapsed: 1.5 },
+    ];
+
+    const applied = applyResults(
+      controller as any,
+      run as any,
+      events as any,
+      "example.com/pkg",
+      "/some/dir",
+    );
+
+    const pkgResult = applied.find((r) => r.itemId === "example.com/pkg");
+    expect(pkgResult).toEqual({ itemId: "example.com/pkg", status: "pass", duration: 1500 });
+  });
+
+  it("captures package-level fail event with Elapsed", () => {
+    const { controller, run } = makeApplyResultsFixture();
+
+    const events = [
+      { Action: "fail" as const, Test: "MySuite/TestFail", Package: "example.com/pkg", Elapsed: 0.2 },
+      { Action: "fail" as const, Package: "example.com/pkg", Elapsed: 2.3 },
+    ];
+
+    const applied = applyResults(
+      controller as any,
+      run as any,
+      events as any,
+      "example.com/pkg",
+      "/some/dir",
+    );
+
+    const pkgResult = applied.find((r) => r.itemId === "example.com/pkg");
+    expect(pkgResult).toEqual({ itemId: "example.com/pkg", status: "fail", duration: 2300 });
   });
 });
 
@@ -519,5 +598,108 @@ describe("computeWildcard", () => {
     expect(
       computeWildcard(["example.com/pkg", "example.com/pkg"]),
     ).toBeUndefined();
+  });
+});
+
+describe("resolvePackageItems", () => {
+  function makeResolveFixture() {
+    const pkg = createItem("example.com/pkg", "pkg", undefined, [
+      { id: "package" },
+    ]);
+    const suiteA = createItem("example.com/pkg/SuiteA", "SuiteA", pkg);
+    const methodA1 = createItem(
+      "example.com/pkg/SuiteA/TestOne",
+      "TestOne",
+      suiteA,
+    );
+    const methodA2 = createItem(
+      "example.com/pkg/SuiteA/TestTwo",
+      "TestTwo",
+      suiteA,
+    );
+
+    const run = {
+      passed: vi.fn(),
+      failed: vi.fn(),
+    };
+
+    return { pkg, suiteA, methodA1, methodA2, run };
+  }
+
+  it("uses package-level result with duration when available", () => {
+    const { pkg, run } = makeResolveFixture();
+    const controller = {
+      getResult: vi.fn((id: string) => {
+        if (id === "example.com/pkg")
+          return { status: "pass" as const, duration: 1500 };
+        return undefined;
+      }),
+    };
+
+    resolvePackageItems(run as any, [pkg as any], controller as any);
+    expect(run.passed).toHaveBeenCalledWith(pkg, 1500);
+    expect(run.failed).not.toHaveBeenCalled();
+  });
+
+  it("uses package-level fail result with duration", () => {
+    const { pkg, run } = makeResolveFixture();
+    const controller = {
+      getResult: vi.fn((id: string) => {
+        if (id === "example.com/pkg")
+          return { status: "fail" as const, duration: 2300 };
+        return undefined;
+      }),
+    };
+
+    resolvePackageItems(run as any, [pkg as any], controller as any);
+    expect(run.failed).toHaveBeenCalledWith(pkg, [], 2300);
+    expect(run.passed).not.toHaveBeenCalled();
+  });
+
+  it("falls back to child aggregation when no package result", () => {
+    const { pkg, run } = makeResolveFixture();
+    const controller = {
+      getResult: vi.fn((id: string) => {
+        if (id === "example.com/pkg/SuiteA")
+          return { status: "pass" as const, duration: 100 };
+        if (id === "example.com/pkg/SuiteA/TestOne")
+          return { status: "pass" as const, duration: 50 };
+        if (id === "example.com/pkg/SuiteA/TestTwo")
+          return { status: "pass" as const, duration: 50 };
+        return undefined;
+      }),
+    };
+
+    resolvePackageItems(run as any, [pkg as any], controller as any);
+    expect(run.passed).toHaveBeenCalledWith(pkg);
+    expect(run.failed).not.toHaveBeenCalled();
+  });
+
+  it("falls back to failed from children when no package result", () => {
+    const { pkg, run } = makeResolveFixture();
+    const controller = {
+      getResult: vi.fn((id: string) => {
+        if (id === "example.com/pkg/SuiteA/TestOne")
+          return { status: "pass" as const, duration: 50 };
+        if (id === "example.com/pkg/SuiteA/TestTwo")
+          return { status: "fail" as const, duration: 30 };
+        return undefined;
+      }),
+    };
+
+    resolvePackageItems(run as any, [pkg as any], controller as any);
+    expect(run.failed).toHaveBeenCalledWith(pkg, []);
+    expect(run.passed).not.toHaveBeenCalled();
+  });
+
+  it("skips package when no children have results", () => {
+    const { pkg, run } = makeResolveFixture();
+    const controller = {
+      getResult: vi.fn(() => undefined),
+    };
+
+    resolvePackageItems(run as any, [pkg as any], controller as any);
+    expect(run.passed).not.toHaveBeenCalled();
+    expect(run.failed).not.toHaveBeenCalled();
   });
 });

@@ -24,7 +24,6 @@ func (ts *ƒƒ_GOTEST_ParallelTestSuite) AfterEach(it *gotest.T) {}
 
 func TestParallelTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_ParallelTestSuite{}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	tt := gotest.NewT(t)
@@ -89,7 +88,6 @@ func (ts *ƒƒ_GOTEST_MethodParallelTestSuite) AfterEach(it *gotest.T, ctx *Meth
 
 func TestMethodParallelTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_MethodParallelTestSuite{}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 	gotest.OverlaySuiteConfig(&ƒcfg, s.MethodParallelTestSuite.SuiteConfig())
 	wg := &sync.WaitGroup{}

@@ -109,7 +109,6 @@ func TestUserTestSuite(t *testing.T) {
 			APIFixture: ƒ_APIFixture,
 		},
 	}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	tt := gotest.NewT(t)

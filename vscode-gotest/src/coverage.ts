@@ -4,7 +4,7 @@ import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import type { CoverageStore } from "./coverageStore.js";
 import { scopedConfig } from "./cli.js";
-import { collectItems, groupByPackage, buildRunFilter } from "./runnerUtils.js";
+import { collectItems, enqueueDescendants, groupByPackage, buildRunFilter, resolvePackageItems } from "./runnerUtils.js";
 import { executeBatch } from "./batchRunner.js";
 
 export interface ParsedFileCoverage {
@@ -261,13 +261,13 @@ export class CoverageRunner implements vscode.Disposable {
     try {
       const items = collectItems(this.controller, request);
       if (items.length === 0) {
-        run.end();
         return;
       }
 
       for (const item of items) {
         this.controller.clearResults(item);
         run.started(item);
+        enqueueDescendants(run, item);
       }
 
       const groups = groupByPackage(items);
@@ -342,11 +342,15 @@ export class CoverageRunner implements vscode.Disposable {
 
         const config = scopedConfig(workspaceDir);
         const testFlags = config.get<string[]>("testFlags") ?? [];
+        const coverTestOnly =
+          config.get<boolean>("coverTestOnlyPackages") ?? false;
 
-        const unfiltered = pkgInfos.filter((p) => !p.filter && !p.testOnly);
-        const unfilteredTestOnly = pkgInfos.filter(
-          (p) => !p.filter && p.testOnly,
-        );
+        const unfiltered = coverTestOnly
+          ? pkgInfos.filter((p) => !p.filter && !p.testOnly)
+          : pkgInfos.filter((p) => !p.filter);
+        const unfilteredTestOnly = coverTestOnly
+          ? pkgInfos.filter((p) => !p.filter && p.testOnly)
+          : [];
         const filtered = pkgInfos.filter((p) => p.filter);
 
         if (unfiltered.length > 0) {
@@ -386,10 +390,12 @@ export class CoverageRunner implements vscode.Disposable {
             testFlags,
             run,
             effectiveToken,
-            info.testOnly,
+            coverTestOnly && info.testOnly,
           );
         }
       }
+
+      resolvePackageItems(run, items, this.controller);
 
       const { coverages: allCoverages } = this.store.buildFileCoverages(this.cache);
       for (const fc of allCoverages) {

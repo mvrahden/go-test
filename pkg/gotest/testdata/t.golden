@@ -2,8 +2,6 @@
     t_test.go:10: failed for reasons
 --- FAIL: Test_Stdlib_HelloWorld (<TIMESTAMP>)
 === RUN   TestSimpleTestSuite
-=== PAUSE TestSimpleTestSuite
-=== CONT  TestSimpleTestSuite
 === RUN   TestSimpleTestSuite/TestT
 === RUN   TestSimpleTestSuite/TestT/should_perform_the_test_case
     t_test.go:17: failed for reasons
@@ -85,5 +83,4 @@
         --- FAIL: TestSimpleTestSuite/TestHelperTrace/shows_called_from_trace (<TIMESTAMP>)
 FAIL
 FAIL	github.com/mvrahden/go-test/pkg/gotest	<TIMESTAMP>
-FAIL
 exit status 1

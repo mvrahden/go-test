@@ -26,7 +26,8 @@
     "Testing"
   ],
   "activationEvents": [
-    "workspaceContains:**/*_test.go"
+    "workspaceContains:go.mod",
+    "workspaceContains:go.work"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -162,6 +163,12 @@
           "default": true,
           "scope": "resource",
           "description": "Collect coverage data alongside normal test runs"
+        },
+        "gotest.coverTestOnlyPackages": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "Enable cross-package coverage instrumentation (-coverpkg=./...) for test-only packages. When enabled, test-only packages run in a separate batch with full instrumentation to capture their coverage of production code."
         },
         "gotest.coverOnSave": {
           "type": "boolean",

@@ -4,8 +4,10 @@ import type { DiscoveryCache } from "./discovery.js";
 import { scopedConfig } from "./cli.js";
 import {
   collectItems,
+  enqueueDescendants,
   groupByPackage,
   buildRunFilter,
+  resolvePackageItems,
 } from "./runnerUtils.js";
 import type { CoverageStore } from "./coverageStore.js";
 import { executeBatch } from "./batchRunner.js";
@@ -49,13 +51,13 @@ export class TestRunner {
     try {
       const items = collectItems(this.controller, request);
       if (items.length === 0) {
-        run.end();
         return;
       }
 
       for (const item of items) {
         this.controller.clearResults(item);
         run.started(item);
+        enqueueDescendants(run, item);
       }
 
       const groups = groupByPackage(items);
@@ -166,6 +168,8 @@ export class TestRunner {
         }
       }
 
+      resolvePackageItems(run, items, this.controller);
+
       if (anyCoverOnRun) {
         const { coverages: allCoverages } = this.coverageStore!.buildFileCoverages(this.cache);
         for (const fc of allCoverages) {
@@ -173,7 +177,7 @@ export class TestRunner {
         }
         await this.coverageStore!.save();
       }
-      await this.controller.saveResults();
+      this.controller.saveResults();
     } finally {
       cancelSub.dispose();
       if (this.activeRun === cts) {

@@ -83,7 +83,6 @@ func TestDemoTestSuite(t *testing.T) {
 			SetupFixture: ƒ_SetupFixture,
 		},
 	}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	tt := gotest.NewT(t)

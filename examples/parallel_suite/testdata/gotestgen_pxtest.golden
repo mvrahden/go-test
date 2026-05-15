@@ -23,7 +23,6 @@ func (ts *ƒƒ_GOTEST_ParallelExtTestSuite) AfterEach(it *gotest.T) {}
 
 func TestParallelExtTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_ParallelExtTestSuite{}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	tt := gotest.NewT(t)

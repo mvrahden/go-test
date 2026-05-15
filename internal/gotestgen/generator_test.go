@@ -40,11 +40,13 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 		testdatadir := filepath.Join("..", "..", "examples", tC.directory, "testdata")
 
 		t.Run(fmt.Sprintf("Generate for package %q with %s", tC.directory, tC.description), func(t *testing.T) {
-			res, err := Generate([]string{pkg}, nil)
+			loaded, err := LoadPackages([]string{pkg}, nil)
+			gotest.NoError(t, err)
+			res, _, err := GenerateFromLoaded(loaded)
 			gotest.NoError(t, err)
 			gotest.NotEmpty(t, res, "expected non-empty results for %s", tC.directory)
 			for _, v := range res {
-				gotest.Equal(t, tC.pkgName, v.Package)
+				gotest.Equal(t, tC.pkgName, v.PkgPath)
 				gotest.NotEqual(t, tC.pkgName, v.AbsPath)
 				gotest.NotZero(t, v.AbsPath)
 				gotest.True(t, filepath.IsAbs(v.AbsPath))
@@ -76,9 +78,13 @@ func TestGeneratorGoldenExamples_DumpGolden(t *testing.T) {
 		pkg := path.Join("..", "..", "examples", tC.directory)
 		testdatadir := filepath.Join("..", "..", "examples", tC.directory, "testdata")
 
-		res, err := Generate([]string{pkg}, nil)
+		loaded, err := LoadPackages([]string{pkg}, nil)
 		if err != nil {
-			t.Fatalf("Generate %s: %v", tC.directory, err)
+			t.Fatalf("LoadPackages %s: %v", tC.directory, err)
+		}
+		res, _, err := GenerateFromLoaded(loaded)
+		if err != nil {
+			t.Fatalf("GenerateFromLoaded %s: %v", tC.directory, err)
 		}
 		for _, v := range res {
 			if len(v.PTest) > 0 {
@@ -95,9 +101,9 @@ func TestGeneratorGoldenExamples_DumpGolden(t *testing.T) {
 }
 
 func TestGenerate_StdlibPackage_ReturnsEmpty(t *testing.T) {
-	res, err := Generate([]string{"strings"}, nil)
+	loaded, err := LoadPackages([]string{"strings"}, nil)
 	gotest.NoError(t, err)
-	gotest.Empty(t, res)
+	gotest.Empty(t, loaded)
 }
 
 func getExpectedOutputFile(t *testing.T, testdatadir, fileName string) string {

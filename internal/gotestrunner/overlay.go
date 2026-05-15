@@ -1,6 +1,7 @@
 package gotestrunner
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -16,9 +17,17 @@ type overlayJSON struct {
 }
 
 func WriteOverlay(results gotestgen.GenerateResults) (string, error) {
-	tmpDir, err := os.MkdirTemp("", "gotest-overlay-*")
+	cwd, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("create overlay temp dir: %w", err)
+		return "", fmt.Errorf("get working directory: %w", err)
+	}
+	h := sha256.Sum256([]byte(cwd))
+	dirName := fmt.Sprintf("gotest-overlay-%x", h[:8])
+	tmpDir := filepath.Join(os.TempDir(), dirName)
+
+	os.RemoveAll(tmpDir)
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		return "", fmt.Errorf("create overlay dir: %w", err)
 	}
 
 	overlay := overlayJSON{Replace: map[string]string{}}

@@ -3,10 +3,19 @@ import { spawn } from "node:child_process";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import {
-  parseTestEvents,
   extractTestMessages,
   type TestEvent,
 } from "./outputParser.js";
+
+export function enqueueDescendants(
+  run: vscode.TestRun,
+  item: vscode.TestItem,
+): void {
+  item.children.forEach((child) => {
+    run.enqueued(child);
+    enqueueDescendants(run, child);
+  });
+}
 
 export function collectItems(
   controller: GoTestController,
@@ -187,6 +196,15 @@ export function applyResults(
     }
 
     if (!event.Test) {
+      if (
+        event.Action === "pass" ||
+        event.Action === "fail" ||
+        event.Action === "skip"
+      ) {
+        const duration =
+          event.Elapsed !== undefined ? event.Elapsed * 1000 : undefined;
+        applied.push({ itemId: importPath, status: event.Action, duration });
+      }
       continue;
     }
 
@@ -248,6 +266,7 @@ export function spawnTestProcess(
   outputChannel: vscode.OutputChannel,
   label: string,
   env?: Record<string, string>,
+  onStdoutLine?: (line: string) => void,
 ): Promise<SpawnResult> {
   return new Promise<SpawnResult>((resolve, reject) => {
     const child = spawn(bin, args, {
@@ -256,9 +275,23 @@ export function spawnTestProcess(
     });
     let stdout = "";
     let stderr = "";
+    let lineBuffer = "";
 
     child.stdout.on("data", (data: Buffer) => {
-      stdout += data.toString();
+      const chunk = data.toString();
+      stdout += chunk;
+
+      if (onStdoutLine) {
+        lineBuffer += chunk;
+        const lines = lineBuffer.split("\n");
+        lineBuffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed) {
+            onStdoutLine(trimmed);
+          }
+        }
+      }
     });
 
     child.stderr.on("data", (data: Buffer) => {
@@ -385,4 +418,42 @@ export function getPackageDir(
 ): string | undefined {
   const pkg = getPackageItem(item);
   return cache.getPackage(pkg.id)?.dir;
+}
+
+export function resolvePackageItems(
+  run: vscode.TestRun,
+  items: vscode.TestItem[],
+  controller: GoTestController,
+): void {
+  for (const item of items) {
+    const pkgResult = controller.getResult(item.id);
+    if (pkgResult) {
+      if (pkgResult.status === "fail") {
+        run.failed(item, [], pkgResult.duration);
+      } else {
+        run.passed(item, pkgResult.duration);
+      }
+      continue;
+    }
+
+    let anyFailed = false;
+    let anyResolved = false;
+    const visit = (child: vscode.TestItem) => {
+      const result = controller.getResult(child.id);
+      if (result) {
+        anyResolved = true;
+        if (result.status === "fail") anyFailed = true;
+      }
+      child.children.forEach(visit);
+    };
+    item.children.forEach(visit);
+
+    if (!anyResolved) continue;
+
+    if (anyFailed) {
+      run.failed(item, []);
+    } else {
+      run.passed(item);
+    }
+  }
 }

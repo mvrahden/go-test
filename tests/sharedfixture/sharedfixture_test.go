@@ -21,9 +21,9 @@ func TestSharedFixtureIntegration(t *testing.T) {
 	standalonePattern := "github.com/mvrahden/go-test/tests/sharedfixture/standalone/..."
 	fixtureboundPattern := "github.com/mvrahden/go-test/tests/sharedfixture/fixturebound/..."
 
-	allResults, allSharedFixtures, err := gotestgen.GenerateWithSharedFixtures(
-		[]string{standalonePattern, fixtureboundPattern}, nil,
-	)
+	loaded, err := gotestgen.LoadPackages([]string{standalonePattern, fixtureboundPattern}, nil)
+	gotest.NoError(t, err)
+	allResults, allSharedFixtures, err := gotestgen.GenerateFromLoaded(loaded)
 	gotest.NoError(t, err)
 
 	t.Run("Discovery", func(t *testing.T) {
@@ -179,7 +179,7 @@ func TestSharedFixtureIntegration(t *testing.T) {
 			}
 			code := string(r.PTest)
 
-			if strings.HasSuffix(r.Package, "/standalone") {
+			if strings.HasSuffix(r.PkgPath, "/standalone") {
 				t.Run("standalone", func(t *testing.T) {
 					gotest.Contains(t, code, `os.Getenv("GOTEST_SHARED_STATE_FILE")`)
 					gotest.Contains(t, code, "os.ReadFile(ƒsharedFile)")
@@ -192,7 +192,7 @@ func TestSharedFixtureIntegration(t *testing.T) {
 				})
 			}
 
-			if strings.HasSuffix(r.Package, "/fixturebound") {
+			if strings.HasSuffix(r.PkgPath, "/fixturebound") {
 				t.Run("fixturebound", func(t *testing.T) {
 					gotest.Contains(t, code, `os.Getenv("GOTEST_SHARED_STATE_FILE")`)
 					gotest.Contains(t, code, "os.ReadFile(ƒsharedFile)")

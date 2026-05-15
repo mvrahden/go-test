@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/mvrahden/go-test/internal/gotestgen"
+	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
 func parseWatchFlags(args []string) (jsonMode bool, remaining []string) {
@@ -69,7 +71,6 @@ func runWatch(args []string) int {
 		SetupTimeout:    setupTimeout,
 		Debug:           slices.Contains(ownArgs, "--debug"),
 		CI:              slices.Contains(ownArgs, "--ci"),
-		Spec:            slices.Contains(ownArgs, "--spec"),
 		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
 	}
 
@@ -147,26 +148,32 @@ func runWatch(args []string) int {
 }
 
 func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
+	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
+	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
+	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
+	if err != nil {
+		if jsonMode {
+			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
+		} else {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		}
+		return 2
+	}
+
 	if cfg.CI {
-		violations, err := RunFocusGuard(cfg.PackagePatterns)
-		if err != nil {
+		if code, err := enforceFocusGuard(loaded); err != nil {
 			if jsonMode {
 				fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
 			} else {
 				fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			}
 			return 2
-		}
-		if len(violations) > 0 {
-			fmt.Fprintln(os.Stderr, "FAIL: focus prefix detected — remove F_ before merging:")
-			for _, v := range violations {
-				fmt.Fprintln(os.Stderr, v.String())
-			}
-			return 1
+		} else if code != 0 {
+			return code
 		}
 	}
 
-	overlay, cleanup, err := generateOverlay(cfg.PackagePatterns, cfg.Debug)
+	overlay, cleanup, err := generateOverlayFromLoaded(loaded, cfg.Debug)
 	if err != nil {
 		if jsonMode {
 			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
@@ -177,20 +184,12 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
 	}
 	defer cleanup()
 
-	overlayArgs := append([]string{overlay.overlayFlag}, cfg.GoTestArgs...)
-
 	if jsonMode {
 		fmt.Printf("{\"Action\":\"watch-start\",\"Package\":%q}\n", strings.Join(cfg.PackagePatterns, ","))
-		jsonData, code, err := executeTestsJSON(ctx, cfg, overlay, overlayArgs)
-		if err != nil {
-			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
-			return 2
-		}
-		os.Stdout.Write(jsonData)
-		return code
+		cfg.JSON = true
 	}
 
-	code, err := executeTests(ctx, cfg, overlay, overlayArgs)
+	code, err := executeTests(ctx, cfg, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -237,7 +236,7 @@ func dirsToPatterns(dirs map[string]bool) []string {
 func replacePatterns(originalArgs []string, newPatterns []string) []string {
 	var args []string
 	for _, arg := range originalArgs {
-		if looksLikePackagePattern(arg) {
+		if gotestrunner.LooksLikePackagePattern(arg) {
 			continue
 		}
 		args = append(args, arg)

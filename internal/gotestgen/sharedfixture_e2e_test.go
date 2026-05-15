@@ -20,11 +20,13 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 	}
 
 	pkg := "../../examples/shared_fixture/..."
-	results, sharedFixtures, err := GenerateWithSharedFixtures([]string{pkg}, nil)
+	loaded, err := LoadPackages([]string{pkg}, nil)
+	gotest.NoError(t, err)
+	results, sharedFixtures, err := GenerateFromLoaded(loaded)
 	gotest.NoError(t, err)
 
 	sort.Slice(results, func(i, j int) bool {
-		return results[i].Package < results[j].Package
+		return results[i].PkgPath < results[j].PkgPath
 	})
 
 	var activeResults []*GenerateResult
@@ -39,12 +41,12 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 		for _, r := range activeResults {
 			var subdir string
 			switch {
-			case strings.HasSuffix(r.Package, "/api"):
+			case strings.HasSuffix(r.PkgPath, "/api"):
 				subdir = "api"
-			case strings.HasSuffix(r.Package, "/web"):
+			case strings.HasSuffix(r.PkgPath, "/web"):
 				subdir = "web"
 			default:
-				t.Fatalf("unexpected package: %s", r.Package)
+				t.Fatalf("unexpected package: %s", r.PkgPath)
 			}
 
 			t.Run(subdir, func(t *testing.T) {
@@ -58,7 +60,7 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 	t.Run("APIPackage_MultiFixtureEmbedding", func(t *testing.T) {
 		var apiResult *GenerateResult
 		for _, r := range activeResults {
-			if strings.HasSuffix(r.Package, "/api") {
+			if strings.HasSuffix(r.PkgPath, "/api") {
 				apiResult = r
 				break
 			}
@@ -90,7 +92,7 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 	t.Run("WebPackage_SingleFixtureEmbedding", func(t *testing.T) {
 		var webResult *GenerateResult
 		for _, r := range activeResults {
-			if strings.HasSuffix(r.Package, "/web") {
+			if strings.HasSuffix(r.PkgPath, "/web") {
 				webResult = r
 				break
 			}
@@ -176,9 +178,9 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 		gotest.True(t, sf1TeardownIdx < sf0TeardownIdx,
 			"reverse teardown: Redis (sf1) should tear down before Postgres (sf0)")
 
-		// Cascading teardown on BeforeAll failure
-		gotest.True(t, strings.Contains(code, "sf0.AfterAll(context.Background())\n\t\t\tfmt.Fprintf(os.Stderr, \"RedisSharedFixture.BeforeAll failed after"),
-			"Redis BeforeAll failure should tear down Postgres first")
+		// Parallel startup: on failure, succeeded fixtures get AfterAll
+		gotest.Contains(t, code, "if ƒerrs[0] == nil {")
+		gotest.Contains(t, code, "if ƒerrs[1] == nil {")
 
 		// Golden file comparison
 		setupGoldenDir := filepath.Join("..", "..", "examples", "shared_fixture", "testdata")
@@ -207,15 +209,17 @@ func TestSharedFixture_E2E_DumpGolden(t *testing.T) {
 	}
 
 	pkg := "../../examples/shared_fixture/..."
-	results, sharedFixtures, err := GenerateWithSharedFixtures([]string{pkg}, nil)
+	loaded, err := LoadPackages([]string{pkg}, nil)
+	gotest.NoError(t, err)
+	results, sharedFixtures, err := GenerateFromLoaded(loaded)
 	gotest.NoError(t, err)
 
 	for _, r := range results {
 		var subdir string
 		switch {
-		case strings.HasSuffix(r.Package, "/api"):
+		case strings.HasSuffix(r.PkgPath, "/api"):
 			subdir = "api"
-		case strings.HasSuffix(r.Package, "/web"):
+		case strings.HasSuffix(r.PkgPath, "/web"):
 			subdir = "web"
 		default:
 			continue

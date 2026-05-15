@@ -21,7 +21,6 @@ func (ts *ƒƒ_GOTEST_StringTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestStringTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_StringTestSuite{}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	tt := gotest.NewT(t)
@@ -69,7 +68,6 @@ func (ts *ƒƒ_GOTEST_IntTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestIntTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_IntTestSuite{}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	tt := gotest.NewT(t)

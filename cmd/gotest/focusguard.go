@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
@@ -20,12 +21,20 @@ func (v FocusViolation) String() string {
 	return fmt.Sprintf("  type %s", v.SuiteName)
 }
 
-func RunFocusGuard(patterns []string) ([]FocusViolation, error) {
-	suites, err := gotestgen.Collect(patterns, nil)
+func enforceFocusGuard(loaded []*gotestgen.LoadResult) (int, error) {
+	suites, err := gotestgen.CollectFromLoaded(loaded)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	return CheckFocusViolations(suites), nil
+	violations := CheckFocusViolations(suites)
+	if len(violations) > 0 {
+		fmt.Fprintln(os.Stderr, "FAIL: focus prefix detected — remove F_ before merging:")
+		for _, v := range violations {
+			fmt.Fprintln(os.Stderr, v.String())
+		}
+		return 1, nil
+	}
+	return 0, nil
 }
 
 func CheckFocusViolations(suites gotestast.TestSuiteSpecSet) []FocusViolation {

@@ -138,7 +138,6 @@ func TestLightTestSuite(t *testing.T) {
 			InfraFixture: ƒ_InfraFixture,
 		},
 	}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	tt := gotest.NewT(t)
@@ -168,7 +167,6 @@ func TestFullTestSuite(t *testing.T) {
 			APIFixture: ƒ_APIFixture,
 		},
 	}
-	t.Parallel()
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	tt := gotest.NewT(t)

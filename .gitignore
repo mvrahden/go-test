@@ -5,3 +5,4 @@ dist/
 /gotest
 *.out
 spec.txt
+.vite

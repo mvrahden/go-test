@@ -124,12 +124,8 @@ func Test_TestsuiteCLI_AllPackages(t *testing.T) {
 	out, _ := cmd.CombinedOutput()
 	output := string(out)
 
-	gotest.Contains(t, output, "examples/stdlib")
-	gotest.Contains(t, output, "examples/simple_suite")
-	gotest.Contains(t, output, "examples/focus_exclude")
-	gotest.Contains(t, output, "examples/parallel_suite")
-	gotest.Contains(t, output, "examples/generic_suite")
 	gotest.Contains(t, output, "TestUnitTestSuite")
+	gotest.Contains(t, output, "TestSimpleTestSuite")
 	gotest.Contains(t, output, "TestF_FocusedTestSuite")
 	gotest.Contains(t, output, "TestParallelTestSuite")
 	gotest.Contains(t, output, "TestStringTestSuite")

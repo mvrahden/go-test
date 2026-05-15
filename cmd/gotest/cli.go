@@ -44,7 +44,19 @@ func main() {
 		return
 	default:
 		args := os.Args[1:]
+		if slices.Contains(args, "--spec") {
+			var specArgs []string
+			for _, a := range args {
+				if a != "--spec" {
+					specArgs = append(specArgs, a)
+				}
+			}
+			os.Exit(runSpec(specArgs))
+		}
 		ownArgs, goTestArgs := SplitArgs(args)
+
+		jsonMode, goTestArgs := stripJSONFlag(goTestArgs)
+
 		minCoverage, err := parseMinFlag(ownArgs)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -83,7 +95,7 @@ func main() {
 			SetupTimeout:    setupTimeout,
 			Debug:           slices.Contains(ownArgs, "--debug"),
 			CI:              slices.Contains(ownArgs, "--ci"),
-			Spec:            slices.Contains(ownArgs, "--spec"),
+			JSON:            jsonMode,
 			UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
 		}
 
@@ -165,6 +177,19 @@ func readCoverageTotal(profilePath string) (float64, error) {
 	}
 	pctStr := strings.TrimSuffix(fields[len(fields)-1], "%")
 	return strconv.ParseFloat(pctStr, 64)
+}
+
+func stripJSONFlag(args []string) (bool, []string) {
+	found := false
+	var out []string
+	for _, arg := range args {
+		if arg == "-json" {
+			found = true
+			continue
+		}
+		out = append(out, arg)
+	}
+	return found, out
 }
 
 func printUsage() {
