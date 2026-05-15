@@ -1,7 +1,3 @@
-=== RUN   Test_Unit_Stdlib
---- PASS: Test_Unit_Stdlib (<TIMESTAMP>)
-=== RUN   Test_Unit_Stdlib
---- PASS: Test_Unit_Stdlib (<TIMESTAMP>)
 === RUN   TestUnitTestSuite
 === RUN   TestUnitTestSuite/TestUnitSuccess
 === RUN   TestUnitTestSuite/TestReady

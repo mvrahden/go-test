@@ -1,6 +1,3 @@
-=== RUN   Test_Stdlib_HelloWorld
-    t_test.go:10: failed for reasons
---- FAIL: Test_Stdlib_HelloWorld (<TIMESTAMP>)
 === RUN   TestSimpleTestSuite
 === RUN   TestSimpleTestSuite/TestT
 === RUN   TestSimpleTestSuite/TestT/should_perform_the_test_case

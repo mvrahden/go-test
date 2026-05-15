@@ -276,9 +276,6 @@ func WritePackageSummary(pkg string, failed bool, d time.Duration) {
 //
 // If userRunFilter is non-empty, only suites whose test function name
 // matches the filter regex are included.
-//
-// Non-suite test functions are discovered via -test.list and grouped into
-// a single additional target per package so they are not silently skipped.
 func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, runFlags []string, userRunFilter string) []SuiteTarget {
 	binByPkg := make(map[string]string, len(compiled))
 	for _, cr := range compiled {
@@ -295,38 +292,6 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 		}
 
 		pkgDir := dirsByPkg[pkg]
-
-		suiteSet := make(map[string]bool, len(suites))
-		for _, suiteName := range suites {
-			suiteSet["Test"+suiteName] = true
-		}
-
-		allFuncs := listTestFuncs(bin)
-		var standalone []string
-		for _, fn := range allFuncs {
-			if suiteSet[fn] {
-				continue
-			}
-			if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, fn) {
-				continue
-			}
-			standalone = append(standalone, fn)
-		}
-		if len(standalone) > 0 {
-			escaped := make([]string, len(standalone))
-			for i, fn := range standalone {
-				escaped[i] = regexp.QuoteMeta(fn)
-			}
-			pattern := "^(" + strings.Join(escaped, "|") + ")$"
-			targets = append(targets, SuiteTarget{
-				Package:    pkg,
-				Dir:        pkgDir,
-				BinaryPath: bin,
-				SuiteName:  "(standalone)",
-				RunFilter:  pattern,
-				RunFlags:   translatedFlags,
-			})
-		}
 
 		for _, suiteName := range suites {
 			testFuncName := "Test" + suiteName
@@ -347,22 +312,6 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 		}
 	}
 	return targets
-}
-
-func listTestFuncs(binaryPath string) []string {
-	cmd := exec.Command(binaryPath, "-test.list", ".*")
-	out, err := cmd.Output()
-	if err != nil {
-		return nil
-	}
-	var funcs []string
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			funcs = append(funcs, line)
-		}
-	}
-	return funcs
 }
 
 // matchesSuiteFunc checks if the user's -run regex could match a given
