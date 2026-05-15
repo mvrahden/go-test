@@ -52,6 +52,61 @@ const (
 	RunCaptureJSON
 )
 
+// PackageBatcher collects per-suite results and flushes output when all
+// suites for a package have completed. Results are stored at fixed indices
+// to guarantee deterministic output order regardless of goroutine scheduling.
+//
+// All methods must be called under a single external mutex.
+type PackageBatcher struct {
+	pkgs map[string]*pkgBatch
+}
+
+type pkgBatch struct {
+	expected  int
+	completed int
+	results   []SuiteResult
+}
+
+func NewPackageBatcher() *PackageBatcher {
+	return &PackageBatcher{pkgs: map[string]*pkgBatch{}}
+}
+
+// Register prepares the batcher for a package with count suites.
+func (b *PackageBatcher) Register(pkg string, count int) {
+	b.pkgs[pkg] = &pkgBatch{
+		expected: count,
+		results:  make([]SuiteResult, count),
+	}
+}
+
+// Record stores a result at position idx within its package.
+// Returns true when all suites for that package are now complete.
+func (b *PackageBatcher) Record(pkg string, idx int, r SuiteResult) bool {
+	s := b.pkgs[pkg]
+	s.results[idx] = r
+	s.completed++
+	return s.completed == s.expected
+}
+
+// Flush writes the completed package's output to stdout: each suite's output
+// with trailing status stripped, followed by the package summary line.
+func (b *PackageBatcher) Flush(pkg string) {
+	s := b.pkgs[pkg]
+	pkgFailed := false
+	var pkgDuration time.Duration
+	for _, pr := range s.results {
+		os.Stdout.Write(StripTrailingStatus(pr.Stdout))
+		if len(pr.Stderr) > 0 {
+			os.Stderr.Write(pr.Stderr)
+		}
+		if pr.ExitCode != 0 {
+			pkgFailed = true
+		}
+		pkgDuration += pr.Duration
+	}
+	WritePackageSummary(pkg, pkgFailed, pkgDuration)
+}
+
 // RunSuites executes each suite target in its own subprocess with bounded
 // concurrency. The mode parameter controls output format and delivery.
 // The returned []byte is non-nil only for RunCaptureJSON.
@@ -62,24 +117,25 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 
 	useTest2JSON := mode != RunBatchText
 
-	// Per-package batching state (RunBatchText only).
-	var pkgSuiteCount map[string]int
-	var pkgIndices map[string][]int
-	var pkgCompleted map[string]int
+	var batcher *PackageBatcher
+	var localIdx []int
 	if mode == RunBatchText {
-		pkgSuiteCount = map[string]int{}
-		pkgIndices = map[string][]int{}
-		pkgCompleted = map[string]int{}
+		batcher = NewPackageBatcher()
+		pkgCount := map[string]int{}
+		localIdx = make([]int, len(targets))
 		for i, t := range targets {
-			pkgSuiteCount[t.Package]++
-			pkgIndices[t.Package] = append(pkgIndices[t.Package], i)
+			localIdx[i] = pkgCount[t.Package]
+			pkgCount[t.Package]++
+		}
+		for pkg, count := range pkgCount {
+			batcher.Register(pkg, count)
 		}
 	}
 
-	results := make([]SuiteResult, len(targets))
 	var merged bytes.Buffer
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	var worstCode int
 	sem := make(chan struct{}, maxParallel)
 
 	env := os.Environ()
@@ -96,25 +152,13 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 			r := RunSingleSuite(ctx, t, env, useTest2JSON)
 
 			mu.Lock()
-			results[idx] = r
+			if r.ExitCode > worstCode {
+				worstCode = r.ExitCode
+			}
 			switch mode {
 			case RunBatchText:
-				pkgCompleted[t.Package]++
-				if pkgCompleted[t.Package] == pkgSuiteCount[t.Package] {
-					pkgFailed := false
-					var pkgDuration time.Duration
-					for _, j := range pkgIndices[t.Package] {
-						pr := results[j]
-						os.Stdout.Write(StripTrailingStatus(pr.Stdout))
-						if len(pr.Stderr) > 0 {
-							os.Stderr.Write(pr.Stderr)
-						}
-						if pr.ExitCode != 0 {
-							pkgFailed = true
-						}
-						pkgDuration += pr.Duration
-					}
-					WritePackageSummary(t.Package, pkgFailed, pkgDuration)
+				if batcher.Record(t.Package, localIdx[idx], r) {
+					batcher.Flush(t.Package)
 				}
 			case RunStreamJSON:
 				os.Stdout.Write(r.Stdout)
@@ -128,13 +172,6 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 		}(i, target)
 	}
 	wg.Wait()
-
-	worstCode := 0
-	for _, r := range results {
-		if r.ExitCode > worstCode {
-			worstCode = r.ExitCode
-		}
-	}
 
 	return merged.Bytes(), worstCode
 }
