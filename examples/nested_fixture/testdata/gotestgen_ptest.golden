@@ -140,36 +140,25 @@ func TestLightTestSuite(t *testing.T) {
 	}
 	ƒcfg := gotest.DefaultSuiteConfig()
 
-	newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
-		return func(tt *gotest.T) {
-			t := tt.T()
-			t.Run(desc, func(it *testing.T) {
-				ttt := gotest.NewT(it)
-				if ƒcfg.Timeout > 0 {
-					ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-				}
-				defer s.AfterEach(ttt)
-				s.BeforeEach(ttt)
-				ƒƒ_GOTEST_exec(testFn, ttt)
-			})
-		}
-	}
-
-	testCases := []gotest.TestCase{
-		newTestCase("TestDBAccess", s.TestDBAccess),
-	}
-
 	tt := gotest.NewT(t)
 	t.Cleanup(func() {
 		s.AfterAll(tt)
 	})
 	s.BeforeAll(tt)
-	for _, tc := range testCases {
-		tc(tt)
-		if ƒcfg.FailFast && t.Failed() {
-			break
+
+	t.Run("TestDBAccess", func(it *testing.T) {
+		ttt := gotest.NewT(it)
+		if ƒcfg.Timeout > 0 {
+			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
 		}
+		defer s.AfterEach(ttt)
+		s.BeforeEach(ttt)
+		ƒƒ_GOTEST_exec(s.TestDBAccess, ttt)
+	})
+	if ƒcfg.FailFast && t.Failed() {
+		return
 	}
+
 }
 
 func TestFullTestSuite(t *testing.T) {
@@ -180,35 +169,36 @@ func TestFullTestSuite(t *testing.T) {
 	}
 	ƒcfg := gotest.DefaultSuiteConfig()
 
-	newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
-		return func(tt *gotest.T) {
-			t := tt.T()
-			t.Run(desc, func(it *testing.T) {
-				ttt := gotest.NewT(it)
-				if ƒcfg.Timeout > 0 {
-					ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-				}
-				defer s.AfterEach(ttt)
-				s.BeforeEach(ttt)
-				ƒƒ_GOTEST_exec(testFn, ttt)
-			})
-		}
-	}
-
-	testCases := []gotest.TestCase{
-		newTestCase("TestAPIAccess", s.TestAPIAccess),
-		newTestCase("TestAPIHealth", s.TestAPIHealth),
-	}
-
 	tt := gotest.NewT(t)
 	t.Cleanup(func() {
 		s.AfterAll(tt)
 	})
 	s.BeforeAll(tt)
-	for _, tc := range testCases {
-		tc(tt)
-		if ƒcfg.FailFast && t.Failed() {
-			break
+
+	t.Run("TestAPIAccess", func(it *testing.T) {
+		ttt := gotest.NewT(it)
+		if ƒcfg.Timeout > 0 {
+			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
 		}
+		defer s.AfterEach(ttt)
+		s.BeforeEach(ttt)
+		ƒƒ_GOTEST_exec(s.TestAPIAccess, ttt)
+	})
+	if ƒcfg.FailFast && t.Failed() {
+		return
 	}
+
+	t.Run("TestAPIHealth", func(it *testing.T) {
+		ttt := gotest.NewT(it)
+		if ƒcfg.Timeout > 0 {
+			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+		}
+		defer s.AfterEach(ttt)
+		s.BeforeEach(ttt)
+		ƒƒ_GOTEST_exec(s.TestAPIHealth, ttt)
+	})
+	if ƒcfg.FailFast && t.Failed() {
+		return
+	}
+
 }

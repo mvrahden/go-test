@@ -11,8 +11,18 @@ import (
 
 func runGenerate(args []string) int {
 	patterns := ExtractPackagePatterns(args)
+	tags, _ := extractTagsFlag(args)
+	var buildFlags []string
+	if tags != "" {
+		buildFlags = append(buildFlags, "-tags="+tags)
+	}
 
-	results, err := gotestgen.Generate(patterns, nil)
+	loaded, err := gotestgen.LoadPackages(patterns, buildFlags)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	results, _, err := gotestgen.GenerateFromLoaded(loaded)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

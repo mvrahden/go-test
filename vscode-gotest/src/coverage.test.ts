@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll } from "vitest";
 
 vi.mock("vscode", () => {
   class Position {
@@ -32,10 +32,18 @@ vi.mock("vscode", () => {
       public location: Position | Range,
     ) {}
   }
+  class TestCoverageCount {
+    constructor(
+      public covered: number,
+      public total: number,
+    ) {}
+  }
   class FileCoverage {
     constructor(
       public uri: Uri,
       public statementCoverage: { covered: number; total: number },
+      public branchCoverage?: { covered: number; total: number },
+      public declarationCoverage?: { covered: number; total: number },
     ) {}
     static fromDetails(
       uri: Uri,
@@ -51,13 +59,28 @@ vi.mock("vscode", () => {
       return new FileCoverage(uri, { covered, total: details.length });
     }
   }
+  class EventEmitter<T> {
+    private listeners: ((e: T) => void)[] = [];
+    event = (listener: (e: T) => void) => {
+      this.listeners.push(listener);
+      return { dispose: () => {} };
+    };
+    fire(e: T) {
+      for (const l of this.listeners) l(e);
+    }
+    dispose() {
+      this.listeners = [];
+    }
+  }
   return {
     Position,
     Range,
     Uri,
     StatementCoverage,
     DeclarationCoverage,
+    TestCoverageCount,
     FileCoverage,
+    EventEmitter,
   };
 });
 
@@ -65,7 +88,10 @@ import {
   parseCoverProfile,
   parseFuncCoverage,
   buildFileCoverages,
+  deduplicateProfiles,
+  filterSupplementaryProfiles,
 } from "./coverage.js";
+import { splitCoverByPackage } from "./coverageUtils.js";
 
 describe("parseCoverProfile", () => {
   const moduleToDir = (importPath: string) => {
@@ -85,6 +111,18 @@ describe("parseCoverProfile", () => {
     expect(result).toHaveLength(1);
     expect(result[0].absPath).toBe("/abs/pkg/main.go");
     expect(result[0].statements).toHaveLength(2);
+  });
+
+  it("captures numStatements from profile entries", () => {
+    const content = [
+      "mode: atomic",
+      "example.com/pkg/main.go:10.2,15.3 5 3",
+      "example.com/pkg/main.go:20.5,25.10 3 0",
+    ].join("\n");
+
+    const result = parseCoverProfile(content, moduleToDir);
+    expect(result).toHaveLength(1);
+    expect(result[0].numStatements).toEqual([5, 3]);
   });
 
   it("groups statements by file", () => {
@@ -197,24 +235,277 @@ describe("buildFileCoverages", () => {
     return undefined;
   };
 
-  it("builds FileCoverage from parsed data", () => {
+  it("returns statement-weighted metrics via constructor", () => {
     const parsed = parseCoverProfile(
-      "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 5 1\nexample.com/pkg/main.go:3.1,4.2 3 0\n",
       moduleToDir,
     );
-    const result = buildFileCoverages(parsed);
-    expect(result).toHaveLength(1);
-    expect(result[0].uri.fsPath).toBe("/abs/pkg/main.go");
+    const { coverages, details } = buildFileCoverages(parsed);
+    expect(coverages).toHaveLength(1);
+    expect(coverages[0].uri.fsPath).toBe("/abs/pkg/main.go");
+    expect(coverages[0].statementCoverage.covered).toBe(5);
+    expect(coverages[0].statementCoverage.total).toBe(8);
+    expect(details.get("/abs/pkg/main.go")).toHaveLength(2);
   });
 
-  it("merges declarations when provided", () => {
+  it("includes declarations in details but not in sidebar metric", () => {
     const parsed = parseCoverProfile(
       "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
       moduleToDir,
     );
-    const funcContent = "example.com/pkg/main.go:1:\tMyFunc\t\t100.0%\n";
+    const funcContent = [
+      "example.com/pkg/main.go:1:\tMyFunc\t\t100.0%",
+      "example.com/pkg/main.go:10:\tOther\t\t0.0%",
+    ].join("\n");
     const declarations = parseFuncCoverage(funcContent, moduleToDir);
-    const result = buildFileCoverages(parsed, declarations);
+    const { coverages, details } = buildFileCoverages(parsed, declarations);
+    expect(coverages).toHaveLength(1);
+    expect(coverages[0].declarationCoverage).toBeUndefined();
+    expect(details.get("/abs/pkg/main.go")).toHaveLength(3);
+  });
+
+  it("has no declarationCoverage regardless of input", () => {
+    const parsed = parseCoverProfile(
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
+      moduleToDir,
+    );
+    const { coverages } = buildFileCoverages(parsed);
+    expect(coverages[0].declarationCoverage).toBeUndefined();
+  });
+
+  it("returns details keyed by absolute path", () => {
+    const parsed = parseCoverProfile(
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\nexample.com/pkg/main.go:3.1,4.2 1 0\n",
+      moduleToDir,
+    );
+    const { details } = buildFileCoverages(parsed);
+    const d = details.get("/abs/pkg/main.go")!;
+    expect(d).toHaveLength(2);
+  });
+});
+
+describe("deduplicateProfiles", () => {
+  const moduleToDir = (importPath: string) => {
+    if (importPath === "example.com/pkg") return "/abs/pkg";
+    return undefined;
+  };
+
+  it("passes through non-overlapping profiles unchanged", () => {
+    const parsed = parseCoverProfile(
+      [
+        "mode: set",
+        "example.com/pkg/a.go:1.1,2.2 3 1",
+        "example.com/pkg/b.go:1.1,2.2 5 0",
+      ].join("\n"),
+      moduleToDir,
+    );
+    const result = deduplicateProfiles(parsed);
+    expect(result).toHaveLength(2);
+    const a = result.find((r) => r.absPath === "/abs/pkg/a.go")!;
+    const b = result.find((r) => r.absPath === "/abs/pkg/b.go")!;
+    expect(a.statements).toHaveLength(1);
+    expect(b.statements).toHaveLength(1);
+  });
+
+  it("deduplicates same-file blocks by range, taking max(count)", () => {
+    const profileA = parseCoverProfile(
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 4 0\n",
+      moduleToDir,
+    );
+    const profileB = parseCoverProfile(
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 4 5\n",
+      moduleToDir,
+    );
+    const combined = [...profileA, ...profileB];
+    const result = deduplicateProfiles(combined);
+
     expect(result).toHaveLength(1);
+    expect(result[0].absPath).toBe("/abs/pkg/main.go");
+    expect(result[0].statements).toHaveLength(1);
+    expect(result[0].statements[0].executed).toBe(5);
+    expect(result[0].numStatements).toEqual([4]);
+  });
+
+  it("keeps distinct blocks within same file after merge", () => {
+    const profileA = parseCoverProfile(
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 3 1\n",
+      moduleToDir,
+    );
+    const profileB = parseCoverProfile(
+      "mode: set\nexample.com/pkg/main.go:5.1,6.2 2 1\n",
+      moduleToDir,
+    );
+    const combined = [...profileA, ...profileB];
+    const result = deduplicateProfiles(combined);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].statements).toHaveLength(2);
+    expect(result[0].numStatements).toEqual([3, 2]);
+  });
+
+  it("picks higher count when both entries are nonzero", () => {
+    const profileA = parseCoverProfile(
+      "mode: atomic\nexample.com/pkg/main.go:1.1,2.2 3 10\n",
+      moduleToDir,
+    );
+    const profileB = parseCoverProfile(
+      "mode: atomic\nexample.com/pkg/main.go:1.1,2.2 3 2\n",
+      moduleToDir,
+    );
+    const combined = [...profileA, ...profileB];
+    const result = deduplicateProfiles(combined);
+
+    expect(result[0].statements[0].executed).toBe(10);
+  });
+
+  it("returns empty array for empty input", () => {
+    expect(deduplicateProfiles([])).toHaveLength(0);
+  });
+});
+
+describe("splitCoverByPackage", () => {
+  it("assigns lines to matching import path prefixes", () => {
+    const content = [
+      "mode: atomic",
+      "example.com/pkg/a.go:1.1,2.2 3 1",
+      "example.com/pkg/b.go:3.1,4.2 2 0",
+      "example.com/other/c.go:5.1,6.2 1 1",
+    ].join("\n");
+
+    const result = splitCoverByPackage(content, [
+      "example.com/pkg",
+      "example.com/other",
+    ]);
+    expect(result.size).toBe(2);
+    expect(result.get("example.com/pkg")).toContain("example.com/pkg/a.go");
+    expect(result.get("example.com/pkg")).toContain("example.com/pkg/b.go");
+    expect(result.get("example.com/other")).toContain("example.com/other/c.go");
+  });
+
+  it("drops lines that match no import path", () => {
+    const content = ["mode: set", "example.com/unknown/x.go:1.1,2.2 1 1"].join(
+      "\n",
+    );
+
+    const result = splitCoverByPackage(content, ["example.com/pkg"]);
+    expect(result.size).toBe(0);
+  });
+
+  it("preserves mode line in each bucket", () => {
+    const content = ["mode: atomic", "example.com/pkg/a.go:1.1,2.2 3 1"].join(
+      "\n",
+    );
+
+    const result = splitCoverByPackage(content, ["example.com/pkg"]);
+    expect(result.get("example.com/pkg")).toMatch(/^mode: atomic\n/);
+  });
+});
+
+describe("filterSupplementaryProfiles", () => {
+  const moduleToDir = (importPath: string) => {
+    if (importPath === "example.com/pkg") return "/abs/pkg";
+    if (importPath === "example.com/other") return "/abs/other";
+    return undefined;
+  };
+
+  it("keeps supplementary entries that match primary file scope", () => {
+    const primary = parseCoverProfile(
+      "mode: set\nexample.com/pkg/a.go:1.1,2.2 3 5\n",
+      moduleToDir,
+    );
+    const supplementary = parseCoverProfile(
+      "mode: set\nexample.com/pkg/a.go:1.1,2.2 3 0\nexample.com/other/b.go:1.1,2.2 2 1\n",
+      moduleToDir,
+    );
+    const result = filterSupplementaryProfiles(primary, supplementary);
+    expect(result).toHaveLength(1);
+    expect(result[0].absPath).toBe("/abs/pkg/a.go");
+  });
+
+  it("returns empty when no supplementary files match primary scope", () => {
+    const primary = parseCoverProfile(
+      "mode: set\nexample.com/pkg/a.go:1.1,2.2 3 1\n",
+      moduleToDir,
+    );
+    const supplementary = parseCoverProfile(
+      "mode: set\nexample.com/other/b.go:1.1,2.2 2 1\n",
+      moduleToDir,
+    );
+    const result = filterSupplementaryProfiles(primary, supplementary);
+    expect(result).toHaveLength(0);
+  });
+
+  it("returns all supplementary when primary is empty (fallback)", () => {
+    const supplementary = parseCoverProfile(
+      "mode: set\nexample.com/pkg/a.go:1.1,2.2 3 1\nexample.com/other/b.go:1.1,2.2 2 1\n",
+      moduleToDir,
+    );
+    const result = filterSupplementaryProfiles([], supplementary);
+    expect(result).toHaveLength(2);
+  });
+
+  it("returns empty when both inputs are empty", () => {
+    expect(filterSupplementaryProfiles([], [])).toHaveLength(0);
+  });
+});
+
+describe("CoverageStore.getDetails", () => {
+  let CoverageStoreCls: typeof import("./coverageStore.js").CoverageStore;
+
+  beforeAll(async () => {
+    const mod = await import("./coverageStore.js");
+    CoverageStoreCls = mod.CoverageStore;
+  });
+
+  it("returns details for a file after buildFileCoverages", () => {
+    const store = new CoverageStoreCls(undefined);
+    store.update(
+      "example.com/pkg",
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
+    );
+    const mockCache = {
+      resolveImportPath: (ip: string) =>
+        ip === "example.com/pkg" ? "/abs/pkg" : undefined,
+    };
+    store.buildFileCoverages(mockCache as any);
+    const details = store.getDetails("/abs/pkg/main.go");
+    expect(details.length).toBeGreaterThan(0);
+  });
+
+  it("returns empty array for unknown path", () => {
+    const store = new CoverageStoreCls(undefined);
+    expect(store.getDetails("/no/such/file.go")).toEqual([]);
+  });
+
+  it("clears cached details on invalidate", () => {
+    const store = new CoverageStoreCls(undefined);
+    store.update(
+      "example.com/pkg",
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
+    );
+    const mockCache = {
+      resolveImportPath: (ip: string) =>
+        ip === "example.com/pkg" ? "/abs/pkg" : undefined,
+    };
+    store.buildFileCoverages(mockCache as any);
+    expect(store.getDetails("/abs/pkg/main.go").length).toBeGreaterThan(0);
+    store.invalidate("example.com/pkg");
+    expect(store.getDetails("/abs/pkg/main.go")).toEqual([]);
+  });
+
+  it("clears cached details on clear", () => {
+    const store = new CoverageStoreCls(undefined);
+    store.update(
+      "example.com/pkg",
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
+    );
+    const mockCache = {
+      resolveImportPath: (ip: string) =>
+        ip === "example.com/pkg" ? "/abs/pkg" : undefined,
+    };
+    store.buildFileCoverages(mockCache as any);
+    expect(store.getDetails("/abs/pkg/main.go").length).toBeGreaterThan(0);
+    store.clear();
+    expect(store.getDetails("/abs/pkg/main.go")).toEqual([]);
   });
 });

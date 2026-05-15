@@ -7,10 +7,13 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 )
 
-func TestCallerTrace_DirectCall_ReturnsEmpty(t *testing.T) {
+func TestCallerTrace_DirectCall_ReturnsTrace(t *testing.T) {
 	trace := assert.CallerTrace()
-	if trace != "" {
-		t.Fatalf("expected empty trace for direct call, got: %q", trace)
+	if trace == "" {
+		t.Fatalf("expected non-empty trace for direct call, got empty")
+	}
+	if !strings.Contains(trace, "called from:") {
+		t.Fatalf("expected 'called from:' in trace, got: %q", trace)
 	}
 }
 
@@ -50,5 +53,32 @@ func TestCallerTrace_DeepHelperChain_ReturnsTrace(t *testing.T) {
 	}
 	if !strings.Contains(trace, "called from:") {
 		t.Fatalf("expected 'called from:' in trace, got: %q", trace)
+	}
+}
+
+func TestCallerFrame_DirectCall_ReturnsFrame(t *testing.T) {
+	frame := assert.CallerFrame()
+	if frame == "" {
+		t.Fatalf("expected non-empty frame, got empty")
+	}
+	if !strings.Contains(frame, "trace_test.go:") {
+		t.Fatalf("expected 'trace_test.go:' in frame, got: %q", frame)
+	}
+	if strings.Contains(frame, "called from") {
+		t.Fatalf("CallerFrame should not contain 'called from', got: %q", frame)
+	}
+}
+
+func helperThatCallsCallerFrame() string {
+	return assert.CallerFrame()
+}
+
+func TestCallerFrame_ThroughHelper_ReturnsOutermostUserFrame(t *testing.T) {
+	frame := helperThatCallsCallerFrame()
+	if frame == "" {
+		t.Fatalf("expected non-empty frame, got empty")
+	}
+	if !strings.Contains(frame, "trace_test.go:") {
+		t.Fatalf("expected 'trace_test.go:' in frame, got: %q", frame)
 	}
 }

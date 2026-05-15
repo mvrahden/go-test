@@ -3,3 +3,6 @@ go.work.sum
 bin/
 dist/
 /gotest
+*.out
+spec.txt
+.vite

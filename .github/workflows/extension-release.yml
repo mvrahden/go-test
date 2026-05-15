@@ -1,0 +1,28 @@
+name: extension-release
+
+on:
+  release:
+    types: [created]
+
+defaults:
+  run:
+    working-directory: vscode-gotest
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: vscode-gotest/package-lock.json
+      - run: npm ci
+      - run: npm run format:check
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npm run compile
+      - run: npx @vscode/vsce publish --no-dependencies
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}

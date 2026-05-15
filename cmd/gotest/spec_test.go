@@ -120,10 +120,13 @@ func TestRunSpec_InputStdin(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	// Generate overlay and run tests to get JSON output
-	results, _, err := gotestgen.GenerateWithSharedFixtures([]string{"./simple_suite"}, nil)
+	loaded, err := gotestgen.LoadPackages([]string{"./simple_suite"}, nil)
 	if err != nil {
-		t.Fatalf("GenerateWithSharedFixtures: %v", err)
+		t.Fatalf("LoadPackages: %v", err)
+	}
+	results, _, err := gotestgen.GenerateFromLoaded(loaded)
+	if err != nil {
+		t.Fatalf("GenerateFromLoaded: %v", err)
 	}
 
 	tmpDir, err := gotestrunner.WriteOverlay(results)

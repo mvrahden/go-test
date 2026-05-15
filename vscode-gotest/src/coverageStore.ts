@@ -3,9 +3,12 @@ import * as path from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import {
   type ParsedFileCoverage,
+  type CoverageResult,
   parseCoverProfile,
   parseFuncCoverage,
   buildFileCoverages,
+  deduplicateProfiles,
+  filterSupplementaryProfiles,
 } from "./coverage.js";
 import type { DiscoveryCache } from "./discovery.js";
 
@@ -13,6 +16,7 @@ interface StoredPackageCoverage {
   coverprofile: string;
   funcCoverage?: string;
   timestamp: number;
+  supplementary?: boolean;
 }
 
 interface StoredData {
@@ -28,9 +32,9 @@ interface ParsedPackageCache {
 export class CoverageStore implements vscode.Disposable {
   private packages = new Map<string, StoredPackageCoverage>();
   private parsed = new Map<string, ParsedPackageCache>();
+  private cachedDetails = new Map<string, vscode.FileCoverageDetail[]>();
   private readonly storagePath: string | undefined;
-  private readonly _onDidChange = new vscode.EventEmitter<void>();
-  readonly onDidChange: vscode.Event<void> = this._onDidChange.event;
+  private saveChain = Promise.resolve();
 
   constructor(storageUri: vscode.Uri | undefined) {
     if (storageUri) {
@@ -42,6 +46,10 @@ export class CoverageStore implements vscode.Disposable {
     return this.packages.size;
   }
 
+  getDetails(absPath: string): vscode.FileCoverageDetail[] {
+    return this.cachedDetails.get(absPath) ?? [];
+  }
+
   has(importPath: string): boolean {
     return this.packages.has(importPath);
   }
@@ -50,21 +58,23 @@ export class CoverageStore implements vscode.Disposable {
     importPath: string,
     coverprofile: string,
     funcCoverage?: string,
+    supplementary?: boolean,
   ): void {
     this.packages.set(importPath, {
       coverprofile,
       funcCoverage,
       timestamp: Date.now(),
+      supplementary: supplementary || undefined,
     });
     this.parsed.delete(importPath);
-    this._onDidChange.fire();
+    this.cachedDetails.clear();
   }
 
   invalidate(importPath: string): boolean {
     const deleted = this.packages.delete(importPath);
     if (deleted) {
       this.parsed.delete(importPath);
-      this._onDidChange.fire();
+      this.cachedDetails.clear();
     }
     return deleted;
   }
@@ -75,14 +85,16 @@ export class CoverageStore implements vscode.Disposable {
     }
     this.packages.clear();
     this.parsed.clear();
-    this._onDidChange.fire();
+    this.cachedDetails.clear();
   }
 
-  buildFileCoverages(cache: DiscoveryCache): vscode.FileCoverage[] {
+  buildFileCoverages(cache: DiscoveryCache): CoverageResult {
     const moduleToDir = (importPath: string) =>
       cache.resolveImportPath(importPath);
     const allDeclarations = new Map<string, vscode.DeclarationCoverage[]>();
-    const allProfiles: ParsedFileCoverage[] = [];
+
+    const primaryProfiles: ParsedFileCoverage[] = [];
+    const supplementaryProfiles: ParsedFileCoverage[] = [];
 
     for (const [importPath, pkg] of this.packages) {
       let entry = this.parsed.get(importPath);
@@ -96,7 +108,12 @@ export class CoverageStore implements vscode.Disposable {
         this.parsed.set(importPath, entry);
       }
 
-      allProfiles.push(...entry.profiles);
+      if (pkg.supplementary) {
+        supplementaryProfiles.push(...entry.profiles);
+      } else {
+        primaryProfiles.push(...entry.profiles);
+      }
+
       for (const [filePath, declarations] of entry.declarations) {
         const existing = allDeclarations.get(filePath) ?? [];
         existing.push(...declarations);
@@ -104,7 +121,18 @@ export class CoverageStore implements vscode.Disposable {
       }
     }
 
-    return buildFileCoverages(allProfiles, allDeclarations);
+    const filtered = filterSupplementaryProfiles(
+      primaryProfiles,
+      supplementaryProfiles,
+    );
+    const allProfiles = [...primaryProfiles, ...filtered];
+
+    const result = buildFileCoverages(
+      deduplicateProfiles(allProfiles),
+      allDeclarations,
+    );
+    this.cachedDetails = result.details;
+    return result;
   }
 
   async load(): Promise<void> {
@@ -127,23 +155,27 @@ export class CoverageStore implements vscode.Disposable {
     }
   }
 
-  async save(): Promise<void> {
-    if (!this.storagePath) {
-      return;
-    }
+  save(): Promise<void> {
+    const op = this.saveChain.then(() => this.writeToDisk());
+    this.saveChain = op.catch(() => {});
+    return op;
+  }
+
+  flush(): Promise<void> {
+    return this.saveChain;
+  }
+
+  private async writeToDisk(): Promise<void> {
+    if (!this.storagePath) return;
     const data: StoredData = {
       version: 1,
       packages: Object.fromEntries(this.packages),
     };
-    try {
-      await mkdir(path.dirname(this.storagePath), { recursive: true });
-      await writeFile(this.storagePath, JSON.stringify(data), "utf-8");
-    } catch {
-      // Best-effort persistence
-    }
+    await mkdir(path.dirname(this.storagePath), { recursive: true });
+    await writeFile(this.storagePath, JSON.stringify(data), "utf-8");
   }
 
   dispose(): void {
-    this._onDidChange.dispose();
+    this.cachedDetails.clear();
   }
 }

@@ -19,6 +19,7 @@ func TestE2E_CLI(t *testing.T) {
 		{"no testsuite", "no_testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}},
 		{"simple testsuite", "testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}},
 		{"suite guard", "suite_guard", []string{about.PSuite + ".golden"}},
+		{"fixture lifecycle", "fixture_lifecycle", []string{about.PSuite + ".golden"}},
 	}
 	for _, tC := range testcases {
 		t.Run(tC.desc, func(t *testing.T) {
@@ -26,10 +27,12 @@ func TestE2E_CLI(t *testing.T) {
 			gotest.NoError(t, err)
 
 			path := filepath.Join(cwd, "testdata_e2e", tC.dirName)
-			results, err := Generate([]string{path}, nil)
+			loaded, err := LoadPackages([]string{path}, nil)
+			gotest.NoError(t, err)
+			results, _, err := GenerateFromLoaded(loaded)
 			gotest.NoError(t, err)
 			gotest.True(t, strings.HasSuffix(results[0].AbsPath, "go-test/internal/gotestgen/testdata_e2e/"+tC.dirName))
-			gotest.Equal(t, "github.com/mvrahden/go-test/internal/gotestgen/testdata_e2e/"+tC.dirName, results[0].Package)
+			gotest.Equal(t, "github.com/mvrahden/go-test/internal/gotestgen/testdata_e2e/"+tC.dirName, results[0].PkgPath)
 
 			for idx, golden := range tC.goldenFiles {
 				expected, err := os.ReadFile(filepath.Join("testdata_e2e", tC.dirName, golden))
@@ -57,9 +60,9 @@ func TestE2E_NoTestSuites(t *testing.T) {
 	}
 	for _, tC := range testcases {
 		t.Run(tC.desc, func(t *testing.T) {
-			res, err := Generate([]string{tC.args[0]}, nil)
+			loaded, err := LoadPackages([]string{tC.args[0]}, nil)
 			gotest.NoError(t, err)
-			gotest.Empty(t, res)
+			gotest.Empty(t, loaded)
 		})
 	}
 }

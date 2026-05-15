@@ -23,35 +23,36 @@ func TestSimpleTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_SimpleTestSuite{}
 	ƒcfg := gotest.DefaultSuiteConfig()
 
-	newTestCase := func(desc string, testFn gotest.TestCase) gotest.TestCase {
-		return func(tt *gotest.T) {
-			t := tt.T()
-			t.Run(desc, func(it *testing.T) {
-				ttt := gotest.NewT(it)
-				if ƒcfg.Timeout > 0 {
-					ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-				}
-				defer s.AfterEach(ttt)
-				s.BeforeEach(ttt)
-				ƒƒ_GOTEST_exec(testFn, ttt)
-			})
-		}
-	}
-
-	testCases := []gotest.TestCase{
-		newTestCase("TestSucceeds", s.TestSucceeds),
-		newTestCase("TestFails", s.TestFails),
-	}
-
 	tt := gotest.NewT(t)
 	t.Cleanup(func() {
 		s.AfterAll(tt)
 	})
 	s.BeforeAll(tt)
-	for _, tc := range testCases {
-		tc(tt)
-		if ƒcfg.FailFast && t.Failed() {
-			break
+
+	t.Run("TestSucceeds", func(it *testing.T) {
+		ttt := gotest.NewT(it)
+		if ƒcfg.Timeout > 0 {
+			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
 		}
+		defer s.AfterEach(ttt)
+		s.BeforeEach(ttt)
+		ƒƒ_GOTEST_exec(s.TestSucceeds, ttt)
+	})
+	if ƒcfg.FailFast && t.Failed() {
+		return
 	}
+
+	t.Run("TestFails", func(it *testing.T) {
+		ttt := gotest.NewT(it)
+		if ƒcfg.Timeout > 0 {
+			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+		}
+		defer s.AfterEach(ttt)
+		s.BeforeEach(ttt)
+		ƒƒ_GOTEST_exec(s.TestFails, ttt)
+	})
+	if ƒcfg.FailFast && t.Failed() {
+		return
+	}
+
 }

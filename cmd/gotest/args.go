@@ -3,12 +3,18 @@ package main
 import (
 	"strings"
 	"time"
+
+	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
 type ExecConfig struct {
 	GoTestArgs      []string
 	PackagePatterns []string
 	SetupTimeout    time.Duration
+	Debug           bool
+	CI              bool
+	JSON            bool
+	UpdateSnapshots bool
 }
 
 // knownSubcommands is the set of recognized subcommands.
@@ -83,7 +89,7 @@ func ExtractPackagePatterns(goTestArgs []string) []string {
 		if strings.HasPrefix(arg, "-") {
 			continue
 		}
-		if looksLikePackagePattern(arg) {
+		if gotestrunner.LooksLikePackagePattern(arg) {
 			patterns = append(patterns, arg)
 		}
 	}
@@ -91,10 +97,6 @@ func ExtractPackagePatterns(goTestArgs []string) []string {
 		return []string{"."}
 	}
 	return patterns
-}
-
-func looksLikePackagePattern(s string) bool {
-	return strings.HasPrefix(s, ".") || strings.HasPrefix(s, "/") || strings.Contains(s, "/")
 }
 
 func extractTagsFlag(args []string) (tags string, remaining []string) {

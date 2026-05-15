@@ -5,10 +5,15 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         go-version: ["1.24", "1.25", "1.26"]
     steps:
@@ -18,8 +23,12 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Init workspace
         run: go work init . ./examples
+      - name: Vet
+        run: go vet ./...
+      - name: Lint
+        run: go run ./cmd/gotest-lint ./...
       - name: Test
-        run: go run ./cmd/gotest spec --no-color --output=spec.txt ./... -race -coverprofile=coverage.out
+        run: go run ./cmd/gotest spec --no-color --min=40 --output=spec.txt ./... -race -coverprofile=coverage.out
       - name: Summary
         if: always()
         run: |

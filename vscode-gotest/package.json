@@ -5,6 +5,20 @@
   "version": "0.1.0",
   "publisher": "mvrahden",
   "license": "MIT",
+  "icon": "static/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mvrahden/go-test",
+    "directory": "vscode-gotest"
+  },
+  "keywords": [
+    "go",
+    "golang",
+    "test",
+    "testing",
+    "suite",
+    "bdd"
+  ],
   "engines": {
     "vscode": "^1.101.0"
   },
@@ -12,7 +26,8 @@
     "Testing"
   ],
   "activationEvents": [
-    "workspaceContains:**/*_test.go"
+    "workspaceContains:go.mod",
+    "workspaceContains:go.work"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -148,6 +163,12 @@
           "default": true,
           "scope": "resource",
           "description": "Collect coverage data alongside normal test runs"
+        },
+        "gotest.coverTestOnlyPackages": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "Enable cross-package coverage instrumentation (-coverpkg=./...) for test-only packages. When enabled, test-only packages run in a separate batch with full instrumentation to capture their coverage of production code."
         },
         "gotest.coverOnSave": {
           "type": "boolean",

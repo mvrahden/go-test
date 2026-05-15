@@ -1,32 +1,22 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { rm, mkdtemp, readFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import type { CoverageStore } from "./coverageStore.js";
-import { parseTestEvents, groupEventsByPackage } from "./outputParser.js";
-import {
-  buildCliCommand,
-  formatCliCommand,
-  resolveGoBinary,
-  scopedConfig,
-} from "./cli.js";
+import { scopedConfig } from "./cli.js";
 import {
   collectItems,
+  enqueueDescendants,
   groupByPackage,
-  applyResults,
-  spawnTestProcess,
   buildRunFilter,
+  resolvePackageItems,
 } from "./runnerUtils.js";
-
-const execFileAsync = promisify(execFile);
+import { executeBatch } from "./batchRunner.js";
 
 export interface ParsedFileCoverage {
   absPath: string;
   statements: vscode.StatementCoverage[];
+  numStatements: number[];
 }
 
 export function parseCoverProfile(
@@ -34,7 +24,10 @@ export function parseCoverProfile(
   moduleToDir: (importPath: string) => string | undefined,
 ): ParsedFileCoverage[] {
   const lines = content.split("\n");
-  const fileEntries = new Map<string, vscode.StatementCoverage[]>();
+  const fileEntries = new Map<
+    string,
+    { statements: vscode.StatementCoverage[]; numStatements: number[] }
+  >();
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -54,25 +47,27 @@ export function parseCoverProfile(
     const startCol = parseInt(match[3], 10) - 1;
     const endLine = parseInt(match[4], 10) - 1;
     const endCol = parseInt(match[5], 10) - 1;
+    const numStatements = parseInt(match[6], 10);
     const count = parseInt(match[7], 10);
 
-    let statements = fileEntries.get(filePath);
-    if (!statements) {
-      statements = [];
-      fileEntries.set(filePath, statements);
+    let entry = fileEntries.get(filePath);
+    if (!entry) {
+      entry = { statements: [], numStatements: [] };
+      fileEntries.set(filePath, entry);
     }
 
     const range = new vscode.Range(
       new vscode.Position(startLine, startCol),
       new vscode.Position(endLine, endCol),
     );
-    statements.push(
+    entry.statements.push(
       new vscode.StatementCoverage(count > 0 ? count : false, range),
     );
+    entry.numStatements.push(numStatements);
   }
 
   const result: ParsedFileCoverage[] = [];
-  for (const [importFilePath, statements] of fileEntries) {
+  for (const [importFilePath, entry] of fileEntries) {
     const lastSlash = importFilePath.lastIndexOf("/");
     const fileName = importFilePath.slice(lastSlash + 1);
     const importDir = importFilePath.slice(0, lastSlash);
@@ -81,26 +76,119 @@ export function parseCoverProfile(
       continue;
     }
     const absPath = path.join(absDir, fileName);
-    result.push({ absPath, statements });
+    result.push({
+      absPath,
+      statements: entry.statements,
+      numStatements: entry.numStatements,
+    });
   }
 
   return result;
 }
 
+export interface CoverageResult {
+  coverages: vscode.FileCoverage[];
+  details: Map<string, vscode.FileCoverageDetail[]>;
+}
+
 export function buildFileCoverages(
   parsed: ParsedFileCoverage[],
   declarations?: Map<string, vscode.DeclarationCoverage[]>,
-): vscode.FileCoverage[] {
-  return parsed.map((entry) => {
+): CoverageResult {
+  const coverages: vscode.FileCoverage[] = [];
+  const details = new Map<string, vscode.FileCoverageDetail[]>();
+
+  for (const entry of parsed) {
     const uri = vscode.Uri.file(entry.absPath);
     const decls = declarations?.get(entry.absPath);
-    if (decls && decls.length > 0) {
-      const details: (vscode.StatementCoverage | vscode.DeclarationCoverage)[] =
-        [...entry.statements, ...decls];
-      return vscode.FileCoverage.fromDetails(uri, details);
+
+    let covered = 0;
+    let total = 0;
+    for (let i = 0; i < entry.statements.length; i++) {
+      const ns = entry.numStatements[i];
+      total += ns;
+      const exec = entry.statements[i].executed;
+      if ((typeof exec === "number" && exec > 0) || exec === true) {
+        covered += ns;
+      }
     }
-    return vscode.FileCoverage.fromDetails(uri, entry.statements);
-  });
+    const stmtCount = new vscode.TestCoverageCount(covered, total);
+
+    const fc = new vscode.FileCoverage(uri, stmtCount);
+    coverages.push(fc);
+
+    const fileDetails: vscode.FileCoverageDetail[] = [...entry.statements];
+    if (decls && decls.length > 0) {
+      fileDetails.push(...decls);
+    }
+    details.set(entry.absPath, fileDetails);
+  }
+
+  return { coverages, details };
+}
+
+export function filterSupplementaryProfiles(
+  primary: ParsedFileCoverage[],
+  supplementary: ParsedFileCoverage[],
+): ParsedFileCoverage[] {
+  if (primary.length === 0) return supplementary;
+  const scope = new Set(primary.map((p) => p.absPath));
+  return supplementary.filter((p) => scope.has(p.absPath));
+}
+
+export function deduplicateProfiles(
+  profiles: ParsedFileCoverage[],
+): ParsedFileCoverage[] {
+  const byFile = new Map<string, ParsedFileCoverage[]>();
+  for (const p of profiles) {
+    const list = byFile.get(p.absPath) ?? [];
+    list.push(p);
+    byFile.set(p.absPath, list);
+  }
+
+  const result: ParsedFileCoverage[] = [];
+  for (const [absPath, entries] of byFile) {
+    if (entries.length === 1) {
+      result.push(entries[0]);
+      continue;
+    }
+
+    const blocks = new Map<
+      string,
+      { stmt: vscode.StatementCoverage; numStmts: number }
+    >();
+    for (const entry of entries) {
+      for (let i = 0; i < entry.statements.length; i++) {
+        const stmt = entry.statements[i];
+        const ns = entry.numStatements[i];
+        const r = stmt.location as vscode.Range;
+        const key = `${r.start.line}:${r.start.character},${r.end.line}:${r.end.character}`;
+
+        const prev = blocks.get(key);
+        if (
+          !prev ||
+          executedToCount(stmt.executed) > executedToCount(prev.stmt.executed)
+        ) {
+          blocks.set(key, { stmt, numStmts: ns });
+        }
+      }
+    }
+
+    const statements: vscode.StatementCoverage[] = [];
+    const numStatements: number[] = [];
+    for (const { stmt, numStmts } of blocks.values()) {
+      statements.push(stmt);
+      numStatements.push(numStmts);
+    }
+    result.push({ absPath, statements, numStatements });
+  }
+
+  return result;
+}
+
+function executedToCount(executed: number | boolean): number {
+  if (typeof executed === "number") return executed;
+  return executed ? 1 : 0;
 }
 
 export function parseFuncCoverage(
@@ -150,92 +238,8 @@ export function parseFuncCoverage(
   return result;
 }
 
-export function splitCoverByPackage(
-  content: string,
-  importPaths: string[],
-): Map<string, string> {
-  const lines = content.split("\n");
-  const buckets = new Map<string, string[]>();
-  let modeLine = "";
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    if (trimmed.startsWith("mode:")) {
-      modeLine = trimmed;
-      continue;
-    }
-    for (const ip of importPaths) {
-      if (trimmed.startsWith(ip + "/")) {
-        let bucket = buckets.get(ip);
-        if (!bucket) {
-          bucket = [];
-          buckets.set(ip, bucket);
-        }
-        bucket.push(trimmed);
-        break;
-      }
-    }
-  }
-
-  const result = new Map<string, string>();
-  for (const [ip, pkgLines] of buckets) {
-    result.set(ip, modeLine + "\n" + pkgLines.join("\n") + "\n");
-  }
-  return result;
-}
-
-export function splitFuncCoverageByPackage(
-  content: string,
-  importPaths: string[],
-): Map<string, string> {
-  const lines = content.split("\n");
-  const buckets = new Map<string, string[]>();
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("total:")) continue;
-    for (const ip of importPaths) {
-      if (trimmed.startsWith(ip + "/")) {
-        let bucket = buckets.get(ip);
-        if (!bucket) {
-          bucket = [];
-          buckets.set(ip, bucket);
-        }
-        bucket.push(trimmed);
-        break;
-      }
-    }
-  }
-
-  const result = new Map<string, string>();
-  for (const [ip, pkgLines] of buckets) {
-    result.set(ip, pkgLines.join("\n") + "\n");
-  }
-  return result;
-}
-
-export async function runGoToolCoverFunc(
-  coverFile: string,
-  workspaceDir: string,
-): Promise<string> {
-  const goBin = await resolveGoBinary(undefined, workspaceDir);
-  const { stdout } = await execFileAsync(
-    goBin,
-    ["tool", "cover", `-func=${coverFile}`],
-    {
-      cwd: workspaceDir,
-      timeout: 10_000,
-    },
-  );
-  return stdout;
-}
-
 export class CoverageRunner implements vscode.Disposable {
   private activeRun: vscode.CancellationTokenSource | undefined;
-  private activePackageRun: vscode.CancellationTokenSource | undefined;
-  private packageRunQueue = Promise.resolve();
-  private pendingPackages = new Set<string>();
 
   constructor(
     private readonly controller: GoTestController,
@@ -263,12 +267,13 @@ export class CoverageRunner implements vscode.Disposable {
     try {
       const items = collectItems(this.controller, request);
       if (items.length === 0) {
-        run.end();
         return;
       }
 
       for (const item of items) {
+        this.controller.clearResults(item);
         run.started(item);
+        enqueueDescendants(run, item);
       }
 
       const groups = groupByPackage(items);
@@ -280,6 +285,7 @@ export class CoverageRunner implements vscode.Disposable {
         dir: string;
         workspaceDir: string;
         filter: string | undefined;
+        testOnly: boolean;
       }
 
       const validPkgs: PkgInfo[] = [];
@@ -316,6 +322,7 @@ export class CoverageRunner implements vscode.Disposable {
           dir: pkg.dir,
           workspaceDir,
           filter,
+          testOnly: pkg.testOnly ?? false,
         });
       }
 
@@ -341,8 +348,15 @@ export class CoverageRunner implements vscode.Disposable {
 
         const config = scopedConfig(workspaceDir);
         const testFlags = config.get<string[]>("testFlags") ?? [];
+        const coverTestOnly =
+          config.get<boolean>("coverTestOnlyPackages") ?? false;
 
-        const unfiltered = pkgInfos.filter((p) => !p.filter);
+        const unfiltered = coverTestOnly
+          ? pkgInfos.filter((p) => !p.filter && !p.testOnly)
+          : pkgInfos.filter((p) => !p.filter);
+        const unfilteredTestOnly = coverTestOnly
+          ? pkgInfos.filter((p) => !p.filter && p.testOnly)
+          : [];
         const filtered = pkgInfos.filter((p) => p.filter);
 
         if (unfiltered.length > 0) {
@@ -353,6 +367,18 @@ export class CoverageRunner implements vscode.Disposable {
             testFlags,
             run,
             effectiveToken,
+          );
+        }
+
+        if (unfilteredTestOnly.length > 0) {
+          allJsonOutput += await this.runCoverageBatch(
+            unfilteredTestOnly,
+            undefined,
+            workspaceDir,
+            testFlags,
+            run,
+            effectiveToken,
+            true,
           );
         }
 
@@ -370,15 +396,21 @@ export class CoverageRunner implements vscode.Disposable {
             testFlags,
             run,
             effectiveToken,
+            coverTestOnly && info.testOnly,
           );
         }
       }
 
-      const allCoverages = this.store.buildFileCoverages(this.cache);
+      resolvePackageItems(run, items, this.controller);
+
+      const { coverages: allCoverages } = this.store.buildFileCoverages(
+        this.cache,
+      );
       for (const fc of allCoverages) {
         run.addCoverage(fc);
       }
       await this.store.save();
+      await this.controller.saveResults();
 
       if (allJsonOutput) {
         this.onJsonOutput(allJsonOutput);
@@ -404,275 +436,30 @@ export class CoverageRunner implements vscode.Disposable {
     testFlags: string[],
     run: vscode.TestRun,
     token: vscode.CancellationToken,
+    testOnly?: boolean,
   ): Promise<string> {
-    const importPaths = pkgInfos.map((p) => p.importPath);
-    let coverFile: string | undefined;
-
-    try {
-      const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
-      coverFile = path.join(tmpDir, "cover.out");
-
-      const cliArgs: string[] = [
-        "-json",
-        "-count=1",
-        "-covermode=atomic",
-        `-coverprofile=${coverFile}`,
-        ...importPaths,
-      ];
-      if (filter) {
-        cliArgs.push("-run", filter);
-      }
-      cliArgs.push(...testFlags);
-
-      const cmd = await buildCliCommand(
-        cliArgs,
-        workspaceDir,
-        this.outputChannel,
-      );
-      this.outputChannel.appendLine(`[coverage] ${formatCliCommand(cmd)}`);
-
-      const result = await spawnTestProcess(
-        cmd.bin,
-        cmd.args,
-        workspaceDir,
-        token,
-        this.outputChannel,
-        "coverage",
-      );
-
-      if (token.isCancellationRequested) {
-        for (const info of pkgInfos) {
-          for (const item of info.items) {
-            run.skipped(item);
-          }
+    const result = await executeBatch({
+      pkgInfos,
+      filter,
+      workspaceDir,
+      testFlags,
+      run,
+      token,
+      controller: this.controller,
+      outputChannel: this.outputChannel,
+      label: "coverage",
+      coverage: { store: this.store, testOnly },
+      onResults: (applied) => {
+        for (const r of applied) {
+          this.controller.recordResult(r.itemId, r.status, r.duration);
         }
-        return result.stdout;
-      }
-
-      if (result.stdout) {
-        const events = parseTestEvents(result.stdout);
-        const eventsByPkg = groupEventsByPackage(events);
-
-        for (const info of pkgInfos) {
-          const pkgEvents = eventsByPkg.get(info.importPath) ?? [];
-          applyResults(
-            this.controller,
-            run,
-            pkgEvents,
-            info.importPath,
-            info.dir,
-          );
-        }
-      } else if (result.exitCode !== 0) {
-        const message =
-          result.stderr.trim() || `gotest exited with code ${result.exitCode}`;
-        for (const info of pkgInfos) {
-          for (const item of info.items) {
-            run.errored(item, new vscode.TestMessage(message));
-          }
-        }
-      }
-      try {
-        const coverContent = await readFile(coverFile, "utf-8");
-        let funcOutput: string | undefined;
-        try {
-          funcOutput = await runGoToolCoverFunc(coverFile, workspaceDir);
-        } catch {
-          this.outputChannel.appendLine(
-            "[coverage] go tool cover -func failed, skipping declaration coverage",
-          );
-        }
-
-        const coverByPkg = splitCoverByPackage(coverContent, importPaths);
-        const funcByPkg = funcOutput
-          ? splitFuncCoverageByPackage(funcOutput, importPaths)
-          : undefined;
-
-        for (const info of pkgInfos) {
-          const pkgCover = coverByPkg.get(info.importPath);
-          if (pkgCover) {
-            this.store.update(
-              info.importPath,
-              pkgCover,
-              funcByPkg?.get(info.importPath),
-            );
-          }
-        }
-      } catch {
-        this.outputChannel.appendLine("[coverage] no coverprofile generated");
-      }
-      return result.stdout;
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.outputChannel.appendLine(`[coverage] error: ${message}`);
-      for (const info of pkgInfos) {
-        for (const item of info.items) {
-          run.errored(item, new vscode.TestMessage(message));
-        }
-      }
-      return "";
-    } finally {
-      if (coverFile) {
-        rm(path.dirname(coverFile), { recursive: true, force: true }).catch(
-          () => {},
-        );
-      }
-    }
-  }
-
-  async copyCoverageSummary(): Promise<void> {
-    const coverages = this.store.buildFileCoverages(this.cache);
-    if (coverages.length === 0) {
-      vscode.window.showInformationMessage(
-        "No coverage data available. Run tests with coverage first.",
-      );
-      return;
-    }
-
-    const rows: { file: string; covered: number; total: number }[] = [];
-
-    for (const fc of coverages) {
-      let filePath = fc.uri.fsPath;
-      const folder = vscode.workspace.getWorkspaceFolder(fc.uri);
-      if (folder && filePath.startsWith(folder.uri.fsPath)) {
-        filePath = filePath.slice(folder.uri.fsPath.length + 1);
-      }
-      rows.push({
-        file: filePath,
-        covered: fc.statementCoverage.covered,
-        total: fc.statementCoverage.total,
-      });
-    }
-
-    rows.sort((a, b) => a.file.localeCompare(b.file));
-
-    const maxFileLen = Math.max(4, ...rows.map((r) => r.file.length));
-    const header = `${"File".padEnd(maxFileLen)}  Stmts      Cover`;
-    const separator = "-".repeat(header.length);
-
-    const lines = [header, separator];
-    let totalCovered = 0;
-    let totalStmts = 0;
-
-    for (const row of rows) {
-      totalCovered += row.covered;
-      totalStmts += row.total;
-      const pct =
-        row.total > 0
-          ? ((row.covered / row.total) * 100).toFixed(1) + "%"
-          : "N/A";
-      const stmts = `${row.covered}/${row.total}`;
-      lines.push(`${row.file.padEnd(maxFileLen)}  ${stmts.padEnd(9)}  ${pct}`);
-    }
-
-    lines.push(separator);
-    const totalPct =
-      totalStmts > 0
-        ? ((totalCovered / totalStmts) * 100).toFixed(1) + "%"
-        : "N/A";
-    const totalStmtsStr = `${totalCovered}/${totalStmts}`;
-    lines.push(
-      `${"Total".padEnd(maxFileLen)}  ${totalStmtsStr.padEnd(9)}  ${totalPct}`,
-    );
-
-    const text = lines.join("\n");
-    await vscode.env.clipboard.writeText(text);
-    vscode.window.showInformationMessage(
-      "Coverage summary copied to clipboard.",
-    );
-  }
-
-  async runPackage(importPath: string): Promise<void> {
-    if (this.pendingPackages.has(importPath)) return;
-    this.pendingPackages.add(importPath);
-    this.packageRunQueue = this.packageRunQueue.then(async () => {
-      this.pendingPackages.delete(importPath);
-      await this.executePackageRun(importPath);
+      },
     });
-    return this.packageRunQueue;
-  }
-
-  private async executePackageRun(importPath: string): Promise<void> {
-    this.activePackageRun?.cancel();
-    const cts = new vscode.CancellationTokenSource();
-    this.activePackageRun = cts;
-
-    const pkg = this.cache.getPackage(importPath);
-    if (!pkg) return;
-    const workspaceDir = this.cache.getWorkspaceDir(importPath);
-    if (!workspaceDir) return;
-
-    const config = scopedConfig(workspaceDir);
-    const testFlags = config.get<string[]>("testFlags") ?? [];
-    let coverFile: string | undefined;
-
-    try {
-      const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
-      coverFile = path.join(tmpDir, "cover.out");
-
-      const cliArgs: string[] = [
-        "-count=1",
-        "-covermode=atomic",
-        `-coverprofile=${coverFile}`,
-        importPath,
-      ];
-      cliArgs.push(...testFlags);
-
-      const cmd = await buildCliCommand(
-        cliArgs,
-        workspaceDir,
-        this.outputChannel,
-      );
-      this.outputChannel.appendLine(`[coverage:save] ${formatCliCommand(cmd)}`);
-
-      await spawnTestProcess(
-        cmd.bin,
-        cmd.args,
-        workspaceDir,
-        cts.token,
-        this.outputChannel,
-        "coverage",
-      );
-
-      if (cts.token.isCancellationRequested) return;
-
-      const coverContent = await readFile(coverFile, "utf-8");
-      let funcOutput: string | undefined;
-      try {
-        funcOutput = await runGoToolCoverFunc(coverFile, workspaceDir);
-      } catch {
-        this.outputChannel.appendLine(
-          "[coverage:save] go tool cover -func failed",
-        );
-      }
-      this.store.update(importPath, coverContent, funcOutput);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.outputChannel.appendLine(`[coverage:save] failed: ${message}`);
-      return;
-    } finally {
-      if (this.activePackageRun === cts) this.activePackageRun = undefined;
-      cts.dispose();
-      if (coverFile)
-        rm(path.dirname(coverFile), { recursive: true, force: true }).catch(
-          () => {},
-        );
-    }
-
-    const request = new vscode.TestRunRequest();
-    const run = this.controller.createTestRun(request, "Cover on Save");
-    const allCoverages = this.store.buildFileCoverages(this.cache);
-    for (const fc of allCoverages) {
-      run.addCoverage(fc);
-    }
-    run.end();
-    await this.store.save();
+    return result.stdout;
   }
 
   dispose(): void {
     this.activeRun?.cancel();
     this.activeRun = undefined;
-    this.activePackageRun?.cancel();
-    this.activePackageRun = undefined;
   }
 }

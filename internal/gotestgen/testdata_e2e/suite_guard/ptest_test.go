@@ -16,6 +16,7 @@ func (s *GuardedTestSuite) SuiteGuard() string {
 }
 
 func (s *GuardedTestSuite) BeforeAll(t *gotest.T) {}
+func (s *GuardedTestSuite) AfterAll(t *gotest.T)  {}
 
 func (s *GuardedTestSuite) TestHello(t *gotest.T) { HelloWorld() }
 func (s *GuardedTestSuite) TestWorld(t *gotest.T) { HelloWorld() }
