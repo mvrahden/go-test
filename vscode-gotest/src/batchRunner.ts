@@ -143,13 +143,23 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         if (dir) {
           const applied = applyResults(controller, run, buffer, pkg, dir);
           onResults?.(applied);
-          streamedPkgs.add(pkg);
+          const hasTerminal = buffer.some(
+            (e) =>
+              !e.Test &&
+              (e.Action === "pass" ||
+                e.Action === "fail" ||
+                e.Action === "skip"),
+          );
+          if (hasTerminal) {
+            streamedPkgs.add(pkg);
+          }
         }
       }
     }
 
     if (token.isCancellationRequested) {
       for (const info of pkgInfos) {
+        if (streamedPkgs.has(info.importPath)) continue;
         for (const item of info.items) {
           run.skipped(item);
         }

@@ -6,9 +6,12 @@ export type { TestResult } from "./testResultStore.js";
 import { type PathNode, buildPathTrie, collapsePathTrie } from "./pathTrie.js";
 
 export class GoTestController implements vscode.Disposable {
+  private static readonly MAX_DYNAMIC_SUBTESTS = 100;
+
   private controller: vscode.TestController;
   private disposables: vscode.Disposable[] = [];
   private coverageProfile: vscode.TestRunProfile | undefined;
+  private dynamicOverflow = new Map<string, number>();
 
   constructor(
     private readonly cache: DiscoveryCache,
@@ -274,6 +277,9 @@ export class GoTestController implements vscode.Disposable {
     for (const id of toDelete) {
       item.children.delete(id);
     }
+    if (this.dynamicOverflow.delete(item.id)) {
+      item.description = undefined;
+    }
   }
 
   createDynamicSubtest(
@@ -285,6 +291,17 @@ export class GoTestController implements vscode.Disposable {
     const existing = parentItem.children.get(id);
     if (existing) {
       return existing;
+    }
+
+    if (
+      parentItem.children.size >=
+      GoTestController.MAX_DYNAMIC_SUBTESTS
+    ) {
+      const overflow =
+        (this.dynamicOverflow.get(parentItem.id) ?? 0) + 1;
+      this.dynamicOverflow.set(parentItem.id, overflow);
+      parentItem.description = `${parentItem.children.size + overflow} subtests (${parentItem.children.size} shown)`;
+      return parentItem;
     }
 
     const item = this.controller.createTestItem(id, label, parentItem.uri);
@@ -330,8 +347,8 @@ export class GoTestController implements vscode.Disposable {
     this.clearDynamicChildren(item);
   }
 
-  async saveResults(): Promise<void> {
-    await this.resultStore.save();
+  saveResults(): void {
+    this.resultStore.save();
   }
 
   dispose(): void {

@@ -21,6 +21,7 @@ export class TestResultStore {
   private results = new Map<string, StoredTestResult>();
   private readonly storagePath: string | undefined;
   private saveChain = Promise.resolve();
+  private debounceTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly maxAge: number;
 
   constructor(
@@ -80,13 +81,26 @@ export class TestResultStore {
     } catch { /* No stored data or corrupt — start fresh */ }
   }
 
-  save(): Promise<void> {
-    const op = this.saveChain.then(() => this.writeToDisk());
-    this.saveChain = op.catch(() => {});
-    return op;
+  save(): void {
+    if (this.debounceTimer !== undefined) {
+      clearTimeout(this.debounceTimer);
+    }
+    this.debounceTimer = setTimeout(() => {
+      this.debounceTimer = undefined;
+      this.saveChain = this.saveChain
+        .then(() => this.writeToDisk())
+        .catch(() => {});
+    }, 500);
   }
 
   flush(): Promise<void> {
+    if (this.debounceTimer !== undefined) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = undefined;
+      this.saveChain = this.saveChain
+        .then(() => this.writeToDisk())
+        .catch(() => {});
+    }
     return this.saveChain;
   }
 
@@ -102,6 +116,10 @@ export class TestResultStore {
   }
 
   dispose(): void {
+    if (this.debounceTimer !== undefined) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = undefined;
+    }
     this.results.clear();
   }
 }

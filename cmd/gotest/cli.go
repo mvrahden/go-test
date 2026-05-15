@@ -44,6 +44,15 @@ func main() {
 		return
 	default:
 		args := os.Args[1:]
+		if slices.Contains(args, "--spec") {
+			var specArgs []string
+			for _, a := range args {
+				if a != "--spec" {
+					specArgs = append(specArgs, a)
+				}
+			}
+			os.Exit(runSpec(specArgs))
+		}
 		ownArgs, goTestArgs := SplitArgs(args)
 
 		jsonMode, goTestArgs := stripJSONFlag(goTestArgs)
@@ -87,7 +96,6 @@ func main() {
 			Debug:           slices.Contains(ownArgs, "--debug"),
 			CI:              slices.Contains(ownArgs, "--ci"),
 			JSON:            jsonMode,
-			Spec:            slices.Contains(ownArgs, "--spec"),
 			UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
 		}
 
