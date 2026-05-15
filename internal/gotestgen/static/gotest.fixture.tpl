@@ -189,14 +189,21 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
     wg := &sync.WaitGroup{}
 {{- end }}
 
-    tt := gotest.NewT(t)
+    ƒsetupT := gotest.NewT(t)
+    if ƒcfg.SetupTimeout > 0 {
+        ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+    }
     t.Cleanup(func() {
 {{- if $ts.IsMethodParallel }}
         wg.Wait()
 {{- end }}
-        s.AfterAll(tt)
+        ƒteardownT := gotest.NewT(t)
+        if ƒcfg.SetupTimeout > 0 {
+            ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+        }
+        s.AfterAll(ƒteardownT)
     })
-    s.BeforeAll(tt)
+    s.BeforeAll(ƒsetupT)
 
 {{ range $tc := $ts.TestCases }}
     t.Run("{{ $tc.Identifier }}", func(it *testing.T) {
@@ -257,14 +264,21 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
     wg := &sync.WaitGroup{}
 {{- end }}
 
-    tt := gotest.NewT(t)
+    ƒsetupT := gotest.NewT(t)
+    if ƒcfg.SetupTimeout > 0 {
+        ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+    }
     t.Cleanup(func() {
 {{- if $ts.IsMethodParallel }}
         wg.Wait()
 {{- end }}
-        s.AfterAll(tt)
+        ƒteardownT := gotest.NewT(t)
+        if ƒcfg.SetupTimeout > 0 {
+            ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+        }
+        s.AfterAll(ƒteardownT)
     })
-    s.BeforeAll(tt)
+    s.BeforeAll(ƒsetupT)
 
 {{ range $tc := $ts.TestCases }}
     t.Run("{{ $tc.Identifier }}", func(it *testing.T) {

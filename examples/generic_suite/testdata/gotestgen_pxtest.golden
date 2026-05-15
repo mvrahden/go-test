@@ -25,11 +25,18 @@ func TestSimpleExtTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_SimpleExtTestSuite{}
 	ƒcfg := gotest.DefaultSuiteConfig()
 
-	tt := gotest.NewT(t)
+	ƒsetupT := gotest.NewT(t)
+	if ƒcfg.SetupTimeout > 0 {
+		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+	}
 	t.Cleanup(func() {
-		s.AfterAll(tt)
+		ƒteardownT := gotest.NewT(t)
+		if ƒcfg.SetupTimeout > 0 {
+			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+		}
+		s.AfterAll(ƒteardownT)
 	})
-	s.BeforeAll(tt)
+	s.BeforeAll(ƒsetupT)
 
 	t.Run("TestAlpha", func(it *testing.T) {
 		ttt := gotest.NewT(it)
