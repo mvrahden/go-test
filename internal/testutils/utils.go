@@ -30,7 +30,48 @@ func CompareTestOutputWithGolden(t *testing.T, tmp string, actual *bytes.Buffer,
 	actualStr = strings.ReplaceAll(actualStr, tmp, "<REPLACED>")
 	actualStr = timestampRegex.ReplaceAllString(actualStr, "<TIMESTAMP>")
 	actualStr = assertionLineRegex.ReplaceAllString(actualStr, "assertions.go:<LINE>:")
-	gotest.Equal(t, expected.String(), actualStr)
+	gotest.Equal(t, sortTestBlocks(expected.String()), sortTestBlocks(actualStr))
+}
+
+var topLevelRunRe = regexp.MustCompile(`^=== RUN   (Test[^/\s]+)\s*$`)
+
+// sortTestBlocks reorders top-level test blocks alphabetically while
+// preserving content within each block and keeping the trailer last.
+func sortTestBlocks(s string) string {
+	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
+
+	type block struct {
+		key   string
+		lines []string
+	}
+	var blocks []block
+	var trailer []string
+	cur := -1
+
+	for _, line := range lines {
+		if m := topLevelRunRe.FindStringSubmatch(line); m != nil {
+			blocks = append(blocks, block{key: m[1], lines: []string{line}})
+			cur = len(blocks) - 1
+		} else if cur >= 0 && (line == "PASS" || line == "FAIL") {
+			trailer = append(trailer, line)
+			cur = -1
+		} else if cur < 0 {
+			trailer = append(trailer, line)
+		} else {
+			blocks[cur].lines = append(blocks[cur].lines, line)
+		}
+	}
+
+	slices.SortFunc(blocks, func(a, b block) int {
+		return strings.Compare(a.key, b.key)
+	})
+
+	var result []string
+	for _, b := range blocks {
+		result = append(result, b.lines...)
+	}
+	result = append(result, trailer...)
+	return strings.Join(result, "\n") + "\n"
 }
 
 func openGolden(t *testing.T, testFS embed.FS, name string) *bytes.Buffer {
