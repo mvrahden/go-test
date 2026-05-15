@@ -26,7 +26,8 @@
     "Testing"
   ],
   "activationEvents": [
-    "workspaceContains:**/*_test.go"
+    "workspaceContains:go.mod",
+    "workspaceContains:go.work"
   ],
   "main": "./dist/extension.js",
   "contributes": {

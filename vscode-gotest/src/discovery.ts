@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import * as path from "node:path";
+import { access } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type {
@@ -142,10 +144,27 @@ export class DiscoveryService {
     return this.discover(workspaceDir, [pkgPattern]);
   }
 
+  private async isGoWorkspace(dir: string): Promise<boolean> {
+    for (const name of ["go.mod", "go.work"]) {
+      try {
+        await access(path.join(dir, name));
+        return true;
+      } catch {}
+    }
+    return false;
+  }
+
   private async execute(
     workspaceDir: string,
     patterns?: string[],
   ): Promise<void> {
+    if (!(await this.isGoWorkspace(workspaceDir))) {
+      this.outputChannel.appendLine(
+        `[discovery] skipping non-Go workspace: ${workspaceDir}`,
+      );
+      return;
+    }
+
     try {
       const cmd = await buildCliCommand(
         ["discover", ...(patterns ?? ["./..."])],
