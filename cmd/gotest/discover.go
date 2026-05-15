@@ -90,6 +90,7 @@ func runDiscover(args []string) int {
 			TestOnly:   lr.IsTestOnly(),
 		}
 
+		hasWarnings := false
 		pkgs := []*packages.Package{lr.Ptest, lr.Pxtest}
 		for _, pkg := range pkgs {
 			if pkg == nil {
@@ -97,6 +98,7 @@ func runDiscover(args []string) int {
 			}
 			result := c.CollectSuiteSpecs(pkg)
 			if len(result.Errs) > 0 {
+				hasWarnings = true
 				for _, ce := range result.Errs {
 					w := discoverWarning{
 						ImportPath: lr.PkgPath,
@@ -120,7 +122,7 @@ func runDiscover(args []string) int {
 			}
 		}
 
-		if len(pkgEntry.Suites) > 0 {
+		if len(pkgEntry.Suites) > 0 || hasWarnings {
 			out.Packages = append(out.Packages, pkgEntry)
 		}
 	}

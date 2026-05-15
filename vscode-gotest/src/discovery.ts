@@ -108,7 +108,7 @@ export class DiscoveryService {
 
   constructor(
     private readonly cache: DiscoveryCache,
-    private readonly outputChannel: vscode.OutputChannel,
+    private readonly outputChannel: vscode.LogOutputChannel,
   ) {}
 
   async discover(workspaceDir: string, patterns?: string[]): Promise<void> {
@@ -159,7 +159,7 @@ export class DiscoveryService {
     patterns?: string[],
   ): Promise<void> {
     if (!(await this.isGoWorkspace(workspaceDir))) {
-      this.outputChannel.appendLine(
+      this.outputChannel.info(
         `[discovery] skipping non-Go workspace: ${workspaceDir}`,
       );
       return;
@@ -171,7 +171,7 @@ export class DiscoveryService {
         workspaceDir,
         this.outputChannel,
       );
-      this.outputChannel.appendLine(`[discovery] ${formatCliCommand(cmd)}`);
+      this.outputChannel.info(`[discovery] ${formatCliCommand(cmd)}`);
 
       const { stdout } = await execFileAsync(cmd.bin, cmd.args, {
         cwd: workspaceDir,
@@ -187,13 +187,13 @@ export class DiscoveryService {
       this.hasShownError = false;
       for (const w of warnings) {
         const loc = w.file ? ` (${w.file}:${w.line ?? 0})` : "";
-        this.outputChannel.appendLine(
-          `[discovery] warning: ${w.importPath}${loc}: ${w.message}`,
+        this.outputChannel.warn(
+          `[discovery] ${w.importPath}${loc}: ${w.message}`,
         );
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.outputChannel.appendLine(`[discovery] error: ${message}`);
+      this.outputChannel.error(`[discovery] ${message}`);
       if (!this.hasShownError) {
         this.hasShownError = true;
         vscode.window

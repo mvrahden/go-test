@@ -245,7 +245,7 @@ export class CoverageRunner implements vscode.Disposable {
     private readonly controller: GoTestController,
     private readonly cache: DiscoveryCache,
     private readonly store: CoverageStore,
-    private readonly outputChannel: vscode.OutputChannel,
+    private readonly outputChannel: vscode.LogOutputChannel,
     private readonly onJsonOutput: (json: string) => void,
   ) {}
 
@@ -254,7 +254,7 @@ export class CoverageRunner implements vscode.Disposable {
     token: vscode.CancellationToken,
   ): Promise<void> {
     if (this.activeRun) {
-      this.outputChannel.appendLine("[coverage] cancelling previous run");
+      this.outputChannel.info("[coverage] cancelling previous run");
       this.activeRun.cancel();
     }
     const cts = new vscode.CancellationTokenSource();

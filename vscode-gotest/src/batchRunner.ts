@@ -30,7 +30,7 @@ export interface BatchConfig {
   run: vscode.TestRun;
   token: vscode.CancellationToken;
   controller: GoTestController;
-  outputChannel: vscode.OutputChannel;
+  outputChannel: vscode.LogOutputChannel;
   label: string;
   coverage?: {
     store: CoverageStore;
@@ -82,7 +82,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     cliArgs.push(...testFlags);
 
     const cmd = await buildCliCommand(cliArgs, workspaceDir, outputChannel);
-    outputChannel.appendLine(`[${label}] ${formatCliCommand(cmd)}`);
+    outputChannel.info(`[${label}] ${formatCliCommand(cmd)}`);
 
     const streamedPkgs = new Set<string>();
     const pkgEventBuffers = new Map<string, TestEvent[]>();
@@ -221,7 +221,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         try {
           funcOutput = await runGoToolCoverFunc(coverFile, workspaceDir);
         } catch {
-          outputChannel.appendLine(`[${label}] go tool cover -func failed`);
+          outputChannel.warn(`[${label}] go tool cover -func failed`);
         }
 
         if (coverage.testOnly) {
@@ -251,14 +251,14 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
           }
         }
       } catch {
-        outputChannel.appendLine(`[${label}] no coverprofile generated`);
+        outputChannel.warn(`[${label}] no coverprofile generated`);
       }
     }
 
     return { stdout: result.stdout };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    outputChannel.appendLine(`[${label}] error: ${message}`);
+    outputChannel.error(`[${label}] ${message}`);
     for (const info of pkgInfos) {
       for (const item of info.items) {
         run.errored(item, new vscode.TestMessage(message));

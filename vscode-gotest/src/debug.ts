@@ -7,7 +7,7 @@ export class DebugLauncher implements vscode.Disposable {
   private readonly prepareProcesses = new Map<string, ChildProcess>();
   private sessionListener: vscode.Disposable | undefined;
 
-  constructor(private readonly outputChannel: vscode.OutputChannel) {}
+  constructor(private readonly outputChannel: vscode.LogOutputChannel) {}
 
   async debug(
     request: vscode.TestRunRequest,
@@ -40,7 +40,7 @@ export class DebugLauncher implements vscode.Disposable {
         workspaceFolder.uri.fsPath,
         this.outputChannel,
       );
-      this.outputChannel.appendLine(`[debug] ${formatCliCommand(cmd)}`);
+      this.outputChannel.info(`[debug] ${formatCliCommand(cmd)}`);
 
       const timeout =
         scopedConfig(workspaceFolder.uri.fsPath).get<number>(
@@ -88,7 +88,7 @@ export class DebugLauncher implements vscode.Disposable {
       debugConfig.env = { GOTEST_SHARED_STATE_FILE: prepare.stateFile };
     }
 
-    this.outputChannel.appendLine(
+    this.outputChannel.info(
       `[debug] launching: ${JSON.stringify(debugConfig)}`,
     );
 
@@ -174,7 +174,7 @@ export class DebugLauncher implements vscode.Disposable {
       });
 
       child.stderr.on("data", (data: Buffer) => {
-        this.outputChannel.appendLine(
+        this.outputChannel.debug(
           `[debug:prepare] ${data.toString().trimEnd()}`,
         );
       });

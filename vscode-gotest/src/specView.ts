@@ -81,7 +81,7 @@ export class SpecViewPanel implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private disposables: vscode.Disposable[] = [];
 
-  constructor(private readonly outputChannel: vscode.OutputChannel) {}
+  constructor(private readonly outputChannel: vscode.LogOutputChannel) {}
 
   show(): void {
     if (this.panel) {
@@ -129,7 +129,7 @@ export class SpecViewPanel implements vscode.Disposable {
       this.panel.webview.html = this.buildHtml(content);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.outputChannel.appendLine(`[specView] error: ${message}`);
+      this.outputChannel.error(`[specView] ${message}`);
     }
   }
 

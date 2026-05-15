@@ -21,7 +21,7 @@ export class TestRunner {
   constructor(
     private readonly controller: GoTestController,
     private readonly cache: DiscoveryCache,
-    private readonly outputChannel: vscode.OutputChannel,
+    private readonly outputChannel: vscode.LogOutputChannel,
     private readonly coverageStore?: CoverageStore,
   ) {}
 
@@ -36,7 +36,7 @@ export class TestRunner {
     token: vscode.CancellationToken,
   ): Promise<void> {
     if (this.activeRun) {
-      this.outputChannel.appendLine("[runner] cancelling previous run");
+      this.outputChannel.info("[runner] cancelling previous run");
       this.activeRun.cancel();
     }
     const cts = new vscode.CancellationTokenSource();
