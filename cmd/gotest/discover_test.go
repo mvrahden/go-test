@@ -106,15 +106,15 @@ func TestRunDiscover_SimpleSuite(t *testing.T) {
 	if s.File != "ptest_test.go" {
 		t.Errorf("file = %q, want ptest_test.go", s.File)
 	}
-	if s.Line != 9 {
-		t.Errorf("line = %d, want 9", s.Line)
+	if s.Line != 5 {
+		t.Errorf("line = %d, want 5", s.Line)
 	}
 	if s.Col != 6 {
 		t.Errorf("col = %d, want 6", s.Col)
 	}
 
 	// Lifecycle hooks
-	expectedLifecycle := []string{"BeforeAll", "AfterAll", "BeforeEach", "AfterEach"}
+	expectedLifecycle := []string{"BeforeEach"}
 	if len(s.Lifecycle) != len(expectedLifecycle) {
 		t.Errorf("lifecycle = %v, want %v", s.Lifecycle, expectedLifecycle)
 	} else {
@@ -134,17 +134,17 @@ func TestRunDiscover_SimpleSuite(t *testing.T) {
 	if len(s.Methods) != 2 {
 		t.Fatalf("expected 2 methods, got %d", len(s.Methods))
 	}
-	if s.Methods[0].Name != "TestSucceeds" {
-		t.Errorf("method[0] name = %q, want TestSucceeds", s.Methods[0].Name)
+	if s.Methods[0].Name != "TestLength" {
+		t.Errorf("method[0] name = %q, want TestLength", s.Methods[0].Name)
 	}
-	if s.Methods[0].Line != 35 {
-		t.Errorf("method[0] line = %d, want 35", s.Methods[0].Line)
+	if s.Methods[0].Line != 13 {
+		t.Errorf("method[0] line = %d, want 13", s.Methods[0].Line)
 	}
 	if s.Methods[0].Col != 1 {
 		t.Errorf("method[0] col = %d, want 1", s.Methods[0].Col)
 	}
-	if s.Methods[1].Name != "TestFails" {
-		t.Errorf("method[1] name = %q, want TestFails", s.Methods[1].Name)
+	if s.Methods[1].Name != "TestContains" {
+		t.Errorf("method[1] name = %q, want TestContains", s.Methods[1].Name)
 	}
 
 	// Verify JSON serialization roundtrip

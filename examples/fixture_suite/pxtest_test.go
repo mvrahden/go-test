@@ -19,4 +19,6 @@ type ExternalDemoTestSuite struct {
 	*ExternalSetupFixture
 }
 
-func (s *ExternalDemoTestSuite) TestReady(t *gotest.T) {}
+func (s *ExternalDemoTestSuite) TestReady(t *gotest.T) {
+	gotest.True(t, s.ExternalSetupFixture.Ready)
+}
