@@ -4,9 +4,21 @@
   <img src="static/gopher.png" alt="gotest gopher" width="360" />
 </p>
 
+[![CI](https://github.com/mvrahden/go-test/actions/workflows/test.yml/badge.svg)](https://github.com/mvrahden/go-test/actions/workflows/test.yml)
+[![Go 1.24+](https://img.shields.io/badge/Go-1.24%2B-00ADD8?logo=go)](https://go.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Go tests that write themselves, organize themselves, and explain themselves.
 
 `gotest` closes the gap between `func TestX(t *testing.T)` and a well-organized test suite through code generation. You write structs, name them well, and the tool handles the rest. No runtime dependencies. No reflection. No lock-in. Just standard Go tests with lifecycle management and structured organization.
+
+## Why gotest?
+
+Go's `testing` package gives you `func TestX(t *testing.T)` and nothing more. Setup/teardown logic is copy-pasted or buried in `TestMain`. As test suites grow, organization becomes a discipline problem rather than a tooling one.
+
+**testify/suite** solves organization but adds runtime reflection, interface dispatch, and a `suite.Run(t, new(MySuite))` ceremony in every file. Test output is standard — but the mechanism behind it isn't.
+
+**gotest** takes a different approach: you write structs with naming conventions, and a code generator produces the `func Test*` wrappers, lifecycle wiring, and `t.Run` nesting that you'd write by hand. The generated code is deleted after tests run. What remains is standard `go test` output, zero runtime dependencies, and no lock-in — `gotest clean` removes all traces, and your test structs still compile.
 
 ## Install
 
@@ -296,13 +308,35 @@ func (s *Suite) TestCreate(t *gotest.T) {
 
 ### Parallel Tests
 
-Suite-level parallelism runs each suite in its own subprocess, providing full process isolation with zero shared state:
+**Suite-level parallelism** is automatic — the `gotest` runner executes each suite's test binary as a separate subprocess, giving full process isolation with zero shared state between suites.
+
+**Method-level parallelism** is opt-in via `SuiteConfig{Parallel: true}`. When enabled, each test method runs concurrently. Because the suite struct is shared, parallel methods can't safely mutate it — instead, `BeforeEach` returns a per-test context struct that each method receives as a second argument:
 
 ```go
-func (s *Suite) SuiteConfig() gotest.SuiteConfig {
-    return gotest.SuiteConfig{Parallel: true} // requires returning BeforeEach
+type MethodParallelCtx struct {
+    Value int64
+}
+
+type MyTestSuite struct{}
+
+func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
+    return gotest.SuiteConfig{Parallel: true}
+}
+
+func (s *MyTestSuite) BeforeEach(t *gotest.T) *MethodParallelCtx {
+    return &MethodParallelCtx{Value: time.Now().UnixNano()}
+}
+
+func (s *MyTestSuite) TestOne(t *gotest.T, ctx *MethodParallelCtx) {
+    gotest.NotZero(t, ctx.Value)
+}
+
+func (s *MyTestSuite) TestTwo(t *gotest.T, ctx *MethodParallelCtx) {
+    gotest.NotZero(t, ctx.Value)
 }
 ```
+
+The returning `BeforeEach` pattern ensures each parallel method operates on its own isolated state.
 
 ### Type-Safe Assertions
 
@@ -446,7 +480,7 @@ The generated code is what a careful developer would write by hand: `t.Run`, `t.
 | `SuiteConfig()` method | Suite timeout/failfast config |
 | `Hydrate` / `Dehydrate` | SharedFixture test-process resource reconstruction |
 
-### Behavior Specification
+## Behavior Specification
 
 View test suites as a readable behavioral specification:
 
@@ -481,7 +515,7 @@ Append spec view after normal test output:
 gotest ./... -v --spec
 ```
 
-### Watch Mode
+## Watch Mode
 
 Re-run tests on file changes with 200ms debounce:
 
@@ -522,7 +556,7 @@ Detects: lifecycle hook typos, value receivers on suite methods, missing `AfterA
 
 ## VS Code Extension
 
-The **[Go Test Suites](vscode-gotest/)** extension brings first-class IDE support: suite-aware Test Explorer, CodeLens run/debug buttons, coverage gutters, watch mode, spec view, focus/exclude quick fixes, and suite scaffolding. Install via `code --install-extension mvrahden.vscode-gotest`.
+The **[Go Test Suites](https://marketplace.visualstudio.com/items?itemName=mvrahden.vscode-gotest)** extension brings first-class IDE support: suite-aware Test Explorer, CodeLens run/debug buttons, coverage gutters, watch mode, spec view, focus/exclude quick fixes, and suite scaffolding. Install via `code --install-extension mvrahden.vscode-gotest`.
 
 ## License
 
