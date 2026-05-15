@@ -301,6 +301,12 @@ export function spawnTestProcess(
 
     child.on("close", (code) => {
       cancelListener.dispose();
+      if (onStdoutLine) {
+        const remaining = lineBuffer.trim();
+        if (remaining) {
+          onStdoutLine(remaining);
+        }
+      }
       if (stderr) {
         for (const line of stderr.split("\n")) {
           if (line.trim()) {
