@@ -10,19 +10,19 @@ import (
 //go:noinline
 func ƒƒ_GOTEST_exec(fn gotest.TestCase, t *gotest.T) { fn(t) }
 
-type ƒƒ_GOTEST_SimpleExtTestSuite struct {
-	SimpleExtTestSuite
+type ƒƒ_GOTEST_GenericExtTestSuite struct {
+	GenericExtTestSuite
 }
 
-func (ts *ƒƒ_GOTEST_SimpleExtTestSuite) BeforeAll(it *gotest.T) {}
-func (ts *ƒƒ_GOTEST_SimpleExtTestSuite) AfterAll(it *gotest.T)  {}
-func (ts *ƒƒ_GOTEST_SimpleExtTestSuite) BeforeEach(it *gotest.T) {
-	ts.SimpleExtTestSuite.BeforeEach(it)
+func (ts *ƒƒ_GOTEST_GenericExtTestSuite) BeforeAll(it *gotest.T) {}
+func (ts *ƒƒ_GOTEST_GenericExtTestSuite) AfterAll(it *gotest.T)  {}
+func (ts *ƒƒ_GOTEST_GenericExtTestSuite) BeforeEach(it *gotest.T) {
+	ts.GenericExtTestSuite.BeforeEach(it)
 }
-func (ts *ƒƒ_GOTEST_SimpleExtTestSuite) AfterEach(it *gotest.T) {}
+func (ts *ƒƒ_GOTEST_GenericExtTestSuite) AfterEach(it *gotest.T) {}
 
-func TestSimpleExtTestSuite(t *testing.T) {
-	s := &ƒƒ_GOTEST_SimpleExtTestSuite{}
+func TestGenericExtTestSuite(t *testing.T) {
+	s := &ƒƒ_GOTEST_GenericExtTestSuite{}
 	ƒcfg := gotest.DefaultSuiteConfig()
 
 	ƒsetupT := gotest.NewT(t)

@@ -105,7 +105,7 @@ func Test_TestsuiteCLI_GenericSuite(t *testing.T) {
 	gotest.NoError(t, err, "generic suite should pass: %s", output)
 	gotest.Contains(t, output, "TestStringTestSuite")
 	gotest.Contains(t, output, "TestIntTestSuite")
-	gotest.Contains(t, output, "TestSimpleExtTestSuite")
+	gotest.Contains(t, output, "TestGenericExtTestSuite")
 	gotest.Contains(t, output, "TestAlpha")
 	gotest.Contains(t, output, "TestBeta")
 	gotest.Contains(t, output, "PASS")
