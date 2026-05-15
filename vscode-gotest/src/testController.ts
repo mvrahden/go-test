@@ -16,7 +16,7 @@ export class GoTestController implements vscode.Disposable {
   constructor(
     private readonly cache: DiscoveryCache,
     private readonly resultStore: TestResultStore,
-    private readonly outputChannel: vscode.OutputChannel,
+    private readonly outputChannel: vscode.LogOutputChannel,
     runHandler: (
       request: vscode.TestRunRequest,
       token: vscode.CancellationToken,

@@ -34,7 +34,7 @@ const replaceBinaryCache = new Map<string, { hash: string; binPath: string }>();
 let versionWarningShown = false;
 
 export async function validateGoBinary(
-  log?: vscode.OutputChannel,
+  log?: vscode.LogOutputChannel,
   workspaceDir?: string,
 ): Promise<string | undefined> {
   const goBin = await resolveGoBinary(log, workspaceDir);
@@ -43,10 +43,10 @@ export async function validateGoBinary(
       timeout: 5_000,
       cwd: workspaceDir,
     });
-    log?.appendLine(`[go] binary validated: ${stdout.trim()}`);
+    log?.debug(`[go] binary validated: ${stdout.trim()}`);
     return goBin;
   } catch {
-    log?.appendLine(`[go] binary "${goBin}" failed validation`);
+    log?.warn(`[go] binary "${goBin}" failed validation`);
     clearGoBinaryCache();
     return undefined;
   }
@@ -55,7 +55,7 @@ export async function validateGoBinary(
 export async function buildCliCommand(
   subcommandArgs: string[],
   workspaceDir?: string,
-  log?: vscode.OutputChannel,
+  log?: vscode.LogOutputChannel,
 ): Promise<CliCommand> {
   const config = scopedConfig(workspaceDir);
 
@@ -69,12 +69,10 @@ export async function buildCliCommand(
   if (cliPath) {
     const resolved = resolveCliPath(cliPath, workspaceDir);
     if (await fileExists(resolved)) {
-      log?.appendLine(`[cli] cliPath override: ${resolved}`);
+      log?.debug(`[cli] cliPath override: ${resolved}`);
       return { bin: resolved, args: subcommandArgs };
     }
-    log?.appendLine(
-      `[cli] cliPath "${resolved}" not found, probing alternatives`,
-    );
+    log?.debug(`[cli] cliPath "${resolved}" not found, probing alternatives`);
   }
 
   // 2. Project-pinned version from go.mod
@@ -95,22 +93,20 @@ export async function buildCliCommand(
             log,
           );
           if (bin) {
-            log?.appendLine(`[cli] using go.mod (replace): ${bin}`);
+            log?.debug(`[cli] using go.mod (replace): ${bin}`);
             return { bin, args: subcommandArgs };
           }
-          log?.appendLine(`[cli] replace build failed, falling back to go run`);
+          log?.debug(`[cli] replace build failed, falling back to go run`);
         }
 
         const qualified = `${modulePath}@${version}`;
-        log?.appendLine(`[cli] using go.mod: ${goBin} run ${qualified}`);
+        log?.debug(`[cli] using go.mod: ${goBin} run ${qualified}`);
         return {
           bin: goBin,
           args: ["run", qualified, "--", ...subcommandArgs],
         };
       }
-      log?.appendLine(
-        `[cli] go.mod pins ${version}, requires >= ${MIN_CLI_VERSION}`,
-      );
+      log?.warn(`[cli] go.mod pins ${version}, requires >= ${MIN_CLI_VERSION}`);
       showVersionWarning(version, effectiveDir, log);
     }
   }
@@ -126,17 +122,17 @@ export async function buildCliCommand(
       const goBin = await resolveGoBinary(log, workspaceDir);
       const bin = await buildCachedBinary(goBin, effectiveDir, modulePath, log);
       if (bin) {
-        log?.appendLine(`[cli] using local module: ${bin}`);
+        log?.debug(`[cli] using local module: ${bin}`);
         return { bin, args: subcommandArgs };
       }
-      log?.appendLine(`[cli] local module build failed, continuing`);
+      log?.debug(`[cli] local module build failed, continuing`);
     }
   }
 
   // 3. Globally installed binary
   const gotest = await findInstalledGotest(workspaceDir, log);
   if (gotest) {
-    log?.appendLine(`[cli] using installed binary: ${gotest}`);
+    log?.debug(`[cli] using installed binary: ${gotest}`);
     return { bin: gotest, args: subcommandArgs };
   }
 
@@ -145,7 +141,7 @@ export async function buildCliCommand(
   const qualified = modulePath.includes("@")
     ? modulePath
     : `${modulePath}@latest`;
-  log?.appendLine(`[cli] using fallback: ${goBin} run ${qualified}`);
+  log?.debug(`[cli] using fallback: ${goBin} run ${qualified}`);
   return { bin: goBin, args: ["run", qualified, "--", ...subcommandArgs] };
 }
 
@@ -179,7 +175,7 @@ function resolveCliPath(cliPath: string, workspaceDir?: string): string {
 function showVersionWarning(
   version: string,
   effectiveDir: string,
-  log?: vscode.OutputChannel,
+  log?: vscode.LogOutputChannel,
 ): void {
   if (versionWarningShown) {
     return;
@@ -195,18 +191,18 @@ function showVersionWarning(
       try {
         const goBin = await resolveGoBinary(log, effectiveDir);
         const args = ["get", `${DEFAULT_MODULE_PATH}@latest`];
-        log?.appendLine(`[cli] upgrading: ${goBin} ${args.join(" ")}`);
+        log?.info(`[cli] upgrading: ${goBin} ${args.join(" ")}`);
         await execFileAsync(goBin, args, {
           cwd: effectiveDir,
           timeout: 30_000,
         });
-        log?.appendLine("[cli] upgrade complete");
+        log?.info("[cli] upgrade complete");
         vscode.window.showInformationMessage(
           "Go Test Suites: gotest dependency upgraded to latest.",
         );
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        log?.appendLine(`[cli] upgrade failed: ${msg}`);
+        log?.error(`[cli] upgrade failed: ${msg}`);
         vscode.window.showErrorMessage(
           `Go Test Suites: upgrade failed. ${msg}`,
         );
@@ -293,7 +289,7 @@ async function buildCachedBinary(
   goBin: string,
   workspaceDir: string,
   modulePath: string,
-  log?: vscode.OutputChannel,
+  log?: vscode.LogOutputChannel,
 ): Promise<string | undefined> {
   const goModPath = path.join(workspaceDir, "go.mod");
   let goModContent: string;
@@ -355,7 +351,7 @@ async function buildCachedBinary(
   const binPath = path.join(cacheDir, `gotest-${dirHash}`);
 
   try {
-    log?.appendLine(`[cli] building gotest from replace directive...`);
+    log?.debug(`[cli] building gotest from replace directive...`);
     await execFileAsync(goBin, ["build", "-o", binPath, modulePath], {
       cwd: workspaceDir,
       timeout: 60_000,
@@ -364,7 +360,7 @@ async function buildCachedBinary(
     return binPath;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    log?.appendLine(`[cli] replace build error: ${msg}`);
+    log?.warn(`[cli] replace build error: ${msg}`);
     return undefined;
   }
 }

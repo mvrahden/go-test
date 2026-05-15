@@ -18,7 +18,7 @@ export class CoverOnSave implements vscode.Disposable {
     private readonly controller: GoTestController,
     private readonly cache: DiscoveryCache,
     private readonly store: CoverageStore,
-    private readonly outputChannel: vscode.OutputChannel,
+    private readonly outputChannel: vscode.LogOutputChannel,
   ) {}
 
   run(importPath: string): Promise<void> {
@@ -62,7 +62,7 @@ export class CoverOnSave implements vscode.Disposable {
         workspaceDir,
         this.outputChannel,
       );
-      this.outputChannel.appendLine(`[coverage:save] ${formatCliCommand(cmd)}`);
+      this.outputChannel.info(`[coverage:save] ${formatCliCommand(cmd)}`);
 
       await spawnTestProcess(
         cmd.bin,
@@ -80,14 +80,12 @@ export class CoverOnSave implements vscode.Disposable {
       try {
         funcOutput = await runGoToolCoverFunc(coverFile, workspaceDir);
       } catch {
-        this.outputChannel.appendLine(
-          "[coverage:save] go tool cover -func failed",
-        );
+        this.outputChannel.warn("[coverage:save] go tool cover -func failed");
       }
       this.store.update(importPath, coverContent, funcOutput);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.outputChannel.appendLine(`[coverage:save] failed: ${message}`);
+      this.outputChannel.error(`[coverage:save] ${message}`);
       return;
     } finally {
       if (this.activeRun === cts) this.activeRun = undefined;

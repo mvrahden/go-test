@@ -260,7 +260,7 @@ export function spawnTestProcess(
   args: string[],
   cwd: string,
   token: vscode.CancellationToken,
-  outputChannel: vscode.OutputChannel,
+  outputChannel: vscode.LogOutputChannel,
   label: string,
   env?: Record<string, string>,
   onStdoutLine?: (line: string) => void,
@@ -301,10 +301,16 @@ export function spawnTestProcess(
 
     child.on("close", (code) => {
       cancelListener.dispose();
+      if (onStdoutLine) {
+        const remaining = lineBuffer.trim();
+        if (remaining) {
+          onStdoutLine(remaining);
+        }
+      }
       if (stderr) {
         for (const line of stderr.split("\n")) {
           if (line.trim()) {
-            outputChannel.appendLine(`[${label}] stderr: ${line}`);
+            outputChannel.warn(`[${label}] stderr: ${line}`);
           }
         }
       }
@@ -313,7 +319,7 @@ export function spawnTestProcess(
 
     child.on("error", (err: Error) => {
       cancelListener.dispose();
-      outputChannel.appendLine(`[${label}] error: ${err.message}`);
+      outputChannel.error(`[${label}] ${err.message}`);
       reject(err);
     });
   });

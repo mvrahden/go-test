@@ -111,7 +111,7 @@ export class ScaffoldCodeActionProvider
 }
 
 export async function runScaffoldCommand(
-  outputChannel: vscode.OutputChannel,
+  outputChannel: vscode.LogOutputChannel,
   discoverCallback: () => void,
   workspaceDir?: string,
 ): Promise<void> {
@@ -129,7 +129,7 @@ export async function runScaffoldCommand(
 
 export async function executeScaffold(
   target: string,
-  outputChannel: vscode.OutputChannel,
+  outputChannel: vscode.LogOutputChannel,
   discoverCallback: () => void,
   workspaceDir?: string,
 ): Promise<void> {
@@ -140,7 +140,7 @@ export async function executeScaffold(
   }
 
   const cmd = await buildCliCommand(["scaffold", target], effectiveDir);
-  outputChannel.appendLine(`[scaffold] ${formatCliCommand(cmd)}`);
+  outputChannel.info(`[scaffold] ${formatCliCommand(cmd)}`);
 
   try {
     const stdout = await spawnScaffold(cmd, effectiveDir);

@@ -16,7 +16,7 @@ export function clearGoBinaryCache(): void {
 }
 
 export async function resolveGoBinary(
-  log?: vscode.OutputChannel,
+  log?: vscode.LogOutputChannel,
   workspaceDir?: string,
 ): Promise<string> {
   const cacheKey = workspaceDir ?? "";
@@ -42,20 +42,20 @@ export async function resolveGoBinary(
 
 async function resolveProjectGoBinary(
   workspaceDir: string,
-  log?: vscode.OutputChannel,
+  log?: vscode.LogOutputChannel,
 ): Promise<string | undefined> {
   const goVersion = await readGoVersionFromMod(workspaceDir);
   if (!goVersion) {
     return undefined;
   }
 
-  log?.appendLine(`[go] go.mod declares go ${goVersion}`);
+  log?.debug(`[go] go.mod declares go ${goVersion}`);
 
   // ~/sdk/go1.26.2/bin/go
   const home = process.env.HOME ?? "";
   const sdkBin = path.join(home, "sdk", `go${goVersion}`, "bin", "go");
   if (await fileExists(sdkBin)) {
-    log?.appendLine(`[go] resolved go ${goVersion} via SDK: ${sdkBin}`);
+    log?.debug(`[go] resolved go ${goVersion} via SDK: ${sdkBin}`);
     return sdkBin;
   }
 
@@ -63,58 +63,54 @@ async function resolveProjectGoBinary(
   const versionedName = `go${goVersion}`;
   const shellVersioned = await whichFromShell(versionedName);
   if (shellVersioned) {
-    log?.appendLine(
-      `[go] resolved go ${goVersion} via shell: ${shellVersioned}`,
-    );
+    log?.debug(`[go] resolved go ${goVersion} via shell: ${shellVersioned}`);
     return shellVersioned;
   }
 
   const whichVersioned = await which(versionedName);
   if (whichVersioned) {
-    log?.appendLine(
-      `[go] resolved go ${goVersion} via PATH: ${whichVersioned}`,
-    );
+    log?.debug(`[go] resolved go ${goVersion} via PATH: ${whichVersioned}`);
     return whichVersioned;
   }
 
-  log?.appendLine(
+  log?.debug(
     `[go] go ${goVersion} not found, falling back to generic detection`,
   );
   return undefined;
 }
 
 async function resolveGenericGoBinary(
-  log?: vscode.OutputChannel,
+  log?: vscode.LogOutputChannel,
 ): Promise<string> {
   const goroot = process.env.GOROOT;
   if (goroot) {
     const goBin = path.join(goroot, "bin", "go");
     if (await fileExists(goBin)) {
-      log?.appendLine(`[go] resolved via GOROOT: ${goBin}`);
+      log?.debug(`[go] resolved via GOROOT: ${goBin}`);
       return goBin;
     }
   }
 
   const shellGo = await whichFromShell("go");
   if (shellGo) {
-    log?.appendLine(`[go] resolved via shell: ${shellGo}`);
+    log?.debug(`[go] resolved via shell: ${shellGo}`);
     return shellGo;
   }
 
   const whichGo = await which("go");
   if (whichGo) {
-    log?.appendLine(`[go] resolved via PATH: ${whichGo}`);
+    log?.debug(`[go] resolved via PATH: ${whichGo}`);
     return whichGo;
   }
 
   for (const candidate of await commonGoPaths()) {
     if (await fileExists(candidate)) {
-      log?.appendLine(`[go] resolved at common path: ${candidate}`);
+      log?.debug(`[go] resolved at common path: ${candidate}`);
       return candidate;
     }
   }
 
-  log?.appendLine("[go] could not resolve binary, using bare 'go'");
+  log?.warn("[go] could not resolve binary, using bare 'go'");
   return "go";
 }
 
@@ -133,7 +129,7 @@ async function readGoVersionFromMod(
 
 export async function findInstalledGotest(
   workspaceDir?: string,
-  log?: vscode.OutputChannel,
+  log?: vscode.LogOutputChannel,
 ): Promise<string | undefined> {
   if (cachedGotestBinary) {
     if (await fileExists(cachedGotestBinary)) {
@@ -186,7 +182,7 @@ export async function findInstalledGotest(
       }
     }
   } catch {
-    log?.appendLine("[cli] failed to query go env for gotest location");
+    log?.debug("[cli] failed to query go env for gotest location");
   }
 
   const whichGotest = await which("gotest");

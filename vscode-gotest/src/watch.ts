@@ -26,7 +26,7 @@ class WatchProcess implements vscode.Disposable {
     private readonly pkgScope: string,
     private readonly cwd: string,
     private readonly cmd: CliCommand,
-    private readonly outputChannel: vscode.OutputChannel,
+    private readonly outputChannel: vscode.LogOutputChannel,
     private readonly onCycleStart: () => void,
     private readonly onEvents: (jsonLines: string) => void,
     private readonly onError: (msg: string) => void,
@@ -36,7 +36,7 @@ class WatchProcess implements vscode.Disposable {
   }
 
   private start(): void {
-    this.outputChannel.appendLine(
+    this.outputChannel.info(
       `[watch] spawning: ${formatCliCommand(this.cmd)} (cwd: ${this.cwd})`,
     );
 
@@ -50,7 +50,7 @@ class WatchProcess implements vscode.Disposable {
     });
 
     this.child.stderr?.on("data", (data: Buffer) => {
-      this.outputChannel.appendLine(`[watch] stderr: ${data.toString()}`);
+      this.outputChannel.warn(`[watch] stderr: ${data.toString().trimEnd()}`);
     });
 
     this.child.on("close", () => {
@@ -60,7 +60,7 @@ class WatchProcess implements vscode.Disposable {
     });
 
     this.child.on("error", (err: Error) => {
-      this.outputChannel.appendLine(`[watch] process error: ${err.message}`);
+      this.outputChannel.error(`[watch] process error: ${err.message}`);
       if (!this.disposed) {
         this.maybeRestart();
       }
@@ -100,7 +100,7 @@ class WatchProcess implements vscode.Disposable {
         this.cycleBuffer += trimmed + "\n";
       } catch {
         // Non-JSON line, skip
-        this.outputChannel.appendLine(`[watch] non-JSON line: ${trimmed}`);
+        this.outputChannel.debug(`[watch] non-JSON line: ${trimmed}`);
       }
     }
 
@@ -129,7 +129,7 @@ class WatchProcess implements vscode.Disposable {
     this.consecutiveCrashes++;
 
     if (this.consecutiveCrashes >= WatchProcess.MAX_CONSECUTIVE_CRASHES) {
-      this.outputChannel.appendLine(
+      this.outputChannel.error(
         `[watch] ${this.consecutiveCrashes} consecutive crashes, stopping (scope: ${this.pkgScope})`,
       );
       this.onError(
@@ -145,7 +145,7 @@ class WatchProcess implements vscode.Disposable {
       WatchProcess.MAX_RESTART_DELAY_MS,
     );
 
-    this.outputChannel.appendLine(
+    this.outputChannel.warn(
       `[watch] restarting in ${delay / 1000}s (crash ${this.consecutiveCrashes}/${WatchProcess.MAX_CONSECUTIVE_CRASHES}, scope: ${this.pkgScope})`,
     );
 
@@ -194,7 +194,7 @@ export class WatchManager implements vscode.Disposable {
   constructor(
     private readonly controller: GoTestController,
     private readonly cache: DiscoveryCache,
-    private readonly outputChannel: vscode.OutputChannel,
+    private readonly outputChannel: vscode.LogOutputChannel,
     private readonly onCycleComplete: (jsonOutput: string) => void,
   ) {
     this.statusBar = vscode.window.createStatusBarItem(
@@ -250,7 +250,7 @@ export class WatchManager implements vscode.Disposable {
       },
       // onError
       (msg: string) => {
-        this.outputChannel.appendLine(`[watch] error: ${msg}`);
+        this.outputChannel.error(`[watch] ${msg}`);
         vscode.window.showWarningMessage(`gotest watch: ${msg}`);
       },
       // onExit
