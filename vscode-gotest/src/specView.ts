@@ -462,7 +462,7 @@ function buildLeafHtml(node: SpecNode, parentName: string, locationMap: Location
     }
   }
 
-  return `<div class="leaf ${node.status}" data-display="${escapeAttr(node.display)}">
+  return `<div class="leaf ${node.kind} ${node.status}" data-display="${escapeAttr(node.display)}">
   ${iconHtml} ${escapeHtml(node.display)}${suffix} <span class="dur">(${dur})</span>
   ${errorBlock}
 </div>`;
@@ -740,8 +740,10 @@ details.branch > .leaf { margin-left: 20px; }
 details.branch > summary { cursor: pointer; list-style: none; }
 details.branch > summary::-webkit-details-marker { display: none; }
 summary.node { padding: 1px 0; }
+summary.node.block { color: var(--vscode-terminal-ansiYellow); }
 
 .leaf { padding: 1px 0; white-space: nowrap; }
+.leaf.block { font-style: italic; }
 
 .icon.pass { color: var(--vscode-testing-iconPassed); }
 .icon.fail { color: var(--vscode-testing-iconFailed); }
