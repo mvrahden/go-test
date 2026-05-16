@@ -75,6 +75,7 @@ export function activate(context: vscode.ExtensionContext): void {
     outputChannel,
   );
   const specView = new SpecViewPanel(outputChannel);
+  specView.setExtensionUri(context.extensionUri);
 
   coverageRunner = new CoverageRunner(
     controller,
