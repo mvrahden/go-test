@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/mvrahden/go-test/about"
-	"github.com/mvrahden/go-test/internal/testutils"
+	"github.com/mvrahden/go-test/tests/e2e/internal/testutils"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -24,11 +24,7 @@ func Test_TestsuiteCLI(t *testing.T) {
 	tmp := t.TempDir()
 
 	// clone module into tmp
-	excludedPaths := []string{
-		".git",    // entire .git dir
-		"go.work", // no go.work reference
-	}
-	testutils.CopyModuleUnderTestToTmp(t, tmp, "./..", excludedPaths...)
+	testutils.CopyModuleUnderTestToTmp(t, tmp, "../..", testutils.DefaultExcludePaths...)
 	testutils.ActivateTests(t, tmp)
 
 	unexpectedFiles := []string{
@@ -69,7 +65,7 @@ func Test_TestsuiteCLI(t *testing.T) {
 
 func Test_TestsuiteCLI_ParallelSuite(t *testing.T) {
 	tmp := t.TempDir()
-	testutils.CopyModuleUnderTestToTmp(t, tmp, "./..", ".git", "go.work")
+	testutils.CopyModuleUnderTestToTmp(t, tmp, "../..", testutils.DefaultExcludePaths...)
 	testutils.ActivateTests(t, tmp)
 	testutils.HackGoWork(t, tmp)
 
@@ -92,7 +88,7 @@ func Test_TestsuiteCLI_ParallelSuite(t *testing.T) {
 
 func Test_TestsuiteCLI_GenericSuite(t *testing.T) {
 	tmp := t.TempDir()
-	testutils.CopyModuleUnderTestToTmp(t, tmp, "./..", ".git", "go.work")
+	testutils.CopyModuleUnderTestToTmp(t, tmp, "../..", testutils.DefaultExcludePaths...)
 	testutils.ActivateTests(t, tmp)
 	testutils.HackGoWork(t, tmp)
 
@@ -113,7 +109,8 @@ func Test_TestsuiteCLI_GenericSuite(t *testing.T) {
 
 func Test_TestsuiteCLI_AllPackages(t *testing.T) {
 	tmp := t.TempDir()
-	testutils.CopyModuleUnderTestToTmp(t, tmp, "./..", ".git", "go.work", "examples/shared_fixture")
+	testutils.CopyModuleUnderTestToTmp(t, tmp, "../..",
+		append(testutils.DefaultExcludePaths, "examples/shared_fixture")...)
 	testutils.ActivateTests(t, tmp)
 	testutils.HackGoWork(t, tmp)
 
@@ -132,7 +129,7 @@ func Test_TestsuiteCLI_AllPackages(t *testing.T) {
 
 func Test_TestsuiteCLI_ExitCode(t *testing.T) {
 	tmp := t.TempDir()
-	testutils.CopyModuleUnderTestToTmp(t, tmp, "./..", ".git", "go.work")
+	testutils.CopyModuleUnderTestToTmp(t, tmp, "../..", testutils.DefaultExcludePaths...)
 	testutils.ActivateTests(t, tmp)
 	testutils.HackGoWork(t, tmp)
 

@@ -67,6 +67,8 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `scaffold` | Generate test suite skeleton from a Go type |
 | `migrate` | Convert testify/suite tests to go-test suites |
 | `spec` | Run tests and render behavioral specification |
+| `lint` | Run gotest-specific linter checks |
+| `refactor` | Source code refactoring tools (e.g. `toggle-focus`) |
 | `version` | Print version information |
 | `help` | Show help |
 
@@ -212,14 +214,29 @@ FAIL: focus prefix detected — remove F_ before merging:
   pkg/payment/pay_test.go:28  func (s *PaymentTestSuite) F_TestCharge
 ```
 
+### SuiteGuard
+
+A suite can define a `SuiteGuard()` method that returns a reason string. If non-empty, the entire suite is skipped at runtime with `t.Skipf("suite guard: %s", reason)`:
+
+```go
+func (s *MySuite) SuiteGuard() string {
+    if os.Getenv("INTEGRATION_DB") == "" {
+        return "INTEGRATION_DB not set"
+    }
+    return ""
+}
+```
+
+Unlike `X_` (compile-time exclusion), `SuiteGuard` evaluates at runtime — useful for environment-dependent tests that should compile everywhere but only run when prerequisites are available.
+
 ### Parallel Execution
 
-**Suite-level parallelism** is always on. Every generated `func Test*` calls `t.Parallel()` unconditionally. This enables Go's test runner to execute independent suites concurrently. There is no opt-out.
+**Suite-level parallelism** is handled by the `gotest` CLI runner, which executes each suite's test binary as a separate subprocess. This provides process-level isolation between suites. The generated `func Test*` does **not** call `t.Parallel()` — parallelism is at the runner level, not the Go test scheduler level.
 
 **Method-level parallelism** is opt-in via `SuiteConfig{Parallel: true}`. Each generated subtest calls `it.Parallel()` and coordinates via `sync.WaitGroup`. Method-level parallelism requires a returning `BeforeEach` — per-test state lives in the returned context, not on the shared suite struct.
 
 ```go
-// Default: suite-level parallel (always-on), methods run sequentially
+// Default: methods run sequentially within the suite
 type MyTestSuite struct{}
 
 func (s *MyTestSuite) TestAlpha(t *gotest.T) {}
@@ -584,17 +601,6 @@ Equal failed:
 
 Zero external dependencies — uses `reflect.DeepEqual`, `cmp.Compare`, `fmt.Sprintf("%#v")`, and a minimal inline diff renderer.
 
-### Fluent API
-
-Discoverable via autocomplete. Delegates to the functional layer. Accepts `any` (runtime type checking, not compile-time):
-
-```go
-t.Assert(result).Equal(expected)
-t.Assert(items).HasLength(3)
-t.Assert(err).NoError()
-t.Assert(ok).IsTrue()
-```
-
 ---
 
 ## BDD Vocabulary
@@ -815,15 +821,26 @@ type ƒƒ_GOTEST_MyTestSuite struct { MyTestSuite }
 
 func TestMyTestSuite(t *testing.T) {
     s := &ƒƒ_GOTEST_MyTestSuite{}
-    t.Parallel()
     ƒcfg := gotest.DefaultSuiteConfig()
 
-    tt := gotest.NewT(t)
-    t.Cleanup(func() { s.AfterAll(tt) })
-    s.BeforeAll(tt)
+    ƒsetupT := gotest.NewT(t)
+    if ƒcfg.SetupTimeout > 0 {
+        ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+    }
+    t.Cleanup(func() {
+        ƒteardownT := gotest.NewT(t)
+        if ƒcfg.SetupTimeout > 0 {
+            ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
+        }
+        s.AfterAll(ƒteardownT)
+    })
+    s.BeforeAll(ƒsetupT)
 
     t.Run("TestSomething", func(it *testing.T) {
         ttt := gotest.NewT(it)
+        if ƒcfg.Timeout > 0 {
+            ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+        }
         defer s.AfterEach(ttt)
         s.BeforeEach(ttt)
         ƒƒ_GOTEST_exec(s.TestSomething, ttt)
@@ -835,10 +852,11 @@ func TestMyTestSuite(t *testing.T) {
 
 ## Linter
 
-`gotest-lint` is a standalone binary built on `go/analysis`, compatible with `golangci-lint`:
+Available as a subcommand and as a standalone binary, built on `go/analysis` and compatible with `golangci-lint`:
 
 ```bash
-gotest-lint ./...
+gotest lint ./...                                          # subcommand
+go run github.com/mvrahden/go-test/cmd/gotest-lint ./...   # standalone
 ```
 
 Detects:
@@ -853,14 +871,14 @@ Detects:
 ## CI Integration
 
 ```yaml
-- uses: mvrahden/setup-gotest@v1
+- uses: ./.github/actions/setup-gotest  # local composite action
 - run: gotest --ci ./... -v -race -coverprofile=coverage.out
 - run: gotest spec ./... --format=md --output=behavior-spec.md
 ```
 
 Exit codes match `go test`: 0 = pass, 1 = test failure, 2 = build error.
 
-The `setup-gotest` composite action installs the binary via `go install`.
+The `--ci` flag fails the run when any `F_` (focus) prefix is committed, preventing accidental focus leaks in CI. The local `setup-gotest` composite action installs the binary via `go install`.
 
 ---
 
@@ -924,21 +942,6 @@ The file count answers: *"How much of my codebase do my tests reach at all?"*
 ---
 
 ## Advanced Patterns
-
-### Nested Suites
-
-A suite referencing another suite via a named pointer field inherits its lifecycle hooks. The generator chains parent/child hooks:
-
-```
-ParentTestSuite.BeforeAll
-└── ChildTestSuite
-    ├── ParentTestSuite.BeforeEach (if defined)
-    │   └── ChildTestSuite.BeforeEach
-    │       └── Test
-    │       └── ChildTestSuite.AfterEach
-    │   └── ParentTestSuite.AfterEach
-ParentTestSuite.AfterAll
-```
 
 ### Contract Testing via Generic Suites
 

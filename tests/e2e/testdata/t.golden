@@ -1,57 +1,54 @@
-=== RUN   Test_Stdlib_HelloWorld
-    t_test.go:10: failed for reasons
---- FAIL: Test_Stdlib_HelloWorld (<TIMESTAMP>)
 === RUN   TestSimpleTestSuite
 === RUN   TestSimpleTestSuite/TestT
 === RUN   TestSimpleTestSuite/TestT/should_perform_the_test_case
-    t_test.go:17: failed for reasons
+    t_test.go:13: failed for reasons
 === RUN   TestSimpleTestSuite/TestIsTrue
 === RUN   TestSimpleTestSuite/TestIsTrue/fails
-    t_test.go:23: True failed:
+    t_test.go:19: True failed:
           expected: true
           actual:   false
 === RUN   TestSimpleTestSuite/TestIsTrue/succeeds
 === RUN   TestSimpleTestSuite/TestIsFalse
 === RUN   TestSimpleTestSuite/TestIsFalse/fails
-    t_test.go:32: False failed:
+    t_test.go:28: False failed:
           expected: false
           actual:   true
 === RUN   TestSimpleTestSuite/TestIsFalse/succeeds
 === RUN   TestSimpleTestSuite/TestIsEqualTo
 === RUN   TestSimpleTestSuite/TestIsEqualTo/fails
-    t_test.go:41: Equal failed:
+    t_test.go:37: Equal failed:
           expected: []string{"def"}
           actual:   []string{"abc"}
 === RUN   TestSimpleTestSuite/TestIsEqualTo/succeeds
 === RUN   TestSimpleTestSuite/TestIsZero
 === RUN   TestSimpleTestSuite/TestIsZero/fails
-    t_test.go:50: Zero failed:
+    t_test.go:46: Zero failed:
           expected: "" (zero value)
           actual:   "abc"
 === RUN   TestSimpleTestSuite/TestIsZero/succeeds
 === RUN   TestSimpleTestSuite/TestIsEmpty
 === RUN   TestSimpleTestSuite/TestIsEmpty/fails
-    t_test.go:59: Empty failed:
+    t_test.go:55: Empty failed:
           object is not empty: []string{"abc"}
 === RUN   TestSimpleTestSuite/TestIsEmpty/succeeds
 === RUN   TestSimpleTestSuite/TestHasLength
 === RUN   TestSimpleTestSuite/TestHasLength/fails
-    t_test.go:69: Len failed:
+    t_test.go:65: Len failed:
           expected length 3
           actual length 1
 === RUN   TestSimpleTestSuite/TestHasLength/succeeds
 === RUN   TestSimpleTestSuite/TestContains
 === RUN   TestSimpleTestSuite/TestContains/fails
-    t_test.go:79: Contains failed:
+    t_test.go:75: Contains failed:
           "hello" does not contain "xyz"
 === RUN   TestSimpleTestSuite/TestContains/succeeds
 === RUN   TestSimpleTestSuite/TestStdlibCompat
-    assertions.go:<LINE>: t_test.go:88: True failed:
+    assertions.go:<LINE>: t_test.go:84: True failed:
           expected: true
           actual:   false
 === RUN   TestSimpleTestSuite/TestHelperTrace
 === RUN   TestSimpleTestSuite/TestHelperTrace/shows_called_from_trace
-    t_test.go:92: True failed:
+    t_test.go:88: True failed:
           expected: true
           actual:   false
 --- FAIL: TestSimpleTestSuite (<TIMESTAMP>)
