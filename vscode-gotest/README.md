@@ -108,6 +108,7 @@ Fully supported. Each workspace folder is discovered independently. Commands res
 | Go Test: Stop Watch | Stop all active watch processes |
 | Go Test: Scaffold Suite | Generate a test suite from a target |
 | Go Test: Copy Coverage Summary | Copy coverage table to clipboard |
+| Go Test: Copy Test Results | Copy test results to clipboard |
 
 ## Settings
 
@@ -123,6 +124,10 @@ These can be set in `.vscode/settings.json` per workspace folder:
 | `gotest.testFlags` | `[]` | Additional flags passed to `go test` |
 | `gotest.buildFlags` | `[]` | Additional build flags passed to Delve |
 | `gotest.discoverOnSave` | `true` | Re-discover tests when `_test.go` files change |
+| `gotest.coverOnRun` | `true` | Collect coverage data alongside normal test runs |
+| `gotest.coverOnSave` | `false` | Re-run package coverage when a `.go` file is saved |
+| `gotest.coverTestOnlyPackages` | `false` | Enable cross-package coverage instrumentation for test-only packages |
+| `gotest.debug.prepareTimeout` | `60` | Seconds to wait for debug preparation before timing out |
 | `gotest.watch.scope` | `./...` | Default package scope for watch mode |
 
 ### Global settings (window scope)

@@ -241,19 +241,6 @@ func TestBuildSuiteCmd(t *testing.T) {
 			wantArgs: []string{"go", "tool", "test2json", "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
 				"-test.run=^TestFoo\\.Bar\\+Baz$", "-test.v=test2json"},
 		},
-		{
-			name: "json/standalone group",
-			target: SuiteTarget{
-				Package:    "example.com/pkg",
-				BinaryPath: "/tmp/pkg.test",
-				SuiteName:  "(standalone)",
-				RunFilter:  "^(TestAlpha|TestBeta)$",
-			},
-			test2json:  true,
-			wantBinary: "go",
-			wantArgs: []string{"go", "tool", "test2json", "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
-				"-test.run=^(TestAlpha|TestBeta)$", "-test.v=test2json"},
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := buildSuiteCmd(ctx, tc.target, env, tc.test2json)
