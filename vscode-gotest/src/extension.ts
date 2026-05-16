@@ -84,7 +84,7 @@ export function activate(context: vscode.ExtensionContext): void {
         panel: vscode.WebviewPanel,
         state: unknown,
       ) {
-        specView.restorePanel(panel, state);
+        await specView.restorePanel(panel, state);
       },
     },
   );
@@ -311,8 +311,8 @@ function registerCommands(deps: {
       await diagnostics.showFocusedTests();
     }),
 
-    vscode.commands.registerCommand("gotest.showSpecView", () => {
-      specView.show();
+    vscode.commands.registerCommand("gotest.showSpecView", async () => {
+      await specView.show();
     }),
 
     vscode.commands.registerCommand("gotest.startWatch", async () => {
