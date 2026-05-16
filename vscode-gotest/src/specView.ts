@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "node:path";
 import { spawn } from "node:child_process";
 import { buildCliCommand } from "./cli.js";
 import type { DiscoveryCache } from "./discovery.js";
@@ -122,9 +123,9 @@ export class SpecViewPanel implements vscode.Disposable {
     for (const pkg of this.cache.packages) {
       for (const suite of pkg.suites) {
         const testName = `Test${suite.name}`;
-        map[testName] = { file: suite.file, line: suite.line };
+        map[testName] = { file: path.join(pkg.dir, suite.file), line: suite.line };
         for (const method of suite.methods) {
-          map[`${testName}/${method.name}`] = { file: method.file, line: method.line };
+          map[`${testName}/${method.name}`] = { file: path.join(pkg.dir, method.file), line: method.line };
         }
       }
     }
@@ -294,9 +295,12 @@ function buildToolbar(): string {
 }
 
 function buildPackageHtml(pkg: SpecPackage, multiPkg: boolean): string {
-  const header = multiPkg ? `<div class="pkg-header">=== ${escapeHtml(pkg.path)} ===</div>` : "";
   const nodes = pkg.nodes.map((n) => buildNodeHtml(n, "")).join("");
-  return `${header}${nodes}`;
+  if (!multiPkg) return nodes;
+  return `<details class="pkg-section" open>
+  <summary class="pkg-header">${escapeHtml(pkg.path)}</summary>
+  ${nodes}
+</details>`;
 }
 
 function buildNodeHtml(node: SpecNode, parentName: string): string {
