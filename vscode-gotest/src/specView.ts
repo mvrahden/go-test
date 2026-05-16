@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
+import { readFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { buildCliCommand } from "./cli.js";
 import type { DiscoveryCache } from "./discovery.js";
@@ -9,23 +10,36 @@ export class SpecViewPanel implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private extensionUri: vscode.Uri | undefined;
   private lastSpecData: SpecData | undefined;
+  private modulePaths: string[] = [];
 
   constructor(
     private readonly outputChannel: vscode.LogOutputChannel,
     private readonly cache?: DiscoveryCache,
-  ) {}
+  ) {
+    if (cache) {
+      this.disposables.push(
+        cache.onDidUpdate(() => this.rebuildIfVisible()),
+      );
+    }
+  }
+
+  private rebuildIfVisible(): void {
+    if (!this.panel || !this.lastSpecData) return;
+    this.panel.webview.html = this.buildHtml({ type: "specData", data: this.lastSpecData });
+  }
 
   setExtensionUri(uri: vscode.Uri): void {
     this.extensionUri = uri;
   }
 
-  show(): void {
+  async show(): Promise<void> {
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.Beside);
       return;
     }
 
     this.createPanel();
+    await this.resolveModulePaths();
 
     if (this.lastSpecData) {
       this.panel!.webview.html = this.buildHtml({ type: "specData", data: this.lastSpecData });
@@ -34,9 +48,10 @@ export class SpecViewPanel implements vscode.Disposable {
     }
   }
 
-  restorePanel(panel: vscode.WebviewPanel, state: unknown): void {
+  async restorePanel(panel: vscode.WebviewPanel, state: unknown): Promise<void> {
     this.panel = panel;
     this.wirePanel();
+    await this.resolveModulePaths();
 
     const specData = parseStoredState(state);
     if (specData) {
@@ -75,8 +90,19 @@ export class SpecViewPanel implements vscode.Disposable {
         } else if (msg.type === "goToLocation" && msg.file && msg.line) {
           const uri = vscode.Uri.file(msg.file);
           const line = Math.max(0, msg.line - 1);
+          const specColumn = this.panel?.viewColumn;
+          const other = vscode.window.visibleTextEditors.find(
+            (e) => e.viewColumn !== undefined && e.viewColumn !== specColumn,
+          );
+          const viewColumn = other?.viewColumn
+            ?? (specColumn === vscode.ViewColumn.One
+              ? vscode.ViewColumn.Beside
+              : vscode.ViewColumn.One);
           vscode.window.showTextDocument(uri, {
+            viewColumn,
             selection: new vscode.Range(line, 0, line, 0),
+          }).then(undefined, (err: unknown) => {
+            this.outputChannel.error(`[specView] showTextDocument failed: ${err}`);
           });
         }
       },
@@ -102,6 +128,7 @@ export class SpecViewPanel implements vscode.Disposable {
       const raw = await this.runSpecFromInput(jsonOutput);
       const data: SpecData = JSON.parse(raw);
       this.lastSpecData = data;
+      await this.resolveModulePaths();
 
       if (!this.panel) return;
       const autoRefresh =
@@ -115,6 +142,49 @@ export class SpecViewPanel implements vscode.Disposable {
       const message = err instanceof Error ? err.message : String(err);
       this.outputChannel.error(`[specView] ${message}`);
     }
+  }
+
+  private async resolveModulePaths(): Promise<void> {
+    const moduleSet = new Set<string>();
+    if (this.cache) {
+      const goModCache = new Map<string, string | undefined>();
+      for (const pkg of this.cache.packages) {
+        const mod = await this.findModuleForDir(pkg.dir, goModCache);
+        if (mod) moduleSet.add(mod);
+      }
+    }
+    this.modulePaths = Array.from(moduleSet);
+  }
+
+  private async findModuleForDir(
+    startDir: string,
+    cache: Map<string, string | undefined>,
+  ): Promise<string | undefined> {
+    let dir = startDir;
+    const visited: string[] = [];
+    while (true) {
+      if (cache.has(dir)) {
+        const hit = cache.get(dir);
+        for (const v of visited) cache.set(v, hit);
+        return hit;
+      }
+      visited.push(dir);
+      try {
+        const content = await readFile(path.join(dir, "go.mod"), "utf-8");
+        const match = /^\s*module\s+(\S+)/m.exec(content);
+        if (match) {
+          for (const v of visited) cache.set(v, match[1]);
+          return match[1];
+        }
+      } catch {
+        // no go.mod at this level
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    for (const v of visited) cache.set(v, undefined);
+    return undefined;
   }
 
   private buildLocationMap(): Record<string, { file: string; line: number }> {
@@ -157,7 +227,7 @@ export class SpecViewPanel implements vscode.Disposable {
     const body =
       msg.type === "empty"
         ? buildEmptyBody(gopherUri)
-        : buildSpecBody(msg.data);
+        : buildSpecBody(msg.data, this.modulePaths, locationMap);
     const stateJson = msg.type === "specData"
       ? JSON.stringify(msg.data)
       : "null";
@@ -174,7 +244,6 @@ ${CSS}
 <body>
 ${body}
 <script nonce="${nonce}">
-const LOCATION_MAP = ${JSON.stringify(locationMap)};
 const SPEC_STATE = ${stateJson};
 ${SCRIPT}
 </script>
@@ -266,9 +335,19 @@ function buildEmptyBody(gopherUri: string): string {
 </div>`;
 }
 
-function buildSpecBody(data: SpecData): string {
+type LocationMap = Record<string, { file: string; line: number }>;
+
+function buildSpecBody(data: SpecData, modulePaths: string[], locationMap: LocationMap): string {
   const toolbar = buildToolbar();
-  const tree = data.packages.map((pkg) => buildPackageHtml(pkg, data.packages.length > 1)).join("");
+  const groups = groupByModule(data.packages, modulePaths);
+  let tree: string;
+  if (groups.length === 1 && groups[0].entries.length === 1) {
+    tree = groups[0].entries[0].pkg.nodes.map((n) => buildNodeHtml(n, "", locationMap)).join("");
+  } else if (groups.length === 1) {
+    tree = groups[0].entries.map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, locationMap)).join("");
+  } else {
+    tree = groups.map((g) => buildModuleSectionHtml(g, locationMap)).join("");
+  }
   const summary = buildSummary(data.stats);
   return `<div class="spec-container">
   ${toolbar}
@@ -294,24 +373,56 @@ function buildToolbar(): string {
 </div>`;
 }
 
-function buildPackageHtml(pkg: SpecPackage, multiPkg: boolean): string {
-  const nodes = pkg.nodes.map((n) => buildNodeHtml(n, "")).join("");
-  if (!multiPkg) return nodes;
+interface ModuleGroup {
+  modulePath: string;
+  entries: Array<{ pkg: SpecPackage; displayPath: string }>;
+}
+
+function groupByModule(packages: SpecPackage[], modulePaths: string[]): ModuleGroup[] {
+  const sorted = [...modulePaths].sort((a, b) => b.length - a.length);
+  const groups = new Map<string, ModuleGroup>();
+  for (const pkg of packages) {
+    const mod = sorted.find((m) => pkg.path === m || pkg.path.startsWith(m + "/")) ?? "";
+    let group = groups.get(mod);
+    if (!group) {
+      group = { modulePath: mod, entries: [] };
+      groups.set(mod, group);
+    }
+    const displayPath = mod && pkg.path.length > mod.length
+      ? pkg.path.slice(mod.length + 1)
+      : pkg.path;
+    group.entries.push({ pkg, displayPath });
+  }
+  return Array.from(groups.values());
+}
+
+function buildPackageSectionHtml(displayPath: string, pkg: SpecPackage, locationMap: LocationMap): string {
+  const nodes = pkg.nodes.map((n) => buildNodeHtml(n, "", locationMap)).join("");
   return `<details class="pkg-section" open>
-  <summary class="pkg-header">${escapeHtml(pkg.path)}</summary>
+  <summary class="pkg-header">${escapeHtml(displayPath)}</summary>
   ${nodes}
 </details>`;
 }
 
-function buildNodeHtml(node: SpecNode, parentName: string): string {
+function buildModuleSectionHtml(group: ModuleGroup, locationMap: LocationMap): string {
+  const inner = group.entries.length === 1
+    ? group.entries[0].pkg.nodes.map((n) => buildNodeHtml(n, "", locationMap)).join("")
+    : group.entries.map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, locationMap)).join("");
+  return `<details class="module-section" open>
+  <summary class="module-header">${escapeHtml(group.modulePath || "unknown")}</summary>
+  ${inner}
+</details>`;
+}
+
+function buildNodeHtml(node: SpecNode, parentName: string, locationMap: LocationMap): string {
   if (node.children.length === 0) {
-    return buildLeafHtml(node, parentName);
+    return buildLeafHtml(node, parentName, locationMap);
   }
-  return buildBranchHtml(node, parentName);
+  return buildBranchHtml(node, parentName, locationMap);
 }
 
 function locationKey(node: SpecNode, parentName: string): string {
-  if (node.kind === "suite" || node.kind === "fixture" || node.kind === "test") {
+  if (node.kind === "suite") {
     return node.name;
   }
   if (node.kind === "method" && parentName) {
@@ -320,16 +431,21 @@ function locationKey(node: SpecNode, parentName: string): string {
   return "";
 }
 
-function buildIconHtml(status: string, node: SpecNode, parentName: string): string {
+function buildIconHtml(status: string, node: SpecNode, parentName: string, locationMap: LocationMap): string {
   const icon = statusIcon(status);
   const key = locationKey(node, parentName);
-  const locAttr = key ? ` data-loc-key="${escapeAttr(key)}"` : "";
-  const gotoSpan = key ? `<span class="goto-text" title="Go to source">↗</span>` : "";
-  return `<span class="icon ${status}"${locAttr}><span class="status-text">${icon}</span>${gotoSpan}</span>`;
+  const loc = key ? locationMap[key] : undefined;
+  const locAttrs = loc
+    ? ` data-loc-file="${escapeAttr(loc.file)}" data-loc-line="${loc.line}"`
+    : "";
+  const gotoSpan = loc
+    ? `<span class="goto-text" title="Go to source">↗</span>`
+    : "";
+  return `<span class="icon ${status}"${locAttrs}><span class="status-text">${icon}</span>${gotoSpan}</span>`;
 }
 
-function buildLeafHtml(node: SpecNode, parentName: string): string {
-  const iconHtml = buildIconHtml(node.status, node, parentName);
+function buildLeafHtml(node: SpecNode, parentName: string, locationMap: LocationMap): string {
+  const iconHtml = buildIconHtml(node.status, node, parentName, locationMap);
   const dur = formatDuration(node.duration);
   const suffix =
     node.excluded || node.status === "skip" ? " — SKIPPED" : "";
@@ -352,13 +468,13 @@ function buildLeafHtml(node: SpecNode, parentName: string): string {
 </div>`;
 }
 
-function buildBranchHtml(node: SpecNode, parentName: string): string {
+function buildBranchHtml(node: SpecNode, parentName: string, locationMap: LocationMap): string {
   const shouldOpen = hasFailure(node);
   const openAttr = shouldOpen ? " open" : "";
   const status = derivedStatus(node);
-  const iconHtml = buildIconHtml(status, node, parentName);
+  const iconHtml = buildIconHtml(status, node, parentName, locationMap);
   const selfName = node.name;
-  const children = node.children.map((c) => buildNodeHtml(c, selfName)).join("");
+  const children = node.children.map((c) => buildNodeHtml(c, selfName, locationMap)).join("");
 
   let label = escapeHtml(node.display);
   if (
@@ -587,10 +703,35 @@ body {
   padding: 8px 12px;
   line-height: 1.7;
 }
-.pkg-header {
-  color: var(--vscode-descriptionForeground);
-  margin: 12px 0 4px 0;
+/* Module sections */
+details.module-section { margin-top: 16px; }
+details.module-section:first-child { margin-top: 0; }
+details.module-section > summary.module-header {
+  cursor: pointer;
+  list-style: none;
+  color: var(--vscode-editor-foreground);
+  font-weight: 600;
+  font-size: 0.9em;
+  padding: 2px 0;
 }
+details.module-section > summary.module-header::-webkit-details-marker { display: none; }
+details.module-section > details.pkg-section,
+details.module-section > details.branch,
+details.module-section > .leaf { margin-left: 12px; }
+
+/* Package sections */
+details.pkg-section { margin-top: 12px; }
+details.pkg-section:first-child { margin-top: 0; }
+details.pkg-section > summary.pkg-header {
+  cursor: pointer;
+  list-style: none;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+  padding: 2px 0;
+}
+details.pkg-section > summary.pkg-header::-webkit-details-marker { display: none; }
+details.pkg-section > details.branch,
+details.pkg-section > .leaf { margin-left: 12px; }
 
 /* Nodes — nesting via margin */
 details.branch { list-style: none; }
@@ -615,11 +756,11 @@ summary.node { padding: 1px 0; }
 
 /* Icon hover swap: status icon → go-to-source */
 .icon .goto-text { display: none; }
-.icon[data-loc-key] { cursor: pointer; }
-summary.node:hover > .icon[data-loc-key] > .status-text,
-.leaf:hover > .icon[data-loc-key] > .status-text { display: none; }
-summary.node:hover > .icon[data-loc-key] > .goto-text,
-.leaf:hover > .icon[data-loc-key] > .goto-text { display: inline; color: var(--vscode-textLink-foreground); }
+.icon[data-loc-file] { cursor: pointer; }
+summary.node:hover > .icon[data-loc-file] > .status-text,
+.leaf:hover > .icon[data-loc-file] > .status-text { display: none; }
+summary.node:hover > .icon[data-loc-file] > .goto-text,
+.leaf:hover > .icon[data-loc-file] > .goto-text { display: inline; color: var(--vscode-textLink-foreground); }
 
 /* Error output */
 .error-details { margin: 2px 0 4px 20px; }
@@ -672,23 +813,23 @@ document.addEventListener('click', (e) => {
     vscode.postMessage({ type: 'runTests' });
     return;
   }
-  const iconEl = t.closest('.icon[data-loc-key]');
+  const iconEl = t.closest('.icon[data-loc-file]');
   if (iconEl) {
-    const key = iconEl.dataset.locKey;
-    const loc = key && LOCATION_MAP[key];
-    if (loc) {
-      vscode.postMessage({ type: 'goToLocation', file: loc.file, line: loc.line });
+    const file = iconEl.dataset.locFile;
+    const line = Number(iconEl.dataset.locLine);
+    if (file && line) {
+      vscode.postMessage({ type: 'goToLocation', file: file, line: line });
+      e.preventDefault();
+      e.stopPropagation();
+      return;
     }
-    e.preventDefault();
-    e.stopPropagation();
-    return;
   }
   if (t.id === 'expand-all-btn') {
-    document.querySelectorAll('details.branch').forEach(d => d.open = true);
+    document.querySelectorAll('details.branch, details.pkg-section, details.module-section').forEach(d => d.open = true);
     return;
   }
   if (t.id === 'collapse-all-btn') {
-    document.querySelectorAll('details.branch').forEach(d => d.open = false);
+    document.querySelectorAll('details.branch, details.pkg-section, details.module-section').forEach(d => d.open = false);
     return;
   }
   if (t.dataset.filter) {
