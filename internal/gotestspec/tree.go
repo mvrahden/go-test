@@ -36,6 +36,7 @@ type Node struct {
 	Children  []*Node
 	Focused   bool
 	Excluded  bool
+	External  bool
 	Variant   int
 	duplicate bool
 }
@@ -147,6 +148,7 @@ func BuildTree(events []TestEvent) []*Package {
 			seen[n.Name]++
 			if n.duplicate {
 				n.Variant = seen[n.Name]
+				n.External = true
 			}
 		}
 	}

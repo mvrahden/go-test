@@ -399,9 +399,15 @@ func TestBuildTree_DuplicateSuite_PtestPxtest(t *testing.T) {
 		}
 	}
 
-	// suite2 should be marked as variant 2.
+	// suite2 should be marked as variant 2 and external.
 	if suite2.Variant != 2 {
 		t.Errorf("suite2 variant = %d, want 2", suite2.Variant)
+	}
+	if !suite2.External {
+		t.Error("expected suite2 to be external")
+	}
+	if suite1.External {
+		t.Error("expected suite1 to not be external")
 	}
 
 	// Both should have pass status.
