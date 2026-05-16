@@ -195,7 +195,7 @@ export class WatchManager implements vscode.Disposable {
     private readonly controller: GoTestController,
     private readonly cache: DiscoveryCache,
     private readonly outputChannel: vscode.LogOutputChannel,
-    private readonly onCycleComplete: (jsonOutput: string) => void,
+    private readonly onCycleComplete: (jsonOutput: string, scope: string, cwd: string) => void,
   ) {
     this.statusBar = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Left,
@@ -228,7 +228,7 @@ export class WatchManager implements vscode.Disposable {
         }
 
         if (cycleJsonAccumulator) {
-          this.onCycleComplete(cycleJsonAccumulator);
+          this.onCycleComplete(cycleJsonAccumulator, pkgScope, cwd);
         }
         this.controller.saveResults();
         cycleJsonAccumulator = "";
@@ -267,7 +267,7 @@ export class WatchManager implements vscode.Disposable {
 
         // Fire cycle complete with accumulated JSON
         if (cycleJsonAccumulator) {
-          this.onCycleComplete(cycleJsonAccumulator);
+          this.onCycleComplete(cycleJsonAccumulator, pkgScope, cwd);
         }
 
         // Remove from map
