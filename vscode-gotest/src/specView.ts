@@ -10,6 +10,7 @@ export class SpecViewPanel implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private extensionUri: vscode.Uri | undefined;
   private lastSpecData: SpecData | undefined;
+  private jsonLayers = new Map<string, string>();
   private modulePaths: string[] = [];
 
   constructor(
@@ -109,6 +110,7 @@ export class SpecViewPanel implements vscode.Disposable {
           }
         } else if (msg.type === "clearResults") {
           this.lastSpecData = undefined;
+          this.jsonLayers.clear();
           if (this.panel) {
             this.panel.webview.html = this.buildHtml({ type: "empty" });
           }
@@ -149,9 +151,12 @@ export class SpecViewPanel implements vscode.Disposable {
     );
   }
 
-  async refresh(jsonOutput: string): Promise<void> {
+  async refresh(jsonOutput: string, tag = "default"): Promise<void> {
+    this.jsonLayers.set(tag, jsonOutput);
+    const combined = Array.from(this.jsonLayers.values()).join("");
+
     try {
-      const raw = await this.runSpecFromInput(jsonOutput);
+      const raw = await this.runSpecFromInput(combined);
       const data: SpecData = JSON.parse(raw);
       this.lastSpecData = data;
       await this.resolveModulePaths();
