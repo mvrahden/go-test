@@ -640,6 +640,24 @@ describe("computeWildcard", () => {
       computeWildcard(["example.com/pkg", "example.com/pkg"]),
     ).toBeUndefined();
   });
+
+  it("returns undefined when wildcard would equal modulePath/...", () => {
+    expect(
+      computeWildcard(
+        ["example.com/pkg/a", "example.com/internal/b"],
+        "example.com",
+      ),
+    ).toBeUndefined();
+  });
+
+  it("allows wildcard deeper than module root", () => {
+    expect(
+      computeWildcard(
+        ["example.com/pkg/a", "example.com/pkg/b"],
+        "example.com",
+      ),
+    ).toBe("example.com/pkg/...");
+  });
 });
 
 describe("resolvePackageItems", () => {
