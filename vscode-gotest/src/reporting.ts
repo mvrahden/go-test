@@ -216,7 +216,9 @@ export async function copyTestResults(
 
   const walkItem = (item: vscode.TestItem, indent: number): Agg => {
     const structural =
-      item.id.startsWith("dir:") || item.id.startsWith("wsFolder:") || item.tags.some((t) => t.id === "package");
+      item.id.startsWith("dir:") ||
+      item.id.startsWith("wsFolder:") ||
+      item.tags.some((t) => t.id === "package");
     const result = structural ? undefined : resultStore.get(item.id);
 
     const rowIdx = rows.length;

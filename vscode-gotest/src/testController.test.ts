@@ -268,8 +268,7 @@ describe("GoTestController.rebuild", () => {
       expect(
         alphaChildIds.some(
           (id: string) =>
-            id.startsWith("dir:alpha/") ||
-            id === "example.com/alpha/pkg",
+            id.startsWith("dir:alpha/") || id === "example.com/alpha/pkg",
         ),
       ).toBe(true);
     });
@@ -335,9 +334,16 @@ describe("GoTestController.rebuild", () => {
       const rootIds = collectIds(ctrl.testController.items);
 
       // No wsFolder: nodes in single-folder mode
-      expect(rootIds.filter((id: string) => id.startsWith("wsFolder:"))).toHaveLength(0);
+      expect(
+        rootIds.filter((id: string) => id.startsWith("wsFolder:")),
+      ).toHaveLength(0);
       // Should have dir: nodes (flat layout)
-      expect(rootIds.some((id: string) => id.startsWith("dir:") || id.startsWith("example.com/"))).toBe(true);
+      expect(
+        rootIds.some(
+          (id: string) =>
+            id.startsWith("dir:") || id.startsWith("example.com/"),
+        ),
+      ).toBe(true);
     });
 
     it("uses unqualified dir IDs without folder prefix", () => {
