@@ -74,7 +74,20 @@ export function activate(context: vscode.ExtensionContext): void {
     coverageStore,
     outputChannel,
   );
-  const specView = new SpecViewPanel(outputChannel);
+  const specView = new SpecViewPanel(outputChannel, cache);
+  specView.setExtensionUri(context.extensionUri);
+
+  const specViewSerializer = vscode.window.registerWebviewPanelSerializer(
+    "gotestSpecView",
+    {
+      async deserializeWebviewPanel(
+        panel: vscode.WebviewPanel,
+        state: unknown,
+      ) {
+        await specView.restorePanel(panel, state);
+      },
+    },
+  );
 
   coverageRunner = new CoverageRunner(
     controller,
@@ -143,6 +156,7 @@ export function activate(context: vscode.ExtensionContext): void {
     coverOnSave,
     coverageStore,
     specView,
+    specViewSerializer,
     specViewRefreshDisposable,
     watchManager,
     ...commandDisposables,
@@ -297,8 +311,8 @@ function registerCommands(deps: {
       await diagnostics.showFocusedTests();
     }),
 
-    vscode.commands.registerCommand("gotest.showSpecView", () => {
-      specView.show();
+    vscode.commands.registerCommand("gotest.showSpecView", async () => {
+      await specView.show();
     }),
 
     vscode.commands.registerCommand("gotest.startWatch", async () => {

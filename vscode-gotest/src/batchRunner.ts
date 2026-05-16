@@ -59,7 +59,10 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
   } = config;
 
   const importPaths = pkgInfos.map((p) => p.importPath);
-  const wildcard = filter ? undefined : computeWildcard(importPaths);
+  const modulePath = await readModulePath(workspaceDir);
+  const wildcard = filter
+    ? undefined
+    : computeWildcard(importPaths, modulePath);
   const cliPkgArgs = wildcard ? [wildcard] : importPaths;
   let coverFile: string | undefined;
 
@@ -271,5 +274,15 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         () => {},
       );
     }
+  }
+}
+
+async function readModulePath(dir: string): Promise<string | undefined> {
+  try {
+    const content = await readFile(path.join(dir, "go.mod"), "utf-8");
+    const match = /^\s*module\s+(\S+)/m.exec(content);
+    return match?.[1];
+  } catch {
+    return undefined;
   }
 }

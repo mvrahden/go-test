@@ -394,7 +394,10 @@ export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
       : filters.join("|");
 }
 
-export function computeWildcard(importPaths: string[]): string | undefined {
+export function computeWildcard(
+  importPaths: string[],
+  modulePath?: string,
+): string | undefined {
   if (importPaths.length <= 1) return undefined;
 
   const split = importPaths.map((p) => p.split("/"));
@@ -411,6 +414,7 @@ export function computeWildcard(importPaths: string[]): string | undefined {
 
   const prefix = first.slice(0, prefixLen).join("/");
   if (importPaths.every((p) => p === prefix)) return undefined;
+  if (modulePath && prefix === modulePath) return undefined;
 
   return prefix + "/...";
 }
