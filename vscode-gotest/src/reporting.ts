@@ -53,11 +53,14 @@ export async function copyCoverageSummary(
     return node;
   };
 
+  const isMultiFolder = (vscode.workspace.workspaceFolders?.length ?? 0) > 1;
+
   const relativize = (fsPath: string): string => {
     const uri = vscode.Uri.file(fsPath);
     const folder = vscode.workspace.getWorkspaceFolder(uri);
     if (folder && fsPath.startsWith(folder.uri.fsPath)) {
-      return fsPath.slice(folder.uri.fsPath.length + 1);
+      const rel = fsPath.slice(folder.uri.fsPath.length + 1);
+      return isMultiFolder ? `${folder.name}/${rel}` : rel;
     }
     return fsPath;
   };
@@ -213,7 +216,7 @@ export async function copyTestResults(
 
   const walkItem = (item: vscode.TestItem, indent: number): Agg => {
     const structural =
-      item.id.startsWith("dir:") || item.tags.some((t) => t.id === "package");
+      item.id.startsWith("dir:") || item.id.startsWith("wsFolder:") || item.tags.some((t) => t.id === "package");
     const result = structural ? undefined : resultStore.get(item.id);
 
     const rowIdx = rows.length;
