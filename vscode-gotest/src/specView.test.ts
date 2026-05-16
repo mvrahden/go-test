@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("vscode", () => ({
-  Uri: { joinPath: (...args: string[]) => ({ toString: () => args.join("/") }) },
+  Uri: {
+    joinPath: (...args: string[]) => ({ toString: () => args.join("/") }),
+  },
   workspace: {
     getConfiguration: () => ({ get: () => true }),
   },
