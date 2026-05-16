@@ -6,10 +6,6 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-func Test_Stdlib_HelloWorld(t *testing.T) {
-	t.Errorf("failed for reasons")
-}
-
 type SimpleTestSuite struct{}
 
 func (s *SimpleTestSuite) TestT(t *gotest.T) {
