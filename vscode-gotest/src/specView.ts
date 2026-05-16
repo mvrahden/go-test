@@ -87,6 +87,16 @@ export class SpecViewPanel implements vscode.Disposable {
       (msg) => {
         if (msg.type === "runTests") {
           vscode.commands.executeCommand("testing.runAll");
+        } else if (msg.type === "copySpec") {
+          if (this.lastSpecData) {
+            const text = specDataToReport(this.lastSpecData, this.modulePaths);
+            vscode.env.clipboard.writeText(text);
+          }
+        } else if (msg.type === "clearResults") {
+          this.lastSpecData = undefined;
+          if (this.panel) {
+            this.panel.webview.html = this.buildHtml({ type: "empty" });
+          }
         } else if (msg.type === "goToLocation" && msg.file && msg.line) {
           const uri = vscode.Uri.file(msg.file);
           const line = Math.max(0, msg.line - 1);
@@ -370,6 +380,10 @@ function buildToolbar(): string {
   <div class="toolbar-group search-group">
     <input type="text" class="search-input" id="search-input" placeholder="Search behaviors..." />
   </div>
+  <div class="toolbar-group">
+    <button class="tool-btn" id="copy-spec-btn" title="Copy spec as markdown">Copy</button>
+    <button class="tool-btn" id="clear-results-btn" title="Clear results">Clear</button>
+  </div>
 </div>`;
 }
 
@@ -537,6 +551,141 @@ function buildSummary(stats: SpecStats): string {
     ${stats.skipped > 0 ? `<span class="skip">${stats.skipped} skipped</span>` : ""}
   </span>
 </div>`;
+}
+
+interface LeafAgg { passed: number; failed: number; skipped: number; duration: number }
+
+function countLeaves(node: SpecNode): LeafAgg {
+  if (node.children.length === 0) {
+    return {
+      passed: node.status === "pass" ? 1 : 0,
+      failed: node.status === "fail" ? 1 : 0,
+      skipped: node.status === "skip" ? 1 : 0,
+      duration: node.duration,
+    };
+  }
+  const agg: LeafAgg = { passed: 0, failed: 0, skipped: 0, duration: 0 };
+  for (const c of node.children) {
+    const ca = countLeaves(c);
+    agg.passed += ca.passed;
+    agg.failed += ca.failed;
+    agg.skipped += ca.skipped;
+    agg.duration += ca.duration;
+  }
+  return agg;
+}
+
+function fmtAgg(a: LeafAgg): string {
+  const parts: string[] = [];
+  if (a.passed > 0) parts.push(`${a.passed} passed`);
+  if (a.failed > 0) parts.push(`${a.failed} failed`);
+  if (a.skipped > 0) parts.push(`${a.skipped} skipped`);
+  return parts.length > 0 ? parts.join(", ") : "-";
+}
+
+function fmtTime(seconds: number): string {
+  return seconds > 0 ? seconds.toFixed(3) + "s" : "-";
+}
+
+type ReportRow = { label: string; time: string; result: string };
+
+function specDataToReport(data: SpecData, modulePaths: string[]): string {
+  const rows: ReportRow[] = [];
+  const groups = groupByModule(data.packages, modulePaths);
+
+  for (const group of groups) {
+    if (groups.length > 1) {
+      const moduleAgg: LeafAgg = { passed: 0, failed: 0, skipped: 0, duration: 0 };
+      for (const e of group.entries) {
+        for (const n of e.pkg.nodes) {
+          const a = countLeaves(n);
+          moduleAgg.passed += a.passed;
+          moduleAgg.failed += a.failed;
+          moduleAgg.skipped += a.skipped;
+          moduleAgg.duration += a.duration;
+        }
+      }
+      rows.push({
+        label: group.modulePath || "unknown",
+        time: fmtTime(moduleAgg.duration),
+        result: fmtAgg(moduleAgg),
+      });
+    }
+
+    const pkgIndent = groups.length > 1 ? 1 : 0;
+    for (const entry of group.entries) {
+      const pkgAgg: LeafAgg = { passed: 0, failed: 0, skipped: 0, duration: 0 };
+      for (const n of entry.pkg.nodes) {
+        const a = countLeaves(n);
+        pkgAgg.passed += a.passed;
+        pkgAgg.failed += a.failed;
+        pkgAgg.skipped += a.skipped;
+        pkgAgg.duration += a.duration;
+      }
+      rows.push({
+        label: "  ".repeat(pkgIndent) + entry.displayPath,
+        time: fmtTime(entry.pkg.duration),
+        result: fmtAgg(pkgAgg),
+      });
+      for (const node of entry.pkg.nodes) {
+        walkReportNode(rows, node, pkgIndent + 1);
+      }
+    }
+  }
+
+  const maxLabelLen = Math.max(8, ...rows.map((r) => r.label.length));
+  const header = `${"Behavior".padEnd(maxLabelLen)}  Time       Result`;
+  const separator = "-".repeat(header.length);
+
+  const lines = [header, separator];
+  for (const row of rows) {
+    lines.push(`${row.label.padEnd(maxLabelLen)}  ${row.time.padEnd(9)}  ${row.result}`);
+  }
+  lines.push(separator);
+
+  const stats = data.stats;
+  const counts: string[] = [];
+  if (stats.suites > 0) counts.push(`${stats.suites} suites`);
+  if (stats.behaviors > 0) counts.push(`${stats.behaviors} behaviors`);
+  if (stats.tests > 0) counts.push(`${stats.tests} stdlib tests`);
+  const results: string[] = [];
+  if (stats.passed > 0) results.push(`${stats.passed} passed`);
+  if (stats.failed > 0) results.push(`${stats.failed} failed`);
+  if (stats.skipped > 0) results.push(`${stats.skipped} skipped`);
+  const totalDur = data.packages.reduce((s, p) => s + p.duration, 0);
+  lines.push(`${counts.join(", ")}: ${results.join(", ")} (${fmtTime(totalDur)})`);
+
+  return lines.join("\n");
+}
+
+function walkReportNode(rows: ReportRow[], node: SpecNode, indent: number): void {
+  if (node.kind === "fixture") {
+    for (const c of node.children) walkReportNode(rows, c, indent);
+    return;
+  }
+
+  let label = node.display;
+  if (node.focused) label += " — FOCUSED";
+  else if (node.excluded) label += " — SKIPPED";
+
+  if (node.children.length === 0) {
+    rows.push({
+      label: "  ".repeat(indent) + label,
+      time: fmtTime(node.duration),
+      result: node.status,
+    });
+    return;
+  }
+
+  const agg = countLeaves(node);
+  rows.push({
+    label: "  ".repeat(indent) + label,
+    time: fmtTime(agg.duration),
+    result: fmtAgg(agg),
+  });
+  for (const c of node.children) {
+    walkReportNode(rows, c, indent + 1);
+  }
 }
 
 function escapeHtml(s: string): string {
@@ -825,6 +974,15 @@ document.addEventListener('click', (e) => {
       e.stopPropagation();
       return;
     }
+  }
+  if (t.id === 'copy-spec-btn') {
+    vscode.postMessage({ type: 'copySpec' });
+    return;
+  }
+  if (t.id === 'clear-results-btn') {
+    vscode.setState(null);
+    vscode.postMessage({ type: 'clearResults' });
+    return;
   }
   if (t.id === 'expand-all-btn') {
     document.querySelectorAll('details.branch, details.pkg-section, details.module-section').forEach(d => d.open = true);
