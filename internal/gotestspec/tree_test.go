@@ -332,6 +332,87 @@ func TestSplitTestPath(t *testing.T) {
 	}
 }
 
+func TestBuildTree_DuplicateSuite_PtestPxtest(t *testing.T) {
+	// Simulates same-named suite in ptest and pxtest. Go runs both and appends
+	// #01 to subtests of the second run.
+	input := `{"Action":"run","Package":"example.com/stdlib","Test":"TestUnitTestSuite"}
+{"Action":"run","Package":"example.com/stdlib","Test":"TestUnitTestSuite/TestCreate"}
+{"Action":"pass","Package":"example.com/stdlib","Test":"TestUnitTestSuite/TestCreate","Elapsed":0.01}
+{"Action":"run","Package":"example.com/stdlib","Test":"TestUnitTestSuite/TestReady"}
+{"Action":"pass","Package":"example.com/stdlib","Test":"TestUnitTestSuite/TestReady","Elapsed":0.01}
+{"Action":"pass","Package":"example.com/stdlib","Test":"TestUnitTestSuite","Elapsed":0.02}
+{"Action":"run","Package":"example.com/stdlib","Test":"TestUnitTestSuite"}
+{"Action":"run","Package":"example.com/stdlib","Test":"TestUnitTestSuite/TestCreate#01"}
+{"Action":"pass","Package":"example.com/stdlib","Test":"TestUnitTestSuite/TestCreate#01","Elapsed":0.01}
+{"Action":"run","Package":"example.com/stdlib","Test":"TestUnitTestSuite/TestReady#01"}
+{"Action":"pass","Package":"example.com/stdlib","Test":"TestUnitTestSuite/TestReady#01","Elapsed":0.01}
+{"Action":"pass","Package":"example.com/stdlib","Test":"TestUnitTestSuite","Elapsed":0.02}
+{"Action":"pass","Package":"example.com/stdlib","Elapsed":0.05}`
+
+	events, err := ParseEvents(strings.NewReader(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tree := BuildTree(events)
+	if len(tree) != 1 {
+		t.Fatalf("expected 1 package, got %d", len(tree))
+	}
+	pkg := tree[0]
+
+	// Should produce 2 separate suite nodes, not 1 merged one.
+	if len(pkg.Nodes) != 2 {
+		t.Fatalf("expected 2 root nodes, got %d", len(pkg.Nodes))
+	}
+
+	suite1 := pkg.Nodes[0]
+	suite2 := pkg.Nodes[1]
+
+	if suite1.Kind != KindSuite {
+		t.Errorf("suite1 kind = %d, want KindSuite", suite1.Kind)
+	}
+	if suite2.Kind != KindSuite {
+		t.Errorf("suite2 kind = %d, want KindSuite", suite2.Kind)
+	}
+	if suite1.Display != "Unit" {
+		t.Errorf("suite1 display = %q, want Unit", suite1.Display)
+	}
+	if suite2.Display != "Unit" {
+		t.Errorf("suite2 display = %q, want Unit", suite2.Display)
+	}
+
+	// Each suite should have 2 methods (not 4 merged).
+	if len(suite1.Children) != 2 {
+		t.Fatalf("suite1 expected 2 children, got %d", len(suite1.Children))
+	}
+	if len(suite2.Children) != 2 {
+		t.Fatalf("suite2 expected 2 children, got %d", len(suite2.Children))
+	}
+
+	// Children of suite2 should NOT have #01 suffix.
+	for _, c := range suite2.Children {
+		if strings.Contains(c.Name, "#") {
+			t.Errorf("suite2 child %q still has # suffix", c.Name)
+		}
+		if strings.Contains(c.Display, "#") {
+			t.Errorf("suite2 child display %q still has # suffix", c.Display)
+		}
+	}
+
+	// suite2 should be marked as variant 2.
+	if suite2.Variant != 2 {
+		t.Errorf("suite2 variant = %d, want 2", suite2.Variant)
+	}
+
+	// Both should have pass status.
+	if suite1.Status != StatusPass {
+		t.Errorf("suite1 status = %d, want StatusPass", suite1.Status)
+	}
+	if suite2.Status != StatusPass {
+		t.Errorf("suite2 status = %d, want StatusPass", suite2.Status)
+	}
+}
+
 func TestClassify_ParallelMethod(t *testing.T) {
 	input := `{"Action":"run","Package":"p","Test":"TestMyTestSuite"}
 {"Action":"run","Package":"p","Test":"TestMyTestSuite/TestParallelCreate"}
