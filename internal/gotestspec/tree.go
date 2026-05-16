@@ -27,15 +27,17 @@ const (
 )
 
 type Node struct {
-	Name     string
-	Display  string
-	Kind     NodeKind
-	Status   Status
-	Duration time.Duration
-	Output   []string
-	Children []*Node
-	Focused  bool
-	Excluded bool
+	Name      string
+	Display   string
+	Kind      NodeKind
+	Status    Status
+	Duration  time.Duration
+	Output    []string
+	Children  []*Node
+	Focused   bool
+	Excluded  bool
+	Variant   int
+	duplicate bool
 }
 
 type Package struct {
@@ -61,6 +63,8 @@ func (s Stats) Total() int {
 func BuildTree(events []TestEvent) []*Package {
 	pkgs := map[string]*Package{}
 	nodes := map[string]map[string]*Node{}
+	// Track top-level test run counts per package to detect ptest/pxtest duplicates.
+	topRunCount := map[string]map[string]int{}
 
 	for _, ev := range events {
 		pkg := pkgs[ev.Package]
@@ -68,6 +72,7 @@ func BuildTree(events []TestEvent) []*Package {
 			pkg = &Package{Path: ev.Package}
 			pkgs[ev.Package] = pkg
 			nodes[ev.Package] = map[string]*Node{}
+			topRunCount[ev.Package] = map[string]int{}
 		}
 
 		if ev.Test == "" {
@@ -81,22 +86,51 @@ func BuildTree(events []TestEvent) []*Package {
 		segments := splitTestPath(ev.Test)
 		nmap := nodes[ev.Package]
 
-		for i := range segments {
-			path := strings.Join(segments[:i+1], "/")
+		// Detect duplicate top-level run (ptest/pxtest same-name suite).
+		if ev.Action == ActionRun && len(segments) == 1 {
+			topRunCount[ev.Package][segments[0]]++
+			if topRunCount[ev.Package][segments[0]] > 1 {
+				// Create a duplicate node; children with #NN suffixes will attach here.
+				dup := &Node{Name: segments[0], duplicate: true}
+				dupPath := segments[0] + "\x00dup"
+				nmap[dupPath] = dup
+				pkg.Nodes = append(pkg.Nodes, dup)
+				continue
+			}
+		}
+
+		// Resolve parent for children with #NN suffix (belongs to duplicate node).
+		resolvedSegments := segments
+		if len(segments) > 1 {
+			resolvedSegments = resolveDuplicateSegments(segments, nmap)
+		}
+
+		for i := range resolvedSegments {
+			path := strings.Join(resolvedSegments[:i+1], "/")
 			if nmap[path] != nil {
 				continue
 			}
-			n := &Node{Name: segments[i]}
+			name := resolvedSegments[i]
+			// Strip #NN suffix from display for children of duplicate runs.
+			cleanName := stripDuplicateSuffix(name)
+			n := &Node{Name: cleanName}
 			nmap[path] = n
 			if i == 0 {
 				pkg.Nodes = append(pkg.Nodes, n)
 			} else {
-				parent := nmap[strings.Join(segments[:i], "/")]
+				parent := nmap[strings.Join(resolvedSegments[:i], "/")]
 				parent.Children = append(parent.Children, n)
 			}
 		}
 
-		node := nmap[ev.Test]
+		node := nmap[strings.Join(resolvedSegments, "/")]
+		// Route top-level pass/fail/output to duplicate if original already resolved.
+		if len(resolvedSegments) == 1 && node.Status != StatusNone {
+			dupPath := resolvedSegments[0] + "\x00dup"
+			if dup := nmap[dupPath]; dup != nil {
+				node = dup
+			}
+		}
 		switch ev.Action {
 		case ActionOutput:
 			node.Output = append(node.Output, ev.Output)
@@ -107,8 +141,13 @@ func BuildTree(events []TestEvent) []*Package {
 	}
 
 	for _, pkg := range pkgs {
+		seen := map[string]int{}
 		for _, n := range pkg.Nodes {
 			classify(n, true)
+			seen[n.Name]++
+			if n.duplicate {
+				n.Variant = seen[n.Name]
+			}
 		}
 	}
 
@@ -123,6 +162,61 @@ func BuildTree(events []TestEvent) []*Package {
 		return result[i].Path < result[j].Path
 	})
 	return result
+}
+
+// resolveDuplicateSegments checks if a child path belongs to a duplicate
+// top-level node (parent has #NN suffix pattern) and remaps it.
+func resolveDuplicateSegments(segments []string, nmap map[string]*Node) []string {
+	topName := segments[0]
+	dupPath := topName + "\x00dup"
+	if nmap[dupPath] == nil {
+		return segments
+	}
+
+	// Check if any child segment has the #NN suffix indicating it belongs to
+	// the duplicate run.
+	for _, seg := range segments[1:] {
+		if hasDuplicateSuffix(seg) {
+			out := make([]string, len(segments))
+			out[0] = topName + "\x00dup"
+			for i := 1; i < len(segments); i++ {
+				out[i] = stripDuplicateSuffix(segments[i])
+			}
+			return out
+		}
+	}
+	return segments
+}
+
+func hasDuplicateSuffix(s string) bool {
+	idx := strings.LastIndex(s, "#")
+	if idx < 0 {
+		return false
+	}
+	suffix := s[idx+1:]
+	if len(suffix) == 0 {
+		return false
+	}
+	for _, c := range suffix {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func stripDuplicateSuffix(s string) string {
+	idx := strings.LastIndex(s, "#")
+	if idx < 0 {
+		return s
+	}
+	suffix := s[idx+1:]
+	for _, c := range suffix {
+		if c < '0' || c > '9' {
+			return s
+		}
+	}
+	return s[:idx]
 }
 
 func CollectStats(packages []*Package) Stats {
