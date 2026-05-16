@@ -17,15 +17,16 @@ export class SpecViewPanel implements vscode.Disposable {
     private readonly cache?: DiscoveryCache,
   ) {
     if (cache) {
-      this.disposables.push(
-        cache.onDidUpdate(() => this.rebuildIfVisible()),
-      );
+      this.disposables.push(cache.onDidUpdate(() => this.rebuildIfVisible()));
     }
   }
 
   private rebuildIfVisible(): void {
     if (!this.panel || !this.lastSpecData) return;
-    this.panel.webview.html = this.buildHtml({ type: "specData", data: this.lastSpecData });
+    this.panel.webview.html = this.buildHtml({
+      type: "specData",
+      data: this.lastSpecData,
+    });
   }
 
   setExtensionUri(uri: vscode.Uri): void {
@@ -42,13 +43,19 @@ export class SpecViewPanel implements vscode.Disposable {
     await this.resolveModulePaths();
 
     if (this.lastSpecData) {
-      this.panel!.webview.html = this.buildHtml({ type: "specData", data: this.lastSpecData });
+      this.panel!.webview.html = this.buildHtml({
+        type: "specData",
+        data: this.lastSpecData,
+      });
     } else {
       this.panel!.webview.html = this.buildHtml({ type: "empty" });
     }
   }
 
-  async restorePanel(panel: vscode.WebviewPanel, state: unknown): Promise<void> {
+  async restorePanel(
+    panel: vscode.WebviewPanel,
+    state: unknown,
+  ): Promise<void> {
     this.panel = panel;
     this.wirePanel();
     await this.resolveModulePaths();
@@ -56,9 +63,15 @@ export class SpecViewPanel implements vscode.Disposable {
     const specData = parseStoredState(state);
     if (specData) {
       this.lastSpecData = specData;
-      this.panel.webview.html = this.buildHtml({ type: "specData", data: specData });
+      this.panel.webview.html = this.buildHtml({
+        type: "specData",
+        data: specData,
+      });
     } else if (this.lastSpecData) {
-      this.panel.webview.html = this.buildHtml({ type: "specData", data: this.lastSpecData });
+      this.panel.webview.html = this.buildHtml({
+        type: "specData",
+        data: this.lastSpecData,
+      });
     } else {
       this.panel.webview.html = this.buildHtml({ type: "empty" });
     }
@@ -67,16 +80,18 @@ export class SpecViewPanel implements vscode.Disposable {
   private createPanel(): void {
     const localResourceRoots: vscode.Uri[] = [];
     if (this.extensionUri) {
-      localResourceRoots.push(
-        vscode.Uri.joinPath(this.extensionUri, "static"),
-      );
+      localResourceRoots.push(vscode.Uri.joinPath(this.extensionUri, "static"));
     }
 
     this.panel = vscode.window.createWebviewPanel(
       "gotestSpecView",
       "Go Test: Spec View",
       vscode.ViewColumn.Beside,
-      { enableScripts: true, retainContextWhenHidden: true, localResourceRoots },
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots,
+      },
     );
 
     this.wirePanel();
@@ -104,16 +119,21 @@ export class SpecViewPanel implements vscode.Disposable {
           const other = vscode.window.visibleTextEditors.find(
             (e) => e.viewColumn !== undefined && e.viewColumn !== specColumn,
           );
-          const viewColumn = other?.viewColumn
-            ?? (specColumn === vscode.ViewColumn.One
+          const viewColumn =
+            other?.viewColumn ??
+            (specColumn === vscode.ViewColumn.One
               ? vscode.ViewColumn.Beside
               : vscode.ViewColumn.One);
-          vscode.window.showTextDocument(uri, {
-            viewColumn,
-            selection: new vscode.Range(line, 0, line, 0),
-          }).then(undefined, (err: unknown) => {
-            this.outputChannel.error(`[specView] showTextDocument failed: ${err}`);
-          });
+          vscode.window
+            .showTextDocument(uri, {
+              viewColumn,
+              selection: new vscode.Range(line, 0, line, 0),
+            })
+            .then(undefined, (err: unknown) => {
+              this.outputChannel.error(
+                `[specView] showTextDocument failed: ${err}`,
+              );
+            });
         }
       },
       null,
@@ -199,9 +219,15 @@ export class SpecViewPanel implements vscode.Disposable {
     for (const pkg of this.cache.packages) {
       for (const suite of pkg.suites) {
         const testName = `Test${suite.name}`;
-        map[testName] = { file: path.join(pkg.dir, suite.file), line: suite.line };
+        map[testName] = {
+          file: path.join(pkg.dir, suite.file),
+          line: suite.line,
+        };
         for (const method of suite.methods) {
-          map[`${testName}/${method.name}`] = { file: path.join(pkg.dir, method.file), line: method.line };
+          map[`${testName}/${method.name}`] = {
+            file: path.join(pkg.dir, method.file),
+            line: method.line,
+          };
         }
       }
     }
@@ -219,7 +245,9 @@ export class SpecViewPanel implements vscode.Disposable {
   private getGopherUri(): string {
     if (!this.panel || !this.extensionUri) return "";
     return this.panel.webview
-      .asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "static", "icon.png"))
+      .asWebviewUri(
+        vscode.Uri.joinPath(this.extensionUri, "static", "icon.png"),
+      )
       .toString();
   }
 
@@ -234,9 +262,8 @@ export class SpecViewPanel implements vscode.Disposable {
       msg.type === "empty"
         ? buildEmptyBody(gopherUri)
         : buildSpecBody(msg.data, this.modulePaths, locationMap);
-    const stateJson = msg.type === "specData"
-      ? JSON.stringify(msg.data)
-      : "null";
+    const stateJson =
+      msg.type === "specData" ? JSON.stringify(msg.data) : "null";
 
     return `<!DOCTYPE html>
 <html>
@@ -344,14 +371,22 @@ function buildEmptyBody(gopherUri: string): string {
 
 type LocationMap = Record<string, { file: string; line: number }>;
 
-function buildSpecBody(data: SpecData, modulePaths: string[], locationMap: LocationMap): string {
+function buildSpecBody(
+  data: SpecData,
+  modulePaths: string[],
+  locationMap: LocationMap,
+): string {
   const toolbar = buildToolbar();
   const groups = groupByModule(data.packages, modulePaths);
   let tree: string;
   if (groups.length === 1 && groups[0].entries.length === 1) {
-    tree = groups[0].entries[0].pkg.nodes.map((n) => buildNodeHtml(n, "", locationMap)).join("");
+    tree = groups[0].entries[0].pkg.nodes
+      .map((n) => buildNodeHtml(n, "", locationMap))
+      .join("");
   } else if (groups.length === 1) {
-    tree = groups[0].entries.map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, locationMap)).join("");
+    tree = groups[0].entries
+      .map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, locationMap))
+      .join("");
   } else {
     tree = groups.map((g) => buildModuleSectionHtml(g, locationMap)).join("");
   }
@@ -389,43 +424,68 @@ interface ModuleGroup {
   entries: Array<{ pkg: SpecPackage; displayPath: string }>;
 }
 
-function groupByModule(packages: SpecPackage[], modulePaths: string[]): ModuleGroup[] {
+function groupByModule(
+  packages: SpecPackage[],
+  modulePaths: string[],
+): ModuleGroup[] {
   const sorted = [...modulePaths].sort((a, b) => b.length - a.length);
   const groups = new Map<string, ModuleGroup>();
   for (const pkg of packages) {
-    const mod = sorted.find((m) => pkg.path === m || pkg.path.startsWith(m + "/")) ?? "";
+    const mod =
+      sorted.find((m) => pkg.path === m || pkg.path.startsWith(m + "/")) ?? "";
     let group = groups.get(mod);
     if (!group) {
       group = { modulePath: mod, entries: [] };
       groups.set(mod, group);
     }
-    const displayPath = mod && pkg.path.length > mod.length
-      ? pkg.path.slice(mod.length + 1)
-      : pkg.path;
+    const displayPath =
+      mod && pkg.path.length > mod.length
+        ? pkg.path.slice(mod.length + 1)
+        : pkg.path;
     group.entries.push({ pkg, displayPath });
   }
   return Array.from(groups.values());
 }
 
-function buildPackageSectionHtml(displayPath: string, pkg: SpecPackage, locationMap: LocationMap): string {
-  const nodes = pkg.nodes.map((n) => buildNodeHtml(n, "", locationMap)).join("");
+function buildPackageSectionHtml(
+  displayPath: string,
+  pkg: SpecPackage,
+  locationMap: LocationMap,
+): string {
+  const nodes = pkg.nodes
+    .map((n) => buildNodeHtml(n, "", locationMap))
+    .join("");
   return `<details class="pkg-section" open>
   <summary class="pkg-header">${escapeHtml(displayPath)}</summary>
   ${nodes}
 </details>`;
 }
 
-function buildModuleSectionHtml(group: ModuleGroup, locationMap: LocationMap): string {
-  const inner = group.entries.length === 1
-    ? group.entries[0].pkg.nodes.map((n) => buildNodeHtml(n, "", locationMap)).join("")
-    : group.entries.map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, locationMap)).join("");
+function buildModuleSectionHtml(
+  group: ModuleGroup,
+  locationMap: LocationMap,
+): string {
+  const inner =
+    group.entries.length === 1
+      ? group.entries[0].pkg.nodes
+          .map((n) => buildNodeHtml(n, "", locationMap))
+          .join("")
+      : group.entries
+          .map((e) =>
+            buildPackageSectionHtml(e.displayPath, e.pkg, locationMap),
+          )
+          .join("");
   return `<details class="module-section" open>
   <summary class="module-header">${escapeHtml(group.modulePath || "unknown")}</summary>
   ${inner}
 </details>`;
 }
 
-function buildNodeHtml(node: SpecNode, parentName: string, locationMap: LocationMap): string {
+function buildNodeHtml(
+  node: SpecNode,
+  parentName: string,
+  locationMap: LocationMap,
+): string {
   if (node.children.length === 0) {
     return buildLeafHtml(node, parentName, locationMap);
   }
@@ -442,7 +502,12 @@ function locationKey(node: SpecNode, parentName: string): string {
   return "";
 }
 
-function buildIconHtml(status: string, node: SpecNode, parentName: string, locationMap: LocationMap): string {
+function buildIconHtml(
+  status: string,
+  node: SpecNode,
+  parentName: string,
+  locationMap: LocationMap,
+): string {
   const icon = statusIcon(status);
   const key = locationKey(node, parentName);
   const loc = key ? locationMap[key] : undefined;
@@ -455,11 +520,14 @@ function buildIconHtml(status: string, node: SpecNode, parentName: string, locat
   return `<span class="icon ${status}"${locAttrs}><span class="status-text">${icon}</span>${gotoSpan}</span>`;
 }
 
-function buildLeafHtml(node: SpecNode, parentName: string, locationMap: LocationMap): string {
+function buildLeafHtml(
+  node: SpecNode,
+  parentName: string,
+  locationMap: LocationMap,
+): string {
   const iconHtml = buildIconHtml(node.status, node, parentName, locationMap);
   const dur = formatDuration(node.duration);
-  const suffix =
-    node.excluded || node.status === "skip" ? " — SKIPPED" : "";
+  const suffix = node.excluded || node.status === "skip" ? " — SKIPPED" : "";
 
   let errorBlock = "";
   if (node.status === "fail" && node.output.length > 0) {
@@ -479,13 +547,19 @@ function buildLeafHtml(node: SpecNode, parentName: string, locationMap: Location
 </div>`;
 }
 
-function buildBranchHtml(node: SpecNode, parentName: string, locationMap: LocationMap): string {
+function buildBranchHtml(
+  node: SpecNode,
+  parentName: string,
+  locationMap: LocationMap,
+): string {
   const shouldOpen = hasFailure(node);
   const openAttr = shouldOpen ? " open" : "";
   const status = derivedStatus(node);
   const iconHtml = buildIconHtml(status, node, parentName, locationMap);
   const selfName = node.name;
-  const children = node.children.map((c) => buildNodeHtml(c, selfName, locationMap)).join("");
+  const children = node.children
+    .map((c) => buildNodeHtml(c, selfName, locationMap))
+    .join("");
 
   let label = escapeHtml(node.display);
   if (
@@ -513,17 +587,33 @@ function hasFailure(node: SpecNode): boolean {
 }
 
 function derivedStatus(node: SpecNode): string {
-  if (node.children.some((c) => c.status === "fail" || derivedStatus(c) === "fail")) return "fail";
-  if (node.children.every((c) => c.status === "skip" || (c.children.length > 0 && derivedStatus(c) === "skip"))) return "skip";
+  if (
+    node.children.some(
+      (c) => c.status === "fail" || derivedStatus(c) === "fail",
+    )
+  )
+    return "fail";
+  if (
+    node.children.every(
+      (c) =>
+        c.status === "skip" ||
+        (c.children.length > 0 && derivedStatus(c) === "skip"),
+    )
+  )
+    return "skip";
   return "pass";
 }
 
 function statusIcon(status: string): string {
   switch (status) {
-    case "pass": return "✓";
-    case "fail": return "✗";
-    case "skip": return "~";
-    default: return "?";
+    case "pass":
+      return "✓";
+    case "fail":
+      return "✗";
+    case "skip":
+      return "~";
+    default:
+      return "?";
   }
 }
 
@@ -550,7 +640,12 @@ function buildSummary(stats: SpecStats): string {
 </div>`;
 }
 
-interface LeafAgg { passed: number; failed: number; skipped: number; duration: number }
+interface LeafAgg {
+  passed: number;
+  failed: number;
+  skipped: number;
+  duration: number;
+}
 
 function countLeaves(node: SpecNode): LeafAgg {
   if (node.children.length === 0) {
@@ -592,7 +687,12 @@ function specDataToReport(data: SpecData, modulePaths: string[]): string {
 
   for (const group of groups) {
     if (groups.length > 1) {
-      const moduleAgg: LeafAgg = { passed: 0, failed: 0, skipped: 0, duration: 0 };
+      const moduleAgg: LeafAgg = {
+        passed: 0,
+        failed: 0,
+        skipped: 0,
+        duration: 0,
+      };
       for (const e of group.entries) {
         for (const n of e.pkg.nodes) {
           const a = countLeaves(n);
@@ -636,7 +736,9 @@ function specDataToReport(data: SpecData, modulePaths: string[]): string {
 
   const lines = [header, separator];
   for (const row of rows) {
-    lines.push(`${row.label.padEnd(maxLabelLen)}  ${row.time.padEnd(9)}  ${row.result}`);
+    lines.push(
+      `${row.label.padEnd(maxLabelLen)}  ${row.time.padEnd(9)}  ${row.result}`,
+    );
   }
   lines.push(separator);
 
@@ -650,12 +752,18 @@ function specDataToReport(data: SpecData, modulePaths: string[]): string {
   if (stats.failed > 0) results.push(`${stats.failed} failed`);
   if (stats.skipped > 0) results.push(`${stats.skipped} skipped`);
   const totalDur = data.packages.reduce((s, p) => s + p.duration, 0);
-  lines.push(`${counts.join(", ")}: ${results.join(", ")} (${fmtTime(totalDur)})`);
+  lines.push(
+    `${counts.join(", ")}: ${results.join(", ")} (${fmtTime(totalDur)})`,
+  );
 
   return lines.join("\n");
 }
 
-function walkReportNode(rows: ReportRow[], node: SpecNode, indent: number): void {
+function walkReportNode(
+  rows: ReportRow[],
+  node: SpecNode,
+  indent: number,
+): void {
   if (node.kind === "fixture") {
     for (const c of node.children) walkReportNode(rows, c, indent);
     return;
@@ -706,7 +814,8 @@ function parseStoredState(state: unknown): SpecData | undefined {
 }
 
 function getNonce(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let result = "";
   for (let i = 0; i < 32; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));

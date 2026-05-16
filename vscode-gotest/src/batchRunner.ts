@@ -60,7 +60,9 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
 
   const importPaths = pkgInfos.map((p) => p.importPath);
   const modulePath = await readModulePath(workspaceDir);
-  const wildcard = filter ? undefined : computeWildcard(importPaths, modulePath);
+  const wildcard = filter
+    ? undefined
+    : computeWildcard(importPaths, modulePath);
   const cliPkgArgs = wildcard ? [wildcard] : importPaths;
   let coverFile: string | undefined;
 
