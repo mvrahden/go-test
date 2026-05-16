@@ -301,6 +301,26 @@ function registerCommands(deps: {
       },
     ),
 
+    vscode.commands.registerCommand(
+      "gotest.runFile",
+      async (suiteIds: string[]) => {
+        const items = suiteIds
+          .map((id) => controller.findItem(id))
+          .filter((item): item is vscode.TestItem => item !== undefined);
+        if (items.length === 0) {
+          outputChannel.warn(`[command] runFile: no items found`);
+          return;
+        }
+        const cts = new vscode.CancellationTokenSource();
+        try {
+          const request = new vscode.TestRunRequest(items);
+          await runner.run(request, cts.token);
+        } finally {
+          cts.dispose();
+        }
+      },
+    ),
+
     vscode.commands.registerCommand("gotest.refreshTests", async () => {
       for (const folder of vscode.workspace.workspaceFolders ?? []) {
         await discoveryService.discover(folder.uri.fsPath);
