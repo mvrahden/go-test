@@ -1,13 +1,18 @@
 import * as vscode from "vscode";
 import { spawn } from "node:child_process";
 import { buildCliCommand } from "./cli.js";
+import type { DiscoveryCache } from "./discovery.js";
 
 export class SpecViewPanel implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private disposables: vscode.Disposable[] = [];
   private extensionUri: vscode.Uri | undefined;
+  private lastSpecData: SpecData | undefined;
 
-  constructor(private readonly outputChannel: vscode.LogOutputChannel) {}
+  constructor(
+    private readonly outputChannel: vscode.LogOutputChannel,
+    private readonly cache?: DiscoveryCache,
+  ) {}
 
   setExtensionUri(uri: vscode.Uri): void {
     this.extensionUri = uri;
@@ -19,6 +24,31 @@ export class SpecViewPanel implements vscode.Disposable {
       return;
     }
 
+    this.createPanel();
+
+    if (this.lastSpecData) {
+      this.panel!.webview.html = this.buildHtml({ type: "specData", data: this.lastSpecData });
+    } else {
+      this.panel!.webview.html = this.buildHtml({ type: "empty" });
+    }
+  }
+
+  restorePanel(panel: vscode.WebviewPanel, state: unknown): void {
+    this.panel = panel;
+    this.wirePanel();
+
+    const specData = parseStoredState(state);
+    if (specData) {
+      this.lastSpecData = specData;
+      this.panel.webview.html = this.buildHtml({ type: "specData", data: specData });
+    } else if (this.lastSpecData) {
+      this.panel.webview.html = this.buildHtml({ type: "specData", data: this.lastSpecData });
+    } else {
+      this.panel.webview.html = this.buildHtml({ type: "empty" });
+    }
+  }
+
+  private createPanel(): void {
     const localResourceRoots: vscode.Uri[] = [];
     if (this.extensionUri) {
       localResourceRoots.push(
@@ -30,28 +60,36 @@ export class SpecViewPanel implements vscode.Disposable {
       "gotestSpecView",
       "Go Test: Spec View",
       vscode.ViewColumn.Beside,
-      { enableScripts: true, localResourceRoots },
+      { enableScripts: true, retainContextWhenHidden: true, localResourceRoots },
     );
 
-    this.panel.webview.onDidReceiveMessage(
+    this.wirePanel();
+  }
+
+  private wirePanel(): void {
+    this.panel!.webview.onDidReceiveMessage(
       (msg) => {
         if (msg.type === "runTests") {
           vscode.commands.executeCommand("testing.runAll");
+        } else if (msg.type === "goToLocation" && msg.file && msg.line) {
+          const uri = vscode.Uri.file(msg.file);
+          const line = Math.max(0, msg.line - 1);
+          vscode.window.showTextDocument(uri, {
+            selection: new vscode.Range(line, 0, line, 0),
+          });
         }
       },
       null,
       this.disposables,
     );
 
-    this.panel.onDidDispose(
+    this.panel!.onDidDispose(
       () => {
         this.panel = undefined;
       },
       null,
       this.disposables,
     );
-
-    this.panel.webview.html = this.buildHtml({ type: "empty" });
   }
 
   get isVisible(): boolean {
@@ -59,26 +97,38 @@ export class SpecViewPanel implements vscode.Disposable {
   }
 
   async refresh(jsonOutput: string): Promise<void> {
-    const autoRefresh =
-      vscode.workspace
-        .getConfiguration("gotest")
-        .get<boolean>("specView.autoRefresh") ?? true;
-
-    if (!autoRefresh || !this.panel) {
-      return;
-    }
-
     try {
       const raw = await this.runSpecFromInput(jsonOutput);
-      const data = JSON.parse(raw);
-      this.panel.webview.html = this.buildHtml({
-        type: "specData",
-        data,
-      });
+      const data: SpecData = JSON.parse(raw);
+      this.lastSpecData = data;
+
+      if (!this.panel) return;
+      const autoRefresh =
+        vscode.workspace
+          .getConfiguration("gotest")
+          .get<boolean>("specView.autoRefresh") ?? true;
+      if (!autoRefresh) return;
+
+      this.panel.webview.html = this.buildHtml({ type: "specData", data });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.outputChannel.error(`[specView] ${message}`);
     }
+  }
+
+  private buildLocationMap(): Record<string, { file: string; line: number }> {
+    const map: Record<string, { file: string; line: number }> = {};
+    if (!this.cache) return map;
+    for (const pkg of this.cache.packages) {
+      for (const suite of pkg.suites) {
+        const testName = `Test${suite.name}`;
+        map[testName] = { file: suite.file, line: suite.line };
+        for (const method of suite.methods) {
+          map[`${testName}/${method.name}`] = { file: method.file, line: method.line };
+        }
+      }
+    }
+    return map;
   }
 
   dispose(): void {
@@ -101,11 +151,15 @@ export class SpecViewPanel implements vscode.Disposable {
   ): string {
     const gopherUri = this.getGopherUri();
     const nonce = getNonce();
+    const locationMap = this.buildLocationMap();
 
     const body =
       msg.type === "empty"
         ? buildEmptyBody(gopherUri)
         : buildSpecBody(msg.data);
+    const stateJson = msg.type === "specData"
+      ? JSON.stringify(msg.data)
+      : "null";
 
     return `<!DOCTYPE html>
 <html>
@@ -119,6 +173,8 @@ ${CSS}
 <body>
 ${body}
 <script nonce="${nonce}">
+const LOCATION_MAP = ${JSON.stringify(locationMap)};
+const SPEC_STATE = ${stateJson};
 ${SCRIPT}
 </script>
 </body>
@@ -200,7 +256,7 @@ function buildEmptyBody(gopherUri: string): string {
   ${img}
   <h1 class="empty-title">Behavioral Specification</h1>
   <p class="empty-text">Run your tests to see the spec view.<br/>Each suite, method, and behavior will appear here as an interactive tree.</p>
-  <button class="empty-button" onclick="postRunTests()">Run Tests</button>
+  <button class="empty-button" id="run-tests-btn">Run Tests</button>
   <div class="empty-legend">
     <span class="legend-item pass">✓ passed</span>
     <span class="legend-item fail">✗ failed</span>
@@ -223,37 +279,53 @@ function buildSpecBody(data: SpecData): string {
 function buildToolbar(): string {
   return `<div class="toolbar">
   <div class="toolbar-group">
-    <button class="tool-btn" onclick="expandAll()" title="Expand all">▼ All</button>
-    <button class="tool-btn" onclick="collapseAll()" title="Collapse all">▲ None</button>
+    <button class="tool-btn" id="expand-all-btn" title="Expand all">▼ All</button>
+    <button class="tool-btn" id="collapse-all-btn" title="Collapse all">▲ None</button>
   </div>
   <div class="toolbar-group">
-    <button class="filter-btn pass active" onclick="toggleFilter('pass')" title="Toggle passed">✓</button>
-    <button class="filter-btn fail active" onclick="toggleFilter('fail')" title="Toggle failed">✗</button>
-    <button class="filter-btn skip active" onclick="toggleFilter('skip')" title="Toggle skipped">~</button>
+    <button class="filter-btn pass active" data-filter="pass" title="Toggle passed">✓</button>
+    <button class="filter-btn fail active" data-filter="fail" title="Toggle failed">✗</button>
+    <button class="filter-btn skip active" data-filter="skip" title="Toggle skipped">~</button>
   </div>
   <div class="toolbar-group search-group">
-    <input type="text" class="search-input" id="search-input" placeholder="Search behaviors..." oninput="onSearchInput()" />
+    <input type="text" class="search-input" id="search-input" placeholder="Search behaviors..." />
   </div>
 </div>`;
 }
 
 function buildPackageHtml(pkg: SpecPackage, multiPkg: boolean): string {
   const header = multiPkg ? `<div class="pkg-header">=== ${escapeHtml(pkg.path)} ===</div>` : "";
-  const nodes = pkg.nodes.map((n) => buildNodeHtml(n, 0)).join("");
+  const nodes = pkg.nodes.map((n) => buildNodeHtml(n, "")).join("");
   return `${header}${nodes}`;
 }
 
-function buildNodeHtml(node: SpecNode, depth: number): string {
-  const isLeaf = node.children.length === 0;
-
-  if (isLeaf) {
-    return buildLeafHtml(node, depth);
+function buildNodeHtml(node: SpecNode, parentName: string): string {
+  if (node.children.length === 0) {
+    return buildLeafHtml(node, parentName);
   }
-  return buildBranchHtml(node, depth);
+  return buildBranchHtml(node, parentName);
 }
 
-function buildLeafHtml(node: SpecNode, depth: number): string {
-  const icon = statusIcon(node.status);
+function locationKey(node: SpecNode, parentName: string): string {
+  if (node.kind === "suite" || node.kind === "fixture" || node.kind === "test") {
+    return node.name;
+  }
+  if (node.kind === "method" && parentName) {
+    return `${parentName}/${node.name}`;
+  }
+  return "";
+}
+
+function buildIconHtml(status: string, node: SpecNode, parentName: string): string {
+  const icon = statusIcon(status);
+  const key = locationKey(node, parentName);
+  const locAttr = key ? ` data-loc-key="${escapeAttr(key)}"` : "";
+  const gotoSpan = key ? `<span class="goto-text" title="Go to source">↗</span>` : "";
+  return `<span class="icon ${status}"${locAttr}><span class="status-text">${icon}</span>${gotoSpan}</span>`;
+}
+
+function buildLeafHtml(node: SpecNode, parentName: string): string {
+  const iconHtml = buildIconHtml(node.status, node, parentName);
   const dur = formatDuration(node.duration);
   const suffix =
     node.excluded || node.status === "skip" ? " — SKIPPED" : "";
@@ -270,17 +342,19 @@ function buildLeafHtml(node: SpecNode, depth: number): string {
     }
   }
 
-  return `<div class="leaf ${node.status}" data-display="${escapeAttr(node.display)}" style="padding-left:${(depth + 1) * 16}px">
-  <span class="icon ${node.status}">${icon}</span> ${escapeHtml(node.display)}${suffix} <span class="dur">(${dur})</span>
+  return `<div class="leaf ${node.status}" data-display="${escapeAttr(node.display)}">
+  ${iconHtml} ${escapeHtml(node.display)}${suffix} <span class="dur">(${dur})</span>
   ${errorBlock}
 </div>`;
 }
 
-function buildBranchHtml(node: SpecNode, depth: number): string {
+function buildBranchHtml(node: SpecNode, parentName: string): string {
   const shouldOpen = hasFailure(node);
   const openAttr = shouldOpen ? " open" : "";
-  const icon = derivedStatusIcon(node);
-  const children = node.children.map((c) => buildNodeHtml(c, depth + 1)).join("");
+  const status = derivedStatus(node);
+  const iconHtml = buildIconHtml(status, node, parentName);
+  const selfName = node.name;
+  const children = node.children.map((c) => buildNodeHtml(c, selfName)).join("");
 
   let label = escapeHtml(node.display);
   if (
@@ -296,8 +370,8 @@ function buildBranchHtml(node: SpecNode, depth: number): string {
   if (node.focused) suffix = ` <span class="tag focused">FOCUSED</span>`;
   else if (node.excluded) suffix = ` <span class="tag skipped">SKIPPED</span>`;
 
-  return `<details class="branch" data-display="${escapeAttr(node.display)}"${openAttr} style="padding-left:${depth * 16}px">
-  <summary class="node ${node.kind}"><span class="icon ${derivedStatus(node)}">${icon}</span> ${label}${suffix}</summary>
+  return `<details class="branch" data-display="${escapeAttr(node.display)}"${openAttr}>
+  <summary class="node ${node.kind}">${iconHtml} ${label}${suffix}</summary>
   ${children}
 </details>`;
 }
@@ -311,10 +385,6 @@ function derivedStatus(node: SpecNode): string {
   if (node.children.some((c) => c.status === "fail" || derivedStatus(c) === "fail")) return "fail";
   if (node.children.every((c) => c.status === "skip" || (c.children.length > 0 && derivedStatus(c) === "skip"))) return "skip";
   return "pass";
-}
-
-function derivedStatusIcon(node: SpecNode): string {
-  return statusIcon(derivedStatus(node));
 }
 
 function statusIcon(status: string): string {
@@ -355,6 +425,18 @@ function escapeHtml(s: string): string {
 
 function escapeAttr(s: string): string {
   return escapeHtml(s).replace(/"/g, "&quot;");
+}
+
+function parseStoredState(state: unknown): SpecData | undefined {
+  if (
+    state &&
+    typeof state === "object" &&
+    "packages" in (state as Record<string, unknown>) &&
+    "stats" in (state as Record<string, unknown>)
+  ) {
+    return state as SpecData;
+  }
+  return undefined;
 }
 
 function getNonce(): string {
@@ -506,8 +588,10 @@ body {
   margin: 12px 0 4px 0;
 }
 
-/* Nodes */
+/* Nodes — nesting via margin */
 details.branch { list-style: none; }
+details.branch > details.branch,
+details.branch > .leaf { margin-left: 20px; }
 details.branch > summary { cursor: pointer; list-style: none; }
 details.branch > summary::-webkit-details-marker { display: none; }
 summary.node { padding: 1px 0; }
@@ -524,6 +608,14 @@ summary.node { padding: 1px 0; }
 .tag { font-size: 0.8em; margin-left: 6px; }
 .tag.focused { color: var(--vscode-testing-iconSkipped); }
 .tag.skipped { color: var(--vscode-testing-iconSkipped); }
+
+/* Icon hover swap: status icon → go-to-source */
+.icon .goto-text { display: none; }
+.icon[data-loc-key] { cursor: pointer; }
+summary.node:hover > .icon[data-loc-key] > .status-text,
+.leaf:hover > .icon[data-loc-key] > .status-text { display: none; }
+summary.node:hover > .icon[data-loc-key] > .goto-text,
+.leaf:hover > .icon[data-loc-key] > .goto-text { display: inline; color: var(--vscode-textLink-foreground); }
 
 /* Error output */
 .error-details { margin: 2px 0 4px 20px; }
@@ -566,35 +658,48 @@ summary.node { padding: 1px 0; }
 
 const SCRIPT = `
 const vscode = acquireVsCodeApi();
+if (SPEC_STATE) vscode.setState(SPEC_STATE);
 
-function postRunTests() {
-  vscode.postMessage({ type: 'runTests' });
-}
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  if (!t || !(t instanceof HTMLElement)) return;
 
-function expandAll() {
-  document.querySelectorAll('details.branch').forEach(d => d.open = true);
-}
-
-function collapseAll() {
-  document.querySelectorAll('details.branch').forEach(d => d.open = false);
-}
-
-function toggleFilter(status) {
-  const tree = document.getElementById('spec-tree');
-  if (!tree) return;
-
-  const btn = document.querySelector('.filter-btn.' + status);
-  if (!btn) return;
-
-  btn.classList.toggle('active');
-  tree.classList.toggle('hide-' + status);
-
-  updateBranchVisibility();
-}
+  if (t.id === 'run-tests-btn') {
+    vscode.postMessage({ type: 'runTests' });
+    return;
+  }
+  const iconEl = t.closest('.icon[data-loc-key]');
+  if (iconEl) {
+    const key = iconEl.dataset.locKey;
+    const loc = key && LOCATION_MAP[key];
+    if (loc) {
+      vscode.postMessage({ type: 'goToLocation', file: loc.file, line: loc.line });
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+  if (t.id === 'expand-all-btn') {
+    document.querySelectorAll('details.branch').forEach(d => d.open = true);
+    return;
+  }
+  if (t.id === 'collapse-all-btn') {
+    document.querySelectorAll('details.branch').forEach(d => d.open = false);
+    return;
+  }
+  if (t.dataset.filter) {
+    const status = t.dataset.filter;
+    const tree = document.getElementById('spec-tree');
+    if (!tree) return;
+    t.classList.toggle('active');
+    tree.classList.toggle('hide-' + status);
+    updateBranchVisibility();
+    return;
+  }
+});
 
 function updateBranchVisibility() {
   const branches = document.querySelectorAll('details.branch');
-  // Process bottom-up: reverse the NodeList
   const arr = Array.from(branches).reverse();
   for (const branch of arr) {
     const children = branch.querySelectorAll(':scope > .leaf:not([style*="display: none"]):not(.search-hidden), :scope > details.branch:not(.branch-hidden):not(.search-hidden)');
@@ -614,9 +719,12 @@ function updateBranchVisibility() {
 }
 
 let searchTimeout = null;
-function onSearchInput() {
-  clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(applySearch, 200);
+const searchInput = document.getElementById('search-input');
+if (searchInput) {
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(applySearch, 200);
+  });
 }
 
 function applySearch() {
@@ -626,12 +734,10 @@ function applySearch() {
   const tree = document.getElementById('spec-tree');
   if (!tree) return;
 
-  // Clear previous search state
   tree.querySelectorAll('.search-hidden').forEach(el => el.classList.remove('search-hidden'));
   tree.querySelectorAll('.branch-hidden').forEach(el => el.classList.remove('branch-hidden'));
 
   if (!query) {
-    // Restore smart defaults: close all, open those with failures
     tree.querySelectorAll('details.branch').forEach(d => {
       d.open = d.querySelector('.leaf.fail') !== null;
     });
@@ -639,7 +745,6 @@ function applySearch() {
     return;
   }
 
-  // Hide non-matching leaves
   tree.querySelectorAll('.leaf').forEach(leaf => {
     const display = (leaf.getAttribute('data-display') || '').toLowerCase();
     if (!display.includes(query)) {
@@ -647,7 +752,6 @@ function applySearch() {
     }
   });
 
-  // Hide branches with no visible descendants, expand those with matches
   const branches = Array.from(tree.querySelectorAll('details.branch')).reverse();
   for (const branch of branches) {
     const hasVisible = branch.querySelector('.leaf:not(.search-hidden):not(.branch-hidden), details.branch:not(.search-hidden):not(.branch-hidden)');
