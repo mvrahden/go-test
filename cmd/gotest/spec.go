@@ -115,6 +115,8 @@ func runSpec(args []string) int {
 	switch format {
 	case "md", "markdown":
 		gotestspec.RenderMarkdown(w, tree)
+	case "json":
+		gotestspec.RenderJSON(w, tree)
 	default:
 		gotestspec.RenderTerminal(w, tree, renderOpts...)
 	}
@@ -175,6 +177,8 @@ func runSpecFromInput(input, format, output string, noColor bool) int {
 	switch format {
 	case "md", "markdown":
 		gotestspec.RenderMarkdown(w, tree)
+	case "json":
+		gotestspec.RenderJSON(w, tree)
 	default:
 		gotestspec.RenderTerminal(w, tree, renderOpts...)
 	}
