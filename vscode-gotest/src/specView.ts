@@ -129,10 +129,6 @@ export class SpecViewPanel implements vscode.Disposable {
     );
   }
 
-  get isVisible(): boolean {
-    return this.panel?.visible ?? false;
-  }
-
   async refresh(jsonOutput: string): Promise<void> {
     try {
       const raw = await this.runSpecFromInput(jsonOutput);
@@ -285,6 +281,7 @@ ${SCRIPT}
         reject(err);
       });
 
+      child.stdin.on("error", () => {});
       child.stdin.write(jsonInput);
       child.stdin.end();
     });
@@ -381,7 +378,7 @@ function buildToolbar(): string {
     <input type="text" class="search-input" id="search-input" placeholder="Search behaviors..." />
   </div>
   <div class="toolbar-group">
-    <button class="tool-btn" id="copy-spec-btn" title="Copy spec as markdown">Copy</button>
+    <button class="tool-btn" id="copy-spec-btn" title="Copy spec report">Copy</button>
     <button class="tool-btn" id="clear-results-btn" title="Clear results">Clear</button>
   </div>
 </div>`;
