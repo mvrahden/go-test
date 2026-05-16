@@ -6,3 +6,4 @@ dist/
 *.out
 spec.txt
 .vite
+.worktrees/
