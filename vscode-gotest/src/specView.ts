@@ -342,6 +342,7 @@ interface SpecNode {
   duration: number;
   focused: boolean;
   excluded: boolean;
+  external: boolean;
   output: string[];
   children: SpecNode[];
 }
@@ -532,7 +533,10 @@ function buildLeafHtml(
 ): string {
   const iconHtml = buildIconHtml(node.status, node, parentName, locationMap);
   const dur = formatDuration(node.duration);
-  const suffix = node.excluded || node.status === "skip" ? " — SKIPPED" : "";
+  let suffix = "";
+  if (node.external) suffix += ` <span class="tag external">EXT.</span>`;
+  if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
+  else if (node.excluded || node.status === "skip") suffix += " — SKIPPED";
 
   let errorBlock = "";
   if (node.status === "fail" && node.output.length > 0) {
@@ -577,8 +581,9 @@ function buildBranchHtml(
   }
 
   let suffix = "";
-  if (node.focused) suffix = ` <span class="tag focused">FOCUSED</span>`;
-  else if (node.excluded) suffix = ` <span class="tag skipped">SKIPPED</span>`;
+  if (node.external) suffix += ` <span class="tag external">EXT.</span>`;
+  if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
+  else if (node.excluded) suffix += ` <span class="tag skipped">SKIPPED</span>`;
 
   return `<details class="branch" data-display="${escapeAttr(node.display)}"${openAttr}>
   <summary class="node ${node.kind}">${iconHtml} ${label}${suffix}</summary>
@@ -775,8 +780,11 @@ function walkReportNode(
   }
 
   let label = node.display;
-  if (node.focused) label += " — FOCUSED";
-  else if (node.excluded) label += " — SKIPPED";
+  const tags: string[] = [];
+  if (node.external) tags.push("EXT.");
+  if (node.focused) tags.push("FOCUSED");
+  else if (node.excluded) tags.push("SKIPPED");
+  if (tags.length > 0) label += " — " + tags.join(", ");
 
   if (node.children.length === 0) {
     rows.push({
@@ -1015,6 +1023,7 @@ summary.node.block { color: var(--vscode-terminal-ansiYellow); }
 .tag { font-size: 0.8em; margin-left: 6px; }
 .tag.focused { color: var(--vscode-testing-iconSkipped); }
 .tag.skipped { color: var(--vscode-testing-iconSkipped); }
+.tag.external { color: var(--vscode-descriptionForeground); }
 
 /* Icon hover swap: status icon → go-to-source */
 .icon .goto-text { display: none; }
