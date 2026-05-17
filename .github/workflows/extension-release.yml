@@ -23,6 +23,12 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm test
       - run: npm run compile
-      - run: npx @vscode/vsce publish --no-dependencies
+      - name: Set version from release tag
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+      - run: npx @vscode/vsce package --no-dependencies
+      - run: npx @vscode/vsce publish --no-dependencies --packagePath *.vsix
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      - run: npx ovsx publish *.vsix
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
