@@ -120,7 +120,15 @@ export class SpecViewPanel implements vscode.Disposable {
           vscode.commands.executeCommand("testing.runAll");
         } else if (msg.type === "copySpec") {
           if (this.lastSpecData) {
-            const text = specDataToReport(this.lastSpecData, this.modulePaths);
+            const hidden =
+              Array.isArray(msg.hidden) && msg.hidden.length > 0
+                ? new Set<string>(msg.hidden)
+                : undefined;
+            const text = specDataToReport(
+              this.lastSpecData,
+              this.modulePaths,
+              hidden,
+            );
             vscode.env.clipboard.writeText(text);
           }
         } else if (msg.type === "clearResults") {
@@ -672,8 +680,11 @@ interface LeafAgg {
   duration: number;
 }
 
-function countLeaves(node: SpecNode): LeafAgg {
+function countLeaves(node: SpecNode, hidden?: Set<string>): LeafAgg {
   if (node.children.length === 0) {
+    if (hidden && hidden.has(node.status)) {
+      return { passed: 0, failed: 0, skipped: 0, duration: 0 };
+    }
     return {
       passed: node.status === "pass" ? 1 : 0,
       failed: node.status === "fail" ? 1 : 0,
@@ -683,7 +694,7 @@ function countLeaves(node: SpecNode): LeafAgg {
   }
   const agg: LeafAgg = { passed: 0, failed: 0, skipped: 0, duration: 0 };
   for (const c of node.children) {
-    const ca = countLeaves(c);
+    const ca = countLeaves(c, hidden);
     agg.passed += ca.passed;
     agg.failed += ca.failed;
     agg.skipped += ca.skipped;
@@ -706,9 +717,14 @@ function fmtTime(seconds: number): string {
 
 type ReportRow = { label: string; time: string; result: string };
 
-function specDataToReport(data: SpecData, modulePaths: string[]): string {
+function specDataToReport(
+  data: SpecData,
+  modulePaths: string[],
+  hidden?: Set<string>,
+): string {
   const rows: ReportRow[] = [];
   const groups = groupByModule(data.packages, modulePaths);
+  const totalAgg: LeafAgg = { passed: 0, failed: 0, skipped: 0, duration: 0 };
 
   for (const group of groups) {
     if (groups.length > 1) {
@@ -720,12 +736,15 @@ function specDataToReport(data: SpecData, modulePaths: string[]): string {
       };
       for (const e of group.entries) {
         for (const n of e.pkg.nodes) {
-          const a = countLeaves(n);
+          const a = countLeaves(n, hidden);
           moduleAgg.passed += a.passed;
           moduleAgg.failed += a.failed;
           moduleAgg.skipped += a.skipped;
           moduleAgg.duration += a.duration;
         }
+      }
+      if (moduleAgg.passed + moduleAgg.failed + moduleAgg.skipped === 0) {
+        continue;
       }
       rows.push({
         label: group.modulePath || "unknown",
@@ -738,19 +757,24 @@ function specDataToReport(data: SpecData, modulePaths: string[]): string {
     for (const entry of group.entries) {
       const pkgAgg: LeafAgg = { passed: 0, failed: 0, skipped: 0, duration: 0 };
       for (const n of entry.pkg.nodes) {
-        const a = countLeaves(n);
+        const a = countLeaves(n, hidden);
         pkgAgg.passed += a.passed;
         pkgAgg.failed += a.failed;
         pkgAgg.skipped += a.skipped;
         pkgAgg.duration += a.duration;
       }
+      if (pkgAgg.passed + pkgAgg.failed + pkgAgg.skipped === 0) continue;
+      totalAgg.passed += pkgAgg.passed;
+      totalAgg.failed += pkgAgg.failed;
+      totalAgg.skipped += pkgAgg.skipped;
+      totalAgg.duration += pkgAgg.duration;
       rows.push({
         label: "  ".repeat(pkgIndent) + entry.displayPath,
-        time: fmtTime(entry.pkg.duration),
+        time: fmtTime(pkgAgg.duration),
         result: fmtAgg(pkgAgg),
       });
       for (const node of entry.pkg.nodes) {
-        walkReportNode(rows, node, pkgIndent + 1);
+        walkReportNode(rows, node, pkgIndent + 1, hidden);
       }
     }
   }
@@ -767,18 +791,16 @@ function specDataToReport(data: SpecData, modulePaths: string[]): string {
   }
   lines.push(separator);
 
-  const stats = data.stats;
   const counts: string[] = [];
-  if (stats.suites > 0) counts.push(`${stats.suites} suites`);
-  if (stats.behaviors > 0) counts.push(`${stats.behaviors} behaviors`);
-  if (stats.tests > 0) counts.push(`${stats.tests} stdlib tests`);
+  if (data.stats.suites > 0) counts.push(`${data.stats.suites} suites`);
+  if (data.stats.behaviors > 0) counts.push(`${data.stats.behaviors} behaviors`);
+  if (data.stats.tests > 0) counts.push(`${data.stats.tests} stdlib tests`);
   const results: string[] = [];
-  if (stats.passed > 0) results.push(`${stats.passed} passed`);
-  if (stats.failed > 0) results.push(`${stats.failed} failed`);
-  if (stats.skipped > 0) results.push(`${stats.skipped} skipped`);
-  const totalDur = data.packages.reduce((s, p) => s + p.duration, 0);
+  if (totalAgg.passed > 0) results.push(`${totalAgg.passed} passed`);
+  if (totalAgg.failed > 0) results.push(`${totalAgg.failed} failed`);
+  if (totalAgg.skipped > 0) results.push(`${totalAgg.skipped} skipped`);
   lines.push(
-    `${counts.join(", ")}: ${results.join(", ")} (${fmtTime(totalDur)})`,
+    `${counts.join(", ")}: ${results.join(", ")} (${fmtTime(totalAgg.duration)})`,
   );
 
   return lines.join("\n");
@@ -788,20 +810,21 @@ function walkReportNode(
   rows: ReportRow[],
   node: SpecNode,
   indent: number,
+  hidden?: Set<string>,
 ): void {
   if (node.kind === "fixture") {
-    for (const c of node.children) walkReportNode(rows, c, indent);
+    for (const c of node.children) walkReportNode(rows, c, indent, hidden);
     return;
   }
 
-  let label = node.display;
-  const tags: string[] = [];
-  if (node.external) tags.push("EXTERNAL");
-  if (node.focused) tags.push("FOCUSED");
-  else if (node.excluded) tags.push("SKIPPED");
-  if (tags.length > 0) label += " — " + tags.join(", ");
-
   if (node.children.length === 0) {
+    if (hidden && hidden.has(node.status)) return;
+    let label = node.display;
+    const tags: string[] = [];
+    if (node.external) tags.push("EXTERNAL");
+    if (node.focused) tags.push("FOCUSED");
+    else if (node.excluded) tags.push("SKIPPED");
+    if (tags.length > 0) label += " — " + tags.join(", ");
     rows.push({
       label: "  ".repeat(indent) + label,
       time: fmtTime(node.duration),
@@ -810,14 +833,23 @@ function walkReportNode(
     return;
   }
 
-  const agg = countLeaves(node);
+  const agg = countLeaves(node, hidden);
+  if (agg.passed + agg.failed + agg.skipped === 0) return;
+
+  let label = node.display;
+  const tags: string[] = [];
+  if (node.external) tags.push("EXTERNAL");
+  if (node.focused) tags.push("FOCUSED");
+  else if (node.excluded) tags.push("SKIPPED");
+  if (tags.length > 0) label += " — " + tags.join(", ");
+
   rows.push({
     label: "  ".repeat(indent) + label,
     time: fmtTime(agg.duration),
     result: fmtAgg(agg),
   });
   for (const c of node.children) {
-    walkReportNode(rows, c, indent + 1);
+    walkReportNode(rows, c, indent + 1, hidden);
   }
 }
 
@@ -1111,7 +1143,12 @@ document.addEventListener('click', (e) => {
     }
   }
   if (t.id === 'copy-spec-btn') {
-    vscode.postMessage({ type: 'copySpec' });
+    const tree = document.getElementById('spec-tree');
+    const hidden = [];
+    if (tree && tree.classList.contains('hide-pass')) hidden.push('pass');
+    if (tree && tree.classList.contains('hide-fail')) hidden.push('fail');
+    if (tree && tree.classList.contains('hide-skip')) hidden.push('skip');
+    vscode.postMessage({ type: 'copySpec', hidden: hidden });
     return;
   }
   if (t.id === 'clear-results-btn') {
