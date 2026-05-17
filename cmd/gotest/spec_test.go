@@ -120,7 +120,7 @@ func TestRunSpec_InputStdin(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	loaded, err := gotestgen.LoadPackages([]string{"./simple_suite"}, nil)
+	loaded, err := gotestgen.LoadPackages([]string{"./cart"}, nil)
 	if err != nil {
 		t.Fatalf("LoadPackages: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestRunSpec_InputStdin(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	overlayArgs := []string{"-overlay=" + filepath.Join(tmpDir, "overlay.json"), "./simple_suite"}
+	overlayArgs := []string{"-overlay=" + filepath.Join(tmpDir, "overlay.json"), "./cart"}
 	jsonData, _, err := gotestrunner.StdlibRunTestsJSON(context.Background(), overlayArgs)
 	if err != nil {
 		t.Fatalf("StdlibRunTestsJSON: %v", err)
@@ -153,7 +153,7 @@ func TestRunSpec_InputStdin(t *testing.T) {
 	gotestspec.RenderTerminal(&buf, tree, gotestspec.WithNoColor())
 
 	output := buf.String()
-	if !bytes.Contains([]byte(output), []byte("Simple")) {
-		t.Errorf("expected output to contain \"Simple\", got:\n%s", output)
+	if !bytes.Contains([]byte(output), []byte("ShoppingCart")) {
+		t.Errorf("expected output to contain \"ShoppingCart\", got:\n%s", output)
 	}
 }

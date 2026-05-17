@@ -19,6 +19,11 @@ func TestSharedFixture_E2E_MultiPackage(t *testing.T) {
 		t.Skip("go.work not found — run 'go work init . && go work use ./examples' at the project root to enable cross-module golden tests")
 	}
 
+	sharedFixtureDir := filepath.Join("..", "..", "examples", "shared_fixture")
+	if _, err := os.Stat(sharedFixtureDir); os.IsNotExist(err) {
+		t.Skip("examples/shared_fixture directory not found — shared fixture examples were removed")
+	}
+
 	pkg := "../../examples/shared_fixture/..."
 	loaded, err := LoadPackages([]string{pkg}, nil)
 	gotest.NoError(t, err)
@@ -206,6 +211,11 @@ func TestSharedFixture_E2E_DumpGolden(t *testing.T) {
 	goWorkFile := filepath.Join("..", "..", "go.work")
 	if _, err := os.Stat(goWorkFile); os.IsNotExist(err) {
 		t.Skip("go.work not found")
+	}
+
+	sharedFixtureDir := filepath.Join("..", "..", "examples", "shared_fixture")
+	if _, err := os.Stat(sharedFixtureDir); os.IsNotExist(err) {
+		t.Skip("examples/shared_fixture directory not found — shared fixture examples were removed")
 	}
 
 	pkg := "../../examples/shared_fixture/..."

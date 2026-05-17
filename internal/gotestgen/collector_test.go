@@ -2,9 +2,6 @@ package gotestgen
 
 import (
 	"fmt"
-	"go/ast"
-	"go/importer"
-	"go/parser"
 	"go/token"
 	"go/types"
 	"os"
@@ -17,36 +14,6 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"golang.org/x/tools/go/packages"
 )
-
-// loadTestPkg parses source code into a type-checked *packages.Package.
-// It resolves imports using the default Go importer so that references
-// to gotest.T and error work correctly.
-func loadTestPkg(t *testing.T, src string) *packages.Package {
-	t.Helper()
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, "test.go", src, parser.ParseComments)
-	gotest.NoError(t, err)
-
-	conf := types.Config{
-		Importer: importer.ForCompiler(fset, "source", nil),
-	}
-	info := &types.Info{
-		Types:  make(map[ast.Expr]types.TypeAndValue),
-		Defs:   make(map[*ast.Ident]types.Object),
-		Uses:   make(map[*ast.Ident]types.Object),
-		Scopes: make(map[ast.Node]*types.Scope),
-	}
-	tpkg, err := conf.Check("testpkg", fset, []*ast.File{f}, info)
-	gotest.NoError(t, err)
-
-	return &packages.Package{
-		Name:      tpkg.Name(),
-		Fset:      fset,
-		Syntax:    []*ast.File{f},
-		TypesInfo: info,
-		Types:     tpkg,
-	}
-}
 
 var sharedMod struct {
 	once  sync.Once

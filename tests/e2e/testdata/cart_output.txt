@@ -1,0 +1,86 @@
+=== RUN   TestShoppingCartTestSuite
+=== RUN   TestShoppingCartTestSuite/TestAddSingleItem
+=== RUN   TestShoppingCartTestSuite/TestAddSingleItem/adding_a_single_item
+=== RUN   TestShoppingCartTestSuite/TestAddSingleItem/adding_a_single_item/increases_the_item_count
+=== RUN   TestShoppingCartTestSuite/TestAddSingleItem/adding_a_single_item/tracks_the_quantity
+=== RUN   TestShoppingCartTestSuite/TestAddSingleItem/adding_a_single_item/calculates_the_line_total
+=== RUN   TestShoppingCartTestSuite/TestAddMultipleItems
+=== RUN   TestShoppingCartTestSuite/TestAddMultipleItems/adding_multiple_different_items
+=== RUN   TestShoppingCartTestSuite/TestAddMultipleItems/adding_multiple_different_items/counts_all_unique_items
+=== RUN   TestShoppingCartTestSuite/TestAddMultipleItems/adding_multiple_different_items/sums_the_total_across_items
+=== RUN   TestShoppingCartTestSuite/TestAddSameItemTwice
+=== RUN   TestShoppingCartTestSuite/TestAddSameItemTwice/adding_the_same_item_twice
+=== RUN   TestShoppingCartTestSuite/TestAddSameItemTwice/adding_the_same_item_twice/merges_the_quantities
+=== RUN   TestShoppingCartTestSuite/TestAddSameItemTwice/adding_the_same_item_twice/keeps_only_one_unique_entry
+=== RUN   TestShoppingCartTestSuite/TestReduceQuantity
+=== RUN   TestShoppingCartTestSuite/TestReduceQuantity/reducing_quantity_below_current_amount
+=== RUN   TestShoppingCartTestSuite/TestReduceQuantity/reducing_quantity_below_current_amount/decreases_without_removing_the_item
+=== RUN   TestShoppingCartTestSuite/TestReduceQuantity/reducing_quantity_below_current_amount/keeps_the_item_in_the_cart
+=== RUN   TestShoppingCartTestSuite/TestRemoveAllOfItem
+=== RUN   TestShoppingCartTestSuite/TestRemoveAllOfItem/removing_all_of_an_item
+=== RUN   TestShoppingCartTestSuite/TestRemoveAllOfItem/removing_all_of_an_item/removes_the_item_entirely
+=== RUN   TestShoppingCartTestSuite/TestApplyDiscount
+=== RUN   TestShoppingCartTestSuite/TestApplyDiscount/applying_a_10_percent_discount
+=== RUN   TestShoppingCartTestSuite/TestApplyDiscount/applying_a_10_percent_discount/reduces_the_total_within_tolerance
+=== RUN   TestShoppingCartTestSuite/TestApplyExcessiveDiscount
+=== RUN   TestShoppingCartTestSuite/TestApplyExcessiveDiscount/the_discount_exceeds_100_percent
+=== RUN   TestShoppingCartTestSuite/TestApplyExcessiveDiscount/the_discount_exceeds_100_percent/clamps_to_zero
+=== RUN   TestShoppingCartTestSuite/TestCheckoutEmpty
+=== RUN   TestShoppingCartTestSuite/TestCheckoutEmpty/the_cart_is_empty
+=== RUN   TestShoppingCartTestSuite/TestCheckoutEmpty/the_cart_is_empty/returns_an_error
+=== RUN   TestShoppingCartTestSuite/TestCheckoutWithItems
+=== RUN   TestShoppingCartTestSuite/TestCheckoutWithItems/the_cart_has_items
+=== RUN   TestShoppingCartTestSuite/TestCheckoutWithItems/the_cart_has_items/succeeds_without_error
+=== RUN   TestShoppingCartTestSuite/TestCheckoutWithItems/the_cart_has_items/clears_the_cart
+--- PASS: TestShoppingCartTestSuite (<TIMESTAMP>)
+    --- PASS: TestShoppingCartTestSuite/TestAddSingleItem (<TIMESTAMP>)
+        --- PASS: TestShoppingCartTestSuite/TestAddSingleItem/adding_a_single_item (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestAddSingleItem/adding_a_single_item/increases_the_item_count (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestAddSingleItem/adding_a_single_item/tracks_the_quantity (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestAddSingleItem/adding_a_single_item/calculates_the_line_total (<TIMESTAMP>)
+    --- PASS: TestShoppingCartTestSuite/TestAddMultipleItems (<TIMESTAMP>)
+        --- PASS: TestShoppingCartTestSuite/TestAddMultipleItems/adding_multiple_different_items (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestAddMultipleItems/adding_multiple_different_items/counts_all_unique_items (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestAddMultipleItems/adding_multiple_different_items/sums_the_total_across_items (<TIMESTAMP>)
+    --- PASS: TestShoppingCartTestSuite/TestAddSameItemTwice (<TIMESTAMP>)
+        --- PASS: TestShoppingCartTestSuite/TestAddSameItemTwice/adding_the_same_item_twice (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestAddSameItemTwice/adding_the_same_item_twice/merges_the_quantities (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestAddSameItemTwice/adding_the_same_item_twice/keeps_only_one_unique_entry (<TIMESTAMP>)
+    --- PASS: TestShoppingCartTestSuite/TestReduceQuantity (<TIMESTAMP>)
+        --- PASS: TestShoppingCartTestSuite/TestReduceQuantity/reducing_quantity_below_current_amount (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestReduceQuantity/reducing_quantity_below_current_amount/decreases_without_removing_the_item (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestReduceQuantity/reducing_quantity_below_current_amount/keeps_the_item_in_the_cart (<TIMESTAMP>)
+    --- PASS: TestShoppingCartTestSuite/TestRemoveAllOfItem (<TIMESTAMP>)
+        --- PASS: TestShoppingCartTestSuite/TestRemoveAllOfItem/removing_all_of_an_item (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestRemoveAllOfItem/removing_all_of_an_item/removes_the_item_entirely (<TIMESTAMP>)
+    --- PASS: TestShoppingCartTestSuite/TestApplyDiscount (<TIMESTAMP>)
+        --- PASS: TestShoppingCartTestSuite/TestApplyDiscount/applying_a_10_percent_discount (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestApplyDiscount/applying_a_10_percent_discount/reduces_the_total_within_tolerance (<TIMESTAMP>)
+    --- PASS: TestShoppingCartTestSuite/TestApplyExcessiveDiscount (<TIMESTAMP>)
+        --- PASS: TestShoppingCartTestSuite/TestApplyExcessiveDiscount/the_discount_exceeds_100_percent (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestApplyExcessiveDiscount/the_discount_exceeds_100_percent/clamps_to_zero (<TIMESTAMP>)
+    --- PASS: TestShoppingCartTestSuite/TestCheckoutEmpty (<TIMESTAMP>)
+        --- PASS: TestShoppingCartTestSuite/TestCheckoutEmpty/the_cart_is_empty (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestCheckoutEmpty/the_cart_is_empty/returns_an_error (<TIMESTAMP>)
+    --- PASS: TestShoppingCartTestSuite/TestCheckoutWithItems (<TIMESTAMP>)
+        --- PASS: TestShoppingCartTestSuite/TestCheckoutWithItems/the_cart_has_items (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestCheckoutWithItems/the_cart_has_items/succeeds_without_error (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestCheckoutWithItems/the_cart_has_items/clears_the_cart (<TIMESTAMP>)
+=== RUN   TestShoppingCartTestSuite
+=== RUN   TestShoppingCartTestSuite/TestAddItem
+=== RUN   TestShoppingCartTestSuite/TestAddItem/adding_items_to_a_fresh_cart
+=== RUN   TestShoppingCartTestSuite/TestAddItem/adding_items_to_a_fresh_cart/tracks_each_item
+=== RUN   TestShoppingCartTestSuite/TestAddItem/adding_items_to_a_fresh_cart/stores_the_correct_quantity
+=== RUN   TestShoppingCartTestSuite/TestRemoveItem
+=== RUN   TestShoppingCartTestSuite/TestRemoveItem/removing_the_last_item
+=== RUN   TestShoppingCartTestSuite/TestRemoveItem/removing_the_last_item/leaves_the_cart_empty
+--- PASS: TestShoppingCartTestSuite (<TIMESTAMP>)
+    --- PASS: TestShoppingCartTestSuite/TestAddItem (<TIMESTAMP>)
+        --- PASS: TestShoppingCartTestSuite/TestAddItem/adding_items_to_a_fresh_cart (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestAddItem/adding_items_to_a_fresh_cart/tracks_each_item (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestAddItem/adding_items_to_a_fresh_cart/stores_the_correct_quantity (<TIMESTAMP>)
+    --- PASS: TestShoppingCartTestSuite/TestRemoveItem (<TIMESTAMP>)
+        --- PASS: TestShoppingCartTestSuite/TestRemoveItem/removing_the_last_item (<TIMESTAMP>)
+            --- PASS: TestShoppingCartTestSuite/TestRemoveItem/removing_the_last_item/leaves_the_cart_empty (<TIMESTAMP>)
+PASS
+ok  	github.com/mvrahden/go-test/examples/cart	<TIMESTAMP>

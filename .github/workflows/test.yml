@@ -27,7 +27,9 @@ jobs:
         run: go vet ./... ./examples/...
       - name: Lint
         run: go run ./cmd/gotest-lint ./... ./examples/...
-      - name: Test
+      - name: Test (stdlib)
+        run: go test ./... -race
+      - name: Test (suites)
         run: go run ./cmd/gotest spec --no-color --min=40 --output=spec.txt ./... ./examples/... -race -coverprofile=coverage.out
       - name: Summary
         if: always()

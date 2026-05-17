@@ -1,0 +1,96 @@
+=== RUN   TestTokenValidatorTestSuite
+=== RUN   TestTokenValidatorTestSuite/TestValidateToken
+=== RUN   TestTokenValidatorTestSuite/TestValidateToken/the_token_is_valid
+=== RUN   TestTokenValidatorTestSuite/TestValidateToken/the_token_is_valid/returns_no_error
+=== RUN   TestTokenValidatorTestSuite/TestValidateToken/the_token_is_valid/extracts_the_email_claim
+=== RUN   TestTokenValidatorTestSuite/TestValidateToken/the_token_is_expired
+=== RUN   TestTokenValidatorTestSuite/TestValidateToken/the_token_is_expired/returns_a_TokenExpiredError
+=== RUN   TestTokenValidatorTestSuite/TestValidateToken/the_token_is_expired/includes_expiry_in_the_error_message
+=== RUN   TestTokenValidatorTestSuite/TestValidateToken/the_signature_is_tampered
+=== RUN   TestTokenValidatorTestSuite/TestValidateToken/the_signature_is_tampered/returns_ErrInvalidSignature
+=== RUN   TestTokenValidatorTestSuite/TestValidateToken/the_token_is_malformed
+=== RUN   TestTokenValidatorTestSuite/TestValidateToken/the_token_is_malformed/returns_ErrTokenMalformed
+=== RUN   TestTokenValidatorTestSuite/TestPasswordPolicy
+=== RUN   TestTokenValidatorTestSuite/TestPasswordPolicy/strong_password_with_mixed_characters
+=== RUN   TestTokenValidatorTestSuite/TestPasswordPolicy/strong_password_with_mixed_characters/evaluates_the_password_correctly
+=== RUN   TestTokenValidatorTestSuite/TestPasswordPolicy/too_short
+=== RUN   TestTokenValidatorTestSuite/TestPasswordPolicy/too_short/evaluates_the_password_correctly
+=== RUN   TestTokenValidatorTestSuite/TestPasswordPolicy/missing_special_characters
+=== RUN   TestTokenValidatorTestSuite/TestPasswordPolicy/missing_special_characters/evaluates_the_password_correctly
+=== RUN   TestTokenValidatorTestSuite/TestPasswordPolicy/missing_digits
+=== RUN   TestTokenValidatorTestSuite/TestPasswordPolicy/missing_digits/evaluates_the_password_correctly
+=== RUN   TestTokenValidatorTestSuite/TestPasswordPolicy/exactly_at_minimum_length
+=== RUN   TestTokenValidatorTestSuite/TestPasswordPolicy/exactly_at_minimum_length/evaluates_the_password_correctly
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat/standard_email
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat/standard_email/checking_the_format
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat/standard_email/checking_the_format/matches_as_expected
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat/standard_email/checking_the_format/passes_the_full_regex
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat/missing_at_sign
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat/missing_at_sign/checking_the_format
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat/missing_at_sign/checking_the_format/matches_as_expected
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat/subdomain_email
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat/subdomain_email/checking_the_format
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat/subdomain_email/checking_the_format/matches_as_expected
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat/subdomain_email/checking_the_format/passes_the_full_regex
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat/missing_TLD
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat/missing_TLD/checking_the_format
+=== RUN   TestTokenValidatorTestSuite/TestEmailFormat/missing_TLD/checking_the_format/matches_as_expected
+=== RUN   TestTokenValidatorTestSuite/TestParseConfig
+=== RUN   TestTokenValidatorTestSuite/TestParseConfig/the_config_string_is_nil
+=== RUN   TestTokenValidatorTestSuite/TestParseConfig/the_config_string_is_nil/panics_with_a_clear_message
+=== RUN   TestTokenValidatorTestSuite/TestParseConfig/the_config_string_is_provided
+=== RUN   TestTokenValidatorTestSuite/TestParseConfig/the_config_string_is_provided/returns_the_parsed_value
+--- PASS: TestTokenValidatorTestSuite (<TIMESTAMP>)
+    --- PASS: TestTokenValidatorTestSuite/TestValidateToken (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestValidateToken/the_token_is_valid (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestValidateToken/the_token_is_valid/returns_no_error (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestValidateToken/the_token_is_valid/extracts_the_email_claim (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestValidateToken/the_token_is_expired (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestValidateToken/the_token_is_expired/returns_a_TokenExpiredError (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestValidateToken/the_token_is_expired/includes_expiry_in_the_error_message (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestValidateToken/the_signature_is_tampered (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestValidateToken/the_signature_is_tampered/returns_ErrInvalidSignature (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestValidateToken/the_token_is_malformed (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestValidateToken/the_token_is_malformed/returns_ErrTokenMalformed (<TIMESTAMP>)
+    --- PASS: TestTokenValidatorTestSuite/TestPasswordPolicy (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestPasswordPolicy/strong_password_with_mixed_characters (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestPasswordPolicy/strong_password_with_mixed_characters/evaluates_the_password_correctly (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestPasswordPolicy/too_short (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestPasswordPolicy/too_short/evaluates_the_password_correctly (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestPasswordPolicy/missing_special_characters (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestPasswordPolicy/missing_special_characters/evaluates_the_password_correctly (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestPasswordPolicy/missing_digits (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestPasswordPolicy/missing_digits/evaluates_the_password_correctly (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestPasswordPolicy/exactly_at_minimum_length (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestPasswordPolicy/exactly_at_minimum_length/evaluates_the_password_correctly (<TIMESTAMP>)
+    --- PASS: TestTokenValidatorTestSuite/TestEmailFormat (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestEmailFormat/standard_email (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestEmailFormat/standard_email/checking_the_format (<TIMESTAMP>)
+                --- PASS: TestTokenValidatorTestSuite/TestEmailFormat/standard_email/checking_the_format/matches_as_expected (<TIMESTAMP>)
+                --- PASS: TestTokenValidatorTestSuite/TestEmailFormat/standard_email/checking_the_format/passes_the_full_regex (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestEmailFormat/missing_at_sign (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestEmailFormat/missing_at_sign/checking_the_format (<TIMESTAMP>)
+                --- PASS: TestTokenValidatorTestSuite/TestEmailFormat/missing_at_sign/checking_the_format/matches_as_expected (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestEmailFormat/subdomain_email (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestEmailFormat/subdomain_email/checking_the_format (<TIMESTAMP>)
+                --- PASS: TestTokenValidatorTestSuite/TestEmailFormat/subdomain_email/checking_the_format/matches_as_expected (<TIMESTAMP>)
+                --- PASS: TestTokenValidatorTestSuite/TestEmailFormat/subdomain_email/checking_the_format/passes_the_full_regex (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestEmailFormat/missing_TLD (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestEmailFormat/missing_TLD/checking_the_format (<TIMESTAMP>)
+                --- PASS: TestTokenValidatorTestSuite/TestEmailFormat/missing_TLD/checking_the_format/matches_as_expected (<TIMESTAMP>)
+    --- PASS: TestTokenValidatorTestSuite/TestParseConfig (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestParseConfig/the_config_string_is_nil (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestParseConfig/the_config_string_is_nil/panics_with_a_clear_message (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestParseConfig/the_config_string_is_provided (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestParseConfig/the_config_string_is_provided/returns_the_parsed_value (<TIMESTAMP>)
+=== RUN   TestTokenValidatorTestSuite
+=== RUN   TestTokenValidatorTestSuite/TestSecretIsConfigured
+=== RUN   TestTokenValidatorTestSuite/TestSecretIsConfigured/the_validator_is_initialized
+=== RUN   TestTokenValidatorTestSuite/TestSecretIsConfigured/the_validator_is_initialized/has_a_non-empty_secret
+--- PASS: TestTokenValidatorTestSuite (<TIMESTAMP>)
+    --- PASS: TestTokenValidatorTestSuite/TestSecretIsConfigured (<TIMESTAMP>)
+        --- PASS: TestTokenValidatorTestSuite/TestSecretIsConfigured/the_validator_is_initialized (<TIMESTAMP>)
+            --- PASS: TestTokenValidatorTestSuite/TestSecretIsConfigured/the_validator_is_initialized/has_a_non-empty_secret (<TIMESTAMP>)
+PASS
+ok  	github.com/mvrahden/go-test/examples/auth	<TIMESTAMP>

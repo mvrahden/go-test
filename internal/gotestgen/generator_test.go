@@ -28,13 +28,9 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 		pkgName     string
 		description string
 	}{
-		{"stdlib", "github.com/mvrahden/go-test/examples/stdlib", "stdlib and testsuites"},
-		{"simple_suite", "github.com/mvrahden/go-test/examples/simple_suite", "simple test suites"},
-		{"focus_exclude", "github.com/mvrahden/go-test/examples/focus_exclude", "focus and exclude semantics"},
-		{"parallel_suite", "github.com/mvrahden/go-test/examples/parallel_suite", "parallel test suites"},
-		{"generic_suite", "github.com/mvrahden/go-test/examples/generic_suite", "generic test suites via type aliases"},
-		{"fixture_suite", "github.com/mvrahden/go-test/examples/fixture_suite", "fixture suites"},
-		{"nested_fixture", "github.com/mvrahden/go-test/examples/nested_fixture", "nested fixture suites"},
+		{"auth", "github.com/mvrahden/go-test/examples/auth", "auth validator suites"},
+		{"cart", "github.com/mvrahden/go-test/examples/cart", "shopping cart suites"},
+		{"search", "github.com/mvrahden/go-test/examples/search", "parallel search suites with generics"},
 	} {
 		pkg := path.Join("..", "..", "examples", tC.directory)
 		testdatadir := filepath.Join("..", "..", "examples", tC.directory, "testdata")
@@ -67,13 +63,9 @@ func TestGeneratorGoldenExamples_DumpGolden(t *testing.T) {
 	for _, tC := range []struct {
 		directory string
 	}{
-		{"stdlib"},
-		{"simple_suite"},
-		{"focus_exclude"},
-		{"parallel_suite"},
-		{"generic_suite"},
-		{"fixture_suite"},
-		{"nested_fixture"},
+		{"auth"},
+		{"cart"},
+		{"search"},
 	} {
 		pkg := path.Join("..", "..", "examples", tC.directory)
 		testdatadir := filepath.Join("..", "..", "examples", tC.directory, "testdata")

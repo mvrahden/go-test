@@ -29,15 +29,15 @@ func Test_TestsuiteCLI(t *testing.T) {
 
 	unexpectedFiles := []string{
 		"go.work",
-		"examples/stdlib/ƒƒ_psuite_test.go",
-		"examples/stdlib/ƒƒ_pxsuite_test.go",
+		"examples/auth/ƒƒ_psuite_test.go",
+		"examples/auth/ƒƒ_pxsuite_test.go",
 	}
 	testutils.AssertFilesNotInTmp(t, tmp, unexpectedFiles...)
 	// assert package to test is in tmp
 	expectedFiles := []string{
 		"go.mod",
-		"examples/stdlib/unit.go",
-		"examples/stdlib/unit_suite_ptest_test.go",
+		"examples/auth/validator.go",
+		"examples/auth/suite_test.go",
 	}
 	testutils.AssertFilesInTmp(t, tmp, expectedFiles...)
 	testutils.HackGoWork(t, tmp)
@@ -50,11 +50,10 @@ func Test_TestsuiteCLI(t *testing.T) {
 		goldenName string
 		debug      bool
 	}{
-		{desc: "stdlib by relative path", basedir: "examples", pkgPath: "stdlib", goldenName: "stdlib_output.txt"},
-		{desc: "simple suite by relative path", basedir: "examples", pkgPath: "simple_suite", goldenName: "simple_suite_output.txt"},
-		{desc: "stdlib by package name", basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/stdlib", goldenName: "stdlib_output.txt"},
-		{desc: "simple suite by package name", basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/simple_suite", goldenName: "simple_suite_output.txt"},
-		{desc: "focus and exclude directives", basedir: "examples", pkgPath: "focus_exclude", goldenName: "focus_exclude_output.txt"},
+		{desc: "auth by relative path", basedir: "examples", pkgPath: "auth", goldenName: "auth_output.txt"},
+		{desc: "cart by relative path", basedir: "examples", pkgPath: "cart", goldenName: "cart_output.txt"},
+		{desc: "auth by package name", basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/auth", goldenName: "auth_output.txt"},
+		{desc: "cart by package name", basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/cart", goldenName: "cart_output.txt"},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -70,18 +69,18 @@ func Test_TestsuiteCLI_ParallelSuite(t *testing.T) {
 	testutils.HackGoWork(t, tmp)
 
 	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/gotest",
-		filepath.Join(tmp, "examples", "parallel_suite"), "-v")
+		filepath.Join(tmp, "examples", "search"), "-v")
 	cmd.Dir = filepath.Join(tmp, "examples")
 	out, err := cmd.CombinedOutput()
 	output := string(out)
 
 	gotest.NoError(t, err, "parallel suite should pass: %s", output)
-	gotest.Contains(t, output, "TestMethodParallelTestSuite")
-	gotest.Contains(t, output, "TestOne")
-	gotest.Contains(t, output, "TestTwo")
-	gotest.Contains(t, output, "TestParallelExtTestSuite")
-	gotest.Contains(t, output, "TestDelta")
-	gotest.Contains(t, output, "TestEpsilon")
+	gotest.Contains(t, output, "TestArticleSearchTestSuite")
+	gotest.Contains(t, output, "TestSearchByTitle")
+	gotest.Contains(t, output, "TestSearchByBody")
+	gotest.Contains(t, output, "TestArticleIndexTestSuite")
+	gotest.Contains(t, output, "TestProductIndexTestSuite")
+	gotest.Contains(t, output, "TestSearchResultTestSuite")
 	gotest.Contains(t, output, "PAUSE")
 	gotest.Contains(t, output, "PASS")
 }
@@ -93,24 +92,21 @@ func Test_TestsuiteCLI_GenericSuite(t *testing.T) {
 	testutils.HackGoWork(t, tmp)
 
 	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/gotest",
-		filepath.Join(tmp, "examples", "generic_suite"), "-v")
+		filepath.Join(tmp, "examples", "search"), "-v")
 	cmd.Dir = filepath.Join(tmp, "examples")
 	out, err := cmd.CombinedOutput()
 	output := string(out)
 
 	gotest.NoError(t, err, "generic suite should pass: %s", output)
-	gotest.Contains(t, output, "TestStringTestSuite")
-	gotest.Contains(t, output, "TestIntTestSuite")
-	gotest.Contains(t, output, "TestGenericExtTestSuite")
-	gotest.Contains(t, output, "TestAlpha")
-	gotest.Contains(t, output, "TestBeta")
+	gotest.Contains(t, output, "TestArticleIndexTestSuite")
+	gotest.Contains(t, output, "TestProductIndexTestSuite")
+	gotest.Contains(t, output, "TestEmptyIndex")
 	gotest.Contains(t, output, "PASS")
 }
 
 func Test_TestsuiteCLI_AllPackages(t *testing.T) {
 	tmp := t.TempDir()
-	testutils.CopyModuleUnderTestToTmp(t, tmp, "../..",
-		append(testutils.DefaultExcludePaths, "examples/shared_fixture")...)
+	testutils.CopyModuleUnderTestToTmp(t, tmp, "../..", testutils.DefaultExcludePaths...)
 	testutils.ActivateTests(t, tmp)
 	testutils.HackGoWork(t, tmp)
 
@@ -120,11 +116,10 @@ func Test_TestsuiteCLI_AllPackages(t *testing.T) {
 	out, _ := cmd.CombinedOutput()
 	output := string(out)
 
-	gotest.Contains(t, output, "TestUnitTestSuite")
-	gotest.Contains(t, output, "TestSimpleTestSuite")
-	gotest.Contains(t, output, "TestF_FocusedTestSuite")
-	gotest.Contains(t, output, "TestMethodParallelTestSuite")
-	gotest.Contains(t, output, "TestStringTestSuite")
+	gotest.Contains(t, output, "TestTokenValidatorTestSuite")
+	gotest.Contains(t, output, "TestShoppingCartTestSuite")
+	gotest.Contains(t, output, "TestArticleSearchTestSuite")
+	gotest.Contains(t, output, "TestNotificationServiceTestSuite")
 }
 
 func Test_TestsuiteCLI_ExitCode(t *testing.T) {

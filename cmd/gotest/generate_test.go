@@ -29,7 +29,7 @@ func TestGenerateOverlay_ProducesValidOutput(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	loaded, err := gotestgen.LoadPackages([]string{"./simple_suite"}, nil)
+	loaded, err := gotestgen.LoadPackages([]string{"./cart"}, nil)
 	if err != nil {
 		t.Fatalf("LoadPackages: %v", err)
 	}

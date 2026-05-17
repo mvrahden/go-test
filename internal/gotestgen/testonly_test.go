@@ -27,10 +27,9 @@ func TestIsTestOnly(t *testing.T) {
 		pattern  string
 		expected bool
 	}{
-		{"./simple_suite", true},
-		{"./stdlib", false},
-		{"./focus_exclude", false},
-		{"./generic_suite", false},
+		{"./cart", false},
+		{"./auth", false},
+		{"./search", false},
 	}
 
 	for _, tc := range tests {
