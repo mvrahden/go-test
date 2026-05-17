@@ -122,8 +122,6 @@ func (s *TokenValidatorTestSuite) TestParseConfig(t *gotest.T) {
 	})
 }
 
-type F_TokenValidatorTestSuite = TokenValidatorTestSuite
-
 type X_DeprecatedOAuthTestSuite struct{}
 
 func (s *X_DeprecatedOAuthTestSuite) TestLegacyFlow(t *gotest.T) {
