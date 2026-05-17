@@ -1,8 +1,6 @@
 # notification — Async Delivery & Temporal Assertions
 
-Demonstrates async testing with temporal assertions, JSON comparison, and
-snapshot testing using a notification dispatcher that processes messages
-asynchronously.
+Demonstrates async testing with temporal assertions, JSON comparison, and snapshot testing using a notification dispatcher that processes messages asynchronously.
 
 ## Structure
 

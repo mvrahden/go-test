@@ -1,7 +1,6 @@
 # repository — Fixtures & Integration Testing
 
-Demonstrates the fixture system and integration test configuration using a
-user repository backed by a `DatabaseFixture` with full lifecycle management.
+Demonstrates the fixture system and integration test configuration using a user repository backed by a `DatabaseFixture` with full lifecycle management.
 
 ## Structure
 

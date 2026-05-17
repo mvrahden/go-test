@@ -1,7 +1,6 @@
 # search — Generics, Parallel Execution & Collection Assertions
 
-Demonstrates generic test suites with type alias instantiation, parallel test
-execution, returning `BeforeEach` for per-test isolation, and collection assertions.
+Demonstrates generic test suites with type alias instantiation, parallel test execution, returning `BeforeEach` for per-test isolation, and collection assertions.
 
 ## Structure
 

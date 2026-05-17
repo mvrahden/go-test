@@ -1,7 +1,6 @@
 # inventory — Comparison Assertions
 
-Demonstrates the full set of ordered comparison assertions using stock level
-management with reserve and restock operations.
+Demonstrates the full set of ordered comparison assertions using stock level management with reserve and restock operations.
 
 ## Structure
 

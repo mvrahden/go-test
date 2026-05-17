@@ -1,7 +1,6 @@
 # auth — Token Validation & Error Handling
 
-Demonstrates error assertions, parameterized testing, and the exclude modifier
-using a JWT-like token validator, password policy, and email format checker.
+Demonstrates error assertions, parameterized testing, and the exclude modifier using a JWT-like token validator, password policy, and email format checker.
 
 ## Structure
 

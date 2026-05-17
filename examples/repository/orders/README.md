@@ -1,7 +1,6 @@
 # orders — Suite Lifecycle & FailFast
 
-Demonstrates `BeforeAll` on the suite (shared state across test methods) and
-`FailFast` configuration using an order placement and lifecycle workflow.
+Demonstrates `BeforeAll` on the suite (shared state across test methods) and `FailFast` configuration using an order placement and lifecycle workflow.
 
 ## Structure
 
