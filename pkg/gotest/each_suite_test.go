@@ -49,13 +49,21 @@ func (s *EachTestSuite) TestCallbackAPI(t *gotest.T) {
 		})
 	})
 
-	t.When("entries lack Desc and Name", func(w *gotest.T) {
-		w.It("falls back to index-based names", func(it *gotest.T) {
+	t.When("entries are anonymous structs", func(w *gotest.T) {
+		w.It("runs each entry", func(it *gotest.T) {
 			count := 0
-			it.Each([]struct{ Val int }{
-				{10}, {20},
-			}, func(tt *gotest.T, tc struct{ Val int }) {
+			it.Each([]struct {
+				Desc string
+				Val  int
+			}{
+				{"processes first value", 10},
+				{"processes second value", 20},
+			}, func(tt *gotest.T, tc struct {
+				Desc string
+				Val  int
+			}) {
 				count++
+				gotest.Greater(tt, tc.Val, 0)
 			})
 			gotest.Equal(it, 2, count)
 		})

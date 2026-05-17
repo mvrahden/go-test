@@ -10,15 +10,25 @@
 
 Go tests that write themselves, organize themselves, and explain themselves.
 
-`gotest` closes the gap between `func TestX(t *testing.T)` and a well-organized test suite through code generation. You write structs, name them well, and the tool handles the rest. No runtime dependencies. No reflection. No lock-in. Just standard Go tests with lifecycle management and structured organization.
+`gotest` closes the gap between `func TestX(t *testing.T)` and a well-organized test suite through code generation.
+You write structs, name them well, and the tool handles the rest.
+No runtime dependencies.
+No reflection.
+No lock-in.
+Just standard Go tests with lifecycle management and structured organization.
 
 ## Why gotest?
 
-Go's `testing` package gives you `func TestX(t *testing.T)` and nothing more. Setup/teardown logic is copy-pasted or buried in `TestMain`. As test suites grow, organization becomes a discipline problem rather than a tooling one.
+Go's `testing` package gives you `func TestX(t *testing.T)` and nothing more.
+Setup/teardown logic is copy-pasted or buried in `TestMain`.
+As test suites grow, organization becomes a discipline problem rather than a tooling one.
 
-**testify/suite** solves organization but adds runtime reflection, interface dispatch, and a `suite.Run(t, new(MySuite))` ceremony in every file. Test output is standard — but the mechanism behind it isn't.
+**testify/suite** solves organization but adds runtime reflection, interface dispatch, and a `suite.Run(t, new(MySuite))` ceremony in every file.
+Test output is standard — but the mechanism behind it isn't.
 
-**gotest** takes a different approach: you write structs with naming conventions, and a code generator produces the `func Test*` wrappers, lifecycle wiring, and `t.Run` nesting that you'd write by hand. The generated code is deleted after tests run. What remains is standard `go test` output, zero runtime dependencies, and no lock-in — `gotest clean` removes all traces, and your test structs still compile.
+**gotest** takes a different approach: you write structs with naming conventions, and a code generator produces the `func Test*` wrappers, lifecycle wiring, and `t.Run` nesting that you'd write by hand.
+The generated code is deleted after tests run.
+What remains is standard `go test` output, zero runtime dependencies, and no lock-in — `gotest clean` removes all traces, and your test structs still compile.
 
 ## Install
 
@@ -77,7 +87,8 @@ Output is standard `go test` output:
 --- PASS: TestUserServiceTestSuite (0.01s)
 ```
 
-No generated code leaks into your workflow. `gotest` generates it before tests run and cleans it up after.
+No generated code leaks into your workflow.
+`gotest` generates it before tests run and cleans it up after.
 
 ## Features
 
@@ -92,7 +103,9 @@ func (s *MySuite) BeforeEach(t *gotest.T) {} // before each test method
 func (s *MySuite) AfterEach(t *gotest.T)  {} // after each test method
 ```
 
-`*gotest.T` exposes `t.Context()` (mirrors Go 1.24's `testing.T.Context()`), plus the full DSL (`t.It()`, `t.When()`, `t.MatchSnapshot()`). Use `*testing.T` for plain stdlib tests — the functional assertions (`gotest.Equal(t, ...)`) still work with either type. You can mix freely within a single suite:
+`*gotest.T` exposes `t.Context()` (mirrors Go 1.24's `testing.T.Context()`), plus the full DSL (`t.It()`, `t.When()`, `t.MatchSnapshot()`).
+Use `*testing.T` for plain stdlib tests — the functional assertions (`gotest.Equal(t, ...)`) still work with either type.
+You can mix freely within a single suite:
 
 ```go
 func (s *MySuite) BeforeEach(t *testing.T) {} // stdlib is fine here
@@ -100,7 +113,9 @@ func (s *MySuite) TestPlain(t *testing.T)  {} // no gotest import needed
 func (s *MySuite) TestRich(t *gotest.T)    {} // full DSL available
 ```
 
-**Resource management through suite fields.** Resources that need setup and teardown (database pools, caches, services) should be stored as suite fields and managed through `BeforeEach`/`AfterEach`. Avoid using `defer` or `t.T().Cleanup()` in test methods — these bypass the suite lifecycle and scatter resource management across test code:
+**Resource management through suite fields.**
+Resources that need setup and teardown (database pools, caches, services) should be stored as suite fields and managed through `BeforeEach`/`AfterEach`.
+Avoid using `defer` or `t.T().Cleanup()` in test methods — these bypass the suite lifecycle and scatter resource management across test code:
 
 ```go
 type AuthServiceTestSuite struct {
@@ -132,7 +147,8 @@ func (s *AuthServiceTestSuite) TestPermissions(t *gotest.T) {
 }
 ```
 
-When different test methods need fundamentally different service configurations, split them into separate suites — each with its own `BeforeEach`/`AfterEach`. This keeps resource management declarative and predictable.
+When different test methods need fundamentally different service configurations, split them into separate suites — each with its own `BeforeEach`/`AfterEach`.
+This keeps resource management declarative and predictable.
 
 Fixture hooks receive `context.Context` and return `error` — the generated wrapper reports failures with automatic attribution:
 
@@ -143,13 +159,18 @@ func (f *MyFixture) BeforeEach(ctx context.Context) error { return nil }
 func (f *MyFixture) AfterEach(ctx context.Context) error  { return nil }
 ```
 
-Setup hooks (`BeforeAll`, `BeforeEach`) receive `t.Context()` — cancelled when the test ends, carries the test deadline. Cleanup hooks (`AfterAll`, `AfterEach`) receive `context.Background()` — cleanup must proceed even after the test context is cancelled. Requires Go 1.24+.
+Setup hooks (`BeforeAll`, `BeforeEach`) receive `t.Context()` — cancelled when the test ends, carries the test deadline.
+Cleanup hooks (`AfterAll`, `AfterEach`) receive `context.Background()` — cleanup must proceed even after the test context is cancelled.
+Requires Go 1.24+.
 
-All hooks are optional. `AfterAll` runs via `t.Cleanup` (LIFO). `AfterEach` is deferred, so it runs even on `t.Fatal()`.
+All hooks are optional.
+`AfterAll` runs via `t.Cleanup` (LIFO).
+`AfterEach` is deferred, so it runs even on `t.Fatal()`.
 
 ### Fixtures
 
-Fixtures replace `TestMain` + package-level singletons with convention-driven setup. Any struct ending in `Fixture` is a package fixture; ending in `SharedFixture` is a cross-package shared fixture.
+Fixtures replace `TestMain` + package-level singletons with convention-driven setup.
+Any struct ending in `Fixture` is a package fixture; ending in `SharedFixture` is a cross-package shared fixture.
 
 ```go
 // fixture_test.go
@@ -188,7 +209,9 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 }
 ```
 
-Fixtures support the same lifecycle hooks as suites. `BeforeAll`/`AfterAll` run once around all suites bound to the fixture. `BeforeEach`/`AfterEach` wrap every individual test case, running outside the suite's own hooks:
+Fixtures support the same lifecycle hooks as suites.
+`BeforeAll`/`AfterAll` run once around all suites bound to the fixture.
+`BeforeEach`/`AfterEach` wrap every individual test case, running outside the suite's own hooks:
 
 ```
 Fixture.BeforeEach
@@ -227,7 +250,8 @@ For cross-package shared state (e.g. a database container shared across integrat
 
 ### Configuration
 
-Every fixture and suite runs with sensible defaults — 2-minute fixture timeout, 30-second per-test timeout. Override with optional marker methods:
+Every fixture and suite runs with sensible defaults — 2-minute fixture timeout, 30-second per-test timeout.
+Override with optional marker methods:
 
 ```go
 func (f *InfraFixture) FixtureConfig() gotest.FixtureConfig {
@@ -250,7 +274,8 @@ func (s *BatchTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-Only non-zero fields override. Use negative duration to explicitly disable a timeout (`Timeout: -1`).
+Only non-zero fields override.
+Use negative duration to explicitly disable a timeout (`Timeout: -1`).
 
 Preset constructors for common scenarios:
 
@@ -290,7 +315,8 @@ func (s *IntegrationTestSuite) SuiteGuard() string {
 }
 ```
 
-Returns a non-empty reason to skip the entire suite. Unlike `X_` (static exclude), `SuiteGuard` makes the decision at runtime — useful for integration tests that need external services.
+Returns a non-empty reason to skip the entire suite.
+Unlike `X_` (static exclude), `SuiteGuard` makes the decision at runtime — useful for integration tests that need external services.
 
 ### BDD Vocabulary
 
@@ -304,13 +330,17 @@ func (s *Suite) TestCreate(t *gotest.T) {
 }
 ```
 
-`When` groups context. `It` specifies behavior. Both map to `t.Run` under the hood.
+`When` groups context.
+`It` specifies behavior.
+Both map to `t.Run` under the hood.
 
 ### Parallel Tests
 
 **Suite-level parallelism** is automatic — the `gotest` runner executes each suite's test binary as a separate subprocess, giving full process isolation with zero shared state between suites.
 
-**Method-level parallelism** is opt-in via `SuiteConfig{Parallel: true}`. When enabled, each test method runs concurrently. Because the suite struct is shared, parallel methods can't safely mutate it — instead, `BeforeEach` returns a per-test context struct that each method receives as a second argument:
+**Method-level parallelism** is opt-in via `SuiteConfig{Parallel: true}`.
+When enabled, each test method runs concurrently.
+Because the suite struct is shared, parallel methods can't safely mutate it — instead, `BeforeEach` returns a per-test context struct that each method receives as a second argument:
 
 ```go
 type MethodParallelCtx struct {
@@ -395,7 +425,8 @@ t.Each(cases, func(it *gotest.T, tc Case) {
 })
 ```
 
-Each entry becomes a subtest. Uses `Desc` or `Name` field for the test name, falls back to `#0`, `#1`, etc.
+Each entry becomes a subtest.
+Uses `Desc` or `Name` field for the test name, falls back to `#0`, `#1`, etc.
 
 ### Async Assertions
 
@@ -411,7 +442,8 @@ t.Consistently(500*time.Millisecond, 50*time.Millisecond, func(poll *gotest.T) {
 })
 ```
 
-Poll callbacks receive a `*gotest.T` — use the full assertion library inside. Failures during polling are collected, not propagated, until the timeout.
+Poll callbacks receive a `*gotest.T` — use the full assertion library inside.
+Failures during polling are collected, not propagated, until the timeout.
 
 ### Snapshot Testing
 
@@ -422,7 +454,10 @@ func (s *Suite) TestRender(t *gotest.T) {
 }
 ```
 
-Snapshots are stored in `testdata/__snapshots__/`. On first run, the snapshot is created. On subsequent runs, the output is compared. Update all snapshots with:
+Snapshots are stored in `testdata/__snapshots__/`.
+On first run, the snapshot is created.
+On subsequent runs, the output is compared.
+Update all snapshots with:
 
 ```bash
 gotest --update-snapshots ./...
@@ -460,7 +495,8 @@ MySuite struct      ƒƒ_psuite_test.go        func TestMySuite(t *testing.T)
                                                  ...
 ```
 
-The generated code is what a careful developer would write by hand: `t.Run`, `t.Cleanup`, `defer`, `sync.WaitGroup`. No reflection, no interface dispatch.
+The generated code is what a careful developer would write by hand: `t.Run`, `t.Cleanup`, `defer`, `sync.WaitGroup`.
+No reflection, no interface dispatch.
 
 ## Naming Conventions
 
@@ -524,7 +560,8 @@ gotest watch ./... -v
 gotest watch ./... --spec     # watch + spec view
 ```
 
-Only the affected package is re-run. Combine with `F_` prefix for a tight feedback loop — only focused tests run on each save.
+Only the affected package is re-run.
+Combine with `F_` prefix for a tight feedback loop — only focused tests run on each save.
 
 ## Commands
 
@@ -552,11 +589,13 @@ Catch common mistakes in test suites with static analysis:
 gotest lint ./...
 ```
 
-Detects: lifecycle hook typos, value receivers on suite methods, missing `AfterAll` when `BeforeAll` exists, committed `F_` prefixes, and orphaned generated files. Also available as a standalone binary (`gotest-lint`) compatible with `golangci-lint` via `go/analysis`.
+Detects: lifecycle hook typos, value receivers on suite methods, missing `AfterAll` when `BeforeAll` exists, committed `F_` prefixes, and orphaned generated files.
+Also available as a standalone binary (`gotest-lint`) compatible with `golangci-lint` via `go/analysis`.
 
 ## VS Code Extension
 
-The **[Go Test Suites](https://marketplace.visualstudio.com/items?itemName=mvrahden.vscode-gotest)** extension brings first-class IDE support: suite-aware Test Explorer, CodeLens run/debug buttons, coverage gutters, watch mode, spec view, focus/exclude quick fixes, and suite scaffolding. Install via `code --install-extension mvrahden.vscode-gotest`.
+The **[Go Test Suites](https://marketplace.visualstudio.com/items?itemName=mvrahden.vscode-gotest)** extension brings first-class IDE support: suite-aware Test Explorer, CodeLens run/debug buttons, coverage gutters, watch mode, spec view, focus/exclude quick fixes, and suite scaffolding.
+Install via `code --install-extension mvrahden.vscode-gotest`.
 
 ## License
 

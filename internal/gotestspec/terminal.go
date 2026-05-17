@@ -92,6 +92,9 @@ func renderNode(w io.Writer, n *Node, depth int, c colors) {
 	}
 
 	suffix := ""
+	if n.External {
+		suffix = fmt.Sprintf(" %s— EXTERNAL%s", c.dim, c.reset)
+	}
 	if n.Focused {
 		suffix = fmt.Sprintf(" %s— FOCUSED%s", c.yellow, c.reset)
 	} else if n.Excluded {

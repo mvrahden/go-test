@@ -796,7 +796,7 @@ function walkReportNode(
 
   let label = node.display;
   const tags: string[] = [];
-  if (node.external) tags.push("EXT.");
+  if (node.external) tags.push("EXTERNAL");
   if (node.focused) tags.push("FOCUSED");
   else if (node.excluded) tags.push("SKIPPED");
   if (tags.length > 0) label += " — " + tags.join(", ");

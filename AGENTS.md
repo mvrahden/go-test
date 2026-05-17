@@ -1,6 +1,8 @@
 # gotest — Agent Reference
 
-gotest is a code-generation framework for Go test suites. You write suite structs with lifecycle methods and test cases; the `gotest generate` command produces the test harness (TestMain, test functions, lifecycle wiring). The generated code is not hand-edited.
+gotest is a code-generation framework for Go test suites.
+You write suite structs with lifecycle methods and test cases; the `gotest generate` command produces the test harness (TestMain, test functions, lifecycle wiring).
+The generated code is not hand-edited.
 
 All assertions accept both `*gotest.T` and `*testing.T` as first argument.
 
@@ -8,21 +10,40 @@ All assertions accept both `*gotest.T` and `*testing.T` as first argument.
 
 These override any default instincts from stdlib `testing` or other Go test frameworks.
 
-**Never call `t.T().Helper()`.** gotest uses `CallerTrace` to automatically walk the call stack and attribute assertion failures to the correct user code location. Calling `t.T().Helper()` is harmless but unnecessary noise — it's already handled by the framework. Same applies to `t.Helper()` in methods that accept `*testing.T` directly.
+**Never call `t.T().Helper()`.**
+gotest uses `CallerTrace` to automatically walk the call stack and attribute assertion failures to the correct user code location.
+Calling `t.T().Helper()` is harmless but unnecessary noise — it's already handled by the framework.
+Same applies to `t.Helper()` in methods that accept `*testing.T` directly.
 
-**Never call `t.T().Cleanup()` inside suite methods.** Use `BeforeAll`/`AfterAll` for suite-level resources and `BeforeEach`/`AfterEach` for per-test resources. The generated harness manages cleanup ordering (LIFO). Calling `t.T().Cleanup()` inside suite methods breaks the predictable lifecycle.
+**Never call `t.T().Cleanup()` inside suite methods.**
+Use `BeforeAll`/`AfterAll` for suite-level resources and `BeforeEach`/`AfterEach` for per-test resources.
+The generated harness manages cleanup ordering (LIFO).
+Calling `t.T().Cleanup()` inside suite methods breaks the predictable lifecycle.
 
-**Never call `t.T().Fatalf()` in reusable test helpers.** Use gotest assertions instead. Helpers that call `t.T()` panic inside `Eventually`/`Consistently` because the collecting T has no underlying `*testing.T`. This is the most common source of runtime panics in gotest code.
+**Never call `t.T().Fatalf()` in reusable test helpers.**
+Use gotest assertions instead.
+Helpers that call `t.T()` panic inside `Eventually`/`Consistently` because the collecting T has no underlying `*testing.T`.
+This is the most common source of runtime panics in gotest code.
 
-**Never use `t.T().Skip()` for environment gating.** Use `SuiteGuard() string` instead. SuiteGuard runs before shared fixture wiring and `t.Parallel()`, avoiding wasted work. `t.T().Skip()` inside `BeforeAll` runs after those expensive operations.
+**Never use `t.T().Skip()` for environment gating.**
+Use `SuiteGuard() string` instead.
+SuiteGuard runs before shared fixture wiring and `t.Parallel()`, avoiding wasted work.
+`t.T().Skip()` inside `BeforeAll` runs after those expensive operations.
 
-**`Nil`/`NotNil` assertions do not exist.** This is deliberate. Go generics cannot constrain to "nillable types", so a generic `NotNil(t, x)` would silently accept non-nillable types (e.g. `int`, `struct{}`), creating logical bugs with no compile-time warning. Use `NotZero`/`Zero` for pointer, interface, and channel nil checks (these types satisfy `comparable`). For slices, maps, and channels, prefer `Empty`/`NotEmpty` — a nil slice and an empty slice are equivalent for most test intent. Use `True(t, x != nil)` only when the nil vs empty distinction actually matters.
+**`Nil`/`NotNil` assertions do not exist.**
+This is deliberate.
+Go generics cannot constrain to "nillable types", so a generic `NotNil(t, x)` would silently accept non-nillable types (e.g. `int`, `struct{}`), creating logical bugs with no compile-time warning.
+Use `NotZero`/`Zero` for pointer, interface, and channel nil checks (these types satisfy `comparable`).
+For slices, maps, and channels, prefer `Empty`/`NotEmpty` — a nil slice and an empty slice are equivalent for most test intent.
+Use `True(t, x != nil)` only when the nil vs empty distinction actually matters.
 
-**`HasPrefix`/`HasSuffix` assertions do not exist.** Use `Regexp(t, "^prefix", str)` or `Regexp(t, "suffix$", str)`.
+**`HasPrefix`/`HasSuffix` assertions do not exist.**
+Use `Regexp(t, "^prefix", str)` or `Regexp(t, "suffix$", str)`.
 
 ## Assertions
 
-All assertion functions call `FailNow()` on failure (fatal — test stops immediately). All accept optional trailing `msgAndArgs ...any` for custom error messages.
+All assertion functions call `FailNow()` on failure (fatal — test stops immediately).
+All accept optional trailing `msgAndArgs ...any` for custom error messages.
 
 ### Unconditional Failure
 
@@ -30,7 +51,8 @@ All assertion functions call `FailNow()` on failure (fatal — test stops immedi
 gotest.Fail(t, msgAndArgs ...any)                    // immediately fails with message
 ```
 
-Use in unreachable branches (`default` in exhaustive switches, after calls that must not return). Prefer over `gotest.True(t, false, "msg")`.
+Use in unreachable branches (`default` in exhaustive switches, after calls that must not return).
+Prefer over `gotest.True(t, false, "msg")`.
 
 ### Equality
 
@@ -53,7 +75,8 @@ gotest.Zero[V comparable](t, value V)               // value == zero value for t
 gotest.NotZero[V comparable](t, value V)             // value != zero value for type
 ```
 
-`comparable` includes: pointers, interfaces, channels, numerics, strings, bools, structs of comparables, arrays of comparables. It excludes: slices, maps, functions.
+`comparable` includes: pointers, interfaces, channels, numerics, strings, bools, structs of comparables, arrays of comparables.
+It excludes: slices, maps, functions.
 
 For nil checks on slices, maps, or functions: `gotest.True(t, x != nil)`.
 
@@ -145,9 +168,14 @@ t.Consistently(2*time.Second, 100*time.Millisecond, func(poll *gotest.T) {
 })
 ```
 
-The method form creates a **collecting T** with `t: nil`. On each tick, the callback runs; if any assertion fails, it retries on the next tick. On timeout, the last failure is reported.
+The method form creates a **collecting T** with `t: nil`.
+On each tick, the callback runs; if any assertion fails, it retries on the next tick.
+On timeout, the last failure is reported.
 
-**Critical constraint:** Inside the callback, `poll.T()` panics. All code in the callback must use gotest assertions only. Any helper that calls `t.T()` will panic. This is by design — the collecting T intercepts failures without aborting, enabling retry semantics.
+**Critical constraint:** Inside the callback, `poll.T()` panics.
+All code in the callback must use gotest assertions only.
+Any helper that calls `t.T()` will panic.
+This is by design — the collecting T intercepts failures without aborting, enabling retry semantics.
 
 ## Suite Conventions
 
@@ -181,7 +209,8 @@ func (s *MyTestSuite) BeforeEach(t *gotest.T) {}  // before each test
 func (s *MyTestSuite) AfterEach(t *gotest.T)  {}  // after each test
 ```
 
-All are optional. Execution order: BeforeAll -> (BeforeEach -> Test -> AfterEach)* -> AfterAll.
+All are optional.
+Execution order: BeforeAll -> (BeforeEach -> Test -> AfterEach)* -> AfterAll.
 For parallel test cases, AfterAll waits for all parallel tests to complete.
 
 ### SuiteConfig (optional)
@@ -206,7 +235,8 @@ func (s *MyTestSuite) SuiteGuard() string {
 }
 ```
 
-Returns empty string to run, non-empty to skip with that reason. Runs before shared fixture wiring, before `t.Parallel()`, before any expensive work.
+Returns empty string to run, non-empty to skip with that reason.
+Runs before shared fixture wiring, before `t.Parallel()`, before any expensive work.
 
 ### Focus & Exclude prefixes
 
@@ -225,11 +255,16 @@ Focus and exclude apply independently at both suite and test case levels.
 
 ## Parallel Semantics
 
-**Suite-level** (`*TestSuiteParallel` suffix): The entire suite runs concurrently with other top-level tests. Methods within the suite run sequentially relative to each other. Safe to share suite struct state `s` across methods.
+**Suite-level** (`*TestSuiteParallel` suffix): The entire suite runs concurrently with other top-level tests.
+Methods within the suite run sequentially relative to each other.
+Safe to share suite struct state `s` across methods.
 
-**Method-level** (`TestParallel*` prefix): Individual test cases run concurrently within the same suite. Suite struct state `s` is shared — writing to `s` fields from parallel methods is a data race. Use method-local variables or synchronization.
+**Method-level** (`TestParallel*` prefix): Individual test cases run concurrently within the same suite.
+Suite struct state `s` is shared — writing to `s` fields from parallel methods is a data race.
+Use method-local variables or synchronization.
 
-These are independent. A `TestSuiteParallel` can also have `TestParallel*` methods (suite runs parallel with others AND methods run parallel within it).
+These are independent.
+A `TestSuiteParallel` can also have `TestParallel*` methods (suite runs parallel with others AND methods run parallel within it).
 
 ## Other T Methods
 

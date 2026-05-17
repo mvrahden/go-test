@@ -1,6 +1,7 @@
 # Fixtures
 
-Fixtures replace `TestMain` + package-level singletons with convention-driven setup. Any struct whose name ends in `Fixture` is a package fixture; any struct ending in `SharedFixture` is a cross-package shared fixture.
+Fixtures replace `TestMain` + package-level singletons with convention-driven setup.
+Any struct whose name ends in `Fixture` is a package fixture; any struct ending in `SharedFixture` is a cross-package shared fixture.
 
 ## Package Fixture (`*Fixture` suffix)
 
@@ -47,10 +48,12 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 ### Rules
 
 - One root `*Fixture` per package (nested child fixtures are allowed).
-- The fixture struct must have `BeforeAll(ctx context.Context) error`. `AfterAll(ctx context.Context) error` is optional.
+- The fixture struct must have `BeforeAll(ctx context.Context) error`.
+  `AfterAll(ctx context.Context) error` is optional.
 - `BeforeEach(t *gotest.T)` and `AfterEach(t *gotest.T)` are optional and run around every test case in all child suites.
 - TestSuites reference the fixture via a named pointer field (`Fixture *E2ESetupFixture`).
-- The code generator owns `TestMain` when a fixture is present. Remove any user-defined `TestMain`.
+- The code generator owns `TestMain` when a fixture is present.
+  Remove any user-defined `TestMain`.
 
 ### Generated test output
 
@@ -63,7 +66,8 @@ Filter with `-run Test_E2ESetupFixture/BatchTestSuite` to run only batch tests.
 
 ## Nested Fixtures (Level 2)
 
-Fixtures can reference other fixtures via named pointer fields to form a dependency tree. The root fixture's `BeforeAll` runs first, then each child fixture's `BeforeAll`.
+Fixtures can reference other fixtures via named pointer fields to form a dependency tree.
+The root fixture's `BeforeAll` runs first, then each child fixture's `BeforeAll`.
 
 ```go
 type InfraFixture struct {
@@ -99,7 +103,9 @@ Filter with `-run Test_InfraFixture/ReconcilerTestSuite` to skip the API stack e
 
 ## Shared Fixtures (Level 3, `*SharedFixture` suffix)
 
-Shared fixtures run in a subprocess managed by the `gotest` CLI. They start once per CLI invocation and are shared across all packages. State crosses the process boundary via JSON serialization, with `Hydrate` handling reconstruction of non-serializable resources.
+Shared fixtures run in a subprocess managed by the `gotest` CLI.
+They start once per CLI invocation and are shared across all packages.
+State crosses the process boundary via JSON serialization, with `Hydrate` handling reconstruction of non-serializable resources.
 
 ```go
 // tests/fixtures/postgres.go
@@ -143,7 +149,9 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
 
 ### Rules
 
-- Shared fixture types must live in a **non-internal** package (not under `internal/`). The setup subprocess compiles outside the module tree and cannot import `internal/` paths. Shared fixtures may freely import and depend on `internal/` packages — only the fixture type's own package path is restricted.
+- Shared fixture types must live in a **non-internal** package (not under `internal/`).
+  The setup subprocess compiles outside the module tree and cannot import `internal/` paths.
+  Shared fixtures may freely import and depend on `internal/` packages — only the fixture type's own package path is restricted.
 - `BeforeAll(ctx context.Context) error` and `AfterAll(ctx context.Context) error` — runs in the subprocess.
 - `Hydrate(ctx context.Context) error` and `Dehydrate(ctx context.Context) error` — runs in the test process, optional.
 - `BeforeEach`/`AfterEach` are not allowed on shared fixtures.
@@ -152,9 +160,11 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
 
 ### State transfer
 
-In the example above, `ConnStr` and `Port` are transferable (not assigned in `Hydrate`'s call chain). `Pool` is local (assigned in `connect()`, which is called from `Hydrate`).
+In the example above, `ConnStr` and `Port` are transferable (not assigned in `Hydrate`'s call chain).
+`Pool` is local (assigned in `connect()`, which is called from `Hydrate`).
 
-Convention: in `Hydrate`, assign to local fields. Read transferred fields but do not reassign them — use local variables for any transformation.
+Convention: in `Hydrate`, assign to local fields.
+Read transferred fields but do not reassign them — use local variables for any transformation.
 
 ### Using shared fixtures in test suites
 
@@ -172,7 +182,8 @@ func (s *UserTestSuite) TestCreate(t *gotest.T) {
 }
 ```
 
-A standalone suite can reference multiple shared fixtures. Suites without any shared fixture fields coexist in the same package without issue.
+A standalone suite can reference multiple shared fixtures.
+Suites without any shared fixture fields coexist in the same package without issue.
 
 **Fixture-bound suites** wire shared fixtures through a package fixture to add package-specific resources:
 
@@ -252,7 +263,8 @@ Key improvements:
 
 ## Resource Management
 
-Test resources that need setup and teardown (database connections, caches, services) should be stored as suite fields and managed through lifecycle hooks. Avoid using `defer` or `t.T().Cleanup()` in test methods — these bypass the suite lifecycle.
+Test resources that need setup and teardown (database connections, caches, services) should be stored as suite fields and managed through lifecycle hooks.
+Avoid using `defer` or `t.T().Cleanup()` in test methods — these bypass the suite lifecycle.
 
 ```go
 type OrderTestSuite struct {
@@ -281,4 +293,5 @@ func (s *OrderTestSuite) TestCreate(t *gotest.T) {
 }
 ```
 
-When different test methods need fundamentally different service configurations, split them into separate suites — each with its own `BeforeEach`/`AfterEach`. This keeps resource management declarative and co-located.
+When different test methods need fundamentally different service configurations, split them into separate suites — each with its own `BeforeEach`/`AfterEach`.
+This keeps resource management declarative and co-located.
