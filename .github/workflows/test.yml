@@ -24,11 +24,11 @@ jobs:
       - name: Init workspace
         run: go work init . ./examples
       - name: Vet
-        run: go vet ./...
+        run: go vet ./... ./examples/...
       - name: Lint
-        run: go run ./cmd/gotest-lint ./...
+        run: go run ./cmd/gotest-lint ./... ./examples/...
       - name: Test
-        run: go run ./cmd/gotest spec --no-color --min=40 --output=spec.txt ./... -race -coverprofile=coverage.out
+        run: go run ./cmd/gotest spec --no-color --min=40 --output=spec.txt ./... ./examples/... -race -coverprofile=coverage.out
       - name: Summary
         if: always()
         run: |

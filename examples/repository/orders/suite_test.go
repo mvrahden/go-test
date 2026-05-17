@@ -14,6 +14,10 @@ func (s *OrderRepositoryTestSuite) BeforeAll(t *gotest.T) {
 	s.store = newOrderStore()
 }
 
+func (s *OrderRepositoryTestSuite) AfterAll(t *gotest.T) {
+	s.store = nil
+}
+
 func (s *OrderRepositoryTestSuite) TestPlaceOrder(t *gotest.T) {
 	t.When("stock is sufficient", func(t *gotest.T) {
 		order, err := s.store.Place("ord-1", "Widget", 5, 10)

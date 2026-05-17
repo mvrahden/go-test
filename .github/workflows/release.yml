@@ -21,8 +21,8 @@ jobs:
           go-version: stable
       - name: Init workspace
         run: go work init . ./examples
-      - run: go vet ./...
-      - run: go run ./cmd/gotest spec --no-color --min=40 ./... -race
+      - run: go vet ./... ./examples/...
+      - run: go run ./cmd/gotest spec --no-color --min=40 ./... ./examples/... -race
 
   build:
     runs-on: ubuntu-latest
