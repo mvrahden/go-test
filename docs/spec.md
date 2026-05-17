@@ -2,9 +2,17 @@
 
 Go tests that write themselves, organize themselves, and explain themselves.
 
-`gotest` closes the gap between `func TestX(t *testing.T)` and a well-organized test suite through code generation. Developers write structs, name them well, and the tool handles the rest. No runtime dependencies. No reflection. No lock-in. Just standard Go tests with lifecycle management and structured organization.
+`gotest` closes the gap between `func TestX(t *testing.T)` and a well-organized test suite through code generation.
+Developers write structs, name them well, and the tool handles the rest.
+No runtime dependencies.
+No reflection.
+No lock-in.
+Just standard Go tests with lifecycle management and structured organization.
 
-A Go developer should be able to `go install` this tool and immediately write better-organized tests without learning a framework. The naming conventions are the API. The generated code is the implementation. The output is `go test` output.
+A Go developer should be able to `go install` this tool and immediately write better-organized tests without learning a framework.
+The naming conventions are the API.
+The generated code is the implementation.
+The output is `go test` output.
 
 ---
 
@@ -14,29 +22,41 @@ Ranked. When they conflict, higher-ranked principles win.
 
 ### 1. Standard Go output, always
 
-Every generated test is a `func Test*(t *testing.T)`. Every line of output is standard `go test` output. Every CI system, IDE, coverage tool, and profiler works unchanged.
+Every generated test is a `func Test*(t *testing.T)`.
+Every line of output is standard `go test` output.
+Every CI system, IDE, coverage tool, and profiler works unchanged.
 
 ### 2. The naming IS the API
 
-No config files. No struct tags. No annotations. No registration calls. A developer reads the naming conventions once and never opens documentation again.
+No config files.
+No struct tags.
+No annotations.
+No registration calls.
+A developer reads the naming conventions once and never opens documentation again.
 
 ### 3. Zero runtime cost
 
-The tool generates code at build time and cleans it up after. At test execution time, there is no `go-test` code in the call stack (except the thin `gotest.T` wrapper). No reflection, no interface dispatch, no type assertions. The generated code is what a careful developer would write by hand.
+The tool generates code at build time and cleans it up after.
+At test execution time, there is no `go-test` code in the call stack (except the thin `gotest.T` wrapper).
+No reflection, no interface dispatch, no type assertions.
+The generated code is what a careful developer would write by hand.
 
 ### 4. Invisible until needed
 
-A developer who has never heard of `go-test` can read a test suite struct and understand what it does. A developer who runs `go test` directly (without the CLI) gets a compilation error for the missing generated file — not silent wrong behavior.
+A developer who has never heard of `go-test` can read a test suite struct and understand what it does.
+A developer who runs `go test` directly (without the CLI) gets a compilation error for the missing generated file — not silent wrong behavior.
 
 ### 5. Adopt incrementally, eject freely
 
-Existing `func Test*` tests coexist with suites in the same package. Removing the tool means deleting suite structs and writing the equivalent `func Test*` functions — the generated code shows exactly what to write.
+Existing `func Test*` tests coexist with suites in the same package.
+Removing the tool means deleting suite structs and writing the equivalent `func Test*` functions — the generated code shows exactly what to write.
 
 ---
 
 ## Conceptual Model
 
-Test suites are behavioral specifications. Every level of the test hierarchy maps to a specification concept:
+Test suites are behavioral specifications.
+Every level of the test hierarchy maps to a specification concept:
 
 ```
 struct  = Subject     "UserService"
@@ -46,7 +66,8 @@ It()    = Behavior    "creates the user"
 Each()  = Variants    "standard format", "missing @", "empty string"
 ```
 
-The naming conventions at the struct/method level and the string descriptions at the `It`/`When` level together form a complete behavioral specification. The tool generates the bridge code (lifecycle, parallel coordination, focus/exclude) and can render the full specification in human-readable form.
+The naming conventions at the struct/method level and the string descriptions at the `It`/`When` level together form a complete behavioral specification.
+The tool generates the bridge code (lifecycle, parallel coordination, focus/exclude) and can render the full specification in human-readable form.
 
 ---
 
@@ -87,7 +108,10 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 
 ### Disambiguation
 
-The first positional arg is checked against the known subcommand set. If it matches, it's consumed. Otherwise, it's a package pattern. `gotest ./watch` tests the `watch` package; `gotest watch` enters watch mode.
+The first positional arg is checked against the known subcommand set.
+If it matches, it's consumed.
+Otherwise, it's a package pattern.
+`gotest ./watch` tests the `watch` package; `gotest watch` enters watch mode.
 
 ### Examples
 
@@ -128,7 +152,8 @@ Requirements:
 
 ### Lifecycle Hooks
 
-All hooks are optional. Unimplemented hooks become no-ops in the generated code.
+All hooks are optional.
+Unimplemented hooks become no-ops in the generated code.
 
 | Method | Signature | Semantics |
 |--------|-----------|-----------|
@@ -157,9 +182,11 @@ BeforeAll
 AfterAll (via t.Cleanup — LIFO, runs after all subtests)
 ```
 
-The returning form creates a typed per-test context that flows through the lifecycle bracket. Each test method receives its own context instance, enabling safe method-level parallelism without shared mutable state on the suite struct.
+The returning form creates a typed per-test context that flows through the lifecycle bracket.
+Each test method receives its own context instance, enabling safe method-level parallelism without shared mutable state on the suite struct.
 
-`AfterAll` is registered via `t.Cleanup` before `BeforeAll` runs, ensuring it executes even if `BeforeAll` registers its own cleanup functions (LIFO ordering). `AfterEach` is `defer`-ed, ensuring it runs even when `t.Fatal()` triggers `runtime.Goexit()`.
+`AfterAll` is registered via `t.Cleanup` before `BeforeAll` runs, ensuring it executes even if `BeforeAll` registers its own cleanup functions (LIFO ordering).
+`AfterEach` is `defer`-ed, ensuring it runs even when `t.Fatal()` triggers `runtime.Goexit()`.
 
 Hooks accept either `*gotest.T` or `*testing.T`.
 
@@ -176,7 +203,8 @@ When `BeforeEach` returns a value, the following rules are enforced at generatio
 
 ### Test Cases
 
-Any exported method matching `^(?:X_|F_)?Test.+$` is a test case. Each becomes a `t.Run` subtest in the generated code.
+Any exported method matching `^(?:X_|F_)?Test.+$` is a test case.
+Each becomes a `t.Run` subtest in the generated code.
 
 ```go
 func (s *Suite) TestSomething(t *gotest.T) {}
@@ -216,7 +244,8 @@ FAIL: focus prefix detected — remove F_ before merging:
 
 ### SuiteGuard
 
-A suite can define a `SuiteGuard()` method that returns a reason string. If non-empty, the entire suite is skipped at runtime with `t.Skipf("suite guard: %s", reason)`:
+A suite can define a `SuiteGuard()` method that returns a reason string.
+If non-empty, the entire suite is skipped at runtime with `t.Skipf("suite guard: %s", reason)`:
 
 ```go
 func (s *MySuite) SuiteGuard() string {
@@ -231,9 +260,13 @@ Unlike `X_` (compile-time exclusion), `SuiteGuard` evaluates at runtime — usef
 
 ### Parallel Execution
 
-**Suite-level parallelism** is handled by the `gotest` CLI runner, which executes each suite's test binary as a separate subprocess. This provides process-level isolation between suites. The generated `func Test*` does **not** call `t.Parallel()` — parallelism is at the runner level, not the Go test scheduler level.
+**Suite-level parallelism** is handled by the `gotest` CLI runner, which executes each suite's test binary as a separate subprocess.
+This provides process-level isolation between suites.
+The generated `func Test*` does **not** call `t.Parallel()` — parallelism is at the runner level, not the Go test scheduler level.
 
-**Method-level parallelism** is opt-in via `SuiteConfig{Parallel: true}`. Each generated subtest calls `it.Parallel()` and coordinates via `sync.WaitGroup`. Method-level parallelism requires a returning `BeforeEach` — per-test state lives in the returned context, not on the shared suite struct.
+**Method-level parallelism** is opt-in via `SuiteConfig{Parallel: true}`.
+Each generated subtest calls `it.Parallel()` and coordinates via `sync.WaitGroup`.
+Method-level parallelism requires a returning `BeforeEach` — per-test state lives in the returned context, not on the shared suite struct.
 
 ```go
 // Default: methods run sequentially within the suite
@@ -260,7 +293,8 @@ func (s *ParallelMethodTestSuite) TestCreate(t *gotest.T, ctx *TestCtx) {}
 func (s *ParallelMethodTestSuite) TestDelete(t *gotest.T, ctx *TestCtx) {}
 ```
 
-When method-level parallelism is enabled, the generated code uses a `sync.WaitGroup` to ensure `AfterAll` waits for all parallel subtests to complete. `wg.Done()` is `defer`-ed to prevent deadlocks on `t.Fatal()`.
+When method-level parallelism is enabled, the generated code uses a `sync.WaitGroup` to ensure `AfterAll` waits for all parallel subtests to complete.
+`wg.Done()` is `defer`-ed to prevent deadlocks on `t.Fatal()`.
 
 ### Generic Suites
 
@@ -275,11 +309,14 @@ type StringTestSuite = GenericTestSuite[string]
 type IntTestSuite    = GenericTestSuite[int]
 ```
 
-Each alias produces an independent test suite. Generic aliases only work in same-package tests (`ptest`), not `pxtest`.
+Each alias produces an independent test suite.
+Generic aliases only work in same-package tests (`ptest`), not `pxtest`.
 
 ### Fixtures
 
-Structs ending in `Fixture` are package fixtures. Structs ending in `SharedFixture` are cross-package shared fixtures. Both use `(ctx context.Context) error` lifecycle signatures:
+Structs ending in `Fixture` are package fixtures.
+Structs ending in `SharedFixture` are cross-package shared fixtures.
+Both use `(ctx context.Context) error` lifecycle signatures:
 
 ```go
 // Package fixtures — run in test process
@@ -291,9 +328,12 @@ func (f *MySharedFixture) BeforeAll(ctx context.Context) error  { return nil }
 func (f *MySharedFixture) AfterAll(ctx context.Context) error   { return nil }
 ```
 
-Package fixture setup hooks receive `t.Context()` (cancelled when the test ends). Cleanup hooks receive `context.Background()` (cleanup must proceed after test context cancellation). Shared fixture hooks receive a context with the configured timeout (from `SharedFixtureConfig()` or defaults).
+Package fixture setup hooks receive `t.Context()` (cancelled when the test ends).
+Cleanup hooks receive `context.Background()` (cleanup must proceed after test context cancellation).
+Shared fixture hooks receive a context with the configured timeout (from `SharedFixtureConfig()` or defaults).
 
-Package fixtures additionally support `BeforeEach`/`AfterEach`. Shared fixtures do not — they run once in the subprocess, not per test case.
+Package fixtures additionally support `BeforeEach`/`AfterEach`.
+Shared fixtures do not — they run once in the subprocess, not per test case.
 
 Test suites reference fixtures via named pointer fields:
 
@@ -322,7 +362,8 @@ type BatchTestSuite struct {
 
 Both paths produce the same lifecycle: deserialize from state file, call `Hydrate`, run tests, call `Dehydrate`.
 
-Fixtures may be defined in a different package from the suite. The resolver walks the type graph from targeted suites to discover all required fixtures, including cross-package dependencies.
+Fixtures may be defined in a different package from the suite.
+The resolver walks the type graph from targeted suites to discover all required fixtures, including cross-package dependencies.
 
 Fixtures nest — a root fixture's hooks run first, wrapping the child's:
 
@@ -338,7 +379,9 @@ InfraFixture.AfterAll
 
 #### SharedFixture State Transfer
 
-SharedFixtures run in a generated subprocess. State crosses the process boundary via JSON serialization. The `Hydrate` method determines which fields are local (reconstructed in the test process) versus transferable (serialized from the subprocess).
+SharedFixtures run in a generated subprocess.
+State crosses the process boundary via JSON serialization.
+The `Hydrate` method determines which fields are local (reconstructed in the test process) versus transferable (serialized from the subprocess).
 
 **Additional lifecycle hooks for shared fixtures:**
 
@@ -347,11 +390,14 @@ SharedFixtures run in a generated subprocess. State crosses the process boundary
 | `Hydrate` | Test process | `(ctx context.Context) error` | Reconstruct local resources from transferred state |
 | `Dehydrate` | Test process | `(ctx context.Context) error` | Clean up locally-created resources |
 
-`Hydrate` and `Dehydrate` are optional. If a SharedFixture has only JSON-serializable exported fields, all fields transfer automatically and no `Hydrate` is needed.
+`Hydrate` and `Dehydrate` are optional.
+If a SharedFixture has only JSON-serializable exported fields, all fields transfer automatically and no `Hydrate` is needed.
 
 **Field classification:**
 
-Fields assigned to the receiver in `Hydrate` — directly, or in receiver methods called from `Hydrate` (one level deep) — are **local**. They are excluded from serialization and reconstructed in the test process. All other exported fields are **transferable**.
+Fields assigned to the receiver in `Hydrate` — directly, or in receiver methods called from `Hydrate` (one level deep) — are **local**.
+They are excluded from serialization and reconstructed in the test process.
+All other exported fields are **transferable**.
 
 ```go
 type PostgresSharedFixture struct {
@@ -389,7 +435,8 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
 }
 ```
 
-**Convention:** In `Hydrate`, assign to local fields. Read transferred fields but do not reassign them — use local variables for any transformation.
+**Convention:** In `Hydrate`, assign to local fields.
+Read transferred fields but do not reassign them — use local variables for any transformation.
 
 **Classification algorithm:**
 
@@ -421,14 +468,17 @@ Test process:
 
 **Validation at generation time:**
 
-- Shared fixture types must not live in `internal/` packages. The setup subprocess compiles outside the module tree and cannot import `internal/` paths. Shared fixtures may freely depend on `internal/` packages — only the fixture type's own package path is restricted.
+- Shared fixture types must not live in `internal/` packages.
+  The setup subprocess compiles outside the module tree and cannot import `internal/` paths.
+  Shared fixtures may freely depend on `internal/` packages — only the fixture type's own package path is restricted.
 - If a transferable field's type has zero exported fields and does not implement `json.Marshaler`/`encoding.TextMarshaler`, the generator emits an error suggesting the field be handled in `Hydrate`
 - If `Hydrate` exists without `Dehydrate`, the generator emits an error
 - `Hydrate`/`Dehydrate` signatures must be `(ctx context.Context) error` with pointer receiver
 
 ### Configuration
 
-Every fixture and suite runs with sensible defaults. Optional marker methods override specific fields via overlay semantics — only non-zero fields replace the default.
+Every fixture and suite runs with sensible defaults.
+Optional marker methods override specific fields via overlay semantics — only non-zero fields replace the default.
 
 #### Config Types
 
@@ -456,7 +506,8 @@ type SuiteConfig struct {
 | `0`   | Keep default (field not overridden) |
 | `< 0` | Explicitly disabled (no timeout) |
 
-This applies to `Timeout`, `SetupTimeout`, and `RetryDelay`. Boolean fields (`FailFast`, `Parallel`) only override to `true` — a false overlay does not reset a true base.
+This applies to `Timeout`, `SetupTimeout`, and `RetryDelay`.
+Boolean fields (`FailFast`, `Parallel`) only override to `true` — a false overlay does not reset a true base.
 
 #### Marker Methods
 
@@ -468,7 +519,8 @@ func (f *MySharedFixture) SharedFixtureConfig()  gotest.FixtureConfig
 func (s *MySuite)         SuiteConfig()          gotest.SuiteConfig
 ```
 
-All three return the same `FixtureConfig` type for fixtures (package and shared) and `SuiteConfig` for suites. The method name follows the type suffix convention.
+All three return the same `FixtureConfig` type for fixtures (package and shared) and `SuiteConfig` for suites.
+The method name follows the type suffix convention.
 
 Requirements (same conventions as lifecycle hooks):
 - Pointer receiver matching the fixture/suite type name
@@ -507,21 +559,32 @@ func (f *InfraFixture) FixtureConfig() gotest.FixtureConfig {
 
 #### Generated Behavior
 
-**Package fixtures:** The test harness always resolves `DefaultFixtureConfig()`, overlays when the marker is present, then uses the config to wrap `BeforeAll` in a retry loop with `context.WithTimeout` and wrap `AfterAll` cleanup with timeout. Retry attempts are logged with attempt number.
+**Package fixtures:** The test harness always resolves `DefaultFixtureConfig()`, overlays when the marker is present, then uses the config to wrap `BeforeAll` in a retry loop with `context.WithTimeout` and wrap `AfterAll` cleanup with timeout.
+Retry attempts are logged with attempt number.
 
-**Shared fixtures:** The generated subprocess resolves `DefaultFixtureConfig()`, overlays when `SharedFixtureConfig()` is present, then wraps each SharedFixture's `BeforeAll(ctx)` in the same retry loop with `context.WithTimeout`. After `BeforeAll`, transferable fields (determined by Hydrate-assignment analysis) are serialized to stdout as JSON. `AfterAll(ctx)` gets timeout wrapping in the teardown handler. In the test harness, the deserialized fixture is hydrated via `Hydrate(ctx)` if present, and `Dehydrate(ctx)` is deferred for cleanup.
+**Shared fixtures:** The generated subprocess resolves `DefaultFixtureConfig()`, overlays when `SharedFixtureConfig()` is present, then wraps each SharedFixture's `BeforeAll(ctx)` in the same retry loop with `context.WithTimeout`.
+After `BeforeAll`, transferable fields (determined by Hydrate-assignment analysis) are serialized to stdout as JSON.
+`AfterAll(ctx)` gets timeout wrapping in the teardown handler.
+In the test harness, the deserialized fixture is hydrated via `Hydrate(ctx)` if present, and `Dehydrate(ctx)` is deferred for cleanup.
 
 **Suites:** The test harness always resolves `DefaultSuiteConfig()`, overlays when the marker is present, then wraps each test case with `NewTWithDeadline` when timeout > 0, and breaks the test case loop on first failure when `FailFast` is set.
 
-**`NewTWithDeadline`:** Creates a `*gotest.T` with a context deadline. `t.Context()` returns the deadline-aware context. Existing `NewT` callers are unaffected.
+**`NewTWithDeadline`:** Creates a `*gotest.T` with a context deadline.
+`t.Context()` returns the deadline-aware context.
+Existing `NewT` callers are unaffected.
 
 #### Feature Interactions
 
-- **Parallel suites:** `FailFast` checks run between subtests — in method-parallel suites, all parallel subtests complete before `FailFast` is evaluated. Suite-level parallelism does not affect `FailFast` (each suite's subtests are independent).
-- **Focus/Exclude:** Config applies after focus/exclude filtering. Skipped suites get unchanged skip stubs.
+- **Parallel suites:** `FailFast` checks run between subtests — in method-parallel suites, all parallel subtests complete before `FailFast` is evaluated.
+  Suite-level parallelism does not affect `FailFast` (each suite's subtests are independent).
+- **Focus/Exclude:** Config applies after focus/exclude filtering.
+  Skipped suites get unchanged skip stubs.
 - **Global `-timeout`:** `FixtureConfig.Timeout` is bounded by Go's global timeout via `context.WithTimeout` inheriting the parent's shorter deadline.
 - **Nested fixtures:** Each level resolves config independently — no inheritance between fixture levels.
-- **Hydrate/Dehydrate:** SharedFixture state is deserialized and hydrated before any test suites run. `Dehydrate` is deferred, running after all suites complete. `Hydrate` receives a context with the SharedFixture's configured timeout. `Dehydrate` receives `context.Background()`.
+- **Hydrate/Dehydrate:** SharedFixture state is deserialized and hydrated before any test suites run.
+  `Dehydrate` is deferred, running after all suites complete.
+  `Hydrate` receives a context with the SharedFixture's configured timeout.
+  `Dehydrate` receives `context.Background()`.
 
 ---
 
@@ -529,7 +592,8 @@ func (f *InfraFixture) FixtureConfig() gotest.FixtureConfig {
 
 ### Functional API
 
-Type-safe generics with compile-time safety. All functions accept any type implementing `testingT` (`Helper()` + `Errorf()` + `FailNow()`) — works with both `*gotest.T` and `*testing.T`.
+Type-safe generics with compile-time safety.
+All functions accept any type implementing `testingT` (`Helper()` + `Errorf()` + `FailNow()`) — works with both `*gotest.T` and `*testing.T`.
 
 ```go
 // Equality — [T any] catches cross-type comparison at compile time
@@ -586,7 +650,8 @@ gotest.Panics(t, f func(), msgAndArgs ...any) any
 gotest.Must[T any](val T, ok any) T
 ```
 
-All functions call `t.Helper()` so failures report the caller's file:line. Equality failures include a diff:
+All functions call `t.Helper()` so failures report the caller's file:line.
+Equality failures include a diff:
 
 ```
 Equal failed:
@@ -607,7 +672,9 @@ Zero external dependencies — uses `reflect.DeepEqual`, `cmp.Compare`, `fmt.Spr
 
 ### t.When() / t.It()
 
-`When` groups context. `It` specifies behavior. Both map to `t.Run` under the hood — the distinction is purely semantic.
+`When` groups context.
+`It` specifies behavior.
+Both map to `t.Run` under the hood — the distinction is purely semantic.
 
 ```go
 func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
@@ -682,7 +749,9 @@ t.Consistently(2*time.Second, 100*time.Millisecond, func(poll *gotest.T) {
 })
 ```
 
-The `poll *gotest.T` is a collecting wrapper — assertion failures during intermediate polls are captured but not propagated. On timeout, the last poll's assertion failures are reported. `Consistently` fails on first `false` poll and reports which poll failed.
+The `poll *gotest.T` is a collecting wrapper — assertion failures during intermediate polls are captured but not propagated.
+On timeout, the last poll's assertion failures are reported.
+`Consistently` fails on first `false` poll and reports which poll failed.
 
 ---
 
@@ -706,7 +775,8 @@ t.MatchSnapshot(result, "variant")    // custom snapshot name
 $ gotest scaffold ./pkg/user.UserService
 ```
 
-Generates a test suite skeleton with `BeforeEach`, per-method `Test*` stubs, and method signatures as comments. Methods returning `error` get happy-path and error-case stubs.
+Generates a test suite skeleton with `BeforeEach`, per-method `Test*` stubs, and method signatures as comments.
+Methods returning `error` get happy-path and error-case stubs.
 
 Interface scaffolding generates a generic contract suite:
 
@@ -791,7 +861,8 @@ Focus integration: `F_`-prefixed suites during watch mode create a tight feedbac
 gotest generate ./...
 ```
 
-Writes generated files directly to package directories. Use case: `//go:generate gotest generate ./...` for checked-in generated files.
+Writes generated files directly to package directories.
+Use case: `//go:generate gotest generate ./...` for checked-in generated files.
 
 **Clean up** orphaned files:
 
@@ -810,7 +881,8 @@ Per package directory, up to two files:
 | `ƒƒ_psuite_test.go` | Same-package (white-box) test suites |
 | `ƒƒ_pxsuite_test.go` | External-package (black-box) test suites |
 
-The `ƒƒ` Unicode prefix prevents naming collisions with user code. Files contain a `// Code generated` header.
+The `ƒƒ` Unicode prefix prevents naming collisions with user code.
+Files contain a `// Code generated` header.
 
 ### Generated Structure
 
@@ -878,13 +950,15 @@ Detects:
 
 Exit codes match `go test`: 0 = pass, 1 = test failure, 2 = build error.
 
-The `--ci` flag fails the run when any `F_` (focus) prefix is committed, preventing accidental focus leaks in CI. The local `setup-gotest` composite action installs the binary via `go install`.
+The `--ci` flag fails the run when any `F_` (focus) prefix is committed, preventing accidental focus leaks in CI.
+The local `setup-gotest` composite action installs the binary via `go install`.
 
 ---
 
 ## Coverage Aggregation
 
-The Go coverage profile is the single source of truth at every level of aggregation. No filesystem scanning, line counting heuristics, or mixed data sources.
+The Go coverage profile is the single source of truth at every level of aggregation.
+No filesystem scanning, line counting heuristics, or mixed data sources.
 
 ### Primary Metric: Statement-Weighted Coverage
 
@@ -894,7 +968,8 @@ Each profile entry has the form:
 file:startLine.startCol,endLine.endCol numStatements count
 ```
 
-`numStatements` is the number of Go statements in a basic block as determined by the compiler's instrumentation. Coverage at any scope (file, directory, workspace) is:
+`numStatements` is the number of Go statements in a basic block as determined by the compiler's instrumentation.
+Coverage at any scope (file, directory, workspace) is:
 
 ```
 covered = sum of numStatements for all blocks in scope where count > 0
@@ -902,22 +977,30 @@ total   = sum of numStatements for all blocks in scope
 percentage = covered / total (or 0% if total == 0)
 ```
 
-A directory's percentage is the weighted sum of its children (weighted by statement count, not an average of percentages). A parent's number is always derivable from its children.
+A directory's percentage is the weighted sum of its children (weighted by statement count, not an average of percentages).
+A parent's number is always derivable from its children.
 
-This is the sole numeric metric displayed in both the Test Coverage sidebar bar and the Copy Coverage report. The sidebar and report must always show identical `covered/total` values for the same scope.
+This is the sole numeric metric displayed in both the Test Coverage sidebar bar and the Copy Coverage report.
+The sidebar and report must always show identical `covered/total` values for the same scope.
 
-Declaration (function) coverage is not a sidebar or report metric. Function-level annotations are available in the editor gutter via `loadDetailedCoverage` for navigation purposes only.
+Declaration (function) coverage is not a sidebar or report metric.
+Function-level annotations are available in the editor gutter via `loadDetailedCoverage` for navigation purposes only.
 
 ### Block Deduplication
 
-When `-coverpkg` is used, each file may appear in multiple test binary profiles. Blocks are deduplicated by `file + startLine.startCol,endLine.endCol` identity: for each unique block, take `max(count)` across all entries. This matches `go tool cover` behavior.
+When `-coverpkg` is used, each file may appear in multiple test binary profiles.
+Blocks are deduplicated by `file + startLine.startCol,endLine.endCol` identity: for each unique block, take `max(count)` across all entries.
+This matches `go tool cover` behavior.
 
 ### Supplementary Coverage (Cross-Package Profiles)
 
-Test-only packages (packages with no production `.go` files) run with `-coverpkg=./...`, which instruments all packages in the module. This cross-package profile is **supplementary**: it can increase block counts for files that primary profiles already cover, but does not add new files to the aggregate.
+Test-only packages (packages with no production `.go` files) run with `-coverpkg=./...`, which instruments all packages in the module.
+This cross-package profile is **supplementary**: it can increase block counts for files that primary profiles already cover, but does not add new files to the aggregate.
 
-- **Primary profiles** come from a package's own `go test` run. They define the file scope.
-- **Supplementary profiles** come from test-only packages with `-coverpkg=./...`. After block deduplication, only files present in the primary scope are retained.
+- **Primary profiles** come from a package's own `go test` run.
+  They define the file scope.
+- **Supplementary profiles** come from test-only packages with `-coverpkg=./...`.
+  After block deduplication, only files present in the primary scope are retained.
 - If no primary profiles exist, supplementary profiles are treated as primary (fallback).
 
 ### Breadth Indicator
@@ -925,17 +1008,21 @@ Test-only packages (packages with no production `.go` files) run with `-coverpkg
 A supplementary signal showing how many source files have coverage data vs. how many exist:
 
 - **Source files:** Non-test Go files (`*.go` excluding `*_test.go`) per directory, from the filesystem.
-- **Profile files:** Files from the source file set with at least one entry in the primary coverage scope, regardless of whether that entry has `count > 0`. A file at 0% was instrumented and counts as profiled.
+- **Profile files:** Files from the source file set with at least one entry in the primary coverage scope, regardless of whether that entry has `count > 0`.
+  A file at 0% was instrumented and counts as profiled.
 
 The percentage answers: *"How well-tested is the code my tests reach?"*
 The file count answers: *"How much of my codebase do my tests reach at all?"*
 
 ### What NOT to Do
 
-- Do not count lines of code, lines with tokens, or non-blank lines as a denominator. The profile's `numStatements` is the only valid statement metric.
+- Do not count lines of code, lines with tokens, or non-blank lines as a denominator.
+  The profile's `numStatements` is the only valid statement metric.
 - Do not include `_test.go` files in any denominator.
-- Do not average per-file percentages to compute a directory percentage. Use weighted sums by statement count.
-- Do not invent a filesystem-based metric as a fallback when the profile is sparse. A sparse profile is honest.
+- Do not average per-file percentages to compute a directory percentage.
+  Use weighted sums by statement count.
+- Do not invent a filesystem-based metric as a fallback when the profile is sparse.
+  A sparse profile is honest.
 - Do not display declaration/function coverage as a separate metric in the sidebar or report.
 - Do not let supplementary (cross-package) profiles expand the file scope beyond what primary profiles define.
 
@@ -977,27 +1064,34 @@ Each alias produces an independent conformance report.
 
 ### Test dependency ordering
 
-Tests that depend on other tests are brittle. Each test sets up its own preconditions via `BeforeEach`.
+Tests that depend on other tests are brittle.
+Each test sets up its own preconditions via `BeforeEach`.
 
 ### Mocking framework
 
-Mocking is orthogonal to test organization. `gomock`, `mockery`, `moq`, and counterfeiter all work inside suites unchanged.
+Mocking is orthogonal to test organization.
+`gomock`, `mockery`, `moq`, and counterfeiter all work inside suites unchanged.
 
 ### Decorator / annotation syntax
 
-Go doesn't have decorators. Naming conventions are grepped, autocompleted, and understood at a glance. Struct tags are hidden in backtick strings.
+Go doesn't have decorators.
+Naming conventions are grepped, autocompleted, and understood at a glance.
+Struct tags are hidden in backtick strings.
 
 ### Runtime suite registration
 
-`suite.Run(t, new(MySuite))` is testify's approach. The entire point of `go-test` is to generate that boilerplate.
+`suite.Run(t, new(MySuite))` is testify's approach.
+The entire point of `go-test` is to generate that boilerplate.
 
 ### Cross-package suite inheritance
 
-Breaks Go's package isolation model. Cross-package sharing uses helper functions or fixtures, not suite inheritance.
+Breaks Go's package isolation model.
+Cross-package sharing uses helper functions or fixtures, not suite inheritance.
 
 ### Replacing `go test` output
 
-The `spec` subcommand and `--spec` flag are post-processing views over `go test -json` data. They add a layer on top; they never suppress or replace the underlying output.
+The `spec` subcommand and `--spec` flag are post-processing views over `go test -json` data.
+They add a layer on top; they never suppress or replace the underlying output.
 
 ---
 
@@ -1035,20 +1129,28 @@ about/                       Build metadata, file naming constants
 | **Resolve** | Effective suites + local fixtures | `ResolveResult` — fixture trees, shared fixture info, suite→fixture bindings |
 | **Render** | Reduced spec + resolve result | Formatted Go source bytes |
 
-Collection is a two-pass AST traversal: find type declarations matching suite patterns, then attach methods by matching receiver types. Resolution is demand-driven: it starts from targeted suites and walks the Go type graph recursively (via `types.Named`, `types.Struct`, `types.MethodSet`) to discover all required fixtures, including cross-package dependencies.
+Collection is a two-pass AST traversal: find type declarations matching suite patterns, then attach methods by matching receiver types.
+Resolution is demand-driven: it starts from targeted suites and walks the Go type graph recursively (via `types.Named`, `types.Struct`, `types.MethodSet`) to discover all required fixtures, including cross-package dependencies.
 
 ### Key Invariant
 
-The pipeline is always: **static analysis → code generation → standard `go test`**. No runtime component grows beyond the thin `gotest.T` wrapper. If a feature can't be implemented as either (a) generated code, (b) a method on `gotest.T`, or (c) post-processing of `go test -json`, it doesn't belong in this project.
+The pipeline is always: **static analysis → code generation → standard `go test`**.
+No runtime component grows beyond the thin `gotest.T` wrapper.
+If a feature can't be implemented as either (a) generated code, (b) a method on `gotest.T`, or (c) post-processing of `go test -json`, it doesn't belong in this project.
 
 ---
 
 ## Known Limitations
 
-1. **Generic aliases in `pxtest`:** Go does not allow defining methods on aliases of types from other packages. Generic suite aliases only work in same-package tests.
+1. **Generic aliases in `pxtest`:** Go does not allow defining methods on aliases of types from other packages.
+   Generic suite aliases only work in same-package tests.
 
-2. **`go.work` required for cross-module tests:** The generator golden tests require `go.work` (`go work init . && go work use ./examples`). Tests skip gracefully when absent.
+2. **`go.work` required for cross-module tests:** The generator golden tests require `go.work` (`go work init . && go work use ./examples`).
+   Tests skip gracefully when absent.
 
-3. **No incremental generation:** The tool regenerates all suite files on every run. There is no staleness detection.
+3. **No incremental generation:** The tool regenerates all suite files on every run.
+   There is no staleness detection.
 
-4. **Hydrate method walking depth:** The generator follows receiver method calls from `Hydrate` one level deep to classify local fields. Assignments hidden behind two or more levels of indirection are not detected. Opaque types (zero exported fields) are unaffected — they serialize harmlessly as `{}` and `Hydrate` overwrites the value.
+4. **Hydrate method walking depth:** The generator follows receiver method calls from `Hydrate` one level deep to classify local fields.
+   Assignments hidden behind two or more levels of indirection are not detected.
+   Opaque types (zero exported fields) are unaffected — they serialize harmlessly as `{}` and `Hydrate` overwrites the value.

@@ -6,11 +6,13 @@
 
 First-class VS Code integration for [go-test](https://github.com/mvrahden/go-test) — suite-based, BDD-style testing for Go.
 
-Run, debug, and watch your test suites directly from the editor. See structured results in Test Explorer, get coverage gutters, and scaffold new suites without leaving VS Code.
+Run, debug, and watch your test suites directly from the editor.
+See structured results in Test Explorer, get coverage gutters, and scaffold new suites without leaving VS Code.
 
 ## Why this extension?
 
-Go's standard `testing` package gives you `func TestX(t *testing.T)` and nothing more. [go-test](https://github.com/mvrahden/go-test) adds suite-based organization with lifecycle hooks, fixtures, focus/exclude, and BDD-style output — all through naming conventions, zero runtime dependencies.
+Go's standard `testing` package gives you `func TestX(t *testing.T)` and nothing more.
+[go-test](https://github.com/mvrahden/go-test) adds suite-based organization with lifecycle hooks, fixtures, focus/exclude, and BDD-style output — all through naming conventions, zero runtime dependencies.
 
 This extension makes that workflow native to VS Code:
 
@@ -30,7 +32,8 @@ This extension makes that workflow native to VS Code:
 - **VS Code** (1.101+)
 - **[Delve](https://github.com/go-delve/delve)** (for debugging only)
 
-The extension invokes the gotest CLI automatically — no separate install needed. It resolves the version from your `go.mod` and uses `go run` to execute it.
+The extension invokes the gotest CLI automatically — no separate install needed.
+It resolves the version from your `go.mod` and uses `go run` to execute it.
 
 ### Install
 
@@ -51,11 +54,15 @@ code --install-extension mvrahden.vscode-gotest
 
 ### Test Explorer
 
-Tests appear in a structured tree: **Package > Suite > Method > Subtest**. Run or debug at any level — a single method, an entire suite, or all tests in a package. Multi-select is fully supported. Test results persist across sessions, so you see pass/fail state immediately after reopening the editor.
+Tests appear in a structured tree: **Package > Suite > Method > Subtest**.
+Run or debug at any level — a single method, an entire suite, or all tests in a package.
+Multi-select is fully supported.
+Test results persist across sessions, so you see pass/fail state immediately after reopening the editor.
 
 ### CodeLens
 
-**Run** and **Debug** buttons appear inline above every suite and test method in `_test.go` files. Click to execute immediately.
+**Run** and **Debug** buttons appear inline above every suite and test method in `_test.go` files.
+Click to execute immediately.
 
 Package-level and file-level actions appear on the `package` declaration line:
 
@@ -64,17 +71,24 @@ Package-level and file-level actions appear on the `package` declaration line:
 
 ### Coverage
 
-Use the **Coverage** run profile in Test Explorer to run tests with `go test -coverprofile`. Results appear as native VS Code coverage gutters. Coverage data persists across sessions and accumulates across packages. Source file edits automatically invalidate stale coverage for the affected package.
+Use the **Coverage** run profile in Test Explorer to run tests with `go test -coverprofile`.
+Results appear as native VS Code coverage gutters.
+Coverage data persists across sessions and accumulates across packages.
+Source file edits automatically invalidate stale coverage for the affected package.
 
 Copy a tabular coverage summary to the clipboard via the **Go Test: Copy Coverage Summary** command.
 
 ### Watch mode
 
-Start continuous testing with **Go Test: Start Watch**. The extension spawns a `gotest watch` process that re-runs tests on file changes. Results stream into Test Explorer in real-time. A status bar item shows active watcher count and lets you stop all watchers with a click.
+Start continuous testing with **Go Test: Start Watch**.
+The extension spawns a `gotest watch` process that re-runs tests on file changes.
+Results stream into Test Explorer in real-time.
+A status bar item shows active watcher count and lets you stop all watchers with a click.
 
 ### Spec View
 
-After each test run, the **Spec View** panel renders BDD-formatted output with color-coded pass/fail/skip indicators. Open it with **Go Test: Show Spec View**.
+After each test run, the **Spec View** panel renders BDD-formatted output with color-coded pass/fail/skip indicators.
+Open it with **Go Test: Show Spec View**.
 
 - **Go-to-source** — click any suite or method to navigate to its definition
 - **Toolbar** — expand/collapse all, filter by pass/fail/skip status, search behaviors by name
@@ -104,7 +118,11 @@ The generated file opens automatically and discovery refreshes.
 
 ### Multi-root workspaces
 
-Fully supported. Each workspace folder is discovered independently. Commands resolve the correct workspace folder from the active editor, and file watchers trigger per-folder discovery. Per-project settings like `cliPath`, `testFlags`, and `buildTags` can be configured per folder via `.vscode/settings.json`. Projects using `go.work` are also supported.
+Fully supported.
+Each workspace folder is discovered independently.
+Commands resolve the correct workspace folder from the active editor, and file watchers trigger per-folder discovery.
+Per-project settings like `cliPath`, `testFlags`, and `buildTags` can be configured per folder via `.vscode/settings.json`.
+Projects using `go.work` are also supported.
 
 ## Commands
 
