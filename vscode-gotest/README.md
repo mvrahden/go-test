@@ -51,11 +51,16 @@ code --install-extension mvrahden.vscode-gotest
 
 ### Test Explorer
 
-Tests appear in a structured tree: **Package > Suite > Method > Subtest**. Run or debug at any level — a single method, an entire suite, or all tests in a package. Multi-select is fully supported.
+Tests appear in a structured tree: **Package > Suite > Method > Subtest**. Run or debug at any level — a single method, an entire suite, or all tests in a package. Multi-select is fully supported. Test results persist across sessions, so you see pass/fail state immediately after reopening the editor.
 
 ### CodeLens
 
-**Run** and **Debug** buttons appear inline above every suite struct and test method in `_test.go` files. Click to execute immediately.
+**Run** and **Debug** buttons appear inline above every suite and test method in `_test.go` files. Click to execute immediately.
+
+Package-level and file-level actions appear on the `package` declaration line:
+
+- **Run Package** — run all suites in the package
+- **Run File** — run all suites defined in the current file (shown when the file contains multiple suites)
 
 ### Coverage
 
@@ -70,6 +75,12 @@ Start continuous testing with **Go Test: Start Watch**. The extension spawns a `
 ### Spec View
 
 After each test run, the **Spec View** panel renders BDD-formatted output with color-coded pass/fail/skip indicators. Open it with **Go Test: Show Spec View**.
+
+- **Go-to-source** — click any suite or method to navigate to its definition
+- **Toolbar** — expand/collapse all, filter by pass/fail/skip status, search behaviors by name
+- **Copy / Clear** — copy the full spec report to clipboard or clear results
+- **Persistence** — the panel survives editor reload and restores its last state
+- **Live updates** — auto-refreshes from test runs, coverage runs, and watch mode
 
 ### Focus and Exclude
 
@@ -93,13 +104,14 @@ The generated file opens automatically and discovery refreshes.
 
 ### Multi-root workspaces
 
-Fully supported. Each workspace folder is discovered independently. Commands resolve the correct workspace folder from the active editor, and file watchers trigger per-folder discovery. Per-project settings like `cliPath`, `testFlags`, and `buildTags` can be configured per folder via `.vscode/settings.json`.
+Fully supported. Each workspace folder is discovered independently. Commands resolve the correct workspace folder from the active editor, and file watchers trigger per-folder discovery. Per-project settings like `cliPath`, `testFlags`, and `buildTags` can be configured per folder via `.vscode/settings.json`. Projects using `go.work` are also supported.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
 | Go Test: Run | Run a specific test by ID |
+| Go Test: Run File | Run all suites in the current file |
 | Go Test: Debug | Debug a specific test by ID |
 | Go Test: Refresh | Re-run test discovery for all workspace folders |
 | Go Test: Show Focused Tests | List all focused tests and navigate to them |
@@ -107,8 +119,9 @@ Fully supported. Each workspace folder is discovered independently. Commands res
 | Go Test: Start Watch | Start continuous testing for a package scope |
 | Go Test: Stop Watch | Stop all active watch processes |
 | Go Test: Scaffold Suite | Generate a test suite from a target |
+| Go Test: Scaffold Target | Generate a test suite for a specific target |
 | Go Test: Copy Coverage Summary | Copy coverage table to clipboard |
-| Go Test: Copy Test Results | Copy test results to clipboard |
+| Go Test: Copy Test Results | Copy test results to clipboard (also available as context menu on test items) |
 
 ## Settings
 
