@@ -717,7 +717,7 @@ function fmtTime(seconds: number): string {
 
 type ReportRow = { label: string; time: string; result: string };
 
-function specDataToReport(
+export function specDataToReport(
   data: SpecData,
   modulePaths: string[],
   hidden?: Set<string>,
@@ -799,8 +799,11 @@ function specDataToReport(
   if (totalAgg.passed > 0) results.push(`${totalAgg.passed} passed`);
   if (totalAgg.failed > 0) results.push(`${totalAgg.failed} failed`);
   if (totalAgg.skipped > 0) results.push(`${totalAgg.skipped} skipped`);
+  const totalDur = hidden
+    ? totalAgg.duration
+    : data.packages.reduce((s, p) => s + p.duration, 0);
   lines.push(
-    `${counts.join(", ")}: ${results.join(", ")} (${fmtTime(totalAgg.duration)})`,
+    `${counts.join(", ")}: ${results.join(", ")} (${fmtTime(totalDur)})`,
   );
 
   return lines.join("\n");
