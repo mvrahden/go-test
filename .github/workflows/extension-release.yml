@@ -4,12 +4,19 @@ on:
   release:
     types: [created]
 
+concurrency:
+  group: extension-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
 defaults:
   run:
     working-directory: vscode-gotest
 
 jobs:
-  publish:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,9 +30,27 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm test
       - run: npm run compile
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: vscode-gotest/package-lock.json
+      - run: npm ci
+      - run: npm run compile
       - name: Set version from release tag
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
       - run: npx @vscode/vsce package --no-dependencies
+      - name: Upload .vsix to release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" vscode-gotest/*.vsix
       - run: npx @vscode/vsce publish --no-dependencies --packagePath *.vsix
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
