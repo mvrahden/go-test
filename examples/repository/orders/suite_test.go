@@ -7,9 +7,7 @@ type OrderRepositoryTestSuite struct {
 }
 
 func (s *OrderRepositoryTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.FailFast = true
-	return cfg
+	return gotest.SuiteConfig{FailFast: true}
 }
 
 func (s *OrderRepositoryTestSuite) BeforeAll(t *gotest.T) {

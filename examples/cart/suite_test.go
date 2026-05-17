@@ -12,7 +12,7 @@ func (s *ShoppingCartTestSuite) BeforeEach(t *gotest.T) {
 	s.cart = newCart(s.catalog)
 }
 
-func (s *ShoppingCartTestSuite) TestAddItem(t *gotest.T) {
+func (s *ShoppingCartTestSuite) TestAddSingleItem(t *gotest.T) {
 	t.When("adding a single item", func(t *gotest.T) {
 		s.cart.Add("Apple", 2)
 
@@ -26,7 +26,9 @@ func (s *ShoppingCartTestSuite) TestAddItem(t *gotest.T) {
 			gotest.Equal(t, 3.00, s.cart.Total())
 		})
 	})
+}
 
+func (s *ShoppingCartTestSuite) TestAddMultipleItems(t *gotest.T) {
 	t.When("adding multiple different items", func(t *gotest.T) {
 		s.cart.Add("Apple", 1)
 		s.cart.Add("Bread", 1)
@@ -38,7 +40,9 @@ func (s *ShoppingCartTestSuite) TestAddItem(t *gotest.T) {
 			gotest.Equal(t, 4.50, s.cart.Total())
 		})
 	})
+}
 
+func (s *ShoppingCartTestSuite) TestAddSameItemTwice(t *gotest.T) {
 	t.When("adding the same item twice", func(t *gotest.T) {
 		s.cart.Add("Milk", 1)
 		s.cart.Add("Milk", 2)
@@ -52,10 +56,9 @@ func (s *ShoppingCartTestSuite) TestAddItem(t *gotest.T) {
 	})
 }
 
-func (s *ShoppingCartTestSuite) TestRemoveItem(t *gotest.T) {
-	s.cart.Add("Apple", 3)
-
+func (s *ShoppingCartTestSuite) TestReduceQuantity(t *gotest.T) {
 	t.When("reducing quantity below current amount", func(t *gotest.T) {
+		s.cart.Add("Apple", 3)
 		s.cart.Remove("Apple", 1)
 
 		t.It("decreases without removing the item", func(t *gotest.T) {
@@ -65,8 +68,11 @@ func (s *ShoppingCartTestSuite) TestRemoveItem(t *gotest.T) {
 			gotest.Contains(t, s.cart.Items(), "Apple")
 		})
 	})
+}
 
+func (s *ShoppingCartTestSuite) TestRemoveAllOfItem(t *gotest.T) {
 	t.When("removing all of an item", func(t *gotest.T) {
+		s.cart.Add("Apple", 3)
 		s.cart.Remove("Apple", 3)
 
 		t.It("removes the item entirely", func(t *gotest.T) {
@@ -76,17 +82,19 @@ func (s *ShoppingCartTestSuite) TestRemoveItem(t *gotest.T) {
 }
 
 func (s *ShoppingCartTestSuite) TestApplyDiscount(t *gotest.T) {
-	s.cart.Add("Bread", 2)
-
 	t.When("applying a 10 percent discount", func(t *gotest.T) {
+		s.cart.Add("Bread", 2)
 		s.cart.ApplyDiscount(0.10)
 
 		t.It("reduces the total within tolerance", func(t *gotest.T) {
 			gotest.InDelta(t, 5.40, s.cart.Total(), 0.01)
 		})
 	})
+}
 
+func (s *ShoppingCartTestSuite) TestApplyExcessiveDiscount(t *gotest.T) {
 	t.When("the discount exceeds 100 percent", func(t *gotest.T) {
+		s.cart.Add("Bread", 2)
 		s.cart.ApplyDiscount(1.5)
 
 		t.It("clamps to zero", func(t *gotest.T) {
@@ -96,7 +104,7 @@ func (s *ShoppingCartTestSuite) TestApplyDiscount(t *gotest.T) {
 	})
 }
 
-func (s *ShoppingCartTestSuite) TestCheckout(t *gotest.T) {
+func (s *ShoppingCartTestSuite) TestCheckoutEmpty(t *gotest.T) {
 	t.When("the cart is empty", func(t *gotest.T) {
 		err := s.cart.Checkout()
 
@@ -104,7 +112,9 @@ func (s *ShoppingCartTestSuite) TestCheckout(t *gotest.T) {
 			gotest.ErrorIs(t, err, ErrEmptyCart)
 		})
 	})
+}
 
+func (s *ShoppingCartTestSuite) TestCheckoutWithItems(t *gotest.T) {
 	t.When("the cart has items", func(t *gotest.T) {
 		s.cart.Add("Apple", 2)
 		s.cart.Add("Milk", 1)
