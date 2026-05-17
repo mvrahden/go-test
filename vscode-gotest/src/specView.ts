@@ -58,6 +58,13 @@ export class SpecViewPanel implements vscode.Disposable {
     state: unknown,
   ): Promise<void> {
     this.panel = panel;
+    if (this.extensionUri) {
+      this.panel.iconPath = vscode.Uri.joinPath(
+        this.extensionUri,
+        "static",
+        "spec-icon.svg",
+      );
+    }
     this.wirePanel();
     await this.resolveModulePaths();
 
@@ -94,6 +101,14 @@ export class SpecViewPanel implements vscode.Disposable {
         localResourceRoots,
       },
     );
+
+    if (this.extensionUri) {
+      this.panel.iconPath = vscode.Uri.joinPath(
+        this.extensionUri,
+        "static",
+        "spec-icon.svg",
+      );
+    }
 
     this.wirePanel();
   }
