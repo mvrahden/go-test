@@ -209,7 +209,7 @@ func hasDuplicateSuffix(s string) bool {
 
 func stripDuplicateSuffix(s string) string {
 	idx := strings.LastIndex(s, "#")
-	if idx < 0 {
+	if idx <= 0 {
 		return s
 	}
 	suffix := s[idx+1:]
@@ -288,15 +288,15 @@ func classify(n *Node, topLevel bool) {
 			name = name[2:]
 		}
 
-		if strings.HasSuffix(name, "Fixture") && !strings.HasSuffix(name, "TestSuite") {
+		if strings.HasPrefix(name, "Test") {
+			n.Kind = KindMethod
+			n.Display = strings.TrimPrefix(name, "Test")
+		} else if strings.HasSuffix(name, "Fixture") && !strings.HasSuffix(name, "TestSuite") {
 			n.Kind = KindFixture
 			n.Display = strings.TrimSuffix(name, "Fixture")
 		} else if strings.HasSuffix(name, "TestSuite") {
 			n.Kind = KindSuite
 			n.Display = strings.TrimSuffix(name, "TestSuite")
-		} else if strings.HasPrefix(name, "Test") {
-			n.Kind = KindMethod
-			n.Display = strings.TrimPrefix(name, "Test")
 		} else {
 			n.Kind = KindBlock
 			n.Display = strings.ReplaceAll(name, "_", " ")
