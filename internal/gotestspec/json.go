@@ -25,6 +25,8 @@ type jsonNode struct {
 	Duration float64    `json:"duration"`
 	Focused  bool       `json:"focused"`
 	Excluded bool       `json:"excluded"`
+	External bool       `json:"external"`
+	Variant  int        `json:"variant,omitempty"`
 	Output   []string   `json:"output"`
 	Children []jsonNode `json:"children"`
 }
@@ -81,6 +83,8 @@ func convertNodes(nodes []*Node) []jsonNode {
 			Duration: n.Duration.Seconds(),
 			Focused:  n.Focused,
 			Excluded: n.Excluded,
+			External: n.External,
+			Variant:  n.Variant,
 			Output:   n.Output,
 			Children: convertNodes(n.Children),
 		}

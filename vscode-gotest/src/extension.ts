@@ -95,7 +95,7 @@ export function activate(context: vscode.ExtensionContext): void {
     coverageStore,
     outputChannel,
     (jsonOutput) => {
-      specView.refresh(jsonOutput);
+      specView.refresh(jsonOutput, "coverage");
     },
   );
 
@@ -106,15 +106,15 @@ export function activate(context: vscode.ExtensionContext): void {
   runner = new TestRunner(controller, cache, outputChannel, coverageStore);
 
   const specViewRefreshDisposable = runner.onDidComplete((jsonOutput) => {
-    specView.refresh(jsonOutput);
+    specView.refresh(jsonOutput, "run");
   });
 
   const watchManager = new WatchManager(
     controller,
     cache,
     outputChannel,
-    (jsonOutput) => {
-      specView.refresh(jsonOutput);
+    (jsonOutput, scope, cwd) => {
+      specView.refresh(jsonOutput, `watch:${scope}@${cwd}`);
     },
   );
 
@@ -295,6 +295,26 @@ function registerCommands(deps: {
             },
             (i) => getPackageDir(i, cache),
           );
+        } finally {
+          cts.dispose();
+        }
+      },
+    ),
+
+    vscode.commands.registerCommand(
+      "gotest.runFile",
+      async (suiteIds: string[]) => {
+        const items = suiteIds
+          .map((id) => controller.findItem(id))
+          .filter((item): item is vscode.TestItem => item !== undefined);
+        if (items.length === 0) {
+          outputChannel.warn(`[command] runFile: no items found`);
+          return;
+        }
+        const cts = new vscode.CancellationTokenSource();
+        try {
+          const request = new vscode.TestRunRequest(items);
+          await runner.run(request, cts.token);
         } finally {
           cts.dispose();
         }

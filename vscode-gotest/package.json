@@ -41,6 +41,10 @@
         "title": "Go Test: Debug"
       },
       {
+        "command": "gotest.runFile",
+        "title": "Go Test: Run File"
+      },
+      {
         "command": "gotest.refreshTests",
         "title": "Go Test: Refresh"
       },

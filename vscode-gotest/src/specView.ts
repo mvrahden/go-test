@@ -10,6 +10,7 @@ export class SpecViewPanel implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private extensionUri: vscode.Uri | undefined;
   private lastSpecData: SpecData | undefined;
+  private jsonLayers = new Map<string, string>();
   private modulePaths: string[] = [];
 
   constructor(
@@ -57,6 +58,13 @@ export class SpecViewPanel implements vscode.Disposable {
     state: unknown,
   ): Promise<void> {
     this.panel = panel;
+    if (this.extensionUri) {
+      this.panel.iconPath = vscode.Uri.joinPath(
+        this.extensionUri,
+        "static",
+        "spec-icon.svg",
+      );
+    }
     this.wirePanel();
     await this.resolveModulePaths();
 
@@ -94,6 +102,14 @@ export class SpecViewPanel implements vscode.Disposable {
       },
     );
 
+    if (this.extensionUri) {
+      this.panel.iconPath = vscode.Uri.joinPath(
+        this.extensionUri,
+        "static",
+        "spec-icon.svg",
+      );
+    }
+
     this.wirePanel();
   }
 
@@ -109,6 +125,7 @@ export class SpecViewPanel implements vscode.Disposable {
           }
         } else if (msg.type === "clearResults") {
           this.lastSpecData = undefined;
+          this.jsonLayers.clear();
           if (this.panel) {
             this.panel.webview.html = this.buildHtml({ type: "empty" });
           }
@@ -149,9 +166,12 @@ export class SpecViewPanel implements vscode.Disposable {
     );
   }
 
-  async refresh(jsonOutput: string): Promise<void> {
+  async refresh(jsonOutput: string, tag = "default"): Promise<void> {
+    this.jsonLayers.set(tag, jsonOutput);
+    const combined = Array.from(this.jsonLayers.values()).join("");
+
     try {
-      const raw = await this.runSpecFromInput(jsonOutput);
+      const raw = await this.runSpecFromInput(combined);
       const data: SpecData = JSON.parse(raw);
       this.lastSpecData = data;
       await this.resolveModulePaths();
@@ -337,6 +357,7 @@ interface SpecNode {
   duration: number;
   focused: boolean;
   excluded: boolean;
+  external: boolean;
   output: string[];
   children: SpecNode[];
 }
@@ -527,7 +548,10 @@ function buildLeafHtml(
 ): string {
   const iconHtml = buildIconHtml(node.status, node, parentName, locationMap);
   const dur = formatDuration(node.duration);
-  const suffix = node.excluded || node.status === "skip" ? " — SKIPPED" : "";
+  let suffix = "";
+  if (node.external) suffix += ` <span class="tag external">EXT.</span>`;
+  if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
+  else if (node.excluded || node.status === "skip") suffix += " — SKIPPED";
 
   let errorBlock = "";
   if (node.status === "fail" && node.output.length > 0) {
@@ -572,8 +596,9 @@ function buildBranchHtml(
   }
 
   let suffix = "";
-  if (node.focused) suffix = ` <span class="tag focused">FOCUSED</span>`;
-  else if (node.excluded) suffix = ` <span class="tag skipped">SKIPPED</span>`;
+  if (node.external) suffix += ` <span class="tag external">EXT.</span>`;
+  if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
+  else if (node.excluded) suffix += ` <span class="tag skipped">SKIPPED</span>`;
 
   return `<details class="branch" data-display="${escapeAttr(node.display)}"${openAttr}>
   <summary class="node ${node.kind}">${iconHtml} ${label}${suffix}</summary>
@@ -770,8 +795,11 @@ function walkReportNode(
   }
 
   let label = node.display;
-  if (node.focused) label += " — FOCUSED";
-  else if (node.excluded) label += " — SKIPPED";
+  const tags: string[] = [];
+  if (node.external) tags.push("EXT.");
+  if (node.focused) tags.push("FOCUSED");
+  else if (node.excluded) tags.push("SKIPPED");
+  if (tags.length > 0) label += " — " + tags.join(", ");
 
   if (node.children.length === 0) {
     rows.push({
@@ -1010,6 +1038,7 @@ summary.node.block { color: var(--vscode-terminal-ansiYellow); }
 .tag { font-size: 0.8em; margin-left: 6px; }
 .tag.focused { color: var(--vscode-testing-iconSkipped); }
 .tag.skipped { color: var(--vscode-testing-iconSkipped); }
+.tag.external { color: var(--vscode-descriptionForeground); }
 
 /* Icon hover swap: status icon → go-to-source */
 .icon .goto-text { display: none; }

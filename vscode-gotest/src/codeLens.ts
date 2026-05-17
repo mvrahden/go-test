@@ -41,6 +41,29 @@ export class GoTestCodeLensProvider
     if (!pkg) return [];
 
     const lenses: vscode.CodeLens[] = [];
+    const packageLine = new vscode.Range(0, 0, 0, 0);
+
+    lenses.push(
+      new vscode.CodeLens(packageLine, {
+        title: "▶ Run Package",
+        command: "gotest.runTest",
+        arguments: [importPath],
+      }),
+    );
+
+    const fileSuiteIds = pkg.suites
+      .filter((s) => path.join(pkg.dir, s.file) === docPath)
+      .map((s) => `${importPath}/${s.name}`);
+
+    if (fileSuiteIds.length > 1) {
+      lenses.push(
+        new vscode.CodeLens(packageLine, {
+          title: "▶ Run File",
+          command: "gotest.runFile",
+          arguments: [fileSuiteIds],
+        }),
+      );
+    }
 
     for (const suite of pkg.suites) {
       if (path.join(pkg.dir, suite.file) === docPath) {

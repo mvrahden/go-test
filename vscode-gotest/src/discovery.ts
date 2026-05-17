@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type {
@@ -154,6 +154,38 @@ export class DiscoveryService {
     return false;
   }
 
+  private async resolveWorkspacePatterns(
+    workspaceDir: string,
+  ): Promise<string[]> {
+    try {
+      const content = await readFile(
+        path.join(workspaceDir, "go.work"),
+        "utf-8",
+      );
+      const usePattern = /^\s*use\s*\(\s*([\s\S]*?)\s*\)/m;
+      const blockMatch = usePattern.exec(content);
+      if (blockMatch) {
+        const dirs = blockMatch[1]
+          .split("\n")
+          .map((l) => l.trim())
+          .filter((l) => l && !l.startsWith("//"));
+        if (dirs.length > 1) {
+          return dirs.map((d) => `${d}/...`);
+        }
+      }
+      const singleUse = /^\s*use\s+(\S+)/gm;
+      const singles: string[] = [];
+      let m: RegExpExecArray | null;
+      while ((m = singleUse.exec(content)) !== null) {
+        singles.push(m[1]);
+      }
+      if (singles.length > 1) {
+        return singles.map((d) => `${d}/...`);
+      }
+    } catch {}
+    return ["./..."];
+  }
+
   private async execute(
     workspaceDir: string,
     patterns?: string[],
@@ -166,8 +198,10 @@ export class DiscoveryService {
     }
 
     try {
+      const effectivePatterns =
+        patterns ?? (await this.resolveWorkspacePatterns(workspaceDir));
       const cmd = await buildCliCommand(
-        ["discover", ...(patterns ?? ["./..."])],
+        ["discover", ...effectivePatterns],
         workspaceDir,
         this.outputChannel,
       );
@@ -179,7 +213,6 @@ export class DiscoveryService {
       });
 
       const output: DiscoverOutput = JSON.parse(stdout);
-      const effectivePatterns = patterns ?? ["./..."];
       const fullScan = effectivePatterns.some((p) => p.includes("..."));
       const warnings = output.warnings ?? [];
       const packages = output.packages ?? [];

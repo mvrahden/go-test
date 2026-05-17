@@ -98,33 +98,43 @@ export class GoTestController implements vscode.Disposable {
 
     const seenIds = new Set<string>();
     const rootIds = new Set<string>();
+    const isMultiFolder = wsGroups.size > 1;
 
-    for (const [_wsDir, entries] of wsGroups) {
+    for (const [wsDir, entries] of wsGroups) {
       const trie = buildPathTrie(entries);
       collapsePathTrie(trie);
 
+      const idPrefix = isMultiFolder ? `${this.folderName(wsDir)}/` : "";
+      const target = isMultiFolder
+        ? this.getOrCreateFolderItem(wsDir, seenIds, rootIds)
+        : this.controller.items;
+
       if (trie.importPath && trie.children.size === 0) {
-        this.addPackageItem(trie.importPath, this.controller.items, seenIds);
-        rootIds.add(trie.importPath);
+        this.addPackageItem(trie.importPath, target, seenIds);
+        if (!isMultiFolder) rootIds.add(trie.importPath);
       } else if (trie.importPath) {
-        this.addPackageItem(trie.importPath, this.controller.items, seenIds);
-        rootIds.add(trie.importPath);
+        this.addPackageItem(trie.importPath, target, seenIds);
+        if (!isMultiFolder) rootIds.add(trie.importPath);
         for (const child of trie.children.values()) {
-          this.addTrieNode(child, this.controller.items, seenIds);
-          rootIds.add(
-            child.importPath && child.children.size === 0
-              ? child.importPath
-              : `dir:${child.segment}`,
-          );
+          this.addTrieNode(child, target, seenIds, idPrefix);
+          if (!isMultiFolder) {
+            rootIds.add(
+              child.importPath && child.children.size === 0
+                ? child.importPath
+                : `dir:${child.segment}`,
+            );
+          }
         }
       } else {
         for (const child of trie.children.values()) {
-          this.addTrieNode(child, this.controller.items, seenIds);
-          rootIds.add(
-            child.importPath && child.children.size === 0
-              ? child.importPath
-              : `dir:${child.segment}`,
-          );
+          this.addTrieNode(child, target, seenIds, idPrefix);
+          if (!isMultiFolder) {
+            rootIds.add(
+              child.importPath && child.children.size === 0
+                ? child.importPath
+                : `dir:${child.segment}`,
+            );
+          }
         }
       }
     }
@@ -140,13 +150,14 @@ export class GoTestController implements vscode.Disposable {
     node: PathNode,
     parent: vscode.TestItemCollection,
     seenIds: Set<string>,
+    idPrefix = "",
   ): void {
     if (node.importPath && node.children.size === 0) {
       this.addPackageItem(node.importPath, parent, seenIds);
       return;
     }
 
-    const dirId = `dir:${node.segment}`;
+    const dirId = `dir:${idPrefix}${node.segment}`;
     seenIds.add(dirId);
 
     let dirItem = parent.get(dirId);
@@ -161,11 +172,11 @@ export class GoTestController implements vscode.Disposable {
 
     const seenChildIds = new Set<string>();
     for (const child of node.children.values()) {
-      this.addTrieNode(child, dirItem.children, seenIds);
+      this.addTrieNode(child, dirItem.children, seenIds, idPrefix);
       const childId =
         child.importPath && child.children.size === 0
           ? child.importPath
-          : `dir:${child.segment}`;
+          : `dir:${idPrefix}${child.segment}`;
       seenChildIds.add(childId);
     }
 
@@ -174,6 +185,31 @@ export class GoTestController implements vscode.Disposable {
         dirItem.children.delete(child.id);
       }
     });
+  }
+
+  private folderName(wsDir: string): string {
+    return (
+      vscode.workspace.getWorkspaceFolder(vscode.Uri.file(wsDir))?.name ??
+      path.basename(wsDir)
+    );
+  }
+
+  private getOrCreateFolderItem(
+    wsDir: string,
+    seenIds: Set<string>,
+    rootIds: Set<string>,
+  ): vscode.TestItemCollection {
+    const name = this.folderName(wsDir);
+    const id = `wsFolder:${name}`;
+    seenIds.add(id);
+    rootIds.add(id);
+
+    let item = this.controller.items.get(id);
+    if (!item) {
+      item = this.controller.createTestItem(id, name);
+    }
+    this.controller.items.add(item);
+    return item.children;
   }
 
   private addPackageItem(
