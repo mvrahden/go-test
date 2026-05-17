@@ -50,7 +50,7 @@ jobs:
         working-directory: .
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.event.release.tag_name }}" vscode-gotest/*.vsix
+        run: gh release upload "${{ github.event.release.tag_name }}" vscode-gotest/*.vsix --clobber
       - run: npx @vscode/vsce publish --no-dependencies --packagePath *.vsix
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
