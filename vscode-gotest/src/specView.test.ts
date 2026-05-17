@@ -89,7 +89,14 @@ describe("specDataToReport", () => {
         ],
       },
     ],
-    stats: { suites: 1, behaviors: 3, tests: 0, passed: 1, failed: 1, skipped: 1 },
+    stats: {
+      suites: 1,
+      behaviors: 3,
+      tests: 0,
+      passed: 1,
+      failed: 1,
+      skipped: 1,
+    },
   };
 
   it("includes all statuses when no filter is set", () => {
@@ -140,7 +147,11 @@ describe("specDataToReport", () => {
   });
 
   it("omits branches with no visible leaves", () => {
-    const report = specDataToReport(data, [], new Set(["pass", "fail", "skip"]));
+    const report = specDataToReport(
+      data,
+      [],
+      new Set(["pass", "fail", "skip"]),
+    );
     expect(report).not.toContain("MySuite");
     expect(report).not.toContain("pkg");
   });

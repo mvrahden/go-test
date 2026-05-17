@@ -793,7 +793,8 @@ export function specDataToReport(
 
   const counts: string[] = [];
   if (data.stats.suites > 0) counts.push(`${data.stats.suites} suites`);
-  if (data.stats.behaviors > 0) counts.push(`${data.stats.behaviors} behaviors`);
+  if (data.stats.behaviors > 0)
+    counts.push(`${data.stats.behaviors} behaviors`);
   if (data.stats.tests > 0) counts.push(`${data.stats.tests} stdlib tests`);
   const results: string[] = [];
   if (totalAgg.passed > 0) results.push(`${totalAgg.passed} passed`);
