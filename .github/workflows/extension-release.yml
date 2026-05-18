@@ -1,8 +1,16 @@
 name: extension-release
 
 on:
-  release:
-    types: [created]
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+    secrets:
+      VSCE_PAT:
+        required: true
+      OVSX_PAT:
+        required: true
 
 concurrency:
   group: extension-release
@@ -31,7 +39,7 @@ jobs:
       - run: npm test
       - run: npm run compile
 
-  publish:
+  package:
     runs-on: ubuntu-latest
     needs: check
     steps:
@@ -44,16 +52,49 @@ jobs:
       - run: npm ci
       - run: npm run compile
       - name: Set version from release tag
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+        run: npm version "${TAG#v}" --no-git-tag-version
+        env:
+          TAG: ${{ inputs.tag }}
       - run: npx @vscode/vsce package --no-dependencies
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: vscode-gotest/*.vsix
+
+  publish-github:
+    runs-on: ubuntu-latest
+    needs: package
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: vsix
       - name: Upload .vsix to release
         working-directory: .
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.event.release.tag_name }}" vscode-gotest/*.vsix --clobber
-      - run: npx @vscode/vsce publish --no-dependencies --packagePath *.vsix
+        run: gh release upload "${{ inputs.tag }}" *.vsix --clobber
+
+  publish-marketplace:
+    runs-on: ubuntu-latest
+    needs: package
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: vsix
+      - working-directory: .
+        run: npx @vscode/vsce publish --no-dependencies --packagePath *.vsix
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-      - run: npx ovsx publish *.vsix
+
+  publish-openvsx:
+    runs-on: ubuntu-latest
+    needs: package
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: vsix
+      - working-directory: .
+        run: npx ovsx publish *.vsix
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}

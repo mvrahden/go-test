@@ -1,9 +1,9 @@
 name: test
 
 on:
-  push:
-    branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened]
+    paths-ignore: [vscode-gotest/**]
 
 concurrency:
   group: test-${{ github.ref }}

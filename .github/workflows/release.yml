@@ -63,3 +63,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ github.event.release.tag_name }}" gotest-*
+
+  extension:
+    needs: build
+    uses: ./.github/workflows/extension-release.yml
+    with:
+      tag: ${{ github.event.release.tag_name }}
+    secrets:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
