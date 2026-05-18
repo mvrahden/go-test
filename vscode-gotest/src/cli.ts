@@ -337,7 +337,7 @@ async function buildCachedBinary(
     }
   }
 
-  const cacheDir = path.join(os.tmpdir(), "vscode-gotest");
+  const cacheDir = path.join(os.tmpdir(), "gotest");
   try {
     await mkdir(cacheDir, { recursive: true });
   } catch {

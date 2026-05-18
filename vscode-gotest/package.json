@@ -1,5 +1,5 @@
 {
-  "name": "vscode-gotest",
+  "name": "gotest",
   "displayName": "Go Test Suites",
   "description": "Test Explorer, CodeLens, and debug integration for go-test suites",
   "version": "0.1.0",

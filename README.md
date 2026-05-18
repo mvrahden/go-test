@@ -594,8 +594,9 @@ Also available as a standalone binary (`gotest-lint`) compatible with `golangci-
 
 ## VS Code Extension
 
-The **[Go Test Suites](https://marketplace.visualstudio.com/items?itemName=mvrahden.vscode-gotest)** extension brings first-class IDE support: suite-aware Test Explorer, CodeLens run/debug buttons, coverage gutters, watch mode, spec view, focus/exclude quick fixes, and suite scaffolding.
-Install via `code --install-extension mvrahden.vscode-gotest`.
+The **Go Test Suites** extension brings first-class IDE support: suite-aware Test Explorer, CodeLens run/debug buttons, coverage gutters, watch mode, spec view, focus/exclude quick fixes, and suite scaffolding.
+Available on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest) and [Open VSX](https://open-vsx.org/extension/mvrahden/gotest).
+Install via `code --install-extension mvrahden.gotest`.
 
 ## License
 

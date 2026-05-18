@@ -37,11 +37,13 @@ It resolves the version from your `go.mod` and uses `go run` to execute it.
 
 ### Install
 
-Search **"Go Test Suites"** in the VS Code Extensions panel, or install from the command line:
+Search **"Go Test Suites"** in the Extensions panel, or install from the command line:
 
 ```
-code --install-extension mvrahden.vscode-gotest
+code --install-extension mvrahden.gotest
 ```
+
+Also available on [Open VSX](https://open-vsx.org/extension/mvrahden/gotest) for VS Code forks.
 
 ### First run
 
