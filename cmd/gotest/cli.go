@@ -10,32 +10,39 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/about"
+	"github.com/mvrahden/go-test/internal/config"
 )
 
 func main() {
+	projectCfg, err := config.Load(".")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: loading %s: %s\n", config.FileName, err)
+		os.Exit(2)
+	}
+
 	subcmd, remaining := ParseSubcommand(os.Args[1:])
 
 	switch subcmd {
 	case "discover":
-		os.Exit(runDiscover(remaining))
+		os.Exit(runDiscover(applyConfigTags(remaining, projectCfg)))
 	case "prepare":
-		os.Exit(runPrepare(remaining))
+		os.Exit(runPrepare(applyConfigTags(remaining, projectCfg)))
 	case "scaffold":
 		os.Exit(runScaffold(remaining))
 	case "migrate":
 		os.Exit(runMigrate(remaining))
 	case "generate":
-		os.Exit(runGenerate(remaining))
+		os.Exit(runGenerate(applyConfigTags(remaining, projectCfg)))
 	case "clean":
 		os.Exit(runClean(remaining))
 	case "spec":
-		os.Exit(runSpec(remaining))
+		os.Exit(runSpec(applyConfigDefaults(remaining, projectCfg)))
 	case "watch":
-		os.Exit(runWatch(remaining))
+		os.Exit(runWatch(applyConfigDefaults(remaining, projectCfg)))
 	case "refactor":
 		os.Exit(runRefactor(remaining))
 	case "lint":
-		os.Exit(runLint(remaining))
+		os.Exit(runLint(remaining, projectCfg))
 	case "version":
 		fmt.Println(about.LongInfo())
 		return
@@ -51,8 +58,9 @@ func main() {
 					specArgs = append(specArgs, a)
 				}
 			}
-			os.Exit(runSpec(specArgs))
+			os.Exit(runSpec(applyConfigDefaults(specArgs, projectCfg)))
 		}
+		args = applyConfigDefaults(args, projectCfg)
 		ownArgs, goTestArgs := SplitArgs(args)
 
 		jsonMode, goTestArgs := stripJSONFlag(goTestArgs)
@@ -61,6 +69,9 @@ func main() {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			os.Exit(2)
+		}
+		if minCoverage == 0 && projectCfg.MinCoverage > 0 {
+			minCoverage = projectCfg.MinCoverage
 		}
 		setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
 		if err != nil {
@@ -115,6 +126,52 @@ func main() {
 
 		os.Exit(code)
 	}
+}
+
+// applyConfigTags prepends -tags from config if not already set in args.
+func applyConfigTags(args []string, cfg config.ProjectConfig) []string {
+	if cfg.Tags == "" {
+		return args
+	}
+	for _, arg := range args {
+		if arg == "-tags" || strings.HasPrefix(arg, "-tags=") {
+			return args
+		}
+	}
+	return append([]string{"-tags=" + cfg.Tags}, args...)
+}
+
+// applyConfigDefaults prepends config-derived flags if not already set in args.
+func applyConfigDefaults(args []string, cfg config.ProjectConfig) []string {
+	out := applyConfigTags(args, cfg)
+
+	if cfg.SetupTimeout.Duration() > 0 {
+		hasFlag := false
+		for _, arg := range out {
+			if arg == "--setup-timeout" || strings.HasPrefix(arg, "--setup-timeout=") {
+				hasFlag = true
+				break
+			}
+		}
+		if !hasFlag {
+			out = append([]string{"--setup-timeout=" + cfg.SetupTimeout.Duration().String()}, out...)
+		}
+	}
+
+	if cfg.Debounce.Duration() > 0 {
+		hasFlag := false
+		for _, arg := range out {
+			if arg == "--debounce" || strings.HasPrefix(arg, "--debounce=") {
+				hasFlag = true
+				break
+			}
+		}
+		if !hasFlag {
+			out = append([]string{"--debounce=" + cfg.Debounce.Duration().String()}, out...)
+		}
+	}
+
+	return out
 }
 
 func parseMinFlag(args []string) (int, error) {
