@@ -6,14 +6,14 @@
 
 Specification-driven test suites for AI-assisted Go development.
 
-[go-test](https://github.com/mvrahden/go-test) turns your tests into behavioral specifications — BDD-style suites that read as documentation, with structured output that AI agents consume natively.
+[go-test](https://github.com/mvrahden/go-test) turns your tests into behavioral specifications — BDD-style suites that read as documentation, with structured output for AI-assisted workflows.
 This extension brings that workflow into VS Code: run, debug, watch, and verify your specifications without leaving the editor.
 
 ## Why this extension?
 
 AI writes code fast. The bottleneck is verification — you can't review AI-generated code line by line at the rate it's produced.
 
-[go-test](https://github.com/mvrahden/go-test) closes that gap. Test suites become formal behavioral specifications. Every CLI command produces structured JSON. The Spec View renders your specification as an interactive tree. Coverage shows implementation progress. You define what the system should do — AI implements, tests verify.
+[go-test](https://github.com/mvrahden/go-test) closes that gap. Test suites become behavioral specifications. The Spec View renders your specification as an interactive tree with structured output. Coverage shows implementation progress. You define what the system should do — tests verify.
 
 - **Spec View** — Your quality dashboard. BDD-formatted specification tree with pass/fail/skip indicators, go-to-source navigation, and clipboard export. Paste specs into AI conversations as context.
 - **Suite-aware Test Explorer** — Navigate tests as Package > Suite > Method > Subtest, not a flat list of functions.

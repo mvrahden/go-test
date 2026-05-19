@@ -33,7 +33,7 @@ Test output is standard — but the mechanism behind it isn't.
 The generated code is deleted after tests run.
 What remains is standard `go test` output, zero runtime dependencies, and no lock-in — `gotest clean` removes all traces, and your test structs still compile.
 
-**AI-assisted development** — BDD-style suites double as behavioral specifications that AI agents consume natively. Every CLI command produces structured JSON. Define what the system should do, let AI implement, tests verify. The `gotest spec` output gives you a human-readable and machine-readable contract in one artifact.
+**AI-assisted development** — BDD-style suites double as behavioral specifications. `gotest spec` renders your test structure as a readable contract with structured JSON output. Your tests are the documentation — always in sync, never stale.
 
 ## Install
 
