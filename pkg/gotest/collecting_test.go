@@ -1,4 +1,4 @@
-package gotest
+package gotest //nolint:stdlib-test
 
 import (
 	"testing"

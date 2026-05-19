@@ -1,4 +1,4 @@
-package migrate
+package migrate //nolint:stdlib-test
 
 import (
 	"go/format"

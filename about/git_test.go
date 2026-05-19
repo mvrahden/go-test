@@ -1,4 +1,4 @@
-package about_test
+package about_test //nolint:stdlib-test
 
 import (
 	"testing"

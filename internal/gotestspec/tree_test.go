@@ -1,4 +1,4 @@
-package gotestspec
+package gotestspec //nolint:stdlib-test
 
 import (
 	"strings"

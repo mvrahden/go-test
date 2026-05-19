@@ -1,4 +1,4 @@
-package assert_test
+package assert_test //nolint:stdlib-test
 
 import (
 	"reflect"

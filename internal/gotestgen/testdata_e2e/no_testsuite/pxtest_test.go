@@ -1,4 +1,4 @@
-package e2epkg_test
+package e2epkg_test //nolint:stdlib-test
 
 import "testing"
 

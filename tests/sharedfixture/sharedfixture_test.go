@@ -1,4 +1,4 @@
-package sharedfixture_test
+package sharedfixture_test //nolint:stdlib-test
 
 import (
 	"bytes"

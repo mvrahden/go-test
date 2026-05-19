@@ -1,4 +1,4 @@
-package lint
+package lint //nolint:stdlib-test
 
 import (
 	"testing"

@@ -1,4 +1,4 @@
-package config
+package config //nolint:stdlib-test
 
 import (
 	"os"

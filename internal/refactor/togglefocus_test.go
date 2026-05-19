@@ -1,4 +1,4 @@
-package refactor
+package refactor //nolint:stdlib-test
 
 import (
 	"os"

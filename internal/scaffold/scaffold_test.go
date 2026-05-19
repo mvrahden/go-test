@@ -1,4 +1,4 @@
-package scaffold
+package scaffold //nolint:stdlib-test
 
 import (
 	"os"

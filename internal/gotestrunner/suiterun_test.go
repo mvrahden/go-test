@@ -1,4 +1,4 @@
-package gotestrunner
+package gotestrunner //nolint:stdlib-test
 
 import (
 	"bytes"
