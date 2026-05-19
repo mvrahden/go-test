@@ -1,7 +1,7 @@
 {
   "name": "gotest",
   "displayName": "Go - Test Suites",
-  "description": "Test Explorer, CodeLens, and debug integration for go-test suites",
+  "description": "Specification-driven test suites for AI-assisted Go development — Spec View, Test Explorer, coverage, and debug integration",
   "version": "0.1.0",
   "publisher": "mvrahden",
   "license": "MIT",
@@ -17,7 +17,10 @@
     "test",
     "testing",
     "suite",
-    "bdd"
+    "bdd",
+    "specification",
+    "coverage",
+    "ai"
   ],
   "engines": {
     "vscode": "^1.101.0"
