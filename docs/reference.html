@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gotest Reference — Naming Conventions, Lifecycle, Assertions &amp; More</title>
+  <meta name="description" content="Technical reference for gotest: naming conventions, suite lifecycle, fixture model, type-safe assertions, coverage calculation, and CLI commands for Go test suites.">
+  <meta name="keywords" content="go test lifecycle hooks, go bdd naming conventions, go test assertions, go coverage calculation, go test suite reference, gotest">
+
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://mvrahden.github.io/go-test/reference.html">
+  <meta property="og:title" content="gotest Reference — Naming Conventions, Lifecycle, Assertions &amp; More">
+  <meta property="og:description" content="Technical reference for the gotest framework: naming conventions, lifecycle model, assertions, fixtures, configuration, coverage, and CLI.">
+  <meta property="og:image" content="https://mvrahden.github.io/go-test/gopher.png">
+  <meta property="og:image:width" content="1024">
+  <meta property="og:image:height" content="572">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="gotest Reference">
+  <meta name="twitter:description" content="Naming conventions, lifecycle model, assertions, fixtures, configuration, and CLI for Go test suites.">
+  <meta name="twitter:image" content="https://mvrahden.github.io/go-test/gopher.png">
+
+  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="canonical" href="https://mvrahden.github.io/go-test/reference.html">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "name": "gotest Reference",
+    "description": "Technical reference for the gotest Go test framework",
+    "url": "https://mvrahden.github.io/go-test/reference.html",
+    "isPartOf": {
+      "@type": "SoftwareSourceCode",
+      "name": "gotest",
+      "url": "https://github.com/mvrahden/go-test"
+    },
+    "programmingLanguage": "Go",
+    "author": {
+      "@type": "Person",
+      "name": "Menno van Rahden",
+      "url": "https://github.com/mvrahden"
+    }
+  }
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan: #00ADD8;
+      --cyan-dark: #007d9c;
+      --bg: #ffffff;
+      --bg-alt: #f6f8fa;
+      --bg-dark: #0d1117;
+      --bg-dark-alt: #161b22;
+      --text: #24292f;
+      --text-secondary: #656d76;
+      --text-on-dark: #e6edf3;
+      --text-dimmed: #8b949e;
+      --border: #d0d7de;
+      --green: #3fb950;
+      --amber: #d29922;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Liberation Mono', monospace;
+      --max-w: 820px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --bg-alt: #161b22;
+        --bg-dark: #010409;
+        --bg-dark-alt: #0d1117;
+        --text: #e6edf3;
+        --text-secondary: #8b949e;
+        --border: #30363d;
+      }
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-sans);
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--cyan-dark); text-decoration: none; }
+    @media (prefers-color-scheme: dark) { a { color: var(--cyan); } }
+    a:hover { text-decoration: underline; }
+
+    /* ===== Nav ===== */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+    }
+    .nav-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 1.125rem;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .nav-brand:hover { text-decoration: none; }
+    .nav-brand img { width: 28px; height: 28px; border-radius: 50%; }
+    .nav-links { display: flex; gap: 1.25rem; font-size: 0.9rem; }
+    .nav-links a { color: var(--text-secondary); }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+
+    /* ===== Layout ===== */
+    .page { max-width: var(--max-w); margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+
+    .page-header {
+      text-align: center;
+      margin-bottom: 4rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-header h1 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+    }
+    .page-header p {
+      color: var(--text-secondary);
+      font-size: 1.1rem;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    /* ===== Table of Contents ===== */
+    .toc {
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem 2rem;
+      margin-bottom: 4rem;
+    }
+    .toc-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      margin-bottom: 0.75rem;
+    }
+    .toc ol {
+      list-style: none;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.4rem 2rem;
+      counter-reset: toc;
+    }
+    .toc li { counter-increment: toc; }
+    .toc li::before {
+      content: counter(toc) ".";
+      color: var(--text-dimmed);
+      font-size: 0.85rem;
+      margin-right: 0.4rem;
+    }
+    .toc a { font-size: 0.9rem; }
+
+    /* ===== Sections ===== */
+    .ref-section {
+      margin-bottom: 4rem;
+    }
+    .ref-section h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      padding-top: 1rem;
+    }
+    .ref-section .lead {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+    }
+    .ref-section h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 2rem 0 0.75rem;
+    }
+    .ref-section p {
+      margin-bottom: 1rem;
+      font-size: 0.95rem;
+    }
+
+    /* ===== Tables ===== */
+    .ref-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      margin: 1rem 0 1.5rem;
+    }
+    .ref-table th,
+    .ref-table td {
+      padding: 0.6rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .ref-table th {
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-secondary);
+    }
+    .ref-table code {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      background: var(--bg-alt);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+    }
+    @media (prefers-color-scheme: dark) {
+      .ref-table code { background: var(--bg-dark-alt); }
+    }
+
+    /* ===== Code blocks ===== */
+    .code-block {
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 1rem 0 1.5rem;
+    }
+    @media (prefers-color-scheme: dark) {
+      .code-block { background: #161b22; }
+    }
+    .code-label {
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    @media (prefers-color-scheme: dark) {
+      .code-label { background: var(--bg-dark-alt); }
+    }
+    .code-block pre {
+      padding: 1rem 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.65;
+      overflow-x: auto;
+    }
+    .kw { color: #cf222e; }
+    .fn { color: #8250df; }
+    .tp { color: #0550ae; }
+    .st { color: #0a3069; }
+    .cm { color: #6e7781; }
+    @media (prefers-color-scheme: dark) {
+      .kw { color: #ff7b72; }
+      .fn { color: #d2a8ff; }
+      .tp { color: #79c0ff; }
+      .st { color: #a5d6ff; }
+      .cm { color: #8b949e; }
+    }
+
+    /* ===== Diagram blocks ===== */
+    .diagram {
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.7;
+      white-space: pre;
+      overflow-x: auto;
+      margin: 1rem 0 1.5rem;
+    }
+    @media (prefers-color-scheme: dark) {
+      .diagram { background: #161b22; }
+    }
+    .diagram .g { color: var(--green); }
+    .diagram .d { color: var(--text-dimmed); }
+
+    /* ===== Callout ===== */
+    .callout {
+      border-left: 3px solid var(--cyan);
+      padding: 0.75rem 1rem;
+      background: var(--bg-alt);
+      border-radius: 0 8px 8px 0;
+      font-size: 0.9rem;
+      margin: 1rem 0 1.5rem;
+      color: var(--text-secondary);
+    }
+    @media (prefers-color-scheme: dark) {
+      .callout { background: #161b22; }
+    }
+
+    /* ===== Inline code ===== */
+    :not(pre) > code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      background: var(--bg-alt);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :not(pre) > code { background: var(--bg-dark-alt); }
+    }
+
+    /* ===== Footer ===== */
+    footer {
+      background: var(--bg-dark);
+      color: var(--text-dimmed);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--text-on-dark); }
+    footer a:hover { color: var(--cyan); }
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 640px) {
+      .page-header h1 { font-size: 1.75rem; }
+      .toc ol { grid-template-columns: 1fr; }
+      .ref-table { font-size: 0.8rem; }
+      .ref-table th, .ref-table td { padding: 0.5rem; }
+    }
+  </style>
+</head>
+
+<body>
+  <nav>
+    <div class="nav-inner">
+      <a href="./" class="nav-brand">
+        <img src="logo.png" alt="gotest logo" width="28" height="28">
+        gotest
+      </a>
+      <div class="nav-links">
+        <a href="./">Home</a>
+        <a href="https://github.com/mvrahden/go-test">GitHub</a>
+        <a href="https://pkg.go.dev/github.com/mvrahden/go-test">pkg.go.dev</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page">
+    <header class="page-header">
+      <h1>Reference</h1>
+      <p>The mental model behind gotest. Learn the conventions once — the rest follows.</p>
+    </header>
+
+    <div class="toc">
+      <div class="toc-title">Contents</div>
+      <ol>
+        <li><a href="#conceptual-model">Conceptual Model</a></li>
+        <li><a href="#naming-conventions">Naming Conventions</a></li>
+        <li><a href="#lifecycle">Suite Lifecycle</a></li>
+        <li><a href="#test-dsl">Test DSL</a></li>
+        <li><a href="#fixtures">Fixtures</a></li>
+        <li><a href="#assertions">Assertions</a></li>
+        <li><a href="#configuration">Configuration</a></li>
+        <li><a href="#coverage">Coverage</a></li>
+        <li><a href="#cli">CLI Reference</a></li>
+      </ol>
+    </div>
+
+    <!-- 1. Conceptual Model -->
+    <section class="ref-section" id="conceptual-model">
+      <h2>Conceptual Model</h2>
+      <p class="lead">Test suites are behavioral specifications. Every level of the hierarchy maps to a concept.</p>
+
+      <table class="ref-table">
+        <thead>
+          <tr><th>Go construct</th><th>Spec concept</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>struct</code></td><td>Subject</td><td><code>UserServiceTestSuite</code></td></tr>
+          <tr><td><code>method</code></td><td>Capability</td><td><code>TestCreate</code></td></tr>
+          <tr><td><code>When()</code></td><td>Context</td><td><code>"when email is valid"</code></td></tr>
+          <tr><td><code>It()</code></td><td>Behavior</td><td><code>"creates the user"</code></td></tr>
+          <tr><td><code>Each()</code></td><td>Variants</td><td><code>"standard format"</code>, <code>"missing @"</code></td></tr>
+        </tbody>
+      </table>
+
+      <p>Naming conventions at the struct and method level, plus string descriptions in <code>When</code> and <code>It</code>, form a complete specification. The tool generates the wiring and can render the full spec in human-readable form:</p>
+
+      <div class="diagram">UserService
+  Create
+    when email is valid
+      <span class="g">&#10003;</span> creates the user
+      <span class="g">&#10003;</span> sends a welcome email
+    when email already exists
+      <span class="g">&#10003;</span> returns ErrDuplicate
+  Delete
+    <span class="g">&#10003;</span> soft-deletes the user</div>
+
+      <p>This isn't a separate reporting layer — it's the same test hierarchy rendered differently. The spec view and the test output always agree because they come from the same source.</p>
+    </section>
+
+    <!-- 2. Naming Conventions -->
+    <section class="ref-section" id="naming-conventions">
+      <h2>Naming Conventions</h2>
+      <p class="lead">The naming conventions are the entire API. There are no config files, struct tags, or annotations.</p>
+
+      <h3>Types</h3>
+      <table class="ref-table">
+        <thead>
+          <tr><th>Pattern</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>*TestSuite</code></td><td>Test suite. Each generates a <code>func Test*</code> entry point.</td></tr>
+          <tr><td><code>*Fixture</code></td><td>Package fixture. Shared setup for all suites in a package.</td></tr>
+          <tr><td><code>*SharedFixture</code></td><td>Cross-package fixture. Runs in a subprocess, state transfers via JSON.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Methods</h3>
+      <table class="ref-table">
+        <thead>
+          <tr><th>Method</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Test*</code></td><td>Test case. Becomes a subtest.</td></tr>
+          <tr><td><code>BeforeAll</code></td><td>Runs once before all tests in the suite.</td></tr>
+          <tr><td><code>AfterAll</code></td><td>Runs once after all tests. Registered as cleanup, so it always runs.</td></tr>
+          <tr><td><code>BeforeEach</code></td><td>Runs before every test case.</td></tr>
+          <tr><td><code>AfterEach</code></td><td>Runs after every test case. Deferred, so it runs even on fatal errors.</td></tr>
+          <tr><td><code>SuiteGuard()</code></td><td>Returns a reason to skip the suite, or empty string to run. Evaluated at runtime.</td></tr>
+          <tr><td><code>SuiteConfig()</code></td><td>Returns timeout, parallelism, and fail-fast settings.</td></tr>
+          <tr><td><code>FixtureConfig()</code></td><td>Returns timeout and retry settings for package fixtures.</td></tr>
+          <tr><td><code>SharedFixtureConfig()</code></td><td>Returns timeout and retry settings for shared fixtures.</td></tr>
+          <tr><td><code>Hydrate</code> / <code>Dehydrate</code></td><td>Reconstruct / clean up local resources in shared fixtures after state transfer.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Prefixes</h3>
+      <table class="ref-table">
+        <thead>
+          <tr><th>Prefix</th><th>Effect</th><th>Use case</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>F_</code></td><td>Focus — only focused items run</td><td>Tight iteration during development</td></tr>
+          <tr><td><code>X_</code></td><td>Exclude — always skipped</td><td>Temporarily disable a flaky test</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">
+        <code>F_</code> and <code>X_</code> work on both types and methods. <code>X_</code> takes precedence over <code>F_</code>. Use <code>--ci</code> to fail the build if any focus prefix is committed.
+      </div>
+    </section>
+
+    <!-- 3. Lifecycle -->
+    <section class="ref-section" id="lifecycle">
+      <h2>Suite Lifecycle</h2>
+      <p class="lead">Predictable execution order with guaranteed cleanup — even on panics and fatal errors.</p>
+
+      <h3>Execution order</h3>
+      <div class="diagram">BeforeAll
+<span class="d">├──</span> BeforeEach <span class="d">→</span> Test A <span class="d">→</span> AfterEach <span class="d">(deferred)</span>
+<span class="d">├──</span> BeforeEach <span class="d">→</span> Test B <span class="d">→</span> AfterEach <span class="d">(deferred)</span>
+<span class="d">├──</span> BeforeEach <span class="d">→</span> Test C <span class="d">→</span> AfterEach <span class="d">(deferred)</span>
+AfterAll <span class="d">(via t.Cleanup — always runs)</span></div>
+
+      <p>All hooks are optional. Unimplemented hooks are no-ops. <code>AfterAll</code> is registered before <code>BeforeAll</code> runs, so cleanup happens even if setup fails. <code>AfterEach</code> is deferred, so it runs even on <code>t.Fatal()</code>.</p>
+
+      <h3>Hook signatures</h3>
+      <p>Every hook accepts either <code>*gotest.T</code> (full DSL access) or <code>*testing.T</code> (plain stdlib). Mix freely within the same suite:</p>
+      <div class="code-block">
+        <pre><span class="kw">func</span> (s *<span class="tp">MySuite</span>) <span class="fn">BeforeAll</span>(t *gotest.T)   {}  <span class="cm">// full DSL</span>
+<span class="kw">func</span> (s *<span class="tp">MySuite</span>) <span class="fn">BeforeEach</span>(t *testing.T) {}  <span class="cm">// plain stdlib</span>
+<span class="kw">func</span> (s *<span class="tp">MySuite</span>) <span class="fn">TestPlain</span>(t *testing.T)  {}  <span class="cm">// no gotest import needed</span>
+<span class="kw">func</span> (s *<span class="tp">MySuite</span>) <span class="fn">TestRich</span>(t *gotest.T)    {}  <span class="cm">// When, It, MatchSnapshot</span></pre>
+      </div>
+
+      <h3>Per-test context</h3>
+      <p>When <code>BeforeEach</code> returns a value, each test receives its own isolated context. This enables safe method-level parallelism without shared mutable state:</p>
+      <div class="code-block">
+        <pre><span class="kw">func</span> (s *<span class="tp">MySuite</span>) <span class="fn">BeforeEach</span>(t *gotest.T) *<span class="tp">TestCtx</span> {
+    <span class="kw">return</span> &amp;TestCtx{conn: s.pool.Acquire()}
+}
+
+<span class="kw">func</span> (s *<span class="tp">MySuite</span>) <span class="fn">AfterEach</span>(t *gotest.T, ctx *<span class="tp">TestCtx</span>) {
+    ctx.conn.Release()
+}
+
+<span class="kw">func</span> (s *<span class="tp">MySuite</span>) <span class="fn">TestCreate</span>(t *gotest.T, ctx *<span class="tp">TestCtx</span>) {
+    <span class="cm">// ctx.conn is unique to this test</span>
+}</pre>
+      </div>
+
+      <h3>Parallel execution</h3>
+      <p><strong>Suite-level:</strong> Each suite runs as a separate subprocess — full process isolation with zero shared state between suites. This is automatic.</p>
+      <p><strong>Method-level:</strong> Opt-in via <code>SuiteConfig{Parallel: true}</code>. Requires a returning <code>BeforeEach</code> so each parallel test gets its own state.</p>
+    </section>
+
+    <!-- 4. Test DSL -->
+    <section class="ref-section" id="test-dsl">
+      <h2>Test DSL</h2>
+      <p class="lead">Methods on <code>*gotest.T</code> for structuring tests. Every method maps to <code>t.Run</code> — the DSL adds semantics, not runtime machinery.</p>
+
+      <h3>When / It</h3>
+      <p><code>When</code> groups context. <code>It</code> specifies behavior. Nest them freely to build a specification tree:</p>
+      <div class="code-block">
+        <pre><span class="kw">func</span> (s *<span class="tp">MySuite</span>) <span class="fn">TestCreate</span>(t *gotest.T) {
+    t.When(<span class="st">"email is valid"</span>, <span class="kw">func</span>(w *gotest.T) {
+        w.It(<span class="st">"creates the user"</span>, <span class="kw">func</span>(it *gotest.T) {
+            err := s.svc.Create(ctx, validUser)
+            gotest.NoError(it, err)
+        })
+    })
+
+    t.When(<span class="st">"email already exists"</span>, <span class="kw">func</span>(w *gotest.T) {
+        w.It(<span class="st">"returns ErrDuplicate"</span>, <span class="kw">func</span>(it *gotest.T) {
+            s.svc.Create(ctx, validUser)
+            err := s.svc.Create(ctx, validUser)
+            gotest.ErrorIs(it, err, ErrDuplicate)
+        })
+    })
+}</pre>
+      </div>
+
+      <h3>Data-driven tests</h3>
+      <p><strong>Iterator API</strong> — range over test entries with compile-time type safety:</p>
+      <div class="code-block">
+        <pre><span class="kw">for</span> it, tc := <span class="kw">range</span> gotest.Each(t, []<span class="kw">struct</span> {
+    Desc  <span class="tp">string</span>
+    Input <span class="tp">string</span>
+    Want  <span class="tp">int</span>
+}{
+    {Desc: <span class="st">"single digit"</span>, Input: <span class="st">"5"</span>, Want: 5},
+    {Desc: <span class="st">"negative"</span>,     Input: <span class="st">"-3"</span>, Want: -3},
+}) {
+    gotest.Equal(it, tc.Want, parse(tc.Input))
+}</pre>
+      </div>
+      <p><strong>Callback API</strong> — same semantics, different style:</p>
+      <div class="code-block">
+        <pre>t.Each(cases, <span class="kw">func</span>(it *gotest.T, tc Case) {
+    gotest.Equal(it, tc.Want, parse(tc.Input))
+})</pre>
+      </div>
+      <div class="callout">
+        Each entry becomes a subtest. Uses the <code>Desc</code> or <code>Name</code> field for the test name, falls back to <code>#0</code>, <code>#1</code>, etc.
+      </div>
+
+      <h3>Snapshot testing</h3>
+      <p>Capture expected output once, verify it on every subsequent run:</p>
+      <div class="code-block">
+        <pre>t.MatchSnapshot(render(input))              <span class="cm">// auto-named from test path</span>
+t.MatchSnapshot(render(other), <span class="st">"variant"</span>)  <span class="cm">// explicit snapshot name</span></pre>
+      </div>
+      <p>On first run, the snapshot is created. On subsequent runs, the output is compared and failures include a diff. Update all snapshots with <code>gotest --update-snapshots ./...</code>.</p>
+
+      <h3>Async polling</h3>
+      <p>Two forms — a simple boolean check, or rich assertion polling with the full assertion library:</p>
+      <div class="code-block">
+        <div class="code-label">Boolean polling (function)</div>
+        <pre>gotest.Eventually(t, <span class="kw">func</span>() <span class="tp">bool</span> {
+    <span class="kw">return</span> s.svc.IsReady()
+}, 5*time.Second, 100*time.Millisecond)</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-label">Rich assertion polling (method on *T)</div>
+        <pre>t.Eventually(5*time.Second, 100*time.Millisecond, <span class="kw">func</span>(poll *gotest.T) {
+    result, err := s.store.Get(<span class="st">"key"</span>)
+    gotest.NoError(poll, err)
+    gotest.Equal(poll, <span class="st">"completed"</span>, result.Status)
+})</pre>
+      </div>
+      <p>The method form collects intermediate failures without propagating them. On timeout, the last poll's assertion failures are reported. <code>Consistently</code> works the same way — it asserts a condition holds for the full duration and fails on the first violation.</p>
+
+      <h3>Helpers</h3>
+      <table class="ref-table">
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>t.T()</code></td><td>Returns the underlying <code>*testing.T</code>. Use when you need to pass it to third-party libraries.</td></tr>
+          <tr><td><code>t.Context()</code></td><td>Returns the test context. Cancelled when the test ends, carries the test deadline.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 5. Fixtures -->
+
+    <section class="ref-section" id="fixtures">
+      <h2>Fixtures</h2>
+      <p class="lead">Expensive setup — databases, containers, external services — defined once, shared across suites.</p>
+
+      <h3>Package fixtures</h3>
+      <p>Any struct ending in <code>Fixture</code> is a package fixture. Suites reference it via a named pointer field:</p>
+      <div class="code-block">
+        <pre><span class="kw">type</span> <span class="tp">E2EFixture</span> <span class="kw">struct</span> {
+    Pool *pgxpool.Pool
+}
+
+<span class="kw">func</span> (f *<span class="tp">E2EFixture</span>) <span class="fn">BeforeAll</span>(ctx context.Context) <span class="tp">error</span> {
+    <span class="cm">// start database, populate f.Pool</span>
+}
+
+<span class="kw">type</span> <span class="tp">BatchTestSuite</span> <span class="kw">struct</span> {
+    Fixture *E2EFixture  <span class="cm">// automatically wired</span>
+}</pre>
+      </div>
+
+      <p>Fixture hooks use <code>(ctx context.Context) error</code> signatures. Errors are reported with automatic attribution — <code>E2EFixture.BeforeAll failed: connection refused</code>.</p>
+
+      <p>Package fixtures support all four lifecycle hooks. <code>BeforeEach</code>/<code>AfterEach</code> wrap every individual test case, running outside the suite's own hooks:</p>
+      <div class="diagram">Fixture.BeforeEach
+  <span class="d">└──</span> Suite.BeforeEach <span class="d">→</span> Test <span class="d">→</span> Suite.AfterEach
+Fixture.AfterEach</div>
+
+      <h3>Nesting</h3>
+      <p>Fixtures compose through named pointer fields — the same pattern suites use to reference fixtures. A child fixture points to its parent, and the generator wires the lifecycle automatically:</p>
+      <div class="code-block">
+        <pre><span class="kw">type</span> <span class="tp">InfraFixture</span> <span class="kw">struct</span> {
+    Pool *pgxpool.Pool
+}
+
+<span class="kw">func</span> (f *<span class="tp">InfraFixture</span>) <span class="fn">BeforeAll</span>(ctx context.Context) <span class="tp">error</span> {
+    <span class="cm">// start database container, populate f.Pool</span>
+}
+
+<span class="kw">type</span> <span class="tp">APIFixture</span> <span class="kw">struct</span> {
+    Infra     *InfraFixture <span class="cm">// named field — wired automatically</span>
+    ServerURL <span class="tp">string</span>
+}
+
+<span class="kw">func</span> (f *<span class="tp">APIFixture</span>) <span class="fn">BeforeAll</span>(ctx context.Context) <span class="tp">error</span> {
+    <span class="cm">// start API server using f.Infra.Pool</span>
+}
+
+<span class="kw">type</span> <span class="tp">OrderTestSuite</span> <span class="kw">struct</span> {
+    Fixture *APIFixture <span class="cm">// accesses f.Infra.Pool and f.ServerURL</span>
+}</pre>
+      </div>
+      <p>The parent's hooks run first, wrapping the child's. The suite sees the fully initialized fixture chain:</p>
+      <div class="diagram">InfraFixture.BeforeAll
+  <span class="d">└──</span> APIFixture.BeforeAll
+        <span class="d">└──</span> Suite.BeforeAll
+              <span class="d">├──</span> Suite.BeforeEach <span class="d">→</span> Test <span class="d">→</span> Suite.AfterEach
+        <span class="d">└──</span> Suite.AfterAll
+  <span class="d">└──</span> APIFixture.AfterAll
+InfraFixture.AfterAll</div>
+
+      <h3>Shared fixtures</h3>
+      <p>Structs ending in <code>SharedFixture</code> run in a subprocess and share state across packages via JSON serialization. Resources that can't serialize (connection pools, caches) are reconstructed in each test process via <code>Hydrate</code>:</p>
+      <div class="code-block">
+        <pre><span class="kw">type</span> <span class="tp">PostgresSharedFixture</span> <span class="kw">struct</span> {
+    ConnStr <span class="tp">string</span>        <span class="cm">// serialized — transfers across processes</span>
+    Pool    *pgxpool.Pool <span class="cm">// local — reconstructed via Hydrate</span>
+}
+
+<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">Hydrate</span>(ctx context.Context) <span class="tp">error</span> {
+    <span class="kw">var</span> err <span class="tp">error</span>
+    f.Pool, err = pgxpool.New(ctx, f.ConnStr)
+    <span class="kw">return</span> err
+}</pre>
+      </div>
+      <div class="callout">
+        Fields assigned in <code>Hydrate</code> are automatically classified as local and excluded from serialization. Everything else transfers. No annotations needed.
+      </div>
+    </section>
+
+    <!-- 5. Assertions -->
+    <section class="ref-section" id="assertions">
+      <h2>Assertions</h2>
+      <p class="lead">Type-safe generics with compile-time checking. Zero external dependencies. Works with both <code>*gotest.T</code> and <code>*testing.T</code>.</p>
+
+      <h3>Equality &amp; identity</h3>
+      <table class="ref-table">
+        <thead><tr><th>Function</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>Equal(t, expected, actual)</code></td><td>Deep equality. Cross-type comparison is a compile error. Failures include a diff.</td></tr>
+          <tr><td><code>NotEqual(t, a, b)</code></td><td>Inverse of Equal.</td></tr>
+          <tr><td><code>Zero(t, value)</code></td><td>Value equals its zero value.</td></tr>
+          <tr><td><code>NotZero(t, value)</code></td><td>Value is not zero.</td></tr>
+          <tr><td><code>Empty(t, obj)</code></td><td>Slice, map, string, or channel is empty.</td></tr>
+          <tr><td><code>NotEmpty(t, obj)</code></td><td>Not empty.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Errors</h3>
+      <table class="ref-table">
+        <thead><tr><th>Function</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>NoError(t, err)</code></td><td>Error is nil.</td></tr>
+          <tr><td><code>Error(t, err)</code></td><td>Error is not nil.</td></tr>
+          <tr><td><code>ErrorIs(t, err, target)</code></td><td>Wraps <code>errors.Is</code>.</td></tr>
+          <tr><td><code>ErrorAs[E](t, err)</code></td><td>Wraps <code>errors.As</code>. Returns the matched error.</td></tr>
+          <tr><td><code>ErrorContains(t, err, substr)</code></td><td>Error message contains substring.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Collections</h3>
+      <table class="ref-table">
+        <thead><tr><th>Function</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>Contains(t, haystack, needle)</code></td><td>String, slice, or map contains value.</td></tr>
+          <tr><td><code>NotContains(t, s, v)</code></td><td>Inverse of Contains.</td></tr>
+          <tr><td><code>Len(t, obj, n)</code></td><td>Collection has exactly n elements.</td></tr>
+          <tr><td><code>ElementsMatch(t, a, b)</code></td><td>Same elements regardless of order.</td></tr>
+          <tr><td><code>Subset(t, list, sub)</code></td><td>All elements of sub exist in list.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Comparison &amp; numeric</h3>
+      <table class="ref-table">
+        <thead><tr><th>Function</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>Greater(t, a, b)</code></td><td>a &gt; b. Constrained to <code>cmp.Ordered</code> — comparing incomparable types is a compile error.</td></tr>
+          <tr><td><code>GreaterOrEqual(t, a, b)</code></td><td>a &ge; b.</td></tr>
+          <tr><td><code>Less(t, a, b)</code></td><td>a &lt; b.</td></tr>
+          <tr><td><code>LessOrEqual(t, a, b)</code></td><td>a &le; b.</td></tr>
+          <tr><td><code>InDelta(t, expected, actual, delta)</code></td><td>Difference within delta. Works with any numeric type.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Strings, time &amp; other</h3>
+      <table class="ref-table">
+        <thead><tr><th>Function</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>Regexp(t, pattern, str)</code></td><td>String matches regex pattern.</td></tr>
+          <tr><td><code>JSONEq(t, expected, actual)</code></td><td>JSON-equal. Accepts string, []byte, io.Reader, or any marshalable value.</td></tr>
+          <tr><td><code>TimeWithin(t, expected, actual, tol)</code></td><td>Times within tolerance.</td></tr>
+          <tr><td><code>TimeIsNow(t, ts, tolerance)</code></td><td>Timestamp is approximately now.</td></tr>
+          <tr><td><code>True(t, v)</code> / <code>False(t, v)</code></td><td>Boolean checks.</td></tr>
+          <tr><td><code>Panics(t, fn)</code></td><td>Function panics. Returns the recovered value.</td></tr>
+          <tr><td><code>Fail(t, msgAndArgs...)</code></td><td>Explicit immediate failure.</td></tr>
+          <tr><td><code>Must(val, ok)</code></td><td>Unwraps <code>(T, error)</code> and <code>(T, bool)</code> pairs. Panics on error or false — for test setup, not assertions.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Async</h3>
+      <table class="ref-table">
+        <thead><tr><th>Function</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>Eventually(t, fn, timeout, tick)</code></td><td>Poll <code>func() bool</code> until true or timeout.</td></tr>
+          <tr><td><code>Consistently(t, fn, duration, tick)</code></td><td>Assert <code>func() bool</code> holds for the full duration.</td></tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        These are the standalone boolean-polling forms. For rich assertion polling with <code>func(poll *T)</code>, use the <a href="#test-dsl">method forms on *T</a>.
+      </div>
+
+      <div class="callout">
+        All assertions call <code>t.Helper()</code>, so failures report the caller's file and line — not the assertion library internals.
+      </div>
+    </section>
+
+    <!-- 6. Configuration -->
+    <section class="ref-section" id="configuration">
+      <h2>Configuration</h2>
+      <p class="lead">Sensible defaults. Override only what you need via marker methods.</p>
+
+      <h3>Suite configuration</h3>
+      <table class="ref-table">
+        <thead><tr><th>Field</th><th>Default</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>Timeout</code></td><td>30s</td><td>Per-test-case deadline.</td></tr>
+          <tr><td><code>SetupTimeout</code></td><td>30s</td><td>BeforeAll / AfterAll deadline.</td></tr>
+          <tr><td><code>Retries</code></td><td>0</td><td>Per-test-case retry attempts on failure.</td></tr>
+          <tr><td><code>FailFast</code></td><td>false</td><td>Stop the suite on first failure.</td></tr>
+          <tr><td><code>Parallel</code></td><td>false</td><td>Run test methods concurrently.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Fixture configuration</h3>
+      <table class="ref-table">
+        <thead><tr><th>Field</th><th>Default</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>Timeout</code></td><td>2 min</td><td>BeforeAll / AfterAll deadline.</td></tr>
+          <tr><td><code>Retries</code></td><td>0</td><td>BeforeAll retry attempts.</td></tr>
+          <tr><td><code>RetryDelay</code></td><td>0</td><td>Pause between retries.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Presets</h3>
+      <p>Start with a preset, override individual fields:</p>
+      <table class="ref-table">
+        <thead><tr><th>Preset</th><th>Timeout</th><th>SetupTimeout</th><th>Retries</th><th>Use case</th></tr></thead>
+        <tbody>
+          <tr><td><code>DefaultSuiteConfig()</code></td><td>30s</td><td>30s</td><td>0</td><td>Unit and integration tests</td></tr>
+          <tr><td><code>IntegrationSuiteConfig()</code></td><td>2 min</td><td>5 min</td><td>0</td><td>Heavier integration tests</td></tr>
+          <tr><td><code>DefaultFixtureConfig()</code></td><td>2 min</td><td>—</td><td>0</td><td>Standard fixtures</td></tr>
+          <tr><td><code>ContainerFixtureConfig()</code></td><td>5 min</td><td>—</td><td>1</td><td>Testcontainers, image pulls</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">
+        Use a negative duration (<code>Timeout: -1</code>) to explicitly disable a timeout. Zero means "keep the default."
+      </div>
+    </section>
+
+    <!-- 7. Coverage -->
+    <section class="ref-section" id="coverage">
+      <h2>Coverage</h2>
+      <p class="lead">Statement-weighted coverage from the Go coverage profile. One source of truth, no heuristics.</p>
+
+      <h3>How it's calculated</h3>
+      <p>The Go compiler instruments code into basic blocks. Each block records how many statements it contains and how many times it was executed. Coverage at any scope — file, directory, workspace — is:</p>
+
+      <div class="diagram">covered = statements in blocks executed at least once
+total   = all instrumented statements
+percentage = covered / total</div>
+
+      <p>A directory's percentage is the weighted sum of its children, weighted by statement count. This means a parent's number is always derivable from its children — no rounding surprises, no averaging artifacts.</p>
+
+      <h3>Breadth indicator</h3>
+      <p>Coverage percentage answers: <em>"How well-tested is the code my tests reach?"</em></p>
+      <p>The breadth indicator answers a complementary question: <em>"How much of my codebase do my tests reach at all?"</em> It shows profiled source files vs. total source files per directory. A file at 0% still counts as reached — it was instrumented.</p>
+
+      <h3>Cross-package coverage</h3>
+      <p>Test-only packages (no production code) run with <code>-coverpkg=./...</code>, which instruments the entire module. These cross-package profiles are supplementary — they can increase coverage for files already in scope, but don't expand the file scope. This prevents integration test packages from inflating coverage numbers for code they touch incidentally.</p>
+
+      <div class="callout">
+        Coverage uses the profile's <code>numStatements</code> as the sole metric. No line counting, no token scanning, no filesystem heuristics. The profile is the source of truth.
+      </div>
+    </section>
+
+    <!-- 8. CLI Reference -->
+    <section class="ref-section" id="cli">
+      <h2>CLI Reference</h2>
+      <p class="lead">One command, multiple modes. All <code>go test</code> flags pass through unchanged.</p>
+
+      <h3>Commands</h3>
+      <table class="ref-table">
+        <thead><tr><th>Command</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>gotest ./...</code></td><td>Generate, test, cleanup. The default workflow.</td></tr>
+          <tr><td><code>gotest watch ./...</code></td><td>Re-run on file changes. Only affected packages re-run.</td></tr>
+          <tr><td><code>gotest spec ./...</code></td><td>Run tests and render the behavioral specification.</td></tr>
+          <tr><td><code>gotest lint ./...</code></td><td>Static analysis for test suites.</td></tr>
+          <tr><td><code>gotest scaffold ./pkg/user.Svc</code></td><td>Generate a suite skeleton from any Go type.</td></tr>
+          <tr><td><code>gotest migrate ./...</code></td><td>Convert testify/suite tests automatically.</td></tr>
+          <tr><td><code>gotest generate ./...</code></td><td>Generate suite files without running tests.</td></tr>
+          <tr><td><code>gotest clean ./...</code></td><td>Remove generated files.</td></tr>
+          <tr><td><code>gotest refactor toggle-focus &lt;file&gt; &lt;id&gt;</code></td><td>Toggle <code>F_</code>/<code>X_</code> prefixes programmatically.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Flags</h3>
+      <table class="ref-table">
+        <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>--ci</code></td><td>Fail the build if any focus prefix is committed.</td></tr>
+          <tr><td><code>--spec</code></td><td>Append spec summary after normal test output.</td></tr>
+          <tr><td><code>--update-snapshots</code></td><td>Regenerate all snapshot files.</td></tr>
+          <tr><td><code>--min=&lt;pct&gt;</code></td><td>Fail if coverage falls below threshold.</td></tr>
+          <tr><td><code>--format=md</code></td><td>Markdown output for <code>spec</code> command.</td></tr>
+          <tr><td><code>--output=&lt;path&gt;</code></td><td>Write formatted output to file.</td></tr>
+          <tr><td><code>--no-color</code></td><td>Strip ANSI codes from output.</td></tr>
+          <tr><td><code>--debug</code></td><td>Keep generated files after the run.</td></tr>
+          <tr><td><code>--setup-timeout=&lt;dur&gt;</code></td><td>Shared fixture setup deadline (default 1m).</td></tr>
+          <tr><td><code>--debounce=&lt;dur&gt;</code></td><td>Watch mode debounce interval (default 200ms).</td></tr>
+          <tr><td><code>--input=&lt;path&gt;</code></td><td>Read test output from file instead of running tests (<code>spec</code> command).</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">
+        Standard <code>go test</code> flags work unchanged: <code>-v</code>, <code>-race</code>, <code>-cover</code>, <code>-count</code>, <code>-run</code>, <code>-json</code>, <code>-short</code>, <code>-timeout</code>.
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <div class="footer-links">
+      <a href="./">Home</a>
+      <a href="https://github.com/mvrahden/go-test">GitHub</a>
+      <a href="https://pkg.go.dev/github.com/mvrahden/go-test">pkg.go.dev</a>
+      <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code Extension</a>
+      <a href="https://github.com/mvrahden/go-test/blob/main/LICENSE">MIT License</a>
+    </div>
+  </footer>
+</body>
+</html>

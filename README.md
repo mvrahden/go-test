@@ -248,7 +248,7 @@ InfraFixture.AfterEach
 
 Output nests naturally: `Test_InfraFixture/APIFixture/BatchTestSuite/TestDispatch`.
 
-For cross-package shared state (e.g. a database container shared across integration test packages), use `*SharedFixture` suffix — see [docs/fixtures.md](docs/fixtures.md) for the full reference.
+For cross-package shared state (e.g. a database container shared across integration test packages), use `*SharedFixture` suffix — see [docs/design/fixtures.md](docs/design/fixtures.md) for the full reference.
 
 ### Configuration
 
