@@ -183,7 +183,7 @@ function showVersionWarning(
   versionWarningShown = true;
   vscode.window
     .showWarningMessage(
-      `Go Test Suites: go.mod pins gotest ${version}, but >= ${MIN_CLI_VERSION} is required.`,
+      `gotest: go.mod pins gotest ${version}, but >= ${MIN_CLI_VERSION} is required.`,
       "Upgrade",
     )
     .then(async (choice) => {
@@ -198,13 +198,13 @@ function showVersionWarning(
         });
         log?.info("[cli] upgrade complete");
         vscode.window.showInformationMessage(
-          "Go Test Suites: gotest dependency upgraded to latest.",
+          "gotest: gotest dependency upgraded to latest.",
         );
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         log?.error(`[cli] upgrade failed: ${msg}`);
         vscode.window.showErrorMessage(
-          `Go Test Suites: upgrade failed. ${msg}`,
+          `gotest: upgrade failed. ${msg}`,
         );
       }
     });

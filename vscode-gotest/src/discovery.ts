@@ -231,7 +231,7 @@ export class DiscoveryService {
         this.hasShownError = true;
         vscode.window
           .showWarningMessage(
-            `Go Test Suites: discovery failed. Ensure 'go' is installed and the gotest module is accessible.`,
+            `gotest: discovery failed. Ensure 'go' is installed and the gotest module is accessible.`,
             "Open Output",
           )
           .then((choice) => {

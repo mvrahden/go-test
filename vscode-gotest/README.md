@@ -1,4 +1,4 @@
-# Go Test Suites
+# gotest — Go Suite Testing
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/mvrahden/go-test/main/static/gopher.png" alt="gotest gopher" width="360" />
@@ -37,7 +37,7 @@ It resolves the version from your `go.mod` and uses `go run` to execute it.
 
 ### Install
 
-Search **"Go Test Suites"** in the Extensions panel, or install from the command line:
+Search **"gotest"** in the Extensions panel, or install from the command line:
 
 ```
 code --install-extension mvrahden.gotest

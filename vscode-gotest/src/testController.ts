@@ -32,7 +32,7 @@ export class GoTestController implements vscode.Disposable {
   ) {
     this.controller = vscode.tests.createTestController(
       "gotest",
-      "Go Test Suites",
+      "gotest",
     );
 
     this.controller.createRunProfile(

@@ -24,7 +24,7 @@ import { copyCoverageSummary, copyTestResults } from "./reporting.js";
 let flushOnDeactivate: (() => Promise<void>) | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
-  const outputChannel = vscode.window.createOutputChannel("Go Test Suites", {
+  const outputChannel = vscode.window.createOutputChannel("gotest", {
     log: true,
   });
   outputChannel.info("[activate] extension activated");
@@ -525,7 +525,7 @@ async function initializeAsync(deps: {
   if (!goBin) {
     outputChannel.error("[activate] Go binary not found or not working");
     const choice = await vscode.window.showErrorMessage(
-      "Go Test Suites: could not find a working 'go' installation. Ensure Go is installed and on your PATH.",
+      "gotest: could not find a working 'go' installation. Ensure Go is installed and on your PATH.",
       "Open Output",
     );
     if (choice === "Open Output") outputChannel.show();

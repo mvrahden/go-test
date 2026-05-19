@@ -1,6 +1,6 @@
 {
   "name": "gotest",
-  "displayName": "Go Test Suites",
+  "displayName": "gotest — Go Suite Testing",
   "description": "Test Explorer, CodeLens, and debug integration for go-test suites",
   "version": "0.1.0",
   "publisher": "mvrahden",
@@ -111,7 +111,7 @@
       ]
     },
     "configuration": {
-      "title": "Go Test Suites",
+      "title": "gotest",
       "properties": {
         "gotest.modulePath": {
           "type": "string",
