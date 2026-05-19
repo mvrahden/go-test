@@ -17,13 +17,21 @@ import (
 )
 
 func runSpec(inv Invocation) int {
-	format, output, input, noColor, remaining := parseSpecFlags(inv.DefaultArgs())
+	ownArgs, goTestArgs, err := SplitArgs(inv.DefaultArgs(), specAllowed)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+
+	format := extractStringFlag(ownArgs, "--format", "terminal")
+	output := extractStringFlag(ownArgs, "--output", "")
+	input := extractStringFlag(ownArgs, "--input", "")
+	noColor := hasFlag(ownArgs, "--no-color")
 
 	if input != "" {
 		return runSpecFromInput(input, format, output, noColor)
 	}
 
-	ownArgs, goTestArgs := SplitArgs(remaining)
 	setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -186,30 +194,3 @@ func runSpecFromInput(input, format, output string, noColor bool) int {
 	return 0
 }
 
-func parseSpecFlags(args []string) (format, output, input string, noColor bool, remaining []string) {
-	format = "terminal"
-	for i := 0; i < len(args); i++ {
-		switch {
-		case args[i] == "--format" && i+1 < len(args):
-			format = args[i+1]
-			i++
-		case strings.HasPrefix(args[i], "--format="):
-			format = strings.TrimPrefix(args[i], "--format=")
-		case args[i] == "--output" && i+1 < len(args):
-			output = args[i+1]
-			i++
-		case strings.HasPrefix(args[i], "--output="):
-			output = strings.TrimPrefix(args[i], "--output=")
-		case args[i] == "--input" && i+1 < len(args):
-			input = args[i+1]
-			i++
-		case strings.HasPrefix(args[i], "--input="):
-			input = strings.TrimPrefix(args[i], "--input=")
-		case args[i] == "--no-color":
-			noColor = true
-		default:
-			remaining = append(remaining, args[i])
-		}
-	}
-	return
-}

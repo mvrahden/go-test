@@ -49,13 +49,21 @@ export class CoverOnSave implements vscode.Disposable {
       const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
       coverFile = path.join(tmpDir, "cover.out");
 
-      const cliArgs: string[] = [
+      const gotestArgs: string[] = [];
+      const goTestArgs: string[] = [
         "-count=1",
         "-covermode=atomic",
         `-coverprofile=${coverFile}`,
         importPath,
       ];
-      cliArgs.push(...testFlags);
+      for (const flag of testFlags) {
+        if (flag.startsWith("--")) {
+          gotestArgs.push(flag);
+        } else {
+          goTestArgs.push(flag);
+        }
+      }
+      const cliArgs = [...gotestArgs, "--", ...goTestArgs];
 
       const cmd = await buildCliCommand(
         cliArgs,

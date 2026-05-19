@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -92,32 +93,72 @@ func ParseSubcommand(args []string) (subcmd string, remaining []string) {
 	return "", args
 }
 
-func SplitArgs(inArgs []string) (ownArgs, goTestArgs []string) {
-	for i := 0; i < len(inArgs); i++ {
-		arg := inArgs[i]
-		switch {
-		case arg == "--debug" || arg == "--ci" || arg == "--spec" || arg == "--update-snapshots":
-			ownArgs = append(ownArgs, arg)
-		case strings.HasPrefix(arg, "--min="):
-			ownArgs = append(ownArgs, arg)
-		case arg == "--min" && i+1 < len(inArgs):
-			ownArgs = append(ownArgs, arg, inArgs[i+1])
-			i++
-		case strings.HasPrefix(arg, "--setup-timeout="):
-			ownArgs = append(ownArgs, arg)
-		case arg == "--setup-timeout" && i+1 < len(inArgs):
-			ownArgs = append(ownArgs, arg, inArgs[i+1])
-			i++
-		case strings.HasPrefix(arg, "--debounce="):
-			ownArgs = append(ownArgs, arg)
-		case arg == "--debounce" && i+1 < len(inArgs):
-			ownArgs = append(ownArgs, arg, inArgs[i+1])
-			i++
-		default:
+// SplitArgs classifies args into gotest flags and go test flags.
+//
+// gotest flags use --double-dash; go test flags use -single-dash.
+// Both domains are validated against their respective registries.
+// A bare "--" acts as an escape hatch: everything after it goes to
+// goTestArgs without validation.
+func SplitArgs(args []string, allowed map[string]bool) (ownArgs, goTestArgs []string, err error) {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		if arg == "--" {
+			goTestArgs = append(goTestArgs, args[i+1:]...)
+			return
+		}
+
+		if arg == "-args" {
+			goTestArgs = append(goTestArgs, args[i:]...)
+			return
+		}
+
+		if !strings.HasPrefix(arg, "-") {
 			goTestArgs = append(goTestArgs, arg)
+			continue
+		}
+
+		name, _, hasEquals := strings.Cut(arg, "=")
+
+		if strings.HasPrefix(name, "--") {
+			kind := gotestFlags[name]
+			if kind == 0 {
+				return nil, nil, fmt.Errorf("unknown flag: %s", name)
+			}
+			if !allowed[name] {
+				return nil, nil, fmt.Errorf("flag %s is not valid for this subcommand", name)
+			}
+			ownArgs = append(ownArgs, arg)
+			if !hasEquals && kind == ValueFlag && i+1 < len(args) {
+				i++
+				ownArgs = append(ownArgs, args[i])
+			}
+			continue
+		}
+
+		isValue, known := gotestrunner.IsGoTestFlag(name)
+		if !known {
+			return nil, nil, fmt.Errorf("unknown flag: %s", name)
+		}
+		goTestArgs = append(goTestArgs, arg)
+		if !hasEquals && isValue && i+1 < len(args) {
+			i++
+			goTestArgs = append(goTestArgs, args[i])
 		}
 	}
-	return ownArgs, goTestArgs
+	return
+}
+
+func extractStringFlag(args []string, name, defaultVal string) string {
+	for i, arg := range args {
+		if v, ok := strings.CutPrefix(arg, name+"="); ok {
+			return v
+		}
+		if arg == name && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return defaultVal
 }
 
 func ExtractPackagePatterns(goTestArgs []string) []string {

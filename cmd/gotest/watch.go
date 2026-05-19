@@ -17,17 +17,6 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
-func parseWatchFlags(args []string) (jsonMode bool, remaining []string) {
-	for _, arg := range args {
-		if arg == "-json" {
-			jsonMode = true
-		} else {
-			remaining = append(remaining, arg)
-		}
-	}
-	return
-}
-
 func parseDebounceFlag(args []string) (time.Duration, error) {
 	for i, arg := range args {
 		var raw string
@@ -52,8 +41,12 @@ func parseDebounceFlag(args []string) (time.Duration, error) {
 
 func runWatch(inv Invocation) int {
 	args := inv.DefaultArgs()
-	jsonMode, args := parseWatchFlags(args)
-	ownArgs, goTestArgs := SplitArgs(args)
+	ownArgs, goTestArgs, err := SplitArgs(args, watchAllowed)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	jsonMode, goTestArgs := stripJSONFlag(goTestArgs)
 	setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

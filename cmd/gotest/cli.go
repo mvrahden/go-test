@@ -68,7 +68,11 @@ func runTest(inv Invocation) int {
 	}
 
 	args := inv.DefaultArgs()
-	ownArgs, goTestArgs := SplitArgs(args)
+	ownArgs, goTestArgs, err := SplitArgs(args, testAllowed)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 
 	jsonMode, goTestArgs := stripJSONFlag(goTestArgs)
 
@@ -213,7 +217,8 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, `%s — test suite runner for Go
 
 Usage:
-  gotest [subcommand] [flags] [packages...]
+  gotest [gotest-flags] [--] [go-test-flags] [packages...]
+  gotest <subcommand> [flags] [packages...]
 
 Subcommands:
   discover    Discover test suites and output JSON metadata
@@ -229,7 +234,7 @@ Subcommands:
   version     Print version information
   help        Show this help message
 
-Flags:
+Flags (gotest):
   --ci                      Enable focus guard (fail on F_ prefixes)
   --debug                   Keep generated overlay for inspection
   --spec                    Append spec view after normal test output
@@ -238,6 +243,7 @@ Flags:
   --setup-timeout=<dur>     Shared fixture setup deadline (default 1m)
   --debounce=<dur>          Watch mode debounce interval (default 200ms)
 
-All other flags and arguments are forwarded to "go test".
+gotest flags use --double-dash; go test flags use -single-dash.
+Use a bare "--" to pass unrecognized flags to go test without validation.
 `, about.ShortInfo())
 }

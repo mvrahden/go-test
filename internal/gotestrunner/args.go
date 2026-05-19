@@ -10,8 +10,14 @@ var buildOnlyFlags = map[string]bool{
 	"-asan":     true,
 	"-cover":    true,
 	"-a":        true,
+	"-c":        true,
 	"-trimpath": true,
 	"-work":     true,
+}
+
+var buildSpecialValueFlags = map[string]bool{
+	"-o":    true,
+	"-exec": true,
 }
 
 var buildValueFlags = map[string]bool{
@@ -108,7 +114,7 @@ func ClassifyGoTestArgs(args []string) ClassifiedArgs {
 			continue
 		}
 
-		if buildValueFlags[name] {
+		if buildValueFlags[name] || buildSpecialValueFlags[name] {
 			if hasEquals {
 				result.BuildFlags = append(result.BuildFlags, arg)
 				i++
@@ -291,6 +297,28 @@ func StripCoverBuildFlags(flags []string) []string {
 		out = append(out, f)
 	}
 	return out
+}
+
+// IsGoTestFlag reports whether name (the flag name without any =value suffix)
+// is a recognized go test flag. It returns whether the flag takes a value
+// argument and whether it is known at all.
+func IsGoTestFlag(name string) (isValue bool, known bool) {
+	if buildOnlyFlags[name] {
+		return false, true
+	}
+	if buildValueFlags[name] || buildSpecialValueFlags[name] {
+		return true, true
+	}
+	if runOnlyFlags[name] {
+		return false, true
+	}
+	if runValueFlags[name] {
+		return true, true
+	}
+	if name == "-json" || name == "-args" {
+		return false, true
+	}
+	return false, false
 }
 
 func LooksLikePackagePattern(s string) bool {

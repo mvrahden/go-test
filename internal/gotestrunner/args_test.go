@@ -4,6 +4,35 @@ import (
 	"testing"
 )
 
+func TestIsGoTestFlag(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		flag    string
+		isValue bool
+		known   bool
+	}{
+		{"build bool", "-race", false, true},
+		{"build value", "-tags", true, true},
+		{"build special value", "-o", true, true},
+		{"run bool", "-v", false, true},
+		{"run value", "-run", true, true},
+		{"json", "-json", false, true},
+		{"args", "-args", false, true},
+		{"unknown", "-zzz", false, false},
+		{"double dash unknown", "--debug", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			isValue, known := IsGoTestFlag(tc.flag)
+			if isValue != tc.isValue {
+				t.Errorf("isValue = %v, want %v", isValue, tc.isValue)
+			}
+			if known != tc.known {
+				t.Errorf("known = %v, want %v", known, tc.known)
+			}
+		})
+	}
+}
+
 func TestExtractCoverProfile(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

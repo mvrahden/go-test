@@ -78,22 +78,23 @@ func TestReplacePatterns(t *testing.T) {
 	}
 }
 
-func TestParseWatchFlags(t *testing.T) {
+func TestWatchSplitArgs(t *testing.T) {
 	for _, tc := range []struct {
-		desc     string
-		args     []string
-		wantJSON bool
-		wantRest []string
+		desc         string
+		args         []string
+		expectOwn    []string
+		expectGoTest []string
 	}{
-		{"no flags", []string{"./pkg/..."}, false, []string{"./pkg/..."}},
-		{"json flag first", []string{"-json", "./pkg/..."}, true, []string{"./pkg/..."}},
-		{"json flag after package", []string{"./pkg/...", "-json"}, true, []string{"./pkg/..."}},
-		{"json with other flags", []string{"-json", "--spec", "./..."}, true, []string{"--spec", "./..."}},
+		{"no flags", []string{"./pkg/..."}, nil, []string{"./pkg/..."}},
+		{"json flag", []string{"-json", "./pkg/..."}, nil, []string{"-json", "./pkg/..."}},
+		{"debounce with json", []string{"--debounce=500ms", "-json", "./..."}, []string{"--debounce=500ms"}, []string{"-json", "./..."}},
+		{"debug and ci", []string{"--debug", "--ci", "-v", "./..."}, []string{"--debug", "--ci"}, []string{"-v", "./..."}},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			jsonMode, remaining := parseWatchFlags(tc.args)
-			gotest.Equal(t, tc.wantJSON, jsonMode)
-			gotest.Equal(t, tc.wantRest, remaining)
+			own, goTest, err := SplitArgs(tc.args, watchAllowed)
+			gotest.NoError(t, err)
+			gotest.Equal(t, tc.expectOwn, own)
+			gotest.Equal(t, tc.expectGoTest, goTest)
 		})
 	}
 }

@@ -11,18 +11,35 @@ func TestSplitArgs(t *testing.T) {
 	for _, tc := range []struct {
 		desc         string
 		inArgs       []string
+		allowed      map[string]bool
 		expectOwn    []string
 		expectGoTest []string
+		expectErr    bool
 	}{
-		{desc: "empty", inArgs: nil, expectOwn: nil, expectGoTest: nil},
-		{desc: "only go test args", inArgs: []string{"-v", "./...", "-race", "-count=1"}, expectOwn: nil, expectGoTest: []string{"-v", "./...", "-race", "-count=1"}},
-		{desc: "only own args", inArgs: []string{"--debug"}, expectOwn: []string{"--debug"}, expectGoTest: nil},
-		{desc: "mixed args", inArgs: []string{"--debug", "-v", "./...", "-race"}, expectOwn: []string{"--debug"}, expectGoTest: []string{"-v", "./...", "-race"}},
-		{desc: "min flag with equals", inArgs: []string{"--min=80", "-v"}, expectOwn: []string{"--min=80"}, expectGoTest: []string{"-v"}},
-		{desc: "min flag with space", inArgs: []string{"--min", "90", "-v"}, expectOwn: []string{"--min", "90"}, expectGoTest: []string{"-v"}},
+		{desc: "empty", inArgs: nil, allowed: testAllowed, expectOwn: nil, expectGoTest: nil},
+		{desc: "only go test args", inArgs: []string{"-v", "./...", "-race", "-count=1"}, allowed: testAllowed, expectOwn: nil, expectGoTest: []string{"-v", "./...", "-race", "-count=1"}},
+		{desc: "only own args", inArgs: []string{"--debug"}, allowed: testAllowed, expectOwn: []string{"--debug"}, expectGoTest: nil},
+		{desc: "mixed args", inArgs: []string{"--debug", "-v", "./...", "-race"}, allowed: testAllowed, expectOwn: []string{"--debug"}, expectGoTest: []string{"-v", "./...", "-race"}},
+		{desc: "min flag with equals", inArgs: []string{"--min=80", "-v"}, allowed: testAllowed, expectOwn: []string{"--min=80"}, expectGoTest: []string{"-v"}},
+		{desc: "min flag with space", inArgs: []string{"--min", "90", "-v"}, allowed: testAllowed, expectOwn: []string{"--min", "90"}, expectGoTest: []string{"-v"}},
+		{desc: "unknown gotest flag", inArgs: []string{"--unknown"}, allowed: testAllowed, expectErr: true},
+		{desc: "unknown go test flag", inArgs: []string{"-zzz"}, allowed: testAllowed, expectErr: true},
+		{desc: "gotest flag not in allowed set", inArgs: []string{"--debounce=200ms"}, allowed: testAllowed, expectErr: true},
+		{desc: "bare -- escape hatch", inArgs: []string{"--debug", "--", "-custom", "./..."}, allowed: testAllowed, expectOwn: []string{"--debug"}, expectGoTest: []string{"-custom", "./..."}},
+		{desc: "bare -- with no gotest flags", inArgs: []string{"--", "-v", "./..."}, allowed: testAllowed, expectOwn: nil, expectGoTest: []string{"-v", "./..."}},
+		{desc: "-args passthrough", inArgs: []string{"-v", "-args", "-custom=1"}, allowed: testAllowed, expectOwn: nil, expectGoTest: []string{"-v", "-args", "-custom=1"}},
+		{desc: "spec allowed set", inArgs: []string{"--format=md", "--no-color", "-v"}, allowed: specAllowed, expectOwn: []string{"--format=md", "--no-color"}, expectGoTest: []string{"-v"}},
+		{desc: "watch allowed set", inArgs: []string{"--debounce=500ms", "-v"}, allowed: watchAllowed, expectOwn: []string{"--debounce=500ms"}, expectGoTest: []string{"-v"}},
+		{desc: "go test value flag with space", inArgs: []string{"-run", "TestFoo", "./..."}, allowed: testAllowed, expectOwn: nil, expectGoTest: []string{"-run", "TestFoo", "./..."}},
+		{desc: "go test value flag with equals", inArgs: []string{"-timeout=30s"}, allowed: testAllowed, expectOwn: nil, expectGoTest: []string{"-timeout=30s"}},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			own, goTest := SplitArgs(tc.inArgs)
+			own, goTest, err := SplitArgs(tc.inArgs, tc.allowed)
+			if tc.expectErr {
+				gotest.True(t, err != nil, "expected error")
+				return
+			}
+			gotest.NoError(t, err)
 			gotest.Equal(t, tc.expectOwn, own)
 			gotest.Equal(t, tc.expectGoTest, goTest)
 		})

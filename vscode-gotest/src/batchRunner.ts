@@ -72,18 +72,26 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       coverFile = path.join(tmpDir, "cover.out");
     }
 
-    const cliArgs: string[] = ["-json", "-count=1", ...cliPkgArgs];
+    const gotestArgs: string[] = [];
+    const goTestArgs: string[] = ["-json", "-count=1", ...cliPkgArgs];
     if (coverFile) {
-      cliArgs.push("-covermode=atomic", `-coverprofile=${coverFile}`);
+      goTestArgs.push("-covermode=atomic", `-coverprofile=${coverFile}`);
     }
     if (coverage?.testOnly) {
-      cliArgs.push("-coverpkg=./...");
+      goTestArgs.push("-coverpkg=./...");
     }
     if (filter) {
-      cliArgs.push("-run", filter);
+      goTestArgs.push("-run", filter);
     }
-    cliArgs.push(...testFlags);
+    for (const flag of testFlags) {
+      if (flag.startsWith("--")) {
+        gotestArgs.push(flag);
+      } else {
+        goTestArgs.push(flag);
+      }
+    }
 
+    const cliArgs = [...gotestArgs, "--", ...goTestArgs];
     const cmd = await buildCliCommand(cliArgs, workspaceDir, outputChannel);
     outputChannel.info(`[${label}] ${formatCliCommand(cmd)}`);
 

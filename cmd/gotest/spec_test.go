@@ -12,7 +12,7 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
 
-func TestParseSpecFlags_Input(t *testing.T) {
+func TestSpecFlagParsing(t *testing.T) {
 	tests := []struct {
 		name      string
 		args      []string
@@ -20,7 +20,7 @@ func TestParseSpecFlags_Input(t *testing.T) {
 		wantOut   string
 		wantInput string
 		wantColor bool
-		wantRest  []string
+		wantGoLen int
 	}{
 		{
 			name:      "no flags",
@@ -28,7 +28,7 @@ func TestParseSpecFlags_Input(t *testing.T) {
 			wantFmt:   "terminal",
 			wantInput: "",
 			wantColor: false,
-			wantRest:  []string{"./..."},
+			wantGoLen: 1,
 		},
 		{
 			name:      "input with equals",
@@ -36,7 +36,7 @@ func TestParseSpecFlags_Input(t *testing.T) {
 			wantFmt:   "terminal",
 			wantInput: "events.json",
 			wantColor: false,
-			wantRest:  nil,
+			wantGoLen: 0,
 		},
 		{
 			name:      "input with space",
@@ -44,7 +44,7 @@ func TestParseSpecFlags_Input(t *testing.T) {
 			wantFmt:   "terminal",
 			wantInput: "events.json",
 			wantColor: false,
-			wantRest:  nil,
+			wantGoLen: 0,
 		},
 		{
 			name:      "input stdin dash",
@@ -52,7 +52,7 @@ func TestParseSpecFlags_Input(t *testing.T) {
 			wantFmt:   "terminal",
 			wantInput: "-",
 			wantColor: false,
-			wantRest:  nil,
+			wantGoLen: 0,
 		},
 		{
 			name:      "input with format",
@@ -60,7 +60,7 @@ func TestParseSpecFlags_Input(t *testing.T) {
 			wantFmt:   "md",
 			wantInput: "data.json",
 			wantColor: false,
-			wantRest:  nil,
+			wantGoLen: 0,
 		},
 		{
 			name:      "input with output and no-color",
@@ -69,13 +69,22 @@ func TestParseSpecFlags_Input(t *testing.T) {
 			wantInput: "-",
 			wantOut:   "out.txt",
 			wantColor: true,
-			wantRest:  nil,
+			wantGoLen: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			format, output, input, noColor, remaining := parseSpecFlags(tt.args)
+			ownArgs, goTestArgs, err := SplitArgs(tt.args, specAllowed)
+			if err != nil {
+				t.Fatalf("SplitArgs: %v", err)
+			}
+
+			format := extractStringFlag(ownArgs, "--format", "terminal")
+			output := extractStringFlag(ownArgs, "--output", "")
+			input := extractStringFlag(ownArgs, "--input", "")
+			noColor := hasFlag(ownArgs, "--no-color")
+
 			if format != tt.wantFmt {
 				t.Errorf("format = %q, want %q", format, tt.wantFmt)
 			}
@@ -88,14 +97,8 @@ func TestParseSpecFlags_Input(t *testing.T) {
 			if noColor != tt.wantColor {
 				t.Errorf("noColor = %v, want %v", noColor, tt.wantColor)
 			}
-			if len(remaining) != len(tt.wantRest) {
-				t.Errorf("remaining = %v, want %v", remaining, tt.wantRest)
-			} else {
-				for i := range remaining {
-					if remaining[i] != tt.wantRest[i] {
-						t.Errorf("remaining[%d] = %q, want %q", i, remaining[i], tt.wantRest[i])
-					}
-				}
+			if len(goTestArgs) != tt.wantGoLen {
+				t.Errorf("goTestArgs = %v (len %d), want len %d", goTestArgs, len(goTestArgs), tt.wantGoLen)
 			}
 		})
 	}
