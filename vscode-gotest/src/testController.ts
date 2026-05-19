@@ -30,10 +30,7 @@ export class GoTestController implements vscode.Disposable {
       token: vscode.CancellationToken,
     ) => Promise<void>,
   ) {
-    this.controller = vscode.tests.createTestController(
-      "gotest",
-      "gotest",
-    );
+    this.controller = vscode.tests.createTestController("gotest", "gotest");
 
     this.controller.createRunProfile(
       "Run",

@@ -203,9 +203,7 @@ function showVersionWarning(
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         log?.error(`[cli] upgrade failed: ${msg}`);
-        vscode.window.showErrorMessage(
-          `gotest: upgrade failed. ${msg}`,
-        );
+        vscode.window.showErrorMessage(`gotest: upgrade failed. ${msg}`);
       }
     });
 }
