@@ -15,7 +15,11 @@ func runLint(args []string, projectCfg config.ProjectConfig) int {
 		args = []string{"./..."}
 	}
 
-	flagArgs := lintSkipFlags(args, projectCfg)
+	flagArgs, err := lintSkipFlags(args, projectCfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 	os.Args = append([]string{"gotest-lint"}, append(flagArgs, args...)...)
 	singlechecker.Main(lint.Analyzer)
 
@@ -25,13 +29,16 @@ func runLint(args []string, projectCfg config.ProjectConfig) int {
 
 // lintSkipFlags returns analyzer flags derived from the config's lint.skip
 // list, omitting any rules that are already set via CLI args.
-func lintSkipFlags(args []string, cfg config.ProjectConfig) []string {
+func lintSkipFlags(args []string, cfg config.ProjectConfig) ([]string, error) {
 	var flags []string
 	for _, rule := range cfg.Lint.Skip {
+		if !lint.SkippableRules[lint.Rule(rule)] {
+			return nil, fmt.Errorf("unknown lint rule in %s: %q", config.FileName, rule)
+		}
 		flag := "-skip-" + rule
 		if !slices.Contains(args, flag) && !slices.Contains(args, flag+"=true") && !slices.Contains(args, flag+"=false") {
 			flags = append(flags, flag)
 		}
 	}
-	return flags
+	return flags, nil
 }

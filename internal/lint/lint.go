@@ -27,6 +27,12 @@ const (
 	Testify       Rule = "testify"
 )
 
+// SkippableRules is the set of rules that support opt-out via skip flags.
+var SkippableRules = map[Rule]bool{
+	StdlibTest: true,
+	Testify:    true,
+}
+
 var cfg struct {
 	skipStdlibTest bool
 	skipTestify    bool
