@@ -9,7 +9,7 @@ export { resolveGoBinary } from "./goBinary.js";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
-const MIN_CLI_VERSION = "v1.13.0";
+const MIN_CLI_VERSION = "v1.14.0";
 
 export interface CliCommand {
   bin: string;

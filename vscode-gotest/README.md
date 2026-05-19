@@ -1,26 +1,25 @@
-# gotest — Go Suite Testing
+# Go - Test Suites
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/mvrahden/go-test/main/static/gopher.png" alt="gotest gopher" width="360" />
 </p>
 
-First-class VS Code integration for [go-test](https://github.com/mvrahden/go-test) — suite-based, BDD-style testing for Go.
+Specification-driven test suites for AI-assisted Go development.
 
-Run, debug, and watch your test suites directly from the editor.
-See structured results in Test Explorer, get coverage gutters, and scaffold new suites without leaving VS Code.
+[go-test](https://github.com/mvrahden/go-test) turns your tests into behavioral specifications — BDD-style suites that read as documentation, with structured output for AI-assisted workflows.
+This extension brings that workflow into VS Code: run, debug, watch, and verify your specifications without leaving the editor.
 
 ## Why this extension?
 
-Go's standard `testing` package gives you `func TestX(t *testing.T)` and nothing more.
-[go-test](https://github.com/mvrahden/go-test) adds suite-based organization with lifecycle hooks, fixtures, focus/exclude, and BDD-style output — all through naming conventions, zero runtime dependencies.
+AI writes code fast. The bottleneck is verification — you can't review AI-generated code line by line at the rate it's produced.
 
-This extension makes that workflow native to VS Code:
+[go-test](https://github.com/mvrahden/go-test) closes that gap. Test suites become behavioral specifications. The Spec View renders your specification as an interactive tree with structured output. Coverage shows implementation progress. You define what the system should do — tests verify.
 
+- **Spec View** — Your quality dashboard. BDD-formatted specification tree with pass/fail/skip indicators, go-to-source navigation, and clipboard export. Paste specs into AI conversations as context.
 - **Suite-aware Test Explorer** — Navigate tests as Package > Suite > Method > Subtest, not a flat list of functions.
+- **Coverage gutters** — Track implementation progress with native VS Code coverage integration, per-statement highlighting, and persistent results across sessions.
 - **One-click Run and Debug** — CodeLens buttons above every suite and method. Debug with Delve, breakpoints included.
-- **Coverage gutters** — Native VS Code coverage integration with per-statement highlighting and persistent results across sessions.
-- **Watch mode** — Continuous testing on file changes with streaming results and a status bar indicator.
-- **Spec View** — BDD-formatted output rendered in a side panel after every test run.
+- **Watch mode** — Continuous verification on file changes with streaming results and a status bar indicator.
 - **Focus/Exclude management** — Toggle `F_`/`X_` prefixes via Quick Fix actions. Diagnostic warnings prevent focused tests from reaching CI.
 - **Scaffold generation** — Generate test suite skeletons from types and files via code actions or the command palette.
 
@@ -28,7 +27,7 @@ This extension makes that workflow native to VS Code:
 
 ### Prerequisites
 
-- **Go** (1.21+)
+- **Go** (1.24+)
 - **VS Code** (1.101+)
 - **[Delve](https://github.com/go-delve/delve)** (for debugging only)
 
@@ -192,12 +191,13 @@ These can be set in `.vscode/settings.json` per workspace folder:
 
 ### Gotest CLI resolution
 
-The extension resolves the gotest binary in this order:
+The extension resolves the gotest CLI in this order:
 
-1. **`gotest.cliPath`** — Explicit path to a binary. Highest priority; always used when set.
-2. **`go.mod` version** — If your project's `go.mod` references the gotest module, the pinned version is used via `go run pkg@version`.
-3. **Installed binary** — A `gotest` binary found in `GOBIN`, `GOPATH/bin`, or on `PATH`.
-4. **`go run @latest`** — Fallback when none of the above apply.
+1. **`gotest.cliPath`** — Explicit path to a binary. Highest priority; version-validated against the minimum required version.
+2. **Workspace is gotest module** — If the workspace's `go.mod` declares the gotest module itself (development or `go.work` overlap), uses `go run ./cmd/gotest`.
+3. **`go.mod` + replace directive** — If `go.mod` has a `replace` directive for the gotest module, uses `go run modulePath` (no version, respects replace resolution).
+4. **`go.mod` pinned version** — If `go.mod` references the gotest module, uses `go run modulePath@version` with the pinned version.
+5. **`go run @latest`** — Fallback when none of the above apply.
 
 ### Go binary resolution
 
@@ -211,7 +211,7 @@ The extension resolves the Go toolchain per workspace folder:
 ## Requirements
 
 - VS Code 1.101 or later
-- Go 1.21 or later
+- Go 1.24 or later
 - A Go project using [go-test](https://github.com/mvrahden/go-test) suites
 - [Delve](https://github.com/go-delve/delve) for debug support
 

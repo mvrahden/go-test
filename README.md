@@ -11,6 +11,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Go tests that write themselves, organize themselves, and explain themselves.
+Specification-driven test suites for AI-assisted Go development.
 
 `gotest` closes the gap between `func TestX(t *testing.T)` and a well-organized test suite through code generation.
 You write structs, name them well, and the tool handles the rest.
@@ -31,6 +32,8 @@ Test output is standard — but the mechanism behind it isn't.
 **gotest** takes a different approach: you write structs with naming conventions, and a code generator produces the `func Test*` wrappers, lifecycle wiring, and `t.Run` nesting that you'd write by hand.
 The generated code is deleted after tests run.
 What remains is standard `go test` output, zero runtime dependencies, and no lock-in — `gotest clean` removes all traces, and your test structs still compile.
+
+**AI-assisted development** — BDD-style suites double as behavioral specifications. `gotest spec` renders your test structure as a readable contract with structured JSON output. Your tests are the documentation — always in sync, never stale.
 
 ## Install
 
