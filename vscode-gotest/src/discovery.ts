@@ -212,7 +212,9 @@ export class DiscoveryService {
         timeout: 30_000,
       });
 
-      const output: DiscoverOutput = JSON.parse(stdout);
+      const jsonStart = stdout.indexOf("{");
+      const json = jsonStart > 0 ? stdout.substring(jsonStart) : stdout;
+      const output: DiscoverOutput = JSON.parse(json);
       const fullScan = effectivePatterns.some((p) => p.includes("..."));
       const warnings = output.warnings ?? [];
       const packages = output.packages ?? [];

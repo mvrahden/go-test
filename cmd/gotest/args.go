@@ -26,15 +26,12 @@ func (inv Invocation) TagArgs() []string {
 	return append([]string{"-tags=" + inv.Config.Tags}, inv.Args...)
 }
 
-// DefaultArgs returns args with tags, setup-timeout, and debounce from config,
+// DefaultArgs returns args with tags and setup-timeout from config,
 // each only if not already set via CLI flags.
 func (inv Invocation) DefaultArgs() []string {
 	out := inv.TagArgs()
 	if inv.Config.SetupTimeout.Duration() > 0 && !hasFlag(out, "--setup-timeout") {
 		out = append([]string{"--setup-timeout=" + inv.Config.SetupTimeout.Duration().String()}, out...)
-	}
-	if inv.Config.Debounce.Duration() > 0 && !hasFlag(out, "--debounce") {
-		out = append([]string{"--debounce=" + inv.Config.Debounce.Duration().String()}, out...)
 	}
 	return out
 }

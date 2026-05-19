@@ -96,7 +96,13 @@ export async function buildCliCommand(
             log?.debug(`[cli] using go.mod (replace): ${bin}`);
             return { bin, args: subcommandArgs };
           }
-          log?.debug(`[cli] replace build failed, falling back to go run`);
+          log?.debug(
+            `[cli] replace build failed, using go run with module resolution`,
+          );
+          return {
+            bin: goBin,
+            args: ["run", modulePath, "--", ...subcommandArgs],
+          };
         }
 
         const qualified = `${modulePath}@${version}`;
