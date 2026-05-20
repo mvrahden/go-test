@@ -205,6 +205,16 @@
       transition: all 0.15s;
     }
     .install-cmd button:hover { background: var(--border); }
+    .release-indicator {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--text-dimmed);
+    }
+    .release-indicator a {
+      color: var(--text-secondary);
+      text-decoration: none;
+    }
+    .release-indicator a:hover { text-decoration: underline; }
 
     /* ===== Spec View ===== */
     .spec-section {
@@ -543,6 +553,7 @@
           <code>go install github.com/mvrahden/go-test/cmd/gotest@latest</code>
           <button onclick="navigator.clipboard.writeText('go install github.com/mvrahden/go-test/cmd/gotest@latest').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500);gtag('event','copy_install_command')})" aria-label="Copy install command">Copy</button>
         </div>
+        <div class="release-indicator" id="release-indicator"></div>
       </div>
     </section>
 
@@ -744,5 +755,15 @@
     </div>
     <p class="footer-copy">Built for Go developers who want tests that explain themselves.</p>
   </footer>
+  <script>
+  fetch('https://api.github.com/repos/mvrahden/go-test/releases/latest')
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(d => {
+      const el = document.getElementById('release-indicator');
+      const date = new Date(d.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      el.innerHTML = `<a href="${d.html_url}">${d.tag_name}</a> &middot; ${date}`;
+    })
+    .catch(() => {});
+  </script>
 </body>
 </html>
