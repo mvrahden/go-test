@@ -359,8 +359,14 @@ describe("buildCliCommand", () => {
 
       expect(cmd).toEqual({
         bin: "/usr/local/go/bin/go",
-        args: ["run", `${GOTEST_MODULE}@latest`, "--", "spec", "./..."],
+        args: ["run", `${GOTEST_MODULE}@latest`, "spec", "./..."],
       });
+    });
+
+    it("does not include -- separator", async () => {
+      const cmd = await buildCliCommand(["spec", "./..."], "/workspace");
+
+      expect(cmd.args).not.toContain("--");
     });
 
     it("uses go run module@latest when version not found in go.mod", async () => {

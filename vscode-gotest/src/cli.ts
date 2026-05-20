@@ -132,7 +132,7 @@ export async function buildCliCommand(
     ? modulePath
     : `${modulePath}@latest`;
   log?.debug(`[cli] using fallback: ${goBin} run ${qualified}`);
-  return { bin: goBin, args: ["run", qualified, "--", ...subcommandArgs] };
+  return { bin: goBin, args: ["run", qualified, ...subcommandArgs] };
 }
 
 async function readModuleDeclaration(
