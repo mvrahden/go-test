@@ -48,9 +48,9 @@ async function resolveProjectGoBinary(
 
   log?.debug(`[go] go.mod declares go ${goVersion}`);
 
-  // ~/sdk/go1.26.2/bin/go
-  const home = process.env.HOME ?? "";
-  const sdkBin = path.join(home, "sdk", `go${goVersion}`, "bin", "go");
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
+  const goBin = process.platform === "win32" ? "go.exe" : "go";
+  const sdkBin = path.join(home, "sdk", `go${goVersion}`, "bin", goBin);
   if (await fileExists(sdkBin)) {
     log?.debug(`[go] resolved go ${goVersion} via SDK: ${sdkBin}`);
     return sdkBin;
@@ -81,7 +81,8 @@ async function resolveGenericGoBinary(
 ): Promise<string> {
   const goroot = process.env.GOROOT;
   if (goroot) {
-    const goBin = path.join(goroot, "bin", "go");
+    const goExe = process.platform === "win32" ? "go.exe" : "go";
+    const goBin = path.join(goroot, "bin", goExe);
     if (await fileExists(goBin)) {
       log?.debug(`[go] resolved via GOROOT: ${goBin}`);
       return goBin;
@@ -126,7 +127,10 @@ async function readGoVersionFromMod(
 
 export async function fileExists(p: string): Promise<boolean> {
   try {
-    await access(p, constants.X_OK);
+    await access(
+      p,
+      process.platform === "win32" ? constants.F_OK : constants.X_OK,
+    );
     return true;
   } catch {
     return false;
@@ -134,9 +138,10 @@ export async function fileExists(p: string): Promise<boolean> {
 }
 
 async function which(name: string): Promise<string | undefined> {
+  const cmd = process.platform === "win32" ? "where" : "which";
   try {
-    const { stdout } = await execFileAsync("which", [name], { timeout: 3_000 });
-    const resolved = stdout.trim();
+    const { stdout } = await execFileAsync(cmd, [name], { timeout: 3_000 });
+    const resolved = stdout.trim().split(/\r?\n/)[0];
     return resolved || undefined;
   } catch {
     return undefined;
@@ -144,6 +149,9 @@ async function which(name: string): Promise<string | undefined> {
 }
 
 async function whichFromShell(name: string): Promise<string | undefined> {
+  if (process.platform === "win32") {
+    return undefined;
+  }
   const shell = process.env.SHELL ?? "/bin/bash";
   try {
     const { stdout } = await execFileAsync(
@@ -159,13 +167,20 @@ async function whichFromShell(name: string): Promise<string | undefined> {
 }
 
 async function commonGoPaths(): Promise<string[]> {
-  const home = process.env.HOME ?? "";
-  const paths = [
-    "/usr/local/go/bin/go",
-    path.join(home, "go", "bin", "go"),
-    "/usr/bin/go",
-    "/snap/bin/go",
-  ];
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
+  const goBin = process.platform === "win32" ? "go.exe" : "go";
+  const paths: string[] = [];
+
+  if (process.platform === "win32") {
+    paths.push(path.join("C:\\Program Files\\Go\\bin", goBin));
+    paths.push(path.join(home, "go", "bin", goBin));
+    paths.push(path.join(home, "scoop", "apps", "go", "current", "bin", goBin));
+  } else {
+    paths.push("/usr/local/go/bin/go");
+    paths.push(path.join(home, "go", "bin", "go"));
+    paths.push("/usr/bin/go");
+    paths.push("/snap/bin/go");
+  }
 
   const sdkDir = path.join(home, "sdk");
   try {
@@ -175,7 +190,7 @@ async function commonGoPaths(): Promise<string[]> {
       .sort()
       .reverse();
     for (const dir of goDirs) {
-      paths.push(path.join(sdkDir, dir, "bin", "go"));
+      paths.push(path.join(sdkDir, dir, "bin", goBin));
     }
   } catch {
     // ~/sdk doesn't exist

@@ -162,7 +162,9 @@ export class DebugLauncher implements vscode.Disposable {
         if (!settled && stdout.includes("\n")) {
           settle(() => {
             try {
-              const output = JSON.parse(stdout.split("\n")[0]) as PrepareOutput;
+              const output = JSON.parse(
+                stdout.split("\n")[0].trim(),
+              ) as PrepareOutput;
               resolve({ output, child });
             } catch {
               killProcessTree(child, "SIGTERM");
