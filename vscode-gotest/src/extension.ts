@@ -171,9 +171,11 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   flushOnDeactivate = async () => {
-    await runRegistry.save();
-    await coverageStore.flush();
-    await testResultStore.flush();
+    await Promise.allSettled([
+      runRegistry.save(),
+      coverageStore.flush(),
+      testResultStore.flush(),
+    ]);
   };
 
   initializeAsync({
@@ -553,9 +555,11 @@ async function initializeAsync(deps: {
   runRegistry.sweep();
   await runRegistry.save();
 
-  const registrySaveInterval = setInterval(async () => {
+  const registrySaveInterval = setInterval(() => {
     runRegistry.sweep();
-    await runRegistry.save();
+    runRegistry.save().catch((err) => {
+      outputChannel.error(`[registry] periodic save failed: ${err}`);
+    });
   }, 60_000);
   context.subscriptions.push({
     dispose() {

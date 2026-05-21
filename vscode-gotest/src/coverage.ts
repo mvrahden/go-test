@@ -276,6 +276,9 @@ export class CoverageRunner implements vscode.Disposable {
     const items = collectItems(this.controller, request);
     if (items.length === 0) {
       run.end();
+      cancelSub.dispose();
+      if (this.activeRun === cts) this.activeRun = undefined;
+      cts.dispose();
       return;
     }
 

@@ -1,6 +1,7 @@
 package gotestrunner
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -44,5 +45,5 @@ func processAlive(pid int) bool {
 		return false
 	}
 	err = proc.Signal(syscall.Signal(0))
-	return err == nil
+	return err == nil || errors.Is(err, syscall.EPERM)
 }
