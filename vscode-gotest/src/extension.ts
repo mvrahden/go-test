@@ -17,6 +17,7 @@ import { CoverageRunner } from "./coverage.js";
 import { CoverOnSave } from "./coverOnSave.js";
 import { CoverageStore } from "./coverageStore.js";
 import { TestResultStore } from "./testResultStore.js";
+import { RunRegistry } from "./runRegistry.js";
 import { validateGoBinary, scopedConfig } from "./cli.js";
 import { buildRunFilter, getPackageDir } from "./runnerUtils.js";
 import { copyCoverageSummary, copyTestResults } from "./reporting.js";
@@ -40,6 +41,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const discoveryService = new DiscoveryService(cache, outputChannel);
   const debugLauncher = new DebugLauncher(outputChannel);
   const testResultStore = new TestResultStore(context.storageUri);
+  const registryDir =
+    context.storageUri?.fsPath ?? context.globalStorageUri.fsPath;
+  const runRegistry = new RunRegistry(registryDir);
 
   let runner!: TestRunner;
   let coverageRunner!: CoverageRunner;
@@ -74,6 +78,7 @@ export function activate(context: vscode.ExtensionContext): void {
     cache,
     coverageStore,
     outputChannel,
+    runRegistry,
   );
   const specView = new SpecViewPanel(outputChannel, cache);
   specView.setExtensionUri(context.extensionUri);
@@ -98,13 +103,20 @@ export function activate(context: vscode.ExtensionContext): void {
     (jsonOutput) => {
       specView.refresh(jsonOutput, "coverage");
     },
+    runRegistry,
   );
 
   controller.setCoverageDetailProvider((uri) =>
     coverageStore.getDetails(uri.fsPath),
   );
 
-  runner = new TestRunner(controller, cache, outputChannel, coverageStore);
+  runner = new TestRunner(
+    controller,
+    cache,
+    outputChannel,
+    runRegistry,
+    coverageStore,
+  );
 
   const specViewRefreshDisposable = runner.onDidComplete((jsonOutput) => {
     specView.refresh(jsonOutput, "run");
@@ -117,6 +129,7 @@ export function activate(context: vscode.ExtensionContext): void {
     (jsonOutput, scope, cwd) => {
       specView.refresh(jsonOutput, `watch:${scope}@${cwd}`);
     },
+    runRegistry,
   );
 
   const diagnostics = new FocusDiagnostics(cache);
@@ -165,8 +178,11 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   flushOnDeactivate = async () => {
-    await coverageStore.flush();
-    await testResultStore.flush();
+    await Promise.allSettled([
+      runRegistry.save(),
+      coverageStore.flush(),
+      testResultStore.flush(),
+    ]);
   };
 
   initializeAsync({
@@ -177,6 +193,8 @@ export function activate(context: vscode.ExtensionContext): void {
     testResultStore,
     controller,
     cache,
+    runRegistry,
+    context,
   }).catch((err) => {
     outputChannel.error(`[activate] async initialization failed: ${err}`);
   });
@@ -509,6 +527,8 @@ async function initializeAsync(deps: {
   testResultStore: TestResultStore;
   controller: GoTestController;
   cache: DiscoveryCache;
+  runRegistry: RunRegistry;
+  context: vscode.ExtensionContext;
 }): Promise<void> {
   const {
     workspaceFolders,
@@ -518,6 +538,8 @@ async function initializeAsync(deps: {
     testResultStore,
     controller,
     cache,
+    runRegistry,
+    context,
   } = deps;
 
   const firstDir = workspaceFolders[0].uri.fsPath;
@@ -531,6 +553,28 @@ async function initializeAsync(deps: {
     if (choice === "Open Output") outputChannel.show();
     return;
   }
+
+  await runRegistry.load();
+  const crashed = runRegistry.sweepStale();
+  if (crashed.length > 0) {
+    outputChannel.info(
+      `[registry] marked ${crashed.length} stale run(s) as crashed`,
+    );
+  }
+  runRegistry.sweep();
+  await runRegistry.save();
+
+  const registrySaveInterval = setInterval(() => {
+    runRegistry.sweep();
+    runRegistry.save().catch((err) => {
+      outputChannel.error(`[registry] periodic save failed: ${err}`);
+    });
+  }, 60_000);
+  context.subscriptions.push({
+    dispose() {
+      clearInterval(registrySaveInterval);
+    },
+  });
 
   for (const folder of workspaceFolders) {
     await discoveryService.discover(folder.uri.fsPath);

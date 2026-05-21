@@ -31,6 +31,8 @@ func generateOverlayFromLoaded(loaded []*gotestgen.LoadResult, debug bool) (*ove
 		return nil, nil, err
 	}
 
+	gotestrunner.CleanStaleOverlays()
+
 	tmpDir, err := gotestrunner.WriteOverlay(allResults)
 	if err != nil {
 		return nil, nil, err

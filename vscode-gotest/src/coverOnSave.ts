@@ -8,9 +8,12 @@ import type { CoverageStore } from "./coverageStore.js";
 import { buildCliCommand, formatCliCommand, scopedConfig } from "./cli.js";
 import { spawnTestProcess } from "./runnerUtils.js";
 import { runGoToolCoverFunc } from "./coverageUtils.js";
+import type { RunRegistry } from "./runRegistry.js";
 
 export class CoverOnSave implements vscode.Disposable {
   private activeRun: vscode.CancellationTokenSource | undefined;
+  private activeRecordId: string | undefined;
+  private previousRunPromise: Promise<void> = Promise.resolve();
   private runQueue = Promise.resolve();
   private pendingPackages = new Set<string>();
 
@@ -19,6 +22,7 @@ export class CoverOnSave implements vscode.Disposable {
     private readonly cache: DiscoveryCache,
     private readonly store: CoverageStore,
     private readonly outputChannel: vscode.LogOutputChannel,
+    private readonly registry: RunRegistry,
   ) {}
 
   run(importPath: string): Promise<void> {
@@ -32,7 +36,14 @@ export class CoverOnSave implements vscode.Disposable {
   }
 
   private async execute(importPath: string): Promise<void> {
-    this.activeRun?.cancel();
+    if (this.activeRun) {
+      this.activeRun.cancel();
+      if (this.activeRecordId) {
+        this.registry.cancel(this.activeRecordId);
+        this.activeRecordId = undefined;
+      }
+      await this.previousRunPromise;
+    }
     const cts = new vscode.CancellationTokenSource();
     this.activeRun = cts;
 
@@ -40,6 +51,17 @@ export class CoverOnSave implements vscode.Disposable {
     if (!pkg) return;
     const workspaceDir = this.cache.getWorkspaceDir(importPath);
     if (!workspaceDir) return;
+
+    const recordId = this.registry.register({
+      kind: "coverage",
+      packages: [importPath],
+    }).id;
+    this.activeRecordId = recordId;
+
+    let resolveRun!: () => void;
+    this.previousRunPromise = new Promise<void>((r) => {
+      resolveRun = r;
+    });
 
     const config = scopedConfig(workspaceDir);
     const testFlags = config.get<string[]>("testFlags") ?? [];
@@ -96,6 +118,11 @@ export class CoverOnSave implements vscode.Disposable {
       this.outputChannel.error(`[coverage:save] ${message}`);
       return;
     } finally {
+      if (this.activeRecordId === recordId) {
+        this.registry.complete(recordId);
+        this.activeRecordId = undefined;
+      }
+      resolveRun();
       if (this.activeRun === cts) this.activeRun = undefined;
       cts.dispose();
       if (coverFile)

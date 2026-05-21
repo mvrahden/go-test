@@ -11,17 +11,21 @@ import {
 } from "./runnerUtils.js";
 import type { CoverageStore } from "./coverageStore.js";
 import { executeBatch } from "./batchRunner.js";
+import type { RunRegistry } from "./runRegistry.js";
 
 export class TestRunner {
   private _lastJsonOutput = "";
   private readonly _onDidComplete = new vscode.EventEmitter<string>();
   readonly onDidComplete: vscode.Event<string> = this._onDidComplete.event;
   private activeRun: vscode.CancellationTokenSource | undefined;
+  private activeRecordId: string | undefined;
+  private previousRunPromise: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly controller: GoTestController,
     private readonly cache: DiscoveryCache,
     private readonly outputChannel: vscode.LogOutputChannel,
+    private readonly registry: RunRegistry,
     private readonly coverageStore?: CoverageStore,
   ) {}
 
@@ -38,6 +42,11 @@ export class TestRunner {
     if (this.activeRun) {
       this.outputChannel.info("[runner] cancelling previous run");
       this.activeRun.cancel();
+      if (this.activeRecordId) {
+        this.registry.cancel(this.activeRecordId);
+        this.activeRecordId = undefined;
+      }
+      await this.previousRunPromise;
     }
     const cts = new vscode.CancellationTokenSource();
     this.activeRun = cts;
@@ -48,11 +57,24 @@ export class TestRunner {
     this._lastJsonOutput = "";
     let anyCoverOnRun = false;
 
+    let resolveRun!: () => void;
+    this.previousRunPromise = new Promise<void>((r) => {
+      resolveRun = r;
+    });
+
+    let recordId: string | undefined;
+
     try {
       const items = collectItems(this.controller, request);
       if (items.length === 0) {
         return;
       }
+
+      recordId = this.registry.register({
+        kind: "test",
+        packages: items.map((i) => i.id),
+      }).id;
+      this.activeRecordId = recordId;
 
       for (const item of items) {
         this.controller.clearResults(item);
@@ -180,6 +202,11 @@ export class TestRunner {
       }
       this.controller.saveResults();
     } finally {
+      if (recordId !== undefined && this.activeRecordId === recordId) {
+        this.registry.complete(recordId);
+        this.activeRecordId = undefined;
+      }
+      resolveRun();
       cancelSub.dispose();
       if (this.activeRun === cts) {
         this.activeRun = undefined;
