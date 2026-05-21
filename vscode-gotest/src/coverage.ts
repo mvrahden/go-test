@@ -241,6 +241,8 @@ export function parseFuncCoverage(
 
 export class CoverageRunner implements vscode.Disposable {
   private activeRun: vscode.CancellationTokenSource | undefined;
+  private activeRecordId: string | undefined;
+  private previousRunPromise: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly controller: GoTestController,
@@ -258,6 +260,11 @@ export class CoverageRunner implements vscode.Disposable {
     if (this.activeRun) {
       this.outputChannel.info("[coverage] cancelling previous run");
       this.activeRun.cancel();
+      if (this.activeRecordId) {
+        this.registry.cancel(this.activeRecordId);
+        this.activeRecordId = undefined;
+      }
+      await this.previousRunPromise;
     }
     const cts = new vscode.CancellationTokenSource();
     this.activeRun = cts;
@@ -266,12 +273,22 @@ export class CoverageRunner implements vscode.Disposable {
 
     const run = this.controller.createTestRun(request, "Go Test Coverage");
 
-    try {
-      const items = collectItems(this.controller, request);
-      if (items.length === 0) {
-        return;
-      }
+    const items = collectItems(this.controller, request);
+    if (items.length === 0) {
+      run.end();
+      return;
+    }
 
+    const recordId = this.registry.register({
+      kind: "coverage",
+      packages: items.map((i) => i.id),
+    }).id;
+    this.activeRecordId = recordId;
+
+    let resolveRun!: () => void;
+    this.previousRunPromise = new Promise<void>((r) => { resolveRun = r; });
+
+    try {
       for (const item of items) {
         this.controller.clearResults(item);
         run.started(item);
@@ -418,6 +435,11 @@ export class CoverageRunner implements vscode.Disposable {
         this.onJsonOutput(allJsonOutput);
       }
     } finally {
+      if (this.activeRecordId === recordId) {
+        this.registry.complete(recordId);
+        this.activeRecordId = undefined;
+      }
+      resolveRun();
       cancelSub.dispose();
       if (this.activeRun === cts) {
         this.activeRun = undefined;
