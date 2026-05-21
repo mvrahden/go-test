@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/mvrahden/go-test/about"
@@ -51,6 +53,53 @@ func TestWriteOverlay(t *testing.T) {
 	bPXSuite := filepath.Join("/fake/pkg/b", about.PXSuite)
 	if _, ok := ov.Replace[bPXSuite]; ok {
 		t.Error("pkg/b should not have PXSuite mapping (empty PXTest)")
+	}
+}
+
+func TestWriteOverlay_UniquePaths(t *testing.T) {
+	results := gotestgen.GenerateResults{
+		{AbsPath: "/fake/pkg/a", PTest: []byte("package a\n")},
+	}
+
+	dir1, err := WriteOverlay(results)
+	if err != nil {
+		t.Fatalf("first WriteOverlay: %v", err)
+	}
+	defer os.RemoveAll(dir1)
+
+	dir2, err := WriteOverlay(results)
+	if err != nil {
+		t.Fatalf("second WriteOverlay: %v", err)
+	}
+	defer os.RemoveAll(dir2)
+
+	if dir1 == dir2 {
+		t.Fatalf("expected unique overlay dirs, both are %s", dir1)
+	}
+}
+
+func TestWriteOverlay_PIDFile(t *testing.T) {
+	results := gotestgen.GenerateResults{
+		{AbsPath: "/fake/pkg/a", PTest: []byte("package a\n")},
+	}
+
+	tmpDir, err := WriteOverlay(results)
+	if err != nil {
+		t.Fatalf("WriteOverlay: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	data, err := os.ReadFile(filepath.Join(tmpDir, ".pid"))
+	if err != nil {
+		t.Fatalf("read .pid: %v", err)
+	}
+
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		t.Fatalf("parse .pid: %v", err)
+	}
+	if pid != os.Getpid() {
+		t.Fatalf("expected PID %d, got %d", os.Getpid(), pid)
 	}
 }
 

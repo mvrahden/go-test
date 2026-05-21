@@ -22,12 +22,15 @@ func WriteOverlay(results gotestgen.GenerateResults) (string, error) {
 		return "", fmt.Errorf("get working directory: %w", err)
 	}
 	h := sha256.Sum256([]byte(cwd))
-	dirName := fmt.Sprintf("gotest-overlay-%x", h[:8])
-	tmpDir := filepath.Join(os.TempDir(), dirName)
-
-	os.RemoveAll(tmpDir)
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+	prefix := fmt.Sprintf("gotest-overlay-%x-", h[:8])
+	tmpDir, err := os.MkdirTemp(os.TempDir(), prefix)
+	if err != nil {
 		return "", fmt.Errorf("create overlay dir: %w", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(tmpDir, ".pid"), []byte(strconv.Itoa(os.Getpid())), 0644); err != nil {
+		os.RemoveAll(tmpDir)
+		return "", fmt.Errorf("write pid file: %w", err)
 	}
 
 	overlay := overlayJSON{Replace: map[string]string{}}
