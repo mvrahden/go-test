@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -39,11 +38,11 @@ func (p *SharedFixtureProcess) Teardown() error {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
-	syscall.Kill(-p.cmd.Process.Pid, syscall.SIGTERM)
+	gotestrunner.TerminateProcessGroup(p.cmd.Process.Pid)
 	select {
 	case <-p.done:
 	case <-time.After(timeout):
-		syscall.Kill(-p.cmd.Process.Pid, syscall.SIGKILL)
+		gotestrunner.ForceKillProcessGroup(p.cmd.Process.Pid)
 	}
 	return nil
 }

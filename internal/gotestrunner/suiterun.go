@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -263,7 +262,7 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		select {
 		case err = <-done:
 		case <-time.After(budget):
-			syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			ForceKillProcessGroup(cmd.Process.Pid)
 			err = <-done
 		}
 	}
