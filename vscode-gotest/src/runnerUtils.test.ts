@@ -663,6 +663,24 @@ describe("computeWildcard", () => {
     ).toBeUndefined();
   });
 
+  it("includes module-root package alongside sub-directory wildcards", () => {
+    expect(
+      computeWildcard(
+        [
+          "example.com",
+          "example.com/pkg/a",
+          "example.com/pkg/b",
+          "example.com/internal/c",
+        ],
+        "example.com",
+      ),
+    ).toEqual([
+      "example.com",
+      "example.com/pkg/...",
+      "example.com/internal/c",
+    ]);
+  });
+
   it("allows wildcard deeper than module root", () => {
     expect(
       computeWildcard(

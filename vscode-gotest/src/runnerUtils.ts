@@ -442,7 +442,12 @@ export function computeWildcard(
   if (!modulePath || prefix !== modulePath) return [prefix + "/..."];
 
   const groups = new Map<string, string[]>();
+  const ungrouped: string[] = [];
   for (const p of importPaths) {
+    if (p === modulePath) {
+      ungrouped.push(p);
+      continue;
+    }
     const rest = p.slice(modulePath.length + 1);
     const seg = rest.split("/")[0];
     let group = groups.get(seg);
@@ -453,7 +458,7 @@ export function computeWildcard(
     group.push(p);
   }
 
-  const result: string[] = [];
+  const result: string[] = [...ungrouped];
   for (const [seg, paths] of groups) {
     if (paths.length === 1) {
       result.push(paths[0]);
