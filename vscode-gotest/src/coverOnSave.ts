@@ -37,6 +37,7 @@ export class CoverOnSave implements vscode.Disposable {
 
   private async execute(importPath: string): Promise<void> {
     if (this.activeRun) {
+      this.outputChannel.info("[coverage:save] cancelling previous run");
       this.activeRun.cancel();
       if (this.activeRecordId) {
         this.registry.cancel(this.activeRecordId);
