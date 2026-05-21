@@ -60,10 +60,10 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
 
   const importPaths = pkgInfos.map((p) => p.importPath);
   const modulePath = await readModulePath(workspaceDir);
-  const wildcard = filter
+  const wildcards = filter
     ? undefined
     : computeWildcard(importPaths, modulePath);
-  const cliPkgArgs = wildcard ? [wildcard] : importPaths;
+  const cliPkgArgs = wildcards ?? importPaths;
   let coverFile: string | undefined;
 
   try {
@@ -169,8 +169,15 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     }
 
     if (token.isCancellationRequested) {
-      for (const info of pkgInfos) {
-        if (streamedPkgs.has(info.importPath)) continue;
+      const skippedPkgs = pkgInfos.filter(
+        (i) => !streamedPkgs.has(i.importPath),
+      );
+      if (skippedPkgs.length > 0) {
+        outputChannel.info(
+          `[${label}] cancelled, skipping ${skippedPkgs.length} remaining package(s)`,
+        );
+      }
+      for (const info of skippedPkgs) {
         for (const item of info.items) {
           run.skipped(item);
         }
@@ -187,15 +194,6 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
 
       for (const info of pkgInfos) {
         if (streamedPkgs.has(info.importPath)) {
-          if (stderrTrimmed) {
-            for (const item of info.items) {
-              run.appendOutput(
-                stderrTrimmed.replace(/\n/g, "\r\n") + "\r\n",
-                undefined,
-                item,
-              );
-            }
-          }
           continue;
         }
 

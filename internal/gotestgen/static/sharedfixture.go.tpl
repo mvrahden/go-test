@@ -102,6 +102,16 @@ func main() {
 	}
 {{- end }}
 {{ end }}
+	{
+		var ƒmaxTimeout time.Duration
+{{ range $f := .Fixtures }}
+		if ƒcfg_{{ $f.VarName }}.Timeout > ƒmaxTimeout {
+			ƒmaxTimeout = ƒcfg_{{ $f.VarName }}.Timeout
+		}
+{{ end }}
+		ƒbudgetBytes, _ := json.Marshal((ƒmaxTimeout + 30*time.Second).String())
+		state["_teardownBudget"] = ƒbudgetBytes
+	}
 	json.NewEncoder(os.Stdout).Encode(state)
 
 	sig := make(chan os.Signal, 1)

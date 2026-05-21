@@ -221,6 +221,10 @@ func executeTests(ctx context.Context, cfg ExecConfig, overlay *overlayResult) (
 		return 0, nil
 	}
 
+	for j := range targets {
+		targets[j].BudgetFile = targets[j].BinaryPath + ".budget"
+	}
+
 	setupCoverage(targets, overlay, pf.userCoverProfile)
 	if pf.userCoverProfile != "" {
 		defer mergeCoverProfiles(targets, pf.userCoverProfile)
@@ -305,11 +309,16 @@ func executeTestsStreaming(ctx context.Context, cfg ExecConfig, overlay *overlay
 	}
 
 loop:
-	for cr := range compileCh {
+	for {
+		var cr gotestrunner.CompileResult
+		var ok bool
 		select {
+		case cr, ok = <-compileCh:
+			if !ok {
+				break loop
+			}
 		case <-streamCtx.Done():
 			break loop
-		default:
 		}
 
 		singleCompiled := []gotestrunner.CompileResult{cr}
@@ -320,6 +329,10 @@ loop:
 			continue
 		}
 		anyTargets = true
+
+		for j := range targets {
+			targets[j].BudgetFile = targets[j].BinaryPath + ".budget"
+		}
 
 		if pf.userCoverProfile != "" {
 			baseIdx := len(allTargets)
@@ -352,15 +365,12 @@ loop:
 					env = baseEnv
 				}
 
-				sem <- struct{}{}
-				defer func() { <-sem }()
-
-				mu.Lock()
-				if streamCtx.Err() != nil {
-					mu.Unlock()
+				select {
+				case sem <- struct{}{}:
+				case <-streamCtx.Done():
 					return
 				}
-				mu.Unlock()
+				defer func() { <-sem }()
 
 				r := gotestrunner.RunSingleSuite(streamCtx, t, env, cfg.JSON)
 				mu.Lock()
@@ -423,6 +433,10 @@ func executeTestsCaptured(ctx context.Context, cfg ExecConfig, overlay *overlayR
 
 	if len(targets) == 0 {
 		return nil, 0, nil
+	}
+
+	for j := range targets {
+		targets[j].BudgetFile = targets[j].BinaryPath + ".budget"
 	}
 
 	if pf.userCoverProfile != "" {

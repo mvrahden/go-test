@@ -268,9 +268,13 @@ export class CoverageRunner implements vscode.Disposable {
     }
     const cts = new vscode.CancellationTokenSource();
     this.activeRun = cts;
-    const cancelSub = token.onCancellationRequested(() => cts.cancel());
+    const cancelSub = token.onCancellationRequested(() => {
+      this.outputChannel.info("[coverage] stop requested");
+      cts.cancel();
+    });
     const effectiveToken = cts.token;
 
+    this.outputChannel.info("[coverage] run started");
     const run = this.controller.createTestRun(request, "Go Test Coverage");
 
     const items = collectItems(this.controller, request);
@@ -440,8 +444,13 @@ export class CoverageRunner implements vscode.Disposable {
         this.onJsonOutput(allJsonOutput);
       }
     } finally {
+      const wasCancelled = effectiveToken.isCancellationRequested;
       if (this.activeRecordId === recordId) {
-        this.registry.complete(recordId);
+        if (wasCancelled) {
+          this.registry.cancel(recordId);
+        } else {
+          this.registry.complete(recordId);
+        }
         this.activeRecordId = undefined;
       }
       resolveRun();
@@ -451,6 +460,9 @@ export class CoverageRunner implements vscode.Disposable {
       }
       cts.dispose();
       run.end();
+      this.outputChannel.info(
+        `[coverage] run ${wasCancelled ? "cancelled" : "completed"}`,
+      );
     }
   }
 

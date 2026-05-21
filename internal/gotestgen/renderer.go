@@ -110,7 +110,7 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		imports = append(imports, headerImport{Path: "fmt"})
 		imports = append(imports, headerImport{Path: "time"})
 	}
-	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
+	if hasFixtures || slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
 		return v.IsMethodParallel()
 	}) {
 		imports = append(imports, headerImport{Path: "sync"})

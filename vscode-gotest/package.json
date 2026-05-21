@@ -212,6 +212,13 @@
           "default": "./...",
           "scope": "resource",
           "description": "Default package scope for watch mode"
+        },
+        "gotest.forceKillTimeout": {
+          "type": "number",
+          "default": 600,
+          "minimum": 10,
+          "scope": "resource",
+          "description": "Seconds to wait after SIGTERM before sending SIGKILL to a cancelled process"
         }
       }
     }

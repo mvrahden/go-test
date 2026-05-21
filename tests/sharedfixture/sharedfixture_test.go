@@ -94,7 +94,7 @@ func TestSharedFixtureIntegration(t *testing.T) {
 		})
 
 		t.Run("StateContent", func(t *testing.T) {
-			gotest.Equal(t, 2, len(state), "expected entries for Alpha and Beta")
+			gotest.Equal(t, 3, len(state), "expected entries for Alpha, Beta, and _teardownBudget")
 
 			alphaKey := "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.AlphaSharedFixture"
 			betaKey := "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.BetaSharedFixture"
@@ -103,6 +103,8 @@ func TestSharedFixtureIntegration(t *testing.T) {
 			gotest.True(t, hasAlpha, "state should contain AlphaSharedFixture")
 			_, hasBeta := state[betaKey]
 			gotest.True(t, hasBeta, "state should contain BetaSharedFixture")
+			_, hasBudget := state["_teardownBudget"]
+			gotest.True(t, hasBudget, "state should contain _teardownBudget")
 
 			var alphaState struct{ DataPath string }
 			gotest.NoError(t, json.Unmarshal(state[alphaKey], &alphaState))

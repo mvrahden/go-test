@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
@@ -29,49 +30,117 @@ func TestMain(m *testing.M) { os.Exit(ƒƒ_GOTEST_main(m)) }
 
 func ƒƒ_GOTEST_main(m *testing.M) (ƒcode int) {
 
-	{
+	var ƒcfg_AppFixture gotest.FixtureConfig
+	var ƒok_AppFixture bool
 
-		ƒ_AppFixture = &AppFixture{}
-		ƒcfg := gotest.DefaultFixtureConfig()
-		gotest.OverlayFixtureConfig(&ƒcfg, ƒ_AppFixture.FixtureConfig())
-		var ƒerr error
-		ƒattempts := 1 + ƒcfg.Retries
-		for ƒi := range ƒattempts {
-			ctx := context.Background()
-			if ƒcfg.Timeout > 0 {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
-				defer cancel()
-			}
-			ƒerr = ƒ_AppFixture.BeforeAll(ctx)
-			if ƒerr == nil {
-				break
-			}
-			if ƒi < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "AppFixture.BeforeAll attempt %d/%d failed: %v\n", ƒi+1, ƒattempts, ƒerr)
-				if ƒcfg.RetryDelay > 0 {
-					time.Sleep(ƒcfg.RetryDelay)
+	defer func() {
+		var ƒtwg sync.WaitGroup
+		ƒtdfails := make([]bool, 1)
+
+		ƒtwg.Add(1)
+		go func() {
+			defer ƒtwg.Done()
+
+			if ƒok_AppFixture {
+				ctx := context.Background()
+				if ƒcfg_AppFixture.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_AppFixture.Timeout)
+					defer cancel()
 				}
-			}
-		}
-		if ƒerr != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: AppFixture.BeforeAll failed after %d attempt(s): %v\n", ƒattempts, ƒerr)
-			return 2
-		}
-		defer func() {
-			ctx := context.Background()
-			if ƒcfg.Timeout > 0 {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
-				defer cancel()
-			}
-			if err := ƒ_AppFixture.AfterAll(ctx); err != nil {
-				fmt.Fprintf(os.Stderr, "AppFixture.AfterAll failed: %v\n", err)
-				if ƒcode == 0 {
-					ƒcode = 1
+				if err := ƒ_AppFixture.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "AppFixture.AfterAll failed: %v\n", err)
+					ƒtdfails[0] = true
 				}
 			}
 		}()
+
+		ƒtwg.Wait()
+		for _, ƒf := range ƒtdfails {
+			if ƒf && ƒcode == 0 {
+				ƒcode = 1
+				break
+			}
+		}
+	}()
+
+	ƒctx, ƒcancel := context.WithCancel(context.Background())
+	defer ƒcancel()
+
+	{
+		var ƒswg sync.WaitGroup
+		ƒtfails := make([]bool, 1)
+
+		ƒswg.Add(1)
+		go func() {
+			defer ƒswg.Done()
+
+			ƒ_AppFixture = &AppFixture{}
+			ƒcfg_AppFixture = gotest.DefaultFixtureConfig()
+			gotest.OverlayFixtureConfig(&ƒcfg_AppFixture, ƒ_AppFixture.FixtureConfig())
+			var ƒerr error
+			ƒattempts := 1 + ƒcfg_AppFixture.Retries
+			for ƒi := range ƒattempts {
+				ctx := ƒctx
+				if ƒcfg_AppFixture.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_AppFixture.Timeout)
+					defer cancel()
+				}
+				ƒerr = ƒ_AppFixture.BeforeAll(ctx)
+				if ƒerr == nil {
+					break
+				}
+				if ƒctx.Err() != nil {
+					break
+				}
+				if ƒi < ƒattempts-1 {
+					fmt.Fprintf(os.Stderr, "AppFixture.BeforeAll attempt %d/%d failed: %v\n", ƒi+1, ƒattempts, ƒerr)
+					if ƒcfg_AppFixture.RetryDelay > 0 {
+						time.Sleep(ƒcfg_AppFixture.RetryDelay)
+					}
+				}
+			}
+			if ƒerr != nil {
+				fmt.Fprintf(os.Stderr, "FAIL: AppFixture.BeforeAll failed after %d attempt(s): %v\n", ƒattempts, ƒerr)
+				ƒtfails[0] = true
+				ƒcancel()
+				return
+			}
+			ƒok_AppFixture = true
+
+		}()
+
+		ƒswg.Wait()
+		for _, ƒf := range ƒtfails {
+			if ƒf {
+				return 2
+			}
+		}
+	}
+
+	{
+		var ƒmaxTreePath time.Duration
+		var ƒmaxSuiteSetup time.Duration
+
+		{
+			ƒtreePath := ƒcfg_AppFixture.Timeout
+			if ƒtreePath > ƒmaxTreePath {
+				ƒmaxTreePath = ƒtreePath
+			}
+		}
+
+		{
+			ƒscfg := gotest.DefaultSuiteConfig()
+			gotest.OverlaySuiteConfig(&ƒscfg, (&AppTestSuite{App: ƒ_AppFixture}).SuiteConfig())
+			if ƒscfg.SetupTimeout > ƒmaxSuiteSetup {
+				ƒmaxSuiteSetup = ƒscfg.SetupTimeout
+			}
+		}
+
+		if ƒbudgetFile := os.Getenv("GOTEST_TEARDOWN_BUDGET_FILE"); ƒbudgetFile != "" {
+			os.WriteFile(ƒbudgetFile, []byte((ƒmaxTreePath + ƒmaxSuiteSetup + 30*time.Second).String()), 0644)
+		}
 	}
 
 	ƒcode = m.Run()

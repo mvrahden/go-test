@@ -28,143 +28,270 @@ func TestMain(m *testing.M) { os.Exit(ƒƒ_GOTEST_main(m)) }
 
 func ƒƒ_GOTEST_main(m *testing.M) (ƒcode int) {
 {{ range $f := .RootFixtures }}
-{
-{{- /* Resolve shared fixture embeddings from JSON state */ -}}
-{{ if $f.SharedFixtures }}
-    ƒsharedFile := os.Getenv("GOTEST_SHARED_STATE_FILE")
-    if ƒsharedFile == "" {
-        fmt.Fprintln(os.Stderr, "FAIL: GOTEST_SHARED_STATE_FILE not set — run via gotest CLI")
-        return 2
-    }
-    ƒsharedRaw, ƒsharedErr := os.ReadFile(ƒsharedFile)
-    if ƒsharedErr != nil {
-        fmt.Fprintf(os.Stderr, "FAIL: read shared state file: %v\n", ƒsharedErr)
-        return 2
-    }
-    ƒsharedState := map[string]json.RawMessage{}
-    if err := json.Unmarshal(ƒsharedRaw, &ƒsharedState); err != nil {
-        fmt.Fprintf(os.Stderr, "FAIL: unmarshal shared state: %v\n", err)
-        return 2
-    }
-{{ range $sf := $f.SharedFixtures }}
-    {{ $sf.LocalVar }} := &{{ $sf.QualifiedType }}{}
-    if ƒb, ok := ƒsharedState["{{ $sf.StateKey }}"]; ok {
-        if err := json.Unmarshal(ƒb, {{ $sf.LocalVar }}); err != nil {
-            fmt.Fprintf(os.Stderr, "FAIL: unmarshal {{ $sf.FieldName }} state: %v\n", err)
-            return 2
-        }
-    }
-{{- if $sf.HasHydrate }}
-    if err := {{ $sf.LocalVar }}.Hydrate(context.Background()); err != nil {
-        fmt.Fprintf(os.Stderr, "FAIL: {{ $sf.FieldName }}.Hydrate: %v\n", err)
-        return 2
-    }
-{{- end }}
-{{- if $sf.HasDehydrate }}
-    defer {{ $sf.LocalVar }}.Dehydrate(context.Background())
-{{- end }}
-{{ end }}
-{{ end }}
-
-    ƒ_{{ $f.Identifier }} = &{{ $f.QualifiedIdentifier }}{}
-{{- range $sf := $f.SharedFixtures }}
-    ƒ_{{ $f.Identifier }}.{{ $sf.FieldName }} = {{ $sf.LocalVar }}
-{{- end }}
-    ƒcfg := gotest.DefaultFixtureConfig()
-{{- if $f.HasConfig }}
-    gotest.OverlayFixtureConfig(&ƒcfg, ƒ_{{ $f.Identifier }}.FixtureConfig())
-{{- end }}
-    var ƒerr error
-    ƒattempts := 1 + ƒcfg.Retries
-    for ƒi := range ƒattempts {
-        ctx := context.Background()
-        if ƒcfg.Timeout > 0 {
-            var cancel context.CancelFunc
-            ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
-            defer cancel()
-        }
-        ƒerr = ƒ_{{ $f.Identifier }}.BeforeAll(ctx)
-        if ƒerr == nil {
-            break
-        }
-        if ƒi < ƒattempts-1 {
-            fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.BeforeAll attempt %d/%d failed: %v\n", ƒi+1, ƒattempts, ƒerr)
-            if ƒcfg.RetryDelay > 0 {
-                time.Sleep(ƒcfg.RetryDelay)
-            }
-        }
-    }
-    if ƒerr != nil {
-        fmt.Fprintf(os.Stderr, "FAIL: {{ $f.Identifier }}.BeforeAll failed after %d attempt(s): %v\n", ƒattempts, ƒerr)
-        return 2
-    }
-{{- if $f.AfterAll }}
-    defer func() {
-        ctx := context.Background()
-        if ƒcfg.Timeout > 0 {
-            var cancel context.CancelFunc
-            ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
-            defer cancel()
-        }
-        if err := ƒ_{{ $f.Identifier }}.AfterAll(ctx); err != nil {
-            fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.AfterAll failed: %v\n", err)
-            if ƒcode == 0 { ƒcode = 1 }
-        }
-    }()
-{{- end }}
-}
-
-{{- /* Setup child fixtures */ -}}
+    var ƒcfg_{{ $f.Identifier }} gotest.FixtureConfig
+    var ƒok_{{ $f.Identifier }} bool
 {{ range $cf := $f.ChildFixtures }}
-{
-    ƒ_{{ $cf.Identifier }} = &{{ $cf.QualifiedIdentifier }}{
-        {{ $cf.ParentFieldName }}: ƒ_{{ $f.Identifier }},
-    }
-    ƒcfg := gotest.DefaultFixtureConfig()
-{{- if $cf.HasConfig }}
-    gotest.OverlayFixtureConfig(&ƒcfg, ƒ_{{ $cf.Identifier }}.FixtureConfig())
-{{- end }}
-    var ƒerr error
-    ƒattempts := 1 + ƒcfg.Retries
-    for ƒi := range ƒattempts {
-        ctx := context.Background()
-        if ƒcfg.Timeout > 0 {
-            var cancel context.CancelFunc
-            ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
-            defer cancel()
-        }
-        ƒerr = ƒ_{{ $cf.Identifier }}.BeforeAll(ctx)
-        if ƒerr == nil {
-            break
-        }
-        if ƒi < ƒattempts-1 {
-            fmt.Fprintf(os.Stderr, "{{ $cf.Identifier }}.BeforeAll attempt %d/%d failed: %v\n", ƒi+1, ƒattempts, ƒerr)
-            if ƒcfg.RetryDelay > 0 {
-                time.Sleep(ƒcfg.RetryDelay)
-            }
-        }
-    }
-    if ƒerr != nil {
-        fmt.Fprintf(os.Stderr, "FAIL: {{ $cf.Identifier }}.BeforeAll failed after %d attempt(s): %v\n", ƒattempts, ƒerr)
-        return 2
-    }
-{{- if $cf.AfterAll }}
+    var ƒcfg_{{ $cf.Identifier }} gotest.FixtureConfig
+    var ƒok_{{ $cf.Identifier }} bool
+{{ end }}
+{{ end }}
+
     defer func() {
-        ctx := context.Background()
-        if ƒcfg.Timeout > 0 {
-            var cancel context.CancelFunc
-            ctx, cancel = context.WithTimeout(ctx, ƒcfg.Timeout)
-            defer cancel()
-        }
-        if err := ƒ_{{ $cf.Identifier }}.AfterAll(ctx); err != nil {
-            fmt.Fprintf(os.Stderr, "{{ $cf.Identifier }}.AfterAll failed: %v\n", err)
-            if ƒcode == 0 { ƒcode = 1 }
+        var ƒtwg sync.WaitGroup
+        ƒtdfails := make([]bool, {{ len .RootFixtures }})
+{{ range $i, $f := .RootFixtures }}
+        ƒtwg.Add(1)
+        go func() {
+            defer ƒtwg.Done()
+{{ if $f.ChildFixtures }}
+            var ƒcwg sync.WaitGroup
+            ƒcdfails := make([]bool, {{ len $f.ChildFixtures }})
+{{ range $j, $cf := $f.ChildFixtures }}
+{{- if $cf.AfterAll }}
+            if ƒok_{{ $cf.Identifier }} {
+                ƒcwg.Add(1)
+                go func() {
+                    defer ƒcwg.Done()
+                    ctx := context.Background()
+                    if ƒcfg_{{ $cf.Identifier }}.Timeout > 0 {
+                        var cancel context.CancelFunc
+                        ctx, cancel = context.WithTimeout(ctx, ƒcfg_{{ $cf.Identifier }}.Timeout)
+                        defer cancel()
+                    }
+                    if err := ƒ_{{ $cf.Identifier }}.AfterAll(ctx); err != nil {
+                        fmt.Fprintf(os.Stderr, "{{ $cf.Identifier }}.AfterAll failed: %v\n", err)
+                        ƒcdfails[{{ $j }}] = true
+                    }
+                }()
+            }
+{{- end }}
+{{ end }}
+            ƒcwg.Wait()
+            for _, ƒf := range ƒcdfails {
+                if ƒf { ƒtdfails[{{ $i }}] = true; break }
+            }
+{{ end }}
+{{- if $f.AfterAll }}
+            if ƒok_{{ $f.Identifier }} {
+                ctx := context.Background()
+                if ƒcfg_{{ $f.Identifier }}.Timeout > 0 {
+                    var cancel context.CancelFunc
+                    ctx, cancel = context.WithTimeout(ctx, ƒcfg_{{ $f.Identifier }}.Timeout)
+                    defer cancel()
+                }
+                if err := ƒ_{{ $f.Identifier }}.AfterAll(ctx); err != nil {
+                    fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.AfterAll failed: %v\n", err)
+                    ƒtdfails[{{ $i }}] = true
+                }
+            }
+{{- end }}
+{{- range $sf := $f.SharedFixtures }}
+{{- if $sf.HasDehydrate }}
+            if ƒok_{{ $f.Identifier }} {
+                ƒ_{{ $f.Identifier }}.{{ $sf.FieldName }}.Dehydrate(context.Background())
+            }
+{{- end }}
+{{- end }}
+        }()
+{{ end }}
+        ƒtwg.Wait()
+        for _, ƒf := range ƒtdfails {
+            if ƒf && ƒcode == 0 { ƒcode = 1; break }
         }
     }()
+
+    ƒctx, ƒcancel := context.WithCancel(context.Background())
+    defer ƒcancel()
+
+    {
+        var ƒswg sync.WaitGroup
+        ƒtfails := make([]bool, {{ len .RootFixtures }})
+{{ range $i, $f := .RootFixtures }}
+        ƒswg.Add(1)
+        go func() {
+            defer ƒswg.Done()
+{{ if $f.SharedFixtures }}
+            ƒsharedFile := os.Getenv("GOTEST_SHARED_STATE_FILE")
+            if ƒsharedFile == "" {
+                fmt.Fprintln(os.Stderr, "FAIL: GOTEST_SHARED_STATE_FILE not set — run via gotest CLI")
+                ƒtfails[{{ $i }}] = true
+                ƒcancel()
+                return
+            }
+            ƒsharedRaw, ƒsharedErr := os.ReadFile(ƒsharedFile)
+            if ƒsharedErr != nil {
+                fmt.Fprintf(os.Stderr, "FAIL: read shared state file: %v\n", ƒsharedErr)
+                ƒtfails[{{ $i }}] = true
+                ƒcancel()
+                return
+            }
+            ƒsharedState := map[string]json.RawMessage{}
+            if err := json.Unmarshal(ƒsharedRaw, &ƒsharedState); err != nil {
+                fmt.Fprintf(os.Stderr, "FAIL: unmarshal shared state: %v\n", err)
+                ƒtfails[{{ $i }}] = true
+                ƒcancel()
+                return
+            }
+{{ range $sf := $f.SharedFixtures }}
+            {{ $sf.LocalVar }} := &{{ $sf.QualifiedType }}{}
+            if ƒb, ok := ƒsharedState["{{ $sf.StateKey }}"]; ok {
+                if err := json.Unmarshal(ƒb, {{ $sf.LocalVar }}); err != nil {
+                    fmt.Fprintf(os.Stderr, "FAIL: unmarshal {{ $sf.FieldName }} state: %v\n", err)
+                    ƒtfails[{{ $i }}] = true
+                    ƒcancel()
+                    return
+                }
+            }
+{{- if $sf.HasHydrate }}
+            if err := {{ $sf.LocalVar }}.Hydrate(context.Background()); err != nil {
+                fmt.Fprintf(os.Stderr, "FAIL: {{ $sf.FieldName }}.Hydrate: %v\n", err)
+                ƒtfails[{{ $i }}] = true
+                ƒcancel()
+                return
+            }
 {{- end }}
-}
 {{ end }}
 {{ end }}
+            ƒ_{{ $f.Identifier }} = &{{ $f.QualifiedIdentifier }}{}
+{{- range $sf := $f.SharedFixtures }}
+            ƒ_{{ $f.Identifier }}.{{ $sf.FieldName }} = {{ $sf.LocalVar }}
+{{- end }}
+            ƒcfg_{{ $f.Identifier }} = gotest.DefaultFixtureConfig()
+{{- if $f.HasConfig }}
+            gotest.OverlayFixtureConfig(&ƒcfg_{{ $f.Identifier }}, ƒ_{{ $f.Identifier }}.FixtureConfig())
+{{- end }}
+            var ƒerr error
+            ƒattempts := 1 + ƒcfg_{{ $f.Identifier }}.Retries
+            for ƒi := range ƒattempts {
+                ctx := ƒctx
+                if ƒcfg_{{ $f.Identifier }}.Timeout > 0 {
+                    var cancel context.CancelFunc
+                    ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_{{ $f.Identifier }}.Timeout)
+                    defer cancel()
+                }
+                ƒerr = ƒ_{{ $f.Identifier }}.BeforeAll(ctx)
+                if ƒerr == nil {
+                    break
+                }
+                if ƒctx.Err() != nil {
+                    break
+                }
+                if ƒi < ƒattempts-1 {
+                    fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.BeforeAll attempt %d/%d failed: %v\n", ƒi+1, ƒattempts, ƒerr)
+                    if ƒcfg_{{ $f.Identifier }}.RetryDelay > 0 {
+                        time.Sleep(ƒcfg_{{ $f.Identifier }}.RetryDelay)
+                    }
+                }
+            }
+            if ƒerr != nil {
+                fmt.Fprintf(os.Stderr, "FAIL: {{ $f.Identifier }}.BeforeAll failed after %d attempt(s): %v\n", ƒattempts, ƒerr)
+                ƒtfails[{{ $i }}] = true
+                ƒcancel()
+                return
+            }
+            ƒok_{{ $f.Identifier }} = true
+{{ if $f.ChildFixtures }}
+            {
+                ƒcfails := make([]bool, {{ len $f.ChildFixtures }})
+                var ƒcwg sync.WaitGroup
+{{ range $j, $cf := $f.ChildFixtures }}
+                ƒcwg.Add(1)
+                go func() {
+                    defer ƒcwg.Done()
+                    ƒ_{{ $cf.Identifier }} = &{{ $cf.QualifiedIdentifier }}{
+                        {{ $cf.ParentFieldName }}: ƒ_{{ $f.Identifier }},
+                    }
+                    ƒcfg_{{ $cf.Identifier }} = gotest.DefaultFixtureConfig()
+{{- if $cf.HasConfig }}
+                    gotest.OverlayFixtureConfig(&ƒcfg_{{ $cf.Identifier }}, ƒ_{{ $cf.Identifier }}.FixtureConfig())
+{{- end }}
+                    var ƒerr error
+                    ƒattempts := 1 + ƒcfg_{{ $cf.Identifier }}.Retries
+                    for ƒi := range ƒattempts {
+                        ctx := ƒctx
+                        if ƒcfg_{{ $cf.Identifier }}.Timeout > 0 {
+                            var cancel context.CancelFunc
+                            ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_{{ $cf.Identifier }}.Timeout)
+                            defer cancel()
+                        }
+                        ƒerr = ƒ_{{ $cf.Identifier }}.BeforeAll(ctx)
+                        if ƒerr == nil {
+                            break
+                        }
+                        if ƒctx.Err() != nil {
+                            break
+                        }
+                        if ƒi < ƒattempts-1 {
+                            fmt.Fprintf(os.Stderr, "{{ $cf.Identifier }}.BeforeAll attempt %d/%d failed: %v\n", ƒi+1, ƒattempts, ƒerr)
+                            if ƒcfg_{{ $cf.Identifier }}.RetryDelay > 0 {
+                                time.Sleep(ƒcfg_{{ $cf.Identifier }}.RetryDelay)
+                            }
+                        }
+                    }
+                    if ƒerr != nil {
+                        fmt.Fprintf(os.Stderr, "FAIL: {{ $cf.Identifier }}.BeforeAll failed after %d attempt(s): %v\n", ƒattempts, ƒerr)
+                        ƒcfails[{{ $j }}] = true
+                        ƒcancel()
+                        return
+                    }
+                    ƒok_{{ $cf.Identifier }} = true
+                }()
+{{ end }}
+                ƒcwg.Wait()
+                for _, ƒf := range ƒcfails {
+                    if ƒf { ƒtfails[{{ $i }}] = true; break }
+                }
+            }
+{{ end }}
+        }()
+{{ end }}
+        ƒswg.Wait()
+        for _, ƒf := range ƒtfails {
+            if ƒf { return 2 }
+        }
+    }
+
+    {
+        var ƒmaxTreePath time.Duration
+        var ƒmaxSuiteSetup time.Duration
+{{ range $f := .RootFixtures }}
+        {
+{{- if $f.ChildFixtures }}
+            var ƒmaxChild time.Duration
+{{ range $cf := $f.ChildFixtures }}
+            if ƒcfg_{{ $cf.Identifier }}.Timeout > ƒmaxChild { ƒmaxChild = ƒcfg_{{ $cf.Identifier }}.Timeout }
+{{ end }}
+            ƒtreePath := ƒcfg_{{ $f.Identifier }}.Timeout + ƒmaxChild
+{{- else }}
+            ƒtreePath := ƒcfg_{{ $f.Identifier }}.Timeout
+{{- end }}
+            if ƒtreePath > ƒmaxTreePath { ƒmaxTreePath = ƒtreePath }
+        }
+{{ range $ts := $f.ChildSuites }}
+        {
+            ƒscfg := gotest.DefaultSuiteConfig()
+{{- if $ts.HasConfig }}
+            gotest.OverlaySuiteConfig(&ƒscfg, (&{{ $ts.Identifier }}{ {{ $ts.FixtureFieldName }}: ƒ_{{ $f.Identifier }} }).SuiteConfig())
+{{- end }}
+            if ƒscfg.SetupTimeout > ƒmaxSuiteSetup { ƒmaxSuiteSetup = ƒscfg.SetupTimeout }
+        }
+{{ end }}
+{{ range $cf := $f.ChildFixtures }}
+{{ range $ts := $cf.ChildSuites }}
+        {
+            ƒscfg := gotest.DefaultSuiteConfig()
+{{- if $ts.HasConfig }}
+            gotest.OverlaySuiteConfig(&ƒscfg, (&{{ $ts.Identifier }}{ {{ $ts.FixtureFieldName }}: ƒ_{{ $cf.Identifier }} }).SuiteConfig())
+{{- end }}
+            if ƒscfg.SetupTimeout > ƒmaxSuiteSetup { ƒmaxSuiteSetup = ƒscfg.SetupTimeout }
+        }
+{{ end }}
+{{ end }}
+{{ end }}
+        if ƒbudgetFile := os.Getenv("GOTEST_TEARDOWN_BUDGET_FILE"); ƒbudgetFile != "" {
+            os.WriteFile(ƒbudgetFile, []byte((ƒmaxTreePath + ƒmaxSuiteSetup + 30*time.Second).String()), 0644)
+        }
+    }
 
     ƒcode = m.Run()
     return

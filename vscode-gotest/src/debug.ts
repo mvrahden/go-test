@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { spawn, type ChildProcess } from "node:child_process";
 import type { PrepareOutput } from "./types.js";
 import { buildCliCommand, formatCliCommand, scopedConfig } from "./cli.js";
+import { killProcessTree } from "./runnerUtils.js";
 
 export class DebugLauncher implements vscode.Disposable {
   private readonly prepareProcesses = new Map<string, ChildProcess>();
@@ -130,7 +131,7 @@ export class DebugLauncher implements vscode.Disposable {
     token: vscode.CancellationToken,
   ): Promise<{ output: PrepareOutput; child: ChildProcess }> {
     return new Promise((resolve, reject) => {
-      const child = spawn(bin, args, { cwd });
+      const child = spawn(bin, args, { cwd, detached: true });
       let stdout = "";
       let settled = false;
       const settle = (fn: () => void) => {
@@ -144,14 +145,14 @@ export class DebugLauncher implements vscode.Disposable {
 
       const timer = setTimeout(() => {
         settle(() => {
-          child.kill("SIGTERM");
+          killProcessTree(child, "SIGTERM");
           reject(new Error(`timed out after ${timeoutSeconds}s`));
         });
       }, timeoutSeconds * 1000);
 
       const cancelListener = token.onCancellationRequested(() => {
         settle(() => {
-          child.kill("SIGTERM");
+          killProcessTree(child, "SIGTERM");
           reject(new Error("cancelled"));
         });
       });
@@ -164,7 +165,7 @@ export class DebugLauncher implements vscode.Disposable {
               const output = JSON.parse(stdout.split("\n")[0]) as PrepareOutput;
               resolve({ output, child });
             } catch {
-              child.kill("SIGTERM");
+              killProcessTree(child, "SIGTERM");
               reject(
                 new Error(`Failed to parse prepare output: ${stdout.trim()}`),
               );
@@ -195,7 +196,7 @@ export class DebugLauncher implements vscode.Disposable {
     const child = this.prepareProcesses.get(sessionName);
     if (child) {
       this.prepareProcesses.delete(sessionName);
-      child.kill("SIGTERM");
+      killProcessTree(child, "SIGTERM");
     }
   }
 }

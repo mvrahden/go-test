@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -23,6 +24,7 @@ type SuiteTarget struct {
 	RunFilter    string   // raw -test.run value (overrides SuiteName if set)
 	RunFlags     []string // test binary flags (with -test. prefix)
 	CoverProfile string   // per-suite cover profile path (empty if no -coverprofile)
+	BudgetFile   string   // sidecar path for teardown budget (empty = use default)
 }
 
 // SuiteResult holds the output from running a single suite subprocess.
@@ -147,7 +149,11 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 		wg.Add(1)
 		go func(idx int, t SuiteTarget) {
 			defer wg.Done()
-			sem <- struct{}{}
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
 			defer func() { <-sem }()
 			r := RunSingleSuite(ctx, t, env, useTest2JSON)
 
@@ -208,18 +214,32 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 		args = append(args, testArgs...)
 		cmd := exec.CommandContext(ctx, "go", args...)
 		cmd.Env = env
+		if target.BudgetFile != "" {
+			cmd.Env = append(cmd.Env, "GOTEST_TEARDOWN_BUDGET_FILE="+target.BudgetFile)
+		}
 		cmd.Dir = target.Dir
+		SetProcessGroup(cmd)
+		cmd.WaitDelay = 0
 		return cmd
 	}
 
 	cmd := exec.CommandContext(ctx, target.BinaryPath, testArgs...)
 	cmd.Env = env
+	if target.BudgetFile != "" {
+		cmd.Env = append(cmd.Env, "GOTEST_TEARDOWN_BUDGET_FILE="+target.BudgetFile)
+	}
 	cmd.Dir = target.Dir
+	SetProcessGroup(cmd)
+	cmd.WaitDelay = 0
 	return cmd
 }
 
 // RunSingleSuite executes a single suite subprocess.
 // When test2json is true, the binary is wrapped with `go tool test2json`.
+//
+// On context cancellation, cmd.Cancel sends SIGTERM to the process group.
+// A per-process kill timer (from the teardown budget file) then governs
+// when SIGKILL is sent, rather than Go's built-in WaitDelay.
 func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult {
 	cmd := buildSuiteCmd(ctx, target, env, test2json)
 	var stdout, stderr bytes.Buffer
@@ -227,7 +247,27 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 	cmd.Stderr = &stderr
 
 	start := time.Now()
-	err := cmd.Run()
+
+	if err := cmd.Start(); err != nil {
+		return SuiteResult{Target: target, ExitCode: 2, Duration: time.Since(start)}
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+
+	var err error
+	select {
+	case err = <-done:
+	case <-ctx.Done():
+		budget := readTeardownBudget(target.BudgetFile)
+		select {
+		case err = <-done:
+		case <-time.After(budget):
+			syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			err = <-done
+		}
+	}
+
 	duration := time.Since(start)
 
 	exitCode := 0
@@ -246,6 +286,21 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		ExitCode: exitCode,
 		Duration: duration,
 	}
+}
+
+func readTeardownBudget(path string) time.Duration {
+	if path == "" {
+		return GracefulShutdownDelay
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return GracefulShutdownDelay
+	}
+	d, err := time.ParseDuration(strings.TrimSpace(string(data)))
+	if err != nil || d <= 0 {
+		return GracefulShutdownDelay
+	}
+	return d
 }
 
 func StripTrailingStatus(data []byte) []byte {

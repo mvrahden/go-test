@@ -41,7 +41,11 @@ func CompilePackages(ctx context.Context, packages []string, overlayFlag string,
 		wg.Add(1)
 		go func(idx int, pkgPath string) {
 			defer wg.Done()
-			sem <- struct{}{}
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
 			defer func() { <-sem }()
 
 			binaryName := sanitizePkgName(pkgPath) + ".test"
@@ -53,6 +57,8 @@ func CompilePackages(ctx context.Context, packages []string, overlayFlag string,
 
 			cmd := exec.CommandContext(ctx, "go", args...)
 			cmd.Stderr = os.Stderr
+			SetProcessGroup(cmd)
+			cmd.WaitDelay = BuildShutdownDelay
 
 			if err := cmd.Run(); err != nil {
 				results[idx] = result{err: fmt.Errorf("compile %s: %w", pkgPath, err)}
@@ -97,7 +103,11 @@ func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag s
 			wg.Add(1)
 			go func(pkgPath string) {
 				defer wg.Done()
-				sem <- struct{}{}
+				select {
+				case sem <- struct{}{}:
+				case <-ctx.Done():
+					return
+				}
 				defer func() { <-sem }()
 
 				binaryName := sanitizePkgName(pkgPath) + ".test"
@@ -109,6 +119,8 @@ func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag s
 
 				cmd := exec.CommandContext(ctx, "go", args...)
 				cmd.Stderr = os.Stderr
+				SetProcessGroup(cmd)
+				cmd.WaitDelay = BuildShutdownDelay
 
 				if err := cmd.Run(); err != nil {
 					fmt.Fprintf(os.Stderr, "compile %s: %s\n", pkgPath, err)

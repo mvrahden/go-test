@@ -1,8 +1,23 @@
 import * as vscode from "vscode";
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import { extractTestMessages, type TestEvent } from "./outputParser.js";
+
+export function killProcessTree(
+  child: ChildProcess,
+  signal: NodeJS.Signals = "SIGTERM",
+): void {
+  if (child.pid) {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch {
+      // process group already exited
+    }
+  }
+  child.kill(signal);
+}
 
 export function enqueueDescendants(
   run: vscode.TestRun,
@@ -269,10 +284,12 @@ export function spawnTestProcess(
     const child = spawn(bin, args, {
       cwd,
       env: env ? { ...process.env, ...env } : undefined,
+      detached: true,
     });
     let stdout = "";
     let stderr = "";
     let lineBuffer = "";
+    let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
 
     child.stdout.on("data", (data: Buffer) => {
       const chunk = data.toString();
@@ -296,10 +313,24 @@ export function spawnTestProcess(
     });
 
     const cancelListener = token.onCancellationRequested(() => {
-      child.kill("SIGTERM");
+      outputChannel.info(
+        `[${label}] cancellation requested, sending SIGTERM (pid ${child.pid})`,
+      );
+      killProcessTree(child, "SIGTERM");
+      const killTimeout =
+        vscode.workspace
+          .getConfiguration("gotest")
+          .get<number>("forceKillTimeout", 600) * 1000;
+      forceKillTimer = setTimeout(() => {
+        outputChannel.warn(
+          `[${label}] process did not exit after SIGTERM, sending SIGKILL`,
+        );
+        killProcessTree(child, "SIGKILL");
+      }, killTimeout);
     });
 
     child.on("close", (code) => {
+      if (forceKillTimer) clearTimeout(forceKillTimer);
       cancelListener.dispose();
       if (onStdoutLine) {
         const remaining = lineBuffer.trim();
@@ -318,6 +349,7 @@ export function spawnTestProcess(
     });
 
     child.on("error", (err: Error) => {
+      if (forceKillTimer) clearTimeout(forceKillTimer);
       cancelListener.dispose();
       outputChannel.error(`[${label}] ${err.message}`);
       reject(err);
@@ -397,7 +429,7 @@ export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
 export function computeWildcard(
   importPaths: string[],
   modulePath?: string,
-): string | undefined {
+): string[] | undefined {
   if (importPaths.length <= 1) return undefined;
 
   const split = importPaths.map((p) => p.split("/"));
@@ -414,9 +446,35 @@ export function computeWildcard(
 
   const prefix = first.slice(0, prefixLen).join("/");
   if (importPaths.every((p) => p === prefix)) return undefined;
-  if (modulePath && prefix === modulePath) return undefined;
+  if (!modulePath || prefix !== modulePath) return [prefix + "/..."];
 
-  return prefix + "/...";
+  const groups = new Map<string, string[]>();
+  const ungrouped: string[] = [];
+  for (const p of importPaths) {
+    if (p === modulePath) {
+      ungrouped.push(p);
+      continue;
+    }
+    const rest = p.slice(modulePath.length + 1);
+    const seg = rest.split("/")[0];
+    let group = groups.get(seg);
+    if (!group) {
+      group = [];
+      groups.set(seg, group);
+    }
+    group.push(p);
+  }
+
+  const result: string[] = [...ungrouped];
+  for (const [seg, paths] of groups) {
+    if (paths.length === 1) {
+      result.push(paths[0]);
+    } else {
+      result.push(modulePath + "/" + seg + "/...");
+    }
+  }
+
+  return result.length < importPaths.length ? result : undefined;
 }
 
 export function getPackageDir(

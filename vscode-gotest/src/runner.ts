@@ -50,9 +50,13 @@ export class TestRunner {
     }
     const cts = new vscode.CancellationTokenSource();
     this.activeRun = cts;
-    const cancelSub = token.onCancellationRequested(() => cts.cancel());
+    const cancelSub = token.onCancellationRequested(() => {
+      this.outputChannel.info("[runner] stop requested");
+      cts.cancel();
+    });
     const effectiveToken = cts.token;
 
+    this.outputChannel.info("[runner] run started");
     const run = this.controller.createTestRun(request, "Go Test Run");
     this._lastJsonOutput = "";
     let anyCoverOnRun = false;
@@ -202,8 +206,13 @@ export class TestRunner {
       }
       this.controller.saveResults();
     } finally {
+      const wasCancelled = effectiveToken.isCancellationRequested;
       if (recordId !== undefined && this.activeRecordId === recordId) {
-        this.registry.complete(recordId);
+        if (wasCancelled) {
+          this.registry.cancel(recordId);
+        } else {
+          this.registry.complete(recordId);
+        }
         this.activeRecordId = undefined;
       }
       resolveRun();
@@ -216,6 +225,9 @@ export class TestRunner {
         this._onDidComplete.fire(this._lastJsonOutput);
       }
       run.end();
+      this.outputChannel.info(
+        `[runner] run ${wasCancelled ? "cancelled" : "completed"}`,
+      );
     }
   }
 

@@ -608,8 +608,8 @@ describe("computeWildcard", () => {
   });
 
   it("returns wildcard for two paths with common prefix", () => {
-    expect(computeWildcard(["example.com/pkg/a", "example.com/pkg/b"])).toBe(
-      "example.com/pkg/...",
+    expect(computeWildcard(["example.com/pkg/a", "example.com/pkg/b"])).toEqual(
+      ["example.com/pkg/..."],
     );
   });
 
@@ -620,19 +620,19 @@ describe("computeWildcard", () => {
         "example.com/pkg/platform/cluster",
         "example.com/pkg/platform/auth",
       ]),
-    ).toBe("example.com/pkg/platform/...");
+    ).toEqual(["example.com/pkg/platform/..."]);
   });
 
   it("stops at segment boundary", () => {
     expect(
       computeWildcard(["example.com/foo/bar", "example.com/foo/baz"]),
-    ).toBe("example.com/foo/...");
+    ).toEqual(["example.com/foo/..."]);
   });
 
   it("handles divergence at top level", () => {
     expect(
       computeWildcard(["example.com/pkg/a", "example.com/internal/b"]),
-    ).toBe("example.com/...");
+    ).toEqual(["example.com/..."]);
   });
 
   it("returns undefined when all paths are identical", () => {
@@ -641,7 +641,16 @@ describe("computeWildcard", () => {
     ).toBeUndefined();
   });
 
-  it("returns undefined when wildcard would equal modulePath/...", () => {
+  it("groups by sub-directory when prefix equals module root", () => {
+    expect(
+      computeWildcard(
+        ["example.com/pkg/a", "example.com/pkg/b", "example.com/internal/c"],
+        "example.com",
+      ),
+    ).toEqual(["example.com/pkg/...", "example.com/internal/c"]);
+  });
+
+  it("returns undefined when sub-grouping does not reduce count", () => {
     expect(
       computeWildcard(
         ["example.com/pkg/a", "example.com/internal/b"],
@@ -650,13 +659,27 @@ describe("computeWildcard", () => {
     ).toBeUndefined();
   });
 
+  it("includes module-root package alongside sub-directory wildcards", () => {
+    expect(
+      computeWildcard(
+        [
+          "example.com",
+          "example.com/pkg/a",
+          "example.com/pkg/b",
+          "example.com/internal/c",
+        ],
+        "example.com",
+      ),
+    ).toEqual(["example.com", "example.com/pkg/...", "example.com/internal/c"]);
+  });
+
   it("allows wildcard deeper than module root", () => {
     expect(
       computeWildcard(
         ["example.com/pkg/a", "example.com/pkg/b"],
         "example.com",
       ),
-    ).toBe("example.com/pkg/...");
+    ).toEqual(["example.com/pkg/..."]);
   });
 });
 

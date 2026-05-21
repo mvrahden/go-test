@@ -571,10 +571,10 @@ func (s *CFGTestSuite) TestOne(t *gotest.T) {}
 	output, _ := renderTestPkg(t, pkg)
 
 	gotest.Contains(t, output, "gotest.DefaultFixtureConfig()")
-	gotest.Contains(t, output, "gotest.OverlayFixtureConfig(&ƒcfg, ƒ_CFGFixture.FixtureConfig())")
-	gotest.Contains(t, output, "ƒattempts := 1 + ƒcfg.Retries")
+	gotest.Contains(t, output, "gotest.OverlayFixtureConfig(&ƒcfg_CFGFixture, ƒ_CFGFixture.FixtureConfig())")
+	gotest.Contains(t, output, "ƒattempts := 1 + ƒcfg_CFGFixture.Retries")
 	gotest.Contains(t, output, "ƒ_CFGFixture.BeforeAll(ctx)")
-	gotest.Contains(t, output, "context.WithTimeout(ctx, ƒcfg.Timeout)")
+	gotest.Contains(t, output, "context.WithTimeout(ƒctx, ƒcfg_CFGFixture.Timeout)")
 }
 
 func TestRenderer_FixtureWithoutConfig_UsesDefault(t *testing.T) {
