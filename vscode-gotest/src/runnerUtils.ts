@@ -8,7 +8,7 @@ export function killProcessTree(
   child: ChildProcess,
   signal: NodeJS.Signals = "SIGTERM",
 ): void {
-  if (child.pid) {
+  if (child.pid && process.platform !== "win32") {
     try {
       process.kill(-child.pid, signal);
       return;

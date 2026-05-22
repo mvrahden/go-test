@@ -1,3 +1,5 @@
+import * as path from "node:path";
+
 export interface TestEvent {
   Time: string;
   Action: "run" | "pass" | "fail" | "skip" | "output" | "pause" | "cont";
@@ -74,9 +76,8 @@ export function extractTestMessages(
       const lineNum = parseInt(match[2], 10);
       const message = match[3];
 
-      // Prepend pkgDir to relative file paths
-      if (!file.startsWith("/")) {
-        file = `${pkgDir}/${file}`;
+      if (!path.isAbsolute(file)) {
+        file = path.join(pkgDir, file);
       }
 
       messages.push({ file, line: lineNum, message });

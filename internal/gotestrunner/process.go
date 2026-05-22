@@ -2,7 +2,6 @@ package gotestrunner
 
 import (
 	"os/exec"
-	"syscall"
 	"time"
 )
 
@@ -22,12 +21,12 @@ const (
 // to receive SIGTERM (then SIGKILL after GracefulShutdownDelay) when
 // its associated context is cancelled.
 func SetProcessGroup(cmd *exec.Cmd) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	setProcessGroupAttr(cmd)
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {
 			return nil
 		}
-		return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+		return TerminateProcessGroup(cmd.Process.Pid)
 	}
 	cmd.WaitDelay = GracefulShutdownDelay
 }

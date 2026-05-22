@@ -244,20 +244,11 @@ func toPascalCase(s string) string {
 }
 
 func determinePkgDir(pkg *packages.Package) string {
-	// Use the directory from GoFiles if available
 	if len(pkg.GoFiles) > 0 {
-		// GoFiles contains absolute paths; extract directory from first file
-		lastSlash := strings.LastIndex(pkg.GoFiles[0], "/")
-		if lastSlash >= 0 {
-			return pkg.GoFiles[0][:lastSlash]
-		}
+		return filepath.Dir(pkg.GoFiles[0])
 	}
-	// Fallback: try CompiledGoFiles
 	if len(pkg.CompiledGoFiles) > 0 {
-		lastSlash := strings.LastIndex(pkg.CompiledGoFiles[0], "/")
-		if lastSlash >= 0 {
-			return pkg.CompiledGoFiles[0][:lastSlash]
-		}
+		return filepath.Dir(pkg.CompiledGoFiles[0])
 	}
 	return ""
 }
