@@ -22,7 +22,6 @@ func TestE2E_CLI(t *testing.T) {
 	}
 	for _, tC := range testcases {
 		t.Run(tC.desc, func(t *testing.T) {
-			ttt := gotest.NewT(t)
 			cwd, err := os.Getwd()
 			gotest.NoError(t, err)
 
@@ -34,9 +33,9 @@ func TestE2E_CLI(t *testing.T) {
 			gotest.True(t, strings.HasSuffix(results[0].AbsPath, "go-test/internal/gotestgen/testdata_e2e/"+tC.dirName))
 			gotest.Equal(t, "github.com/mvrahden/go-test/internal/gotestgen/testdata_e2e/"+tC.dirName, results[0].PkgPath)
 
-			ttt.MatchSnapshot(string(results[0].PTest), tC.dirName+"-ptest")
+			gotest.MatchSnapshot(t, string(results[0].PTest), tC.dirName+"-ptest")
 			if tC.hasPX {
-				ttt.MatchSnapshot(string(results[0].PXTest), tC.dirName+"-pxtest")
+				gotest.MatchSnapshot(t, string(results[0].PXTest), tC.dirName+"-pxtest")
 			}
 		})
 	}

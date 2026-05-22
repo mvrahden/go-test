@@ -4,11 +4,8 @@ import (
 	"context"
 	"fmt"
 	"iter"
-	"os"
-	"path/filepath"
 	"reflect"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -206,67 +203,5 @@ func (t *T) Consistently(waitFor, tick time.Duration, fn func(poll *T)) {
 
 func (t *T) MatchSnapshot(value any, name ...string) {
 	t.t.Helper()
-
-	content := fmt.Sprintf("%v", value)
-	testName := t.t.Name()
-
-	// Determine snapshot file path
-	snapName := sanitizeFilename(testName)
-	if len(name) > 0 && name[0] != "" {
-		snapName += "_" + sanitizeFilename(name[0])
-	}
-	snapDir := filepath.Join("testdata", "__snapshots__")
-	snapPath := filepath.Join(snapDir, snapName+".snap")
-
-	// Check if update mode
-	if os.Getenv("GOTEST_UPDATE_SNAPSHOTS") != "" {
-		if err := os.MkdirAll(snapDir, 0755); err != nil {
-			t.t.Fatalf("MatchSnapshot: failed to create snapshot dir: %v", err)
-			return
-		}
-		if err := os.WriteFile(snapPath, []byte(content), 0644); err != nil {
-			t.t.Fatalf("MatchSnapshot: failed to write snapshot: %v", err)
-			return
-		}
-		t.t.Logf("updated snapshot: %s", snapPath)
-		return
-	}
-
-	// Read existing snapshot
-	existing, err := os.ReadFile(snapPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// First run: create snapshot
-			if err := os.MkdirAll(snapDir, 0755); err != nil {
-				t.t.Fatalf("MatchSnapshot: failed to create snapshot dir: %v", err)
-				return
-			}
-			if err := os.WriteFile(snapPath, []byte(content), 0644); err != nil {
-				t.t.Fatalf("MatchSnapshot: failed to write snapshot: %v", err)
-				return
-			}
-			t.t.Logf("created snapshot: %s", snapPath)
-			return
-		}
-		t.t.Fatalf("MatchSnapshot: failed to read snapshot: %v", err)
-		return
-	}
-
-	// Compare
-	want := string(existing)
-	if content != want {
-		d := assert.Diff(want, content)
-		if d != "" {
-			t.t.Fatalf("MatchSnapshot: snapshot mismatch (%s):\n  diff:\n%s\nRun with GOTEST_UPDATE_SNAPSHOTS=1 to update", snapPath, d)
-		} else {
-			t.t.Fatalf("MatchSnapshot: snapshot mismatch (%s):\n  expected: %s\n  actual:   %s\nRun with GOTEST_UPDATE_SNAPSHOTS=1 to update", snapPath, want, content)
-		}
-	}
-}
-
-func sanitizeFilename(s string) string {
-	s = strings.ReplaceAll(s, "/", "_")
-	s = strings.ReplaceAll(s, " ", "_")
-	s = strings.ReplaceAll(s, ":", "_")
-	return s
+	matchSnapshot(t.t, 2, value, name...)
 }

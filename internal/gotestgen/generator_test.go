@@ -35,7 +35,6 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 		pkg := path.Join("..", "..", "examples", tC.directory)
 
 		t.Run(fmt.Sprintf("Generate for package %q with %s", tC.directory, tC.description), func(t *testing.T) {
-			ttt := gotest.NewT(t)
 			loaded, err := LoadPackages([]string{pkg}, nil)
 			gotest.NoError(t, err)
 			res, _, err := GenerateFromLoaded(loaded)
@@ -46,8 +45,8 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 				gotest.NotEqual(t, tC.pkgName, v.AbsPath)
 				gotest.NotZero(t, v.AbsPath)
 				gotest.True(t, filepath.IsAbs(v.AbsPath))
-				ttt.MatchSnapshot(string(v.PTest), tC.directory+"-ptest")
-				ttt.MatchSnapshot(string(v.PXTest), tC.directory+"-pxtest")
+				gotest.MatchSnapshot(t, string(v.PTest), tC.directory+"-ptest")
+				gotest.MatchSnapshot(t, string(v.PXTest), tC.directory+"-pxtest")
 			}
 		})
 	}
