@@ -26,7 +26,7 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 	})
 
 	t.When("snapshot already exists", func(w *gotest.T) {
-		w.It("matches without error", func(it *gotest.T) {
+		w.It("matches multiple snapshots with dedup suffixes", func(it *gotest.T) {
 			it.MatchSnapshot("stable value")
 			it.MatchSnapshot("stable value")
 		})
