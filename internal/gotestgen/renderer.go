@@ -76,7 +76,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	}
 
 	if len(fixtureBound) > 0 {
-		if err := r.renderFixtures(buf, fixtureBound, viewModels); err != nil {
+		if err := r.renderFixtures(buf, pkg, fixtureBound, viewModels); err != nil {
 			return nil, fmt.Errorf("failed rendering fixture suites. err: %w", err)
 		}
 	}
@@ -109,6 +109,7 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	if hasFixtures {
 		imports = append(imports, headerImport{Path: "fmt"})
 		imports = append(imports, headerImport{Path: "time"})
+		imports = append(imports, headerImport{Name: "_", Path: "unsafe"})
 	}
 	if hasFixtures || slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
 		return v.IsMethodParallel()
@@ -177,7 +178,7 @@ func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSh
 	})
 }
 
-func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, viewModels []*FixtureViewModel) error {
+func (r *renderer) renderFixtures(buf *bytes.Buffer, pkg *packages.Package, fixtureBound []*gotestast.TestSuiteSpec, viewModels []*FixtureViewModel) error {
 	if len(viewModels) == 0 {
 		return nil
 	}
@@ -185,7 +186,17 @@ func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.T
 	return gotestTpl.ExecuteTemplate(buf, "gotest.fixture.tpl", map[string]any{
 		"RootFixtures":       viewModels,
 		"FixtureBoundSuites": fixtureBound,
+		"CoverVarName":       detectCoverVarName(pkg),
 	})
+}
+
+func detectCoverVarName(pkg *packages.Package) string {
+	if tp := pkg.Imports["testing"]; tp != nil && tp.Types != nil {
+		if tp.Types.Scope().Lookup("cover2") != nil {
+			return "cover2"
+		}
+	}
+	return "cover"
 }
 
 func (renderer) formatOutput(buf *bytes.Buffer) ([]byte, error) {

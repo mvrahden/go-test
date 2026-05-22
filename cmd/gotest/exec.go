@@ -154,6 +154,7 @@ type parsedFlags struct {
 
 func parseExecFlags(goTestArgs []string) parsedFlags {
 	classified := gotestrunner.ClassifyGoTestArgs(goTestArgs)
+	classified.BuildFlags = gotestrunner.InjectChecklinkname(classified.BuildFlags)
 	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
 	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
 	userCoverProfile := gotestrunner.ExtractCoverProfile(runFlags)

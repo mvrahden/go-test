@@ -7,7 +7,7 @@ import (
 )
 
 func StdlibRunTests(ctx context.Context, args []string, extraEnv ...map[string]string) (int, error) {
-	cmd := exec.CommandContext(ctx, "go", append([]string{"test"}, args...)...)
+	cmd := exec.CommandContext(ctx, "go", append([]string{"test", "-ldflags=-checklinkname=0"}, args...)...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	SetProcessGroup(cmd)

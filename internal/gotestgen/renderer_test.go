@@ -31,31 +31,7 @@ func renderTestPkg(t *testing.T, pkg *packages.Package) (string, SpecOutcome) {
 
 func TestRenderer_FixtureWithChildSuite(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type DBFixture struct {
-	Conn string
-}
-
-func (f *DBFixture) BeforeAll(ctx context.Context) error  { return nil }
-func (f *DBFixture) AfterAll(ctx context.Context) error   { return nil }
-
-type QueryTestSuite struct {
-	*DBFixture
-}
-
-func (s *QueryTestSuite) BeforeEach(t *gotest.T) {}
-func (s *QueryTestSuite) AfterEach(t *gotest.T)  {}
-func (s *QueryTestSuite) TestInsert(t *gotest.T) {}
-func (s *QueryTestSuite) TestSelect(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 	gotest.True(t, len(output) > 0, "expected non-empty output")
 
@@ -87,25 +63,7 @@ func (s *QueryTestSuite) TestSelect(t *gotest.T) {}
 
 func TestRenderer_FixtureWithoutAfterAll(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type SimpleFixture struct {}
-
-func (f *SimpleFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type BasicTestSuite struct {
-	*SimpleFixture
-}
-
-func (s *BasicTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	// AfterAll should NOT be in the cleanup since the fixture has no AfterAll
@@ -115,29 +73,7 @@ func (s *BasicTestSuite) TestOne(t *gotest.T) {}
 
 func TestRenderer_MixedFixtureBoundAndStandalone(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type AppFixture struct {}
-
-func (f *AppFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type BoundTestSuite struct {
-	*AppFixture
-}
-
-func (s *BoundTestSuite) TestBound(t *gotest.T) {}
-
-type StandaloneTestSuite struct {}
-
-func (s *StandaloneTestSuite) TestFree(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	// Should have both fixture-bound and standalone
@@ -149,32 +85,7 @@ func (s *StandaloneTestSuite) TestFree(t *gotest.T) {}
 
 func TestRenderer_FixtureWithBeforeAfterEach(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type EachFixture struct {}
-
-func (f *EachFixture) BeforeAll(ctx context.Context) error  { return nil }
-func (f *EachFixture) AfterAll(ctx context.Context) error   { return nil }
-func (f *EachFixture) BeforeEach(ctx context.Context) error { return nil }
-func (f *EachFixture) AfterEach(ctx context.Context) error  { return nil }
-
-type EachTestSuite struct {
-	*EachFixture
-}
-
-func (s *EachTestSuite) BeforeAll(t *gotest.T)  {}
-func (s *EachTestSuite) AfterAll(t *gotest.T)   {}
-func (s *EachTestSuite) BeforeEach(t *gotest.T) {}
-func (s *EachTestSuite) AfterEach(t *gotest.T)  {}
-func (s *EachTestSuite) TestCase(t *gotest.T)   {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 	gotest.True(t, len(output) > 0, "expected non-empty output")
 
@@ -202,25 +113,7 @@ func (s *EachTestSuite) TestCase(t *gotest.T)   {}
 
 func TestRenderer_FixtureWithoutBeforeAfterEach(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type MinimalFixture struct {}
-
-func (f *MinimalFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type MinimalTestSuite struct {
-	*MinimalFixture
-}
-
-func (s *MinimalTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	// Fixture without BeforeEach/AfterEach should NOT emit those calls
@@ -230,37 +123,7 @@ func (s *MinimalTestSuite) TestOne(t *gotest.T) {}
 
 func TestRenderer_NestedFixtureWithBeforeAfterEach(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type InfraFixture struct {}
-
-func (f *InfraFixture) BeforeAll(ctx context.Context) error  { return nil }
-func (f *InfraFixture) BeforeEach(ctx context.Context) error { return nil }
-func (f *InfraFixture) AfterEach(ctx context.Context) error  { return nil }
-
-type APIFixture struct {
-	*InfraFixture
-}
-
-func (f *APIFixture) BeforeAll(ctx context.Context) error  { return nil }
-func (f *APIFixture) BeforeEach(ctx context.Context) error { return nil }
-func (f *APIFixture) AfterEach(ctx context.Context) error  { return nil }
-
-type HandlerTestSuite struct {
-	*APIFixture
-}
-
-func (s *HandlerTestSuite) BeforeEach(t *gotest.T) {}
-func (s *HandlerTestSuite) AfterEach(t *gotest.T)  {}
-func (s *HandlerTestSuite) TestGet(t *gotest.T)    {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	// Nested fixture: parent (fixture) and child hooks should both appear with error handling
@@ -289,26 +152,7 @@ func (s *HandlerTestSuite) TestGet(t *gotest.T)    {}
 
 func TestBuildFixtureViewModels_RootFixtureOnly(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type MyFixture struct {}
-
-func (f *MyFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *MyFixture) AfterAll(ctx context.Context) error  { return nil }
-
-type MyTestSuite struct {
-	*MyFixture
-}
-
-func (s *MyTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -333,18 +177,7 @@ func (s *MyTestSuite) TestOne(t *gotest.T) {}
 
 func TestRenderer_StdlibT_StandaloneSuite(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "testing"
-
-type PlainTestSuite struct{}
-
-func (s *PlainTestSuite) BeforeEach(t *testing.T) {}
-func (s *PlainTestSuite) AfterEach(t *testing.T)  {}
-func (s *PlainTestSuite) TestFoo(t *testing.T)    {}
-func (s *PlainTestSuite) TestBar(t *testing.T)    {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	// Wrapper lifecycle methods should unwrap via .T()
@@ -358,21 +191,7 @@ func (s *PlainTestSuite) TestBar(t *testing.T)    {}
 
 func TestRenderer_StdlibT_MixedSuite(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"testing"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type MixedTestSuite struct{}
-
-func (s *MixedTestSuite) BeforeEach(t *testing.T) {}
-func (s *MixedTestSuite) TestStdlib(t *testing.T)  {}
-func (s *MixedTestSuite) TestGotest(t *gotest.T)   {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	// BeforeEach uses *testing.T → unwrap
@@ -388,26 +207,7 @@ func (s *MixedTestSuite) TestGotest(t *gotest.T)   {}
 
 func TestRenderer_StdlibT_FixtureBoundSuite(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"testing"
-)
-
-type DBFixture struct{}
-
-func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type StdlibTestSuite struct {
-	*DBFixture
-}
-
-func (s *StdlibTestSuite) BeforeAll(t *testing.T)  {}
-func (s *StdlibTestSuite) AfterEach(t *testing.T)  {}
-func (s *StdlibTestSuite) TestQuery(t *testing.T)  {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	// Wrapper lifecycle should unwrap
@@ -420,27 +220,7 @@ func (s *StdlibTestSuite) TestQuery(t *testing.T)  {}
 
 func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
 	t.Parallel()
-	src := "package testpkg\n\n" +
-		"import (\n" +
-		"\t\"context\"\n\n" +
-		"\t\"github.com/mvrahden/go-test/pkg/gotest\"\n" +
-		")\n\n" +
-		"type PostgresSharedFixture struct {\n" +
-		"\tDSN string\n" +
-		"}\n\n" +
-		"func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
-		"type E2EFixture struct {\n" +
-		"\t*PostgresSharedFixture\n" +
-		"\tPool string\n" +
-		"}\n\n" +
-		"func (f *E2EFixture) BeforeAll(ctx context.Context) error { return nil }\n" +
-		"func (f *E2EFixture) AfterAll(ctx context.Context) error  { return nil }\n\n" +
-		"type QueryTestSuite struct {\n" +
-		"\t*E2EFixture\n" +
-		"}\n\n" +
-		"func (s *QueryTestSuite) TestInsert(t *gotest.T) {}\n"
-
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 	gotest.True(t, len(output) > 0, "expected non-empty output")
 
@@ -471,23 +251,7 @@ func TestRenderer_SharedFixtureEmbedding(t *testing.T) {
 
 func TestRenderer_SharedFixtureEmptyStruct(t *testing.T) {
 	t.Parallel()
-	src := "package testpkg\n\n" +
-		"import (\n" +
-		"\t\"context\"\n\n" +
-		"\t\"github.com/mvrahden/go-test/pkg/gotest\"\n" +
-		")\n\n" +
-		"type SetupSharedFixture struct{}\n\n" +
-		"func (f *SetupSharedFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
-		"type AppFixture struct {\n" +
-		"\t*SetupSharedFixture\n" +
-		"}\n\n" +
-		"func (f *AppFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
-		"type AppTestSuite struct {\n" +
-		"\t*AppFixture\n" +
-		"}\n\n" +
-		"func (s *AppTestSuite) TestRun(t *gotest.T) {}\n"
-
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	// Shared fixture should be created and assigned via JSON state
@@ -498,26 +262,7 @@ func TestRenderer_SharedFixtureEmptyStruct(t *testing.T) {
 
 func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
 	t.Parallel()
-	src := "package testpkg\n\n" +
-		"import (\n" +
-		"\t\"context\"\n\n" +
-		"\t\"github.com/mvrahden/go-test/pkg/gotest\"\n" +
-		")\n\n" +
-		"type PGSharedFixture struct {\n" +
-		"\tDSN  string\n" +
-		"\tHost string\n" +
-		"}\n\n" +
-		"func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
-		"type DBFixture struct {\n" +
-		"\t*PGSharedFixture\n" +
-		"}\n\n" +
-		"func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
-		"type DBTestSuite struct {\n" +
-		"\t*DBFixture\n" +
-		"}\n\n" +
-		"func (s *DBTestSuite) TestQuery(t *gotest.T) {}\n"
-
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -540,34 +285,12 @@ func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
 	gotest.Equal(t, "PGSharedFixture", sf.QualifiedType)
 	gotest.Equal(t, "PGSharedFixture", sf.FieldName)
 	gotest.Equal(t, "", sf.PkgPath, "same-package shared fixture should have empty PkgPath")
-	gotest.Equal(t, "testpkg.PGSharedFixture", sf.StateKey)
+	gotest.Equal(t, pkg.PkgPath+".PGSharedFixture", sf.StateKey)
 }
 
 func TestRenderer_FixtureWithConfig(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type CFGFixture struct{}
-
-func (f *CFGFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *CFGFixture) AfterAll(ctx context.Context) error  { return nil }
-func (f *CFGFixture) FixtureConfig() gotest.FixtureConfig {
-	return gotest.ContainerFixtureConfig()
-}
-
-type CFGTestSuite struct {
-	*CFGFixture
-}
-
-func (s *CFGTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	gotest.Contains(t, output, "gotest.DefaultFixtureConfig()")
@@ -579,25 +302,7 @@ func (s *CFGTestSuite) TestOne(t *gotest.T) {}
 
 func TestRenderer_FixtureWithoutConfig_UsesDefault(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type PlainFixture struct{}
-
-func (f *PlainFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type PlainTestSuite struct {
-	*PlainFixture
-}
-
-func (s *PlainTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	gotest.Contains(t, output, "gotest.DefaultFixtureConfig()")
@@ -606,18 +311,7 @@ func (s *PlainTestSuite) TestOne(t *gotest.T) {}
 
 func TestRenderer_SuiteWithConfig(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type ConfiguredTestSuite struct{}
-
-func (s *ConfiguredTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Timeout: 10_000_000_000, FailFast: true}
-}
-func (s *ConfiguredTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	gotest.Contains(t, output, "gotest.DefaultSuiteConfig()")
@@ -628,15 +322,7 @@ func (s *ConfiguredTestSuite) TestOne(t *gotest.T) {}
 
 func TestRenderer_SuiteWithoutConfig_UsesDefault(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type PlainTestSuite struct{}
-
-func (s *PlainTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	gotest.Contains(t, output, "gotest.DefaultSuiteConfig()")
@@ -645,20 +331,7 @@ func (s *PlainTestSuite) TestOne(t *gotest.T) {}
 
 func TestRenderer_NamedField_SuiteToFixture(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type DBFixture struct{ Conn string }
-func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type QueryTestSuite struct { db *DBFixture }
-func (s *QueryTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	gotest.Contains(t, output, "db: ƒ_DBFixture", "suite struct literal should use named field")
@@ -667,26 +340,7 @@ func (s *QueryTestSuite) TestOne(t *gotest.T) {}
 
 func TestRenderer_NamedField_ChildToParentFixture(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type InfraFixture struct{ Val string }
-func (f *InfraFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type APIFixture struct { infra *InfraFixture }
-func (f *APIFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type LightTestSuite struct { *InfraFixture }
-func (s *LightTestSuite) TestOne(t *gotest.T) {}
-
-type FullTestSuite struct { *APIFixture }
-func (s *FullTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	gotest.Contains(t, output, "infra: ƒ_InfraFixture", "child fixture struct literal should use named parent field")
@@ -694,24 +348,7 @@ func (s *FullTestSuite) TestOne(t *gotest.T) {}
 
 func TestRenderer_NamedField_SharedFixtureInFixture(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type PGSharedFixture struct{ ConnStr string }
-func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *PGSharedFixture) AfterAll(ctx context.Context) error  { return nil }
-
-type AppFixture struct { pg *PGSharedFixture }
-func (f *AppFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type UserTestSuite struct { *AppFixture }
-func (s *UserTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	gotest.Contains(t, output, "ƒ_AppFixture.pg = sf0", "shared fixture injection should use named field")
@@ -720,23 +357,7 @@ func (s *UserTestSuite) TestOne(t *gotest.T) {}
 
 func TestRenderer_MixedFieldStyles_SameFixture(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type DBFixture struct{ Conn string }
-func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type EmbeddedTestSuite struct { *DBFixture }
-func (s *EmbeddedTestSuite) TestOne(t *gotest.T) {}
-
-type NamedTestSuite struct { db *DBFixture }
-func (s *NamedTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	gotest.Contains(t, output, "DBFixture: ƒ_DBFixture", "embedded suite should use type name")
@@ -745,17 +366,7 @@ func (s *NamedTestSuite) TestOne(t *gotest.T) {}
 
 func TestRenderer_VoidBeforeEach_Sequential(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type OrderTestSuite struct{}
-
-func (s *OrderTestSuite) BeforeEach(t *gotest.T) {}
-func (s *OrderTestSuite) AfterEach(t *gotest.T)  {}
-func (s *OrderTestSuite) TestOne(t *gotest.T)    {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	gotest.True(t, !strings.Contains(output, "t.Parallel()"), "suite-level t.Parallel() should not be emitted — isolation is subprocess-level")
@@ -767,20 +378,7 @@ func (s *OrderTestSuite) TestOne(t *gotest.T)    {}
 
 func TestRenderer_ReturningBeforeEach_Sequential(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type myCtx struct{ val string }
-
-type OrderTestSuite struct{}
-
-func (s *OrderTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
-func (s *OrderTestSuite) AfterEach(t *gotest.T, ctx *myCtx) {}
-func (s *OrderTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
-func (s *OrderTestSuite) TestTwo(t *gotest.T, _ *myCtx)   {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	gotest.True(t, !strings.Contains(output, "t.Parallel()"), "suite-level t.Parallel() should not be emitted")
@@ -794,22 +392,7 @@ func (s *OrderTestSuite) TestTwo(t *gotest.T, _ *myCtx)   {}
 
 func TestRenderer_ReturningBeforeEach_Parallel(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type myCtx struct{ val string }
-
-type OrderTestSuite struct{}
-
-func (s *OrderTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
-}
-func (s *OrderTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
-func (s *OrderTestSuite) AfterEach(t *gotest.T, ctx *myCtx) {}
-func (s *OrderTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	stripped := strings.ReplaceAll(output, "it.Parallel()", "")
@@ -825,29 +408,7 @@ func (s *OrderTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
 
 func TestRenderer_FixtureBound_ReturningBeforeEach(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type DBFixture struct{ Conn string }
-
-func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type myCtx struct{ pool string }
-
-type QueryTestSuite struct {
-	*DBFixture
-}
-
-func (s *QueryTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
-func (s *QueryTestSuite) AfterEach(t *gotest.T, ctx *myCtx) {}
-func (s *QueryTestSuite) TestInsert(t *gotest.T, ctx *myCtx) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	output, _ := renderTestPkg(t, pkg)
 
 	gotest.True(t, !strings.Contains(output, "t.Parallel()"), "suite-level t.Parallel() should not be emitted")

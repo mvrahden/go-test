@@ -1,13 +1,15 @@
 package gotestgen //nolint:stdlib-test
 
 import (
+	"embed"
 	"fmt"
 	"go/token"
 	"go/types"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sync"
+	"strings"
 	"testing"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
@@ -15,76 +17,119 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-var sharedMod struct {
-	once  sync.Once
-	goMod []byte
-	goSum []byte
-	err   error
+//go:embed testdata/sources
+var testSources embed.FS
+
+var (
+	testPkgIndex map[string]*packages.Package
+	testPkgDir   string
+	testPkgErr   error
+)
+
+func TestMain(m *testing.M) {
+	testPkgIndex, testPkgDir, testPkgErr = loadAllTestPkgs()
+	code := m.Run()
+	if testPkgDir != "" {
+		os.RemoveAll(testPkgDir)
+	}
+	os.Exit(code)
 }
 
-func initSharedMod() {
+func loadAllTestPkgs() (map[string]*packages.Package, string, error) {
 	modRoot, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
-		sharedMod.err = err
-		return
+		return nil, "", err
 	}
 
-	dir, err := os.MkdirTemp("", "gotest-shared-mod-*")
+	scratch, err := os.MkdirTemp("", "gotest-mod-init-*")
 	if err != nil {
-		sharedMod.err = err
-		return
+		return nil, "", err
 	}
-	defer os.RemoveAll(dir)
+	defer os.RemoveAll(scratch)
 
 	goMod := []byte("module testpkg\n\ngo 1.24\n\nrequire github.com/mvrahden/go-test v0.0.0\n\nreplace github.com/mvrahden/go-test => " + modRoot + "\n")
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), goMod, 0644); err != nil {
-		sharedMod.err = err
-		return
+	if err := os.WriteFile(filepath.Join(scratch, "go.mod"), goMod, 0644); err != nil {
+		return nil, "", err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "stub.go"), []byte("package testpkg\n\nimport _ \"github.com/mvrahden/go-test/pkg/gotest\"\n"), 0644); err != nil {
-		sharedMod.err = err
-		return
+	if err := os.WriteFile(filepath.Join(scratch, "stub.go"), []byte("package testpkg\n\nimport _ \"github.com/mvrahden/go-test/pkg/gotest\"\n"), 0644); err != nil {
+		return nil, "", err
 	}
 
 	cmd := exec.Command("go", "mod", "tidy")
-	cmd.Dir = dir
+	cmd.Dir = scratch
 	cmd.Env = append(os.Environ(), "GOWORK=off")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		sharedMod.err = fmt.Errorf("go mod tidy: %w\n%s", err, out)
-		return
+		return nil, "", fmt.Errorf("go mod tidy: %w\n%s", err, out)
 	}
 
-	sharedMod.goMod, _ = os.ReadFile(filepath.Join(dir, "go.mod"))
-	sharedMod.goSum, _ = os.ReadFile(filepath.Join(dir, "go.sum"))
-}
-
-// loadTestPkgWithGotest loads a package that imports gotest.T using the full
-// packages.Load machinery. Module resolution is cached across tests.
-func loadTestPkgWithGotest(t *testing.T, src string) *packages.Package {
-	t.Helper()
-
-	sharedMod.once.Do(initSharedMod)
-	if sharedMod.err != nil {
-		t.Fatal(sharedMod.err)
+	dir, err := os.MkdirTemp("", "gotest-batch-root-*")
+	if err != nil {
+		return nil, "", err
 	}
 
-	dir := t.TempDir()
-	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "test.go"), []byte(src), 0644))
-	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), sharedMod.goMod, 0644))
-	if len(sharedMod.goSum) > 0 {
-		gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.sum"), sharedMod.goSum, 0644))
+	tidiedMod, _ := os.ReadFile(filepath.Join(scratch, "go.mod"))
+	tidiedSum, _ := os.ReadFile(filepath.Join(scratch, "go.sum"))
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), tidiedMod, 0644); err != nil {
+		return nil, dir, err
+	}
+	if len(tidiedSum) > 0 {
+		if err := os.WriteFile(filepath.Join(dir, "go.sum"), tidiedSum, 0644); err != nil {
+			return nil, dir, err
+		}
+	}
+
+	entries, err := fs.ReadDir(testSources, "testdata/sources")
+	if err != nil {
+		return nil, dir, err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		data, err := fs.ReadFile(testSources, "testdata/sources/"+name+"/test.go")
+		if err != nil {
+			return nil, dir, err
+		}
+		subDir := filepath.Join(dir, name)
+		if err := os.MkdirAll(subDir, 0755); err != nil {
+			return nil, dir, err
+		}
+		if err := os.WriteFile(filepath.Join(subDir, "test.go"), data, 0644); err != nil {
+			return nil, dir, err
+		}
 	}
 
 	pkgs, err := packages.Load(&packages.Config{
 		Mode: packageEvalMode,
 		Dir:  dir,
 		Env:  append(os.Environ(), "GOWORK=off"),
-	}, ".")
-	gotest.NoError(t, err)
-	gotest.True(t, len(pkgs) > 0, "expected at least one package loaded")
+	}, "./...")
+	if err != nil {
+		return nil, dir, err
+	}
 
-	pkg := pkgs[0]
-	gotest.True(t, len(pkg.Errors) == 0, "expected no package errors, got: %v", pkg.Errors)
+	index := make(map[string]*packages.Package, len(pkgs))
+	for _, pkg := range pkgs {
+		parts := strings.Split(pkg.PkgPath, "/")
+		key := parts[len(parts)-1]
+		index[key] = pkg
+	}
+	return index, dir, nil
+}
+
+func mustTestPkg(t *testing.T) *packages.Package {
+	t.Helper()
+	if testPkgErr != nil {
+		t.Fatal(testPkgErr)
+	}
+	pkg, ok := testPkgIndex[t.Name()]
+	if !ok {
+		t.Fatalf("no test package found for %s", t.Name())
+	}
+	if len(pkg.Errors) > 0 {
+		t.Fatalf("package errors: %v", pkg.Errors)
+	}
 	return pkg
 }
 
@@ -92,17 +137,7 @@ func loadTestPkgWithGotest(t *testing.T, src string) *packages.Package {
 
 func TestCollector_FixtureCollection_PackageFixture(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "context"
-
-type DBFixture struct {
-	Conn string
-}
-
-func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -115,20 +150,7 @@ func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
 
 func TestCollector_FixtureCollection_PackageFixtureAllMethods(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "context"
-
-type DBFixture struct {
-	Conn string
-}
-
-func (f *DBFixture) BeforeAll(ctx context.Context) error  { return nil }
-func (f *DBFixture) AfterAll(ctx context.Context) error   { return nil }
-func (f *DBFixture) BeforeEach(ctx context.Context) error { return nil }
-func (f *DBFixture) AfterEach(ctx context.Context) error  { return nil }
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -143,17 +165,7 @@ func (f *DBFixture) AfterEach(ctx context.Context) error  { return nil }
 
 func TestCollector_FixtureCollection_SharedFixture(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "context"
-
-type RedisSharedFixture struct {
-	Addr string
-}
-
-func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error { return nil }
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -164,18 +176,7 @@ func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 
 func TestCollector_FixtureCollection_SharedFixtureWithAfterAll(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "context"
-
-type RedisSharedFixture struct {
-	Addr string
-}
-
-func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *RedisSharedFixture) AfterAll(ctx context.Context) error  { return nil }
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -190,27 +191,7 @@ func (f *RedisSharedFixture) AfterAll(ctx context.Context) error  { return nil }
 
 func TestCollector_FixtureEmbeddingInTestSuite(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type DBFixture struct {
-	Conn string
-}
-
-func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type MyTestSuite struct {
-	*DBFixture
-}
-
-func (s *MyTestSuite) TestSomething(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -221,15 +202,7 @@ func (s *MyTestSuite) TestSomething(t *gotest.T) {}
 
 func TestCollector_NoFixtureEmbedding(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) TestSomething(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -241,21 +214,7 @@ func (s *MyTestSuite) TestSomething(t *gotest.T) {}
 
 func TestCollector_FixtureToFixtureEmbedding(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "context"
-
-type BaseFixture struct{}
-
-func (f *BaseFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type DBFixture struct {
-	*BaseFixture
-}
-
-func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	// Note: this will error because there are 2 package fixtures
@@ -269,16 +228,7 @@ func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
 
 func TestCollector_SharedFixture_BeforeEachDisallowed(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "context"
-
-type RedisSharedFixture struct{}
-
-func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error    { return nil }
-func (f *RedisSharedFixture) BeforeEach(ctx context.Context) error   { return nil }
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.True(t, len(result.Errs) > 0, "expected error for BeforeEach on shared fixture")
@@ -287,16 +237,7 @@ func (f *RedisSharedFixture) BeforeEach(ctx context.Context) error   { return ni
 
 func TestCollector_SharedFixture_AfterEachDisallowed(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "context"
-
-type RedisSharedFixture struct{}
-
-func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error  { return nil }
-func (f *RedisSharedFixture) AfterEach(ctx context.Context) error  { return nil }
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.True(t, len(result.Errs) > 0, "expected error for AfterEach on shared fixture")
@@ -305,15 +246,7 @@ func (f *RedisSharedFixture) AfterEach(ctx context.Context) error  { return nil 
 
 func TestCollector_SharedFixture_WrongBeforeAllSignature(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type RedisSharedFixture struct{}
-
-func (f *RedisSharedFixture) BeforeAll(t *gotest.T) {} // wrong: should be (ctx context.Context) error
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.True(t, len(result.Errs) > 0, "expected error for wrong BeforeAll signature on shared fixture")
@@ -337,15 +270,7 @@ func TestApplyTestSuiteSpecs_OK(t *testing.T) {
 
 func TestCollector_PackageFixture_WrongBeforeAllSignature(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type DBFixture struct{}
-
-func (f *DBFixture) BeforeAll(t *gotest.T) {} // wrong: should be (ctx context.Context) error
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.True(t, len(result.Errs) > 0, "expected error for wrong BeforeAll signature on package fixture")
@@ -356,15 +281,7 @@ func (f *DBFixture) BeforeAll(t *gotest.T) {} // wrong: should be (ctx context.C
 
 func TestCollector_StdlibT_SuiteDetected(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "testing"
-
-type PlainTestSuite struct{}
-
-func (s *PlainTestSuite) TestFoo(t *testing.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -376,19 +293,7 @@ func (s *PlainTestSuite) TestFoo(t *testing.T) {}
 
 func TestCollector_StdlibT_LifecycleHooks(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "testing"
-
-type HookTestSuite struct{}
-
-func (s *HookTestSuite) BeforeAll(t *testing.T)  {}
-func (s *HookTestSuite) AfterAll(t *testing.T)   {}
-func (s *HookTestSuite) BeforeEach(t *testing.T) {}
-func (s *HookTestSuite) AfterEach(t *testing.T)  {}
-func (s *HookTestSuite) TestOne(t *testing.T)    {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -407,20 +312,7 @@ func (s *HookTestSuite) TestOne(t *testing.T)    {}
 
 func TestCollector_StdlibT_MixedMethodSignatures(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"testing"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type MixedTestSuite struct{}
-
-func (s *MixedTestSuite) TestStdlib(t *testing.T) {}
-func (s *MixedTestSuite) TestGotest(t *gotest.T)  {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -436,15 +328,7 @@ func (s *MixedTestSuite) TestGotest(t *gotest.T)  {}
 
 func TestCollector_StdlibT_WrongParamType(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "fmt"
-
-type BadTestSuite struct{}
-
-func (s *BadTestSuite) TestBad(f fmt.Stringer) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.True(t, len(result.Errs) > 0, "expected error for unsupported param type")
@@ -453,15 +337,7 @@ func (s *BadTestSuite) TestBad(f fmt.Stringer) {}
 
 func TestCollector_GotestT_NotUsesStdlibT(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type GotestTestSuite struct{}
-
-func (s *GotestTestSuite) TestFoo(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -483,25 +359,7 @@ func TestCollector_NilPackage(t *testing.T) {
 
 func TestCollector_SharedFixtureNotTreatedAsParent(t *testing.T) {
 	t.Parallel()
-	src := "package testpkg\n\n" +
-		"import (\n" +
-		"\t\"context\"\n\n" +
-		"\t\"github.com/mvrahden/go-test/pkg/gotest\"\n" +
-		")\n\n" +
-		"type PGSharedFixture struct {\n" +
-		"\tDSN string `gotest:\"env=PG_DSN\"`\n" +
-		"}\n\n" +
-		"func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
-		"type E2EFixture struct {\n" +
-		"\t*PGSharedFixture\n" +
-		"}\n\n" +
-		"func (f *E2EFixture) BeforeAll(ctx context.Context) error { return nil }\n\n" +
-		"type QueryTestSuite struct {\n" +
-		"\t*E2EFixture\n" +
-		"}\n\n" +
-		"func (s *QueryTestSuite) TestInsert(t *gotest.T) {}\n"
-
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
@@ -521,22 +379,7 @@ func TestCollector_SharedFixtureNotTreatedAsParent(t *testing.T) {
 
 func TestCollector_FixtureConfig_Detected(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type DBFixture struct{}
-
-func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *DBFixture) FixtureConfig() gotest.FixtureConfig {
-	return gotest.DefaultFixtureConfig()
-}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -546,22 +389,7 @@ func (f *DBFixture) FixtureConfig() gotest.FixtureConfig {
 
 func TestCollector_SharedFixtureConfig_Detected(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type PGSharedFixture struct{}
-
-func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *PGSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
-	return gotest.ContainerFixtureConfig()
-}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
@@ -571,15 +399,7 @@ func (f *PGSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 
 func TestCollector_FixtureConfig_AbsentIsNil(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "context"
-
-type PlainFixture struct{}
-
-func (f *PlainFixture) BeforeAll(ctx context.Context) error { return nil }
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -589,18 +409,7 @@ func (f *PlainFixture) BeforeAll(ctx context.Context) error { return nil }
 
 func TestCollector_SuiteConfig_Detected(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{}
-}
-func (s *MyTestSuite) TestFoo(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -610,15 +419,7 @@ func (s *MyTestSuite) TestFoo(t *gotest.T) {}
 
 func TestCollector_SuiteConfig_AbsentIsFalse(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type PlainTestSuite struct{}
-
-func (s *PlainTestSuite) TestFoo(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -628,22 +429,7 @@ func (s *PlainTestSuite) TestFoo(t *gotest.T) {}
 
 func TestCollector_FixtureConfig_InvalidSignature_WithParams(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type BadFixture struct{}
-
-func (f *BadFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *BadFixture) FixtureConfig(x int) gotest.FixtureConfig {
-	return gotest.DefaultFixtureConfig()
-}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.NotEmpty(t, result.Errs, "expected error for invalid FixtureConfig signature")
@@ -652,16 +438,7 @@ func (f *BadFixture) FixtureConfig(x int) gotest.FixtureConfig {
 
 func TestCollector_FixtureConfig_InvalidSignature_WrongReturnType(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "context"
-
-type BadFixture struct{}
-
-func (f *BadFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *BadFixture) FixtureConfig() string { return "" }
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.NotEmpty(t, result.Errs, "expected error for wrong FixtureConfig return type")
@@ -670,18 +447,7 @@ func (f *BadFixture) FixtureConfig() string { return "" }
 
 func TestCollector_SuiteConfig_InvalidSignature_WithParams(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type BadTestSuite struct{}
-
-func (s *BadTestSuite) SuiteConfig(x int) gotest.SuiteConfig {
-	return gotest.DefaultSuiteConfig()
-}
-func (s *BadTestSuite) TestFoo(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.NotEmpty(t, result.Errs, "expected error for invalid SuiteConfig signature")
@@ -690,16 +456,7 @@ func (s *BadTestSuite) TestFoo(t *gotest.T) {}
 
 func TestCollector_SuiteConfig_InvalidSignature_WrongReturnType(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type BadTestSuite struct{}
-
-func (s *BadTestSuite) SuiteConfig() int { return 0 }
-func (s *BadTestSuite) TestFoo(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.NotEmpty(t, result.Errs, "expected error for wrong SuiteConfig return type")
@@ -708,16 +465,7 @@ func (s *BadTestSuite) TestFoo(t *gotest.T) {}
 
 func TestCollector_SuiteGuard_Detected(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) SuiteGuard() string { return "" }
-func (s *MyTestSuite) TestFoo(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -727,15 +475,7 @@ func (s *MyTestSuite) TestFoo(t *gotest.T) {}
 
 func TestCollector_SuiteGuard_AbsentIsFalse(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type PlainTestSuite struct{}
-
-func (s *PlainTestSuite) TestFoo(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -745,16 +485,7 @@ func (s *PlainTestSuite) TestFoo(t *gotest.T) {}
 
 func TestCollector_SuiteGuard_InvalidSignature_WithParams(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type BadTestSuite struct{}
-
-func (s *BadTestSuite) SuiteGuard(x int) string { return "" }
-func (s *BadTestSuite) TestFoo(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.NotEmpty(t, result.Errs, "expected error for invalid SuiteGuard signature")
@@ -763,16 +494,7 @@ func (s *BadTestSuite) TestFoo(t *gotest.T) {}
 
 func TestCollector_SuiteGuard_InvalidSignature_WrongReturnType(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type BadTestSuite struct{}
-
-func (s *BadTestSuite) SuiteGuard() int { return 0 }
-func (s *BadTestSuite) TestFoo(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.NotEmpty(t, result.Errs, "expected error for wrong SuiteGuard return type")
@@ -783,18 +505,7 @@ func (s *BadTestSuite) TestFoo(t *gotest.T) {}
 
 func TestCollector_BeforeEach_ReturningForm(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type myCtx struct{ val string }
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
-func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
@@ -807,18 +518,7 @@ func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
 
 func TestCollector_BeforeEach_TooManyReturns(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type myCtx struct{}
-
-type BadTestSuite struct{}
-
-func (s *BadTestSuite) BeforeEach(t *gotest.T) (*myCtx, error) { return nil, nil }
-func (s *BadTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.NotEmpty(t, result.Errs, "expected error for 2 return values")
@@ -827,19 +527,7 @@ func (s *BadTestSuite) TestOne(t *gotest.T) {}
 
 func TestCollector_AfterEach_WithContextParam(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type myCtx struct{ val string }
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
-func (s *MyTestSuite) AfterEach(t *gotest.T, ctx *myCtx) {}
-func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
@@ -851,18 +539,7 @@ func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
 
 func TestCollector_AfterEach_TooManyParams(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type myCtx struct{}
-
-type BadTestSuite struct{}
-
-func (s *BadTestSuite) AfterEach(t *gotest.T, ctx *myCtx, extra int) {}
-func (s *BadTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.NotEmpty(t, result.Errs, "expected error for 3 params")
@@ -870,19 +547,7 @@ func (s *BadTestSuite) TestOne(t *gotest.T) {}
 
 func TestCollector_TestMethod_WithContextParam(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type myCtx struct{}
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
-func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
-func (s *MyTestSuite) TestTwo(t *gotest.T, _ *myCtx) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
@@ -893,18 +558,7 @@ func (s *MyTestSuite) TestTwo(t *gotest.T, _ *myCtx) {}
 
 func TestCollector_TestMethod_AsyncWithContext(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type myCtx struct{}
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
-func (s *MyTestSuite) TestOneAsync(t *gotest.T, ctx *myCtx, done func()) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
@@ -914,21 +568,7 @@ func (s *MyTestSuite) TestOneAsync(t *gotest.T, ctx *myCtx, done func()) {}
 
 func TestCollector_SuiteConfig_ParallelParsed(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type myCtx struct{}
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
-}
-func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
-func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
@@ -937,20 +577,7 @@ func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
 
 func TestCollector_SuiteConfig_NonLiteralBody_Error(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type MyTestSuite struct{}
-
-var cfg = gotest.SuiteConfig{Parallel: true}
-
-func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return cfg
-}
-func (s *MyTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.NotEmpty(t, result.Errs, "expected error for non-literal SuiteConfig body")
@@ -958,19 +585,7 @@ func (s *MyTestSuite) TestOne(t *gotest.T) {}
 
 func TestCollector_Validation_ParallelRequiresReturningBeforeEach(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
-}
-func (s *MyTestSuite) BeforeEach(t *gotest.T) {}
-func (s *MyTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.NotEmpty(t, result.Errs, "expected error: parallel requires returning BeforeEach")
@@ -979,18 +594,7 @@ func (s *MyTestSuite) TestOne(t *gotest.T) {}
 
 func TestCollector_Validation_ParallelWithoutBeforeEach_Allowed(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
-}
-func (s *MyTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs), "parallel with no BeforeEach should be allowed")
@@ -998,19 +602,7 @@ func (s *MyTestSuite) TestOne(t *gotest.T) {}
 
 func TestCollector_Validation_MethodMissingContextParam(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type myCtx struct{}
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
-func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
-func (s *MyTestSuite) TestTwo(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.NotEmpty(t, result.Errs, "expected error: TestTwo missing context param")
@@ -1019,19 +611,7 @@ func (s *MyTestSuite) TestTwo(t *gotest.T) {}
 
 func TestCollector_Validation_AfterEachMissingContextParam(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type myCtx struct{}
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
-func (s *MyTestSuite) AfterEach(t *gotest.T) {}
-func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.NotEmpty(t, result.Errs, "expected error: AfterEach missing context param")
@@ -1040,18 +620,7 @@ func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
 
 func TestCollector_Validation_OrphanContextAfterEach(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type myCtx struct{}
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) AfterEach(t *gotest.T, ctx *myCtx) {}
-func (s *MyTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.NotEmpty(t, result.Errs, "expected error: orphan context AfterEach")
@@ -1059,19 +628,7 @@ func (s *MyTestSuite) TestOne(t *gotest.T) {}
 
 func TestCollector_Validation_TypeMismatch(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type myCtx struct{}
-type otherCtx struct{}
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
-func (s *MyTestSuite) TestOne(t *gotest.T, ctx *otherCtx) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.NotEmpty(t, result.Errs, "expected error: type mismatch")
@@ -1080,20 +637,7 @@ func (s *MyTestSuite) TestOne(t *gotest.T, ctx *otherCtx) {}
 
 func TestCollector_Validation_ReturningBeforeEach_FullyConsistent_OK(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type myCtx struct{}
-
-type MyTestSuite struct{}
-
-func (s *MyTestSuite) BeforeEach(t *gotest.T) *myCtx { return &myCtx{} }
-func (s *MyTestSuite) AfterEach(t *gotest.T, ctx *myCtx) {}
-func (s *MyTestSuite) TestOne(t *gotest.T, ctx *myCtx) {}
-func (s *MyTestSuite) TestTwo(t *gotest.T, _ *myCtx) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)

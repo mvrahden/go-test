@@ -299,6 +299,24 @@ func StripCoverBuildFlags(flags []string) []string {
 	return out
 }
 
+// InjectChecklinkname ensures -ldflags includes -checklinkname=0 so that
+// linkname references in generated overlay code can link correctly
+// (required for Go 1.23+ which restricts linkname to stdlib symbols).
+func InjectChecklinkname(buildFlags []string) []string {
+	const ldflag = "-checklinkname=0"
+	for i, f := range buildFlags {
+		if strings.HasPrefix(f, "-ldflags=") {
+			buildFlags[i] = f + " " + ldflag
+			return buildFlags
+		}
+		if f == "-ldflags" && i+1 < len(buildFlags) {
+			buildFlags[i+1] = buildFlags[i+1] + " " + ldflag
+			return buildFlags
+		}
+	}
+	return append(buildFlags, "-ldflags="+ldflag)
+}
+
 // IsGoTestFlag reports whether name (the flag name without any =value suffix)
 // is a recognized go test flag. It returns whether the flag takes a value
 // argument and whether it is known at all.

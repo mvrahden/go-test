@@ -25,20 +25,7 @@ func TestIsInternalPkgPath(t *testing.T) {
 
 func TestResolve_Embedding_SuiteToFixture(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type DBFixture struct{ Conn string }
-func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type QueryTestSuite struct { *DBFixture }
-func (s *QueryTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -59,20 +46,7 @@ func (s *QueryTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_NamedField_SuiteToFixture(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type DBFixture struct{ Conn string }
-func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type QueryTestSuite struct { db *DBFixture }
-func (s *QueryTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -93,24 +67,7 @@ func (s *QueryTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_Embedding_ChildToParentFixture(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type InfraFixture struct{ Val string }
-func (f *InfraFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *InfraFixture) AfterAll(ctx context.Context) error  { return nil }
-
-type APIFixture struct { *InfraFixture }
-func (f *APIFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type FullTestSuite struct { *APIFixture }
-func (s *FullTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -132,23 +89,7 @@ func (s *FullTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_NamedField_ChildToParentFixture(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type InfraFixture struct{ Val string }
-func (f *InfraFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type APIFixture struct { infra *InfraFixture }
-func (f *APIFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type FullTestSuite struct { *APIFixture }
-func (s *FullTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -170,24 +111,7 @@ func (s *FullTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_NamedField_FixtureToSharedFixture(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type PGSharedFixture struct{ ConnStr string }
-func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *PGSharedFixture) AfterAll(ctx context.Context) error  { return nil }
-
-type AppFixture struct { pg *PGSharedFixture }
-func (f *AppFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type UserTestSuite struct { *AppFixture }
-func (s *UserTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -210,21 +134,7 @@ func (s *UserTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_DirectSharedFixture_Embedded(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type PGSharedFixture struct{ ConnStr string }
-func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *PGSharedFixture) AfterAll(ctx context.Context) error  { return nil }
-
-type UserTestSuite struct { *PGSharedFixture }
-func (s *UserTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -253,21 +163,7 @@ func (s *UserTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_DirectSharedFixture_NamedField(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type PGSharedFixture struct{ ConnStr string }
-func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *PGSharedFixture) AfterAll(ctx context.Context) error  { return nil }
-
-type UserTestSuite struct { pg *PGSharedFixture }
-func (s *UserTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -288,27 +184,7 @@ func (s *UserTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_SuiteWithFixtureAndDirectSharedFixture(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type PGSharedFixture struct{ ConnStr string }
-func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *PGSharedFixture) AfterAll(ctx context.Context) error  { return nil }
-
-type AppFixture struct{ Val string }
-func (f *AppFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type UserTestSuite struct {
-	*AppFixture
-	*PGSharedFixture
-}
-func (s *UserTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -332,23 +208,7 @@ func (s *UserTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_MixedFieldStyles_SameFixture(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type DBFixture struct{ Conn string }
-func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type EmbeddedTestSuite struct { *DBFixture }
-func (s *EmbeddedTestSuite) TestOne(t *gotest.T) {}
-
-type NamedTestSuite struct { db *DBFixture }
-func (s *NamedTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -372,23 +232,7 @@ func (s *NamedTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_CycleDetection(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type AFixture struct { *BFixture }
-func (f *AFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type BFixture struct { *AFixture }
-func (f *BFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type SomeTestSuite struct { *AFixture }
-func (s *SomeTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -403,26 +247,7 @@ func (s *SomeTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_MultipleFixturesPerSuite(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type AFixture struct{}
-func (f *AFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type BFixture struct{}
-func (f *BFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type BadTestSuite struct {
-	*AFixture
-	*BFixture
-}
-func (s *BadTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -437,16 +262,7 @@ func (s *BadTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_MissingBeforeAll(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type NoSetupFixture struct{ Val string }
-
-type SomeTestSuite struct { *NoSetupFixture }
-func (s *SomeTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -461,14 +277,7 @@ func (s *SomeTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_NoFixture_Standalone(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import "github.com/mvrahden/go-test/pkg/gotest"
-
-type PlainTestSuite struct{ val string }
-func (s *PlainTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -487,29 +296,7 @@ func (s *PlainTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_MultipleParentFixtures_Error(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type AFixture struct{}
-func (f *AFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type BFixture struct{}
-func (f *BFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type ChildFixture struct {
-	*AFixture
-	*BFixture
-}
-func (f *ChildFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type SomeTestSuite struct { *ChildFixture }
-func (s *SomeTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -524,27 +311,7 @@ func (s *SomeTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_SharedFixture_TransferFields(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type PGSharedFixture struct {
-	ConnStr string
-	Port    int
-}
-func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *PGSharedFixture) AfterAll(ctx context.Context) error  { return nil }
-
-type AppFixture struct { *PGSharedFixture }
-func (f *AppFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type UserTestSuite struct { *AppFixture }
-func (s *UserTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -566,23 +333,7 @@ func (s *UserTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_LifecycleMethods_Detection(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type FullFixture struct{ Val string }
-func (f *FullFixture) BeforeAll(ctx context.Context) error  { return nil }
-func (f *FullFixture) AfterAll(ctx context.Context) error   { return nil }
-func (f *FullFixture) BeforeEach(ctx context.Context) error { return nil }
-func (f *FullFixture) AfterEach(ctx context.Context) error  { return nil }
-
-type SomeTestSuite struct { *FullFixture }
-func (s *SomeTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -603,23 +354,7 @@ func (s *SomeTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_UnreferencedFixture_NotInOutput(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type UsedFixture struct{}
-func (f *UsedFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type UnusedFixture struct{}
-func (f *UnusedFixture) BeforeAll(ctx context.Context) error { return nil }
-
-type MyTestSuite struct { *UsedFixture }
-func (s *MyTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))
@@ -636,28 +371,7 @@ func (s *MyTestSuite) TestOne(t *gotest.T) {}
 
 func TestResolve_DirectMultipleSharedFixtures_OnSuite(t *testing.T) {
 	t.Parallel()
-	src := `package testpkg
-
-import (
-	"context"
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
-
-type PGSharedFixture struct{ ConnStr string }
-func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *PGSharedFixture) AfterAll(ctx context.Context) error  { return nil }
-
-type RedisSharedFixture struct{ Addr string }
-func (f *RedisSharedFixture) BeforeAll(ctx context.Context) error { return nil }
-func (f *RedisSharedFixture) AfterAll(ctx context.Context) error  { return nil }
-
-type FullTestSuite struct {
-	pg    *PGSharedFixture
-	redis *RedisSharedFixture
-}
-func (s *FullTestSuite) TestOne(t *gotest.T) {}
-`
-	pkg := loadTestPkgWithGotest(t, src)
+	pkg := mustTestPkg(t)
 	c := collector{}
 	result := c.CollectSuiteSpecs(pkg)
 	gotest.Equal(t, 0, len(result.Errs))

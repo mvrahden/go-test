@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	_ "unsafe"
 )
 
 //go:noinline
@@ -26,12 +27,32 @@ func (ts *ƒƒ_GOTEST_AppTestSuite) AfterEach(it *gotest.T)  { ts.AppTestSuite.A
 
 var ƒ_AppFixture *AppFixture
 
+// ƒflushCoverage triggers coverage report writing.
+//
+//go:linkname ƒflushCoverage testing.coverReport
+func ƒflushCoverage()
+
+// ƒtestingCover exposes the stdlib coverage state for tearDown interception.
+//
+//go:linkname ƒtestingCover testing.cover
+var ƒtestingCover struct {
+	mode        string
+	tearDown    func(coverprofile string, gocoverdir string) (string, error)
+	snapshotcov func() float64
+}
+
 func TestMain(m *testing.M) { os.Exit(ƒƒ_GOTEST_main(m)) }
 
 func ƒƒ_GOTEST_main(m *testing.M) (ƒcode int) {
 
 	var ƒcfg_AppFixture gotest.FixtureConfig
 	var ƒok_AppFixture bool
+
+	var ƒorigTearDown func(string, string) (string, error)
+	if testing.CoverMode() != "" {
+		ƒorigTearDown = ƒtestingCover.tearDown
+		ƒtestingCover.tearDown = func(string, string) (string, error) { return "", nil }
+	}
 
 	defer func() {
 		var ƒtwg sync.WaitGroup
@@ -61,6 +82,10 @@ func ƒƒ_GOTEST_main(m *testing.M) (ƒcode int) {
 				ƒcode = 1
 				break
 			}
+		}
+		if ƒorigTearDown != nil {
+			ƒtestingCover.tearDown = ƒorigTearDown
+			ƒflushCoverage()
 		}
 	}()
 

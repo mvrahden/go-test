@@ -24,6 +24,23 @@ var ƒ_{{ $cf.Identifier }} *{{ $cf.QualifiedIdentifier }}
 {{ end }}
 {{ end }}
 
+{{- /*
+Go flushes coverage counters inside m.Run(), before fixture AfterAll runs.
+We swap tearDown with a no-op so counters survive, then flush after teardown.
+The linkname struct layout is guarded by TestLinknameCompat tests.
+*/}}
+// ƒflushCoverage triggers coverage report writing.
+//go:linkname ƒflushCoverage testing.coverReport
+func ƒflushCoverage()
+
+// ƒtestingCover exposes the stdlib coverage state for tearDown interception.
+//go:linkname ƒtestingCover testing.{{ .CoverVarName }}
+var ƒtestingCover struct {
+    mode        string
+    tearDown    func(coverprofile string, gocoverdir string) (string, error)
+    snapshotcov func() float64
+}
+
 func TestMain(m *testing.M) { os.Exit(ƒƒ_GOTEST_main(m)) }
 
 func ƒƒ_GOTEST_main(m *testing.M) (ƒcode int) {
@@ -35,6 +52,12 @@ func ƒƒ_GOTEST_main(m *testing.M) (ƒcode int) {
     var ƒok_{{ $cf.Identifier }} bool
 {{ end }}
 {{ end }}
+
+    var ƒorigTearDown func(string, string) (string, error)
+    if testing.CoverMode() != "" {
+        ƒorigTearDown = ƒtestingCover.tearDown
+        ƒtestingCover.tearDown = func(string, string) (string, error) { return "", nil }
+    }
 
     defer func() {
         var ƒtwg sync.WaitGroup
@@ -97,6 +120,10 @@ func ƒƒ_GOTEST_main(m *testing.M) (ƒcode int) {
         ƒtwg.Wait()
         for _, ƒf := range ƒtdfails {
             if ƒf && ƒcode == 0 { ƒcode = 1; break }
+        }
+        if ƒorigTearDown != nil {
+            ƒtestingCover.tearDown = ƒorigTearDown
+            ƒflushCoverage()
         }
     }()
 
