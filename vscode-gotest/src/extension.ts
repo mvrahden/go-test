@@ -21,6 +21,7 @@ import { RunRegistry } from "./runRegistry.js";
 import { validateGoBinary, scopedConfig } from "./cli.js";
 import { buildRunFilter, getPackageDir } from "./runnerUtils.js";
 import { copyCoverageSummary, copyTestResults } from "./reporting.js";
+import { execFile } from "node:child_process";
 
 let flushOnDeactivate: (() => Promise<void>) | undefined;
 
@@ -552,6 +553,21 @@ async function initializeAsync(deps: {
     );
     if (choice === "Open Output") outputChannel.show();
     return;
+  }
+
+  for (const folder of workspaceFolders) {
+    execFile(
+      "git",
+      ["config", "diff.snapshot.xfuncname", "^=== SNAP .+ ===$"],
+      { cwd: folder.uri.fsPath },
+      (err) => {
+        if (err) {
+          outputChannel.debug(
+            `[activate] git config diff.snapshot.xfuncname failed: ${err.message}`,
+          );
+        }
+      },
+    );
   }
 
   await runRegistry.load();
