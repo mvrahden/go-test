@@ -17,7 +17,7 @@ func (s *EventuallyTestSuite) TestEventually(t *gotest.T) {
 				time.Sleep(50 * time.Millisecond)
 				counter.Store(42)
 			}()
-			it.Eventually(1*time.Second, 10*time.Millisecond, func(poll *gotest.T) {
+			gotest.Eventually(it, 1*time.Second, 10*time.Millisecond, func(poll *gotest.T) {
 				gotest.Equal(poll, int32(42), counter.Load())
 			})
 		})
@@ -25,7 +25,7 @@ func (s *EventuallyTestSuite) TestEventually(t *gotest.T) {
 
 	t.When("condition is immediately true", func(w *gotest.T) {
 		w.It("passes on first poll", func(it *gotest.T) {
-			it.Eventually(1*time.Second, 10*time.Millisecond, func(poll *gotest.T) {
+			gotest.Eventually(it, 1*time.Second, 10*time.Millisecond, func(poll *gotest.T) {
 				gotest.True(poll, true)
 			})
 		})
@@ -35,7 +35,7 @@ func (s *EventuallyTestSuite) TestEventually(t *gotest.T) {
 func (s *EventuallyTestSuite) TestConsistently(t *gotest.T) {
 	t.When("condition stays true for the duration", func(w *gotest.T) {
 		w.It("passes", func(it *gotest.T) {
-			it.Consistently(100*time.Millisecond, 20*time.Millisecond, func(poll *gotest.T) {
+			gotest.Consistently(it, 100*time.Millisecond, 20*time.Millisecond, func(poll *gotest.T) {
 				gotest.True(poll, true)
 			})
 		})

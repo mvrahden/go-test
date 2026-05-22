@@ -26,7 +26,7 @@ func (s *NotificationServiceTestSuite) TestDeliverNotification(t *gotest.T) {
 		})
 
 		t.It("eventually delivers the message", func(t *gotest.T) {
-			t.Eventually(500*time.Millisecond, 10*time.Millisecond, func(poll *gotest.T) {
+			gotest.Eventually(t, 500*time.Millisecond, 10*time.Millisecond, func(poll *gotest.T) {
 				gotest.Equal(poll, 1, s.dispatcher.DeliveryCount())
 			})
 		})
@@ -43,9 +43,9 @@ func (s *NotificationServiceTestSuite) TestBatchDelivery(t *gotest.T) {
 		}
 
 		t.It("eventually delivers all messages", func(t *gotest.T) {
-			gotest.Eventually(t, func() bool {
-				return s.dispatcher.DeliveryCount() == 3
-			}, 500*time.Millisecond, 10*time.Millisecond)
+			gotest.Eventually(t, 500*time.Millisecond, 10*time.Millisecond, func(poll *gotest.T) {
+				gotest.Equal(poll, 3, s.dispatcher.DeliveryCount())
+			})
 		})
 	})
 }
@@ -53,15 +53,9 @@ func (s *NotificationServiceTestSuite) TestBatchDelivery(t *gotest.T) {
 func (s *NotificationServiceTestSuite) TestIdleDispatcher(t *gotest.T) {
 	t.When("no notifications have been sent", func(t *gotest.T) {
 		t.It("consistently reports zero deliveries", func(t *gotest.T) {
-			t.Consistently(200*time.Millisecond, 50*time.Millisecond, func(poll *gotest.T) {
+			gotest.Consistently(t, 200*time.Millisecond, 50*time.Millisecond, func(poll *gotest.T) {
 				gotest.Equal(poll, 0, s.dispatcher.DeliveryCount())
 			})
-		})
-
-		t.It("validates using the function-level form", func(t *gotest.T) {
-			gotest.Consistently(t, func() bool {
-				return s.dispatcher.DeliveryCount() == 0
-			}, 200*time.Millisecond, 50*time.Millisecond)
 		})
 	})
 }
@@ -71,7 +65,7 @@ func (s *NotificationServiceTestSuite) TestDeliveryTimestamp(t *gotest.T) {
 		before := time.Now()
 		s.dispatcher.Send(Notification{To: "user@example.com", Subject: "Timestamp check"})
 
-		t.Eventually(500*time.Millisecond, 10*time.Millisecond, func(poll *gotest.T) {
+		gotest.Eventually(t, 500*time.Millisecond, 10*time.Millisecond, func(poll *gotest.T) {
 			gotest.Equal(poll, 1, s.dispatcher.DeliveryCount())
 		})
 		delivered := s.dispatcher.Deliveries()[0]
@@ -95,7 +89,7 @@ func (s *NotificationServiceTestSuite) TestNotificationPayload(t *gotest.T) {
 			Priority: PriorityHigh,
 		})
 
-		t.Eventually(500*time.Millisecond, 10*time.Millisecond, func(poll *gotest.T) {
+		gotest.Eventually(t, 500*time.Millisecond, 10*time.Millisecond, func(poll *gotest.T) {
 			gotest.Equal(poll, 1, s.dispatcher.DeliveryCount())
 		})
 		delivered := s.dispatcher.Deliveries()[0]

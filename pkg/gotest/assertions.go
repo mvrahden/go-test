@@ -410,38 +410,52 @@ func didPanic(f func()) (recovered any, panicked bool) {
 	return nil, false
 }
 
-// Eventually asserts that condition returns true within waitFor, polling every tick.
-func Eventually(t testingT, condition func() bool, waitFor, tick time.Duration, msgAndArgs ...any) {
+// Eventually polls fn until it passes without assertion failures, or fails after waitFor.
+func Eventually(t testingT, waitFor, tick time.Duration, fn func(poll *T)) {
 	timer := time.NewTimer(waitFor)
 	defer timer.Stop()
 	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
+
+	var lastMsg string
+	polls := 0
 	for {
 		select {
 		case <-timer.C:
-			fail(t, fmt.Sprintf("Eventually failed:\n  condition did not become true within %v", waitFor), msgAndArgs)
+			if lastMsg != "" {
+				failf(t, "Eventually failed after %v (%d polls):\n  last failure:\n    %s", waitFor, polls, lastMsg)
+			} else {
+				failf(t, "Eventually failed after %v (%d polls): condition never satisfied", waitFor, polls)
+			}
 			return
 		case <-ticker.C:
-			if condition() {
+			polls++
+			failed, msg := runCollectingPoll(fn)
+			if !failed {
 				return
 			}
+			lastMsg = msg
 		}
 	}
 }
 
-// Consistently asserts that condition returns true for the entire waitFor duration, polling every tick.
-func Consistently(t testingT, condition func() bool, waitFor, tick time.Duration, msgAndArgs ...any) {
+// Consistently polls fn for the entire waitFor duration, failing on the first assertion failure.
+func Consistently(t testingT, waitFor, tick time.Duration, fn func(poll *T)) {
 	timer := time.NewTimer(waitFor)
 	defer timer.Stop()
 	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
+
+	polls := 0
 	for {
 		select {
 		case <-timer.C:
 			return
 		case <-ticker.C:
-			if !condition() {
-				fail(t, fmt.Sprintf("Consistently failed:\n  condition returned false before %v elapsed", waitFor), msgAndArgs)
+			polls++
+			failed, msg := runCollectingPoll(fn)
+			if failed {
+				failf(t, "Consistently failed on poll %d:\n    %s", polls, msg)
 				return
 			}
 		}

@@ -30,6 +30,7 @@ func (t *T) T() *testing.T {
 	}
 	return t.t
 }
+
 func (t *T) Context() context.Context {
 	if t.ctx != nil {
 		return t.ctx
@@ -51,6 +52,7 @@ func (t *T) Errorf(format string, args ...any) {
 	assert.SkipInternalFrames(t.t)
 	t.t.Errorf(format, args...)
 }
+
 func (t *T) FailNow() {
 	if t.collector != nil {
 		t.collector.FailNow()
@@ -67,34 +69,11 @@ func (t *T) It(description string, testFn func(it *T)) {
 		execTestFn(testFn, NewT(t))
 	})
 }
+
 func (t *T) When(description string, fn func(w *T)) {
 	t.t.Run(description, func(tt *testing.T) {
 		execTestFn(fn, NewT(tt))
 	})
-}
-func (t *T) Each(entries any, fn any) {
-	ev := reflect.ValueOf(entries)
-	if ev.Kind() != reflect.Slice {
-		t.t.Helper()
-		t.t.Fatalf("Each: entries must be a slice, got %T", entries)
-		return
-	}
-
-	fv := reflect.ValueOf(fn)
-	ft := fv.Type()
-	if ft.Kind() != reflect.Func || ft.NumIn() != 2 {
-		t.t.Helper()
-		t.t.Fatalf("Each: fn must be func(*gotest.T, EntryType), got %T", fn)
-		return
-	}
-
-	for i := 0; i < ev.Len(); i++ {
-		entry := ev.Index(i)
-		name := eachEntryName(entry, i)
-		t.t.Run(name, func(tt *testing.T) {
-			fv.Call([]reflect.Value{reflect.ValueOf(NewT(tt)), entry})
-		})
-	}
 }
 
 func Each[E any](t *T, entries []E) iter.Seq2[*T, E] {
@@ -138,65 +117,12 @@ func (c *collectingT) FailNow() {
 
 func runCollectingPoll(fn func(poll *T)) (failed bool, message string) {
 	c := &collectingT{}
+	poll := &T{collector: c}
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		fn(&T{t: nil, collector: c})
+		fn(poll)
 	}()
 	<-done
 	return c.failed, c.message
-}
-
-func (t *T) Eventually(waitFor, tick time.Duration, fn func(poll *T)) {
-	t.t.Helper()
-	timer := time.NewTimer(waitFor)
-	defer timer.Stop()
-	ticker := time.NewTicker(tick)
-	defer ticker.Stop()
-
-	var lastMsg string
-	polls := 0
-	for {
-		select {
-		case <-timer.C:
-			t.t.Helper()
-			if lastMsg != "" {
-				t.t.Fatalf("Eventually failed after %v (%d polls):\n  last failure:\n    %s", waitFor, polls, lastMsg)
-			} else {
-				t.t.Fatalf("Eventually failed after %v (%d polls): condition never satisfied", waitFor, polls)
-			}
-			return
-		case <-ticker.C:
-			polls++
-			failed, msg := runCollectingPoll(fn)
-			if !failed {
-				return
-			}
-			lastMsg = msg
-		}
-	}
-}
-
-func (t *T) Consistently(waitFor, tick time.Duration, fn func(poll *T)) {
-	t.t.Helper()
-	timer := time.NewTimer(waitFor)
-	defer timer.Stop()
-	ticker := time.NewTicker(tick)
-	defer ticker.Stop()
-
-	polls := 0
-	for {
-		select {
-		case <-timer.C:
-			return
-		case <-ticker.C:
-			polls++
-			failed, msg := runCollectingPoll(fn)
-			if failed {
-				t.t.Helper()
-				t.t.Fatalf("Consistently failed on poll %d:\n    %s", polls, msg)
-				return
-			}
-		}
-	}
 }
