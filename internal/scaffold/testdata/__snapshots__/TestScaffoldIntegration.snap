@@ -1,3 +1,4 @@
+=== SNAP _ ===
 package sampletype
 
 import (
@@ -38,3 +39,4 @@ func (s *UserServiceTestSuite) TestGetByID(t *gotest.T) {
 		// TODO: test error case
 	})
 }
+
