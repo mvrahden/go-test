@@ -15,69 +15,90 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-var sharedMod struct {
-	once  sync.Once
-	goMod []byte
-	goSum []byte
-	err   error
+var sharedModRoot struct {
+	once sync.Once
+	dir  string
+	err  error
 }
 
-func initSharedMod() {
+func initSharedModRoot() {
 	modRoot, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
-		sharedMod.err = err
+		sharedModRoot.err = err
 		return
 	}
 
-	dir, err := os.MkdirTemp("", "gotest-shared-mod-*")
+	// Bootstrap: run go mod tidy in a scratch dir to produce go.sum.
+	scratch, err := os.MkdirTemp("", "gotest-mod-init-*")
 	if err != nil {
-		sharedMod.err = err
+		sharedModRoot.err = err
 		return
 	}
-	defer os.RemoveAll(dir)
+	defer os.RemoveAll(scratch)
 
 	goMod := []byte("module testpkg\n\ngo 1.24\n\nrequire github.com/mvrahden/go-test v0.0.0\n\nreplace github.com/mvrahden/go-test => " + modRoot + "\n")
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), goMod, 0644); err != nil {
-		sharedMod.err = err
+	if err := os.WriteFile(filepath.Join(scratch, "go.mod"), goMod, 0644); err != nil {
+		sharedModRoot.err = err
 		return
 	}
-	if err := os.WriteFile(filepath.Join(dir, "stub.go"), []byte("package testpkg\n\nimport _ \"github.com/mvrahden/go-test/pkg/gotest\"\n"), 0644); err != nil {
-		sharedMod.err = err
+	if err := os.WriteFile(filepath.Join(scratch, "stub.go"), []byte("package testpkg\n\nimport _ \"github.com/mvrahden/go-test/pkg/gotest\"\n"), 0644); err != nil {
+		sharedModRoot.err = err
 		return
 	}
 
 	cmd := exec.Command("go", "mod", "tidy")
-	cmd.Dir = dir
+	cmd.Dir = scratch
 	cmd.Env = append(os.Environ(), "GOWORK=off")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		sharedMod.err = fmt.Errorf("go mod tidy: %w\n%s", err, out)
+		sharedModRoot.err = fmt.Errorf("go mod tidy: %w\n%s", err, out)
 		return
 	}
 
-	sharedMod.goMod, _ = os.ReadFile(filepath.Join(dir, "go.mod"))
-	sharedMod.goSum, _ = os.ReadFile(filepath.Join(dir, "go.sum"))
+	// Persistent shared module root — all tests create sub-packages here.
+	dir, err := os.MkdirTemp("", "gotest-shared-root-*")
+	if err != nil {
+		sharedModRoot.err = err
+		return
+	}
+
+	tidiedMod, _ := os.ReadFile(filepath.Join(scratch, "go.mod"))
+	tidiedSum, _ := os.ReadFile(filepath.Join(scratch, "go.sum"))
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), tidiedMod, 0644); err != nil {
+		sharedModRoot.err = err
+		return
+	}
+	if len(tidiedSum) > 0 {
+		if err := os.WriteFile(filepath.Join(dir, "go.sum"), tidiedSum, 0644); err != nil {
+			sharedModRoot.err = err
+			return
+		}
+	}
+	sharedModRoot.dir = dir
 }
 
-// loadTestPkgWithGotest loads a package that imports gotest.T using the full
-// packages.Load machinery. Module resolution is cached across tests.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if sharedModRoot.dir != "" {
+		os.RemoveAll(sharedModRoot.dir)
+	}
+	os.Exit(code)
+}
+
 func loadTestPkgWithGotest(t *testing.T, src string) *packages.Package {
 	t.Helper()
 
-	sharedMod.once.Do(initSharedMod)
-	if sharedMod.err != nil {
-		t.Fatal(sharedMod.err)
+	sharedModRoot.once.Do(initSharedModRoot)
+	if sharedModRoot.err != nil {
+		t.Fatal(sharedModRoot.err)
 	}
 
-	dir := t.TempDir()
-	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "test.go"), []byte(src), 0644))
-	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), sharedMod.goMod, 0644))
-	if len(sharedMod.goSum) > 0 {
-		gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.sum"), sharedMod.goSum, 0644))
-	}
+	subDir := filepath.Join(sharedModRoot.dir, t.Name())
+	gotest.NoError(t, os.MkdirAll(subDir, 0755))
+	gotest.NoError(t, os.WriteFile(filepath.Join(subDir, "test.go"), []byte(src), 0644))
 
 	pkgs, err := packages.Load(&packages.Config{
 		Mode: packageEvalMode,
-		Dir:  dir,
+		Dir:  subDir,
 		Env:  append(os.Environ(), "GOWORK=off"),
 	}, ".")
 	gotest.NoError(t, err)

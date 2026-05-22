@@ -540,7 +540,7 @@ func TestBuildFixtureViewModels_SharedFixtureDetection(t *testing.T) {
 	gotest.Equal(t, "PGSharedFixture", sf.QualifiedType)
 	gotest.Equal(t, "PGSharedFixture", sf.FieldName)
 	gotest.Equal(t, "", sf.PkgPath, "same-package shared fixture should have empty PkgPath")
-	gotest.Equal(t, "testpkg.PGSharedFixture", sf.StateKey)
+	gotest.Equal(t, pkg.PkgPath+".PGSharedFixture", sf.StateKey)
 }
 
 func TestRenderer_FixtureWithConfig(t *testing.T) {
