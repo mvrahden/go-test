@@ -1,6 +1,7 @@
 package gotest_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,7 +27,7 @@ func TestMatchSnapshot_CreatesGroupedFile(t *testing.T) {
 		gotest.MatchSnapshot(t, "value-two")
 	})
 
-	snapPath := filepath.Join(dir, "TestMatchSnapshot_CreatesGroupedFile.snap")
+	snapPath := filepath.Join(dir, "TestMatchSnapshot_CreatesGroupedFile_ext.snap")
 	data, err := os.ReadFile(snapPath)
 	gotest.NoError(t, err)
 
@@ -45,7 +46,7 @@ func TestMatchSnapshot_CustomName(t *testing.T) {
 		gotest.MatchSnapshot(t, "hello", "my-label")
 	})
 
-	snapPath := filepath.Join(dir, "TestMatchSnapshot_CustomName.snap")
+	snapPath := filepath.Join(dir, "TestMatchSnapshot_CustomName_ext.snap")
 	data, err := os.ReadFile(snapPath)
 	gotest.NoError(t, err)
 	gotest.True(t, strings.Contains(string(data), "=== SNAP case my-label ==="))
@@ -57,7 +58,7 @@ func TestMatchSnapshot_TopLevelOnly(t *testing.T) {
 
 	gotest.MatchSnapshot(t, "top-level-value")
 
-	snapPath := filepath.Join(dir, "TestMatchSnapshot_TopLevelOnly.snap")
+	snapPath := filepath.Join(dir, "TestMatchSnapshot_TopLevelOnly_ext.snap")
 	data, err := os.ReadFile(snapPath)
 	gotest.NoError(t, err)
 	gotest.True(t, strings.Contains(string(data), "=== SNAP _ ==="))
@@ -75,7 +76,7 @@ func TestMatchSnapshot_SectionsAreSorted(t *testing.T) {
 		gotest.MatchSnapshot(t, "a-val")
 	})
 
-	snapPath := filepath.Join(dir, "TestMatchSnapshot_SectionsAreSorted.snap")
+	snapPath := filepath.Join(dir, "TestMatchSnapshot_SectionsAreSorted_ext.snap")
 	data, err := os.ReadFile(snapPath)
 	gotest.NoError(t, err)
 
@@ -83,6 +84,28 @@ func TestMatchSnapshot_SectionsAreSorted(t *testing.T) {
 	alphaIdx := strings.Index(content, "=== SNAP alpha ===")
 	zebraIdx := strings.Index(content, "=== SNAP zebra ===")
 	gotest.True(t, alphaIdx < zebraIdx, "alpha section should come before zebra")
+}
+
+func TestMatchSnapshot_ConcurrentWrites(t *testing.T) {
+	dir := snapshotDir()
+	t.Cleanup(func() { os.RemoveAll(dir) })
+
+	t.Run("parallel", func(t *testing.T) {
+		for i := range 10 {
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				t.Parallel()
+				gotest.MatchSnapshot(t, fmt.Sprintf("value-%d", i))
+			})
+		}
+	})
+
+	snapPath := filepath.Join(dir, "TestMatchSnapshot_ConcurrentWrites_ext.snap")
+	data, err := os.ReadFile(snapPath)
+	gotest.NoError(t, err)
+	content := string(data)
+	for i := range 10 {
+		gotest.True(t, strings.Contains(content, fmt.Sprintf("value-%d", i)))
+	}
 }
 
 func TestMatchSnapshot_UpdateMode(t *testing.T) {
@@ -98,7 +121,7 @@ func TestMatchSnapshot_UpdateMode(t *testing.T) {
 		gotest.MatchSnapshot(t, "updated")
 	})
 
-	snapPath := filepath.Join(dir, "TestMatchSnapshot_UpdateMode.snap")
+	snapPath := filepath.Join(dir, "TestMatchSnapshot_UpdateMode_ext.snap")
 	data, err := os.ReadFile(snapPath)
 	gotest.NoError(t, err)
 

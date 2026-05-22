@@ -18,7 +18,7 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 		w.It("creates a grouped snapshot file on first run", func(it *gotest.T) {
 			it.MatchSnapshot("hello world")
 
-			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite.snap")
+			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")
 			data, err := os.ReadFile(snapPath)
 			gotest.NoError(it, err)
 			gotest.True(it, strings.Contains(string(data), "hello world"))
@@ -36,7 +36,7 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 		w.It("uses the custom name in the section key", func(it *gotest.T) {
 			it.MatchSnapshot("custom content", "my-snapshot")
 
-			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite.snap")
+			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")
 			data, err := os.ReadFile(snapPath)
 			gotest.NoError(it, err)
 			gotest.True(it, strings.Contains(string(data), "my-snapshot"))
@@ -50,7 +50,7 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 			it.T().Setenv("GOTEST_UPDATE_SNAPSHOTS", "1")
 			it.MatchSnapshot("updated")
 
-			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite.snap")
+			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")
 			data, err := os.ReadFile(snapPath)
 			gotest.NoError(it, err)
 			content := string(data)
