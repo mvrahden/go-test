@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -11,6 +12,8 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 	"github.com/mvrahden/go-test/pkg/gotest/internal/snapfile"
 )
+
+var dedupSuffixRe = regexp.MustCompile(`#\d+$`)
 
 func matchSnapshot(t testing.TB, callerSkip int, value any, name ...string) {
 	t.Helper()
@@ -96,7 +99,7 @@ func matchSnapshot(t testing.TB, callerSkip int, value any, name ...string) {
 
 func splitTestName(name string) (topLevel, rest string) {
 	if top, sub, ok := strings.Cut(name, "/"); ok {
-		return top, sub
+		return top, dedupSuffixRe.ReplaceAllString(sub, "")
 	}
 	return name, ""
 }
