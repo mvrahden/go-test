@@ -18,18 +18,3 @@ func (m *mockT) FailNow() {
 }
 
 func newMock() *mockT { return &mockT{} }
-
-func sanitizeForTest(s string) string {
-	for _, pair := range [][2]string{{"/", "_"}, {" ", "_"}, {":", "_"}} {
-		result := ""
-		for _, c := range s {
-			if string(c) == pair[0] {
-				result += pair[1]
-			} else {
-				result += string(c)
-			}
-		}
-		s = result
-	}
-	return s
-}

@@ -3,6 +3,7 @@ package gotest_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -14,13 +15,13 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 	t.T().Cleanup(func() { os.RemoveAll(snapDir) })
 
 	t.When("no snapshot exists", func(w *gotest.T) {
-		w.It("creates the snapshot on first run", func(it *gotest.T) {
+		w.It("creates a grouped snapshot file on first run", func(it *gotest.T) {
 			it.MatchSnapshot("hello world")
 
-			snapName := sanitizeForTest(it.T().Name()) + ".snap"
-			data, err := os.ReadFile(filepath.Join(snapDir, snapName))
+			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite.snap")
+			data, err := os.ReadFile(snapPath)
 			gotest.NoError(it, err)
-			gotest.Equal(it, "hello world", string(data))
+			gotest.True(it, strings.Contains(string(data), "hello world"))
 		})
 	})
 
@@ -32,13 +33,13 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 	})
 
 	t.When("custom name is provided", func(w *gotest.T) {
-		w.It("uses the custom name in the filename", func(it *gotest.T) {
+		w.It("uses the custom name in the section key", func(it *gotest.T) {
 			it.MatchSnapshot("custom content", "my-snapshot")
 
-			snapName := sanitizeForTest(it.T().Name()) + "_my-snapshot.snap"
-			data, err := os.ReadFile(filepath.Join(snapDir, snapName))
+			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite.snap")
+			data, err := os.ReadFile(snapPath)
 			gotest.NoError(it, err)
-			gotest.Equal(it, "custom content", string(data))
+			gotest.True(it, strings.Contains(string(data), "my-snapshot"))
 		})
 	})
 
@@ -49,10 +50,11 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 			it.T().Setenv("GOTEST_UPDATE_SNAPSHOTS", "1")
 			it.MatchSnapshot("updated")
 
-			snapName := sanitizeForTest(it.T().Name()) + ".snap"
-			data, err := os.ReadFile(filepath.Join(snapDir, snapName))
+			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite.snap")
+			data, err := os.ReadFile(snapPath)
 			gotest.NoError(it, err)
-			gotest.Equal(it, "updated", string(data))
+			content := string(data)
+			gotest.True(it, strings.Contains(content, "updated"))
 		})
 	})
 }
