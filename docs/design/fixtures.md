@@ -50,7 +50,7 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 - One root `*Fixture` per package (nested child fixtures are allowed).
 - The fixture struct must have `BeforeAll(ctx context.Context) error`.
   `AfterAll(ctx context.Context) error` is optional.
-- `BeforeEach(t *gotest.T)` and `AfterEach(t *gotest.T)` are optional and run around every test case in all child suites.
+- `BeforeEach(ctx context.Context) error` and `AfterEach(ctx context.Context) error` are optional and run around every test case in all child suites.
 - TestSuites reference the fixture via a named pointer field (`Fixture *E2ESetupFixture`).
 - The code generator owns `TestMain` when a fixture is present.
   Remove any user-defined `TestMain`.
