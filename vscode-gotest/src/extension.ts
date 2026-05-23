@@ -21,6 +21,7 @@ import { RunRegistry } from "./runRegistry.js";
 import { validateGoBinary, scopedConfig } from "./cli.js";
 import { buildRunFilter, getPackageDir } from "./runnerUtils.js";
 import { copyCoverageSummary, copyTestResults } from "./reporting.js";
+import { execFile } from "node:child_process";
 
 let flushOnDeactivate: (() => Promise<void>) | undefined;
 
@@ -64,6 +65,7 @@ export function activate(context: vscode.ExtensionContext): void {
         (item) => getPackageDir(item, cache),
       ),
     (request, token) => coverageRunner.run(request, token),
+    (request, token) => runner.run(request, token, { updateSnapshots: true }),
   );
 
   controller.testController.refreshHandler = async () => {
@@ -409,6 +411,37 @@ function registerCommands(deps: {
       },
     ),
 
+    vscode.commands.registerCommand(
+      "gotest.updateSnapshots",
+      async (testId?: string) => {
+        const items: vscode.TestItem[] = [];
+        if (testId) {
+          const item = controller.findItem(testId);
+          if (item) {
+            items.push(item);
+          } else {
+            outputChannel.warn(
+              `[command] updateSnapshots: item not found: ${testId}`,
+            );
+            return;
+          }
+        } else {
+          controller.testController.items.forEach((item) => items.push(item));
+        }
+        if (items.length === 0) {
+          outputChannel.warn("[command] updateSnapshots: no test items");
+          return;
+        }
+        const cts = new vscode.CancellationTokenSource();
+        try {
+          const request = new vscode.TestRunRequest(items);
+          await runner.run(request, cts.token, { updateSnapshots: true });
+        } finally {
+          cts.dispose();
+        }
+      },
+    ),
+
     vscode.commands.registerCommand("gotest.copyCoverage", () =>
       copyCoverageSummary(coverageStore, cache),
     ),
@@ -552,6 +585,21 @@ async function initializeAsync(deps: {
     );
     if (choice === "Open Output") outputChannel.show();
     return;
+  }
+
+  for (const folder of workspaceFolders) {
+    execFile(
+      "git",
+      ["config", "diff.snapshot.xfuncname", "^=== SNAP .+ ===$"],
+      { cwd: folder.uri.fsPath },
+      (err) => {
+        if (err) {
+          outputChannel.debug(
+            `[activate] git config diff.snapshot.xfuncname failed: ${err.message}`,
+          );
+        }
+      },
+    );
   }
 
   await runRegistry.load();

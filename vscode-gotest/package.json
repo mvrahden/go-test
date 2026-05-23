@@ -81,6 +81,11 @@
         "title": "Go Test: Scaffold Target"
       },
       {
+        "command": "gotest.updateSnapshots",
+        "title": "Go Test: Update Snapshots",
+        "icon": "$(refresh)"
+      },
+      {
         "command": "gotest.copyCoverage",
         "title": "Go Test: Copy Coverage Summary",
         "icon": "$(copy)"
@@ -107,6 +112,11 @@
         }
       ],
       "testing/item/context": [
+        {
+          "command": "gotest.updateSnapshots",
+          "when": "controllerId == gotest",
+          "group": "gotest@1"
+        },
         {
           "command": "gotest.copyTestResults",
           "when": "controllerId == gotest",

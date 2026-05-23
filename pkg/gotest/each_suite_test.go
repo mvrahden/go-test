@@ -6,81 +6,7 @@ import (
 
 type EachTestSuite struct{}
 
-func (s *EachTestSuite) TestCallbackAPI(t *gotest.T) {
-	t.When("entries have Desc field", func(w *gotest.T) {
-		w.It("runs each entry as a named subtest", func(it *gotest.T) {
-			var ran []string
-			it.Each([]struct {
-				Desc  string
-				Value int
-			}{
-				{"first entry", 1},
-				{"second entry", 2},
-				{"third entry", 3},
-			}, func(tt *gotest.T, tc struct {
-				Desc  string
-				Value int
-			}) {
-				ran = append(ran, tc.Desc)
-				gotest.Greater(tt, tc.Value, 0)
-			})
-			gotest.Len(it, ran, 3)
-			gotest.Equal(it, "first entry", ran[0])
-		})
-	})
-
-	t.When("entries have Name field", func(w *gotest.T) {
-		w.It("uses Name for subtest name", func(it *gotest.T) {
-			count := 0
-			it.Each([]struct {
-				Name string
-				OK   bool
-			}{
-				{"alpha", true},
-				{"beta", true},
-			}, func(tt *gotest.T, tc struct {
-				Name string
-				OK   bool
-			}) {
-				count++
-				gotest.True(tt, tc.OK)
-			})
-			gotest.Equal(it, 2, count)
-		})
-	})
-
-	t.When("entries are anonymous structs", func(w *gotest.T) {
-		w.It("runs each entry", func(it *gotest.T) {
-			count := 0
-			it.Each([]struct {
-				Desc string
-				Val  int
-			}{
-				{"processes first value", 10},
-				{"processes second value", 20},
-			}, func(tt *gotest.T, tc struct {
-				Desc string
-				Val  int
-			}) {
-				count++
-				gotest.Greater(tt, tc.Val, 0)
-			})
-			gotest.Equal(it, 2, count)
-		})
-	})
-
-	t.When("slice is empty", func(w *gotest.T) {
-		w.It("runs nothing", func(it *gotest.T) {
-			count := 0
-			it.Each([]struct{ X int }{}, func(tt *gotest.T, tc struct{ X int }) {
-				count++
-			})
-			gotest.Equal(it, 0, count)
-		})
-	})
-}
-
-func (s *EachTestSuite) TestIteratorAPI(t *gotest.T) {
+func (s *EachTestSuite) TestEach(t *gotest.T) {
 	type entry struct {
 		Desc  string
 		Value int
@@ -99,6 +25,23 @@ func (s *EachTestSuite) TestIteratorAPI(t *gotest.T) {
 			}
 			gotest.Len(it, ran, 3)
 			gotest.Equal(it, "first entry", ran[0])
+		})
+	})
+
+	t.When("entries have Name field", func(w *gotest.T) {
+		w.It("uses Name for subtest name", func(it *gotest.T) {
+			count := 0
+			for sub, tc := range gotest.Each(it, []struct {
+				Name string
+				OK   bool
+			}{
+				{"alpha", true},
+				{"beta", true},
+			}) {
+				count++
+				gotest.True(sub, tc.OK)
+			}
+			gotest.Equal(it, 2, count)
 		})
 	})
 

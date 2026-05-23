@@ -115,6 +115,7 @@ function createController(cache: DiscoveryCache): GoTestController {
     noop,
     noop,
     noop,
+    noop,
   );
 }
 

@@ -1,3 +1,4 @@
+=== SNAP _ ===
 package sampletype
 
 import (
@@ -30,3 +31,4 @@ func (s *ValidatorContractTestSuite[T]) TestValidate(t *gotest.T) {
 
 // Instantiate the contract for a concrete implementation:
 // type MyValidatorTestSuite = ValidatorContractTestSuite[*MyImpl]
+

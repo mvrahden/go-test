@@ -33,7 +33,6 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 		{"search", "github.com/mvrahden/go-test/examples/search", "parallel search suites with generics"},
 	} {
 		pkg := path.Join("..", "..", "examples", tC.directory)
-		testdatadir := filepath.Join("..", "..", "examples", tC.directory, "testdata")
 
 		t.Run(fmt.Sprintf("Generate for package %q with %s", tC.directory, tC.description), func(t *testing.T) {
 			loaded, err := LoadPackages([]string{pkg}, nil)
@@ -46,50 +45,11 @@ func TestGeneratorGoldenExamples(t *testing.T) {
 				gotest.NotEqual(t, tC.pkgName, v.AbsPath)
 				gotest.NotZero(t, v.AbsPath)
 				gotest.True(t, filepath.IsAbs(v.AbsPath))
-				ptestExpected := getExpectedOutputFile(t, testdatadir, "gotestgen_ptest.golden")
-				gotest.Equal(t, ptestExpected, string(v.PTest))
-				pxtestExpected := getExpectedOutputFile(t, testdatadir, "gotestgen_pxtest.golden")
-				gotest.Equal(t, pxtestExpected, string(v.PXTest))
+				gotest.MatchSnapshot(t, string(v.PTest), tC.directory+"-ptest")
+				gotest.MatchSnapshot(t, string(v.PXTest), tC.directory+"-pxtest")
 			}
 		})
 	}
-}
-
-func TestGeneratorGoldenExamples_DumpGolden(t *testing.T) {
-	if os.Getenv("DUMP_GOLDEN") != "1" {
-		t.Skip("set DUMP_GOLDEN=1 to regenerate golden files")
-	}
-
-	for _, tC := range []struct {
-		directory string
-	}{
-		{"auth"},
-		{"cart"},
-		{"search"},
-	} {
-		pkg := path.Join("..", "..", "examples", tC.directory)
-		testdatadir := filepath.Join("..", "..", "examples", tC.directory, "testdata")
-
-		loaded, err := LoadPackages([]string{pkg}, nil)
-		if err != nil {
-			t.Fatalf("LoadPackages %s: %v", tC.directory, err)
-		}
-		res, _, err := GenerateFromLoaded(loaded)
-		if err != nil {
-			t.Fatalf("GenerateFromLoaded %s: %v", tC.directory, err)
-		}
-		for _, v := range res {
-			if len(v.PTest) > 0 {
-				os.WriteFile(filepath.Join(testdatadir, "gotestgen_ptest.golden"), v.PTest, 0644)
-				fmt.Fprintf(os.Stderr, "wrote %s/gotestgen_ptest.golden\n", testdatadir)
-			}
-			if len(v.PXTest) > 0 {
-				os.WriteFile(filepath.Join(testdatadir, "gotestgen_pxtest.golden"), v.PXTest, 0644)
-				fmt.Fprintf(os.Stderr, "wrote %s/gotestgen_pxtest.golden\n", testdatadir)
-			}
-		}
-	}
-	t.Log("Golden files regenerated. Re-run TestGeneratorGoldenExamples to verify.")
 }
 
 func TestGenerate_StdlibPackage_ReturnsEmpty(t *testing.T) {

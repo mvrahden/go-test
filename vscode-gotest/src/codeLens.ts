@@ -65,8 +65,14 @@ export class GoTestCodeLensProvider
       );
     }
 
+    const docText = document.getText();
+    const fileSuites = pkg.suites.filter(
+      (s) => path.join(pkg.dir, s.file) === docPath,
+    );
+
     for (const suite of pkg.suites) {
-      if (path.join(pkg.dir, suite.file) === docPath) {
+      const suiteInFile = path.join(pkg.dir, suite.file) === docPath;
+      if (suiteInFile) {
         const range = new vscode.Range(suite.line - 1, 0, suite.line - 1, 0);
         const testPath = `${importPath}/${suite.name}`;
 
@@ -84,29 +90,66 @@ export class GoTestCodeLensProvider
         );
       }
 
-      for (const method of suite.methods) {
-        if (path.join(pkg.dir, method.file) === docPath) {
-          const range = new vscode.Range(
-            method.line - 1,
-            0,
-            method.line - 1,
-            0,
-          );
-          const testPath = `${importPath}/${suite.name}/${method.name}`;
+      let suiteHasSnapshots = false;
 
+      const fileMethods = suite.methods.filter(
+        (m) => path.join(pkg.dir, m.file) === docPath,
+      );
+
+      for (let i = 0; i < fileMethods.length; i++) {
+        const method = fileMethods[i];
+        const range = new vscode.Range(method.line - 1, 0, method.line - 1, 0);
+        const testPath = `${importPath}/${suite.name}/${method.name}`;
+
+        lenses.push(
+          new vscode.CodeLens(range, {
+            title: "▶ Run",
+            command: "gotest.runTest",
+            arguments: [testPath],
+          }),
+          new vscode.CodeLens(range, {
+            title: "Debug",
+            command: "gotest.debugTest",
+            arguments: [testPath],
+          }),
+        );
+
+        const startOffset = document.offsetAt(range.start);
+        const nextSuiteIdx = fileSuites.indexOf(suite) + 1;
+        const suiteEndLine =
+          nextSuiteIdx < fileSuites.length
+            ? fileSuites[nextSuiteIdx].line - 2
+            : document.lineCount - 1;
+        const endLine = fileMethods[i + 1]
+          ? fileMethods[i + 1].line - 2
+          : suiteEndLine;
+        const endOffset = document.offsetAt(
+          new vscode.Position(endLine, Number.MAX_SAFE_INTEGER),
+        );
+        const methodText = docText.slice(startOffset, endOffset);
+
+        if (methodText.includes("MatchSnapshot")) {
+          suiteHasSnapshots = true;
           lenses.push(
             new vscode.CodeLens(range, {
-              title: "▶ Run",
-              command: "gotest.runTest",
-              arguments: [testPath],
-            }),
-            new vscode.CodeLens(range, {
-              title: "Debug",
-              command: "gotest.debugTest",
+              title: "↻ Update Snapshots",
+              command: "gotest.updateSnapshots",
               arguments: [testPath],
             }),
           );
         }
+      }
+
+      if (suiteInFile && suiteHasSnapshots) {
+        const range = new vscode.Range(suite.line - 1, 0, suite.line - 1, 0);
+        const testPath = `${importPath}/${suite.name}`;
+        lenses.push(
+          new vscode.CodeLens(range, {
+            title: "↻ Update Snapshots",
+            command: "gotest.updateSnapshots",
+            arguments: [testPath],
+          }),
+        );
       }
     }
 

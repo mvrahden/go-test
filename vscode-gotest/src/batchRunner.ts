@@ -32,6 +32,7 @@ export interface BatchConfig {
   controller: GoTestController;
   outputChannel: vscode.LogOutputChannel;
   label: string;
+  env?: Record<string, string>;
   coverage?: {
     store: CoverageStore;
     testOnly?: boolean;
@@ -54,6 +55,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     controller,
     outputChannel,
     label,
+    env,
     coverage,
     onResults,
   } = config;
@@ -144,7 +146,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       token,
       outputChannel,
       label,
-      undefined,
+      env,
       handleStdoutLine,
     );
 

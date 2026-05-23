@@ -1,3 +1,4 @@
+=== SNAP _ ===
 package basic
 
 import (
@@ -29,3 +30,4 @@ func (s *UserTestSuite) TestCreate(t *gotest.T) {
 func (s *UserTestSuite) TestDelete(t *gotest.T) {
 	gotest.NotEmpty(t, s.db)
 }
+

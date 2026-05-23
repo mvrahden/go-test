@@ -6,20 +6,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 func TestE2E_CLI(t *testing.T) {
 	testcases := []struct {
-		desc        string
-		dirName     string
-		goldenFiles []string
+		desc    string
+		dirName string
+		hasPX   bool
 	}{
-		{"no testsuite", "no_testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}},
-		{"simple testsuite", "testsuite", []string{about.PSuite + ".golden", about.PXSuite + ".golden"}},
-		{"suite guard", "suite_guard", []string{about.PSuite + ".golden"}},
-		{"fixture lifecycle", "fixture_lifecycle", []string{about.PSuite + ".golden"}},
+		{"no testsuite", "no_testsuite", true},
+		{"simple testsuite", "testsuite", true},
+		{"suite guard", "suite_guard", false},
+		{"fixture lifecycle", "fixture_lifecycle", false},
 	}
 	for _, tC := range testcases {
 		t.Run(tC.desc, func(t *testing.T) {
@@ -34,15 +33,9 @@ func TestE2E_CLI(t *testing.T) {
 			gotest.True(t, strings.HasSuffix(results[0].AbsPath, "go-test/internal/gotestgen/testdata_e2e/"+tC.dirName))
 			gotest.Equal(t, "github.com/mvrahden/go-test/internal/gotestgen/testdata_e2e/"+tC.dirName, results[0].PkgPath)
 
-			for idx, golden := range tC.goldenFiles {
-				expected, err := os.ReadFile(filepath.Join("testdata_e2e", tC.dirName, golden))
-				gotest.NoError(t, err)
-				if idx == 0 {
-					gotest.Equal(t, string(expected), string(results[0].PTest))
-				}
-				if idx == 1 {
-					gotest.Equal(t, string(expected), string(results[0].PXTest))
-				}
+			gotest.MatchSnapshot(t, string(results[0].PTest), tC.dirName+"-ptest")
+			if tC.hasPX {
+				gotest.MatchSnapshot(t, string(results[0].PXTest), tC.dirName+"-pxtest")
 			}
 		})
 	}

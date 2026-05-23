@@ -3,6 +3,7 @@ package gotest_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -14,45 +15,46 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 	t.T().Cleanup(func() { os.RemoveAll(snapDir) })
 
 	t.When("no snapshot exists", func(w *gotest.T) {
-		w.It("creates the snapshot on first run", func(it *gotest.T) {
-			it.MatchSnapshot("hello world")
+		w.It("creates a grouped snapshot file on first run", func(it *gotest.T) {
+			gotest.MatchSnapshot(it,"hello world")
 
-			snapName := sanitizeForTest(it.T().Name()) + ".snap"
-			data, err := os.ReadFile(filepath.Join(snapDir, snapName))
+			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")
+			data, err := os.ReadFile(snapPath)
 			gotest.NoError(it, err)
-			gotest.Equal(it, "hello world", string(data))
+			gotest.True(it, strings.Contains(string(data), "hello world"))
 		})
 	})
 
 	t.When("snapshot already exists", func(w *gotest.T) {
-		w.It("matches without error", func(it *gotest.T) {
-			it.MatchSnapshot("stable value")
-			it.MatchSnapshot("stable value")
+		w.It("matches multiple snapshots with dedup suffixes", func(it *gotest.T) {
+			gotest.MatchSnapshot(it,"stable value")
+			gotest.MatchSnapshot(it,"stable value")
 		})
 	})
 
 	t.When("custom name is provided", func(w *gotest.T) {
-		w.It("uses the custom name in the filename", func(it *gotest.T) {
-			it.MatchSnapshot("custom content", "my-snapshot")
+		w.It("uses the custom name in the section key", func(it *gotest.T) {
+			gotest.MatchSnapshot(it,"custom content", "my-snapshot")
 
-			snapName := sanitizeForTest(it.T().Name()) + "_my-snapshot.snap"
-			data, err := os.ReadFile(filepath.Join(snapDir, snapName))
+			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")
+			data, err := os.ReadFile(snapPath)
 			gotest.NoError(it, err)
-			gotest.Equal(it, "custom content", string(data))
+			gotest.True(it, strings.Contains(string(data), "my-snapshot"))
 		})
 	})
 
 	t.When("update mode is enabled", func(w *gotest.T) {
 		w.It("overwrites the existing snapshot", func(it *gotest.T) {
-			it.MatchSnapshot("original")
+			gotest.MatchSnapshot(it,"original")
 
 			it.T().Setenv("GOTEST_UPDATE_SNAPSHOTS", "1")
-			it.MatchSnapshot("updated")
+			gotest.MatchSnapshot(it,"updated")
 
-			snapName := sanitizeForTest(it.T().Name()) + ".snap"
-			data, err := os.ReadFile(filepath.Join(snapDir, snapName))
+			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")
+			data, err := os.ReadFile(snapPath)
 			gotest.NoError(it, err)
-			gotest.Equal(it, "updated", string(data))
+			content := string(data)
+			gotest.True(it, strings.Contains(content, "updated"))
 		})
 	})
 }

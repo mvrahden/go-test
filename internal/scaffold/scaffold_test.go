@@ -1,10 +1,10 @@
 package scaffold //nolint:stdlib-test
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 func TestParseTarget(t *testing.T) {
@@ -381,28 +381,10 @@ func TestScaffoldIntegration_File(t *testing.T) {
 		t.Fatalf("GenerateFileScaffold failed: %v", err)
 	}
 
-	goldenPath := filepath.Join("testdata", "funcs_suite_test.go.golden")
-
-	if os.Getenv("UPDATE_GOLDEN") != "" {
-		if err := os.WriteFile(goldenPath, out, 0644); err != nil {
-			t.Fatalf("failed to write golden file: %v", err)
-		}
-		t.Log("golden file updated")
-		return
-	}
-
-	golden, err := os.ReadFile(goldenPath)
-	if err != nil {
-		t.Fatalf("golden file not found (run with UPDATE_GOLDEN=1 to create): %v", err)
-	}
-
-	if string(out) != string(golden) {
-		t.Errorf("output does not match golden file.\n--- got ---\n%s\n--- want ---\n%s", string(out), string(golden))
-	}
+	gotest.MatchSnapshot(t, string(out))
 }
 
 func TestScaffoldIntegration(t *testing.T) {
-	// Full pipeline: introspect -> generate -> verify against golden file
 	info, err := IntrospectType("./testdata/sampletype", "UserService")
 	if err != nil {
 		t.Fatalf("IntrospectType failed: %v", err)
@@ -413,24 +395,7 @@ func TestScaffoldIntegration(t *testing.T) {
 		t.Fatalf("GenerateScaffold failed: %v", err)
 	}
 
-	goldenPath := filepath.Join("testdata", "user_service_suite_test.go.golden")
-
-	if os.Getenv("UPDATE_GOLDEN") != "" {
-		if err := os.WriteFile(goldenPath, out, 0644); err != nil {
-			t.Fatalf("failed to write golden file: %v", err)
-		}
-		t.Log("golden file updated")
-		return
-	}
-
-	golden, err := os.ReadFile(goldenPath)
-	if err != nil {
-		t.Fatalf("golden file not found (run with UPDATE_GOLDEN=1 to create): %v", err)
-	}
-
-	if string(out) != string(golden) {
-		t.Errorf("output does not match golden file.\n--- got ---\n%s\n--- want ---\n%s", string(out), string(golden))
-	}
+	gotest.MatchSnapshot(t, string(out))
 }
 
 func TestScaffoldIntegration_Interface(t *testing.T) {
@@ -444,22 +409,5 @@ func TestScaffoldIntegration_Interface(t *testing.T) {
 		t.Fatalf("GenerateContractScaffold failed: %v", err)
 	}
 
-	goldenPath := filepath.Join("testdata", "validator_contract_suite_test.go.golden")
-
-	if os.Getenv("UPDATE_GOLDEN") != "" {
-		if err := os.WriteFile(goldenPath, out, 0644); err != nil {
-			t.Fatalf("failed to write golden file: %v", err)
-		}
-		t.Log("golden file updated")
-		return
-	}
-
-	golden, err := os.ReadFile(goldenPath)
-	if err != nil {
-		t.Fatalf("golden file not found (run with UPDATE_GOLDEN=1 to create): %v", err)
-	}
-
-	if string(out) != string(golden) {
-		t.Errorf("output does not match golden file.\n--- got ---\n%s\n--- want ---\n%s", string(out), string(golden))
-	}
+	gotest.MatchSnapshot(t, string(out))
 }

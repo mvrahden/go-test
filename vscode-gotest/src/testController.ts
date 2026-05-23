@@ -29,6 +29,10 @@ export class GoTestController implements vscode.Disposable {
       request: vscode.TestRunRequest,
       token: vscode.CancellationToken,
     ) => Promise<void>,
+    updateSnapshotsHandler: (
+      request: vscode.TestRunRequest,
+      token: vscode.CancellationToken,
+    ) => Promise<void>,
   ) {
     this.controller = vscode.tests.createTestController("gotest", "gotest");
 
@@ -50,6 +54,13 @@ export class GoTestController implements vscode.Disposable {
       "Coverage",
       vscode.TestRunProfileKind.Coverage,
       (request, token) => coverageHandler(request, token),
+      false,
+    );
+
+    this.controller.createRunProfile(
+      "Update Snapshots",
+      vscode.TestRunProfileKind.Run,
+      (request, token) => updateSnapshotsHandler(request, token),
       false,
     );
 

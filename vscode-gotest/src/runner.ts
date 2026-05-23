@@ -13,6 +13,10 @@ import type { CoverageStore } from "./coverageStore.js";
 import { executeBatch } from "./batchRunner.js";
 import type { RunRegistry } from "./runRegistry.js";
 
+export interface RunOptions {
+  updateSnapshots?: boolean;
+}
+
 export class TestRunner {
   private _lastJsonOutput = "";
   private readonly _onDidComplete = new vscode.EventEmitter<string>();
@@ -38,6 +42,7 @@ export class TestRunner {
   async run(
     request: vscode.TestRunRequest,
     token: vscode.CancellationToken,
+    options?: RunOptions,
   ): Promise<void> {
     if (this.activeRun) {
       this.outputChannel.info("[runner] cancelling previous run");
@@ -133,6 +138,10 @@ export class TestRunner {
         });
       }
 
+      const extraEnv = options?.updateSnapshots
+        ? { GOTEST_UPDATE_SNAPSHOTS: "1" }
+        : undefined;
+
       const byWorkspace = new Map<string, PkgInfo[]>();
       for (const info of validPkgs) {
         let list = byWorkspace.get(info.workspaceDir);
@@ -172,6 +181,7 @@ export class TestRunner {
             coverOnRun,
             run,
             effectiveToken,
+            extraEnv,
           );
         }
 
@@ -190,6 +200,7 @@ export class TestRunner {
             coverOnRun,
             run,
             effectiveToken,
+            extraEnv,
           );
         }
       }
@@ -205,6 +216,28 @@ export class TestRunner {
         await this.coverageStore!.save();
       }
       this.controller.saveResults();
+
+      if (!options?.updateSnapshots && this.hasSnapshotMismatch()) {
+        vscode.window
+          .showWarningMessage(
+            "Snapshot mismatch detected. Update snapshots?",
+            "Update Snapshots",
+          )
+          .then(async (choice) => {
+            if (choice !== "Update Snapshots") return;
+            const cts2 = new vscode.CancellationTokenSource();
+            try {
+              await this.run(request, cts2.token, { updateSnapshots: true });
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : String(err);
+              this.outputChannel.error(
+                `[runner] snapshot update failed: ${msg}`,
+              );
+            } finally {
+              cts2.dispose();
+            }
+          });
+      }
     } finally {
       const wasCancelled = effectiveToken.isCancellationRequested;
       if (recordId !== undefined && this.activeRecordId === recordId) {
@@ -243,6 +276,7 @@ export class TestRunner {
     coverOnRun: boolean,
     run: vscode.TestRun,
     token: vscode.CancellationToken,
+    env?: Record<string, string>,
   ): Promise<void> {
     const result = await executeBatch({
       pkgInfos,
@@ -254,6 +288,7 @@ export class TestRunner {
       controller: this.controller,
       outputChannel: this.outputChannel,
       label: "runner",
+      env,
       coverage: coverOnRun ? { store: this.coverageStore! } : undefined,
       onResults: (applied) => {
         for (const r of applied) {
@@ -262,5 +297,9 @@ export class TestRunner {
       },
     });
     this._lastJsonOutput += result.stdout;
+  }
+
+  private hasSnapshotMismatch(): boolean {
+    return this._lastJsonOutput.includes("MatchSnapshot: snapshot mismatch");
   }
 }

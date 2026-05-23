@@ -4,10 +4,11 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 func TestDeriveNewName(t *testing.T) {
@@ -100,17 +101,5 @@ func TestTransformFile(t *testing.T) {
 		t.Fatalf("failed to gofmt result: %v\n\nraw output:\n%s", err, got)
 	}
 
-	expectedPath := filepath.Join("testdata", "basic", "expected_test.go")
-	expectedRaw, err := os.ReadFile(expectedPath)
-	if err != nil {
-		t.Fatalf("failed to read expected file: %v", err)
-	}
-	expectedBytes, err := format.Source(expectedRaw)
-	if err != nil {
-		t.Fatalf("failed to gofmt expected: %v", err)
-	}
-
-	if string(gotBytes) != string(expectedBytes) {
-		t.Errorf("transformed output does not match expected.\n\n--- GOT ---\n%s\n\n--- EXPECTED ---\n%s", string(gotBytes), string(expectedBytes))
-	}
+	gotest.MatchSnapshot(t, string(gotBytes))
 }

@@ -63,17 +63,17 @@ func (s *TokenValidatorTestSuite) TestPasswordPolicy(t *gotest.T) {
 		Valid    bool
 	}
 
-	t.Each([]testCase{
+	for t, tc := range gotest.Each(t, []testCase{
 		{"strong password with mixed characters", "P@ssw0rd!Long", true},
 		{"too short", "P@1a", false},
 		{"missing special characters", "Password123", false},
 		{"missing digits", "Password!!!", false},
 		{"exactly at minimum length", "A1!bcdef", true},
-	}, func(t *gotest.T, tc testCase) {
+	}) {
 		t.It("evaluates the password correctly", func(t *gotest.T) {
 			gotest.Equal(t, tc.Valid, isStrongPassword(tc.Password))
 		})
-	})
+	}
 }
 
 func (s *TokenValidatorTestSuite) TestEmailFormat(t *gotest.T) {
