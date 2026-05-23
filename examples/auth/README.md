@@ -10,4 +10,4 @@ Demonstrates error assertions, parameterized testing, and the exclude modifier u
 
 ## Features
 
-`ErrorIs` · `ErrorAs` · `ErrorContains` · `Panics` · `Must` · `Regexp` · `t.Each` · `gotest.Each` · `X_` exclude
+`ErrorIs` · `ErrorAs` · `ErrorContains` · `Panics` · `Must` · `Regexp` · `gotest.Each` · `X_` exclude

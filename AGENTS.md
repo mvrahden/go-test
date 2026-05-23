@@ -147,46 +147,34 @@ gotest.Panics(t, f func()) any  // asserts f panics, returns recovered value
 
 ## Eventually & Consistently
 
-Two forms exist for each:
-
-### Standalone (simple bool polling)
+Package-level functions for async polling. Both use `*gotest.R` — an assertion recorder that captures failures without propagating them.
 
 ```go
-gotest.Eventually(t, func() bool { return ready() }, 5*time.Second, 100*time.Millisecond)
-gotest.Consistently(t, func() bool { return stable() }, 2*time.Second, 100*time.Millisecond)
-```
-
-### Method form (full assertion support)
-
-```go
-t.Eventually(5*time.Second, 100*time.Millisecond, func(poll *gotest.T) {
+gotest.Eventually(t, 5*time.Second, 100*time.Millisecond, func(poll *gotest.R) {
     gotest.Equal(poll, "ready", getStatus())
 })
 
-t.Consistently(2*time.Second, 100*time.Millisecond, func(poll *gotest.T) {
+gotest.Consistently(t, 2*time.Second, 100*time.Millisecond, func(poll *gotest.R) {
     gotest.True(poll, isHealthy())
 })
 ```
 
-The method form creates a **collecting T** with `t: nil`.
-On each tick, the callback runs; if any assertion fails, it retries on the next tick.
-On timeout, the last failure is reported.
+There are no method forms on `*T`. Only package-level `gotest.Eventually()` and `gotest.Consistently()` exist.
 
-**Critical constraint:** Inside the callback, `poll.T()` panics.
-All code in the callback must use gotest assertions only.
+**Critical constraint:** Inside the callback, `poll` is a `*gotest.R`, not a `*gotest.T`.
+`poll` has no `T()` method. All code in the callback must use gotest assertions only.
 Any helper that calls `t.T()` will panic.
-This is by design — the collecting T intercepts failures without aborting, enabling retry semantics.
+This is by design — the recorder intercepts failures without aborting, enabling retry semantics.
 
 ## Suite Conventions
 
 ### Suite types
 
 ```go
-type MyServiceTestSuite struct { /* state */ }           // sequential suite
-type MyServiceTestSuiteParallel struct { /* state */ }   // runs parallel with other suites
+type MyServiceTestSuite struct { /* state */ }           // test suite
 ```
 
-- Name must end with `TestSuite` or `TestSuiteParallel`
+- Name must end with `TestSuite`
 - All methods must use pointer receivers
 - Must have at least one `Test*` method
 
@@ -194,7 +182,7 @@ type MyServiceTestSuiteParallel struct { /* state */ }   // runs parallel with o
 
 ```go
 func (s *MyTestSuite) TestCreate(t *gotest.T) {}                 // sequential
-func (s *MyTestSuite) TestParallelRead(t *gotest.T) {}           // parallel within suite (concurrent with other TestParallel* methods)
+func (s *MyTestSuite) TestRead(t *gotest.T) {}                   // standard test method
 func (s *MyTestSuite) TestLongPollAsync(t *gotest.T, done func()) {} // async (call done() when finished)
 ```
 
@@ -221,7 +209,7 @@ func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-Fields: `Timeout` (per-test deadline), `SetupTimeout`, `Retries`, `FailFast` (stop on first failure).
+Fields: `Timeout` (per-test deadline), `SetupTimeout`, `Retries`, `FailFast` (stop on first failure), `Parallel` (run methods concurrently).
 Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
 
 ### SuiteGuard (optional)
@@ -255,16 +243,12 @@ Focus and exclude apply independently at both suite and test case levels.
 
 ## Parallel Semantics
 
-**Suite-level** (`*TestSuiteParallel` suffix): The entire suite runs concurrently with other top-level tests.
-Methods within the suite run sequentially relative to each other.
-Safe to share suite struct state `s` across methods.
+**Suite-level**: Each suite runs as a separate subprocess — full process isolation. This is automatic.
 
-**Method-level** (`TestParallel*` prefix): Individual test cases run concurrently within the same suite.
+**Method-level**: Opt-in via `SuiteConfig{Parallel: true}`.
+All test methods within the suite run concurrently.
 Suite struct state `s` is shared — writing to `s` fields from parallel methods is a data race.
-Use method-local variables or synchronization.
-
-These are independent.
-A `TestSuiteParallel` can also have `TestParallel*` methods (suite runs parallel with others AND methods run parallel within it).
+Use a returning `BeforeEach` to give each method its own isolated state.
 
 ## Other T Methods
 
@@ -273,12 +257,9 @@ t.T() *testing.T                                    // access underlying testing
 t.Context() context.Context                          // test context (respects deadline from SuiteConfig)
 t.It("description", func(it *gotest.T) { ... })     // BDD-style subtest
 t.When("condition", func(w *gotest.T) { ... })       // BDD-style subtest
-t.Each(entries, func(t *gotest.T, entry E) { ... })  // table-driven iteration (reflection-based)
-t.MatchSnapshot(value any, name ...string)           // snapshot testing (testdata/__snapshots__/)
-t.Assert(v any).Equal(expected)                      // fluent assertion chain (alternative style)
 ```
 
-Generic `Each` (preferred over method form):
+Table-driven tests with `Each`:
 ```go
 for t, entry := range gotest.Each(t, entries) {
     gotest.Equal(t, entry.Expected, Compute(entry.Input))

@@ -397,19 +397,60 @@ The returning `BeforeEach` pattern ensures each parallel method operates on its 
 Functional API with compile-time type safety:
 
 ```go
-gotest.Equal(t, expected, actual)            // [T any] — cross-type comparison is a compile error
+// Equality
+gotest.Equal(t, expected, actual)            // [V any] — deep equality; cross-type = compile error
+gotest.NotEqual(t, expected, actual)         // [V any] — deep inequality
+
+// Boolean
+gotest.True(t, condition)
+gotest.False(t, condition)
+
+// Zero / nil
+gotest.Zero(t, value)                        // [V comparable] — value == zero value for type
+gotest.NotZero(t, value)                     // [V comparable] — also covers pointer/interface nil
+
+// Errors
 gotest.NoError(t, err)
+gotest.Error(t, err)                         // err != nil
 gotest.ErrorIs(t, err, target)
 gotest.ErrorAs[*MyError](t, err)             // returns the matched error
 gotest.ErrorContains(t, err, "not found")
-gotest.Contains(t, haystack, needle)
-gotest.Greater(t, a, b)                      // [T cmp.Ordered]
+
+// Collections
+gotest.Empty(t, object)                      // nil, or len == 0
+gotest.NotEmpty(t, object)
 gotest.Len(t, collection, 3)
-gotest.True(t, condition)
-gotest.Panics(t, func() { ... })
-gotest.Regexp(t, `^start`, str)
+gotest.Contains(t, haystack, needle)         // substring, element, or map key
+gotest.NotContains(t, haystack, needle)
+gotest.ElementsMatch(t, a, b)               // [V comparable] — same elements, any order
+gotest.Subset(t, list, subset)              // [V comparable] — all subset elements in list
+
+// Ordering
+gotest.Greater(t, a, b)                      // [V cmp.Ordered]
+gotest.GreaterOrEqual(t, a, b)               // [V cmp.Ordered]
+gotest.Less(t, a, b)                         // [V cmp.Ordered]
+gotest.LessOrEqual(t, a, b)                  // [V cmp.Ordered]
+
+// Numeric
 gotest.InDelta(t, 3.14, pi, 0.01)
+
+// Strings & patterns
+gotest.Regexp(t, `^start`, str)
+
+// JSON
 gotest.JSONEq(t, expected, actual)           // string, []byte, io.Reader, or any marshalable value
+
+// Time
+gotest.TimeWithin(t, expected, actual, tol)  // times within tolerance
+gotest.TimeIsNow(t, ts, tolerance)           // timestamp ≈ now
+
+// Panics
+gotest.Panics(t, func() { ... })             // returns recovered value
+
+// Failure
+gotest.Fail(t, "unreachable")                // immediate unconditional failure
+
+// Async polling
 gotest.Eventually(t, 5*time.Second, 100*time.Millisecond, func(poll *gotest.R) { ... })
 gotest.Consistently(t, 500*time.Millisecond, 50*time.Millisecond, func(poll *gotest.R) { ... })
 ```
@@ -481,6 +522,12 @@ Update all snapshots with:
 gotest --update-snapshots ./...
 ```
 
+Or when running `go test` directly:
+
+```bash
+GOTEST_UPDATE_SNAPSHOTS=1 go test ./...
+```
+
 ## Configuration
 
 Every fixture and suite runs with sensible defaults — 2-minute fixture timeout, 30-second per-test timeout.
@@ -501,8 +548,10 @@ func (f *PostgresSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 
 func (s *BatchTestSuite) SuiteConfig() gotest.SuiteConfig {
     return gotest.SuiteConfig{
-        Timeout:  1 * time.Minute,
-        FailFast: true,
+        Timeout:      1 * time.Minute,
+        SetupTimeout: 2 * time.Minute,
+        FailFast:     true,
+        Parallel:     false,
     }
 }
 ```
@@ -512,12 +561,12 @@ Use negative duration to explicitly disable a timeout (`Timeout: -1`).
 
 Preset constructors for common scenarios:
 
-| Preset | Timeout | Retries | Use case |
-|--------|---------|---------|----------|
-| `DefaultFixtureConfig()` | 2 min | 0 | Standard fixtures |
-| `ContainerFixtureConfig()` | 5 min | 1 | Testcontainers, image pulls |
-| `DefaultSuiteConfig()` | 30 sec | 0 | Unit/integration tests |
-| `IntegrationSuiteConfig()` | 2 min | 0 | Heavier integration tests |
+| Preset | Timeout | SetupTimeout | Retries | RetryDelay | Use case |
+|--------|---------|--------------|---------|------------|----------|
+| `DefaultFixtureConfig()` | 2 min | — | 0 | — | Standard fixtures |
+| `ContainerFixtureConfig()` | 5 min | — | 1 | 5 sec | Testcontainers, image pulls |
+| `DefaultSuiteConfig()` | 30 sec | 30 sec | 0 | — | Unit/integration tests |
+| `IntegrationSuiteConfig()` | 2 min | 5 min | 0 | — | Heavier integration tests |
 
 ## Test Selection
 
@@ -630,7 +679,7 @@ All `go test` flags work unchanged: `-race`, `-cover`, `-count`, `-run`, `-json`
 | `*SharedFixture` suffix | Cross-package shared fixture |
 | `FixtureConfig()` method | Fixture timeout/retry config |
 | `SharedFixtureConfig()` method | Shared fixture timeout/retry config |
-| `SuiteConfig()` method | Suite timeout/failfast config |
+| `SuiteConfig()` method | Suite timeout/parallelism/failfast config |
 | `Hydrate` / `Dehydrate` | SharedFixture test-process resource reconstruction |
 
 ## VS Code Extension
