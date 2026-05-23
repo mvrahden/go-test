@@ -57,12 +57,15 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 
 ### Generated test output
 
+Fixture lifecycle runs through `TestMain` — fixture names do not appear in test paths.
+Suites bound to a fixture produce the same test names as standalone suites:
+
 ```
-Test_E2ESetupFixture/BatchTestSuite/TestDispatch        PASS
-Test_E2ESetupFixture/KeyTestSuite/TestCreate             PASS
+TestBatchTestSuite/TestDispatch        PASS
+TestKeyTestSuite/TestCreate            PASS
 ```
 
-Filter with `-run Test_E2ESetupFixture/BatchTestSuite` to run only batch tests.
+Filter with `-run TestBatchTestSuite` to run only batch tests.
 
 ## Nested Fixtures (Level 2)
 
@@ -95,11 +98,11 @@ type BatchTestSuite struct { API *APIFixture }            // needs full API
 ### Generated test output
 
 ```
-Test_InfraFixture/ReconcilerTestSuite/TestOrphan        PASS
-Test_InfraFixture/APIFixture/BatchTestSuite/TestDispatch PASS
+TestReconcilerTestSuite/TestOrphan  PASS
+TestBatchTestSuite/TestDispatch     PASS
 ```
 
-Filter with `-run Test_InfraFixture/ReconcilerTestSuite` to skip the API stack entirely.
+Filter with `-run TestReconcilerTestSuite` to run only reconciler tests.
 
 ## Shared Fixtures (Level 3, `*SharedFixture` suffix)
 
