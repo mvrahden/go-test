@@ -836,6 +836,10 @@ func (s *AssertionsTestSuite) TestLen(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Len(r, map[string]int{"a": 1}, 5) })
 			gotest.True(it, m.Failed())
 		})
+		w.It("fails for negative expected length", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Len(r, []int{1, 2}, -1) })
+			gotest.True(it, m.Failed())
+		})
 	})
 
 	t.When("object has no length", func(w *gotest.T) {
