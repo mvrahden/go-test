@@ -12,6 +12,104 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+type SnapshotGroupingTestSuite struct{}
+
+func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
+	snapDir := filepath.Join("testdata", "__snapshots__")
+	t.T().Cleanup(func() { os.RemoveAll(snapDir) })
+
+	t.When("subtests write snapshots", func(w *gotest.T) {
+		w.It("creates a file with named sections per subtest", func(it *gotest.T) {
+			gotest.MatchSnapshot(it, "value-one")
+			snapPath := filepath.Join(snapDir, "TestSnapshotGroupingTestSuite_ext.snap")
+			data, err := os.ReadFile(snapPath)
+			gotest.NoError(it, err)
+			content := string(data)
+			gotest.Contains(it, content, "value-one")
+		})
+
+		w.It("creates a file with named sections per subtest (second)", func(it *gotest.T) {
+			gotest.MatchSnapshot(it, "value-two")
+			snapPath := filepath.Join(snapDir, "TestSnapshotGroupingTestSuite_ext.snap")
+			data, err := os.ReadFile(snapPath)
+			gotest.NoError(it, err)
+			content := string(data)
+			gotest.Contains(it, content, "value-two")
+		})
+	})
+
+	t.When("a top-level snapshot is written", func(w *gotest.T) {
+		w.It("uses the _ section key for top-level callers", func(it *gotest.T) {
+			snapPath := filepath.Join(snapDir, "TestSnapshotGroupingTestSuite_ext.snap")
+			gotest.MatchSnapshot(it, "top-level-value")
+			data, err := os.ReadFile(snapPath)
+			gotest.NoError(it, err)
+			gotest.Contains(it, string(data), "top-level-value")
+		})
+	})
+
+	t.When("subtests write in non-alphabetical order", func(w *gotest.T) {
+		w.It("zebra comes first alphabetically after alpha", func(it *gotest.T) {
+			gotest.MatchSnapshot(it, "z-val")
+		})
+	})
+
+	t.When("subtests write in non-alphabetical order (alpha)", func(w *gotest.T) {
+		w.It("alpha section appears before zebra in the file", func(it *gotest.T) {
+			gotest.MatchSnapshot(it, "a-val")
+			snapPath := filepath.Join(snapDir, "TestSnapshotGroupingTestSuite_ext.snap")
+			data, err := os.ReadFile(snapPath)
+			gotest.NoError(it, err)
+			content := string(data)
+			gotest.True(it, strings.Contains(content, "a-val"))
+			gotest.True(it, strings.Contains(content, "z-val"))
+		})
+	})
+}
+
+type SnapshotConcurrencyTestSuite struct{}
+
+func (s *SnapshotConcurrencyTestSuite) TestMatchSnapshotConcurrency(t *gotest.T) {
+	snapDir := filepath.Join("testdata", "__snapshots__")
+	t.T().Cleanup(func() { os.RemoveAll(snapDir) })
+
+	t.When("multiple goroutines write concurrently", func(w *gotest.T) {
+		for i := range 10 {
+				w.It(fmt.Sprintf("goroutine %d writes its value", i), func(it *gotest.T) {
+				it.T().Parallel()
+				gotest.MatchSnapshot(it, fmt.Sprintf("concurrent-value-%d", i))
+			})
+		}
+	})
+}
+
+type SnapshotUpdateTestSuite struct{}
+
+func (s *SnapshotUpdateTestSuite) TestMatchSnapshotUpdate(t *gotest.T) {
+	snapDir := filepath.Join("testdata", "__snapshots__")
+	t.T().Cleanup(func() { os.RemoveAll(snapDir) })
+
+	t.When("GOTEST_UPDATE_SNAPSHOTS is set", func(w *gotest.T) {
+		w.It("replaces original content with updated content and removes the old value", func(it *gotest.T) {
+			snapPath := filepath.Join(snapDir, "TestSnapshotUpdateTestSuite_ext.snap")
+			gotest.MatchSnapshot(it, "original-value")
+
+			data, err := os.ReadFile(snapPath)
+			gotest.NoError(it, err)
+			gotest.Contains(it, string(data), "original-value")
+
+			it.T().Setenv("GOTEST_UPDATE_SNAPSHOTS", "1")
+			gotest.MatchSnapshot(it, "updated-value")
+
+			data, err = os.ReadFile(snapPath)
+			gotest.NoError(it, err)
+			content := string(data)
+			gotest.Contains(it, content, "updated-value")
+			gotest.True(it, !strings.Contains(content, "original-value"), "original content should be replaced")
+		})
+	})
+}
+
 type snapshotTextMarshaler string
 
 func (m snapshotTextMarshaler) MarshalText() ([]byte, error) { return []byte(m), nil }

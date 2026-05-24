@@ -26,8 +26,8 @@ func TestIsExternalPackage(t *testing.T) {
 	})
 
 	t.Run("pxtest file returns true", func(t *testing.T) {
-		pkgCache.Delete(filepath.Join(dir, "snapshot_test.go"))
-		got := isExternalPackage(filepath.Join(dir, "snapshot_test.go"))
+		pkgCache.Delete(filepath.Join(dir, "record_suite_test.go"))
+		got := isExternalPackage(filepath.Join(dir, "record_suite_test.go"))
 		if !got {
 			t.Fatal("expected true for pxtest file")
 		}
