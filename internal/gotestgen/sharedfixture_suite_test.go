@@ -9,9 +9,15 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// SharedFixtureTestSuite tests shared-fixture setup binary generation
+// from SharedFixtureInfo inputs.
 type SharedFixtureTestSuite struct{}
 
-func (s *SharedFixtureTestSuite) TestSingleFixture(t *gotest.T) {
+func (s *SharedFixtureTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
+func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 	t.When("single fixture with one transfer field", func(w *gotest.T) {
 		w.It("generates valid Go with expected structure", func(it *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
@@ -46,9 +52,7 @@ func (s *SharedFixtureTestSuite) TestSingleFixture(t *gotest.T) {
 			gotest.Contains(it, code, "ConnStr: sf0.ConnStr")
 		})
 	})
-}
 
-func (s *SharedFixtureTestSuite) TestMultipleFixtures(t *gotest.T) {
 	t.When("multiple fixtures from different packages", func(w *gotest.T) {
 		w.It("generates imports and lifecycle for both", func(it *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
@@ -90,20 +94,16 @@ func (s *SharedFixtureTestSuite) TestMultipleFixtures(t *gotest.T) {
 			gotest.True(it, lastSf1 < lastSf0, "teardown should be in reverse order: sf1 before sf0")
 		})
 	})
-}
 
-func (s *SharedFixtureTestSuite) TestNoFixtures(t *gotest.T) {
-	t.When("nil fixtures slice", func(w *gotest.T) {
+	t.When("no fixtures", func(w *gotest.T) {
 		w.It("returns an error", func(it *gotest.T) {
 			_, err := gotestgen.GenerateSharedSetup(nil)
 			gotest.Error(it, err)
 			gotest.Contains(it, err.Error(), "no shared fixtures")
 		})
 	})
-}
 
-func (s *SharedFixtureTestSuite) TestNoTransferFields(t *gotest.T) {
-	t.When("fixture has no transfer fields", func(w *gotest.T) {
+	t.When("no transfer fields", func(w *gotest.T) {
 		w.It("generates valid Go with lifecycle calls", func(it *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
@@ -125,10 +125,8 @@ func (s *SharedFixtureTestSuite) TestNoTransferFields(t *gotest.T) {
 			gotest.Contains(it, code, "sf0.AfterAll(ctx)")
 		})
 	})
-}
 
-func (s *SharedFixtureTestSuite) TestMultipleTransferFields(t *gotest.T) {
-	t.When("fixture has multiple transfer and local fields", func(w *gotest.T) {
+	t.When("multiple transfer and local fields", func(w *gotest.T) {
 		w.It("serializes only transfer fields", func(it *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
@@ -152,151 +150,8 @@ func (s *SharedFixtureTestSuite) TestMultipleTransferFields(t *gotest.T) {
 			gotest.True(it, !strings.Contains(code, "sf0.Pool"), "Pool is local and should not be serialized")
 		})
 	})
-}
 
-func (s *SharedFixtureTestSuite) TestContextCalls(t *gotest.T) {
-	t.When("fixture uses context", func(w *gotest.T) {
-		w.It("generates context-aware lifecycle calls", func(it *gotest.T) {
-			fixtures := []gotestgen.SharedFixtureInfo{
-				{
-					Identifier:     "PGFixture",
-					PkgPath:        "github.com/example/fixtures",
-					TransferFields: []string{"ConnStr"},
-				},
-			}
-
-			src, err := gotestgen.GenerateSharedSetup(fixtures)
-			gotest.NoError(it, err)
-
-			code := string(src)
-			gotest.Contains(it, code, "ctx := context.Background()")
-			gotest.Contains(it, code, "sf0.BeforeAll(ctx)")
-			gotest.Contains(it, code, "sf0.AfterAll(ctx)")
-		})
-	})
-}
-
-func (s *SharedFixtureTestSuite) TestDefaultTimeout(t *gotest.T) {
-	t.When("fixture without config", func(w *gotest.T) {
-		w.It("uses default fixture config", func(it *gotest.T) {
-			fixtures := []gotestgen.SharedFixtureInfo{
-				{
-					Identifier:     "PGFixture",
-					PkgPath:        "github.com/example/fixtures",
-					TransferFields: []string{"ConnStr"},
-				},
-			}
-
-			src, err := gotestgen.GenerateSharedSetup(fixtures)
-			gotest.NoError(it, err)
-
-			code := string(src)
-			fset := token.NewFileSet()
-			_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
-			gotest.NoError(it, err, "generated code should be valid Go: %s", code)
-
-			gotest.Contains(it, code, `gotest "github.com/mvrahden/go-test/pkg/gotest"`)
-			gotest.Contains(it, code, "gotest.DefaultFixtureConfig()")
-			gotest.Contains(it, code, "context.WithTimeout(ctx,")
-			gotest.True(it, !strings.Contains(code, "SharedFixtureConfig()"),
-				"should not call SharedFixtureConfig when HasConfig is false")
-		})
-	})
-}
-
-func (s *SharedFixtureTestSuite) TestWithConfig(t *gotest.T) {
-	t.When("fixture has config", func(w *gotest.T) {
-		w.It("generates config overlay and timeout", func(it *gotest.T) {
-			fixtures := []gotestgen.SharedFixtureInfo{
-				{
-					Identifier:     "PGFixture",
-					PkgPath:        "github.com/example/fixtures",
-					HasConfig:      true,
-					TransferFields: []string{"ConnStr"},
-				},
-			}
-
-			src, err := gotestgen.GenerateSharedSetup(fixtures)
-			gotest.NoError(it, err)
-
-			code := string(src)
-			fset := token.NewFileSet()
-			_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
-			gotest.NoError(it, err, "generated code should be valid Go: %s", code)
-
-			gotest.Contains(it, code, "gotest.DefaultFixtureConfig()")
-			gotest.Contains(it, code, "sf0.SharedFixtureConfig()")
-			gotest.Contains(it, code, "gotest.OverlayFixtureConfig(")
-			gotest.Contains(it, code, "context.WithTimeout(ctx,")
-		})
-	})
-}
-
-func (s *SharedFixtureTestSuite) TestRetryLogic(t *gotest.T) {
-	t.When("fixture with retry configuration", func(w *gotest.T) {
-		w.It("generates retry loop with delay", func(it *gotest.T) {
-			fixtures := []gotestgen.SharedFixtureInfo{
-				{
-					Identifier:     "PGFixture",
-					PkgPath:        "github.com/example/fixtures",
-					TransferFields: []string{"ConnStr"},
-				},
-			}
-
-			src, err := gotestgen.GenerateSharedSetup(fixtures)
-			gotest.NoError(it, err)
-
-			code := string(src)
-			gotest.Contains(it, code, "1 + ƒcfg_sf0.Retries")
-			gotest.Contains(it, code, "time.Sleep(ƒcfg_sf0.RetryDelay)")
-			gotest.Contains(it, code, "BeforeAll failed after")
-		})
-	})
-}
-
-func (s *SharedFixtureTestSuite) TestMarshalErrorHandling(t *gotest.T) {
-	t.When("marshal produces an error", func(w *gotest.T) {
-		w.It("generates error handling for marshal", func(it *gotest.T) {
-			fixtures := []gotestgen.SharedFixtureInfo{
-				{
-					Identifier:     "PGFixture",
-					PkgPath:        "github.com/example/fixtures",
-					TransferFields: []string{"ConnStr"},
-				},
-			}
-
-			src, err := gotestgen.GenerateSharedSetup(fixtures)
-			gotest.NoError(it, err)
-
-			code := string(src)
-			gotest.Contains(it, code, "json.Marshal(transfer{")
-			gotest.Contains(it, code, "PGFixture: marshal:")
-		})
-	})
-}
-
-func (s *SharedFixtureTestSuite) TestStateKeyUsesFullyQualifiedName(t *gotest.T) {
-	t.When("fixture state key", func(w *gotest.T) {
-		w.It("uses fully qualified package path and identifier", func(it *gotest.T) {
-			fixtures := []gotestgen.SharedFixtureInfo{
-				{
-					Identifier:     "PGFixture",
-					PkgPath:        "github.com/example/fixtures",
-					TransferFields: []string{"ConnStr"},
-				},
-			}
-
-			src, err := gotestgen.GenerateSharedSetup(fixtures)
-			gotest.NoError(it, err)
-
-			code := string(src)
-			gotest.Contains(it, code, `state["github.com/example/fixtures.PGFixture"]`)
-		})
-	})
-}
-
-func (s *SharedFixtureTestSuite) TestSamePackageDeduplicatesImport(t *gotest.T) {
-	t.When("two fixtures from the same package", func(w *gotest.T) {
+	t.When("two fixtures from same package", func(w *gotest.T) {
 		w.It("deduplicates the import", func(it *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
@@ -330,8 +185,137 @@ func (s *SharedFixtureTestSuite) TestSamePackageDeduplicatesImport(t *gotest.T) 
 	})
 }
 
-func (s *SharedFixtureTestSuite) TestReverseOrderTeardownOnError(t *gotest.T) {
-	t.When("sf1.BeforeAll fails", func(w *gotest.T) {
+func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
+	t.When("context lifecycle", func(w *gotest.T) {
+		w.It("generates context-aware lifecycle calls", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					PkgPath:        "github.com/example/fixtures",
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			gotest.Contains(it, code, "ctx := context.Background()")
+			gotest.Contains(it, code, "sf0.BeforeAll(ctx)")
+			gotest.Contains(it, code, "sf0.AfterAll(ctx)")
+		})
+	})
+
+	t.When("default timeout", func(w *gotest.T) {
+		w.It("uses default fixture config", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					PkgPath:        "github.com/example/fixtures",
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			fset := token.NewFileSet()
+			_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
+			gotest.NoError(it, err, "generated code should be valid Go: %s", code)
+
+			gotest.Contains(it, code, `gotest "github.com/mvrahden/go-test/pkg/gotest"`)
+			gotest.Contains(it, code, "gotest.DefaultFixtureConfig()")
+			gotest.Contains(it, code, "context.WithTimeout(ctx,")
+			gotest.True(it, !strings.Contains(code, "SharedFixtureConfig()"),
+				"should not call SharedFixtureConfig when HasConfig is false")
+		})
+	})
+
+	t.When("with config overlay", func(w *gotest.T) {
+		w.It("generates config overlay and timeout", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					PkgPath:        "github.com/example/fixtures",
+					HasConfig:      true,
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			fset := token.NewFileSet()
+			_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
+			gotest.NoError(it, err, "generated code should be valid Go: %s", code)
+
+			gotest.Contains(it, code, "gotest.DefaultFixtureConfig()")
+			gotest.Contains(it, code, "sf0.SharedFixtureConfig()")
+			gotest.Contains(it, code, "gotest.OverlayFixtureConfig(")
+			gotest.Contains(it, code, "context.WithTimeout(ctx,")
+		})
+	})
+
+	t.When("retry logic", func(w *gotest.T) {
+		w.It("generates retry loop with delay", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					PkgPath:        "github.com/example/fixtures",
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			gotest.Contains(it, code, "1 + ƒcfg_sf0.Retries")
+			gotest.Contains(it, code, "time.Sleep(ƒcfg_sf0.RetryDelay)")
+			gotest.Contains(it, code, "BeforeAll failed after")
+		})
+	})
+
+	t.When("state key format", func(w *gotest.T) {
+		w.It("uses fully qualified package path and identifier", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					PkgPath:        "github.com/example/fixtures",
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			gotest.Contains(it, code, `state["github.com/example/fixtures.PGFixture"]`)
+		})
+	})
+
+	t.When("marshal error handling", func(w *gotest.T) {
+		w.It("generates error handling for marshal", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					PkgPath:        "github.com/example/fixtures",
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			gotest.Contains(it, code, "json.Marshal(transfer{")
+			gotest.Contains(it, code, "PGFixture: marshal:")
+		})
+	})
+
+	t.When("reverse teardown on error", func(w *gotest.T) {
 		w.It("tears down sf0 in reverse order", func(it *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
@@ -361,8 +345,6 @@ func (s *SharedFixtureTestSuite) TestReverseOrderTeardownOnError(t *gotest.T) {
 		})
 	})
 }
-
-// --- Integration test (folded from sharedfixture_integration_test.go) ---
 
 func (s *SharedFixtureTestSuite) TestIntegrationGeneratedSetupBinary(t *gotest.T) {
 	t.When("multi-fixture setup binary", func(w *gotest.T) {

@@ -9,7 +9,12 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
+// RendererTestSuite tests Go code generation from suite and fixture specs.
 type RendererTestSuite struct{}
+
+func (s *RendererTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
 
 func renderTestPkg(t testing.TB, pkg *packages.Package) (string, gotestgen.SpecOutcome) {
 	t.Helper()

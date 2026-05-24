@@ -16,6 +16,8 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// SharedFixtureIntegrationTestSuite tests shared fixture lifecycle integration
+// with real package loading, code generation, and binary execution.
 type SharedFixtureIntegrationTestSuite struct{}
 
 func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gotest.T) {

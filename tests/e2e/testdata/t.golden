@@ -80,4 +80,3 @@
         --- FAIL: TestSimpleTestSuite/TestHelperTrace/shows_called_from_trace (<TIMESTAMP>)
 FAIL
 FAIL	github.com/mvrahden/go-test/pkg/gotest	<TIMESTAMP>
-exit status 1

@@ -18,10 +18,16 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// GotestrunnerProcessTestSuite tests process group lifecycle,
+// signal-based cancellation, and teardown budget enforcement.
 type GotestrunnerProcessTestSuite struct{}
 
-func (s *GotestrunnerProcessTestSuite) TestSetProcessGroup(t *gotest.T) {
-	t.When("setting process group on a command", func(w *gotest.T) {
+func (s *GotestrunnerProcessTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
+func (s *GotestrunnerProcessTestSuite) TestProcessGroupSetup(t *gotest.T) {
+	t.When("setting on a command", func(w *gotest.T) {
 		w.It("sets Setpgid, Cancel, and WaitDelay", func(it *gotest.T) {
 			cmd := exec.Command("echo")
 			gotestrunner.SetProcessGroup(cmd)
@@ -32,36 +38,34 @@ func (s *GotestrunnerProcessTestSuite) TestSetProcessGroup(t *gotest.T) {
 			gotest.Equal(it, gotestrunner.GracefulShutdownDelay, cmd.WaitDelay)
 		})
 	})
-}
 
-func (s *GotestrunnerProcessTestSuite) TestBuildSuiteCmdSetsProcessGroup(t *gotest.T) {
 	t.When("building suite cmd", func(w *gotest.T) {
-		for _, test2json := range []bool{false, true} {
-			name := "plain"
-			if test2json {
-				name = "test2json"
+		for sub, tc := range gotest.Each(w, []struct {
+			Name      string
+			test2json bool
+		}{
+			{"plain mode", false},
+			{"test2json mode", true},
+		}) {
+			ctx := context.Background()
+			env := []string{"PATH=/usr/bin"}
+			target := gotestrunner.SuiteTarget{
+				Package:    "example.com/pkg",
+				BinaryPath: "/tmp/pkg.test",
+				SuiteName:  "TestFoo",
 			}
-			w.It(fmt.Sprintf("sets process group in %s mode", name), func(it *gotest.T) {
-				ctx := context.Background()
-				env := []string{"PATH=/usr/bin"}
-				target := gotestrunner.SuiteTarget{
-					Package:    "example.com/pkg",
-					BinaryPath: "/tmp/pkg.test",
-					SuiteName:  "TestFoo",
-				}
-				cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, env, test2json)
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, env, tc.test2json)
 
-				gotest.True(it, cmd.SysProcAttr != nil && cmd.SysProcAttr.Setpgid,
-					"expected Setpgid to be true")
-				gotest.True(it, cmd.Cancel != nil, "expected Cancel to be set")
-				gotest.Equal(it, time.Duration(0), cmd.WaitDelay)
-			})
+			gotest.True(sub, cmd.SysProcAttr != nil && cmd.SysProcAttr.Setpgid,
+				"expected Setpgid to be true")
+			gotest.True(sub, cmd.Cancel != nil, "expected Cancel to be set")
+			gotest.Equal(sub, time.Duration(0), cmd.WaitDelay)
 		}
 	})
 }
 
-func (s *GotestrunnerProcessTestSuite) TestSetProcessGroupCancel(t *gotest.T) {
-	t.When("Cancel is called on a running process", func(w *gotest.T) {
+func (s *GotestrunnerProcessTestSuite) TestProcessGroupCancel(t *gotest.T) {
+	t.When("process is running", func(w *gotest.T) {
 		w.It("sends SIGTERM to the process group", func(it *gotest.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -97,10 +101,8 @@ func (s *GotestrunnerProcessTestSuite) TestSetProcessGroupCancel(t *gotest.T) {
 			gotest.True(it, err != nil, "process %d still alive after Cancel", pid)
 		})
 	})
-}
 
-func (s *GotestrunnerProcessTestSuite) TestSetProcessGroupCancelNilProcess(t *gotest.T) {
-	t.When("Cancel is called before Start", func(w *gotest.T) {
+	t.When("process not yet started", func(w *gotest.T) {
 		w.It("does not panic and returns no error", func(it *gotest.T) {
 			cmd := exec.Command("sleep", "300")
 			gotestrunner.SetProcessGroup(cmd)
@@ -112,84 +114,7 @@ func (s *GotestrunnerProcessTestSuite) TestSetProcessGroupCancelNilProcess(t *go
 	})
 }
 
-func (s *GotestrunnerProcessTestSuite) TestReadTeardownBudget(t *gotest.T) {
-	t.When("empty path", func(w *gotest.T) {
-		w.It("returns default", func(it *gotest.T) {
-			got := gotestrunner.ExportReadTeardownBudget("")
-			gotest.Equal(it, gotestrunner.GracefulShutdownDelay, got)
-		})
-	})
-
-	t.When("missing file", func(w *gotest.T) {
-		w.It("returns default", func(it *gotest.T) {
-			got := gotestrunner.ExportReadTeardownBudget("/nonexistent/budget")
-			gotest.Equal(it, gotestrunner.GracefulShutdownDelay, got)
-		})
-	})
-
-	t.When("valid duration", func(w *gotest.T) {
-		w.It("returns parsed duration", func(it *gotest.T) {
-			f := filepath.Join(it.T().TempDir(), "budget")
-			os.WriteFile(f, []byte("2m30s\n"), 0644)
-			got := gotestrunner.ExportReadTeardownBudget(f)
-			want := 2*time.Minute + 30*time.Second
-			gotest.Equal(it, want, got)
-		})
-	})
-
-	t.When("invalid duration", func(w *gotest.T) {
-		w.It("returns default", func(it *gotest.T) {
-			f := filepath.Join(it.T().TempDir(), "budget")
-			os.WriteFile(f, []byte("not-a-duration"), 0644)
-			got := gotestrunner.ExportReadTeardownBudget(f)
-			gotest.Equal(it, gotestrunner.GracefulShutdownDelay, got)
-		})
-	})
-
-	t.When("zero duration", func(w *gotest.T) {
-		w.It("returns default", func(it *gotest.T) {
-			f := filepath.Join(it.T().TempDir(), "budget")
-			os.WriteFile(f, []byte("0s"), 0644)
-			got := gotestrunner.ExportReadTeardownBudget(f)
-			gotest.Equal(it, gotestrunner.GracefulShutdownDelay, got)
-		})
-	})
-}
-
-func (s *GotestrunnerProcessTestSuite) TestBuildSuiteCmdBudgetFileEnv(t *gotest.T) {
-	ctx := context.Background()
-	env := []string{"PATH=/usr/bin"}
-
-	t.When("BudgetFile is set", func(w *gotest.T) {
-		w.It("sets GOTEST_TEARDOWN_BUDGET_FILE in env", func(it *gotest.T) {
-			target := gotestrunner.SuiteTarget{
-				Package:    "example.com/pkg",
-				BinaryPath: "/tmp/pkg.test",
-				SuiteName:  "TestFoo",
-				BudgetFile: "/tmp/pkg.test.budget",
-			}
-			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, env, false)
-			gotest.True(it, slices.Contains(cmd.Env, "GOTEST_TEARDOWN_BUDGET_FILE=/tmp/pkg.test.budget"), "GOTEST_TEARDOWN_BUDGET_FILE not found in cmd.Env")
-		})
-	})
-
-	t.When("BudgetFile is empty", func(w *gotest.T) {
-		w.It("does not set GOTEST_TEARDOWN_BUDGET_FILE", func(it *gotest.T) {
-			target := gotestrunner.SuiteTarget{
-				Package:    "example.com/pkg",
-				BinaryPath: "/tmp/pkg.test",
-				SuiteName:  "TestFoo",
-			}
-			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, env, false)
-			for _, e := range cmd.Env {
-				gotest.False(it, strings.HasPrefix(e, "GOTEST_TEARDOWN_BUDGET_FILE="),
-					"unexpected GOTEST_TEARDOWN_BUDGET_FILE in env: %s", e)
-			}
-		})
-	})
-}
-
-func (s *GotestrunnerProcessTestSuite) TestSetProcessGroupWaitDelayForceKills(t *gotest.T) {
+func (s *GotestrunnerProcessTestSuite) TestProcessGroupTermination(t *gotest.T) {
 	t.When("process ignores SIGTERM", func(w *gotest.T) {
 		w.It("force-kills after WaitDelay", func(it *gotest.T) {
 			if os.Getenv("GOTEST_TRAP_SIGTERM") == "1" {
@@ -204,7 +129,7 @@ func (s *GotestrunnerProcessTestSuite) TestSetProcessGroupWaitDelayForceKills(t 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestGotestrunnerProcessTestSuite$/^TestSetProcessGroupWaitDelayForceKills$")
+			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestGotestrunnerProcessTestSuite$/^TestProcessGroupTermination$")
 			cmd.Env = append(os.Environ(), "GOTEST_TRAP_SIGTERM=1")
 			gotestrunner.SetProcessGroup(cmd)
 			// Override WaitDelay to a short value for the test.
@@ -243,11 +168,9 @@ func (s *GotestrunnerProcessTestSuite) TestSetProcessGroupWaitDelayForceKills(t 
 			}
 		})
 	})
-}
 
-func (s *GotestrunnerProcessTestSuite) TestSetProcessGroupKillsProcessTree(t *gotest.T) {
-	t.When("context is cancelled", func(w *gotest.T) {
-		w.It("kills the entire process tree", func(it *gotest.T) {
+	t.When("process has child tree", func(w *gotest.T) {
+		w.It("kills entire process tree", func(it *gotest.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -294,6 +217,85 @@ func (s *GotestrunnerProcessTestSuite) TestSetProcessGroupKillsProcessTree(t *go
 				proc.Kill()
 				it.T().Errorf("grandchild process %d is still alive after context cancellation", childPID)
 			}
+		})
+	})
+}
+
+func (s *GotestrunnerProcessTestSuite) TestTeardownBudget(t *gotest.T) {
+	t.When("reading budget file", func(w *gotest.T) {
+		w.When("empty path", func(w *gotest.T) {
+			w.It("returns default", func(it *gotest.T) {
+				got := gotestrunner.ExportReadTeardownBudget("")
+				gotest.Equal(it, gotestrunner.GracefulShutdownDelay, got)
+			})
+		})
+
+		w.When("missing file", func(w *gotest.T) {
+			w.It("returns default", func(it *gotest.T) {
+				got := gotestrunner.ExportReadTeardownBudget("/nonexistent/budget")
+				gotest.Equal(it, gotestrunner.GracefulShutdownDelay, got)
+			})
+		})
+
+		w.When("valid duration", func(w *gotest.T) {
+			w.It("returns parsed duration", func(it *gotest.T) {
+				f := filepath.Join(it.T().TempDir(), "budget")
+				os.WriteFile(f, []byte("2m30s\n"), 0644)
+				got := gotestrunner.ExportReadTeardownBudget(f)
+				want := 2*time.Minute + 30*time.Second
+				gotest.Equal(it, want, got)
+			})
+		})
+
+		w.When("invalid duration", func(w *gotest.T) {
+			w.It("returns default", func(it *gotest.T) {
+				f := filepath.Join(it.T().TempDir(), "budget")
+				os.WriteFile(f, []byte("not-a-duration"), 0644)
+				got := gotestrunner.ExportReadTeardownBudget(f)
+				gotest.Equal(it, gotestrunner.GracefulShutdownDelay, got)
+			})
+		})
+
+		w.When("zero duration", func(w *gotest.T) {
+			w.It("returns default", func(it *gotest.T) {
+				f := filepath.Join(it.T().TempDir(), "budget")
+				os.WriteFile(f, []byte("0s"), 0644)
+				got := gotestrunner.ExportReadTeardownBudget(f)
+				gotest.Equal(it, gotestrunner.GracefulShutdownDelay, got)
+			})
+		})
+	})
+
+	t.When("env injection in BuildSuiteCmd", func(w *gotest.T) {
+		ctx := context.Background()
+		env := []string{"PATH=/usr/bin"}
+
+		w.When("BudgetFile is set", func(w *gotest.T) {
+			w.It("sets GOTEST_TEARDOWN_BUDGET_FILE in env", func(it *gotest.T) {
+				target := gotestrunner.SuiteTarget{
+					Package:    "example.com/pkg",
+					BinaryPath: "/tmp/pkg.test",
+					SuiteName:  "TestFoo",
+					BudgetFile: "/tmp/pkg.test.budget",
+				}
+				cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, env, false)
+				gotest.True(it, slices.Contains(cmd.Env, "GOTEST_TEARDOWN_BUDGET_FILE=/tmp/pkg.test.budget"), "GOTEST_TEARDOWN_BUDGET_FILE not found in cmd.Env")
+			})
+		})
+
+		w.When("BudgetFile is empty", func(w *gotest.T) {
+			w.It("does not set GOTEST_TEARDOWN_BUDGET_FILE", func(it *gotest.T) {
+				target := gotestrunner.SuiteTarget{
+					Package:    "example.com/pkg",
+					BinaryPath: "/tmp/pkg.test",
+					SuiteName:  "TestFoo",
+				}
+				cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, env, false)
+				for _, e := range cmd.Env {
+					gotest.False(it, strings.HasPrefix(e, "GOTEST_TEARDOWN_BUDGET_FILE="),
+						"unexpected GOTEST_TEARDOWN_BUDGET_FILE in env: %s", e)
+				}
+			})
 		})
 	})
 }

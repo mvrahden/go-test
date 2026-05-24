@@ -22,7 +22,12 @@ func (e *myError) Error() string { return fmt.Sprintf("myError: code=%d", e.Code
 
 type point struct{ X, Y int }
 
+// AssertionsTestSuite tests all gotest assertion functions via recorded outcomes.
 type AssertionsTestSuite struct{}
+
+func (s *AssertionsTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
 
 func (s *AssertionsTestSuite) TestFail(t *gotest.T) {
 	t.When("called without message", func(w *gotest.T) {

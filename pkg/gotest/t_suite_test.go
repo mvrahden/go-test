@@ -6,7 +6,13 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// TTestSuite tests the T wrapper: deadline propagation, context access,
+// and fallback to the underlying testing.T.
 type TTestSuite struct{}
+
+func (s *TTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
 
 func (s *TTestSuite) TestNewTWithDeadline(t *gotest.T) {
 	t.When("deadline is set", func(w *gotest.T) {

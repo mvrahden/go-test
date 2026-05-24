@@ -6,7 +6,13 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// ConfigTestSuite tests config constructors, presets, and overlay logic
+// for FixtureConfig and SuiteConfig.
 type ConfigTestSuite struct{}
+
+func (s *ConfigTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
 
 func (s *ConfigTestSuite) TestDefaultFixtureConfig(t *gotest.T) {
 	t.It("returns 2-minute timeout with no retries", func(it *gotest.T) {

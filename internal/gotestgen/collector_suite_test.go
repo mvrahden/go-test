@@ -6,7 +6,12 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// CollectorTestSuite tests suite and fixture spec collection from Go packages.
 type CollectorTestSuite struct{}
+
+func (s *CollectorTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
 
 func (s *CollectorTestSuite) TestFixtureCollection(t *gotest.T) {
 	t.When("package fixture", func(w *gotest.T) {
@@ -93,6 +98,16 @@ func (s *CollectorTestSuite) TestFixtureEmbedding(t *gotest.T) {
 			result := c.CollectSuiteSpecs(pkg)
 			gotest.Equal(it, 0, len(result.Errs))
 			gotest.Equal(it, 2, len(result.Fixtures))
+		})
+	})
+
+	t.When("package fixture has wrong BeforeAll signature", func(w *gotest.T) {
+		w.It("reports an error", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_PackageFixture_WrongBeforeAllSignature")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.True(it, len(result.Errs) > 0, "expected error for wrong BeforeAll signature on package fixture")
+			gotest.Contains(it, result.Errs[0].Err.Error(), "unsupported signature")
 		})
 	})
 }
@@ -462,9 +477,7 @@ func (s *CollectorTestSuite) TestStdlibT(t *gotest.T) {
 			gotest.Contains(it, result.Errs[0].Err.Error(), "must be *gotest.T or *testing.T")
 		})
 	})
-}
 
-func (s *CollectorTestSuite) TestGotestTNotUsesStdlibT(t *gotest.T) {
 	t.When("test method uses *gotest.T", func(w *gotest.T) {
 		w.It("reports NOT UsesStdlibT", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_GotestT_NotUsesStdlibT")
@@ -485,18 +498,6 @@ func (s *CollectorTestSuite) TestNilPackage(t *gotest.T) {
 			gotest.Equal(it, 0, len(result.Errs))
 			gotest.True(it, result.Suites == nil, "expected nil suites")
 			gotest.True(it, result.Fixtures == nil, "expected nil fixtures")
-		})
-	})
-}
-
-func (s *CollectorTestSuite) TestPackageFixtureWrongBeforeAllSignature(t *gotest.T) {
-	t.When("BeforeAll has wrong signature", func(w *gotest.T) {
-		w.It("reports an error", func(it *gotest.T) {
-			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_PackageFixture_WrongBeforeAllSignature")
-			c := gotestgen.NewCollector()
-			result := c.CollectSuiteSpecs(pkg)
-			gotest.True(it, len(result.Errs) > 0, "expected error for wrong BeforeAll signature on package fixture")
-			gotest.Contains(it, result.Errs[0].Err.Error(), "unsupported signature")
 		})
 	})
 }

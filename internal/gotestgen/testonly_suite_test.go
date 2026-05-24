@@ -8,6 +8,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// TestOnlyTestSuite tests detection of test-only packages.
 type TestOnlyTestSuite struct{}
 
 func (s *TestOnlyTestSuite) TestIsTestOnly(t *gotest.T) {

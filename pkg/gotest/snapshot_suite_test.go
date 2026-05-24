@@ -12,6 +12,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// SnapshotGroupingTestSuite tests grouped snapshot file creation with per-subtest sections.
 type SnapshotGroupingTestSuite struct{}
 
 func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
@@ -67,6 +68,7 @@ func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
 	})
 }
 
+// SnapshotConcurrencyTestSuite tests concurrent snapshot writes from parallel subtests.
 type SnapshotConcurrencyTestSuite struct{}
 
 func (s *SnapshotConcurrencyTestSuite) TestMatchSnapshotConcurrency(t *gotest.T) {
@@ -83,6 +85,7 @@ func (s *SnapshotConcurrencyTestSuite) TestMatchSnapshotConcurrency(t *gotest.T)
 	})
 }
 
+// SnapshotUpdateTestSuite tests snapshot update mode via GOTEST_UPDATE_SNAPSHOTS.
 type SnapshotUpdateTestSuite struct{}
 
 func (s *SnapshotUpdateTestSuite) TestMatchSnapshotUpdate(t *gotest.T) {
@@ -124,6 +127,7 @@ func (m snapshotJSONMarshaler) MarshalJSON() ([]byte, error) { return json.Marsh
 
 type snapshotNamedString string
 
+// SnapshotTestSuite tests snapshot matching, custom naming, and value serialization.
 type SnapshotTestSuite struct{}
 
 func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
