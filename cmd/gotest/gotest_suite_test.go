@@ -16,13 +16,13 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// CmdGotestTestSuite tests CLI argument parsing, subcommands,
+// discovery, spec rendering, and code generation.
 type CmdGotestTestSuite struct{}
 
 func (s *CmdGotestTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true}
 }
-
-// --- args ---
 
 func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
 	type entry struct {
@@ -162,6 +162,10 @@ func (s *CmdGotestTestSuite) TestSplitArgs(t *gotest.T) {
 		{desc: "watch allowed set", inArgs: []string{"--debounce=500ms", "-v"}, allowed: ExportWatchAllowed, expectOwn: []string{"--debounce=500ms"}, expectGoTest: []string{"-v"}},
 		{desc: "go test value flag with space", inArgs: []string{"-run", "TestFoo", "./..."}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-run", "TestFoo", "./..."}},
 		{desc: "go test value flag with equals", inArgs: []string{"-timeout=30s"}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-timeout=30s"}},
+		{desc: "watch: no flags", inArgs: []string{"./pkg/..."}, allowed: ExportWatchAllowed, expectOwn: nil, expectGoTest: []string{"./pkg/..."}},
+		{desc: "watch: json flag", inArgs: []string{"-json", "./pkg/..."}, allowed: ExportWatchAllowed, expectOwn: nil, expectGoTest: []string{"-json", "./pkg/..."}},
+		{desc: "watch: debounce with json", inArgs: []string{"--debounce=500ms", "-json", "./..."}, allowed: ExportWatchAllowed, expectOwn: []string{"--debounce=500ms"}, expectGoTest: []string{"-json", "./..."}},
+		{desc: "watch: debug and ci", inArgs: []string{"--debug", "--ci", "-v", "./..."}, allowed: ExportWatchAllowed, expectOwn: []string{"--debug", "--ci"}, expectGoTest: []string{"-v", "./..."}},
 	} {
 		t.When(tc.desc, func(w *gotest.T) {
 			w.It("splits correctly", func(it *gotest.T) {
@@ -209,52 +213,48 @@ func (s *CmdGotestTestSuite) TestParseSubcommand(t *gotest.T) {
 	}
 }
 
-func (s *CmdGotestTestSuite) TestExtractPackagePatterns(t *gotest.T) {
-	for _, tc := range []struct {
-		desc     string
-		args     []string
-		expected []string
-	}{
-		{desc: "explicit relative path", args: []string{"-v", "./...", "-race"}, expected: []string{"./..."}},
-		{desc: "explicit named package", args: []string{"-v", "github.com/foo/bar", "-race"}, expected: []string{"github.com/foo/bar"}},
-		{desc: "no package defaults to dot", args: []string{"-v", "-race"}, expected: []string{"."}},
-		{desc: "multiple packages", args: []string{"./pkg/a", "./pkg/b", "-v"}, expected: []string{"./pkg/a", "./pkg/b"}},
-		{desc: "stops at -args", args: []string{"-v", "./...", "-args", "-custom", "./not/a/pkg"}, expected: []string{"./..."}},
-		{desc: "no args defaults to dot", args: nil, expected: []string{"."}},
-		{desc: "bare relative path", args: []string{"-v", "./cmd/gotest"}, expected: []string{"./cmd/gotest"}},
-	} {
-		t.When(tc.desc, func(w *gotest.T) {
-			w.It("extracts expected patterns", func(it *gotest.T) {
+func (s *CmdGotestTestSuite) TestPackagePatterns(t *gotest.T) {
+	t.When("extract package patterns", func(w *gotest.T) {
+		for _, tc := range []struct {
+			desc     string
+			args     []string
+			expected []string
+		}{
+			{desc: "explicit relative path", args: []string{"-v", "./...", "-race"}, expected: []string{"./..."}},
+			{desc: "explicit named package", args: []string{"-v", "github.com/foo/bar", "-race"}, expected: []string{"github.com/foo/bar"}},
+			{desc: "no package defaults to dot", args: []string{"-v", "-race"}, expected: []string{"."}},
+			{desc: "multiple packages", args: []string{"./pkg/a", "./pkg/b", "-v"}, expected: []string{"./pkg/a", "./pkg/b"}},
+			{desc: "stops at -args", args: []string{"-v", "./...", "-args", "-custom", "./not/a/pkg"}, expected: []string{"./..."}},
+			{desc: "no args defaults to dot", args: nil, expected: []string{"."}},
+			{desc: "bare relative path", args: []string{"-v", "./cmd/gotest"}, expected: []string{"./cmd/gotest"}},
+		} {
+			w.It(tc.desc, func(it *gotest.T) {
 				result := ExtractPackagePatterns(tc.args)
 				gotest.Equal(it, tc.expected, result)
 			})
-		})
-	}
-}
+		}
+	})
 
-func (s *CmdGotestTestSuite) TestLooksLikePackagePattern(t *gotest.T) {
-	for _, tc := range []struct {
-		desc   string
-		input  string
-		expect bool
-	}{
-		{desc: "relative path", input: "./pkg/foo", expect: true},
-		{desc: "absolute path", input: "/usr/local/pkg", expect: true},
-		{desc: "named package", input: "github.com/foo/bar", expect: true},
-		{desc: "flag", input: "-v", expect: false},
-		{desc: "bare word", input: "strings", expect: false},
-		{desc: "dot only", input: ".", expect: true},
-		{desc: "dot-slash", input: "./...", expect: true},
-	} {
-		t.When(tc.desc, func(w *gotest.T) {
-			w.It("returns expected result", func(it *gotest.T) {
+	t.When("looks like package pattern", func(w *gotest.T) {
+		for _, tc := range []struct {
+			desc   string
+			input  string
+			expect bool
+		}{
+			{desc: "relative path", input: "./pkg/foo", expect: true},
+			{desc: "absolute path", input: "/usr/local/pkg", expect: true},
+			{desc: "named package", input: "github.com/foo/bar", expect: true},
+			{desc: "flag", input: "-v", expect: false},
+			{desc: "bare word", input: "strings", expect: false},
+			{desc: "dot only", input: ".", expect: true},
+			{desc: "dot-slash", input: "./...", expect: true},
+		} {
+			w.It(tc.desc, func(it *gotest.T) {
 				gotest.Equal(it, tc.expect, gotestrunner.LooksLikePackagePattern(tc.input))
 			})
-		})
-	}
+		}
+	})
 }
-
-// --- cli ---
 
 func (s *CmdGotestTestSuite) TestParseMinFlag(t *gotest.T) {
 	for _, tc := range []struct {
@@ -285,8 +285,6 @@ func (s *CmdGotestTestSuite) TestParseMinFlag(t *gotest.T) {
 		})
 	}
 }
-
-// --- discover ---
 
 func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 	t.It("discovers suites in examples/cart", func(it *gotest.T) {
@@ -402,8 +400,6 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 	})
 }
 
-// --- focusguard ---
-
 func (s *CmdGotestTestSuite) TestFocusViolation_String(t *gotest.T) {
 	for _, tc := range []struct {
 		desc     string
@@ -433,8 +429,6 @@ func (s *CmdGotestTestSuite) TestFocusViolation_String(t *gotest.T) {
 		})
 	}
 }
-
-// --- generate ---
 
 func (s *CmdGotestTestSuite) TestGenerateOverlay(t *gotest.T) {
 	t.When("suites are present", func(w *gotest.T) {
@@ -535,8 +529,6 @@ func (s *CmdGotestTestSuite) TestGenerateOverlay(t *gotest.T) {
 		})
 	})
 }
-
-// --- spec ---
 
 func (s *CmdGotestTestSuite) TestSpecFlagParsing(t *gotest.T) {
 	for _, tc := range []struct {
@@ -674,105 +666,77 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 	})
 }
 
-// --- watch ---
-
-func (s *CmdGotestTestSuite) TestIsGoFile(t *gotest.T) {
-	for _, tc := range []struct {
-		desc   string
-		name   string
-		expect bool
-	}{
-		{desc: "go file", name: "main.go", expect: true},
-		{desc: "test file", name: "main_test.go", expect: true},
-		{desc: "path with go file", name: "/tmp/foo/bar.go", expect: true},
-		{desc: "not a go file", name: "main.py", expect: false},
-		{desc: "go in middle", name: "foo.go.bak", expect: false},
-		{desc: "empty", name: "", expect: false},
-	} {
-		t.When(tc.desc, func(w *gotest.T) {
-			w.It("returns expected result", func(it *gotest.T) {
+func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
+	t.When("IsGoFile", func(w *gotest.T) {
+		for _, tc := range []struct {
+			desc   string
+			name   string
+			expect bool
+		}{
+			{desc: "go file", name: "main.go", expect: true},
+			{desc: "test file", name: "main_test.go", expect: true},
+			{desc: "path with go file", name: "/tmp/foo/bar.go", expect: true},
+			{desc: "not a go file", name: "main.py", expect: false},
+			{desc: "go in middle", name: "foo.go.bak", expect: false},
+			{desc: "empty", name: "", expect: false},
+		} {
+			w.It(tc.desc, func(it *gotest.T) {
 				gotest.Equal(it, tc.expect, ExportIsGoFile(tc.name))
 			})
-		})
-	}
-}
+		}
+	})
 
-func (s *CmdGotestTestSuite) TestDirsToPatterns(t *gotest.T) {
-	for _, tc := range []struct {
-		desc    string
-		dirs    map[string]bool
-		lenWant int
-	}{
-		{desc: "single dir", dirs: map[string]bool{"pkg/foo": true}, lenWant: 1},
-		{desc: "multiple dirs", dirs: map[string]bool{"pkg/foo": true, "cmd/bar": true}, lenWant: 2},
-		{desc: "empty", dirs: map[string]bool{}, lenWant: 0},
-	} {
-		t.When(tc.desc, func(w *gotest.T) {
-			w.It("returns correct patterns", func(it *gotest.T) {
+	t.When("DirsToPatterns", func(w *gotest.T) {
+		for _, tc := range []struct {
+			desc    string
+			dirs    map[string]bool
+			lenWant int
+		}{
+			{desc: "single dir", dirs: map[string]bool{"pkg/foo": true}, lenWant: 1},
+			{desc: "multiple dirs", dirs: map[string]bool{"pkg/foo": true, "cmd/bar": true}, lenWant: 2},
+			{desc: "empty", dirs: map[string]bool{}, lenWant: 0},
+		} {
+			w.It(tc.desc, func(it *gotest.T) {
 				result := ExportDirsToPatterns(tc.dirs)
 				gotest.Len(it, result, tc.lenWant)
 				for _, p := range result {
 					gotest.True(it, len(p) > 2 && p[:2] == "./", "expected ./ prefix, got: %s", p)
 				}
 			})
-		})
-	}
-}
+		}
+	})
 
-func (s *CmdGotestTestSuite) TestReplacePatterns(t *gotest.T) {
-	for _, tc := range []struct {
-		desc        string
-		original    []string
-		newPatterns []string
-		expected    []string
-	}{
-		{
-			desc:        "replaces package pattern",
-			original:    []string{"-v", "./pkg/foo", "-race"},
-			newPatterns: []string{"./cmd/bar"},
-			expected:    []string{"-v", "-race", "./cmd/bar"},
-		},
-		{
-			desc:        "no patterns to replace",
-			original:    []string{"-v", "-race"},
-			newPatterns: []string{"./pkg/new"},
-			expected:    []string{"-v", "-race", "./pkg/new"},
-		},
-		{
-			desc:        "multiple patterns replaced",
-			original:    []string{"-v", "./pkg/a", "./pkg/b", "-race"},
-			newPatterns: []string{"./changed"},
-			expected:    []string{"-v", "-race", "./changed"},
-		},
-	} {
-		t.When(tc.desc, func(w *gotest.T) {
-			w.It("returns expected result", func(it *gotest.T) {
+	t.When("ReplacePatterns", func(w *gotest.T) {
+		for _, tc := range []struct {
+			desc        string
+			original    []string
+			newPatterns []string
+			expected    []string
+		}{
+			{
+				desc:        "replaces package pattern",
+				original:    []string{"-v", "./pkg/foo", "-race"},
+				newPatterns: []string{"./cmd/bar"},
+				expected:    []string{"-v", "-race", "./cmd/bar"},
+			},
+			{
+				desc:        "no patterns to replace",
+				original:    []string{"-v", "-race"},
+				newPatterns: []string{"./pkg/new"},
+				expected:    []string{"-v", "-race", "./pkg/new"},
+			},
+			{
+				desc:        "multiple patterns replaced",
+				original:    []string{"-v", "./pkg/a", "./pkg/b", "-race"},
+				newPatterns: []string{"./changed"},
+				expected:    []string{"-v", "-race", "./changed"},
+			},
+		} {
+			w.It(tc.desc, func(it *gotest.T) {
 				result := ExportReplacePatterns(tc.original, tc.newPatterns)
 				gotest.Equal(it, tc.expected, result)
 			})
-		})
-	}
+		}
+	})
 }
 
-func (s *CmdGotestTestSuite) TestWatchSplitArgs(t *gotest.T) {
-	for _, tc := range []struct {
-		desc         string
-		args         []string
-		expectOwn    []string
-		expectGoTest []string
-	}{
-		{"no flags", []string{"./pkg/..."}, nil, []string{"./pkg/..."}},
-		{"json flag", []string{"-json", "./pkg/..."}, nil, []string{"-json", "./pkg/..."}},
-		{"debounce with json", []string{"--debounce=500ms", "-json", "./..."}, []string{"--debounce=500ms"}, []string{"-json", "./..."}},
-		{"debug and ci", []string{"--debug", "--ci", "-v", "./..."}, []string{"--debug", "--ci"}, []string{"-v", "./..."}},
-	} {
-		t.When(tc.desc, func(w *gotest.T) {
-			w.It("splits watch args correctly", func(it *gotest.T) {
-				own, goTest, err := SplitArgs(tc.args, ExportWatchAllowed)
-				gotest.NoError(it, err)
-				gotest.Equal(it, tc.expectOwn, own)
-				gotest.Equal(it, tc.expectGoTest, goTest)
-			})
-		})
-	}
-}
