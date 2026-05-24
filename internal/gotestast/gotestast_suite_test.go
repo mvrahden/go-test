@@ -134,6 +134,8 @@ func buildFixtureSpec(t *testing.T, src string) *gotestast.FixtureSpec {
 	return spec
 }
 
+// GotestastTestSuite tests AST-level fixture and suite detection,
+// harness binding, and lifecycle method validation.
 type GotestastTestSuite struct{}
 
 func (s *GotestastTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -605,7 +607,7 @@ func (f *OtherFixture) BeforeAll(ctx context.Context) error { return nil }
 	})
 }
 
-func (s *GotestastTestSuite) TestValidateFixtureConsistency(t *gotest.T) {
+func (s *GotestastTestSuite) TestFixtureValidation(t *gotest.T) {
 	t.When("Hydrate present without Dehydrate", func(w *gotest.T) {
 		w.It("returns an error", func(it *gotest.T) {
 			src := `package testpkg
@@ -719,6 +721,55 @@ func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
 			gotest.Equal(it, token.Pos(-1), pos)
 		})
 	})
+
+	t.When("context-error signature", func(w *gotest.T) {
+		src := `package testpkg
+
+import "context"
+
+type S struct{}
+
+func (s *S) Good(ctx context.Context) error { return nil }
+func (s *S) NoParams() error { return nil }
+func (s *S) WrongParam(x int) error { return nil }
+func (s *S) NoReturn(ctx context.Context) {}
+func (s *S) WrongReturn(ctx context.Context) int { return 0 }
+func (s *S) TooManyParams(ctx context.Context, x int) error { return nil }
+`
+		fm := loadFixtureWithMethods(t.T(), src)
+
+		for _, tc := range []struct {
+			name    string
+			wantErr bool
+			errMsg  string
+		}{
+			{"Good", false, ""},
+			{"NoParams", true, "unsupported signature"},
+			{"WrongParam", true, "unsupported param type"},
+			{"NoReturn", true, "unsupported signature"},
+			{"WrongReturn", true, "unsupported return type"},
+			{"TooManyParams", true, "unsupported signature"},
+		} {
+			w.It(tc.name, func(it *gotest.T) {
+				for _, fd := range fm.funcDecls {
+					if fd.Name.Name != tc.name {
+						continue
+					}
+					m := fm.pkg.TypesInfo.ObjectOf(fd.Name).(*types.Func)
+					sig := fm.pkg.TypesInfo.TypeOf(fd.Name).(*types.Signature)
+					methodID := "S." + m.Name()
+
+					err := gotestast.ExportValidateContextErrorSig(sig, methodID)
+					if tc.wantErr {
+						gotest.True(it, err != nil, "expected error for %s", tc.name)
+						gotest.Contains(it, err.Error(), tc.errMsg)
+					} else {
+						gotest.NoError(it, err)
+					}
+				}
+			})
+		}
+	})
 }
 
 func (s *GotestastTestSuite) TestExportedFieldNames(t *gotest.T) {
@@ -742,59 +793,6 @@ type PGSharedFixture struct {
 			gotest.Equal(it, "Port", names[1])
 		})
 	})
-}
-
-func (s *GotestastTestSuite) TestValidateContextErrorSig(t *gotest.T) {
-	src := `package testpkg
-
-import "context"
-
-type S struct{}
-
-func (s *S) Good(ctx context.Context) error { return nil }
-func (s *S) NoParams() error { return nil }
-func (s *S) WrongParam(x int) error { return nil }
-func (s *S) NoReturn(ctx context.Context) {}
-func (s *S) WrongReturn(ctx context.Context) int { return 0 }
-func (s *S) TooManyParams(ctx context.Context, x int) error { return nil }
-`
-	fm := loadFixtureWithMethods(t.T(), src)
-
-	tests := []struct {
-		name    string
-		wantErr bool
-		errMsg  string
-	}{
-		{"Good", false, ""},
-		{"NoParams", true, "unsupported signature"},
-		{"WrongParam", true, "unsupported param type"},
-		{"NoReturn", true, "unsupported signature"},
-		{"WrongReturn", true, "unsupported return type"},
-		{"TooManyParams", true, "unsupported signature"},
-	}
-
-	for _, tc := range tests {
-		t.When(tc.name, func(w *gotest.T) {
-			w.It("validates correctly", func(it *gotest.T) {
-				for _, fd := range fm.funcDecls {
-					if fd.Name.Name != tc.name {
-						continue
-					}
-					m := fm.pkg.TypesInfo.ObjectOf(fd.Name).(*types.Func)
-					sig := fm.pkg.TypesInfo.TypeOf(fd.Name).(*types.Signature)
-					methodID := "S." + m.Name()
-
-					err := gotestast.ExportValidateContextErrorSig(sig, methodID)
-					if tc.wantErr {
-						gotest.True(it, err != nil, "expected error for %s", tc.name)
-						gotest.Contains(it, err.Error(), tc.errMsg)
-					} else {
-						gotest.NoError(it, err)
-					}
-				}
-			})
-		})
-	}
 }
 
 func (s *GotestastTestSuite) TestClassifyLocalFields(t *gotest.T) {
