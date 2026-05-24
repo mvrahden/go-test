@@ -25,15 +25,19 @@ type point struct{ X, Y int }
 type AssertionsTestSuite struct{}
 
 func (s *AssertionsTestSuite) TestFail(t *gotest.T) {
-	t.It("always fails", func(it *gotest.T) {
-		m := gotest.Record(func(r *gotest.R) { gotest.Fail(r) })
-		gotest.True(it, m.Failed())
+	t.When("called without message", func(w *gotest.T) {
+		w.It("fails", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Fail(r) })
+			gotest.True(it, m.Failed())
+		})
 	})
 
-	t.It("includes custom message", func(it *gotest.T) {
-		m := gotest.Record(func(r *gotest.R) { gotest.Fail(r, "something went wrong: %d", 42) })
-		gotest.True(it, m.Failed())
-		gotest.Contains(it, m.Message(), "something went wrong: 42")
+	t.When("called with message", func(w *gotest.T) {
+		w.It("includes the formatted message", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Fail(r, "something went wrong: %d", 42) })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "something went wrong: 42")
+		})
 	})
 }
 
