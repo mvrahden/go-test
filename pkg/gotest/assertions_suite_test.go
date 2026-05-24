@@ -516,70 +516,88 @@ func (s *AssertionsTestSuite) TestFailMessagePropagation(t *gotest.T) {
 }
 
 func (s *AssertionsTestSuite) TestContains(t *gotest.T) {
-	t.When("container includes element", func(w *gotest.T) {
-		w.It("passes for string substring", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, "hello world", "world") })
-			gotest.False(it, m.Failed())
-		})
-		w.It("passes for slice element", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, []int{1, 2, 3}, 2) })
-			gotest.False(it, m.Failed())
-		})
-		w.It("passes for map key", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, map[string]int{"a": 1, "b": 2}, "a") })
-			gotest.False(it, m.Failed())
-		})
-	})
-
-	t.When("container does not include element", func(w *gotest.T) {
-		w.It("fails for string", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, "hello world", "xyz") })
-			gotest.True(it, m.Failed())
-		})
-		w.It("fails for slice", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, []int{1, 2, 3}, 99) })
-			gotest.True(it, m.Failed())
-		})
-		w.It("fails for map", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, map[string]int{"a": 1}, "z") })
-			gotest.True(it, m.Failed())
-		})
-	})
-
 	t.When("container is nil", func(w *gotest.T) {
 		w.It("fails", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, nil, "anything") })
 			gotest.True(it, m.Failed())
 		})
 	})
-}
 
-func (s *AssertionsTestSuite) TestNotContains(t *gotest.T) {
-	t.When("container does not include element", func(w *gotest.T) {
-		w.It("passes for string", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, "hello world", "xyz") })
+	t.When("input is a string", func(w *gotest.T) {
+		w.It("passes for matching substring", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, "hello world", "world") })
 			gotest.False(it, m.Failed())
 		})
-		w.It("passes for slice", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, []int{1, 2, 3}, 99) })
-			gotest.False(it, m.Failed())
-		})
-		w.It("passes for map key", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, map[string]int{"a": 1}, "z") })
-			gotest.False(it, m.Failed())
+
+		// --- fails
+
+		w.It("fails for non-matching substring", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, "hello world", "xyz") })
+			gotest.True(it, m.Failed())
 		})
 	})
 
-	t.When("container includes element", func(w *gotest.T) {
-		w.It("fails for string", func(it *gotest.T) {
+	t.When("input is a slice", func(w *gotest.T) {
+		w.It("passes for present element", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, []int{1, 2, 3}, 2) })
+			gotest.False(it, m.Failed())
+		})
+
+		// --- fails
+
+		w.It("fails for absent element", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, []int{1, 2, 3}, 99) })
+			gotest.True(it, m.Failed())
+		})
+	})
+
+	t.When("input is a map", func(w *gotest.T) {
+		w.It("passes for existing key", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, map[string]int{"a": 1, "b": 2}, "a") })
+			gotest.False(it, m.Failed())
+		})
+
+		// --- fails
+
+		w.It("fails for missing key", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, map[string]int{"a": 1}, "z") })
+			gotest.True(it, m.Failed())
+		})
+	})
+}
+
+func (s *AssertionsTestSuite) TestNotContains(t *gotest.T) {
+	t.When("input is a string", func(w *gotest.T) {
+		w.It("passes for non-matching substring", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, "hello world", "xyz") })
+			gotest.False(it, m.Failed())
+		})
+		// --- fails
+		w.It("fails for matching substring", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, "hello world", "world") })
 			gotest.True(it, m.Failed())
 		})
-		w.It("fails for slice", func(it *gotest.T) {
+	})
+
+	t.When("input is a slice", func(w *gotest.T) {
+		w.It("passes for absent element", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, []int{1, 2, 3}, 99) })
+			gotest.False(it, m.Failed())
+		})
+		// --- fails
+		w.It("fails for present element", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, []int{1, 2, 3}, 2) })
 			gotest.True(it, m.Failed())
 		})
-		w.It("fails for map key", func(it *gotest.T) {
+	})
+
+	t.When("input is a map", func(w *gotest.T) {
+		w.It("passes for missing key", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, map[string]int{"a": 1}, "z") })
+			gotest.False(it, m.Failed())
+		})
+		// --- fails
+		w.It("fails for existing key", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, map[string]int{"a": 1, "b": 2}, "a") })
 			gotest.True(it, m.Failed())
 		})
