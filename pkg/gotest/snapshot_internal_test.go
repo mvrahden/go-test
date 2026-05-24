@@ -1,3 +1,8 @@
+// This file tests unexported implementation details (isExternalPackage,
+// splitTestName, readAndRestore, pkgCache) and calls MatchSnapshot directly as
+// a package-internal function. Exporting these solely for testing would leak
+// implementation details into the public API surface. ptest files cannot use
+// gotest suites because the suite runner itself lives in this package.
 package gotest //nolint:stdlib-test
 
 import (
@@ -18,16 +23,16 @@ func TestIsExternalPackage(t *testing.T) {
 	dir := thisDir()
 
 	t.Run("ptest file returns false", func(t *testing.T) {
-		pkgCache.Delete(filepath.Join(dir, "r_test.go"))
-		got := isExternalPackage(filepath.Join(dir, "r_test.go"))
+		pkgCache.Delete(filepath.Join(dir, "snapshot_internal_test.go"))
+		got := isExternalPackage(filepath.Join(dir, "snapshot_internal_test.go"))
 		if got {
 			t.Fatal("expected false for ptest file")
 		}
 	})
 
 	t.Run("pxtest file returns true", func(t *testing.T) {
-		pkgCache.Delete(filepath.Join(dir, "snapshot_test.go"))
-		got := isExternalPackage(filepath.Join(dir, "snapshot_test.go"))
+		pkgCache.Delete(filepath.Join(dir, "record_suite_test.go"))
+		got := isExternalPackage(filepath.Join(dir, "record_suite_test.go"))
 		if !got {
 			t.Fatal("expected true for pxtest file")
 		}
@@ -41,7 +46,7 @@ func TestIsExternalPackage(t *testing.T) {
 	})
 
 	t.Run("result is cached", func(t *testing.T) {
-		path := filepath.Join(dir, "r_test.go")
+		path := filepath.Join(dir, "snapshot_internal_test.go")
 		pkgCache.Delete(path)
 		isExternalPackage(path)
 		_, ok := pkgCache.Load(path)

@@ -1,3 +1,8 @@
+// These tests verify the assertion primitives that gotest is built on. Using
+// gotest suites here would be circular: a bug in the assertion logic would
+// silently pass its own tests, making failures undetectable. stdlib tests with
+// raw if/t.Error are the only way to independently verify correctness at this
+// layer.
 package assert //nolint:stdlib-test
 
 import (
