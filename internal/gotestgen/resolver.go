@@ -74,6 +74,10 @@ func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, loc
 	}
 
 	for _, suite := range suites {
+		if suite.IsGenericAlias() && suite.IsPxTestSuite() {
+			return nil, fmt.Errorf("generic alias suite %q must not be in an external test package (pxtest); move it to the internal test file", suite.Identifier())
+		}
+
 		fixture, err := r.resolveFixtureForSuite(suite)
 		if err != nil {
 			return nil, err
@@ -359,18 +363,20 @@ func (r *resolver) buildSharedFixtureRef(named *types.Named, idx int) (SharedFix
 		PkgPath:       pkgPath,
 	}
 
-	r.registerSharedFixture(named)
+	if err := r.registerSharedFixture(named); err != nil {
+		return SharedFixtureRef{}, err
+	}
 
 	return ref, nil
 }
 
-func (r *resolver) registerSharedFixture(named *types.Named) {
+func (r *resolver) registerSharedFixture(named *types.Named) error {
 	typePkg := named.Obj().Pkg()
 	name := named.Obj().Name()
 	key := typePkg.Path() + "." + name
 
 	if _, ok := r.sharedSeen[key]; ok {
-		return
+		return nil
 	}
 
 	mset := types.NewMethodSet(types.NewPointer(named))
@@ -381,13 +387,13 @@ func (r *resolver) registerSharedFixture(named *types.Named) {
 	st, ok := named.Underlying().(*types.Struct)
 	if !ok {
 		r.sharedSeen[key] = &SharedFixtureInfo{
-			Identifier: name,
-			PkgPath:    typePkg.Path(),
-			HasConfig:  hasConfig,
-			HasHydrate: hasHydrate,
+			Identifier:   name,
+			PkgPath:      typePkg.Path(),
+			HasConfig:    hasConfig,
+			HasHydrate:   hasHydrate,
 			HasDehydrate: hasDehydrate,
 		}
-		return
+		return nil
 	}
 
 	var allExported []string
@@ -418,6 +424,18 @@ func (r *resolver) registerSharedFixture(named *types.Named) {
 		}
 	}
 
+	for _, fieldName := range transfer {
+		for i := 0; i < st.NumFields(); i++ {
+			f := st.Field(i)
+			if f.Name() == fieldName {
+				if err := validateTransferFieldType(name, f); err != nil {
+					return err
+				}
+				break
+			}
+		}
+	}
+
 	r.sharedSeen[key] = &SharedFixtureInfo{
 		Identifier:     name,
 		PkgPath:        typePkg.Path(),
@@ -427,6 +445,7 @@ func (r *resolver) registerSharedFixture(named *types.Named) {
 		TransferFields: transfer,
 		LocalFields:    local,
 	}
+	return nil
 }
 
 func (r *resolver) findPackageForType(named *types.Named) *packages.Package {
@@ -495,6 +514,44 @@ func findHydrateDecl(pkg *packages.Package, fixtureName string) *ast.FuncDecl {
 		}
 	}
 	return nil
+}
+
+func validateTransferFieldType(fixtureName string, field *types.Var) error {
+	if reason := nonSerializable(field.Type()); reason != "" {
+		return fmt.Errorf("shared fixture %q: transfer field %q has non-JSON-serializable type %s (%s)", fixtureName, field.Name(), field.Type(), reason)
+	}
+	return nil
+}
+
+func nonSerializable(t types.Type) string {
+	switch u := t.Underlying().(type) {
+	case *types.Chan:
+		return "channel"
+	case *types.Signature:
+		return "function"
+	case *types.Array:
+		return nonSerializable(u.Elem())
+	case *types.Slice:
+		return nonSerializable(u.Elem())
+	case *types.Map:
+		if r := nonSerializable(u.Key()); r != "" {
+			return r + " in map key"
+		}
+		return nonSerializable(u.Elem())
+	case *types.Pointer:
+		return nonSerializable(u.Elem())
+	case *types.Struct:
+		for i := 0; i < u.NumFields(); i++ {
+			f := u.Field(i)
+			if !f.Exported() {
+				continue
+			}
+			if r := nonSerializable(f.Type()); r != "" {
+				return r + " in field " + f.Name()
+			}
+		}
+	}
+	return ""
 }
 
 func detectConfigMethod(mset *types.MethodSet, typePkg *types.Package, kind gotestast.FixtureKind) bool {

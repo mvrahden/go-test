@@ -106,6 +106,16 @@ func (collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 		return CollectorResult{Errs: errs}
 	}
 
+	// validate fixture consistency (e.g. Hydrate/Dehydrate pairing)
+	for _, f := range fixtures {
+		if pos, err := gotestast.ValidateFixtureConsistency(f); err != nil {
+			errs = append(errs, CollectorError{Err: err, Pos: pos})
+		}
+	}
+	if len(errs) > 0 {
+		return CollectorResult{Errs: errs}
+	}
+
 	// Fixture embedding and validation are handled by the resolver (resolver.go),
 	// which walks the type graph recursively and supports cross-package fixtures.
 

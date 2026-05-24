@@ -3,7 +3,9 @@ package gotestgen //nolint:stdlib-test
 import (
 	"testing"
 
+	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"golang.org/x/tools/go/packages"
 )
 
 func TestIsInternalPkgPath(t *testing.T) {
@@ -396,4 +398,39 @@ func TestResolve_DirectMultipleSharedFixtures_OnSuite(t *testing.T) {
 	gotest.Equal(t, "redis", fieldNames["RedisSharedFixture"])
 
 	gotest.Equal(t, 2, len(resolved.RequiredSharedFixtures))
+}
+
+func TestResolve_SharedFixture_NonSerializableField(t *testing.T) {
+	t.Parallel()
+	pkg := mustTestPkg(t)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.Equal(t, 0, len(result.Errs))
+
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	gotest.NoError(t, err)
+
+	_, err = Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+	gotest.True(t, err != nil, "expected error for non-serializable transfer field")
+	gotest.Contains(t, err.Error(), "non-JSON-serializable")
+	gotest.Contains(t, err.Error(), "channel")
+}
+
+func TestResolve_GenericAlias_PxTest_Rejected(t *testing.T) {
+	t.Parallel()
+	suite := gotestast.NewTestSuiteSpecForTest("FooTestSuite", "mypkg_test", true)
+	pkg := &packages.Package{Name: "mypkg_test", PkgPath: "example.com/mypkg_test"}
+
+	_, err := Resolve(pkg, []*gotestast.TestSuiteSpec{suite}, nil)
+	gotest.True(t, err != nil, "expected error for generic alias in pxtest")
+	gotest.Contains(t, err.Error(), "must not be in an external test package")
+}
+
+func TestResolve_GenericAlias_InternalTest_Allowed(t *testing.T) {
+	t.Parallel()
+	suite := gotestast.NewTestSuiteSpecForTest("FooTestSuite", "mypkg", true)
+	pkg := &packages.Package{Name: "mypkg", PkgPath: "example.com/mypkg"}
+
+	_, err := Resolve(pkg, []*gotestast.TestSuiteSpec{suite}, nil)
+	gotest.NoError(t, err)
 }

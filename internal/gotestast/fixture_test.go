@@ -258,6 +258,112 @@ func (f *PGSharedFixture) Dehydrate(ctx context.Context) error   { return nil }
 	gotest.Equal(t, "Hydrate", spec.HydrateDecl.Name.Name)
 }
 
+func TestValidateFixtureConsistency_HydrateWithoutDehydrate(t *testing.T) {
+	src := `package testpkg
+
+import "context"
+
+type PGSharedFixture struct {
+	ConnStr string
+}
+
+func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *PGSharedFixture) Hydrate(ctx context.Context) error   { return nil }
+`
+	fm := loadFixtureWithMethods(t, src)
+	spec, err := DetermineFixture(fm.genDecls[0], fm.pkg)
+	gotest.NoError(t, err)
+
+	for _, fd := range fm.funcDecls {
+		_, err := DetermineFixtureHarness(fd, fm.pkg, spec)
+		gotest.NoError(t, err)
+	}
+
+	pos, err := ValidateFixtureConsistency(spec)
+	gotest.True(t, err != nil, "expected error for Hydrate without Dehydrate")
+	gotest.Contains(t, err.Error(), "has Hydrate but no Dehydrate")
+	gotest.True(t, pos > 0)
+}
+
+func TestValidateFixtureConsistency_DehydrateWithoutHydrate(t *testing.T) {
+	src := `package testpkg
+
+import "context"
+
+type PGSharedFixture struct {
+	ConnStr string
+}
+
+func (f *PGSharedFixture) BeforeAll(ctx context.Context) error   { return nil }
+func (f *PGSharedFixture) Dehydrate(ctx context.Context) error   { return nil }
+`
+	fm := loadFixtureWithMethods(t, src)
+	spec, err := DetermineFixture(fm.genDecls[0], fm.pkg)
+	gotest.NoError(t, err)
+
+	for _, fd := range fm.funcDecls {
+		_, err := DetermineFixtureHarness(fd, fm.pkg, spec)
+		gotest.NoError(t, err)
+	}
+
+	pos, err := ValidateFixtureConsistency(spec)
+	gotest.True(t, err != nil, "expected error for Dehydrate without Hydrate")
+	gotest.Contains(t, err.Error(), "has Dehydrate but no Hydrate")
+	gotest.True(t, pos > 0)
+}
+
+func TestValidateFixtureConsistency_BothPresent(t *testing.T) {
+	src := `package testpkg
+
+import "context"
+
+type PGSharedFixture struct {
+	ConnStr string
+}
+
+func (f *PGSharedFixture) BeforeAll(ctx context.Context) error   { return nil }
+func (f *PGSharedFixture) Hydrate(ctx context.Context) error     { return nil }
+func (f *PGSharedFixture) Dehydrate(ctx context.Context) error   { return nil }
+`
+	fm := loadFixtureWithMethods(t, src)
+	spec, err := DetermineFixture(fm.genDecls[0], fm.pkg)
+	gotest.NoError(t, err)
+
+	for _, fd := range fm.funcDecls {
+		_, err := DetermineFixtureHarness(fd, fm.pkg, spec)
+		gotest.NoError(t, err)
+	}
+
+	pos, err := ValidateFixtureConsistency(spec)
+	gotest.NoError(t, err)
+	gotest.Equal(t, token.Pos(-1), pos)
+}
+
+func TestValidateFixtureConsistency_PackageFixture_Skipped(t *testing.T) {
+	src := `package testpkg
+
+import "context"
+
+type DBFixture struct {
+	Conn string
+}
+
+func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
+`
+	fm := loadFixtureWithMethods(t, src)
+	spec, err := DetermineFixture(fm.genDecls[0], fm.pkg)
+	gotest.NoError(t, err)
+
+	for _, fd := range fm.funcDecls {
+		_, err := DetermineFixtureHarness(fd, fm.pkg, spec)
+		gotest.NoError(t, err)
+	}
+
+	pos, err := ValidateFixtureConsistency(spec)
+	gotest.NoError(t, err)
+	gotest.Equal(t, token.Pos(-1), pos)
+}
+
 func TestDetermineFixtureHarness_Hydrate_OnPackageFixture_Rejected(t *testing.T) {
 	src := `package testpkg
 

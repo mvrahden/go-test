@@ -245,6 +245,9 @@ func (ts *TestSuiteSpec) ContextTypePkgPath() string {
 	return p.Path()
 }
 
+// IsGenericAlias returns true if this suite is a type alias of a generic type.
+func (ts *TestSuiteSpec) IsGenericAlias() bool { return ts.underlyingTypeName != "" }
+
 func (ts *TestSuiteSpec) FileSet() *token.FileSet { return ts.pkg.Fset }
 func (ts *TestSuiteSpec) Pos() token.Pos           { return ts.ts.Name.Pos() }
 func (ts *TestSuiteSpec) IsFocused() bool           { return strings.HasPrefix(ts.ts.Name.Name, "F_") }
@@ -258,6 +261,20 @@ func (ts *TestSuiteSpec) TypeSpecPos() token.Pos {
 // Package returns the underlying *packages.Package.
 func (ts *TestSuiteSpec) Package() *packages.Package {
 	return ts.pkg
+}
+
+// NewTestSuiteSpecForTest creates a minimal TestSuiteSpec for use in unit tests.
+func NewTestSuiteSpecForTest(name, pkgName string, isGenericAlias bool) *TestSuiteSpec {
+	var underlyingTypeName string
+	if isGenericAlias {
+		underlyingTypeName = "GenericBase"
+	}
+	return &TestSuiteSpec{
+		pkg:                &packages.Package{Name: pkgName},
+		ts:                 &ast.TypeSpec{Name: ast.NewIdent(name)},
+		th:                 &TestSuiteHarness{},
+		underlyingTypeName: underlyingTypeName,
+	}
 }
 
 type TestSuiteHarness struct {
@@ -617,6 +634,11 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 			return fmt.Errorf("%s.AfterEach: accepts a context parameter but BeforeEach does not return one", suiteName)
 		}
 		return nil
+	}
+
+	// Context type must be a pointer to a struct
+	if _, ok := be.returnType.(*types.Pointer); !ok {
+		return fmt.Errorf("%s.BeforeEach: return type %s must be a pointer", suiteName, be.returnType)
 	}
 
 	// Returning BeforeEach — ALL methods must have context param
