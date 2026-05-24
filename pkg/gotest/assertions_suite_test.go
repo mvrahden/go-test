@@ -1045,6 +1045,20 @@ func (s *AssertionsTestSuite) TestInDelta(t *gotest.T) {
 			gotest.True(it, m.Failed())
 		})
 	})
+
+	t.When("delta is negative", func(w *gotest.T) {
+		w.It("always fails even for equal values", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.InDelta(r, 5, 5, -1.0) })
+			gotest.True(it, m.Failed())
+		})
+	})
+
+	t.When("delta is zero", func(w *gotest.T) {
+		w.It("fails for unequal values", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.InDelta(r, 5, 6, 0.0) })
+			gotest.True(it, m.Failed())
+		})
+	})
 }
 
 func (s *AssertionsTestSuite) TestJSONEq(t *gotest.T) {
