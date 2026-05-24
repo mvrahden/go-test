@@ -1,8 +1,9 @@
-package e2e //nolint:stdlib-test
+package e2e_test
 
 import (
 	"bytes"
 	"embed"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -10,37 +11,75 @@ import (
 	"testing"
 
 	"github.com/mvrahden/go-test/about"
-	"github.com/mvrahden/go-test/tests/e2e/internal/testutils"
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/tests/e2e/internal/testutils"
 )
 
 //go:embed testdata
 var testdataFS embed.FS
 
-// Test_TestsuiteCLI tests the full CLI execution as a blackbox and
-// makes golden assertions against the CLI output.
-func Test_TestsuiteCLI(t *testing.T) {
+type E2ETestSuite struct{}
+
+func (s *E2ETestSuite) TestT(t *gotest.T) {
+	tmp := t.T().TempDir()
+
+	// clone module into tmp — exclude all real test files from pkg/gotest
+	excludedPaths := append(testutils.DefaultExcludePaths,
+		"pkg/gotest/assertions_suite_test.go",
+		"pkg/gotest/config_suite_test.go",
+		"pkg/gotest/each_suite_test.go",
+		"pkg/gotest/export_test.go",
+		"pkg/gotest/must_suite_test.go",
+		"pkg/gotest/record_suite_test.go",
+		"pkg/gotest/snapshot_internal_test.go",
+		"pkg/gotest/snapshot_suite_test.go",
+		"pkg/gotest/t_suite_test.go",
+		"pkg/gotest/ƒƒ_",
+	)
+	testutils.CopyModuleUnderTestToTmp(t.T(), tmp, "../..", excludedPaths...)
+	placeFixture(t.T(), tmp, "t_test.go", "pkg/gotest/t_test.go")
+
+	testutils.AssertFilesNotInTmp(t.T(), tmp, "go.work")
+	testutils.AssertFilesInTmp(t.T(), tmp, "go.mod", "pkg/gotest/t_test.go", "pkg/gotest/t.go")
+	testutils.HackGoWork(t.T(), tmp)
+
+	tmpCurrentPackage := filepath.Join(tmp, "/pkg/gotest")
+	cmd := exec.
+		Command("go", "run", "github.com/mvrahden/go-test/cmd/gotest", tmpCurrentPackage, "-v")
+	cmd.Dir = tmp
+	out, _ := cmd.CombinedOutput()
+
+	testutils.CompareTestOutputWithGolden(
+		t.T(),
+		tmp,
+		bytes.NewBuffer(out),
+		testdataFS,
+		"t.golden",
+	)
+}
+
+func (s *E2ETestSuite) TestTestsuiteCLI(t *gotest.T) {
 	// Create test directory with test files
-	tmp := t.TempDir()
+	tmp := t.T().TempDir()
 
 	// clone module into tmp
-	testutils.CopyModuleUnderTestToTmp(t, tmp, "../..", testutils.DefaultExcludePaths...)
-	testutils.ActivateTests(t, tmp)
+	testutils.CopyModuleUnderTestToTmp(t.T(), tmp, "../..", testutils.DefaultExcludePaths...)
+	testutils.ActivateTests(t.T(), tmp)
 
 	unexpectedFiles := []string{
 		"go.work",
 		"examples/auth/ƒƒ_psuite_test.go",
 		"examples/auth/ƒƒ_pxsuite_test.go",
 	}
-	testutils.AssertFilesNotInTmp(t, tmp, unexpectedFiles...)
+	testutils.AssertFilesNotInTmp(t.T(), tmp, unexpectedFiles...)
 	// assert package to test is in tmp
 	expectedFiles := []string{
 		"go.mod",
 		"examples/auth/validator.go",
 		"examples/auth/suite_test.go",
 	}
-	testutils.AssertFilesInTmp(t, tmp, expectedFiles...)
-	testutils.HackGoWork(t, tmp)
+	testutils.AssertFilesInTmp(t.T(), tmp, expectedFiles...)
+	testutils.HackGoWork(t.T(), tmp)
 
 	testCases := []struct {
 		desc       string
@@ -56,17 +95,17 @@ func Test_TestsuiteCLI(t *testing.T) {
 		{desc: "cart by package name", basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/cart", goldenName: "cart_output.txt"},
 	}
 	for _, tc := range testCases {
-		t.Run(tc.desc, func(t *testing.T) {
-			performTest(t, tmp, tc.basedir, tc.pkgPath, tc.pkgName, tc.goldenName, tc.debug)
+		t.It(tc.desc, func(it *gotest.T) {
+			performTest(it.T(), tmp, tc.basedir, tc.pkgPath, tc.pkgName, tc.goldenName, tc.debug)
 		})
 	}
 }
 
-func Test_TestsuiteCLI_ParallelSuite(t *testing.T) {
-	tmp := t.TempDir()
-	testutils.CopyModuleUnderTestToTmp(t, tmp, "../..", testutils.DefaultExcludePaths...)
-	testutils.ActivateTests(t, tmp)
-	testutils.HackGoWork(t, tmp)
+func (s *E2ETestSuite) TestTestsuiteCLIParallelSuite(t *gotest.T) {
+	tmp := t.T().TempDir()
+	testutils.CopyModuleUnderTestToTmp(t.T(), tmp, "../..", testutils.DefaultExcludePaths...)
+	testutils.ActivateTests(t.T(), tmp)
+	testutils.HackGoWork(t.T(), tmp)
 
 	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/gotest",
 		filepath.Join(tmp, "examples", "search"), "-v")
@@ -85,11 +124,11 @@ func Test_TestsuiteCLI_ParallelSuite(t *testing.T) {
 	gotest.Contains(t, output, "PASS")
 }
 
-func Test_TestsuiteCLI_GenericSuite(t *testing.T) {
-	tmp := t.TempDir()
-	testutils.CopyModuleUnderTestToTmp(t, tmp, "../..", testutils.DefaultExcludePaths...)
-	testutils.ActivateTests(t, tmp)
-	testutils.HackGoWork(t, tmp)
+func (s *E2ETestSuite) TestTestsuiteCLIGenericSuite(t *gotest.T) {
+	tmp := t.T().TempDir()
+	testutils.CopyModuleUnderTestToTmp(t.T(), tmp, "../..", testutils.DefaultExcludePaths...)
+	testutils.ActivateTests(t.T(), tmp)
+	testutils.HackGoWork(t.T(), tmp)
 
 	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/gotest",
 		filepath.Join(tmp, "examples", "search"), "-v")
@@ -104,11 +143,11 @@ func Test_TestsuiteCLI_GenericSuite(t *testing.T) {
 	gotest.Contains(t, output, "PASS")
 }
 
-func Test_TestsuiteCLI_AllPackages(t *testing.T) {
-	tmp := t.TempDir()
-	testutils.CopyModuleUnderTestToTmp(t, tmp, "../..", testutils.DefaultExcludePaths...)
-	testutils.ActivateTests(t, tmp)
-	testutils.HackGoWork(t, tmp)
+func (s *E2ETestSuite) TestTestsuiteCLIAllPackages(t *gotest.T) {
+	tmp := t.T().TempDir()
+	testutils.CopyModuleUnderTestToTmp(t.T(), tmp, "../..", testutils.DefaultExcludePaths...)
+	testutils.ActivateTests(t.T(), tmp)
+	testutils.HackGoWork(t.T(), tmp)
 
 	cmd := exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/gotest",
 		"github.com/mvrahden/go-test/examples/...", "-v")
@@ -122,11 +161,11 @@ func Test_TestsuiteCLI_AllPackages(t *testing.T) {
 	gotest.Contains(t, output, "TestNotificationServiceTestSuite")
 }
 
-func Test_TestsuiteCLI_ExitCode(t *testing.T) {
-	tmp := t.TempDir()
-	testutils.CopyModuleUnderTestToTmp(t, tmp, "../..", testutils.DefaultExcludePaths...)
-	testutils.ActivateTests(t, tmp)
-	testutils.HackGoWork(t, tmp)
+func (s *E2ETestSuite) TestTestsuiteCLIExitCode(t *gotest.T) {
+	tmp := t.T().TempDir()
+	testutils.CopyModuleUnderTestToTmp(t.T(), tmp, "../..", testutils.DefaultExcludePaths...)
+	testutils.ActivateTests(t.T(), tmp)
+	testutils.HackGoWork(t.T(), tmp)
 
 	failDir := filepath.Join(tmp, "examples", "fail_suite")
 	os.MkdirAll(failDir, 0o755)
@@ -138,14 +177,33 @@ func Test_TestsuiteCLI_ExitCode(t *testing.T) {
 	_, err := cmd.CombinedOutput()
 
 	if err == nil {
-		t.Fatal("expected non-zero exit code for failing tests")
+		t.T().Fatal("expected non-zero exit code for failing tests")
 	}
 	exitErr, ok := err.(*exec.ExitError)
 	if !ok {
-		t.Fatalf("expected *exec.ExitError, got %T: %v", err, err)
+		t.T().Fatalf("expected *exec.ExitError, got %T: %v", err, err)
 	}
 	if exitErr.ExitCode() == 0 {
-		t.Fatal("expected non-zero exit code")
+		t.T().Fatal("expected non-zero exit code")
+	}
+}
+
+func placeFixture(t *testing.T, tmpDir, srcName, dstRel string) {
+	t.Helper()
+	src, err := testdataFS.Open("testdata/" + srcName)
+	if err != nil {
+		t.Fatalf("open fixture %s: %v", srcName, err)
+	}
+	defer src.Close()
+	dst := filepath.Join(tmpDir, dstRel)
+	os.MkdirAll(filepath.Dir(dst), 0o755)
+	f, err := os.Create(dst)
+	if err != nil {
+		t.Fatalf("create %s: %v", dst, err)
+	}
+	defer f.Close()
+	if _, err := io.Copy(f, src); err != nil {
+		t.Fatalf("copy fixture: %v", err)
 	}
 }
 
