@@ -525,6 +525,7 @@ func (s *AssertionsTestSuite) TestNoError(t *gotest.T) {
 		w.It("fails", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NoError(r, errors.New("some error")) })
 			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "some error")
 		})
 	})
 }
@@ -541,6 +542,7 @@ func (s *AssertionsTestSuite) TestError(t *gotest.T) {
 		w.It("fails", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Error(r, nil) })
 			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "expected an error")
 		})
 	})
 }
