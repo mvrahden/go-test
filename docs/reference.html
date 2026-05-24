@@ -563,12 +563,6 @@ AfterAll <span class="d">(via t.Cleanup — always runs)</span></div>
     gotest.Equal(it, tc.Want, parse(tc.Input))
 }</pre>
       </div>
-      <p><strong>Callback API</strong> — same semantics, different style:</p>
-      <div class="code-block">
-        <pre>t.Each(cases, <span class="kw">func</span>(it *gotest.T, tc Case) {
-    gotest.Equal(it, tc.Want, parse(tc.Input))
-})</pre>
-      </div>
       <div class="callout">
         Each entry becomes a subtest. Uses the <code>Desc</code> or <code>Name</code> field for the test name, falls back to <code>#0</code>, <code>#1</code>, etc.
       </div>
@@ -576,28 +570,28 @@ AfterAll <span class="d">(via t.Cleanup — always runs)</span></div>
       <h3>Snapshot testing</h3>
       <p>Capture expected output once, verify it on every subsequent run:</p>
       <div class="code-block">
-        <pre>t.MatchSnapshot(render(input))              <span class="cm">// auto-named from test path</span>
-t.MatchSnapshot(render(other), <span class="st">"variant"</span>)  <span class="cm">// explicit snapshot name</span></pre>
+        <pre>gotest.MatchSnapshot(t, render(input))              <span class="cm">// auto-named from test path</span>
+gotest.MatchSnapshot(t, render(other), <span class="st">"variant"</span>)  <span class="cm">// explicit snapshot name</span></pre>
       </div>
       <p>On first run, the snapshot is created. On subsequent runs, the output is compared and failures include a diff. Update all snapshots with <code>gotest --update-snapshots ./...</code>.</p>
 
       <h3>Async polling</h3>
-      <p>Two forms — a simple boolean check, or rich assertion polling with the full assertion library:</p>
+      <p>Package-level functions for polling conditions. Callbacks receive <code>*gotest.R</code> — an assertion recorder that captures failures without propagating them:</p>
       <div class="code-block">
-        <div class="code-label">Boolean polling (function)</div>
-        <pre>gotest.Eventually(t, <span class="kw">func</span>() <span class="tp">bool</span> {
-    <span class="kw">return</span> s.svc.IsReady()
-}, 5*time.Second, 100*time.Millisecond)</pre>
-      </div>
-      <div class="code-block">
-        <div class="code-label">Rich assertion polling (method on *T)</div>
-        <pre>t.Eventually(5*time.Second, 100*time.Millisecond, <span class="kw">func</span>(poll *gotest.T) {
+        <div class="code-label">Eventually — poll until assertions pass</div>
+        <pre>gotest.Eventually(t, 5*time.Second, 100*time.Millisecond, <span class="kw">func</span>(poll *gotest.R) {
     result, err := s.store.Get(<span class="st">"key"</span>)
     gotest.NoError(poll, err)
     gotest.Equal(poll, <span class="st">"completed"</span>, result.Status)
 })</pre>
       </div>
-      <p>The method form collects intermediate failures without propagating them. On timeout, the last poll's assertion failures are reported. <code>Consistently</code> works the same way — it asserts a condition holds for the full duration and fails on the first violation.</p>
+      <div class="code-block">
+        <div class="code-label">Consistently — assert condition holds for full duration</div>
+        <pre>gotest.Consistently(t, 2*time.Second, 100*time.Millisecond, <span class="kw">func</span>(poll *gotest.R) {
+    gotest.True(poll, s.cache.IsValid())
+})</pre>
+      </div>
+      <p>On each tick the callback runs; if any assertion fails, it retries on the next tick. On timeout, the last failure is reported. <code>Consistently</code> inverts the logic — it fails on the first assertion failure.</p>
 
       <h3>Helpers</h3>
       <table class="ref-table">
@@ -763,12 +757,12 @@ InfraFixture.AfterAll</div>
       <table class="ref-table">
         <thead><tr><th>Function</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>Eventually(t, fn, timeout, tick)</code></td><td>Poll <code>func() bool</code> until true or timeout.</td></tr>
-          <tr><td><code>Consistently(t, fn, duration, tick)</code></td><td>Assert <code>func() bool</code> holds for the full duration.</td></tr>
+          <tr><td><code>Eventually(t, timeout, tick, fn)</code></td><td>Poll <code>func(poll *R)</code> until assertions pass or timeout.</td></tr>
+          <tr><td><code>Consistently(t, duration, tick, fn)</code></td><td>Assert <code>func(poll *R)</code> holds for the full duration.</td></tr>
         </tbody>
       </table>
       <div class="callout">
-        These are the standalone boolean-polling forms. For rich assertion polling with <code>func(poll *T)</code>, use the <a href="#test-dsl">method forms on *T</a>.
+        All assertions work inside polling callbacks — use <code>poll</code> (a <code>*gotest.R</code>) exactly as you would use <code>t</code>. Failures are collected, not propagated, enabling retry semantics.
       </div>
 
       <div class="callout">

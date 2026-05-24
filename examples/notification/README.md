@@ -9,4 +9,4 @@ Demonstrates async testing with temporal assertions, JSON comparison, and snapsh
 
 ## Features
 
-`t.Eventually` · `gotest.Eventually` · `t.Consistently` · `gotest.Consistently` · `JSONEq` · `t.MatchSnapshot` · `TimeIsNow` · `TimeWithin` · `NewTWithDeadline`
+`gotest.Eventually` · `gotest.Consistently` · `JSONEq` · `gotest.MatchSnapshot` · `TimeIsNow` · `TimeWithin` · `NewTWithDeadline`

@@ -90,6 +90,8 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `spec` | Run tests and render behavioral specification |
 | `lint` | Run gotest-specific linter checks |
 | `refactor` | Source code refactoring tools (e.g. `toggle-focus`) |
+| `discover` | Discover test suites and output JSON metadata |
+| `prepare` | Start shared fixtures for debug (blocks until SIGTERM) |
 | `version` | Print version information |
 | `help` | Show help |
 
@@ -105,6 +107,9 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--output=<path>` | Write formatted output to file |
 | `--no-color` | Strip ANSI codes from terminal output |
 | `--min=<pct>` | Fail if coverage below threshold (enables `-coverprofile`) |
+| `--setup-timeout=<dur>` | Override fixture setup timeout |
+| `--debounce=<dur>` | Debounce interval for watch mode (default 200ms) |
+| `--input=<path>` | Input file for `spec` subcommand |
 
 ### Disambiguation
 
@@ -371,7 +376,11 @@ Fixtures nest — a root fixture's hooks run first, wrapping the child's:
 InfraFixture.BeforeAll
   APIFixture.BeforeAll
     Suite.BeforeAll
-      Suite.BeforeEach → Test → Suite.AfterEach
+      InfraFixture.BeforeEach
+        APIFixture.BeforeEach
+          Suite.BeforeEach → Test → Suite.AfterEach
+        APIFixture.AfterEach
+      InfraFixture.AfterEach
     Suite.AfterAll
   APIFixture.AfterAll
 InfraFixture.AfterAll
@@ -593,16 +602,17 @@ Existing `NewT` callers are unaffected.
 ### Functional API
 
 Type-safe generics with compile-time safety.
-All functions accept any type implementing `testingT` (`Helper()` + `Errorf()` + `FailNow()`) — works with both `*gotest.T` and `*testing.T`.
+All functions accept any type implementing `testingT` (`Errorf()` + `FailNow()`) — works with `*gotest.T`, `*testing.T`, and `*gotest.R`.
+`Helper()` is optional: when present, failures include the caller's file:line.
 
 ```go
-// Equality — [T any] catches cross-type comparison at compile time
-gotest.Equal[T any](t, expected, actual T, msgAndArgs ...any)
-gotest.NotEqual[T any](t, expected, actual T, msgAndArgs ...any)
+// Equality — [V any] catches cross-type comparison at compile time
+gotest.Equal[V any](t, expected, actual V, msgAndArgs ...any)
+gotest.NotEqual[V any](t, expected, actual V, msgAndArgs ...any)
 
 // Zero / Empty
-gotest.Zero[T comparable](t, value T, msgAndArgs ...any)
-gotest.NotZero[T comparable](t, value T, msgAndArgs ...any)
+gotest.Zero[V comparable](t, value V, msgAndArgs ...any)
+gotest.NotZero[V comparable](t, value V, msgAndArgs ...any)
 gotest.Empty(t, object any, msgAndArgs ...any)
 gotest.NotEmpty(t, object any, msgAndArgs ...any)
 
@@ -621,20 +631,20 @@ gotest.ErrorContains(t, err error, contains string, msgAndArgs ...any)
 gotest.Contains(t, s, contains any, msgAndArgs ...any)
 gotest.NotContains(t, s, contains any, msgAndArgs ...any)
 gotest.Len(t, object any, length int, msgAndArgs ...any)
-gotest.ElementsMatch[T comparable](t, listA, listB []T, msgAndArgs ...any)
-gotest.Subset[T comparable](t, list, subset []T, msgAndArgs ...any)
+gotest.ElementsMatch[V comparable](t, listA, listB []V, msgAndArgs ...any)
+gotest.Subset[V comparable](t, list, subset []V, msgAndArgs ...any)
 
-// Comparison — [T cmp.Ordered] prevents comparing incomparable types
-gotest.Greater[T cmp.Ordered](t, a, b T, msgAndArgs ...any)
-gotest.GreaterOrEqual[T cmp.Ordered](t, a, b T, msgAndArgs ...any)
-gotest.Less[T cmp.Ordered](t, a, b T, msgAndArgs ...any)
-gotest.LessOrEqual[T cmp.Ordered](t, a, b T, msgAndArgs ...any)
+// Comparison — [V cmp.Ordered] prevents comparing incomparable types
+gotest.Greater[V cmp.Ordered](t, a, b V, msgAndArgs ...any)
+gotest.GreaterOrEqual[V cmp.Ordered](t, a, b V, msgAndArgs ...any)
+gotest.Less[V cmp.Ordered](t, a, b V, msgAndArgs ...any)
+gotest.LessOrEqual[V cmp.Ordered](t, a, b V, msgAndArgs ...any)
 
 // String / Regex
 gotest.Regexp[P regexpPattern](t, rx P, str string, msgAndArgs ...any)
 
 // Numeric
-gotest.InDelta[T numeric](t, expected, actual T, delta float64, msgAndArgs ...any)
+gotest.InDelta[V numeric](t, expected, actual V, delta float64, msgAndArgs ...any)
 
 // Serialization — accepts string, []byte, json.RawMessage, io.Reader, or marshalable
 gotest.JSONEq(t, expected, actual any, msgAndArgs ...any)
@@ -646,11 +656,20 @@ gotest.TimeIsNow(t, ts time.Time, tolerance time.Duration, msgAndArgs ...any)
 // Panic
 gotest.Panics(t, f func(), msgAndArgs ...any) any
 
+// Snapshot — auto-named from test path, or custom name
+gotest.MatchSnapshot(t, value any, name ...string)
+
+// Polling — see Async Assertions section
+gotest.Eventually(t, waitFor, tick time.Duration, fn func(poll *gotest.R))
+gotest.Consistently(t, waitFor, tick time.Duration, fn func(poll *gotest.R))
+
+// Explicit failure
+gotest.Fail(t, msgAndArgs ...any)
+
 // Unwrap — panics on failure (no t parameter, enables multi-return expansion)
-gotest.Must[T any](val T, ok any) T
+gotest.Must[V any](val V, ok any) V
 ```
 
-All functions call `t.Helper()` so failures report the caller's file:line.
 Equality failures include a diff:
 
 ```
@@ -695,7 +714,7 @@ func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
 }
 ```
 
-### t.Each()
+### gotest.Each()
 
 Table-driven tests with automatic subtest naming.
 
@@ -714,52 +733,56 @@ for it, tc := range gotest.Each(t, []struct {
 }
 ```
 
-Callback API:
-
-```go
-t.Each(cases, func(it *gotest.T, tc Case) {
-    gotest.Equal(it, tc.Want, parse(tc.Input))
-})
-```
-
 Uses `Desc` or `Name` field for the subtest name, falls back to `#0`, `#1`, etc.
 
 ---
 
 ## Async Assertions
 
-**Boolean polling** (functional API):
+### *gotest.R — Assertion Recorder
+
+`*R` is an assertion recorder that captures assertion outcomes without propagating them to the test runner.
+It satisfies the same `testingT` contract as `*testing.T` (`Errorf` + `FailNow`), making it the callback type for `Eventually` and `Consistently`.
+All assertion functions work with `*R` just as they do with `*T` or `*testing.T`.
 
 ```go
-gotest.Eventually(t, func() bool { return s.svc.IsReady() }, 5*time.Second, 100*time.Millisecond)
-gotest.Consistently(t, func() bool { return cache.IsValid() }, 2*time.Second, 50*time.Millisecond)
+type R struct { ... }
+func (r *R) Errorf(format string, args ...any)
+func (r *R) FailNow()
+func (r *R) Helper()
+func (r *R) Failed() bool
+func (r *R) Message() string
+
+func Record(fn func(*R)) *R
 ```
 
-**Rich assertion polling** (methods on `*gotest.T`):
+`Record` runs `fn` with a fresh `*R` in a dedicated goroutine (required because `FailNow` calls `runtime.Goexit`).
+
+### Polling
 
 ```go
-t.Eventually(5*time.Second, 100*time.Millisecond, func(poll *gotest.T) {
+gotest.Eventually(t, 5*time.Second, 100*time.Millisecond, func(poll *gotest.R) {
     result, err := s.store.Get("key")
     gotest.NoError(poll, err)
-    gotest.Equal(poll, result.Status, "completed")
+    gotest.Equal(poll, "completed", result.Status)
 })
 
-t.Consistently(2*time.Second, 100*time.Millisecond, func(poll *gotest.T) {
-    gotest.Equal(poll, s.counter.Value(), 0)
+gotest.Consistently(t, 2*time.Second, 100*time.Millisecond, func(poll *gotest.R) {
+    gotest.Equal(poll, 0, s.counter.Value())
 })
 ```
 
-The `poll *gotest.T` is a collecting wrapper — assertion failures during intermediate polls are captured but not propagated.
-On timeout, the last poll's assertion failures are reported.
-`Consistently` fails on first `false` poll and reports which poll failed.
+The `poll *gotest.R` captures assertion failures without propagating them to the test runner.
+On timeout, `Eventually` reports the last poll's assertion failures.
+`Consistently` fails on first assertion failure and reports which poll failed.
 
 ---
 
 ## Snapshot Testing
 
 ```go
-t.MatchSnapshot(result)               // auto-named from test
-t.MatchSnapshot(result, "variant")    // custom snapshot name
+gotest.MatchSnapshot(t, result)               // auto-named from test
+gotest.MatchSnapshot(t, result, "variant")    // custom snapshot name
 ```
 
 - Snapshots stored in `testdata/__snapshots__/<TestName>.snap`
@@ -937,6 +960,9 @@ Detects:
 - **Missing lifecycle pair:** `BeforeAll` without `AfterAll` — resources may leak
 - **Committed focus prefixes:** `F_` prefix on types or methods
 - **Orphaned generated files:** `ƒƒ_*` files checked into version control
+- **Stdlib test functions:** `func TestX(t *testing.T)` in packages with suites — likely meant to be a suite method
+- **Testify imports:** `testify/suite` imports in packages using gotest — migration incomplete
+- **Poll scope errors:** Assertions inside `Eventually`/`Consistently` callbacks using the outer `t` instead of the `poll` parameter
 
 ---
 
@@ -1102,19 +1128,21 @@ They add a layer on top; they never suppress or replace the underlying output.
 ```
 cmd/gotest/                  CLI entrypoint, subcommands, arg handling
   └── internal/gotestrunner/   Suite generation I/O, go test execution, overlay
-        └── internal/cmd/testgen/   Generation orchestration
-              └── internal/gotestgen/   Package loading, collection, fixture resolution, rendering
-                    └── internal/gotestast/   AST analysis, spec model, regex classification
+        └── internal/gotestgen/   Package loading, collection, fixture resolution, rendering
+              └── internal/gotestast/   AST analysis, spec model, regex classification
 
 cmd/gotest-lint/             Standalone linter binary (singlechecker)
   └── internal/lint/           go/analysis analyzer
 
+internal/config/             gotest.yaml configuration loading
 internal/gotestspec/         Spec tree builder and renderers (terminal, markdown)
 internal/scaffold/           Type-to-suite skeleton generator
 internal/migrate/            testify/suite AST transformer
+internal/refactor/           AST refactoring tools (focus/exclude toggle)
 
-pkg/gotest/                  User-facing API (T, Assert, It, When, Each, Eventually, MatchSnapshot)
-  └── internal/assert/         Core assertion implementation (~300 lines, pure stdlib)
+pkg/gotest/                  User-facing API (T, R, assertions, Each, Eventually, Consistently, MatchSnapshot)
+  └── internal/assert/         Core assertion implementation (pure stdlib)
+  └── internal/snapfile/       Snapshot file I/O and diffing
 
 about/                       Build metadata, file naming constants
 ```
