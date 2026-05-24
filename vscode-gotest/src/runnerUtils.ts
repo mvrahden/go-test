@@ -2,7 +2,11 @@ import * as vscode from "vscode";
 import { spawn, type ChildProcess } from "node:child_process";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
-import { extractTestMessages, type TestEvent } from "./outputParser.js";
+import {
+  extractTestMessages,
+  parseExpectedActual,
+  type TestEvent,
+} from "./outputParser.js";
 
 export function killProcessTree(
   child: ChildProcess,
@@ -237,7 +241,16 @@ export function applyResults(
         const output = outputMap.get(event.Test) ?? "";
         const testMessages = extractTestMessages(output, pkgDir);
         const vscodeMessages = testMessages.map((msg) => {
-          const message = new vscode.TestMessage(msg.message);
+          const parsed = parseExpectedActual(msg.message);
+          const message = new vscode.TestMessage(
+            parsed
+              ? `${msg.message.split("\n")[0].replace(/:\s*$/, "")}: expected ${parsed.expected}, actual ${parsed.actual}`
+              : msg.message,
+          );
+          if (parsed) {
+            message.expectedOutput = parsed.expected;
+            message.actualOutput = parsed.actual;
+          }
           message.location = new vscode.Location(
             vscode.Uri.file(msg.file),
             new vscode.Position(msg.line - 1, 0),

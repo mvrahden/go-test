@@ -17,7 +17,15 @@ vi.mock("vscode", () => {
   }
   class TestMessage {
     location?: unknown;
+    expectedOutput?: string;
+    actualOutput?: string;
     constructor(public readonly message: string) {}
+    static diff(message: string, expected: string, actual: string) {
+      const msg = new TestMessage(message);
+      msg.expectedOutput = expected;
+      msg.actualOutput = actual;
+      return msg;
+    }
   }
   class Location {
     constructor(
@@ -596,6 +604,66 @@ describe("applyResults", () => {
       status: "fail",
       duration: 2300,
     });
+  });
+
+  it("creates TestMessage.diff with expected/actual from assertion output", () => {
+    const { controller, run, failItem } = makeApplyResultsFixture();
+
+    const events = [
+      {
+        Action: "output" as const,
+        Test: "MySuite/TestFail",
+        Package: "example.com/pkg",
+        Output: "=== RUN   MySuite/TestFail\n",
+      },
+      {
+        Action: "output" as const,
+        Test: "MySuite/TestFail",
+        Package: "example.com/pkg",
+        Output: "    fail_test.go:14: Equal failed:\n",
+      },
+      {
+        Action: "output" as const,
+        Test: "MySuite/TestFail",
+        Package: "example.com/pkg",
+        Output: "          expected: 720000000000\n",
+      },
+      {
+        Action: "output" as const,
+        Test: "MySuite/TestFail",
+        Package: "example.com/pkg",
+        Output: "          actual:   120000000000\n",
+      },
+      {
+        Action: "output" as const,
+        Test: "MySuite/TestFail",
+        Package: "example.com/pkg",
+        Output: "--- FAIL: MySuite/TestFail (0.00s)\n",
+      },
+      {
+        Action: "fail" as const,
+        Test: "MySuite/TestFail",
+        Package: "example.com/pkg",
+        Elapsed: 0,
+      },
+    ];
+
+    applyResults(
+      controller as any,
+      run as any,
+      events as any,
+      "example.com/pkg",
+      "/some/dir",
+    );
+
+    expect(run.failed).toHaveBeenCalledTimes(1);
+    const messages = run.failed.mock.calls[0][1];
+    expect(messages).toHaveLength(1);
+    expect(messages[0].expectedOutput).toBe("720000000000");
+    expect(messages[0].actualOutput).toBe("120000000000");
+    expect(messages[0].message).toBe(
+      "Equal failed: expected 720000000000, actual 120000000000",
+    );
   });
 });
 

@@ -69,20 +69,39 @@ export function extractTestMessages(
   const pattern = /^\s*(.+?):(\d+):\s*(.+)$/;
   const lines = output.split("\n");
 
-  for (const line of lines) {
-    const match = pattern.exec(line);
-    if (match) {
-      let file = match[1];
-      const lineNum = parseInt(match[2], 10);
-      const message = match[3];
+  for (let i = 0; i < lines.length; i++) {
+    const match = pattern.exec(lines[i]);
+    if (!match) continue;
 
-      if (!path.isAbsolute(file)) {
-        file = path.join(pkgDir, file);
-      }
+    let file = match[1];
+    const lineNum = parseInt(match[2], 10);
+    let message = match[3];
 
-      messages.push({ file, line: lineNum, message });
+    if (!path.isAbsolute(file)) {
+      file = path.join(pkgDir, file);
     }
+
+    while (i + 1 < lines.length) {
+      const next = lines[i + 1];
+      const trimmed = next.trim();
+      if (!trimmed || pattern.test(next) || /^(===\s|---\s)/.test(trimmed))
+        break;
+      if (!/^\s/.test(next)) break;
+      message += "\n" + next;
+      i++;
+    }
+
+    messages.push({ file, line: lineNum, message });
   }
 
   return messages;
+}
+
+export function parseExpectedActual(
+  message: string,
+): { expected: string; actual: string } | undefined {
+  const expectedMatch = /^\s*expected:\s*(.+)$/m.exec(message);
+  const actualMatch = /^\s*actual:\s*(.+)$/m.exec(message);
+  if (!expectedMatch || !actualMatch) return undefined;
+  return { expected: expectedMatch[1], actual: actualMatch[1] };
 }
