@@ -25,98 +25,116 @@ func (s *CmdGotestTestSuite) SuiteConfig() gotest.SuiteConfig {
 // --- args ---
 
 func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
-	for _, tc := range []struct {
+	type entry struct {
 		desc   string
 		inv    Invocation
 		expect []string
-	}{
-		// CLI absent x config zero/positive/negative
-		{
-			desc:   "CLI absent, config zero: no prepend",
-			inv:    Invocation{Args: []string{"-v"}},
-			expect: []string{"-v"},
-		},
-		{
-			desc: "CLI absent, config positive: config prepended",
-			inv: Invocation{
-				Args:   []string{"-v"},
-				Config: config.ProjectConfig{SetupTimeout: config.Duration(2 * time.Minute)},
+	}
+
+	t.When("CLI absent", func(w *gotest.T) {
+		for _, tc := range []entry{
+			{
+				desc:   "config zero: no prepend",
+				inv:    Invocation{Args: []string{"-v"}},
+				expect: []string{"-v"},
 			},
-			expect: []string{"--setup-timeout=2m0s", "-v"},
-		},
-		{
-			desc: "CLI absent, config negative: config prepended",
-			inv: Invocation{
-				Args:   []string{"-v"},
-				Config: config.ProjectConfig{SetupTimeout: config.Duration(-1 * time.Second)},
+			{
+				desc: "config positive: config prepended",
+				inv: Invocation{
+					Args:   []string{"-v"},
+					Config: config.ProjectConfig{SetupTimeout: config.Duration(2 * time.Minute)},
+				},
+				expect: []string{"--setup-timeout=2m0s", "-v"},
 			},
-			expect: []string{"--setup-timeout=-1s", "-v"},
-		},
-		// CLI positive x config zero/positive/negative
-		{
-			desc: "CLI positive, config zero: CLI preserved",
-			inv: Invocation{
-				Args: []string{"--setup-timeout=5m", "-v"},
+			{
+				desc: "config negative: config prepended",
+				inv: Invocation{
+					Args:   []string{"-v"},
+					Config: config.ProjectConfig{SetupTimeout: config.Duration(-1 * time.Second)},
+				},
+				expect: []string{"--setup-timeout=-1s", "-v"},
 			},
-			expect: []string{"--setup-timeout=5m", "-v"},
-		},
-		{
-			desc: "CLI positive, config positive: CLI wins",
-			inv: Invocation{
-				Args:   []string{"--setup-timeout=5m", "-v"},
-				Config: config.ProjectConfig{SetupTimeout: config.Duration(2 * time.Minute)},
+			{
+				desc: "tags and setup-timeout both prepended",
+				inv: Invocation{
+					Args:   []string{"-v"},
+					Config: config.ProjectConfig{Tags: "integration", SetupTimeout: config.Duration(3 * time.Minute)},
+				},
+				expect: []string{"--setup-timeout=3m0s", "-tags=integration", "-v"},
 			},
-			expect: []string{"--setup-timeout=5m", "-v"},
-		},
-		{
-			desc: "CLI positive, config negative: CLI wins",
-			inv: Invocation{
-				Args:   []string{"--setup-timeout=5m", "-v"},
-				Config: config.ProjectConfig{SetupTimeout: config.Duration(-1 * time.Second)},
-			},
-			expect: []string{"--setup-timeout=5m", "-v"},
-		},
-		// CLI negative x config zero/positive/negative
-		{
-			desc: "CLI negative, config zero: CLI preserved",
-			inv: Invocation{
-				Args: []string{"--setup-timeout=-1s", "-v"},
-			},
-			expect: []string{"--setup-timeout=-1s", "-v"},
-		},
-		{
-			desc: "CLI negative, config positive: CLI wins",
-			inv: Invocation{
-				Args:   []string{"--setup-timeout=-1s", "-v"},
-				Config: config.ProjectConfig{SetupTimeout: config.Duration(2 * time.Minute)},
-			},
-			expect: []string{"--setup-timeout=-1s", "-v"},
-		},
-		{
-			desc: "CLI negative, config negative: CLI wins",
-			inv: Invocation{
-				Args:   []string{"--setup-timeout=-1s", "-v"},
-				Config: config.ProjectConfig{SetupTimeout: config.Duration(-1 * time.Second)},
-			},
-			expect: []string{"--setup-timeout=-1s", "-v"},
-		},
-		// combined defaults
-		{
-			desc: "tags and setup-timeout both prepended",
-			inv: Invocation{
-				Args:   []string{"-v"},
-				Config: config.ProjectConfig{Tags: "integration", SetupTimeout: config.Duration(3 * time.Minute)},
-			},
-			expect: []string{"--setup-timeout=3m0s", "-tags=integration", "-v"},
-		},
-	} {
-		t.When(tc.desc, func(w *gotest.T) {
-			w.It("produces expected args", func(it *gotest.T) {
+		} {
+			w.It(tc.desc, func(it *gotest.T) {
 				got := tc.inv.DefaultArgs()
 				gotest.Equal(it, tc.expect, got)
 			})
-		})
-	}
+		}
+	})
+
+	t.When("CLI positive", func(w *gotest.T) {
+		for _, tc := range []entry{
+			{
+				desc: "config zero: CLI preserved",
+				inv: Invocation{
+					Args: []string{"--setup-timeout=5m", "-v"},
+				},
+				expect: []string{"--setup-timeout=5m", "-v"},
+			},
+			{
+				desc: "config positive: CLI wins",
+				inv: Invocation{
+					Args:   []string{"--setup-timeout=5m", "-v"},
+					Config: config.ProjectConfig{SetupTimeout: config.Duration(2 * time.Minute)},
+				},
+				expect: []string{"--setup-timeout=5m", "-v"},
+			},
+			{
+				desc: "config negative: CLI wins",
+				inv: Invocation{
+					Args:   []string{"--setup-timeout=5m", "-v"},
+					Config: config.ProjectConfig{SetupTimeout: config.Duration(-1 * time.Second)},
+				},
+				expect: []string{"--setup-timeout=5m", "-v"},
+			},
+		} {
+			w.It(tc.desc, func(it *gotest.T) {
+				got := tc.inv.DefaultArgs()
+				gotest.Equal(it, tc.expect, got)
+			})
+		}
+	})
+
+	t.When("CLI negative", func(w *gotest.T) {
+		for _, tc := range []entry{
+			{
+				desc: "config zero: CLI preserved",
+				inv: Invocation{
+					Args: []string{"--setup-timeout=-1s", "-v"},
+				},
+				expect: []string{"--setup-timeout=-1s", "-v"},
+			},
+			{
+				desc: "config positive: CLI wins",
+				inv: Invocation{
+					Args:   []string{"--setup-timeout=-1s", "-v"},
+					Config: config.ProjectConfig{SetupTimeout: config.Duration(2 * time.Minute)},
+				},
+				expect: []string{"--setup-timeout=-1s", "-v"},
+			},
+			{
+				desc: "config negative: CLI wins",
+				inv: Invocation{
+					Args:   []string{"--setup-timeout=-1s", "-v"},
+					Config: config.ProjectConfig{SetupTimeout: config.Duration(-1 * time.Second)},
+				},
+				expect: []string{"--setup-timeout=-1s", "-v"},
+			},
+		} {
+			w.It(tc.desc, func(it *gotest.T) {
+				got := tc.inv.DefaultArgs()
+				gotest.Equal(it, tc.expect, got)
+			})
+		}
+	})
 }
 
 func (s *CmdGotestTestSuite) TestSplitArgs(t *gotest.T) {
@@ -418,101 +436,103 @@ func (s *CmdGotestTestSuite) TestFocusViolation_String(t *gotest.T) {
 
 // --- generate ---
 
-func (s *CmdGotestTestSuite) TestGenerateOverlay_ProducesValidOutput(t *gotest.T) {
-	t.It("produces valid overlay JSON", func(it *gotest.T) {
-		examplesDir := filepath.Join("..", "..", "examples")
-		if _, err := os.Stat(filepath.Join(examplesDir, "go.mod")); err != nil {
-			it.T().Skipf("examples directory not found: %v", err)
-		}
+func (s *CmdGotestTestSuite) TestGenerateOverlay(t *gotest.T) {
+	t.When("suites are present", func(w *gotest.T) {
+		w.It("produces valid overlay JSON", func(it *gotest.T) {
+			examplesDir := filepath.Join("..", "..", "examples")
+			if _, err := os.Stat(filepath.Join(examplesDir, "go.mod")); err != nil {
+				it.T().Skipf("examples directory not found: %v", err)
+			}
 
-		origDir, err := os.Getwd()
-		if err != nil {
-			it.T().Fatal(err)
-		}
-		absExamples, err := filepath.Abs(examplesDir)
-		if err != nil {
-			it.T().Fatal(err)
-		}
-		if err := os.Chdir(absExamples); err != nil {
-			it.T().Fatal(err)
-		}
-		defer os.Chdir(origDir)
+			origDir, err := os.Getwd()
+			if err != nil {
+				it.T().Fatal(err)
+			}
+			absExamples, err := filepath.Abs(examplesDir)
+			if err != nil {
+				it.T().Fatal(err)
+			}
+			if err := os.Chdir(absExamples); err != nil {
+				it.T().Fatal(err)
+			}
+			defer os.Chdir(origDir)
 
-		loaded, err := gotestgen.LoadPackages([]string{"./cart"}, nil)
-		if err != nil {
-			it.T().Fatalf("LoadPackages: %v", err)
-		}
-		results, _, err := gotestgen.GenerateFromLoaded(loaded)
-		if err != nil {
-			it.T().Fatalf("GenerateFromLoaded: %v", err)
-		}
-		if len(results) == 0 {
-			it.T().Fatal("expected at least one generate result")
-		}
+			loaded, err := gotestgen.LoadPackages([]string{"./cart"}, nil)
+			if err != nil {
+				it.T().Fatalf("LoadPackages: %v", err)
+			}
+			results, _, err := gotestgen.GenerateFromLoaded(loaded)
+			if err != nil {
+				it.T().Fatalf("GenerateFromLoaded: %v", err)
+			}
+			if len(results) == 0 {
+				it.T().Fatal("expected at least one generate result")
+			}
 
-		tmpDir, err := gotestrunner.WriteOverlay(results)
-		if err != nil {
-			it.T().Fatalf("WriteOverlay: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+			tmpDir, err := gotestrunner.WriteOverlay(results)
+			if err != nil {
+				it.T().Fatalf("WriteOverlay: %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
 
-		overlayFile := filepath.Join(tmpDir, "overlay.json")
-		if _, err := os.Stat(overlayFile); err != nil {
-			it.T().Fatalf("overlay.json not found: %v", err)
-		}
+			overlayFile := filepath.Join(tmpDir, "overlay.json")
+			if _, err := os.Stat(overlayFile); err != nil {
+				it.T().Fatalf("overlay.json not found: %v", err)
+			}
 
-		data, err := os.ReadFile(overlayFile)
-		if err != nil {
-			it.T().Fatalf("reading overlay.json: %v", err)
-		}
-		var overlayContent struct {
-			Replace map[string]string `json:"Replace"`
-		}
-		if err := json.Unmarshal(data, &overlayContent); err != nil {
-			it.T().Fatalf("overlay.json is not valid JSON: %v", err)
-		}
-		gotest.True(it, len(overlayContent.Replace) > 0, "overlay.json Replace map is empty")
+			data, err := os.ReadFile(overlayFile)
+			if err != nil {
+				it.T().Fatalf("reading overlay.json: %v", err)
+			}
+			var overlayContent struct {
+				Replace map[string]string `json:"Replace"`
+			}
+			if err := json.Unmarshal(data, &overlayContent); err != nil {
+				it.T().Fatalf("overlay.json is not valid JSON: %v", err)
+			}
+			gotest.True(it, len(overlayContent.Replace) > 0, "overlay.json Replace map is empty")
+		})
 	})
-}
 
-func (s *CmdGotestTestSuite) TestGenerateOverlay_NoSuitesReturnsEmpty(t *gotest.T) {
-	t.It("returns empty results for package without suites", func(it *gotest.T) {
-		tmpDir, err := os.MkdirTemp("", "overlay-test-nosuite-*")
-		if err != nil {
-			it.T().Fatal(err)
-		}
-		defer os.RemoveAll(tmpDir)
+	t.When("no suites", func(w *gotest.T) {
+		w.It("returns empty results for package without suites", func(it *gotest.T) {
+			tmpDir, err := os.MkdirTemp("", "overlay-test-nosuite-*")
+			if err != nil {
+				it.T().Fatal(err)
+			}
+			defer os.RemoveAll(tmpDir)
 
-		if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module nosuite\n\ngo 1.24\n"), 0644); err != nil {
-			it.T().Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0644); err != nil {
-			it.T().Fatal(err)
-		}
+			if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module nosuite\n\ngo 1.24\n"), 0644); err != nil {
+				it.T().Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0644); err != nil {
+				it.T().Fatal(err)
+			}
 
-		origDir, err := os.Getwd()
-		if err != nil {
-			it.T().Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			it.T().Fatal(err)
-		}
-		defer os.Chdir(origDir)
+			origDir, err := os.Getwd()
+			if err != nil {
+				it.T().Fatal(err)
+			}
+			if err := os.Chdir(tmpDir); err != nil {
+				it.T().Fatal(err)
+			}
+			defer os.Chdir(origDir)
 
-		loaded, err := gotestgen.LoadPackages([]string{"."}, nil)
-		if err != nil {
-			it.T().Fatalf("LoadPackages: %v", err)
-		}
-		results, _, err := gotestgen.GenerateFromLoaded(loaded)
-		if err != nil {
-			it.T().Fatalf("GenerateFromLoaded: %v", err)
-		}
+			loaded, err := gotestgen.LoadPackages([]string{"."}, nil)
+			if err != nil {
+				it.T().Fatalf("LoadPackages: %v", err)
+			}
+			results, _, err := gotestgen.GenerateFromLoaded(loaded)
+			if err != nil {
+				it.T().Fatalf("GenerateFromLoaded: %v", err)
+			}
 
-		var allResults gotestgen.GenerateResults
-		allResults = append(allResults, results...)
-		if len(allResults) != 0 {
-			it.T().Skipf("expected 0 results for package without suites, got %d (package may have test suites)", len(allResults))
-		}
+			var allResults gotestgen.GenerateResults
+			allResults = append(allResults, results...)
+			if len(allResults) != 0 {
+				it.T().Skipf("expected 0 results for package without suites, got %d (package may have test suites)", len(allResults))
+			}
+		})
 	})
 }
 
