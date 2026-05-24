@@ -1,6 +1,7 @@
 package gotest //nolint:stdlib-test
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -95,5 +96,35 @@ func TestMatchSnapshot_PtestUsesNoSuffix(t *testing.T) {
 	extPath := filepath.Join(snapDir, "TestMatchSnapshot_PtestUsesNoSuffix_ext.snap")
 	if _, err := os.Stat(extPath); err == nil {
 		t.Fatal("_ext.snap should not exist for ptest caller")
+	}
+}
+
+func TestReadAndRestore_SeekableReader(t *testing.T) {
+	r := strings.NewReader("test data")
+	b, err := readAndRestore(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != "test data" {
+		t.Fatalf("want %q, got %q", "test data", string(b))
+	}
+	again, _ := io.ReadAll(r)
+	if string(again) != "test data" {
+		t.Fatalf("reader should be restored; re-read got %q", again)
+	}
+}
+
+func TestReadAndRestore_NonSeekableReader(t *testing.T) {
+	r := io.NopCloser(strings.NewReader("ephemeral"))
+	b, err := readAndRestore(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != "ephemeral" {
+		t.Fatalf("want %q, got %q", "ephemeral", string(b))
+	}
+	remaining, _ := io.ReadAll(r)
+	if len(remaining) != 0 {
+		t.Fatal("non-seekable reader should be consumed")
 	}
 }

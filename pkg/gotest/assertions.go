@@ -100,6 +100,16 @@ func isEmpty(object any) bool {
 	return false
 }
 
+func readAndRestore(r io.Reader) ([]byte, error) {
+	if seeker, ok := r.(io.Seeker); ok {
+		pos, err := seeker.Seek(0, io.SeekCurrent)
+		if err == nil {
+			defer seeker.Seek(pos, io.SeekStart)
+		}
+	}
+	return io.ReadAll(r)
+}
+
 // normalizeJSON converts a value to a JSON-comparable form.
 // Accepts string, []byte, json.RawMessage, io.Reader, or any JSON-marshalable value.
 func normalizeJSON(v any) (any, error) {
@@ -112,7 +122,7 @@ func normalizeJSON(v any) (any, error) {
 	case json.RawMessage:
 		raw = []byte(val)
 	case io.Reader:
-		b, err := io.ReadAll(val)
+		b, err := readAndRestore(val)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read value: %w", err)
 		}
