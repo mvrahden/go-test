@@ -30,7 +30,7 @@ func (inv Invocation) TagArgs() []string {
 // each only if not already set via CLI flags.
 func (inv Invocation) DefaultArgs() []string {
 	out := inv.TagArgs()
-	if inv.Config.SetupTimeout.Duration() > 0 && !hasFlag(out, "--setup-timeout") {
+	if inv.Config.SetupTimeout.Duration() != 0 && !hasFlag(out, "--setup-timeout") {
 		out = append([]string{"--setup-timeout=" + inv.Config.SetupTimeout.Duration().String()}, out...)
 	}
 	return out

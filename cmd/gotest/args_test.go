@@ -2,10 +2,105 @@ package main //nolint:stdlib-test
 
 import (
 	"testing"
+	"time"
 
+	"github.com/mvrahden/go-test/internal/config"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
+
+func TestDefaultArgs(t *testing.T) {
+	for _, tc := range []struct {
+		desc   string
+		inv    Invocation
+		expect []string
+	}{
+		// CLI absent × config zero/positive/negative
+		{
+			desc:   "CLI absent, config zero: no prepend",
+			inv:    Invocation{Args: []string{"-v"}},
+			expect: []string{"-v"},
+		},
+		{
+			desc: "CLI absent, config positive: config prepended",
+			inv: Invocation{
+				Args:   []string{"-v"},
+				Config: config.ProjectConfig{SetupTimeout: config.Duration(2 * time.Minute)},
+			},
+			expect: []string{"--setup-timeout=2m0s", "-v"},
+		},
+		{
+			desc: "CLI absent, config negative: config prepended",
+			inv: Invocation{
+				Args:   []string{"-v"},
+				Config: config.ProjectConfig{SetupTimeout: config.Duration(-1 * time.Second)},
+			},
+			expect: []string{"--setup-timeout=-1s", "-v"},
+		},
+		// CLI positive × config zero/positive/negative
+		{
+			desc: "CLI positive, config zero: CLI preserved",
+			inv: Invocation{
+				Args: []string{"--setup-timeout=5m", "-v"},
+			},
+			expect: []string{"--setup-timeout=5m", "-v"},
+		},
+		{
+			desc: "CLI positive, config positive: CLI wins",
+			inv: Invocation{
+				Args:   []string{"--setup-timeout=5m", "-v"},
+				Config: config.ProjectConfig{SetupTimeout: config.Duration(2 * time.Minute)},
+			},
+			expect: []string{"--setup-timeout=5m", "-v"},
+		},
+		{
+			desc: "CLI positive, config negative: CLI wins",
+			inv: Invocation{
+				Args:   []string{"--setup-timeout=5m", "-v"},
+				Config: config.ProjectConfig{SetupTimeout: config.Duration(-1 * time.Second)},
+			},
+			expect: []string{"--setup-timeout=5m", "-v"},
+		},
+		// CLI negative × config zero/positive/negative
+		{
+			desc: "CLI negative, config zero: CLI preserved",
+			inv: Invocation{
+				Args: []string{"--setup-timeout=-1s", "-v"},
+			},
+			expect: []string{"--setup-timeout=-1s", "-v"},
+		},
+		{
+			desc: "CLI negative, config positive: CLI wins",
+			inv: Invocation{
+				Args:   []string{"--setup-timeout=-1s", "-v"},
+				Config: config.ProjectConfig{SetupTimeout: config.Duration(2 * time.Minute)},
+			},
+			expect: []string{"--setup-timeout=-1s", "-v"},
+		},
+		{
+			desc: "CLI negative, config negative: CLI wins",
+			inv: Invocation{
+				Args:   []string{"--setup-timeout=-1s", "-v"},
+				Config: config.ProjectConfig{SetupTimeout: config.Duration(-1 * time.Second)},
+			},
+			expect: []string{"--setup-timeout=-1s", "-v"},
+		},
+		// combined defaults
+		{
+			desc: "tags and setup-timeout both prepended",
+			inv: Invocation{
+				Args:   []string{"-v"},
+				Config: config.ProjectConfig{Tags: "integration", SetupTimeout: config.Duration(3 * time.Minute)},
+			},
+			expect: []string{"--setup-timeout=3m0s", "-tags=integration", "-v"},
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			got := tc.inv.DefaultArgs()
+			gotest.Equal(t, tc.expect, got)
+		})
+	}
+}
 
 func TestSplitArgs(t *testing.T) {
 	for _, tc := range []struct {
@@ -48,10 +143,10 @@ func TestSplitArgs(t *testing.T) {
 
 func TestParseSubcommand(t *testing.T) {
 	for _, tc := range []struct {
-		desc              string
-		args              []string
-		expectSubcmd      string
-		expectRemaining   []string
+		desc            string
+		args            []string
+		expectSubcmd    string
+		expectRemaining []string
 	}{
 		{desc: "empty args", args: nil, expectSubcmd: "", expectRemaining: nil},
 		{desc: "no subcommand, just flags", args: []string{"-v", "./..."}, expectSubcmd: "", expectRemaining: []string{"-v", "./..."}},
@@ -61,7 +156,7 @@ func TestParseSubcommand(t *testing.T) {
 		{desc: "help subcommand", args: []string{"help"}, expectSubcmd: "help", expectRemaining: nil},
 		{desc: "generate subcommand", args: []string{"generate", "./..."}, expectSubcmd: "generate", expectRemaining: []string{"./..."}},
 		{desc: "watch subcommand", args: []string{"watch"}, expectSubcmd: "watch", expectRemaining: nil},
-{desc: "clean subcommand", args: []string{"clean", "./..."}, expectSubcmd: "clean", expectRemaining: []string{"./..."}},
+		{desc: "clean subcommand", args: []string{"clean", "./..."}, expectSubcmd: "clean", expectRemaining: []string{"./..."}},
 		{desc: "spec subcommand", args: []string{"spec"}, expectSubcmd: "spec", expectRemaining: nil},
 		{desc: "unknown first arg is not consumed", args: []string{"./...", "-v"}, expectSubcmd: "", expectRemaining: []string{"./...", "-v"}},
 		{desc: "flag first arg is not consumed", args: []string{"-v", "./..."}, expectSubcmd: "", expectRemaining: []string{"-v", "./..."}},
@@ -115,4 +210,3 @@ func TestLooksLikePackagePattern(t *testing.T) {
 		})
 	}
 }
-
