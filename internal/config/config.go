@@ -17,7 +17,8 @@ const FileName = ".gotest.yml"
 type ProjectConfig struct {
 	// Tags is a comma-separated list of build tags passed to go test (e.g. "integration,e2e").
 	Tags string `yaml:"tags"`
-	// SetupTimeout is the deadline for shared fixture setup. Overrides the CLI default (1m).
+	// SetupTimeout is the total budget for all shared fixture setup.
+	// When omitted, each fixture's own SharedFixtureConfig().Timeout governs.
 	SetupTimeout Duration `yaml:"setup-timeout"`
 	// MinCoverage is the minimum coverage percentage (0-100). The run fails if coverage is below.
 	MinCoverage int `yaml:"min-coverage"`
