@@ -136,6 +136,10 @@ func buildFixtureSpec(t *testing.T, src string) *gotestast.FixtureSpec {
 
 type GotestastTestSuite struct{}
 
+func (s *GotestastTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
 func (s *GotestastTestSuite) TestDetermineFixture(t *gotest.T) {
 	t.When("type ends with Fixture suffix and is a struct", func(w *gotest.T) {
 		w.It("returns PackageFixture for non-shared fixture", func(it *gotest.T) {

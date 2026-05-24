@@ -8,6 +8,10 @@ import (
 
 type LintTestSuite struct{}
 
+func (s *LintTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
 func (s *LintTestSuite) TestAnalyzer(t *gotest.T) {
 	testdata := analysistest.TestData()
 

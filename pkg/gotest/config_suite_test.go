@@ -8,6 +8,10 @@ import (
 
 type ConfigTestSuite struct{}
 
+func (s *ConfigTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
 func (s *ConfigTestSuite) TestDefaultFixtureConfig(t *gotest.T) {
 	t.It("returns 2-minute timeout with no retries", func(it *gotest.T) {
 		cfg := gotest.DefaultFixtureConfig()

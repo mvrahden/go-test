@@ -20,6 +20,10 @@ import (
 
 type GotestrunnerProcessTestSuite struct{}
 
+func (s *GotestrunnerProcessTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
 func (s *GotestrunnerProcessTestSuite) TestSetProcessGroup(t *gotest.T) {
 	t.When("setting process group on a command", func(w *gotest.T) {
 		w.It("sets Setpgid, Cancel, and WaitDelay", func(it *gotest.T) {

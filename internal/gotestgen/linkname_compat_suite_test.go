@@ -10,6 +10,10 @@ import (
 
 type LinknameCompatTestSuite struct{}
 
+func (s *LinknameCompatTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
 func loadTestingScope(t testing.TB) *types.Scope {
 	t.Helper()
 	cfg := &packages.Config{Mode: packages.NeedTypes | packages.NeedSyntax}

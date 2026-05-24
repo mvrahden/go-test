@@ -18,6 +18,10 @@ import (
 
 type CmdGotestTestSuite struct{}
 
+func (s *CmdGotestTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
 // --- args ---
 
 func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {

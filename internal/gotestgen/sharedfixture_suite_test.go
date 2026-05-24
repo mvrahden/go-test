@@ -11,6 +11,10 @@ import (
 
 type SharedFixtureTestSuite struct{}
 
+func (s *SharedFixtureTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
 func (s *SharedFixtureTestSuite) TestSingleFixture(t *gotest.T) {
 	t.When("single fixture with one transfer field", func(w *gotest.T) {
 		w.It("generates valid Go with expected structure", func(it *gotest.T) {

@@ -61,6 +61,10 @@ func buildTest2JSONArgs(target gotestrunner.SuiteTarget) (path string, args []st
 
 type GotestrunnerTestSuite struct{}
 
+func (s *GotestrunnerTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
 // --- args tests ---
 
 func (s *GotestrunnerTestSuite) TestIsGoTestFlag(t *gotest.T) {

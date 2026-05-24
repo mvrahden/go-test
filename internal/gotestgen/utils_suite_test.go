@@ -8,6 +8,10 @@ import (
 
 type UtilsTestSuite struct{}
 
+func (s *UtilsTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
 func (s *UtilsTestSuite) TestDeterminePkgDir(t *gotest.T) {
 	t.When("various package configurations", func(w *gotest.T) {
 		for _, tC := range []struct {

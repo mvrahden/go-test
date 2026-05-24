@@ -11,6 +11,10 @@ import (
 
 type RendererTestSuite struct{}
 
+func (s *RendererTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
 func renderTestPkg(t testing.TB, pkg *packages.Package) (string, gotestgen.SpecOutcome) {
 	t.Helper()
 	c := gotestgen.NewCollector()

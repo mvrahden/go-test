@@ -11,6 +11,10 @@ import (
 
 type ResolverTestSuite struct{}
 
+func (s *ResolverTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
 func (s *ResolverTestSuite) TestIsInternalPkgPath(t *gotest.T) {
 	t.When("various paths", func(w *gotest.T) {
 		for _, tc := range []struct {

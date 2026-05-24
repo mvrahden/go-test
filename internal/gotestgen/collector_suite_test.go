@@ -8,6 +8,10 @@ import (
 
 type CollectorTestSuite struct{}
 
+func (s *CollectorTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
 func (s *CollectorTestSuite) TestFixtureCollection(t *gotest.T) {
 	t.When("package fixture", func(w *gotest.T) {
 		w.It("detects package fixture type and fields", func(it *gotest.T) {

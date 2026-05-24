@@ -8,6 +8,10 @@ import (
 
 type TTestSuite struct{}
 
+func (s *TTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
 func (s *TTestSuite) TestNewTWithDeadline(t *gotest.T) {
 	t.When("deadline is set", func(w *gotest.T) {
 		w.It("sets context deadline", func(it *gotest.T) {
