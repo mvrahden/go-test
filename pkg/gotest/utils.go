@@ -10,10 +10,16 @@ import (
 // Each iterates over entries as sub-tests, yielding a fresh *T and the entry for each.
 func Each[E any](t *T, entries []E) iter.Seq2[*T, E] {
 	return func(yield func(*T, E) bool) {
+		var stop bool
 		for i, entry := range entries {
+			if stop {
+				break
+			}
 			name := eachEntryName(reflect.ValueOf(entry), i)
 			t.t.Run(name, func(tt *testing.T) {
-				yield(NewT(tt), entry)
+				if !yield(NewT(tt), entry) {
+					stop = true
+				}
 			})
 		}
 	}
