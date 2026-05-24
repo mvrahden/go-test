@@ -2,10 +2,6 @@ package gotest
 
 import (
 	"context"
-	"fmt"
-	"iter"
-	"reflect"
-	"runtime"
 	"testing"
 	"time"
 
@@ -74,55 +70,4 @@ func (t *T) When(description string, fn func(w *T)) {
 	t.t.Run(description, func(tt *testing.T) {
 		execTestFn(fn, NewT(tt))
 	})
-}
-
-func Each[E any](t *T, entries []E) iter.Seq2[*T, E] {
-	return func(yield func(*T, E) bool) {
-		for i, entry := range entries {
-			name := eachEntryName(reflect.ValueOf(entry), i)
-			t.t.Run(name, func(tt *testing.T) {
-				yield(NewT(tt), entry)
-			})
-		}
-	}
-}
-
-func eachEntryName(v reflect.Value, index int) string {
-	if v.Kind() == reflect.Struct {
-		for _, field := range []string{"Desc", "Name"} {
-			f := v.FieldByName(field)
-			if f.IsValid() && f.Kind() == reflect.String && f.String() != "" {
-				return f.String()
-			}
-		}
-	}
-	return fmt.Sprintf("#%d", index)
-}
-
-// collectingT captures assertion failures without propagating them.
-// Used by Eventually/Consistently to suppress intermediate poll failures.
-type collectingT struct {
-	failed  bool
-	message string
-}
-
-func (c *collectingT) Errorf(format string, args ...any) {
-	c.failed = true
-	c.message = fmt.Sprintf(format, args...)
-}
-func (c *collectingT) FailNow() {
-	c.failed = true
-	runtime.Goexit()
-}
-
-func runCollectingPoll(fn func(poll *T)) (failed bool, message string) {
-	c := &collectingT{}
-	poll := &T{collector: c}
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		fn(poll)
-	}()
-	<-done
-	return c.failed, c.message
 }
