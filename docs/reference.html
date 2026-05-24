@@ -779,7 +779,38 @@ InfraFixture.AfterAll</div>
     <!-- 6. Configuration -->
     <section class="ref-section" id="configuration">
       <h2>Configuration</h2>
-      <p class="lead">Sensible defaults. Override only what you need via marker methods.</p>
+      <p class="lead">Sensible defaults. Override only what you need — via project file, marker methods, or CLI flags.</p>
+
+      <h3>Precedence</h3>
+      <p>Configuration is resolved in layers. Each layer can override the one below it:</p>
+      <div class="diagram">1. CLI flags            <span class="d">--setup-timeout=2m, --min=80, --debounce=500ms</span>
+2. Project file         <span class="d">.gotest.yml — checked into the repo</span>
+3. In-code config       <span class="d">SuiteConfig(), FixtureConfig(), SharedFixtureConfig()</span>
+4. Built-in defaults    <span class="d">DefaultSuiteConfig(), DefaultFixtureConfig()</span></div>
+      <p>CLI flags take precedence over the project file. The project file sets team-wide defaults; CLI flags allow per-invocation overrides. In-code config and built-in defaults operate at the suite/fixture level — independent of the project-level settings.</p>
+
+      <h3>Project file — <code>.gotest.yml</code></h3>
+      <p>Place a <code>.gotest.yml</code> in your project root. gotest finds it by walking up from the working directory, stopping at the first match or at a <code>go.mod</code> boundary.</p>
+      <table class="ref-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>tags</code></td><td>string</td><td><em>none</em></td><td>Build tags, comma-separated (e.g. <code>"integration,e2e"</code>).</td></tr>
+          <tr><td><code>setup-timeout</code></td><td>duration</td><td>1m</td><td>Shared fixture setup deadline (<code>--setup-timeout</code>).</td></tr>
+          <tr><td><code>min-coverage</code></td><td>int</td><td>0 (off)</td><td>Minimum coverage percentage, 0–100 (<code>--min</code>).</td></tr>
+          <tr><td><code>debounce</code></td><td>duration</td><td>200ms</td><td>Watch mode re-run delay (<code>--debounce</code>).</td></tr>
+          <tr><td><code>lint.skip</code></td><td>[string]</td><td><em>none</em></td><td>Lint rules to disable: <code>stdlib-test</code>, <code>testify</code>.</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-label">.gotest.yml</div>
+        <pre>tags: integration
+setup-timeout: 2m
+min-coverage: 80
+debounce: 500ms
+lint:
+  skip:
+    - testify</pre>
+      </div>
 
       <h3>Suite configuration</h3>
       <table class="ref-table">
