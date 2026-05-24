@@ -150,14 +150,14 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 	snapDir := filepath.Join(filepath.Dir(callerFile), "testdata", "__snapshots__")
 	snapPath := filepath.Join(snapDir, topLevel+suffix+".snap")
 
+	mu := fileMutex(snapPath)
+	mu.Lock()
+	defer mu.Unlock()
+
 	if err := os.MkdirAll(snapDir, 0755); err != nil {
 		failf(t, "MatchSnapshot: failed to create snapshot dir: %v", err)
 		return
 	}
-
-	mu := fileMutex(snapPath)
-	mu.Lock()
-	defer mu.Unlock()
 
 	existing, _ := os.ReadFile(snapPath)
 	sections := snapfile.Parse(existing)

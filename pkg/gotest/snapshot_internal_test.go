@@ -85,7 +85,7 @@ func TestSplitTestName(t *testing.T) {
 
 func TestMatchSnapshot_PtestUsesNoSuffix(t *testing.T) {
 	snapDir := filepath.Join(thisDir(), "testdata", "__snapshots__")
-	t.Cleanup(func() { os.RemoveAll(snapDir) })
+	t.Cleanup(func() { os.Remove(filepath.Join(snapDir, "TestMatchSnapshot_PtestUsesNoSuffix.snap")) })
 
 	MatchSnapshot(t, "ptest-value")
 

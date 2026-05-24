@@ -17,7 +17,7 @@ type SnapshotGroupingTestSuite struct{}
 
 func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
 	snapDir := filepath.Join("testdata", "__snapshots__")
-	t.T().Cleanup(func() { os.RemoveAll(snapDir) })
+	t.T().Cleanup(func() { os.Remove(filepath.Join(snapDir, "TestSnapshotGroupingTestSuite_ext.snap")) })
 
 	t.When("subtests write snapshots", func(w *gotest.T) {
 		w.It("creates a file with named sections per subtest", func(it *gotest.T) {
@@ -73,7 +73,7 @@ type SnapshotConcurrencyTestSuite struct{}
 
 func (s *SnapshotConcurrencyTestSuite) TestMatchSnapshotConcurrency(t *gotest.T) {
 	snapDir := filepath.Join("testdata", "__snapshots__")
-	t.T().Cleanup(func() { os.RemoveAll(snapDir) })
+	t.T().Cleanup(func() { os.Remove(filepath.Join(snapDir, "TestSnapshotConcurrencyTestSuite_ext.snap")) })
 
 	t.When("multiple goroutines write concurrently", func(w *gotest.T) {
 		for i := range 10 {
@@ -90,7 +90,7 @@ type SnapshotUpdateTestSuite struct{}
 
 func (s *SnapshotUpdateTestSuite) TestMatchSnapshotUpdate(t *gotest.T) {
 	snapDir := filepath.Join("testdata", "__snapshots__")
-	t.T().Cleanup(func() { os.RemoveAll(snapDir) })
+	t.T().Cleanup(func() { os.Remove(filepath.Join(snapDir, "TestSnapshotUpdateTestSuite_ext.snap")) })
 
 	t.When("GOTEST_UPDATE_SNAPSHOTS is set", func(w *gotest.T) {
 		w.It("replaces original content with updated content and removes the old value", func(it *gotest.T) {
@@ -132,7 +132,7 @@ type SnapshotTestSuite struct{}
 
 func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 	snapDir := filepath.Join("testdata", "__snapshots__")
-	t.T().Cleanup(func() { os.RemoveAll(snapDir) })
+	t.T().Cleanup(func() { os.Remove(filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")) })
 
 	t.When("no snapshot exists", func(w *gotest.T) {
 		w.It("creates a grouped snapshot file on first run", func(it *gotest.T) {
@@ -182,8 +182,8 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 	snapDir := filepath.Join("testdata", "__snapshots__")
 
-	t.T().Cleanup(func() { os.RemoveAll(snapDir) })
 	snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")
+	t.T().Cleanup(func() { os.Remove(snapPath) })
 
 	t.When("value is a string", func(w *gotest.T) {
 		w.It("snapshots the string directly", func(it *gotest.T) {
