@@ -13,7 +13,7 @@
 Specification-driven test suites for Go with isolation and parallelism as first-class citizens.
 
 Write test suites as Go structs.
-`gotest` generates the lifecycle wiring, `t.Run` nesting, and process isolation that you'd write by hand — then cleans up after.
+`gotest` generates the lifecycle wiring, `t.Run` nesting, and process isolation that you'd write by hand.
 What runs is standard `go test`.
 What you read back is a behavioral specification.
 
@@ -94,7 +94,7 @@ UserService
 ```
 
 No generated code leaks into your workflow.
-`gotest` creates it before tests run and cleans it up after.
+`gotest` creates it before tests run - invisible to the project's filetree.
 
 ## Why gotest?
 
@@ -112,7 +112,7 @@ Test output is standard — but the mechanism behind it isn't.
 - **Safely parallel.** Suite-level parallelism is automatic. Method-level is opt-in. Because isolation is built in, parallel tests can't interfere with each other.
 
 Under the hood, `gotest` generates the same `t.Run`, `t.Cleanup`, and `defer` code you'd write by hand.
-Generated files never touch your source tree — they're created before tests run and cleaned up after.
+Generated files never touch your source tree — they're created hidden before tests run and cleaned up after.
 
 ## How It Works
 
