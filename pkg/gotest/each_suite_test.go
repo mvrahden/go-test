@@ -70,4 +70,28 @@ func (s *EachTestSuite) TestEach(t *gotest.T) {
 			}
 		})
 	})
+
+	t.When("slice is nil", func(w *gotest.T) {
+		w.It("does not iterate", func(it *gotest.T) {
+			count := 0
+			for range gotest.Each(it, []struct{ X int }(nil)) {
+				count++
+			}
+			gotest.Equal(it, 0, count)
+		})
+	})
+
+	t.When("entries have no Desc or Name field", func(w *gotest.T) {
+		w.It("uses index-based naming", func(it *gotest.T) {
+			count := 0
+			for sub, tc := range gotest.Each(it, []struct{ Value int }{
+				{10},
+				{20},
+			}) {
+				count++
+				gotest.Greater(sub, tc.Value, 0)
+			}
+			gotest.Equal(it, 2, count)
+		})
+	})
 }
