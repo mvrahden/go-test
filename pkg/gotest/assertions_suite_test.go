@@ -1147,6 +1147,26 @@ func (s *AssertionsTestSuite) TestTimeWithin(t *gotest.T) {
 			gotest.True(it, m.Failed())
 		})
 	})
+
+	t.When("tolerance is negative", func(w *gotest.T) {
+		w.It("always fails even for identical times", func(it *gotest.T) {
+			base := time.Now()
+			m := gotest.Record(func(r *gotest.R) {
+				gotest.TimeWithin(r, base, base, -1*time.Second)
+			})
+			gotest.True(it, m.Failed())
+		})
+	})
+
+	t.When("times are identical", func(w *gotest.T) {
+		w.It("passes with any positive tolerance", func(it *gotest.T) {
+			base := time.Now()
+			m := gotest.Record(func(r *gotest.R) {
+				gotest.TimeWithin(r, base, base, 1*time.Nanosecond)
+			})
+			gotest.False(it, m.Failed())
+		})
+	})
 }
 
 func (s *AssertionsTestSuite) TestTimeIsNow(t *gotest.T) {
