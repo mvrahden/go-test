@@ -8,6 +8,8 @@ import {
   resolveTestItem,
   applyResults,
   killProcessTree,
+  resolvePackageItems,
+  resolveAncestorItems,
 } from "./runnerUtils.js";
 import type { RunRegistry } from "./runRegistry.js";
 
@@ -407,6 +409,16 @@ export class WatchManager implements vscode.Disposable {
           this.controller.recordResult(r.itemId, r.status, r.duration);
         }
       }
+    }
+
+    const pkgItems: vscode.TestItem[] = [];
+    for (const importPath of byPackage.keys()) {
+      const item = this.controller.findItem(importPath);
+      if (item) pkgItems.push(item);
+    }
+    if (pkgItems.length > 0) {
+      resolvePackageItems(run, pkgItems, this.controller);
+      resolveAncestorItems(run, this.controller);
     }
   }
 }

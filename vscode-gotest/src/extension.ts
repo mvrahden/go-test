@@ -19,7 +19,11 @@ import { CoverageStore } from "./coverageStore.js";
 import { TestResultStore } from "./testResultStore.js";
 import { RunRegistry } from "./runRegistry.js";
 import { validateGoBinary, scopedConfig } from "./cli.js";
-import { buildRunFilter, getPackageDir } from "./runnerUtils.js";
+import {
+  buildRunFilter,
+  getPackageDir,
+  resolveAncestorItems,
+} from "./runnerUtils.js";
 import { copyCoverageSummary, copyTestResults } from "./reporting.js";
 import { execFile } from "node:child_process";
 
@@ -663,6 +667,7 @@ async function initializeAsync(deps: {
         );
       else if (result.status === "skip") resultRun.skipped(item);
     });
+    resolveAncestorItems(resultRun, controller);
     resultRun.end();
     outputChannel.info(
       `[results] restored ${testResultStore.size} result(s) from storage`,

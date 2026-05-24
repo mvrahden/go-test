@@ -8,6 +8,7 @@ import {
   groupByPackage,
   buildRunFilter,
   resolvePackageItems,
+  resolveAncestorItems,
 } from "./runnerUtils.js";
 import type { CoverageStore } from "./coverageStore.js";
 import { executeBatch } from "./batchRunner.js";
@@ -206,6 +207,7 @@ export class TestRunner {
       }
 
       resolvePackageItems(run, items, this.controller);
+      resolveAncestorItems(run, this.controller);
 
       if (anyCoverOnRun) {
         const { coverages: allCoverages } =
