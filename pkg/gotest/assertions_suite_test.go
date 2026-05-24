@@ -1203,6 +1203,20 @@ func (s *AssertionsTestSuite) TestPanics(t *gotest.T) {
 			gotest.False(it, m.Failed())
 			gotest.Equal(it, 42, v)
 		})
+		w.It("passes for nil panic", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) {
+				gotest.Panics(r, func() { panic(nil) })
+			})
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for error panic", func(it *gotest.T) {
+			var v any
+			m := gotest.Record(func(r *gotest.R) {
+				v = gotest.Panics(r, func() { panic(fmt.Errorf("boom")) })
+			})
+			gotest.False(it, m.Failed())
+			gotest.Contains(it, fmt.Sprint(v), "boom")
+		})
 	})
 
 	t.When("function does not panic", func(w *gotest.T) {
