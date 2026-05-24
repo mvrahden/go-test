@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sync/atomic"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -1188,6 +1189,19 @@ func (s *AssertionsTestSuite) TestEventually(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) {
 				gotest.Eventually(r, 50*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {
 					gotest.True(poll, true)
+				})
+			})
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for async goroutine condition", func(it *gotest.T) {
+			var counter atomic.Int32
+			go func() {
+				time.Sleep(50 * time.Millisecond)
+				counter.Store(42)
+			}()
+			m := gotest.Record(func(r *gotest.R) {
+				gotest.Eventually(r, 1*time.Second, 10*time.Millisecond, func(poll *gotest.R) {
+					gotest.Equal(poll, int32(42), counter.Load())
 				})
 			})
 			gotest.False(it, m.Failed())
