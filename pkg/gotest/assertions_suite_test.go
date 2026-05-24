@@ -184,7 +184,7 @@ func (s *AssertionsTestSuite) TestEmpty(t *gotest.T) {
 			gotest.False(it, m.Failed())
 		})
 
-		// ---
+		// --- fails
 
 		w.It("fails for non-empty", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, []int{1, 2, 3}) })
@@ -198,7 +198,7 @@ func (s *AssertionsTestSuite) TestEmpty(t *gotest.T) {
 			gotest.False(it, m.Failed())
 		})
 
-		// ---
+		// --- fails
 
 		w.It("fails for non-empty", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, map[string]int{"a": 1}) })
@@ -212,7 +212,7 @@ func (s *AssertionsTestSuite) TestEmpty(t *gotest.T) {
 			gotest.False(it, m.Failed())
 		})
 
-		// ---
+		// --- fails
 
 		w.It("fails for non-empty", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, "hello") })
@@ -226,7 +226,7 @@ func (s *AssertionsTestSuite) TestEmpty(t *gotest.T) {
 			gotest.False(it, m.Failed())
 		})
 
-		// ---
+		// --- fails
 
 		w.It("fails for non-empty", func(it *gotest.T) {
 			ch := make(chan int, 1)
@@ -258,7 +258,7 @@ func (s *AssertionsTestSuite) TestEmpty(t *gotest.T) {
 			gotest.False(it, m.Failed())
 		})
 
-		// ---
+		// --- fails
 
 		w.It("fails for single indirection to non-empty", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, &[]int{1, 2, 3}) })
@@ -293,7 +293,7 @@ func (s *AssertionsTestSuite) TestNotEmpty(t *gotest.T) {
 			gotest.False(it, m.Failed())
 		})
 
-		// ---
+		// --- fails
 
 		w.It("fails for empty", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, []int{}) })
@@ -307,7 +307,7 @@ func (s *AssertionsTestSuite) TestNotEmpty(t *gotest.T) {
 			gotest.False(it, m.Failed())
 		})
 
-		// ---
+		// --- fails
 
 		w.It("fails for empty", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, map[string]int{}) })
@@ -321,7 +321,7 @@ func (s *AssertionsTestSuite) TestNotEmpty(t *gotest.T) {
 			gotest.False(it, m.Failed())
 		})
 
-		// ---
+		// --- fails
 
 		w.It("fails for empty", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, "") })
@@ -337,7 +337,7 @@ func (s *AssertionsTestSuite) TestNotEmpty(t *gotest.T) {
 			gotest.False(it, m.Failed())
 		})
 
-		// ---
+		// --- fails
 
 		w.It("fails for empty", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, make(chan int)) })
@@ -363,7 +363,7 @@ func (s *AssertionsTestSuite) TestNotEmpty(t *gotest.T) {
 			gotest.False(it, m.Failed())
 		})
 
-		// ---
+		// --- fails
 
 		w.It("fails for nil pointer", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, (*[]int)(nil)) })
