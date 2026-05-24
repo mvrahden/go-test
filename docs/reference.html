@@ -782,12 +782,14 @@ InfraFixture.AfterAll</div>
       <p class="lead">Sensible defaults. Override only what you need — via project file, marker methods, or CLI flags.</p>
 
       <h3>Precedence</h3>
-      <p>Configuration is resolved in layers. Each layer can override the one below it:</p>
+      <p>There are two independent configuration scopes:</p>
+      <p><strong>Project scope</strong> — CLI flags override the project file. These control the test runner itself:</p>
       <div class="diagram">1. CLI flags            <span class="d">--setup-timeout=2m, --min=80, --debounce=500ms</span>
-2. Project file         <span class="d">.gotest.yml — checked into the repo</span>
-3. In-code config       <span class="d">SuiteConfig(), FixtureConfig(), SharedFixtureConfig()</span>
-4. Built-in defaults    <span class="d">DefaultSuiteConfig(), DefaultFixtureConfig()</span></div>
-      <p>CLI flags take precedence over the project file. The project file sets team-wide defaults; CLI flags allow per-invocation overrides. In-code config and built-in defaults operate at the suite/fixture level — independent of the project-level settings.</p>
+2. Project file         <span class="d">.gotest.yml — checked into the repo</span></div>
+      <p><strong>Code scope</strong> — marker methods override built-in presets. These control individual suites and fixtures:</p>
+      <div class="diagram">1. In-code config       <span class="d">SuiteConfig(), FixtureConfig(), SharedFixtureConfig()</span>
+2. Built-in defaults    <span class="d">DefaultSuiteConfig(), DefaultFixtureConfig()</span></div>
+      <p>The two scopes are independent — they don't override each other. For shared fixture timeouts specifically, <code>--setup-timeout</code> is an outer wall-clock budget on the entire setup phase, while <code>SharedFixtureConfig().Timeout</code> is an inner per-fixture deadline. Both run concurrently — whichever fires first wins. When <code>--setup-timeout</code> is omitted, only the per-fixture timeouts apply.</p>
 
       <h3>Project file — <code>.gotest.yml</code></h3>
       <p>Place a <code>.gotest.yml</code> in your project root. gotest finds it by walking up from the working directory, stopping at the first match or at a <code>go.mod</code> boundary.</p>
