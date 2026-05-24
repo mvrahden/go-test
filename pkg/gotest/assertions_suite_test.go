@@ -171,64 +171,218 @@ func (s *AssertionsTestSuite) TestNotZero(t *gotest.T) {
 }
 
 func (s *AssertionsTestSuite) TestEmpty(t *gotest.T) {
-	t.When("object is empty", func(w *gotest.T) {
-		w.It("passes for nil", func(it *gotest.T) {
+	t.When("input is nil", func(w *gotest.T) {
+		w.It("passes", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, nil) })
-			gotest.False(it, m.Failed())
-		})
-		w.It("passes for empty slice", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, []int{}) })
-			gotest.False(it, m.Failed())
-		})
-		w.It("passes for empty string", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, "") })
-			gotest.False(it, m.Failed())
-		})
-		w.It("passes for empty map", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, map[string]int{}) })
 			gotest.False(it, m.Failed())
 		})
 	})
 
-	t.When("object is not empty", func(w *gotest.T) {
-		w.It("fails for non-empty slice", func(it *gotest.T) {
+	t.When("input is a slice", func(w *gotest.T) {
+		w.It("passes for empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, []int{}) })
+			gotest.False(it, m.Failed())
+		})
+
+		// ---
+
+		w.It("fails for non-empty", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, []int{1, 2, 3}) })
 			gotest.True(it, m.Failed())
 		})
-		w.It("fails for non-empty string", func(it *gotest.T) {
+	})
+
+	t.When("input is a map", func(w *gotest.T) {
+		w.It("passes for empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, map[string]int{}) })
+			gotest.False(it, m.Failed())
+		})
+
+		// ---
+
+		w.It("fails for non-empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, map[string]int{"a": 1}) })
+			gotest.True(it, m.Failed())
+		})
+	})
+
+	t.When("input is a string", func(w *gotest.T) {
+		w.It("passes for empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, "") })
+			gotest.False(it, m.Failed())
+		})
+
+		// ---
+
+		w.It("fails for non-empty", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, "hello") })
 			gotest.True(it, m.Failed())
 		})
-		w.It("fails for non-empty map", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, map[string]int{"a": 1}) })
+	})
+
+	t.When("input is a channel", func(w *gotest.T) {
+		w.It("passes for empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, make(chan int)) })
+			gotest.False(it, m.Failed())
+		})
+
+		// ---
+
+		w.It("fails for non-empty", func(it *gotest.T) {
+			ch := make(chan int, 1)
+			ch <- 42
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, ch) })
+			gotest.True(it, m.Failed())
+		})
+	})
+
+	t.When("input is a pointer", func(w *gotest.T) {
+		w.It("passes for nil pointer", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, (*[]int)(nil)) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for single indirection to empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, &[]int{}) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for double indirection to empty", func(it *gotest.T) {
+			inner := &[]int{}
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, &inner) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for triple indirection to empty", func(it *gotest.T) {
+			s := []int{}
+			p1 := &s
+			p2 := &p1
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, &p2) })
+			gotest.False(it, m.Failed())
+		})
+
+		// ---
+
+		w.It("fails for single indirection to non-empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, &[]int{1, 2, 3}) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for double indirection to non-empty", func(it *gotest.T) {
+			inner := &[]int{1, 2, 3}
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, &inner) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for triple indirection to non-empty", func(it *gotest.T) {
+			s := []int{1, 2, 3}
+			p1 := &s
+			p2 := &p1
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, &p2) })
 			gotest.True(it, m.Failed())
 		})
 	})
 }
 
 func (s *AssertionsTestSuite) TestNotEmpty(t *gotest.T) {
-	t.When("object is not empty", func(w *gotest.T) {
-		w.It("passes for non-empty slice", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, []int{1, 2, 3}) })
-			gotest.False(it, m.Failed())
-		})
-		w.It("passes for non-empty string", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, "hello") })
-			gotest.False(it, m.Failed())
-		})
-	})
-
-	t.When("object is empty", func(w *gotest.T) {
-		w.It("fails for nil", func(it *gotest.T) {
+	t.When("input is nil", func(w *gotest.T) {
+		w.It("fails", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, nil) })
 			gotest.True(it, m.Failed())
 		})
-		w.It("fails for empty slice", func(it *gotest.T) {
+	})
+
+	t.When("input is a slice", func(w *gotest.T) {
+		w.It("passes for non-empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, []int{1, 2, 3}) })
+			gotest.False(it, m.Failed())
+		})
+
+		// ---
+
+		w.It("fails for empty", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, []int{}) })
 			gotest.True(it, m.Failed())
 		})
-		w.It("fails for empty string", func(it *gotest.T) {
+	})
+
+	t.When("input is a map", func(w *gotest.T) {
+		w.It("passes for non-empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, map[string]int{"a": 1}) })
+			gotest.False(it, m.Failed())
+		})
+
+		// ---
+
+		w.It("fails for empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, map[string]int{}) })
+			gotest.True(it, m.Failed())
+		})
+	})
+
+	t.When("input is a string", func(w *gotest.T) {
+		w.It("passes for non-empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, "hello") })
+			gotest.False(it, m.Failed())
+		})
+
+		// ---
+
+		w.It("fails for empty", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, "") })
+			gotest.True(it, m.Failed())
+		})
+	})
+
+	t.When("input is a channel", func(w *gotest.T) {
+		w.It("passes for non-empty", func(it *gotest.T) {
+			ch := make(chan int, 1)
+			ch <- 42
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, ch) })
+			gotest.False(it, m.Failed())
+		})
+
+		// ---
+
+		w.It("fails for empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, make(chan int)) })
+			gotest.True(it, m.Failed())
+		})
+	})
+
+	t.When("input is a pointer", func(w *gotest.T) {
+		w.It("passes for single indirection to non-empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, &[]int{1, 2, 3}) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for double indirection to non-empty", func(it *gotest.T) {
+			inner := &[]int{1, 2, 3}
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, &inner) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for triple indirection to non-empty", func(it *gotest.T) {
+			s := []int{1, 2, 3}
+			p1 := &s
+			p2 := &p1
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, &p2) })
+			gotest.False(it, m.Failed())
+		})
+
+		// ---
+
+		w.It("fails for nil pointer", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, (*[]int)(nil)) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for single indirection to empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, &[]int{}) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for double indirection to empty", func(it *gotest.T) {
+			inner := &[]int{}
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, &inner) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for triple indirection to empty", func(it *gotest.T) {
+			s := []int{}
+			p1 := &s
+			p2 := &p1
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, &p2) })
 			gotest.True(it, m.Failed())
 		})
 	})
