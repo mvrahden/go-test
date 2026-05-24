@@ -81,7 +81,8 @@ func includesElement(s, element any) bool {
 	return false
 }
 
-// isEmpty checks if a value is considered empty (nil, or has Len() == 0).
+// isEmpty reports whether a value is considered empty: nil, zero-length
+// (slices, maps, arrays, channels, strings), or a pointer to an empty value.
 func isEmpty(object any) bool {
 	if object == nil {
 		return true
@@ -94,6 +95,7 @@ func isEmpty(object any) bool {
 		if rv.IsNil() {
 			return true
 		}
+		return isEmpty(rv.Elem().Interface())
 	}
 	return false
 }
@@ -191,7 +193,7 @@ func ElementsMatch[V comparable](t testingT, listA, listB []V, msgAndArgs ...any
 	}
 }
 
-// Empty asserts that object is empty (nil, or has length 0).
+// Empty asserts that object is empty: nil, zero length, or a pointer to an empty value.
 func Empty(t testingT, object any, msgAndArgs ...any) {
 	if !isEmpty(object) {
 		fail(t, fmt.Sprintf("Empty failed:\n  object is not empty: %#v", object), msgAndArgs)
@@ -293,7 +295,7 @@ func GreaterOrEqual[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
 
 // InDelta asserts that expected and actual are within delta of each other.
 func InDelta[V numeric](t testingT, expected, actual V, delta float64, msgAndArgs ...any) {
-	diff := math.Abs(float64(expected) - float64(actual))
+	diff := math.Abs(float64(expected - actual))
 	if diff > delta {
 		fail(t, fmt.Sprintf("InDelta failed:\n  |%v - %v| = %v exceeds delta %v", expected, actual, diff, delta), msgAndArgs)
 	}
@@ -364,7 +366,7 @@ func NotContains(t testingT, s, contains any, msgAndArgs ...any) {
 	}
 }
 
-// NotEmpty asserts that object is NOT empty.
+// NotEmpty asserts that object is NOT empty. See Empty for the definition of emptiness.
 func NotEmpty(t testingT, object any, msgAndArgs ...any) {
 	if isEmpty(object) {
 		fail(t, fmt.Sprintf("NotEmpty failed:\n  object is empty: %#v", object), msgAndArgs)
