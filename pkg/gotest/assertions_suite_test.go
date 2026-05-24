@@ -1104,6 +1104,16 @@ func (s *AssertionsTestSuite) TestJSONEq(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, json.RawMessage(`{"x":10}`), `{"x":10}`) })
 			gotest.False(it, m.Failed())
 		})
+		w.It("passes for nested objects with different key order", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) {
+				gotest.JSONEq(r, `{"a":{"x":1,"y":2},"b":3}`, `{"b":3,"a":{"y":2,"x":1}}`)
+			})
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for equal arrays", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, `[1,2,3]`, `[1,2,3]`) })
+			gotest.False(it, m.Failed())
+		})
 	})
 
 	t.When("JSON structures differ", func(w *gotest.T) {
@@ -1113,6 +1123,14 @@ func (s *AssertionsTestSuite) TestJSONEq(t *gotest.T) {
 		})
 		w.It("fails for different keys", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, `{"a":1}`, `{"b":1}`) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for null vs empty object", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, `null`, `{}`) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for arrays with different order", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, `[1,2,3]`, `[3,2,1]`) })
 			gotest.True(it, m.Failed())
 		})
 	})
