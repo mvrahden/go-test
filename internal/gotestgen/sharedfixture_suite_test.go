@@ -15,7 +15,7 @@ func (s *SharedFixtureTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true}
 }
 
-func (s *SharedFixtureTestSuite) TestSingleFixture(t *gotest.T) {
+func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 	t.When("single fixture with one transfer field", func(w *gotest.T) {
 		w.It("generates valid Go with expected structure", func(it *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
@@ -50,9 +50,7 @@ func (s *SharedFixtureTestSuite) TestSingleFixture(t *gotest.T) {
 			gotest.Contains(it, code, "ConnStr: sf0.ConnStr")
 		})
 	})
-}
 
-func (s *SharedFixtureTestSuite) TestMultipleFixtures(t *gotest.T) {
 	t.When("multiple fixtures from different packages", func(w *gotest.T) {
 		w.It("generates imports and lifecycle for both", func(it *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
@@ -94,10 +92,8 @@ func (s *SharedFixtureTestSuite) TestMultipleFixtures(t *gotest.T) {
 			gotest.True(it, lastSf1 < lastSf0, "teardown should be in reverse order: sf1 before sf0")
 		})
 	})
-}
 
-func (s *SharedFixtureTestSuite) TestNoFixtures(t *gotest.T) {
-	t.When("nil fixtures slice", func(w *gotest.T) {
+	t.When("no fixtures", func(w *gotest.T) {
 		w.It("returns an error", func(it *gotest.T) {
 			_, err := gotestgen.GenerateSharedSetup(nil)
 			gotest.Error(it, err)
