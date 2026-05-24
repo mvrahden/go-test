@@ -41,6 +41,8 @@ func (s *E2ETestSuite) BeforeAll(t *gotest.T) {
 	testutils.HackGoWork(t.T(), s.workDir)
 }
 
+func (s *E2ETestSuite) AfterAll(t *gotest.T) {}
+
 func (s *E2ETestSuite) TestT(t *gotest.T) {
 	tmp := t.T().TempDir()
 	excludedPaths := append(testutils.DefaultExcludePaths,
