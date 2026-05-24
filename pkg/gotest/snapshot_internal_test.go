@@ -41,7 +41,7 @@ func TestIsExternalPackage(t *testing.T) {
 	})
 
 	t.Run("result is cached", func(t *testing.T) {
-		path := filepath.Join(dir, "collecting_test.go")
+		path := filepath.Join(dir, "r_test.go")
 		pkgCache.Delete(path)
 		isExternalPackage(path)
 		_, ok := pkgCache.Load(path)
