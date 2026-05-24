@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
-	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 )
@@ -46,7 +45,7 @@ func runPrepare(inv Invocation) int {
 
 	var setupProc *SharedFixtureProcess
 	if len(overlay.sharedFixtures) > 0 {
-		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, time.Minute)
+		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, 0)
 		if err != nil {
 			stop()
 			cleanup()

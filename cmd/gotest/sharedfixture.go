@@ -101,20 +101,34 @@ func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	}()
 
 	var state map[string]json.RawMessage
-	select {
-	case res := <-decoded:
-		if res.err != nil {
+	if setupTimeout > 0 {
+		select {
+		case res := <-decoded:
+			if res.err != nil {
+				cmd.Process.Kill()
+				return nil, fmt.Errorf("read shared fixture state: %w", res.err)
+			}
+			state = res.state
+		case <-ctx.Done():
 			cmd.Process.Kill()
-			return nil, fmt.Errorf("read shared fixture state: %w", res.err)
+			return nil, fmt.Errorf("cancelled: %w", ctx.Err())
+		case <-time.After(setupTimeout):
+			cmd.Process.Kill()
+			io.Copy(io.Discard, stdout)
+			return nil, fmt.Errorf("timed out after %v", setupTimeout)
 		}
-		state = res.state
-	case <-ctx.Done():
-		cmd.Process.Kill()
-		return nil, fmt.Errorf("cancelled: %w", ctx.Err())
-	case <-time.After(setupTimeout):
-		cmd.Process.Kill()
-		io.Copy(io.Discard, stdout)
-		return nil, fmt.Errorf("timed out after %v", setupTimeout)
+	} else {
+		select {
+		case res := <-decoded:
+			if res.err != nil {
+				cmd.Process.Kill()
+				return nil, fmt.Errorf("read shared fixture state: %w", res.err)
+			}
+			state = res.state
+		case <-ctx.Done():
+			cmd.Process.Kill()
+			return nil, fmt.Errorf("cancelled: %w", ctx.Err())
+		}
 	}
 
 	teardownTimeout := setupTimeout

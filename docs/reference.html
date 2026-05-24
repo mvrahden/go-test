@@ -795,7 +795,7 @@ InfraFixture.AfterAll</div>
         <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
         <tbody>
           <tr><td><code>tags</code></td><td>string</td><td><em>none</em></td><td>Build tags, comma-separated (e.g. <code>"integration,e2e"</code>).</td></tr>
-          <tr><td><code>setup-timeout</code></td><td>duration</td><td>1m</td><td>Shared fixture setup deadline (<code>--setup-timeout</code>).</td></tr>
+          <tr><td><code>setup-timeout</code></td><td>duration</td><td><em>none</em></td><td>Shared fixture setup deadline. Omit to let the fixture's own config govern. Use <code>-1</code> to disable (<code>--setup-timeout</code>).</td></tr>
           <tr><td><code>min-coverage</code></td><td>int</td><td>0 (off)</td><td>Minimum coverage percentage, 0–100 (<code>--min</code>).</td></tr>
           <tr><td><code>debounce</code></td><td>duration</td><td>200ms</td><td>Watch mode re-run delay (<code>--debounce</code>).</td></tr>
           <tr><td><code>lint.skip</code></td><td>[string]</td><td><em>none</em></td><td>Lint rules to disable: <code>stdlib-test</code>, <code>testify</code>.</td></tr>
@@ -910,7 +910,7 @@ percentage = covered / total</div>
           <tr><td><code>--output=&lt;path&gt;</code></td><td>Write formatted output to file.</td></tr>
           <tr><td><code>--no-color</code></td><td>Strip ANSI codes from output.</td></tr>
           <tr><td><code>--debug</code></td><td>Preserve overlays after the run for inspection.</td></tr>
-          <tr><td><code>--setup-timeout=&lt;dur&gt;</code></td><td>Shared fixture setup deadline (default 1m).</td></tr>
+          <tr><td><code>--setup-timeout=&lt;dur&gt;</code></td><td>Shared fixture setup deadline. Omit to let the fixture's own config govern. Use <code>-1</code> to disable.</td></tr>
           <tr><td><code>--debounce=&lt;dur&gt;</code></td><td>Watch mode debounce interval (default 200ms).</td></tr>
           <tr><td><code>--input=&lt;path&gt;</code></td><td>Read test output from file instead of running tests (<code>spec</code> command).</td></tr>
         </tbody>

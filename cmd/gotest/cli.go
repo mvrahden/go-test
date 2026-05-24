@@ -186,12 +186,12 @@ func parseSetupTimeoutFlag(args []string) (time.Duration, error) {
 		if err != nil {
 			return 0, fmt.Errorf("invalid --setup-timeout value %q: %w", raw, err)
 		}
-		if d <= 0 {
-			return 0, fmt.Errorf("invalid --setup-timeout value %q: must be positive", raw)
+		if d < -1 || d == 0 {
+			return 0, fmt.Errorf("invalid --setup-timeout value %q: must be positive or -1 to disable", raw)
 		}
 		return d, nil
 	}
-	return time.Minute, nil
+	return 0, nil
 }
 
 func readCoverageTotal(profilePath string) (float64, error) {
