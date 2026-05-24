@@ -4,6 +4,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// RecordTestSuite tests the Record/R recorder for capturing assertion outcomes.
 type RecordTestSuite struct{}
 
 func (s *RecordTestSuite) TestRecord(t *gotest.T) {

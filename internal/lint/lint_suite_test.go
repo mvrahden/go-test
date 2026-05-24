@@ -6,6 +6,7 @@ import (
 	"golang.org/x/tools/go/analysis/analysistest"
 )
 
+// LintTestSuite tests the gotest lint analyzer rules and nolint directive parsing.
 type LintTestSuite struct{}
 
 func (s *LintTestSuite) SuiteConfig() gotest.SuiteConfig {

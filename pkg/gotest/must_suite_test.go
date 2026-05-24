@@ -7,6 +7,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// MustTestSuite tests the Must wrapper that panics on assertion failure.
 type MustTestSuite struct{}
 
 func (s *MustTestSuite) TestMust(t *gotest.T) {

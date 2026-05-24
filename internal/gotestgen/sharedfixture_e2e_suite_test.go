@@ -14,6 +14,8 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// SharedFixtureE2ETestSuite tests shared-fixture code generation end-to-end
+// across multi-package example directories.
 type SharedFixtureE2ETestSuite struct{}
 
 func (s *SharedFixtureE2ETestSuite) TestMultiPackage(t *gotest.T) {

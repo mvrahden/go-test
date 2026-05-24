@@ -5,6 +5,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// GitTestSuite tests PSuiteRegex pattern matching for generated suite file discovery.
 type GitTestSuite struct{}
 
 func (s *GitTestSuite) TestPSuiteRegex(t *gotest.T) {

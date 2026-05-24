@@ -59,6 +59,8 @@ func buildTest2JSONArgs(target gotestrunner.SuiteTarget) (path string, args []st
 	return "go", args
 }
 
+// GotestrunnerTestSuite tests runner internals: flag classification, overlay
+// management, command building, output formatting, and suite filtering.
 type GotestrunnerTestSuite struct{}
 
 // --- args tests ---

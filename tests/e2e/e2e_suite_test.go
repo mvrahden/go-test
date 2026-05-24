@@ -18,6 +18,7 @@ import (
 //go:embed testdata
 var testdataFS embed.FS
 
+// E2ETestSuite tests the gotest CLI end-to-end against real packages.
 type E2ETestSuite struct{}
 
 func (s *E2ETestSuite) TestT(t *gotest.T) {

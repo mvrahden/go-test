@@ -9,6 +9,7 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
+// RendererTestSuite tests Go code generation from suite and fixture specs.
 type RendererTestSuite struct{}
 
 func (s *RendererTestSuite) SuiteConfig() gotest.SuiteConfig {

@@ -9,6 +9,8 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
+// ResolverTestSuite tests fixture binding resolution, including suite-to-fixture,
+// parent-child, shared fixture, and lifecycle method detection.
 type ResolverTestSuite struct{}
 
 func (s *ResolverTestSuite) SuiteConfig() gotest.SuiteConfig {

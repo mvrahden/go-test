@@ -6,6 +6,8 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// ConfigTestSuite tests config constructors, presets, and overlay logic
+// for FixtureConfig and SuiteConfig.
 type ConfigTestSuite struct{}
 
 func (s *ConfigTestSuite) SuiteConfig() gotest.SuiteConfig {
