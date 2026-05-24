@@ -1,8 +1,6 @@
 package gotestgen_test
 
 import (
-	"fmt"
-
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -19,20 +17,19 @@ func (s *ResolverTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 func (s *ResolverTestSuite) TestIsInternalPkgPath(t *gotest.T) {
 	t.When("various paths", func(w *gotest.T) {
-		for _, tc := range []struct {
+		for sub, tc := range gotest.Each(w, []struct {
+			Desc     string
 			path     string
 			expected bool
 		}{
-			{"github.com/foo/internal/bar", true},
-			{"github.com/foo/internal", true},
-			{"internal/bar", true},
-			{"github.com/foo/bar", false},
-			{"github.com/foo/internalize", false},
-			{"github.com/foo/pkg/bar", false},
-		} {
-			w.It("returns "+fmt.Sprintf("%v", tc.expected)+" for "+tc.path, func(it *gotest.T) {
-				gotest.Equal(it, tc.expected, gotestgen.ExportIsInternalPkgPath(tc.path), tc.path)
-			})
+			{"internal segment", "github.com/foo/internal/bar", true},
+			{"internal leaf", "github.com/foo/internal", true},
+			{"internal root", "internal/bar", true},
+			{"no internal", "github.com/foo/bar", false},
+			{"internalize prefix", "github.com/foo/internalize", false},
+			{"pkg path", "github.com/foo/pkg/bar", false},
+		}) {
+			gotest.Equal(sub, tc.expected, gotestgen.ExportIsInternalPkgPath(tc.path))
 		}
 	})
 }

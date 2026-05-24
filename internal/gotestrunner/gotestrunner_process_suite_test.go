@@ -40,26 +40,26 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupSetup(t *gotest.T) {
 	})
 
 	t.When("building suite cmd", func(w *gotest.T) {
-		for _, test2json := range []bool{false, true} {
-			name := "plain"
-			if test2json {
-				name = "test2json"
+		for sub, tc := range gotest.Each(w, []struct {
+			Name      string
+			test2json bool
+		}{
+			{"plain mode", false},
+			{"test2json mode", true},
+		}) {
+			ctx := context.Background()
+			env := []string{"PATH=/usr/bin"}
+			target := gotestrunner.SuiteTarget{
+				Package:    "example.com/pkg",
+				BinaryPath: "/tmp/pkg.test",
+				SuiteName:  "TestFoo",
 			}
-			w.It(fmt.Sprintf("sets process group in %s mode", name), func(it *gotest.T) {
-				ctx := context.Background()
-				env := []string{"PATH=/usr/bin"}
-				target := gotestrunner.SuiteTarget{
-					Package:    "example.com/pkg",
-					BinaryPath: "/tmp/pkg.test",
-					SuiteName:  "TestFoo",
-				}
-				cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, env, test2json)
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, env, tc.test2json)
 
-				gotest.True(it, cmd.SysProcAttr != nil && cmd.SysProcAttr.Setpgid,
-					"expected Setpgid to be true")
-				gotest.True(it, cmd.Cancel != nil, "expected Cancel to be set")
-				gotest.Equal(it, time.Duration(0), cmd.WaitDelay)
-			})
+			gotest.True(sub, cmd.SysProcAttr != nil && cmd.SysProcAttr.Setpgid,
+				"expected Setpgid to be true")
+			gotest.True(sub, cmd.Cancel != nil, "expected Cancel to be set")
+			gotest.Equal(sub, time.Duration(0), cmd.WaitDelay)
 		}
 	})
 }
