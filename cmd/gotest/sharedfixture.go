@@ -51,8 +51,8 @@ func (p *SharedFixtureProcess) Teardown() error {
 // starts it as a subprocess, reads JSON state from stdout, writes it to a state
 // file, and returns a SharedFixtureProcess. setupTimeout is a total budget for
 // all shared fixtures to complete setup; 0 means no external deadline (each
-// fixture's own SharedFixtureConfig().Timeout governs); -1 explicitly disables
-// the deadline.
+// fixture's own SharedFixtureConfig().Timeout governs); any negative value
+// explicitly disables the deadline.
 func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestgen.SharedFixtureInfo, setupTimeout time.Duration) (*SharedFixtureProcess, error) {
 	src, err := gotestgen.GenerateSharedSetup(fixtures)
 	if err != nil {
