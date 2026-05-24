@@ -1,3 +1,6 @@
+// snapfile is a dependency of gotest's MatchSnapshot. Importing gotest here
+// would create an import cycle (gotest -> snapfile -> gotest). stdlib tests are
+// the only option for packages that sit below gotest in the dependency graph.
 package snapfile_test //nolint:stdlib-test
 
 import (
