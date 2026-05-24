@@ -47,8 +47,8 @@ import {
   computeWildcard,
   applyResults,
   enqueueDescendants,
-  resolvePackageItems,
   resolveAncestorItems,
+  resolveAncestorsOf,
 } from "./runnerUtils.js";
 import { buildPathTrie, collapsePathTrie, type PathNode } from "./pathTrie.js";
 
@@ -752,109 +752,6 @@ describe("computeWildcard", () => {
   });
 });
 
-describe("resolvePackageItems", () => {
-  function makeResolveFixture() {
-    const pkg = createItem("example.com/pkg", "pkg", undefined, [
-      { id: "package" },
-    ]);
-    const suiteA = createItem("example.com/pkg/SuiteA", "SuiteA", pkg);
-    const methodA1 = createItem(
-      "example.com/pkg/SuiteA/TestOne",
-      "TestOne",
-      suiteA,
-    );
-    const methodA2 = createItem(
-      "example.com/pkg/SuiteA/TestTwo",
-      "TestTwo",
-      suiteA,
-    );
-
-    const run = {
-      passed: vi.fn(),
-      failed: vi.fn(),
-    };
-
-    return { pkg, suiteA, methodA1, methodA2, run };
-  }
-
-  it("uses package-level result with duration when available", () => {
-    const { pkg, run } = makeResolveFixture();
-    const controller = {
-      getResult: vi.fn((id: string) => {
-        if (id === "example.com/pkg")
-          return { status: "pass" as const, duration: 1500 };
-        return undefined;
-      }),
-    };
-
-    resolvePackageItems(run as any, [pkg as any], controller as any);
-    expect(run.passed).toHaveBeenCalledWith(pkg, 1500);
-    expect(run.failed).not.toHaveBeenCalled();
-  });
-
-  it("uses package-level fail result with duration", () => {
-    const { pkg, run } = makeResolveFixture();
-    const controller = {
-      getResult: vi.fn((id: string) => {
-        if (id === "example.com/pkg")
-          return { status: "fail" as const, duration: 2300 };
-        return undefined;
-      }),
-    };
-
-    resolvePackageItems(run as any, [pkg as any], controller as any);
-    expect(run.failed).toHaveBeenCalledWith(pkg, [], 2300);
-    expect(run.passed).not.toHaveBeenCalled();
-  });
-
-  it("falls back to child aggregation when no package result", () => {
-    const { pkg, run } = makeResolveFixture();
-    const controller = {
-      getResult: vi.fn((id: string) => {
-        if (id === "example.com/pkg/SuiteA")
-          return { status: "pass" as const, duration: 100 };
-        if (id === "example.com/pkg/SuiteA/TestOne")
-          return { status: "pass" as const, duration: 50 };
-        if (id === "example.com/pkg/SuiteA/TestTwo")
-          return { status: "pass" as const, duration: 50 };
-        return undefined;
-      }),
-    };
-
-    resolvePackageItems(run as any, [pkg as any], controller as any);
-    expect(run.passed).toHaveBeenCalledWith(pkg);
-    expect(run.failed).not.toHaveBeenCalled();
-  });
-
-  it("falls back to failed from children when no package result", () => {
-    const { pkg, run } = makeResolveFixture();
-    const controller = {
-      getResult: vi.fn((id: string) => {
-        if (id === "example.com/pkg/SuiteA/TestOne")
-          return { status: "pass" as const, duration: 50 };
-        if (id === "example.com/pkg/SuiteA/TestTwo")
-          return { status: "fail" as const, duration: 30 };
-        return undefined;
-      }),
-    };
-
-    resolvePackageItems(run as any, [pkg as any], controller as any);
-    expect(run.failed).toHaveBeenCalledWith(pkg, []);
-    expect(run.passed).not.toHaveBeenCalled();
-  });
-
-  it("skips package when no children have results", () => {
-    const { pkg, run } = makeResolveFixture();
-    const controller = {
-      getResult: vi.fn(() => undefined),
-    };
-
-    resolvePackageItems(run as any, [pkg as any], controller as any);
-    expect(run.passed).not.toHaveBeenCalled();
-    expect(run.failed).not.toHaveBeenCalled();
-  });
-});
-
 describe("resolveAncestorItems", () => {
   function makeAncestorFixture() {
     const dir = createItem("dir:internal", "internal", undefined);
@@ -887,46 +784,50 @@ describe("resolveAncestorItems", () => {
     return { dir, pkg, suite, method, run, controller };
   }
 
-  it("marks dir passed when all packages passed", () => {
-    const { dir, run, controller } = makeAncestorFixture();
+  it("marks package and dir passed when suite passed", () => {
+    const { dir, pkg, run, controller } = makeAncestorFixture();
     controller.getResult.mockImplementation((id: string) => {
-      if (id === "example.com/internal/auth")
+      if (id === "example.com/internal/auth/AuthSuite")
         return { status: "pass" as const, duration: 500 };
       return undefined;
     });
 
     resolveAncestorItems(run as any, controller as any);
 
-    expect(run.passed).toHaveBeenCalledTimes(1);
+    expect(run.passed).toHaveBeenCalledTimes(2);
+    expect(run.passed).toHaveBeenCalledWith(pkg);
     expect(run.passed).toHaveBeenCalledWith(dir);
     expect(run.failed).not.toHaveBeenCalled();
   });
 
-  it("marks dir failed when any package failed", () => {
-    const { dir, run, controller } = makeAncestorFixture();
+  it("marks package and dir failed when suite failed", () => {
+    const { dir, pkg, run, controller } = makeAncestorFixture();
     controller.getResult.mockImplementation((id: string) => {
-      if (id === "example.com/internal/auth")
+      if (id === "example.com/internal/auth/AuthSuite")
         return { status: "fail" as const, duration: 500 };
       return undefined;
     });
 
     resolveAncestorItems(run as any, controller as any);
 
+    expect(run.failed).toHaveBeenCalledTimes(2);
+    expect(run.failed).toHaveBeenCalledWith(pkg, []);
     expect(run.failed).toHaveBeenCalledWith(dir, []);
-    expect(run.passed).not.toHaveBeenCalled();
   });
 
   it("marks dir failed when one of multiple packages failed", () => {
     const dir = createItem("dir:pkg", "pkg", undefined);
     const pkgA = createItem("example.com/pkg/a", "a", dir, [{ id: "package" }]);
+    const suiteA = createItem("example.com/pkg/a/SuiteA", "SuiteA", pkgA);
     const pkgB = createItem("example.com/pkg/b", "b", dir, [{ id: "package" }]);
+    const suiteB = createItem("example.com/pkg/b/SuiteB", "SuiteB", pkgB);
 
     const run = { passed: vi.fn(), failed: vi.fn() };
     const controller = {
       getResult: vi.fn((id: string) => {
-        if (id === "example.com/pkg/a")
+        if (id === "example.com/pkg/a/SuiteA")
           return { status: "pass" as const, duration: 100 };
-        if (id === "example.com/pkg/b")
+        if (id === "example.com/pkg/b/SuiteB")
           return { status: "fail" as const, duration: 200 };
         return undefined;
       }),
@@ -937,6 +838,36 @@ describe("resolveAncestorItems", () => {
 
     resolveAncestorItems(run as any, controller as any);
 
+    expect(run.passed).toHaveBeenCalledWith(pkgA);
+    expect(run.failed).toHaveBeenCalledWith(pkgB, []);
+    expect(run.failed).toHaveBeenCalledWith(dir, []);
+  });
+
+  it("aggregates from children, ignoring overwritten package result", () => {
+    const dir = createItem("dir:pkg", "pkg", undefined);
+    const pkg = createItem("example.com/pkg", "pkg", dir, [{ id: "package" }]);
+    const suiteA = createItem("example.com/pkg/SuiteA", "SuiteA", pkg);
+    const suiteB = createItem("example.com/pkg/SuiteB", "SuiteB", pkg);
+
+    const run = { passed: vi.fn(), failed: vi.fn() };
+    const controller = {
+      getResult: vi.fn((id: string) => {
+        if (id === "example.com/pkg")
+          return { status: "pass" as const, duration: 500 };
+        if (id === "example.com/pkg/SuiteA")
+          return { status: "fail" as const, duration: 100 };
+        if (id === "example.com/pkg/SuiteB")
+          return { status: "pass" as const, duration: 200 };
+        return undefined;
+      }),
+      testController: {
+        items: new Map<string, MockTestItem>([["dir:pkg", dir]]),
+      },
+    };
+
+    resolveAncestorItems(run as any, controller as any);
+
+    expect(run.failed).toHaveBeenCalledWith(pkg, []);
     expect(run.failed).toHaveBeenCalledWith(dir, []);
     expect(run.passed).not.toHaveBeenCalled();
   });
@@ -947,11 +878,12 @@ describe("resolveAncestorItems", () => {
     const pkg = createItem("example.com/src/internal/svc", "svc", sub, [
       { id: "package" },
     ]);
+    const suite = createItem("example.com/src/internal/svc/Svc", "Svc", pkg);
 
     const run = { passed: vi.fn(), failed: vi.fn() };
     const controller = {
       getResult: vi.fn((id: string) => {
-        if (id === "example.com/src/internal/svc")
+        if (id === "example.com/src/internal/svc/Svc")
           return { status: "fail" as const, duration: 300 };
         return undefined;
       }),
@@ -962,7 +894,8 @@ describe("resolveAncestorItems", () => {
 
     resolveAncestorItems(run as any, controller as any);
 
-    expect(run.failed).toHaveBeenCalledTimes(2);
+    expect(run.failed).toHaveBeenCalledTimes(3);
+    expect(run.failed).toHaveBeenCalledWith(pkg, []);
     expect(run.failed).toHaveBeenCalledWith(root, []);
     expect(run.failed).toHaveBeenCalledWith(sub, []);
   });
@@ -972,11 +905,12 @@ describe("resolveAncestorItems", () => {
     const pkg = createItem("example.com/root", "root", wsFolder, [
       { id: "package" },
     ]);
+    const suite = createItem("example.com/root/Suite", "Suite", pkg);
 
     const run = { passed: vi.fn(), failed: vi.fn() };
     const controller = {
       getResult: vi.fn((id: string) => {
-        if (id === "example.com/root")
+        if (id === "example.com/root/Suite")
           return { status: "pass" as const, duration: 100 };
         return undefined;
       }),
@@ -989,6 +923,7 @@ describe("resolveAncestorItems", () => {
 
     resolveAncestorItems(run as any, controller as any);
 
+    expect(run.passed).toHaveBeenCalledWith(pkg);
     expect(run.passed).toHaveBeenCalledWith(wsFolder);
   });
 
@@ -1001,8 +936,8 @@ describe("resolveAncestorItems", () => {
     expect(run.failed).not.toHaveBeenCalled();
   });
 
-  it("derives dir state from suite/method results when package has no result", () => {
-    const { dir, run, controller } = makeAncestorFixture();
+  it("derives suite, package, and dir state from method results", () => {
+    const { dir, pkg, suite, run, controller } = makeAncestorFixture();
     controller.getResult.mockImplementation((id: string) => {
       if (id === "example.com/internal/auth/AuthSuite/TestLogin")
         return { status: "fail" as const, duration: 50 };
@@ -1011,8 +946,123 @@ describe("resolveAncestorItems", () => {
 
     resolveAncestorItems(run as any, controller as any);
 
-    expect(run.failed).toHaveBeenCalledTimes(1);
+    expect(run.failed).toHaveBeenCalledTimes(3);
+    expect(run.failed).toHaveBeenCalledWith(suite, []);
+    expect(run.failed).toHaveBeenCalledWith(pkg, []);
     expect(run.failed).toHaveBeenCalledWith(dir, []);
     expect(run.passed).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveAncestorsOf", () => {
+  it("propagates passed to parent when all siblings resolved", () => {
+    const dir = createItem("dir:pkg", "pkg", undefined);
+    const pkgA = createItem("example.com/pkg/a", "a", dir, [{ id: "package" }]);
+    const pkgB = createItem("example.com/pkg/b", "b", dir, [{ id: "package" }]);
+
+    const run = { passed: vi.fn(), failed: vi.fn() };
+    const controller = {
+      getResult: vi.fn((id: string) => {
+        if (id === "example.com/pkg/a")
+          return { status: "pass" as const, duration: 100 };
+        if (id === "example.com/pkg/b")
+          return { status: "pass" as const, duration: 200 };
+        return undefined;
+      }),
+      recordResult: vi.fn(),
+    };
+
+    resolveAncestorsOf(run as any, pkgB as any, controller as any);
+
+    expect(run.passed).toHaveBeenCalledWith(dir);
+    expect(controller.recordResult).toHaveBeenCalledWith(
+      "dir:pkg",
+      "pass",
+      undefined,
+    );
+  });
+
+  it("propagates failed when any sibling failed", () => {
+    const dir = createItem("dir:pkg", "pkg", undefined);
+    const pkgA = createItem("example.com/pkg/a", "a", dir, [{ id: "package" }]);
+    const pkgB = createItem("example.com/pkg/b", "b", dir, [{ id: "package" }]);
+
+    const run = { passed: vi.fn(), failed: vi.fn() };
+    const controller = {
+      getResult: vi.fn((id: string) => {
+        if (id === "example.com/pkg/a")
+          return { status: "fail" as const, duration: 100 };
+        if (id === "example.com/pkg/b")
+          return { status: "pass" as const, duration: 200 };
+        return undefined;
+      }),
+      recordResult: vi.fn(),
+    };
+
+    resolveAncestorsOf(run as any, pkgB as any, controller as any);
+
+    expect(run.failed).toHaveBeenCalledWith(dir, []);
+    expect(controller.recordResult).toHaveBeenCalledWith(
+      "dir:pkg",
+      "fail",
+      undefined,
+    );
+  });
+
+  it("stops propagation when a sibling has no result", () => {
+    const dir = createItem("dir:pkg", "pkg", undefined);
+    const pkgA = createItem("example.com/pkg/a", "a", dir, [{ id: "package" }]);
+    const pkgB = createItem("example.com/pkg/b", "b", dir, [{ id: "package" }]);
+
+    const run = { passed: vi.fn(), failed: vi.fn() };
+    const controller = {
+      getResult: vi.fn((id: string) => {
+        if (id === "example.com/pkg/a")
+          return { status: "pass" as const, duration: 100 };
+        return undefined;
+      }),
+      recordResult: vi.fn(),
+    };
+
+    resolveAncestorsOf(run as any, pkgA as any, controller as any);
+
+    expect(run.passed).not.toHaveBeenCalled();
+    expect(run.failed).not.toHaveBeenCalled();
+    expect(controller.recordResult).not.toHaveBeenCalled();
+  });
+
+  it("propagates through multiple ancestor levels", () => {
+    const root = createItem("wsFolder:myproject", "myproject", undefined);
+    const dir = createItem("dir:internal", "internal", root);
+    const pkg = createItem("example.com/internal/svc", "svc", dir, [
+      { id: "package" },
+    ]);
+
+    const run = { passed: vi.fn(), failed: vi.fn() };
+    const controller = {
+      getResult: vi.fn((id: string) => {
+        if (id === "example.com/internal/svc")
+          return { status: "pass" as const, duration: 100 };
+        if (id === "dir:internal")
+          return { status: "pass" as const, duration: undefined };
+        return undefined;
+      }),
+      recordResult: vi.fn(),
+    };
+
+    resolveAncestorsOf(run as any, pkg as any, controller as any);
+
+    expect(run.passed).toHaveBeenCalledWith(dir);
+    expect(run.passed).toHaveBeenCalledWith(root);
+    expect(controller.recordResult).toHaveBeenCalledWith(
+      "dir:internal",
+      "pass",
+      undefined,
+    );
+    expect(controller.recordResult).toHaveBeenCalledWith(
+      "wsFolder:myproject",
+      "pass",
+      undefined,
+    );
   });
 });
