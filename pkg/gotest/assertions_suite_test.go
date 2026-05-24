@@ -277,6 +277,27 @@ func (s *AssertionsTestSuite) TestEmpty(t *gotest.T) {
 			gotest.True(it, m.Failed())
 		})
 	})
+
+	t.When("input is an array", func(w *gotest.T) {
+		w.It("passes for zero-length array", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, [0]int{}) })
+			gotest.False(it, m.Failed())
+		})
+
+		// --- fails
+
+		w.It("fails for non-zero-length array", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, [3]int{1, 2, 3}) })
+			gotest.True(it, m.Failed())
+		})
+	})
+
+	t.When("input is an integer", func(w *gotest.T) {
+		w.It("fails", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, 42) })
+			gotest.True(it, m.Failed())
+		})
+	})
 }
 
 func (s *AssertionsTestSuite) TestNotEmpty(t *gotest.T) {
@@ -386,6 +407,27 @@ func (s *AssertionsTestSuite) TestNotEmpty(t *gotest.T) {
 			gotest.True(it, m.Failed())
 		})
 	})
+
+	t.When("input is an array", func(w *gotest.T) {
+		w.It("passes for non-zero-length array", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, [3]int{1, 2, 3}) })
+			gotest.False(it, m.Failed())
+		})
+
+		// --- fails
+
+		w.It("fails for zero-length array", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, [0]int{}) })
+			gotest.True(it, m.Failed())
+		})
+	})
+
+	t.When("input is an integer", func(w *gotest.T) {
+		w.It("passes", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, 42) })
+			gotest.False(it, m.Failed())
+		})
+	})
 }
 
 func (s *AssertionsTestSuite) TestNoError(t *gotest.T) {
@@ -471,6 +513,10 @@ func (s *AssertionsTestSuite) TestErrorAs(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.ErrorAs[*myError](r, errors.New("plain error")) })
 			gotest.True(it, m.Failed())
 		})
+		w.It("fails for nil error", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.ErrorAs[*myError](r, nil) })
+			gotest.True(it, m.Failed())
+		})
 	})
 }
 
@@ -535,6 +581,10 @@ func (s *AssertionsTestSuite) TestContains(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, "hello world", "xyz") })
 			gotest.True(it, m.Failed())
 		})
+		w.It("fails for non-string element", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, "hello world", 42) })
+			gotest.True(it, m.Failed())
+		})
 	})
 
 	t.When("input is a slice", func(w *gotest.T) {
@@ -564,9 +614,30 @@ func (s *AssertionsTestSuite) TestContains(t *gotest.T) {
 			gotest.True(it, m.Failed())
 		})
 	})
+
+	t.When("input is an array", func(w *gotest.T) {
+		w.It("passes for present element", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, [3]int{1, 2, 3}, 2) })
+			gotest.False(it, m.Failed())
+		})
+
+		// --- fails
+
+		w.It("fails for absent element", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, [3]int{1, 2, 3}, 99) })
+			gotest.True(it, m.Failed())
+		})
+	})
 }
 
 func (s *AssertionsTestSuite) TestNotContains(t *gotest.T) {
+	t.When("container is nil", func(w *gotest.T) {
+		w.It("passes", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, nil, "anything") })
+			gotest.False(it, m.Failed())
+		})
+	})
+
 	t.When("input is a string", func(w *gotest.T) {
 		w.It("passes for non-matching substring", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, "hello world", "xyz") })
@@ -602,6 +673,18 @@ func (s *AssertionsTestSuite) TestNotContains(t *gotest.T) {
 			gotest.True(it, m.Failed())
 		})
 	})
+
+	t.When("input is an array", func(w *gotest.T) {
+		w.It("passes for absent element", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, [3]int{1, 2, 3}, 99) })
+			gotest.False(it, m.Failed())
+		})
+		// --- fails
+		w.It("fails for present element", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, [3]int{1, 2, 3}, 2) })
+			gotest.True(it, m.Failed())
+		})
+	})
 }
 
 func (s *AssertionsTestSuite) TestLen(t *gotest.T) {
@@ -618,6 +701,17 @@ func (s *AssertionsTestSuite) TestLen(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Len(r, map[string]int{"a": 1, "b": 2}, 2) })
 			gotest.False(it, m.Failed())
 		})
+		w.It("passes for array", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Len(r, [3]int{1, 2, 3}, 3) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for channel", func(it *gotest.T) {
+			ch := make(chan int, 3)
+			ch <- 1
+			ch <- 2
+			m := gotest.Record(func(r *gotest.R) { gotest.Len(r, ch, 2) })
+			gotest.False(it, m.Failed())
+		})
 	})
 
 	t.When("length does not match", func(w *gotest.T) {
@@ -627,6 +721,10 @@ func (s *AssertionsTestSuite) TestLen(t *gotest.T) {
 		})
 		w.It("fails for string", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Len(r, "hello", 99) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for map", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Len(r, map[string]int{"a": 1}, 5) })
 			gotest.True(it, m.Failed())
 		})
 	})
@@ -657,6 +755,10 @@ func (s *AssertionsTestSuite) TestElementsMatch(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.ElementsMatch(r, []int{}, []int{}) })
 			gotest.False(it, m.Failed())
 		})
+		w.It("passes for both nil", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.ElementsMatch[int](r, nil, nil) })
+			gotest.False(it, m.Failed())
+		})
 	})
 
 	t.When("elements differ", func(w *gotest.T) {
@@ -683,6 +785,10 @@ func (s *AssertionsTestSuite) TestSubset(t *gotest.T) {
 		})
 		w.It("passes for empty subset", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Subset(r, []int{1, 2, 3}, []int{}) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for both empty", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Subset(r, []int{}, []int{}) })
 			gotest.False(it, m.Failed())
 		})
 	})
@@ -826,6 +932,14 @@ func (s *AssertionsTestSuite) TestInDelta(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.InDelta(r, 100, 101, 2.0) })
 			gotest.False(it, m.Failed())
 		})
+		w.It("passes at exact boundary", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.InDelta(r, 100, 102, 2.0) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for zero delta with equal values", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.InDelta(r, 5, 5, 0.0) })
+			gotest.False(it, m.Failed())
+		})
 	})
 
 	t.When("values exceed delta", func(w *gotest.T) {
@@ -881,8 +995,12 @@ func (s *AssertionsTestSuite) TestJSONEq(t *gotest.T) {
 	})
 
 	t.When("input is invalid JSON", func(w *gotest.T) {
-		w.It("fails", func(it *gotest.T) {
+		w.It("fails for invalid expected", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, `{not json}`, `{"a":1}`) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for invalid actual", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, `{"a":1}`, `{not json}`) })
 			gotest.True(it, m.Failed())
 		})
 	})
@@ -894,6 +1012,20 @@ func (s *AssertionsTestSuite) TestTimeWithin(t *gotest.T) {
 			base := time.Now()
 			m := gotest.Record(func(r *gotest.R) {
 				gotest.TimeWithin(r, base, base.Add(50*time.Millisecond), 100*time.Millisecond)
+			})
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes when actual is before expected", func(it *gotest.T) {
+			base := time.Now()
+			m := gotest.Record(func(r *gotest.R) {
+				gotest.TimeWithin(r, base, base.Add(-50*time.Millisecond), 100*time.Millisecond)
+			})
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes at exact tolerance boundary", func(it *gotest.T) {
+			base := time.Now()
+			m := gotest.Record(func(r *gotest.R) {
+				gotest.TimeWithin(r, base, base.Add(100*time.Millisecond), 100*time.Millisecond)
 			})
 			gotest.False(it, m.Failed())
 		})
@@ -936,6 +1068,14 @@ func (s *AssertionsTestSuite) TestPanics(t *gotest.T) {
 			gotest.False(it, m.Failed())
 			gotest.Equal(it, "oh no", v)
 		})
+		w.It("passes for non-string panic value", func(it *gotest.T) {
+			var v any
+			m := gotest.Record(func(r *gotest.R) {
+				v = gotest.Panics(r, func() { panic(42) })
+			})
+			gotest.False(it, m.Failed())
+			gotest.Equal(it, 42, v)
+		})
 	})
 
 	t.When("function does not panic", func(w *gotest.T) {
@@ -954,6 +1094,14 @@ func (s *AssertionsTestSuite) TestEventually(t *gotest.T) {
 				gotest.Eventually(r, 50*time.Millisecond, 1*time.Millisecond, func(poll *gotest.R) {
 					count++
 					gotest.GreaterOrEqual(poll, count, 3)
+				})
+			})
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes on first poll", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) {
+				gotest.Eventually(r, 50*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {
+					gotest.True(poll, true)
 				})
 			})
 			gotest.False(it, m.Failed())
@@ -991,6 +1139,14 @@ func (s *AssertionsTestSuite) TestConsistently(t *gotest.T) {
 				gotest.Consistently(r, 50*time.Millisecond, 1*time.Millisecond, func(poll *gotest.R) {
 					count++
 					gotest.Less(poll, count, 3)
+				})
+			})
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails on first poll", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) {
+				gotest.Consistently(r, 50*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {
+					gotest.True(poll, false)
 				})
 			})
 			gotest.True(it, m.Failed())
