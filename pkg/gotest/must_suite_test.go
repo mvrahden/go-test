@@ -2,6 +2,7 @@ package gotest_test
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -24,18 +25,20 @@ func (s *MustTestSuite) TestMust(t *gotest.T) {
 	})
 
 	t.When("ok is an error", func(w *gotest.T) {
-		w.It("panics", func(it *gotest.T) {
-			gotest.Panics(it, func() {
+		w.It("panics with the error message", func(it *gotest.T) {
+			v := gotest.Panics(it, func() {
 				gotest.Must(0, errors.New("boom"))
 			})
+			gotest.Contains(it, fmt.Sprint(v), "boom")
 		})
 	})
 
 	t.When("ok is false", func(w *gotest.T) {
-		w.It("panics", func(it *gotest.T) {
-			gotest.Panics(it, func() {
+		w.It("panics with got-false message", func(it *gotest.T) {
+			v := gotest.Panics(it, func() {
 				gotest.Must(0, false)
 			})
+			gotest.Contains(it, fmt.Sprint(v), "false")
 		})
 	})
 
@@ -48,10 +51,11 @@ func (s *MustTestSuite) TestMust(t *gotest.T) {
 	})
 
 	t.When("ok is an unknown type", func(w *gotest.T) {
-		w.It("panics", func(it *gotest.T) {
-			gotest.Panics(it, func() {
+		w.It("panics with unsupported-type message", func(it *gotest.T) {
+			v := gotest.Panics(it, func() {
 				gotest.Must(42, 123)
 			})
+			gotest.Contains(it, fmt.Sprint(v), "unsupported")
 		})
 	})
 }
