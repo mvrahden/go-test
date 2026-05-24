@@ -2,9 +2,14 @@ package gotest
 
 import (
 	"bufio"
+	"bytes"
+	"encoding"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"runtime"
 	"strings"
@@ -48,6 +53,56 @@ func fileMutex(path string) *sync.Mutex {
 	return mu.(*sync.Mutex)
 }
 
+func snapshotContent(value any) (string, error) {
+	if value == nil {
+		return "", fmt.Errorf("unsupported snapshot value: nil")
+	}
+	if rv := reflect.ValueOf(value); rv.Kind() == reflect.Pointer && rv.IsNil() {
+		return "", fmt.Errorf("unsupported snapshot value: nil %T", value)
+	}
+	switch v := value.(type) {
+	case string:
+		return v, nil
+	case []byte:
+		return string(v), nil
+	case encoding.TextMarshaler:
+		b, err := v.MarshalText()
+		if err != nil {
+			return "", fmt.Errorf("MarshalText failed: %w", err)
+		}
+		return string(b), nil
+	case fmt.Stringer:
+		return v.String(), nil
+	case json.Marshaler:
+		b, err := v.MarshalJSON()
+		if err != nil {
+			return "", fmt.Errorf("MarshalJSON failed: %w", err)
+		}
+		var buf bytes.Buffer
+		if err := json.Indent(&buf, b, "", "  "); err == nil {
+			return buf.String(), nil
+		}
+		return string(b), nil
+	case error:
+		return v.Error(), nil
+	case io.Reader:
+		b, err := readAndRestore(v)
+		if err != nil {
+			return "", fmt.Errorf("failed to read: %w", err)
+		}
+		return string(b), nil
+	default:
+		rv := reflect.ValueOf(value)
+		if rv.Kind() == reflect.String {
+			return rv.String(), nil
+		}
+		return "", fmt.Errorf(
+			"unsupported snapshot type %T; use string, []byte, encoding.TextMarshaler, fmt.Stringer, json.Marshaler, or error",
+			value,
+		)
+	}
+}
+
 func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 	_, callerFile, _, ok := runtime.Caller(callerSkip)
 	if !ok {
@@ -55,7 +110,11 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 		return
 	}
 
-	content := fmt.Sprintf("%v", value)
+	content, err := snapshotContent(value)
+	if err != nil {
+		failf(t, "MatchSnapshot: %v", err)
+		return
+	}
 	if err := snapfile.ValidateContent(content); err != nil {
 		failf(t, "MatchSnapshot: %v", err)
 		return
