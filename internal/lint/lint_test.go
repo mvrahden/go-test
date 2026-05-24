@@ -21,6 +21,11 @@ func TestAnalyzer_Nolint(t *testing.T) {
 	analysistest.Run(t, testdata, Analyzer, "withnolint")
 }
 
+func TestAnalyzer_PollScope(t *testing.T) {
+	testdata := analysistest.TestData()
+	analysistest.Run(t, testdata, Analyzer, "withpollscope")
+}
+
 func TestAnalyzer_NolintFile(t *testing.T) {
 	testdata := analysistest.TestData()
 	analysistest.Run(t, testdata, Analyzer, "withnolint_file")

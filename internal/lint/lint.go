@@ -25,6 +25,7 @@ const (
 	GeneratedFile Rule = "generated-file"
 	StdlibTest    Rule = "stdlib-test"
 	Testify       Rule = "testify"
+	PollScope     Rule = "poll-scope"
 )
 
 // SkippableRules is the set of rules that support opt-out via skip flags.
@@ -65,6 +66,7 @@ func run(pass *analysis.Pass) (any, error) {
 	checkOrphanedFiles(pass)
 	checkStdlibTests(pass, insp)
 	checkTestifyImports(pass)
+	checkPollScope(pass, insp)
 
 	return nil, nil
 }
@@ -360,6 +362,146 @@ func isPointerReceiver(recv *ast.FieldList) bool {
 
 func isLifecycleHook(name string) bool {
 	return slices.Contains(lifecycleHooks, name)
+}
+
+// --- poll-scope check ---
+
+var pollScopeAssertionFuncs = map[string]bool{
+	"Consistently": true, "Contains": true, "ElementsMatch": true,
+	"Empty": true, "Equal": true, "Error": true,
+	"ErrorAs": true, "ErrorContains": true, "ErrorIs": true,
+	"Eventually": true, "Fail": true, "False": true,
+	"Greater": true, "GreaterOrEqual": true, "InDelta": true,
+	"JSONEq": true, "Len": true, "Less": true,
+	"LessOrEqual": true, "MatchSnapshot": true, "NoError": true,
+	"NotContains": true, "NotEmpty": true, "NotEqual": true,
+	"NotZero": true, "Panics": true, "Regexp": true,
+	"Subset": true, "TimeIsNow": true, "TimeWithin": true,
+	"True": true, "Zero": true,
+}
+
+var pollScopeMethodNames = map[string]bool{
+	"Errorf":  true,
+	"Fatal":   true,
+	"Fatalf":  true,
+	"FailNow": true,
+}
+
+func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector) {
+	insp.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(n ast.Node) {
+		call := n.(*ast.CallExpr)
+
+		fnName := pollingFuncName(call)
+		if fnName == "" {
+			return
+		}
+
+		pollParam, funcLit := extractPollCallback(call)
+		if funcLit == nil {
+			return
+		}
+
+		ast.Inspect(funcLit.Body, func(n ast.Node) bool {
+			innerCall, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+
+			// Case 1: gotest assertion with wrong first arg — gotest.Equal(t, ...) or Equal(t, ...)
+			if name := resolveAssertionName(innerCall.Fun); name != "" && len(innerCall.Args) > 0 {
+				if ident, ok := innerCall.Args[0].(*ast.Ident); ok && ident.Name != pollParam {
+					report(pass, PollScope, ident.Pos(),
+						"use %s instead of %s in poll callback passed to %s",
+						pollParam, ident.Name, fnName)
+				}
+				return true
+			}
+
+			// Case 2: direct method call — t.Errorf(...), t.Fatal(...)
+			sel, ok := innerCall.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			ident, ok := sel.X.(*ast.Ident)
+			if !ok {
+				return true
+			}
+			if pollScopeMethodNames[sel.Sel.Name] && ident.Name != pollParam {
+				report(pass, PollScope, ident.Pos(),
+					"%s.%s in poll callback bypasses assertion recording — use %s",
+					ident.Name, sel.Sel.Name, pollParam)
+			}
+			return true
+		})
+	})
+}
+
+func pollingFuncName(call *ast.CallExpr) string {
+	switch fn := call.Fun.(type) {
+	case *ast.SelectorExpr:
+		if fn.Sel.Name == "Eventually" || fn.Sel.Name == "Consistently" {
+			return fn.Sel.Name
+		}
+	case *ast.Ident:
+		if fn.Name == "Eventually" || fn.Name == "Consistently" {
+			return fn.Name
+		}
+	}
+	return ""
+}
+
+func extractPollCallback(call *ast.CallExpr) (string, *ast.FuncLit) {
+	if len(call.Args) == 0 {
+		return "", nil
+	}
+	lastArg := call.Args[len(call.Args)-1]
+	funcLit, ok := lastArg.(*ast.FuncLit)
+	if !ok {
+		return "", nil
+	}
+	if funcLit.Type.Params == nil || len(funcLit.Type.Params.List) != 1 {
+		return "", nil
+	}
+	param := funcLit.Type.Params.List[0]
+	if !isStarR(param.Type) {
+		return "", nil
+	}
+	if len(param.Names) == 0 {
+		return "", nil
+	}
+	return param.Names[0].Name, funcLit
+}
+
+func isStarR(expr ast.Expr) bool {
+	star, ok := expr.(*ast.StarExpr)
+	if !ok {
+		return false
+	}
+	switch x := star.X.(type) {
+	case *ast.Ident:
+		return x.Name == "R"
+	case *ast.SelectorExpr:
+		return x.Sel.Name == "R"
+	}
+	return false
+}
+
+func resolveAssertionName(expr ast.Expr) string {
+	switch fn := expr.(type) {
+	case *ast.SelectorExpr:
+		if pollScopeAssertionFuncs[fn.Sel.Name] {
+			return fn.Sel.Name
+		}
+	case *ast.Ident:
+		if pollScopeAssertionFuncs[fn.Name] {
+			return fn.Name
+		}
+	case *ast.IndexExpr:
+		return resolveAssertionName(fn.X)
+	case *ast.IndexListExpr:
+		return resolveAssertionName(fn.X)
+	}
+	return ""
 }
 
 func levenshtein(a, b string) int {
