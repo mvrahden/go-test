@@ -227,6 +227,14 @@ func (s *AssertionsTestSuite) TestNotZero(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotZero(r, point{1, 2}) })
 			gotest.False(it, m.Failed())
 		})
+		w.It("passes for float64", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotZero(r, 3.14) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for non-nil channel", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotZero(r, make(chan int)) })
+			gotest.False(it, m.Failed())
+		})
 	})
 
 	t.When("value is zero", func(w *gotest.T) {
@@ -248,6 +256,14 @@ func (s *AssertionsTestSuite) TestNotZero(t *gotest.T) {
 		})
 		w.It("fails for struct", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotZero(r, point{}) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for float64", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotZero(r, 0.0) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for nil channel", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotZero[chan int](r, nil) })
 			gotest.True(it, m.Failed())
 		})
 	})
