@@ -271,6 +271,28 @@ func NewFixtureSpecForTestWithPkg(name string, kind FixtureKind, pkgPath string)
 	}
 }
 
+// ValidateFixtureConsistency checks post-collection invariants on a fixture spec.
+func ValidateFixtureConsistency(f *FixtureSpec) (token.Pos, error) {
+	if f.Kind != SharedFixture {
+		return -1, nil
+	}
+	hasHydrate := f.Hydrate != nil
+	hasDehydrate := f.Dehydrate != nil
+	if hasHydrate != hasDehydrate {
+		var present, absent string
+		var pos token.Pos
+		if hasHydrate {
+			present, absent = "Hydrate", "Dehydrate"
+			pos = f.Hydrate.Pos()
+		} else {
+			present, absent = "Dehydrate", "Hydrate"
+			pos = f.Dehydrate.Pos()
+		}
+		return pos, fmt.Errorf("shared fixture %q has %s but no %s; both must be defined together", f.ts.Name.Name, present, absent)
+	}
+	return -1, nil
+}
+
 func validateContextErrorSig(sig *types.Signature, methodID string) error {
 	if sig.Params().Len() != 1 || sig.Results().Len() != 1 {
 		return fmt.Errorf("unsupported signature for %q: expected (context.Context) error", methodID)

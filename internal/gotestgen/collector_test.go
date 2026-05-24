@@ -643,6 +643,33 @@ func TestCollector_Validation_ReturningBeforeEach_FullyConsistent_OK(t *testing.
 	gotest.Equal(t, 0, len(result.Errs), "expected no errors, got: %v", result.Errs)
 }
 
+func TestCollector_SharedFixture_HydrateWithoutDehydrate(t *testing.T) {
+	t.Parallel()
+	pkg := mustTestPkg(t)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error: Hydrate without Dehydrate")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "has Hydrate but no Dehydrate")
+}
+
+func TestCollector_SharedFixture_DehydrateWithoutHydrate(t *testing.T) {
+	t.Parallel()
+	pkg := mustTestPkg(t)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error: Dehydrate without Hydrate")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "has Dehydrate but no Hydrate")
+}
+
+func TestCollector_Validation_ContextMustBePointer(t *testing.T) {
+	t.Parallel()
+	pkg := mustTestPkg(t)
+	c := collector{}
+	result := c.CollectSuiteSpecs(pkg)
+	gotest.NotEmpty(t, result.Errs, "expected error: non-pointer context")
+	gotest.Contains(t, result.Errs[0].Err.Error(), "must be a pointer")
+}
+
 // --- helpers ---
 
 // makeFixtureSpec creates a minimal FixtureSpec for validation testing.
