@@ -150,16 +150,17 @@ func Consistently(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
 
 	polls := 0
 	for {
+		polls++
+		rec := Record(fn)
+		if rec.Failed() {
+			failf(t, "Consistently failed on poll %d:\n    %s", polls, rec.Message())
+			return
+		}
+
 		select {
 		case <-timer.C:
 			return
 		case <-ticker.C:
-			polls++
-			rec := Record(fn)
-			if rec.Failed() {
-				failf(t, "Consistently failed on poll %d:\n    %s", polls, rec.Message())
-				return
-			}
 		}
 	}
 }
@@ -248,21 +249,18 @@ func Eventually(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
 	var lastMsg string
 	polls := 0
 	for {
+		polls++
+		rec := Record(fn)
+		if !rec.Failed() {
+			return
+		}
+		lastMsg = rec.Message()
+
 		select {
 		case <-timer.C:
-			if lastMsg != "" {
-				failf(t, "Eventually failed after %v (%d polls):\n  last failure:\n    %s", waitFor, polls, lastMsg)
-			} else {
-				failf(t, "Eventually failed after %v (%d polls): condition never satisfied", waitFor, polls)
-			}
+			failf(t, "Eventually failed after %v (%d polls):\n  last failure:\n    %s", waitFor, polls, lastMsg)
 			return
 		case <-ticker.C:
-			polls++
-			rec := Record(fn)
-			if !rec.Failed() {
-				return
-			}
-			lastMsg = rec.Message()
 		}
 	}
 }

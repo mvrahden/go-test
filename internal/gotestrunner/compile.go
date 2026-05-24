@@ -3,6 +3,7 @@ package gotestrunner
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -71,14 +72,16 @@ func CompilePackages(ctx context.Context, packages []string, overlayFlag string,
 	wg.Wait()
 
 	var compiled []CompileResult
+	var errs []error
 	for _, r := range results {
 		if r.err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n", r.err)
+			errs = append(errs, r.err)
 			continue
 		}
 		compiled = append(compiled, r.cr)
 	}
-	return compiled, nil
+	return compiled, errors.Join(errs...)
 }
 
 // CompilePackagesStream is like CompilePackages but sends results to a

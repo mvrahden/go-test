@@ -1,6 +1,9 @@
 package gotestrunner
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // buildOnlyFlags are flags consumed exclusively by `go test -c` (compilation).
 // Boolean flags have empty string value; value flags list their name only.
@@ -304,6 +307,7 @@ func StripCoverBuildFlags(flags []string) []string {
 // (required for Go 1.23+ which restricts linkname to stdlib symbols).
 func InjectChecklinkname(buildFlags []string) []string {
 	const ldflag = "-checklinkname=0"
+	buildFlags = slices.Clone(buildFlags)
 	for i, f := range buildFlags {
 		if strings.HasPrefix(f, "-ldflags=") {
 			buildFlags[i] = f + " " + ldflag
