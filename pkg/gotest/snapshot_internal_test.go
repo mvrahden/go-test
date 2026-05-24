@@ -1,3 +1,8 @@
+// This file tests unexported implementation details (isExternalPackage,
+// splitTestName, readAndRestore, pkgCache) and calls MatchSnapshot directly as
+// a package-internal function. Exporting these solely for testing would leak
+// implementation details into the public API surface. ptest files cannot use
+// gotest suites because the suite runner itself lives in this package.
 package gotest //nolint:stdlib-test
 
 import (
