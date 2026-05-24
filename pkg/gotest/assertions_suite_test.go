@@ -1009,6 +1009,10 @@ func (s *AssertionsTestSuite) TestRegexp(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Regexp(r, re, "say hello world") })
 			gotest.False(it, m.Failed())
 		})
+		w.It("passes for empty pattern (matches everything)", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Regexp(r, ``, "anything") })
+			gotest.False(it, m.Failed())
+		})
 	})
 
 	t.When("string does not match pattern", func(w *gotest.T) {
