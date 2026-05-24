@@ -19,6 +19,8 @@ type myError struct {
 
 func (e *myError) Error() string { return fmt.Sprintf("myError: code=%d", e.Code) }
 
+type point struct{ X, Y int }
+
 type AssertionsTestSuite struct{}
 
 func (s *AssertionsTestSuite) TestFail(t *gotest.T) {
@@ -48,6 +50,20 @@ func (s *AssertionsTestSuite) TestEqual(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Equal(r, []int{1, 2, 3}, []int{1, 2, 3}) })
 			gotest.False(it, m.Failed())
 		})
+		w.It("passes for structs", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Equal(r, point{1, 2}, point{1, 2}) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for maps regardless of key order", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) {
+				gotest.Equal(r, map[string]int{"a": 1, "b": 2}, map[string]int{"b": 2, "a": 1})
+			})
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for nil slices", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Equal[[]int](r, nil, nil) })
+			gotest.False(it, m.Failed())
+		})
 	})
 
 	t.When("values differ", func(w *gotest.T) {
@@ -63,6 +79,14 @@ func (s *AssertionsTestSuite) TestEqual(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Equal(r, []int{1, 2}, []int{3, 4}) })
 			gotest.True(it, m.Failed())
 		})
+		w.It("fails for nil slice vs empty slice", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Equal(r, []int(nil), []int{}) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for structs", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Equal(r, point{1, 2}, point{3, 4}) })
+			gotest.True(it, m.Failed())
+		})
 	})
 }
 
@@ -74,6 +98,10 @@ func (s *AssertionsTestSuite) TestNotEqual(t *gotest.T) {
 		})
 		w.It("passes for strings", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotEqual(r, "hello", "world") })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for nil slice vs empty slice", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEqual(r, []int(nil), []int{}) })
 			gotest.False(it, m.Failed())
 		})
 	})
@@ -132,6 +160,18 @@ func (s *AssertionsTestSuite) TestZero(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Zero(r, "") })
 			gotest.False(it, m.Failed())
 		})
+		w.It("passes for bool", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Zero(r, false) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for nil pointer", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Zero[*int](r, nil) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for struct", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Zero(r, point{}) })
+			gotest.False(it, m.Failed())
+		})
 	})
 
 	t.When("value is non-zero", func(w *gotest.T) {
@@ -141,6 +181,19 @@ func (s *AssertionsTestSuite) TestZero(t *gotest.T) {
 		})
 		w.It("fails for string", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Zero(r, "hello") })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for bool", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Zero(r, true) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for non-nil pointer", func(it *gotest.T) {
+			n := 1
+			m := gotest.Record(func(r *gotest.R) { gotest.Zero(r, &n) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for struct", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Zero(r, point{1, 2}) })
 			gotest.True(it, m.Failed())
 		})
 	})
@@ -156,6 +209,19 @@ func (s *AssertionsTestSuite) TestNotZero(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotZero(r, "hello") })
 			gotest.False(it, m.Failed())
 		})
+		w.It("passes for bool", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotZero(r, true) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for non-nil pointer", func(it *gotest.T) {
+			n := 1
+			m := gotest.Record(func(r *gotest.R) { gotest.NotZero(r, &n) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for struct", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotZero(r, point{1, 2}) })
+			gotest.False(it, m.Failed())
+		})
 	})
 
 	t.When("value is zero", func(w *gotest.T) {
@@ -165,6 +231,18 @@ func (s *AssertionsTestSuite) TestNotZero(t *gotest.T) {
 		})
 		w.It("fails for string", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotZero(r, "") })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for bool", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotZero(r, false) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for nil pointer", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotZero[*int](r, nil) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails for struct", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotZero(r, point{}) })
 			gotest.True(it, m.Failed())
 		})
 	})
@@ -710,6 +788,14 @@ func (s *AssertionsTestSuite) TestLen(t *gotest.T) {
 			ch <- 1
 			ch <- 2
 			m := gotest.Record(func(r *gotest.R) { gotest.Len(r, ch, 2) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for nil slice", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Len(r, []int(nil), 0) })
+			gotest.False(it, m.Failed())
+		})
+		w.It("passes for nil map", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Len(r, map[string]int(nil), 0) })
 			gotest.False(it, m.Failed())
 		})
 	})
