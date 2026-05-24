@@ -25,21 +25,19 @@ func (s *CmdGotestTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
-	type entry struct {
-		desc   string
-		inv    Invocation
-		expect []string
-	}
-
 	t.When("CLI absent", func(w *gotest.T) {
-		for _, tc := range []entry{
+		for sub, tc := range gotest.Each(w, []struct {
+			Desc   string
+			inv    Invocation
+			expect []string
+		}{
 			{
-				desc:   "config zero: no prepend",
+				Desc:   "config zero: no prepend",
 				inv:    Invocation{Args: []string{"-v"}},
 				expect: []string{"-v"},
 			},
 			{
-				desc: "config positive: config prepended",
+				Desc: "config positive: config prepended",
 				inv: Invocation{
 					Args:   []string{"-v"},
 					Config: config.ProjectConfig{SetupTimeout: config.Duration(2 * time.Minute)},
@@ -47,7 +45,7 @@ func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
 				expect: []string{"--setup-timeout=2m0s", "-v"},
 			},
 			{
-				desc: "config negative: config prepended",
+				Desc: "config negative: config prepended",
 				inv: Invocation{
 					Args:   []string{"-v"},
 					Config: config.ProjectConfig{SetupTimeout: config.Duration(-1 * time.Second)},
@@ -55,32 +53,34 @@ func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
 				expect: []string{"--setup-timeout=-1s", "-v"},
 			},
 			{
-				desc: "tags and setup-timeout both prepended",
+				Desc: "tags and setup-timeout both prepended",
 				inv: Invocation{
 					Args:   []string{"-v"},
 					Config: config.ProjectConfig{Tags: "integration", SetupTimeout: config.Duration(3 * time.Minute)},
 				},
 				expect: []string{"--setup-timeout=3m0s", "-tags=integration", "-v"},
 			},
-		} {
-			w.It(tc.desc, func(it *gotest.T) {
-				got := tc.inv.DefaultArgs()
-				gotest.Equal(it, tc.expect, got)
-			})
+		}) {
+			got := tc.inv.DefaultArgs()
+			gotest.Equal(sub, tc.expect, got)
 		}
 	})
 
 	t.When("CLI positive", func(w *gotest.T) {
-		for _, tc := range []entry{
+		for sub, tc := range gotest.Each(w, []struct {
+			Desc   string
+			inv    Invocation
+			expect []string
+		}{
 			{
-				desc: "config zero: CLI preserved",
+				Desc: "config zero: CLI preserved",
 				inv: Invocation{
 					Args: []string{"--setup-timeout=5m", "-v"},
 				},
 				expect: []string{"--setup-timeout=5m", "-v"},
 			},
 			{
-				desc: "config positive: CLI wins",
+				Desc: "config positive: CLI wins",
 				inv: Invocation{
 					Args:   []string{"--setup-timeout=5m", "-v"},
 					Config: config.ProjectConfig{SetupTimeout: config.Duration(2 * time.Minute)},
@@ -88,32 +88,34 @@ func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
 				expect: []string{"--setup-timeout=5m", "-v"},
 			},
 			{
-				desc: "config negative: CLI wins",
+				Desc: "config negative: CLI wins",
 				inv: Invocation{
 					Args:   []string{"--setup-timeout=5m", "-v"},
 					Config: config.ProjectConfig{SetupTimeout: config.Duration(-1 * time.Second)},
 				},
 				expect: []string{"--setup-timeout=5m", "-v"},
 			},
-		} {
-			w.It(tc.desc, func(it *gotest.T) {
-				got := tc.inv.DefaultArgs()
-				gotest.Equal(it, tc.expect, got)
-			})
+		}) {
+			got := tc.inv.DefaultArgs()
+			gotest.Equal(sub, tc.expect, got)
 		}
 	})
 
 	t.When("CLI negative", func(w *gotest.T) {
-		for _, tc := range []entry{
+		for sub, tc := range gotest.Each(w, []struct {
+			Desc   string
+			inv    Invocation
+			expect []string
+		}{
 			{
-				desc: "config zero: CLI preserved",
+				Desc: "config zero: CLI preserved",
 				inv: Invocation{
 					Args: []string{"--setup-timeout=-1s", "-v"},
 				},
 				expect: []string{"--setup-timeout=-1s", "-v"},
 			},
 			{
-				desc: "config positive: CLI wins",
+				Desc: "config positive: CLI wins",
 				inv: Invocation{
 					Args:   []string{"--setup-timeout=-1s", "-v"},
 					Config: config.ProjectConfig{SetupTimeout: config.Duration(2 * time.Minute)},
@@ -121,168 +123,150 @@ func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
 				expect: []string{"--setup-timeout=-1s", "-v"},
 			},
 			{
-				desc: "config negative: CLI wins",
+				Desc: "config negative: CLI wins",
 				inv: Invocation{
 					Args:   []string{"--setup-timeout=-1s", "-v"},
 					Config: config.ProjectConfig{SetupTimeout: config.Duration(-1 * time.Second)},
 				},
 				expect: []string{"--setup-timeout=-1s", "-v"},
 			},
-		} {
-			w.It(tc.desc, func(it *gotest.T) {
-				got := tc.inv.DefaultArgs()
-				gotest.Equal(it, tc.expect, got)
-			})
+		}) {
+			got := tc.inv.DefaultArgs()
+			gotest.Equal(sub, tc.expect, got)
 		}
 	})
 }
 
 func (s *CmdGotestTestSuite) TestSplitArgs(t *gotest.T) {
-	for _, tc := range []struct {
-		desc         string
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc         string
 		inArgs       []string
 		allowed      map[string]bool
 		expectOwn    []string
 		expectGoTest []string
 		expectErr    bool
 	}{
-		{desc: "empty", inArgs: nil, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: nil},
-		{desc: "only go test args", inArgs: []string{"-v", "./...", "-race", "-count=1"}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-v", "./...", "-race", "-count=1"}},
-		{desc: "only own args", inArgs: []string{"--debug"}, allowed: ExportTestAllowed, expectOwn: []string{"--debug"}, expectGoTest: nil},
-		{desc: "mixed args", inArgs: []string{"--debug", "-v", "./...", "-race"}, allowed: ExportTestAllowed, expectOwn: []string{"--debug"}, expectGoTest: []string{"-v", "./...", "-race"}},
-		{desc: "min flag with equals", inArgs: []string{"--min=80", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--min=80"}, expectGoTest: []string{"-v"}},
-		{desc: "min flag with space", inArgs: []string{"--min", "90", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--min", "90"}, expectGoTest: []string{"-v"}},
-		{desc: "unknown gotest flag", inArgs: []string{"--unknown"}, allowed: ExportTestAllowed, expectErr: true},
-		{desc: "unknown go test flag", inArgs: []string{"-zzz"}, allowed: ExportTestAllowed, expectErr: true},
-		{desc: "gotest flag not in allowed set", inArgs: []string{"--debounce=200ms"}, allowed: ExportTestAllowed, expectErr: true},
-		{desc: "bare -- escape hatch", inArgs: []string{"--debug", "--", "-custom", "./..."}, allowed: ExportTestAllowed, expectOwn: []string{"--debug"}, expectGoTest: []string{"-custom", "./..."}},
-		{desc: "bare -- with no gotest flags", inArgs: []string{"--", "-v", "./..."}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-v", "./..."}},
-		{desc: "-args passthrough", inArgs: []string{"-v", "-args", "-custom=1"}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-v", "-args", "-custom=1"}},
-		{desc: "spec allowed set", inArgs: []string{"--format=md", "--no-color", "-v"}, allowed: ExportSpecAllowed, expectOwn: []string{"--format=md", "--no-color"}, expectGoTest: []string{"-v"}},
-		{desc: "watch allowed set", inArgs: []string{"--debounce=500ms", "-v"}, allowed: ExportWatchAllowed, expectOwn: []string{"--debounce=500ms"}, expectGoTest: []string{"-v"}},
-		{desc: "go test value flag with space", inArgs: []string{"-run", "TestFoo", "./..."}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-run", "TestFoo", "./..."}},
-		{desc: "go test value flag with equals", inArgs: []string{"-timeout=30s"}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-timeout=30s"}},
-		{desc: "watch: no flags", inArgs: []string{"./pkg/..."}, allowed: ExportWatchAllowed, expectOwn: nil, expectGoTest: []string{"./pkg/..."}},
-		{desc: "watch: json flag", inArgs: []string{"-json", "./pkg/..."}, allowed: ExportWatchAllowed, expectOwn: nil, expectGoTest: []string{"-json", "./pkg/..."}},
-		{desc: "watch: debounce with json", inArgs: []string{"--debounce=500ms", "-json", "./..."}, allowed: ExportWatchAllowed, expectOwn: []string{"--debounce=500ms"}, expectGoTest: []string{"-json", "./..."}},
-		{desc: "watch: debug and ci", inArgs: []string{"--debug", "--ci", "-v", "./..."}, allowed: ExportWatchAllowed, expectOwn: []string{"--debug", "--ci"}, expectGoTest: []string{"-v", "./..."}},
-	} {
-		t.When(tc.desc, func(w *gotest.T) {
-			w.It("splits correctly", func(it *gotest.T) {
-				own, goTest, err := SplitArgs(tc.inArgs, tc.allowed)
-				if tc.expectErr {
-					gotest.True(it, err != nil, "expected error")
-					return
-				}
-				gotest.NoError(it, err)
-				gotest.Equal(it, tc.expectOwn, own)
-				gotest.Equal(it, tc.expectGoTest, goTest)
-			})
-		})
+		{Desc: "empty", inArgs: nil, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: nil},
+		{Desc: "only go test args", inArgs: []string{"-v", "./...", "-race", "-count=1"}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-v", "./...", "-race", "-count=1"}},
+		{Desc: "only own args", inArgs: []string{"--debug"}, allowed: ExportTestAllowed, expectOwn: []string{"--debug"}, expectGoTest: nil},
+		{Desc: "mixed args", inArgs: []string{"--debug", "-v", "./...", "-race"}, allowed: ExportTestAllowed, expectOwn: []string{"--debug"}, expectGoTest: []string{"-v", "./...", "-race"}},
+		{Desc: "min flag with equals", inArgs: []string{"--min=80", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--min=80"}, expectGoTest: []string{"-v"}},
+		{Desc: "min flag with space", inArgs: []string{"--min", "90", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--min", "90"}, expectGoTest: []string{"-v"}},
+		{Desc: "unknown gotest flag", inArgs: []string{"--unknown"}, allowed: ExportTestAllowed, expectErr: true},
+		{Desc: "unknown go test flag", inArgs: []string{"-zzz"}, allowed: ExportTestAllowed, expectErr: true},
+		{Desc: "gotest flag not in allowed set", inArgs: []string{"--debounce=200ms"}, allowed: ExportTestAllowed, expectErr: true},
+		{Desc: "bare -- escape hatch", inArgs: []string{"--debug", "--", "-custom", "./..."}, allowed: ExportTestAllowed, expectOwn: []string{"--debug"}, expectGoTest: []string{"-custom", "./..."}},
+		{Desc: "bare -- with no gotest flags", inArgs: []string{"--", "-v", "./..."}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-v", "./..."}},
+		{Desc: "-args passthrough", inArgs: []string{"-v", "-args", "-custom=1"}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-v", "-args", "-custom=1"}},
+		{Desc: "spec allowed set", inArgs: []string{"--format=md", "--no-color", "-v"}, allowed: ExportSpecAllowed, expectOwn: []string{"--format=md", "--no-color"}, expectGoTest: []string{"-v"}},
+		{Desc: "watch allowed set", inArgs: []string{"--debounce=500ms", "-v"}, allowed: ExportWatchAllowed, expectOwn: []string{"--debounce=500ms"}, expectGoTest: []string{"-v"}},
+		{Desc: "go test value flag with space", inArgs: []string{"-run", "TestFoo", "./..."}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-run", "TestFoo", "./..."}},
+		{Desc: "go test value flag with equals", inArgs: []string{"-timeout=30s"}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-timeout=30s"}},
+		{Desc: "watch: no flags", inArgs: []string{"./pkg/..."}, allowed: ExportWatchAllowed, expectOwn: nil, expectGoTest: []string{"./pkg/..."}},
+		{Desc: "watch: json flag", inArgs: []string{"-json", "./pkg/..."}, allowed: ExportWatchAllowed, expectOwn: nil, expectGoTest: []string{"-json", "./pkg/..."}},
+		{Desc: "watch: debounce with json", inArgs: []string{"--debounce=500ms", "-json", "./..."}, allowed: ExportWatchAllowed, expectOwn: []string{"--debounce=500ms"}, expectGoTest: []string{"-json", "./..."}},
+		{Desc: "watch: debug and ci", inArgs: []string{"--debug", "--ci", "-v", "./..."}, allowed: ExportWatchAllowed, expectOwn: []string{"--debug", "--ci"}, expectGoTest: []string{"-v", "./..."}},
+	}) {
+		own, goTest, err := SplitArgs(tc.inArgs, tc.allowed)
+		if tc.expectErr {
+			gotest.True(sub, err != nil, "expected error")
+			continue
+		}
+		gotest.NoError(sub, err)
+		gotest.Equal(sub, tc.expectOwn, own)
+		gotest.Equal(sub, tc.expectGoTest, goTest)
 	}
 }
 
 func (s *CmdGotestTestSuite) TestParseSubcommand(t *gotest.T) {
-	for _, tc := range []struct {
-		desc            string
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc            string
 		args            []string
 		expectSubcmd    string
 		expectRemaining []string
 	}{
-		{desc: "empty args", args: nil, expectSubcmd: "", expectRemaining: nil},
-		{desc: "no subcommand, just flags", args: []string{"-v", "./..."}, expectSubcmd: "", expectRemaining: []string{"-v", "./..."}},
-		{desc: "version subcommand", args: []string{"version"}, expectSubcmd: "version", expectRemaining: nil},
-		{desc: "scaffold subcommand", args: []string{"scaffold", "-v"}, expectSubcmd: "scaffold", expectRemaining: []string{"-v"}},
-		{desc: "migrate subcommand", args: []string{"migrate"}, expectSubcmd: "migrate", expectRemaining: nil},
-		{desc: "help subcommand", args: []string{"help"}, expectSubcmd: "help", expectRemaining: nil},
-		{desc: "generate subcommand", args: []string{"generate", "./..."}, expectSubcmd: "generate", expectRemaining: []string{"./..."}},
-		{desc: "watch subcommand", args: []string{"watch"}, expectSubcmd: "watch", expectRemaining: nil},
-		{desc: "clean subcommand", args: []string{"clean", "./..."}, expectSubcmd: "clean", expectRemaining: []string{"./..."}},
-		{desc: "spec subcommand", args: []string{"spec"}, expectSubcmd: "spec", expectRemaining: nil},
-		{desc: "unknown first arg is not consumed", args: []string{"./...", "-v"}, expectSubcmd: "", expectRemaining: []string{"./...", "-v"}},
-		{desc: "flag first arg is not consumed", args: []string{"-v", "./..."}, expectSubcmd: "", expectRemaining: []string{"-v", "./..."}},
-		{desc: "package pattern not consumed", args: []string{"github.com/foo/bar"}, expectSubcmd: "", expectRemaining: []string{"github.com/foo/bar"}},
-	} {
-		t.When(tc.desc, func(w *gotest.T) {
-			w.It("returns expected subcmd and remaining", func(it *gotest.T) {
-				subcmd, remaining := ParseSubcommand(tc.args)
-				gotest.Equal(it, tc.expectSubcmd, subcmd)
-				gotest.Equal(it, tc.expectRemaining, remaining)
-			})
-		})
+		{Desc: "empty args", args: nil, expectSubcmd: "", expectRemaining: nil},
+		{Desc: "no subcommand, just flags", args: []string{"-v", "./..."}, expectSubcmd: "", expectRemaining: []string{"-v", "./..."}},
+		{Desc: "version subcommand", args: []string{"version"}, expectSubcmd: "version", expectRemaining: nil},
+		{Desc: "scaffold subcommand", args: []string{"scaffold", "-v"}, expectSubcmd: "scaffold", expectRemaining: []string{"-v"}},
+		{Desc: "migrate subcommand", args: []string{"migrate"}, expectSubcmd: "migrate", expectRemaining: nil},
+		{Desc: "help subcommand", args: []string{"help"}, expectSubcmd: "help", expectRemaining: nil},
+		{Desc: "generate subcommand", args: []string{"generate", "./..."}, expectSubcmd: "generate", expectRemaining: []string{"./..."}},
+		{Desc: "watch subcommand", args: []string{"watch"}, expectSubcmd: "watch", expectRemaining: nil},
+		{Desc: "clean subcommand", args: []string{"clean", "./..."}, expectSubcmd: "clean", expectRemaining: []string{"./..."}},
+		{Desc: "spec subcommand", args: []string{"spec"}, expectSubcmd: "spec", expectRemaining: nil},
+		{Desc: "unknown first arg is not consumed", args: []string{"./...", "-v"}, expectSubcmd: "", expectRemaining: []string{"./...", "-v"}},
+		{Desc: "flag first arg is not consumed", args: []string{"-v", "./..."}, expectSubcmd: "", expectRemaining: []string{"-v", "./..."}},
+		{Desc: "package pattern not consumed", args: []string{"github.com/foo/bar"}, expectSubcmd: "", expectRemaining: []string{"github.com/foo/bar"}},
+	}) {
+		subcmd, remaining := ParseSubcommand(tc.args)
+		gotest.Equal(sub, tc.expectSubcmd, subcmd)
+		gotest.Equal(sub, tc.expectRemaining, remaining)
 	}
 }
 
 func (s *CmdGotestTestSuite) TestPackagePatterns(t *gotest.T) {
 	t.When("extract package patterns", func(w *gotest.T) {
-		for _, tc := range []struct {
-			desc     string
+		for sub, tc := range gotest.Each(w, []struct {
+			Desc     string
 			args     []string
 			expected []string
 		}{
-			{desc: "explicit relative path", args: []string{"-v", "./...", "-race"}, expected: []string{"./..."}},
-			{desc: "explicit named package", args: []string{"-v", "github.com/foo/bar", "-race"}, expected: []string{"github.com/foo/bar"}},
-			{desc: "no package defaults to dot", args: []string{"-v", "-race"}, expected: []string{"."}},
-			{desc: "multiple packages", args: []string{"./pkg/a", "./pkg/b", "-v"}, expected: []string{"./pkg/a", "./pkg/b"}},
-			{desc: "stops at -args", args: []string{"-v", "./...", "-args", "-custom", "./not/a/pkg"}, expected: []string{"./..."}},
-			{desc: "no args defaults to dot", args: nil, expected: []string{"."}},
-			{desc: "bare relative path", args: []string{"-v", "./cmd/gotest"}, expected: []string{"./cmd/gotest"}},
-		} {
-			w.It(tc.desc, func(it *gotest.T) {
-				result := ExtractPackagePatterns(tc.args)
-				gotest.Equal(it, tc.expected, result)
-			})
+			{Desc: "explicit relative path", args: []string{"-v", "./...", "-race"}, expected: []string{"./..."}},
+			{Desc: "explicit named package", args: []string{"-v", "github.com/foo/bar", "-race"}, expected: []string{"github.com/foo/bar"}},
+			{Desc: "no package defaults to dot", args: []string{"-v", "-race"}, expected: []string{"."}},
+			{Desc: "multiple packages", args: []string{"./pkg/a", "./pkg/b", "-v"}, expected: []string{"./pkg/a", "./pkg/b"}},
+			{Desc: "stops at -args", args: []string{"-v", "./...", "-args", "-custom", "./not/a/pkg"}, expected: []string{"./..."}},
+			{Desc: "no args defaults to dot", args: nil, expected: []string{"."}},
+			{Desc: "bare relative path", args: []string{"-v", "./cmd/gotest"}, expected: []string{"./cmd/gotest"}},
+		}) {
+			result := ExtractPackagePatterns(tc.args)
+			gotest.Equal(sub, tc.expected, result)
 		}
 	})
 
 	t.When("looks like package pattern", func(w *gotest.T) {
-		for _, tc := range []struct {
-			desc   string
+		for sub, tc := range gotest.Each(w, []struct {
+			Desc   string
 			input  string
 			expect bool
 		}{
-			{desc: "relative path", input: "./pkg/foo", expect: true},
-			{desc: "absolute path", input: "/usr/local/pkg", expect: true},
-			{desc: "named package", input: "github.com/foo/bar", expect: true},
-			{desc: "flag", input: "-v", expect: false},
-			{desc: "bare word", input: "strings", expect: false},
-			{desc: "dot only", input: ".", expect: true},
-			{desc: "dot-slash", input: "./...", expect: true},
-		} {
-			w.It(tc.desc, func(it *gotest.T) {
-				gotest.Equal(it, tc.expect, gotestrunner.LooksLikePackagePattern(tc.input))
-			})
+			{Desc: "relative path", input: "./pkg/foo", expect: true},
+			{Desc: "absolute path", input: "/usr/local/pkg", expect: true},
+			{Desc: "named package", input: "github.com/foo/bar", expect: true},
+			{Desc: "flag", input: "-v", expect: false},
+			{Desc: "bare word", input: "strings", expect: false},
+			{Desc: "dot only", input: ".", expect: true},
+			{Desc: "dot-slash", input: "./...", expect: true},
+		}) {
+			gotest.Equal(sub, tc.expect, gotestrunner.LooksLikePackagePattern(tc.input))
 		}
 	})
 }
 
 func (s *CmdGotestTestSuite) TestParseMinFlag(t *gotest.T) {
-	for _, tc := range []struct {
-		desc      string
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc      string
 		args      []string
 		expect    int
 		expectErr bool
 	}{
-		{desc: "no flag", args: []string{"--debug"}, expect: 0},
-		{desc: "equals syntax", args: []string{"--min=80"}, expect: 80},
-		{desc: "space syntax", args: []string{"--min", "90"}, expect: 90},
-		{desc: "empty args", args: nil, expect: 0},
-		{desc: "invalid value", args: []string{"--min=abc"}, expectErr: true},
-		{desc: "min at end no value", args: []string{"--min"}, expect: 0},
-		{desc: "negative value", args: []string{"--min=-5"}, expectErr: true},
-		{desc: "over 100", args: []string{"--min=150"}, expectErr: true},
-	} {
-		t.When(tc.desc, func(w *gotest.T) {
-			w.It("parses correctly", func(it *gotest.T) {
-				got, err := ExportParseMinFlag(tc.args)
-				if tc.expectErr {
-					gotest.True(it, err != nil, "expected error")
-				} else {
-					gotest.NoError(it, err)
-					gotest.Equal(it, tc.expect, got)
-				}
-			})
-		})
+		{Desc: "no flag", args: []string{"--debug"}, expect: 0},
+		{Desc: "equals syntax", args: []string{"--min=80"}, expect: 80},
+		{Desc: "space syntax", args: []string{"--min", "90"}, expect: 90},
+		{Desc: "empty args", args: nil, expect: 0},
+		{Desc: "invalid value", args: []string{"--min=abc"}, expectErr: true},
+		{Desc: "min at end no value", args: []string{"--min"}, expect: 0},
+		{Desc: "negative value", args: []string{"--min=-5"}, expectErr: true},
+		{Desc: "over 100", args: []string{"--min=150"}, expectErr: true},
+	}) {
+		got, err := ExportParseMinFlag(tc.args)
+		if tc.expectErr {
+			gotest.True(sub, err != nil, "expected error")
+		} else {
+			gotest.NoError(sub, err)
+			gotest.Equal(sub, tc.expect, got)
+		}
 	}
 }
 
@@ -401,32 +385,28 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 }
 
 func (s *CmdGotestTestSuite) TestFocusViolation_String(t *gotest.T) {
-	for _, tc := range []struct {
-		desc     string
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc     string
 		v        FocusViolation
 		expected string
 	}{
 		{
-			desc:     "suite violation only",
+			Desc:     "suite violation only",
 			v:        FocusViolation{SuiteName: "F_MyTestSuite"},
 			expected: "  type F_MyTestSuite",
 		},
 		{
-			desc:     "method violation",
+			Desc:     "method violation",
 			v:        FocusViolation{SuiteName: "MyTestSuite", MethodName: "F_TestSomething"},
 			expected: "  MyTestSuite.F_TestSomething",
 		},
 		{
-			desc:     "both focused suite and method",
+			Desc:     "both focused suite and method",
 			v:        FocusViolation{SuiteName: "F_MyTestSuite", MethodName: "F_TestFoo"},
 			expected: "  F_MyTestSuite.F_TestFoo",
 		},
-	} {
-		t.When(tc.desc, func(w *gotest.T) {
-			w.It("formats correctly", func(it *gotest.T) {
-				gotest.Equal(it, tc.expected, tc.v.String())
-			})
-		})
+	}) {
+		gotest.Equal(sub, tc.expected, tc.v.String())
 	}
 }
 
@@ -531,8 +511,8 @@ func (s *CmdGotestTestSuite) TestGenerateOverlay(t *gotest.T) {
 }
 
 func (s *CmdGotestTestSuite) TestSpecFlagParsing(t *gotest.T) {
-	for _, tc := range []struct {
-		desc      string
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc      string
 		args      []string
 		wantFmt   string
 		wantOut   string
@@ -541,7 +521,7 @@ func (s *CmdGotestTestSuite) TestSpecFlagParsing(t *gotest.T) {
 		wantGoLen int
 	}{
 		{
-			desc:      "no flags",
+			Desc:      "no flags",
 			args:      []string{"./..."},
 			wantFmt:   "terminal",
 			wantInput: "",
@@ -549,7 +529,7 @@ func (s *CmdGotestTestSuite) TestSpecFlagParsing(t *gotest.T) {
 			wantGoLen: 1,
 		},
 		{
-			desc:      "input with equals",
+			Desc:      "input with equals",
 			args:      []string{"--input=events.json"},
 			wantFmt:   "terminal",
 			wantInput: "events.json",
@@ -557,7 +537,7 @@ func (s *CmdGotestTestSuite) TestSpecFlagParsing(t *gotest.T) {
 			wantGoLen: 0,
 		},
 		{
-			desc:      "input with space",
+			Desc:      "input with space",
 			args:      []string{"--input", "events.json"},
 			wantFmt:   "terminal",
 			wantInput: "events.json",
@@ -565,7 +545,7 @@ func (s *CmdGotestTestSuite) TestSpecFlagParsing(t *gotest.T) {
 			wantGoLen: 0,
 		},
 		{
-			desc:      "input stdin dash",
+			Desc:      "input stdin dash",
 			args:      []string{"--input=-"},
 			wantFmt:   "terminal",
 			wantInput: "-",
@@ -573,7 +553,7 @@ func (s *CmdGotestTestSuite) TestSpecFlagParsing(t *gotest.T) {
 			wantGoLen: 0,
 		},
 		{
-			desc:      "input with format",
+			Desc:      "input with format",
 			args:      []string{"--format=md", "--input=data.json"},
 			wantFmt:   "md",
 			wantInput: "data.json",
@@ -581,7 +561,7 @@ func (s *CmdGotestTestSuite) TestSpecFlagParsing(t *gotest.T) {
 			wantGoLen: 0,
 		},
 		{
-			desc:      "input with output and no-color",
+			Desc:      "input with output and no-color",
 			args:      []string{"--input=-", "--output=out.txt", "--no-color"},
 			wantFmt:   "terminal",
 			wantInput: "-",
@@ -589,24 +569,20 @@ func (s *CmdGotestTestSuite) TestSpecFlagParsing(t *gotest.T) {
 			wantColor: true,
 			wantGoLen: 0,
 		},
-	} {
-		t.When(tc.desc, func(w *gotest.T) {
-			w.It("parses flags correctly", func(it *gotest.T) {
-				ownArgs, goTestArgs, err := SplitArgs(tc.args, ExportSpecAllowed)
-				gotest.NoError(it, err)
+	}) {
+		ownArgs, goTestArgs, err := SplitArgs(tc.args, ExportSpecAllowed)
+		gotest.NoError(sub, err)
 
-				format := ExportExtractStringFlag(ownArgs, "--format", "terminal")
-				output := ExportExtractStringFlag(ownArgs, "--output", "")
-				input := ExportExtractStringFlag(ownArgs, "--input", "")
-				noColor := ExportHasFlag(ownArgs, "--no-color")
+		format := ExportExtractStringFlag(ownArgs, "--format", "terminal")
+		output := ExportExtractStringFlag(ownArgs, "--output", "")
+		input := ExportExtractStringFlag(ownArgs, "--input", "")
+		noColor := ExportHasFlag(ownArgs, "--no-color")
 
-				gotest.Equal(it, tc.wantFmt, format)
-				gotest.Equal(it, tc.wantOut, output)
-				gotest.Equal(it, tc.wantInput, input)
-				gotest.Equal(it, tc.wantColor, noColor)
-				gotest.Len(it, goTestArgs, tc.wantGoLen)
-			})
-		})
+		gotest.Equal(sub, tc.wantFmt, format)
+		gotest.Equal(sub, tc.wantOut, output)
+		gotest.Equal(sub, tc.wantInput, input)
+		gotest.Equal(sub, tc.wantColor, noColor)
+		gotest.Len(sub, goTestArgs, tc.wantGoLen)
 	}
 }
 
@@ -668,74 +644,68 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 
 func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 	t.When("IsGoFile", func(w *gotest.T) {
-		for _, tc := range []struct {
-			desc   string
+		for sub, tc := range gotest.Each(w, []struct {
+			Desc   string
 			name   string
 			expect bool
 		}{
-			{desc: "go file", name: "main.go", expect: true},
-			{desc: "test file", name: "main_test.go", expect: true},
-			{desc: "path with go file", name: "/tmp/foo/bar.go", expect: true},
-			{desc: "not a go file", name: "main.py", expect: false},
-			{desc: "go in middle", name: "foo.go.bak", expect: false},
-			{desc: "empty", name: "", expect: false},
-		} {
-			w.It(tc.desc, func(it *gotest.T) {
-				gotest.Equal(it, tc.expect, ExportIsGoFile(tc.name))
-			})
+			{Desc: "go file", name: "main.go", expect: true},
+			{Desc: "test file", name: "main_test.go", expect: true},
+			{Desc: "path with go file", name: "/tmp/foo/bar.go", expect: true},
+			{Desc: "not a go file", name: "main.py", expect: false},
+			{Desc: "go in middle", name: "foo.go.bak", expect: false},
+			{Desc: "empty", name: "", expect: false},
+		}) {
+			gotest.Equal(sub, tc.expect, ExportIsGoFile(tc.name))
 		}
 	})
 
 	t.When("DirsToPatterns", func(w *gotest.T) {
-		for _, tc := range []struct {
-			desc    string
+		for sub, tc := range gotest.Each(w, []struct {
+			Desc    string
 			dirs    map[string]bool
 			lenWant int
 		}{
-			{desc: "single dir", dirs: map[string]bool{"pkg/foo": true}, lenWant: 1},
-			{desc: "multiple dirs", dirs: map[string]bool{"pkg/foo": true, "cmd/bar": true}, lenWant: 2},
-			{desc: "empty", dirs: map[string]bool{}, lenWant: 0},
-		} {
-			w.It(tc.desc, func(it *gotest.T) {
-				result := ExportDirsToPatterns(tc.dirs)
-				gotest.Len(it, result, tc.lenWant)
-				for _, p := range result {
-					gotest.True(it, len(p) > 2 && p[:2] == "./", "expected ./ prefix, got: %s", p)
-				}
-			})
+			{Desc: "single dir", dirs: map[string]bool{"pkg/foo": true}, lenWant: 1},
+			{Desc: "multiple dirs", dirs: map[string]bool{"pkg/foo": true, "cmd/bar": true}, lenWant: 2},
+			{Desc: "empty", dirs: map[string]bool{}, lenWant: 0},
+		}) {
+			result := ExportDirsToPatterns(tc.dirs)
+			gotest.Len(sub, result, tc.lenWant)
+			for _, p := range result {
+				gotest.True(sub, len(p) > 2 && p[:2] == "./", "expected ./ prefix, got: %s", p)
+			}
 		}
 	})
 
 	t.When("ReplacePatterns", func(w *gotest.T) {
-		for _, tc := range []struct {
-			desc        string
+		for sub, tc := range gotest.Each(w, []struct {
+			Desc        string
 			original    []string
 			newPatterns []string
 			expected    []string
 		}{
 			{
-				desc:        "replaces package pattern",
+				Desc:        "replaces package pattern",
 				original:    []string{"-v", "./pkg/foo", "-race"},
 				newPatterns: []string{"./cmd/bar"},
 				expected:    []string{"-v", "-race", "./cmd/bar"},
 			},
 			{
-				desc:        "no patterns to replace",
+				Desc:        "no patterns to replace",
 				original:    []string{"-v", "-race"},
 				newPatterns: []string{"./pkg/new"},
 				expected:    []string{"-v", "-race", "./pkg/new"},
 			},
 			{
-				desc:        "multiple patterns replaced",
+				Desc:        "multiple patterns replaced",
 				original:    []string{"-v", "./pkg/a", "./pkg/b", "-race"},
 				newPatterns: []string{"./changed"},
 				expected:    []string{"-v", "-race", "./changed"},
 			},
-		} {
-			w.It(tc.desc, func(it *gotest.T) {
-				result := ExportReplacePatterns(tc.original, tc.newPatterns)
-				gotest.Equal(it, tc.expected, result)
-			})
+		}) {
+			result := ExportReplacePatterns(tc.original, tc.newPatterns)
+			gotest.Equal(sub, tc.expected, result)
 		}
 	})
 }

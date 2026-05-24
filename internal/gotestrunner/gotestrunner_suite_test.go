@@ -66,8 +66,8 @@ type GotestrunnerTestSuite struct{}
 // --- args tests ---
 
 func (s *GotestrunnerTestSuite) TestIsGoTestFlag(t *gotest.T) {
-	for _, tc := range []struct {
-		name    string
+	for sub, tc := range gotest.Each(t, []struct {
+		Name    string
 		flag    string
 		isValue bool
 		known   bool
@@ -81,21 +81,17 @@ func (s *GotestrunnerTestSuite) TestIsGoTestFlag(t *gotest.T) {
 		{"args", "-args", false, true},
 		{"unknown", "-zzz", false, false},
 		{"double dash unknown", "--debug", false, false},
-	} {
-		t.When(tc.name, func(w *gotest.T) {
-			w.It("returns expected isValue and known", func(it *gotest.T) {
-				isValue, known := gotestrunner.IsGoTestFlag(tc.flag)
-				gotest.Equal(it, tc.isValue, isValue)
-				gotest.Equal(it, tc.known, known)
-			})
-		})
+	}) {
+		isValue, known := gotestrunner.IsGoTestFlag(tc.flag)
+		gotest.Equal(sub, tc.isValue, isValue)
+		gotest.Equal(sub, tc.known, known)
 	}
 }
 
 func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 	t.When("extracting from flags", func(w *gotest.T) {
-		for _, tc := range []struct {
-			name   string
+		for sub, tc := range gotest.Each(w, []struct {
+			Name   string
 			flags  []string
 			expect string
 		}{
@@ -104,17 +100,15 @@ func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 			{"space form", []string{"-coverprofile", "cover.out", "-v"}, "cover.out"},
 			{"stops at -args", []string{"-args", "-coverprofile=cover.out"}, ""},
 			{"no coverprofile", []string{"-v", "-count=1"}, ""},
-		} {
-			w.It(tc.name, func(it *gotest.T) {
-				got := gotestrunner.ExtractCoverProfile(tc.flags)
-				gotest.Equal(it, tc.expect, got)
-			})
+		}) {
+			got := gotestrunner.ExtractCoverProfile(tc.flags)
+			gotest.Equal(sub, tc.expect, got)
 		}
 	})
 
 	t.When("stripping from flags", func(w *gotest.T) {
-		for _, tc := range []struct {
-			name   string
+		for sub, tc := range gotest.Each(w, []struct {
+			Name   string
 			flags  []string
 			expect []string
 		}{
@@ -123,11 +117,9 @@ func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 			{"space form", []string{"-coverprofile", "cover.out", "-v"}, []string{"-v"}},
 			{"preserves -args passthrough", []string{"-v", "-args", "-coverprofile=x"}, []string{"-v", "-args", "-coverprofile=x"}},
 			{"no coverprofile unchanged", []string{"-v", "-count=1"}, []string{"-v", "-count=1"}},
-		} {
-			w.It(tc.name, func(it *gotest.T) {
-				got := gotestrunner.StripCoverProfile(tc.flags)
-				gotest.Equal(it, tc.expect, got)
-			})
+		}) {
+			got := gotestrunner.StripCoverProfile(tc.flags)
+			gotest.Equal(sub, tc.expect, got)
 		}
 	})
 
@@ -353,14 +345,14 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 		ctx := context.Background()
 		env := []string{"PATH=/usr/bin", "HOME=/home/test"}
 
-		for _, tc := range []struct {
-			name       string
+		for sub, tc := range gotest.Each(w, []struct {
+			Name       string
 			target     gotestrunner.SuiteTarget
 			wantBinary string
 			wantArgs   []string
 		}{
 			{
-				name: "basic suite",
+				Name: "basic suite",
 				target: gotestrunner.SuiteTarget{
 					Package:    "example.com/pkg",
 					BinaryPath: "/tmp/pkg.test",
@@ -370,7 +362,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 				wantArgs:   []string{"/tmp/pkg.test", "-test.run=^TestFooSuite$"},
 			},
 			{
-				name: "run filter overrides suite name",
+				Name: "run filter overrides suite name",
 				target: gotestrunner.SuiteTarget{
 					Package:    "example.com/pkg",
 					BinaryPath: "/tmp/pkg.test",
@@ -381,7 +373,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 				wantArgs:   []string{"/tmp/pkg.test", "-test.run=^TestFooSuite$/^TestBar$"},
 			},
 			{
-				name: "with run flags",
+				Name: "with run flags",
 				target: gotestrunner.SuiteTarget{
 					Package:    "example.com/pkg",
 					BinaryPath: "/tmp/pkg.test",
@@ -392,7 +384,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 				wantArgs:   []string{"/tmp/pkg.test", "-test.run=^TestFooSuite$", "-test.timeout=30s", "-test.count=1"},
 			},
 			{
-				name: "keeps -test.v in run flags",
+				Name: "keeps -test.v in run flags",
 				target: gotestrunner.SuiteTarget{
 					Package:    "example.com/pkg",
 					BinaryPath: "/tmp/pkg.test",
@@ -403,7 +395,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 				wantArgs:   []string{"/tmp/pkg.test", "-test.run=^TestFooSuite$", "-test.v", "-test.timeout=10s"},
 			},
 			{
-				name: "with cover profile",
+				Name: "with cover profile",
 				target: gotestrunner.SuiteTarget{
 					Package:      "example.com/pkg",
 					BinaryPath:   "/tmp/pkg.test",
@@ -414,7 +406,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 				wantArgs:   []string{"/tmp/pkg.test", "-test.run=^TestFooSuite$", "-test.coverprofile=/tmp/cover.out"},
 			},
 			{
-				name: "suite name with regex-special chars",
+				Name: "suite name with regex-special chars",
 				target: gotestrunner.SuiteTarget{
 					Package:    "example.com/pkg",
 					BinaryPath: "/tmp/pkg.test",
@@ -424,7 +416,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 				wantArgs:   []string{"/tmp/pkg.test", "-test.run=^TestFoo\\.Bar\\+Baz$"},
 			},
 			{
-				name: "all fields populated",
+				Name: "all fields populated",
 				target: gotestrunner.SuiteTarget{
 					Package:      "example.com/pkg",
 					BinaryPath:   "/tmp/pkg.test",
@@ -436,20 +428,18 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 				wantBinary: "/tmp/pkg.test",
 				wantArgs:   []string{"/tmp/pkg.test", "-test.run=^TestFooSuite$/^TestBar$", "-test.timeout=30s", "-test.v", "-test.coverprofile=/tmp/cover.out"},
 			},
-		} {
-			w.It(tc.name, func(it *gotest.T) {
-				cmd := gotestrunner.ExportBuildSuiteCmd(ctx, tc.target, env, false)
+		}) {
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, tc.target, env, false)
 
-				gotest.Equal(it, tc.wantBinary, cmd.Path)
+			gotest.Equal(sub, tc.wantBinary, cmd.Path)
 
-				// Compare full args list.
-				gotest.Equal(it, len(tc.wantArgs), len(cmd.Args))
-				for i := range cmd.Args {
-					gotest.Equal(it, tc.wantArgs[i], cmd.Args[i])
-				}
+			// Compare full args list.
+			gotest.Equal(sub, len(tc.wantArgs), len(cmd.Args))
+			for i := range cmd.Args {
+				gotest.Equal(sub, tc.wantArgs[i], cmd.Args[i])
+			}
 
-				gotest.Equal(it, len(env), len(cmd.Env))
-			})
+			gotest.Equal(sub, len(env), len(cmd.Env))
 		}
 
 		w.It("matches original buildPlainArgs", func(it *gotest.T) {
@@ -481,14 +471,14 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 		ctx := context.Background()
 		env := []string{"PATH=/usr/bin", "HOME=/home/test"}
 
-		for _, tc := range []struct {
-			name       string
+		for sub, tc := range gotest.Each(w, []struct {
+			Name       string
 			target     gotestrunner.SuiteTarget
 			wantBinary string
 			wantArgs   []string
 		}{
 			{
-				name: "basic suite",
+				Name: "basic suite",
 				target: gotestrunner.SuiteTarget{
 					Package:    "example.com/pkg",
 					BinaryPath: "/tmp/pkg.test",
@@ -499,7 +489,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					"-test.run=^TestFooSuite$", "-test.v=test2json"},
 			},
 			{
-				name: "run filter overrides suite name",
+				Name: "run filter overrides suite name",
 				target: gotestrunner.SuiteTarget{
 					Package:    "example.com/pkg",
 					BinaryPath: "/tmp/pkg.test",
@@ -511,7 +501,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					"-test.run=^TestFooSuite$/^TestBar$", "-test.v=test2json"},
 			},
 			{
-				name: "strips -test.v from run flags",
+				Name: "strips -test.v from run flags",
 				target: gotestrunner.SuiteTarget{
 					Package:    "example.com/pkg",
 					BinaryPath: "/tmp/pkg.test",
@@ -523,7 +513,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					"-test.run=^TestFooSuite$", "-test.v=test2json", "-test.timeout=30s"},
 			},
 			{
-				name: "strips -test.v=true from run flags",
+				Name: "strips -test.v=true from run flags",
 				target: gotestrunner.SuiteTarget{
 					Package:    "example.com/pkg",
 					BinaryPath: "/tmp/pkg.test",
@@ -535,7 +525,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					"-test.run=^TestFooSuite$", "-test.v=test2json"},
 			},
 			{
-				name: "with cover profile",
+				Name: "with cover profile",
 				target: gotestrunner.SuiteTarget{
 					Package:      "example.com/pkg",
 					BinaryPath:   "/tmp/pkg.test",
@@ -547,7 +537,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					"-test.run=^TestFooSuite$", "-test.v=test2json", "-test.coverprofile=/tmp/cover.out"},
 			},
 			{
-				name: "all fields, -test.v stripped",
+				Name: "all fields, -test.v stripped",
 				target: gotestrunner.SuiteTarget{
 					Package:      "example.com/pkg",
 					BinaryPath:   "/tmp/pkg.test",
@@ -563,7 +553,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					"-test.coverprofile=/tmp/cover.out"},
 			},
 			{
-				name: "suite name with regex-special chars",
+				Name: "suite name with regex-special chars",
 				target: gotestrunner.SuiteTarget{
 					Package:    "example.com/pkg",
 					BinaryPath: "/tmp/pkg.test",
@@ -573,27 +563,25 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 				wantArgs: []string{"go", "tool", "test2json", "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
 					"-test.run=^TestFoo\\.Bar\\+Baz$", "-test.v=test2json"},
 			},
-		} {
-			w.It(tc.name, func(it *gotest.T) {
-				cmd := gotestrunner.ExportBuildSuiteCmd(ctx, tc.target, env, true)
+		}) {
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, tc.target, env, true)
 
-				// For "go", cmd.Path is resolved to the absolute path; compare Args[0] loosely.
-				gotest.True(it, strings.HasSuffix(cmd.Path, "/go") || cmd.Path == "go",
-					"binary: got %q, want suffix /go", cmd.Path)
+			// For "go", cmd.Path is resolved to the absolute path; compare Args[0] loosely.
+			gotest.True(sub, strings.HasSuffix(cmd.Path, "/go") || cmd.Path == "go",
+				"binary: got %q, want suffix /go", cmd.Path)
 
-				// Compare full args list.
-				gotest.Equal(it, len(tc.wantArgs), len(cmd.Args))
-				for i := range cmd.Args {
-					if i == 0 {
-						gotest.True(it, strings.HasSuffix(cmd.Args[0], "/go") || cmd.Args[0] == "go",
-							"args[0]: got %q, want suffix /go", cmd.Args[0])
-						continue
-					}
-					gotest.Equal(it, tc.wantArgs[i], cmd.Args[i])
+			// Compare full args list.
+			gotest.Equal(sub, len(tc.wantArgs), len(cmd.Args))
+			for i := range cmd.Args {
+				if i == 0 {
+					gotest.True(sub, strings.HasSuffix(cmd.Args[0], "/go") || cmd.Args[0] == "go",
+						"args[0]: got %q, want suffix /go", cmd.Args[0])
+					continue
 				}
+				gotest.Equal(sub, tc.wantArgs[i], cmd.Args[i])
+			}
 
-				gotest.Equal(it, len(env), len(cmd.Env))
-			})
+			gotest.Equal(sub, len(env), len(cmd.Env))
 		}
 
 		w.It("matches original buildTest2JSONArgs", func(it *gotest.T) {
@@ -737,88 +725,84 @@ func (s *GotestrunnerTestSuite) TestPackageBatcher(t *gotest.T) {
 
 func (s *GotestrunnerTestSuite) TestOutputFormatting(t *gotest.T) {
 	t.When("stripping trailing status", func(w *gotest.T) {
-		for _, tc := range []struct {
-			name   string
+		for sub, tc := range gotest.Each(w, []struct {
+			Name   string
 			input  string
 			expect string
 		}{
 			{
-				name:   "strips trailing PASS",
+				Name:   "strips trailing PASS",
 				input:  "=== RUN   TestFoo\n--- PASS: TestFoo (0.00s)\nPASS\n",
 				expect: "=== RUN   TestFoo\n--- PASS: TestFoo (0.00s)\n",
 			},
 			{
-				name:   "strips trailing FAIL",
+				Name:   "strips trailing FAIL",
 				input:  "=== RUN   TestFoo\n--- FAIL: TestFoo (0.00s)\nFAIL\n",
 				expect: "=== RUN   TestFoo\n--- FAIL: TestFoo (0.00s)\n",
 			},
 			{
-				name:   "strips trailing PASS with extra newlines",
+				Name:   "strips trailing PASS with extra newlines",
 				input:  "line1\nline2\nPASS\n\n\n",
 				expect: "line1\nline2\n",
 			},
 			{
-				name:   "preserves non-status last line",
+				Name:   "preserves non-status last line",
 				input:  "line1\nline2\nsome output\n",
 				expect: "line1\nline2\nsome output\n",
 			},
 			{
-				name:   "only PASS returns nil",
+				Name:   "only PASS returns nil",
 				input:  "PASS\n",
 				expect: "",
 			},
 			{
-				name:   "no newlines returns nil",
+				Name:   "no newlines returns nil",
 				input:  "PASS",
 				expect: "",
 			},
-		} {
-			w.It(tc.name, func(it *gotest.T) {
-				got := gotestrunner.StripTrailingStatus([]byte(tc.input))
-				if tc.expect == "" {
-					gotest.True(it, got == nil, "expected nil, got %q", got)
-				} else {
-					gotest.Equal(it, tc.expect, string(got))
-				}
-			})
+		}) {
+			got := gotestrunner.StripTrailingStatus([]byte(tc.input))
+			if tc.expect == "" {
+				gotest.True(sub, got == nil, "expected nil, got %q", got)
+			} else {
+				gotest.Equal(sub, tc.expect, string(got))
+			}
 		}
 	})
 
 	t.When("writing package summary", func(w *gotest.T) {
-		for _, tc := range []struct {
-			name     string
+		for sub, tc := range gotest.Each(w, []struct {
+			Name     string
 			pkg      string
 			failed   bool
 			duration time.Duration
 			expect   string
 		}{
 			{
-				name:     "passing package",
+				Name:     "passing package",
 				pkg:      "example.com/pkg",
 				failed:   false,
 				duration: 1234 * time.Millisecond,
 				expect:   "PASS\nok  \texample.com/pkg\t1.234s\n",
 			},
 			{
-				name:     "failing package",
+				Name:     "failing package",
 				pkg:      "example.com/pkg",
 				failed:   true,
 				duration: 567 * time.Millisecond,
 				expect:   "FAIL\nFAIL\texample.com/pkg\t0.567s\n",
 			},
-		} {
-			w.It(tc.name, func(it *gotest.T) {
-				r, wr, _ := os.Pipe()
-				old := os.Stdout
-				os.Stdout = wr
-				gotestrunner.WritePackageSummary(tc.pkg, tc.failed, tc.duration)
-				wr.Close()
-				os.Stdout = old
-				var buf bytes.Buffer
-				buf.ReadFrom(r)
-				r.Close()
-				gotest.Equal(it, tc.expect, buf.String())
-			})
+		}) {
+			r, wr, _ := os.Pipe()
+			old := os.Stdout
+			os.Stdout = wr
+			gotestrunner.WritePackageSummary(tc.pkg, tc.failed, tc.duration)
+			wr.Close()
+			os.Stdout = old
+			var buf bytes.Buffer
+			buf.ReadFrom(r)
+			r.Close()
+			gotest.Equal(sub, tc.expect, buf.String())
 		}
 	})
 }
@@ -826,8 +810,8 @@ func (s *GotestrunnerTestSuite) TestOutputFormatting(t *gotest.T) {
 // --- splitTopLevelOr tests ---
 
 func (s *GotestrunnerTestSuite) TestSplitTopLevelOr(t *gotest.T) {
-	for _, tc := range []struct {
-		name   string
+	for sub, tc := range gotest.Each(t, []struct {
+		Name   string
 		input  string
 		expect []string
 	}{
@@ -839,73 +823,65 @@ func (s *GotestrunnerTestSuite) TestSplitTopLevelOr(t *gotest.T) {
 		{"escaped pipe", `^Test\|Foo$`, []string{`^Test\|Foo$`}},
 		{"nested parens", `^Test$/^((A|B)|C)$`, []string{`^Test$/^((A|B)|C)$`}},
 		{"three alternatives", `^A$|^B$|^C$`, []string{`^A$`, `^B$`, `^C$`}},
-	} {
-		t.When(tc.name, func(w *gotest.T) {
-			w.It("splits correctly", func(it *gotest.T) {
-				got := gotestrunner.ExportSplitTopLevelOr(tc.input)
-				gotest.Equal(it, tc.expect, got)
-			})
-		})
+	}) {
+		got := gotestrunner.ExportSplitTopLevelOr(tc.input)
+		gotest.Equal(sub, tc.expect, got)
 	}
 }
 
 // --- suiteRunFilter tests ---
 
 func (s *GotestrunnerTestSuite) TestSuiteRunFilter(t *gotest.T) {
-	for _, tc := range []struct {
-		name         string
+	for sub, tc := range gotest.Each(t, []struct {
+		Name         string
 		userFilter   string
 		testFuncName string
 		expect       string
 	}{
 		{
-			name:         "empty filter",
+			Name:         "empty filter",
 			userFilter:   "",
 			testFuncName: "TestFooSuite",
 			expect:       "",
 		},
 		{
-			name:         "suite only (no subtest)",
+			Name:         "suite only (no subtest)",
 			userFilter:   "^TestFooSuite$",
 			testFuncName: "TestFooSuite",
 			expect:       "",
 		},
 		{
-			name:         "single method filter",
+			Name:         "single method filter",
 			userFilter:   "^TestFooSuite$/^TestBar$",
 			testFuncName: "TestFooSuite",
 			expect:       "^TestFooSuite$/^TestBar$",
 		},
 		{
-			name:         "multi-method same suite",
+			Name:         "multi-method same suite",
 			userFilter:   "^TestFooSuite$/^(TestBar|TestBaz)$",
 			testFuncName: "TestFooSuite",
 			expect:       "^TestFooSuite$/^(TestBar|TestBaz)$",
 		},
 		{
-			name:         "multi-suite picks matching",
+			Name:         "multi-suite picks matching",
 			userFilter:   "^TestSuiteA$/^TestX$|^TestSuiteB$/^TestY$",
 			testFuncName: "TestSuiteA",
 			expect:       "^TestSuiteA$/^TestX$",
 		},
 		{
-			name:         "multi-suite picks other",
+			Name:         "multi-suite picks other",
 			userFilter:   "^TestSuiteA$/^TestX$|^TestSuiteB$/^TestY$",
 			testFuncName: "TestSuiteB",
 			expect:       "^TestSuiteB$/^TestY$",
 		},
 		{
-			name:         "multi-suite no match",
+			Name:         "multi-suite no match",
 			userFilter:   "^TestSuiteA$/^TestX$|^TestSuiteB$/^TestY$",
 			testFuncName: "TestSuiteC",
 			expect:       "",
 		},
-	} {
-		t.When(tc.name, func(w *gotest.T) {
-			w.It("returns the expected filter", func(it *gotest.T) {
-				got := gotestrunner.ExportSuiteRunFilter(tc.userFilter, tc.testFuncName)
-				gotest.Equal(it, tc.expect, got)
-			})
-		})
+	}) {
+		got := gotestrunner.ExportSuiteRunFilter(tc.userFilter, tc.testFuncName)
+		gotest.Equal(sub, tc.expect, got)
 	}
 }

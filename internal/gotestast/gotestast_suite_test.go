@@ -738,8 +738,8 @@ func (s *S) TooManyParams(ctx context.Context, x int) error { return nil }
 `
 		fm := loadFixtureWithMethods(t.T(), src)
 
-		for _, tc := range []struct {
-			name    string
+		for sub, tc := range gotest.Each(w, []struct {
+			Name    string
 			wantErr bool
 			errMsg  string
 		}{
@@ -749,25 +749,23 @@ func (s *S) TooManyParams(ctx context.Context, x int) error { return nil }
 			{"NoReturn", true, "unsupported signature"},
 			{"WrongReturn", true, "unsupported return type"},
 			{"TooManyParams", true, "unsupported signature"},
-		} {
-			w.It(tc.name, func(it *gotest.T) {
-				for _, fd := range fm.funcDecls {
-					if fd.Name.Name != tc.name {
-						continue
-					}
-					m := fm.pkg.TypesInfo.ObjectOf(fd.Name).(*types.Func)
-					sig := fm.pkg.TypesInfo.TypeOf(fd.Name).(*types.Signature)
-					methodID := "S." + m.Name()
-
-					err := gotestast.ExportValidateContextErrorSig(sig, methodID)
-					if tc.wantErr {
-						gotest.True(it, err != nil, "expected error for %s", tc.name)
-						gotest.Contains(it, err.Error(), tc.errMsg)
-					} else {
-						gotest.NoError(it, err)
-					}
+		}) {
+			for _, fd := range fm.funcDecls {
+				if fd.Name.Name != tc.Name {
+					continue
 				}
-			})
+				m := fm.pkg.TypesInfo.ObjectOf(fd.Name).(*types.Func)
+				sig := fm.pkg.TypesInfo.TypeOf(fd.Name).(*types.Signature)
+				methodID := "S." + m.Name()
+
+				err := gotestast.ExportValidateContextErrorSig(sig, methodID)
+				if tc.wantErr {
+					gotest.True(sub, err != nil, "expected error for %s", tc.Name)
+					gotest.Contains(sub, err.Error(), tc.errMsg)
+				} else {
+					gotest.NoError(sub, err)
+				}
+			}
 		}
 	})
 }
