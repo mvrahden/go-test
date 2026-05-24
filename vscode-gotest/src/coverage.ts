@@ -9,7 +9,6 @@ import {
   enqueueDescendants,
   groupByPackage,
   buildRunFilter,
-  resolvePackageItems,
   resolveAncestorItems,
 } from "./runnerUtils.js";
 import { executeBatch } from "./batchRunner.js";
@@ -430,7 +429,6 @@ export class CoverageRunner implements vscode.Disposable {
         }
       }
 
-      resolvePackageItems(run, items, this.controller);
       resolveAncestorItems(run, this.controller);
 
       const { coverages: allCoverages } = this.store.buildFileCoverages(
