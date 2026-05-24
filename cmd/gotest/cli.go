@@ -186,8 +186,8 @@ func parseSetupTimeoutFlag(args []string) (time.Duration, error) {
 		if err != nil {
 			return 0, fmt.Errorf("invalid --setup-timeout value %q: %w", raw, err)
 		}
-		if d < -1 || d == 0 {
-			return 0, fmt.Errorf("invalid --setup-timeout value %q: must be positive or -1 to disable", raw)
+		if d == 0 {
+			return 0, fmt.Errorf("invalid --setup-timeout value %q: must be positive or negative to disable", raw)
 		}
 		return d, nil
 	}

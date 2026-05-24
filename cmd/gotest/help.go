@@ -83,7 +83,7 @@ Flags (gotest — use --double-dash):
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
   --min=<pct>             Fail if coverage < pct%% (0-100)
-  --setup-timeout=<dur>   Total budget for shared fixture setup (-1 to disable)
+  --setup-timeout=<dur>   Total budget for shared fixture setup (-1s to disable)
 
 Flags (go test — use -single-dash, forwarded automatically):
   -v                      Verbose output
@@ -126,7 +126,7 @@ Flags:
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
   --min=<pct>             Fail if coverage < pct% (0-100, enables -coverprofile)
-  --setup-timeout=<dur>   Total budget for shared fixture setup (-1 to disable)
+  --setup-timeout=<dur>   Total budget for shared fixture setup (-1s to disable)
 
 All standard go test flags (-single-dash) are forwarded automatically.
 Use a bare "--" to pass unrecognized flags without validation.
@@ -159,7 +159,7 @@ Flags:
   --debug                 Keep generated overlay
   --update-snapshots      Regenerate snapshot files
   --min=<pct>             Fail if coverage < pct% (0-100)
-  --setup-timeout=<dur>   Total budget for shared fixture setup (-1 to disable)
+  --setup-timeout=<dur>   Total budget for shared fixture setup (-1s to disable)
 
 Examples:
   gotest spec ./...                                Run and render spec
@@ -185,7 +185,7 @@ Flags:
   --ci                    Fail on focused tests (F_ prefixes)
   --debug                 Keep generated overlay
   --update-snapshots      Regenerate snapshot files
-  --setup-timeout=<dur>   Total budget for shared fixture setup (-1 to disable)
+  --setup-timeout=<dur>   Total budget for shared fixture setup (-1s to disable)
 
 Examples:
   gotest watch ./...                         Watch all packages
@@ -380,7 +380,7 @@ at a go.mod boundary. CLI flags override config values.
 
 Fields:
   tags: <string>            Build tags, comma-separated (e.g., "integration,e2e")
-  setup-timeout: <duration> Total budget for all shared fixture setup (e.g., "2m", -1 to disable)
+  setup-timeout: <duration> Total budget for all shared fixture setup (e.g., "2m", "-1s" to disable)
   min-coverage: <int>       Minimum coverage percentage, 0-100
   debounce: <duration>      Watch mode re-run delay (e.g., "500ms", default: 200ms)
   lint:
