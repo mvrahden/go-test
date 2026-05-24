@@ -4,6 +4,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// EachTestSuite tests the Each helper for parameterized subtests.
 type EachTestSuite struct{}
 
 func (s *EachTestSuite) TestEach(t *gotest.T) {

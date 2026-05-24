@@ -18,6 +18,8 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// GotestrunnerProcessTestSuite tests process group lifecycle,
+// signal-based cancellation, and teardown budget enforcement.
 type GotestrunnerProcessTestSuite struct{}
 
 func (s *GotestrunnerProcessTestSuite) SuiteConfig() gotest.SuiteConfig {

@@ -6,6 +6,7 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
+// UtilsTestSuite tests generator utility functions like DeterminePkgDir.
 type UtilsTestSuite struct{}
 
 func (s *UtilsTestSuite) SuiteConfig() gotest.SuiteConfig {
