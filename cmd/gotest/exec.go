@@ -145,15 +145,17 @@ func prepareTestRun(ctx context.Context, overlay *overlayResult, buildFlags []st
 }
 
 type parsedFlags struct {
-	buildFlags      []string
-	runFlags        []string
-	userRunFilter   string
+	buildFlags       []string
+	runFlags         []string
+	userRunFilter    string
 	userCoverProfile string
+	verbose          bool
 }
 
 func parseExecFlags(goTestArgs []string) parsedFlags {
 	classified := gotestrunner.ClassifyGoTestArgs(goTestArgs)
 	classified.BuildFlags = gotestrunner.InjectChecklinkname(classified.BuildFlags)
+	verbose := gotestrunner.HasVerboseFlag(classified.RunFlags)
 	userRunFilter := gotestrunner.ExtractRunFilter(classified.RunFlags)
 	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
 	userCoverProfile := gotestrunner.ExtractCoverProfile(runFlags)
@@ -164,6 +166,7 @@ func parseExecFlags(goTestArgs []string) parsedFlags {
 		runFlags:         runFlags,
 		userRunFilter:    userRunFilter,
 		userCoverProfile: userCoverProfile,
+		verbose:          verbose,
 	}
 }
 
@@ -235,7 +238,7 @@ func executeTests(ctx context.Context, cfg ExecConfig, overlay *overlayResult) (
 	if cfg.JSON {
 		mode = gotestrunner.RunStreamJSON
 	}
-	_, code := gotestrunner.RunSuites(ctx, targets, extraEnv, 0, mode)
+	_, code := gotestrunner.RunSuites(ctx, targets, extraEnv, 0, mode, pf.verbose)
 	return code, nil
 }
 
@@ -306,7 +309,7 @@ func executeTestsStreaming(ctx context.Context, cfg ExecConfig, overlay *overlay
 
 	var batcher *gotestrunner.PackageBatcher
 	if !cfg.JSON {
-		batcher = gotestrunner.NewPackageBatcher()
+		batcher = gotestrunner.NewPackageBatcher(pf.verbose)
 	}
 
 loop:
@@ -447,7 +450,7 @@ func executeTestsCaptured(ctx context.Context, cfg ExecConfig, overlay *overlayR
 		defer mergeCoverProfiles(targets, pf.userCoverProfile)
 	}
 
-	data, code := gotestrunner.RunSuites(ctx, targets, extraEnv, 0, gotestrunner.RunCaptureJSON)
+	data, code := gotestrunner.RunSuites(ctx, targets, extraEnv, 0, gotestrunner.RunCaptureJSON, false)
 	return data, code, nil
 }
 

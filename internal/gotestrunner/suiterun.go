@@ -59,7 +59,8 @@ const (
 //
 // All methods must be called under a single external mutex.
 type PackageBatcher struct {
-	pkgs map[string]*pkgBatch
+	pkgs    map[string]*pkgBatch
+	verbose bool
 }
 
 type pkgBatch struct {
@@ -68,8 +69,8 @@ type pkgBatch struct {
 	results   []SuiteResult
 }
 
-func NewPackageBatcher() *PackageBatcher {
-	return &PackageBatcher{pkgs: map[string]*pkgBatch{}}
+func NewPackageBatcher(verbose bool) *PackageBatcher {
+	return &PackageBatcher{pkgs: map[string]*pkgBatch{}, verbose: verbose}
 }
 
 // Register prepares the batcher for a package with count suites.
@@ -91,27 +92,34 @@ func (b *PackageBatcher) Record(pkg string, idx int, r SuiteResult) bool {
 
 // Flush writes the completed package's output to stdout: each suite's output
 // with trailing status stripped, followed by the package summary line.
+//
+// In non-verbose mode, binary stdout is suppressed for passing packages
+// to match `go test` behavior (which only shows output for failures).
 func (b *PackageBatcher) Flush(pkg string) {
 	s := b.pkgs[pkg]
 	pkgFailed := false
 	var pkgDuration time.Duration
 	for _, pr := range s.results {
-		os.Stdout.Write(StripTrailingStatus(pr.Stdout))
-		if len(pr.Stderr) > 0 {
-			os.Stderr.Write(pr.Stderr)
-		}
 		if pr.ExitCode != 0 {
 			pkgFailed = true
 		}
 		pkgDuration += pr.Duration
 	}
-	WritePackageSummary(pkg, pkgFailed, pkgDuration)
+	if b.verbose || pkgFailed {
+		for _, pr := range s.results {
+			os.Stdout.Write(StripTrailingStatus(pr.Stdout))
+			if len(pr.Stderr) > 0 {
+				os.Stderr.Write(pr.Stderr)
+			}
+		}
+	}
+	WritePackageSummary(pkg, pkgFailed, pkgDuration, b.verbose)
 }
 
 // RunSuites executes each suite target in its own subprocess with bounded
 // concurrency. The mode parameter controls output format and delivery.
 // The returned []byte is non-nil only for RunCaptureJSON.
-func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int, mode RunMode) ([]byte, int) {
+func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int, mode RunMode, verbose bool) ([]byte, int) {
 	if maxParallel <= 0 {
 		maxParallel = 2 * runtime.GOMAXPROCS(0)
 	}
@@ -121,7 +129,7 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 	var batcher *PackageBatcher
 	var localIdx []int
 	if mode == RunBatchText {
-		batcher = NewPackageBatcher()
+		batcher = NewPackageBatcher(verbose)
 		pkgCount := map[string]int{}
 		localIdx = make([]int, len(targets))
 		for i, t := range targets {
@@ -315,11 +323,13 @@ func StripTrailingStatus(data []byte) []byte {
 	return data
 }
 
-func WritePackageSummary(pkg string, failed bool, d time.Duration) {
+func WritePackageSummary(pkg string, failed bool, d time.Duration, verbose bool) {
 	if failed {
 		fmt.Fprintf(os.Stdout, "FAIL\nFAIL\t%s\t%.3fs\n", pkg, d.Seconds())
-	} else {
+	} else if verbose {
 		fmt.Fprintf(os.Stdout, "PASS\nok  \t%s\t%.3fs\n", pkg, d.Seconds())
+	} else {
+		fmt.Fprintf(os.Stdout, "ok  \t%s\t%.3fs\n", pkg, d.Seconds())
 	}
 }
 

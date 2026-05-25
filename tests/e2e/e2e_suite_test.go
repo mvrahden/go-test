@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/mvrahden/go-test/about"
@@ -118,6 +120,80 @@ func (s *E2ETestSuite) TestTestsuiteCLIAllPackages(t *gotest.T) {
 	gotest.Contains(t, output, "TestShoppingCartTestSuite")
 	gotest.Contains(t, output, "TestArticleSearchTestSuite")
 	gotest.Contains(t, output, "TestNotificationServiceTestSuite")
+}
+
+func (s *E2ETestSuite) TestOutputFormat(t *gotest.T) {
+	pkgSummaryRe := regexp.MustCompile(`^(ok|FAIL)\s+\S+\s+\d+\.\d+s$`)
+
+	t.When("non-verbose mode", func(w *gotest.T) {
+		w.It("produces only summary lines without PASS prefix", func(it *gotest.T) {
+			cmd := exec.Command(s.binary, filepath.Join(s.workDir, "examples", "auth"))
+			cmd.Dir = filepath.Join(s.workDir, "examples")
+			out, err := cmd.CombinedOutput()
+			output := strings.TrimSpace(string(out))
+
+			gotest.NoError(it, err, "auth suite should pass: %s", output)
+
+			lines := strings.Split(output, "\n")
+			for _, line := range lines {
+				gotest.True(it, pkgSummaryRe.MatchString(line),
+					"every line should be a package summary, got: %q", line)
+			}
+			gotest.False(it, strings.Contains(output, "PASS"),
+				"non-verbose output should not contain PASS")
+			gotest.False(it, strings.Contains(output, "=== RUN"),
+				"non-verbose output should not contain verbose test output")
+		})
+
+		w.It("produces summary lines for multiple packages", func(it *gotest.T) {
+			cmd := exec.Command(s.binary, "github.com/mvrahden/go-test/examples/auth", "github.com/mvrahden/go-test/examples/cart")
+			cmd.Dir = filepath.Join(s.workDir, "examples")
+			out, err := cmd.CombinedOutput()
+			output := strings.TrimSpace(string(out))
+
+			gotest.NoError(it, err, "suites should pass: %s", output)
+
+			lines := strings.Split(output, "\n")
+			gotest.Equal(it, 2, len(lines), "expected two summary lines, got: %q", output)
+			for _, line := range lines {
+				gotest.True(it, pkgSummaryRe.MatchString(line),
+					"each line should be a package summary, got: %q", line)
+			}
+		})
+	})
+
+	t.When("verbose mode", func(w *gotest.T) {
+		w.It("includes PASS prefix before ok summary", func(it *gotest.T) {
+			cmd := exec.Command(s.binary, filepath.Join(s.workDir, "examples", "auth"), "-v")
+			cmd.Dir = filepath.Join(s.workDir, "examples")
+			out, err := cmd.CombinedOutput()
+			output := string(out)
+
+			gotest.NoError(it, err, "auth suite should pass: %s", output)
+			gotest.Contains(it, output, "=== RUN")
+			gotest.Contains(it, output, "--- PASS:")
+			gotest.Contains(it, output, "PASS\nok  \t")
+		})
+	})
+
+	t.When("failing tests", func(w *gotest.T) {
+		w.It("shows failure output even without -v", func(it *gotest.T) {
+			failDir := filepath.Join(s.workDir, "examples", "fail_fmt")
+			os.MkdirAll(failDir, 0o755)
+			defer os.RemoveAll(failDir)
+			os.WriteFile(filepath.Join(failDir, "ptest_test.go"), []byte(
+				"package failfmt\n\nimport \"github.com/mvrahden/go-test/pkg/gotest\"\n\ntype FailFmtTestSuite struct{}\n\nfunc (s *FailFmtTestSuite) TestAlwaysFails(t *gotest.T) { t.FailNow() }\n",
+			), 0o644)
+
+			cmd := exec.Command(s.binary, failDir)
+			cmd.Dir = filepath.Join(s.workDir, "examples")
+			out, _ := cmd.CombinedOutput()
+			output := string(out)
+
+			gotest.Contains(it, output, "FAIL")
+			gotest.Contains(it, output, "--- FAIL:")
+		})
+	})
 }
 
 func (s *E2ETestSuite) TestTestsuiteCLIExitCode(t *gotest.T) {

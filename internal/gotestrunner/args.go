@@ -358,6 +358,12 @@ func InjectDefaultTimeout(runFlags []string) []string {
 	return append(runFlags, "-timeout=10m")
 }
 
+func HasVerboseFlag(flags []string) bool {
+	return slices.ContainsFunc(flags, func(f string) bool {
+		return f == "-v" || f == "-v=true"
+	})
+}
+
 func LooksLikePackagePattern(s string) bool {
 	return strings.HasPrefix(s, ".") || strings.HasPrefix(s, "/") || strings.Contains(s, "/") || strings.Contains(s, "\\")
 }

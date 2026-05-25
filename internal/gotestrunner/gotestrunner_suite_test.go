@@ -636,7 +636,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 func (s *GotestrunnerTestSuite) TestPackageBatcher(t *gotest.T) {
 	t.When("recording results", func(w *gotest.T) {
 		w.It("returns true only when all suites are recorded", func(it *gotest.T) {
-			b := gotestrunner.NewPackageBatcher()
+			b := gotestrunner.NewPackageBatcher(false)
 			b.Register("pkg/a", 3)
 			b.Register("pkg/b", 1)
 
@@ -649,11 +649,26 @@ func (s *GotestrunnerTestSuite) TestPackageBatcher(t *gotest.T) {
 		})
 	})
 
-	t.When("flushing mixed pass/fail results", func(w *gotest.T) {
-		w.It("writes combined stdout and stderr", func(it *gotest.T) {
-			b := gotestrunner.NewPackageBatcher()
-			b.Register("example.com/pkg", 2)
+	t.When("flushing in verbose mode", func(w *gotest.T) {
+		w.It("writes verbose output and PASS summary for passing packages", func(it *gotest.T) {
+			b := gotestrunner.NewPackageBatcher(true)
+			b.Register("example.com/ok", 1)
+			b.Record("example.com/ok", 0, gotestrunner.SuiteResult{
+				Stdout:   []byte("=== RUN   TestOK\n--- PASS: TestOK (0.00s)\nPASS\n"),
+				ExitCode: 0,
+				Duration: 50 * time.Millisecond,
+			})
 
+			out, _ := captureFlush(it, b, "example.com/ok")
+
+			wantOut := "=== RUN   TestOK\n--- PASS: TestOK (0.00s)\n" +
+				"PASS\nok  \texample.com/ok\t0.050s\n"
+			gotest.Equal(it, wantOut, out)
+		})
+
+		w.It("writes verbose output and FAIL summary for mixed results", func(it *gotest.T) {
+			b := gotestrunner.NewPackageBatcher(true)
+			b.Register("example.com/pkg", 2)
 			b.Record("example.com/pkg", 0, gotestrunner.SuiteResult{
 				Stdout:   []byte("=== RUN   TestA\n--- PASS: TestA (0.00s)\nPASS\n"),
 				ExitCode: 0,
@@ -666,61 +681,103 @@ func (s *GotestrunnerTestSuite) TestPackageBatcher(t *gotest.T) {
 				Duration: 200 * time.Millisecond,
 			})
 
-			// Capture stdout and stderr.
-			oldOut, oldErr := os.Stdout, os.Stderr
-			rOut, wOut, _ := os.Pipe()
-			rErr, wErr, _ := os.Pipe()
-			os.Stdout = wOut
-			os.Stderr = wErr
-
-			b.Flush("example.com/pkg")
-
-			wOut.Close()
-			wErr.Close()
-			os.Stdout = oldOut
-			os.Stderr = oldErr
-
-			var bufOut, bufErr bytes.Buffer
-			bufOut.ReadFrom(rOut)
-			bufErr.ReadFrom(rErr)
-			rOut.Close()
-			rErr.Close()
+			out, serr := captureFlush(it, b, "example.com/pkg")
 
 			wantOut := "=== RUN   TestA\n--- PASS: TestA (0.00s)\n" +
 				"=== RUN   TestB\n--- FAIL: TestB (0.00s)\n" +
 				"FAIL\nFAIL\texample.com/pkg\t0.300s\n"
-			gotest.Equal(it, wantOut, bufOut.String())
-			gotest.Equal(it, "some error\n", bufErr.String())
+			gotest.Equal(it, wantOut, out)
+			gotest.Equal(it, "some error\n", serr)
 		})
 	})
 
-	t.When("flushing all-passing results", func(w *gotest.T) {
-		w.It("writes PASS summary", func(it *gotest.T) {
-			b := gotestrunner.NewPackageBatcher()
+	t.When("flushing in non-verbose mode", func(w *gotest.T) {
+		w.It("suppresses binary output for passing packages", func(it *gotest.T) {
+			b := gotestrunner.NewPackageBatcher(false)
 			b.Register("example.com/ok", 1)
 			b.Record("example.com/ok", 0, gotestrunner.SuiteResult{
-				Stdout:   []byte("=== RUN   TestOK\n--- PASS: TestOK (0.00s)\nPASS\n"),
+				Stdout:   []byte("PASS\n"),
 				ExitCode: 0,
 				Duration: 50 * time.Millisecond,
 			})
 
-			oldOut := os.Stdout
-			rOut, wOut, _ := os.Pipe()
-			os.Stdout = wOut
+			out, _ := captureFlush(it, b, "example.com/ok")
 
-			b.Flush("example.com/ok")
+			gotest.Equal(it, "ok  \texample.com/ok\t0.050s\n", out)
+		})
 
-			wOut.Close()
-			os.Stdout = oldOut
-			var buf bytes.Buffer
-			buf.ReadFrom(rOut)
-			rOut.Close()
+		w.It("shows binary output for failing packages", func(it *gotest.T) {
+			b := gotestrunner.NewPackageBatcher(false)
+			b.Register("example.com/fail", 1)
+			b.Record("example.com/fail", 0, gotestrunner.SuiteResult{
+				Stdout:   []byte("--- FAIL: TestBad (0.00s)\n    bad_test.go:5: assertion failed\nFAIL\n"),
+				Stderr:   []byte("error output\n"),
+				ExitCode: 1,
+				Duration: 100 * time.Millisecond,
+			})
 
-			wantOut := "=== RUN   TestOK\n--- PASS: TestOK (0.00s)\n" +
-				"PASS\nok  \texample.com/ok\t0.050s\n"
-			gotest.Equal(it, wantOut, buf.String())
+			out, serr := captureFlush(it, b, "example.com/fail")
+
+			wantOut := "--- FAIL: TestBad (0.00s)\n    bad_test.go:5: assertion failed\n" +
+				"FAIL\nFAIL\texample.com/fail\t0.100s\n"
+			gotest.Equal(it, wantOut, out)
+			gotest.Equal(it, "error output\n", serr)
+		})
+
+		w.It("omits PASS prefix from summary line", func(it *gotest.T) {
+			b := gotestrunner.NewPackageBatcher(false)
+			b.Register("example.com/clean", 1)
+			b.Record("example.com/clean", 0, gotestrunner.SuiteResult{
+				Stdout:   []byte("PASS\n"),
+				ExitCode: 0,
+				Duration: 1234 * time.Millisecond,
+			})
+
+			out, _ := captureFlush(it, b, "example.com/clean")
+
+			gotest.False(it, strings.Contains(out, "PASS"),
+				"non-verbose passing output should not contain PASS, got: %q", out)
+			gotest.True(it, strings.HasPrefix(out, "ok  \t"),
+				"should start with ok summary, got: %q", out)
 		})
 	})
+}
+
+func capturePackageSummary(pkg string, failed bool, d time.Duration, verbose bool) string {
+	r, wr, _ := os.Pipe()
+	old := os.Stdout
+	os.Stdout = wr
+	gotestrunner.WritePackageSummary(pkg, failed, d, verbose)
+	wr.Close()
+	os.Stdout = old
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	r.Close()
+	return buf.String()
+}
+
+func captureFlush(t *gotest.T, b *gotestrunner.PackageBatcher, pkg string) (stdout, stderr string) {
+	t.T().Helper()
+	oldOut, oldErr := os.Stdout, os.Stderr
+	rOut, wOut, _ := os.Pipe()
+	rErr, wErr, _ := os.Pipe()
+	os.Stdout = wOut
+	os.Stderr = wErr
+
+	b.Flush(pkg)
+
+	wOut.Close()
+	wErr.Close()
+	os.Stdout = oldOut
+	os.Stderr = oldErr
+
+	var bufOut, bufErr bytes.Buffer
+	bufOut.ReadFrom(rOut)
+	bufErr.ReadFrom(rErr)
+	rOut.Close()
+	rErr.Close()
+
+	return bufOut.String(), bufErr.String()
 }
 
 // --- output formatting tests ---
@@ -773,39 +830,61 @@ func (s *GotestrunnerTestSuite) TestOutputFormatting(t *gotest.T) {
 	})
 
 	t.When("writing package summary", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct {
-			Name     string
-			pkg      string
-			failed   bool
-			duration time.Duration
-			expect   string
-		}{
-			{
-				Name:     "passing package",
-				pkg:      "example.com/pkg",
-				failed:   false,
-				duration: 1234 * time.Millisecond,
-				expect:   "PASS\nok  \texample.com/pkg\t1.234s\n",
-			},
-			{
-				Name:     "failing package",
-				pkg:      "example.com/pkg",
-				failed:   true,
-				duration: 567 * time.Millisecond,
-				expect:   "FAIL\nFAIL\texample.com/pkg\t0.567s\n",
-			},
-		}) {
-			r, wr, _ := os.Pipe()
-			old := os.Stdout
-			os.Stdout = wr
-			gotestrunner.WritePackageSummary(tc.pkg, tc.failed, tc.duration)
-			wr.Close()
-			os.Stdout = old
-			var buf bytes.Buffer
-			buf.ReadFrom(r)
-			r.Close()
-			gotest.Equal(sub, tc.expect, buf.String())
-		}
+		w.When("verbose mode", func(w2 *gotest.T) {
+			for sub, tc := range gotest.Each(w2, []struct {
+				Name     string
+				pkg      string
+				failed   bool
+				duration time.Duration
+				expect   string
+			}{
+				{
+					Name:     "passing package includes PASS prefix",
+					pkg:      "example.com/pkg",
+					failed:   false,
+					duration: 1234 * time.Millisecond,
+					expect:   "PASS\nok  \texample.com/pkg\t1.234s\n",
+				},
+				{
+					Name:     "failing package includes FAIL prefix",
+					pkg:      "example.com/pkg",
+					failed:   true,
+					duration: 567 * time.Millisecond,
+					expect:   "FAIL\nFAIL\texample.com/pkg\t0.567s\n",
+				},
+			}) {
+				got := capturePackageSummary(tc.pkg, tc.failed, tc.duration, true)
+				gotest.Equal(sub, tc.expect, got)
+			}
+		})
+
+		w.When("non-verbose mode", func(w2 *gotest.T) {
+			for sub, tc := range gotest.Each(w2, []struct {
+				Name     string
+				pkg      string
+				failed   bool
+				duration time.Duration
+				expect   string
+			}{
+				{
+					Name:     "passing package omits PASS prefix",
+					pkg:      "example.com/pkg",
+					failed:   false,
+					duration: 1234 * time.Millisecond,
+					expect:   "ok  \texample.com/pkg\t1.234s\n",
+				},
+				{
+					Name:     "failing package still includes FAIL prefix",
+					pkg:      "example.com/pkg",
+					failed:   true,
+					duration: 567 * time.Millisecond,
+					expect:   "FAIL\nFAIL\texample.com/pkg\t0.567s\n",
+				},
+			}) {
+				got := capturePackageSummary(tc.pkg, tc.failed, tc.duration, false)
+				gotest.Equal(sub, tc.expect, got)
+			}
+		})
 	})
 }
 
@@ -827,6 +906,26 @@ func (s *GotestrunnerTestSuite) TestSplitTopLevelOr(t *gotest.T) {
 		{"three alternatives", `^A$|^B$|^C$`, []string{`^A$`, `^B$`, `^C$`}},
 	}) {
 		got := gotestrunner.ExportSplitTopLevelOr(tc.input)
+		gotest.Equal(sub, tc.expect, got)
+	}
+}
+
+// --- HasVerboseFlag tests ---
+
+func (s *GotestrunnerTestSuite) TestHasVerboseFlag(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Name   string
+		flags  []string
+		expect bool
+	}{
+		{"empty flags", nil, false},
+		{"no -v", []string{"-count=1", "-timeout=10m"}, false},
+		{"-v present", []string{"-count=1", "-v"}, true},
+		{"-v=true present", []string{"-v=true", "-timeout=10m"}, true},
+		{"-v=false is not verbose", []string{"-v=false"}, false},
+		{"-verbose is not -v", []string{"-verbose"}, false},
+	}) {
+		got := gotestrunner.HasVerboseFlag(tc.flags)
 		gotest.Equal(sub, tc.expect, got)
 	}
 }
