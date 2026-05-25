@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"syscall"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 )
@@ -34,7 +33,7 @@ func runPrepare(inv Invocation) int {
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(),
-		os.Interrupt, syscall.SIGTERM)
+		shutdownSignals...)
 
 	overlay, cleanup, err := generateOverlayFromLoaded(loaded, false)
 	if err != nil {
@@ -75,7 +74,7 @@ func runPrepare(inv Invocation) int {
 	}
 
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(sigCh, shutdownSignals...)
 	<-sigCh
 
 	if setupProc != nil {

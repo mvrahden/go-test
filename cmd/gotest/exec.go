@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -159,6 +158,7 @@ func parseExecFlags(goTestArgs []string) parsedFlags {
 	runFlags := gotestrunner.StripRunFilter(classified.RunFlags)
 	userCoverProfile := gotestrunner.ExtractCoverProfile(runFlags)
 	runFlags = gotestrunner.StripCoverProfile(runFlags)
+	runFlags = gotestrunner.InjectDefaultTimeout(runFlags)
 	return parsedFlags{
 		buildFlags:       classified.BuildFlags,
 		runFlags:         runFlags,
@@ -477,7 +477,7 @@ func Run(cfg ExecConfig) int {
 	defer cleanup()
 
 	ctx, stop := signal.NotifyContext(context.Background(),
-		os.Interrupt, syscall.SIGTERM)
+		shutdownSignals...)
 	defer stop()
 
 	code, execErr := executeTestsStreaming(ctx, cfg, overlay)

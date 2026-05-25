@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"slices"
 	"strings"
-	"syscall"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -87,7 +86,7 @@ func runSpec(inv Invocation) int {
 	}
 	defer cleanup()
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, cancel := signal.NotifyContext(context.Background(), shutdownSignals...)
 	defer cancel()
 
 	jsonData, code, err := executeTestsCaptured(ctx, cfg, overlay)

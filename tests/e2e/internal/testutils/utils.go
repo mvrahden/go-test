@@ -39,7 +39,9 @@ func CompareTestOutputWithGolden(t *testing.T, tmp string, actual *bytes.Buffer,
 	actualStr = strings.ReplaceAll(actualStr, tmp, "<REPLACED>")
 	actualStr = timestampRegex.ReplaceAllString(actualStr, "<TIMESTAMP>")
 	actualStr = assertionLineRegex.ReplaceAllString(actualStr, "assertions.go:<LINE>:")
-	gotest.Equal(t, sortTestBlocks(expected.String()), sortTestBlocks(actualStr))
+	expectedStr := strings.ReplaceAll(expected.String(), "\r\n", "\n")
+	actualStr = strings.ReplaceAll(actualStr, "\r\n", "\n")
+	gotest.Equal(t, sortTestBlocks(expectedStr), sortTestBlocks(actualStr))
 }
 
 var topLevelRunRe = regexp.MustCompile(`^=== RUN   (Test[^/\s]+)\s*$`)
@@ -84,7 +86,7 @@ func sortTestBlocks(s string) string {
 }
 
 func openGolden(t *testing.T, testFS embed.FS, name string) *bytes.Buffer {
-	buf, err := testFS.ReadFile(filepath.Join("testdata", name))
+	buf, err := testFS.ReadFile("testdata/" + name)
 	if err != nil {
 		t.Fatalf("failed reading golden: %s", err)
 	}
@@ -153,17 +155,20 @@ func determineNotFoundFiles(t *testing.T, path string, searchFiles ...string) (f
 
 func HackGoWork(t *testing.T, tmp string) {
 	t.Helper()
-	out, err := exec.
-		Command("bash", "-c", fmt.Sprintf("cd %s && go mod tidy", tmp)).
-		CombinedOutput()
-	if err != nil {
-		t.Fatalf("cmd failed: %s: output: %s", err, string(out))
+	tidy := exec.Command("go", "mod", "tidy")
+	tidy.Dir = tmp
+	if out, err := tidy.CombinedOutput(); err != nil {
+		t.Fatalf("go mod tidy failed: %s: output: %s", err, string(out))
 	}
-	out, err = exec.
-		Command("bash", "-c", fmt.Sprintf("cd %s && go work init %s && go work use %s/examples", tmp, tmp, tmp)).
-		CombinedOutput()
-	if err != nil {
-		t.Fatalf("cmd failed: %s: output: %s", err, string(out))
+	init := exec.Command("go", "work", "init", tmp)
+	init.Dir = tmp
+	if out, err := init.CombinedOutput(); err != nil {
+		t.Fatalf("go work init failed: %s: output: %s", err, string(out))
+	}
+	use := exec.Command("go", "work", "use", filepath.Join(tmp, "examples"))
+	use.Dir = tmp
+	if out, err := use.CombinedOutput(); err != nil {
+		t.Fatalf("go work use failed: %s: output: %s", err, string(out))
 	}
 }
 

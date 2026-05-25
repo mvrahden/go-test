@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/mvrahden/go-test/about"
@@ -29,7 +30,11 @@ func (s *E2ETestSuite) BeforeAll(t *gotest.T) {
 	gotest.NoError(t, err)
 
 	binDir := t.T().TempDir()
-	s.binary = filepath.Join(binDir, "gotest")
+	binaryName := "gotest"
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+	s.binary = filepath.Join(binDir, binaryName)
 	cmd := exec.Command("go", "build", "-o", s.binary, "./cmd/gotest")
 	cmd.Dir = absRoot
 	out, err := cmd.CombinedOutput()

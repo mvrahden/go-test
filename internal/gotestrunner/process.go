@@ -1,6 +1,7 @@
 package gotestrunner
 
 import (
+	"os"
 	"os/exec"
 	"time"
 )
@@ -26,7 +27,27 @@ func SetProcessGroup(cmd *exec.Cmd) {
 		if cmd.Process == nil {
 			return nil
 		}
-		return TerminateProcessGroup(cmd.Process.Pid)
+		if err := TerminateProcessGroup(cmd.Process.Pid); err != nil {
+			return os.ErrProcessDone
+		}
+		return nil
 	}
 	cmd.WaitDelay = GracefulShutdownDelay
+}
+
+// SetBuildProcessGroup configures cmd to run in its own process group
+// with immediate kill on cancellation. Build processes (compilers,
+// linkers) have no cleanup work, so graceful shutdown is unnecessary.
+func SetBuildProcessGroup(cmd *exec.Cmd) {
+	setProcessGroupAttr(cmd)
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return nil
+		}
+		if err := ForceKillProcessGroup(cmd.Process.Pid); err != nil {
+			return os.ErrProcessDone
+		}
+		return nil
+	}
+	cmd.WaitDelay = BuildShutdownDelay
 }

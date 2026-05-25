@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -68,6 +69,9 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 		gotest.NoError(w, os.WriteFile(setupFile, setupSrc, 0644))
 
 		setupBin := filepath.Join(sharedDir, "setup")
+		if runtime.GOOS == "windows" {
+			setupBin += ".exe"
+		}
 		buildCmd := exec.Command("go", "build", "-o", setupBin, setupFile)
 		buildCmd.Stderr = os.Stderr
 		gotest.NoError(w, buildCmd.Run(), "build shared fixture setup binary")
@@ -77,6 +81,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 
 		cmd := exec.CommandContext(ctx, setupBin)
 		cmd.Stderr = os.Stderr
+		gotestrunner.SetProcessGroup(cmd)
 
 		stdout, err := cmd.StdoutPipe()
 		gotest.NoError(w, err)
@@ -166,14 +171,14 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 			gotest.Contains(it, output, "Service")
 		})
 
-		cmd.Process.Signal(os.Interrupt)
-		done := make(chan struct{})
-		go func() { cmd.Wait(); close(done) }()
+		gotestrunner.TerminateProcessGroup(cmd.Process.Pid)
+		doneCh := make(chan struct{})
+		go func() { cmd.Wait(); close(doneCh) }()
 		select {
-		case <-done:
+		case <-doneCh:
 		case <-time.After(10 * time.Second):
-			cmd.Process.Kill()
-			w.T().Fatal("shared fixture subprocess did not exit after SIGTERM")
+			gotestrunner.ForceKillProcessGroup(cmd.Process.Pid)
+			w.T().Fatal("shared fixture subprocess did not exit after termination signal")
 		}
 	})
 

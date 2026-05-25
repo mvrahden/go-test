@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -70,10 +71,12 @@ func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	}
 
 	setupBin := filepath.Join(sharedDir, "setup")
+	if runtime.GOOS == "windows" {
+		setupBin += ".exe"
+	}
 	buildCmd := exec.CommandContext(ctx, "go", "build", "-o", setupBin, setupFile)
 	buildCmd.Stderr = os.Stderr
-	gotestrunner.SetProcessGroup(buildCmd)
-	buildCmd.WaitDelay = gotestrunner.BuildShutdownDelay
+	gotestrunner.SetBuildProcessGroup(buildCmd)
 	if err := buildCmd.Run(); err != nil {
 		return nil, fmt.Errorf("build shared fixture setup: %w", err)
 	}

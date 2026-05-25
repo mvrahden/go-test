@@ -1,6 +1,8 @@
 package gotestgen_test
 
 import (
+	"path/filepath"
+
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"golang.org/x/tools/go/packages"
@@ -33,7 +35,7 @@ func (s *UtilsTestSuite) TestDeterminePkgDir(t *gotest.T) {
 			{Desc: "PXTest at module root", ModuleDir: "/user/xyz/projects", ModulePath: "github.com/user_xyz/module-abc", PackagePath: "github.com/user_xyz/module-abc_test", PackageName: "module_abc_test", Expected: "/user/xyz/projects"},
 		}) {
 			actual := gotestgen.DeterminePkgDir(&packages.Package{Module: &packages.Module{Dir: tC.ModuleDir, Path: tC.ModulePath}, PkgPath: tC.PackagePath, Name: tC.PackageName})
-			gotest.Equal(sub, tC.Expected, actual)
+			gotest.Equal(sub, tC.Expected, filepath.ToSlash(actual))
 		}
 	})
 }

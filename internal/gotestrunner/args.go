@@ -343,6 +343,21 @@ func IsGoTestFlag(name string) (isValue bool, known bool) {
 	return false, false
 }
 
+// InjectDefaultTimeout adds -timeout=10m to runFlags if the user did not
+// supply one. This matches `go test` behavior — compiled test binaries have
+// no timeout by default, which can cause indefinite hangs.
+func InjectDefaultTimeout(runFlags []string) []string {
+	for _, f := range runFlags {
+		if f == "-args" {
+			break
+		}
+		if strings.HasPrefix(f, "-timeout") {
+			return runFlags
+		}
+	}
+	return append(runFlags, "-timeout=10m")
+}
+
 func LooksLikePackagePattern(s string) bool {
-	return strings.HasPrefix(s, ".") || strings.HasPrefix(s, "/") || strings.Contains(s, "/")
+	return strings.HasPrefix(s, ".") || strings.HasPrefix(s, "/") || strings.Contains(s, "/") || strings.Contains(s, "\\")
 }

@@ -566,16 +566,18 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 		}) {
 			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, tc.target, env, true)
 
-			// For "go", cmd.Path is resolved to the absolute path; compare Args[0] loosely.
-			gotest.True(sub, strings.HasSuffix(cmd.Path, "/go") || cmd.Path == "go",
-				"binary: got %q, want suffix /go", cmd.Path)
+			// For "go", cmd.Path is resolved to the absolute path; compare base name loosely.
+			base := filepath.Base(cmd.Path)
+			gotest.True(sub, base == "go" || base == "go.exe",
+				"binary: got %q, want go or go.exe", cmd.Path)
 
 			// Compare full args list.
 			gotest.Equal(sub, len(tc.wantArgs), len(cmd.Args))
 			for i := range cmd.Args {
 				if i == 0 {
-					gotest.True(sub, strings.HasSuffix(cmd.Args[0], "/go") || cmd.Args[0] == "go",
-						"args[0]: got %q, want suffix /go", cmd.Args[0])
+					a0 := filepath.Base(cmd.Args[0])
+					gotest.True(sub, a0 == "go" || a0 == "go.exe",
+						"args[0]: got %q, want go or go.exe", cmd.Args[0])
 					continue
 				}
 				gotest.Equal(sub, tc.wantArgs[i], cmd.Args[i])

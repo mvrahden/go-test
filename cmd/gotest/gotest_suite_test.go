@@ -238,6 +238,7 @@ func (s *CmdGotestTestSuite) TestPackagePatterns(t *gotest.T) {
 			{Desc: "bare word", input: "strings", expect: false},
 			{Desc: "dot only", input: ".", expect: true},
 			{Desc: "dot-slash", input: "./...", expect: true},
+			{Desc: "windows absolute path", input: `C:\Users\runner\pkg`, expect: true},
 		}) {
 			gotest.Equal(sub, tc.expect, gotestrunner.LooksLikePackagePattern(tc.input))
 		}
@@ -272,16 +273,15 @@ func (s *CmdGotestTestSuite) TestParseMinFlag(t *gotest.T) {
 
 func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 	t.It("discovers suites in examples/cart", func(it *gotest.T) {
-		examplesDir := filepath.Join("..", "..", "examples")
-		if _, err := os.Stat(filepath.Join(examplesDir, "go.mod")); err != nil {
+		absExamples, err := filepath.Abs(filepath.Join("..", "..", "examples"))
+		if err != nil {
+			it.T().Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Join(absExamples, "go.mod")); err != nil {
 			it.T().Skipf("examples directory not found: %v", err)
 		}
 
 		origDir, err := os.Getwd()
-		if err != nil {
-			it.T().Fatal(err)
-		}
-		absExamples, err := filepath.Abs(examplesDir)
 		if err != nil {
 			it.T().Fatal(err)
 		}
@@ -413,16 +413,15 @@ func (s *CmdGotestTestSuite) TestFocusViolation_String(t *gotest.T) {
 func (s *CmdGotestTestSuite) TestGenerateOverlay(t *gotest.T) {
 	t.When("suites are present", func(w *gotest.T) {
 		w.It("produces valid overlay JSON", func(it *gotest.T) {
-			examplesDir := filepath.Join("..", "..", "examples")
-			if _, err := os.Stat(filepath.Join(examplesDir, "go.mod")); err != nil {
+			absExamples, err := filepath.Abs(filepath.Join("..", "..", "examples"))
+			if err != nil {
+				it.T().Fatal(err)
+			}
+			if _, err := os.Stat(filepath.Join(absExamples, "go.mod")); err != nil {
 				it.T().Skipf("examples directory not found: %v", err)
 			}
 
 			origDir, err := os.Getwd()
-			if err != nil {
-				it.T().Fatal(err)
-			}
-			absExamples, err := filepath.Abs(examplesDir)
 			if err != nil {
 				it.T().Fatal(err)
 			}
@@ -588,16 +587,15 @@ func (s *CmdGotestTestSuite) TestSpecFlagParsing(t *gotest.T) {
 
 func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 	t.It("renders spec output from stdin-like JSON", func(it *gotest.T) {
-		examplesDir := filepath.Join("..", "..", "examples")
-		if _, err := os.Stat(filepath.Join(examplesDir, "go.mod")); err != nil {
+		absExamples, err := filepath.Abs(filepath.Join("..", "..", "examples"))
+		if err != nil {
+			it.T().Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Join(absExamples, "go.mod")); err != nil {
 			it.T().Skipf("examples directory not found: %v", err)
 		}
 
 		origDir, err := os.Getwd()
-		if err != nil {
-			it.T().Fatal(err)
-		}
-		absExamples, err := filepath.Abs(examplesDir)
 		if err != nil {
 			it.T().Fatal(err)
 		}

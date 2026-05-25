@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -40,7 +39,7 @@ func (s *GeneratorTestSuite) TestGoldenExamples(t *gotest.T) {
 			{"cart", "github.com/mvrahden/go-test/examples/cart"},
 			{"search", "github.com/mvrahden/go-test/examples/search"},
 		}) {
-			pkg := path.Join("..", "..", "examples", tC.Desc)
+			pkg := filepath.Join("..", "..", "examples", tC.Desc)
 
 			loaded, err := gotestgen.LoadPackages([]string{pkg}, nil)
 			gotest.NoError(sub, err)
@@ -91,7 +90,7 @@ func (s *GeneratorTestSuite) TestE2ECLI(t *gotest.T) {
 			gotest.NoError(sub, err)
 			results, _, err := gotestgen.GenerateFromLoaded(loaded)
 			gotest.NoError(sub, err)
-			gotest.True(sub, strings.HasSuffix(results[0].AbsPath, "go-test/internal/gotestgen/testdata_e2e/"+tC.dirName))
+			gotest.True(sub, strings.HasSuffix(filepath.ToSlash(results[0].AbsPath), "go-test/internal/gotestgen/testdata_e2e/"+tC.dirName))
 			gotest.Equal(sub, "github.com/mvrahden/go-test/internal/gotestgen/testdata_e2e/"+tC.dirName, results[0].PkgPath)
 
 			gotest.MatchSnapshot(sub, string(results[0].PTest), tC.dirName+"-ptest")
