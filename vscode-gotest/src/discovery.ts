@@ -186,6 +186,9 @@ export class DiscoveryService {
     return ["./..."];
   }
 
+  private static readonly MAX_RETRIES = 3;
+  private static readonly RETRY_DELAYS_MS = [2_000, 4_000];
+
   private async execute(
     workspaceDir: string,
     patterns?: string[],
@@ -197,50 +200,71 @@ export class DiscoveryService {
       return;
     }
 
-    try {
-      const effectivePatterns =
-        patterns ?? (await this.resolveWorkspacePatterns(workspaceDir));
-      const cmd = await buildCliCommand(
-        ["discover", ...effectivePatterns],
-        workspaceDir,
-        this.outputChannel,
-      );
-      this.outputChannel.info(`[discovery] ${formatCliCommand(cmd)}`);
+    const effectivePatterns =
+      patterns ?? (await this.resolveWorkspacePatterns(workspaceDir));
 
-      const { stdout } = await execFileAsync(cmd.bin, cmd.args, {
-        cwd: workspaceDir,
-        timeout: 30_000,
-      });
-
-      const jsonStart = stdout.indexOf("{");
-      const json = jsonStart > 0 ? stdout.substring(jsonStart) : stdout;
-      const output: DiscoverOutput = JSON.parse(json);
-      const fullScan = effectivePatterns.some((p) => p.includes("..."));
-      const warnings = output.warnings ?? [];
-      const packages = output.packages ?? [];
-      this.cache.update(packages, fullScan, workspaceDir, warnings);
-      this.hasShownError = false;
-      for (const w of warnings) {
-        const loc = w.file ? ` (${w.file}:${w.line ?? 0})` : "";
-        this.outputChannel.warn(
-          `[discovery] ${w.importPath}${loc}: ${w.message}`,
+    for (let attempt = 1; attempt <= DiscoveryService.MAX_RETRIES; attempt++) {
+      if (this.pending.some((p) => p.workspaceDir === workspaceDir)) {
+        this.outputChannel.debug(
+          `[discovery] superseded by queued request, aborting retry`,
         );
+        return;
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.outputChannel.error(`[discovery] ${message}`);
-      if (!this.hasShownError) {
-        this.hasShownError = true;
-        vscode.window
-          .showWarningMessage(
-            `gotest: discovery failed. Ensure 'go' is installed and the gotest module is accessible.`,
-            "Open Output",
-          )
-          .then((choice) => {
-            if (choice === "Open Output") {
-              this.outputChannel.show();
-            }
-          });
+
+      try {
+        const cmd = await buildCliCommand(
+          ["discover", ...effectivePatterns],
+          workspaceDir,
+          this.outputChannel,
+        );
+        this.outputChannel.info(`[discovery] ${formatCliCommand(cmd)}`);
+
+        const { stdout } = await execFileAsync(cmd.bin, cmd.args, {
+          cwd: workspaceDir,
+          timeout: 30_000,
+        });
+
+        const jsonStart = stdout.indexOf("{");
+        const json = jsonStart > 0 ? stdout.substring(jsonStart) : stdout;
+        const output: DiscoverOutput = JSON.parse(json);
+        const fullScan = effectivePatterns.some((p) => p.includes("..."));
+        const warnings = output.warnings ?? [];
+        const packages = output.packages ?? [];
+        this.cache.update(packages, fullScan, workspaceDir, warnings);
+        this.hasShownError = false;
+        for (const w of warnings) {
+          const loc = w.file ? ` (${w.file}:${w.line ?? 0})` : "";
+          this.outputChannel.warn(
+            `[discovery] ${w.importPath}${loc}: ${w.message}`,
+          );
+        }
+        return;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (attempt < DiscoveryService.MAX_RETRIES) {
+          this.outputChannel.debug(
+            `[discovery] attempt ${attempt}/${DiscoveryService.MAX_RETRIES} failed, retrying: ${message}`,
+          );
+          const delay = DiscoveryService.RETRY_DELAYS_MS[attempt - 1] ?? 4_000;
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+        this.outputChannel.error(
+          `[discovery] failed after ${DiscoveryService.MAX_RETRIES} attempts: ${message}`,
+        );
+        if (!this.hasShownError) {
+          this.hasShownError = true;
+          vscode.window
+            .showWarningMessage(
+              `gotest: discovery failed. Ensure 'go' is installed and the gotest module is accessible.`,
+              "Open Output",
+            )
+            .then((choice) => {
+              if (choice === "Open Output") {
+                this.outputChannel.show();
+              }
+            });
+        }
       }
     }
   }
