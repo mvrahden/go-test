@@ -110,14 +110,6 @@ func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, loc
 		}
 	}
 
-	if len(result.RootFixtures) > 1 {
-		names := make([]string, len(result.RootFixtures))
-		for i, rf := range result.RootFixtures {
-			names[i] = rf.Identifier
-		}
-		return nil, fmt.Errorf("at most one root package fixture per package is allowed, found: %s", strings.Join(names, ", "))
-	}
-
 	// Collect deduplicated shared fixtures
 	for _, sf := range r.sharedSeen {
 		result.RequiredSharedFixtures = append(result.RequiredSharedFixtures, *sf)

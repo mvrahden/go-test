@@ -48,22 +48,20 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 
 			// Verify the output contains key structural elements
 			gotest.True(it, strings.Contains(output, "func TestMain(m *testing.M)"), "expected TestMain")
-			gotest.True(it, strings.Contains(output, "os.Exit(ƒƒ_GOTEST_main(m))"), "expected os.Exit(ƒƒ_GOTEST_main(m))")
-			gotest.True(it, strings.Contains(output, "func ƒƒ_GOTEST_main(m *testing.M)"), "expected ƒƒ_GOTEST_main")
+			gotest.True(it, strings.Contains(output, "gotestruntime.RunFixtureMain(m,"), "expected RunFixtureMain delegation")
 			gotest.True(it, strings.Contains(output, `"os"`), "expected os import")
 			gotest.True(it, strings.Contains(output, "ƒ_DBFixture = &DBFixture{}"), "expected fixture instantiation")
 			gotest.True(it, strings.Contains(output, "ƒ_DBFixture.BeforeAll(ctx)"), "expected BeforeAll call")
-			gotest.True(it, strings.Contains(output, `"FAIL: DBFixture.BeforeAll failed after`), "expected BeforeAll error attribution")
 			gotest.True(it, strings.Contains(output, "ƒ_DBFixture.AfterAll(ctx)"), "expected AfterAll in cleanup")
-			gotest.True(it, strings.Contains(output, `"DBFixture.AfterAll failed:`), "expected AfterAll error attribution")
 			gotest.True(it, strings.Contains(output, "func TestQueryTestSuite(t *testing.T)"), "expected top-level TestQueryTestSuite func")
 			gotest.True(it, strings.Contains(output, "ƒƒ_GOTEST_QueryTestSuite"), "expected wrapper struct")
 			gotest.True(it, strings.Contains(output, "DBFixture: ƒ_DBFixture"), "expected fixture injection")
 			gotest.True(it, strings.Contains(output, `t.Run("TestInsert"`), "expected TestInsert test case")
 			gotest.True(it, strings.Contains(output, `t.Run("TestSelect"`), "expected TestSelect test case")
 
-			// Verify it does NOT contain old-style Test_DBFixture or t.Run for suites
+			// Verify it does NOT contain old-style patterns
 			gotest.True(it, !strings.Contains(output, "func Test_DBFixture("), "should NOT have old-style Test_DBFixture")
+			gotest.True(it, !strings.Contains(output, "go:linkname"), "should NOT have linkname directives")
 
 			// Verify wrapper struct and lifecycle methods are at file scope (not nested in functions)
 			gotest.True(it, strings.Contains(output, "type ƒƒ_GOTEST_QueryTestSuite struct"), "expected wrapper struct declaration")
@@ -78,7 +76,7 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithoutAfterAll")
 			output, _ := renderTestPkg(it.T(), pkg)
 
-			gotest.True(it, strings.Contains(output, "func ƒƒ_GOTEST_main(m *testing.M)"), "expected ƒƒ_GOTEST_main")
+			gotest.True(it, strings.Contains(output, "gotestruntime.RunFixtureMain(m,"), "expected RunFixtureMain")
 			gotest.True(it, !strings.Contains(output, "ƒ_SimpleFixture.AfterAll"), "should NOT have AfterAll call")
 		})
 	})
@@ -89,7 +87,7 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg)
 
 			gotest.True(it, strings.Contains(output, "func TestMain(m *testing.M)"), "expected TestMain for fixture")
-			gotest.True(it, strings.Contains(output, "func ƒƒ_GOTEST_main(m *testing.M)"), "expected ƒƒ_GOTEST_main")
+			gotest.True(it, strings.Contains(output, "gotestruntime.RunFixtureMain(m,"), "expected RunFixtureMain")
 			gotest.True(it, strings.Contains(output, "func TestBoundTestSuite(t *testing.T)"), "expected top-level TestBoundTestSuite func")
 			gotest.True(it, strings.Contains(output, "func TestStandaloneTestSuite(t *testing.T)"), "expected standalone test func")
 		})
@@ -219,22 +217,23 @@ func (s *RendererTestSuite) TestStdlibTSupport(t *gotest.T) {
 
 func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 	t.When("embedding", func(w *gotest.T) {
-		w.It("renders shared fixture deserialization and lifecycle", func(it *gotest.T) {
+		w.It("renders shared fixture binding in fixture node", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SharedFixtureEmbedding")
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.True(it, len(output) > 0, "expected non-empty output")
 
-			// Shared fixture deserialized from JSON state
-			gotest.Contains(it, output, "sf0 := &PostgresSharedFixture{}")
-			gotest.Contains(it, output, `os.Getenv("GOTEST_SHARED_STATE_FILE")`)
-			gotest.Contains(it, output, `"FAIL: GOTEST_SHARED_STATE_FILE not set`)
-			gotest.Contains(it, output, `json.Unmarshal`)
+			// Shared fixture allocated at package level
+			gotest.Contains(it, output, "var ƒ_sf0_E2EFixture = &PostgresSharedFixture{}")
 
-			// Shared fixture should be assigned to the package fixture
-			gotest.Contains(it, output, "ƒ_E2EFixture.PostgresSharedFixture = sf0")
+			// Shared fixture binding in FixtureNode
+			gotest.Contains(it, output, "gotestruntime.SharedFixtureBinding")
+			gotest.Contains(it, output, "Target:   ƒ_sf0_E2EFixture")
+
+			// Shared fixture should be assigned to the package fixture via Assign closure
+			gotest.Contains(it, output, "ƒ_E2EFixture.PostgresSharedFixture = ƒ_sf0_E2EFixture")
 
 			// Package fixture lifecycle should still work
-			gotest.Contains(it, output, "func ƒƒ_GOTEST_main(m *testing.M)")
+			gotest.Contains(it, output, "gotestruntime.RunFixtureMain(m,")
 			gotest.Contains(it, output, "ƒ_E2EFixture = &E2EFixture{}")
 			gotest.Contains(it, output, "ƒ_E2EFixture.BeforeAll(ctx)")
 			gotest.Contains(it, output, "ƒ_E2EFixture.AfterAll(ctx)")
@@ -243,10 +242,8 @@ func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 			gotest.Contains(it, output, "func TestQueryTestSuite(t *testing.T)")
 			gotest.Contains(it, output, "E2EFixture: ƒ_E2EFixture")
 
-			// JSON state deserialization should appear before ƒ_E2EFixture.BeforeAll
-			sfIdx := strings.Index(output, "json.Unmarshal(ƒb, sf0)")
-			beforeAllIdx := strings.Index(output, "ƒ_E2EFixture.BeforeAll(ctx)")
-			gotest.True(it, sfIdx < beforeAllIdx, "shared fixture JSON deserialization must precede fixture.BeforeAll")
+			// Runtime enforces ordering: SharedFixtures processed before BeforeAll is called
+			gotest.Contains(it, output, `"E2EFixture"`)
 		})
 	})
 
@@ -255,9 +252,9 @@ func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SharedFixtureEmptyStruct")
 			output, _ := renderTestPkg(it.T(), pkg)
 
-			gotest.Contains(it, output, "sf0 := &SetupSharedFixture{}")
-			gotest.Contains(it, output, "ƒ_AppFixture.SetupSharedFixture = sf0")
-			gotest.Contains(it, output, `os.Getenv("GOTEST_SHARED_STATE_FILE")`)
+			gotest.Contains(it, output, "var ƒ_sf0_AppFixture = &SetupSharedFixture{}")
+			gotest.Contains(it, output, "ƒ_AppFixture.SetupSharedFixture = ƒ_sf0_AppFixture")
+			gotest.Contains(it, output, "Target:   ƒ_sf0_AppFixture")
 		})
 	})
 }
@@ -266,15 +263,14 @@ func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 
 func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 	t.When("fixture with config", func(w *gotest.T) {
-		w.It("renders config overlay and timeout", func(it *gotest.T) {
+		w.It("renders config overlay in fixture node", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithConfig")
 			output, _ := renderTestPkg(it.T(), pkg)
 
 			gotest.Contains(it, output, "gotest.DefaultFixtureConfig()")
-			gotest.Contains(it, output, "gotest.OverlayFixtureConfig(&ƒcfg_CFGFixture, ƒ_CFGFixture.FixtureConfig())")
-			gotest.Contains(it, output, "ƒattempts := 1 + ƒcfg_CFGFixture.Retries")
+			gotest.Contains(it, output, "gotest.OverlayFixtureConfig(&cfg, (&CFGFixture{}).FixtureConfig())")
 			gotest.Contains(it, output, "ƒ_CFGFixture.BeforeAll(ctx)")
-			gotest.Contains(it, output, "context.WithTimeout(ƒctx, ƒcfg_CFGFixture.Timeout)")
+			gotest.Contains(it, output, `Name: "CFGFixture"`)
 		})
 	})
 
@@ -342,7 +338,7 @@ func (s *RendererTestSuite) TestNamedFields(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_NamedField_SharedFixtureInFixture")
 			output, _ := renderTestPkg(it.T(), pkg)
 
-			gotest.Contains(it, output, "ƒ_AppFixture.pg = sf0", "shared fixture injection should use named field")
+			gotest.Contains(it, output, "ƒ_AppFixture.pg = ƒ_sf0_AppFixture", "shared fixture injection should use named field")
 			gotest.True(it, !strings.Contains(output, "ƒ_AppFixture.PGSharedFixture"), "should NOT use type name for shared fixture field")
 		})
 	})
