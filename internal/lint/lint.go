@@ -38,6 +38,7 @@ var SkippableRules = map[Rule]bool{
 var cfg struct {
 	skipStdlibTest bool
 	skipTestify    bool
+	disableNolint  bool
 }
 
 var Analyzer = &analysis.Analyzer{
@@ -50,6 +51,7 @@ var Analyzer = &analysis.Analyzer{
 func init() {
 	Analyzer.Flags.BoolVar(&cfg.skipStdlibTest, "skip-stdlib-test", false, "disable stdlib test function detection")
 	Analyzer.Flags.BoolVar(&cfg.skipTestify, "skip-testify", false, "disable testify import detection")
+	Analyzer.Flags.BoolVar(&cfg.disableNolint, "disable-nolint", false, "report all diagnostics and let the analysis driver handle suppression")
 }
 
 var lifecycleHooks = []string{"BeforeAll", "AfterAll", "BeforeEach", "AfterEach"}
@@ -73,7 +75,7 @@ func run(pass *analysis.Pass) (any, error) {
 }
 
 func report(pass *analysis.Pass, rule Rule, pos token.Pos, format string, args ...any) {
-	if isSuppressed(pass, pos, rule) {
+	if !cfg.disableNolint && isSuppressed(pass, pos, rule) {
 		return
 	}
 	pass.Report(analysis.Diagnostic{
@@ -295,7 +297,7 @@ func checkStdlibTests(pass *analysis.Pass, insp *inspector.Inspector) {
 		if !isTestingT(fd.Type.Params.List[0].Type) {
 			return
 		}
-		if docSuppressed(fd.Doc, StdlibTest) {
+		if !cfg.disableNolint && docSuppressed(fd.Doc, StdlibTest) {
 			return
 		}
 		report(pass, StdlibTest, fd.Pos(), "stdlib test %s — consider using a gotest suite", name)
