@@ -19,6 +19,7 @@ type overlayResult struct {
 	overlayFlag      string
 	sharedFixtures   []gotestgen.SharedFixtureInfo
 	suitePackages    []string
+	noSuitePackages  []string                     // loaded packages that had no suites
 	suitesByPkg      map[string][]string          // import path → suite struct names
 	dirsByPkg        map[string]string             // import path → package source directory
 	fixtureDepSuites map[string]map[string]bool   // import path → set of test func names needing shared fixtures
@@ -44,12 +45,15 @@ func generateOverlayFromLoaded(loaded []*gotestgen.LoadResult, debug bool) (*ove
 	}
 
 	var suitePkgs []string
+	var noSuitePkgs []string
 	suitesByPkg := map[string][]string{}
 	dirsByPkg := map[string]string{}
 	fixtureDepSuites := map[string]map[string]bool{}
 	for _, r := range allResults {
 		if len(r.PTest) > 0 || len(r.PXTest) > 0 {
 			suitePkgs = append(suitePkgs, r.PkgPath)
+		} else {
+			noSuitePkgs = append(noSuitePkgs, r.PkgPath)
 		}
 		if len(r.SuiteNames) > 0 {
 			suitesByPkg[r.PkgPath] = r.SuiteNames
@@ -71,6 +75,7 @@ func generateOverlayFromLoaded(loaded []*gotestgen.LoadResult, debug bool) (*ove
 		overlayFlag:      "-overlay=" + filepath.Join(tmpDir, "overlay.json"),
 		sharedFixtures:   allSharedFixtures,
 		suitePackages:    suitePkgs,
+		noSuitePackages:  noSuitePkgs,
 		suitesByPkg:      suitesByPkg,
 		dirsByPkg:        dirsByPkg,
 		fixtureDepSuites: fixtureDepSuites,
@@ -312,6 +317,14 @@ func executeTestsStreaming(ctx context.Context, cfg ExecConfig, overlay *overlay
 		batcher = gotestrunner.NewPackageBatcher(pf.verbose)
 	}
 
+	type jsonPkgState struct {
+		expected  int
+		completed int
+		failed    bool
+		duration  time.Duration
+	}
+	jsonPkgs := map[string]*jsonPkgState{}
+
 loop:
 	for {
 		var cr gotestrunner.CompileResult
@@ -351,6 +364,11 @@ loop:
 			batcher.Register(cr.Package, len(targets))
 			mu.Unlock()
 		}
+		if cfg.JSON {
+			mu.Lock()
+			jsonPkgs[cr.Package] = &jsonPkgState{expected: len(targets)}
+			mu.Unlock()
+		}
 
 		for i, target := range targets {
 			wg.Add(1)
@@ -386,8 +404,18 @@ loop:
 					if len(r.Stderr) > 0 {
 						os.Stderr.Write(r.Stderr)
 					}
-				} else if batcher.Record(t.Package, idx, r) {
-					batcher.Flush(t.Package)
+					s := jsonPkgs[t.Package]
+					s.completed++
+					s.duration += r.Duration
+					if r.ExitCode != 0 {
+						s.failed = true
+					}
+					if s.completed == s.expected {
+						gotestrunner.WriteJSONPackageSummary(t.Package, s.failed, s.duration)
+					}
+				} else {
+					batcher.Record(t.Package, idx, r)
+					batcher.FlushReady()
 				}
 				mu.Unlock()
 			}(target, i)
@@ -404,11 +432,21 @@ loop:
 		mergeCoverProfiles(allTargets, pf.userCoverProfile)
 	}
 
-	if !anyTargets {
+	if !anyTargets && len(overlay.noSuitePackages) == 0 {
 		if !cfg.JSON {
 			fmt.Fprintln(os.Stderr, "no test suites to run")
 		}
 		return 0, nil
+	}
+
+	if !cfg.JSON {
+		for _, pkg := range overlay.noSuitePackages {
+			gotestrunner.WriteNoTestFiles(pkg)
+		}
+	}
+
+	if worstCode != 0 && !cfg.JSON {
+		gotestrunner.WriteTrailingFail()
 	}
 
 	return worstCode, nil

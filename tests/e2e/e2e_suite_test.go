@@ -193,6 +193,51 @@ func (s *E2ETestSuite) TestOutputFormat(t *gotest.T) {
 			gotest.Contains(it, output, "FAIL")
 			gotest.Contains(it, output, "--- FAIL:")
 		})
+
+		w.It("emits trailing FAIL after all packages when any fails", func(it *gotest.T) {
+			failDir := filepath.Join(s.workDir, "examples", "fail_trail")
+			os.MkdirAll(failDir, 0o755)
+			defer os.RemoveAll(failDir)
+			os.WriteFile(filepath.Join(failDir, "ptest_test.go"), []byte(
+				"package failtrail\n\nimport \"github.com/mvrahden/go-test/pkg/gotest\"\n\ntype FailTrailTestSuite struct{}\n\nfunc (s *FailTrailTestSuite) TestAlwaysFails(t *gotest.T) { t.FailNow() }\n",
+			), 0o644)
+
+			cmd := exec.Command(s.binary, filepath.Join(s.workDir, "examples", "auth"), failDir)
+			cmd.Dir = filepath.Join(s.workDir, "examples")
+			out, _ := cmd.CombinedOutput()
+			output := string(out)
+
+			lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+			gotest.Equal(it, "FAIL", lines[len(lines)-1],
+				"last line should be trailing FAIL, got output: %q", output)
+		})
+	})
+
+	t.When("package ordering", func(w *gotest.T) {
+		w.It("outputs packages in argument order for multiple packages", func(it *gotest.T) {
+			cmd := exec.Command(s.binary,
+				"github.com/mvrahden/go-test/examples/cart",
+				"github.com/mvrahden/go-test/examples/auth",
+			)
+			cmd.Dir = filepath.Join(s.workDir, "examples")
+			out, err := cmd.CombinedOutput()
+			output := strings.TrimSpace(string(out))
+
+			gotest.NoError(it, err, "suites should pass: %s", output)
+
+			lines := strings.Split(output, "\n")
+			gotest.True(it, len(lines) >= 2, "expected at least 2 lines, got: %q", output)
+			gotest.Contains(it, lines[0], "examples/cart",
+				"first line should be cart (listed first), got: %q", lines[0])
+			gotest.Contains(it, lines[1], "examples/auth",
+				"second line should be auth (listed second), got: %q", lines[1])
+		})
+	})
+
+	t.When("cached results", func(w *gotest.T) {
+		w.It("shows (cached) on second run", func(it *gotest.T) {
+			it.T().Skip("cache support not yet implemented")
+		})
 	})
 }
 

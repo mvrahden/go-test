@@ -3,6 +3,7 @@ package gotestrunner
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -54,12 +55,16 @@ const (
 )
 
 // PackageBatcher collects per-suite results and flushes output when all
-// suites for a package have completed. Results are stored at fixed indices
-// to guarantee deterministic output order regardless of goroutine scheduling.
+// suites for a package have completed. Packages are flushed in registration
+// order to match `go test` output ordering, regardless of completion order.
+// Results within each package are stored at fixed indices to guarantee
+// deterministic output order regardless of goroutine scheduling.
 //
 // All methods must be called under a single external mutex.
 type PackageBatcher struct {
 	pkgs    map[string]*pkgBatch
+	order   []string
+	flushed int
 	verbose bool
 }
 
@@ -74,11 +79,13 @@ func NewPackageBatcher(verbose bool) *PackageBatcher {
 }
 
 // Register prepares the batcher for a package with count suites.
+// Packages are flushed in the order they are registered.
 func (b *PackageBatcher) Register(pkg string, count int) {
 	b.pkgs[pkg] = &pkgBatch{
 		expected: count,
 		results:  make([]SuiteResult, count),
 	}
+	b.order = append(b.order, pkg)
 }
 
 // Record stores a result at position idx within its package.
@@ -90,12 +97,28 @@ func (b *PackageBatcher) Record(pkg string, idx int, r SuiteResult) bool {
 	return s.completed == s.expected
 }
 
-// Flush writes the completed package's output to stdout: each suite's output
-// with trailing status stripped, followed by the package summary line.
-//
-// In non-verbose mode, binary stdout is suppressed for passing packages
-// to match `go test` behavior (which only shows output for failures).
+// FlushReady writes output for all consecutive completed packages starting
+// from the current head of the registration order. This ensures packages
+// appear in registration order even when they complete out of order.
+func (b *PackageBatcher) FlushReady() {
+	for b.flushed < len(b.order) {
+		pkg := b.order[b.flushed]
+		s := b.pkgs[pkg]
+		if s.completed < s.expected {
+			break
+		}
+		b.flush(pkg)
+		b.flushed++
+	}
+}
+
+// Flush writes a single completed package's output unconditionally.
+// Prefer FlushReady for ordered output.
 func (b *PackageBatcher) Flush(pkg string) {
+	b.flush(pkg)
+}
+
+func (b *PackageBatcher) flush(pkg string) {
 	s := b.pkgs[pkg]
 	pkgFailed := false
 	var pkgDuration time.Duration
@@ -116,6 +139,18 @@ func (b *PackageBatcher) Flush(pkg string) {
 	WritePackageSummary(pkg, pkgFailed, pkgDuration, b.verbose)
 }
 
+// AnyFailed reports whether any recorded package had a non-zero exit code.
+func (b *PackageBatcher) AnyFailed() bool {
+	for _, s := range b.pkgs {
+		for _, r := range s.results {
+			if r.ExitCode != 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // RunSuites executes each suite target in its own subprocess with bounded
 // concurrency. The mode parameter controls output format and delivery.
 // The returned []byte is non-nil only for RunCaptureJSON.
@@ -131,13 +166,17 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 	if mode == RunBatchText {
 		batcher = NewPackageBatcher(verbose)
 		pkgCount := map[string]int{}
+		var pkgOrder []string
 		localIdx = make([]int, len(targets))
 		for i, t := range targets {
+			if _, seen := pkgCount[t.Package]; !seen {
+				pkgOrder = append(pkgOrder, t.Package)
+			}
 			localIdx[i] = pkgCount[t.Package]
 			pkgCount[t.Package]++
 		}
-		for pkg, count := range pkgCount {
-			batcher.Register(pkg, count)
+		for _, pkg := range pkgOrder {
+			batcher.Register(pkg, pkgCount[pkg])
 		}
 	}
 
@@ -170,9 +209,8 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 			}
 			switch mode {
 			case RunBatchText:
-				if batcher.Record(t.Package, localIdx[idx], r) {
-					batcher.Flush(t.Package)
-				}
+				batcher.Record(t.Package, localIdx[idx], r)
+				batcher.FlushReady()
 			case RunStreamJSON:
 				os.Stdout.Write(r.Stdout)
 				if len(r.Stderr) > 0 {
@@ -331,6 +369,46 @@ func WritePackageSummary(pkg string, failed bool, d time.Duration, verbose bool)
 	} else {
 		fmt.Fprintf(os.Stdout, "ok  \t%s\t%.3fs\n", pkg, d.Seconds())
 	}
+}
+
+// WriteTrailingFail prints a bare FAIL line to stdout, matching what
+// `go test` emits after all package results when any package fails.
+func WriteTrailingFail() {
+	fmt.Fprintln(os.Stdout, "FAIL")
+}
+
+// WriteNoTestFiles prints the `go test` annotation for packages with
+// no test files: `?   \tpkg\t[no test files]`.
+func WriteNoTestFiles(pkg string) {
+	fmt.Fprintf(os.Stdout, "?   \t%s\t[no test files]\n", pkg)
+}
+
+// WriteJSONPackageSummary emits the JSON output event for the package
+// summary line that `go test -json` includes. It writes a single
+// Output action containing the `ok` or `FAIL` summary text.
+func WriteJSONPackageSummary(pkg string, failed bool, d time.Duration) {
+	var line string
+	if failed {
+		line = fmt.Sprintf("FAIL\t%s\t%.3fs\n", pkg, d.Seconds())
+	} else {
+		line = fmt.Sprintf("ok  \t%s\t%.3fs\n", pkg, d.Seconds())
+	}
+	evt := jsonOutputEvent{
+		Time:    time.Now(),
+		Action:  "output",
+		Package: pkg,
+		Output:  line,
+	}
+	data, _ := json.Marshal(evt)
+	data = append(data, '\n')
+	os.Stdout.Write(data)
+}
+
+type jsonOutputEvent struct {
+	Time    time.Time `json:"Time"`
+	Action  string    `json:"Action"`
+	Package string    `json:"Package"`
+	Output  string    `json:"Output,omitempty"`
 }
 
 // BuildSuiteTargets constructs SuiteTarget entries from compiled binaries

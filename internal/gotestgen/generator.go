@@ -120,27 +120,37 @@ func loadPackages(mode packages.LoadMode, targetPkgs []string, buildFlags []stri
 	loadedTestPkgs = slices.Filter(loadedTestPkgs, func(item *packages.Package, index int) bool {
 		return strings.HasSuffix(item.ID, ".test]")
 	})
-	testPkgs := slices.ReduceSeed(loadedTestPkgs, map[string]*LoadResult{}, func(p *packages.Package, acc map[string]*LoadResult) map[string]*LoadResult {
+	pkgOrder := map[string]int{}
+	for i, p := range totalFoundPkgs {
+		path := strings.TrimSuffix(p.PkgPath, "_test")
+		if _, exists := pkgOrder[path]; !exists {
+			pkgOrder[path] = i
+		}
+	}
+
+	testPkgMap := map[string]*LoadResult{}
+	var res []*LoadResult
+	for _, p := range loadedTestPkgs {
 		isPxTest := strings.HasSuffix(p.Name, "_test")
 		pkgPath := p.PkgPath
 		if isPxTest {
 			pkgPath = strings.TrimSuffix(pkgPath, "_test")
 		}
-		_, ok := acc[pkgPath]
+		lr, ok := testPkgMap[pkgPath]
 		if !ok {
-			acc[pkgPath] = &LoadResult{PkgPath: pkgPath, PkgDir: DeterminePkgDir(p), hasProdFiles: prodPkgs[pkgPath]}
+			lr = &LoadResult{PkgPath: pkgPath, PkgDir: DeterminePkgDir(p), hasProdFiles: prodPkgs[pkgPath]}
+			testPkgMap[pkgPath] = lr
+			res = append(res, lr)
 		}
 		if !isPxTest {
-			acc[pkgPath].Ptest = p
+			lr.Ptest = p
 		} else {
-			acc[pkgPath].Pxtest = p
+			lr.Pxtest = p
 		}
-		return acc
-	})
-	var res []*LoadResult
-	for _, v := range testPkgs {
-		res = append(res, v)
 	}
+	sort.SliceStable(res, func(i, j int) bool {
+		return pkgOrder[res[i].PkgPath] < pkgOrder[res[j].PkgPath]
+	})
 	return res, warnings, nil
 }
 

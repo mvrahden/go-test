@@ -741,6 +741,69 @@ func (s *GotestrunnerTestSuite) TestPackageBatcher(t *gotest.T) {
 				"should start with ok summary, got: %q", out)
 		})
 	})
+
+	t.When("flushing in registration order", func(w *gotest.T) {
+		w.It("buffers later packages until earlier ones complete", func(it *gotest.T) {
+			b := gotestrunner.NewPackageBatcher(false)
+			b.Register("example.com/a", 1)
+			b.Register("example.com/b", 1)
+			b.Register("example.com/c", 1)
+
+			pass := func(d time.Duration) gotestrunner.SuiteResult {
+				return gotestrunner.SuiteResult{Stdout: []byte("PASS\n"), ExitCode: 0, Duration: d}
+			}
+
+			b.Record("example.com/c", 0, pass(30*time.Millisecond))
+			out := captureFlushReady(it, b)
+			gotest.Equal(it, "", out, "c should be buffered because a and b are not done")
+
+			b.Record("example.com/a", 0, pass(10*time.Millisecond))
+			out = captureFlushReady(it, b)
+			gotest.Equal(it, "ok  \texample.com/a\t0.010s\n", out, "a should flush as the head")
+
+			b.Record("example.com/b", 0, pass(20*time.Millisecond))
+			out = captureFlushReady(it, b)
+			want := "ok  \texample.com/b\t0.020s\n" +
+				"ok  \texample.com/c\t0.030s\n"
+			gotest.Equal(it, want, out, "b and c should flush together")
+		})
+
+		w.It("flushes immediately when packages complete in order", func(it *gotest.T) {
+			b := gotestrunner.NewPackageBatcher(false)
+			b.Register("example.com/x", 1)
+			b.Register("example.com/y", 1)
+
+			pass := func(d time.Duration) gotestrunner.SuiteResult {
+				return gotestrunner.SuiteResult{Stdout: []byte("PASS\n"), ExitCode: 0, Duration: d}
+			}
+
+			b.Record("example.com/x", 0, pass(10*time.Millisecond))
+			out := captureFlushReady(it, b)
+			gotest.Equal(it, "ok  \texample.com/x\t0.010s\n", out)
+
+			b.Record("example.com/y", 0, pass(20*time.Millisecond))
+			out = captureFlushReady(it, b)
+			gotest.Equal(it, "ok  \texample.com/y\t0.020s\n", out)
+		})
+	})
+
+	t.When("tracking failures", func(w *gotest.T) {
+		w.It("reports no failure when all pass", func(it *gotest.T) {
+			b := gotestrunner.NewPackageBatcher(false)
+			b.Register("example.com/ok", 1)
+			b.Record("example.com/ok", 0, gotestrunner.SuiteResult{ExitCode: 0})
+			gotest.False(it, b.AnyFailed())
+		})
+
+		w.It("reports failure when any suite fails", func(it *gotest.T) {
+			b := gotestrunner.NewPackageBatcher(false)
+			b.Register("example.com/a", 1)
+			b.Register("example.com/b", 1)
+			b.Record("example.com/a", 0, gotestrunner.SuiteResult{ExitCode: 0})
+			b.Record("example.com/b", 0, gotestrunner.SuiteResult{ExitCode: 1})
+			gotest.True(it, b.AnyFailed())
+		})
+	})
 }
 
 func capturePackageSummary(pkg string, failed bool, d time.Duration, verbose bool) string {
@@ -778,6 +841,33 @@ func captureFlush(t *gotest.T, b *gotestrunner.PackageBatcher, pkg string) (stdo
 	rErr.Close()
 
 	return bufOut.String(), bufErr.String()
+}
+
+func captureFlushReady(t *gotest.T, b *gotestrunner.PackageBatcher) string {
+	t.T().Helper()
+	r, wr, _ := os.Pipe()
+	old := os.Stdout
+	os.Stdout = wr
+	b.FlushReady()
+	wr.Close()
+	os.Stdout = old
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	r.Close()
+	return buf.String()
+}
+
+func captureStdout(fn func()) string {
+	r, wr, _ := os.Pipe()
+	old := os.Stdout
+	os.Stdout = wr
+	fn()
+	wr.Close()
+	os.Stdout = old
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	r.Close()
+	return buf.String()
 }
 
 // --- output formatting tests ---
@@ -884,6 +974,44 @@ func (s *GotestrunnerTestSuite) TestOutputFormatting(t *gotest.T) {
 				got := capturePackageSummary(tc.pkg, tc.failed, tc.duration, false)
 				gotest.Equal(sub, tc.expect, got)
 			}
+		})
+	})
+
+	t.When("writing trailing fail", func(w *gotest.T) {
+		w.It("emits a bare FAIL line", func(it *gotest.T) {
+			got := captureStdout(gotestrunner.WriteTrailingFail)
+			gotest.Equal(it, "FAIL\n", got)
+		})
+	})
+
+	t.When("writing no-test-files annotation", func(w *gotest.T) {
+		w.It("matches go test format", func(it *gotest.T) {
+			got := captureStdout(func() { gotestrunner.WriteNoTestFiles("example.com/empty") })
+			gotest.Equal(it, "?   \texample.com/empty\t[no test files]\n", got)
+		})
+	})
+
+	t.When("writing JSON package summary", func(w *gotest.T) {
+		w.It("emits output action for passing package", func(it *gotest.T) {
+			got := captureStdout(func() {
+				gotestrunner.WriteJSONPackageSummary("example.com/ok", false, 123*time.Millisecond)
+			})
+			var evt map[string]any
+			gotest.NoError(it, json.Unmarshal([]byte(strings.TrimSpace(got)), &evt))
+			gotest.Equal(it, "output", evt["Action"])
+			gotest.Equal(it, "example.com/ok", evt["Package"])
+			gotest.Contains(it, evt["Output"].(string), "ok  \texample.com/ok\t0.123s")
+		})
+
+		w.It("emits output action for failing package", func(it *gotest.T) {
+			got := captureStdout(func() {
+				gotestrunner.WriteJSONPackageSummary("example.com/bad", true, 456*time.Millisecond)
+			})
+			var evt map[string]any
+			gotest.NoError(it, json.Unmarshal([]byte(strings.TrimSpace(got)), &evt))
+			gotest.Equal(it, "output", evt["Action"])
+			gotest.Equal(it, "example.com/bad", evt["Package"])
+			gotest.Contains(it, evt["Output"].(string), "FAIL\texample.com/bad\t0.456s")
 		})
 	})
 }
