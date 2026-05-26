@@ -3,6 +3,7 @@ package e2e_test
 import (
 	"bytes"
 	"embed"
+	"encoding/json"
 	"io"
 	"io/fs"
 	"os"
@@ -270,11 +271,11 @@ func (s *E2ETestSuite) TestOutputFormatGolden(t *gotest.T) {
 
 		w.It("multi-package mixed with failure", func(it *gotest.T) {
 			failDir := filepath.Join(s.workDir, "examples", "fail_golden")
-			os.MkdirAll(failDir, 0o755)
+			gotest.NoError(it, os.MkdirAll(failDir, 0o755))
 			defer os.RemoveAll(failDir)
-			os.WriteFile(filepath.Join(failDir, "ptest_test.go"), []byte(
+			gotest.NoError(it, os.WriteFile(filepath.Join(failDir, "ptest_test.go"), []byte(
 				"package failgolden\n\nimport \"github.com/mvrahden/go-test/pkg/gotest\"\n\ntype FailGoldenTestSuite struct{}\n\nfunc (s *FailGoldenTestSuite) TestAlwaysFails(t *gotest.T) { t.FailNow() }\n",
-			), 0o644)
+			), 0o644))
 
 			cmd := exec.Command(s.binary,
 				"github.com/mvrahden/go-test/examples/fail_golden",
@@ -284,6 +285,17 @@ func (s *E2ETestSuite) TestOutputFormatGolden(t *gotest.T) {
 			out, _ := cmd.CombinedOutput()
 
 			gotest.MatchSnapshot(it, normalizeOutput(string(out), s.workDir))
+		})
+	})
+
+	t.When("json", func(w *gotest.T) {
+		w.It("single passing package", func(it *gotest.T) {
+			cmd := exec.Command(s.binary, "github.com/mvrahden/go-test/examples/auth", "-json", "-parallel", "1")
+			cmd.Dir = filepath.Join(s.workDir, "examples")
+			out, err := cmd.CombinedOutput()
+
+			gotest.NoError(it, err, "auth should pass: %s", string(out))
+			gotest.MatchSnapshot(it, normalizeJSONOutput(string(out)))
 		})
 	})
 
@@ -304,6 +316,31 @@ func normalizeOutput(raw string, workDir string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	re := regexp.MustCompile(`\d+\.\d+s`)
 	return re.ReplaceAllString(s, "<TIMESTAMP>")
+}
+
+func normalizeJSONOutput(raw string) string {
+	re := regexp.MustCompile(`\d+\.\d+s`)
+	var lines []string
+	for line := range strings.SplitSeq(strings.TrimRight(raw, "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		var ev map[string]any
+		if json.Unmarshal([]byte(line), &ev) != nil {
+			lines = append(lines, line)
+			continue
+		}
+		ev["Time"] = "<TIMESTAMP>"
+		if _, ok := ev["Elapsed"]; ok {
+			ev["Elapsed"] = "<TIMESTAMP>"
+		}
+		if output, ok := ev["Output"].(string); ok {
+			ev["Output"] = re.ReplaceAllString(output, "<TIMESTAMP>")
+		}
+		normalized, _ := json.Marshal(ev)
+		lines = append(lines, string(normalized))
+	}
+	return strings.Join(lines, "\n") + "\n"
 }
 
 func placeFixture(t *testing.T, tmpDir, srcName, dstRel string) {

@@ -1162,6 +1162,8 @@ func (s *GotestrunnerTestSuite) TestSuiteRunFilter(t *gotest.T) {
 	}
 }
 
+var jsonTimestampRe = regexp.MustCompile(`\d+\.\d+s`)
+
 func normalizeJSON(raw string) string {
 	var lines []string
 	for line := range strings.SplitSeq(strings.TrimRight(raw, "\n"), "\n") {
@@ -1178,8 +1180,7 @@ func normalizeJSON(raw string) string {
 			ev["Elapsed"] = "«ELAPSED»"
 		}
 		if output, ok := ev["Output"].(string); ok {
-			re := regexp.MustCompile(`\d+\.\d+s`)
-			ev["Output"] = re.ReplaceAllString(output, "«TS»")
+			ev["Output"] = jsonTimestampRe.ReplaceAllString(output, "«TS»")
 		}
 		normalized, _ := json.Marshal(ev)
 		lines = append(lines, string(normalized))
@@ -1329,6 +1330,7 @@ func (s *GotestrunnerTestSuite) TestOutputGolden(t *gotest.T) {
 				ExitCode: 0,
 				Duration: 50 * time.Millisecond,
 			})
+			c.Finalize(nil)
 
 			gotest.MatchSnapshot(it, normalizeJSON(stdout.String()))
 		})
@@ -1359,6 +1361,7 @@ func (s *GotestrunnerTestSuite) TestOutputGolden(t *gotest.T) {
 			c.RecordResult("example.com/b", 0, gotestrunner.SuiteResult{
 				Stdout: []byte(failJSON), ExitCode: 1, Duration: 20 * time.Millisecond,
 			})
+			c.Finalize(nil)
 
 			gotest.MatchSnapshot(it, normalizeJSON(stdout.String()))
 		})
