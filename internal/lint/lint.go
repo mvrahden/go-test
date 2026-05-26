@@ -195,6 +195,9 @@ func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
 	return suites
 }
 
+// X_ (skip) prefixes are intentionally not flagged: a skipped test is visibly
+// absent from results, whereas a focused test silently hides all other tests
+// behind a green CI run.
 func checkFocusPrefixes(pass *analysis.Pass, suites map[string]*suiteInfo) {
 	for name, s := range suites {
 		if strings.HasPrefix(name, "F_") {
@@ -244,6 +247,9 @@ func checkMethods(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 	})
 }
 
+// Only the All pair is checked: BeforeAll holds shared resources for the
+// entire suite lifetime, so a missing AfterAll is a likely leak.  BeforeEach
+// resources are scoped to a single test and cleaned up with the test.
 func checkLifecyclePairs(pass *analysis.Pass, suites map[string]*suiteInfo) {
 	for _, s := range suites {
 		_, hasBeforeAll := s.methods["BeforeAll"]
@@ -338,15 +344,19 @@ func receiverTypeName(recv *ast.FieldList) string {
 	if recv == nil || len(recv.List) == 0 {
 		return ""
 	}
-	switch t := recv.List[0].Type.(type) {
-	case *ast.StarExpr:
-		if ident, ok := t.X.(*ast.Ident); ok {
+	t := recv.List[0].Type
+	if star, ok := t.(*ast.StarExpr); ok {
+		t = star.X
+	}
+	switch x := t.(type) {
+	case *ast.Ident:
+		return x.Name
+	case *ast.IndexExpr:
+		if ident, ok := x.X.(*ast.Ident); ok {
 			return ident.Name
 		}
-	case *ast.Ident:
-		return t.Name
-	case *ast.IndexExpr:
-		if ident, ok := t.X.(*ast.Ident); ok {
+	case *ast.IndexListExpr:
+		if ident, ok := x.X.(*ast.Ident); ok {
 			return ident.Name
 		}
 	}
