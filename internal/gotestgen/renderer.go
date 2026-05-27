@@ -25,6 +25,7 @@ var (
 type FixtureViewModel struct {
 	Identifier          string
 	QualifiedIdentifier string // "pkg.Name" for cross-package, "Name" for same
+	ParentIdentifier    string // Identifier of the parent fixture (empty for roots)
 	ParentFieldName     string // field name in this fixture's struct for the parent fixture pointer
 	PkgPath             string // import path, empty if same package
 	HasConfig           bool
@@ -37,6 +38,14 @@ type FixtureViewModel struct {
 	ChildSuites         []*gotestast.TestSuiteSpec
 	ChildFixtures       []*FixtureViewModel
 	SharedFixtures      []SharedFixtureRef
+}
+
+// FlatFixtureSuite describes a suite with its full fixture ancestry chain,
+// used for generating per-suite Test functions at arbitrary tree depth.
+type FlatFixtureSuite struct {
+	Suite        *gotestast.TestSuiteSpec
+	Fixture      *FixtureViewModel   // the fixture this suite is directly bound to
+	FixtureChain []*FixtureViewModel // root → ... → parent fixture (full path)
 }
 
 // SharedFixtureRef describes a shared fixture embedded in a package fixture.
@@ -76,7 +85,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	}
 
 	if len(fixtureBound) > 0 {
-		if err := r.renderFixtures(buf, pkg, fixtureBound, viewModels); err != nil {
+		if err := r.renderFixtures(buf, fixtureBound, viewModels); err != nil {
 			return nil, fmt.Errorf("failed rendering fixture suites. err: %w", err)
 		}
 	}
@@ -107,16 +116,17 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	}
 	hasSuiteSharedFixtures := len(suiteSharedFixtures) > 0
 	if hasFixtures {
-		imports = append(imports, headerImport{Path: "fmt"})
+		imports = append(imports, headerImport{Path: about.Repo + "/pkg/gotestruntime"})
+		imports = append(imports, headerImport{Path: "context"})
+		imports = append(imports, headerImport{Path: "os"})
 		imports = append(imports, headerImport{Path: "time"})
-		imports = append(imports, headerImport{Name: "_", Path: "unsafe"})
 	}
-	if hasFixtures || slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
+	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
 		return v.IsMethodParallel()
 	}) {
 		imports = append(imports, headerImport{Path: "sync"})
 	}
-	if hasFixtures || hasSuiteSharedFixtures {
+	if !hasFixtures && hasSuiteSharedFixtures {
 		imports = append(imports, headerImport{Path: "context"})
 		imports = append(imports, headerImport{Path: "os"})
 	}
@@ -127,7 +137,7 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 			imports = append(imports, headerImport{Path: vm.PkgPath})
 			seenPkg[vm.PkgPath] = true
 		}
-		collectFixtureImports(vm, &imports, seenPkg, &hasSharedFixtures)
+		collectFixtureImports(vm, &imports, seenPkg)
 	}
 	for _, refs := range suiteSharedFixtures {
 		for _, sf := range refs {
@@ -154,9 +164,8 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	return headerTpl.ExecuteTemplate(buf, "header.go.tpl", map[string]any{"Header": data})
 }
 
-func collectFixtureImports(vm *FixtureViewModel, imports *[]headerImport, seenPkg map[string]bool, hasSharedFixtures *bool) {
+func collectFixtureImports(vm *FixtureViewModel, imports *[]headerImport, seenPkg map[string]bool) {
 	for _, sf := range vm.SharedFixtures {
-		*hasSharedFixtures = true
 		if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
 			*imports = append(*imports, headerImport{Path: sf.PkgPath})
 			seenPkg[sf.PkgPath] = true
@@ -167,7 +176,7 @@ func collectFixtureImports(vm *FixtureViewModel, imports *[]headerImport, seenPk
 			*imports = append(*imports, headerImport{Path: child.PkgPath})
 			seenPkg[child.PkgPath] = true
 		}
-		collectFixtureImports(child, imports, seenPkg, hasSharedFixtures)
+		collectFixtureImports(child, imports, seenPkg)
 	}
 }
 
@@ -178,7 +187,7 @@ func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSh
 	})
 }
 
-func (r *renderer) renderFixtures(buf *bytes.Buffer, pkg *packages.Package, fixtureBound []*gotestast.TestSuiteSpec, viewModels []*FixtureViewModel) error {
+func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, viewModels []*FixtureViewModel) error {
 	if len(viewModels) == 0 {
 		return nil
 	}
@@ -186,17 +195,9 @@ func (r *renderer) renderFixtures(buf *bytes.Buffer, pkg *packages.Package, fixt
 	return gotestTpl.ExecuteTemplate(buf, "gotest.fixture.tpl", map[string]any{
 		"RootFixtures":       viewModels,
 		"FixtureBoundSuites": fixtureBound,
-		"CoverVarName":       detectCoverVarName(pkg),
+		"AllFixtures":        flattenFixtures(viewModels),
+		"FlatSuites":         flattenSuites(viewModels),
 	})
-}
-
-func detectCoverVarName(pkg *packages.Package) string {
-	if tp := pkg.Imports["testing"]; tp != nil && tp.Types != nil {
-		if tp.Types.Scope().Lookup("cover2") != nil {
-			return "cover2"
-		}
-	}
-	return "cover"
 }
 
 func (renderer) formatOutput(buf *bytes.Buffer) ([]byte, error) {
@@ -232,8 +233,47 @@ func resolvedToViewModel(rf *ResolvedFixture) *FixtureViewModel {
 		SharedFixtures:      rf.SharedFixtures,
 	}
 	for _, child := range rf.Children {
-		vm.ChildFixtures = append(vm.ChildFixtures, resolvedToViewModel(child))
+		childVM := resolvedToViewModel(child)
+		childVM.ParentIdentifier = vm.Identifier
+		vm.ChildFixtures = append(vm.ChildFixtures, childVM)
 	}
 	return vm
+}
+
+func flattenFixtures(roots []*FixtureViewModel) []*FixtureViewModel {
+	var result []*FixtureViewModel
+	var walk func(node *FixtureViewModel)
+	walk = func(node *FixtureViewModel) {
+		result = append(result, node)
+		for _, child := range node.ChildFixtures {
+			walk(child)
+		}
+	}
+	for _, root := range roots {
+		walk(root)
+	}
+	return result
+}
+
+func flattenSuites(roots []*FixtureViewModel) []FlatFixtureSuite {
+	var result []FlatFixtureSuite
+	var walk func(node *FixtureViewModel, chain []*FixtureViewModel)
+	walk = func(node *FixtureViewModel, chain []*FixtureViewModel) {
+		currentChain := append(chain, node)
+		for _, suite := range node.ChildSuites {
+			result = append(result, FlatFixtureSuite{
+				Suite:        suite,
+				Fixture:      node,
+				FixtureChain: append([]*FixtureViewModel(nil), currentChain...),
+			})
+		}
+		for _, child := range node.ChildFixtures {
+			walk(child, currentChain)
+		}
+	}
+	for _, root := range roots {
+		walk(root, nil)
+	}
+	return result
 }
 

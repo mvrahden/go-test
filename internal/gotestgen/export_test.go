@@ -157,6 +157,8 @@ type ExportRenderer = renderer
 var ExportPackageEvalMode = packageEvalMode
 var ExportIsInternalPkgPath = isInternalPkgPath
 var ExportBuildFixtureViewModelsFromResolved = buildFixtureViewModelsFromResolved
+var ExportFlattenFixtures = flattenFixtures
+var ExportFlattenSuites = flattenSuites
 
 // ExportMakeFixtureSpec creates a minimal FixtureSpec for validation testing.
 func ExportMakeFixtureSpec(name string, kind gotestast.FixtureKind, hasBeforeAll bool) *gotestast.FixtureSpec {

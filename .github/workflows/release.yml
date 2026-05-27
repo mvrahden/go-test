@@ -22,7 +22,7 @@ jobs:
       - name: Init workspace
         run: go work init . ./examples
       - run: go vet ./... ./examples/...
-      - run: go test ./... -race
+      - run: go test -ldflags=-checklinkname=0 ./... -race
       - run: go run ./cmd/gotest spec --no-color --min=40 ./... ./examples/... -race
 
   build:

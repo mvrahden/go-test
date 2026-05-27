@@ -204,10 +204,12 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 
 			if strings.HasSuffix(r.PkgPath, "/fixturebound") {
 				w.It("fixturebound", func(it *gotest.T) {
-					gotest.Contains(it, code, `os.Getenv("GOTEST_SHARED_STATE_FILE")`)
-					gotest.Contains(it, code, "os.ReadFile(ƒsharedFile)")
-					gotest.Contains(it, code, "ƒ_InfraFixture.Alpha = sf0")
-					gotest.Contains(it, code, "sf0.Hydrate(context.Background())")
+					gotest.Contains(it, code, "gotestruntime.RunFixtureMain(m,")
+					gotest.Contains(it, code, "gotestruntime.SharedFixtureBinding")
+					gotest.Contains(it, code, "var ƒ_sf0_InfraFixture = &fixtures.AlphaSharedFixture{}")
+					gotest.Contains(it, code, "ƒ_InfraFixture.Alpha = ƒ_sf0_InfraFixture")
+					gotest.Contains(it, code, "ƒ_sf0_InfraFixture.Hydrate(ctx)")
+					gotest.Contains(it, code, "ƒ_sf0_InfraFixture.Dehydrate(ctx)")
 				})
 			}
 		}

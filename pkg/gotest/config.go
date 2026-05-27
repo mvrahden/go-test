@@ -6,6 +6,12 @@ import "time"
 // shared fixtures. Returned by the optional FixtureConfig() or
 // SharedFixtureConfig() marker method on a fixture struct.
 // A zero value means "keep the default."
+//
+// For shared fixtures, state is captured once during setup and distributed to
+// all test processes as a JSON snapshot. Transfer fields (exported, not assigned
+// in Hydrate) should contain stable connection parameters (host, port,
+// credentials) rather than ephemeral handles. Each test process calls Hydrate()
+// to establish live connections from those parameters.
 type FixtureConfig struct {
 	// Timeout is the deadline for each lifecycle operation (BeforeAll/AfterAll).
 	// Use -1 to disable. Default: 2m (DefaultFixtureConfig).

@@ -37,7 +37,7 @@ jobs:
       - name: Init workspace
         run: go work init . ./examples
       - name: Test (stdlib)
-        run: go test ./... -race
+        run: go test -ldflags=-checklinkname=0 ./... -race
       - name: Install gotest
         run: go install ./cmd/gotest
       - name: Test (suites)
@@ -61,7 +61,7 @@ jobs:
       - name: Lint
         run: go run ./cmd/gotest-lint ./... ./examples/...
       - name: Test (stdlib)
-        run: go test ./... -race
+        run: go test -ldflags=-checklinkname=0 ./... -race
       - name: Test (suites)
         run: go run ./cmd/gotest spec --no-color --min=40 --output=spec.txt ./... ./examples/... -race -coverprofile=coverage.out
       - name: Summary
