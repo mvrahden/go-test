@@ -27,6 +27,8 @@ const (
 	StdlibTest    Rule = "stdlib-test"
 	Testify       Rule = "testify"
 	PollScope     Rule = "poll-scope"
+	TestSignature Rule = "test-signature"
+	XLifecycle    Rule = "x-lifecycle"
 )
 
 // SkippableRules is the set of rules that support opt-out via skip flags.
@@ -61,8 +63,8 @@ func run(pass *analysis.Pass) (any, error) {
 
 	suites := discoverSuites(insp)
 	if len(suites) > 0 {
-		checkFocusPrefixes(pass, suites)
 		checkMethods(pass, insp, suites)
+		checkFocusPrefixes(pass, suites)
 		checkLifecyclePairs(pass, suites)
 	}
 
@@ -82,6 +84,18 @@ func report(pass *analysis.Pass, rule Rule, pos token.Pos, format string, args .
 		Pos:      pos,
 		Category: string(rule),
 		Message:  fmt.Sprintf(format, args...),
+	})
+}
+
+func reportWithFix(pass *analysis.Pass, rule Rule, pos token.Pos, fixes []analysis.SuggestedFix, format string, args ...any) {
+	if !cfg.disableNolint && isSuppressed(pass, pos, rule) {
+		return
+	}
+	pass.Report(analysis.Diagnostic{
+		Pos:            pos,
+		Category:       string(rule),
+		Message:        fmt.Sprintf(format, args...),
+		SuggestedFixes: fixes,
 	})
 }
 
@@ -164,9 +178,10 @@ func parseNolint(text string) (rules map[Rule]bool, ok bool) {
 }
 
 type suiteInfo struct {
-	name    string
-	pos     token.Pos
-	methods map[string]token.Pos
+	name              string
+	pos               token.Pos
+	methods           map[string]token.Pos
+	recvTypePositions []token.Pos
 }
 
 func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
@@ -203,7 +218,25 @@ func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
 func checkFocusPrefixes(pass *analysis.Pass, suites map[string]*suiteInfo) {
 	for name, s := range suites {
 		if strings.HasPrefix(name, "F_") {
-			report(pass, Focus, s.pos, "focused suite %s should not be committed", name)
+			stripped := strings.TrimPrefix(name, "F_")
+			edits := []analysis.TextEdit{{
+				Pos:     s.pos,
+				End:     s.pos + 2,
+				NewText: []byte(""),
+			}}
+			for _, p := range s.recvTypePositions {
+				edits = append(edits, analysis.TextEdit{
+					Pos:     p,
+					End:     p + 2,
+					NewText: []byte(""),
+				})
+			}
+			reportWithFix(pass, Focus, s.pos,
+				[]analysis.SuggestedFix{{
+					Message:   fmt.Sprintf("rename %s to %s", name, stripped),
+					TextEdits: edits,
+				}},
+				"focused suite %s should not be committed", name)
 		}
 	}
 }
@@ -224,19 +257,47 @@ func checkMethods(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 		methodName := fd.Name.Name
 		suite.methods[methodName] = fd.Pos()
 
+		if p := recvTypePos(fd.Recv); p != token.NoPos {
+			suite.recvTypePositions = append(suite.recvTypePositions, p)
+		}
+
 		if !isPointerReceiver(fd.Recv) {
-			report(pass, Receiver, fd.Pos(), "suite method %s.%s should use a pointer receiver", recvName, methodName)
+			reportWithFix(pass, Receiver, fd.Pos(),
+				[]analysis.SuggestedFix{{
+					Message: "use pointer receiver",
+					TextEdits: []analysis.TextEdit{{
+						Pos:     fd.Recv.List[0].Type.Pos(),
+						End:     fd.Recv.List[0].Type.Pos(),
+						NewText: []byte("*"),
+					}},
+				}},
+				"suite method %s.%s should use a pointer receiver", recvName, methodName)
 		}
 
 		stripped := strings.TrimPrefix(strings.TrimPrefix(methodName, "F_"), "X_")
 		if strings.HasPrefix(stripped, "Test") {
 			if strings.HasPrefix(methodName, "F_") {
-				report(pass, Focus, fd.Pos(), "focused method %s.%s should not be committed", recvName, methodName)
+				reportWithFix(pass, Focus, fd.Pos(),
+					[]analysis.SuggestedFix{{
+						Message: fmt.Sprintf("rename %s to %s", methodName, strings.TrimPrefix(methodName, "F_")),
+						TextEdits: []analysis.TextEdit{{
+							Pos:     fd.Name.Pos(),
+							End:     fd.Name.Pos() + 2,
+							NewText: []byte(""),
+						}},
+					}},
+					"focused method %s.%s should not be committed", recvName, methodName)
+			}
+			if !hasValidTestSignature(fd) {
+				report(pass, TestSignature, fd.Pos(), "test method %s.%s has wrong signature — must accept *gotest.T", recvName, methodName)
 			}
 			return
 		}
 
 		if isLifecycleHook(stripped) {
+			if strings.HasPrefix(methodName, "X_") {
+				report(pass, XLifecycle, fd.Pos(), "X_ prefix on lifecycle hook %s.%s has no effect — remove the prefix or the method", recvName, methodName)
+			}
 			return
 		}
 
@@ -342,6 +403,30 @@ func isTestingT(expr ast.Expr) bool {
 	return ident.Name == "testing" && sel.Sel.Name == "T"
 }
 
+func hasValidTestSignature(fd *ast.FuncDecl) bool {
+	params := fd.Type.Params
+	if params == nil || len(params.List) != 1 {
+		return false
+	}
+	return isGotestT(params.List[0].Type)
+}
+
+func isGotestT(expr ast.Expr) bool {
+	star, ok := expr.(*ast.StarExpr)
+	if !ok {
+		return false
+	}
+	sel, ok := star.X.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	ident, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	return sel.Sel.Name == "T" && ident.Name != "testing"
+}
+
 func receiverTypeName(recv *ast.FieldList) string {
 	if recv == nil || len(recv.List) == 0 {
 		return ""
@@ -371,6 +456,26 @@ func isPointerReceiver(recv *ast.FieldList) bool {
 	}
 	_, ok := recv.List[0].Type.(*ast.StarExpr)
 	return ok
+}
+
+func recvTypePos(recv *ast.FieldList) token.Pos {
+	t := recv.List[0].Type
+	if star, ok := t.(*ast.StarExpr); ok {
+		t = star.X
+	}
+	switch x := t.(type) {
+	case *ast.Ident:
+		return x.Pos()
+	case *ast.IndexExpr:
+		if ident, ok := x.X.(*ast.Ident); ok {
+			return ident.Pos()
+		}
+	case *ast.IndexListExpr:
+		if ident, ok := x.X.(*ast.Ident); ok {
+			return ident.Pos()
+		}
+	}
+	return token.NoPos
 }
 
 func isLifecycleHook(name string) bool {
