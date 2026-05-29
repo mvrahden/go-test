@@ -9,8 +9,10 @@ import (
 type UserServiceTestSuite struct{}
 
 func (s *UserServiceTestSuite) TestCreate()                {} // want `test method UserServiceTestSuite\.TestCreate has wrong signature`
-func (s *UserServiceTestSuite) TestCorrectSig(t *gotest.T) {}
-func (s *UserServiceTestSuite) TestStdlibSig(t *testing.T) {} // want `test method UserServiceTestSuite\.TestStdlibSig has wrong signature`
+func (s *UserServiceTestSuite) TestCorrectSig(t *gotest.T)                    {}
+func (s *UserServiceTestSuite) TestContextualSig(t *gotest.T, ctx *struct{})  {}
+func (s *UserServiceTestSuite) TestStdlibSig(t *testing.T)                    {}
+func (s *UserServiceTestSuite) TestStdlibCtxSig(t *testing.T, ctx *struct{})  {}
 func (s *UserServiceTestSuite) BeforeAll()                 {}
 func (s *UserServiceTestSuite) AfterAll()                  {}
 func (s *UserServiceTestSuite) X_AfterEach()               {} // want `X_ prefix on lifecycle hook UserServiceTestSuite\.X_AfterEach has no effect`

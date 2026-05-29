@@ -405,13 +405,13 @@ func isTestingT(expr ast.Expr) bool {
 
 func hasValidTestSignature(fd *ast.FuncDecl) bool {
 	params := fd.Type.Params
-	if params == nil || len(params.List) != 1 {
+	if params == nil || len(params.List) < 1 || len(params.List) > 2 {
 		return false
 	}
-	return isGotestT(params.List[0].Type)
+	return isSupportedT(params.List[0].Type)
 }
 
-func isGotestT(expr ast.Expr) bool {
+func isSupportedT(expr ast.Expr) bool {
 	star, ok := expr.(*ast.StarExpr)
 	if !ok {
 		return false
@@ -424,7 +424,7 @@ func isGotestT(expr ast.Expr) bool {
 	if !ok {
 		return false
 	}
-	return sel.Sel.Name == "T" && ident.Name != "testing"
+	return sel.Sel.Name == "T" && (ident.Name == "gotest" || ident.Name == "testing")
 }
 
 func receiverTypeName(recv *ast.FieldList) string {
