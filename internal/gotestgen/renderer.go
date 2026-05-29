@@ -81,17 +81,16 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 
 	fixtureBound := resolved.FixtureBound
 	standalone := resolved.Standalone
-	viewModels := buildFixtureViewModelsFromResolved(resolved.RootFixtures)
 	allViewModels := buildAllFixtureViewModels(resolved.AllFixtures)
 	hasFixtures := len(resolved.RootFixtures) > 0
 
 	buf := bytes.NewBuffer(nil)
-	if err := r.renderFileHeader(buf, pkg, spec, viewModels, hasFixtures, resolved.SuiteSharedFixtures, allViewModels); err != nil {
+	if err := r.renderFileHeader(buf, pkg, spec, hasFixtures, resolved.SuiteSharedFixtures, allViewModels); err != nil {
 		return nil, fmt.Errorf("failed rendering file header. err: %w", err)
 	}
 
 	if len(fixtureBound) > 0 {
-		if err := r.renderFixtures(buf, fixtureBound, viewModels, allViewModels, resolved.SuiteFixtureFields); err != nil {
+		if err := r.renderFixtures(buf, fixtureBound, allViewModels, resolved.SuiteFixtureFields); err != nil {
 			return nil, fmt.Errorf("failed rendering fixture suites. err: %w", err)
 		}
 	}
@@ -110,7 +109,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	return r.formatOutput(buf)
 }
 
-func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, viewModels []*FixtureViewModel, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allViewModels []*FixtureViewModel) error {
+func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allViewModels []*FixtureViewModel) error {
 	type TplData struct {
 		RepoName    string
 		PackageName string
@@ -175,22 +174,6 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	return headerTpl.ExecuteTemplate(buf, "header.go.tpl", map[string]any{"Header": data})
 }
 
-func collectFixtureImports(vm *FixtureViewModel, imports *[]headerImport, seenPkg map[string]bool) {
-	for _, sf := range vm.SharedFixtures {
-		if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
-			*imports = append(*imports, headerImport{Path: sf.PkgPath})
-			seenPkg[sf.PkgPath] = true
-		}
-	}
-	for _, child := range vm.ChildFixtures {
-		if child.PkgPath != "" && !seenPkg[child.PkgPath] {
-			*imports = append(*imports, headerImport{Path: child.PkgPath})
-			seenPkg[child.PkgPath] = true
-		}
-		collectFixtureImports(child, imports, seenPkg)
-	}
-}
-
 func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef) error {
 	return gotestTpl.ExecuteTemplate(buf, "gotest.suites.tpl", map[string]any{
 		"Spec":                spec,
@@ -198,13 +181,12 @@ func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSh
 	})
 }
 
-func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, viewModels []*FixtureViewModel, allViewModels []*FixtureViewModel, suiteFixtureFields map[string][]FixtureFieldBinding) error {
-	if len(viewModels) == 0 {
+func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, allViewModels []*FixtureViewModel, suiteFixtureFields map[string][]FixtureFieldBinding) error {
+	if len(allViewModels) == 0 {
 		return nil
 	}
 
 	return gotestTpl.ExecuteTemplate(buf, "gotest.fixture.tpl", map[string]any{
-		"RootFixtures":       viewModels,
 		"FixtureBoundSuites": fixtureBound,
 		"AllFixtures":        allViewModels,
 		"FlatSuites":         flattenSuitesDAG(allViewModels, suiteFixtureFields),
@@ -217,51 +199,6 @@ func (renderer) formatOutput(buf *bytes.Buffer) ([]byte, error) {
 		return nil, fmt.Errorf("failed formatting the generated sources. err: %w", err)
 	}
 	return srcs, nil
-}
-
-func buildFixtureViewModelsFromResolved(roots []*ResolvedFixture) []*FixtureViewModel {
-	var vms []*FixtureViewModel
-	for _, rf := range roots {
-		vms = append(vms, resolvedToViewModel(rf))
-	}
-	return vms
-}
-
-func resolvedToViewModel(rf *ResolvedFixture) *FixtureViewModel {
-	vm := &FixtureViewModel{
-		Identifier:          rf.Identifier,
-		QualifiedIdentifier: rf.QualifiedType,
-		ParentFieldName:     rf.ParentFieldName,
-		PkgPath:             rf.PkgPath,
-		HasConfig:           rf.HasConfig,
-		BeforeAll:           rf.BeforeAll,
-		AfterAll:            rf.AfterAll,
-		BeforeEach:          rf.BeforeEach,
-		AfterEach:           rf.AfterEach,
-		HasHydrate:          rf.HasHydrate,
-		HasDehydrate:        rf.HasDehydrate,
-		ChildSuites:         rf.ChildSuites,
-		SharedFixtures:      rf.SharedFixtures,
-	}
-
-	if len(rf.Parents) > 0 {
-		vm.ParentFields = make(map[string]string)
-		for _, p := range rf.Parents {
-			vm.ParentIdentifiers = append(vm.ParentIdentifiers, p.Identifier)
-			vm.ParentFields[p.Identifier] = rf.ParentFields[p]
-		}
-		vm.DependsOn = vm.ParentIdentifiers
-		vm.ParentIdentifier = rf.Parents[0].Identifier
-	}
-
-	for _, child := range rf.Children {
-		childVM := resolvedToViewModel(child)
-		if childVM.ParentIdentifier == "" {
-			childVM.ParentIdentifier = vm.Identifier
-		}
-		vm.ChildFixtures = append(vm.ChildFixtures, childVM)
-	}
-	return vm
 }
 
 func resolvedToFlatViewModel(rf *ResolvedFixture) *FixtureViewModel {
@@ -300,43 +237,6 @@ func buildAllFixtureViewModels(allFixtures []*ResolvedFixture) []*FixtureViewMod
 		vms = append(vms, resolvedToFlatViewModel(rf))
 	}
 	return vms
-}
-
-func flattenFixtures(roots []*FixtureViewModel) []*FixtureViewModel {
-	var result []*FixtureViewModel
-	var walk func(node *FixtureViewModel)
-	walk = func(node *FixtureViewModel) {
-		result = append(result, node)
-		for _, child := range node.ChildFixtures {
-			walk(child)
-		}
-	}
-	for _, root := range roots {
-		walk(root)
-	}
-	return result
-}
-
-func flattenSuites(roots []*FixtureViewModel) []FlatFixtureSuite {
-	var result []FlatFixtureSuite
-	var walk func(node *FixtureViewModel, chain []*FixtureViewModel)
-	walk = func(node *FixtureViewModel, chain []*FixtureViewModel) {
-		currentChain := append(chain, node)
-		for _, suite := range node.ChildSuites {
-			result = append(result, FlatFixtureSuite{
-				Suite:        suite,
-				Fixture:      node,
-				FixtureChain: append([]*FixtureViewModel(nil), currentChain...),
-			})
-		}
-		for _, child := range node.ChildFixtures {
-			walk(child, currentChain)
-		}
-	}
-	for _, root := range roots {
-		walk(root, nil)
-	}
-	return result
 }
 
 func flattenSuitesDAG(allViewModels []*FixtureViewModel, suiteFixtureFields map[string][]FixtureFieldBinding) []FlatFixtureSuite {

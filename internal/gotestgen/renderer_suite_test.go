@@ -436,14 +436,13 @@ func (s *RendererTestSuite) TestBuildFixtureViewModels(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			vms := gotestgen.ExportBuildFixtureViewModelsFromResolved(resolved.RootFixtures)
+			vms := gotestgen.ExportBuildAllFixtureViewModels(resolved.AllFixtures)
 			gotest.Equal(it, 1, len(vms))
 			gotest.Equal(it, "MyFixture", vms[0].Identifier)
 			gotest.True(it, vms[0].BeforeAll, "expected BeforeAll")
 			gotest.True(it, vms[0].AfterAll, "expected AfterAll")
 			gotest.Equal(it, 1, len(vms[0].ChildSuites))
 			gotest.Equal(it, "MyTestSuite", vms[0].ChildSuites[0].Identifier())
-			gotest.Equal(it, 0, len(vms[0].ChildFixtures))
 		})
 	})
 
@@ -460,7 +459,7 @@ func (s *RendererTestSuite) TestBuildFixtureViewModels(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			vms := gotestgen.ExportBuildFixtureViewModelsFromResolved(resolved.RootFixtures)
+			vms := gotestgen.ExportBuildAllFixtureViewModels(resolved.AllFixtures)
 			gotest.Equal(it, 1, len(vms))
 
 			vm := vms[0]
