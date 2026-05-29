@@ -24,13 +24,11 @@ var (
 // FixtureViewModel is the view model passed to the fixture template.
 type FixtureViewModel struct {
 	Identifier          string
-	QualifiedIdentifier string // "pkg.Name" for cross-package, "Name" for same
-	ParentIdentifier    string // Identifier of the parent fixture (empty for roots, backward compat)
-	ParentIdentifiers   []string // all parent fixture identifiers
-	ParentFieldName     string // field name for single parent (backward compat)
+	QualifiedIdentifier string            // "pkg.Name" for cross-package, "Name" for same
+	ParentIdentifiers   []string          // all parent fixture identifiers
 	ParentFields        map[string]string // parent identifier → field name in this fixture's struct
-	DependsOn           []string // same as ParentIdentifiers, for template convenience
-	PkgPath             string // import path, empty if same package
+	DependsOn           []string          // same as ParentIdentifiers, for template convenience
+	PkgPath             string            // import path, empty if same package
 	HasConfig           bool
 	BeforeAll           bool
 	AfterAll            bool
@@ -39,16 +37,14 @@ type FixtureViewModel struct {
 	HasHydrate          bool
 	HasDehydrate        bool
 	ChildSuites         []*gotestast.TestSuiteSpec
-	ChildFixtures       []*FixtureViewModel
 	SharedFixtures      []SharedFixtureRef
 }
 
-// FlatFixtureSuite describes a suite with its full fixture ancestry chain,
-// used for generating per-suite Test functions at arbitrary tree depth.
+// FlatFixtureSuite describes a suite with its fixture dependency graph,
+// used for generating per-suite Test functions.
 type FlatFixtureSuite struct {
 	Suite         *gotestast.TestSuiteSpec
-	Fixture       *FixtureViewModel   // the fixture this suite is directly bound to (first fixture)
-	FixtureChain  []*FixtureViewModel // root → ... → parent fixture (full path, backward compat)
+	Fixture       *FixtureViewModel   // the first fixture this suite is bound to
 	FixtureOrder  []*FixtureViewModel // topological order of ALL needed fixtures
 	FixtureFields map[string]string   // fixture identifier → field name in suite struct
 }
@@ -205,7 +201,6 @@ func resolvedToFlatViewModel(rf *ResolvedFixture) *FixtureViewModel {
 	vm := &FixtureViewModel{
 		Identifier:          rf.Identifier,
 		QualifiedIdentifier: rf.QualifiedType,
-		ParentFieldName:     rf.ParentFieldName,
 		PkgPath:             rf.PkgPath,
 		HasConfig:           rf.HasConfig,
 		BeforeAll:           rf.BeforeAll,
@@ -225,7 +220,6 @@ func resolvedToFlatViewModel(rf *ResolvedFixture) *FixtureViewModel {
 			vm.ParentFields[p.Identifier] = rf.ParentFields[p]
 		}
 		vm.DependsOn = vm.ParentIdentifiers
-		vm.ParentIdentifier = rf.Parents[0].Identifier
 	}
 
 	return vm
@@ -279,15 +273,9 @@ func flattenSuitesDAG(allViewModels []*FixtureViewModel, suiteFixtureFields map[
 			}
 		}
 
-		var chain []*FixtureViewModel
-		if si.fixture != nil {
-			chain = buildChainToRoot(si.fixture, vmByID)
-		}
-
 		result = append(result, FlatFixtureSuite{
 			Suite:         si.suite,
 			Fixture:       si.fixture,
-			FixtureChain:  chain,
 			FixtureOrder:  fixtureOrder,
 			FixtureFields: fixtureFields,
 		})
@@ -318,16 +306,4 @@ func collectTransitiveDeps(suiteID string, suiteFixtureFields map[string][]Fixtu
 	return needed
 }
 
-func buildChainToRoot(fixture *FixtureViewModel, vmByID map[string]*FixtureViewModel) []*FixtureViewModel {
-	var chain []*FixtureViewModel
-	current := fixture
-	for current != nil {
-		chain = append([]*FixtureViewModel{current}, chain...)
-		if current.ParentIdentifier == "" {
-			break
-		}
-		current = vmByID[current.ParentIdentifier]
-	}
-	return chain
-}
 

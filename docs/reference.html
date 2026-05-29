@@ -633,7 +633,7 @@ gotest.MatchSnapshot(t, render(other), <span class="st">"variant"</span>)  <span
 Fixture.AfterEach</div>
 
       <h3>Nesting</h3>
-      <p>Fixtures compose through named pointer fields — the same pattern suites use to reference fixtures. A fixture can depend on multiple other fixtures, forming a directed acyclic graph (DAG). The generator resolves dependencies and wires the lifecycle automatically:</p>
+      <p>Fixtures compose through named pointer fields — the same pattern suites use to reference fixtures. A fixture can depend on multiple other fixtures. The generator resolves dependencies and wires the lifecycle automatically:</p>
       <div class="code-block">
         <pre><span class="kw">type</span> <span class="tp">DBFixture</span> <span class="kw">struct</span> {
     Pool *pgxpool.Pool
@@ -665,7 +665,7 @@ Fixture.AfterEach</div>
     Fixture *APIFixture <span class="cm">// accesses DB, Cache, and ServerURL</span>
 }</pre>
       </div>
-      <p>Setup runs in topological order. Independent fixtures (no edges between them) set up in parallel; teardown runs in reverse:</p>
+      <p>Dependencies are set up first. Independent fixtures set up in parallel; teardown runs in reverse:</p>
       <div class="diagram">DBFixture.BeforeAll <span class="d">──┐</span>
                         <span class="d">├──</span> APIFixture.BeforeAll
 CacheFixture.BeforeAll <span class="d">┘</span>

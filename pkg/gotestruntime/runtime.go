@@ -482,11 +482,16 @@ func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
 	}
 
 	cache := make(map[string]time.Duration)
+	visiting := make(map[string]bool)
 	var longestPath func(name string) time.Duration
 	longestPath = func(name string) time.Duration {
 		if d, ok := cache[name]; ok {
 			return d
 		}
+		if visiting[name] {
+			return 0
+		}
+		visiting[name] = true
 		node := byName[name]
 		own := node.Config.Timeout
 		if own < 0 {

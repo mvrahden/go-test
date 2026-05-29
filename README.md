@@ -315,29 +315,28 @@ Fixture.AfterEach
 
 All four hooks are optional (only `BeforeAll` is required).
 
-Fixtures form a DAG — each fixture can depend on multiple parents via pointer fields.
-Setup runs in topological order, teardown in reverse. Diamond dependencies are deduplicated (each fixture type is instantiated once):
+Fixtures compose naturally — each fixture can depend on multiple others via pointer fields.
+Dependencies are set up before dependents, independent fixtures set up in parallel, and everything tears down in reverse.
+If two fixtures share a common dependency, it's created once:
 
 ```go
 type InfraFixture struct { Pool *pgxpool.Pool }
 type CacheFixture struct { Client *redis.Client }
 
 type APIFixture struct {
-    Infra *InfraFixture
-    Cache *CacheFixture
+    Infra *InfraFixture   // depends on infra
+    Cache *CacheFixture   // and cache — both set up before APIFixture
 }
 ```
 
 ```
-InfraFixture.BeforeEach
-CacheFixture.BeforeEach
-  APIFixture.BeforeEach
-    Suite.BeforeEach
-      TestCase
-    Suite.AfterEach
-  APIFixture.AfterEach
-CacheFixture.AfterEach
-InfraFixture.AfterEach
+InfraFixture.BeforeEach  ─┐
+CacheFixture.BeforeEach  ─┤
+                           └─ APIFixture.BeforeEach
+                                └─ Suite.BeforeEach → TestCase → Suite.AfterEach
+                           ┌─ APIFixture.AfterEach
+InfraFixture.AfterEach  ──┤
+CacheFixture.AfterEach  ──┘
 ```
 
 **Failure reporting.**

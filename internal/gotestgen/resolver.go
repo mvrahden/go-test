@@ -39,7 +39,6 @@ type ResolvedFixture struct {
 	Parents        []*ResolvedFixture // all parent fixtures
 	ParentFields   map[*ResolvedFixture]string // parent fixture → field name in this fixture's struct
 	Children       []*ResolvedFixture
-	Dependents     []*ResolvedFixture
 	SharedFixtures []SharedFixtureRef
 	ChildSuites    []*gotestast.TestSuiteSpec
 }
@@ -321,7 +320,6 @@ func (r *resolver) resolvePackageFixtureFields(rf *ResolvedFixture, st *types.St
 			}
 			rf.ParentFields[parent] = field.Name()
 			parent.Children = append(parent.Children, rf)
-			parent.Dependents = append(parent.Dependents, rf)
 		}
 	}
 
