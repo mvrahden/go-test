@@ -145,9 +145,9 @@ func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 			_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
 			gotest.NoError(it, err, "generated code should be valid Go: %s", code)
 
-			gotest.True(it, strings.Contains(code, "sf0.ConnStr"), "ConnStr should be serialized")
-			gotest.True(it, strings.Contains(code, "sf0.Port"), "Port should be serialized")
-			gotest.True(it, !strings.Contains(code, "sf0.Pool"), "Pool is local and should not be serialized")
+			gotest.Contains(it, code, "sf0.ConnStr", "ConnStr should be serialized")
+			gotest.Contains(it, code, "sf0.Port", "Port should be serialized")
+			gotest.NotContains(it, code, "sf0.Pool", "Pool is local and should not be serialized")
 		})
 	})
 
@@ -179,7 +179,7 @@ func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 
 			gotest.Contains(it, code, "sfpkg0.PostgresFixture{}")
 			gotest.Contains(it, code, "sfpkg0.RedisFixture{}")
-			gotest.True(it, !strings.Contains(code, "sfpkg1"),
+			gotest.NotContains(it, code, "sfpkg1",
 				"should not have sfpkg1 alias when both fixtures share the same package")
 		})
 	})
@@ -227,7 +227,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			gotest.Contains(it, code, `gotest "github.com/mvrahden/go-test/pkg/gotest"`)
 			gotest.Contains(it, code, "gotest.DefaultFixtureConfig()")
 			gotest.Contains(it, code, "context.WithTimeout(ctx,")
-			gotest.True(it, !strings.Contains(code, "SharedFixtureConfig()"),
+			gotest.NotContains(it, code, "SharedFixtureConfig()",
 				"should not call SharedFixtureConfig when HasConfig is false")
 		})
 	})
@@ -386,9 +386,9 @@ func (s *SharedFixtureTestSuite) TestIntegrationGeneratedSetupBinary(t *gotest.T
 			gotest.Contains(it, code, "syscall.SIGTERM")
 			gotest.Contains(it, code, "json.NewEncoder(os.Stdout).Encode(state)")
 
-			gotest.True(it, strings.Contains(code, "sf0.DSN"), "DSN should be serialized")
-			gotest.True(it, strings.Contains(code, "sf1.Endpoint"), "Endpoint should be serialized")
-			gotest.True(it, strings.Contains(code, "sf1.Bucket"), "Bucket should be serialized")
+			gotest.Contains(it, code, "sf0.DSN", "DSN should be serialized")
+			gotest.Contains(it, code, "sf1.Endpoint", "Endpoint should be serialized")
+			gotest.Contains(it, code, "sf1.Bucket", "Bucket should be serialized")
 
 			gcsAfterAllIdx := strings.LastIndex(code, "sf1.AfterAll(ctx)")
 			pgAfterAllIdx := strings.LastIndex(code, "sf0.AfterAll(ctx)")

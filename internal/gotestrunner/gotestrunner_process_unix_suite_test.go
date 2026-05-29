@@ -135,7 +135,7 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupTermination(t *gotest.T) 
 			// Wait for the child to be ready.
 			buf := make([]byte, 64)
 			n, _ := stdout.Read(buf)
-			gotest.True(it, strings.Contains(string(buf[:n]), "ready"),
+			gotest.Contains(it, string(buf[:n]), "ready",
 				"child not ready: %q", string(buf[:n]))
 
 			pid := cmd.Process.Pid

@@ -47,27 +47,27 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			gotest.True(it, len(output) > 0, "expected non-empty output")
 
 			// Verify the output contains key structural elements
-			gotest.True(it, strings.Contains(output, "func TestMain(m *testing.M)"), "expected TestMain")
-			gotest.True(it, strings.Contains(output, "gotestruntime.RunFixtureMain(m,"), "expected RunFixtureMain delegation")
-			gotest.True(it, strings.Contains(output, `"os"`), "expected os import")
-			gotest.True(it, strings.Contains(output, "ƒ_DBFixture = &DBFixture{}"), "expected fixture instantiation")
-			gotest.True(it, strings.Contains(output, "ƒ_DBFixture.BeforeAll(ctx)"), "expected BeforeAll call")
-			gotest.True(it, strings.Contains(output, "ƒ_DBFixture.AfterAll(ctx)"), "expected AfterAll in cleanup")
-			gotest.True(it, strings.Contains(output, "func TestQueryTestSuite(t *testing.T)"), "expected top-level TestQueryTestSuite func")
-			gotest.True(it, strings.Contains(output, "ƒƒ_GOTEST_QueryTestSuite"), "expected wrapper struct")
-			gotest.True(it, strings.Contains(output, "DBFixture: ƒ_DBFixture"), "expected fixture injection")
-			gotest.True(it, strings.Contains(output, `t.Run("TestInsert"`), "expected TestInsert test case")
-			gotest.True(it, strings.Contains(output, `t.Run("TestSelect"`), "expected TestSelect test case")
+			gotest.Contains(it, output, "func TestMain(m *testing.M)", "expected TestMain")
+			gotest.Contains(it, output, "gotestruntime.RunFixtureMain(m,", "expected RunFixtureMain delegation")
+			gotest.Contains(it, output, `"os"`, "expected os import")
+			gotest.Contains(it, output, "ƒ_DBFixture = &DBFixture{}", "expected fixture instantiation")
+			gotest.Contains(it, output, "ƒ_DBFixture.BeforeAll(ctx)", "expected BeforeAll call")
+			gotest.Contains(it, output, "ƒ_DBFixture.AfterAll(ctx)", "expected AfterAll in cleanup")
+			gotest.Contains(it, output, "func TestQueryTestSuite(t *testing.T)", "expected top-level TestQueryTestSuite func")
+			gotest.Contains(it, output, "ƒƒ_GOTEST_QueryTestSuite", "expected wrapper struct")
+			gotest.Contains(it, output, "DBFixture: ƒ_DBFixture", "expected fixture injection")
+			gotest.Contains(it, output, `t.Run("TestInsert"`, "expected TestInsert test case")
+			gotest.Contains(it, output, `t.Run("TestSelect"`, "expected TestSelect test case")
 
 			// Verify it does NOT contain old-style patterns
-			gotest.True(it, !strings.Contains(output, "func Test_DBFixture("), "should NOT have old-style Test_DBFixture")
-			gotest.True(it, !strings.Contains(output, "go:linkname"), "should NOT have linkname directives")
+			gotest.NotContains(it, output, "func Test_DBFixture(", "should NOT have old-style Test_DBFixture")
+			gotest.NotContains(it, output, "go:linkname", "should NOT have linkname directives")
 
 			// Verify wrapper struct and lifecycle methods are at file scope (not nested in functions)
-			gotest.True(it, strings.Contains(output, "type ƒƒ_GOTEST_QueryTestSuite struct"), "expected wrapper struct declaration")
-			gotest.True(it, strings.Contains(output, "func (ts *ƒƒ_GOTEST_QueryTestSuite) BeforeAll(it *gotest.T)"), "expected BeforeAll wrapper")
-			gotest.True(it, strings.Contains(output, "func (ts *ƒƒ_GOTEST_QueryTestSuite) BeforeEach(it *gotest.T)"), "expected BeforeEach wrapper")
-			gotest.True(it, strings.Contains(output, "func (ts *ƒƒ_GOTEST_QueryTestSuite) AfterEach(it *gotest.T)"), "expected AfterEach wrapper")
+			gotest.Contains(it, output, "type ƒƒ_GOTEST_QueryTestSuite struct", "expected wrapper struct declaration")
+			gotest.Contains(it, output, "func (ts *ƒƒ_GOTEST_QueryTestSuite) BeforeAll(it *gotest.T)", "expected BeforeAll wrapper")
+			gotest.Contains(it, output, "func (ts *ƒƒ_GOTEST_QueryTestSuite) BeforeEach(it *gotest.T)", "expected BeforeEach wrapper")
+			gotest.Contains(it, output, "func (ts *ƒƒ_GOTEST_QueryTestSuite) AfterEach(it *gotest.T)", "expected AfterEach wrapper")
 		})
 	})
 
@@ -76,8 +76,8 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithoutAfterAll")
 			output, _ := renderTestPkg(it.T(), pkg)
 
-			gotest.True(it, strings.Contains(output, "gotestruntime.RunFixtureMain(m,"), "expected RunFixtureMain")
-			gotest.True(it, !strings.Contains(output, "ƒ_SimpleFixture.AfterAll"), "should NOT have AfterAll call")
+			gotest.Contains(it, output, "gotestruntime.RunFixtureMain(m,", "expected RunFixtureMain")
+			gotest.NotContains(it, output, "ƒ_SimpleFixture.AfterAll", "should NOT have AfterAll call")
 		})
 	})
 
@@ -86,10 +86,10 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_MixedFixtureBoundAndStandalone")
 			output, _ := renderTestPkg(it.T(), pkg)
 
-			gotest.True(it, strings.Contains(output, "func TestMain(m *testing.M)"), "expected TestMain for fixture")
-			gotest.True(it, strings.Contains(output, "gotestruntime.RunFixtureMain(m,"), "expected RunFixtureMain")
-			gotest.True(it, strings.Contains(output, "func TestBoundTestSuite(t *testing.T)"), "expected top-level TestBoundTestSuite func")
-			gotest.True(it, strings.Contains(output, "func TestStandaloneTestSuite(t *testing.T)"), "expected standalone test func")
+			gotest.Contains(it, output, "func TestMain(m *testing.M)", "expected TestMain for fixture")
+			gotest.Contains(it, output, "gotestruntime.RunFixtureMain(m,", "expected RunFixtureMain")
+			gotest.Contains(it, output, "func TestBoundTestSuite(t *testing.T)", "expected top-level TestBoundTestSuite func")
+			gotest.Contains(it, output, "func TestStandaloneTestSuite(t *testing.T)", "expected standalone test func")
 		})
 	})
 
@@ -100,16 +100,16 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			gotest.True(it, len(output) > 0, "expected non-empty output")
 
 			// Should have the suite wrapper with lifecycle methods delegating
-			gotest.True(it, strings.Contains(output, "ts.EachTestSuite.BeforeAll(it)"), "expected suite BeforeAll delegation")
-			gotest.True(it, strings.Contains(output, "ts.EachTestSuite.AfterAll(it)"), "expected suite AfterAll delegation")
-			gotest.True(it, strings.Contains(output, "ts.EachTestSuite.BeforeEach(it)"), "expected suite BeforeEach delegation")
-			gotest.True(it, strings.Contains(output, "ts.EachTestSuite.AfterEach(it)"), "expected suite AfterEach delegation")
+			gotest.Contains(it, output, "ts.EachTestSuite.BeforeAll(it)", "expected suite BeforeAll delegation")
+			gotest.Contains(it, output, "ts.EachTestSuite.AfterAll(it)", "expected suite AfterAll delegation")
+			gotest.Contains(it, output, "ts.EachTestSuite.BeforeEach(it)", "expected suite BeforeEach delegation")
+			gotest.Contains(it, output, "ts.EachTestSuite.AfterEach(it)", "expected suite AfterEach delegation")
 
 			// Fixture-level BeforeEach/AfterEach should appear in the test case closure with error handling
-			gotest.True(it, strings.Contains(output, "ƒ_EachFixture.BeforeEach(it.Context())"), "expected fixture BeforeEach in test case")
-			gotest.True(it, strings.Contains(output, `"EachFixture.BeforeEach failed:`), "expected BeforeEach error attribution")
-			gotest.True(it, strings.Contains(output, "ƒ_EachFixture.AfterEach(context.Background())"), "expected fixture AfterEach in test case")
-			gotest.True(it, strings.Contains(output, `"EachFixture.AfterEach failed:`), "expected AfterEach error attribution")
+			gotest.Contains(it, output, "ƒ_EachFixture.BeforeEach(it.Context())", "expected fixture BeforeEach in test case")
+			gotest.Contains(it, output, `"EachFixture.BeforeEach failed:`, "expected BeforeEach error attribution")
+			gotest.Contains(it, output, "ƒ_EachFixture.AfterEach(context.Background())", "expected fixture AfterEach in test case")
+			gotest.Contains(it, output, `"EachFixture.AfterEach failed:`, "expected AfterEach error attribution")
 
 			// Verify ordering: fixture AfterEach deferred before suite AfterEach (LIFO)
 			fixtureAfterIdx := strings.Index(output, "ƒ_EachFixture.AfterEach(context.Background())")
@@ -127,8 +127,8 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithoutBeforeAfterEach")
 			output, _ := renderTestPkg(it.T(), pkg)
 
-			gotest.True(it, !strings.Contains(output, "ƒ_MinimalFixture.BeforeEach"), "should NOT have fixture BeforeEach")
-			gotest.True(it, !strings.Contains(output, "ƒ_MinimalFixture.AfterEach"), "should NOT have fixture AfterEach")
+			gotest.NotContains(it, output, "ƒ_MinimalFixture.BeforeEach", "should NOT have fixture BeforeEach")
+			gotest.NotContains(it, output, "ƒ_MinimalFixture.AfterEach", "should NOT have fixture AfterEach")
 		})
 	})
 
@@ -138,14 +138,14 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg)
 
 			// Nested fixture: parent (fixture) and child hooks should both appear with error handling
-			gotest.True(it, strings.Contains(output, "ƒ_InfraFixture.AfterEach(context.Background())"), "expected parent fixture AfterEach")
-			gotest.True(it, strings.Contains(output, `"InfraFixture.AfterEach failed:`), "expected parent AfterEach attribution")
-			gotest.True(it, strings.Contains(output, "ƒ_InfraFixture.BeforeEach(it.Context())"), "expected parent fixture BeforeEach")
-			gotest.True(it, strings.Contains(output, `"InfraFixture.BeforeEach failed:`), "expected parent BeforeEach attribution")
-			gotest.True(it, strings.Contains(output, "ƒ_APIFixture.AfterEach(context.Background())"), "expected child fixture AfterEach")
-			gotest.True(it, strings.Contains(output, `"APIFixture.AfterEach failed:`), "expected child AfterEach attribution")
-			gotest.True(it, strings.Contains(output, "ƒ_APIFixture.BeforeEach(it.Context())"), "expected child fixture BeforeEach")
-			gotest.True(it, strings.Contains(output, `"APIFixture.BeforeEach failed:`), "expected child BeforeEach attribution")
+			gotest.Contains(it, output, "ƒ_InfraFixture.AfterEach(context.Background())", "expected parent fixture AfterEach")
+			gotest.Contains(it, output, `"InfraFixture.AfterEach failed:`, "expected parent AfterEach attribution")
+			gotest.Contains(it, output, "ƒ_InfraFixture.BeforeEach(it.Context())", "expected parent fixture BeforeEach")
+			gotest.Contains(it, output, `"InfraFixture.BeforeEach failed:`, "expected parent BeforeEach attribution")
+			gotest.Contains(it, output, "ƒ_APIFixture.AfterEach(context.Background())", "expected child fixture AfterEach")
+			gotest.Contains(it, output, `"APIFixture.AfterEach failed:`, "expected child AfterEach attribution")
+			gotest.Contains(it, output, "ƒ_APIFixture.BeforeEach(it.Context())", "expected child fixture BeforeEach")
+			gotest.Contains(it, output, `"APIFixture.BeforeEach failed:`, "expected child BeforeEach attribution")
 
 			// Verify ordering: parent deferred first (runs last), then child, then suite
 			parentAfterIdx := strings.Index(output, "ƒ_InfraFixture.AfterEach(context.Background())")
@@ -172,12 +172,12 @@ func (s *RendererTestSuite) TestStdlibTSupport(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg)
 
 			// Wrapper lifecycle methods should unwrap via .T()
-			gotest.True(it, strings.Contains(output, "ts.PlainTestSuite.BeforeEach(it.T())"), "expected BeforeEach unwrap to .T()")
-			gotest.True(it, strings.Contains(output, "ts.PlainTestSuite.AfterEach(it.T())"), "expected AfterEach unwrap to .T()")
+			gotest.Contains(it, output, "ts.PlainTestSuite.BeforeEach(it.T())", "expected BeforeEach unwrap to .T()")
+			gotest.Contains(it, output, "ts.PlainTestSuite.AfterEach(it.T())", "expected AfterEach unwrap to .T()")
 
 			// Test cases should use adapter lambda
-			gotest.True(it, strings.Contains(output, `func(t *gotest.T) { s.TestFoo(t.T()) }`), "expected TestFoo adapter")
-			gotest.True(it, strings.Contains(output, `func(t *gotest.T) { s.TestBar(t.T()) }`), "expected TestBar adapter")
+			gotest.Contains(it, output, `func(t *gotest.T) { s.TestFoo(t.T()) }`, "expected TestFoo adapter")
+			gotest.Contains(it, output, `func(t *gotest.T) { s.TestBar(t.T()) }`, "expected TestBar adapter")
 		})
 	})
 
@@ -187,14 +187,14 @@ func (s *RendererTestSuite) TestStdlibTSupport(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg)
 
 			// BeforeEach uses *testing.T -> unwrap
-			gotest.True(it, strings.Contains(output, "ts.MixedTestSuite.BeforeEach(it.T())"), "expected BeforeEach unwrap")
+			gotest.Contains(it, output, "ts.MixedTestSuite.BeforeEach(it.T())", "expected BeforeEach unwrap")
 
 			// TestStdlib uses *testing.T -> adapter
-			gotest.True(it, strings.Contains(output, `func(t *gotest.T) { s.TestStdlib(t.T()) }`), "expected TestStdlib adapter")
+			gotest.Contains(it, output, `func(t *gotest.T) { s.TestStdlib(t.T()) }`, "expected TestStdlib adapter")
 
 			// TestGotest uses *gotest.T -> direct
-			gotest.True(it, strings.Contains(output, `ƒƒ_GOTEST_exec(s.TestGotest, ttt)`), "expected TestGotest direct reference")
-			gotest.True(it, !strings.Contains(output, `s.TestGotest(t.T())`), "TestGotest should NOT have adapter")
+			gotest.Contains(it, output, `ƒƒ_GOTEST_exec(s.TestGotest, ttt)`, "expected TestGotest direct reference")
+			gotest.NotContains(it, output, `s.TestGotest(t.T())`, "TestGotest should NOT have adapter")
 		})
 	})
 
@@ -204,11 +204,11 @@ func (s *RendererTestSuite) TestStdlibTSupport(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg)
 
 			// Wrapper lifecycle should unwrap
-			gotest.True(it, strings.Contains(output, "ts.StdlibTestSuite.BeforeAll(it.T())"), "expected BeforeAll unwrap")
-			gotest.True(it, strings.Contains(output, "ts.StdlibTestSuite.AfterEach(it.T())"), "expected AfterEach unwrap")
+			gotest.Contains(it, output, "ts.StdlibTestSuite.BeforeAll(it.T())", "expected BeforeAll unwrap")
+			gotest.Contains(it, output, "ts.StdlibTestSuite.AfterEach(it.T())", "expected AfterEach unwrap")
 
 			// Test case should use adapter
-			gotest.True(it, strings.Contains(output, `func(t *gotest.T) { s.TestQuery(t.T()) }`), "expected TestQuery adapter")
+			gotest.Contains(it, output, `func(t *gotest.T) { s.TestQuery(t.T()) }`, "expected TestQuery adapter")
 		})
 	})
 }
@@ -280,7 +280,7 @@ func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg)
 
 			gotest.Contains(it, output, "gotest.DefaultFixtureConfig()")
-			gotest.True(it, !strings.Contains(output, "OverlayFixtureConfig"), "should not have overlay call")
+			gotest.NotContains(it, output, "OverlayFixtureConfig", "should not have overlay call")
 		})
 	})
 }
@@ -306,7 +306,7 @@ func (s *RendererTestSuite) TestSuiteConfig(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg)
 
 			gotest.Contains(it, output, "gotest.DefaultSuiteConfig()")
-			gotest.True(it, !strings.Contains(output, "OverlaySuiteConfig"), "should not have overlay call")
+			gotest.NotContains(it, output, "OverlaySuiteConfig", "should not have overlay call")
 		})
 	})
 }
@@ -320,7 +320,7 @@ func (s *RendererTestSuite) TestNamedFields(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg)
 
 			gotest.Contains(it, output, "db: ƒ_DBFixture", "suite struct literal should use named field")
-			gotest.True(it, !strings.Contains(output, "DBFixture: ƒ_DBFixture"), "should NOT use type name as field name")
+			gotest.NotContains(it, output, "DBFixture: ƒ_DBFixture", "should NOT use type name as field name")
 		})
 	})
 
@@ -339,7 +339,7 @@ func (s *RendererTestSuite) TestNamedFields(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg)
 
 			gotest.Contains(it, output, "ƒ_AppFixture.pg = ƒ_sf0_AppFixture", "shared fixture injection should use named field")
-			gotest.True(it, !strings.Contains(output, "ƒ_AppFixture.PGSharedFixture"), "should NOT use type name for shared fixture field")
+			gotest.NotContains(it, output, "ƒ_AppFixture.PGSharedFixture", "should NOT use type name for shared fixture field")
 		})
 	})
 }
@@ -366,11 +366,11 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_VoidBeforeEach_Sequential")
 			output, _ := renderTestPkg(it.T(), pkg)
 
-			gotest.True(it, !strings.Contains(output, "t.Parallel()"), "suite-level t.Parallel() should not be emitted — isolation is subprocess-level")
+			gotest.NotContains(it, output, "t.Parallel()", "suite-level t.Parallel() should not be emitted — isolation is subprocess-level")
 			gotest.Contains(it, output, "s.BeforeEach(ttt)")
 			gotest.Contains(it, output, "defer s.AfterEach(ttt)")
-			gotest.True(it, !strings.Contains(output, "sync.WaitGroup"), "sequential suite should not use WaitGroup")
-			gotest.True(it, !strings.Contains(output, "it.Parallel()"), "sequential suite should not call it.Parallel()")
+			gotest.NotContains(it, output, "sync.WaitGroup", "sequential suite should not use WaitGroup")
+			gotest.NotContains(it, output, "it.Parallel()", "sequential suite should not call it.Parallel()")
 		})
 	})
 
@@ -379,7 +379,7 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ReturningBeforeEach_Sequential")
 			output, _ := renderTestPkg(it.T(), pkg)
 
-			gotest.True(it, !strings.Contains(output, "t.Parallel()"), "suite-level t.Parallel() should not be emitted")
+			gotest.NotContains(it, output, "t.Parallel()", "suite-level t.Parallel() should not be emitted")
 			gotest.Contains(it, output, "ctx := s.BeforeEach(ttt)")
 			gotest.Contains(it, output, "defer s.AfterEach(ttt, ctx)")
 			gotest.Contains(it, output, "s.TestOne(ttt, ctx)")
@@ -395,7 +395,7 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg)
 
 			stripped := strings.ReplaceAll(output, "it.Parallel()", "")
-			gotest.True(it, !strings.Contains(stripped, "t.Parallel()"), "suite-level t.Parallel() should not be emitted")
+			gotest.NotContains(it, stripped, "t.Parallel()", "suite-level t.Parallel() should not be emitted")
 			gotest.Contains(it, output, "it.Parallel()")
 			gotest.Contains(it, output, "wg.Add(1)")
 			gotest.Contains(it, output, "defer wg.Done()")
@@ -411,7 +411,7 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBound_ReturningBeforeEach")
 			output, _ := renderTestPkg(it.T(), pkg)
 
-			gotest.True(it, !strings.Contains(output, "t.Parallel()"), "suite-level t.Parallel() should not be emitted")
+			gotest.NotContains(it, output, "t.Parallel()", "suite-level t.Parallel() should not be emitted")
 			gotest.Contains(it, output, "ctx := s.BeforeEach(ttt)")
 			gotest.Contains(it, output, "defer s.AfterEach(ttt, ctx)")
 			gotest.Contains(it, output, "s.TestInsert(ttt, ctx)")

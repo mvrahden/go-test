@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -595,16 +596,7 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 			it.T().Skipf("examples directory not found: %v", err)
 		}
 
-		origDir, err := os.Getwd()
-		if err != nil {
-			it.T().Fatal(err)
-		}
-		if err := os.Chdir(absExamples); err != nil {
-			it.T().Fatal(err)
-		}
-		defer os.Chdir(origDir)
-
-		loaded, err := gotestgen.LoadPackages([]string{"./cart"}, nil)
+		loaded, err := gotestgen.LoadPackages([]string{filepath.Join(absExamples, "cart")}, nil)
 		if err != nil {
 			it.T().Fatalf("LoadPackages: %v", err)
 		}
@@ -619,11 +611,20 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 		}
 		defer os.RemoveAll(tmpDir)
 
-		overlayArgs := []string{"-overlay=" + filepath.Join(tmpDir, "overlay.json"), "./cart"}
-		jsonData, _, err := gotestrunner.StdlibRunTestsJSON(context.Background(), overlayArgs)
-		if err != nil {
-			it.T().Fatalf("StdlibRunTestsJSON: %v", err)
+		cmd := exec.CommandContext(context.Background(), "go",
+			"test", "-json", "-ldflags=-checklinkname=0",
+			"-overlay="+filepath.Join(tmpDir, "overlay.json"), "./cart")
+		cmd.Dir = absExamples
+		var jsonOut bytes.Buffer
+		cmd.Stdout = &jsonOut
+		cmd.Stderr = os.Stderr
+		gotestrunner.SetProcessGroup(cmd)
+		if err := cmd.Run(); err != nil {
+			if cmd.ProcessState == nil {
+				it.T().Fatalf("go test: %v", err)
+			}
 		}
+		jsonData := jsonOut.Bytes()
 
 		events, err := gotestspec.ParseEvents(bytes.NewReader(jsonData))
 		if err != nil {
@@ -636,7 +637,7 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 		gotestspec.RenderTerminal(&buf, tree, gotestspec.WithNoColor())
 
 		output := buf.String()
-		gotest.True(it, bytes.Contains([]byte(output), []byte("ShoppingCart")), "expected output to contain \"ShoppingCart\", got:\n%s", output)
+		gotest.Contains(it, output, "ShoppingCart")
 	})
 }
 

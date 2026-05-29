@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -182,7 +181,7 @@ func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 				lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 
 				gotest.Equal(it, 4, len(lines))
-				gotest.True(it, slices.Contains(lines, "foo/bar.go:10.1,12.5 1 0"))
+				gotest.Contains(it, lines, "foo/bar.go:10.1,12.5 1 0")
 			})
 		})
 

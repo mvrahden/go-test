@@ -62,8 +62,8 @@ func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
 			data, err := os.ReadFile(snapPath)
 			gotest.NoError(it, err)
 			content := string(data)
-			gotest.True(it, strings.Contains(content, "a-val"))
-			gotest.True(it, strings.Contains(content, "z-val"))
+			gotest.Contains(it, content, "a-val")
+			gotest.Contains(it, content, "z-val")
 		})
 	})
 }
@@ -108,7 +108,7 @@ func (s *SnapshotUpdateTestSuite) TestMatchSnapshotUpdate(t *gotest.T) {
 			gotest.NoError(it, err)
 			content := string(data)
 			gotest.Contains(it, content, "updated-value")
-			gotest.True(it, !strings.Contains(content, "original-value"), "original content should be replaced")
+			gotest.NotContains(it, content, "original-value", "original content should be replaced")
 		})
 	})
 }
@@ -141,7 +141,7 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")
 			data, err := os.ReadFile(snapPath)
 			gotest.NoError(it, err)
-			gotest.True(it, strings.Contains(string(data), "hello world"))
+			gotest.Contains(it, string(data), "hello world")
 		})
 	})
 
@@ -159,7 +159,7 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")
 			data, err := os.ReadFile(snapPath)
 			gotest.NoError(it, err)
-			gotest.True(it, strings.Contains(string(data), "my-snapshot"))
+			gotest.Contains(it, string(data), "my-snapshot")
 		})
 	})
 
@@ -174,7 +174,7 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 			data, err := os.ReadFile(snapPath)
 			gotest.NoError(it, err)
 			content := string(data)
-			gotest.True(it, strings.Contains(content, "updated"))
+			gotest.Contains(it, content, "updated")
 		})
 	})
 }

@@ -47,6 +47,16 @@ func (s *LintTestSuite) TestAnalyzer(t *gotest.T) {
 	})
 }
 
+func (s *LintTestSuite) TestDisableNolintFlag(t *gotest.T) {
+	t.When("analyzer flags", func(w *gotest.T) {
+		w.It("registers the disable-nolint flag", func(it *gotest.T) {
+			f := lint.Analyzer.Flags.Lookup("disable-nolint")
+			gotest.True(it, f != nil)
+			gotest.Equal(it, "false", f.DefValue)
+		})
+	})
+}
+
 func (s *LintTestSuite) TestParseNolint(t *gotest.T) {
 	tests := []struct {
 		desc      string
@@ -83,4 +93,21 @@ func (s *LintTestSuite) TestParseNolint(t *gotest.T) {
 			})
 		})
 	}
+}
+
+// DisableNolintTestSuite runs separately and non-parallel because it
+// temporarily mutates the shared analyzer flag.
+type DisableNolintTestSuite struct{}
+
+func (s *DisableNolintTestSuite) TestNolintDirectivesIgnored(t *gotest.T) {
+	testdata := analysistest.TestData()
+
+	lint.ExportSetDisableNolint(true)
+	defer lint.ExportSetDisableNolint(false)
+
+	t.When("disable-nolint is set", func(w *gotest.T) {
+		w.It("reports all diagnostics regardless of nolint directives", func(it *gotest.T) {
+			analysistest.Run(it.T(), testdata, lint.Analyzer, "withdisablednolint")
+		})
+	})
 }

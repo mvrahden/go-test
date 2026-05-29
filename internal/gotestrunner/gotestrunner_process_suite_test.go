@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -53,7 +52,7 @@ func (s *GotestrunnerProcessTestSuite) TestGracefulTermination(t *gotest.T) {
 
 			buf := make([]byte, 256)
 			n, _ := stdout.Read(buf)
-			gotest.True(it, strings.Contains(string(buf[:n]), "ready"),
+			gotest.Contains(it, string(buf[:n]), "ready",
 				"child not ready: %q", string(buf[:n]))
 
 			err = gotestrunner.TerminateProcessGroup(cmd.Process.Pid)
@@ -134,7 +133,7 @@ func (s *GotestrunnerProcessTestSuite) TestTeardownBudget(t *gotest.T) {
 					BudgetFile: "/tmp/pkg.test.budget",
 				}
 				cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, env, false)
-				gotest.True(it, slices.Contains(cmd.Env, "GOTEST_TEARDOWN_BUDGET_FILE=/tmp/pkg.test.budget"), "GOTEST_TEARDOWN_BUDGET_FILE not found in cmd.Env")
+				gotest.Contains(it, cmd.Env, "GOTEST_TEARDOWN_BUDGET_FILE=/tmp/pkg.test.budget", "GOTEST_TEARDOWN_BUDGET_FILE not found in cmd.Env")
 			})
 		})
 
