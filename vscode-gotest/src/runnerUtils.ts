@@ -505,6 +505,32 @@ export function computeWildcard(
   return result.length < importPaths.length ? result : undefined;
 }
 
+/**
+ * Determines the gotest package patterns and CWD for a batch of packages.
+ * When all packages belong to the same module, uses "./..." from the module dir.
+ * Otherwise falls back to computeWildcard or individual import paths.
+ */
+export function resolveRunPatterns(
+  importPaths: string[],
+  modulePath: string | undefined,
+  moduleDir: string | undefined,
+  workspaceDir: string,
+): { patterns: string[]; cwd: string } {
+  if (
+    modulePath &&
+    moduleDir &&
+    importPaths.length > 1 &&
+    importPaths.every(
+      (ip) => ip === modulePath || ip.startsWith(modulePath + "/"),
+    )
+  ) {
+    return { patterns: ["./..."], cwd: moduleDir };
+  }
+
+  const wildcards = computeWildcard(importPaths, modulePath);
+  return { patterns: wildcards ?? importPaths, cwd: workspaceDir };
+}
+
 export function getPackageDir(
   item: vscode.TestItem,
   cache: DiscoveryCache,

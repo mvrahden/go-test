@@ -479,6 +479,14 @@ export class CoverageRunner implements vscode.Disposable {
     token: vscode.CancellationToken,
     testOnly?: boolean,
   ): Promise<string> {
+    const firstPkg = pkgInfos[0];
+    const modulePath = firstPkg
+      ? this.cache.getModulePath(firstPkg.importPath)
+      : undefined;
+    const moduleDir = modulePath
+      ? this.cache.getModuleDir(modulePath)
+      : undefined;
+
     const result = await executeBatch({
       pkgInfos,
       filter,
@@ -489,6 +497,7 @@ export class CoverageRunner implements vscode.Disposable {
       controller: this.controller,
       outputChannel: this.outputChannel,
       label: "coverage",
+      moduleDir,
       coverage: { store: this.store, testOnly },
       onResults: (applied) => {
         for (const r of applied) {

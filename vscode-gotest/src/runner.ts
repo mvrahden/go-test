@@ -278,6 +278,14 @@ export class TestRunner {
     token: vscode.CancellationToken,
     env?: Record<string, string>,
   ): Promise<void> {
+    const firstPkg = pkgInfos[0];
+    const modulePath = firstPkg
+      ? this.cache.getModulePath(firstPkg.importPath)
+      : undefined;
+    const moduleDir = modulePath
+      ? this.cache.getModuleDir(modulePath)
+      : undefined;
+
     const result = await executeBatch({
       pkgInfos,
       filter,
@@ -289,6 +297,7 @@ export class TestRunner {
       outputChannel: this.outputChannel,
       label: "runner",
       env,
+      moduleDir,
       coverage: coverOnRun ? { store: this.coverageStore! } : undefined,
       onResults: (applied) => {
         for (const r of applied) {

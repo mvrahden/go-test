@@ -45,6 +45,7 @@ import {
   getPackageItem,
   expandToPackages,
   computeWildcard,
+  resolveRunPatterns,
   applyResults,
   enqueueDescendants,
   resolveAncestorItems,
@@ -1064,5 +1065,63 @@ describe("resolveAncestorsOf", () => {
       "pass",
       undefined,
     );
+  });
+});
+
+describe("resolveRunPatterns", () => {
+  it("returns ./... from module dir when all packages are in the same module", () => {
+    const result = resolveRunPatterns(
+      ["example.com/proj/pkg/a", "example.com/proj/pkg/b"],
+      "example.com/proj",
+      "/ws",
+      "/ws",
+    );
+    expect(result.patterns).toEqual(["./..."]);
+    expect(result.cwd).toBe("/ws");
+  });
+
+  it("uses module dir as cwd when it differs from workspace dir", () => {
+    const result = resolveRunPatterns(
+      ["example.com/proj/examples/auth", "example.com/proj/examples/cart"],
+      "example.com/proj/examples",
+      "/ws/examples",
+      "/ws",
+    );
+    expect(result.patterns).toEqual(["./..."]);
+    expect(result.cwd).toBe("/ws/examples");
+  });
+
+  it("falls back to computeWildcard when no module info", () => {
+    const result = resolveRunPatterns(
+      ["example.com/pkg/a", "example.com/pkg/b"],
+      undefined,
+      undefined,
+      "/ws",
+    );
+    expect(result.patterns).toEqual(["example.com/pkg/..."]);
+    expect(result.cwd).toBe("/ws");
+  });
+
+  it("falls back to individual paths for single package", () => {
+    const result = resolveRunPatterns(
+      ["example.com/proj/pkg/a"],
+      "example.com/proj",
+      "/ws",
+      "/ws",
+    );
+    expect(result.patterns).toEqual(["example.com/proj/pkg/a"]);
+    expect(result.cwd).toBe("/ws");
+  });
+
+  it("falls back when packages span multiple modules", () => {
+    const result = resolveRunPatterns(
+      ["example.com/proj/pkg/a", "example.com/other/pkg/b"],
+      "example.com/proj",
+      "/ws",
+      "/ws",
+    );
+    // Not all packages match the module, so falls back
+    expect(result.cwd).toBe("/ws");
+    expect(result.patterns).not.toEqual(["./..."]);
   });
 });

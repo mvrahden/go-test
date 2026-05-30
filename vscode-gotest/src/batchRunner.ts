@@ -9,7 +9,7 @@ import { buildCliCommand, formatCliCommand } from "./cli.js";
 import {
   applyResults,
   spawnTestProcess,
-  computeWildcard,
+  resolveRunPatterns,
   type AppliedResult,
 } from "./runnerUtils.js";
 import {
@@ -33,6 +33,7 @@ export interface BatchConfig {
   outputChannel: vscode.LogOutputChannel;
   label: string;
   env?: Record<string, string>;
+  moduleDir?: string;
   coverage?: {
     store: CoverageStore;
     testOnly?: boolean;
@@ -56,16 +57,27 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     outputChannel,
     label,
     env,
+    moduleDir,
     coverage,
     onResults,
   } = config;
 
   const importPaths = pkgInfos.map((p) => p.importPath);
-  const modulePath = await readModulePath(workspaceDir);
-  const wildcards = filter
-    ? undefined
-    : computeWildcard(importPaths, modulePath);
-  const cliPkgArgs = wildcards ?? importPaths;
+  const modulePath = await readModulePath(moduleDir ?? workspaceDir);
+  let cliPkgArgs: string[];
+  let effectiveCwd = workspaceDir;
+  if (filter) {
+    cliPkgArgs = importPaths;
+  } else {
+    const resolved = resolveRunPatterns(
+      importPaths,
+      modulePath,
+      moduleDir,
+      workspaceDir,
+    );
+    cliPkgArgs = resolved.patterns;
+    effectiveCwd = resolved.cwd;
+  }
   let coverFile: string | undefined;
 
   try {
@@ -94,7 +106,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     }
 
     const cliArgs = [...gotestArgs, "--", ...goTestArgs];
-    const cmd = await buildCliCommand(cliArgs, workspaceDir, outputChannel);
+    const cmd = await buildCliCommand(cliArgs, effectiveCwd, outputChannel);
     outputChannel.info(`[${label}] ${formatCliCommand(cmd)}`);
 
     const streamedPkgs = new Set<string>();
@@ -142,7 +154,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     const result = await spawnTestProcess(
       cmd.bin,
       cmd.args,
-      workspaceDir,
+      effectiveCwd,
       token,
       outputChannel,
       label,
