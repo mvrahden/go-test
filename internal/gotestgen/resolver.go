@@ -463,14 +463,26 @@ func (r *resolver) registerSharedFixture(named *types.Named) error {
 	hasDehydrate := mset.Lookup(typePkg, "Dehydrate") != nil
 	hasConfig := detectConfigMethod(mset, typePkg, gotestast.SharedFixture)
 
+	isLocal := typePkg.Path() == r.targetPkg.PkgPath
+	pkgName := ""
+	var qualifiedType string
+	if isLocal {
+		qualifiedType = fixtureQualifiedType(named, "")
+	} else {
+		pkgName = typePkg.Name()
+		qualifiedType = fixtureQualifiedType(named, pkgName)
+	}
+
 	st, ok := named.Underlying().(*types.Struct)
 	if !ok {
 		r.sharedSeen[key] = &SharedFixtureInfo{
-			Identifier:   identifier,
-			PkgPath:      typePkg.Path(),
-			HasConfig:    hasConfig,
-			HasHydrate:   hasHydrate,
-			HasDehydrate: hasDehydrate,
+			Identifier:    identifier,
+			PkgPath:       typePkg.Path(),
+			PkgName:       pkgName,
+			QualifiedType: qualifiedType,
+			HasConfig:     hasConfig,
+			HasHydrate:    hasHydrate,
+			HasDehydrate:  hasDehydrate,
 		}
 		return nil
 	}
@@ -551,6 +563,8 @@ func (r *resolver) registerSharedFixture(named *types.Named) error {
 	r.sharedSeen[key] = &SharedFixtureInfo{
 		Identifier:       identifier,
 		PkgPath:          typePkg.Path(),
+		PkgName:          pkgName,
+		QualifiedType:    qualifiedType,
 		HasConfig:        hasConfig,
 		HasHydrate:       hasHydrate,
 		HasDehydrate:     hasDehydrate,
@@ -740,6 +754,10 @@ func topologicalSort(resolved map[*types.Named]*ResolvedFixture) ([]*ResolvedFix
 		}
 	}
 
+	sort.Slice(all, func(i, j int) bool {
+		return all[i].Identifier < all[j].Identifier
+	})
+
 	var queue []*ResolvedFixture
 	for _, rf := range all {
 		if inDegree[rf] == 0 {
@@ -756,6 +774,9 @@ func topologicalSort(resolved map[*types.Named]*ResolvedFixture) ([]*ResolvedFix
 			inDegree[child]--
 			if inDegree[child] == 0 {
 				queue = append(queue, child)
+				sort.Slice(queue, func(i, j int) bool {
+					return queue[i].Identifier < queue[j].Identifier
+				})
 			}
 		}
 	}

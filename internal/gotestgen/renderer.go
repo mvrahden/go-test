@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"go/format"
-	"strings"
 	"text/template"
 
 	"github.com/mvrahden/go-test/about"
@@ -92,7 +91,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	fixtureBound := resolved.FixtureBound
 	standalone := resolved.Standalone
 	allViewModels := buildAllFixtureViewModels(resolved.AllFixtures)
-	sfNodeVMs := buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures, pkg.PkgPath)
+	sfNodeVMs := buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures)
 	hasFixtures := len(resolved.RootFixtures) > 0 || len(sfNodeVMs) > 0
 
 	buf := bytes.NewBuffer(nil)
@@ -244,7 +243,7 @@ func buildAllFixtureViewModels(allFixtures []*ResolvedFixture) []*FixtureViewMod
 	return vms
 }
 
-func buildSharedFixtureNodeVMs(sharedFixtures []SharedFixtureInfo, targetPkgPath string) []*SharedFixtureNodeVM {
+func buildSharedFixtureNodeVMs(sharedFixtures []SharedFixtureInfo) []*SharedFixtureNodeVM {
 	if len(sharedFixtures) == 0 {
 		return nil
 	}
@@ -253,10 +252,8 @@ func buildSharedFixtureNodeVMs(sharedFixtures []SharedFixtureInfo, targetPkgPath
 	stateKeyToID := make(map[string]string, len(sharedFixtures))
 	for _, sf := range sharedFixtures {
 		id := sf.Identifier
-		if sf.PkgPath != targetPkgPath {
-			parts := strings.Split(sf.PkgPath, "/")
-			pkgName := parts[len(parts)-1]
-			id = pkgName + "_" + sf.Identifier
+		if sf.PkgName != "" {
+			id = sf.PkgName + "_" + sf.Identifier
 		}
 		stateKeyToID[sf.PkgPath+"."+sf.Identifier] = id
 	}
@@ -264,12 +261,9 @@ func buildSharedFixtureNodeVMs(sharedFixtures []SharedFixtureInfo, targetPkgPath
 	var vms []*SharedFixtureNodeVM
 	for _, sf := range sharedFixtures {
 		id := sf.Identifier
-		qualifiedType := sf.Identifier
-		if sf.PkgPath != targetPkgPath {
-			parts := strings.Split(sf.PkgPath, "/")
-			pkgName := parts[len(parts)-1]
-			id = pkgName + "_" + sf.Identifier
-			qualifiedType = pkgName + "." + sf.Identifier
+		qualifiedType := sf.QualifiedType
+		if sf.PkgName != "" {
+			id = sf.PkgName + "_" + sf.Identifier
 		}
 
 		var dependsOn []string

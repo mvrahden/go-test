@@ -164,9 +164,9 @@ func (ts *ƒƒ_GOTEST_ServiceTestSuite) AfterAll(it *gotest.T)   {}
 func (ts *ƒƒ_GOTEST_ServiceTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_ServiceTestSuite) AfterEach(it *gotest.T)  {}
 
-var ƒ_DatabaseFixture *DatabaseFixture
-
 var ƒ_CacheFixture *CacheFixture
+
+var ƒ_DatabaseFixture *DatabaseFixture
 
 var ƒ_ServiceFixture *ServiceFixture
 
@@ -190,19 +190,6 @@ func TestMain(m *testing.M) {
 	os.Exit(gotestruntime.RunFixtureMain(m, gotestruntime.MainConfig{
 		Fixtures: []*gotestruntime.FixtureNode{
 			{
-				Name:   "DatabaseFixture",
-				Config: gotest.DefaultFixtureConfig(),
-				Init: func() {
-					ƒ_DatabaseFixture = &DatabaseFixture{}
-				},
-				BeforeAll: func(ctx context.Context) error {
-					return ƒ_DatabaseFixture.BeforeAll(ctx)
-				},
-				AfterAll: func(ctx context.Context) error {
-					return ƒ_DatabaseFixture.AfterAll(ctx)
-				},
-			},
-			{
 				Name:   "CacheFixture",
 				Config: gotest.DefaultFixtureConfig(),
 				Init: func() {
@@ -213,6 +200,19 @@ func TestMain(m *testing.M) {
 				},
 				AfterAll: func(ctx context.Context) error {
 					return ƒ_CacheFixture.AfterAll(ctx)
+				},
+			},
+			{
+				Name:   "DatabaseFixture",
+				Config: gotest.DefaultFixtureConfig(),
+				Init: func() {
+					ƒ_DatabaseFixture = &DatabaseFixture{}
+				},
+				BeforeAll: func(ctx context.Context) error {
+					return ƒ_DatabaseFixture.BeforeAll(ctx)
+				},
+				AfterAll: func(ctx context.Context) error {
+					return ƒ_DatabaseFixture.AfterAll(ctx)
 				},
 			},
 			{

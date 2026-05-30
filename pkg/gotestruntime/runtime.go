@@ -242,7 +242,6 @@ func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string
 	// Handle shared state nodes (unmarshal + hydrate)
 	if node.SharedState != nil {
 		if sharedState == nil {
-			tracker.markSucceeded(node)
 			return nil
 		}
 		raw, ok := sharedState[node.SharedState.StateKey]

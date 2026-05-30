@@ -15,6 +15,8 @@ var sharedFixtureTpl = template.Must(template.New("sharedfixture").ParseFS(templ
 type SharedFixtureInfo struct {
 	Identifier       string // type name e.g. "PostgresFixture"
 	PkgPath          string // import path e.g. "github.com/example/project/tests/fixtures"
+	PkgName          string // Go package name e.g. "fixtures" (from types.Package.Name())
+	QualifiedType    string // Go type expression e.g. "fixtures.PostgresFixture" (handles generics)
 	HasConfig        bool
 	HasHydrate       bool
 	HasDehydrate     bool
