@@ -17,8 +17,12 @@ import (
 {{- end }}
 )
 
+func ƒquote(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
+}
+
 func main() {
-	state := map[string]json.RawMessage{}
 {{ range $f := .Fixtures }}
 	{{ $f.VarName }} := &{{ $f.QualifiedType }}{}
 	ƒcfg_{{ $f.VarName }} := gotest.DefaultFixtureConfig()
@@ -27,13 +31,29 @@ func main() {
 {{- end }}
 {{ end }}
 	ƒerrs := make([]error, {{ len .Fixtures }})
-	ƒctx, ƒcancel := context.WithCancel(context.Background())
-	defer ƒcancel()
+	ƒctx := context.Background()
+{{ range $f := .Fixtures }}
+	ƒdone_{{ $f.VarName }} := make(chan struct{})
+{{- end }}
+
 	var ƒwg sync.WaitGroup
 {{ range $i, $f := .Fixtures }}
 	ƒwg.Add(1)
 	go func() {
 		defer ƒwg.Done()
+		defer close(ƒdone_{{ $f.VarName }})
+{{- range $dep := $f.DependsOnVars }}
+		<-ƒdone_{{ $dep }}
+{{- end }}
+{{- range $idx := $f.DependsOnIndices }}
+		if ƒerrs[{{ $idx }}] != nil {
+			ƒerrs[{{ $i }}] = fmt.Errorf("skipped: dependency failed")
+			return
+		}
+{{- end }}
+{{- range $pa := $f.ParentAssignments }}
+		{{ $f.VarName }}.{{ $pa.FieldName }} = {{ $pa.ParentVar }}
+{{- end }}
 		ƒattempts := 1 + ƒcfg_{{ $f.VarName }}.Retries
 		for ƒj := range ƒattempts {
 			ctx := ƒctx
@@ -48,7 +68,6 @@ func main() {
 			if ƒerrs[{{ $i }}] == nil {
 				break
 			}
-			ƒcancel()
 			if ƒj < ƒattempts-1 {
 				fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[{{ $i }}])
 				if ƒcfg_{{ $f.VarName }}.RetryDelay > 0 {
@@ -58,7 +77,30 @@ func main() {
 		}
 		if ƒerrs[{{ $i }}] != nil {
 			fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_{{ $f.VarName }}.Retries, ƒerrs[{{ $i }}])
+			return
 		}
+{{- if $f.TransferFields }}
+		{
+			type transfer struct {
+{{- range $f.TransferFields }}
+				{{ . }} interface{} `json:"{{ . }}"`
+{{- end }}
+			}
+			b, err := json.Marshal(transfer{
+{{- range $f.TransferFields }}
+				{{ . }}: {{ $f.VarName }}.{{ . }},
+{{- end }}
+			})
+			if err != nil {
+				ƒerrs[{{ $i }}] = fmt.Errorf("marshal: %w", err)
+				fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}: marshal: %v\n", err)
+				return
+			}
+			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("{{ $f.StateKey }}"), string(b))
+		}
+{{- else }}
+		fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":{}}\n", ƒquote("{{ $f.StateKey }}"))
+{{- end }}
 	}()
 {{ end }}
 	ƒwg.Wait()
@@ -70,62 +112,39 @@ func main() {
 			break
 		}
 	}
+
 	if ƒanyFailed {
-{{ range $i, $f := .Fixtures }}
-		if ƒerrs[{{ $i }}] == nil {
-			{{ $f.VarName }}.AfterAll(context.Background())
+		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
+{{ range .TeardownFixtures }}
+		if ƒerrs[{{ .Index }}] == nil {
+			{{ .VarName }}.AfterAll(context.Background())
 		}
-{{ end }}
+{{- end }}
 		os.Exit(1)
-	}
-{{ range $f := .Fixtures }}
-{{- if $f.TransferFields }}
-	{
-		type transfer struct {
-{{- range $f.TransferFields }}
-			{{ . }} interface{} `json:"{{ . }}"`
-{{- end }}
-		}
-		b, err := json.Marshal(transfer{
-{{- range $f.TransferFields }}
-			{{ . }}: {{ $f.VarName }}.{{ . }},
-{{- end }}
-		})
-		if err != nil {
-{{ range $.TeardownVars }}
-			{{ . }}.AfterAll(context.Background())
-{{- end }}
-			fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}: marshal: %v\n", err)
-			os.Exit(1)
-		}
-		state[{{ printf "%q" $f.StateKey }}] = b
-	}
-{{- end }}
-{{ end }}
-	{
+	} else {
 		var ƒmaxTimeout time.Duration
 {{ range $f := .Fixtures }}
 		if ƒcfg_{{ $f.VarName }}.Timeout > ƒmaxTimeout {
 			ƒmaxTimeout = ƒcfg_{{ $f.VarName }}.Timeout
 		}
 {{ end }}
-		ƒbudgetBytes, _ := json.Marshal((ƒmaxTimeout + 30*time.Second).String())
-		state["_teardownBudget"] = ƒbudgetBytes
+		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
 	}
-	json.NewEncoder(os.Stdout).Encode(state)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
 	<-sig
-{{ range .TeardownVars }}
-	{
+{{ range .TeardownFixtures }}
+	if ƒerrs[{{ .Index }}] == nil {
 		ctx := context.Background()
-		if ƒcfg_{{ . }}.Timeout > 0 {
+		if ƒcfg_{{ .VarName }}.Timeout > 0 {
 			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, ƒcfg_{{ . }}.Timeout)
-			defer cancel()
+			ctx, cancel = context.WithTimeout(ctx, ƒcfg_{{ .VarName }}.Timeout)
+			{{ .VarName }}.AfterAll(ctx)
+			cancel()
+		} else {
+			{{ .VarName }}.AfterAll(ctx)
 		}
-		{{ . }}.AfterAll(ctx)
 	}
 {{- end }}
 }
