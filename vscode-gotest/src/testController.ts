@@ -290,6 +290,9 @@ export class GoTestController implements vscode.Disposable {
     }
 
     const seenChildIds = new Set<string>();
+    if (node.importPath) {
+      seenChildIds.add(node.importPath);
+    }
     for (const child of node.children.values()) {
       this.addTrieNode(child, dirItem.children, seenIds, idPrefix);
       const childId =
