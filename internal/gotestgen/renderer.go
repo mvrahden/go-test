@@ -92,16 +92,15 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	fixtureBound := resolved.FixtureBound
 	standalone := resolved.Standalone
 	allViewModels := buildAllFixtureViewModels(resolved.AllFixtures)
-	hasFixtures := len(resolved.RootFixtures) > 0
+	sfNodeVMs := buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures, pkg.PkgPath)
+	hasFixtures := len(resolved.RootFixtures) > 0 || len(sfNodeVMs) > 0
 
 	buf := bytes.NewBuffer(nil)
 	if err := r.renderFileHeader(buf, pkg, spec, hasFixtures, resolved.SuiteSharedFixtures, allViewModels); err != nil {
 		return nil, fmt.Errorf("failed rendering file header. err: %w", err)
 	}
 
-	sfNodeVMs := buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures, pkg.PkgPath)
-
-	if len(fixtureBound) > 0 {
+	if len(fixtureBound) > 0 || len(sfNodeVMs) > 0 {
 		if err := r.renderFixtures(buf, fixtureBound, allViewModels, resolved.SuiteFixtureFields, sfNodeVMs); err != nil {
 			return nil, fmt.Errorf("failed rendering fixture suites. err: %w", err)
 		}
@@ -131,7 +130,6 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		{Path: "testing"},
 		{Path: about.Repo + "/pkg/gotest"},
 	}
-	hasSuiteSharedFixtures := len(suiteSharedFixtures) > 0
 	if hasFixtures {
 		imports = append(imports, headerImport{Path: about.Repo + "/pkg/gotestruntime"})
 		imports = append(imports, headerImport{Path: "context"})
@@ -142,27 +140,6 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		return v.IsMethodParallel()
 	}) {
 		imports = append(imports, headerImport{Path: "sync"})
-	}
-	if !hasFixtures && hasSuiteSharedFixtures {
-		imports = append(imports, headerImport{Path: "context"})
-		imports = append(imports, headerImport{Path: "os"})
-	}
-	hasSharedFixtures := false
-	if hasSuiteSharedFixtures {
-		fixtureBoundSuites := make(map[string]bool)
-		for _, vm := range allViewModels {
-			for _, cs := range vm.ChildSuites {
-				fixtureBoundSuites[cs.Identifier()] = true
-			}
-		}
-		for _, ts := range spec.EffectiveTestSuites {
-			if _, hasSF := suiteSharedFixtures[ts.Identifier()]; hasSF {
-				if !fixtureBoundSuites[ts.Identifier()] {
-					hasSharedFixtures = true
-					break
-				}
-			}
-		}
 	}
 	seenPkg := map[string]bool{}
 	for _, vm := range allViewModels {
@@ -191,9 +168,6 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 			seenPkg[pkgPath] = true
 		}
 	}
-	if hasSharedFixtures {
-		imports = append(imports, headerImport{Path: "encoding/json"})
-	}
 	data := TplData{
 		RepoName:    about.ShortInfo(),
 		PackageName: pkg.Name,
@@ -210,7 +184,7 @@ func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSh
 }
 
 func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, allViewModels []*FixtureViewModel, suiteFixtureFields map[string][]FixtureFieldBinding, sfNodes []*SharedFixtureNodeVM) error {
-	if len(allViewModels) == 0 {
+	if len(allViewModels) == 0 && len(sfNodes) == 0 {
 		return nil
 	}
 

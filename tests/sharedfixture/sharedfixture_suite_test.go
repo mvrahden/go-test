@@ -191,25 +191,23 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 
 			if strings.HasSuffix(r.PkgPath, "/standalone") {
 				w.It("standalone", func(it *gotest.T) {
-					gotest.Contains(it, code, `os.Getenv("GOTEST_SHARED_STATE_FILE")`)
-					gotest.Contains(it, code, "os.ReadFile(ƒsharedFile)")
-					gotest.Contains(it, code, "s.Alpha = sf0")
-					gotest.Contains(it, code, "sf0.Hydrate(context.Background())")
-					gotest.Contains(it, code, "sf0.Dehydrate(context.Background())")
-					gotest.Contains(it, code, "s.Beta = sf1")
-					gotest.NotContains(it, code, "sf1.Hydrate")
-					gotest.NotContains(it, code, "sf1.Dehydrate")
+					gotest.Contains(it, code, "gotestruntime.RunFixtureMain(m,")
+					gotest.Contains(it, code, "var ƒ_sf_fixtures_AlphaSharedFixture = &fixtures.AlphaSharedFixture{}")
+					gotest.Contains(it, code, "var ƒ_sf_fixtures_BetaSharedFixture = &fixtures.BetaSharedFixture{}")
+					gotest.Contains(it, code, "s.Alpha = ƒ_sf_fixtures_AlphaSharedFixture")
+					gotest.Contains(it, code, "s.Beta = ƒ_sf_fixtures_BetaSharedFixture")
+					gotest.NotContains(it, code, "encoding/json", "should NOT import encoding/json")
+					gotest.NotContains(it, code, "json.Unmarshal", "should NOT inline JSON unmarshal")
 				})
 			}
 
 			if strings.HasSuffix(r.PkgPath, "/fixturebound") {
 				w.It("fixturebound", func(it *gotest.T) {
 					gotest.Contains(it, code, "gotestruntime.RunFixtureMain(m,")
-					gotest.Contains(it, code, "gotestruntime.SharedFixtureBinding")
-					gotest.Contains(it, code, "var ƒ_sf0_InfraFixture = &fixtures.AlphaSharedFixture{}")
-					gotest.Contains(it, code, "ƒ_InfraFixture.Alpha = ƒ_sf0_InfraFixture")
-					gotest.Contains(it, code, "ƒ_sf0_InfraFixture.Hydrate(ctx)")
-					gotest.Contains(it, code, "ƒ_sf0_InfraFixture.Dehydrate(ctx)")
+					gotest.Contains(it, code, "var ƒ_sf_fixtures_AlphaSharedFixture = &fixtures.AlphaSharedFixture{}")
+					gotest.Contains(it, code, "Alpha: ƒ_sf_fixtures_AlphaSharedFixture")
+					gotest.Contains(it, code, "ƒ_sf_fixtures_AlphaSharedFixture.Hydrate(ctx)")
+					gotest.Contains(it, code, "ƒ_sf_fixtures_AlphaSharedFixture.Dehydrate(ctx)")
 				})
 			}
 		}
