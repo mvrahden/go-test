@@ -277,31 +277,41 @@ without modifying source. Go's compiler reads virtual paths from the overlay.
 ### SharedFixture Lifecycle
 
 SharedFixtures live in a **separate subprocess** that outlives all test
-binaries. State is transferred via JSON serialization.
+binaries. They form a DAG via pointer fields to other SharedFixture types.
+State is transferred via JSON serialization, streamed as each fixture completes.
 
 ```
 ┌── SETUP SUBPROCESS ──────────────────────────────────────────────────┐
 │                                                                       │
-│  for each SharedFixture (concurrent):                                 │
-│    sf.BeforeAll(ctx)     timeout: SharedFixtureConfig.Timeout (5m)    │
-│                          retries: SharedFixtureConfig.Retries (1)     │
+│  DAG-ordered BeforeAll (parents before children, independent conc.):  │
 │                                                                       │
-│  Serialize transfer fields → JSON → stdout                            │
+│  wave 0 (no dependencies):                                            │
+│  ┌─ PostgresSF.BeforeAll(ctx) ─┐  ┌─ RedisSF.BeforeAll(ctx) ─┐      │
+│  └───────────┬─────────────────┘  └──────────┬────────────────┘      │
+│              │ emit JSON state               │ emit JSON state        │
+│              └──────────┬────────────────────┘                        │
+│                         ▼                                              │
+│  wave 1 (depends on Postgres):                                        │
+│  ┌─ SchemaSF.BeforeAll(ctx) ────────────────────────────────────┐     │
+│  └──────────┬───────────────────────────────────────────────────┘     │
+│             │ emit JSON state                                         │
+│                                                                       │
+│  Each fixture's state emitted to stdout immediately after BeforeAll   │
 │  Include _teardownBudget = maxTimeout + 30s                           │
 │                                                                       │
 │  ═══════════ block on SIGTERM/SIGINT ═══════════                      │
 │                                                                       │
-│  for each SharedFixture (reverse order):                              │
+│  for each SharedFixture (reverse DAG order):                          │
 │    sf.AfterAll(ctx)      timeout: SharedFixtureConfig.Timeout         │
 │                                                                       │
 └───────────────────────────────────────────────────────────────────────┘
 
-         │ stdout: JSON state       │ state.json file
+         │ stdout: JSON state       │ per-suite state.json files
          ▼                          ▼
 
 ┌── TEST PROCESS (per suite binary) ───────────────────────────────────┐
 │                                                                       │
-│  Read GOTEST_SHARED_STATE_FILE                                        │
+│  Read GOTEST_SHARED_STATE_FILE (contains only this suite's entries)   │
 │  json.Unmarshal → SharedFixture struct (transfer fields only)         │
 │  sf.Hydrate(ctx)    ← reconstruct local fields (e.g., DB handles)    │
 │  t.Cleanup → sf.Dehydrate(ctx)   ← release local resources           │
@@ -412,23 +422,31 @@ Each CompileResult immediately produces SuiteTargets that enter
 the execution semaphore. No "compile all, then run all" barrier.
 ```
 
-### Lazy Fixture Environment Resolution
+### Per-Suite Fixture Readiness
 
-Suites that need shared fixtures call `resolveFixtureEnv()` which blocks
-(via `sync.Once`) until the shared fixture setup completes. Suites that
-don't need shared fixtures skip this entirely and use `baseEnv`:
+Each suite has a set of shared fixture keys it needs (including transitive
+dependencies). The runner tracks which fixtures have emitted their state
+and dispatches suites as soon as their specific dependencies are all ready:
 
 ```
 Suite goroutine:
   │
-  ├─ needsFixture? ──yes──▶ resolveFixtureEnv()
+  ├─ needsFixture? ──yes──▶ waitForFixtureKeys(suite.SharedFixtureKeys)
   │                              │
-  │                              ├─ sync.Once blocks until fixtureReady
+  │                              ├─ Blocks until all keys in the suite's
+  │                              │   dependency set have emitted state
+  │                              ├─ Writes per-suite state file (only
+  │                              │   the entries this suite needs)
   │                              ├─ Returns env with GOTEST_SHARED_STATE_FILE
   │                              └─ Error? → streamCancel(), return
   │
   └─ needsFixture? ──no───▶ use baseEnv directly (no blocking)
 ```
+
+Suites that only need `PostgresSharedFixture` start as soon as Postgres
+is ready — they don't wait for `SchemaSharedFixture` or other unrelated
+fixtures. This reduces wall-clock time when fixtures have different
+startup durations.
 
 ---
 

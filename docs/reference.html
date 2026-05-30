@@ -693,6 +693,21 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
       <div class="callout">
         Fields assigned in <code>Hydrate</code> are automatically classified as local and excluded from serialization. Everything else transfers. No annotations needed.
       </div>
+
+      <h3>SharedFixture dependencies</h3>
+      <p>SharedFixtures can depend on other SharedFixtures via pointer fields — the same pattern used by package fixtures. <code>BeforeAll</code> runs in dependency order (parents first, independent fixtures in parallel). Cyclic dependencies are rejected at resolution time.</p>
+      <div class="code-block">
+        <pre><span class="kw">type</span> <span class="tp">SchemaSharedFixture</span> <span class="kw">struct</span> {
+    Postgres *<span class="tp">PostgresSharedFixture</span>  <span class="cm">// dependency — Postgres starts first</span>
+    Version  <span class="tp">string</span>
+}
+
+<span class="kw">func</span> (f *<span class="tp">SchemaSharedFixture</span>) <span class="fn">BeforeAll</span>(ctx context.Context) <span class="tp">error</span> {
+    <span class="cm">// f.Postgres.ConnStr is available</span>
+    <span class="kw">return</span> migrate(f.Postgres.ConnStr)
+}</pre>
+      </div>
+      <p>Suites are dispatched as soon as their specific shared fixture dependencies are ready — they don't wait for unrelated fixtures. Transitive dependencies are included automatically: if a suite needs <code>SchemaSharedFixture</code>, it also gets <code>PostgresSharedFixture</code>.</p>
     </section>
 
     <!-- 5. Assertions -->

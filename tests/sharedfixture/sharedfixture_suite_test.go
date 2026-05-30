@@ -131,12 +131,12 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 			_, hasBeta := state[betaKey]
 			gotest.True(it, hasBeta, "state should contain BetaSharedFixture")
 
-			gotest.Equal(it, "", doneEntry.Error, "done entry should have no error")
-			gotest.NotEqual(it, "", doneEntry.TeardownBudget, "done entry should have teardownBudget")
+			gotest.Empty(it, doneEntry.Error, "done entry should have no error")
+			gotest.NotEmpty(it, doneEntry.TeardownBudget, "done entry should have teardownBudget")
 
 			var alphaState struct{ DataPath string }
 			gotest.NoError(it, json.Unmarshal(state[alphaKey], &alphaState))
-			gotest.NotEqual(it, "", alphaState.DataPath, "Alpha.DataPath should be a real temp file path")
+			gotest.NotEmpty(it, alphaState.DataPath, "Alpha.DataPath should be a real temp file path")
 
 			var betaState struct {
 				Label string

@@ -283,6 +283,53 @@ func (f *E2ESetupFixture) BeforeAll(ctx context.Context) error {
 }
 ```
 
+### SharedFixture Dependencies
+
+SharedFixtures can depend on other SharedFixtures via pointer fields — the same pattern used by package fixtures:
+
+```go
+type PostgresSharedFixture struct {
+    ConnStr string
+    Pool    *pgxpool.Pool
+}
+
+func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error {
+    c, err := postgres.Run(ctx, "postgres:16")
+    if err != nil {
+        return err
+    }
+    f.ConnStr = c.MustConnectionString(ctx)
+    return f.connect(ctx)
+}
+
+func (f *PostgresSharedFixture) Hydrate(ctx context.Context) error { return f.connect(ctx) }
+
+type SchemaSharedFixture struct {
+    Postgres *PostgresSharedFixture   // dependency — Postgres starts first
+    Version  string
+}
+
+func (f *SchemaSharedFixture) BeforeAll(ctx context.Context) error {
+    // f.Postgres.ConnStr is available — Postgres.BeforeAll already completed
+    return migrate(f.Postgres.ConnStr)
+}
+```
+
+#### Rules
+
+- Dependencies are expressed via `*XSharedFixture` pointer fields on the struct.
+- `BeforeAll` runs in dependency order: parents before children, independent fixtures in parallel.
+- Cyclic dependencies are rejected at resolution time.
+- SharedFixtures cannot depend on PackageFixtures (they run in different processes).
+
+#### Per-suite dispatch
+
+Each shared fixture's state is emitted immediately after its `BeforeAll` completes (streaming protocol).
+Suites are dispatched as soon as their specific shared fixture dependencies are ready — they do not wait for all shared fixtures to finish.
+
+If a suite needs `SchemaSharedFixture`, and `SchemaSharedFixture` depends on `PostgresSharedFixture`, both are included automatically (transitive dependencies).
+Per-suite state files contain only the entries that suite needs.
+
 ### CLI flow
 
 ```

@@ -354,7 +354,17 @@ Fixture hook failures are reported with automatic attribution.
 FAIL: E2ESetupFixture.BeforeAll failed after 2 attempt(s): start postgres: connection refused
 ```
 
-For cross-package shared state (e.g. a database container shared across integration test packages), use `*SharedFixture` suffix — see [docs/design/fixtures.md](docs/design/fixtures.md) for the full reference.
+For cross-package shared state (e.g. a database container shared across integration test packages), use `*SharedFixture` suffix.
+SharedFixtures can depend on other SharedFixtures via pointer fields — `BeforeAll` runs in dependency order, and suites start as soon as their specific dependencies are ready:
+
+```go
+type SchemaSharedFixture struct {
+    Postgres *PostgresSharedFixture   // dependency — Postgres starts first
+    Version  string
+}
+```
+
+See [docs/design/fixtures.md](docs/design/fixtures.md) for the full reference.
 
 ## Parallelism
 
