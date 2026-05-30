@@ -531,6 +531,9 @@ func (s *ResolverTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
 			gotest.True(it, schema != nil, "expected SchemaSharedFixture in required list")
 			gotest.Equal(it, 1, len(schema.Dependencies))
 			gotest.Contains(it, schema.Dependencies[0], "PGSharedFixture")
+
+			gotest.NotContains(it, schema.TransferFields, "PG", "dep pointer field excluded from transfer")
+			gotest.Contains(it, schema.TransferFields, "Version", "non-dep exported field is a transfer field")
 		})
 	})
 

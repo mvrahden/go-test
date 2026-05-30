@@ -1507,6 +1507,60 @@ func TestDAG_SharedStateChain(t *testing.T) {
 	gotest.True(t, indexOf(events, "schema.hydrate") < indexOf(events, "m.run"))
 }
 
+func TestDAG_SharedStateNode_MissingStateFile(t *testing.T) {
+	rec := &recorder{}
+
+	t.Setenv("GOTEST_SHARED_STATE_FILE", "")
+
+	type pg struct{ ConnStr string }
+	pgTarget := &pg{}
+
+	pgNode := &FixtureNode{
+		Name: "PostgresSharedFixture",
+		SharedState: &SharedStateNode{
+			StateKey: "pkg.PostgresSharedFixture",
+			Target:   pgTarget,
+			Hydrate: func(ctx context.Context) error {
+				rec.record("pg.hydrate")
+				return nil
+			},
+			Dehydrate: func(ctx context.Context) error {
+				rec.record("pg.dehydrate")
+				return nil
+			},
+		},
+	}
+
+	plainNode := &FixtureNode{
+		Name:   "PlainFixture",
+		Config: gotest.DefaultFixtureConfig(),
+		Init:   func() { rec.record("plain.init") },
+		BeforeAll: func(ctx context.Context) error {
+			rec.record("plain.beforeAll")
+			return nil
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("plain.afterAll")
+			return nil
+		},
+	}
+
+	exitCode := run(func() int {
+		rec.record("m.run")
+		return 0
+	}, MainConfig{Fixtures: []*FixtureNode{pgNode, plainNode}})
+
+	gotest.Equal(t, 0, exitCode)
+
+	events := rec.names()
+	gotest.NotContains(t, events, "pg.hydrate")
+	gotest.NotContains(t, events, "pg.dehydrate")
+	gotest.Contains(t, events, "plain.init")
+	gotest.Contains(t, events, "plain.beforeAll")
+	gotest.Contains(t, events, "m.run")
+	gotest.Contains(t, events, "plain.afterAll")
+}
+
 func indexOf(slice []string, val string) int {
 	for i, s := range slice {
 		if s == val {
