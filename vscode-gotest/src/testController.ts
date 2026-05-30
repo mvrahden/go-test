@@ -109,39 +109,150 @@ export class GoTestController implements vscode.Disposable {
     const isMultiFolder = wsGroups.size > 1;
 
     for (const [wsDir, entries] of wsGroups) {
-      const trie = buildPathTrie(entries);
-      collapsePathTrie(trie);
-
-      const idPrefix = isMultiFolder ? `${this.folderName(wsDir)}/` : "";
+      const modules = this.cache.getModules(wsDir);
+      const isMultiModule = modules.length > 1;
       const target = isMultiFolder
         ? this.getOrCreateFolderItem(wsDir, seenIds, rootIds)
         : this.controller.items;
 
-      if (trie.importPath && trie.children.size === 0) {
-        this.addPackageItem(trie.importPath, target, seenIds);
-        if (!isMultiFolder) rootIds.add(trie.importPath);
-      } else if (trie.importPath) {
-        this.addPackageItem(trie.importPath, target, seenIds);
-        if (!isMultiFolder) rootIds.add(trie.importPath);
-        for (const child of trie.children.values()) {
-          this.addTrieNode(child, target, seenIds, idPrefix);
-          if (!isMultiFolder) {
-            rootIds.add(
-              child.importPath && child.children.size === 0
-                ? child.importPath
-                : `dir:${child.segment}`,
+      if (isMultiModule) {
+        // Group entries by module
+        const byModule = new Map<string, typeof entries>();
+        for (const entry of entries) {
+          const mod = this.cache.getModulePath(entry.importPath) ?? "";
+          let group = byModule.get(mod);
+          if (!group) {
+            group = [];
+            byModule.set(mod, group);
+          }
+          group.push(entry);
+        }
+
+        for (const [modulePath, moduleEntries] of byModule) {
+          const moduleDir = this.cache.getModuleDir(modulePath);
+
+          // Compute module-relative prefix (e.g. "examples" for a module at /ws/examples)
+          const moduleRelPrefix =
+            moduleDir && moduleDir.startsWith(wsDir)
+              ? moduleDir.slice(wsDir.length).replace(/^[/\\]+/, "")
+              : "";
+
+          // Rewrite entries so relativePath is relative to module dir, not workspace dir
+          const moduleRelEntries = moduleEntries.map((e) => ({
+            relativePath:
+              moduleRelPrefix &&
+              e.relativePath.startsWith(moduleRelPrefix)
+                ? e.relativePath
+                    .slice(moduleRelPrefix.length)
+                    .replace(/^[/\\]+/, "") || "."
+                : e.relativePath,
+            importPath: e.importPath,
+          }));
+
+          // Create module node
+          const moduleLabel =
+            moduleRelPrefix ||
+            modulePath.split("/").pop() ||
+            modulePath;
+          const moduleId = `module:${modulePath}`;
+          seenIds.add(moduleId);
+          if (!isMultiFolder) rootIds.add(moduleId);
+
+          let moduleItem = target.get(moduleId);
+          if (!moduleItem) {
+            moduleItem = this.controller.createTestItem(
+              moduleId,
+              moduleLabel,
             );
           }
+          moduleItem.tags = [new vscode.TestTag("module")];
+          moduleItem.description = "module";
+          target.add(moduleItem);
+
+          // Build path trie within this module
+          const trie = buildPathTrie(moduleRelEntries);
+          collapsePathTrie(trie);
+
+          const seenModuleChildIds = new Set<string>();
+
+          if (trie.importPath && trie.children.size === 0) {
+            this.addPackageItem(
+              trie.importPath,
+              moduleItem.children,
+              seenIds,
+            );
+            seenModuleChildIds.add(trie.importPath);
+          } else if (trie.importPath) {
+            this.addPackageItem(
+              trie.importPath,
+              moduleItem.children,
+              seenIds,
+            );
+            seenModuleChildIds.add(trie.importPath);
+            for (const child of trie.children.values()) {
+              this.addTrieNode(child, moduleItem.children, seenIds, "");
+              seenModuleChildIds.add(
+                child.importPath && child.children.size === 0
+                  ? child.importPath
+                  : `dir:${child.segment}`,
+              );
+            }
+          } else {
+            for (const child of trie.children.values()) {
+              this.addTrieNode(child, moduleItem.children, seenIds, "");
+              seenModuleChildIds.add(
+                child.importPath && child.children.size === 0
+                  ? child.importPath
+                  : `dir:${child.segment}`,
+              );
+            }
+          }
+
+          // Clean up stale children within the module node
+          moduleItem.children.forEach((child: vscode.TestItem) => {
+            if (
+              !seenModuleChildIds.has(child.id) &&
+              !child.id.includes("/dynamic/")
+            ) {
+              moduleItem!.children.delete(child.id);
+            }
+          });
         }
       } else {
-        for (const child of trie.children.values()) {
-          this.addTrieNode(child, target, seenIds, idPrefix);
-          if (!isMultiFolder) {
-            rootIds.add(
-              child.importPath && child.children.size === 0
-                ? child.importPath
-                : `dir:${child.segment}`,
-            );
+        // Single module — existing behavior (no module node)
+        const trie = buildPathTrie(entries);
+        collapsePathTrie(trie);
+
+        const idPrefix = isMultiFolder
+          ? `${this.folderName(wsDir)}/`
+          : "";
+
+        if (trie.importPath && trie.children.size === 0) {
+          this.addPackageItem(trie.importPath, target, seenIds);
+          if (!isMultiFolder) rootIds.add(trie.importPath);
+        } else if (trie.importPath) {
+          this.addPackageItem(trie.importPath, target, seenIds);
+          if (!isMultiFolder) rootIds.add(trie.importPath);
+          for (const child of trie.children.values()) {
+            this.addTrieNode(child, target, seenIds, idPrefix);
+            if (!isMultiFolder) {
+              rootIds.add(
+                child.importPath && child.children.size === 0
+                  ? child.importPath
+                  : `dir:${child.segment}`,
+              );
+            }
+          }
+        } else {
+          for (const child of trie.children.values()) {
+            this.addTrieNode(child, target, seenIds, idPrefix);
+            if (!isMultiFolder) {
+              rootIds.add(
+                child.importPath && child.children.size === 0
+                  ? child.importPath
+                  : `dir:${child.segment}`,
+              );
+            }
           }
         }
       }
