@@ -18,10 +18,16 @@ func run(runTests func() int, cfg MainConfig) int {
 
 	var sharedState map[string]json.RawMessage
 	if anyNodeHasSharedFixtures(cfg.Roots, cfg.Fixtures) {
-		var err error
-		sharedState, err = loadSharedState()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
+		if os.Getenv("GOTEST_SHARED_STATE_FILE") != "" {
+			var err error
+			sharedState, err = loadSharedState()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
+				restoreCoverage()
+				return 2
+			}
+		} else if anyNodeHasLegacySharedFixtures(cfg.Roots, cfg.Fixtures) {
+			fmt.Fprintf(os.Stderr, "FAIL: GOTEST_SHARED_STATE_FILE not set — run via gotest CLI\n")
 			restoreCoverage()
 			return 2
 		}
@@ -235,12 +241,14 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string]json.RawMessage, tracker *nodeTracker) error {
 	// Handle shared state nodes (unmarshal + hydrate)
 	if node.SharedState != nil {
-		if sharedState != nil {
-			raw, ok := sharedState[node.SharedState.StateKey]
-			if ok {
-				if err := json.Unmarshal(raw, node.SharedState.Target); err != nil {
-					return fmt.Errorf("unmarshal shared fixture %q: %w", node.SharedState.StateKey, err)
-				}
+		if sharedState == nil {
+			tracker.markSucceeded(node)
+			return nil
+		}
+		raw, ok := sharedState[node.SharedState.StateKey]
+		if ok {
+			if err := json.Unmarshal(raw, node.SharedState.Target); err != nil {
+				return fmt.Errorf("unmarshal shared fixture %q: %w", node.SharedState.StateKey, err)
 			}
 		}
 		if node.Init != nil {
@@ -587,6 +595,20 @@ func loadSharedState() (map[string]json.RawMessage, error) {
 func anyNodeHasSharedFixtures(roots, fixtures []*FixtureNode) bool {
 	for _, f := range fixtures {
 		if len(f.SharedFixtures) > 0 || f.SharedState != nil {
+			return true
+		}
+	}
+	for _, root := range roots {
+		if hasSharedFixtures(root) {
+			return true
+		}
+	}
+	return false
+}
+
+func anyNodeHasLegacySharedFixtures(roots, fixtures []*FixtureNode) bool {
+	for _, f := range fixtures {
+		if len(f.SharedFixtures) > 0 {
 			return true
 		}
 	}

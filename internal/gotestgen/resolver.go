@@ -401,15 +401,15 @@ func (r *resolver) buildSharedFixtureRef(named *types.Named, idx int) (SharedFix
 	typePkg := named.Obj().Pkg()
 	typePkgPath := typePkg.Path()
 
-	isLocal := typePkgPath == r.targetPkg.PkgPath
-
-	if !isLocal && isInternalPkgPath(typePkgPath) {
+	if isInternalPkgPath(typePkgPath) {
 		return SharedFixtureRef{}, fmt.Errorf(
 			"shared fixture %q is in an internal package (%s); "+
 				"shared fixtures must live in a non-internal package so the setup subprocess can import them",
 			identifier, typePkgPath,
 		)
 	}
+
+	isLocal := typePkgPath == r.targetPkg.PkgPath
 
 	mset := types.NewMethodSet(types.NewPointer(named))
 	hasHydrate := mset.Lookup(typePkg, "Hydrate") != nil
