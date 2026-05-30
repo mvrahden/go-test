@@ -14,7 +14,7 @@ export interface DiscoverOutput {
 export interface DiscoverPackage {
   importPath: string;
   dir: string;
-  modulePath?: string;     // NEW: Go module path from go.mod
+  modulePath?: string; // NEW: Go module path from go.mod
   testOnly?: boolean;
   suites: DiscoverSuite[];
 }

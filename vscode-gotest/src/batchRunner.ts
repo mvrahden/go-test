@@ -68,11 +68,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
   } else {
     const modulePath = await readModulePath(workspaceDir);
     const wsPatterns = await readWorkspacePatterns(workspaceDir);
-    const wildcards = resolveRunPatterns(
-      importPaths,
-      modulePath,
-      wsPatterns,
-    );
+    const wildcards = resolveRunPatterns(importPaths, modulePath, wsPatterns);
     cliPkgArgs = wildcards ?? importPaths;
   }
   let coverFile: string | undefined;

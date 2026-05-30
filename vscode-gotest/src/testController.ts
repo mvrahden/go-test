@@ -140,8 +140,7 @@ export class GoTestController implements vscode.Disposable {
           // Rewrite entries so relativePath is relative to module dir, not workspace dir
           const moduleRelEntries = moduleEntries.map((e) => ({
             relativePath:
-              moduleRelPrefix &&
-              e.relativePath.startsWith(moduleRelPrefix)
+              moduleRelPrefix && e.relativePath.startsWith(moduleRelPrefix)
                 ? e.relativePath
                     .slice(moduleRelPrefix.length)
                     .replace(/^[/\\]+/, "") || "."
@@ -151,19 +150,14 @@ export class GoTestController implements vscode.Disposable {
 
           // Create module node
           const moduleLabel =
-            moduleRelPrefix ||
-            modulePath.split("/").pop() ||
-            modulePath;
+            moduleRelPrefix || modulePath.split("/").pop() || modulePath;
           const moduleId = `module:${modulePath}`;
           seenIds.add(moduleId);
           if (!isMultiFolder) rootIds.add(moduleId);
 
           let moduleItem = target.get(moduleId);
           if (!moduleItem) {
-            moduleItem = this.controller.createTestItem(
-              moduleId,
-              moduleLabel,
-            );
+            moduleItem = this.controller.createTestItem(moduleId, moduleLabel);
           }
           moduleItem.tags = [new vscode.TestTag("module")];
           moduleItem.description = "module";
@@ -176,18 +170,10 @@ export class GoTestController implements vscode.Disposable {
           const seenModuleChildIds = new Set<string>();
 
           if (trie.importPath && trie.children.size === 0) {
-            this.addPackageItem(
-              trie.importPath,
-              moduleItem.children,
-              seenIds,
-            );
+            this.addPackageItem(trie.importPath, moduleItem.children, seenIds);
             seenModuleChildIds.add(trie.importPath);
           } else if (trie.importPath) {
-            this.addPackageItem(
-              trie.importPath,
-              moduleItem.children,
-              seenIds,
-            );
+            this.addPackageItem(trie.importPath, moduleItem.children, seenIds);
             seenModuleChildIds.add(trie.importPath);
             for (const child of trie.children.values()) {
               this.addTrieNode(child, moduleItem.children, seenIds, "");
@@ -223,9 +209,7 @@ export class GoTestController implements vscode.Disposable {
         const trie = buildPathTrie(entries);
         collapsePathTrie(trie);
 
-        const idPrefix = isMultiFolder
-          ? `${this.folderName(wsDir)}/`
-          : "";
+        const idPrefix = isMultiFolder ? `${this.folderName(wsDir)}/` : "";
 
         if (trie.importPath && trie.children.size === 0) {
           this.addPackageItem(trie.importPath, target, seenIds);

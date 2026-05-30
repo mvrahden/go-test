@@ -17,8 +17,8 @@ export class DiscoveryCache implements vscode.Disposable {
   private workspaceDirs = new Map<string, string>();
   private dirIndex = new Map<string, string>();
   private _warnings: (DiscoverWarning & { _wsDir: string })[] = [];
-  private moduleDirs = new Map<string, string>();   // modulePath → absolute dir
-  private pkgModules = new Map<string, string>();    // importPath → modulePath
+  private moduleDirs = new Map<string, string>(); // modulePath → absolute dir
+  private pkgModules = new Map<string, string>(); // importPath → modulePath
   private _onDidUpdate = new vscode.EventEmitter<void>();
 
   readonly onDidUpdate: vscode.Event<void> = this._onDidUpdate.event;

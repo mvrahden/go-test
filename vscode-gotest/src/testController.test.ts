@@ -595,9 +595,9 @@ describe("GoTestController.rebuild", () => {
       const exChildIds: string[] = [];
       exModule.children.forEach((c: any) => exChildIds.push(c.id));
       // Should NOT have "examples" as a directory prefix within the module subtree
-      expect(
-        exChildIds.some((id: string) => id === "dir:examples"),
-      ).toBe(false);
+      expect(exChildIds.some((id: string) => id === "dir:examples")).toBe(
+        false,
+      );
     });
   });
 });
