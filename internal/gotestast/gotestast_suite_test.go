@@ -1093,6 +1093,173 @@ func (f *PGSharedFixture) setupB(ctx context.Context) error {
 	})
 }
 
+// SpecTestSuite tests TestSuiteSpecSet.ReduceToEffectiveSet, DetermineTestSuite,
+// DetermineTestSuiteHarness, and TestSuiteSpec accessor methods.
+type SpecTestSuite struct{}
+
+func (s *SpecTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+
+func (s *SpecTestSuite) TestReduceToEffectiveSet(t *gotest.T) {
+	t.When("no focused or excluded suites", func(w *gotest.T) {
+		w.It("returns all suites as effective", func(it *gotest.T) {
+			suites := gotestast.TestSuiteSpecSet{
+				gotestast.NewTestSuiteSpecForTest("AlphaTestSuite", "pkg", false),
+				gotestast.NewTestSuiteSpecForTest("BetaTestSuite", "pkg", false),
+			}
+			effective, skippedSuites, skippedCases := suites.ReduceToEffectiveSet()
+			gotest.Equal(it, 2, len(effective))
+			gotest.Empty(it, skippedSuites)
+			gotest.Equal(it, 2, len(skippedCases)) // entries exist but with nil values
+		})
+	})
+
+	t.When("focused suite present", func(w *gotest.T) {
+		w.It("keeps only focused suites, skips unfocused", func(it *gotest.T) {
+			suites := gotestast.TestSuiteSpecSet{
+				gotestast.NewTestSuiteSpecForTest("F_FocusedTestSuite", "pkg", false),
+				gotestast.NewTestSuiteSpecForTest("NormalTestSuite", "pkg", false),
+			}
+			effective, skippedSuites, _ := suites.ReduceToEffectiveSet()
+			gotest.Equal(it, 1, len(effective))
+			gotest.Equal(it, "F_FocusedTestSuite", effective[0].Identifier())
+			gotest.Equal(it, 1, len(skippedSuites))
+			gotest.Equal(it, "NormalTestSuite", skippedSuites[0].Identifier())
+		})
+	})
+
+	t.When("excluded suite present", func(w *gotest.T) {
+		w.It("removes excluded suites", func(it *gotest.T) {
+			suites := gotestast.TestSuiteSpecSet{
+				gotestast.NewTestSuiteSpecForTest("X_ExcludedTestSuite", "pkg", false),
+				gotestast.NewTestSuiteSpecForTest("NormalTestSuite", "pkg", false),
+			}
+			effective, skippedSuites, _ := suites.ReduceToEffectiveSet()
+			gotest.Equal(it, 1, len(effective))
+			gotest.Equal(it, "NormalTestSuite", effective[0].Identifier())
+			gotest.Equal(it, 1, len(skippedSuites))
+		})
+	})
+}
+
+func (s *SpecTestSuite) TestDetermineTestSuite(t *gotest.T) {
+	t.When("valid test suite type", func(w *gotest.T) {
+		w.It("detects struct type ending in TestSuite", func(it *gotest.T) {
+			pkg, genDecls := loadFixtureAST(it.T(), `
+				package testpkg
+				type MyTestSuite struct{ Value string }
+			`)
+			spec, _, err := gotestast.DetermineTestSuite(genDecls[0], pkg)
+			gotest.NoError(it, err)
+			gotest.True(it, spec != nil)
+			gotest.Equal(it, "MyTestSuite", spec.Identifier())
+		})
+	})
+
+	t.When("non-suite type", func(w *gotest.T) {
+		w.It("returns nil for types not ending in TestSuite", func(it *gotest.T) {
+			pkg, genDecls := loadFixtureAST(it.T(), `
+				package testpkg
+				type MyService struct{}
+			`)
+			spec, _, err := gotestast.DetermineTestSuite(genDecls[0], pkg)
+			gotest.NoError(it, err)
+			gotest.True(it, spec == nil)
+		})
+	})
+
+	t.When("generated suite wrapper", func(w *gotest.T) {
+		w.It("ignores ƒƒ_GOTEST_ prefixed types", func(it *gotest.T) {
+			gotest.False(it, gotestast.IS_TEST_SUITE.MatchString("ƒƒ_GOTEST_MyTestSuite"))
+			gotest.True(it, gotestast.IS_TEST_SUITE.MatchString("MyTestSuite"))
+		})
+	})
+
+	t.When("focused and excluded prefixes", func(w *gotest.T) {
+		w.It("accepts F_ prefix as focused", func(it *gotest.T) {
+			gotest.True(it, gotestast.IS_TEST_SUITE.MatchString("F_MyTestSuite"))
+		})
+		w.It("accepts X_ prefix as excluded", func(it *gotest.T) {
+			gotest.True(it, gotestast.IS_TEST_SUITE.MatchString("X_MyTestSuite"))
+		})
+		w.It("rejects underscore-only prefix", func(it *gotest.T) {
+			gotest.False(it, gotestast.IS_TEST_SUITE.MatchString("_PrivateTestSuite"))
+		})
+	})
+}
+
+func (s *SpecTestSuite) TestDetermineTestSuiteHarness(t *gotest.T) {
+	t.When("lifecycle methods", func(w *gotest.T) {
+		w.It("discovers BeforeAll and AfterAll", func(it *gotest.T) {
+			fm := loadFixtureWithMethods(it.T(), `
+				package testpkg
+				import "testing"
+				type MyTestSuite struct{}
+				func (s *MyTestSuite) BeforeAll(t *testing.T) {}
+				func (s *MyTestSuite) AfterAll(t *testing.T) {}
+				func (s *MyTestSuite) TestOne(t *testing.T) {}
+			`)
+			spec, _, err := gotestast.DetermineTestSuite(fm.genDecls[0], fm.pkg)
+			gotest.NoError(it, err)
+			gotest.True(it, spec != nil)
+
+			for _, fd := range fm.funcDecls {
+				_, err := gotestast.DetermineTestSuiteHarness(fd, fm.pkg, spec)
+				gotest.NoError(it, err)
+			}
+
+			gotest.True(it, spec.BeforeAll() != nil, "BeforeAll should be detected")
+			gotest.True(it, spec.AfterAll() != nil, "AfterAll should be detected")
+			gotest.Equal(it, 1, len(spec.TestCases()))
+		})
+	})
+
+	t.When("test case methods", func(w *gotest.T) {
+		w.It("detects focused and excluded test cases", func(it *gotest.T) {
+			gotest.True(it, gotestast.IS_TEST_CASE.MatchString("TestSomething"))
+			gotest.True(it, gotestast.IS_TEST_CASE.MatchString("F_TestFocused"))
+			gotest.True(it, gotestast.IS_TEST_CASE.MatchString("X_TestExcluded"))
+			gotest.False(it, gotestast.IS_TEST_CASE.MatchString("NotATest"))
+		})
+	})
+}
+
+func (s *SpecTestSuite) TestTestSuiteSpecAccessors(t *gotest.T) {
+	t.When("accessor methods", func(w *gotest.T) {
+		w.It("returns correct identifiers", func(it *gotest.T) {
+			spec := gotestast.NewTestSuiteSpecForTest("MyTestSuite", "mypkg", false)
+			gotest.Equal(it, "MyTestSuite", spec.Identifier())
+			gotest.Equal(it, "mypkg", spec.PackageName())
+			gotest.False(it, spec.IsFocused())
+			gotest.False(it, spec.IsExcluded())
+			gotest.False(it, spec.IsGenericAlias())
+		})
+		w.It("detects focused prefix", func(it *gotest.T) {
+			spec := gotestast.NewTestSuiteSpecForTest("F_MyTestSuite", "mypkg", false)
+			gotest.True(it, spec.IsFocused())
+			gotest.False(it, spec.IsExcluded())
+		})
+		w.It("detects excluded prefix", func(it *gotest.T) {
+			spec := gotestast.NewTestSuiteSpecForTest("X_MyTestSuite", "mypkg", false)
+			gotest.False(it, spec.IsFocused())
+			gotest.True(it, spec.IsExcluded())
+		})
+		w.It("detects generic alias", func(it *gotest.T) {
+			spec := gotestast.NewTestSuiteSpecForTest("MyTestSuite", "mypkg", true)
+			gotest.True(it, spec.IsGenericAlias())
+		})
+		w.It("detects pxtest package", func(it *gotest.T) {
+			spec := gotestast.NewTestSuiteSpecForTest("MyTestSuite", "mypkg_test", false)
+			gotest.True(it, spec.IsPxTestSuite())
+		})
+		w.It("detects internal test package", func(it *gotest.T) {
+			spec := gotestast.NewTestSuiteSpecForTest("MyTestSuite", "mypkg", false)
+			gotest.False(it, spec.IsPxTestSuite())
+		})
+	})
+}
+
 func (s *GotestastTestSuite) TestRegexp(t *gotest.T) {
 	testCases := []struct {
 		desc string
