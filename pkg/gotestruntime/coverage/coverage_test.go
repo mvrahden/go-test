@@ -1,3 +1,5 @@
+//go:build !gotest_no_coverage_intercept
+
 package coverage //nolint:stdlib-test
 
 import (
