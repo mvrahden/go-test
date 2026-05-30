@@ -156,7 +156,7 @@ These can be set in `.vscode/settings.json` per workspace folder:
 | `gotest.cliPath` | `""` | Path to a gotest binary (overrides all other resolution) |
 | `gotest.modulePath` | `github.com/mvrahden/go-test/cmd/gotest` | Go module path for the gotest CLI |
 | `gotest.buildTags` | `""` | Comma-separated Go build tags (e.g. `integration,e2e`) |
-| `gotest.testFlags` | `[]` | Additional flags passed to `go test` |
+| `gotest.testFlags` | `[]` | Additional flags passed to gotest (`--` prefixed) and `go test` (`-` prefixed) |
 | `gotest.buildFlags` | `[]` | Additional build flags passed to Delve |
 | `gotest.discoverOnSave` | `true` | Re-discover tests when `_test.go` files change |
 | `gotest.coverOnRun` | `true` | Collect coverage data alongside normal test runs |
@@ -186,6 +186,11 @@ These can be set in `.vscode/settings.json` per workspace folder:
 
   // Extra flags for go test (e.g. timeout, verbose)
   "gotest.testFlags": ["-timeout=120s", "-v"],
+
+  // Control parallelism:
+  //   --parallel=N  total concurrent tests across all suites (gotest flag)
+  //   -parallel=N   concurrent tests within each suite (go test flag)
+  // "gotest.testFlags": ["--parallel=12", "-parallel=4"],
 
   // Extra build flags for Delve debug sessions
   "gotest.buildFlags": ["-gcflags=all=-N -l"]

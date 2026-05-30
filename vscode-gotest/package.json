@@ -164,7 +164,7 @@
           },
           "default": [],
           "scope": "resource",
-          "description": "Additional flags passed to gotest test"
+          "description": "Additional flags passed to gotest (--prefixed) and go test (-prefixed), e.g. [\"--parallel=12\", \"-parallel=4\"]"
         },
         "gotest.buildFlags": {
           "type": "array",
