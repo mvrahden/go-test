@@ -354,17 +354,23 @@ export class CoverageRunner implements vscode.Disposable {
         });
       }
 
-      const byWorkspace = new Map<string, PkgInfo[]>();
+      const byModule = new Map<
+        string,
+        { wsDir: string; moduleDir?: string; pkgs: PkgInfo[] }
+      >();
       for (const info of validPkgs) {
-        let list = byWorkspace.get(info.workspaceDir);
-        if (!list) {
-          list = [];
-          byWorkspace.set(info.workspaceDir, list);
+        const mp = this.cache.getModulePath(info.importPath);
+        const md = mp ? this.cache.getModuleDir(mp) : undefined;
+        const key = md ?? info.workspaceDir;
+        let group = byModule.get(key);
+        if (!group) {
+          group = { wsDir: info.workspaceDir, moduleDir: md, pkgs: [] };
+          byModule.set(key, group);
         }
-        list.push(info);
+        group.pkgs.push(info);
       }
 
-      for (const [workspaceDir, pkgInfos] of byWorkspace) {
+      for (const [, { wsDir: workspaceDir, pkgs: pkgInfos }] of byModule) {
         if (effectiveToken.isCancellationRequested) {
           for (const info of pkgInfos) {
             for (const item of info.items) {
