@@ -39,6 +39,18 @@ func (s *MultiTestSuite) TestBetaAvailable(t *gotest.T) {
 	gotest.Equal(t, 42, s.Beta.Count)
 }
 
+type GammaTestSuite struct {
+	Gamma *fixtures.GammaSharedFixture
+}
+
+func (s *GammaTestSuite) TestDerivedFromAlpha(t *gotest.T) {
+	gotest.Contains(t, s.Gamma.Derived, "gamma-")
+}
+
+func (s *GammaTestSuite) TestAlphaWired(t *gotest.T) {
+	gotest.NotEqual(t, "", s.Gamma.Alpha.DataPath)
+}
+
 type PlainTestSuite struct{}
 
 func (s *PlainTestSuite) TestPlainWorks(t *gotest.T) {

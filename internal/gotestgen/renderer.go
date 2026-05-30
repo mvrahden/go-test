@@ -24,10 +24,11 @@ var (
 // FixtureViewModel is the view model passed to the fixture template.
 type FixtureViewModel struct {
 	Identifier          string
-	QualifiedIdentifier string // "pkg.Name" for cross-package, "Name" for same
-	ParentIdentifier    string // Identifier of the parent fixture (empty for roots)
-	ParentFieldName     string // field name in this fixture's struct for the parent fixture pointer
-	PkgPath             string // import path, empty if same package
+	QualifiedIdentifier string            // "pkg.Name" for cross-package, "Name" for same
+	ParentIdentifiers   []string          // all parent fixture identifiers
+	ParentFields        map[string]string // parent identifier → field name in this fixture's struct
+	DependsOn           []string          // same as ParentIdentifiers, for template convenience
+	PkgPath             string            // import path, empty if same package
 	HasConfig           bool
 	BeforeAll           bool
 	AfterAll            bool
@@ -36,16 +37,16 @@ type FixtureViewModel struct {
 	HasHydrate          bool
 	HasDehydrate        bool
 	ChildSuites         []*gotestast.TestSuiteSpec
-	ChildFixtures       []*FixtureViewModel
 	SharedFixtures      []SharedFixtureRef
 }
 
-// FlatFixtureSuite describes a suite with its full fixture ancestry chain,
-// used for generating per-suite Test functions at arbitrary tree depth.
+// FlatFixtureSuite describes a suite with its fixture dependency graph,
+// used for generating per-suite Test functions.
 type FlatFixtureSuite struct {
-	Suite        *gotestast.TestSuiteSpec
-	Fixture      *FixtureViewModel   // the fixture this suite is directly bound to
-	FixtureChain []*FixtureViewModel // root → ... → parent fixture (full path)
+	Suite         *gotestast.TestSuiteSpec
+	Fixture       *FixtureViewModel   // the first fixture this suite is bound to
+	FixtureOrder  []*FixtureViewModel // topological order of ALL needed fixtures
+	FixtureFields map[string]string   // fixture identifier → field name in suite struct
 }
 
 // SharedFixtureRef describes a shared fixture embedded in a package fixture.
@@ -54,9 +55,22 @@ type SharedFixtureRef struct {
 	QualifiedType string // e.g. "fixtures.PostgresSharedFixture"
 	FieldName     string // e.g. "PostgresSharedFixture"
 	StateKey      string // e.g. "github.com/example/fixtures.PostgresSharedFixture"
+	Identifier    string // e.g. "PostgresSharedFixture" (same pkg) or "fixtures_PostgresSharedFixture" (cross pkg)
 	HasHydrate    bool
 	HasDehydrate  bool
 	PkgPath       string // import path, empty if same package
+}
+
+// SharedFixtureNodeVM is the view model for rendering a shared fixture as a DAG node.
+type SharedFixtureNodeVM struct {
+	Identifier    string
+	QualifiedType string
+	StateKey      string
+	HasHydrate    bool
+	HasDehydrate  bool
+	PkgPath       string
+	DependsOn     []string
+	ParentFields  map[string]string // parent shared fixture identifier → field name
 }
 
 type headerImport struct {
@@ -76,16 +90,17 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 
 	fixtureBound := resolved.FixtureBound
 	standalone := resolved.Standalone
-	viewModels := buildFixtureViewModelsFromResolved(resolved.RootFixtures)
-	hasFixtures := len(resolved.RootFixtures) > 0
+	allViewModels := buildAllFixtureViewModels(resolved.AllFixtures)
+	sfNodeVMs := buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures)
+	hasFixtures := len(resolved.RootFixtures) > 0 || len(sfNodeVMs) > 0
 
 	buf := bytes.NewBuffer(nil)
-	if err := r.renderFileHeader(buf, pkg, spec, viewModels, hasFixtures, resolved.SuiteSharedFixtures); err != nil {
+	if err := r.renderFileHeader(buf, pkg, spec, hasFixtures, resolved.SuiteSharedFixtures, allViewModels); err != nil {
 		return nil, fmt.Errorf("failed rendering file header. err: %w", err)
 	}
 
-	if len(fixtureBound) > 0 {
-		if err := r.renderFixtures(buf, fixtureBound, viewModels); err != nil {
+	if len(fixtureBound) > 0 || len(sfNodeVMs) > 0 {
+		if err := r.renderFixtures(buf, fixtureBound, allViewModels, resolved.SuiteFixtureFields, sfNodeVMs); err != nil {
 			return nil, fmt.Errorf("failed rendering fixture suites. err: %w", err)
 		}
 	}
@@ -104,7 +119,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	return r.formatOutput(buf)
 }
 
-func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, viewModels []*FixtureViewModel, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef) error {
+func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allViewModels []*FixtureViewModel) error {
 	type TplData struct {
 		RepoName    string
 		PackageName string
@@ -114,7 +129,6 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		{Path: "testing"},
 		{Path: about.Repo + "/pkg/gotest"},
 	}
-	hasSuiteSharedFixtures := len(suiteSharedFixtures) > 0
 	if hasFixtures {
 		imports = append(imports, headerImport{Path: about.Repo + "/pkg/gotestruntime"})
 		imports = append(imports, headerImport{Path: "context"})
@@ -126,18 +140,18 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	}) {
 		imports = append(imports, headerImport{Path: "sync"})
 	}
-	if !hasFixtures && hasSuiteSharedFixtures {
-		imports = append(imports, headerImport{Path: "context"})
-		imports = append(imports, headerImport{Path: "os"})
-	}
-	hasSharedFixtures := hasSuiteSharedFixtures
 	seenPkg := map[string]bool{}
-	for _, vm := range viewModels {
+	for _, vm := range allViewModels {
 		if vm.PkgPath != "" && !seenPkg[vm.PkgPath] {
 			imports = append(imports, headerImport{Path: vm.PkgPath})
 			seenPkg[vm.PkgPath] = true
 		}
-		collectFixtureImports(vm, &imports, seenPkg)
+		for _, sf := range vm.SharedFixtures {
+			if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
+				imports = append(imports, headerImport{Path: sf.PkgPath})
+				seenPkg[sf.PkgPath] = true
+			}
+		}
 	}
 	for _, refs := range suiteSharedFixtures {
 		for _, sf := range refs {
@@ -153,31 +167,12 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 			seenPkg[pkgPath] = true
 		}
 	}
-	if hasSharedFixtures {
-		imports = append(imports, headerImport{Path: "encoding/json"})
-	}
 	data := TplData{
 		RepoName:    about.ShortInfo(),
 		PackageName: pkg.Name,
 		Imports:     imports,
 	}
 	return headerTpl.ExecuteTemplate(buf, "header.go.tpl", map[string]any{"Header": data})
-}
-
-func collectFixtureImports(vm *FixtureViewModel, imports *[]headerImport, seenPkg map[string]bool) {
-	for _, sf := range vm.SharedFixtures {
-		if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
-			*imports = append(*imports, headerImport{Path: sf.PkgPath})
-			seenPkg[sf.PkgPath] = true
-		}
-	}
-	for _, child := range vm.ChildFixtures {
-		if child.PkgPath != "" && !seenPkg[child.PkgPath] {
-			*imports = append(*imports, headerImport{Path: child.PkgPath})
-			seenPkg[child.PkgPath] = true
-		}
-		collectFixtureImports(child, imports, seenPkg)
-	}
 }
 
 func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef) error {
@@ -187,16 +182,16 @@ func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSh
 	})
 }
 
-func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, viewModels []*FixtureViewModel) error {
-	if len(viewModels) == 0 {
+func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, allViewModels []*FixtureViewModel, suiteFixtureFields map[string][]FixtureFieldBinding, sfNodes []*SharedFixtureNodeVM) error {
+	if len(allViewModels) == 0 && len(sfNodes) == 0 {
 		return nil
 	}
 
 	return gotestTpl.ExecuteTemplate(buf, "gotest.fixture.tpl", map[string]any{
-		"RootFixtures":       viewModels,
 		"FixtureBoundSuites": fixtureBound,
-		"AllFixtures":        flattenFixtures(viewModels),
-		"FlatSuites":         flattenSuites(viewModels),
+		"AllFixtures":        allViewModels,
+		"FlatSuites":         flattenSuitesDAG(allViewModels, suiteFixtureFields),
+		"SharedFixtureNodes": sfNodes,
 	})
 }
 
@@ -208,19 +203,10 @@ func (renderer) formatOutput(buf *bytes.Buffer) ([]byte, error) {
 	return srcs, nil
 }
 
-func buildFixtureViewModelsFromResolved(roots []*ResolvedFixture) []*FixtureViewModel {
-	var vms []*FixtureViewModel
-	for _, rf := range roots {
-		vms = append(vms, resolvedToViewModel(rf))
-	}
-	return vms
-}
-
-func resolvedToViewModel(rf *ResolvedFixture) *FixtureViewModel {
+func resolvedToFlatViewModel(rf *ResolvedFixture) *FixtureViewModel {
 	vm := &FixtureViewModel{
 		Identifier:          rf.Identifier,
 		QualifiedIdentifier: rf.QualifiedType,
-		ParentFieldName:     rf.ParentFieldName,
 		PkgPath:             rf.PkgPath,
 		HasConfig:           rf.HasConfig,
 		BeforeAll:           rf.BeforeAll,
@@ -232,48 +218,156 @@ func resolvedToViewModel(rf *ResolvedFixture) *FixtureViewModel {
 		ChildSuites:         rf.ChildSuites,
 		SharedFixtures:      rf.SharedFixtures,
 	}
-	for _, child := range rf.Children {
-		childVM := resolvedToViewModel(child)
-		childVM.ParentIdentifier = vm.Identifier
-		vm.ChildFixtures = append(vm.ChildFixtures, childVM)
+
+	if len(rf.Parents) > 0 {
+		vm.ParentFields = make(map[string]string)
+		for _, p := range rf.Parents {
+			vm.ParentIdentifiers = append(vm.ParentIdentifiers, p.Identifier)
+			vm.ParentFields[p.Identifier] = rf.ParentFields[p]
+		}
+		vm.DependsOn = vm.ParentIdentifiers
 	}
+
+	for _, sf := range rf.SharedFixtures {
+		vm.DependsOn = append(vm.DependsOn, sf.Identifier)
+	}
+
 	return vm
 }
 
-func flattenFixtures(roots []*FixtureViewModel) []*FixtureViewModel {
-	var result []*FixtureViewModel
-	var walk func(node *FixtureViewModel)
-	walk = func(node *FixtureViewModel) {
-		result = append(result, node)
-		for _, child := range node.ChildFixtures {
-			walk(child)
+func buildAllFixtureViewModels(allFixtures []*ResolvedFixture) []*FixtureViewModel {
+	var vms []*FixtureViewModel
+	for _, rf := range allFixtures {
+		vms = append(vms, resolvedToFlatViewModel(rf))
+	}
+	return vms
+}
+
+func buildSharedFixtureNodeVMs(sharedFixtures []SharedFixtureInfo) []*SharedFixtureNodeVM {
+	if len(sharedFixtures) == 0 {
+		return nil
+	}
+
+	// Build a map from state key → identifier for dependency resolution.
+	stateKeyToID := make(map[string]string, len(sharedFixtures))
+	for _, sf := range sharedFixtures {
+		id := sf.Identifier
+		if sf.PkgName != "" {
+			id = sf.PkgName + "_" + sf.Identifier
+		}
+		stateKeyToID[sf.PkgPath+"."+sf.Identifier] = id
+	}
+
+	var vms []*SharedFixtureNodeVM
+	for _, sf := range sharedFixtures {
+		id := sf.Identifier
+		qualifiedType := sf.QualifiedType
+		if sf.PkgName != "" {
+			id = sf.PkgName + "_" + sf.Identifier
+		}
+
+		var dependsOn []string
+		for _, depKey := range sf.Dependencies {
+			if depID, ok := stateKeyToID[depKey]; ok {
+				dependsOn = append(dependsOn, depID)
+			}
+		}
+
+		var parentFields map[string]string
+		if len(sf.DependencyFields) > 0 {
+			parentFields = make(map[string]string)
+			for depKey, fieldName := range sf.DependencyFields {
+				if parentID, ok := stateKeyToID[depKey]; ok {
+					parentFields[parentID] = fieldName
+				}
+			}
+		}
+
+		vms = append(vms, &SharedFixtureNodeVM{
+			Identifier:    id,
+			QualifiedType: qualifiedType,
+			StateKey:      sf.PkgPath + "." + sf.Identifier,
+			HasHydrate:    sf.HasHydrate,
+			HasDehydrate:  sf.HasDehydrate,
+			PkgPath:       sf.PkgPath,
+			DependsOn:     dependsOn,
+			ParentFields:  parentFields,
+		})
+	}
+	return vms
+}
+
+func flattenSuitesDAG(allViewModels []*FixtureViewModel, suiteFixtureFields map[string][]FixtureFieldBinding) []FlatFixtureSuite {
+	vmByID := make(map[string]*FixtureViewModel)
+	for _, vm := range allViewModels {
+		vmByID[vm.Identifier] = vm
+	}
+
+	type suiteInfo struct {
+		suite   *gotestast.TestSuiteSpec
+		fixture *FixtureViewModel
+	}
+	var suites []suiteInfo
+	for _, vm := range allViewModels {
+		for _, s := range vm.ChildSuites {
+			suites = append(suites, suiteInfo{suite: s, fixture: vm})
 		}
 	}
-	for _, root := range roots {
-		walk(root)
+
+	seen := make(map[string]bool)
+	var result []FlatFixtureSuite
+	for _, si := range suites {
+		if seen[si.suite.Identifier()] {
+			continue
+		}
+		seen[si.suite.Identifier()] = true
+
+		fixtureFields := make(map[string]string)
+		bindings := suiteFixtureFields[si.suite.Identifier()]
+		for _, b := range bindings {
+			fixtureFields[b.FixtureIdentifier] = b.FieldName
+		}
+
+		needed := collectTransitiveDeps(si.suite.Identifier(), suiteFixtureFields, vmByID)
+
+		var fixtureOrder []*FixtureViewModel
+		for _, vm := range allViewModels {
+			if needed[vm.Identifier] {
+				fixtureOrder = append(fixtureOrder, vm)
+			}
+		}
+
+		result = append(result, FlatFixtureSuite{
+			Suite:         si.suite,
+			Fixture:       si.fixture,
+			FixtureOrder:  fixtureOrder,
+			FixtureFields: fixtureFields,
+		})
 	}
 	return result
 }
 
-func flattenSuites(roots []*FixtureViewModel) []FlatFixtureSuite {
-	var result []FlatFixtureSuite
-	var walk func(node *FixtureViewModel, chain []*FixtureViewModel)
-	walk = func(node *FixtureViewModel, chain []*FixtureViewModel) {
-		currentChain := append(chain, node)
-		for _, suite := range node.ChildSuites {
-			result = append(result, FlatFixtureSuite{
-				Suite:        suite,
-				Fixture:      node,
-				FixtureChain: append([]*FixtureViewModel(nil), currentChain...),
-			})
+func collectTransitiveDeps(suiteID string, suiteFixtureFields map[string][]FixtureFieldBinding, vmByID map[string]*FixtureViewModel) map[string]bool {
+	needed := make(map[string]bool)
+	bindings := suiteFixtureFields[suiteID]
+	var visit func(id string)
+	visit = func(id string) {
+		if needed[id] {
+			return
 		}
-		for _, child := range node.ChildFixtures {
-			walk(child, currentChain)
+		needed[id] = true
+		vm := vmByID[id]
+		if vm == nil {
+			return
+		}
+		for _, parentID := range vm.ParentIdentifiers {
+			visit(parentID)
 		}
 	}
-	for _, root := range roots {
-		walk(root, nil)
+	for _, b := range bindings {
+		visit(b.FixtureIdentifier)
 	}
-	return result
+	return needed
 }
+
 

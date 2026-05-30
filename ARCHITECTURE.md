@@ -166,15 +166,16 @@ Resolve(targetPkg, suites, localFixtures)
   │       ├─ Lookup method set: BeforeAll (required), AfterAll,
   │       │   BeforeEach, AfterEach, Hydrate, Dehydrate, Config
   │       └─ Recurse into fixture struct fields for:
-  │           ├─ Parent fixture (at most one, builds tree)
+  │           ├─ Parent fixtures (zero or more, builds DAG)
   │           └─ SharedFixture references
   │
   ├─ Suite gets linked: fixture.ChildSuites ← append(suite)
   └─ Suite categorized: FixtureBound or Standalone
 ```
 
-Constraint: at most **one root PackageFixture per package**.
-Fixtures form a single-inheritance tree (parent via embedding).
+Fixtures form a **DAG** (directed acyclic graph) via embedding: a fixture may
+have multiple parents, and suites may reference multiple fixtures. The same
+fixture type is deduplicated by identity so each fixture is set up exactly once.
 
 ### What Gets Generated
 
@@ -206,14 +207,17 @@ For **fixture-bound suites** (have a fixture), a `TestMain` is generated:
 func TestMain(m *testing.M) { os.Exit(ƒƒ_GOTEST_main(m)) }
 
 func ƒƒ_GOTEST_main(m *testing.M) (code int) {
+    // Fixtures is a flat list with DependsOn edges forming a DAG.
     // 1. Read shared fixture state (if needed)
-    // 2. Instantiate root fixture
-    // 3. BeforeAll on root fixture (with retries, timeout)
-    // 4. Instantiate child fixtures (concurrent)
-    // 5. BeforeAll on each child fixture (concurrent, with retries)
-    // 6. Compute teardown budget → write to budget file
-    // 7. code = m.Run()   ← runs all TestXxx functions
-    // 8. defer: AfterAll children (concurrent), then AfterAll root
+    // 2. Instantiate all fixtures from Fixtures list
+    // 3. DAG wavefront setup: fixtures with no dependencies start
+    //    concurrently; each fixture starts after its DependsOn set
+    //    has completed (channel-based signalling)
+    // 4. BeforeAll on each fixture (with retries, timeout)
+    // 5. Compute teardown budget → write to budget file
+    // 6. code = m.Run()   ← runs all TestXxx functions
+    // 7. defer: reverse-wavefront teardown (leaves first,
+    //    roots last; independent fixtures tear down concurrently)
 }
 ```
 
@@ -229,13 +233,19 @@ without modifying source. Go's compiler reads virtual paths from the overlay.
 ```
 ┌──────────────────── PER PACKAGE (via TestMain) ─────────────────────┐
 │                                                                      │
-│  ┌─ RootFixture.BeforeAll(ctx) ─────────────────────────────────┐   │
-│  │  timeout: FixtureConfig.Timeout (default 2m)                 │   │
-│  │  retries: FixtureConfig.Retries (default 0)                  │   │
-│  │                                                               │   │
-│  │  ┌─ ChildFixture.BeforeAll(ctx) ──────────────────────┐      │   │
-│  │  │  (runs concurrently with sibling child fixtures)    │      │   │
-│  │  └────────────────────────────────────────────────────┘      │   │
+│  DAG wavefront setup (channel-based parallel scheduling):            │
+│                                                                      │
+│  wave 0 (no dependencies):                                           │
+│  ┌─ FixtureA.BeforeAll(ctx) ─┐  ┌─ FixtureB.BeforeAll(ctx) ─┐     │
+│  │  timeout: Config.Timeout  │  │  timeout: Config.Timeout   │     │
+│  │  retries: Config.Retries  │  │  retries: Config.Retries   │     │
+│  └───────────┬───────────────┘  └───────────┬────────────────┘     │
+│              │ done(ch)                      │ done(ch)              │
+│              └──────────┬────────────────────┘                      │
+│                         ▼                                            │
+│  wave 1 (depends on A and B):                                        │
+│  ┌─ FixtureC.BeforeAll(ctx) ────────────────────────────────────┐   │
+│  │  blocks until all DependsOn channels signal                  │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 │                                                                      │
 │  ┌──── PER SUITE (each TestXxxTestSuite function) ──────────────┐   │
@@ -256,8 +266,9 @@ without modifying source. Go's compiler reads virtual paths from the overlay.
 │  │                                                               │   │
 │  └───────────────────────────────────────────────────────────────┘   │
 │                                                                      │
-│  deferred: ChildFixture.AfterAll(ctx)  ← concurrent                 │
-│  deferred: RootFixture.AfterAll(ctx)   ← after children complete    │
+│  deferred: reverse-wavefront teardown                                │
+│    wave 0: FixtureC.AfterAll(ctx)  ← leaves first                   │
+│    wave 1: FixtureA.AfterAll(ctx), FixtureB.AfterAll(ctx)  ← conc.  │
 │  deferred: flush coverage counters                                   │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
@@ -266,31 +277,41 @@ without modifying source. Go's compiler reads virtual paths from the overlay.
 ### SharedFixture Lifecycle
 
 SharedFixtures live in a **separate subprocess** that outlives all test
-binaries. State is transferred via JSON serialization.
+binaries. They form a DAG via pointer fields to other SharedFixture types.
+State is transferred via JSON serialization, streamed as each fixture completes.
 
 ```
 ┌── SETUP SUBPROCESS ──────────────────────────────────────────────────┐
 │                                                                       │
-│  for each SharedFixture (concurrent):                                 │
-│    sf.BeforeAll(ctx)     timeout: SharedFixtureConfig.Timeout (5m)    │
-│                          retries: SharedFixtureConfig.Retries (1)     │
+│  DAG-ordered BeforeAll (parents before children, independent conc.):  │
 │                                                                       │
-│  Serialize transfer fields → JSON → stdout                            │
+│  wave 0 (no dependencies):                                            │
+│  ┌─ PostgresSF.BeforeAll(ctx) ─┐  ┌─ RedisSF.BeforeAll(ctx) ─┐      │
+│  └───────────┬─────────────────┘  └──────────┬────────────────┘      │
+│              │ emit JSON state               │ emit JSON state        │
+│              └──────────┬────────────────────┘                        │
+│                         ▼                                              │
+│  wave 1 (depends on Postgres):                                        │
+│  ┌─ SchemaSF.BeforeAll(ctx) ────────────────────────────────────┐     │
+│  └──────────┬───────────────────────────────────────────────────┘     │
+│             │ emit JSON state                                         │
+│                                                                       │
+│  Each fixture's state emitted to stdout immediately after BeforeAll   │
 │  Include _teardownBudget = maxTimeout + 30s                           │
 │                                                                       │
 │  ═══════════ block on SIGTERM/SIGINT ═══════════                      │
 │                                                                       │
-│  for each SharedFixture (reverse order):                              │
+│  for each SharedFixture (reverse DAG order):                          │
 │    sf.AfterAll(ctx)      timeout: SharedFixtureConfig.Timeout         │
 │                                                                       │
 └───────────────────────────────────────────────────────────────────────┘
 
-         │ stdout: JSON state       │ state.json file
+         │ stdout: JSON state       │ per-suite state.json files
          ▼                          ▼
 
 ┌── TEST PROCESS (per suite binary) ───────────────────────────────────┐
 │                                                                       │
-│  Read GOTEST_SHARED_STATE_FILE                                        │
+│  Read GOTEST_SHARED_STATE_FILE (contains only this suite's entries)   │
 │  json.Unmarshal → SharedFixture struct (transfer fields only)         │
 │  sf.Hydrate(ctx)    ← reconstruct local fields (e.g., DB handles)    │
 │  t.Cleanup → sf.Dehydrate(ctx)   ← release local resources           │
@@ -401,23 +422,31 @@ Each CompileResult immediately produces SuiteTargets that enter
 the execution semaphore. No "compile all, then run all" barrier.
 ```
 
-### Lazy Fixture Environment Resolution
+### Per-Suite Fixture Readiness
 
-Suites that need shared fixtures call `resolveFixtureEnv()` which blocks
-(via `sync.Once`) until the shared fixture setup completes. Suites that
-don't need shared fixtures skip this entirely and use `baseEnv`:
+Each suite has a set of shared fixture keys it needs (including transitive
+dependencies). The runner tracks which fixtures have emitted their state
+and dispatches suites as soon as their specific dependencies are all ready:
 
 ```
 Suite goroutine:
   │
-  ├─ needsFixture? ──yes──▶ resolveFixtureEnv()
+  ├─ needsFixture? ──yes──▶ waitForFixtureKeys(suite.SharedFixtureKeys)
   │                              │
-  │                              ├─ sync.Once blocks until fixtureReady
+  │                              ├─ Blocks until all keys in the suite's
+  │                              │   dependency set have emitted state
+  │                              ├─ Writes per-suite state file (only
+  │                              │   the entries this suite needs)
   │                              ├─ Returns env with GOTEST_SHARED_STATE_FILE
   │                              └─ Error? → streamCancel(), return
   │
   └─ needsFixture? ──no───▶ use baseEnv directly (no blocking)
 ```
+
+Suites that only need `PostgresSharedFixture` start as soon as Postgres
+is ready — they don't wait for `SchemaSharedFixture` or other unrelated
+fixtures. This reduces wall-clock time when fixtures have different
+startup durations.
 
 ---
 

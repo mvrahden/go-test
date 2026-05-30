@@ -1,6 +1,7 @@
 package sharedfixture_test
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -31,7 +32,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 	gotest.NoError(t, err)
 
 	t.When("Discovery", func(w *gotest.T) {
-		gotest.Equal(w, 2, len(allSharedFixtures), "expected Alpha and Beta shared fixtures")
+		gotest.Equal(w, 3, len(allSharedFixtures), "expected Alpha, Beta, and Gamma shared fixtures")
 
 		found := map[string]gotestgen.SharedFixtureInfo{}
 		for _, sf := range allSharedFixtures {
@@ -53,6 +54,17 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 		gotest.Contains(w, beta.TransferFields, "Label")
 		gotest.Contains(w, beta.TransferFields, "Count")
 		gotest.Empty(w, beta.LocalFields)
+
+		w.It("detects Gamma dependency on Alpha", func(it *gotest.T) {
+			gamma, ok := found["GammaSharedFixture"]
+			gotest.True(it, ok, "expected GammaSharedFixture")
+			gotest.False(it, gamma.HasHydrate)
+			gotest.False(it, gamma.HasDehydrate)
+			gotest.Contains(it, gamma.TransferFields, "Derived")
+			gotest.NotContains(it, gamma.TransferFields, "Alpha", "dep pointer excluded from transfer")
+			gotest.Equal(it, 1, len(gamma.Dependencies))
+			gotest.Contains(it, gamma.Dependencies[0], "AlphaSharedFixture")
+		})
 	})
 
 	tmpDir, err := gotestrunner.WriteOverlay(allResults)
@@ -87,8 +99,26 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 		gotest.NoError(w, err)
 		gotest.NoError(w, cmd.Start())
 
-		var state map[string]json.RawMessage
-		gotest.NoError(w, json.NewDecoder(stdout).Decode(&state))
+		type stateEntry struct {
+			Key            string          `json:"key"`
+			State          json.RawMessage `json:"state,omitempty"`
+			TeardownBudget string          `json:"teardownBudget,omitempty"`
+			Error          string          `json:"error,omitempty"`
+		}
+
+		state := map[string]json.RawMessage{}
+		var doneEntry stateEntry
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			var entry stateEntry
+			gotest.NoError(w, json.Unmarshal(scanner.Bytes(), &entry))
+			if entry.Key == "_done" {
+				doneEntry = entry
+				break
+			}
+			state[entry.Key] = entry.State
+		}
+		gotest.NoError(w, scanner.Err())
 
 		stateBytes, err := json.Marshal(state)
 		gotest.NoError(w, err)
@@ -102,21 +132,25 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 		})
 
 		w.It("StateContent", func(it *gotest.T) {
-			gotest.Equal(it, 3, len(state), "expected entries for Alpha, Beta, and _teardownBudget")
+			gotest.Equal(it, 3, len(state), "expected entries for Alpha, Beta, and Gamma")
 
 			alphaKey := "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.AlphaSharedFixture"
 			betaKey := "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.BetaSharedFixture"
+			gammaKey := "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.GammaSharedFixture"
 
 			_, hasAlpha := state[alphaKey]
 			gotest.True(it, hasAlpha, "state should contain AlphaSharedFixture")
 			_, hasBeta := state[betaKey]
 			gotest.True(it, hasBeta, "state should contain BetaSharedFixture")
-			_, hasBudget := state["_teardownBudget"]
-			gotest.True(it, hasBudget, "state should contain _teardownBudget")
+			_, hasGamma := state[gammaKey]
+			gotest.True(it, hasGamma, "state should contain GammaSharedFixture")
+
+			gotest.Empty(it, doneEntry.Error, "done entry should have no error")
+			gotest.NotEmpty(it, doneEntry.TeardownBudget, "done entry should have teardownBudget")
 
 			var alphaState struct{ DataPath string }
 			gotest.NoError(it, json.Unmarshal(state[alphaKey], &alphaState))
-			gotest.NotEqual(it, "", alphaState.DataPath, "Alpha.DataPath should be a real temp file path")
+			gotest.NotEmpty(it, alphaState.DataPath, "Alpha.DataPath should be a real temp file path")
 
 			var betaState struct {
 				Label string
@@ -125,6 +159,10 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 			gotest.NoError(it, json.Unmarshal(state[betaKey], &betaState))
 			gotest.Equal(it, "beta-shared", betaState.Label)
 			gotest.Equal(it, 42, betaState.Count)
+
+			var gammaState struct{ Derived string }
+			gotest.NoError(it, json.Unmarshal(state[gammaKey], &gammaState))
+			gotest.Contains(it, gammaState.Derived, "gamma-", "Gamma.Derived proves Alpha ran first in subprocess DAG")
 		})
 
 		w.It("RunTests", func(it *gotest.T) {
@@ -182,6 +220,29 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 		}
 	})
 
+	t.When("PerSuiteDispatch", func(w *gotest.T) {
+		w.It("computes correct required keys per suite", func(it *gotest.T) {
+			for _, r := range allResults {
+				if !strings.HasSuffix(r.PkgPath, "/standalone") {
+					continue
+				}
+				keys := r.SuiteRequiredSharedFixtureKeys
+
+				alphaKeys := keys["TestAlphaTestSuite"]
+				gotest.Equal(it, 1, len(alphaKeys), "AlphaTestSuite needs only Alpha")
+
+				multiKeys := keys["TestMultiTestSuite"]
+				gotest.Equal(it, 2, len(multiKeys), "MultiTestSuite needs Alpha + Beta")
+
+				gammaKeys := keys["TestGammaTestSuite"]
+				gotest.Equal(it, 2, len(gammaKeys), "GammaTestSuite needs Gamma + Alpha transitively")
+
+				plainKeys := keys["TestPlainTestSuite"]
+				gotest.Empty(it, plainKeys, "PlainTestSuite needs no shared fixtures")
+			}
+		})
+	})
+
 	t.When("GeneratedCode", func(w *gotest.T) {
 		for _, r := range allResults {
 			if len(r.PTest) == 0 {
@@ -191,25 +252,29 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 
 			if strings.HasSuffix(r.PkgPath, "/standalone") {
 				w.It("standalone", func(it *gotest.T) {
-					gotest.Contains(it, code, `os.Getenv("GOTEST_SHARED_STATE_FILE")`)
-					gotest.Contains(it, code, "os.ReadFile(ƒsharedFile)")
-					gotest.Contains(it, code, "s.Alpha = sf0")
-					gotest.Contains(it, code, "sf0.Hydrate(context.Background())")
-					gotest.Contains(it, code, "sf0.Dehydrate(context.Background())")
-					gotest.Contains(it, code, "s.Beta = sf1")
-					gotest.NotContains(it, code, "sf1.Hydrate")
-					gotest.NotContains(it, code, "sf1.Dehydrate")
+					gotest.Contains(it, code, "gotestruntime.RunFixtureMain(m,")
+					gotest.Contains(it, code, "var ƒ_sf_fixtures_AlphaSharedFixture = &fixtures.AlphaSharedFixture{}")
+					gotest.Contains(it, code, "var ƒ_sf_fixtures_BetaSharedFixture = &fixtures.BetaSharedFixture{}")
+					gotest.Contains(it, code, "var ƒ_sf_fixtures_GammaSharedFixture = &fixtures.GammaSharedFixture{}")
+					gotest.Contains(it, code, "s.Alpha = ƒ_sf_fixtures_AlphaSharedFixture")
+					gotest.Contains(it, code, "s.Beta = ƒ_sf_fixtures_BetaSharedFixture")
+					gotest.Contains(it, code, "s.Gamma = ƒ_sf_fixtures_GammaSharedFixture")
+					gotest.NotContains(it, code, "encoding/json", "should NOT import encoding/json")
+					gotest.NotContains(it, code, "json.Unmarshal", "should NOT inline JSON unmarshal")
+				})
+				w.It("standalone dependency chain", func(it *gotest.T) {
+					gotest.Contains(it, code, `"fixtures_AlphaSharedFixture"`, "Gamma DependsOn Alpha")
+					gotest.Contains(it, code, "ƒ_sf_fixtures_GammaSharedFixture.Alpha = ƒ_sf_fixtures_AlphaSharedFixture", "Gamma Init wires Alpha")
 				})
 			}
 
 			if strings.HasSuffix(r.PkgPath, "/fixturebound") {
 				w.It("fixturebound", func(it *gotest.T) {
 					gotest.Contains(it, code, "gotestruntime.RunFixtureMain(m,")
-					gotest.Contains(it, code, "gotestruntime.SharedFixtureBinding")
-					gotest.Contains(it, code, "var ƒ_sf0_InfraFixture = &fixtures.AlphaSharedFixture{}")
-					gotest.Contains(it, code, "ƒ_InfraFixture.Alpha = ƒ_sf0_InfraFixture")
-					gotest.Contains(it, code, "ƒ_sf0_InfraFixture.Hydrate(ctx)")
-					gotest.Contains(it, code, "ƒ_sf0_InfraFixture.Dehydrate(ctx)")
+					gotest.Contains(it, code, "var ƒ_sf_fixtures_AlphaSharedFixture = &fixtures.AlphaSharedFixture{}")
+					gotest.Contains(it, code, "Alpha: ƒ_sf_fixtures_AlphaSharedFixture")
+					gotest.Contains(it, code, "ƒ_sf_fixtures_AlphaSharedFixture.Hydrate(ctx)")
+					gotest.Contains(it, code, "ƒ_sf_fixtures_AlphaSharedFixture.Dehydrate(ctx)")
 				})
 			}
 		}

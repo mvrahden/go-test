@@ -47,9 +47,10 @@ func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 			gotest.Contains(it, code, "sfpkg0.PostgresFixture{}")
 			gotest.Contains(it, code, "sf0.BeforeAll(ctx)")
 			gotest.Contains(it, code, "sf0.AfterAll(ctx)")
-			gotest.Contains(it, code, "json.NewEncoder(os.Stdout).Encode(state)")
+			gotest.Contains(it, code, `ƒquote("github.com/example/project/tests/fixtures.PostgresFixture")`)
 			gotest.Contains(it, code, "signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)")
 			gotest.Contains(it, code, "ConnStr: sf0.ConnStr")
+			gotest.Contains(it, code, `_done`)
 		})
 	})
 
@@ -292,7 +293,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			gotest.NoError(it, err)
 
 			code := string(src)
-			gotest.Contains(it, code, `state["github.com/example/fixtures.PGFixture"]`)
+			gotest.Contains(it, code, `ƒquote("github.com/example/fixtures.PGFixture")`)
 		})
 	})
 
@@ -384,7 +385,7 @@ func (s *SharedFixtureTestSuite) TestIntegrationGeneratedSetupBinary(t *gotest.T
 			gotest.Contains(it, code, "sf1.BeforeAll(ctx)")
 
 			gotest.Contains(it, code, "syscall.SIGTERM")
-			gotest.Contains(it, code, "json.NewEncoder(os.Stdout).Encode(state)")
+			gotest.Contains(it, code, `_done`)
 
 			gotest.Contains(it, code, "sf0.DSN", "DSN should be serialized")
 			gotest.Contains(it, code, "sf1.Endpoint", "Endpoint should be serialized")

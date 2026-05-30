@@ -36,6 +36,7 @@ func (s *GeneratorTestSuite) TestE2ECLI(t *gotest.T) {
 			{"simple testsuite", "testsuite", true},
 			{"suite guard", "suite_guard", false},
 			{"fixture lifecycle", "fixture_lifecycle", false},
+			{"multi fixture", "multi_fixture", false},
 		}) {
 			cwd, err := os.Getwd()
 			gotest.NoError(sub, err)

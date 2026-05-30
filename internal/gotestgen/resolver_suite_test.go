@@ -302,7 +302,7 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 	})
 
 	t.When("suite references multiple fixtures", func(w *gotest.T) {
-		w.It("returns an error", func(it *gotest.T) {
+		w.It("resolves all fixtures", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_MultipleFixturesPerSuite")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
@@ -311,9 +311,13 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
-			gotest.Error(it, err)
-			gotest.Contains(it, err.Error(), "multiple fixtures")
+			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.NoError(it, err)
+			gotest.Equal(it, 2, len(resolved.RootFixtures))
+			gotest.Equal(it, 1, len(resolved.FixtureBound))
+
+			bindings := resolved.SuiteFixtureFields["MultiTestSuite"]
+			gotest.Equal(it, 2, len(bindings))
 		})
 	})
 
@@ -334,8 +338,8 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 	})
 
 	t.When("fixture has multiple parent fixtures", func(w *gotest.T) {
-		w.It("returns an error", func(it *gotest.T) {
-			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_MultipleParentFixtures_Error")
+		w.It("resolves all parent fixtures", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_MultipleParentFixtures")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
 			gotest.Equal(it, 0, len(result.Errs))
@@ -343,9 +347,27 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
-			gotest.Error(it, err)
-			gotest.Contains(it, err.Error(), "multiple fixtures")
+			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.NoError(it, err)
+			gotest.Equal(it, 2, len(resolved.RootFixtures), "A and B should be roots")
+			gotest.Equal(it, 1, len(resolved.FixtureBound))
+		})
+	})
+
+	t.When("diamond dependency", func(w *gotest.T) {
+		w.It("deduplicates shared ancestor", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_DiamondDependency")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Equal(it, 0, len(result.Errs))
+
+			spec, err := c.ApplyTestSuiteSpecs(result)
+			gotest.NoError(it, err)
+
+			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.NoError(it, err)
+			gotest.Equal(it, 1, len(resolved.RootFixtures), "DB should be the only root")
+			gotest.Equal(it, 3, len(resolved.AllFixtures))
 		})
 	})
 
@@ -479,6 +501,62 @@ func (s *ResolverTestSuite) TestGenericAlias(t *gotest.T) {
 
 			_, err := gotestgen.Resolve(pkg, []*gotestast.TestSuiteSpec{suite}, nil)
 			gotest.NoError(it, err)
+		})
+	})
+}
+
+func (s *ResolverTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
+	t.When("shared fixture depends on another shared fixture", func(w *gotest.T) {
+		w.It("resolves the dependency chain", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixture_DependsOnSharedFixture")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Equal(it, 0, len(result.Errs))
+
+			spec, err := c.ApplyTestSuiteSpecs(result)
+			gotest.NoError(it, err)
+
+			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.NoError(it, err)
+
+			gotest.Equal(it, 2, len(resolved.RequiredSharedFixtures))
+
+			// Find Schema and verify it has PG as a dependency
+			var schema *gotestgen.SharedFixtureInfo
+			for i := range resolved.RequiredSharedFixtures {
+				if resolved.RequiredSharedFixtures[i].Identifier == "SchemaSharedFixture" {
+					schema = &resolved.RequiredSharedFixtures[i]
+				}
+			}
+			gotest.True(it, schema != nil, "expected SchemaSharedFixture in required list")
+			gotest.Equal(it, 1, len(schema.Dependencies))
+			gotest.Contains(it, schema.Dependencies[0], "PGSharedFixture")
+
+			gotest.NotContains(it, schema.TransferFields, "PG", "dep pointer field excluded from transfer")
+			gotest.Contains(it, schema.TransferFields, "Version", "non-dep exported field is a transfer field")
+		})
+	})
+
+	t.When("suite has transitive shared fixture dependencies", func(w *gotest.T) {
+		w.It("computes full required set including transitive deps", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixture_TransitiveDeps")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Equal(it, 0, len(result.Errs))
+
+			spec, err := c.ApplyTestSuiteSpecs(result)
+			gotest.NoError(it, err)
+
+			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.NoError(it, err)
+
+			// UserTestSuite references Schema which depends on PG → needs both
+			userKeys := resolved.SuiteRequiredSharedFixtureKeys["UserTestSuite"]
+			gotest.Equal(it, 2, len(userKeys), "UserTestSuite needs PG + Schema")
+
+			// SimpleTestSuite references only PG → needs only PG
+			simpleKeys := resolved.SuiteRequiredSharedFixtureKeys["SimpleTestSuite"]
+			gotest.Equal(it, 1, len(simpleKeys), "SimpleTestSuite needs only PG")
 		})
 	})
 }

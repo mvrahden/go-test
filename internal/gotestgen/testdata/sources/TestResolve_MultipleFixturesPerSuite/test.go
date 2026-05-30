@@ -11,8 +11,8 @@ func (f *AFixture) BeforeAll(ctx context.Context) error { return nil }
 type BFixture struct{}
 func (f *BFixture) BeforeAll(ctx context.Context) error { return nil }
 
-type BadTestSuite struct {
-	*AFixture
-	*BFixture
+type MultiTestSuite struct {
+	A *AFixture
+	B *BFixture
 }
-func (s *BadTestSuite) TestOne(t *gotest.T) {}
+func (s *MultiTestSuite) TestOne(t *gotest.T) {}

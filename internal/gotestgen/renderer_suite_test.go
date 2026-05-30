@@ -217,24 +217,23 @@ func (s *RendererTestSuite) TestStdlibTSupport(t *gotest.T) {
 
 func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 	t.When("embedding", func(w *gotest.T) {
-		w.It("renders shared fixture binding in fixture node", func(it *gotest.T) {
+		w.It("renders shared fixture as DAG node", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SharedFixtureEmbedding")
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.True(it, len(output) > 0, "expected non-empty output")
 
-			// Shared fixture allocated at package level
-			gotest.Contains(it, output, "var ƒ_sf0_E2EFixture = &PostgresSharedFixture{}")
+			// Shared fixture allocated at package level with sf_ prefix
+			gotest.Contains(it, output, "var ƒ_sf_PostgresSharedFixture = &PostgresSharedFixture{}")
 
-			// Shared fixture binding in FixtureNode
-			gotest.Contains(it, output, "gotestruntime.SharedFixtureBinding")
-			gotest.Contains(it, output, "Target:   ƒ_sf0_E2EFixture")
+			// Shared fixture rendered as SharedStateNode DAG node
+			gotest.Contains(it, output, "gotestruntime.SharedStateNode")
+			gotest.Contains(it, output, "ƒ_sf_PostgresSharedFixture,", "expected Target to reference shared fixture var")
 
-			// Shared fixture should be assigned to the package fixture via Assign closure
-			gotest.Contains(it, output, "ƒ_E2EFixture.PostgresSharedFixture = ƒ_sf0_E2EFixture")
+			// Package fixture should wire shared fixture via struct literal
+			gotest.Contains(it, output, "PostgresSharedFixture: ƒ_sf_PostgresSharedFixture")
 
 			// Package fixture lifecycle should still work
 			gotest.Contains(it, output, "gotestruntime.RunFixtureMain(m,")
-			gotest.Contains(it, output, "ƒ_E2EFixture = &E2EFixture{}")
 			gotest.Contains(it, output, "ƒ_E2EFixture.BeforeAll(ctx)")
 			gotest.Contains(it, output, "ƒ_E2EFixture.AfterAll(ctx)")
 
@@ -242,19 +241,23 @@ func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 			gotest.Contains(it, output, "func TestQueryTestSuite(t *testing.T)")
 			gotest.Contains(it, output, "E2EFixture: ƒ_E2EFixture")
 
-			// Runtime enforces ordering: SharedFixtures processed before BeforeAll is called
+			// Package fixture depends on shared fixture
 			gotest.Contains(it, output, `"E2EFixture"`)
+
+			// Old patterns should NOT be present
+			gotest.NotContains(it, output, "SharedFixtureBinding", "should NOT have old SharedFixtureBinding")
+			gotest.NotContains(it, output, "ƒ_sf0_E2EFixture", "should NOT have old sf0 variable naming")
 		})
 	})
 
 	t.When("empty struct", func(w *gotest.T) {
-		w.It("renders shared fixture creation and assignment", func(it *gotest.T) {
+		w.It("renders shared fixture as DAG node and struct literal wiring", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SharedFixtureEmptyStruct")
 			output, _ := renderTestPkg(it.T(), pkg)
 
-			gotest.Contains(it, output, "var ƒ_sf0_AppFixture = &SetupSharedFixture{}")
-			gotest.Contains(it, output, "ƒ_AppFixture.SetupSharedFixture = ƒ_sf0_AppFixture")
-			gotest.Contains(it, output, "Target:   ƒ_sf0_AppFixture")
+			gotest.Contains(it, output, "var ƒ_sf_SetupSharedFixture = &SetupSharedFixture{}")
+			gotest.Contains(it, output, "SetupSharedFixture: ƒ_sf_SetupSharedFixture")
+			gotest.Contains(it, output, "ƒ_sf_SetupSharedFixture,", "expected Target to reference shared fixture var")
 		})
 	})
 }
@@ -334,12 +337,13 @@ func (s *RendererTestSuite) TestNamedFields(t *gotest.T) {
 	})
 
 	t.When("shared fixture in fixture", func(w *gotest.T) {
-		w.It("uses named field for shared fixture injection", func(it *gotest.T) {
+		w.It("uses named field for shared fixture injection via struct literal", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_NamedField_SharedFixtureInFixture")
 			output, _ := renderTestPkg(it.T(), pkg)
 
-			gotest.Contains(it, output, "ƒ_AppFixture.pg = ƒ_sf0_AppFixture", "shared fixture injection should use named field")
+			gotest.Contains(it, output, "pg: ƒ_sf_PGSharedFixture", "shared fixture injection should use named field in struct literal")
 			gotest.NotContains(it, output, "ƒ_AppFixture.PGSharedFixture", "should NOT use type name for shared fixture field")
+			gotest.NotContains(it, output, "ƒ_sf0_AppFixture", "should NOT have old sf0 variable naming")
 		})
 	})
 }
@@ -436,14 +440,13 @@ func (s *RendererTestSuite) TestBuildFixtureViewModels(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			vms := gotestgen.ExportBuildFixtureViewModelsFromResolved(resolved.RootFixtures)
+			vms := gotestgen.ExportBuildAllFixtureViewModels(resolved.AllFixtures)
 			gotest.Equal(it, 1, len(vms))
 			gotest.Equal(it, "MyFixture", vms[0].Identifier)
 			gotest.True(it, vms[0].BeforeAll, "expected BeforeAll")
 			gotest.True(it, vms[0].AfterAll, "expected AfterAll")
 			gotest.Equal(it, 1, len(vms[0].ChildSuites))
 			gotest.Equal(it, "MyTestSuite", vms[0].ChildSuites[0].Identifier())
-			gotest.Equal(it, 0, len(vms[0].ChildFixtures))
 		})
 	})
 
@@ -460,7 +463,7 @@ func (s *RendererTestSuite) TestBuildFixtureViewModels(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			vms := gotestgen.ExportBuildFixtureViewModelsFromResolved(resolved.RootFixtures)
+			vms := gotestgen.ExportBuildAllFixtureViewModels(resolved.AllFixtures)
 			gotest.Equal(it, 1, len(vms))
 
 			vm := vms[0]
@@ -471,6 +474,7 @@ func (s *RendererTestSuite) TestBuildFixtureViewModels(t *gotest.T) {
 			gotest.Equal(it, "sf0", sf.LocalVar)
 			gotest.Equal(it, "PGSharedFixture", sf.QualifiedType)
 			gotest.Equal(it, "PGSharedFixture", sf.FieldName)
+			gotest.Equal(it, "PGSharedFixture", sf.Identifier)
 			gotest.Equal(it, "", sf.PkgPath, "same-package shared fixture should have empty PkgPath")
 			gotest.Equal(it, pkg.PkgPath+".PGSharedFixture", sf.StateKey)
 		})

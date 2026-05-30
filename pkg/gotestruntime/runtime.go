@@ -17,11 +17,17 @@ func run(runTests func() int, cfg MainConfig) int {
 	tracker := &nodeTracker{succeeded: make(map[*FixtureNode]bool)}
 
 	var sharedState map[string]json.RawMessage
-	if anyNodeHasSharedFixtures(cfg.Roots) {
-		var err error
-		sharedState, err = loadSharedState()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
+	if anyNodeHasSharedFixtures(cfg.Roots, cfg.Fixtures) {
+		if os.Getenv("GOTEST_SHARED_STATE_FILE") != "" {
+			var err error
+			sharedState, err = loadSharedState()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
+				restoreCoverage()
+				return 2
+			}
+		} else if anyNodeHasLegacySharedFixtures(cfg.Roots, cfg.Fixtures) {
+			fmt.Fprintf(os.Stderr, "FAIL: GOTEST_SHARED_STATE_FILE not set — run via gotest CLI\n")
 			restoreCoverage()
 			return 2
 		}
@@ -29,6 +35,24 @@ func run(runTests func() int, cfg MainConfig) int {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	if len(cfg.Fixtures) > 0 {
+		if err := setupDAG(ctx, cfg.Fixtures, sharedState, tracker); err != nil {
+			_ = teardownDAG(cfg.Fixtures, tracker)
+			restoreCoverage()
+			return 2
+		}
+
+		writeBudgetFile(cfg)
+
+		code := runTests()
+
+		if teardownDAG(cfg.Fixtures, tracker) && code == 0 {
+			code = 1
+		}
+		restoreCoverage()
+		return code
+	}
 
 	if err := setupRoots(ctx, cfg.Roots, sharedState, tracker); err != nil {
 		_ = teardownRoots(cfg.Roots, tracker)
@@ -141,6 +165,214 @@ func setupNode(ctx context.Context, node *FixtureNode, sharedState map[string]js
 	}
 
 	return nil
+}
+
+func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[string]json.RawMessage, tracker *nodeTracker) error {
+	byName := make(map[string]*FixtureNode, len(fixtures))
+	for _, f := range fixtures {
+		byName[f.Name] = f
+	}
+
+	for _, f := range fixtures {
+		for _, dep := range f.DependsOn {
+			if _, ok := byName[dep]; !ok {
+				return fmt.Errorf("fixture %q depends on %q, which does not exist", f.Name, dep)
+			}
+		}
+	}
+
+	done := make(map[string]chan struct{}, len(fixtures))
+	for _, f := range fixtures {
+		done[f.Name] = make(chan struct{})
+	}
+
+	childCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	errs := make(map[string]error)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, f := range fixtures {
+		wg.Add(1)
+		go func(node *FixtureNode) {
+			defer wg.Done()
+			defer close(done[node.Name])
+
+			for _, dep := range node.DependsOn {
+				select {
+				case <-done[dep]:
+					mu.Lock()
+					depErr := errs[dep]
+					mu.Unlock()
+					if depErr != nil {
+						mu.Lock()
+						errs[node.Name] = fmt.Errorf("skipped: dependency %q failed", dep)
+						mu.Unlock()
+						cancel()
+						return
+					}
+				case <-childCtx.Done():
+					mu.Lock()
+					errs[node.Name] = childCtx.Err()
+					mu.Unlock()
+					return
+				}
+			}
+
+			if err := setupNodeDAG(childCtx, node, sharedState, tracker); err != nil {
+				mu.Lock()
+				errs[node.Name] = err
+				mu.Unlock()
+				cancel()
+			}
+		}(f)
+	}
+	wg.Wait()
+
+	for _, f := range fixtures {
+		if err, ok := errs[f.Name]; ok && err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string]json.RawMessage, tracker *nodeTracker) error {
+	// Handle shared state nodes (unmarshal + hydrate)
+	if node.SharedState != nil {
+		if sharedState == nil {
+			return nil
+		}
+		raw, ok := sharedState[node.SharedState.StateKey]
+		if ok {
+			if err := json.Unmarshal(raw, node.SharedState.Target); err != nil {
+				return fmt.Errorf("unmarshal shared fixture %q: %w", node.SharedState.StateKey, err)
+			}
+		}
+		if node.Init != nil {
+			node.Init()
+		}
+		if node.SharedState.Hydrate != nil {
+			if err := node.SharedState.Hydrate(ctx); err != nil {
+				return fmt.Errorf("hydrate shared fixture %q: %w", node.SharedState.StateKey, err)
+			}
+		}
+		tracker.markSucceeded(node)
+		return nil
+	}
+
+	if len(node.SharedFixtures) > 0 {
+		for _, sf := range node.SharedFixtures {
+			raw, ok := sharedState[sf.StateKey]
+			if !ok {
+				return fmt.Errorf("shared fixture state key %q not found in state file", sf.StateKey)
+			}
+			if err := json.Unmarshal(raw, sf.Target); err != nil {
+				return fmt.Errorf("unmarshal shared fixture %q: %w", sf.StateKey, err)
+			}
+			if sf.Hydrate != nil {
+				if err := sf.Hydrate(ctx); err != nil {
+					return fmt.Errorf("hydrate shared fixture %q: %w", sf.StateKey, err)
+				}
+			}
+		}
+	}
+
+	if node.Init != nil {
+		node.Init()
+	}
+
+	for _, sf := range node.SharedFixtures {
+		if sf.Assign != nil {
+			sf.Assign()
+		}
+	}
+
+	if err := runBeforeAllWithRetry(ctx, node); err != nil {
+		return err
+	}
+
+	tracker.markSucceeded(node)
+	return nil
+}
+
+func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
+	dependents := make(map[string][]string, len(fixtures))
+	for _, f := range fixtures {
+		for _, dep := range f.DependsOn {
+			dependents[dep] = append(dependents[dep], f.Name)
+		}
+	}
+
+	done := make(map[string]chan struct{}, len(fixtures))
+	for _, f := range fixtures {
+		done[f.Name] = make(chan struct{})
+	}
+
+	failed := make(map[string]bool)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, f := range fixtures {
+		wg.Add(1)
+		go func(node *FixtureNode) {
+			defer wg.Done()
+			defer close(done[node.Name])
+
+			for _, dep := range dependents[node.Name] {
+				<-done[dep]
+			}
+
+			if tracker.isSucceeded(node) {
+				if node.SharedState != nil {
+					if node.SharedState.Dehydrate != nil {
+						if err := node.SharedState.Dehydrate(context.Background()); err != nil {
+							fmt.Fprintf(os.Stderr, "%s: dehydrate failed: %v\n", node.Name, err)
+							mu.Lock()
+							failed[node.Name] = true
+							mu.Unlock()
+						}
+					}
+					return  // shared state nodes don't have AfterAll in test process
+				}
+
+				if node.AfterAll != nil {
+					ctx := context.Background()
+					if node.Config.Timeout > 0 {
+						var cancel context.CancelFunc
+						ctx, cancel = context.WithTimeout(ctx, node.Config.Timeout)
+						defer cancel()
+					}
+					if err := node.AfterAll(ctx); err != nil {
+						fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", node.Name, err)
+						mu.Lock()
+						failed[node.Name] = true
+						mu.Unlock()
+					}
+				}
+
+				for _, sf := range node.SharedFixtures {
+					if sf.Dehydrate != nil {
+						if err := sf.Dehydrate(context.Background()); err != nil {
+							fmt.Fprintf(os.Stderr, "%s: dehydrate failed: %v\n", node.Name, err)
+							mu.Lock()
+							failed[node.Name] = true
+							mu.Unlock()
+						}
+					}
+				}
+			}
+		}(f)
+	}
+	wg.Wait()
+
+	for _, f := range failed {
+		if f {
+			return true
+		}
+	}
+	return false
 }
 
 func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
@@ -263,8 +495,13 @@ func writeBudgetFile(cfg MainConfig) {
 		return
 	}
 
-	maxTreePath := computeMaxTreePath(cfg.Roots)
-	budget := maxTreePath + cfg.MaxSuiteSetupTimeout + 30*time.Second
+	var maxPath time.Duration
+	if len(cfg.Fixtures) > 0 {
+		maxPath = computeMaxDAGPath(cfg.Fixtures)
+	} else {
+		maxPath = computeMaxTreePath(cfg.Roots)
+	}
+	budget := maxPath + cfg.MaxSuiteSetupTimeout + 30*time.Second
 	os.WriteFile(path, []byte(budget.String()), 0644)
 }
 
@@ -274,6 +511,50 @@ func computeMaxTreePath(roots []*FixtureNode) time.Duration {
 		path := nodeTreePath(root)
 		if path > maxPath {
 			maxPath = path
+		}
+	}
+	return maxPath
+}
+
+func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
+	byName := make(map[string]*FixtureNode, len(fixtures))
+	for _, f := range fixtures {
+		byName[f.Name] = f
+	}
+
+	cache := make(map[string]time.Duration)
+	visiting := make(map[string]bool)
+	var longestPath func(name string) time.Duration
+	longestPath = func(name string) time.Duration {
+		if d, ok := cache[name]; ok {
+			return d
+		}
+		if visiting[name] {
+			return 0
+		}
+		visiting[name] = true
+		node := byName[name]
+		own := node.Config.Timeout
+		if own < 0 {
+			own = 0
+		}
+		var maxDep time.Duration
+		for _, dep := range node.DependsOn {
+			depPath := longestPath(dep)
+			if depPath > maxDep {
+				maxDep = depPath
+			}
+		}
+		result := own + maxDep
+		cache[name] = result
+		return result
+	}
+
+	var maxPath time.Duration
+	for _, f := range fixtures {
+		p := longestPath(f.Name)
+		if p > maxPath {
+			maxPath = p
 		}
 	}
 	return maxPath
@@ -310,7 +591,26 @@ func loadSharedState() (map[string]json.RawMessage, error) {
 	return state, nil
 }
 
-func anyNodeHasSharedFixtures(roots []*FixtureNode) bool {
+func anyNodeHasSharedFixtures(roots, fixtures []*FixtureNode) bool {
+	for _, f := range fixtures {
+		if len(f.SharedFixtures) > 0 || f.SharedState != nil {
+			return true
+		}
+	}
+	for _, root := range roots {
+		if hasSharedFixtures(root) {
+			return true
+		}
+	}
+	return false
+}
+
+func anyNodeHasLegacySharedFixtures(roots, fixtures []*FixtureNode) bool {
+	for _, f := range fixtures {
+		if len(f.SharedFixtures) > 0 {
+			return true
+		}
+	}
 	for _, root := range roots {
 		if hasSharedFixtures(root) {
 			return true

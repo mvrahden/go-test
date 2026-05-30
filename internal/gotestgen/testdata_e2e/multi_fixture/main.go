@@ -1,0 +1,3 @@
+package multifixture
+
+func DoWork() {}

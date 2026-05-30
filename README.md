@@ -288,15 +288,16 @@ Setup hooks (`BeforeAll`, `BeforeEach`) receive `t.Context()` — cancelled when
 Cleanup hooks (`AfterAll`, `AfterEach`) receive `context.Background()` — cleanup must proceed even after the test context is cancelled.
 Requires Go 1.24+.
 
-Test suites reference the fixture via a named pointer field:
+Test suites reference fixtures via named pointer fields — one or more:
 
 ```go
 type BatchTestSuite struct {
-    Fixture *E2ESetupFixture
+    Setup *E2ESetupFixture
+    Cache *CacheFixture
 }
 
 func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
-    // s.Fixture.Pool is populated by E2ESetupFixture.BeforeAll
+    // s.Setup.Pool and s.Cache.Client are populated by their respective BeforeAll hooks
 }
 ```
 
@@ -314,25 +315,28 @@ Fixture.AfterEach
 
 All four hooks are optional (only `BeforeAll` is required).
 
-Fixtures can nest — a root fixture's hooks run first, wrapping the child's:
+Fixtures compose naturally — each fixture can depend on multiple others via pointer fields.
+Dependencies are set up before dependents, independent fixtures set up in parallel, and everything tears down in reverse.
+If two fixtures share a common dependency, it's created once:
 
 ```go
 type InfraFixture struct { Pool *pgxpool.Pool }
+type CacheFixture struct { Client *redis.Client }
 
 type APIFixture struct {
-    Infra     *InfraFixture
-    ServerURL string
+    Infra *InfraFixture   // depends on infra
+    Cache *CacheFixture   // and cache — both set up before APIFixture
 }
 ```
 
 ```
-InfraFixture.BeforeEach
-  APIFixture.BeforeEach
-    Suite.BeforeEach
-      TestCase
-    Suite.AfterEach
-  APIFixture.AfterEach
-InfraFixture.AfterEach
+InfraFixture.BeforeEach  ─┐
+CacheFixture.BeforeEach  ─┤
+                           └─ APIFixture.BeforeEach
+                                └─ Suite.BeforeEach → TestCase → Suite.AfterEach
+                           ┌─ APIFixture.AfterEach
+InfraFixture.AfterEach  ──┤
+CacheFixture.AfterEach  ──┘
 ```
 
 **Failure reporting.**
@@ -350,7 +354,17 @@ Fixture hook failures are reported with automatic attribution.
 FAIL: E2ESetupFixture.BeforeAll failed after 2 attempt(s): start postgres: connection refused
 ```
 
-For cross-package shared state (e.g. a database container shared across integration test packages), use `*SharedFixture` suffix — see [docs/design/fixtures.md](docs/design/fixtures.md) for the full reference.
+For cross-package shared state (e.g. a database container shared across integration test packages), use `*SharedFixture` suffix.
+SharedFixtures can depend on other SharedFixtures via pointer fields — `BeforeAll` runs in dependency order, and suites start as soon as their specific dependencies are ready:
+
+```go
+type SchemaSharedFixture struct {
+    Postgres *PostgresSharedFixture   // dependency — Postgres starts first
+    Version  string
+}
+```
+
+See [docs/design/fixtures.md](docs/design/fixtures.md) for the full reference.
 
 ## Parallelism
 

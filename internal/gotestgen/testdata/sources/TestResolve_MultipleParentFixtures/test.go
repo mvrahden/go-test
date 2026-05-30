@@ -12,10 +12,10 @@ type BFixture struct{}
 func (f *BFixture) BeforeAll(ctx context.Context) error { return nil }
 
 type ChildFixture struct {
-	*AFixture
-	*BFixture
+	A *AFixture
+	B *BFixture
 }
 func (f *ChildFixture) BeforeAll(ctx context.Context) error { return nil }
 
-type SomeTestSuite struct { *ChildFixture }
+type SomeTestSuite struct { Child *ChildFixture }
 func (s *SomeTestSuite) TestOne(t *gotest.T) {}
