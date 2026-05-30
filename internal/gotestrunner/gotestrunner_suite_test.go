@@ -980,6 +980,48 @@ func (s *GotestrunnerTestSuite) TestSuiteRunFilter(t *gotest.T) {
 	}
 }
 
+func (s *GotestrunnerTestSuite) TestComputeConcurrency(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Name         string
+		budget       int
+		numSuites    int
+		gomaxprocs   int
+		wantInter    int
+		wantIntra    int
+	}{
+		// Default budget (2×GOMAXPROCS), 4 cores
+		{"1 suite 4 cores", 8, 1, 4, 1, 8},
+		{"2 suites 4 cores", 8, 2, 4, 2, 4},
+		{"4 suites 4 cores", 8, 4, 4, 4, 2},
+		{"20 suites 4 cores", 8, 20, 4, 4, 2},
+
+		// Default budget (2×GOMAXPROCS), 8 cores
+		{"2 suites 8 cores", 16, 2, 8, 2, 8},
+		{"8 suites 8 cores", 16, 8, 8, 8, 2},
+		{"30 suites 8 cores", 16, 30, 8, 8, 2},
+
+		// Small budget (< GOMAXPROCS)
+		{"budget 4 on 8 cores", 4, 20, 8, 4, 1},
+		{"budget 2 on 8 cores", 2, 20, 8, 2, 1},
+
+		// Large budget
+		{"budget 32 on 4 cores", 32, 20, 4, 4, 8},
+
+		// Edge: fewer suites than cores
+		{"budget 16 1 suite", 16, 1, 8, 1, 16},
+
+		// Edge: zero/negative budget uses default
+		{"zero budget", 0, 10, 4, 4, 2},
+
+		// Edge: zero suites
+		{"zero suites", 8, 0, 4, 1, 8},
+	}) {
+		inter, intra := gotestrunner.ComputeConcurrency(tc.budget, tc.numSuites, tc.gomaxprocs)
+		gotest.Equal(sub, tc.wantInter, inter, "inter")
+		gotest.Equal(sub, tc.wantIntra, intra, "intra")
+	}
+}
+
 var jsonTimestampRe = regexp.MustCompile(`\d+\.\d+s`)
 
 func normalizeJSON(raw string) string {
