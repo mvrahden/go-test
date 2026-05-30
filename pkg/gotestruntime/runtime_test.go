@@ -985,6 +985,405 @@ func TestTeardownFailure_PreservesNonZeroExitCode(t *testing.T) {
 	gotest.Equal(t, 3, exitCode)
 }
 
+func TestDAG_LinearChain(t *testing.T) {
+	rec := &recorder{}
+
+	root := &FixtureNode{
+		Name:   "Root",
+		Config: gotest.DefaultFixtureConfig(),
+		Init:   func() { rec.record("root.init") },
+		BeforeAll: func(ctx context.Context) error {
+			rec.record("root.beforeAll")
+			return nil
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("root.afterAll")
+			return nil
+		},
+	}
+	mid := &FixtureNode{
+		Name:      "Mid",
+		Config:    gotest.DefaultFixtureConfig(),
+		DependsOn: []string{"Root"},
+		Init:      func() { rec.record("mid.init") },
+		BeforeAll: func(ctx context.Context) error {
+			rec.record("mid.beforeAll")
+			return nil
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("mid.afterAll")
+			return nil
+		},
+	}
+	leaf := &FixtureNode{
+		Name:      "Leaf",
+		Config:    gotest.DefaultFixtureConfig(),
+		DependsOn: []string{"Mid"},
+		Init:      func() { rec.record("leaf.init") },
+		BeforeAll: func(ctx context.Context) error {
+			rec.record("leaf.beforeAll")
+			return nil
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("leaf.afterAll")
+			return nil
+		},
+	}
+
+	exitCode := run(func() int {
+		rec.record("m.run")
+		return 0
+	}, MainConfig{Fixtures: []*FixtureNode{root, mid, leaf}})
+
+	gotest.Equal(t, 0, exitCode)
+
+	events := rec.names()
+
+	rootBA := indexOf(events, "root.beforeAll")
+	midBA := indexOf(events, "mid.beforeAll")
+	leafBA := indexOf(events, "leaf.beforeAll")
+	mRun := indexOf(events, "m.run")
+
+	gotest.True(t, rootBA < midBA, "root.beforeAll must precede mid.beforeAll")
+	gotest.True(t, midBA < leafBA, "mid.beforeAll must precede leaf.beforeAll")
+	gotest.True(t, leafBA < mRun, "leaf.beforeAll must precede m.run")
+
+	leafAA := indexOf(events, "leaf.afterAll")
+	midAA := indexOf(events, "mid.afterAll")
+	rootAA := indexOf(events, "root.afterAll")
+
+	gotest.True(t, mRun < leafAA, "m.run must precede leaf.afterAll")
+	gotest.True(t, leafAA < midAA, "leaf.afterAll must precede mid.afterAll")
+	gotest.True(t, midAA < rootAA, "mid.afterAll must precede root.afterAll")
+}
+
+func TestDAG_IndependentFixtures(t *testing.T) {
+	aStarted := make(chan struct{})
+	bStarted := make(chan struct{})
+
+	fixtureA := &FixtureNode{
+		Name:   "A",
+		Config: gotest.DefaultFixtureConfig(),
+		Init:   func() {},
+		BeforeAll: func(ctx context.Context) error {
+			close(aStarted)
+			select {
+			case <-bStarted:
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		},
+	}
+	fixtureB := &FixtureNode{
+		Name:   "B",
+		Config: gotest.DefaultFixtureConfig(),
+		Init:   func() {},
+		BeforeAll: func(ctx context.Context) error {
+			close(bStarted)
+			select {
+			case <-aStarted:
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		},
+	}
+
+	exitCode := run(func() int { return 0 }, MainConfig{Fixtures: []*FixtureNode{fixtureA, fixtureB}})
+	gotest.Equal(t, 0, exitCode)
+}
+
+func TestDAG_DiamondDependency(t *testing.T) {
+	rec := &recorder{}
+
+	db := &FixtureNode{
+		Name:   "DB",
+		Config: gotest.DefaultFixtureConfig(),
+		Init:   func() {},
+		BeforeAll: func(ctx context.Context) error {
+			rec.record("db.beforeAll")
+			return nil
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("db.afterAll")
+			return nil
+		},
+	}
+	repoA := &FixtureNode{
+		Name:      "RepoA",
+		Config:    gotest.DefaultFixtureConfig(),
+		DependsOn: []string{"DB"},
+		Init:      func() {},
+		BeforeAll: func(ctx context.Context) error {
+			rec.record("repoA.beforeAll")
+			return nil
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("repoA.afterAll")
+			return nil
+		},
+	}
+	repoB := &FixtureNode{
+		Name:      "RepoB",
+		Config:    gotest.DefaultFixtureConfig(),
+		DependsOn: []string{"DB"},
+		Init:      func() {},
+		BeforeAll: func(ctx context.Context) error {
+			rec.record("repoB.beforeAll")
+			return nil
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("repoB.afterAll")
+			return nil
+		},
+	}
+	service := &FixtureNode{
+		Name:      "Service",
+		Config:    gotest.DefaultFixtureConfig(),
+		DependsOn: []string{"RepoA", "RepoB"},
+		Init:      func() {},
+		BeforeAll: func(ctx context.Context) error {
+			rec.record("service.beforeAll")
+			return nil
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("service.afterAll")
+			return nil
+		},
+	}
+
+	exitCode := run(func() int {
+		rec.record("m.run")
+		return 0
+	}, MainConfig{Fixtures: []*FixtureNode{db, repoA, repoB, service}})
+
+	gotest.Equal(t, 0, exitCode)
+
+	events := rec.names()
+
+	dbBA := indexOf(events, "db.beforeAll")
+	repoABA := indexOf(events, "repoA.beforeAll")
+	repoBBA := indexOf(events, "repoB.beforeAll")
+	serviceBA := indexOf(events, "service.beforeAll")
+	mRun := indexOf(events, "m.run")
+
+	gotest.True(t, dbBA < repoABA, "DB must set up before RepoA")
+	gotest.True(t, dbBA < repoBBA, "DB must set up before RepoB")
+	gotest.True(t, repoABA < serviceBA, "RepoA must set up before Service")
+	gotest.True(t, repoBBA < serviceBA, "RepoB must set up before Service")
+	gotest.True(t, serviceBA < mRun, "Service must set up before m.run")
+
+	serviceAA := indexOf(events, "service.afterAll")
+	repoAAA := indexOf(events, "repoA.afterAll")
+	repoBAA := indexOf(events, "repoB.afterAll")
+	dbAA := indexOf(events, "db.afterAll")
+
+	gotest.True(t, mRun < serviceAA, "m.run must precede service.afterAll")
+	gotest.True(t, serviceAA < repoAAA, "service.afterAll must precede repoA.afterAll")
+	gotest.True(t, serviceAA < repoBAA, "service.afterAll must precede repoB.afterAll")
+	gotest.True(t, repoAAA < dbAA, "repoA.afterAll must precede db.afterAll")
+	gotest.True(t, repoBAA < dbAA, "repoB.afterAll must precede db.afterAll")
+}
+
+func TestDAG_DependencyFailure_SkipsDependents(t *testing.T) {
+	rec := &recorder{}
+
+	root := &FixtureNode{
+		Name:   "Root",
+		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
+		Init:   func() {},
+		BeforeAll: func(ctx context.Context) error {
+			return errors.New("root fails")
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("root.afterAll")
+			return nil
+		},
+	}
+	child := &FixtureNode{
+		Name:      "Child",
+		Config:    gotest.DefaultFixtureConfig(),
+		DependsOn: []string{"Root"},
+		Init:      func() {},
+		BeforeAll: func(ctx context.Context) error {
+			rec.record("child.beforeAll")
+			return nil
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("child.afterAll")
+			return nil
+		},
+	}
+
+	exitCode := run(func() int { return 0 }, MainConfig{Fixtures: []*FixtureNode{root, child}})
+
+	gotest.Equal(t, 2, exitCode)
+	events := rec.names()
+	gotest.NotContains(t, events, "child.beforeAll")
+	gotest.NotContains(t, events, "child.afterAll")
+	gotest.NotContains(t, events, "root.afterAll")
+}
+
+func TestDAG_DependencyFailure_PartialTeardown(t *testing.T) {
+	rec := &recorder{}
+
+	aReady := make(chan struct{})
+
+	a := &FixtureNode{
+		Name:   "A",
+		Config: gotest.DefaultFixtureConfig(),
+		Init:   func() {},
+		BeforeAll: func(ctx context.Context) error {
+			rec.record("a.beforeAll")
+			close(aReady)
+			return nil
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("a.afterAll")
+			return nil
+		},
+	}
+	b := &FixtureNode{
+		Name:   "B",
+		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
+		Init:   func() {},
+		BeforeAll: func(ctx context.Context) error {
+			<-aReady
+			return errors.New("B fails")
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("b.afterAll")
+			return nil
+		},
+	}
+	c := &FixtureNode{
+		Name:      "C",
+		Config:    gotest.DefaultFixtureConfig(),
+		DependsOn: []string{"A"},
+		Init:      func() {},
+		BeforeAll: func(ctx context.Context) error {
+			rec.record("c.beforeAll")
+			return nil
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("c.afterAll")
+			return nil
+		},
+	}
+
+	exitCode := run(func() int { return 0 }, MainConfig{Fixtures: []*FixtureNode{a, b, c}})
+
+	gotest.Equal(t, 2, exitCode)
+	events := rec.names()
+	gotest.Contains(t, events, "a.beforeAll")
+	gotest.Contains(t, events, "a.afterAll")
+	gotest.NotContains(t, events, "b.afterAll")
+}
+
+func TestDAG_SharedFixtureWithDAGPath(t *testing.T) {
+	rec := &recorder{}
+
+	type SharedDB struct {
+		Host string `json:"host"`
+		Port int    `json:"port"`
+	}
+
+	stateData := map[string]json.RawMessage{
+		"example.com/fixtures.SharedDB": json.RawMessage(`{"host":"localhost","port":5432}`),
+	}
+	stateBytes, _ := json.Marshal(stateData)
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	os.WriteFile(stateFile, stateBytes, 0644)
+	t.Setenv("GOTEST_SHARED_STATE_FILE", stateFile)
+
+	var target SharedDB
+	var assignedHost string
+
+	node := &FixtureNode{
+		Name:   "Root",
+		Config: gotest.DefaultFixtureConfig(),
+		Init:   func() { rec.record("root.init") },
+		BeforeAll: func(ctx context.Context) error {
+			rec.record("root.beforeAll")
+			return nil
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("root.afterAll")
+			return nil
+		},
+		SharedFixtures: []SharedFixtureBinding{
+			{
+				StateKey: "example.com/fixtures.SharedDB",
+				Target:   &target,
+				Hydrate: func(ctx context.Context) error {
+					rec.record("sf.hydrate")
+					return nil
+				},
+				Dehydrate: func(ctx context.Context) error {
+					rec.record("sf.dehydrate")
+					return nil
+				},
+				Assign: func() {
+					rec.record("sf.assign")
+					assignedHost = target.Host
+				},
+			},
+		},
+	}
+
+	exitCode := run(func() int {
+		rec.record("m.run")
+		return 0
+	}, MainConfig{Fixtures: []*FixtureNode{node}})
+
+	gotest.Equal(t, 0, exitCode)
+	gotest.Equal(t, "localhost", target.Host)
+	gotest.Equal(t, 5432, target.Port)
+	gotest.Equal(t, "localhost", assignedHost)
+
+	events := rec.names()
+	hydrateIdx := indexOf(events, "sf.hydrate")
+	initIdx := indexOf(events, "root.init")
+	assignIdx := indexOf(events, "sf.assign")
+	beforeAllIdx := indexOf(events, "root.beforeAll")
+	mRunIdx := indexOf(events, "m.run")
+	afterAllIdx := indexOf(events, "root.afterAll")
+	dehydrateIdx := indexOf(events, "sf.dehydrate")
+
+	gotest.True(t, hydrateIdx < initIdx)
+	gotest.True(t, initIdx < assignIdx)
+	gotest.True(t, assignIdx < beforeAllIdx)
+	gotest.True(t, beforeAllIdx < mRunIdx)
+	gotest.True(t, mRunIdx < afterAllIdx)
+	gotest.True(t, afterAllIdx < dehydrateIdx)
+}
+
+func TestDAG_ComputeMaxPath(t *testing.T) {
+	fixtures := []*FixtureNode{
+		{Name: "A", Config: gotest.FixtureConfig{Timeout: 1 * time.Minute}},
+		{Name: "B", Config: gotest.FixtureConfig{Timeout: 3 * time.Minute}, DependsOn: []string{"A"}},
+		{Name: "C", Config: gotest.FixtureConfig{Timeout: 2 * time.Minute}, DependsOn: []string{"A"}},
+	}
+
+	// Longest path: A(1m) + B(3m) = 4m
+	result := computeMaxDAGPath(fixtures)
+	gotest.Equal(t, 4*time.Minute, result)
+}
+
+func TestDAG_InvalidDependency(t *testing.T) {
+	node := &FixtureNode{
+		Name:      "Orphan",
+		Config:    gotest.DefaultFixtureConfig(),
+		DependsOn: []string{"DoesNotExist"},
+		Init:      func() {},
+		BeforeAll: func(ctx context.Context) error { return nil },
+	}
+
+	exitCode := run(func() int { return 0 }, MainConfig{Fixtures: []*FixtureNode{node}})
+	gotest.Equal(t, 2, exitCode)
+}
+
 func indexOf(slice []string, val string) int {
 	for i, s := range slice {
 		if s == val {
