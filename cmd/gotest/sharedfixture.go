@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,6 +30,7 @@ type fixtureStateEntry struct {
 type SharedFixtureProcess struct {
 	cmd             *exec.Cmd
 	stateFile       string
+	sharedDir       string
 	done            chan struct{}
 	teardownTimeout time.Duration
 
@@ -74,6 +74,73 @@ func (p *SharedFixtureProcess) State(keys []string) map[string]json.RawMessage {
 	return result
 }
 
+// WaitAllReady blocks until all fixtures have completed setup (the _done sentinel
+// is received). On success it writes the accumulated state to a global state file.
+// Returns error on setup failure, timeout, or context cancellation.
+func (p *SharedFixtureProcess) WaitAllReady(ctx context.Context, timeout time.Duration) error {
+	if timeout > 0 {
+		select {
+		case <-p.allDone:
+		case <-ctx.Done():
+			p.cmd.Process.Kill()
+			return fmt.Errorf("cancelled: %w", ctx.Err())
+		case <-time.After(timeout):
+			p.cmd.Process.Kill()
+			return fmt.Errorf("timed out after %v", timeout)
+		}
+	} else {
+		select {
+		case <-p.allDone:
+		case <-ctx.Done():
+			p.cmd.Process.Kill()
+			return fmt.Errorf("cancelled: %w", ctx.Err())
+		}
+	}
+	if p.setupErr != nil {
+		p.cmd.Process.Kill()
+		return fmt.Errorf("shared fixture setup: %w", p.setupErr)
+	}
+
+	p.mu.Lock()
+	stateBytes, err := json.Marshal(p.state)
+	p.mu.Unlock()
+	if err != nil {
+		p.cmd.Process.Kill()
+		return fmt.Errorf("re-marshal shared fixture state: %w", err)
+	}
+
+	p.stateFile = filepath.Join(p.sharedDir, "state.json")
+	if err := os.WriteFile(p.stateFile, stateBytes, 0644); err != nil {
+		p.cmd.Process.Kill()
+		return fmt.Errorf("write shared fixture state file: %w", err)
+	}
+	return nil
+}
+
+// WriteStateFileForKeys writes a state file containing only the specified keys.
+// Returns the path to the written file.
+func (p *SharedFixtureProcess) WriteStateFileForKeys(name string, keys []string) (string, error) {
+	p.mu.Lock()
+	subset := make(map[string]json.RawMessage, len(keys))
+	for _, k := range keys {
+		if v, ok := p.state[k]; ok {
+			subset[k] = v
+		}
+	}
+	p.mu.Unlock()
+
+	data, err := json.Marshal(subset)
+	if err != nil {
+		return "", fmt.Errorf("marshal state for %s: %w", name, err)
+	}
+
+	path := filepath.Join(p.sharedDir, name+".json")
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return "", fmt.Errorf("write state file for %s: %w", name, err)
+	}
+	return path, nil
+}
+
 // Teardown signals the shared fixture subprocess to shut down and waits
 // for it to complete. If the process doesn't exit within 30 seconds,
 // it is forcibly killed.
@@ -95,11 +162,11 @@ func (p *SharedFixtureProcess) Teardown() error {
 }
 
 // startSharedFixtures generates a shared setup binary in the overlay temp dir,
-// starts it as a subprocess, reads JSON state from stdout, writes it to a state
-// file, and returns a SharedFixtureProcess. setupTimeout is a total budget for
-// all shared fixtures to complete setup; 0 means no external deadline (each
-// fixture's own SharedFixtureConfig().Timeout governs); any negative value
-// explicitly disables the deadline.
+// starts it as a subprocess, and returns a SharedFixtureProcess immediately.
+// A background goroutine reads JSON state lines from stdout, closing per-fixture
+// ready channels as each fixture completes. The caller must either wait on
+// individual Ready() channels (streaming) or call WaitAllReady (batch).
+// setupTimeout is stored as the initial teardownTimeout; 0 means no deadline.
 func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestgen.SharedFixtureInfo, setupTimeout time.Duration) (*SharedFixtureProcess, error) {
 	src, err := gotestgen.GenerateSharedSetup(fixtures)
 	if err != nil {
@@ -150,9 +217,22 @@ func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 
 	allDone := make(chan struct{})
 	state := make(map[string]json.RawMessage)
-	var mu sync.Mutex
-	var setupErr error
-	teardownTimeout := setupTimeout
+
+	waitDone := make(chan struct{})
+	go func() {
+		cmd.Wait()
+		close(waitDone)
+	}()
+
+	proc := &SharedFixtureProcess{
+		cmd:             cmd,
+		sharedDir:       sharedDir,
+		done:            waitDone,
+		teardownTimeout: setupTimeout,
+		ready:           ready,
+		state:           state,
+		allDone:         allDone,
+	}
 
 	// Read streaming JSON lines from the subprocess stdout.
 	go func() {
@@ -166,19 +246,19 @@ func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 			}
 			if entry.Key == "_done" {
 				if entry.Error != "" {
-					setupErr = fmt.Errorf("%s", entry.Error)
+					proc.setupErr = fmt.Errorf("%s", entry.Error)
 				}
 				if entry.TeardownBudget != "" {
 					if d, err := time.ParseDuration(entry.TeardownBudget); err == nil && d > 0 {
-						teardownTimeout = d
+						proc.teardownTimeout = d
 					}
 				}
 				close(allDone)
 				return
 			}
-			mu.Lock()
+			proc.mu.Lock()
 			state[entry.Key] = entry.State
-			mu.Unlock()
+			proc.mu.Unlock()
 			if ch, ok := ready[entry.Key]; ok && !closedReady[entry.Key] {
 				close(ch)
 				closedReady[entry.Key] = true
@@ -186,65 +266,12 @@ func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		}
 		// Scanner ended without _done — subprocess crashed.
 		if err := scanner.Err(); err != nil {
-			setupErr = fmt.Errorf("reading subprocess stdout: %w", err)
-		} else if setupErr == nil {
-			setupErr = fmt.Errorf("subprocess exited without _done sentinel")
+			proc.setupErr = fmt.Errorf("reading subprocess stdout: %w", err)
+		} else if proc.setupErr == nil {
+			proc.setupErr = fmt.Errorf("subprocess exited without _done sentinel")
 		}
 		close(allDone)
 	}()
 
-	// Wait for allDone (with timeout).
-	if setupTimeout > 0 {
-		select {
-		case <-allDone:
-		case <-ctx.Done():
-			cmd.Process.Kill()
-			return nil, fmt.Errorf("cancelled: %w", ctx.Err())
-		case <-time.After(setupTimeout):
-			cmd.Process.Kill()
-			io.Copy(io.Discard, stdout)
-			return nil, fmt.Errorf("timed out after %v", setupTimeout)
-		}
-	} else {
-		select {
-		case <-allDone:
-		case <-ctx.Done():
-			cmd.Process.Kill()
-			return nil, fmt.Errorf("cancelled: %w", ctx.Err())
-		}
-	}
-
-	if setupErr != nil {
-		cmd.Process.Kill()
-		return nil, fmt.Errorf("shared fixture setup: %w", setupErr)
-	}
-
-	// Write accumulated state to file (backward compat with non-streaming callers).
-	stateBytes, err := json.Marshal(state)
-	if err != nil {
-		cmd.Process.Kill()
-		return nil, fmt.Errorf("re-marshal shared fixture state: %w", err)
-	}
-
-	stateFile := filepath.Join(sharedDir, "state.json")
-	if err := os.WriteFile(stateFile, stateBytes, 0644); err != nil {
-		cmd.Process.Kill()
-		return nil, fmt.Errorf("write shared fixture state file: %w", err)
-	}
-
-	waitDone := make(chan struct{})
-	go func() {
-		cmd.Wait()
-		close(waitDone)
-	}()
-
-	return &SharedFixtureProcess{
-		cmd:             cmd,
-		stateFile:       stateFile,
-		done:            waitDone,
-		teardownTimeout: teardownTimeout,
-		ready:           ready,
-		state:           state,
-		allDone:         allDone,
-	}, nil
+	return proc, nil
 }

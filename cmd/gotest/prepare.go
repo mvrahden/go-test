@@ -51,6 +51,13 @@ func runPrepare(inv Invocation) int {
 			fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", err)
 			return 2
 		}
+		if err := setupProc.WaitAllReady(ctx, 0); err != nil {
+			stop()
+			setupProc.Teardown()
+			cleanup()
+			fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", err)
+			return 2
+		}
 	}
 
 	// Stop the context-based listener before switching to channel-based blocking.

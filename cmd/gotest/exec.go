@@ -15,14 +15,14 @@ import (
 )
 
 type overlayResult struct {
-	tmpDir           string
-	overlayFlag      string
-	sharedFixtures   []gotestgen.SharedFixtureInfo
-	suitePackages    []string
-	noSuitePackages  []string                     // loaded packages that had no suites
-	suitesByPkg      map[string][]string          // import path → suite struct names
-	dirsByPkg        map[string]string             // import path → package source directory
-	fixtureDepSuites map[string]map[string]bool   // import path → set of test func names needing shared fixtures
+	tmpDir                         string
+	overlayFlag                    string
+	sharedFixtures                 []gotestgen.SharedFixtureInfo
+	suitePackages                  []string
+	noSuitePackages                []string                        // loaded packages that had no suites
+	suitesByPkg                    map[string][]string             // import path → suite struct names
+	dirsByPkg                      map[string]string               // import path → package source directory
+	suiteRequiredSharedFixtureKeys map[string]map[string][]string  // import path → test func name → required state keys
 }
 
 func generateOverlayFromLoaded(loaded []*gotestgen.LoadResult, debug bool) (*overlayResult, func(), error) {
@@ -48,7 +48,7 @@ func generateOverlayFromLoaded(loaded []*gotestgen.LoadResult, debug bool) (*ove
 	var noSuitePkgs []string
 	suitesByPkg := map[string][]string{}
 	dirsByPkg := map[string]string{}
-	fixtureDepSuites := map[string]map[string]bool{}
+	suiteReqKeys := map[string]map[string][]string{}
 	for _, r := range allResults {
 		if len(r.PTest) > 0 || len(r.PXTest) > 0 {
 			suitePkgs = append(suitePkgs, r.PkgPath)
@@ -61,24 +61,20 @@ func generateOverlayFromLoaded(loaded []*gotestgen.LoadResult, debug bool) (*ove
 		if r.AbsPath != "" {
 			dirsByPkg[r.PkgPath] = r.AbsPath
 		}
-		if len(r.FixtureDepSuites) > 0 {
-			s := make(map[string]bool, len(r.FixtureDepSuites))
-			for _, fn := range r.FixtureDepSuites {
-				s[fn] = true
-			}
-			fixtureDepSuites[r.PkgPath] = s
+		if len(r.SuiteRequiredSharedFixtureKeys) > 0 {
+			suiteReqKeys[r.PkgPath] = r.SuiteRequiredSharedFixtureKeys
 		}
 	}
 
 	return &overlayResult{
-		tmpDir:           tmpDir,
-		overlayFlag:      "-overlay=" + filepath.Join(tmpDir, "overlay.json"),
-		sharedFixtures:   allSharedFixtures,
-		suitePackages:    suitePkgs,
-		noSuitePackages:  noSuitePkgs,
-		suitesByPkg:      suitesByPkg,
-		dirsByPkg:        dirsByPkg,
-		fixtureDepSuites: fixtureDepSuites,
+		tmpDir:                         tmpDir,
+		overlayFlag:                    "-overlay=" + filepath.Join(tmpDir, "overlay.json"),
+		sharedFixtures:                 allSharedFixtures,
+		suitePackages:                  suitePkgs,
+		noSuitePackages:                noSuitePkgs,
+		suitesByPkg:                    suitesByPkg,
+		dirsByPkg:                      dirsByPkg,
+		suiteRequiredSharedFixtureKeys: suiteReqKeys,
 	}, cleanup, nil
 }
 
@@ -128,6 +124,11 @@ func prepareTestRun(ctx context.Context, overlay *overlayResult, buildFlags []st
 			defer wg.Done()
 			setupProc, setupErr = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, setupTimeout)
 			if setupErr != nil {
+				cancel()
+				return
+			}
+			if err := setupProc.WaitAllReady(ctx, setupTimeout); err != nil {
+				setupErr = err
 				cancel()
 			}
 		}()
@@ -260,21 +261,26 @@ func executeTestsStreaming(ctx context.Context, cfg ExecConfig, overlay *overlay
 
 	baseEnv := buildBaseEnv(cfg)
 
-	// Start fixture setup and compilation concurrently.
-	fixtureReady := make(chan struct{})
-	var setupProc *SharedFixtureProcess
-	var setupErr error
-
 	streamCtx, streamCancel := context.WithCancel(ctx)
 	defer streamCancel()
 
+	// Start fixture setup (non-blocking) and compilation concurrently.
+	var setupProc *SharedFixtureProcess
+	fixtureStarted := make(chan struct{})
+	var fixtureStartErr error
+
 	if len(overlay.sharedFixtures) > 0 {
 		go func() {
-			setupProc, setupErr = startSharedFixtures(streamCtx, overlay.tmpDir, overlay.sharedFixtures, cfg.SetupTimeout)
-			close(fixtureReady)
+			var err error
+			setupProc, err = startSharedFixtures(streamCtx, overlay.tmpDir, overlay.sharedFixtures, cfg.SetupTimeout)
+			if err != nil {
+				fixtureStartErr = err
+				streamCancel()
+			}
+			close(fixtureStarted)
 		}()
 	} else {
-		close(fixtureReady)
+		close(fixtureStarted)
 	}
 
 	compileCh := gotestrunner.CompilePackagesStream(streamCtx, overlay.suitePackages, overlay.overlayFlag, pf.buildFlags, overlay.tmpDir)
@@ -284,33 +290,6 @@ func executeTestsStreaming(ctx context.Context, cfg ExecConfig, overlay *overlay
 	var wg sync.WaitGroup
 	anyTargets := false
 	var allTargets []gotestrunner.SuiteTarget
-
-	// Lazy fixture env resolution — first caller blocks until fixtures are ready.
-	var fixtureEnv []string
-	var fixtureEnvErr error
-	var fixtureOnce sync.Once
-
-	resolveFixtureEnv := func() ([]string, error) {
-		fixtureOnce.Do(func() {
-			select {
-			case <-fixtureReady:
-			case <-streamCtx.Done():
-				fixtureEnvErr = streamCtx.Err()
-				return
-			}
-			if setupErr != nil {
-				fixtureEnvErr = fmt.Errorf("shared fixture setup: %w", setupErr)
-				streamCancel()
-				return
-			}
-			fixtureEnv = make([]string, len(baseEnv))
-			copy(fixtureEnv, baseEnv)
-			if setupProc != nil {
-				fixtureEnv = append(fixtureEnv, "GOTEST_SHARED_STATE_FILE="+setupProc.StateFile())
-			}
-		})
-		return fixtureEnv, fixtureEnvErr
-	}
 
 	mode := gotestrunner.RunBatchText
 	if cfg.JSON {
@@ -360,14 +339,42 @@ loop:
 			go func(t gotestrunner.SuiteTarget, idx int) {
 				defer wg.Done()
 
-				needsFixture := overlay.fixtureDepSuites[t.Package][t.SuiteName]
+				requiredKeys := overlay.suiteRequiredSharedFixtureKeys[t.Package][t.SuiteName]
 				var env []string
-				if needsFixture {
-					var err error
-					env, err = resolveFixtureEnv()
-					if err != nil {
+				if len(requiredKeys) > 0 {
+					// Wait for the subprocess to start.
+					select {
+					case <-fixtureStarted:
+					case <-streamCtx.Done():
 						return
 					}
+					if fixtureStartErr != nil {
+						return
+					}
+
+					// Wait for each required fixture to become ready.
+					for _, key := range requiredKeys {
+						ch := setupProc.Ready(key)
+						if ch == nil {
+							return
+						}
+						select {
+						case <-ch:
+						case <-streamCtx.Done():
+							return
+						}
+					}
+
+					// Write a per-suite state file with only the required keys.
+					stateFile, err := setupProc.WriteStateFileForKeys(t.SuiteName, requiredKeys)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "WARN: write state file for %s: %s\n", t.SuiteName, err)
+						return
+					}
+
+					env = make([]string, len(baseEnv), len(baseEnv)+1)
+					copy(env, baseEnv)
+					env = append(env, "GOTEST_SHARED_STATE_FILE="+stateFile)
 				} else {
 					env = baseEnv
 				}

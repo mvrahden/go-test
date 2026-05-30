@@ -2,6 +2,7 @@ package gotestgen
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
@@ -195,11 +196,11 @@ func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFix
 			return nil, err
 		}
 
-		ptestBuf, ptestFixtureDeps, err := generateForPkg(lr.Ptest, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures)
+		ptestBuf, ptestFixtureDeps, ptestReqKeys, err := generateForPkg(lr.Ptest, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures)
 		if err != nil {
 			return nil, err
 		}
-		pxtestBuf, pxtestFixtureDeps, err := generateForPkg(lr.Pxtest, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures)
+		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, err := generateForPkg(lr.Pxtest, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures)
 		if err != nil {
 			return nil, err
 		}
@@ -221,13 +222,22 @@ func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFix
 			}
 		}
 
+		// Merge per-suite required shared fixture keys from both test suffixes.
+		var mergedReqKeys map[string][]string
+		if len(ptestReqKeys) > 0 || len(pxtestReqKeys) > 0 {
+			mergedReqKeys = make(map[string][]string, len(ptestReqKeys)+len(pxtestReqKeys))
+			maps.Copy(mergedReqKeys, ptestReqKeys)
+			maps.Copy(mergedReqKeys, pxtestReqKeys)
+		}
+
 		return &GenerateResult{
-			AbsPath:          lr.PkgDir,
-			PkgPath:          lr.PkgPath,
-			PTest:            ptestBuf,
-			PXTest:           pxtestBuf,
-			SuiteNames:       suiteNames,
-			FixtureDepSuites: append(ptestFixtureDeps, pxtestFixtureDeps...),
+			AbsPath:                        lr.PkgDir,
+			PkgPath:                        lr.PkgPath,
+			PTest:                          ptestBuf,
+			PXTest:                         pxtestBuf,
+			SuiteNames:                     suiteNames,
+			FixtureDepSuites:               append(ptestFixtureDeps, pxtestFixtureDeps...),
+			SuiteRequiredSharedFixtureKeys: mergedReqKeys,
 		}, nil
 	})
 	if err != nil {
@@ -242,14 +252,14 @@ func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFix
 	return results, allSharedFixtures, nil
 }
 
-func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo) ([]byte, []string, error) {
+func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo) ([]byte, []string, map[string][]string, error) {
 	if pkg == nil || len(spec.EffectiveTestSuites) == 0 {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	resolved, err := Resolve(pkg, spec.EffectiveTestSuites, collected.Fixtures)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	for _, sf := range resolved.RequiredSharedFixtures {
@@ -279,9 +289,18 @@ func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected Collector
 		}
 	}
 
+	// Convert suite-identifier-keyed required keys to test-func-name-keyed.
+	var suiteReqKeys map[string][]string
+	if len(resolved.SuiteRequiredSharedFixtureKeys) > 0 {
+		suiteReqKeys = make(map[string][]string, len(resolved.SuiteRequiredSharedFixtureKeys))
+		for suiteID, keys := range resolved.SuiteRequiredSharedFixtureKeys {
+			suiteReqKeys["Test"+suiteID] = keys
+		}
+	}
+
 	r := renderer{}
 	buf, err := r.RenderTestSuiteSpec(pkg, spec, resolved)
-	return buf, fixtureDeps, err
+	return buf, fixtureDeps, suiteReqKeys, err
 }
 
 func fixtureTreeHasSharedFixtures(roots []*ResolvedFixture) bool {
