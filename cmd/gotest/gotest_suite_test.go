@@ -641,6 +641,133 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 	})
 }
 
+func (s *CmdGotestTestSuite) TestParseExecFlags(t *gotest.T) {
+	t.When("parsing exec flags", func(w *gotest.T) {
+		w.It("extracts verbose flag", func(it *gotest.T) {
+			pf := ExportParseExecFlags([]string{"-v", "./..."})
+			gotest.True(it, pf.Verbose)
+		})
+		w.It("extracts run filter", func(it *gotest.T) {
+			pf := ExportParseExecFlags([]string{"-run", "TestFoo", "-v"})
+			gotest.Equal(it, "TestFoo", pf.UserRunFilter)
+		})
+		w.It("extracts cover profile", func(it *gotest.T) {
+			pf := ExportParseExecFlags([]string{"-coverprofile=cover.out", "-v"})
+			gotest.Equal(it, "cover.out", pf.UserCoverProfile)
+		})
+		w.It("separates build and run flags", func(it *gotest.T) {
+			pf := ExportParseExecFlags([]string{"-race", "-v", "-count=1"})
+			gotest.Contains(it, pf.BuildFlags, "-race")
+		})
+		w.It("handles empty args", func(it *gotest.T) {
+			pf := ExportParseExecFlags(nil)
+			gotest.False(it, pf.Verbose)
+			gotest.Empty(it, pf.UserRunFilter)
+		})
+	})
+}
+
+func (s *CmdGotestTestSuite) TestAssignCoverProfiles(t *gotest.T) {
+	t.When("assigning cover profiles", func(w *gotest.T) {
+		w.It("assigns sequential paths", func(it *gotest.T) {
+			targets := []gotestrunner.SuiteTarget{
+				{Package: "pkg/a", SuiteName: "TestA"},
+				{Package: "pkg/b", SuiteName: "TestB"},
+			}
+			ExportAssignCoverProfiles(targets, "/tmp/cover")
+			gotest.Equal(it, "/tmp/cover/0.out", targets[0].CoverProfile)
+			gotest.Equal(it, "/tmp/cover/1.out", targets[1].CoverProfile)
+		})
+	})
+}
+
+func (s *CmdGotestTestSuite) TestBuildExtraEnv(t *gotest.T) {
+	t.When("building extra env", func(w *gotest.T) {
+		w.It("includes snapshot flag when set", func(it *gotest.T) {
+			env := ExportBuildExtraEnv(ExportExecConfig{UpdateSnapshots: true}, nil)
+			gotest.Equal(it, "1", env["GOTEST_UPDATE_SNAPSHOTS"])
+		})
+		w.It("omits snapshot flag when not set", func(it *gotest.T) {
+			env := ExportBuildExtraEnv(ExportExecConfig{}, nil)
+			_, ok := env["GOTEST_UPDATE_SNAPSHOTS"]
+			gotest.False(it, ok)
+		})
+		w.It("omits state file when no process", func(it *gotest.T) {
+			env := ExportBuildExtraEnv(ExportExecConfig{}, nil)
+			_, ok := env["GOTEST_SHARED_STATE_FILE"]
+			gotest.False(it, ok)
+		})
+	})
+}
+
+func (s *CmdGotestTestSuite) TestSharedFixtureProcess(t *gotest.T) {
+	t.When("fixtureStateEntry parsing", func(w *gotest.T) {
+		w.It("parses fixture state line", func(it *gotest.T) {
+			line := `{"key":"pkg.Fixture","state":{"Host":"localhost"}}`
+			var entry ExportFixtureStateEntry
+			err := json.Unmarshal([]byte(line), &entry)
+			gotest.NoError(it, err)
+			gotest.Equal(it, "pkg.Fixture", entry.Key)
+			gotest.NotEmpty(it, entry.State)
+		})
+		w.It("parses done sentinel", func(it *gotest.T) {
+			line := `{"key":"_done","teardownBudget":"2m30s"}`
+			var entry ExportFixtureStateEntry
+			err := json.Unmarshal([]byte(line), &entry)
+			gotest.NoError(it, err)
+			gotest.Equal(it, "_done", entry.Key)
+			gotest.Equal(it, "2m30s", entry.TeardownBudget)
+		})
+		w.It("parses done sentinel with error", func(it *gotest.T) {
+			line := `{"key":"_done","error":"one or more shared fixtures failed"}`
+			var entry ExportFixtureStateEntry
+			err := json.Unmarshal([]byte(line), &entry)
+			gotest.NoError(it, err)
+			gotest.Equal(it, "_done", entry.Key)
+			gotest.Equal(it, "one or more shared fixtures failed", entry.Error)
+		})
+	})
+
+	t.When("WriteStateFileForKeys", func(w *gotest.T) {
+		w.It("writes subset of state to file", func(it *gotest.T) {
+			tmpDir := it.T().TempDir()
+			proc := ExportNewSharedFixtureProcess(tmpDir, map[string]json.RawMessage{
+				"pkg.Alpha": json.RawMessage(`{"Value":"a"}`),
+				"pkg.Beta":  json.RawMessage(`{"Value":"b"}`),
+				"pkg.Gamma": json.RawMessage(`{"Value":"c"}`),
+			})
+			path, err := proc.WriteStateFileForKeys("TestSuite", []string{"pkg.Alpha", "pkg.Gamma"})
+			gotest.NoError(it, err)
+			gotest.Contains(it, path, "TestSuite.json")
+
+			data, err := os.ReadFile(path)
+			gotest.NoError(it, err)
+			var state map[string]json.RawMessage
+			gotest.NoError(it, json.Unmarshal(data, &state))
+			gotest.Equal(it, 2, len(state))
+			_, hasAlpha := state["pkg.Alpha"]
+			gotest.True(it, hasAlpha)
+			_, hasBeta := state["pkg.Beta"]
+			gotest.False(it, hasBeta)
+			_, hasGamma := state["pkg.Gamma"]
+			gotest.True(it, hasGamma)
+		})
+	})
+
+	t.When("State", func(w *gotest.T) {
+		w.It("returns only requested keys", func(it *gotest.T) {
+			proc := ExportNewSharedFixtureProcess("", map[string]json.RawMessage{
+				"pkg.Alpha": json.RawMessage(`{"a":1}`),
+				"pkg.Beta":  json.RawMessage(`{"b":2}`),
+			})
+			result := proc.State([]string{"pkg.Alpha"})
+			gotest.Equal(it, 1, len(result))
+			_, hasAlpha := result["pkg.Alpha"]
+			gotest.True(it, hasAlpha)
+		})
+	})
+}
+
 func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 	t.When("IsGoFile", func(w *gotest.T) {
 		for sub, tc := range gotest.Each(w, []struct {
