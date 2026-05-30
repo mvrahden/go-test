@@ -1,0 +1,3 @@
+package sharedfixdep
+
+func DoWork() {}

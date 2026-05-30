@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
+	"sort"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
@@ -140,10 +141,9 @@ func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, loc
 	}
 	result.AllFixtures = allFixtures
 
-	// Collect deduplicated shared fixtures
-	for _, sf := range r.sharedSeen {
-		result.RequiredSharedFixtures = append(result.RequiredSharedFixtures, *sf)
-	}
+	// Collect deduplicated shared fixtures in deterministic topological order
+	// (dependencies before dependents, ties broken by identifier).
+	result.RequiredSharedFixtures = topoSortSharedFixtures(r.sharedSeen)
 
 	// Compute per-suite transitive shared fixture keys
 	suiteKeys := make(map[string][]string)
@@ -401,15 +401,15 @@ func (r *resolver) buildSharedFixtureRef(named *types.Named, idx int) (SharedFix
 	typePkg := named.Obj().Pkg()
 	typePkgPath := typePkg.Path()
 
-	if isInternalPkgPath(typePkgPath) {
+	isLocal := typePkgPath == r.targetPkg.PkgPath
+
+	if !isLocal && isInternalPkgPath(typePkgPath) {
 		return SharedFixtureRef{}, fmt.Errorf(
 			"shared fixture %q is in an internal package (%s); "+
 				"shared fixtures must live in a non-internal package so the setup subprocess can import them",
 			identifier, typePkgPath,
 		)
 	}
-
-	isLocal := typePkgPath == r.targetPkg.PkgPath
 
 	mset := types.NewMethodSet(types.NewPointer(named))
 	hasHydrate := mset.Lookup(typePkg, "Hydrate") != nil
@@ -666,6 +666,62 @@ func nonSerializable(t types.Type) string {
 		}
 	}
 	return ""
+}
+
+// topoSortSharedFixtures returns shared fixtures sorted in topological order
+// (dependencies before dependents), with ties broken by identifier for stability.
+func topoSortSharedFixtures(seen map[string]*SharedFixtureInfo) []SharedFixtureInfo {
+	if len(seen) == 0 {
+		return nil
+	}
+
+	// Collect all keys and sort for deterministic tie-breaking.
+	keys := make([]string, 0, len(seen))
+	for k := range seen {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	inDegree := make(map[string]int, len(keys))
+	for _, k := range keys {
+		inDegree[k] = len(seen[k].Dependencies)
+	}
+
+	// Adjacency: depKey → list of nodes that depend on it.
+	children := make(map[string][]string)
+	for _, k := range keys {
+		for _, dep := range seen[k].Dependencies {
+			children[dep] = append(children[dep], k)
+		}
+	}
+
+	// Build initial queue of zero-degree nodes (sorted for determinism).
+	var queue []string
+	for _, k := range keys {
+		if inDegree[k] == 0 {
+			queue = append(queue, k)
+		}
+	}
+
+	var result []SharedFixtureInfo
+	for len(queue) > 0 {
+		// Pop first element.
+		node := queue[0]
+		queue = queue[1:]
+		result = append(result, *seen[node])
+		// Reduce in-degree of dependents.
+		deps := children[node]
+		sort.Strings(deps)
+		for _, child := range deps {
+			inDegree[child]--
+			if inDegree[child] == 0 {
+				queue = append(queue, child)
+				sort.Strings(queue) // keep queue sorted for determinism
+			}
+		}
+	}
+
+	return result
 }
 
 func topologicalSort(resolved map[*types.Named]*ResolvedFixture) ([]*ResolvedFixture, error) {
