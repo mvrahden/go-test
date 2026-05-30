@@ -1,7 +1,9 @@
 package gotestrunner
 
 import (
+	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -362,6 +364,39 @@ func HasVerboseFlag(flags []string) bool {
 	return slices.ContainsFunc(flags, func(f string) bool {
 		return f == "-v" || f == "-v=true"
 	})
+}
+
+// ExtractParallelValue returns the integer value of -parallel from run flags.
+// Returns 0 if not present or not parseable. Stops scanning at -args.
+func ExtractParallelValue(runFlags []string) int {
+	for i, f := range runFlags {
+		if f == "-args" {
+			return 0
+		}
+		if v, ok := strings.CutPrefix(f, "-parallel="); ok {
+			n, _ := strconv.Atoi(v)
+			return n
+		}
+		if f == "-parallel" && i+1 < len(runFlags) {
+			n, _ := strconv.Atoi(runFlags[i+1])
+			return n
+		}
+	}
+	return 0
+}
+
+// InjectParallel appends -parallel=n to runFlags if not already present
+// before the -args boundary.
+func InjectParallel(runFlags []string, n int) []string {
+	for _, f := range runFlags {
+		if f == "-args" {
+			break
+		}
+		if strings.HasPrefix(f, "-parallel") {
+			return runFlags
+		}
+	}
+	return append(runFlags, fmt.Sprintf("-parallel=%d", n))
 }
 
 func LooksLikePackagePattern(s string) bool {

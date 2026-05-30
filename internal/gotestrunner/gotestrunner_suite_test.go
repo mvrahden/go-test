@@ -1022,6 +1022,42 @@ func (s *GotestrunnerTestSuite) TestComputeConcurrency(t *gotest.T) {
 	}
 }
 
+func (s *GotestrunnerTestSuite) TestExtractParallelValue(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Name   string
+		flags  []string
+		expect int
+	}{
+		{"empty", nil, 0},
+		{"not present", []string{"-v", "-timeout=10m"}, 0},
+		{"equals form", []string{"-v", "-parallel=4"}, 4},
+		{"space form", []string{"-parallel", "8", "-v"}, 8},
+		{"stops at -args", []string{"-args", "-parallel=4"}, 0},
+		{"invalid value", []string{"-parallel=abc"}, 0},
+	}) {
+		got := gotestrunner.ExtractParallelValue(tc.flags)
+		gotest.Equal(sub, tc.expect, got)
+	}
+}
+
+func (s *GotestrunnerTestSuite) TestInjectParallel(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Name   string
+		flags  []string
+		n      int
+		expect []string
+	}{
+		{"injects into empty", nil, 4, []string{"-parallel=4"}},
+		{"injects when absent", []string{"-v", "-timeout=10m"}, 2, []string{"-v", "-timeout=10m", "-parallel=2"}},
+		{"skips when equals present", []string{"-parallel=8", "-v"}, 2, []string{"-parallel=8", "-v"}},
+		{"skips when space present", []string{"-parallel", "8", "-v"}, 2, []string{"-parallel", "8", "-v"}},
+		{"does not inject after -args", []string{"-v", "-args", "-parallel=9"}, 2, []string{"-v", "-args", "-parallel=9", "-parallel=2"}},
+	}) {
+		got := gotestrunner.InjectParallel(tc.flags, tc.n)
+		gotest.Equal(sub, tc.expect, got)
+	}
+}
+
 var jsonTimestampRe = regexp.MustCompile(`\d+\.\d+s`)
 
 func normalizeJSON(raw string) string {
