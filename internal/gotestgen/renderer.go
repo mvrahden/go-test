@@ -95,7 +95,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	hasFixtures := len(resolved.RootFixtures) > 0 || len(sfNodeVMs) > 0
 
 	buf := bytes.NewBuffer(nil)
-	if err := r.renderFileHeader(buf, pkg, spec, hasFixtures, resolved.SuiteSharedFixtures, allViewModels); err != nil {
+	if err := r.renderFileHeader(buf, pkg, spec, hasFixtures, resolved.SuiteSharedFixtures, allViewModels, sfNodeVMs); err != nil {
 		return nil, fmt.Errorf("failed rendering file header. err: %w", err)
 	}
 
@@ -119,7 +119,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	return r.formatOutput(buf)
 }
 
-func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allViewModels []*FixtureViewModel) error {
+func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allViewModels []*FixtureViewModel, sfNodes []*SharedFixtureNodeVM) error {
 	type TplData struct {
 		RepoName    string
 		PackageName string
@@ -159,6 +159,12 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 				imports = append(imports, headerImport{Path: sf.PkgPath})
 				seenPkg[sf.PkgPath] = true
 			}
+		}
+	}
+	for _, sf := range sfNodes {
+		if sf.PkgPath != "" && sf.PkgPath != pkg.PkgPath && !seenPkg[sf.PkgPath] {
+			imports = append(imports, headerImport{Path: sf.PkgPath})
+			seenPkg[sf.PkgPath] = true
 		}
 	}
 	for _, ts := range spec.EffectiveTestSuites {

@@ -250,6 +250,18 @@ func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 		})
 	})
 
+	t.When("cross-package transitive dependency", func(w *gotest.T) {
+		w.It("imports the transitive shared fixture package", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_CrossPkgTransitiveSharedFixture")
+			output, _ := renderTestPkg(it.T(), pkg)
+			gotest.True(it, len(output) > 0, "expected non-empty output")
+
+			gotest.Contains(it, output, `"testpkg/extfixtures"`, "expected import for transitive shared fixture package")
+			gotest.Contains(it, output, "var ƒ_sf_extfixtures_PostgresSharedFixture = &extfixtures.PostgresSharedFixture{}")
+			gotest.Contains(it, output, "var ƒ_sf_SchemaSharedFixture = &SchemaSharedFixture{}")
+		})
+	})
+
 	t.When("empty struct", func(w *gotest.T) {
 		w.It("renders shared fixture as DAG node and struct literal wiring", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SharedFixtureEmptyStruct")
