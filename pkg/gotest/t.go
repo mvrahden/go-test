@@ -2,6 +2,8 @@ package gotest
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -37,8 +39,11 @@ func NewTWithDeadline(t *testing.T, timeout time.Duration) *T {
 }
 
 func (t *T) Errorf(format string, args ...any) {
-	assert.SkipInternalFrames(t.t)
-	t.t.Errorf(format, args...)
+	msg := fmt.Sprintf(format, args...)
+	if goFrame := assert.SkipInternalFrames(t.t); goFrame != "" {
+		msg = strings.TrimPrefix(msg, goFrame+": ")
+	}
+	t.t.Errorf("%s", msg)
 }
 
 func (t *T) FailNow() {

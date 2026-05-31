@@ -9,20 +9,6 @@ import (
 
 const gotestDirMarker = "/pkg/gotest/"
 
-// CallerTrace walks the call stack and returns a "called from: file:line"
-// annotation pointing to the user's call site.
-//
-// It skips gotest-internal frames (assertion mechanics), collects user
-// frames, and stops at the first boundary sentinel (execTestFn from
-// T.It/T.When, or ƒƒ_GOTEST_exec from the generated bridge).
-func CallerTrace() string {
-	f := callerFrame(2)
-	if f == nil {
-		return ""
-	}
-	return fmt.Sprintf("\n  called from: %s:%d", filepath.Base(f.File), f.Line)
-}
-
 // CallerFrame returns the user's call site as "file:line",
 // or "" if no user frame is found.
 func CallerFrame() string {

@@ -1,6 +1,8 @@
 package assert
 
 import (
+	"fmt"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"sync"
@@ -18,11 +20,15 @@ var (
 // frame PCs in tt's helperPCs map. This causes Go's testing.T.decorate to
 // skip those frames when choosing the file:line prefix for error output.
 //
+// Returns the "file:line" of the first non-gotest user frame — the frame
+// Go's decoration will show. Returns "" on any failure or if no user frame
+// is found.
+//
 // Uses reflect + unsafe to access unexported fields. Runtime type guards
 // ensure a silent no-op if Go's testing internals change.
-func SkipInternalFrames(tt *testing.T) {
+func SkipInternalFrames(tt *testing.T) string {
 	if tt == nil {
-		return
+		return ""
 	}
 
 	v := reflect.ValueOf(tt).Elem()
@@ -32,24 +38,27 @@ func SkipInternalFrames(tt *testing.T) {
 	hnField := v.FieldByName("helperNames")
 
 	if !muField.IsValid() || !muField.CanAddr() || muField.Type() != rwMutexType {
-		return
+		return ""
 	}
 	if !hpField.IsValid() || !hpField.CanAddr() || hpField.Type() != helperPCsType {
-		return
+		return ""
 	}
 
 	pcs := make([]uintptr, 32)
 	n := runtime.Callers(2, pcs) // skip runtime.Callers + SkipInternalFrames
 	if n == 0 {
-		return
+		return ""
 	}
 
 	var toMark []uintptr
+	var firstUserFrame string
 	frames := runtime.CallersFrames(pcs[:n])
 	for {
 		frame, more := frames.Next()
 		if IsGotestSource(frame.File) || IsGeneratedBridge(frame.File) {
 			toMark = append(toMark, frame.PC)
+		} else if firstUserFrame == "" {
+			firstUserFrame = fmt.Sprintf("%s:%d", filepath.Base(frame.File), frame.Line)
 		}
 		if !more {
 			break
@@ -57,7 +66,7 @@ func SkipInternalFrames(tt *testing.T) {
 	}
 
 	if len(toMark) == 0 {
-		return
+		return firstUserFrame
 	}
 
 	mu := (*sync.RWMutex)(unsafe.Pointer(muField.UnsafeAddr()))
@@ -76,4 +85,6 @@ func SkipInternalFrames(tt *testing.T) {
 		hn := (*map[string]struct{})(unsafe.Pointer(hnField.UnsafeAddr()))
 		*hn = nil
 	}
+
+	return firstUserFrame
 }

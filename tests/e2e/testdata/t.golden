@@ -48,7 +48,7 @@
           actual:   false
 === RUN   TestSimpleTestSuite/TestHelperTrace
 === RUN   TestSimpleTestSuite/TestHelperTrace/shows_called_from_trace
-    t_test.go:88: True failed:
+    t_test.go:88: t_test.go:93: True failed:
           expected: true
           actual:   false
 --- FAIL: TestSimpleTestSuite (<TIMESTAMP>)

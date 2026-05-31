@@ -26,8 +26,6 @@ func (r *R) FailNow() {
 	runtime.Goexit()
 }
 
-func (r *R) Helper() {}
-
 func (r *R) Failed() bool    { return r.failed }
 func (r *R) Message() string { return r.message }
 
