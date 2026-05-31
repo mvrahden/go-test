@@ -19,80 +19,54 @@ type CompileResult struct {
 	BinaryPath string // path to compiled test binary
 }
 
-// CompilePackages compiles test binaries for the given packages using
-// `go test -c`. Compilation runs concurrently with a limit of maxProcs.
-// The overlay flag (e.g., "-overlay=/tmp/gotest/overlay.json") is passed
-// to include generated test code.
-func CompilePackages(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir string) ([]CompileResult, error) {
-	binDir := filepath.Join(outputDir, "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
-		return nil, fmt.Errorf("create bin dir: %w", err)
-	}
-
-	type result struct {
-		cr  CompileResult
-		err error
-	}
-
-	results := make([]result, len(packages))
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, runtime.NumCPU())
-
-	for i, pkg := range packages {
-		wg.Add(1)
-		go func(idx int, pkgPath string) {
-			defer wg.Done()
-			select {
-			case sem <- struct{}{}:
-			case <-ctx.Done():
-				return
-			}
-			defer func() { <-sem }()
-
-			binaryName := sanitizePkgName(pkgPath) + ".test"
-			binaryPath := filepath.Join(binDir, binaryName)
-
-			args := []string{"test", "-c", overlayFlag, "-o", binaryPath}
-			args = append(args, buildFlags...)
-			args = append(args, pkgPath)
-
-			cmd := exec.CommandContext(ctx, "go", args...)
-			cmd.Stderr = os.Stderr
-			SetBuildProcessGroup(cmd)
-
-			if err := cmd.Run(); err != nil {
-				results[idx] = result{err: fmt.Errorf("compile %s: %w", pkgPath, err)}
-				return
-			}
-
-			results[idx] = result{cr: CompileResult{Package: pkgPath, BinaryPath: binaryPath}}
-		}(i, pkg)
-	}
-	wg.Wait()
-
-	var compiled []CompileResult
-	var errs []error
-	for _, r := range results {
-		if r.err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", r.err)
-			errs = append(errs, r.err)
-			continue
-		}
-		compiled = append(compiled, r.cr)
-	}
-	return compiled, errors.Join(errs...)
+type CompileOutcome struct {
+	Result CompileResult
+	Err    error
 }
 
-// CompilePackagesStream is like CompilePackages but sends results to a
-// channel as each package finishes compiling, enabling execution to overlap
-// with compilation. The channel is closed when all packages are done.
-func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir string) <-chan CompileResult {
-	ch := make(chan CompileResult)
+func compilePackage(ctx context.Context, pkgPath, overlayFlag string, buildFlags []string, binDir string) (CompileResult, error) {
+	binaryName := sanitizePkgName(pkgPath) + ".test"
+	binaryPath := filepath.Join(binDir, binaryName)
+
+	args := []string{"test", "-c", overlayFlag, "-o", binaryPath}
+	args = append(args, buildFlags...)
+	args = append(args, pkgPath)
+
+	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd.Stderr = os.Stderr
+	SetBuildProcessGroup(cmd)
+
+	if err := cmd.Run(); err != nil {
+		return CompileResult{}, fmt.Errorf("compile %s: %w", pkgPath, err)
+	}
+
+	return CompileResult{Package: pkgPath, BinaryPath: binaryPath}, nil
+}
+
+func CompilePackages(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir string) ([]CompileResult, error) {
+	ch := CompilePackagesStream(ctx, packages, overlayFlag, buildFlags, outputDir)
+	var results []CompileResult
+	var errs []error
+	for outcome := range ch {
+		if outcome.Err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", outcome.Err)
+			errs = append(errs, outcome.Err)
+			continue
+		}
+		results = append(results, outcome.Result)
+	}
+	return results, errors.Join(errs...)
+}
+
+func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir string) <-chan CompileOutcome {
+	ch := make(chan CompileOutcome)
 
 	binDir := filepath.Join(outputDir, "bin")
 	if err := os.MkdirAll(binDir, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "create bin dir: %s\n", err)
-		close(ch)
+		go func() {
+			ch <- CompileOutcome{Err: fmt.Errorf("create bin dir: %w", err)}
+			close(ch)
+		}()
 		return ch
 	}
 
@@ -107,29 +81,15 @@ func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag s
 				defer wg.Done()
 				select {
 				case sem <- struct{}{}:
+					defer func() { <-sem }()
 				case <-ctx.Done():
 					return
 				}
-				defer func() { <-sem }()
 
-				binaryName := sanitizePkgName(pkgPath) + ".test"
-				binaryPath := filepath.Join(binDir, binaryName)
-
-				args := []string{"test", "-c", overlayFlag, "-o", binaryPath}
-				args = append(args, buildFlags...)
-				args = append(args, pkgPath)
-
-				cmd := exec.CommandContext(ctx, "go", args...)
-				cmd.Stderr = os.Stderr
-				SetBuildProcessGroup(cmd)
-
-				if err := cmd.Run(); err != nil {
-					fmt.Fprintf(os.Stderr, "compile %s: %s\n", pkgPath, err)
-					return
-				}
-
+				cr, err := compilePackage(ctx, pkgPath, overlayFlag, buildFlags, binDir)
+				outcome := CompileOutcome{Result: cr, Err: err}
 				select {
-				case ch <- CompileResult{Package: pkgPath, BinaryPath: binaryPath}:
+				case ch <- outcome:
 				case <-ctx.Done():
 				}
 			}(pkg)
