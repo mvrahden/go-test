@@ -10,10 +10,12 @@ All assertions accept both `*gotest.T` and `*testing.T` as first argument.
 
 These override any default instincts from stdlib `testing` or other Go test frameworks.
 
-**Never call `t.T().Helper()`.**
-gotest uses `CallerTrace` to automatically walk the call stack and attribute assertion failures to the correct user code location.
-Calling `t.T().Helper()` is harmless but unnecessary noise — it's already handled by the framework.
-Same applies to `t.Helper()` in methods that accept `*testing.T` directly.
+**Never call `t.T().Helper()` when using gotest assertions.**
+gotest automatically resolves assertion failures to the correct call site in your test code.
+Calling `t.T().Helper()` is counterproductive — it removes useful location information from failure output.
+Without it, failures show both where the assertion was called (inside the helper) and where the helper was called (in the test).
+This applies to all gotest assertion functions (`gotest.Equal`, `gotest.True`, etc.).
+If you pass `t.T()` to third-party code that uses Go's standard `t.Errorf`, Go's `t.Helper()` convention applies as normal.
 
 **Never call `t.T().Cleanup()` inside suite methods.**
 Use `BeforeAll`/`AfterAll` for suite-level resources and `BeforeEach`/`AfterEach` for per-test resources.
@@ -145,6 +147,18 @@ gotest.TimeIsNow(t, ts time.Time, tolerance time.Duration)
 gotest.Panics(t, f func()) any  // asserts f panics, returns recovered value
 ```
 
+### Snapshots
+
+```go
+gotest.MatchSnapshot(t, value any, name ...string)   // compare value against stored snapshot
+```
+
+Snapshots are stored in `testdata/__snapshots__/<TestSuiteName>.snap` next to the test file.
+On first run (or with `--update-snapshots`), the snapshot is created.
+On subsequent runs, the value is compared against the stored snapshot.
+The optional `name` disambiguates multiple snapshots within the same test case.
+Snapshot entries are written in deterministic order and are thread-safe — parallel test methods can use `MatchSnapshot` without coordination.
+
 ## Eventually & Consistently
 
 Package-level functions for async polling. Both use `*gotest.R` — an assertion recorder that captures failures without propagating them.
@@ -181,9 +195,8 @@ type MyServiceTestSuite struct { /* state */ }           // test suite
 ### Test methods
 
 ```go
-func (s *MyTestSuite) TestCreate(t *gotest.T) {}                 // sequential
-func (s *MyTestSuite) TestRead(t *gotest.T) {}                   // standard test method
-func (s *MyTestSuite) TestLongPollAsync(t *gotest.T, done func()) {} // async (call done() when finished)
+func (s *MyTestSuite) TestCreate(t *gotest.T) {}         // standard test method
+func (s *MyTestSuite) TestRead(t *gotest.T) {}
 ```
 
 Methods can also accept `*testing.T` for stdlib compatibility.
@@ -240,6 +253,84 @@ func (s *MyTestSuite) X_TestBroken(t *gotest.T) {}    // EXCLUDED test case
 - `X_` — exclude. Always skipped. Compile-time decision (AST level). Use for permanently/temporarily disabled tests.
 
 Focus and exclude apply independently at both suite and test case levels.
+
+## Fixtures
+
+### Package fixtures
+
+Shared setup for suites in the same package. Name must end with `Fixture`.
+
+```go
+type DBFixture struct {
+    Pool *pgxpool.Pool
+}
+
+func (f *DBFixture) BeforeAll(ctx context.Context) error  { /* start db, set f.Pool */ return nil }
+func (f *DBFixture) AfterAll(ctx context.Context) error   { f.Pool.Close(); return nil }
+func (f *DBFixture) BeforeEach(ctx context.Context) error { /* truncate tables */ return nil }
+func (f *DBFixture) AfterEach(ctx context.Context) error  { return nil }
+```
+
+`BeforeAll` is required. All other methods are optional.
+Fixture hooks use `(ctx context.Context) error` — different from suite hooks.
+
+Suites wire fixtures via pointer fields:
+
+```go
+type UserTestSuite struct {
+    DB *DBFixture
+}
+```
+
+Fixtures compose via pointer fields (DAG — dependencies set up first):
+
+```go
+type APIFixture struct {
+    DB    *DBFixture     // set up before APIFixture
+    Cache *CacheFixture  // set up before APIFixture (parallel with DB)
+}
+```
+
+### FixtureConfig (optional)
+
+```go
+func (f *DBFixture) FixtureConfig() gotest.FixtureConfig {
+    return gotest.ContainerFixtureConfig() // Timeout: 5m, Retries: 1, RetryDelay: 5s
+}
+```
+
+Presets: `DefaultFixtureConfig()` (2m timeout), `ContainerFixtureConfig()` (5m, 1 retry, 5s delay).
+
+### Shared fixtures
+
+Cross-package fixtures that run in a subprocess. Name must end with `SharedFixture`.
+State transfers via JSON serialization — non-serializable fields are reconstructed via `Hydrate`.
+
+```go
+type PostgresSharedFixture struct {
+    ConnStr string         // transfer field — serialized across processes
+    Pool    *pgxpool.Pool  // local field — assigned in Hydrate, excluded from serialization
+}
+
+func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error {
+    f.ConnStr = startPostgres(ctx)
+    return f.connect(ctx)
+}
+func (f *PostgresSharedFixture) AfterAll(ctx context.Context) error   { return stopPostgres() }
+func (f *PostgresSharedFixture) Hydrate(ctx context.Context) error    { return f.connect(ctx) }
+func (f *PostgresSharedFixture) Dehydrate(ctx context.Context) error  { f.Pool.Close(); return nil }
+
+func (f *PostgresSharedFixture) connect(ctx context.Context) error {
+    var err error
+    f.Pool, err = pgxpool.New(ctx, f.ConnStr)
+    return err
+}
+```
+
+Fields assigned in `Hydrate` are automatically classified as local and excluded from serialization.
+
+Suites reference shared fixtures via pointer fields (same as package fixtures).
+Shared fixtures must not live in `internal/` packages.
 
 ## Parallel Semantics
 

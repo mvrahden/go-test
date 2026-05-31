@@ -601,7 +601,8 @@ AfterAll <span class="d">(via t.Cleanup — always runs)</span></div>
         <pre>gotest.MatchSnapshot(t, render(input))              <span class="cm">// auto-named from test path</span>
 gotest.MatchSnapshot(t, render(other), <span class="st">"variant"</span>)  <span class="cm">// explicit snapshot name</span></pre>
       </div>
-      <p>On first run, the snapshot is created. On subsequent runs, the output is compared and failures include a diff. Update all snapshots with <code>gotest --update-snapshots ./...</code>.</p>
+      <p>Snapshots are stored in <code>testdata/__snapshots__/</code> next to the test file. On first run, the snapshot is created. On subsequent runs, the output is compared and failures include a diff. Snapshot entries are written in deterministic order and are thread-safe — parallel test methods can use <code>MatchSnapshot</code> without coordination.</p>
+      <p>Update all snapshots with <code>gotest --update-snapshots ./...</code> or <code>GOTEST_UPDATE_SNAPSHOTS=1 go test ./...</code> when running <code>go test</code> directly.</p>
 
       <h3>Async polling</h3>
       <p>Package-level functions for polling conditions. Callbacks receive <code>*gotest.R</code> — an assertion recorder that captures failures without propagating them:</p>
@@ -756,6 +757,9 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
     <section class="ref-section" id="assertions">
       <h2>Assertions</h2>
       <p class="lead">Type-safe generics with compile-time checking. Zero external dependencies. Works with both <code>*gotest.T</code> and <code>*testing.T</code>.</p>
+      <div class="callout">
+        Assertion failures automatically trace back to the test call site. Helper functions don't need <code>t.Helper()</code> — the framework resolves the outermost caller from the test file.
+      </div>
 
       <h3>Equality &amp; identity</h3>
       <table class="ref-table">

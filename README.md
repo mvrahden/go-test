@@ -504,6 +504,7 @@ val  := gotest.Must(cache.Get(key))
 ```
 
 All assertions work with `*gotest.T` (suites), `*testing.T` (standalone tests), and `*gotest.R` (polling callbacks).
+Assertion failures automatically trace back to the test call site — no `t.Helper()` calls needed in helper functions.
 
 ### Data-Driven Tests
 
@@ -557,6 +558,7 @@ func (s *Suite) TestRender(t *gotest.T) {
 Snapshots are stored in `testdata/__snapshots__/`.
 On first run, the snapshot is created.
 On subsequent runs, the output is compared.
+Snapshot entries are written in deterministic order and are thread-safe — parallel test methods can use `MatchSnapshot` without coordination.
 Update all snapshots with:
 
 ```bash
