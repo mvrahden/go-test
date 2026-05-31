@@ -16,7 +16,7 @@ func StdlibRunTestsJSON(ctx context.Context, args []string, extraEnv ...map[stri
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr
-	SetProcessGroup(cmd)
+	setProcessGroup(cmd)
 
 	if len(extraEnv) > 0 && len(extraEnv[0]) > 0 {
 		cmd.Env = os.Environ()

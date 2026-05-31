@@ -140,8 +140,6 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 			cmd.Env = append(cmd.Env, protocol.EnvTeardownBudgetFile+"="+target.BudgetFile)
 		}
 		cmd.Dir = target.Dir
-		SetProcessGroup(cmd)
-		cmd.WaitDelay = 0
 		return cmd
 	}
 
@@ -151,8 +149,6 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 		cmd.Env = append(cmd.Env, protocol.EnvTeardownBudgetFile+"="+target.BudgetFile)
 	}
 	cmd.Dir = target.Dir
-	SetProcessGroup(cmd)
-	cmd.WaitDelay = 0
 	return cmd
 }
 
@@ -170,35 +166,20 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 
 	start := time.Now()
 
-	if err := cmd.Start(); err != nil {
+	mp := NewManagedProcess(cmd, ProcessConfig{
+		Grace:      GraceBudget,
+		BudgetFile: target.BudgetFile,
+	})
+	if err := mp.Start(); err != nil {
 		return SuiteResult{Target: target, ExitCode: 2, Duration: time.Since(start)}
 	}
 
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
-
-	var err error
-	select {
-	case err = <-done:
-	case <-ctx.Done():
-		budget := readTeardownBudget(target.BudgetFile)
-		select {
-		case err = <-done:
-		case <-time.After(budget):
-			ForceKillProcessGroup(cmd.Process.Pid)
-			err = <-done
-		}
-	}
-
+	mp.WaitWithGrace(ctx)
 	duration := time.Since(start)
 
 	exitCode := 0
-	if err != nil {
-		if cmd.ProcessState != nil {
-			exitCode = cmd.ProcessState.ExitCode()
-		} else {
-			exitCode = 2
-		}
+	if cmd.ProcessState != nil {
+		exitCode = cmd.ProcessState.ExitCode()
 	}
 
 	return SuiteResult{

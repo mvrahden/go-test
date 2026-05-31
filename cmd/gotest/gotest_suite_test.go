@@ -591,11 +591,13 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 		var jsonOut bytes.Buffer
 		cmd.Stdout = &jsonOut
 		cmd.Stderr = os.Stderr
-		gotestrunner.SetProcessGroup(cmd)
-		if err := cmd.Run(); err != nil {
-			if cmd.ProcessState == nil {
-				it.T().Fatalf("go test: %v", err)
-			}
+		mp := gotestrunner.NewManagedProcess(cmd, gotestrunner.ProcessConfig{Grace: gotestrunner.GraceKill})
+		if err := mp.Start(); err != nil {
+			it.T().Fatalf("go test start: %v", err)
+		}
+		mp.WaitWithGrace(context.Background())
+		if cmd.ProcessState == nil {
+			it.T().Fatal("go test: process state is nil")
 		}
 		jsonData := jsonOut.Bytes()
 

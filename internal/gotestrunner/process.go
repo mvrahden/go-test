@@ -18,10 +18,7 @@ const (
 	BuildShutdownDelay = 10 * time.Second
 )
 
-// SetProcessGroup configures cmd to run in its own process group and
-// to receive SIGTERM (then SIGKILL after GracefulShutdownDelay) when
-// its associated context is cancelled.
-func SetProcessGroup(cmd *exec.Cmd) {
+func setProcessGroup(cmd *exec.Cmd) {
 	setProcessGroupAttr(cmd)
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {
@@ -35,10 +32,7 @@ func SetProcessGroup(cmd *exec.Cmd) {
 	cmd.WaitDelay = GracefulShutdownDelay
 }
 
-// SetBuildProcessGroup configures cmd to run in its own process group
-// with immediate kill on cancellation. Build processes (compilers,
-// linkers) have no cleanup work, so graceful shutdown is unnecessary.
-func SetBuildProcessGroup(cmd *exec.Cmd) {
+func setBuildProcessGroup(cmd *exec.Cmd) {
 	setProcessGroupAttr(cmd)
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {

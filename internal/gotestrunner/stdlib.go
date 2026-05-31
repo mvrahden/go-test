@@ -10,7 +10,7 @@ func StdlibRunTests(ctx context.Context, args []string, extraEnv ...map[string]s
 	cmd := exec.CommandContext(ctx, "go", append([]string{"test", "-ldflags=-checklinkname=0"}, args...)...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	SetProcessGroup(cmd)
+	setProcessGroup(cmd)
 
 	if len(extraEnv) > 0 && len(extraEnv[0]) > 0 {
 		cmd.Env = os.Environ()

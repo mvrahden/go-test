@@ -93,11 +93,16 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 
 		cmd := exec.CommandContext(ctx, setupBin)
 		cmd.Stderr = os.Stderr
-		gotestrunner.SetProcessGroup(cmd)
+
+		mp := gotestrunner.NewManagedProcess(cmd, gotestrunner.ProcessConfig{
+			Grace:         gotestrunner.GraceFixed,
+			GraceDuration: 10 * time.Second,
+		})
 
 		stdout, err := cmd.StdoutPipe()
 		gotest.NoError(w, err)
 		gotest.NoError(w, cmd.Start())
+		mp.Adopt()
 
 		type stateEntry struct {
 			Key            string          `json:"key"`
@@ -209,15 +214,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 			gotest.Contains(it, output, "Service")
 		})
 
-		gotestrunner.TerminateProcessGroup(cmd.Process.Pid)
-		doneCh := make(chan struct{})
-		go func() { cmd.Wait(); close(doneCh) }()
-		select {
-		case <-doneCh:
-		case <-time.After(10 * time.Second):
-			gotestrunner.ForceKillProcessGroup(cmd.Process.Pid)
-			w.T().Fatal("shared fixture subprocess did not exit after termination signal")
-		}
+		mp.Terminate()
 	})
 
 	t.When("PerSuiteDispatch", func(w *gotest.T) {

@@ -34,9 +34,12 @@ func compilePackage(ctx context.Context, pkgPath, overlayFlag string, buildFlags
 
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Stderr = os.Stderr
-	SetBuildProcessGroup(cmd)
 
-	if err := cmd.Run(); err != nil {
+	mp := NewManagedProcess(cmd, ProcessConfig{Grace: GraceKill})
+	if err := mp.Start(); err != nil {
+		return CompileResult{}, fmt.Errorf("compile %s: %w", pkgPath, err)
+	}
+	if err := mp.WaitWithGrace(ctx); err != nil {
 		return CompileResult{}, fmt.Errorf("compile %s: %w", pkgPath, err)
 	}
 
