@@ -332,9 +332,9 @@ type APIFixture struct {
 ```
 InfraFixture.BeforeEach  ─┐
 CacheFixture.BeforeEach  ─┤
-                           └─ APIFixture.BeforeEach
-                                └─ Suite.BeforeEach → TestCase → Suite.AfterEach
-                           ┌─ APIFixture.AfterEach
+                          └─ APIFixture.BeforeEach
+                               └─ Suite.BeforeEach → TestCase → Suite.AfterEach
+                          ┌─ APIFixture.AfterEach
 InfraFixture.AfterEach  ──┤
 CacheFixture.AfterEach  ──┘
 ```

@@ -27,7 +27,7 @@
  │  │   go test -c per    │    │   JSON state from stdout   │  │
  │  │   pkg (NumCPU par)  │    │   → write state.json       │  │
  │  └────────┬────────────┘    └────────────┬───────────────┘  │
- │           │ <-chan CompileResult          │ *SharedFixtureProcess
+ │           │ <-chan CompileResult         │ *SharedFixtureProcess
  └───────────┼──────────────────────────────┼──────────────────┘
              │    (overlap: exec starts     │
              │     as packages compile)     │

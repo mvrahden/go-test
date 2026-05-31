@@ -666,13 +666,13 @@ Fixture.AfterEach</div>
 }</pre>
       </div>
       <p>Dependencies are set up first. Independent fixtures set up in parallel; teardown runs in reverse:</p>
-      <div class="diagram">DBFixture.BeforeAll <span class="d">──┐</span>
-                        <span class="d">├──</span> APIFixture.BeforeAll
+      <div class="diagram">DBFixture.BeforeAll <span class="d">───┐</span>
+                       <span class="d">├──</span> APIFixture.BeforeAll
 CacheFixture.BeforeAll <span class="d">┘</span>
                              <span class="d">└──</span> Suite.BeforeAll
                                    <span class="d">├──</span> Suite.BeforeEach <span class="d">→</span> Test <span class="d">→</span> Suite.AfterEach
                              <span class="d">└──</span> Suite.AfterAll
-                        <span class="d">┌──</span> APIFixture.AfterAll
+                       <span class="d">┌──</span> APIFixture.AfterAll
 DBFixture.AfterAll <span class="d">────┘</span>
 CacheFixture.AfterAll <span class="d">─┘</span></div>
 
