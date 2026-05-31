@@ -44,6 +44,28 @@ type ResolvedFixture struct {
 	ChildSuites    []*gotestast.TestSuiteSpec
 }
 
+func (rf *ResolvedFixture) DependsOn() []string {
+	ids := make([]string, 0, len(rf.Parents)+len(rf.SharedFixtures))
+	for _, p := range rf.Parents {
+		ids = append(ids, p.Identifier)
+	}
+	for _, sf := range rf.SharedFixtures {
+		ids = append(ids, sf.Identifier)
+	}
+	return ids
+}
+
+func (rf *ResolvedFixture) ParentFieldNames() map[string]string {
+	if len(rf.ParentFields) == 0 {
+		return nil
+	}
+	m := make(map[string]string, len(rf.ParentFields))
+	for p, name := range rf.ParentFields {
+		m[p.Identifier] = name
+	}
+	return m
+}
+
 // FixtureFieldBinding maps a fixture identifier to its field name in a suite struct.
 type FixtureFieldBinding struct {
 	FixtureIdentifier string

@@ -436,11 +436,11 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 	})
 }
 
-// --- Build fixture view model tests ---
+// --- Resolved fixture tests ---
 
-func (s *RendererTestSuite) TestBuildFixtureViewModels(t *gotest.T) {
+func (s *RendererTestSuite) TestResolvedFixtures(t *gotest.T) {
 	t.When("root fixture only", func(w *gotest.T) {
-		w.It("builds correct view model structure", func(it *gotest.T) {
+		w.It("resolves correct fixture structure", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestBuildFixtureViewModels_RootFixtureOnly")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
@@ -452,13 +452,13 @@ func (s *RendererTestSuite) TestBuildFixtureViewModels(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			vms := gotestgen.ExportBuildAllFixtureViewModels(resolved.AllFixtures)
-			gotest.Equal(it, 1, len(vms))
-			gotest.Equal(it, "MyFixture", vms[0].Identifier)
-			gotest.True(it, vms[0].BeforeAll, "expected BeforeAll")
-			gotest.True(it, vms[0].AfterAll, "expected AfterAll")
-			gotest.Equal(it, 1, len(vms[0].ChildSuites))
-			gotest.Equal(it, "MyTestSuite", vms[0].ChildSuites[0].Identifier())
+			fixtures := resolved.AllFixtures
+			gotest.Equal(it, 1, len(fixtures))
+			gotest.Equal(it, "MyFixture", fixtures[0].Identifier)
+			gotest.True(it, fixtures[0].BeforeAll, "expected BeforeAll")
+			gotest.True(it, fixtures[0].AfterAll, "expected AfterAll")
+			gotest.Equal(it, 1, len(fixtures[0].ChildSuites))
+			gotest.Equal(it, "MyTestSuite", fixtures[0].ChildSuites[0].Identifier())
 		})
 	})
 
@@ -475,14 +475,14 @@ func (s *RendererTestSuite) TestBuildFixtureViewModels(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			vms := gotestgen.ExportBuildAllFixtureViewModels(resolved.AllFixtures)
-			gotest.Equal(it, 1, len(vms))
+			fixtures := resolved.AllFixtures
+			gotest.Equal(it, 1, len(fixtures))
 
-			vm := vms[0]
-			gotest.Equal(it, "DBFixture", vm.Identifier)
-			gotest.Equal(it, 1, len(vm.SharedFixtures))
+			rf := fixtures[0]
+			gotest.Equal(it, "DBFixture", rf.Identifier)
+			gotest.Equal(it, 1, len(rf.SharedFixtures))
 
-			sf := vm.SharedFixtures[0]
+			sf := rf.SharedFixtures[0]
 			gotest.Equal(it, "sf0", sf.LocalVar)
 			gotest.Equal(it, "PGSharedFixture", sf.QualifiedType)
 			gotest.Equal(it, "PGSharedFixture", sf.FieldName)
