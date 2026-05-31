@@ -42,9 +42,8 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupSetup(t *gotest.T) {
 			ctx := context.Background()
 			env := []string{"PATH=/usr/bin"}
 			target := gotestrunner.SuiteTarget{
-				Package:    "example.com/pkg",
+				SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFoo"},
 				BinaryPath: "/tmp/pkg.test",
-				SuiteName:  "TestFoo",
 			}
 			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, env, tc.test2json)
 

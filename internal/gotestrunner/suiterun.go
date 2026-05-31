@@ -15,14 +15,20 @@ import (
 	"github.com/mvrahden/go-test/internal/protocol"
 )
 
+// SuiteSpec identifies a test suite by its package and name. It carries only
+// the immutable identity fields — the "what to run" — without execution details.
+type SuiteSpec struct {
+	Package   string // import path (for reporting)
+	Dir       string // package source directory (working dir for the binary)
+	SuiteName string // test function name, e.g., "TestFooTestSuite"
+	RunFilter string // raw -test.run value (overrides SuiteName if set)
+}
+
 // SuiteTarget identifies a single test suite (or group of standalone tests)
 // to run in its own subprocess.
 type SuiteTarget struct {
-	Package      string   // import path (for reporting)
-	Dir          string   // package source directory (working dir for the binary)
+	SuiteSpec
 	BinaryPath   string   // path to compiled test binary
-	SuiteName    string   // test function name, e.g., "TestFooTestSuite"
-	RunFilter    string   // raw -test.run value (overrides SuiteName if set)
 	RunFlags     []string // test binary flags (with -test. prefix)
 	CoverProfile string   // per-suite cover profile path (empty if no -coverprofile)
 	BudgetFile   string   // sidecar path for teardown budget (empty = use default)
@@ -259,10 +265,12 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 				continue
 			}
 			target := SuiteTarget{
-				Package:    pkg,
-				Dir:        pkgDir,
+				SuiteSpec: SuiteSpec{
+					Package:   pkg,
+					Dir:       pkgDir,
+					SuiteName: testFuncName,
+				},
 				BinaryPath: bin,
-				SuiteName:  testFuncName,
 				RunFlags:   translatedFlags,
 			}
 			if rf := suiteRunFilter(userRunFilter, testFuncName); rf != "" {
