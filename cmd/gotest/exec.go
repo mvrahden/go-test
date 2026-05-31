@@ -12,6 +12,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 type overlayResult struct {
@@ -81,10 +82,10 @@ func generateOverlayFromLoaded(loaded []*gotestgen.LoadResult, debug bool) (*ove
 func buildExtraEnv(cfg ExecConfig, proc *SharedFixtureProcess) map[string]string {
 	env := make(map[string]string)
 	if cfg.UpdateSnapshots {
-		env["GOTEST_UPDATE_SNAPSHOTS"] = "1"
+		env[protocol.EnvUpdateSnapshots] = "1"
 	}
 	if proc != nil {
-		env["GOTEST_SHARED_STATE_FILE"] = proc.StateFile()
+		env[protocol.EnvSharedStateFile] = proc.StateFile()
 	}
 	return env
 }
@@ -92,7 +93,7 @@ func buildExtraEnv(cfg ExecConfig, proc *SharedFixtureProcess) map[string]string
 func buildBaseEnv(cfg ExecConfig) []string {
 	env := os.Environ()
 	if cfg.UpdateSnapshots {
-		env = append(env, "GOTEST_UPDATE_SNAPSHOTS=1")
+		env = append(env, protocol.EnvUpdateSnapshots+"=1")
 	}
 	return env
 }
@@ -239,7 +240,7 @@ func executeTests(ctx context.Context, cfg ExecConfig, overlay *overlayResult) (
 	}
 
 	for j := range targets {
-		targets[j].BudgetFile = targets[j].BinaryPath + ".budget"
+		targets[j].BudgetFile = protocol.BudgetFilePath(targets[j].BinaryPath)
 	}
 
 	setupCoverage(targets, overlay, pf.userCoverProfile)
@@ -352,7 +353,7 @@ loop:
 		anyTargets = true
 
 		for j := range targets {
-			targets[j].BudgetFile = targets[j].BinaryPath + ".budget"
+			targets[j].BudgetFile = protocol.BudgetFilePath(targets[j].BinaryPath)
 		}
 
 		if pf.userCoverProfile != "" {
@@ -405,7 +406,7 @@ loop:
 
 					env = make([]string, len(baseEnv), len(baseEnv)+1)
 					copy(env, baseEnv)
-					env = append(env, "GOTEST_SHARED_STATE_FILE="+stateFile)
+					env = append(env, protocol.EnvSharedStateFile+"="+stateFile)
 				} else {
 					env = baseEnv
 				}
@@ -478,7 +479,7 @@ func executeTestsCaptured(ctx context.Context, cfg ExecConfig, overlay *overlayR
 	}
 
 	for j := range targets {
-		targets[j].BudgetFile = targets[j].BinaryPath + ".budget"
+		targets[j].BudgetFile = protocol.BudgetFilePath(targets[j].BinaryPath)
 	}
 
 	if pf.userCoverProfile != "" {

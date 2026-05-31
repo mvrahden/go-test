@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -101,7 +102,7 @@ func (s *SnapshotUpdateTestSuite) TestMatchSnapshotUpdate(t *gotest.T) {
 			gotest.NoError(it, err)
 			gotest.Contains(it, string(data), "original-value")
 
-			it.T().Setenv("GOTEST_UPDATE_SNAPSHOTS", "1")
+			it.T().Setenv(protocol.EnvUpdateSnapshots, "1")
 			gotest.MatchSnapshot(it, "updated-value")
 
 			data, err = os.ReadFile(snapPath)
@@ -167,7 +168,7 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 		w.It("overwrites the existing snapshot", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, "original")
 
-			it.T().Setenv("GOTEST_UPDATE_SNAPSHOTS", "1")
+			it.T().Setenv(protocol.EnvUpdateSnapshots, "1")
 			gotest.MatchSnapshot(it, "updated")
 
 			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")

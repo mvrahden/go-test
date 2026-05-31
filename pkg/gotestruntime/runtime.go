@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotestruntime/coverage"
 )
 
@@ -490,7 +491,7 @@ func teardownNode(node *FixtureNode, tracker *nodeTracker) bool {
 }
 
 func writeBudgetFile(cfg MainConfig) {
-	path := os.Getenv("GOTEST_TEARDOWN_BUDGET_FILE")
+	path := os.Getenv(protocol.EnvTeardownBudgetFile)
 	if path == "" {
 		return
 	}
@@ -576,7 +577,7 @@ func nodeTreePath(node *FixtureNode) time.Duration {
 }
 
 func loadSharedState() (map[string]json.RawMessage, error) {
-	path := os.Getenv("GOTEST_SHARED_STATE_FILE")
+	path := os.Getenv(protocol.EnvSharedStateFile)
 	if path == "" {
 		return nil, fmt.Errorf("GOTEST_SHARED_STATE_FILE not set — run via gotest CLI")
 	}

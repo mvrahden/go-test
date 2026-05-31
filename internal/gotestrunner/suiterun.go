@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // SuiteTarget identifies a single test suite (or group of standalone tests)
@@ -135,7 +137,7 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 		cmd := exec.CommandContext(ctx, "go", args...)
 		cmd.Env = env
 		if target.BudgetFile != "" {
-			cmd.Env = append(cmd.Env, "GOTEST_TEARDOWN_BUDGET_FILE="+target.BudgetFile)
+			cmd.Env = append(cmd.Env, protocol.EnvTeardownBudgetFile+"="+target.BudgetFile)
 		}
 		cmd.Dir = target.Dir
 		SetProcessGroup(cmd)
@@ -146,7 +148,7 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 	cmd := exec.CommandContext(ctx, target.BinaryPath, testArgs...)
 	cmd.Env = env
 	if target.BudgetFile != "" {
-		cmd.Env = append(cmd.Env, "GOTEST_TEARDOWN_BUDGET_FILE="+target.BudgetFile)
+		cmd.Env = append(cmd.Env, protocol.EnvTeardownBudgetFile+"="+target.BudgetFile)
 	}
 	cmd.Dir = target.Dir
 	SetProcessGroup(cmd)

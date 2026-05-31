@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -748,7 +749,7 @@ func TestSharedFixture_LoadAndHydrate(t *testing.T) {
 	stateBytes, _ := json.Marshal(stateData)
 	stateFile := filepath.Join(t.TempDir(), "state.json")
 	os.WriteFile(stateFile, stateBytes, 0644)
-	t.Setenv("GOTEST_SHARED_STATE_FILE", stateFile)
+	t.Setenv(protocol.EnvSharedStateFile, stateFile)
 
 	var target SharedDB
 	var assignedHost string
@@ -814,7 +815,7 @@ func TestSharedFixture_LoadAndHydrate(t *testing.T) {
 }
 
 func TestSharedFixture_MissingEnvVar(t *testing.T) {
-	t.Setenv("GOTEST_SHARED_STATE_FILE", "")
+	t.Setenv(protocol.EnvSharedStateFile, "")
 
 	node := &FixtureNode{
 		Name:      "Root",
@@ -844,7 +845,7 @@ func TestSharedFixture_NilHydrateAndDehydrate(t *testing.T) {
 	stateBytes, _ := json.Marshal(stateData)
 	stateFile := filepath.Join(t.TempDir(), "state.json")
 	os.WriteFile(stateFile, stateBytes, 0644)
-	t.Setenv("GOTEST_SHARED_STATE_FILE", stateFile)
+	t.Setenv(protocol.EnvSharedStateFile, stateFile)
 
 	var target SharedDB
 	node := &FixtureNode{
@@ -870,7 +871,7 @@ func TestSharedFixture_NilHydrateAndDehydrate(t *testing.T) {
 
 func TestBudgetFile_WrittenCorrectly(t *testing.T) {
 	budgetFile := filepath.Join(t.TempDir(), "budget")
-	t.Setenv("GOTEST_TEARDOWN_BUDGET_FILE", budgetFile)
+	t.Setenv(protocol.EnvTeardownBudgetFile, budgetFile)
 
 	root := &FixtureNode{
 		Name:      "Root",
@@ -903,7 +904,7 @@ func TestBudgetFile_WrittenCorrectly(t *testing.T) {
 }
 
 func TestBudgetFile_NotWrittenWhenEnvUnset(t *testing.T) {
-	t.Setenv("GOTEST_TEARDOWN_BUDGET_FILE", "")
+	t.Setenv(protocol.EnvTeardownBudgetFile, "")
 
 	root := &FixtureNode{
 		Name:      "Root",
@@ -918,7 +919,7 @@ func TestBudgetFile_NotWrittenWhenEnvUnset(t *testing.T) {
 
 func TestBudgetFile_MultipleRootsUsesMax(t *testing.T) {
 	budgetFile := filepath.Join(t.TempDir(), "budget")
-	t.Setenv("GOTEST_TEARDOWN_BUDGET_FILE", budgetFile)
+	t.Setenv(protocol.EnvTeardownBudgetFile, budgetFile)
 
 	rootA := &FixtureNode{
 		Name:      "RootA",
@@ -1296,7 +1297,7 @@ func TestDAG_SharedFixtureWithDAGPath(t *testing.T) {
 	stateBytes, _ := json.Marshal(stateData)
 	stateFile := filepath.Join(t.TempDir(), "state.json")
 	os.WriteFile(stateFile, stateBytes, 0644)
-	t.Setenv("GOTEST_SHARED_STATE_FILE", stateFile)
+	t.Setenv(protocol.EnvSharedStateFile, stateFile)
 
 	var target SharedDB
 	var assignedHost string

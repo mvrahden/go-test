@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 	"github.com/mvrahden/go-test/pkg/gotest/internal/snapfile"
 )
@@ -170,7 +171,7 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 		}
 	}
 
-	if os.Getenv("GOTEST_UPDATE_SNAPSHOTS") != "" {
+	if os.Getenv(protocol.EnvUpdateSnapshots) != "" {
 		if idx >= 0 {
 			sections[idx].Content = content + "\n"
 		} else {
