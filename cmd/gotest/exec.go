@@ -332,16 +332,21 @@ func executeTestsStreaming(ctx context.Context, cfg ExecConfig, overlay *overlay
 
 loop:
 	for {
-		var cr gotestrunner.CompileResult
+		var outcome gotestrunner.CompileOutcome
 		var ok bool
 		select {
-		case cr, ok = <-compileCh:
+		case outcome, ok = <-compileCh:
 			if !ok {
 				break loop
 			}
 		case <-streamCtx.Done():
 			break loop
 		}
+
+		if outcome.Err != nil {
+			continue
+		}
+		cr := outcome.Result
 
 		singleCompiled := []gotestrunner.CompileResult{cr}
 		singleSuites := map[string][]string{cr.Package: overlay.suitesByPkg[cr.Package]}
