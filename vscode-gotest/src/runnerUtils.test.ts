@@ -45,6 +45,7 @@ import {
   getPackageItem,
   expandToPackages,
   computeWildcard,
+  resolveRunPatterns,
   applyResults,
   enqueueDescendants,
   resolveAncestorItems,
@@ -1064,5 +1065,48 @@ describe("resolveAncestorsOf", () => {
       "pass",
       undefined,
     );
+  });
+});
+
+describe("resolveRunPatterns", () => {
+  it("uses workspace patterns when prefix equals module path", () => {
+    const result = resolveRunPatterns(
+      [
+        "example.com/proj/pkg/a",
+        "example.com/proj/pkg/b",
+        "example.com/proj/examples/auth",
+      ],
+      "example.com/proj",
+      ["./...", "./examples/..."],
+    );
+    expect(result).toEqual(["./...", "./examples/..."]);
+  });
+
+  it("falls back to computeWildcard when prefix is deeper than module", () => {
+    const result = resolveRunPatterns(
+      ["example.com/proj/pkg/a", "example.com/proj/pkg/b"],
+      "example.com/proj",
+      ["./...", "./examples/..."],
+    );
+    expect(result).toEqual(["example.com/proj/pkg/..."]);
+  });
+
+  it("falls back to computeWildcard when no workspace patterns", () => {
+    const result = resolveRunPatterns(
+      ["example.com/pkg/a", "example.com/pkg/b"],
+      "example.com",
+      undefined,
+    );
+    expect(result).toEqual(["example.com/pkg/..."]);
+  });
+
+  it("returns undefined for single package", () => {
+    expect(
+      resolveRunPatterns(["example.com/proj/pkg/a"], "example.com/proj"),
+    ).toBeUndefined();
+  });
+
+  it("returns undefined for empty array", () => {
+    expect(resolveRunPatterns([], "example.com/proj")).toBeUndefined();
   });
 });

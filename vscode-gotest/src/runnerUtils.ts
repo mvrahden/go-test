@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
+import * as path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import {
@@ -503,6 +505,75 @@ export function computeWildcard(
   }
 
   return result.length < importPaths.length ? result : undefined;
+}
+
+/**
+ * Determines the gotest package patterns for a batch of packages.
+ * Uses workspace patterns (from go.work) when available and the common
+ * prefix equals the module path. Otherwise falls back to computeWildcard.
+ */
+export function resolveRunPatterns(
+  importPaths: string[],
+  modulePath: string | undefined,
+  workspacePatterns?: string[],
+): string[] | undefined {
+  if (importPaths.length <= 1) return undefined;
+
+  // If workspace patterns are available (go.work) and the common prefix
+  // equals the module path, use the workspace patterns directly.
+  // This handles multi-module workspaces: ["./...", "./examples/..."]
+  if (workspacePatterns && workspacePatterns.length > 0 && modulePath) {
+    const split = importPaths.map((p) => p.split("/"));
+    const first = split[0];
+    let prefixLen = 0;
+    for (let i = 0; i < first.length; i++) {
+      if (split.every((s) => s[i] === first[i])) {
+        prefixLen = i + 1;
+      } else {
+        break;
+      }
+    }
+    const prefix = first.slice(0, prefixLen).join("/");
+    if (prefix === modulePath) {
+      return workspacePatterns;
+    }
+  }
+
+  return computeWildcard(importPaths, modulePath);
+}
+
+/**
+ * Reads go.work use directives and returns per-module patterns.
+ * Returns undefined if no go.work exists.
+ */
+export async function readWorkspacePatterns(
+  dir: string,
+): Promise<string[] | undefined> {
+  try {
+    const content = await readFile(path.join(dir, "go.work"), "utf-8");
+
+    const blockMatch = /^\s*use\s*\(\s*([\s\S]*?)\s*\)/m.exec(content);
+    if (blockMatch) {
+      const dirs = blockMatch[1]
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith("//"));
+      if (dirs.length > 0) {
+        return dirs.map((d) => (d === "." ? "./..." : `${d}/...`));
+      }
+    }
+
+    const singles: string[] = [];
+    const singleUse = /^\s*use\s+(\S+)/gm;
+    let m: RegExpExecArray | null;
+    while ((m = singleUse.exec(content)) !== null) {
+      singles.push(m[1]);
+    }
+    if (singles.length > 0) {
+      return singles.map((d) => (d === "." ? "./..." : `${d}/...`));
+    }
+  } catch {}
+  return undefined;
 }
 
 export function getPackageDir(

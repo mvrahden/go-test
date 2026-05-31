@@ -17,6 +17,8 @@ export class DiscoveryCache implements vscode.Disposable {
   private workspaceDirs = new Map<string, string>();
   private dirIndex = new Map<string, string>();
   private _warnings: (DiscoverWarning & { _wsDir: string })[] = [];
+  private moduleDirs = new Map<string, string>(); // modulePath → absolute dir
+  private pkgModules = new Map<string, string>(); // importPath → modulePath
   private _onDidUpdate = new vscode.EventEmitter<void>();
 
   readonly onDidUpdate: vscode.Event<void> = this._onDidUpdate.event;
@@ -51,6 +53,26 @@ export class DiscoveryCache implements vscode.Disposable {
     return this.dirIndex.get(dir);
   }
 
+  getModulePath(importPath: string): string | undefined {
+    return this.pkgModules.get(importPath);
+  }
+
+  getModuleDir(modulePath: string): string | undefined {
+    return this.moduleDirs.get(modulePath);
+  }
+
+  /** Returns unique module paths for packages within a workspace dir. */
+  getModules(workspaceDir: string): string[] {
+    const modules = new Set<string>();
+    for (const [importPath, wsDir] of this.workspaceDirs) {
+      if (wsDir === workspaceDir) {
+        const mod = this.pkgModules.get(importPath);
+        if (mod) modules.add(mod);
+      }
+    }
+    return Array.from(modules);
+  }
+
   update(
     packages: DiscoverPackage[],
     fullScan: boolean,
@@ -65,6 +87,7 @@ export class DiscoveryCache implements vscode.Disposable {
           if (pkg) this.dirIndex.delete(pkg.dir);
           this.cache.delete(key);
           this.workspaceDirs.delete(key);
+          this.pkgModules.delete(key);
         }
       }
     }
@@ -74,6 +97,17 @@ export class DiscoveryCache implements vscode.Disposable {
       this.cache.set(pkg.importPath, pkg);
       this.dirIndex.set(pkg.dir, pkg.importPath);
       this.workspaceDirs.set(pkg.importPath, workspaceDir);
+      if (pkg.modulePath) {
+        this.pkgModules.set(pkg.importPath, pkg.modulePath);
+        if (!this.moduleDirs.has(pkg.modulePath)) {
+          // Derive module dir: strip the package suffix from the absolute dir
+          const suffix = pkg.importPath.slice(pkg.modulePath.length);
+          const moduleDir = suffix
+            ? pkg.dir.slice(0, -suffix.length).replace(/[/\\]+$/, "")
+            : pkg.dir;
+          this.moduleDirs.set(pkg.modulePath, moduleDir);
+        }
+      }
     }
     if (warnings !== undefined) {
       this._warnings = this._warnings.filter((w) => w._wsDir !== workspaceDir);
@@ -89,6 +123,8 @@ export class DiscoveryCache implements vscode.Disposable {
     this.dirIndex.clear();
     this.workspaceDirs.clear();
     this._warnings = [];
+    this.moduleDirs.clear();
+    this.pkgModules.clear();
     this._onDidUpdate.fire();
   }
 

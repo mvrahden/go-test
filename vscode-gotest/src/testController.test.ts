@@ -79,11 +79,14 @@ function createMockCache(
     importPath: string;
     dir: string;
     wsDir: string;
+    modulePath?: string;
     suites?: any[];
   }>,
 ): DiscoveryCache {
   const pkgMap = new Map<string, any>();
   const wsDirs = new Map<string, string>();
+  const pkgModules = new Map<string, string>();
+  const moduleDirs = new Map<string, string>();
 
   for (const pkg of packages) {
     pkgMap.set(pkg.importPath, {
@@ -92,6 +95,16 @@ function createMockCache(
       suites: pkg.suites ?? [],
     });
     wsDirs.set(pkg.importPath, pkg.wsDir);
+    if (pkg.modulePath) {
+      pkgModules.set(pkg.importPath, pkg.modulePath);
+      if (!moduleDirs.has(pkg.modulePath)) {
+        const suffix = pkg.importPath.slice(pkg.modulePath.length);
+        const moduleDir = suffix
+          ? pkg.dir.slice(0, -suffix.length).replace(/[/\\]+$/, "")
+          : pkg.dir;
+        moduleDirs.set(pkg.modulePath, moduleDir);
+      }
+    }
   }
 
   return {
@@ -100,6 +113,18 @@ function createMockCache(
     },
     getPackage: (ip: string) => pkgMap.get(ip),
     getWorkspaceDir: (ip: string) => wsDirs.get(ip),
+    getModulePath: (ip: string) => pkgModules.get(ip),
+    getModuleDir: (mp: string) => moduleDirs.get(mp),
+    getModules: (wsDir: string) => {
+      const modules = new Set<string>();
+      for (const [ip, wd] of wsDirs) {
+        if (wd === wsDir) {
+          const mod = pkgModules.get(ip);
+          if (mod) modules.add(mod);
+        }
+      }
+      return Array.from(modules);
+    },
     onDidUpdate: vi.fn(),
   } as unknown as DiscoveryCache;
 }
@@ -123,6 +148,32 @@ function collectIds(collection: any): string[] {
   const ids: string[] = [];
   collection.forEach((item: any) => ids.push(item.id));
   return ids;
+}
+
+function makeSuite(name: string): any {
+  return {
+    name,
+    parallel: false,
+    focused: false,
+    excluded: false,
+    guarded: false,
+    file: `${name.toLowerCase()}_test.go`,
+    line: 1,
+    col: 1,
+    lifecycle: [],
+    fixtures: [],
+    methods: [
+      {
+        name: "TestOne",
+        parallel: false,
+        focused: false,
+        excluded: false,
+        file: `${name.toLowerCase()}_test.go`,
+        line: 10,
+        col: 1,
+      },
+    ],
+  };
 }
 
 describe("GoTestController.rebuild", () => {
@@ -390,6 +441,163 @@ describe("GoTestController.rebuild", () => {
       for (const id of dirIds) {
         expect(id).not.toContain("dir:solo/");
       }
+    });
+  });
+
+  describe("go.work multi-module", () => {
+    it("inserts module nodes when workspace has multiple modules", () => {
+      const cache = createMockCache([
+        {
+          importPath: "example.com/proj/internal/auth",
+          dir: "/ws/internal/auth",
+          wsDir: "/ws",
+          modulePath: "example.com/proj",
+          suites: [makeSuite("AuthSuite")],
+        },
+        {
+          importPath: "example.com/proj/examples/cart",
+          dir: "/ws/examples/cart",
+          wsDir: "/ws",
+          modulePath: "example.com/proj/examples",
+          suites: [makeSuite("CartSuite")],
+        },
+      ]);
+
+      const ctrl = createController(cache);
+      ctrl.rebuild();
+
+      const rootIds = collectIds(ctrl.testController.items);
+      expect(rootIds).toContain("module:example.com/proj");
+      expect(rootIds).toContain("module:example.com/proj/examples");
+
+      const modItem = (ctrl.testController.items as any)._map.get(
+        "module:example.com/proj",
+      );
+      expect(modItem.tags.some((t: any) => t.id === "module")).toBe(true);
+      expect(modItem.description).toBe("module");
+    });
+
+    it("omits module nodes for single-module workspace", () => {
+      const cache = createMockCache([
+        {
+          importPath: "example.com/proj/internal/auth",
+          dir: "/ws/internal/auth",
+          wsDir: "/ws",
+          modulePath: "example.com/proj",
+          suites: [makeSuite("AuthSuite")],
+        },
+        {
+          importPath: "example.com/proj/internal/db",
+          dir: "/ws/internal/db",
+          wsDir: "/ws",
+          modulePath: "example.com/proj",
+          suites: [makeSuite("DBSuite")],
+        },
+      ]);
+
+      const ctrl = createController(cache);
+      ctrl.rebuild();
+
+      const rootIds = collectIds(ctrl.testController.items);
+      expect(rootIds).not.toContain("module:example.com/proj");
+      // Should have directory nodes directly
+      expect(rootIds.some((id: string) => id.startsWith("dir:"))).toBe(true);
+    });
+
+    it("nests packages under the correct module node", () => {
+      const cache = createMockCache([
+        {
+          importPath: "example.com/proj/pkg/a",
+          dir: "/ws/pkg/a",
+          wsDir: "/ws",
+          modulePath: "example.com/proj",
+          suites: [makeSuite("ASuite")],
+        },
+        {
+          importPath: "example.com/proj/examples/auth",
+          dir: "/ws/examples/auth",
+          wsDir: "/ws",
+          modulePath: "example.com/proj/examples",
+          suites: [makeSuite("ExAuthSuite")],
+        },
+      ]);
+
+      const ctrl = createController(cache);
+      ctrl.rebuild();
+
+      // Check packages are under the right module
+      const projModule = (ctrl.testController.items as any)._map.get(
+        "module:example.com/proj",
+      );
+      expect(projModule).toBeDefined();
+
+      const exModule = (ctrl.testController.items as any)._map.get(
+        "module:example.com/proj/examples",
+      );
+      expect(exModule).toBeDefined();
+
+      // pkg/a should be under proj module
+      const projChildren: string[] = [];
+      projModule.children.forEach((c: any) => projChildren.push(c.id));
+      expect(
+        projChildren.some(
+          (id: string) =>
+            id.includes("pkg/a") || id === "example.com/proj/pkg/a",
+        ),
+      ).toBe(true);
+
+      // examples/auth should be under examples module
+      const exChildren: string[] = [];
+      exModule.children.forEach((c: any) => exChildren.push(c.id));
+      expect(
+        exChildren.some(
+          (id: string) =>
+            id.includes("auth") || id === "example.com/proj/examples/auth",
+        ),
+      ).toBe(true);
+    });
+
+    it("uses module-relative paths within module subtrees", () => {
+      const cache = createMockCache([
+        {
+          importPath: "example.com/proj/examples/demo/foo",
+          dir: "/ws/examples/demo/foo",
+          wsDir: "/ws",
+          modulePath: "example.com/proj/examples",
+          suites: [makeSuite("FooSuite")],
+        },
+        {
+          importPath: "example.com/proj/examples/demo/bar",
+          dir: "/ws/examples/demo/bar",
+          wsDir: "/ws",
+          modulePath: "example.com/proj/examples",
+          suites: [makeSuite("BarSuite")],
+        },
+        {
+          importPath: "example.com/proj/lib",
+          dir: "/ws/lib",
+          wsDir: "/ws",
+          modulePath: "example.com/proj",
+          suites: [makeSuite("LibSuite")],
+        },
+      ]);
+
+      const ctrl = createController(cache);
+      ctrl.rebuild();
+
+      // The examples module should have demo/foo and demo/bar nested under "demo" dir,
+      // NOT "examples/demo/foo"
+      const exModule = (ctrl.testController.items as any)._map.get(
+        "module:example.com/proj/examples",
+      );
+      expect(exModule).toBeDefined();
+
+      const exChildIds: string[] = [];
+      exModule.children.forEach((c: any) => exChildIds.push(c.id));
+      // Should NOT have "examples" as a directory prefix within the module subtree
+      expect(exChildIds.some((id: string) => id === "dir:examples")).toBe(
+        false,
+      );
     });
   });
 });

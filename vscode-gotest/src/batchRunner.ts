@@ -9,7 +9,8 @@ import { buildCliCommand, formatCliCommand } from "./cli.js";
 import {
   applyResults,
   spawnTestProcess,
-  computeWildcard,
+  resolveRunPatterns,
+  readWorkspacePatterns,
   type AppliedResult,
 } from "./runnerUtils.js";
 import {
@@ -61,11 +62,15 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
   } = config;
 
   const importPaths = pkgInfos.map((p) => p.importPath);
-  const modulePath = await readModulePath(workspaceDir);
-  const wildcards = filter
-    ? undefined
-    : computeWildcard(importPaths, modulePath);
-  const cliPkgArgs = wildcards ?? importPaths;
+  let cliPkgArgs: string[];
+  if (filter) {
+    cliPkgArgs = importPaths;
+  } else {
+    const modulePath = await readModulePath(workspaceDir);
+    const wsPatterns = await readWorkspacePatterns(workspaceDir);
+    const wildcards = resolveRunPatterns(importPaths, modulePath, wsPatterns);
+    cliPkgArgs = wildcards ?? importPaths;
+  }
   let coverFile: string | undefined;
 
   try {
