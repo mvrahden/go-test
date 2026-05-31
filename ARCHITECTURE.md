@@ -15,6 +15,7 @@
  ┌─────────────────────────────────────────────────────────────┐
  │  2. CODE GENERATION                                         │
  │     Collector → Resolver → Renderer → overlay.json          │
+ │     (Renderer works directly with ResolvedFixture)          │
  └──────────────────────────┬──────────────────────────────────┘
                             │  overlayResult (tmpDir, fixture info)
                             ▼
@@ -176,6 +177,11 @@ Resolve(targetPkg, suites, localFixtures)
 Fixtures form a **DAG** (directed acyclic graph) via embedding: a fixture may
 have multiple parents, and suites may reference multiple fixtures. The same
 fixture type is deduplicated by identity so each fixture is set up exactly once.
+
+The resolver produces both `RootFixtures` (entry points with no parents) and
+`AllFixtures` (every fixture in topological order). The renderer uses
+`AllFixtures` to emit a flat list with `DependsOn` edges for the generated
+`TestMain`.
 
 ### What Gets Generated
 
@@ -402,8 +408,8 @@ The system has **four levels of parallelism**, each with distinct mechanisms:
 
 ### Streaming Execution (Compile-Execute Overlap)
 
-`executeTestsStreaming` is the primary execution path. It overlaps compilation
-with test execution:
+`RunPipeline` with `Streaming: true` is the primary execution path. It overlaps
+compilation with test execution:
 
 ```
 time ─────────────────────────────────────────────────────────────────▶
@@ -535,14 +541,14 @@ startup durations.
 
 ### Process Group Isolation
 
-Every subprocess gets its own process group via `Setpgid: true`:
+All subprocesses are managed by `ManagedProcess`, which sets `Setpgid: true`
+internally and handles the full lifecycle: start, signal (SIGTERM to the
+process group via negative PID), grace period, and escalation to SIGKILL.
+Three grace strategies control post-signal behavior:
 
-```go
-cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-cmd.Cancel = func() error {
-    return syscall.Kill(-pid, syscall.SIGTERM)  // negative PID = group
-}
-```
+- `GraceFixed` — wait a fixed duration (e.g., 10s for compile commands).
+- `GraceBudget` — read the teardown budget from a sidecar file at runtime.
+- `GraceKill` — skip SIGTERM and send SIGKILL immediately.
 
 This ensures that when a suite subprocess is terminated, all its child
 processes (e.g., processes spawned by tests) are also killed. SIGTERM goes
@@ -623,10 +629,10 @@ Or without test2json:
 t=0s    CLI starts
         ├─ Parse flags, load config
         ├─ LoadPackages(./...)
-        ├─ GenerateFromLoaded → overlay.json
+        ├─ GenerateOverlay → overlay.json
         ├─ signal.NotifyContext (SIGINT/SIGTERM → ctx cancel)
         │
-t=0.5s  executeTestsStreaming begins
+t=0.5s  RunPipeline begins (Streaming: true)
         ├─ Start goroutine: CompilePackagesStream → compileCh
         ├─ Start goroutine: startSharedFixtures (if any)
         │
@@ -675,9 +681,11 @@ t=8s    All suites done, wg.Wait() returns
    channel as each package finishes. Test execution begins before all packages
    are compiled, reducing total wall-clock time.
 
-5. **Process groups**: Every subprocess gets `Setpgid: true`. Signals target
+5. **Process groups via ManagedProcess**: Every subprocess is wrapped in a
+   `ManagedProcess` that sets `Setpgid: true` internally. Signals target
    the group (negative PID), ensuring child processes spawned by tests are
-   also cleaned up.
+   also cleaned up. Grace period strategy is configuration, not per-callsite
+   reimplementation.
 
 6. **Budget-based teardown**: Each suite subprocess computes its own teardown
    budget (max fixture timeout + max suite setup timeout + 30s headroom) and
@@ -687,3 +695,8 @@ t=8s    All suites done, wg.Wait() returns
 7. **Coverage interception**: The fixture template intercepts Go's coverage
    `tearDown` function via `go:linkname` to ensure coverage counters survive
    past `m.Run()` and capture fixture teardown code.
+
+8. **Unified pipeline entry point**: `cmd/gotest` is a thin CLI shell that
+   delegates to `internal/gotestrunner.RunPipeline`. The pipeline encapsulates
+   the compile -> fixture-setup -> execute -> teardown -> output flow and
+   supports both streaming (`Streaming: true`) and batch modes.
