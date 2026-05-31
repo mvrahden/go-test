@@ -684,11 +684,22 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
     Pool    *pgxpool.Pool <span class="cm">// local — reconstructed via Hydrate</span>
 }
 
-<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">Hydrate</span>(ctx context.Context) <span class="tp">error</span> {
+<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">BeforeAll</span>(ctx context.Context) <span class="tp">error</span> {
+    f.ConnStr = startPostgres(ctx)
+    <span class="kw">return</span> f.connect(ctx)
+}
+
+<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">Hydrate</span>(ctx context.Context) <span class="tp">error</span>   { <span class="kw">return</span> f.connect(ctx) }
+<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">Dehydrate</span>(ctx context.Context) <span class="tp">error</span> { f.Pool.Close(); <span class="kw">return</span> <span class="kw">nil</span> }
+
+<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">connect</span>(ctx context.Context) <span class="tp">error</span> {
     <span class="kw">var</span> err <span class="tp">error</span>
     f.Pool, err = pgxpool.New(ctx, f.ConnStr)
     <span class="kw">return</span> err
 }</pre>
+      </div>
+      <div class="callout">
+        <code>BeforeAll</code> always sets transfer fields. Local fields only need to be set in <code>BeforeAll</code> when a dependent shared fixture accesses them in the DAG — otherwise they may add an idle resource to the subprocess. <code>Hydrate</code> handles local field reconstruction in test processes.
       </div>
       <div class="callout">
         Fields assigned in <code>Hydrate</code> are automatically classified as local and excluded from serialization. Everything else transfers. No annotations needed.
@@ -706,6 +717,9 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
     <span class="cm">// f.Postgres.ConnStr is available</span>
     <span class="kw">return</span> migrate(f.Postgres.ConnStr)
 }</pre>
+      </div>
+      <div class="callout">
+        Within the setup subprocess, dependent fixtures receive in-memory pointers — not serialized state. <code>B.BeforeAll()</code> can access all of <code>A</code>'s fields, including local fields like connection pools — provided <code>A.BeforeAll()</code> set them. When a dependent only needs transfer fields, skipping local setup in the parent avoids idle resources in the subprocess.
       </div>
       <p>Suites are dispatched as soon as their specific shared fixture dependencies are ready — they don't wait for unrelated fixtures. Transitive dependencies are included automatically: if a suite needs <code>SchemaSharedFixture</code>, it also gets <code>PostgresSharedFixture</code>.</p>
     </section>

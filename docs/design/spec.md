@@ -475,6 +475,16 @@ Test process:
   sf.Dehydrate(ctx)              → cleans up local resources
 ```
 
+**DAG dependencies within the subprocess:**
+
+When SharedFixture B depends on SharedFixture A, both run in the same subprocess.
+After A.BeforeAll() completes, B receives an in-memory pointer to A — not serialized state.
+B.BeforeAll() can access all fields that A.BeforeAll() set, including local fields like connection pools.
+The serialization boundary only exists between the subprocess and test processes.
+
+`BeforeAll` always sets transfer fields. Local fields only need to be set in `BeforeAll` when a dependent shared fixture accesses them — otherwise they may add an idle resource to the subprocess.
+`Hydrate` is not called within the subprocess — it runs only in test processes after JSON deserialization.
+
 **Validation at generation time:**
 
 - Shared fixture types must not live in `internal/` packages.
