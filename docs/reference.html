@@ -93,7 +93,7 @@
       font-family: var(--font-sans);
       color: var(--text);
       background: var(--bg);
-      line-height: 1.7;
+      line-height: 1.6;
       -webkit-font-smoothing: antialiased;
     }
 
@@ -111,7 +111,7 @@
       backdrop-filter: blur(8px);
     }
     .nav-inner {
-      max-width: var(--max-w);
+      max-width: 1080px;
       margin: 0 auto;
       padding: 0.75rem 1.5rem;
       display: flex;
@@ -129,9 +129,35 @@
     }
     .nav-brand:hover { text-decoration: none; }
     .nav-brand img { width: 28px; height: 28px; border-radius: 50%; }
-    .nav-links { display: flex; gap: 1.25rem; font-size: 0.9rem; }
+    .nav-links { display: flex; gap: 1.25rem; font-size: 0.9rem; align-items: center; }
     .nav-links a { color: var(--text-secondary); }
     .nav-links a:hover { color: var(--text); text-decoration: none; }
+    .nav-links .nav-home {
+      padding: 0.25rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-weight: 600;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .nav-links .nav-home:hover { background: var(--bg-alt); }
+    .nav-links .star-btn { font-size: 0.85rem; }
+    .star-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.15s;
+      font-size: 0.8rem;
+    }
+    .star-btn:hover { background: var(--bg-alt); text-decoration: none; }
+    .star-btn .star-icon { color: #e3b341; }
+    .star-count { font-weight: 400; color: var(--text-dimmed); }
 
     /* ===== Layout ===== */
     .page { max-width: var(--max-w); margin: 0 auto; padding: 3rem 1.5rem 5rem; }
@@ -340,6 +366,7 @@
     }
     footer a { color: var(--text-on-dark); }
     footer a:hover { color: var(--cyan); }
+    .footer-copy { color: #484f58; font-size: 0.8rem; }
     .footer-links {
       display: flex;
       justify-content: center;
@@ -366,9 +393,10 @@
         gotest
       </a>
       <div class="nav-links">
-        <a href="./">Home</a>
-        <a href="https://github.com/mvrahden/go-test">GitHub</a>
+        <a href="./" class="nav-home">Home</a>
+        <a href="https://github.com/mvrahden/go-test" class="star-btn"><span class="star-icon">&#9734;</span> Star<span class="star-count" id="star-count"></span></a>
         <a href="https://pkg.go.dev/github.com/mvrahden/go-test">pkg.go.dev</a>
+        <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code</a>
       </div>
     </div>
   </nav>
@@ -684,11 +712,22 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
     Pool    *pgxpool.Pool <span class="cm">// local — reconstructed via Hydrate</span>
 }
 
-<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">Hydrate</span>(ctx context.Context) <span class="tp">error</span> {
+<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">BeforeAll</span>(ctx context.Context) <span class="tp">error</span> {
+    f.ConnStr = startPostgres(ctx)
+    <span class="kw">return</span> f.connect(ctx)
+}
+
+<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">Hydrate</span>(ctx context.Context) <span class="tp">error</span>   { <span class="kw">return</span> f.connect(ctx) }
+<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">Dehydrate</span>(ctx context.Context) <span class="tp">error</span> { f.Pool.Close(); <span class="kw">return</span> <span class="kw">nil</span> }
+
+<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">connect</span>(ctx context.Context) <span class="tp">error</span> {
     <span class="kw">var</span> err <span class="tp">error</span>
     f.Pool, err = pgxpool.New(ctx, f.ConnStr)
     <span class="kw">return</span> err
 }</pre>
+      </div>
+      <div class="callout">
+        <code>BeforeAll</code> always sets transfer fields. Local fields only need to be set in <code>BeforeAll</code> when a dependent shared fixture accesses them in the DAG — otherwise they may add an idle resource to the subprocess. <code>Hydrate</code> handles local field reconstruction in test processes.
       </div>
       <div class="callout">
         Fields assigned in <code>Hydrate</code> are automatically classified as local and excluded from serialization. Everything else transfers. No annotations needed.
@@ -706,6 +745,9 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
     <span class="cm">// f.Postgres.ConnStr is available</span>
     <span class="kw">return</span> migrate(f.Postgres.ConnStr)
 }</pre>
+      </div>
+      <div class="callout">
+        Within the setup subprocess, dependent fixtures receive in-memory pointers — not serialized state. <code>B.BeforeAll()</code> can access all of <code>A</code>'s fields, including local fields like connection pools — provided <code>A.BeforeAll()</code> set them. When a dependent only needs transfer fields, skipping local setup in the parent avoids idle resources in the subprocess.
       </div>
       <p>Suites are dispatched as soon as their specific shared fixture dependencies are ready — they don't wait for unrelated fixtures. Transitive dependencies are included automatically: if a suite needs <code>SchemaSharedFixture</code>, it also gets <code>PostgresSharedFixture</code>.</p>
     </section>
@@ -952,6 +994,17 @@ percentage = covered / total</div>
       <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code Extension</a>
       <a href="https://github.com/mvrahden/go-test/blob/main/LICENSE">MIT License</a>
     </div>
+    <p class="footer-copy">Built for Go developers who want tests that explain themselves.</p>
   </footer>
+  <script>
+  fetch('https://api.github.com/repos/mvrahden/go-test')
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(d => {
+      if (d.stargazers_count >= 10) {
+        document.getElementById('star-count').textContent = ` ${d.stargazers_count}`;
+      }
+    })
+    .catch(() => {});
+  </script>
 </body>
 </html>
