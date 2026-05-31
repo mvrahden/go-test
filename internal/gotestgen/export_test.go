@@ -140,7 +140,6 @@ type ExportRenderer = renderer
 // Function exports for all gotestgen test files (Tasks 10-12).
 var ExportPackageEvalMode = packageEvalMode
 var ExportIsInternalPkgPath = isInternalPkgPath
-var ExportBuildAllFixtureViewModels = buildAllFixtureViewModels
 
 // ExportMakeFixtureSpec creates a minimal FixtureSpec for validation testing.
 func ExportMakeFixtureSpec(name string, kind gotestast.FixtureKind, hasBeforeAll bool) *gotestast.FixtureSpec {

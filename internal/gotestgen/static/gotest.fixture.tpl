@@ -23,7 +23,7 @@ var ƒ_sf_{{ $sf.Identifier }} = &{{ $sf.QualifiedType }}{}
 
 {{- /* Package fixture package-level vars */ -}}
 {{ range $f := .AllFixtures }}
-var ƒ_{{ $f.Identifier }} *{{ $f.QualifiedIdentifier }}
+var ƒ_{{ $f.Identifier }} *{{ $f.QualifiedType }}
 {{ end }}
 
 func TestMain(m *testing.M) {
@@ -167,16 +167,16 @@ func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
 {{- if .HasConfig }}
                 Config: func() gotest.FixtureConfig {
                     cfg := gotest.DefaultFixtureConfig()
-                    gotest.OverlayFixtureConfig(&cfg, (&{{ .QualifiedIdentifier }}{}).FixtureConfig())
+                    gotest.OverlayFixtureConfig(&cfg, (&{{ .QualifiedType }}{}).FixtureConfig())
                     return cfg
                 }(),
 {{- else }}
                 Config: gotest.DefaultFixtureConfig(),
 {{- end }}
                 Init: func() {
-{{- if or .ParentFields .SharedFixtures }}
-                    ƒ_{{ .Identifier }} = &{{ .QualifiedIdentifier }}{
-{{- range $parentID, $fieldName := .ParentFields }}
+{{- if or .ParentFieldNames .SharedFixtures }}
+                    ƒ_{{ .Identifier }} = &{{ .QualifiedType }}{
+{{- range $parentID, $fieldName := .ParentFieldNames }}
                         {{ $fieldName }}: ƒ_{{ $parentID }},
 {{- end }}
 {{- range $sf := .SharedFixtures }}
@@ -184,7 +184,7 @@ func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
 {{- end }}
                     }
 {{- else }}
-                    ƒ_{{ .Identifier }} = &{{ .QualifiedIdentifier }}{}
+                    ƒ_{{ .Identifier }} = &{{ .QualifiedType }}{}
 {{- end }}
                 },
                 BeforeAll: func(ctx context.Context) error {
