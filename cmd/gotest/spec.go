@@ -79,7 +79,7 @@ func runSpec(inv Invocation) int {
 		}
 	}
 
-	overlay, cleanup, err := generateOverlayFromLoaded(loaded, cfg.Debug)
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, cfg.Debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -89,13 +89,21 @@ func runSpec(inv Invocation) int {
 	ctx, cancel := signal.NotifyContext(context.Background(), shutdownSignals...)
 	defer cancel()
 
-	jsonData, code, err := executeTestsCaptured(ctx, cfg, overlay)
+	result, err := gotestrunner.RunPipeline(ctx, gotestrunner.PipelineConfig{
+		GoTestArgs:      cfg.GoTestArgs,
+		SetupTimeout:    cfg.SetupTimeout,
+		UpdateSnapshots: cfg.UpdateSnapshots,
+		Streaming:       false,
+		OutputMode:      gotestrunner.RunCaptureJSON,
+	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	events, err := gotestspec.ParseEvents(bytes.NewReader(jsonData))
+	code := result.ExitCode
+
+	events, err := gotestspec.ParseEvents(bytes.NewReader(result.CapturedJSON))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
 		return 2

@@ -175,7 +175,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
 		}
 	}
 
-	overlay, cleanup, err := generateOverlayFromLoaded(loaded, cfg.Debug)
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, cfg.Debug)
 	if err != nil {
 		if jsonMode {
 			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
@@ -191,12 +191,23 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
 		cfg.JSON = true
 	}
 
-	code, err := executeTests(ctx, cfg, overlay)
+	mode := gotestrunner.RunBatchText
+	if cfg.JSON {
+		mode = gotestrunner.RunStreamJSON
+	}
+
+	result, err := gotestrunner.RunPipeline(ctx, gotestrunner.PipelineConfig{
+		GoTestArgs:      cfg.GoTestArgs,
+		SetupTimeout:    cfg.SetupTimeout,
+		UpdateSnapshots: cfg.UpdateSnapshots,
+		Streaming:       false,
+		OutputMode:      mode,
+	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	return code
+	return result.ExitCode
 }
 
 func addWatchDirs(w *fsnotify.Watcher, pattern string) {

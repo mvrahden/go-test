@@ -1,4 +1,4 @@
-package main
+package gotestrunner
 
 import (
 	"bufio"
@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
-	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
 // fixtureStateEntry represents a single JSON line emitted by the shared fixture subprocess.
@@ -147,11 +146,11 @@ func (p *SharedFixtureProcess) Teardown() error {
 	if p.cmd == nil || p.cmd.Process == nil {
 		return nil
 	}
-	gotestrunner.TerminateProcessGroup(p.cmd.Process.Pid)
+	TerminateProcessGroup(p.cmd.Process.Pid)
 	select {
 	case <-p.done:
 	case <-time.After(p.teardownTimeout):
-		gotestrunner.ForceKillProcessGroup(p.cmd.Process.Pid)
+		ForceKillProcessGroup(p.cmd.Process.Pid)
 		<-p.done
 	}
 	if p.sharedDir != "" {
@@ -160,13 +159,13 @@ func (p *SharedFixtureProcess) Teardown() error {
 	return nil
 }
 
-// startSharedFixtures generates a shared setup binary in the overlay temp dir,
+// StartSharedFixtures generates a shared setup binary in the overlay temp dir,
 // starts it as a subprocess, and returns a SharedFixtureProcess immediately.
 // A background goroutine reads JSON state lines from stdout, closing per-fixture
 // ready channels as each fixture completes. The caller must either wait on
 // individual Ready() channels (streaming) or call WaitAllReady (batch).
 // setupTimeout is stored as the initial teardownTimeout; 0 means no deadline.
-func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestgen.SharedFixtureInfo, setupTimeout time.Duration) (*SharedFixtureProcess, error) {
+func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestgen.SharedFixtureInfo, setupTimeout time.Duration) (*SharedFixtureProcess, error) {
 	src, err := gotestgen.GenerateSharedSetup(fixtures)
 	if err != nil {
 		return nil, fmt.Errorf("generate shared setup: %w", err)
@@ -188,7 +187,7 @@ func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	}
 	buildCmd := exec.CommandContext(ctx, "go", "build", "-o", setupBin, setupFile)
 	buildCmd.Stderr = os.Stderr
-	buildMp := gotestrunner.NewManagedProcess(buildCmd, gotestrunner.ProcessConfig{Grace: gotestrunner.GraceKill})
+	buildMp := NewManagedProcess(buildCmd, ProcessConfig{Grace: GraceKill})
 	if err := buildMp.Start(); err != nil {
 		return nil, fmt.Errorf("build shared fixture setup: %w", err)
 	}
@@ -199,8 +198,8 @@ func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	cmd := exec.CommandContext(ctx, setupBin)
 	cmd.Stderr = os.Stderr
 
-	mp := gotestrunner.NewManagedProcess(cmd, gotestrunner.ProcessConfig{
-		Grace:         gotestrunner.GraceFixed,
+	mp := NewManagedProcess(cmd, ProcessConfig{
+		Grace:         GraceFixed,
 		GraceDuration: 30 * time.Second,
 	})
 

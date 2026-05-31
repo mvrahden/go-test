@@ -146,6 +146,8 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 			cmd.Env = append(cmd.Env, protocol.EnvTeardownBudgetFile+"="+target.BudgetFile)
 		}
 		cmd.Dir = target.Dir
+		setProcessGroup(cmd)
+		cmd.WaitDelay = 0
 		return cmd
 	}
 
@@ -155,6 +157,8 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 		cmd.Env = append(cmd.Env, protocol.EnvTeardownBudgetFile+"="+target.BudgetFile)
 	}
 	cmd.Dir = target.Dir
+	setProcessGroup(cmd)
+	cmd.WaitDelay = 0
 	return cmd
 }
 

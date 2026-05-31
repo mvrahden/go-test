@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
+	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
 type prepareOutput struct {
@@ -35,16 +36,16 @@ func runPrepare(inv Invocation) int {
 	ctx, stop := signal.NotifyContext(context.Background(),
 		shutdownSignals...)
 
-	overlay, cleanup, err := generateOverlayFromLoaded(loaded, false)
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, false)
 	if err != nil {
 		stop()
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	var setupProc *SharedFixtureProcess
-	if len(overlay.sharedFixtures) > 0 {
-		setupProc, err = startSharedFixtures(ctx, overlay.tmpDir, overlay.sharedFixtures, 0)
+	var setupProc *gotestrunner.SharedFixtureProcess
+	if len(overlay.SharedFixtures) > 0 {
+		setupProc, err = gotestrunner.StartSharedFixtures(ctx, overlay.TmpDir, overlay.SharedFixtures, 0)
 		if err != nil {
 			stop()
 			cleanup()
@@ -60,12 +61,11 @@ func runPrepare(inv Invocation) int {
 		}
 	}
 
-	// Stop the context-based listener before switching to channel-based blocking.
 	stop()
 
 	out := prepareOutput{
-		OverlayFile: filepath.Join(overlay.tmpDir, "overlay.json"),
-		Dir:         overlay.tmpDir,
+		OverlayFile: filepath.Join(overlay.TmpDir, "overlay.json"),
+		Dir:         overlay.TmpDir,
 	}
 	if setupProc != nil {
 		out.StateFile = setupProc.StateFile()
