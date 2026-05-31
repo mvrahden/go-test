@@ -25,19 +25,20 @@ type ManagedProcess struct {
 	cmd    *exec.Cmd
 	config ProcessConfig
 	done   chan struct{}
+	job    *jobObject
 }
 
 func NewManagedProcess(cmd *exec.Cmd, cfg ProcessConfig) *ManagedProcess {
 	setProcessGroupAttr(cmd)
 	cmd.WaitDelay = 0
+	job, _ := newJobObject()
+	mp := &ManagedProcess{cmd: cmd, config: cfg, done: make(chan struct{}), job: job}
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {
 			return nil
 		}
 		if cfg.Grace == GraceKill {
-			if err := ForceKillProcessGroup(cmd.Process.Pid); err != nil {
-				return os.ErrProcessDone
-			}
+			mp.forceKill()
 			return nil
 		}
 		if err := TerminateProcessGroup(cmd.Process.Pid); err != nil {
@@ -45,19 +46,33 @@ func NewManagedProcess(cmd *exec.Cmd, cfg ProcessConfig) *ManagedProcess {
 		}
 		return nil
 	}
-	return &ManagedProcess{cmd: cmd, config: cfg, done: make(chan struct{})}
+	return mp
 }
 
 func (p *ManagedProcess) Start() error {
 	if err := p.cmd.Start(); err != nil {
 		return err
 	}
-	go func() { p.cmd.Wait(); close(p.done) }()
+	p.assignJob()
+	go func() { p.cmd.Wait(); p.closeJob(); close(p.done) }()
 	return nil
 }
 
 func (p *ManagedProcess) Adopt() {
-	go func() { p.cmd.Wait(); close(p.done) }()
+	p.assignJob()
+	go func() { p.cmd.Wait(); p.closeJob(); close(p.done) }()
+}
+
+func (p *ManagedProcess) assignJob() {
+	if p.job != nil && p.cmd.Process != nil {
+		p.job.assign(p.cmd.Process.Pid)
+	}
+}
+
+func (p *ManagedProcess) closeJob() {
+	if p.job != nil {
+		p.job.close()
+	}
 }
 
 func (p *ManagedProcess) Done() <-chan struct{}       { return p.done }
@@ -82,9 +97,7 @@ func (p *ManagedProcess) WaitWithGrace(ctx context.Context) error {
 	select {
 	case <-p.done:
 	case <-time.After(grace):
-		if p.cmd.Process != nil {
-			ForceKillProcessGroup(p.cmd.Process.Pid)
-		}
+		p.forceKill()
 		<-p.done
 	}
 	if p.cmd.ProcessState != nil && !p.cmd.ProcessState.Success() {
@@ -102,10 +115,18 @@ func (p *ManagedProcess) Terminate() {
 	select {
 	case <-p.done:
 	case <-time.After(grace):
-		if p.cmd.Process != nil {
-			ForceKillProcessGroup(p.cmd.Process.Pid)
-		}
+		p.forceKill()
 		<-p.done
+	}
+}
+
+func (p *ManagedProcess) forceKill() {
+	if p.job != nil {
+		p.job.terminate(1)
+		return
+	}
+	if p.cmd.Process != nil {
+		ForceKillProcessGroup(p.cmd.Process.Pid)
 	}
 }
 
