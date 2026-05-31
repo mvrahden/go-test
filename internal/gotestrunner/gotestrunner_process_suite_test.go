@@ -128,9 +128,8 @@ func (s *GotestrunnerProcessTestSuite) TestTeardownBudget(t *gotest.T) {
 		w.When("BudgetFile is set", func(w *gotest.T) {
 			w.It("sets GOTEST_TEARDOWN_BUDGET_FILE in env", func(it *gotest.T) {
 				target := gotestrunner.SuiteTarget{
-					Package:    "example.com/pkg",
+					SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFoo"},
 					BinaryPath: "/tmp/pkg.test",
-					SuiteName:  "TestFoo",
 					BudgetFile: "/tmp/pkg.test.budget",
 				}
 				cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, env, false)
@@ -141,9 +140,8 @@ func (s *GotestrunnerProcessTestSuite) TestTeardownBudget(t *gotest.T) {
 		w.When("BudgetFile is empty", func(w *gotest.T) {
 			w.It("does not set GOTEST_TEARDOWN_BUDGET_FILE", func(it *gotest.T) {
 				target := gotestrunner.SuiteTarget{
-					Package:    "example.com/pkg",
+					SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFoo"},
 					BinaryPath: "/tmp/pkg.test",
-					SuiteName:  "TestFoo",
 				}
 				cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, env, false)
 				for _, e := range cmd.Env {
