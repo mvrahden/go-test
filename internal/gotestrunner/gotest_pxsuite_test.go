@@ -317,4 +317,56 @@ func TestGotestrunnerTestSuite(t *testing.T) {
 		return
 	}
 
+	t.Run("TestParseExecFlags", func(it *testing.T) {
+		ttt := gotest.NewT(it)
+		if ƒcfg.Timeout > 0 {
+			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+		}
+		defer s.AfterEach(ttt)
+		s.BeforeEach(ttt)
+		ƒƒ_GOTEST_exec(s.TestParseExecFlags, ttt)
+	})
+	if ƒcfg.FailFast && t.Failed() {
+		return
+	}
+
+	t.Run("TestAssignCoverProfiles", func(it *testing.T) {
+		ttt := gotest.NewT(it)
+		if ƒcfg.Timeout > 0 {
+			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+		}
+		defer s.AfterEach(ttt)
+		s.BeforeEach(ttt)
+		ƒƒ_GOTEST_exec(s.TestAssignCoverProfiles, ttt)
+	})
+	if ƒcfg.FailFast && t.Failed() {
+		return
+	}
+
+	t.Run("TestBuildExtraEnv", func(it *testing.T) {
+		ttt := gotest.NewT(it)
+		if ƒcfg.Timeout > 0 {
+			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+		}
+		defer s.AfterEach(ttt)
+		s.BeforeEach(ttt)
+		ƒƒ_GOTEST_exec(s.TestBuildExtraEnv, ttt)
+	})
+	if ƒcfg.FailFast && t.Failed() {
+		return
+	}
+
+	t.Run("TestSharedFixtureProcess", func(it *testing.T) {
+		ttt := gotest.NewT(it)
+		if ƒcfg.Timeout > 0 {
+			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
+		}
+		defer s.AfterEach(ttt)
+		s.BeforeEach(ttt)
+		ƒƒ_GOTEST_exec(s.TestSharedFixtureProcess, ttt)
+	})
+	if ƒcfg.FailFast && t.Failed() {
+		return
+	}
+
 }
