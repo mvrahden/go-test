@@ -14,6 +14,7 @@ func TestLoad_FullConfig(t *testing.T) {
 tags: "integration,e2e"
 setup-timeout: 2m
 min-coverage: 80
+parallel: 12
 debounce: 500ms
 lint:
   skip:
@@ -29,6 +30,7 @@ lint:
 	assertEqual(t, "tags", cfg.Tags, "integration,e2e")
 	assertEqual(t, "setup-timeout", cfg.SetupTimeout.Duration(), 2*time.Minute)
 	assertEqual(t, "min-coverage", cfg.MinCoverage, 80)
+	assertEqual(t, "parallel", cfg.Parallel, 12)
 	assertEqual(t, "debounce", cfg.Debounce.Duration(), 500*time.Millisecond)
 	assertSliceEqual(t, "lint.skip", cfg.Lint.Skip, []string{"stdlib-test", "testify"})
 }
@@ -45,6 +47,7 @@ func TestLoad_NoFile_ReturnsZero(t *testing.T) {
 	assertEqual(t, "tags", cfg.Tags, "")
 	assertEqual(t, "setup-timeout", cfg.SetupTimeout.Duration(), time.Duration(0))
 	assertEqual(t, "min-coverage", cfg.MinCoverage, 0)
+	assertEqual(t, "parallel", cfg.Parallel, 0)
 	assertEqual(t, "debounce", cfg.Debounce.Duration(), time.Duration(0))
 	if len(cfg.Lint.Skip) != 0 {
 		t.Errorf("lint.skip: got %v, want empty", cfg.Lint.Skip)

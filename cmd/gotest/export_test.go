@@ -4,6 +4,7 @@ type ExportDiscoverOutput = discoverOutput
 type ExportDiscoverPackage = discoverPackage
 
 var ExportParseMinFlag = parseMinFlag
+var ExportParseParallelFlag = parseParallelFlag
 var ExportBuildDiscoverSuite = buildDiscoverSuite
 var ExportExtractStringFlag = extractStringFlag
 var ExportHasFlag = hasFlag

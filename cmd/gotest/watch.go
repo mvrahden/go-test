@@ -64,6 +64,9 @@ func runWatch(inv Invocation) int {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
+	if parallel == 0 {
+		parallel = inv.Config.Parallel
+	}
 	patterns := ExtractPackagePatterns(goTestArgs)
 
 	cfg := ExecConfig{

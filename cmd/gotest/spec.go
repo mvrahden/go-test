@@ -42,6 +42,15 @@ func runSpec(inv Invocation) int {
 		return 2
 	}
 
+	parallel, err := parseParallelFlag(ownArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if parallel == 0 {
+		parallel = inv.Config.Parallel
+	}
+
 	var coverProfile string
 	if minCoverage > 0 {
 		for _, arg := range goTestArgs {
@@ -60,6 +69,7 @@ func runSpec(inv Invocation) int {
 		Debug:           slices.Contains(ownArgs, "--debug"),
 		CI:              slices.Contains(ownArgs, "--ci"),
 		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
+		Parallel:        parallel,
 	}
 
 	classified := gotestrunner.ClassifyGoTestArgs(goTestArgs)

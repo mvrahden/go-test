@@ -22,6 +22,9 @@ type ProjectConfig struct {
 	SetupTimeout Duration `yaml:"setup-timeout"`
 	// MinCoverage is the minimum coverage percentage (0-100). The run fails if coverage is below.
 	MinCoverage int `yaml:"min-coverage"`
+	// Parallel is the total concurrency budget (concurrent test methods across all
+	// suite processes). Zero means use the default (2×GOMAXPROCS).
+	Parallel int `yaml:"parallel"`
 	// Debounce is the delay before re-running tests in watch mode. Overrides the CLI default (200ms).
 	Debounce Duration `yaml:"debounce"`
 	// Lint holds lint-specific configuration.

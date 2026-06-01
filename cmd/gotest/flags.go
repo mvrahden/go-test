@@ -31,7 +31,7 @@ var testAllowed = flagSet(
 
 var specAllowed = flagSet(
 	"--debug", "--ci", "--update-snapshots",
-	"--min", "--setup-timeout",
+	"--min", "--setup-timeout", "--parallel",
 	"--format", "--output", "--input", "--no-color",
 )
 
