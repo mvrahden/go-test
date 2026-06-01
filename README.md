@@ -611,6 +611,33 @@ Preset constructors for common scenarios:
 | `DefaultSuiteConfig()` | 30 sec | 30 sec | 0 | — | Unit/integration tests |
 | `IntegrationSuiteConfig()` | 2 min | 5 min | 0 | — | Heavier integration tests |
 
+### Project Configuration
+
+Project-level defaults live in `.gotest.yml` at the repository root (or nearest parent with a `go.mod`).
+CLI flags always take precedence over config values; zero/omitted fields are ignored.
+
+```yaml
+# .gotest.yml
+tags: "integration,e2e"
+setup-timeout: 5m
+min-coverage: 80
+parallel: 12
+debounce: 500ms
+lint:
+  skip:
+    - stdlib-test
+    - testify
+```
+
+| Field | Type | CLI flag | Description |
+|-------|------|----------|-------------|
+| `tags` | string | `-tags` | Comma-separated build tags |
+| `setup-timeout` | duration | `--setup-timeout` | Total budget for shared fixture setup |
+| `min-coverage` | int | `--min` | Minimum coverage percentage (0–100) |
+| `parallel` | int | `--parallel` | Total concurrent test method budget |
+| `debounce` | duration | `--debounce` | Watch mode re-run delay |
+| `lint.skip` | list | — | Lint rules to disable project-wide |
+
 ## Test Selection
 
 ### Focus and Exclude

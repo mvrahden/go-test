@@ -858,15 +858,16 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
       <p>The two scopes are independent — they don't override each other. For shared fixture timeouts specifically, <code>--setup-timeout</code> is an outer wall-clock budget on the entire setup phase, while <code>SharedFixtureConfig().Timeout</code> is an inner per-fixture deadline. Both run concurrently — whichever fires first wins. When <code>--setup-timeout</code> is omitted, only the per-fixture timeouts apply.</p>
 
       <h3>Project file — <code>.gotest.yml</code></h3>
-      <p>Place a <code>.gotest.yml</code> in your project root. gotest finds it by walking up from the working directory, stopping at the first match or at a <code>go.mod</code> boundary.</p>
+      <p>Place a <code>.gotest.yml</code> in your project root. gotest finds it by walking up from the working directory, stopping at the first match or at a <code>go.mod</code> boundary. CLI flags always take precedence; zero or omitted fields use defaults.</p>
       <table class="ref-table">
-        <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
+        <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>CLI override</th><th>Effect</th></tr></thead>
         <tbody>
-          <tr><td><code>tags</code></td><td>string</td><td><em>none</em></td><td>Build tags, comma-separated (e.g. <code>"integration,e2e"</code>).</td></tr>
-          <tr><td><code>setup-timeout</code></td><td>duration</td><td><em>none</em></td><td>Total budget for all shared fixture setup. Omit to let each fixture's own config govern. Use a negative value (e.g. <code>-1s</code>) to disable (<code>--setup-timeout</code>).</td></tr>
-          <tr><td><code>min-coverage</code></td><td>int</td><td>0 (off)</td><td>Minimum coverage percentage, 0–100 (<code>--min</code>).</td></tr>
-          <tr><td><code>debounce</code></td><td>duration</td><td>200ms</td><td>Watch mode re-run delay (<code>--debounce</code>).</td></tr>
-          <tr><td><code>lint.skip</code></td><td>[string]</td><td><em>none</em></td><td>Lint rules to disable: <code>stdlib-test</code>, <code>testify</code>.</td></tr>
+          <tr><td><code>tags</code></td><td>string</td><td><em>none</em></td><td><code>-tags</code></td><td>Build tags, comma-separated (e.g. <code>"integration,e2e"</code>).</td></tr>
+          <tr><td><code>setup-timeout</code></td><td>duration</td><td><em>none</em></td><td><code>--setup-timeout</code></td><td>Total budget for all shared fixture setup. Omit to let each fixture's own config govern. Negative disables.</td></tr>
+          <tr><td><code>min-coverage</code></td><td>int</td><td>0 (off)</td><td><code>--min</code></td><td>Minimum coverage percentage, 0–100.</td></tr>
+          <tr><td><code>parallel</code></td><td>int</td><td>0 (auto)</td><td><code>--parallel</code></td><td>Total concurrent test method budget. 0 means 2×GOMAXPROCS.</td></tr>
+          <tr><td><code>debounce</code></td><td>duration</td><td>200ms</td><td><code>--debounce</code></td><td>Watch mode re-run delay.</td></tr>
+          <tr><td><code>lint.skip</code></td><td>[string]</td><td><em>none</em></td><td>—</td><td>Lint rules to disable: <code>stdlib-test</code>, <code>testify</code>.</td></tr>
         </tbody>
       </table>
       <div class="code-block">
@@ -874,6 +875,7 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
         <pre>tags: integration
 setup-timeout: 2m
 min-coverage: 80
+parallel: 12
 debounce: 500ms
 lint:
   skip:
