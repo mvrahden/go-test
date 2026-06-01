@@ -26,6 +26,7 @@ import {
 } from "./runnerUtils.js";
 import { copyCoverageSummary, copyTestResults } from "./reporting.js";
 import { execFile } from "node:child_process";
+import { ensureGitExclude } from "./gitExclude.js";
 
 let flushOnDeactivate: (() => Promise<void>) | undefined;
 
@@ -604,6 +605,7 @@ async function initializeAsync(deps: {
         }
       },
     );
+    ensureGitExclude(folder.uri.fsPath, outputChannel);
   }
 
   await runRegistry.load();
