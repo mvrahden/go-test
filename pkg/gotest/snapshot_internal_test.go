@@ -104,6 +104,46 @@ func TestMatchSnapshot_PtestUsesNoSuffix(t *testing.T) {
 	}
 }
 
+func TestMatchSnapshot_NormalizesCRLFInContent(t *testing.T) {
+	snapDir := filepath.Join(thisDir(), "testdata", "__snapshots__")
+	snapFile := filepath.Join(snapDir, "TestMatchSnapshot_NormalizesCRLFInContent.snap")
+	t.Cleanup(func() { os.Remove(snapFile) })
+
+	MatchSnapshot(t, "line1\r\nline2\r\n")
+
+	data, err := os.ReadFile(snapFile)
+	if err != nil {
+		t.Fatalf("expected snapshot file: %v", err)
+	}
+	if strings.Contains(string(data), "\r\n") {
+		t.Fatal("snapshot file should not contain \\r\\n — content must be normalized on write")
+	}
+	if !strings.Contains(string(data), "line1\nline2\n") {
+		t.Fatal("expected normalized content in snapshot file")
+	}
+
+	MatchSnapshot(t, "line1\r\nline2\r\n")
+}
+
+func TestMatchSnapshot_MatchesAfterCRLFFileCorruption(t *testing.T) {
+	snapDir := filepath.Join(thisDir(), "testdata", "__snapshots__")
+	snapFile := filepath.Join(snapDir, "TestMatchSnapshot_MatchesAfterCRLFFileCorruption.snap")
+	t.Cleanup(func() { os.Remove(snapFile) })
+
+	MatchSnapshot(t, "stable value")
+
+	data, err := os.ReadFile(snapFile)
+	if err != nil {
+		t.Fatalf("read snap: %v", err)
+	}
+	corrupted := strings.ReplaceAll(string(data), "\n", "\r\n")
+	if err := os.WriteFile(snapFile, []byte(corrupted), 0644); err != nil {
+		t.Fatalf("write corrupted snap: %v", err)
+	}
+
+	MatchSnapshot(t, "stable value")
+}
+
 func TestReadAndRestore_SeekableReader(t *testing.T) {
 	r := strings.NewReader("test data")
 	b, err := readAndRestore(r)

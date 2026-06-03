@@ -45,6 +45,9 @@ func isExternalPackage(callerFile string) bool {
 			return ext
 		}
 	}
+	if err := sc.Err(); err != nil {
+		return false
+	}
 	pkgCache.Store(callerFile, false)
 	return false
 }
@@ -116,6 +119,7 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 		failf(t, "MatchSnapshot: %v", err)
 		return
 	}
+	content = strings.ReplaceAll(content, "\r\n", "\n")
 	if err := snapfile.ValidateContent(content); err != nil {
 		failf(t, "MatchSnapshot: %v", err)
 		return

@@ -82,6 +82,16 @@ func TestRoundTrip_ParseThenSerialize(t *testing.T) {
 	gotest.Equal(t, input, string(out))
 }
 
+func TestParse_CRLFLineEndings(t *testing.T) {
+	input := []byte("=== SNAP alpha ===\r\nfirst\r\n=== SNAP beta ===\r\nsecond\r\n")
+	sections := snapfile.Parse(input)
+	gotest.Len(t, sections, 2)
+	gotest.Equal(t, "alpha", sections[0].Key)
+	gotest.Equal(t, "first\n", sections[0].Content)
+	gotest.Equal(t, "beta", sections[1].Key)
+	gotest.Equal(t, "second\n", sections[1].Content)
+}
+
 func TestValidateContent_Clean(t *testing.T) {
 	err := snapfile.ValidateContent("normal content\nmore lines\n")
 	gotest.NoError(t, err)

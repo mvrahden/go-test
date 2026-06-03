@@ -22,7 +22,8 @@ func Parse(data []byte) []Section {
 		return nil
 	}
 
-	text := strings.TrimSuffix(string(data), "\n")
+	text := strings.ReplaceAll(string(data), "\r\n", "\n")
+	text = strings.TrimSuffix(text, "\n")
 	lines := strings.Split(text, "\n")
 
 	var sections []Section
