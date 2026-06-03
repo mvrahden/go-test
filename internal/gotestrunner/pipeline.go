@@ -197,6 +197,7 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	}
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
+	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
 	RunSuites(ctx, targets, extraEnv, maxParallel, collector)
 	collector.Finalize(overlay.NoSuitePackages)
 
@@ -252,6 +253,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	var allTargets []SuiteTarget
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
+	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
 	collector.SetFlushOrder(overlay.SuitePackages)
 
 loop:

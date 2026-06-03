@@ -20,6 +20,7 @@ type OverlayResult struct {
 	NoSuitePackages  []string
 	SuitesByPkg      map[string][]string
 	DirsByPkg        map[string]string
+	SkippedSuitesByPkg              map[string][]string
 	FixtureDepSuites                map[string]map[string]bool
 	SuiteRequiredSharedFixtureKeys map[string]map[string][]string
 }
@@ -47,6 +48,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, debug bool) (*OverlayResult
 	var noSuitePkgs []string
 	suitesByPkg := map[string][]string{}
 	dirsByPkg := map[string]string{}
+	skippedSuitesByPkg := map[string][]string{}
 	fixtureDepSuites := map[string]map[string]bool{}
 	suiteReqKeys := map[string]map[string][]string{}
 	for _, r := range allResults {
@@ -60,6 +62,9 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, debug bool) (*OverlayResult
 		}
 		if r.AbsPath != "" {
 			dirsByPkg[r.PkgPath] = r.AbsPath
+		}
+		if len(r.SkippedSuiteNames) > 0 {
+			skippedSuitesByPkg[r.PkgPath] = r.SkippedSuiteNames
 		}
 		if len(r.FixtureDepSuites) > 0 {
 			s := make(map[string]bool, len(r.FixtureDepSuites))
@@ -81,6 +86,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, debug bool) (*OverlayResult
 		NoSuitePackages:  noSuitePkgs,
 		SuitesByPkg:      suitesByPkg,
 		DirsByPkg:        dirsByPkg,
+		SkippedSuitesByPkg:              skippedSuitesByPkg,
 		FixtureDepSuites:                fixtureDepSuites,
 		SuiteRequiredSharedFixtureKeys: suiteReqKeys,
 	}, cleanup, nil

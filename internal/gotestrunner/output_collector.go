@@ -165,6 +165,35 @@ func (c *OutputCollector) UsesTest2JSON() bool {
 	return c.mode != RunBatchText
 }
 
+func (c *OutputCollector) EmitSkippedSuites(skippedByPkg map[string][]string) {
+	if c.mode == RunBatchText {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	w := c.jsonWriter()
+	now := time.Now()
+	for pkg, names := range skippedByPkg {
+		for _, name := range names {
+			testFunc := "Test" + name
+			writeJSONLine(w, map[string]any{
+				"Time": now, "Action": "run", "Package": pkg, "Test": testFunc,
+			})
+			writeJSONLine(w, map[string]any{
+				"Time": now, "Action": "output", "Package": pkg, "Test": testFunc,
+				"Output": fmt.Sprintf("--- SKIP: %s (0.00s)\n", testFunc),
+			})
+			writeJSONLine(w, map[string]any{
+				"Time": now, "Action": "output", "Package": pkg, "Test": testFunc,
+				"Output": "    test suite was excluded by user\n",
+			})
+			writeJSONLine(w, map[string]any{
+				"Time": now, "Action": "skip", "Package": pkg, "Test": testFunc, "Elapsed": 0,
+			})
+		}
+	}
+}
+
 func (c *OutputCollector) anyFailedLocked() bool {
 	for _, s := range c.pkgs {
 		for _, r := range s.results {
