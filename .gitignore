@@ -8,3 +8,5 @@ spec.txt
 .vite
 .worktrees/
 ƒƒ_*
+gotest_psuite_test.go
+gotest_pxsuite_test.go

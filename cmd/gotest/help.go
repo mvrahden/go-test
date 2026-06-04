@@ -78,10 +78,11 @@ Subcommands:
 Run "gotest help <subcommand>" for subcommand-specific help.
 
 Flags (gotest — use --double-dash):
-  --ci                    Fail on focused tests (F_ prefixes)
+  --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay for inspection
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
+  --no-cache              Disable overlay cache, force fresh generation
   --min=<pct>             Fail if coverage < pct%% (0-100)
   --setup-timeout=<dur>   Total budget for shared fixture setup (-1s to disable)
 
@@ -97,6 +98,11 @@ Flags (go test — use -single-dash, forwarded automatically):
 
 Use a bare "--" to separate gotest flags from go test flags,
 or to pass unrecognized flags to go test without validation.
+
+Environment:
+  CI=true                 Auto-enables --ci when GOTEST_CI is unset
+  GOTEST_CI=0             Opt out of CI auto-detection
+  GOTEST_CACHE_DIR=<dir>  Override overlay cache location (default: ~/.cache/gotest)
 
 Configuration:
   Place a .gotest.yml in your project root. Run "gotest help config" for details.
@@ -119,17 +125,22 @@ Usage:
 
 When no subcommand is given, gotest discovers test suites in the target
 packages, generates an overlay with lifecycle wiring, and runs "go test".
+Generated overlays are cached by content hash for faster repeated runs.
 
 Flags:
-  --ci                    Fail on focused tests (F_ prefixes)
+  --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay for inspection
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
+  --no-cache              Disable overlay cache, force fresh generation
   --min=<pct>             Fail if coverage < pct% (0-100, enables -coverprofile)
   --setup-timeout=<dur>   Total budget for shared fixture setup (-1s to disable)
 
 All standard go test flags (-single-dash) are forwarded automatically.
 Use a bare "--" to pass unrecognized flags without validation.
+
+CI auto-detection: when the standard CI env var is set and GOTEST_CI is
+unset, --ci is enabled automatically. Set GOTEST_CI=0 to opt out.
 
 Examples:
   gotest ./...                              Run all suites
@@ -155,9 +166,10 @@ Flags:
   --output=<file>         Write to file instead of stdout
   --input=<file>          Render from saved JSON ("-" for stdin)
   --no-color              Disable ANSI color codes
-  --ci                    Fail on focused tests (F_ prefixes)
+  --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay
   --update-snapshots      Regenerate snapshot files
+  --no-cache              Disable overlay cache, force fresh generation
   --min=<pct>             Fail if coverage < pct% (0-100)
   --setup-timeout=<dur>   Total budget for shared fixture setup (-1s to disable)
 
@@ -182,9 +194,10 @@ runs are scoped to the packages containing changed files.
 
 Flags:
   --debounce=<dur>        Re-run delay after change (default: 200ms)
-  --ci                    Fail on focused tests (F_ prefixes)
+  --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay
   --update-snapshots      Regenerate snapshot files
+  --no-cache              Disable overlay cache, force fresh generation
   --setup-timeout=<dur>   Total budget for shared fixture setup (-1s to disable)
 
 Examples:
@@ -365,6 +378,10 @@ Usage:
 Removes generated overlay files (gotest_*_test.go) that are no longer
 needed. These files are normally ephemeral but may be left behind
 by --debug runs or interrupted processes.
+
+The overlay cache (used for faster repeated runs) is managed separately
+and auto-evicts entries older than 7 days. Set GOTEST_CACHE_DIR to
+control the cache location; use --no-cache to bypass it entirely.
 
 Examples:
   gotest clean ./...                         Clean all packages

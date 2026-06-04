@@ -120,7 +120,7 @@ Generated files never touch your source tree — they're created hidden before t
 you write:          gotest generates:         go test runs:
                     (hidden, auto-cleaned)
 
-MySuite struct      ƒƒ_psuite_test.go        func TestMySuite(t *testing.T)
+MySuite struct      gotest_psuite_test.go     func TestMySuite(t *testing.T)
   BeforeAll()   →     lifecycle wiring    →     t.Cleanup(AfterAll)
   TestFoo()           t.Run nesting              BeforeAll()
   AfterAll()          process isolation          t.Run("TestFoo", ...)
@@ -650,11 +650,13 @@ func (s *MySuite) F_TestCreate(t *gotest.T) {} // focus a single test
 func (s *MySuite) X_TestFlaky(t *gotest.T)  {} // exclude a single test
 ```
 
-Use `--ci` in CI to fail the build if any `F_` prefix slipped through:
+Use `--ci` in CI to fail the build if any `F_` prefix slipped through and to enable snapshot read-only mode (missing baselines fail instead of being generated):
 
 ```bash
 gotest --ci ./... -v -race
 ```
+
+CI mode is auto-detected: when the standard `CI` environment variable is set and `GOTEST_CI` is unset, `--ci` is enabled automatically. Set `GOTEST_CI=0` to opt out.
 
 ### SuiteGuard
 
@@ -727,7 +729,7 @@ gotest lint ./...              # static analysis for test suites
 gotest refactor toggle-focus . # toggle F_/X_ prefixes programmatically
 gotest migrate ./...           # convert testify/suite to go-test
 gotest generate ./...          # run code generation only (no tests)
-gotest clean ./...             # remove cached overlays (debugging)
+gotest clean ./...             # remove orphaned generated files
 gotest version                 # print version
 gotest help                    # show help
 ```

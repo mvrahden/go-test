@@ -503,7 +503,7 @@
       </table>
 
       <div class="callout">
-        <code>F_</code> and <code>X_</code> work on both types and methods. <code>X_</code> takes precedence over <code>F_</code>. Use <code>--ci</code> to fail the build if any focus prefix is committed.
+        <code>F_</code> and <code>X_</code> work on both types and methods. <code>X_</code> takes precedence over <code>F_</code>. Use <code>--ci</code> to fail the build if any focus prefix is committed and to enable snapshot read-only mode. CI mode is auto-detected from the <code>CI</code> environment variable.
       </div>
     </section>
 
@@ -972,9 +972,10 @@ percentage = covered / total</div>
       <table class="ref-table">
         <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
         <tbody>
-          <tr><td><code>--ci</code></td><td>Fail the build if any focus prefix is committed.</td></tr>
+          <tr><td><code>--ci</code></td><td>CI mode: fail on focus prefixes, snapshot read-only. Auto-detected from <code>CI</code> env var; opt out with <code>GOTEST_CI=0</code>.</td></tr>
           <tr><td><code>--spec</code></td><td>Append spec summary after normal test output.</td></tr>
           <tr><td><code>--update-snapshots</code></td><td>Regenerate all snapshot files.</td></tr>
+          <tr><td><code>--no-cache</code></td><td>Disable overlay cache, force fresh generation.</td></tr>
           <tr><td><code>--min=&lt;pct&gt;</code></td><td>Fail if coverage falls below threshold.</td></tr>
           <tr><td><code>--format=md</code></td><td>Markdown output for <code>spec</code> command.</td></tr>
           <tr><td><code>--output=&lt;path&gt;</code></td><td>Write formatted output to file.</td></tr>

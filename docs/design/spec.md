@@ -100,7 +100,8 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | Flag | Effect |
 |------|--------|
 | `--debug` | Keep generated files after run |
-| `--ci` | Fail if `F_` focus prefixes exist |
+| `--ci` | CI mode: fail on `F_` prefixes, snapshot read-only |
+| `--no-cache` | Disable overlay cache, force fresh generation |
 | `--spec` | Append spec summary after normal output |
 | `--update-snapshots` | Regenerate snapshot files |
 | `--format=<fmt>` | Output format for `spec` (terminal, md) |
@@ -238,7 +239,8 @@ Rules:
 
 Skipped suites produce a `t.Skipf("test suite was excluded by user")` stub.
 
-The `--ci` flag performs a static analysis scan before generation — no test execution needed:
+The `--ci` flag performs a static analysis scan before generation and enables
+snapshot read-only mode (missing baselines fail instead of being generated):
 
 ```
 $ gotest --ci ./...
@@ -246,6 +248,9 @@ FAIL: focus prefix detected — remove F_ before merging:
   pkg/user/user_test.go:12    type F_UserServiceTestSuite
   pkg/payment/pay_test.go:28  func (s *PaymentTestSuite) F_TestCharge
 ```
+
+CI mode is auto-detected from the standard `CI` environment variable when
+`GOTEST_CI` is unset. Set `GOTEST_CI=0` to opt out.
 
 ### SuiteGuard
 
@@ -903,7 +908,7 @@ Use case: `//go:generate gotest generate ./...` for checked-in generated files.
 gotest clean ./...
 ```
 
-Walks directories and removes files matching `ƒƒ_p(x)?suite_test.go`.
+Walks directories and removes files matching `gotest_p(x)?suite_test.go`.
 
 ### Generated Files
 
@@ -911,10 +916,10 @@ Per package directory, up to two files:
 
 | File | Purpose |
 |------|---------|
-| `ƒƒ_psuite_test.go` | Same-package (white-box) test suites |
-| `ƒƒ_pxsuite_test.go` | External-package (black-box) test suites |
+| `gotest_psuite_test.go` | Same-package (white-box) test suites |
+| `gotest_pxsuite_test.go` | External-package (black-box) test suites |
 
-The `ƒƒ` Unicode prefix prevents naming collisions with user code.
+The `gotest_` prefix prevents naming collisions with user code.
 Files contain a `// Code generated` header.
 
 ### Generated Structure
@@ -969,7 +974,7 @@ Detects:
 - **Value receivers:** Suite methods with value receivers instead of pointer receivers
 - **Missing lifecycle pair:** `BeforeAll` without `AfterAll` — resources may leak
 - **Committed focus prefixes:** `F_` prefix on types or methods
-- **Orphaned generated files:** `ƒƒ_*` files checked into version control
+- **Orphaned generated files:** `gotest_*suite_test.go` files checked into version control
 - **Stdlib test functions:** `func TestX(t *testing.T)` in packages with suites — likely meant to be a suite method
 - **Testify imports:** `testify/suite` imports in packages using gotest — migration incomplete
 - **Poll scope errors:** Assertions inside `Eventually`/`Consistently` callbacks using the outer `t` instead of the `poll` parameter

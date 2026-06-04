@@ -674,8 +674,9 @@ t=8s    All suites done, wg.Wait() returns
    panicking suite cannot affect others. The OS enforces memory isolation.
 
 3. **Overlay filesystem**: Generated code is injected via Go's `-overlay` flag.
-   Source files are never modified. The overlay is a temp directory cleaned up
-   on exit.
+   Source files are never modified. Overlays are written to a content-addressable
+   cache (`~/.cache/gotest/overlays/<hash>/`) for reuse across runs. Cache entries
+   auto-evict after 7 days. Use `--no-cache` to force fresh generation.
 
 4. **Streaming compilation**: `CompilePackagesStream` sends results to a
    channel as each package finishes. Test execution begins before all packages
