@@ -1,1 +1,1 @@
-*.snap diff=snapshot
+*.snap text eol=lf diff=snapshot

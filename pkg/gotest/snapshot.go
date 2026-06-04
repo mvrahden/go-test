@@ -45,6 +45,9 @@ func isExternalPackage(callerFile string) bool {
 			return ext
 		}
 	}
+	if err := sc.Err(); err != nil {
+		return false
+	}
 	pkgCache.Store(callerFile, false)
 	return false
 }
@@ -116,6 +119,7 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 		failf(t, "MatchSnapshot: %v", err)
 		return
 	}
+	content = strings.ReplaceAll(content, "\r\n", "\n")
 	if err := snapfile.ValidateContent(content); err != nil {
 		failf(t, "MatchSnapshot: %v", err)
 		return
@@ -185,6 +189,10 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 	}
 
 	if idx < 0 {
+		if snapshotReadonly() {
+			failf(t, "MatchSnapshot: no baseline snapshot for %q — run tests locally to generate", sectionKey)
+			return
+		}
 		sections = append(sections, snapfile.Section{Key: sectionKey, Content: content + "\n"})
 		if err := os.WriteFile(snapPath, snapfile.Serialize(sections), 0644); err != nil {
 			failf(t, "MatchSnapshot: failed to write snapshot: %v", err)
@@ -203,6 +211,14 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 			failf(t, "MatchSnapshot: snapshot mismatch [%s]:\n  expected: %s\n  actual:   %s\nRun with GOTEST_UPDATE_SNAPSHOTS=1 to update", sectionKey, want, got)
 		}
 	}
+}
+
+// snapshotReadonly returns true when MatchSnapshot should refuse to generate
+// new baseline snapshots. Activated by GOTEST_CI=1 (set by the --ci flag).
+// Opt-out with GOTEST_CI=0 when baseline generation is intentional in CI.
+func snapshotReadonly() bool {
+	v := os.Getenv(protocol.EnvCI)
+	return v == "1" || v == "true"
 }
 
 func splitTestName(name string) (topLevel, rest string) {

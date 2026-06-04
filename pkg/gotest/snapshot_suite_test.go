@@ -17,6 +17,7 @@ import (
 type SnapshotGroupingTestSuite struct{}
 
 func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
+	t.T().Setenv(protocol.EnvCI, "0")
 	snapDir := filepath.Join("testdata", "__snapshots__")
 	t.T().Cleanup(func() { os.Remove(filepath.Join(snapDir, "TestSnapshotGroupingTestSuite_ext.snap")) })
 
@@ -73,6 +74,7 @@ func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
 type SnapshotConcurrencyTestSuite struct{}
 
 func (s *SnapshotConcurrencyTestSuite) TestMatchSnapshotConcurrency(t *gotest.T) {
+	t.T().Setenv(protocol.EnvCI, "0")
 	snapDir := filepath.Join("testdata", "__snapshots__")
 	t.T().Cleanup(func() { os.Remove(filepath.Join(snapDir, "TestSnapshotConcurrencyTestSuite_ext.snap")) })
 
@@ -90,6 +92,7 @@ func (s *SnapshotConcurrencyTestSuite) TestMatchSnapshotConcurrency(t *gotest.T)
 type SnapshotUpdateTestSuite struct{}
 
 func (s *SnapshotUpdateTestSuite) TestMatchSnapshotUpdate(t *gotest.T) {
+	t.T().Setenv(protocol.EnvCI, "0")
 	snapDir := filepath.Join("testdata", "__snapshots__")
 	t.T().Cleanup(func() { os.Remove(filepath.Join(snapDir, "TestSnapshotUpdateTestSuite_ext.snap")) })
 
@@ -132,6 +135,7 @@ type snapshotNamedString string
 type SnapshotTestSuite struct{}
 
 func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
+	t.T().Setenv(protocol.EnvCI, "0")
 	snapDir := filepath.Join("testdata", "__snapshots__")
 	t.T().Cleanup(func() { os.Remove(filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")) })
 
@@ -181,6 +185,7 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 }
 
 func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
+	t.T().Setenv(protocol.EnvCI, "0")
 	snapDir := filepath.Join("testdata", "__snapshots__")
 
 	snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")
@@ -189,7 +194,7 @@ func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 	t.When("value is a string", func(w *gotest.T) {
 		w.It("snapshots the string directly", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, "plain text")
-			data, _ := os.ReadFile(snapPath)
+			data := gotest.Must(os.ReadFile(snapPath))
 			gotest.Contains(it, string(data), "plain text")
 		})
 	})
@@ -197,7 +202,7 @@ func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 	t.When("value is []byte", func(w *gotest.T) {
 		w.It("snapshots the byte content as text", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, []byte("raw bytes"))
-			data, _ := os.ReadFile(snapPath)
+			data := gotest.Must(os.ReadFile(snapPath))
 			gotest.Contains(it, string(data), "raw bytes")
 		})
 	})
@@ -205,7 +210,7 @@ func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 	t.When("value is a TextMarshaler", func(w *gotest.T) {
 		w.It("uses MarshalText output", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, snapshotTextMarshaler("marshaled text"))
-			data, _ := os.ReadFile(snapPath)
+			data := gotest.Must(os.ReadFile(snapPath))
 			gotest.Contains(it, string(data), "marshaled text")
 		})
 	})
@@ -213,7 +218,7 @@ func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 	t.When("value is a Stringer", func(w *gotest.T) {
 		w.It("uses String output", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, snapshotStringer("display text"))
-			data, _ := os.ReadFile(snapPath)
+			data := gotest.Must(os.ReadFile(snapPath))
 			gotest.Contains(it, string(data), "display text")
 		})
 	})
@@ -222,7 +227,7 @@ func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 		w.It("uses String without consuming the buffer", func(it *gotest.T) {
 			buf := bytes.NewBufferString("buffer content")
 			gotest.MatchSnapshot(it, buf)
-			data, _ := os.ReadFile(snapPath)
+			data := gotest.Must(os.ReadFile(snapPath))
 			gotest.Contains(it, string(data), "buffer content")
 			gotest.Equal(it, "buffer content", buf.String())
 		})
@@ -231,7 +236,7 @@ func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 	t.When("value is a json.Marshaler", func(w *gotest.T) {
 		w.It("pretty-prints the JSON output", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, snapshotJSONMarshaler{data: map[string]int{"a": 1}})
-			data, _ := os.ReadFile(snapPath)
+			data := gotest.Must(os.ReadFile(snapPath))
 			gotest.Contains(it, string(data), "{\n  \"a\": 1\n}")
 		})
 	})
@@ -239,7 +244,7 @@ func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 	t.When("value is json.RawMessage", func(w *gotest.T) {
 		w.It("pretty-prints the raw JSON", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, json.RawMessage(`{"b":2,"a":1}`))
-			data, _ := os.ReadFile(snapPath)
+			data := gotest.Must(os.ReadFile(snapPath))
 			gotest.Contains(it, string(data), "\"b\": 2")
 			gotest.Contains(it, string(data), "\"a\": 1")
 		})
@@ -248,7 +253,7 @@ func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 	t.When("value is an error", func(w *gotest.T) {
 		w.It("snapshots the error message", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, fmt.Errorf("something went wrong"))
-			data, _ := os.ReadFile(snapPath)
+			data := gotest.Must(os.ReadFile(snapPath))
 			gotest.Contains(it, string(data), "something went wrong")
 		})
 	})
@@ -257,9 +262,9 @@ func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 		w.It("reads content and restores the reader position", func(it *gotest.T) {
 			r := strings.NewReader("reader content")
 			gotest.MatchSnapshot(it, r)
-			data, _ := os.ReadFile(snapPath)
+			data := gotest.Must(os.ReadFile(snapPath))
 			gotest.Contains(it, string(data), "reader content")
-			again, _ := io.ReadAll(r)
+			again := gotest.Must(io.ReadAll(r))
 			gotest.Equal(it, "reader content", string(again))
 		})
 	})
@@ -268,7 +273,7 @@ func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 		w.It("reads content (consuming the reader)", func(it *gotest.T) {
 			r := io.NopCloser(strings.NewReader("pipe content"))
 			gotest.MatchSnapshot(it, r)
-			data, _ := os.ReadFile(snapPath)
+			data := gotest.Must(os.ReadFile(snapPath))
 			gotest.Contains(it, string(data), "pipe content")
 		})
 	})
@@ -276,7 +281,7 @@ func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 	t.When("value is a named string type", func(w *gotest.T) {
 		w.It("snapshots via reflect", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, snapshotNamedString("typed value"))
-			data, _ := os.ReadFile(snapPath)
+			data := gotest.Must(os.ReadFile(snapPath))
 			gotest.Contains(it, string(data), "typed value")
 		})
 	})

@@ -6,6 +6,7 @@
 package gotest //nolint:stdlib-test
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -104,6 +105,117 @@ func TestMatchSnapshot_PtestUsesNoSuffix(t *testing.T) {
 	}
 }
 
+func TestMatchSnapshot_NormalizesCRLFInContent(t *testing.T) {
+	snapDir := filepath.Join(thisDir(), "testdata", "__snapshots__")
+	snapFile := filepath.Join(snapDir, "TestMatchSnapshot_NormalizesCRLFInContent.snap")
+	t.Cleanup(func() { os.Remove(snapFile) })
+
+	MatchSnapshot(t, "line1\r\nline2\r\n")
+
+	data, err := os.ReadFile(snapFile)
+	if err != nil {
+		t.Fatalf("expected snapshot file: %v", err)
+	}
+	if strings.Contains(string(data), "\r\n") {
+		t.Fatal("snapshot file should not contain \\r\\n — content must be normalized on write")
+	}
+	if !strings.Contains(string(data), "line1\nline2\n") {
+		t.Fatal("expected normalized content in snapshot file")
+	}
+
+	MatchSnapshot(t, "line1\r\nline2\r\n")
+}
+
+func TestMatchSnapshot_MatchesAfterCRLFFileCorruption(t *testing.T) {
+	snapDir := filepath.Join(thisDir(), "testdata", "__snapshots__")
+	snapFile := filepath.Join(snapDir, "TestMatchSnapshot_MatchesAfterCRLFFileCorruption.snap")
+	t.Cleanup(func() { os.Remove(snapFile) })
+
+	MatchSnapshot(t, "stable value")
+
+	data, err := os.ReadFile(snapFile)
+	if err != nil {
+		t.Fatalf("read snap: %v", err)
+	}
+	corrupted := strings.ReplaceAll(string(data), "\n", "\r\n")
+	if err := os.WriteFile(snapFile, []byte(corrupted), 0644); err != nil {
+		t.Fatalf("write corrupted snap: %v", err)
+	}
+
+	MatchSnapshot(t, "stable value")
+}
+
+func TestSnapshotReadonly(t *testing.T) {
+	t.Run("GOTEST_CI=1 is readonly", func(t *testing.T) {
+		t.Setenv("GOTEST_CI", "1")
+		if !snapshotReadonly() {
+			t.Fatal("expected readonly")
+		}
+	})
+	t.Run("GOTEST_CI=true is readonly", func(t *testing.T) {
+		t.Setenv("GOTEST_CI", "true")
+		if !snapshotReadonly() {
+			t.Fatal("expected readonly")
+		}
+	})
+	t.Run("GOTEST_CI=0 is writable", func(t *testing.T) {
+		t.Setenv("GOTEST_CI", "0")
+		if snapshotReadonly() {
+			t.Fatal("expected writable")
+		}
+	})
+	t.Run("GOTEST_CI unset is writable", func(t *testing.T) {
+		t.Setenv("GOTEST_CI", "")
+		if snapshotReadonly() {
+			t.Fatal("expected writable")
+		}
+	})
+}
+
+func TestMatchSnapshot_CIMode_FailsOnMissingBaseline(t *testing.T) {
+	snapDir := filepath.Join(thisDir(), "testdata", "__snapshots__")
+	snapFile := filepath.Join(snapDir, "TestMatchSnapshot_CIMode_FailsOnMissingBaseline.snap")
+	t.Cleanup(func() { os.Remove(snapFile) })
+
+	t.Setenv("GOTEST_CI", "1")
+
+	mock := &mockT{name: "TestMatchSnapshot_CIMode_FailsOnMissingBaseline/subtest"}
+	MatchSnapshot(mock, "new-value")
+
+	if !mock.failed {
+		t.Fatal("expected MatchSnapshot to fail in CI mode when no baseline exists")
+	}
+	if !strings.Contains(mock.msg, "no baseline snapshot") {
+		t.Fatalf("expected 'no baseline snapshot' message, got: %s", mock.msg)
+	}
+
+	if _, err := os.Stat(snapFile); err == nil {
+		t.Fatal("expected snapshot file to NOT be written in CI mode")
+	}
+}
+
+func TestMatchSnapshot_CIMode_ComparesExistingBaseline(t *testing.T) {
+	snapDir := filepath.Join(thisDir(), "testdata", "__snapshots__")
+	snapFile := filepath.Join(snapDir, "TestMatchSnapshot_CIMode_ComparesExistingBaseline.snap")
+	t.Cleanup(func() { os.Remove(snapFile) })
+
+	MatchSnapshot(t, "expected value")
+
+	t.Setenv("GOTEST_CI", "1")
+	MatchSnapshot(t, "expected value")
+}
+
+type mockT struct {
+	name   string
+	failed bool
+	msg    string
+}
+
+func (m *mockT) Helper()                           {}
+func (m *mockT) FailNow()                          {}
+func (m *mockT) Name() string                      { return m.name }
+func (m *mockT) Errorf(format string, args ...any) { m.failed = true; m.msg = fmt.Sprintf(format, args...) }
+
 func TestReadAndRestore_SeekableReader(t *testing.T) {
 	r := strings.NewReader("test data")
 	b, err := readAndRestore(r)
@@ -113,7 +225,7 @@ func TestReadAndRestore_SeekableReader(t *testing.T) {
 	if string(b) != "test data" {
 		t.Fatalf("want %q, got %q", "test data", string(b))
 	}
-	again, _ := io.ReadAll(r)
+	again := Must(io.ReadAll(r))
 	if string(again) != "test data" {
 		t.Fatalf("reader should be restored; re-read got %q", again)
 	}
@@ -128,7 +240,7 @@ func TestReadAndRestore_NonSeekableReader(t *testing.T) {
 	if string(b) != "ephemeral" {
 		t.Fatalf("want %q, got %q", "ephemeral", string(b))
 	}
-	remaining, _ := io.ReadAll(r)
+	remaining := Must(io.ReadAll(r))
 	if len(remaining) != 0 {
 		t.Fatal("non-seekable reader should be consumed")
 	}

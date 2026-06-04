@@ -196,7 +196,7 @@ func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 				err := gotestrunner.MergeCoverProfiles([]string{filepath.Join(dir, "missing.out"), p}, out)
 				gotest.NoError(it, err)
 
-				data, _ := os.ReadFile(out)
+				data := gotest.Must(os.ReadFile(out))
 				lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 				gotest.Equal(it, 2, len(lines))
 			})
@@ -740,6 +740,85 @@ func (s *GotestrunnerTestSuite) TestOutputCollector(t *gotest.T) {
 	})
 }
 
+func (s *GotestrunnerTestSuite) TestEmitSkippedSuites(t *gotest.T) {
+	t.When("text mode", func(w *gotest.T) {
+		w.It("produces no output", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.EmitSkippedSuites(map[string][]string{
+				"example.com/a": {"SkippedSuite"},
+			})
+			gotest.Empty(it, stdout.String())
+		})
+	})
+
+	t.When("JSON streaming mode", func(w *gotest.T) {
+		w.It("emits run, output, output, skip events per suite", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.EmitSkippedSuites(map[string][]string{
+				"example.com/pkg": {"FooSuite"},
+			})
+
+			lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+			gotest.Equal(it, 4, len(lines))
+
+			var ev0, ev1, ev2, ev3 map[string]any
+			gotest.NoError(it, json.Unmarshal([]byte(lines[0]), &ev0))
+			gotest.NoError(it, json.Unmarshal([]byte(lines[1]), &ev1))
+			gotest.NoError(it, json.Unmarshal([]byte(lines[2]), &ev2))
+			gotest.NoError(it, json.Unmarshal([]byte(lines[3]), &ev3))
+
+			gotest.Equal(it, "run", ev0["Action"])
+			gotest.Equal(it, "TestFooSuite", ev0["Test"])
+			gotest.Equal(it, "example.com/pkg", ev0["Package"])
+
+			gotest.Equal(it, "output", ev1["Action"])
+			gotest.Contains(it, ev1["Output"].(string), "SKIP")
+
+			gotest.Equal(it, "output", ev2["Action"])
+			gotest.Contains(it, ev2["Output"].(string), "excluded by user")
+
+			gotest.Equal(it, "skip", ev3["Action"])
+			gotest.Equal(it, "TestFooSuite", ev3["Test"])
+		})
+
+		w.It("sorts packages for deterministic output", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.EmitSkippedSuites(map[string][]string{
+				"example.com/z": {"ZSuite"},
+				"example.com/a": {"ASuite"},
+			})
+
+			lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+			gotest.Equal(it, 8, len(lines))
+
+			var first, fifth map[string]any
+			json.Unmarshal([]byte(lines[0]), &first)
+			json.Unmarshal([]byte(lines[4]), &fifth)
+			gotest.Equal(it, "example.com/a", first["Package"])
+			gotest.Equal(it, "example.com/z", fifth["Package"])
+		})
+	})
+
+	t.When("empty map", func(w *gotest.T) {
+		w.It("produces no output", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.EmitSkippedSuites(map[string][]string{})
+			gotest.Empty(it, stdout.String())
+		})
+
+		w.It("handles nil map", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.EmitSkippedSuites(nil)
+			gotest.Empty(it, stdout.String())
+		})
+	})
+}
+
 func capturePackageSummary(pkg string, failed bool, d time.Duration, verbose bool) string {
 	r, wr, _ := os.Pipe()
 	old := os.Stdout
@@ -1060,7 +1139,7 @@ func normalizeJSON(raw string) string {
 		if output, ok := ev["Output"].(string); ok {
 			ev["Output"] = jsonTimestampRe.ReplaceAllString(output, "«TS»")
 		}
-		normalized, _ := json.Marshal(ev)
+		normalized := gotest.Must(json.Marshal(ev))
 		lines = append(lines, string(normalized))
 	}
 	return strings.Join(lines, "\n") + "\n"
@@ -1301,6 +1380,69 @@ func (s *GotestrunnerTestSuite) TestBuildExtraEnv(t *gotest.T) {
 			env := gotestrunner.ExportBuildExtraEnv(gotestrunner.PipelineConfig{}, nil)
 			_, ok := env[protocol.EnvSharedStateFile]
 			gotest.False(it, ok)
+		})
+	})
+}
+
+func (s *GotestrunnerTestSuite) TestCIAutoDetection(t *gotest.T) {
+	t.When("auto-detecting CI from environment", func(w *gotest.T) {
+		w.It("sets CI when CI=true and GOTEST_CI is unset", func(it *gotest.T) {
+			it.T().Setenv("CI", "true")
+			it.T().Setenv(protocol.EnvCI, "")
+
+			cfg := gotestrunner.ExportAutoDetectCI(gotestrunner.PipelineConfig{})
+			gotest.True(it, cfg.CI)
+		})
+
+		w.It("does not override explicit --ci flag", func(it *gotest.T) {
+			it.T().Setenv("CI", "")
+
+			cfg := gotestrunner.ExportAutoDetectCI(gotestrunner.PipelineConfig{CI: true})
+			gotest.True(it, cfg.CI)
+		})
+
+		w.It("respects GOTEST_CI=0 opt-out", func(it *gotest.T) {
+			it.T().Setenv("CI", "true")
+			it.T().Setenv(protocol.EnvCI, "0")
+
+			cfg := gotestrunner.ExportAutoDetectCI(gotestrunner.PipelineConfig{})
+			gotest.False(it, cfg.CI)
+		})
+
+		w.It("stays off when neither CI nor GOTEST_CI is set", func(it *gotest.T) {
+			it.T().Setenv("CI", "")
+			it.T().Setenv(protocol.EnvCI, "")
+
+			cfg := gotestrunner.ExportAutoDetectCI(gotestrunner.PipelineConfig{})
+			gotest.False(it, cfg.CI)
+		})
+	})
+
+	t.When("propagating CI to subprocess env", func(w *gotest.T) {
+		w.It("sets GOTEST_CI in extra env when CI is true", func(it *gotest.T) {
+			env := gotestrunner.ExportBuildExtraEnv(gotestrunner.PipelineConfig{CI: true}, nil)
+			gotest.Equal(it, "1", env[protocol.EnvCI])
+		})
+
+		w.It("omits GOTEST_CI in extra env when CI is false", func(it *gotest.T) {
+			env := gotestrunner.ExportBuildExtraEnv(gotestrunner.PipelineConfig{}, nil)
+			_, ok := env[protocol.EnvCI]
+			gotest.False(it, ok)
+		})
+
+		w.It("appends GOTEST_CI to base env when CI is true", func(it *gotest.T) {
+			it.T().Setenv("CI", "")
+			it.T().Setenv(protocol.EnvCI, "")
+
+			env := gotestrunner.ExportBuildBaseEnv(gotestrunner.PipelineConfig{CI: true})
+			found := false
+			for _, e := range env {
+				if e == protocol.EnvCI+"=1" {
+					found = true
+					break
+				}
+			}
+			gotest.True(it, found, "expected GOTEST_CI=1 in base env")
 		})
 	})
 }

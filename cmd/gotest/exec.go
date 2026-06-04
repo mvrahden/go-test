@@ -43,6 +43,7 @@ func Run(cfg ExecConfig) int {
 		GoTestArgs:      cfg.GoTestArgs,
 		SetupTimeout:    cfg.SetupTimeout,
 		UpdateSnapshots: cfg.UpdateSnapshots,
+		CI:              cfg.CI,
 		Parallel:        cfg.Parallel,
 		Streaming:       true,
 		OutputMode:      modeFromJSON(cfg.JSON),

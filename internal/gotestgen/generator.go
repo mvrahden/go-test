@@ -18,6 +18,7 @@ type GenerateResult struct {
 	PTest                          []byte              // generated internal test source
 	PXTest                         []byte              // generated external test source
 	SuiteNames                     []string            // suite struct identifiers (e.g. "FooTestSuite")
+	SkippedSuiteNames              []string            // identifiers of suites excluded by focus/X_ rules
 	FixtureDepSuites               []string            // test function names that depend on shared fixtures (e.g. "TestFooSuite")
 	SuiteRequiredSharedFixtureKeys map[string][]string // test func name → required state keys
 }
@@ -222,6 +223,22 @@ func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFix
 			}
 		}
 
+		var skippedNames []string
+		for _, s := range ptestSpec.SkippedTestSuites {
+			id := s.Identifier()
+			if !seen[id] {
+				seen[id] = true
+				skippedNames = append(skippedNames, id)
+			}
+		}
+		for _, s := range pxtestSpec.SkippedTestSuites {
+			id := s.Identifier()
+			if !seen[id] {
+				seen[id] = true
+				skippedNames = append(skippedNames, id)
+			}
+		}
+
 		// Merge per-suite required shared fixture keys from both test suffixes.
 		var mergedReqKeys map[string][]string
 		if len(ptestReqKeys) > 0 || len(pxtestReqKeys) > 0 {
@@ -236,6 +253,7 @@ func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFix
 			PTest:                          ptestBuf,
 			PXTest:                         pxtestBuf,
 			SuiteNames:                     suiteNames,
+			SkippedSuiteNames:              skippedNames,
 			FixtureDepSuites:               append(ptestFixtureDeps, pxtestFixtureDeps...),
 			SuiteRequiredSharedFixtureKeys: mergedReqKeys,
 		}, nil

@@ -2,7 +2,9 @@ package gotest_test
 
 import (
 	"fmt"
+	"regexp"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -34,6 +36,17 @@ func runSpy(fn func(t *spyT)) *spyT {
 	}()
 	<-done
 	return spy
+}
+
+var pollCountRe = regexp.MustCompile(`\((\d+) polls\)`)
+
+func maskPollCount(msg string) (masked string, count int) {
+	m := pollCountRe.FindStringSubmatch(msg)
+	if m == nil {
+		return msg, 0
+	}
+	count = gotest.Must(strconv.Atoi(m[1]))
+	return pollCountRe.ReplaceAllString(msg, "(N polls)"), count
 }
 
 // --- suite ---
@@ -134,7 +147,9 @@ func (s *LineReportingTestSuite) TestEventually(t *gotest.T) {
 				})
 			})
 			gotest.True(it, spy.failed)
-			gotest.MatchSnapshot(it, spy.msg)
+			masked, polls := maskPollCount(spy.msg)
+			gotest.MatchSnapshot(it, masked)
+			gotest.InDelta(it, 5, polls, 1)
 		})
 	})
 
@@ -146,7 +161,9 @@ func (s *LineReportingTestSuite) TestEventually(t *gotest.T) {
 				})
 			})
 			gotest.True(it, spy.failed)
-			gotest.MatchSnapshot(it, spy.msg)
+			masked, polls := maskPollCount(spy.msg)
+			gotest.MatchSnapshot(it, masked)
+			gotest.InDelta(it, 5, polls, 1)
 		})
 	})
 }
@@ -160,7 +177,9 @@ func (s *LineReportingTestSuite) TestHelperCallingEventually(t *gotest.T) {
 				eventuallyHelper(t)
 			})
 			gotest.True(it, spy.failed)
-			gotest.MatchSnapshot(it, spy.msg)
+			masked, polls := maskPollCount(spy.msg)
+			gotest.MatchSnapshot(it, masked)
+			gotest.InDelta(it, 5, polls, 1)
 		})
 	})
 }
