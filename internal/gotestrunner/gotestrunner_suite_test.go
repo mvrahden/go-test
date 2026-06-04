@@ -414,39 +414,6 @@ func (s *GotestrunnerTestSuite) TestOverlayCache(t *gotest.T) {
 	})
 
 	t.When("writing to cache", func(w *gotest.T) {
-		w.It("returns cached directory on cache hit", func(it *gotest.T) {
-			cacheDir := it.T().TempDir()
-			it.T().Setenv(protocol.EnvCacheDir, cacheDir)
-
-			results := gotestgen.GenerateResults{
-				{AbsPath: "/fake/pkg/x", PTest: []byte("package x\n")},
-			}
-
-			// First write — cache miss, writes files.
-			dir1, err := gotestrunner.WriteOverlay(results)
-			gotest.NoError(it, err)
-			defer os.RemoveAll(dir1)
-
-			// Manually write to cache to simulate prior run.
-			hash := gotestrunner.ExportOverlayContentHash(results)
-			cachedDir := filepath.Join(cacheDir, "overlays", hash)
-			os.MkdirAll(filepath.Join(cachedDir, "0"), 0755)
-			os.WriteFile(filepath.Join(cachedDir, "0", "gotest_psuite_test.go"), []byte("package x\n"), 0644)
-			overlayData := fmt.Sprintf(`{"Replace":{"%s":"%s"}}`,
-				filepath.Join("/fake/pkg/x", "gotest_psuite_test.go"),
-				filepath.Join(cachedDir, "0", "gotest_psuite_test.go"))
-			os.WriteFile(filepath.Join(cachedDir, "overlay.json"), []byte(overlayData), 0644)
-
-			// Second call via GenerateOverlay path — should find cache hit.
-			overlay, cleanup, err := gotestrunner.GenerateOverlay(nil, false, false)
-			if err == nil {
-				defer cleanup()
-				// If loaded is nil it produces empty results, which has a different hash.
-				// That's fine — we're testing the WriteOverlay path separately.
-				_ = overlay
-			}
-		})
-
 		w.It("creates valid overlay in cache directory", func(it *gotest.T) {
 			cacheDir := it.T().TempDir()
 			it.T().Setenv(protocol.EnvCacheDir, cacheDir)

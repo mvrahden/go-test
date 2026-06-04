@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/mvrahden/go-test/about"
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -136,6 +137,8 @@ func writeToCacheDir(root string, results gotestgen.GenerateResults) (string, er
 	dir := filepath.Join(root, "overlays", hash)
 
 	if _, err := os.Stat(filepath.Join(dir, "overlay.json")); err == nil {
+		now := time.Now()
+		os.Chtimes(dir, now, now)
 		return dir, nil
 	}
 
