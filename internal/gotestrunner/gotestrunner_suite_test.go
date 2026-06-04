@@ -196,7 +196,7 @@ func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 				err := gotestrunner.MergeCoverProfiles([]string{filepath.Join(dir, "missing.out"), p}, out)
 				gotest.NoError(it, err)
 
-				data, _ := os.ReadFile(out)
+				data := gotest.Must(os.ReadFile(out))
 				lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 				gotest.Equal(it, 2, len(lines))
 			})
@@ -1139,7 +1139,7 @@ func normalizeJSON(raw string) string {
 		if output, ok := ev["Output"].(string); ok {
 			ev["Output"] = jsonTimestampRe.ReplaceAllString(output, "«TS»")
 		}
-		normalized, _ := json.Marshal(ev)
+		normalized := gotest.Must(json.Marshal(ev))
 		lines = append(lines, string(normalized))
 	}
 	return strings.Join(lines, "\n") + "\n"

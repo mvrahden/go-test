@@ -45,7 +45,7 @@ func maskPollCount(msg string) (masked string, count int) {
 	if m == nil {
 		return msg, 0
 	}
-	count, _ = strconv.Atoi(m[1])
+	count = gotest.Must(strconv.Atoi(m[1]))
 	return pollCountRe.ReplaceAllString(msg, "(N polls)"), count
 }
 

@@ -225,7 +225,7 @@ func TestReadAndRestore_SeekableReader(t *testing.T) {
 	if string(b) != "test data" {
 		t.Fatalf("want %q, got %q", "test data", string(b))
 	}
-	again, _ := io.ReadAll(r)
+	again := Must(io.ReadAll(r))
 	if string(again) != "test data" {
 		t.Fatalf("reader should be restored; re-read got %q", again)
 	}
@@ -240,7 +240,7 @@ func TestReadAndRestore_NonSeekableReader(t *testing.T) {
 	if string(b) != "ephemeral" {
 		t.Fatalf("want %q, got %q", "ephemeral", string(b))
 	}
-	remaining, _ := io.ReadAll(r)
+	remaining := Must(io.ReadAll(r))
 	if len(remaining) != 0 {
 		t.Fatal("non-seekable reader should be consumed")
 	}
