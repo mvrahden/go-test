@@ -28,9 +28,16 @@ var ƒ_{{ $f.Identifier }} *{{ $f.QualifiedType }}
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+{{- range $name := .FixtureTestNames }}
+    "{{ $name }}",
+{{- end }}
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
     if err := ƒ_fixtureOnce.Do(func() error {
+        ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
         var ƒmaxSuiteSetup time.Duration
 {{ range $fs := .FlatSuites }}
         {
@@ -88,7 +95,13 @@ func ƒ_setupFixtures(t *testing.T) {
     }); err != nil {
         t.Fatalf("fixture setup: %v", err)
     }
-    t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+    t.Cleanup(func() {
+        if ƒ_pending.Add(-1) == 0 {
+            if ƒ_fixtureDAG.Teardown() {
+                t.Errorf("fixture teardown failed")
+            }
+        }
+    })
 }
 
 {{- /* Render fixture-bound suites as top-level Test functions */ -}}
