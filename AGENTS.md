@@ -1,7 +1,7 @@
 # gotest — Agent Reference
 
 gotest is a code-generation framework for Go test suites.
-You write suite structs with lifecycle methods and test cases; the `gotest generate` command produces the test harness (TestMain, test functions, lifecycle wiring).
+You write suite structs with lifecycle methods and test cases; the `gotest generate` command produces the test harness (test functions, fixture initialization, lifecycle wiring).
 The generated code is not hand-edited.
 
 All assertions accept both `*gotest.T` and `*testing.T` as first argument.

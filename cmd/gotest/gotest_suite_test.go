@@ -353,12 +353,17 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 		gotest.Equal(it, "github.com/mvrahden/go-test/examples/cart", pkg.ImportPath)
 		gotest.True(it, filepath.IsAbs(pkg.Dir), "dir should be absolute, got %q", pkg.Dir)
 
-		if len(pkg.Suites) != 2 {
-			it.T().Fatalf("expected 2 suites, got %d", len(pkg.Suites))
+		if len(pkg.Suites) != 4 {
+			it.T().Fatalf("expected 4 suites, got %d", len(pkg.Suites))
 		}
 
-		// Verify the ptest suite
-		st := pkg.Suites[0]
+		suiteByNameAndFile := map[string]ExportDiscoverSuite{}
+		for _, s := range pkg.Suites {
+			suiteByNameAndFile[s.Name+":"+s.File] = s
+		}
+
+		// Verify ptest ShoppingCartTestSuite
+		st := suiteByNameAndFile["ShoppingCartTestSuite:suite_test.go"]
 		gotest.Equal(it, "ShoppingCartTestSuite", st.Name)
 		gotest.False(it, st.Parallel)
 		gotest.False(it, st.Focused)
@@ -379,14 +384,22 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 		gotest.Equal(it, 1, st.Methods[0].Col)
 		gotest.Equal(it, "TestAddMultipleItems", st.Methods[1].Name)
 
-		// Verify the pxtest suite
-		sx := pkg.Suites[1]
+		// Verify ptest PricingTestSuite (fixture-bound)
+		pt := suiteByNameAndFile["PricingTestSuite:pricing_suite_test.go"]
+		gotest.Equal(it, "PricingTestSuite", pt.Name)
+
+		// Verify pxtest ShoppingCartTestSuite
+		sx := suiteByNameAndFile["ShoppingCartTestSuite:suite_ext_test.go"]
 		gotest.Equal(it, "ShoppingCartTestSuite", sx.Name)
 		if len(sx.Methods) != 2 {
 			it.T().Fatalf("expected 2 pxtest methods, got %d", len(sx.Methods))
 		}
 		gotest.Equal(it, "TestAddItem", sx.Methods[0].Name)
 		gotest.Equal(it, "TestRemoveItem", sx.Methods[1].Name)
+
+		// Verify pxtest PricingExtTestSuite (fixture-bound)
+		px := suiteByNameAndFile["PricingExtTestSuite:pricing_ext_suite_test.go"]
+		gotest.Equal(it, "PricingExtTestSuite", px.Name)
 
 		// Verify JSON serialization roundtrip
 		data, err := json.Marshal(out)

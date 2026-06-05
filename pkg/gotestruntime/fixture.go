@@ -2,7 +2,7 @@ package gotestruntime
 
 import (
 	"context"
-	"testing"
+	"sync"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -41,15 +41,16 @@ type SharedFixtureBinding struct {
 	Assign    func()
 }
 
-// MainConfig holds the configuration for RunFixtureMain.
 type MainConfig struct {
 	Roots                []*FixtureNode // deprecated: use Fixtures
 	Fixtures             []*FixtureNode
 	MaxSuiteSetupTimeout time.Duration
 }
 
-// RunFixtureMain replaces the generated ƒƒ_GOTEST_main function.
-// It orchestrates fixture tree setup, m.Run(), and teardown.
-func RunFixtureMain(m *testing.M, cfg MainConfig) int {
-	return run(m.Run, cfg)
+// FixtureDAG holds the result of SetupFixtureDAG for later teardown.
+type FixtureDAG struct {
+	cfg     MainConfig
+	tracker *nodeTracker
+	torn    sync.Once
+	failed  bool
 }

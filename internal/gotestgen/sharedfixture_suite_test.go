@@ -38,19 +38,7 @@ func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 			_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
 			gotest.NoError(it, err, "generated code should be valid Go: %s", code)
 
-			gotest.Contains(it, code, "package main")
-			gotest.Contains(it, code, `"context"`)
-			gotest.Contains(it, code, `"encoding/json"`)
-			gotest.Contains(it, code, `"os/signal"`)
-			gotest.Contains(it, code, `"syscall"`)
-			gotest.Contains(it, code, `sfpkg0 "github.com/example/project/tests/fixtures"`)
-			gotest.Contains(it, code, "sfpkg0.PostgresFixture{}")
-			gotest.Contains(it, code, "sf0.BeforeAll(ctx)")
-			gotest.Contains(it, code, "sf0.AfterAll(ctx)")
-			gotest.Contains(it, code, `ƒquote("github.com/example/project/tests/fixtures.PostgresFixture")`)
-			gotest.Contains(it, code, "signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)")
-			gotest.Contains(it, code, "ConnStr: sf0.ConnStr")
-			gotest.Contains(it, code, `_done`)
+			gotest.MatchSnapshot(it, code)
 		})
 	})
 
@@ -79,20 +67,7 @@ func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 			_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
 			gotest.NoError(it, err, "generated code should be valid Go: %s", code)
 
-			gotest.Contains(it, code, `sfpkg0 "github.com/example/project/tests/fixtures"`)
-			gotest.Contains(it, code, `sfpkg1 "github.com/example/project/tests/redis"`)
-
-			gotest.Contains(it, code, "sfpkg0.PostgresFixture{}")
-			gotest.Contains(it, code, "sfpkg1.RedisFixture{}")
-
-			gotest.Contains(it, code, "sf0.BeforeAll(ctx)")
-			gotest.Contains(it, code, "sf1.BeforeAll(ctx)")
-			gotest.Contains(it, code, "sf0.AfterAll(ctx)")
-			gotest.Contains(it, code, "sf1.AfterAll(ctx)")
-
-			lastSf1 := strings.LastIndex(code, "sf1.AfterAll(ctx)")
-			lastSf0 := strings.LastIndex(code, "sf0.AfterAll(ctx)")
-			gotest.True(it, lastSf1 < lastSf0, "teardown should be in reverse order: sf1 before sf0")
+			gotest.MatchSnapshot(it, code)
 		})
 	})
 
@@ -122,8 +97,7 @@ func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 			_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
 			gotest.NoError(it, err, "generated code should be valid Go: %s", code)
 
-			gotest.Contains(it, code, "sf0.BeforeAll(ctx)")
-			gotest.Contains(it, code, "sf0.AfterAll(ctx)")
+			gotest.MatchSnapshot(it, code)
 		})
 	})
 
@@ -146,8 +120,8 @@ func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 			_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
 			gotest.NoError(it, err, "generated code should be valid Go: %s", code)
 
-			gotest.Contains(it, code, "sf0.ConnStr", "ConnStr should be serialized")
-			gotest.Contains(it, code, "sf0.Port", "Port should be serialized")
+			gotest.MatchSnapshot(it, code)
+
 			gotest.NotContains(it, code, "sf0.Pool", "Pool is local and should not be serialized")
 		})
 	})
@@ -175,11 +149,10 @@ func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 			_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
 			gotest.NoError(it, err, "generated code should be valid Go: %s", code)
 
+			gotest.MatchSnapshot(it, code)
+
 			gotest.Equal(it, 1, strings.Count(code, `"github.com/example/shared"`),
 				"same-package fixtures should produce exactly one import")
-
-			gotest.Contains(it, code, "sfpkg0.PostgresFixture{}")
-			gotest.Contains(it, code, "sfpkg0.RedisFixture{}")
 			gotest.NotContains(it, code, "sfpkg1",
 				"should not have sfpkg1 alias when both fixtures share the same package")
 		})
@@ -200,10 +173,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			src, err := gotestgen.GenerateSharedSetup(fixtures)
 			gotest.NoError(it, err)
 
-			code := string(src)
-			gotest.Contains(it, code, "ctx := context.Background()")
-			gotest.Contains(it, code, "sf0.BeforeAll(ctx)")
-			gotest.Contains(it, code, "sf0.AfterAll(ctx)")
+			gotest.MatchSnapshot(it, string(src))
 		})
 	})
 
@@ -225,9 +195,8 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
 			gotest.NoError(it, err, "generated code should be valid Go: %s", code)
 
-			gotest.Contains(it, code, `gotest "github.com/mvrahden/go-test/pkg/gotest"`)
-			gotest.Contains(it, code, "gotest.DefaultFixtureConfig()")
-			gotest.Contains(it, code, "context.WithTimeout(ctx,")
+			gotest.MatchSnapshot(it, code)
+
 			gotest.NotContains(it, code, "SharedFixtureConfig()",
 				"should not call SharedFixtureConfig when HasConfig is false")
 		})
@@ -252,10 +221,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
 			gotest.NoError(it, err, "generated code should be valid Go: %s", code)
 
-			gotest.Contains(it, code, "gotest.DefaultFixtureConfig()")
-			gotest.Contains(it, code, "sf0.SharedFixtureConfig()")
-			gotest.Contains(it, code, "gotest.OverlayFixtureConfig(")
-			gotest.Contains(it, code, "context.WithTimeout(ctx,")
+			gotest.MatchSnapshot(it, code)
 		})
 	})
 
@@ -272,10 +238,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			src, err := gotestgen.GenerateSharedSetup(fixtures)
 			gotest.NoError(it, err)
 
-			code := string(src)
-			gotest.Contains(it, code, "1 + ƒcfg_sf0.Retries")
-			gotest.Contains(it, code, "time.Sleep(ƒcfg_sf0.RetryDelay)")
-			gotest.Contains(it, code, "BeforeAll failed after")
+			gotest.MatchSnapshot(it, string(src))
 		})
 	})
 
@@ -292,8 +255,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			src, err := gotestgen.GenerateSharedSetup(fixtures)
 			gotest.NoError(it, err)
 
-			code := string(src)
-			gotest.Contains(it, code, `ƒquote("github.com/example/fixtures.PGFixture")`)
+			gotest.MatchSnapshot(it, string(src))
 		})
 	})
 
@@ -310,9 +272,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			src, err := gotestgen.GenerateSharedSetup(fixtures)
 			gotest.NoError(it, err)
 
-			code := string(src)
-			gotest.Contains(it, code, "json.Marshal(transfer{")
-			gotest.Contains(it, code, "PGFixture: marshal:")
+			gotest.MatchSnapshot(it, string(src))
 		})
 	})
 
@@ -339,10 +299,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
 			gotest.NoError(it, err, "generated code should be valid Go: %s", code)
 
-			// When sf1.BeforeAll fails, sf0 should be torn down
-			idx1BeforeAll := strings.Index(code, "sf1.BeforeAll(ctx)")
-			idxTeardownSf0 := strings.Index(code[idx1BeforeAll:], "sf0.AfterAll(ctx)")
-			gotest.True(it, idxTeardownSf0 > 0, "sf0.AfterAll should appear after sf1.BeforeAll error block")
+			gotest.MatchSnapshot(it, code)
 		})
 	})
 }
@@ -372,29 +329,7 @@ func (s *SharedFixtureTestSuite) TestIntegrationGeneratedSetupBinary(t *gotest.T
 			_, parseErr := parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
 			gotest.NoError(it, parseErr, "generated code should be valid Go: %s", code)
 
-			gotest.Contains(it, code, "package main")
-			gotest.Contains(it, code, `"context"`)
-			gotest.Contains(it, code, `"github.com/example/project/tests/fixtures"`)
-			gotest.Contains(it, code, `"github.com/example/project/tests/gcs"`)
-
-			gotest.Contains(it, code, "PostgresFixture{}")
-			gotest.Contains(it, code, "GCSFixture{}")
-
-			gotest.Contains(it, code, "ctx := context.Background()")
-			gotest.Contains(it, code, "sf0.BeforeAll(ctx)")
-			gotest.Contains(it, code, "sf1.BeforeAll(ctx)")
-
-			gotest.Contains(it, code, "syscall.SIGTERM")
-			gotest.Contains(it, code, `_done`)
-
-			gotest.Contains(it, code, "sf0.DSN", "DSN should be serialized")
-			gotest.Contains(it, code, "sf1.Endpoint", "Endpoint should be serialized")
-			gotest.Contains(it, code, "sf1.Bucket", "Bucket should be serialized")
-
-			gcsAfterAllIdx := strings.LastIndex(code, "sf1.AfterAll(ctx)")
-			pgAfterAllIdx := strings.LastIndex(code, "sf0.AfterAll(ctx)")
-			gotest.True(it, gcsAfterAllIdx < pgAfterAllIdx,
-				"expected reverse teardown order: sf1 (GCSFixture) before sf0 (PostgresFixture)")
+			gotest.MatchSnapshot(it, code)
 		})
 	})
 }

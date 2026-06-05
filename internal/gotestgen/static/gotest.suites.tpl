@@ -15,6 +15,10 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
 {{- end }}
 
 func Test{{ $ts.Identifier }}(t *testing.T) {
+{{- $sfRefs := index $.SuiteSharedFixtures $ts.Identifier }}
+{{- if $sfRefs }}
+  ƒ_setupFixtures(t)
+{{- end }}
   s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
 {{- if $ts.HasGuard }}
   if ƒreason := s.{{ $ts.Identifier }}.SuiteGuard(); ƒreason != "" {
@@ -22,7 +26,6 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
     return
   }
 {{- end }}
-{{- $sfRefs := index $.SuiteSharedFixtures $ts.Identifier }}
 {{- if $sfRefs }}
 {{ range $sf := $sfRefs }}
   s.{{ $sf.FieldName }} = ƒ_sf_{{ $sf.Identifier }}

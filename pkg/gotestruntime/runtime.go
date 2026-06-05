@@ -9,12 +9,9 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/protocol"
-	"github.com/mvrahden/go-test/pkg/gotestruntime/coverage"
 )
 
 func run(runTests func() int, cfg MainConfig) int {
-	restoreCoverage := coverage.InterceptTeardown()
-
 	tracker := &nodeTracker{succeeded: make(map[*FixtureNode]bool)}
 
 	var sharedState map[string]json.RawMessage
@@ -24,12 +21,10 @@ func run(runTests func() int, cfg MainConfig) int {
 			sharedState, err = loadSharedState()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
-				restoreCoverage()
 				return 2
 			}
 		} else if anyNodeHasLegacySharedFixtures(cfg.Roots, cfg.Fixtures) {
 			fmt.Fprintf(os.Stderr, "FAIL: %s not set — run via gotest CLI\n", protocol.EnvSharedStateFile)
-			restoreCoverage()
 			return 2
 		}
 	}
@@ -40,7 +35,6 @@ func run(runTests func() int, cfg MainConfig) int {
 	if len(cfg.Fixtures) > 0 {
 		if err := setupDAG(ctx, cfg.Fixtures, sharedState, tracker); err != nil {
 			_ = teardownDAG(cfg.Fixtures, tracker)
-			restoreCoverage()
 			return 2
 		}
 
@@ -51,13 +45,11 @@ func run(runTests func() int, cfg MainConfig) int {
 		if teardownDAG(cfg.Fixtures, tracker) && code == 0 {
 			code = 1
 		}
-		restoreCoverage()
 		return code
 	}
 
 	if err := setupRoots(ctx, cfg.Roots, sharedState, tracker); err != nil {
 		_ = teardownRoots(cfg.Roots, tracker)
-		restoreCoverage()
 		return 2
 	}
 
@@ -68,7 +60,6 @@ func run(runTests func() int, cfg MainConfig) int {
 	if teardownRoots(cfg.Roots, tracker) && code == 0 {
 		code = 1
 	}
-	restoreCoverage()
 
 	return code
 }
@@ -647,5 +638,49 @@ func (t *nodeTracker) isSucceeded(node *FixtureNode) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.succeeded[node]
+}
+
+func SetupFixtureDAG(ctx context.Context, cfg MainConfig) (*FixtureDAG, error) {
+	tracker := &nodeTracker{succeeded: make(map[*FixtureNode]bool)}
+
+	var sharedState map[string]json.RawMessage
+	if anyNodeHasSharedFixtures(cfg.Roots, cfg.Fixtures) {
+		if os.Getenv(protocol.EnvSharedStateFile) != "" {
+			var err error
+			sharedState, err = loadSharedState()
+			if err != nil {
+				return nil, fmt.Errorf("load shared state: %w", err)
+			}
+		} else if anyNodeHasLegacySharedFixtures(cfg.Roots, cfg.Fixtures) {
+			return nil, fmt.Errorf("%s not set — run via gotest CLI", protocol.EnvSharedStateFile)
+		}
+	}
+
+	if len(cfg.Fixtures) > 0 {
+		if err := setupDAG(ctx, cfg.Fixtures, sharedState, tracker); err != nil {
+			_ = teardownDAG(cfg.Fixtures, tracker)
+			return nil, err
+		}
+	} else if len(cfg.Roots) > 0 {
+		if err := setupRoots(ctx, cfg.Roots, sharedState, tracker); err != nil {
+			_ = teardownRoots(cfg.Roots, tracker)
+			return nil, err
+		}
+	}
+
+	writeBudgetFile(cfg)
+
+	return &FixtureDAG{cfg: cfg, tracker: tracker}, nil
+}
+
+func (d *FixtureDAG) Teardown() bool {
+	d.torn.Do(func() {
+		if len(d.cfg.Fixtures) > 0 {
+			d.failed = teardownDAG(d.cfg.Fixtures, d.tracker)
+		} else {
+			d.failed = teardownRoots(d.cfg.Roots, d.tracker)
+		}
+	})
+	return d.failed
 }
 
