@@ -469,7 +469,7 @@ describe("applyResults", () => {
     return { controller, run, passItem, failItem, skipItem };
   }
 
-  it("returns AppliedResult[] and does NOT call controller.recordResult", () => {
+  it("returns AppliedResult[] and records results to controller", () => {
     const { controller, run, passItem, failItem, skipItem } =
       makeApplyResultsFixture();
 
@@ -540,8 +540,10 @@ describe("applyResults", () => {
       duration: undefined,
     });
 
-    // Does NOT call controller.recordResult
-    expect(controller.recordResult).not.toHaveBeenCalled();
+    // Records each test result to the controller
+    expect(controller.recordResult).toHaveBeenCalledWith(passItem.id, "pass", 100);
+    expect(controller.recordResult).toHaveBeenCalledWith(failItem.id, "fail", 200);
+    expect(controller.recordResult).toHaveBeenCalledWith(skipItem.id, "skip", undefined);
 
     // Does call run methods
     expect(run.passed).toHaveBeenCalledWith(passItem, 100);
@@ -1108,5 +1110,59 @@ describe("resolveRunPatterns", () => {
 
   it("returns undefined for empty array", () => {
     expect(resolveRunPatterns([], "example.com/proj")).toBeUndefined();
+  });
+});
+
+describe("applyResults records before resolving ancestors", () => {
+  it("records package result so resolveAncestorsOf can cascade", () => {
+    const dir = createItem("dir:pkg", "pkg", undefined);
+    const pkg = createItem("example.com/pkg", "pkg", dir, [{ id: "package" }]);
+    const suite = createItem("example.com/pkg/MySuite", "MySuite", pkg);
+    const method = createItem(
+      "example.com/pkg/MySuite/TestFoo",
+      "TestFoo",
+      suite,
+    );
+
+    const results = new Map<string, { status: string; duration?: number }>();
+    const run = {
+      passed: vi.fn(),
+      failed: vi.fn(),
+      skipped: vi.fn(),
+      started: vi.fn(),
+      appendOutput: vi.fn(),
+    };
+    const controller = {
+      findItem: vi.fn((id: string) => {
+        if (id === "example.com/pkg") return pkg;
+        if (id === "example.com/pkg/MySuite") return suite;
+        if (id === "example.com/pkg/MySuite/TestFoo") return method;
+        return undefined;
+      }),
+      getResult: vi.fn((id: string) => results.get(id)),
+      recordResult: vi.fn(
+        (id: string, status: string, duration?: number) => {
+          results.set(id, { status, duration });
+        },
+      ),
+      createDynamicSubtest: vi.fn(),
+    };
+
+    const events = [
+      { Package: "example.com/pkg", Test: "MySuite/TestFoo", Action: "pass" as const, Elapsed: 0.1 },
+      { Package: "example.com/pkg", Test: "MySuite", Action: "pass" as const, Elapsed: 0.2 },
+      { Package: "example.com/pkg", Action: "pass" as const, Elapsed: 0.3 },
+    ];
+
+    applyResults(controller as any, run as any, events, "example.com/pkg", "/fake/dir");
+
+    // The package result must have been recorded
+    expect(controller.recordResult).toHaveBeenCalledWith(
+      "example.com/pkg",
+      "pass",
+      300,
+    );
+    // resolveAncestorsOf should have resolved dir:pkg because the pkg result was in the store
+    expect(run.passed).toHaveBeenCalledWith(dir);
   });
 });

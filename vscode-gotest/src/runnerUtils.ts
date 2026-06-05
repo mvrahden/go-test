@@ -225,6 +225,7 @@ export function applyResults(
         const duration =
           event.Elapsed !== undefined ? event.Elapsed * 1000 : undefined;
         applied.push({ itemId: importPath, status: event.Action, duration });
+        controller.recordResult(importPath, event.Action, duration);
 
         const pkgItem = controller.findItem(importPath);
         if (pkgItem) {
@@ -253,6 +254,7 @@ export function applyResults(
       case "pass":
         run.passed(item, duration);
         applied.push({ itemId: item.id, status: "pass", duration });
+        controller.recordResult(item.id, "pass", duration);
         break;
       case "fail": {
         const output = outputMap.get(event.Test) ?? "";
@@ -279,11 +281,13 @@ export function applyResults(
         }
         run.failed(item, vscodeMessages, duration);
         applied.push({ itemId: item.id, status: "fail", duration });
+        controller.recordResult(item.id, "fail", duration);
         break;
       }
       case "skip":
         run.skipped(item);
         applied.push({ itemId: item.id, status: "skip", duration: undefined });
+        controller.recordResult(item.id, "skip", undefined);
         break;
       case "run":
         run.started(item);
