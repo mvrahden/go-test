@@ -632,8 +632,12 @@ function resolveItemRecursive(
 ): { anyFailed: boolean; anyResolved: boolean } {
   const directResult = controller.getResult(item.id);
   const isPackage = item.tags.some((t) => t.id === "package");
+  const isStructural =
+    item.id.startsWith("dir:") ||
+    item.id.startsWith("wsFolder:") ||
+    item.id.startsWith("module:");
 
-  if (directResult && !isPackage) {
+  if (directResult && !isPackage && !isStructural) {
     return { anyFailed: directResult.status === "fail", anyResolved: true };
   }
 
@@ -650,6 +654,9 @@ function resolveItemRecursive(
       run.failed(item, []);
     } else {
       run.passed(item);
+    }
+    if (isStructural) {
+      controller.recordResult(item.id, anyFailed ? "fail" : "pass", undefined);
     }
   }
 

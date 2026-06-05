@@ -779,6 +779,7 @@ describe("resolveAncestorItems", () => {
 
     const controller = {
       getResult: vi.fn((_id: string) => undefined as any),
+      recordResult: vi.fn(),
       testController: {
         items: new Map<string, MockTestItem>([["dir:internal", dir]]),
       },
@@ -834,6 +835,7 @@ describe("resolveAncestorItems", () => {
           return { status: "fail" as const, duration: 200 };
         return undefined;
       }),
+      recordResult: vi.fn(),
       testController: {
         items: new Map<string, MockTestItem>([["dir:pkg", dir]]),
       },
@@ -863,6 +865,7 @@ describe("resolveAncestorItems", () => {
           return { status: "pass" as const, duration: 200 };
         return undefined;
       }),
+      recordResult: vi.fn(),
       testController: {
         items: new Map<string, MockTestItem>([["dir:pkg", dir]]),
       },
@@ -890,6 +893,7 @@ describe("resolveAncestorItems", () => {
           return { status: "fail" as const, duration: 300 };
         return undefined;
       }),
+      recordResult: vi.fn(),
       testController: {
         items: new Map<string, MockTestItem>([["dir:src", root]]),
       },
@@ -917,6 +921,7 @@ describe("resolveAncestorItems", () => {
           return { status: "pass" as const, duration: 100 };
         return undefined;
       }),
+      recordResult: vi.fn(),
       testController: {
         items: new Map<string, MockTestItem>([
           ["wsFolder:myproject", wsFolder],
@@ -954,6 +959,62 @@ describe("resolveAncestorItems", () => {
     expect(run.failed).toHaveBeenCalledWith(pkg, []);
     expect(run.failed).toHaveBeenCalledWith(dir, []);
     expect(run.passed).not.toHaveBeenCalled();
+  });
+
+  it("re-aggregates dir node instead of using stale stored result", () => {
+    const dir = createItem("dir:pkg", "pkg", undefined);
+    const pkgA = createItem("example.com/pkg/a", "a", dir, [{ id: "package" }]);
+    const suiteA = createItem("example.com/pkg/a/SuiteA", "SuiteA", pkgA);
+
+    const run = { passed: vi.fn(), failed: vi.fn() };
+    const controller = {
+      getResult: vi.fn((id: string) => {
+        if (id === "dir:pkg")
+          return { status: "fail" as const, duration: undefined };
+        if (id === "example.com/pkg/a/SuiteA")
+          return { status: "pass" as const, duration: 100 };
+        return undefined;
+      }),
+      recordResult: vi.fn(),
+      testController: {
+        items: new Map([["dir:pkg", dir]]),
+      },
+    };
+
+    resolveAncestorItems(run as any, controller as any);
+
+    expect(run.passed).toHaveBeenCalledWith(pkgA);
+    expect(run.passed).toHaveBeenCalledWith(dir);
+    expect(run.failed).not.toHaveBeenCalled();
+  });
+
+  it("re-aggregates wsFolder node instead of using stale stored result", () => {
+    const wsFolder = createItem("wsFolder:myproject", "myproject", undefined);
+    const pkg = createItem("example.com/root", "root", wsFolder, [
+      { id: "package" },
+    ]);
+    const suite = createItem("example.com/root/Suite", "Suite", pkg);
+
+    const run = { passed: vi.fn(), failed: vi.fn() };
+    const controller = {
+      getResult: vi.fn((id: string) => {
+        if (id === "wsFolder:myproject")
+          return { status: "fail" as const, duration: undefined };
+        if (id === "example.com/root/Suite")
+          return { status: "pass" as const, duration: 100 };
+        return undefined;
+      }),
+      recordResult: vi.fn(),
+      testController: {
+        items: new Map([["wsFolder:myproject", wsFolder]]),
+      },
+    };
+
+    resolveAncestorItems(run as any, controller as any);
+
+    expect(run.passed).toHaveBeenCalledWith(pkg);
+    expect(run.passed).toHaveBeenCalledWith(wsFolder);
+    expect(run.failed).not.toHaveBeenCalled();
   });
 });
 
