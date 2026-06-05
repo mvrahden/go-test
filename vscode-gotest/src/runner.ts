@@ -5,6 +5,7 @@ import { scopedConfig } from "./cli.js";
 import {
   collectItems,
   enqueueDescendants,
+  enqueueAncestors,
   groupByPackage,
   buildRunFilter,
   resolveAncestorItems,
@@ -90,6 +91,7 @@ export class TestRunner {
         run.started(item);
         enqueueDescendants(run, item);
       }
+      enqueueAncestors(run, items);
 
       const groups = groupByPackage(items);
 

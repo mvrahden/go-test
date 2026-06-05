@@ -35,6 +35,22 @@ export function enqueueDescendants(
   });
 }
 
+export function enqueueAncestors(
+  run: vscode.TestRun,
+  items: vscode.TestItem[],
+): void {
+  const seen = new Set<string>();
+  for (const item of items) {
+    let ancestor = item.parent;
+    while (ancestor) {
+      if (seen.has(ancestor.id)) break;
+      run.enqueued(ancestor);
+      seen.add(ancestor.id);
+      ancestor = ancestor.parent;
+    }
+  }
+}
+
 export function collectItems(
   controller: GoTestController,
   request: vscode.TestRunRequest,

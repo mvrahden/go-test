@@ -48,6 +48,7 @@ import {
   resolveRunPatterns,
   applyResults,
   enqueueDescendants,
+  enqueueAncestors,
   resolveAncestorItems,
   resolveAncestorsOf,
 } from "./runnerUtils.js";
@@ -1018,6 +1019,39 @@ describe("resolveAncestorItems", () => {
   });
 });
 
+describe("enqueueAncestors", () => {
+  it("enqueues all ancestors of given items", () => {
+    const root = createItem("dir:pkg", "pkg", undefined);
+    const sub = createItem("dir:pkg/sub", "sub", root);
+    const pkg = createItem("example.com/pkg/sub/a", "a", sub, [
+      { id: "package" },
+    ]);
+
+    const run = { enqueued: vi.fn() };
+    enqueueAncestors(run as any, [pkg as any]);
+
+    expect(run.enqueued).toHaveBeenCalledTimes(2);
+    expect(run.enqueued).toHaveBeenCalledWith(sub);
+    expect(run.enqueued).toHaveBeenCalledWith(root);
+  });
+
+  it("deduplicates shared ancestors", () => {
+    const root = createItem("dir:pkg", "pkg", undefined);
+    const pkgA = createItem("example.com/pkg/a", "a", root, [
+      { id: "package" },
+    ]);
+    const pkgB = createItem("example.com/pkg/b", "b", root, [
+      { id: "package" },
+    ]);
+
+    const run = { enqueued: vi.fn() };
+    enqueueAncestors(run as any, [pkgA as any, pkgB as any]);
+
+    expect(run.enqueued).toHaveBeenCalledTimes(1);
+    expect(run.enqueued).toHaveBeenCalledWith(root);
+  });
+});
+
 describe("resolveAncestorsOf", () => {
   it("propagates passed to parent when all siblings resolved", () => {
     const dir = createItem("dir:pkg", "pkg", undefined);
@@ -1215,7 +1249,7 @@ describe("applyResults records before resolving ancestors", () => {
       { Package: "example.com/pkg", Action: "pass" as const, Elapsed: 0.3 },
     ];
 
-    applyResults(controller as any, run as any, events, "example.com/pkg", "/fake/dir");
+    applyResults(controller as any, run as any, events as any, "example.com/pkg", "/fake/dir");
 
     // The package result must have been recorded
     expect(controller.recordResult).toHaveBeenCalledWith(
