@@ -57,12 +57,11 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
   Teardown runs in reverse topological order.
 - TestSuites reference fixtures via named pointer fields (`Fixture *E2ESetupFixture`).
   A suite may have multiple fixture fields.
-- The code generator owns `TestMain` when a fixture is present.
-  Remove any user-defined `TestMain`.
+- Fixtures do not use `TestMain`. User-defined `TestMain` functions coexist with fixtures without conflict.
 
 ### Generated test output
 
-Fixture lifecycle runs through `TestMain` — fixture names do not appear in test paths.
+Fixture setup runs automatically before the first fixture-bound test — fixture names do not appear in test paths.
 Suites bound to a fixture produce the same test names as standalone suites:
 
 ```

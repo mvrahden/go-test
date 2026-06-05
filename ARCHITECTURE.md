@@ -180,8 +180,8 @@ fixture type is deduplicated by identity so each fixture is set up exactly once.
 
 The resolver produces both `RootFixtures` (entry points with no parents) and
 `AllFixtures` (every fixture in topological order). The renderer uses
-`AllFixtures` to emit a flat list with `DependsOn` edges for the generated
-`TestMain`.
+`AllFixtures` to emit a flat list with `DependsOn` edges for the fixture
+DAG initializer.
 
 ### What Gets Generated
 
@@ -207,25 +207,42 @@ func TestFooTestSuite(t *testing.T) {
 }
 ```
 
-For **fixture-bound suites** (have a fixture), a `TestMain` is generated:
+For **fixture-bound suites** (have a fixture), a lazy initializer wrapping
+`sync.Once` is generated. Each `TestX` function calls it — the DAG runs
+at most once per test binary:
 
 ```go
-func TestMain(m *testing.M) { os.Exit(ƒƒ_GOTEST_main(m)) }
+var ƒ_fixtureOnce gotestruntime.FixtureOnce
+var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
-func ƒƒ_GOTEST_main(m *testing.M) (code int) {
-    // Fixtures is a flat list with DependsOn edges forming a DAG.
-    // 1. Read shared fixture state (if needed)
-    // 2. Instantiate all fixtures from Fixtures list
-    // 3. DAG wavefront setup: fixtures with no dependencies start
-    //    concurrently; each fixture starts after its DependsOn set
-    //    has completed (channel-based signalling)
-    // 4. BeforeAll on each fixture (with retries, timeout)
-    // 5. Compute teardown budget → write to budget file
-    // 6. code = m.Run()   ← runs all TestXxx functions
-    // 7. defer: reverse-wavefront teardown (leaves first,
-    //    roots last; independent fixtures tear down concurrently)
+func ƒ_setupFixtures(t *testing.T) {
+    if err := ƒ_fixtureOnce.Do(func() error {
+        // Fixtures is a flat list with DependsOn edges forming a DAG.
+        // 1. Read shared fixture state (if needed)
+        // 2. DAG wavefront setup via SetupFixtureDAG:
+        //    no-dependency fixtures start concurrently;
+        //    each fixture waits for its DependsOn set
+        // 3. BeforeAll on each fixture (retries, timeout)
+        // 4. Compute teardown budget → write budget file
+        var err error
+        ƒ_fixtureDAG, err = gotestruntime.SetupFixtureDAG(ctx, cfg)
+        return err
+    }); err != nil {
+        t.Fatalf("fixture setup: %v", err)
+    }
+    t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+}
+
+func TestQueryTestSuite(t *testing.T) {
+    ƒ_setupFixtures(t)      // idempotent — DAG setup runs at most once
+    s := &ƒƒ_GOTEST_QueryTestSuite{...}
+    // ... suite lifecycle (same as standalone) ...
 }
 ```
+
+No `TestMain` is generated — both `package foo` and `package foo_test`
+can define fixture-bound suites without conflict. Teardown runs via
+`t.Cleanup` (reverse-wavefront: leaves first, roots last).
 
 The overlay filesystem (`-overlay=path/overlay.json`) injects generated files
 without modifying source. Go's compiler reads virtual paths from the overlay.
@@ -237,7 +254,7 @@ without modifying source. Go's compiler reads virtual paths from the overlay.
 ### PackageFixture Lifecycle
 
 ```
-┌──────────────────── PER PACKAGE (via TestMain) ─────────────────────┐
+┌──────────────────── PER PACKAGE (lazy fixture init) ────────────────┐
 │                                                                      │
 │  DAG wavefront setup (channel-based parallel scheduling):            │
 │                                                                      │
@@ -272,10 +289,9 @@ without modifying source. Go's compiler reads virtual paths from the overlay.
 │  │                                                               │   │
 │  └───────────────────────────────────────────────────────────────┘   │
 │                                                                      │
-│  deferred: reverse-wavefront teardown                                │
+│  t.Cleanup: reverse-wavefront teardown (idempotent via sync.Once)    │
 │    wave 0: FixtureC.AfterAll(ctx)  ← leaves first                   │
 │    wave 1: FixtureA.AfterAll(ctx), FixtureB.AfterAll(ctx)  ← conc.  │
-│  deferred: flush coverage counters                                   │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -471,7 +487,7 @@ startup durations.
 │     Container preset: 5m + 1 retry + 5s delay (ContainerFixtureConfig) │
 │                                                                        │
 │  FixtureConfig.Timeout (per package fixture)                           │
-│  └─ Deadline on BeforeAll/AfterAll in TestMain                         │
+│  └─ Deadline on BeforeAll/AfterAll during fixture setup                │
 │     Default: 2m                                                        │
 │                                                                        │
 │  SuiteConfig.SetupTimeout (per suite)                                  │
@@ -483,7 +499,7 @@ startup durations.
 │     Default: 30s                                                       │
 │                                                                        │
 │  Teardown Budget (per suite subprocess)                                │
-│  └─ Written to BudgetFile after fixture setup in TestMain              │
+│  └─ Written to BudgetFile after fixture setup completes                │
 │     = max(fixture tree path timeout) + max(suite setup timeout) + 30s  │
 │     Used by RunSingleSuite on context cancellation before SIGKILL      │
 │                                                                        │
@@ -693,9 +709,9 @@ t=8s    All suites done, wg.Wait() returns
    writes it to a sidecar file. The runner reads this before deciding when to
    escalate from SIGTERM to SIGKILL.
 
-7. **Coverage interception**: The fixture template intercepts Go's coverage
-   `tearDown` function via `go:linkname` to ensure coverage counters survive
-   past `m.Run()` and capture fixture teardown code.
+7. **No coverage interception needed**: Fixture setup no longer uses
+   `TestMain` + `os.Exit(m.Run())`, so Go's coverage machinery works
+   without interception. The test binary exits normally via `t.Cleanup`.
 
 8. **Unified pipeline entry point**: `cmd/gotest` is a thin CLI shell that
    delegates to `internal/gotestrunner.RunPipeline`. The pipeline encapsulates

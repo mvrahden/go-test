@@ -348,7 +348,7 @@ Fixture hook failures are reported with automatic attribution.
     E2ESetupFixture.BeforeEach failed: connection refused
 ```
 
-`BeforeAll`/`AfterAll` run in `TestMain`, so failures are reported to stderr and abort the test binary:
+`BeforeAll`/`AfterAll` failures are fatal — they fail all fixture-bound tests with automatic attribution:
 
 ```
 FAIL: E2ESetupFixture.BeforeAll failed after 2 attempt(s): start postgres: connection refused
