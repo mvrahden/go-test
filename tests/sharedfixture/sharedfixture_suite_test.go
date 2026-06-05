@@ -249,7 +249,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 
 			if strings.HasSuffix(r.PkgPath, "/standalone") {
 				w.It("standalone", func(it *gotest.T) {
-					gotest.Contains(it, code, "gotestruntime.RunFixtureMain(m,")
+					gotest.Contains(it, code, "gotestruntime.SetupFixtureDAG(")
 					gotest.Contains(it, code, "var ƒ_sf_fixtures_AlphaSharedFixture = &fixtures.AlphaSharedFixture{}")
 					gotest.Contains(it, code, "var ƒ_sf_fixtures_BetaSharedFixture = &fixtures.BetaSharedFixture{}")
 					gotest.Contains(it, code, "var ƒ_sf_fixtures_GammaSharedFixture = &fixtures.GammaSharedFixture{}")
@@ -267,7 +267,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 
 			if strings.HasSuffix(r.PkgPath, "/fixturebound") {
 				w.It("fixturebound", func(it *gotest.T) {
-					gotest.Contains(it, code, "gotestruntime.RunFixtureMain(m,")
+					gotest.Contains(it, code, "gotestruntime.SetupFixtureDAG(")
 					gotest.Contains(it, code, "var ƒ_sf_fixtures_AlphaSharedFixture = &fixtures.AlphaSharedFixture{}")
 					gotest.Contains(it, code, "Alpha: ƒ_sf_fixtures_AlphaSharedFixture")
 					gotest.Contains(it, code, "ƒ_sf_fixtures_AlphaSharedFixture.Hydrate(ctx)")

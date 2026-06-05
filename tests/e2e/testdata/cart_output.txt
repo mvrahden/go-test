@@ -1,3 +1,9 @@
+=== RUN   TestPricingTestSuite
+=== RUN   TestPricingTestSuite/TestLookupPrice
+=== RUN   TestPricingTestSuite/TestLookupPrice/returns_the_catalog_price
+--- PASS: TestPricingTestSuite (<TIMESTAMP>)
+    --- PASS: TestPricingTestSuite/TestLookupPrice (<TIMESTAMP>)
+        --- PASS: TestPricingTestSuite/TestLookupPrice/returns_the_catalog_price (<TIMESTAMP>)
 === RUN   TestShoppingCartTestSuite
 === RUN   TestShoppingCartTestSuite/TestAddSingleItem
 === RUN   TestShoppingCartTestSuite/TestAddSingleItem/adding_a_single_item
@@ -82,5 +88,11 @@
     --- PASS: TestShoppingCartTestSuite/TestRemoveItem (<TIMESTAMP>)
         --- PASS: TestShoppingCartTestSuite/TestRemoveItem/removing_the_last_item (<TIMESTAMP>)
             --- PASS: TestShoppingCartTestSuite/TestRemoveItem/removing_the_last_item/leaves_the_cart_empty (<TIMESTAMP>)
+=== RUN   TestPricingExtTestSuite
+=== RUN   TestPricingExtTestSuite/TestLookupExtPrice
+=== RUN   TestPricingExtTestSuite/TestLookupExtPrice/returns_the_external_catalog_price
+--- PASS: TestPricingExtTestSuite (<TIMESTAMP>)
+    --- PASS: TestPricingExtTestSuite/TestLookupExtPrice (<TIMESTAMP>)
+        --- PASS: TestPricingExtTestSuite/TestLookupExtPrice/returns_the_external_catalog_price (<TIMESTAMP>)
 PASS
 ok  	github.com/mvrahden/go-test/examples/cart	<TIMESTAMP>

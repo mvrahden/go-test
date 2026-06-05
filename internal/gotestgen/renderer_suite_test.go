@@ -47,9 +47,9 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			gotest.True(it, len(output) > 0, "expected non-empty output")
 
 			// Verify the output contains key structural elements
-			gotest.Contains(it, output, "func TestMain(m *testing.M)", "expected TestMain")
-			gotest.Contains(it, output, "gotestruntime.RunFixtureMain(m,", "expected RunFixtureMain delegation")
-			gotest.Contains(it, output, `"os"`, "expected os import")
+			gotest.Contains(it, output, "func ƒ_setupFixtures(t *testing.T)", "expected ƒ_setupFixtures function")
+			gotest.Contains(it, output, "gotestruntime.SetupFixtureDAG(", "expected SetupFixtureDAG call")
+			gotest.NotContains(it, output, `"os"`, "should NOT have os import")
 			gotest.Contains(it, output, "ƒ_DBFixture = &DBFixture{}", "expected fixture instantiation")
 			gotest.Contains(it, output, "ƒ_DBFixture.BeforeAll(ctx)", "expected BeforeAll call")
 			gotest.Contains(it, output, "ƒ_DBFixture.AfterAll(ctx)", "expected AfterAll in cleanup")
@@ -76,7 +76,7 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithoutAfterAll")
 			output, _ := renderTestPkg(it.T(), pkg)
 
-			gotest.Contains(it, output, "gotestruntime.RunFixtureMain(m,", "expected RunFixtureMain")
+			gotest.Contains(it, output, "gotestruntime.SetupFixtureDAG(", "expected SetupFixtureDAG")
 			gotest.NotContains(it, output, "ƒ_SimpleFixture.AfterAll", "should NOT have AfterAll call")
 		})
 	})
@@ -86,8 +86,8 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_MixedFixtureBoundAndStandalone")
 			output, _ := renderTestPkg(it.T(), pkg)
 
-			gotest.Contains(it, output, "func TestMain(m *testing.M)", "expected TestMain for fixture")
-			gotest.Contains(it, output, "gotestruntime.RunFixtureMain(m,", "expected RunFixtureMain")
+			gotest.Contains(it, output, "func ƒ_setupFixtures(t *testing.T)", "expected ƒ_setupFixtures for fixture")
+			gotest.Contains(it, output, "gotestruntime.SetupFixtureDAG(", "expected SetupFixtureDAG")
 			gotest.Contains(it, output, "func TestBoundTestSuite(t *testing.T)", "expected top-level TestBoundTestSuite func")
 			gotest.Contains(it, output, "func TestStandaloneTestSuite(t *testing.T)", "expected standalone test func")
 		})
@@ -233,7 +233,7 @@ func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 			gotest.Contains(it, output, "PostgresSharedFixture: ƒ_sf_PostgresSharedFixture")
 
 			// Package fixture lifecycle should still work
-			gotest.Contains(it, output, "gotestruntime.RunFixtureMain(m,")
+			gotest.Contains(it, output, "gotestruntime.SetupFixtureDAG(")
 			gotest.Contains(it, output, "ƒ_E2EFixture.BeforeAll(ctx)")
 			gotest.Contains(it, output, "ƒ_E2EFixture.AfterAll(ctx)")
 

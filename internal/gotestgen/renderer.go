@@ -113,7 +113,6 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	if hasFixtures {
 		imports = append(imports, headerImport{Path: about.Repo + "/pkg/gotestruntime"})
 		imports = append(imports, headerImport{Path: "context"})
-		imports = append(imports, headerImport{Path: "os"})
 		imports = append(imports, headerImport{Path: "time"})
 	}
 	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {

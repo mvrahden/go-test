@@ -7,7 +7,6 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
-	"os"
 	"testing"
 	"time"
 )
@@ -26,44 +25,56 @@ func (ts *ƒƒ_GOTEST_AppTestSuite) AfterEach(it *gotest.T)  { ts.AppTestSuite.A
 
 var ƒ_AppFixture *AppFixture
 
-func TestMain(m *testing.M) {
-	var ƒmaxSuiteSetup time.Duration
+var ƒ_fixtureOnce gotestruntime.FixtureOnce
+var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
-	{
-		ƒscfg := gotest.DefaultSuiteConfig()
-		gotest.OverlaySuiteConfig(&ƒscfg, (&AppTestSuite{
-			App: ƒ_AppFixture,
-		}).SuiteConfig())
-		if ƒscfg.SetupTimeout > ƒmaxSuiteSetup {
-			ƒmaxSuiteSetup = ƒscfg.SetupTimeout
+func ƒ_setupFixtures(t *testing.T) {
+	if err := ƒ_fixtureOnce.Do(func() error {
+		var ƒmaxSuiteSetup time.Duration
+
+		{
+			ƒscfg := gotest.DefaultSuiteConfig()
+			gotest.OverlaySuiteConfig(&ƒscfg, (&AppTestSuite{
+				App: ƒ_AppFixture,
+			}).SuiteConfig())
+			if ƒscfg.SetupTimeout > ƒmaxSuiteSetup {
+				ƒmaxSuiteSetup = ƒscfg.SetupTimeout
+			}
 		}
-	}
 
-	os.Exit(gotestruntime.RunFixtureMain(m, gotestruntime.MainConfig{
-		Fixtures: []*gotestruntime.FixtureNode{
-			{
-				Name: "AppFixture",
-				Config: func() gotest.FixtureConfig {
-					cfg := gotest.DefaultFixtureConfig()
-					gotest.OverlayFixtureConfig(&cfg, (&AppFixture{}).FixtureConfig())
-					return cfg
-				}(),
-				Init: func() {
-					ƒ_AppFixture = &AppFixture{}
-				},
-				BeforeAll: func(ctx context.Context) error {
-					return ƒ_AppFixture.BeforeAll(ctx)
-				},
-				AfterAll: func(ctx context.Context) error {
-					return ƒ_AppFixture.AfterAll(ctx)
+		var err error
+		ƒ_fixtureDAG, err = gotestruntime.SetupFixtureDAG(context.Background(), gotestruntime.MainConfig{
+			Fixtures: []*gotestruntime.FixtureNode{
+				{
+					Name: "AppFixture",
+					Config: func() gotest.FixtureConfig {
+						cfg := gotest.DefaultFixtureConfig()
+						gotest.OverlayFixtureConfig(&cfg, (&AppFixture{}).FixtureConfig())
+						return cfg
+					}(),
+					Init: func() {
+						ƒ_AppFixture = &AppFixture{}
+					},
+					BeforeAll: func(ctx context.Context) error {
+						return ƒ_AppFixture.BeforeAll(ctx)
+					},
+					AfterAll: func(ctx context.Context) error {
+						return ƒ_AppFixture.AfterAll(ctx)
+					},
 				},
 			},
-		},
-		MaxSuiteSetupTimeout: ƒmaxSuiteSetup,
-	}))
+			MaxSuiteSetupTimeout: ƒmaxSuiteSetup,
+		})
+		return err
+	}); err != nil {
+		t.Fatalf("fixture setup: %v", err)
+	}
+	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
 }
 
 func TestAppTestSuite(t *testing.T) {
+	ƒ_setupFixtures(t)
+
 	s := &ƒƒ_GOTEST_AppTestSuite{
 		AppTestSuite: AppTestSuite{
 			App: ƒ_AppFixture,
@@ -138,7 +149,6 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
-	"os"
 	"testing"
 	"time"
 )
@@ -170,77 +180,89 @@ var ƒ_DatabaseFixture *DatabaseFixture
 
 var ƒ_ServiceFixture *ServiceFixture
 
-func TestMain(m *testing.M) {
-	var ƒmaxSuiteSetup time.Duration
+var ƒ_fixtureOnce gotestruntime.FixtureOnce
+var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
-	{
-		ƒscfg := gotest.DefaultSuiteConfig()
-		if ƒscfg.SetupTimeout > ƒmaxSuiteSetup {
-			ƒmaxSuiteSetup = ƒscfg.SetupTimeout
+func ƒ_setupFixtures(t *testing.T) {
+	if err := ƒ_fixtureOnce.Do(func() error {
+		var ƒmaxSuiteSetup time.Duration
+
+		{
+			ƒscfg := gotest.DefaultSuiteConfig()
+			if ƒscfg.SetupTimeout > ƒmaxSuiteSetup {
+				ƒmaxSuiteSetup = ƒscfg.SetupTimeout
+			}
 		}
-	}
 
-	{
-		ƒscfg := gotest.DefaultSuiteConfig()
-		if ƒscfg.SetupTimeout > ƒmaxSuiteSetup {
-			ƒmaxSuiteSetup = ƒscfg.SetupTimeout
+		{
+			ƒscfg := gotest.DefaultSuiteConfig()
+			if ƒscfg.SetupTimeout > ƒmaxSuiteSetup {
+				ƒmaxSuiteSetup = ƒscfg.SetupTimeout
+			}
 		}
-	}
 
-	os.Exit(gotestruntime.RunFixtureMain(m, gotestruntime.MainConfig{
-		Fixtures: []*gotestruntime.FixtureNode{
-			{
-				Name:   "CacheFixture",
-				Config: gotest.DefaultFixtureConfig(),
-				Init: func() {
-					ƒ_CacheFixture = &CacheFixture{}
+		var err error
+		ƒ_fixtureDAG, err = gotestruntime.SetupFixtureDAG(context.Background(), gotestruntime.MainConfig{
+			Fixtures: []*gotestruntime.FixtureNode{
+				{
+					Name:   "CacheFixture",
+					Config: gotest.DefaultFixtureConfig(),
+					Init: func() {
+						ƒ_CacheFixture = &CacheFixture{}
+					},
+					BeforeAll: func(ctx context.Context) error {
+						return ƒ_CacheFixture.BeforeAll(ctx)
+					},
+					AfterAll: func(ctx context.Context) error {
+						return ƒ_CacheFixture.AfterAll(ctx)
+					},
 				},
-				BeforeAll: func(ctx context.Context) error {
-					return ƒ_CacheFixture.BeforeAll(ctx)
+				{
+					Name:   "DatabaseFixture",
+					Config: gotest.DefaultFixtureConfig(),
+					Init: func() {
+						ƒ_DatabaseFixture = &DatabaseFixture{}
+					},
+					BeforeAll: func(ctx context.Context) error {
+						return ƒ_DatabaseFixture.BeforeAll(ctx)
+					},
+					AfterAll: func(ctx context.Context) error {
+						return ƒ_DatabaseFixture.AfterAll(ctx)
+					},
 				},
-				AfterAll: func(ctx context.Context) error {
-					return ƒ_CacheFixture.AfterAll(ctx)
+				{
+					Name:   "ServiceFixture",
+					Config: gotest.DefaultFixtureConfig(),
+					Init: func() {
+						ƒ_ServiceFixture = &ServiceFixture{
+							Cache: ƒ_CacheFixture,
+							DB:    ƒ_DatabaseFixture,
+						}
+					},
+					BeforeAll: func(ctx context.Context) error {
+						return ƒ_ServiceFixture.BeforeAll(ctx)
+					},
+					AfterAll: func(ctx context.Context) error {
+						return ƒ_ServiceFixture.AfterAll(ctx)
+					},
+					DependsOn: []string{
+						"DatabaseFixture",
+						"CacheFixture",
+					},
 				},
 			},
-			{
-				Name:   "DatabaseFixture",
-				Config: gotest.DefaultFixtureConfig(),
-				Init: func() {
-					ƒ_DatabaseFixture = &DatabaseFixture{}
-				},
-				BeforeAll: func(ctx context.Context) error {
-					return ƒ_DatabaseFixture.BeforeAll(ctx)
-				},
-				AfterAll: func(ctx context.Context) error {
-					return ƒ_DatabaseFixture.AfterAll(ctx)
-				},
-			},
-			{
-				Name:   "ServiceFixture",
-				Config: gotest.DefaultFixtureConfig(),
-				Init: func() {
-					ƒ_ServiceFixture = &ServiceFixture{
-						Cache: ƒ_CacheFixture,
-						DB:    ƒ_DatabaseFixture,
-					}
-				},
-				BeforeAll: func(ctx context.Context) error {
-					return ƒ_ServiceFixture.BeforeAll(ctx)
-				},
-				AfterAll: func(ctx context.Context) error {
-					return ƒ_ServiceFixture.AfterAll(ctx)
-				},
-				DependsOn: []string{
-					"DatabaseFixture",
-					"CacheFixture",
-				},
-			},
-		},
-		MaxSuiteSetupTimeout: ƒmaxSuiteSetup,
-	}))
+			MaxSuiteSetupTimeout: ƒmaxSuiteSetup,
+		})
+		return err
+	}); err != nil {
+		t.Fatalf("fixture setup: %v", err)
+	}
+	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
 }
 
 func TestMultiFixtureTestSuite(t *testing.T) {
+	ƒ_setupFixtures(t)
+
 	s := &ƒƒ_GOTEST_MultiFixtureTestSuite{
 		MultiFixtureTestSuite: MultiFixtureTestSuite{
 			Cache: ƒ_CacheFixture,
@@ -291,6 +313,8 @@ func TestMultiFixtureTestSuite(t *testing.T) {
 }
 
 func TestServiceTestSuite(t *testing.T) {
+	ƒ_setupFixtures(t)
+
 	s := &ƒƒ_GOTEST_ServiceTestSuite{
 		ServiceTestSuite: ServiceTestSuite{
 			Svc: ƒ_ServiceFixture,

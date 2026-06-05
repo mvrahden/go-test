@@ -26,65 +26,77 @@ var ƒ_sf_{{ $sf.Identifier }} = &{{ $sf.QualifiedType }}{}
 var ƒ_{{ $f.Identifier }} *{{ $f.QualifiedType }}
 {{ end }}
 
-func TestMain(m *testing.M) {
-    var ƒmaxSuiteSetup time.Duration
+var ƒ_fixtureOnce gotestruntime.FixtureOnce
+var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+
+func ƒ_setupFixtures(t *testing.T) {
+    if err := ƒ_fixtureOnce.Do(func() error {
+        var ƒmaxSuiteSetup time.Duration
 {{ range $fs := .FlatSuites }}
-    {
-        ƒscfg := gotest.DefaultSuiteConfig()
+        {
+            ƒscfg := gotest.DefaultSuiteConfig()
 {{- if $fs.Suite.HasConfig }}
-        gotest.OverlaySuiteConfig(&ƒscfg, (&{{ $fs.Suite.Identifier }}{
+            gotest.OverlaySuiteConfig(&ƒscfg, (&{{ $fs.Suite.Identifier }}{
 {{- range $id, $field := $fs.FixtureFields }}
-            {{ $field }}: ƒ_{{ $id }},
+                {{ $field }}: ƒ_{{ $id }},
 {{- end }}
-        }).SuiteConfig())
+            }).SuiteConfig())
 {{- end }}
-        if ƒscfg.SetupTimeout > ƒmaxSuiteSetup { ƒmaxSuiteSetup = ƒscfg.SetupTimeout }
-    }
+            if ƒscfg.SetupTimeout > ƒmaxSuiteSetup { ƒmaxSuiteSetup = ƒscfg.SetupTimeout }
+        }
 {{ end }}
 
-    os.Exit(gotestruntime.RunFixtureMain(m, gotestruntime.MainConfig{
-        Fixtures: []*gotestruntime.FixtureNode{
+        var err error
+        ƒ_fixtureDAG, err = gotestruntime.SetupFixtureDAG(context.Background(), gotestruntime.MainConfig{
+            Fixtures: []*gotestruntime.FixtureNode{
 {{- range $sf := .SharedFixtureNodes }}
-            {
-                Name: "{{ $sf.Identifier }}",
-                SharedState: &gotestruntime.SharedStateNode{
-                    StateKey: "{{ $sf.StateKey }}",
-                    Target: ƒ_sf_{{ $sf.Identifier }},
+                {
+                    Name: "{{ $sf.Identifier }}",
+                    SharedState: &gotestruntime.SharedStateNode{
+                        StateKey: "{{ $sf.StateKey }}",
+                        Target: ƒ_sf_{{ $sf.Identifier }},
 {{- if $sf.HasHydrate }}
-                    Hydrate: func(ctx context.Context) error { return ƒ_sf_{{ $sf.Identifier }}.Hydrate(ctx) },
+                        Hydrate: func(ctx context.Context) error { return ƒ_sf_{{ $sf.Identifier }}.Hydrate(ctx) },
 {{- end }}
 {{- if $sf.HasDehydrate }}
-                    Dehydrate: func(ctx context.Context) error { return ƒ_sf_{{ $sf.Identifier }}.Dehydrate(ctx) },
+                        Dehydrate: func(ctx context.Context) error { return ƒ_sf_{{ $sf.Identifier }}.Dehydrate(ctx) },
 {{- end }}
-                },
+                    },
 {{- if $sf.ParentFields }}
-                Init: func() {
+                    Init: func() {
 {{- range $parentID, $fieldName := $sf.ParentFields }}
-                    ƒ_sf_{{ $sf.Identifier }}.{{ $fieldName }} = ƒ_sf_{{ $parentID }}
+                        ƒ_sf_{{ $sf.Identifier }}.{{ $fieldName }} = ƒ_sf_{{ $parentID }}
 {{- end }}
-                },
+                    },
 {{- end }}
 {{- if $sf.DependsOn }}
-                DependsOn: []string{
+                    DependsOn: []string{
 {{- range $dep := $sf.DependsOn }}
-                    "{{ $dep }}",
+                        "{{ $dep }}",
+{{- end }}
+                    },
 {{- end }}
                 },
-{{- end }}
-            },
 {{- end }}
 {{- range $f := .AllFixtures }}
 {{ template "fixtureNode" $f }}
 {{- end }}
-        },
-        MaxSuiteSetupTimeout: ƒmaxSuiteSetup,
-    }))
+            },
+            MaxSuiteSetupTimeout: ƒmaxSuiteSetup,
+        })
+        return err
+    }); err != nil {
+        t.Fatalf("fixture setup: %v", err)
+    }
+    t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
 }
 
 {{- /* Render fixture-bound suites as top-level Test functions */ -}}
 {{ range $fs := .FlatSuites }}
 
 func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
+    ƒ_setupFixtures(t)
+
     s := &ƒƒ_GOTEST_{{ $fs.Suite.Identifier }}{
         {{ $fs.Suite.Identifier }}: {{ $fs.Suite.Identifier }}{
 {{- range $id, $field := $fs.FixtureFields }}

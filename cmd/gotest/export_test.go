@@ -2,6 +2,7 @@ package main
 
 type ExportDiscoverOutput = discoverOutput
 type ExportDiscoverPackage = discoverPackage
+type ExportDiscoverSuite = discoverSuite
 
 var ExportParseMinFlag = parseMinFlag
 var ExportParseParallelFlag = parseParallelFlag
