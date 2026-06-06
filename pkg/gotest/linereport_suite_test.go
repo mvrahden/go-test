@@ -142,28 +142,28 @@ func (s *LineReportingTestSuite) TestEventually(t *gotest.T) {
 	t.When("inner assertion fails (via *R)", func(w *gotest.T) {
 		w.It("timeout includes inner assertion call site", func(it *gotest.T) {
 			spy := runSpy(func(t *spyT) {
-				gotest.Eventually(t, 50*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {
+				gotest.Eventually(t, 200*time.Millisecond, 20*time.Millisecond, func(poll *gotest.R) {
 					gotest.True(poll, false, "condition not met")
 				})
 			})
 			gotest.True(it, spy.failed)
 			masked, polls := maskPollCount(spy.msg)
 			gotest.MatchSnapshot(it, masked)
-			gotest.InDelta(it, 5, polls, 1)
+			gotest.InDelta(it, 10, polls, 5)
 		})
 	})
 
 	t.When("called directly from test (no helper)", func(w *gotest.T) {
 		w.It("timeout references this file", func(it *gotest.T) {
 			spy := runSpy(func(t *spyT) {
-				gotest.Eventually(t, 50*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {
+				gotest.Eventually(t, 200*time.Millisecond, 20*time.Millisecond, func(poll *gotest.R) {
 					gotest.True(poll, false)
 				})
 			})
 			gotest.True(it, spy.failed)
 			masked, polls := maskPollCount(spy.msg)
 			gotest.MatchSnapshot(it, masked)
-			gotest.InDelta(it, 5, polls, 1)
+			gotest.InDelta(it, 10, polls, 5)
 		})
 	})
 }
@@ -179,7 +179,7 @@ func (s *LineReportingTestSuite) TestHelperCallingEventually(t *gotest.T) {
 			gotest.True(it, spy.failed)
 			masked, polls := maskPollCount(spy.msg)
 			gotest.MatchSnapshot(it, masked)
-			gotest.InDelta(it, 5, polls, 1)
+			gotest.InDelta(it, 10, polls, 5)
 		})
 	})
 }

@@ -81,7 +81,16 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	}
 
 	if len(fixtureBound) > 0 || len(sfNodeVMs) > 0 {
-		if err := r.renderFixtures(buf, fixtureBound, allFixtures, resolved.SuiteFixtureFields, sfNodeVMs); err != nil {
+		var fixtureTestNames []string
+		for _, ts := range fixtureBound {
+			fixtureTestNames = append(fixtureTestNames, ts.Identifier())
+		}
+		for _, ts := range standalone {
+			if _, hasSF := resolved.SuiteSharedFixtures[ts.Identifier()]; hasSF {
+				fixtureTestNames = append(fixtureTestNames, ts.Identifier())
+			}
+		}
+		if err := r.renderFixtures(buf, fixtureBound, allFixtures, resolved.SuiteFixtureFields, sfNodeVMs, fixtureTestNames); err != nil {
 			return nil, fmt.Errorf("failed rendering fixture suites. err: %w", err)
 		}
 	}
@@ -113,6 +122,7 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	if hasFixtures {
 		imports = append(imports, headerImport{Path: about.Repo + "/pkg/gotestruntime"})
 		imports = append(imports, headerImport{Path: "context"})
+		imports = append(imports, headerImport{Path: "sync/atomic"})
 		imports = append(imports, headerImport{Path: "time"})
 	}
 	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
@@ -168,7 +178,7 @@ func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSh
 	})
 }
 
-func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, allFixtures []*ResolvedFixture, suiteFixtureFields map[string][]FixtureFieldBinding, sfNodes []*SharedFixtureNodeVM) error {
+func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, allFixtures []*ResolvedFixture, suiteFixtureFields map[string][]FixtureFieldBinding, sfNodes []*SharedFixtureNodeVM, fixtureTestNames []string) error {
 	if len(allFixtures) == 0 && len(sfNodes) == 0 {
 		return nil
 	}
@@ -178,6 +188,7 @@ func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.T
 		"AllFixtures":        allFixtures,
 		"FlatSuites":         flattenSuitesDAG(allFixtures, suiteFixtureFields),
 		"SharedFixtureNodes": sfNodes,
+		"FixtureTestNames":   fixtureTestNames,
 	})
 }
 

@@ -7,6 +7,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -31,9 +32,14 @@ var ƒ_DBFixture *DBFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"QueryTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -63,7 +69,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestQueryTestSuite(t *testing.T) {
@@ -303,6 +315,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -323,9 +336,14 @@ var ƒ_CFGFixture *CFGFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"CFGTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -362,7 +380,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestCFGTestSuite(t *testing.T) {
@@ -412,6 +436,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -432,9 +457,14 @@ var ƒ_PlainFixture *PlainFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"PlainTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -464,7 +494,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestPlainTestSuite(t *testing.T) {
@@ -514,6 +550,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -534,9 +571,14 @@ var ƒ_EachFixture *EachFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"EachTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -569,7 +611,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestEachTestSuite(t *testing.T) {
@@ -627,6 +675,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -647,9 +696,14 @@ var ƒ_DBFixture *DBFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"QueryTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -682,7 +736,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestQueryTestSuite(t *testing.T) {
@@ -745,6 +805,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -765,9 +826,14 @@ var ƒ_SimpleFixture *SimpleFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"BasicTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -797,7 +863,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestBasicTestSuite(t *testing.T) {
@@ -847,6 +919,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -867,9 +940,14 @@ var ƒ_MinimalFixture *MinimalFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"MinimalTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -899,7 +977,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestMinimalTestSuite(t *testing.T) {
@@ -949,6 +1033,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -969,9 +1054,14 @@ var ƒ_AppFixture *AppFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"BoundTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -1001,7 +1091,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestBoundTestSuite(t *testing.T) {
@@ -1092,6 +1188,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -1114,9 +1211,14 @@ var ƒ_APIFixture *APIFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"HandlerTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -1161,7 +1263,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestHandlerTestSuite(t *testing.T) {
@@ -1227,6 +1335,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -1256,9 +1365,15 @@ var ƒ_DBFixture *DBFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"EmbeddedTestSuite",
+	"NamedTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -1295,7 +1410,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestEmbeddedTestSuite(t *testing.T) {
@@ -1383,6 +1504,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -1414,9 +1536,15 @@ var ƒ_APIFixture *APIFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"LightTestSuite",
+	"FullTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -1468,7 +1596,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestLightTestSuite(t *testing.T) {
@@ -1556,6 +1690,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -1578,9 +1713,14 @@ var ƒ_AppFixture *AppFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"UserTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -1622,7 +1762,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestUserTestSuite(t *testing.T) {
@@ -1672,6 +1818,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -1692,9 +1839,14 @@ var ƒ_DBFixture *DBFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"QueryTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -1724,7 +1876,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestQueryTestSuite(t *testing.T) {
@@ -1774,6 +1932,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"testpkg/extfixtures"
 	"time"
@@ -1788,9 +1947,14 @@ var ƒ_sf_SchemaSharedFixture = &SchemaSharedFixture{}
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"MigrationTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		var err error
@@ -1823,7 +1987,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 type ƒƒ_GOTEST_MigrationTestSuite struct {
@@ -1879,6 +2049,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -1901,9 +2072,14 @@ var ƒ_E2EFixture *E2EFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"QueryTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -1948,7 +2124,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestQueryTestSuite(t *testing.T) {
@@ -1998,6 +2180,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -2020,9 +2203,14 @@ var ƒ_AppFixture *AppFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"AppTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -2064,7 +2252,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestAppTestSuite(t *testing.T) {
@@ -2114,6 +2308,7 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -2134,9 +2329,14 @@ var ƒ_DBFixture *DBFixture
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
+var ƒ_fixtureTestNames = []string{
+	"StdlibTestSuite",
+}
+var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -2166,7 +2366,13 @@ func ƒ_setupFixtures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+	t.Cleanup(func() {
+		if ƒ_pending.Add(-1) == 0 {
+			if ƒ_fixtureDAG.Teardown() {
+				t.Errorf("fixture teardown failed")
+			}
+		}
+	})
 }
 
 func TestStdlibTestSuite(t *testing.T) {
