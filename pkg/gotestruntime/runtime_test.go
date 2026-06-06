@@ -1562,6 +1562,74 @@ func TestDAG_SharedStateNode_MissingStateFile(t *testing.T) {
 	gotest.Contains(t, events, "plain.afterAll")
 }
 
+func TestBeforeAllError_IncludesFixtureName(t *testing.T) {
+	node := &FixtureNode{
+		Name:   "Database",
+		Config: gotest.DefaultFixtureConfig(),
+		Init:   func() {},
+		BeforeAll: func(ctx context.Context) error {
+			return errors.New("connection refused")
+		},
+	}
+
+	err := runBeforeAllWithRetry(context.Background(), node)
+
+	gotest.ErrorContains(t, err, "Database.BeforeAll")
+	gotest.ErrorContains(t, err, "connection refused")
+}
+
+func TestBeforeAllError_WrapsOriginalError(t *testing.T) {
+	sentinel := errors.New("sentinel")
+	node := &FixtureNode{
+		Name:   "Cache",
+		Config: gotest.DefaultFixtureConfig(),
+		Init:   func() {},
+		BeforeAll: func(ctx context.Context) error {
+			return sentinel
+		},
+	}
+
+	err := runBeforeAllWithRetry(context.Background(), node)
+
+	gotest.ErrorIs(t, err, sentinel)
+}
+
+func TestBeforeAllError_ContextCancelIncludesFixtureName(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	node := &FixtureNode{
+		Name:   "Slow",
+		Config: gotest.DefaultFixtureConfig(),
+		Init:   func() {},
+		BeforeAll: func(ctx context.Context) error {
+			return nil
+		},
+	}
+
+	err := runBeforeAllWithRetry(ctx, node)
+
+	gotest.ErrorContains(t, err, "Slow.BeforeAll")
+	gotest.ErrorIs(t, err, context.Canceled)
+}
+
+func TestDAGSetupError_IncludesFixtureName(t *testing.T) {
+	node := &FixtureNode{
+		Name:   "Redis",
+		Config: gotest.DefaultFixtureConfig(),
+		Init:   func() {},
+		BeforeAll: func(ctx context.Context) error {
+			return errors.New("dial tcp: connection refused")
+		},
+	}
+
+	tracker := &nodeTracker{succeeded: make(map[*FixtureNode]bool)}
+	err := setupDAG(context.Background(), []*FixtureNode{node}, nil, tracker)
+
+	gotest.ErrorContains(t, err, "Redis.BeforeAll")
+	gotest.ErrorContains(t, err, "dial tcp: connection refused")
+}
+
 func indexOf(slice []string, val string) int {
 	for i, s := range slice {
 		if s == val {
