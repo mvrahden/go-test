@@ -17,7 +17,8 @@ import (
 )
 
 type OverlayResult struct {
-	TmpDir           string
+	CacheDir         string
+	WorkDir          string
 	OverlayFlag      string
 	SharedFixtures   []gotestgen.SharedFixtureInfo
 	SuitePackages    []string
@@ -37,17 +38,27 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, debug bool, noCache bool) (
 
 	CleanStaleOverlays()
 
-	dir, cached, err := writeOverlayCached(allResults, noCache)
+	cacheDir, cached, err := writeOverlayCached(allResults, noCache)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	cleanup := func() {}
-	if !cached {
-		cleanup = func() { os.RemoveAll(dir) }
+	workDir, err := os.MkdirTemp("", "gotest-work-*")
+	if err != nil {
+		if !cached {
+			os.RemoveAll(cacheDir)
+		}
+		return nil, nil, fmt.Errorf("create work dir: %w", err)
+	}
+
+	cleanup := func() {
+		os.RemoveAll(workDir)
+		if !cached {
+			os.RemoveAll(cacheDir)
+		}
 	}
 	if debug {
-		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s (cached=%v)\n", dir, cached)
+		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s (cached=%v)\nDEBUG: work dir: %s\n", cacheDir, cached, workDir)
 		cleanup = func() {}
 	}
 
@@ -86,8 +97,9 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, debug bool, noCache bool) (
 	}
 
 	return &OverlayResult{
-		TmpDir:           dir,
-		OverlayFlag:      "-overlay=" + filepath.Join(dir, "overlay.json"),
+		CacheDir:         cacheDir,
+		WorkDir:          workDir,
+		OverlayFlag:      "-overlay=" + filepath.Join(cacheDir, "overlay.json"),
 		SharedFixtures:   allSharedFixtures,
 		SuitePackages:    suitePkgs,
 		NoSuitePackages:  noSuitePkgs,

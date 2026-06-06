@@ -45,7 +45,7 @@ func runPrepare(inv Invocation) int {
 
 	var setupProc *gotestrunner.SharedFixtureProcess
 	if len(overlay.SharedFixtures) > 0 {
-		setupProc, err = gotestrunner.StartSharedFixtures(ctx, overlay.TmpDir, overlay.SharedFixtures, 0)
+		setupProc, err = gotestrunner.StartSharedFixtures(ctx, overlay.WorkDir, overlay.SharedFixtures, 0)
 		if err != nil {
 			stop()
 			cleanup()
@@ -64,8 +64,8 @@ func runPrepare(inv Invocation) int {
 	stop()
 
 	out := prepareOutput{
-		OverlayFile: filepath.Join(overlay.TmpDir, "overlay.json"),
-		Dir:         overlay.TmpDir,
+		OverlayFile: filepath.Join(overlay.CacheDir, "overlay.json"),
+		Dir:         overlay.WorkDir,
 	}
 	if setupProc != nil {
 		out.StateFile = setupProc.StateFile()

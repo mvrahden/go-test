@@ -90,7 +90,7 @@ func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []st
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		compiled, compileErr = CompilePackages(ctx, overlay.SuitePackages, overlay.OverlayFlag, buildFlags, overlay.TmpDir)
+		compiled, compileErr = CompilePackages(ctx, overlay.SuitePackages, overlay.OverlayFlag, buildFlags, overlay.WorkDir)
 		if compileErr != nil {
 			cancel()
 		}
@@ -100,7 +100,7 @@ func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []st
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			setupProc, setupErr = StartSharedFixtures(ctx, overlay.TmpDir, overlay.SharedFixtures, setupTimeout)
+			setupProc, setupErr = StartSharedFixtures(ctx, overlay.WorkDir, overlay.SharedFixtures, setupTimeout)
 			if setupErr != nil {
 				cancel()
 				return
@@ -159,7 +159,7 @@ func setupCoverage(targets []SuiteTarget, overlay *OverlayResult, userCoverProfi
 	if userCoverProfile == "" {
 		return
 	}
-	coverDir := filepath.Join(overlay.TmpDir, "cover")
+	coverDir := filepath.Join(overlay.WorkDir, "cover")
 	os.MkdirAll(coverDir, 0o755)
 	assignCoverProfiles(targets, coverDir)
 }
@@ -220,7 +220,7 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (PipelineResult, error) {
 	var coverDir string
 	if pf.UserCoverProfile != "" {
-		coverDir = filepath.Join(overlay.TmpDir, "cover")
+		coverDir = filepath.Join(overlay.WorkDir, "cover")
 		os.MkdirAll(coverDir, 0o755)
 	}
 
@@ -239,7 +239,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 		go func() {
 			defer fixtureWg.Done()
 			var err error
-			setupProc, err = StartSharedFixtures(streamCtx, overlay.TmpDir, overlay.SharedFixtures, cfg.SetupTimeout)
+			setupProc, err = StartSharedFixtures(streamCtx, overlay.WorkDir, overlay.SharedFixtures, cfg.SetupTimeout)
 			if err != nil {
 				fixtureStartErr = err
 				streamCancel()
@@ -250,7 +250,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 		close(fixtureStarted)
 	}
 
-	compileCh := CompilePackagesStream(streamCtx, overlay.SuitePackages, overlay.OverlayFlag, pf.BuildFlags, overlay.TmpDir)
+	compileCh := CompilePackagesStream(streamCtx, overlay.SuitePackages, overlay.OverlayFlag, pf.BuildFlags, overlay.WorkDir)
 
 	totalSuites := 0
 	for _, suites := range overlay.SuitesByPkg {
