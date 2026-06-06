@@ -35,6 +35,22 @@ export function enqueueDescendants(
   });
 }
 
+export function enqueueAncestors(
+  run: vscode.TestRun,
+  items: vscode.TestItem[],
+): void {
+  const seen = new Set<string>();
+  for (const item of items) {
+    let ancestor = item.parent;
+    while (ancestor) {
+      if (seen.has(ancestor.id)) break;
+      run.enqueued(ancestor);
+      seen.add(ancestor.id);
+      ancestor = ancestor.parent;
+    }
+  }
+}
+
 export function collectItems(
   controller: GoTestController,
   request: vscode.TestRunRequest,
@@ -225,6 +241,7 @@ export function applyResults(
         const duration =
           event.Elapsed !== undefined ? event.Elapsed * 1000 : undefined;
         applied.push({ itemId: importPath, status: event.Action, duration });
+        controller.recordResult(importPath, event.Action, duration);
 
         const pkgItem = controller.findItem(importPath);
         if (pkgItem) {
@@ -253,6 +270,7 @@ export function applyResults(
       case "pass":
         run.passed(item, duration);
         applied.push({ itemId: item.id, status: "pass", duration });
+        controller.recordResult(item.id, "pass", duration);
         break;
       case "fail": {
         const output = outputMap.get(event.Test) ?? "";
@@ -279,11 +297,13 @@ export function applyResults(
         }
         run.failed(item, vscodeMessages, duration);
         applied.push({ itemId: item.id, status: "fail", duration });
+        controller.recordResult(item.id, "fail", duration);
         break;
       }
       case "skip":
         run.skipped(item);
         applied.push({ itemId: item.id, status: "skip", duration: undefined });
+        controller.recordResult(item.id, "skip", undefined);
         break;
       case "run":
         run.started(item);
@@ -595,13 +615,27 @@ export function resolveAncestorsOf(
     let allResolved = true;
     current.children.forEach((child) => {
       const result = controller.getResult(child.id);
-      if (!result) {
+      if (result) {
+        if (result.status === "fail") anyFailed = true;
+        return;
+      }
+      const isStructural =
+        child.id.startsWith("dir:") ||
+        child.id.startsWith("wsFolder:") ||
+        child.id.startsWith("module:");
+      if (isStructural) {
+        const r = resolveItemRecursive(run, child, controller);
+        if (r.anyResolved) {
+          if (r.anyFailed) anyFailed = true;
+        } else {
+          allResolved = false;
+        }
+      } else {
         allResolved = false;
-      } else if (result.status === "fail") {
-        anyFailed = true;
       }
     });
     if (!allResolved) break;
+    run.started(current);
     if (anyFailed) {
       run.failed(current, []);
     } else {
@@ -628,8 +662,12 @@ function resolveItemRecursive(
 ): { anyFailed: boolean; anyResolved: boolean } {
   const directResult = controller.getResult(item.id);
   const isPackage = item.tags.some((t) => t.id === "package");
+  const isStructural =
+    item.id.startsWith("dir:") ||
+    item.id.startsWith("wsFolder:") ||
+    item.id.startsWith("module:");
 
-  if (directResult && !isPackage) {
+  if (directResult && !isPackage && !isStructural) {
     return { anyFailed: directResult.status === "fail", anyResolved: true };
   }
 
@@ -642,10 +680,14 @@ function resolveItemRecursive(
   });
 
   if (anyResolved) {
+    run.started(item);
     if (anyFailed) {
       run.failed(item, []);
     } else {
       run.passed(item);
+    }
+    if (isStructural) {
+      controller.recordResult(item.id, anyFailed ? "fail" : "pass", undefined);
     }
   }
 
