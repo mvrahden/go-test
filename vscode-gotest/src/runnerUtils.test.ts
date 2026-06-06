@@ -542,9 +542,21 @@ describe("applyResults", () => {
     });
 
     // Records each test result to the controller
-    expect(controller.recordResult).toHaveBeenCalledWith(passItem.id, "pass", 100);
-    expect(controller.recordResult).toHaveBeenCalledWith(failItem.id, "fail", 200);
-    expect(controller.recordResult).toHaveBeenCalledWith(skipItem.id, "skip", undefined);
+    expect(controller.recordResult).toHaveBeenCalledWith(
+      passItem.id,
+      "pass",
+      100,
+    );
+    expect(controller.recordResult).toHaveBeenCalledWith(
+      failItem.id,
+      "fail",
+      200,
+    );
+    expect(controller.recordResult).toHaveBeenCalledWith(
+      skipItem.id,
+      "skip",
+      undefined,
+    );
 
     // Does call run methods
     expect(run.passed).toHaveBeenCalledWith(passItem, 100);
@@ -774,6 +786,7 @@ describe("resolveAncestorItems", () => {
     );
 
     const run = {
+      started: vi.fn(),
       passed: vi.fn(),
       failed: vi.fn(),
     };
@@ -827,7 +840,7 @@ describe("resolveAncestorItems", () => {
     const pkgB = createItem("example.com/pkg/b", "b", dir, [{ id: "package" }]);
     const suiteB = createItem("example.com/pkg/b/SuiteB", "SuiteB", pkgB);
 
-    const run = { passed: vi.fn(), failed: vi.fn() };
+    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
     const controller = {
       getResult: vi.fn((id: string) => {
         if (id === "example.com/pkg/a/SuiteA")
@@ -855,7 +868,7 @@ describe("resolveAncestorItems", () => {
     const suiteA = createItem("example.com/pkg/SuiteA", "SuiteA", pkg);
     const suiteB = createItem("example.com/pkg/SuiteB", "SuiteB", pkg);
 
-    const run = { passed: vi.fn(), failed: vi.fn() };
+    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
     const controller = {
       getResult: vi.fn((id: string) => {
         if (id === "example.com/pkg")
@@ -887,7 +900,7 @@ describe("resolveAncestorItems", () => {
     ]);
     const suite = createItem("example.com/src/internal/svc/Svc", "Svc", pkg);
 
-    const run = { passed: vi.fn(), failed: vi.fn() };
+    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
     const controller = {
       getResult: vi.fn((id: string) => {
         if (id === "example.com/src/internal/svc/Svc")
@@ -915,7 +928,7 @@ describe("resolveAncestorItems", () => {
     ]);
     const suite = createItem("example.com/root/Suite", "Suite", pkg);
 
-    const run = { passed: vi.fn(), failed: vi.fn() };
+    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
     const controller = {
       getResult: vi.fn((id: string) => {
         if (id === "example.com/root/Suite")
@@ -967,7 +980,7 @@ describe("resolveAncestorItems", () => {
     const pkgA = createItem("example.com/pkg/a", "a", dir, [{ id: "package" }]);
     const suiteA = createItem("example.com/pkg/a/SuiteA", "SuiteA", pkgA);
 
-    const run = { passed: vi.fn(), failed: vi.fn() };
+    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
     const controller = {
       getResult: vi.fn((id: string) => {
         if (id === "dir:pkg")
@@ -996,7 +1009,7 @@ describe("resolveAncestorItems", () => {
     ]);
     const suite = createItem("example.com/root/Suite", "Suite", pkg);
 
-    const run = { passed: vi.fn(), failed: vi.fn() };
+    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
     const controller = {
       getResult: vi.fn((id: string) => {
         if (id === "wsFolder:myproject")
@@ -1015,6 +1028,86 @@ describe("resolveAncestorItems", () => {
 
     expect(run.passed).toHaveBeenCalledWith(pkg);
     expect(run.passed).toHaveBeenCalledWith(wsFolder);
+    expect(run.failed).not.toHaveBeenCalled();
+  });
+
+  it("cascades through all ancestor levels when resolveAncestorsOf is followed by resolveAncestorItems", () => {
+    // Models user scenario: re-run one package, siblings passed in prior runs,
+    // structural nodes have no stored results (first run with new extension).
+    //
+    // Tree:
+    //   wsFolder:root → dir:pkg → dir:platform → [api (pkg), billing (pkg)]
+    //                           → dir:core     → [auth (pkg)]
+    const root = createItem("wsFolder:root", "root", undefined);
+    const dirPkg = createItem("dir:pkg", "pkg", root);
+    const dirPlatform = createItem("dir:platform", "platform", dirPkg);
+    const dirCore = createItem("dir:core", "core", dirPkg);
+
+    const apiPkg = createItem("example.com/platform/api", "api", dirPlatform, [
+      { id: "package" },
+    ]);
+    const apiSuite = createItem("example.com/platform/api/Api", "Api", apiPkg);
+
+    const billingPkg = createItem(
+      "example.com/platform/billing",
+      "billing",
+      dirPlatform,
+      [{ id: "package" }],
+    );
+    const billingSuite = createItem(
+      "example.com/platform/billing/Billing",
+      "Billing",
+      billingPkg,
+    );
+
+    const authPkg = createItem("example.com/core/auth", "auth", dirCore, [
+      { id: "package" },
+    ]);
+    const authSuite = createItem("example.com/core/auth/Auth", "Auth", authPkg);
+
+    // Dynamic mock: recordResult feeds back into getResult
+    const results = new Map<string, { status: string; duration?: number }>();
+    // Package + suite results from current run and prior runs
+    results.set("example.com/platform/api", { status: "pass", duration: 100 });
+    results.set("example.com/platform/api/Api", {
+      status: "pass",
+      duration: 50,
+    });
+    results.set("example.com/platform/billing", {
+      status: "pass",
+      duration: 200,
+    });
+    results.set("example.com/platform/billing/Billing", {
+      status: "pass",
+      duration: 100,
+    });
+    results.set("example.com/core/auth", { status: "pass", duration: 150 });
+    results.set("example.com/core/auth/Auth", {
+      status: "pass",
+      duration: 75,
+    });
+    // NO structural node results — simulates first run after installing fix
+
+    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
+    const controller = {
+      getResult: vi.fn((id: string) => results.get(id)),
+      recordResult: vi.fn((id: string, status: string, duration?: number) => {
+        results.set(id, { status, duration });
+      }),
+      testController: {
+        items: new Map([["wsFolder:root", root]]),
+      },
+    };
+
+    // Step 1: resolveAncestorsOf from just-ran package (streaming, during run).
+    // dir:core has no stored result but its package descendants do, so
+    // resolveAncestorsOf resolves it from descendants and cascades all the way up.
+    resolveAncestorsOf(run as any, apiPkg as any, controller as any);
+
+    expect(run.passed).toHaveBeenCalledWith(dirPlatform);
+    expect(run.passed).toHaveBeenCalledWith(dirCore);
+    expect(run.passed).toHaveBeenCalledWith(dirPkg);
+    expect(run.passed).toHaveBeenCalledWith(root);
     expect(run.failed).not.toHaveBeenCalled();
   });
 });
@@ -1058,7 +1151,7 @@ describe("resolveAncestorsOf", () => {
     const pkgA = createItem("example.com/pkg/a", "a", dir, [{ id: "package" }]);
     const pkgB = createItem("example.com/pkg/b", "b", dir, [{ id: "package" }]);
 
-    const run = { passed: vi.fn(), failed: vi.fn() };
+    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
     const controller = {
       getResult: vi.fn((id: string) => {
         if (id === "example.com/pkg/a")
@@ -1085,7 +1178,7 @@ describe("resolveAncestorsOf", () => {
     const pkgA = createItem("example.com/pkg/a", "a", dir, [{ id: "package" }]);
     const pkgB = createItem("example.com/pkg/b", "b", dir, [{ id: "package" }]);
 
-    const run = { passed: vi.fn(), failed: vi.fn() };
+    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
     const controller = {
       getResult: vi.fn((id: string) => {
         if (id === "example.com/pkg/a")
@@ -1112,7 +1205,7 @@ describe("resolveAncestorsOf", () => {
     const pkgA = createItem("example.com/pkg/a", "a", dir, [{ id: "package" }]);
     const pkgB = createItem("example.com/pkg/b", "b", dir, [{ id: "package" }]);
 
-    const run = { passed: vi.fn(), failed: vi.fn() };
+    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
     const controller = {
       getResult: vi.fn((id: string) => {
         if (id === "example.com/pkg/a")
@@ -1136,16 +1229,15 @@ describe("resolveAncestorsOf", () => {
       { id: "package" },
     ]);
 
-    const run = { passed: vi.fn(), failed: vi.fn() };
+    const results = new Map<string, { status: string; duration?: number }>();
+    results.set("example.com/internal/svc", { status: "pass", duration: 100 });
+
+    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
     const controller = {
-      getResult: vi.fn((id: string) => {
-        if (id === "example.com/internal/svc")
-          return { status: "pass" as const, duration: 100 };
-        if (id === "dir:internal")
-          return { status: "pass" as const, duration: undefined };
-        return undefined;
+      getResult: vi.fn((id: string) => results.get(id)),
+      recordResult: vi.fn((id: string, status: string, duration?: number) => {
+        results.set(id, { status, duration });
       }),
-      recordResult: vi.fn(),
     };
 
     resolveAncestorsOf(run as any, pkg as any, controller as any);
@@ -1162,6 +1254,55 @@ describe("resolveAncestorsOf", () => {
       "pass",
       undefined,
     );
+  });
+
+  it("resolves structural siblings from descendants when they have no stored result", () => {
+    // dir:pkg has two structural children: dir:platform (has package result)
+    // and dir:core (NO stored result, but its package descendant has a result).
+    // resolveAncestorsOf should resolve dir:core from its descendants and
+    // cascade to dir:pkg.
+    const root = createItem("wsFolder:root", "root", undefined);
+    const dirPkg = createItem("dir:pkg", "pkg", root);
+    const dirPlatform = createItem("dir:platform", "platform", dirPkg);
+    const dirCore = createItem("dir:core", "core", dirPkg);
+
+    const apiPkg = createItem("example.com/platform/api", "api", dirPlatform, [
+      { id: "package" },
+    ]);
+    createItem("example.com/platform/api/Api", "Api", apiPkg);
+
+    const authPkg = createItem("example.com/core/auth", "auth", dirCore, [
+      { id: "package" },
+    ]);
+    createItem("example.com/core/auth/Auth", "Auth", authPkg);
+
+    const results = new Map<string, { status: string; duration?: number }>();
+    results.set("example.com/platform/api", { status: "pass", duration: 100 });
+    results.set("example.com/platform/api/Api", {
+      status: "pass",
+      duration: 50,
+    });
+    results.set("example.com/core/auth", { status: "pass", duration: 150 });
+    results.set("example.com/core/auth/Auth", {
+      status: "pass",
+      duration: 75,
+    });
+
+    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
+    const controller = {
+      getResult: vi.fn((id: string) => results.get(id)),
+      recordResult: vi.fn((id: string, status: string, duration?: number) => {
+        results.set(id, { status, duration });
+      }),
+    };
+
+    resolveAncestorsOf(run as any, apiPkg as any, controller as any);
+
+    expect(run.passed).toHaveBeenCalledWith(dirPlatform);
+    expect(run.passed).toHaveBeenCalledWith(dirCore);
+    expect(run.passed).toHaveBeenCalledWith(dirPkg);
+    expect(run.passed).toHaveBeenCalledWith(root);
+    expect(run.failed).not.toHaveBeenCalled();
   });
 });
 
@@ -1235,21 +1376,35 @@ describe("applyResults records before resolving ancestors", () => {
         return undefined;
       }),
       getResult: vi.fn((id: string) => results.get(id)),
-      recordResult: vi.fn(
-        (id: string, status: string, duration?: number) => {
-          results.set(id, { status, duration });
-        },
-      ),
+      recordResult: vi.fn((id: string, status: string, duration?: number) => {
+        results.set(id, { status, duration });
+      }),
       createDynamicSubtest: vi.fn(),
     };
 
     const events = [
-      { Package: "example.com/pkg", Test: "MySuite/TestFoo", Action: "pass" as const, Elapsed: 0.1 },
-      { Package: "example.com/pkg", Test: "MySuite", Action: "pass" as const, Elapsed: 0.2 },
+      {
+        Package: "example.com/pkg",
+        Test: "MySuite/TestFoo",
+        Action: "pass" as const,
+        Elapsed: 0.1,
+      },
+      {
+        Package: "example.com/pkg",
+        Test: "MySuite",
+        Action: "pass" as const,
+        Elapsed: 0.2,
+      },
       { Package: "example.com/pkg", Action: "pass" as const, Elapsed: 0.3 },
     ];
 
-    applyResults(controller as any, run as any, events as any, "example.com/pkg", "/fake/dir");
+    applyResults(
+      controller as any,
+      run as any,
+      events as any,
+      "example.com/pkg",
+      "/fake/dir",
+    );
 
     // The package result must have been recorded
     expect(controller.recordResult).toHaveBeenCalledWith(

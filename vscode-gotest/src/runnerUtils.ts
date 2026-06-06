@@ -615,13 +615,27 @@ export function resolveAncestorsOf(
     let allResolved = true;
     current.children.forEach((child) => {
       const result = controller.getResult(child.id);
-      if (!result) {
+      if (result) {
+        if (result.status === "fail") anyFailed = true;
+        return;
+      }
+      const isStructural =
+        child.id.startsWith("dir:") ||
+        child.id.startsWith("wsFolder:") ||
+        child.id.startsWith("module:");
+      if (isStructural) {
+        const r = resolveItemRecursive(run, child, controller);
+        if (r.anyResolved) {
+          if (r.anyFailed) anyFailed = true;
+        } else {
+          allResolved = false;
+        }
+      } else {
         allResolved = false;
-      } else if (result.status === "fail") {
-        anyFailed = true;
       }
     });
     if (!allResolved) break;
+    run.started(current);
     if (anyFailed) {
       run.failed(current, []);
     } else {
@@ -666,6 +680,7 @@ function resolveItemRecursive(
   });
 
   if (anyResolved) {
+    run.started(item);
     if (anyFailed) {
       run.failed(item, []);
     } else {
