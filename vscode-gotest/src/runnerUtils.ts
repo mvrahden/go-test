@@ -48,7 +48,7 @@ export function skipUnresolved(
   });
 }
 
-export function enqueueAncestors(
+export function startAncestors(
   run: vscode.TestRun,
   items: vscode.TestItem[],
 ): void {
@@ -57,7 +57,7 @@ export function enqueueAncestors(
     let ancestor = item.parent;
     while (ancestor) {
       if (seen.has(ancestor.id)) break;
-      run.enqueued(ancestor);
+      run.started(ancestor);
       seen.add(ancestor.id);
       ancestor = ancestor.parent;
     }

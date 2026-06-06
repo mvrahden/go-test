@@ -49,7 +49,7 @@ import {
   applyResults,
   applyEvent,
   enqueueDescendants,
-  enqueueAncestors,
+  startAncestors,
   resolveAncestorItems,
   resolveAncestorsOf,
   skipUnresolved,
@@ -1308,20 +1308,20 @@ describe("resolveAncestorItems", () => {
   });
 });
 
-describe("enqueueAncestors", () => {
-  it("enqueues all ancestors of given items", () => {
+describe("startAncestors", () => {
+  it("starts all ancestors of given items", () => {
     const root = createItem("dir:pkg", "pkg", undefined);
     const sub = createItem("dir:pkg/sub", "sub", root);
     const pkg = createItem("example.com/pkg/sub/a", "a", sub, [
       { id: "package" },
     ]);
 
-    const run = { enqueued: vi.fn() };
-    enqueueAncestors(run as any, [pkg as any]);
+    const run = { started: vi.fn() };
+    startAncestors(run as any, [pkg as any]);
 
-    expect(run.enqueued).toHaveBeenCalledTimes(2);
-    expect(run.enqueued).toHaveBeenCalledWith(sub);
-    expect(run.enqueued).toHaveBeenCalledWith(root);
+    expect(run.started).toHaveBeenCalledTimes(2);
+    expect(run.started).toHaveBeenCalledWith(sub);
+    expect(run.started).toHaveBeenCalledWith(root);
   });
 
   it("deduplicates shared ancestors", () => {
@@ -1333,11 +1333,11 @@ describe("enqueueAncestors", () => {
       { id: "package" },
     ]);
 
-    const run = { enqueued: vi.fn() };
-    enqueueAncestors(run as any, [pkgA as any, pkgB as any]);
+    const run = { started: vi.fn() };
+    startAncestors(run as any, [pkgA as any, pkgB as any]);
 
-    expect(run.enqueued).toHaveBeenCalledTimes(1);
-    expect(run.enqueued).toHaveBeenCalledWith(root);
+    expect(run.started).toHaveBeenCalledTimes(1);
+    expect(run.started).toHaveBeenCalledWith(root);
   });
 });
 
