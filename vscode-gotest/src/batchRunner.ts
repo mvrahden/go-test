@@ -7,7 +7,8 @@ import type { CoverageStore } from "./coverageStore.js";
 import { type TestEvent } from "./outputParser.js";
 import { buildCliCommand, formatCliCommand } from "./cli.js";
 import {
-  applyResults,
+  applyEvent,
+  skipUnresolved,
   spawnTestProcess,
   resolveRunPatterns,
   readWorkspacePatterns,
@@ -103,7 +104,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     outputChannel.info(`[${label}] ${formatCliCommand(cmd)}`);
 
     const streamedPkgs = new Set<string>();
-    const pkgEventBuffers = new Map<string, TestEvent[]>();
+    const pkgOutputMaps = new Map<string, Map<string, string>>();
     const pkgDirMap = new Map(pkgInfos.map((p) => [p.importPath, p.dir]));
 
     const handleStdoutLine = (line: string) => {
@@ -115,12 +116,24 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         return;
       }
 
-      let buffer = pkgEventBuffers.get(event.Package);
-      if (!buffer) {
-        buffer = [];
-        pkgEventBuffers.set(event.Package, buffer);
+      const dir = pkgDirMap.get(event.Package);
+      if (!dir) return;
+
+      let outputMap = pkgOutputMaps.get(event.Package);
+      if (!outputMap) {
+        outputMap = new Map();
+        pkgOutputMaps.set(event.Package, outputMap);
       }
-      buffer.push(event);
+
+      const result = applyEvent(
+        controller,
+        run,
+        event,
+        outputMap,
+        event.Package,
+        dir,
+      );
+      if (result) onResults?.([result]);
 
       const isTerminal =
         !event.Test &&
@@ -128,19 +141,8 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
           event.Action === "fail" ||
           event.Action === "skip");
       if (isTerminal) {
-        const dir = pkgDirMap.get(event.Package);
-        if (dir) {
-          const applied = applyResults(
-            controller,
-            run,
-            buffer,
-            event.Package,
-            dir,
-          );
-          onResults?.(applied);
-          streamedPkgs.add(event.Package);
-        }
-        pkgEventBuffers.set(event.Package, []);
+        streamedPkgs.add(event.Package);
+        pkgOutputMaps.delete(event.Package);
       }
     };
 
@@ -155,26 +157,6 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       handleStdoutLine,
     );
 
-    for (const [pkg, buffer] of pkgEventBuffers) {
-      if (buffer.length > 0) {
-        const dir = pkgDirMap.get(pkg);
-        if (dir) {
-          const applied = applyResults(controller, run, buffer, pkg, dir);
-          onResults?.(applied);
-          const hasTerminal = buffer.some(
-            (e) =>
-              !e.Test &&
-              (e.Action === "pass" ||
-                e.Action === "fail" ||
-                e.Action === "skip"),
-          );
-          if (hasTerminal) {
-            streamedPkgs.add(pkg);
-          }
-        }
-      }
-    }
-
     if (token.isCancellationRequested) {
       const skippedPkgs = pkgInfos.filter(
         (i) => !streamedPkgs.has(i.importPath),
@@ -187,6 +169,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       for (const info of skippedPkgs) {
         for (const item of info.items) {
           run.skipped(item);
+          skipUnresolved(run, item, controller);
         }
       }
       return { stdout: result.stdout };
@@ -217,6 +200,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
           .join("\n\n");
         for (const item of info.items) {
           run.errored(item, new vscode.TestMessage(diagnostic));
+          skipUnresolved(run, item, controller);
         }
       }
     }
@@ -269,6 +253,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     for (const info of pkgInfos) {
       for (const item of info.items) {
         run.errored(item, new vscode.TestMessage(message));
+        skipUnresolved(run, item, controller);
       }
     }
     return { stdout: "" };
