@@ -328,7 +328,14 @@ export function applyResults(
   const outputMap = new Map<string, string>();
   const applied: AppliedResult[] = [];
   for (const event of events) {
-    const result = applyEvent(controller, run, event, outputMap, importPath, pkgDir);
+    const result = applyEvent(
+      controller,
+      run,
+      event,
+      outputMap,
+      importPath,
+      pkgDir,
+    );
     if (result) applied.push(result);
   }
   return applied;
