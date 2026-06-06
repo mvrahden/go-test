@@ -52,6 +52,7 @@ import {
   enqueueAncestors,
   resolveAncestorItems,
   resolveAncestorsOf,
+  skipUnresolved,
 } from "./runnerUtils.js";
 import { buildPathTrie, collapsePathTrie, type PathNode } from "./pathTrie.js";
 
@@ -1609,5 +1610,86 @@ describe("applyResults records before resolving ancestors", () => {
     );
     // resolveAncestorsOf should have resolved dir:pkg because the pkg result was in the store
     expect(run.passed).toHaveBeenCalledWith(dir);
+  });
+});
+
+describe("skipUnresolved", () => {
+  it("marks descendants without results as skipped", () => {
+    const pkg = createItem("example.com/pkg", "pkg", undefined, [
+      { id: "package" },
+    ]);
+    const suite = createItem("example.com/pkg/SuiteA", "SuiteA", pkg);
+    const method1 = createItem("example.com/pkg/SuiteA/Test1", "Test1", suite);
+    const method2 = createItem("example.com/pkg/SuiteA/Test2", "Test2", suite);
+
+    const run = { skipped: vi.fn() };
+    const controller = {
+      getResult: vi.fn(() => undefined),
+    };
+
+    skipUnresolved(run as any, pkg as any, controller as any);
+
+    expect(run.skipped).toHaveBeenCalledTimes(3);
+    expect(run.skipped).toHaveBeenCalledWith(suite);
+    expect(run.skipped).toHaveBeenCalledWith(method1);
+    expect(run.skipped).toHaveBeenCalledWith(method2);
+  });
+
+  it("does not touch items that have results", () => {
+    const pkg = createItem("example.com/pkg", "pkg", undefined, [
+      { id: "package" },
+    ]);
+    const suite = createItem("example.com/pkg/SuiteA", "SuiteA", pkg);
+    const method1 = createItem("example.com/pkg/SuiteA/Test1", "Test1", suite);
+    const method2 = createItem("example.com/pkg/SuiteA/Test2", "Test2", suite);
+
+    const run = { skipped: vi.fn() };
+    const controller = {
+      getResult: vi.fn((id: string) => {
+        if (id === "example.com/pkg/SuiteA/Test1")
+          return { status: "pass" as const, duration: 100 };
+        return undefined;
+      }),
+    };
+
+    skipUnresolved(run as any, pkg as any, controller as any);
+
+    expect(run.skipped).toHaveBeenCalledTimes(2);
+    expect(run.skipped).toHaveBeenCalledWith(suite);
+    expect(run.skipped).toHaveBeenCalledWith(method2);
+    expect(run.skipped).not.toHaveBeenCalledWith(method1);
+  });
+
+  it("is a no-op for leaf items with no children", () => {
+    const method = createItem("example.com/pkg/SuiteA/Test1", "Test1");
+    const run = { skipped: vi.fn() };
+    const controller = { getResult: vi.fn(() => undefined) };
+
+    skipUnresolved(run as any, method as any, controller as any);
+
+    expect(run.skipped).not.toHaveBeenCalled();
+  });
+
+  it("recurses through dynamic subtests", () => {
+    const method = createItem("example.com/pkg/Suite/Test1", "Test1");
+    const dynamic1 = createItem(
+      "example.com/pkg/Suite/Test1/dynamic/sub1",
+      "sub1",
+      method,
+    );
+    const dynamic2 = createItem(
+      "example.com/pkg/Suite/Test1/dynamic/sub2",
+      "sub2",
+      method,
+    );
+
+    const run = { skipped: vi.fn() };
+    const controller = { getResult: vi.fn(() => undefined) };
+
+    skipUnresolved(run as any, method as any, controller as any);
+
+    expect(run.skipped).toHaveBeenCalledTimes(2);
+    expect(run.skipped).toHaveBeenCalledWith(dynamic1);
+    expect(run.skipped).toHaveBeenCalledWith(dynamic2);
   });
 });

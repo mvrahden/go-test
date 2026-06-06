@@ -35,6 +35,19 @@ export function enqueueDescendants(
   });
 }
 
+export function skipUnresolved(
+  run: vscode.TestRun,
+  item: vscode.TestItem,
+  controller: GoTestController,
+): void {
+  item.children.forEach((child) => {
+    skipUnresolved(run, child, controller);
+    if (!controller.getResult(child.id)) {
+      run.skipped(child);
+    }
+  });
+}
+
 export function enqueueAncestors(
   run: vscode.TestRun,
   items: vscode.TestItem[],
