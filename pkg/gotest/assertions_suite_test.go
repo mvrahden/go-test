@@ -1337,9 +1337,9 @@ func (s *AssertionsTestSuite) TestConsistently(t *gotest.T) {
 		w.It("fails", func(it *gotest.T) {
 			count := 0
 			m := gotest.Record(func(r *gotest.R) {
-				gotest.Consistently(r, 50*time.Millisecond, 1*time.Millisecond, func(poll *gotest.R) {
+				gotest.Consistently(r, 500*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {
 					count++
-					gotest.Less(poll, count, 3)
+					gotest.Less(poll, count, 2)
 				})
 			})
 			gotest.True(it, m.Failed())

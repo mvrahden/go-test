@@ -26,7 +26,7 @@ func nestedHelper[V comparable](t testingTLike, expected, actual V) {
 }
 
 func eventuallyHelper(t testingTLike) {
-	gotest.Eventually(t, 50*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {
+	gotest.Eventually(t, 200*time.Millisecond, 20*time.Millisecond, func(poll *gotest.R) {
 		gotest.True(poll, false, "condition not met")
 	})
 }

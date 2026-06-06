@@ -13,20 +13,20 @@ linereport_suite_test.go:35: Equal failed:
   expected: 1
   actual:   2
 === SNAP TestEventually/called_directly_from_test_(no_helper)/timeout_references_this_file ===
-linereport_suite_test.go:35: Eventually failed after 50ms (N polls):
+linereport_suite_test.go:35: Eventually failed after 200ms (N polls):
   last failure:
     linereport_suite_test.go:160: True failed:
   expected: true
   actual:   false
 === SNAP TestEventually/inner_assertion_fails_(via_*R)/timeout_includes_inner_assertion_call_site ===
-linereport_suite_test.go:35: Eventually failed after 50ms (N polls):
+linereport_suite_test.go:35: Eventually failed after 200ms (N polls):
   last failure:
     linereport_suite_test.go:146: True failed:
   expected: true
   actual:   false
   message: condition not met
 === SNAP TestHelperCallingEventually/Eventually_times_out_inside_a_helper/traces_back_to_this_file_not_the_helper ===
-linereport_suite_test.go:35: Eventually failed after 50ms (N polls):
+linereport_suite_test.go:35: Eventually failed after 200ms (N polls):
   last failure:
     linereport_helpers_test.go:30: True failed:
   expected: true
