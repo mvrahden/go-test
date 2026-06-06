@@ -371,9 +371,16 @@ func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
 	attempts := 1 + node.Config.Retries
 	var lastErr error
 
+	wrapErr := func(err error) error {
+		if err == nil {
+			return nil
+		}
+		return fmt.Errorf("%s.BeforeAll: %w", node.Name, err)
+	}
+
 	for i := range attempts {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return wrapErr(ctx.Err())
 		}
 
 		var attemptCtx context.Context
@@ -391,14 +398,14 @@ func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
 			return nil
 		}
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return wrapErr(ctx.Err())
 		}
 		if i < attempts-1 {
 			fmt.Fprintf(os.Stderr, "%s.BeforeAll attempt %d/%d failed: %v\n", node.Name, i+1, attempts, lastErr)
 			if node.Config.RetryDelay > 0 {
 				select {
 				case <-ctx.Done():
-					return ctx.Err()
+					return wrapErr(ctx.Err())
 				case <-time.After(node.Config.RetryDelay):
 				}
 			}
@@ -406,7 +413,7 @@ func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
 	}
 
 	fmt.Fprintf(os.Stderr, "FAIL: %s.BeforeAll failed after %d attempt(s): %v\n", node.Name, attempts, lastErr)
-	return lastErr
+	return fmt.Errorf("%s.BeforeAll: %w", node.Name, lastErr)
 }
 
 func teardownRoots(roots []*FixtureNode, tracker *nodeTracker) bool {
