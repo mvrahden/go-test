@@ -48,35 +48,34 @@ func didPanic(f func()) (recovered any, panicked bool) {
 	return nil, false
 }
 
-func includesElement(s, element any) bool {
+func includesElement(s, element any) (found, valid bool) {
 	if s == nil {
-		return false
+		return false, true
 	}
-	// string substring check
 	if str, ok := s.(string); ok {
 		sub, ok := element.(string)
 		if !ok {
-			return false
+			return false, true
 		}
-		return strings.Contains(str, sub)
+		return strings.Contains(str, sub), true
 	}
 	rv := reflect.ValueOf(s)
 	switch rv.Kind() {
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < rv.Len(); i++ {
 			if reflect.DeepEqual(rv.Index(i).Interface(), element) {
-				return true
+				return true, true
 			}
 		}
-		return false
+		return false, true
 	case reflect.Map:
 		mapKey := reflect.ValueOf(element)
 		if !mapKey.IsValid() {
-			return false
+			return false, true
 		}
-		return rv.MapIndex(mapKey).IsValid()
+		return rv.MapIndex(mapKey).IsValid(), true
 	}
-	return false
+	return false, false
 }
 
 // isEmpty reports whether a value is considered empty: nil, zero-length
@@ -177,7 +176,12 @@ func Consistently(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
 
 // Contains asserts that s contains the given element (substring for strings, element for slices/arrays, key for maps).
 func Contains(t testingT, s, contains any, msgAndArgs ...any) {
-	if !includesElement(s, contains) {
+	found, valid := includesElement(s, contains)
+	if !valid {
+		fail(t, fmt.Sprintf("Contains failed:\n  object of type %T is not a string, slice, array, or map", s), msgAndArgs)
+		return
+	}
+	if !found {
 		fail(t, fmt.Sprintf("Contains failed:\n  %#v does not contain %#v", s, contains), msgAndArgs)
 	}
 }
@@ -303,7 +307,7 @@ func GreaterOrEqual[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
 
 // InDelta asserts that expected and actual are within delta of each other.
 func InDelta[V numeric](t testingT, expected, actual V, delta float64, msgAndArgs ...any) {
-	diff := math.Abs(float64(expected - actual))
+	diff := math.Abs(float64(expected) - float64(actual))
 	if diff > delta {
 		fail(t, fmt.Sprintf("InDelta failed:\n  |%v - %v| = %v exceeds delta %v", expected, actual, diff, delta), msgAndArgs)
 	}
@@ -369,7 +373,12 @@ func NoError(t testingT, err error, msgAndArgs ...any) {
 
 // NotContains asserts that s does NOT contain the given element.
 func NotContains(t testingT, s, contains any, msgAndArgs ...any) {
-	if includesElement(s, contains) {
+	found, valid := includesElement(s, contains)
+	if !valid {
+		fail(t, fmt.Sprintf("NotContains failed:\n  object of type %T is not a string, slice, array, or map", s), msgAndArgs)
+		return
+	}
+	if found {
 		fail(t, fmt.Sprintf("NotContains failed:\n  %#v should not contain %#v", s, contains), msgAndArgs)
 	}
 }

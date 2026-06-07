@@ -81,6 +81,11 @@ func runScaffoldFile(target string) int {
 func writeScaffoldFile(pkgDir, filename string, content []byte) int {
 	outPath := filepath.Join(pkgDir, filename)
 
+	if _, err := os.Stat(outPath); err == nil {
+		fmt.Fprintf(os.Stderr, "scaffold: %s already exists, refusing to overwrite\n", outPath)
+		return 1
+	}
+
 	if err := os.WriteFile(outPath, content, 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "scaffold: failed to write %s: %v\n", outPath, err)
 		return 1

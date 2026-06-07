@@ -309,6 +309,12 @@ loop:
 			wg.Add(1)
 			go func(t SuiteTarget, idx int) {
 				defer wg.Done()
+				recorded := false
+				defer func() {
+					if !recorded {
+						collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
+					}
+				}()
 
 				requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[t.Package][t.SuiteName]
 				var env []string
@@ -356,6 +362,7 @@ loop:
 
 				r := RunSingleSuite(streamCtx, t, env, collector.UsesTest2JSON())
 				collector.RecordResult(t.Package, idx, r)
+				recorded = true
 			}(target, i)
 		}
 	}

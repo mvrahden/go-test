@@ -490,11 +490,6 @@ export class CoverageRunner implements vscode.Disposable {
       outputChannel: this.outputChannel,
       label: "coverage",
       coverage: { store: this.store, testOnly },
-      onResults: (applied) => {
-        for (const r of applied) {
-          this.controller.recordResult(r.itemId, r.status, r.duration);
-        }
-      },
     });
     return result.stdout;
   }
