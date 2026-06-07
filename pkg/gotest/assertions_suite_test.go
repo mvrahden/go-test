@@ -1073,6 +1073,14 @@ func (s *AssertionsTestSuite) TestRegexp(t *gotest.T) {
 			gotest.True(it, m.Failed())
 		})
 	})
+
+	t.When("regexp is nil", func(w *gotest.T) {
+		w.It("fails with nil regexp error", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Regexp(r, (*regexp.Regexp)(nil), "anything") })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "regexp is nil")
+		})
+	})
 }
 
 func (s *AssertionsTestSuite) TestInDelta(t *gotest.T) {

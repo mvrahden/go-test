@@ -426,6 +426,10 @@ func Regexp[P regexpPattern](t testingT, rx P, str string, msgAndArgs ...any) {
 			return
 		}
 	case *regexp.Regexp:
+		if v == nil {
+			fail(t, "Regexp failed:\n  regexp is nil", msgAndArgs)
+			return
+		}
 		re = v
 	}
 	if !re.MatchString(str) {
