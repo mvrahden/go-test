@@ -8,6 +8,12 @@ import (
 )
 
 func DeterminePkgDir(p *packages.Package) string {
+	if p.Module == nil {
+		if len(p.GoFiles) > 0 {
+			return filepath.Dir(p.GoFiles[0])
+		}
+		return ""
+	}
 	modDir := p.Module.Dir
 	modPath := p.Module.Path
 	pkgPath := p.PkgPath
