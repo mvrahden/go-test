@@ -308,7 +308,7 @@ func GreaterOrEqual[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
 // InDelta asserts that expected and actual are within delta of each other.
 func InDelta[V numeric](t testingT, expected, actual V, delta float64, msgAndArgs ...any) {
 	diff := math.Abs(float64(expected) - float64(actual))
-	if diff > delta {
+	if math.IsNaN(diff) || diff > delta {
 		fail(t, fmt.Sprintf("InDelta failed:\n  |%v - %v| = %v exceeds delta %v", expected, actual, diff, delta), msgAndArgs)
 	}
 }

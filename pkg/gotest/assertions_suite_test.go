@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"sync/atomic"
 	"time"
@@ -1131,6 +1132,21 @@ func (s *AssertionsTestSuite) TestInDelta(t *gotest.T) {
 	t.When("delta is zero", func(w *gotest.T) {
 		w.It("fails for unequal values", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.InDelta(r, 5, 6, 0.0) })
+			gotest.True(it, m.Failed())
+		})
+	})
+
+	t.When("values are NaN", func(w *gotest.T) {
+		w.It("fails when expected is NaN", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.InDelta(r, math.NaN(), 1.0, 100.0) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails when actual is NaN", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.InDelta(r, 1.0, math.NaN(), 100.0) })
+			gotest.True(it, m.Failed())
+		})
+		w.It("fails when both are NaN", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.InDelta(r, math.NaN(), math.NaN(), 100.0) })
 			gotest.True(it, m.Failed())
 		})
 	})
