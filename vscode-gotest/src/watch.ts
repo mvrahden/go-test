@@ -9,6 +9,7 @@ import {
   applyResults,
   killProcessTree,
   resolveAncestorItems,
+  skipUnresolved,
 } from "./runnerUtils.js";
 import type { RunRegistry } from "./runRegistry.js";
 
@@ -243,6 +244,10 @@ export class WatchManager implements vscode.Disposable {
         // End previous TestRun if any
         const existingRun = this.activeRuns.get(pkgScope);
         if (existingRun) {
+          this.controller.testController.items.forEach((root) => {
+            skipUnresolved(existingRun, root, this.controller);
+          });
+          resolveAncestorItems(existingRun, this.controller);
           existingRun.end();
         }
 
