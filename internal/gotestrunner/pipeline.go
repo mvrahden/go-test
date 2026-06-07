@@ -80,6 +80,7 @@ func buildBaseEnv(cfg PipelineConfig) []string {
 
 func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []string, setupTimeout time.Duration) ([]CompileResult, *SharedFixtureProcess, error) {
 	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	var compiled []CompileResult
 	var compileErr error
@@ -115,7 +116,6 @@ func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []st
 	wg.Wait()
 
 	if compileErr != nil || setupErr != nil {
-		cancel()
 		if setupProc != nil {
 			setupProc.Teardown()
 		}
@@ -391,8 +391,13 @@ loop:
 
 	collector.Finalize(overlay.NoSuitePackages)
 
+	exitCode := collector.WorstExitCode()
+	if ctx.Err() != nil && exitCode == 0 {
+		exitCode = 130
+	}
+
 	return PipelineResult{
-		ExitCode:     collector.WorstExitCode(),
+		ExitCode:     exitCode,
 		CapturedJSON: collector.CapturedJSON(),
 	}, nil
 }
