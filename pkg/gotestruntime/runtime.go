@@ -75,6 +75,12 @@ func setupRoots(ctx context.Context, roots []*FixtureNode, sharedState map[strin
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					errs[i] = fmt.Errorf("%s: panic: %v", root.Name, r)
+					cancel()
+				}
+			}()
 			if err := setupNode(childCtx, root, sharedState, tracker); err != nil {
 				errs[i] = err
 				cancel()
@@ -141,6 +147,12 @@ func setupNode(ctx context.Context, node *FixtureNode, sharedState map[string]js
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						errs[i] = fmt.Errorf("%s: panic: %v", child.Name, r)
+						cancel()
+					}
+				}()
 				if err := setupNode(childCtx, child, sharedState, tracker); err != nil {
 					errs[i] = err
 					cancel()
@@ -190,6 +202,14 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 		go func(node *FixtureNode) {
 			defer wg.Done()
 			defer close(done[node.Name])
+			defer func() {
+				if r := recover(); r != nil {
+					mu.Lock()
+					errs[node.Name] = fmt.Errorf("%s: panic: %v", node.Name, r)
+					mu.Unlock()
+					cancel()
+				}
+			}()
 
 			for _, dep := range node.DependsOn {
 				select {
@@ -529,6 +549,7 @@ func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
 			return d
 		}
 		if visiting[name] {
+			fmt.Fprintf(os.Stderr, "WARN: cycle detected in fixture DAG at %q, budget may be inaccurate\n", name)
 			return 0
 		}
 		visiting[name] = true
