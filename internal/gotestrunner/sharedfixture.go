@@ -154,6 +154,7 @@ func (p *SharedFixtureProcess) Teardown() error {
 	select {
 	case <-p.done:
 	case <-time.After(timeout):
+		fmt.Fprintf(os.Stderr, "WARN: shared fixture process did not exit within %v, forcing termination\n", timeout)
 		ForceKillProcessGroup(p.cmd.Process.Pid)
 		<-p.done
 	}
