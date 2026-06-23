@@ -250,13 +250,6 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	streamCtx, streamCancel := context.WithCancel(ctx)
 	defer streamCancel()
 
-	var setupDeadline <-chan time.Time
-	if resolvedSetupTimeout > 0 && len(overlay.SharedFixtures) > 0 {
-		timer := time.NewTimer(resolvedSetupTimeout)
-		defer timer.Stop()
-		setupDeadline = timer.C
-	}
-
 	if len(overlay.SharedFixtures) > 0 {
 		fixtureWg.Add(1)
 		go func() {
@@ -270,6 +263,12 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 			close(fixtureStarted)
 			if err != nil {
 				return
+			}
+			var setupDeadline <-chan time.Time
+			if resolvedSetupTimeout > 0 {
+				timer := time.NewTimer(resolvedSetupTimeout)
+				defer timer.Stop()
+				setupDeadline = timer.C
 			}
 			select {
 			case <-setupProc.AllDone():
