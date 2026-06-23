@@ -117,7 +117,17 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 {{ range .TeardownFixtures }}
 		if ƒerrs[{{ .Index }}] == nil {
-			{{ .VarName }}.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_{{ .VarName }}.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_{{ .VarName }}.Timeout)
+					defer cancel()
+				}
+				if err := {{ .VarName }}.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "{{ .Identifier }}.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 {{- end }}
 		os.Exit(1)

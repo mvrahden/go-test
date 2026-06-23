@@ -143,10 +143,30 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[1] == nil {
-			sf1.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf1.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf1.Timeout)
+					defer cancel()
+				}
+				if err := sf1.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "RedisFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		if ƒerrs[0] == nil {
-			sf0.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf0.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+					defer cancel()
+				}
+				if err := sf0.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "PostgresFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		os.Exit(1)
 	} else {
@@ -288,7 +308,17 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			sf0.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf0.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+					defer cancel()
+				}
+				if err := sf0.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "PostgresFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		os.Exit(1)
 	} else {
@@ -400,7 +430,17 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			sf0.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf0.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+					defer cancel()
+				}
+				if err := sf0.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "SetupFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		os.Exit(1)
 	} else {
@@ -525,7 +565,17 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			sf0.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf0.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+					defer cancel()
+				}
+				if err := sf0.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "PostgresFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		os.Exit(1)
 	} else {
@@ -699,10 +749,30 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[1] == nil {
-			sf1.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf1.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf1.Timeout)
+					defer cancel()
+				}
+				if err := sf1.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "RedisFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		if ƒerrs[0] == nil {
-			sf0.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf0.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+					defer cancel()
+				}
+				if err := sf0.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "PostgresFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		os.Exit(1)
 	} else {
@@ -842,7 +912,17 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			sf0.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf0.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+					defer cancel()
+				}
+				if err := sf0.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "PGFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		os.Exit(1)
 	} else {
@@ -967,7 +1047,17 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			sf0.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf0.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+					defer cancel()
+				}
+				if err := sf0.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "PGFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		os.Exit(1)
 	} else {
@@ -1092,7 +1182,17 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			sf0.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf0.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+					defer cancel()
+				}
+				if err := sf0.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "PGFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		os.Exit(1)
 	} else {
@@ -1217,7 +1317,17 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			sf0.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf0.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+					defer cancel()
+				}
+				if err := sf0.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "PGFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		os.Exit(1)
 	} else {
@@ -1392,10 +1502,30 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[1] == nil {
-			sf1.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf1.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf1.Timeout)
+					defer cancel()
+				}
+				if err := sf1.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "RedisFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		if ƒerrs[0] == nil {
-			sf0.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf0.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+					defer cancel()
+				}
+				if err := sf0.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "PGFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		os.Exit(1)
 	} else {
@@ -1535,7 +1665,17 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			sf0.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf0.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+					defer cancel()
+				}
+				if err := sf0.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "PGFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		os.Exit(1)
 	} else {
@@ -1661,7 +1801,17 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			sf0.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf0.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+					defer cancel()
+				}
+				if err := sf0.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "PGFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		os.Exit(1)
 	} else {
@@ -1838,10 +1988,30 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[1] == nil {
-			sf1.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf1.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf1.Timeout)
+					defer cancel()
+				}
+				if err := sf1.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "GCSFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		if ƒerrs[0] == nil {
-			sf0.AfterAll(context.Background())
+			{
+				ctx := context.Background()
+				if ƒcfg_sf0.Timeout > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, ƒcfg_sf0.Timeout)
+					defer cancel()
+				}
+				if err := sf0.AfterAll(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "PostgresFixture.AfterAll failed: %v\n", err)
+				}
+			}
 		}
 		os.Exit(1)
 	} else {
