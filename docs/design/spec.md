@@ -108,7 +108,8 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--output=<path>` | Write formatted output to file |
 | `--no-color` | Strip ANSI codes from terminal output |
 | `--min=<pct>` | Fail if coverage below threshold (enables `-coverprofile`) |
-| `--setup-timeout=<dur>` | Override fixture setup timeout |
+| `--setup-timeout=<dur>` | Override fixture setup timeout (default: 2m, 0 to disable) |
+| `--timeout=<dur>` | Global pipeline deadline (default: 15m, 0 to disable) |
 | `--debounce=<dur>` | Debounce interval for watch mode (default 200ms) |
 | `--input=<path>` | Input file for `spec` subcommand |
 
@@ -527,10 +528,10 @@ type SuiteConfig struct {
 | Value | Meaning |
 |-------|---------|
 | `> 0` | Use this duration |
-| `0`   | Keep default (field not overridden) |
-| `< 0` | Explicitly disabled (no timeout) |
+| `0`   | Explicitly disabled (no timeout) |
 
 This applies to `Timeout`, `SetupTimeout`, and `RetryDelay`.
+Omit the field (or leave nil in `ProjectConfig`) to keep the default.
 Boolean fields (`FailFast`, `Parallel`) only override to `true` — a false overlay does not reset a true base.
 
 #### Marker Methods

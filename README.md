@@ -600,7 +600,7 @@ func (s *BatchTestSuite) SuiteConfig() gotest.SuiteConfig {
 ```
 
 Only non-zero fields override.
-Use negative duration to explicitly disable a timeout (`Timeout: -1`).
+Use zero duration to explicitly disable a timeout (`Timeout: 0`).
 
 Preset constructors for common scenarios:
 
@@ -619,6 +619,7 @@ CLI flags always take precedence over config values; zero/omitted fields are ign
 ```yaml
 # .gotest.yml
 tags: "integration,e2e"
+timeout: 15m
 setup-timeout: 5m
 min-coverage: 80
 parallel: 12
@@ -632,7 +633,8 @@ lint:
 | Field | Type | CLI flag | Description |
 |-------|------|----------|-------------|
 | `tags` | string | `-tags` | Comma-separated build tags |
-| `setup-timeout` | duration | `--setup-timeout` | Total budget for shared fixture setup |
+| `timeout` | duration | `--timeout` | Global pipeline deadline (default: 15m, 0 to disable) |
+| `setup-timeout` | duration | `--setup-timeout` | Total budget for shared fixture setup (default: 2m, 0 to disable) |
 | `min-coverage` | int | `--min` | Minimum coverage percentage (0–100) |
 | `parallel` | int | `--parallel` | Total concurrent test method budget |
 | `debounce` | duration | `--debounce` | Watch mode re-run delay |

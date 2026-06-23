@@ -477,9 +477,13 @@ startup durations.
 ```
 ┌────────────────────── Timeout Hierarchy ──────────────────────────────┐
 │                                                                        │
+│  --timeout (CLI flag)                                                  │
+│  └─ Global pipeline deadline (covers compile + setup + test + teardown)│
+│     Default: 15m (0 to disable)                                        │
+│                                                                        │
 │  --setup-timeout (CLI flag)                                            │
 │  └─ Total budget for shared fixture subprocess to emit JSON state      │
-│     Default: 0 (no external deadline; per-fixture timeouts govern)     │
+│     Default: 2m (0 to disable)                                         │
 │                                                                        │
 │  SharedFixtureConfig.Timeout (per shared fixture)                      │
 │  └─ Deadline on each BeforeAll/AfterAll call in the setup subprocess   │
