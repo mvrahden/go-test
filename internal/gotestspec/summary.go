@@ -71,6 +71,9 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 		fmt.Fprintf(w, "%s%d tests passed%s (%s)\n",
 			c.green, stats.Total(), c.reset,
 			formatDuration(totalDuration(packages)))
+		if cfg.coverage != nil {
+			fmt.Fprintf(w, "%sCoverage: %.1f%%%s\n", c.dim, cfg.coverage.Total, c.reset)
+		}
 		return
 	}
 
@@ -92,16 +95,27 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 	}
 
 	fmt.Fprintln(w)
+	if cfg.coverage != nil {
+		fmt.Fprintf(w, "%sCoverage: %.1f%%%s\n", c.dim, cfg.coverage.Total, c.reset)
+	}
 	renderSummary(w, stats, c)
 }
 
-func RenderMarkdownSummary(w io.Writer, packages []*Package) {
+func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
+	cfg := renderConfig{}
+	for _, o := range opts {
+		o(&cfg)
+	}
+
 	stats := CollectStats(packages)
 	failures := collectFailures(packages)
 
 	if len(failures) == 0 {
 		fmt.Fprintf(w, "### All %d tests passed (%s)\n",
 			stats.Total(), formatDuration(totalDuration(packages)))
+		if cfg.coverage != nil {
+			renderMarkdownCoverage(w, cfg.coverage)
+		}
 		return
 	}
 
@@ -125,6 +139,9 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package) {
 	}
 
 	fmt.Fprintln(w)
+	if cfg.coverage != nil {
+		renderMarkdownCoverage(w, cfg.coverage)
+	}
 
 	fmt.Fprint(w, "---\n")
 	var parts []string
@@ -139,4 +156,16 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package) {
 	}
 	fmt.Fprintf(w, "%s: %d passed, %d failed, %d skipped\n",
 		strings.Join(parts, ", "), stats.Passed, stats.Failed, stats.Skipped)
+}
+
+func renderMarkdownCoverage(w io.Writer, report *CoverageReport) {
+	fmt.Fprintf(w, "### Coverage: %.1f%%\n\n", report.Total)
+	if len(report.Packages) > 1 {
+		fmt.Fprintln(w, "| Package | Coverage |")
+		fmt.Fprintln(w, "|---------|----------|")
+		for _, pkg := range report.Packages {
+			fmt.Fprintf(w, "| `%s` | %.1f%% |\n", pkg.Path, pkg.Percentage)
+		}
+		fmt.Fprintln(w)
+	}
 }

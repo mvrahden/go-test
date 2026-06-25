@@ -23,13 +23,18 @@ var ansiColors = colors{
 var noColors = colors{}
 
 type renderConfig struct {
-	color bool
+	color    bool
+	coverage *CoverageReport
 }
 
 type RenderOption func(*renderConfig)
 
 func WithNoColor() RenderOption {
 	return func(c *renderConfig) { c.color = false }
+}
+
+func WithCoverage(report *CoverageReport) RenderOption {
+	return func(c *renderConfig) { c.coverage = report }
 }
 
 func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {

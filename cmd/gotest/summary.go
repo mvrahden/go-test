@@ -25,11 +25,12 @@ func runSummary(inv Invocation) int {
 	format := extractStringFlag(ownArgs, "--format", "terminal")
 	output := extractStringFlag(ownArgs, "--output", "")
 	input := extractStringFlag(ownArgs, "--input", "")
+	coverageProfile := extractStringFlag(ownArgs, "--coverage", "")
 	noColor := hasFlag(ownArgs, "--no-color")
 	github := hasFlag(ownArgs, "--github") || os.Getenv("GITHUB_ACTIONS") == "true"
 
 	if input != "" {
-		return runSummaryFromInput(input, format, output, noColor, github)
+		return runSummaryFromInput(input, format, output, coverageProfile, noColor, github)
 	}
 
 	setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
@@ -155,7 +156,15 @@ func runSummary(inv Invocation) int {
 
 	tree := gotestspec.BuildTree(events)
 
-	writeSummaryOutput(tree, format, output, noColor, github)
+	if coverageProfile == "" {
+		for _, arg := range goTestArgs {
+			if v, ok := strings.CutPrefix(arg, "-coverprofile="); ok {
+				coverageProfile = v
+			}
+		}
+	}
+
+	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github)
 
 	if code == 0 && minCoverage > 0 && coverProfile != "" {
 		pct, err := readCoverageTotal(coverProfile)
@@ -172,7 +181,7 @@ func runSummary(inv Invocation) int {
 	return code
 }
 
-func runSummaryFromInput(input, format, output string, noColor, github bool) int {
+func runSummaryFromInput(input, format, output, coverageProfile string, noColor, github bool) int {
 	var r io.Reader
 	if input == "-" {
 		r = os.Stdin
@@ -194,7 +203,7 @@ func runSummaryFromInput(input, format, output string, noColor, github bool) int
 
 	tree := gotestspec.BuildTree(events)
 
-	writeSummaryOutput(tree, format, output, noColor, github)
+	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github)
 
 	stats := gotestspec.CollectStats(tree)
 	if stats.Failed > 0 {
@@ -203,7 +212,7 @@ func runSummaryFromInput(input, format, output string, noColor, github bool) int
 	return 0
 }
 
-func writeSummaryOutput(tree []*gotestspec.Package, format, output string, noColor, github bool) {
+func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool) {
 	var w io.Writer = os.Stdout
 	var closeFunc func()
 	if output != "" {
@@ -224,9 +233,18 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output string, noCol
 		renderOpts = append(renderOpts, gotestspec.WithNoColor())
 	}
 
+	if coverageProfile != "" {
+		report, err := gotestspec.ParseCoverageProfile(coverageProfile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: reading coverage profile: %s\n", err)
+		} else {
+			renderOpts = append(renderOpts, gotestspec.WithCoverage(report))
+		}
+	}
+
 	switch format {
 	case "md", "markdown":
-		gotestspec.RenderMarkdownSummary(w, tree)
+		gotestspec.RenderMarkdownSummary(w, tree, renderOpts...)
 	case "json":
 		gotestspec.RenderJSON(w, tree)
 	default:
@@ -241,7 +259,7 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output string, noCol
 		if summaryPath := os.Getenv("GITHUB_STEP_SUMMARY"); summaryPath != "" {
 			sf, err := os.OpenFile(summaryPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err == nil {
-				gotestspec.RenderMarkdownSummary(sf, tree)
+				gotestspec.RenderMarkdownSummary(sf, tree, renderOpts...)
 				sf.Close()
 			}
 		}

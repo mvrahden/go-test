@@ -208,6 +208,7 @@ Flags:
   --no-color              Disable ANSI color codes
   --github                GitHub CI mode: emit annotations and step summary
                           (auto-detected via $GITHUB_ACTIONS)
+  --coverage=<file>       Include coverage from profile in summary output
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay
   --update-snapshots      Regenerate snapshot files
