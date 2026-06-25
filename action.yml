@@ -25,8 +25,9 @@ inputs:
     description: "Additional go test flags (-single-dash style)"
     required: false
   version:
-    description: "gotest version to install (e.g. v1.0.0)"
-    default: "latest"
+    description: "gotest version to install (e.g. v1.0.0, latest). When omitted, uses 'go run' with the version from go.mod."
+    required: false
+    default: ""
 
 outputs:
   exit-code:
@@ -40,6 +41,7 @@ runs:
   using: "composite"
   steps:
     - name: Install gotest
+      if: ${{ inputs.version != '' }}
       shell: bash
       run: go install github.com/mvrahden/go-test/cmd/gotest@${{ inputs.version }}
 
@@ -53,7 +55,14 @@ runs:
         INPUT_MIN_COVERAGE: ${{ inputs.min-coverage }}
         INPUT_FLAGS: ${{ inputs.flags }}
         INPUT_GO_TEST_FLAGS: ${{ inputs.go-test-flags }}
+        INPUT_VERSION: ${{ inputs.version }}
       run: |
+        if [ -n "$INPUT_VERSION" ]; then
+          cmd=(gotest)
+        else
+          cmd=(go run github.com/mvrahden/go-test/cmd/gotest)
+        fi
+
         args=(summary --github)
 
         cover_profile=""
@@ -88,7 +97,7 @@ runs:
         fi
 
         set +e
-        gotest "${args[@]}"
+        "${cmd[@]}" "${args[@]}"
         exit_code=$?
         set -e
 
