@@ -93,17 +93,14 @@ func packageDir(pkgPath, modulePath string) string {
 }
 
 func parseFirstLocation(lines []string) (file string, line int, message string) {
-	for _, l := range lines {
+	for i, l := range lines {
 		f, ln, msg := parseFileLine(l)
 		if f != "" {
 			var allMsgs []string
 			if msg != "" {
 				allMsgs = append(allMsgs, msg)
 			}
-			for _, rest := range lines {
-				if rest == l {
-					continue
-				}
+			for _, rest := range lines[i+1:] {
 				rf, _, rm := parseFileLine(rest)
 				if rf == "" && rm == "" {
 					allMsgs = append(allMsgs, rest)

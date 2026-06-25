@@ -156,6 +156,40 @@ func TestCollectAnnotations_NoFileReference(t *testing.T) {
 	}
 }
 
+func TestCollectAnnotations_FiltersLogNoiseBeforeAssertion(t *testing.T) {
+	packages := []*Package{{
+		Path: "github.com/user/repo/pkg/foo",
+		Nodes: []*Node{{
+			Kind:     KindTest,
+			Display:  "Slow",
+			Status:   StatusFail,
+			Duration: 10 * time.Second,
+			Output: []string{
+				"    2026/06/25 18:10:03 INFO staging params.json bytes=2\n",
+				"    2026/06/25 18:10:03 INFO file stored successfully\n",
+				"    helpers.go:37: foo_test.go:74: Eventually failed after 10s:\n",
+				"    last failure:\n",
+				"    helpers.go:47: True failed:\n",
+				"    expected: true\n",
+				"    actual:   false\n",
+			},
+		}},
+	}}
+
+	annotations := CollectAnnotations(packages, "github.com/user/repo")
+	if len(annotations) != 1 {
+		t.Fatalf("expected 1 annotation, got %d", len(annotations))
+	}
+
+	a := annotations[0]
+	if strings.Contains(a.Message, "INFO") {
+		t.Errorf("annotation message should not contain log noise, got:\n%s", a.Message)
+	}
+	if !strings.Contains(a.Message, "True failed:") {
+		t.Errorf("annotation message should contain assertion output, got:\n%s", a.Message)
+	}
+}
+
 func TestWriteGitHubAnnotations(t *testing.T) {
 	annotations := []Annotation{
 		{
