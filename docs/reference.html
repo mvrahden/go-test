@@ -419,6 +419,7 @@
         <li><a href="#configuration">Configuration</a></li>
         <li><a href="#coverage">Coverage</a></li>
         <li><a href="#cli">CLI Reference</a></li>
+        <li><a href="#ci-integration">CI Integration</a></li>
       </ol>
     </div>
 
@@ -959,6 +960,7 @@ percentage = covered / total</div>
           <tr><td><code>gotest ./...</code></td><td>Generate overlays and run tests. The default workflow.</td></tr>
           <tr><td><code>gotest watch ./...</code></td><td>Re-run on file changes. Only affected packages re-run.</td></tr>
           <tr><td><code>gotest spec ./...</code></td><td>Run tests and render the behavioral specification.</td></tr>
+          <tr><td><code>gotest summary ./...</code></td><td>Failure-focused summary for CI. Shows only failing tests with assertion output.</td></tr>
           <tr><td><code>gotest lint ./...</code></td><td>Static analysis for test suites.</td></tr>
           <tr><td><code>gotest scaffold ./pkg/user.Svc</code></td><td>Generate a suite skeleton from any Go type.</td></tr>
           <tr><td><code>gotest migrate ./...</code></td><td>Convert testify/suite tests automatically.</td></tr>
@@ -983,12 +985,100 @@ percentage = covered / total</div>
           <tr><td><code>--debug</code></td><td>Preserve overlays after the run for inspection.</td></tr>
           <tr><td><code>--setup-timeout=&lt;dur&gt;</code></td><td>Total budget for all shared fixture setup. Omit to let each fixture's own config govern. Use a negative value (e.g. <code>-1s</code>) to disable.</td></tr>
           <tr><td><code>--debounce=&lt;dur&gt;</code></td><td>Watch mode debounce interval (default 200ms).</td></tr>
-          <tr><td><code>--input=&lt;path&gt;</code></td><td>Read test output from file instead of running tests (<code>spec</code> command).</td></tr>
+          <tr><td><code>--input=&lt;path&gt;</code></td><td>Read test output from file instead of running tests (<code>spec</code>, <code>summary</code>).</td></tr>
+          <tr><td><code>--github</code></td><td>GitHub CI mode: emit <code>::error</code> annotations and write step summary (<code>summary</code> command). Auto-detected via <code>$GITHUB_ACTIONS</code>.</td></tr>
+          <tr><td><code>--coverage=&lt;file&gt;</code></td><td>Include coverage from profile in summary output (<code>summary</code> command).</td></tr>
         </tbody>
       </table>
 
       <div class="callout">
         Standard <code>go test</code> flags work unchanged: <code>-v</code>, <code>-race</code>, <code>-cover</code>, <code>-count</code>, <code>-run</code>, <code>-json</code>, <code>-short</code>, <code>-timeout</code>.
+      </div>
+    </section>
+
+    <!-- 10. CI Integration -->
+    <section class="ref-section" id="ci-integration">
+      <h2>CI Integration</h2>
+      <p class="lead">Failure-focused summaries, inline PR annotations, and coverage reports — out of the box.</p>
+
+      <h3>gotest summary</h3>
+      <p>The <code>summary</code> subcommand shows only failing tests with their assertion output, filtering out <code>=== RUN</code>, <code>=== CONT</code>, <code>--- PASS</code> noise. When all tests pass, it prints a single success line:</p>
+      <div class="code-block">
+        <div class="code-label">All tests pass</div>
+        <pre>147 tests passed (2.3s)
+Coverage: 82.4%</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-label">Failures show assertion output only</div>
+        <pre>3 of 147 tests failed
+
+FAIL  pkg/foo TestValidateInput / empty string (12ms)
+      foo_test.go:42: expected error, got nil
+
+FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
+      bar_test.go:88:
+        expected: []string{"a", "b", "c"}
+             got: []string{"a", "c", "b"}</pre>
+      </div>
+
+      <p>In GitHub Actions, <code>--github</code> (auto-detected via <code>$GITHUB_ACTIONS</code>) emits <code>::error</code> annotations that appear inline on PR diffs and writes a markdown summary to the job summary panel.</p>
+
+      <h3>GitHub Action</h3>
+      <p>The repository includes a composite action at <code>mvrahden/go-test@v1</code> that wraps <code>gotest summary --github</code>:</p>
+      <div class="code-block">
+        <div class="code-label">.github/workflows/test.yml</div>
+        <pre>- uses: actions/checkout@v4
+- uses: actions/setup-go@v5
+  with:
+    go-version-file: go.mod
+
+- uses: mvrahden/go-test@v1
+  with:
+    packages: ./...
+    race: true
+    coverage: true
+    min-coverage: 80</pre>
+      </div>
+
+      <h3>Action inputs</h3>
+      <table class="ref-table">
+        <thead><tr><th>Input</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>packages</code></td><td><code>./...</code></td><td>Package patterns to test.</td></tr>
+          <tr><td><code>race</code></td><td><code>false</code></td><td>Enable the race detector.</td></tr>
+          <tr><td><code>coverage</code></td><td><code>false</code></td><td>Enable coverage profiling and reporting.</td></tr>
+          <tr><td><code>min-coverage</code></td><td><em>none</em></td><td>Minimum coverage percentage (0–100). Fails the step if below.</td></tr>
+          <tr><td><code>flags</code></td><td><em>none</em></td><td>Additional gotest flags (<code>--double-dash</code> style).</td></tr>
+          <tr><td><code>go-test-flags</code></td><td><em>none</em></td><td>Additional go test flags (<code>-single-dash</code> style).</td></tr>
+          <tr><td><code>version</code></td><td><code>gomod</code></td><td>Version to install, or <code>gomod</code> to resolve from <code>go.mod</code>.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Action outputs</h3>
+      <table class="ref-table">
+        <thead><tr><th>Output</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>exit-code</code></td><td>Test process exit code.</td></tr>
+          <tr><td><code>coverage</code></td><td>Coverage percentage (empty if coverage not enabled).</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Version resolution</h3>
+      <p>By default (<code>version: gomod</code>), the action runs <code>go&nbsp;run&nbsp;github.com/mvrahden/go-test/cmd/gotest</code>, which resolves the version pinned in your project's <code>go.mod</code>. This keeps the CLI version in sync with the library you already depend on — no version drift between CI and local development.</p>
+      <p>Set <code>version: latest</code> or a specific tag (e.g. <code>v1.2.0</code>) to install a standalone binary via <code>go install</code> instead. This is useful when your project doesn't depend on go-test as a library.</p>
+
+      <div class="callout">
+        To use the <code>gomod</code> default, ensure gotest is in your <code>go.mod</code>: use a <code>tool</code> directive (Go 1.24+) or add it via <code>go get github.com/mvrahden/go-test/cmd/gotest</code>.
+      </div>
+
+      <h3>Manual CI setup</h3>
+      <p>For non-GitHub CI systems, run <code>gotest summary</code> directly:</p>
+      <div class="code-block">
+        <pre>gotest summary ./... -race -coverprofile=coverage.out</pre>
+      </div>
+      <p>Or pipe from <code>go test -json</code> to summarize existing output without re-running tests:</p>
+      <div class="code-block">
+        <pre>go test -json ./... | gotest summary --input=-</pre>
       </div>
     </section>
   </div>

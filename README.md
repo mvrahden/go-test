@@ -720,11 +720,29 @@ gotest lint ./...
 Detects: lifecycle hook typos, value receivers on suite methods, missing `AfterAll` when `BeforeAll` exists, committed `F_` prefixes, and orphaned generated files.
 Also available as a standalone binary (`gotest-lint`) compatible with `golangci-lint` via `go/analysis`.
 
+## GitHub Actions
+
+Use the official action for CI pipelines with failure summaries, inline PR annotations, and coverage reporting:
+
+```yaml
+- uses: mvrahden/go-test@v1
+  with:
+    packages: ./...
+    race: true
+    coverage: true
+    min-coverage: 80
+```
+
+By default (`version: gomod`), the action resolves `gotest` from your `go.mod` — no version drift between CI and local development. Set `version: latest` or a specific tag to install a standalone binary instead.
+
+The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel. See the [reference](https://mvrahden.github.io/go-test/reference.html#ci-integration) for the full inputs/outputs table.
+
 ## Commands
 
 ```bash
 gotest ./... -v -race          # generate overlays and run tests (default)
 gotest spec ./...              # behavioral specification view
+gotest summary ./...           # failure-focused summary for CI
 gotest watch ./... -v          # watch mode with auto-rerun
 gotest scaffold ./pkg/user.Svc # generate suite skeleton from type
 gotest lint ./...              # static analysis for test suites
