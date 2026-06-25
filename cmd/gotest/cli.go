@@ -46,6 +46,8 @@ func main() {
 		os.Exit(runClean(inv))
 	case "spec":
 		os.Exit(runSpec(inv))
+	case "summary":
+		os.Exit(runSummary(inv))
 	case "watch":
 		os.Exit(runWatch(inv))
 	case "refactor":

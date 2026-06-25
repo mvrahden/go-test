@@ -27,6 +27,8 @@ func showHelp(topic string) {
 		printTestHelp()
 	case "spec":
 		printSpecHelp()
+	case "summary":
+		printSummaryHelp()
 	case "watch":
 		printWatchHelp()
 	case "discover":
@@ -64,6 +66,7 @@ Usage:
 
 Subcommands:
   spec        Render behavioral specification from test output
+  summary     Show failure-focused test summary for CI
   watch       Watch for file changes and re-run tests
   discover    Discover test suites and output JSON
   scaffold    Generate test suite skeleton
@@ -182,6 +185,47 @@ Examples:
   gotest spec --no-color --output=spec.txt ./...   Plain text for CI artifacts
   gotest spec --input=- < events.json              Render from piped JSON input
   gotest spec --format=json ./... -count=1         JSON tree, no caching
+`)
+}
+
+func printSummaryHelp() {
+	fmt.Print(`gotest summary — failure-focused test summary for CI
+
+Usage:
+  gotest summary [flags] [--] [go-test-flags] [packages...]
+  gotest summary --input=<file> [--format=<fmt>] [--output=<file>]
+
+Runs test suites and shows only failing tests with their error output.
+Designed for CI pipelines where the full spec tree is too verbose.
+
+When all tests pass, prints a single success line. When tests fail,
+prints each failure with its package, test path, and assertion output.
+
+Flags:
+  --format=<fmt>          Output format: terminal (default), md, json
+  --output=<file>         Write to file instead of stdout
+  --input=<file>          Read from saved JSON ("-" for stdin)
+  --no-color              Disable ANSI color codes
+  --github                GitHub CI mode: emit annotations and step summary
+                          (auto-detected via $GITHUB_ACTIONS)
+  --ci                    CI mode: fail on F_ prefixes, snapshot read-only
+  --debug                 Keep generated overlay
+  --update-snapshots      Regenerate snapshot files
+  --no-cache              Disable overlay cache, force fresh generation
+  --min=<pct>             Fail if coverage < pct% (0-100)
+  --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
+  --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
+
+GitHub CI mode (--github):
+  Emits ::error annotations for each failure, showing inline on PR diffs.
+  Writes a markdown summary to $GITHUB_STEP_SUMMARY.
+
+Examples:
+  gotest summary ./...                                Run and show failures only
+  gotest summary --github ./... -race                 CI pipeline with annotations
+  gotest summary --format=md --output=summary.md      Markdown failure report
+  gotest summary --input=- < events.json              Summarize from piped JSON
+  go test -json ./... | gotest summary --input=-      Filter plain go test output
 `)
 }
 

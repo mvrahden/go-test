@@ -134,6 +134,13 @@ func formatDuration(d time.Duration) string {
 
 func renderErrorOutput(w io.Writer, output []string, depth int, c colors) {
 	indent := strings.Repeat("  ", depth)
+	for _, line := range filterOutput(output) {
+		fmt.Fprintf(w, "%s%s%s%s\n", indent, c.red, line, c.reset)
+	}
+}
+
+func filterOutput(output []string) []string {
+	var filtered []string
 	for _, line := range output {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
@@ -142,8 +149,9 @@ func renderErrorOutput(w io.Writer, output []string, depth int, c colors) {
 		if strings.HasPrefix(trimmed, "=== ") || strings.HasPrefix(trimmed, "--- ") {
 			continue
 		}
-		fmt.Fprintf(w, "%s%s%s%s\n", indent, c.red, trimmed, c.reset)
+		filtered = append(filtered, trimmed)
 	}
+	return filtered
 }
 
 func renderSummary(w io.Writer, stats Stats, c colors) {

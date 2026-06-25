@@ -69,6 +69,7 @@ var knownSubcommands = map[string]bool{
 	"scaffold": true,
 	"migrate":  true,
 	"spec":     true,
+	"summary":  true,
 	"watch":    true,
 	"clean":    true,
 	"lint":     true,
