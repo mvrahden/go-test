@@ -38,10 +38,11 @@ jobs:
         run: go work init . ./examples
       - name: Test (stdlib)
         run: go test -ldflags=-checklinkname=0 ./... -race
-      - name: Install gotest
-        run: go install ./cmd/gotest
       - name: Test (suites)
-        run: gotest ./... ./examples/... -race
+        uses: ./
+        with:
+          packages: "./... ./examples/..."
+          race: true
 
   test:
     runs-on: ubuntu-latest
@@ -63,24 +64,18 @@ jobs:
       - name: Test (stdlib)
         run: go test -ldflags=-checklinkname=0 -tags gotest_no_coverage_intercept -coverprofile=coverage-stdlib.out ./... -race
       - name: Test (suites)
-        run: go run ./cmd/gotest spec --no-color --min=40 --output=spec.txt ./... ./examples/... -race -coverprofile=coverage-suites.out
+        uses: ./
+        with:
+          packages: "./... ./examples/..."
+          race: true
+          min-coverage: 40
+          go-test-flags: "-coverprofile=coverage-suites.out"
       - name: Merge coverage
         run: |
-          # Merge stdlib + suite coverage profiles: dedup blocks, keep max hit count
           awk '
             FNR==1 && /^mode:/ { if(!mode){mode=$0}; next }
             { key=$1" "$2; if(!(key in max)||$3+0>max[key]+0){max[key]=$3+0;line[key]=$0} }
             END { print mode; n=asorti(line,sorted); for(i=1;i<=n;i++) print line[sorted[i]] }
           ' coverage-stdlib.out coverage-suites.out > coverage.out
-      - name: Summary
-        if: always()
-        run: |
-          if [ -f spec.txt ]; then
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            cat spec.txt >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-          fi
-          if [ -f coverage.out ]; then
-            pct=$(go tool cover -func=coverage.out | tail -1 | awk '{print $NF}')
-            echo "**Coverage: ${pct}**" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          pct=$(go tool cover -func=coverage.out | tail -1 | awk '{print $NF}')
+          echo "**Combined coverage: ${pct}**" >> "$GITHUB_STEP_SUMMARY"
