@@ -62,7 +62,7 @@ jobs:
       - name: Lint
         run: go run ./cmd/gotest-lint ./... ./examples/...
       - name: Test (stdlib)
-        run: go test -ldflags=-checklinkname=0 -tags gotest_no_coverage_intercept -coverprofile=coverage-stdlib.out ./... -race
+        run: go test -ldflags=-checklinkname=0 -coverprofile=coverage-stdlib.out ./... -race
       - name: Test (suites)
         uses: ./
         with:
