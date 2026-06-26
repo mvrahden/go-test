@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -129,6 +130,7 @@ func runSummary(inv Invocation) int {
 		defer timeoutCancel()
 	}
 
+	pipelineStart := time.Now()
 	result, err := gotestrunner.RunPipeline(ctx, gotestrunner.PipelineConfig{
 		GoTestArgs:      cfg.GoTestArgs,
 		SetupTimeout:    cfg.SetupTimeout,
@@ -167,7 +169,8 @@ func runSummary(inv Invocation) int {
 		}
 	}
 
-	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github)
+	elapsed := time.Since(pipelineStart)
+	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed)
 
 	if code == 0 && minCoverage > 0 && coverProfile != "" {
 		pct, err := readCoverageTotal(coverProfile)
@@ -206,7 +209,7 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 
 	tree := gotestspec.BuildTree(events)
 
-	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github)
+	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0)
 
 	stats := gotestspec.CollectStats(tree)
 	if stats.Failed > 0 {
@@ -215,7 +218,7 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 	return 0
 }
 
-func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool) {
+func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool, elapsed time.Duration) {
 	var w io.Writer = os.Stdout
 	var closeFunc func()
 	if output != "" {
@@ -232,6 +235,9 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 	}
 
 	var renderOpts []gotestspec.RenderOption
+	if elapsed > 0 {
+		renderOpts = append(renderOpts, gotestspec.WithElapsed(elapsed))
+	}
 	if noColor {
 		renderOpts = append(renderOpts, gotestspec.WithNoColor())
 	}

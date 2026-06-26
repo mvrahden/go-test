@@ -54,6 +54,13 @@ func totalDuration(packages []*Package) time.Duration {
 	return d
 }
 
+func effectiveDuration(cfg renderConfig, packages []*Package) time.Duration {
+	if cfg.elapsed > 0 {
+		return cfg.elapsed
+	}
+	return totalDuration(packages)
+}
+
 func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 	cfg := renderConfig{color: true}
 	for _, o := range opts {
@@ -70,7 +77,7 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 	if len(failures) == 0 {
 		fmt.Fprintf(w, "%s%d tests passed%s (%s)\n",
 			c.green, stats.Total(), c.reset,
-			formatDuration(totalDuration(packages)))
+			formatDuration(effectiveDuration(cfg, packages)))
 		if cfg.coverage != nil {
 			fmt.Fprintf(w, "%sCoverage: %.1f%%%s\n", c.dim, cfg.coverage.Total, c.reset)
 		}
@@ -112,7 +119,7 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 
 	if len(failures) == 0 {
 		fmt.Fprintf(w, "### All %d tests passed (%s)\n",
-			stats.Total(), formatDuration(totalDuration(packages)))
+			stats.Total(), formatDuration(effectiveDuration(cfg, packages)))
 		if cfg.coverage != nil {
 			renderMarkdownCoverage(w, cfg.coverage)
 		}

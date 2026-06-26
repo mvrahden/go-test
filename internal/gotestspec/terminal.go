@@ -25,6 +25,7 @@ var noColors = colors{}
 type renderConfig struct {
 	color    bool
 	coverage *CoverageReport
+	elapsed  time.Duration
 }
 
 type RenderOption func(*renderConfig)
@@ -35,6 +36,10 @@ func WithNoColor() RenderOption {
 
 func WithCoverage(report *CoverageReport) RenderOption {
 	return func(c *renderConfig) { c.coverage = report }
+}
+
+func WithElapsed(d time.Duration) RenderOption {
+	return func(c *renderConfig) { c.elapsed = d }
 }
 
 func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
