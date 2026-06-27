@@ -19,16 +19,17 @@ import (
 type Rule string
 
 const (
-	Focus         Rule = "focus"
-	Receiver      Rule = "receiver"
-	LifecycleTypo Rule = "lifecycle-typo"
-	LifecyclePair Rule = "lifecycle-pair"
-	GeneratedFile Rule = "generated-file"
-	StdlibTest    Rule = "stdlib-test"
-	Testify       Rule = "testify"
-	PollScope     Rule = "poll-scope"
-	TestSignature Rule = "test-signature"
-	XLifecycle    Rule = "x-lifecycle"
+	Focus             Rule = "focus"
+	Receiver          Rule = "receiver"
+	LifecycleTypo     Rule = "lifecycle-typo"
+	LifecyclePair     Rule = "lifecycle-pair"
+	GeneratedFile     Rule = "generated-file"
+	StdlibTest        Rule = "stdlib-test"
+	Testify           Rule = "testify"
+	PollScope         Rule = "poll-scope"
+	TestSignature     Rule = "test-signature"
+	XLifecycle        Rule = "x-lifecycle"
+	AssertionSimplify Rule = "assertion-simplify"
 )
 
 // SkippableRules is the set of rules that support opt-out via skip flags.
@@ -72,6 +73,7 @@ func run(pass *analysis.Pass) (any, error) {
 	checkStdlibTests(pass, insp)
 	checkTestifyImports(pass)
 	checkPollScope(pass, insp)
+	checkAssertionSimplify(pass, insp)
 
 	return nil, nil
 }

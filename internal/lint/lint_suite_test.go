@@ -40,6 +40,12 @@ func (s *LintTestSuite) TestAnalyzer(t *gotest.T) {
 		})
 	})
 
+	t.When("assertion simplify", func(w *gotest.T) {
+		w.It("detects sub-optimal assertion patterns", func(it *gotest.T) {
+			analysistest.RunWithSuggestedFixes(it.T(), testdata, lint.Analyzer, "withsimplify")
+		})
+	})
+
 	t.When("file-level nolint", func(w *gotest.T) {
 		w.It("respects file-level nolint", func(it *gotest.T) {
 			analysistest.Run(it.T(), testdata, lint.Analyzer, "withnolint_file")
