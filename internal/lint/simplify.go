@@ -146,19 +146,20 @@ func simplifyNilComparison(pass *analysis.Pass, call *ast.CallExpr, left, right,
 	if negated {
 		positive = !positive
 	}
-	if isErrorType(pass, other) {
+	switch {
+	case isErrorType(pass, other):
 		target := "NoError"
 		if !positive {
 			target = "Error"
 		}
 		emitSimplify(pass, call, source, target, []ast.Expr{tArg, other}, msgArgs, "error nil check")
-	} else if isComparableType(pass, other) {
+	case isComparableType(pass, other):
 		target := "Zero"
 		if !positive {
 			target = "NotZero"
 		}
 		emitSimplify(pass, call, source, target, []ast.Expr{tArg, other}, msgArgs, "nil check")
-	} else if isEmptyableType(pass, other) {
+	case isEmptyableType(pass, other):
 		target := "Empty"
 		if !positive {
 			target = "NotEmpty"
@@ -251,11 +252,12 @@ func simplifyEquality(pass *analysis.Pass, call *ast.CallExpr, negated bool) {
 		if isNilIdent(expected) {
 			other = actual
 		}
-		if isErrorType(pass, other) {
+		switch {
+		case isErrorType(pass, other):
 			emitSimplify(pass, call, source, pick(negated, "Error", "NoError"), []ast.Expr{tArg, other}, msgArgs, "nil error comparison")
-		} else if isComparableType(pass, other) {
+		case isComparableType(pass, other):
 			emitSimplify(pass, call, source, pick(negated, "NotZero", "Zero"), []ast.Expr{tArg, other}, msgArgs, "nil comparison")
-		} else if isEmptyableType(pass, other) {
+		case isEmptyableType(pass, other):
 			emitSimplify(pass, call, source, pick(negated, "NotEmpty", "Empty"), []ast.Expr{tArg, other}, msgArgs, "nil comparison")
 		}
 		return
