@@ -16,7 +16,7 @@ func (s *FooTestSuite) TestBaz() {}
 `
 	dir := t.TempDir()
 	path := filepath.Join(dir, "foo_test.go")
-	os.WriteFile(path, []byte(src), 0644)
+	_ = os.WriteFile(path, []byte(src), 0600)
 
 	if err := ToggleFocus(path, "FooTestSuite"); err != nil {
 		t.Fatal(err)
@@ -54,7 +54,7 @@ func (s *FooTestSuite) TestBaz() {}
 `
 	dir := t.TempDir()
 	path := filepath.Join(dir, "foo_test.go")
-	os.WriteFile(path, []byte(src), 0644)
+	_ = os.WriteFile(path, []byte(src), 0600)
 
 	if err := ToggleFocus(path, "FooTestSuite.TestBar"); err != nil {
 		t.Fatal(err)
@@ -91,7 +91,7 @@ func (s BarTestSuite) TestOne() {}
 `
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bar_test.go")
-	os.WriteFile(path, []byte(src), 0644)
+	_ = os.WriteFile(path, []byte(src), 0600)
 
 	if err := ToggleFocus(path, "BarTestSuite"); err != nil {
 		t.Fatal(err)
@@ -116,7 +116,7 @@ type FooTestSuite struct{}
 `
 	dir := t.TempDir()
 	path := filepath.Join(dir, "foo_test.go")
-	os.WriteFile(path, []byte(src), 0644)
+	_ = os.WriteFile(path, []byte(src), 0600)
 
 	err := ToggleFocus(path, "NonExistent")
 	if err == nil {

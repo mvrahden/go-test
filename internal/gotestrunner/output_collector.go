@@ -95,7 +95,7 @@ func (c *OutputCollector) Register(pkg string, count int) {
 // (head-of-line ordering). For JSON modes, test-level events are emitted
 // immediately; package-level synthetic events are emitted when all suites
 // for a package complete.
-func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) {
+func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //nolint:gocritic
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if r.ExitCode > c.worst {
@@ -112,7 +112,7 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) {
 		w := c.jsonWriter()
 		filterPackageLevelEvents(w, r.Stdout)
 		if len(r.Stderr) > 0 {
-			c.stderr.Write(r.Stderr)
+			_, _ = c.stderr.Write(r.Stderr)
 		}
 		if s.completed == s.expected {
 			c.emitJSONPackageSummary(w, pkg, s)
@@ -199,8 +199,8 @@ func (c *OutputCollector) EmitSkippedSuites(skippedByPkg map[string][]string) {
 
 func (c *OutputCollector) anyFailedLocked() bool {
 	for _, s := range c.pkgs {
-		for _, r := range s.results {
-			if r.ExitCode != 0 {
+		for i := range s.results {
+			if s.results[i].ExitCode != 0 {
 				return true
 			}
 		}
@@ -223,25 +223,27 @@ func (c *OutputCollector) flushReadyText() {
 func (c *OutputCollector) flushTextPkg(s *pkgState, pkg string) {
 	failed := false
 	var dur time.Duration
-	for _, r := range s.results {
-		if r.ExitCode != 0 {
+	for i := range s.results {
+		if s.results[i].ExitCode != 0 {
 			failed = true
 		}
-		dur += r.Duration
+		dur += s.results[i].Duration
 	}
 	if c.verbose || failed {
-		for _, r := range s.results {
-			c.stdout.Write(StripTrailingStatus(r.Stdout))
+		for i := range s.results {
+			r := &s.results[i]
+			_, _ = c.stdout.Write(StripTrailingStatus(r.Stdout))
 			if len(r.Stderr) > 0 {
-				c.stderr.Write(r.Stderr)
+				_, _ = c.stderr.Write(r.Stderr)
 			}
 		}
 	}
-	if failed {
+	switch {
+	case failed:
 		fmt.Fprintf(c.stdout, "FAIL\nFAIL\t%s\t%.3fs\n", pkg, dur.Seconds())
-	} else if c.verbose {
+	case c.verbose:
 		fmt.Fprintf(c.stdout, "PASS\nok  \t%s\t%.3fs\n", pkg, dur.Seconds())
-	} else {
+	default:
 		fmt.Fprintf(c.stdout, "ok  \t%s\t%.3fs\n", pkg, dur.Seconds())
 	}
 }
@@ -256,11 +258,11 @@ func (c *OutputCollector) jsonWriter() io.Writer {
 func (c *OutputCollector) emitJSONPackageSummary(w io.Writer, pkg string, s *pkgState) {
 	failed := false
 	var dur time.Duration
-	for _, r := range s.results {
-		if r.ExitCode != 0 {
+	for i := range s.results {
+		if s.results[i].ExitCode != 0 {
 			failed = true
 		}
-		dur += r.Duration
+		dur += s.results[i].Duration
 	}
 	now := time.Now()
 	var summaryLine string
@@ -302,14 +304,14 @@ func filterPackageLevelEvents(w io.Writer, data []byte) {
 			Test string `json:"Test"`
 		}
 		if json.Unmarshal(line, &ev) != nil || ev.Test != "" {
-			w.Write(line)
-			w.Write([]byte{'\n'})
+			_, _ = w.Write(line)
+			_, _ = w.Write([]byte{'\n'})
 		}
 	}
 }
 
 func writeJSONLine(w io.Writer, fields map[string]any) {
 	data, _ := json.Marshal(fields)
-	w.Write(data)
-	w.Write([]byte{'\n'})
+	_, _ = w.Write(data)
+	_, _ = w.Write([]byte{'\n'})
 }

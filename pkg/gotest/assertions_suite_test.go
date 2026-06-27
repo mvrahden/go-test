@@ -617,11 +617,11 @@ func (s *AssertionsTestSuite) TestErrorAs(t *gotest.T) {
 
 	t.When("error does not match type", func(w *gotest.T) {
 		w.It("fails", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.ErrorAs[*myError](r, errors.New("plain error")) })
+			m := gotest.Record(func(r *gotest.R) { _ = gotest.ErrorAs[*myError](r, errors.New("plain error")) })
 			gotest.True(it, m.Failed())
 		})
 		w.It("fails for nil error", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.ErrorAs[*myError](r, nil) })
+			m := gotest.Record(func(r *gotest.R) { _ = gotest.ErrorAs[*myError](r, nil) })
 			gotest.True(it, m.Failed())
 		})
 	})

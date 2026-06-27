@@ -63,7 +63,7 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
 			fmt.Fprintln(w)
 		}
 		for _, node := range pkg.Nodes {
-			renderNode(w, node, 0, c)
+			renderNode(w, node, 0, &c)
 		}
 	}
 
@@ -72,7 +72,7 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
 	renderSummary(w, stats, c)
 }
 
-func renderNode(w io.Writer, n *Node, depth int, c colors) {
+func renderNode(w io.Writer, n *Node, depth int, c *colors) {
 	indent := strings.Repeat("  ", depth)
 	isLeaf := len(n.Children) == 0
 
@@ -118,7 +118,7 @@ func renderNode(w io.Writer, n *Node, depth int, c colors) {
 	}
 }
 
-func statusIcon(s Status, c colors) (string, string) {
+func statusIcon(s Status, c *colors) (string, string) {
 	switch s {
 	case StatusPass:
 		return "✓", c.green
@@ -142,7 +142,7 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%.1fs", d.Seconds())
 }
 
-func renderErrorOutput(w io.Writer, output []string, depth int, c colors) {
+func renderErrorOutput(w io.Writer, output []string, depth int, c *colors) {
 	indent := strings.Repeat("  ", depth)
 	for _, line := range filterOutput(output) {
 		fmt.Fprintf(w, "%s%s%s%s\n", indent, c.red, line, c.reset)
@@ -184,7 +184,7 @@ func filterOutput(output []string) []string {
 	return filtered
 }
 
-func renderSummary(w io.Writer, stats Stats, c colors) {
+func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic
 	var parts []string
 	if stats.Passed > 0 {
 		parts = append(parts, fmt.Sprintf("%s%d passed%s", c.green, stats.Passed, c.reset))

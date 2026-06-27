@@ -7,7 +7,7 @@ import (
 )
 
 func StdlibRunTests(ctx context.Context, args []string, extraEnv ...map[string]string) (int, error) {
-	cmd := exec.CommandContext(ctx, "go", append([]string{"test", "-ldflags=-checklinkname=0"}, args...)...)
+	cmd := exec.CommandContext(ctx, "go", append([]string{"test", "-ldflags=-checklinkname=0"}, args...)...) //nolint:gosec // G204: go tool with controlled arguments
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	SetProcessGroup(cmd)

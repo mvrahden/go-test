@@ -32,7 +32,7 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupSetup(t *gotest.T) {
 	})
 
 	t.When("building suite cmd", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct {
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
 			Name      string
 			test2json bool
 		}{
@@ -81,7 +81,7 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupCancel(t *gotest.T) {
 			select {
 			case <-done:
 			case <-time.After(5 * time.Second):
-				cmd.Process.Kill()
+				_ = cmd.Process.Kill()
 				it.T().Fatal("process did not exit after Cancel")
 			}
 
@@ -111,14 +111,14 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupTermination(t *gotest.T) 
 				fmt.Println("ready")
 				// Block by reading stdin (never gets data).
 				buf := make([]byte, 1)
-				os.Stdin.Read(buf)
+				_, _ = os.Stdin.Read(buf)
 				return
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestGotestrunnerProcessTestSuite$/^TestProcessGroupTermination$")
+			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestGotestrunnerProcessTestSuite$/^TestProcessGroupTermination$") //nolint:gosec // G204: test-only subprocess with hardcoded args
 			cmd.Env = append(os.Environ(), "GOTEST_TRAP_SIGTERM=1")
 			gotestrunner.SetProcessGroup(cmd)
 			// Override WaitDelay to a short value for the test.
@@ -144,7 +144,7 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupTermination(t *gotest.T) 
 			select {
 			case <-done:
 			case <-time.After(10 * time.Second):
-				cmd.Process.Kill()
+				_ = cmd.Process.Kill()
 				it.T().Fatal("process not killed after WaitDelay")
 			}
 
@@ -152,7 +152,7 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupTermination(t *gotest.T) 
 			time.Sleep(50 * time.Millisecond)
 			err = syscall.Kill(pid, 0)
 			if err == nil {
-				syscall.Kill(-pid, syscall.SIGKILL)
+				_ = syscall.Kill(-pid, syscall.SIGKILL)
 				it.T().Errorf("process %d still alive after WaitDelay force-kill", pid)
 			}
 		})
@@ -191,7 +191,7 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupTermination(t *gotest.T) 
 			cancel()
 
 			// Wait for the command to finish (killed by context cancellation).
-			cmd.Wait()
+			_ = cmd.Wait()
 
 			// Give the OS a moment to reap.
 			time.Sleep(100 * time.Millisecond)
@@ -203,7 +203,7 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupTermination(t *gotest.T) 
 			}
 			err = proc.Signal(syscall.Signal(0))
 			if err == nil {
-				proc.Kill()
+				_ = proc.Kill()
 				it.T().Errorf("grandchild process %d is still alive after context cancellation", childPID)
 			}
 		})

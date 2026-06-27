@@ -16,7 +16,7 @@ type Invocation struct {
 }
 
 // TagArgs returns args with -tags prepended from config, if not already set.
-func (inv Invocation) TagArgs() []string {
+func (inv Invocation) TagArgs() []string { //nolint:gocritic
 	if inv.Config.Tags == "" {
 		return inv.Args
 	}
@@ -28,7 +28,7 @@ func (inv Invocation) TagArgs() []string {
 
 // DefaultArgs returns args with tags and setup-timeout from config,
 // each only if not already set via CLI flags.
-func (inv Invocation) DefaultArgs() []string {
+func (inv Invocation) DefaultArgs() []string { //nolint:gocritic
 	out := inv.TagArgs()
 	if inv.Config.SetupTimeout != nil && !hasFlag(out, "--setup-timeout") {
 		out = append([]string{"--setup-timeout=" + inv.Config.SetupTimeout.Duration().String()}, out...)

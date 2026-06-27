@@ -27,7 +27,7 @@ func (s *CmdGotestTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
 	t.When("CLI absent", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct {
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
 			Desc   string
 			inv    Invocation
 			expect []string
@@ -92,7 +92,7 @@ func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
 	})
 
 	t.When("CLI positive", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct {
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
 			Desc   string
 			inv    Invocation
 			expect []string
@@ -135,7 +135,7 @@ func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
 	})
 
 	t.When("CLI negative", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct {
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
 			Desc   string
 			inv    Invocation
 			expect []string
@@ -242,7 +242,7 @@ func (s *CmdGotestTestSuite) TestParseSubcommand(t *gotest.T) {
 
 func (s *CmdGotestTestSuite) TestPackagePatterns(t *gotest.T) {
 	t.When("extract package patterns", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct {
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
 			Desc     string
 			args     []string
 			expected []string
@@ -261,7 +261,7 @@ func (s *CmdGotestTestSuite) TestPackagePatterns(t *gotest.T) {
 	})
 
 	t.When("looks like package pattern", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct {
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
 			Desc   string
 			input  string
 			expect bool
@@ -424,7 +424,7 @@ func (s *CmdGotestTestSuite) TestResolveGlobalTimeout(t *gotest.T) {
 	}
 
 	t.When("end-to-end parse+resolve", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct {
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
 			Desc   string
 			args   []string
 			expect time.Duration
@@ -503,8 +503,8 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 		}
 
 		suiteByNameAndFile := map[string]ExportDiscoverSuite{}
-		for _, s := range pkg.Suites {
-			suiteByNameAndFile[s.Name+":"+s.File] = s
+		for i := range pkg.Suites {
+			suiteByNameAndFile[pkg.Suites[i].Name+":"+pkg.Suites[i].File] = pkg.Suites[i]
 		}
 
 		// Verify ptest ShoppingCartTestSuite
@@ -641,10 +641,10 @@ func (s *CmdGotestTestSuite) TestGenerateOverlay(t *gotest.T) {
 			}
 			defer os.RemoveAll(tmpDir)
 
-			if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module nosuite\n\ngo 1.24\n"), 0644); err != nil {
+			if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module nosuite\n\ngo 1.24\n"), 0600); err != nil {
 				it.T().Fatal(err)
 			}
-			if err := os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0644); err != nil {
+			if err := os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0600); err != nil {
 				it.T().Fatal(err)
 			}
 
@@ -767,7 +767,7 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 		}
 		defer os.RemoveAll(tmpDir)
 
-		cmd := exec.CommandContext(context.Background(), "go",
+		cmd := exec.CommandContext(context.Background(), "go", //nolint:gosec // G204: go tool with controlled arguments
 			"test", "-json", "-ldflags=-checklinkname=0",
 			"-overlay="+filepath.Join(tmpDir, "overlay.json"), "./cart")
 		cmd.Dir = absExamples
@@ -778,7 +778,7 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 		if err := mp.Start(); err != nil {
 			it.T().Fatalf("go test start: %v", err)
 		}
-		mp.WaitWithGrace(context.Background())
+		_ = mp.WaitWithGrace(context.Background())
 		if cmd.ProcessState == nil {
 			it.T().Fatal("go test: process state is nil")
 		}
@@ -801,7 +801,7 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 
 func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 	t.When("IsGoFile", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct {
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
 			Desc   string
 			name   string
 			expect bool
@@ -818,7 +818,7 @@ func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 	})
 
 	t.When("DirsToPatterns", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct {
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
 			Desc    string
 			dirs    map[string]bool
 			lenWant int
@@ -836,7 +836,7 @@ func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 	})
 
 	t.When("ReplacePatterns", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct {
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
 			Desc        string
 			original    []string
 			newPatterns []string

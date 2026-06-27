@@ -181,7 +181,7 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 		} else {
 			sections = append(sections, snapfile.Section{Key: sectionKey, Content: content + "\n"})
 		}
-		if err := os.WriteFile(snapPath, snapfile.Serialize(sections), 0644); err != nil {
+		if err := os.WriteFile(snapPath, snapfile.Serialize(sections), 0600); err != nil {
 			failf(t, "MatchSnapshot: failed to write snapshot: %v", err)
 			return
 		}
@@ -194,7 +194,7 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 			return
 		}
 		sections = append(sections, snapfile.Section{Key: sectionKey, Content: content + "\n"})
-		if err := os.WriteFile(snapPath, snapfile.Serialize(sections), 0644); err != nil {
+		if err := os.WriteFile(snapPath, snapfile.Serialize(sections), 0600); err != nil {
 			failf(t, "MatchSnapshot: failed to write snapshot: %v", err)
 			return
 		}

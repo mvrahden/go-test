@@ -48,7 +48,7 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_ProcessExitsDuringGrace(t *g
 				sig := make(chan os.Signal, 1)
 				signal.Notify(sig, terminationSignals()...)
 				marker := os.Getenv("GOTEST_MARKER_FILE")
-				os.WriteFile(marker, []byte("started"), 0644)
+				_ = os.WriteFile(marker, []byte("started"), 0600)
 				<-sig
 				os.Exit(0)
 			}
@@ -58,7 +58,7 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_ProcessExitsDuringGrace(t *g
 			// Use a cancellable context for CommandContext so cmd.Cancel fires on cancel().
 			ctx, cancel := context.WithCancel(context.Background())
 
-			cmd := exec.CommandContext(ctx, os.Args[0],
+			cmd := exec.CommandContext(ctx, os.Args[0], //nolint:gosec // G204: test-only subprocess
 				"-test.run=^TestManagedProcessTestSuite$/^TestWaitWithGrace_ProcessExitsDuringGrace$")
 			cmd.Env = append(os.Environ(),
 				"GOTEST_MP_CHILD_QUICK_EXIT=1",
@@ -80,7 +80,7 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_ProcessExitsDuringGrace(t *g
 			cancel()
 
 			start := time.Now()
-			mp.WaitWithGrace(ctx)
+			_ = mp.WaitWithGrace(ctx)
 			elapsed := time.Since(start)
 
 			gotest.True(it, elapsed < 2*time.Second,
@@ -99,7 +99,7 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_GraceTimeout_ForceKills(t *g
 				os.Exit(0)
 			}
 
-			cmd := exec.CommandContext(context.Background(), os.Args[0],
+			cmd := exec.CommandContext(context.Background(), os.Args[0], //nolint:gosec // G204: test-only subprocess
 				"-test.run=^TestManagedProcessTestSuite$/^TestWaitWithGrace_GraceTimeout_ForceKills$")
 			cmd.Env = append(os.Environ(), "GOTEST_MP_CHILD_IGNORE_TERM=1")
 
@@ -120,7 +120,7 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_GraceTimeout_ForceKills(t *g
 			cancel()
 
 			start := time.Now()
-			mp.WaitWithGrace(ctx)
+			_ = mp.WaitWithGrace(ctx)
 			elapsed := time.Since(start)
 
 			gotest.True(it, elapsed >= 200*time.Millisecond,
@@ -142,9 +142,9 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_GraceBudget(t *gotest.T) {
 			}
 
 			budgetFile := filepath.Join(it.T().TempDir(), "budget")
-			os.WriteFile(budgetFile, []byte("300ms"), 0644)
+			_ = os.WriteFile(budgetFile, []byte("300ms"), 0600)
 
-			cmd := exec.CommandContext(context.Background(), os.Args[0],
+			cmd := exec.CommandContext(context.Background(), os.Args[0], //nolint:gosec // G204: test-only subprocess
 				"-test.run=^TestManagedProcessTestSuite$/^TestWaitWithGrace_GraceBudget$")
 			cmd.Env = append(os.Environ(), "GOTEST_MP_CHILD_IGNORE_TERM=1")
 
@@ -165,7 +165,7 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_GraceBudget(t *gotest.T) {
 			cancel()
 
 			start := time.Now()
-			mp.WaitWithGrace(ctx)
+			_ = mp.WaitWithGrace(ctx)
 			elapsed := time.Since(start)
 
 			gotest.True(it, elapsed >= 300*time.Millisecond,
@@ -187,7 +187,7 @@ func (s *ManagedProcessTestSuite) TestTerminate(t *gotest.T) {
 				os.Exit(0)
 			}
 
-			cmd := exec.CommandContext(context.Background(), os.Args[0],
+			cmd := exec.CommandContext(context.Background(), os.Args[0], //nolint:gosec // G204: test-only subprocess
 				"-test.run=^TestManagedProcessTestSuite$/^TestTerminate$/process_responds_to_SIGTERM")
 			cmd.Env = append(os.Environ(), "GOTEST_MP_CHILD_QUICK_EXIT=1")
 
@@ -222,7 +222,7 @@ func (s *ManagedProcessTestSuite) TestTerminate(t *gotest.T) {
 				os.Exit(0)
 			}
 
-			cmd := exec.CommandContext(context.Background(), os.Args[0],
+			cmd := exec.CommandContext(context.Background(), os.Args[0], //nolint:gosec // G204: test-only subprocess
 				"-test.run=^TestManagedProcessTestSuite$/^TestTerminate$/process_ignores_SIGTERM")
 			cmd.Env = append(os.Environ(), "GOTEST_MP_CHILD_IGNORE_TERM=1")
 
@@ -291,7 +291,7 @@ func (s *ManagedProcessTestSuite) TestSetGraceDuration(t *gotest.T) {
 				os.Exit(0)
 			}
 
-			cmd := exec.CommandContext(context.Background(), os.Args[0],
+			cmd := exec.CommandContext(context.Background(), os.Args[0], //nolint:gosec // G204: test-only subprocess
 				"-test.run=^TestManagedProcessTestSuite$/^TestSetGraceDuration$")
 			cmd.Env = append(os.Environ(), "GOTEST_MP_CHILD_IGNORE_TERM=1")
 
@@ -344,7 +344,7 @@ func (s *ManagedProcessTestSuite) TestGraceKill(t *gotest.T) {
 				os.Exit(0)
 			}
 
-			cmd := exec.CommandContext(context.Background(), os.Args[0],
+			cmd := exec.CommandContext(context.Background(), os.Args[0], //nolint:gosec // G204: test-only subprocess
 				"-test.run=^TestManagedProcessTestSuite$/^TestGraceKill$")
 			cmd.Env = append(os.Environ(), "GOTEST_MP_CHILD_IGNORE_TERM=1")
 
@@ -364,7 +364,7 @@ func (s *ManagedProcessTestSuite) TestGraceKill(t *gotest.T) {
 			cancel()
 
 			start := time.Now()
-			mp.WaitWithGrace(ctx)
+			_ = mp.WaitWithGrace(ctx)
 			elapsed := time.Since(start)
 
 			gotest.True(it, elapsed < 500*time.Millisecond,

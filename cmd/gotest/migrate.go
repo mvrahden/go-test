@@ -7,7 +7,7 @@ import (
 	"github.com/mvrahden/go-test/internal/migrate"
 )
 
-func runMigrate(inv Invocation) int {
+func runMigrate(inv Invocation) int { //nolint:gocritic
 	patterns := inv.Args
 	if len(patterns) == 0 {
 		patterns = []string{"."}

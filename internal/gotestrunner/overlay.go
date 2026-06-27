@@ -150,7 +150,7 @@ func writeToCacheDir(root string, results gotestgen.GenerateResults) (string, er
 
 	if _, err := os.Stat(filepath.Join(dir, "overlay.json")); err == nil {
 		now := time.Now()
-		os.Chtimes(dir, now, now)
+		_ = os.Chtimes(dir, now, now)
 		return dir, nil
 	}
 
@@ -177,7 +177,7 @@ func writeToTmpDir(results gotestgen.GenerateResults) (string, error) {
 		return "", fmt.Errorf("create overlay dir: %w", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(tmpDir, ".pid"), []byte(strconv.Itoa(os.Getpid())), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, ".pid"), []byte(strconv.Itoa(os.Getpid())), 0600); err != nil {
 		os.RemoveAll(tmpDir)
 		return "", fmt.Errorf("write pid file: %w", err)
 	}
@@ -200,14 +200,14 @@ func writeOverlayFiles(dir string, results gotestgen.GenerateResults) error {
 
 		if len(result.PTest) > 0 {
 			dst := filepath.Join(subDir, about.PSuite)
-			if err := os.WriteFile(dst, result.PTest, 0644); err != nil {
+			if err := os.WriteFile(dst, result.PTest, 0600); err != nil {
 				return fmt.Errorf("write overlay ptest: %w", err)
 			}
 			overlay.Replace[filepath.Join(result.AbsPath, about.PSuite)] = dst
 		}
 		if len(result.PXTest) > 0 {
 			dst := filepath.Join(subDir, about.PXSuite)
-			if err := os.WriteFile(dst, result.PXTest, 0644); err != nil {
+			if err := os.WriteFile(dst, result.PXTest, 0600); err != nil {
 				return fmt.Errorf("write overlay pxtest: %w", err)
 			}
 			overlay.Replace[filepath.Join(result.AbsPath, about.PXSuite)] = dst
@@ -219,7 +219,7 @@ func writeOverlayFiles(dir string, results gotestgen.GenerateResults) error {
 		return fmt.Errorf("marshal overlay json: %w", err)
 	}
 	// Write overlay.json last — its presence signals a complete, valid entry.
-	if err := os.WriteFile(filepath.Join(dir, "overlay.json"), data, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "overlay.json"), data, 0600); err != nil {
 		return fmt.Errorf("write overlay json: %w", err)
 	}
 	return nil

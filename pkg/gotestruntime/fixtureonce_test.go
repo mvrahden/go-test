@@ -69,7 +69,7 @@ func (s *FixtureOnceTestSuite) TestDo(t *gotest.T) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					fo.Do(func() error {
+					_ = fo.Do(func() error {
 						calls.Add(1)
 						return nil
 					})

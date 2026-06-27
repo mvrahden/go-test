@@ -60,15 +60,17 @@ func sortTestBlocks(s string) string {
 	cur := -1
 
 	for _, line := range lines {
-		if m := topLevelRunRe.FindStringSubmatch(line); m != nil {
+		m := topLevelRunRe.FindStringSubmatch(line)
+		switch {
+		case m != nil:
 			blocks = append(blocks, block{key: m[1], lines: []string{line}})
 			cur = len(blocks) - 1
-		} else if cur >= 0 && (line == "PASS" || line == "FAIL") {
+		case cur >= 0 && (line == "PASS" || line == "FAIL"):
 			trailer = append(trailer, line)
 			cur = -1
-		} else if cur < 0 {
+		case cur < 0:
 			trailer = append(trailer, line)
-		} else {
+		default:
 			blocks[cur].lines = append(blocks[cur].lines, line)
 		}
 	}
@@ -165,7 +167,7 @@ func HackGoWork(t *testing.T, tmp string) {
 	if out, err := init.CombinedOutput(); err != nil {
 		t.Fatalf("go work init failed: %s: output: %s", err, string(out))
 	}
-	use := exec.Command("go", "work", "use", filepath.Join(tmp, "examples"))
+	use := exec.Command("go", "work", "use", filepath.Join(tmp, "examples")) //nolint:gosec // G204: go tool with controlled arguments
 	use.Dir = tmp
 	if out, err := use.CombinedOutput(); err != nil {
 		t.Fatalf("go work use failed: %s: output: %s", err, string(out))
@@ -174,7 +176,7 @@ func HackGoWork(t *testing.T, tmp string) {
 
 // copied from: https://github.com/golang/go/issues/62484#issue-1884498794
 func copyFS(dir string, fsys fs.FS, skipRootLevels ...string) error {
-	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, _ error) error {
 		// assert path matches
 		if slices.ContainsFunc(skipRootLevels, func(v string) bool {
 			return strings.HasPrefix(path, v)

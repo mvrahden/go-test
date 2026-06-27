@@ -35,8 +35,8 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 		gotest.Equal(w, 3, len(allSharedFixtures), "expected Alpha, Beta, and Gamma shared fixtures")
 
 		found := map[string]gotestgen.SharedFixtureInfo{}
-		for _, sf := range allSharedFixtures {
-			found[sf.Identifier] = sf
+		for i := range allSharedFixtures {
+			found[allSharedFixtures[i].Identifier] = allSharedFixtures[i]
 		}
 
 		alpha, ok := found["AlphaSharedFixture"]
@@ -78,7 +78,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 		sharedDir := filepath.Join(tmpDir, "shared")
 		gotest.NoError(w, os.MkdirAll(sharedDir, 0755))
 		setupFile := filepath.Join(sharedDir, "setup.go")
-		gotest.NoError(w, os.WriteFile(setupFile, setupSrc, 0644))
+		gotest.NoError(w, os.WriteFile(setupFile, setupSrc, 0600))
 
 		setupBin := filepath.Join(sharedDir, "setup")
 		if runtime.GOOS == "windows" {
@@ -129,7 +129,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 		gotest.NoError(w, err)
 
 		stateFile := filepath.Join(sharedDir, "state.json")
-		gotest.NoError(w, os.WriteFile(stateFile, stateBytes, 0644))
+		gotest.NoError(w, os.WriteFile(stateFile, stateBytes, 0600))
 
 		w.It("TempDirStructure", func(it *gotest.T) {
 			_, err := os.Stat(stateFile)

@@ -80,22 +80,22 @@ func (p *SharedFixtureProcess) WaitAllReady(ctx context.Context, timeout time.Du
 		select {
 		case <-p.allDone:
 		case <-ctx.Done():
-			p.cmd.Process.Kill()
+			_ = p.cmd.Process.Kill()
 			return fmt.Errorf("cancelled: %w", ctx.Err())
 		case <-time.After(timeout):
-			p.cmd.Process.Kill()
+			_ = p.cmd.Process.Kill()
 			return fmt.Errorf("timed out after %v", timeout)
 		}
 	} else {
 		select {
 		case <-p.allDone:
 		case <-ctx.Done():
-			p.cmd.Process.Kill()
+			_ = p.cmd.Process.Kill()
 			return fmt.Errorf("cancelled: %w", ctx.Err())
 		}
 	}
 	if p.setupErr != nil {
-		p.cmd.Process.Kill()
+		_ = p.cmd.Process.Kill()
 		return fmt.Errorf("shared fixture setup: %w", p.setupErr)
 	}
 
@@ -103,13 +103,13 @@ func (p *SharedFixtureProcess) WaitAllReady(ctx context.Context, timeout time.Du
 	stateBytes, err := json.Marshal(p.state)
 	p.mu.Unlock()
 	if err != nil {
-		p.cmd.Process.Kill()
+		_ = p.cmd.Process.Kill()
 		return fmt.Errorf("re-marshal shared fixture state: %w", err)
 	}
 
 	p.stateFile = filepath.Join(p.sharedDir, "state.json")
-	if err := os.WriteFile(p.stateFile, stateBytes, 0644); err != nil {
-		p.cmd.Process.Kill()
+	if err := os.WriteFile(p.stateFile, stateBytes, 0600); err != nil {
+		_ = p.cmd.Process.Kill()
 		return fmt.Errorf("write shared fixture state file: %w", err)
 	}
 	return nil
@@ -133,7 +133,7 @@ func (p *SharedFixtureProcess) WriteStateFileForKeys(name string, keys []string)
 	}
 
 	path := filepath.Join(p.sharedDir, name+".json")
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0600); err != nil {
 		return "", fmt.Errorf("write state file for %s: %w", name, err)
 	}
 	return path, nil
@@ -150,12 +150,12 @@ func (p *SharedFixtureProcess) Teardown() error {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
-	TerminateProcessGroup(p.cmd.Process.Pid)
+	_ = TerminateProcessGroup(p.cmd.Process.Pid)
 	select {
 	case <-p.done:
 	case <-time.After(timeout):
 		fmt.Fprintf(os.Stderr, "WARN: shared fixture process did not exit within %v, forcing termination\n", timeout)
-		ForceKillProcessGroup(p.cmd.Process.Pid)
+		_ = ForceKillProcessGroup(p.cmd.Process.Pid)
 		<-p.done
 	}
 	if p.sharedDir != "" {
@@ -182,7 +182,7 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	}
 
 	setupFile := filepath.Join(sharedDir, "setup.go")
-	if err := os.WriteFile(setupFile, src, 0644); err != nil {
+	if err := os.WriteFile(setupFile, src, 0600); err != nil {
 		return nil, err
 	}
 
@@ -217,8 +217,8 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 
 	// Build per-fixture readiness channels.
 	ready := make(map[string]chan struct{}, len(fixtures))
-	for _, sf := range fixtures {
-		key := sf.PkgPath + "." + sf.Identifier
+	for i := range fixtures {
+		key := fixtures[i].PkgPath + "." + fixtures[i].Identifier
 		ready[key] = make(chan struct{})
 	}
 
@@ -238,7 +238,7 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 
 	go func() {
 		defer func() {
-			cmd.Wait()
+			_ = cmd.Wait()
 			close(waitDone)
 		}()
 		closedReady := make(map[string]bool, len(ready))

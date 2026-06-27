@@ -515,7 +515,7 @@ func assertionQualifier(expr ast.Expr) string {
 
 func renderExpr(fset *token.FileSet, node ast.Expr) string {
 	var buf bytes.Buffer
-	format.Node(&buf, fset, node)
+	_ = format.Node(&buf, fset, node)
 	return buf.String()
 }
 

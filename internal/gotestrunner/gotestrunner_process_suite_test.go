@@ -32,13 +32,13 @@ func (s *GotestrunnerProcessTestSuite) TestGracefulTermination(t *gotest.T) {
 				signal.Notify(sig, gracefulSignals...)
 				fmt.Println("ready")
 				<-sig
-				os.WriteFile(marker, []byte("cleanup-ran"), 0644)
+				_ = os.WriteFile(marker, []byte("cleanup-ran"), 0600)
 				os.Exit(0)
 			}
 
 			marker := filepath.Join(it.T().TempDir(), "marker")
 
-			cmd := exec.CommandContext(context.Background(), os.Args[0],
+			cmd := exec.CommandContext(context.Background(), os.Args[0], //nolint:gosec // G204: test-only subprocess with hardcoded args
 				"-test.run=^TestGotestrunnerProcessTestSuite$/^TestGracefulTermination$")
 			cmd.Env = append(os.Environ(),
 				"GOTEST_GRACEFUL_CHILD=1",
@@ -65,7 +65,7 @@ func (s *GotestrunnerProcessTestSuite) TestGracefulTermination(t *gotest.T) {
 			select {
 			case <-done:
 			case <-time.After(5 * time.Second):
-				cmd.Process.Kill()
+				_ = cmd.Process.Kill()
 				it.T().Fatal("process did not exit after TerminateProcessGroup")
 			}
 
@@ -95,7 +95,7 @@ func (s *GotestrunnerProcessTestSuite) TestTeardownBudget(t *gotest.T) {
 		w.When("valid duration", func(w *gotest.T) {
 			w.It("returns parsed duration", func(it *gotest.T) {
 				f := filepath.Join(it.T().TempDir(), "budget")
-				os.WriteFile(f, []byte("2m30s\n"), 0644)
+				_ = os.WriteFile(f, []byte("2m30s\n"), 0600)
 				got := gotestrunner.ExportReadTeardownBudget(f)
 				want := 2*time.Minute + 30*time.Second
 				gotest.Equal(it, want, got)
@@ -105,7 +105,7 @@ func (s *GotestrunnerProcessTestSuite) TestTeardownBudget(t *gotest.T) {
 		w.When("invalid duration", func(w *gotest.T) {
 			w.It("returns default", func(it *gotest.T) {
 				f := filepath.Join(it.T().TempDir(), "budget")
-				os.WriteFile(f, []byte("not-a-duration"), 0644)
+				_ = os.WriteFile(f, []byte("not-a-duration"), 0600)
 				got := gotestrunner.ExportReadTeardownBudget(f)
 				gotest.Equal(it, gotestrunner.GracefulShutdownDelay, got)
 			})
@@ -114,7 +114,7 @@ func (s *GotestrunnerProcessTestSuite) TestTeardownBudget(t *gotest.T) {
 		w.When("zero duration", func(w *gotest.T) {
 			w.It("returns default", func(it *gotest.T) {
 				f := filepath.Join(it.T().TempDir(), "budget")
-				os.WriteFile(f, []byte("0s"), 0644)
+				_ = os.WriteFile(f, []byte("0s"), 0600)
 				got := gotestrunner.ExportReadTeardownBudget(f)
 				gotest.Equal(it, gotestrunner.GracefulShutdownDelay, got)
 			})

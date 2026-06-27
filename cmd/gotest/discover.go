@@ -60,7 +60,7 @@ type discoverMethod struct {
 	Col      int    `json:"col"`
 }
 
-func runDiscover(inv Invocation) int {
+func runDiscover(inv Invocation) int { //nolint:gocritic
 	tags, remaining := extractTagsFlag(inv.TagArgs())
 	patterns := ExtractPackagePatterns(remaining)
 	var buildFlags []string

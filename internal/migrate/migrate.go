@@ -272,7 +272,8 @@ func TransformFile(fset *token.FileSet, f *ast.File, plan MigrationPlan) {
 	lifecycleMethods := map[string]bool{}
 	suiteOldNames := map[string]bool{}
 
-	for _, sm := range plan.Suites {
+	for i := range plan.Suites {
+		sm := &plan.Suites[i]
 		oldToNew[sm.OldName] = sm.NewName
 		suiteReceivers[sm.OldName] = sm.ReceiverName
 		suiteOldNames[sm.OldName] = true
@@ -440,8 +441,7 @@ func rewriteAssertions(body *ast.BlockStmt, recvName string, assertionMap map[st
 
 	// Walk nested blocks
 	ast.Inspect(body, func(n ast.Node) bool {
-		switch node := n.(type) {
-		case *ast.BlockStmt:
+		if node, ok := n.(*ast.BlockStmt); ok {
 			if node != body {
 				rewriteAssertions(node, recvName, assertionMap)
 				return false
@@ -622,9 +622,9 @@ func MigrateFile(path string) ([]MigrateResult, error) {
 
 	// Post-process: rewrite remaining s.T() to t.T()
 	src := buf.String()
-	for _, sm := range plan.Suites {
-		if sm.ReceiverName != "" {
-			src = rewriteSTandalone(src, sm.ReceiverName)
+	for i := range plan.Suites {
+		if plan.Suites[i].ReceiverName != "" {
+			src = rewriteSTandalone(src, plan.Suites[i].ReceiverName)
 		}
 	}
 
@@ -633,16 +633,16 @@ func MigrateFile(path string) ([]MigrateResult, error) {
 		return nil, fmt.Errorf("gofmt %s: %w", path, err)
 	}
 
-	if err := os.WriteFile(path, formatted, 0644); err != nil {
+	if err := os.WriteFile(path, formatted, 0600); err != nil {
 		return nil, fmt.Errorf("write %s: %w", path, err)
 	}
 
 	var results []MigrateResult
-	for _, sm := range plan.Suites {
+	for i := range plan.Suites {
 		results = append(results, MigrateResult{
 			File:    path,
-			OldName: sm.OldName,
-			NewName: sm.NewName,
+			OldName: plan.Suites[i].OldName,
+			NewName: plan.Suites[i].NewName,
 		})
 	}
 	return results, nil

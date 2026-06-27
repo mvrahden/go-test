@@ -38,7 +38,7 @@ func parseDebounceFlag(args []string) (time.Duration, error) {
 	return 200 * time.Millisecond, nil
 }
 
-func runWatch(inv Invocation) int {
+func runWatch(inv Invocation) int { //nolint:gocritic
 	args := inv.DefaultArgs()
 	if inv.Config.Debounce != nil && !hasFlag(args, "--debounce") {
 		args = append([]string{"--debounce=" + inv.Config.Debounce.Duration().String()}, args...)
@@ -160,7 +160,7 @@ func runWatch(inv Invocation) int {
 	}
 }
 
-func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int {
+func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int { //nolint:gocritic
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
 	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
@@ -241,7 +241,7 @@ func addWatchDirs(w *fsnotify.Watcher, pattern string) {
 	if dir == "" || dir == "." {
 		dir = "."
 	}
-	filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -250,7 +250,7 @@ func addWatchDirs(w *fsnotify.Watcher, pattern string) {
 			if strings.HasPrefix(name, ".") || name == "vendor" || name == "testdata" || name == "node_modules" {
 				return filepath.SkipDir
 			}
-			w.Add(path)
+			_ = w.Add(path)
 		}
 		return nil
 	})

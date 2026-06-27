@@ -47,10 +47,10 @@ func loadAllTestPkgs() (map[string]*packages.Package, string, error) {
 	defer os.RemoveAll(scratch)
 
 	goMod := []byte("module testpkg\n\ngo 1.24\n\nrequire github.com/mvrahden/go-test v0.0.0\n\nreplace github.com/mvrahden/go-test => " + modRoot + "\n")
-	if err := os.WriteFile(filepath.Join(scratch, "go.mod"), goMod, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(scratch, "go.mod"), goMod, 0600); err != nil {
 		return nil, "", err
 	}
-	if err := os.WriteFile(filepath.Join(scratch, "stub.go"), []byte("package testpkg\n\nimport _ \"github.com/mvrahden/go-test/pkg/gotest\"\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(scratch, "stub.go"), []byte("package testpkg\n\nimport _ \"github.com/mvrahden/go-test/pkg/gotest\"\n"), 0600); err != nil {
 		return nil, "", err
 	}
 
@@ -68,11 +68,11 @@ func loadAllTestPkgs() (map[string]*packages.Package, string, error) {
 
 	tidiedMod, _ := os.ReadFile(filepath.Join(scratch, "go.mod"))
 	tidiedSum, _ := os.ReadFile(filepath.Join(scratch, "go.sum"))
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), tidiedMod, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), tidiedMod, 0600); err != nil {
 		return nil, dir, err
 	}
 	if len(tidiedSum) > 0 {
-		if err := os.WriteFile(filepath.Join(dir, "go.sum"), tidiedSum, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "go.sum"), tidiedSum, 0600); err != nil {
 			return nil, dir, err
 		}
 	}
@@ -94,7 +94,7 @@ func loadAllTestPkgs() (map[string]*packages.Package, string, error) {
 		if err := os.MkdirAll(subDir, 0755); err != nil {
 			return nil, dir, err
 		}
-		if err := os.WriteFile(filepath.Join(subDir, "test.go"), data, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(subDir, "test.go"), data, 0600); err != nil {
 			return nil, dir, err
 		}
 	}

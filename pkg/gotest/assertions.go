@@ -101,7 +101,7 @@ func readAndRestore(r io.Reader) ([]byte, error) {
 	if seeker, ok := r.(io.Seeker); ok {
 		pos, err := seeker.Seek(0, io.SeekCurrent)
 		if err == nil {
-			defer seeker.Seek(pos, io.SeekStart)
+			defer func() { _, _ = seeker.Seek(pos, io.SeekStart) }()
 		}
 	}
 	return io.ReadAll(r)

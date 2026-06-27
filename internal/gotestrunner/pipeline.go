@@ -131,7 +131,7 @@ func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []st
 	if compileErr != nil || setupErr != nil {
 		cancel()
 		if setupProc != nil {
-			setupProc.Teardown()
+			_ = setupProc.Teardown()
 		}
 		if compileErr != nil {
 			return nil, nil, nil, compileErr
@@ -156,9 +156,9 @@ func assignCoverProfiles(targets []SuiteTarget, coverDir string) {
 
 func mergeCoverProfiles(targets []SuiteTarget, userProfile string) {
 	var profiles []string
-	for _, t := range targets {
-		if t.CoverProfile != "" {
-			profiles = append(profiles, t.CoverProfile)
+	for i := range targets {
+		if targets[i].CoverProfile != "" {
+			profiles = append(profiles, targets[i].CoverProfile)
 		}
 	}
 	if len(profiles) == 0 {
@@ -174,18 +174,18 @@ func setupCoverage(targets []SuiteTarget, overlay *OverlayResult, userCoverProfi
 		return
 	}
 	coverDir := filepath.Join(overlay.WorkDir, "cover")
-	os.MkdirAll(coverDir, 0o755)
+	_ = os.MkdirAll(coverDir, 0o755)
 	assignCoverProfiles(targets, coverDir)
 }
 
-func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (PipelineResult, error) {
+func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (PipelineResult, error) { //nolint:gocritic
 	compiled, setupProc, cancelPrepare, err := prepareTestRun(ctx, overlay, pf.BuildFlags, cfg.SetupTimeout)
 	if err != nil {
 		return PipelineResult{ExitCode: 2}, err
 	}
 	defer cancelPrepare()
 	if setupProc != nil {
-		defer setupProc.Teardown()
+		defer func() { _ = setupProc.Teardown() }()
 	}
 
 	select {
@@ -232,11 +232,11 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	}, nil
 }
 
-func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (PipelineResult, error) {
+func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (PipelineResult, error) { //nolint:gocritic
 	var coverDir string
 	if pf.UserCoverProfile != "" {
 		coverDir = filepath.Join(overlay.WorkDir, "cover")
-		os.MkdirAll(coverDir, 0o755)
+		_ = os.MkdirAll(coverDir, 0o755)
 	}
 
 	resolvedSetupTimeout := resolveSetupTimeout(cfg.SetupTimeout)
@@ -341,7 +341,8 @@ loop:
 
 		collector.Register(cr.Package, len(targets))
 
-		for i, target := range targets {
+		for i := range targets { //nolint:gocritic
+			target := targets[i]
 			wg.Add(1)
 			go func(t SuiteTarget, idx int) {
 				defer wg.Done()
@@ -411,7 +412,7 @@ loop:
 	streamCancel()
 
 	if setupProc != nil {
-		setupProc.Teardown()
+		_ = setupProc.Teardown()
 	}
 
 	if pf.UserCoverProfile != "" {

@@ -16,7 +16,7 @@ func (s *GitTestSuite) TestPSuiteRegex(t *gotest.T) {
 			{"gosuite/gotest_psuite_test.go"},
 			{"gosuite/gotest_pxsuite_test.go"},
 		}) {
-			gotest.True(sub, about.PSuiteRegex.Match([]byte(tc.Name)))
+			gotest.True(sub, about.PSuiteRegex.MatchString(tc.Name))
 		}
 	})
 
@@ -30,7 +30,7 @@ func (s *GitTestSuite) TestPSuiteRegex(t *gotest.T) {
 			{"focus_suite/gotestgen_ptest.golden"},
 			{"focus_suite/gotestgen_pxtest.golden"},
 		}) {
-			gotest.False(sub, about.PSuiteRegex.Match([]byte(tc.Name)))
+			gotest.False(sub, about.PSuiteRegex.MatchString(tc.Name))
 		}
 	})
 }

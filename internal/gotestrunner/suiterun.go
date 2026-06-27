@@ -72,12 +72,12 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 	pkgCount := map[string]int{}
 	var pkgOrder []string
 	localIdx := make([]int, len(targets))
-	for i, t := range targets {
-		if _, seen := pkgCount[t.Package]; !seen {
-			pkgOrder = append(pkgOrder, t.Package)
+	for i := range targets {
+		if _, seen := pkgCount[targets[i].Package]; !seen {
+			pkgOrder = append(pkgOrder, targets[i].Package)
 		}
-		localIdx[i] = pkgCount[t.Package]
-		pkgCount[t.Package]++
+		localIdx[i] = pkgCount[targets[i].Package]
+		pkgCount[targets[i].Package]++
 	}
 	for _, pkg := range pkgOrder {
 		collector.Register(pkg, pkgCount[pkg])
@@ -93,7 +93,7 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 		env = append(env, k+"="+v)
 	}
 
-	for i, target := range targets {
+	for i, target := range targets { //nolint:gocritic
 		wg.Add(1)
 		go func(idx int, t SuiteTarget) {
 			defer wg.Done()
@@ -110,7 +110,7 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 	wg.Wait()
 }
 
-func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2json bool) *exec.Cmd {
+func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2json bool) *exec.Cmd { //nolint:gocritic
 	var runArg string
 	if target.RunFilter != "" {
 		runArg = "-test.run=" + target.RunFilter
@@ -149,7 +149,7 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 		return cmd
 	}
 
-	cmd := exec.CommandContext(ctx, target.BinaryPath, testArgs...)
+	cmd := exec.CommandContext(ctx, target.BinaryPath, testArgs...) //nolint:gosec // G204: binary built by this tool, not user-supplied
 	cmd.Env = env
 	if target.BudgetFile != "" {
 		cmd.Env = append(cmd.Env, protocol.EnvTeardownBudgetFile+"="+target.BudgetFile)
@@ -164,7 +164,7 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 // On context cancellation, cmd.Cancel sends SIGTERM to the process group.
 // A per-process kill timer (from the teardown budget file) then governs
 // when SIGKILL is sent, rather than Go's built-in WaitDelay.
-func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult {
+func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic
 	cmd := buildSuiteCmd(ctx, target, env, test2json)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -180,7 +180,7 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		return SuiteResult{Target: target, ExitCode: 2, Duration: time.Since(start)}
 	}
 
-	mp.WaitWithGrace(ctx)
+	_ = mp.WaitWithGrace(ctx)
 	duration := time.Since(start)
 
 	exitCode := 0
@@ -226,11 +226,12 @@ func StripTrailingStatus(data []byte) []byte {
 }
 
 func WritePackageSummary(pkg string, failed bool, d time.Duration, verbose bool) {
-	if failed {
+	switch {
+	case failed:
 		fmt.Fprintf(os.Stdout, "FAIL\nFAIL\t%s\t%.3fs\n", pkg, d.Seconds())
-	} else if verbose {
+	case verbose:
 		fmt.Fprintf(os.Stdout, "PASS\nok  \t%s\t%.3fs\n", pkg, d.Seconds())
-	} else {
+	default:
 		fmt.Fprintf(os.Stdout, "ok  \t%s\t%.3fs\n", pkg, d.Seconds())
 	}
 }

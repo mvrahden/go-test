@@ -67,25 +67,26 @@ func GenerateSharedSetup(fixtures []SharedFixtureInfo) ([]byte, error) {
 
 	var imports []sharedSetupImport
 	pkgAlias := map[string]string{}
-	for _, sf := range fixtures {
-		if _, ok := pkgAlias[sf.PkgPath]; !ok {
+	for i := range fixtures {
+		if _, ok := pkgAlias[fixtures[i].PkgPath]; !ok {
 			alias := fmt.Sprintf("sfpkg%d", len(imports))
-			pkgAlias[sf.PkgPath] = alias
-			imports = append(imports, sharedSetupImport{Alias: alias, Path: sf.PkgPath})
+			pkgAlias[fixtures[i].PkgPath] = alias
+			imports = append(imports, sharedSetupImport{Alias: alias, Path: fixtures[i].PkgPath})
 		}
 	}
 
 	// Build a map from state key → var name and state key → index for dependency resolution.
 	stateKeyToVar := make(map[string]string, len(fixtures))
 	stateKeyToIndex := make(map[string]int, len(fixtures))
-	for i, sf := range fixtures {
-		key := sf.PkgPath + "." + sf.Identifier
+	for i := range fixtures {
+		key := fixtures[i].PkgPath + "." + fixtures[i].Identifier
 		stateKeyToVar[key] = fmt.Sprintf("sf%d", i)
 		stateKeyToIndex[key] = i
 	}
 
 	var fixtureVMs []sharedSetupFixture
-	for i, sf := range fixtures {
+	for i := range fixtures {
+		sf := &fixtures[i]
 		varName := fmt.Sprintf("sf%d", i)
 		alias := pkgAlias[sf.PkgPath]
 
@@ -125,8 +126,8 @@ func GenerateSharedSetup(fixtures []SharedFixtureInfo) ([]byte, error) {
 	}
 
 	teardownFixtures := make([]sharedSetupFixture, len(fixtureVMs))
-	for i, f := range fixtureVMs {
-		teardownFixtures[len(fixtureVMs)-1-i] = f
+	for i := range fixtureVMs {
+		teardownFixtures[len(fixtureVMs)-1-i] = fixtureVMs[i]
 	}
 
 	data := sharedSetupData{

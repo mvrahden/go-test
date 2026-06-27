@@ -23,7 +23,7 @@ import (
 // --- reference implementations (pre-refactor logic) ---
 
 // buildPlainArgs reproduces the exact arg logic of the old RunSingleSuite.
-func buildPlainArgs(target gotestrunner.SuiteTarget) (path string, args []string) {
+func buildPlainArgs(target gotestrunner.SuiteTarget) (path string, args []string) { //nolint:gocritic
 	if target.RunFilter != "" {
 		args = append(args, "-test.run="+target.RunFilter)
 	} else {
@@ -37,7 +37,7 @@ func buildPlainArgs(target gotestrunner.SuiteTarget) (path string, args []string
 }
 
 // buildTest2JSONArgs reproduces the exact arg logic of the old RunSingleSuiteTest2JSON.
-func buildTest2JSONArgs(target gotestrunner.SuiteTarget) (path string, args []string) {
+func buildTest2JSONArgs(target gotestrunner.SuiteTarget) (path string, args []string) { //nolint:gocritic
 	var testArgs []string
 	if target.RunFilter != "" {
 		testArgs = append(testArgs, "-test.run="+target.RunFilter)
@@ -130,7 +130,7 @@ func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 
 				writeProfile := func(name, content string) string {
 					p := filepath.Join(dir, name)
-					err := os.WriteFile(p, []byte(content), 0o644)
+					err := os.WriteFile(p, []byte(content), 0o600)
 					gotest.NoError(it, err)
 					return p
 				}
@@ -165,7 +165,7 @@ func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 
 				writeProfile := func(name, content string) string {
 					p := filepath.Join(dir, name)
-					err := os.WriteFile(p, []byte(content), 0o644)
+					err := os.WriteFile(p, []byte(content), 0o600)
 					gotest.NoError(it, err)
 					return p
 				}
@@ -190,7 +190,7 @@ func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 			w2.It("skips the missing file", func(it *gotest.T) {
 				dir := it.T().TempDir()
 				p := filepath.Join(dir, "exists.out")
-				os.WriteFile(p, []byte("mode: set\nfoo.go:1.2,3.4 1 1\n"), 0o644)
+				_ = os.WriteFile(p, []byte("mode: set\nfoo.go:1.2,3.4 1 1\n"), 0o600)
 
 				out := filepath.Join(dir, "merged.out")
 				err := gotestrunner.MergeCoverProfiles([]string{filepath.Join(dir, "missing.out"), p}, out)
@@ -293,7 +293,7 @@ func (s *GotestrunnerTestSuite) TestOverlayManagement(t *gotest.T) {
 			dir, err := os.MkdirTemp(os.TempDir(), "gotest-overlay-test-")
 			gotest.NoError(it, err)
 			// Write a PID that doesn't exist (use a very high PID)
-			os.WriteFile(filepath.Join(dir, ".pid"), []byte("999999999"), 0644)
+			_ = os.WriteFile(filepath.Join(dir, ".pid"), []byte("999999999"), 0600)
 
 			gotestrunner.CleanStaleOverlays()
 
@@ -307,7 +307,7 @@ func (s *GotestrunnerTestSuite) TestOverlayManagement(t *gotest.T) {
 			defer os.RemoveAll(dir)
 
 			// Write our own PID -- guaranteed alive
-			os.WriteFile(filepath.Join(dir, ".pid"), []byte(strconv.Itoa(os.Getpid())), 0644)
+			_ = os.WriteFile(filepath.Join(dir, ".pid"), []byte(strconv.Itoa(os.Getpid())), 0600)
 
 			gotestrunner.CleanStaleOverlays()
 
@@ -408,7 +408,7 @@ func (s *GotestrunnerTestSuite) TestOverlayCache(t *gotest.T) {
 
 			root, err := gotestrunner.ExportCacheRoot()
 			gotest.NoError(it, err)
-			gotest.True(it, strings.HasSuffix(root, filepath.Join("gotest")))
+			gotest.True(it, strings.HasSuffix(root, "gotest"))
 			gotest.NotEmpty(it, root)
 		})
 	})
@@ -486,19 +486,19 @@ func (s *GotestrunnerTestSuite) TestOverlayCache(t *gotest.T) {
 			it.T().Setenv(protocol.EnvCacheDir, cacheDir)
 
 			overlaysDir := filepath.Join(cacheDir, "overlays")
-			os.MkdirAll(overlaysDir, 0755)
+			_ = os.MkdirAll(overlaysDir, 0755)
 
 			// Create an old entry.
 			oldDir := filepath.Join(overlaysDir, "old-hash-entry")
-			os.MkdirAll(oldDir, 0755)
-			os.WriteFile(filepath.Join(oldDir, "overlay.json"), []byte("{}"), 0644)
+			_ = os.MkdirAll(oldDir, 0755)
+			_ = os.WriteFile(filepath.Join(oldDir, "overlay.json"), []byte("{}"), 0600)
 			oldTime := time.Now().Add(-8 * 24 * time.Hour)
-			os.Chtimes(oldDir, oldTime, oldTime)
+			_ = os.Chtimes(oldDir, oldTime, oldTime)
 
 			// Create a fresh entry.
 			freshDir := filepath.Join(overlaysDir, "fresh-hash-entry")
-			os.MkdirAll(freshDir, 0755)
-			os.WriteFile(filepath.Join(freshDir, "overlay.json"), []byte("{}"), 0644)
+			_ = os.MkdirAll(freshDir, 0755)
+			_ = os.WriteFile(filepath.Join(freshDir, "overlay.json"), []byte("{}"), 0600)
 
 			gotestrunner.CleanStaleOverlays()
 
@@ -518,7 +518,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 		ctx := context.Background()
 		env := []string{"PATH=/usr/bin", "HOME=/home/test"}
 
-		for sub, tc := range gotest.Each(w, []struct {
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
 			Name       string
 			target     gotestrunner.SuiteTarget
 			wantBinary string
@@ -617,7 +617,8 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 			refCtx := context.Background()
 			refEnv := []string{"A=1"}
 
-			for _, target := range targets {
+			for i := range targets { //nolint:gocritic
+				target := targets[i]
 				refPath, refArgs := buildPlainArgs(target)
 				cmd := gotestrunner.ExportBuildSuiteCmd(refCtx, target, refEnv, false)
 
@@ -635,7 +636,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 		ctx := context.Background()
 		env := []string{"PATH=/usr/bin", "HOME=/home/test"}
 
-		for sub, tc := range gotest.Each(w, []struct {
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
 			Name       string
 			target     gotestrunner.SuiteTarget
 			wantBinary string
@@ -753,7 +754,8 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 			refCtx := context.Background()
 			refEnv := []string{"A=1"}
 
-			for _, target := range targets {
+			for i := range targets { //nolint:gocritic
+				target := targets[i]
 				_, refArgs := buildTest2JSONArgs(target)
 				cmd := gotestrunner.ExportBuildSuiteCmd(refCtx, target, refEnv, true)
 
@@ -968,8 +970,8 @@ func (s *GotestrunnerTestSuite) TestEmitSkippedSuites(t *gotest.T) {
 			gotest.Equal(it, 8, len(lines))
 
 			var first, fifth map[string]any
-			json.Unmarshal([]byte(lines[0]), &first)
-			json.Unmarshal([]byte(lines[4]), &fifth)
+			_ = json.Unmarshal([]byte(lines[0]), &first)
+			_ = json.Unmarshal([]byte(lines[4]), &fifth)
 			gotest.Equal(it, "example.com/a", first["Package"])
 			gotest.Equal(it, "example.com/z", fifth["Package"])
 		})
@@ -1000,7 +1002,7 @@ func capturePackageSummary(pkg string, failed bool, d time.Duration, verbose boo
 	wr.Close()
 	os.Stdout = old
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	r.Close()
 	return buf.String()
 }

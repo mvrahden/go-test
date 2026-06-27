@@ -66,7 +66,7 @@ func RenderJSON(w io.Writer, packages []*Package) {
 
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	enc.Encode(root)
+	_ = enc.Encode(root)
 }
 
 func convertNodes(nodes []*Node) []jsonNode {

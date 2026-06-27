@@ -70,7 +70,7 @@ func main() {
 	}
 }
 
-func runTest(inv Invocation) int {
+func runTest(inv Invocation) int { //nolint:gocritic
 	if slices.Contains(inv.Args, "--spec") {
 		var specArgs []string
 		for _, a := range inv.Args {
@@ -229,7 +229,7 @@ func parseParallelFlag(args []string) (int, error) {
 }
 
 func readCoverageTotal(profilePath string) (float64, error) {
-	out, err := exec.Command("go", "tool", "cover", "-func="+profilePath).Output()
+	out, err := exec.Command("go", "tool", "cover", "-func="+profilePath).Output() //nolint:gosec // G204: go tool with controlled arguments
 	if err != nil {
 		return 0, fmt.Errorf("go tool cover: %w", err)
 	}

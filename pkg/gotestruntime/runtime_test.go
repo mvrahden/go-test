@@ -748,7 +748,7 @@ func TestSharedFixture_LoadAndHydrate(t *testing.T) {
 	}
 	stateBytes, _ := json.Marshal(stateData)
 	stateFile := filepath.Join(t.TempDir(), "state.json")
-	os.WriteFile(stateFile, stateBytes, 0644)
+	_ = os.WriteFile(stateFile, stateBytes, 0600)
 	t.Setenv(protocol.EnvSharedStateFile, stateFile)
 
 	var target SharedDB
@@ -844,7 +844,7 @@ func TestSharedFixture_NilHydrateAndDehydrate(t *testing.T) {
 	}
 	stateBytes, _ := json.Marshal(stateData)
 	stateFile := filepath.Join(t.TempDir(), "state.json")
-	os.WriteFile(stateFile, stateBytes, 0644)
+	_ = os.WriteFile(stateFile, stateBytes, 0600)
 	t.Setenv(protocol.EnvSharedStateFile, stateFile)
 
 	var target SharedDB
@@ -1296,7 +1296,7 @@ func TestDAG_SharedFixtureWithDAGPath(t *testing.T) {
 	}
 	stateBytes, _ := json.Marshal(stateData)
 	stateFile := filepath.Join(t.TempDir(), "state.json")
-	os.WriteFile(stateFile, stateBytes, 0644)
+	_ = os.WriteFile(stateFile, stateBytes, 0600)
 	t.Setenv(protocol.EnvSharedStateFile, stateFile)
 
 	var target SharedDB
@@ -1391,7 +1391,7 @@ func TestDAG_SharedStateNode(t *testing.T) {
 
 	stateJSON := `{"ConnStr":"postgres://test"}`
 	stateFile := filepath.Join(t.TempDir(), "state.json")
-	os.WriteFile(stateFile, fmt.Appendf(nil, `{"pkg.PostgresSharedFixture":%s}`, stateJSON), 0644)
+	_ = os.WriteFile(stateFile, fmt.Appendf(nil, `{"pkg.PostgresSharedFixture":%s}`, stateJSON), 0600)
 	t.Setenv("GOTEST_SHARED_STATE_FILE", stateFile)
 
 	type pg struct{ ConnStr string }
@@ -1458,10 +1458,10 @@ func TestDAG_SharedStateChain(t *testing.T) {
 	rec := &recorder{}
 
 	stateFile := filepath.Join(t.TempDir(), "state.json")
-	os.WriteFile(stateFile, []byte(`{
+	_ = os.WriteFile(stateFile, []byte(`{
 		"pkg.Postgres": {"ConnStr":"postgres://test"},
 		"pkg.Schema":   {"Version":"v42"}
-	}`), 0644)
+	}`), 0600)
 	t.Setenv("GOTEST_SHARED_STATE_FILE", stateFile)
 
 	type pg struct{ ConnStr string }

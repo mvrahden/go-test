@@ -18,7 +18,7 @@ type prepareOutput struct {
 	StateFile   string `json:"stateFile,omitempty"`
 }
 
-func runPrepare(inv Invocation) int {
+func runPrepare(inv Invocation) int { //nolint:gocritic
 	args := inv.TagArgs()
 	patterns := ExtractPackagePatterns(args)
 	tags, _ := extractTagsFlag(args)
@@ -54,7 +54,7 @@ func runPrepare(inv Invocation) int {
 		}
 		if err := setupProc.WaitAllReady(ctx, 0); err != nil {
 			stop()
-			setupProc.Teardown()
+			_ = setupProc.Teardown()
 			cleanup()
 			fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup: %s\n", err)
 			return 2
@@ -73,7 +73,7 @@ func runPrepare(inv Invocation) int {
 
 	if err := json.NewEncoder(os.Stdout).Encode(out); err != nil {
 		if setupProc != nil {
-			setupProc.Teardown()
+			_ = setupProc.Teardown()
 		}
 		cleanup()
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -85,7 +85,7 @@ func runPrepare(inv Invocation) int {
 	<-sigCh
 
 	if setupProc != nil {
-		setupProc.Teardown()
+		_ = setupProc.Teardown()
 	}
 	cleanup()
 	return 0

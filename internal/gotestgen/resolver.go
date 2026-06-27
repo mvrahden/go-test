@@ -709,8 +709,7 @@ func nonSerializable(t types.Type) string {
 }
 
 func isJSONMapKey(t types.Type) bool {
-	switch u := t.Underlying().(type) {
-	case *types.Basic:
+	if u, ok := t.Underlying().(*types.Basic); ok {
 		return u.Info()&(types.IsString|types.IsInteger) != 0
 	}
 	return false

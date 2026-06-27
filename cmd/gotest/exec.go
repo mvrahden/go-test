@@ -10,7 +10,7 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
-func Run(cfg ExecConfig) int {
+func Run(cfg ExecConfig) int { //nolint:gocritic
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
 	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)

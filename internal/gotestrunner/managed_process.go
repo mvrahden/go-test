@@ -54,18 +54,18 @@ func (p *ManagedProcess) Start() error {
 		return err
 	}
 	p.assignJob()
-	go func() { p.cmd.Wait(); p.closeJob(); close(p.done) }()
+	go func() { _ = p.cmd.Wait(); p.closeJob(); close(p.done) }()
 	return nil
 }
 
 func (p *ManagedProcess) Adopt() {
 	p.assignJob()
-	go func() { p.cmd.Wait(); p.closeJob(); close(p.done) }()
+	go func() { _ = p.cmd.Wait(); p.closeJob(); close(p.done) }()
 }
 
 func (p *ManagedProcess) assignJob() {
 	if p.job != nil && p.cmd.Process != nil {
-		p.job.assign(p.cmd.Process.Pid)
+		_ = p.job.assign(p.cmd.Process.Pid)
 	}
 }
 
@@ -110,7 +110,7 @@ func (p *ManagedProcess) Terminate() {
 	if p.cmd.Process == nil {
 		return
 	}
-	TerminateProcessGroup(p.cmd.Process.Pid)
+	_ = TerminateProcessGroup(p.cmd.Process.Pid)
 	grace := p.graceTimeout()
 	select {
 	case <-p.done:
@@ -122,11 +122,11 @@ func (p *ManagedProcess) Terminate() {
 
 func (p *ManagedProcess) forceKill() {
 	if p.job != nil {
-		p.job.terminate(1)
+		_ = p.job.terminate(1)
 		return
 	}
 	if p.cmd.Process != nil {
-		ForceKillProcessGroup(p.cmd.Process.Pid)
+		_ = ForceKillProcessGroup(p.cmd.Process.Pid)
 	}
 }
 

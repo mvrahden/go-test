@@ -61,7 +61,7 @@ type headerImport struct {
 
 type renderer struct{}
 
-func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, resolved *ResolveResult) ([]byte, error) {
+func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, resolved *ResolveResult) ([]byte, error) { //nolint:gocritic
 	if pkg == nil {
 		return nil, nil
 	}
@@ -109,7 +109,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	return r.formatOutput(buf)
 }
 
-func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, sfNodes []*SharedFixtureNodeVM) error {
+func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, sfNodes []*SharedFixtureNodeVM) error { //nolint:gocritic
 	type TplData struct {
 		RepoName    string
 		PackageName string
@@ -120,10 +120,12 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		{Path: about.Repo + "/pkg/gotest"},
 	}
 	if hasFixtures {
-		imports = append(imports, headerImport{Path: about.Repo + "/pkg/gotestruntime"})
-		imports = append(imports, headerImport{Path: "context"})
-		imports = append(imports, headerImport{Path: "sync/atomic"})
-		imports = append(imports, headerImport{Path: "time"})
+		imports = append(imports,
+			headerImport{Path: about.Repo + "/pkg/gotestruntime"},
+			headerImport{Path: "context"},
+			headerImport{Path: "sync/atomic"},
+			headerImport{Path: "time"},
+		)
 	}
 	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
 		return v.IsMethodParallel()
@@ -171,7 +173,7 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	return headerTpl.ExecuteTemplate(buf, "header.go.tpl", map[string]any{"Header": data})
 }
 
-func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef) error {
+func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef) error { //nolint:gocritic
 	return gotestTpl.ExecuteTemplate(buf, "gotest.suites.tpl", map[string]any{
 		"Spec":                spec,
 		"SuiteSharedFixtures": suiteSharedFixtures,
@@ -206,16 +208,17 @@ func buildSharedFixtureNodeVMs(sharedFixtures []SharedFixtureInfo) []*SharedFixt
 	}
 
 	stateKeyToID := make(map[string]string, len(sharedFixtures))
-	for _, sf := range sharedFixtures {
-		id := sf.Identifier
-		if sf.PkgName != "" {
-			id = sf.PkgName + "_" + sf.Identifier
+	for i := range sharedFixtures {
+		id := sharedFixtures[i].Identifier
+		if sharedFixtures[i].PkgName != "" {
+			id = sharedFixtures[i].PkgName + "_" + sharedFixtures[i].Identifier
 		}
-		stateKeyToID[sf.PkgPath+"."+sf.Identifier] = id
+		stateKeyToID[sharedFixtures[i].PkgPath+"."+sharedFixtures[i].Identifier] = id
 	}
 
 	var vms []*SharedFixtureNodeVM
-	for _, sf := range sharedFixtures {
+	for i := range sharedFixtures {
+		sf := &sharedFixtures[i]
 		id := sf.Identifier
 		qualifiedType := sf.QualifiedType
 		if sf.PkgName != "" {

@@ -269,13 +269,14 @@ func classify(n *Node, topLevel bool) {
 			raw = raw[2:]
 		}
 
-		if strings.HasPrefix(raw, "_") && strings.HasSuffix(raw, "Fixture") {
+		switch {
+		case strings.HasPrefix(raw, "_") && strings.HasSuffix(raw, "Fixture"):
 			n.Kind = KindFixture
 			n.Display = strings.TrimSuffix(strings.TrimPrefix(raw, "_"), "Fixture")
-		} else if strings.HasSuffix(raw, "TestSuite") {
+		case strings.HasSuffix(raw, "TestSuite"):
 			n.Kind = KindSuite
 			n.Display = strings.TrimSuffix(raw, "TestSuite")
-		} else {
+		default:
 			n.Kind = KindTest
 			n.Display = strings.TrimPrefix(raw, "_")
 		}
@@ -288,16 +289,17 @@ func classify(n *Node, topLevel bool) {
 			name = name[2:]
 		}
 
-		if strings.HasPrefix(name, "Test") {
+		switch {
+		case strings.HasPrefix(name, "Test"):
 			n.Kind = KindMethod
 			n.Display = strings.TrimPrefix(name, "Test")
-		} else if strings.HasSuffix(name, "Fixture") && !strings.HasSuffix(name, "TestSuite") {
+		case strings.HasSuffix(name, "Fixture") && !strings.HasSuffix(name, "TestSuite"):
 			n.Kind = KindFixture
 			n.Display = strings.TrimSuffix(name, "Fixture")
-		} else if strings.HasSuffix(name, "TestSuite") {
+		case strings.HasSuffix(name, "TestSuite"):
 			n.Kind = KindSuite
 			n.Display = strings.TrimSuffix(name, "TestSuite")
-		} else {
+		default:
 			n.Kind = KindBlock
 			n.Display = strings.ReplaceAll(name, "_", " ")
 		}
