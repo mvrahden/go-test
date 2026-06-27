@@ -57,7 +57,7 @@ func (s *LintTestSuite) TestDisableNolintFlag(t *gotest.T) {
 	t.When("analyzer flags", func(w *gotest.T) {
 		w.It("registers the disable-nolint flag", func(it *gotest.T) {
 			f := lint.Analyzer.Flags.Lookup("disable-nolint")
-			gotest.True(it, f != nil)
+			gotest.NotZero(it, f)
 			gotest.Equal(it, "false", f.DefValue)
 		})
 	})
@@ -89,9 +89,9 @@ func (s *LintTestSuite) TestParseNolint(t *gotest.T) {
 					return
 				}
 				if tc.wantRules == nil {
-					gotest.True(it, rules == nil)
+					gotest.Empty(it, rules)
 				} else {
-					gotest.Equal(it, len(tc.wantRules), len(rules))
+					gotest.Len(it, tc.wantRules, len(rules))
 					for r := range tc.wantRules {
 						gotest.True(it, rules[r])
 					}

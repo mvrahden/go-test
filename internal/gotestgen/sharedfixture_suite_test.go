@@ -75,7 +75,7 @@ func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 		w.It("returns an error", func(it *gotest.T) {
 			_, err := gotestgen.GenerateSharedSetup(nil)
 			gotest.Error(it, err)
-			gotest.Contains(it, err.Error(), "no shared fixtures")
+			gotest.ErrorContains(it, err, "no shared fixtures")
 		})
 	})
 

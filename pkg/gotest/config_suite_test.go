@@ -38,7 +38,7 @@ func (s *ConfigTestSuite) TestDefaultSuiteConfig(t *gotest.T) {
 		gotest.Equal(it, 30*time.Second, cfg.Timeout)
 		gotest.Equal(it, 30*time.Second, cfg.SetupTimeout)
 		gotest.Equal(it, 0, cfg.Retries)
-		gotest.Equal(it, false, cfg.FailFast)
+		gotest.False(it, cfg.FailFast)
 	})
 }
 
@@ -48,7 +48,7 @@ func (s *ConfigTestSuite) TestIntegrationSuiteConfig(t *gotest.T) {
 		gotest.Equal(it, 2*time.Minute, cfg.Timeout)
 		gotest.Equal(it, 5*time.Minute, cfg.SetupTimeout)
 		gotest.Equal(it, 0, cfg.Retries)
-		gotest.Equal(it, false, cfg.FailFast)
+		gotest.False(it, cfg.FailFast)
 	})
 }
 
@@ -104,7 +104,7 @@ func (s *ConfigTestSuite) TestOverlaySuiteConfig(t *gotest.T) {
 			gotest.Equal(it, 30*time.Second, base.Timeout)
 			gotest.Equal(it, 30*time.Second, base.SetupTimeout)
 			gotest.Equal(it, 0, base.Retries)
-			gotest.Equal(it, false, base.FailFast)
+			gotest.False(it, base.FailFast)
 		})
 	})
 
@@ -120,7 +120,7 @@ func (s *ConfigTestSuite) TestOverlaySuiteConfig(t *gotest.T) {
 			gotest.Equal(it, 1*time.Minute, base.Timeout)
 			gotest.Equal(it, 2*time.Minute, base.SetupTimeout)
 			gotest.Equal(it, 5, base.Retries)
-			gotest.Equal(it, true, base.FailFast)
+			gotest.True(it, base.FailFast)
 		})
 	})
 
@@ -153,7 +153,7 @@ func (s *ConfigTestSuite) TestOverlaySuiteConfig(t *gotest.T) {
 		w.It("does not override a true base", func(it *gotest.T) {
 			base := gotest.SuiteConfig{FailFast: true}
 			gotest.OverlaySuiteConfig(&base, gotest.SuiteConfig{FailFast: false})
-			gotest.Equal(it, true, base.FailFast)
+			gotest.True(it, base.FailFast)
 		})
 	})
 
@@ -164,7 +164,7 @@ func (s *ConfigTestSuite) TestOverlaySuiteConfig(t *gotest.T) {
 			gotest.Equal(it, 30*time.Second, base.Timeout)
 			gotest.Equal(it, 30*time.Second, base.SetupTimeout)
 			gotest.Equal(it, 0, base.Retries)
-			gotest.Equal(it, true, base.FailFast)
+			gotest.True(it, base.FailFast)
 		})
 	})
 }

@@ -40,7 +40,7 @@ func (s *ResolverTestSuite) TestSuiteToFixtureBinding(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_Embedding_SuiteToFixture")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -48,10 +48,10 @@ func (s *ResolverTestSuite) TestSuiteToFixtureBinding(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 1, len(resolved.RootFixtures))
+			gotest.Len(it, resolved.RootFixtures, 1)
 			gotest.Equal(it, "DBFixture", resolved.RootFixtures[0].Identifier)
 
-			gotest.Equal(it, 1, len(resolved.FixtureBound))
+			gotest.Len(it, resolved.FixtureBound, 1)
 			gotest.Equal(it, "QueryTestSuite", resolved.FixtureBound[0].Identifier())
 			gotest.Equal(it, "DBFixture", resolved.FixtureBound[0].FixtureFieldName())
 		})
@@ -62,7 +62,7 @@ func (s *ResolverTestSuite) TestSuiteToFixtureBinding(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_NamedField_SuiteToFixture")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -70,10 +70,10 @@ func (s *ResolverTestSuite) TestSuiteToFixtureBinding(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 1, len(resolved.RootFixtures))
+			gotest.Len(it, resolved.RootFixtures, 1)
 			gotest.Equal(it, "DBFixture", resolved.RootFixtures[0].Identifier)
 
-			gotest.Equal(it, 1, len(resolved.FixtureBound))
+			gotest.Len(it, resolved.FixtureBound, 1)
 			gotest.Equal(it, "QueryTestSuite", resolved.FixtureBound[0].Identifier())
 			gotest.Equal(it, "db", resolved.FixtureBound[0].FixtureFieldName())
 		})
@@ -86,7 +86,7 @@ func (s *ResolverTestSuite) TestChildToParentFixtureBinding(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_Embedding_ChildToParentFixture")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -94,10 +94,10 @@ func (s *ResolverTestSuite) TestChildToParentFixtureBinding(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 1, len(resolved.RootFixtures))
+			gotest.Len(it, resolved.RootFixtures, 1)
 			root := resolved.RootFixtures[0]
 			gotest.Equal(it, "InfraFixture", root.Identifier)
-			gotest.Equal(it, 1, len(root.Children))
+			gotest.Len(it, root.Children, 1)
 			child := root.Children[0]
 			gotest.Equal(it, "APIFixture", child.Identifier)
 			gotest.Equal(it, "InfraFixture", child.ParentFieldName)
@@ -109,7 +109,7 @@ func (s *ResolverTestSuite) TestChildToParentFixtureBinding(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_NamedField_ChildToParentFixture")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -117,10 +117,10 @@ func (s *ResolverTestSuite) TestChildToParentFixtureBinding(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 1, len(resolved.RootFixtures))
+			gotest.Len(it, resolved.RootFixtures, 1)
 			root := resolved.RootFixtures[0]
 			gotest.Equal(it, "InfraFixture", root.Identifier)
-			gotest.Equal(it, 1, len(root.Children))
+			gotest.Len(it, root.Children, 1)
 			child := root.Children[0]
 			gotest.Equal(it, "APIFixture", child.Identifier)
 			gotest.Equal(it, "infra", child.ParentFieldName)
@@ -134,7 +134,7 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_NamedField_FixtureToSharedFixture")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -142,13 +142,13 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 1, len(resolved.RootFixtures))
+			gotest.Len(it, resolved.RootFixtures, 1)
 			root := resolved.RootFixtures[0]
-			gotest.Equal(it, 1, len(root.SharedFixtures))
+			gotest.Len(it, root.SharedFixtures, 1)
 			gotest.Equal(it, "pg", root.SharedFixtures[0].FieldName)
 			gotest.Equal(it, "PGSharedFixture", root.SharedFixtures[0].QualifiedType)
 
-			gotest.Equal(it, 1, len(resolved.RequiredSharedFixtures))
+			gotest.Len(it, resolved.RequiredSharedFixtures, 1)
 			gotest.Equal(it, "PGSharedFixture", resolved.RequiredSharedFixtures[0].Identifier)
 		})
 	})
@@ -158,7 +158,7 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_DirectSharedFixture_Embedded")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -166,19 +166,19 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 0, len(resolved.RootFixtures), "no package fixture")
-			gotest.Equal(it, 0, len(resolved.FixtureBound), "suite not fixture-bound")
-			gotest.Equal(it, 1, len(resolved.Standalone), "suite is standalone")
+			gotest.Empty(it, resolved.RootFixtures, "no package fixture")
+			gotest.Empty(it, resolved.FixtureBound, "suite not fixture-bound")
+			gotest.Len(it, resolved.Standalone, 1, "suite is standalone")
 			gotest.Equal(it, "UserTestSuite", resolved.Standalone[0].Identifier())
 
-			gotest.True(it, resolved.SuiteSharedFixtures != nil, "SuiteSharedFixtures should be populated")
+			gotest.NotEmpty(it, resolved.SuiteSharedFixtures, "SuiteSharedFixtures should be populated")
 			refs := resolved.SuiteSharedFixtures["UserTestSuite"]
-			gotest.Equal(it, 1, len(refs))
+			gotest.Len(it, refs, 1)
 			gotest.Equal(it, "PGSharedFixture", refs[0].FieldName)
 			gotest.Equal(it, "PGSharedFixture", refs[0].QualifiedType)
 			gotest.Equal(it, "sf0", refs[0].LocalVar)
 
-			gotest.Equal(it, 1, len(resolved.RequiredSharedFixtures))
+			gotest.Len(it, resolved.RequiredSharedFixtures, 1)
 			gotest.Equal(it, "PGSharedFixture", resolved.RequiredSharedFixtures[0].Identifier)
 		})
 	})
@@ -188,7 +188,7 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_DirectSharedFixture_NamedField")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -196,11 +196,11 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 0, len(resolved.RootFixtures))
-			gotest.Equal(it, 1, len(resolved.Standalone))
+			gotest.Empty(it, resolved.RootFixtures)
+			gotest.Len(it, resolved.Standalone, 1)
 
 			refs := resolved.SuiteSharedFixtures["UserTestSuite"]
-			gotest.Equal(it, 1, len(refs))
+			gotest.Len(it, refs, 1)
 			gotest.Equal(it, "pg", refs[0].FieldName)
 		})
 	})
@@ -210,7 +210,7 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SuiteWithFixtureAndDirectSharedFixture")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -218,15 +218,15 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 1, len(resolved.RootFixtures), "package fixture found")
-			gotest.Equal(it, 1, len(resolved.FixtureBound), "suite is fixture-bound")
+			gotest.Len(it, resolved.RootFixtures, 1, "package fixture found")
+			gotest.Len(it, resolved.FixtureBound, 1, "suite is fixture-bound")
 			gotest.Equal(it, "AppFixture", resolved.FixtureBound[0].FixtureFieldName())
 
 			refs := resolved.SuiteSharedFixtures["UserTestSuite"]
-			gotest.Equal(it, 1, len(refs), "direct shared fixture also recorded")
+			gotest.Len(it, refs, 1, "direct shared fixture also recorded")
 			gotest.Equal(it, "PGSharedFixture", refs[0].FieldName)
 
-			gotest.Equal(it, 1, len(resolved.RequiredSharedFixtures))
+			gotest.Len(it, resolved.RequiredSharedFixtures, 1)
 		})
 	})
 
@@ -235,7 +235,7 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_DirectMultipleSharedFixtures_OnSuite")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -243,11 +243,11 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 0, len(resolved.RootFixtures))
-			gotest.Equal(it, 1, len(resolved.Standalone))
+			gotest.Empty(it, resolved.RootFixtures)
+			gotest.Len(it, resolved.Standalone, 1)
 
 			refs := resolved.SuiteSharedFixtures["FullTestSuite"]
-			gotest.Equal(it, 2, len(refs))
+			gotest.Len(it, refs, 2)
 
 			fieldNames := map[string]string{}
 			for _, ref := range refs {
@@ -256,7 +256,7 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			gotest.Equal(it, "pg", fieldNames["PGSharedFixture"])
 			gotest.Equal(it, "redis", fieldNames["RedisSharedFixture"])
 
-			gotest.Equal(it, 2, len(resolved.RequiredSharedFixtures))
+			gotest.Len(it, resolved.RequiredSharedFixtures, 2)
 		})
 	})
 
@@ -265,7 +265,7 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixture_TransferFields")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -273,13 +273,13 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 1, len(resolved.RequiredSharedFixtures))
+			gotest.Len(it, resolved.RequiredSharedFixtures, 1)
 			sf := resolved.RequiredSharedFixtures[0]
 			gotest.Equal(it, "PGSharedFixture", sf.Identifier)
 			gotest.Contains(it, sf.TransferFields, "ConnStr")
 			gotest.Contains(it, sf.TransferFields, "Port")
-			gotest.True(it, !sf.HasHydrate, "no Hydrate method")
-			gotest.True(it, !sf.HasDehydrate, "no Dehydrate method")
+			gotest.False(it, sf.HasHydrate, "no Hydrate method")
+			gotest.False(it, sf.HasDehydrate, "no Dehydrate method")
 		})
 	})
 }
@@ -290,14 +290,14 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_CycleDetection")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
 			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.Error(it, err)
-			gotest.Contains(it, err.Error(), "cycle")
+			gotest.ErrorContains(it, err, "cycle")
 		})
 	})
 
@@ -306,18 +306,18 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_MultipleFixturesPerSuite")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
-			gotest.Equal(it, 2, len(resolved.RootFixtures))
-			gotest.Equal(it, 1, len(resolved.FixtureBound))
+			gotest.Len(it, resolved.RootFixtures, 2)
+			gotest.Len(it, resolved.FixtureBound, 1)
 
 			bindings := resolved.SuiteFixtureFields["MultiTestSuite"]
-			gotest.Equal(it, 2, len(bindings))
+			gotest.Len(it, bindings, 2)
 		})
 	})
 
@@ -326,14 +326,14 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_MissingBeforeAll")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
 			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.Error(it, err)
-			gotest.Contains(it, err.Error(), "must have a BeforeAll")
+			gotest.ErrorContains(it, err, "must have a BeforeAll")
 		})
 	})
 
@@ -342,15 +342,15 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_MultipleParentFixtures")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
-			gotest.Equal(it, 2, len(resolved.RootFixtures), "A and B should be roots")
-			gotest.Equal(it, 1, len(resolved.FixtureBound))
+			gotest.Len(it, resolved.RootFixtures, 2, "A and B should be roots")
+			gotest.Len(it, resolved.FixtureBound, 1)
 		})
 	})
 
@@ -359,15 +359,15 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_DiamondDependency")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
-			gotest.Equal(it, 1, len(resolved.RootFixtures), "DB should be the only root")
-			gotest.Equal(it, 3, len(resolved.AllFixtures))
+			gotest.Len(it, resolved.RootFixtures, 1, "DB should be the only root")
+			gotest.Len(it, resolved.AllFixtures, 3)
 		})
 	})
 
@@ -376,15 +376,15 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixture_NonSerializableField")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
 			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
-			gotest.True(it, err != nil, "expected error for non-serializable transfer field")
-			gotest.Contains(it, err.Error(), "non-JSON-serializable")
-			gotest.Contains(it, err.Error(), "channel")
+			gotest.Error(it, err, "expected error for non-serializable transfer field")
+			gotest.ErrorContains(it, err, "non-JSON-serializable")
+			gotest.ErrorContains(it, err, "channel")
 		})
 	})
 }
@@ -395,7 +395,7 @@ func (s *ResolverTestSuite) TestMixedFieldStylesSameFixture(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_MixedFieldStyles_SameFixture")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -403,8 +403,8 @@ func (s *ResolverTestSuite) TestMixedFieldStylesSameFixture(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 1, len(resolved.RootFixtures))
-			gotest.Equal(it, 2, len(resolved.FixtureBound))
+			gotest.Len(it, resolved.RootFixtures, 1)
+			gotest.Len(it, resolved.FixtureBound, 2)
 
 			fieldNames := map[string]string{}
 			for _, s := range resolved.FixtureBound {
@@ -422,7 +422,7 @@ func (s *ResolverTestSuite) TestNoFixtureStandalone(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_NoFixture_Standalone")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -430,9 +430,9 @@ func (s *ResolverTestSuite) TestNoFixtureStandalone(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 0, len(resolved.RootFixtures))
-			gotest.Equal(it, 0, len(resolved.FixtureBound))
-			gotest.Equal(it, 1, len(resolved.Standalone))
+			gotest.Empty(it, resolved.RootFixtures)
+			gotest.Empty(it, resolved.FixtureBound)
+			gotest.Len(it, resolved.Standalone, 1)
 			gotest.Equal(it, "PlainTestSuite", resolved.Standalone[0].Identifier())
 		})
 	})
@@ -444,7 +444,7 @@ func (s *ResolverTestSuite) TestLifecycleMethodsDetection(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_LifecycleMethods_Detection")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -452,7 +452,7 @@ func (s *ResolverTestSuite) TestLifecycleMethodsDetection(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 1, len(resolved.RootFixtures))
+			gotest.Len(it, resolved.RootFixtures, 1)
 			rf := resolved.RootFixtures[0]
 			gotest.True(it, rf.BeforeAll, "BeforeAll detected")
 			gotest.True(it, rf.AfterAll, "AfterAll detected")
@@ -468,7 +468,7 @@ func (s *ResolverTestSuite) TestUnreferencedFixtureNotInOutput(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_UnreferencedFixture_NotInOutput")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -476,7 +476,7 @@ func (s *ResolverTestSuite) TestUnreferencedFixtureNotInOutput(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 1, len(resolved.RootFixtures))
+			gotest.Len(it, resolved.RootFixtures, 1)
 			gotest.Equal(it, "UsedFixture", resolved.RootFixtures[0].Identifier)
 		})
 	})
@@ -489,8 +489,8 @@ func (s *ResolverTestSuite) TestGenericAlias(t *gotest.T) {
 			pkg := &packages.Package{Name: "mypkg_test", PkgPath: "example.com/mypkg_test"}
 
 			_, err := gotestgen.Resolve(pkg, []*gotestast.TestSuiteSpec{suite}, nil)
-			gotest.True(it, err != nil, "expected error for generic alias in pxtest")
-			gotest.Contains(it, err.Error(), "must not be in an external test package")
+			gotest.Error(it, err, "expected error for generic alias in pxtest")
+			gotest.ErrorContains(it, err, "must not be in an external test package")
 		})
 	})
 
@@ -511,7 +511,7 @@ func (s *ResolverTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixture_DependsOnSharedFixture")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -519,7 +519,7 @@ func (s *ResolverTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
 			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
-			gotest.Equal(it, 2, len(resolved.RequiredSharedFixtures))
+			gotest.Len(it, resolved.RequiredSharedFixtures, 2)
 
 			// Find Schema and verify it has PG as a dependency
 			var schema *gotestgen.SharedFixtureInfo
@@ -528,8 +528,8 @@ func (s *ResolverTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
 					schema = &resolved.RequiredSharedFixtures[i]
 				}
 			}
-			gotest.True(it, schema != nil, "expected SchemaSharedFixture in required list")
-			gotest.Equal(it, 1, len(schema.Dependencies))
+			gotest.NotZero(it, schema, "expected SchemaSharedFixture in required list")
+			gotest.Len(it, schema.Dependencies, 1)
 			gotest.Contains(it, schema.Dependencies[0], "PGSharedFixture")
 
 			gotest.NotContains(it, schema.TransferFields, "PG", "dep pointer field excluded from transfer")
@@ -542,7 +542,7 @@ func (s *ResolverTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixture_TransitiveDeps")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -552,11 +552,11 @@ func (s *ResolverTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
 
 			// UserTestSuite references Schema which depends on PG → needs both
 			userKeys := resolved.SuiteRequiredSharedFixtureKeys["UserTestSuite"]
-			gotest.Equal(it, 2, len(userKeys), "UserTestSuite needs PG + Schema")
+			gotest.Len(it, userKeys, 2, "UserTestSuite needs PG + Schema")
 
 			// SimpleTestSuite references only PG → needs only PG
 			simpleKeys := resolved.SuiteRequiredSharedFixtureKeys["SimpleTestSuite"]
-			gotest.Equal(it, 1, len(simpleKeys), "SimpleTestSuite needs only PG")
+			gotest.Len(it, simpleKeys, 1, "SimpleTestSuite needs only PG")
 		})
 	})
 }

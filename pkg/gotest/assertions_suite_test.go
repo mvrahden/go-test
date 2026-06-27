@@ -850,11 +850,11 @@ func (s *AssertionsTestSuite) TestLen(t *gotest.T) {
 			gotest.False(it, m.Failed())
 		})
 		w.It("passes for nil slice", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Len(r, []int(nil), 0) })
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, []int(nil)) })
 			gotest.False(it, m.Failed())
 		})
 		w.It("passes for nil map", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Len(r, map[string]int(nil), 0) })
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, map[string]int(nil)) })
 			gotest.False(it, m.Failed())
 		})
 	})

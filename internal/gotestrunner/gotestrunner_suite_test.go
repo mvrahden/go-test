@@ -147,7 +147,7 @@ func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 				lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 
 				gotest.Equal(it, "mode: set", lines[0])
-				gotest.Equal(it, 4, len(lines))
+				gotest.Len(it, lines, 4)
 
 				// Verify sorted order: foo/bar.go blocks before foo/baz.go
 				gotest.True(it, strings.HasPrefix(lines[1], "foo/bar.go"))
@@ -181,7 +181,7 @@ func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 				gotest.NoError(it, err)
 				lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 
-				gotest.Equal(it, 4, len(lines))
+				gotest.Len(it, lines, 4)
 				gotest.Contains(it, lines, "foo/bar.go:10.1,12.5 1 0")
 			})
 		})
@@ -198,7 +198,7 @@ func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 
 				data := gotest.Must(os.ReadFile(out))
 				lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-				gotest.Equal(it, 2, len(lines))
+				gotest.Len(it, lines, 2)
 			})
 		})
 	})
@@ -229,7 +229,7 @@ func (s *GotestrunnerTestSuite) TestOverlayManagement(t *gotest.T) {
 				filepath.Join("/fake/pkg/a", about.PXSuite): true,
 				filepath.Join("/fake/pkg/b", about.PSuite):  true,
 			}
-			gotest.Equal(it, len(wantKeys), len(ov.Replace))
+			gotest.Len(it, wantKeys, len(ov.Replace))
 			for virtual, real := range ov.Replace {
 				gotest.True(it, wantKeys[virtual], "unexpected overlay key: %s", virtual)
 				_, err := os.Stat(real)
@@ -284,7 +284,7 @@ func (s *GotestrunnerTestSuite) TestOverlayManagement(t *gotest.T) {
 			var ov gotestrunner.ExportOverlayJSON
 			err = json.Unmarshal(data, &ov)
 			gotest.NoError(it, err)
-			gotest.Equal(it, 0, len(ov.Replace))
+			gotest.Empty(it, ov.Replace)
 		})
 	})
 
@@ -350,7 +350,7 @@ func (s *GotestrunnerTestSuite) TestOverlayCache(t *gotest.T) {
 			h1 := gotestrunner.ExportOverlayContentHash(results)
 			h2 := gotestrunner.ExportOverlayContentHash(results)
 			gotest.Equal(it, h1, h2)
-			gotest.Equal(it, 64, len(h1))
+			gotest.Len(it, h1, 64)
 		})
 
 		w.It("is order-independent (sorted by AbsPath)", func(it *gotest.T) {
@@ -389,7 +389,7 @@ func (s *GotestrunnerTestSuite) TestOverlayCache(t *gotest.T) {
 			h1 := gotestrunner.ExportOverlayContentHash(nil)
 			h2 := gotestrunner.ExportOverlayContentHash(gotestgen.GenerateResults{})
 			gotest.Equal(it, h1, h2)
-			gotest.Equal(it, 64, len(h1))
+			gotest.Len(it, h1, 64)
 		})
 	})
 
@@ -443,7 +443,7 @@ func (s *GotestrunnerTestSuite) TestOverlayCache(t *gotest.T) {
 			gotest.NoError(it, err)
 			var ov gotestrunner.ExportOverlayJSON
 			gotest.NoError(it, json.Unmarshal(data, &ov))
-			gotest.Equal(it, 2, len(ov.Replace))
+			gotest.Len(it, ov.Replace, 2)
 		})
 
 		w.It("returns same directory on repeated calls (cache hit)", func(it *gotest.T) {
@@ -598,12 +598,12 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 			gotest.Equal(sub, tc.wantBinary, cmd.Path)
 
 			// Compare full args list.
-			gotest.Equal(sub, len(tc.wantArgs), len(cmd.Args))
+			gotest.Len(sub, tc.wantArgs, len(cmd.Args))
 			for i := range cmd.Args {
 				gotest.Equal(sub, tc.wantArgs[i], cmd.Args[i])
 			}
 
-			gotest.Equal(sub, len(env), len(cmd.Env))
+			gotest.Len(sub, env, len(cmd.Env))
 		}
 
 		w.It("matches original buildPlainArgs", func(it *gotest.T) {
@@ -624,7 +624,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 
 				gotest.Equal(it, refPath, cmd.Args[0])
 				gotArgs := cmd.Args[1:]
-				gotest.Equal(it, len(refArgs), len(gotArgs))
+				gotest.Len(it, refArgs, len(gotArgs))
 				for i := range gotArgs {
 					gotest.Equal(it, refArgs[i], gotArgs[i])
 				}
@@ -728,7 +728,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 				"binary: got %q, want go or go.exe", cmd.Path)
 
 			// Compare full args list.
-			gotest.Equal(sub, len(tc.wantArgs), len(cmd.Args))
+			gotest.Len(sub, tc.wantArgs, len(cmd.Args))
 			for i := range cmd.Args {
 				if i == 0 {
 					a0 := filepath.Base(cmd.Args[0])
@@ -739,7 +739,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 				gotest.Equal(sub, tc.wantArgs[i], cmd.Args[i])
 			}
 
-			gotest.Equal(sub, len(env), len(cmd.Env))
+			gotest.Len(sub, env, len(cmd.Env))
 		}
 
 		w.It("matches original buildTest2JSONArgs", func(it *gotest.T) {
@@ -761,7 +761,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 
 				// cmd.Args[1:] against refArgs (which doesn't include "go").
 				gotArgs := cmd.Args[1:]
-				gotest.Equal(it, len(refArgs), len(gotArgs))
+				gotest.Len(it, refArgs, len(gotArgs))
 				for i := range gotArgs {
 					gotest.Equal(it, refArgs[i], gotArgs[i])
 				}
@@ -909,7 +909,7 @@ func (s *GotestrunnerTestSuite) TestOutputCollector(t *gotest.T) {
 				}
 			}
 
-			gotest.Equal(it, 1, len(pkgVerdicts), "should have exactly one package-level verdict, got: %v", pkgVerdicts)
+			gotest.Len(it, pkgVerdicts, 1, "should have exactly one package-level verdict, got: %v", pkgVerdicts)
 			gotest.Equal(it, "fail", pkgVerdicts[0], "package should be marked as fail when any suite fails")
 		})
 	})
@@ -936,7 +936,7 @@ func (s *GotestrunnerTestSuite) TestEmitSkippedSuites(t *gotest.T) {
 			})
 
 			lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
-			gotest.Equal(it, 4, len(lines))
+			gotest.Len(it, lines, 4)
 
 			var ev0, ev1, ev2, ev3 map[string]any
 			gotest.NoError(it, json.Unmarshal([]byte(lines[0]), &ev0))
@@ -967,7 +967,7 @@ func (s *GotestrunnerTestSuite) TestEmitSkippedSuites(t *gotest.T) {
 			})
 
 			lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
-			gotest.Equal(it, 8, len(lines))
+			gotest.Len(it, lines, 8)
 
 			var first, fifth map[string]any
 			_ = json.Unmarshal([]byte(lines[0]), &first)
@@ -1049,7 +1049,7 @@ func (s *GotestrunnerTestSuite) TestOutputFormatting(t *gotest.T) {
 		}) {
 			got := gotestrunner.StripTrailingStatus([]byte(tc.input))
 			if tc.expect == "" {
-				gotest.True(sub, got == nil, "expected nil, got %q", got)
+				gotest.Empty(sub, got, "expected nil, got %q", got)
 			} else {
 				gotest.Equal(sub, tc.expect, string(got))
 			}
@@ -1682,7 +1682,7 @@ func (s *GotestrunnerTestSuite) TestSharedFixtureProcess(t *gotest.T) {
 			gotest.NoError(it, err)
 			var state map[string]json.RawMessage
 			gotest.NoError(it, json.Unmarshal(data, &state))
-			gotest.Equal(it, 2, len(state))
+			gotest.Len(it, state, 2)
 			_, hasAlpha := state["pkg.Alpha"]
 			gotest.True(it, hasAlpha)
 			_, hasBeta := state["pkg.Beta"]
@@ -1699,7 +1699,7 @@ func (s *GotestrunnerTestSuite) TestSharedFixtureProcess(t *gotest.T) {
 				"pkg.Beta":  json.RawMessage(`{"b":2}`),
 			})
 			result := proc.State([]string{"pkg.Alpha"})
-			gotest.Equal(it, 1, len(result))
+			gotest.Len(it, result, 1)
 			_, hasAlpha := result["pkg.Alpha"]
 			gotest.True(it, hasAlpha)
 		})

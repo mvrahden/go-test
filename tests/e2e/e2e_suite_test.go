@@ -136,10 +136,10 @@ func (s *E2ETestSuite) TestTestsuiteCLIExitCode(t *gotest.T) {
 	cmd.Dir = filepath.Join(s.workDir, "examples")
 	_, err := cmd.CombinedOutput()
 
-	gotest.True(t, err != nil, "expected non-zero exit code for failing tests")
+	gotest.Error(t, err, "expected non-zero exit code for failing tests")
 	exitErr, ok := err.(*exec.ExitError)
 	gotest.True(t, ok, "expected *exec.ExitError, got %T: %v", err, err)
-	gotest.True(t, exitErr.ExitCode() != 0, "expected non-zero exit code")
+	gotest.NotEqual(t, exitErr.ExitCode(), 0, "expected non-zero exit code")
 }
 
 func (s *E2ETestSuite) TestSharedFixtureExitTiming(t *gotest.T) {
@@ -155,8 +155,7 @@ func (s *E2ETestSuite) TestSharedFixtureExitTiming(t *gotest.T) {
 			elapsed := time.Since(start)
 
 			gotest.NoError(it, err, "shared fixture tests should pass: %s", string(out))
-			gotest.True(it, elapsed < 60*time.Second,
-				"should exit promptly after tests complete (no process hang), took %v", elapsed)
+			gotest.Less(it, elapsed, 60*time.Second, "should exit promptly after tests complete (no process hang), took %v", elapsed)
 		})
 	})
 }

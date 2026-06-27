@@ -204,7 +204,7 @@ func (s *CmdGotestTestSuite) TestSplitArgs(t *gotest.T) {
 	}) {
 		own, goTest, err := SplitArgs(tc.inArgs, tc.allowed)
 		if tc.expectErr {
-			gotest.True(sub, err != nil, "expected error")
+			gotest.Error(sub, err, "expected error")
 			continue
 		}
 		gotest.NoError(sub, err)
@@ -298,7 +298,7 @@ func (s *CmdGotestTestSuite) TestParseMinFlag(t *gotest.T) {
 	}) {
 		got, err := ExportParseMinFlag(tc.args)
 		if tc.expectErr {
-			gotest.True(sub, err != nil, "expected error")
+			gotest.Error(sub, err, "expected error")
 		} else {
 			gotest.NoError(sub, err)
 			gotest.Equal(sub, tc.expect, got)
@@ -323,7 +323,7 @@ func (s *CmdGotestTestSuite) TestParseParallelFlag(t *gotest.T) {
 	}) {
 		got, err := ExportParseParallelFlag(tc.args)
 		if tc.expectErr {
-			gotest.True(sub, err != nil, "expected error")
+			gotest.Error(sub, err, "expected error")
 		} else {
 			gotest.NoError(sub, err)
 			gotest.Equal(sub, tc.expect, got)
@@ -349,7 +349,7 @@ func (s *CmdGotestTestSuite) TestParseSetupTimeoutFlag(t *gotest.T) {
 	}) {
 		got, err := ExportParseSetupTimeoutFlag(tc.args)
 		if tc.expectErr {
-			gotest.True(sub, err != nil, "expected error")
+			gotest.Error(sub, err, "expected error")
 		} else {
 			gotest.NoError(sub, err)
 			gotest.Equal(sub, tc.expect, got)
@@ -374,7 +374,7 @@ func (s *CmdGotestTestSuite) TestParseDebounceFlag(t *gotest.T) {
 	}) {
 		got, err := ExportParseDebounceFlag(tc.args)
 		if tc.expectErr {
-			gotest.True(sub, err != nil, "expected error")
+			gotest.Error(sub, err, "expected error")
 		} else {
 			gotest.NoError(sub, err)
 			gotest.Equal(sub, tc.expect, got)
@@ -400,7 +400,7 @@ func (s *CmdGotestTestSuite) TestParseGlobalTimeoutFlag(t *gotest.T) {
 	}) {
 		got, err := ExportParseGlobalTimeoutFlag(tc.args)
 		if tc.expectErr {
-			gotest.True(sub, err != nil, "expected error")
+			gotest.Error(sub, err, "expected error")
 		} else {
 			gotest.NoError(sub, err)
 			gotest.Equal(sub, tc.expect, got)
@@ -519,7 +519,7 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 
 		expectedLifecycle := []string{"BeforeEach"}
 		gotest.Equal(it, expectedLifecycle, st.Lifecycle)
-		gotest.Len(it, st.Fixtures, 0)
+		gotest.Empty(it, st.Fixtures)
 
 		if len(st.Methods) != 9 {
 			it.T().Fatalf("expected 9 methods, got %d", len(st.Methods))
@@ -629,7 +629,7 @@ func (s *CmdGotestTestSuite) TestGenerateOverlay(t *gotest.T) {
 			if err := json.Unmarshal(data, &overlayContent); err != nil {
 				it.T().Fatalf("overlay.json is not valid JSON: %v", err)
 			}
-			gotest.True(it, len(overlayContent.Replace) > 0, "overlay.json Replace map is empty")
+			gotest.NotEmpty(it, overlayContent.Replace, "overlay.json Replace map is empty")
 		})
 	})
 

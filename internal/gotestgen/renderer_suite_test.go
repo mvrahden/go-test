@@ -20,7 +20,7 @@ func renderTestPkg(t testing.TB, pkg *packages.Package) (string, gotestgen.SpecO
 	t.Helper()
 	c := gotestgen.NewCollector()
 	result := c.CollectSuiteSpecs(pkg)
-	gotest.Equal(t, 0, len(result.Errs), "expected no collection errors, got: %v", result.Errs)
+	gotest.Empty(t, result.Errs, "expected no collection errors, got: %v", result.Errs)
 
 	spec, err := c.ApplyTestSuiteSpecs(result)
 	gotest.NoError(t, err)
@@ -309,7 +309,7 @@ func (s *RendererTestSuite) TestResolvedFixtures(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestBuildFixtureViewModels_RootFixtureOnly")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -318,11 +318,11 @@ func (s *RendererTestSuite) TestResolvedFixtures(t *gotest.T) {
 			gotest.NoError(it, err)
 
 			fixtures := resolved.AllFixtures
-			gotest.Equal(it, 1, len(fixtures))
+			gotest.Len(it, fixtures, 1)
 			gotest.Equal(it, "MyFixture", fixtures[0].Identifier)
 			gotest.True(it, fixtures[0].BeforeAll, "expected BeforeAll")
 			gotest.True(it, fixtures[0].AfterAll, "expected AfterAll")
-			gotest.Equal(it, 1, len(fixtures[0].ChildSuites))
+			gotest.Len(it, fixtures[0].ChildSuites, 1)
 			gotest.Equal(it, "MyTestSuite", fixtures[0].ChildSuites[0].Identifier())
 		})
 	})
@@ -332,7 +332,7 @@ func (s *RendererTestSuite) TestResolvedFixtures(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestBuildFixtureViewModels_SharedFixtureDetection")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Equal(it, 0, len(result.Errs))
+			gotest.Empty(it, result.Errs)
 
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
@@ -341,11 +341,11 @@ func (s *RendererTestSuite) TestResolvedFixtures(t *gotest.T) {
 			gotest.NoError(it, err)
 
 			fixtures := resolved.AllFixtures
-			gotest.Equal(it, 1, len(fixtures))
+			gotest.Len(it, fixtures, 1)
 
 			rf := fixtures[0]
 			gotest.Equal(it, "DBFixture", rf.Identifier)
-			gotest.Equal(it, 1, len(rf.SharedFixtures))
+			gotest.Len(it, rf.SharedFixtures, 1)
 
 			sf := rf.SharedFixtures[0]
 			gotest.Equal(it, "sf0", sf.LocalVar)

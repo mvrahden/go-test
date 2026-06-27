@@ -87,7 +87,7 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupCancel(t *gotest.T) {
 
 			// Process should be gone.
 			err = syscall.Kill(pid, 0)
-			gotest.True(it, err != nil, "process %d still alive after Cancel", pid)
+			gotest.Error(it, err, "process %d still alive after Cancel", pid)
 		})
 	})
 

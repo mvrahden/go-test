@@ -120,7 +120,7 @@ func buildFixtureSpec(t *testing.T, src string) *gotestast.FixtureSpec {
 			break
 		}
 	}
-	gotest.True(t, spec != nil, "expected to find SharedFixture")
+	gotest.NotZero(t, spec, "expected to find SharedFixture")
 
 	for _, d := range f.Decls {
 		fd, ok := d.(*ast.FuncDecl)
@@ -152,11 +152,11 @@ type DBFixture struct {
 }
 `
 			pkg, decls := loadFixtureAST(it.T(), src)
-			gotest.Equal(it, 1, len(decls))
+			gotest.Len(it, decls, 1)
 
 			spec, err := gotestast.DetermineFixture(decls[0], pkg)
 			gotest.NoError(it, err)
-			gotest.True(it, spec != nil, "expected non-nil FixtureSpec")
+			gotest.NotZero(it, spec, "expected non-nil FixtureSpec")
 			gotest.Equal(it, gotestast.PackageFixture, spec.Kind)
 			gotest.Equal(it, "DBFixture", spec.Identifier())
 			gotest.Equal(it, "testpkg", spec.PackageName())
@@ -170,11 +170,11 @@ type RedisSharedFixture struct {
 }
 `
 			pkg, decls := loadFixtureAST(it.T(), src)
-			gotest.Equal(it, 1, len(decls))
+			gotest.Len(it, decls, 1)
 
 			spec, err := gotestast.DetermineFixture(decls[0], pkg)
 			gotest.NoError(it, err)
-			gotest.True(it, spec != nil, "expected non-nil FixtureSpec")
+			gotest.NotZero(it, spec, "expected non-nil FixtureSpec")
 			gotest.Equal(it, gotestast.SharedFixture, spec.Kind)
 			gotest.Equal(it, "RedisSharedFixture", spec.Identifier())
 		})
@@ -189,11 +189,11 @@ type PlainStruct struct {
 }
 `
 			pkg, decls := loadFixtureAST(it.T(), src)
-			gotest.Equal(it, 1, len(decls))
+			gotest.Len(it, decls, 1)
 
 			spec, err := gotestast.DetermineFixture(decls[0], pkg)
 			gotest.NoError(it, err)
-			gotest.True(it, spec == nil, "expected nil FixtureSpec for struct without Fixture suffix")
+			gotest.Zero(it, spec, "expected nil FixtureSpec for struct without Fixture suffix")
 		})
 	})
 
@@ -204,12 +204,12 @@ type PlainStruct struct {
 type BadFixture int
 `
 			pkg, decls := loadFixtureAST(it.T(), src)
-			gotest.Equal(it, 1, len(decls))
+			gotest.Len(it, decls, 1)
 
 			spec, err := gotestast.DetermineFixture(decls[0], pkg)
-			gotest.True(it, err != nil, "expected error for non-struct fixture")
-			gotest.True(it, spec == nil, "expected nil FixtureSpec on error")
-			gotest.Contains(it, err.Error(), "fixture must be a struct type")
+			gotest.Error(it, err, "expected error for non-struct fixture")
+			gotest.Zero(it, spec, "expected nil FixtureSpec on error")
+			gotest.ErrorContains(it, err, "fixture must be a struct type")
 		})
 	})
 }
@@ -229,12 +229,12 @@ func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 func (f *PGSharedFixture) AfterAll(ctx context.Context) error  { return nil }
 `
 			fm := loadFixtureWithMethods(it.T(), src)
-			gotest.Equal(it, 1, len(fm.genDecls))
-			gotest.Equal(it, 2, len(fm.funcDecls))
+			gotest.Len(it, fm.genDecls, 1)
+			gotest.Len(it, fm.funcDecls, 2)
 
 			spec, err := gotestast.DetermineFixture(fm.genDecls[0], fm.pkg)
 			gotest.NoError(it, err)
-			gotest.True(it, spec != nil)
+			gotest.NotZero(it, spec)
 			gotest.Equal(it, gotestast.SharedFixture, spec.Kind)
 
 			for _, fd := range fm.funcDecls {
@@ -242,8 +242,8 @@ func (f *PGSharedFixture) AfterAll(ctx context.Context) error  { return nil }
 				gotest.NoError(it, err)
 			}
 
-			gotest.True(it, spec.BeforeAll != nil, "BeforeAll should be set")
-			gotest.True(it, spec.AfterAll != nil, "AfterAll should be set")
+			gotest.NotZero(it, spec.BeforeAll, "BeforeAll should be set")
+			gotest.NotZero(it, spec.AfterAll, "AfterAll should be set")
 		})
 	})
 
@@ -267,9 +267,9 @@ func (f *BadSharedFixture) BeforeEach(ctx context.Context) error { return nil }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "BeforeEach" {
-					gotest.True(it, err != nil, "BeforeEach should be rejected on shared fixture")
-					gotest.Contains(it, err.Error(), "must not have BeforeEach method")
-					gotest.True(it, pos > 0, "error position should be set")
+					gotest.Error(it, err, "BeforeEach should be rejected on shared fixture")
+					gotest.ErrorContains(it, err, "must not have BeforeEach method")
+					gotest.Greater(it, pos, 0, "error position should be set")
 				}
 			}
 		})
@@ -295,9 +295,9 @@ func (f *BadSharedFixture) AfterEach(ctx context.Context) error { return nil }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "AfterEach" {
-					gotest.True(it, err != nil, "AfterEach should be rejected on shared fixture")
-					gotest.Contains(it, err.Error(), "must not have AfterEach method")
-					gotest.True(it, pos > 0, "error position should be set")
+					gotest.Error(it, err, "AfterEach should be rejected on shared fixture")
+					gotest.ErrorContains(it, err, "must not have AfterEach method")
+					gotest.Greater(it, pos, 0, "error position should be set")
 				}
 			}
 		})
@@ -326,9 +326,9 @@ func (f *PGSharedFixture) Dehydrate(ctx context.Context) error   { return nil }
 				gotest.NoError(it, err)
 			}
 
-			gotest.True(it, spec.Hydrate != nil, "Hydrate should be set")
-			gotest.True(it, spec.Dehydrate != nil, "Dehydrate should be set")
-			gotest.True(it, spec.HydrateDecl != nil, "HydrateDecl should be set")
+			gotest.NotZero(it, spec.Hydrate, "Hydrate should be set")
+			gotest.NotZero(it, spec.Dehydrate, "Dehydrate should be set")
+			gotest.NotZero(it, spec.HydrateDecl, "HydrateDecl should be set")
 			gotest.Equal(it, "Hydrate", spec.HydrateDecl.Name.Name)
 		})
 	})
@@ -353,9 +353,9 @@ func (f *DBFixture) Hydrate(ctx context.Context) error   { return nil }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "Hydrate" {
-					gotest.True(it, err != nil, "Hydrate should be rejected on package fixture")
-					gotest.Contains(it, err.Error(), "Hydrate/Dehydrate are for shared fixtures only")
-					gotest.True(it, pos > 0)
+					gotest.Error(it, err, "Hydrate should be rejected on package fixture")
+					gotest.ErrorContains(it, err, "Hydrate/Dehydrate are for shared fixtures only")
+					gotest.Greater(it, pos, 0)
 				}
 			}
 		})
@@ -381,9 +381,9 @@ func (f *DBFixture) Dehydrate(ctx context.Context) error  { return nil }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "Dehydrate" {
-					gotest.True(it, err != nil, "Dehydrate should be rejected on package fixture")
-					gotest.Contains(it, err.Error(), "Hydrate/Dehydrate are for shared fixtures only")
-					gotest.True(it, pos > 0)
+					gotest.Error(it, err, "Dehydrate should be rejected on package fixture")
+					gotest.ErrorContains(it, err, "Hydrate/Dehydrate are for shared fixtures only")
+					gotest.Greater(it, pos, 0)
 				}
 			}
 		})
@@ -416,7 +416,7 @@ func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 					break
 				}
 			}
-			gotest.True(it, spec != nil)
+			gotest.NotZero(it, spec)
 			gotest.Equal(it, gotestast.SharedFixture, spec.Kind)
 
 			for _, fd := range fm.funcDecls {
@@ -424,7 +424,7 @@ func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 				gotest.NoError(it, err)
 			}
 
-			gotest.True(it, spec.BeforeAll != nil)
+			gotest.NotZero(it, spec.BeforeAll)
 		})
 	})
 
@@ -448,9 +448,9 @@ func (f *PGSharedFixture) FixtureConfig() int { return 0 }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "FixtureConfig" {
-					gotest.True(it, err != nil, "FixtureConfig should be rejected on shared fixture")
-					gotest.Contains(it, err.Error(), "should use SharedFixtureConfig()")
-					gotest.True(it, pos > 0)
+					gotest.Error(it, err, "FixtureConfig should be rejected on shared fixture")
+					gotest.ErrorContains(it, err, "should use SharedFixtureConfig()")
+					gotest.Greater(it, pos, 0)
 				}
 			}
 		})
@@ -476,9 +476,9 @@ func (f *DBFixture) SharedFixtureConfig() int { return 0 }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "SharedFixtureConfig" {
-					gotest.True(it, err != nil, "SharedFixtureConfig should be rejected on package fixture")
-					gotest.Contains(it, err.Error(), "should use FixtureConfig()")
-					gotest.True(it, pos > 0)
+					gotest.Error(it, err, "SharedFixtureConfig should be rejected on package fixture")
+					gotest.ErrorContains(it, err, "should use FixtureConfig()")
+					gotest.Greater(it, pos, 0)
 				}
 			}
 		})
@@ -509,10 +509,10 @@ func (f *DBFixture) AfterEach(ctx context.Context) error  { return nil }
 				gotest.NoError(it, err)
 			}
 
-			gotest.True(it, spec.BeforeAll != nil, "BeforeAll should be set")
-			gotest.True(it, spec.AfterAll != nil, "AfterAll should be set")
-			gotest.True(it, spec.BeforeEach != nil, "BeforeEach should be set")
-			gotest.True(it, spec.AfterEach != nil, "AfterEach should be set")
+			gotest.NotZero(it, spec.BeforeAll, "BeforeAll should be set")
+			gotest.NotZero(it, spec.AfterAll, "AfterAll should be set")
+			gotest.NotZero(it, spec.BeforeEach, "BeforeEach should be set")
+			gotest.NotZero(it, spec.AfterEach, "AfterEach should be set")
 		})
 	})
 
@@ -533,9 +533,9 @@ func (f *DBFixture) BeforeAll() error { return nil }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "BeforeAll" {
-					gotest.True(it, err != nil, "BeforeAll with wrong sig should be rejected")
-					gotest.Contains(it, err.Error(), "unsupported signature")
-					gotest.True(it, pos > 0)
+					gotest.Error(it, err, "BeforeAll with wrong sig should be rejected")
+					gotest.ErrorContains(it, err, "unsupported signature")
+					gotest.Greater(it, pos, 0)
 				}
 			}
 		})
@@ -563,7 +563,7 @@ func (f *DBFixture) helper() {}
 				gotest.NoError(it, err)
 			}
 
-			gotest.True(it, spec.BeforeAll != nil)
+			gotest.NotZero(it, spec.BeforeAll)
 		})
 	})
 
@@ -595,14 +595,14 @@ func (f *OtherFixture) BeforeAll(ctx context.Context) error { return nil }
 					break
 				}
 			}
-			gotest.True(it, dbSpec != nil)
+			gotest.NotZero(it, dbSpec)
 
 			for _, fd := range fm.funcDecls {
 				_, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, dbSpec)
 				gotest.NoError(it, err)
 			}
 
-			gotest.True(it, dbSpec.BeforeAll != nil, "only matching receiver's BeforeAll should be set")
+			gotest.NotZero(it, dbSpec.BeforeAll, "only matching receiver's BeforeAll should be set")
 		})
 	})
 }
@@ -631,9 +631,9 @@ func (f *PGSharedFixture) Hydrate(ctx context.Context) error   { return nil }
 			}
 
 			pos, err := gotestast.ValidateFixtureConsistency(spec)
-			gotest.True(it, err != nil, "expected error for Hydrate without Dehydrate")
-			gotest.Contains(it, err.Error(), "has Hydrate but no Dehydrate")
-			gotest.True(it, pos > 0)
+			gotest.Error(it, err, "expected error for Hydrate without Dehydrate")
+			gotest.ErrorContains(it, err, "has Hydrate but no Dehydrate")
+			gotest.Greater(it, pos, 0)
 		})
 	})
 
@@ -660,9 +660,9 @@ func (f *PGSharedFixture) Dehydrate(ctx context.Context) error   { return nil }
 			}
 
 			pos, err := gotestast.ValidateFixtureConsistency(spec)
-			gotest.True(it, err != nil, "expected error for Dehydrate without Hydrate")
-			gotest.Contains(it, err.Error(), "has Dehydrate but no Hydrate")
-			gotest.True(it, pos > 0)
+			gotest.Error(it, err, "expected error for Dehydrate without Hydrate")
+			gotest.ErrorContains(it, err, "has Dehydrate but no Hydrate")
+			gotest.Greater(it, pos, 0)
 		})
 	})
 
@@ -760,8 +760,8 @@ func (s *S) TooManyParams(ctx context.Context, x int) error { return nil }
 
 				err := gotestast.ExportValidateContextErrorSig(sig, methodID)
 				if tc.wantErr {
-					gotest.True(sub, err != nil, "expected error for %s", tc.Name)
-					gotest.Contains(sub, err.Error(), tc.errMsg)
+					gotest.Error(sub, err, "expected error for %s", tc.Name)
+					gotest.ErrorContains(sub, err, tc.errMsg)
 				} else {
 					gotest.NoError(sub, err)
 				}
@@ -786,7 +786,7 @@ type PGSharedFixture struct {
 			gotest.NoError(it, err)
 
 			names := spec.ExportedFieldNames()
-			gotest.Equal(it, 2, len(names))
+			gotest.Len(it, names, 2)
 			gotest.Equal(it, "ConnStr", names[0])
 			gotest.Equal(it, "Port", names[1])
 		})
@@ -815,11 +815,11 @@ func (f *PGSharedFixture) Hydrate(ctx context.Context) error {
 			spec := buildFixtureSpec(it.T(), src)
 			local := gotestast.ClassifyLocalFields(spec)
 
-			gotest.True(it, local != nil)
+			gotest.NotEmpty(it, local)
 			gotest.True(it, local["Pool"], "Pool should be local")
-			gotest.True(it, !local["ConnStr"], "ConnStr should not be local")
-			gotest.True(it, !local["Port"], "Port should not be local")
-			gotest.Equal(it, 1, len(local))
+			gotest.False(it, local["ConnStr"], "ConnStr should not be local")
+			gotest.False(it, local["Port"], "Port should not be local")
+			gotest.Len(it, local, 1)
 		})
 	})
 
@@ -847,9 +847,9 @@ func (f *PGSharedFixture) connect(ctx context.Context) error {
 			spec := buildFixtureSpec(it.T(), src)
 			local := gotestast.ClassifyLocalFields(spec)
 
-			gotest.True(it, local != nil)
+			gotest.NotEmpty(it, local)
 			gotest.True(it, local["Pool"], "Pool should be local (via connect helper)")
-			gotest.Equal(it, 1, len(local))
+			gotest.Len(it, local, 1)
 		})
 	})
 
@@ -878,11 +878,11 @@ func (f *PGSharedFixture) connect(ctx context.Context) error {
 			spec := buildFixtureSpec(it.T(), src)
 			local := gotestast.ClassifyLocalFields(spec)
 
-			gotest.True(it, local != nil)
+			gotest.NotEmpty(it, local)
 			gotest.True(it, local["Pool"], "Pool should be local")
 			gotest.True(it, local["Cache"], "Cache should be local")
-			gotest.True(it, !local["ConnStr"], "ConnStr should not be local")
-			gotest.Equal(it, 2, len(local))
+			gotest.False(it, local["ConnStr"], "ConnStr should not be local")
+			gotest.Len(it, local, 2)
 		})
 	})
 
@@ -908,7 +908,7 @@ func (f *PGSharedFixture) Hydrate(ctx context.Context) error {
 			spec := buildFixtureSpec(it.T(), src)
 			local := gotestast.ClassifyLocalFields(spec)
 
-			gotest.True(it, local != nil)
+			gotest.NotEmpty(it, local)
 			gotest.True(it, local["Pool"], "Pool should be local even inside if block")
 		})
 	})
@@ -935,7 +935,7 @@ func (f *PGSharedFixture) Hydrate(ctx context.Context) error {
 			spec := buildFixtureSpec(it.T(), src)
 			local := gotestast.ClassifyLocalFields(spec)
 
-			gotest.True(it, local != nil)
+			gotest.NotEmpty(it, local)
 			gotest.True(it, local["Pool"], "Pool should be local in multi-return assign")
 		})
 	})
@@ -956,7 +956,7 @@ func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 			spec := buildFixtureSpec(it.T(), src)
 			local := gotestast.ClassifyLocalFields(spec)
 
-			gotest.True(it, local == nil, "no Hydrate -> nil local fields")
+			gotest.Empty(it, local, "no Hydrate -> nil local fields")
 		})
 	})
 
@@ -979,7 +979,7 @@ func (f *PGSharedFixture) Hydrate(ctx context.Context) error {
 			spec := buildFixtureSpec(it.T(), src)
 			local := gotestast.ClassifyLocalFields(spec)
 
-			gotest.True(it, local == nil, "Hydrate reads only -> nil local fields")
+			gotest.Empty(it, local, "Hydrate reads only -> nil local fields")
 		})
 	})
 
@@ -1003,7 +1003,7 @@ func (f *PGSharedFixture) Hydrate(ctx context.Context) error {
 			spec := buildFixtureSpec(it.T(), src)
 			local := gotestast.ClassifyLocalFields(spec)
 
-			gotest.True(it, local == nil, "unexported field assignments should be ignored")
+			gotest.Empty(it, local, "unexported field assignments should be ignored")
 		})
 	})
 
@@ -1029,7 +1029,7 @@ func (f *PGSharedFixture) Hydrate(ctx context.Context) error {
 			spec := buildFixtureSpec(it.T(), src)
 			local := gotestast.ClassifyLocalFields(spec)
 
-			gotest.True(it, local != nil)
+			gotest.NotEmpty(it, local)
 			gotest.True(it, local["Pool"], "Pool should be local inside for loop")
 		})
 	})
@@ -1057,7 +1057,7 @@ func (f *PGSharedFixture) Hydrate(ctx context.Context) error {
 			spec := buildFixtureSpec(it.T(), src)
 			local := gotestast.ClassifyLocalFields(spec)
 
-			gotest.True(it, local != nil)
+			gotest.NotEmpty(it, local)
 			gotest.True(it, local["Pool"], "Pool should be local inside switch")
 		})
 	})
@@ -1088,7 +1088,7 @@ func (f *PGSharedFixture) setupB(ctx context.Context) error {
 			spec := buildFixtureSpec(it.T(), src)
 			local := gotestast.ClassifyLocalFields(spec)
 
-			gotest.True(it, local == nil, "two-level-deep assignments should NOT be classified as local")
+			gotest.Empty(it, local, "two-level-deep assignments should NOT be classified as local")
 		})
 	})
 }
@@ -1109,9 +1109,9 @@ func (s *SpecTestSuite) TestReduceToEffectiveSet(t *gotest.T) {
 				gotestast.NewTestSuiteSpecForTest("BetaTestSuite", "pkg", false),
 			}
 			effective, skippedSuites, skippedCases := suites.ReduceToEffectiveSet()
-			gotest.Equal(it, 2, len(effective))
+			gotest.Len(it, effective, 2)
 			gotest.Empty(it, skippedSuites)
-			gotest.Equal(it, 2, len(skippedCases)) // entries exist but with nil values
+			gotest.Len(it, skippedCases, 2) // entries exist but with nil values
 		})
 	})
 
@@ -1122,9 +1122,9 @@ func (s *SpecTestSuite) TestReduceToEffectiveSet(t *gotest.T) {
 				gotestast.NewTestSuiteSpecForTest("NormalTestSuite", "pkg", false),
 			}
 			effective, skippedSuites, _ := suites.ReduceToEffectiveSet()
-			gotest.Equal(it, 1, len(effective))
+			gotest.Len(it, effective, 1)
 			gotest.Equal(it, "F_FocusedTestSuite", effective[0].Identifier())
-			gotest.Equal(it, 1, len(skippedSuites))
+			gotest.Len(it, skippedSuites, 1)
 			gotest.Equal(it, "NormalTestSuite", skippedSuites[0].Identifier())
 		})
 	})
@@ -1136,9 +1136,9 @@ func (s *SpecTestSuite) TestReduceToEffectiveSet(t *gotest.T) {
 				gotestast.NewTestSuiteSpecForTest("NormalTestSuite", "pkg", false),
 			}
 			effective, skippedSuites, _ := suites.ReduceToEffectiveSet()
-			gotest.Equal(it, 1, len(effective))
+			gotest.Len(it, effective, 1)
 			gotest.Equal(it, "NormalTestSuite", effective[0].Identifier())
-			gotest.Equal(it, 1, len(skippedSuites))
+			gotest.Len(it, skippedSuites, 1)
 		})
 	})
 }
@@ -1152,7 +1152,7 @@ func (s *SpecTestSuite) TestDetermineTestSuite(t *gotest.T) {
 			`)
 			spec, _, err := gotestast.DetermineTestSuite(genDecls[0], pkg)
 			gotest.NoError(it, err)
-			gotest.True(it, spec != nil)
+			gotest.NotZero(it, spec)
 			gotest.Equal(it, "MyTestSuite", spec.Identifier())
 		})
 	})
@@ -1165,7 +1165,7 @@ func (s *SpecTestSuite) TestDetermineTestSuite(t *gotest.T) {
 			`)
 			spec, _, err := gotestast.DetermineTestSuite(genDecls[0], pkg)
 			gotest.NoError(it, err)
-			gotest.True(it, spec == nil)
+			gotest.Zero(it, spec)
 		})
 	})
 
@@ -1202,16 +1202,16 @@ func (s *SpecTestSuite) TestDetermineTestSuiteHarness(t *gotest.T) {
 			`)
 			spec, _, err := gotestast.DetermineTestSuite(fm.genDecls[0], fm.pkg)
 			gotest.NoError(it, err)
-			gotest.True(it, spec != nil)
+			gotest.NotZero(it, spec)
 
 			for _, fd := range fm.funcDecls {
 				_, err := gotestast.DetermineTestSuiteHarness(fd, fm.pkg, spec)
 				gotest.NoError(it, err)
 			}
 
-			gotest.True(it, spec.BeforeAll() != nil, "BeforeAll should be detected")
-			gotest.True(it, spec.AfterAll() != nil, "AfterAll should be detected")
-			gotest.Equal(it, 1, len(spec.TestCases()))
+			gotest.NotZero(it, spec.BeforeAll(), "BeforeAll should be detected")
+			gotest.NotZero(it, spec.AfterAll(), "AfterAll should be detected")
+			gotest.Len(it, spec.TestCases(), 1)
 		})
 	})
 

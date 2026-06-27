@@ -232,7 +232,7 @@ func TestRetry_DelayObservedBetweenAttempts(t *testing.T) {
 	exitCode := run(func() int { return 0 }, MainConfig{Roots: []*FixtureNode{node}})
 
 	gotest.Equal(t, 0, exitCode)
-	gotest.Equal(t, 2, len(timestamps))
+	gotest.Len(t, timestamps, 2)
 	elapsed := timestamps[1].Sub(timestamps[0])
 	gotest.GreaterOrEqual(t, elapsed, 40*time.Millisecond)
 }
@@ -357,28 +357,28 @@ func TestChildren_SetupOrder(t *testing.T) {
 	// Root must come before any child
 	rootInitIdx := indexOf(events, "root.init")
 	rootBeforeAllIdx := indexOf(events, "root.beforeAll")
-	gotest.True(t, rootInitIdx >= 0)
-	gotest.True(t, rootBeforeAllIdx >= 0)
-	gotest.True(t, rootInitIdx < rootBeforeAllIdx)
+	gotest.GreaterOrEqual(t, rootInitIdx, 0)
+	gotest.GreaterOrEqual(t, rootBeforeAllIdx, 0)
+	gotest.Less(t, rootInitIdx, rootBeforeAllIdx)
 
 	// Children must come after root.beforeAll
 	for _, ev := range []string{"childA.init", "childA.beforeAll", "childB.init", "childB.beforeAll"} {
 		idx := indexOf(events, ev)
-		gotest.True(t, idx > rootBeforeAllIdx, "expected %s after root.beforeAll", ev)
+		gotest.Greater(t, idx, rootBeforeAllIdx, "expected %s after root.beforeAll", ev)
 	}
 
 	// m.run must come after all children setup
 	mRunIdx := indexOf(events, "m.run")
 	for _, ev := range []string{"childA.beforeAll", "childB.beforeAll"} {
 		idx := indexOf(events, ev)
-		gotest.True(t, idx < mRunIdx, "expected %s before m.run", ev)
+		gotest.Less(t, idx, mRunIdx, "expected %s before m.run", ev)
 	}
 
 	// Root AfterAll must come after children AfterAll
 	rootAfterAllIdx := indexOf(events, "root.afterAll")
 	for _, ev := range []string{"childA.afterAll", "childB.afterAll"} {
 		idx := indexOf(events, ev)
-		gotest.True(t, idx < rootAfterAllIdx, "expected %s before root.afterAll", ev)
+		gotest.Less(t, idx, rootAfterAllIdx, "expected %s before root.afterAll", ev)
 	}
 }
 
@@ -613,18 +613,18 @@ func TestTreeDepth_ThreeLevels(t *testing.T) {
 	grandchildBA := indexOf(events, "grandchild.beforeAll")
 	mRun := indexOf(events, "m.run")
 
-	gotest.True(t, rootBA < childBA)
-	gotest.True(t, childBA < grandchildBA)
-	gotest.True(t, grandchildBA < mRun)
+	gotest.Less(t, rootBA, childBA)
+	gotest.Less(t, childBA, grandchildBA)
+	gotest.Less(t, grandchildBA, mRun)
 
 	// Teardown order: grandchild → child → root
 	grandchildAA := indexOf(events, "grandchild.afterAll")
 	childAA := indexOf(events, "child.afterAll")
 	rootAA := indexOf(events, "root.afterAll")
 
-	gotest.True(t, mRun < grandchildAA)
-	gotest.True(t, grandchildAA < childAA)
-	gotest.True(t, childAA < rootAA)
+	gotest.Less(t, mRun, grandchildAA)
+	gotest.Less(t, grandchildAA, childAA)
+	gotest.Less(t, childAA, rootAA)
 }
 
 func TestMultipleRoots_ConcurrentSetup(t *testing.T) {
@@ -806,12 +806,12 @@ func TestSharedFixture_LoadAndHydrate(t *testing.T) {
 	afterAllIdx := indexOf(events, "root.afterAll")
 	dehydrateIdx := indexOf(events, "sf.dehydrate")
 
-	gotest.True(t, hydrateIdx < initIdx)
-	gotest.True(t, initIdx < assignIdx)
-	gotest.True(t, assignIdx < beforeAllIdx)
-	gotest.True(t, beforeAllIdx < mRunIdx)
-	gotest.True(t, mRunIdx < afterAllIdx)
-	gotest.True(t, afterAllIdx < dehydrateIdx)
+	gotest.Less(t, hydrateIdx, initIdx)
+	gotest.Less(t, initIdx, assignIdx)
+	gotest.Less(t, assignIdx, beforeAllIdx)
+	gotest.Less(t, beforeAllIdx, mRunIdx)
+	gotest.Less(t, mRunIdx, afterAllIdx)
+	gotest.Less(t, afterAllIdx, dehydrateIdx)
 }
 
 func TestSharedFixture_MissingEnvVar(t *testing.T) {
@@ -1046,17 +1046,17 @@ func TestDAG_LinearChain(t *testing.T) {
 	leafBA := indexOf(events, "leaf.beforeAll")
 	mRun := indexOf(events, "m.run")
 
-	gotest.True(t, rootBA < midBA, "root.beforeAll must precede mid.beforeAll")
-	gotest.True(t, midBA < leafBA, "mid.beforeAll must precede leaf.beforeAll")
-	gotest.True(t, leafBA < mRun, "leaf.beforeAll must precede m.run")
+	gotest.Less(t, rootBA, midBA, "root.beforeAll must precede mid.beforeAll")
+	gotest.Less(t, midBA, leafBA, "mid.beforeAll must precede leaf.beforeAll")
+	gotest.Less(t, leafBA, mRun, "leaf.beforeAll must precede m.run")
 
 	leafAA := indexOf(events, "leaf.afterAll")
 	midAA := indexOf(events, "mid.afterAll")
 	rootAA := indexOf(events, "root.afterAll")
 
-	gotest.True(t, mRun < leafAA, "m.run must precede leaf.afterAll")
-	gotest.True(t, leafAA < midAA, "leaf.afterAll must precede mid.afterAll")
-	gotest.True(t, midAA < rootAA, "mid.afterAll must precede root.afterAll")
+	gotest.Less(t, mRun, leafAA, "m.run must precede leaf.afterAll")
+	gotest.Less(t, leafAA, midAA, "leaf.afterAll must precede mid.afterAll")
+	gotest.Less(t, midAA, rootAA, "mid.afterAll must precede root.afterAll")
 }
 
 func TestDAG_IndependentFixtures(t *testing.T) {
@@ -1170,22 +1170,22 @@ func TestDAG_DiamondDependency(t *testing.T) {
 	serviceBA := indexOf(events, "service.beforeAll")
 	mRun := indexOf(events, "m.run")
 
-	gotest.True(t, dbBA < repoABA, "DB must set up before RepoA")
-	gotest.True(t, dbBA < repoBBA, "DB must set up before RepoB")
-	gotest.True(t, repoABA < serviceBA, "RepoA must set up before Service")
-	gotest.True(t, repoBBA < serviceBA, "RepoB must set up before Service")
-	gotest.True(t, serviceBA < mRun, "Service must set up before m.run")
+	gotest.Less(t, dbBA, repoABA, "DB must set up before RepoA")
+	gotest.Less(t, dbBA, repoBBA, "DB must set up before RepoB")
+	gotest.Less(t, repoABA, serviceBA, "RepoA must set up before Service")
+	gotest.Less(t, repoBBA, serviceBA, "RepoB must set up before Service")
+	gotest.Less(t, serviceBA, mRun, "Service must set up before m.run")
 
 	serviceAA := indexOf(events, "service.afterAll")
 	repoAAA := indexOf(events, "repoA.afterAll")
 	repoBAA := indexOf(events, "repoB.afterAll")
 	dbAA := indexOf(events, "db.afterAll")
 
-	gotest.True(t, mRun < serviceAA, "m.run must precede service.afterAll")
-	gotest.True(t, serviceAA < repoAAA, "service.afterAll must precede repoA.afterAll")
-	gotest.True(t, serviceAA < repoBAA, "service.afterAll must precede repoB.afterAll")
-	gotest.True(t, repoAAA < dbAA, "repoA.afterAll must precede db.afterAll")
-	gotest.True(t, repoBAA < dbAA, "repoB.afterAll must precede db.afterAll")
+	gotest.Less(t, mRun, serviceAA, "m.run must precede service.afterAll")
+	gotest.Less(t, serviceAA, repoAAA, "service.afterAll must precede repoA.afterAll")
+	gotest.Less(t, serviceAA, repoBAA, "service.afterAll must precede repoB.afterAll")
+	gotest.Less(t, repoAAA, dbAA, "repoA.afterAll must precede db.afterAll")
+	gotest.Less(t, repoBAA, dbAA, "repoB.afterAll must precede db.afterAll")
 }
 
 func TestDAG_DependencyFailure_SkipsDependents(t *testing.T) {
@@ -1353,12 +1353,12 @@ func TestDAG_SharedFixtureWithDAGPath(t *testing.T) {
 	afterAllIdx := indexOf(events, "root.afterAll")
 	dehydrateIdx := indexOf(events, "sf.dehydrate")
 
-	gotest.True(t, hydrateIdx < initIdx)
-	gotest.True(t, initIdx < assignIdx)
-	gotest.True(t, assignIdx < beforeAllIdx)
-	gotest.True(t, beforeAllIdx < mRunIdx)
-	gotest.True(t, mRunIdx < afterAllIdx)
-	gotest.True(t, afterAllIdx < dehydrateIdx)
+	gotest.Less(t, hydrateIdx, initIdx)
+	gotest.Less(t, initIdx, assignIdx)
+	gotest.Less(t, assignIdx, beforeAllIdx)
+	gotest.Less(t, beforeAllIdx, mRunIdx)
+	gotest.Less(t, mRunIdx, afterAllIdx)
+	gotest.Less(t, afterAllIdx, dehydrateIdx)
 }
 
 func TestDAG_ComputeMaxPath(t *testing.T) {
@@ -1446,12 +1446,12 @@ func TestDAG_SharedStateNode(t *testing.T) {
 	afterAllIdx := indexOf(events, "api.afterAll")
 	dehydrateIdx := indexOf(events, "pg.dehydrate")
 
-	gotest.True(t, hydrateIdx >= 0, "hydrate should be called")
-	gotest.True(t, hydrateIdx < initIdx, "hydrate before api.init")
-	gotest.True(t, initIdx < beforeAllIdx, "api.init before api.beforeAll")
-	gotest.True(t, beforeAllIdx < mRunIdx, "api.beforeAll before m.run")
-	gotest.True(t, mRunIdx < afterAllIdx, "m.run before api.afterAll")
-	gotest.True(t, afterAllIdx < dehydrateIdx, "api.afterAll before pg.dehydrate")
+	gotest.GreaterOrEqual(t, hydrateIdx, 0, "hydrate should be called")
+	gotest.Less(t, hydrateIdx, initIdx, "hydrate before api.init")
+	gotest.Less(t, initIdx, beforeAllIdx, "api.init before api.beforeAll")
+	gotest.Less(t, beforeAllIdx, mRunIdx, "api.beforeAll before m.run")
+	gotest.Less(t, mRunIdx, afterAllIdx, "m.run before api.afterAll")
+	gotest.Less(t, afterAllIdx, dehydrateIdx, "api.afterAll before pg.dehydrate")
 }
 
 func TestDAG_SharedStateChain(t *testing.T) {
@@ -1503,9 +1503,9 @@ func TestDAG_SharedStateChain(t *testing.T) {
 	gotest.Equal(t, 0, exitCode)
 
 	events := rec.names()
-	gotest.True(t, indexOf(events, "pg.hydrate") < indexOf(events, "schema.init"))
-	gotest.True(t, indexOf(events, "schema.init") < indexOf(events, "schema.hydrate"))
-	gotest.True(t, indexOf(events, "schema.hydrate") < indexOf(events, "m.run"))
+	gotest.Less(t, indexOf(events, "pg.hydrate"), indexOf(events, "schema.init"))
+	gotest.Less(t, indexOf(events, "schema.init"), indexOf(events, "schema.hydrate"))
+	gotest.Less(t, indexOf(events, "schema.hydrate"), indexOf(events, "m.run"))
 }
 
 func TestDAG_SharedStateNode_MissingStateFile(t *testing.T) {

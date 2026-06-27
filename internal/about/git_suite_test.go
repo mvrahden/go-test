@@ -16,7 +16,7 @@ func (s *GitTestSuite) TestPSuiteRegex(t *gotest.T) {
 			{"gosuite/gotest_psuite_test.go"},
 			{"gosuite/gotest_pxsuite_test.go"},
 		}) {
-			gotest.True(sub, about.PSuiteRegex.MatchString(tc.Name))
+			gotest.Regexp(sub, about.PSuiteRegex, tc.Name)
 		}
 	})
 

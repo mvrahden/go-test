@@ -152,10 +152,16 @@ func simplifyNilComparison(pass *analysis.Pass, call *ast.CallExpr, left, right,
 			target = "Error"
 		}
 		emitSimplify(pass, call, source, target, []ast.Expr{tArg, other}, msgArgs, "error nil check")
-	} else {
+	} else if isComparableType(pass, other) {
 		target := "Zero"
 		if !positive {
 			target = "NotZero"
+		}
+		emitSimplify(pass, call, source, target, []ast.Expr{tArg, other}, msgArgs, "nil check")
+	} else if isEmptyableType(pass, other) {
+		target := "Empty"
+		if !positive {
+			target = "NotEmpty"
 		}
 		emitSimplify(pass, call, source, target, []ast.Expr{tArg, other}, msgArgs, "nil check")
 	}
@@ -247,8 +253,10 @@ func simplifyEquality(pass *analysis.Pass, call *ast.CallExpr, negated bool) {
 		}
 		if isErrorType(pass, other) {
 			emitSimplify(pass, call, source, pick(negated, "Error", "NoError"), []ast.Expr{tArg, other}, msgArgs, "nil error comparison")
-		} else {
+		} else if isComparableType(pass, other) {
 			emitSimplify(pass, call, source, pick(negated, "NotZero", "Zero"), []ast.Expr{tArg, other}, msgArgs, "nil comparison")
+		} else if isEmptyableType(pass, other) {
+			emitSimplify(pass, call, source, pick(negated, "NotEmpty", "Empty"), []ast.Expr{tArg, other}, msgArgs, "nil comparison")
 		}
 		return
 	}
@@ -273,7 +281,7 @@ func simplifyLen(pass *analysis.Pass, call *ast.CallExpr) {
 	if len(call.Args) < 3 {
 		return
 	}
-	if isIntLit(call.Args[2], 0) {
+	if isIntLit(call.Args[2], 0) && !isNilIdent(call.Args[1]) {
 		emitSimplify(pass, call, "Len", "Empty", []ast.Expr{call.Args[0], call.Args[1]}, call.Args[3:], "zero length check")
 	}
 }
@@ -490,13 +498,38 @@ func isErrorMethodCall(expr ast.Expr) (recv ast.Expr, ok bool) {
 	return sel.X, true
 }
 
-func isErrorType(pass *analysis.Pass, expr ast.Expr) bool {
+func isEmptyableType(pass *analysis.Pass, expr ast.Expr) bool {
 	t := pass.TypesInfo.TypeOf(expr)
 	if t == nil {
 		return false
 	}
+	switch t.Underlying().(type) {
+	case *types.Slice, *types.Map, *types.Chan, *types.Array:
+		return true
+	}
+	return false
+}
+
+func isComparableType(pass *analysis.Pass, expr ast.Expr) bool {
+	t := pass.TypesInfo.TypeOf(expr)
+	if t == nil || isUntypedNil(t) {
+		return false
+	}
+	return types.Comparable(t)
+}
+
+func isErrorType(pass *analysis.Pass, expr ast.Expr) bool {
+	t := pass.TypesInfo.TypeOf(expr)
+	if t == nil || isUntypedNil(t) {
+		return false
+	}
 	errorType := types.Universe.Lookup("error").Type()
 	return types.AssignableTo(t, errorType)
+}
+
+func isUntypedNil(t types.Type) bool {
+	b, ok := t.(*types.Basic)
+	return ok && b.Kind() == types.UntypedNil
 }
 
 func assertionQualifier(expr ast.Expr) string {

@@ -83,8 +83,7 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_ProcessExitsDuringGrace(t *g
 			_ = mp.WaitWithGrace(ctx)
 			elapsed := time.Since(start)
 
-			gotest.True(it, elapsed < 2*time.Second,
-				"should exit quickly after SIGTERM, took %v", elapsed)
+			gotest.Less(it, elapsed, 2*time.Second, "should exit quickly after SIGTERM, took %v", elapsed)
 		})
 	})
 }
@@ -123,10 +122,8 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_GraceTimeout_ForceKills(t *g
 			_ = mp.WaitWithGrace(ctx)
 			elapsed := time.Since(start)
 
-			gotest.True(it, elapsed >= 200*time.Millisecond,
-				"should wait at least grace period, took %v", elapsed)
-			gotest.True(it, elapsed < 2*time.Second,
-				"should force-kill shortly after grace, took %v", elapsed)
+			gotest.GreaterOrEqual(it, elapsed, 200*time.Millisecond, "should wait at least grace period, took %v", elapsed)
+			gotest.Less(it, elapsed, 2*time.Second, "should force-kill shortly after grace, took %v", elapsed)
 		})
 	})
 }
@@ -168,10 +165,8 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_GraceBudget(t *gotest.T) {
 			_ = mp.WaitWithGrace(ctx)
 			elapsed := time.Since(start)
 
-			gotest.True(it, elapsed >= 300*time.Millisecond,
-				"should wait budget duration, took %v", elapsed)
-			gotest.True(it, elapsed < 2*time.Second,
-				"should not wait forever, took %v", elapsed)
+			gotest.GreaterOrEqual(it, elapsed, 300*time.Millisecond, "should wait budget duration, took %v", elapsed)
+			gotest.Less(it, elapsed, 2*time.Second, "should not wait forever, took %v", elapsed)
 		})
 	})
 }
@@ -208,8 +203,7 @@ func (s *ManagedProcessTestSuite) TestTerminate(t *gotest.T) {
 			mp.Terminate()
 			elapsed := time.Since(start)
 
-			gotest.True(it, elapsed < 2*time.Second,
-				"Terminate should return quickly for cooperative process, took %v", elapsed)
+			gotest.Less(it, elapsed, 2*time.Second, "Terminate should return quickly for cooperative process, took %v", elapsed)
 		})
 	})
 
@@ -243,8 +237,8 @@ func (s *ManagedProcessTestSuite) TestTerminate(t *gotest.T) {
 			mp.Terminate()
 			elapsed := time.Since(start)
 
-			gotest.True(it, elapsed >= 200*time.Millisecond, "took %v", elapsed)
-			gotest.True(it, elapsed < 2*time.Second, "took %v", elapsed)
+			gotest.GreaterOrEqual(it, elapsed, 200*time.Millisecond, "took %v", elapsed)
+			gotest.Less(it, elapsed, 2*time.Second, "took %v", elapsed)
 		})
 	})
 
@@ -313,8 +307,7 @@ func (s *ManagedProcessTestSuite) TestSetGraceDuration(t *gotest.T) {
 			mp.Terminate()
 			elapsed := time.Since(start)
 
-			gotest.True(it, elapsed < 2*time.Second,
-				"should use updated 200ms grace, not original 10s, took %v", elapsed)
+			gotest.Less(it, elapsed, 2*time.Second, "should use updated 200ms grace, not original 10s, took %v", elapsed)
 		})
 	})
 
@@ -367,8 +360,7 @@ func (s *ManagedProcessTestSuite) TestGraceKill(t *gotest.T) {
 			_ = mp.WaitWithGrace(ctx)
 			elapsed := time.Since(start)
 
-			gotest.True(it, elapsed < 500*time.Millisecond,
-				"GraceKill should kill immediately, took %v", elapsed)
+			gotest.Less(it, elapsed, 500*time.Millisecond, "GraceKill should kill immediately, took %v", elapsed)
 		})
 	})
 }

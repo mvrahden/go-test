@@ -32,7 +32,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 	gotest.NoError(t, err)
 
 	t.When("Discovery", func(w *gotest.T) {
-		gotest.Equal(w, 3, len(allSharedFixtures), "expected Alpha, Beta, and Gamma shared fixtures")
+		gotest.Len(w, allSharedFixtures, 3, "expected Alpha, Beta, and Gamma shared fixtures")
 
 		found := map[string]gotestgen.SharedFixtureInfo{}
 		for i := range allSharedFixtures {
@@ -62,7 +62,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 			gotest.False(it, gamma.HasDehydrate)
 			gotest.Contains(it, gamma.TransferFields, "Derived")
 			gotest.NotContains(it, gamma.TransferFields, "Alpha", "dep pointer excluded from transfer")
-			gotest.Equal(it, 1, len(gamma.Dependencies))
+			gotest.Len(it, gamma.Dependencies, 1)
 			gotest.Contains(it, gamma.Dependencies[0], "AlphaSharedFixture")
 		})
 	})
@@ -137,7 +137,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 		})
 
 		w.It("StateContent", func(it *gotest.T) {
-			gotest.Equal(it, 3, len(state), "expected entries for Alpha, Beta, and Gamma")
+			gotest.Len(it, state, 3, "expected entries for Alpha, Beta, and Gamma")
 
 			alphaKey := "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.AlphaSharedFixture"
 			betaKey := "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.BetaSharedFixture"
@@ -226,13 +226,13 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 				keys := r.SuiteRequiredSharedFixtureKeys
 
 				alphaKeys := keys["TestAlphaTestSuite"]
-				gotest.Equal(it, 1, len(alphaKeys), "AlphaTestSuite needs only Alpha")
+				gotest.Len(it, alphaKeys, 1, "AlphaTestSuite needs only Alpha")
 
 				multiKeys := keys["TestMultiTestSuite"]
-				gotest.Equal(it, 2, len(multiKeys), "MultiTestSuite needs Alpha + Beta")
+				gotest.Len(it, multiKeys, 2, "MultiTestSuite needs Alpha + Beta")
 
 				gammaKeys := keys["TestGammaTestSuite"]
-				gotest.Equal(it, 2, len(gammaKeys), "GammaTestSuite needs Gamma + Alpha transitively")
+				gotest.Len(it, gammaKeys, 2, "GammaTestSuite needs Gamma + Alpha transitively")
 
 				plainKeys := keys["TestPlainTestSuite"]
 				gotest.Empty(it, plainKeys, "PlainTestSuite needs no shared fixtures")

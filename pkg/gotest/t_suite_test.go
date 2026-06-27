@@ -41,7 +41,7 @@ func (s *TTestSuite) TestTContext(t *gotest.T) {
 	t.When("custom ctx is set via NewTWithDeadline", func(w *gotest.T) {
 		w.It("uses the custom ctx", func(it *gotest.T) {
 			tt := gotest.NewTWithDeadline(it.T(), 1*time.Second)
-			gotest.True(it, gotest.ExportTCtx(tt) != nil)
+			gotest.NotZero(it, gotest.ExportTCtx(tt))
 			gotest.Equal(it, gotest.ExportTCtx(tt), tt.Context())
 		})
 	})
@@ -49,7 +49,7 @@ func (s *TTestSuite) TestTContext(t *gotest.T) {
 	t.When("NewT is used without deadline", func(w *gotest.T) {
 		w.It("falls back to testing.T.Context()", func(it *gotest.T) {
 			tt := gotest.NewT(it.T())
-			gotest.True(it, gotest.ExportTCtx(tt) == nil)
+			gotest.Zero(it, gotest.ExportTCtx(tt))
 			gotest.Equal(it, it.T().Context(), tt.Context())
 		})
 	})
