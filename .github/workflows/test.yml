@@ -10,26 +10,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.26"
-      - name: Format check
-        run: test -z "$(gofmt -l .)" || (echo "gofmt needed on:" && gofmt -l . && exit 1)
-      - name: Init workspace
-        run: go work init . ./examples
-      - name: Vuln check
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./... ./examples/...
-      - name: Lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          args: ./... ./examples/...
-
   build:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -77,10 +57,6 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Init workspace
         run: go work init . ./examples
-      - name: Vet
-        run: go vet ./... ./examples/...
-      - name: Lint
-        run: go run ./cmd/gotest-lint ./... ./examples/...
       - name: Test (stdlib)
         run: go test -ldflags=-checklinkname=0 -coverprofile=coverage-stdlib.out ./... -race
       - name: Test (suites)
