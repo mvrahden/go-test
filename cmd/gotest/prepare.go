@@ -18,7 +18,7 @@ type prepareOutput struct {
 	StateFile   string `json:"stateFile,omitempty"`
 }
 
-func runPrepare(inv Invocation) int { //nolint:gocritic
+func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	args := inv.TagArgs()
 	patterns := ExtractPackagePatterns(args)
 	tags, _ := extractTagsFlag(args)

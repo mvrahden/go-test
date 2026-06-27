@@ -38,7 +38,7 @@ func parseDebounceFlag(args []string) (time.Duration, error) {
 	return 200 * time.Millisecond, nil
 }
 
-func runWatch(inv Invocation) int { //nolint:gocritic
+func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	args := inv.DefaultArgs()
 	if inv.Config.Debounce != nil && !hasFlag(args, "--debounce") {
 		args = append([]string{"--debounce=" + inv.Config.Debounce.Duration().String()}, args...)
@@ -160,7 +160,7 @@ func runWatch(inv Invocation) int { //nolint:gocritic
 	}
 }
 
-func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int { //nolint:gocritic
+func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int { //nolint:gocritic // hugeParam: stable API
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
 	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)

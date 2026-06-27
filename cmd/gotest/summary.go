@@ -16,7 +16,7 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
 
-func runSummary(inv Invocation) int { //nolint:gocritic
+func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	ownArgs, goTestArgs, err := SplitArgs(inv.DefaultArgs(), summaryAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

@@ -633,7 +633,7 @@ func MigrateFile(path string) ([]MigrateResult, error) {
 		return nil, fmt.Errorf("gofmt %s: %w", path, err)
 	}
 
-	if err := os.WriteFile(path, formatted, 0600); err != nil {
+	if err := os.WriteFile(path, formatted, 0644); err != nil { //nolint:gosec // G306: not sensitive data
 		return nil, fmt.Errorf("write %s: %w", path, err)
 	}
 

@@ -70,7 +70,7 @@ func main() {
 	}
 }
 
-func runTest(inv Invocation) int { //nolint:gocritic
+func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if slices.Contains(inv.Args, "--spec") {
 		var specArgs []string
 		for _, a := range inv.Args {

@@ -95,7 +95,7 @@ func (c *OutputCollector) Register(pkg string, count int) {
 // (head-of-line ordering). For JSON modes, test-level events are emitted
 // immediately; package-level synthetic events are emitted when all suites
 // for a package complete.
-func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //nolint:gocritic
+func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //nolint:gocritic // hugeParam: stable API
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if r.ExitCode > c.worst {

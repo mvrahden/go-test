@@ -9,7 +9,7 @@ import (
 	"github.com/mvrahden/go-test/internal/scaffold"
 )
 
-func runScaffold(inv Invocation) int { //nolint:gocritic
+func runScaffold(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	var target string
 	for _, arg := range inv.Args {
 		if !isFlag(arg) {
@@ -86,7 +86,7 @@ func writeScaffoldFile(pkgDir, filename string, content []byte) int {
 		return 1
 	}
 
-	if err := os.WriteFile(outPath, content, 0600); err != nil {
+	if err := os.WriteFile(outPath, content, 0644); err != nil { //nolint:gosec // G306: not sensitive data
 		fmt.Fprintf(os.Stderr, "scaffold: failed to write %s: %v\n", outPath, err)
 		return 1
 	}

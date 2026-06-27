@@ -93,7 +93,7 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 		env = append(env, k+"="+v)
 	}
 
-	for i, target := range targets { //nolint:gocritic
+	for i, target := range targets { //nolint:gocritic // rangeValCopy: intentional
 		wg.Add(1)
 		go func(idx int, t SuiteTarget) {
 			defer wg.Done()
@@ -110,7 +110,7 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 	wg.Wait()
 }
 
-func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2json bool) *exec.Cmd { //nolint:gocritic
+func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2json bool) *exec.Cmd { //nolint:gocritic // hugeParam: stable API
 	var runArg string
 	if target.RunFilter != "" {
 		runArg = "-test.run=" + target.RunFilter
@@ -164,7 +164,7 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 // On context cancellation, cmd.Cancel sends SIGTERM to the process group.
 // A per-process kill timer (from the teardown budget file) then governs
 // when SIGKILL is sent, rather than Go's built-in WaitDelay.
-func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic
+func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic // hugeParam: stable API
 	cmd := buildSuiteCmd(ctx, target, env, test2json)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

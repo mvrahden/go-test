@@ -15,7 +15,7 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
 
-func runSpec(inv Invocation) int { //nolint:gocritic
+func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	ownArgs, goTestArgs, err := SplitArgs(inv.DefaultArgs(), specAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

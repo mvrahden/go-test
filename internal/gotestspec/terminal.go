@@ -184,7 +184,7 @@ func filterOutput(output []string) []string {
 	return filtered
 }
 
-func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic
+func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hugeParam: stable API
 	var parts []string
 	if stats.Passed > 0 {
 		parts = append(parts, fmt.Sprintf("%s%d passed%s", c.green, stats.Passed, c.reset))

@@ -27,7 +27,7 @@ func (s *CmdGotestTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
 	t.When("CLI absent", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
 			Desc   string
 			inv    Invocation
 			expect []string
@@ -92,7 +92,7 @@ func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
 	})
 
 	t.When("CLI positive", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
 			Desc   string
 			inv    Invocation
 			expect []string
@@ -135,7 +135,7 @@ func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
 	})
 
 	t.When("CLI negative", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
 			Desc   string
 			inv    Invocation
 			expect []string
@@ -242,7 +242,7 @@ func (s *CmdGotestTestSuite) TestParseSubcommand(t *gotest.T) {
 
 func (s *CmdGotestTestSuite) TestPackagePatterns(t *gotest.T) {
 	t.When("extract package patterns", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
 			Desc     string
 			args     []string
 			expected []string
@@ -261,7 +261,7 @@ func (s *CmdGotestTestSuite) TestPackagePatterns(t *gotest.T) {
 	})
 
 	t.When("looks like package pattern", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
 			Desc   string
 			input  string
 			expect bool
@@ -424,7 +424,7 @@ func (s *CmdGotestTestSuite) TestResolveGlobalTimeout(t *gotest.T) {
 	}
 
 	t.When("end-to-end parse+resolve", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
 			Desc   string
 			args   []string
 			expect time.Duration
@@ -801,7 +801,7 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 
 func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 	t.When("IsGoFile", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
 			Desc   string
 			name   string
 			expect bool
@@ -818,7 +818,7 @@ func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 	})
 
 	t.When("DirsToPatterns", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
 			Desc    string
 			dirs    map[string]bool
 			lenWant int
@@ -836,7 +836,7 @@ func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 	})
 
 	t.When("ReplacePatterns", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
 			Desc        string
 			original    []string
 			newPatterns []string

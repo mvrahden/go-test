@@ -10,7 +10,7 @@ import (
 	"golang.org/x/tools/go/analysis/singlechecker"
 )
 
-func runLint(inv Invocation) int { //nolint:gocritic
+func runLint(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	args := inv.Args
 	if len(args) == 0 {
 		args = []string{"./..."}
@@ -30,7 +30,7 @@ func runLint(inv Invocation) int { //nolint:gocritic
 
 // lintSkipFlags returns analyzer flags derived from the config's lint.skip
 // list, omitting any rules that are already set via CLI args.
-func lintSkipFlags(args []string, cfg config.ProjectConfig) ([]string, error) { //nolint:gocritic
+func lintSkipFlags(args []string, cfg config.ProjectConfig) ([]string, error) { //nolint:gocritic // hugeParam: stable API
 	var flags []string
 	for _, rule := range cfg.Lint.Skip {
 		if !lint.SkippableRules[lint.Rule(rule)] {

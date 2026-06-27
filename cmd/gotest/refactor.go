@@ -7,7 +7,7 @@ import (
 	"github.com/mvrahden/go-test/internal/refactor"
 )
 
-func runRefactor(inv Invocation) int { //nolint:gocritic
+func runRefactor(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	args := inv.Args
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, `usage: gotest refactor <command> [args]

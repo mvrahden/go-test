@@ -32,7 +32,7 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupSetup(t *gotest.T) {
 	})
 
 	t.When("building suite cmd", func(w *gotest.T) {
-		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
 			Name      string
 			test2json bool
 		}{

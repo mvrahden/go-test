@@ -164,5 +164,5 @@ func applyReplacements(filePath string, src []byte, repls []replacement) error {
 		result = append(result[:r.pos], append([]byte(r.newName), result[end:]...)...)
 	}
 
-	return os.WriteFile(filePath, result, 0600)
+	return os.WriteFile(filePath, result, 0644) //nolint:gosec // G306: not sensitive data
 }

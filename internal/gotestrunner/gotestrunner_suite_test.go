@@ -23,7 +23,7 @@ import (
 // --- reference implementations (pre-refactor logic) ---
 
 // buildPlainArgs reproduces the exact arg logic of the old RunSingleSuite.
-func buildPlainArgs(target gotestrunner.SuiteTarget) (path string, args []string) { //nolint:gocritic
+func buildPlainArgs(target gotestrunner.SuiteTarget) (path string, args []string) { //nolint:gocritic // hugeParam: stable API
 	if target.RunFilter != "" {
 		args = append(args, "-test.run="+target.RunFilter)
 	} else {
@@ -37,7 +37,7 @@ func buildPlainArgs(target gotestrunner.SuiteTarget) (path string, args []string
 }
 
 // buildTest2JSONArgs reproduces the exact arg logic of the old RunSingleSuiteTest2JSON.
-func buildTest2JSONArgs(target gotestrunner.SuiteTarget) (path string, args []string) { //nolint:gocritic
+func buildTest2JSONArgs(target gotestrunner.SuiteTarget) (path string, args []string) { //nolint:gocritic // hugeParam: stable API
 	var testArgs []string
 	if target.RunFilter != "" {
 		testArgs = append(testArgs, "-test.run="+target.RunFilter)
@@ -518,7 +518,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 		ctx := context.Background()
 		env := []string{"PATH=/usr/bin", "HOME=/home/test"}
 
-		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
 			Name       string
 			target     gotestrunner.SuiteTarget
 			wantBinary string
@@ -617,7 +617,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 			refCtx := context.Background()
 			refEnv := []string{"A=1"}
 
-			for i := range targets { //nolint:gocritic
+			for i := range targets { //nolint:gocritic // hugeParam: stable API
 				target := targets[i]
 				refPath, refArgs := buildPlainArgs(target)
 				cmd := gotestrunner.ExportBuildSuiteCmd(refCtx, target, refEnv, false)
@@ -636,7 +636,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 		ctx := context.Background()
 		env := []string{"PATH=/usr/bin", "HOME=/home/test"}
 
-		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
 			Name       string
 			target     gotestrunner.SuiteTarget
 			wantBinary string
@@ -754,7 +754,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 			refCtx := context.Background()
 			refEnv := []string{"A=1"}
 
-			for i := range targets { //nolint:gocritic
+			for i := range targets { //nolint:gocritic // hugeParam: stable API
 				target := targets[i]
 				_, refArgs := buildTest2JSONArgs(target)
 				cmd := gotestrunner.ExportBuildSuiteCmd(refCtx, target, refEnv, true)

@@ -10,7 +10,7 @@ import (
 	"github.com/mvrahden/go-test/about"
 )
 
-func runClean(inv Invocation) int { //nolint:gocritic
+func runClean(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	patterns := ExtractPackagePatterns(inv.Args)
 
 	var removed int

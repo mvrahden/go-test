@@ -178,7 +178,7 @@ func setupCoverage(targets []SuiteTarget, overlay *OverlayResult, userCoverProfi
 	assignCoverProfiles(targets, coverDir)
 }
 
-func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (PipelineResult, error) { //nolint:gocritic
+func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (PipelineResult, error) { //nolint:gocritic // hugeParam: stable API
 	compiled, setupProc, cancelPrepare, err := prepareTestRun(ctx, overlay, pf.BuildFlags, cfg.SetupTimeout)
 	if err != nil {
 		return PipelineResult{ExitCode: 2}, err
@@ -232,7 +232,7 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	}, nil
 }
 
-func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (PipelineResult, error) { //nolint:gocritic
+func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (PipelineResult, error) { //nolint:gocritic // hugeParam: stable API
 	var coverDir string
 	if pf.UserCoverProfile != "" {
 		coverDir = filepath.Join(overlay.WorkDir, "cover")
@@ -341,7 +341,7 @@ loop:
 
 		collector.Register(cr.Package, len(targets))
 
-		for i := range targets { //nolint:gocritic
+		for i := range targets { //nolint:gocritic // hugeParam: stable API
 			target := targets[i]
 			wg.Add(1)
 			go func(t SuiteTarget, idx int) {
