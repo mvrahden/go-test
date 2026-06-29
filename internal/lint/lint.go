@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"go/types"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -30,6 +31,7 @@ const (
 	TestSignature     Rule = "test-signature"
 	XLifecycle        Rule = "x-lifecycle"
 	AssertionSimplify Rule = "assertion-simplify"
+	SuiteCleanup      Rule = "suite-cleanup"
 )
 
 // SkippableRules is the set of rules that support opt-out via skip flags.
@@ -67,6 +69,7 @@ func run(pass *analysis.Pass) (any, error) {
 		checkMethods(pass, insp, suites)
 		checkFocusPrefixes(pass, suites)
 		checkLifecyclePairs(pass, suites)
+		checkSuiteCleanup(pass, insp, suites)
 	}
 
 	checkOrphanedFiles(pass)
@@ -328,6 +331,338 @@ func checkLifecyclePairs(pass *analysis.Pass, suites map[string]*suiteInfo) {
 			report(pass, LifecyclePair, s.pos, "suite %s has BeforeAll but no AfterAll — resources may leak", s.name)
 		}
 	}
+}
+
+func checkSuiteCleanup(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo) {
+	cr := buildCleanupReach(pass, insp, 5)
+
+	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
+		fd := n.(*ast.FuncDecl)
+		if fd.Body == nil {
+			return
+		}
+
+		isSuiteMethod := false
+		if fd.Recv != nil && len(fd.Recv.List) > 0 {
+			recvName := receiverTypeName(fd.Recv)
+			if _, ok := suites[recvName]; ok {
+				isSuiteMethod = true
+			} else {
+				return
+			}
+		}
+
+		tVars := map[string]bool{}
+		gotestTVars := map[string]bool{}
+
+		if isSuiteMethod && fd.Type.Params != nil && len(fd.Type.Params.List) > 0 {
+			for _, name := range fd.Type.Params.List[0].Names {
+				gotestTVars[name.Name] = true
+			}
+		}
+
+		ast.Inspect(fd.Body, func(n ast.Node) bool {
+			switch node := n.(type) {
+			case *ast.AssignStmt:
+				for i, rhs := range node.Rhs {
+					if i >= len(node.Lhs) {
+						break
+					}
+					lhsId, ok := node.Lhs[i].(*ast.Ident)
+					if !ok {
+						continue
+					}
+					if isTMethodCall(rhs) {
+						tVars[lhsId.Name] = true
+						continue
+					}
+					if id, ok := rhs.(*ast.Ident); ok {
+						if tVars[id.Name] {
+							tVars[lhsId.Name] = true
+						}
+						if gotestTVars[id.Name] {
+							gotestTVars[lhsId.Name] = true
+						}
+					}
+				}
+			case *ast.CallExpr:
+				if isCleanupCall(node, tVars) {
+					reportCleanup(pass, node.Pos())
+					return true
+				}
+				if isSuiteMethod && cr.callPassesTaintedArg(node, tVars, gotestTVars) {
+					reportCleanup(pass, node.Pos())
+				}
+			}
+			return true
+		})
+	})
+}
+
+func reportCleanup(pass *analysis.Pass, pos token.Pos) {
+	report(pass, SuiteCleanup, pos,
+		"use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle")
+}
+
+// --- cleanup reachability analysis ---
+
+// cleanupReach tracks which function parameters transitively lead to a
+// .Cleanup() call, enabling interprocedural detection across helper chains.
+type cleanupReach struct {
+	pass      *analysis.Pass
+	funcDecls map[types.Object]*ast.FuncDecl
+	params    map[*ast.FuncDecl]map[int]bool
+}
+
+func buildCleanupReach(pass *analysis.Pass, insp *inspector.Inspector, maxDepth int) *cleanupReach {
+	cr := &cleanupReach{
+		pass:      pass,
+		funcDecls: map[types.Object]*ast.FuncDecl{},
+		params:    map[*ast.FuncDecl]map[int]bool{},
+	}
+
+	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
+		fd := n.(*ast.FuncDecl)
+		if fd.Body == nil || fd.Name == nil {
+			return
+		}
+		if obj := pass.TypesInfo.Defs[fd.Name]; obj != nil {
+			cr.funcDecls[obj] = fd
+		}
+	})
+
+	for _, fd := range cr.funcDecls {
+		cr.scanDirect(fd)
+	}
+	for round := 0; round < maxDepth; round++ {
+		changed := false
+		for _, fd := range cr.funcDecls {
+			if cr.propagate(fd) {
+				changed = true
+			}
+		}
+		if !changed {
+			break
+		}
+	}
+
+	return cr
+}
+
+func (cr *cleanupReach) mark(fd *ast.FuncDecl, paramIdx int) bool {
+	if cr.params[fd] == nil {
+		cr.params[fd] = map[int]bool{}
+	}
+	if cr.params[fd][paramIdx] {
+		return false
+	}
+	cr.params[fd][paramIdx] = true
+	return true
+}
+
+func (cr *cleanupReach) resolveCallee(call *ast.CallExpr) *ast.FuncDecl {
+	var ident *ast.Ident
+	switch fn := call.Fun.(type) {
+	case *ast.Ident:
+		ident = fn
+	case *ast.SelectorExpr:
+		ident = fn.Sel
+	}
+	if ident == nil {
+		return nil
+	}
+	obj := cr.pass.TypesInfo.Uses[ident]
+	if obj == nil {
+		return nil
+	}
+	return cr.funcDecls[obj]
+}
+
+// scanDirect finds parameters that have .Cleanup() called on them directly
+// (including via .T() and variable aliases).
+func (cr *cleanupReach) scanDirect(fd *ast.FuncDecl) {
+	aliases := flattenParams(fd.Type.Params)
+	if len(aliases) == 0 {
+		return
+	}
+
+	ast.Inspect(fd.Body, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.AssignStmt:
+			trackParamFlow(node, aliases)
+		case *ast.CallExpr:
+			sel, ok := node.Fun.(*ast.SelectorExpr)
+			if !ok || sel.Sel.Name != "Cleanup" {
+				break
+			}
+			if id, ok := sel.X.(*ast.Ident); ok {
+				if idx, ok := aliases[id.Name]; ok {
+					cr.mark(fd, idx)
+				}
+			}
+			if innerCall, ok := sel.X.(*ast.CallExpr); ok && len(innerCall.Args) == 0 {
+				if innerSel, ok := innerCall.Fun.(*ast.SelectorExpr); ok && innerSel.Sel.Name == "T" {
+					if id, ok := innerSel.X.(*ast.Ident); ok {
+						if idx, ok := aliases[id.Name]; ok {
+							cr.mark(fd, idx)
+						}
+					}
+				}
+			}
+		}
+		return true
+	})
+}
+
+// propagate marks parameters that flow into cleanup-reaching parameters
+// of called functions (one round of fixed-point iteration).
+func (cr *cleanupReach) propagate(fd *ast.FuncDecl) bool {
+	aliases := flattenParams(fd.Type.Params)
+	if len(aliases) == 0 {
+		return false
+	}
+
+	changed := false
+	ast.Inspect(fd.Body, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.AssignStmt:
+			trackParamFlow(node, aliases)
+		case *ast.CallExpr:
+			callee := cr.resolveCallee(node)
+			if callee == nil {
+				break
+			}
+			calleeReach := cr.params[callee]
+			if len(calleeReach) == 0 {
+				break
+			}
+			for argIdx, arg := range node.Args {
+				if !calleeReach[argIdx] {
+					continue
+				}
+				if idx := exprToParamIdx(arg, aliases); idx >= 0 {
+					if cr.mark(fd, idx) {
+						changed = true
+					}
+				}
+			}
+		}
+		return true
+	})
+	return changed
+}
+
+func (cr *cleanupReach) callPassesTaintedArg(call *ast.CallExpr, tVars, gotestTVars map[string]bool) bool {
+	callee := cr.resolveCallee(call)
+	if callee == nil {
+		return false
+	}
+	calleeReach := cr.params[callee]
+	if len(calleeReach) == 0 {
+		return false
+	}
+	for argIdx, arg := range call.Args {
+		if !calleeReach[argIdx] {
+			continue
+		}
+		if isTMethodCall(arg) {
+			return true
+		}
+		if id, ok := arg.(*ast.Ident); ok {
+			if tVars[id.Name] || gotestTVars[id.Name] {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// flattenParams returns a map from parameter name to its flattened index.
+func flattenParams(params *ast.FieldList) map[string]int {
+	if params == nil {
+		return nil
+	}
+	m := map[string]int{}
+	idx := 0
+	for _, field := range params.List {
+		for _, name := range field.Names {
+			m[name.Name] = idx
+			idx++
+		}
+	}
+	return m
+}
+
+// trackParamFlow extends the alias map for direct assignments (x := param)
+// and .T() calls (x := param.T()).
+func trackParamFlow(assign *ast.AssignStmt, aliases map[string]int) {
+	for i, rhs := range assign.Rhs {
+		if i >= len(assign.Lhs) {
+			break
+		}
+		lhsId, ok := assign.Lhs[i].(*ast.Ident)
+		if !ok {
+			continue
+		}
+		if id, ok := rhs.(*ast.Ident); ok {
+			if idx, ok := aliases[id.Name]; ok {
+				aliases[lhsId.Name] = idx
+			}
+			continue
+		}
+		if call, ok := rhs.(*ast.CallExpr); ok && isTMethodCall(call) {
+			if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
+				if id, ok := sel.X.(*ast.Ident); ok {
+					if idx, ok := aliases[id.Name]; ok {
+						aliases[lhsId.Name] = idx
+					}
+				}
+			}
+		}
+	}
+}
+
+// exprToParamIdx returns the parameter index if the expression is a
+// parameter/alias ident or a .T() call on one. Returns -1 otherwise.
+func exprToParamIdx(expr ast.Expr, aliases map[string]int) int {
+	if id, ok := expr.(*ast.Ident); ok {
+		if idx, ok := aliases[id.Name]; ok {
+			return idx
+		}
+	}
+	if call, ok := expr.(*ast.CallExpr); ok && isTMethodCall(call) {
+		if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
+			if id, ok := sel.X.(*ast.Ident); ok {
+				if idx, ok := aliases[id.Name]; ok {
+					return idx
+				}
+			}
+		}
+	}
+	return -1
+}
+
+func isTMethodCall(expr ast.Expr) bool {
+	call, ok := expr.(*ast.CallExpr)
+	if !ok || len(call.Args) != 0 {
+		return false
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	return ok && sel.Sel.Name == "T"
+}
+
+func isCleanupCall(call *ast.CallExpr, tVars map[string]bool) bool {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != "Cleanup" {
+		return false
+	}
+	if innerCall, ok := sel.X.(*ast.CallExpr); ok && isTMethodCall(innerCall) {
+		return true
+	}
+	if id, ok := sel.X.(*ast.Ident); ok && tVars[id.Name] {
+		return true
+	}
+	return false
 }
 
 func checkOrphanedFiles(pass *analysis.Pass) {

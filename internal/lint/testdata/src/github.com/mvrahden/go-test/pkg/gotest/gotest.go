@@ -1,6 +1,9 @@
 package gotest
 
-import "time"
+import (
+	"testing"
+	"time"
+)
 
 type R struct{}
 
@@ -14,6 +17,7 @@ type T struct{}
 
 func (t *T) Errorf(string, ...any) {}
 func (t *T) FailNow()              {}
+func (t *T) T() *testing.T         { return nil }
 
 type testingT interface {
 	Errorf(format string, args ...any)
