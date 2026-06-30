@@ -126,7 +126,7 @@ func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 	t.When("merging profiles", func(w *gotest.T) {
 		w.When("two profiles with overlapping blocks", func(w2 *gotest.T) {
 			w2.It("merges and sorts with max-count aggregation", func(it *gotest.T) {
-				dir := it.T().TempDir()
+				dir := it.TempDir()
 
 				writeProfile := func(name, content string) string {
 					p := filepath.Join(dir, name)
@@ -161,7 +161,7 @@ func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 
 		w.When("profile A has uncovered block not in profile B", func(w2 *gotest.T) {
 			w2.It("preserves uncovered blocks with count 0", func(it *gotest.T) {
-				dir := it.T().TempDir()
+				dir := it.TempDir()
 
 				writeProfile := func(name, content string) string {
 					p := filepath.Join(dir, name)
@@ -188,7 +188,7 @@ func (s *GotestrunnerTestSuite) TestCoverProfile(t *gotest.T) {
 
 		w.When("one profile is missing", func(w2 *gotest.T) {
 			w2.It("skips the missing file", func(it *gotest.T) {
-				dir := it.T().TempDir()
+				dir := it.TempDir()
 				p := filepath.Join(dir, "exists.out")
 				_ = os.WriteFile(p, []byte("mode: set\nfoo.go:1.2,3.4 1 1\n"), 0o600)
 
@@ -395,8 +395,8 @@ func (s *GotestrunnerTestSuite) TestOverlayCache(t *gotest.T) {
 
 	t.When("cache root resolution", func(w *gotest.T) {
 		w.It("respects GOTEST_CACHE_DIR env var", func(it *gotest.T) {
-			dir := it.T().TempDir()
-			it.T().Setenv(protocol.EnvCacheDir, dir)
+			dir := it.TempDir()
+			it.Setenv(protocol.EnvCacheDir, dir)
 
 			root, err := gotestrunner.ExportCacheRoot()
 			gotest.NoError(it, err)
@@ -404,7 +404,7 @@ func (s *GotestrunnerTestSuite) TestOverlayCache(t *gotest.T) {
 		})
 
 		w.It("falls back to UserCacheDir/gotest when env is unset", func(it *gotest.T) {
-			it.T().Setenv(protocol.EnvCacheDir, "")
+			it.Setenv(protocol.EnvCacheDir, "")
 
 			root, err := gotestrunner.ExportCacheRoot()
 			gotest.NoError(it, err)
@@ -415,8 +415,8 @@ func (s *GotestrunnerTestSuite) TestOverlayCache(t *gotest.T) {
 
 	t.When("writing to cache", func(w *gotest.T) {
 		w.It("creates valid overlay in cache directory", func(it *gotest.T) {
-			cacheDir := it.T().TempDir()
-			it.T().Setenv(protocol.EnvCacheDir, cacheDir)
+			cacheDir := it.TempDir()
+			it.Setenv(protocol.EnvCacheDir, cacheDir)
 
 			results := gotestgen.GenerateResults{
 				{AbsPath: "/fake/pkg/m", PTest: []byte("package m\n"), PXTest: []byte("package m_test\n")},
@@ -447,8 +447,8 @@ func (s *GotestrunnerTestSuite) TestOverlayCache(t *gotest.T) {
 		})
 
 		w.It("returns same directory on repeated calls (cache hit)", func(it *gotest.T) {
-			cacheDir := it.T().TempDir()
-			it.T().Setenv(protocol.EnvCacheDir, cacheDir)
+			cacheDir := it.TempDir()
+			it.Setenv(protocol.EnvCacheDir, cacheDir)
 
 			results := gotestgen.GenerateResults{
 				{AbsPath: "/fake/pkg/r", PTest: []byte("package r\n")},
@@ -464,8 +464,8 @@ func (s *GotestrunnerTestSuite) TestOverlayCache(t *gotest.T) {
 		})
 
 		w.It("falls back to tmpdir when noCache is true", func(it *gotest.T) {
-			cacheDir := it.T().TempDir()
-			it.T().Setenv(protocol.EnvCacheDir, cacheDir)
+			cacheDir := it.TempDir()
+			it.Setenv(protocol.EnvCacheDir, cacheDir)
 
 			results := gotestgen.GenerateResults{
 				{AbsPath: "/fake/pkg/nc", PTest: []byte("package nc\n")},
@@ -482,8 +482,8 @@ func (s *GotestrunnerTestSuite) TestOverlayCache(t *gotest.T) {
 
 	t.When("cleaning old cache entries", func(w *gotest.T) {
 		w.It("removes entries older than 7 days", func(it *gotest.T) {
-			cacheDir := it.T().TempDir()
-			it.T().Setenv(protocol.EnvCacheDir, cacheDir)
+			cacheDir := it.TempDir()
+			it.Setenv(protocol.EnvCacheDir, cacheDir)
 
 			overlaysDir := filepath.Join(cacheDir, "overlays")
 			_ = os.MkdirAll(overlaysDir, 0755)
@@ -780,7 +780,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 
 			goPath, err := exec.LookPath("go")
 			if err != nil {
-				it.T().Skip("go not in PATH")
+				it.Skipf("go not in PATH")
 			}
 			gotest.Equal(it, goPath, cmd.Path)
 		})
@@ -1578,31 +1578,31 @@ func (s *GotestrunnerTestSuite) TestResolveSetupTimeout(t *gotest.T) {
 func (s *GotestrunnerTestSuite) TestCIAutoDetection(t *gotest.T) {
 	t.When("auto-detecting CI from environment", func(w *gotest.T) {
 		w.It("sets CI when CI=true and GOTEST_CI is unset", func(it *gotest.T) {
-			it.T().Setenv("CI", "true")
-			it.T().Setenv(protocol.EnvCI, "")
+			it.Setenv("CI", "true")
+			it.Setenv(protocol.EnvCI, "")
 
 			cfg := gotestrunner.ExportAutoDetectCI(gotestrunner.PipelineConfig{})
 			gotest.True(it, cfg.CI)
 		})
 
 		w.It("does not override explicit --ci flag", func(it *gotest.T) {
-			it.T().Setenv("CI", "")
+			it.Setenv("CI", "")
 
 			cfg := gotestrunner.ExportAutoDetectCI(gotestrunner.PipelineConfig{CI: true})
 			gotest.True(it, cfg.CI)
 		})
 
 		w.It("respects GOTEST_CI=0 opt-out", func(it *gotest.T) {
-			it.T().Setenv("CI", "true")
-			it.T().Setenv(protocol.EnvCI, "0")
+			it.Setenv("CI", "true")
+			it.Setenv(protocol.EnvCI, "0")
 
 			cfg := gotestrunner.ExportAutoDetectCI(gotestrunner.PipelineConfig{})
 			gotest.False(it, cfg.CI)
 		})
 
 		w.It("stays off when neither CI nor GOTEST_CI is set", func(it *gotest.T) {
-			it.T().Setenv("CI", "")
-			it.T().Setenv(protocol.EnvCI, "")
+			it.Setenv("CI", "")
+			it.Setenv(protocol.EnvCI, "")
 
 			cfg := gotestrunner.ExportAutoDetectCI(gotestrunner.PipelineConfig{})
 			gotest.False(it, cfg.CI)
@@ -1622,8 +1622,8 @@ func (s *GotestrunnerTestSuite) TestCIAutoDetection(t *gotest.T) {
 		})
 
 		w.It("appends GOTEST_CI to base env when CI is true", func(it *gotest.T) {
-			it.T().Setenv("CI", "")
-			it.T().Setenv(protocol.EnvCI, "")
+			it.Setenv("CI", "")
+			it.Setenv(protocol.EnvCI, "")
 
 			env := gotestrunner.ExportBuildBaseEnv(gotestrunner.PipelineConfig{CI: true})
 			found := false
@@ -1668,7 +1668,7 @@ func (s *GotestrunnerTestSuite) TestSharedFixtureProcess(t *gotest.T) {
 
 	t.When("WriteStateFileForKeys", func(w *gotest.T) {
 		w.It("writes subset of state to file", func(it *gotest.T) {
-			tmpDir := it.T().TempDir()
+			tmpDir := it.TempDir()
 			proc := gotestrunner.ExportNewSharedFixtureProcess(tmpDir, map[string]json.RawMessage{
 				"pkg.Alpha": json.RawMessage(`{"Value":"a"}`),
 				"pkg.Beta":  json.RawMessage(`{"Value":"b"}`),

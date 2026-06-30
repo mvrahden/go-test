@@ -449,7 +449,7 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 			it.T().Fatal(err)
 		}
 		if _, err := os.Stat(filepath.Join(absExamples, "go.mod")); err != nil {
-			it.T().Skipf("examples directory not found: %v", err)
+			it.Skipf("examples directory not found: %v", err)
 		}
 
 		loadResults, err := gotestgen.LoadPackages([]string{filepath.Join(absExamples, "cart")}, nil)
@@ -593,7 +593,7 @@ func (s *CmdGotestTestSuite) TestGenerateOverlay(t *gotest.T) {
 				it.T().Fatal(err)
 			}
 			if _, err := os.Stat(filepath.Join(absExamples, "go.mod")); err != nil {
-				it.T().Skipf("examples directory not found: %v", err)
+				it.Skipf("examples directory not found: %v", err)
 			}
 
 			loaded, err := gotestgen.LoadPackages([]string{filepath.Join(absExamples, "cart")}, nil)
@@ -660,7 +660,7 @@ func (s *CmdGotestTestSuite) TestGenerateOverlay(t *gotest.T) {
 			var allResults gotestgen.GenerateResults
 			allResults = append(allResults, results...)
 			if len(allResults) != 0 {
-				it.T().Skipf("expected 0 results for package without suites, got %d (package may have test suites)", len(allResults))
+				it.Skipf("expected 0 results for package without suites, got %d (package may have test suites)", len(allResults))
 			}
 		})
 	})
@@ -749,7 +749,7 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 			it.T().Fatal(err)
 		}
 		if _, err := os.Stat(filepath.Join(absExamples, "go.mod")); err != nil {
-			it.T().Skipf("examples directory not found: %v", err)
+			it.Skipf("examples directory not found: %v", err)
 		}
 
 		loaded, err := gotestgen.LoadPackages([]string{filepath.Join(absExamples, "cart")}, nil)

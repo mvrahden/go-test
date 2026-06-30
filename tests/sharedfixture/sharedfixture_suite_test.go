@@ -20,7 +20,13 @@ import (
 
 // SharedFixtureIntegrationTestSuite tests shared fixture lifecycle integration
 // with real package loading, code generation, and binary execution.
-type SharedFixtureIntegrationTestSuite struct{}
+type SharedFixtureIntegrationTestSuite struct{ tmpDir string }
+
+func (s *SharedFixtureIntegrationTestSuite) AfterEach(_ *gotest.T) {
+	if s.tmpDir != "" {
+		os.RemoveAll(s.tmpDir)
+	}
+}
 
 func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gotest.T) {
 	standalonePattern := "github.com/mvrahden/go-test/tests/sharedfixture/standalone/..."
@@ -67,15 +73,14 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 		})
 	})
 
-	tmpDir, err := gotestrunner.WriteOverlay(allResults)
+	s.tmpDir, err = gotestrunner.WriteOverlay(allResults)
 	gotest.NoError(t, err)
-	t.T().Cleanup(func() { os.RemoveAll(tmpDir) })
 
 	t.When("SetupSubprocess", func(w *gotest.T) {
 		setupSrc, err := gotestgen.GenerateSharedSetup(allSharedFixtures)
 		gotest.NoError(w, err)
 
-		sharedDir := filepath.Join(tmpDir, "shared")
+		sharedDir := filepath.Join(s.tmpDir, "shared")
 		gotest.NoError(w, os.MkdirAll(sharedDir, 0755))
 		setupFile := filepath.Join(sharedDir, "setup.go")
 		gotest.NoError(w, os.WriteFile(setupFile, setupSrc, 0600))
@@ -171,7 +176,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 		})
 
 		w.It("RunTests", func(it *gotest.T) {
-			overlayFlag := "-overlay=" + filepath.Join(tmpDir, "overlay.json")
+			overlayFlag := "-overlay=" + filepath.Join(s.tmpDir, "overlay.json")
 			goTestArgs := []string{
 				overlayFlag, "-v",
 				standalonePattern,
@@ -187,7 +192,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 		})
 
 		w.It("RunSpecJSON", func(it *gotest.T) {
-			overlayFlag := "-overlay=" + filepath.Join(tmpDir, "overlay.json")
+			overlayFlag := "-overlay=" + filepath.Join(s.tmpDir, "overlay.json")
 			goTestArgs := []string{
 				overlayFlag,
 				standalonePattern,

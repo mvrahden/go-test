@@ -153,7 +153,7 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupTermination(t *gotest.T) 
 			err = syscall.Kill(pid, 0)
 			if err == nil {
 				_ = syscall.Kill(-pid, syscall.SIGKILL)
-				it.T().Errorf("process %d still alive after WaitDelay force-kill", pid)
+				it.Errorf("process %d still alive after WaitDelay force-kill", pid)
 			}
 		})
 	})
@@ -204,7 +204,7 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupTermination(t *gotest.T) 
 			err = proc.Signal(syscall.Signal(0))
 			if err == nil {
 				_ = proc.Kill()
-				it.T().Errorf("grandchild process %d is still alive after context cancellation", childPID)
+				it.Errorf("grandchild process %d is still alive after context cancellation", childPID)
 			}
 		})
 	})

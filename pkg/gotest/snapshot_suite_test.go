@@ -14,12 +14,17 @@ import (
 )
 
 // SnapshotGroupingTestSuite tests grouped snapshot file creation with per-subtest sections.
-type SnapshotGroupingTestSuite struct{}
+type SnapshotGroupingTestSuite struct{ snapPath string }
+
+func (s *SnapshotGroupingTestSuite) BeforeEach(_ *gotest.T) {
+	s.snapPath = filepath.Join("testdata", "__snapshots__", "TestSnapshotGroupingTestSuite_ext.snap")
+}
+
+func (s *SnapshotGroupingTestSuite) AfterEach(_ *gotest.T) { os.Remove(s.snapPath) }
 
 func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
-	t.T().Setenv(protocol.EnvCI, "0")
+	t.Setenv(protocol.EnvCI, "0")
 	snapDir := filepath.Join("testdata", "__snapshots__")
-	t.T().Cleanup(func() { os.Remove(filepath.Join(snapDir, "TestSnapshotGroupingTestSuite_ext.snap")) })
 
 	t.When("subtests write snapshots", func(w *gotest.T) {
 		w.It("creates a file with named sections per subtest", func(it *gotest.T) {
@@ -71,12 +76,16 @@ func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
 }
 
 // SnapshotConcurrencyTestSuite tests concurrent snapshot writes from parallel subtests.
-type SnapshotConcurrencyTestSuite struct{}
+type SnapshotConcurrencyTestSuite struct{ snapPath string }
+
+func (s *SnapshotConcurrencyTestSuite) BeforeEach(_ *gotest.T) {
+	s.snapPath = filepath.Join("testdata", "__snapshots__", "TestSnapshotConcurrencyTestSuite_ext.snap")
+}
+
+func (s *SnapshotConcurrencyTestSuite) AfterEach(_ *gotest.T) { os.Remove(s.snapPath) }
 
 func (s *SnapshotConcurrencyTestSuite) TestMatchSnapshotConcurrency(t *gotest.T) {
-	t.T().Setenv(protocol.EnvCI, "0")
-	snapDir := filepath.Join("testdata", "__snapshots__")
-	t.T().Cleanup(func() { os.Remove(filepath.Join(snapDir, "TestSnapshotConcurrencyTestSuite_ext.snap")) })
+	t.Setenv(protocol.EnvCI, "0")
 
 	t.When("multiple goroutines write concurrently", func(w *gotest.T) {
 		for i := range 10 {
@@ -89,12 +98,17 @@ func (s *SnapshotConcurrencyTestSuite) TestMatchSnapshotConcurrency(t *gotest.T)
 }
 
 // SnapshotUpdateTestSuite tests snapshot update mode via GOTEST_UPDATE_SNAPSHOTS.
-type SnapshotUpdateTestSuite struct{}
+type SnapshotUpdateTestSuite struct{ snapPath string }
+
+func (s *SnapshotUpdateTestSuite) BeforeEach(_ *gotest.T) {
+	s.snapPath = filepath.Join("testdata", "__snapshots__", "TestSnapshotUpdateTestSuite_ext.snap")
+}
+
+func (s *SnapshotUpdateTestSuite) AfterEach(_ *gotest.T) { os.Remove(s.snapPath) }
 
 func (s *SnapshotUpdateTestSuite) TestMatchSnapshotUpdate(t *gotest.T) {
-	t.T().Setenv(protocol.EnvCI, "0")
+	t.Setenv(protocol.EnvCI, "0")
 	snapDir := filepath.Join("testdata", "__snapshots__")
-	t.T().Cleanup(func() { os.Remove(filepath.Join(snapDir, "TestSnapshotUpdateTestSuite_ext.snap")) })
 
 	t.When("GOTEST_UPDATE_SNAPSHOTS is set", func(w *gotest.T) {
 		w.It("replaces original content with updated content and removes the old value", func(it *gotest.T) {
@@ -105,7 +119,7 @@ func (s *SnapshotUpdateTestSuite) TestMatchSnapshotUpdate(t *gotest.T) {
 			gotest.NoError(it, err)
 			gotest.Contains(it, string(data), "original-value")
 
-			it.T().Setenv(protocol.EnvUpdateSnapshots, "1")
+			it.Setenv(protocol.EnvUpdateSnapshots, "1")
 			gotest.MatchSnapshot(it, "updated-value")
 
 			data, err = os.ReadFile(snapPath)
@@ -132,12 +146,17 @@ func (m snapshotJSONMarshaler) MarshalJSON() ([]byte, error) { return json.Marsh
 type snapshotNamedString string
 
 // SnapshotTestSuite tests snapshot matching, custom naming, and value serialization.
-type SnapshotTestSuite struct{}
+type SnapshotTestSuite struct{ snapPath string }
+
+func (s *SnapshotTestSuite) BeforeEach(_ *gotest.T) {
+	s.snapPath = filepath.Join("testdata", "__snapshots__", "TestSnapshotTestSuite_ext.snap")
+}
+
+func (s *SnapshotTestSuite) AfterEach(_ *gotest.T) { os.Remove(s.snapPath) }
 
 func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
-	t.T().Setenv(protocol.EnvCI, "0")
+	t.Setenv(protocol.EnvCI, "0")
 	snapDir := filepath.Join("testdata", "__snapshots__")
-	t.T().Cleanup(func() { os.Remove(filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")) })
 
 	t.When("no snapshot exists", func(w *gotest.T) {
 		w.It("creates a grouped snapshot file on first run", func(it *gotest.T) {
@@ -172,7 +191,7 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 		w.It("overwrites the existing snapshot", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, "original")
 
-			it.T().Setenv(protocol.EnvUpdateSnapshots, "1")
+			it.Setenv(protocol.EnvUpdateSnapshots, "1")
 			gotest.MatchSnapshot(it, "updated")
 
 			snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")
@@ -185,11 +204,9 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 }
 
 func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
-	t.T().Setenv(protocol.EnvCI, "0")
+	t.Setenv(protocol.EnvCI, "0")
 	snapDir := filepath.Join("testdata", "__snapshots__")
-
 	snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")
-	t.T().Cleanup(func() { os.Remove(snapPath) })
 
 	t.When("value is a string", func(w *gotest.T) {
 		w.It("snapshots the string directly", func(it *gotest.T) {

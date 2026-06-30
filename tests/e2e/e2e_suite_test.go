@@ -33,7 +33,7 @@ func (s *E2ETestSuite) BeforeAll(t *gotest.T) {
 	absRoot, err := filepath.Abs("../..")
 	gotest.NoError(t, err)
 
-	binDir := t.T().TempDir()
+	binDir := t.TempDir()
 	binaryName := "gotest"
 	if runtime.GOOS == "windows" {
 		binaryName += ".exe"
@@ -44,7 +44,7 @@ func (s *E2ETestSuite) BeforeAll(t *gotest.T) {
 	out, err := cmd.CombinedOutput()
 	gotest.NoError(t, err, "build gotest binary: %s", string(out))
 
-	s.workDir = t.T().TempDir()
+	s.workDir = t.TempDir()
 	testutils.CopyModuleUnderTestToTmp(t.T(), s.workDir, "../..", testutils.DefaultExcludePaths...)
 	testutils.ActivateTests(t.T(), s.workDir)
 	testutils.HackGoWork(t.T(), s.workDir)
@@ -53,7 +53,7 @@ func (s *E2ETestSuite) BeforeAll(t *gotest.T) {
 func (s *E2ETestSuite) AfterAll(t *gotest.T) {}
 
 func (s *E2ETestSuite) TestT(t *gotest.T) {
-	tmp := t.T().TempDir()
+	tmp := t.TempDir()
 	excludedPaths := append(append([]string(nil), testutils.DefaultExcludePaths...),
 		"pkg/gotest/assertions_suite_test.go",
 		"pkg/gotest/config_suite_test.go",

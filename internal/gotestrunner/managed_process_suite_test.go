@@ -53,7 +53,7 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_ProcessExitsDuringGrace(t *g
 				os.Exit(0)
 			}
 
-			marker := filepath.Join(it.T().TempDir(), "started")
+			marker := filepath.Join(it.TempDir(), "started")
 
 			// Use a cancellable context for CommandContext so cmd.Cancel fires on cancel().
 			ctx, cancel := context.WithCancel(context.Background())
@@ -138,7 +138,7 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_GraceBudget(t *gotest.T) {
 				os.Exit(0)
 			}
 
-			budgetFile := filepath.Join(it.T().TempDir(), "budget")
+			budgetFile := filepath.Join(it.TempDir(), "budget")
 			_ = os.WriteFile(budgetFile, []byte("300ms"), 0600)
 
 			cmd := exec.CommandContext(context.Background(), os.Args[0], //nolint:gosec // G204: test-only subprocess
