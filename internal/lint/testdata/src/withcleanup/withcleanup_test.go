@@ -46,9 +46,10 @@ func (s *ResourceTestSuite) TestNoCleanup(t *gotest.T) {
 func (s *ResourceTestSuite) BeforeEach() {}
 func (s *ResourceTestSuite) AfterEach()  {}
 
-// Helper with *gotest.T — .T().Cleanup() caught by direct detection.
+// Helper with *gotest.T — not flagged directly; only call sites in suite
+// methods are flagged via interprocedural analysis.
 func helperGoTestT(t *gotest.T) { //nolint:unused
-	t.T().Cleanup(func() {}) // want `use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle`
+	t.T().Cleanup(func() {})
 }
 
 // Helper with *testing.T — .Cleanup() caught only via transitive analysis.
