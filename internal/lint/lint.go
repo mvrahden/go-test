@@ -336,24 +336,23 @@ func checkLifecyclePairs(pass *analysis.Pass, suites map[string]*suiteInfo) {
 // --- t-escape and suite rule detection ---
 
 type escapeConfig struct {
-	rule        Rule
-	message     string
-	suiteOnly   bool
-	skipClosure bool
-	canAutofix  bool
+	rule       Rule
+	message    string
+	suiteOnly  bool
+	canAutofix bool
 }
 
 var escapeConfigs = map[string]escapeConfig{
-	"Errorf":   {TEscape, "Errorf is available on gotest.T — unnecessary T escape", false, false, true},
-	"FailNow":  {TEscape, "FailNow is available on gotest.T — unnecessary T escape", false, false, true},
-	"Skipf":    {TEscape, "Skipf is available on gotest.T — unnecessary T escape", false, false, true},
-	"Setenv":   {TEscape, "Setenv is available on gotest.T — unnecessary T escape", false, false, true},
-	"TempDir":  {TEscape, "TempDir is available on gotest.T — unnecessary T escape", false, false, true},
-	"Skip":     {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
-	"SkipNow":  {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
-	"Cleanup":  {TEscape, "use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle", true, false, false},
-	"Parallel": {TEscape, "use SuiteConfig.Parallel instead — T.Parallel bypasses suite lifecycle coordination", true, true, false},
-	"Run":      {TEscape, "use It or When instead — T.Run bypasses gotest wrapping", true, true, false},
+	"Errorf":   {TEscape, "Errorf is available on gotest.T — unnecessary T escape", false, true},
+	"FailNow":  {TEscape, "FailNow is available on gotest.T — unnecessary T escape", false, true},
+	"Skipf":    {TEscape, "Skipf is available on gotest.T — unnecessary T escape", false, true},
+	"Setenv":   {TEscape, "Setenv is available on gotest.T — unnecessary T escape", false, true},
+	"TempDir":  {TEscape, "TempDir is available on gotest.T — unnecessary T escape", false, true},
+	"Skip":     {TEscape, "must use Skipf instead — unnecessary T escape", false, false},
+	"SkipNow":  {TEscape, "must use Skipf instead — unnecessary T escape", false, false},
+	"Cleanup":  {TEscape, "use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle", true, false},
+	"Parallel": {TEscape, "use SuiteConfig.Parallel instead — T.Parallel bypasses suite lifecycle coordination", true, false},
+	"Run":      {TEscape, "use It or When instead — T.Run bypasses gotest wrapping", true, false},
 }
 
 var gotestAssertionFuncs = map[string]bool{
@@ -404,30 +403,14 @@ func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 			}
 		}
 
-		closureDepth := 0
-		var stack []ast.Node
-
 		ast.Inspect(fd.Body, func(n ast.Node) bool {
-			if n == nil {
-				top := stack[len(stack)-1]
-				stack = stack[:len(stack)-1]
-				if _, ok := top.(*ast.FuncLit); ok {
-					closureDepth--
-				}
-				return false
-			}
-			stack = append(stack, n)
-			if _, ok := n.(*ast.FuncLit); ok {
-				closureDepth++
-			}
-
 			switch node := n.(type) {
 			case *ast.AssignStmt:
 				trackTVarAssign(node, tVars, gotestTVars)
 			case *ast.CallExpr:
-				reportDirectEscape(pass, node, isSuiteMethod, closureDepth, tVars, reported)
+				reportDirectEscape(pass, node, isSuiteMethod, tVars, reported)
 				if isSuiteMethod {
-					collectInterproceduralEscape(node, closureDepth, tVars, gotestTVars, mr, &deferred)
+					collectInterproceduralEscape(node, tVars, gotestTVars, mr, &deferred)
 				}
 			}
 			return true
@@ -466,14 +449,14 @@ func trackTVarAssign(assign *ast.AssignStmt, tVars, gotestTVars map[string]bool)
 	}
 }
 
-func reportDirectEscape(pass *analysis.Pass, call *ast.CallExpr, isSuiteMethod bool, closureDepth int, tVars map[string]bool, reported map[token.Pos]bool) {
+func reportDirectEscape(pass *analysis.Pass, call *ast.CallExpr, isSuiteMethod bool, tVars map[string]bool, reported map[token.Pos]bool) {
 	sel, _ := call.Fun.(*ast.SelectorExpr)
 	if sel == nil {
 		return
 	}
 
 	if esc, ok := escapeConfigs[sel.Sel.Name]; ok {
-		if (!esc.suiteOnly || isSuiteMethod) && (!esc.skipClosure || closureDepth == 0) {
+		if !esc.suiteOnly || isSuiteMethod {
 			isDirect := isTMethodCall(sel.X)
 			isAlias := false
 			if !isDirect {
@@ -530,13 +513,10 @@ func reportDirectEscape(pass *analysis.Pass, call *ast.CallExpr, isSuiteMethod b
 	}
 }
 
-func collectInterproceduralEscape(call *ast.CallExpr, closureDepth int, tVars, gotestTVars map[string]bool, mr *methodReach, results *[]deferredReport) {
+func collectInterproceduralEscape(call *ast.CallExpr, tVars, gotestTVars map[string]bool, mr *methodReach, results *[]deferredReport) {
 	methods := mr.reachedMethods(call, tVars, gotestTVars)
 	for method, positions := range methods {
 		esc := escapeConfigs[method]
-		if esc.skipClosure && closureDepth > 0 {
-			continue
-		}
 		for pos := range positions {
 			*results = append(*results, deferredReport{esc.rule, pos, esc.message})
 		}

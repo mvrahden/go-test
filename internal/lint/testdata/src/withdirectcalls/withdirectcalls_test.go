@@ -26,17 +26,15 @@ func (s *DirectCallTestSuite) TestRunIndirect(t *gotest.T) {
 	tt.Run("sub", func(st *testing.T) {}) // want `use It or When instead — T.Run bypasses gotest wrapping`
 }
 
-// Parallel inside closure is OK — scoped to subtest
 func (s *DirectCallTestSuite) TestParallelInClosure(t *gotest.T) {
 	_ = func() {
-		t.T().Parallel()
+		t.T().Parallel() // want `use SuiteConfig.Parallel instead — T.Parallel bypasses suite lifecycle coordination`
 	}
 }
 
-// Run inside closure is OK — likely inside It/When callback
 func (s *DirectCallTestSuite) TestRunInClosure(t *gotest.T) {
 	_ = func() {
-		t.T().Run("sub", func(st *testing.T) {})
+		t.T().Run("sub", func(st *testing.T) {}) // want `use It or When instead — T.Run bypasses gotest wrapping`
 	}
 }
 
@@ -138,5 +136,5 @@ func (h *parallelHelper) doParallel(t *testing.T) {
 }
 
 func helperParallelClosureOnly(t *testing.T) {
-	t.Parallel()
+	t.Parallel() // want `use SuiteConfig.Parallel instead — T.Parallel bypasses suite lifecycle coordination`
 }
