@@ -349,8 +349,8 @@ var escapeConfigs = map[string]escapeConfig{
 	"Skipf":    {TEscape, "Skipf is available on gotest.T — unnecessary T escape", false, false, true},
 	"Setenv":   {TEscape, "Setenv is available on gotest.T — unnecessary T escape", false, false, true},
 	"TempDir":  {TEscape, "TempDir is available on gotest.T — unnecessary T escape", false, false, true},
-	"Skip":     {TEscape, "Skipf is available on gotest.T — unnecessary T escape", false, false, false},
-	"SkipNow":  {TEscape, "Skipf is available on gotest.T — unnecessary T escape", false, false, false},
+	"Skip":     {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
+	"SkipNow":  {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
 	"Cleanup":  {TEscape, "use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle", true, false, false},
 	"Parallel": {TEscape, "use SuiteConfig.Parallel instead — T.Parallel bypasses suite lifecycle coordination", true, true, false},
 	"Run":      {TEscape, "use It or When instead — T.Run bypasses gotest wrapping", true, true, false},
@@ -370,8 +370,16 @@ var gotestAssertionFuncs = map[string]bool{
 	"Eventually": true, "Consistently": true,
 }
 
+type deferredReport struct {
+	rule    Rule
+	pos     token.Pos
+	message string
+}
+
 func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo) {
 	mr := buildMethodReach(pass, insp, 5)
+	reported := map[token.Pos]bool{}
+	var deferred []deferredReport
 
 	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
 		fd := n.(*ast.FuncDecl)
@@ -381,15 +389,18 @@ func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 
 		isSuiteMethod := false
 		if fd.Recv != nil && len(fd.Recv.List) > 0 {
-			recvName := receiverTypeName(fd.Recv)
-			_, isSuiteMethod = suites[recvName]
+			_, isSuiteMethod = suites[receiverTypeName(fd.Recv)]
 		}
 
 		tVars := map[string]bool{}
 		gotestTVars := map[string]bool{}
-		if isSuiteMethod && fd.Type.Params != nil && len(fd.Type.Params.List) > 0 {
-			for _, name := range fd.Type.Params.List[0].Names {
-				gotestTVars[name.Name] = true
+		if isSuiteMethod && fd.Type.Params != nil {
+			for _, field := range fd.Type.Params.List {
+				if isGotestTType(pass, field) {
+					for _, name := range field.Names {
+						gotestTVars[name.Name] = true
+					}
+				}
 			}
 		}
 
@@ -414,11 +425,21 @@ func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 			case *ast.AssignStmt:
 				trackTVarAssign(node, tVars, gotestTVars)
 			case *ast.CallExpr:
-				reportEscape(pass, node, isSuiteMethod, closureDepth, tVars, gotestTVars, mr)
+				reportDirectEscape(pass, node, isSuiteMethod, closureDepth, tVars, reported)
+				if isSuiteMethod {
+					collectInterproceduralEscape(node, closureDepth, tVars, gotestTVars, mr, &deferred)
+				}
 			}
 			return true
 		})
 	})
+
+	for _, d := range deferred {
+		if !reported[d.pos] {
+			reported[d.pos] = true
+			report(pass, d.rule, d.pos, "%s", d.message)
+		}
+	}
 }
 
 func trackTVarAssign(assign *ast.AssignStmt, tVars, gotestTVars map[string]bool) {
@@ -445,84 +466,84 @@ func trackTVarAssign(assign *ast.AssignStmt, tVars, gotestTVars map[string]bool)
 	}
 }
 
-func reportEscape(pass *analysis.Pass, call *ast.CallExpr, isSuiteMethod bool, closureDepth int, tVars, gotestTVars map[string]bool, mr *methodReach) {
+func reportDirectEscape(pass *analysis.Pass, call *ast.CallExpr, isSuiteMethod bool, closureDepth int, tVars map[string]bool, reported map[token.Pos]bool) {
 	sel, _ := call.Fun.(*ast.SelectorExpr)
+	if sel == nil {
+		return
+	}
 
-	if sel != nil {
-		if cfg, ok := escapeConfigs[sel.Sel.Name]; ok {
-			if (!cfg.suiteOnly || isSuiteMethod) && (!cfg.skipClosure || closureDepth == 0) {
-				isDirect := isTMethodCall(sel.X)
-				isAlias := false
-				if !isDirect {
-					if id, ok := sel.X.(*ast.Ident); ok && tVars[id.Name] {
-						isAlias = true
-					}
+	if esc, ok := escapeConfigs[sel.Sel.Name]; ok {
+		if (!esc.suiteOnly || isSuiteMethod) && (!esc.skipClosure || closureDepth == 0) {
+			isDirect := isTMethodCall(sel.X)
+			isAlias := false
+			if !isDirect {
+				if id, ok := sel.X.(*ast.Ident); ok && tVars[id.Name] {
+					isAlias = true
 				}
-				if isDirect || isAlias {
-					if cfg.canAutofix && isDirect {
-						inner := sel.X.(*ast.CallExpr)
-						innerSel := inner.Fun.(*ast.SelectorExpr)
-						reportWithFix(pass, cfg.rule, call.Pos(),
-							[]analysis.SuggestedFix{{
-								Message: fmt.Sprintf("call %s directly", sel.Sel.Name),
-								TextEdits: []analysis.TextEdit{{
-									Pos:     innerSel.X.End(),
-									End:     inner.End(),
-									NewText: []byte(""),
-								}},
+			}
+			if isDirect || isAlias {
+				reported[call.Pos()] = true
+				if esc.canAutofix && isDirect {
+					inner := sel.X.(*ast.CallExpr)
+					innerSel := inner.Fun.(*ast.SelectorExpr)
+					reportWithFix(pass, esc.rule, call.Pos(),
+						[]analysis.SuggestedFix{{
+							Message: fmt.Sprintf("call %s directly", sel.Sel.Name),
+							TextEdits: []analysis.TextEdit{{
+								Pos:     innerSel.X.End(),
+								End:     inner.End(),
+								NewText: []byte(""),
 							}},
-							"%s", cfg.message)
-					} else {
-						report(pass, cfg.rule, call.Pos(), "%s", cfg.message)
-					}
-					return
-				}
-			}
-		}
-
-		if gotestAssertionFuncs[sel.Sel.Name] && isGotestPkgRef(pass, sel.X) && len(call.Args) > 0 {
-			arg := call.Args[0]
-			if inner, ok := arg.(*ast.CallExpr); ok && isTMethodCall(inner) {
-				innerSel := inner.Fun.(*ast.SelectorExpr)
-				reportWithFix(pass, TEscape, inner.Pos(),
-					[]analysis.SuggestedFix{{
-						Message: "pass gotest.T directly",
-						TextEdits: []analysis.TextEdit{{
-							Pos:     innerSel.X.End(),
-							End:     inner.End(),
-							NewText: []byte(""),
 						}},
-					}},
-					"pass gotest.T directly to %s — unnecessary T escape", sel.Sel.Name)
-				return
-			}
-			if id, ok := arg.(*ast.Ident); ok && tVars[id.Name] {
-				report(pass, TEscape, arg.Pos(),
-					"pass gotest.T directly to %s — unnecessary T escape", sel.Sel.Name)
+						"%s", esc.message)
+				} else {
+					report(pass, esc.rule, call.Pos(), "%s", esc.message)
+				}
 				return
 			}
 		}
 	}
 
-	if isSuiteMethod {
-		methods := mr.reachedMethods(call, tVars, gotestTVars)
-		reported := map[Rule]bool{}
-		for method := range methods {
-			cfg := escapeConfigs[method]
-			if !cfg.suiteOnly {
-				continue
-			}
-			if cfg.skipClosure && closureDepth > 0 {
-				continue
-			}
-			if reported[cfg.rule] {
-				continue
-			}
-			reported[cfg.rule] = true
-			report(pass, cfg.rule, call.Pos(), "%s", cfg.message)
+	if gotestAssertionFuncs[sel.Sel.Name] && isGotestPkgRef(pass, sel.X) && len(call.Args) > 0 {
+		arg := call.Args[0]
+		if inner, ok := arg.(*ast.CallExpr); ok && isTMethodCall(inner) {
+			reported[inner.Pos()] = true
+			innerSel := inner.Fun.(*ast.SelectorExpr)
+			reportWithFix(pass, TEscape, inner.Pos(),
+				[]analysis.SuggestedFix{{
+					Message: "pass gotest.T directly",
+					TextEdits: []analysis.TextEdit{{
+						Pos:     innerSel.X.End(),
+						End:     inner.End(),
+						NewText: []byte(""),
+					}},
+				}},
+				"pass gotest.T directly to %s — unnecessary T escape", sel.Sel.Name)
+			return
+		}
+		if id, ok := arg.(*ast.Ident); ok && tVars[id.Name] {
+			reported[arg.Pos()] = true
+			report(pass, TEscape, arg.Pos(),
+				"pass gotest.T directly to %s — unnecessary T escape", sel.Sel.Name)
+			return
 		}
 	}
 }
+
+func collectInterproceduralEscape(call *ast.CallExpr, closureDepth int, tVars, gotestTVars map[string]bool, mr *methodReach, results *[]deferredReport) {
+	methods := mr.reachedMethods(call, tVars, gotestTVars)
+	for method, positions := range methods {
+		esc := escapeConfigs[method]
+		if esc.skipClosure && closureDepth > 0 {
+			continue
+		}
+		for pos := range positions {
+			*results = append(*results, deferredReport{esc.rule, pos, esc.message})
+		}
+	}
+}
+
+const gotestImportPath = "github.com/mvrahden/go-test/pkg/gotest"
 
 func isGotestPkgRef(pass *analysis.Pass, expr ast.Expr) bool {
 	id, ok := expr.(*ast.Ident)
@@ -537,24 +558,48 @@ func isGotestPkgRef(pass *analysis.Pass, expr ast.Expr) bool {
 	if !ok {
 		return false
 	}
-	return pkgName.Imported().Path() == "github.com/mvrahden/go-test/pkg/gotest"
+	return pkgName.Imported().Path() == gotestImportPath
+}
+
+func isGotestTType(pass *analysis.Pass, field *ast.Field) bool {
+	typ := pass.TypesInfo.TypeOf(field.Type)
+	if typ == nil {
+		return false
+	}
+	ptr, ok := typ.(*types.Pointer)
+	if !ok {
+		return false
+	}
+	named, ok := ptr.Elem().(*types.Named)
+	if !ok {
+		return false
+	}
+	obj := named.Obj()
+	return obj.Name() == "T" && obj.Pkg() != nil && obj.Pkg().Path() == gotestImportPath
 }
 
 // --- interprocedural method reachability ---
+
+type callEdge struct {
+	callee *ast.FuncDecl
+	args   map[int]int // call arg position → caller's param index
+}
 
 // methodReach tracks which function parameters transitively lead to calls
 // of flagged methods, enabling interprocedural detection across helper chains.
 type methodReach struct {
 	pass      *analysis.Pass
 	funcDecls map[types.Object]*ast.FuncDecl
-	params    map[*ast.FuncDecl]map[int]map[string]bool
+	params    map[*ast.FuncDecl]map[int]map[string]map[token.Pos]bool
+	edges     map[*ast.FuncDecl][]callEdge
 }
 
 func buildMethodReach(pass *analysis.Pass, insp *inspector.Inspector, maxDepth int) *methodReach {
 	mr := &methodReach{
 		pass:      pass,
 		funcDecls: map[types.Object]*ast.FuncDecl{},
-		params:    map[*ast.FuncDecl]map[int]map[string]bool{},
+		params:    map[*ast.FuncDecl]map[int]map[string]map[token.Pos]bool{},
+		edges:     map[*ast.FuncDecl][]callEdge{},
 	}
 
 	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
@@ -570,15 +615,8 @@ func buildMethodReach(pass *analysis.Pass, insp *inspector.Inspector, maxDepth i
 	for _, fd := range mr.funcDecls {
 		mr.scanDirect(fd)
 	}
-	for round := range maxDepth {
-		_ = round
-		changed := false
-		for _, fd := range mr.funcDecls {
-			if mr.propagate(fd) {
-				changed = true
-			}
-		}
-		if !changed {
+	for range maxDepth {
+		if !mr.propagate() {
 			break
 		}
 	}
@@ -586,17 +624,20 @@ func buildMethodReach(pass *analysis.Pass, insp *inspector.Inspector, maxDepth i
 	return mr
 }
 
-func (mr *methodReach) mark(fd *ast.FuncDecl, paramIdx int, method string) bool {
+func (mr *methodReach) mark(fd *ast.FuncDecl, paramIdx int, method string, pos token.Pos) bool {
 	if mr.params[fd] == nil {
-		mr.params[fd] = map[int]map[string]bool{}
+		mr.params[fd] = map[int]map[string]map[token.Pos]bool{}
 	}
 	if mr.params[fd][paramIdx] == nil {
-		mr.params[fd][paramIdx] = map[string]bool{}
+		mr.params[fd][paramIdx] = map[string]map[token.Pos]bool{}
 	}
-	if mr.params[fd][paramIdx][method] {
+	if mr.params[fd][paramIdx][method] == nil {
+		mr.params[fd][paramIdx][method] = map[token.Pos]bool{}
+	}
+	if mr.params[fd][paramIdx][method][pos] {
 		return false
 	}
-	mr.params[fd][paramIdx][method] = true
+	mr.params[fd][paramIdx][method][pos] = true
 	return true
 }
 
@@ -630,24 +671,33 @@ func (mr *methodReach) scanDirect(fd *ast.FuncDecl) {
 			trackParamFlow(node, aliases)
 		case *ast.CallExpr:
 			sel, ok := node.Fun.(*ast.SelectorExpr)
-			if !ok {
-				break
-			}
-			if _, ok := escapeConfigs[sel.Sel.Name]; !ok {
-				break
-			}
-			method := sel.Sel.Name
-			if id, ok := sel.X.(*ast.Ident); ok {
-				if idx, ok := aliases[id.Name]; ok {
-					mr.mark(fd, idx, method)
+			if ok {
+				if _, ok := escapeConfigs[sel.Sel.Name]; ok {
+					method := sel.Sel.Name
+					if id, ok := sel.X.(*ast.Ident); ok {
+						if idx, ok := aliases[id.Name]; ok {
+							mr.mark(fd, idx, method, node.Pos())
+						}
+					}
+					if isTMethodCall(sel.X) {
+						innerSel := sel.X.(*ast.CallExpr).Fun.(*ast.SelectorExpr)
+						if id, ok := innerSel.X.(*ast.Ident); ok {
+							if idx, ok := aliases[id.Name]; ok {
+								mr.mark(fd, idx, method, node.Pos())
+							}
+						}
+					}
 				}
 			}
-			if isTMethodCall(sel.X) {
-				innerSel := sel.X.(*ast.CallExpr).Fun.(*ast.SelectorExpr)
-				if id, ok := innerSel.X.(*ast.Ident); ok {
-					if idx, ok := aliases[id.Name]; ok {
-						mr.mark(fd, idx, method)
+			if callee := mr.resolveCallee(node); callee != nil {
+				edge := callEdge{callee: callee, args: map[int]int{}}
+				for argIdx, arg := range node.Args {
+					if idx := exprToParamIdx(arg, aliases); idx >= 0 {
+						edge.args[argIdx] = idx
 					}
+				}
+				if len(edge.args) > 0 {
+					mr.edges[fd] = append(mr.edges[fd], edge)
 				}
 			}
 		}
@@ -655,46 +705,29 @@ func (mr *methodReach) scanDirect(fd *ast.FuncDecl) {
 	})
 }
 
-func (mr *methodReach) propagate(fd *ast.FuncDecl) bool {
-	aliases := flattenParams(fd.Type.Params)
-	if len(aliases) == 0 {
-		return false
-	}
-
+func (mr *methodReach) propagate() bool {
 	changed := false
-	ast.Inspect(fd.Body, func(n ast.Node) bool {
-		switch node := n.(type) {
-		case *ast.AssignStmt:
-			trackParamFlow(node, aliases)
-		case *ast.CallExpr:
-			callee := mr.resolveCallee(node)
-			if callee == nil {
-				break
-			}
-			calleeReach := mr.params[callee]
+	for fd, edges := range mr.edges {
+		for _, edge := range edges {
+			calleeReach := mr.params[edge.callee]
 			if len(calleeReach) == 0 {
-				break
+				continue
 			}
-			for argIdx, arg := range node.Args {
-				methods := calleeReach[argIdx]
-				if len(methods) == 0 {
-					continue
-				}
-				if idx := exprToParamIdx(arg, aliases); idx >= 0 {
-					for method := range methods {
-						if mr.mark(fd, idx, method) {
+			for argIdx, callerParamIdx := range edge.args {
+				for method, positions := range calleeReach[argIdx] {
+					for pos := range positions {
+						if mr.mark(fd, callerParamIdx, method, pos) {
 							changed = true
 						}
 					}
 				}
 			}
 		}
-		return true
-	})
+	}
 	return changed
 }
 
-func (mr *methodReach) reachedMethods(call *ast.CallExpr, tVars, gotestTVars map[string]bool) map[string]bool {
+func (mr *methodReach) reachedMethods(call *ast.CallExpr, tVars, gotestTVars map[string]bool) map[string]map[token.Pos]bool {
 	callee := mr.resolveCallee(call)
 	if callee == nil {
 		return nil
@@ -703,7 +736,7 @@ func (mr *methodReach) reachedMethods(call *ast.CallExpr, tVars, gotestTVars map
 	if len(calleeReach) == 0 {
 		return nil
 	}
-	var methods map[string]bool
+	var methods map[string]map[token.Pos]bool
 	for argIdx, arg := range call.Args {
 		argMethods := calleeReach[argIdx]
 		if len(argMethods) == 0 {
@@ -717,10 +750,15 @@ func (mr *methodReach) reachedMethods(call *ast.CallExpr, tVars, gotestTVars map
 		}
 		if tainted {
 			if methods == nil {
-				methods = map[string]bool{}
+				methods = map[string]map[token.Pos]bool{}
 			}
-			for m := range argMethods {
-				methods[m] = true
+			for method, positions := range argMethods {
+				if methods[method] == nil {
+					methods[method] = map[token.Pos]bool{}
+				}
+				for pos := range positions {
+					methods[method][pos] = true
+				}
 			}
 		}
 	}
@@ -735,6 +773,10 @@ func flattenParams(params *ast.FieldList) map[string]int {
 	m := map[string]int{}
 	idx := 0
 	for _, field := range params.List {
+		if len(field.Names) == 0 {
+			idx++
+			continue
+		}
 		for _, name := range field.Names {
 			m[name.Name] = idx
 			idx++
