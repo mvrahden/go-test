@@ -1,5 +1,5 @@
-name: "Go Test Summary"
-description: "Run Go tests with failure-focused summary, GitHub annotations, and coverage reporting"
+name: "Go - Test Suites"
+description: "Run your test suites with a failure-focused summary, GitHub annotations, and coverage reporting"
 
 branding:
   icon: "check-circle"
