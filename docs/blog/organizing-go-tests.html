@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Organizing Go Tests Beyond func TestX | gotest blog</title>
+  <meta name="description" content="Go's testing simplicity is a feature. Until your project outgrows it. A look at flat test functions, table-driven tests, subtests, and suites, and how code generation changes the equation.">
+  <meta name="keywords" content="go test organization, golang test structure, go test suites, go testing best practices, testify alternative, go bdd, go test lifecycle">
+
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://mvrahden.github.io/go-test/blog/organizing-go-tests.html">
+  <meta property="og:title" content="Organizing Go Tests Beyond func TestX">
+  <meta property="og:description" content="Go's testing simplicity is a feature. Until your project outgrows it. A look at flat test functions, table-driven tests, subtests, and suites.">
+  <meta property="og:image" content="https://mvrahden.github.io/go-test/static/gopher.png">
+  <meta property="og:image:width" content="1024">
+  <meta property="og:image:height" content="572">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Organizing Go Tests Beyond func TestX">
+  <meta name="twitter:description" content="Go's testing simplicity is a feature. Until your project outgrows it. Flat functions, table tests, subtests, and suites, and what code generation changes.">
+  <meta name="twitter:image" content="https://mvrahden.github.io/go-test/static/gopher.png">
+
+  <link rel="icon" type="image/png" href="../static/logo.png">
+  <link rel="canonical" href="https://mvrahden.github.io/go-test/blog/organizing-go-tests.html">
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WHJ67Z1J0"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-7WHJ67Z1J0');
+  </script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "Organizing Go Tests Beyond func TestX",
+    "description": "Go's testing simplicity is a feature. Until your project outgrows it. A progression through flat functions, table-driven tests, subtests, and suites.",
+    "url": "https://mvrahden.github.io/go-test/blog/organizing-go-tests.html",
+    "datePublished": "2026-07-06",
+    "author": {
+      "@type": "Person",
+      "name": "Menno van Rahden",
+      "url": "https://github.com/mvrahden"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "gotest",
+      "url": "https://mvrahden.github.io/go-test/"
+    },
+    "isPartOf": {
+      "@type": "Blog",
+      "name": "gotest blog",
+      "url": "https://mvrahden.github.io/go-test/blog/"
+    },
+    "programmingLanguage": "Go"
+  }
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan: #00ADD8;
+      --cyan-dark: #007d9c;
+      --bg: #ffffff;
+      --bg-alt: #f6f8fa;
+      --bg-dark: #0d1117;
+      --bg-dark-alt: #161b22;
+      --text: #24292f;
+      --text-secondary: #656d76;
+      --text-on-dark: #e6edf3;
+      --text-dimmed: #8b949e;
+      --border: #d0d7de;
+      --green: #3fb950;
+      --amber: #d29922;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Liberation Mono', monospace;
+      --max-w: 740px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --bg-alt: #161b22;
+        --bg-dark: #010409;
+        --bg-dark-alt: #0d1117;
+        --text: #e6edf3;
+        --text-secondary: #8b949e;
+        --border: #30363d;
+      }
+    }
+
+    html { scroll-behavior: smooth; height: 100%; }
+
+    body {
+      font-family: var(--font-sans);
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .article { flex: 1; }
+
+    a { color: var(--cyan-dark); text-decoration: none; }
+    @media (prefers-color-scheme: dark) { a { color: var(--cyan); } }
+    a:hover { text-decoration: underline; }
+
+    /* ===== Nav ===== */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+    }
+    .nav-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 1.125rem;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .nav-brand:hover { text-decoration: none; }
+    .nav-brand img { width: 28px; height: 28px; border-radius: 50%; }
+    .nav-links { display: flex; gap: 1.25rem; font-size: 0.9rem; align-items: center; }
+    .nav-links a { color: var(--text-secondary); }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+    .nav-links .nav-ref {
+      padding: 0.25rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-weight: 600;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .nav-links .nav-ref:hover { background: var(--bg-alt); }
+    .nav-links .star-btn { font-size: 0.85rem; }
+    .star-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.15s;
+      font-size: 0.8rem;
+    }
+    .star-btn:hover { background: var(--bg-alt); text-decoration: none; }
+    .star-btn .star-icon { color: #e3b341; }
+    .star-count { font-weight: 400; color: var(--text-dimmed); }
+
+    /* ===== Article ===== */
+    .article {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .article-header {
+      padding: 3.5rem 0 2rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2.5rem;
+    }
+    .article-header .back {
+      display: inline-block;
+      font-size: 0.85rem;
+      color: var(--text-dimmed);
+      margin-bottom: 1.5rem;
+    }
+    .article-header .back:hover { color: var(--text-secondary); }
+    .article-header h1 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+    }
+    .article-header h1 code {
+      font-size: 0.85em;
+      font-weight: 700;
+      color: var(--cyan-dark);
+    }
+    @media (prefers-color-scheme: dark) {
+      .article-header h1 code { color: var(--cyan); }
+    }
+    .article-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--text-dimmed);
+    }
+    .article-meta .tag {
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    /* ===== Article Body ===== */
+    .article-body {
+      padding-bottom: 3rem;
+    }
+    .article-body p {
+      font-size: 1.1rem;
+      line-height: 1.75;
+      margin-bottom: 1.5rem;
+    }
+    .article-body h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-top: 3rem;
+      margin-bottom: 1rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .article-body h2:first-child {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+    .article-body h3 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+    }
+    .article-body ul, .article-body ol {
+      margin-bottom: 1.5rem;
+      padding-left: 1.5rem;
+    }
+    .article-body li {
+      font-size: 1.05rem;
+      line-height: 1.7;
+      margin-bottom: 0.4rem;
+    }
+    .article-body strong { font-weight: 600; }
+
+    .article-body code {
+      font-family: var(--font-mono);
+      font-size: 0.88em;
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+    }
+    @media (prefers-color-scheme: dark) {
+      .article-body code { background: var(--bg-alt); }
+    }
+
+    .article-body blockquote {
+      border-left: 3px solid var(--cyan);
+      padding: 0.75rem 1.25rem;
+      margin: 1.5rem 0;
+      background: var(--bg-alt);
+      border-radius: 0 6px 6px 0;
+    }
+    .article-body blockquote p {
+      font-size: 1.05rem;
+      margin-bottom: 0;
+      color: var(--text-secondary);
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #161b22;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      margin: 1.5rem 0;
+      overflow: hidden;
+    }
+    .code-label {
+      display: block;
+      padding: 0.5rem 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-dimmed);
+      border-bottom: 1px solid #30363d;
+      background: #1c2128;
+    }
+    .code-block pre {
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.65;
+      color: #e6edf3;
+    }
+    .code-block pre code {
+      font-family: inherit;
+      font-size: inherit;
+      padding: 0;
+      border: none;
+      background: none;
+      border-radius: 0;
+      color: inherit;
+    }
+
+    /* Minimal syntax hints */
+    .kw { color: #ff7b72; }
+    .fn { color: #d2a8ff; }
+    .str { color: #a5d6ff; }
+    .cm { color: #8b949e; }
+    .tp { color: #79c0ff; }
+
+    /* Terminal block (for spec output) */
+    .terminal {
+      margin: 1.5rem 0;
+      background: #161b22;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      overflow: hidden;
+    }
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      background: #1c2128;
+      border-bottom: 1px solid #30363d;
+    }
+    .terminal-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .terminal-dot.r { background: #f85149; }
+    .terminal-dot.y { background: #d29922; }
+    .terminal-dot.g { background: #3fb950; }
+    .terminal-title {
+      margin-left: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-dimmed);
+    }
+    .terminal-body {
+      padding: 1.25rem 1.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.7;
+      color: var(--text-on-dark);
+      overflow-x: auto;
+    }
+    .t-prompt { color: var(--text-dimmed); }
+    .t-cmd { color: var(--cyan); }
+    .t-suite { color: #f0f6fc; font-weight: 600; }
+    .t-test { color: #f0f6fc; font-weight: 600; }
+    .t-when { color: var(--text-dimmed); }
+    .t-pass { color: var(--green); }
+    .t-time { color: #484f58; }
+    .t-summary { color: var(--text-dimmed); border-top: 1px solid #21262d; display: block; padding-top: 0.75rem; margin-top: 0.5rem; }
+
+    /* Side-by-side comparison */
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    .compare .code-block { margin: 0; }
+    @media (max-width: 720px) {
+      .compare { grid-template-columns: 1fr; }
+    }
+
+    /* CTA section */
+    .cta {
+      margin: 2.5rem 0;
+      padding: 2rem;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      text-align: center;
+    }
+    .cta p {
+      margin-bottom: 1rem;
+    }
+    .cta .install-cmd {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+    .cta .install-cmd code {
+      white-space: nowrap;
+      color: var(--text);
+    }
+    .cta .install-cmd button {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.3rem 0.5rem;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .cta .install-cmd button:hover { background: var(--border); }
+    .cta-links {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+    }
+
+    /* ===== Footer ===== */
+    footer {
+      background: var(--bg-dark);
+      color: var(--text-dimmed);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--text-on-dark); }
+    footer a:hover { color: var(--cyan); }
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .footer-copy { color: #484f58; font-size: 0.8rem; }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 640px) {
+      .article-header h1 { font-size: 1.75rem; }
+      .article-body p { font-size: 1.05rem; }
+    }
+    @media (max-width: 480px) {
+      .nav-links { gap: 0.75rem; font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="nav-inner">
+      <a href="../" class="nav-brand">
+        <img src="../static/logo.png" alt="gotest logo" width="28" height="28">
+        gotest
+      </a>
+      <div class="nav-links">
+        <a href="./">Blog</a>
+        <a href="../reference.html" class="nav-ref">Reference</a>
+        <a href="https://github.com/mvrahden/go-test" class="star-btn"><span class="star-icon">&#9734;</span> Star<span class="star-count" id="star-count"></span></a>
+        <a href="https://pkg.go.dev/github.com/mvrahden/go-test">pkg.go.dev</a>
+        <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="article">
+    <header class="article-header">
+      <a href="./" class="back">&larr; All posts</a>
+      <h1>Organizing Go Tests Beyond <code>func TestX</code></h1>
+      <div class="article-meta">
+        <time datetime="2026-07-06">July 6, 2026</time>
+        <span>&middot;</span>
+        <span>10 min read</span>
+        <span class="tag">Patterns</span>
+      </div>
+    </header>
+
+    <div class="article-body">
+
+      <p>Go's testing package is deliberately simple. No annotations, no test classes, no dependency injection: just functions that start with <code>Test</code> and a <code>*testing.T</code>. This simplicity is one of Go's genuine strengths. But it creates a gap that every growing project eventually falls into.</p>
+
+      <p>This post walks through the progression most Go projects follow as their test suites grow: flat functions, table-driven tests, subtests, and suites. Each solves a real problem. Each leaves something on the table. Understanding that progression makes it easier to see where your own project sits, and what it might need next.</p>
+
+      <h2>Flat functions: where everyone starts</h2>
+
+      <p>A new Go project's test file usually looks like this:</p>
+
+      <div class="code-block">
+        <span class="code-label">user_service_test.go</span>
+        <pre><code><span class="kw">func</span> <span class="fn">TestCreateUser</span>(t *<span class="tp">testing.T</span>) {
+    db := setupTestDB(t)
+    err := db.CreateUser(User{Name: <span class="str">"Alice"</span>, Email: <span class="str">"alice@example.com"</span>})
+    <span class="kw">if</span> err != <span class="kw">nil</span> {
+        t.Fatalf(<span class="str">"expected no error, got %v"</span>, err)
+    }
+}
+
+<span class="kw">func</span> <span class="fn">TestCreateUserDuplicateEmail</span>(t *<span class="tp">testing.T</span>) {
+    db := setupTestDB(t)
+    db.CreateUser(User{Name: <span class="str">"Alice"</span>, Email: <span class="str">"alice@example.com"</span>})
+    err := db.CreateUser(User{Name: <span class="str">"Bob"</span>, Email: <span class="str">"alice@example.com"</span>})
+    <span class="kw">if</span> err == <span class="kw">nil</span> {
+        t.Fatal(<span class="str">"expected error for duplicate email"</span>)
+    }
+}
+
+<span class="kw">func</span> <span class="fn">TestGetUser</span>(t *<span class="tp">testing.T</span>) {
+    db := setupTestDB(t)
+    db.CreateUser(User{Name: <span class="str">"Alice"</span>, Email: <span class="str">"alice@example.com"</span>})
+    user, err := db.GetUser(<span class="str">"alice@example.com"</span>)
+    <span class="kw">if</span> err != <span class="kw">nil</span> {
+        t.Fatalf(<span class="str">"expected no error, got %v"</span>, err)
+    }
+    <span class="kw">if</span> user.Name != <span class="str">"Alice"</span> {
+        t.Errorf(<span class="str">"expected Alice, got %s"</span>, user.Name)
+    }
+}
+
+<span class="kw">func</span> <span class="fn">TestGetUserNotFound</span>(t *<span class="tp">testing.T</span>) {
+    db := setupTestDB(t)
+    _, err := db.GetUser(<span class="str">"nobody@example.com"</span>)
+    <span class="kw">if</span> err == <span class="kw">nil</span> {
+        t.Fatal(<span class="str">"expected error for missing user"</span>)
+    }
+}
+
+<span class="kw">func</span> <span class="fn">TestDeleteUser</span>(t *<span class="tp">testing.T</span>) {
+    db := setupTestDB(t)
+    db.CreateUser(User{Name: <span class="str">"Alice"</span>, Email: <span class="str">"alice@example.com"</span>})
+    err := db.DeleteUser(<span class="str">"alice@example.com"</span>)
+    <span class="kw">if</span> err != <span class="kw">nil</span> {
+        t.Fatalf(<span class="str">"expected no error, got %v"</span>, err)
+    }
+}</code></pre>
+      </div>
+
+      <p>Five functions, and <code>setupTestDB(t)</code> appears in every one. There's no visible relationship between the "create" tests and the "get" tests; they're just an alphabetical list. Assertions are manual <code>if</code>/<code>t.Fatal</code> checks with inconsistent formatting.</p>
+
+      <p>This works fine at 10 test functions. At 50, you're scrolling to find what you need. At 200, you're <code>grep</code>-ing your own test files.</p>
+
+      <h2>Table-driven tests: less code, same structure</h2>
+
+      <p>The first escape hatch most Go developers reach for is the table-driven pattern:</p>
+
+      <div class="code-block">
+        <pre><code><span class="kw">func</span> <span class="fn">TestCreateUser</span>(t *<span class="tp">testing.T</span>) {
+    tests := []<span class="kw">struct</span> {
+        name    <span class="tp">string</span>
+        user    User
+        wantErr <span class="tp">bool</span>
+    }{
+        {<span class="str">"valid user"</span>, User{Name: <span class="str">"Alice"</span>, Email: <span class="str">"alice@example.com"</span>}, <span class="kw">false</span>},
+        {<span class="str">"missing name"</span>, User{Email: <span class="str">"alice@example.com"</span>}, <span class="kw">true</span>},
+        {<span class="str">"invalid email"</span>, User{Name: <span class="str">"Alice"</span>, Email: <span class="str">"not-an-email"</span>}, <span class="kw">true</span>},
+    }
+
+    <span class="kw">for</span> _, tt := <span class="kw">range</span> tests {
+        t.Run(tt.name, <span class="kw">func</span>(t *<span class="tp">testing.T</span>) {
+            db := setupTestDB(t)
+            err := db.CreateUser(tt.user)
+            <span class="kw">if</span> (err != <span class="kw">nil</span>) != tt.wantErr {
+                t.Errorf(<span class="str">"CreateUser() error = %v, wantErr %v"</span>, err, tt.wantErr)
+            }
+        })
+    }
+}</code></pre>
+      </div>
+
+      <p>Better. Less repetition within a group of related cases. <code>t.Run</code> gives each case a name so failures point to the right row.</p>
+
+      <p>But table-driven tests solve repetition, not organization. <code>TestCreateUser</code> and <code>TestGetUser</code> and <code>TestDeleteUser</code> are still unrelated flat functions sitting in a file together. And the pattern starts to strain when cases need different assertion logic: the struct grows fields like <code>wantCode</code>, <code>wantBody</code>, <code>setupFn</code>, <code>checkFn</code>, and the table becomes harder to read than the tests it replaced.</p>
+
+      <h2>Subtests: hierarchy without lifecycle</h2>
+
+      <p>Go 1.7 introduced <code>t.Run</code>, and with it came the ability to nest tests:</p>
+
+      <div class="code-block">
+        <pre><code><span class="kw">func</span> <span class="fn">TestUserService</span>(t *<span class="tp">testing.T</span>) {
+    db := setupTestDB(t)
+    t.Cleanup(<span class="kw">func</span>() { db.Close() })
+
+    t.Run(<span class="str">"Create"</span>, <span class="kw">func</span>(t *<span class="tp">testing.T</span>) {
+        t.Run(<span class="str">"valid user"</span>, <span class="kw">func</span>(t *<span class="tp">testing.T</span>) {
+            err := db.CreateUser(User{Name: <span class="str">"Alice"</span>})
+            <span class="kw">if</span> err != <span class="kw">nil</span> {
+                t.Fatal(err)
+            }
+        })
+        t.Run(<span class="str">"duplicate email"</span>, <span class="kw">func</span>(t *<span class="tp">testing.T</span>) {
+            err := db.CreateUser(User{Name: <span class="str">"Alice"</span>})
+            <span class="cm">// this fails: Create/valid_user already inserted Alice</span>
+            <span class="kw">if</span> err == <span class="kw">nil</span> {
+                t.Fatal(<span class="str">"expected error"</span>)
+            }
+        })
+    })
+
+    t.Run(<span class="str">"Delete"</span>, <span class="kw">func</span>(t *<span class="tp">testing.T</span>) {
+        err := db.DeleteUser(<span class="str">"alice@example.com"</span>)
+        <span class="cm">// depends on what Create tests left behind</span>
+        <span class="kw">if</span> err != <span class="kw">nil</span> {
+            t.Fatal(err)
+        }
+    })
+}</code></pre>
+      </div>
+
+      <p>Now there's visible structure: <code>TestUserService/Create/valid_user</code> reads like a path. But this pattern has real problems:</p>
+
+      <ul>
+        <li><strong>Shared state leaks across subtests.</strong> The <code>db</code> variable is shared between "Create" and "Delete." If the "Create" subtests modify the database, "Delete" inherits that state. Tests become order-dependent.</li>
+        <li><strong>No per-group lifecycle.</strong> There's no way to reset <code>db</code> before each subtest. <code>t.Cleanup</code> runs once, at the end. You'd need to call <code>setupTestDB(t)</code> inside every leaf <code>t.Run</code>, which brings back the repetition you were trying to eliminate.</li>
+        <li><strong>Closures stack up fast.</strong> Three levels of nesting means three levels of <code>func(t *testing.T) {</code>. At scale, the indentation alone makes the file hard to navigate.</li>
+        <li><strong>Parallelism is manual.</strong> Want to run subtests in parallel? You need <code>t.Parallel()</code> in every leaf, and careful synchronization on the shared <code>db</code>.</li>
+      </ul>
+
+      <p>Subtests give you hierarchy. They don't give you lifecycle.</p>
+
+      <h2>What a suite actually provides</h2>
+
+      <p>The pattern most projects eventually need is a <strong>test suite</strong>: a group of tests organized around a single subject, with lifecycle hooks that guarantee each test starts from a known state.</p>
+
+      <p>A suite gives you four things that flat functions and subtests don't:</p>
+
+      <ol>
+        <li><strong>Grouping by subject.</strong> All tests for <code>UserService</code> live on one struct.</li>
+        <li><strong>Lifecycle hooks.</strong> <code>BeforeEach</code> runs before every test, so each test gets fresh state.</li>
+        <li><strong>Isolation.</strong> Test methods can't accidentally share state through closures.</li>
+        <li><strong>Discoverability.</strong> The struct name tells you what's under test. Methods tell you what it does.</li>
+      </ol>
+
+      <p>In Go, the most established suite framework is <code>testify/suite</code>:</p>
+
+      <div class="code-block">
+        <span class="code-label">testify/suite approach</span>
+        <pre><code><span class="kw">type</span> <span class="tp">UserServiceSuite</span> <span class="kw">struct</span> {
+    suite.Suite
+    db *TestDB
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserServiceSuite</span>) <span class="fn">SetupTest</span>() {
+    s.db = setupTestDB(s.T())
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserServiceSuite</span>) <span class="fn">TearDownTest</span>() {
+    s.db.Close()
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserServiceSuite</span>) <span class="fn">TestCreateUser</span>() {
+    err := s.db.CreateUser(User{Name: <span class="str">"Alice"</span>})
+    s.NoError(err)
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserServiceSuite</span>) <span class="fn">TestCreateUserDuplicate</span>() {
+    s.db.CreateUser(User{Name: <span class="str">"Alice"</span>, Email: <span class="str">"a@b.com"</span>})
+    err := s.db.CreateUser(User{Name: <span class="str">"Bob"</span>, Email: <span class="str">"a@b.com"</span>})
+    s.Error(err)
+}
+
+<span class="kw">func</span> <span class="fn">TestUserServiceSuite</span>(t *<span class="tp">testing.T</span>) {
+    suite.Run(t, <span class="kw">new</span>(UserServiceSuite))
+}
+</code></pre>
+      </div>
+
+      <p>This solves the organizational problem. <code>SetupTest</code> runs before each test method. State lives on the struct, not in closures. Each method is a self-contained test.</p>
+
+      <p>But it comes with trade-offs:</p>
+
+      <ul>
+        <li><strong>Reflection-based discovery.</strong> <code>suite.Run</code> uses <code>reflect</code> to find and invoke test methods at runtime. That means test failures don't always map cleanly to stack traces, and refactoring tools can't always follow the call chain.</li>
+        <li><strong>Runtime dependency.</strong> Your test binary imports <code>github.com/stretchr/testify</code>, a third-party module with its own release cycle and transitive dependencies.</li>
+        <li><strong>Framework coupling.</strong> Every suite must embed <code>suite.Suite</code>. Every assertion goes through <code>s.NoError</code>, <code>s.Equal</code>, methods on the embedded struct, not type-safe generic functions.</li>
+        <li><strong>No BDD structure.</strong> Test methods are flat; there's no equivalent of "when X, it should Y" nesting within a method.</li>
+      </ul>
+
+      <h2>A different angle: suites as a compile-time concern</h2>
+
+      <p>Here's the observation that changes the equation: <strong>the suite pattern is an organizational concern, not a runtime concern.</strong></p>
+
+      <p>What suites need at runtime is ordinary Go code: <code>t.Run</code> calls, <code>t.Cleanup</code> calls, struct initialization. Everything the stdlib already provides. The reason frameworks like testify/suite use reflection is to <em>discover</em> test methods and <em>wire up</em> lifecycle hooks. But discovery and wiring are compile-time activities. They can happen before <code>go test</code> runs.</p>
+
+      <p>That's the approach <a href="https://github.com/mvrahden/go-test">gotest</a> takes. You write test suites as plain Go structs with naming conventions. A code generator reads your source, discovers the structure, and generates the lifecycle wiring that you'd write by hand. What runs is standard <code>go test</code>. No reflection. No framework orchestration at runtime.</p>
+
+      <div class="code-block">
+        <span class="code-label">gotest approach</span>
+        <pre><code><span class="kw">type</span> <span class="tp">UserServiceTestSuite</span> <span class="kw">struct</span> {
+    db *TestDB
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserServiceTestSuite</span>) <span class="fn">BeforeEach</span>(t *<span class="tp">gotest.T</span>) {
+    s.db = setupTestDB(t)
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserServiceTestSuite</span>) <span class="fn">TestCreateUser</span>(t *<span class="tp">gotest.T</span>) {
+    t.When(<span class="str">"the input is valid"</span>, <span class="kw">func</span>(w *<span class="tp">gotest.T</span>) {
+        err := s.db.CreateUser(User{Name: <span class="str">"Alice"</span>, Email: <span class="str">"alice@example.com"</span>})
+
+        w.It(<span class="str">"succeeds without error"</span>, <span class="kw">func</span>(it *<span class="tp">gotest.T</span>) {
+            gotest.NoError(it, err)
+        })
+    })
+
+    t.When(<span class="str">"the email already exists"</span>, <span class="kw">func</span>(w *<span class="tp">gotest.T</span>) {
+        s.db.CreateUser(User{Name: <span class="str">"Alice"</span>, Email: <span class="str">"alice@example.com"</span>})
+        err := s.db.CreateUser(User{Name: <span class="str">"Bob"</span>, Email: <span class="str">"alice@example.com"</span>})
+
+        w.It(<span class="str">"returns an error"</span>, <span class="kw">func</span>(it *<span class="tp">gotest.T</span>) {
+            gotest.Error(it, err)
+        })
+    })
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserServiceTestSuite</span>) <span class="fn">TestDeleteUser</span>(t *<span class="tp">gotest.T</span>) {
+    t.When(<span class="str">"the user exists"</span>, <span class="kw">func</span>(w *<span class="tp">gotest.T</span>) {
+        s.db.CreateUser(User{Name: <span class="str">"Alice"</span>, Email: <span class="str">"alice@example.com"</span>})
+        err := s.db.DeleteUser(<span class="str">"alice@example.com"</span>)
+
+        w.It(<span class="str">"succeeds without error"</span>, <span class="kw">func</span>(it *<span class="tp">gotest.T</span>) {
+            gotest.NoError(it, err)
+        })
+    })
+}</code></pre>
+      </div>
+
+      <p>A few things to notice:</p>
+
+      <ul>
+        <li><strong>No framework embedding.</strong> The struct has only your fields. No <code>suite.Suite</code>, no interface to satisfy.</li>
+        <li><strong>Lifecycle via naming conventions.</strong> <code>BeforeEach</code> is recognized by name. It runs before every <code>Test*</code> method, giving each test a fresh <code>db</code>.</li>
+        <li><strong>BDD structure inside methods.</strong> <code>t.When</code> and <code>t.It</code> create labeled subtests via <code>t.Run</code>. They're just method calls: no DSL, no magic.</li>
+        <li><strong>Type-safe assertions.</strong> <code>gotest.NoError</code>, <code>gotest.Equal</code>, and others are generic functions. Pass the wrong type and the compiler catches it.</li>
+      </ul>
+
+      <p>Running <code>gotest ./...</code> generates the <code>t.Run</code> nesting, lifecycle calls, and process isolation behind the scenes, then invokes <code>go test</code>. The generated code is injected via Go's <code>-overlay</code> flag; it never touches your source tree.</p>
+
+      <h2>Tests that explain themselves</h2>
+
+      <p>There's a useful consequence of this structure. Because test methods, <code>When</code> blocks, and <code>It</code> blocks all have descriptive names, gotest can render them as a behavioral specification:</p>
+
+      <div class="terminal">
+        <div class="terminal-header">
+          <span class="terminal-dot r"></span>
+          <span class="terminal-dot y"></span>
+          <span class="terminal-dot g"></span>
+          <span class="terminal-title">gotest spec ./...</span>
+        </div>
+        <pre class="terminal-body"><span class="t-prompt">$</span> <span class="t-cmd">gotest spec ./...</span>
+
+<span class="t-suite">UserService</span>
+  <span class="t-test">CreateUser</span>
+    <span class="t-when">when the input is valid</span>
+      <span class="t-pass">&#10003;</span> succeeds without error <span class="t-time">(5ms)</span>
+    <span class="t-when">when the email already exists</span>
+      <span class="t-pass">&#10003;</span> returns an error <span class="t-time">(&lt;1ms)</span>
+  <span class="t-test">DeleteUser</span>
+    <span class="t-when">when the user exists</span>
+      <span class="t-pass">&#10003;</span> succeeds without error <span class="t-time">(3ms)</span>
+<span class="t-summary">1 suite, 3 behaviors: <span class="t-pass">3 passed</span>, 0 failed, 0 skipped</span></pre>
+      </div>
+
+      <p>This isn't generated documentation; it's a direct rendering of your test structure. If a test is missing, the spec has a gap. If a test fails, the spec shows it. The test <em>is</em> the specification.</p>
+
+      <p>This spec output is also machine-readable. <code>gotest spec --format json</code> produces structured JSON that you can feed into documentation pipelines, AI-assisted workflows, or CI reporting.</p>
+
+      <h2>Where this leaves you</h2>
+
+      <p>Every Go project moves through a progression:</p>
+
+      <ol>
+        <li><strong>Flat functions.</strong> Simple, but no organization.</li>
+        <li><strong>Table-driven tests.</strong> Reduce repetition within a group.</li>
+        <li><strong>Subtests.</strong> Add hierarchy, but no lifecycle.</li>
+        <li><strong>Suites.</strong> Add lifecycle, grouping, and isolation.</li>
+      </ol>
+
+      <p>The question at step 4 is how you get suites. Runtime reflection (testify/suite) works and is battle-tested. Compile-time code generation (gotest) gives you the same organizational benefits with type safety, no reflection, and BDD structure, at the cost of a code generation step.</p>
+
+      <p>Neither is universally right. But if you've been writing Go tests long enough to feel the limits of flat functions and subtests, it's worth understanding the trade-offs. The test structure you choose is the one you'll read, debug, and maintain for the life of the project.</p>
+
+      <div class="cta">
+        <p><strong>Try gotest on your next project.</strong></p>
+        <div class="install-cmd">
+          <code>go install github.com/mvrahden/go-test/cmd/gotest@latest</code>
+          <button onclick="navigator.clipboard.writeText('go install github.com/mvrahden/go-test/cmd/gotest@latest').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})" aria-label="Copy install command">Copy</button>
+        </div>
+        <div class="cta-links">
+          <a href="../reference.html">Reference</a>
+          <a href="https://github.com/mvrahden/go-test">GitHub</a>
+          <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code Extension</a>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-links">
+      <a href="../">Home</a>
+      <a href="https://github.com/mvrahden/go-test">GitHub</a>
+      <a href="https://pkg.go.dev/github.com/mvrahden/go-test">pkg.go.dev</a>
+      <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code Extension</a>
+      <a href="../reference.html">Reference</a>
+      <a href="./">Blog</a>
+      <a href="https://github.com/mvrahden/go-test/blob/main/LICENSE">MIT License</a>
+    </div>
+    <p class="footer-copy">Built for Go developers who want tests that explain themselves.</p>
+  </footer>
+  <script>
+  fetch('https://api.github.com/repos/mvrahden/go-test')
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(d => {
+      if (d.stargazers_count >= 10) {
+        document.getElementById('star-count').textContent = ` ${d.stargazers_count}`;
+      }
+    })
+    .catch(() => {});
+  </script>
+</body>
+</html>
