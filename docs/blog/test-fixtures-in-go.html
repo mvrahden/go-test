@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Test Fixtures in Go: Patterns That Scale | gotest blog</title>
+  <meta name="description" content="Every growing Go project needs shared test infrastructure: databases, caches, containers. A look at fixture patterns from global vars to DAG-based lifecycle management.">
+  <meta name="keywords" content="go test fixtures, golang test setup, go testing database, go test containers, go test lifecycle, go test shared state, gotest fixtures">
+
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://mvrahden.github.io/go-test/blog/test-fixtures-in-go.html">
+  <meta property="og:title" content="Test Fixtures in Go: Patterns That Scale">
+  <meta property="og:description" content="Every growing Go project needs shared test infrastructure. A look at fixture patterns from global vars to DAG-based lifecycle management.">
+  <meta property="og:image" content="https://mvrahden.github.io/go-test/static/gopher.png">
+  <meta property="og:image:width" content="1024">
+  <meta property="og:image:height" content="572">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Test Fixtures in Go: Patterns That Scale">
+  <meta name="twitter:description" content="Every growing Go project needs shared test infrastructure. A look at fixture patterns from global vars to DAG-based lifecycle management.">
+  <meta name="twitter:image" content="https://mvrahden.github.io/go-test/static/gopher.png">
+
+  <link rel="icon" type="image/png" href="../static/logo.png">
+  <link rel="canonical" href="https://mvrahden.github.io/go-test/blog/test-fixtures-in-go.html">
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WHJ67Z1J0"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-7WHJ67Z1J0');
+  </script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "Test Fixtures in Go: Patterns That Scale",
+    "description": "Every growing Go project needs shared test infrastructure: databases, caches, containers. A look at fixture patterns from global vars to DAG-based lifecycle management.",
+    "url": "https://mvrahden.github.io/go-test/blog/test-fixtures-in-go.html",
+    "datePublished": "2026-07-07",
+    "author": {
+      "@type": "Person",
+      "name": "Menno van Rahden",
+      "url": "https://github.com/mvrahden"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "gotest",
+      "url": "https://mvrahden.github.io/go-test/"
+    },
+    "isPartOf": {
+      "@type": "Blog",
+      "name": "gotest blog",
+      "url": "https://mvrahden.github.io/go-test/blog/"
+    },
+    "programmingLanguage": "Go"
+  }
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan: #00ADD8;
+      --cyan-dark: #007d9c;
+      --bg: #ffffff;
+      --bg-alt: #f6f8fa;
+      --bg-dark: #0d1117;
+      --bg-dark-alt: #161b22;
+      --text: #24292f;
+      --text-secondary: #656d76;
+      --text-on-dark: #e6edf3;
+      --text-dimmed: #8b949e;
+      --border: #d0d7de;
+      --green: #3fb950;
+      --amber: #d29922;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Liberation Mono', monospace;
+      --max-w: 740px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --bg-alt: #161b22;
+        --bg-dark: #010409;
+        --bg-dark-alt: #0d1117;
+        --text: #e6edf3;
+        --text-secondary: #8b949e;
+        --border: #30363d;
+      }
+    }
+
+    html { scroll-behavior: smooth; height: 100%; }
+
+    body {
+      font-family: var(--font-sans);
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .article { flex: 1; }
+
+    a { color: var(--cyan-dark); text-decoration: none; }
+    @media (prefers-color-scheme: dark) { a { color: var(--cyan); } }
+    a:hover { text-decoration: underline; }
+
+    /* ===== Nav ===== */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+    }
+    .nav-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 1.125rem;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .nav-brand:hover { text-decoration: none; }
+    .nav-brand img { width: 28px; height: 28px; border-radius: 50%; }
+    .nav-links { display: flex; gap: 1.25rem; font-size: 0.9rem; align-items: center; }
+    .nav-links a { color: var(--text-secondary); }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+    .nav-links .nav-ref {
+      padding: 0.25rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-weight: 600;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .nav-links .nav-ref:hover { background: var(--bg-alt); }
+    .nav-links .star-btn { font-size: 0.85rem; }
+    .star-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.15s;
+      font-size: 0.8rem;
+    }
+    .star-btn:hover { background: var(--bg-alt); text-decoration: none; }
+    .star-btn .star-icon { color: #e3b341; }
+    .star-count { font-weight: 400; color: var(--text-dimmed); }
+
+    /* ===== Article ===== */
+    .article {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .article-header {
+      padding: 3.5rem 0 2rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2.5rem;
+    }
+    .article-header .back {
+      display: inline-block;
+      font-size: 0.85rem;
+      color: var(--text-dimmed);
+      margin-bottom: 1.5rem;
+    }
+    .article-header .back:hover { color: var(--text-secondary); }
+    .article-header h1 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+    }
+    .article-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--text-dimmed);
+    }
+    .article-meta .tag {
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    /* ===== Article Body ===== */
+    .article-body {
+      padding-bottom: 3rem;
+    }
+    .article-body p {
+      font-size: 1.1rem;
+      line-height: 1.75;
+      margin-bottom: 1.5rem;
+    }
+    .article-body h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-top: 3rem;
+      margin-bottom: 1rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .article-body h2:first-child {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+    .article-body h3 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+    }
+    .article-body ul, .article-body ol {
+      margin-bottom: 1.5rem;
+      padding-left: 1.5rem;
+    }
+    .article-body li {
+      font-size: 1.05rem;
+      line-height: 1.7;
+      margin-bottom: 0.4rem;
+    }
+    .article-body strong { font-weight: 600; }
+
+    .article-body code {
+      font-family: var(--font-mono);
+      font-size: 0.88em;
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+    }
+
+    .article-body blockquote {
+      border-left: 3px solid var(--cyan);
+      padding: 0.75rem 1.25rem;
+      margin: 1.5rem 0;
+      background: var(--bg-alt);
+      border-radius: 0 6px 6px 0;
+    }
+    .article-body blockquote p {
+      font-size: 1.05rem;
+      margin-bottom: 0;
+      color: var(--text-secondary);
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #161b22;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      margin: 1.5rem 0;
+      overflow: hidden;
+    }
+    .code-label {
+      display: block;
+      padding: 0.5rem 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-dimmed);
+      border-bottom: 1px solid #30363d;
+      background: #1c2128;
+    }
+    .code-block pre {
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.65;
+      color: #e6edf3;
+    }
+    .code-block pre code {
+      font-family: inherit;
+      font-size: inherit;
+      padding: 0;
+      border: none;
+      background: none;
+      border-radius: 0;
+      color: inherit;
+    }
+
+    .kw { color: #ff7b72; }
+    .fn { color: #d2a8ff; }
+    .str { color: #a5d6ff; }
+    .cm { color: #8b949e; }
+    .tp { color: #79c0ff; }
+
+    /* Diagram */
+    .diagram {
+      margin: 1.5rem 0;
+      padding: 1.5rem;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.8;
+      overflow-x: auto;
+      text-align: center;
+      color: var(--text-secondary);
+    }
+
+    /* CTA section */
+    .cta {
+      margin: 2.5rem 0;
+      padding: 2rem;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      text-align: center;
+    }
+    .cta p {
+      margin-bottom: 1rem;
+    }
+    .cta .install-cmd {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+    .cta .install-cmd code {
+      white-space: nowrap;
+      color: var(--text);
+    }
+    .cta .install-cmd button {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.3rem 0.5rem;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .cta .install-cmd button:hover { background: var(--border); }
+    .cta-links {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+    }
+
+    /* ===== Footer ===== */
+    footer {
+      background: var(--bg-dark);
+      color: var(--text-dimmed);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--text-on-dark); }
+    footer a:hover { color: var(--cyan); }
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .footer-copy { color: #484f58; font-size: 0.8rem; }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 640px) {
+      .article-header h1 { font-size: 1.75rem; }
+      .article-body p { font-size: 1.05rem; }
+    }
+    @media (max-width: 480px) {
+      .nav-links { gap: 0.75rem; font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="nav-inner">
+      <a href="../" class="nav-brand">
+        <img src="../static/logo.png" alt="gotest logo" width="28" height="28">
+        gotest
+      </a>
+      <div class="nav-links">
+        <a href="./">Blog</a>
+        <a href="../reference.html" class="nav-ref">Reference</a>
+        <a href="https://github.com/mvrahden/go-test" class="star-btn"><span class="star-icon">&#9734;</span> Star<span class="star-count" id="star-count"></span></a>
+        <a href="https://pkg.go.dev/github.com/mvrahden/go-test">pkg.go.dev</a>
+        <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="article">
+    <header class="article-header">
+      <a href="./" class="back">&larr; All posts</a>
+      <h1>Test Fixtures in Go: Patterns That Scale</h1>
+      <div class="article-meta">
+        <time datetime="2026-07-07">July 7, 2026</time>
+        <span>&middot;</span>
+        <span>12 min read</span>
+        <span class="tag">Patterns</span>
+      </div>
+    </header>
+
+    <div class="article-body">
+
+      <p>Most Go projects eventually need shared test infrastructure: a database connection, a message queue, a container that takes seconds to start. The stdlib doesn't have a built-in answer for this. So every team invents its own fixture pattern, and most of those patterns stop working at some point.</p>
+
+      <p>This post looks at the common approaches, where each one breaks down, and what a fixture system needs to handle the cases that real projects run into.</p>
+
+      <h2>The problem</h2>
+
+      <p>A test fixture is any shared resource that tests depend on. The simplest example: a database that multiple test functions query. The fixture problem is about lifecycle: when does the database get created, when does it get torn down, and how do you make sure tests don't step on each other?</p>
+
+      <p>The challenge grows along two axes:</p>
+
+      <ul>
+        <li><strong>Cost.</strong> Some fixtures are cheap (an in-memory map). Others are expensive (spinning up a Postgres container). Expensive fixtures can't be created per-test; you need to share them.</li>
+        <li><strong>Scope.</strong> Some fixtures belong to one test file. Others are shared across an entire package. Some need to be shared across multiple packages. Each scope has different lifecycle requirements.</li>
+      </ul>
+
+      <h2>Pattern 1: Global variables</h2>
+
+      <p>The most common first approach:</p>
+
+      <div class="code-block">
+        <pre><code><span class="kw">var</span> testDB *sql.DB
+
+<span class="kw">func</span> <span class="fn">TestMain</span>(m *<span class="tp">testing.M</span>) {
+    <span class="kw">var</span> err <span class="tp">error</span>
+    testDB, err = sql.Open(<span class="str">"postgres"</span>, os.Getenv(<span class="str">"TEST_DB_URL"</span>))
+    <span class="kw">if</span> err != <span class="kw">nil</span> {
+        log.Fatal(err)
+    }
+    <span class="kw">defer</span> testDB.Close()
+    os.Exit(m.Run())
+}
+
+<span class="kw">func</span> <span class="fn">TestCreateUser</span>(t *<span class="tp">testing.T</span>) {
+    _, err := testDB.Exec(<span class="str">"INSERT INTO users ..."</span>)
+    <span class="cm">// ...</span>
+}
+
+<span class="kw">func</span> <span class="fn">TestListUsers</span>(t *<span class="tp">testing.T</span>) {
+    rows, err := testDB.Query(<span class="str">"SELECT * FROM users"</span>)
+    <span class="cm">// depends on what TestCreateUser left behind</span>
+}</code></pre>
+      </div>
+
+      <p><code>TestMain</code> is Go's package-level setup hook: it runs once before any tests in the package. The database connection lives in a global variable that every test function can access.</p>
+
+      <p>This works until it doesn't:</p>
+
+      <ul>
+        <li><strong>Tests share state.</strong> <code>TestListUsers</code> sees rows that <code>TestCreateUser</code> inserted. Tests become order-dependent. Add <code>t.Parallel()</code> and they become race-condition-dependent.</li>
+        <li><strong>Teardown is fragile.</strong> If any test panics, <code>defer testDB.Close()</code> might not run. If <code>TestMain</code> itself fails, the process exits with no cleanup.</li>
+        <li><strong>One fixture per package.</strong> <code>TestMain</code> can only be defined once. Need a database <em>and</em> a cache? Everything goes into one function.</li>
+        <li><strong>No per-test reset.</strong> There's no hook to truncate tables between tests. You'd need to write that into every test function manually.</li>
+      </ul>
+
+      <h2>Pattern 2: Helper functions</h2>
+
+      <p>The next step is to wrap fixture creation in a helper:</p>
+
+      <div class="code-block">
+        <pre><code><span class="kw">func</span> <span class="fn">setupTestDB</span>(t *<span class="tp">testing.T</span>) *sql.DB {
+    t.Helper()
+    db, err := sql.Open(<span class="str">"postgres"</span>, os.Getenv(<span class="str">"TEST_DB_URL"</span>))
+    <span class="kw">if</span> err != <span class="kw">nil</span> {
+        t.Fatal(err)
+    }
+    t.Cleanup(<span class="kw">func</span>() { db.Close() })
+    <span class="kw">return</span> db
+}
+
+<span class="kw">func</span> <span class="fn">TestCreateUser</span>(t *<span class="tp">testing.T</span>) {
+    db := setupTestDB(t)
+    <span class="cm">// db is fresh for this test</span>
+}
+
+<span class="kw">func</span> <span class="fn">TestListUsers</span>(t *<span class="tp">testing.T</span>) {
+    db := setupTestDB(t)
+    <span class="cm">// db is fresh for this test too</span>
+}</code></pre>
+      </div>
+
+      <p>Better. Each test gets its own connection. <code>t.Cleanup</code> handles teardown even if the test panics. No shared state between tests.</p>
+
+      <p>But the cost problem is back: if the fixture is expensive (a container, a schema migration, a seed dataset), creating it per-test is too slow. And if you add caching to amortize the cost, say a <code>sync.Once</code> around the container startup, you've reinvented the global variable pattern with extra steps.</p>
+
+      <h2>Pattern 3: Struct-based fixtures with sync.Once</h2>
+
+      <p>A more structured approach uses a struct to hold the fixture state and <code>sync.Once</code> to ensure one-time initialization:</p>
+
+      <div class="code-block">
+        <pre><code><span class="kw">type</span> <span class="tp">DBFixture</span> <span class="kw">struct</span> {
+    once <span class="tp">sync.Once</span>
+    db   *<span class="tp">sql.DB</span>
+    err  <span class="tp">error</span>
+}
+
+<span class="kw">func</span> (f *<span class="tp">DBFixture</span>) <span class="fn">Get</span>(t *<span class="tp">testing.T</span>) *<span class="tp">sql.DB</span> {
+    t.Helper()
+    f.once.Do(<span class="kw">func</span>() {
+        f.db, f.err = sql.Open(<span class="str">"postgres"</span>, os.Getenv(<span class="str">"TEST_DB_URL"</span>))
+    })
+    <span class="kw">if</span> f.err != <span class="kw">nil</span> {
+        t.Fatal(f.err)
+    }
+    <span class="kw">return</span> f.db
+}
+
+<span class="kw">var</span> dbFixture DBFixture
+
+<span class="kw">func</span> <span class="fn">TestCreateUser</span>(t *<span class="tp">testing.T</span>) {
+    db := dbFixture.Get(t)
+    <span class="cm">// ...</span>
+}</code></pre>
+      </div>
+
+      <p>This solves the cost problem: the database is created once and shared. But it still has the state-leaking problem (tests share the same database), and teardown is still unclear: when does the database get closed? <code>sync.Once</code> has no corresponding "undo."</p>
+
+      <p>More fundamentally, none of these patterns handle <strong>fixture dependencies</strong>. What if your test needs a database <em>and</em> a cache, and the cache needs the database connection to configure itself? Now you need to manage initialization order, and that's where hand-rolled patterns start to collapse.</p>
+
+      <h2>What fixtures actually need</h2>
+
+      <p>Looking at the patterns above, a fixture system needs to handle four concerns:</p>
+
+      <ol>
+        <li><strong>Lifecycle hooks.</strong> Setup and teardown at both the suite level (once) and the test level (per-test). Fixtures that take <code>context.Context</code> and return <code>error</code>, so expensive operations can be cancelled and failures can be handled.</li>
+        <li><strong>Dependency ordering.</strong> If fixture B depends on fixture A, A's setup must complete before B's begins. Teardown runs in reverse order. This is a DAG (directed acyclic graph) problem.</li>
+        <li><strong>Scope control.</strong> Some fixtures are package-scoped (shared across suites in one package). Some are shared across multiple packages. The fixture system needs to understand these scopes.</li>
+        <li><strong>Isolation.</strong> Per-test hooks that reset state between test methods, so tests don't inherit side effects from each other.</li>
+      </ol>
+
+      <h2>Fixtures as structs with lifecycle conventions</h2>
+
+      <p>In <a href="https://github.com/mvrahden/go-test">gotest</a>, a fixture is a struct with naming conventions, the same pattern used for test suites. A struct whose name ends in <code>Fixture</code> is recognized as a package-scoped fixture. Its lifecycle methods are discovered by name:</p>
+
+      <div class="code-block">
+        <span class="code-label">fixtures.go</span>
+        <pre><code><span class="kw">type</span> <span class="tp">DatabaseFixture</span> <span class="kw">struct</span> {
+    DB *sql.DB
+}
+
+<span class="kw">func</span> (f *<span class="tp">DatabaseFixture</span>) <span class="fn">FixtureConfig</span>() <span class="tp">gotest.FixtureConfig</span> {
+    <span class="kw">return</span> gotest.ContainerFixtureConfig()  <span class="cm">// 5m timeout, 1 retry</span>
+}
+
+<span class="kw">func</span> (f *<span class="tp">DatabaseFixture</span>) <span class="fn">BeforeAll</span>(_ <span class="tp">context.Context</span>) <span class="tp">error</span> {
+    <span class="kw">var</span> err <span class="tp">error</span>
+    f.DB, err = sql.Open(<span class="str">"postgres"</span>, os.Getenv(<span class="str">"TEST_DB_URL"</span>))
+    <span class="kw">return</span> err
+}
+
+<span class="kw">func</span> (f *<span class="tp">DatabaseFixture</span>) <span class="fn">AfterAll</span>(_ <span class="tp">context.Context</span>) <span class="tp">error</span> {
+    <span class="kw">return</span> f.DB.Close()
+}
+
+<span class="kw">func</span> (f *<span class="tp">DatabaseFixture</span>) <span class="fn">BeforeEach</span>(_ <span class="tp">context.Context</span>) <span class="tp">error</span> {
+    _, err := f.DB.Exec(<span class="str">"TRUNCATE users, orders"</span>)
+    <span class="kw">return</span> err
+}</code></pre>
+      </div>
+
+      <p>A few things to notice:</p>
+
+      <ul>
+        <li><strong>Lifecycle methods take <code>context.Context</code> and return <code>error</code>.</strong> This is different from suite lifecycle hooks (which take <code>*gotest.T</code>). Fixtures represent infrastructure; they need cancellation and error propagation.</li>
+        <li><strong><code>BeforeAll</code>/<code>AfterAll</code></strong> run once for the package. The database is opened once and closed once.</li>
+        <li><strong><code>BeforeEach</code></strong> runs before every test method in every suite that uses this fixture. Tables get truncated, so each test starts clean.</li>
+        <li><strong><code>FixtureConfig</code></strong> controls timeout and retry behavior. <code>ContainerFixtureConfig()</code> gives a 5-minute timeout with one retry, appropriate for infrastructure that might need time to start.</li>
+      </ul>
+
+      <h2>Suites consume fixtures by referencing them</h2>
+
+      <p>A suite declares its fixture dependency by including it as a pointer field:</p>
+
+      <div class="code-block">
+        <span class="code-label">suite_test.go</span>
+        <pre><code><span class="kw">type</span> <span class="tp">UserRepositoryTestSuite</span> <span class="kw">struct</span> {
+    DB   *DatabaseFixture
+    repo *userRepository
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserRepositoryTestSuite</span>) <span class="fn">BeforeEach</span>(t *<span class="tp">gotest.T</span>) {
+    s.repo = newUserRepository(s.DB.DB)
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserRepositoryTestSuite</span>) <span class="fn">TestCreateUser</span>(t *<span class="tp">gotest.T</span>) {
+    t.When(<span class="str">"the input is valid"</span>, <span class="kw">func</span>(w *<span class="tp">gotest.T</span>) {
+        err := s.repo.Create(User{Name: <span class="str">"Alice"</span>})
+
+        w.It(<span class="str">"succeeds"</span>, <span class="kw">func</span>(it *<span class="tp">gotest.T</span>) {
+            gotest.NoError(it, err)
+        })
+    })
+}</code></pre>
+      </div>
+
+      <p>The field <code>DB *DatabaseFixture</code> is the entire dependency declaration. gotest sees the pointer to a <code>Fixture</code>-suffixed type and wires it up automatically. By the time <code>BeforeEach</code> runs on the suite, the fixture's <code>BeforeAll</code> has already completed and <code>s.DB.DB</code> is a live database connection.</p>
+
+      <p>The lifecycle order for each test method is:</p>
+
+      <ol>
+        <li>Fixture <code>BeforeEach</code>: truncate tables</li>
+        <li>Suite <code>BeforeEach</code>: create repository</li>
+        <li>Test method: run the test</li>
+        <li>Suite <code>AfterEach</code></li>
+        <li>Fixture <code>AfterEach</code></li>
+      </ol>
+
+      <p>If multiple suites in the same package reference <code>*DatabaseFixture</code>, they all share the same instance. <code>BeforeAll</code> runs once for the package, not once per suite.</p>
+
+      <h2>Fixture dependencies form a DAG</h2>
+
+      <p>Fixtures can depend on other fixtures. A cache fixture that needs a database connection declares the dependency the same way, as a pointer field:</p>
+
+      <div class="code-block">
+        <pre><code><span class="kw">type</span> <span class="tp">CacheFixture</span> <span class="kw">struct</span> {
+    DB    *DatabaseFixture  <span class="cm">// depends on DatabaseFixture</span>
+    Cache *redis.Client
+}
+
+<span class="kw">func</span> (f *<span class="tp">CacheFixture</span>) <span class="fn">BeforeAll</span>(_ <span class="tp">context.Context</span>) <span class="tp">error</span> {
+    f.Cache = redis.NewClient(&amp;redis.Options{Addr: <span class="str">"localhost:6379"</span>})
+    <span class="cm">// f.DB.DB is already initialized. DatabaseFixture.BeforeAll ran first</span>
+    <span class="kw">return</span> f.Cache.Ping(context.Background()).Err()
+}</code></pre>
+      </div>
+
+      <p>gotest resolves these dependencies into a directed acyclic graph and runs <code>BeforeAll</code> in topological order. Independent fixtures (no dependency between them) initialize concurrently. Teardown runs in reverse topological order.</p>
+
+      <div class="diagram">
+DatabaseFixture.BeforeAll &rarr; CacheFixture.BeforeAll &rarr; tests run &rarr; CacheFixture.AfterAll &rarr; DatabaseFixture.AfterAll
+      </div>
+
+      <p>This scales to arbitrary depth. If a third fixture depends on the cache, it slots into the graph naturally. You never manually coordinate initialization order; the dependency pointers encode it.</p>
+
+      <h2>The cross-package problem</h2>
+
+      <p>Everything above works within a single package. But <code>go test</code> runs each package as a <strong>separate OS process</strong>. There is no shared memory between <code>pkg/user</code> and <code>pkg/order</code>. They are different binaries, running in different processes, with different address spaces.</p>
+
+      <p>This means none of the patterns above can share a fixture across packages:</p>
+
+      <ul>
+        <li><strong><code>TestMain</code></strong> runs once per package, not once per test run. Five packages that need Postgres means five containers started, five schema migrations run.</li>
+        <li><strong><code>sync.Once</code></strong> is a per-process primitive. It does not cross process boundaries.</li>
+        <li><strong>Helper packages</strong> like <code>testutil.GetDB()</code> get imported by each package independently. Each one initializes its own connection in its own process.</li>
+      </ul>
+
+      <p>The stdlib has no answer for this. Most teams fall back to external orchestration: a Makefile or CI script starts the database before <code>go test</code>, passes the DSN through an environment variable, and each package's <code>TestMain</code> connects independently. It works, but the fixture lifecycle lives outside of Go, in shell scripts, docker-compose files, or CI configuration. The test code cannot express "I need a Postgres instance" as a dependency; it can only assume one already exists.</p>
+
+      <h2>Sharing fixtures across packages</h2>
+
+      <p>gotest has <strong>shared fixtures</strong> for this: structs whose name ends in <code>SharedFixture</code>. A shared fixture runs in its own subprocess, once for the entire test run. Its state is serialized as JSON and transferred to every test package that needs it.</p>
+
+      <div class="code-block">
+        <span class="code-label">shared_fixtures.go</span>
+        <pre><code><span class="kw">type</span> <span class="tp">PostgresSharedFixture</span> <span class="kw">struct</span> {
+    DSN    <span class="tp">string</span>   <span class="cm">// serialized: transferred to test packages</span>
+    conn   *sql.DB  <span class="cm">// local: reconstructed by Hydrate</span>
+}
+
+<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">BeforeAll</span>(_ <span class="tp">context.Context</span>) <span class="tp">error</span> {
+    <span class="cm">// start container, run migrations</span>
+    f.DSN = <span class="str">"postgres://localhost:5432/testdb"</span>
+    <span class="kw">var</span> err <span class="tp">error</span>
+    f.conn, err = sql.Open(<span class="str">"postgres"</span>, f.DSN)
+    <span class="kw">return</span> err
+}
+
+<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">AfterAll</span>(_ <span class="tp">context.Context</span>) <span class="tp">error</span> {
+    f.conn.Close()
+    <span class="cm">// stop container</span>
+    <span class="kw">return</span> <span class="kw">nil</span>
+}
+
+<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">Hydrate</span>(_ <span class="tp">context.Context</span>) <span class="tp">error</span> {
+    <span class="kw">var</span> err <span class="tp">error</span>
+    f.conn, err = sql.Open(<span class="str">"postgres"</span>, f.DSN)
+    <span class="kw">return</span> err
+}
+
+<span class="kw">func</span> (f *<span class="tp">PostgresSharedFixture</span>) <span class="fn">Dehydrate</span>(_ <span class="tp">context.Context</span>) <span class="tp">error</span> {
+    <span class="kw">return</span> f.conn.Close()
+}</code></pre>
+      </div>
+
+      <p>The key concept is the split between <strong>transfer fields</strong> and <strong>local fields</strong>:</p>
+
+      <ul>
+        <li><strong>Transfer fields</strong> (<code>DSN</code>) are exported and serialized as JSON. They cross process boundaries.</li>
+        <li><strong>Local fields</strong> (<code>conn</code>) are unexported or assigned in <code>Hydrate</code>. They represent resources that can't be serialized: connections, file handles, goroutines.</li>
+      </ul>
+
+      <p><code>Hydrate</code> runs in each test package's process after the JSON state is deserialized. It reconstructs the non-serializable resources from the transferred data. <code>Dehydrate</code> cleans up those local resources when the test package finishes.</p>
+
+      <h2>Where this leaves you</h2>
+
+      <p>Every fixture pattern represents a trade-off between simplicity, cost, and isolation:</p>
+
+      <ul>
+        <li><strong>Global variables</strong> are simple but share state and have fragile teardown.</li>
+        <li><strong>Helper functions</strong> isolate well but duplicate expensive setup.</li>
+        <li><strong>sync.Once wrappers</strong> amortize cost but reintroduce shared state and have no lifecycle management.</li>
+        <li><strong>All of the above</strong> are confined to a single package. None can share a database or container across the process boundary that <code>go test</code> puts between packages.</li>
+      </ul>
+
+      <p>A struct-based fixture system with lifecycle hooks, dependency ordering, scope control, and serialization-based shared fixtures addresses all four concerns. The fixture is created once (cheap), torn down reliably (lifecycle hooks with context and error handling), each test gets a clean slate (per-test hooks), and expensive infrastructure like databases and containers can be shared across the process boundaries that <code>go test</code> puts between packages.</p>
+
+      <p>The important part isn't the specific implementation. It is recognizing that fixture management is a graph problem. Once you have more than two fixtures that depend on each other, manual coordination becomes a liability. A system that resolves dependencies, enforces initialization order, handles teardown in reverse, and bridges the cross-package process boundary is worth the upfront investment.</p>
+
+      <div class="cta">
+        <p><strong>Try gotest fixtures on your next project.</strong></p>
+        <div class="install-cmd">
+          <code>go install github.com/mvrahden/go-test/cmd/gotest@latest</code>
+          <button onclick="navigator.clipboard.writeText('go install github.com/mvrahden/go-test/cmd/gotest@latest').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})" aria-label="Copy install command">Copy</button>
+        </div>
+        <div class="cta-links">
+          <a href="../reference.html">Reference</a>
+          <a href="https://github.com/mvrahden/go-test">GitHub</a>
+          <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code Extension</a>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-links">
+      <a href="../">Home</a>
+      <a href="https://github.com/mvrahden/go-test">GitHub</a>
+      <a href="https://pkg.go.dev/github.com/mvrahden/go-test">pkg.go.dev</a>
+      <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code Extension</a>
+      <a href="../reference.html">Reference</a>
+      <a href="./">Blog</a>
+      <a href="https://github.com/mvrahden/go-test/blob/main/LICENSE">MIT License</a>
+    </div>
+    <p class="footer-copy">Built for Go developers who want tests that explain themselves.</p>
+  </footer>
+  <script>
+  fetch('https://api.github.com/repos/mvrahden/go-test')
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(d => {
+      if (d.stargazers_count >= 10) {
+        document.getElementById('star-count').textContent = ` ${d.stargazers_count}`;
+      }
+    })
+    .catch(() => {});
+  </script>
+</body>
+</html>
