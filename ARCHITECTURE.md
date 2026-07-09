@@ -594,10 +594,10 @@ to the entire group, not just the leader process.
 │  JSON events streamed to stdout as each suite completes.             │
 │  No batching; order depends on completion time.                      │
 │                                                                      │
-├─ RunCaptureJSON (internal, for watch mode) ──────────────────────────┤
+├─ RunCaptureJSON (internal) ───────────────────────────────────────────┤
 │                                                                      │
 │  Same as StreamJSON but captured into bytes.Buffer.                   │
-│  Nothing written to stdout. Used for programmatic consumption.       │
+│  Nothing written to stdout. Used by watch, spec, and summary modes.  │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
 ```

@@ -42,6 +42,15 @@ Use `True(t, x != nil)` only when the nil vs empty distinction actually matters.
 **`HasPrefix`/`HasSuffix` assertions do not exist.**
 Use `Regexp(t, "^prefix", str)` or `Regexp(t, "suffix$", str)`.
 
+**Prefer specific assertions over generic boolean checks.**
+The linter enforces assertion simplification.
+`True(t, a == b)` → `Equal(t, a, b)`. `True(t, err != nil)` → `Error(t, err)`. `True(t, len(x) == 0)` → `Empty(t, x)`. `Equal(t, true, v)` → `True(t, v)`. `Equal(t, nil, v)` → `Zero(t, v)`. `Len(t, x, 0)` → `Empty(t, x)`.
+The more specific assertion produces better failure messages.
+
+**Always pair `BeforeAll` with `AfterAll` in suites.**
+If `BeforeAll` acquires resources, add an `AfterAll` to release them.
+The linter flags unpaired `BeforeAll` as a likely resource leak.
+
 ## Assertions
 
 All assertion functions call `FailNow()` on failure (fatal — test stops immediately).
@@ -214,6 +223,32 @@ All are optional.
 Execution order: BeforeAll -> (BeforeEach -> Test -> AfterEach)* -> AfterAll.
 For parallel test cases, AfterAll waits for all parallel tests to complete.
 
+**Returning BeforeEach (required for `Parallel: true`):**
+
+When `SuiteConfig` enables `Parallel`, `BeforeEach` must return a context struct pointer to give each parallel test its own isolated state. Test methods and `AfterEach` then accept this context as an additional parameter:
+
+```go
+type testCtx struct {
+    db   *sql.DB
+    repo *UserRepository
+}
+
+func (s *MyTestSuite) BeforeEach(t *gotest.T) *testCtx {
+    db := setupTestDB()
+    return &testCtx{db: db, repo: newUserRepository(db)}
+}
+
+func (s *MyTestSuite) AfterEach(t *gotest.T, ctx *testCtx) {
+    ctx.db.Close()
+}
+
+func (s *MyTestSuite) TestCreate(t *gotest.T, ctx *testCtx) {
+    gotest.NoError(t, ctx.repo.Create("alice"))
+}
+```
+
+Without the returning form, the suite struct `s` is shared across parallel methods — writing to `s` fields is a data race.
+
 ### SuiteConfig (optional)
 
 ```go
@@ -222,8 +257,9 @@ func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-Fields: `Timeout` (per-test deadline), `SetupTimeout`, `Retries`, `FailFast` (stop on first failure), `Parallel` (run methods concurrently).
+Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel` (run methods concurrently).
 Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
+Use `-1` for `Timeout` or `SetupTimeout` to disable the deadline.
 
 ### SuiteGuard (optional)
 
@@ -282,6 +318,9 @@ type UserTestSuite struct {
 }
 ```
 
+When both fixture and suite define `BeforeEach`/`AfterEach`, the fixture's hooks wrap the suite's:
+fixture.BeforeEach -> suite.BeforeEach -> test -> suite.AfterEach -> fixture.AfterEach.
+
 Fixtures compose via pointer fields (DAG — dependencies set up first):
 
 ```go
@@ -329,8 +368,39 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
 
 Fields assigned in `Hydrate` are automatically classified as local and excluded from serialization.
 
+Shared fixture configuration uses a method named `SharedFixtureConfig()` (not `FixtureConfig()`) but returns the same `gotest.FixtureConfig` type:
+
+```go
+func (f *PostgresSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
+    return gotest.ContainerFixtureConfig() // 5m timeout, 1 retry
+}
+```
+
 Suites reference shared fixtures via pointer fields (same as package fixtures).
 Shared fixtures must not live in `internal/` packages.
+
+### Generic test suites (contract testing)
+
+Generic suite structs define contract tests once; type aliases instantiate them for each concrete type:
+
+```go
+type IndexContractTestSuite[T Indexable] struct{}
+
+func (s *IndexContractTestSuite[T]) SuiteConfig() gotest.SuiteConfig {
+    return gotest.SuiteConfig{Parallel: true}
+}
+
+func (s *IndexContractTestSuite[T]) TestEmptyIndex(t *gotest.T) {
+    idx := newIndex[T]()
+    gotest.Empty(t, idx.Search("anything"))
+}
+
+// Type aliases create concrete suites the framework discovers:
+type ArticleIndexTestSuite = IndexContractTestSuite[Article]
+type ProductIndexTestSuite = IndexContractTestSuite[Product]
+```
+
+Each type alias produces a separate suite that runs independently.
 
 ## Parallel Semantics
 
@@ -346,6 +416,9 @@ Use a returning `BeforeEach` to give each method its own isolated state.
 ```go
 t.T() *testing.T                                    // access underlying testing.T (panics inside Eventually)
 t.Context() context.Context                          // test context (respects deadline from SuiteConfig)
+t.Skipf(format, args...)                             // skip the test with a formatted reason
+t.Setenv(key, value)                                 // set env var, restored after test
+t.TempDir() string                                   // create a temp dir, cleaned up after test
 t.It("description", func(it *gotest.T) { ... })     // BDD-style subtest
 t.When("condition", func(w *gotest.T) { ... })       // BDD-style subtest
 ```
@@ -356,6 +429,7 @@ for t, entry := range gotest.Each(t, entries) {
     gotest.Equal(t, entry.Expected, Compute(entry.Input))
 }
 ```
+Subtest names are derived from the entry struct's `Desc` or `Name` string field (if present), otherwise `#0`, `#1`, etc.
 
 ## Utilities
 
