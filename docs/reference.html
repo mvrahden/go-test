@@ -212,6 +212,7 @@
       margin-right: 0.4rem;
     }
     .toc a { font-size: 0.9rem; }
+    .toc-desc { font-size: 0.8rem; color: var(--text-dimmed); }
 
     /* ===== Sections ===== */
     .ref-section {
@@ -394,6 +395,7 @@
       </a>
       <div class="nav-links">
         <a href="./" class="nav-home">Home</a>
+        <a href="blog/">Blog</a>
         <a href="https://github.com/mvrahden/go-test" class="star-btn"><span class="star-icon">&#9734;</span> Star<span class="star-count" id="star-count"></span></a>
         <a href="https://pkg.go.dev/github.com/mvrahden/go-test">pkg.go.dev</a>
         <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code</a>
@@ -410,16 +412,16 @@
     <div class="toc">
       <div class="toc-title">Contents</div>
       <ol>
-        <li><a href="#conceptual-model">Conceptual Model</a></li>
-        <li><a href="#naming-conventions">Naming Conventions</a></li>
-        <li><a href="#lifecycle">Suite Lifecycle</a></li>
-        <li><a href="#test-dsl">Test DSL</a></li>
-        <li><a href="#fixtures">Fixtures</a></li>
-        <li><a href="#assertions">Assertions</a></li>
-        <li><a href="#configuration">Configuration</a></li>
-        <li><a href="#coverage">Coverage</a></li>
-        <li><a href="#cli">CLI Reference</a></li>
-        <li><a href="#ci-integration">CI Integration</a></li>
+        <li><a href="#conceptual-model">Conceptual Model</a> <span class="toc-desc">— how Go constructs map to spec concepts</span></li>
+        <li><a href="#naming-conventions">Naming Conventions</a> <span class="toc-desc">— suffixes, prefixes, and lifecycle methods</span></li>
+        <li><a href="#lifecycle">Suite Lifecycle</a> <span class="toc-desc">— execution order, hooks, and parallel modes</span></li>
+        <li><a href="#test-dsl">Test DSL</a> <span class="toc-desc">— When/It, data-driven tests, snapshots, polling</span></li>
+        <li><a href="#fixtures">Fixtures</a> <span class="toc-desc">— package fixtures, DAG ordering, shared fixtures</span></li>
+        <li><a href="#assertions">Assertions</a> <span class="toc-desc">— type-safe generics for equality, errors, collections</span></li>
+        <li><a href="#configuration">Configuration</a> <span class="toc-desc">— project file, suite config, fixture config</span></li>
+        <li><a href="#coverage">Coverage</a> <span class="toc-desc">— statement-weighted calculation and thresholds</span></li>
+        <li><a href="#cli">CLI Reference</a> <span class="toc-desc">— commands, flags, go test passthrough</span></li>
+        <li><a href="#ci-integration">CI Integration</a> <span class="toc-desc">— summary output, GitHub Action, PR annotations</span></li>
       </ol>
     </div>
 
@@ -979,7 +981,7 @@ percentage = covered / total</div>
           <tr><td><code>--update-snapshots</code></td><td>Regenerate all snapshot files.</td></tr>
           <tr><td><code>--no-cache</code></td><td>Disable overlay cache, force fresh generation.</td></tr>
           <tr><td><code>--min=&lt;pct&gt;</code></td><td>Fail if coverage falls below threshold.</td></tr>
-          <tr><td><code>--format=md</code></td><td>Markdown output for <code>spec</code> command.</td></tr>
+          <tr><td><code>--format=&lt;fmt&gt;</code></td><td>Output format for <code>spec</code> command: <code>md</code> (Markdown) or <code>json</code> (structured JSON).</td></tr>
           <tr><td><code>--output=&lt;path&gt;</code></td><td>Write formatted output to file.</td></tr>
           <tr><td><code>--no-color</code></td><td>Strip ANSI codes from output.</td></tr>
           <tr><td><code>--debug</code></td><td>Preserve overlays after the run for inspection.</td></tr>
@@ -1089,6 +1091,7 @@ FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
       <a href="https://github.com/mvrahden/go-test">GitHub</a>
       <a href="https://pkg.go.dev/github.com/mvrahden/go-test">pkg.go.dev</a>
       <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code Extension</a>
+      <a href="blog/">Blog</a>
       <a href="https://github.com/mvrahden/go-test/blob/main/LICENSE">MIT License</a>
     </div>
     <p class="footer-copy">Built for Go developers who want tests that explain themselves.</p>
