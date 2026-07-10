@@ -1,6 +1,9 @@
 name: quality
 
 on:
+  push:
+    branches: [main]
+    paths-ignore: [vscode-gotest/**]
   pull_request:
     types: [opened, synchronize, reopened]
     paths-ignore: [vscode-gotest/**]
