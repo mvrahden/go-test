@@ -296,7 +296,6 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			gotest.NoError(it, err)
 
 			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
-			gotest.Error(it, err)
 			gotest.ErrorContains(it, err, "cycle")
 		})
 	})
@@ -332,7 +331,6 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			gotest.NoError(it, err)
 
 			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
-			gotest.Error(it, err)
 			gotest.ErrorContains(it, err, "must have a BeforeAll")
 		})
 	})
@@ -382,7 +380,6 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			gotest.NoError(it, err)
 
 			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
-			gotest.Error(it, err, "expected error for non-serializable transfer field")
 			gotest.ErrorContains(it, err, "non-JSON-serializable")
 			gotest.ErrorContains(it, err, "channel")
 		})
@@ -489,7 +486,6 @@ func (s *ResolverTestSuite) TestGenericAlias(t *gotest.T) {
 			pkg := &packages.Package{Name: "mypkg_test", PkgPath: "example.com/mypkg_test"}
 
 			_, err := gotestgen.Resolve(pkg, []*gotestast.TestSuiteSpec{suite}, nil)
-			gotest.Error(it, err, "expected error for generic alias in pxtest")
 			gotest.ErrorContains(it, err, "must not be in an external test package")
 		})
 	})

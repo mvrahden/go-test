@@ -267,7 +267,6 @@ func (f *BadSharedFixture) BeforeEach(ctx context.Context) error { return nil }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "BeforeEach" {
-					gotest.Error(it, err, "BeforeEach should be rejected on shared fixture")
 					gotest.ErrorContains(it, err, "must not have BeforeEach method")
 					gotest.Greater(it, pos, 0, "error position should be set")
 				}
@@ -295,7 +294,6 @@ func (f *BadSharedFixture) AfterEach(ctx context.Context) error { return nil }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "AfterEach" {
-					gotest.Error(it, err, "AfterEach should be rejected on shared fixture")
 					gotest.ErrorContains(it, err, "must not have AfterEach method")
 					gotest.Greater(it, pos, 0, "error position should be set")
 				}
@@ -353,7 +351,6 @@ func (f *DBFixture) Hydrate(ctx context.Context) error   { return nil }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "Hydrate" {
-					gotest.Error(it, err, "Hydrate should be rejected on package fixture")
 					gotest.ErrorContains(it, err, "Hydrate/Dehydrate are for shared fixtures only")
 					gotest.Greater(it, pos, 0)
 				}
@@ -381,7 +378,6 @@ func (f *DBFixture) Dehydrate(ctx context.Context) error  { return nil }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "Dehydrate" {
-					gotest.Error(it, err, "Dehydrate should be rejected on package fixture")
 					gotest.ErrorContains(it, err, "Hydrate/Dehydrate are for shared fixtures only")
 					gotest.Greater(it, pos, 0)
 				}
@@ -448,7 +444,6 @@ func (f *PGSharedFixture) FixtureConfig() int { return 0 }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "FixtureConfig" {
-					gotest.Error(it, err, "FixtureConfig should be rejected on shared fixture")
 					gotest.ErrorContains(it, err, "should use SharedFixtureConfig()")
 					gotest.Greater(it, pos, 0)
 				}
@@ -476,7 +471,6 @@ func (f *DBFixture) SharedFixtureConfig() int { return 0 }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "SharedFixtureConfig" {
-					gotest.Error(it, err, "SharedFixtureConfig should be rejected on package fixture")
 					gotest.ErrorContains(it, err, "should use FixtureConfig()")
 					gotest.Greater(it, pos, 0)
 				}
@@ -533,7 +527,6 @@ func (f *DBFixture) BeforeAll() error { return nil }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "BeforeAll" {
-					gotest.Error(it, err, "BeforeAll with wrong sig should be rejected")
 					gotest.ErrorContains(it, err, "unsupported signature")
 					gotest.Greater(it, pos, 0)
 				}
@@ -631,7 +624,6 @@ func (f *PGSharedFixture) Hydrate(ctx context.Context) error   { return nil }
 			}
 
 			pos, err := gotestast.ValidateFixtureConsistency(spec)
-			gotest.Error(it, err, "expected error for Hydrate without Dehydrate")
 			gotest.ErrorContains(it, err, "has Hydrate but no Dehydrate")
 			gotest.Greater(it, pos, 0)
 		})
@@ -660,7 +652,6 @@ func (f *PGSharedFixture) Dehydrate(ctx context.Context) error   { return nil }
 			}
 
 			pos, err := gotestast.ValidateFixtureConsistency(spec)
-			gotest.Error(it, err, "expected error for Dehydrate without Hydrate")
 			gotest.ErrorContains(it, err, "has Dehydrate but no Hydrate")
 			gotest.Greater(it, pos, 0)
 		})
@@ -760,7 +751,6 @@ func (s *S) TooManyParams(ctx context.Context, x int) error { return nil }
 
 				err := gotestast.ExportValidateContextErrorSig(sig, methodID)
 				if tc.wantErr {
-					gotest.Error(sub, err, "expected error for %s", tc.Name)
 					gotest.ErrorContains(sub, err, tc.errMsg)
 				} else {
 					gotest.NoError(sub, err)

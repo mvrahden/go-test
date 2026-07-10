@@ -399,7 +399,7 @@ func (s *AssertionsTestSuite) TestEmpty(t *gotest.T) {
 
 	t.When("input is an integer", func(w *gotest.T) {
 		w.It("fails with type guard", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, 42) })
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, 42) }) //nolint:assertion-type-guard // testing guard behavior
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "cannot be empty")
 		})
@@ -530,7 +530,7 @@ func (s *AssertionsTestSuite) TestNotEmpty(t *gotest.T) {
 
 	t.When("input is an integer", func(w *gotest.T) {
 		w.It("fails with type guard", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, 42) })
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, 42) }) //nolint:assertion-type-guard // testing guard behavior
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "cannot be empty")
 		})
@@ -556,11 +556,11 @@ func (s *AssertionsTestSuite) TestNil(t *gotest.T) {
 			gotest.False(it, m.Failed())
 		})
 		w.It("passes for nil pointer", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, (*int)(nil)) })
+			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, (*int)(nil)) }) //nolint:assertion-simplify // testing guard behavior
 			gotest.False(it, m.Failed())
 		})
 		w.It("passes for nil channel", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, (chan int)(nil)) })
+			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, (chan int)(nil)) }) //nolint:assertion-simplify // testing guard behavior
 			gotest.False(it, m.Failed())
 		})
 	})
@@ -580,33 +580,33 @@ func (s *AssertionsTestSuite) TestNil(t *gotest.T) {
 		})
 		w.It("fails for non-nil pointer", func(it *gotest.T) {
 			n := 1
-			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, &n) })
+			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, &n) }) //nolint:assertion-simplify // testing guard behavior
 			gotest.True(it, m.Failed())
 		})
 		w.It("fails for non-nil channel", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, make(chan int)) })
+			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, make(chan int)) }) //nolint:assertion-simplify // testing guard behavior
 			gotest.True(it, m.Failed())
 		})
 	})
 
 	t.When("value is not nilable", func(w *gotest.T) {
 		w.It("fails with type guard for int", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, 42) })
+			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, 42) }) //nolint:assertion-type-guard // testing guard behavior
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "not nilable")
 		})
 		w.It("fails with type guard for string", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, "hello") })
+			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, "hello") }) //nolint:assertion-type-guard // testing guard behavior
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "not nilable")
 		})
 		w.It("fails with type guard for bool", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, true) })
+			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, true) }) //nolint:assertion-type-guard // testing guard behavior
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "not nilable")
 		})
 		w.It("fails with type guard for struct", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, point{}) })
+			m := gotest.Record(func(r *gotest.R) { gotest.Nil(r, point{}) }) //nolint:assertion-type-guard // testing guard behavior
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "not nilable")
 		})
@@ -629,11 +629,11 @@ func (s *AssertionsTestSuite) TestNotNil(t *gotest.T) {
 		})
 		w.It("passes for non-nil pointer", func(it *gotest.T) {
 			n := 1
-			m := gotest.Record(func(r *gotest.R) { gotest.NotNil(r, &n) })
+			m := gotest.Record(func(r *gotest.R) { gotest.NotNil(r, &n) }) //nolint:assertion-simplify // testing guard behavior
 			gotest.False(it, m.Failed())
 		})
 		w.It("passes for non-nil channel", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.NotNil(r, make(chan int)) })
+			m := gotest.Record(func(r *gotest.R) { gotest.NotNil(r, make(chan int)) }) //nolint:assertion-simplify // testing guard behavior
 			gotest.False(it, m.Failed())
 		})
 	})
@@ -656,28 +656,28 @@ func (s *AssertionsTestSuite) TestNotNil(t *gotest.T) {
 			gotest.True(it, m.Failed())
 		})
 		w.It("fails for nil pointer", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.NotNil(r, (*int)(nil)) })
+			m := gotest.Record(func(r *gotest.R) { gotest.NotNil(r, (*int)(nil)) }) //nolint:assertion-simplify // testing guard behavior
 			gotest.True(it, m.Failed())
 		})
 		w.It("fails for nil channel", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.NotNil(r, (chan int)(nil)) })
+			m := gotest.Record(func(r *gotest.R) { gotest.NotNil(r, (chan int)(nil)) }) //nolint:assertion-simplify // testing guard behavior
 			gotest.True(it, m.Failed())
 		})
 	})
 
 	t.When("value is not nilable", func(w *gotest.T) {
 		w.It("fails with type guard for int", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.NotNil(r, 42) })
+			m := gotest.Record(func(r *gotest.R) { gotest.NotNil(r, 42) }) //nolint:assertion-type-guard // testing guard behavior
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "not nilable")
 		})
 		w.It("fails with type guard for string", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.NotNil(r, "hello") })
+			m := gotest.Record(func(r *gotest.R) { gotest.NotNil(r, "hello") }) //nolint:assertion-type-guard // testing guard behavior
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "not nilable")
 		})
 		w.It("fails with type guard for struct", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.NotNil(r, point{}) })
+			m := gotest.Record(func(r *gotest.R) { gotest.NotNil(r, point{}) }) //nolint:assertion-type-guard // testing guard behavior
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "not nilable")
 		})
@@ -745,12 +745,12 @@ func (s *AssertionsTestSuite) TestErrorIs(t *gotest.T) {
 
 	t.When("target is nil", func(w *gotest.T) {
 		w.It("fails with type guard", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.ErrorIs(r, errSentinel, nil) })
+			m := gotest.Record(func(r *gotest.R) { gotest.ErrorIs(r, errSentinel, nil) }) //nolint:assertion-simplify // testing guard behavior
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "target is nil")
 		})
 		w.It("fails with type guard even when err is nil", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.ErrorIs(r, nil, nil) })
+			m := gotest.Record(func(r *gotest.R) { gotest.ErrorIs(r, nil, nil) }) //nolint:assertion-simplify // testing guard behavior
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "target is nil")
 		})
@@ -815,12 +815,12 @@ func (s *AssertionsTestSuite) TestErrorContains(t *gotest.T) {
 
 	t.When("contains is empty", func(w *gotest.T) {
 		w.It("fails with type guard", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.ErrorContains(r, errors.New("x"), "") })
+			m := gotest.Record(func(r *gotest.R) { gotest.ErrorContains(r, errors.New("x"), "") }) //nolint:assertion-simplify // testing guard behavior
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "contains is empty")
 		})
 		w.It("fails with type guard even when err is nil", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.ErrorContains(r, nil, "") })
+			m := gotest.Record(func(r *gotest.R) { gotest.ErrorContains(r, nil, "") }) //nolint:assertion-simplify // testing guard behavior
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "contains is empty")
 		})
@@ -832,7 +832,6 @@ func (s *AssertionsTestSuite) TestFailMessagePropagation(t *gotest.T) {
 		w.It("includes message in failure output", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Equal(r, 1, 2, "custom failure message") })
 			gotest.True(it, m.Failed())
-			gotest.NotEmpty(it, m.Message())
 			gotest.Contains(it, m.Message(), "custom failure message")
 		})
 		w.It("supports format strings", func(it *gotest.T) {

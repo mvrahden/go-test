@@ -330,7 +330,7 @@ func TestCorrectUsage(t *testing.T) {
 
 	s := []int{1}
 	gotest.Empty(t, s)
-	gotest.NotEmpty(t, s) //nolint:assertion-redundant
+	gotest.NotEmpty(t, s) //nolint:assertion-redundant // testing correct usage, not a redundant guard
 	gotest.Len(t, s, 3)
 	gotest.Contains(t, "hello", "h")
 

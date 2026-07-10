@@ -74,7 +74,7 @@ func TestNotEmptyBeforeContains(t *testing.T) {
 func TestNotNilBeforeLenZero(t *testing.T) {
 	var s []int
 	gotest.NotNil(t, s)
-	gotest.Len(t, s, 0) //nolint:assertion-simplify
+	gotest.Len(t, s, 0) //nolint:assertion-simplify // testing that NotNil+Len(0) is not redundant
 }
 
 func TestDifferentVariables(t *testing.T) {

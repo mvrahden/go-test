@@ -26,7 +26,7 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupSetup(t *gotest.T) {
 
 			gotest.True(it, cmd.SysProcAttr != nil && cmd.SysProcAttr.Setpgid,
 				"expected Setpgid to be true")
-			gotest.True(it, cmd.Cancel != nil, "expected Cancel to be set")
+			gotest.NotNil(it, cmd.Cancel, "expected Cancel to be set")
 			gotest.Equal(it, gotestrunner.GracefulShutdownDelay, cmd.WaitDelay)
 		})
 	})
