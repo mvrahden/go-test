@@ -35,6 +35,9 @@ outputs:
   coverage:
     description: "Coverage percentage (empty if coverage not enabled)"
     value: ${{ steps.test.outputs.coverage }}
+  coverage-color:
+    description: "Shields.io color for coverage (brightgreen/green/yellowgreen/yellow/orange/red)"
+    value: ${{ steps.test.outputs.coverage-color }}
 
 runs:
   using: "composite"
@@ -105,6 +108,15 @@ runs:
         if [ -n "$cover_profile" ] && [ -f "$cover_profile" ]; then
           cov=$(go tool cover -func="$cover_profile" | tail -1 | awk '{print $NF}' | sed 's/%//')
           echo "coverage=$cov" >> "$GITHUB_OUTPUT"
+          color=$(awk -v c="$cov" 'BEGIN {
+            if (c >= 90) print "brightgreen"
+            else if (c >= 80) print "green"
+            else if (c >= 70) print "yellowgreen"
+            else if (c >= 60) print "yellow"
+            else if (c >= 40) print "orange"
+            else print "red"
+          }')
+          echo "coverage-color=$color" >> "$GITHUB_OUTPUT"
           rm -f "$cover_profile"
         fi
 
