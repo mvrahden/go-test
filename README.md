@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/mvrahden/go-test/actions/workflows/test.yml/badge.svg)](https://github.com/mvrahden/go-test/actions/workflows/test.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/mvrahden/go-test.svg)](https://pkg.go.dev/github.com/mvrahden/go-test)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mvrahden/go-test)](https://goreportcard.com/report/github.com/mvrahden/go-test)
+[![Quality](https://img.shields.io/github/actions/workflow/status/mvrahden/go-test/quality.yml?branch=main&label=quality)](https://github.com/mvrahden/go-test/actions/workflows/quality.yml)
 [![Go 1.24+](https://img.shields.io/badge/Go-1.24%2B-00ADD8?logo=go)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
