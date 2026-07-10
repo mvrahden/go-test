@@ -44,6 +44,8 @@ func Zero(t testingT, value any, msgAndArgs ...any)                           {}
 func NotZero(t testingT, value any, msgAndArgs ...any)                        {}
 func Empty(t testingT, object any, msgAndArgs ...any)                         {}
 func NotEmpty(t testingT, object any, msgAndArgs ...any)                      {}
+func Nil(t testingT, object any, msgAndArgs ...any)                           {}
+func NotNil(t testingT, object any, msgAndArgs ...any)                        {}
 func Len(t testingT, object any, length int, msgAndArgs ...any)               {}
 func Contains(t testingT, s, contains any, msgAndArgs ...any)                 {}
 func NotContains(t testingT, s, contains any, msgAndArgs ...any)              {}

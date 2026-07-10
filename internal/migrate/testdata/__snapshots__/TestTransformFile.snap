@@ -28,6 +28,6 @@ func (s *UserTestSuite) TestCreate(t *gotest.T) {
 }
 
 func (s *UserTestSuite) TestDelete(t *gotest.T) {
-	gotest.NotEmpty(t, s.db)
+	gotest.NotNil(t, s.db)
 }
 

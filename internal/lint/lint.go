@@ -30,7 +30,8 @@ const (
 	PollScope         Rule = "poll-scope"
 	TestSignature     Rule = "test-signature"
 	XLifecycle        Rule = "x-lifecycle"
-	AssertionSimplify Rule = "assertion-simplify"
+	AssertionSimplify  Rule = "assertion-simplify"
+	AssertionTypeGuard Rule = "assertion-type-guard"
 	TEscape           Rule = "t-escape"
 )
 
@@ -991,8 +992,10 @@ var pollScopeAssertionFuncs = map[string]bool{
 	"Eventually": true, "Fail": true, "False": true,
 	"Greater": true, "GreaterOrEqual": true, "InDelta": true,
 	"JSONEq": true, "Len": true, "Less": true,
-	"LessOrEqual": true, "MatchSnapshot": true, "NoError": true,
+	"LessOrEqual": true, "MatchSnapshot": true, "Nil": true,
+	"NoError": true,
 	"NotContains": true, "NotEmpty": true, "NotEqual": true,
+	"NotNil": true,
 	"NotZero": true, "Panics": true, "Regexp": true,
 	"Subset": true, "TimeIsNow": true, "TimeWithin": true,
 	"True": true, "Zero": true,
