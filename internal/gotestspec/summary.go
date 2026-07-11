@@ -46,6 +46,25 @@ func collectFailedLeaves(pkgPath string, n *Node, display []string, out *[]failu
 	}
 }
 
+type packageDiagnostic struct {
+	Package string
+	Output  []string
+}
+
+func collectPackageDiagnostics(packages []*Package) []packageDiagnostic {
+	var diags []packageDiagnostic
+	for _, pkg := range packages {
+		if pkg.Status != StatusFail || len(pkg.Output) == 0 {
+			continue
+		}
+		diags = append(diags, packageDiagnostic{
+			Package: pkg.Path,
+			Output:  pkg.Output,
+		})
+	}
+	return diags
+}
+
 func totalDuration(packages []*Package) time.Duration {
 	var d time.Duration
 	for _, pkg := range packages {
@@ -73,8 +92,9 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 
 	stats := CollectStats(packages)
 	failures := collectFailures(packages)
+	diags := collectPackageDiagnostics(packages)
 
-	if len(failures) == 0 {
+	if len(failures) == 0 && len(diags) == 0 {
 		fmt.Fprintf(w, "%s%d tests passed%s (%s)\n",
 			c.green, stats.Total(), c.reset,
 			formatDuration(effectiveDuration(cfg, packages)))
@@ -84,19 +104,30 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 		return
 	}
 
-	fmt.Fprintf(w, "%s%d of %d tests failed%s\n",
-		c.red, stats.Failed, stats.Total(), c.reset)
+	if len(failures) > 0 {
+		fmt.Fprintf(w, "%s%d of %d tests failed%s\n",
+			c.red, stats.Failed, stats.Total(), c.reset)
 
-	for _, f := range failures {
+		for _, f := range failures {
+			fmt.Fprintln(w)
+			displayPath := strings.Join(f.Display, " / ")
+			fmt.Fprintf(w, "%sFAIL%s  %s%s%s %s (%s)\n",
+				c.red, c.reset,
+				c.dim, f.Package, c.reset,
+				displayPath,
+				formatDuration(f.Duration))
+
+			for _, line := range filterOutput(f.Output) {
+				fmt.Fprintf(w, "      %s%s%s\n", c.red, line, c.reset)
+			}
+		}
+	}
+
+	for _, d := range diags {
 		fmt.Fprintln(w)
-		displayPath := strings.Join(f.Display, " / ")
-		fmt.Fprintf(w, "%sFAIL%s  %s%s%s %s (%s)\n",
-			c.red, c.reset,
-			c.dim, f.Package, c.reset,
-			displayPath,
-			formatDuration(f.Duration))
-
-		for _, line := range filterOutput(f.Output) {
+		fmt.Fprintf(w, "%sFAIL%s  %s%s%s\n",
+			c.red, c.reset, c.dim, d.Package, c.reset)
+		for _, line := range filterOutput(d.Output) {
 			fmt.Fprintf(w, "      %s%s%s\n", c.red, line, c.reset)
 		}
 	}
@@ -116,8 +147,9 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 
 	stats := CollectStats(packages)
 	failures := collectFailures(packages)
+	diags := collectPackageDiagnostics(packages)
 
-	if len(failures) == 0 {
+	if len(failures) == 0 && len(diags) == 0 {
 		fmt.Fprintf(w, "### All %d tests passed (%s)\n",
 			stats.Total(), formatDuration(effectiveDuration(cfg, packages)))
 		if cfg.coverage != nil {
@@ -126,7 +158,11 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 		return
 	}
 
-	fmt.Fprintf(w, "### %d of %d tests failed\n", stats.Failed, stats.Total())
+	if len(failures) > 0 {
+		fmt.Fprintf(w, "### %d of %d tests failed\n", stats.Failed, stats.Total())
+	} else {
+		fmt.Fprintf(w, "### %d tests passed — package failure detected\n", stats.Total())
+	}
 
 	for _, f := range failures {
 		displayPath := strings.Join(f.Display, " / ")
@@ -142,6 +178,18 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 			fmt.Fprintln(w)
 		}
 
+		fmt.Fprintln(w, "</details>")
+	}
+
+	for _, d := range diags {
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "<details>\n<summary><b>%s</b> — package-level failure</summary>\n\n",
+			d.Package)
+		lines := filterOutput(d.Output)
+		for _, line := range lines {
+			fmt.Fprintf(w, "    %s\n", line)
+		}
+		fmt.Fprintln(w)
 		fmt.Fprintln(w, "</details>")
 	}
 
