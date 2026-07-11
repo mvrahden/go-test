@@ -3,7 +3,12 @@ import { spawn, type ChildProcess } from "node:child_process";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import { parseTestEvents, type TestEvent } from "./outputParser.js";
-import { buildCliCommand, formatCliCommand, type CliCommand } from "./cli.js";
+import {
+  buildCliCommand,
+  clearBinaryCache,
+  formatCliCommand,
+  type CliCommand,
+} from "./cli.js";
 import {
   resolveTestItem,
   applyResults,
@@ -28,17 +33,22 @@ class WatchProcess implements vscode.Disposable {
   private cycleBuffer = "";
   private disposed = false;
   private consecutiveCrashes = 0;
+  private needsResolve = false;
+
+  private cmd: CliCommand;
 
   constructor(
     private readonly pkgScope: string,
     private readonly cwd: string,
-    private readonly cmd: CliCommand,
+    cmd: CliCommand,
+    private readonly buildCmd: () => Promise<CliCommand>,
     private readonly outputChannel: vscode.LogOutputChannel,
     private readonly onCycleStart: () => void,
     private readonly onEvents: (jsonLines: string) => void,
     private readonly onError: (msg: string) => void,
     private readonly onExit: () => void,
   ) {
+    this.cmd = cmd;
     this.start();
   }
 
@@ -71,6 +81,10 @@ class WatchProcess implements vscode.Disposable {
 
     this.child.on("error", (err: Error) => {
       this.outputChannel.error(`[watch] process error: ${err.message}`);
+      if ("code" in err && err.code === "ENOENT") {
+        clearBinaryCache();
+        this.needsResolve = true;
+      }
       if (!this.disposed) {
         this.maybeRestart();
       }
@@ -159,10 +173,18 @@ class WatchProcess implements vscode.Disposable {
       `[watch] restarting in ${delay / 1000}s (crash ${this.consecutiveCrashes}/${WatchProcess.MAX_CONSECUTIVE_CRASHES}, scope: ${this.pkgScope})`,
     );
 
-    setTimeout(() => {
-      if (!this.disposed) {
-        this.start();
+    setTimeout(async () => {
+      if (this.disposed) return;
+      if (this.needsResolve) {
+        this.needsResolve = false;
+        try {
+          this.cmd = await this.buildCmd();
+        } catch {
+          this.onExit();
+          return;
+        }
       }
+      this.start();
     }, delay);
   }
 
@@ -230,7 +252,9 @@ export class WatchManager implements vscode.Disposable {
       this.stop(pkgScope);
     }
 
-    const cmd = await buildCliCommand(["watch", "--", "-json", pkgScope], cwd);
+    const buildCmd = () =>
+      buildCliCommand(["watch", "--", "-json", pkgScope], cwd);
+    const cmd = await buildCmd();
 
     let cycleJsonAccumulator = "";
 
@@ -238,6 +262,7 @@ export class WatchManager implements vscode.Disposable {
       pkgScope,
       cwd,
       cmd,
+      buildCmd,
       this.outputChannel,
       // onCycleStart
       () => {

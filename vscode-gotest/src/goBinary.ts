@@ -57,15 +57,17 @@ async function resolveProjectGoBinary(
   }
 
   // go1.26.2 on PATH (installed via `go install golang.org/dl/go1.26.2`)
+  // These can be wrapper stubs that fail when the SDK isn't downloaded,
+  // so validate before accepting.
   const versionedName = `go${goVersion}`;
   const shellVersioned = await whichFromShell(versionedName);
-  if (shellVersioned) {
+  if (shellVersioned && (await validateBinary(shellVersioned))) {
     log?.debug(`[go] resolved go ${goVersion} via shell: ${shellVersioned}`);
     return shellVersioned;
   }
 
   const whichVersioned = await which(versionedName);
-  if (whichVersioned) {
+  if (whichVersioned && (await validateBinary(whichVersioned))) {
     log?.debug(`[go] resolved go ${goVersion} via PATH: ${whichVersioned}`);
     return whichVersioned;
   }
@@ -122,6 +124,15 @@ async function readGoVersionFromMod(
     return match?.[1];
   } catch {
     return undefined;
+  }
+}
+
+async function validateBinary(bin: string): Promise<boolean> {
+  try {
+    await execFileAsync(bin, ["version"], { timeout: 5_000 });
+    return true;
+  } catch {
+    return false;
   }
 }
 

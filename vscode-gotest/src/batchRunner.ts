@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import type { GoTestController } from "./testController.js";
 import type { CoverageStore } from "./coverageStore.js";
 import { type TestEvent } from "./outputParser.js";
-import { buildCliCommand, formatCliCommand } from "./cli.js";
+import { buildCliCommand, clearBinaryCache, formatCliCommand } from "./cli.js";
 import {
   applyEvent,
   skipUnresolved,
@@ -249,6 +249,9 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     return { stdout: result.stdout };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+    if (err instanceof Error && "code" in err && err.code === "ENOENT") {
+      clearBinaryCache();
+    }
     outputChannel.error(`[${label}] ${message}`);
     for (const info of pkgInfos) {
       for (const item of info.items) {

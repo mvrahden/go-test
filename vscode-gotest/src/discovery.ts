@@ -8,7 +8,7 @@ import type {
   DiscoverPackage,
   DiscoverWarning,
 } from "./types.js";
-import { buildCliCommand, formatCliCommand } from "./cli.js";
+import { buildCliCommand, clearBinaryCache, formatCliCommand } from "./cli.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -277,6 +277,11 @@ export class DiscoveryService {
         return;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
+        const isENOENT =
+          err instanceof Error && "code" in err && err.code === "ENOENT";
+        if (isENOENT) {
+          clearBinaryCache();
+        }
         if (attempt < DiscoveryService.MAX_RETRIES) {
           this.outputChannel.debug(
             `[discovery] attempt ${attempt}/${DiscoveryService.MAX_RETRIES} failed, retrying: ${message}`,
