@@ -177,11 +177,12 @@ func gatherMessage(lines []string, fromIdx int) string {
 	}
 	for _, rest := range lines[fromIdx+1:] {
 		rf, _, rm := parseFileLine(rest)
-		if rf == "" && rm == "" {
+		switch {
+		case rf == "" && rm == "":
 			allMsgs = append(allMsgs, rest)
-		} else if rm != "" {
+		case rm != "":
 			allMsgs = append(allMsgs, rm)
-		} else if rf != "" {
+		case rf != "":
 			allMsgs = append(allMsgs, rest)
 		}
 	}
