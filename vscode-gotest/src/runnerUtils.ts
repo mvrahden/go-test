@@ -311,7 +311,15 @@ export function applyEvent(
         return message;
       });
       if (vscodeMessages.length === 0) {
-        vscodeMessages.push(new vscode.TestMessage(output || "Test failed"));
+        const fallback = new vscode.TestMessage(output || "Test failed");
+        const loc = extractDiagnosticLocation(output, pkgDir);
+        if (loc) {
+          fallback.location = new vscode.Location(
+            vscode.Uri.file(loc.file),
+            new vscode.Position(loc.line - 1, 0),
+          );
+        }
+        vscodeMessages.push(fallback);
       }
       run.failed(item, vscodeMessages, duration);
       controller.recordResult(item.id, "fail", duration);

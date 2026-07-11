@@ -887,6 +887,45 @@ describe("applyEvent", () => {
     );
   });
 
+  it("uses diagnostic location as fallback for panic stack traces", () => {
+    const { controller, run, failItem } = makeApplyEventFixture();
+    const outputMap = new Map<string, string>();
+    outputMap.set(
+      "TestMySuite/TestFail",
+      [
+        "panic: runtime error: index out of range [0] with length 0",
+        "",
+        "goroutine 7 [running]:",
+        "testing.tRunner.func1.2({0x5836c0, 0x1})",
+        "\t/usr/local/go/src/testing/testing.go:1974 +0x232",
+        "example.com/pkg.(*Suite).BeforeEach(...)",
+        "\t/some/dir/suite_test.go:56",
+      ].join("\n"),
+    );
+
+    applyEvent(
+      controller as any,
+      run as any,
+      {
+        Action: "fail",
+        Test: "TestMySuite/TestFail",
+        Package: "example.com/pkg",
+        Elapsed: 0.1,
+      } as any,
+      outputMap,
+      "example.com/pkg",
+      "/some/dir",
+    );
+
+    expect(run.failed).toHaveBeenCalledTimes(1);
+    const messages = run.failed.mock.calls[0][1];
+    expect(messages).toHaveLength(1);
+    expect(messages[0].message).toContain("panic: runtime error");
+    expect(messages[0].location).toBeDefined();
+    expect(messages[0].location.uri.fsPath).toBe("/some/dir/suite_test.go");
+    expect(messages[0].location.range.line).toBe(55);
+  });
+
   it("processes package terminal event — resolves package and ancestors", () => {
     const { controller, run, pkgItem } = makeApplyEventFixture();
     const outputMap = new Map<string, string>();
