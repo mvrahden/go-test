@@ -104,14 +104,18 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--no-cache` | Disable overlay cache, force fresh generation |
 | `--spec` | Append spec summary after normal output |
 | `--update-snapshots` | Regenerate snapshot files |
-| `--format=<fmt>` | Output format for `spec` (terminal, md) |
+| `--format=<fmt>` | Output format for `spec`/`summary` (terminal, md) |
 | `--output=<path>` | Write formatted output to file |
 | `--no-color` | Strip ANSI codes from terminal output |
 | `--min=<pct>` | Fail if coverage below threshold (enables `-coverprofile`) |
 | `--setup-timeout=<dur>` | Override fixture setup timeout (default: 2m, 0 to disable) |
 | `--timeout=<dur>` | Global pipeline deadline (default: 15m, 0 to disable) |
 | `--debounce=<dur>` | Debounce interval for watch mode (default 200ms) |
+| `--parallel=<n>` | Total concurrent test method budget (default: 2×GOMAXPROCS) |
+| `--compile-parallel=<n>` | Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan) |
 | `--input=<path>` | Input file for `spec` subcommand |
+| `--github` | Emit GitHub annotations and step summary (auto-enabled in GitHub Actions) |
+| `--coverage=<path>` | Coverage profile path for `summary` subcommand |
 
 ### Disambiguation
 
