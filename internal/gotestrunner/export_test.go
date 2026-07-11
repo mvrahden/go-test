@@ -11,6 +11,7 @@ import (
 type ExportOverlayJSON = overlayJSON
 type ExportFixtureStateEntry = fixtureStateEntry
 
+var ExportCompileConcurrency = compileConcurrency
 var ExportBuildSuiteCmd = buildSuiteCmd
 var ExportReadTeardownBudget = readTeardownBudget
 var ExportSplitTopLevelOr = splitTopLevelOr

@@ -59,6 +59,7 @@ type ExecConfig struct {
 	UpdateSnapshots bool
 	NoCache         bool
 	Parallel        int
+	CompileParallel int
 }
 
 // knownSubcommands is the set of recognized subcommands.

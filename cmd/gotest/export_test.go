@@ -6,6 +6,7 @@ type ExportDiscoverSuite = discoverSuite
 
 var ExportParseMinFlag = parseMinFlag
 var ExportParseParallelFlag = parseParallelFlag
+var ExportParseCompileParallelFlag = parseCompileParallelFlag
 var ExportParseSetupTimeoutFlag = parseSetupTimeoutFlag
 var ExportParseGlobalTimeoutFlag = parseGlobalTimeoutFlag
 var ExportResolveGlobalTimeout = resolveGlobalTimeout

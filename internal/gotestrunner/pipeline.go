@@ -45,6 +45,7 @@ type PipelineConfig struct {
 	UpdateSnapshots bool
 	CI              bool
 	Parallel        int
+	CompileParallel int
 	Streaming       bool
 	OutputMode      RunMode
 }
@@ -91,7 +92,7 @@ func buildBaseEnv(cfg PipelineConfig) []string {
 	return env
 }
 
-func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []string, setupTimeout time.Duration) ([]CompileResult, *SharedFixtureProcess, context.CancelFunc, error) {
+func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []string, setupTimeout time.Duration, compileParallel int) ([]CompileResult, *SharedFixtureProcess, context.CancelFunc, error) {
 	setupTimeout = resolveSetupTimeout(setupTimeout)
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -104,7 +105,7 @@ func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []st
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		compiled, compileErr = CompilePackages(ctx, overlay.SuitePackages, overlay.OverlayFlag, buildFlags, overlay.WorkDir)
+		compiled, compileErr = CompilePackages(ctx, overlay.SuitePackages, overlay.OverlayFlag, buildFlags, overlay.WorkDir, compileParallel)
 		if compileErr != nil {
 			cancel()
 		}
@@ -179,7 +180,7 @@ func setupCoverage(targets []SuiteTarget, overlay *OverlayResult, userCoverProfi
 }
 
 func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (PipelineResult, error) { //nolint:gocritic // hugeParam: stable API
-	compiled, setupProc, cancelPrepare, err := prepareTestRun(ctx, overlay, pf.BuildFlags, cfg.SetupTimeout)
+	compiled, setupProc, cancelPrepare, err := prepareTestRun(ctx, overlay, pf.BuildFlags, cfg.SetupTimeout, cfg.CompileParallel)
 	if err != nil {
 		return PipelineResult{ExitCode: 2}, err
 	}
@@ -286,7 +287,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 		close(fixtureStarted)
 	}
 
-	compileCh := CompilePackagesStream(streamCtx, overlay.SuitePackages, overlay.OverlayFlag, pf.BuildFlags, overlay.WorkDir)
+	compileCh := CompilePackagesStream(streamCtx, overlay.SuitePackages, overlay.OverlayFlag, pf.BuildFlags, overlay.WorkDir, cfg.CompileParallel)
 
 	totalSuites := 0
 	for _, suites := range overlay.SuitesByPkg {

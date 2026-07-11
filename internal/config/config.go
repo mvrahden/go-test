@@ -28,6 +28,9 @@ type ProjectConfig struct {
 	// Parallel is the total concurrency budget (concurrent test methods across all
 	// suite processes). Zero means use the default (2×GOMAXPROCS).
 	Parallel int `yaml:"parallel"`
+	// CompileParallel caps the number of concurrent `go test -c` compilation
+	// processes. Zero means auto (NumCPU, halved when -race/-msan/-asan).
+	CompileParallel int `yaml:"compile-parallel"`
 	// Debounce is the delay before re-running tests in watch mode.
 	// When omitted, the CLI default (200ms) applies.
 	Debounce *Duration `yaml:"debounce"`

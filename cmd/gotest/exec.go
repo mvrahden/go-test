@@ -51,6 +51,7 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 		UpdateSnapshots: cfg.UpdateSnapshots,
 		CI:              cfg.CI,
 		Parallel:        cfg.Parallel,
+		CompileParallel: cfg.CompileParallel,
 		Streaming:       true,
 		OutputMode:      modeFromJSON(cfg.JSON),
 	}, overlay)

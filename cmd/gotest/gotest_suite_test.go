@@ -331,6 +331,31 @@ func (s *CmdGotestTestSuite) TestParseParallelFlag(t *gotest.T) {
 	}
 }
 
+func (s *CmdGotestTestSuite) TestParseCompileParallelFlag(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc      string
+		args      []string
+		expect    int
+		expectErr bool
+	}{
+		{Desc: "no flag", args: []string{"--debug"}, expect: 0},
+		{Desc: "equals syntax", args: []string{"--compile-parallel=4"}, expect: 4},
+		{Desc: "space syntax", args: []string{"--compile-parallel", "2"}, expect: 2},
+		{Desc: "empty args", args: nil, expect: 0},
+		{Desc: "invalid value", args: []string{"--compile-parallel=abc"}, expectErr: true},
+		{Desc: "zero value", args: []string{"--compile-parallel=0"}, expectErr: true},
+		{Desc: "negative value", args: []string{"--compile-parallel=-1"}, expectErr: true},
+	}) {
+		got, err := ExportParseCompileParallelFlag(tc.args)
+		if tc.expectErr {
+			gotest.Error(sub, err, "expected error")
+		} else {
+			gotest.NoError(sub, err)
+			gotest.Equal(sub, tc.expect, got)
+		}
+	}
+}
+
 func (s *CmdGotestTestSuite) TestParseSetupTimeoutFlag(t *gotest.T) {
 	for sub, tc := range gotest.Each(t, []struct {
 		Desc      string

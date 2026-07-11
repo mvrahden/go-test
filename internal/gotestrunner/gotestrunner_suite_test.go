@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -1254,6 +1255,29 @@ func (s *GotestrunnerTestSuite) TestComputeConcurrency(t *gotest.T) {
 		inter, intra := gotestrunner.ComputeConcurrency(tc.budget, tc.numSuites, tc.gomaxprocs)
 		gotest.Equal(sub, tc.wantInter, inter, "inter")
 		gotest.Equal(sub, tc.wantIntra, intra, "intra")
+	}
+}
+
+func (s *GotestrunnerTestSuite) TestCompileConcurrency(t *gotest.T) {
+	numCPU := runtime.NumCPU()
+
+	for sub, tc := range gotest.Each(t, []struct {
+		Name            string
+		compileParallel int
+		buildFlags      []string
+		expect          int
+	}{
+		{"default without sanitizers", 0, []string{"-v", "-count=1"}, numCPU},
+		{"race halves", 0, []string{"-race"}, max(1, numCPU/2)},
+		{"msan halves", 0, []string{"-msan"}, max(1, numCPU/2)},
+		{"asan halves", 0, []string{"-asan"}, max(1, numCPU/2)},
+		{"race among other flags", 0, []string{"-v", "-race", "-count=1"}, max(1, numCPU/2)},
+		{"explicit override honored", 3, []string{"-race"}, 3},
+		{"explicit override without sanitizers", 6, []string{"-v"}, 6},
+		{"no flags", 0, nil, numCPU},
+	}) {
+		got := gotestrunner.ExportCompileConcurrency(tc.compileParallel, tc.buildFlags)
+		gotest.Equal(sub, tc.expect, got)
 	}
 }
 

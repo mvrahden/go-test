@@ -16,6 +16,7 @@ setup-timeout: 2m
 timeout: 20m
 min-coverage: 80
 parallel: 12
+compile-parallel: 2
 debounce: 500ms
 lint:
   skip:
@@ -33,6 +34,7 @@ lint:
 	assertDuration(t, "timeout", cfg.Timeout, 20*time.Minute)
 	assertEqual(t, "min-coverage", cfg.MinCoverage, 80)
 	assertEqual(t, "parallel", cfg.Parallel, 12)
+	assertEqual(t, "compile-parallel", cfg.CompileParallel, 2)
 	assertDuration(t, "debounce", cfg.Debounce, 500*time.Millisecond)
 	assertSliceEqual(t, "lint.skip", cfg.Lint.Skip, []string{"stdlib-test", "testify"})
 }
@@ -51,6 +53,7 @@ func TestLoad_NoFile_ReturnsZero(t *testing.T) {
 	assertNilDuration(t, "timeout", cfg.Timeout)
 	assertEqual(t, "min-coverage", cfg.MinCoverage, 0)
 	assertEqual(t, "parallel", cfg.Parallel, 0)
+	assertEqual(t, "compile-parallel", cfg.CompileParallel, 0)
 	assertNilDuration(t, "debounce", cfg.Debounce)
 	if len(cfg.Lint.Skip) != 0 {
 		t.Errorf("lint.skip: got %v, want empty", cfg.Lint.Skip)
