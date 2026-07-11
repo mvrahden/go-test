@@ -437,3 +437,59 @@ func TestClassify_ParallelMethod(t *testing.T) {
 		t.Errorf("display = %q, want ParallelCreate", method.Display)
 	}
 }
+
+func TestBuildTree_PackageLevelOutput(t *testing.T) {
+	input := `{"Action":"run","Package":"p","Test":"TestFoo"}
+{"Action":"output","Package":"p","Test":"TestFoo","Output":"=== RUN   TestFoo\n"}
+{"Action":"output","Package":"p","Test":"TestFoo","Output":"--- PASS: TestFoo (0.00s)\n"}
+{"Action":"pass","Package":"p","Test":"TestFoo","Elapsed":0}
+{"Action":"output","Package":"p","Output":"==================\n"}
+{"Action":"output","Package":"p","Output":"WARNING: DATA RACE\n"}
+{"Action":"output","Package":"p","Output":"Write at 0x00c by goroutine 9:\n"}
+{"Action":"output","Package":"p","Output":"==================\n"}
+{"Action":"output","Package":"p","Output":"Found 1 data race(s)\n"}
+{"Action":"output","Package":"p","Output":"FAIL\tp\t1.0s\n"}
+{"Action":"fail","Package":"p","Elapsed":1.0}`
+
+	events, err := ParseEvents(strings.NewReader(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tree := BuildTree(events)
+	if len(tree) != 1 {
+		t.Fatalf("expected 1 package, got %d", len(tree))
+	}
+	pkg := tree[0]
+
+	// Test node should be present and passed
+	if len(pkg.Nodes) != 1 {
+		t.Fatalf("expected 1 node, got %d", len(pkg.Nodes))
+	}
+	if pkg.Nodes[0].Status != StatusPass {
+		t.Errorf("test status = %d, want StatusPass", pkg.Nodes[0].Status)
+	}
+
+	// Package should have failed
+	if pkg.Status != StatusFail {
+		t.Errorf("package status = %d, want StatusFail", pkg.Status)
+	}
+
+	// Package-level diagnostic output should be collected
+	if len(pkg.Output) == 0 {
+		t.Fatal("expected package-level output, got none")
+	}
+
+	combined := strings.Join(pkg.Output, "")
+	if !strings.Contains(combined, "WARNING: DATA RACE") {
+		t.Errorf("package output should contain race warning, got:\n%s", combined)
+	}
+	if !strings.Contains(combined, "Found 1 data race(s)") {
+		t.Errorf("package output should contain race count, got:\n%s", combined)
+	}
+
+	// Summary lines should NOT be in package output
+	if strings.Contains(combined, "FAIL\tp\t") {
+		t.Errorf("package output should not contain summary line, got:\n%s", combined)
+	}
+}
