@@ -15,6 +15,7 @@ type jsonPackage struct {
 	Status   string     `json:"status"`
 	Duration float64    `json:"duration"`
 	Nodes    []jsonNode `json:"nodes"`
+	Output   []string   `json:"output"`
 }
 
 type jsonNode struct {
@@ -56,11 +57,16 @@ func RenderJSON(w io.Writer, packages []*Package) {
 	}
 
 	for i, pkg := range packages {
+		output := pkg.Output
+		if output == nil {
+			output = []string{}
+		}
 		root.Packages[i] = jsonPackage{
 			Path:     pkg.Path,
 			Status:   statusString(pkg.Status),
 			Duration: pkg.Duration.Seconds(),
 			Nodes:    convertNodes(pkg.Nodes),
+			Output:   output,
 		}
 	}
 

@@ -117,6 +117,14 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if parallel == 0 {
 		parallel = inv.Config.Parallel
 	}
+	compileParallel, err := parseCompileParallelFlag(ownArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if compileParallel == 0 {
+		compileParallel = inv.Config.CompileParallel
+	}
 
 	var coverProfile string
 	if minCoverage > 0 {
@@ -150,6 +158,7 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
 		NoCache:         slices.Contains(ownArgs, "--no-cache"),
 		Parallel:        parallel,
+		CompileParallel: compileParallel,
 	}
 
 	code := Run(cfg)
@@ -224,6 +233,21 @@ func parseParallelFlag(args []string) (int, error) {
 	}
 	if v <= 0 {
 		return 0, fmt.Errorf("invalid --parallel value %d: must be positive", v)
+	}
+	return v, nil
+}
+
+func parseCompileParallelFlag(args []string) (int, error) {
+	raw := extractStringFlag(args, "--compile-parallel", "")
+	if raw == "" {
+		return 0, nil
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("invalid --compile-parallel value %q: must be a positive integer", raw)
+	}
+	if v <= 0 {
+		return 0, fmt.Errorf("invalid --compile-parallel value %d: must be positive", v)
 	}
 	return v, nil
 }

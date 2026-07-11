@@ -11,6 +11,7 @@ import (
 type ExportOverlayJSON = overlayJSON
 type ExportFixtureStateEntry = fixtureStateEntry
 
+var ExportCompileConcurrency = compileConcurrency
 var ExportBuildSuiteCmd = buildSuiteCmd
 var ExportReadTeardownBudget = readTeardownBudget
 var ExportSplitTopLevelOr = splitTopLevelOr
@@ -21,6 +22,8 @@ var ExportBuildExtraEnv = buildExtraEnv
 var ExportBuildBaseEnv = buildBaseEnv
 var ExportOverlayContentHash = overlayContentHash
 var ExportCacheRoot = cacheRoot
+var ExportFilterPackageLevelEvents = filterPackageLevelEvents
+var ExportIsPackageSummaryLine = isPackageSummaryLine
 
 func ExportAutoDetectCI(cfg PipelineConfig) PipelineConfig {
 	if !cfg.CI && os.Getenv(protocol.EnvCI) == "" && os.Getenv("CI") != "" {

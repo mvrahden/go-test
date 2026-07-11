@@ -242,3 +242,93 @@ func TestCollectFailures_DeepHierarchy(t *testing.T) {
 		t.Errorf("display path = %q, want %q", got, want)
 	}
 }
+
+func TestRenderSummary_PackageDiagnostic(t *testing.T) {
+	packages := []*Package{{
+		Path:   "example.com/pkg",
+		Status: StatusFail,
+		Nodes: []*Node{
+			{Kind: KindTest, Display: "Foo", Status: StatusPass, Duration: time.Millisecond},
+		},
+		Output: []string{
+			"==================\n",
+			"WARNING: DATA RACE\n",
+			"Write at 0x00c by goroutine 9:\n",
+			"  pkg.TestFoo.func1()\n",
+			"      foo_test.go:12 +0x38\n",
+			"==================\n",
+			"Found 1 data race(s)\n",
+		},
+	}}
+
+	var buf bytes.Buffer
+	RenderSummary(&buf, packages, WithNoColor())
+	out := buf.String()
+
+	if !strings.Contains(out, "WARNING: DATA RACE") {
+		t.Errorf("expected race warning in output:\n%s", out)
+	}
+	if !strings.Contains(out, "example.com/pkg") {
+		t.Errorf("expected package path in output:\n%s", out)
+	}
+	if !strings.Contains(out, "package failure detected") {
+		t.Errorf("expected 'package failure detected' header:\n%s", out)
+	}
+}
+
+func TestRenderMarkdownSummary_PackageDiagnostic(t *testing.T) {
+	packages := []*Package{{
+		Path:   "example.com/pkg",
+		Status: StatusFail,
+		Nodes: []*Node{
+			{Kind: KindTest, Display: "Foo", Status: StatusPass, Duration: time.Millisecond},
+		},
+		Output: []string{
+			"==================\n",
+			"WARNING: DATA RACE\n",
+			"Found 1 data race(s)\n",
+		},
+	}}
+
+	var buf bytes.Buffer
+	RenderMarkdownSummary(&buf, packages)
+	out := buf.String()
+
+	if !strings.Contains(out, "WARNING: DATA RACE") {
+		t.Errorf("expected race warning in markdown:\n%s", out)
+	}
+	if !strings.Contains(out, "<details>") {
+		t.Errorf("expected collapsible section:\n%s", out)
+	}
+}
+
+func TestRenderSummary_BothTestFailureAndPackageDiagnostic(t *testing.T) {
+	packages := []*Package{{
+		Path:   "p",
+		Status: StatusFail,
+		Nodes: []*Node{
+			{
+				Kind: KindTest, Display: "Good", Status: StatusPass, Duration: time.Millisecond,
+			},
+			{
+				Kind: KindTest, Display: "Bad", Status: StatusFail, Duration: time.Millisecond,
+				Output: []string{"    foo_test.go:10: assertion failed\n"},
+			},
+		},
+		Output: []string{
+			"WARNING: DATA RACE\n",
+			"Found 1 data race(s)\n",
+		},
+	}}
+
+	var buf bytes.Buffer
+	RenderSummary(&buf, packages, WithNoColor())
+	out := buf.String()
+
+	if !strings.Contains(out, "assertion failed") {
+		t.Errorf("expected test failure output:\n%s", out)
+	}
+	if !strings.Contains(out, "WARNING: DATA RACE") {
+		t.Errorf("expected race warning:\n%s", out)
+	}
+}

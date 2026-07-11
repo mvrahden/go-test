@@ -73,6 +73,14 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if parallel == 0 {
 		parallel = inv.Config.Parallel
 	}
+	compileParallel, err := parseCompileParallelFlag(ownArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if compileParallel == 0 {
+		compileParallel = inv.Config.CompileParallel
+	}
 	patterns := ExtractPackagePatterns(goTestArgs)
 
 	cfg := ExecConfig{
@@ -85,6 +93,7 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
 		NoCache:         slices.Contains(ownArgs, "--no-cache"),
 		Parallel:        parallel,
+		CompileParallel: compileParallel,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
@@ -220,6 +229,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode bool) int { //no
 		UpdateSnapshots: cfg.UpdateSnapshots,
 		CI:              cfg.CI,
 		Parallel:        cfg.Parallel,
+		CompileParallel: cfg.CompileParallel,
 		Streaming:       false,
 		OutputMode:      mode,
 	}, overlay)

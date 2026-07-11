@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import {
+  extractDiagnosticLocation,
   extractTestMessages,
   parseExpectedActual,
   type TestEvent,
@@ -223,9 +224,10 @@ export function applyEvent(
   importPath: string,
   pkgDir: string,
 ): AppliedResult | undefined {
-  if (event.Action === "output" && event.Test) {
-    const existing = outputMap.get(event.Test) ?? "";
-    outputMap.set(event.Test, existing + (event.Output ?? ""));
+  if (event.Action === "output") {
+    const key = event.Test ?? "";
+    const existing = outputMap.get(key) ?? "";
+    outputMap.set(key, existing + (event.Output ?? ""));
   }
 
   if (event.Action === "output" && event.Output) {
@@ -253,7 +255,16 @@ export function applyEvent(
       const pkgItem = controller.findItem(importPath);
       if (pkgItem) {
         if (event.Action === "fail") {
-          run.failed(pkgItem, [], duration);
+          const output = outputMap.get("") ?? "";
+          const message = new vscode.TestMessage(output || "Package failed");
+          const loc = extractDiagnosticLocation(output, pkgDir);
+          if (loc) {
+            message.location = new vscode.Location(
+              vscode.Uri.file(loc.file),
+              new vscode.Position(loc.line - 1, 0),
+            );
+          }
+          run.failed(pkgItem, [message], duration);
         } else if (event.Action === "pass") {
           run.passed(pkgItem, duration);
         } else {
@@ -300,7 +311,15 @@ export function applyEvent(
         return message;
       });
       if (vscodeMessages.length === 0) {
-        vscodeMessages.push(new vscode.TestMessage(output || "Test failed"));
+        const fallback = new vscode.TestMessage(output || "Test failed");
+        const loc = extractDiagnosticLocation(output, pkgDir);
+        if (loc) {
+          fallback.location = new vscode.Location(
+            vscode.Uri.file(loc.file),
+            new vscode.Position(loc.line - 1, 0),
+          );
+        }
+        vscodeMessages.push(fallback);
       }
       run.failed(item, vscodeMessages, duration);
       controller.recordResult(item.id, "fail", duration);

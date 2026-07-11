@@ -46,8 +46,8 @@ func compilePackage(ctx context.Context, pkgPath, overlayFlag string, buildFlags
 	return CompileResult{Package: pkgPath, BinaryPath: binaryPath}, nil
 }
 
-func CompilePackages(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir string) ([]CompileResult, error) {
-	ch := CompilePackagesStream(ctx, packages, overlayFlag, buildFlags, outputDir)
+func CompilePackages(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir string, compileParallel int) ([]CompileResult, error) {
+	ch := CompilePackagesStream(ctx, packages, overlayFlag, buildFlags, outputDir, compileParallel)
 	var results []CompileResult
 	var errs []error
 	for outcome := range ch {
@@ -61,7 +61,20 @@ func CompilePackages(ctx context.Context, packages []string, overlayFlag string,
 	return results, errors.Join(errs...)
 }
 
-func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir string) <-chan CompileOutcome {
+func compileConcurrency(compileParallel int, buildFlags []string) int {
+	if compileParallel > 0 {
+		return compileParallel
+	}
+	n := runtime.NumCPU()
+	for _, f := range buildFlags {
+		if f == "-race" || f == "-msan" || f == "-asan" {
+			return max(1, n/2)
+		}
+	}
+	return n
+}
+
+func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir string, compileParallel int) <-chan CompileOutcome {
 	ch := make(chan CompileOutcome)
 
 	binDir := filepath.Join(outputDir, "bin")
@@ -76,7 +89,7 @@ func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag s
 	go func() {
 		defer close(ch)
 		var wg sync.WaitGroup
-		sem := make(chan struct{}, runtime.NumCPU())
+		sem := make(chan struct{}, compileConcurrency(compileParallel, buildFlags))
 
 		for _, pkg := range packages {
 			wg.Add(1)

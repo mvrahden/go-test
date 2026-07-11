@@ -637,6 +637,7 @@ lint:
 | `setup-timeout` | duration | `--setup-timeout` | Total budget for shared fixture setup (default: 2m, 0 to disable) |
 | `min-coverage` | int | `--min` | Minimum coverage percentage (0–100) |
 | `parallel` | int | `--parallel` | Total concurrent test method budget |
+| `compile-parallel` | int | `--compile-parallel` | Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan) |
 | `debounce` | duration | `--debounce` | Watch mode re-run delay |
 | `lint.skip` | list | — | Lint rules to disable project-wide |
 

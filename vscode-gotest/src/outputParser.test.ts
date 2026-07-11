@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseTestEvents,
   extractTestMessages,
+  extractDiagnosticLocation,
   parseExpectedActual,
 } from "./outputParser.js";
 
@@ -152,6 +153,71 @@ describe("extractTestMessages", () => {
     expect(messages).toHaveLength(1);
     expect(messages[0].message).toContain("diff:");
     expect(messages[0].message).toContain('+ "b": 3');
+  });
+});
+
+describe("extractDiagnosticLocation", () => {
+  it("extracts location from race detector stack trace", () => {
+    const output = [
+      "WARNING: DATA RACE",
+      "Read at 0x00c00001c0f0 by goroutine 7:",
+      "  example.com/pkg.(*Foo).Bar()",
+      "      /home/user/project/foo.go:42 +0x1a4",
+    ].join("\n");
+
+    const loc = extractDiagnosticLocation(output, "/home/user/project");
+    expect(loc).toEqual({ file: "/home/user/project/foo.go", line: 42 });
+  });
+
+  it("extracts location from panic stack trace", () => {
+    const output = [
+      "panic: runtime error: index out of range",
+      "",
+      "goroutine 1 [running]:",
+      "example.com/pkg.SomeFunc(...)",
+      "\t/home/user/project/file.go:123 +0x1a4",
+    ].join("\n");
+
+    const loc = extractDiagnosticLocation(output, "/home/user/project");
+    expect(loc).toEqual({ file: "/home/user/project/file.go", line: 123 });
+  });
+
+  it("skips stdlib frames", () => {
+    const output = [
+      "goroutine 1 [running]:",
+      "runtime/pprof.writeGoroutineStacks()",
+      "\t/usr/local/go/src/runtime/pprof/pprof.go:799 +0x1a4",
+      "example.com/pkg.MyFunc()",
+      "\t/home/user/project/my.go:10 +0x2b",
+    ].join("\n");
+
+    const loc = extractDiagnosticLocation(output, "/home/user/project");
+    expect(loc).toEqual({ file: "/home/user/project/my.go", line: 10 });
+  });
+
+  it("skips testing.go frames", () => {
+    const output = [
+      "\ttesting.go:1234 +0x1a4",
+      "\t/home/user/project/svc.go:55 +0x2b",
+    ].join("\n");
+
+    const loc = extractDiagnosticLocation(output, "/home/user/project");
+    expect(loc).toEqual({ file: "/home/user/project/svc.go", line: 55 });
+  });
+
+  it("prepends pkgDir to relative paths", () => {
+    const output = "      foo.go:10 +0x1a4\n";
+    const loc = extractDiagnosticLocation(output, "/abs/pkg");
+    expect(loc).toEqual({ file: "/abs/pkg/foo.go", line: 10 });
+  });
+
+  it("returns undefined when no .go file references", () => {
+    const output = "WARNING: DATA RACE\nsome text without file refs\n";
+    expect(extractDiagnosticLocation(output, "/pkg")).toBeUndefined();
+  });
+
+  it("returns undefined for empty output", () => {
+    expect(extractDiagnosticLocation("", "/pkg")).toBeUndefined();
   });
 });
 

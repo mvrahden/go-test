@@ -46,6 +46,7 @@ type Package struct {
 	Status   Status
 	Duration time.Duration
 	Nodes    []*Node
+	Output   []string
 }
 
 type Stats struct {
@@ -77,9 +78,14 @@ func BuildTree(events []TestEvent) []*Package {
 		}
 
 		if ev.Test == "" {
-			if ev.Action == ActionPass || ev.Action == ActionFail {
+			switch ev.Action {
+			case ActionPass, ActionFail:
 				pkg.Status = statusFrom(ev.Action)
 				pkg.Duration = elapsed(ev.Elapsed)
+			case ActionOutput:
+				if !isPackageSummaryLine(ev.Output) {
+					pkg.Output = append(pkg.Output, ev.Output)
+				}
 			}
 			continue
 		}
@@ -350,4 +356,17 @@ func statusFrom(a Action) Status {
 
 func elapsed(s float64) time.Duration {
 	return time.Duration(s * float64(time.Second))
+}
+
+// isPackageSummaryLine reports whether s is a `go test` package-level summary
+// line (e.g. "PASS", "FAIL", "ok  \tpkg\t0.01s", "FAIL\tpkg\t0.01s",
+// "?   \tpkg\t[no test files]") rather than diagnostic output that should be
+// surfaced to the user.
+// NOTE: keep in sync with internal/gotestrunner/output_collector.go isPackageSummaryLine.
+func isPackageSummaryLine(s string) bool {
+	s = strings.TrimRight(s, "\n\r")
+	return s == "PASS" || s == "FAIL" ||
+		strings.HasPrefix(s, "ok  \t") ||
+		strings.HasPrefix(s, "FAIL\t") ||
+		strings.HasPrefix(s, "?   \t")
 }

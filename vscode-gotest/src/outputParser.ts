@@ -97,6 +97,33 @@ export function extractTestMessages(
   return messages;
 }
 
+export function extractDiagnosticLocation(
+  output: string,
+  pkgDir: string,
+): { file: string; line: number } | undefined {
+  const pattern = /\.go:(\d+)/;
+  for (const line of output.split("\n")) {
+    const match = pattern.exec(line);
+    if (!match) continue;
+    const raw = line.substring(0, match.index + 3).trim();
+    if (isStdlibPath(raw) || raw.endsWith("testing.go")) continue;
+    let file = raw;
+    if (!path.isAbsolute(file)) {
+      file = path.join(pkgDir, file);
+    }
+    return { file, line: parseInt(match[1], 10) };
+  }
+  return undefined;
+}
+
+function isStdlibPath(file: string): boolean {
+  const idx = file.lastIndexOf("/src/");
+  if (idx < 0) return false;
+  const after = file.substring(idx + 5);
+  const seg = after.split("/")[0];
+  return seg !== "" && !seg.includes(".");
+}
+
 export function parseExpectedActual(
   message: string,
 ): { expected: string; actual: string } | undefined {

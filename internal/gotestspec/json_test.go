@@ -3,6 +3,7 @@ package gotestspec //nolint:stdlib-test
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -170,5 +171,22 @@ func TestRenderJSON_ErrorOutput(t *testing.T) {
 	}
 	if node.Output[0] != "expected 1, got 2\n" {
 		t.Errorf("output = %q", node.Output[0])
+	}
+}
+
+func TestRenderJSON_IncludesPackageOutput(t *testing.T) {
+	packages := []*Package{{
+		Path:   "p",
+		Status: StatusFail,
+		Nodes:  []*Node{{Kind: KindTest, Display: "Foo", Status: StatusPass}},
+		Output: []string{"WARNING: DATA RACE\n"},
+	}}
+
+	var buf bytes.Buffer
+	RenderJSON(&buf, packages)
+	out := buf.String()
+
+	if !strings.Contains(out, "WARNING: DATA RACE") {
+		t.Errorf("JSON output should contain package diagnostics:\n%s", out)
 	}
 }
