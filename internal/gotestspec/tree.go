@@ -362,6 +362,7 @@ func elapsed(s float64) time.Duration {
 // line (e.g. "PASS", "FAIL", "ok  \tpkg\t0.01s", "FAIL\tpkg\t0.01s",
 // "?   \tpkg\t[no test files]") rather than diagnostic output that should be
 // surfaced to the user.
+// NOTE: keep in sync with internal/gotestrunner/output_collector.go isPackageSummaryLine.
 func isPackageSummaryLine(s string) bool {
 	s = strings.TrimRight(s, "\n\r")
 	return s == "PASS" || s == "FAIL" ||

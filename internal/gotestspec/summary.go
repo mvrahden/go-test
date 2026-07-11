@@ -121,6 +121,9 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 				fmt.Fprintf(w, "      %s%s%s\n", c.red, line, c.reset)
 			}
 		}
+	} else {
+		fmt.Fprintf(w, "%s%d tests passed%s — %spackage failure detected%s\n",
+			c.green, stats.Total(), c.reset, c.red, c.reset)
 	}
 
 	for _, d := range diags {

@@ -289,6 +289,7 @@ func (c *OutputCollector) emitJSONPackageSummary(w io.Writer, pkg string, s *pkg
 // (e.g. "PASS", "FAIL\tpkg\t0.5s", "?   \tpkg\t[no test files]"). These are
 // re-synthesized by emitJSONPackageSummary, so raw copies from per-suite
 // test2json instances must be dropped to avoid duplication.
+// NOTE: keep in sync with internal/gotestspec/tree.go isPackageSummaryLine.
 func isPackageSummaryLine(s string) bool {
 	s = strings.TrimRight(s, "\n\r")
 	return s == "PASS" || s == "FAIL" ||

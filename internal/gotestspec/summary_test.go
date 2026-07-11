@@ -271,8 +271,8 @@ func TestRenderSummary_PackageDiagnostic(t *testing.T) {
 	if !strings.Contains(out, "example.com/pkg") {
 		t.Errorf("expected package path in output:\n%s", out)
 	}
-	if strings.Contains(out, "1 tests passed") {
-		t.Errorf("should not say all passed when package failed:\n%s", out)
+	if !strings.Contains(out, "package failure detected") {
+		t.Errorf("expected 'package failure detected' header:\n%s", out)
 	}
 }
 
