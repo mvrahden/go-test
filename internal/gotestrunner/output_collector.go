@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 )
@@ -283,9 +284,26 @@ func (c *OutputCollector) emitJSONPackageSummary(w io.Writer, pkg string, s *pkg
 	})
 }
 
-// filterPackageLevelEvents writes only test-level JSON events (those with a
-// non-empty Test field) to w, stripping package-level events that would be
-// duplicated across per-suite test2json instances.
+// isPackageSummaryLine reports whether s (an "output" event's Output field)
+// is one of the summary lines that go test / test2json synthesizes itself
+// (e.g. "PASS", "FAIL\tpkg\t0.5s", "?   \tpkg\t[no test files]"). These are
+// re-synthesized by emitJSONPackageSummary, so raw copies from per-suite
+// test2json instances must be dropped to avoid duplication.
+func isPackageSummaryLine(s string) bool {
+	s = strings.TrimRight(s, "\n\r")
+	return s == "PASS" || s == "FAIL" ||
+		strings.HasPrefix(s, "ok  \t") ||
+		strings.HasPrefix(s, "FAIL\t") ||
+		strings.HasPrefix(s, "?   \t")
+}
+
+// filterPackageLevelEvents writes test-level JSON events (those with a
+// non-empty Test field) to w unchanged, strips package-level structural
+// events (start, pass, fail, etc.) and synthesized summary lines that would
+// be duplicated across per-suite test2json instances, but keeps
+// package-level "output" events carrying diagnostic text (e.g. race
+// detector reports, panic stack traces) that would otherwise be silently
+// dropped.
 func filterPackageLevelEvents(w io.Writer, data []byte) {
 	for len(data) > 0 {
 		idx := bytes.IndexByte(data, '\n')
@@ -301,9 +319,16 @@ func filterPackageLevelEvents(w io.Writer, data []byte) {
 			continue
 		}
 		var ev struct {
-			Test string `json:"Test"`
+			Test   string `json:"Test"`
+			Action string `json:"Action"`
+			Output string `json:"Output"`
 		}
 		if json.Unmarshal(line, &ev) != nil || ev.Test != "" {
+			_, _ = w.Write(line)
+			_, _ = w.Write([]byte{'\n'})
+			continue
+		}
+		if ev.Action == "output" && !isPackageSummaryLine(ev.Output) {
 			_, _ = w.Write(line)
 			_, _ = w.Write([]byte{'\n'})
 		}

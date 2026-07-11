@@ -916,6 +916,96 @@ func (s *GotestrunnerTestSuite) TestOutputCollector(t *gotest.T) {
 	})
 }
 
+// --- filterPackageLevelEvents / isPackageSummaryLine tests ---
+
+func (s *GotestrunnerTestSuite) TestFilterPackageLevelEvents(t *gotest.T) {
+	t.When("a suite produces diagnostic package output (e.g. a race report)", func(w *gotest.T) {
+		w.It("keeps test-level events and diagnostic output, drops summary lines and the package verdict", func(it *gotest.T) {
+			input := strings.Join([]string{
+				`{"Action":"run","Package":"p","Test":"TestFoo"}`,
+				`{"Action":"output","Package":"p","Test":"TestFoo","Output":"=== RUN   TestFoo\n"}`,
+				`{"Action":"output","Package":"p","Test":"TestFoo","Output":"--- PASS: TestFoo (0.00s)\n"}`,
+				`{"Action":"pass","Package":"p","Test":"TestFoo","Elapsed":0}`,
+				`{"Action":"output","Package":"p","Output":"PASS\n"}`,
+				`{"Action":"output","Package":"p","Output":"==================\n"}`,
+				`{"Action":"output","Package":"p","Output":"WARNING: DATA RACE\n"}`,
+				`{"Action":"output","Package":"p","Output":"Write at 0x00c by goroutine 9:\n"}`,
+				`{"Action":"output","Package":"p","Output":"  pkg.TestFoo.func1()\n"}`,
+				`{"Action":"output","Package":"p","Output":"      /path/to/foo_test.go:12 +0x38\n"}`,
+				`{"Action":"output","Package":"p","Output":"==================\n"}`,
+				`{"Action":"output","Package":"p","Output":"Found 1 data race(s)\n"}`,
+				`{"Action":"output","Package":"p","Output":"FAIL\tp\t1.012s\n"}`,
+				`{"Action":"fail","Package":"p","Elapsed":1.012}`,
+			}, "\n")
+
+			var buf bytes.Buffer
+			gotestrunner.ExportFilterPackageLevelEvents(&buf, []byte(input))
+			out := buf.String()
+
+			// Test-level events must survive.
+			gotest.Contains(it, out, `"Test":"TestFoo"`)
+
+			// Diagnostic output must survive.
+			gotest.Contains(it, out, "WARNING: DATA RACE")
+			gotest.Contains(it, out, "Found 1 data race(s)")
+			gotest.Contains(it, out, "foo_test.go:12")
+
+			// Summary lines must be dropped.
+			gotest.NotContains(it, out, `"Output":"PASS\n"`)
+			gotest.NotContains(it, out, `"Output":"FAIL\tp\t`)
+
+			// Package-level structural events must be dropped.
+			gotest.NotContains(it, out, `"Action":"fail","Package":"p","Elapsed"`)
+		})
+	})
+
+	t.When("a suite completes normally with no diagnostic output", func(w *gotest.T) {
+		w.It("drops package-level structural events and the ok summary line", func(it *gotest.T) {
+			input := strings.Join([]string{
+				`{"Action":"start","Package":"p"}`,
+				`{"Action":"run","Package":"p","Test":"TestFoo"}`,
+				`{"Action":"output","Package":"p","Test":"TestFoo","Output":"=== RUN   TestFoo\n"}`,
+				`{"Action":"pass","Package":"p","Test":"TestFoo","Elapsed":0.01}`,
+				`{"Action":"output","Package":"p","Output":"ok  \tp\t0.01s\n"}`,
+				`{"Action":"pass","Package":"p","Elapsed":0.01}`,
+			}, "\n")
+
+			var buf bytes.Buffer
+			gotestrunner.ExportFilterPackageLevelEvents(&buf, []byte(input))
+			out := buf.String()
+
+			// Test-level events survive.
+			gotest.Contains(it, out, `"Test":"TestFoo"`)
+
+			// Package-level structural events are dropped.
+			gotest.NotContains(it, out, `"Action":"start"`)
+			gotest.NotContains(it, out, `"ok  \\tp\\t`)
+		})
+	})
+}
+
+func (s *GotestrunnerTestSuite) TestIsPackageSummaryLine(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Name  string
+		input string
+		want  bool
+	}{
+		{"bare PASS", "PASS\n", true},
+		{"bare FAIL", "FAIL\n", true},
+		{"ok package summary", "ok  \tpkg\t0.5s\n", true},
+		{"FAIL package summary", "FAIL\tpkg\t1.2s\n", true},
+		{"no test files summary", "?   \tpkg\t[no test files]\n", true},
+		{"race separator", "==================\n", false},
+		{"race warning", "WARNING: DATA RACE\n", false},
+		{"race detector count", "Found 1 data race(s)\n", false},
+		{"panic message", "panic: boom\n", false},
+		{"goroutine trace header", "goroutine 1 [running]:\n", false},
+	}) {
+		got := gotestrunner.ExportIsPackageSummaryLine(tc.input)
+		gotest.Equal(sub, tc.want, got)
+	}
+}
+
 func (s *GotestrunnerTestSuite) TestEmitSkippedSuites(t *gotest.T) {
 	t.When("text mode", func(w *gotest.T) {
 		w.It("produces no output", func(it *gotest.T) {

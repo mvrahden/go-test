@@ -22,6 +22,8 @@ var ExportBuildExtraEnv = buildExtraEnv
 var ExportBuildBaseEnv = buildBaseEnv
 var ExportOverlayContentHash = overlayContentHash
 var ExportCacheRoot = cacheRoot
+var ExportFilterPackageLevelEvents = filterPackageLevelEvents
+var ExportIsPackageSummaryLine = isPackageSummaryLine
 
 func ExportAutoDetectCI(cfg PipelineConfig) PipelineConfig {
 	if !cfg.CI && os.Getenv(protocol.EnvCI) == "" && os.Getenv("CI") != "" {
