@@ -3,6 +3,7 @@ import {
   parseTestEvents,
   extractTestMessages,
   extractDiagnosticLocation,
+  isPackageSummaryLine,
   parseExpectedActual,
 } from "./outputParser.js";
 
@@ -218,6 +219,23 @@ describe("extractDiagnosticLocation", () => {
 
   it("returns undefined for empty output", () => {
     expect(extractDiagnosticLocation("", "/pkg")).toBeUndefined();
+  });
+});
+
+describe("isPackageSummaryLine", () => {
+  it.each([
+    ["PASS\n", true],
+    ["FAIL\n", true],
+    ["ok  \tpkg\t0.5s\n", true],
+    ["FAIL\tpkg\t1.2s\n", true],
+    ["?   \tpkg\t[no test files]\n", true],
+    ["WARNING: DATA RACE\n", false],
+    ["==================\n", false],
+    ["Found 1 data race(s)\n", false],
+    ["panic: boom\n", false],
+    ["goroutine 1 [running]:\n", false],
+  ])("%s → %s", (input, expected) => {
+    expect(isPackageSummaryLine(input)).toBe(expected);
   });
 });
 

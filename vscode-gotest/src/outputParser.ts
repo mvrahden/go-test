@@ -124,6 +124,17 @@ function isStdlibPath(file: string): boolean {
   return seg !== "" && !seg.includes(".");
 }
 
+export function isPackageSummaryLine(s: string): boolean {
+  const trimmed = s.replace(/[\n\r]+$/, "");
+  return (
+    trimmed === "PASS" ||
+    trimmed === "FAIL" ||
+    trimmed.startsWith("ok  \t") ||
+    trimmed.startsWith("FAIL\t") ||
+    trimmed.startsWith("?   \t")
+  );
+}
+
 export function parseExpectedActual(
   message: string,
 ): { expected: string; actual: string } | undefined {

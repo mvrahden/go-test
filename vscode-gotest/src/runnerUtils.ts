@@ -7,6 +7,7 @@ import type { DiscoveryCache } from "./discovery.js";
 import {
   extractDiagnosticLocation,
   extractTestMessages,
+  isPackageSummaryLine,
   parseExpectedActual,
   type TestEvent,
 } from "./outputParser.js";
@@ -226,8 +227,11 @@ export function applyEvent(
 ): AppliedResult | undefined {
   if (event.Action === "output") {
     const key = event.Test ?? "";
-    const existing = outputMap.get(key) ?? "";
-    outputMap.set(key, existing + (event.Output ?? ""));
+    const output = event.Output ?? "";
+    if (!(key === "" && isPackageSummaryLine(output))) {
+      const existing = outputMap.get(key) ?? "";
+      outputMap.set(key, existing + output);
+    }
   }
 
   if (event.Action === "output" && event.Output) {
