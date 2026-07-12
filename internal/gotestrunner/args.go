@@ -206,79 +206,54 @@ func TranslateToTestBinaryFlags(flags []string) []string {
 	return out
 }
 
-// ExtractRunFilter returns the value of -run from run flags, if present.
-func ExtractRunFilter(runFlags []string) string {
-	for i, f := range runFlags {
+// extractFlag returns the value of a named flag from flags, stopping at -args.
+func extractFlag(flags []string, name string) string {
+	for i, f := range flags {
 		if f == "-args" {
 			return ""
 		}
-		if v, ok := strings.CutPrefix(f, "-run="); ok {
+		if v, ok := strings.CutPrefix(f, name+"="); ok {
 			return v
 		}
-		if f == "-run" && i+1 < len(runFlags) {
-			return runFlags[i+1]
+		if f == name && i+1 < len(flags) {
+			return flags[i+1]
 		}
 	}
 	return ""
 }
+
+// stripFlag removes a named flag and its value from flags, stopping at -args.
+func stripFlag(flags []string, name string) []string {
+	var out []string
+	for i := 0; i < len(flags); i++ {
+		f := flags[i]
+		if f == "-args" {
+			out = append(out, flags[i:]...)
+			return out
+		}
+		if strings.HasPrefix(f, name+"=") {
+			continue
+		}
+		if f == name {
+			i++ // skip value
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
+// ExtractRunFilter returns the value of -run from run flags, if present.
+func ExtractRunFilter(runFlags []string) string { return extractFlag(runFlags, "-run") }
 
 // StripRunFilter removes -run and its value from run flags.
-func StripRunFilter(runFlags []string) []string {
-	var out []string
-	for i := 0; i < len(runFlags); i++ {
-		f := runFlags[i]
-		if f == "-args" {
-			out = append(out, runFlags[i:]...)
-			return out
-		}
-		if strings.HasPrefix(f, "-run=") {
-			continue
-		}
-		if f == "-run" {
-			i++ // skip value
-			continue
-		}
-		out = append(out, f)
-	}
-	return out
-}
+func StripRunFilter(runFlags []string) []string { return stripFlag(runFlags, "-run") }
 
 // ExtractCoverProfile returns the value of -coverprofile from run flags, if present.
-func ExtractCoverProfile(runFlags []string) string {
-	for i, f := range runFlags {
-		if f == "-args" {
-			return ""
-		}
-		if v, ok := strings.CutPrefix(f, "-coverprofile="); ok {
-			return v
-		}
-		if f == "-coverprofile" && i+1 < len(runFlags) {
-			return runFlags[i+1]
-		}
-	}
-	return ""
-}
+func ExtractCoverProfile(runFlags []string) string { return extractFlag(runFlags, "-coverprofile") }
 
 // StripCoverProfile removes -coverprofile and its value from run flags.
-func StripCoverProfile(runFlags []string) []string {
-	var out []string
-	for i := 0; i < len(runFlags); i++ {
-		f := runFlags[i]
-		if f == "-args" {
-			out = append(out, runFlags[i:]...)
-			return out
-		}
-		if strings.HasPrefix(f, "-coverprofile=") {
-			continue
-		}
-		if f == "-coverprofile" {
-			i++ // skip value
-			continue
-		}
-		out = append(out, f)
-	}
-	return out
-}
+func StripCoverProfile(runFlags []string) []string { return stripFlag(runFlags, "-coverprofile") }
 
 // StripCoverBuildFlags removes coverage-related build flags (-cover,
 // -covermode, -coverpkg) that break packages.Load when passed as BuildFlags.
@@ -366,20 +341,8 @@ func HasVerboseFlag(flags []string) bool {
 // ExtractParallelValue returns the integer value of -parallel from run flags.
 // Returns 0 if not present or not parseable. Stops scanning at -args.
 func ExtractParallelValue(runFlags []string) int {
-	for i, f := range runFlags {
-		if f == "-args" {
-			return 0
-		}
-		if v, ok := strings.CutPrefix(f, "-parallel="); ok {
-			n, _ := strconv.Atoi(v)
-			return n
-		}
-		if f == "-parallel" && i+1 < len(runFlags) {
-			n, _ := strconv.Atoi(runFlags[i+1])
-			return n
-		}
-	}
-	return 0
+	v, _ := strconv.Atoi(extractFlag(runFlags, "-parallel"))
+	return v
 }
 
 // InjectParallel appends -parallel=n to runFlags if not already present
