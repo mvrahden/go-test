@@ -12,6 +12,9 @@ func DeterminePkgDir(p *packages.Package) string {
 		if len(p.GoFiles) > 0 {
 			return filepath.Dir(p.GoFiles[0])
 		}
+		if len(p.CompiledGoFiles) > 0 {
+			return filepath.Dir(p.CompiledGoFiles[0])
+		}
 		return ""
 	}
 	modDir := p.Module.Dir

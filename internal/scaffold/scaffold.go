@@ -12,6 +12,7 @@ import (
 	"text/template"
 	"unicode"
 
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -129,7 +130,7 @@ func IntrospectType(pkgPattern, typeName string) (*TypeInfo, error) {
 	info := &TypeInfo{
 		Name:    typeName,
 		PkgName: pkg.Name,
-		PkgDir:  determinePkgDir(pkg),
+		PkgDir:  gotestgen.DeterminePkgDir(pkg),
 	}
 
 	// Check if interface
@@ -226,7 +227,7 @@ func IntrospectFile(pkgPattern, filename string) (*FileInfo, error) {
 	return &FileInfo{
 		SuiteName: suiteName,
 		PkgName:   pkg.Name,
-		PkgDir:    determinePkgDir(pkg),
+		PkgDir:    gotestgen.DeterminePkgDir(pkg),
 		Funcs:     funcs,
 	}, nil
 }
@@ -243,15 +244,6 @@ func toPascalCase(s string) string {
 	return result.String()
 }
 
-func determinePkgDir(pkg *packages.Package) string {
-	if len(pkg.GoFiles) > 0 {
-		return filepath.Dir(pkg.GoFiles[0])
-	}
-	if len(pkg.CompiledGoFiles) > 0 {
-		return filepath.Dir(pkg.CompiledGoFiles[0])
-	}
-	return ""
-}
 
 func extractStructMethods(named *types.Named) []MethodInfo {
 	// Get pointer receiver methods (includes value receiver methods)
