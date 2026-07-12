@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Why Your Go Tests Are Slow (and What to Do About It) | gotest blog</title>
+  <meta name="description" content="Most slow Go test suites aren't slow because of slow tests. They're slow because of slow structure: sequential execution, redundant setup, and shared state that prevents parallelism.">
+  <meta name="keywords" content="go tests slow, go test parallelism, golang test performance, go test parallel, go testing speed, t.Parallel, go test optimization">
+
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://mvrahden.github.io/go-test/blog/go-testing-at-scale.html">
+  <meta property="og:title" content="Why Your Go Tests Are Slow (and What to Do About It)">
+  <meta property="og:description" content="Most slow Go test suites aren't slow because of slow tests. They're slow because of slow structure: sequential execution, redundant setup, and shared state that prevents parallelism.">
+  <meta property="og:image" content="https://mvrahden.github.io/go-test/static/gopher.png">
+  <meta property="og:image:width" content="1024">
+  <meta property="og:image:height" content="572">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Why Your Go Tests Are Slow (and What to Do About It)">
+  <meta name="twitter:description" content="Most slow Go test suites aren't slow because of slow tests. They're slow because of slow structure.">
+  <meta name="twitter:image" content="https://mvrahden.github.io/go-test/static/gopher.png">
+
+  <link rel="icon" type="image/png" href="../static/logo.png">
+  <link rel="canonical" href="https://mvrahden.github.io/go-test/blog/go-testing-at-scale.html">
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WHJ67Z1J0"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-7WHJ67Z1J0');
+  </script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "Why Your Go Tests Are Slow (and What to Do About It)",
+    "description": "Most slow Go test suites aren't slow because of slow tests. They're slow because of slow structure: sequential execution, redundant setup, and shared state that prevents parallelism.",
+    "url": "https://mvrahden.github.io/go-test/blog/go-testing-at-scale.html",
+    "datePublished": "2026-07-11",
+    "author": {
+      "@type": "Person",
+      "name": "Menno van Rahden",
+      "url": "https://github.com/mvrahden"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "gotest",
+      "url": "https://mvrahden.github.io/go-test/"
+    },
+    "isPartOf": {
+      "@type": "Blog",
+      "name": "gotest blog",
+      "url": "https://mvrahden.github.io/go-test/blog/"
+    },
+    "programmingLanguage": "Go"
+  }
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan: #00ADD8;
+      --cyan-dark: #007d9c;
+      --bg: #ffffff;
+      --bg-alt: #f6f8fa;
+      --bg-dark: #0d1117;
+      --bg-dark-alt: #161b22;
+      --text: #24292f;
+      --text-secondary: #656d76;
+      --text-on-dark: #e6edf3;
+      --text-dimmed: #8b949e;
+      --border: #d0d7de;
+      --green: #3fb950;
+      --amber: #d29922;
+      --red: #f85149;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Liberation Mono', monospace;
+      --max-w: 740px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --bg-alt: #161b22;
+        --bg-dark: #010409;
+        --bg-dark-alt: #0d1117;
+        --text: #e6edf3;
+        --text-secondary: #8b949e;
+        --border: #30363d;
+      }
+    }
+
+    html { scroll-behavior: smooth; height: 100%; }
+
+    body {
+      font-family: var(--font-sans);
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .article { flex: 1; }
+
+    a { color: var(--cyan-dark); text-decoration: none; }
+    @media (prefers-color-scheme: dark) { a { color: var(--cyan); } }
+    a:hover { text-decoration: underline; }
+
+    /* ===== Nav ===== */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+    }
+    .nav-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 1.125rem;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .nav-brand:hover { text-decoration: none; }
+    .nav-brand img { width: 28px; height: 28px; border-radius: 50%; }
+    .nav-links { display: flex; gap: 1.25rem; font-size: 0.9rem; align-items: center; }
+    .nav-links a { color: var(--text-secondary); }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+    .nav-links .nav-ref {
+      padding: 0.25rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-weight: 600;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .nav-links .nav-ref:hover { background: var(--bg-alt); }
+    .nav-links .star-btn { font-size: 0.85rem; }
+    .star-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.15s;
+      font-size: 0.8rem;
+    }
+    .star-btn:hover { background: var(--bg-alt); text-decoration: none; }
+    .star-btn .star-icon { color: #e3b341; }
+    .star-count { font-weight: 400; color: var(--text-dimmed); }
+
+    /* ===== Article ===== */
+    .article {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .article-header {
+      padding: 3.5rem 0 2rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2.5rem;
+    }
+    .article-header .back {
+      display: inline-block;
+      font-size: 0.85rem;
+      color: var(--text-dimmed);
+      margin-bottom: 1.5rem;
+    }
+    .article-header .back:hover { color: var(--text-secondary); }
+    .article-header h1 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+    }
+    .article-header h1 code {
+      font-size: 0.85em;
+      font-weight: 700;
+      color: var(--cyan-dark);
+    }
+    @media (prefers-color-scheme: dark) {
+      .article-header h1 code { color: var(--cyan); }
+    }
+    .article-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--text-dimmed);
+    }
+    .article-meta .tag {
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    /* ===== Article Body ===== */
+    .article-body {
+      padding-bottom: 3rem;
+    }
+    .article-body p {
+      font-size: 1.1rem;
+      line-height: 1.75;
+      margin-bottom: 1.5rem;
+    }
+    .article-body h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-top: 3rem;
+      margin-bottom: 1rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .article-body h2:first-child {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+    .article-body h3 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+    }
+    .article-body ul, .article-body ol {
+      margin-bottom: 1.5rem;
+      padding-left: 1.5rem;
+    }
+    .article-body li {
+      font-size: 1.05rem;
+      line-height: 1.7;
+      margin-bottom: 0.4rem;
+    }
+    .article-body strong { font-weight: 600; }
+
+    .article-body code {
+      font-family: var(--font-mono);
+      font-size: 0.88em;
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+    }
+    @media (prefers-color-scheme: dark) {
+      .article-body code { background: var(--bg-alt); }
+    }
+
+    .article-body blockquote {
+      border-left: 3px solid var(--cyan);
+      padding: 0.75rem 1.25rem;
+      margin: 1.5rem 0;
+      background: var(--bg-alt);
+      border-radius: 0 6px 6px 0;
+    }
+    .article-body blockquote p {
+      font-size: 1.05rem;
+      margin-bottom: 0;
+      color: var(--text-secondary);
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #161b22;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      margin: 1.5rem 0;
+      overflow: hidden;
+    }
+    .code-label {
+      display: block;
+      padding: 0.5rem 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-dimmed);
+      border-bottom: 1px solid #30363d;
+      background: #1c2128;
+    }
+    .code-block pre {
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.65;
+      color: #e6edf3;
+    }
+    .code-block pre code {
+      font-family: inherit;
+      font-size: inherit;
+      padding: 0;
+      border: none;
+      background: none;
+      border-radius: 0;
+      color: inherit;
+    }
+
+    /* Minimal syntax hints */
+    .kw { color: #ff7b72; }
+    .fn { color: #d2a8ff; }
+    .str { color: #a5d6ff; }
+    .cm { color: #8b949e; }
+    .tp { color: #79c0ff; }
+
+    /* Terminal block */
+    .terminal {
+      margin: 1.5rem 0;
+      background: #161b22;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      overflow: hidden;
+    }
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      background: #1c2128;
+      border-bottom: 1px solid #30363d;
+    }
+    .terminal-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .terminal-dot.r { background: #f85149; }
+    .terminal-dot.y { background: #d29922; }
+    .terminal-dot.g { background: #3fb950; }
+    .terminal-title {
+      margin-left: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-dimmed);
+    }
+    .terminal-body {
+      padding: 1.25rem 1.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.7;
+      color: var(--text-on-dark);
+      overflow-x: auto;
+    }
+    .t-prompt { color: var(--text-dimmed); }
+    .t-cmd { color: var(--cyan); }
+    .t-dim { color: #484f58; }
+    .t-pass { color: var(--green); }
+    .t-fail { color: var(--red); }
+    .t-warn { color: var(--amber); }
+    .t-summary { color: var(--text-dimmed); border-top: 1px solid #21262d; display: block; padding-top: 0.75rem; margin-top: 0.5rem; }
+
+    /* Diagram */
+    .diagram {
+      margin: 1.5rem 0;
+      padding: 1.25rem 1.5rem;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre;
+      color: var(--text);
+    }
+
+    /* CTA section */
+    .cta {
+      margin: 2.5rem 0;
+      padding: 2rem;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      text-align: center;
+    }
+    .cta p {
+      margin-bottom: 1rem;
+    }
+    .cta .install-cmd {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+    .cta .install-cmd code {
+      white-space: nowrap;
+      color: var(--text);
+    }
+    .cta .install-cmd button {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.3rem 0.5rem;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .cta .install-cmd button:hover { background: var(--border); }
+    .cta-links {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+    }
+
+    /* ===== Footer ===== */
+    footer {
+      background: var(--bg-dark);
+      color: var(--text-dimmed);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--text-on-dark); }
+    footer a:hover { color: var(--cyan); }
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .footer-copy { color: #484f58; font-size: 0.8rem; }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 640px) {
+      .article-header h1 { font-size: 1.75rem; }
+      .article-body p { font-size: 1.05rem; }
+    }
+    @media (max-width: 480px) {
+      .nav-links { gap: 0.75rem; font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="nav-inner">
+      <a href="../" class="nav-brand">
+        <img src="../static/logo.png" alt="gotest logo" width="28" height="28">
+        gotest
+      </a>
+      <div class="nav-links">
+        <a href="./">Blog</a>
+        <a href="../reference.html" class="nav-ref">Reference</a>
+        <a href="https://github.com/mvrahden/go-test" class="star-btn"><span class="star-icon">&#9734;</span> Star<span class="star-count" id="star-count"></span></a>
+        <a href="https://pkg.go.dev/github.com/mvrahden/go-test">pkg.go.dev</a>
+        <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="article">
+    <header class="article-header">
+      <a href="./" class="back">&larr; All posts</a>
+      <h1>Why Your Go Tests Are Slow (and What to Do About It)</h1>
+      <div class="article-meta">
+        <time datetime="2026-07-11">July 11, 2026</time>
+        <span>&middot;</span>
+        <span>11 min read</span>
+        <span class="tag">Performance</span>
+      </div>
+    </header>
+
+    <div class="article-body">
+
+      <p><code>go test ./...</code> takes 90 seconds. You've profiled the hot tests and they're fast. The database setup is cached. The assertions are trivial. So where does the time go?</p>
+
+      <p>Usually the answer isn't slow tests. It's slow structure: the way tests are organized determines how much work runs sequentially, how much setup gets repeated, and how much parallelism the runtime can actually use. This post looks at the three structural patterns that make Go test suites slow, and what to do about each one.</p>
+
+      <h2>How <code>go test</code> parallelism actually works</h2>
+
+      <p>Before diagnosing anything, it helps to understand what <code>go test</code> does under the hood. There are two levels of parallelism, controlled by two different flags:</p>
+
+      <ul>
+        <li><strong>Package-level parallelism (<code>-p</code>).</strong> <code>go test</code> compiles each package into a separate test binary and runs up to <code>-p</code> packages concurrently. The default is <code>GOMAXPROCS</code>, which is typically the number of CPU cores. If you have 8 packages, up to 8 run at the same time.</li>
+        <li><strong>Test-level parallelism (<code>-parallel</code>).</strong> Within a single package's test binary, <code>go test</code> runs tests sequentially by default. Tests that call <code>t.Parallel()</code> are released to run concurrently, up to <code>-parallel</code> goroutines (default: <code>GOMAXPROCS</code>).</li>
+      </ul>
+
+      <p>The key insight: within a package, tests run in a single process. All test functions, all subtests, all suite methods: one binary, one process. The only parallelism available is goroutine-level, via <code>t.Parallel()</code>.</p>
+
+      <p>This means the ceiling for your test suite's speed is determined by the longest single-package execution. If one package has 200 tests that run sequentially, that package is your bottleneck, no matter how many CPU cores you have.</p>
+
+      <h2>Problem 1: The single-process bottleneck</h2>
+
+      <p>Consider a package with 60 test functions: 20 for users, 20 for orders, 20 for payments:</p>
+
+      <div class="code-block">
+        <span class="code-label">service_test.go</span>
+        <pre><code><span class="kw">func</span> <span class="fn">TestCreateUser</span>(t *<span class="tp">testing.T</span>)    { <span class="cm">/* ... */</span> }
+<span class="kw">func</span> <span class="fn">TestGetUser</span>(t *<span class="tp">testing.T</span>)       { <span class="cm">/* ... */</span> }
+<span class="kw">func</span> <span class="fn">TestDeleteUser</span>(t *<span class="tp">testing.T</span>)    { <span class="cm">/* ... */</span> }
+<span class="cm">// ... 17 more user tests</span>
+
+<span class="kw">func</span> <span class="fn">TestCreateOrder</span>(t *<span class="tp">testing.T</span>)   { <span class="cm">/* ... */</span> }
+<span class="cm">// ... 19 more order tests</span>
+
+<span class="kw">func</span> <span class="fn">TestProcessPayment</span>(t *<span class="tp">testing.T</span>) { <span class="cm">/* ... */</span> }
+<span class="cm">// ... 19 more payment tests</span></code></pre>
+      </div>
+
+      <p>Each test takes 100ms (database setup + a few assertions). The total wall-clock time for this package is:</p>
+
+      <div class="diagram">60 tests × 100ms = 6 seconds (sequential)</div>
+
+      <p>All 60 tests run in one process, one after another. Even though the user tests are logically independent from the payment tests, they share a process and execute sequentially. On an 8-core machine, 7 cores sit idle while this package grinds through its queue.</p>
+
+      <p>You can add <code>t.Parallel()</code> to each test function, and for tests that don't share state, you should. But the moment tests touch a shared database, a shared filesystem, or package-level variables, <code>t.Parallel()</code> creates races instead of solving them. More on that in Problem 3.</p>
+
+      <blockquote>
+        <p>If you use testify/suite, this problem is sharper. <code>suite.Run</code> executes each test method sequentially, and there's no way to call <code>t.Parallel()</code> on individual methods from within the suite. The suite runner itself can be marked parallel with respect to other top-level test functions, but its internal methods remain sequential.</p>
+      </blockquote>
+
+      <p>The most effective stdlib-only fix is splitting the package. Three packages means three binaries, three processes, and package-level parallelism kicks in. But splitting by parallelism rather than by domain creates artificial package boundaries that make the codebase harder to navigate.</p>
+
+      <h2>Problem 2: Redundant fixture setup</h2>
+
+      <p>The second structural bottleneck is rebuilding expensive resources for every test. Here's a typical pattern:</p>
+
+      <div class="code-block">
+        <pre><code><span class="kw">func</span> <span class="fn">setupTestDB</span>(t *<span class="tp">testing.T</span>) *<span class="tp">sql.DB</span> {
+    db, err := sql.Open(<span class="str">"postgres"</span>, testDSN)  <span class="cm">// lazy: no connection yet</span>
+    <span class="kw">if</span> err != <span class="kw">nil</span> {
+        t.Fatal(err)
+    }
+    db.Exec(<span class="str">"TRUNCATE users"</span>)                 <span class="cm">// 70ms: TCP connect + truncate</span>
+    t.Cleanup(<span class="kw">func</span>() { db.Close() })
+    <span class="kw">return</span> db
+}
+
+<span class="kw">func</span> <span class="fn">TestCreateUser</span>(t *<span class="tp">testing.T</span>) {
+    db := setupTestDB(t)  <span class="cm">// 70ms</span>
+    svc := NewUserService(db)
+    <span class="cm">// ... test logic (5ms)</span>
+}
+
+<span class="kw">func</span> <span class="fn">TestGetUser</span>(t *<span class="tp">testing.T</span>) {
+    db := setupTestDB(t)  <span class="cm">// 70ms again</span>
+    svc := NewUserService(db)
+    <span class="cm">// ... test logic (5ms)</span>
+}</code></pre>
+      </div>
+
+      <p>70ms of setup, 20 test functions. That's 1.4 seconds of pure connection churn. Scale to 60 tests across your package and you're spending over 4 seconds just establishing database connections.</p>
+
+      <p>The stdlib offers two escape hatches:</p>
+
+      <ul>
+        <li><strong><code>TestMain</code></strong> gives you a per-package setup hook. You can connect once and assign to a package-level variable. But <code>TestMain</code> is per package: one function for all tests. If different groups of tests need different setup, you're back to per-test setup or awkward conditional logic.</li>
+        <li><strong><code>sync.Once</code></strong> gives you lazy initialization. Wrap the connection in a <code>sync.Once</code> and every test that needs it gets the cached result. This works, but it's manual wiring. Each fixture needs its own <code>Once</code>, its own variable, and its own teardown logic, typically deferred from <code>TestMain</code>.</li>
+      </ul>
+
+      <p>Neither approach handles dependencies between fixtures. If the database connection depends on a container, and the container depends on a Docker socket check, you're writing a dependency graph by hand in <code>TestMain</code>.</p>
+
+      <h2>Problem 3: <code>t.Parallel()</code> and shared state</h2>
+
+      <p>The most underused tool in Go's testing package is <code>t.Parallel()</code>. It marks a test as safe to run concurrently with other parallel tests. In theory, this is how you speed up a package with many independent tests.</p>
+
+      <p>In practice, it collides with shared state. A common pattern is a package-level variable set up in <code>TestMain</code>:</p>
+
+      <div class="code-block">
+        <pre><code><span class="kw">var</span> testDB *sql.DB
+
+<span class="kw">func</span> <span class="fn">TestMain</span>(m *<span class="tp">testing.M</span>) {
+    testDB = connectTestDB()
+    os.Exit(m.Run())
+}
+
+<span class="kw">func</span> <span class="fn">TestCreateUser</span>(t *<span class="tp">testing.T</span>) {
+    t.Parallel()
+    testDB.Exec(<span class="str">"INSERT INTO users ..."</span>)  <span class="cm">// concurrent write</span>
+}
+
+<span class="kw">func</span> <span class="fn">TestDeleteUser</span>(t *<span class="tp">testing.T</span>) {
+    t.Parallel()
+    testDB.Exec(<span class="str">"DELETE FROM users ..."</span>)  <span class="cm">// concurrent write</span>
+}</code></pre>
+      </div>
+
+      <p>Both tests write to the same <code>testDB</code>, and likely to the same table. You get flaky tests, deadlocks, or data races. The fix is to give each parallel test its own connection, which means giving up the shared setup that <code>TestMain</code> was supposed to simplify.</p>
+
+      <blockquote>
+        <p>In test suites (testify/suite or similar), the struct itself is the shared state. Every method reads and writes through <code>s.db</code>, <code>s.svc</code>, etc. There's no built-in way to give each parallel method its own copy of the struct. You'd need to restructure the entire suite to pass resources through function parameters rather than struct fields, losing the organizational benefits of a suite.</p>
+      </blockquote>
+
+      <p>There's also a subtler <code>t.Parallel()</code> gotcha with subtests and closures:</p>
+
+      <div class="code-block">
+        <pre><code><span class="kw">func</span> <span class="fn">TestUsers</span>(t *<span class="tp">testing.T</span>) {
+    users := []<span class="tp">string</span>{<span class="str">"alice"</span>, <span class="str">"bob"</span>, <span class="str">"carol"</span>}
+    <span class="kw">for</span> _, u := <span class="kw">range</span> users {
+        t.Run(u, <span class="kw">func</span>(t *<span class="tp">testing.T</span>) {
+            t.Parallel()
+            testUser(t, u)  <span class="cm">// all three goroutines see "carol"</span>
+        })
+    }
+}</code></pre>
+      </div>
+
+      <p>The loop variable <code>u</code> is captured by reference. By the time the parallel subtests execute, the loop has finished and <code>u</code> is <code>"carol"</code> for all three. Go 1.22 fixed this specific issue by making loop variables per-iteration, but the broader point stands: <code>t.Parallel()</code> with closures requires careful reasoning about what state is shared and when it's accessed.</p>
+
+      <h2>What you can do today</h2>
+
+      <p>Before changing tools, there are structural improvements you can make with the standard library and your existing framework:</p>
+
+      <h3>Profile before optimizing</h3>
+
+      <p>Run <code>go test -v -count=1 ./...</code> and look at the timings. Often one or two packages dominate. Within those packages, add <code>-run</code> filters to isolate which tests are slow. Profile CPU time with <code>-cpuprofile</code> if you suspect computation, or just time the setup functions.</p>
+
+      <h3>Split large packages</h3>
+
+      <p>The single most effective optimization is splitting a large package into smaller ones. Each package becomes a separate test binary that runs in its own process. If you have 4 logical groups of tests averaging 5 seconds each, moving them to separate packages turns 20 seconds of sequential execution into 5 seconds of parallel execution (on a 4+ core machine).</p>
+
+      <p>The trade-off is package boundaries that exist for parallelism, not for domain clarity. Sometimes these align (each domain gets its own package). Sometimes they don't.</p>
+
+      <h3>Use <code>sync.Once</code> for expensive setup</h3>
+
+      <p>If multiple tests in the same package need the same database connection, share it:</p>
+
+      <div class="code-block">
+        <pre><code><span class="kw">var</span> (
+    testDB     *sql.DB
+    testDBOnce sync.Once
+)
+
+<span class="kw">func</span> <span class="fn">getTestDB</span>(t *<span class="tp">testing.T</span>) *<span class="tp">sql.DB</span> {
+    testDBOnce.Do(<span class="kw">func</span>() {
+        <span class="kw">var</span> err error
+        testDB, err = sql.Open(<span class="str">"postgres"</span>, testDSN)
+        <span class="kw">if</span> err != <span class="kw">nil</span> {
+            t.Fatal(err)  <span class="cm">// dangerous: poisons the Once for all subsequent callers</span>
+        }
+    })
+    <span class="kw">return</span> testDB
+}</code></pre>
+      </div>
+
+      <p>This avoids reconnecting per test, but has a subtle flaw. <code>t.Fatal</code> calls <code>runtime.Goexit()</code>, which terminates the goroutine while running deferred functions, including the one inside <code>sync.Once</code> that marks the initialization as "done." The <code>Once</code> is now permanently poisoned: subsequent callers skip the init function entirely and get a <code>nil</code> <code>testDB</code>, crashing with nil-pointer panics that have no connection to the original setup failure. And teardown requires a <code>TestMain</code> to close the connection after all tests finish.</p>
+
+      <h3>Use <code>t.Parallel()</code> where it's safe</h3>
+
+      <p>For tests that are genuinely independent (each creates its own state and doesn't read shared mutable data), adding <code>t.Parallel()</code> is free speed. This works best with table-driven tests where each case is self-contained:</p>
+
+      <div class="code-block">
+        <pre><code><span class="kw">for</span> _, tt := <span class="kw">range</span> tests {
+    t.Run(tt.name, <span class="kw">func</span>(t *<span class="tp">testing.T</span>) {
+        t.Parallel()
+        result := process(tt.input)
+        <span class="kw">if</span> result != tt.want {
+            t.Errorf(<span class="str">"got %v, want %v"</span>, result, tt.want)
+        }
+    })
+}</code></pre>
+      </div>
+
+      <p>This is ideal for pure functions with no external dependencies. It's less practical for integration tests that touch a database, a filesystem, or a network service.</p>
+
+      <h2>A structural approach to test parallelism</h2>
+
+      <p>The optimizations above are real and worth doing. But they work <em>around</em> a fundamental constraint: all tests in a package share a single process. Parallelism within that process is opt-in, manual, and fragile.</p>
+
+      <p>What if the constraint were removed? What if each suite ran in its own OS process, with its own memory space, and parallelism between suites was the default rather than the exception?</p>
+
+      <p>This is the approach <a href="https://github.com/mvrahden/go-test">gotest</a> takes. Each test suite is compiled into the package's test binary (via <code>go test -c</code>), but each suite is <strong>executed as a separate subprocess</strong> with a <code>-test.run</code> filter that targets only that suite. The result is process-level isolation between suites:</p>
+
+      <div class="diagram">go test (package)
+├── process 1: UserSuite      (20 tests)
+├── process 2: OrderSuite     (20 tests)    ← all three run concurrently
+└── process 3: PaymentSuite   (20 tests)</div>
+
+      <p>The three suites from the earlier example now run in parallel by default. No <code>t.Parallel()</code>, no careful state management, no package splitting. The OS guarantees memory isolation. A panic in <code>PaymentSuite</code> cannot crash <code>UserSuite</code>. A goroutine leak in one process does not affect the others.</p>
+
+      <p>The concurrency budget defaults to <code>2 × GOMAXPROCS</code>, split between inter-suite parallelism (number of concurrent processes) and intra-suite parallelism (goroutines within each process). On an 8-core machine, up to 8 suite processes run concurrently, each with its own goroutine budget for method-level parallelism.</p>
+
+      <h3>Method-level parallelism</h3>
+
+      <p>Within a suite, you can opt into parallel test methods:</p>
+
+      <div class="code-block">
+        <pre><code><span class="kw">type</span> <span class="tp">UserServiceTestSuite</span> <span class="kw">struct</span>{}
+
+<span class="kw">type</span> <span class="tp">UserServiceCtx</span> <span class="kw">struct</span> {
+    db  *TestDB
+    svc *UserService
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserServiceTestSuite</span>) <span class="fn">SuiteConfig</span>() gotest.SuiteConfig {
+    <span class="kw">return</span> gotest.SuiteConfig{Parallel: <span class="kw">true</span>}
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserServiceTestSuite</span>) <span class="fn">BeforeEach</span>(t *<span class="tp">gotest.T</span>) *<span class="tp">UserServiceCtx</span> {
+    db := NewTestDB(t.T())
+    <span class="kw">return</span> &amp;UserServiceCtx{db: db, svc: NewUserService(db)}
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserServiceTestSuite</span>) <span class="fn">TestCreate</span>(t *<span class="tp">gotest.T</span>, ctx *<span class="tp">UserServiceCtx</span>) {
+    err := ctx.svc.Create(<span class="str">"alice@example.com"</span>)
+    gotest.NoError(t, err)
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserServiceTestSuite</span>) <span class="fn">TestDelete</span>(t *<span class="tp">gotest.T</span>, ctx *<span class="tp">UserServiceCtx</span>) {
+    ctx.svc.Create(<span class="str">"alice@example.com"</span>)
+    err := ctx.svc.Delete(<span class="str">"alice@example.com"</span>)
+    gotest.NoError(t, err)
+}</code></pre>
+      </div>
+
+      <p>The key is the returning <code>BeforeEach</code>. It creates a per-test context: a separate struct holding the resources each test needs. The generated code calls <code>BeforeEach</code> before each parallel method, giving it a fresh <code>ctx</code> with its own <code>db</code> and <code>svc</code>. No shared state, no races, no manual <code>t.Parallel()</code> calls.</p>
+
+      <h3>Fixture lifecycle</h3>
+
+      <p>Instead of <code>sync.Once</code> and package-level variables, gotest manages fixture lifecycles through a dependency DAG, the structural answer to Problem 2's redundant setup. A fixture is a struct with conventional method names:</p>
+
+      <div class="code-block">
+        <pre><code><span class="kw">type</span> <span class="tp">DatabaseFixture</span> <span class="kw">struct</span> {
+    Container *PostgresContainer
+    DB        *sql.DB
+}
+
+<span class="kw">func</span> (f *<span class="tp">DatabaseFixture</span>) <span class="fn">FixtureConfig</span>() gotest.FixtureConfig {
+    <span class="kw">return</span> gotest.ContainerFixtureConfig()
+}
+
+<span class="kw">func</span> (f *<span class="tp">DatabaseFixture</span>) <span class="fn">BeforeAll</span>(t *<span class="tp">gotest.T</span>) {
+    f.Container = startPostgres(t.T())
+    f.DB = connectDB(f.Container.DSN())
+}
+
+<span class="kw">func</span> (f *<span class="tp">DatabaseFixture</span>) <span class="fn">AfterAll</span>(t *<span class="tp">gotest.T</span>) {
+    f.DB.Close()
+    f.Container.Stop()
+}</code></pre>
+      </div>
+
+      <p><code>BeforeAll</code> runs once per suite process, not once per test. All test methods in the suite share the fixture. Dependencies between fixtures are expressed as pointer fields: if <code>DatabaseFixture</code> has a <code>*DockerFixture</code> field, the Docker fixture sets up first. The generator resolves the DAG automatically.</p>
+
+      <p>For cross-package sharing, a <code>SharedFixture</code> runs in its own setup process. Its state is serialized to JSON and deserialized in each suite process via <code>Hydrate()</code>. A Postgres container starts once, and every suite across every package connects to it. <a href="test-fixtures-in-go.html">More on fixture patterns.</a></p>
+
+      <h2>What the numbers look like</h2>
+
+      <p>The three-suite example from earlier, on an 8-core machine:</p>
+
+      <div class="terminal">
+        <div class="terminal-header">
+          <span class="terminal-dot r"></span>
+          <span class="terminal-dot y"></span>
+          <span class="terminal-dot g"></span>
+          <span class="terminal-title">comparison</span>
+        </div>
+        <pre class="terminal-body"><span class="t-dim">sequential (single process):</span>
+  3 suites × 20 tests × 100ms = <span class="t-fail">6.0s</span>
+
+<span class="t-dim">parallel suites (3 processes):</span>
+  max(20 × 100ms, 20 × 100ms, 20 × 100ms) = <span class="t-warn">2.0s</span>
+
+<span class="t-dim">parallel suites + parallel methods (3 processes, 4 goroutines each):</span>
+  max(20/4 × 100ms, ...) ≈ <span class="t-pass">0.5s</span></pre>
+      </div>
+
+      <p>The improvement from 6 seconds to 0.5 seconds comes entirely from structural changes: process isolation between suites and goroutine parallelism within them. No test logic was changed. No assertion was added or removed. The test code is identical; only the execution model is different.</p>
+
+      <p>These are simplified numbers. Real workloads have uneven test durations, fixture setup costs, and I/O contention. But the pattern holds: structural parallelism is multiplicative. <code>t.Parallel()</code> on individual tests is additive.</p>
+
+      <h2>Where to start</h2>
+
+      <p>If your test suite is slow, the diagnostic path is straightforward:</p>
+
+      <ol>
+        <li><strong>Find the bottleneck package.</strong> Run <code>go test -v -count=1 ./...</code> and sort by duration. One or two packages usually dominate.</li>
+        <li><strong>Check for sequential suites.</strong> If the bottleneck package has multiple suites, they're running sequentially. Split the package, or use a tool that isolates suites into separate processes.</li>
+        <li><strong>Check for redundant setup.</strong> If your setup helper does expensive I/O (connect to database, start container, load fixtures), look at how many times it runs. Consider shared fixtures that set up once per process or once per test run.</li>
+        <li><strong>Check for parallelism blockers.</strong> If tests are independent but run sequentially because they share state, the test structure is preventing parallelism. Either restructure for <code>t.Parallel()</code> or use a framework that provides per-test isolation.</li>
+      </ol>
+
+      <p>The fastest test suite is the one where isolation is structural (guaranteed by processes and memory boundaries) rather than behavioral (relying on developers to avoid sharing state). The first kind scales with cores. The second kind scales with discipline.</p>
+
+      <div class="cta">
+        <p><strong>Try gotest on your next project.</strong></p>
+        <div class="install-cmd">
+          <code>go install github.com/mvrahden/go-test/cmd/gotest@latest</code>
+          <button onclick="navigator.clipboard.writeText('go install github.com/mvrahden/go-test/cmd/gotest@latest').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})" aria-label="Copy install command">Copy</button>
+        </div>
+        <div class="cta-links">
+          <a href="../reference.html">Reference</a>
+          <a href="https://github.com/mvrahden/go-test">GitHub</a>
+          <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code Extension</a>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-links">
+      <a href="../">Home</a>
+      <a href="https://github.com/mvrahden/go-test">GitHub</a>
+      <a href="https://pkg.go.dev/github.com/mvrahden/go-test">pkg.go.dev</a>
+      <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code Extension</a>
+      <a href="../reference.html">Reference</a>
+      <a href="./">Blog</a>
+      <a href="https://github.com/mvrahden/go-test/blob/main/LICENSE">MIT License</a>
+    </div>
+    <p class="footer-copy">Built for Go developers who want tests that explain themselves.</p>
+  </footer>
+  <script>
+  fetch('https://api.github.com/repos/mvrahden/go-test')
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(d => {
+      if (d.stargazers_count >= 10) {
+        document.getElementById('star-count').textContent = ` ${d.stargazers_count}`;
+      }
+    })
+    .catch(() => {});
+  </script>
+</body>
+</html>

@@ -535,7 +535,7 @@
 
       <p>The code generator runs before <code>go test</code> and produces Go source files. Those files are injected via Go's <code>-overlay</code> flag, a built-in mechanism that maps virtual file paths to real files on disk. The compiler sees the generated files; your source directory does not. After the run, nothing is left behind. Your <code>git status</code> stays clean.</p>
 
-      <p>This extends to isolation. Each suite runs in its own OS process — a generated test binary, compiled and executed separately. A panicking test in one suite cannot crash another. Memory is isolated by the OS, not by convention. Goroutine leaks, global state mutations, and port conflicts stay contained to the process that caused them.</p>
+      <p>This extends to isolation. Each suite runs in its own OS process: a generated test binary, compiled and executed separately. A panicking test in one suite cannot crash another. Memory is isolated by the OS, not by convention. Goroutine leaks, global state mutations, and port conflicts stay contained to the process that caused them.</p>
 
       <p>This structural isolation is what makes suite-level parallelism safe by default: suites run concurrently without any opt-in, because they cannot interfere with each other.</p>
 
@@ -569,6 +569,7 @@
 
       <ul>
         <li><strong>Test suites</strong> are plain structs with <code>TestSuite</code> suffix, not types that embed a framework base. Lifecycle hooks are methods with conventional names, not interface implementations. <a href="organizing-go-tests.html">More on organizing tests.</a></li>
+        <li><strong>Parallel execution</strong> is safe by default at the suite level: each suite runs as a separate OS process, so suites cannot interfere with each other. Method-level parallelism is opt-in via <code>SuiteConfig{Parallel: true}</code>, with a returning <code>BeforeEach</code> giving each test its own isolated state. <a href="../reference.html#lifecycle">More in the reference.</a></li>
         <li><strong>Fixtures</strong> are structs with <code>Fixture</code> suffix. Dependencies between fixtures are expressed as pointer fields, forming a DAG that the generator resolves automatically. Shared fixtures cross the process boundary through JSON serialization. <a href="test-fixtures-in-go.html">More on fixtures.</a></li>
         <li><strong>BDD structure</strong> uses <code>t.When()</code> and <code>t.It()</code> method calls that map directly to <code>t.Run</code>. The <code>gotest spec</code> command renders this structure as a behavioral specification, because the hierarchy is already there in the test code. <a href="readable-tests-with-bdd.html">More on BDD-style tests.</a></li>
         <li><strong>AST-based discovery</strong> uses <code>go/parser</code> to read source files without importing or compiling them. This keeps the generation step fast and means the generator never executes user code. <a href="code-generation-not-reflection.html">More on code generation.</a></li>
