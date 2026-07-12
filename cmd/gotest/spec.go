@@ -7,8 +7,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"slices"
-	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -31,78 +29,28 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return runSpecFromInput(input, format, output, noColor)
 	}
 
-	setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2
-	}
-	globalTimeout, err := parseGlobalTimeoutFlag(ownArgs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2
-	}
-	globalTimeout = resolveGlobalTimeout(globalTimeout)
 	minCoverage, err := parseMinFlag(ownArgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	parallel, err := parseParallelFlag(ownArgs)
+	goTestArgs, coverProfile, coverCleanup, err := ensureCoverProfile(goTestArgs, minCoverage)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	if parallel == 0 {
-		parallel = inv.Config.Parallel
-	}
-	compileParallel, err := parseCompileParallelFlag(ownArgs)
+	defer coverCleanup()
+
+	cfg, err := parseExecFlags(ownArgs, goTestArgs, inv.Config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
-	}
-	if compileParallel == 0 {
-		compileParallel = inv.Config.CompileParallel
-	}
-
-	var coverProfile string
-	if minCoverage > 0 {
-		for _, arg := range goTestArgs {
-			if v, ok := strings.CutPrefix(arg, "-coverprofile="); ok {
-				coverProfile = v
-			}
-		}
-		if coverProfile == "" {
-			f, ferr := os.CreateTemp("", "gotest-cover-*.out")
-			if ferr != nil {
-				fmt.Fprintf(os.Stderr, "FAIL: %s\n", ferr)
-				return 2
-			}
-			coverProfile = f.Name()
-			f.Close()
-			defer os.Remove(coverProfile)
-			goTestArgs = append(goTestArgs, "-coverprofile="+coverProfile)
-		}
-	}
-
-	patterns := ExtractPackagePatterns(goTestArgs)
-
-	cfg := ExecConfig{
-		GoTestArgs:      goTestArgs,
-		PackagePatterns: patterns,
-		SetupTimeout:    setupTimeout,
-		GlobalTimeout:   globalTimeout,
-		Debug:           slices.Contains(ownArgs, "--debug"),
-		CI:              slices.Contains(ownArgs, "--ci"),
-		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
-		NoCache:         slices.Contains(ownArgs, "--no-cache"),
-		Parallel:        parallel,
-		CompileParallel: compileParallel,
 	}
 
 	classified := gotestrunner.ClassifyGoTestArgs(goTestArgs)
 	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
-	loaded, err := gotestgen.LoadPackages(patterns, loadFlags)
+	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -189,19 +137,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		gotestspec.RenderTerminal(w, tree, renderOpts...)
 	}
 
-	if code == 0 && minCoverage > 0 && coverProfile != "" {
-		pct, err := readCoverageTotal(coverProfile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: reading coverage: %s\n", err)
-			return 2
-		}
-		if pct < float64(minCoverage) {
-			fmt.Fprintf(os.Stderr, "\nFAIL: %.1f%% coverage (minimum %d%%)\n", pct, minCoverage)
-			return 1
-		}
-	}
-
-	return code
+	return enforceCoverage(coverProfile, minCoverage, code)
 }
 
 func runSpecFromInput(input, format, output string, noColor bool) int {

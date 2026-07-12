@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -49,51 +48,16 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 	jsonMode, goTestArgs := stripJSONFlag(goTestArgs)
-	setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2
-	}
-	globalTimeout, err := parseGlobalTimeoutFlag(ownArgs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2
-	}
-	globalTimeout = resolveGlobalTimeout(globalTimeout)
 	debounceDuration, err := parseDebounceFlag(ownArgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	parallel, err := parseParallelFlag(ownArgs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2
-	}
-	if parallel == 0 {
-		parallel = inv.Config.Parallel
-	}
-	compileParallel, err := parseCompileParallelFlag(ownArgs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2
-	}
-	if compileParallel == 0 {
-		compileParallel = inv.Config.CompileParallel
-	}
-	patterns := ExtractPackagePatterns(goTestArgs)
 
-	cfg := ExecConfig{
-		GoTestArgs:      goTestArgs,
-		PackagePatterns: patterns,
-		SetupTimeout:    setupTimeout,
-		GlobalTimeout:   globalTimeout,
-		Debug:           slices.Contains(ownArgs, "--debug"),
-		CI:              slices.Contains(ownArgs, "--ci"),
-		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
-		NoCache:         slices.Contains(ownArgs, "--no-cache"),
-		Parallel:        parallel,
-		CompileParallel: compileParallel,
+	cfg, err := parseExecFlags(ownArgs, goTestArgs, inv.Config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
@@ -114,7 +78,7 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 	defer watcher.Close()
 
-	for _, pattern := range patterns {
+	for _, pattern := range cfg.PackagePatterns {
 		addWatchDirs(watcher, pattern)
 	}
 

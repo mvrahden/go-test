@@ -81,13 +81,11 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return runSpec(Invocation{Args: specArgs, Config: inv.Config})
 	}
 
-	args := inv.DefaultArgs()
-	ownArgs, goTestArgs, err := SplitArgs(args, testAllowed)
+	ownArgs, goTestArgs, err := SplitArgs(inv.DefaultArgs(), testAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-
 	jsonMode, goTestArgs := stripJSONFlag(goTestArgs)
 
 	minCoverage, err := parseMinFlag(ownArgs)
@@ -98,84 +96,22 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if minCoverage == 0 {
 		minCoverage = inv.Config.MinCoverage
 	}
-	setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
+
+	goTestArgs, coverProfile, coverCleanup, err := ensureCoverProfile(goTestArgs, minCoverage)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	globalTimeout, err := parseGlobalTimeoutFlag(ownArgs)
+	defer coverCleanup()
+
+	cfg, err := parseExecFlags(ownArgs, goTestArgs, inv.Config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	globalTimeout = resolveGlobalTimeout(globalTimeout)
-	parallel, err := parseParallelFlag(ownArgs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2
-	}
-	if parallel == 0 {
-		parallel = inv.Config.Parallel
-	}
-	compileParallel, err := parseCompileParallelFlag(ownArgs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2
-	}
-	if compileParallel == 0 {
-		compileParallel = inv.Config.CompileParallel
-	}
+	cfg.JSON = jsonMode
 
-	var coverProfile string
-	if minCoverage > 0 {
-		for _, arg := range goTestArgs {
-			if v, ok := strings.CutPrefix(arg, "-coverprofile="); ok {
-				coverProfile = v
-			}
-		}
-		if coverProfile == "" {
-			f, err := os.CreateTemp("", "gotest-cover-*.out")
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-				return 2
-			}
-			coverProfile = f.Name()
-			f.Close()
-			defer os.Remove(coverProfile)
-			goTestArgs = append(goTestArgs, "-coverprofile="+coverProfile)
-		}
-	}
-
-	patterns := ExtractPackagePatterns(goTestArgs)
-	cfg := ExecConfig{
-		GoTestArgs:      goTestArgs,
-		PackagePatterns: patterns,
-		SetupTimeout:    setupTimeout,
-		GlobalTimeout:   globalTimeout,
-		Debug:           slices.Contains(ownArgs, "--debug"),
-		CI:              slices.Contains(ownArgs, "--ci"),
-		JSON:            jsonMode,
-		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
-		NoCache:         slices.Contains(ownArgs, "--no-cache"),
-		Parallel:        parallel,
-		CompileParallel: compileParallel,
-	}
-
-	code := Run(cfg)
-
-	if code == 0 && minCoverage > 0 {
-		pct, err := readCoverageTotal(coverProfile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: reading coverage: %s\n", err)
-			return 2
-		}
-		if pct < float64(minCoverage) {
-			fmt.Fprintf(os.Stderr, "\nFAIL: %.1f%% coverage (minimum %d%%)\n", pct, minCoverage)
-			return 1
-		}
-	}
-
-	return code
+	return enforceCoverage(coverProfile, minCoverage, Run(cfg))
 }
 
 func parseMinFlag(args []string) (int, error) {
@@ -250,6 +186,79 @@ func parseCompileParallelFlag(args []string) (int, error) {
 		return 0, fmt.Errorf("invalid --compile-parallel value %d: must be positive", v)
 	}
 	return v, nil
+}
+
+func parseExecFlags(ownArgs, goTestArgs []string, projCfg config.ProjectConfig) (ExecConfig, error) {
+	setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
+	if err != nil {
+		return ExecConfig{}, err
+	}
+	globalTimeout, err := parseGlobalTimeoutFlag(ownArgs)
+	if err != nil {
+		return ExecConfig{}, err
+	}
+	globalTimeout = resolveGlobalTimeout(globalTimeout)
+	parallel, err := parseParallelFlag(ownArgs)
+	if err != nil {
+		return ExecConfig{}, err
+	}
+	if parallel == 0 {
+		parallel = projCfg.Parallel
+	}
+	compileParallel, err := parseCompileParallelFlag(ownArgs)
+	if err != nil {
+		return ExecConfig{}, err
+	}
+	if compileParallel == 0 {
+		compileParallel = projCfg.CompileParallel
+	}
+	return ExecConfig{
+		GoTestArgs:      goTestArgs,
+		PackagePatterns: ExtractPackagePatterns(goTestArgs),
+		SetupTimeout:    setupTimeout,
+		GlobalTimeout:   globalTimeout,
+		Debug:           slices.Contains(ownArgs, "--debug"),
+		CI:              slices.Contains(ownArgs, "--ci"),
+		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
+		NoCache:         slices.Contains(ownArgs, "--no-cache"),
+		Parallel:        parallel,
+		CompileParallel: compileParallel,
+	}, nil
+}
+
+func ensureCoverProfile(goTestArgs []string, minCoverage int) ([]string, string, func(), error) {
+	noop := func() {}
+	if minCoverage <= 0 {
+		return goTestArgs, "", noop, nil
+	}
+	for _, arg := range goTestArgs {
+		if v, ok := strings.CutPrefix(arg, "-coverprofile="); ok {
+			return goTestArgs, v, noop, nil
+		}
+	}
+	f, err := os.CreateTemp("", "gotest-cover-*.out")
+	if err != nil {
+		return goTestArgs, "", noop, err
+	}
+	profile := f.Name()
+	f.Close()
+	return append(goTestArgs, "-coverprofile="+profile), profile, func() { os.Remove(profile) }, nil
+}
+
+func enforceCoverage(coverProfile string, minCoverage, code int) int {
+	if code != 0 || minCoverage <= 0 || coverProfile == "" {
+		return code
+	}
+	pct, err := readCoverageTotal(coverProfile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: reading coverage: %s\n", err)
+		return 2
+	}
+	if pct < float64(minCoverage) {
+		fmt.Fprintf(os.Stderr, "\nFAIL: %.1f%% coverage (minimum %d%%)\n", pct, minCoverage)
+		return 1
+	}
+	return code
 }
 
 func readCoverageTotal(profilePath string) (float64, error) {
