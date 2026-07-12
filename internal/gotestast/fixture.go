@@ -7,6 +7,7 @@ import (
 	"go/types"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/protocol"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -20,8 +21,8 @@ const (
 )
 
 const (
-	suffixFixture       = "Fixture"
-	suffixSharedFixture = "SharedFixture"
+	suffixFixture       = protocol.SuffixFixture
+	suffixSharedFixture = protocol.SuffixSharedFixture
 )
 
 // FixtureSpec describes a fixture type identified by naming convention.
@@ -291,6 +292,27 @@ func ValidateFixtureConsistency(f *FixtureSpec) (token.Pos, error) {
 		return pos, fmt.Errorf("shared fixture %q has %s but no %s; both must be defined together", f.ts.Name.Name, present, absent)
 	}
 	return -1, nil
+}
+
+// ReceiverTypeName extracts the type name from a receiver expression,
+// unwrapping pointer and generic type wrappers.
+func ReceiverTypeName(expr ast.Expr) string {
+	if star, ok := expr.(*ast.StarExpr); ok {
+		expr = star.X
+	}
+	switch x := expr.(type) {
+	case *ast.Ident:
+		return x.Name
+	case *ast.IndexExpr:
+		if ident, ok := x.X.(*ast.Ident); ok {
+			return ident.Name
+		}
+	case *ast.IndexListExpr:
+		if ident, ok := x.X.(*ast.Ident); ok {
+			return ident.Name
+		}
+	}
+	return ""
 }
 
 func validateContextErrorSig(sig *types.Signature, methodID string) error {

@@ -3,6 +3,8 @@ package gotestast
 import (
 	"go/ast"
 	"go/types"
+
+	"golang.org/x/tools/go/packages"
 )
 
 // ClassifyLocalFields analyzes a Hydrate method's AST to determine which
@@ -104,6 +106,38 @@ func collectReceiverMethodCalls(block *ast.BlockStmt, recvName string) []string 
 		return true
 	})
 	return names
+}
+
+// FindMethodDecl finds the FuncDecl for a named method on a receiver type
+// within the given package's syntax.
+func FindMethodDecl(pkg *packages.Package, receiverName, methodName string) *ast.FuncDecl {
+	for _, file := range pkg.Syntax {
+		for _, decl := range file.Decls {
+			fd, ok := decl.(*ast.FuncDecl)
+			if !ok || fd.Recv == nil || fd.Name.Name != methodName {
+				continue
+			}
+			obj := pkg.TypesInfo.ObjectOf(fd.Name)
+			fn, ok := obj.(*types.Func)
+			if !ok {
+				continue
+			}
+			sig, ok := fn.Type().(*types.Signature)
+			if !ok || sig.Recv() == nil {
+				continue
+			}
+			recv := sig.Recv().Type()
+			if ptr, ok := recv.(*types.Pointer); ok {
+				recv = ptr.Elem()
+			}
+			named, ok := recv.(*types.Named)
+			if !ok || named.Obj().Name() != receiverName {
+				continue
+			}
+			return fd
+		}
+	}
+	return nil
 }
 
 func findMethodBodyInSyntax(syntax []*ast.File, info *types.Info, fixtureName, methodName string) *ast.BlockStmt {
