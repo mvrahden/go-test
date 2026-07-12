@@ -39,14 +39,6 @@ describe("TestResultStore", () => {
     expect(store.get("pkg/suite/b")).toBeDefined();
   });
 
-  it("clear: removes all results", () => {
-    store.record("pkg/suite/a", "pass");
-    store.record("pkg/suite/b", "fail");
-    store.clear();
-    expect(store.size).toBe(0);
-    expect(store.get("pkg/suite/a")).toBeUndefined();
-  });
-
   it("forEach: iterates all entries", () => {
     store.record("pkg/suite/a", "pass", 10);
     store.record("pkg/suite/b", "skip");

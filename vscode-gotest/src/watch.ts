@@ -224,8 +224,6 @@ export class WatchManager implements vscode.Disposable {
   private watchers = new Map<string, WatchProcess>();
   private activeRuns = new Map<string, vscode.TestRun>();
   private watchRecordIds = new Map<string, string>();
-  private readonly _onDidChange = new vscode.EventEmitter<void>();
-  readonly onDidChange: vscode.Event<void> = this._onDidChange.event;
   private readonly statusBar: vscode.StatusBarItem;
 
   constructor(
@@ -327,7 +325,6 @@ export class WatchManager implements vscode.Disposable {
         // Remove from map
         this.watchers.delete(pkgScope);
         this.updateStatusBar();
-        this._onDidChange.fire();
       },
     );
 
@@ -338,7 +335,6 @@ export class WatchManager implements vscode.Disposable {
     }).id;
     this.watchRecordIds.set(pkgScope, recordId);
     this.updateStatusBar();
-    this._onDidChange.fire();
   }
 
   stop(pkgScope: string): void {
@@ -361,7 +357,6 @@ export class WatchManager implements vscode.Disposable {
     }
 
     this.updateStatusBar();
-    this._onDidChange.fire();
   }
 
   stopAll(): void {
@@ -383,21 +378,15 @@ export class WatchManager implements vscode.Disposable {
     this.watchers.clear();
     this.activeRuns.clear();
     this.updateStatusBar();
-    this._onDidChange.fire();
   }
 
   get activeCount(): number {
     return this.watchers.size;
   }
 
-  isWatching(pkgScope: string): boolean {
-    return this.watchers.has(pkgScope);
-  }
-
   dispose(): void {
     this.stopAll();
     this.statusBar.dispose();
-    this._onDidChange.dispose();
   }
 
   private updateStatusBar(): void {

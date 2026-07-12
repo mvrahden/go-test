@@ -50,10 +50,6 @@ export class CoverageStore implements vscode.Disposable {
     return this.cachedDetails.get(absPath) ?? [];
   }
 
-  has(importPath: string): boolean {
-    return this.packages.has(importPath);
-  }
-
   update(
     importPath: string,
     coverprofile: string,

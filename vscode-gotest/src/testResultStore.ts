@@ -54,10 +54,6 @@ export class TestResultStore {
     this.results.delete(itemId);
   }
 
-  clear(): void {
-    this.results.clear();
-  }
-
   forEach(callback: (result: TestResult, itemId: string) => void): void {
     this.results.forEach((result, id) => callback(result, id));
   }

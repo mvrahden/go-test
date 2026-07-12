@@ -41,21 +41,6 @@ export function parseTestEvents(jsonLines: string): TestEvent[] {
   return events;
 }
 
-export function groupEventsByPackage(
-  events: TestEvent[],
-): Map<string, TestEvent[]> {
-  const groups = new Map<string, TestEvent[]>();
-  for (const event of events) {
-    let list = groups.get(event.Package);
-    if (!list) {
-      list = [];
-      groups.set(event.Package, list);
-    }
-    list.push(event);
-  }
-  return groups;
-}
-
 /**
  * Extract file:line:message patterns from test output.
  * Pattern: /^\s*(.+?):(\d+):\s*(.+)$/

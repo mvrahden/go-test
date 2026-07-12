@@ -118,16 +118,6 @@ export class DiscoveryCache implements vscode.Disposable {
     this._onDidUpdate.fire();
   }
 
-  clear(): void {
-    this.cache.clear();
-    this.dirIndex.clear();
-    this.workspaceDirs.clear();
-    this._warnings = [];
-    this.moduleDirs.clear();
-    this.pkgModules.clear();
-    this._onDidUpdate.fire();
-  }
-
   dispose(): void {
     this._onDidUpdate.dispose();
   }
