@@ -15,7 +15,7 @@ func run(runTests func() int, cfg MainConfig) int {
 	tracker := &nodeTracker{succeeded: make(map[*FixtureNode]bool)}
 
 	var sharedState map[string]json.RawMessage
-	if anyNodeHasSharedFixtures(cfg.Roots, cfg.Fixtures) {
+	if anyNodeHasSharedState(cfg.Fixtures) {
 		if os.Getenv(protocol.EnvSharedStateFile) != "" {
 			var err error
 			sharedState, err = loadSharedState()
@@ -23,9 +23,6 @@ func run(runTests func() int, cfg MainConfig) int {
 				fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
 				return 2
 			}
-		} else if anyNodeHasLegacySharedFixtures(cfg.Roots, cfg.Fixtures) {
-			fmt.Fprintf(os.Stderr, "FAIL: %s not set — run via gotest CLI\n", protocol.EnvSharedStateFile)
-			return 2
 		}
 	}
 
@@ -48,7 +45,7 @@ func run(runTests func() int, cfg MainConfig) int {
 		return code
 	}
 
-	if err := setupRoots(ctx, cfg.Roots, sharedState, tracker); err != nil {
+	if err := setupRoots(ctx, cfg.Roots, tracker); err != nil {
 		_ = teardownRoots(cfg.Roots, tracker)
 		return 2
 	}
@@ -64,7 +61,7 @@ func run(runTests func() int, cfg MainConfig) int {
 	return code
 }
 
-func setupRoots(ctx context.Context, roots []*FixtureNode, sharedState map[string]json.RawMessage, tracker *nodeTracker) error {
+func setupRoots(ctx context.Context, roots []*FixtureNode, tracker *nodeTracker) error {
 	errs := make([]error, len(roots))
 	var wg sync.WaitGroup
 
@@ -81,7 +78,7 @@ func setupRoots(ctx context.Context, roots []*FixtureNode, sharedState map[strin
 					cancel()
 				}
 			}()
-			if err := setupNode(childCtx, root, sharedState, tracker); err != nil {
+			if err := setupNode(childCtx, root, tracker); err != nil {
 				errs[i] = err
 				cancel()
 			}
@@ -97,45 +94,17 @@ func setupRoots(ctx context.Context, roots []*FixtureNode, sharedState map[strin
 	return nil
 }
 
-func setupNode(ctx context.Context, node *FixtureNode, sharedState map[string]json.RawMessage, tracker *nodeTracker) error {
-	// 1-2. Unmarshal and hydrate shared fixtures
-	if len(node.SharedFixtures) > 0 {
-		for _, sf := range node.SharedFixtures {
-			raw, ok := sharedState[sf.StateKey]
-			if !ok {
-				return fmt.Errorf("shared fixture state key %q not found in state file", sf.StateKey)
-			}
-			if err := json.Unmarshal(raw, sf.Target); err != nil {
-				return fmt.Errorf("unmarshal shared fixture %q: %w", sf.StateKey, err)
-			}
-			if sf.Hydrate != nil {
-				if err := sf.Hydrate(ctx); err != nil {
-					return fmt.Errorf("hydrate shared fixture %q: %w", sf.StateKey, err)
-				}
-			}
-		}
-	}
-
-	// 3. Init
+func setupNode(ctx context.Context, node *FixtureNode, tracker *nodeTracker) error {
 	if node.Init != nil {
 		node.Init()
 	}
 
-	// 4. Assign shared fixtures
-	for _, sf := range node.SharedFixtures {
-		if sf.Assign != nil {
-			sf.Assign()
-		}
-	}
-
-	// 5. BeforeAll with retry/timeout
 	if err := runBeforeAllWithRetry(ctx, node); err != nil {
 		return err
 	}
 
 	tracker.markSucceeded(node)
 
-	// 6. Setup children concurrently
 	if len(node.Children) > 0 {
 		errs := make([]error, len(node.Children))
 		var wg sync.WaitGroup
@@ -153,7 +122,7 @@ func setupNode(ctx context.Context, node *FixtureNode, sharedState map[string]js
 						cancel()
 					}
 				}()
-				if err := setupNode(childCtx, child, sharedState, tracker); err != nil {
+				if err := setupNode(childCtx, child, tracker); err != nil {
 					errs[i] = err
 					cancel()
 				}
@@ -274,31 +243,8 @@ func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string
 		return nil
 	}
 
-	if len(node.SharedFixtures) > 0 {
-		for _, sf := range node.SharedFixtures {
-			raw, ok := sharedState[sf.StateKey]
-			if !ok {
-				return fmt.Errorf("shared fixture state key %q not found in state file", sf.StateKey)
-			}
-			if err := json.Unmarshal(raw, sf.Target); err != nil {
-				return fmt.Errorf("unmarshal shared fixture %q: %w", sf.StateKey, err)
-			}
-			if sf.Hydrate != nil {
-				if err := sf.Hydrate(ctx); err != nil {
-					return fmt.Errorf("hydrate shared fixture %q: %w", sf.StateKey, err)
-				}
-			}
-		}
-	}
-
 	if node.Init != nil {
 		node.Init()
-	}
-
-	for _, sf := range node.SharedFixtures {
-		if sf.Assign != nil {
-			sf.Assign()
-		}
 	}
 
 	if err := runBeforeAllWithRetry(ctx, node); err != nil {
@@ -361,17 +307,6 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
 						mu.Lock()
 						failed[node.Name] = true
 						mu.Unlock()
-					}
-				}
-
-				for _, sf := range node.SharedFixtures {
-					if sf.Dehydrate != nil {
-						if err := sf.Dehydrate(context.Background()); err != nil {
-							fmt.Fprintf(os.Stderr, "%s: dehydrate failed: %v\n", node.Name, err)
-							mu.Lock()
-							failed[node.Name] = true
-							mu.Unlock()
-						}
 					}
 				}
 			}
@@ -494,15 +429,6 @@ func teardownNode(node *FixtureNode, tracker *nodeTracker) bool {
 				anyFailed = true
 			}
 		}
-
-		for _, sf := range node.SharedFixtures {
-			if sf.Dehydrate != nil {
-				if err := sf.Dehydrate(context.Background()); err != nil {
-					fmt.Fprintf(os.Stderr, "%s: dehydrate failed: %v\n", node.Name, err)
-					anyFailed = true
-				}
-			}
-		}
 	}
 
 	return anyFailed
@@ -611,40 +537,9 @@ func loadSharedState() (map[string]json.RawMessage, error) {
 	return state, nil
 }
 
-func anyNodeHasSharedFixtures(roots, fixtures []*FixtureNode) bool {
+func anyNodeHasSharedState(fixtures []*FixtureNode) bool {
 	for _, f := range fixtures {
-		if len(f.SharedFixtures) > 0 || f.SharedState != nil {
-			return true
-		}
-	}
-	for _, root := range roots {
-		if hasSharedFixtures(root) {
-			return true
-		}
-	}
-	return false
-}
-
-func anyNodeHasLegacySharedFixtures(roots, fixtures []*FixtureNode) bool {
-	for _, f := range fixtures {
-		if len(f.SharedFixtures) > 0 {
-			return true
-		}
-	}
-	for _, root := range roots {
-		if hasSharedFixtures(root) {
-			return true
-		}
-	}
-	return false
-}
-
-func hasSharedFixtures(node *FixtureNode) bool {
-	if len(node.SharedFixtures) > 0 {
-		return true
-	}
-	for _, child := range node.Children {
-		if hasSharedFixtures(child) {
+		if f.SharedState != nil {
 			return true
 		}
 	}
@@ -672,15 +567,13 @@ func SetupFixtureDAG(ctx context.Context, cfg MainConfig) (*FixtureDAG, error) {
 	tracker := &nodeTracker{succeeded: make(map[*FixtureNode]bool)}
 
 	var sharedState map[string]json.RawMessage
-	if anyNodeHasSharedFixtures(cfg.Roots, cfg.Fixtures) {
+	if anyNodeHasSharedState(cfg.Fixtures) {
 		if os.Getenv(protocol.EnvSharedStateFile) != "" {
 			var err error
 			sharedState, err = loadSharedState()
 			if err != nil {
 				return nil, fmt.Errorf("load shared state: %w", err)
 			}
-		} else if anyNodeHasLegacySharedFixtures(cfg.Roots, cfg.Fixtures) {
-			return nil, fmt.Errorf("%s not set — run via gotest CLI", protocol.EnvSharedStateFile)
 		}
 	}
 
@@ -690,7 +583,7 @@ func SetupFixtureDAG(ctx context.Context, cfg MainConfig) (*FixtureDAG, error) {
 			return nil, err
 		}
 	} else if len(cfg.Roots) > 0 {
-		if err := setupRoots(ctx, cfg.Roots, sharedState, tracker); err != nil {
+		if err := setupRoots(ctx, cfg.Roots, tracker); err != nil {
 			_ = teardownRoots(cfg.Roots, tracker)
 			return nil, err
 		}
