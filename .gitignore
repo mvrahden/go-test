@@ -6,6 +6,9 @@ dist/
 spec.txt
 .vite
 .worktrees/
+site/public/
+site/resources/
+site/.hugo_build.lock
 ƒƒ_*
 gotest_psuite_test.go
 gotest_pxsuite_test.go

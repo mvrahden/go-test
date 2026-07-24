@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {{- partial "head.html" . -}}
+</head>
+<body>
+  {{- partial "nav.html" . -}}
+  {{- block "main" . }}{{ end -}}
+  {{- partial "footer.html" . -}}
+  <script>
+  fetch('https://api.github.com/repos/mvrahden/go-test')
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(d => {
+      if (d.stargazers_count >= 10) {
+        document.getElementById('star-count').textContent = ` ${d.stargazers_count}`;
+      }
+    })
+    .catch(() => {});
+  </script>
+  {{- block "scripts" . }}{{ end -}}
+</body>
+</html>

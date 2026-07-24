@@ -1,0 +1,16 @@
+  <nav>
+    <div class="nav-inner">
+      <a href="{{ "/" | relURL }}" class="nav-brand">
+        <img src="{{ "logo.png" | absURL }}" alt="gotest logo" width="28" height="28">
+        gotest
+      </a>
+      <div class="nav-links">
+        {{ if not .IsHome }}<a href="{{ "/" | relURL }}">Home</a>{{ end }}
+        <a href="{{ "blog/" | relURL }}">Blog</a>
+        <a href="{{ "reference/" | relURL }}" class="nav-ref">Reference</a>
+        <a href="https://github.com/mvrahden/go-test" class="star-btn"><span class="star-icon">&#9734;</span> Star<span class="star-count" id="star-count"></span></a>
+        <a href="https://pkg.go.dev/github.com/mvrahden/go-test" onclick="gtag('event','click',{event_category:'outbound',event_label:'pkg.go.dev'})">pkg.go.dev</a>
+        <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest" onclick="gtag('event','click',{event_category:'outbound',event_label:'vscode_marketplace'})">VS Code</a>
+      </div>
+    </div>
+  </nav>

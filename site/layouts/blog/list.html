@@ -1,0 +1,21 @@
+{{ define "main" }}
+  <header class="blog-header">
+    <h1>Blog</h1>
+    <p>Thinking about Go testing: patterns, trade-offs, and the ideas behind gotest.</p>
+  </header>
+
+  <main class="post-list">
+    {{ range .Pages.ByDate.Reverse }}
+    <article class="post-entry">
+      <div class="post-entry-meta">
+        <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "January 2, 2006" }}</time>
+        <span>&middot;</span>
+        <span>{{ .Params.readTime }} min read</span>
+        {{ with .Params.tag }}<span class="tag">{{ . }}</span>{{ end }}
+      </div>
+      <h2><a href="{{ .RelPermalink }}">{{ .Title | markdownify }}</a></h2>
+      <p class="excerpt">{{ .Description }}</p>
+    </article>
+    {{ end }}
+  </main>
+{{ end }}

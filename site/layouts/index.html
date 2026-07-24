@@ -1,0 +1,231 @@
+{{ define "main" }}
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container">
+        <h1>gotest</h1>
+        <p class="tagline">Specification-driven test suites for Go.</p>
+        <p class="bridge">A <code>go test</code> code generator &mdash; you write structs with naming conventions, it handles the wiring.</p>
+        <div class="pills">
+          <span class="pill"><code>go test</code> under the hood</span>
+          <span class="pill">No runtime deps</span>
+          <span class="pill">No reflection</span>
+          <span class="pill">Pure code generation</span>
+        </div>
+        <img src="{{ "gopher.png" | absURL }}" alt="gotest gopher" class="hero-gopher" width="360">
+        <div class="install-cmd">
+          <code>go install github.com/mvrahden/go-test/cmd/gotest@latest</code>
+          <button onclick="navigator.clipboard.writeText('go install github.com/mvrahden/go-test/cmd/gotest@latest').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500);gtag('event','copy_install_command')})" aria-label="Copy install command">Copy</button>
+        </div>
+        <div class="hero-meta">
+          <span id="release-indicator"></span>
+          <span class="sep">&middot;</span>
+          <span class="trust-badges">
+            <a href="https://github.com/mvrahden/go-test/actions/workflows/test.yml"><img src="https://github.com/mvrahden/go-test/actions/workflows/test.yml/badge.svg" alt="CI"></a>
+            <a href="https://goreportcard.com/report/github.com/mvrahden/go-test"><img src="https://goreportcard.com/badge/github.com/mvrahden/go-test" alt="Go Report Card"></a>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Spec View -->
+    <section class="spec-section">
+      <div class="container">
+        <div class="terminal">
+          <div class="terminal-header">
+            <span class="terminal-dot r"></span>
+            <span class="terminal-dot y"></span>
+            <span class="terminal-dot g"></span>
+            <span class="terminal-title">gotest spec ./pkg/user</span>
+          </div>
+          <pre class="terminal-body"><span class="t-prompt">$</span> <span class="t-cmd">gotest spec ./pkg/user</span>
+
+<span class="t-suite">UserService</span>
+  <span class="t-test">Create</span>
+    <span class="t-when">when email is valid</span>
+      <span class="t-pass">&#10003;</span> creates the user <span class="t-time">(8ms)</span>
+      <span class="t-pass">&#10003;</span> sends a welcome email <span class="t-time">(120ms)</span>
+    <span class="t-when">when email already exists</span>
+      <span class="t-pass">&#10003;</span> returns ErrDuplicate <span class="t-time">(&lt;1ms)</span>
+  <span class="t-test">Delete</span>
+    <span class="t-pass">&#10003;</span> soft-deletes the user <span class="t-time">(5ms)</span>
+    <span class="t-skip">~</span><span class="t-skip"> hard-deletes after 30 days &#8212; SKIPPED</span>
+<span class="t-summary">1 suite, 5 behaviors: <span class="t-pass">4 passed</span>, 0 failed, <span class="t-skip">1 skipped</span></span></pre>
+        </div>
+        <p class="caption">Under the hood it's <code>go test</code>. On the surface, your suites read as specifications.</p>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+      <div class="container">
+        <h2>Tests that verify. Specifications that document.</h2>
+        <p class="subtitle">Convention-driven suites that read as documentation. Structured output for humans and machines.</p>
+        <div class="feature-grid">
+          <div class="feature-card">
+            <h3><span class="check">&#10003;</span> Behavioral Specifications</h3>
+            <p><code>When</code> groups context, <code>It</code> specifies behavior. Your tests are the documentation — always in sync, never stale.</p>
+          </div>
+          <div class="feature-card">
+            <h3><span class="check">&#10003;</span> Lifecycle Hooks</h3>
+            <p>Setup and teardown at the suite or test level. Define it once, every test gets it. No more copy-pasted boilerplate.</p>
+          </div>
+          <div class="feature-card">
+            <h3><span class="check">&#10003;</span> Type-Safe Assertions</h3>
+            <p>Generic assertions that catch type mismatches at compile time. Equality failures include diffs. Failures trace back to the test call site automatically — no <code>t.Helper()</code> needed.</p>
+          </div>
+          <div class="feature-card">
+            <h3><span class="check">&#10003;</span> Snapshot Testing</h3>
+            <p>Capture expected output once, catch regressions automatically. Snapshots are created on first run and verified on every run after.</p>
+          </div>
+          <div class="feature-card">
+            <h3><span class="check">&#10003;</span> Fixtures</h3>
+            <p>Share expensive setup like databases or containers across test suites, even across packages. Fixtures nest and compose naturally.</p>
+          </div>
+          <div class="feature-card">
+            <h3><span class="check">&#10003;</span> Watch Mode</h3>
+            <p>Save a file, see results instantly. Only affected packages re-run. Focus on a single test for a tight feedback loop.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Code Example -->
+    <section class="code-section">
+      <div class="container">
+        <h2>Write structs. Get tests.</h2>
+        <p class="subtitle">The naming conventions are the API. Your test structure is the specification.</p>
+        <div class="code-block">
+          <div class="code-header">user_service_suite_test.go</div>
+          <pre class="code-body"><span class="kw">type</span> <span class="tp">UserServiceTestSuite</span> <span class="kw">struct</span> {
+    svc *UserService
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserServiceTestSuite</span>) <span class="fn">BeforeEach</span>(t *gotest.T) {
+    s.svc = NewUserService()
+}
+
+<span class="kw">func</span> (s *<span class="tp">UserServiceTestSuite</span>) <span class="fn">TestCreate</span>(t *gotest.T) {
+    t.When(<span class="st">"email is valid"</span>, <span class="kw">func</span>(w *gotest.T) {
+        w.It(<span class="st">"creates the user"</span>, <span class="kw">func</span>(it *gotest.T) {
+            err := s.svc.Create(<span class="st">"alice@example.com"</span>)
+            gotest.NoError(it, err)
+        })
+    })
+}</pre>
+        </div>
+        <div class="code-steps">
+          <div class="code-step">
+            <strong>You write</strong>
+            Struct + methods with naming conventions
+          </div>
+          <span class="step-arrow">&#8594;</span>
+          <div class="code-step">
+            <strong>gotest generates</strong>
+            The boilerplate you'd write by hand
+          </div>
+          <span class="step-arrow">&#8594;</span>
+          <div class="code-step">
+            <strong>go test runs</strong>
+            Standard output, standard tooling. Your source tree stays clean.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comparison -->
+    <section class="comparison">
+      <div class="container">
+        <h2>Coming from testify/suite?</h2>
+        <p class="subtitle">Same test organization, different mechanism.</p>
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>testify/suite</th>
+              <th>gotest</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Runtime dependencies</td>
+              <td class="yes">Yes</td>
+              <td class="no">None</td>
+            </tr>
+            <tr>
+              <td>Reflection</td>
+              <td class="yes">Yes</td>
+              <td class="no">None</td>
+            </tr>
+            <tr>
+              <td>Registration boilerplate</td>
+              <td class="yes">suite.Run(t, new(...))</td>
+              <td class="no">None</td>
+            </tr>
+            <tr>
+              <td>Lock-in</td>
+              <td class="yes">High</td>
+              <td class="no">Low &mdash; standard Go structs</td>
+            </tr>
+            <tr>
+              <td>BDD vocabulary</td>
+              <td>&mdash;</td>
+              <td class="no">When / It</td>
+            </tr>
+            <tr>
+              <td>Snapshot testing</td>
+              <td>&mdash;</td>
+              <td class="no">Built-in</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="migrate-cmd">
+          <code>gotest migrate ./...</code>
+          <p>Automatic migration: renames hooks, rewrites assertions, removes testify imports.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ecosystem -->
+    <section class="ecosystem">
+      <div class="container">
+        <h2>Full ecosystem</h2>
+        <div class="eco-grid">
+          <div class="eco-item">
+            <strong>CLI</strong>
+            <code>gotest ./... -v -race</code>
+            <p>Generate and test in one command</p>
+          </div>
+          <div class="eco-item">
+            <strong>Linter</strong>
+            <code>gotest lint ./...</code>
+            <p>Catch common mistakes before they reach CI</p>
+          </div>
+          <div class="eco-item">
+            <strong>VS Code</strong>
+            <code>mvrahden.gotest</code>
+            <p>Spec View, Test Explorer, coverage, debug</p>
+          </div>
+          <div class="eco-item">
+            <strong>GitHub Action</strong>
+            <code>mvrahden/go-test@v1</code>
+            <p>PR annotations, step summaries, coverage reports</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+{{ end }}
+
+{{ define "scripts" }}
+  <script>
+  fetch('https://api.github.com/repos/mvrahden/go-test/releases/latest')
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(d => {
+      const el = document.getElementById('release-indicator');
+      const date = new Date(d.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      el.innerHTML = `<a href="${d.html_url}">${d.tag_name}</a> &middot; ${date}`;
+    })
+    .catch(() => {});
+  </script>
+{{ end }}

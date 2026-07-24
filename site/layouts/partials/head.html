@@ -1,0 +1,83 @@
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ if .IsHome }}{{ .Site.Title }} — {{ .Site.Params.description }}{{ else }}{{ .Title }} | {{ .Site.Title }}{{ end }}</title>
+  <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.tagline }}{{ end }}">
+  {{ with .Params.keywords }}<meta name="keywords" content="{{ if reflect.IsSlice . }}{{ delimit . ", " }}{{ else }}{{ . }}{{ end }}">{{ end }}
+
+  <meta property="og:type" content="{{ if and (eq .Section "blog") .IsPage }}article{{ else }}website{{ end }}">
+  <meta property="og:url" content="{{ .Permalink }}">
+  <meta property="og:title" content="{{ .Title }}">
+  <meta property="og:description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.tagline }}{{ end }}">
+  <meta property="og:image" content="{{ "gopher.png" | absURL }}">
+  <meta property="og:image:width" content="1024">
+  <meta property="og:image:height" content="572">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ .Title }}">
+  <meta name="twitter:description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.tagline }}{{ end }}">
+  <meta name="twitter:image" content="{{ "gopher.png" | absURL }}">
+
+  <link rel="icon" type="image/png" href="{{ "logo.png" | absURL }}">
+  <link rel="canonical" href="{{ .Permalink }}">
+  {{ with .OutputFormats.Get "RSS" }}<link rel="alternate" type="application/rss+xml" title="{{ $.Site.Title }} Blog" href="{{ .Permalink }}">{{ end }}
+
+  {{ if and (eq .Section "blog") .IsPage }}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": {{ .Title | jsonify | safeJS }},
+    "description": {{ .Description | jsonify | safeJS }},
+    "url": {{ .Permalink | jsonify | safeJS }},
+    "datePublished": "{{ .Date.Format "2006-01-02" }}",
+    "author": {
+      "@type": "Person",
+      "name": {{ .Site.Params.author | jsonify | safeJS }},
+      "url": {{ .Site.Params.authorURL | jsonify | safeJS }}
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "gotest",
+      "url": {{ .Site.BaseURL | jsonify | safeJS }}
+    },
+    "isPartOf": {
+      "@type": "Blog",
+      "name": "gotest blog",
+      "url": "{{ .Site.BaseURL }}blog/"
+    },
+    "programmingLanguage": "Go"
+  }
+  </script>
+  {{ else if .IsHome }}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "name": "gotest",
+    "description": {{ .Site.Params.tagline | jsonify | safeJS }},
+    "url": {{ .Site.BaseURL | jsonify | safeJS }},
+    "codeRepository": {{ .Site.Params.repoURL | jsonify | safeJS }},
+    "programmingLanguage": "Go",
+    "license": "https://opensource.org/licenses/MIT",
+    "operatingSystem": "Cross-platform",
+    "applicationCategory": "DeveloperApplication",
+    "author": {
+      "@type": "Person",
+      "name": {{ .Site.Params.author | jsonify | safeJS }},
+      "url": {{ .Site.Params.authorURL | jsonify | safeJS }}
+    }
+  }
+  </script>
+  {{ end }}
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id={{ .Site.Params.gaID }}"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', '{{ .Site.Params.gaID }}');
+  </script>
+
+  {{ $css := resources.Get "css/main.css" | minify | fingerprint }}
+  <link rel="stylesheet" href="{{ $css.RelPermalink }}">

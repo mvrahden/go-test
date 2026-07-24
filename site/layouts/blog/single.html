@@ -1,0 +1,31 @@
+{{ define "main" }}
+  <main class="article">
+    <header class="article-header">
+      <a href="{{ "blog/" | relURL }}" class="back">&larr; All posts</a>
+      <h1>{{ .Title | markdownify }}</h1>
+      <div class="article-meta">
+        <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "January 2, 2006" }}</time>
+        <span>&middot;</span>
+        <span>{{ .Params.readTime }} min read</span>
+        {{ with .Params.tag }}<span class="tag">{{ . }}</span>{{ end }}
+      </div>
+    </header>
+
+    <div class="article-body">
+      {{ .Content }}
+
+      <div class="cta">
+        <p><strong>Try gotest on your next project.</strong></p>
+        <div class="install-cmd">
+          <code>go install github.com/mvrahden/go-test/cmd/gotest@latest</code>
+          <button onclick="navigator.clipboard.writeText('go install github.com/mvrahden/go-test/cmd/gotest@latest').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})" aria-label="Copy install command">Copy</button>
+        </div>
+        <div class="cta-links">
+          <a href="{{ "reference/" | relURL }}">Reference</a>
+          <a href="https://github.com/mvrahden/go-test">GitHub</a>
+          <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code Extension</a>
+        </div>
+      </div>
+    </div>
+  </main>
+{{ end }}
