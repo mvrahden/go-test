@@ -1,0 +1,63 @@
+{{ define "main" }}
+  <main class="article">
+    <header class="article-header">
+      <a href="{{ "blog/" | relURL }}" class="back">&larr; All posts</a>
+      <h1>{{ .Title | markdownify }}</h1>
+      <div class="article-meta">
+        <a class="byline" href="{{ .Site.Params.authorURL }}" rel="author">{{ .Site.Params.author }}</a>
+        <span>&middot;</span>
+        <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "January 2, 2006" }}</time>
+        <span>&middot;</span>
+        <span>{{ .ReadingTime }} min read</span>
+        {{ range .GetTerms "tags" }}<a class="tag" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}
+      </div>
+    </header>
+
+    <div class="article-body">
+      {{ if .Params.toc }}
+      <nav class="article-toc">
+        <strong>Contents</strong>
+        {{ .TableOfContents }}
+      </nav>
+      {{ end }}
+
+      {{ .Content }}
+
+      <div class="cta">
+        <p><strong>{{ .Params.cta_text | default "Try gotest on your next project." }}</strong></p>
+        {{ $cmd := .Params.cta_command | default "go install github.com/mvrahden/go-test/cmd/gotest@latest" }}
+        <div class="install-cmd">
+          <code>{{ $cmd }}</code>
+          <button onclick="navigator.clipboard.writeText('{{ $cmd }}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})" aria-label="Copy command">Copy</button>
+        </div>
+        <div class="cta-links">
+          <a href="{{ "reference/" | relURL }}">Reference</a>
+          <a href="https://github.com/mvrahden/go-test">GitHub</a>
+          <a href="https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest">VS Code Extension</a>
+        </div>
+      </div>
+
+      {{ $related := .Site.RegularPages.Related . | first 3 }}
+      {{ $need := sub 3 (len $related) }}
+      {{ if gt $need 0 }}
+        {{ $exclude := $related | append . }}
+        {{ $recent := (where .Site.RegularPages "Section" "blog").ByDate.Reverse }}
+        {{ $fill := complement $exclude $recent | first $need }}
+        {{ $related = $related | append $fill }}
+      {{ end }}
+      {{ with $related }}
+      <aside class="related-posts">
+        <h2>Read next</h2>
+        <div class="related-grid">
+          {{ range . }}
+          <a href="{{ .RelPermalink }}" class="related-card">
+            <span class="related-title">{{ .Title | markdownify }}</span>
+            <span class="related-desc">{{ .Description }}</span>
+          </a>
+          {{ end }}
+        </div>
+      </aside>
+      {{ end }}
+    </div>
+  </main>
+{{ end }}

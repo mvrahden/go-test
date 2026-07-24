@@ -736,7 +736,7 @@ Use the official action for CI pipelines with failure summaries, inline PR annot
 
 By default (`version: gomod`), the action resolves `gotest` from your `go.mod` — no version drift between CI and local development. Set `version: latest` or a specific tag to install a standalone binary instead.
 
-The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel. See the [reference](https://mvrahden.github.io/go-test/reference.html#ci-integration) for the full inputs/outputs table.
+The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel. See the [reference](https://mvrahden.github.io/go-test/reference/#ci-integration) for the full inputs/outputs table.
 
 ## Commands
 

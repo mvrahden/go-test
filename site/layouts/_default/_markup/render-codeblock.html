@@ -1,0 +1,8 @@
+{{- if eq .Type "diagram" -}}
+<div class="diagram">{{ .Inner }}</div>
+{{- else -}}
+<div class="code-block">
+  {{- with .Attributes.title }}<span class="code-label">{{ . }}</span>{{ end }}
+  {{- $result := transform.HighlightCodeBlock . }}{{ $result.Wrapped }}
+</div>
+{{- end -}}

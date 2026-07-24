@@ -1,0 +1,4 @@
+<div class="spec-block">
+  {{ with .Get "title" }}<span class="spec-label">{{ . }}</span>{{ end }}
+  <pre class="spec-body">{{ .Inner }}</pre>
+</div>

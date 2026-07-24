@@ -1,0 +1,12 @@
+{{ define "main" }}
+  <header class="blog-header">
+    <h1>Blog</h1>
+    <p>Thinking about Go testing: patterns, trade-offs, and the ideas behind gotest.</p>
+  </header>
+
+  <main class="post-list">
+    {{ range .Pages.ByDate.Reverse }}
+    {{ partial "post-entry.html" . }}
+    {{ end }}
+  </main>
+{{ end }}

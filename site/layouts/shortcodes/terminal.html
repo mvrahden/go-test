@@ -1,0 +1,9 @@
+<div class="terminal">
+  <div class="terminal-header">
+    <span class="terminal-dot r"></span>
+    <span class="terminal-dot y"></span>
+    <span class="terminal-dot g"></span>
+    {{ with .Get "title" }}<span class="terminal-title">{{ . }}</span>{{ end }}
+  </div>
+  <pre class="terminal-body">{{ .Inner }}</pre>
+</div>

@@ -1,0 +1,12 @@
+{{ define "main" }}
+  <header class="blog-header">
+    <h1>{{ .Title }}</h1>
+    <p>{{ len .Pages }} post{{ if ne (len .Pages) 1 }}s{{ end }} tagged &ldquo;{{ .Title }}&rdquo;. <a href="{{ "blog/" | relURL }}">All posts &rarr;</a></p>
+  </header>
+
+  <main class="post-list">
+    {{ range .Pages.ByDate.Reverse }}
+    {{ partial "post-entry.html" . }}
+    {{ end }}
+  </main>
+{{ end }}

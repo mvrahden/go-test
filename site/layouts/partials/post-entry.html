@@ -1,0 +1,10 @@
+<article class="post-entry">
+  <div class="post-entry-meta">
+    <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "January 2, 2006" }}</time>
+    <span>&middot;</span>
+    <span>{{ .ReadingTime }} min read</span>
+    {{ range .GetTerms "tags" }}<a class="tag" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}
+  </div>
+  <h2><a href="{{ .RelPermalink }}">{{ .Title | markdownify }}</a></h2>
+  <p class="excerpt">{{ .Description }}</p>
+</article>
