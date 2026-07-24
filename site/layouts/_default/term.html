@@ -1,7 +1,7 @@
 {{ define "main" }}
   <header class="blog-header">
-    <h1>Blog</h1>
-    <p>Thinking about Go testing: patterns, trade-offs, and the ideas behind gotest.</p>
+    <h1>{{ .Title }}</h1>
+    <p>{{ len .Pages }} post{{ if ne (len .Pages) 1 }}s{{ end }} tagged &ldquo;{{ .Title }}&rdquo;. <a href="{{ "blog/" | relURL }}">All posts &rarr;</a></p>
   </header>
 
   <main class="post-list">

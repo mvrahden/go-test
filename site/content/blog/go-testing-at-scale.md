@@ -1,9 +1,8 @@
 ---
 title: "Why Your Go Tests Are Slow (and What to Do About It)"
 date: 2026-07-11
-description: "Most slow Go test suites aren't slow because of slow tests. They're slow because of slow structure: sequential execution, redundant setup, and shared state that prevents parallelism."
-tag: "Performance"
-readTime: 11
+description: "Most slow Go test suites aren't slow because of slow tests. Sequential execution, redundant setup, and shared state are what prevent parallelism."
+tags: ["Performance"]
 aliases: ["/blog/go-testing-at-scale.html"]
 ---
 

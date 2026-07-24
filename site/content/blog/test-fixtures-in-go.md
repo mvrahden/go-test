@@ -1,9 +1,8 @@
 ---
 title: "Test Fixtures in Go: Patterns That Scale"
 date: 2026-07-07
-description: "Every growing Go project needs shared test infrastructure: databases, caches, containers. A look at fixture patterns from global vars to DAG-based lifecycle management."
-tag: "Patterns"
-readTime: 12
+description: "Every growing Go project needs shared test infrastructure. Fixture patterns from global vars to DAG-based lifecycle management, and when to use each."
+tags: ["Patterns"]
 aliases: ["/blog/test-fixtures-in-go.html"]
 ---
 

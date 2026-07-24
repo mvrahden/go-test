@@ -1,9 +1,8 @@
 ---
 title: "Migrating from `testify/suite` to gotest"
 date: 2026-07-10
-description: "A practical guide to migrating Go test suites from testify/suite to gotest. Before-and-after examples, automated migration with gotest migrate, and what needs manual review."
-tag: "Migration"
-readTime: 12
+description: "A practical guide to migrating Go test suites from testify/suite to gotest: before-and-after examples, automated migration, and what needs manual review."
+tags: ["Migration"]
 aliases: ["/blog/testify-migration-guide.html"]
 ---
 

@@ -21,11 +21,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # full history so Hugo's GitInfo produces accurate lastmod dates
+          fetch-depth: 0
+      - name: Check meta description lengths
+        run: |
+          fail=0
+          while IFS= read -r -d '' f; do
+            desc=$(awk -F'"' '/^description:/{print $2; exit}' "$f")
+            if [ "${#desc}" -gt 160 ]; then
+              echo "::error file=$f::meta description is ${#desc} chars (max 160)"
+              fail=1
+            fi
+          done < <(find site/content \( -name '*.md' -o -name '*.html' \) -print0)
+          exit $fail
       - uses: peaceiris/actions-hugo@v3
         with:
-          hugo-version: latest
+          hugo-version: '0.157.0'
           extended: true
-      - run: hugo --minify --source site
+      - run: hugo --minify --panicOnWarning --source site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site/public

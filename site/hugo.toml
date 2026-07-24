@@ -1,13 +1,18 @@
 baseURL = 'https://mvrahden.github.io/go-test/'
 languageCode = 'en-us'
 title = 'gotest'
+enableRobotsTXT = true
+enableGitInfo = true
+
+[frontmatter]
+  lastmod = [':git', 'lastmod', 'date']
 
 [params]
   description = 'Specification-Driven Test Suites for Go'
   tagline = 'A go test code generator. Struct-based suites with lifecycle hooks, BDD structure, and spec output for AI-assisted workflows. Zero reflection, zero runtime deps.'
   gaID = 'G-7WHJ67Z1J0'
   repoURL = 'https://github.com/mvrahden/go-test'
-  ogImage = 'static/gopher.png'
+  ogImage = 'gopher.png'
   author = 'Menno van Rahden'
   authorURL = 'https://github.com/mvrahden'
 
@@ -33,7 +38,19 @@ title = 'gotest'
   changefreq = 'weekly'
   priority = 0.5
 
-disableKinds = ['taxonomy', 'term']
+[taxonomies]
+  tag = 'tags'
+
+[related]
+  includeNewer = true
+  threshold = 20
+  toLower = true
+  [[related.indices]]
+    name = 'tags'
+    weight = 80
+  [[related.indices]]
+    name = 'keywords'
+    weight = 100
 
 [menus]
   [[menus.main]]

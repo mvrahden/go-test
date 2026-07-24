@@ -1,9 +1,8 @@
 ---
 title: "Why gotest Exists"
 date: 2026-07-05
-description: "Go's testing package is one of the best things about the language. But it leaves gaps that every growing project eventually hits. The motivation behind gotest and the five principles that shaped its design."
-tag: "Philosophy"
-readTime: 8
+description: "Go's testing package is excellent, but growing projects hit its gaps. The motivation behind gotest and the five principles that shaped its design."
+tags: ["Philosophy"]
 aliases: ["/blog/why-gotest.html"]
 ---
 

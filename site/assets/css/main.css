@@ -575,6 +575,19 @@ footer a:hover { color: var(--cyan); }
 @media (prefers-color-scheme: dark) {
   .post-entry h2 a:hover { color: var(--cyan); }
 }
+.post-entry h2 code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  font-weight: 700;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  color: var(--cyan-dark);
+}
+@media (prefers-color-scheme: dark) {
+  .post-entry h2 code { color: var(--cyan); }
+}
 .post-entry .excerpt {
   color: var(--text-secondary);
   font-size: 1.05rem;
@@ -671,6 +684,38 @@ footer a:hover { color: var(--cyan); }
   margin-bottom: 0.4rem;
 }
 .article-body strong { font-weight: 600; }
+
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: 0.95rem;
+}
+.article-body th {
+  text-align: left;
+  padding: 0.6rem 1rem;
+  border-bottom: 2px solid var(--border);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.article-body td {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.article-body table code {
+  font-size: 0.85em;
+}
+.article-body tr:last-child td {
+  border-bottom: none;
+}
+@media (max-width: 600px) {
+  .article-body table { font-size: 0.85rem; }
+  .article-body th, .article-body td { padding: 0.4rem 0.5rem; }
+}
 
 .article-body code {
   font-family: var(--font-mono);
@@ -1083,6 +1128,84 @@ footer a:hover { color: var(--cyan); }
 }
 
 
+/* ===== Byline & tag links ===== */
+.article-meta .byline { color: var(--text-secondary); font-weight: 500; }
+.article-meta .byline:hover { color: var(--text); text-decoration: none; }
+.article-meta a.tag:hover,
+.post-entry-meta a.tag:hover {
+  color: var(--text);
+  border-color: var(--text-secondary);
+  text-decoration: none;
+}
+
+/* ===== Article TOC ===== */
+.article-toc {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  margin: 0 0 2rem;
+  font-size: 0.9rem;
+}
+.article-toc strong {
+  display: block;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+.article-toc ul { list-style: none; margin: 0; padding: 0; }
+.article-toc ul ul { padding-left: 1rem; }
+.article-toc li { margin: 0.25rem 0; }
+
+/* ===== Related posts ===== */
+.related-posts {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+.related-posts h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+.related-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.related-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 0.15s;
+}
+.related-card:hover { border-color: var(--cyan-dark); text-decoration: none; }
+.related-card .related-title { font-weight: 600; color: var(--text); line-height: 1.35; }
+.related-card .related-desc {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ===== Tags index ===== */
+.terms-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.terms-list .tag {
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+.terms-list .tag:hover { color: var(--text); border-color: var(--text-secondary); text-decoration: none; }
+.terms-list .term-count { color: var(--text-dimmed); font-size: 0.8rem; }
+
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
   .hero h1 { font-size: 2.5rem; }
@@ -1093,6 +1216,7 @@ footer a:hover { color: var(--cyan); }
   .step-arrow { transform: rotate(90deg); }
 }
 @media (max-width: 640px) {
+  .related-grid { grid-template-columns: 1fr; }
   .blog-header { padding: 2.5rem 1.5rem 1.5rem; }
   .blog-header h1 { font-size: 2rem; }
   .article-header h1 { font-size: 1.75rem; }

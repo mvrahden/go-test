@@ -1,9 +1,8 @@
 ---
 title: "Organizing Go Tests Beyond `func TestX`"
 date: 2026-07-06
-description: "Go's testing simplicity is a feature. Until your project outgrows it. A look at why flat test functions, table-driven tests, and subtests each solve part of the problem, and what happens when you need all three at once."
-tag: "Patterns"
-readTime: 10
+description: "Why flat Go test functions, table-driven tests, and subtests each solve part of the organization problem — and what happens when you need all three at once."
+tags: ["Patterns"]
 aliases: ["/blog/organizing-go-tests.html"]
 ---
 

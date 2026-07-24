@@ -1,9 +1,8 @@
 ---
 title: "Readable Tests with BDD-Style Go"
 date: 2026-07-08
-description: "Test names like TestCreateUser_WhenEmailInvalid_ReturnsError are hard to scan. BDD-style labeled subtests and spec output turn your tests into living documentation."
-tag: "Testing"
-readTime: 9
+description: "Test names like TestCreateUser_WhenEmailInvalid_ReturnsError are hard to scan. BDD-style labeled subtests turn Go tests into living documentation."
+tags: ["Testing"]
 aliases: ["/blog/readable-tests-with-bdd.html"]
 ---
 
