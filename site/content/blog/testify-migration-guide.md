@@ -3,16 +3,46 @@ title: "Migrating from `testify/suite` to gotest"
 date: 2026-07-10
 description: "A practical guide to migrating Go test suites from testify/suite to gotest: before-and-after examples, automated migration, and what needs manual review."
 tags: ["Migration"]
+keywords: ["migrate from testify", "testify suite alternative", "testify to gotest", "gotest migrate", "go test suite migration"]
+cta_text: "Run gotest migrate on your first testify suite today."
+cta_command: "gotest migrate ./..."
+toc: true
+howto:
+  name: "Migrate a testify/suite codebase to gotest"
+  steps:
+    - name: "Preview the changes"
+      text: "Run gotest migrate ./... --dry-run to see what the AST-level rewrite would change without writing any files."
+    - name: "Migrate one package"
+      text: "Run gotest migrate ./pkg/user on a package with a few well-understood suites and verify the tests still pass."
+    - name: "Resolve manual-review TODOs"
+      text: "Search for the // TODO: manual review comments the tool leaves for s.T() calls, custom suite helpers, BeforeTest/AfterTest/SetupSubTest hooks, and direct testify/assert or testify/require usage."
+    - name: "Run testify and gotest side by side"
+      text: "Leave unmigrated packages on testify; both run via go test without conflict while you migrate package by package."
+    - name: "Track progress with the linter"
+      text: "Run gotest lint to flag testify/suite imports in packages that also use gotest suites, catching packages where migration is incomplete."
+    - name: "Drop testify"
+      text: "Once the last suite is migrated, remove the testify dependency from go.mod."
 aliases: ["/blog/testify-migration-guide.html"]
 ---
 
-`testify/suite` is the most widely used Go test suite framework, and for good reason. It gives you struct-based test grouping and lifecycle hooks on top of the standard library. Many teams have hundreds of suites built on it.
+`gotest migrate ./...` rewrites most of a testify/suite codebase automatically: struct renames, lifecycle hooks, assertion calls, imports, and the `suite.Run` boilerplate. The catch is a handful of patterns it can't convert safely and leaves for manual review. This guide shows what the tool converts, what it leaves for you, and how to migrate package by package without breaking the rest of the codebase.
 
-This guide is for teams that have decided to try gotest alongside or in place of their testify suites. It covers what changes, what stays the same, and how to use `gotest migrate` to automate most of the work.
+`testify/suite` is the most widely used Go test suite framework, and for good reason. It gives you struct-based test grouping and lifecycle hooks on top of the standard library. Many teams have hundreds of suites built on it. This guide is for teams that have decided to try gotest alongside or in place of those suites.
 
-> This is not a case for why you should migrate. If you're still evaluating, [Why gotest Exists]({{< ref "/blog/why-gotest" >}}) and [Code Generation, Not Reflection]({{< ref "/blog/code-generation-not-reflection" >}}) cover the design differences. This post assumes you've already decided to give it a try.
+> This is not a case for why you should migrate. If you're still evaluating, [Why Go's testing Package Needs a Suite Layer]({{< ref "/blog/why-gotest" >}}) and [Code Generation vs Reflection in Go Test Frameworks]({{< ref "/blog/code-generation-not-reflection" >}}) cover the design differences. This post assumes you've already decided to give it a try. If you're starting fresh rather than migrating, [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) is the better entry point.
 
-## What maps to what
+## What won't migrate automatically
+
+`gotest migrate` handles the mechanical bulk of the transformation. Four patterns are flagged with `// TODO: manual review` comments instead of being rewritten:
+
+- **`s.T()` handoffs.** Helper functions that receive `s.T()` need to use the `t` parameter that test methods now receive.
+- **Custom suite helpers.** Methods that aren't lifecycle hooks or test methods are left unchanged; assertion calls via `s.Require()` inside them need manual conversion.
+- **`BeforeTest` / `AfterTest` / `SetupSubTest` / `TearDownSubTest`.** testify's per-test-name and subtest-level hooks have no direct gotest equivalent.
+- **Direct `testify/assert` or `testify/require` usage.** Calls that don't go through the suite aren't touched.
+
+Each of these gets a detailed treatment in the "What needs manual review" section below. And `--dry-run` makes the whole run a no-op preview, so you can see every change before a single file is written.
+
+## testify to gotest: what maps to what
 
 The structural concepts are the same in both frameworks. Suites are structs, tests are methods, lifecycle hooks run at predictable points. The names change, and the wiring changes, but the mental model carries over.
 
@@ -31,7 +61,7 @@ The structural concepts are the same in both frameworks. Suites are structs, tes
 
 The biggest conceptual shift is that test methods now receive a `t` parameter. In testify, the test's `*testing.T` is buried inside the embedded `suite.Suite` and accessed via `s.T()`. In gotest, it's an explicit parameter, which means assertions are standalone function calls rather than method calls on the suite.
 
-## Before and after
+## Before and after: a full suite migration
 
 Here's a complete testify/suite test file and what it looks like after migration:
 
@@ -140,7 +170,7 @@ And one behavioral change to be aware of: in the "before" code, `s.Equal(...)`, 
 And what changed shape:
 
 - The struct name gained `Test`: `UserServiceSuite` became `UserServiceTestSuite`.
-- Lifecycle hooks were renamed and now accept `t`: `SetupTest()` became `BeforeEach(t *gotest.T)`.
+- Lifecycle hooks were renamed and now accept `t`: `SetupTest()` became `BeforeEach(t *gotest.T)`. [Go Test Lifecycle]({{< ref "/blog/go-test-lifecycle" >}}) covers the full hook ordering and its guarantees.
 - Assertions moved from method calls on the suite to standalone function calls: `s.Require().NoError(err)` became `gotest.NoError(t, err)`.
 - Test methods now accept `t`: `TestCreate()` became `TestCreate(t *gotest.T)`.
 
@@ -152,7 +182,7 @@ Once a suite is migrated, several things change beyond the syntax:
 - **No framework in the stack trace.** When a test fails, the stack trace shows your code calling a gotest assertion function. There's no reflection layer, no `suite.Run` orchestration, no `reflect.Value.Call` in between.
 - **BDD structure.** Test methods can use `t.When()` and `t.It()` to create labeled subtests. Combined with `gotest spec`, your test hierarchy renders as a behavioral specification. [More on BDD-style tests.]({{< ref "/blog/readable-tests-with-bdd" >}})
 - **Process isolation.** Each suite runs as a separate OS process. A panicking test in one suite cannot crash another. Suite-level parallelism is safe by default.
-- **Fixtures.** gotest's fixture system supports dependency DAGs, cross-package sharing via serialization, and automatic lifecycle management. [More on fixtures.]({{< ref "/blog/test-fixtures-in-go" >}})
+- **Fixtures.** gotest's fixture system supports dependency DAGs, cross-package sharing via serialization, and automatic lifecycle management. [More on fixtures]({{< ref "/blog/test-fixtures-in-go" >}}), and [Advanced Go Test Fixtures]({{< ref "/blog/advanced-fixture-patterns" >}}) for the DAG and sharing patterns.
 - **No runtime dependency.** The `gotest` package has zero transitive dependencies beyond the standard library. The code generator runs at build time. What executes at test time is standard `go test`.
 
 ## Running the migration tool
@@ -216,7 +246,7 @@ One difference worth noting: testify distinguishes between `s.Assert()` (continu
 
 Another difference: gotest assertions are generic. `gotest.Equal[V any](t, expected, actual V)` catches type mismatches at compile time. In testify, `s.Equal(42, "42")` compiles and fails at runtime. In gotest, `gotest.Equal(t, 42, "42")` is a compile error.
 
-## Migrating gradually
+## Migrating gradually, package by package
 
 You don't have to migrate everything at once. gotest suites and `func Test*` functions coexist in the same package. A practical approach for larger codebases:
 
@@ -225,13 +255,13 @@ You don't have to migrate everything at once. gotest suites and `func Test*` fun
 1. **Migrate package by package.** There's no deadline. Each package is independent. A half-migrated codebase works fine.
 1. **Remove testify when ready.** Once the last suite is migrated, drop the `testify` dependency from `go.mod`.
 
-The linter can help track progress. `gotest lint` flags `testify/suite` imports in packages that also use gotest suites, catching packages where migration is incomplete.
+The linter can help track progress. `gotest lint` flags `testify/suite` imports in packages that also use gotest suites, catching packages where migration is incomplete. Wiring that check into your pipeline keeps half-migrated packages from lingering; [Go Tests in GitHub Actions]({{< ref "/blog/gotest-in-ci" >}}) covers the CI setup.
 
 ## Common questions
 
 ### Do I need to rewrite all my assertion helpers?
 
-Only the ones that use testify's assertion API. If you have helper functions that accept `*testing.T` and use the standard library's `t.Fatal` or `t.Errorf`, those work unchanged. Functions that call `require.Equal(t, ...)>` need their imports and calls updated to `gotest.Equal(t, ...)`.
+Only the ones that use testify's assertion API. If you have helper functions that accept `*testing.T` and use the standard library's `t.Fatal` or `t.Errorf`, those work unchanged. Functions that call `require.Equal(t, ...)` need their imports and calls updated to `gotest.Equal(t, ...)`.
 
 ### What about testify/mock?
 

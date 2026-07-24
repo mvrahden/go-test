@@ -1,8 +1,11 @@
 ---
-title: "Readable Tests with BDD-Style Go"
+title: "Readable Go Tests with BDD-Style Subtests"
 date: 2026-07-08
 description: "Test names like TestCreateUser_WhenEmailInvalid_ReturnsError are hard to scan. BDD-style labeled subtests turn Go tests into living documentation."
 tags: ["Testing"]
+keywords: ["go bdd", "bdd go testing", "readable go tests", "go subtests", "ginkgo alternative"]
+toc: true
+cta_text: "Turn your next test suite into a readable spec with gotest spec."
 aliases: ["/blog/readable-tests-with-bdd.html"]
 ---
 
@@ -17,7 +20,7 @@ You can decode it. `TestCreateUser` is the subject, `WhenEmailInvalid` is the co
 
 This post looks at why Go test output is hard to read at scale, how BDD-style structure helps, and what it takes to turn test runs into something that reads like a specification.
 
-## The naming problem
+## The Go test naming problem
 
 Go's test runner requires test function names to start with `Test` and use CamelCase or underscores. This forces you to encode three separate ideas, namely the subject, the condition, and the expectation, into a single identifier:
 
@@ -69,11 +72,9 @@ Every subtest name is repeated three times: once in `=== RUN`, again in its own 
 
 ## What BDD structure looks like
 
-Behavior-driven development (BDD) introduces a simple idea: describe *what* a system does in terms of *contexts* and *expectations*. A test for a user service might read:
+Behavior-driven development (BDD) describes *what* a system does in terms of contexts and expectations — "when X, it should Y" — instead of jamming both into a single function name. ([BDD in Go: What Behavior-Driven Development Actually Means]({{< ref "/blog/what-bdd-means-in-go" >}}) covers the methodology and what gotest deliberately borrows from it.) A test for a user service might read:
 
 > UserService → Create → when email is valid → creates the user
-
-The structure is always the same: subject, behavior, context, expectation. Each level adds specificity. The key insight is that contexts and expectations are separate concepts; they shouldn't be jammed into a single function name.
 
 In gotest, two methods on `*gotest.T` express this structure:
 
@@ -123,7 +124,7 @@ A few things to notice:
 
 - **Setup runs inside `When` blocks.** The condition and its setup live together. `When("email already exists", ...)` creates the duplicate inside the block, not in a separate fixture.
 - **Multiple `It` blocks per `When`.** "creates the user" and "sends a welcome email" share the same setup but assert different things.
-- **Suite and method names carry meaning.** `UserServiceTestSuite` becomes the subject. `TestCreate` becomes the behavior. `When`/`It` provide context and expectation.
+- **Suite and method names carry meaning.** `UserServiceTestSuite` becomes the subject. `TestCreate` becomes the behavior. `When`/`It` provide context and expectation. (If this suite structure is new to you, [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) covers the setup.)
 - **You can skip `When`.** `TestDelete` goes straight to `It` because the test doesn't need a conditional context.
 
 ## Tests as specification output
@@ -231,17 +232,10 @@ The rendering strips naming conventions automatically:
 - `TestCreate` → **Create** (drops `Test` prefix)
 - Underscores in `When`/`It` labels → spaces
 
-Suite and method names are bold. Contexts are dimmed. Passing expectations get a green checkmark, failing ones a red cross. The summary line at the bottom shows total counts and duration.
+Suite and method names are bold. Contexts are dimmed. Passing expectations get a green checkmark, failing ones a red cross. The summary line at the bottom shows total counts and duration. The same spec tree is also available inside your editor — see the [gotest VS Code Extension]({{< ref "/blog/your-editor-knows-your-tests" >}}).
 
 ## Tests that document themselves
 
-The deeper value of spec output is that it doubles as documentation. When someone new joins the team and asks "what does the order service do?", you can point them at `gotest spec ./pkg/order/...` instead of a wiki page that's three sprints out of date.
+The deeper value of spec output is that it doubles as documentation. When someone new joins the team and asks "what does the order service do?", you can point them at `gotest spec ./pkg/order/...` instead of a wiki page that's three sprints out of date — and it stays accurate because it's generated from the tests. Making that work in practice, from behavior-focused labels to publishing the spec, is the subject of [Go Tests as Living Documentation]({{< ref "/blog/tests-as-documentation" >}}).
 
-The spec output stays accurate because it's generated from the tests. If the behavior changes, the tests change, and the spec reflects it. There's no separate document to keep in sync.
-
-This works best when test names are written as behavioral descriptions rather than implementation details. Compare:
-
-- **Implementation-focused:** `t.It("calls repository.Save", ...)`
-- **Behavior-focused:** `t.It("persists the user", ...)`
-
-The first tells you what the code does internally. The second tells you what the system does for its users. When the spec output reads like a behavioral contract, you've turned your test suite into a living specification.
+Credit where it's due: Ginkgo pioneered BDD-style specs in Go, and its `Describe`/`It` blocks are where many Go developers first saw tests read like sentences. gotest aims for the same readability without a runtime DSL or reflection — `When` and `It` compile down to plain `t.Run` calls. One caveat applies either way: deeply nested `When` blocks can become as hard to read as the underscore names they replaced, so treat two or three levels as the ceiling for a spec that still scans.

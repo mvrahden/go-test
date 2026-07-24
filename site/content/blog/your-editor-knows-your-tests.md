@@ -146,7 +146,7 @@ The generated file opens automatically, and discovery refreshes to include the n
 
 ## The trade-off, revisited
 
-gotest's code generation architecture is a deliberate choice. It enables compile-time validation of lifecycle hooks, overlay-based injection that keeps your module clean, process-level suite isolation, and zero reflection overhead. The ["Code Generation, Not Reflection"]({{< ref "/blog/code-generation-not-reflection" >}}) post explains why these properties matter.
+gotest's code generation architecture is a deliberate choice. It enables compile-time validation of lifecycle hooks, overlay-based injection that keeps your module clean, process-level suite isolation, and zero reflection overhead. The [Code Generation vs Reflection]({{< ref "/blog/code-generation-not-reflection" >}}) post explains why these properties matter.
 
 The cost is that standard Go tooling doesn't see your suites. This is a real cost. If you open a gotest project in VS Code without the extension, your suites are invisible to the Testing sidebar, CodeLens doesn't appear, and you're running everything from the terminal.
 

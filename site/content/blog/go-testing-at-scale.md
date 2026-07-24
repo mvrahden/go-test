@@ -3,12 +3,24 @@ title: "Why Your Go Tests Are Slow (and What to Do About It)"
 date: 2026-07-11
 description: "Most slow Go test suites aren't slow because of slow tests. Sequential execution, redundant setup, and shared state are what prevent parallelism."
 tags: ["Performance"]
+keywords: ["why are my go tests slow", "speed up go tests", "go test parallelism", "go test t.parallel", "go test slow"]
+cta_text: "Run your slowest suites as parallel processes."
+toc: true
+faq:
+  - q: "Why are my Go tests slow even though each test is fast?"
+    a: "Usually it is structure, not the tests. Every test in a package runs in one process, sequentially by default, so the longest single-package run sets your ceiling no matter how many CPU cores you have."
+  - q: "Does t.Parallel() speed up Go tests?"
+    a: "Only for genuinely independent tests. The moment tests share a database, filesystem, or package-level variable, t.Parallel() creates races and flaky failures instead of speed."
+  - q: "How do I stop reconnecting to the database in every test?"
+    a: "TestMain gives one per-package hook and sync.Once gives lazy caching, but both are manual wiring and sync.Once can be poisoned by t.Fatal. A per-process fixture that sets up once is the structural fix."
+  - q: "Does splitting a Go package make tests faster?"
+    a: "Yes — each package compiles to its own test binary and runs as a separate process, so package-level parallelism kicks in. But splitting purely for speed creates package boundaries that don't match your domains."
 aliases: ["/blog/go-testing-at-scale.html"]
 ---
 
 `go test ./...` takes 90 seconds. You've profiled the hot tests and they're fast. The database setup is cached. The assertions are trivial. So where does the time go?
 
-Usually the answer isn't slow tests. It's slow structure: the way tests are organized determines how much work runs sequentially, how much setup gets repeated, and how much parallelism the runtime can actually use. This post looks at the three structural patterns that make Go test suites slow, and what to do about each one.
+Usually the answer isn't slow tests. It's slow structure: the way tests are organized determines how much work runs sequentially, how much setup gets repeated, and how much parallelism the runtime can actually use. This post looks at the three structural patterns that make Go test suites slow, and what to do about each one. The payoff is real: the benchmark later in the post takes the same example suite from 6 seconds to 0.5 seconds through structural changes alone, without touching a single test.
 
 ## How `go test` parallelism actually works
 
@@ -136,11 +148,11 @@ The loop variable `u` is captured by reference. By the time the parallel subtest
 
 ## What you can do today
 
-Before changing tools, there are structural improvements you can make with the standard library and your existing framework:
+Before changing tools, there are structural improvements you can make with the standard library and your existing framework. The zero-code first step: check that `-p` and `-parallel` aren't pinned below your core count (some CI templates set them low) and tune them before touching any test code. Beyond that:
 
 ### Profile before optimizing
 
-Run `go test -v -count=1 ./...` and look at the timings. Often one or two packages dominate. Within those packages, add `-run` filters to isolate which tests are slow. Profile CPU time with `-cpuprofile` if you suspect computation, or just time the setup functions.
+Run `go test -v -count=1 ./...` and look at the timings. Often one or two packages dominate. Within those packages, add `-run` filters to isolate which tests are slow. Profile CPU time with `-cpuprofile` if you suspect computation, or just time the setup functions. Keep CI wall-clock time separate from your day-to-day feedback loop, though: the loop you run fifty times a day is worth optimizing on its own terms, and [Go Test Watch Mode and Focused Tests]({{< ref "/blog/the-inner-loop" >}}) covers that side.
 
 ### Split large packages
 
@@ -190,7 +202,7 @@ for _, tt := range tests {
 
 This is ideal for pure functions with no external dependencies. It's less practical for integration tests that touch a database, a filesystem, or a network service.
 
-## A structural approach to test parallelism
+## Process isolation: parallel Go test suites by default
 
 The optimizations above are real and worth doing. But they work *around* a fundamental constraint: all tests in a package share a single process. Parallelism within that process is opt-in, manual, and fragile.
 
@@ -242,7 +254,7 @@ func (s *UserServiceTestSuite) TestDelete(t *gotest.T, ctx *UserServiceCtx) {
 }
 ```
 
-The key is the returning `BeforeEach`. It creates a per-test context: a separate struct holding the resources each test needs. The generated code calls `BeforeEach` before each parallel method, giving it a fresh `ctx` with its own `db` and `svc`. No shared state, no races, no manual `t.Parallel()` calls.
+The key is the returning `BeforeEach`. It creates a per-test context: a separate struct holding the resources each test needs. The generated code calls `BeforeEach` before each parallel method, giving it a fresh `ctx` with its own `db` and `svc`. No shared state, no races, no manual `t.Parallel()` calls. [Go Test Lifecycle]({{< ref "/blog/go-test-lifecycle" >}}) covers where the returning `BeforeEach` fits in the full execution order.
 
 ### Fixture lifecycle
 
@@ -269,11 +281,11 @@ func (f *DatabaseFixture) AfterAll(t *gotest.T) {
 }
 ```
 
-`BeforeAll` runs once per suite process, not once per test. All test methods in the suite share the fixture. Dependencies between fixtures are expressed as pointer fields: if `DatabaseFixture` has a `*DockerFixture` field, the Docker fixture sets up first. The generator resolves the DAG automatically.
+`BeforeAll` runs once per suite process, not once per test. All test methods in the suite share the fixture. Dependencies between fixtures are expressed as pointer fields: if `DatabaseFixture` has a `*DockerFixture` field, the Docker fixture sets up first. The generator resolves the DAG automatically. [Advanced Go Test Fixtures]({{< ref "/blog/advanced-fixture-patterns" >}}) goes deeper into DAG design and fixture composition.
 
-For cross-package sharing, a `SharedFixture` runs in its own setup process. Its state is serialized to JSON and deserialized in each suite process via `Hydrate()`. A Postgres container starts once, and every suite across every package connects to it. [More on fixture patterns.]({{< ref "/blog/test-fixtures-in-go" >}})
+For cross-package sharing, a `SharedFixture` runs in its own setup process. Its state is serialized to JSON and deserialized in each suite process via `Hydrate()`. A Postgres container starts once, and every suite across every package connects to it. [More on fixture patterns]({{< ref "/blog/test-fixtures-in-go" >}}), and [Sharing Test Fixtures Across Go Packages]({{< ref "/blog/shared-fixtures" >}}) for the deep treatment of cross-package sharing.
 
-## What the numbers look like
+## Benchmark: 6 seconds to 0.5 seconds
 
 The three-suite example from earlier, on an 8-core machine:
 

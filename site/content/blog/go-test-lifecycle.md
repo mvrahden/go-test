@@ -5,6 +5,7 @@ description: "Go test setup and teardown, in order: suite hooks, fixture hooks, 
 tags: ["Patterns"]
 keywords: ["go test setup teardown", "go test lifecycle", "beforeeach aftereach go", "go test cleanup order"]
 toc: true
+cta_text: "See these lifecycle guarantees in your own suite."
 faq:
   - q: "Does AfterEach run after t.Fatal?"
     a: "Yes. AfterEach is deferred within each test's scope, so it runs even if the test method calls t.Fatal, panics, or fails an assertion that stops execution."

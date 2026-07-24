@@ -8,7 +8,7 @@ keywords: ["bdd golang", "go bdd framework", "ginkgo alternative", "behavior dri
 
 BDD — Behavior-Driven Development — is one of the most misunderstood ideas in testing. Most developers encounter it as syntax: `describe`, `context`, `it`. They learn the keywords, use them in a few test files, and assume they are doing BDD. But BDD is not syntax. It is a communication practice. And Go's type system makes it possible to do BDD without the ceremony that other languages require.
 
-This is not a tutorial on `When` and `It` — that is covered in [Readable Tests with BDD-Style Go]({{< ref "/blog/readable-tests-with-bdd" >}}). This post is about the idea behind BDD, why most implementations of it carry unnecessary weight, and how Go's type system maps to BDD concepts in a way that is unique among programming languages.
+This is not a tutorial on `When` and `It` — that is covered in [Readable Go Tests with BDD-Style Subtests]({{< ref "/blog/readable-tests-with-bdd" >}}). This post is about the idea behind BDD, why most implementations of it carry unnecessary weight, and how Go's type system maps to BDD concepts in a way that is unique among programming languages.
 
 ## BDD is about communication, not keywords
 
@@ -252,4 +252,4 @@ BDD in Go does not need a DSL. It needs types, methods, and two keywords. The la
 
 This is not an argument against other BDD frameworks — they solve real problems in languages that lack Go's structural tools. It is an argument that Go developers have an opportunity to do BDD with less ceremony and more compiler support than any other language offers. The type system is not an obstacle to BDD. It is the best implementation of it.
 
-For the practical syntax guide to `When`, `It`, and spec output, see [Readable Tests with BDD-Style Go]({{< ref "/blog/readable-tests-with-bdd" >}}). If you would rather feel the difference than read about it, [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) takes you from install to spec output in one sitting. For the complete API, see the [reference docs]({{< ref "/reference" >}}).
+For the practical syntax guide to `When`, `It`, and spec output, see [Readable Go Tests with BDD-Style Subtests]({{< ref "/blog/readable-tests-with-bdd" >}}). If you would rather feel the difference than read about it, [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) takes you from install to spec output in one sitting. For the complete API, see the [reference docs]({{< ref "/reference" >}}).

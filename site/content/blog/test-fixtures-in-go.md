@@ -3,14 +3,17 @@ title: "Test Fixtures in Go: Patterns That Scale"
 date: 2026-07-07
 description: "Every growing Go project needs shared test infrastructure. Fixture patterns from global vars to DAG-based lifecycle management, and when to use each."
 tags: ["Patterns"]
+keywords: ["go test fixtures", "testmain go", "sync.once test setup", "shared test database go", "go test setup teardown"]
+toc: true
+cta_text: "Share one Postgres container across every test package with gotest fixtures."
 aliases: ["/blog/test-fixtures-in-go.html"]
 ---
 
-Most Go projects eventually need shared test infrastructure: a database connection, a message queue, a container that takes seconds to start. The stdlib doesn't have a built-in answer for this. So every team invents its own fixture pattern, and most of those patterns stop working at some point.
+Most Go projects eventually need shared test infrastructure: a database connection, a message queue, a container that takes seconds to start. The stdlib doesn't have a built-in answer for this. So every team invents its own fixture pattern, and most of those patterns quietly break the day you add `t.Parallel()` or a second package that needs the same Postgres.
 
 This post looks at the common approaches, where each one breaks down, and what a fixture system needs to handle the cases that real projects run into.
 
-## The problem
+## The fixture lifecycle problem
 
 A test fixture is any shared resource that tests depend on. The simplest example: a database that multiple test functions query. The fixture problem is about lifecycle: when does the database get created, when does it get torn down, and how do you make sure tests don't step on each other?
 
@@ -82,7 +85,7 @@ func TestListUsers(t *testing.T) {
 }
 ```
 
-Better. Each test gets its own connection. `t.Cleanup` handles teardown even if the test panics. No shared state between tests.
+Better. Each test gets its own connection. `t.Cleanup` handles teardown even if the test panics. No shared state between tests. This is the same `setupTestDB` helper that shows up in every flat test file — [Organizing Go Tests]({{< ref "/blog/organizing-go-tests" >}}) covers how that file-level structure evolves.
 
 But the cost problem is back: if the fixture is expensive (a container, a schema migration, a seed dataset), creating it per-test is too slow. And if you add caching to amortize the cost, say a `sync.Once` around the container startup, you've reinvented the global variable pattern with extra steps.
 
@@ -190,7 +193,7 @@ func (s *UserRepositoryTestSuite) TestCreateUser(t *gotest.T) {
 }
 ```
 
-The field `DB *DatabaseFixture` is the entire dependency declaration. gotest sees the pointer to a `Fixture`-suffixed type and wires it up automatically. By the time `BeforeEach` runs on the suite, the fixture's `BeforeAll` has already completed and `s.DB.DB` is a live database connection.
+The field `DB *DatabaseFixture` is the entire dependency declaration. gotest sees the pointer to a `Fixture`-suffixed type and wires it up automatically. By the time `BeforeEach` runs on the suite, the fixture's `BeforeAll` has already completed and `s.DB.DB` is a live database connection. (The complete ordering guarantees are laid out in [Go Test Lifecycle]({{< ref "/blog/go-test-lifecycle" >}}).)
 
 The lifecycle order for each test method is:
 
@@ -219,13 +222,7 @@ func (f *CacheFixture) BeforeAll(_ context.Context) error {
 }
 ```
 
-gotest resolves these dependencies into a directed acyclic graph and runs `BeforeAll` in topological order. Independent fixtures (no dependency between them) initialize concurrently. Teardown runs in reverse topological order.
-
-```diagram
-DatabaseFixture.BeforeAll → CacheFixture.BeforeAll → tests run → CacheFixture.AfterAll → DatabaseFixture.AfterAll
-```
-
-This scales to arbitrary depth. If a third fixture depends on the cache, it slots into the graph naturally. You never manually coordinate initialization order; the dependency pointers encode it.
+gotest resolves these dependencies into a directed acyclic graph and runs `BeforeAll` in topological order; teardown runs in reverse. You never manually coordinate initialization order; the dependency pointers encode it. How this plays out at depth — diamond-shaped graphs, concurrent initialization of independent fixtures, timeout and retry configuration — is the subject of [Advanced Go Test Fixtures]({{< ref "/blog/advanced-fixture-patterns" >}}).
 
 ## The cross-package problem
 
@@ -237,51 +234,17 @@ This means none of the patterns above can share a fixture across packages:
 - **`sync.Once`** is a per-process primitive. It does not cross process boundaries.
 - **Helper packages** like `testutil.GetDB()` get imported by each package independently. Each one initializes its own connection in its own process.
 
-The stdlib has no answer for this. Most teams fall back to external orchestration: a Makefile or CI script starts the database before `go test`, passes the DSN through an environment variable, and each package's `TestMain` connects independently. It works, but the fixture lifecycle lives outside of Go, in shell scripts, docker-compose files, or CI configuration. The test code cannot express "I need a Postgres instance" as a dependency; it can only assume one already exists.
+The stdlib has no answer for this. Most teams fall back to external orchestration: a Makefile or CI script starts the database before `go test`, passes the DSN through an environment variable, and each package's `TestMain` connects independently. It works, but the fixture lifecycle lives outside of Go, in shell scripts, docker-compose files, or CI configuration. The test code cannot express "I need a Postgres instance" as a dependency; it can only assume one already exists. To be fair, testcontainers-go handles the container startup side of this well — but it runs inside your test process, so it can't cross the package-process boundary either; each package still starts its own container.
 
 ## Sharing fixtures across packages
 
 gotest has **shared fixtures** for this: structs whose name ends in `SharedFixture`. A shared fixture runs in its own subprocess, once for the entire test run. Its state is serialized as JSON and transferred to every test package that needs it.
 
-```go {title="shared_fixtures.go"}
-type PostgresSharedFixture struct {
-    DSN    string   // serialized: transferred to test packages
-    conn   *sql.DB  // local: reconstructed by Hydrate
-}
+The core idea is a split between transfer fields and local fields. Exported fields like a DSN are serialized and cross the process boundary; resources that can't be serialized — connections, file handles, goroutines — are reconstructed in each test package's process by a `Hydrate` method and cleaned up by `Dehydrate`. The container starts once; every package connects to it.
 
-func (f *PostgresSharedFixture) BeforeAll(_ context.Context) error {
-    // start container, run migrations
-    f.DSN = "postgres://localhost:5432/testdb"
-    var err error
-    f.conn, err = sql.Open("postgres", f.DSN)
-    return err
-}
+The end-to-end treatment — the fixture definition, the hydration lifecycle, and how it behaves in CI — is in [Sharing Test Fixtures Across Go Packages]({{< ref "/blog/shared-fixtures" >}}).
 
-func (f *PostgresSharedFixture) AfterAll(_ context.Context) error {
-    f.conn.Close()
-    // stop container
-    return nil
-}
-
-func (f *PostgresSharedFixture) Hydrate(_ context.Context) error {
-    var err error
-    f.conn, err = sql.Open("postgres", f.DSN)
-    return err
-}
-
-func (f *PostgresSharedFixture) Dehydrate(_ context.Context) error {
-    return f.conn.Close()
-}
-```
-
-The key concept is the split between **transfer fields** and **local fields**:
-
-- **Transfer fields** (`DSN`) are exported and serialized as JSON. They cross process boundaries.
-- **Local fields** (`conn`) are unexported or assigned in `Hydrate`. They represent resources that can't be serialized: connections, file handles, goroutines.
-
-`Hydrate` runs in each test package's process after the JSON state is deserialized. It reconstructs the non-serializable resources from the transferred data. `Dehydrate` cleans up those local resources when the test package finishes.
-
-## Where this leaves you
+## Choosing a fixture pattern
 
 Every fixture pattern represents a trade-off between simplicity, cost, and isolation:
 

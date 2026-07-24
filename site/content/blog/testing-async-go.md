@@ -200,4 +200,4 @@ Both `Eventually` and `Consistently` accept any value that implements `Errorf` a
 
 ## Next steps
 
-The [reference docs]({{< ref "/reference" >}}) cover the full assertion API, including every function that works with `*gotest.R` in polling callbacks. If you're new to gotest's suite system and the `BeforeEach`/`When`/`It` patterns used in the examples above, [Readable Tests with BDD-Style Go]({{< ref "/blog/readable-tests-with-bdd" >}}) walks through the structure in detail. For fixture lifecycle management, see [Test Fixtures in Go]({{< ref "/blog/test-fixtures-in-go" >}}).
+The [reference docs]({{< ref "/reference" >}}) cover the full assertion API, including every function that works with `*gotest.R` in polling callbacks. If you're new to gotest's suite system and the `BeforeEach`/`When`/`It` patterns used in the examples above, [Readable Go Tests with BDD-Style Subtests]({{< ref "/blog/readable-tests-with-bdd" >}}) walks through the structure in detail. For fixture lifecycle management, see [Test Fixtures in Go]({{< ref "/blog/test-fixtures-in-go" >}}).

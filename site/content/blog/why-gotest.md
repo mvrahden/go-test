@@ -1,30 +1,33 @@
 ---
-title: "Why gotest Exists"
+title: "Why Go's testing Package Needs a Suite Layer"
 date: 2026-07-05
-description: "Go's testing package is excellent, but growing projects hit its gaps. The motivation behind gotest and the five principles that shaped its design."
+description: "Go's testing package is deliberately minimal. Where growing projects hit its gaps, and the five principles behind gotest's suite layer."
 tags: ["Philosophy"]
+keywords: ["go test suite", "go testing package", "testify suite alternative", "go test setup and teardown", "go test framework"]
+toc: true
+cta_text: "See it in action — build your first gotest suite in 10 minutes."
 aliases: ["/blog/why-gotest.html"]
 ---
 
-Go's `testing` package is one of the best things about the language. No framework to install. No annotations to learn. Write a function that starts with `Test`, accept a `*testing.T`, and run `go test`. It works, and it scales further than most people expect.
+Go's `testing` package is one of the best things about the language: no framework to install, no annotations to learn, just `func Test*` and `go test`. But past a few dozen test files, most projects hit the same wall. There is no way to group related tests, no per-test setup hook, and no way for two packages to share a database container.
 
-But it does leave gaps. Not because the design is wrong, but because `testing` is deliberately minimal. It gives you a test runner and an assertion-free `T` type. Everything else is left to the developer: organizing tests into groups, managing setup and teardown, sharing expensive infrastructure, expressing what a test *means* rather than just what it does.
+That is not because the design is wrong, but because `testing` is deliberately minimal. It gives you a test runner and an assertion-free `T` type. Everything else is left to the developer: organizing tests into groups, managing setup and teardown, sharing expensive infrastructure, expressing what a test *means* rather than just what it does.
 
 gotest exists to fill those gaps without replacing what works. This post explains the problems it targets, the principles behind its design, and why those principles lead to code generation rather than a runtime framework.
 
-## The gaps
+## The gaps in Go's testing package
 
 Most Go projects hit the same set of problems as their test suite grows past a few dozen files:
 
 - **No structural grouping.** The stdlib gives you `func TestX` and `t.Run` for subtests. But subtests are closures inside flat functions, not first-class groups. If you have 30 test functions for `UserService` and 20 for `OrderService` in the same package, they are an alphabetical list. There is no way to say "these tests belong together" at the structural level.
-- **No lifecycle hooks.** There is no built-in "run this before each test" or "run this once before the suite." `TestMain` gives you one entry point per package, but it runs before all tests and has no per-test granularity. `t.Cleanup` runs after a test, but there is no corresponding setup hook.
+- **No lifecycle hooks.** There is no built-in "run this before each test" or "run this once before the suite." `TestMain` gives you one entry point per package, but it runs before all tests and has no per-test granularity. `t.Cleanup` runs after a test, but there is no corresponding setup hook. [Go Test Lifecycle]({{< ref "/blog/go-test-lifecycle" >}}) walks through what the stdlib gives you and where it stops.
 - **No fixture management.** If three test functions need a Postgres container, each one either starts its own (slow) or they share a package-level variable (fragile). The stdlib has no concept of "this resource has a lifecycle and these tests depend on it."
-- **No cross-package sharing.** `go test` runs each package as a separate OS process. There is no way for `pkg/user` and `pkg/order` to share a database container through Go code. Most teams fall back to Makefiles or CI scripts to start infrastructure before running tests.
+- **No cross-package sharing.** `go test` runs each package as a separate OS process. There is no way for `pkg/user` and `pkg/order` to share a database container through Go code. Most teams fall back to Makefiles or CI scripts to start infrastructure before running tests. [Sharing Test Fixtures Across Go Packages]({{< ref "/blog/shared-fixtures" >}}) looks at this problem in depth.
 - **No structure in output.** Test names like `TestCreateUser_WhenEmailInvalid_ReturnsError` encode meaning in underscores. But `go test -v` renders them as flat lines. There is no hierarchical view that shows what a test suite covers at a glance.
 
 These are not theoretical concerns. They are the reasons most Go projects beyond a certain size end up either adopting a framework like testify/suite or building an ad-hoc system of helper functions, global variables, and `TestMain` orchestration.
 
-## What existing frameworks do
+## What testify/suite does (and its trade-offs)
 
 testify/suite is the most widely used answer to these problems. It gives you struct-based test suites with `SetupTest`/`TearDownTest` lifecycle hooks, and it works. But it makes trade-offs that gotest is designed to avoid:
 
@@ -33,9 +36,9 @@ testify/suite is the most widely used answer to these problems. It gives you str
 - **Framework coupling.** Every suite must embed `suite.Suite`. Assertions go through `s.Equal`, `s.NoError`, which are methods on the embedded struct, not standalone functions. Removing the framework means rewriting every assertion in every test.
 - **No fixture graph.** testify/suite has no concept of fixture dependencies. If suite A and suite B both need a database, and the database needs a container, the developer manages that wiring manually.
 
-testify/suite is a good tool. gotest is not a reaction against it. But looking at the trade-offs above, they are not independent problems. They share a root cause.
+testify/suite is a good tool. gotest is not a reaction against it. For a small suite, the registration line is negligible and a build step is not worth adding; testify or plain `go test` is the right choice there. The trade-offs above matter as a project grows, and looking at them together, they are not independent problems. They share a root cause.
 
-## A different starting point
+## Static discovery instead of reflection
 
 testify/suite discovers tests at runtime through reflection. Once you choose reflection, the rest follows: you need a base type to reflect on (framework coupling), the developer must connect each suite to the test runner (registration boilerplate), and method signatures cannot be validated until the code actually runs (silent failures).
 
@@ -113,7 +116,7 @@ And a developer who decides to stop using gotest can look at the generated code 
 
 ## Principle 5: Adopt incrementally, eject freely
 
-Existing `func Test*` tests coexist with suites in the same package. You do not need to convert everything at once. A single suite can live next to 50 flat test functions, and `gotest` handles both.
+Existing `func Test*` tests coexist with suites in the same package. You do not need to convert everything at once. A single suite can live next to 50 flat test functions, and `gotest` handles both. If you want to try it, [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) is the place to start.
 
 Ejecting is real work, but it is straightforward work. You replace `*gotest.T` parameters with `*testing.T`, swap gotest assertions for your preferred alternative, and write the `func Test*` entry points that the generator was producing for you. The generated code shows exactly what those entry points look like. There is no data to migrate, no configuration to unwind, no runtime state to reconstruct.
 
@@ -127,7 +130,9 @@ Code generation also solves the error-reporting problem that plagues reflection-
 
 The overlay filesystem injection is what makes this practical. Without it, code generation would mean generated files in your source tree: files to `.gitignore`, files that clutter your editor, files that go stale if you forget to regenerate. The `-overlay` flag removes all of that. The generated code exists only during the test run, in a content-addressable cache that handles invalidation automatically.
 
-## What follows from this
+What adoption costs is the build step itself: `gotest` runs before `go test`, both locally and in CI. [Go Tests in GitHub Actions]({{< ref "/blog/gotest-in-ci" >}}) shows what that looks like in a pipeline, and [Go Test Watch Mode and Focused Tests]({{< ref "/blog/the-inner-loop" >}}) covers the day-to-day loop once the caching kicks in.
+
+## Where each feature goes deeper
 
 These principles are not abstract. They directly shaped every feature in gotest:
 

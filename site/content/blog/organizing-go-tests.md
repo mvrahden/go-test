@@ -3,8 +3,13 @@ title: "Organizing Go Tests Beyond `func TestX`"
 date: 2026-07-06
 description: "Why flat Go test functions, table-driven tests, and subtests each solve part of the organization problem — and what happens when you need all three at once."
 tags: ["Patterns"]
+keywords: ["go test organization", "table-driven tests", "go subtests", "testify suite alternative", "go test suite"]
+toc: true
+cta_text: "See how a flat test file becomes a gotest suite in minutes."
 aliases: ["/blog/organizing-go-tests.html"]
 ---
+
+A test file with 10 test functions is easy to hold in your head. At 50, you're scrolling to find what you need. At 200, you're `grep`-ing your own tests to figure out what's covered and what isn't.
 
 Go's testing package is deliberately simple. No annotations, no test classes, no dependency injection: just functions that start with `Test` and a `*testing.T`. This simplicity is one of Go's genuine strengths. But it creates a gap that every growing project eventually falls into.
 
@@ -64,7 +69,7 @@ func TestDeleteUser(t *testing.T) {
 
 Five functions, and `setupTestDB(t)` appears in every one. There's no visible relationship between the "create" tests and the "get" tests; they're just an alphabetical list. Assertions are manual `if`/`t.Fatal` checks with inconsistent formatting.
 
-This works fine at 10 test functions. At 50, you're scrolling to find what you need. At 200, you're `grep`-ing your own test files.
+This is fine for a young project. It's also the file that grows, one function at a time, into the 200-test grep target.
 
 ## Table-driven tests: less code, same structure
 
@@ -136,13 +141,13 @@ func TestUserService(t *testing.T) {
 Now there's visible structure: `TestUserService/Create/valid_user` reads like a path. But this pattern has real problems:
 
 - **Shared state leaks across subtests.** The `db` variable is shared between "Create" and "Delete." If the "Create" subtests modify the database, "Delete" inherits that state. Tests become order-dependent.
-- **No per-group lifecycle.** There's no way to reset `db` before each subtest. `t.Cleanup` runs once, at the end. You'd need to call `setupTestDB(t)` inside every leaf `t.Run`, which brings back the repetition you were trying to eliminate.
+- **No per-group lifecycle.** There's no way to reset `db` before each subtest. `t.Cleanup` runs once, at the end. You'd need to call `setupTestDB(t)` inside every leaf `t.Run`, which brings back the repetition you were trying to eliminate. ([Test Fixtures in Go]({{< ref "/blog/test-fixtures-in-go" >}}) looks at this per-test setup problem in depth.)
 - **Closures stack up fast.** Three levels of nesting means three levels of `func(t *testing.T) {`. At scale, the indentation alone makes the file hard to navigate.
 - **Parallelism is manual.** Want to run subtests in parallel? You need `t.Parallel()` in every leaf, and careful synchronization on the shared `db`.
 
 Subtests give you hierarchy. They don't give you lifecycle.
 
-## What a suite actually provides
+## What a test suite actually provides
 
 The pattern most projects eventually need is a **test suite**: a group of tests organized around a single subject, with lifecycle hooks that guarantee each test starts from a known state.
 
@@ -194,13 +199,15 @@ But it comes with trade-offs:
 - **Framework coupling.** Every suite must embed `suite.Suite`. Every assertion goes through `s.NoError`, `s.Equal`, methods on the embedded struct, not type-safe generic functions.
 - **No BDD structure.** Test methods are flat; there's no equivalent of "when X, it should Y" nesting within a method.
 
-## A different angle: suites as a compile-time concern
+To be fair, testify isn't the only option: Ginkgo is the mature BDD-suite framework in Go, and it does provide that nesting — at the cost of its own runner and a runtime DSL.
+
+## Suites as a compile-time concern
 
 Here's the observation that changes the equation: **the suite pattern is an organizational concern, not a runtime concern.**
 
 What suites need at runtime is ordinary Go code: `t.Run` calls, `t.Cleanup` calls, struct initialization. Everything the stdlib already provides. The reason frameworks like testify/suite use reflection is to *discover* test methods and *wire up* lifecycle hooks. But discovery and wiring are compile-time activities. They can happen before `go test` runs.
 
-That's the approach [gotest](https://github.com/mvrahden/go-test) takes. You write test suites as plain Go structs with naming conventions. A code generator reads your source, discovers the structure, and generates the lifecycle wiring that you'd write by hand. What runs is standard `go test`. No reflection. No framework orchestration at runtime.
+That's the approach [gotest](https://github.com/mvrahden/go-test) takes. You write test suites as plain Go structs with naming conventions. A code generator reads your source, discovers the structure, and generates the lifecycle wiring that you'd write by hand. What runs is standard `go test`. No reflection. No framework orchestration at runtime. (If you want to try this hands-on, [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) is the walkthrough.)
 
 ```go {title="gotest approach"}
 type UserServiceTestSuite struct {
@@ -245,13 +252,13 @@ func (s *UserServiceTestSuite) TestDeleteUser(t *gotest.T) {
 A few things to notice:
 
 - **No framework embedding.** The struct has only your fields. No `suite.Suite`, no interface to satisfy.
-- **Lifecycle via naming conventions.** `BeforeEach` is recognized by name. It runs before every `Test*` method, giving each test a fresh `db`.
-- **BDD structure inside methods.** `t.When` and `t.It` create labeled subtests via `t.Run`. They're just method calls: no DSL, no magic.
+- **Lifecycle via naming conventions.** `BeforeEach` is recognized by name. It runs before every `Test*` method, giving each test a fresh `db`. The full hook ordering is laid out in [Go Test Lifecycle]({{< ref "/blog/go-test-lifecycle" >}}).
+- **BDD structure inside methods.** `t.When` and `t.It` create labeled subtests via `t.Run`. They're just method calls: no DSL, no magic. [Readable Go Tests with BDD-Style Subtests]({{< ref "/blog/readable-tests-with-bdd" >}}) covers this structure in detail.
 - **Type-safe assertions.** `gotest.NoError`, `gotest.Equal`, and others are generic functions. Pass the wrong type and the compiler catches it.
 
 Running `gotest ./...` generates the `t.Run` nesting, lifecycle calls, and process isolation behind the scenes, then invokes `go test`. The generated code is injected via Go's `-overlay` flag; it never touches your source tree.
 
-## Tests that explain themselves
+## From test structure to living spec
 
 There's a useful consequence of this structure. Because test methods, `When` blocks, and `It` blocks all have descriptive names, gotest can render them as a behavioral specification:
 
@@ -272,9 +279,9 @@ There's a useful consequence of this structure. Because test methods, `When` blo
 
 This isn't generated documentation; it's a direct rendering of your test structure. If a test is missing, the spec has a gap. If a test fails, the spec shows it. The test *is* the specification.
 
-This spec output is also machine-readable. `gotest spec --format json` produces structured JSON that you can feed into documentation pipelines, AI-assisted workflows, or CI reporting.
+This spec output is also machine-readable. `gotest spec --format json` produces structured JSON that you can feed into documentation pipelines, AI-assisted workflows, or CI reporting. [Go Tests as Living Documentation]({{< ref "/blog/tests-as-documentation" >}}) explores what you can build on top of that.
 
-## Where this leaves you
+## Flat functions to suites: the trade-off
 
 Every Go project moves through a progression:
 

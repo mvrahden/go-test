@@ -1,8 +1,11 @@
 ---
-title: "Code Generation, Not Reflection: How gotest Discovers Your Tests"
+title: "Code Generation vs Reflection in Go Test Frameworks"
 date: 2026-07-09
 description: "Most Go test frameworks use reflection to find suites at runtime. gotest uses AST-based code generation with overlay filesystem injection instead."
 tags: ["Internals"]
+keywords: ["go code generation testing", "reflection vs code generation go", "go ast test discovery", "go test overlay flag", "go generate tests"]
+toc: true
+cta_text: "Run gotest generate on your own suite and read the bridge it writes."
 aliases: ["/blog/code-generation-not-reflection.html"]
 ---
 
@@ -49,9 +52,9 @@ gotest uses Go's `go/parser` and `go/ast` packages to walk your source files. It
 
 - **Structs ending in `TestSuite`**: recognized as test suites
 - **Methods starting with `Test`** on suite types: recognized as test cases
-- **`BeforeEach`, `AfterEach`, `BeforeAll`, `AfterAll`**: recognized as lifecycle hooks
+- **`BeforeEach`, `AfterEach`, `BeforeAll`, `AfterAll`**: recognized as lifecycle hooks ([Go Test Lifecycle]({{< ref "/blog/go-test-lifecycle" >}}) covers when each one runs)
 - **Structs ending in `Fixture`**: recognized as package fixtures
-- **Structs ending in `SharedFixture`**: recognized as cross-package fixtures
+- **Structs ending in `SharedFixture`**: recognized as cross-package fixtures ([Sharing Test Fixtures Across Go Packages]({{< ref "/blog/shared-fixtures" >}}) explains how these work)
 
 This is purely static analysis. No code runs. No `reflect` import. The AST walker reads struct declarations and method signatures from the parse tree, the same way a linter would.
 
@@ -113,7 +116,7 @@ gotest writes the generated files to a content-addressable cache directory, crea
 
 The cache uses SHA-256 hashing of the generated content. If you run tests twice without changing any suite code, the second run reuses the cached overlay; no regeneration needed.
 
-## What you gain
+## What code generation gains over reflection
 
 The code generation approach has several concrete advantages over reflection:
 
@@ -163,7 +166,7 @@ When you run `gotest ./...`, the full pipeline executes automatically:
 
 Steps 1--6 are fast; they operate on parse trees, not compiled code. And with caching, steps 4--6 are skipped entirely on repeat runs if the source hasn't changed.
 
-For large projects, gotest also uses streaming compilation: test packages start running as soon as they're compiled, without waiting for all packages to finish compiling. This overlaps compilation time with execution time, reducing wall-clock duration for multi-package test runs.
+For large projects, gotest also uses streaming compilation: test packages start running as soon as they're compiled, without waiting for all packages to finish compiling. This overlaps compilation time with execution time, reducing wall-clock duration for multi-package test runs — the place this matters most is CI, as covered in [Go Tests in GitHub Actions]({{< ref "/blog/gotest-in-ci" >}}).
 
 ## Inspecting the generated code
 
@@ -180,12 +183,14 @@ cat pkg/user/gotest_psuite_test.go
 gotest clean
 ```
 
-The generated files are standard Go test files. They import your package, reference your types, and call your methods. Reading them is the most direct way to understand what the framework does, because the framework *is* the generated code.
+The generated files are standard Go test files. They import your package, reference your types, and call your methods. Reading them is the most direct way to understand what the framework does, because the framework *is* the generated code. If you'd rather start from the other end — write a small suite and then inspect what gets generated for it — [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) walks through exactly that.
 
 ## The trade-off
 
 Code generation isn't free. It adds a build step: the AST discovery and generation that runs before `go test`. If you run `go test` directly without `gotest`, you'll get a compilation error because the generated bridge file doesn't exist.
 
 This is a deliberate design choice. A missing generated file produces a clear compiler error that tells you what to do. The alternative, silently doing nothing when the bridge is absent, would be worse.
+
+Day to day, the build step mostly disappears: the overlay cache means repeat runs skip generation entirely, so the edit-test loop stays as fast as plain `go test`. [Go Test Watch Mode and Focused Tests]({{< ref "/blog/the-inner-loop" >}}) covers what that loop looks like in practice.
 
 The code generation approach aligns with Go's broader philosophy: explicit over implicit, compile-time over runtime, readable code over framework magic. The generated code is what a careful developer would write by hand. gotest just writes it for you.
