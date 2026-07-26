@@ -780,6 +780,44 @@ func (s *CollectorTestSuite) TestValidation(t *gotest.T) {
 	})
 }
 
+func (s *CollectorTestSuite) TestBenchmarkMethod(t *gotest.T) {
+	t.When("suite has benchmark methods", func(w *gotest.T) {
+		w.It("classifies benchmark methods and applies X_ exclusion", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_BenchmarkMethod")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "expected no errors, got: %v", result.Errs)
+
+			spec := gotest.Must(c.ApplyTestSuiteSpecs(result))
+			gotest.Len(it, spec.EffectiveTestSuites, 1)
+
+			suite := spec.EffectiveTestSuites[0]
+			gotest.Len(it, suite.Benchmarks(), 1)
+			gotest.Equal(it, "BenchmarkParse", suite.Benchmarks()[0].Identifier())
+		})
+	})
+
+	t.When("benchmark method has an unsupported signature", func(w *gotest.T) {
+		w.It("rejects benchmark methods without *gotest.B/*testing.B", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_BenchmarkMethod_BadSignature")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "expected error for unsupported benchmark param type")
+			gotest.ErrorContains(it, result.Errs[0].Err, "must accept exactly one parameter of type *gotest.B or *testing.B")
+		})
+	})
+
+	t.When("suite has benchmarks and a returning BeforeEach", func(w *gotest.T) {
+		w.It("rejects benchmarks on returning-BeforeEach suites", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_BenchmarkMethod_ReturningBeforeEach")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "expected error: benchmarks with returning BeforeEach")
+			gotest.ErrorContains(it, result.Errs[0].Err, "move benchmarks to a dedicated suite")
+		})
+	})
+}
+
 func (s *CollectorTestSuite) TestApplyTestSuiteSpecs(t *gotest.T) {
 	t.When("valid result with fixtures only", func(w *gotest.T) {
 		w.It("returns no suites", func(it *gotest.T) {

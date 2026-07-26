@@ -119,6 +119,14 @@ func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, loc
 			return nil, err
 		}
 		if len(fixtures) > 0 {
+			if len(suite.Benchmarks()) > 0 {
+				for _, fm := range fixtures {
+					if bad := findHookedFixture(fm.resolved); bad != nil {
+						return nil, fmt.Errorf("suite %s has benchmark methods but fixture %s defines BeforeEach/AfterEach — per-method fixture hooks are not supported for benchmarks", suite.Identifier(), bad.Identifier)
+					}
+				}
+			}
+
 			if result.SuiteFixtureFields == nil {
 				result.SuiteFixtureFields = make(map[string][]FixtureFieldBinding)
 			}
@@ -230,6 +238,27 @@ func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, loc
 	}
 
 	return result, nil
+}
+
+// findHookedFixture walks a fixture and its transitive parents looking for one
+// that defines BeforeEach/AfterEach. Per-method fixture hooks assume a fresh
+// invocation per test case; benchmarks run their body in a tight b.Loop(), so
+// wiring fixture BeforeEach/AfterEach around each benchmark method is out of
+// scope for now (see docs/design/bench-fuzz.md Part 1) — reject it at
+// resolve-time instead of generating code that silently ignores the hooks.
+func findHookedFixture(rf *ResolvedFixture) *ResolvedFixture {
+	if rf == nil {
+		return nil
+	}
+	if rf.BeforeEach || rf.AfterEach {
+		return rf
+	}
+	for _, p := range rf.Parents {
+		if bad := findHookedFixture(p); bad != nil {
+			return bad
+		}
+	}
+	return nil
 }
 
 func hasChildSuitesRecursive(rf *ResolvedFixture) bool {

@@ -488,3 +488,49 @@ func (s *RendererTestSuite) TestDeterministicOutput(t *gotest.T) {
 		}
 	})
 }
+
+// --- Benchmark wrapper rendering tests ---
+
+func (s *RendererTestSuite) TestRenderer_BenchmarkWrapper(t *gotest.T) {
+	t.It("emits Benchmark<Suite> with lifecycle fencing", func(it *gotest.T) {
+		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_BenchmarkMethod")
+		out, _ := renderTestPkg(it.T(), pkg)
+
+		gotest.Contains(it, out, "func BenchmarkBenchTestSuite(b *testing.B)")
+		gotest.Contains(it, out, `b.Run("BenchmarkParse"`)
+		gotest.Contains(it, out, "b.StopTimer()")
+		gotest.Contains(it, out, "s.BeforeEach(ƒeachT)")
+		gotest.NotContains(it, out, "X_BenchmarkOld")
+	})
+
+	t.It("never emits NewTWithDeadline — benchmarks are bounded by -benchtime, not deadlines", func(it *gotest.T) {
+		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_BenchmarkMethod")
+		out, _ := renderTestPkg(it.T(), pkg)
+
+		benchFn := out[strings.Index(out, "func BenchmarkBenchTestSuite"):]
+		gotest.NotContains(it, benchFn, "NewTWithDeadline", "bench wrapper must not apply a suite-config deadline")
+	})
+
+	t.When("benchmark method takes *testing.B directly", func(w *gotest.T) {
+		w.It("dispatches with the raw *testing.B instead of gotest.NewB(b)", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_Benchmark_StdlibB")
+			out, _ := renderTestPkg(it.T(), pkg)
+
+			gotest.Contains(it, out, "func BenchmarkStdlibBenchTestSuite(b *testing.B)")
+			gotest.Contains(it, out, "s.BenchmarkRaw(b)")
+			gotest.NotContains(it, out, "s.BenchmarkRaw(gotest.NewB(b))")
+		})
+	})
+
+	t.When("benchmark suite is bound to a package fixture", func(w *gotest.T) {
+		w.It("calls ƒ_setupFixtures and constructs the suite with fixture fields populated", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBoundBenchmark")
+			out, _ := renderTestPkg(it.T(), pkg)
+
+			benchFn := out[strings.Index(out, "func BenchmarkParserTestSuite"):]
+			gotest.Contains(it, benchFn, "ƒ_setupFixtures(b)")
+			gotest.Contains(it, benchFn, "ParserTestSuite: ParserTestSuite{")
+			gotest.Contains(it, benchFn, "PoolFixture: ƒ_PoolFixture")
+		})
+	})
+}
