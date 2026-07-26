@@ -127,6 +127,14 @@ func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, loc
 				}
 			}
 
+			if len(suite.Fuzzers()) > 0 {
+				for _, fm := range fixtures {
+					if bad := findHookedFixture(fm.resolved); bad != nil {
+						return nil, fmt.Errorf("suite %s has fuzz methods but fixture %s defines BeforeEach/AfterEach — per-execution fixture hooks are not supported for fuzz targets", suite.Identifier(), bad.Identifier)
+					}
+				}
+			}
+
 			if result.SuiteFixtureFields == nil {
 				result.SuiteFixtureFields = make(map[string][]FixtureFieldBinding)
 			}

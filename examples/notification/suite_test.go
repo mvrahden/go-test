@@ -3,6 +3,7 @@ package notification
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -105,6 +106,16 @@ func (s *NotificationServiceTestSuite) TestNotificationPayload(t *gotest.T) {
 		t.It("matches the delivery summary snapshot", func(t *gotest.T) {
 			gotest.MatchSnapshot(t, formatSummary(delivered))
 		})
+	})
+}
+
+func (s *NotificationServiceTestSuite) FuzzTrim(f *gotest.F) {
+	f.Add("  x ")
+	gotest.Fuzz(f, func(t *gotest.T, in string) {
+		// Property: strings.TrimSpace is idempotent — trimming an
+		// already-trimmed string is a no-op round-trip.
+		trimmed := strings.TrimSpace(in)
+		gotest.Equal(t, trimmed, strings.TrimSpace(trimmed))
 	})
 }
 

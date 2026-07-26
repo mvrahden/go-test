@@ -818,6 +818,44 @@ func (s *CollectorTestSuite) TestBenchmarkMethod(t *gotest.T) {
 	})
 }
 
+func (s *CollectorTestSuite) TestFuzzMethod(t *gotest.T) {
+	t.When("suite has fuzz methods", func(w *gotest.T) {
+		w.It("classifies fuzz methods and applies X_ exclusion", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzMethod")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "expected no errors, got: %v", result.Errs)
+
+			spec := gotest.Must(c.ApplyTestSuiteSpecs(result))
+			gotest.Len(it, spec.EffectiveTestSuites, 1)
+
+			suite := spec.EffectiveTestSuites[0]
+			gotest.Len(it, suite.Fuzzers(), 1)
+			gotest.Equal(it, "FuzzParse", suite.Fuzzers()[0].Identifier())
+		})
+	})
+
+	t.When("fuzz method has an unsupported signature", func(w *gotest.T) {
+		w.It("rejects fuzz methods without *gotest.F (including *testing.F)", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzMethod_BadSignature")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "expected error for unsupported fuzz param type")
+			gotest.ErrorContains(it, result.Errs[0].Err, "must accept exactly one parameter of type *gotest.F")
+		})
+	})
+
+	t.When("suite has fuzz methods and a returning BeforeEach", func(w *gotest.T) {
+		w.It("rejects fuzz methods on returning-BeforeEach suites", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzMethod_ReturningBeforeEach")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "expected error: fuzz methods with returning BeforeEach")
+			gotest.ErrorContains(it, result.Errs[0].Err, "move fuzz targets to a dedicated suite")
+		})
+	})
+}
+
 func (s *CollectorTestSuite) TestApplyTestSuiteSpecs(t *gotest.T) {
 	t.When("valid result with fixtures only", func(w *gotest.T) {
 		w.It("returns no suites", func(it *gotest.T) {

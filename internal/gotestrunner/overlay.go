@@ -30,6 +30,7 @@ type OverlayResult struct {
 	StdlibTestsByPkg               map[string]int // stdlib func TestX counts per package — gotest reports but does not run them
 	SuitesByPkg                    map[string][]string
 	BenchesByPkg                   map[string][]string
+	FuzzFuncsByPkg                 map[string]map[string][]string
 	DirsByPkg                      map[string]string
 	SkippedSuitesByPkg             map[string][]string
 	FixtureDepSuites               map[string]map[string]bool
@@ -73,6 +74,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 	stdlibByPkg := map[string]int{}
 	suitesByPkg := map[string][]string{}
 	benchesByPkg := map[string][]string{}
+	fuzzFuncsByPkg := map[string]map[string][]string{}
 	dirsByPkg := map[string]string{}
 	skippedSuitesByPkg := map[string][]string{}
 	fixtureDepSuites := map[string]map[string]bool{}
@@ -91,6 +93,9 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		}
 		if len(r.BenchSuiteNames) > 0 {
 			benchesByPkg[r.PkgPath] = r.BenchSuiteNames
+		}
+		if len(r.FuzzFuncsBySuite) > 0 {
+			fuzzFuncsByPkg[r.PkgPath] = r.FuzzFuncsBySuite
 		}
 		if r.AbsPath != "" {
 			dirsByPkg[r.PkgPath] = r.AbsPath
@@ -121,6 +126,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		StdlibTestsByPkg:               stdlibByPkg,
 		SuitesByPkg:                    suitesByPkg,
 		BenchesByPkg:                   benchesByPkg,
+		FuzzFuncsByPkg:                 fuzzFuncsByPkg,
 		DirsByPkg:                      dirsByPkg,
 		SkippedSuitesByPkg:             skippedSuitesByPkg,
 		FixtureDepSuites:               fixtureDepSuites,

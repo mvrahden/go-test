@@ -61,6 +61,7 @@ func (s *E2ETestSuite) TestT(t *gotest.T) {
 		"pkg/gotest/each_filter_suite_test.go",
 		"pkg/gotest/each_suite_test.go",
 		"pkg/gotest/export_test.go",
+		"pkg/gotest/f_suite_test.go",
 		"pkg/gotest/must_suite_test.go",
 		"pkg/gotest/record_suite_test.go",
 		"pkg/gotest/snapshot_internal_test.go",
