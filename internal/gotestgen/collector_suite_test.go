@@ -247,6 +247,18 @@ func (s *CollectorTestSuite) TestSuiteConfig(t *gotest.T) {
 		})
 	})
 
+	t.When("suite composes its config from a preset", func(w *gotest.T) {
+		w.It("accepts the compose form and detects Parallel", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_ComposeBody")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+			gotest.Len(it, result.Suites, 1)
+			gotest.True(it, result.Suites[0].HasConfig(), "expected HasConfig() to be true")
+			gotest.True(it, result.Suites[0].IsMethodParallel(), "Parallel set via cfg.Parallel = true must be detected")
+		})
+	})
+
 	t.When("suite has no Config method", func(w *gotest.T) {
 		w.It("reports HasConfig as false", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_AbsentIsFalse")
@@ -514,11 +526,57 @@ func (s *CollectorTestSuite) TestValidation(t *gotest.T) {
 	})
 
 	t.When("parallel without BeforeEach", func(w *gotest.T) {
-		w.It("is allowed", func(it *gotest.T) {
+		w.It("is allowed for a field-less suite", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_ParallelWithoutBeforeEach_Allowed")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
 			gotest.Empty(it, result.Errs, "parallel with no BeforeEach should be allowed")
+		})
+
+		w.It("is allowed for suites with fields (write-once-in-BeforeAll is a valid pattern)", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_ParallelStateNoBeforeEach")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "structural field checks cannot distinguish read-only from racy state")
+		})
+
+		w.It("is allowed when the only fields are fixture pointers", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_ParallelFixtureOnlyNoBeforeEach")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "fixture pointer fields are wired once and read-only")
+		})
+	})
+
+	t.When("unexported suite", func(w *gotest.T) {
+		w.It("errors when it has test cases", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_UnexportedSuiteWithCases")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "unexported suite with cases is a silent false-green")
+			gotest.ErrorContains(it, result.Errs[0].Err, "must be exported")
+		})
+
+		w.It("is allowed as a case-less embed base", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_UnexportedCaselessBase")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "helper/base types ending in TestSuite must stay legal")
+		})
+	})
+
+	t.When("a referenced fixture has a value-receiver hook", func(w *gotest.T) {
+		w.It("errors at resolution, not collection — incidental Fixture-named types stay legal", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Fixture_ValueReceiverHook")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "collection must not fail on value-receiver hooks")
+
+			spec, err := c.ApplyTestSuiteSpecs(result)
+			gotest.NoError(it, err)
+
+			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.ErrorContains(it, err, "value type receiver")
 		})
 	})
 

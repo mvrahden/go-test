@@ -1147,6 +1147,18 @@ func (s *SpecTestSuite) TestDetermineTestSuite(t *gotest.T) {
 		})
 	})
 
+	t.When("unexported suite type", func(w *gotest.T) {
+		w.It("is collected — the exported check moved to validation (case-less bases stay legal)", func(it *gotest.T) {
+			pkg, genDecls := loadFixtureAST(it.T(), `
+				package testpkg
+				type myTestSuite struct{ Value string }
+			`)
+			spec, _, err := gotestast.DetermineTestSuite(genDecls[0], pkg)
+			gotest.NoError(it, err)
+			gotest.NotZero(it, spec)
+		})
+	})
+
 	t.When("non-suite type", func(w *gotest.T) {
 		w.It("returns nil for types not ending in TestSuite", func(it *gotest.T) {
 			pkg, genDecls := loadFixtureAST(it.T(), `

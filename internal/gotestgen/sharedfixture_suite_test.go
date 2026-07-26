@@ -201,8 +201,8 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 		})
 	})
 
-	t.When("with config overlay", func(w *gotest.T) {
-		w.It("generates config overlay and timeout", func(it *gotest.T) {
+	t.When("with config marker", func(w *gotest.T) {
+		w.It("uses the marker config for the timeout", func(it *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",

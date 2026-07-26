@@ -327,6 +327,7 @@ func qualifier(pkg *types.Package) types.Qualifier {
 }
 
 func (m *TestSuiteMethod) Pos() token.Pos   { return m.n.Pos() }
+func (m *TestSuiteMethod) IsAsync() bool    { return IS_TEST_CASE_ASYNC.MatchString(m.m.Name()) }
 func (m *TestSuiteMethod) IsFocused() bool  { return strings.HasPrefix(m.m.Name(), "F_") }
 func (m *TestSuiteMethod) IsExcluded() bool { return strings.HasPrefix(m.m.Name(), "X_") }
 
@@ -337,40 +338,113 @@ func (m *TestSuiteMethod) Identifier() string {
 	return m.m.Name()
 }
 
+// suiteConfigBodyErr describes the statically-parseable forms: the generator
+// needs Parallel at generation time, so SuiteConfig bodies cannot be arbitrary Go.
+const suiteConfigBodyErr = "SuiteConfig method body must return a gotest.SuiteConfig literal or preset call, optionally composed as `cfg := <literal|preset>` followed by plain `cfg.<Field> = <value>` assignments"
+
 func parseSuiteConfigAST(_ *packages.Package, funcDecl *ast.FuncDecl) (parallel bool, err error) {
-	if funcDecl.Body == nil || len(funcDecl.Body.List) != 1 {
-		return false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
+	if funcDecl.Body == nil || len(funcDecl.Body.List) == 0 {
+		return false, fmt.Errorf(suiteConfigBodyErr)
 	}
-	retStmt, ok := funcDecl.Body.List[0].(*ast.ReturnStmt)
-	if !ok || len(retStmt.Results) != 1 {
-		return false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
+	stmts := funcDecl.Body.List
+
+	// Single-statement form: return <literal | preset call>.
+	if len(stmts) == 1 {
+		retStmt, ok := stmts[0].(*ast.ReturnStmt)
+		if !ok || len(retStmt.Results) != 1 {
+			return false, fmt.Errorf(suiteConfigBodyErr)
+		}
+		switch result := retStmt.Results[0].(type) {
+		case *ast.CompositeLit:
+			return suiteConfigParallelFromLiteral(result), nil
+		case *ast.CallExpr:
+			if !isKnownSuitePreset(result) {
+				return false, fmt.Errorf("SuiteConfig: only the gotest presets (DefaultSuiteConfig, IntegrationSuiteConfig) may be called — Parallel is resolved statically and a custom helper would silently drop it")
+			}
+			return false, nil
+		default:
+			return false, fmt.Errorf(suiteConfigBodyErr)
+		}
 	}
-	switch result := retStmt.Results[0].(type) {
+
+	// Compose form: cfg := <literal|preset>; cfg.Field = value ...; return cfg.
+	first, ok := stmts[0].(*ast.AssignStmt)
+	if !ok || first.Tok != token.DEFINE || len(first.Lhs) != 1 || len(first.Rhs) != 1 {
+		return false, fmt.Errorf(suiteConfigBodyErr)
+	}
+	cfgIdent, ok := first.Lhs[0].(*ast.Ident)
+	if !ok {
+		return false, fmt.Errorf(suiteConfigBodyErr)
+	}
+	switch rhs := first.Rhs[0].(type) {
 	case *ast.CompositeLit:
-		for _, elt := range result.Elts {
-			kv, ok := elt.(*ast.KeyValueExpr)
-			if !ok {
-				continue
+		parallel = suiteConfigParallelFromLiteral(rhs)
+	case *ast.CallExpr:
+		if !isKnownSuitePreset(rhs) {
+			return false, fmt.Errorf("SuiteConfig: only the gotest presets (DefaultSuiteConfig, IntegrationSuiteConfig) may be called — Parallel is resolved statically and a custom helper would silently drop it")
+		}
+	default:
+		return false, fmt.Errorf(suiteConfigBodyErr)
+	}
+
+	last, ok := stmts[len(stmts)-1].(*ast.ReturnStmt)
+	if !ok || len(last.Results) != 1 {
+		return false, fmt.Errorf(suiteConfigBodyErr)
+	}
+	if retIdent, ok := last.Results[0].(*ast.Ident); !ok || retIdent.Name != cfgIdent.Name {
+		return false, fmt.Errorf(suiteConfigBodyErr)
+	}
+
+	for _, stmt := range stmts[1 : len(stmts)-1] {
+		assign, ok := stmt.(*ast.AssignStmt)
+		if !ok || assign.Tok != token.ASSIGN || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
+			return false, fmt.Errorf(suiteConfigBodyErr)
+		}
+		sel, ok := assign.Lhs[0].(*ast.SelectorExpr)
+		if !ok {
+			return false, fmt.Errorf(suiteConfigBodyErr)
+		}
+		if base, ok := sel.X.(*ast.Ident); !ok || base.Name != cfgIdent.Name {
+			return false, fmt.Errorf(suiteConfigBodyErr)
+		}
+		if sel.Sel.Name == "Parallel" {
+			val, ok := assign.Rhs[0].(*ast.Ident)
+			if !ok || (val.Name != "true" && val.Name != "false") {
+				return false, fmt.Errorf("SuiteConfig: Parallel must be assigned a boolean literal — the generator resolves it statically")
 			}
-			key, ok := kv.Key.(*ast.Ident)
-			if !ok {
-				continue
-			}
-			if key.Name == "Parallel" {
-				ident, ok := kv.Value.(*ast.Ident)
-				if ok && ident.Name == "true" {
-					parallel = true
-				}
+			parallel = val.Name == "true"
+		}
+	}
+	return parallel, nil
+}
+
+// isKnownSuitePreset accepts only the gotest-shipped presets as config bases:
+// they are known to leave Parallel false, so static Parallel detection stays sound.
+func isKnownSuitePreset(call *ast.CallExpr) bool {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	return sel.Sel.Name == "DefaultSuiteConfig" || sel.Sel.Name == "IntegrationSuiteConfig"
+}
+
+func suiteConfigParallelFromLiteral(lit *ast.CompositeLit) bool {
+	for _, elt := range lit.Elts {
+		kv, ok := elt.(*ast.KeyValueExpr)
+		if !ok {
+			continue
+		}
+		key, ok := kv.Key.(*ast.Ident)
+		if !ok {
+			continue
+		}
+		if key.Name == "Parallel" {
+			if ident, ok := kv.Value.(*ast.Ident); ok && ident.Name == "true" {
+				return true
 			}
 		}
-		return parallel, nil
-	case *ast.CallExpr:
-		return false, nil
-	case *ast.Ident:
-		return false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
-	default:
-		return false, fmt.Errorf("SuiteConfig method body must be a single return statement with a gotest.SuiteConfig struct literal")
 	}
+	return false
 }
 
 func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, token.Pos, error) {
@@ -616,6 +690,13 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 	be := ts.th.BeforeEach
 	ae := ts.th.AfterEach
 	suiteName := ts.ts.Name.Name
+
+	// An unexported suite with test cases is a silent false-green: go test only
+	// runs exported Test functions, so its generated Test func would never
+	// execute. Unexported case-less types (embed bases, helpers) stay legal.
+	if len(ts.th.TestCases) > 0 && !ts.ts.Name.IsExported() {
+		return fmt.Errorf("test suite %q must be exported — go test never runs its generated Test function", suiteName)
+	}
 
 	// Rule 1/7: Parallel requires returning BeforeEach (void BeforeEach forbidden)
 	if ts.th.ConfigParallel && be != nil && !be.HasReturn() {

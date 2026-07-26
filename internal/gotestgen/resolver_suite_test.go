@@ -300,6 +300,51 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 		})
 	})
 
+	t.When("a shared fixture lacks BeforeAll", func(w *gotest.T) {
+		w.It("returns a clean error instead of a subprocess compile error", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixture_MissingBeforeAll")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+
+			spec, err := c.ApplyTestSuiteSpecs(result)
+			gotest.NoError(it, err)
+
+			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.ErrorContains(it, err, "must define BeforeAll")
+		})
+	})
+
+	t.When("a shared fixture depends on a package fixture", func(w *gotest.T) {
+		w.It("returns an error instead of serializing a zero-value field", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixture_PackageFixtureDep")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+
+			spec, err := c.ApplyTestSuiteSpecs(result)
+			gotest.NoError(it, err)
+
+			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.ErrorContains(it, err, "cannot depend on package fixture")
+		})
+	})
+
+	t.When("shared fixtures form a cycle", func(w *gotest.T) {
+		w.It("returns an error instead of skipping them", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixtureCycle")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+
+			spec, err := c.ApplyTestSuiteSpecs(result)
+			gotest.NoError(it, err)
+
+			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.ErrorContains(it, err, "cycle")
+		})
+	})
+
 	t.When("suite references multiple fixtures", func(w *gotest.T) {
 		w.It("resolves all fixtures", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_MultipleFixturesPerSuite")

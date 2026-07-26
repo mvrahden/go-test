@@ -104,6 +104,40 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 
 // --- stdlib T support tests ---
 
+func (s *RendererTestSuite) TestAsyncTestCases(t *gotest.T) {
+	t.When("a suite has an async test case", func(w *gotest.T) {
+		w.It("renders a done channel and deadline wait", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_AsyncTestCases")
+			output, _ := renderTestPkg(it.T(), pkg)
+			gotest.Contains(it, output, "ƒdone := make(chan struct{}, 1)")
+			gotest.Contains(it, output, "case <-ƒdone:")
+			gotest.Contains(it, output, "done() was not called")
+			gotest.NotContains(it, output, "ƒƒ_GOTEST_exec(s.TestPingAsync", "async cases bypass the exec trampoline")
+			gotest.Contains(it, output, "ƒƒ_GOTEST_exec(s.TestPlain", "sync cases keep the trampoline")
+		})
+	})
+}
+
+func (s *RendererTestSuite) TestParallelAllExcluded(t *gotest.T) {
+	t.It("compiles — no unused ƒfailed when every case is excluded", func(it *gotest.T) {
+		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ParallelAllExcluded")
+		output, _ := renderTestPkg(it.T(), pkg)
+		gotest.NotContains(it, output, "ƒfailed", "ƒfailed must only be declared when test cases exist")
+	})
+}
+
+func (s *RendererTestSuite) TestParallelFailFast(t *gotest.T) {
+	t.When("method-parallel suite with FailFast", func(w *gotest.T) {
+		w.It("emits a shared failure flag that skips not-yet-started subtests", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ParallelFailFast")
+			output, _ := renderTestPkg(it.T(), pkg)
+			gotest.Contains(it, output, "ƒfailed.Load()", "parallel subtests must consult the shared failure flag")
+			gotest.Contains(it, output, "ƒfailed.Store(true)", "failing subtests must set the shared failure flag")
+			gotest.Contains(it, output, "it.Skip(", "flagged subtests must skip instead of running")
+		})
+	})
+}
+
 func (s *RendererTestSuite) TestStdlibTSupport(t *gotest.T) {
 	t.When("standalone suite", func(w *gotest.T) {
 		w.It("unwraps via .T() and uses adapter lambdas", func(it *gotest.T) {
@@ -169,10 +203,13 @@ func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 
 func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 	t.When("fixture with config", func(w *gotest.T) {
-		w.It("renders config overlay in fixture node", func(it *gotest.T) {
+		w.It("uses the marker's config verbatim in the fixture node", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithConfig")
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.MatchSnapshot(it, output)
+
+			gotest.Contains(it, output, "Config: (&CFGFixture{}).FixtureConfig(),", "marker config must be used as-is")
+			gotest.NotContains(it, output, "OverlayFixtureConfig", "literal semantics: no overlay")
 		})
 	})
 
@@ -191,10 +228,13 @@ func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 
 func (s *RendererTestSuite) TestSuiteConfig(t *gotest.T) {
 	t.When("suite with config", func(w *gotest.T) {
-		w.It("renders config overlay and deadline", func(it *gotest.T) {
+		w.It("uses the marker's config verbatim and renders the deadline", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SuiteWithConfig")
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.MatchSnapshot(it, output)
+
+			gotest.Contains(it, output, "ƒcfg := s.ConfiguredTestSuite.SuiteConfig()", "marker config must be used as-is")
+			gotest.NotContains(it, output, "OverlaySuiteConfig", "literal semantics: no overlay")
 		})
 	})
 

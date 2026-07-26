@@ -41,13 +41,14 @@ func ƒ_setupFixtures(t *testing.T) {
         var ƒmaxSuiteSetup time.Duration
 {{ range $fs := .FlatSuites }}
         {
-            ƒscfg := gotest.DefaultSuiteConfig()
 {{- if $fs.Suite.HasConfig }}
-            gotest.OverlaySuiteConfig(&ƒscfg, (&{{ $fs.Suite.Identifier }}{
+            ƒscfg := (&{{ $fs.Suite.Identifier }}{
 {{- range $id, $field := $fs.FixtureFields }}
                 {{ $field }}: ƒ_{{ $id }},
 {{- end }}
-            }).SuiteConfig())
+            }).SuiteConfig()
+{{- else }}
+            ƒscfg := gotest.DefaultSuiteConfig()
 {{- end }}
             if ƒscfg.SetupTimeout > ƒmaxSuiteSetup { ƒmaxSuiteSetup = ƒscfg.SetupTimeout }
         }
@@ -59,6 +60,11 @@ func ƒ_setupFixtures(t *testing.T) {
 {{- range $sf := .SharedFixtureNodes }}
                 {
                     Name: "{{ $sf.Identifier }}",
+{{- if $sf.HasConfig }}
+                    Config: ƒ_sf_{{ $sf.Identifier }}.SharedFixtureConfig(),
+{{- else }}
+                    Config: gotest.DefaultFixtureConfig(),
+{{- end }}
                     SharedState: &gotestruntime.SharedStateNode{
                         StateKey: "{{ $sf.StateKey }}",
                         Target: ƒ_sf_{{ $sf.Identifier }},
@@ -117,13 +123,23 @@ func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
 {{- end }}
         },
     }
-    ƒcfg := gotest.DefaultSuiteConfig()
+{{- if $fs.Suite.HasGuard }}
+    if ƒreason := s.{{ $fs.Suite.Identifier }}.SuiteGuard(); ƒreason != "" {
+        t.Skipf("suite guard: %s", ƒreason)
+        return
+    }
+{{- end }}
 {{- if $fs.Suite.HasConfig }}
-    gotest.OverlaySuiteConfig(&ƒcfg, s.{{ $fs.Suite.Identifier }}.SuiteConfig())
+    ƒcfg := s.{{ $fs.Suite.Identifier }}.SuiteConfig()
+{{- else }}
+    ƒcfg := gotest.DefaultSuiteConfig()
 {{- end }}
 
 {{- if $fs.Suite.IsMethodParallel }}
     wg := &sync.WaitGroup{}
+{{- if $fs.Suite.TestCases }}
+    ƒfailed := &atomic.Bool{}
+{{- end }}
 {{- end }}
 
     ƒsetupT := gotest.NewT(t)
@@ -148,6 +164,10 @@ func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
         wg.Add(1)
         it.Parallel()
         defer wg.Done()
+        if ƒcfg.FailFast && ƒfailed.Load() {
+          it.Skip("FailFast: earlier test failed")
+        }
+        defer func() { if it.Failed() { ƒfailed.Store(true) } }()
 {{- end }}
         ttt := gotest.NewT(it)
         if ƒcfg.Timeout > 0 {
@@ -172,16 +192,38 @@ func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
 {{- if $fs.Suite.HasReturningBeforeEach }}
         ctx := s.BeforeEach(ttt)
         defer s.AfterEach(ttt, ctx)
+{{- if $tc.IsAsync }}
+        ƒdone := make(chan struct{}, 1)
+        s.{{ $tc.Identifier }}({{ if $tc.UsesStdlibT }}ttt.T(){{ else }}ttt{{ end }}, ctx, func() { select { case ƒdone <- struct{}{}: default: } })
+        select {
+        case <-ƒdone:
+        case <-ttt.Context().Done():
+          it.Fatalf("%s: done() was not called before the test deadline", "{{ $tc.Identifier }}")
+        }
+{{- else }}
         s.{{ $tc.Identifier }}({{ if $tc.UsesStdlibT }}ttt.T(){{ else }}ttt{{ end }}, ctx)
+{{- end }}
 {{- else }}
         defer s.AfterEach(ttt)
         s.BeforeEach(ttt)
+{{- if $tc.IsAsync }}
+        ƒdone := make(chan struct{}, 1)
+        s.{{ $tc.Identifier }}({{ if $tc.UsesStdlibT }}ttt.T(){{ else }}ttt{{ end }}, func() { select { case ƒdone <- struct{}{}: default: } })
+        select {
+        case <-ƒdone:
+        case <-ttt.Context().Done():
+          it.Fatalf("%s: done() was not called before the test deadline", "{{ $tc.Identifier }}")
+        }
+{{- else }}
         ƒƒ_GOTEST_exec({{ if $tc.UsesStdlibT }}func(t *gotest.T) { s.{{ $tc.Identifier }}(t.T()) }{{ else }}s.{{ $tc.Identifier }}{{ end }}, ttt)
 {{- end }}
+{{- end }}
     })
+{{- if not $fs.Suite.IsMethodParallel }}
     if ƒcfg.FailFast && t.Failed() {
         return
     }
+{{- end }}
 {{ end }}
 }
 {{ end }}
@@ -190,11 +232,7 @@ func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
             {
                 Name: "{{ .Identifier }}",
 {{- if .HasConfig }}
-                Config: func() gotest.FixtureConfig {
-                    cfg := gotest.DefaultFixtureConfig()
-                    gotest.OverlayFixtureConfig(&cfg, (&{{ .QualifiedType }}{}).FixtureConfig())
-                    return cfg
-                }(),
+                Config: (&{{ .QualifiedType }}{}).FixtureConfig(),
 {{- else }}
                 Config: gotest.DefaultFixtureConfig(),
 {{- end }}

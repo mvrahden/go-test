@@ -3,7 +3,6 @@ package gotestgen
 import (
 	"fmt"
 	"go/types"
-	"os"
 	"sort"
 	"strings"
 
@@ -86,12 +85,13 @@ type ResolveResult struct {
 }
 
 type resolver struct {
-	targetPkg     *packages.Package
-	localFixtures []*gotestast.FixtureSpec
-	resolved      map[*types.Named]*ResolvedFixture
-	resolving     map[*types.Named]bool         // cycle detection
-	sharedSeen    map[string]*SharedFixtureInfo // key: pkgPath.Name
-	result        *ResolveResult
+	targetPkg       *packages.Package
+	localFixtures   []*gotestast.FixtureSpec
+	resolved        map[*types.Named]*ResolvedFixture
+	resolving       map[*types.Named]bool         // cycle detection
+	sharedSeen      map[string]*SharedFixtureInfo // key: pkgPath.Name
+	sharedResolving map[string]bool               // cycle detection for shared fixtures
+	result          *ResolveResult
 }
 
 // Resolve performs demand-driven fixture resolution starting from targeted test
@@ -100,12 +100,13 @@ type resolver struct {
 func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, localFixtures []*gotestast.FixtureSpec) (*ResolveResult, error) {
 	result := &ResolveResult{}
 	r := &resolver{
-		targetPkg:     targetPkg,
-		localFixtures: localFixtures,
-		resolved:      make(map[*types.Named]*ResolvedFixture),
-		resolving:     make(map[*types.Named]bool),
-		sharedSeen:    make(map[string]*SharedFixtureInfo),
-		result:        result,
+		targetPkg:       targetPkg,
+		localFixtures:   localFixtures,
+		resolved:        make(map[*types.Named]*ResolvedFixture),
+		resolving:       make(map[*types.Named]bool),
+		sharedSeen:      make(map[string]*SharedFixtureInfo),
+		sharedResolving: make(map[string]bool),
+		result:          result,
 	}
 
 	for _, suite := range suites {
@@ -166,7 +167,10 @@ func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, loc
 
 	// Collect deduplicated shared fixtures in deterministic topological order
 	// (dependencies before dependents, ties broken by identifier).
-	result.RequiredSharedFixtures = topoSortSharedFixtures(r.sharedSeen)
+	result.RequiredSharedFixtures, err = topoSortSharedFixtures(r.sharedSeen)
+	if err != nil {
+		return nil, err
+	}
 
 	// Compute per-suite transitive shared fixture keys
 	suiteKeys := make(map[string][]string)
@@ -331,6 +335,13 @@ func (r *resolver) resolveFixture(named *types.Named) (*ResolvedFixture, error) 
 	mset := types.NewMethodSet(types.NewPointer(named))
 	typePkg := named.Obj().Pkg()
 
+	// A referenced fixture with value-receiver hooks would silently run no-ops;
+	// reject it here. Unreferenced *Fixture-named types are never resolved and
+	// stay unaffected.
+	if err := rejectValueReceiverHooks(named, typePkg, identifier); err != nil {
+		return nil, err
+	}
+
 	rf := &ResolvedFixture{
 		Kind:         kind,
 		Identifier:   identifier,
@@ -413,6 +424,52 @@ func (r *resolver) resolvePackageFixtureFields(rf *ResolvedFixture, st *types.St
 	return nil
 }
 
+// rejectValueReceiverHooks errors when a fixture's own lifecycle/marker methods
+// use value receivers — collection would silently skip them, leaving a
+// zero-value fixture. Only explicitly declared methods are checked; methods
+// promoted from embedded fixtures are legitimate and ignored.
+func rejectValueReceiverHooks(named *types.Named, _ *types.Package, identifier string) error {
+	hooks := map[string]bool{
+		"BeforeAll": true, "AfterAll": true, "BeforeEach": true, "AfterEach": true,
+		"Hydrate": true, "Dehydrate": true, "FixtureConfig": true, "SharedFixtureConfig": true,
+	}
+	for i := 0; i < named.NumMethods(); i++ {
+		m := named.Method(i)
+		if !hooks[m.Name()] {
+			continue
+		}
+		sig, ok := m.Type().(*types.Signature)
+		if !ok || sig.Recv() == nil {
+			continue
+		}
+		if _, isPtr := sig.Recv().Type().(*types.Pointer); !isPtr {
+			return fmt.Errorf("fixture %q: %s has an unsupported value type receiver — use a pointer receiver", identifier, m.Name())
+		}
+	}
+	return nil
+}
+
+// declaresHook reports whether the named type itself (not via embedding)
+// declares a method with the given name.
+func declaresHook(named *types.Named, name string) bool {
+	for i := 0; i < named.NumMethods(); i++ {
+		if named.Method(i).Name() == name {
+			return true
+		}
+	}
+	return false
+}
+
+// hasCtxErrSignature reports whether fn is func(context.Context) error.
+func hasCtxErrSignature(fn *types.Func) bool {
+	sig, ok := fn.Type().(*types.Signature)
+	if !ok {
+		return false
+	}
+	return sig.Params().Len() == 1 && sig.Params().At(0).Type().String() == "context.Context" &&
+		sig.Results().Len() == 1 && sig.Results().At(0).Type().String() == "error"
+}
+
 func isInternalPkgPath(pkgPath string) bool {
 	return strings.HasPrefix(pkgPath, "internal/") ||
 		strings.HasSuffix(pkgPath, "/internal") ||
@@ -480,11 +537,54 @@ func (r *resolver) registerSharedFixture(named *types.Named) error {
 	if _, ok := r.sharedSeen[key]; ok {
 		return nil
 	}
+	if r.sharedResolving[key] {
+		return fmt.Errorf("cycle detected in shared fixture dependencies involving %q", key)
+	}
+	r.sharedResolving[key] = true
+	defer delete(r.sharedResolving, key)
+
+	if err := rejectValueReceiverHooks(named, typePkg, identifier); err != nil {
+		return err
+	}
+
+	// Same restriction as buildSharedFixtureRef — also applies to fixtures that are
+	// only reachable transitively, which would otherwise fail later as a confusing
+	// subprocess compile error.
+	if isInternalPkgPath(typePkg.Path()) {
+		return fmt.Errorf(
+			"shared fixture %q is in an internal package (%s); "+
+				"shared fixtures must live in a non-internal package so the setup subprocess can import them",
+			identifier, typePkg.Path(),
+		)
+	}
 
 	mset := types.NewMethodSet(types.NewPointer(named))
 	hasHydrate := mset.Lookup(typePkg, "Hydrate") != nil
 	hasDehydrate := mset.Lookup(typePkg, "Dehydrate") != nil
 	hasConfig := detectConfigMethod(mset, typePkg, gotestast.SharedFixture)
+
+	// Validate here (not only in the collector) so cross-package shared fixtures,
+	// which are resolved by method-set lookup alone, get clean errors instead of
+	// subprocess compile failures or silent misbehavior.
+	for _, hook := range []string{"BeforeAll", "AfterAll", "Hydrate", "Dehydrate"} {
+		sel := mset.Lookup(typePkg, hook)
+		if sel == nil {
+			continue
+		}
+		if fn, ok := sel.Obj().(*types.Func); ok && !hasCtxErrSignature(fn) {
+			return fmt.Errorf("shared fixture %q: %s must have signature (ctx context.Context) error", identifier, hook)
+		}
+	}
+	if mset.Lookup(typePkg, "BeforeAll") == nil {
+		return fmt.Errorf("shared fixture %q must define BeforeAll(ctx context.Context) error", identifier)
+	}
+	if hasHydrate != hasDehydrate {
+		present, missing := "Hydrate", "Dehydrate"
+		if hasDehydrate {
+			present, missing = "Dehydrate", "Hydrate"
+		}
+		return fmt.Errorf("shared fixture %q has %s but no %s; both must be defined together", identifier, present, missing)
+	}
 
 	isLocal := typePkg.Path() == r.targetPkg.PkgPath
 	pkgName := ""
@@ -557,6 +657,11 @@ func (r *resolver) registerSharedFixture(named *types.Named) error {
 			if err := r.registerSharedFixture(depNamed); err != nil {
 				return err
 			}
+		} else if strings.HasSuffix(depName, protocol.SuffixFixture) && declaresHook(depNamed, "BeforeAll") {
+			// Only reject actual package fixtures (they declare BeforeAll);
+			// a plain data type that merely ends in "Fixture" stays an
+			// ordinary field, classifiable as Hydrate-local.
+			return fmt.Errorf("shared fixture %q cannot depend on package fixture %q — they run in different processes", identifier, depName)
 		}
 	}
 
@@ -639,7 +744,7 @@ func (r *resolver) findLocalSpec(rf *ResolvedFixture) *gotestast.FixtureSpec {
 
 func validateTransferFieldType(fixtureName string, field *types.Var) error {
 	if reason := nonSerializable(field.Type()); reason != "" {
-		return fmt.Errorf("shared fixture %q: transfer field %q has non-JSON-serializable type %s (%s)", fixtureName, field.Name(), field.Type(), reason)
+		return fmt.Errorf("shared fixture %q: transfer field %q has non-JSON-serializable type %s (%s) — assign it in Hydrate to make it a local field instead", fixtureName, field.Name(), field.Type(), reason)
 	}
 	return nil
 }
@@ -687,9 +792,9 @@ func isJSONMapKey(t types.Type) bool {
 
 // topoSortSharedFixtures returns shared fixtures sorted in topological order
 // (dependencies before dependents), with ties broken by identifier for stability.
-func topoSortSharedFixtures(seen map[string]*SharedFixtureInfo) []SharedFixtureInfo {
+func topoSortSharedFixtures(seen map[string]*SharedFixtureInfo) ([]SharedFixtureInfo, error) {
 	if len(seen) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Collect all keys and sort for deterministic tie-breaking.
@@ -746,10 +851,10 @@ func topoSortSharedFixtures(seen map[string]*SharedFixtureInfo) []SharedFixtureI
 				cycled = append(cycled, k)
 			}
 		}
-		fmt.Fprintf(os.Stderr, "WARN: cycle detected in shared fixtures: %v — these fixtures will be skipped\n", cycled)
+		return nil, fmt.Errorf("cycle detected in shared fixture dependencies: %v", cycled)
 	}
 
-	return result
+	return result, nil
 }
 
 func topologicalSort(resolved map[*types.Named]*ResolvedFixture) ([]*ResolvedFixture, error) {
