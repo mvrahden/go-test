@@ -129,7 +129,7 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 	named, ok := t.(interface{ Name() string })
 	if !ok {
 		gt, ok := t.(*T)
-		if ok {
+		if ok && gt.T() != nil {
 			named = gt.T()
 		}
 	}

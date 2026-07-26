@@ -2,6 +2,7 @@ package gotest_test
 
 import (
 	"context"
+	"testing"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -140,5 +141,27 @@ func (s *TTestSuite) TestNestedBehaviorContext(t *gotest.T) {
 				gotest.NoError(ni, ni.Context().Err())
 			})
 		})
+	})
+}
+
+func (s *TTestSuite) TestNewTFromTB(t *gotest.T) {
+	t.It("routes helpers through the TB and nils T()", func(it *gotest.T) {
+		res := testing.Benchmark(func(b *testing.B) {
+			tb := gotest.NewTFromTB(b)
+			gotest.Zero(it, tb.T())
+			gotest.NotZero(it, tb.Context())
+			gotest.Equal(it, "recovered", func() (r string) {
+				defer func() {
+					if recover() != nil {
+						r = "recovered"
+					}
+				}()
+				tb.It("nope", func(*gotest.T) {})
+				return "no panic"
+			}())
+			for b.Loop() {
+			}
+		})
+		gotest.Greater(it, res.N, 0)
 	})
 }

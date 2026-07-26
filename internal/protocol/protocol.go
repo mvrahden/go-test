@@ -16,6 +16,8 @@ const (
 	SuffixTestSuite     = "TestSuite"
 	PrefixFocused       = "F_"
 	PrefixExcluded      = "X_"
+	PrefixBenchmark     = "Benchmark"
+	PrefixFuzz          = "Fuzz"
 )
 
 func BudgetFilePath(binaryPath string) string {
