@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 214" width="680" height="214" role="img">
+<style>
+svg{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+:root{--s1:#007d9c;--s2:#eb6834;--ink:#24292f;--ink2:#656d76;--grid:#d0d7de}
+@media (prefers-color-scheme:dark){:root{--s1:#0a9cc4;--s2:#d95926;--ink:#e6edf3;--ink2:#8b949e;--grid:#30363d}}
+.lbl{fill:var(--ink);font-size:13px}
+.val{fill:var(--ink2);font-size:12px}
+.tick{fill:var(--ink2);font-size:11px}
+.grid{stroke:var(--grid);stroke-width:1}
+</style>
+<rect x="170" y="6" width="12" height="12" rx="3" fill="var(--s1)"/>
+<text class="lbl" x="188" y="16">Repos using t.Parallel() anywhere</text>
+<rect x="459" y="6" width="12" height="12" rx="3" fill="var(--s2)"/>
+<text class="lbl" x="477" y="16">Tests that run in parallel</text>
+<line class="grid" x1="282" y1="34" x2="282" y2="190"/>
+<text class="tick" x="282" y="206" text-anchor="middle">20%</text>
+<line class="grid" x1="395" y1="34" x2="395" y2="190"/>
+<text class="tick" x="395" y="206" text-anchor="middle">40%</text>
+<line class="grid" x1="508" y1="34" x2="508" y2="190"/>
+<text class="tick" x="508" y="206" text-anchor="middle">60%</text>
+<line class="grid" x1="620" y1="34" x2="620" y2="190"/>
+<text class="tick" x="620" y="206" text-anchor="middle">80%</text>
+<text class="lbl" x="162" y="56" text-anchor="end">Full corpus</text>
+<path d="M170,34 h254.75 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-254.75 z" fill="var(--s1)"/>
+<text class="val" x="435" y="46">46%</text>
+<path d="M170,52 h59.0 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-59.0 z" fill="var(--s2)"/>
+<text class="val" x="239" y="64">11.2%</text>
+<text class="lbl" x="162" y="108" text-anchor="end">Top 100 by stars</text>
+<path d="M170,86 h372.875 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-372.875 z" fill="var(--s1)"/>
+<text class="val" x="553" y="98">67%</text>
+<path d="M170,104 h47.1875 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-47.1875 z" fill="var(--s2)"/>
+<text class="val" x="227" y="116">9.1%</text>
+<text class="lbl" x="162" y="160" text-anchor="end">Long tail (400)</text>
+<path d="M170,138 h226.625 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-226.625 z" fill="var(--s1)"/>
+<text class="val" x="407" y="150">41%</text>
+<path d="M170,156 h47.1875 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-47.1875 z" fill="var(--s2)"/>
+<text class="val" x="227" y="168">9.1%</text>
+</svg>
