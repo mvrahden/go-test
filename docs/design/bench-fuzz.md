@@ -1,9 +1,13 @@
 # Benchmarking & Fuzzing
 
-> Status: Part 1 (benchmarking core) shipped; Parts 2-4 remain proposals.
-> See the README's "Benchmarking" section and ARCHITECTURE.md for what
-> `gotest bench` actually does today. The rest of this document — baselines,
-> gates, editor integration, and all of fuzzing — is still a design proposal.
+> Status: Parts 1–3 (benchmarking core, baselines/gates/editor integration,
+> fuzz core) shipped. Of Part 4 (the fuzz AST layer), seed harvesting,
+> crash triage/promote, `scaffold --fuzz`, and the three fuzz lint rules
+> (determinism/no-oracle/seed) have also shipped, primitives-only; only
+> struct decoders (the typed-fuzzing codec layer) remain a proposal,
+> deferred pending a dedicated design doc. See "Shipped deviations (Part 4)"
+> below, the README's "Benchmarking" and "Fuzzing" sections, and
+> ARCHITECTURE.md for what `gotest bench`/`gotest fuzz` actually do today.
 
 ## Shipped deviations (Part 1)
 
@@ -40,9 +44,11 @@ The goal is not "also run `go test -bench`". It is making performance and robust
 first-class parts of the behavioral spec, with the same lifecycle, isolation, and
 tooling story that suites already have.
 
-Today, `-bench`/`-fuzz` flags are classified in `internal/gotestrunner/args.go` and
-forwarded to the test binary — but generated suites never emit `Benchmark*`/`Fuzz*`
-functions, so those flags do nothing useful.
+This is no longer a forward-looking claim: `-bench`/`-fuzz` flags have been
+classified in `internal/gotestrunner/args.go` since before this doc was
+written, and generated suites now do emit `Benchmark*`/`Fuzz*` functions —
+see the README's "Benchmarking" and "Fuzzing" sections and ARCHITECTURE.md
+for what ships today.
 
 ## Why gotest is structurally positioned for this
 
@@ -190,6 +196,59 @@ Benchmarks slot in:
 
 ---
 
+## Shipped deviations (Part 3)
+
+Where the implementation diverged from this proposal (or filled in something
+it left open):
+
+- **`*gotest.F`-only parameter — no `*testing.F` fallback.** Unlike
+  benchmarks, where a `Benchmark*` method may take either `*gotest.B` or
+  bare `*testing.B`, a `Fuzz*` method must take `*gotest.F`; the collector
+  rejects `*testing.F` outright (`"fuzz method %s must accept exactly one
+  parameter of type *gotest.F"`). Fuzz lifecycle interposition depends on
+  `gotest.F`'s `beforeEach`/`afterEach` wiring, which the stdlib type has no
+  way to carry.
+- **`Fuzz`/`Fuzz2`/`Fuzz3` — a hard arity cap of three.** The generic
+  adapters in `pkg/gotest/f.go` cover one, two, or three fuzzed arguments;
+  there is no variadic or reflection-based form. A fourth argument needs a
+  fourth adapter to be added by hand — not a runtime limitation, just what
+  shipped.
+- **Generated-name convention: full method name kept.** The wrapper is
+  `Fuzz<SuiteIdentifier>_<MethodName>`, e.g. `FuzzParserTestSuite_FuzzParse`
+  — not `FuzzParserTestSuite_Parse` as an earlier sketch of this section
+  showed before this section was reconciled to match. Every generated name
+  in this document now uses the shipped convention.
+- **Per-execution lifecycle is unconditional — no `FuzzConfig` escape
+  hatch.** The "provide the escape hatch from day one" bullet under
+  "Lifecycle semantics decision" below did not ship: `SuiteConfig{Fuzz:
+  gotest.FuzzConfig{PerExecutionLifecycle: false}}` does not exist.
+  `BeforeEach`/`AfterEach` run before/after every single execution — seed
+  replay and every generated input alike — with no opt-out. Revisit if a
+  suite's `BeforeEach` doing real I/O turns out to bottleneck fuzzing
+  throughput in practice.
+- **Seed replay covers every run subcommand, not just the plain runner.**
+  `gotest ./...`/`gotest test`, `gotest spec`, `gotest watch`, and `gotest
+  summary` all replay each fuzz method's seed corpus (`f.Add` seeds plus
+  anything already under `testdata/fuzz/`) as ordinary subtests
+  (`Fuzz<Suite>_<Method>/seed#0`). A user-supplied `-run` filter is never
+  widened to include fuzz funcs — it wins outright, and a seed replays only
+  if the generated name happens to match the filter on its own.
+- **Top-level stdlib `func FuzzXxx(*testing.F)` funcs are invisible to
+  gotest.** Only `Fuzz*` methods on a `*TestSuite` struct are discovered.
+  A bare fuzz function not attached to any suite runs only via `go test`
+  directly — `gotest ./...`, `gotest fuzz`, and every other subcommand
+  silently skip it. No AST discovery work was done for this case; it is a
+  known, documented limitation, not a bug.
+- **The orchestrator shares one global `--timeout` across all targets, and
+  skips rather than blocks.** `gotest fuzz` has no per-target timeout
+  independent of `--for`; when there are more targets than `--jobs`, later
+  waves may not acquire a slot before the shared deadline expires, in which
+  case gotest prints `[<Func>] skipped: global timeout reached before this
+  target started` for each one rather than letting them start anyway and
+  run past the deadline. `--for` (which floors each target's slice at 10s)
+  is the documented way to give every target an explicit, bounded budget
+  instead of relying on `--timeout` alone.
+
 ## Part 2: Fuzzing
 
 ### Authoring model
@@ -200,7 +259,7 @@ Benchmarks slot in:
 ```go
 func (s *ParserTestSuite) FuzzParse(f *gotest.F) {
     f.Add("{}")                            // explicit seeds
-    f.Fuzz(func(t *gotest.T, input string) {
+    gotest.Fuzz(f, func(t *gotest.T, input string) {
         doc, err := s.p.Parse(input)
         if err != nil {
             return                         // rejecting invalid input is fine
@@ -212,7 +271,14 @@ func (s *ParserTestSuite) FuzzParse(f *gotest.F) {
 }
 ```
 
-Generated: `func FuzzParserTestSuite_Parse(f *testing.F)` with `BeforeAll` once per
+(`gotest.Fuzz(f, func(t *gotest.T, input string) {...})` — the shipped API is a
+package-level generic adapter taking `*gotest.F`, not a `Fuzz` method on
+`*gotest.F` itself; `Fuzz2`/`Fuzz3` are the two/three-argument forms, capped
+at three. See "Shipped deviations (Part 3)" above and the README's "Fuzzing"
+section.)
+
+Generated: `func FuzzParserTestSuite_FuzzParse(f *testing.F)` — the full method name
+is kept, not stripped of its `Fuzz` prefix — with `BeforeAll` once per
 process and `BeforeEach`/`AfterEach` interposed around each execution.
 
 **Lifecycle semantics decision.** Per-execution lifecycle is correct for isolation,
@@ -322,6 +388,63 @@ gotest fuzz ./pkg/parser --for=2h # overnight, one package
   round-robin.
 - `gotest stats` grows a fuzz-health section: corpus size, total fuzz time,
   time-since-last-crasher per target.
+
+## Shipped deviations (Part 4)
+
+Seed harvesting, crash triage/promote, `scaffold --fuzz`, and the three fuzz
+lint rules all shipped — every one of them scoped to Go's natively fuzzable
+primitive types (string, `[]byte`, bool, and the int/uint/float variants).
+Only struct decoders (feature 1 above) did not ship; see below.
+
+- **Seed harvesting is primitives-only, test-file-scoped, and
+  conservative-literal.** `HarvestSeeds` (`internal/gotestast/seeds.go`)
+  only matches call-sites whose non-`*gotest.T` arguments are basic types —
+  struct-typed fuzz callbacks are out of scope, since only primitives have
+  `f.Add` codecs. It scans `_test.go` sources only, never production files.
+  Within test files it only lifts literal shapes: a basic literal, a
+  unary-minus of one, `true`/`false`, or a single-arg conversion of one of
+  those — never arbitrary expressions — matched via two shapes: direct
+  literal call-sites and `gotest.Each` table rows. It runs on by default;
+  disable per-run with `--no-harvest`, or persistently with `fuzz: harvest:
+  false` in project config (the CLI flag wins if both are set).
+- **Triage and promote are primitives-only, matching harvesting's scope.**
+  `gotest fuzz triage` re-runs each package's crasher files
+  (`testdata/fuzz/<Func>/...`) as ordinary subtests and reports
+  input/cause/status; `gotest fuzz promote` does the same discovery, then
+  splices each crasher's arguments into the suite's `Fuzz*` method as a new
+  `f.Add(...)` seed via AST-level source editing (`internal/refactor`),
+  deleting the crasher file only once the splice succeeds. Both are
+  restricted to Go's native primitive corpus types — no struct decoding,
+  since no encode/decode codecs exist for them.
+- **`gotest scaffold --fuzz` generates one of three skeleton shapes**,
+  chosen by what it can determine about the target function:
+  1. a round-trip property test, when the target's parameter is natively
+     fuzzable and a same-package inverse function (`Marshal`/`Unmarshal`,
+     `Encode`/`Decode`, ...) is found;
+  2. a crash-safety skeleton, when the parameter is fuzzable but no inverse
+     pair was found — it calls the target and leaves a `// TODO: assert an
+     invariant beyond "doesn't crash"` comment;
+  3. a not-natively-fuzzable TODO stub, when the parameter type isn't one
+     of Go's native fuzzable types — struct-typed targets land here today,
+     since generating a fuzz call for them would panic at runtime; the body
+     is comment-only, explaining that struct fuzzing isn't supported yet.
+- **Three fuzz lint rules shipped** (`internal/lint/fuzz.go`): `fuzz-
+  determinism` flags fuzz callbacks (and their same-package callees) that
+  read `time.Now`, `math/rand`/`math/rand/v2`, or `os.Getenv`; `fuzz-no-
+  oracle` flags a fuzz callback whose body never asserts anything through
+  its `*gotest.T` parameter (only catching panics, not a real property);
+  `fuzz-seed` flags a `Fuzz*` method with no `f.Add` call (harvesting may
+  still backfill seeds at generate time regardless).
+- **Struct decoders (Task 20) remain a proposal, not shipped.** The design
+  below (deterministic, reflection-free, field-index-tagged codecs; a
+  `gotest.FuzzBytes` primitive) was reviewed and found to compromise two
+  project principles as specced — a reflect-based type registry breaks
+  zero-reflection, and a committed field-map file breaks the
+  no-committed-generated-files rule — so it was deferred rather than shipped
+  as designed. It needs its own dedicated design doc before implementation,
+  once an overlay-rewrite mechanism (rather than a committed side file) is
+  worked out. Until then, typed fuzzing via generated decoders is out of
+  scope for `gotest fuzz`, `triage`, `promote`, and `scaffold --fuzz` alike.
 
 ---
 

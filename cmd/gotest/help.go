@@ -143,6 +143,7 @@ Flags:
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable overlay cache, force fresh generation
+  --no-harvest            Disable fuzz seed harvesting for this run (see below)
   --min=<pct>             Fail if coverage < pct% (0-100, enables -coverprofile)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
@@ -152,6 +153,14 @@ Use a bare "--" to pass unrecognized flags without validation.
 
 CI auto-detection: when the standard CI env var is set and GOTEST_CI is
 unset, --ci is enabled automatically. Set GOTEST_CI=0 to opt out.
+
+Fuzz seed harvesting (on by default): if any target package has FuzzX
+suite methods, gotest mines your test files' table-test literals and
+call-site arguments into f.Add(...) seeds when it generates their wrapper
+— this happens as part of ordinary overlay generation, whether or not you
+ever run "gotest fuzz". Pass --no-harvest to disable it for this run, or
+set "fuzz: harvest: false" in .gotest.yml to disable it persistently (see
+"gotest help config" and "gotest help fuzz").
 
 Examples:
   gotest ./...                              Run all suites
@@ -367,6 +376,16 @@ mutating and searching for new failing inputs.
 time.Now/math-rand/os.Getenv from a fuzz target breaks corpus replay),
 fuzz-no-oracle (a callback that asserts nothing only catches panics), and
 fuzz-seed (no f.Add seeds means coverage-guided exploration starts blind).
+
+Seed harvesting (on by default): at generation time, gotest mines your
+test files' table-test literals and direct call-site arguments that flow
+into a fuzz target's function-under-test, and injects them as f.Add(...)
+seeds in the generated wrapper — turning your existing valid-input
+examples into a starting corpus without any extra authoring. Only literal
+primitive values from _test.go sources are harvested, never production
+code or computed expressions. Disable it for one run with --no-harvest, or
+persistently via "fuzz: harvest: false" in .gotest.yml (see "gotest help
+config").
 
 Flags:
   --for=<dur>             Total fuzz time budget, split evenly across all
@@ -704,6 +723,9 @@ Fields:
   bench:
     baseline: <path>        Default --against baseline path for "gotest bench"
     gate: <float>           Default --gate regression percentage (0 disables)
+  fuzz:
+    harvest: <bool>         Seed harvesting for "gotest fuzz" (default: true;
+                             the --no-harvest CLI flag overrides this per-run)
 
 Skippable lint rules (non-integrity only): assertion-redundant,
 assertion-simplify, fail-guard, stdlib-test, t-escape, testify
@@ -719,5 +741,7 @@ Example .gotest.yml:
   bench:
     baseline: bench-baseline.json
     gate: 10
+  fuzz:
+    harvest: false
 `)
 }
