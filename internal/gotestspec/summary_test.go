@@ -302,6 +302,111 @@ func TestRenderMarkdownSummary_PackageDiagnostic(t *testing.T) {
 	}
 }
 
+func TestRenderSummary_WithBenchDeltas(t *testing.T) {
+	packages := []*Package{{
+		Path: "p",
+		Nodes: []*Node{
+			{Kind: KindTest, Display: "Foo", Status: StatusPass, Duration: time.Millisecond},
+		},
+	}}
+
+	deltas := []BenchDelta{
+		{Key: "p Foo/BenchmarkFoo", OldNs: 100, NewNs: 150, PercentChange: 50, Significant: true},
+		{Key: "p Foo/BenchmarkBar", OldNs: 100, NewNs: 105, PercentChange: 5, Significant: false},
+	}
+
+	var buf bytes.Buffer
+	RenderSummary(&buf, packages, WithNoColor(), WithBenchDeltas(deltas))
+	out := buf.String()
+
+	if !strings.Contains(out, "BENCHMARK  OLD ns/op  NEW ns/op  Δ") {
+		t.Errorf("expected delta table header, got:\n%s", out)
+	}
+	if !strings.Contains(out, "p Foo/BenchmarkFoo  100.0  150.0  +50.0% ⚠") {
+		t.Errorf("expected regression row with warning, got:\n%s", out)
+	}
+	if !strings.Contains(out, "p Foo/BenchmarkBar  100.0  105.0  +5.0%\n") {
+		t.Errorf("expected insignificant row without warning, got:\n%s", out)
+	}
+	if strings.Contains(out, "p Foo/BenchmarkBar  100.0  105.0  +5.0% ⚠") {
+		t.Errorf("insignificant row should not carry a warning, got:\n%s", out)
+	}
+}
+
+func TestRenderSummary_NoBenchDeltas(t *testing.T) {
+	packages := []*Package{{
+		Path: "p",
+		Nodes: []*Node{
+			{Kind: KindTest, Display: "Foo", Status: StatusPass, Duration: time.Millisecond},
+		},
+	}}
+
+	var buf bytes.Buffer
+	RenderSummary(&buf, packages, WithNoColor())
+	out := buf.String()
+
+	if strings.Contains(out, "BENCHMARK") {
+		t.Errorf("expected no delta table when no deltas were given, got:\n%s", out)
+	}
+}
+
+func TestRenderMarkdownSummary_WithBenchDeltas(t *testing.T) {
+	packages := []*Package{{
+		Path: "pkg/foo",
+		Nodes: []*Node{
+			{
+				Kind:     KindTest,
+				Display:  "Bad",
+				Status:   StatusFail,
+				Duration: 10 * time.Millisecond,
+				Output:   []string{"    foo_test.go:1: boom\n"},
+			},
+		},
+	}}
+
+	deltas := []BenchDelta{
+		{Key: "p Foo/BenchmarkFoo", OldNs: 100, NewNs: 200, PercentChange: 100, Significant: true},
+		{Key: "p Foo/BenchmarkBar", OldNs: 100, NewNs: 102, PercentChange: 2, Significant: false},
+	}
+
+	var buf bytes.Buffer
+	RenderMarkdownSummary(&buf, packages, WithBenchDeltas(deltas))
+	out := buf.String()
+
+	if !strings.Contains(out, "| Benchmark | old ns/op | new ns/op | Δ |") {
+		t.Errorf("expected markdown delta table header, got:\n%s", out)
+	}
+	if !strings.Contains(out, "| p Foo/BenchmarkFoo | 100.0 | 200.0 | +100.0% ⚠ |") {
+		t.Errorf("expected regression row, got:\n%s", out)
+	}
+	if !strings.Contains(out, "| p Foo/BenchmarkBar | 100.0 | 102.0 | +2.0% |") {
+		t.Errorf("expected insignificant row, got:\n%s", out)
+	}
+
+	tableIdx := strings.Index(out, "| Benchmark |")
+	ruleIdx := strings.Index(out, "---\n")
+	if tableIdx == -1 || ruleIdx == -1 || tableIdx > ruleIdx {
+		t.Errorf("expected delta table before the trailing ---, got:\n%s", out)
+	}
+}
+
+func TestRenderMarkdownSummary_NoBenchDeltas(t *testing.T) {
+	packages := []*Package{{
+		Path: "p",
+		Nodes: []*Node{
+			{Kind: KindTest, Display: "Foo", Status: StatusPass, Duration: time.Millisecond},
+		},
+	}}
+
+	var buf bytes.Buffer
+	RenderMarkdownSummary(&buf, packages)
+	out := buf.String()
+
+	if strings.Contains(out, "| Benchmark |") {
+		t.Errorf("expected no delta table when no deltas were given, got:\n%s", out)
+	}
+}
+
 func TestRenderSummary_BothTestFailureAndPackageDiagnostic(t *testing.T) {
 	packages := []*Package{{
 		Path:   "p",

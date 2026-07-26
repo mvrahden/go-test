@@ -17,6 +17,7 @@ import (
 
 	. "github.com/mvrahden/go-test/cmd/gotest"
 	"github.com/mvrahden/go-test/internal/config"
+	"github.com/mvrahden/go-test/internal/gotestbench"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
@@ -54,6 +55,13 @@ func (s *CmdGotestTestSuite) BeforeAll(t *gotest.T) {
 // runCLI runs the built gotest binary from the repo root and returns its
 // combined stdout+stderr output.
 func (s *CmdGotestTestSuite) runCLI(t *gotest.T, args ...string) string {
+	out, _ := s.runCLIExit(t, args...)
+	return out
+}
+
+// runCLIExit runs the built gotest binary from the repo root and returns its
+// combined stdout+stderr output along with its exit code.
+func (s *CmdGotestTestSuite) runCLIExit(t *gotest.T, args ...string) (string, int) {
 	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = s.repoRoot
 	out, err := cmd.CombinedOutput()
@@ -61,7 +69,11 @@ func (s *CmdGotestTestSuite) runCLI(t *gotest.T, args ...string) string {
 	if err != nil && !errors.As(err, &exitErr) {
 		t.T().Fatalf("running gotest binary: %v\n%s", err, out)
 	}
-	return string(out)
+	code := 0
+	if cmd.ProcessState != nil {
+		code = cmd.ProcessState.ExitCode()
+	}
+	return string(out), code
 }
 
 func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
@@ -1023,5 +1035,71 @@ func (s *CmdGotestTestSuite) TestBenchSubcommand(t *gotest.T) {
 	t.It("reports when no benchmarks exist", func(it *gotest.T) {
 		out := s.runCLI(it, "bench", "./internal/protocol")
 		gotest.Contains(it, out, "no benchmarks found")
+	})
+}
+
+func (s *CmdGotestTestSuite) TestBenchSaveAgainstGate(t *gotest.T) {
+	t.It("saves a baseline with one Sample per -count repetition", func(it *gotest.T) {
+		dir := it.TempDir()
+		baselinePath := filepath.Join(dir, "baseline.json")
+
+		out, code := s.runCLIExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=4", "--save="+baselinePath)
+		gotest.Equal(it, 0, code)
+		// --save implies spec rendering (Task 7's spec view), which trims
+		// the suite wrapper's "TestSuite" suffix, so it shows up as
+		// "BenchmarkNotificationDispatchBench" rather than the raw
+		// "BenchmarkNotificationDispatchBenchTestSuite" wrapper name.
+		gotest.Contains(it, out, "NotificationDispatchBench")
+		gotest.Contains(it, out, "ns/op")
+
+		data, err := os.ReadFile(baselinePath)
+		gotest.NoError(it, err)
+		var b gotestbench.Baseline
+		gotest.NoError(it, json.Unmarshal(data, &b))
+		gotest.NotEmpty(it, b.Results)
+		for _, r := range b.Results {
+			gotest.Len(it, r.Samples, 4)
+		}
+	})
+
+	t.It("compares two saved baselines and passes an impossible-to-trip gate", func(it *gotest.T) {
+		dir := it.TempDir()
+		firstPath := filepath.Join(dir, "first.json")
+
+		_, code := s.runCLIExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--save="+firstPath)
+		gotest.Equal(it, 0, code)
+
+		out, code := s.runCLIExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--against="+firstPath, "--gate=500")
+		gotest.Equal(it, 0, code)
+		// A bare --against (no --spec/--save) must still show the benchmark
+		// actually ran, not just a delta table header: the tree's own
+		// ns/op result line has to render alongside the comparison.
+		gotest.Contains(it, out, "ns/op")
+		gotest.Contains(it, out, "BENCHMARK")
+		gotest.Contains(it, out, "OLD ns/op")
+		gotest.Contains(it, out, "NEW ns/op")
+	})
+
+	t.It("errors when --gate is given without a baseline source", func(it *gotest.T) {
+		out, code := s.runCLIExit(it, "bench", "./examples/notification", "-benchtime=10x", "--gate=10")
+		gotest.NotEqual(it, 0, code)
+		gotest.Contains(it, out, "--gate requires --against")
+	})
+
+	t.It("renders exactly one summary trailer for --spec --against", func(it *gotest.T) {
+		dir := it.TempDir()
+		firstPath := filepath.Join(dir, "first.json")
+
+		_, code := s.runCLIExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--save="+firstPath)
+		gotest.Equal(it, 0, code)
+
+		out, code := s.runCLIExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--spec", "--against="+firstPath)
+		gotest.Equal(it, 0, code)
+		// The spec tree's own trailing counts line ("N suites, N
+		// benchmarks: ...") must appear exactly once, with no second,
+		// stacked "N tests passed (...)" trailer from a separate
+		// RenderSummary call.
+		gotest.Contains(it, out, "benchmarks:")
+		gotest.NotContains(it, out, "tests passed (")
 	})
 }
