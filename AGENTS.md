@@ -29,15 +29,14 @@ This is the most common source of runtime panics in gotest code.
 
 **Never use `t.T().Skip()` for environment gating.**
 Use `SuiteGuard() string` instead.
-SuiteGuard runs before shared fixture wiring and `t.Parallel()`, avoiding wasted work.
-`t.T().Skip()` inside `BeforeAll` runs after those expensive operations.
+SuiteGuard runs before the suite's config resolution, `BeforeAll`, and every test method — the suite's own setup never executes.
+(Package/shared fixture setup currently still runs before the guard.)
+`t.T().Skip()` inside `BeforeAll` runs even later, after suite setup has started.
 
-**`Nil`/`NotNil` assertions do not exist.**
-This is deliberate.
-Go generics cannot constrain to "nillable types", so a generic `NotNil(t, x)` would silently accept non-nillable types (e.g. `int`, `struct{}`), creating logical bugs with no compile-time warning.
-Use `NotZero`/`Zero` for pointer, interface, and channel nil checks (these types satisfy `comparable`).
-For slices, maps, and channels, prefer `Empty`/`NotEmpty` — a nil slice and an empty slice are equivalent for most test intent.
-Use `True(t, x != nil)` only when the nil vs empty distinction actually matters.
+**`Nil`/`NotNil` are for non-comparable nilables only.**
+They carry a runtime type guard: slices, maps, funcs, channels, pointers, interfaces, and unsafe pointers are accepted; any other type fails with a type-guard error (the `assertion-type-guard` lint rule catches misuse statically).
+Use `Zero`/`NotZero` for comparable nilables (pointers, interfaces, channels).
+For slices and maps, prefer `Empty`/`NotEmpty` — a nil slice and an empty slice are equivalent for most test intent; reach for `Nil`/`NotNil` only when the nil vs empty distinction matters.
 
 **`HasPrefix`/`HasSuffix` assertions do not exist.**
 Use `Regexp(t, "^prefix", str)` or `Regexp(t, "suffix$", str)`.
@@ -89,7 +88,7 @@ gotest.NotZero[V comparable](t, value V)             // value != zero value for 
 `comparable` includes: pointers, interfaces, channels, numerics, strings, bools, structs of comparables, arrays of comparables.
 It excludes: slices, maps, functions.
 
-For nil checks on slices, maps, or functions: `gotest.True(t, x != nil)`.
+For nil checks on slices, maps, or functions: `gotest.NotNil(t, x)` / `gotest.Nil(t, x)` (never `True(t, x != nil)` — the `assertion-simplify` rule rewrites it).
 
 ### Collections
 
@@ -162,7 +161,7 @@ gotest.Panics(t, f func()) any  // asserts f panics, returns recovered value
 gotest.MatchSnapshot(t, value any, name ...string)   // compare value against stored snapshot
 ```
 
-Snapshots are stored in `testdata/__snapshots__/<TestSuiteName>.snap` next to the test file.
+Snapshots are stored in `testdata/__snapshots__/<TestName>.snap` (e.g. `TestMyTestSuite.snap`; suffix `_ext` for external `_test` packages) next to the test file.
 On first run (or with `--update-snapshots`), the snapshot is created.
 On subsequent runs, the value is compared against the stored snapshot.
 The optional `name` disambiguates multiple snapshots within the same test case.
@@ -225,7 +224,7 @@ For parallel test cases, AfterAll waits for all parallel tests to complete.
 
 **Returning BeforeEach (required for `Parallel: true`):**
 
-When `SuiteConfig` enables `Parallel`, `BeforeEach` must return a context struct pointer to give each parallel test its own isolated state. Test methods and `AfterEach` then accept this context as an additional parameter:
+When `SuiteConfig` enables `Parallel` on a suite with per-test state, `BeforeEach` must return a context struct pointer to give each parallel test its own isolated state (field-less suites, or suites whose only fields are fixture pointers, may be parallel without one). Test methods and `AfterEach` then accept this context as an additional parameter:
 
 ```go
 type testCtx struct {
@@ -259,7 +258,8 @@ func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel` (run methods concurrently).
 Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
-Use `-1` for `Timeout` or `SetupTimeout` to disable the deadline.
+The returned config is used as-is: a zero (or omitted) duration disables that deadline; without the marker method, `DefaultSuiteConfig()` (30s/30s) applies.
+Compose from presets for defaults + overrides: `cfg := gotest.DefaultSuiteConfig(); cfg.Parallel = true; return cfg`.
 
 ### SuiteGuard (optional)
 
@@ -273,7 +273,8 @@ func (s *MyTestSuite) SuiteGuard() string {
 ```
 
 Returns empty string to run, non-empty to skip with that reason.
-Runs before shared fixture wiring, before `t.Parallel()`, before any expensive work.
+Runs before the suite's config, `BeforeAll`, and any test method (fixture setup currently still runs first).
+Works for standalone and fixture-bound suites alike.
 
 ### Focus & Exclude prefixes
 
