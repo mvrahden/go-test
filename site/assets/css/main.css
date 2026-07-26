@@ -53,7 +53,7 @@ body {
   flex-direction: column;
 }
 
-main { flex: 1; }
+main { flex: 1; width: 100%; min-width: 0; }
 
 a { color: var(--cyan-dark); text-decoration: none; }
 @media (prefers-color-scheme: dark) { a { color: var(--cyan); } }
@@ -1263,4 +1263,26 @@ footer a:hover { color: var(--cyan); }
   .nav-links { gap: 0.75rem; font-size: 0.8rem; }
   .terminal-body { font-size: 0.75rem; padding: 1rem; }
   .install-cmd { font-size: 0.8rem; }
+}
+
+
+/* ===== Mobile refinements ===== */
+/* geometric no-ops on desktop: fire only when space runs out */
+.article-body img { max-width: 100%; height: auto; }
+.article-body { overflow-wrap: break-word; }
+.article-meta, .post-entry-meta { flex-wrap: wrap; row-gap: 0.35rem; }
+
+@media (max-width: 640px) {
+  /* wide tables scroll inside their own box instead of breaking the page */
+  .article-body table, .comparison-table, .ref-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* outbound nav links live in footer and CTAs; drop them from the bar */
+  .nav-links .nav-out, .nav-links .nav-home-link { display: none; }
+}
+
+@media (max-width: 480px) {
+  .nav-inner, .article, .post-list, .page-header, .blog-header { padding-left: 1rem; padding-right: 1rem; }
 }
