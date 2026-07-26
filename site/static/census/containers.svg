@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 312" width="680" height="312" role="img">
+<style>
+svg{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+:root{--s1:#007d9c;--s2:#eb6834;--ink:#24292f;--ink2:#656d76;--grid:#d0d7de}
+@media (prefers-color-scheme:dark){:root{--s1:#0a9cc4;--s2:#d95926;--ink:#e6edf3;--ink2:#8b949e;--grid:#30363d}}
+.lbl{fill:var(--ink);font-size:13px}
+.val{fill:var(--ink2);font-size:12px}
+.tick{fill:var(--ink2);font-size:11px}
+.grid{stroke:var(--grid);stroke-width:1}
+</style>
+<line class="grid" x1="268" y1="8" x2="268" y2="288"/>
+<text class="tick" x="268" y="304" text-anchor="middle">25</text>
+<line class="grid" x1="385" y1="8" x2="385" y2="288"/>
+<text class="tick" x="385" y="304" text-anchor="middle">50</text>
+<line class="grid" x1="502" y1="8" x2="502" y2="288"/>
+<text class="tick" x="502" y="304" text-anchor="middle">75</text>
+<line class="grid" x1="620" y1="8" x2="620" y2="288"/>
+<text class="tick" x="620" y="304" text-anchor="middle">100</text>
+<text class="lbl" x="142" y="20" text-anchor="end">postgres</text>
+<path d="M150,8 h381.4 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-381.4 z" fill="var(--s1)"/>
+<text class="val" x="541" y="20">82</text>
+<text class="lbl" x="142" y="48" text-anchor="end">redis</text>
+<path d="M150,36 h212.2 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-212.2 z" fill="var(--s1)"/>
+<text class="val" x="372" y="48">46</text>
+<text class="lbl" x="142" y="76" text-anchor="end">mysql</text>
+<path d="M150,64 h207.5 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-207.5 z" fill="var(--s1)"/>
+<text class="val" x="368" y="76">45</text>
+<text class="lbl" x="142" y="104" text-anchor="end">prometheus</text>
+<path d="M150,92 h165.2 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-165.2 z" fill="var(--s1)"/>
+<text class="val" x="325" y="104">36</text>
+<text class="lbl" x="142" y="132" text-anchor="end">grafana</text>
+<path d="M150,120 h127.6 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-127.6 z" fill="var(--s1)"/>
+<text class="val" x="288" y="132">28</text>
+<text class="lbl" x="142" y="160" text-anchor="end">nginx</text>
+<path d="M150,148 h113.5 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-113.5 z" fill="var(--s1)"/>
+<text class="val" x="274" y="160">25</text>
+<text class="lbl" x="142" y="188" text-anchor="end">minio</text>
+<path d="M150,176 h113.5 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-113.5 z" fill="var(--s1)"/>
+<text class="val" x="274" y="188">25</text>
+<text class="lbl" x="142" y="216" text-anchor="end">jaeger</text>
+<path d="M150,204 h108.8 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-108.8 z" fill="var(--s1)"/>
+<text class="val" x="269" y="216">24</text>
+<text class="lbl" x="142" y="244" text-anchor="end">mongo</text>
+<path d="M150,232 h94.7 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-94.7 z" fill="var(--s1)"/>
+<text class="val" x="255" y="244">21</text>
+<text class="lbl" x="142" y="272" text-anchor="end">clickhouse</text>
+<path d="M150,260 h90.0 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-90.0 z" fill="var(--s1)"/>
+<text class="val" x="250" y="272">20</text>
+</svg>

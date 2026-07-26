@@ -5,7 +5,6 @@ description: "Most slow Go test suites aren't slow because of slow tests. Sequen
 tags: ["Performance"]
 keywords: ["why are my go tests slow", "speed up go tests", "go test parallelism", "go test t.parallel", "go test slow"]
 cta_text: "Run your slowest suites as parallel processes."
-toc: true
 faq:
   - q: "Why are my Go tests slow even though each test is fast?"
     a: "Usually it is structure, not the tests. Every test in a package runs in one process, sequentially by default, so the longest single-package run sets your ceiling no matter how many CPU cores you have."

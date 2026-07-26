@@ -5,7 +5,6 @@ description: "go test runs each package in a separate OS process. How do you sha
 tags: ["Deep Dive"]
 keywords: ["share database across go test packages", "go testmain fixture", "go shared test fixtures", "go test process boundary"]
 cta_text: "Try shared fixtures in your next project."
-toc: true
 ---
 
 `go test` compiles each package into a separate test binary and runs it as a separate OS process. That design buys you isolation, and it makes one thing structurally difficult: sharing a fixture *across* packages. A Postgres container that `pkg/user`, `pkg/order`, and `pkg/billing` all need. A Redis instance that three packages query. A schema migration that should run once for the entire test run, not once per package. Sharing any of these means crossing process boundaries.

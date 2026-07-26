@@ -4,7 +4,6 @@ date: 2026-07-07
 description: "Every growing Go project needs shared test infrastructure. Fixture patterns from global vars to DAG-based lifecycle management, and when to use each."
 tags: ["Patterns"]
 keywords: ["go test fixtures", "testmain go", "sync.once test setup", "shared test database go", "go test setup teardown"]
-toc: true
 cta_text: "Share one Postgres container across every test package with gotest fixtures."
 aliases: ["/blog/test-fixtures-in-go.html"]
 ---

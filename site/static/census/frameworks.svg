@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 312" width="680" height="312" role="img">
+<style>
+svg{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+:root{--s1:#007d9c;--s2:#eb6834;--ink:#24292f;--ink2:#656d76;--grid:#d0d7de}
+@media (prefers-color-scheme:dark){:root{--s1:#0a9cc4;--s2:#d95926;--ink:#e6edf3;--ink2:#8b949e;--grid:#30363d}}
+.lbl{fill:var(--ink);font-size:13px}
+.val{fill:var(--ink2);font-size:12px}
+.tick{fill:var(--ink2);font-size:11px}
+.grid{stroke:var(--grid);stroke-width:1}
+</style>
+<line class="grid" x1="268" y1="8" x2="268" y2="288"/>
+<text class="tick" x="268" y="304" text-anchor="middle">15%</text>
+<line class="grid" x1="385" y1="8" x2="385" y2="288"/>
+<text class="tick" x="385" y="304" text-anchor="middle">30%</text>
+<line class="grid" x1="502" y1="8" x2="502" y2="288"/>
+<text class="tick" x="502" y="304" text-anchor="middle">45%</text>
+<line class="grid" x1="620" y1="8" x2="620" y2="288"/>
+<text class="tick" x="620" y="304" text-anchor="middle">60%</text>
+<text class="lbl" x="142" y="20" text-anchor="end">httptest (stdlib)</text>
+<path d="M150,8 h466.0 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-466.0 z" fill="var(--s1)"/>
+<text class="val" x="626" y="20">60%</text>
+<text class="lbl" x="142" y="48" text-anchor="end">testify assert/require</text>
+<path d="M150,36 h434.6666666666667 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-434.6666666666667 z" fill="var(--s1)"/>
+<text class="val" x="595" y="48">56%</text>
+<text class="lbl" x="142" y="76" text-anchor="end">go-cmp</text>
+<path d="M150,64 h160.5 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-160.5 z" fill="var(--s1)"/>
+<text class="val" x="320" y="76">21%</text>
+<text class="lbl" x="142" y="104" text-anchor="end">testify/mock</text>
+<path d="M150,92 h105.66666666666667 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-105.66666666666667 z" fill="var(--s1)"/>
+<text class="val" x="266" y="104">14%</text>
+<text class="lbl" x="142" y="132" text-anchor="end">testify/suite</text>
+<path d="M150,120 h74.33333333333333 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-74.33333333333333 z" fill="var(--s1)"/>
+<text class="val" x="234" y="132">10%</text>
+<text class="lbl" x="142" y="160" text-anchor="end">gomock</text>
+<path d="M150,148 h66.5 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-66.5 z" fill="var(--s1)"/>
+<text class="val" x="226" y="160">9%</text>
+<text class="lbl" x="142" y="188" text-anchor="end">gomega</text>
+<path d="M150,176 h58.666666666666664 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-58.666666666666664 z" fill="var(--s1)"/>
+<text class="val" x="219" y="188">8%</text>
+<text class="lbl" x="142" y="216" text-anchor="end">ginkgo</text>
+<path d="M150,204 h58.666666666666664 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-58.666666666666664 z" fill="var(--s1)"/>
+<text class="val" x="219" y="216">8%</text>
+<text class="lbl" x="142" y="244" text-anchor="end">testing/quick (stdlib)</text>
+<path d="M150,232 h35.166666666666664 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-35.166666666666664 z" fill="var(--s1)"/>
+<text class="val" x="195" y="244">5%</text>
+<text class="lbl" x="142" y="272" text-anchor="end">testcontainers-go</text>
+<path d="M150,260 h19.5 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-19.5 z" fill="var(--s1)"/>
+<text class="val" x="180" y="272">3%</text>
+</svg>

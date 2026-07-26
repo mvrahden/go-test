@@ -4,7 +4,6 @@ date: 2026-07-05
 description: "Go's testing package is deliberately minimal. Where growing projects hit its gaps, and the five principles behind gotest's suite layer."
 tags: ["Philosophy"]
 keywords: ["go test suite", "go testing package", "testify suite alternative", "go test setup and teardown", "go test framework"]
-toc: true
 cta_text: "See it in action — build your first gotest suite in 10 minutes."
 aliases: ["/blog/why-gotest.html"]
 ---

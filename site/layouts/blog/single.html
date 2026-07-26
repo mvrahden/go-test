@@ -14,12 +14,10 @@
     </header>
 
     <div class="article-body">
-      {{ if .Params.toc }}
-      <nav class="article-toc">
-        <strong>Contents</strong>
+      <details class="article-toc">
+        <summary>Contents</summary>
         {{ .TableOfContents }}
-      </nav>
-      {{ end }}
+      </details>
 
       {{ .Content }}
 

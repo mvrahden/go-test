@@ -4,7 +4,6 @@ date: 2026-07-06
 description: "Why flat Go test functions, table-driven tests, and subtests each solve part of the organization problem — and what happens when you need all three at once."
 tags: ["Patterns"]
 keywords: ["go test organization", "table-driven tests", "go subtests", "testify suite alternative", "go test suite"]
-toc: true
 cta_text: "See how a flat test file becomes a gotest suite in minutes."
 aliases: ["/blog/organizing-go-tests.html"]
 ---
