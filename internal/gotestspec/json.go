@@ -19,26 +19,33 @@ type jsonPackage struct {
 }
 
 type jsonNode struct {
-	Name     string     `json:"name"`
-	Display  string     `json:"display"`
-	Kind     string     `json:"kind"`
-	Status   string     `json:"status"`
-	Duration float64    `json:"duration"`
-	Focused  bool       `json:"focused"`
-	Excluded bool       `json:"excluded"`
-	External bool       `json:"external"`
-	Variant  int        `json:"variant,omitempty"`
-	Output   []string   `json:"output"`
-	Children []jsonNode `json:"children"`
+	Name        string     `json:"name"`
+	Display     string     `json:"display"`
+	Kind        string     `json:"kind"`
+	Status      string     `json:"status"`
+	Duration    float64    `json:"duration"`
+	Focused     bool       `json:"focused"`
+	Excluded    bool       `json:"excluded"`
+	External    bool       `json:"external"`
+	Variant     int        `json:"variant,omitempty"`
+	Output      []string   `json:"output"`
+	Children    []jsonNode `json:"children"`
+	Iterations  int        `json:"iterations,omitempty"`
+	NsPerOp     float64    `json:"ns_per_op,omitempty"`
+	BytesPerOp  int64      `json:"bytes_per_op,omitempty"`
+	AllocsPerOp int64      `json:"allocs_per_op,omitempty"`
 }
 
 type jsonStats struct {
-	Suites    int `json:"suites"`
-	Behaviors int `json:"behaviors"`
-	Tests     int `json:"tests"`
-	Passed    int `json:"passed"`
-	Failed    int `json:"failed"`
-	Skipped   int `json:"skipped"`
+	Suites     int `json:"suites"`
+	Behaviors  int `json:"behaviors"`
+	Tests      int `json:"tests"`
+	Benchmarks int `json:"benchmarks"`
+	// FailedPackages carries package-level verdicts (build failures, deaths
+	// outside any test); the packages array shows which via status "fail".
+	Passed  int `json:"passed"`
+	Failed  int `json:"failed"`
+	Skipped int `json:"skipped"`
 	// FailedPackages carries package-level verdicts (build failures, deaths
 	// outside any test); the packages array shows which via status "fail".
 	FailedPackages int `json:"failedPackages,omitempty"`
@@ -53,6 +60,7 @@ func RenderJSON(w io.Writer, packages []*Package) {
 			Suites:         stats.Suites,
 			Behaviors:      stats.Behaviors,
 			Tests:          stats.Tests,
+			Benchmarks:     stats.Benchmarks,
 			Passed:         stats.Passed,
 			Failed:         stats.Failed,
 			Skipped:        stats.Skipped,
@@ -86,17 +94,21 @@ func convertNodes(nodes []*Node) []jsonNode {
 	result := make([]jsonNode, len(nodes))
 	for i, n := range nodes {
 		result[i] = jsonNode{
-			Name:     n.Name,
-			Display:  n.Display,
-			Kind:     kindString(n.Kind),
-			Status:   statusString(n.Status),
-			Duration: n.Duration.Seconds(),
-			Focused:  n.Focused,
-			Excluded: n.Excluded,
-			External: n.External,
-			Variant:  n.Variant,
-			Output:   n.Output,
-			Children: convertNodes(n.Children),
+			Name:        n.Name,
+			Display:     n.Display,
+			Kind:        kindString(n.Kind),
+			Status:      statusString(n.Status),
+			Duration:    n.Duration.Seconds(),
+			Focused:     n.Focused,
+			Excluded:    n.Excluded,
+			External:    n.External,
+			Variant:     n.Variant,
+			Output:      n.Output,
+			Children:    convertNodes(n.Children),
+			Iterations:  n.Iterations,
+			NsPerOp:     n.NsPerOp,
+			BytesPerOp:  n.BytesPerOp,
+			AllocsPerOp: n.AllocsPerOp,
 		}
 		if result[i].Output == nil {
 			result[i].Output = []string{}
@@ -130,6 +142,8 @@ func kindString(k NodeKind) string {
 		return "block"
 	case KindTest:
 		return "test"
+	case KindBenchmark:
+		return "benchmark"
 	default:
 		return "unknown"
 	}

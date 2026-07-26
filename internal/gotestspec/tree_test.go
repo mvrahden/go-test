@@ -3,6 +3,8 @@ package gotestspec //nolint:stdlib-test
 import (
 	"strings"
 	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 func TestBuildTree_SuiteHierarchy(t *testing.T) {
@@ -436,6 +438,104 @@ func TestClassify_ParallelMethod(t *testing.T) {
 	if method.Display != "ParallelCreate" {
 		t.Errorf("display = %q, want ParallelCreate", method.Display)
 	}
+}
+
+func TestBuildTree_BenchmarkEvents(t *testing.T) {
+	events := []TestEvent{
+		{Action: ActionOutput, Package: "p", Test: "BenchmarkFooTestSuite/BenchmarkParse",
+			Output: "BenchmarkFooTestSuite/BenchmarkParse-8   \t 1201 \t 985.2 ns/op \t 24 B/op \t 3 allocs/op\n"},
+		{Action: ActionBench, Package: "p", Test: "BenchmarkFooTestSuite/BenchmarkParse"},
+	}
+	pkgs := BuildTree(events)
+	leaf := pkgs[0].Nodes[0].Children[0]
+	gotest.Equal(t, KindBenchmark, leaf.Kind)
+	gotest.Equal(t, StatusPass, leaf.Status)
+	gotest.InDelta(t, 985.2, leaf.NsPerOp, 0.001)
+	gotest.Equal(t, int64(24), leaf.BytesPerOp)
+	gotest.Equal(t, int64(3), leaf.AllocsPerOp)
+	stats := CollectStats(pkgs)
+	gotest.Equal(t, 1, stats.Benchmarks)
+	gotest.Equal(t, 0, stats.Behaviors)
+}
+
+func TestBuildTree_BenchmarkOutputSplitAcrossEvents(t *testing.T) {
+	// test2json "output" events are not guaranteed line-aligned; under real
+	// subprocess pipe timing a bench result line can arrive split mid-token
+	// across two consecutive events for the same tagged Test. Metrics must
+	// still be recovered by scanning the node's joined output, not just the
+	// single event that happens to complete the line.
+	events := []TestEvent{
+		{Action: ActionOutput, Package: "p", Test: "BenchmarkFoo",
+			Output: "BenchmarkFoo-8   \t 12"},
+		{Action: ActionOutput, Package: "p", Test: "BenchmarkFoo",
+			Output: "01 \t 985.2 ns/op\n"},
+		{Action: ActionBench, Package: "p", Test: "BenchmarkFoo"},
+	}
+	pkgs := BuildTree(events)
+	leaf := pkgs[0].Nodes[0]
+	gotest.Equal(t, KindBenchmark, leaf.Kind)
+	gotest.Equal(t, StatusPass, leaf.Status)
+	gotest.Equal(t, 1201, leaf.Iterations)
+	gotest.InDelta(t, 985.2, leaf.NsPerOp, 0.001)
+}
+
+func TestClassify_TopLevelTestNamedBenchmarkIsNotABenchmark(t *testing.T) {
+	// "TestBenchmarkFoo" is a legitimate stdlib test whose name merely
+	// starts with "Benchmark" after the "Test" prefix is trimmed. It must
+	// resolve through the ordinary test classification, never the bench
+	// branch.
+	input := `{"Action":"run","Package":"p","Test":"TestBenchmarkFoo"}
+{"Action":"pass","Package":"p","Test":"TestBenchmarkFoo","Elapsed":0.01}
+{"Action":"pass","Package":"p","Elapsed":0.01}`
+
+	events, err := ParseEvents(strings.NewReader(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree := BuildTree(events)
+
+	node := tree[0].Nodes[0]
+	gotest.Equal(t, KindTest, node.Kind)
+	gotest.Equal(t, "BenchmarkFoo", node.Display)
+}
+
+func TestClassify_NestedBenchmarkingPrefixIsNotABenchmark(t *testing.T) {
+	// "Benchmarking_the_new_endpoint" starts with "Benchmark" but continues
+	// with a lowercase letter ("ing..."), so it is an ordinary "when/it"
+	// style block name, not a Go benchmark identifier.
+	input := `{"Action":"run","Package":"p","Test":"TestFooTestSuite"}
+{"Action":"run","Package":"p","Test":"TestFooTestSuite/TestBar"}
+{"Action":"run","Package":"p","Test":"TestFooTestSuite/TestBar/Benchmarking_the_new_endpoint"}
+{"Action":"pass","Package":"p","Test":"TestFooTestSuite/TestBar/Benchmarking_the_new_endpoint","Elapsed":0.01}
+{"Action":"pass","Package":"p","Test":"TestFooTestSuite/TestBar","Elapsed":0.01}
+{"Action":"pass","Package":"p","Test":"TestFooTestSuite","Elapsed":0.01}
+{"Action":"pass","Package":"p","Elapsed":0.01}`
+
+	events, err := ParseEvents(strings.NewReader(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree := BuildTree(events)
+
+	block := tree[0].Nodes[0].Children[0].Children[0]
+	gotest.Equal(t, KindBlock, block.Kind)
+	gotest.Equal(t, "Benchmarking the new endpoint", block.Display)
+}
+
+func TestClassify_NestedBenchmarkName(t *testing.T) {
+	input := `{"Action":"run","Package":"p","Test":"TestFooTestSuite"}
+{"Action":"run","Package":"p","Test":"TestFooTestSuite/BenchmarkParse"}
+{"Action":"output","Package":"p","Test":"TestFooTestSuite/BenchmarkParse","Output":"BenchmarkParse-8   \t 100 \t 10.0 ns/op\n"}`
+
+	events, err := ParseEvents(strings.NewReader(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree := BuildTree(events)
+
+	leaf := tree[0].Nodes[0].Children[0]
+	gotest.Equal(t, KindBenchmark, leaf.Kind)
+	gotest.Equal(t, "Parse", leaf.Display)
 }
 
 func TestBuildTree_PackageLevelOutput(t *testing.T) {

@@ -3,6 +3,7 @@ package gotestspec
 import (
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"time"
 )
@@ -90,6 +91,18 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors) {
 
 	if isLeaf {
 		icon, clr := statusIcon(n.Status, c)
+
+		if n.Kind == KindBenchmark && n.Iterations > 0 {
+			fmt.Fprintf(w, "%s%s%s%s %s  %s ns/op · %d B/op · %d allocs/op%s\n",
+				indent, clr, icon, c.reset,
+				n.Display, formatNs(n.NsPerOp), n.BytesPerOp, n.AllocsPerOp, c.reset)
+
+			if n.Status == StatusFail {
+				renderErrorOutput(w, n.Output, depth+2, c)
+			}
+			return
+		}
+
 		dur := formatDuration(n.Duration)
 
 		suffix := ""
@@ -109,7 +122,7 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors) {
 	}
 
 	label := n.Display
-	if n.Kind == KindSuite || n.Kind == KindFixture || n.Kind == KindMethod || n.Kind == KindTest {
+	if n.Kind == KindSuite || n.Kind == KindFixture || n.Kind == KindMethod || n.Kind == KindTest || n.Kind == KindBenchmark {
 		label = c.bold + label + c.reset
 	}
 
@@ -158,6 +171,16 @@ func statusIcon(s Status, c *colors) (string, string) {
 	default:
 		return "?", c.dim
 	}
+}
+
+// formatNs renders a ns/op value the way Go's own benchmark output does:
+// no trailing decimal for whole numbers ("1243"), one decimal place
+// otherwise ("985.2").
+func formatNs(ns float64) string {
+	if ns == math.Trunc(ns) {
+		return fmt.Sprintf("%.0f", ns)
+	}
+	return fmt.Sprintf("%.1f", ns)
 }
 
 func formatDuration(d time.Duration) string {
@@ -237,6 +260,9 @@ func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hu
 	}
 	if stats.Tests > 0 {
 		counts = append(counts, fmt.Sprintf("%d stdlib tests", stats.Tests))
+	}
+	if stats.Benchmarks > 0 {
+		counts = append(counts, fmt.Sprintf("%d benchmarks", stats.Benchmarks))
 	}
 	if len(counts) == 0 {
 		counts = append(counts, "0 suites")
