@@ -72,6 +72,7 @@ func TestParseCoverageLine(t *testing.T) {
 		name  string
 		input string
 		file  string
+		block string
 		stmts int
 		count int
 		err   bool
@@ -80,6 +81,7 @@ func TestParseCoverageLine(t *testing.T) {
 			name:  "standard line",
 			input: "github.com/user/repo/foo.go:10.20,12.2 1 5",
 			file:  "github.com/user/repo/foo.go",
+			block: "10.20,12.2",
 			stmts: 1,
 			count: 5,
 		},
@@ -87,6 +89,7 @@ func TestParseCoverageLine(t *testing.T) {
 			name:  "uncovered",
 			input: "pkg/bar.go:5.1,8.3 3 0",
 			file:  "pkg/bar.go",
+			block: "5.1,8.3",
 			stmts: 3,
 			count: 0,
 		},
@@ -99,7 +102,7 @@ func TestParseCoverageLine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			file, stmts, count, err := parseCoverageLine(tt.input)
+			file, block, stmts, count, err := parseCoverageLine(tt.input)
 			if tt.err {
 				if err == nil {
 					t.Error("expected error")
@@ -111,6 +114,9 @@ func TestParseCoverageLine(t *testing.T) {
 			}
 			if file != tt.file {
 				t.Errorf("file = %q, want %q", file, tt.file)
+			}
+			if block != tt.block {
+				t.Errorf("block = %q, want %q", block, tt.block)
 			}
 			if stmts != tt.stmts {
 				t.Errorf("stmts = %d, want %d", stmts, tt.stmts)

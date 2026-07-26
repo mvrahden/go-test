@@ -32,11 +32,16 @@ func ParseCoverageProfile(path string) (*CoverageReport, error) {
 }
 
 func parseCoverageReader(r io.Reader) (*CoverageReport, error) {
-	type pkgAccum struct {
-		covered int
-		total   int
+	// Deduplicate blocks first: merged profiles (e.g. concatenated per-suite
+	// profiles with -coverpkg overlap) can repeat the same block. Count each
+	// unique file+range once, keeping the maximum execution count, matching
+	// go tool cover behavior.
+	type blockInfo struct {
+		file  string
+		stmts int
+		count int
 	}
-	pkgs := map[string]*pkgAccum{}
+	blocks := map[string]*blockInfo{}
 
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
@@ -45,24 +50,38 @@ func parseCoverageReader(r io.Reader) (*CoverageReport, error) {
 			continue
 		}
 
-		file, stmts, count, err := parseCoverageLine(line)
+		file, block, stmts, count, err := parseCoverageLine(line)
 		if err != nil {
 			continue
 		}
 
-		pkg := coveragePackage(file)
+		key := file + ":" + block
+		if b := blocks[key]; b == nil {
+			blocks[key] = &blockInfo{file: file, stmts: stmts, count: count}
+		} else if count > b.count {
+			b.count = count
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	type pkgAccum struct {
+		covered int
+		total   int
+	}
+	pkgs := map[string]*pkgAccum{}
+	for _, b := range blocks {
+		pkg := coveragePackage(b.file)
 		acc := pkgs[pkg]
 		if acc == nil {
 			acc = &pkgAccum{}
 			pkgs[pkg] = acc
 		}
-		acc.total += stmts
-		if count > 0 {
-			acc.covered += stmts
+		acc.total += b.stmts
+		if b.count > 0 {
+			acc.covered += b.stmts
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
 	}
 
 	var totalCovered, totalStmts int
@@ -99,39 +118,40 @@ func parseCoverageReader(r io.Reader) (*CoverageReport, error) {
 
 // parseCoverageLine parses a Go coverage profile line.
 // Format: file:startLine.startCol,endLine.endCol numStatements count
-func parseCoverageLine(line string) (file string, stmts int, count int, err error) {
+func parseCoverageLine(line string) (file, block string, stmts int, count int, err error) {
 	line = strings.TrimSpace(line)
 	if line == "" {
-		return "", 0, 0, fmt.Errorf("empty line")
+		return "", "", 0, 0, fmt.Errorf("empty line")
 	}
 
 	lastSpace := strings.LastIndex(line, " ")
 	if lastSpace < 0 {
-		return "", 0, 0, fmt.Errorf("invalid format")
+		return "", "", 0, 0, fmt.Errorf("invalid format")
 	}
 	count, err = strconv.Atoi(line[lastSpace+1:])
 	if err != nil {
-		return "", 0, 0, err
+		return "", "", 0, 0, err
 	}
 	rest := line[:lastSpace]
 
 	lastSpace = strings.LastIndex(rest, " ")
 	if lastSpace < 0 {
-		return "", 0, 0, fmt.Errorf("invalid format")
+		return "", "", 0, 0, fmt.Errorf("invalid format")
 	}
 	stmts, err = strconv.Atoi(rest[lastSpace+1:])
 	if err != nil {
-		return "", 0, 0, err
+		return "", "", 0, 0, err
 	}
 	rest = rest[:lastSpace]
 
 	colonIdx := strings.LastIndex(rest, ":")
 	if colonIdx < 0 {
-		return "", 0, 0, fmt.Errorf("invalid format")
+		return "", "", 0, 0, fmt.Errorf("invalid format")
 	}
 	file = rest[:colonIdx]
+	block = rest[colonIdx+1:]
 
-	return file, stmts, count, nil
+	return file, block, stmts, count, nil
 }
 
 func coveragePackage(file string) string {
