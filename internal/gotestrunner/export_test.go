@@ -28,6 +28,7 @@ var ExportOverlayContentHash = overlayContentHash
 var ExportCacheRoot = cacheRoot
 var ExportFilterPackageLevelEvents = filterPackageLevelEvents
 var ExportIsPackageSummaryLine = protocol.IsPackageSummaryLine
+var ResolveBenchParallelismForTest = resolveMaxParallel
 
 // ExportProcessPID and ExportProcessDone let the teardown tests observe the
 // shared fixture subprocess directly: whether it is still alive, and when it is

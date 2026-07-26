@@ -787,6 +787,121 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 			gotest.Equal(it, goPath, cmd.Path)
 		})
 	})
+
+	t.When("bench mode", func(w *gotest.T) {
+		ctx := context.Background()
+
+		w.It("targets Benchmark<Suite> and disables tests", func(it *gotest.T) {
+			target := gotestrunner.SuiteTarget{
+				SuiteSpec:  gotestrunner.SuiteSpec{SuiteName: "BenchTestSuite", Package: "example.com/p", Dir: it.TempDir()},
+				BinaryPath: "/tmp/bin.test",
+				Bench:      true,
+			}
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, nil, false)
+			gotest.Contains(it, cmd.Args, "-test.run=^$")
+			gotest.Contains(it, cmd.Args, "-test.bench=^BenchmarkBenchTestSuite$")
+			gotest.Contains(it, cmd.Args, "-test.benchmem")
+		})
+
+		w.It("quotes regex-special characters in the suite name", func(it *gotest.T) {
+			target := gotestrunner.SuiteTarget{
+				SuiteSpec:  gotestrunner.SuiteSpec{SuiteName: "Foo.Bar+Baz", Package: "example.com/p"},
+				BinaryPath: "/tmp/bin.test",
+				Bench:      true,
+			}
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, nil, false)
+			gotest.Contains(it, cmd.Args, `-test.bench=^BenchmarkFoo\.Bar\+Baz$`)
+		})
+
+		w.It("does not append -test.benchmem when the user already passed one", func(it *gotest.T) {
+			target := gotestrunner.SuiteTarget{
+				SuiteSpec:  gotestrunner.SuiteSpec{SuiteName: "BenchTestSuite", Package: "example.com/p"},
+				BinaryPath: "/tmp/bin.test",
+				Bench:      true,
+				RunFlags:   []string{"-test.benchmem", "-test.benchtime=2x"},
+			}
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, nil, false)
+			count := 0
+			for _, a := range cmd.Args {
+				if a == "-test.benchmem" {
+					count++
+				}
+			}
+			gotest.Equal(it, 1, count, "expected exactly one -test.benchmem, got args: %v", cmd.Args)
+			gotest.Contains(it, cmd.Args, "-test.benchtime=2x")
+		})
+
+		w.It("ignores RunFilter when Bench is set", func(it *gotest.T) {
+			target := gotestrunner.SuiteTarget{
+				SuiteSpec:  gotestrunner.SuiteSpec{SuiteName: "BenchTestSuite", Package: "example.com/p", RunFilter: "^TestFoo$/^Bar$"},
+				BinaryPath: "/tmp/bin.test",
+				Bench:      true,
+			}
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, nil, false)
+			gotest.Contains(it, cmd.Args, "-test.run=^$")
+			gotest.NotContains(it, cmd.Args, "-test.run=^TestFoo$/^Bar$")
+		})
+	})
+}
+
+func (s *GotestrunnerTestSuite) TestBuildBenchTargets(t *gotest.T) {
+	compiled := []gotestrunner.CompileResult{
+		{Package: "example.com/pkg", BinaryPath: "/tmp/pkg.test"},
+	}
+	dirsByPkg := map[string]string{"example.com/pkg": "/src/pkg"}
+
+	t.When("building targets from benchesByPkg", func(w *gotest.T) {
+		w.It("builds a Bench target per suite with the bare suite name", func(it *gotest.T) {
+			benchesByPkg := map[string][]string{"example.com/pkg": {"BenchTestSuite"}}
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "")
+			gotest.Len(it, targets, 1)
+			gotest.True(it, targets[0].Bench)
+			gotest.Equal(it, "BenchTestSuite", targets[0].SuiteName)
+			gotest.Equal(it, "example.com/pkg", targets[0].Package)
+			gotest.Equal(it, "/src/pkg", targets[0].Dir)
+			gotest.Equal(it, "/tmp/pkg.test", targets[0].BinaryPath)
+		})
+
+		w.It("skips packages with no compiled binary", func(it *gotest.T) {
+			benchesByPkg := map[string][]string{"example.com/other": {"BenchTestSuite"}}
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "")
+			gotest.Empty(it, targets)
+		})
+
+		w.It("filters by userRunFilter (-run) matching Benchmark<Suite>", func(it *gotest.T) {
+			benchesByPkg := map[string][]string{"example.com/pkg": {"BenchTestSuite", "OtherSuite"}}
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "^BenchmarkBenchTestSuite$", "")
+			gotest.Len(it, targets, 1)
+			gotest.Equal(it, "BenchTestSuite", targets[0].SuiteName)
+		})
+
+		w.It("filters by userBenchFilter (-bench) matching Benchmark<Suite>", func(it *gotest.T) {
+			benchesByPkg := map[string][]string{"example.com/pkg": {"BenchTestSuite", "OtherSuite"}}
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "OtherSuite")
+			gotest.Len(it, targets, 1)
+			gotest.Equal(it, "OtherSuite", targets[0].SuiteName)
+		})
+
+		w.It("AND-composes -run and -bench when both are set", func(it *gotest.T) {
+			benchesByPkg := map[string][]string{"example.com/pkg": {"Foo", "Bar", "Baz"}}
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "^Benchmark(Foo|Bar)$", "Foo")
+			gotest.Len(it, targets, 1)
+			gotest.Equal(it, "Foo", targets[0].SuiteName)
+		})
+
+		w.It("includes all targets when neither filter is set", func(it *gotest.T) {
+			benchesByPkg := map[string][]string{"example.com/pkg": {"Foo", "Bar", "Baz"}}
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "")
+			gotest.Len(it, targets, 3)
+		})
+
+		w.It("translates run flags to -test. prefixed form", func(it *gotest.T) {
+			benchesByPkg := map[string][]string{"example.com/pkg": {"BenchTestSuite"}}
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, []string{"-benchtime=2x"}, "", "")
+			gotest.Len(it, targets, 1)
+			gotest.Contains(it, targets[0].RunFlags, "-test.benchtime=2x")
+		})
+	})
 }
 
 // --- OutputCollector tests ---
@@ -1459,6 +1574,99 @@ func (s *GotestrunnerTestSuite) TestInjectParallel(t *gotest.T) {
 		got := gotestrunner.InjectParallel(tc.flags, tc.n)
 		gotest.Equal(sub, tc.expect, got)
 	}
+}
+
+func (s *GotestrunnerTestSuite) TestExtractBenchFilter(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Name   string
+		flags  []string
+		expect string
+	}{
+		{"empty", nil, ""},
+		{"not present", []string{"-v", "-timeout=10m"}, ""},
+		{"equals form", []string{"-bench=Foo"}, "Foo"},
+		{"space form", []string{"-bench", "Foo", "-v"}, "Foo"},
+		{"stops at -args", []string{"-args", "-bench=Foo"}, ""},
+	}) {
+		got := gotestrunner.ExtractBenchFilter(tc.flags)
+		gotest.Equal(sub, tc.expect, got)
+	}
+}
+
+func (s *GotestrunnerTestSuite) TestStripBenchFilter(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Name   string
+		flags  []string
+		expect []string
+	}{
+		{"empty", nil, nil},
+		{"equals form", []string{"-bench=Foo", "-v"}, []string{"-v"}},
+		{"space form", []string{"-bench", "Foo", "-v"}, []string{"-v"}},
+		{"leaves other flags untouched", []string{"-benchtime=2x", "-count=1"}, []string{"-benchtime=2x", "-count=1"}},
+		{"does not strip past -args", []string{"-v", "-args", "-bench=Foo"}, []string{"-v", "-args", "-bench=Foo"}},
+	}) {
+		got := gotestrunner.StripBenchFilter(tc.flags)
+		gotest.Equal(sub, tc.expect, got)
+	}
+}
+
+func (s *GotestrunnerTestSuite) TestResolveBenchParallelism(t *gotest.T) {
+	t.When("resolving dispatch concurrency", func(w *gotest.T) {
+		w.It("forces serial dispatch (1) in bench mode regardless of budget", func(it *gotest.T) {
+			cfg := gotestrunner.PipelineConfig{Bench: true, Parallel: 8}
+			runFlags := []string{}
+			got := gotestrunner.ResolveBenchParallelismForTest(cfg, &runFlags, 5)
+			gotest.Equal(it, 1, got)
+		})
+
+		w.It("does not inject -parallel into run flags in bench mode", func(it *gotest.T) {
+			cfg := gotestrunner.PipelineConfig{Bench: true}
+			runFlags := []string{"-v"}
+			gotestrunner.ResolveBenchParallelismForTest(cfg, &runFlags, 5)
+			gotest.Equal(it, []string{"-v"}, runFlags)
+		})
+
+		w.It("falls back to computeDispatchConcurrency (with intra-injection) outside bench mode", func(it *gotest.T) {
+			cfg := gotestrunner.PipelineConfig{Bench: false}
+			runFlags := []string{}
+			got := gotestrunner.ResolveBenchParallelismForTest(cfg, &runFlags, 4)
+			gotest.True(it, got > 0)
+			found := false
+			for _, f := range runFlags {
+				if strings.HasPrefix(f, "-parallel") {
+					found = true
+				}
+			}
+			gotest.True(it, found, "expected -parallel to be injected outside bench mode, got %v", runFlags)
+		})
+	})
+}
+
+func (s *GotestrunnerTestSuite) TestBenchFilterNeverReachesTargetRunFlags(t *gotest.T) {
+	t.When("a user -bench filter is present in raw run flags", func(w *gotest.T) {
+		w.It("is extracted and stripped before BuildBenchTargets so it never leaks into RunFlags", func(it *gotest.T) {
+			rawRunFlags := []string{"-bench=Foo", "-benchtime=2x"}
+			userBenchFilter := gotestrunner.ExtractBenchFilter(rawRunFlags)
+			runFlags := gotestrunner.StripBenchFilter(rawRunFlags)
+
+			gotest.Equal(it, "Foo", userBenchFilter)
+			gotest.NotContains(it, runFlags, "-bench=Foo")
+
+			compiled := []gotestrunner.CompileResult{
+				{Package: "example.com/pkg", BinaryPath: "/tmp/pkg.test"},
+			}
+			benchesByPkg := map[string][]string{"example.com/pkg": {"Foo"}}
+			dirsByPkg := map[string]string{"example.com/pkg": "/src/pkg"}
+
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, runFlags, "", userBenchFilter)
+			gotest.Len(it, targets, 1)
+			for _, f := range targets[0].RunFlags {
+				leaked := f == "-test.bench" || strings.HasPrefix(f, "-test.bench=")
+				gotest.False(it, leaked, "user -bench leaked into target RunFlags: %v", targets[0].RunFlags)
+			}
+			gotest.Contains(it, targets[0].RunFlags, "-test.benchtime=2x")
+		})
+	})
 }
 
 var jsonTimestampRe = regexp.MustCompile(`\d+\.\d+s`)

@@ -43,6 +43,18 @@ func computeDispatchConcurrency(runFlags *[]string, budget, totalSuites int) int
 	return inter
 }
 
+// resolveMaxParallel computes the dispatch concurrency for a batch run. In
+// bench mode, dispatch is always serial (1) — benchmarks must not run
+// concurrently with each other for meaningful timing — and this entirely
+// skips computeDispatchConcurrency's -parallel intra-injection, since
+// benchmark suites must not be told to run their methods in parallel either.
+func resolveMaxParallel(cfg PipelineConfig, runFlags *[]string, totalSuites int) int { //nolint:gocritic // hugeParam: stable API
+	if cfg.Bench {
+		return 1
+	}
+	return computeDispatchConcurrency(runFlags, cfg.Parallel, totalSuites)
+}
+
 type PipelineConfig struct {
 	GoTestArgs      []string
 	SetupTimeout    time.Duration
@@ -52,6 +64,8 @@ type PipelineConfig struct {
 	CompileParallel int
 	Streaming       bool
 	OutputMode      RunMode
+	Bench           bool
+	BenchesByPkg    map[string][]string
 }
 
 type PipelineResult struct {
@@ -138,6 +152,10 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 		}
 	}
 	pf := ParseExecFlags(cfg.GoTestArgs)
+
+	if cfg.Bench {
+		cfg.Streaming = false
+	}
 
 	if cfg.Streaming {
 		return runStreaming(ctx, cfg, overlay, pf)
@@ -282,9 +300,28 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	if cfg.OutputMode == RunCaptureJSON {
 		runFlags = append(append([]string(nil), runFlags...), "-v")
 	}
-	maxParallel := computeDispatchConcurrency(&runFlags, cfg.Parallel, totalSuites)
 
-	targets := BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, runFlags, pf.UserRunFilter)
+	var targets []SuiteTarget
+	var maxParallel int
+	if cfg.Bench {
+		// A user-supplied -bench value arrives in RunFlags via normal flag
+		// classification. It must not reach buildSuiteCmd as a raw
+		// -test.bench flag — that would be appended after the generated
+		// -test.bench=^Benchmark<Suite>$ and silently win, defeating
+		// per-suite scoping. Extract and strip it here, then feed it to
+		// BuildBenchTargets as a bench-name filter, matched against
+		// Benchmark<Suite>. -run (pf.UserRunFilter) is passed through
+		// alongside it as an independent suite filter — both compose with
+		// AND semantics, e.g. `gotest bench ./pkg/parser -run Parse`
+		// filters by suite while -bench filters by benchmark name.
+		userBenchFilter := ExtractBenchFilter(runFlags)
+		runFlags = StripBenchFilter(runFlags)
+		targets = BuildBenchTargets(compiled, cfg.BenchesByPkg, overlay.DirsByPkg, runFlags, pf.UserRunFilter, userBenchFilter)
+		maxParallel = resolveMaxParallel(cfg, &runFlags, totalSuites)
+	} else {
+		maxParallel = resolveMaxParallel(cfg, &runFlags, totalSuites)
+		targets = BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, runFlags, pf.UserRunFilter)
+	}
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg

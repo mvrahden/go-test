@@ -31,6 +31,8 @@ func showHelp(topic string) {
 		printSummaryHelp()
 	case "watch":
 		printWatchHelp()
+	case "bench":
+		printBenchHelp()
 	case "discover":
 		printDiscoverHelp()
 	case "scaffold":
@@ -65,6 +67,7 @@ Usage:
   gotest <subcommand> [flags] [packages...]
 
 Subcommands:
+  bench       Run BenchmarkX suite methods serially
   spec        Render behavioral specification from test output
   summary     Show failure-focused test summary for CI
   watch       Watch for file changes and re-run tests
@@ -255,6 +258,56 @@ Examples:
   gotest watch ./pkg/auth/... -v             Watch with verbose output
   gotest watch ./... --spec                  Spec view on every change
   gotest watch --debounce=500ms ./...        Slower debounce for large projects
+`)
+}
+
+func printBenchHelp() {
+	fmt.Print(`gotest bench — run BenchmarkX suite methods
+
+Usage:
+  gotest bench [flags] [--] [go-test-flags] [packages...]
+
+Discovers suites containing BenchmarkX methods and runs each suite's
+generated Benchmark<SuiteName> wrapper via "go test -bench". Benchmark
+suites always dispatch serially, one at a time, regardless of --parallel
+or -test.parallel — running benchmarks concurrently would make their
+timing results meaningless. --min is not available in bench mode;
+-coverprofile is still supported and profiles are merged as usual.
+
+The standard go test flag -test.benchmem is enabled by default, so every
+benchmark line reports allocations (B/op, allocs/op) alongside ns/op.
+
+Flags:
+  --spec                  Render spec view instead of raw benchmark output
+  --no-color              Disable ANSI color codes (with --spec)
+  --debug                 Keep generated overlay for inspection
+  --no-cache              Disable overlay cache, force fresh generation
+  --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
+  --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
+
+All standard go test flags (-single-dash) are forwarded automatically.
+Use a bare "--" to pass unrecognized flags without validation.
+
+Filtering:
+  -bench=<regexp>         Select which benchmark suites run, matched against
+                           each suite's Benchmark<SuiteName> wrapper name
+  -benchtime=<x>          Iterations or duration per benchmark (e.g. 100x, 2s)
+  -count=<n>              Run each benchmark n times
+
+Note: -run and -bench both filter which suites run in bench mode, matched
+against each suite's Benchmark<SuiteName> wrapper name — -run the same
+way it scopes suites for "gotest test", -bench by benchmark function
+name. When both are given, a suite must match both to run (e.g.
+"gotest bench ./pkg/parser -run Parse" filters by suite).
+
+If no packages contain any BenchmarkX methods, prints "no benchmarks
+found" and exits 0 without invoking go test.
+
+Examples:
+  gotest bench ./...                          Run all benchmark suites
+  gotest bench ./pkg/auth/... -benchtime=2s   Longer per-benchmark budget
+  gotest bench -bench=Cache ./...             Only suites matching "Cache"
+  gotest bench --spec ./...                   Spec-style rendering
 `)
 }
 

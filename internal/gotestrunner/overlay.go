@@ -29,6 +29,7 @@ type OverlayResult struct {
 	NoSuitePackages                []string
 	StdlibTestsByPkg               map[string]int // stdlib func TestX counts per package — gotest reports but does not run them
 	SuitesByPkg                    map[string][]string
+	BenchesByPkg                   map[string][]string
 	DirsByPkg                      map[string]string
 	SkippedSuitesByPkg             map[string][]string
 	FixtureDepSuites               map[string]map[string]bool
@@ -71,6 +72,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 	var noSuitePkgs []string
 	stdlibByPkg := map[string]int{}
 	suitesByPkg := map[string][]string{}
+	benchesByPkg := map[string][]string{}
 	dirsByPkg := map[string]string{}
 	skippedSuitesByPkg := map[string][]string{}
 	fixtureDepSuites := map[string]map[string]bool{}
@@ -86,6 +88,9 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		}
 		if len(r.SuiteNames) > 0 {
 			suitesByPkg[r.PkgPath] = r.SuiteNames
+		}
+		if len(r.BenchSuiteNames) > 0 {
+			benchesByPkg[r.PkgPath] = r.BenchSuiteNames
 		}
 		if r.AbsPath != "" {
 			dirsByPkg[r.PkgPath] = r.AbsPath
@@ -115,6 +120,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		NoSuitePackages:                noSuitePkgs,
 		StdlibTestsByPkg:               stdlibByPkg,
 		SuitesByPkg:                    suitesByPkg,
+		BenchesByPkg:                   benchesByPkg,
 		DirsByPkg:                      dirsByPkg,
 		SkippedSuitesByPkg:             skippedSuitesByPkg,
 		FixtureDepSuites:               fixtureDepSuites,

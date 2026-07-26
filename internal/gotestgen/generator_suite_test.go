@@ -58,6 +58,35 @@ func (s *GeneratorTestSuite) TestE2ECLI(t *gotest.T) {
 	})
 }
 
+func (s *GeneratorTestSuite) TestGenerateFromLoaded_BenchSuiteNames(t *gotest.T) {
+	t.When("a suite has effective benchmark methods", func(w *gotest.T) {
+		w.It("includes the suite identifier in BenchSuiteNames", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_BenchmarkMethod")
+			loaded := []*gotestgen.LoadResult{
+				{PkgPath: pkg.PkgPath, PkgDir: "/fake/dir", Ptest: pkg},
+			}
+			results, _, err := gotestgen.GenerateFromLoaded(loaded)
+			gotest.NoError(it, err)
+			gotest.Len(it, results, 1)
+			gotest.Contains(it, results[0].SuiteNames, "BenchTestSuite")
+			gotest.Contains(it, results[0].BenchSuiteNames, "BenchTestSuite")
+		})
+	})
+
+	t.When("a suite has no benchmark methods", func(w *gotest.T) {
+		w.It("excludes the suite identifier from BenchSuiteNames", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteGuard_Detected")
+			loaded := []*gotestgen.LoadResult{
+				{PkgPath: pkg.PkgPath, PkgDir: "/fake/dir", Ptest: pkg},
+			}
+			results, _, err := gotestgen.GenerateFromLoaded(loaded)
+			gotest.NoError(it, err)
+			gotest.Len(it, results, 1)
+			gotest.Empty(it, results[0].BenchSuiteNames)
+		})
+	})
+}
+
 func (s *GeneratorTestSuite) TestE2ENoTestSuites(t *gotest.T) {
 	t.When("packages without test suites", func(w *gotest.T) {
 		for sub, tC := range gotest.Each(w, []struct {
