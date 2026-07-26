@@ -363,6 +363,11 @@ those replay as regular subtests, at zero extra cost, without -fuzz and
 without this subcommand. Reach for "gotest fuzz" specifically to spend time
 mutating and searching for new failing inputs.
 
+"gotest lint" flags common fuzz-writing mistakes: fuzz-determinism (reading
+time.Now/math-rand/os.Getenv from a fuzz target breaks corpus replay),
+fuzz-no-oracle (a callback that asserts nothing only catches panics), and
+fuzz-seed (no f.Add seeds means coverage-guided exploration starts blind).
+
 Flags:
   --for=<dur>             Total fuzz time budget, split evenly across all
                            targets (each target's share floors at 10s). When
@@ -476,17 +481,62 @@ func printScaffoldHelp() {
 
 Usage:
   gotest scaffold <target>
+  gotest scaffold --fuzz <./pkg/path.FuncName>
 
 Target is one of:
   ./pkg/path.TypeName      Generate suite for a specific type
   ./pkg/path/file.go       Generate a suite over the file's exported functions
+  ./pkg/path.FuncName      With --fuzz: generate a fuzz skeleton for a
+                           single-parameter package-level function
 
 Creates a new _test.go file with a suite struct, a runner function,
 and stub methods for each exported method on the target type.
 
+Flags:
+  --fuzz    Scaffold a Fuzz<Func> method for a package-level function
+            instead of a type/file suite (see below)
+
+--fuzz (round-trip and crash-safety skeletons):
+
+Looks for an inverse of the target function by name — Marshal<->Unmarshal,
+Encode<->Decode, Parse<->Format, Parse<->String, and same-suffix prefix
+pairs like ParseJSON<->FormatJSON — then checks the two signatures are
+actually compatible inverses: f: A -> (B[, error]) and g: B -> (A[, error]),
+modulo the error result, compared with go/types' Identical (so two named
+types with the same underlying type never match).
+
+When a compatible inverse is found and A is one of Go's natively fuzzable
+types (string, []byte, bool, and the int/uint/float variants), the
+generated method seeds a corpus entry and asserts the round-trip property
+— decoding what was just encoded returns the original input:
+
+  func (s *EncodeTestSuite) FuzzEncode(f *gotest.F) {
+      f.Add("")
+      gotest.Fuzz(f, func(t *gotest.T, in string) {
+          encoded, err := Encode(in)
+          if err != nil {
+              return
+          }
+          decoded, err := Decode(encoded)
+          gotest.NoError(t, err)
+          gotest.Equal(t, in, decoded) // round-trip property
+      })
+  }
+
+When no compatible inverse is found (but A is still natively fuzzable), it
+falls back to a crash-safety skeleton that only calls the function — no
+assertions beyond "doesn't panic" — and prints:
+  no inverse pair found for Encode — generated crash-safety skeleton
+
+When A itself isn't a natively fuzzable type (a struct, say), neither
+skeleton can call gotest.Fuzz on it — struct fuzzing isn't supported yet
+— so scaffold instead emits a stub method with a TODO comment, and prints:
+  MyStruct is not natively fuzzable for Encode — generated TODO stub (struct fuzzing is not yet supported)
+
 Examples:
   gotest scaffold ./pkg/auth.UserService        Suite for UserService type
   gotest scaffold ./pkg/auth/service.go         Suite over the file's exported functions
+  gotest scaffold --fuzz ./pkg/codec.Encode     Fuzz skeleton for Encode
 `)
 }
 

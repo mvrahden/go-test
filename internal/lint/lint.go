@@ -40,6 +40,9 @@ const (
 	SuiteLifecycle     Rule = "suite-lifecycle"
 	BenchLoop          Rule = "bench-loop"
 	BenchFixtureIO     Rule = "bench-fixture-io"
+	FuzzDeterminism    Rule = "fuzz-determinism"
+	FuzzNoOracle       Rule = "fuzz-no-oracle"
+	FuzzSeed           Rule = "fuzz-seed"
 )
 
 // Tier classifies what breaks when a rule's finding is ignored, and derives
@@ -168,6 +171,9 @@ func run(pass *analysis.Pass) (any, error) {
 	checkRedundantAssertion(pass, insp, cl)
 	checkBenchLoop(pass, insp, suites)
 	checkBenchFixtureIO(pass, insp, suites)
+	checkFuzzDeterminism(pass, insp, suites)
+	checkFuzzNoOracle(pass, insp, suites)
+	checkFuzzSeed(pass, insp, suites)
 
 	return nil, nil
 }

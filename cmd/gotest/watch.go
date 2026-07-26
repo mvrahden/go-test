@@ -330,7 +330,6 @@ func benchDeltaLines(results []gotestbench.Result, prevNs map[string]float64) (l
 		nextNs[key] = mean
 	}
 	return lines, nextNs
->>>>>>> 2b480de (feat(watch,lint,discover,vscode): benchmark DX surfaces)
 }
 
 func addWatchDirs(w *fsnotify.Watcher, pattern string) {

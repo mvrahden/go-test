@@ -93,6 +93,12 @@ func (s *LintTestSuite) TestAnalyzer(t *gotest.T) {
 			analysistest.Run(it.T(), testdata, lint.Analyzer, "bench")
 		})
 	})
+
+	t.When("fuzz methods", func(w *gotest.T) {
+		w.It("detects fuzz-determinism, fuzz-no-oracle, and fuzz-seed violations", func(it *gotest.T) {
+			analysistest.Run(it.T(), testdata, lint.Analyzer, "fuzz")
+		})
+	})
 }
 
 func (s *LintTestSuite) TestDisableNolintFlag(t *gotest.T) {

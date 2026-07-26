@@ -32,6 +32,18 @@ func (b *B) ReportAllocs()                     {}
 func (b *B) Errorf(format string, args ...any) {}
 func (b *B) FailNow()                          {}
 
+type F struct{}
+
+func (f *F) F() *testing.F                     { return nil }
+func (f *F) Add(args ...any)                   {}
+func (f *F) Errorf(format string, args ...any) {}
+func (f *F) FailNow()                          {}
+func (f *F) Skipf(format string, args ...any)  {}
+
+func Fuzz[A any](f *F, fn func(*T, A))              {}
+func Fuzz2[A, B any](f *F, fn func(*T, A, B))       {}
+func Fuzz3[A, B, C any](f *F, fn func(*T, A, B, C)) {}
+
 type testingT interface {
 	Errorf(format string, args ...any)
 	FailNow()

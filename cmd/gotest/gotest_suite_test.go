@@ -1182,6 +1182,83 @@ func (s *CmdGotestTestSuite) TestFuzzSubcommand(t *gotest.T) {
 	})
 }
 
+// runScaffoldFuzzCLI writes files (module + a single "codec.go" source) to
+// an isolated temp module and runs "gotest scaffold --fuzz" from inside it,
+// so the command's writeScaffoldFile output never touches the real repo.
+func (s *CmdGotestTestSuite) runScaffoldFuzzCLI(t *gotest.T, codecSrc, funcName string) (string, int, string) { //nolint:gocritic // hugeParam: test helper
+	dir := t.TempDir()
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module fuzzscaffold\n\ngo 1.24\n"), 0644)) //nolint:gosec // G306: throwaway test module
+	gotest.NoError(t, os.MkdirAll(filepath.Join(dir, "codec"), 0755))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "codec", "codec.go"), []byte(codecSrc), 0644)) //nolint:gosec // G306: throwaway test module
+
+	cmd := exec.Command(s.binary, "scaffold", "--fuzz", "./codec."+funcName) //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	var exitErr *exec.ExitError
+	if err != nil && !errors.As(err, &exitErr) {
+		t.T().Fatalf("running gotest binary: %v\n%s", err, out)
+	}
+	code := 0
+	if cmd.ProcessState != nil {
+		code = cmd.ProcessState.ExitCode()
+	}
+	return string(out), code, dir
+}
+
+func (s *CmdGotestTestSuite) TestScaffoldFuzzSubcommand(t *gotest.T) {
+	t.It("generates a round-trip skeleton for a found inverse pair", func(it *gotest.T) {
+		out, code, dir := s.runScaffoldFuzzCLI(it, `package codec
+
+func Encode(s string) ([]byte, error) { return []byte(s), nil }
+func Decode(b []byte) (string, error) { return string(b), nil }
+`, "Encode")
+		gotest.Equal(it, 0, code)
+		gotest.Contains(it, out, "Generated: codec/encode_fuzz_test.go")
+
+		generated, err := os.ReadFile(filepath.Join(dir, "codec", "encode_fuzz_test.go"))
+		gotest.NoError(it, err)
+		src := string(generated)
+		gotest.Contains(it, src, "gotest.Fuzz(")
+		gotest.Contains(it, src, "Encode")
+		gotest.Contains(it, src, "Decode")
+		gotest.Contains(it, src, "gotest.Equal(t, in, decoded) // round-trip property")
+	})
+
+	t.It("falls back to a crash-safety skeleton when no inverse pair exists", func(it *gotest.T) {
+		out, code, dir := s.runScaffoldFuzzCLI(it, `package codec
+
+func Render(n int) string { return "" }
+`, "Render")
+		gotest.Equal(it, 0, code)
+		gotest.Contains(it, out, "no inverse pair found for Render — generated crash-safety skeleton")
+		gotest.Contains(it, out, "Generated: codec/render_fuzz_test.go")
+
+		generated, err := os.ReadFile(filepath.Join(dir, "codec", "render_fuzz_test.go"))
+		gotest.NoError(it, err)
+		src := string(generated)
+		gotest.Contains(it, src, "gotest.Fuzz(")
+		gotest.Contains(it, src, "Render(in)")
+	})
+
+	t.It("falls back to a TODO stub when the parameter isn't natively fuzzable", func(it *gotest.T) {
+		out, code, dir := s.runScaffoldFuzzCLI(it, `package codec
+
+type Config struct{ Name string }
+
+func ApplyConfig(c Config) string { return c.Name }
+`, "ApplyConfig")
+		gotest.Equal(it, 0, code)
+		gotest.Contains(it, out, "codec.Config is not natively fuzzable for ApplyConfig — generated TODO stub (struct fuzzing is not yet supported)")
+		gotest.Contains(it, out, "Generated: codec/apply_config_fuzz_test.go")
+
+		generated, err := os.ReadFile(filepath.Join(dir, "codec", "apply_config_fuzz_test.go"))
+		gotest.NoError(it, err)
+		src := string(generated)
+		gotest.NotContains(it, src, "gotest.Fuzz(")
+		gotest.Contains(it, src, "not natively fuzzable")
+	})
+}
+
 func (s *CmdGotestTestSuite) TestBenchSaveAgainstGate(t *gotest.T) {
 	t.It("saves a baseline with one Sample per -count repetition", func(it *gotest.T) {
 		dir := it.TempDir()
