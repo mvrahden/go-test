@@ -1152,6 +1152,14 @@ func (s *CmdGotestTestSuite) TestBenchSubcommand(t *gotest.T) {
 	})
 }
 
+func (s *CmdGotestTestSuite) TestFuzzSubcommand(t *gotest.T) {
+	t.It("reports when no fuzz targets exist", func(it *gotest.T) {
+		out, code := s.runCLIExit(it, "fuzz", "./internal/protocol")
+		gotest.Contains(it, out, "no fuzz targets found")
+		gotest.Equal(it, 0, code)
+	})
+}
+
 func (s *CmdGotestTestSuite) TestBenchSaveAgainstGate(t *gotest.T) {
 	t.It("saves a baseline with one Sample per -count repetition", func(it *gotest.T) {
 		dir := it.TempDir()

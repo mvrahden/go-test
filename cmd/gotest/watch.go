@@ -230,6 +230,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench
 		OutputMode:      mode,
 		Bench:           bench,
 		BenchesByPkg:    overlay.BenchesByPkg,
+		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

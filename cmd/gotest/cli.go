@@ -52,6 +52,8 @@ func main() {
 		os.Exit(runWatch(inv))
 	case "bench":
 		os.Exit(runBench(inv))
+	case "fuzz":
+		os.Exit(runFuzz(inv))
 	case "refactor":
 		os.Exit(runRefactor(inv))
 	case "lint":

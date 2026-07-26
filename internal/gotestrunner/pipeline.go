@@ -66,6 +66,7 @@ type PipelineConfig struct {
 	OutputMode      RunMode
 	Bench           bool
 	BenchesByPkg    map[string][]string
+	FuzzFuncsByPkg  map[string]map[string][]string
 }
 
 type PipelineResult struct {
@@ -320,7 +321,7 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		maxParallel = resolveMaxParallel(cfg, &runFlags, totalSuites)
 	} else {
 		maxParallel = resolveMaxParallel(cfg, &runFlags, totalSuites)
-		targets = BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, runFlags, pf.UserRunFilter)
+		targets = BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, runFlags, pf.UserRunFilter)
 	}
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
@@ -473,7 +474,7 @@ loop:
 
 		singleCompiled := []CompileResult{cr}
 		singleSuites := map[string][]string{cr.Package: overlay.SuitesByPkg[cr.Package]}
-		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, pf.RunFlags, pf.UserRunFilter)
+		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, pf.RunFlags, pf.UserRunFilter)
 
 		if len(targets) == 0 {
 			continue

@@ -842,6 +842,67 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 			gotest.NotContains(it, cmd.Args, "-test.run=^TestFoo$/^Bar$")
 		})
 	})
+
+	t.When("fuzz seed replay", func(w *gotest.T) {
+		ctx := context.Background()
+
+		w.It("composes an alternation of the suite name and every fuzz func when no RunFilter is set", func(it *gotest.T) {
+			target := gotestrunner.SuiteTarget{
+				SuiteSpec:  gotestrunner.SuiteSpec{SuiteName: "TestFooSuite", Package: "example.com/p"},
+				BinaryPath: "/tmp/bin.test",
+				FuzzFuncs:  []string{"FuzzFooSuite_A", "FuzzFooSuite_B"},
+			}
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, nil, false)
+			gotest.Contains(it, cmd.Args, "-test.run=^(?:TestFooSuite|FuzzFooSuite_A|FuzzFooSuite_B)$")
+		})
+
+		w.It("leaves a user RunFilter untouched even when fuzz funcs are present", func(it *gotest.T) {
+			target := gotestrunner.SuiteTarget{
+				SuiteSpec:  gotestrunner.SuiteSpec{SuiteName: "TestFooSuite", Package: "example.com/p", RunFilter: "^TestFooSuite$/^Sub$"},
+				BinaryPath: "/tmp/bin.test",
+				FuzzFuncs:  []string{"FuzzFooSuite_A"},
+			}
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, nil, false)
+			gotest.Contains(it, cmd.Args, "-test.run=^TestFooSuite$/^Sub$")
+			for _, a := range cmd.Args {
+				gotest.False(it, strings.Contains(a, "FuzzFooSuite_A"), "user RunFilter must not be widened with fuzz funcs, got arg: %s", a)
+			}
+		})
+
+		w.It("does not affect the run arg when FuzzFuncs is empty", func(it *gotest.T) {
+			target := gotestrunner.SuiteTarget{
+				SuiteSpec:  gotestrunner.SuiteSpec{SuiteName: "TestFooSuite", Package: "example.com/p"},
+				BinaryPath: "/tmp/bin.test",
+			}
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, nil, false)
+			gotest.Contains(it, cmd.Args, "-test.run=^TestFooSuite$")
+		})
+
+		w.It("ignores FuzzFuncs on bench targets", func(it *gotest.T) {
+			target := gotestrunner.SuiteTarget{
+				SuiteSpec:  gotestrunner.SuiteSpec{SuiteName: "BenchTestSuite", Package: "example.com/p"},
+				BinaryPath: "/tmp/bin.test",
+				Bench:      true,
+				FuzzFuncs:  []string{"FuzzBenchTestSuite_A"},
+			}
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, nil, false)
+			gotest.Contains(it, cmd.Args, "-test.run=^$")
+			gotest.Contains(it, cmd.Args, "-test.bench=^BenchmarkBenchTestSuite$")
+			for _, a := range cmd.Args {
+				gotest.False(it, strings.Contains(a, "FuzzBenchTestSuite_A"), "bench mode must ignore FuzzFuncs, got arg: %s", a)
+			}
+		})
+
+		w.It("quotes regex-special characters in fuzz func names", func(it *gotest.T) {
+			target := gotestrunner.SuiteTarget{
+				SuiteSpec:  gotestrunner.SuiteSpec{SuiteName: "TestFooSuite", Package: "example.com/p"},
+				BinaryPath: "/tmp/bin.test",
+				FuzzFuncs:  []string{"FuzzFoo.Bar+Baz"},
+			}
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, nil, false)
+			gotest.Contains(it, cmd.Args, `-test.run=^(?:TestFooSuite|FuzzFoo\.Bar\+Baz)$`)
+		})
+	})
 }
 
 func (s *GotestrunnerTestSuite) TestBuildBenchTargets(t *gotest.T) {
@@ -900,6 +961,43 @@ func (s *GotestrunnerTestSuite) TestBuildBenchTargets(t *gotest.T) {
 			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, []string{"-benchtime=2x"}, "", "")
 			gotest.Len(it, targets, 1)
 			gotest.Contains(it, targets[0].RunFlags, "-test.benchtime=2x")
+		})
+	})
+}
+
+func (s *GotestrunnerTestSuite) TestBuildSuiteTargets(t *gotest.T) {
+	compiled := []gotestrunner.CompileResult{
+		{Package: "example.com/pkg", BinaryPath: "/tmp/pkg.test"},
+	}
+	dirsByPkg := map[string]string{"example.com/pkg": "/src/pkg"}
+
+	t.When("populating FuzzFuncs from fuzzFuncsByPkg", func(w *gotest.T) {
+		w.It("attaches the suite's fuzz func names by pkg+suite", func(it *gotest.T) {
+			suitesByPkg := map[string][]string{"example.com/pkg": {"FooSuite"}}
+			fuzzFuncsByPkg := map[string]map[string][]string{
+				"example.com/pkg": {"FooSuite": {"FuzzFooSuite_A", "FuzzFooSuite_B"}},
+			}
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, nil, "")
+			gotest.Len(it, targets, 1)
+			gotest.Equal(it, "TestFooSuite", targets[0].SuiteName)
+			gotest.Equal(it, []string{"FuzzFooSuite_A", "FuzzFooSuite_B"}, targets[0].FuzzFuncs)
+		})
+
+		w.It("leaves FuzzFuncs empty for a suite absent from fuzzFuncsByPkg", func(it *gotest.T) {
+			suitesByPkg := map[string][]string{"example.com/pkg": {"FooSuite"}}
+			fuzzFuncsByPkg := map[string]map[string][]string{
+				"example.com/pkg": {"OtherSuite": {"FuzzOtherSuite_A"}},
+			}
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, nil, "")
+			gotest.Len(it, targets, 1)
+			gotest.Empty(it, targets[0].FuzzFuncs)
+		})
+
+		w.It("tolerates a nil fuzzFuncsByPkg map", func(it *gotest.T) {
+			suitesByPkg := map[string][]string{"example.com/pkg": {"FooSuite"}}
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, nil, nil, "")
+			gotest.Len(it, targets, 1)
+			gotest.Empty(it, targets[0].FuzzFuncs)
 		})
 	})
 }

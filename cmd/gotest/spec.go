@@ -93,6 +93,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		CompileParallel: cfg.CompileParallel,
 		Streaming:       false,
 		OutputMode:      gotestrunner.RunCaptureJSON,
+		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

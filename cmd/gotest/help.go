@@ -33,6 +33,8 @@ func showHelp(topic string) {
 		printWatchHelp()
 	case "bench":
 		printBenchHelp()
+	case "fuzz":
+		printFuzzHelp()
 	case "discover":
 		printDiscoverHelp()
 	case "scaffold":
@@ -68,6 +70,7 @@ Usage:
 
 Subcommands:
   bench       Run BenchmarkX suite methods serially
+  fuzz        Run FuzzX suite methods with go test -fuzz
   spec        Render behavioral specification from test output
   summary     Show failure-focused test summary for CI
   watch       Watch for file changes and re-run tests
@@ -329,6 +332,65 @@ Examples:
   gotest bench --against=bench.json ./...     Compare against a baseline
   gotest bench --against=bench.json --gate=10 ./...
                                                Fail if any benchmark regresses >10%
+`)
+}
+
+func printFuzzHelp() {
+	fmt.Print(`gotest fuzz — run FuzzX suite methods with go test -fuzz
+
+Usage:
+  gotest fuzz [flags] [packages...]
+
+Discovers suites containing FuzzX methods (written with gotest.F and
+gotest.Fuzz, see "gotest help scaffold") and runs each one's generated
+Fuzz<SuiteName>_<MethodName> wrapper as its own "go test -fuzz=..." process,
+one target per invocation of go test. This is unlike every other gotest
+subcommand: a suite binary compiled once with "go test -c" has no native
+fuzz instrumentation, because cmd/go only weaves it in when -fuzz is present
+at "go test" time. So fuzzing cannot reuse the shared compiled binary and
+each target gets its own background "go test -fuzz" process instead.
+
+Multiple targets run concurrently (bounded by --jobs) and each one streams
+its output live, line by line, prefixed with "[<Func>] ", so long-running
+fuzz sessions show progress rather than going silent until they exit.
+
+Seed corpus replay (the seeds added via f.Add in a FuzzX method, plus any
+corpus gotest fuzz has since discovered under testdata/fuzz/) already
+happens for free as part of an ordinary "gotest" or "gotest test" run —
+those replay as regular subtests, at zero extra cost, without -fuzz and
+without this subcommand. Reach for "gotest fuzz" specifically to spend time
+mutating and searching for new failing inputs.
+
+Flags:
+  --for=<dur>             Total fuzz time budget, split evenly across all
+                           targets (each target's share floors at 10s). When
+                           omitted, no -fuzztime is passed and go's own
+                           default applies per target — fuzzing runs until
+                           interrupted or until the global --timeout expires.
+  --jobs=<n>               Max concurrent targets (default: max(1, GOMAXPROCS/2))
+  --no-cache               Disable overlay cache, force fresh generation
+  --debug                  Keep generated overlay for inspection
+  --timeout=<dur>          Global pipeline deadline (default: 15m, 0 to disable)
+
+All targets share the one global --timeout deadline: if there are more
+targets than --jobs, later waves may not get to start before it expires —
+gotest prints "[<Func>] skipped: ..." for each one that doesn't. Use --for
+to give every target an explicit, bounded budget instead of relying on
+--timeout alone.
+
+If no packages contain any FuzzX methods, prints "no fuzz targets found"
+and exits 0 without invoking go test.
+
+On a crashing input, the target's exit code is non-zero and gotest prints
+the crasher artifact directory go reports, e.g.:
+  [FuzzParserTestSuite_FuzzParse] crasher artifacts (if any): /abs/pkg/testdata/fuzz/FuzzParserTestSuite_FuzzParse/
+Commit the failing corpus entry under that path to turn the crash into a
+permanent regression test — it replays automatically in ordinary runs.
+
+Examples:
+  gotest fuzz ./pkg/parser/...                Fuzz until interrupted or timeout
+  gotest fuzz --for=5m ./...                  5-minute budget split across all targets
+  gotest fuzz --for=1m --jobs=2 ./...         Cap concurrency to 2 targets at a time
 `)
 }
 

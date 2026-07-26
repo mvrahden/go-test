@@ -67,6 +67,7 @@ var knownSubcommands = map[string]bool{
 	"discover": true,
 	"prepare":  true,
 	"bench":    true,
+	"fuzz":     true,
 	"generate": true,
 	"scaffold": true,
 	"migrate":  true,

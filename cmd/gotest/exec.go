@@ -56,6 +56,7 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 		CompileParallel: cfg.CompileParallel,
 		Streaming:       true,
 		OutputMode:      modeFromJSON(cfg.JSON),
+		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
