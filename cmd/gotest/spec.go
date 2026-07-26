@@ -34,6 +34,9 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
+	if minCoverage == 0 && inv.Config.MinCoverage > 0 {
+		minCoverage = inv.Config.MinCoverage
+	}
 
 	goTestArgs, coverProfile, coverCleanup, err := ensureCoverProfile(goTestArgs, minCoverage)
 	if err != nil {

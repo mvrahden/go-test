@@ -218,7 +218,7 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 // Opt-out with GOTEST_CI=0 when baseline generation is intentional in CI.
 func snapshotReadonly() bool {
 	v := os.Getenv(protocol.EnvCI)
-	return v == "1" || v == "true"
+	return v != "" && v != "0" && v != "false"
 }
 
 func splitTestName(name string) (topLevel, rest string) {

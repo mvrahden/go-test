@@ -218,7 +218,7 @@ func parseExecFlags(ownArgs, goTestArgs []string, projCfg *config.ProjectConfig)
 		SetupTimeout:    setupTimeout,
 		GlobalTimeout:   globalTimeout,
 		Debug:           slices.Contains(ownArgs, "--debug"),
-		CI:              slices.Contains(ownArgs, "--ci"),
+		CI:              slices.Contains(ownArgs, "--ci") || detectCIEnv(),
 		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
 		NoCache:         slices.Contains(ownArgs, "--no-cache"),
 		Parallel:        parallel,

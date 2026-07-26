@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sort"
+	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -65,7 +67,26 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 			return 1
 		}
 	}
+	if total, names := sumStdlibTests(overlay.StdlibTestsByPkg); total > 0 && !cfg.JSON {
+		fmt.Fprintf(os.Stderr, "note: %d stdlib test(s) in %s not run — gotest runs suites; use 'go test' for stdlib tests\n", total, names)
+	}
 	return result.ExitCode
+}
+
+// sumStdlibTests totals the stdlib tests gotest reports but does not run, and
+// names the affected packages (truncated) so the note is actionable.
+func sumStdlibTests(byPkg map[string]int) (int, string) {
+	total := 0
+	pkgs := make([]string, 0, len(byPkg))
+	for pkg, n := range byPkg {
+		total += n
+		pkgs = append(pkgs, pkg)
+	}
+	sort.Strings(pkgs)
+	if len(pkgs) > 3 {
+		pkgs = append(pkgs[:3], fmt.Sprintf("… %d more", len(byPkg)-3))
+	}
+	return total, strings.Join(pkgs, ", ")
 }
 
 func modeFromJSON(jsonMode bool) gotestrunner.RunMode {
