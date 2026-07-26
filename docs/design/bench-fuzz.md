@@ -1,6 +1,34 @@
 # Benchmarking & Fuzzing
 
-> Status: **design proposal** — not yet implemented.
+> Status: Part 1 (benchmarking core) shipped; Parts 2-4 remain proposals.
+> See the README's "Benchmarking" section and ARCHITECTURE.md for what
+> `gotest bench` actually does today. The rest of this document — baselines,
+> gates, editor integration, and all of fuzzing — is still a design proposal.
+
+## Shipped deviations (Part 1)
+
+Where the implementation diverged from this proposal:
+
+- **Per-method lifecycle timer fencing.** The generated wrapper stops the
+  benchmark timer before `BeforeEach`, starts and resets it immediately
+  before the benchmark method runs, and stops it again before `AfterEach` —
+  not just "outside the loop" as implied above, but an explicit
+  `StopTimer`/`BeforeEach`/`StartTimer`/`ResetTimer`/method/`StopTimer`/`AfterEach`
+  sequence per benchmark method.
+- **Fixture per-method hooks × benchmarks is a hard rejection, not a
+  restriction to work around later.** A fixture with `BeforeEach`/`AfterEach`
+  bound to a suite that has `Benchmark*` methods fails at generation time
+  ("per-method fixture hooks are not supported for benchmarks"). Only
+  fixture `BeforeAll`/`AfterAll` (once per process) are supported for
+  benchmark suites.
+- **`-run` and `-bench` compose with AND semantics**, both matched against
+  the same `Benchmark<SuiteName>` wrapper name (`-run` scopes by suite,
+  `-bench` by benchmark function name) — not the stdlib model where `-run`
+  and `-bench` are independent regexes matched against different things.
+  A `-run Test<Suite>`-style value matches nothing in bench mode.
+- **No `gotest.EachBench` yet.** Input-scaling tables (the
+  `BenchmarkParseScaling` idiom below) are not implemented — Part 1 shipped
+  single-point benchmarks only.
 
 Tests are a specification. That framing extends beyond correctness:
 
