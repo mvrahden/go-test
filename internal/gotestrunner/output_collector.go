@@ -26,8 +26,12 @@ type OutputCollector struct {
 	flushed  int
 	worst    int
 	captured bytes.Buffer
-	stdout   io.Writer
-	stderr   io.Writer
+
+	// StdlibTestsByPkg lets Finalize distinguish packages that truly have no
+	// test files from packages whose tests gotest does not run (stdlib tests).
+	StdlibTestsByPkg map[string]int
+	stdout           io.Writer
+	stderr           io.Writer
 }
 
 type pkgState struct {
@@ -140,7 +144,13 @@ func (c *OutputCollector) Finalize(noTestFilePkgs []string) {
 		}
 	}
 	for _, pkg := range noTestFilePkgs {
-		fmt.Fprintf(c.stdout, "?   \t%s\t[no test files]\n", pkg)
+		note := "[no test files]"
+		if c.StdlibTestsByPkg[pkg] > 0 {
+			// The package has stdlib tests — gotest runs suites only, so
+			// "[no test files]" would be a lie. Point at the truth instead.
+			note = "[no suites]"
+		}
+		fmt.Fprintf(c.stdout, "?   \t%s\t%s\n", pkg, note)
 	}
 	if c.anyFailedLocked() {
 		fmt.Fprintln(c.stdout, "FAIL")

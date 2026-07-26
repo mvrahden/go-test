@@ -82,7 +82,7 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupCancel(t *gotest.T) {
 			case <-done:
 			case <-time.After(5 * time.Second):
 				_ = cmd.Process.Kill()
-				it.T().Fatal("process did not exit after Cancel")
+				gotest.Fail(it, "process did not exit after Cancel")
 			}
 
 			// Process should be gone.
@@ -145,7 +145,7 @@ func (s *GotestrunnerProcessTestSuite) TestProcessGroupTermination(t *gotest.T) 
 			case <-done:
 			case <-time.After(10 * time.Second):
 				_ = cmd.Process.Kill()
-				it.T().Fatal("process not killed after WaitDelay")
+				gotest.Fail(it, "process not killed after WaitDelay")
 			}
 
 			// Process should be dead.

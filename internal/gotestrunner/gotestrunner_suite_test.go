@@ -995,6 +995,7 @@ func (s *GotestrunnerTestSuite) TestIsPackageSummaryLine(t *gotest.T) {
 		{"ok package summary", "ok  \tpkg\t0.5s\n", true},
 		{"FAIL package summary", "FAIL\tpkg\t1.2s\n", true},
 		{"no test files summary", "?   \tpkg\t[no test files]\n", true},
+		{"no suites summary", "?   \tpkg\t[no suites]\n", true},
 		{"race separator", "==================\n", false},
 		{"race warning", "WARNING: DATA RACE\n", false},
 		{"race detector count", "Found 1 data race(s)\n", false},

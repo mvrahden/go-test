@@ -66,7 +66,7 @@ func (s *GotestrunnerProcessTestSuite) TestGracefulTermination(t *gotest.T) {
 			case <-done:
 			case <-time.After(5 * time.Second):
 				_ = cmd.Process.Kill()
-				it.T().Fatal("process did not exit after TerminateProcessGroup")
+				gotest.Fail(it, "process did not exit after TerminateProcessGroup")
 			}
 
 			data, err := os.ReadFile(marker)
