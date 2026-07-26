@@ -37,8 +37,8 @@ type OverlayResult struct {
 	SuiteRequiredSharedFixtureKeys map[string]map[string][]string
 }
 
-func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPackage, debug bool, noCache bool) (*OverlayResult, func(), error) {
-	allResults, allSharedFixtures, err := gotestgen.GenerateFromLoaded(loaded)
+func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPackage, debug bool, noCache bool, harvestSeeds bool) (*OverlayResult, func(), error) {
+	allResults, allSharedFixtures, err := gotestgen.GenerateFromLoadedOpts(loaded, harvestSeeds)
 	if err != nil {
 		return nil, nil, err
 	}

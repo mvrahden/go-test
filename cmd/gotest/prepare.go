@@ -39,7 +39,11 @@ func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	ctx, stop := signal.NotifyContext(context.Background(),
 		shutdownSignals...)
 
+<<<<<<< HEAD
 	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, nil, false, false)
+=======
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, false, false, true)
+>>>>>>> 56525f9 (feat(fuzz): harvest table-test literals as seed corpus)
 	if err != nil {
 		stop()
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

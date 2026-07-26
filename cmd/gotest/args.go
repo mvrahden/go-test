@@ -60,6 +60,7 @@ type ExecConfig struct {
 	NoCache         bool
 	Parallel        int
 	CompileParallel int
+	HarvestSeeds    bool
 }
 
 // knownSubcommands is the set of recognized subcommands.

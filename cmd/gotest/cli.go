@@ -227,6 +227,7 @@ func parseExecFlags(ownArgs, goTestArgs []string, projCfg *config.ProjectConfig)
 		NoCache:         slices.Contains(ownArgs, "--no-cache"),
 		Parallel:        parallel,
 		CompileParallel: compileParallel,
+		HarvestSeeds:    !slices.Contains(ownArgs, "--no-harvest") && projCfg.Fuzz.HarvestSeeds(),
 	}, nil
 }
 
