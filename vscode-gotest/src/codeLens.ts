@@ -140,6 +140,22 @@ export class GoTestCodeLensProvider
         }
       }
 
+      const fileBenchmarks = suite.benchmarks.filter(
+        (m) => path.join(pkg.dir, m.file) === docPath,
+      );
+
+      for (const method of fileBenchmarks) {
+        const range = new vscode.Range(method.line - 1, 0, method.line - 1, 0);
+
+        lenses.push(
+          new vscode.CodeLens(range, {
+            title: "▶ Run Bench",
+            command: "gotest.runBench",
+            arguments: [importPath, suite.name, method.name],
+          }),
+        );
+      }
+
       if (suiteInFile && suiteHasSnapshots) {
         const range = new vscode.Range(suite.line - 1, 0, suite.line - 1, 0);
         const testPath = `${importPath}/${suite.name}`;

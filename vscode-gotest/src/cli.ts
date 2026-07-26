@@ -288,6 +288,20 @@ export function formatCliCommand(cmd: CliCommand): string {
   return `${cmd.bin} ${cmd.args.join(" ")}`;
 }
 
+// buildBenchArgs constructs the `gotest bench` subcommand arguments for a
+// single suite. Method-level scoping isn't supported by the runner yet
+// (Task 6/7): the generated benchmark wrapper is named "Benchmark<Suite>",
+// and both -run and -bench match against that same top-level name — so
+// passing -run with the bare suite name would just filter everything out.
+// -bench alone scopes down to the suite; the individual benchmark method
+// always runs alongside its suite-mates.
+export function buildBenchArgs(
+  importPath: string,
+  suiteName: string,
+): string[] {
+  return ["bench", importPath, "-bench", `^Benchmark${suiteName}$`];
+}
+
 export function scopedConfig(
   workspaceDir?: string,
 ): vscode.WorkspaceConfiguration {

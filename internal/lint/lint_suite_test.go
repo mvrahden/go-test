@@ -87,6 +87,12 @@ func (s *LintTestSuite) TestAnalyzer(t *gotest.T) {
 			analysistest.Run(it.T(), testdata, lint.Analyzer, "withnolint_file")
 		})
 	})
+
+	t.When("benchmark methods", func(w *gotest.T) {
+		w.It("detects bench-loop and bench-fixture-io violations", func(it *gotest.T) {
+			analysistest.Run(it.T(), testdata, lint.Analyzer, "bench")
+		})
+	})
 }
 
 func (s *LintTestSuite) TestDisableNolintFlag(t *gotest.T) {

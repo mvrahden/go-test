@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { DiscoveryCache, DiscoveryService } from "./discovery.js";
 import { GoTestController } from "./testController.js";
-import { TestRunner } from "./runner.js";
+import { TestRunner, runBenchCommand } from "./runner.js";
 import { GoTestCodeLensProvider } from "./codeLens.js";
 import { DebugLauncher } from "./debug.js";
 import { FocusExcludeProvider } from "./focusExclude.js";
@@ -298,6 +298,21 @@ function registerCommands(deps: {
         } finally {
           cts.dispose();
         }
+      },
+    ),
+
+    vscode.commands.registerCommand(
+      "gotest.runBench",
+      async (importPath: string, suiteName: string, _methodName?: string) => {
+        const wsDir =
+          cache.getWorkspaceDir(importPath) ?? resolveActiveWorkspaceDir();
+        if (!wsDir) {
+          outputChannel.warn(
+            `[command] runBench: no workspace dir for ${importPath}`,
+          );
+          return;
+        }
+        await runBenchCommand(importPath, suiteName, wsDir, outputChannel);
       },
     ),
 

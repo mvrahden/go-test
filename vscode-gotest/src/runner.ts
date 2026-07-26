@@ -1,7 +1,14 @@
 import * as vscode from "vscode";
+import { spawn } from "node:child_process";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
-import { scopedConfig } from "./cli.js";
+import {
+  scopedConfig,
+  buildCliCommand,
+  buildBenchArgs,
+  formatCliCommand,
+  type CliCommand,
+} from "./cli.js";
 import {
   collectItems,
   enqueueDescendants,
@@ -303,4 +310,62 @@ export class TestRunner {
   private hasSnapshotMismatch(): boolean {
     return this._lastJsonOutput.includes("MatchSnapshot: snapshot mismatch");
   }
+}
+
+// runBenchCommand shells out to `gotest bench` for a single suite and routes
+// its output straight to the output channel. Unlike TestRunner.run, this
+// doesn't go through the TestController/JSON-protocol machinery — bench
+// output is plain ns/op text, not structured test-run events, and there are
+// no TestItems for benchmarks (yet). Method-level scoping isn't supported by
+// the runner (see buildBenchArgs); the whole suite's benchmarks run.
+export async function runBenchCommand(
+  importPath: string,
+  suiteName: string,
+  workspaceDir: string,
+  outputChannel: vscode.LogOutputChannel,
+): Promise<void> {
+  const cmd = await buildCliCommand(
+    buildBenchArgs(importPath, suiteName),
+    workspaceDir,
+    outputChannel,
+  );
+  outputChannel.info(`[bench] ${formatCliCommand(cmd)}`);
+
+  try {
+    const { stdout, stderr, code } = await spawnBench(cmd, workspaceDir);
+    if (stdout.trim()) outputChannel.info(stdout.trimEnd());
+    if (stderr.trim()) outputChannel.warn(stderr.trimEnd());
+    outputChannel.info(`[bench] exited with code ${code}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    outputChannel.error(`[bench] failed: ${message}`);
+    vscode.window.showErrorMessage(`gotest bench failed: ${message}`);
+  }
+}
+
+function spawnBench(
+  cmd: CliCommand,
+  cwd: string,
+): Promise<{ stdout: string; stderr: string; code: number | null }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd.bin, cmd.args, { cwd });
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (data: Buffer) => {
+      stdout += data.toString();
+    });
+
+    child.stderr.on("data", (data: Buffer) => {
+      stderr += data.toString();
+    });
+
+    child.on("close", (code) => {
+      resolve({ stdout, stderr, code });
+    });
+
+    child.on("error", (err: Error) => {
+      reject(err);
+    });
+  });
 }

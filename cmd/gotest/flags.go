@@ -30,6 +30,7 @@ var gotestFlags = map[string]FlagKind{
 	"--save":             ValueFlag,
 	"--against":          ValueFlag,
 	"--gate":             ValueFlag,
+	"--bench":            BoolFlag,
 }
 
 var testAllowed = flagSet(
@@ -53,6 +54,7 @@ var summaryAllowed = flagSet(
 var watchAllowed = flagSet(
 	"--debug", "--ci", "--update-snapshots", "--no-cache", "--spec",
 	"--setup-timeout", "--timeout", "--debounce", "--parallel", "--compile-parallel",
+	"--bench",
 )
 
 var benchAllowed = flagSet(

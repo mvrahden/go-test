@@ -703,6 +703,52 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 	})
 }
 
+func (s *CmdGotestTestSuite) TestRunDiscover_Benchmarks(t *gotest.T) {
+	t.It("includes benchmark methods in discover JSON, marking exclusions", func(it *gotest.T) {
+		srcPath := filepath.Join(
+			s.repoRoot, "internal", "gotestgen", "testdata", "sources",
+			"TestCollector_BenchmarkMethod", "test.go",
+		)
+		src, err := os.ReadFile(srcPath)
+		gotest.NoError(it, err)
+
+		// The Task 3 testdata source isn't its own module, so stage it as a
+		// throwaway package inside the examples module (already `use`d by
+		// go.work) rather than fighting GOWORK for an out-of-workspace dir.
+		fixtureDir, err := os.MkdirTemp(filepath.Join(s.repoRoot, "examples"), "discoverbench-")
+		gotest.NoError(it, err)
+		defer os.RemoveAll(fixtureDir)
+		gotest.NoError(it, os.WriteFile(filepath.Join(fixtureDir, "bench_fixture.go"), src, 0600))
+
+		// gotestgen.LoadPackages requires Tests:true's "[pkg.test]" variant,
+		// which only exists for packages with _test.go files; this fixture
+		// (copied verbatim from the Task 3 testdata, filename "test.go") has
+		// none, so load it as a plain package instead — CollectSuiteSpecs
+		// only needs Syntax/Types, not a test-binary variant.
+		pkgs, err := packages.Load(&packages.Config{
+			Mode: packages.NeedModule | packages.NeedSyntax | packages.NeedName |
+				packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps,
+		}, fixtureDir)
+		gotest.NoError(it, err)
+		gotest.Len(it, pkgs, 1)
+		gotest.Empty(it, pkgs[0].Errors, "expected no package load errors, got: %v", pkgs[0].Errors)
+
+		c := gotestgen.NewCollector()
+		result := c.CollectSuiteSpecs(pkgs[0])
+		gotest.Empty(it, result.Errs, "expected no collector errors, got: %v", result.Errs)
+		gotest.Len(it, result.Suites, 1)
+
+		ds := ExportBuildDiscoverSuite(result.Suites[0])
+		data, err := json.Marshal(ds)
+		gotest.NoError(it, err)
+		payload := string(data)
+
+		gotest.Contains(it, payload, `"benchmarks":[{"name":"BenchmarkParse"`)
+		gotest.Contains(it, payload, `"X_BenchmarkOld"`)
+		gotest.Contains(it, payload, `"excluded":true`)
+	})
+}
+
 func (s *CmdGotestTestSuite) TestFocusViolation_String(t *gotest.T) {
 	for sub, tc := range gotest.Each(t, []struct {
 		Desc     string
@@ -1023,6 +1069,74 @@ func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 			result := ExportReplacePatterns(tc.original, tc.newPatterns)
 			gotest.Equal(sub, tc.expected, result)
 		}
+	})
+}
+
+func (s *CmdGotestTestSuite) TestBenchDeltaLines(t *gotest.T) {
+	t.When("first run", func(w *gotest.T) {
+		w.It("prints no deltas but records ns/op", func(it *gotest.T) {
+			results := []gotestbench.Result{
+				{Package: "p", Suite: "Foo", Name: "BenchmarkBar", Samples: []gotestbench.Sample{{NsPerOp: 100}}},
+			}
+			lines, next := ExportBenchDeltaLines(results, nil)
+			gotest.Empty(it, lines)
+			gotest.Equal(it, 100.0, next["p\x00Foo\x00BenchmarkBar"])
+		})
+	})
+
+	t.When("a benchmark regresses", func(w *gotest.T) {
+		w.It("reports a positive delta", func(it *gotest.T) {
+			results := []gotestbench.Result{
+				{Package: "p", Suite: "Foo", Name: "BenchmarkBar", Samples: []gotestbench.Sample{{NsPerOp: 200}}},
+			}
+			prev := map[string]float64{"p\x00Foo\x00BenchmarkBar": 100}
+
+			lines, next := ExportBenchDeltaLines(results, prev)
+
+			gotest.Len(it, lines, 1)
+			gotest.Contains(it, lines[0], "BenchmarkBar")
+			gotest.Contains(it, lines[0], "200.00 ns/op")
+			gotest.Contains(it, lines[0], "+100.0%")
+			gotest.Equal(it, 200.0, next["p\x00Foo\x00BenchmarkBar"])
+		})
+	})
+
+	t.When("a benchmark improves", func(w *gotest.T) {
+		w.It("reports a negative delta", func(it *gotest.T) {
+			results := []gotestbench.Result{
+				{Package: "p", Suite: "Foo", Name: "BenchmarkBar", Samples: []gotestbench.Sample{{NsPerOp: 50}}},
+			}
+			prev := map[string]float64{"p\x00Foo\x00BenchmarkBar": 100}
+
+			lines, _ := ExportBenchDeltaLines(results, prev)
+
+			gotest.Len(it, lines, 1)
+			gotest.Contains(it, lines[0], "-50.0%")
+		})
+	})
+
+	t.When("a benchmark has multiple samples", func(w *gotest.T) {
+		w.It("averages ns/op across samples", func(it *gotest.T) {
+			results := []gotestbench.Result{
+				{Package: "p", Suite: "", Name: "BenchmarkBaz", Samples: []gotestbench.Sample{{NsPerOp: 100}, {NsPerOp: 200}}},
+			}
+			_, next := ExportBenchDeltaLines(results, nil)
+			gotest.Equal(it, 150.0, next["p\x00\x00BenchmarkBaz"])
+		})
+	})
+
+	t.When("a benchmark is new this run", func(w *gotest.T) {
+		w.It("prints no delta for it", func(it *gotest.T) {
+			results := []gotestbench.Result{
+				{Package: "p", Suite: "Foo", Name: "BenchmarkNew", Samples: []gotestbench.Sample{{NsPerOp: 100}}},
+			}
+			prev := map[string]float64{"p\x00Foo\x00BenchmarkOther": 50}
+
+			lines, next := ExportBenchDeltaLines(results, prev)
+
+			gotest.Empty(it, lines)
+			gotest.Equal(it, 100.0, next["p\x00Foo\x00BenchmarkNew"])
+		})
 	})
 }
 

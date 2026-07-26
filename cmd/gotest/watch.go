@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/mvrahden/go-test/internal/gotestbench"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
@@ -49,6 +50,7 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
+	bench := hasFlag(ownArgs, "--bench")
 	jsonMode, goTestArgs := stripJSONFlag(goTestArgs)
 	specMode := hasFlag(ownArgs, "--spec")
 	if specMode && jsonMode {
@@ -76,7 +78,8 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if !jsonMode {
 		fmt.Printf("\033[2m  running tests...\033[0m\n")
 	}
-	watchRunOnce(ctx, cfg, jsonMode, specMode)
+	var benchNs map[string]float64
+	_, benchNs = watchRunOnce(ctx, cfg, jsonMode, specMode, bench, benchNs)
 	if !jsonMode {
 		fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
 	}
@@ -128,7 +131,7 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 			changedCfg := cfg
 			changedCfg.GoTestArgs = pkgArgs
 			changedCfg.PackagePatterns = pkgPatterns
-			watchRunOnce(ctx, changedCfg, jsonMode, specMode)
+			_, benchNs = watchRunOnce(ctx, changedCfg, jsonMode, specMode, bench, benchNs)
 			changedDirs = nil
 			if !jsonMode {
 				fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
@@ -143,7 +146,11 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 }
 
-func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode bool) int { //nolint:gocritic // hugeParam: stable API
+// watchRunOnce runs one watch iteration. benchNs carries the previous
+// iteration's per-benchmark mean ns/op (nil on the first run) and the
+// returned map becomes the caller's benchNs for the next iteration; it is
+// only ever populated/consulted when bench is true.
+func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench bool, benchNs map[string]float64) (int, map[string]float64) { //nolint:gocritic // hugeParam: stable API
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
 	loaded, broken, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
@@ -153,7 +160,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode bool) 
 		} else {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		}
-		return 2
+		return 2, benchNs
 	}
 
 	if cfg.CI {
@@ -163,9 +170,9 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode bool) 
 			} else {
 				fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			}
-			return 2
+			return 2, benchNs
 		} else if code != 0 {
-			return code
+			return code, benchNs
 		}
 	}
 
@@ -176,7 +183,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode bool) 
 		} else {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		}
-		return 2
+		return 2, benchNs
 	}
 	defer cleanup()
 
@@ -185,11 +192,23 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode bool) 
 		cfg.JSON = true
 	}
 
+	// Bench mode needs -v injected the same way runBench forces it (see
+	// cmd/gotest/bench.go): our batch collector otherwise suppresses a
+	// passing suite's stdout, hiding the ns/op lines go test would
+	// normally always print for -bench.
+	if bench && !gotestrunner.HasVerboseFlag(cfg.GoTestArgs) {
+		cfg.GoTestArgs = append(cfg.GoTestArgs, "-v")
+	}
+
 	mode := gotestrunner.RunBatchText
 	if cfg.JSON {
 		mode = gotestrunner.RunStreamJSON
 	}
-	if specMode {
+	if specMode || bench {
+		// Both renders below need the result tree, which only RunCaptureJSON
+		// produces (RunBatchText prints go test's own text output directly;
+		// RunStreamJSON streams JSON live instead of returning it). This also
+		// matches runBench's own capture path.
 		mode = gotestrunner.RunCaptureJSON
 	}
 
@@ -209,26 +228,108 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode bool) 
 		CompileParallel: cfg.CompileParallel,
 		Streaming:       false,
 		OutputMode:      mode,
+		Bench:           bench,
+		BenchesByPkg:    overlay.BenchesByPkg,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2
+		return 2, benchNs
 	}
+
+	if bench {
+		benchNs = renderBenchRun(result.CapturedJSON, jsonMode, benchNs)
+	}
+
 	if cfg.GlobalTimeout > 0 && runCtx.Err() == context.DeadlineExceeded {
 		fmt.Fprintf(os.Stderr, "FAIL: global --timeout exceeded after %v\n", cfg.GlobalTimeout)
 		if result.ExitCode == 0 {
-			return 1
+			return 1, benchNs
 		}
 	}
-	if specMode {
+	if bench {
+		// Bench rendering already draws the full tree, so it subsumes --spec.
+		benchNs = renderBenchRun(result.CapturedJSON, jsonMode, benchNs)
+	} else if specMode {
 		events, perr := gotestspec.ParseEvents(bytes.NewReader(result.CapturedJSON))
 		if perr != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", perr)
-			return 2
+			return 2, benchNs
 		}
 		gotestspec.RenderTerminal(os.Stdout, gotestspec.BuildTree(events))
 	}
-	return result.ExitCode
+	return result.ExitCode, benchNs
+}
+
+// renderBenchRun parses a bench run's captured test2json output into a
+// gotestspec tree, prints the results (in text mode) followed by any
+// per-benchmark "Δ" delta lines vs prevNs, and returns the updated ns/op
+// map for the next watch iteration. In JSON mode the raw captured events
+// are written through as-is instead (mirroring what RunStreamJSON would
+// have streamed live) and no delta lines are printed, since JSON consumers
+// expect only test2json-shaped lines on stdout.
+func renderBenchRun(capturedJSON []byte, jsonMode bool, prevNs map[string]float64) map[string]float64 {
+	if jsonMode {
+		os.Stdout.Write(capturedJSON) //nolint:errcheck // best-effort watch output
+		return prevNs
+	}
+
+	events, err := gotestspec.ParseEvents(bytes.NewReader(capturedJSON))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: parsing bench events: %s\n", err)
+		return prevNs
+	}
+	tree := gotestspec.BuildTree(events)
+	gotestspec.RenderTerminal(os.Stdout, tree)
+
+	baseline := gotestbench.FromPackages(tree)
+	lines, nextNs := benchDeltaLines(baseline.Results, prevNs)
+	for _, line := range lines {
+		fmt.Println(line)
+	}
+	return nextNs
+}
+
+// benchDeltaKey uniquely identifies a benchmark result across watch runs,
+// scoped by package and suite so same-named benchmarks in different
+// packages/suites don't collide.
+func benchDeltaKey(r gotestbench.Result) string {
+	return r.Package + "\x00" + r.Suite + "\x00" + r.Name
+}
+
+// meanNsPerOp returns the mean ns/op across r's samples, or 0 if it has
+// none.
+func meanNsPerOp(r gotestbench.Result) float64 {
+	if len(r.Samples) == 0 {
+		return 0
+	}
+	var sum float64
+	for _, s := range r.Samples {
+		sum += s.NsPerOp
+	}
+	return sum / float64(len(r.Samples))
+}
+
+// benchDeltaLines computes the current run's mean ns/op for each of
+// results and, for every benchmark that also appeared in prevNs (the
+// previous run's ns/op, keyed by benchDeltaKey), formats a "Δ" delta line
+// comparing the two. Benchmarks with no prior entry — the watcher's first
+// bench run, or a benchmark that's new this run — produce no line, since
+// there's nothing yet to compare against. The returned map becomes prevNs
+// on the caller's next invocation, so deltas always compare against the
+// immediately preceding in-memory run, never a persisted baseline.
+func benchDeltaLines(results []gotestbench.Result, prevNs map[string]float64) (lines []string, nextNs map[string]float64) {
+	nextNs = make(map[string]float64, len(results))
+	for _, r := range results {
+		mean := meanNsPerOp(r)
+		key := benchDeltaKey(r)
+		if old, ok := prevNs[key]; ok && old != 0 {
+			pct := (mean - old) / old * 100
+			lines = append(lines, fmt.Sprintf("%s  %.2f ns/op  (Δ %+.1f%%)", r.Name, mean, pct))
+		}
+		nextNs[key] = mean
+	}
+	return lines, nextNs
+>>>>>>> 2b480de (feat(watch,lint,discover,vscode): benchmark DX surfaces)
 }
 
 func addWatchDirs(w *fsnotify.Watcher, pattern string) {

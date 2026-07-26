@@ -38,6 +38,8 @@ const (
 	AssertionRedundant Rule = "assertion-redundant"
 	TEscape            Rule = "t-escape"
 	SuiteLifecycle     Rule = "suite-lifecycle"
+	BenchLoop          Rule = "bench-loop"
+	BenchFixtureIO     Rule = "bench-fixture-io"
 )
 
 // Tier classifies what breaks when a rule's finding is ignored, and derives
@@ -83,6 +85,12 @@ var ruleMeta = map[Rule]struct {
 	TEscape:            {TierExpressiveness, ScopeSuites},
 	SuiteLifecycle:     {TierIntegrity, ScopeSuites},
 	FailGuard:          {TierExpressiveness, ScopeGotestFiles},
+	// A benchmark that never iterates measures nothing — its numbers lie,
+	// so bench-loop is integrity. bench-fixture-io is a heuristic about
+	// what the timed loop includes; legitimate setups exist, so it stays
+	// skippable.
+	BenchLoop:      {TierIntegrity, ScopeSuites},
+	BenchFixtureIO: {TierExpressiveness, ScopeSuites},
 }
 
 // Known reports whether the rule ID exists.
@@ -158,6 +166,8 @@ func run(pass *analysis.Pass) (any, error) {
 	checkAssertionSimplify(pass, insp, cl)
 	checkFailGuard(pass, insp, cl)
 	checkRedundantAssertion(pass, insp, cl)
+	checkBenchLoop(pass, insp, suites)
+	checkBenchFixtureIO(pass, insp, suites)
 
 	return nil, nil
 }
@@ -328,6 +338,7 @@ type suiteInfo struct {
 	pos               token.Pos
 	methods           map[string]token.Pos
 	recvTypePositions []token.Pos
+	hasFixtureField   bool // struct has a *...Fixture / *...SharedFixture field (see bench-fixture-io)
 }
 
 func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
@@ -347,9 +358,10 @@ func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
 			stripped := strings.TrimPrefix(strings.TrimPrefix(name, protocol.PrefixFocused), protocol.PrefixExcluded)
 			if strings.HasSuffix(stripped, protocol.SuffixTestSuite) {
 				suites[name] = &suiteInfo{
-					name:    name,
-					pos:     ts.Pos(),
-					methods: make(map[string]token.Pos),
+					name:            name,
+					pos:             ts.Pos(),
+					methods:         make(map[string]token.Pos),
+					hasFixtureField: structHasFixtureField(ts.Type),
 				}
 			}
 		}
