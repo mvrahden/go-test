@@ -19,6 +19,15 @@ import (
 // shared compiled suite binary — see the doc comment on
 // internal/gotestrunner/fuzzrun.go for why.
 func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+	if sub, rest, ok := extractFuzzSubcommand(inv.Args); ok {
+		switch sub {
+		case "triage":
+			return runFuzzTriage(rest)
+		case "promote":
+			return runFuzzPromote(rest)
+		}
+	}
+
 	ownArgs, goTestArgs, err := SplitArgs(inv.DefaultArgs(), fuzzAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
