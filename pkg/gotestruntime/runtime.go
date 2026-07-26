@@ -234,8 +234,17 @@ func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string
 		if node.Init != nil {
 			node.Init()
 		}
-		if node.SharedState.Hydrate != nil {
-			if err := node.SharedState.Hydrate(ctx); err != nil {
+		if node.SharedState.Hydrate != nil { //nolint:nestif // linear hydrate sequence
+			hctx := ctx
+			var cancel context.CancelFunc
+			if node.Config.Timeout > 0 {
+				hctx, cancel = context.WithTimeout(ctx, node.Config.Timeout)
+			}
+			err := node.SharedState.Hydrate(hctx)
+			if cancel != nil {
+				cancel()
+			}
+			if err != nil {
 				return fmt.Errorf("hydrate shared fixture %q: %w", node.SharedState.StateKey, err)
 			}
 		}
@@ -481,8 +490,10 @@ func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
 		visiting[name] = true
 		node := byName[name]
 		own := node.Config.Timeout
-		if own < 0 {
-			own = 0
+		if own <= 0 {
+			// "No deadline" must not zero the teardown budget — an unbounded
+			// fixture still needs supervisor headroom; use the default floor.
+			own = 2 * time.Minute
 		}
 		var maxDep time.Duration
 		for _, dep := range node.DependsOn {

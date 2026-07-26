@@ -13,7 +13,8 @@ import (
 const FileName = ".gotest.yml"
 
 // ProjectConfig holds settings loaded from .gotest.yml.
-// CLI flags take precedence over these values; nil/zero values are ignored.
+// CLI flags take precedence over these values; omitted keys fall back to
+// defaults (duration keys are pointers, so an explicit 0 is honored as "disable").
 type ProjectConfig struct {
 	// Tags is a comma-separated list of build tags passed to go test (e.g. "integration,e2e").
 	Tags string `yaml:"tags"`

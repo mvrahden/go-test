@@ -1241,6 +1241,37 @@ func TestDAG_SharedStateNode(t *testing.T) {
 	gotest.Less(t, afterAllIdx, dehydrateIdx, "api.afterAll before pg.dehydrate")
 }
 
+func TestDAG_SharedStateNode_HydrateTimeout(t *testing.T) {
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	_ = os.WriteFile(stateFile, []byte(`{"pkg.PGSharedFixture":{"ConnStr":"x"}}`), 0600)
+	t.Setenv("GOTEST_SHARED_STATE_FILE", stateFile)
+
+	type pg struct{ ConnStr string }
+	var hydrateHasDeadline, dehydrateHasDeadline bool
+	node := &FixtureNode{
+		Name:   "PGSharedFixture",
+		Config: gotest.FixtureConfig{Timeout: 5 * time.Minute},
+		SharedState: &SharedStateNode{
+			StateKey: "pkg.PGSharedFixture",
+			Target:   &pg{},
+			Hydrate: func(ctx context.Context) error {
+				_, hydrateHasDeadline = ctx.Deadline()
+				return nil
+			},
+			Dehydrate: func(ctx context.Context) error {
+				_, dehydrateHasDeadline = ctx.Deadline()
+				return nil
+			},
+		},
+	}
+
+	exitCode := run(func() int { return 0 }, MainConfig{Fixtures: []*FixtureNode{node}})
+
+	gotest.Equal(t, 0, exitCode)
+	gotest.True(t, hydrateHasDeadline, "Hydrate should run under the fixture's configured timeout")
+	gotest.False(t, dehydrateHasDeadline, "Dehydrate runs on context.Background")
+}
+
 func TestDAG_SharedStateChain(t *testing.T) {
 	rec := &recorder{}
 
