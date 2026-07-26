@@ -6,7 +6,6 @@ tags: ["Migration"]
 keywords: ["migrate from testify", "testify suite alternative", "testify to gotest", "gotest migrate", "go test suite migration"]
 cta_text: "Run gotest migrate on your first testify suite today."
 cta_command: "gotest migrate ./..."
-toc: true
 howto:
   name: "Migrate a testify/suite codebase to gotest"
   steps:

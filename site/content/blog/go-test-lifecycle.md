@@ -4,7 +4,6 @@ date: 2026-07-14
 description: "Go test setup and teardown, in order: suite hooks, fixture hooks, cleanup guarantees, and retries — the full gotest lifecycle from BeforeAll to AfterAll."
 tags: ["Patterns"]
 keywords: ["go test setup teardown", "go test lifecycle", "beforeeach aftereach go", "go test cleanup order"]
-toc: true
 cta_text: "See these lifecycle guarantees in your own suite."
 faq:
   - q: "Does AfterEach run after t.Fatal?"

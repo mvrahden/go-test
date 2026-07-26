@@ -4,7 +4,6 @@ date: 2026-07-24
 description: "We parsed 720,118 test functions across the 1,000 most-starred Go repos. What the data says about parallelism, sleeps, golden files, and containers."
 tags: ["Research"]
 keywords: ["go testing statistics", "state of go testing", "go test parallel adoption", "testify vs ginkgo usage", "go testing survey"]
-toc: true
 cta_text: "See what structured suites change about these numbers."
 faq:
   - q: "How many Go tests run in parallel?"

@@ -4,7 +4,6 @@ date: 2026-07-09
 description: "Most Go test frameworks use reflection to find suites at runtime. gotest uses AST-based code generation with overlay filesystem injection instead."
 tags: ["Internals"]
 keywords: ["go code generation testing", "reflection vs code generation go", "go ast test discovery", "go test overlay flag", "go generate tests"]
-toc: true
 cta_text: "Run gotest generate on your own suite and read the bridge it writes."
 aliases: ["/blog/code-generation-not-reflection.html"]
 ---

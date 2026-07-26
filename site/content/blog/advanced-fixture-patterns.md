@@ -5,7 +5,6 @@ description: "Go test fixture patterns at scale: composition, container-backed f
 tags: ["Deep Dive"]
 keywords: ["go test fixtures", "testcontainers go", "go fixture composition", "go test per-test isolation"]
 cta_text: "Compose your first fixture DAG."
-toc: true
 ---
 
 A single fixture gets you started: start a thing, stop a thing, point your tests at it. Real projects need more. Fixtures that compose into dependency graphs, containers that survive flaky startup, per-test isolation that keeps parallel tests from stepping on each other, and configuration that adapts to each environment. These are the patterns that emerge when fixtures grow beyond a single struct with two hooks.

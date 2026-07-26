@@ -4,7 +4,6 @@ date: 2026-07-08
 description: "Test names like TestCreateUser_WhenEmailInvalid_ReturnsError are hard to scan. BDD-style labeled subtests turn Go tests into living documentation."
 tags: ["Testing"]
 keywords: ["go bdd", "bdd go testing", "readable go tests", "go subtests", "ginkgo alternative"]
-toc: true
 cta_text: "Turn your next test suite into a readable spec with gotest spec."
 aliases: ["/blog/readable-tests-with-bdd.html"]
 ---
