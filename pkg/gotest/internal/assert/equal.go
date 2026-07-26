@@ -8,28 +8,34 @@ import (
 
 // CheckEqual returns "" if expected and actual are deeply equal.
 // Otherwise it returns a formatted error string describing the mismatch,
-// including a diff section when both formatted values are multiline.
+// including a line diff when the rendered values are multiline — large
+// composite values are expanded to one field/entry per line for this purpose.
 func CheckEqual(expected, actual any) string {
 	if reflect.DeepEqual(expected, actual) {
 		return ""
 	}
 
-	fmtExpected := FormatValue(expected)
-	fmtActual := FormatValue(actual)
+	fmtExpected := FormatValueExpanded(expected)
+	fmtActual := FormatValueExpanded(actual)
+	if fmtExpected == fmtActual {
+		// The values differ (DeepEqual said so) but the expanded rendering
+		// hides it — e.g. only unexported fields differ, which expansion
+		// cannot read. Fall back to %#v, which can.
+		fmtExpected = FormatValue(expected)
+		fmtActual = FormatValue(actual)
+	}
 
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "Equal failed:\n")
 	fmt.Fprintf(&sb, "  expected: %s\n", fmtExpected)
 	fmt.Fprintf(&sb, "  actual:   %s", fmtActual)
 
-	d := Diff(fmtExpected, fmtActual)
-	if d != "" {
+	if d := Diff(fmtExpected, fmtActual); d != "" {
 		fmt.Fprintf(&sb, "\n  diff:\n")
 		for _, line := range strings.Split(strings.TrimRight(d, "\n"), "\n") {
 			fmt.Fprintf(&sb, "    %s\n", line)
 		}
 	}
-
 	return sb.String()
 }
 

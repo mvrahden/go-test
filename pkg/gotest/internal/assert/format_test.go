@@ -6,6 +6,7 @@
 package assert //nolint:stdlib-test
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -189,4 +190,63 @@ func containsSubstring(s, substr string) bool {
 			}
 			return false
 		}())
+}
+
+type wideOrder struct {
+	ID     string
+	Amount int
+	Items  []string
+	Region string
+}
+
+func TestFormatValueExpanded_SmallValuesStaySingleLine(t *testing.T) {
+	if got := FormatValueExpanded(map[string]int{"a": 1}); strings.Contains(got, "\n") {
+		t.Errorf("small value should stay single-line, got %q", got)
+	}
+}
+
+func TestFormatValueExpanded_LargeStructExpands(t *testing.T) {
+	v := wideOrder{ID: "A-0001", Amount: 100, Items: []string{"alpha", "beta"}, Region: "eu-central-1"}
+	got := FormatValueExpanded(v)
+	if !strings.Contains(got, "\n") {
+		t.Fatalf("large struct should expand to multiline, got %q", got)
+	}
+	if !strings.Contains(got, "  Amount: 100,") {
+		t.Errorf("expanded struct should have one field per line, got %q", got)
+	}
+}
+
+func TestFormatValueExpanded_MapKeysSorted(t *testing.T) {
+	v := map[string]string{"zebra": "last", "alpha": "first", "middle": "mid-entry-padding"}
+	got := FormatValueExpanded(v)
+	ia, iz := strings.Index(got, `"alpha"`), strings.Index(got, `"zebra"`)
+	if ia < 0 || iz < 0 || ia > iz {
+		t.Errorf("map keys should be sorted deterministically, got %q", got)
+	}
+}
+
+func TestCheckEqualViaExpansion_LargeStructsGetDiff(t *testing.T) {
+	want := wideOrder{ID: "A-0001", Amount: 100, Items: []string{"alpha", "beta"}, Region: "eu-central-1"}
+	got := wideOrder{ID: "A-0001", Amount: 150, Items: []string{"alpha"}, Region: "eu-central-1"}
+	msg := CheckEqual(want, got)
+	if !strings.Contains(msg, "diff:") {
+		t.Fatalf("large-struct inequality should include a diff section, got %q", msg)
+	}
+	if !strings.Contains(msg, "- ") || !strings.Contains(msg, "+ ") {
+		t.Errorf("diff should contain -/+ lines, got %q", msg)
+	}
+}
+
+func TestFormatValueExpanded_HugeValuesStaySingleLine(t *testing.T) {
+	huge := make([]int, 20000)
+	for i := range huge {
+		huge[i] = i
+	}
+	other := make([]int, 20000)
+	copy(other, huge)
+	other[19999] = -1
+	msg := CheckEqual(huge, other)
+	if strings.Contains(msg, "diff:") {
+		t.Errorf("huge values must not expand into a quadratic diff")
+	}
 }

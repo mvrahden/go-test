@@ -234,3 +234,21 @@ func TestCheckNotEqual_BothNil(t *testing.T) {
 		t.Errorf("error should contain '<nil>', got: %q", result)
 	}
 }
+
+type partlyHidden struct {
+	Exported string
+	Padding  string
+	secret   int
+}
+
+func TestCheckEqual_UnexportedOnlyDifference_FallsBackToGoSyntax(t *testing.T) {
+	a := partlyHidden{Exported: "long-enough-value-to-cross-the-threshold", Padding: "x", secret: 1}
+	b := partlyHidden{Exported: "long-enough-value-to-cross-the-threshold", Padding: "x", secret: 2}
+	msg := CheckEqual(a, b)
+	if msg == "" {
+		t.Fatal("expected failure message")
+	}
+	if !strings.Contains(msg, "secret:1") || !strings.Contains(msg, "secret:2") {
+		t.Errorf("message must reveal the unexported difference, got: %q", msg)
+	}
+}
