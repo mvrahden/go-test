@@ -676,6 +676,42 @@ a returning `BeforeEach` is rejected (`suite %s has fuzz methods but a returning
 
 Codegen emits one top-level function per `Fuzz*` method, named `Fuzz<SuiteIdentifier>_<MethodName>` — e.g. `FuzzParserTestSuite_FuzzParse` — since Go's fuzzing engine targets exactly one `FuzzX` symbol per run.
 
+### Struct arguments
+
+Go's fuzzing engine accepts exactly fifteen argument types, and everything real takes structs.
+`gotest.Fuzz` accepts a struct — or any named type over a native one, like `type Priority int` — and codegen emits a decoder/encoder for it, attaches it to the `*gotest.F` the wrapper builds, and reroutes the target to a native `[]byte` one:
+
+```go
+func (s *UserServiceTestSuite) FuzzCreate(f *gotest.F) {
+    f.Add(CreateUserRequest{Email: "a@b.c", Age: 30})
+    gotest.Fuzz(f, func(t *gotest.T, req CreateUserRequest) {
+        gotest.NoError(t, req.Validate())
+    })
+}
+```
+
+Seeds you write stay plain Go literals — `f.Add` encodes any argument a codec claims, and rejects a seed whose type isn't the one the target fuzzes rather than letting it decode as an unrelated value.
+
+Crashers are not yet symmetrical: `gotest fuzz promote` splices the corpus entry back as a `[]byte(...)` literal for struct targets, which replays correctly but is tied to the current encoding. Readable `f.Add(CreateUserRequest{...})` promotion needs struct decoding inside the test binary and is not implemented yet.
+
+Fields decode in declaration order from a byte cursor, and decoding is total: a short or empty input yields zero values rather than a rejected execution.
+**Appending a field is therefore corpus-safe** — new trailing fields read from an exhausted cursor and decode as zero, leaving every existing field's value intact.
+Reordering or inserting fields reinterprets the cached corpus; promoting crashers to source is the mitigation.
+
+Codegen refuses, at generation time, anything it cannot encode faithfully — permitting it would generate code that lies:
+
+| Refused | Do this instead |
+|---|---|
+| structs with unexported fields | fuzz the constructor's input, or declare a local wrapper struct |
+| `map` fields | fuzz a slice of key/value pairs and build the map in the callback |
+| interfaces, channels, funcs | — |
+| recursive types | — |
+| `time.Time` and friends (unexported internals) | fuzz an `int64` and convert in the callback |
+| a non-native argument to `Fuzz2`/`Fuzz3` | wrap the arguments in a single struct and use `gotest.Fuzz` |
+
+Each rejection names the offending field path and its type, e.g. `fuzz target FuzzUserServiceTestSuite_FuzzCreate: CreateUserRequest.mu (sync.Mutex) is not fuzzable — unexported fields cannot be set — fuzz the constructor's input, or declare a local wrapper struct`.
+Nothing in the toolchain catches this for us — `go vet` only checks direct `(*testing.F).Fuzz` calls, and the generic adapter hides the instantiation from it — so generation time is the only place a useful message can be produced.
+
 ### Seed harvesting
 
 At generation time, gotest mines each `Fuzz*` method's package for literal primitive values that already flow into the function under fuzz — table-test rows (`gotest.Each`) and direct call-site literals in `_test.go` files — and injects them as additional `f.Add(...)` seeds in the generated wrapper, on top of whatever you added by hand.

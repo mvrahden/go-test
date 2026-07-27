@@ -30,11 +30,7 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 		}
 	}
 
-<<<<<<< HEAD
-	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, broken, cfg.Debug, cfg.NoCache)
-=======
-	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, cfg.Debug, cfg.NoCache, cfg.HarvestSeeds)
->>>>>>> 56525f9 (feat(fuzz): harvest table-test literals as seed corpus)
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, broken, cfg.Debug, cfg.NoCache, cfg.HarvestSeeds)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

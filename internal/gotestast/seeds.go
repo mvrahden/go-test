@@ -263,6 +263,25 @@ func calleeFuncOf(pkg *packages.Package, fun ast.Expr) *types.Func {
 	}
 }
 
+// calleeIdentOf returns the identifier a call expression's Fun operand
+// ultimately names, unwrapping explicit generic instantiation. It is the key
+// types.Info.Instances is indexed by — for gotest.Fuzz(...) that is the Sel
+// ident "Fuzz", not the "gotest" qualifier.
+func calleeIdentOf(fun ast.Expr) *ast.Ident {
+	switch e := fun.(type) {
+	case *ast.Ident:
+		return e
+	case *ast.SelectorExpr:
+		return e.Sel
+	case *ast.IndexExpr:
+		return calleeIdentOf(e.X)
+	case *ast.IndexListExpr:
+		return calleeIdentOf(e.X)
+	default:
+		return nil
+	}
+}
+
 // harvestDirectLiteralCalls scans fd for calls to a harvested callee whose
 // mapped argument positions are all qualifying literals.
 func harvestDirectLiteralCalls(pkg *packages.Package, fd *ast.FuncDecl, targets []harvestTarget, add func(funcName string, args []string, pos token.Pos)) {

@@ -4,8 +4,8 @@
 > fuzz core) shipped. Of Part 4 (the fuzz AST layer), seed harvesting,
 > crash triage/promote, `scaffold --fuzz`, and the three fuzz lint rules
 > (determinism/no-oracle/seed) have also shipped, primitives-only; only
-> struct decoders (the typed-fuzzing codec layer) remain a proposal,
-> deferred pending a dedicated design doc. See "Shipped deviations (Part 4)"
+> struct decoders (the typed-fuzzing codec layer) remain a proposal, now
+> designed separately in [fuzz-structs.md](fuzz-structs.md). See "Shipped deviations (Part 4)"
 > below, the README's "Benchmarking" and "Fuzzing" sections, and
 > ARCHITECTURE.md for what `gotest bench`/`gotest fuzz` actually do today.
 
@@ -441,10 +441,12 @@ Only struct decoders (feature 1 above) did not ship; see below.
   project principles as specced — a reflect-based type registry breaks
   zero-reflection, and a committed field-map file breaks the
   no-committed-generated-files rule — so it was deferred rather than shipped
-  as designed. It needs its own dedicated design doc before implementation,
-  once an overlay-rewrite mechanism (rather than a committed side file) is
-  worked out. Until then, typed fuzzing via generated decoders is out of
-  scope for `gotest fuzz`, `triage`, `promote`, and `scaffold --fuzz` alike.
+  as designed. [fuzz-structs.md](fuzz-structs.md) supersedes the sketch below
+  with a mechanism that keeps both principles: codecs travel on `*gotest.F`
+  (a type assertion, no `reflect`, no globals) and the wire format is a total
+  consuming reader with no committed field map. Until that ships, typed fuzzing
+  via generated decoders is out of scope for `gotest fuzz`, `triage`,
+  `promote`, and `scaffold --fuzz` alike.
 
 ---
 
