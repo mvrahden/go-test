@@ -161,6 +161,18 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		for _, path := range codecs.PkgPaths {
 			addImport(path)
 		}
+		// strings/strconv/math back the literal-rendering functions, and are
+		// only pulled in when at least one was actually emitted — unlike
+		// gotestruntime above, they are not needed by every codec set.
+		if codecs.NeedsStrings {
+			addImport("strings")
+		}
+		if codecs.NeedsStrconv {
+			addImport("strconv")
+		}
+		if codecs.NeedsMath {
+			addImport("math")
+		}
 	}
 	// This condition must stay identical to the one guarding the ƒfailed
 	// declaration in gotest.suites.tpl. A parallel suite whose every method is

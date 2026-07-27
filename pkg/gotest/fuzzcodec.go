@@ -16,6 +16,11 @@ package gotest
 type Codec[A any] struct {
 	Decode func([]byte) A
 	Encode func(A) []byte
+
+	// Literal renders v as self-contained Go source, e.g. `Request{Name: "a"}`.
+	// Generated code sets it only for types that have such a form; it is nil
+	// otherwise, and every consumer falls back to raw corpus bytes.
+	Literal func(A) string
 }
 
 // encodeAny lets F.Add turn a typed seed into the bytes the rerouted target

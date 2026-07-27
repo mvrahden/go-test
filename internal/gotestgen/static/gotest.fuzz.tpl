@@ -47,7 +47,7 @@ func Fuzz{{ $ts.Identifier }}_{{ $fz.Identifier }}(f *testing.F) {
 {{- range index $.HarvestedSeeds $funcName }}
   f.Add({{ . }})
 {{- end }}
-  s.{{ $fz.Identifier }}(gotest.NewF(f, s.BeforeEach, s.AfterEach{{ range $c := $.FuzzCodecs }}, gotest.Codec[{{ $c.TypeRef }}]{Decode: {{ $c.DecodeFunc }}, Encode: {{ $c.EncodeFunc }}}{{ end }}))
+  s.{{ $fz.Identifier }}(gotest.NewF(f, s.BeforeEach, s.AfterEach{{ range $c := $.FuzzCodecs }}, gotest.Codec[{{ $c.TypeRef }}]{Decode: {{ $c.DecodeFunc }}, Encode: {{ $c.EncodeFunc }}{{ if $c.LiteralFunc }}, Literal: {{ $c.LiteralFunc }}{{ end }}}{{ end }}))
 }
 {{ end }}
 {{- end }}

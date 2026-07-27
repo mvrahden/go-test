@@ -14,6 +14,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/refactor"
 )
 
@@ -266,9 +267,13 @@ func runFuzzTriage(args []string) int {
 			}
 
 			fmt.Printf("  file:  %s\n", displayPath(file))
-			fmt.Printf("  input: %s\n", displayArgs(corpusArgs))
 
 			out, code := rerunCrasher(overlay, target, filepath.Base(file))
+			if lit := extractDecodedInput(out); lit != "" {
+				fmt.Printf("  input: %s\n", lit)
+			} else {
+				fmt.Printf("  input: %s\n", displayArgs(corpusArgs))
+			}
 			if code != 0 {
 				anyStillFailing = true
 				fmt.Printf("  cause: %s\n", extractCause(out))
@@ -297,10 +302,24 @@ func rerunCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzT
 		goArgs = append(goArgs, overlay.OverlayFlag)
 	}
 	pattern := "^" + regexp.QuoteMeta(target.Func) + "/" + regexp.QuoteMeta(hashBase) + "$"
-	goArgs = append(goArgs, "-run="+pattern, target.Package)
+	// -count=1 disables go test's result cache: a passing (stale) crasher
+	// would otherwise be served straight from cache on repeated triage runs,
+	// which replays no output at all — silently dropping the very
+	// FuzzInputPrefix marker line this re-run exists to capture.
+	//
+	// -v is required for the same reason on a PASSING replay: the testing
+	// package only flushes a fuzz corpus replay's captured output (which is
+	// where the FuzzInputPrefix marker line written to stderr ends up) when
+	// the subtest fails OR when running verbose. Without it, a no-longer-
+	// failing (stale) struct crasher would decode fine but print nothing.
+	goArgs = append(goArgs, "-run="+pattern, "-count=1", "-v", target.Package)
 
 	cmd := exec.Command("go", goArgs...) //nolint:gosec // G204: go tool with controlled arguments
 	cmd.Dir = target.Dir
+	// Echo the decoded input on every execution, not just on failure — this
+	// is what makes a no-longer-failing (stale) crasher still show its
+	// decoded struct rather than printing no marker line at all.
+	cmd.Env = append(os.Environ(), protocol.EnvFuzzEchoInput+"=1")
 	out, err := cmd.CombinedOutput()
 
 	code := 0
@@ -310,6 +329,26 @@ func rerunCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzT
 		code = 1
 	}
 	return string(out), code
+}
+
+// extractDecodedInput scans a re-run's combined output for
+// protocol.FuzzInputPrefix lines and returns the literal carried by the
+// LAST one (a failing execution may run the callback body more than once,
+// e.g. under -race retries, so the last line is the one describing the
+// execution whose outcome the caller is reporting). Returns "" when no such
+// line is present — either the target isn't struct-typed, or its codec has
+// no Literal function (see gotestgen's Literal-less types, e.g. a struct
+// with a *int field), in which case the caller falls back to the raw
+// corpus display.
+func extractDecodedInput(output string) string {
+	lit := ""
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSuffix(line, "\r")
+		if rest, ok := strings.CutPrefix(line, protocol.FuzzInputPrefix); ok {
+			lit = rest
+		}
+	}
+	return lit
 }
 
 // extractCause pulls the first "panic:" or "--- FAIL" line out of a failed
@@ -396,7 +435,7 @@ func runFuzzPromote(args []string) int {
 		}
 
 		for _, file := range files {
-			msg, ok := promoteCrasher(target, suite, method, file)
+			msg, ok := promoteCrasher(overlay, target, suite, method, file)
 			fmt.Println(msg)
 			if !ok {
 				failed = true
@@ -427,7 +466,7 @@ func runFuzzPromote(args []string) int {
 // Extracted out of runFuzzPromote's loop so this confident-skip contract —
 // "skipped: ..." printed, crasher file survives — is directly unit
 // testable without a full go/packages load.
-func promoteCrasher(target gotestrunner.FuzzTarget, suite, method, file string) (message string, ok bool) { //nolint:gocritic // hugeParam: stable API
+func promoteCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzTarget, suite, method, file string) (message string, ok bool) { //nolint:gocritic // hugeParam: stable API
 	hashBase := filepath.Base(file)
 
 	corpusArgs, perr := parseCorpusFile(file)
@@ -438,6 +477,17 @@ func promoteCrasher(target gotestrunner.FuzzTarget, suite, method, file string) 
 	spliceArgs := make([]string, len(corpusArgs))
 	for i, a := range corpusArgs {
 		spliceArgs[i] = a.spliceExpr()
+	}
+	// A struct target's corpus entry is an opaque []byte. Re-run it with input
+	// echo on and splice the decoded literal instead, so the promoted seed is
+	// readable source that survives any future change to the wire format.
+	// Guarded to single-corpus-argument targets: only those can carry a
+	// codec — Fuzz2/Fuzz3 are native-types-only by design (Phase A).
+	if len(corpusArgs) == 1 {
+		out, _ := rerunCrasher(overlay, target, hashBase)
+		if lit := extractDecodedInput(out); lit != "" {
+			spliceArgs = []string{lit}
+		}
 	}
 
 	editedFile, line, err := refactor.PromoteFuzzSeed(target.Dir, suite, method, spliceArgs)

@@ -1,8 +1,10 @@
 # Struct Fuzzing
 
-> Status: **Phase A implemented** — supersedes Part 4's "typed fuzzing via generated decoders" sketch in
+> Status: **Phases A and C implemented** — supersedes Part 4's "typed fuzzing via generated decoders" sketch in
 > [bench-fuzz.md](bench-fuzz.md), which was deferred during implementation because its mechanism
-> did not survive contact with the codegen model. Phases B–D remain proposals.
+> did not survive contact with the codegen model. Phases B and D remain proposals.
+> Phase C shipped by a different mechanism than this document originally proposed; see
+> [Phase C, as shipped](#phase-c-as-shipped).
 
 Go's fuzzing engine accepts exactly fifteen argument types.
 Everything real takes structs.
@@ -183,15 +185,15 @@ it is documented, and promote is the mitigation. Codec output is versioned
 (`ƒ_fuzzdec_v1_<Type>`) so a future format change moves every generated identifier rather than
 quietly redefining the old ones.
 
-**In Phase A this mitigation does not yet reach struct targets.** `triage`/`promote` decode a corpus
-entry through Go's native corpus format, where a rerouted struct target's entry is a plain
-`[]byte(...)`. Promotion therefore splices a *byte literal* into user source — it replays correctly
-today (`F.Add` passes an unclaimed `[]byte` straight through to the rerouted target), but it is
-format-bound in exactly the way a Go literal is not. Versioning the generated identifiers cannot
-protect a blob living in a hand-owned file: under a future v2 format it would decode to a different
-value with no error. So for struct targets the durable artifact is source only once **Phase C**
-lands and promotion emits `f.Add(CreateUserRequest{...})`. Until then, treat a promoted struct
-crasher as a cache entry that happens to live in source.
+**Phase C closes this for struct targets.** Before it, `triage`/`promote` read a corpus entry through
+Go's native corpus format, where a rerouted struct target's entry is a plain `[]byte(...)`; promotion
+spliced a *byte literal* into user source. That replayed correctly (`F.Add` passes an unclaimed
+`[]byte` straight through to the rerouted target) but was format-bound in exactly the way a Go
+literal is not — versioning the generated identifiers cannot protect a blob living in a hand-owned
+file, since under a future v2 format it would decode to a different value with no error. Promotion
+now emits `f.Add(CreateUserRequest{...})`, so the durable artifact really is source. A type with no
+literal form would still fall back to the byte literal — but as of [Pointer-to-basic](#pointer-to-basic)
+no such shape remains, so every promoted struct crasher is typed source.
 
 ---
 
@@ -277,18 +279,61 @@ with exactly that advice. Loosening this later is backward compatible.
 the table-test harvester; `f.Add` seed/target type-mismatch reported against the target instead of
 panicking from stdlib.
 
-**Phase C — readable crashers.** This is also what makes promote's output durable for struct
+**Phase C — readable crashers. Shipped**, and this is what makes promote's output durable for struct
 targets rather than format-bound (see "Where corpus durability actually comes from" above).
-`triage`/`promote` currently handle primitives only; struct
-decoding must happen inside the test binary, where the types exist. A generated, normally-skipped
-helper target that decodes a corpus file and prints a Go literal on demand keeps the decoder
-single-sourced instead of reimplementing it in the CLI.
+See [Phase C, as shipped](#phase-c-as-shipped) — the mechanism is not the one sketched here.
 
 **Phase D — on demand.** Maps with canonical ordering, depth-limited recursion, user-registered
 codecs for opaque types.
 
-Phase A is self-contained and shippable: struct fuzzing works end to end, crashers are byte blobs
-until Phase C.
+---
+
+## Phase C, as shipped
+
+This document proposed decoding crashers via a generated, normally-skipped helper target that reads
+a corpus path from an environment variable and prints a Go literal on demand, driven by the CLI.
+That is not what shipped, because a simpler seam turned out to exist.
+
+The generated `Codec[A]` carries a third optional function, `Literal func(A) string`, emitted for
+every type with self-contained Go literal syntax. `gotest.Fuzz`'s codec path reports the decoded
+value **with the failure itself** — printing `ƒƒGOTEST_FUZZ_INPUT: Frame{…}` to stderr on panic or
+`t.Failed()`, and on every execution when `GOTEST_FUZZ_ECHO_INPUT=1`. `triage` and `promote` already
+re-run each crasher; they simply scrape that line from the run they were doing anyway.
+
+Three reasons this is better than the sketch:
+
+- **No new protocol.** No env-var-driven helper target, no extra generated test function in every
+  package that fuzzes a struct, no second way to invoke the test binary.
+- **The decoded input reaches the person who needs it first.** Anyone whose fuzz target crashes sees
+  the struct in ordinary test output, without knowing `triage` exists. The sketch surfaced it only
+  through the CLI.
+- **One decoder, one direction of travel.** The literal is produced where the types already exist,
+  by the same emitter that produces the decoder and encoder, and travels out as text.
+
+The cost is the marker line's format being a contract between `pkg/gotest` and `cmd/gotest`; both
+constants live in `internal/protocol` so they cannot drift.
+
+### Pointer-to-basic
+
+`literalSupported` now accepts exactly the shape set the codec itself accepts — basics, `[]byte`,
+slices, arrays, structs of exported fields, and pointers to any of those. **No fuzzable type lacks a
+literal**, so the raw-bytes fallback survives only as a safety net for a missing marker line, never
+because of a type's shape.
+
+Pointer-to-basic was excluded at first, on the stated grounds that no self-contained expression
+exists. That was wrong, and the correction is worth recording rather than quietly inheriting:
+
+- `&5` is indeed invalid.
+- `&[]int{5}[0]` **is** valid on every version gotest supports — slice indexing is addressable per
+  the spec, whereas `&[...]int{5}[0]`, an array-literal index, is not.
+- Go 1.26 added `new(expr)`, so `new(5)` compiles — but only for modules declaring `go 1.26` or
+  later. The literal is spliced into the *user's* module, whose `go` directive governs, and gotest
+  supports 1.24+, so `new` cannot be emitted. Once the floor moves, switching to `new(5)` is a
+  cosmetic change behind the same API.
+
+So pointers render as `&[]int{5}[0]` (a pointer to a struct keeps the friendlier `&T{…}`). Slightly
+cryptic in a seed list, and still strictly better than the opaque `[]byte("\x03\x00…")` it replaces —
+which was unreadable *and* format-bound.
 
 ---
 

@@ -10,6 +10,7 @@ type Envelope struct {
 	Name string
 	S    crossdep.Setting
 	P    *crossdep.Setting
+	Tag  crossdep.ID
 }
 
 type CrossPkgFuzzTestSuite struct{}

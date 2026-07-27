@@ -2,8 +2,10 @@ package gotest_test
 
 import (
 	"context"
+	"os/exec"
 	"testing"
 
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -167,6 +169,25 @@ func FuzzCodecRightTypeSeedWithTwoCodecs(f *testing.F) {
 	})
 }
 
+// FuzzCodecReportsDecodedInputOnFailure proves the codec path prints the
+// decoded value when an execution fails, which is what makes a struct
+// crasher readable in triage and promotable back into source.
+func FuzzCodecReportsDecodedInputOnFailure(f *testing.F) {
+	type req struct{ Name string }
+	codec := gotest.Codec[req]{
+		Decode:  func(b []byte) req { return req{Name: string(b)} },
+		Encode:  func(v req) []byte { return []byte(v.Name) },
+		Literal: func(v req) string { return `req{Name: "` + v.Name + `"}` },
+	}
+	f.Add([]byte("boom"))
+	gf := gotest.NewF(f, nil, nil, codec)
+	gotest.Fuzz(gf, func(t *gotest.T, v req) {
+		if v.Name == "boom" {
+			t.Errorf("deliberate failure for input reporting")
+		}
+	})
+}
+
 // FWrapperTestSuite is a normal gotest suite covering what's assertable
 // about *gotest.F outside of a real fuzz target. *testing.F has no public
 // constructor, so an actual *gotest.F can only be built inside a genuine
@@ -238,5 +259,16 @@ func (s *FWrapperTestSuite) TestSeedTypeMismatch(t *gotest.T) {
 		out := gotest.ExportEncodeSeeds(f, args)
 		gotest.Equal[any](it, []byte("hi"), out[0])
 		gotest.Equal[any](it, codecOther{Label: "hi"}, args[0], "f.Add(vals...) must not mutate the caller's slice")
+	})
+}
+
+func (s *FWrapperTestSuite) TestDecodedInputReporting(t *gotest.T) {
+	t.It("prints the decoded literal to stderr when an execution fails", func(it *gotest.T) {
+		// The target fuzz func fails deliberately, so "go test" exits
+		// non-zero; the error is expected and not the thing under test —
+		// see e.g. e2e_suite_test.go's identical out, _ := ... idiom for a
+		// subprocess whose non-zero exit is the point, not a defect.
+		out, _ := exec.Command("go", "test", "-run", "^FuzzCodecReportsDecodedInputOnFailure$", ".").CombinedOutput()
+		gotest.Contains(it, string(out), protocol.FuzzInputPrefix+`req{Name: "boom"}`)
 	})
 }

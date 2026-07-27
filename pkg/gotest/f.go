@@ -2,7 +2,11 @@ package gotest
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"testing"
+
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // F wraps *testing.F for fuzz targets, pairing it with optional
@@ -142,8 +146,29 @@ func Fuzz[A any](f *F, fn func(*T, A)) {
 			continue
 		}
 		f.checkSeeds(i)
+		echo := os.Getenv(protocol.EnvFuzzEchoInput) == "1"
 		f.f.Fuzz(func(t *testing.T, raw []byte) {
-			f.each(t, func(tt *T) { fn(tt, codec.Decode(raw)) })
+			v := codec.Decode(raw)
+			if codec.Literal != nil {
+				if echo {
+					reportFuzzInput(codec.Literal(v))
+				} else {
+					// A panic aborts the process before t.Cleanup runs, so the
+					// report has to happen in a defer that survives unwinding.
+					// The literal is built here, not above, so the common
+					// pass-with-echo-off path never constructs it.
+					defer func() {
+						if r := recover(); r != nil {
+							reportFuzzInput(codec.Literal(v))
+							panic(r)
+						}
+						if t.Failed() {
+							reportFuzzInput(codec.Literal(v))
+						}
+					}()
+				}
+			}
+			f.each(t, func(tt *T) { fn(tt, v) })
 		})
 		return
 	}
@@ -151,6 +176,12 @@ func Fuzz[A any](f *F, fn func(*T, A)) {
 	f.f.Fuzz(func(t *testing.T, a A) {
 		f.each(t, func(tt *T) { fn(tt, a) })
 	})
+}
+
+// reportFuzzInput prints literal, the decoded input of a struct-typed fuzz
+// execution, to stderr for triage and promote to scrape.
+func reportFuzzInput(literal string) {
+	fmt.Fprintln(os.Stderr, protocol.FuzzInputPrefix+literal)
 }
 
 // Fuzz2 is the two-argument form of Fuzz. Multi-argument targets are native

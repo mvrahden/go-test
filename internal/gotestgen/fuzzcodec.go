@@ -28,6 +28,14 @@ type FuzzCodecRef struct {
 	TypeRef    string // Go type expression valid in the generated file, e.g. "Request" or "user.Request"
 	DecodeFunc string // e.g. "ƒ_fuzzdec_v1_Request"
 	EncodeFunc string // e.g. "ƒ_fuzzenc_v1_Request"
+
+	// LiteralFunc is the emitted "func(T) string" identifier, e.g.
+	// "ƒ_fuzzlit_v1_Request", or "" when TypeRef has no self-contained Go
+	// literal form — some reachable part of it is a shape with no syntax
+	// that reconstructs it without referencing generated code (a map, an
+	// interface, ...). "" means the generated Codec[T] leaves Literal nil,
+	// and every consumer falls back to raw corpus bytes.
+	LiteralFunc string
 }
 
 // FuzzCodecSet is everything the renderer needs to emit struct-fuzzing
@@ -36,6 +44,17 @@ type FuzzCodecSet struct {
 	Codecs   []FuzzCodecRef // one per non-native type the package fuzzes, sorted by TypeRef
 	Source   string         // deduplicated source of every decoder/encoder and helper
 	PkgPaths []string       // import paths Source references, excluding gotestruntime
+
+	// NeedsStrings/NeedsStrconv/NeedsMath report whether Source uses the
+	// corresponding standard library package. They are independent of
+	// PkgPaths (which only tracks packages the FUZZED TYPES themselves
+	// reference) because these three are implementation details of literal
+	// rendering — pulled in only when at least one Literal function was
+	// actually emitted, so a fixture with no literal support adds none of
+	// them and never trips "imported and not used".
+	NeedsStrings bool
+	NeedsStrconv bool
+	NeedsMath    bool
 }
 
 // BuildFuzzCodecs resolves every non-native fuzz argument type in pkg and
@@ -115,7 +134,17 @@ func BuildFuzzCodecs(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) (
 		fmt.Fprintf(&body, "\nfunc %s(ƒv %s) []byte {\n\tƒw := gotestruntime.NewFuzzWriter()\n\t%s\n\treturn ƒw.Out()\n}\n",
 			encName, p.typeRef, writeStmt)
 
-		refs = append(refs, FuzzCodecRef{TypeRef: p.typeRef, DecodeFunc: decName, EncodeFunc: encName})
+		litFunc := ""
+		if e.literalSupported(p.typ) {
+			e.path = []string{p.typeRef}
+			litName, err := e.literalHelper(p.typ)
+			if err != nil {
+				return nil, fmt.Errorf("fuzz target %s: %w", p.funcName, err)
+			}
+			litFunc = "ƒ_fuzzlit_" + fuzzCodecVersion + "_" + litName
+		}
+
+		refs = append(refs, FuzzCodecRef{TypeRef: p.typeRef, DecodeFunc: decName, EncodeFunc: encName, LiteralFunc: litFunc})
 	}
 
 	var src strings.Builder
@@ -123,6 +152,12 @@ func BuildFuzzCodecs(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) (
 		src.WriteString(e.helpers[name])
 	}
 	src.WriteString(body.String())
+	if e.needsMath {
+		fmt.Fprintf(&src, literalFloatHelperTpl, fuzzCodecVersion)
+	}
+	for _, name := range e.literalOrder {
+		src.WriteString(e.literals[name])
+	}
 
 	pkgPaths := make([]string, 0, len(e.pkgPaths))
 	for path := range e.pkgPaths {
@@ -130,7 +165,14 @@ func BuildFuzzCodecs(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) (
 	}
 	sort.Strings(pkgPaths)
 
-	return &FuzzCodecSet{Codecs: refs, Source: src.String(), PkgPaths: pkgPaths}, nil
+	return &FuzzCodecSet{
+		Codecs:       refs,
+		Source:       src.String(),
+		PkgPaths:     pkgPaths,
+		NeedsStrings: e.needsStrings,
+		NeedsStrconv: e.needsStrconv,
+		NeedsMath:    e.needsMath,
+	}, nil
 }
 
 // nativeFuzzType reports whether Go's fuzzing engine accepts t directly.
@@ -166,6 +208,24 @@ type fuzzEmitter struct {
 	order    []string          // helper identifiers, in emission order
 	stack    []string          // type strings currently being emitted (cycle detection)
 	path     []string          // field path, for error messages
+
+	// literals/literalOrder mirror helpers/order, but for the composite
+	// literal-rendering functions (ƒ_fuzzlit_*). They are keyed on the same
+	// identifiers assignName hands out for helpers/idents, so a type's
+	// read/write/literal helpers always share one suffix. litStack mirrors
+	// stack's cycle-detection discipline for the literal walk.
+	literals     map[string]string
+	literalOrder []string
+	litStack     []string
+
+	// needsStrings/needsStrconv/needsMath track which standard library
+	// packages the emitted literal source actually references, so
+	// BuildFuzzCodecs can report exactly the imports the renderer needs to
+	// add — never more, since an unused import is a compile error in the
+	// generated file.
+	needsStrings bool
+	needsStrconv bool
+	needsMath    bool
 }
 
 func newFuzzEmitter(pkg *packages.Package) *fuzzEmitter {
@@ -175,6 +235,7 @@ func newFuzzEmitter(pkg *packages.Package) *fuzzEmitter {
 		idents:   map[string]string{},
 		taken:    map[string]bool{},
 		helpers:  map[string]string{},
+		literals: map[string]string{},
 	}
 	e.qual = func(p *types.Package) string {
 		if p == nil || p == e.genPkg {
@@ -508,6 +569,18 @@ func (e *fuzzEmitter) reject(t types.Type, reason string) error {
 
 func (e *fuzzEmitter) typeRef(t types.Type) string { return types.TypeString(t, e.qual) }
 
+// isLiteralStructShape reports whether t's underlying type is a struct —
+// the shape that gets the "&T{...}" pointer literal form rather than the
+// "&[]T{elem}[0]" slice-index form.
+func isLiteralStructShape(t types.Type) bool {
+	u := types.Unalias(t)
+	if named, ok := u.(*types.Named); ok {
+		u = named.Underlying()
+	}
+	_, ok := u.(*types.Struct)
+	return ok
+}
+
 // isUnnamedByte reports whether t is exactly the predeclared byte/uint8 —
 // the element type that makes a slice encodable as a length-prefixed blob. A
 // named byte type is not, since ƒr.ByteSlice() would yield the wrong slice
@@ -515,4 +588,355 @@ func (e *fuzzEmitter) typeRef(t types.Type) string { return types.TypeString(t, 
 func isUnnamedByte(t types.Type) bool {
 	b, ok := types.Unalias(t).(*types.Basic)
 	return ok && b.Kind() == types.Uint8
+}
+
+// literalFloatHelperTpl is the one shared, non-memoised helper every
+// generated file with a reachable float gets at most once. It exists
+// because rendering a float needs a conditional (is it NaN? +Inf? -Inf?),
+// and a Go expression cannot branch — every literal function that reaches a
+// float calls this rather than repeating the branch inline. It is purely an
+// implementation detail of the GENERATED FILE: the ƒ_* name never appears in
+// the STRING a literal function returns, which is the only thing that gets
+// spliced into a user's file, so this helper existing at all does not
+// violate the self-contained-string constraint.
+const literalFloatHelperTpl = `
+func ƒ_fuzzlitfloat_%[1]s(v float64) string {
+	if math.IsNaN(v) {
+		return "math.NaN()"
+	}
+	if math.IsInf(v, 1) {
+		return "math.Inf(1)"
+	}
+	if math.IsInf(v, -1) {
+		return "math.Inf(-1)"
+	}
+	return strconv.FormatFloat(v, 'g', -1, 64)
+}
+`
+
+// literalSupported reports whether t has a self-contained Go literal form —
+// the same shapes helperSource emits, minus anything containing an
+// unsupported shape. Every pointer whose element is itself supported
+// qualifies: a pointer-to-struct renders as "&T{...}", and everything else
+// (pointer-to-basic, -slice, -array, -pointer, ...) renders as
+// "&[]T{elem}[0]" — slice indexing is an addressable operand per the spec,
+// so this is valid Go on every version gotest supports, unlike the bare
+// "&5" form. It is a pure read of the type graph: it never emits anything
+// and never touches the helpers/literals memoisation maps, so it is safe to
+// call speculatively before deciding whether to bother building a literal
+// helper at all.
+func (e *fuzzEmitter) literalSupported(t types.Type) bool {
+	u := types.Unalias(t)
+	ts := types.TypeString(u, e.qual)
+	for _, s := range e.litStack {
+		if s == ts {
+			// A cycle here would mean t is recursive, which the read/write
+			// pass already rejects with a hard error before literal support
+			// is ever consulted for it. This branch is a defensive backstop
+			// against an unbounded walk, not a reachable outcome today.
+			return false
+		}
+	}
+
+	underlying := u
+	if named, ok := u.(*types.Named); ok {
+		underlying = named.Underlying()
+	}
+
+	switch under := underlying.(type) {
+	case *types.Basic:
+		_, ok := fuzzBasicMethod[under.Kind()]
+		return ok
+
+	case *types.Slice:
+		if isUnnamedByte(under.Elem()) {
+			return true
+		}
+		e.litStack = append(e.litStack, ts)
+		ok := e.literalSupported(under.Elem())
+		e.litStack = e.litStack[:len(e.litStack)-1]
+		return ok
+
+	case *types.Array:
+		e.litStack = append(e.litStack, ts)
+		ok := e.literalSupported(under.Elem())
+		e.litStack = e.litStack[:len(e.litStack)-1]
+		return ok
+
+	case *types.Struct:
+		e.litStack = append(e.litStack, ts)
+		defer func() { e.litStack = e.litStack[:len(e.litStack)-1] }()
+		for i := 0; i < under.NumFields(); i++ {
+			f := under.Field(i)
+			if f.Name() == "_" {
+				continue // blank fields are unreachable and always zero
+			}
+			if !f.Exported() {
+				return false
+			}
+			if !e.literalSupported(f.Type()) {
+				return false
+			}
+		}
+		return true
+
+	case *types.Pointer:
+		e.litStack = append(e.litStack, ts)
+		ok := e.literalSupported(under.Elem())
+		e.litStack = e.litStack[:len(e.litStack)-1]
+		return ok
+
+	default:
+		return false
+	}
+}
+
+// wrapLiteral wraps inner — a Go expression that evaluates to the plain
+// rendering of a basic value — with an explicit conversion to typeName, when
+// typeName is non-empty. Go's explicit conversion syntax accepts any
+// numeric-, string-, or bool-compatible expression regardless of its own
+// static type, so this is always assignable — see the design table's
+// "explicit conversion is always assignable" note. typeName == "" returns
+// inner unchanged.
+func wrapLiteral(typeName, inner string) string {
+	if typeName == "" {
+		return inner
+	}
+	return fmt.Sprintf("%q + %s + %q", typeName+"(", inner, ")")
+}
+
+// basicLiteralExpr renders the PLAIN (unwrapped) value of a basic-kinded
+// expression src as a Go expression string that evaluates, at run time in
+// the generated file, to that value's textual form. The caller — via
+// literalBasicWrapped — applies wrapLiteral on top when a named type, or an
+// unnamed float32 (whose non-finite rendering has concrete type float64, a
+// mismatch), needs the assignment to type-check.
+func (e *fuzzEmitter) basicLiteralExpr(b *types.Basic, src string) (string, error) {
+	e.needsStrconv = true
+	switch b.Kind() {
+	case types.Bool:
+		return fmt.Sprintf("strconv.FormatBool(bool(%s))", src), nil
+	case types.Int, types.Int8, types.Int16, types.Int32, types.Int64:
+		return fmt.Sprintf("strconv.FormatInt(int64(%s), 10)", src), nil
+	case types.Uint, types.Uint8, types.Uint16, types.Uint32, types.Uint64:
+		return fmt.Sprintf("strconv.FormatUint(uint64(%s), 10)", src), nil
+	case types.Float32, types.Float64:
+		e.needsMath = true
+		return fmt.Sprintf("ƒ_fuzzlitfloat_%s(float64(%s))", fuzzCodecVersion, src), nil
+	case types.String:
+		return fmt.Sprintf("strconv.Quote(string(%s))", src), nil
+	}
+	return "", fmt.Errorf("basicLiteralExpr: kind %v has no literal rendering", b.Kind())
+}
+
+// literalBasicWrapped renders t — guaranteed by literalSupported to be a
+// basic type or a named type over one — as a self-contained Go expression
+// string, applying the explicit-conversion wrap a named type (or an unnamed
+// float32) needs to type-check at the splice site.
+func (e *fuzzEmitter) literalBasicWrapped(t types.Type, src string) (string, error) {
+	u := types.Unalias(t)
+	if named, ok := u.(*types.Named); ok {
+		b, ok := named.Underlying().(*types.Basic)
+		if !ok {
+			return "", fmt.Errorf("literalBasicWrapped: %s is not a named basic type", e.typeRef(t))
+		}
+		inner, err := e.basicLiteralExpr(b, src)
+		if err != nil {
+			return "", err
+		}
+		return wrapLiteral(e.typeRef(t), inner), nil
+	}
+	b, ok := u.(*types.Basic)
+	if !ok {
+		return "", fmt.Errorf("literalBasicWrapped: %s is not a basic type", e.typeRef(t))
+	}
+	inner, err := e.basicLiteralExpr(b, src)
+	if err != nil {
+		return "", err
+	}
+	if b.Kind() == types.Float32 {
+		return wrapLiteral("float32", inner), nil
+	}
+	return inner, nil
+}
+
+// literalExpr returns a Go expression that, at run time in the generated
+// file, evaluates to src's (of type t) self-contained literal rendering.
+// Basic-kinded types (named or not) are always inlined directly, mirroring
+// basicRead/basicWrite; composite types route through literalHelper exactly
+// as helperRead/helperWrite do, so a composite type used from N call sites
+// gets exactly one literal function.
+func (e *fuzzEmitter) literalExpr(t types.Type, src string) (string, error) {
+	u := types.Unalias(t)
+
+	if named, ok := u.(*types.Named); ok {
+		if _, ok := named.Underlying().(*types.Basic); ok {
+			return e.literalBasicWrapped(t, src)
+		}
+		return e.literalHelperCall(t, src)
+	}
+
+	switch u.(type) {
+	case *types.Basic:
+		return e.literalBasicWrapped(t, src)
+	case *types.Slice, *types.Struct, *types.Array, *types.Pointer:
+		return e.literalHelperCall(t, src)
+	}
+	return "", fmt.Errorf("literalExpr: %s has no literal rendering", e.typeRef(t))
+}
+
+func (e *fuzzEmitter) literalHelperCall(t types.Type, src string) (string, error) {
+	name, err := e.literalHelper(t)
+	if err != nil {
+		return "", err
+	}
+	return "ƒ_fuzzlit_" + fuzzCodecVersion + "_" + name + "(" + src + ")", nil
+}
+
+// literalHelper emits the literal-rendering function for a composite type
+// (or, at the top level from BuildFuzzCodecs, any supported type) exactly
+// once and returns its identifier. The identifier comes from the same
+// assignName registry helper/helperRead/helperWrite use, so a type's
+// read/write/literal helpers always share one suffix — e.g. Request's
+// decoder is ƒ_fuzzdec_v1_Request and its literal function is
+// ƒ_fuzzlit_v1_Request.
+func (e *fuzzEmitter) literalHelper(t types.Type) (string, error) {
+	t = types.Unalias(t)
+	ts := types.TypeString(t, e.qual)
+	for _, s := range e.litStack {
+		if s == ts {
+			return "", fmt.Errorf("type %s is recursive — recursive types are not supported", ts)
+		}
+	}
+	name := e.assignName(ts)
+	if _, done := e.literals[name]; done {
+		return name, nil
+	}
+
+	e.litStack = append(e.litStack, ts)
+	src, err := e.literalHelperSource(t, ts, name)
+	e.litStack = e.litStack[:len(e.litStack)-1]
+	if err != nil {
+		return "", err
+	}
+
+	e.literals[name] = src
+	e.literalOrder = append(e.literalOrder, name)
+	return name, nil
+}
+
+// literalHelperSource builds the func(typeRef) string body for one type,
+// mirroring helperSource's switch over struct/slice/array/pointer — plus a
+// basic case, since literalHelper (unlike helper) is also the entry point
+// BuildFuzzCodecs uses directly for a top-level type that turns out to be a
+// bare basic or a named type over one (e.g. fuzzing a `type Priority int`
+// argument directly, with no enclosing struct).
+func (e *fuzzEmitter) literalHelperSource(t types.Type, typeRef, name string) (string, error) {
+	funcName := "ƒ_fuzzlit_" + fuzzCodecVersion + "_" + name
+	var b strings.Builder
+	fmt.Fprintf(&b, "\nfunc %s(ƒv %s) string {\n", funcName, typeRef)
+
+	u := types.Unalias(t)
+	var underlying types.Type = u
+	if named, ok := u.(*types.Named); ok {
+		underlying = named.Underlying()
+	}
+
+	switch under := underlying.(type) {
+	case *types.Basic:
+		expr, err := e.literalBasicWrapped(t, "ƒv")
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprintf(&b, "\treturn %s\n", expr)
+
+	case *types.Struct:
+		e.needsStrings = true
+		b.WriteString("\tvar ƒb strings.Builder\n")
+		fmt.Fprintf(&b, "\tƒb.WriteString(%q)\n", typeRef+"{")
+		wrote := false
+		for i := 0; i < under.NumFields(); i++ {
+			f := under.Field(i)
+			if f.Name() == "_" || !f.Exported() {
+				continue // unreachable (blank) or already rejected upstream
+			}
+			if wrote {
+				b.WriteString("\tƒb.WriteString(\", \")\n")
+			}
+			wrote = true
+			fmt.Fprintf(&b, "\tƒb.WriteString(%q)\n", f.Name()+": ")
+			expr, err := e.literalExpr(f.Type(), "ƒv."+f.Name())
+			if err != nil {
+				return "", err
+			}
+			fmt.Fprintf(&b, "\tƒb.WriteString(%s)\n", expr)
+		}
+		b.WriteString("\tƒb.WriteString(\"}\")\n")
+		b.WriteString("\treturn ƒb.String()\n")
+
+	case *types.Slice:
+		b.WriteString("\tif ƒv == nil {\n\t\treturn \"nil\"\n\t}\n")
+		if isUnnamedByte(under.Elem()) {
+			e.needsStrconv = true
+			fmt.Fprintf(&b, "\treturn %q + strconv.Quote(string(ƒv)) + %q\n", typeRef+"(", ")")
+		} else {
+			e.needsStrings = true
+			b.WriteString("\tvar ƒb strings.Builder\n")
+			fmt.Fprintf(&b, "\tƒb.WriteString(%q)\n", typeRef+"{")
+			b.WriteString("\tfor ƒi := range ƒv {\n")
+			b.WriteString("\t\tif ƒi > 0 {\n\t\t\tƒb.WriteString(\", \")\n\t\t}\n")
+			expr, err := e.literalExpr(under.Elem(), "ƒv[ƒi]")
+			if err != nil {
+				return "", err
+			}
+			fmt.Fprintf(&b, "\t\tƒb.WriteString(%s)\n", expr)
+			b.WriteString("\t}\n")
+			b.WriteString("\tƒb.WriteString(\"}\")\n")
+			b.WriteString("\treturn ƒb.String()\n")
+		}
+
+	case *types.Array:
+		e.needsStrings = true
+		b.WriteString("\tvar ƒb strings.Builder\n")
+		fmt.Fprintf(&b, "\tƒb.WriteString(%q)\n", typeRef+"{")
+		b.WriteString("\tfor ƒi := range ƒv {\n")
+		b.WriteString("\t\tif ƒi > 0 {\n\t\t\tƒb.WriteString(\", \")\n\t\t}\n")
+		expr, err := e.literalExpr(under.Elem(), "ƒv[ƒi]")
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprintf(&b, "\t\tƒb.WriteString(%s)\n", expr)
+		b.WriteString("\t}\n")
+		b.WriteString("\tƒb.WriteString(\"}\")\n")
+		b.WriteString("\treturn ƒb.String()\n")
+
+	case *types.Pointer:
+		b.WriteString("\tif ƒv == nil {\n\t\treturn \"nil\"\n\t}\n")
+		expr, err := e.literalExpr(under.Elem(), "*ƒv")
+		if err != nil {
+			return "", err
+		}
+		if isLiteralStructShape(under.Elem()) {
+			// "&T{...}" reads better than the slice-index form and is valid
+			// Go for any struct element, so keep it for pointer-to-struct.
+			fmt.Fprintf(&b, "\treturn \"&\" + %s\n", expr)
+		} else {
+			// No bare "&5" exists in Go, but slice indexing is an
+			// addressable operand per the spec, so "&[]T{elem}[0]" is valid
+			// on every Go version gotest supports (unlike new(expr), which
+			// Go 1.26 added but which depends on the SPLICE SITE's module
+			// declaring go 1.26+ — not something a codec emitted here can
+			// assume). Reusing literalExpr's element rendering means a named
+			// basic still gets its explicit conversion, e.g.
+			// "&[]Level{Level(3)}[0]".
+			elemTypeRef := e.typeRef(under.Elem())
+			fmt.Fprintf(&b, "\treturn %q + %s + %q\n", "&[]"+elemTypeRef+"{", expr, "}[0]")
+		}
+
+	default:
+		return "", fmt.Errorf("literalHelperSource: %s has no literal rendering", typeRef)
+	}
+
+	b.WriteString("}\n")
+	return b.String(), nil
 }

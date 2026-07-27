@@ -638,6 +638,11 @@ BenchmarkNotificationDispatchBench
 
 Each line reports `ns/op`, `B/op`, and `allocs/op` — the same numbers `go test -bench` prints, rendered as a spec.
 
+### Worked example
+
+[`examples/benchmarking`](examples/benchmarking) benchmarks the hot path of an LRU cache: four benchmarks over the hit, miss, eviction, and cold-fill paths, a `BeforeAll`-only fixture supplying a deterministic key corpus, and the allocation contrast between an allocation-free `Get` and an allocating `Put`.
+It also walks the baseline workflow end to end, with real `--save`/`--against`/`--gate` output.
+
 ## Fuzzing
 
 Fuzz methods live on the same suites as tests — same struct, same lifecycle, own subcommand.
@@ -692,7 +697,11 @@ func (s *UserServiceTestSuite) FuzzCreate(f *gotest.F) {
 
 Seeds you write stay plain Go literals — `f.Add` encodes any argument a codec claims, and rejects a seed whose type isn't the one the target fuzzes rather than letting it decode as an unrelated value.
 
-Crashers are not yet symmetrical: `gotest fuzz promote` splices the corpus entry back as a `[]byte(...)` literal for struct targets, which replays correctly but is tied to the current encoding. Readable `f.Add(CreateUserRequest{...})` promotion needs struct decoding inside the test binary and is not implemented yet.
+Crashers stay readable in both directions.
+When a struct-typed execution fails, the decoded value is printed alongside the failure — `CreateUserRequest{Email: "a@\x00", Age: -1}`, not the raw corpus bytes — and `gotest fuzz promote` splices that same literal back into the target as a typed `f.Add(CreateUserRequest{...})` seed.
+A promoted seed is therefore ordinary Go source, which is what makes it outlive any future change to the encoding.
+Literal rendering covers every shape the codec itself accepts, so a promoted crasher is always typed source.
+Pointer fields included: a `*int` renders as `&[]int{5}[0]`, since `&5` is not valid Go and `new(5)` — added in Go 1.26 — would not compile in a module still declaring `go 1.24`.
 
 Fields decode in declaration order from a byte cursor, and decoding is total: a short or empty input yields zero values rather than a rejected execution.
 **Appending a field is therefore corpus-safe** — new trailing fields read from an exhausted cursor and decode as zero, leaving every existing field's value intact.
@@ -785,13 +794,19 @@ Exits 1 if any crasher's re-run still fails, 0 otherwise.
 The crasher is now a committed regression test that replays for free on every ordinary run, same as any seed under [Seed replay](#seed-replay).
 A crasher whose originating method can't be located with confidence is skipped with a warning and left in place; promote never partially edits source.
 
-Both commands are limited to Go's natively fuzzable primitive types (string, `[]byte`, bool, and the int/uint/float variants) — struct-typed fuzz callbacks aren't supported yet (see the [design doc](docs/design/bench-fuzz.md)).
+Struct-typed targets work the same way: triage prints the decoded struct on the `input:` line, and promote splices it as a typed `f.Add(T{...})` seed rather than an opaque byte string.
+See [Struct arguments](#struct-arguments) for the shapes that carry a literal and the raw-bytes fallback for those that don't.
 
 ### Known limitation
 
 Top-level stdlib fuzz functions — a bare `func FuzzXxx(f *testing.F)` not attached to any suite — are not discovered or run by the gotest runner at all.
 They only run via `go test -run`/`go test -fuzz` directly; `gotest ./...`, `gotest fuzz`, and every other gotest subcommand silently ignore them.
 Only `Fuzz*` methods on `*TestSuite` structs participate in seed replay and the `gotest fuzz` orchestrator.
+
+### Worked example
+
+[`examples/fuzzing`](examples/fuzzing) fuzzes a message broker's wire-frame codec: a struct-typed round-trip target, a `[]byte` target asserting the decoder never panics on adversarial input, a string idempotence target, and a `Fuzz2` target showing why multi-argument targets take native types only.
+Its README records a real crash-to-regression-test cycle — the fuzzer finding a framing bug, `triage` decoding it, `promote` splicing it back as a typed seed.
 
 ## Configuration
 

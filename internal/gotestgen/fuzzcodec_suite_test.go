@@ -68,6 +68,14 @@ func buildCodecs(t *gotest.T, fixture string) (*gotestgen.FuzzCodecSet, error) {
 	return gotestgen.BuildFuzzCodecs(pkg, spec.EffectiveTestSuites)
 }
 
+// build is buildCodecs for tests that only care about the successful-build
+// shape — it fails the test immediately on any generation error.
+func (s *FuzzCodecTestSuite) build(t *gotest.T, fixture string) *gotestgen.FuzzCodecSet {
+	set, err := buildCodecs(t, fixture)
+	gotest.NoError(t, err)
+	return set
+}
+
 func (s *FuzzCodecTestSuite) TestEmitsCodecsForNonNativeTypes(t *gotest.T) {
 	t.It("emits exactly one codec for the struct target and none for the native one", func(it *gotest.T) {
 		set, err := buildCodecs(it, "TestFuzzCodec_StructTarget")
@@ -136,6 +144,33 @@ func (s *FuzzCodecTestSuite) TestCrossPackageTypes(t *gotest.T) {
 		gotest.Contains(it, set.Source, "ƒv.S = ƒ_fuzzread_v1_crossdep_Setting(ƒr)")
 		gotest.Contains(it, set.Source, "func ƒ_fuzzread_v1_ptr_crossdep_Setting(ƒr *gotestruntime.FuzzReader) *crossdep.Setting {")
 	})
+
+	// Regression coverage for a Critical review finding: literalBasicWrapped
+	// used to wrap a named basic with its bare identifier (named.Obj().Name())
+	// instead of the qualified type expression (e.typeRef(t)), so a
+	// cross-package named basic like crossdep.ID rendered as the literal
+	// "ID(...)" — out of scope, and a non-compiling splice, in the user's
+	// file. Both call sites that fed literalBasicWrapped are covered here: a
+	// struct field (TestFuzzCodec_CrossPackage.Envelope.Tag) and a bare
+	// top-level fuzz target with no enclosing struct
+	// (TestFuzzCodec_CrossPackageBasic).
+	t.It("qualifies a cross-package named basic used as a struct field", func(it *gotest.T) {
+		set, err := buildCodecs(it, "TestFuzzCodec_CrossPackage")
+		gotest.NoError(it, err)
+
+		gotest.Contains(it, set.Source, `"crossdep.ID(" + strconv.Quote(string(ƒv.Tag)) + ")"`)
+		gotest.NotContains(it, set.Source, `"ID(" + strconv.Quote`,
+			"the bare identifier is out of scope outside the crossdep package")
+	})
+
+	t.It("qualifies a cross-package named basic fuzzed directly, with no enclosing struct", func(it *gotest.T) {
+		set, err := buildCodecs(it, "TestFuzzCodec_CrossPackageBasic")
+		gotest.NoError(it, err)
+
+		gotest.Len(it, set.Codecs, 1)
+		gotest.Equal(it, "ƒ_fuzzlit_v1_crossdep_ID", set.Codecs[0].LiteralFunc)
+		gotest.Contains(it, set.Source, `return "crossdep.ID(" + strconv.Quote(string(ƒv)) + ")"`)
+	})
 }
 
 // TestAliasDeduplication pins that an alias and its target share one codec
@@ -151,6 +186,34 @@ func (s *FuzzCodecTestSuite) TestAliasDeduplication(t *gotest.T) {
 		gotest.Equal(it, "Inner", set.Codecs[0].TypeRef)
 		gotest.Equal(it, 1, strings.Count(set.Source, "func ƒ_fuzzread_v1_Inner("))
 		gotest.NotContains(it, set.Source, "ƒ_fuzzread_v1_AliasOf")
+	})
+}
+
+func (s *FuzzCodecTestSuite) TestBuildFuzzCodecs_LiteralFuncs(t *gotest.T) {
+	t.It("emits a literal function for a struct target", func(it *gotest.T) {
+		set := s.build(it, "TestFuzzCodec_StructTarget")
+		gotest.Len(it, set.Codecs, 1)
+		gotest.Equal(it, "ƒ_fuzzlit_v1_Request", set.Codecs[0].LiteralFunc)
+		gotest.Contains(it, set.Source, "func ƒ_fuzzlit_v1_Request(ƒv Request) string {")
+		gotest.Contains(it, set.Source, `strconv.Quote(`)
+	})
+
+	t.It("emits a literal function for a pointer-to-basic field, using the slice-index form", func(it *gotest.T) {
+		set := s.build(it, "TestFuzzCodec_PtrBasicField")
+		gotest.Len(it, set.Codecs, 1)
+		gotest.NotEmpty(it, set.Codecs[0].LiteralFunc, "a *int field now has a self-contained literal form")
+		gotest.Contains(it, set.Source, `"&[]int{"`,
+			"a non-nil *int renders as the addressable slice-index form, since \"&5\" is not valid Go")
+		gotest.Contains(it, set.Source, `return "nil"`,
+			"a nil *int still renders as the bare nil literal")
+	})
+
+	t.It("emits a literal function for a bare named-basic target with no enclosing struct", func(it *gotest.T) {
+		set := s.build(it, "TestFuzzCodec_NamedBasicTarget")
+		gotest.Len(it, set.Codecs, 1)
+		gotest.Equal(it, "ƒ_fuzzlit_v1_Level", set.Codecs[0].LiteralFunc)
+		gotest.Contains(it, set.Source, "func ƒ_fuzzlit_v1_Level(ƒv Level) string {")
+		gotest.Contains(it, set.Source, `return "Level(" + strconv.FormatInt(int64(ƒv), 10) + ")"`)
 	})
 }
 

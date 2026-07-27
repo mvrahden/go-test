@@ -625,7 +625,7 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 
 			gotest.Contains(it, out, `"github.com/mvrahden/go-test/pkg/gotestruntime"`)
 			gotest.Contains(it, out, "func ƒ_fuzzdec_v1_Request(ƒb []byte) Request {")
-			gotest.Contains(it, out, "gotest.Codec[Request]{Decode: ƒ_fuzzdec_v1_Request, Encode: ƒ_fuzzenc_v1_Request}")
+			gotest.Contains(it, out, "gotest.Codec[Request]{Decode: ƒ_fuzzdec_v1_Request, Encode: ƒ_fuzzenc_v1_Request, Literal: ƒ_fuzzlit_v1_Request}")
 			gotest.Contains(it, out, "s.FuzzCreate(gotest.NewF(f, s.BeforeEach, s.AfterEach, gotest.Codec[Request]{")
 			gotest.Contains(it, out, "s.FuzzNative(gotest.NewF(f, s.BeforeEach, s.AfterEach, gotest.Codec[Request]{")
 		})

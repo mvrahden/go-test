@@ -11,7 +11,9 @@ type Address struct {
 
 // Rich exercises every kind the Phase A wire format supports: basics of
 // every width, named types over basics, string and []byte, a slice, a fixed
-// array, a pointer, and a nested struct — inline and behind a slice.
+// array, a nested struct — inline and behind a slice — a pointer-to-struct,
+// and a pointer-to-basic (which renders as the "&[]int{...}[0]" slice-index
+// literal form, since "&5" is not valid Go).
 type Rich struct {
 	Name     string
 	Blob     []byte
@@ -35,4 +37,5 @@ type Rich struct {
 	Home     *Address
 	Nested   Address
 	Counters []Address
+	Count    *int
 }

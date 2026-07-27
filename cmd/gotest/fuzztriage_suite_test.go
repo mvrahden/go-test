@@ -19,11 +19,12 @@ import (
 // lifecycle convention: no defer/Cleanup, resources are suite fields torn
 // down in AfterEach.
 type FuzzTriagePromoteTestSuite struct {
-	binary        string
-	repoRoot      string
-	suiteTestPath string
-	fuzzRootDir   string // examples/notification/testdata/fuzz — entirely ours, safe to remove wholesale
-	corpusFile    string
+	binary           string
+	repoRoot         string
+	suiteTestPath    string
+	fuzzRootDir      string // examples/notification/testdata/fuzz — entirely ours, safe to remove wholesale
+	corpusFile       string
+	structCorpusFile string
 
 	origSuiteSrc []byte
 }
@@ -49,10 +50,18 @@ func (s *FuzzTriagePromoteTestSuite) BeforeAll(t *gotest.T) {
 }
 
 // BeforeEach snapshots suite_test.go (promote rewrites it in place) and
-// plants a single stale crasher — a corpus entry whose recorded input
-// (`strings.TrimSpace("stale")` is already idempotent) no longer fails
-// FuzzTrim's property, so triage reports it as resolved rather than as a
-// real regression, and promote has exactly one well-known seed to splice.
+// plants two crasher fixtures under s.fuzzRootDir:
+//
+//   - a single stale crasher for FuzzTrim — a corpus entry whose recorded
+//     input (`strings.TrimSpace("stale")` is already idempotent) no longer
+//     fails FuzzTrim's property, so triage reports it as resolved rather
+//     than as a real regression, and promote has exactly one well-known
+//     seed to splice.
+//   - a single crasher for FuzzSummary, the struct-typed target: its
+//     corpus file is a native []byte entry (that's the real on-disk shape
+//     for any struct-rerouted fuzz target), which triage must re-run
+//     through the codec and report as a decoded Notification{...} literal
+//     rather than the raw []byte(...) corpus text.
 func (s *FuzzTriagePromoteTestSuite) BeforeEach(t *gotest.T) {
 	orig, err := os.ReadFile(s.suiteTestPath)
 	gotest.NoError(t, err)
@@ -62,6 +71,11 @@ func (s *FuzzTriagePromoteTestSuite) BeforeEach(t *gotest.T) {
 	gotest.NoError(t, os.MkdirAll(dir, 0755))
 	s.corpusFile = filepath.Join(dir, "stale-seed")
 	gotest.NoError(t, os.WriteFile(s.corpusFile, []byte("go test fuzz v1\nstring(\"stale\")\n"), 0600))
+
+	structDir := filepath.Join(s.fuzzRootDir, "FuzzNotificationServiceTestSuite_FuzzSummary")
+	gotest.NoError(t, os.MkdirAll(structDir, 0755))
+	s.structCorpusFile = filepath.Join(structDir, "struct-seed")
+	gotest.NoError(t, os.WriteFile(s.structCorpusFile, []byte("go test fuzz v1\n[]byte(\"hello\")\n"), 0600))
 }
 
 func (s *FuzzTriagePromoteTestSuite) AfterEach(t *gotest.T) {
@@ -99,6 +113,21 @@ func (s *FuzzTriagePromoteTestSuite) TestTriage_StaleCrasherNoLongerFailing(t *g
 	})
 }
 
+func (s *FuzzTriagePromoteTestSuite) TestTriage_StructCrasherShowsDecodedInput(t *gotest.T) {
+	out, code := s.runCLIExit(t, "fuzz", "triage", "./examples/notification")
+
+	t.It("reports the struct crasher and its decoded literal", func(it *gotest.T) {
+		gotest.Contains(it, out, "FuzzNotificationServiceTestSuite_FuzzSummary: 1 crasher")
+		gotest.Contains(it, out, "input: Notification{")
+	})
+	t.It("does not fall back to the raw []byte corpus display", func(it *gotest.T) {
+		gotest.NotContains(it, out, "[]byte(")
+	})
+	t.It("exits 0", func(it *gotest.T) {
+		gotest.Equal(it, 0, code)
+	})
+}
+
 func (s *FuzzTriagePromoteTestSuite) TestPromote_SplicesSeedAndDeletesCrasher(t *gotest.T) {
 	out, code := s.runCLIExit(t, "fuzz", "promote", "./examples/notification")
 
@@ -116,6 +145,27 @@ func (s *FuzzTriagePromoteTestSuite) TestPromote_SplicesSeedAndDeletesCrasher(t 
 
 	t.It("deletes the crasher file, since it's now a permanent seed", func(it *gotest.T) {
 		_, err := os.Stat(s.corpusFile)
+		gotest.True(it, os.IsNotExist(err))
+	})
+}
+
+func (s *FuzzTriagePromoteTestSuite) TestPromote_SplicesStructSeedAsTypedLiteral(t *gotest.T) {
+	out, code := s.runCLIExit(t, "fuzz", "promote", "./examples/notification")
+
+	t.It("exits 0 and reports the promotion", func(it *gotest.T) {
+		gotest.Equal(it, 0, code)
+		gotest.Contains(it, out, "promoted FuzzNotificationServiceTestSuite_FuzzSummary/struct-seed")
+	})
+
+	t.It("splices a typed Notification{...} literal into the suite source, not raw bytes", func(it *gotest.T) {
+		rewritten, err := os.ReadFile(s.suiteTestPath)
+		gotest.NoError(it, err)
+		gotest.Contains(it, string(rewritten), "f.Add(Notification{")
+		gotest.NotContains(it, string(rewritten), "f.Add([]byte(")
+	})
+
+	t.It("deletes the crasher file, since it's now a permanent seed", func(it *gotest.T) {
+		_, err := os.Stat(s.structCorpusFile)
 		gotest.True(it, os.IsNotExist(err))
 	})
 }

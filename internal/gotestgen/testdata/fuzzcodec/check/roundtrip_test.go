@@ -6,6 +6,11 @@ import (
 	"testing"
 )
 
+// intPtr exists because Go has no address-of-literal syntax for a basic
+// type — "&42" is not an expression — so a *int test value needs a named
+// variable to take the address of.
+func intPtr(v int) *int { return &v }
+
 func richCases() map[string]Rich {
 	return map[string]Rich{
 		"zero": {},
@@ -20,9 +25,10 @@ func richCases() map[string]Rich {
 			Home:     &Address{Street: "Main", Zip: 12345},
 			Nested:   Address{Street: "Nested", Zip: 1},
 			Counters: []Address{{Street: "x", Zip: 2}, {Street: "y", Zip: 3}},
+			Count:    intPtr(-17),
 		},
 		"nil pointer, empty slices": {
-			Name: "bob", Home: nil, Tags: nil, Counters: nil,
+			Name: "bob", Home: nil, Tags: nil, Counters: nil, Count: nil,
 		},
 		"extreme numerics": {
 			I: math.MaxInt, I8: math.MinInt8, I64: math.MinInt64,
