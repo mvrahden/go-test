@@ -122,32 +122,23 @@ func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
     gotest.OverlaySuiteConfig(&ƒcfg, s.{{ $fs.Suite.Identifier }}.SuiteConfig())
 {{- end }}
 
-{{- if $fs.Suite.IsMethodParallel }}
-    wg := &sync.WaitGroup{}
-{{- end }}
-
     ƒsetupT := gotest.NewT(t)
     if ƒcfg.SetupTimeout > 0 {
         ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
     }
+    // testing runs this cleanup only after every subtest started via t.Run has
+    // finished, parallel ones included. It must never wait on those subtests
+    // itself: on panic the testing package runs ancestor cleanups from the
+    // panicking goroutine, so such a wait deadlocks against the panic unwind.
     t.Cleanup(func() {
-{{- if $fs.Suite.IsMethodParallel }}
-        wg.Wait()
-{{- end }}
-        ƒteardownT := gotest.NewT(t)
-        if ƒcfg.SetupTimeout > 0 {
-            ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-        }
-        s.AfterAll(ƒteardownT)
+        s.AfterAll(gotest.NewTeardownT(t, ƒcfg.SetupTimeout))
     })
     s.BeforeAll(ƒsetupT)
 
 {{ range $tc := $fs.Suite.TestCases }}
     t.Run("{{ $tc.Identifier }}", func(it *testing.T) {
 {{- if $fs.Suite.IsMethodParallel }}
-        wg.Add(1)
         it.Parallel()
-        defer wg.Done()
 {{- end }}
         ttt := gotest.NewT(it)
         if ƒcfg.Timeout > 0 {

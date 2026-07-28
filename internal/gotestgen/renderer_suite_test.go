@@ -280,13 +280,22 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 	})
 
 	t.When("returning BeforeEach parallel", func(w *gotest.T) {
-		w.It("renders parallel markers and WaitGroup", func(it *gotest.T) {
+		w.It("renders parallel markers without a WaitGroup", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ReturningBeforeEach_Parallel")
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.MatchSnapshot(it, output)
 
 			stripped := strings.ReplaceAll(output, "it.Parallel()", "")
 			gotest.NotContains(it, stripped, "t.Parallel()", "suite-level t.Parallel() should not be emitted")
+
+			// A suite-scoped barrier in t.Cleanup deadlocks against Go's panic
+			// unwind, which runs ancestor cleanups from the panicking goroutine
+			// while the test method that would release the barrier is still
+			// parked in t.Run. Go already orders cleanup after all subtests.
+			gotest.Contains(it, output, "it.Parallel()", "parallel suite should call it.Parallel()")
+			gotest.NotContains(it, output, "sync.WaitGroup", "parallel suite must not gate cleanup on a WaitGroup")
+			gotest.NotContains(it, output, "wg.Wait()", "parallel suite must not wait on test methods from t.Cleanup")
+			gotest.NotContains(it, output, `"sync"`, "parallel suite should not import sync")
 		})
 	})
 
@@ -355,5 +364,27 @@ func (s *RendererTestSuite) TestResolvedFixtures(t *gotest.T) {
 			gotest.Equal(it, "", sf.PkgPath, "same-package shared fixture should have empty PkgPath")
 			gotest.Equal(it, pkg.PkgPath+".PGSharedFixture", sf.StateKey)
 		})
+	})
+}
+
+// --- Determinism ---
+
+func (s *RendererTestSuite) TestDeterministicOutput(t *gotest.T) {
+	t.When("rendering the same package repeatedly", func(w *gotest.T) {
+		for sub, tC := range gotest.Each(w, []struct {
+			Desc    string
+			pkgName string
+		}{
+			{"parallel suite", "TestRenderer_ReturningBeforeEach_Parallel"},
+			{"sequential suite", "TestRenderer_VoidBeforeEach_Sequential"},
+			{"fixture-bound suite", "TestRenderer_FixtureWithChildSuite"},
+		}) {
+			pkg := gotestgen.ExportMustTestPkg(sub.T(), tC.pkgName)
+			first, _ := renderTestPkg(sub.T(), pkg)
+			for range 3 {
+				again, _ := renderTestPkg(sub.T(), pkg)
+				gotest.Equal(sub, first, again, "rendering must be byte-identical across runs")
+			}
+		}
 	})
 }

@@ -9,7 +9,6 @@ import (
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
-	"github.com/mvrahden/go-test/internal/x/slices"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -126,11 +125,6 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 			headerImport{Path: "sync/atomic"},
 			headerImport{Path: "time"},
 		)
-	}
-	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
-		return v.IsMethodParallel()
-	}) {
-		imports = append(imports, headerImport{Path: "sync"})
 	}
 	seenPkg := map[string]bool{}
 	for _, rf := range allFixtures {

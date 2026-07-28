@@ -38,6 +38,23 @@ func NewTWithDeadline(t *testing.T, timeout time.Duration) *T {
 	return &T{t: t, ctx: ctx}
 }
 
+// NewTeardownT builds the *T handed to AfterAll from inside t.Cleanup.
+//
+// It cannot derive from t.Context(): the testing package cancels that context
+// immediately before it runs the cleanup functions, so a derived context would
+// reach AfterAll already canceled and every context-aware teardown would fail
+// instantly. The parent's values are kept, its cancellation is dropped, and the
+// configured setup/teardown timeout is applied on top when one is set.
+func NewTeardownT(t *testing.T, timeout time.Duration) *T {
+	ctx := context.WithoutCancel(t.Context())
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		t.Cleanup(cancel)
+	}
+	return &T{t: t, ctx: ctx}
+}
+
 func (t *T) Errorf(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	if goFrame := assert.SkipInternalFrames(t.t); goFrame != "" {

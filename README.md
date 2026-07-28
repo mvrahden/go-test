@@ -126,7 +126,7 @@ MySuite struct      gotest_psuite_test.go     func TestMySuite(t *testing.T)
   AfterAll()          process isolation          t.Run("TestFoo", ...)
 ```
 
-The generated code is what a careful developer would write by hand: `t.Run`, `t.Cleanup`, `defer`, `sync.WaitGroup`.
+The generated code is what a careful developer would write by hand: `t.Run`, `t.Cleanup`, `defer`, `t.Parallel`.
 No reflection, no interface dispatch.
 
 ## Specification

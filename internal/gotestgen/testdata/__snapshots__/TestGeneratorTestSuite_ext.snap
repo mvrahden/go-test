@@ -99,12 +99,12 @@ func TestAppTestSuite(t *testing.T) {
 	if ƒcfg.SetupTimeout > 0 {
 		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
 	}
+	// testing runs this cleanup only after every subtest started via t.Run has
+	// finished, parallel ones included. It must never wait on those subtests
+	// itself: on panic the testing package runs ancestor cleanups from the
+	// panicking goroutine, so such a wait deadlocks against the panic unwind.
 	t.Cleanup(func() {
-		ƒteardownT := gotest.NewT(t)
-		if ƒcfg.SetupTimeout > 0 {
-			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-		}
-		s.AfterAll(ƒteardownT)
+		s.AfterAll(gotest.NewTeardownT(t, ƒcfg.SetupTimeout))
 	})
 	s.BeforeAll(ƒsetupT)
 
@@ -300,12 +300,12 @@ func TestMultiFixtureTestSuite(t *testing.T) {
 	if ƒcfg.SetupTimeout > 0 {
 		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
 	}
+	// testing runs this cleanup only after every subtest started via t.Run has
+	// finished, parallel ones included. It must never wait on those subtests
+	// itself: on panic the testing package runs ancestor cleanups from the
+	// panicking goroutine, so such a wait deadlocks against the panic unwind.
 	t.Cleanup(func() {
-		ƒteardownT := gotest.NewT(t)
-		if ƒcfg.SetupTimeout > 0 {
-			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-		}
-		s.AfterAll(ƒteardownT)
+		s.AfterAll(gotest.NewTeardownT(t, ƒcfg.SetupTimeout))
 	})
 	s.BeforeAll(ƒsetupT)
 
@@ -351,12 +351,12 @@ func TestServiceTestSuite(t *testing.T) {
 	if ƒcfg.SetupTimeout > 0 {
 		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
 	}
+	// testing runs this cleanup only after every subtest started via t.Run has
+	// finished, parallel ones included. It must never wait on those subtests
+	// itself: on panic the testing package runs ancestor cleanups from the
+	// panicking goroutine, so such a wait deadlocks against the panic unwind.
 	t.Cleanup(func() {
-		ƒteardownT := gotest.NewT(t)
-		if ƒcfg.SetupTimeout > 0 {
-			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-		}
-		s.AfterAll(ƒteardownT)
+		s.AfterAll(gotest.NewTeardownT(t, ƒcfg.SetupTimeout))
 	})
 	s.BeforeAll(ƒsetupT)
 
@@ -409,12 +409,12 @@ func TestMyE2ETestSuite(t *testing.T) {
 	if ƒcfg.SetupTimeout > 0 {
 		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
 	}
+	// testing runs this cleanup only after every subtest started via t.Run has
+	// finished, parallel ones included. It must never wait on those subtests
+	// itself: on panic the testing package runs ancestor cleanups from the
+	// panicking goroutine, so such a wait deadlocks against the panic unwind.
 	t.Cleanup(func() {
-		ƒteardownT := gotest.NewT(t)
-		if ƒcfg.SetupTimeout > 0 {
-			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-		}
-		s.AfterAll(ƒteardownT)
+		s.AfterAll(gotest.NewTeardownT(t, ƒcfg.SetupTimeout))
 	})
 	s.BeforeAll(ƒsetupT)
 
@@ -502,12 +502,12 @@ func TestMyE2ETestSuite(t *testing.T) {
 	if ƒcfg.SetupTimeout > 0 {
 		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
 	}
+	// testing runs this cleanup only after every subtest started via t.Run has
+	// finished, parallel ones included. It must never wait on those subtests
+	// itself: on panic the testing package runs ancestor cleanups from the
+	// panicking goroutine, so such a wait deadlocks against the panic unwind.
 	t.Cleanup(func() {
-		ƒteardownT := gotest.NewT(t)
-		if ƒcfg.SetupTimeout > 0 {
-			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-		}
-		s.AfterAll(ƒteardownT)
+		s.AfterAll(gotest.NewTeardownT(t, ƒcfg.SetupTimeout))
 	})
 	s.BeforeAll(ƒsetupT)
 
@@ -599,12 +599,12 @@ func TestGuardedTestSuite(t *testing.T) {
 	if ƒcfg.SetupTimeout > 0 {
 		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
 	}
+	// testing runs this cleanup only after every subtest started via t.Run has
+	// finished, parallel ones included. It must never wait on those subtests
+	// itself: on panic the testing package runs ancestor cleanups from the
+	// panicking goroutine, so such a wait deadlocks against the panic unwind.
 	t.Cleanup(func() {
-		ƒteardownT := gotest.NewT(t)
-		if ƒcfg.SetupTimeout > 0 {
-			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-		}
-		s.AfterAll(ƒteardownT)
+		s.AfterAll(gotest.NewTeardownT(t, ƒcfg.SetupTimeout))
 	})
 	s.BeforeAll(ƒsetupT)
 
