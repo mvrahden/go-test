@@ -327,3 +327,23 @@ func fuzzBodyHasAdd(body *ast.BlockStmt, param string) bool {
 	})
 	return found
 }
+
+// isGotestPkgRef reports whether expr is an identifier referring to the
+// imported gotest package. The fuzz rules key on the literal gotest.Fuzz*
+// adapter calls, so a package-name check is the right discriminator here —
+// unlike the assertion surface, which is derived from type information.
+func isGotestPkgRef(pass *analysis.Pass, expr ast.Expr) bool {
+	id, ok := expr.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	obj := pass.TypesInfo.Uses[id]
+	if obj == nil {
+		return false
+	}
+	pkgName, ok := obj.(*types.PkgName)
+	if !ok {
+		return false
+	}
+	return pkgName.Imported().Path() == gotestImportPath
+}

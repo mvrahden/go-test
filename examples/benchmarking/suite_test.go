@@ -87,6 +87,12 @@ func (s *CacheTestSuite) TestEvictsLeastRecentlyUsed(t *gotest.T) {
 // above "for b.Loop()" — including BeforeEach's rebuild of s.cache — is part
 // of the measurement; see the comment on BeforeEach for why that matters.
 // This is the benchmark to watch for 0 allocs/op.
+//
+// key is read from s.Corpus (a fixture field) above the loop, deliberately:
+// the bench-fixture-io rule flags a fixture read that happens *inside*
+// "for b.Loop()", because that's the one thing the timer fence can't save
+// you from — if the fixture were backed by a database or a network service,
+// an in-loop read would time that I/O instead of Cache.Get.
 func (s *CacheTestSuite) BenchmarkGetHit(b *gotest.B) {
 	key := s.Corpus.Keys[0]
 	for b.Loop() {

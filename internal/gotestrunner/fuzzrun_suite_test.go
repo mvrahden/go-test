@@ -101,7 +101,7 @@ func (s *FuzzRunTestSuite) TestLineWriter(t *gotest.T) {
 			n, err := w.Write([]byte("first\nsecond\nthird"))
 
 			gotest.NoError(it, err)
-			gotest.Equal(it, len("first\nsecond\nthird"), n)
+			gotest.Len(it, "first\nsecond\nthird", n)
 			gotest.Equal(it, "[MyFunc] first\n[MyFunc] second\n", buf.String())
 
 			gotest.NoError(it, w.Close())
@@ -135,7 +135,7 @@ func (s *FuzzRunTestSuite) TestLineWriter(t *gotest.T) {
 
 			n, err := w.Write(huge)
 			gotest.NoError(it, err)
-			gotest.Equal(it, len(huge), n)
+			gotest.Len(it, huge, n)
 
 			// One full cap-sized chunk must already have been force-flushed,
 			// marked as continued, and no bytes dropped.

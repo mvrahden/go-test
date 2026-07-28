@@ -26,6 +26,8 @@ import (
 
 // CmdGotestTestSuite tests CLI argument parsing, subcommands,
 // discovery, spec rendering, and code generation.
+//
+//nolint:lifecycle-pair // BeforeAll's binary lives under t.TempDir(), which the framework removes automatically
 type CmdGotestTestSuite struct {
 	binary   string
 	repoRoot string

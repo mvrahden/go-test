@@ -55,7 +55,7 @@ func loadFuzzHarvestTestPkg(t testing.TB) *packages.Package {
 	pkgs, err := packages.Load(cfg, "./testdata/fuzzharvest")
 	gotest.NoError(t, err)
 	for _, p := range pkgs {
-		gotest.Len(t, p.Errors, 0, "package load errors for %s: %v", p.ID, p.Errors)
+		gotest.Empty(t, p.Errors, "package load errors for %s: %v", p.ID, p.Errors)
 	}
 	for _, p := range pkgs {
 		if strings.HasSuffix(p.ID, ".test]") && !strings.HasSuffix(p.Name, "_test") {
@@ -606,7 +606,7 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 			fuzzFn := out[strings.Index(out, "func FuzzHarvestFuzzTestSuite_FuzzTrim"):]
 			gotest.Contains(it, fuzzFn, `f.Add("hello")`)
 			gotest.Contains(it, fuzzFn, `f.Add("  hi  ")`)
-			gotest.True(it, strings.Index(fuzzFn, `f.Add(`) < strings.Index(fuzzFn, "s.FuzzTrim("), "f.Add(...) lines must precede the user method call")
+			gotest.Less(it, strings.Index(fuzzFn, `f.Add(`), strings.Index(fuzzFn, "s.FuzzTrim("), "f.Add(...) lines must precede the user method call")
 		})
 
 		w.It("emits no f.Add(...) seed lines when harvesting is disabled", func(it *gotest.T) {

@@ -865,7 +865,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, nil, false)
 			gotest.Contains(it, cmd.Args, "-test.run=^TestFooSuite$/^Sub$")
 			for _, a := range cmd.Args {
-				gotest.False(it, strings.Contains(a, "FuzzFooSuite_A"), "user RunFilter must not be widened with fuzz funcs, got arg: %s", a)
+				gotest.NotContains(it, a, "FuzzFooSuite_A", "user RunFilter must not be widened with fuzz funcs, got arg: %s", a)
 			}
 		})
 
@@ -889,7 +889,7 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 			gotest.Contains(it, cmd.Args, "-test.run=^$")
 			gotest.Contains(it, cmd.Args, "-test.bench=^BenchmarkBenchTestSuite$")
 			for _, a := range cmd.Args {
-				gotest.False(it, strings.Contains(a, "FuzzBenchTestSuite_A"), "bench mode must ignore FuzzFuncs, got arg: %s", a)
+				gotest.NotContains(it, a, "FuzzBenchTestSuite_A", "bench mode must ignore FuzzFuncs, got arg: %s", a)
 			}
 		})
 
@@ -1728,7 +1728,7 @@ func (s *GotestrunnerTestSuite) TestResolveBenchParallelism(t *gotest.T) {
 			cfg := gotestrunner.PipelineConfig{Bench: false}
 			runFlags := []string{}
 			got := gotestrunner.ResolveBenchParallelismForTest(cfg, &runFlags, 4)
-			gotest.True(it, got > 0)
+			gotest.Greater(it, got, 0)
 			found := false
 			for _, f := range runFlags {
 				if strings.HasPrefix(f, "-parallel") {

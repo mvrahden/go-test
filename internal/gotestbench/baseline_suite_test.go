@@ -191,7 +191,7 @@ func (s *BaselineTestSuite) TestSaveLoadRoundTrip(t *gotest.T) {
 			gotest.NoError(it, err)
 
 			_, err = gotestbench.Load(path)
-			gotest.NotNil(it, err)
+			gotest.Error(it, err)
 		})
 	})
 }

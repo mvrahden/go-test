@@ -18,6 +18,8 @@ import (
 // promote) that BeforeEach/AfterEach create and restore per the suite
 // lifecycle convention: no defer/Cleanup, resources are suite fields torn
 // down in AfterEach.
+//
+//nolint:lifecycle-pair // BeforeAll's binary lives under t.TempDir(), which the framework removes automatically
 type FuzzTriagePromoteTestSuite struct {
 	binary           string
 	repoRoot         string

@@ -113,6 +113,13 @@ func (s *FrameCodecTestSuite) FuzzDecodeNeverPanics(f *gotest.F) {
 }
 
 // FuzzNormalizeTopicIdempotent is a native string target: idempotence.
+//
+// It declares no f.Add of its own on purpose — its seeds are harvested from
+// TestNormalizeTopicTable's literals, which is the feature being demonstrated.
+// The fuzz-seed rule can't see that (harvesting happens at generation time,
+// after linting), so it warns here; the rule's own message says as much.
+//
+//nolint:fuzz-seed // seeded by harvesting from TestNormalizeTopicTable
 func (s *FrameCodecTestSuite) FuzzNormalizeTopicIdempotent(f *gotest.F) {
 	gotest.Fuzz(f, func(t *gotest.T, topic string) {
 		once := NormalizeTopic(topic)

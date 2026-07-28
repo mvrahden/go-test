@@ -302,6 +302,24 @@ func startsItsLine(pass *analysis.Pass, file *ast.File, cg *ast.CommentGroup) bo
 	return standalone
 }
 
+// docSuppressed reports whether a declaration's doc comment carries a
+// //nolint directive matching rule.
+func docSuppressed(doc *ast.CommentGroup, rule Rule) bool {
+	if doc == nil {
+		return false
+	}
+	for _, c := range doc.List {
+		rules, ok := parseNolint(c.Text)
+		if !ok {
+			continue
+		}
+		if ruleMatched(rules, rule) {
+			return true
+		}
+	}
+	return false
+}
+
 func parseNolint(text string) (rules map[Rule]bool, ok bool) {
 	var rest string
 	switch {
@@ -344,7 +362,7 @@ type suiteInfo struct {
 	pos               token.Pos
 	methods           map[string]token.Pos
 	recvTypePositions []token.Pos
-	hasFixtureField   bool // struct has a *...Fixture / *...SharedFixture field (see bench-fixture-io)
+	fixtureFields     map[string]bool // names of *...Fixture / *...SharedFixture fields (see bench-fixture-io)
 }
 
 func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
@@ -364,10 +382,10 @@ func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
 			stripped := strings.TrimPrefix(strings.TrimPrefix(name, protocol.PrefixFocused), protocol.PrefixExcluded)
 			if strings.HasSuffix(stripped, protocol.SuffixTestSuite) {
 				suites[name] = &suiteInfo{
-					name:            name,
-					pos:             ts.Pos(),
-					methods:         make(map[string]token.Pos),
-					hasFixtureField: structHasFixtureField(ts.Type),
+					name:          name,
+					pos:           ts.Pos(),
+					methods:       make(map[string]token.Pos),
+					fixtureFields: structFixtureFieldNames(ts.Type),
 				}
 			}
 		}

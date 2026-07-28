@@ -160,3 +160,38 @@ func (s *FuzzSeedTestSuite) FuzzSuppressed(f *gotest.F) { //nolint:fuzz-seed
 		gotest.Equal(t, trimmed, strings.TrimSpace(trimmed))
 	})
 }
+
+// FuzzDocSuppressed is suppressed via a nolint directive that lives in its
+// doc comment (last line of the block) rather than on the same line as the
+// declaration — the doc-comment suppression path.
+//
+//nolint:fuzz-seed
+func (s *FuzzSeedTestSuite) FuzzDocSuppressed(f *gotest.F) {
+	gotest.Fuzz(f, func(t *gotest.T, in string) {
+		trimmed := strings.TrimSpace(in)
+		gotest.Equal(t, trimmed, strings.TrimSpace(trimmed))
+	})
+}
+
+// FuzzUnrelatedComment has a doc comment immediately above it that carries
+// no nolint directive — an unrelated preceding comment must not suppress
+// the diagnostic.
+func (s *FuzzSeedTestSuite) FuzzUnrelatedComment(f *gotest.F) { // want `fuzz target FuzzSeedTestSuite.FuzzUnrelatedComment declares no seeds — coverage-guided exploration starts blind \(table-test harvesting may still seed it\)`
+	gotest.Fuzz(f, func(t *gotest.T, in string) {
+		trimmed := strings.TrimSpace(in)
+		gotest.Equal(t, trimmed, strings.TrimSpace(trimmed))
+	})
+}
+
+// FuzzBlankLineSeparated has a nolint comment that is separated from the
+// declaration by a blank line, so it is not an attached doc comment and
+// must not suppress the diagnostic.
+//
+//nolint:fuzz-seed
+
+func (s *FuzzSeedTestSuite) FuzzBlankLineSeparated(f *gotest.F) { // want `fuzz target FuzzSeedTestSuite.FuzzBlankLineSeparated declares no seeds — coverage-guided exploration starts blind \(table-test harvesting may still seed it\)`
+	gotest.Fuzz(f, func(t *gotest.T, in string) {
+		trimmed := strings.TrimSpace(in)
+		gotest.Equal(t, trimmed, strings.TrimSpace(trimmed))
+	})
+}

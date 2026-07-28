@@ -3,7 +3,6 @@ package gotestast_test
 import (
 	"go/ast"
 	"go/token"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -33,7 +32,7 @@ func loadHarvestTestPkgs(t *testing.T) (ptest, pxtest *packages.Package) {
 	pkgs, err := packages.Load(cfg, "./testdata/seeds/harvest")
 	gotest.NoError(t, err)
 	for _, p := range pkgs {
-		gotest.Len(t, p.Errors, 0, "package load errors for %s: %v", p.ID, p.Errors)
+		gotest.Empty(t, p.Errors, "package load errors for %s: %v", p.ID, p.Errors)
 	}
 	for _, p := range pkgs {
 		if !strings.HasSuffix(p.ID, ".test]") {
@@ -146,7 +145,7 @@ func (s *SeedsTestSuite) TestHarvestSeeds(t *gotest.T) {
 		w.It("skips the same literal for the type that does not match", func(it *gotest.T) {
 			got, ok := seeds["FuzzEchoTestSuite_FuzzEchoInt"]
 			gotest.False(it, ok)
-			gotest.Len(it, got, 0)
+			gotest.Empty(it, got)
 		})
 	})
 }
@@ -165,14 +164,13 @@ func (s *SeedsTestSuite) TestHarvestSeedsOrderingIsStable(t *gotest.T) {
 	second, err := gotestast.HarvestSeeds(ptestPkg, suites)
 	gotest.NoError(t, err)
 
-	gotest.Equal(t, len(first), len(second))
+	gotest.Len(t, first, len(second))
 	for funcName, firstSeeds := range first {
 		secondSeeds, ok := second[funcName]
 		gotest.True(t, ok, "missing %s in second run", funcName)
 		gotest.Len(t, secondSeeds, len(firstSeeds))
 		for i := range firstSeeds {
-			gotest.True(t, reflect.DeepEqual(firstSeeds[i].Args, secondSeeds[i].Args),
-				"%s seed %d: first=%v second=%v", funcName, i, firstSeeds[i].Args, secondSeeds[i].Args)
+			gotest.Equal(t, firstSeeds[i].Args, secondSeeds[i].Args, "%s seed %d: first=%v second=%v", funcName, i, firstSeeds[i].Args, secondSeeds[i].Args)
 		}
 	}
 }
