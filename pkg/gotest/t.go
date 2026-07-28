@@ -75,14 +75,28 @@ func (t *T) TempDir() string {
 //go:noinline
 func execTestFn(testFn func(it *T), it *T) { testFn(it) }
 
+// sub builds the *T for a nested behavior. A nested subtest gets its own context
+// from the testing package, which carries none of the parent's deadline — so a
+// suite's configured Timeout would silently stop applying the moment a test
+// entered a When or an It. Deriving from the parent keeps its deadline and
+// values, and registering the cancel on the child ends it with the child.
+func (t *T) sub(tt *testing.T) *T {
+	if t.ctx == nil {
+		return NewT(tt)
+	}
+	ctx, cancel := context.WithCancel(t.ctx)
+	tt.Cleanup(cancel)
+	return NewTWithContext(tt, ctx)
+}
+
 func (t *T) It(description string, testFn func(it *T)) {
-	t.t.Run(description, func(t *testing.T) {
-		execTestFn(testFn, NewT(t))
+	t.t.Run(description, func(tt *testing.T) {
+		execTestFn(testFn, t.sub(tt))
 	})
 }
 
 func (t *T) When(description string, fn func(w *T)) {
 	t.t.Run(description, func(tt *testing.T) {
-		execTestFn(fn, NewT(tt))
+		execTestFn(fn, t.sub(tt))
 	})
 }

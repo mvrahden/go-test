@@ -12,7 +12,7 @@ func Each[E any](t *T, entries []E) iter.Seq2[*T, E] {
 	return func(yield func(*T, E) bool) {
 		for i, entry := range entries {
 			name := eachEntryName(reflect.ValueOf(entry), i)
-			if !eachRun(t.t, name, entry, yield) {
+			if !eachRun(t, name, entry, yield) {
 				break
 			}
 		}
@@ -22,13 +22,13 @@ func Each[E any](t *T, entries []E) iter.Seq2[*T, E] {
 // eachRun creates a named subtest and calls yield from the calling goroutine
 // (not the subtest goroutine). This satisfies Go's range-over-func contract
 // that yield must be called from the same goroutine as the iterator.
-func eachRun[E any](parent *testing.T, name string, entry E, yield func(*T, E) bool) bool {
+func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) bool {
 	ready := make(chan *testing.T, 1)
 	done := make(chan struct{})
 	finished := make(chan struct{})
 
 	go func() {
-		parent.Run(name, func(tt *testing.T) {
+		parent.t.Run(name, func(tt *testing.T) {
 			ready <- tt
 			<-done
 		})
@@ -41,11 +41,11 @@ func eachRun[E any](parent *testing.T, name string, entry E, yield func(*T, E) b
 		close(done)
 		<-finished
 		if goexited && tt.Failed() {
-			parent.FailNow()
+			parent.t.FailNow()
 		}
 	}()
 
-	result := yield(NewT(tt), entry)
+	result := yield(parent.sub(tt), entry)
 	goexited = false
 	return result
 }

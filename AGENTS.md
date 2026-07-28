@@ -261,6 +261,10 @@ Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
 The returned config is used as-is: a zero (or omitted) duration disables that deadline; without the marker method, `DefaultSuiteConfig()` (30s/30s) applies.
 Compose from presets for defaults + overrides: `cfg := gotest.DefaultSuiteConfig(); cfg.Parallel = true; return cfg`.
 
+`Timeout` reaches `t.Context()` inside nested `When`, `It` and `Each` bodies too — a
+nested behavior inherits the enclosing deadline, and its context is canceled when that
+nested subtest ends. For a tighter budget in one place, use `gotest.NewTWithDeadline`.
+
 ### SuiteGuard (optional)
 
 ```go

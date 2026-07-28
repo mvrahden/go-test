@@ -85,3 +85,60 @@ func (s *TTestSuite) TestTContext(t *gotest.T) {
 		})
 	})
 }
+
+func (s *TTestSuite) TestNestedBehaviorContext(t *gotest.T) {
+	t.When("the enclosing T carries a deadline", func(w *gotest.T) {
+		w.It("propagates it into When, It and Each", func(it *gotest.T) {
+			outer := gotest.NewTWithDeadline(it.T(), time.Hour)
+			outerDeadline, ok := outer.Context().Deadline()
+			gotest.True(it, ok)
+
+			seen := 0
+			outer.When("nested when", func(nw *gotest.T) {
+				deadline, ok := nw.Context().Deadline()
+				gotest.True(nw, ok, "When must inherit the enclosing deadline")
+				gotest.Equal(nw, outerDeadline, deadline)
+				seen++
+
+				nw.It("nested it", func(ni *gotest.T) {
+					deadline, ok := ni.Context().Deadline()
+					gotest.True(ni, ok, "It must inherit the enclosing deadline")
+					gotest.Equal(ni, outerDeadline, deadline)
+					seen++
+				})
+
+				for sub, entry := range gotest.Each(nw, []string{"only"}) {
+					deadline, ok := sub.Context().Deadline()
+					gotest.True(sub, ok, "Each must inherit the enclosing deadline: %s", entry)
+					gotest.Equal(sub, outerDeadline, deadline)
+					seen++
+				}
+			})
+			gotest.Equal(it, 3, seen, "every nested form should have run")
+		})
+
+		w.It("still ends the nested context with the nested subtest", func(it *gotest.T) {
+			outer := gotest.NewTWithDeadline(it.T(), time.Hour)
+
+			var nested context.Context
+			outer.It("nested it", func(ni *gotest.T) {
+				nested = ni.Context()
+				gotest.NoError(ni, nested.Err())
+			})
+
+			gotest.ErrorIs(it, nested.Err(), context.Canceled,
+				"the nested context must not outlive its subtest")
+			gotest.NoError(it, outer.Context().Err(), "cancelling a child must not cancel the parent")
+		})
+	})
+
+	t.When("the enclosing T carries no explicit context", func(w *gotest.T) {
+		w.It("falls back to the nested subtest's own context", func(it *gotest.T) {
+			plain := gotest.NewT(it.T())
+			plain.It("nested it", func(ni *gotest.T) {
+				gotest.Zero(ni, gotest.ExportTCtx(ni))
+				gotest.NoError(ni, ni.Context().Err())
+			})
+		})
+	})
+}
