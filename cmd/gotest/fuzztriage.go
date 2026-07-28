@@ -336,10 +336,10 @@ func rerunCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzT
 // LAST one (a failing execution may run the callback body more than once,
 // e.g. under -race retries, so the last line is the one describing the
 // execution whose outcome the caller is reporting). Returns "" when no such
-// line is present — either the target isn't struct-typed, or its codec has
-// no Literal function (see gotestgen's Literal-less types, e.g. a struct
-// with a *int field), in which case the caller falls back to the raw
-// corpus display.
+// line is present — the target isn't struct-typed, or the marker was lost
+// (a truncated or filtered run), in which case the caller falls back to the
+// raw corpus display. Codec shape is no longer a reason: every type the
+// codec generator accepts also gets a Literal function.
 func extractDecodedInput(output string) string {
 	lit := ""
 	for _, line := range strings.Split(output, "\n") {
