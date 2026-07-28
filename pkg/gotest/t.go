@@ -32,6 +32,11 @@ func (t *T) Context() context.Context {
 	return t.t.Context()
 }
 
+// NewTWithDeadline builds the *T handed to BeforeAll and to test methods.
+//
+// It is harness wiring emitted by `gotest generate`; suite code has no reason to
+// call it directly. The context is derived from t.Context(), so it is canceled
+// when the test ends — which is why teardown needs [NewTeardownT] instead.
 func NewTWithDeadline(t *testing.T, timeout time.Duration) *T {
 	ctx, cancel := context.WithTimeout(t.Context(), timeout)
 	t.Cleanup(cancel)
@@ -39,6 +44,9 @@ func NewTWithDeadline(t *testing.T, timeout time.Duration) *T {
 }
 
 // NewTeardownT builds the *T handed to AfterAll from inside t.Cleanup.
+//
+// It is harness wiring emitted by `gotest generate`; suite code has no reason to
+// call it directly.
 //
 // It cannot derive from t.Context(): the testing package cancels that context
 // immediately before it runs the cleanup functions, so a derived context would

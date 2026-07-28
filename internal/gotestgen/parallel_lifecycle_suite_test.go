@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -12,10 +13,10 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// childTimeout is passed to the generated suite as `go test -timeout`. If suite
+// childTimeout is the -test.timeout of the compiled suite binary. If suite
 // cleanup ever waits on work that is itself blocked behind that cleanup, the
 // child dies here with "test timed out" instead of hanging this package.
-const childTimeout = 20 * time.Second
+const childTimeout = 15 * time.Second
 
 // childWallClock bounds the whole subprocess, so even a child that ignores its
 // own timeout cannot stall the parent run.
@@ -53,19 +54,31 @@ func runGeneratedSuite(t *gotest.T, name string) childRun {
 	harness := filepath.Join(dir, "gotest_psuite_test.go")
 	gotest.NoError(t, os.WriteFile(harness, []byte(source), 0o600))
 
-	// -v keeps the suite's own stdout markers even when the child passes.
-	args := []string{"test", "-count=1", "-v", "-timeout", childTimeout.String()}
-	if raceEnabled {
-		args = append(args, "-race")
+	// Compile and run as two steps. A combined `go test` would fold build time
+	// into the measurement even though -timeout only governs execution, and a
+	// compile error would be indistinguishable from a failing suite.
+	bin := filepath.Join(t.TempDir(), "suite.test")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
 	}
-	args = append(args, ".")
+	buildArgs := []string{"test", "-c", "-o", bin}
+	if raceEnabled {
+		buildArgs = append(buildArgs, "-race")
+	}
+	buildArgs = append(buildArgs, ".")
+
+	build := exec.Command("go", buildArgs...) //nolint:gosec // G204: go tool with test-controlled arguments
+	build.Dir = dir
+	build.Env = append(os.Environ(), "GOWORK=off")
+	buildOut, buildErr := build.CombinedOutput()
+	gotest.NoError(t, buildErr, "compiling the generated harness failed:\n%s", buildOut)
 
 	ctx, cancel := context.WithTimeout(context.Background(), childWallClock)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "go", args...) //nolint:gosec // G204: go tool with test-controlled arguments
+	// -test.v keeps the suite's own stdout markers even when the child passes.
+	cmd := exec.CommandContext(ctx, bin, "-test.v", "-test.count=1", "-test.timeout="+childTimeout.String()) //nolint:gosec // G204: freshly compiled test binary
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GOWORK=off")
 
 	start := time.Now()
 	out, err := cmd.CombinedOutput()
@@ -81,7 +94,7 @@ func assertNoDeadlock(t *gotest.T, run childRun) {
 	gotest.NotContains(t, run.output, "test timed out",
 		"suite cleanup deadlocked; the run was terminated by the -timeout alarm:\n%s", run.output)
 	gotest.Less(t, run.elapsed, childTimeout,
-		"child took %s, which is at or beyond its own -timeout of %s:\n%s", run.elapsed, childTimeout, run.output)
+		"child ran for %s, at or beyond its own -test.timeout of %s:\n%s", run.elapsed, childTimeout, run.output)
 }
 
 func (s *ParallelLifecycleTestSuite) TestParallelSuccess(t *gotest.T) {
