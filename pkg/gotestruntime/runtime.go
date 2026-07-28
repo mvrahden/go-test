@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -293,30 +294,18 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
 
 			if tracker.isSucceeded(node) {
 				if node.SharedState != nil {
-					if node.SharedState.Dehydrate != nil {
-						if err := node.SharedState.Dehydrate(context.Background()); err != nil {
-							fmt.Fprintf(os.Stderr, "%s: dehydrate failed: %v\n", node.Name, err)
-							mu.Lock()
-							failed[node.Name] = true
-							mu.Unlock()
-						}
-					}
-					return // shared state nodes don't have AfterAll in test process
-				}
-
-				if node.AfterAll != nil {
-					ctx := context.Background()
-					if node.Config.Timeout > 0 {
-						var cancel context.CancelFunc
-						ctx, cancel = context.WithTimeout(ctx, node.Config.Timeout)
-						defer cancel()
-					}
-					if err := node.AfterAll(ctx); err != nil {
-						fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", node.Name, err)
+					if runDehydrate(node) {
 						mu.Lock()
 						failed[node.Name] = true
 						mu.Unlock()
 					}
+					return // shared state nodes don't have AfterAll in test process
+				}
+
+				if runAfterAll(node) {
+					mu.Lock()
+					failed[node.Name] = true
+					mu.Unlock()
 				}
 			}
 		}(f)
@@ -425,22 +414,61 @@ func teardownNode(node *FixtureNode, tracker *nodeTracker) bool {
 		}
 	}
 
-	if tracker.isSucceeded(node) {
-		if node.AfterAll != nil {
-			ctx := context.Background()
-			if node.Config.Timeout > 0 {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, node.Config.Timeout)
-				defer cancel()
-			}
-			if err := node.AfterAll(ctx); err != nil {
-				fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", node.Name, err)
-				anyFailed = true
-			}
-		}
+	if tracker.isSucceeded(node) && runAfterAll(node) {
+		anyFailed = true
 	}
 
 	return anyFailed
+}
+
+// runAfterAll invokes a fixture's AfterAll, reporting an error or a panic as a
+// teardown failure rather than letting either escape.
+//
+// Teardown runs concurrently across the fixture graph, so an unrecovered panic
+// here would abort the process from a goroutine and take every sibling's
+// teardown down with it — the fixtures that had already started releasing
+// resources would never finish. Setup has recovered panics per node since it
+// was written; this makes teardown symmetric.
+func runAfterAll(node *FixtureNode) (failed bool) {
+	if node.AfterAll == nil {
+		return false
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", node.Name, r, debug.Stack())
+			failed = true
+		}
+	}()
+
+	ctx := context.Background()
+	if node.Config.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, node.Config.Timeout)
+		defer cancel()
+	}
+	if err := node.AfterAll(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", node.Name, err)
+		return true
+	}
+	return false
+}
+
+// runDehydrate mirrors runAfterAll for shared-state nodes.
+func runDehydrate(node *FixtureNode) (failed bool) {
+	if node.SharedState == nil || node.SharedState.Dehydrate == nil {
+		return false
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "%s: dehydrate panicked: %v\n\n%s\n", node.Name, r, debug.Stack())
+			failed = true
+		}
+	}()
+	if err := node.SharedState.Dehydrate(context.Background()); err != nil {
+		fmt.Fprintf(os.Stderr, "%s: dehydrate failed: %v\n", node.Name, err)
+		return true
+	}
+	return false
 }
 
 func writeBudgetFile(cfg MainConfig) {

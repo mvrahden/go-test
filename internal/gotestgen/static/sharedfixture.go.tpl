@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -17,6 +18,31 @@ import (
 	{{ .Alias }} {{ printf "%q" .Path }}
 {{- end }}
 )
+
+{{- /*
+  ƒteardown runs one shared fixture's AfterAll, reporting an error or a panic
+  without letting either abort the process — a panic here would skip every
+  remaining fixture's teardown and leak whatever they hold.
+*/}}
+func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
+			failed = true
+		}
+	}()
+	ctx := context.Background()
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+	if err := after(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
+		return true
+	}
+	return false
+}
 
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
@@ -119,17 +145,7 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 {{ range .TeardownFixtures }}
 		if ƒerrs[{{ .Index }}] == nil {
-			{
-				ctx := context.Background()
-				if ƒcfg_{{ .VarName }}.Timeout > 0 {
-					var cancel context.CancelFunc
-					ctx, cancel = context.WithTimeout(ctx, ƒcfg_{{ .VarName }}.Timeout)
-					defer cancel()
-				}
-				if err := {{ .VarName }}.AfterAll(ctx); err != nil {
-					fmt.Fprintf(os.Stderr, "{{ .Identifier }}.AfterAll failed: %v\n", err)
-				}
-			}
+			ƒteardown("{{ .Identifier }}", ƒcfg_{{ .VarName }}.Timeout, {{ .VarName }}.AfterAll)
 		}
 {{- end }}
 		os.Exit(1)
@@ -146,21 +162,22 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
 	<-sig
+
+	ƒteardownFailed := false
 {{ range .TeardownFixtures }}
 	if ƒerrs[{{ .Index }}] == nil {
-		ctx := context.Background()
-		if ƒcfg_{{ .VarName }}.Timeout > 0 {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, ƒcfg_{{ .VarName }}.Timeout)
-			if err := {{ .VarName }}.AfterAll(ctx); err != nil {
-				fmt.Fprintf(os.Stderr, "{{ .Identifier }}.AfterAll failed: %v\n", err)
-			}
-			cancel()
-		} else {
-			if err := {{ .VarName }}.AfterAll(ctx); err != nil {
-				fmt.Fprintf(os.Stderr, "{{ .Identifier }}.AfterAll failed: %v\n", err)
-			}
+		if ƒteardown("{{ .Identifier }}", ƒcfg_{{ .VarName }}.Timeout, {{ .VarName }}.AfterAll) {
+			ƒteardownFailed = true
 		}
 	}
 {{- end }}
+
+{{- /*
+  A failed teardown must reach the runner; this exact status is what
+  gotestrunner.sharedTeardownFailedExit looks for, so the run cannot report
+  success while shared resources were left behind.
+*/}}
+	if ƒteardownFailed {
+		os.Exit(1)
+	}
 }

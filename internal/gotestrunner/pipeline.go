@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/protocol"
@@ -53,6 +54,19 @@ type PipelineConfig struct {
 type PipelineResult struct {
 	ExitCode     int
 	CapturedJSON []byte
+}
+
+// applyTeardownFailure surfaces a shared fixture teardown failure and makes a
+// run that would otherwise have passed fail instead. Resources the fixtures
+// hold outlive the test process, so leaving them behind must not report ok.
+func applyTeardownFailure(result *PipelineResult, err error) {
+	if err == nil {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
+	if result.ExitCode == 0 {
+		result.ExitCode = 1
+	}
 }
 
 func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult) (PipelineResult, error) {
@@ -181,14 +195,14 @@ func setupCoverage(targets []SuiteTarget, overlay *OverlayResult, userCoverProfi
 	assignCoverProfiles(targets, coverDir)
 }
 
-func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (PipelineResult, error) { //nolint:gocritic // hugeParam: stable API
+func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (result PipelineResult, err error) { //nolint:gocritic // hugeParam: stable API
 	compiled, setupProc, cancelPrepare, err := prepareTestRun(ctx, overlay, pf.BuildFlags, cfg.SetupTimeout, cfg.CompileParallel)
 	if err != nil {
 		return PipelineResult{ExitCode: 2}, err
 	}
 	defer cancelPrepare()
 	if setupProc != nil {
-		defer func() { _ = setupProc.Teardown() }()
+		defer func() { applyTeardownFailure(&result, setupProc.Teardown()) }()
 	}
 
 	select {
@@ -250,6 +264,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	var setupProc *SharedFixtureProcess
 	var fixtureStartErr error
 	var fixtureWg sync.WaitGroup
+	var sharedSetupFailed atomic.Bool
 
 	streamCtx, streamCancel := context.WithCancel(ctx)
 	defer streamCancel()
@@ -262,6 +277,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 			setupProc, err = StartSharedFixtures(streamCtx, overlay.WorkDir, overlay.SharedFixtures, resolvedSetupTimeout)
 			if err != nil {
 				fixtureStartErr = err
+				sharedSetupFailed.Store(true)
 				streamCancel()
 			}
 			close(fixtureStarted)
@@ -278,11 +294,13 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 			case <-setupProc.AllDone():
 				if err := setupProc.SetupErr(); err != nil {
 					fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup failed: %v\n", err)
+					sharedSetupFailed.Store(true)
 					streamCancel()
 				}
 			case <-streamCtx.Done():
 			case <-setupDeadline:
 				fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup timed out after %v\n", resolvedSetupTimeout)
+				sharedSetupFailed.Store(true)
 				streamCancel()
 			}
 		}()
@@ -377,6 +395,19 @@ loop:
 						}
 						select {
 						case <-ch:
+						case <-setupProc.AllDone():
+							// Setup finished. Re-check without blocking: a
+							// select picks at random among ready cases, and by
+							// the time the sentinel arrives every fixture that
+							// did come up has already had its channel closed.
+							select {
+							case <-ch:
+							default:
+								// This one never came up — the process
+								// crashed, most likely. Waiting on it would
+								// hang the run until the outer deadline.
+								return
+							}
 						case <-streamCtx.Done():
 							return
 						}
@@ -416,8 +447,9 @@ loop:
 	// fixture subprocess, triggering WaitDelay-based pipe cleanup.
 	streamCancel()
 
+	var teardownErr error
 	if setupProc != nil {
-		_ = setupProc.Teardown()
+		teardownErr = setupProc.Teardown()
 	}
 
 	if pf.UserCoverProfile != "" {
@@ -428,7 +460,12 @@ loop:
 		if cfg.OutputMode == RunBatchText {
 			fmt.Fprintln(os.Stderr, "no test suites to run")
 		}
-		return PipelineResult{}, nil
+		result := PipelineResult{}
+		if sharedSetupFailed.Load() {
+			result.ExitCode = 1
+		}
+		applyTeardownFailure(&result, teardownErr)
+		return result, nil
 	}
 
 	collector.Finalize(overlay.NoSuitePackages)
@@ -438,8 +475,13 @@ loop:
 		exitCode = 130
 	}
 
-	return PipelineResult{
+	if sharedSetupFailed.Load() && exitCode == 0 {
+		exitCode = 1
+	}
+	result := PipelineResult{
 		ExitCode:     exitCode,
 		CapturedJSON: collector.CapturedJSON(),
-	}, nil
+	}
+	applyTeardownFailure(&result, teardownErr)
+	return result, nil
 }

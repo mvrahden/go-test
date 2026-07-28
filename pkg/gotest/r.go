@@ -32,13 +32,24 @@ func (r *R) Message() string { return r.message }
 // Record runs fn with a fresh *R in a dedicated goroutine and returns
 // the recorder after fn completes. The goroutine is required because
 // FailNow calls runtime.Goexit.
+//
+// A panic inside fn is carried back to the calling goroutine and re-raised
+// there. Left unrecovered it would abort the process from a goroutine the
+// testing package knows nothing about, so no cleanup would run at all — not the
+// suite's AfterAll, not any package fixture's teardown. Re-raising it on the
+// test's own goroutine puts it back on testing's normal panic path.
 func Record(fn func(*R)) *R {
 	r := &R{}
 	done := make(chan struct{})
+	var captured *capturedPanic
 	go func() {
 		defer close(done)
+		defer func() { captured = capturedFrom(recover(), "poll function") }()
 		fn(r)
 	}()
 	<-done
+	if captured != nil {
+		panic(captured)
+	}
 	return r
 }

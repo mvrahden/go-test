@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +15,11 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 )
+
+// sharedTeardownFailedExit is the status the generated setup program exits with
+// when one or more shared fixtures failed to tear down. It must stay in step
+// with the value used by internal/gotestgen/static/sharedfixture.go.tpl.
+const sharedTeardownFailedExit = 1
 
 // fixtureStateEntry represents a single JSON line emitted by the shared fixture subprocess.
 type fixtureStateEntry struct {
@@ -38,6 +44,7 @@ type SharedFixtureProcess struct {
 	mu       sync.Mutex
 	allDone  chan struct{}
 	setupErr error
+	waitErr  error // exit status of the subprocess; valid once done is closed
 }
 
 // StateFile returns the path to the shared fixture state JSON file.
@@ -161,6 +168,23 @@ func (p *SharedFixtureProcess) Teardown() error {
 	if p.sharedDir != "" {
 		os.RemoveAll(p.sharedDir)
 	}
+
+	// A setup failure already surfaces through SetupErr and takes the process
+	// down before teardown ever runs; reporting its exit status here again
+	// would blame teardown for it.
+	if p.setupErr != nil {
+		return nil
+	}
+
+	// The setup program exits with sharedTeardownFailedExit specifically to
+	// report a teardown failure. Any other status is something else — a runtime
+	// panic during setup exits 2, and a signal-terminated process reports -1
+	// (the force-kill path above, already warned about) — and blaming teardown
+	// for those would be misleading.
+	var exitErr *exec.ExitError
+	if errors.As(p.waitErr, &exitErr) && exitErr.ExitCode() == sharedTeardownFailedExit {
+		return fmt.Errorf("shared fixture teardown failed; see AfterAll errors above")
+	}
 	return nil
 }
 
@@ -238,7 +262,7 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 
 	go func() {
 		defer func() {
-			_ = cmd.Wait()
+			proc.waitErr = cmd.Wait()
 			close(waitDone)
 		}()
 		closedReady := make(map[string]bool, len(ready))

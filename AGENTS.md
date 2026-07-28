@@ -188,6 +188,11 @@ There are no method forms on `*T`. Only package-level `gotest.Eventually()` and 
 Any helper that calls `t.T()` will panic.
 This is by design — the recorder intercepts failures without aborting, enabling retry semantics.
 
+A panic in the callback fails the test and is reported with the stack from where it
+happened. The callback runs on its own goroutine, so the panic is carried back to the
+test's goroutine before being re-raised — `AfterEach`, `AfterAll` and fixture teardown all
+still run.
+
 ## Suite Conventions
 
 ### Suite types
@@ -221,6 +226,14 @@ func (s *MyTestSuite) AfterEach(t *gotest.T)  {}  // after each test
 All are optional.
 Execution order: BeforeAll -> (BeforeEach -> Test -> AfterEach)* -> AfterAll.
 For parallel test cases, AfterAll waits for all parallel tests to complete.
+
+**On failure and panic.**
+`AfterAll` runs even when `BeforeAll` failed or panicked, so teardown may see partly
+initialised state — guard it if `BeforeAll` can fail midway. Write `AfterAll` to release
+whatever `BeforeAll` had reached, not to assume it finished.
+The void `AfterEach` likewise runs even when `BeforeEach` panicked. The returning form
+does not: with nothing returned there is no context to release, and the per-test state it
+would clean up was never created.
 
 **Returning BeforeEach (required for `Parallel: true`):**
 
@@ -344,6 +357,10 @@ func (f *DBFixture) FixtureConfig() gotest.FixtureConfig {
 ```
 
 Presets: `DefaultFixtureConfig()` (2m timeout), `ContainerFixtureConfig()` (5m, 1 retry, 5s delay).
+
+**Teardown failures are real failures.** A fixture `AfterAll` that returns an error or
+panics fails the run — for package and shared fixtures alike. A panic in one fixture's
+teardown is contained, so every other fixture still finishes releasing its resources.
 
 ### Shared fixtures
 

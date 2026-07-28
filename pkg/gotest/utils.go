@@ -36,17 +36,33 @@ func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) boo
 	}()
 
 	tt := <-ready
+
+	// goexited stays true when yield leaves via runtime.Goexit — a failed
+	// assertion inside the entry. A panic is tracked separately: the two must
+	// not be confused, because the Goexit branch below would discard an
+	// in-flight panic instead of letting it propagate.
 	goexited := true
+	var captured *capturedPanic
+	var result bool
+
+	// Deferred, so the subtest is released and awaited even when yield leaves
+	// via Goexit — that unwinds straight past the inner closure below.
 	defer func() {
 		close(done)
 		<-finished
+		if captured != nil {
+			panic(captured)
+		}
 		if goexited && tt.Failed() {
 			parent.t.FailNow()
 		}
 	}()
 
-	result := yield(parent.sub(tt), entry)
-	goexited = false
+	func() {
+		defer func() { captured = capturedFrom(recover(), "Each entry") }()
+		result = yield(parent.sub(tt), entry)
+		goexited = false
+	}()
 	return result
 }
 
