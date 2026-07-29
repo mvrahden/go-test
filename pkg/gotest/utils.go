@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"iter"
 	"reflect"
+	"sync"
 	"testing"
 )
 
@@ -93,4 +94,42 @@ func Must[T any](val T, ok any) T {
 	default:
 		panic(fmt.Sprintf("Must: unsupported ok type %T", v))
 	}
+}
+
+// Go runs fn on a new goroutine and returns a function that waits for it.
+//
+// A panic in a goroutine the test starts itself is unrecoverable: Go terminates
+// the whole process without running any other goroutine's deferred work, so no
+// AfterEach, no AfterAll and no fixture teardown happens, and the panic is
+// attributed to nothing in particular. There is no way for a framework to guard
+// a goroutine it did not create — so this creates it for you, captures the panic
+// with the stack from where it happened, and re-raises it on the test's own
+// goroutine, where the testing package handles it like any other test panic.
+//
+//	wait := gotest.Go(t, func() { srv.Serve(l) })
+//	defer wait()
+//
+// The wait is also registered as test cleanup, so a forgotten wait still gets
+// one. Calling the returned function more than once is safe.
+func Go(t *T, fn func()) (wait func()) {
+	done := make(chan struct{})
+	var captured *capturedPanic
+
+	go func() {
+		defer close(done)
+		defer func() { captured = capturedFrom(recover(), "goroutine started by gotest.Go") }()
+		fn()
+	}()
+
+	var once sync.Once
+	wait = func() {
+		once.Do(func() {
+			<-done
+			if captured != nil {
+				panic(captured)
+			}
+		})
+	}
+	t.t.Cleanup(wait)
+	return wait
 }

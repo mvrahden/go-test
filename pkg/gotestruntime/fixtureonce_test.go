@@ -80,3 +80,26 @@ func (s *FixtureOnceTestSuite) TestDo(t *gotest.T) {
 		})
 	})
 }
+
+func (s *FixtureOnceTestSuite) TestPanicInBody(t *gotest.T) {
+	t.When("the body panics", func(w *gotest.T) {
+		// sync.Once marks itself done even when its body panics, so an escaping
+		// panic would leave err nil and tell the next caller setup succeeded.
+		w.It("surfaces the panic as an error", func(it *gotest.T) {
+			var fo gotestruntime.FixtureOnce
+			err := fo.Do(func() error { panic("setup blew up") })
+			gotest.ErrorContains(it, err, "setup blew up")
+		})
+
+		w.It("reports the same failure to later callers", func(it *gotest.T) {
+			var fo gotestruntime.FixtureOnce
+			first := fo.Do(func() error { panic("setup blew up") })
+			second := fo.Do(func() error {
+				gotest.Fail(it, "the body must not run a second time")
+				return nil
+			})
+			gotest.Error(it, second)
+			gotest.Equal(it, first.Error(), second.Error())
+		})
+	})
+}

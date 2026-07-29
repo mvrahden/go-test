@@ -193,6 +193,23 @@ happened. The callback runs on its own goroutine, so the panic is carried back t
 test's goroutine before being re-raised — `AfterEach`, `AfterAll` and fixture teardown all
 still run.
 
+## Goroutines Started by Tests
+
+A panic on a goroutine the test starts is unrecoverable: Go terminates the process
+without running any other goroutine's deferred work, so no `AfterEach`, no `AfterAll`
+and no fixture teardown happens. No framework can guard a goroutine it did not create.
+
+Use `gotest.Go` to start one instead. It captures the panic with the stack from where
+it happened and re-raises it on the test's own goroutine, where it is reported like any
+other test panic and every cleanup still runs.
+
+```go
+wait := gotest.Go(t, func() { srv.Serve(l) })
+defer wait()
+```
+
+The wait is also registered as test cleanup, so a forgotten `wait()` still gets one.
+
 ## Suite Conventions
 
 ### Suite types
@@ -274,10 +291,13 @@ Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
 The returned config is used as-is: a zero (or omitted) duration disables that deadline; without the marker method, `DefaultSuiteConfig()` (30s/30s) applies.
 Compose from presets for defaults + overrides: `cfg := gotest.DefaultSuiteConfig(); cfg.Parallel = true; return cfg`.
 
-`Timeout` is enforced after the fact: Go cannot preempt a running test, so a method
-that ignores `t.Context()` runs to completion and is then failed for exceeding its
-budget. The same applies to a fixture's `Timeout` — an overrunning `BeforeAll` counts
-as a failed attempt and is retried if `Retries` allows.
+`Timeout` cannot interrupt a running test — Go has no way to stop another goroutine —
+so it is enforced by verdict. A method that ignores `t.Context()` is failed the moment
+its deadline passes, while it is still running, and the overrun is also written
+unbuffered so it survives a test that never returns at all. Bounding the process
+remains `go test -timeout`'s job. `SetupTimeout` works the same way for `BeforeAll`
+and `AfterAll`, and an overrunning fixture `BeforeAll` counts as a failed attempt,
+retried if `Retries` allows.
 
 `Timeout` reaches `t.Context()` inside nested `When`, `It` and `Each` bodies too — a
 nested behavior inherits the enclosing deadline, and its context is canceled when that

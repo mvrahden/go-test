@@ -111,11 +111,50 @@ func (s *PanicResilienceTestSuite) TestConfiguredTimeoutOverrun(t *gotest.T) {
 			gotest.Contains(it, run.output, "MARK:overrunning test returned", run.output)
 		})
 
-		w.It("leaves tests that stayed within budget alone", func(it *gotest.T) {
+		w.It("names the overrunning test and leaves the others alone", func(it *gotest.T) {
 			gotest.Contains(it, run.output, "MARK:fast test returned", run.output)
-			gotest.Equal(it, 1, strings.Count(run.output, "exceeded its configured Timeout"),
-				"only the overrunning test should be reported:\n%s", run.output)
+			gotest.Contains(it, run.output, "TestOverrunsItsBudget exceeded its configured Timeout",
+				"the overrun should name the test that blew its budget:\n%s", run.output)
+			gotest.NotContains(it, run.output, "TestStaysWithinBudget exceeded",
+				"a test within budget must not be reported:\n%s", run.output)
 			gotest.Contains(it, run.output, "MARK:suite afterall", run.output)
+		})
+	})
+}
+
+func (s *PanicResilienceTestSuite) TestPanicOnSpawnedGoroutine(t *gotest.T) {
+	t.When("a goroutine started with gotest.Go panics", func(w *gotest.T) {
+		run := runGeneratedSuite(w, "TestLifecycle_GoroutinePanic")
+
+		w.It("terminates promptly instead of timing out", func(it *gotest.T) {
+			assertNoDeadlock(it, run)
+			gotest.False(it, run.passed, "a panicking suite must fail:\n%s", run.output)
+		})
+
+		w.It("reports the panic and still runs every cleanup", func(it *gotest.T) {
+			// A bare `go func(){ panic(...) }()` aborts the process with no
+			// cleanup whatsoever; the point of gotest.Go is that this does not.
+			gotest.Contains(it, run.output, "boom on a spawned goroutine", run.output)
+			gotest.Contains(it, run.output, "MARK:suite afterall", run.output)
+			gotest.Contains(it, run.output, "MARK:fixture released", run.output)
+		})
+	})
+}
+
+func (s *PanicResilienceTestSuite) TestSetupTimeoutOverrun(t *gotest.T) {
+	t.When("BeforeAll blows its configured SetupTimeout", func(w *gotest.T) {
+		run := runGeneratedSuite(w, "TestLifecycle_SetupOverrun")
+
+		w.It("fails the run rather than passing silently", func(it *gotest.T) {
+			assertNoDeadlock(it, run)
+			gotest.False(it, run.passed, "an overrun must fail the run:\n%s", run.output)
+			gotest.Contains(it, run.output, "BeforeAll exceeded its configured SetupTimeout", run.output)
+		})
+
+		w.It("still runs the tests and AfterAll", func(it *gotest.T) {
+			gotest.Contains(it, run.output, "MARK:beforeall returned", run.output)
+			gotest.Contains(it, run.output, "MARK:test ran", run.output)
+			gotest.Contains(it, run.output, "MARK:afterall ran", run.output)
 		})
 	})
 }
