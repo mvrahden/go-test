@@ -2,6 +2,7 @@ package gotestruntime
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -22,8 +23,29 @@ func SetupT(t *testing.T, timeout time.Duration) *gotest.T {
 }
 
 // TestT builds the *gotest.T handed to a single test method.
+//
+// Go cannot preempt a running test, so a configured Timeout can only bound the
+// context handed to it — code that ignores that context runs to completion. It
+// would then pass, silently, having blown the budget the suite asked for. The
+// deadline is therefore checked once the method is done and reported as a
+// failure, which is the most a deadline can mean here.
 func TestT(t *testing.T, timeout time.Duration) *gotest.T {
-	return testScopedT(t, timeout)
+	tt := testScopedT(t, timeout)
+	if timeout > 0 {
+		// Registered after the deadline's own cancel, so it runs before it:
+		// cleanups are LIFO, and the context must still carry why it ended.
+		t.Cleanup(func() { reportOverrun(tt, timeout) })
+	}
+	return tt
+}
+
+// reportOverrun fails t when its deadline expired rather than being canceled by
+// the test finishing. A context that has already expired keeps DeadlineExceeded,
+// so a later cancellation cannot mask it.
+func reportOverrun(t *gotest.T, timeout time.Duration) {
+	if errors.Is(t.Context().Err(), context.DeadlineExceeded) {
+		t.Errorf("exceeded its configured Timeout of %s", timeout)
+	}
 }
 
 // testScopedT applies the timeout convention shared by the phases that run while

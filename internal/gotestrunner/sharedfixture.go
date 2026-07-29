@@ -157,6 +157,18 @@ func (p *SharedFixtureProcess) Teardown() error {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
+
+	// If the process is already gone before we ask it to shut down, it died on
+	// its own — crashed, was OOM-killed, was killed by hand. Its AfterAll never
+	// ran, so whatever it holds is orphaned. That has to be reported: the tests
+	// themselves may all have passed.
+	diedEarly := false
+	select {
+	case <-p.done:
+		diedEarly = true
+	default:
+	}
+
 	_ = TerminateProcessGroup(p.cmd.Process.Pid)
 	select {
 	case <-p.done:
@@ -174,6 +186,10 @@ func (p *SharedFixtureProcess) Teardown() error {
 	// would blame teardown for it.
 	if p.setupErr != nil {
 		return nil
+	}
+
+	if diedEarly {
+		return fmt.Errorf("shared fixture process exited before teardown; its AfterAll never ran and its resources may be leaked")
 	}
 
 	// The setup program exits with sharedTeardownFailedExit specifically to

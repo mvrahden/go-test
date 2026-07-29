@@ -3,6 +3,7 @@ package gotestruntime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -344,7 +345,12 @@ func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
 			attemptCtx, attemptCancel = context.WithCancel(ctx)
 		}
 
-		lastErr = node.BeforeAll(attemptCtx)
+		lastErr = attemptBeforeAll(node, attemptCtx)
+		if lastErr == nil && errors.Is(attemptCtx.Err(), context.DeadlineExceeded) {
+			// Setup that ignores the context still overran its budget; without
+			// this it would report success and the Timeout would mean nothing.
+			lastErr = fmt.Errorf("exceeded its configured Timeout of %s", node.Config.Timeout)
+		}
 		attemptCancel()
 
 		if lastErr == nil {
@@ -367,6 +373,21 @@ func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
 
 	fmt.Fprintf(os.Stderr, "FAIL: %s.BeforeAll failed after %d attempt(s): %v\n", node.Name, attempts, lastErr)
 	return wrapErr(lastErr)
+}
+
+// attemptBeforeAll runs one BeforeAll attempt, turning a panic into an error.
+//
+// A panic is a failure of the same setup the retry policy exists for — a
+// half-initialised client, an empty response indexed into. Letting it escape
+// the retry loop would mean Retries silently covered returned errors only, so
+// the flakiest failures would be the ones never retried.
+func attemptBeforeAll(node *FixtureNode, ctx context.Context) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic: %v\n\n%s", r, debug.Stack())
+		}
+	}()
+	return node.BeforeAll(ctx)
 }
 
 func teardownRoots(roots []*FixtureNode, tracker *nodeTracker) bool {

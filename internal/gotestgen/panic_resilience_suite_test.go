@@ -93,3 +93,29 @@ func (s *PanicResilienceTestSuite) TestPanicInFixtureTeardown(t *gotest.T) {
 		})
 	})
 }
+
+func (s *PanicResilienceTestSuite) TestConfiguredTimeoutOverrun(t *gotest.T) {
+	t.When("a test blows its configured Timeout while ignoring the context", func(w *gotest.T) {
+		run := runGeneratedSuite(w, "TestLifecycle_TimeoutOverrun")
+
+		w.It("terminates promptly instead of timing out", func(it *gotest.T) {
+			assertNoDeadlock(it, run)
+		})
+
+		w.It("fails the run rather than passing silently", func(it *gotest.T) {
+			// Go cannot preempt the test, so it runs to completion either way.
+			// The budget only means something if the overrun is reported.
+			gotest.False(it, run.passed, "an overrun must fail the run:\n%s", run.output)
+			gotest.Contains(it, run.output, "exceeded its configured Timeout",
+				"the overrun should be reported:\n%s", run.output)
+			gotest.Contains(it, run.output, "MARK:overrunning test returned", run.output)
+		})
+
+		w.It("leaves tests that stayed within budget alone", func(it *gotest.T) {
+			gotest.Contains(it, run.output, "MARK:fast test returned", run.output)
+			gotest.Equal(it, 1, strings.Count(run.output, "exceeded its configured Timeout"),
+				"only the overrunning test should be reported:\n%s", run.output)
+			gotest.Contains(it, run.output, "MARK:suite afterall", run.output)
+		})
+	})
+}

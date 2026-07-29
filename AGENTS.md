@@ -274,6 +274,11 @@ Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
 The returned config is used as-is: a zero (or omitted) duration disables that deadline; without the marker method, `DefaultSuiteConfig()` (30s/30s) applies.
 Compose from presets for defaults + overrides: `cfg := gotest.DefaultSuiteConfig(); cfg.Parallel = true; return cfg`.
 
+`Timeout` is enforced after the fact: Go cannot preempt a running test, so a method
+that ignores `t.Context()` runs to completion and is then failed for exceeding its
+budget. The same applies to a fixture's `Timeout` — an overrunning `BeforeAll` counts
+as a failed attempt and is retried if `Retries` allows.
+
 `Timeout` reaches `t.Context()` inside nested `When`, `It` and `Each` bodies too — a
 nested behavior inherits the enclosing deadline, and its context is canceled when that
 nested subtest ends. For a tighter budget in one place, use `gotest.NewTWithDeadline`.
@@ -361,6 +366,10 @@ Presets: `DefaultFixtureConfig()` (2m timeout), `ContainerFixtureConfig()` (5m, 
 **Teardown failures are real failures.** A fixture `AfterAll` that returns an error or
 panics fails the run — for package and shared fixtures alike. A panic in one fixture's
 teardown is contained, so every other fixture still finishes releasing its resources.
+
+`Retries` covers panics as well as returned errors — a `BeforeAll` that panics is
+retried like one that fails. If a shared fixture's process dies before teardown, the
+run fails: its `AfterAll` never ran and whatever it held is orphaned.
 
 ### Shared fixtures
 

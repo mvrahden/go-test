@@ -31,8 +31,10 @@ func (s *HarnessTTestSuite) TestSetupAndTestT(t *gotest.T) {
 			}
 		})
 
+		// SetupT shares testScopedT's deadline mechanics with TestT, and unlike
+		// TestT it does not report an overrun — which this deliberately causes.
 		w.It("expires on its own", func(it *gotest.T) {
-			tt := gotestruntime.TestT(it.T(), 10*time.Millisecond)
+			tt := gotestruntime.SetupT(it.T(), 10*time.Millisecond)
 			<-tt.Context().Done()
 			gotest.ErrorIs(it, tt.Context().Err(), context.DeadlineExceeded)
 		})
