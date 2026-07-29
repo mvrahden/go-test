@@ -407,7 +407,7 @@ The system has **four levels of parallelism**, each with distinct mechanisms:
 │                                                                     │
 │  Enabled by: SuiteConfig{ Parallel: true }                          │
 │  Requires:   BeforeEach returns per-test context struct             │
-│  Mechanism:  it.Parallel() + sync.WaitGroup                         │
+│  Mechanism:  it.Parallel(); AfterAll via t.Cleanup                  │
 │  Concurrency governed by `-test.parallel` (default: GOMAXPROCS)     │
 │                                                                     │
 │  ┌─ Suite subprocess ──────────────────────────────────────────┐    │
@@ -416,7 +416,7 @@ The system has **four levels of parallelism**, each with distinct mechanisms:
 │  │                          TestA(t, ctx); AfterEach(t, ctx) }) │    │
 │  │ t.Run("TestB", func() { it.Parallel(); ctx := BeforeEach(); │    │
 │  │                          TestB(t, ctx); AfterEach(t, ctx) }) │    │
-│  │ wg.Wait()                                                    │    │
+│  │ (testing waits for all parallel subtests before cleanup)     │    │
 │  │ AfterAll()                                                   │    │
 │  └──────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────┘

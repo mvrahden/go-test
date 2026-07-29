@@ -9,7 +9,6 @@ import (
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
-	"github.com/mvrahden/go-test/internal/x/slices"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -116,25 +115,24 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		PackageName string
 		Imports     []headerImport
 	}
+	// Every harness references gotestruntime: the ƒƒ_GOTEST_exec sentinel takes a
+	// gotestruntime.TestCase, and each Test function builds its lifecycle T there.
 	imports := []headerImport{
 		{Path: "testing"},
 		{Path: about.Repo + "/pkg/gotest"},
+		{Path: about.Repo + "/pkg/gotestruntime"},
 	}
 	if hasFixtures {
 		imports = append(imports,
-			headerImport{Path: about.Repo + "/pkg/gotestruntime"},
 			headerImport{Path: "context"},
 			headerImport{Path: "sync/atomic"},
 			headerImport{Path: "time"},
 		)
 	}
-	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
+	if !hasFixtures && slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
 		return v.IsMethodParallel()
 	}) {
-		imports = append(imports, headerImport{Path: "sync"})
-		if !hasFixtures {
-			imports = append(imports, headerImport{Path: "sync/atomic"})
-		}
+		imports = append(imports, headerImport{Path: "sync/atomic"})
 	}
 	seenPkg := map[string]bool{}
 	for _, rf := range allFixtures {

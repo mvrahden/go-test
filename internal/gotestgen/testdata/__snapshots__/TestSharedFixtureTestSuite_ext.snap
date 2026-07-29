@@ -1915,6 +1915,7 @@ import (
 	"time"
 
 	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -1928,7 +1929,7 @@ func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
-	gotest.OverlayFixtureConfig(&ƒcfg_sf0, sf0.SharedFixtureConfig())
+	gotestruntime.OverlayFixtureConfig(&ƒcfg_sf0, sf0.SharedFixtureConfig())
 
 	ƒerrs := make([]error, 1)
 	ƒctx := context.Background()

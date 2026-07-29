@@ -12,7 +12,8 @@ import (
 	"time"
 
 	gotest {{ printf "%q" .GotestImportPath }}
-{{ range .Imports }}
+{{ if .UsesRuntime }}	gotestruntime {{ printf "%q" .GotestRuntimeImportPath }}
+{{ end }}{{ range .Imports }}
 	{{ .Alias }} {{ printf "%q" .Path }}
 {{- end }}
 )

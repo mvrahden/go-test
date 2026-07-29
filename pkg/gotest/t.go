@@ -10,8 +10,6 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 )
 
-type TestCase func(*T)
-
 func NewT(t *testing.T) *T {
 	return &T{t: t}
 }
@@ -32,9 +30,21 @@ func (t *T) Context() context.Context {
 	return t.t.Context()
 }
 
+// NewTWithDeadline wraps t with a context that expires after timeout, so a test
+// can hold work to a tighter budget than the suite's own. The context is derived
+// from t.Context() and is released when the test ends.
 func NewTWithDeadline(t *testing.T, timeout time.Duration) *T {
 	ctx, cancel := context.WithTimeout(t.Context(), timeout)
 	t.Cleanup(cancel)
+	return &T{t: t, ctx: ctx}
+}
+
+// NewTWithContext wraps t, overriding what [T.Context] reports. Use it when the
+// context cannot be expressed as a deadline off t.Context() — injected values,
+// or a lifetime that has to differ from the test's own.
+//
+// The caller owns the context; nothing here cancels it.
+func NewTWithContext(t *testing.T, ctx context.Context) *T {
 	return &T{t: t, ctx: ctx}
 }
 

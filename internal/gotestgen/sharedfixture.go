@@ -27,8 +27,12 @@ type SharedFixtureInfo struct {
 }
 
 type sharedSetupData struct {
-	RepoInfo         string
-	GotestImportPath string
+	RepoInfo                string
+	GotestImportPath        string
+	GotestRuntimeImportPath string
+	// UsesRuntime is false when no shared fixture declares a config, in which
+	// case nothing in the program references gotestruntime.
+	UsesRuntime      bool
 	Imports          []sharedSetupImport
 	Fixtures         []sharedSetupFixture
 	TeardownFixtures []sharedSetupFixture // fixtures in reverse dependency order for teardown
@@ -130,12 +134,22 @@ func GenerateSharedSetup(fixtures []SharedFixtureInfo) ([]byte, error) {
 		teardownFixtures[len(fixtureVMs)-1-i] = fixtureVMs[i]
 	}
 
+	usesRuntime := false
+	for i := range fixtureVMs {
+		if fixtureVMs[i].HasConfig {
+			usesRuntime = true
+			break
+		}
+	}
+
 	data := sharedSetupData{
-		RepoInfo:         about.ShortInfo(),
-		GotestImportPath: about.Repo + "/pkg/gotest",
-		Imports:          imports,
-		Fixtures:         fixtureVMs,
-		TeardownFixtures: teardownFixtures,
+		RepoInfo:                about.ShortInfo(),
+		GotestImportPath:        about.Repo + "/pkg/gotest",
+		GotestRuntimeImportPath: about.Repo + "/pkg/gotestruntime",
+		UsesRuntime:             usesRuntime,
+		Imports:                 imports,
+		Fixtures:                fixtureVMs,
+		TeardownFixtures:        teardownFixtures,
 	}
 
 	var buf bytes.Buffer

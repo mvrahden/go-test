@@ -133,6 +133,20 @@ func ExportMustTestPkg(t testing.TB, name string) *packages.Package {
 	return pkg
 }
 
+// ExportTestPkgDir returns the on-disk directory of a materialized test package
+// inside the throwaway module built by TestMain. Tests that need to compile and
+// run a generated harness — not merely render it — write into this directory.
+func ExportTestPkgDir(t testing.TB, name string) string {
+	t.Helper()
+	if testPkgErr != nil {
+		t.Fatal(testPkgErr)
+	}
+	if _, ok := testPkgIndex[name]; !ok {
+		t.Fatalf("no test package found for %s", name)
+	}
+	return filepath.Join(testPkgDir, name)
+}
+
 // Type aliases for unexported types used in tests across all gotestgen test files.
 type ExportCollector = collector
 type ExportRenderer = renderer
