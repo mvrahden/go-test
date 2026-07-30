@@ -27,18 +27,15 @@ func collectFailures(packages []*Package) []failure {
 func collectFailedLeaves(pkgPath string, n *Node, display []string, out *[]failure) {
 	cur := append(append([]string(nil), display...), n.Display)
 
-	if len(n.Children) == 0 {
-		if n.Status == StatusFail {
-			d := make([]string, len(cur))
-			copy(d, cur)
-			*out = append(*out, failure{
-				Package:  pkgPath,
-				Display:  d,
-				Duration: n.Duration,
-				Output:   n.Output,
-			})
-		}
-		return
+	if n.Status == StatusFail && (len(n.Children) == 0 || failedOnItsOwn(n)) {
+		d := make([]string, len(cur))
+		copy(d, cur)
+		*out = append(*out, failure{
+			Package:  pkgPath,
+			Display:  d,
+			Duration: n.Duration,
+			Output:   n.Output,
+		})
 	}
 
 	for _, child := range n.Children {

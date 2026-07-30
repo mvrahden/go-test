@@ -111,7 +111,16 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors) {
 		suffix = fmt.Sprintf(" %s— SKIPPED%s", c.yellow, c.reset)
 	}
 
+	if failedOnItsOwn(n) {
+		icon, clr := statusIcon(StatusFail, c)
+		suffix += fmt.Sprintf(" %s%s%s", clr, icon, c.reset)
+	}
+
 	fmt.Fprintf(w, "%s%s%s\n", indent, label, suffix)
+
+	if failedOnItsOwn(n) {
+		renderErrorOutput(w, n.Output, depth+1, c)
+	}
 
 	for _, child := range n.Children {
 		renderNode(w, child, depth+1, c)

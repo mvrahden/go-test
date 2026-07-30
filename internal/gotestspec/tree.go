@@ -243,6 +243,17 @@ func collectStats(n *Node, s *Stats, inStdlib bool) {
 	if n.Kind == KindSuite {
 		s.Suites++
 	}
+	if failedOnItsOwn(n) {
+		// Counted alongside the leaves so that Passed+Failed+Skipped still adds
+		// up to the number reported: the verdict is on this node, and the tree
+		// marks it here rather than under any of its children.
+		if inStdlib {
+			s.Tests++
+		} else {
+			s.Behaviors++
+		}
+		s.Failed++
+	}
 	if len(n.Children) == 0 {
 		if inStdlib {
 			s.Tests++
@@ -342,6 +353,19 @@ func splitTestPath(path string) []string {
 		segments = append(segments, cur.String())
 	}
 	return segments
+}
+
+// failedOnItsOwn reports whether an interior node carries a verdict of its own:
+// a suite whose AfterAll failed, or a test method that blew its configured
+// Timeout. Both are attributed to the node while every behaviour beneath it may
+// still have passed.
+//
+// A failed child marks its whole ancestry FAIL too, so status alone cannot tell
+// the two apart. Output does: the testing package emits "=== RUN" and "--- FAIL"
+// markers for every node, and filterOutput strips exactly those, so anything
+// left is the node speaking for itself.
+func failedOnItsOwn(n *Node) bool {
+	return len(n.Children) > 0 && n.Status == StatusFail && len(filterOutput(n.Output)) > 0
 }
 
 func statusFrom(a Action) Status {
