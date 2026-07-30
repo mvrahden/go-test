@@ -141,6 +141,23 @@ func (s *PanicResilienceTestSuite) TestPanicOnSpawnedGoroutine(t *gotest.T) {
 	})
 }
 
+func (s *PanicResilienceTestSuite) TestGoroutineThatRunsUntilStopped(t *gotest.T) {
+	t.When("a gotest.Go goroutine is stopped in AfterEach", func(w *gotest.T) {
+		run := runGeneratedSuite(w, "TestLifecycle_GoroutineService")
+
+		w.It("finishes instead of waiting on itself", func(it *gotest.T) {
+			// The wait gotest.Go registers as cleanup runs after AfterEach, so
+			// the goroutine has already been told to stop by the time anything
+			// waits for it. Waiting inside the test — a `defer wait()` — would
+			// deadlock, because the test's own defers run before AfterEach.
+			assertNoDeadlock(it, run)
+			gotest.True(it, run.passed, "expected the suite to pass:\n%s", run.output)
+			gotest.Contains(it, run.output, "MARK:served a connection", run.output)
+			gotest.Contains(it, run.output, "MARK:suite afterall", run.output)
+		})
+	})
+}
+
 func (s *PanicResilienceTestSuite) TestSetupTimeoutOverrun(t *gotest.T) {
 	t.When("BeforeAll blows its configured SetupTimeout", func(w *gotest.T) {
 		run := runGeneratedSuite(w, "TestLifecycle_SetupOverrun")

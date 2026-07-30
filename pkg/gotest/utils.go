@@ -106,11 +106,23 @@ func Must[T any](val T, ok any) T {
 // with the stack from where it happened, and re-raises it on the test's own
 // goroutine, where the testing package handles it like any other test panic.
 //
-//	wait := gotest.Go(t, func() { srv.Serve(l) })
+// For work that finishes on its own, wait for it where you want the panic to
+// surface:
+//
+//	wait := gotest.Go(t, func() { report = build(input) })
 //	defer wait()
 //
-// The wait is also registered as test cleanup, so a forgotten wait still gets
-// one. Calling the returned function more than once is safe.
+// For a goroutine that runs until something stops it — a server, a poller —
+// do not wait inside the test. The wait is registered as test cleanup, which
+// runs after AfterEach and after any later t.Cleanup, so whatever stops the
+// goroutine has already run by the time anything waits for it:
+//
+//	gotest.Go(t, func() { srv.Serve(l) })   // AfterEach closes l
+//
+// A `defer wait()` here would deadlock instead: the test's own defers run
+// before AfterEach, so it would wait for a goroutine nothing has stopped yet.
+//
+// Calling the returned function more than once is safe.
 func Go(t *T, fn func()) (wait func()) {
 	done := make(chan struct{})
 	var captured *capturedPanic

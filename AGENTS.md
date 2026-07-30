@@ -203,12 +203,24 @@ Use `gotest.Go` to start one instead. It captures the panic with the stack from 
 it happened and re-raises it on the test's own goroutine, where it is reported like any
 other test panic and every cleanup still runs.
 
+For work that finishes on its own, wait where you want the panic to surface:
+
 ```go
-wait := gotest.Go(t, func() { srv.Serve(l) })
+wait := gotest.Go(t, func() { report = build(input) })
 defer wait()
 ```
 
-The wait is also registered as test cleanup, so a forgotten `wait()` still gets one.
+For a goroutine that runs until something stops it — a server, a poller — do **not**
+wait inside the test. `gotest.Go` registers the wait as test cleanup, which runs after
+`AfterEach`, so whatever stops the goroutine has already run by the time anything waits
+for it:
+
+```go
+gotest.Go(t, func() { srv.Serve(l) })   // AfterEach closes the listener
+```
+
+A `defer wait()` here deadlocks instead: the test's own defers run before `AfterEach`,
+so it waits for a goroutine nothing has stopped yet.
 
 ## Suite Conventions
 
