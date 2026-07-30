@@ -25,6 +25,13 @@ var ExportCacheRoot = cacheRoot
 var ExportFilterPackageLevelEvents = filterPackageLevelEvents
 var ExportIsPackageSummaryLine = protocol.IsPackageSummaryLine
 
+// ExportProcessPID and ExportProcessDone let the teardown tests observe the
+// shared fixture subprocess directly: whether it is still alive, and when it is
+// finally reaped.
+func ExportProcessPID(p *SharedFixtureProcess) int { return p.cmd.Process.Pid }
+
+func ExportProcessDone(p *SharedFixtureProcess) <-chan struct{} { return p.done }
+
 func ExportAutoDetectCI(cfg PipelineConfig) PipelineConfig {
 	if !cfg.CI && os.Getenv(protocol.EnvCI) == "" && os.Getenv("CI") != "" {
 		cfg.CI = true

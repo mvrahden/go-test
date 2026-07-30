@@ -443,14 +443,16 @@ loop:
 	wg.Wait()
 	fixtureWg.Wait()
 
-	// Cancel streamCtx before teardown so cmd.Cancel fires on the shared
-	// fixture subprocess, triggering WaitDelay-based pipe cleanup.
-	streamCancel()
-
+	// Teardown owns the shared fixture process's shutdown: it signals, then
+	// waits out the configured teardown budget. Cancelling streamCtx first
+	// would signal the process behind Teardown's back, leaving two owners for
+	// one shutdown — and Teardown could no longer tell a process that died on
+	// its own from one that simply obeyed the signal it never sent.
 	var teardownErr error
 	if setupProc != nil {
 		teardownErr = setupProc.Teardown()
 	}
+	streamCancel()
 
 	if pf.UserCoverProfile != "" {
 		mergeCoverProfiles(allTargets, pf.UserCoverProfile)

@@ -243,8 +243,12 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	cmd := exec.CommandContext(ctx, setupBin)
 	cmd.Stderr = os.Stderr
 
+	// SetProcessGroup's WaitDelay is the backstop for a process that ignores
+	// SIGTERM, and it has to stay looser than any teardown budget. Tighten it
+	// below one and it becomes the budget: a fixture given minutes to stop its
+	// containers is killed part-way through instead, and because a signalled
+	// process reports no meaningful exit status, the run still says ok.
 	SetProcessGroup(cmd)
-	cmd.WaitDelay = 5 * time.Second
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
