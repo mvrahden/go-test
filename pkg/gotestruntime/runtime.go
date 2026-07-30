@@ -346,10 +346,13 @@ func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
 		}
 
 		lastErr = attemptBeforeAll(node, attemptCtx)
-		if lastErr == nil && errors.Is(attemptCtx.Err(), context.DeadlineExceeded) {
-			// Setup that ignores the context still overran its budget; without
-			// this it would report success and the Timeout would mean nothing.
-			lastErr = fmt.Errorf("exceeded its configured Timeout of %s", node.Config.Timeout)
+		if budget := node.Config.Budget(); lastErr == nil && budget > 0 && errors.Is(attemptCtx.Err(), context.DeadlineExceeded) {
+			// Setup that ignores the context still overran the budget it was
+			// given; without this it would report success and a declared Timeout
+			// would mean nothing. Only a declared one, though — failing a
+			// fixture against a default it never asked for is not a verdict its
+			// author could act on.
+			lastErr = fmt.Errorf("exceeded its configured Timeout of %s", budget)
 		}
 		attemptCancel()
 

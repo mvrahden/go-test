@@ -4,8 +4,6 @@ import (
 	"context"
 	"sync"
 	"time"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 // SharedStateNode describes a shared fixture node in the DAG.
@@ -21,7 +19,7 @@ type SharedStateNode struct {
 // Generated code populates this as a struct literal.
 type FixtureNode struct {
 	Name        string
-	Config      gotest.FixtureConfig
+	Config      FixtureConfig
 	Init        func()
 	BeforeAll   func(ctx context.Context) error
 	AfterAll    func(ctx context.Context) error

@@ -38,7 +38,7 @@ func TestSingleRoot_LifecycleOrder(t *testing.T) {
 
 	node := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() { rec.record("root.init") },
 		BeforeAll: func(ctx context.Context) error {
 			rec.record("root.beforeAll")
@@ -62,7 +62,7 @@ func TestSingleRoot_LifecycleOrder(t *testing.T) {
 func TestSingleRoot_ExitCodeForwarded(t *testing.T) {
 	node := &FixtureNode{
 		Name:      "Root",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
 		AfterAll:  func(ctx context.Context) error { return nil },
@@ -80,7 +80,7 @@ func TestSingleRoot_AfterAllCalledOnNonZeroExit(t *testing.T) {
 
 	node := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			return nil
@@ -104,7 +104,7 @@ func TestSingleRoot_NilAfterAll(t *testing.T) {
 
 	node := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() { rec.record("root.init") },
 		BeforeAll: func(ctx context.Context) error {
 			rec.record("root.beforeAll")
@@ -127,7 +127,7 @@ func TestSingleRoot_NilInit(t *testing.T) {
 
 	node := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   nil,
 		BeforeAll: func(ctx context.Context) error {
 			rec.record("root.beforeAll")
@@ -154,7 +154,7 @@ func TestRetry_SucceedsOnSecondAttempt(t *testing.T) {
 
 	node := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute, Retries: 2, RetryDelay: 10 * time.Millisecond},
+		Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute, Retries: 2, RetryDelay: 10 * time.Millisecond}),
 		Init:   func() { rec.record("root.init") },
 		BeforeAll: func(ctx context.Context) error {
 			attempts++
@@ -186,7 +186,7 @@ func TestRetry_ExhaustedRetriesReturnsExitCode2(t *testing.T) {
 
 	node := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute, Retries: 1},
+		Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute, Retries: 1}),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			attempts++
@@ -216,7 +216,7 @@ func TestRetry_DelayObservedBetweenAttempts(t *testing.T) {
 
 	node := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute, Retries: 1, RetryDelay: 50 * time.Millisecond},
+		Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute, Retries: 1, RetryDelay: 50 * time.Millisecond}),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			timestamps = append(timestamps, time.Now())
@@ -239,7 +239,7 @@ func TestRetry_DelayObservedBetweenAttempts(t *testing.T) {
 func TestTimeout_BeforeAllExceedsTimeout(t *testing.T) {
 	node := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.FixtureConfig{Timeout: 50 * time.Millisecond},
+		Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 50 * time.Millisecond}),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			select {
@@ -265,7 +265,7 @@ func TestTimeout_BeforeAllExceedsTimeout(t *testing.T) {
 func TestTimeout_BeforeAllCompletesWithinTimeout(t *testing.T) {
 	node := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.FixtureConfig{Timeout: 500 * time.Millisecond},
+		Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 500 * time.Millisecond}),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			select {
@@ -285,7 +285,7 @@ func TestTimeout_BeforeAllCompletesWithinTimeout(t *testing.T) {
 func TestTimeout_DisabledWithNegativeOne(t *testing.T) {
 	node := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.FixtureConfig{Timeout: -1},
+		Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: -1}),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			deadline, hasDeadline := ctx.Deadline()
@@ -304,7 +304,7 @@ func TestChildren_SetupOrder(t *testing.T) {
 
 	childA := &FixtureNode{
 		Name:   "ChildA",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() { rec.record("childA.init") },
 		BeforeAll: func(ctx context.Context) error {
 			rec.record("childA.beforeAll")
@@ -317,7 +317,7 @@ func TestChildren_SetupOrder(t *testing.T) {
 	}
 	childB := &FixtureNode{
 		Name:   "ChildB",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() { rec.record("childB.init") },
 		BeforeAll: func(ctx context.Context) error {
 			rec.record("childB.beforeAll")
@@ -331,7 +331,7 @@ func TestChildren_SetupOrder(t *testing.T) {
 
 	root := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() { rec.record("root.init") },
 		BeforeAll: func(ctx context.Context) error {
 			rec.record("root.beforeAll")
@@ -387,7 +387,7 @@ func TestChildren_ConcurrentSetup(t *testing.T) {
 
 	childA := &FixtureNode{
 		Name:   "ChildA",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			close(childAStarted)
@@ -402,7 +402,7 @@ func TestChildren_ConcurrentSetup(t *testing.T) {
 	}
 	childB := &FixtureNode{
 		Name:   "ChildB",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			close(childBStarted)
@@ -418,7 +418,7 @@ func TestChildren_ConcurrentSetup(t *testing.T) {
 
 	root := &FixtureNode{
 		Name:      "Root",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
 		Children:  []*FixtureNode{childA, childB},
@@ -434,7 +434,7 @@ func TestChildFailure_CancelsSiblings(t *testing.T) {
 
 	childA := &FixtureNode{
 		Name:   "ChildA",
-		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
+		Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute}),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			close(childAStarted)
@@ -447,7 +447,7 @@ func TestChildFailure_CancelsSiblings(t *testing.T) {
 	}
 	childB := &FixtureNode{
 		Name:   "ChildB",
-		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
+		Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute}),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			// Wait for A to have started (and likely failed)
@@ -469,7 +469,7 @@ func TestChildFailure_CancelsSiblings(t *testing.T) {
 
 	root := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			return nil
@@ -501,7 +501,7 @@ func TestChildFailure_SucceededSiblingGetsAfterAll(t *testing.T) {
 
 	childA := &FixtureNode{
 		Name:   "ChildA",
-		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
+		Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute}),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			// Wait for B to succeed first
@@ -515,7 +515,7 @@ func TestChildFailure_SucceededSiblingGetsAfterAll(t *testing.T) {
 	}
 	childB := &FixtureNode{
 		Name:   "ChildB",
-		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
+		Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute}),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			close(childBReady)
@@ -529,7 +529,7 @@ func TestChildFailure_SucceededSiblingGetsAfterAll(t *testing.T) {
 
 	root := &FixtureNode{
 		Name:      "Root",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
 		AfterAll: func(ctx context.Context) error {
@@ -556,7 +556,7 @@ func TestTreeDepth_ThreeLevels(t *testing.T) {
 
 	grandchild := &FixtureNode{
 		Name:   "Grandchild",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() { rec.record("grandchild.init") },
 		BeforeAll: func(ctx context.Context) error {
 			rec.record("grandchild.beforeAll")
@@ -570,7 +570,7 @@ func TestTreeDepth_ThreeLevels(t *testing.T) {
 
 	child := &FixtureNode{
 		Name:   "Child",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() { rec.record("child.init") },
 		BeforeAll: func(ctx context.Context) error {
 			rec.record("child.beforeAll")
@@ -585,7 +585,7 @@ func TestTreeDepth_ThreeLevels(t *testing.T) {
 
 	root := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() { rec.record("root.init") },
 		BeforeAll: func(ctx context.Context) error {
 			rec.record("root.beforeAll")
@@ -632,7 +632,7 @@ func TestMultipleRoots_ConcurrentSetup(t *testing.T) {
 
 	rootA := &FixtureNode{
 		Name:   "RootA",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			close(rootAStarted)
@@ -647,7 +647,7 @@ func TestMultipleRoots_ConcurrentSetup(t *testing.T) {
 	}
 	rootB := &FixtureNode{
 		Name:   "RootB",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			close(rootBStarted)
@@ -670,7 +670,7 @@ func TestMultipleRoots_OneFailsCancelsOther(t *testing.T) {
 
 	rootA := &FixtureNode{
 		Name:   "RootA",
-		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
+		Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute}),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			return errors.New("rootA fails immediately")
@@ -682,7 +682,7 @@ func TestMultipleRoots_OneFailsCancelsOther(t *testing.T) {
 	}
 	rootB := &FixtureNode{
 		Name:   "RootB",
-		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
+		Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute}),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			// Block until cancelled
@@ -709,7 +709,7 @@ func TestMultipleRoots_ConcurrentTeardown(t *testing.T) {
 
 	rootA := &FixtureNode{
 		Name:      "RootA",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
 		AfterAll: func(ctx context.Context) error {
@@ -720,7 +720,7 @@ func TestMultipleRoots_ConcurrentTeardown(t *testing.T) {
 	}
 	rootB := &FixtureNode{
 		Name:      "RootB",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
 		AfterAll: func(ctx context.Context) error {
@@ -740,13 +740,13 @@ func TestBudgetFile_WrittenCorrectly(t *testing.T) {
 
 	root := &FixtureNode{
 		Name:      "Root",
-		Config:    gotest.FixtureConfig{Timeout: 2 * time.Minute},
+		Config:    ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute}),
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
 		Children: []*FixtureNode{
 			{
 				Name:      "Child",
-				Config:    gotest.FixtureConfig{Timeout: 1 * time.Minute},
+				Config:    ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 1 * time.Minute}),
 				Init:      func() {},
 				BeforeAll: func(ctx context.Context) error { return nil },
 			},
@@ -773,7 +773,7 @@ func TestBudgetFile_NotWrittenWhenEnvUnset(t *testing.T) {
 
 	root := &FixtureNode{
 		Name:      "Root",
-		Config:    gotest.FixtureConfig{Timeout: 2 * time.Minute},
+		Config:    ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute}),
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
 	}
@@ -788,19 +788,19 @@ func TestBudgetFile_MultipleRootsUsesMax(t *testing.T) {
 
 	rootA := &FixtureNode{
 		Name:      "RootA",
-		Config:    gotest.FixtureConfig{Timeout: 1 * time.Minute},
+		Config:    ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 1 * time.Minute}),
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
 	}
 	rootB := &FixtureNode{
 		Name:      "RootB",
-		Config:    gotest.FixtureConfig{Timeout: 3 * time.Minute},
+		Config:    ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 3 * time.Minute}),
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
 		Children: []*FixtureNode{
 			{
 				Name:      "ChildB1",
-				Config:    gotest.FixtureConfig{Timeout: 2 * time.Minute},
+				Config:    ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute}),
 				Init:      func() {},
 				BeforeAll: func(ctx context.Context) error { return nil },
 			},
@@ -825,7 +825,7 @@ func TestBudgetFile_MultipleRootsUsesMax(t *testing.T) {
 func TestTeardownFailure_SetsExitCode1WhenTestsPassed(t *testing.T) {
 	node := &FixtureNode{
 		Name:      "Root",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
 		AfterAll: func(ctx context.Context) error {
@@ -840,7 +840,7 @@ func TestTeardownFailure_SetsExitCode1WhenTestsPassed(t *testing.T) {
 func TestTeardownFailure_PreservesNonZeroExitCode(t *testing.T) {
 	node := &FixtureNode{
 		Name:      "Root",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
 		AfterAll: func(ctx context.Context) error {
@@ -857,7 +857,7 @@ func TestDAG_LinearChain(t *testing.T) {
 
 	root := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() { rec.record("root.init") },
 		BeforeAll: func(ctx context.Context) error {
 			rec.record("root.beforeAll")
@@ -870,7 +870,7 @@ func TestDAG_LinearChain(t *testing.T) {
 	}
 	mid := &FixtureNode{
 		Name:      "Mid",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		DependsOn: []string{"Root"},
 		Init:      func() { rec.record("mid.init") },
 		BeforeAll: func(ctx context.Context) error {
@@ -884,7 +884,7 @@ func TestDAG_LinearChain(t *testing.T) {
 	}
 	leaf := &FixtureNode{
 		Name:      "Leaf",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		DependsOn: []string{"Mid"},
 		Init:      func() { rec.record("leaf.init") },
 		BeforeAll: func(ctx context.Context) error {
@@ -930,7 +930,7 @@ func TestDAG_IndependentFixtures(t *testing.T) {
 
 	fixtureA := &FixtureNode{
 		Name:   "A",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			close(aStarted)
@@ -944,7 +944,7 @@ func TestDAG_IndependentFixtures(t *testing.T) {
 	}
 	fixtureB := &FixtureNode{
 		Name:   "B",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			close(bStarted)
@@ -966,7 +966,7 @@ func TestDAG_DiamondDependency(t *testing.T) {
 
 	db := &FixtureNode{
 		Name:   "DB",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			rec.record("db.beforeAll")
@@ -979,7 +979,7 @@ func TestDAG_DiamondDependency(t *testing.T) {
 	}
 	repoA := &FixtureNode{
 		Name:      "RepoA",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		DependsOn: []string{"DB"},
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error {
@@ -993,7 +993,7 @@ func TestDAG_DiamondDependency(t *testing.T) {
 	}
 	repoB := &FixtureNode{
 		Name:      "RepoB",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		DependsOn: []string{"DB"},
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error {
@@ -1007,7 +1007,7 @@ func TestDAG_DiamondDependency(t *testing.T) {
 	}
 	service := &FixtureNode{
 		Name:      "Service",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		DependsOn: []string{"RepoA", "RepoB"},
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error {
@@ -1058,7 +1058,7 @@ func TestDAG_DependencyFailure_SkipsDependents(t *testing.T) {
 
 	root := &FixtureNode{
 		Name:   "Root",
-		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
+		Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute}),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			return errors.New("root fails")
@@ -1070,7 +1070,7 @@ func TestDAG_DependencyFailure_SkipsDependents(t *testing.T) {
 	}
 	child := &FixtureNode{
 		Name:      "Child",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		DependsOn: []string{"Root"},
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error {
@@ -1099,7 +1099,7 @@ func TestDAG_DependencyFailure_PartialTeardown(t *testing.T) {
 
 	a := &FixtureNode{
 		Name:   "A",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			rec.record("a.beforeAll")
@@ -1113,7 +1113,7 @@ func TestDAG_DependencyFailure_PartialTeardown(t *testing.T) {
 	}
 	b := &FixtureNode{
 		Name:   "B",
-		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
+		Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute}),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			<-aReady
@@ -1126,7 +1126,7 @@ func TestDAG_DependencyFailure_PartialTeardown(t *testing.T) {
 	}
 	c := &FixtureNode{
 		Name:      "C",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		DependsOn: []string{"A"},
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error {
@@ -1150,9 +1150,9 @@ func TestDAG_DependencyFailure_PartialTeardown(t *testing.T) {
 
 func TestDAG_ComputeMaxPath(t *testing.T) {
 	fixtures := []*FixtureNode{
-		{Name: "A", Config: gotest.FixtureConfig{Timeout: 1 * time.Minute}},
-		{Name: "B", Config: gotest.FixtureConfig{Timeout: 3 * time.Minute}, DependsOn: []string{"A"}},
-		{Name: "C", Config: gotest.FixtureConfig{Timeout: 2 * time.Minute}, DependsOn: []string{"A"}},
+		{Name: "A", Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 1 * time.Minute})},
+		{Name: "B", Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 3 * time.Minute}), DependsOn: []string{"A"}},
+		{Name: "C", Config: ResolveFixtureConfig(gotest.FixtureConfig{Timeout: 2 * time.Minute}), DependsOn: []string{"A"}},
 	}
 
 	// Longest path: A(1m) + B(3m) = 4m
@@ -1163,7 +1163,7 @@ func TestDAG_ComputeMaxPath(t *testing.T) {
 func TestDAG_InvalidDependency(t *testing.T) {
 	node := &FixtureNode{
 		Name:      "Orphan",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		DependsOn: []string{"DoesNotExist"},
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
@@ -1202,7 +1202,7 @@ func TestDAG_SharedStateNode(t *testing.T) {
 
 	apiNode := &FixtureNode{
 		Name:      "APIFixture",
-		Config:    gotest.DefaultFixtureConfig(),
+		Config:    ResolveFixtureConfig(),
 		DependsOn: []string{"PostgresSharedFixture"},
 		Init: func() {
 			rec.record("api.init")
@@ -1352,7 +1352,7 @@ func TestDAG_SharedStateNode_MissingStateFile(t *testing.T) {
 
 	plainNode := &FixtureNode{
 		Name:   "PlainFixture",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() { rec.record("plain.init") },
 		BeforeAll: func(ctx context.Context) error {
 			rec.record("plain.beforeAll")
@@ -1383,7 +1383,7 @@ func TestDAG_SharedStateNode_MissingStateFile(t *testing.T) {
 func TestBeforeAllError_IncludesFixtureName(t *testing.T) {
 	node := &FixtureNode{
 		Name:   "Database",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			return errors.New("connection refused")
@@ -1400,7 +1400,7 @@ func TestBeforeAllError_WrapsOriginalError(t *testing.T) {
 	sentinel := errors.New("sentinel")
 	node := &FixtureNode{
 		Name:   "Cache",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			return sentinel
@@ -1418,7 +1418,7 @@ func TestBeforeAllError_ContextCancelIncludesFixtureName(t *testing.T) {
 
 	node := &FixtureNode{
 		Name:   "Slow",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			return nil
@@ -1434,7 +1434,7 @@ func TestBeforeAllError_ContextCancelIncludesFixtureName(t *testing.T) {
 func TestDAGSetupError_IncludesFixtureName(t *testing.T) {
 	node := &FixtureNode{
 		Name:   "Redis",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: ResolveFixtureConfig(),
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			return errors.New("dial tcp: connection refused")

@@ -2,7 +2,6 @@ package gotestruntime
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -24,46 +23,74 @@ func SetupT(t *testing.T, timeout time.Duration) *gotest.T {
 	return testScopedT(t, timeout)
 }
 
-// TestT builds the *gotest.T handed to a single test method.
-//
-// Go cannot preempt a running test, so a configured Timeout can only bound the
-// context handed to it — code that ignores that context runs to completion. It
-// would then pass, silently, having blown the budget the suite asked for. The
-// deadline is therefore checked once the method is done and reported as a
-// failure, which is the most a deadline can mean here.
+// TestT builds the *gotest.T handed to a single test method. The timeout only
+// bounds the context here; holding the method to it is [RunTest]'s job, because
+// code that ignores its context runs to completion either way.
 func TestT(t *testing.T, timeout time.Duration) *gotest.T {
 	return testScopedT(t, timeout)
 }
 
-// RunTest runs one test method under its configured deadline.
+// RunTest runs one test method, held to the suite's Timeout if it declared one.
+func RunTest(t *gotest.T, cfg SuiteConfig, run func()) {
+	watchWhile(t, cfg.TestBudget(), "", "Timeout", run)
+}
+
+// RunSetup runs a suite's BeforeAll, held to its SetupTimeout if it declared one.
+func RunSetup(t *testing.T, cfg SuiteConfig, beforeAll func(*gotest.T)) {
+	tt := SetupT(t, cfg.SetupTimeout)
+	watchWhile(tt, cfg.SetupBudget(), "BeforeAll ", "SetupTimeout", func() { beforeAll(tt) })
+}
+
+// RunTeardown runs a suite's AfterAll from inside t.Cleanup, on the same terms
+// as [RunSetup].
+func RunTeardown(t *testing.T, cfg SuiteConfig, afterAll func(*gotest.T)) {
+	tt := TeardownT(t, cfg.SetupTimeout)
+	watchWhile(tt, cfg.SetupBudget(), "AfterAll ", "SetupTimeout", func() { afterAll(tt) })
+}
+
+// watchWhile runs a lifecycle phase and fails t the moment timeout passes with
+// that phase still running. what names the phase for the message ("BeforeAll ",
+// "AfterAll ", or empty for a test method) and budget names the config field it
+// came from.
 //
-// Nothing can interrupt it. Go has no way to stop another goroutine — no kill,
-// no remote panic, no remote Goexit — and running the method on a goroutine we
-// could abandon is worse than it looks: the testing package waits on subtests
-// registered by t.Run, so a hang inside a nested When or It would not be bounded
-// anyway, and the orphaned subtest would later signal a parent that had already
-// finished. Killing the process is the only true interruption, and that is what
-// go test -timeout already is.
+// The alternative — checking the deadline once the phase returns — cannot judge
+// a phase that never returns, which is the case that matters most. A wedged
+// BeforeAll would leave nothing behind but the -timeout dump, and that names no
+// budget at all.
 //
-// What is missing without this is a verdict. A hung test produces no failure at
-// all — just a timeout dump naming no budget — so a watchdog reports the overrun
-// while the method is still running. The test is marked failed the moment its
-// deadline passes, whatever happens to the process afterwards.
-func RunTest(t *gotest.T, timeout time.Duration, run func()) {
+// Nothing here interrupts the phase; it cannot. Go has no way to stop another
+// goroutine, and running the phase on a goroutine we could abandon is worse than
+// it looks: the testing package waits on subtests registered by t.Run, so a hang
+// inside a nested When or It would not be bounded anyway, and the orphaned
+// subtest would later signal a parent that had already finished. Killing the
+// process is the only true interruption, and that is what go test -timeout is.
+// What this adds is the verdict.
+func watchWhile(t *gotest.T, timeout time.Duration, what, budget string, run func()) {
 	if timeout <= 0 {
 		run()
 		return
 	}
 	done := make(chan struct{})
-	defer close(done) // also runs when the method exits via Goexit
-	go watchDeadline(t, timeout, done)
+	stopped := make(chan struct{})
+	go watchDeadline(t, timeout, what, budget, done, stopped)
+
+	// close(done) also runs when the phase exits via Goexit. Waiting for the
+	// watchdog to stop is what makes its Errorf legal: the testing package
+	// panics on a log from a test that has already completed, and the test
+	// cannot complete while this frame is still on the stack.
+	defer func() {
+		close(done)
+		<-stopped
+	}()
 	run()
 }
 
-// watchDeadline fails t if run has not finished within timeout. Errorf is safe
-// from another goroutine while the test is still running, which is exactly the
-// window this exists for.
-func watchDeadline(t *gotest.T, timeout time.Duration, done <-chan struct{}) {
+// watchDeadline fails t if the phase has not finished within timeout. Errorf is
+// safe from another goroutine while the test is still running, which the
+// handshake in watchWhile guarantees it is.
+func watchDeadline(t *gotest.T, timeout time.Duration, what, budget string, done <-chan struct{}, stopped chan<- struct{}) {
+	defer close(stopped)
+
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	select {
@@ -72,41 +99,24 @@ func watchDeadline(t *gotest.T, timeout time.Duration, done <-chan struct{}) {
 	case <-timer.C:
 	}
 
-	// Written unbuffered as well as recorded on the test. A test that never
+	// A select picks at random among the cases that are ready, so arriving here
+	// does not prove the phase is still running — it may have finished in the
+	// same instant the timer fired. Re-check without blocking: finishing on the
+	// deadline is not an overrun, and reporting one would be a coin flip.
+	select {
+	case <-done:
+		return
+	default:
+	}
+
+	// Written unbuffered as well as recorded on the test. A phase that never
 	// returns never completes, and the testing package only flushes a test's
 	// output when it does — so if the process is later killed by go test
 	// -timeout, this line is the only trace that a budget was blown, and which
 	// one.
-	fmt.Fprintf(os.Stderr, "gotest: %s exceeded its configured Timeout of %s and is still running\n", t.T().Name(), timeout)
-	t.Errorf("exceeded its configured Timeout of %s and is still running", timeout)
-}
-
-// reportOverrun fails t when its deadline expired rather than being canceled by
-// the work finishing. A context that has already expired keeps DeadlineExceeded,
-// so a later cancellation cannot mask it.
-func reportOverrun(t *gotest.T, timeout time.Duration, what, budget string) {
-	if errors.Is(t.Context().Err(), context.DeadlineExceeded) {
-		t.Errorf("%sexceeded its configured %s of %s", what, budget, timeout)
-	}
-}
-
-// RunSetup runs a suite's BeforeAll and reports an overrun of SetupTimeout.
-//
-// The check has to happen here rather than in a cleanup: the deadline would also
-// have passed by the end of a suite whose BeforeAll was fast but whose tests
-// were slow, and that is not an overrun.
-func RunSetup(t *testing.T, timeout time.Duration, beforeAll func(*gotest.T)) {
-	tt := SetupT(t, timeout)
-	beforeAll(tt)
-	reportOverrun(tt, timeout, "BeforeAll ", "SetupTimeout")
-}
-
-// RunTeardown runs a suite's AfterAll from inside t.Cleanup and reports an
-// overrun of SetupTimeout.
-func RunTeardown(t *testing.T, timeout time.Duration, afterAll func(*gotest.T)) {
-	tt := TeardownT(t, timeout)
-	afterAll(tt)
-	reportOverrun(tt, timeout, "AfterAll ", "SetupTimeout")
+	fmt.Fprintf(os.Stderr, "gotest: %s %sexceeded its configured %s of %s and is still running\n",
+		t.T().Name(), what, budget, timeout)
+	t.Errorf("%sexceeded its configured %s of %s and is still running", what, budget, timeout)
 }
 
 // testScopedT applies the timeout convention shared by the phases that run while
@@ -135,39 +145,4 @@ func TeardownT(t *testing.T, timeout time.Duration) *gotest.T {
 		t.Cleanup(cancel)
 	}
 	return gotest.NewTWithContext(t, ctx)
-}
-
-// OverlayFixtureConfig merges overlay into base: non-zero fields in overlay
-// replace the corresponding base field; zero fields are preserved.
-func OverlayFixtureConfig(base *gotest.FixtureConfig, overlay gotest.FixtureConfig) {
-	if overlay.Timeout != 0 {
-		base.Timeout = overlay.Timeout
-	}
-	if overlay.Retries != 0 {
-		base.Retries = overlay.Retries
-	}
-	if overlay.RetryDelay != 0 {
-		base.RetryDelay = overlay.RetryDelay
-	}
-}
-
-// OverlaySuiteConfig merges overlay into base: non-zero fields replace the
-// corresponding base field. FailFast and Parallel are one-way latches — once
-// true, an overlay with false will not reset them.
-func OverlaySuiteConfig(base *gotest.SuiteConfig, overlay gotest.SuiteConfig) {
-	if overlay.Timeout != 0 {
-		base.Timeout = overlay.Timeout
-	}
-	if overlay.SetupTimeout != 0 {
-		base.SetupTimeout = overlay.SetupTimeout
-	}
-	if overlay.Retries != 0 {
-		base.Retries = overlay.Retries
-	}
-	if overlay.FailFast {
-		base.FailFast = true
-	}
-	if overlay.Parallel {
-		base.Parallel = true
-	}
 }

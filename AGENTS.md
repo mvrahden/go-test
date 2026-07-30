@@ -291,13 +291,24 @@ Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
 The returned config is used as-is: a zero (or omitted) duration disables that deadline; without the marker method, `DefaultSuiteConfig()` (30s/30s) applies.
 Compose from presets for defaults + overrides: `cfg := gotest.DefaultSuiteConfig(); cfg.Parallel = true; return cfg`.
 
-`Timeout` cannot interrupt a running test — Go has no way to stop another goroutine —
-so it is enforced by verdict. A method that ignores `t.Context()` is failed the moment
-its deadline passes, while it is still running, and the overrun is also written
-unbuffered so it survives a test that never returns at all. Bounding the process
-remains `go test -timeout`'s job. `SetupTimeout` works the same way for `BeforeAll`
-and `AfterAll`, and an overrunning fixture `BeforeAll` counts as a failed attempt,
-retried if `Retries` allows.
+A timeout does two things, and only one of them is defaulted.
+
+It always bounds `t.Context()`, with the preset value when you declare nothing. That
+costs nothing: code that watches its context gets canceled, code that does not carries
+on.
+
+It is also a budget, enforced by verdict — but only when **you** declare it. `Timeout`
+cannot interrupt a running test, because Go has no way to stop another goroutine, so a
+method that ignores `t.Context()` and outlives the budget is failed instead. That
+failure is reported the moment the deadline passes, while the method is still running,
+and is also written unbuffered so it survives a test that never returns at all.
+A suite that never wrote a `Timeout` is not held to one; being failed against a number
+you did not choose is not a verdict you can act on. Bounding the process remains
+`go test -timeout`'s job either way.
+
+`SetupTimeout` works the same way for `BeforeAll` and `AfterAll`, including for a setup
+that hangs and never returns. A declared fixture `Timeout` likewise: an overrunning
+fixture `BeforeAll` counts as a failed attempt, retried if `Retries` allows.
 
 `Timeout` reaches `t.Context()` inside nested `When`, `It` and `Each` bodies too — a
 nested behavior inherits the enclosing deadline, and its context is canceled when that

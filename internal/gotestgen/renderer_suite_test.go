@@ -214,12 +214,15 @@ func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 	})
 
 	t.When("fixture without config", func(w *gotest.T) {
-		w.It("uses default config without overlay", func(it *gotest.T) {
+		w.It("resolves the defaults with nothing declared", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithoutConfig_UsesDefault")
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.MatchSnapshot(it, output)
 
-			gotest.NotContains(it, output, "OverlayFixtureConfig", "should not have overlay call")
+			// Resolving with no argument is what tells the runtime the fixture
+			// asked for no budget of its own, so it is not held to one.
+			gotest.Contains(it, output, "ResolveFixtureConfig()",
+				"a fixture with no config must declare nothing")
 		})
 	})
 }
@@ -239,12 +242,15 @@ func (s *RendererTestSuite) TestSuiteConfig(t *gotest.T) {
 	})
 
 	t.When("suite without config", func(w *gotest.T) {
-		w.It("uses default config without overlay", func(it *gotest.T) {
+		w.It("resolves the defaults with nothing declared", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SuiteWithoutConfig_UsesDefault")
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.MatchSnapshot(it, output)
 
-			gotest.NotContains(it, output, "OverlaySuiteConfig", "should not have overlay call")
+			// Resolving with no argument is what keeps the default 30s bounding
+			// t.Context() without the suite being failed against it.
+			gotest.Contains(it, output, "ResolveSuiteConfig()",
+				"a suite with no config must declare nothing")
 		})
 	})
 }

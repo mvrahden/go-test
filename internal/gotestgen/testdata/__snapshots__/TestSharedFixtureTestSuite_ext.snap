@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/project/tests/fixtures"
 	sfpkg1 "github.com/example/project/tests/redis"
@@ -47,10 +47,10 @@ func ƒquote(s string) string {
 func main() {
 
 	sf0 := &sfpkg0.PostgresFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.ResolveFixtureConfig()
 
 	sf1 := &sfpkg1.RedisFixture{}
-	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf1 := gotestruntime.ResolveFixtureConfig()
 
 	ƒerrs := make([]error, 2)
 	ƒctx := context.Background()
@@ -220,7 +220,7 @@ import (
 	"syscall"
 	"time"
 
-	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -253,7 +253,7 @@ func ƒquote(s string) string {
 func main() {
 
 	sf0 := &sfpkg0.PostgresFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.ResolveFixtureConfig()
 
 	ƒerrs := make([]error, 1)
 	ƒctx := context.Background()
@@ -367,7 +367,7 @@ import (
 	"syscall"
 	"time"
 
-	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -400,7 +400,7 @@ func ƒquote(s string) string {
 func main() {
 
 	sf0 := &sfpkg0.SetupFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.ResolveFixtureConfig()
 
 	ƒerrs := make([]error, 1)
 	ƒctx := context.Background()
@@ -499,7 +499,7 @@ import (
 	"syscall"
 	"time"
 
-	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/project/tests/fixtures"
 )
@@ -532,7 +532,7 @@ func ƒquote(s string) string {
 func main() {
 
 	sf0 := &sfpkg0.PostgresFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.ResolveFixtureConfig()
 
 	ƒerrs := make([]error, 1)
 	ƒctx := context.Background()
@@ -644,7 +644,7 @@ import (
 	"syscall"
 	"time"
 
-	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/shared"
 )
@@ -677,10 +677,10 @@ func ƒquote(s string) string {
 func main() {
 
 	sf0 := &sfpkg0.PostgresFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.ResolveFixtureConfig()
 
 	sf1 := &sfpkg0.RedisFixture{}
-	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf1 := gotestruntime.ResolveFixtureConfig()
 
 	ƒerrs := make([]error, 2)
 	ƒctx := context.Background()
@@ -850,7 +850,7 @@ import (
 	"syscall"
 	"time"
 
-	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -883,7 +883,7 @@ func ƒquote(s string) string {
 func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.ResolveFixtureConfig()
 
 	ƒerrs := make([]error, 1)
 	ƒctx := context.Background()
@@ -995,7 +995,7 @@ import (
 	"syscall"
 	"time"
 
-	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -1028,7 +1028,7 @@ func ƒquote(s string) string {
 func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.ResolveFixtureConfig()
 
 	ƒerrs := make([]error, 1)
 	ƒctx := context.Background()
@@ -1140,7 +1140,7 @@ import (
 	"syscall"
 	"time"
 
-	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -1173,7 +1173,7 @@ func ƒquote(s string) string {
 func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.ResolveFixtureConfig()
 
 	ƒerrs := make([]error, 1)
 	ƒctx := context.Background()
@@ -1285,7 +1285,7 @@ import (
 	"syscall"
 	"time"
 
-	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -1318,7 +1318,7 @@ func ƒquote(s string) string {
 func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.ResolveFixtureConfig()
 
 	ƒerrs := make([]error, 1)
 	ƒctx := context.Background()
@@ -1430,7 +1430,7 @@ import (
 	"syscall"
 	"time"
 
-	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 	sfpkg1 "github.com/example/redis"
@@ -1464,10 +1464,10 @@ func ƒquote(s string) string {
 func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.ResolveFixtureConfig()
 
 	sf1 := &sfpkg1.RedisFixture{}
-	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf1 := gotestruntime.ResolveFixtureConfig()
 
 	ƒerrs := make([]error, 2)
 	ƒctx := context.Background()
@@ -1637,7 +1637,7 @@ import (
 	"syscall"
 	"time"
 
-	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -1670,7 +1670,7 @@ func ƒquote(s string) string {
 func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.ResolveFixtureConfig()
 
 	ƒerrs := make([]error, 1)
 	ƒctx := context.Background()
@@ -1921,7 +1921,6 @@ import (
 	"syscall"
 	"time"
 
-	gotest "github.com/mvrahden/go-test/pkg/gotest"
 	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
@@ -1955,8 +1954,7 @@ func ƒquote(s string) string {
 func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
-	gotestruntime.OverlayFixtureConfig(&ƒcfg_sf0, sf0.SharedFixtureConfig())
+	ƒcfg_sf0 := gotestruntime.ResolveFixtureConfig(sf0.SharedFixtureConfig())
 
 	ƒerrs := make([]error, 1)
 	ƒctx := context.Background()
@@ -2068,7 +2066,7 @@ import (
 	"syscall"
 	"time"
 
-	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/project/tests/fixtures"
 	sfpkg1 "github.com/example/project/tests/gcs"
@@ -2102,10 +2100,10 @@ func ƒquote(s string) string {
 func main() {
 
 	sf0 := &sfpkg0.PostgresFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.ResolveFixtureConfig()
 
 	sf1 := &sfpkg1.GCSFixture{}
-	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf1 := gotestruntime.ResolveFixtureConfig()
 
 	ƒerrs := make([]error, 2)
 	ƒctx := context.Background()
