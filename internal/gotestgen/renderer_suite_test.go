@@ -208,21 +208,28 @@ func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.MatchSnapshot(it, output)
 
-			gotest.Contains(it, output, "Config: (&CFGFixture{}).FixtureConfig(),", "marker config must be used as-is")
+			// The marker method is called once, at package scope, so the config
+			// that bounds the context and the budget it is judged against cannot
+			// drift apart.
+			gotest.Contains(it, output, "var ƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()", "marker config must be used as-is")
+			gotest.Contains(it, output, "Config: ƒcfg_CFGFixture,", "the node reads the hoisted config")
+			gotest.Contains(it, output, "Budget: ƒcfg_CFGFixture.Timeout,", "a declared Timeout is also the enforced budget")
 			gotest.NotContains(it, output, "OverlayFixtureConfig", "literal semantics: no overlay")
 		})
 	})
 
 	t.When("fixture without config", func(w *gotest.T) {
-		w.It("resolves the defaults with nothing declared", func(it *gotest.T) {
+		w.It("falls back to the defaults and declares no budget", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithoutConfig_UsesDefault")
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.MatchSnapshot(it, output)
 
-			// Resolving with no argument is what tells the runtime the fixture
-			// asked for no budget of its own, so it is not held to one.
-			gotest.Contains(it, output, "ResolveFixtureConfig()",
-				"a fixture with no config must declare nothing")
+			// The defaults still bound the fixture's context, but no Budget field
+			// is emitted, so it is never failed against a number it did not write.
+			gotest.Contains(it, output, "Config: gotest.DefaultFixtureConfig(),",
+				"a fixture with no config falls back to the defaults")
+			gotest.NotContains(it, output, "Budget:",
+				"a fixture with no config must not be held to a budget")
 		})
 	})
 }
@@ -242,15 +249,35 @@ func (s *RendererTestSuite) TestSuiteConfig(t *gotest.T) {
 	})
 
 	t.When("suite without config", func(w *gotest.T) {
-		w.It("resolves the defaults with nothing declared", func(it *gotest.T) {
+		w.It("falls back to the defaults and declares no budget", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SuiteWithoutConfig_UsesDefault")
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.MatchSnapshot(it, output)
 
-			// Resolving with no argument is what keeps the default 30s bounding
-			// t.Context() without the suite being failed against it.
-			gotest.Contains(it, output, "ResolveSuiteConfig()",
-				"a suite with no config must declare nothing")
+			// The default 30s still bounds t.Context(); the zero budget is what
+			// keeps the suite from being failed against it.
+			gotest.Contains(it, output, "ƒcfg := gotest.DefaultSuiteConfig()",
+				"a suite with no config falls back to the defaults")
+			gotest.Contains(it, output, "ƒbudget := gotest.SuiteConfig{}",
+				"a suite with no config must declare no budget")
+		})
+	})
+}
+
+func (s *RendererTestSuite) TestUndeclaredBudgetIsZero(t *gotest.T) {
+	t.When("a suite declares no SuiteConfig", func(w *gotest.T) {
+		w.It("passes a zero budget to every lifecycle phase", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestLifecycle_UndeclaredBudget")
+			source, _ := renderTestPkg(it.T(), pkg)
+
+			// A suite with no marker method gets the defaults for its contexts
+			// and a zero budget, so nothing holds it to a number it never wrote.
+			gotest.Contains(it, source, "ƒcfg := gotest.DefaultSuiteConfig()")
+			gotest.Contains(it, source, "ƒbudget := gotest.SuiteConfig{}")
+			gotest.Contains(it, source, "gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)")
+			gotest.Contains(it, source, "gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)")
+			gotest.Contains(it, source, "gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {")
+			gotest.NotContains(it, source, "sync.WaitGroup")
 		})
 	})
 }

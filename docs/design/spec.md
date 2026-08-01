@@ -701,6 +701,10 @@ In the test harness, the deserialized fixture is hydrated via `Hydrate(ctx)` if 
 `t.Context()` returns the deadline-aware context.
 Existing `NewT` callers are unaffected.
 
+**`NewTWithContext`:** Creates a `*gotest.T` whose `t.Context()` is the context supplied by the caller, for the cases a deadline off `t.Context()` cannot express — injected values, or a lifetime that must outlive the test's own.
+The caller owns the context; nothing in `gotest` cancels it.
+This is what lets `AfterAll` run under a context that survives the cancellation the testing package performs immediately before cleanups.
+
 #### Feature Interactions
 
 - **Parallel suites:** in sequential suites, `FailFast` is checked between subtests.

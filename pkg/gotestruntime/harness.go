@@ -30,22 +30,26 @@ func TestT(t *testing.T, timeout time.Duration) *gotest.T {
 	return testScopedT(t, timeout)
 }
 
-// RunTest runs one test method, held to the suite's Timeout if it declared one.
-func RunTest(t *gotest.T, cfg SuiteConfig, run func()) {
-	watchWhile(t, cfg.TestBudget(), "", "Timeout", run)
+// RunTest runs one test method, held to budget when the suite declared one.
+// A zero budget means no verdict is enforced; the context handed to the method
+// is bounded separately by [TestT].
+func RunTest(t *gotest.T, budget time.Duration, run func()) {
+	watchWhile(t, budget, "", "Timeout", run)
 }
 
-// RunSetup runs a suite's BeforeAll, held to its SetupTimeout if it declared one.
-func RunSetup(t *testing.T, cfg SuiteConfig, beforeAll func(*gotest.T)) {
-	tt := SetupT(t, cfg.SetupTimeout)
-	watchWhile(tt, cfg.SetupBudget(), "BeforeAll ", "SetupTimeout", func() { beforeAll(tt) })
+// RunSetup runs a suite's BeforeAll. timeout bounds the context it receives;
+// budget is the deadline it is held to by verdict, or zero for a suite that
+// declared no config of its own.
+func RunSetup(t *testing.T, timeout, budget time.Duration, beforeAll func(*gotest.T)) {
+	tt := SetupT(t, timeout)
+	watchWhile(tt, budget, "BeforeAll ", "SetupTimeout", func() { beforeAll(tt) })
 }
 
 // RunTeardown runs a suite's AfterAll from inside t.Cleanup, on the same terms
 // as [RunSetup].
-func RunTeardown(t *testing.T, cfg SuiteConfig, afterAll func(*gotest.T)) {
-	tt := TeardownT(t, cfg.SetupTimeout)
-	watchWhile(tt, cfg.SetupBudget(), "AfterAll ", "SetupTimeout", func() { afterAll(tt) })
+func RunTeardown(t *testing.T, timeout, budget time.Duration, afterAll func(*gotest.T)) {
+	tt := TeardownT(t, timeout)
+	watchWhile(tt, budget, "AfterAll ", "SetupTimeout", func() { afterAll(tt) })
 }
 
 // watchWhile runs a lifecycle phase and fails t the moment timeout passes with

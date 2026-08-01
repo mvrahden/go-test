@@ -27,11 +27,11 @@ type SharedFixtureInfo struct {
 }
 
 type sharedSetupData struct {
-	RepoInfo                string
-	GotestRuntimeImportPath string
-	Imports                 []sharedSetupImport
-	Fixtures                []sharedSetupFixture
-	TeardownFixtures        []sharedSetupFixture // fixtures in reverse dependency order for teardown
+	RepoInfo         string
+	GotestImportPath string
+	Imports          []sharedSetupImport
+	Fixtures         []sharedSetupFixture
+	TeardownFixtures []sharedSetupFixture // fixtures in reverse dependency order for teardown
 }
 
 type sharedSetupImport struct {
@@ -131,11 +131,11 @@ func GenerateSharedSetup(fixtures []SharedFixtureInfo) ([]byte, error) {
 	}
 
 	data := sharedSetupData{
-		RepoInfo:                about.ShortInfo(),
-		GotestRuntimeImportPath: about.Repo + "/pkg/gotestruntime",
-		Imports:                 imports,
-		Fixtures:                fixtureVMs,
-		TeardownFixtures:        teardownFixtures,
+		RepoInfo:         about.ShortInfo(),
+		GotestImportPath: about.Repo + "/pkg/gotest",
+		Imports:          imports,
+		Fixtures:         fixtureVMs,
+		TeardownFixtures: teardownFixtures,
 	}
 
 	var buf bytes.Buffer
