@@ -208,10 +208,17 @@ func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.MatchSnapshot(it, output)
 
-			// The marker method is called once, at package scope, so the config
-			// that bounds the context and the budget it is judged against cannot
-			// drift apart.
-			gotest.Contains(it, output, "var ƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()", "marker config must be used as-is")
+			// The marker method is called once, so the config that bounds the
+			// context and the budget it is judged against cannot drift apart. It is
+			// called inside ƒ_fixtureOnce.Do rather than at package-variable
+			// initialisation: there a panicking FixtureConfig() would abort the
+			// binary before TestMain instead of being reported as a setup failure,
+			// and it would read the environment TestMain had not set up yet.
+			gotest.Contains(it, output, "var ƒcfg_CFGFixture gotest.FixtureConfig", "the config is declared, not derived, at package scope")
+			gotest.Contains(it, output, "ƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()", "marker config must be used as-is")
+			gotest.Contains(it, output,
+				"ƒ_fixtureOnce.Do(func() error {\n\t\tƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()",
+				"the config must be derived inside the containment frame, before anything reads it")
 			gotest.Contains(it, output, "Config: ƒcfg_CFGFixture,", "the node reads the hoisted config")
 			gotest.Contains(it, output, "Budget: ƒcfg_CFGFixture.Timeout,", "a declared Timeout is also the enforced budget")
 			gotest.NotContains(it, output, "OverlayFixtureConfig", "literal semantics: no overlay")
@@ -375,14 +382,16 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 	t.When("parallel suite with every test case excluded", func(w *gotest.T) {
 		w.It("imports nothing the harness does not use", func(it *gotest.T) {
 			// The suite survives filtering with an empty TestCases slice, so the
-			// template emits no ƒfailed atomic.Bool. If the import list still
-			// asked for sync/atomic, format.Source would reject the whole package
-			// — the render below is what catches it.
+			// template emits no ƒfailed atomic.Bool. format.Source does not
+			// type-check and would let a stray sync/atomic import through; it is
+			// `go test` that then refuses the whole generated package with
+			// "imported and not used". So the assertion is on the rendered import
+			// block, not on the render succeeding.
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ParallelSuite_AllCasesExcluded")
 			output, _ := renderTestPkg(it.T(), pkg)
 
 			gotest.NotContains(it, output, `"sync/atomic"`,
-				"an unused sync/atomic import fails format.Source for the package")
+				"an unused sync/atomic import makes go test refuse the generated package")
 			gotest.NotContains(it, output, "atomic.Bool",
 				"a suite with no test cases has no failure flag to share")
 			gotest.Contains(it, output, "func TestAllExcludedTestSuite(t *testing.T)",

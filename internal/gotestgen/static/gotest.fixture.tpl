@@ -20,7 +20,7 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
 {{ range $sf := .SharedFixtureNodes }}
 var ƒ_sf_{{ $sf.Identifier }} = &{{ $sf.QualifiedType }}{}
 {{- if $sf.HasConfig }}
-var ƒcfg_sf_{{ $sf.Identifier }} = ƒ_sf_{{ $sf.Identifier }}.SharedFixtureConfig()
+var ƒcfg_sf_{{ $sf.Identifier }} gotest.FixtureConfig
 {{- end }}
 {{ end }}
 
@@ -28,7 +28,7 @@ var ƒcfg_sf_{{ $sf.Identifier }} = ƒ_sf_{{ $sf.Identifier }}.SharedFixtureConf
 {{ range $f := .AllFixtures }}
 var ƒ_{{ $f.Identifier }} *{{ $f.QualifiedType }}
 {{- if $f.HasConfig }}
-var ƒcfg_{{ $f.Identifier }} = (&{{ $f.QualifiedType }}{}).FixtureConfig()
+var ƒcfg_{{ $f.Identifier }} gotest.FixtureConfig
 {{- end }}
 {{ end }}
 
@@ -43,6 +43,23 @@ var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
     if err := ƒ_fixtureOnce.Do(func() error {
+{{- /*
+  Each config is derived exactly once, but inside ƒ_fixtureOnce.Do rather than at
+  package-variable initialisation. A config method that panics has to be
+  contained and reported as a setup failure; at package init it would abort the
+  binary before TestMain, attributed to nothing. It also has to observe the
+  environment TestMain set up, not the one that existed before it ran.
+*/}}
+{{- range $sf := .SharedFixtureNodes }}
+{{- if $sf.HasConfig }}
+        ƒcfg_sf_{{ $sf.Identifier }} = ƒ_sf_{{ $sf.Identifier }}.SharedFixtureConfig()
+{{- end }}
+{{- end }}
+{{- range $f := .AllFixtures }}
+{{- if $f.HasConfig }}
+        ƒcfg_{{ $f.Identifier }} = (&{{ $f.QualifiedType }}{}).FixtureConfig()
+{{- end }}
+{{- end }}
         ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
         var ƒmaxSuiteSetup time.Duration
 {{ range $fs := .FlatSuites }}

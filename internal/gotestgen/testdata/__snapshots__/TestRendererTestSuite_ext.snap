@@ -304,7 +304,7 @@ func (ts *ƒƒ_GOTEST_CFGTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_CFGTestSuite) AfterEach(it *gotest.T)  {}
 
 var ƒ_CFGFixture *CFGFixture
-var ƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()
+var ƒcfg_CFGFixture gotest.FixtureConfig
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
@@ -315,6 +315,7 @@ var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()
 		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 

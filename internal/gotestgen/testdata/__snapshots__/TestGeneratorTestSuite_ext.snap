@@ -25,7 +25,7 @@ func (ts *ƒƒ_GOTEST_AppTestSuite) BeforeEach(it *gotest.T) { ts.AppTestSuite.B
 func (ts *ƒƒ_GOTEST_AppTestSuite) AfterEach(it *gotest.T)  { ts.AppTestSuite.AfterEach(it) }
 
 var ƒ_AppFixture *AppFixture
-var ƒcfg_AppFixture = (&AppFixture{}).FixtureConfig()
+var ƒcfg_AppFixture gotest.FixtureConfig
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
@@ -36,6 +36,7 @@ var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒcfg_AppFixture = (&AppFixture{}).FixtureConfig()
 		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
