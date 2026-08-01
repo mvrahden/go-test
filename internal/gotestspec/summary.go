@@ -27,7 +27,7 @@ func collectFailures(packages []*Package) []failure {
 func collectFailedLeaves(pkgPath string, n *Node, display []string, out *[]failure) {
 	cur := append(append([]string(nil), display...), n.Display)
 
-	if n.Status == StatusFail && (len(n.Children) == 0 || failedOnItsOwn(n)) {
+	if n.Status == StatusFail && (len(n.Children) == 0 || hasOwnDiagnostic(n)) {
 		d := make([]string, len(cur))
 		copy(d, cur)
 		*out = append(*out, failure{

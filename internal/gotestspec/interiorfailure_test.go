@@ -155,9 +155,69 @@ func TestCollectStats_IgnoresInteriorLogWhenADescendantFailed(t *testing.T) {
 			stats.Total(), stats.Behaviors+stats.Tests)
 	}
 
+	// Rendering deliberately uses the weaker hasOwnDiagnostic, not
+	// failedOnItsOwn: it cannot tell this stray t.Log apart from a genuine
+	// teardown diagnostic without a machine-readable marker on gotest's own
+	// verdicts (follow-up work), and showing a stray log line is preferable to
+	// ever hiding a real one. So the summary may still list "Something"
+	// alongside the leaf — that's the accepted residual. What must not
+	// regress is the count above: Failed stays 1 either way.
 	var buf bytes.Buffer
 	RenderSummary(&buf, packages, WithNoColor())
-	if got := strings.Count(buf.String(), "FAIL  example.com/pkg"); got != 1 {
-		t.Errorf("reported %d failures, want 1:\n%s", got, buf.String())
+	if got := strings.Count(buf.String(), "boot_test.go:9: True failed"); got != 1 {
+		t.Errorf("expected the leaf's own diagnostic exactly once, got %d:\n%s", got, buf.String())
+	}
+}
+
+// An interior node can carry a genuine diagnostic of its own (AfterAll failed)
+// at the same time as a descendant fails independently. The count must still
+// attribute the run's one verdict to the leaf, but the teardown diagnostic must
+// still reach the screen — it is the only place that says the database was
+// never released.
+func TestCollectStats_CountsLeafButStillRendersInteriorDiagnostic(t *testing.T) {
+	packages := []*Package{{
+		Path:   "example.com/pkg",
+		Status: StatusFail,
+		Nodes: []*Node{{
+			Kind:    KindSuite,
+			Display: "Boot",
+			Status:  StatusFail,
+			Output: []string{
+				"--- FAIL: TestBootTestSuite (0.02s)\n",
+				"    boot_test.go:14: could not release the database\n",
+			},
+			Children: []*Node{
+				{Kind: KindMethod, Display: "Something", Status: StatusPass, Duration: time.Millisecond},
+				{
+					Kind:    KindMethod,
+					Display: "Another",
+					Status:  StatusFail,
+					Output:  []string{"    --- FAIL: TestBootTestSuite/TestAnother (0.01s)\n"},
+					Children: []*Node{{
+						Kind:    KindBlock,
+						Display: "does the thing",
+						Status:  StatusFail,
+						Output:  []string{"        boot_test.go:9: True failed\n"},
+					}},
+				},
+			},
+		}},
+	}}
+
+	stats := CollectStats(packages)
+	if stats.Failed != 1 {
+		t.Errorf("Failed = %d, want 1 (the leaf only)", stats.Failed)
+	}
+
+	var termBuf bytes.Buffer
+	RenderTerminal(&termBuf, packages, WithNoColor())
+	if termOut := stripANSI(termBuf.String()); !strings.Contains(termOut, "could not release the database") {
+		t.Errorf("expected the interior node's own diagnostic in the tree, got:\n%s", termOut)
+	}
+
+	var summaryBuf bytes.Buffer
+	RenderSummary(&summaryBuf, packages, WithNoColor())
+	if summaryOut := summaryBuf.String(); !strings.Contains(summaryOut, "could not release the database") {
+		t.Errorf("expected the interior node's own diagnostic in the summary, got:\n%s", summaryOut)
 	}
 }

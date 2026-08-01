@@ -384,6 +384,18 @@ func anyDescendantFailed(n *Node) bool {
 	return false
 }
 
+// hasOwnDiagnostic reports whether an interior node carries output of its own,
+// whatever else failed beneath it. It is the rendering condition: a suite whose
+// AfterAll failed must show that error even when a behaviour under it failed
+// too, because nothing else in the run will say the teardown broke.
+//
+// Counting uses the stricter failedOnItsOwn instead — a spurious count breaks
+// the arithmetic the summary reports, while a spurious line of output only
+// adds noise.
+func hasOwnDiagnostic(n *Node) bool {
+	return len(n.Children) > 0 && n.Status == StatusFail && len(filterOutput(n.Output)) > 0
+}
+
 func statusFrom(a Action) Status {
 	switch a {
 	case ActionPass:
