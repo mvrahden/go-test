@@ -372,6 +372,24 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 		})
 	})
 
+	t.When("parallel suite with every test case excluded", func(w *gotest.T) {
+		w.It("imports nothing the harness does not use", func(it *gotest.T) {
+			// The suite survives filtering with an empty TestCases slice, so the
+			// template emits no ƒfailed atomic.Bool. If the import list still
+			// asked for sync/atomic, format.Source would reject the whole package
+			// — the render below is what catches it.
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ParallelSuite_AllCasesExcluded")
+			output, _ := renderTestPkg(it.T(), pkg)
+
+			gotest.NotContains(it, output, `"sync/atomic"`,
+				"an unused sync/atomic import fails format.Source for the package")
+			gotest.NotContains(it, output, "atomic.Bool",
+				"a suite with no test cases has no failure flag to share")
+			gotest.Contains(it, output, "func TestAllExcludedTestSuite(t *testing.T)",
+				"the suite itself is still rendered")
+		})
+	})
+
 	t.When("fixture-bound returning BeforeEach", func(w *gotest.T) {
 		w.It("renders context passing with fixture binding", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBound_ReturningBeforeEach")

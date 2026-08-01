@@ -130,8 +130,14 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 			headerImport{Path: "time"},
 		)
 	}
+	// This condition must stay identical to the one guarding the ƒfailed
+	// declaration in gotest.suites.tpl. A parallel suite whose every method is
+	// excluded stays in EffectiveTestSuites with no TestCases, so the template
+	// emits no atomic.Bool. format.Source does not type-check and would let the
+	// stray import through; it is `go test` that then refuses the whole generated
+	// package with "imported and not used".
 	if !hasFixtures && slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
-		return v.IsMethodParallel()
+		return v.IsMethodParallel() && len(v.TestCases()) > 0
 	}) {
 		imports = append(imports, headerImport{Path: "sync/atomic"})
 	}
