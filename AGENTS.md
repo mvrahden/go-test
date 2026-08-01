@@ -298,24 +298,32 @@ func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel` (run methods concurrently).
+Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel`.
 Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
-The returned config is used as-is: a zero (or omitted) duration disables that deadline; without the marker method, `DefaultSuiteConfig()` (30s/30s) applies.
-Compose from presets for defaults + overrides: `cfg := gotest.DefaultSuiteConfig(); cfg.Parallel = true; return cfg`.
+
+The returned config is used as-is. A zero or omitted duration means **no deadline**,
+matching `go test -timeout 0` — it does not inherit the preset. Start from a preset when
+you want the defaults plus an override:
+
+```go
+func (s *MySuite) SuiteConfig() gotest.SuiteConfig {
+    cfg := gotest.DefaultSuiteConfig()
+    cfg.Parallel = true
+    return cfg
+}
+```
 
 A timeout does two things, and only one of them is defaulted.
 
-It always bounds `t.Context()`, with the preset value when you declare nothing. That
-costs nothing: code that watches its context gets canceled, code that does not carries
-on.
+It always bounds `t.Context()`. And it is a budget the phase is held to, enforced by
+verdict — but only when **you** declare a `SuiteConfig`. `Timeout` cannot interrupt a
+running test, because Go has no way to stop another goroutine, so a method that ignores
+`t.Context()` and outlives the budget is failed instead. That failure is reported the
+moment the deadline passes, while the method is still running, and is written unbuffered
+so it survives a test that never returns at all.
 
-It is also a budget, enforced by verdict — but only when **you** declare it. `Timeout`
-cannot interrupt a running test, because Go has no way to stop another goroutine, so a
-method that ignores `t.Context()` and outlives the budget is failed instead. That
-failure is reported the moment the deadline passes, while the method is still running,
-and is also written unbuffered so it survives a test that never returns at all.
-A suite that never wrote a `Timeout` is not held to one; being failed against a number
-you did not choose is not a verdict you can act on. Bounding the process remains
+A suite with no `SuiteConfig` method is not held to a budget: being failed against a
+number you did not choose is not a verdict you can act on. Bounding the process remains
 `go test -timeout`'s job either way.
 
 `SetupTimeout` works the same way for `BeforeAll` and `AfterAll`, including for a setup
