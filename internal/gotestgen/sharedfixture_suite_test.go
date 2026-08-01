@@ -224,6 +224,38 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 		})
 	})
 
+	t.When("teardown budget", func(w *gotest.T) {
+		w.It("floors an undeclared timeout instead of reporting a bare 30s", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					PkgPath:        "github.com/example/fixtures",
+					HasConfig:      true,
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+
+			// A declared Timeout of 0 means "no deadline", not "takes no time".
+			// Feeding it straight into ƒmaxTimeout would report a flat 30s budget
+			// and let the supervisor force-kill a teardown still releasing
+			// resources — matching gotestruntime.supervisorBudget keeps the three
+			// budget sites agreeing.
+			gotest.Contains(it, code, "func ƒsupervisorBudget(timeout time.Duration) time.Duration",
+				"the generated program must floor an unbounded fixture's budget")
+			gotest.Contains(it, code, "return gotest.DefaultFixtureConfig().Timeout",
+				"the floor is the same default the in-process DAG uses")
+			gotest.Contains(it, code, "if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {",
+				"the reported budget must go through the floor")
+			gotest.NotContains(it, code, "if ƒcfg_sf0.Timeout > ƒmaxTimeout {",
+				"the raw declared timeout must not reach the budget calculation")
+		})
+	})
+
 	t.When("retry logic", func(w *gotest.T) {
 		w.It("generates retry loop with delay", func(it *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{

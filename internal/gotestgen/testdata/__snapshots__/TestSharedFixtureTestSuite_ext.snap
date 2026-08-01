@@ -43,6 +43,12 @@ func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
+func ƒsupervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
+	}
+	return timeout
+}
 
 func main() {
 
@@ -173,12 +179,12 @@ func main() {
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒcfg_sf0.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf0.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
-		if ƒcfg_sf1.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf1.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf1.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
@@ -248,6 +254,12 @@ func ƒteardown(name string, timeout time.Duration, after func(context.Context) 
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
+}
+func ƒsupervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
+	}
+	return timeout
 }
 
 func main() {
@@ -329,8 +341,8 @@ func main() {
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒcfg_sf0.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf0.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
@@ -395,6 +407,12 @@ func ƒteardown(name string, timeout time.Duration, after func(context.Context) 
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
+}
+func ƒsupervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
+	}
+	return timeout
 }
 
 func main() {
@@ -461,8 +479,8 @@ func main() {
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒcfg_sf0.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf0.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
@@ -527,6 +545,12 @@ func ƒteardown(name string, timeout time.Duration, after func(context.Context) 
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
+}
+func ƒsupervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
+	}
+	return timeout
 }
 
 func main() {
@@ -606,8 +630,8 @@ func main() {
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒcfg_sf0.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf0.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
@@ -672,6 +696,12 @@ func ƒteardown(name string, timeout time.Duration, after func(context.Context) 
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
+}
+func ƒsupervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
+	}
+	return timeout
 }
 
 func main() {
@@ -803,12 +833,12 @@ func main() {
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒcfg_sf0.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf0.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
-		if ƒcfg_sf1.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf1.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf1.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
@@ -879,6 +909,12 @@ func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
+func ƒsupervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
+	}
+	return timeout
+}
 
 func main() {
 
@@ -957,8 +993,8 @@ func main() {
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒcfg_sf0.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf0.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
@@ -1024,6 +1060,12 @@ func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
+func ƒsupervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
+	}
+	return timeout
+}
 
 func main() {
 
@@ -1102,8 +1144,8 @@ func main() {
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒcfg_sf0.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf0.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
@@ -1169,6 +1211,12 @@ func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
+func ƒsupervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
+	}
+	return timeout
+}
 
 func main() {
 
@@ -1247,8 +1295,8 @@ func main() {
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒcfg_sf0.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf0.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
@@ -1314,6 +1362,12 @@ func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
+func ƒsupervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
+	}
+	return timeout
+}
 
 func main() {
 
@@ -1392,8 +1446,8 @@ func main() {
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒcfg_sf0.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf0.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
@@ -1459,6 +1513,12 @@ func ƒteardown(name string, timeout time.Duration, after func(context.Context) 
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
+}
+func ƒsupervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
+	}
+	return timeout
 }
 
 func main() {
@@ -1590,12 +1650,12 @@ func main() {
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒcfg_sf0.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf0.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
-		if ƒcfg_sf1.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf1.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf1.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
@@ -1665,6 +1725,12 @@ func ƒteardown(name string, timeout time.Duration, after func(context.Context) 
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
+}
+func ƒsupervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
+	}
+	return timeout
 }
 
 func main() {
@@ -1744,8 +1810,8 @@ func main() {
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒcfg_sf0.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf0.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
@@ -1810,6 +1876,12 @@ func ƒteardown(name string, timeout time.Duration, after func(context.Context) 
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
+}
+func ƒsupervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
+	}
+	return timeout
 }
 
 func main() {
@@ -1889,8 +1961,8 @@ func main() {
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒcfg_sf0.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf0.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
@@ -1956,6 +2028,12 @@ func ƒteardown(name string, timeout time.Duration, after func(context.Context) 
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
+}
+func ƒsupervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
+	}
+	return timeout
 }
 
 func main() {
@@ -2089,12 +2167,12 @@ func main() {
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒcfg_sf0.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf0.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
-		if ƒcfg_sf1.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_sf1.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_sf1.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/protocol"
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 func run(runTests func() int, cfg MainConfig) int {
@@ -541,12 +542,7 @@ func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
 		}
 		visiting[name] = true
 		node := byName[name]
-		own := node.Config.Timeout
-		if own <= 0 {
-			// "No deadline" must not zero the teardown budget — an unbounded
-			// fixture still needs supervisor headroom; use the default floor.
-			own = 2 * time.Minute
-		}
+		own := supervisorBudget(node.Config.Timeout)
 		var maxDep time.Duration
 		for _, dep := range node.DependsOn {
 			depPath := longestPath(dep)
@@ -569,11 +565,24 @@ func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
 	return maxPath
 }
 
-func nodeTreePath(node *FixtureNode) time.Duration {
-	own := node.Config.Timeout
-	if own < 0 {
-		own = 0
+// supervisorBudget is how long a fixture's own lifecycle stage may take, for the
+// purpose of sizing the teardown budget handed to the supervisor.
+//
+// Under literal config semantics a zero Timeout is the spelling of "no deadline",
+// and a negative one is the documented "disabled" — neither means "takes no time".
+// Reading them as zero would hand the supervisor a budget short enough to
+// force-kill a teardown that is still releasing resources, and a signalled
+// process reports no meaningful exit status, so the run would still be green.
+// An unbounded fixture still needs headroom: fall back to the default floor.
+func supervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
 	}
+	return timeout
+}
+
+func nodeTreePath(node *FixtureNode) time.Duration {
+	own := supervisorBudget(node.Config.Timeout)
 	var maxChild time.Duration
 	for _, child := range node.Children {
 		childPath := nodeTreePath(child)

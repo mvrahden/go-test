@@ -793,6 +793,62 @@ func TestBudgetFile_WrittenCorrectly(t *testing.T) {
 	gotest.Equal(t, expected, string(data))
 }
 
+func TestBudgetFile_ZeroTimeoutIsNotZeroBudget(t *testing.T) {
+	budgetFile := filepath.Join(t.TempDir(), "budget")
+	t.Setenv(protocol.EnvTeardownBudgetFile, budgetFile)
+
+	// Under literal config a zero Timeout is the spelling of "no deadline", not
+	// "takes no time". Reading it as zero would hand the supervisor a budget short
+	// enough to force-kill a teardown still releasing resources — and a signalled
+	// process reports no meaningful exit status, so the run would still be green.
+	root := &FixtureNode{
+		Name:      "Root",
+		Config:    gotest.FixtureConfig{Timeout: 0},
+		Init:      func() {},
+		BeforeAll: func(ctx context.Context) error { return nil },
+		Children: []*FixtureNode{
+			{
+				Name:      "Child",
+				Config:    gotest.FixtureConfig{Timeout: 0},
+				Init:      func() {},
+				BeforeAll: func(ctx context.Context) error { return nil },
+			},
+		},
+	}
+
+	exitCode := run(func() int { return 0 }, MainConfig{
+		Roots:                []*FixtureNode{root},
+		MaxSuiteSetupTimeout: 30 * time.Second,
+	})
+	gotest.Equal(t, 0, exitCode)
+
+	data, err := os.ReadFile(budgetFile)
+	gotest.NoError(t, err)
+
+	// Each unbounded stage falls back to the 2m default floor: 2m + 2m + 30s + 30s.
+	expected := (2*time.Minute + 2*time.Minute + 30*time.Second + 30*time.Second).String()
+	gotest.Equal(t, expected, string(data))
+}
+
+func TestBudgetFile_TreeAndDAGAgreeOnUndeclaredTimeouts(t *testing.T) {
+	// computeMaxTreePath (Roots) and computeMaxDAGPath (Fixtures) must read the
+	// same declared value the same way. They drifted once: the DAG floored a
+	// non-positive Timeout while the tree mapped it to zero.
+	for _, timeout := range []time.Duration{0, -1, 90 * time.Second} {
+		tree := computeMaxTreePath([]*FixtureNode{{
+			Name:     "Root",
+			Config:   gotest.FixtureConfig{Timeout: timeout},
+			Children: []*FixtureNode{{Name: "Child", Config: gotest.FixtureConfig{Timeout: timeout}}},
+		}})
+		dag := computeMaxDAGPath([]*FixtureNode{
+			{Name: "Root", Config: gotest.FixtureConfig{Timeout: timeout}},
+			{Name: "Child", Config: gotest.FixtureConfig{Timeout: timeout}, DependsOn: []string{"Root"}},
+		})
+		gotest.Equal(t, dag, tree, "tree and DAG must agree for a declared Timeout of %s", timeout)
+		gotest.Greater(t, tree, time.Duration(0), "a fixture always gets supervisor headroom")
+	}
+}
+
 func TestBudgetFile_NotWrittenWhenEnvUnset(t *testing.T) {
 	t.Setenv(protocol.EnvTeardownBudgetFile, "")
 

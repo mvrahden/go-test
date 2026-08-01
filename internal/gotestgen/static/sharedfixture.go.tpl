@@ -48,6 +48,21 @@ func ƒquote(s string) string {
 	return string(b)
 }
 
+{{- /*
+  ƒsupervisorBudget mirrors gotestruntime.supervisorBudget: a zero Timeout is the
+  literal spelling of "no deadline", not "takes no time", so it must not shrink
+  the teardown budget the supervisor allows. Reporting a flat 30s for an unbounded
+  fixture lets the supervisor force-kill a teardown still releasing resources, and
+  a signalled process reports no meaningful exit status — the run stays green and
+  leaks.
+*/}}
+func ƒsupervisorBudget(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return gotest.DefaultFixtureConfig().Timeout
+	}
+	return timeout
+}
+
 func main() {
 {{ range $f := .Fixtures }}
 	{{ $f.VarName }} := &{{ $f.QualifiedType }}{}
@@ -151,8 +166,8 @@ func main() {
 	} else {
 		var ƒmaxTimeout time.Duration
 {{ range $f := .Fixtures }}
-		if ƒcfg_{{ $f.VarName }}.Timeout > ƒmaxTimeout {
-			ƒmaxTimeout = ƒcfg_{{ $f.VarName }}.Timeout
+		if ƒb := ƒsupervisorBudget(ƒcfg_{{ $f.VarName }}.Timeout); ƒb > ƒmaxTimeout {
+			ƒmaxTimeout = ƒb
 		}
 {{ end }}
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
