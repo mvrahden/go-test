@@ -24,11 +24,15 @@ type FixtureSetup struct {
 	Budget     time.Duration
 	Retries    int
 	RetryDelay time.Duration
-	BeforeAll  func(ctx context.Context) error
+	// BeforeAll is the setup to run. A nil BeforeAll is "there is nothing to set
+	// up" and reports success — callers that populate a FixtureSetup by hand and
+	// leave this out get a pass, not a failure.
+	BeforeAll func(ctx context.Context) error
 }
 
 // RunFixtureSetup runs BeforeAll under s's timeout and retry policy and returns
-// the last error, unwrapped — callers add their own context.
+// the last error, unwrapped — callers add their own context. A nil BeforeAll is
+// nothing to do and reports success.
 //
 // A panic is contained rather than allowed to escape. In the test process it
 // would abort a goroutine the testing package knows nothing about; in the
