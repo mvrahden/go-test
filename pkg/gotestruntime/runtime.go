@@ -3,7 +3,6 @@ package gotestruntime
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -322,10 +321,10 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
 	return false
 }
 
+// runBeforeAllWithRetry adapts a DAG node onto RunFixtureSetup, the single
+// policy the generated shared-fixture subprocess runs BeforeAll under too, and
+// names the fixture in whatever comes back.
 func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
-	attempts := 1 + node.Config.Retries
-	var lastErr error
-
 	wrapErr := func(err error) error {
 		if err == nil {
 			return nil
@@ -333,65 +332,14 @@ func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
 		return fmt.Errorf("%s.BeforeAll: %w", node.Name, err)
 	}
 
-	for i := range attempts {
-		if ctx.Err() != nil {
-			return wrapErr(ctx.Err())
-		}
-
-		var attemptCtx context.Context
-		var attemptCancel context.CancelFunc
-		if node.Config.Timeout > 0 {
-			attemptCtx, attemptCancel = context.WithTimeout(ctx, node.Config.Timeout)
-		} else {
-			attemptCtx, attemptCancel = context.WithCancel(ctx)
-		}
-
-		lastErr = attemptBeforeAll(node, attemptCtx)
-		if lastErr == nil && node.Budget > 0 && errors.Is(attemptCtx.Err(), context.DeadlineExceeded) {
-			// Setup that ignores the context still overran the budget it was
-			// given; without this it would report success and a declared Timeout
-			// would mean nothing. Only a declared one, though — failing a
-			// fixture against a default it never asked for is not a verdict its
-			// author could act on.
-			lastErr = fmt.Errorf("exceeded its configured Timeout of %s", node.Budget)
-		}
-		attemptCancel()
-
-		if lastErr == nil {
-			return nil
-		}
-		if ctx.Err() != nil {
-			return wrapErr(ctx.Err())
-		}
-		if i < attempts-1 {
-			fmt.Fprintf(os.Stderr, "%s.BeforeAll attempt %d/%d failed: %v\n", node.Name, i+1, attempts, lastErr)
-			if node.Config.RetryDelay > 0 {
-				select {
-				case <-ctx.Done():
-					return wrapErr(ctx.Err())
-				case <-time.After(node.Config.RetryDelay):
-				}
-			}
-		}
-	}
-
-	fmt.Fprintf(os.Stderr, "FAIL: %s.BeforeAll failed after %d attempt(s): %v\n", node.Name, attempts, lastErr)
-	return wrapErr(lastErr)
-}
-
-// attemptBeforeAll runs one BeforeAll attempt, turning a panic into an error.
-//
-// A panic is a failure of the same setup the retry policy exists for — a
-// half-initialised client, an empty response indexed into. Letting it escape
-// the retry loop would mean Retries silently covered returned errors only, so
-// the flakiest failures would be the ones never retried.
-func attemptBeforeAll(node *FixtureNode, ctx context.Context) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic: %v\n\n%s", r, debug.Stack())
-		}
-	}()
-	return node.BeforeAll(ctx)
+	return wrapErr(RunFixtureSetup(ctx, FixtureSetup{
+		Name:       node.Name,
+		Timeout:    node.Config.Timeout,
+		Budget:     node.Budget,
+		Retries:    node.Config.Retries,
+		RetryDelay: node.Config.RetryDelay,
+		BeforeAll:  node.BeforeAll,
+	}))
 }
 
 func teardownRoots(roots []*FixtureNode, tracker *nodeTracker) bool {

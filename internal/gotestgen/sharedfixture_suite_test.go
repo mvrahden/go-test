@@ -257,7 +257,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 	})
 
 	t.When("retry logic", func(w *gotest.T) {
-		w.It("generates retry loop with delay", func(it *gotest.T) {
+		w.It("delegates setup to the same policy the in-process DAG runs", func(it *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",
@@ -269,7 +269,79 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			src, err := gotestgen.GenerateSharedSetup(fixtures)
 			gotest.NoError(it, err)
 
-			gotest.MatchSnapshot(it, string(src))
+			code := string(src)
+
+			// An inlined second copy of the loop is how the subprocess ended up
+			// without panic containment, retry-on-panic or a Timeout verdict
+			// while the DAG had all three.
+			gotest.Contains(it, code, "gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{",
+				"setup must go through the shared policy")
+			gotest.NotContains(it, code, "ƒattempts := 1 + ƒcfg_sf0.Retries",
+				"no second copy of the retry loop may remain")
+
+			// A fixture with no config of its own declared no deadline, so it
+			// gets no overrun verdict — only the context bound the default gives.
+			gotest.Contains(it, code, "Budget:     0,",
+				"an undeclared Timeout must not become a verdict")
+
+			gotest.MatchSnapshot(it, code)
+		})
+	})
+
+	t.When("imports", func(w *gotest.T) {
+		w.It("declares exactly what the generated program still uses", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					PkgPath:        "github.com/example/fixtures",
+					HasConfig:      true,
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+
+			// format.Source does not type-check, so a stale import renders
+			// cleanly here and only fails when the program is built in a
+			// throwaway directory during a real run. Assert on the import block
+			// itself rather than on "rendering returned no error".
+			fset := token.NewFileSet()
+			file, err := parser.ParseFile(fset, "setup.go", code, parser.ImportsOnly)
+			gotest.NoError(it, err)
+
+			var paths, locals []string
+			for _, imp := range file.Imports {
+				path := strings.Trim(imp.Path.Value, `"`)
+				paths = append(paths, path)
+				if imp.Name != nil {
+					locals = append(locals, imp.Name.Name)
+				} else {
+					locals = append(locals, path[strings.LastIndex(path, "/")+1:])
+				}
+			}
+			gotest.Equal(it, []string{
+				"context",
+				"encoding/json",
+				"fmt",
+				"os",
+				"os/signal",
+				"runtime/debug",
+				"sync",
+				"syscall",
+				"time",
+				"github.com/mvrahden/go-test/pkg/gotest",
+				"github.com/mvrahden/go-test/pkg/gotestruntime",
+				"github.com/example/fixtures",
+			}, paths)
+
+			body := code[strings.Index(code, "\nfunc "):]
+			for i, local := range locals {
+				gotest.Contains(it, body, local+".",
+					"import %q is declared but never used; the generated program will not build", paths[i])
+			}
 		})
 	})
 

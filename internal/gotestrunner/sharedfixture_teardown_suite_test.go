@@ -35,6 +35,19 @@ func slowTeardownFixture() []gotestgen.SharedFixtureInfo {
 	}}
 }
 
+// panicSetupFixtures pairs the panicking fixture with the slow-teardown one, so
+// the run has a sibling that is demonstrably up and holding something when the
+// panic lands.
+func panicSetupFixtures() []gotestgen.SharedFixtureInfo {
+	return append(slowTeardownFixture(), gotestgen.SharedFixtureInfo{
+		Identifier:     "PanickySetupSharedFixture",
+		PkgPath:        "github.com/mvrahden/go-test/tests/sharedfixture/fixtures",
+		PkgName:        "fixtures",
+		QualifiedType:  "fixtures.PanickySetupSharedFixture",
+		TransferFields: []string{"Marker"},
+	})
+}
+
 // startSlowTeardown boots the shared fixture subprocess under a cancellable
 // context, and returns it with the marker path its AfterAll writes once it has
 // finished releasing, plus the cancel the pipeline calls on its way out.
@@ -82,6 +95,45 @@ func (s *SharedFixtureTeardownTestSuite) TestCleanTeardown(t *gotest.T) {
 			gotest.NoError(it, err)
 			_, statErr := os.Stat(marker)
 			gotest.NoError(it, statErr)
+		})
+	})
+}
+
+func (s *SharedFixtureTeardownTestSuite) TestSetupPanicDoesNotOrphanSiblings(t *gotest.T) {
+	t.When("one shared fixture's BeforeAll panics while a sibling is up", func(w *gotest.T) {
+		marker := filepath.Join(w.TempDir(), "released")
+		w.Setenv(fixtures.EnvSlowTeardownDelay, "0")
+		w.Setenv(fixtures.EnvSlowTeardownMarker, marker)
+		w.Setenv(fixtures.EnvPanicSetupArm, "1")
+
+		ctx, cancel := context.WithCancel(w.Context())
+
+		proc, err := gotestrunner.StartSharedFixtures(ctx, w.TempDir(), panicSetupFixtures(), 30*time.Second)
+		gotest.NoError(w, err, "starting the shared fixture subprocess")
+
+		// Deliberately not WaitAllReady: it kills the process the moment it sees
+		// a setup error, which would cut short the very teardown under test.
+		<-proc.AllDone()
+		setupErr := proc.SetupErr()
+		select {
+		case <-gotestrunner.ExportProcessDone(proc):
+		case <-time.After(10 * time.Second):
+			gotest.Fail(w, "the shared fixture process never exited after a setup panic")
+		}
+		// The process has already exited on its own; cancelling here just
+		// releases the context, so it is not the run's shutdown signal and needs
+		// no suite lifecycle hook.
+		cancel()
+
+		w.It("reports the failure instead of aborting the process", func(it *gotest.T) {
+			gotest.Error(it, setupErr, "a panicking BeforeAll must surface as a setup failure")
+		})
+
+		w.It("still releases the sibling that came up", func(it *gotest.T) {
+			// The panic used to kill the subprocess outright, so the sibling's
+			// AfterAll never ran and whatever it held was orphaned.
+			_, statErr := os.Stat(marker)
+			gotest.NoError(it, statErr, "the sibling's AfterAll never ran; its resources are leaked")
 		})
 	})
 }

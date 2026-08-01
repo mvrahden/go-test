@@ -13,6 +13,7 @@ import (
 	"time"
 
 	gotest {{ printf "%q" .GotestImportPath }}
+	gotestruntime {{ printf "%q" .GotestRuntimeImportPath }}
 {{ range .Imports }}
 	{{ .Alias }} {{ printf "%q" .Path }}
 {{- end }}
@@ -96,29 +97,21 @@ func main() {
 {{- range $pa := $f.ParentAssignments }}
 		{{ $f.VarName }}.{{ $pa.FieldName }} = {{ $pa.ParentVar }}
 {{- end }}
-		ƒattempts := 1 + ƒcfg_{{ $f.VarName }}.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_{{ $f.VarName }}.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_{{ $f.VarName }}.Timeout)
-			}
-			ƒerrs[{{ $i }}] = {{ $f.VarName }}.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[{{ $i }}] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[{{ $i }}])
-				if ƒcfg_{{ $f.VarName }}.RetryDelay > 0 {
-					time.Sleep(ƒcfg_{{ $f.VarName }}.RetryDelay)
-				}
-			}
-		}
+{{- /*
+  One policy, shared with the in-process DAG: a panic here would otherwise kill
+  the process holding every sibling fixture's resources, so none of their
+  AfterAlls would ever run. RunFixtureSetup also writes the per-attempt and
+  final FAIL: lines to stderr.
+*/}}
+		ƒerrs[{{ $i }}] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "{{ $f.Identifier }}",
+			Timeout:    ƒcfg_{{ $f.VarName }}.Timeout,
+			Budget:     {{ if $f.HasConfig }}ƒcfg_{{ $f.VarName }}.Timeout{{ else }}0{{ end }},
+			Retries:    ƒcfg_{{ $f.VarName }}.Retries,
+			RetryDelay: ƒcfg_{{ $f.VarName }}.RetryDelay,
+			BeforeAll:  {{ $f.VarName }}.BeforeAll,
+		})
 		if ƒerrs[{{ $i }}] != nil {
-			fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_{{ $f.VarName }}.Retries, ƒerrs[{{ $i }}])
 			return
 		}
 {{- if $f.TransferFields }}

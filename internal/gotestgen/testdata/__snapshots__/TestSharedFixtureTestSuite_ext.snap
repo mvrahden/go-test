@@ -14,6 +14,7 @@ import (
 	"time"
 
 	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/project/tests/fixtures"
 	sfpkg1 "github.com/example/project/tests/redis"
@@ -70,29 +71,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf0)
-		ƒattempts := 1 + ƒcfg_sf0.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf0.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf0.Timeout)
-			}
-			ƒerrs[0] = sf0.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[0] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "PostgresFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
-				if ƒcfg_sf0.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf0.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "PostgresFixture",
+			Timeout:    ƒcfg_sf0.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf0.Retries,
+			RetryDelay: ƒcfg_sf0.RetryDelay,
+			BeforeAll:  sf0.BeforeAll,
+		})
 		if ƒerrs[0] != nil {
-			fmt.Fprintf(os.Stderr, "PostgresFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf0.Retries, ƒerrs[0])
 			return
 		}
 		{
@@ -115,29 +102,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf1)
-		ƒattempts := 1 + ƒcfg_sf1.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf1.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf1.Timeout)
-			}
-			ƒerrs[1] = sf1.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[1] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "RedisFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[1])
-				if ƒcfg_sf1.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf1.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[1] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "RedisFixture",
+			Timeout:    ƒcfg_sf1.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf1.Retries,
+			RetryDelay: ƒcfg_sf1.RetryDelay,
+			BeforeAll:  sf1.BeforeAll,
+		})
 		if ƒerrs[1] != nil {
-			fmt.Fprintf(os.Stderr, "RedisFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf1.Retries, ƒerrs[1])
 			return
 		}
 		{
@@ -227,6 +200,7 @@ import (
 	"time"
 
 	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -278,29 +252,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf0)
-		ƒattempts := 1 + ƒcfg_sf0.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf0.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf0.Timeout)
-			}
-			ƒerrs[0] = sf0.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[0] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "PostgresFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
-				if ƒcfg_sf0.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf0.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "PostgresFixture",
+			Timeout:    ƒcfg_sf0.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf0.Retries,
+			RetryDelay: ƒcfg_sf0.RetryDelay,
+			BeforeAll:  sf0.BeforeAll,
+		})
 		if ƒerrs[0] != nil {
-			fmt.Fprintf(os.Stderr, "PostgresFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf0.Retries, ƒerrs[0])
 			return
 		}
 		{
@@ -380,6 +340,7 @@ import (
 	"time"
 
 	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -431,29 +392,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf0)
-		ƒattempts := 1 + ƒcfg_sf0.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf0.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf0.Timeout)
-			}
-			ƒerrs[0] = sf0.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[0] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "SetupFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
-				if ƒcfg_sf0.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf0.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "SetupFixture",
+			Timeout:    ƒcfg_sf0.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf0.Retries,
+			RetryDelay: ƒcfg_sf0.RetryDelay,
+			BeforeAll:  sf0.BeforeAll,
+		})
 		if ƒerrs[0] != nil {
-			fmt.Fprintf(os.Stderr, "SetupFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf0.Retries, ƒerrs[0])
 			return
 		}
 		fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":{}}\n", ƒquote("github.com/example/fixtures.SetupFixture"))
@@ -518,6 +465,7 @@ import (
 	"time"
 
 	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/project/tests/fixtures"
 )
@@ -569,29 +517,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf0)
-		ƒattempts := 1 + ƒcfg_sf0.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf0.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf0.Timeout)
-			}
-			ƒerrs[0] = sf0.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[0] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "PostgresFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
-				if ƒcfg_sf0.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf0.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "PostgresFixture",
+			Timeout:    ƒcfg_sf0.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf0.Retries,
+			RetryDelay: ƒcfg_sf0.RetryDelay,
+			BeforeAll:  sf0.BeforeAll,
+		})
 		if ƒerrs[0] != nil {
-			fmt.Fprintf(os.Stderr, "PostgresFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf0.Retries, ƒerrs[0])
 			return
 		}
 		{
@@ -669,6 +603,7 @@ import (
 	"time"
 
 	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/shared"
 )
@@ -724,29 +659,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf0)
-		ƒattempts := 1 + ƒcfg_sf0.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf0.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf0.Timeout)
-			}
-			ƒerrs[0] = sf0.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[0] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "PostgresFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
-				if ƒcfg_sf0.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf0.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "PostgresFixture",
+			Timeout:    ƒcfg_sf0.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf0.Retries,
+			RetryDelay: ƒcfg_sf0.RetryDelay,
+			BeforeAll:  sf0.BeforeAll,
+		})
 		if ƒerrs[0] != nil {
-			fmt.Fprintf(os.Stderr, "PostgresFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf0.Retries, ƒerrs[0])
 			return
 		}
 		{
@@ -769,29 +690,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf1)
-		ƒattempts := 1 + ƒcfg_sf1.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf1.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf1.Timeout)
-			}
-			ƒerrs[1] = sf1.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[1] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "RedisFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[1])
-				if ƒcfg_sf1.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf1.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[1] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "RedisFixture",
+			Timeout:    ƒcfg_sf1.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf1.Retries,
+			RetryDelay: ƒcfg_sf1.RetryDelay,
+			BeforeAll:  sf1.BeforeAll,
+		})
 		if ƒerrs[1] != nil {
-			fmt.Fprintf(os.Stderr, "RedisFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf1.Retries, ƒerrs[1])
 			return
 		}
 		{
@@ -881,6 +788,7 @@ import (
 	"time"
 
 	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -932,29 +840,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf0)
-		ƒattempts := 1 + ƒcfg_sf0.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf0.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf0.Timeout)
-			}
-			ƒerrs[0] = sf0.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[0] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "PGFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
-				if ƒcfg_sf0.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf0.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "PGFixture",
+			Timeout:    ƒcfg_sf0.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf0.Retries,
+			RetryDelay: ƒcfg_sf0.RetryDelay,
+			BeforeAll:  sf0.BeforeAll,
+		})
 		if ƒerrs[0] != nil {
-			fmt.Fprintf(os.Stderr, "PGFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf0.Retries, ƒerrs[0])
 			return
 		}
 		{
@@ -1032,6 +926,7 @@ import (
 	"time"
 
 	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -1083,29 +978,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf0)
-		ƒattempts := 1 + ƒcfg_sf0.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf0.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf0.Timeout)
-			}
-			ƒerrs[0] = sf0.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[0] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "PGFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
-				if ƒcfg_sf0.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf0.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "PGFixture",
+			Timeout:    ƒcfg_sf0.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf0.Retries,
+			RetryDelay: ƒcfg_sf0.RetryDelay,
+			BeforeAll:  sf0.BeforeAll,
+		})
 		if ƒerrs[0] != nil {
-			fmt.Fprintf(os.Stderr, "PGFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf0.Retries, ƒerrs[0])
 			return
 		}
 		{
@@ -1183,6 +1064,7 @@ import (
 	"time"
 
 	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -1234,29 +1116,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf0)
-		ƒattempts := 1 + ƒcfg_sf0.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf0.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf0.Timeout)
-			}
-			ƒerrs[0] = sf0.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[0] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "PGFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
-				if ƒcfg_sf0.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf0.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "PGFixture",
+			Timeout:    ƒcfg_sf0.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf0.Retries,
+			RetryDelay: ƒcfg_sf0.RetryDelay,
+			BeforeAll:  sf0.BeforeAll,
+		})
 		if ƒerrs[0] != nil {
-			fmt.Fprintf(os.Stderr, "PGFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf0.Retries, ƒerrs[0])
 			return
 		}
 		{
@@ -1318,7 +1186,7 @@ func main() {
 	}
 }
 
-=== SNAP TestGeneratedCodeStructure/retry_logic/generates_retry_loop_with_delay ===
+=== SNAP TestGeneratedCodeStructure/retry_logic/delegates_setup_to_the_same_policy_the_in-process_DAG_runs ===
 // Code generated by "gotest (github.com/mvrahden/go-test)"; DO NOT EDIT.
 package main
 
@@ -1334,6 +1202,7 @@ import (
 	"time"
 
 	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -1385,29 +1254,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf0)
-		ƒattempts := 1 + ƒcfg_sf0.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf0.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf0.Timeout)
-			}
-			ƒerrs[0] = sf0.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[0] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "PGFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
-				if ƒcfg_sf0.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf0.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "PGFixture",
+			Timeout:    ƒcfg_sf0.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf0.Retries,
+			RetryDelay: ƒcfg_sf0.RetryDelay,
+			BeforeAll:  sf0.BeforeAll,
+		})
 		if ƒerrs[0] != nil {
-			fmt.Fprintf(os.Stderr, "PGFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf0.Retries, ƒerrs[0])
 			return
 		}
 		{
@@ -1485,6 +1340,7 @@ import (
 	"time"
 
 	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 	sfpkg1 "github.com/example/redis"
@@ -1541,29 +1397,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf0)
-		ƒattempts := 1 + ƒcfg_sf0.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf0.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf0.Timeout)
-			}
-			ƒerrs[0] = sf0.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[0] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "PGFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
-				if ƒcfg_sf0.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf0.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "PGFixture",
+			Timeout:    ƒcfg_sf0.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf0.Retries,
+			RetryDelay: ƒcfg_sf0.RetryDelay,
+			BeforeAll:  sf0.BeforeAll,
+		})
 		if ƒerrs[0] != nil {
-			fmt.Fprintf(os.Stderr, "PGFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf0.Retries, ƒerrs[0])
 			return
 		}
 		{
@@ -1586,29 +1428,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf1)
-		ƒattempts := 1 + ƒcfg_sf1.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf1.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf1.Timeout)
-			}
-			ƒerrs[1] = sf1.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[1] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "RedisFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[1])
-				if ƒcfg_sf1.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf1.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[1] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "RedisFixture",
+			Timeout:    ƒcfg_sf1.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf1.Retries,
+			RetryDelay: ƒcfg_sf1.RetryDelay,
+			BeforeAll:  sf1.BeforeAll,
+		})
 		if ƒerrs[1] != nil {
-			fmt.Fprintf(os.Stderr, "RedisFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf1.Retries, ƒerrs[1])
 			return
 		}
 		{
@@ -1698,6 +1526,7 @@ import (
 	"time"
 
 	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -1749,29 +1578,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf0)
-		ƒattempts := 1 + ƒcfg_sf0.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf0.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf0.Timeout)
-			}
-			ƒerrs[0] = sf0.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[0] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "PGFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
-				if ƒcfg_sf0.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf0.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "PGFixture",
+			Timeout:    ƒcfg_sf0.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf0.Retries,
+			RetryDelay: ƒcfg_sf0.RetryDelay,
+			BeforeAll:  sf0.BeforeAll,
+		})
 		if ƒerrs[0] != nil {
-			fmt.Fprintf(os.Stderr, "PGFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf0.Retries, ƒerrs[0])
 			return
 		}
 		{
@@ -1849,6 +1664,7 @@ import (
 	"time"
 
 	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/fixtures"
 )
@@ -1900,29 +1716,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf0)
-		ƒattempts := 1 + ƒcfg_sf0.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf0.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf0.Timeout)
-			}
-			ƒerrs[0] = sf0.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[0] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "PGFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
-				if ƒcfg_sf0.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf0.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "PGFixture",
+			Timeout:    ƒcfg_sf0.Timeout,
+			Budget:     ƒcfg_sf0.Timeout,
+			Retries:    ƒcfg_sf0.Retries,
+			RetryDelay: ƒcfg_sf0.RetryDelay,
+			BeforeAll:  sf0.BeforeAll,
+		})
 		if ƒerrs[0] != nil {
-			fmt.Fprintf(os.Stderr, "PGFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf0.Retries, ƒerrs[0])
 			return
 		}
 		{
@@ -2000,6 +1802,7 @@ import (
 	"time"
 
 	gotest "github.com/mvrahden/go-test/pkg/gotest"
+	gotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"
 
 	sfpkg0 "github.com/example/project/tests/fixtures"
 	sfpkg1 "github.com/example/project/tests/gcs"
@@ -2056,29 +1859,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf0)
-		ƒattempts := 1 + ƒcfg_sf0.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf0.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf0.Timeout)
-			}
-			ƒerrs[0] = sf0.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[0] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "PostgresFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[0])
-				if ƒcfg_sf0.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf0.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "PostgresFixture",
+			Timeout:    ƒcfg_sf0.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf0.Retries,
+			RetryDelay: ƒcfg_sf0.RetryDelay,
+			BeforeAll:  sf0.BeforeAll,
+		})
 		if ƒerrs[0] != nil {
-			fmt.Fprintf(os.Stderr, "PostgresFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf0.Retries, ƒerrs[0])
 			return
 		}
 		{
@@ -2101,29 +1890,15 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf1)
-		ƒattempts := 1 + ƒcfg_sf1.Retries
-		for ƒj := range ƒattempts {
-			ctx := ƒctx
-			var cancel context.CancelFunc
-			if ƒcfg_sf1.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(ƒctx, ƒcfg_sf1.Timeout)
-			}
-			ƒerrs[1] = sf1.BeforeAll(ctx)
-			if cancel != nil {
-				cancel()
-			}
-			if ƒerrs[1] == nil {
-				break
-			}
-			if ƒj < ƒattempts-1 {
-				fmt.Fprintf(os.Stderr, "GCSFixture.BeforeAll attempt %d/%d failed: %v\n", ƒj+1, ƒattempts, ƒerrs[1])
-				if ƒcfg_sf1.RetryDelay > 0 {
-					time.Sleep(ƒcfg_sf1.RetryDelay)
-				}
-			}
-		}
+		ƒerrs[1] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+			Name:       "GCSFixture",
+			Timeout:    ƒcfg_sf1.Timeout,
+			Budget:     0,
+			Retries:    ƒcfg_sf1.Retries,
+			RetryDelay: ƒcfg_sf1.RetryDelay,
+			BeforeAll:  sf1.BeforeAll,
+		})
 		if ƒerrs[1] != nil {
-			fmt.Fprintf(os.Stderr, "GCSFixture.BeforeAll failed after %d attempt(s): %v\n", 1+ƒcfg_sf1.Retries, ƒerrs[1])
 			return
 		}
 		{
