@@ -146,9 +146,10 @@ func (p *SharedFixtureProcess) WriteStateFileForKeys(name string, keys []string)
 	return path, nil
 }
 
-// Teardown signals the shared fixture subprocess to shut down and waits
-// for it to complete. If the process doesn't exit within 30 seconds,
-// it is forcibly killed.
+// Teardown signals the shared fixture subprocess to shut down and waits for it
+// to complete within its teardown budget (30 seconds if none was reported). A
+// process that outlives the budget is forcibly killed, and that is reported as
+// an error: its AfterAll never finished, so what it held is leaked.
 func (p *SharedFixtureProcess) Teardown() error {
 	if p.cmd == nil || p.cmd.Process == nil {
 		return nil
@@ -169,11 +170,13 @@ func (p *SharedFixtureProcess) Teardown() error {
 	default:
 	}
 
+	forceKilled := false
 	_ = TerminateProcessGroup(p.cmd.Process.Pid)
 	select {
 	case <-p.done:
 	case <-time.After(timeout):
 		fmt.Fprintf(os.Stderr, "WARN: shared fixture process did not exit within %v, forcing termination\n", timeout)
+		forceKilled = true
 		_ = ForceKillProcessGroup(p.cmd.Process.Pid)
 		<-p.done
 	}
@@ -190,6 +193,14 @@ func (p *SharedFixtureProcess) Teardown() error {
 
 	if diedEarly {
 		return fmt.Errorf("shared fixture process exited before teardown; its AfterAll never ran and its resources may be leaked")
+	}
+
+	// A force-killed process was cut off mid-AfterAll. Its exit status says
+	// nothing — a signalled process reports -1, never sharedTeardownFailedExit —
+	// so without reporting it here the run would end green while the containers
+	// the fixture was still stopping stay up.
+	if forceKilled {
+		return fmt.Errorf("shared fixture teardown was force-killed after %s; its AfterAll never finished and its resources may be leaked", timeout)
 	}
 
 	// The setup program exits with sharedTeardownFailedExit specifically to

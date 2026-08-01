@@ -3,6 +3,7 @@ package gotestrunner
 import (
 	"encoding/json"
 	"os"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/protocol"
@@ -31,6 +32,12 @@ var ExportIsPackageSummaryLine = protocol.IsPackageSummaryLine
 func ExportProcessPID(p *SharedFixtureProcess) int { return p.cmd.Process.Pid }
 
 func ExportProcessDone(p *SharedFixtureProcess) <-chan struct{} { return p.done }
+
+// ExportSetTeardownTimeout overrides the budget Teardown enforces. The
+// subprocess reports its own budget on the _done line, so a test that wants to
+// drive the force-kill path has to shrink it afterwards rather than sleep out
+// the minutes the fixture asked for.
+func ExportSetTeardownTimeout(p *SharedFixtureProcess, d time.Duration) { p.teardownTimeout = d }
 
 func ExportAutoDetectCI(cfg PipelineConfig) PipelineConfig {
 	if !cfg.CI && os.Getenv(protocol.EnvCI) == "" && os.Getenv("CI") != "" {

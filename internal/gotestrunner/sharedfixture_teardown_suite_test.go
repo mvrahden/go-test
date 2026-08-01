@@ -138,6 +138,28 @@ func (s *SharedFixtureTeardownTestSuite) TestSetupPanicDoesNotOrphanSiblings(t *
 	})
 }
 
+func (s *SharedFixtureTeardownTestSuite) TestTeardownForceKilled(t *gotest.T) {
+	t.When("AfterAll outlives the teardown budget and the process is force-killed", func(w *gotest.T) {
+		// The budget the subprocess reports on its _done line overwrites the one
+		// StartSharedFixtures was given, so shrinking it here is what makes the
+		// force-kill path reachable without waiting out the fixture's minutes.
+		proc, marker, cancel := startSlowTeardown(w, 10*time.Second, 30*time.Second)
+		gotestrunner.ExportSetTeardownTimeout(proc, 300*time.Millisecond)
+		cancel()
+		err := proc.Teardown()
+
+		w.It("reports the cut-short teardown rather than passing", func(it *gotest.T) {
+			// SIGKILL leaves no exit status to read — the process reports -1, never
+			// the teardown-failed status — so nothing else in the run would say the
+			// resources are still out there.
+			_, statErr := os.Stat(marker)
+			gotest.Error(it, statErr, "AfterAll must not have finished")
+			gotest.ErrorContains(it, err, "force-killed",
+				"a force-killed teardown must fail the run and name the force-kill, so the operator knows what leaked")
+		})
+	})
+}
+
 func (s *SharedFixtureTeardownTestSuite) TestProcessThatDiedOnItsOwn(t *gotest.T) {
 	t.When("the fixture process is killed outright, as an OOM would", func(w *gotest.T) {
 		proc, marker, _ := startSlowTeardown(w, 0, 30*time.Second)
