@@ -115,3 +115,49 @@ func TestCollectStats_IgnoresFailureInheritedFromAChild(t *testing.T) {
 		t.Errorf("reported %d failures, want 1:\n%s", got, buf.String())
 	}
 }
+
+// An interior node that merely logged is not a verdict. BeforeEach output lands
+// on the method node, so counting any non-marker output would report one extra
+// failure for every suite that logs and has a failing behaviour.
+func TestCollectStats_IgnoresInteriorLogWhenADescendantFailed(t *testing.T) {
+	packages := []*Package{{
+		Path:   "example.com/pkg",
+		Status: StatusFail,
+		Nodes: []*Node{{
+			Kind:    KindSuite,
+			Display: "Boot",
+			Status:  StatusFail,
+			Output:  []string{"--- FAIL: TestBootTestSuite (0.02s)\n"},
+			Children: []*Node{{
+				Kind:    KindMethod,
+				Display: "Something",
+				Status:  StatusFail,
+				Output: []string{
+					"    --- FAIL: TestBootTestSuite/TestSomething (0.01s)\n",
+					"        boot_test.go:7: using db testdb-4711\n",
+				},
+				Children: []*Node{{
+					Kind:    KindBlock,
+					Display: "does the thing",
+					Status:  StatusFail,
+					Output:  []string{"        boot_test.go:9: True failed\n"},
+				}},
+			}},
+		}},
+	}}
+
+	stats := CollectStats(packages)
+	if stats.Failed != 1 {
+		t.Errorf("Failed = %d, want 1 (the leaf only)", stats.Failed)
+	}
+	if stats.Total() != stats.Behaviors+stats.Tests {
+		t.Errorf("Passed+Failed+Skipped = %d, want it to equal Behaviors+Tests = %d",
+			stats.Total(), stats.Behaviors+stats.Tests)
+	}
+
+	var buf bytes.Buffer
+	RenderSummary(&buf, packages, WithNoColor())
+	if got := strings.Count(buf.String(), "FAIL  example.com/pkg"); got != 1 {
+		t.Errorf("reported %d failures, want 1:\n%s", got, buf.String())
+	}
+}

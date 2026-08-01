@@ -357,15 +357,31 @@ func splitTestPath(path string) []string {
 
 // failedOnItsOwn reports whether an interior node carries a verdict of its own:
 // a suite whose AfterAll failed, or a test method that blew its configured
-// Timeout. Both are attributed to the node while every behaviour beneath it may
-// still have passed.
+// Timeout. Both are attributed to the node while every behaviour beneath it
+// passed.
 //
 // A failed child marks its whole ancestry FAIL too, so status alone cannot tell
-// the two apart. Output does: the testing package emits "=== RUN" and "--- FAIL"
-// markers for every node, and filterOutput strips exactly those, so anything
-// left is the node speaking for itself.
+// the two apart. Output narrows it — the testing package emits "=== RUN" and
+// "--- FAIL" markers for every node and filterOutput strips exactly those — but
+// not far enough on its own: a plain t.Log survives the filter and would be
+// counted as a second failure. Requiring that no descendant failed is what
+// makes the count add up. It does mean a teardown failure that coincides with a
+// test failure is not counted separately; the leaf already fails the run, and
+// the node's own output is still rendered.
 func failedOnItsOwn(n *Node) bool {
-	return len(n.Children) > 0 && n.Status == StatusFail && len(filterOutput(n.Output)) > 0
+	return len(n.Children) > 0 &&
+		n.Status == StatusFail &&
+		len(filterOutput(n.Output)) > 0 &&
+		!anyDescendantFailed(n)
+}
+
+func anyDescendantFailed(n *Node) bool {
+	for _, child := range n.Children {
+		if child.Status == StatusFail || anyDescendantFailed(child) {
+			return true
+		}
+	}
+	return false
 }
 
 func statusFrom(a Action) Status {
