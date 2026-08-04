@@ -392,11 +392,11 @@ func (s *ParallelMethodTestSuite) TestDelete(t *gotest.T, ctx *TestCtx) {}
 When method-level parallelism is enabled, `AfterAll` still waits for every parallel
 subtest to complete, but nothing in the generated code makes it wait: `t.Cleanup` — where
 `AfterAll` runs — only fires after `TestMyTestSuite` returns, and `testing` does not
-return from a parent test until all of its `t.Parallel()` children have finished. An
-earlier version coordinated this with a `sync.WaitGroup` instead; it was removed because
-it could deadlock against `testing`'s own panic unwind — on panic, `testing` runs
-ancestor cleanups from the panicking goroutine while the test that would have called
-`wg.Done()` was still parked in `t.Run`.
+return from a parent test until all of its `t.Parallel()` children have finished. The
+generated code must never wait on the parallel subtests itself (a `sync.WaitGroup`, a
+channel): on panic, `testing` runs ancestor cleanups from the panicking goroutine while
+the subtest that would release such a wait is still parked inside `t.Run`, so any
+generated wait deadlocks against the panic unwind.
 With `FailFast`, parallel suites additionally share a `ƒfailed` atomic flag: a failed subtest sets it, and subtests that start afterwards skip themselves.
 
 On Windows, suite subprocesses run under job objects so that cancellation and teardown terminate the whole process tree.
@@ -785,10 +785,8 @@ A `defer wait()` in the second shape deadlocks instead: the test's own defers ru
 `AfterEach`, so it would wait for a goroutine nothing has stopped yet. Calling the
 returned `wait` more than once is safe.
 
-Two caveats: no lint rule flags a bare `go func()` inside suite code in place of
-`gotest.Go`, so the fix only reaches callers who read the docs; and the cleanup-registered
-`wait` itself has no timeout, so a goroutine that runs past the end of the test and never
-returns still hangs the binary with no named verdict.
+The cleanup-registered `wait` has no timeout of its own: a goroutine that never
+returns hangs the binary until `go test -timeout` fires, with no named verdict.
 
 ---
 
