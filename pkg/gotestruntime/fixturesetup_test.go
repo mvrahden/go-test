@@ -73,6 +73,27 @@ func (s *FixtureSetupTestSuite) TestBudget(t *gotest.T) {
 	})
 }
 
+func (s *FixtureSetupTestSuite) TestConfigDerivation(t *gotest.T) {
+	t.When("the config marker panics", func(w *gotest.T) {
+		w.It("returns an error attributed to the fixture", func(it *gotest.T) {
+			_, err := gotestruntime.DeriveFixtureConfig("Broken", func() gotest.FixtureConfig {
+				panic("env var not set")
+			})
+			gotest.ErrorContains(it, err, "env var not set")
+		})
+	})
+
+	t.When("the config marker returns normally", func(w *gotest.T) {
+		w.It("hands the config through", func(it *gotest.T) {
+			cfg, err := gotestruntime.DeriveFixtureConfig("Configured", func() gotest.FixtureConfig {
+				return gotest.FixtureConfig{Timeout: 5 * time.Second}
+			})
+			gotest.NoError(it, err)
+			gotest.Equal(it, 5*time.Second, cfg.Timeout)
+		})
+	})
+}
+
 func (s *FixtureSetupTestSuite) TestParentCancellation(t *gotest.T) {
 	t.When("the parent context is cancelled between attempts", func(w *gotest.T) {
 		w.It("stops retrying and reports the cancellation", func(it *gotest.T) {

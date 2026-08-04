@@ -25,9 +25,9 @@ type FixtureNode struct {
 	// verbatim, or the defaults when it has no marker method. Timeout bounds
 	// the context each lifecycle call receives.
 	Config gotest.FixtureConfig
-	// Budget is the deadline BeforeAll is held to by verdict, or zero when the
-	// fixture declared no config of its own. A fixture is never failed against
-	// a number its author did not write.
+	// Budget is the deadline BeforeAll and AfterAll are each held to by
+	// verdict, or zero when the fixture declared no config of its own. A
+	// fixture is never failed against a number its author did not write.
 	Budget      time.Duration
 	Init        func()
 	BeforeAll   func(ctx context.Context) error

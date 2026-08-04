@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -20,37 +19,10 @@ import (
 	sfpkg1 "github.com/example/project/tests/redis"
 )
 
-func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
-			failed = true
-		}
-	}()
-	ctx := context.Background()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if err := after(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
-		return true
-	}
-	return false
-}
-
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
-func ƒsupervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func main() {
 
 	sf0 := &sfpkg0.PostgresFixture{}
@@ -143,20 +115,30 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[1] == nil {
-			ƒteardown("RedisFixture", ƒcfg_sf1.Timeout, sf1.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "RedisFixture",
+				Timeout:  ƒcfg_sf1.Timeout,
+				Budget:   0,
+				AfterAll: sf1.AfterAll,
+			})
 		}
 		if ƒerrs[0] == nil {
-			ƒteardown("PostgresFixture", ƒcfg_sf0.Timeout, sf0.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PostgresFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		}
 		os.Exit(1)
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf1.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf1.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
@@ -170,12 +152,22 @@ func main() {
 	ƒteardownFailed := false
 
 	if ƒerrs[1] == nil {
-		if ƒteardown("RedisFixture", ƒcfg_sf1.Timeout, sf1.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "RedisFixture",
+			Timeout:  ƒcfg_sf1.Timeout,
+			Budget:   0,
+			AfterAll: sf1.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
 	if ƒerrs[0] == nil {
-		if ƒteardown("PostgresFixture", ƒcfg_sf0.Timeout, sf0.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PostgresFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
@@ -194,7 +186,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -205,37 +196,10 @@ import (
 	sfpkg0 "github.com/example/fixtures"
 )
 
-func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
-			failed = true
-		}
-	}()
-	ctx := context.Background()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if err := after(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
-		return true
-	}
-	return false
-}
-
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
-func ƒsupervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func main() {
 
 	sf0 := &sfpkg0.PostgresFixture{}
@@ -295,13 +259,18 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			ƒteardown("PostgresFixture", ƒcfg_sf0.Timeout, sf0.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PostgresFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		}
 		os.Exit(1)
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
@@ -315,7 +284,12 @@ func main() {
 	ƒteardownFailed := false
 
 	if ƒerrs[0] == nil {
-		if ƒteardown("PostgresFixture", ƒcfg_sf0.Timeout, sf0.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PostgresFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
@@ -334,7 +308,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -345,37 +318,10 @@ import (
 	sfpkg0 "github.com/example/fixtures"
 )
 
-func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
-			failed = true
-		}
-	}()
-	ctx := context.Background()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if err := after(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
-		return true
-	}
-	return false
-}
-
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
-func ƒsupervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func main() {
 
 	sf0 := &sfpkg0.SetupFixture{}
@@ -420,13 +366,18 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			ƒteardown("SetupFixture", ƒcfg_sf0.Timeout, sf0.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "SetupFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		}
 		os.Exit(1)
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
@@ -440,7 +391,12 @@ func main() {
 	ƒteardownFailed := false
 
 	if ƒerrs[0] == nil {
-		if ƒteardown("SetupFixture", ƒcfg_sf0.Timeout, sf0.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "SetupFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
@@ -459,7 +415,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -470,37 +425,10 @@ import (
 	sfpkg0 "github.com/example/project/tests/fixtures"
 )
 
-func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
-			failed = true
-		}
-	}()
-	ctx := context.Background()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if err := after(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
-		return true
-	}
-	return false
-}
-
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
-func ƒsupervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func main() {
 
 	sf0 := &sfpkg0.PostgresFixture{}
@@ -558,13 +486,18 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			ƒteardown("PostgresFixture", ƒcfg_sf0.Timeout, sf0.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PostgresFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		}
 		os.Exit(1)
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
@@ -578,7 +511,12 @@ func main() {
 	ƒteardownFailed := false
 
 	if ƒerrs[0] == nil {
-		if ƒteardown("PostgresFixture", ƒcfg_sf0.Timeout, sf0.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PostgresFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
@@ -597,7 +535,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -608,37 +545,10 @@ import (
 	sfpkg0 "github.com/example/shared"
 )
 
-func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
-			failed = true
-		}
-	}()
-	ctx := context.Background()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if err := after(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
-		return true
-	}
-	return false
-}
-
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
-func ƒsupervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func main() {
 
 	sf0 := &sfpkg0.PostgresFixture{}
@@ -731,20 +641,30 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[1] == nil {
-			ƒteardown("RedisFixture", ƒcfg_sf1.Timeout, sf1.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "RedisFixture",
+				Timeout:  ƒcfg_sf1.Timeout,
+				Budget:   0,
+				AfterAll: sf1.AfterAll,
+			})
 		}
 		if ƒerrs[0] == nil {
-			ƒteardown("PostgresFixture", ƒcfg_sf0.Timeout, sf0.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PostgresFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		}
 		os.Exit(1)
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf1.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf1.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
@@ -758,12 +678,22 @@ func main() {
 	ƒteardownFailed := false
 
 	if ƒerrs[1] == nil {
-		if ƒteardown("RedisFixture", ƒcfg_sf1.Timeout, sf1.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "RedisFixture",
+			Timeout:  ƒcfg_sf1.Timeout,
+			Budget:   0,
+			AfterAll: sf1.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
 	if ƒerrs[0] == nil {
-		if ƒteardown("PostgresFixture", ƒcfg_sf0.Timeout, sf0.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PostgresFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
@@ -782,7 +712,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -793,37 +722,10 @@ import (
 	sfpkg0 "github.com/example/fixtures"
 )
 
-func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
-			failed = true
-		}
-	}()
-	ctx := context.Background()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if err := after(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
-		return true
-	}
-	return false
-}
-
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
-func ƒsupervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
@@ -881,13 +783,18 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			ƒteardown("PGFixture", ƒcfg_sf0.Timeout, sf0.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PGFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		}
 		os.Exit(1)
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
@@ -901,7 +808,12 @@ func main() {
 	ƒteardownFailed := false
 
 	if ƒerrs[0] == nil {
-		if ƒteardown("PGFixture", ƒcfg_sf0.Timeout, sf0.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PGFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
@@ -920,7 +832,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -931,37 +842,10 @@ import (
 	sfpkg0 "github.com/example/fixtures"
 )
 
-func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
-			failed = true
-		}
-	}()
-	ctx := context.Background()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if err := after(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
-		return true
-	}
-	return false
-}
-
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
-func ƒsupervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
@@ -1019,13 +903,18 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			ƒteardown("PGFixture", ƒcfg_sf0.Timeout, sf0.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PGFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		}
 		os.Exit(1)
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
@@ -1039,7 +928,12 @@ func main() {
 	ƒteardownFailed := false
 
 	if ƒerrs[0] == nil {
-		if ƒteardown("PGFixture", ƒcfg_sf0.Timeout, sf0.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PGFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
@@ -1058,7 +952,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -1069,37 +962,10 @@ import (
 	sfpkg0 "github.com/example/fixtures"
 )
 
-func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
-			failed = true
-		}
-	}()
-	ctx := context.Background()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if err := after(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
-		return true
-	}
-	return false
-}
-
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
-func ƒsupervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
@@ -1157,13 +1023,18 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			ƒteardown("PGFixture", ƒcfg_sf0.Timeout, sf0.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PGFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		}
 		os.Exit(1)
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
@@ -1177,7 +1048,12 @@ func main() {
 	ƒteardownFailed := false
 
 	if ƒerrs[0] == nil {
-		if ƒteardown("PGFixture", ƒcfg_sf0.Timeout, sf0.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PGFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
@@ -1196,7 +1072,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -1207,37 +1082,10 @@ import (
 	sfpkg0 "github.com/example/fixtures"
 )
 
-func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
-			failed = true
-		}
-	}()
-	ctx := context.Background()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if err := after(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
-		return true
-	}
-	return false
-}
-
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
-func ƒsupervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
@@ -1295,13 +1143,18 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			ƒteardown("PGFixture", ƒcfg_sf0.Timeout, sf0.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PGFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		}
 		os.Exit(1)
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
@@ -1315,7 +1168,12 @@ func main() {
 	ƒteardownFailed := false
 
 	if ƒerrs[0] == nil {
-		if ƒteardown("PGFixture", ƒcfg_sf0.Timeout, sf0.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PGFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
@@ -1334,7 +1192,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -1346,37 +1203,10 @@ import (
 	sfpkg1 "github.com/example/redis"
 )
 
-func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
-			failed = true
-		}
-	}()
-	ctx := context.Background()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if err := after(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
-		return true
-	}
-	return false
-}
-
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
-func ƒsupervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
@@ -1469,20 +1299,30 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[1] == nil {
-			ƒteardown("RedisFixture", ƒcfg_sf1.Timeout, sf1.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "RedisFixture",
+				Timeout:  ƒcfg_sf1.Timeout,
+				Budget:   0,
+				AfterAll: sf1.AfterAll,
+			})
 		}
 		if ƒerrs[0] == nil {
-			ƒteardown("PGFixture", ƒcfg_sf0.Timeout, sf0.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PGFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		}
 		os.Exit(1)
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf1.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf1.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
@@ -1496,12 +1336,22 @@ func main() {
 	ƒteardownFailed := false
 
 	if ƒerrs[1] == nil {
-		if ƒteardown("RedisFixture", ƒcfg_sf1.Timeout, sf1.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "RedisFixture",
+			Timeout:  ƒcfg_sf1.Timeout,
+			Budget:   0,
+			AfterAll: sf1.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
 	if ƒerrs[0] == nil {
-		if ƒteardown("PGFixture", ƒcfg_sf0.Timeout, sf0.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PGFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
@@ -1520,7 +1370,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -1531,37 +1380,10 @@ import (
 	sfpkg0 "github.com/example/fixtures"
 )
 
-func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
-			failed = true
-		}
-	}()
-	ctx := context.Background()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if err := after(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
-		return true
-	}
-	return false
-}
-
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
-func ƒsupervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
@@ -1619,13 +1441,18 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			ƒteardown("PGFixture", ƒcfg_sf0.Timeout, sf0.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PGFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		}
 		os.Exit(1)
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
@@ -1639,7 +1466,12 @@ func main() {
 	ƒteardownFailed := false
 
 	if ƒerrs[0] == nil {
-		if ƒteardown("PGFixture", ƒcfg_sf0.Timeout, sf0.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PGFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
@@ -1658,7 +1490,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -1669,41 +1500,14 @@ import (
 	sfpkg0 "github.com/example/fixtures"
 )
 
-func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
-			failed = true
-		}
-	}()
-	ctx := context.Background()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if err := after(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
-		return true
-	}
-	return false
-}
-
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
-func ƒsupervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := sf0.SharedFixtureConfig()
+	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
 
 	ƒerrs := make([]error, 1)
 	ƒctx := context.Background()
@@ -1716,6 +1520,12 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_sf0)
+		ƒcfg, ƒerr := gotestruntime.DeriveFixtureConfig("PGFixture", sf0.SharedFixtureConfig)
+		if ƒerr != nil {
+			ƒerrs[0] = ƒerr
+			return
+		}
+		ƒcfg_sf0 = ƒcfg
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
@@ -1757,13 +1567,18 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[0] == nil {
-			ƒteardown("PGFixture", ƒcfg_sf0.Timeout, sf0.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PGFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   ƒcfg_sf0.Timeout,
+				AfterAll: sf0.AfterAll,
+			})
 		}
 		os.Exit(1)
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
@@ -1777,7 +1592,12 @@ func main() {
 	ƒteardownFailed := false
 
 	if ƒerrs[0] == nil {
-		if ƒteardown("PGFixture", ƒcfg_sf0.Timeout, sf0.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PGFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   ƒcfg_sf0.Timeout,
+			AfterAll: sf0.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
@@ -1796,7 +1616,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -1808,37 +1627,10 @@ import (
 	sfpkg1 "github.com/example/project/tests/gcs"
 )
 
-func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
-			failed = true
-		}
-	}()
-	ctx := context.Background()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if err := after(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
-		return true
-	}
-	return false
-}
-
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
-func ƒsupervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func main() {
 
 	sf0 := &sfpkg0.PostgresFixture{}
@@ -1933,20 +1725,30 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 
 		if ƒerrs[1] == nil {
-			ƒteardown("GCSFixture", ƒcfg_sf1.Timeout, sf1.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "GCSFixture",
+				Timeout:  ƒcfg_sf1.Timeout,
+				Budget:   0,
+				AfterAll: sf1.AfterAll,
+			})
 		}
 		if ƒerrs[0] == nil {
-			ƒteardown("PostgresFixture", ƒcfg_sf0.Timeout, sf0.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PostgresFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		}
 		os.Exit(1)
 	} else {
 		var ƒmaxTimeout time.Duration
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
-		if ƒb := ƒsupervisorBudget(ƒcfg_sf1.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf1.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 
@@ -1960,12 +1762,22 @@ func main() {
 	ƒteardownFailed := false
 
 	if ƒerrs[1] == nil {
-		if ƒteardown("GCSFixture", ƒcfg_sf1.Timeout, sf1.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "GCSFixture",
+			Timeout:  ƒcfg_sf1.Timeout,
+			Budget:   0,
+			AfterAll: sf1.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}
 	if ƒerrs[0] == nil {
-		if ƒteardown("PostgresFixture", ƒcfg_sf0.Timeout, sf0.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PostgresFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}

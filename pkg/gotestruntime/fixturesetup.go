@@ -7,6 +7,8 @@ import (
 	"os"
 	"runtime/debug"
 	"time"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 // FixtureSetup is one fixture's setup policy: how long an attempt may take,
@@ -102,4 +104,19 @@ func attemptSetup(beforeAll func(context.Context) error, ctx context.Context) (e
 		}
 	}()
 	return beforeAll(ctx)
+}
+
+// DeriveFixtureConfig calls a fixture's config marker method with a panic
+// contained as an error attributed to the fixture. The generated shared-fixture
+// subprocess used to call the marker bare at the top of main, where a panic
+// killed the process before the handshake and surfaced as a generic setup
+// failure attributed to nothing.
+func DeriveFixtureConfig(name string, derive func() gotest.FixtureConfig) (cfg gotest.FixtureConfig, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("deriving its config panicked: %v\n\n%s", r, debug.Stack())
+			fmt.Fprintf(os.Stderr, "FAIL: %s: %v\n", name, err)
+		}
+	}()
+	return derive(), nil
 }

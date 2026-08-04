@@ -220,6 +220,13 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			_, err = parser.ParseFile(fset, "setup.go", code, parser.AllErrors)
 			gotest.NoError(it, err, "generated code should be valid Go: %s", code)
 
+			// A bare marker call at the top of main would panic before the
+			// handshake, killing the process attributed to nothing.
+			gotest.Contains(it, code, `gotestruntime.DeriveFixtureConfig("PGFixture", sf0.SharedFixtureConfig)`,
+				"the config marker must run inside the containment frame")
+			gotest.NotContains(it, code, "ƒcfg_sf0 := sf0.SharedFixtureConfig()",
+				"the marker must not be called outside the containment frame")
+
 			gotest.MatchSnapshot(it, code)
 		})
 	})
@@ -243,16 +250,60 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			// A declared Timeout of 0 means "no deadline", not "takes no time".
 			// Feeding it straight into ƒmaxTimeout would report a flat 30s budget
 			// and let the supervisor force-kill a teardown still releasing
-			// resources — matching gotestruntime.supervisorBudget keeps the three
-			// budget sites agreeing.
-			gotest.Contains(it, code, "func ƒsupervisorBudget(timeout time.Duration) time.Duration",
-				"the generated program must floor an unbounded fixture's budget")
-			gotest.Contains(it, code, "return gotest.DefaultFixtureConfig().Timeout",
-				"the floor is the same default the in-process DAG uses")
-			gotest.Contains(it, code, "if ƒb := ƒsupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {",
-				"the reported budget must go through the floor")
+			// resources. A local mirror of the floor was held in sync with the
+			// runtime only by this test — calling the exported one ends that.
+			gotest.Contains(it, code, "if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {",
+				"the reported budget must go through the shared floor")
+			gotest.NotContains(it, code, "func ƒsupervisorBudget(",
+				"no local copy of the floor may remain")
 			gotest.NotContains(it, code, "if ƒcfg_sf0.Timeout > ƒmaxTimeout {",
 				"the raw declared timeout must not reach the budget calculation")
+		})
+	})
+
+	t.When("teardown policy", func(w *gotest.T) {
+		w.It("delegates teardown to the same policy the in-process DAG runs", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					PkgPath:        "github.com/example/fixtures",
+					HasConfig:      true,
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+
+			// The inlined ƒteardown was the copy that never learned to hold an
+			// AfterAll to its declared Timeout — the DAG side gained the
+			// verdict while the subprocess kept context-bounding alone.
+			gotest.Contains(it, code, "gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{",
+				"teardown must go through the shared policy")
+			gotest.NotContains(it, code, "func ƒteardown(",
+				"no second copy of the teardown policy may remain")
+			gotest.Contains(it, code, "Budget:   ƒcfg_sf0.Timeout,",
+				"a declared Timeout must become a teardown verdict")
+		})
+
+		w.It("gives an undeclared config no teardown verdict", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					PkgPath:        "github.com/example/fixtures",
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			// A fixture with no config of its own declared no deadline, so it
+			// gets no overrun verdict — only the context bound the default gives.
+			gotest.Contains(it, string(src), "Budget:   0,",
+				"an undeclared Timeout must not become a teardown verdict")
 		})
 	})
 
@@ -328,7 +379,6 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 				"fmt",
 				"os",
 				"os/signal",
-				"runtime/debug",
 				"sync",
 				"syscall",
 				"time",

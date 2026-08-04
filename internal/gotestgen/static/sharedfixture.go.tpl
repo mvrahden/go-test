@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -19,59 +18,22 @@ import (
 {{- end }}
 )
 
-{{- /*
-  ƒteardown runs one shared fixture's AfterAll, reporting an error or a panic
-  without letting either abort the process — a panic here would skip every
-  remaining fixture's teardown and leak whatever they hold.
-*/}}
-func ƒteardown(name string, timeout time.Duration, after func(context.Context) error) (failed bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", name, r, debug.Stack())
-			failed = true
-		}
-	}()
-	ctx := context.Background()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if err := after(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", name, err)
-		return true
-	}
-	return false
-}
-
 func ƒquote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
 
 {{- /*
-  ƒsupervisorBudget mirrors gotestruntime.supervisorBudget: a zero Timeout is the
-  literal spelling of "no deadline", not "takes no time", so it must not shrink
-  the teardown budget the supervisor allows. Reporting a flat 30s for an unbounded
-  fixture lets the supervisor force-kill a teardown still releasing resources, and
-  a signalled process reports no meaningful exit status — the run stays green and
-  leaks.
+  Configs start as the defaults and are derived inside each fixture's goroutine,
+  not here: a config marker that panics at the top of main would kill the
+  process before the handshake, attributed to nothing. A fixture whose
+  derivation fails keeps the defaults — its setup is skipped, so they only feed
+  the supervisor budget, where SupervisorBudget floors them anyway.
 */}}
-func ƒsupervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func main() {
 {{ range $f := .Fixtures }}
 	{{ $f.VarName }} := &{{ $f.QualifiedType }}{}
-{{- if $f.HasConfig }}
-	ƒcfg_{{ $f.VarName }} := {{ $f.VarName }}.SharedFixtureConfig()
-{{- else }}
 	ƒcfg_{{ $f.VarName }} := gotest.DefaultFixtureConfig()
-{{- end }}
 {{ end }}
 	ƒerrs := make([]error, {{ len .Fixtures }})
 	ƒctx := context.Background()
@@ -85,6 +47,18 @@ func main() {
 	go func() {
 		defer ƒwg.Done()
 		defer close(ƒdone_{{ $f.VarName }})
+{{- if $f.HasConfig }}
+{{- /*
+  Derived before the dependency wait, on the bare instance — the same moment
+  the in-process harness derives it, before any parent fields are assigned.
+*/}}
+		ƒcfg, ƒerr := gotestruntime.DeriveFixtureConfig("{{ $f.Identifier }}", {{ $f.VarName }}.SharedFixtureConfig)
+		if ƒerr != nil {
+			ƒerrs[{{ $i }}] = ƒerr
+			return
+		}
+		ƒcfg_{{ $f.VarName }} = ƒcfg
+{{- end }}
 {{- range $dep := $f.DependsOnVars }}
 		<-ƒdone_{{ $dep }}
 {{- end }}
@@ -150,16 +124,26 @@ func main() {
 
 	if ƒanyFailed {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
+{{- /*
+  One policy, shared with the in-process DAG, here and on the signal path
+  below: teardown panics are contained so every sibling still releases, and a
+  declared Timeout is a verdict, not just a context the teardown may ignore.
+*/}}
 {{ range .TeardownFixtures }}
 		if ƒerrs[{{ .Index }}] == nil {
-			ƒteardown("{{ .Identifier }}", ƒcfg_{{ .VarName }}.Timeout, {{ .VarName }}.AfterAll)
+			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "{{ .Identifier }}",
+				Timeout:  ƒcfg_{{ .VarName }}.Timeout,
+				Budget:   {{ if .HasConfig }}ƒcfg_{{ .VarName }}.Timeout{{ else }}0{{ end }},
+				AfterAll: {{ .VarName }}.AfterAll,
+			})
 		}
 {{- end }}
 		os.Exit(1)
 	} else {
 		var ƒmaxTimeout time.Duration
 {{ range $f := .Fixtures }}
-		if ƒb := ƒsupervisorBudget(ƒcfg_{{ $f.VarName }}.Timeout); ƒb > ƒmaxTimeout {
+		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_{{ $f.VarName }}.Timeout); ƒb > ƒmaxTimeout {
 			ƒmaxTimeout = ƒb
 		}
 {{ end }}
@@ -173,7 +157,12 @@ func main() {
 	ƒteardownFailed := false
 {{ range .TeardownFixtures }}
 	if ƒerrs[{{ .Index }}] == nil {
-		if ƒteardown("{{ .Identifier }}", ƒcfg_{{ .VarName }}.Timeout, {{ .VarName }}.AfterAll) {
+		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "{{ .Identifier }}",
+			Timeout:  ƒcfg_{{ .VarName }}.Timeout,
+			Budget:   {{ if .HasConfig }}ƒcfg_{{ .VarName }}.Timeout{{ else }}0{{ end }},
+			AfterAll: {{ .VarName }}.AfterAll,
+		}) {
 			ƒteardownFailed = true
 		}
 	}

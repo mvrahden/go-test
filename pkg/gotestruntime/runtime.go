@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/protocol"
-	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 func run(runTests func() int, cfg MainConfig) int {
@@ -394,36 +393,15 @@ func teardownNode(node *FixtureNode, tracker *nodeTracker) bool {
 	return anyFailed
 }
 
-// runAfterAll invokes a fixture's AfterAll, reporting an error or a panic as a
-// teardown failure rather than letting either escape.
-//
-// Teardown runs concurrently across the fixture graph, so an unrecovered panic
-// here would abort the process from a goroutine and take every sibling's
-// teardown down with it — the fixtures that had already started releasing
-// resources would never finish. Setup has recovered panics per node since it
-// was written; this makes teardown symmetric.
-func runAfterAll(node *FixtureNode) (failed bool) {
-	if node.AfterAll == nil {
-		return false
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", node.Name, r, debug.Stack())
-			failed = true
-		}
-	}()
-
-	ctx := context.Background()
-	if node.Config.Timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, node.Config.Timeout)
-		defer cancel()
-	}
-	if err := node.AfterAll(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", node.Name, err)
-		return true
-	}
-	return false
+// runAfterAll adapts a DAG node onto RunFixtureTeardown, the single policy the
+// generated shared-fixture subprocess runs AfterAll under too.
+func runAfterAll(node *FixtureNode) bool {
+	return RunFixtureTeardown(context.Background(), FixtureTeardown{
+		Name:     node.Name,
+		Timeout:  node.Config.Timeout,
+		Budget:   node.Budget,
+		AfterAll: node.AfterAll,
+	})
 }
 
 // runDehydrate mirrors runAfterAll for shared-state nodes.
@@ -490,7 +468,7 @@ func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
 		}
 		visiting[name] = true
 		node := byName[name]
-		own := supervisorBudget(node.Config.Timeout)
+		own := SupervisorBudget(node.Config.Timeout)
 		var maxDep time.Duration
 		for _, dep := range node.DependsOn {
 			depPath := longestPath(dep)
@@ -513,24 +491,8 @@ func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
 	return maxPath
 }
 
-// supervisorBudget is how long a fixture's own lifecycle stage may take, for the
-// purpose of sizing the teardown budget handed to the supervisor.
-//
-// Under literal config semantics a zero Timeout is the spelling of "no deadline",
-// and a negative one is the documented "disabled" — neither means "takes no time".
-// Reading them as zero would hand the supervisor a budget short enough to
-// force-kill a teardown that is still releasing resources, and a signalled
-// process reports no meaningful exit status, so the run would still be green.
-// An unbounded fixture still needs headroom: fall back to the default floor.
-func supervisorBudget(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
-		return gotest.DefaultFixtureConfig().Timeout
-	}
-	return timeout
-}
-
 func nodeTreePath(node *FixtureNode) time.Duration {
-	own := supervisorBudget(node.Config.Timeout)
+	own := SupervisorBudget(node.Config.Timeout)
 	var maxChild time.Duration
 	for _, child := range node.Children {
 		childPath := nodeTreePath(child)
