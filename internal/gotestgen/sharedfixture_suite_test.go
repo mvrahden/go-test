@@ -484,6 +484,47 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 		})
 	})
 
+	t.When("determinism", func(w *gotest.T) {
+		w.It("generates byte-identical output on repeated runs", func(it *gotest.T) {
+			// Two parent assignments is the smallest input where Go map
+			// iteration order could shuffle the emitted statements.
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "AlphaSharedFixture",
+					PkgPath:        "github.com/example/fixtures",
+					TransferFields: []string{"A"},
+				},
+				{
+					Identifier:     "BetaSharedFixture",
+					PkgPath:        "github.com/example/fixtures",
+					TransferFields: []string{"B"},
+				},
+				{
+					Identifier: "GammaSharedFixture",
+					PkgPath:    "github.com/example/fixtures",
+					Dependencies: []string{
+						"github.com/example/fixtures.AlphaSharedFixture",
+						"github.com/example/fixtures.BetaSharedFixture",
+					},
+					DependencyFields: map[string]string{
+						"github.com/example/fixtures.AlphaSharedFixture": "Alpha",
+						"github.com/example/fixtures.BetaSharedFixture":  "Beta",
+					},
+					TransferFields: []string{"C"},
+				},
+			}
+
+			first, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+			for range 25 {
+				again, err := gotestgen.GenerateSharedSetup(fixtures)
+				gotest.NoError(it, err)
+				gotest.Equal(it, string(first), string(again),
+					"generated code must be a pure function of its input; map order shuffled it run to run")
+			}
+		})
+	})
+
 	t.When("reverse teardown on error", func(w *gotest.T) {
 		w.It("tears down sf0 in reverse order", func(it *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{

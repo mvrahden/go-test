@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
+	"maps"
+	"slices"
 	"text/template"
 
 	"github.com/mvrahden/go-test/internal/about"
@@ -105,12 +107,15 @@ func GenerateSharedSetup(fixtures []SharedFixtureInfo) ([]byte, error) {
 			}
 		}
 
+		// Ranged in sorted key order: generated code is a pure function of its
+		// input, and Go map order would shuffle the assignment statements from
+		// run to run — snapshot flakes and build-cache misses for free.
 		var parentAssigns []parentAssignment
-		for depKey, fieldName := range sf.DependencyFields {
+		for _, depKey := range slices.Sorted(maps.Keys(sf.DependencyFields)) {
 			if v, ok := stateKeyToVar[depKey]; ok {
 				parentAssigns = append(parentAssigns, parentAssignment{
 					ParentVar: v,
-					FieldName: fieldName,
+					FieldName: sf.DependencyFields[depKey],
 				})
 			}
 		}

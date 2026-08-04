@@ -651,6 +651,14 @@ func (r *resolver) registerSharedFixture(named *types.Named) error {
 		depName := depNamed.Obj().Name()
 		if strings.HasSuffix(depName, protocol.SuffixSharedFixture) {
 			depKey := depNamed.Obj().Pkg().Path() + "." + fixtureIdentifier(depNamed)
+			// Only one parent instance of a type ever exists in the DAG, and
+			// the wiring maps parent type → field. A second field of the same
+			// type silently won last-writer-wins, leaving the first nil at
+			// BeforeAll — reject the ambiguity at generation time instead.
+			if prev, dup := depFieldMap[depKey]; dup {
+				return fmt.Errorf("shared fixture %q declares two fields of the same parent fixture type %s (%s and %s); keep one wired field and derive the other from it in BeforeAll",
+					identifier, depName, prev, f.Name())
+			}
 			deps = append(deps, depKey)
 			depFields[f.Name()] = true
 			depFieldMap[depKey] = f.Name()
