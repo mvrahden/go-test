@@ -247,17 +247,67 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 
 			code := string(src)
 
-			// A declared Timeout of 0 means "no deadline", not "takes no time".
-			// Feeding it straight into ƒmaxTimeout would report a flat 30s budget
-			// and let the supervisor force-kill a teardown still releasing
-			// resources. A local mirror of the floor was held in sync with the
-			// runtime only by this test — calling the exported one ends that.
-			gotest.Contains(it, code, "if ƒb := gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout); ƒb > ƒmaxTimeout {",
-				"the reported budget must go through the shared floor")
+			// A declared Timeout of 0 means "no deadline", not "takes no time",
+			// so each member's contribution goes through the shared floor. And
+			// because the generated teardown loop is strictly sequential, the
+			// budget is the SUM of the members' floored budgets — a max would
+			// force-kill a fixture set whose teardowns each obeyed their own
+			// declared Timeout.
+			gotest.Contains(it, code, "ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)",
+				"each member's budget must go through the shared floor and into the sum")
 			gotest.NotContains(it, code, "func ƒsupervisorBudget(",
 				"no local copy of the floor may remain")
-			gotest.NotContains(it, code, "if ƒcfg_sf0.Timeout > ƒmaxTimeout {",
-				"the raw declared timeout must not reach the budget calculation")
+			gotest.NotContains(it, code, "ƒb > ƒmaxTimeout",
+				"a max would under-budget a sequential teardown chain")
+		})
+
+		w.It("reports the budget on the failure handshake too", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					PkgPath:        "github.com/example/fixtures",
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			// A failed setup still has succeeded siblings to release, and the
+			// runner sizes its wait from this field; an error line without it
+			// left the runner guessing with a flat 30s.
+			gotest.Contains(it, string(src),
+				`"{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n"`,
+				"the failure handshake must carry the teardown budget")
+		})
+	})
+
+	t.When("shutdown protocol", func(w *gotest.T) {
+		w.It("reports first and waits for the runner's signal even on failure", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					PkgPath:        "github.com/example/fixtures",
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+
+			// The runner owns shutdown timing — only it knows when every suite
+			// has stopped using the fixtures. A subprocess that tore down on its
+			// own after a setup failure raced the suites of its healthy siblings.
+			gotest.Contains(it, code, "ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)",
+				"the process must be shutdown-capable from birth")
+			gotest.Contains(it, code, "<-ƒctx.Done()",
+				"teardown must wait for the runner's signal")
+			gotest.Equal(it, 1, strings.Count(code, "RunFixtureTeardown"),
+				"one teardown epilogue — a separate failure-path copy tears down behind the runner's back")
+			gotest.NotContains(it, code, "signal.Notify(sig",
+				"the late signal registration left a window where SIGTERM killed the process mid-setup")
 		})
 	})
 
@@ -286,6 +336,8 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 				"no second copy of the teardown policy may remain")
 			gotest.Contains(it, code, "Budget:   ƒcfg_sf0.Timeout,",
 				"a declared Timeout must become a teardown verdict")
+			gotest.Contains(it, code, "if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {",
+				"a setup that overran its budget still initialized — its resources exist and must be released")
 		})
 
 		w.It("gives an undeclared config no teardown verdict", func(it *gotest.T) {
@@ -376,6 +428,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			gotest.Equal(it, []string{
 				"context",
 				"encoding/json",
+				"errors",
 				"fmt",
 				"os",
 				"os/signal",

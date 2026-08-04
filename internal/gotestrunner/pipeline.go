@@ -274,7 +274,13 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 		go func() {
 			defer fixtureWg.Done()
 			var err error
-			setupProc, err = StartSharedFixtures(streamCtx, overlay.WorkDir, overlay.SharedFixtures, resolvedSetupTimeout)
+			// The subprocess is bound to the pipeline ctx, not streamCtx: a
+			// setup failure cancels streamCtx to stop suite scheduling, and that
+			// must not double as a shutdown signal — Teardown below is the one
+			// owner of shutdown, and it runs only after every suite has stopped.
+			// The pipeline ctx stays attached as the safety net so an abnormal
+			// runner death still releases the process group.
+			setupProc, err = StartSharedFixtures(ctx, overlay.WorkDir, overlay.SharedFixtures, resolvedSetupTimeout)
 			if err != nil {
 				fixtureStartErr = err
 				sharedSetupFailed.Store(true)

@@ -48,6 +48,33 @@ func panicSetupFixtures() []gotestgen.SharedFixtureInfo {
 	})
 }
 
+// crashTeardownFixture describes the fixture whose owned goroutine crashes the
+// whole subprocess during teardown, outside every containment frame.
+func crashTeardownFixture() []gotestgen.SharedFixtureInfo {
+	return []gotestgen.SharedFixtureInfo{{
+		Identifier:     "CrashTeardownSharedFixture",
+		PkgPath:        "github.com/mvrahden/go-test/tests/sharedfixture/fixtures",
+		PkgName:        "fixtures",
+		QualifiedType:  "fixtures.CrashTeardownSharedFixture",
+		TransferFields: []string{"Marker"},
+	}}
+}
+
+// budgetedTeardownFixture describes the one fixture that declares its own
+// SharedFixtureConfig, driving the declared-budget teardown verdict end to end:
+// config derivation in the subprocess, the budget on RunFixtureTeardown, the
+// teardown-failed exit status, and the runner's report of it.
+func budgetedTeardownFixture() []gotestgen.SharedFixtureInfo {
+	return []gotestgen.SharedFixtureInfo{{
+		Identifier:     "BudgetedTeardownSharedFixture",
+		PkgPath:        "github.com/mvrahden/go-test/tests/sharedfixture/fixtures",
+		PkgName:        "fixtures",
+		QualifiedType:  "fixtures.BudgetedTeardownSharedFixture",
+		HasConfig:      true,
+		TransferFields: []string{"Marker"},
+	}}
+}
+
 // startSlowTeardown boots the shared fixture subprocess under a cancellable
 // context, and returns it with the marker path its AfterAll writes once it has
 // finished releasing, plus the cancel the pipeline calls on its way out.
@@ -102,7 +129,12 @@ func (s *SharedFixtureTeardownTestSuite) TestCleanTeardown(t *gotest.T) {
 func (s *SharedFixtureTeardownTestSuite) TestSetupPanicDoesNotOrphanSiblings(t *gotest.T) {
 	t.When("one shared fixture's BeforeAll panics while a sibling is up", func(w *gotest.T) {
 		marker := filepath.Join(w.TempDir(), "released")
-		w.Setenv(fixtures.EnvSlowTeardownDelay, "0")
+		// A real (non-zero) sibling teardown is the point: the old WaitAllReady
+		// killed the process the moment it saw the setup error, and this test
+		// used to bypass WaitAllReady entirely to dodge that. It now goes
+		// through the production path — the runner requests shutdown and waits
+		// the sibling's AfterAll out.
+		w.Setenv(fixtures.EnvSlowTeardownDelay, "300ms")
 		w.Setenv(fixtures.EnvSlowTeardownMarker, marker)
 		w.Setenv(fixtures.EnvPanicSetupArm, "1")
 
@@ -111,22 +143,13 @@ func (s *SharedFixtureTeardownTestSuite) TestSetupPanicDoesNotOrphanSiblings(t *
 		proc, err := gotestrunner.StartSharedFixtures(ctx, w.TempDir(), panicSetupFixtures(), 30*time.Second)
 		gotest.NoError(w, err, "starting the shared fixture subprocess")
 
-		// Deliberately not WaitAllReady: it kills the process the moment it sees
-		// a setup error, which would cut short the very teardown under test.
-		<-proc.AllDone()
-		setupErr := proc.SetupErr()
-		select {
-		case <-gotestrunner.ExportProcessDone(proc):
-		case <-time.After(10 * time.Second):
-			gotest.Fail(w, "the shared fixture process never exited after a setup panic")
-		}
-		// The process has already exited on its own; cancelling here just
-		// releases the context, so it is not the run's shutdown signal and needs
-		// no suite lifecycle hook.
+		waitErr := proc.WaitAllReady(ctx, 30*time.Second)
+		teardownErr := proc.Teardown()
 		cancel()
 
 		w.It("reports the failure instead of aborting the process", func(it *gotest.T) {
-			gotest.Error(it, setupErr, "a panicking BeforeAll must surface as a setup failure")
+			gotest.ErrorContains(it, waitErr, "shared fixture setup",
+				"a panicking BeforeAll must surface as a setup failure")
 		})
 
 		w.It("still releases the sibling that came up", func(it *gotest.T) {
@@ -134,6 +157,59 @@ func (s *SharedFixtureTeardownTestSuite) TestSetupPanicDoesNotOrphanSiblings(t *
 			// AfterAll never ran and whatever it held was orphaned.
 			_, statErr := os.Stat(marker)
 			gotest.NoError(it, statErr, "the sibling's AfterAll never ran; its resources are leaked")
+		})
+
+		w.It("does not blame teardown for the setup failure", func(it *gotest.T) {
+			gotest.NoError(it, teardownErr,
+				"the sibling teardown ran to completion under the runner's shutdown request")
+		})
+	})
+}
+
+func (s *SharedFixtureTeardownTestSuite) TestCrashDuringTeardown(t *gotest.T) {
+	t.When("a fixture-owned goroutine crashes the process mid-teardown", func(w *gotest.T) {
+		w.Setenv(fixtures.EnvCrashTeardownArm, "1")
+
+		ctx, cancel := context.WithCancel(w.Context())
+
+		proc, err := gotestrunner.StartSharedFixtures(ctx, w.TempDir(), crashTeardownFixture(), 30*time.Second)
+		gotest.NoError(w, err, "starting the shared fixture subprocess")
+		gotest.NoError(w, proc.WaitAllReady(ctx, 30*time.Second), "waiting for setup")
+
+		err = proc.Teardown()
+		cancel()
+
+		w.It("reports the death instead of passing", func(it *gotest.T) {
+			// The process exits 2, not the teardown-failed status. Recognizing
+			// only that one status and defaulting to green — the old shape —
+			// read exactly this crash as a successful teardown.
+			gotest.ErrorContains(it, err, "died during teardown",
+				"an abnormal death in the teardown window must fail the run")
+		})
+	})
+}
+
+func (s *SharedFixtureTeardownTestSuite) TestDeclaredBudgetIsATeardownVerdict(t *gotest.T) {
+	t.When("AfterAll ignores its context and outlives its declared Timeout", func(w *gotest.T) {
+		w.Setenv(fixtures.EnvBudgetedTeardownTimeout, "250ms")
+		w.Setenv(fixtures.EnvBudgetedTeardownDelay, "1s")
+
+		ctx, cancel := context.WithCancel(w.Context())
+
+		proc, err := gotestrunner.StartSharedFixtures(ctx, w.TempDir(), budgetedTeardownFixture(), 30*time.Second)
+		gotest.NoError(w, err, "starting the shared fixture subprocess")
+		gotest.NoError(w, proc.WaitAllReady(ctx, 30*time.Second), "waiting for setup")
+
+		err = proc.Teardown()
+		cancel()
+
+		w.It("fails the run with the teardown verdict", func(it *gotest.T) {
+			// Drives the whole declared-config chain the snapshots only parse:
+			// DeriveFixtureConfig in the subprocess, the budget on
+			// RunFixtureTeardown, the teardown-failed exit status, and the
+			// runner's report of it.
+			gotest.ErrorContains(it, err, "teardown failed; see AfterAll errors above",
+				"a declared Timeout must be a verdict on teardown, not just a context it may ignore")
 		})
 	})
 }

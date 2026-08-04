@@ -82,27 +82,29 @@ func (p *SharedFixtureProcess) State(keys []string) map[string]json.RawMessage {
 // WaitAllReady blocks until all fixtures have completed setup (the _done sentinel
 // is received). On success it writes the accumulated state to a global state file.
 // Returns error on setup failure, timeout, or context cancellation.
+//
+// Every failure path shuts the subprocess down gracefully instead of killing it.
+// The subprocess owns its teardown: on a setup failure it is holding the sibling
+// fixtures that did come up, and a SIGKILL here — the old behavior — cut their
+// AfterAlls short and leaked whatever they held.
 func (p *SharedFixtureProcess) WaitAllReady(ctx context.Context, timeout time.Duration) error {
+	var deadline <-chan time.Time
 	if timeout > 0 {
-		select {
-		case <-p.allDone:
-		case <-ctx.Done():
-			_ = p.cmd.Process.Kill()
-			return fmt.Errorf("cancelled: %w", ctx.Err())
-		case <-time.After(timeout):
-			_ = p.cmd.Process.Kill()
-			return fmt.Errorf("timed out after %v", timeout)
-		}
-	} else {
-		select {
-		case <-p.allDone:
-		case <-ctx.Done():
-			_ = p.cmd.Process.Kill()
-			return fmt.Errorf("cancelled: %w", ctx.Err())
-		}
+		timer := time.NewTimer(timeout)
+		defer timer.Stop()
+		deadline = timer.C
+	}
+	select {
+	case <-p.allDone:
+	case <-ctx.Done():
+		p.shutdown()
+		return fmt.Errorf("cancelled: %w", ctx.Err())
+	case <-deadline:
+		p.shutdown()
+		return fmt.Errorf("timed out after %v", timeout)
 	}
 	if p.setupErr != nil {
-		_ = p.cmd.Process.Kill()
+		p.shutdown()
 		return fmt.Errorf("shared fixture setup: %w", p.setupErr)
 	}
 
@@ -110,16 +112,53 @@ func (p *SharedFixtureProcess) WaitAllReady(ctx context.Context, timeout time.Du
 	stateBytes, err := json.Marshal(p.state)
 	p.mu.Unlock()
 	if err != nil {
-		_ = p.cmd.Process.Kill()
+		p.shutdown()
 		return fmt.Errorf("re-marshal shared fixture state: %w", err)
 	}
 
 	p.stateFile = filepath.Join(p.sharedDir, "state.json")
 	if err := os.WriteFile(p.stateFile, stateBytes, 0600); err != nil {
-		_ = p.cmd.Process.Kill()
+		p.shutdown()
 		return fmt.Errorf("write shared fixture state file: %w", err)
 	}
 	return nil
+}
+
+// shutdown asks the subprocess to exit and waits it out. Requesting and then
+// waiting — rather than killing — is the runner's half of the shutdown
+// contract; force-kill at the budget deadline is its only other lever.
+func (p *SharedFixtureProcess) shutdown() {
+	if p.cmd == nil || p.cmd.Process == nil {
+		return
+	}
+	_ = TerminateProcessGroup(p.cmd.Process.Pid)
+	p.awaitExit(p.teardownBudget())
+}
+
+// awaitExit waits up to budget for the subprocess to exit on its own,
+// force-killing the group when it does not, and reports whether force was
+// needed.
+func (p *SharedFixtureProcess) awaitExit(budget time.Duration) (forceKilled bool) {
+	select {
+	case <-p.done:
+		return false
+	case <-time.After(budget):
+		fmt.Fprintf(os.Stderr, "WARN: shared fixture process did not exit within %v, forcing termination\n", budget)
+		_ = ForceKillProcessGroup(p.cmd.Process.Pid)
+		<-p.done
+		return true
+	}
+}
+
+// teardownBudget returns the budget the subprocess reported on its _done line,
+// floored to 30 seconds when none arrived.
+func (p *SharedFixtureProcess) teardownBudget() time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.teardownTimeout <= 0 {
+		return 30 * time.Second
+	}
+	return p.teardownTimeout
 }
 
 // WriteStateFileForKeys writes a state file containing only the specified keys.
@@ -150,19 +189,21 @@ func (p *SharedFixtureProcess) WriteStateFileForKeys(name string, keys []string)
 // to complete within its teardown budget (30 seconds if none was reported). A
 // process that outlives the budget is forcibly killed, and that is reported as
 // an error: its AfterAll never finished, so what it held is leaked.
+//
+// Success is proven, never inferred: past the setup and force-kill gates, only
+// a clean exit shows the teardown epilogue ran and passed. Recognizing one
+// specific failure status and defaulting to green — the old shape — let a
+// panic in a fixture-owned goroutine (exit 2) or an external kill (no status)
+// during the teardown window read as success while containers stayed up.
 func (p *SharedFixtureProcess) Teardown() error {
 	if p.cmd == nil || p.cmd.Process == nil {
 		return nil
 	}
-	timeout := p.teardownTimeout
-	if timeout <= 0 {
-		timeout = 30 * time.Second
-	}
+	budget := p.teardownBudget()
 
-	// If the process is already gone before we ask it to shut down, it died on
-	// its own — crashed, was OOM-killed, was killed by hand. Its AfterAll never
-	// ran, so whatever it holds is orphaned. That has to be reported: the tests
-	// themselves may all have passed.
+	// Noted before signalling only to sharpen the message below: an exit that
+	// predates the shutdown request happened while tests may still have been
+	// running, which is a different story than dying mid-teardown.
 	diedEarly := false
 	select {
 	case <-p.done:
@@ -170,29 +211,18 @@ func (p *SharedFixtureProcess) Teardown() error {
 	default:
 	}
 
-	forceKilled := false
 	_ = TerminateProcessGroup(p.cmd.Process.Pid)
-	select {
-	case <-p.done:
-	case <-time.After(timeout):
-		fmt.Fprintf(os.Stderr, "WARN: shared fixture process did not exit within %v, forcing termination\n", timeout)
-		forceKilled = true
-		_ = ForceKillProcessGroup(p.cmd.Process.Pid)
-		<-p.done
-	}
+	forceKilled := p.awaitExit(budget)
 	if p.sharedDir != "" {
 		os.RemoveAll(p.sharedDir)
 	}
 
-	// A setup failure already surfaces through SetupErr and takes the process
-	// down before teardown ever runs; reporting its exit status here again
-	// would blame teardown for it.
+	// A setup failure already surfaced through SetupErr; the subprocess ran its
+	// sibling teardowns under the runner's shutdown request and exited 1 for
+	// the setup failure. Reporting that status here again would blame teardown
+	// for it.
 	if p.setupErr != nil {
 		return nil
-	}
-
-	if diedEarly {
-		return fmt.Errorf("shared fixture process exited before teardown; its AfterAll never ran and its resources may be leaked")
 	}
 
 	// A force-killed process was cut off mid-AfterAll. Its exit status says
@@ -200,19 +230,26 @@ func (p *SharedFixtureProcess) Teardown() error {
 	// so without reporting it here the run would end green while the containers
 	// the fixture was still stopping stay up.
 	if forceKilled {
-		return fmt.Errorf("shared fixture teardown was force-killed after %s; its AfterAll never finished and its resources may be leaked", timeout)
+		return fmt.Errorf("shared fixture teardown was force-killed after %s; its AfterAll never finished and its resources may be leaked", budget)
 	}
 
-	// The setup program exits with sharedTeardownFailedExit specifically to
-	// report a teardown failure. Any other status is something else — a runtime
-	// panic during setup exits 2, and a signal-terminated process reports -1
-	// (the force-kill path above, already warned about) — and blaming teardown
-	// for those would be misleading.
+	// A clean exit is the only proof of a completed teardown: the epilogue runs
+	// on any shutdown signal — whoever sent it — and exits 0 only when every
+	// AfterAll passed. Everything else fails, with the most precise message the
+	// status supports. exec maps a success status under a canceled command
+	// context to ctx.Err() — and only a success status, so a context error here
+	// IS the clean exit, just relabeled.
+	if p.waitErr == nil || errors.Is(p.waitErr, context.Canceled) || errors.Is(p.waitErr, context.DeadlineExceeded) {
+		return nil
+	}
 	var exitErr *exec.ExitError
 	if errors.As(p.waitErr, &exitErr) && exitErr.ExitCode() == sharedTeardownFailedExit {
 		return fmt.Errorf("shared fixture teardown failed; see AfterAll errors above")
 	}
-	return nil
+	if diedEarly {
+		return fmt.Errorf("shared fixture process exited before teardown was requested (%v); its AfterAll may not have run and its resources may be leaked", p.waitErr)
+	}
+	return fmt.Errorf("shared fixture process died during teardown (%v); its AfterAll may not have finished and its resources may be leaked", p.waitErr)
 }
 
 // StartSharedFixtures generates a shared setup binary in the overlay temp dir,
@@ -310,7 +347,11 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 				}
 				if entry.TeardownBudget != "" {
 					if d, err := time.ParseDuration(entry.TeardownBudget); err == nil && d > 0 {
+						// Under proc.mu: an interrupted run can reach Teardown
+						// while this goroutine is still draining a late _done.
+						proc.mu.Lock()
 						proc.teardownTimeout = d
+						proc.mu.Unlock()
 					}
 				}
 				close(allDone)

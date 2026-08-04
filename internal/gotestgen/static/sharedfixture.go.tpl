@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -27,16 +28,22 @@ func ƒquote(s string) string {
   Configs start as the defaults and are derived inside each fixture's goroutine,
   not here: a config marker that panics at the top of main would kill the
   process before the handshake, attributed to nothing. A fixture whose
-  derivation fails keeps the defaults — its setup is skipped, so they only feed
-  the supervisor budget, where SupervisorBudget floors them anyway.
+  derivation fails reports the error, its dependents and its teardown skip it,
+  and the defaults it keeps are never read again.
 */}}
 func main() {
+{{- /*
+  Shutdown-capable from birth: SIGTERM at any phase cancels ƒctx, so setup
+  attempts abort instead of the default disposition killing the process
+  mid-lifecycle, and the epilogue below still releases whatever came up.
+*/}}
+	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer ƒstop()
 {{ range $f := .Fixtures }}
 	{{ $f.VarName }} := &{{ $f.QualifiedType }}{}
 	ƒcfg_{{ $f.VarName }} := gotest.DefaultFixtureConfig()
 {{ end }}
 	ƒerrs := make([]error, {{ len .Fixtures }})
-	ƒctx := context.Background()
 {{ range $f := .Fixtures }}
 	ƒdone_{{ $f.VarName }} := make(chan struct{})
 {{- end }}
@@ -122,41 +129,42 @@ func main() {
 		}
 	}
 
-	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\"}\n")
 {{- /*
-  One policy, shared with the in-process DAG, here and on the signal path
-  below: teardown panics are contained so every sibling still releases, and a
-  declared Timeout is a verdict, not just a context the teardown may ignore.
+  Teardown here is strictly sequential, so the budget the supervisor gets is
+  the SUM of the members' budgets: a max would force-kill a set of teardowns
+  that each obeyed its own declared Timeout. Reported on both _done forms —
+  a failed setup still has succeeded siblings to release under this budget.
 */}}
-{{ range .TeardownFixtures }}
-		if ƒerrs[{{ .Index }}] == nil {
-			gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "{{ .Identifier }}",
-				Timeout:  ƒcfg_{{ .VarName }}.Timeout,
-				Budget:   {{ if .HasConfig }}ƒcfg_{{ .VarName }}.Timeout{{ else }}0{{ end }},
-				AfterAll: {{ .VarName }}.AfterAll,
-			})
-		}
-{{- end }}
-		os.Exit(1)
-	} else {
-		var ƒmaxTimeout time.Duration
+	var ƒbudget time.Duration
 {{ range $f := .Fixtures }}
-		if ƒb := gotestruntime.SupervisorBudget(ƒcfg_{{ $f.VarName }}.Timeout); ƒb > ƒmaxTimeout {
-			ƒmaxTimeout = ƒb
-		}
+	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_{{ $f.VarName }}.Timeout)
 {{ end }}
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒquote((ƒmaxTimeout + 30*time.Second).String()))
+	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+
+	if ƒanyFailed {
+		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+	} else {
+		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
-	<-sig
+{{- /*
+  The runner owns shutdown TIMING — only it knows when every suite has stopped
+  using the fixtures — so even a failed setup reports and then waits for the
+  signal instead of tearing down on its own; this process owns shutdown
+  EXECUTION. A SIGTERM that already arrived (canceling setup above) has ƒctx
+  closed and falls straight through.
+*/}}
+	<-ƒctx.Done()
 
+{{- /*
+  One teardown policy, shared with the in-process DAG: panics are contained so
+  every sibling still releases, and a declared Timeout is a verdict, not just
+  a context the teardown may ignore. A fixture whose setup overran its budget
+  still initialized — its resources exist, so it is torn down like a success.
+*/}}
 	ƒteardownFailed := false
 {{ range .TeardownFixtures }}
-	if ƒerrs[{{ .Index }}] == nil {
+	if ƒerrs[{{ .Index }}] == nil || errors.Is(ƒerrs[{{ .Index }}], gotestruntime.ErrSetupOverran) {
 		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
 			Name:     "{{ .Identifier }}",
 			Timeout:  ƒcfg_{{ .VarName }}.Timeout,
@@ -169,11 +177,12 @@ func main() {
 {{- end }}
 
 {{- /*
-  A failed teardown must reach the runner; this exact status is what
-  gotestrunner.sharedTeardownFailedExit looks for, so the run cannot report
-  success while shared resources were left behind.
+  Exit 1 for a lifecycle failure of either kind. The runner reads a teardown
+  failure from this exact status (gotestrunner.sharedTeardownFailedExit) when
+  setup succeeded; a setup failure was already reported on the _done line. A
+  clean exit is the runner's only proof that teardown ran and passed.
 */}}
-	if ƒteardownFailed {
+	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
 }

@@ -37,7 +37,11 @@ func ExportProcessDone(p *SharedFixtureProcess) <-chan struct{} { return p.done 
 // subprocess reports its own budget on the _done line, so a test that wants to
 // drive the force-kill path has to shrink it afterwards rather than sleep out
 // the minutes the fixture asked for.
-func ExportSetTeardownTimeout(p *SharedFixtureProcess, d time.Duration) { p.teardownTimeout = d }
+func ExportSetTeardownTimeout(p *SharedFixtureProcess, d time.Duration) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.teardownTimeout = d
+}
 
 func ExportAutoDetectCI(cfg PipelineConfig) PipelineConfig {
 	if !cfg.CI && os.Getenv(protocol.EnvCI) == "" && os.Getenv("CI") != "" {
