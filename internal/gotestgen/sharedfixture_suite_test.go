@@ -387,7 +387,9 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 				"github.com/example/fixtures",
 			}, paths)
 
-			body := code[strings.Index(code, "\nfunc "):]
+			funcIdx := strings.Index(code, "\nfunc ")
+			gotest.NotEqual(it, -1, funcIdx, "generated program declares no functions")
+			body := code[funcIdx:]
 			for i, local := range locals {
 				gotest.Contains(it, body, local+".",
 					"import %q is declared but never used; the generated program will not build", paths[i])
