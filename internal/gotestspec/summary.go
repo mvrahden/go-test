@@ -27,7 +27,7 @@ func collectFailures(packages []*Package) []failure {
 func collectFailedLeaves(pkgPath string, n *Node, display []string, out *[]failure) {
 	cur := append(append([]string(nil), display...), n.Display)
 
-	if n.Status == StatusFail && (len(n.Children) == 0 || hasOwnDiagnostic(n)) {
+	if n.Status == StatusFail && (len(n.Children) == 0 || hasOwnDiagnostic(n) || failedOnItsOwn(n)) {
 		d := make([]string, len(cur))
 		copy(d, cur)
 		*out = append(*out, failure{
@@ -114,7 +114,11 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 				displayPath,
 				formatDuration(f.Duration))
 
-			for _, line := range filterOutput(f.Output) {
+			lines := filterOutput(f.Output)
+			if len(lines) == 0 {
+				lines = []string{noDiagnosticNote}
+			}
+			for _, line := range lines {
 				fmt.Fprintf(w, "      %s%s%s\n", c.red, line, c.reset)
 			}
 		}
@@ -171,12 +175,13 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 			f.Package, displayPath, formatDuration(f.Duration))
 
 		lines := filterOutput(f.Output)
-		if len(lines) > 0 {
-			for _, line := range lines {
-				fmt.Fprintf(w, "    %s\n", line)
-			}
-			fmt.Fprintln(w)
+		if len(lines) == 0 {
+			lines = []string{noDiagnosticNote}
 		}
+		for _, line := range lines {
+			fmt.Fprintf(w, "    %s\n", line)
+		}
+		fmt.Fprintln(w)
 
 		fmt.Fprintln(w, "</details>")
 	}

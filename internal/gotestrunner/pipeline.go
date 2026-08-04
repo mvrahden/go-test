@@ -2,6 +2,7 @@ package gotestrunner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -67,6 +68,45 @@ func applyTeardownFailure(result *PipelineResult, err error) {
 	if result.ExitCode == 0 {
 		result.ExitCode = 1
 	}
+	// The captured stream is the single source every renderer derives from —
+	// spec, summary, markdown artifacts, saved --input replays. A failure that
+	// only mutated the exit code left all of them saying "all passed" beside
+	// exit 1, so it goes into the stream itself as a failed synthetic package.
+	if result.CapturedJSON != nil {
+		result.CapturedJSON = appendRunFailureEvents(result.CapturedJSON, "shared fixtures", err.Error())
+	}
+}
+
+// recordCompileFailure books a failed compile as a failed package result, so
+// the compile error reaches both the rendered output and the exit code through
+// the same collector every real suite result flows through.
+func recordCompileFailure(c *OutputCollector, pkg string, err error) {
+	if pkg == "" {
+		return
+	}
+	c.Register(pkg, 1)
+	c.RecordResult(pkg, 0, SuiteResult{
+		Stderr:   []byte(err.Error() + "\n"),
+		ExitCode: 2,
+	})
+}
+
+// appendRunFailureEvents appends test2json-shaped events recording a run-level
+// failure that happened outside any test binary, after its stream ended.
+func appendRunFailureEvents(stream []byte, pkg, msg string) []byte {
+	ev := func(action, text string) []byte {
+		e := struct {
+			Action  string `json:"Action"`
+			Package string `json:"Package"`
+			Output  string `json:"Output,omitempty"`
+		}{Action: action, Package: pkg, Output: text}
+		b, _ := json.Marshal(e)
+		return append(b, '\n')
+	}
+	stream = append(stream, ev("start", "")...)
+	stream = append(stream, ev("output", "FAIL: "+msg+"\n")...)
+	stream = append(stream, ev("fail", "")...)
+	return stream
 }
 
 func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult) (PipelineResult, error) {
@@ -324,6 +364,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	sem := make(chan struct{}, maxParallel)
 	var wg sync.WaitGroup
 	anyTargets := false
+	compileFailed := false
 	var allTargets []SuiteTarget
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
@@ -345,6 +386,16 @@ loop:
 		}
 
 		if outcome.Err != nil {
+			// Discovery-to-result is a total function: a package that fails to
+			// compile is a failed package, not a skipped one. Dropping it here
+			// let `gotest run` print the compile error and exit 0 with the
+			// package's tests never executed — batch mode exits 2 on the same
+			// input, and the two modes must agree.
+			if streamCtx.Err() != nil {
+				continue // cancellation noise, not a compile verdict
+			}
+			compileFailed = true
+			recordCompileFailure(collector, outcome.Package, outcome.Err)
 			continue
 		}
 		cr := outcome.Result
@@ -464,7 +515,10 @@ loop:
 		mergeCoverProfiles(allTargets, pf.UserCoverProfile)
 	}
 
-	if !anyTargets && len(overlay.NoSuitePackages) == 0 {
+	// "Nothing to run" is only a clean outcome when nothing failed to become
+	// runnable: with every package broken this used to print the compile
+	// errors and exit 0.
+	if !anyTargets && len(overlay.NoSuitePackages) == 0 && !compileFailed {
 		if cfg.OutputMode == RunBatchText {
 			fmt.Fprintln(os.Stderr, "no test suites to run")
 		}

@@ -190,5 +190,11 @@ func runSpecFromInput(input, format, output string, noColor bool) int {
 		gotestspec.RenderTerminal(w, tree, renderOpts...)
 	}
 
+	// The same exit rule as `summary --input`: a renderer fed a failing stream
+	// must not exit 0 — in a pipe without pipefail this exit code is the only
+	// verdict CI ever sees.
+	if gotestspec.HasFailures(tree) {
+		return 1
+	}
 	return 0
 }

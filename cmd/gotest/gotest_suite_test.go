@@ -923,6 +923,50 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 	})
 }
 
+func (s *CmdGotestTestSuite) TestInputModesShareOneExitRule(t *gotest.T) {
+	// One failing and one passing stream, saved the way CI replays them. In a
+	// pipe without pipefail the exit code of the rendering command is the only
+	// verdict CI ever sees — and `spec --input` used to return 0 on anything.
+	failingStream := `{"Action":"run","Package":"example.com/pkg","Test":"TestBoom"}
+{"Action":"output","Package":"example.com/pkg","Test":"TestBoom","Output":"--- FAIL: TestBoom (0.00s)\n"}
+{"Action":"fail","Package":"example.com/pkg","Test":"TestBoom"}
+{"Action":"fail","Package":"example.com/pkg"}
+`
+	greenStream := `{"Action":"run","Package":"example.com/pkg","Test":"TestOK"}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestOK"}
+{"Action":"pass","Package":"example.com/pkg"}
+`
+
+	writeStream := func(w *gotest.T, content string) string {
+		path := filepath.Join(w.TempDir(), "events.json")
+		gotest.NoError(w, os.WriteFile(path, []byte(content), 0o600))
+		return path
+	}
+
+	t.When("the stream contains a failure", func(w *gotest.T) {
+		input := writeStream(w, failingStream)
+		out := filepath.Join(w.TempDir(), "out.txt")
+
+		w.It("spec --input exits nonzero", func(it *gotest.T) {
+			gotest.Equal(it, 1, ExportRunSpecFromInput(input, "terminal", out, true))
+		})
+
+		w.It("summary --input agrees", func(it *gotest.T) {
+			gotest.Equal(it, 1, ExportRunSummaryFromInput(input, "terminal", out, "", true, false))
+		})
+	})
+
+	t.When("the stream is clean", func(w *gotest.T) {
+		input := writeStream(w, greenStream)
+		out := filepath.Join(w.TempDir(), "out.txt")
+
+		w.It("both exit zero", func(it *gotest.T) {
+			gotest.Equal(it, 0, ExportRunSpecFromInput(input, "terminal", out, true))
+			gotest.Equal(it, 0, ExportRunSummaryFromInput(input, "terminal", out, "", true, false))
+		})
+	})
+}
+
 func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 	t.When("IsGoFile", func(w *gotest.T) {
 		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional

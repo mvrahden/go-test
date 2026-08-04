@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 // A node can fail on its own account rather than because a behaviour beneath it
@@ -34,6 +36,52 @@ func interiorFailurePackages() []*Package {
 			},
 		}},
 	}}
+}
+
+// bareFailPackages is a parent test that failed via a message-less t.Fail()
+// while its only subtest passed: the testing package emits nothing but the
+// "--- FAIL:" marker, which filterOutput strips to nothing.
+func bareFailPackages() []*Package {
+	return []*Package{{
+		Path:   "example.com/pkg",
+		Status: StatusFail,
+		Nodes: []*Node{{
+			Kind:    KindTest,
+			Display: "TestGroup",
+			Status:  StatusFail,
+			Output:  []string{"--- FAIL: TestGroup (0.00s)\n"},
+			Children: []*Node{
+				{Kind: KindTest, Display: "sub", Status: StatusPass},
+			},
+		}},
+	}}
+}
+
+// A verdict comes from status, not prose: requiring surviving output made a
+// bare Fail vanish from the count and render an all-green summary beside a red
+// exit code.
+func TestCollectStats_CountsBareFailInterior(t *testing.T) {
+	stats := CollectStats(bareFailPackages())
+
+	gotest.Equal(t, 1, stats.Failed, "a message-less Fail is still a verdict")
+}
+
+func TestRenderSummary_BareFailIsVisible(t *testing.T) {
+	var buf bytes.Buffer
+	RenderSummary(&buf, bareFailPackages(), WithNoColor())
+	out := buf.String()
+
+	gotest.Contains(t, out, "of 2 tests failed", "the summary must take the red branch")
+	gotest.Contains(t, out, noDiagnosticNote,
+		"a counted failure with no output must render the fallback note")
+}
+
+func TestRenderTerminal_BareFailIsMarked(t *testing.T) {
+	var buf bytes.Buffer
+	RenderTerminal(&buf, bareFailPackages(), WithNoColor())
+
+	gotest.Contains(t, buf.String(), noDiagnosticNote,
+		"the failing node must carry a visible mark in the tree")
 }
 
 func TestCollectStats_CountsInteriorNodeFailure(t *testing.T) {
