@@ -3,6 +3,7 @@ package gotestruntime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -101,6 +102,12 @@ func setupNode(ctx context.Context, node *FixtureNode, tracker *nodeTracker) err
 	}
 
 	if err := runBeforeAllWithRetry(ctx, node); err != nil {
+		// An overrun setup completed its work before the verdict landed, so the
+		// resources it created exist. Marking it succeeded keeps its AfterAll in
+		// the teardown pass; the run still fails on the returned error.
+		if errors.Is(err, ErrSetupOverran) {
+			tracker.markSucceeded(node)
+		}
 		return err
 	}
 
@@ -212,12 +219,21 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 	}
 	wg.Wait()
 
+	// Prefer the causal error over a victim's: cancellation recorded on a node
+	// that was merely waiting for the one that actually failed names nothing an
+	// author can act on, and the real failure is in the map too.
+	var firstErr error
 	for _, f := range fixtures {
 		if err, ok := errs[f.Name]; ok && err != nil {
-			return err
+			if !errors.Is(err, context.Canceled) {
+				return err
+			}
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 	}
-	return nil
+	return firstErr
 }
 
 func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string]json.RawMessage, tracker *nodeTracker) error {
@@ -258,6 +274,12 @@ func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string
 	}
 
 	if err := runBeforeAllWithRetry(ctx, node); err != nil {
+		// An overrun setup completed its work before the verdict landed, so the
+		// resources it created exist. Marking it succeeded keeps its AfterAll in
+		// the teardown pass; the run still fails on the returned error.
+		if errors.Is(err, ErrSetupOverran) {
+			tracker.markSucceeded(node)
+		}
 		return err
 	}
 

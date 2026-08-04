@@ -71,6 +71,44 @@ func (s *FixtureSetupTestSuite) TestBudget(t *gotest.T) {
 			gotest.NoError(it, err)
 		})
 	})
+
+	t.When("a successful attempt overran its budget", func(w *gotest.T) {
+		w.It("is terminal and never retried", func(it *gotest.T) {
+			attempts := 0
+			err := gotestruntime.RunFixtureSetup(context.Background(), gotestruntime.FixtureSetup{
+				Name:    "Slow",
+				Timeout: 20 * time.Millisecond,
+				Budget:  20 * time.Millisecond,
+				Retries: 2,
+				BeforeAll: func(ctx context.Context) error {
+					attempts++
+					time.Sleep(60 * time.Millisecond)
+					return nil
+				},
+			})
+			gotest.ErrorIs(it, err, gotestruntime.ErrSetupOverran)
+			gotest.Equal(it, 1, attempts,
+				"the work completed and the overrun is deterministic; a retry would build a second set of resources")
+		})
+	})
+
+	t.When("the parent context's deadline fires mid-attempt", func(w *gotest.T) {
+		w.It("does not blame the fixture's own budget", func(it *gotest.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+			err := gotestruntime.RunFixtureSetup(ctx, gotestruntime.FixtureSetup{
+				Name:    "Prompt",
+				Timeout: 500 * time.Millisecond,
+				Budget:  500 * time.Millisecond,
+				BeforeAll: func(ctx context.Context) error {
+					time.Sleep(60 * time.Millisecond)
+					return nil
+				},
+			})
+			cancel()
+			gotest.NoError(it, err,
+				"the caller's deadline is not this fixture's budget; a verdict here names a number the author never blew")
+		})
+	})
 }
 
 func (s *FixtureSetupTestSuite) TestConfigDerivation(t *gotest.T) {

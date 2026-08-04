@@ -32,6 +32,13 @@ type FixtureSetup struct {
 	BeforeAll func(ctx context.Context) error
 }
 
+// ErrSetupOverran reports a BeforeAll that returned success only after its
+// declared budget had expired. It is terminal — never retried, because the
+// overrun is deterministic and the work is already done — and callers use it
+// to keep the fixture eligible for teardown: the resources it created exist
+// and must be released even though the run is failing.
+var ErrSetupOverran = errors.New("exceeded its configured Timeout")
+
 // RunFixtureSetup runs BeforeAll under s's timeout and retry policy and returns
 // the last error, unwrapped — callers add their own context. A nil BeforeAll is
 // nothing to do and reports success.
@@ -63,14 +70,25 @@ func RunFixtureSetup(ctx context.Context, s FixtureSetup) error {
 		}
 
 		lastErr = attemptSetup(s.BeforeAll, attemptCtx)
-		if lastErr == nil && s.Budget > 0 && errors.Is(attemptCtx.Err(), context.DeadlineExceeded) {
+		overran := lastErr == nil && s.Budget > 0 && ctx.Err() == nil &&
+			errors.Is(attemptCtx.Err(), context.DeadlineExceeded)
+		attemptCancel()
+
+		if overran {
 			// Setup that ignores the context still overran the budget it was
 			// given; without this a declared Timeout would mean nothing. Only a
 			// declared one, though — failing a fixture against a default it
-			// never asked for is not a verdict its author could act on.
-			lastErr = fmt.Errorf("exceeded its configured Timeout of %s", s.Budget)
+			// never asked for is not a verdict its author could act on. And only
+			// when the attempt's own deadline fired: a parent that expired
+			// mid-attempt is the caller's deadline, not this fixture's budget.
+			//
+			// The verdict is terminal, not retried: the attempt succeeded, so a
+			// retry would create a second set of whatever it built, and the
+			// overrun would repeat deterministically.
+			err := fmt.Errorf("%w of %s", ErrSetupOverran, s.Budget)
+			fmt.Fprintf(os.Stderr, "FAIL: %s.BeforeAll %v\n", s.Name, err)
+			return err
 		}
-		attemptCancel()
 
 		if lastErr == nil {
 			return nil

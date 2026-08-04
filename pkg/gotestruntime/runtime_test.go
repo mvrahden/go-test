@@ -1529,6 +1529,57 @@ func TestDAGSetupError_IncludesFixtureName(t *testing.T) {
 	gotest.ErrorContains(t, err, "dial tcp: connection refused")
 }
 
+// A setup that overran its declared budget completed its work: the resources
+// exist, so the fixture is torn down like a success even though the run fails.
+func TestDAG_OverrunSetupIsStillTornDown(t *testing.T) {
+	rec := &recorder{}
+
+	node := &FixtureNode{
+		Name:   "Slow",
+		Config: gotest.FixtureConfig{Timeout: 20 * time.Millisecond},
+		Budget: 20 * time.Millisecond,
+		BeforeAll: func(ctx context.Context) error {
+			time.Sleep(60 * time.Millisecond)
+			return nil
+		},
+		AfterAll: func(ctx context.Context) error {
+			rec.record("slow.afterAll")
+			return nil
+		},
+	}
+
+	// SetupFixtureDAG tears down its partial progress on a setup error; with the
+	// overrun marked succeeded, that pass must include this fixture's AfterAll.
+	_, err := SetupFixtureDAG(context.Background(), MainConfig{Fixtures: []*FixtureNode{node}})
+
+	gotest.ErrorIs(t, err, ErrSetupOverran)
+	gotest.Equal(t, []string{"slow.afterAll"}, rec.names(),
+		"an overrun-but-successful setup created real resources; skipping its AfterAll leaks them")
+}
+
+// A dependent that was merely waiting on the fixture that failed must not
+// eclipse the causal error in the report.
+func TestDAG_CausalErrorPreferredOverVictims(t *testing.T) {
+	boom := errors.New("no route to host")
+	victim := &FixtureNode{
+		Name:      "Victim",
+		Config:    gotest.DefaultFixtureConfig(),
+		BeforeAll: func(ctx context.Context) error { <-ctx.Done(); return ctx.Err() },
+	}
+	culprit := &FixtureNode{
+		Name:      "Culprit",
+		Config:    gotest.DefaultFixtureConfig(),
+		BeforeAll: func(ctx context.Context) error { return boom },
+	}
+
+	tracker := &nodeTracker{succeeded: make(map[*FixtureNode]bool)}
+	err := setupDAG(context.Background(), []*FixtureNode{victim, culprit}, nil, tracker)
+
+	gotest.ErrorContains(t, err, "Culprit.BeforeAll",
+		"the victim's cancellation names nothing an author can act on")
+	gotest.ErrorContains(t, err, "no route to host")
+}
+
 func indexOf(slice []string, val string) int {
 	for i, s := range slice {
 		if s == val {
