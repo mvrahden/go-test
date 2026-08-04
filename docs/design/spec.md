@@ -90,7 +90,7 @@ The tool generates the bridge code (lifecycle, parallel coordination, focus/excl
 | `gotest` | reports, does not run | **runs** (via generated code) |
 
 This is deliberate: `go test` stays fully usable with its caching and ecosystem, and `gotest` stays a focused suite runner rather than a `go test` wrapper.
-A complete run is both commands; the canonical CI shape is two steps — `go test ./...` followed by `gotest` (the repository's own workflow does exactly this).
+A complete run is both commands; the canonical CI shape is two steps — `go test ./...` followed by `gotest`.
 
 `gotest` reports the half it does not run:
 packages with stdlib tests but no suites print `?   <pkg>  [no suites]` (never the false `[no test files]`), and a run that skipped stdlib tests ends with a note on stderr:
@@ -712,7 +712,6 @@ Bounding the context is not the same as being held to it: `gotestruntime.RunSetu
 
 **`NewTWithDeadline`:** Creates a `*gotest.T` with a context deadline.
 `t.Context()` returns the deadline-aware context.
-Existing `NewT` callers are unaffected.
 
 **`NewTWithContext`:** Creates a `*gotest.T` whose `t.Context()` is the context supplied by the caller, for the cases a deadline off `t.Context()` cannot express — injected values, or a lifetime that must outlive the test's own.
 The caller owns the context; nothing in `gotest` cancels it.
@@ -1058,7 +1057,7 @@ Converts testify/suite tests:
 
 Not converted: direct embedded-suite calls (`s.Equal(...)`) — the removed `suite.Suite` embedding makes them compile errors, and they are annotated with a rewrite hint.
 
-Handles the 90% case; anything it cannot convert is annotated in place so nothing is silently skipped:
+Anything the tool cannot convert is annotated in place, so nothing is silently skipped:
 
 - `// TODO(gotest-migrate): unsupported testify hook <Name> — convert manually` above unconverted lifecycle hooks (`SetupSubTest`, `TearDownSubTest`, `BeforeTest`, `AfterTest`, `HandleStats`)
 - `// TODO(gotest-migrate): unmapped assertion <Name> — convert manually` above assertion calls outside the mapping table (e.g. `ErrorAs`, `Eventually`, `InDelta`)
@@ -1150,7 +1149,7 @@ No tests are executed.
 ```
 
 File paths are basenames; positions are 1-based.
-`methods[].parallel` is reserved and currently always `false` (parallelism is a suite-level property).
+`methods[].parallel` is reserved and always `false` (parallelism is a suite-level property).
 Respects `-tags`.
 
 ---
