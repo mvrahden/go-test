@@ -2,10 +2,9 @@
 
 > **Normative.** This document is the source of truth for gotest's design.
 > `AGENTS.md`, `README.md`, help texts, and the site derive from it — update this file first.
-> Drift guards enforce partial sync: `internal/docsync` (exported pkg/gotest
-> functions and T/R methods must be mentioned here; Go fences must parse) and the
-> CLI-surface test in `cmd/gotest` (subcommand/flag table membership, both directions).
-> Prose semantics remain hand-verified.
+> One drift guard enforces partial sync: the CLI-surface test in `cmd/gotest`
+> (subcommand/flag table membership, both directions).
+> API coverage and prose semantics remain hand-verified.
 
 Go tests that write themselves, organize themselves, and explain themselves.
 
@@ -1458,7 +1457,6 @@ cmd/gotest-lint/             Standalone linter binary (singlechecker)
 
 internal/config/             .gotest.yml project configuration loading
 internal/gotestspec/         Spec tree builder and renderers (terminal, markdown, json)
-internal/docsync/            Drift guards: docs↔code sync tests (test-only package)
 internal/x/                  Small generic helper libraries (slices)
 internal/scaffold/           Type-to-suite skeleton generator
 internal/migrate/            testify/suite AST transformer

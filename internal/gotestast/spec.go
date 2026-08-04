@@ -342,7 +342,7 @@ func (m *TestSuiteMethod) Identifier() string {
 // needs Parallel at generation time, so SuiteConfig bodies cannot be arbitrary Go.
 const suiteConfigBodyErr = "SuiteConfig method body must return a gotest.SuiteConfig literal or preset call, optionally composed as `cfg := <literal|preset>` followed by plain `cfg.<Field> = <value>` assignments"
 
-func parseSuiteConfigAST(_ *packages.Package, funcDecl *ast.FuncDecl) (parallel bool, err error) {
+func parseSuiteConfigAST(pkg *packages.Package, funcDecl *ast.FuncDecl) (parallel bool, err error) {
 	if funcDecl.Body == nil || len(funcDecl.Body.List) == 0 {
 		return false, fmt.Errorf(suiteConfigBodyErr)
 	}
@@ -356,9 +356,9 @@ func parseSuiteConfigAST(_ *packages.Package, funcDecl *ast.FuncDecl) (parallel 
 		}
 		switch result := retStmt.Results[0].(type) {
 		case *ast.CompositeLit:
-			return suiteConfigParallelFromLiteral(result), nil
+			return suiteConfigParallelFromLiteral(result)
 		case *ast.CallExpr:
-			if !isKnownSuitePreset(result) {
+			if !isKnownSuitePreset(result, pkg) {
 				return false, fmt.Errorf("SuiteConfig: only the gotest presets (DefaultSuiteConfig, IntegrationSuiteConfig) may be called — Parallel is resolved statically and a custom helper would silently drop it")
 			}
 			return false, nil
@@ -378,9 +378,12 @@ func parseSuiteConfigAST(_ *packages.Package, funcDecl *ast.FuncDecl) (parallel 
 	}
 	switch rhs := first.Rhs[0].(type) {
 	case *ast.CompositeLit:
-		parallel = suiteConfigParallelFromLiteral(rhs)
+		parallel, err = suiteConfigParallelFromLiteral(rhs)
+		if err != nil {
+			return false, err
+		}
 	case *ast.CallExpr:
-		if !isKnownSuitePreset(rhs) {
+		if !isKnownSuitePreset(rhs, pkg) {
 			return false, fmt.Errorf("SuiteConfig: only the gotest presets (DefaultSuiteConfig, IntegrationSuiteConfig) may be called — Parallel is resolved statically and a custom helper would silently drop it")
 		}
 	default:
@@ -419,32 +422,45 @@ func parseSuiteConfigAST(_ *packages.Package, funcDecl *ast.FuncDecl) (parallel 
 }
 
 // isKnownSuitePreset accepts only the gotest-shipped presets as config bases:
-// they are known to leave Parallel false, so static Parallel detection stays sound.
-func isKnownSuitePreset(call *ast.CallExpr) bool {
+// they are known to leave Parallel false, so static Parallel detection stays
+// sound. The call must resolve to pkg/gotest — a same-named function or method
+// from anywhere else could return Parallel: true and be silently mis-read.
+func isKnownSuitePreset(call *ast.CallExpr, pkg *packages.Package) bool {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
 		return false
 	}
-	return sel.Sel.Name == "DefaultSuiteConfig" || sel.Sel.Name == "IntegrationSuiteConfig"
+	if sel.Sel.Name != "DefaultSuiteConfig" && sel.Sel.Name != "IntegrationSuiteConfig" {
+		return false
+	}
+	obj := pkg.TypesInfo.ObjectOf(sel.Sel)
+	if obj == nil || obj.Pkg() == nil {
+		return false
+	}
+	return obj.Pkg().Path() == about.Repo+"/pkg/gotest"
 }
 
-func suiteConfigParallelFromLiteral(lit *ast.CompositeLit) bool {
+func suiteConfigParallelFromLiteral(lit *ast.CompositeLit) (bool, error) {
 	for _, elt := range lit.Elts {
 		kv, ok := elt.(*ast.KeyValueExpr)
 		if !ok {
-			continue
+			// A positional literal sets fields the scan below cannot see, so a
+			// Parallel value would silently read as false.
+			return false, fmt.Errorf("SuiteConfig literal must use keyed fields (Field: value) — Parallel is resolved statically from the Parallel: key")
 		}
 		key, ok := kv.Key.(*ast.Ident)
 		if !ok {
 			continue
 		}
 		if key.Name == "Parallel" {
-			if ident, ok := kv.Value.(*ast.Ident); ok && ident.Name == "true" {
-				return true
+			ident, ok := kv.Value.(*ast.Ident)
+			if !ok || (ident.Name != "true" && ident.Name != "false") {
+				return false, fmt.Errorf("SuiteConfig: Parallel must be assigned a boolean literal — the generator resolves it statically")
 			}
+			return ident.Name == "true", nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, token.Pos, error) {

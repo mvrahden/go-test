@@ -1,7 +1,7 @@
 # Fixtures
 
 > **Normative.** Part of the design spec (see `spec.md`) — update these docs before
-> derived material. Go fences here are syntax-checked by `internal/docsync`.
+> derived material.
 
 Fixtures replace `TestMain` + package-level singletons with convention-driven setup.
 Any struct whose name ends in `Fixture` is a package fixture; any struct ending in `SharedFixture` is a cross-package shared fixture.
