@@ -1,6 +1,7 @@
 package gotestast
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -344,7 +345,7 @@ const suiteConfigBodyErr = "SuiteConfig method body must return a gotest.SuiteCo
 
 func parseSuiteConfigAST(pkg *packages.Package, funcDecl *ast.FuncDecl) (parallel bool, err error) {
 	if funcDecl.Body == nil || len(funcDecl.Body.List) == 0 {
-		return false, fmt.Errorf(suiteConfigBodyErr)
+		return false, errors.New(suiteConfigBodyErr)
 	}
 	stmts := funcDecl.Body.List
 
@@ -352,7 +353,7 @@ func parseSuiteConfigAST(pkg *packages.Package, funcDecl *ast.FuncDecl) (paralle
 	if len(stmts) == 1 {
 		retStmt, ok := stmts[0].(*ast.ReturnStmt)
 		if !ok || len(retStmt.Results) != 1 {
-			return false, fmt.Errorf(suiteConfigBodyErr)
+			return false, errors.New(suiteConfigBodyErr)
 		}
 		switch result := retStmt.Results[0].(type) {
 		case *ast.CompositeLit:
@@ -363,18 +364,18 @@ func parseSuiteConfigAST(pkg *packages.Package, funcDecl *ast.FuncDecl) (paralle
 			}
 			return false, nil
 		default:
-			return false, fmt.Errorf(suiteConfigBodyErr)
+			return false, errors.New(suiteConfigBodyErr)
 		}
 	}
 
 	// Compose form: cfg := <literal|preset>; cfg.Field = value ...; return cfg.
 	first, ok := stmts[0].(*ast.AssignStmt)
 	if !ok || first.Tok != token.DEFINE || len(first.Lhs) != 1 || len(first.Rhs) != 1 {
-		return false, fmt.Errorf(suiteConfigBodyErr)
+		return false, errors.New(suiteConfigBodyErr)
 	}
 	cfgIdent, ok := first.Lhs[0].(*ast.Ident)
 	if !ok {
-		return false, fmt.Errorf(suiteConfigBodyErr)
+		return false, errors.New(suiteConfigBodyErr)
 	}
 	switch rhs := first.Rhs[0].(type) {
 	case *ast.CompositeLit:
@@ -387,28 +388,28 @@ func parseSuiteConfigAST(pkg *packages.Package, funcDecl *ast.FuncDecl) (paralle
 			return false, fmt.Errorf("SuiteConfig: only the gotest presets (DefaultSuiteConfig, IntegrationSuiteConfig) may be called — Parallel is resolved statically and a custom helper would silently drop it")
 		}
 	default:
-		return false, fmt.Errorf(suiteConfigBodyErr)
+		return false, errors.New(suiteConfigBodyErr)
 	}
 
 	last, ok := stmts[len(stmts)-1].(*ast.ReturnStmt)
 	if !ok || len(last.Results) != 1 {
-		return false, fmt.Errorf(suiteConfigBodyErr)
+		return false, errors.New(suiteConfigBodyErr)
 	}
 	if retIdent, ok := last.Results[0].(*ast.Ident); !ok || retIdent.Name != cfgIdent.Name {
-		return false, fmt.Errorf(suiteConfigBodyErr)
+		return false, errors.New(suiteConfigBodyErr)
 	}
 
 	for _, stmt := range stmts[1 : len(stmts)-1] {
 		assign, ok := stmt.(*ast.AssignStmt)
 		if !ok || assign.Tok != token.ASSIGN || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
-			return false, fmt.Errorf(suiteConfigBodyErr)
+			return false, errors.New(suiteConfigBodyErr)
 		}
 		sel, ok := assign.Lhs[0].(*ast.SelectorExpr)
 		if !ok {
-			return false, fmt.Errorf(suiteConfigBodyErr)
+			return false, errors.New(suiteConfigBodyErr)
 		}
 		if base, ok := sel.X.(*ast.Ident); !ok || base.Name != cfgIdent.Name {
-			return false, fmt.Errorf(suiteConfigBodyErr)
+			return false, errors.New(suiteConfigBodyErr)
 		}
 		if sel.Sel.Name == "Parallel" {
 			val, ok := assign.Rhs[0].(*ast.Ident)
