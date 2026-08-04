@@ -697,10 +697,14 @@ A partial literal opts out of whatever it omits: `SuiteConfig{Parallel: true}` r
 
 **Package fixtures:** The test harness uses the marker's config when present (otherwise `DefaultFixtureConfig()`) to wrap `BeforeAll` in a retry loop with `context.WithTimeout` and wrap `AfterAll` cleanup with timeout.
 Retry attempts are logged with attempt number.
+As with suites, bounding the context is not being held to it: a fixture that declared its own config is additionally held to its `Timeout` *by verdict*, on both `BeforeAll` (`gotestruntime.RunFixtureSetup`) and `AfterAll` (`gotestruntime.RunFixtureTeardown`) — a lifecycle call that ignores its context and outruns the declared budget fails the fixture rather than passing.
+A fixture with no marker gets the default bounds and no verdict; it is never failed against a number its author did not write.
+A setup overrun on a *successful* return is terminal (`gotestruntime.ErrSetupOverran`): it is not retried — the work completed and the overrun is deterministic — and the fixture still gets its `AfterAll`, because the resources it built exist.
 
-**Shared fixtures:** The generated subprocess uses `SharedFixtureConfig()` when present (otherwise `DefaultFixtureConfig()`), wrapping each SharedFixture's `BeforeAll(ctx)` in the same retry loop with `context.WithTimeout`.
+**Shared fixtures:** The generated subprocess uses `SharedFixtureConfig()` when present (otherwise `DefaultFixtureConfig()`), wrapping each SharedFixture's `BeforeAll(ctx)` in the same retry loop with `context.WithTimeout`, under the same declared-budget verdicts as package fixtures.
 After `BeforeAll`, transferable fields (determined by Hydrate-assignment analysis) are serialized to stdout as JSON.
-`AfterAll(ctx)` gets timeout wrapping in the teardown handler.
+`AfterAll(ctx)` runs through `gotestruntime.RunFixtureTeardown` in the teardown handler: context-bounded always, and held to a declared `Timeout` by verdict, with a failed teardown reaching the runner through the process exit status.
+The subprocess is shutdown-capable from birth and never tears down on its own initiative: it reports setup outcome (and its teardown budget) on the `_done` line, then waits for the runner's signal — only the runner knows when every suite has stopped using the fixtures — and a clean exit is the runner's sole proof that teardown ran and passed.
 In the test harness, the deserialized fixture is hydrated via `Hydrate(ctx)` if present, and `Dehydrate(ctx)` is deferred for cleanup.
 
 **Suites:** The test harness uses the marker's config when present (otherwise `DefaultSuiteConfig()`) to bound each phase's context — `gotestruntime.SetupT`/`TestT` apply `NewTWithDeadline` when the timeout is positive — and breaks the test case loop on first failure when `FailFast` is set.
