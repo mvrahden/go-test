@@ -137,7 +137,7 @@ func (s *RendererTestSuite) TestAsyncTestCases(t *gotest.T) {
 	t.When("a suite has an async test case", func(w *gotest.T) {
 		w.It("renders a done channel and deadline wait", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_AsyncTestCases")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, false)
 			gotest.Contains(it, output, "ƒdone := make(chan struct{}, 1)")
 			gotest.Contains(it, output, "case <-ƒdone:")
 			gotest.Contains(it, output, "done() was not called")
@@ -150,7 +150,7 @@ func (s *RendererTestSuite) TestAsyncTestCases(t *gotest.T) {
 func (s *RendererTestSuite) TestParallelAllExcluded(t *gotest.T) {
 	t.It("compiles — no unused ƒfailed when every case is excluded", func(it *gotest.T) {
 		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ParallelAllExcluded")
-		output, _ := renderTestPkg(it.T(), pkg)
+		output, _ := renderTestPkg(it.T(), pkg, false)
 		gotest.NotContains(it, output, "ƒfailed", "ƒfailed must only be declared when test cases exist")
 	})
 }
@@ -159,7 +159,7 @@ func (s *RendererTestSuite) TestParallelFailFast(t *gotest.T) {
 	t.When("method-parallel suite with FailFast", func(w *gotest.T) {
 		w.It("emits a shared failure flag that skips not-yet-started subtests", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ParallelFailFast")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, false)
 			gotest.Contains(it, output, "ƒfailed.Load()", "parallel subtests must consult the shared failure flag")
 			gotest.Contains(it, output, "ƒfailed.Store(true)", "failing subtests must set the shared failure flag")
 			gotest.Contains(it, output, "it.Skip(", "flagged subtests must skip instead of running")
