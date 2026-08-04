@@ -15,7 +15,7 @@ instead, remembering that a `replace` line overrides the `require`
 version.
 
 This skill targets **v1.26.0+**. On **v1.25.x** everything below still
-applies EXCEPT these three, which fail there:
+applies EXCEPT these four, which fail there:
 
 1. **The parallel recipe (rule 4)** — v1.25.x requires the `SuiteConfig`
    body to be a SINGLE return statement, so the compose form is a
@@ -28,9 +28,20 @@ applies EXCEPT these three, which fail there:
    never reset to false).
 3. **`Test*Async` (rule 1)** — recognized but never rendered on v1.25.x;
    write a synchronous test with `Eventually` instead.
+4. **Filtering `Each` rows** — on v1.25.x, `-run` selecting individual
+   `Each` entries (e.g. `-run 'TestX/#1'`) DEADLOCKS the test binary until
+   `-test.timeout` kills it with no teardown, and so does any entry after
+   a `-failfast` trip. Filter whole suites or methods only there.
 
-Cosmetic-only on v1.25.x: no `[no suites]` note, `migrate` leaves no TODO
-markers, `CI=false` still enables CI mode, no expanded value diffs.
+Exit codes on v1.25.x are weaker than they look — never treat a green
+gotest exit alone as proof there: a package failing to compile mid-run, a
+suite binary killed by a signal, and `spec --input` on a failing stream
+all exit 0, `gotest lint` exits 0 on a package it could not analyze, and
+fixture-bound packages mis-count teardown under `-skip 'Suite/case'` and
+`-count>1` (fixtures can be released while tests still run). All of these
+fail properly on v1.26.0+. Cosmetic-only on v1.25.x: no `[no suites]`
+note, `migrate` leaves no TODO markers, `CI=false` still enables CI mode,
+no expanded value diffs.
 
 ## Bootstrap
 

@@ -55,9 +55,14 @@ jobs:
 If `go tool gotest ./...` prints NO "note: … stdlib test(s) … not run"
 lines, the project runs exclusively on gotest suites — the `go test ./...`
 step tests nothing and should be omitted: CI is the action + lint steps
-only. This is safe BECAUSE lint runs in CI: the `stdlib-test` rule fails
+only. This is safe on v1.26.0+ because both remaining steps prove the
+tree: a package that fails to compile fails the run AND fails lint (which
+refuses to lint what it cannot analyze), and the `stdlib-test` rule fails
 the build if someone later adds a stdlib test, so nothing can go silently
-unexecuted. Two corollaries:
+unexecuted. On **v1.25.x it is NOT safe**: there a compile-broken package
+can pass both the run (exit 0, streaming) and lint (analysis silently
+skipped) — keep the `go test ./...` step on v1.25.x, it is the only
+compile gate. Two corollaries:
 
 - Do not ADD stdlib tests to a gotest-exclusive project to satisfy the
   three-step shape — the shape follows the tests, not the other way round.

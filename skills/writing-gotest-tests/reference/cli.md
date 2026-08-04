@@ -8,7 +8,10 @@ invocation runs tests — there is NO `test` subcommand:
   `-json` (streams `go test -json` events incl. every subtest name).
 - `go tool gotest spec ./...` — run + render the behavioral spec view.
   `--format terminal|md|json` (terminal is the default), `--output <file>`; `--input <file|->` re-renders a
-  captured `go test -json` stream WITHOUT running.
+  captured `go test -json` stream WITHOUT running. `--input` exits
+  non-zero when the stream contains failures (same rule as
+  `summary --input`), so replaying a saved stream in CI needs no pipefail
+  gymnastics — the render step itself is the verdict.
 - `go tool gotest watch ./...` — rerun on change; supports `--spec`.
 - `go tool gotest lint ./...` — the 14-rule linter; `-fix` applies
   suggested fixes (textual only — follow with goimports, see SKILL.md).
