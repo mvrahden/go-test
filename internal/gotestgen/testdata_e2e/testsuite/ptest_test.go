@@ -11,3 +11,16 @@ func (m *MyE2ETestSuite) Test_HelloWorld_1(t *gotest.T)   { HelloWorld() }
 func (m *MyE2ETestSuite) Test_HelloWorld_2(t *gotest.T)   { HelloWorld() }
 func (m *MyE2ETestSuite) Test_HelloWorld_3(t *gotest.T)   { HelloWorld() }
 func (m *MyE2ETestSuite) X_Test_HelloWorld_4(t *gotest.T) { HelloWorld() }
+
+type AsyncE2ETestSuite struct{}
+
+func (s *AsyncE2ETestSuite) TestDoneFromGoroutineAsync(t *gotest.T, done func()) {
+	go func() {
+		HelloWorld()
+		done()
+	}()
+}
+
+func (s *AsyncE2ETestSuite) TestDoneInlineAsync(t *gotest.T, done func()) {
+	done()
+}

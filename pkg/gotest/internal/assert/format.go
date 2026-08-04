@@ -3,8 +3,88 @@ package assert
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 )
+
+// expandThreshold is the single-line rendering length above which composite
+// values (structs, maps, slices) switch to an expanded multiline form, so that
+// equality failures can show a line-based diff.
+const expandThreshold = 60
+
+// FormatValueExpanded is FormatValue, except that large composite values are
+// rendered one field/entry per line. Values whose formatting is already
+// multiline (e.g. a GoStringer emitting newlines) pass through unchanged.
+func FormatValueExpanded(v any) string {
+	s := FormatValue(v)
+	if len(s) <= expandThreshold || strings.ContainsRune(s, '\n') {
+		return s
+	}
+	if ml, ok := formatMultiline(reflect.ValueOf(v)); ok {
+		return ml
+	}
+	return s
+}
+
+// expandMaxEntries bounds expansion (and therefore the LCS diff input): beyond
+// this, values stay single-line — a diff over thousands of lines is unreadable
+// and the LCS matrix would be quadratic in it.
+const expandMaxEntries = 64
+
+// formatMultiline renders structs, maps, and slices/arrays with one
+// field/entry per line. Map entries are sorted by formatted key for
+// deterministic output. Returns ok=false for non-composite kinds and for
+// values with more than expandMaxEntries entries.
+func formatMultiline(rv reflect.Value) (string, bool) {
+	for rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return "", false
+		}
+		rv = rv.Elem()
+	}
+	switch rv.Kind() {
+	case reflect.Map, reflect.Slice, reflect.Array:
+		if rv.Len() > expandMaxEntries {
+			return "", false
+		}
+	}
+
+	var sb strings.Builder
+	switch rv.Kind() {
+	case reflect.Struct:
+		sb.WriteString(rv.Type().String() + "{\n")
+		for i := 0; i < rv.NumField(); i++ {
+			if !rv.Type().Field(i).IsExported() {
+				continue
+			}
+			fmt.Fprintf(&sb, "  %s: %#v,\n", rv.Type().Field(i).Name, rv.Field(i).Interface())
+		}
+		sb.WriteString("}")
+		return sb.String(), true
+	case reflect.Map:
+		entries := make([]string, 0, rv.Len())
+		iter := rv.MapRange()
+		for iter.Next() {
+			entries = append(entries, fmt.Sprintf("  %#v: %#v,", iter.Key().Interface(), iter.Value().Interface()))
+		}
+		sort.Strings(entries)
+		sb.WriteString(rv.Type().String() + "{\n")
+		for _, e := range entries {
+			sb.WriteString(e + "\n")
+		}
+		sb.WriteString("}")
+		return sb.String(), true
+	case reflect.Slice, reflect.Array:
+		sb.WriteString(rv.Type().String() + "{\n")
+		for i := 0; i < rv.Len(); i++ {
+			fmt.Fprintf(&sb, "  %#v,\n", rv.Index(i).Interface())
+		}
+		sb.WriteString("}")
+		return sb.String(), true
+	default:
+		return "", false
+	}
+}
 
 // FormatValue formats a Go value for display in error messages.
 // nil → "<nil>", non-nil pointer → dereference and format the pointee,

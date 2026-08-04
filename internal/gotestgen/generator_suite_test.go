@@ -3,7 +3,6 @@ package gotestgen_test
 import (
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -46,7 +45,7 @@ func (s *GeneratorTestSuite) TestE2ECLI(t *gotest.T) {
 			gotest.NoError(sub, err)
 			results, _, err := gotestgen.GenerateFromLoaded(loaded)
 			gotest.NoError(sub, err)
-			gotest.True(sub, strings.HasSuffix(filepath.ToSlash(results[0].AbsPath), "go-test/internal/gotestgen/testdata_e2e/"+tC.dirName))
+			gotest.Equal(sub, dirPath, results[0].AbsPath)
 			gotest.Equal(sub, "github.com/mvrahden/go-test/internal/gotestgen/testdata_e2e/"+tC.dirName, results[0].PkgPath)
 
 			gotest.MatchSnapshot(sub, string(results[0].PTest), tC.dirName+"-ptest")

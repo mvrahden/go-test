@@ -9,6 +9,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/about"
@@ -16,6 +17,72 @@ import (
 )
 
 var gotestImport = about.Repo + "/pkg/gotest"
+
+// assertionMap maps testify assertion method names to gotest function names.
+var assertionMap = map[string]string{
+	"Equal":          "Equal",
+	"NotEqual":       "NotEqual",
+	"NoError":        "NoError",
+	"Error":          "Error",
+	"ErrorIs":        "ErrorIs",
+	"ErrorContains":  "ErrorContains",
+	"True":           "True",
+	"False":          "False",
+	"Nil":            "Nil",
+	"NotNil":         "NotNil",
+	"Empty":          "Empty",
+	"NotEmpty":       "NotEmpty",
+	"Len":            "Len",
+	"Contains":       "Contains",
+	"Zero":           "Zero",
+	"Greater":        "Greater",
+	"GreaterOrEqual": "GreaterOrEqual",
+	"Less":           "Less",
+	"LessOrEqual":    "LessOrEqual",
+}
+
+// unsupportedHooks are testify lifecycle hooks that have no gotest equivalent
+// and cannot be converted automatically.
+var unsupportedHooks = map[string]bool{
+	"SetupSubTest":    true,
+	"TearDownSubTest": true,
+	"BeforeTest":      true,
+	"AfterTest":       true,
+	"HandleStats":     true,
+}
+
+// testifyAssertionNames is a superset of testify assertion method names. It is
+// used to recognize unconverted direct s.<Method>(...) assertion calls on the
+// suite receiver, where the method name alone must identify an assertion.
+var testifyAssertionNames = map[string]bool{
+	"Condition": true, "DirExists": true, "ElementsMatch": true,
+	"EqualError": true, "EqualExportedValues": true, "EqualValues": true,
+	"ErrorAs": true, "Eventually": true, "EventuallyWithT": true,
+	"Exactly": true, "FileExists": true, "Implements": true,
+	"InDelta": true, "InDeltaMapValues": true, "InDeltaSlice": true,
+	"InEpsilon": true, "InEpsilonSlice": true, "IsDecreasing": true,
+	"IsIncreasing": true, "IsNonDecreasing": true, "IsNonIncreasing": true,
+	"IsType": true, "JSONEq": true, "Negative": true, "Never": true,
+	"NoDirExists": true, "NoFileExists": true, "NotElementsMatch": true,
+	"NotErrorAs": true, "NotErrorIs": true, "NotImplements": true,
+	"NotPanics": true, "NotRegexp": true, "NotSame": true,
+	"NotSubset": true, "NotZero": true, "Panics": true,
+	"PanicsWithError": true, "PanicsWithValue": true, "Positive": true,
+	"Regexp": true, "Same": true, "Subset": true,
+	"WithinDuration": true, "WithinRange": true, "YAMLEq": true,
+}
+
+// isTestifyAssertionName reports whether name is a known testify assertion
+// method (including mapped ones and formatted "...f" variants).
+func isTestifyAssertionName(name string) bool {
+	if testifyAssertionNames[name] || assertionMap[name] != "" {
+		return true
+	}
+	if base, ok := strings.CutSuffix(name, "f"); ok {
+		return testifyAssertionNames[base] || assertionMap[base] != ""
+	}
+	return false
+}
 
 // MigrationPlan describes all suites found in a single file.
 type MigrationPlan struct {
@@ -287,29 +354,6 @@ func TransformFile(fset *token.FileSet, f *ast.File, plan MigrationPlan) {
 
 	for k := range lifecycleRenames {
 		lifecycleMethods[k] = true
-	}
-
-	// assertionMap maps testify assertion method names to gotest function names
-	assertionMap := map[string]string{
-		"Equal":          "Equal",
-		"NotEqual":       "NotEqual",
-		"NoError":        "NoError",
-		"Error":          "Error",
-		"ErrorIs":        "ErrorIs",
-		"ErrorContains":  "ErrorContains",
-		"True":           "True",
-		"False":          "False",
-		"Nil":            "Nil",
-		"NotNil":         "NotNil",
-		"Empty":          "Empty",
-		"NotEmpty":       "NotEmpty",
-		"Len":            "Len",
-		"Contains":       "Contains",
-		"Zero":           "Zero",
-		"Greater":        "Greater",
-		"GreaterOrEqual": "GreaterOrEqual",
-		"Less":           "Less",
-		"LessOrEqual":    "LessOrEqual",
 	}
 
 	// 1. Remove runner functions
@@ -597,6 +641,153 @@ func rewriteSTandalone(src string, recvName string) string {
 	return strings.ReplaceAll(src, old, new)
 }
 
+// todoAnnotation marks a line in the migrated output that needs a
+// TODO(gotest-migrate) comment inserted above it.
+type todoAnnotation struct {
+	line int
+	msg  string
+}
+
+// unmappedAssertionName inspects a call expression in migrated output and
+// returns the assertion method name if the call is a testify assertion the
+// migrator could not map. Recognized receiver forms: s.Require().X(...),
+// s.Assert().X(...), direct s.X(...) for known testify assertion names, and
+// package-level assert.X(...) / require.X(...).
+func unconvertedAssertionMsg(call *ast.CallExpr, recvName string) (string, bool) {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return "", false
+	}
+	name := sel.Sel.Name
+	gotestName, mapped := assertionMap[name]
+
+	switch x := sel.X.(type) {
+	case *ast.CallExpr:
+		// s.Require().X(...) or s.Assert().X(...) — mapped names are rewritten.
+		if mapped {
+			return "", false
+		}
+		innerSel, ok := x.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return "", false
+		}
+		ident, ok := innerSel.X.(*ast.Ident)
+		if !ok || ident.Name != recvName {
+			return "", false
+		}
+		if innerSel.Sel.Name == "Require" || innerSel.Sel.Name == "Assert" {
+			return "unmapped assertion " + name + " — convert manually", true
+		}
+	case *ast.Ident:
+		// assert.X(...) or require.X(...) — mapped names are rewritten.
+		if x.Name == "assert" || x.Name == "require" {
+			if mapped {
+				return "", false
+			}
+			return "unmapped assertion " + name + " — convert manually", true
+		}
+		// Direct s.X(...) is never rewritten — the suite.Suite embedding is
+		// removed, so these become compile errors. Annotate mapped names with
+		// the replacement, unmapped ones generically.
+		if x.Name == recvName && isTestifyAssertionName(name) {
+			if mapped {
+				return "unconverted assertion " + name + " — embedded-suite call; rewrite as gotest." + gotestName + "(t, ...)", true
+			}
+			return "unmapped assertion " + name + " — convert manually", true
+		}
+	}
+	return "", false
+}
+
+// annotateUnconverted parses formatted migrated source and inserts
+// `// TODO(gotest-migrate): ...` comments above unconverted testify lifecycle
+// hooks and unmapped assertion calls, so nothing is silently skipped. It
+// operates line-based on the already-formatted output (positions are stable at
+// that point) and re-formats the result.
+func annotateUnconverted(src []byte, suiteNames map[string]bool) ([]byte, error) {
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "", src, parser.ParseComments)
+	if err != nil {
+		return nil, err
+	}
+
+	var anns []todoAnnotation
+	seen := map[string]bool{}
+	add := func(pos token.Pos, msg string) {
+		line := fset.Position(pos).Line
+		key := fmt.Sprintf("%d:%s", line, msg)
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		anns = append(anns, todoAnnotation{line: line, msg: msg})
+	}
+
+	for _, decl := range f.Decls {
+		fd, ok := decl.(*ast.FuncDecl)
+		if !ok || fd.Recv == nil || len(fd.Recv.List) == 0 {
+			continue
+		}
+		recvTypeName, recvVarName := extractReceiverInfo(fd.Recv.List[0])
+		if !suiteNames[recvTypeName] {
+			continue
+		}
+
+		if unsupportedHooks[fd.Name.Name] {
+			pos := fd.Pos()
+			if fd.Doc != nil {
+				pos = fd.Doc.Pos()
+			}
+			add(pos, "unsupported testify hook "+fd.Name.Name+" — convert manually")
+		}
+
+		if fd.Body == nil {
+			continue
+		}
+		ast.Inspect(fd.Body, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			if msg, found := unconvertedAssertionMsg(call, recvVarName); found {
+				add(call.Pos(), msg)
+			}
+			return true
+		})
+	}
+
+	if len(anns) == 0 {
+		return src, nil
+	}
+
+	// Insert comment lines bottom-up so earlier line numbers stay valid.
+	sort.Slice(anns, func(i, j int) bool { return anns[i].line > anns[j].line })
+	lines := strings.Split(string(src), "\n")
+	for _, a := range anns {
+		idx := a.line - 1
+		if idx < 0 || idx >= len(lines) {
+			continue
+		}
+		comment := "// TODO(gotest-migrate): " + a.msg
+		if idx > 0 && strings.Contains(lines[idx-1], comment) {
+			continue // already annotated (idempotency)
+		}
+		indented := leadingWhitespace(lines[idx]) + comment
+		lines = append(lines[:idx], append([]string{indented}, lines[idx:]...)...)
+	}
+	return format.Source([]byte(strings.Join(lines, "\n")))
+}
+
+// leadingWhitespace returns the leading spaces/tabs of a line.
+func leadingWhitespace(s string) string {
+	for i, r := range s {
+		if r != ' ' && r != '\t' {
+			return s[:i]
+		}
+	}
+	return s
+}
+
 // MigrateFile processes a single file: parse, analyze, transform, format, write back.
 func MigrateFile(path string) ([]MigrateResult, error) {
 	fset := token.NewFileSet()
@@ -628,6 +819,17 @@ func MigrateFile(path string) ([]MigrateResult, error) {
 	formatted, err := format.Source([]byte(src))
 	if err != nil {
 		return nil, fmt.Errorf("gofmt %s: %w", path, err)
+	}
+
+	// Annotate anything the migrator could not convert with TODO(gotest-migrate)
+	// markers so nothing is silently skipped.
+	suiteNames := map[string]bool{}
+	for i := range plan.Suites {
+		suiteNames[plan.Suites[i].NewName] = true
+	}
+	formatted, err = annotateUnconverted(formatted, suiteNames)
+	if err != nil {
+		return nil, fmt.Errorf("annotate %s: %w", path, err)
 	}
 
 	if err := os.WriteFile(path, formatted, 0644); err != nil { //nolint:gosec // G306: not sensitive data

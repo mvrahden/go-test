@@ -345,19 +345,24 @@ type escapeConfig struct {
 	message    string
 	suiteOnly  bool
 	canAutofix bool
+	directOnly bool // only flag direct t.T().X() calls; plain *testing.T helpers may use X legitimately
 }
 
 var escapeConfigs = map[string]escapeConfig{
-	"Errorf":   {TEscape, "Errorf is available on gotest.T — unnecessary T escape", false, true},
-	"FailNow":  {TEscape, "FailNow is available on gotest.T — unnecessary T escape", false, true},
-	"Skipf":    {TEscape, "Skipf is available on gotest.T — unnecessary T escape", false, true},
-	"Setenv":   {TEscape, "Setenv is available on gotest.T — unnecessary T escape", false, true},
-	"TempDir":  {TEscape, "TempDir is available on gotest.T — unnecessary T escape", false, true},
-	"Skip":     {TEscape, "must use Skipf instead — unnecessary T escape", false, false},
-	"SkipNow":  {TEscape, "must use Skipf instead — unnecessary T escape", false, false},
-	"Cleanup":  {TEscape, "use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle", true, false},
-	"Parallel": {TEscape, "use SuiteConfig.Parallel instead — T.Parallel bypasses suite lifecycle coordination", true, false},
-	"Run":      {TEscape, "use It or When instead — T.Run bypasses gotest wrapping", true, false},
+	"Errorf":   {TEscape, "Errorf is available on gotest.T — unnecessary T escape", false, true, false},
+	"FailNow":  {TEscape, "FailNow is available on gotest.T — unnecessary T escape", false, true, false},
+	"Skipf":    {TEscape, "Skipf is available on gotest.T — unnecessary T escape", false, true, false},
+	"Setenv":   {TEscape, "Setenv is available on gotest.T — unnecessary T escape", false, true, false},
+	"TempDir":  {TEscape, "TempDir is available on gotest.T — unnecessary T escape", false, true, false},
+	"Skip":     {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
+	"SkipNow":  {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
+	"Cleanup":  {TEscape, "use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle", true, false, false},
+	"Parallel": {TEscape, "use SuiteConfig.Parallel instead — T.Parallel bypasses suite lifecycle coordination", true, false, false},
+	"Run":      {TEscape, "use It or When instead — T.Run bypasses gotest wrapping", true, false, false},
+	"Helper":   {TEscape, "never call Helper — gotest resolves call sites automatically; Helper degrades failure locations", false, false, true},
+	"Log":      {TEscape, "use assertion message args instead — T.Log bypasses the failure report", false, false, true},
+	"Fatal":    {TEscape, "use assertions instead — T.Fatal bypasses the assertion tracer", false, false, true},
+	"Fatalf":   {TEscape, "use assertions instead — T.Fatalf bypasses the assertion tracer", false, false, true},
 }
 
 var gotestAssertionFuncs = map[string]bool{
@@ -657,7 +662,7 @@ func (mr *methodReach) scanDirect(fd *ast.FuncDecl) {
 		case *ast.CallExpr:
 			sel, ok := node.Fun.(*ast.SelectorExpr)
 			if ok {
-				if _, ok := escapeConfigs[sel.Sel.Name]; ok {
+				if esc, ok := escapeConfigs[sel.Sel.Name]; ok && !esc.directOnly {
 					method := sel.Sel.Name
 					if id, ok := sel.X.(*ast.Ident); ok {
 						if idx, ok := aliases[id.Name]; ok {

@@ -17,7 +17,7 @@ Write test suites as Go structs.
 What runs is standard `go test`.
 What you read back is a behavioral specification.
 
-No runtime dependencies. No reflection. Pure code generation.
+No third-party runtime dependencies. No reflection in discovery or registration. Pure code generation.
 
 ## Install
 
@@ -90,7 +90,7 @@ UserService
     when email already exists
       ✓ returns ErrDuplicate
 
-1 suite, 2 behaviors: 2 passed
+1 suites, 2 behaviors: 2 passed
 ```
 
 No generated code leaks into your workflow.
@@ -127,7 +127,7 @@ MySuite struct      gotest_psuite_test.go     func TestMySuite(t *testing.T)
 ```
 
 The generated code is what a careful developer would write by hand: `t.Run`, `t.Cleanup`, `defer`, `sync.WaitGroup`.
-No reflection, no interface dispatch.
+No reflection or interface dispatch in the generated wiring.
 
 ## Specification
 
@@ -170,7 +170,7 @@ UserService
     ✓ soft-deletes the user (5ms)
     ~ hard-deletes after 30 days — SKIPPED
 
-2 suites, 5 behaviors: 4 passed, 0 failed, 1 skipped
+2 suites, 5 behaviors: 4 passed, 1 skipped
 ```
 
 Generate a markdown specification document:
@@ -179,7 +179,7 @@ Generate a markdown specification document:
 gotest spec ./... --format=md --output=docs/behavior-spec.md
 ```
 
-Append spec view after normal test output:
+Render the spec view instead of the default output (also works in watch mode):
 
 ```bash
 gotest ./... -v --spec
@@ -284,8 +284,8 @@ func (f *E2ESetupFixture) AfterAll(ctx context.Context) error {
 
 Fixture hooks receive `context.Context` and return `error` — the generated wrapper reports failures with automatic attribution (e.g., `E2ESetupFixture.BeforeAll failed: start postgres: connection refused`).
 
-Setup hooks (`BeforeAll`, `BeforeEach`) receive `t.Context()` — cancelled when the test ends, carries the test deadline.
-Cleanup hooks (`AfterAll`, `AfterEach`) receive `context.Background()` — cleanup must proceed even after the test context is cancelled.
+`BeforeAll`/`AfterAll` receive `context.Background()` bounded by the fixture's configured timeout.
+`BeforeEach` receives the test's `t.Context()`; `AfterEach` receives `context.Background()` — cleanup must proceed even after the test context is cancelled.
 Requires Go 1.24+.
 
 Test suites reference fixtures via named pointer fields — one or more:
@@ -301,7 +301,7 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 }
 ```
 
-Fixtures support the same lifecycle hooks as suites.
+Fixtures support the same lifecycle hook names as suites — with `(ctx context.Context) error` signatures instead of `*gotest.T`.
 `BeforeAll`/`AfterAll` run once around all suites bound to the fixture.
 `BeforeEach`/`AfterEach` wrap every individual test case, running outside the suite's own hooks:
 
@@ -313,7 +313,7 @@ Fixture.BeforeEach
 Fixture.AfterEach
 ```
 
-All four hooks are optional (only `BeforeAll` is required).
+`BeforeAll` is required; the other three hooks are optional.
 
 Fixtures compose naturally — each fixture can depend on multiple others via pointer fields.
 Dependencies are set up before dependents, independent fixtures set up in parallel, and everything tears down in reverse.
@@ -599,8 +599,8 @@ func (s *BatchTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-Only non-zero fields override.
-Use zero duration to explicitly disable a timeout (`Timeout: 0`).
+The returned config is used as-is — a zero (or omitted) duration means no timeout, and without a `SuiteConfig()`/`FixtureConfig()` method the defaults apply.
+Start from a preset to combine defaults with overrides (`cfg := gotest.DefaultSuiteConfig(); cfg.Parallel = true; return cfg`).
 
 Preset constructors for common scenarios:
 
@@ -608,13 +608,13 @@ Preset constructors for common scenarios:
 |--------|---------|--------------|---------|------------|----------|
 | `DefaultFixtureConfig()` | 2 min | — | 0 | — | Standard fixtures |
 | `ContainerFixtureConfig()` | 5 min | — | 1 | 5 sec | Testcontainers, image pulls |
-| `DefaultSuiteConfig()` | 30 sec | 30 sec | 0 | — | Unit/integration tests |
-| `IntegrationSuiteConfig()` | 2 min | 5 min | 0 | — | Heavier integration tests |
+| `DefaultSuiteConfig()` | 30 sec | 30 sec | — | — | Unit/integration tests |
+| `IntegrationSuiteConfig()` | 2 min | 5 min | — | — | Heavier integration tests |
 
 ### Project Configuration
 
 Project-level defaults live in `.gotest.yml` at the repository root (or nearest parent with a `go.mod`).
-CLI flags always take precedence over config values; zero/omitted fields are ignored.
+CLI flags always take precedence over config values; omitted keys fall back to defaults (an explicit `0` on a duration key disables the deadline).
 
 ```yaml
 # .gotest.yml
@@ -704,7 +704,7 @@ gotest scaffold ./pkg/user.UserService
 
 ```bash
 gotest migrate ./...
-# Migrated 12 suites across 8 packages:
+# Migrated 12 suites:
 #   pkg/user/user_test.go: UserSuite → UserTestSuite
 ```
 
@@ -751,6 +751,8 @@ gotest refactor toggle-focus . # toggle F_/X_ prefixes programmatically
 gotest migrate ./...           # convert testify/suite to go-test
 gotest generate ./...          # run code generation only (no tests)
 gotest clean ./...             # remove orphaned generated files
+gotest discover ./...          # suite metadata as JSON (editor/AI surface)
+gotest prepare ./tests/e2e     # start shared fixtures for debugging
 gotest version                 # print version
 gotest help                    # show help
 ```

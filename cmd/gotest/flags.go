@@ -48,7 +48,7 @@ var summaryAllowed = flagSet(
 )
 
 var watchAllowed = flagSet(
-	"--debug", "--ci", "--update-snapshots", "--no-cache",
+	"--debug", "--ci", "--update-snapshots", "--no-cache", "--spec",
 	"--setup-timeout", "--timeout", "--debounce", "--parallel", "--compile-parallel",
 )
 

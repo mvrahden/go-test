@@ -2,10 +2,13 @@ package gotestgen
 
 import (
 	"fmt"
+	"go/ast"
 	"maps"
+	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/x/slices"
 	"golang.org/x/tools/go/packages"
@@ -21,6 +24,55 @@ type GenerateResult struct {
 	SkippedSuiteNames              []string            // identifiers of suites excluded by focus/X_ rules
 	FixtureDepSuites               []string            // test function names that depend on shared fixtures (e.g. "TestFooSuite")
 	SuiteRequiredSharedFixtureKeys map[string][]string // test func name → required state keys
+	StdlibTestCount                int                 // stdlib func TestX(*testing.T) declarations — reported, never run by gotest
+}
+
+// countStdlibTests counts top-level runnable stdlib test functions — Test*,
+// Benchmark*, Fuzz* (single *testing.T/B/F param) and Example* — across the
+// given package variants, excluding TestMain, non-test files, and generated
+// runner files. gotest never runs these; they are counted so the runner can
+// report them honestly.
+func countStdlibTests(pkgs ...*packages.Package) int {
+	n := 0
+	for _, pkg := range pkgs {
+		if pkg == nil {
+			continue
+		}
+		for _, file := range pkg.Syntax {
+			filename := pkg.Fset.Position(file.Pos()).Filename
+			if !strings.HasSuffix(filename, "_test.go") || about.PSuiteRegex.MatchString(filepath.Base(filename)) {
+				continue
+			}
+			for _, decl := range file.Decls {
+				fd, ok := decl.(*ast.FuncDecl)
+				if !ok || fd.Recv != nil || fd.Name.Name == "TestMain" {
+					continue
+				}
+				name := fd.Name.Name
+				if strings.HasPrefix(name, "Example") {
+					n++
+					continue
+				}
+				if !strings.HasPrefix(name, "Test") && !strings.HasPrefix(name, "Benchmark") && !strings.HasPrefix(name, "Fuzz") {
+					continue
+				}
+				if fd.Type.Params == nil || len(fd.Type.Params.List) != 1 || len(fd.Type.Params.List[0].Names) > 1 {
+					continue
+				}
+				star, ok := fd.Type.Params.List[0].Type.(*ast.StarExpr)
+				if !ok {
+					continue
+				}
+				if sel, ok := star.X.(*ast.SelectorExpr); ok {
+					switch sel.Sel.Name {
+					case "T", "B", "F":
+						n++
+					}
+				}
+			}
+		}
+	}
+	return n
 }
 
 const (
@@ -256,6 +308,7 @@ func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFix
 			SkippedSuiteNames:              skippedNames,
 			FixtureDepSuites:               append(ptestFixtureDeps, pxtestFixtureDeps...),
 			SuiteRequiredSharedFixtureKeys: mergedReqKeys,
+			StdlibTestCount:                countStdlibTests(lr.Ptest, lr.Pxtest),
 		}, nil
 	})
 	if err != nil {

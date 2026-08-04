@@ -269,7 +269,7 @@ func (s *ManagedProcessTestSuite) TestAdopt(t *gotest.T) {
 			select {
 			case <-mp.Done():
 			case <-time.After(3 * time.Second):
-				it.T().Fatal("Done channel not closed after process exited")
+				gotest.Fail(it, "Done channel not closed after process exited")
 			}
 		})
 	})

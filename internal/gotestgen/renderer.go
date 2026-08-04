@@ -47,6 +47,7 @@ type SharedFixtureNodeVM struct {
 	Identifier    string
 	QualifiedType string
 	StateKey      string
+	HasConfig     bool
 	HasHydrate    bool
 	HasDehydrate  bool
 	PkgPath       string
@@ -131,6 +132,9 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		return v.IsMethodParallel()
 	}) {
 		imports = append(imports, headerImport{Path: "sync"})
+		if !hasFixtures {
+			imports = append(imports, headerImport{Path: "sync/atomic"})
+		}
 	}
 	seenPkg := map[string]bool{}
 	for _, rf := range allFixtures {
@@ -246,6 +250,7 @@ func buildSharedFixtureNodeVMs(sharedFixtures []SharedFixtureInfo) []*SharedFixt
 			Identifier:    id,
 			QualifiedType: qualifiedType,
 			StateKey:      sf.PkgPath + "." + sf.Identifier,
+			HasConfig:     sf.HasConfig,
 			HasHydrate:    sf.HasHydrate,
 			HasDehydrate:  sf.HasDehydrate,
 			PkgPath:       sf.PkgPath,

@@ -247,6 +247,18 @@ func (s *CollectorTestSuite) TestSuiteConfig(t *gotest.T) {
 		})
 	})
 
+	t.When("suite composes its config from a preset", func(w *gotest.T) {
+		w.It("accepts the compose form and detects Parallel", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_ComposeBody")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+			gotest.Len(it, result.Suites, 1)
+			gotest.True(it, result.Suites[0].HasConfig(), "expected HasConfig() to be true")
+			gotest.True(it, result.Suites[0].IsMethodParallel(), "Parallel set via cfg.Parallel = true must be detected")
+		})
+	})
+
 	t.When("suite has no Config method", func(w *gotest.T) {
 		w.It("reports HasConfig as false", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_AbsentIsFalse")
@@ -294,6 +306,97 @@ func (s *CollectorTestSuite) TestSuiteConfig(t *gotest.T) {
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
 			gotest.NotEmpty(it, result.Errs, "expected error for non-literal SuiteConfig body")
+		})
+	})
+
+	t.When("single-statement preset call", func(w *gotest.T) {
+		w.It("accepts the gotest preset and reports not parallel", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_PresetCall")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "expected no errors, got: %v", result.Errs)
+			gotest.True(it, result.Suites[0].HasConfig(), "expected HasConfig() to be true")
+			gotest.False(it, result.Suites[0].IsMethodParallel(), "presets leave Parallel false")
+		})
+	})
+
+	t.When("single-statement unknown helper call", func(w *gotest.T) {
+		w.It("reports an error", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_UnknownHelperCall_Error")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "expected error for non-preset helper call")
+			gotest.ErrorContains(it, result.Errs[0].Err, "only the gotest presets")
+		})
+	})
+
+	t.When("a non-gotest function shadows a preset name", func(w *gotest.T) {
+		w.It("reports an error — the name alone must not pass as a preset", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_ForeignPresetName_Error")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "a shadowing DefaultSuiteConfig returning Parallel: true would silently generate a sequential suite")
+			gotest.ErrorContains(it, result.Errs[0].Err, "only the gotest presets")
+		})
+	})
+
+	t.When("positional literal", func(w *gotest.T) {
+		w.It("reports an error — Parallel in positional form is invisible to the static scan", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_PositionalLiteral_Error")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "expected error for keyless SuiteConfig literal")
+			gotest.ErrorContains(it, result.Errs[0].Err, "keyed fields")
+		})
+	})
+
+	t.When("suite composes its config from a literal base", func(w *gotest.T) {
+		w.It("detects Parallel from the base literal", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_ComposeLiteralBase")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "expected no errors, got: %v", result.Errs)
+			gotest.True(it, result.Suites[0].IsMethodParallel(), "Parallel: true in the compose base literal must be detected")
+		})
+	})
+
+	t.When("compose form with unknown base call", func(w *gotest.T) {
+		w.It("reports an error", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_ComposeUnknownBase_Error")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "expected error for non-preset compose base")
+			gotest.ErrorContains(it, result.Errs[0].Err, "only the gotest presets")
+		})
+	})
+
+	t.When("Parallel is assigned a non-literal value", func(w *gotest.T) {
+		w.It("reports an error", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_ParallelNonLiteral_Error")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "expected error for cfg.Parallel = <var>")
+			gotest.ErrorContains(it, result.Errs[0].Err, "boolean literal")
+		})
+	})
+
+	t.When("Parallel is overridden back to false", func(w *gotest.T) {
+		w.It("reports not parallel", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_ParallelFalseOverride")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "expected no errors, got: %v", result.Errs)
+			gotest.False(it, result.Suites[0].IsMethodParallel(), "cfg.Parallel = false must override the base literal")
+		})
+	})
+
+	t.When("compose form is structurally malformed", func(w *gotest.T) {
+		w.It("reports an error", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_MalformedBody_Error")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "expected error for body not ending in `return cfg`")
+			gotest.ErrorContains(it, result.Errs[0].Err, "must return a gotest.SuiteConfig literal or preset call")
 		})
 	})
 }
@@ -415,6 +518,26 @@ func (s *CollectorTestSuite) TestTestMethod(t *gotest.T) {
 			gotest.True(it, result.Suites[0].TestCases()[0].HasContextParam(), "expected context param")
 		})
 	})
+
+	t.When("async method's last param is not done func()", func(w *gotest.T) {
+		w.It("reports an error", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_TestMethod_AsyncWrongDoneParam")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "expected error for Async method without trailing done func()")
+			gotest.ErrorContains(it, result.Errs[0].Err, "unsupported last argument")
+		})
+	})
+
+	t.When("too many params", func(w *gotest.T) {
+		w.It("reports an error", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_TestMethod_TooManyParams")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "expected error for 3 params on a non-async method")
+			gotest.ErrorContains(it, result.Errs[0].Err, "unsupported number of params")
+		})
+	})
 }
 
 func (s *CollectorTestSuite) TestStdlibT(t *gotest.T) {
@@ -514,11 +637,57 @@ func (s *CollectorTestSuite) TestValidation(t *gotest.T) {
 	})
 
 	t.When("parallel without BeforeEach", func(w *gotest.T) {
-		w.It("is allowed", func(it *gotest.T) {
+		w.It("is allowed for a field-less suite", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_ParallelWithoutBeforeEach_Allowed")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
 			gotest.Empty(it, result.Errs, "parallel with no BeforeEach should be allowed")
+		})
+
+		w.It("is allowed for suites with fields (write-once-in-BeforeAll is a valid pattern)", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_ParallelStateNoBeforeEach")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "structural field checks cannot distinguish read-only from racy state")
+		})
+
+		w.It("is allowed when the only fields are fixture pointers", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_ParallelFixtureOnlyNoBeforeEach")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "fixture pointer fields are wired once and read-only")
+		})
+	})
+
+	t.When("unexported suite", func(w *gotest.T) {
+		w.It("errors when it has test cases", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_UnexportedSuiteWithCases")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "unexported suite with cases is a silent false-green")
+			gotest.ErrorContains(it, result.Errs[0].Err, "must be exported")
+		})
+
+		w.It("is allowed as a case-less embed base", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_UnexportedCaselessBase")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "helper/base types ending in TestSuite must stay legal")
+		})
+	})
+
+	t.When("a referenced fixture has a value-receiver hook", func(w *gotest.T) {
+		w.It("errors at resolution, not collection — incidental Fixture-named types stay legal", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Fixture_ValueReceiverHook")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "collection must not fail on value-receiver hooks")
+
+			spec, err := c.ApplyTestSuiteSpecs(result)
+			gotest.NoError(it, err)
+
+			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.ErrorContains(it, err, "value type receiver")
 		})
 	})
 
@@ -577,6 +746,36 @@ func (s *CollectorTestSuite) TestValidation(t *gotest.T) {
 			result := c.CollectSuiteSpecs(pkg)
 			gotest.NotEmpty(it, result.Errs, "expected error: non-pointer context")
 			gotest.ErrorContains(it, result.Errs[0].Err, "must be a pointer")
+		})
+	})
+
+	t.When("orphan context test method", func(w *gotest.T) {
+		w.It("reports an error when BeforeEach does not return a context", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_OrphanContextTestMethod")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "expected error: context param without returning BeforeEach")
+			gotest.ErrorContains(it, result.Errs[0].Err, "BeforeEach does not return a context")
+		})
+	})
+
+	t.When("AfterEach context type mismatch", func(w *gotest.T) {
+		w.It("reports an error", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_AfterEachContextTypeMismatch")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "expected error: AfterEach context type mismatch")
+			gotest.ErrorContains(it, result.Errs[0].Err, "AfterEach: context type")
+		})
+	})
+
+	t.When("suite method has a value receiver", func(w *gotest.T) {
+		w.It("reports an error", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteMethod_ValueReceiver")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "expected error for value-receiver suite method")
+			gotest.ErrorContains(it, result.Errs[0].Err, "unsupported value type receiver")
 		})
 	})
 }

@@ -10,12 +10,20 @@ import (
 )
 
 func runScaffold(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	var target string
 	for _, arg := range inv.Args {
-		if !isFlag(arg) {
-			target = arg
-			break
+		if isFlag(arg) {
+			fmt.Fprintf(os.Stderr, "FAIL: unknown flag %s — scaffold takes no flags\n", arg)
+			return 2
 		}
+	}
+
+	if len(inv.Args) > 1 {
+		fmt.Fprintf(os.Stderr, "FAIL: scaffold takes exactly one target, got %d\n", len(inv.Args))
+		return 2
+	}
+	var target string
+	if len(inv.Args) > 0 {
+		target = inv.Args[0]
 	}
 
 	if target == "" {

@@ -56,8 +56,10 @@ type PipelineResult struct {
 }
 
 func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult) (PipelineResult, error) {
-	if !cfg.CI && os.Getenv(protocol.EnvCI) == "" && os.Getenv("CI") != "" {
-		cfg.CI = true
+	if !cfg.CI && os.Getenv(protocol.EnvCI) == "" {
+		if v := os.Getenv("CI"); v != "" && v != "0" && v != "false" {
+			cfg.CI = true
+		}
 	}
 	pf := ParseExecFlags(cfg.GoTestArgs)
 
@@ -223,6 +225,7 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	}
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
+	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
 	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
 	RunSuites(ctx, targets, extraEnv, maxParallel, collector)
 	collector.Finalize(overlay.NoSuitePackages)
@@ -300,6 +303,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	var allTargets []SuiteTarget
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
+	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
 	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
 	collector.SetFlushOrder(overlay.SuitePackages)
 

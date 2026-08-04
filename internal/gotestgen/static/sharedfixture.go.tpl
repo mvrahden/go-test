@@ -25,9 +25,10 @@ func ƒquote(s string) string {
 func main() {
 {{ range $f := .Fixtures }}
 	{{ $f.VarName }} := &{{ $f.QualifiedType }}{}
-	ƒcfg_{{ $f.VarName }} := gotest.DefaultFixtureConfig()
 {{- if $f.HasConfig }}
-	gotest.OverlayFixtureConfig(&ƒcfg_{{ $f.VarName }}, {{ $f.VarName }}.SharedFixtureConfig())
+	ƒcfg_{{ $f.VarName }} := {{ $f.VarName }}.SharedFixtureConfig()
+{{- else }}
+	ƒcfg_{{ $f.VarName }} := gotest.DefaultFixtureConfig()
 {{- end }}
 {{ end }}
 	ƒerrs := make([]error, {{ len .Fixtures }})

@@ -244,6 +244,7 @@ Flags:
   --debounce=<dur>        Re-run delay after change (default: 200ms)
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay
+  --spec                  Render spec view after each run
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable overlay cache, force fresh generation
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
@@ -252,6 +253,7 @@ Flags:
 Examples:
   gotest watch ./...                         Watch all packages
   gotest watch ./pkg/auth/... -v             Watch with verbose output
+  gotest watch ./... --spec                  Spec view on every change
   gotest watch --debounce=500ms ./...        Slower debounce for large projects
 `)
 }
@@ -270,14 +272,19 @@ Output schema:
     "packages": [{
       "importPath": "example.com/pkg",
       "dir":        "/absolute/path",
+      "modulePath": "example.com",
+      "testOnly":   false,
       "suites": [{
         "name":     "UserTestSuite",
         "file":     "user_test.go",
         "line":     10,
         "col":      1,
+        "parallel": false,
         "focused":  false,
         "excluded": false,
         "guarded":  false,
+        "lifecycle": ["BeforeAll", "AfterAll"],
+        "fixtures":  ["E2ESetupFixture"],
         "methods": [{
           "name": "TestCreate",
           "file": "user_test.go",
@@ -289,7 +296,7 @@ Output schema:
         }]
       }]
     }],
-    "warnings": [{"importPath": "...", "message": "..."}]
+    "warnings": [{"importPath": "...", "file": "...", "line": 1, "col": 1, "message": "..."}]
   }
 
 Examples:
@@ -306,14 +313,14 @@ Usage:
 
 Target is one of:
   ./pkg/path.TypeName      Generate suite for a specific type
-  ./pkg/path/file.go       Generate suites for all types in a file
+  ./pkg/path/file.go       Generate a suite over the file's exported functions
 
 Creates a new _test.go file with a suite struct, a runner function,
 and stub methods for each exported method on the target type.
 
 Examples:
   gotest scaffold ./pkg/auth.UserService        Suite for UserService type
-  gotest scaffold ./pkg/auth/service.go         Suites for all types in file
+  gotest scaffold ./pkg/auth/service.go         Suite over the file's exported functions
 `)
 }
 
@@ -327,17 +334,25 @@ Checks for common mistakes in gotest test suites. Defaults to ./... if
 no packages are specified.
 
 Rules:
-  focus           Focused (F_) suites/methods should not be committed
-  receiver        Suite methods should use pointer receivers
-  lifecycle-typo  Methods similar to lifecycle hooks (likely typos)
-  lifecycle-pair  BeforeAll without matching AfterAll (resource leak)
-  generated-file  Generated overlay files should not be in version control
-  stdlib-test     Stdlib test functions — consider using gotest suites
-  testify         testify imports — consider migrating to gotest
+  focus                 Focused (F_) suites/methods should not be committed
+  receiver              Suite methods should use pointer receivers
+  lifecycle-typo        Methods similar to lifecycle hooks (likely typos)
+  lifecycle-pair        BeforeAll without matching AfterAll (resource leak)
+  generated-file        Generated overlay files should not be in version control
+  stdlib-test           Stdlib test functions — consider using gotest suites
+  testify               testify imports — consider migrating to gotest
+  poll-scope            Outer t used inside Eventually/Consistently callbacks
+  test-signature        Test methods not accepting *gotest.T or *testing.T
+  x-lifecycle           X_ prefix on a lifecycle hook (a no-op)
+  assertion-simplify    Simplifiable assertions (True(t, a == b) → Equal, …)
+  assertion-type-guard  Nil/Empty on types their runtime guards reject
+  assertion-redundant   Assertions made redundant by the following assertion
+  t-escape              Unnecessary or harmful t.T() escapes (incl. Helper/Fatal/Log)
 
 Flags:
   -skip-stdlib-test       Disable the stdlib-test rule
   -skip-testify           Disable the testify rule
+  -disable-nolint         Ignore //nolint comments
   -fix                    Apply suggested fixes
 
 Suppress individual diagnostics with //nolint comments:
@@ -424,7 +439,7 @@ func printCleanHelp() {
 Usage:
   gotest clean [packages...]
 
-Removes generated overlay files (gotest_*_test.go) that are no longer
+Removes generated overlay files (gotest_p(x)suite_test.go) that are no longer
 needed. These files are normally ephemeral but may be left behind
 by --debug runs or interrupted processes.
 
@@ -449,6 +464,8 @@ Fields:
   setup-timeout: <duration> Total budget for all shared fixture setup (default: 2m, 0 to disable)
   timeout: <duration>       Global pipeline deadline (default: 15m, 0 to disable)
   min-coverage: <int>       Minimum coverage percentage, 0-100
+  parallel: <int>           Total concurrent test method budget (default: 2×GOMAXPROCS)
+  compile-parallel: <int>   Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan)
   debounce: <duration>      Watch mode re-run delay (e.g., "500ms", default: 200ms)
   lint:
     skip: [<rule>, ...]     Lint rules to disable globally

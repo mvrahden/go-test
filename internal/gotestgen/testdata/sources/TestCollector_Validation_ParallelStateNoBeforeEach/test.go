@@ -1,0 +1,12 @@
+package testpkg
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type MyTestSuite struct {
+	counter int
+}
+
+func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
+func (s *MyTestSuite) TestOne(t *gotest.T) { _ = s.counter }

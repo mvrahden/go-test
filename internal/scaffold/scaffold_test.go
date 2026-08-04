@@ -1,6 +1,8 @@
 package scaffold //nolint:stdlib-test
 
 import (
+	"go/parser"
+	"go/token"
 	"strings"
 	"testing"
 
@@ -353,8 +355,11 @@ func TestGenerateFileScaffold(t *testing.T) {
 	if !strings.Contains(src, "type CalcTestSuite struct") {
 		t.Error("missing test suite struct")
 	}
-	if !strings.Contains(src, "gotest.TestSuite") {
-		t.Error("missing embedded TestSuite")
+	if strings.Contains(src, "gotest.TestSuite") {
+		t.Error("scaffold must not embed gotest.TestSuite — no such type exists")
+	}
+	if _, perr := parser.ParseFile(token.NewFileSet(), "scaffold.go", src, 0); perr != nil {
+		t.Errorf("generated scaffold does not parse: %v", perr)
 	}
 	if strings.Contains(src, "sut") {
 		t.Error("file-scoped scaffold should NOT have sut field")
