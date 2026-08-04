@@ -36,7 +36,19 @@ func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) boo
 		close(finished)
 	}()
 
-	tt := <-ready
+	// t.Run does not always run the closure: a subtest filtered out by
+	// -run/-skip, or suppressed after -failfast tripped, returns immediately.
+	// Waiting on ready alone deadlocked the binary until -test.timeout killed
+	// it — with no AfterAll and no fixture teardown — the moment anyone reran
+	// a single table entry by name. Observe testing instead of assuming it:
+	// finished-first means this entry was not selected, so skip it and let the
+	// iteration continue, exactly as go test treats the subtest.
+	var tt *testing.T
+	select {
+	case tt = <-ready:
+	case <-finished:
+		return true
+	}
 
 	// goexited stays true when yield leaves via runtime.Goexit — a failed
 	// assertion inside the entry. A panic is tracked separately: the two must

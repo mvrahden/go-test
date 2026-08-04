@@ -57,6 +57,7 @@ func (s *E2ETestSuite) TestT(t *gotest.T) {
 	excludedPaths := append(append([]string(nil), testutils.DefaultExcludePaths...),
 		"pkg/gotest/assertions_suite_test.go",
 		"pkg/gotest/config_suite_test.go",
+		"pkg/gotest/each_filter_suite_test.go",
 		"pkg/gotest/each_suite_test.go",
 		"pkg/gotest/export_test.go",
 		"pkg/gotest/must_suite_test.go",
