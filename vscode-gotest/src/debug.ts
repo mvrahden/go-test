@@ -133,6 +133,7 @@ export class DebugLauncher implements vscode.Disposable {
     return new Promise((resolve, reject) => {
       const child = spawn(bin, args, { cwd, detached: true });
       let stdout = "";
+      let stderr = "";
       let settled = false;
       const settle = (fn: () => void) => {
         if (!settled) {
@@ -177,6 +178,7 @@ export class DebugLauncher implements vscode.Disposable {
       });
 
       child.stderr.on("data", (data: Buffer) => {
+        stderr += data.toString();
         this.outputChannel.debug(
           `[debug:prepare] ${data.toString().trimEnd()}`,
         );
@@ -187,9 +189,16 @@ export class DebugLauncher implements vscode.Disposable {
       });
 
       child.on("close", (code) => {
-        settle(() =>
-          reject(new Error(`prepare exited with code ${code} before ready`)),
-        );
+        // prepare fails fast on packages that do not build; its stderr carries
+        // the compiler diagnostics, which are the only actionable part.
+        settle(() => {
+          const detail = stderr.trim();
+          reject(
+            new Error(
+              `prepare exited with code ${code} before ready${detail ? `:\n${detail}` : ""}`,
+            ),
+          );
+        });
       });
     });
   }

@@ -337,6 +337,18 @@ export class GoTestController implements vscode.Disposable {
       ...this.buildTags(false, false, false),
     ];
     pkgItem.description = importPath;
+    // A broken package keeps its last known suites in the tree but carries an
+    // error badge with the build diagnostics: the tests still exist in the
+    // code, they just cannot run until the package builds again.
+    if (pkg.broken) {
+      const diagnostics = this.cache
+        .getWarnings(importPath)
+        .map((w) => w.message)
+        .join("\n");
+      pkgItem.error = diagnostics || "package failed to build";
+    } else {
+      pkgItem.error = undefined;
+    }
     parent.add(pkgItem);
 
     const seenSuiteIds = new Set<string>();

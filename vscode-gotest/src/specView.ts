@@ -355,6 +355,7 @@ interface SpecPackage {
   status: string;
   duration: number;
   nodes: SpecNode[];
+  output?: string[];
 }
 
 interface SpecNode {
@@ -377,6 +378,10 @@ interface SpecStats {
   passed: number;
   failed: number;
   skipped: number;
+  // Packages whose verdict sits on the package itself — a build failure, a
+  // death outside any test. They carry no failing behavior, so they are
+  // counted separately from `failed`.
+  failedPackages?: number;
 }
 
 // --- HTML Builders ---
@@ -409,9 +414,10 @@ function buildSpecBody(
   const groups = groupByModule(data.packages, modulePaths);
   let tree: string;
   if (groups.length === 1 && groups[0].entries.length === 1) {
-    tree = groups[0].entries[0].pkg.nodes
-      .map((n) => buildNodeHtml(n, "", locationMap))
-      .join("");
+    const pkg = groups[0].entries[0].pkg;
+    tree =
+      buildPackageFailureHtml(pkg) +
+      pkg.nodes.map((n) => buildNodeHtml(n, "", locationMap)).join("");
   } else if (groups.length === 1) {
     tree = groups[0].entries
       .map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, locationMap))
@@ -486,8 +492,35 @@ function buildPackageSectionHtml(
     .join("");
   return `<details class="pkg-section" open>
   <summary class="pkg-header">${escapeHtml(displayPath)}</summary>
-  ${nodes}
+  ${buildPackageFailureHtml(pkg)}${nodes}
 </details>`;
+}
+
+// pkgFailedOnItsOwn reports whether a package's FAIL verdict originates on
+// the package itself rather than on any test beneath it — a build failure, a
+// TestMain os.Exit, a crash outside any test.
+function pkgFailedOnItsOwn(pkg: SpecPackage): boolean {
+  return pkg.status === "fail" && !pkg.nodes.some(hasFailure);
+}
+
+// buildPackageFailureHtml renders a package-level FAIL verdict with its
+// diagnostics. Such a package has no failing node to render it, so without
+// this block the spec view would show the package as an empty green section
+// beside a red exit code.
+function buildPackageFailureHtml(pkg: SpecPackage): string {
+  if (!pkgFailedOnItsOwn(pkg)) return "";
+  const lines = (pkg.output ?? [])
+    .map((l) => l.trimEnd())
+    .filter(Boolean)
+    .map(escapeHtml)
+    .join("\n");
+  const errorBlock = lines
+    ? `<details class="error-details" open><summary class="error-summary">Error details</summary><pre class="error-output">${lines}</pre></details>`
+    : "";
+  return `<div class="leaf test fail">
+  <span class="icon fail"><span class="status-text">✗</span></span> <strong>FAIL</strong>
+  ${errorBlock}
+</div>`;
 }
 
 function buildModuleSectionHtml(
@@ -496,7 +529,8 @@ function buildModuleSectionHtml(
 ): string {
   const inner =
     group.entries.length === 1
-      ? group.entries[0].pkg.nodes
+      ? buildPackageFailureHtml(group.entries[0].pkg) +
+        group.entries[0].pkg.nodes
           .map((n) => buildNodeHtml(n, "", locationMap))
           .join("")
       : group.entries
@@ -663,12 +697,14 @@ function buildSummary(stats: SpecStats): string {
   if (stats.behaviors > 0) counts.push(`${stats.behaviors} behaviors`);
   if (stats.tests > 0) counts.push(`${stats.tests} stdlib tests`);
 
+  const failedPackages = stats.failedPackages ?? 0;
   return `<div class="summary">
   <span class="summary-counts">${counts.join(", ")}</span>
   <span class="summary-results">
     ${stats.passed > 0 ? `<span class="pass">${stats.passed} passed</span>` : ""}
     ${stats.failed > 0 ? `<span class="fail">${stats.failed} failed</span>` : ""}
     ${stats.skipped > 0 ? `<span class="skip">${stats.skipped} skipped</span>` : ""}
+    ${failedPackages > 0 ? `<span class="fail">${failedPackages} failed packages</span>` : ""}
   </span>
 </div>`;
 }
@@ -745,7 +781,10 @@ export function specDataToReport(
           moduleAgg.duration += a.duration;
         }
       }
-      if (moduleAgg.passed + moduleAgg.failed + moduleAgg.skipped === 0) {
+      if (
+        moduleAgg.passed + moduleAgg.failed + moduleAgg.skipped === 0 &&
+        !group.entries.some((e) => pkgFailedOnItsOwn(e.pkg))
+      ) {
         continue;
       }
       rows.push({
@@ -765,7 +804,9 @@ export function specDataToReport(
         pkgAgg.skipped += a.skipped;
         pkgAgg.duration += a.duration;
       }
-      if (pkgAgg.passed + pkgAgg.failed + pkgAgg.skipped === 0) continue;
+      const pkgBroken = pkgFailedOnItsOwn(entry.pkg);
+      if (pkgAgg.passed + pkgAgg.failed + pkgAgg.skipped === 0 && !pkgBroken)
+        continue;
       totalAgg.passed += pkgAgg.passed;
       totalAgg.failed += pkgAgg.failed;
       totalAgg.skipped += pkgAgg.skipped;
@@ -773,7 +814,7 @@ export function specDataToReport(
       rows.push({
         label: "  ".repeat(pkgIndent) + entry.displayPath,
         time: fmtTime(pkgAgg.duration),
-        result: fmtAgg(pkgAgg),
+        result: pkgBroken ? "FAIL (package)" : fmtAgg(pkgAgg),
       });
       for (const node of entry.pkg.nodes) {
         walkReportNode(rows, node, pkgIndent + 1, hidden);
@@ -809,6 +850,8 @@ export function specDataToReport(
   if (totalAgg.passed > 0) results.push(`${totalAgg.passed} passed`);
   if (totalAgg.failed > 0) results.push(`${totalAgg.failed} failed`);
   if (totalAgg.skipped > 0) results.push(`${totalAgg.skipped} skipped`);
+  const failedPackages = data.stats.failedPackages ?? 0;
+  if (failedPackages > 0) results.push(`${failedPackages} failed packages`);
   const totalDur = hidden
     ? totalAgg.duration
     : data.packages.reduce((s, p) => s + p.duration, 0);

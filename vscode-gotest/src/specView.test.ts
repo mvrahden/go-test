@@ -299,3 +299,52 @@ describe("specDataToReport", () => {
     expect(headerLine.length).toBeLessThan(100);
   });
 });
+
+describe("specDataToReport broken packages", () => {
+  const data = {
+    packages: [
+      {
+        path: "example.com/healthy",
+        status: "pass",
+        duration: 0.5,
+        nodes: [suite("OkSuite", [leaf("passes", "pass", 0.5)])],
+      },
+      {
+        path: "example.com/broken",
+        status: "fail",
+        duration: 0,
+        nodes: [],
+        output: [
+          "# example.com/broken\n",
+          "svc.go:4:17: cannot use 42 as string value\n",
+        ],
+      },
+    ],
+    stats: {
+      suites: 1,
+      behaviors: 1,
+      tests: 0,
+      passed: 1,
+      failed: 0,
+      skipped: 0,
+      failedPackages: 1,
+    },
+  };
+
+  it("lists a package-level failure as its own row", () => {
+    const report = specDataToReport(data, ["example.com"]);
+    expect(report).toContain("broken");
+    expect(report).toContain("FAIL (package)");
+  });
+
+  it("carries failed packages into the summary line", () => {
+    const report = specDataToReport(data, ["example.com"]);
+    expect(report).toContain("1 failed packages");
+  });
+
+  it("does not count package failures as behavior failures", () => {
+    const report = specDataToReport(data, ["example.com"]);
+    expect(report).not.toContain("1 failed,");
+    expect(report).toContain("1 passed");
+  });
+});
