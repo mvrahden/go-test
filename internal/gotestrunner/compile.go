@@ -1,14 +1,15 @@
 package gotestrunner
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -25,6 +26,19 @@ type CompileOutcome struct {
 	Err     error
 }
 
+// BuildFailure is a per-package compile failure. A package that fails to
+// compile is a failed package, not an aborted run: the caller books it as a
+// verdict and keeps running the packages that did compile. An empty Package
+// marks a failure of the compile stage itself rather than of one package.
+type BuildFailure struct {
+	Package string
+	Err     error
+}
+
+// compilePackage captures the compiler's stderr into the returned error
+// instead of streaming it: the diagnostics belong to the failing package's
+// verdict, and only the collector can place them there. On success any
+// captured stderr (toolchain notices, module downloads) is forwarded.
 func compilePackage(ctx context.Context, pkgPath, overlayFlag string, buildFlags []string, binDir string) (CompileResult, error) {
 	binaryName := sanitizePkgName(pkgPath) + ".test"
 	binaryPath := filepath.Join(binDir, binaryName)
@@ -34,32 +48,44 @@ func compilePackage(ctx context.Context, pkgPath, overlayFlag string, buildFlags
 	args = append(args, pkgPath)
 
 	cmd := exec.CommandContext(ctx, "go", args...)
-	cmd.Stderr = os.Stderr
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 
 	mp := NewManagedProcess(cmd, ProcessConfig{Grace: GraceKill})
 	if err := mp.Start(); err != nil {
-		return CompileResult{}, fmt.Errorf("compile %s: %w", pkgPath, err)
+		return CompileResult{}, compileError(pkgPath, err, stderr.Bytes())
 	}
 	if err := mp.WaitWithGrace(ctx); err != nil {
-		return CompileResult{}, fmt.Errorf("compile %s: %w", pkgPath, err)
+		return CompileResult{}, compileError(pkgPath, err, stderr.Bytes())
+	}
+	if stderr.Len() > 0 {
+		_, _ = os.Stderr.Write(stderr.Bytes())
 	}
 
 	return CompileResult{Package: pkgPath, BinaryPath: binaryPath}, nil
 }
 
-func CompilePackages(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir string, compileParallel int) ([]CompileResult, error) {
+func compileError(pkgPath string, err error, diagnostics []byte) error {
+	diagnostics = bytes.TrimRight(diagnostics, "\n")
+	if len(diagnostics) == 0 {
+		return fmt.Errorf("compile %s: %w", pkgPath, err)
+	}
+	return fmt.Errorf("compile %s: %w\n%s", pkgPath, err, diagnostics)
+}
+
+func CompilePackages(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir string, compileParallel int) ([]CompileResult, []BuildFailure) {
 	ch := CompilePackagesStream(ctx, packages, overlayFlag, buildFlags, outputDir, compileParallel)
 	var results []CompileResult
-	var errs []error
+	var failures []BuildFailure
 	for outcome := range ch {
 		if outcome.Err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", outcome.Err)
-			errs = append(errs, outcome.Err)
+			failures = append(failures, BuildFailure{Package: outcome.Package, Err: outcome.Err})
 			continue
 		}
 		results = append(results, outcome.Result)
 	}
-	return results, errors.Join(errs...)
+	sort.Slice(failures, func(i, j int) bool { return failures[i].Package < failures[j].Package })
+	return results, failures
 }
 
 func compileConcurrency(compileParallel int, buildFlags []string) int {

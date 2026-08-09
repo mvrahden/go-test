@@ -17,11 +17,15 @@ import (
 )
 
 type OverlayResult struct {
-	CacheDir                       string
-	WorkDir                        string
-	OverlayFlag                    string
-	SharedFixtures                 []gotestgen.SharedFixtureInfo
-	SuitePackages                  []string
+	CacheDir       string
+	WorkDir        string
+	OverlayFlag    string
+	SharedFixtures []gotestgen.SharedFixtureInfo
+	SuitePackages  []string
+	// BrokenPackages are pattern-matched packages that failed to load. The
+	// pipeline books each one as a failed package so the run cannot report
+	// success while some of its packages never became runnable.
+	BrokenPackages                 []gotestgen.BrokenPackage
 	NoSuitePackages                []string
 	StdlibTestsByPkg               map[string]int // stdlib func TestX counts per package — gotest reports but does not run them
 	SuitesByPkg                    map[string][]string
@@ -31,7 +35,7 @@ type OverlayResult struct {
 	SuiteRequiredSharedFixtureKeys map[string]map[string][]string
 }
 
-func GenerateOverlay(loaded []*gotestgen.LoadResult, debug bool, noCache bool) (*OverlayResult, func(), error) {
+func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPackage, debug bool, noCache bool) (*OverlayResult, func(), error) {
 	allResults, allSharedFixtures, err := gotestgen.GenerateFromLoaded(loaded)
 	if err != nil {
 		return nil, nil, err
@@ -107,6 +111,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, debug bool, noCache bool) (
 		OverlayFlag:                    "-overlay=" + filepath.Join(cacheDir, "overlay.json"),
 		SharedFixtures:                 allSharedFixtures,
 		SuitePackages:                  suitePkgs,
+		BrokenPackages:                 broken,
 		NoSuitePackages:                noSuitePkgs,
 		StdlibTestsByPkg:               stdlibByPkg,
 		SuitesByPkg:                    suitesByPkg,

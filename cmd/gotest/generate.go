@@ -18,9 +18,12 @@ func runGenerate(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 		buildFlags = append(buildFlags, "-tags="+tags)
 	}
 
-	loaded, err := gotestgen.LoadPackages(patterns, buildFlags)
+	loaded, broken, err := gotestgen.LoadPackages(patterns, buildFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if reportBrokenPackages(broken) {
 		return 2
 	}
 	results, _, err := gotestgen.GenerateFromLoaded(loaded)

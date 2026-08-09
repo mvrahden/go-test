@@ -32,8 +32,9 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 	standalonePattern := "github.com/mvrahden/go-test/tests/sharedfixture/standalone/..."
 	fixtureboundPattern := "github.com/mvrahden/go-test/tests/sharedfixture/fixturebound/..."
 
-	loaded, err := gotestgen.LoadPackages([]string{standalonePattern, fixtureboundPattern}, nil)
+	loaded, broken, err := gotestgen.LoadPackages([]string{standalonePattern, fixtureboundPattern}, nil)
 	gotest.NoError(t, err)
+	gotest.Empty(t, broken)
 	allResults, allSharedFixtures, err := gotestgen.GenerateFromLoaded(loaded)
 	gotest.NoError(t, err)
 

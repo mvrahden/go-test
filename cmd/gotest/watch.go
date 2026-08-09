@@ -146,7 +146,7 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode bool) int { //nolint:gocritic // hugeParam: stable API
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
-	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
+	loaded, broken, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
 	if err != nil {
 		if jsonMode {
 			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
@@ -169,7 +169,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode bool) 
 		}
 	}
 
-	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, cfg.Debug, cfg.NoCache)
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, broken, cfg.Debug, cfg.NoCache)
 	if err != nil {
 		if jsonMode {
 			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())

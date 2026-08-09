@@ -58,6 +58,11 @@ type Stats struct {
 	Passed    int
 	Failed    int
 	Skipped   int
+	// FailedPackages counts packages whose verdict sits on the package itself
+	// — a build failure, a TestMain os.Exit, a crash outside any test. These
+	// carry no failing behavior, so folding them into Failed would break the
+	// Passed+Failed+Skipped arithmetic; they are counted as what they are.
+	FailedPackages int
 }
 
 func (s Stats) Total() int {
@@ -237,11 +242,31 @@ func stripDuplicateSuffix(s string) string {
 func CollectStats(packages []*Package) Stats {
 	var s Stats
 	for _, pkg := range packages {
+		if PkgFailedOnItsOwn(pkg) {
+			s.FailedPackages++
+		}
 		for _, n := range pkg.Nodes {
 			collectStats(n, &s, n.Kind == KindTest)
 		}
 	}
 	return s
+}
+
+// PkgFailedOnItsOwn reports whether a package's FAIL verdict originates on the
+// package itself rather than on any test beneath it — the package-level
+// counterpart of failedOnItsOwn. This is how a build failure, a TestMain
+// os.Exit, or a crash outside any test presents: package status FAIL with no
+// failing node to account for it.
+func PkgFailedOnItsOwn(pkg *Package) bool {
+	if pkg.Status != StatusFail {
+		return false
+	}
+	for _, n := range pkg.Nodes {
+		if n.Status == StatusFail || anyDescendantFailed(n) {
+			return false
+		}
+	}
+	return true
 }
 
 func collectStats(n *Node, s *Stats, inStdlib bool) {

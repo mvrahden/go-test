@@ -29,11 +29,16 @@ type discoverWarning struct {
 }
 
 type discoverPackage struct {
-	ImportPath string          `json:"importPath"`
-	Dir        string          `json:"dir"`
-	ModulePath string          `json:"modulePath,omitempty"`
-	TestOnly   bool            `json:"testOnly,omitempty"`
-	Suites     []discoverSuite `json:"suites"`
+	ImportPath string `json:"importPath"`
+	Dir        string `json:"dir"`
+	ModulePath string `json:"modulePath,omitempty"`
+	TestOnly   bool   `json:"testOnly,omitempty"`
+	// Broken marks a package that failed to load; its diagnostics are in the
+	// top-level warnings. Suite discovery needs a successful parse, so a
+	// broken package's suite list is unknowable, not empty — consumers must
+	// render the package as broken rather than as having no suites.
+	Broken bool            `json:"broken,omitempty"`
+	Suites []discoverSuite `json:"suites"`
 }
 
 type discoverSuite struct {
@@ -70,15 +75,23 @@ func runDiscover(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 
 	out := discoverOutput{}
 
-	loadResults, loadWarnings, err := gotestgen.LoadPackagesForDiscovery(patterns, buildFlags)
+	loadResults, broken, err := gotestgen.LoadPackagesForDiscovery(patterns, buildFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	for _, w := range loadWarnings {
-		out.Warnings = append(out.Warnings, discoverWarning{
-			ImportPath: w.PkgPath,
-			Message:    w.Message,
+	for i := range broken {
+		for _, msg := range broken[i].Errors {
+			out.Warnings = append(out.Warnings, discoverWarning{
+				ImportPath: broken[i].PkgPath,
+				Message:    msg,
+			})
+		}
+		out.Packages = append(out.Packages, discoverPackage{
+			ImportPath: broken[i].PkgPath,
+			Dir:        broken[i].Dir,
+			Broken:     true,
+			Suites:     []discoverSuite{},
 		})
 	}
 

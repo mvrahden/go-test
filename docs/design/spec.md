@@ -1329,6 +1329,8 @@ Manual setup works without the action:
 
 Exit codes: 0 = pass, 1 = test failure, 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors).
 
+Every package a pattern matches ends in exactly one verdict. A package that fails to load or compile — a syntax error, a type error, a nonexistent path — is a failed package (exit 2): its diagnostics are booked into the same output stream as suite results, grouped under a `# <import-path>` header, so text output, `--json` events, `spec`, `summary`, and `--input` replays all carry the failure. Packages that did build still run; one broken package never blocks the rest. `run`, `watch`, `spec`, and `summary` book-and-continue this way; `generate` and `prepare` fail fast instead, because generated output for an unbuildable package is meaningless; `discover` reports such packages with `"broken": true` and their diagnostics as warnings. "no test suites to run" (exit 0) is reserved for runs where every matched package loaded and none defined suites.
+
 The `--ci` flag fails the run when any `F_` (focus) prefix is committed, preventing accidental focus leaks in CI.
 
 ---

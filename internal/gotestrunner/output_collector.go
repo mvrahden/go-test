@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -134,6 +135,28 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //n
 			c.emitJSONPackageSummary(w, pkg, s)
 		}
 	}
+}
+
+// RecordBuildFailure books a package that failed to build as a failed package
+// with exit code 2 — the code reserved for build errors, distinct from exit 1
+// for tests that ran and failed. Build failures travel the same collector path
+// as suite results so text output, the JSON stream, and the exit code cannot
+// disagree about them. In JSON modes the diagnostics enter the stream as
+// package-level output events; renderers fed the stream (spec, summary,
+// --input replays) carry them without any side channel.
+func (c *OutputCollector) RecordBuildFailure(pkg, msg string) {
+	c.Register(pkg, 1)
+	if c.mode != RunBatchText {
+		c.mu.Lock()
+		w := c.jsonWriter()
+		now := time.Now()
+		writeJSONLine(w, map[string]any{"Time": now, "Action": "start", "Package": pkg})
+		for line := range strings.Lines(msg) {
+			writeJSONLine(w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Output": line})
+		}
+		c.mu.Unlock()
+	}
+	c.RecordResult(pkg, 0, SuiteResult{Stderr: []byte(msg), ExitCode: 2})
 }
 
 // Finalize emits trailing annotations after all suites have run.

@@ -27,16 +27,19 @@ func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		buildFlags = append(buildFlags, "-tags="+tags)
 	}
 
-	loaded, err := gotestgen.LoadPackages(patterns, buildFlags)
+	loaded, broken, err := gotestgen.LoadPackages(patterns, buildFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if reportBrokenPackages(broken) {
 		return 2
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(),
 		shutdownSignals...)
 
-	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, false, false)
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, nil, false, false)
 	if err != nil {
 		stop()
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

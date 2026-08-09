@@ -867,7 +867,9 @@ func (s *GotestrunnerTestSuite) TestOutputCollector(t *gotest.T) {
 		w.It("books a failed compile as a failed package", func(it *gotest.T) {
 			var stdout, stderr bytes.Buffer
 			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &stderr))
-			gotestrunner.ExportRecordCompileFailure(c, "example.com/broken", fmt.Errorf("compile example.com/broken: exit status 1"))
+			gotestrunner.ExportBookBuildFailures(c, nil, []gotestrunner.BuildFailure{
+				{Package: "example.com/broken", Err: fmt.Errorf("compile example.com/broken: exit status 1")},
+			})
 			gotest.True(it, c.AnyFailed())
 			gotest.Equal(it, 2, c.WorstExitCode(),
 				"a compile failure is exit 2, matching batch mode")
