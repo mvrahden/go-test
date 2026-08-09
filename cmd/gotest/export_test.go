@@ -5,6 +5,8 @@ type ExportDiscoverPackage = discoverPackage
 type ExportDiscoverSuite = discoverSuite
 
 var ExportParseMinFlag = parseMinFlag
+var ExportRunSpecFromInput = runSpecFromInput
+var ExportRunSummaryFromInput = runSummaryFromInput
 var ExportParseParallelFlag = parseParallelFlag
 var ExportParseCompileParallelFlag = parseCompileParallelFlag
 var ExportParseSetupTimeoutFlag = parseSetupTimeoutFlag

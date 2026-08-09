@@ -17,6 +17,7 @@ import (
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -846,6 +847,56 @@ func (s *GotestrunnerTestSuite) TestOutputCollector(t *gotest.T) {
 			c.RecordResult("example.com/a", 0, gotestrunner.SuiteResult{ExitCode: 0})
 			c.RecordResult("example.com/b", 0, gotestrunner.SuiteResult{ExitCode: 1})
 			gotest.True(it, c.AnyFailed())
+		})
+
+		w.It("registers a signal-killed binary as a failure", func(it *gotest.T) {
+			var stdout, stderr bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &stderr))
+			c.Register("example.com/oom", 1)
+			// A signal-terminated process reports -1. The worst-code comparison
+			// never registered it, so an OOM-killed suite printed FAIL and the
+			// run still exited 0.
+			c.RecordResult("example.com/oom", 0, gotestrunner.SuiteResult{ExitCode: -1})
+			gotest.True(it, c.AnyFailed())
+			gotest.Equal(it, 1, c.WorstExitCode(),
+				"abnormal termination must raise the exit code, not slip under it")
+			gotest.Contains(it, stdout.String()+stderr.String(), "terminated by signal",
+				"the binary's own output ends mid-stream, so the verdict must say what happened")
+		})
+
+		w.It("books a failed compile as a failed package", func(it *gotest.T) {
+			var stdout, stderr bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &stderr))
+			gotestrunner.ExportRecordCompileFailure(c, "example.com/broken", fmt.Errorf("compile example.com/broken: exit status 1"))
+			gotest.True(it, c.AnyFailed())
+			gotest.Equal(it, 2, c.WorstExitCode(),
+				"a compile failure is exit 2, matching batch mode")
+			gotest.Contains(it, stdout.String()+stderr.String(), "compile example.com/broken",
+				"the failed package must be visible in the stream, not only on raw stderr")
+		})
+	})
+
+	t.When("a shared teardown failure lands after the stream ended", func(w *gotest.T) {
+		w.It("reaches the exit code and every artifact rendered from the stream", func(it *gotest.T) {
+			result := gotestrunner.PipelineResult{CapturedJSON: []byte{}}
+			gotestrunner.ExportApplyTeardownFailure(&result,
+				fmt.Errorf("shared fixture teardown failed; see AfterAll errors above"))
+
+			gotest.Equal(it, 1, result.ExitCode)
+
+			// The captured stream is the single source spec/summary/markdown
+			// artifacts derive from; an exit-code-only failure rendered "all
+			// passed" beside exit 1 in a CI comment.
+			events, err := gotestspec.ParseEvents(bytes.NewReader(result.CapturedJSON))
+			gotest.NoError(it, err)
+			tree := gotestspec.BuildTree(events)
+			gotest.True(it, gotestspec.HasFailures(tree),
+				"the failure must be derivable from the stream itself")
+
+			var buf bytes.Buffer
+			gotestspec.RenderSummary(&buf, tree, gotestspec.WithNoColor())
+			gotest.Contains(it, buf.String(), "shared fixture teardown failed",
+				"a rendered artifact must carry the teardown failure")
 		})
 
 		w.It("tracks worst exit code", func(it *gotest.T) {

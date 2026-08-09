@@ -13,7 +13,7 @@ import (
 )
 
 //go:noinline
-func ƒƒ_GOTEST_exec(fn gotest.TestCase, t *gotest.T) { fn(t) }
+func ƒƒ_GOTEST_exec(fn gotestruntime.TestCase, t *gotest.T) { fn(t) }
 
 type ƒƒ_GOTEST_AppTestSuite struct {
 	AppTestSuite
@@ -25,6 +25,7 @@ func (ts *ƒƒ_GOTEST_AppTestSuite) BeforeEach(it *gotest.T) { ts.AppTestSuite.B
 func (ts *ƒƒ_GOTEST_AppTestSuite) AfterEach(it *gotest.T)  { ts.AppTestSuite.AfterEach(it) }
 
 var ƒ_AppFixture *AppFixture
+var ƒcfg_AppFixture gotest.FixtureConfig
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
@@ -35,6 +36,7 @@ var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t *testing.T) {
 	if err := ƒ_fixtureOnce.Do(func() error {
+		ƒcfg_AppFixture = (&AppFixture{}).FixtureConfig()
 		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
@@ -52,7 +54,8 @@ func ƒ_setupFixtures(t *testing.T) {
 			Fixtures: []*gotestruntime.FixtureNode{
 				{
 					Name:   "AppFixture",
-					Config: (&AppFixture{}).FixtureConfig(),
+					Config: ƒcfg_AppFixture,
+					Budget: ƒcfg_AppFixture.Timeout,
 					Init: func() {
 						ƒ_AppFixture = &AppFixture{}
 					},
@@ -88,25 +91,15 @@ func TestAppTestSuite(t *testing.T) {
 		},
 	}
 	ƒcfg := s.AppTestSuite.SuiteConfig()
+	ƒbudget := ƒcfg
 
-	ƒsetupT := gotest.NewT(t)
-	if ƒcfg.SetupTimeout > 0 {
-		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-	}
 	t.Cleanup(func() {
-		ƒteardownT := gotest.NewT(t)
-		if ƒcfg.SetupTimeout > 0 {
-			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-		}
-		s.AfterAll(ƒteardownT)
+		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
 	})
-	s.BeforeAll(ƒsetupT)
+	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestCreate", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer func() {
 			if err := ƒ_AppFixture.AfterEach(context.Background()); err != nil {
 				it.Errorf("AppFixture.AfterEach failed: %v", err)
@@ -117,17 +110,16 @@ func TestAppTestSuite(t *testing.T) {
 		}
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestCreate, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.TestCreate, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
 	}
 
 	t.Run("TestDelete", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer func() {
 			if err := ƒ_AppFixture.AfterEach(context.Background()); err != nil {
 				it.Errorf("AppFixture.AfterEach failed: %v", err)
@@ -138,7 +130,9 @@ func TestAppTestSuite(t *testing.T) {
 		}
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestDelete, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.TestDelete, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
@@ -161,7 +155,7 @@ import (
 )
 
 //go:noinline
-func ƒƒ_GOTEST_exec(fn gotest.TestCase, t *gotest.T) { fn(t) }
+func ƒƒ_GOTEST_exec(fn gotestruntime.TestCase, t *gotest.T) { fn(t) }
 
 type ƒƒ_GOTEST_MultiFixtureTestSuite struct {
 	MultiFixtureTestSuite
@@ -289,41 +283,32 @@ func TestMultiFixtureTestSuite(t *testing.T) {
 		},
 	}
 	ƒcfg := gotest.DefaultSuiteConfig()
+	ƒbudget := gotest.SuiteConfig{}
 
-	ƒsetupT := gotest.NewT(t)
-	if ƒcfg.SetupTimeout > 0 {
-		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-	}
 	t.Cleanup(func() {
-		ƒteardownT := gotest.NewT(t)
-		if ƒcfg.SetupTimeout > 0 {
-			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-		}
-		s.AfterAll(ƒteardownT)
+		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
 	})
-	s.BeforeAll(ƒsetupT)
+	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestDBReady", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestDBReady, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.TestDBReady, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
 	}
 
 	t.Run("TestCacheReady", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestCacheReady, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.TestCacheReady, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
@@ -340,28 +325,20 @@ func TestServiceTestSuite(t *testing.T) {
 		},
 	}
 	ƒcfg := gotest.DefaultSuiteConfig()
+	ƒbudget := gotest.SuiteConfig{}
 
-	ƒsetupT := gotest.NewT(t)
-	if ƒcfg.SetupTimeout > 0 {
-		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-	}
 	t.Cleanup(func() {
-		ƒteardownT := gotest.NewT(t)
-		if ƒcfg.SetupTimeout > 0 {
-			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-		}
-		s.AfterAll(ƒteardownT)
+		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
 	})
-	s.BeforeAll(ƒsetupT)
+	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestServiceReady", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestServiceReady, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.TestServiceReady, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
@@ -380,11 +357,12 @@ package e2epkg
 
 import (
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/pkg/gotestruntime"
 	"testing"
 )
 
 //go:noinline
-func ƒƒ_GOTEST_exec(fn gotest.TestCase, t *gotest.T) { fn(t) }
+func ƒƒ_GOTEST_exec(fn gotestruntime.TestCase, t *gotest.T) { fn(t) }
 
 type ƒƒ_GOTEST_MyE2ETestSuite struct {
 	MyE2ETestSuite
@@ -398,67 +376,56 @@ func (ts *ƒƒ_GOTEST_MyE2ETestSuite) AfterEach(it *gotest.T)  {}
 func TestMyE2ETestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_MyE2ETestSuite{}
 	ƒcfg := gotest.DefaultSuiteConfig()
+	ƒbudget := gotest.SuiteConfig{}
 
-	ƒsetupT := gotest.NewT(t)
-	if ƒcfg.SetupTimeout > 0 {
-		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-	}
 	t.Cleanup(func() {
-		ƒteardownT := gotest.NewT(t)
-		if ƒcfg.SetupTimeout > 0 {
-			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-		}
-		s.AfterAll(ƒteardownT)
+		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
 	})
-	s.BeforeAll(ƒsetupT)
+	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("Test_HelloWorld", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.Test_HelloWorld, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.Test_HelloWorld, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
 	}
 
 	t.Run("Test_HelloWorld_1", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.Test_HelloWorld_1, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.Test_HelloWorld_1, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
 	}
 
 	t.Run("Test_HelloWorld_2", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.Test_HelloWorld_2, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.Test_HelloWorld_2, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
 	}
 
 	t.Run("Test_HelloWorld_3", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.Test_HelloWorld_3, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.Test_HelloWorld_3, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
@@ -478,63 +445,54 @@ func (ts *ƒƒ_GOTEST_AsyncE2ETestSuite) AfterEach(it *gotest.T)  {}
 func TestAsyncE2ETestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_AsyncE2ETestSuite{}
 	ƒcfg := gotest.DefaultSuiteConfig()
+	ƒbudget := gotest.SuiteConfig{}
 
-	ƒsetupT := gotest.NewT(t)
-	if ƒcfg.SetupTimeout > 0 {
-		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-	}
 	t.Cleanup(func() {
-		ƒteardownT := gotest.NewT(t)
-		if ƒcfg.SetupTimeout > 0 {
-			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-		}
-		s.AfterAll(ƒteardownT)
+		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
 	})
-	s.BeforeAll(ƒsetupT)
+	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestDoneFromGoroutineAsync", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒdone := make(chan struct{}, 1)
-		s.TestDoneFromGoroutineAsync(ttt, func() {
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒdone := make(chan struct{}, 1)
+			s.TestDoneFromGoroutineAsync(ttt, func() {
+				select {
+				case ƒdone <- struct{}{}:
+				default:
+				}
+			})
 			select {
-			case ƒdone <- struct{}{}:
-			default:
+			case <-ƒdone:
+			case <-ttt.Context().Done():
+				it.Fatalf("%s: done() was not called before the test deadline", "TestDoneFromGoroutineAsync")
 			}
 		})
-		select {
-		case <-ƒdone:
-		case <-ttt.Context().Done():
-			it.Fatalf("%s: done() was not called before the test deadline", "TestDoneFromGoroutineAsync")
-		}
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
 	}
 
 	t.Run("TestDoneInlineAsync", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒdone := make(chan struct{}, 1)
-		s.TestDoneInlineAsync(ttt, func() {
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒdone := make(chan struct{}, 1)
+			s.TestDoneInlineAsync(ttt, func() {
+				select {
+				case ƒdone <- struct{}{}:
+				default:
+				}
+			})
 			select {
-			case ƒdone <- struct{}{}:
-			default:
+			case <-ƒdone:
+			case <-ttt.Context().Done():
+				it.Fatalf("%s: done() was not called before the test deadline", "TestDoneInlineAsync")
 			}
 		})
-		select {
-		case <-ƒdone:
-		case <-ttt.Context().Done():
-			it.Fatalf("%s: done() was not called before the test deadline", "TestDoneInlineAsync")
-		}
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
@@ -549,11 +507,12 @@ package e2epkg_test
 
 import (
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/pkg/gotestruntime"
 	"testing"
 )
 
 //go:noinline
-func ƒƒ_GOTEST_exec(fn gotest.TestCase, t *gotest.T) { fn(t) }
+func ƒƒ_GOTEST_exec(fn gotestruntime.TestCase, t *gotest.T) { fn(t) }
 
 type ƒƒ_GOTEST_MyE2ETestSuite struct {
 	MyE2ETestSuite
@@ -567,67 +526,56 @@ func (ts *ƒƒ_GOTEST_MyE2ETestSuite) AfterEach(it *gotest.T)  {}
 func TestMyE2ETestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_MyE2ETestSuite{}
 	ƒcfg := gotest.DefaultSuiteConfig()
+	ƒbudget := gotest.SuiteConfig{}
 
-	ƒsetupT := gotest.NewT(t)
-	if ƒcfg.SetupTimeout > 0 {
-		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-	}
 	t.Cleanup(func() {
-		ƒteardownT := gotest.NewT(t)
-		if ƒcfg.SetupTimeout > 0 {
-			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-		}
-		s.AfterAll(ƒteardownT)
+		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
 	})
-	s.BeforeAll(ƒsetupT)
+	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("Test_HelloWorld", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.Test_HelloWorld, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.Test_HelloWorld, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
 	}
 
 	t.Run("Test_HelloWorld_1", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.Test_HelloWorld_1, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.Test_HelloWorld_1, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
 	}
 
 	t.Run("Test_HelloWorld_2", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.Test_HelloWorld_2, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.Test_HelloWorld_2, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
 	}
 
 	t.Run("Test_HelloWorld_3", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.Test_HelloWorld_3, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.Test_HelloWorld_3, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
@@ -650,7 +598,7 @@ import (
 )
 
 //go:noinline
-func ƒƒ_GOTEST_exec(fn gotest.TestCase, t *gotest.T) { fn(t) }
+func ƒƒ_GOTEST_exec(fn gotestruntime.TestCase, t *gotest.T) { fn(t) }
 
 type ƒƒ_GOTEST_GuardedFixtureBoundTestSuite struct {
 	GuardedFixtureBoundTestSuite
@@ -724,28 +672,20 @@ func TestGuardedFixtureBoundTestSuite(t *testing.T) {
 		return
 	}
 	ƒcfg := gotest.DefaultSuiteConfig()
+	ƒbudget := gotest.SuiteConfig{}
 
-	ƒsetupT := gotest.NewT(t)
-	if ƒcfg.SetupTimeout > 0 {
-		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-	}
 	t.Cleanup(func() {
-		ƒteardownT := gotest.NewT(t)
-		if ƒcfg.SetupTimeout > 0 {
-			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-		}
-		s.AfterAll(ƒteardownT)
+		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
 	})
-	s.BeforeAll(ƒsetupT)
+	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestMustNotRun", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestMustNotRun, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.TestMustNotRun, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
@@ -769,41 +709,32 @@ func TestGuardedTestSuite(t *testing.T) {
 		return
 	}
 	ƒcfg := gotest.DefaultSuiteConfig()
+	ƒbudget := gotest.SuiteConfig{}
 
-	ƒsetupT := gotest.NewT(t)
-	if ƒcfg.SetupTimeout > 0 {
-		ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-	}
 	t.Cleanup(func() {
-		ƒteardownT := gotest.NewT(t)
-		if ƒcfg.SetupTimeout > 0 {
-			ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-		}
-		s.AfterAll(ƒteardownT)
+		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
 	})
-	s.BeforeAll(ƒsetupT)
+	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestHello", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestHello, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.TestHello, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return
 	}
 
 	t.Run("TestWorld", func(it *testing.T) {
-		ttt := gotest.NewT(it)
-		if ƒcfg.Timeout > 0 {
-			ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-		}
+		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 		defer s.AfterEach(ttt)
 		s.BeforeEach(ttt)
-		ƒƒ_GOTEST_exec(s.TestWorld, ttt)
+		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+			ƒƒ_GOTEST_exec(s.TestWorld, ttt)
+		})
 	})
 	if ƒcfg.FailFast && t.Failed() {
 		return

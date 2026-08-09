@@ -20,8 +20,9 @@ type CompileResult struct {
 }
 
 type CompileOutcome struct {
-	Result CompileResult
-	Err    error
+	Package string
+	Result  CompileResult
+	Err     error
 }
 
 func compilePackage(ctx context.Context, pkgPath, overlayFlag string, buildFlags []string, binDir string) (CompileResult, error) {
@@ -103,7 +104,7 @@ func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag s
 				}
 
 				cr, err := compilePackage(ctx, pkgPath, overlayFlag, buildFlags, binDir)
-				outcome := CompileOutcome{Result: cr, Err: err}
+				outcome := CompileOutcome{Package: pkgPath, Result: cr, Err: err}
 				select {
 				case ch <- outcome:
 				case <-ctx.Done():

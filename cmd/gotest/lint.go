@@ -21,6 +21,16 @@ func runLint(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
+
+	// The singlechecker driver skips uncompilable packages and still exits 0,
+	// so a broken tree lints "clean". Prove the targets compile first.
+	if patterns := lint.PreflightPatterns(args); len(patterns) > 0 {
+		if err := lint.PreflightLoad("", patterns); err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
+			return 1
+		}
+	}
+
 	os.Args = append([]string{"gotest-lint"}, append(flagArgs, args...)...)
 	singlechecker.Main(lint.Analyzer)
 

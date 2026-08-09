@@ -111,7 +111,24 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors) {
 		suffix = fmt.Sprintf(" %s— SKIPPED%s", c.yellow, c.reset)
 	}
 
+	// A node that failed on its own account must show a mark even when it left
+	// no output — a bare t.Fail() otherwise renders as a green line beside a
+	// red exit code.
+	ownFailure := hasOwnDiagnostic(n) || failedOnItsOwn(n)
+	if ownFailure {
+		icon, clr := statusIcon(StatusFail, c)
+		suffix += fmt.Sprintf(" %s%s%s", clr, icon, c.reset)
+	}
+
 	fmt.Fprintf(w, "%s%s%s\n", indent, label, suffix)
+
+	if ownFailure {
+		if len(filterOutput(n.Output)) > 0 {
+			renderErrorOutput(w, n.Output, depth+1, c)
+		} else {
+			renderErrorOutput(w, []string{noDiagnosticNote}, depth+1, c)
+		}
+	}
 
 	for _, child := range n.Children {
 		renderNode(w, child, depth+1, c)

@@ -208,18 +208,35 @@ func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.MatchSnapshot(it, output)
 
-			gotest.Contains(it, output, "Config: (&CFGFixture{}).FixtureConfig(),", "marker config must be used as-is")
+			// The marker method is called once, so the config that bounds the
+			// context and the budget it is judged against cannot drift apart. It is
+			// called inside ƒ_fixtureOnce.Do rather than at package-variable
+			// initialisation: there a panicking FixtureConfig() would abort the
+			// binary before TestMain instead of being reported as a setup failure,
+			// and it would read the environment TestMain had not set up yet.
+			gotest.Contains(it, output, "var ƒcfg_CFGFixture gotest.FixtureConfig", "the config is declared, not derived, at package scope")
+			gotest.Contains(it, output, "ƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()", "marker config must be used as-is")
+			gotest.Contains(it, output,
+				"ƒ_fixtureOnce.Do(func() error {\n\t\tƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()",
+				"the config must be derived inside the containment frame, before anything reads it")
+			gotest.Contains(it, output, "Config: ƒcfg_CFGFixture,", "the node reads the hoisted config")
+			gotest.Contains(it, output, "Budget: ƒcfg_CFGFixture.Timeout,", "a declared Timeout is also the enforced budget")
 			gotest.NotContains(it, output, "OverlayFixtureConfig", "literal semantics: no overlay")
 		})
 	})
 
 	t.When("fixture without config", func(w *gotest.T) {
-		w.It("uses default config without overlay", func(it *gotest.T) {
+		w.It("falls back to the defaults and declares no budget", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithoutConfig_UsesDefault")
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.MatchSnapshot(it, output)
 
-			gotest.NotContains(it, output, "OverlayFixtureConfig", "should not have overlay call")
+			// The defaults still bound the fixture's context, but no Budget field
+			// is emitted, so it is never failed against a number it did not write.
+			gotest.Contains(it, output, "Config: gotest.DefaultFixtureConfig(),",
+				"a fixture with no config falls back to the defaults")
+			gotest.NotContains(it, output, "Budget:",
+				"a fixture with no config must not be held to a budget")
 		})
 	})
 }
@@ -239,12 +256,35 @@ func (s *RendererTestSuite) TestSuiteConfig(t *gotest.T) {
 	})
 
 	t.When("suite without config", func(w *gotest.T) {
-		w.It("uses default config without overlay", func(it *gotest.T) {
+		w.It("falls back to the defaults and declares no budget", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SuiteWithoutConfig_UsesDefault")
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.MatchSnapshot(it, output)
 
-			gotest.NotContains(it, output, "OverlaySuiteConfig", "should not have overlay call")
+			// The default 30s still bounds t.Context(); the zero budget is what
+			// keeps the suite from being failed against it.
+			gotest.Contains(it, output, "ƒcfg := gotest.DefaultSuiteConfig()",
+				"a suite with no config falls back to the defaults")
+			gotest.Contains(it, output, "ƒbudget := gotest.SuiteConfig{}",
+				"a suite with no config must declare no budget")
+		})
+	})
+}
+
+func (s *RendererTestSuite) TestUndeclaredBudgetIsZero(t *gotest.T) {
+	t.When("a suite declares no SuiteConfig", func(w *gotest.T) {
+		w.It("passes a zero budget to every lifecycle phase", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestLifecycle_UndeclaredBudget")
+			source, _ := renderTestPkg(it.T(), pkg)
+
+			// A suite with no marker method gets the defaults for its contexts
+			// and a zero budget, so nothing holds it to a number it never wrote.
+			gotest.Contains(it, source, "ƒcfg := gotest.DefaultSuiteConfig()")
+			gotest.Contains(it, source, "ƒbudget := gotest.SuiteConfig{}")
+			gotest.Contains(it, source, "gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)")
+			gotest.Contains(it, source, "gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)")
+			gotest.Contains(it, source, "gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {")
+			gotest.NotContains(it, source, "sync.WaitGroup")
 		})
 	})
 }
@@ -320,13 +360,42 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 	})
 
 	t.When("returning BeforeEach parallel", func(w *gotest.T) {
-		w.It("renders parallel markers and WaitGroup", func(it *gotest.T) {
+		w.It("renders parallel markers without a WaitGroup", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ReturningBeforeEach_Parallel")
 			output, _ := renderTestPkg(it.T(), pkg)
 			gotest.MatchSnapshot(it, output)
 
 			stripped := strings.ReplaceAll(output, "it.Parallel()", "")
 			gotest.NotContains(it, stripped, "t.Parallel()", "suite-level t.Parallel() should not be emitted")
+
+			// A suite-scoped barrier in t.Cleanup deadlocks against Go's panic
+			// unwind, which runs ancestor cleanups from the panicking goroutine
+			// while the test method that would release the barrier is still
+			// parked in t.Run. Go already orders cleanup after all subtests.
+			gotest.Contains(it, output, "it.Parallel()", "parallel suite should call it.Parallel()")
+			gotest.NotContains(it, output, "sync.WaitGroup", "parallel suite must not gate cleanup on a WaitGroup")
+			gotest.NotContains(it, output, "wg.Wait()", "parallel suite must not wait on test methods from t.Cleanup")
+			gotest.NotContains(it, output, `"sync"`, "parallel suite should not import sync")
+		})
+	})
+
+	t.When("parallel suite with every test case excluded", func(w *gotest.T) {
+		w.It("imports nothing the harness does not use", func(it *gotest.T) {
+			// The suite survives filtering with an empty TestCases slice, so the
+			// template emits no ƒfailed atomic.Bool. format.Source does not
+			// type-check and would let a stray sync/atomic import through; it is
+			// `go test` that then refuses the whole generated package with
+			// "imported and not used". So the assertion is on the rendered import
+			// block, not on the render succeeding.
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ParallelSuite_AllCasesExcluded")
+			output, _ := renderTestPkg(it.T(), pkg)
+
+			gotest.NotContains(it, output, `"sync/atomic"`,
+				"an unused sync/atomic import makes go test refuse the generated package")
+			gotest.NotContains(it, output, "atomic.Bool",
+				"a suite with no test cases has no failure flag to share")
+			gotest.Contains(it, output, "func TestAllExcludedTestSuite(t *testing.T)",
+				"the suite itself is still rendered")
 		})
 	})
 
@@ -395,5 +464,27 @@ func (s *RendererTestSuite) TestResolvedFixtures(t *gotest.T) {
 			gotest.Equal(it, "", sf.PkgPath, "same-package shared fixture should have empty PkgPath")
 			gotest.Equal(it, pkg.PkgPath+".PGSharedFixture", sf.StateKey)
 		})
+	})
+}
+
+// --- Determinism ---
+
+func (s *RendererTestSuite) TestDeterministicOutput(t *gotest.T) {
+	t.When("rendering the same package repeatedly", func(w *gotest.T) {
+		for sub, tC := range gotest.Each(w, []struct {
+			Desc    string
+			pkgName string
+		}{
+			{"parallel suite", "TestRenderer_ReturningBeforeEach_Parallel"},
+			{"sequential suite", "TestRenderer_VoidBeforeEach_Sequential"},
+			{"fixture-bound suite", "TestRenderer_FixtureWithChildSuite"},
+		}) {
+			pkg := gotestgen.ExportMustTestPkg(sub.T(), tC.pkgName)
+			first, _ := renderTestPkg(sub.T(), pkg)
+			for range 3 {
+				again, _ := renderTestPkg(sub.T(), pkg)
+				gotest.Equal(sub, first, again, "rendering must be byte-identical across runs")
+			}
+		}
 	})
 }

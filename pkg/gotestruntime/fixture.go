@@ -20,8 +20,15 @@ type SharedStateNode struct {
 // FixtureNode describes one fixture in the dependency graph.
 // Generated code populates this as a struct literal.
 type FixtureNode struct {
-	Name        string
-	Config      gotest.FixtureConfig
+	Name string
+	// Config is the fixture's literal configuration: its own FixtureConfig()
+	// verbatim, or the defaults when it has no marker method. Timeout bounds
+	// the context each lifecycle call receives.
+	Config gotest.FixtureConfig
+	// Budget is the deadline BeforeAll and AfterAll are each held to by
+	// verdict, or zero when the fixture declared no config of its own. A
+	// fixture is never failed against a number its author did not write.
+	Budget      time.Duration
 	Init        func()
 	BeforeAll   func(ctx context.Context) error
 	AfterAll    func(ctx context.Context) error

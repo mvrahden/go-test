@@ -33,76 +33,68 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
 {{- end }}
 {{- if $ts.HasConfig }}
   ƒcfg := s.{{ $ts.Identifier }}.SuiteConfig()
+  ƒbudget := ƒcfg
 {{- else }}
   ƒcfg := gotest.DefaultSuiteConfig()
+  ƒbudget := gotest.SuiteConfig{}
 {{- end }}
-
-{{- if $ts.IsMethodParallel }}
-  wg := &sync.WaitGroup{}
-{{- if $ts.TestCases }}
+{{- if and $ts.IsMethodParallel $ts.TestCases }}
   ƒfailed := &atomic.Bool{}
 {{- end }}
-{{- end }}
+{{- /*
+  testing runs the suite cleanup only after every subtest started via t.Run has
+  finished, parallel ones included. It must never wait on those subtests itself:
+  on panic the testing package runs ancestor cleanups from the panicking
+  goroutine, so such a wait deadlocks against the panic unwind.
+*/}}
 
-  ƒsetupT := gotest.NewT(t)
-  if ƒcfg.SetupTimeout > 0 {
-    ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-  }
   t.Cleanup(func() {
-{{- if $ts.IsMethodParallel }}
-    wg.Wait()
-{{- end }}
-    ƒteardownT := gotest.NewT(t)
-    if ƒcfg.SetupTimeout > 0 {
-        ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-    }
-    s.AfterAll(ƒteardownT)
+    gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
   })
-  s.BeforeAll(ƒsetupT)
+  gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 {{ range $tc := $ts.TestCases }}
   t.Run("{{ $tc.Identifier }}", func(it *testing.T) {
 {{- if $ts.IsMethodParallel }}
-    wg.Add(1)
     it.Parallel()
-    defer wg.Done()
     if ƒcfg.FailFast && ƒfailed.Load() {
       it.Skip("FailFast: earlier test failed")
     }
     defer func() { if it.Failed() { ƒfailed.Store(true) } }()
 {{- end }}
-    ttt := gotest.NewT(it)
-    if ƒcfg.Timeout > 0 {
-        ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-    }
+    ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
 {{- if $ts.HasReturningBeforeEach }}
     ctx := s.BeforeEach(ttt)
     defer s.AfterEach(ttt, ctx)
+    gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
 {{- if $tc.IsAsync }}
-    ƒdone := make(chan struct{}, 1)
-    s.{{ $tc.Identifier }}({{ if $tc.UsesStdlibT }}ttt.T(){{ else }}ttt{{ end }}, ctx, func() { select { case ƒdone <- struct{}{}: default: } })
-    select {
-    case <-ƒdone:
-    case <-ttt.Context().Done():
-      it.Fatalf("%s: done() was not called before the test deadline", "{{ $tc.Identifier }}")
-    }
+      ƒdone := make(chan struct{}, 1)
+      s.{{ $tc.Identifier }}({{ if $tc.UsesStdlibT }}ttt.T(){{ else }}ttt{{ end }}, ctx, func() { select { case ƒdone <- struct{}{}: default: } })
+      select {
+      case <-ƒdone:
+      case <-ttt.Context().Done():
+        it.Fatalf("%s: done() was not called before the test deadline", "{{ $tc.Identifier }}")
+      }
 {{- else }}
-    s.{{ $tc.Identifier }}({{ if $tc.UsesStdlibT }}ttt.T(){{ else }}ttt{{ end }}, ctx)
+      s.{{ $tc.Identifier }}({{ if $tc.UsesStdlibT }}ttt.T(){{ else }}ttt{{ end }}, ctx)
 {{- end }}
+    })
 {{- else }}
     defer s.AfterEach(ttt)
     s.BeforeEach(ttt)
+    gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
 {{- if $tc.IsAsync }}
-    ƒdone := make(chan struct{}, 1)
-    s.{{ $tc.Identifier }}({{ if $tc.UsesStdlibT }}ttt.T(){{ else }}ttt{{ end }}, func() { select { case ƒdone <- struct{}{}: default: } })
-    select {
-    case <-ƒdone:
-    case <-ttt.Context().Done():
-      it.Fatalf("%s: done() was not called before the test deadline", "{{ $tc.Identifier }}")
-    }
+      ƒdone := make(chan struct{}, 1)
+      s.{{ $tc.Identifier }}({{ if $tc.UsesStdlibT }}ttt.T(){{ else }}ttt{{ end }}, func() { select { case ƒdone <- struct{}{}: default: } })
+      select {
+      case <-ƒdone:
+      case <-ttt.Context().Done():
+        it.Fatalf("%s: done() was not called before the test deadline", "{{ $tc.Identifier }}")
+      }
 {{- else }}
-    ƒƒ_GOTEST_exec({{ if $tc.UsesStdlibT }}func(t *gotest.T) { s.{{ $tc.Identifier }}(t.T()) }{{ else }}s.{{ $tc.Identifier }}{{ end }}, ttt)
+      ƒƒ_GOTEST_exec({{ if $tc.UsesStdlibT }}func(t *gotest.T) { s.{{ $tc.Identifier }}(t.T()) }{{ else }}s.{{ $tc.Identifier }}{{ end }}, ttt)
 {{- end }}
+    })
 {{- end }}
   })
 {{- if not $ts.IsMethodParallel }}

@@ -158,14 +158,8 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 
 	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0)
 
-	stats := gotestspec.CollectStats(tree)
-	if stats.Failed > 0 {
+	if gotestspec.HasFailures(tree) {
 		return 1
-	}
-	for _, pkg := range tree {
-		if pkg.Status == gotestspec.StatusFail {
-			return 1
-		}
 	}
 	return 0
 }

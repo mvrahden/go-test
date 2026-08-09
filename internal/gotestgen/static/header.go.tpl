@@ -14,5 +14,5 @@ import (
 {{- end }}
 
 //go:noinline
-func ƒƒ_GOTEST_exec(fn gotest.TestCase, t *gotest.T) { fn(t) }
+func ƒƒ_GOTEST_exec(fn gotestruntime.TestCase, t *gotest.T) { fn(t) }
 {{ end -}}

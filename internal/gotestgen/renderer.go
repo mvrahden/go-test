@@ -116,25 +116,30 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		PackageName string
 		Imports     []headerImport
 	}
+	// Every harness references gotestruntime: the ƒƒ_GOTEST_exec sentinel takes a
+	// gotestruntime.TestCase, and each Test function builds its lifecycle T there.
 	imports := []headerImport{
 		{Path: "testing"},
 		{Path: about.Repo + "/pkg/gotest"},
+		{Path: about.Repo + "/pkg/gotestruntime"},
 	}
 	if hasFixtures {
 		imports = append(imports,
-			headerImport{Path: about.Repo + "/pkg/gotestruntime"},
 			headerImport{Path: "context"},
 			headerImport{Path: "sync/atomic"},
 			headerImport{Path: "time"},
 		)
 	}
-	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
-		return v.IsMethodParallel()
+	// This condition must stay identical to the one guarding the ƒfailed
+	// declaration in gotest.suites.tpl. A parallel suite whose every method is
+	// excluded stays in EffectiveTestSuites with no TestCases, so the template
+	// emits no atomic.Bool. format.Source does not type-check and would let the
+	// stray import through; it is `go test` that then refuses the whole generated
+	// package with "imported and not used".
+	if !hasFixtures && slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
+		return v.IsMethodParallel() && len(v.TestCases()) > 0
 	}) {
-		imports = append(imports, headerImport{Path: "sync"})
-		if !hasFixtures {
-			imports = append(imports, headerImport{Path: "sync/atomic"})
-		}
+		imports = append(imports, headerImport{Path: "sync/atomic"})
 	}
 	seenPkg := map[string]bool{}
 	for _, rf := range allFixtures {

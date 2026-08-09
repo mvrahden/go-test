@@ -90,7 +90,7 @@ The tool generates the bridge code (lifecycle, parallel coordination, focus/excl
 | `gotest` | reports, does not run | **runs** (via generated code) |
 
 This is deliberate: `go test` stays fully usable with its caching and ecosystem, and `gotest` stays a focused suite runner rather than a `go test` wrapper.
-A complete run is both commands; the canonical CI shape is two steps — `go test ./...` followed by `gotest` (the repository's own workflow does exactly this).
+A complete run is both commands; the canonical CI shape is two steps — `go test ./...` followed by `gotest`.
 
 `gotest` reports the half it does not run:
 packages with stdlib tests but no suites print `?   <pkg>  [no suites]` (never the false `[no test files]`), and a run that skipped stdlib tests ends with a note on stderr:
@@ -359,7 +359,9 @@ This provides process-level isolation between suites.
 The generated `func Test*` does **not** call `t.Parallel()` — parallelism is at the runner level, not the Go test scheduler level.
 
 **Method-level parallelism** is opt-in via `SuiteConfig{Parallel: true}`.
-Each generated subtest calls `it.Parallel()` and coordinates via `sync.WaitGroup`.
+Each generated subtest calls `it.Parallel()`; no explicit coordination is needed, because
+`testing` itself only returns from the parent `t.Run` — and therefore only runs
+`t.Cleanup` — after every parallel child has finished.
 Method-level parallelism requires a returning `BeforeEach` — per-test state lives in the returned context, not on the shared suite struct.
 
 ```go
@@ -387,8 +389,14 @@ func (s *ParallelMethodTestSuite) TestCreate(t *gotest.T, ctx *TestCtx) {}
 func (s *ParallelMethodTestSuite) TestDelete(t *gotest.T, ctx *TestCtx) {}
 ```
 
-When method-level parallelism is enabled, the generated code uses a `sync.WaitGroup` to ensure `AfterAll` waits for all parallel subtests to complete.
-`wg.Done()` is `defer`-ed to prevent deadlocks on `t.Fatal()`.
+When method-level parallelism is enabled, `AfterAll` still waits for every parallel
+subtest to complete, but nothing in the generated code makes it wait: `t.Cleanup` — where
+`AfterAll` runs — only fires after `TestMyTestSuite` returns, and `testing` does not
+return from a parent test until all of its `t.Parallel()` children have finished. The
+generated code must never wait on the parallel subtests itself (a `sync.WaitGroup`, a
+channel): on panic, `testing` runs ancestor cleanups from the panicking goroutine while
+the subtest that would release such a wait is still parked inside `t.Run`, so any
+generated wait deadlocks against the panic unwind.
 With `FailFast`, parallel suites additionally share a `ƒfailed` atomic flag: a failed subtest sets it, and subtests that start afterwards skip themselves.
 
 On Windows, suite subprocesses run under job objects so that cancellation and teardown terminate the whole process tree.
@@ -689,17 +697,25 @@ A partial literal opts out of whatever it omits: `SuiteConfig{Parallel: true}` r
 
 **Package fixtures:** The test harness uses the marker's config when present (otherwise `DefaultFixtureConfig()`) to wrap `BeforeAll` in a retry loop with `context.WithTimeout` and wrap `AfterAll` cleanup with timeout.
 Retry attempts are logged with attempt number.
+As with suites, bounding the context is not being held to it: a fixture that declared its own config is additionally held to its `Timeout` *by verdict*, on both `BeforeAll` (`gotestruntime.RunFixtureSetup`) and `AfterAll` (`gotestruntime.RunFixtureTeardown`) — a lifecycle call that ignores its context and outruns the declared budget fails the fixture rather than passing.
+A fixture with no marker gets the default bounds and no verdict; it is never failed against a number its author did not write.
+A setup overrun on a *successful* return is terminal (`gotestruntime.ErrSetupOverran`): it is not retried — the work completed and the overrun is deterministic — and the fixture still gets its `AfterAll`, because the resources it built exist.
 
-**Shared fixtures:** The generated subprocess uses `SharedFixtureConfig()` when present (otherwise `DefaultFixtureConfig()`), wrapping each SharedFixture's `BeforeAll(ctx)` in the same retry loop with `context.WithTimeout`.
+**Shared fixtures:** The generated subprocess uses `SharedFixtureConfig()` when present (otherwise `DefaultFixtureConfig()`), wrapping each SharedFixture's `BeforeAll(ctx)` in the same retry loop with `context.WithTimeout`, under the same declared-budget verdicts as package fixtures.
 After `BeforeAll`, transferable fields (determined by Hydrate-assignment analysis) are serialized to stdout as JSON.
-`AfterAll(ctx)` gets timeout wrapping in the teardown handler.
+`AfterAll(ctx)` runs through `gotestruntime.RunFixtureTeardown` in the teardown handler: context-bounded always, and held to a declared `Timeout` by verdict, with a failed teardown reaching the runner through the process exit status.
+The subprocess is shutdown-capable from birth and never tears down on its own initiative: it reports setup outcome (and its teardown budget) on the `_done` line, then waits for the runner's signal — only the runner knows when every suite has stopped using the fixtures — and a clean exit is the runner's sole proof that teardown ran and passed.
 In the test harness, the deserialized fixture is hydrated via `Hydrate(ctx)` if present, and `Dehydrate(ctx)` is deferred for cleanup.
 
-**Suites:** The test harness uses the marker's config when present (otherwise `DefaultSuiteConfig()`), wraps each test case with `NewTWithDeadline` when timeout > 0, and breaks the test case loop on first failure when `FailFast` is set.
+**Suites:** The test harness uses the marker's config when present (otherwise `DefaultSuiteConfig()`) to bound each phase's context — `gotestruntime.SetupT`/`TestT` apply `NewTWithDeadline` when the timeout is positive — and breaks the test case loop on first failure when `FailFast` is set.
+Bounding the context is not the same as being held to it: `gotestruntime.RunSetup`, `RunTest` and `RunTeardown` additionally take a *budget* duration and fail the phase by verdict if it is still running once the budget elapses, but that budget is the zero value — nothing enforced — unless the suite declared a `SuiteConfig()` of its own. A suite with no marker gets bounded but unenforced defaults; a suite with a marker gets its own values as both the bound and the budget, verbatim.
 
 **`NewTWithDeadline`:** Creates a `*gotest.T` with a context deadline.
 `t.Context()` returns the deadline-aware context.
-Existing `NewT` callers are unaffected.
+
+**`NewTWithContext`:** Creates a `*gotest.T` whose `t.Context()` is the context supplied by the caller, for the cases a deadline off `t.Context()` cannot express — injected values, or a lifetime that must outlive the test's own.
+The caller owns the context; nothing in `gotest` cancels it.
+This is what lets `AfterAll` run under a context that survives the cancellation the testing package performs immediately before cleanups.
 
 #### Feature Interactions
 
@@ -731,11 +747,45 @@ Existing `NewT` callers are unaffected.
 | `TempDir() string` | Delegates to `testing.T.TempDir` |
 | `When(desc, fn)`, `It(desc, fn)` | BDD vocabulary (see below) |
 
-(`gotest.TestCase` — `func(*T)` — is the exported function type the generated exec trampoline accepts.)
+(`gotestruntime.TestCase` — `func(*gotest.T)` — is the exported function type the generated exec trampoline accepts.)
 
 Deliberately absent — the suite lifecycle replaces them:
 `Log` (use assertions' message args), `Fatal`/`Fatalf` (use `FailNow` via assertions), `Cleanup` (use `AfterEach`/`AfterAll`), `Run` (use `When`/`It`), `Parallel` (use `SuiteConfig.Parallel`), `Helper` (the call-site tracer makes it unnecessary and harmful).
 The `t-escape` lint rule flags escapes to these via `t.T()`.
+
+---
+
+## Goroutines Started by Tests
+
+A panic on a goroutine a test starts directly is unrecoverable: Go terminates the whole
+process without running any other goroutine's deferred work, so no `AfterEach`, no
+`AfterAll` and no fixture teardown happens, and the panic is attributed to nothing in
+particular. No framework can guard a goroutine it did not create.
+
+`gotest.Go(t *gotest.T, fn func()) (wait func())` creates the goroutine for the caller
+instead. It captures a panic in `fn` with the stack from where it happened and re-raises
+it on the test's own goroutine, where `testing` reports it like any other test panic and
+every cleanup still runs.
+
+<!-- fence:pseudo -->
+```go
+// Work that finishes on its own: wait where the panic should surface.
+wait := gotest.Go(t, func() { report = build(input) })
+defer wait()
+
+// Work that runs until something stops it — a server, a poller: do not wait
+// inside the test. gotest.Go also registers the wait as t.Cleanup, which runs
+// after AfterEach, so whatever stops the goroutine has already run by the time
+// anything waits for it.
+gotest.Go(t, func() { srv.Serve(l) }) // AfterEach closes the listener
+```
+
+A `defer wait()` in the second shape deadlocks instead: the test's own defers run before
+`AfterEach`, so it would wait for a goroutine nothing has stopped yet. Calling the
+returned `wait` more than once is safe.
+
+The cleanup-registered `wait` has no timeout of its own: a goroutine that never
+returns hangs the binary until `go test -timeout` fires, with no named verdict.
 
 ---
 
@@ -1007,7 +1057,7 @@ Converts testify/suite tests:
 
 Not converted: direct embedded-suite calls (`s.Equal(...)`) — the removed `suite.Suite` embedding makes them compile errors, and they are annotated with a rewrite hint.
 
-Handles the 90% case; anything it cannot convert is annotated in place so nothing is silently skipped:
+Anything the tool cannot convert is annotated in place, so nothing is silently skipped:
 
 - `// TODO(gotest-migrate): unsupported testify hook <Name> — convert manually` above unconverted lifecycle hooks (`SetupSubTest`, `TearDownSubTest`, `BeforeTest`, `AfterTest`, `HandleStats`)
 - `// TODO(gotest-migrate): unmapped assertion <Name> — convert manually` above assertion calls outside the mapping table (e.g. `ErrorAs`, `Eventually`, `InDelta`)
@@ -1099,7 +1149,7 @@ No tests are executed.
 ```
 
 File paths are basenames; positions are 1-based.
-`methods[].parallel` is reserved and currently always `false` (parallelism is a suite-level property).
+`methods[].parallel` is reserved and always `false` (parallelism is a suite-level property).
 Respects `-tags`.
 
 ---
@@ -1180,28 +1230,20 @@ type ƒƒ_GOTEST_MyTestSuite struct { MyTestSuite }
 func TestMyTestSuite(t *testing.T) {
     s := &ƒƒ_GOTEST_MyTestSuite{}
     ƒcfg := gotest.DefaultSuiteConfig()
+    ƒbudget := gotest.SuiteConfig{}
 
-    ƒsetupT := gotest.NewT(t)
-    if ƒcfg.SetupTimeout > 0 {
-        ƒsetupT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-    }
     t.Cleanup(func() {
-        ƒteardownT := gotest.NewT(t)
-        if ƒcfg.SetupTimeout > 0 {
-            ƒteardownT = gotest.NewTWithDeadline(t, ƒcfg.SetupTimeout)
-        }
-        s.AfterAll(ƒteardownT)
+        gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
     })
-    s.BeforeAll(ƒsetupT)
+    gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
     t.Run("TestSomething", func(it *testing.T) {
-        ttt := gotest.NewT(it)
-        if ƒcfg.Timeout > 0 {
-            ttt = gotest.NewTWithDeadline(it, ƒcfg.Timeout)
-        }
+        ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
         defer s.AfterEach(ttt)
         s.BeforeEach(ttt)
-        ƒƒ_GOTEST_exec(s.TestSomething, ttt)
+        gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+            ƒƒ_GOTEST_exec(s.TestSomething, ttt)
+        })
     })
     if ƒcfg.FailFast && t.Failed() {
         return
@@ -1209,10 +1251,18 @@ func TestMyTestSuite(t *testing.T) {
 }
 ```
 
-The sample shows a sequential suite without a config marker; with one, `ƒcfg := s.MyTestSuite.SuiteConfig()` replaces the default.
+The sample shows a sequential suite without a config marker. `ƒcfg` always carries a
+config — the declared one, or `DefaultSuiteConfig()` when there is no `SuiteConfig()`
+method — and its `Timeout`/`SetupTimeout` bound the context that `gotestruntime.TestT`
+and `RunSetup`/`RunTeardown` hand to each phase. `ƒbudget` is different: it is the
+config `RunTest`, `RunSetup` and `RunTeardown` are told to *enforce by verdict*, and it
+stays a zero-value `gotest.SuiteConfig{}` unless the suite declared one. With a
+`SuiteConfig()` marker, `ƒcfg := s.MyTestSuite.SuiteConfig()` replaces the default and
+`ƒbudget := ƒcfg` — the same values the author wrote now double as the enforced budget,
+used verbatim, including a zero or negative duration meaning no deadline.
 Ordering nuance: in the returning-`BeforeEach` form, `ctx := s.BeforeEach(ttt)` runs *before* `defer s.AfterEach(ttt, ctx)` is registered — a fatal failure inside `BeforeEach` means `AfterEach` never runs.
 In the void form shown above, the deferred `AfterEach` is registered first and runs even when `BeforeEach` fails fatally.
-Method-parallel suites additionally emit the `wg`/`ƒfailed` coordination described under Parallel Execution.
+Method-parallel suites additionally emit the `ƒfailed` coordination described under Parallel Execution.
 
 ---
 
@@ -1400,7 +1450,7 @@ Each alias produces an independent conformance report.
 1. `AfterAll` is registered via `t.Cleanup` BEFORE `BeforeAll` runs
 2. `t.Cleanup` runs in LIFO order — user cleanups in `BeforeAll` run before `AfterAll`
 3. `AfterEach` is `defer`-ed — runs even on `t.Fatal()` / `runtime.Goexit()`
-4. In method-parallel suites (`Parallel: true`), `wg.Wait()` completes before `AfterAll`
+4. In method-parallel suites (`Parallel: true`), every `t.Parallel()` subtest completes before `AfterAll` — `testing` does not return from the parent test, and therefore does not run `t.Cleanup`, until they have
 5. `t.Fatal()` in `BeforeAll` skips the entire suite
 6. `t.Skip()` in `BeforeAll` marks the suite as skipped
 7. In context-aware suites (returning `BeforeEach`), each test receives its own context — `AfterEach` receives the same context for cleanup

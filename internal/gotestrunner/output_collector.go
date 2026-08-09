@@ -104,6 +104,16 @@ func (c *OutputCollector) Register(pkg string, count int) {
 func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //nolint:gocritic // hugeParam: stable API
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	// A signal-terminated binary reports -1, which the worst-code comparison
+	// below never registers — a suite OOM-killed mid-run exited the whole run
+	// green in text mode. Failure is any nonzero status: normalize the signal
+	// case to a positive code at this choke point so every downstream
+	// comparison agrees, and say what happened, because the binary's own
+	// output ends mid-stream with no verdict of its own.
+	if r.ExitCode < 0 {
+		r.ExitCode = 1
+		r.Stderr = append(r.Stderr, []byte("gotest: suite binary terminated by signal\n")...)
+	}
 	if r.ExitCode > c.worst {
 		c.worst = r.ExitCode
 	}

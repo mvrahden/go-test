@@ -330,6 +330,26 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 		})
 	})
 
+	t.When("a shared fixture declares two fields of the same parent type", func(w *gotest.T) {
+		w.It("rejects the ambiguity instead of wiring only the last field", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixture_DuplicateParentField")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+
+			spec, err := c.ApplyTestSuiteSpecs(result)
+			gotest.NoError(it, err)
+
+			// The type→field wiring silently kept only the last field; the
+			// first stayed nil until BeforeAll dereferenced it inside the
+			// containment frame — a runtime mystery for a generation-time fact.
+			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.ErrorContains(it, err, "two fields of the same parent fixture type")
+			gotest.ErrorContains(it, err, "Primary")
+			gotest.ErrorContains(it, err, "Secondary")
+		})
+	})
+
 	t.When("shared fixtures form a cycle", func(w *gotest.T) {
 		w.It("returns an error instead of skipping them", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixtureCycle")

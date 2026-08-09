@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
+	"maps"
+	"slices"
 	"text/template"
 
 	"github.com/mvrahden/go-test/internal/about"
@@ -27,11 +29,15 @@ type SharedFixtureInfo struct {
 }
 
 type sharedSetupData struct {
-	RepoInfo         string
-	GotestImportPath string
-	Imports          []sharedSetupImport
-	Fixtures         []sharedSetupFixture
-	TeardownFixtures []sharedSetupFixture // fixtures in reverse dependency order for teardown
+	RepoInfo string
+	// GotestImportPath supplies the fixture config defaults, and
+	// GotestRuntimeImportPath the setup policy the in-process DAG runs under —
+	// the generated program shares it rather than inlining a second copy.
+	GotestImportPath        string
+	GotestRuntimeImportPath string
+	Imports                 []sharedSetupImport
+	Fixtures                []sharedSetupFixture
+	TeardownFixtures        []sharedSetupFixture // fixtures in reverse dependency order for teardown
 }
 
 type sharedSetupImport struct {
@@ -101,12 +107,15 @@ func GenerateSharedSetup(fixtures []SharedFixtureInfo) ([]byte, error) {
 			}
 		}
 
+		// Ranged in sorted key order: generated code is a pure function of its
+		// input, and Go map order would shuffle the assignment statements from
+		// run to run — snapshot flakes and build-cache misses for free.
 		var parentAssigns []parentAssignment
-		for depKey, fieldName := range sf.DependencyFields {
+		for _, depKey := range slices.Sorted(maps.Keys(sf.DependencyFields)) {
 			if v, ok := stateKeyToVar[depKey]; ok {
 				parentAssigns = append(parentAssigns, parentAssignment{
 					ParentVar: v,
-					FieldName: fieldName,
+					FieldName: sf.DependencyFields[depKey],
 				})
 			}
 		}
@@ -131,11 +140,12 @@ func GenerateSharedSetup(fixtures []SharedFixtureInfo) ([]byte, error) {
 	}
 
 	data := sharedSetupData{
-		RepoInfo:         about.ShortInfo(),
-		GotestImportPath: about.Repo + "/pkg/gotest",
-		Imports:          imports,
-		Fixtures:         fixtureVMs,
-		TeardownFixtures: teardownFixtures,
+		RepoInfo:                about.ShortInfo(),
+		GotestImportPath:        about.Repo + "/pkg/gotest",
+		GotestRuntimeImportPath: about.Repo + "/pkg/gotestruntime",
+		Imports:                 imports,
+		Fixtures:                fixtureVMs,
+		TeardownFixtures:        teardownFixtures,
 	}
 
 	var buf bytes.Buffer

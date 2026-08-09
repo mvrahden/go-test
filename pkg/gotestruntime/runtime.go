@@ -3,8 +3,10 @@ package gotestruntime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -100,6 +102,12 @@ func setupNode(ctx context.Context, node *FixtureNode, tracker *nodeTracker) err
 	}
 
 	if err := runBeforeAllWithRetry(ctx, node); err != nil {
+		// An overrun setup completed its work before the verdict landed, so the
+		// resources it created exist. Marking it succeeded keeps its AfterAll in
+		// the teardown pass; the run still fails on the returned error.
+		if errors.Is(err, ErrSetupOverran) {
+			tracker.markSucceeded(node)
+		}
 		return err
 	}
 
@@ -211,12 +219,21 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 	}
 	wg.Wait()
 
+	// Prefer the causal error over a victim's: cancellation recorded on a node
+	// that was merely waiting for the one that actually failed names nothing an
+	// author can act on, and the real failure is in the map too.
+	var firstErr error
 	for _, f := range fixtures {
 		if err, ok := errs[f.Name]; ok && err != nil {
-			return err
+			if !errors.Is(err, context.Canceled) {
+				return err
+			}
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 	}
-	return nil
+	return firstErr
 }
 
 func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string]json.RawMessage, tracker *nodeTracker) error {
@@ -257,6 +274,12 @@ func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string
 	}
 
 	if err := runBeforeAllWithRetry(ctx, node); err != nil {
+		// An overrun setup completed its work before the verdict landed, so the
+		// resources it created exist. Marking it succeeded keeps its AfterAll in
+		// the teardown pass; the run still fails on the returned error.
+		if errors.Is(err, ErrSetupOverran) {
+			tracker.markSucceeded(node)
+		}
 		return err
 	}
 
@@ -293,30 +316,18 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
 
 			if tracker.isSucceeded(node) {
 				if node.SharedState != nil {
-					if node.SharedState.Dehydrate != nil {
-						if err := node.SharedState.Dehydrate(context.Background()); err != nil {
-							fmt.Fprintf(os.Stderr, "%s: dehydrate failed: %v\n", node.Name, err)
-							mu.Lock()
-							failed[node.Name] = true
-							mu.Unlock()
-						}
-					}
-					return // shared state nodes don't have AfterAll in test process
-				}
-
-				if node.AfterAll != nil {
-					ctx := context.Background()
-					if node.Config.Timeout > 0 {
-						var cancel context.CancelFunc
-						ctx, cancel = context.WithTimeout(ctx, node.Config.Timeout)
-						defer cancel()
-					}
-					if err := node.AfterAll(ctx); err != nil {
-						fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", node.Name, err)
+					if runDehydrate(node) {
 						mu.Lock()
 						failed[node.Name] = true
 						mu.Unlock()
 					}
+					return // shared state nodes don't have AfterAll in test process
+				}
+
+				if runAfterAll(node) {
+					mu.Lock()
+					failed[node.Name] = true
+					mu.Unlock()
 				}
 			}
 		}(f)
@@ -331,10 +342,10 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
 	return false
 }
 
+// runBeforeAllWithRetry adapts a DAG node onto RunFixtureSetup, the single
+// policy the generated shared-fixture subprocess runs BeforeAll under too, and
+// names the fixture in whatever comes back.
 func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
-	attempts := 1 + node.Config.Retries
-	var lastErr error
-
 	wrapErr := func(err error) error {
 		if err == nil {
 			return nil
@@ -342,42 +353,14 @@ func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
 		return fmt.Errorf("%s.BeforeAll: %w", node.Name, err)
 	}
 
-	for i := range attempts {
-		if ctx.Err() != nil {
-			return wrapErr(ctx.Err())
-		}
-
-		var attemptCtx context.Context
-		var attemptCancel context.CancelFunc
-		if node.Config.Timeout > 0 {
-			attemptCtx, attemptCancel = context.WithTimeout(ctx, node.Config.Timeout)
-		} else {
-			attemptCtx, attemptCancel = context.WithCancel(ctx)
-		}
-
-		lastErr = node.BeforeAll(attemptCtx)
-		attemptCancel()
-
-		if lastErr == nil {
-			return nil
-		}
-		if ctx.Err() != nil {
-			return wrapErr(ctx.Err())
-		}
-		if i < attempts-1 {
-			fmt.Fprintf(os.Stderr, "%s.BeforeAll attempt %d/%d failed: %v\n", node.Name, i+1, attempts, lastErr)
-			if node.Config.RetryDelay > 0 {
-				select {
-				case <-ctx.Done():
-					return wrapErr(ctx.Err())
-				case <-time.After(node.Config.RetryDelay):
-				}
-			}
-		}
-	}
-
-	fmt.Fprintf(os.Stderr, "FAIL: %s.BeforeAll failed after %d attempt(s): %v\n", node.Name, attempts, lastErr)
-	return wrapErr(lastErr)
+	return wrapErr(RunFixtureSetup(ctx, FixtureSetup{
+		Name:       node.Name,
+		Timeout:    node.Config.Timeout,
+		Budget:     node.Budget,
+		Retries:    node.Config.Retries,
+		RetryDelay: node.Config.RetryDelay,
+		BeforeAll:  node.BeforeAll,
+	}))
 }
 
 func teardownRoots(roots []*FixtureNode, tracker *nodeTracker) bool {
@@ -425,22 +408,40 @@ func teardownNode(node *FixtureNode, tracker *nodeTracker) bool {
 		}
 	}
 
-	if tracker.isSucceeded(node) {
-		if node.AfterAll != nil {
-			ctx := context.Background()
-			if node.Config.Timeout > 0 {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, node.Config.Timeout)
-				defer cancel()
-			}
-			if err := node.AfterAll(ctx); err != nil {
-				fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", node.Name, err)
-				anyFailed = true
-			}
-		}
+	if tracker.isSucceeded(node) && runAfterAll(node) {
+		anyFailed = true
 	}
 
 	return anyFailed
+}
+
+// runAfterAll adapts a DAG node onto RunFixtureTeardown, the single policy the
+// generated shared-fixture subprocess runs AfterAll under too.
+func runAfterAll(node *FixtureNode) bool {
+	return RunFixtureTeardown(context.Background(), FixtureTeardown{
+		Name:     node.Name,
+		Timeout:  node.Config.Timeout,
+		Budget:   node.Budget,
+		AfterAll: node.AfterAll,
+	})
+}
+
+// runDehydrate mirrors runAfterAll for shared-state nodes.
+func runDehydrate(node *FixtureNode) (failed bool) {
+	if node.SharedState == nil || node.SharedState.Dehydrate == nil {
+		return false
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "%s: dehydrate panicked: %v\n\n%s\n", node.Name, r, debug.Stack())
+			failed = true
+		}
+	}()
+	if err := node.SharedState.Dehydrate(context.Background()); err != nil {
+		fmt.Fprintf(os.Stderr, "%s: dehydrate failed: %v\n", node.Name, err)
+		return true
+	}
+	return false
 }
 
 func writeBudgetFile(cfg MainConfig) {
@@ -489,12 +490,7 @@ func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
 		}
 		visiting[name] = true
 		node := byName[name]
-		own := node.Config.Timeout
-		if own <= 0 {
-			// "No deadline" must not zero the teardown budget — an unbounded
-			// fixture still needs supervisor headroom; use the default floor.
-			own = 2 * time.Minute
-		}
+		own := SupervisorBudget(node.Config.Timeout)
 		var maxDep time.Duration
 		for _, dep := range node.DependsOn {
 			depPath := longestPath(dep)
@@ -518,10 +514,7 @@ func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
 }
 
 func nodeTreePath(node *FixtureNode) time.Duration {
-	own := node.Config.Timeout
-	if own < 0 {
-		own = 0
-	}
+	own := SupervisorBudget(node.Config.Timeout)
 	var maxChild time.Duration
 	for _, child := range node.Children {
 		childPath := nodeTreePath(child)

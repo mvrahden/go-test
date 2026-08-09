@@ -188,6 +188,40 @@ There are no method forms on `*T`. Only package-level `gotest.Eventually()` and 
 Any helper that calls `t.T()` will panic.
 This is by design — the recorder intercepts failures without aborting, enabling retry semantics.
 
+A panic in the callback fails the test and is reported with the stack from where it
+happened. The callback runs on its own goroutine, so the panic is carried back to the
+test's goroutine before being re-raised — `AfterEach`, `AfterAll` and fixture teardown all
+still run.
+
+## Goroutines Started by Tests
+
+A panic on a goroutine the test starts is unrecoverable: Go terminates the process
+without running any other goroutine's deferred work, so no `AfterEach`, no `AfterAll`
+and no fixture teardown happens. No framework can guard a goroutine it did not create.
+
+Use `gotest.Go` to start one instead. It captures the panic with the stack from where
+it happened and re-raises it on the test's own goroutine, where it is reported like any
+other test panic and every cleanup still runs.
+
+For work that finishes on its own, wait where you want the panic to surface:
+
+```go
+wait := gotest.Go(t, func() { report = build(input) })
+defer wait()
+```
+
+For a goroutine that runs until something stops it — a server, a poller — do **not**
+wait inside the test. `gotest.Go` registers the wait as test cleanup, which runs after
+`AfterEach`, so whatever stops the goroutine has already run by the time anything waits
+for it:
+
+```go
+gotest.Go(t, func() { srv.Serve(l) })   // AfterEach closes the listener
+```
+
+A `defer wait()` here deadlocks instead: the test's own defers run before `AfterEach`,
+so it waits for a goroutine nothing has stopped yet.
+
 ## Suite Conventions
 
 ### Suite types
@@ -221,6 +255,14 @@ func (s *MyTestSuite) AfterEach(t *gotest.T)  {}  // after each test
 All are optional.
 Execution order: BeforeAll -> (BeforeEach -> Test -> AfterEach)* -> AfterAll.
 For parallel test cases, AfterAll waits for all parallel tests to complete.
+
+**On failure and panic.**
+`AfterAll` runs even when `BeforeAll` failed or panicked, so teardown may see partly
+initialised state — guard it if `BeforeAll` can fail midway. Write `AfterAll` to release
+whatever `BeforeAll` had reached, not to assume it finished.
+The void `AfterEach` likewise runs even when `BeforeEach` panicked. The returning form
+does not: with nothing returned there is no context to release, and the per-test state it
+would clean up was never created.
 
 **Returning BeforeEach (required for `Parallel: true`):**
 
@@ -256,10 +298,41 @@ func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel` (run methods concurrently).
+Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel`.
 Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
-The returned config is used as-is: a zero (or omitted) duration disables that deadline; without the marker method, `DefaultSuiteConfig()` (30s/30s) applies.
-Compose from presets for defaults + overrides: `cfg := gotest.DefaultSuiteConfig(); cfg.Parallel = true; return cfg`.
+
+The returned config is used as-is. A zero or omitted duration means **no deadline**,
+matching `go test -timeout 0` — it does not inherit the preset. Start from a preset when
+you want the defaults plus an override:
+
+```go
+func (s *MySuite) SuiteConfig() gotest.SuiteConfig {
+    cfg := gotest.DefaultSuiteConfig()
+    cfg.Parallel = true
+    return cfg
+}
+```
+
+A timeout does two things, and only one of them is defaulted.
+
+It always bounds `t.Context()`. And it is a budget the phase is held to, enforced by
+verdict — but only when **you** declare a `SuiteConfig`. `Timeout` cannot interrupt a
+running test, because Go has no way to stop another goroutine, so a method that ignores
+`t.Context()` and outlives the budget is failed instead. That failure is reported the
+moment the deadline passes, while the method is still running, and is written unbuffered
+so it survives a test that never returns at all.
+
+A suite with no `SuiteConfig` method is not held to a budget: being failed against a
+number you did not choose is not a verdict you can act on. Bounding the process remains
+`go test -timeout`'s job either way.
+
+`SetupTimeout` works the same way for `BeforeAll` and `AfterAll`, including for a setup
+that hangs and never returns. A declared fixture `Timeout` likewise: an overrunning
+fixture `BeforeAll` counts as a failed attempt, retried if `Retries` allows.
+
+`Timeout` reaches `t.Context()` inside nested `When`, `It` and `Each` bodies too — a
+nested behavior inherits the enclosing deadline, and its context is canceled when that
+nested subtest ends. For a tighter budget in one place, use `gotest.NewTWithDeadline`.
 
 ### SuiteGuard (optional)
 
@@ -340,6 +413,14 @@ func (f *DBFixture) FixtureConfig() gotest.FixtureConfig {
 ```
 
 Presets: `DefaultFixtureConfig()` (2m timeout), `ContainerFixtureConfig()` (5m, 1 retry, 5s delay).
+
+**Teardown failures are real failures.** A fixture `AfterAll` that returns an error or
+panics fails the run — for package and shared fixtures alike. A panic in one fixture's
+teardown is contained, so every other fixture still finishes releasing its resources.
+
+`Retries` covers panics as well as returned errors — a `BeforeAll` that panics is
+retried like one that fails. If a shared fixture's process dies before teardown, the
+run fails: its `AfterAll` never ran and whatever it held is orphaned.
 
 ### Shared fixtures
 

@@ -163,7 +163,12 @@ func BuildTree(events []TestEvent) []*Package {
 
 	result := make([]*Package, 0, len(pkgs))
 	for _, pkg := range pkgs {
-		if len(pkg.Nodes) == 0 {
+		// A package with no test nodes is usually noise ("no test files") — but
+		// only when it carries no verdict. A node-less FAIL is a package that
+		// died outside any test (a TestMain os.Exit(1), a run-level failure
+		// appended after the stream); dropping it hid the failure from every
+		// renderer while the exit code stayed red.
+		if len(pkg.Nodes) == 0 && pkg.Status != StatusFail {
 			continue
 		}
 		result = append(result, pkg)
@@ -242,6 +247,17 @@ func CollectStats(packages []*Package) Stats {
 func collectStats(n *Node, s *Stats, inStdlib bool) {
 	if n.Kind == KindSuite {
 		s.Suites++
+	}
+	if failedOnItsOwn(n) {
+		// Counted alongside the leaves so that Passed+Failed+Skipped still adds
+		// up to the number reported: the verdict is on this node, and the tree
+		// marks it here rather than under any of its children.
+		if inStdlib {
+			s.Tests++
+		} else {
+			s.Behaviors++
+		}
+		s.Failed++
 	}
 	if len(n.Children) == 0 {
 		if inStdlib {
@@ -342,6 +358,66 @@ func splitTestPath(path string) []string {
 		segments = append(segments, cur.String())
 	}
 	return segments
+}
+
+// failedOnItsOwn reports whether an interior node carries a verdict of its own:
+// a suite whose AfterAll failed, a test method that blew its configured
+// Timeout, or a bare t.Fail() with no message at all.
+//
+// A failed child marks its whole ancestry FAIL too, so the discriminator is
+// that nothing beneath this node failed — then the FAIL can only have
+// originated here, and the verdict comes from status alone. An earlier shape
+// additionally required surviving output, which made a message-less failure
+// vanish from the count and render an all-green summary beside a red exit
+// code; prose is for the renderer, not the verdict. It still means a teardown
+// failure that coincides with a test failure is not counted separately; the
+// leaf already fails the run, and the node's own output is still rendered.
+func failedOnItsOwn(n *Node) bool {
+	return len(n.Children) > 0 &&
+		n.Status == StatusFail &&
+		!anyDescendantFailed(n)
+}
+
+// noDiagnosticNote is rendered in place of output for a failure that produced
+// none — a bare Fail/FailNow — so a counted failure is never invisible.
+const noDiagnosticNote = "test failed without diagnostic output (bare Fail?)"
+
+// HasFailures reports whether the tree carries any failure: a failed behaviour,
+// or a package that failed with every test passing (a TestMain os.Exit(1), a
+// panic outside any test). It is the single exit rule for commands fed a
+// recorded stream, so `spec --input` and `summary --input` cannot disagree
+// about what CI sees.
+func HasFailures(packages []*Package) bool {
+	if CollectStats(packages).Failed > 0 {
+		return true
+	}
+	for _, pkg := range packages {
+		if pkg.Status == StatusFail {
+			return true
+		}
+	}
+	return false
+}
+
+func anyDescendantFailed(n *Node) bool {
+	for _, child := range n.Children {
+		if child.Status == StatusFail || anyDescendantFailed(child) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasOwnDiagnostic reports whether an interior node carries output of its own,
+// whatever else failed beneath it. It is the rendering condition: a suite whose
+// AfterAll failed must show that error even when a behaviour under it failed
+// too, because nothing else in the run will say the teardown broke.
+//
+// Counting uses the stricter failedOnItsOwn instead — a spurious count breaks
+// the arithmetic the summary reports, while a spurious line of output only
+// adds noise.
+func hasOwnDiagnostic(n *Node) bool {
+	return len(n.Children) > 0 && n.Status == StatusFail && len(filterOutput(n.Output)) > 0
 }
 
 func statusFrom(a Action) Status {
