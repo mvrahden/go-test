@@ -3,6 +3,7 @@ package withnolint
 import (
 	"testing"
 
+	"github.com/mvrahden/go-test/pkg/gotest"
 	_ "github.com/stretchr/testify/assert"  //nolint:testify
 	_ "github.com/stretchr/testify/require" // want `testify import github.com/stretchr/testify/require — consider migrating to gotest`
 )
@@ -38,3 +39,11 @@ func TestUnsuppressed(t *testing.T) {} // want `stdlib test TestUnsuppressed —
 
 // suppressed: nolint with reason
 func TestWithReason(t *testing.T) {} //nolint:stdlib-test // legacy test
+
+// suppressed: fail-guard inline
+func TestFailGuardNolint(t *testing.T) { //nolint:stdlib-test
+	var err error
+	if err != nil { //nolint:fail-guard
+		gotest.Fail(t, "boom")
+	}
+}

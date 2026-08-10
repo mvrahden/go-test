@@ -33,6 +33,7 @@ const (
 	TestSignature      Rule = "test-signature"
 	XLifecycle         Rule = "x-lifecycle"
 	AssertionSimplify  Rule = "assertion-simplify"
+	FailGuard          Rule = "fail-guard"
 	AssertionTypeGuard Rule = "assertion-type-guard"
 	AssertionRedundant Rule = "assertion-redundant"
 	TEscape            Rule = "t-escape"
@@ -80,6 +81,7 @@ func run(pass *analysis.Pass) (any, error) {
 	checkTestifyImports(pass)
 	checkPollScope(pass, insp)
 	checkAssertionSimplify(pass, insp)
+	checkFailGuard(pass, insp)
 	checkRedundantAssertion(pass, insp)
 	checkTEscape(pass, insp, suites)
 
@@ -109,32 +111,37 @@ func reportWithFix(pass *analysis.Pass, rule Rule, pos token.Pos, fixes []analys
 	})
 }
 
-func isSuppressed(pass *analysis.Pass, pos token.Pos, rule Rule) bool {
-	position := pass.Fset.Position(pos)
+// fileContaining returns the syntax file whose span contains pos, or nil.
+func fileContaining(pass *analysis.Pass, pos token.Pos) *ast.File {
 	for _, file := range pass.Files {
-		if pass.Fset.Position(file.Pos()).Filename != position.Filename {
-			continue
+		if pos >= file.FileStart && pos <= file.FileEnd {
+			return file
 		}
-		pkgLine := pass.Fset.Position(file.Package).Line
-		for _, cg := range file.Comments {
-			for _, c := range cg.List {
-				rules, ok := parseNolint(c.Text)
-				if !ok {
-					continue
-				}
-				if rules != nil && !rules[rule] {
-					continue
-				}
-				cLine := pass.Fset.Position(c.Pos()).Line
-				if cLine == pkgLine {
-					return true
-				}
-				if cLine == position.Line {
-					return true
-				}
+	}
+	return nil
+}
+
+func isSuppressed(pass *analysis.Pass, pos token.Pos, rule Rule) bool {
+	file := fileContaining(pass, pos)
+	if file == nil {
+		return false
+	}
+	line := pass.Fset.Position(pos).Line
+	pkgLine := pass.Fset.Position(file.Package).Line
+	for _, cg := range file.Comments {
+		for _, c := range cg.List {
+			rules, ok := parseNolint(c.Text)
+			if !ok {
+				continue
+			}
+			if rules != nil && !rules[rule] {
+				continue
+			}
+			cLine := pass.Fset.Position(c.Pos()).Line
+			if cLine == pkgLine || cLine == line {
+				return true
 			}
 		}
-		return false
 	}
 	return false
 }
@@ -552,20 +559,7 @@ func isGotestPkgRef(pass *analysis.Pass, expr ast.Expr) bool {
 }
 
 func isGotestTType(pass *analysis.Pass, field *ast.Field) bool {
-	typ := pass.TypesInfo.TypeOf(field.Type)
-	if typ == nil {
-		return false
-	}
-	ptr, ok := typ.(*types.Pointer)
-	if !ok {
-		return false
-	}
-	named, ok := ptr.Elem().(*types.Named)
-	if !ok {
-		return false
-	}
-	obj := named.Obj()
-	return obj.Name() == "T" && obj.Pkg() != nil && obj.Pkg().Path() == gotestImportPath
+	return namedPtrType(pass.TypesInfo.TypeOf(field.Type), gotestImportPath, "T")
 }
 
 // --- interprocedural method reachability ---

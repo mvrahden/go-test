@@ -1,0 +1,239 @@
+package withfailguard //nolint:stdlib-test
+
+import (
+	"errors"
+	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+// === error nil guards ===
+
+func TestErrorGuards(t *testing.T) {
+	err := errors.New("boom")
+	gotest.NoError(t, err, "unexpected error: %v", err) // want `use NoError instead of if\+Fail for error nil check`
+	gotest.Error(t, err, "expected an error")           // want `use Error instead of if\+Fail for error nil check`
+}
+
+// === len guards ===
+
+func TestLenGuards(t *testing.T) {
+	items := []string{"a"}
+	gotest.NotEmpty(t, items, "expected at least one item") // want `use NotEmpty instead of if\+Fail for len == 0 check`
+	gotest.Empty(t, items, "expected no items")             // want `use Empty instead of if\+Fail for len > 0 check`
+	gotest.Len(t, items, 3, "expected three items")         // want `use Len instead of if\+Fail for len comparison`
+}
+
+// === comparison guards ===
+
+func TestComparisonGuards(t *testing.T) {
+	a, b := 1, 2
+	gotest.Equal(t, a, b, "a and b differ")     // want `use Equal instead of if\+Fail for != comparison`
+	gotest.Less(t, a, b, "a should be below b") // want `use Less instead of if\+Fail for >= comparison`
+}
+
+// === nil guards on non-error types ===
+
+func TestNilGuards(t *testing.T) {
+	var p *int
+	gotest.NotZero(t, p, "expected a pointer") // want `use NotZero instead of if\+Fail for nil check`
+	var m map[string]int
+	gotest.Nil(t, m, "expected no map") // want `use Nil instead of if\+Fail for nil check`
+}
+
+// === bool guards, including the False fallback ===
+
+func TestBoolGuards(t *testing.T) {
+	ok := false
+	gotest.True(t, ok, "should be ok")      // want `use True instead of if\+Fail for negation`
+	gotest.False(t, ok, "should not be ok") // want `use False instead of if\+Fail for failure guard`
+}
+
+// === predicate guards ===
+
+var errSentinel = errors.New("sentinel")
+
+func TestPredicateGuards(t *testing.T) {
+	s := "hello"
+	gotest.NotContains(t, s, "bye", "unexpected substring") // want `use NotContains instead of if\+Fail for strings.Contains call`
+	err := errors.New("boom")
+	gotest.ErrorIs(t, err, errSentinel, "wrong error") // want `use ErrorIs instead of if\+Fail for errors.Is call`
+	gotest.NotEmpty(t, s, "expected content")          // want `use NotEmpty instead of if\+Fail for empty string check`
+}
+
+// === message args containing calls: report, but no autofix — the if body
+// evaluates them only on failure, an assertion would evaluate them always ===
+
+func TestMessageArgGate(t *testing.T) {
+	err := errors.New("boom")
+	if err != nil { // want `use NoError instead of if\+Fail for error nil check`
+		gotest.Fail(t, "unexpected error: %v", describe(err))
+	}
+}
+
+func describe(err error) string { return err.Error() }
+
+// === shapes that must not be flagged ===
+
+type failer struct{}
+
+func (failer) Fail(t *testing.T, msg string, args ...any) {}
+
+func TestNotFlagged(t *testing.T) {
+	err := errors.New("boom")
+	// body has more than the fail call
+	if err != nil {
+		t.Log("saw error")
+		gotest.Fail(t, "unexpected error")
+	}
+	// else branch present
+	if err != nil {
+		gotest.Fail(t, "unexpected error")
+	} else {
+		t.Log("no error")
+	}
+	// init statement scopes the value to the if
+	if err := errors.New("x"); err != nil { // want `use NoError instead of if\+Fail for error nil check`
+		gotest.Fail(t, "unexpected error")
+	}
+	// same-name method on another type
+	var f failer
+	if err != nil {
+		f.Fail(t, "unexpected error")
+	}
+}
+
+// === || guards decompose into sequential assertions — halting on the first
+// failure reproduces the short-circuit exactly ===
+
+func TestOrGuards(t *testing.T) {
+	err := errors.New("boom")
+	items := []string{"a"}
+	gotest.NoError(t, err, "load failed: %v", err) // want `use NoError \+ NotEmpty instead of if\+Fail for or-chained failure guard`
+	gotest.NotEmpty(t, items, "load failed: %v", err)
+}
+
+// === else-if Fail chains decompose with per-branch messages ===
+
+func TestElseIfChains(t *testing.T) {
+	err := errors.New("boom")
+	items := []string{"a"}
+	gotest.NoError(t, err, "unexpected error: %v", err) // want `use NoError \+ NotEmpty instead of if\+Fail for else-if failure guard`
+	gotest.NotEmpty(t, items, "expected items")
+}
+
+// === && does not decompose (the negation is a disjunction) — only the
+// False fallback is sound ===
+
+func TestAndGuards(t *testing.T) {
+	err := errors.New("boom")
+	fatal := true
+	gotest.False(t, err != nil && fatal, "fatal error") // want `use False instead of if\+Fail for failure guard`
+}
+
+// === Fail followed by a bare return — unreachable after the halt ===
+
+func TestFailReturn(t *testing.T) {
+	err := errors.New("boom")
+	gotest.NoError(t, err, "unexpected: %v", err) // want `use NoError instead of if\+Fail for error nil check`
+}
+
+// === halting testing.T bodies rewrite the same way ===
+
+func TestFatalGuards(t *testing.T) {
+	err := errors.New("boom")
+	gotest.NoError(t, err, err) // want `use NoError instead of if\+Fatal for error nil check`
+	items := []string{}
+	gotest.NotEmpty(t, items, "no items: %v", err) // want `use NotEmpty instead of if\+Fatalf for len == 0 check`
+	ok := true
+	gotest.True(t, ok) // want `use True instead of if\+FailNow for negation`
+}
+
+// === non-halting bodies: Errorf continues where an assertion halts —
+// report only, never autofix ===
+
+func TestErrorfGuards(t *testing.T) {
+	err := errors.New("boom")
+	if err != nil { // want `use NoError instead of if\+Errorf for error nil check — assertions halt where Errorf continues`
+		t.Errorf("unexpected: %v", err)
+	}
+}
+
+// === message args that can panic under eager evaluation (index, selector,
+// deref) block the autofix — errs[0] is valid exactly when the guard fires ===
+
+func TestMessagePanicGate(t *testing.T) {
+	var errs []error
+	if len(errs) > 0 { // want `use Empty instead of if\+Fail for len > 0 check`
+		gotest.Fail(t, "first error: %v", errs[0])
+	}
+}
+
+// === Errorf+return still deserves the pointer, but without the false claim
+// that Errorf continues, and never a fix ===
+
+func TestErrorfReturnGuard(t *testing.T) {
+	err := errors.New("boom")
+	if err != nil { // want `use NoError instead of if\+Errorf for error nil check`
+		t.Errorf("unexpected error")
+		return
+	}
+}
+
+// === print-style Fatal args beyond one cannot ride printf-style msgAndArgs ===
+
+func TestFatalPrintArgs(t *testing.T) {
+	a, b := 1, 2
+	if a != b { // want `use Equal instead of if\+Fatal for != comparison`
+		t.Fatal("expected", a, "got", b)
+	}
+}
+
+// === a lone literal operand belongs in Equal's expected slot ===
+
+func TestLiteralFirst(t *testing.T) {
+	got := 7
+	gotest.Equal(t, 3, got, "wrong count") // want `use Equal instead of if\+Fail for != comparison`
+	gotest.Equal(t, -1, got, "negative")   // want `use Equal instead of if\+Fail for != comparison`
+}
+
+// === comments inside the guard body would be destroyed by the rewrite ===
+
+func TestCommentedGuard(t *testing.T) {
+	err := errors.New("boom")
+	if err != nil { // want `use NoError instead of if\+Fail for error nil check`
+		// teardown failures here indicate a leaked fixture
+		gotest.Fail(t, "unexpected error")
+	}
+}
+
+// === guards on escaped t.T() receivers belong to the t-escape rule ===
+
+type EscapeGuardTestSuite struct{}
+
+func (s *EscapeGuardTestSuite) TestEscape(it *gotest.T) {
+	err := errors.New("boom")
+	if err != nil {
+		it.T().Fatalf("unexpected: %v", err) // want `use assertions instead — T.Fatalf bypasses the assertion tracer`
+	}
+}
+
+func (s *EscapeGuardTestSuite) TestEscapeError(it *gotest.T) {
+	err := errors.New("boom")
+	if err != nil { // want `use NoError instead of if\+Error for error nil check — assertions halt where Error continues`
+		it.T().Error("boom")
+	}
+}
+
+// === a weak+return branch makes the chain report-only, never invisible ===
+
+func TestChainWithWeakReturn(t *testing.T) {
+	a, b := 1, 2
+	err := errors.New("boom")
+	if a != b { // want `use Equal \+ NoError instead of if\+Fatal for else-if failure guard`
+		t.Fatal("mismatch")
+	} else if err != nil {
+		t.Errorf("boom: %v", err)
+		return
+	}
+}

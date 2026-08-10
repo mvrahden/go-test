@@ -46,6 +46,12 @@ func (s *LintTestSuite) TestAnalyzer(t *gotest.T) {
 		})
 	})
 
+	t.When("fail guard", func(w *gotest.T) {
+		w.It("detects if+Fail guards that assertions express directly", func(it *gotest.T) {
+			analysistest.RunWithSuggestedFixes(it.T(), testdata, lint.Analyzer, "withfailguard", "withfailguard_noimport")
+		})
+	})
+
 	t.When("assertion redundant", func(w *gotest.T) {
 		w.It("detects redundant guard assertions before stronger ones", func(it *gotest.T) {
 			analysistest.RunWithSuggestedFixes(it.T(), testdata, lint.Analyzer, "withredundant")

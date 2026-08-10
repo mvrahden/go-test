@@ -1292,6 +1292,7 @@ Rules (IDs are canonical — used by `//nolint:<rule>`; `.gotest.yml` `lint.skip
 | `assertion-simplify` | Simplifiable assertions: `True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, … |
 | `assertion-type-guard` | `Nil`/`Empty` on types their runtime guards would reject |
 | `assertion-redundant` | An assertion made redundant by the next one on the same argument |
+| `fail-guard` | `if cond { gotest.Fail(…) }` guards (also halting `Fatal`/`Fatalf`/`FailNow` bodies) — the assertion expresses the check directly; `\|\|` conditions and `else if` chains decompose into sequential assertions, non-halting `Errorf` bodies and init-scoped guards report without a fix; fires only in files that import gotest |
 | `t-escape` | Unnecessary `t.T()` escapes: `Errorf`/`FailNow`/`Skipf`/`Setenv`/`TempDir` (available on `gotest.T`), `Skip`/`SkipNow` (use `Skipf`), `Cleanup`/`Parallel`/`Run` (bypass the suite lifecycle), `Helper` (degrades call-site reporting), `Log`/`Fatal`/`Fatalf` (use assertions and their message args) |
 
 Suppression and configuration:
