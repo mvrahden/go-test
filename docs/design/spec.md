@@ -1277,30 +1277,47 @@ go run github.com/mvrahden/go-test/cmd/gotest-lint ./...   # standalone
 
 Rules (IDs are canonical — used by `//nolint:<rule>`; `.gotest.yml` `lint.skip` accepts only the adoption-phase rules `stdlib-test` and `testify`):
 
+Rules are grouped into three tiers by what breaks when a finding is ignored; the tier derives the suppression policy.
+
+**Integrity** — test outcomes can lie or resources can leak. Suppressible per line only, never project-wide.
+
 | Rule ID | Detects |
 |---------|---------|
 | `focus` | Committed `F_` prefixes on suites or methods |
 | `receiver` | Suite methods with value receivers instead of pointer receivers |
 | `lifecycle-typo` | Method names within Levenshtein distance ≤ 2 of a lifecycle hook (`BeforAll`, `AfterEeach`) |
 | `lifecycle-pair` | `BeforeAll` without `AfterAll` — resources may leak |
-| `generated-file` | `gotest_p(x)suite_test.go` files present in source control |
-| `stdlib-test` | `func TestX(*testing.T)` — migration aid suggesting a suite method (fires in any package; skippable — coexisting stdlib tests are legitimate, see The Two Runners) |
-| `testify` | Any `github.com/stretchr/testify/*` import — migration incomplete |
-| `poll-scope` | Assertions inside `Eventually`/`Consistently` callbacks using the outer `t` instead of `poll` |
-| `test-signature` | Test methods not accepting `*gotest.T` (or `*testing.T`) |
 | `x-lifecycle` | `X_` prefix on a lifecycle hook — a no-op |
-| `assertion-simplify` | Simplifiable assertions: `True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, … |
+| `test-signature` | Test methods not accepting `*gotest.T` (or `*testing.T`) |
+| `suite-lifecycle` | `Cleanup`/`Parallel`/`Run` via `t.T()` — they bypass the suite lifecycle (split out of `t-escape`; committed `//nolint:t-escape` comments still suppress it) |
+| `poll-scope` | Assertions inside `Eventually`/`Consistently` callbacks using the outer `t` instead of `poll` |
 | `assertion-type-guard` | `Nil`/`Empty` on types their runtime guards would reject |
+| `generated-file` | `gotest_p(x)suite_test.go` files present in source control |
+
+**Expressiveness** — the test is correct but says it worse. Suppressible per line or project-wide via `lint.skip`.
+
+| Rule ID | Detects |
+|---------|---------|
+| `assertion-simplify` | Simplifiable assertions: `True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, … |
 | `assertion-redundant` | An assertion made redundant by the next one on the same argument |
 | `fail-guard` | `if cond { gotest.Fail(…) }` guards (also halting `Fatal`/`Fatalf`/`FailNow` bodies) — the assertion expresses the check directly; `\|\|` conditions and `else if` chains decompose into sequential assertions, non-halting `Errorf` bodies and init-scoped guards report without a fix; fires only in files that import gotest |
-| `t-escape` | Unnecessary `t.T()` escapes: `Errorf`/`FailNow`/`Skipf`/`Setenv`/`TempDir` (available on `gotest.T`), `Skip`/`SkipNow` (use `Skipf`), `Cleanup`/`Parallel`/`Run` (bypass the suite lifecycle), `Helper` (degrades call-site reporting), `Log`/`Fatal`/`Fatalf` (use assertions and their message args) |
+| `t-escape` | Unnecessary `t.T()` convenience escapes: `Errorf`/`FailNow`/`Skipf`/`Setenv`/`TempDir` (available on `gotest.T`), `Skip`/`SkipNow` (use `Skipf`), `Helper` (degrades call-site reporting), `Log`/`Fatal`/`Fatalf` (use assertions and their message args) |
+
+**Migration** — legitimate coexistence, nudged. Suppressible per line or project-wide via `lint.skip`.
+
+| Rule ID | Detects |
+|---------|---------|
+| `stdlib-test` | `func TestX(*testing.T)` — migration aid suggesting a suite method (fires in any package; coexisting stdlib tests are legitimate, see The Two Runners) |
+| `testify` | Any `github.com/stretchr/testify/*` import — migration incomplete |
+
+One construct yields one finding: integrity rules own the constructs they flag, and expressiveness rules stand down on them (a guard whose body escapes the poll scope gets the `poll-scope` finding, not a `fail-guard` rewrite). The assertion surface itself is derived from the gotest package's type information, so the linter cannot drift from the API and lookalike names from other packages never match.
 
 Suppression and configuration:
 
 - `//nolint:<rule>` on a line; on the `package` line it applies file-wide
-- `.gotest.yml` → `lint.skip: [<rule>, ...]` disables rules project-wide
-- `.gotest.yml` `lint.skip` with any other rule ID is a hard error — correctness rules can only be suppressed per line
-- Flags: `-fix` applies suggested fixes; `-skip-stdlib-test`, `-skip-testify`, `-disable-nolint`
+- `.gotest.yml` → `lint.skip: [<rule>, ...]` disables non-integrity rules project-wide
+- `.gotest.yml` `lint.skip` naming an integrity rule is a hard error — integrity rules can only be suppressed per line; unknown rule IDs are also a hard error
+- Flags: `-fix` applies suggested fixes; `-skip-<rule>` for every non-integrity rule; `-disable-nolint`
 
 ---
 

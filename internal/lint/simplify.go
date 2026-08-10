@@ -13,11 +13,14 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-func checkAssertionSimplify(pass *analysis.Pass, insp *inspector.Inspector) {
+func checkAssertionSimplify(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) {
 	insp.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(n ast.Node) {
 		call := n.(*ast.CallExpr)
 		name := assertionFuncName(pass, call.Fun)
 		if name == "" {
+			return
+		}
+		if cl.anyWithin(call.Pos(), call.End()) {
 			return
 		}
 

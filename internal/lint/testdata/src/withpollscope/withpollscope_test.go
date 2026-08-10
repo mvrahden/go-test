@@ -1,6 +1,7 @@
 package withpollscope //nolint:stdlib-test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -54,3 +55,32 @@ func TestCustomPollParamName(t *testing.T) {
 func TestOutsidePollCallback(t *testing.T) {
 	gotest.Equal(t, 1, 2) // ok — not inside a poll callback
 }
+
+// A guard inside a poll callback is poll-scope's finding alone — the
+// expressiveness rule must stand down on the owned construct.
+func TestGuardInsideCallback(t *testing.T) {
+	var err error
+	gotest.Eventually(t, time.Second, time.Millisecond, func(poll *gotest.R) {
+		if err != nil {
+			t.Errorf("boom: %v", err) // want `t\.Errorf in poll callback bypasses assertion recording — use poll`
+		}
+	})
+}
+
+// Constructs owned by poll-scope get no expressiveness findings on top.
+func TestSimplifiableInsideCallback(t *testing.T) {
+	a, b := 1, 2
+	gotest.Eventually(t, time.Second, time.Millisecond, func(poll *gotest.R) {
+		gotest.True(t, a == b) // want `use poll instead of t in poll callback passed to Eventually`
+	})
+}
+
+func TestRedundantInsideCallback(t *testing.T) {
+	var err error
+	gotest.Eventually(t, time.Second, time.Millisecond, func(poll *gotest.R) {
+		gotest.Error(t, err)                  // want `use poll instead of t in poll callback passed to Eventually`
+		gotest.ErrorIs(t, err, errSentinelPS) // want `use poll instead of t in poll callback passed to Eventually`
+	})
+}
+
+var errSentinelPS = errors.New("sentinel")

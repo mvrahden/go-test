@@ -18,7 +18,7 @@ import (
 // preserves control flow: ||-chained conditions and else-if chains decompose
 // into sequential assertions, where halting on the first failure reproduces
 // the original short-circuit evaluation.
-func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector) {
+func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) {
 	// else-branch if-statements belong to their parent's chain and must never
 	// be reported standalone: replacing one would leave `else <expr>` behind.
 	// Preorder visits parents first, so marking suffices.
@@ -48,6 +48,11 @@ func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector) {
 
 		units, hasInit := collectFailChain(pass, ifStmt)
 		if len(units) == 0 {
+			return
+		}
+		// An integrity rule already owns a call inside this guard — its
+		// finding tells the sharper story.
+		if cl.anyWithin(ifStmt.Pos(), ifStmt.End()) {
 			return
 		}
 
@@ -220,15 +225,6 @@ func extractHaltingUnit(pass *analysis.Pass, body *ast.BlockStmt) *failGuardUnit
 		return nil
 	}
 	name := sel.Sel.Name
-	// Guards on escaped t.T() receivers whose method the t-escape rule
-	// covers are that rule's finding; reporting here too would produce
-	// overlapping, non-convergent fixes. Methods t-escape does not know
-	// (Error) stay with fail-guard.
-	if isTMethodCall(sel.X) {
-		if _, covered := escapeConfigs[name]; covered {
-			return nil
-		}
-	}
 	recvType := pass.TypesInfo.TypeOf(sel.X)
 	onTestingT := namedPtrType(recvType, "testing", "T")
 	onGotestT := namedPtrType(recvType, gotestImportPath, "T")

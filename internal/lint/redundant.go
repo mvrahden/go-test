@@ -8,13 +8,16 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-func checkRedundantAssertion(pass *analysis.Pass, insp *inspector.Inspector) {
+func checkRedundantAssertion(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) {
 	insp.Preorder([]ast.Node{(*ast.BlockStmt)(nil)}, func(n ast.Node) {
 		block := n.(*ast.BlockStmt)
 		for i := 0; i < len(block.List)-1; i++ {
 			first := extractAssertionCall(pass, block.List[i])
 			second := extractAssertionCall(pass, block.List[i+1])
 			if first == nil || second == nil {
+				continue
+			}
+			if cl.anyWithin(first.call.Pos(), first.call.End()) || cl.anyWithin(second.call.Pos(), second.call.End()) {
 				continue
 			}
 			if !sameExprText(pass, first.guardedArg, second.guardedArg) {

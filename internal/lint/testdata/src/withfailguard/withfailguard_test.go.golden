@@ -237,3 +237,12 @@ func TestChainWithWeakReturn(t *testing.T) {
 		return
 	}
 }
+
+// A guard whose body t-escape owns stands fail-guard down even inside a
+// package-level var function literal.
+var packageGuard = func(t *gotest.T) {
+	err := errors.New("boom")
+	if err != nil {
+		t.FailNow() // want `FailNow is available on gotest.T — unnecessary T escape`
+	}
+}

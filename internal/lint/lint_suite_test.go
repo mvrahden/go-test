@@ -175,6 +175,23 @@ func (s *SkippedStyleTestSuite) TestSkipSilencesExpressivenessRule(t *gotest.T) 
 	})
 }
 
+// SkippedEscapeTestSuite runs separately and non-parallel because it
+// temporarily mutates the shared analyzer flags.
+type SkippedEscapeTestSuite struct{}
+
+func (s *SkippedEscapeTestSuite) TestSkippedRuleReleasesClaims(t *gotest.T) {
+	testdata := analysistest.TestData()
+
+	lint.ExportSetSkip(lint.TEscape, true)
+	defer lint.ExportSetSkip(lint.TEscape, false)
+
+	t.When("skip-t-escape is set", func(w *gotest.T) {
+		w.It("lets fail-guard take over escaped halting guards", func(it *gotest.T) {
+			analysistest.Run(it.T(), testdata, lint.Analyzer, "withskippedtescape")
+		})
+	})
+}
+
 type DisableNolintTestSuite struct{}
 
 func (s *DisableNolintTestSuite) TestNolintDirectivesIgnored(t *gotest.T) {

@@ -148,13 +148,41 @@ func run(pass *analysis.Pass) (any, error) {
 	checkOrphanedFiles(pass)
 	checkStdlibTests(pass, insp)
 	checkTestifyImports(pass)
-	checkPollScope(pass, insp)
-	checkAssertionSimplify(pass, insp)
-	checkFailGuard(pass, insp)
-	checkRedundantAssertion(pass, insp)
-	checkTEscape(pass, insp, suites)
+
+	// Integrity rules run first and claim the constructs they own;
+	// expressiveness rules stand down on claimed spans so one construct
+	// yields one finding, from the rule with the stronger story.
+	cl := &claims{}
+	checkPollScope(pass, insp, cl)
+	checkTEscape(pass, insp, suites, cl)
+	checkAssertionSimplify(pass, insp, cl)
+	checkFailGuard(pass, insp, cl)
+	checkRedundantAssertion(pass, insp, cl)
 
 	return nil, nil
+}
+
+// claims records positions owned by earlier findings, whether or not a
+// diagnostic was shown — per-line suppression exempts the construct, not
+// just the message. A skipped expressiveness rule releases its constructs
+// to the remaining active rules; integrity rules cannot be skipped and
+// always claim.
+type claims struct{ positions []token.Pos }
+
+func (c *claims) add(rule Rule, pos token.Pos) {
+	if ruleMeta[rule].Tier != TierIntegrity && skipped(rule) {
+		return
+	}
+	c.positions = append(c.positions, pos)
+}
+
+func (c *claims) anyWithin(start, end token.Pos) bool {
+	for _, p := range c.positions {
+		if p >= start && p < end {
+			return true
+		}
+	}
+	return false
 }
 
 func report(pass *analysis.Pass, rule Rule, pos token.Pos, format string, args ...any) {
@@ -468,10 +496,26 @@ type deferredReport struct {
 	message string
 }
 
-func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo) {
+func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo, cl *claims) {
 	mr := buildMethodReach(pass, insp, 5)
 	reported := map[token.Pos]bool{}
 	var deferred []deferredReport
+
+	scanBody := func(body *ast.BlockStmt, isSuiteMethod bool, gotestTVars map[string]bool) {
+		tVars := map[string]bool{}
+		ast.Inspect(body, func(n ast.Node) bool {
+			switch node := n.(type) {
+			case *ast.AssignStmt:
+				trackTVarAssign(node, tVars, gotestTVars)
+			case *ast.CallExpr:
+				reportDirectEscape(pass, cl, node, isSuiteMethod, tVars, reported)
+				if isSuiteMethod {
+					collectInterproceduralEscape(node, tVars, gotestTVars, mr, &deferred)
+				}
+			}
+			return true
+		})
+	}
 
 	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
 		fd := n.(*ast.FuncDecl)
@@ -484,7 +528,6 @@ func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 			_, isSuiteMethod = suites[receiverTypeName(fd.Recv)]
 		}
 
-		tVars := map[string]bool{}
 		gotestTVars := map[string]bool{}
 		if isSuiteMethod && fd.Type.Params != nil {
 			for _, field := range fd.Type.Params.List {
@@ -496,23 +539,36 @@ func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 			}
 		}
 
-		ast.Inspect(fd.Body, func(n ast.Node) bool {
-			switch node := n.(type) {
-			case *ast.AssignStmt:
-				trackTVarAssign(node, tVars, gotestTVars)
-			case *ast.CallExpr:
-				reportDirectEscape(pass, node, isSuiteMethod, tVars, reported)
-				if isSuiteMethod {
-					collectInterproceduralEscape(node, tVars, gotestTVars, mr, &deferred)
+		scanBody(fd.Body, isSuiteMethod, gotestTVars)
+	})
+
+	// Package-level var function literals are not FuncDecls but their bodies
+	// escape t.T() the same way — without scanning them the claims table
+	// would have blind spots the expressiveness rules rely on.
+	for _, file := range pass.Files {
+		for _, decl := range file.Decls {
+			gd, ok := decl.(*ast.GenDecl)
+			if !ok || gd.Tok != token.VAR {
+				continue
+			}
+			for _, spec := range gd.Specs {
+				vs, ok := spec.(*ast.ValueSpec)
+				if !ok {
+					continue
+				}
+				for _, value := range vs.Values {
+					if lit, ok := value.(*ast.FuncLit); ok && lit.Body != nil {
+						scanBody(lit.Body, false, map[string]bool{})
+					}
 				}
 			}
-			return true
-		})
-	})
+		}
+	}
 
 	for _, d := range deferred {
 		if !reported[d.pos] {
 			reported[d.pos] = true
+			cl.add(d.rule, d.pos)
 			report(pass, d.rule, d.pos, "%s", d.message)
 		}
 	}
@@ -542,7 +598,7 @@ func trackTVarAssign(assign *ast.AssignStmt, tVars, gotestTVars map[string]bool)
 	}
 }
 
-func reportDirectEscape(pass *analysis.Pass, call *ast.CallExpr, isSuiteMethod bool, tVars map[string]bool, reported map[token.Pos]bool) {
+func reportDirectEscape(pass *analysis.Pass, cl *claims, call *ast.CallExpr, isSuiteMethod bool, tVars map[string]bool, reported map[token.Pos]bool) {
 	sel, _ := call.Fun.(*ast.SelectorExpr)
 	if sel == nil {
 		return
@@ -559,6 +615,7 @@ func reportDirectEscape(pass *analysis.Pass, call *ast.CallExpr, isSuiteMethod b
 			}
 			if isDirect || isAlias {
 				reported[call.Pos()] = true
+				cl.add(esc.rule, call.Pos())
 				if esc.canAutofix && isDirect {
 					inner := sel.X.(*ast.CallExpr)
 					innerSel := inner.Fun.(*ast.SelectorExpr)
@@ -1073,7 +1130,7 @@ var pollScopeMethodNames = map[string]bool{
 	"FailNow": true,
 }
 
-func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector) {
+func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) {
 	insp.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(n ast.Node) {
 		call := n.(*ast.CallExpr)
 
@@ -1096,6 +1153,7 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector) {
 			// Case 1: gotest assertion with wrong first arg — gotest.Equal(t, ...) or Equal(t, ...)
 			if name := assertionFuncName(pass, innerCall.Fun); name != "" && len(innerCall.Args) > 0 {
 				if ident, ok := innerCall.Args[0].(*ast.Ident); ok && ident.Name != pollParam {
+					cl.add(PollScope, innerCall.Pos())
 					report(pass, PollScope, ident.Pos(),
 						"use %s instead of %s in poll callback passed to %s",
 						pollParam, ident.Name, fnName)
@@ -1113,6 +1171,7 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector) {
 				return true
 			}
 			if pollScopeMethodNames[sel.Sel.Name] && ident.Name != pollParam {
+				cl.add(PollScope, innerCall.Pos())
 				report(pass, PollScope, ident.Pos(),
 					"%s.%s in poll callback bypasses assertion recording — use %s",
 					ident.Name, sel.Sel.Name, pollParam)
