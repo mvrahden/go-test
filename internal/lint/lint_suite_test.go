@@ -93,6 +93,23 @@ func (s *LintTestSuite) TestDisableNolintFlag(t *gotest.T) {
 	})
 }
 
+func (s *LintTestSuite) TestTierPolicy(t *gotest.T) {
+	t.When("tier-derived skip surface", func(w *gotest.T) {
+		w.It("registers a skip flag for every non-integrity rule and none for integrity rules", func(it *gotest.T) {
+			for _, rule := range []lint.Rule{lint.StdlibTest, lint.Testify, lint.AssertionSimplify, lint.AssertionRedundant, lint.FailGuard, lint.TEscape} {
+				gotest.NotZero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "missing skip flag for %s", rule)
+				gotest.True(it, lint.SkippableRules[rule], "rule %s should be skippable", rule)
+			}
+			for _, rule := range []lint.Rule{lint.Focus, lint.PollScope, lint.TestSignature} {
+				gotest.Zero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "unexpected skip flag for %s", rule)
+				gotest.False(it, lint.SkippableRules[rule], "integrity rule %s must not be skippable", rule)
+			}
+			gotest.True(it, lint.Known(lint.Focus))
+			gotest.False(it, lint.Known(lint.Rule("nope")))
+		})
+	})
+}
+
 func (s *LintTestSuite) TestParseNolint(t *gotest.T) {
 	tests := []struct {
 		desc      string
@@ -135,6 +152,23 @@ func (s *LintTestSuite) TestParseNolint(t *gotest.T) {
 
 // DisableNolintTestSuite runs separately and non-parallel because it
 // temporarily mutates the shared analyzer flag.
+// SkippedStyleTestSuite runs separately and non-parallel because it
+// temporarily mutates the shared analyzer flags.
+type SkippedStyleTestSuite struct{}
+
+func (s *SkippedStyleTestSuite) TestSkipSilencesExpressivenessRule(t *gotest.T) {
+	testdata := analysistest.TestData()
+
+	lint.ExportSetSkip(lint.FailGuard, true)
+	defer lint.ExportSetSkip(lint.FailGuard, false)
+
+	t.When("skip-fail-guard is set", func(w *gotest.T) {
+		w.It("reports nothing for fail-guard findings", func(it *gotest.T) {
+			analysistest.Run(it.T(), testdata, lint.Analyzer, "withskippedstyle")
+		})
+	})
+}
+
 type DisableNolintTestSuite struct{}
 
 func (s *DisableNolintTestSuite) TestNolintDirectivesIgnored(t *gotest.T) {

@@ -39,16 +39,71 @@ const (
 	TEscape            Rule = "t-escape"
 )
 
-// SkippableRules is the set of rules that support opt-out via skip flags.
-var SkippableRules = map[Rule]bool{
-	StdlibTest: true,
-	Testify:    true,
+// Tier classifies what breaks when a rule's finding is ignored, and derives
+// the suppression policy: integrity rules (test outcomes can lie, resources
+// can leak) are suppressible per line only; expressiveness rules (the test is
+// correct but says it worse) and migration rules (legitimate coexistence) may
+// additionally be skipped project-wide.
+type Tier int
+
+const (
+	TierIntegrity Tier = iota
+	TierExpressiveness
+	TierMigration
+)
+
+// Scope documents where a rule may fire.
+type Scope int
+
+const (
+	ScopeEverywhere Scope = iota
+	ScopeGotestFiles
+	ScopeSuites
+	ScopePollCallbacks
+)
+
+var ruleMeta = map[Rule]struct {
+	Tier  Tier
+	Scope Scope
+}{
+	Focus:              {TierIntegrity, ScopeSuites},
+	Receiver:           {TierIntegrity, ScopeSuites},
+	LifecycleTypo:      {TierIntegrity, ScopeSuites},
+	LifecyclePair:      {TierIntegrity, ScopeSuites},
+	GeneratedFile:      {TierIntegrity, ScopeEverywhere},
+	StdlibTest:         {TierMigration, ScopeEverywhere},
+	Testify:            {TierMigration, ScopeEverywhere},
+	PollScope:          {TierIntegrity, ScopePollCallbacks},
+	TestSignature:      {TierIntegrity, ScopeSuites},
+	XLifecycle:         {TierIntegrity, ScopeSuites},
+	AssertionSimplify:  {TierExpressiveness, ScopeGotestFiles},
+	AssertionTypeGuard: {TierIntegrity, ScopeGotestFiles},
+	AssertionRedundant: {TierExpressiveness, ScopeGotestFiles},
+	TEscape:            {TierExpressiveness, ScopeSuites},
+	FailGuard:          {TierExpressiveness, ScopeGotestFiles},
 }
 
+// Known reports whether the rule ID exists.
+func Known(r Rule) bool {
+	_, ok := ruleMeta[r]
+	return ok
+}
+
+// SkippableRules is derived from the tier table: every non-integrity rule
+// supports opt-out via a skip flag (and .gotest.yml lint.skip).
+var SkippableRules = func() map[Rule]bool {
+	m := make(map[Rule]bool, len(ruleMeta))
+	for r, meta := range ruleMeta {
+		if meta.Tier != TierIntegrity {
+			m[r] = true
+		}
+	}
+	return m
+}()
+
 var cfg struct {
-	skipStdlibTest bool
-	skipTestify    bool
-	disableNolint  bool
+	skip          map[Rule]*bool
+	disableNolint bool
 }
 
 var Analyzer = &analysis.Analyzer{
@@ -59,9 +114,21 @@ var Analyzer = &analysis.Analyzer{
 }
 
 func init() {
-	Analyzer.Flags.BoolVar(&cfg.skipStdlibTest, "skip-stdlib-test", false, "disable stdlib test function detection")
-	Analyzer.Flags.BoolVar(&cfg.skipTestify, "skip-testify", false, "disable testify import detection")
+	cfg.skip = make(map[Rule]*bool, len(SkippableRules))
+	rules := make([]string, 0, len(SkippableRules))
+	for r := range SkippableRules {
+		rules = append(rules, string(r))
+	}
+	slices.Sort(rules)
+	for _, r := range rules {
+		cfg.skip[Rule(r)] = Analyzer.Flags.Bool("skip-"+r, false, "disable the "+r+" rule")
+	}
 	Analyzer.Flags.BoolVar(&cfg.disableNolint, "disable-nolint", false, "report all diagnostics and let the analysis driver handle suppression")
+}
+
+func skipped(rule Rule) bool {
+	b, ok := cfg.skip[rule]
+	return ok && *b
 }
 
 var lifecycleHooks = []string{"BeforeAll", "AfterAll", "BeforeEach", "AfterEach"}
@@ -89,6 +156,9 @@ func run(pass *analysis.Pass) (any, error) {
 }
 
 func report(pass *analysis.Pass, rule Rule, pos token.Pos, format string, args ...any) {
+	if skipped(rule) {
+		return
+	}
 	if !cfg.disableNolint && isSuppressed(pass, pos, rule) {
 		return
 	}
@@ -100,6 +170,9 @@ func report(pass *analysis.Pass, rule Rule, pos token.Pos, format string, args .
 }
 
 func reportWithFix(pass *analysis.Pass, rule Rule, pos token.Pos, fixes []analysis.SuggestedFix, format string, args ...any) {
+	if skipped(rule) {
+		return
+	}
 	if !cfg.disableNolint && isSuppressed(pass, pos, rule) {
 		return
 	}
@@ -837,7 +910,7 @@ func checkOrphanedFiles(pass *analysis.Pass) {
 }
 
 func checkStdlibTests(pass *analysis.Pass, insp *inspector.Inspector) {
-	if cfg.skipStdlibTest {
+	if skipped(StdlibTest) {
 		return
 	}
 
@@ -870,7 +943,7 @@ func checkStdlibTests(pass *analysis.Pass, insp *inspector.Inspector) {
 }
 
 func checkTestifyImports(pass *analysis.Pass) {
-	if cfg.skipTestify {
+	if skipped(Testify) {
 		return
 	}
 
