@@ -16,6 +16,10 @@ export interface DiscoverPackage {
   dir: string;
   modulePath?: string; // NEW: Go module path from go.mod
   testOnly?: boolean;
+  // A broken package failed to load; its diagnostics arrive as top-level
+  // warnings. Its suite list is unknowable — discovery needs a successful
+  // parse — so `suites` being empty means "unknown", not "none".
+  broken?: boolean;
   suites: DiscoverSuite[];
 }
 

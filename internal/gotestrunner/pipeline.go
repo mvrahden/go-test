@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/protocol"
 )
 
@@ -77,18 +79,38 @@ func applyTeardownFailure(result *PipelineResult, err error) {
 	}
 }
 
-// recordCompileFailure books a failed compile as a failed package result, so
-// the compile error reaches both the rendered output and the exit code through
-// the same collector every real suite result flows through.
-func recordCompileFailure(c *OutputCollector, pkg string, err error) {
-	if pkg == "" {
-		return
+// stageFailurePkg names the synthetic package under which a build failure
+// that belongs to no single package (e.g. the compile stage's own setup) is
+// booked. The space keeps it out of the import-path namespace.
+const stageFailurePkg = "go build"
+
+// brokenPackageMessage renders a load-broken package's diagnostics in the
+// `go build` shape: a `# path` header followed by one diagnostic per line.
+func brokenPackageMessage(bp *gotestgen.BrokenPackage) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s\n", bp.PkgPath)
+	for _, e := range bp.Errors {
+		b.WriteString(e)
+		b.WriteByte('\n')
 	}
-	c.Register(pkg, 1)
-	c.RecordResult(pkg, 0, SuiteResult{
-		Stderr:   []byte(err.Error() + "\n"),
-		ExitCode: 2,
-	})
+	return b.String()
+}
+
+// bookBuildFailures books load-broken packages and per-package compile
+// failures into the collector. Both are package verdicts: they must reach the
+// rendered output, the JSON stream, and the exit code through the same
+// collector every real suite result flows through.
+func bookBuildFailures(c *OutputCollector, broken []gotestgen.BrokenPackage, failures []BuildFailure) {
+	for i := range broken {
+		c.RecordBuildFailure(broken[i].PkgPath, brokenPackageMessage(&broken[i]))
+	}
+	for _, f := range failures {
+		pkg := f.Package
+		if pkg == "" {
+			pkg = stageFailurePkg
+		}
+		c.RecordBuildFailure(pkg, f.Err.Error()+"\n")
+	}
 }
 
 // appendRunFailureEvents appends test2json-shaped events recording a run-level
@@ -148,12 +170,17 @@ func buildBaseEnv(cfg PipelineConfig) []string {
 	return env
 }
 
-func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []string, setupTimeout time.Duration, compileParallel int) ([]CompileResult, *SharedFixtureProcess, context.CancelFunc, error) {
+// prepareTestRun compiles the suite packages and starts shared fixtures
+// concurrently. Per-package compile failures are package verdicts, not run
+// aborts: they are returned for booking and do not stop the fixtures or the
+// packages that did compile. Only a fixture setup failure is fatal — without
+// the fixtures no surviving suite can run.
+func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []string, setupTimeout time.Duration, compileParallel int) ([]CompileResult, []BuildFailure, *SharedFixtureProcess, context.CancelFunc, error) {
 	setupTimeout = resolveSetupTimeout(setupTimeout)
 	ctx, cancel := context.WithCancel(ctx)
 
 	var compiled []CompileResult
-	var compileErr error
+	var compileFailures []BuildFailure
 	var setupProc *SharedFixtureProcess
 	var setupErr error
 
@@ -161,10 +188,7 @@ func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []st
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		compiled, compileErr = CompilePackages(ctx, overlay.SuitePackages, overlay.OverlayFlag, buildFlags, overlay.WorkDir, compileParallel)
-		if compileErr != nil {
-			cancel()
-		}
+		compiled, compileFailures = CompilePackages(ctx, overlay.SuitePackages, overlay.OverlayFlag, buildFlags, overlay.WorkDir, compileParallel)
 	}()
 
 	if len(overlay.SharedFixtures) > 0 {
@@ -185,18 +209,15 @@ func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []st
 
 	wg.Wait()
 
-	if compileErr != nil || setupErr != nil {
+	if setupErr != nil {
 		cancel()
 		if setupProc != nil {
 			_ = setupProc.Teardown()
 		}
-		if compileErr != nil {
-			return nil, nil, nil, compileErr
-		}
-		return nil, nil, nil, fmt.Errorf("shared fixture setup: %w", setupErr)
+		return nil, nil, nil, nil, fmt.Errorf("shared fixture setup: %w", setupErr)
 	}
 
-	return compiled, setupProc, cancel, nil
+	return compiled, compileFailures, setupProc, cancel, nil
 }
 
 func assignBudgetFiles(targets []SuiteTarget) {
@@ -236,7 +257,7 @@ func setupCoverage(targets []SuiteTarget, overlay *OverlayResult, userCoverProfi
 }
 
 func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (result PipelineResult, err error) { //nolint:gocritic // hugeParam: stable API
-	compiled, setupProc, cancelPrepare, err := prepareTestRun(ctx, overlay, pf.BuildFlags, cfg.SetupTimeout, cfg.CompileParallel)
+	compiled, compileFailures, setupProc, cancelPrepare, err := prepareTestRun(ctx, overlay, pf.BuildFlags, cfg.SetupTimeout, cfg.CompileParallel)
 	if err != nil {
 		return PipelineResult{ExitCode: 2}, err
 	}
@@ -265,7 +286,15 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 
 	targets := BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, runFlags, pf.UserRunFilter)
 
-	if len(targets) == 0 {
+	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
+	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
+	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
+	bookBuildFailures(collector, overlay.BrokenPackages, compileFailures)
+
+	// "Nothing to run" is a clean outcome only when every matched package
+	// became runnable and none of them reports through Finalize. A booked
+	// build failure makes the run a failure regardless of target count.
+	if len(targets) == 0 && !collector.AnyFailed() && len(overlay.NoSuitePackages) == 0 {
 		if cfg.OutputMode != RunCaptureJSON {
 			fmt.Fprintln(os.Stderr, "no test suites to run")
 		}
@@ -278,9 +307,6 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		defer mergeCoverProfiles(targets, pf.UserCoverProfile)
 	}
 
-	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
-	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
-	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
 	RunSuites(ctx, targets, extraEnv, maxParallel, collector)
 	collector.Finalize(overlay.NoSuitePackages)
 
@@ -364,13 +390,22 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	sem := make(chan struct{}, maxParallel)
 	var wg sync.WaitGroup
 	anyTargets := false
-	compileFailed := false
+	buildFailed := len(overlay.BrokenPackages) > 0
 	var allTargets []SuiteTarget
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
 	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
-	collector.SetFlushOrder(overlay.SuitePackages)
+	// Broken packages flush ahead of the suite packages: their verdicts are
+	// known before any suite runs, and the flush order must contain every
+	// package the collector will report on.
+	flushOrder := make([]string, 0, len(overlay.BrokenPackages)+len(overlay.SuitePackages))
+	for i := range overlay.BrokenPackages {
+		flushOrder = append(flushOrder, overlay.BrokenPackages[i].PkgPath)
+	}
+	flushOrder = append(flushOrder, overlay.SuitePackages...)
+	collector.SetFlushOrder(flushOrder)
+	bookBuildFailures(collector, overlay.BrokenPackages, nil)
 
 loop:
 	for {
@@ -387,15 +422,14 @@ loop:
 
 		if outcome.Err != nil {
 			// Discovery-to-result is a total function: a package that fails to
-			// compile is a failed package, not a skipped one. Dropping it here
-			// let `gotest run` print the compile error and exit 0 with the
-			// package's tests never executed — batch mode exits 2 on the same
-			// input, and the two modes must agree.
+			// compile is a failed package, not a skipped one, and batch mode
+			// books the same verdict on the same input — the two modes must
+			// agree.
 			if streamCtx.Err() != nil {
 				continue // cancellation noise, not a compile verdict
 			}
-			compileFailed = true
-			recordCompileFailure(collector, outcome.Package, outcome.Err)
+			buildFailed = true
+			bookBuildFailures(collector, nil, []BuildFailure{{Package: outcome.Package, Err: outcome.Err}})
 			continue
 		}
 		cr := outcome.Result
@@ -515,10 +549,10 @@ loop:
 		mergeCoverProfiles(allTargets, pf.UserCoverProfile)
 	}
 
-	// "Nothing to run" is only a clean outcome when nothing failed to become
-	// runnable: with every package broken this used to print the compile
-	// errors and exit 0.
-	if !anyTargets && len(overlay.NoSuitePackages) == 0 && !compileFailed {
+	// "Nothing to run" is a clean outcome only when every matched package
+	// became runnable and none of them reports through Finalize. A booked
+	// build failure makes the run a failure regardless of target count.
+	if !anyTargets && len(overlay.NoSuitePackages) == 0 && !buildFailed {
 		if cfg.OutputMode == RunBatchText {
 			fmt.Fprintln(os.Stderr, "no test suites to run")
 		}

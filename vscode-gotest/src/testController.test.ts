@@ -81,7 +81,9 @@ function createMockCache(
     wsDir: string;
     modulePath?: string;
     suites?: any[];
+    broken?: boolean;
   }>,
+  warnings: Array<{ importPath: string; message: string }> = [],
 ): DiscoveryCache {
   const pkgMap = new Map<string, any>();
   const wsDirs = new Map<string, string>();
@@ -93,6 +95,7 @@ function createMockCache(
       importPath: pkg.importPath,
       dir: pkg.dir,
       suites: pkg.suites ?? [],
+      broken: pkg.broken,
     });
     wsDirs.set(pkg.importPath, pkg.wsDir);
     if (pkg.modulePath) {
@@ -125,6 +128,7 @@ function createMockCache(
       }
       return Array.from(modules);
     },
+    getWarnings: (ip: string) => warnings.filter((w) => w.importPath === ip),
     onDidUpdate: vi.fn(),
   } as unknown as DiscoveryCache;
 }
@@ -599,5 +603,86 @@ describe("GoTestController.rebuild", () => {
         false,
       );
     });
+  });
+});
+
+describe("GoTestController broken packages", () => {
+  beforeEach(() => {
+    mockWorkspaceFolders.length = 0;
+    mockGetWorkspaceFolder.mockReset();
+  });
+
+  it("badges a broken package with its build diagnostics", () => {
+    const cache = createMockCache(
+      [
+        {
+          importPath: "example.com/proj/broken",
+          dir: "/ws/broken",
+          wsDir: "/ws",
+          suites: [makeSuite("BrokenSuite")],
+          broken: true,
+        },
+      ],
+      [
+        {
+          importPath: "example.com/proj/broken",
+          message: "svc.go:4:17: cannot use 42 as string value",
+        },
+      ],
+    );
+
+    const ctrl = createController(cache);
+    ctrl.rebuild();
+
+    const pkgItem = (ctrl.testController.items as any)._map.get(
+      "example.com/proj/broken",
+    );
+    expect(pkgItem).toBeDefined();
+    expect(pkgItem.error).toContain("cannot use 42");
+    // The last known suites stay in the tree: the tests still exist in the
+    // code, they just cannot run until the package builds again.
+    expect(
+      pkgItem.children.get("example.com/proj/broken/BrokenSuite"),
+    ).toBeDefined();
+  });
+
+  it("falls back to a generic message when no diagnostics are cached", () => {
+    const cache = createMockCache([
+      {
+        importPath: "example.com/proj/broken",
+        dir: "/ws/broken",
+        wsDir: "/ws",
+        suites: [],
+        broken: true,
+      },
+    ]);
+
+    const ctrl = createController(cache);
+    ctrl.rebuild();
+
+    const pkgItem = (ctrl.testController.items as any)._map.get(
+      "example.com/proj/broken",
+    );
+    expect(pkgItem.error).toBe("package failed to build");
+  });
+
+  it("clears the badge when the package builds again", () => {
+    const cache = createMockCache([
+      {
+        importPath: "example.com/proj/pkg",
+        dir: "/ws/pkg",
+        wsDir: "/ws",
+        suites: [makeSuite("PkgSuite")],
+      },
+    ]);
+
+    const ctrl = createController(cache);
+    ctrl.rebuild();
+    const pkgItem = (ctrl.testController.items as any)._map.get(
+      "example.com/proj/pkg",
+    );
+    pkgItem.error = "stale badge";
+    ctrl.rebuild();
+    expect(pkgItem.error).toBeUndefined();
   });
 });

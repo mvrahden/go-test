@@ -278,3 +278,120 @@ describe("DiscoveryService", () => {
     });
   });
 });
+
+describe("DiscoveryCache broken packages", () => {
+  function suiteEntry(name: string) {
+    return {
+      name,
+      parallel: false,
+      focused: false,
+      excluded: false,
+      guarded: false,
+      file: `${name.toLowerCase()}_test.go`,
+      line: 1,
+      col: 1,
+      lifecycle: [],
+      fixtures: [],
+      methods: [],
+    };
+  }
+
+  it("keeps the last known suites when a package turns broken", () => {
+    const cache = new DiscoveryCache();
+    cache.update(
+      [
+        {
+          importPath: "example.com/pkg",
+          dir: "/ws/pkg",
+          suites: [suiteEntry("MySuite")],
+        },
+      ],
+      true,
+      "/ws",
+    );
+    cache.update(
+      [{ importPath: "example.com/pkg", dir: "", broken: true, suites: [] }],
+      false,
+      "/ws",
+    );
+
+    const pkg = cache.getPackage("example.com/pkg");
+    expect(pkg?.broken).toBe(true);
+    expect(pkg?.suites.map((s) => s.name)).toEqual(["MySuite"]);
+    // The empty incoming dir must not clobber the known location.
+    expect(pkg?.dir).toBe("/ws/pkg");
+    expect(cache.resolveFileToPackage("/ws/pkg/mysuite_test.go")).toBe(
+      "example.com/pkg",
+    );
+  });
+
+  it("drops the broken flag when the package builds again", () => {
+    const cache = new DiscoveryCache();
+    cache.update(
+      [
+        {
+          importPath: "example.com/pkg",
+          dir: "/ws/pkg",
+          broken: true,
+          suites: [],
+        },
+      ],
+      true,
+      "/ws",
+    );
+    cache.update(
+      [
+        {
+          importPath: "example.com/pkg",
+          dir: "/ws/pkg",
+          suites: [suiteEntry("MySuite")],
+        },
+      ],
+      false,
+      "/ws",
+    );
+
+    const pkg = cache.getPackage("example.com/pkg");
+    expect(pkg?.broken).toBeUndefined();
+    expect(pkg?.suites.map((s) => s.name)).toEqual(["MySuite"]);
+  });
+
+  it("stores a never-seen broken package as-is without indexing an empty dir", () => {
+    const cache = new DiscoveryCache();
+    cache.update(
+      [{ importPath: "example.com/gone", dir: "", broken: true, suites: [] }],
+      true,
+      "/ws",
+    );
+
+    expect(cache.getPackage("example.com/gone")?.broken).toBe(true);
+    expect(cache.resolveFileToPackage("")).toBeUndefined();
+  });
+
+  it("returns per-package warnings for the badge", () => {
+    const cache = new DiscoveryCache();
+    cache.update(
+      [
+        {
+          importPath: "example.com/pkg",
+          dir: "/ws/pkg",
+          broken: true,
+          suites: [],
+        },
+      ],
+      true,
+      "/ws",
+      [
+        {
+          importPath: "example.com/pkg",
+          message: "svc.go:4:17: cannot use 42",
+        },
+        { importPath: "example.com/other", message: "unrelated" },
+      ],
+    );
+
+    expect(cache.getWarnings("example.com/pkg").map((w) => w.message)).toEqual([
+      "svc.go:4:17: cannot use 42",
+    ]);
+  });
+});

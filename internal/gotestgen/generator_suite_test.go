@@ -15,9 +15,10 @@ type GeneratorTestSuite struct{}
 func (s *GeneratorTestSuite) TestStdlibPackageReturnsEmpty(t *gotest.T) {
 	t.When("loading a stdlib package", func(w *gotest.T) {
 		w.It("returns empty results", func(it *gotest.T) {
-			loaded, err := gotestgen.LoadPackages([]string{"strings"}, nil)
+			loaded, broken, err := gotestgen.LoadPackages([]string{"strings"}, nil)
 			gotest.NoError(it, err)
 			gotest.Empty(it, loaded)
+			gotest.Empty(it, broken)
 		})
 	})
 }
@@ -41,8 +42,9 @@ func (s *GeneratorTestSuite) TestE2ECLI(t *gotest.T) {
 			gotest.NoError(sub, err)
 
 			dirPath := filepath.Join(cwd, "testdata_e2e", tC.dirName)
-			loaded, err := gotestgen.LoadPackages([]string{dirPath}, nil)
+			loaded, broken, err := gotestgen.LoadPackages([]string{dirPath}, nil)
 			gotest.NoError(sub, err)
+			gotest.Empty(sub, broken)
 			results, _, err := gotestgen.GenerateFromLoaded(loaded)
 			gotest.NoError(sub, err)
 			gotest.Equal(sub, dirPath, results[0].AbsPath)
@@ -59,17 +61,21 @@ func (s *GeneratorTestSuite) TestE2ECLI(t *gotest.T) {
 func (s *GeneratorTestSuite) TestE2ENoTestSuites(t *gotest.T) {
 	t.When("packages without test suites", func(w *gotest.T) {
 		for sub, tC := range gotest.Each(w, []struct {
-			Desc string
-			arg  string
+			Desc       string
+			arg        string
+			wantBroken int
 		}{
-			{"no test files", "no_testfiles"},
-			{"non-existent path returns empty", "testdata_e2e/nothing-here"},
-			{"stdlib package returns empty", "strings"},
-			{"stdlib nested package returns empty", "net/http"},
+			{"no test files", "./testdata_e2e/no_testfiles", 0},
+			// A pattern that matches nothing is a broken package, not an empty
+			// result: a typo'd path must never report a passing run.
+			{"non-existent path is broken", "testdata_e2e/nothing-here", 1},
+			{"stdlib package returns empty", "strings", 0},
+			{"stdlib nested package returns empty", "net/http", 0},
 		}) {
-			loaded, err := gotestgen.LoadPackages([]string{tC.arg}, nil)
+			loaded, broken, err := gotestgen.LoadPackages([]string{tC.arg}, nil)
 			gotest.NoError(sub, err)
 			gotest.Empty(sub, loaded)
+			gotest.Len(sub, broken, tC.wantBroken)
 		}
 	})
 }

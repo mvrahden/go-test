@@ -566,7 +566,7 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 			it.Skipf("examples directory not found: %v", err)
 		}
 
-		loadResults, err := gotestgen.LoadPackages([]string{filepath.Join(absExamples, "cart")}, nil)
+		loadResults, _, err := gotestgen.LoadPackages([]string{filepath.Join(absExamples, "cart")}, nil)
 		if err != nil {
 			gotest.Fail(it, "LoadPackages: %v", err)
 		}
@@ -720,7 +720,7 @@ func (s *CmdGotestTestSuite) TestGenerateOverlay(t *gotest.T) {
 				it.Skipf("examples directory not found: %v", err)
 			}
 
-			loaded, err := gotestgen.LoadPackages([]string{filepath.Join(absExamples, "cart")}, nil)
+			loaded, _, err := gotestgen.LoadPackages([]string{filepath.Join(absExamples, "cart")}, nil)
 			if err != nil {
 				gotest.Fail(it, "LoadPackages: %v", err)
 			}
@@ -772,7 +772,7 @@ func (s *CmdGotestTestSuite) TestGenerateOverlay(t *gotest.T) {
 				gotest.Fail(it, "%v", err)
 			}
 
-			loaded, err := gotestgen.LoadPackages([]string{tmpDir}, nil)
+			loaded, _, err := gotestgen.LoadPackages([]string{tmpDir}, nil)
 			if err != nil {
 				gotest.Fail(it, "LoadPackages: %v", err)
 			}
@@ -876,7 +876,7 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 			it.Skipf("examples directory not found: %v", err)
 		}
 
-		loaded, err := gotestgen.LoadPackages([]string{filepath.Join(absExamples, "cart")}, nil)
+		loaded, _, err := gotestgen.LoadPackages([]string{filepath.Join(absExamples, "cart")}, nil)
 		if err != nil {
 			gotest.Fail(it, "LoadPackages: %v", err)
 		}

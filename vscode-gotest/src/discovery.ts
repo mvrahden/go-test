@@ -31,6 +31,10 @@ export class DiscoveryCache implements vscode.Disposable {
     return this._warnings;
   }
 
+  getWarnings(importPath: string): DiscoverWarning[] {
+    return this._warnings.filter((w) => w.importPath === importPath);
+  }
+
   getPackage(importPath: string): DiscoverPackage | undefined {
     return this.cache.get(importPath);
   }
@@ -91,11 +95,26 @@ export class DiscoveryCache implements vscode.Disposable {
         }
       }
     }
-    for (const pkg of packages) {
-      const prev = this.cache.get(pkg.importPath);
+    for (const incoming of packages) {
+      const prev = this.cache.get(incoming.importPath);
+      // A broken package's suite list is unknowable, not empty: discovery
+      // needs a successful parse. The last known suites are kept so the test
+      // tree holds its shape while the package is being edited; the broken
+      // flag travels with them so the UI can mark the package instead of
+      // silently dropping its tests.
+      const pkg =
+        incoming.broken && prev
+          ? {
+              ...incoming,
+              suites: prev.suites,
+              dir: incoming.dir || prev.dir,
+              modulePath: incoming.modulePath ?? prev.modulePath,
+              testOnly: prev.testOnly,
+            }
+          : incoming;
       if (prev && prev.dir !== pkg.dir) this.dirIndex.delete(prev.dir);
       this.cache.set(pkg.importPath, pkg);
-      this.dirIndex.set(pkg.dir, pkg.importPath);
+      if (pkg.dir) this.dirIndex.set(pkg.dir, pkg.importPath);
       this.workspaceDirs.set(pkg.importPath, workspaceDir);
       if (pkg.modulePath) {
         this.pkgModules.set(pkg.importPath, pkg.modulePath);

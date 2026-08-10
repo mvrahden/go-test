@@ -65,6 +65,18 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
 		for _, node := range pkg.Nodes {
 			renderNode(w, node, 0, &c)
 		}
+		// A verdict that sits on the package itself — a build failure, a death
+		// outside any test — has no node to render it; it must still show
+		// beside its diagnostics, or the spec reads green next to a red exit.
+		if PkgFailedOnItsOwn(pkg) {
+			icon, clr := statusIcon(StatusFail, &c)
+			fmt.Fprintf(w, "%s%s%s %sFAIL%s\n", clr, icon, c.reset, c.bold+c.red, c.reset)
+			lines := filterOutput(pkg.Output)
+			if len(lines) == 0 {
+				lines = []string{noDiagnosticNote}
+			}
+			renderErrorOutput(w, lines, 1, &c)
+		}
 	}
 
 	fmt.Fprintln(w)
@@ -212,6 +224,9 @@ func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hu
 	if stats.Skipped > 0 {
 		parts = append(parts, fmt.Sprintf("%s%d skipped%s", c.yellow, stats.Skipped, c.reset))
 	}
+	if stats.FailedPackages > 0 {
+		parts = append(parts, fmt.Sprintf("%s%d failed packages%s", c.red, stats.FailedPackages, c.reset))
+	}
 
 	var counts []string
 	if stats.Suites > 0 {
@@ -222,6 +237,9 @@ func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hu
 	}
 	if stats.Tests > 0 {
 		counts = append(counts, fmt.Sprintf("%d stdlib tests", stats.Tests))
+	}
+	if len(counts) == 0 {
+		counts = append(counts, "0 suites")
 	}
 
 	fmt.Fprintf(w, "%s: %s\n", strings.Join(counts, ", "), strings.Join(parts, ", "))

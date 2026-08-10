@@ -39,6 +39,9 @@ type jsonStats struct {
 	Passed    int `json:"passed"`
 	Failed    int `json:"failed"`
 	Skipped   int `json:"skipped"`
+	// FailedPackages carries package-level verdicts (build failures, deaths
+	// outside any test); the packages array shows which via status "fail".
+	FailedPackages int `json:"failedPackages,omitempty"`
 }
 
 func RenderJSON(w io.Writer, packages []*Package) {
@@ -47,12 +50,13 @@ func RenderJSON(w io.Writer, packages []*Package) {
 	root := jsonRoot{
 		Packages: make([]jsonPackage, len(packages)),
 		Stats: jsonStats{
-			Suites:    stats.Suites,
-			Behaviors: stats.Behaviors,
-			Tests:     stats.Tests,
-			Passed:    stats.Passed,
-			Failed:    stats.Failed,
-			Skipped:   stats.Skipped,
+			Suites:         stats.Suites,
+			Behaviors:      stats.Behaviors,
+			Tests:          stats.Tests,
+			Passed:         stats.Passed,
+			Failed:         stats.Failed,
+			Skipped:        stats.Skipped,
+			FailedPackages: stats.FailedPackages,
 		},
 	}
 
