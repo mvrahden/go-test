@@ -12,7 +12,7 @@ type AlphaTestSuite struct {
 }
 
 func (s *AlphaTestSuite) TestDataPathSet(t *gotest.T) {
-	gotest.NotEqual(t, "", s.Alpha.DataPath)
+	gotest.NotEmpty(t, s.Alpha.DataPath)
 }
 
 func (s *AlphaTestSuite) TestHandleHydrated(t *gotest.T) {
@@ -30,7 +30,7 @@ type MultiTestSuite struct {
 }
 
 func (s *MultiTestSuite) TestAlphaAvailable(t *gotest.T) {
-	gotest.NotEqual(t, "", s.Alpha.DataPath)
+	gotest.NotEmpty(t, s.Alpha.DataPath)
 	gotest.NotEmpty(t, s.Alpha.Handle)
 }
 
@@ -48,7 +48,7 @@ func (s *GammaTestSuite) TestDerivedFromAlpha(t *gotest.T) {
 }
 
 func (s *GammaTestSuite) TestAlphaWired(t *gotest.T) {
-	gotest.NotEqual(t, "", s.Gamma.Alpha.DataPath)
+	gotest.NotEmpty(t, s.Gamma.Alpha.DataPath)
 }
 
 type PlainTestSuite struct{}

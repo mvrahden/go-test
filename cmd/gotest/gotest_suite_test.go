@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/tools/go/packages"
+
 	. "github.com/mvrahden/go-test/cmd/gotest"
 	"github.com/mvrahden/go-test/internal/config"
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -559,20 +561,14 @@ func (s *CmdGotestTestSuite) TestResolveGlobalTimeout(t *gotest.T) {
 func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 	t.It("discovers suites in examples/cart", func(it *gotest.T) {
 		absExamples, err := filepath.Abs(filepath.Join("..", "..", "examples"))
-		if err != nil {
-			gotest.Fail(it, "%v", err)
-		}
+		gotest.NoError(it, err, "%v", err)
 		if _, err := os.Stat(filepath.Join(absExamples, "go.mod")); err != nil {
 			it.Skipf("examples directory not found: %v", err)
 		}
 
 		loadResults, _, err := gotestgen.LoadPackages([]string{filepath.Join(absExamples, "cart")}, nil)
-		if err != nil {
-			gotest.Fail(it, "LoadPackages: %v", err)
-		}
-		if len(loadResults) == 0 {
-			gotest.Fail(it, "expected at least one load result")
-		}
+		gotest.NoError(it, err, "LoadPackages: %v", err)
+		gotest.NotEmpty(it, loadResults, "expected at least one load result")
 
 		out := ExportDiscoverOutput{}
 		c := gotestgen.NewCollector()
@@ -582,39 +578,34 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 				Dir:        lr.PkgDir,
 			}
 
-			if lr.Ptest != nil {
-				result := c.CollectSuiteSpecs(lr.Ptest)
-				if len(result.Errs) > 0 {
-					gotest.Fail(it, "collector error: %v", result.Errs[0].Err)
+			collect := func(pkg *packages.Package) {
+				result := c.CollectSuiteSpecs(pkg)
+				var collectorErrs []string
+				for _, cerr := range result.Errs {
+					collectorErrs = append(collectorErrs, cerr.Err.Error())
 				}
+				gotest.Empty(it, collectorErrs, "collector errors")
 				for _, suite := range result.Suites {
 					pkgEntry.Suites = append(pkgEntry.Suites, ExportBuildDiscoverSuite(suite))
 				}
 			}
+			if lr.Ptest != nil {
+				collect(lr.Ptest)
+			}
 			if lr.Pxtest != nil {
-				result := c.CollectSuiteSpecs(lr.Pxtest)
-				if len(result.Errs) > 0 {
-					gotest.Fail(it, "collector error: %v", result.Errs[0].Err)
-				}
-				for _, suite := range result.Suites {
-					pkgEntry.Suites = append(pkgEntry.Suites, ExportBuildDiscoverSuite(suite))
-				}
+				collect(lr.Pxtest)
 			}
 
 			out.Packages = append(out.Packages, pkgEntry)
 		}
 
-		if len(out.Packages) != 1 {
-			gotest.Fail(it, "expected 1 package, got %d", len(out.Packages))
-		}
+		gotest.Len(it, out.Packages, 1)
 
 		pkg := out.Packages[0]
 		gotest.Equal(it, "github.com/mvrahden/go-test/examples/cart", pkg.ImportPath)
 		gotest.True(it, filepath.IsAbs(pkg.Dir), "dir should be absolute, got %q", pkg.Dir)
 
-		if len(pkg.Suites) != 4 {
-			gotest.Fail(it, "expected 4 suites, got %d", len(pkg.Suites))
-		}
+		gotest.Len(it, pkg.Suites, 4)
 
 		suiteByNameAndFile := map[string]ExportDiscoverSuite{}
 		for i := range pkg.Suites {
@@ -635,9 +626,7 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 		gotest.Equal(it, expectedLifecycle, st.Lifecycle)
 		gotest.Empty(it, st.Fixtures)
 
-		if len(st.Methods) != 9 {
-			gotest.Fail(it, "expected 9 methods, got %d", len(st.Methods))
-		}
+		gotest.Len(it, st.Methods, 9)
 		gotest.Equal(it, "TestAddSingleItem", st.Methods[0].Name)
 		gotest.Equal(it, 15, st.Methods[0].Line)
 		gotest.Equal(it, 1, st.Methods[0].Col)
@@ -650,9 +639,7 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 		// Verify pxtest ShoppingCartTestSuite
 		sx := suiteByNameAndFile["ShoppingCartTestSuite:suite_ext_test.go"]
 		gotest.Equal(it, "ShoppingCartTestSuite", sx.Name)
-		if len(sx.Methods) != 2 {
-			gotest.Fail(it, "expected 2 pxtest methods, got %d", len(sx.Methods))
-		}
+		gotest.Len(it, sx.Methods, 2)
 		gotest.Equal(it, "TestAddItem", sx.Methods[0].Name)
 		gotest.Equal(it, "TestRemoveItem", sx.Methods[1].Name)
 
@@ -662,13 +649,9 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 
 		// Verify JSON serialization roundtrip
 		data, err := json.Marshal(out)
-		if err != nil {
-			gotest.Fail(it, "json.Marshal: %v", err)
-		}
+		gotest.NoError(it, err, "json.Marshal: %v", err)
 		var roundtrip ExportDiscoverOutput
-		if err := json.Unmarshal(data, &roundtrip); err != nil {
-			gotest.Fail(it, "json.Unmarshal: %v", err)
-		}
+		gotest.NoError(it, json.Unmarshal(data, &roundtrip))
 		gotest.Len(it, roundtrip.Packages, 1)
 	})
 }
@@ -713,46 +696,31 @@ func (s *CmdGotestTestSuite) TestGenerateOverlay(t *gotest.T) {
 	t.When("suites are present", func(w *gotest.T) {
 		w.It("produces valid overlay JSON", func(it *gotest.T) {
 			absExamples, err := filepath.Abs(filepath.Join("..", "..", "examples"))
-			if err != nil {
-				gotest.Fail(it, "%v", err)
-			}
+			gotest.NoError(it, err, "%v", err)
 			if _, err := os.Stat(filepath.Join(absExamples, "go.mod")); err != nil {
 				it.Skipf("examples directory not found: %v", err)
 			}
 
 			loaded, _, err := gotestgen.LoadPackages([]string{filepath.Join(absExamples, "cart")}, nil)
-			if err != nil {
-				gotest.Fail(it, "LoadPackages: %v", err)
-			}
+			gotest.NoError(it, err, "LoadPackages: %v", err)
 			results, _, err := gotestgen.GenerateFromLoaded(loaded)
-			if err != nil {
-				gotest.Fail(it, "GenerateFromLoaded: %v", err)
-			}
-			if len(results) == 0 {
-				gotest.Fail(it, "expected at least one generate result")
-			}
+			gotest.NoError(it, err, "GenerateFromLoaded: %v", err)
+			gotest.NotEmpty(it, results, "expected at least one generate result")
 
 			tmpDir, err := gotestrunner.WriteOverlay(results)
-			if err != nil {
-				gotest.Fail(it, "WriteOverlay: %v", err)
-			}
+			gotest.NoError(it, err, "WriteOverlay: %v", err)
 			defer os.RemoveAll(tmpDir)
 
 			overlayFile := filepath.Join(tmpDir, "overlay.json")
-			if _, err := os.Stat(overlayFile); err != nil {
-				gotest.Fail(it, "overlay.json not found: %v", err)
-			}
+			_, err = os.Stat(overlayFile)
+			gotest.NoError(it, err)
 
 			data, err := os.ReadFile(overlayFile)
-			if err != nil {
-				gotest.Fail(it, "reading overlay.json: %v", err)
-			}
+			gotest.NoError(it, err, "reading overlay.json: %v", err)
 			var overlayContent struct {
 				Replace map[string]string `json:"Replace"`
 			}
-			if err := json.Unmarshal(data, &overlayContent); err != nil {
-				gotest.Fail(it, "overlay.json is not valid JSON: %v", err)
-			}
+			gotest.NoError(it, json.Unmarshal(data, &overlayContent), "overlay.json is not valid JSON")
 			gotest.NotEmpty(it, overlayContent.Replace, "overlay.json Replace map is empty")
 		})
 	})
@@ -760,26 +728,16 @@ func (s *CmdGotestTestSuite) TestGenerateOverlay(t *gotest.T) {
 	t.When("no suites", func(w *gotest.T) {
 		w.It("returns empty results for package without suites", func(it *gotest.T) {
 			tmpDir, err := os.MkdirTemp("", "overlay-test-nosuite-*")
-			if err != nil {
-				gotest.Fail(it, "%v", err)
-			}
+			gotest.NoError(it, err, "%v", err)
 			defer os.RemoveAll(tmpDir)
 
-			if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module nosuite\n\ngo 1.24\n"), 0600); err != nil {
-				gotest.Fail(it, "%v", err)
-			}
-			if err := os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0600); err != nil {
-				gotest.Fail(it, "%v", err)
-			}
+			gotest.NoError(it, os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module nosuite\n\ngo 1.24\n"), 0600))
+			gotest.NoError(it, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0600))
 
 			loaded, _, err := gotestgen.LoadPackages([]string{tmpDir}, nil)
-			if err != nil {
-				gotest.Fail(it, "LoadPackages: %v", err)
-			}
+			gotest.NoError(it, err, "LoadPackages: %v", err)
 			results, _, err := gotestgen.GenerateFromLoaded(loaded)
-			if err != nil {
-				gotest.Fail(it, "GenerateFromLoaded: %v", err)
-			}
+			gotest.NoError(it, err, "GenerateFromLoaded: %v", err)
 
 			var allResults gotestgen.GenerateResults
 			allResults = append(allResults, results...)
@@ -869,26 +827,18 @@ func (s *CmdGotestTestSuite) TestSpecFlagParsing(t *gotest.T) {
 func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 	t.It("renders spec output from stdin-like JSON", func(it *gotest.T) {
 		absExamples, err := filepath.Abs(filepath.Join("..", "..", "examples"))
-		if err != nil {
-			gotest.Fail(it, "%v", err)
-		}
+		gotest.NoError(it, err, "%v", err)
 		if _, err := os.Stat(filepath.Join(absExamples, "go.mod")); err != nil {
 			it.Skipf("examples directory not found: %v", err)
 		}
 
 		loaded, _, err := gotestgen.LoadPackages([]string{filepath.Join(absExamples, "cart")}, nil)
-		if err != nil {
-			gotest.Fail(it, "LoadPackages: %v", err)
-		}
+		gotest.NoError(it, err, "LoadPackages: %v", err)
 		results, _, err := gotestgen.GenerateFromLoaded(loaded)
-		if err != nil {
-			gotest.Fail(it, "GenerateFromLoaded: %v", err)
-		}
+		gotest.NoError(it, err, "GenerateFromLoaded: %v", err)
 
 		tmpDir, err := gotestrunner.WriteOverlay(results)
-		if err != nil {
-			gotest.Fail(it, "WriteOverlay: %v", err)
-		}
+		gotest.NoError(it, err, "WriteOverlay: %v", err)
 		defer os.RemoveAll(tmpDir)
 
 		cmd := exec.CommandContext(context.Background(), "go", //nolint:gosec // G204: go tool with controlled arguments
@@ -899,19 +849,13 @@ func (s *CmdGotestTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 		cmd.Stdout = &jsonOut
 		cmd.Stderr = os.Stderr
 		mp := gotestrunner.NewManagedProcess(cmd, gotestrunner.ProcessConfig{Grace: gotestrunner.GraceKill})
-		if err := mp.Start(); err != nil {
-			gotest.Fail(it, "go test start: %v", err)
-		}
+		gotest.NoError(it, mp.Start(), "go test start")
 		_ = mp.WaitWithGrace(context.Background())
-		if cmd.ProcessState == nil {
-			gotest.Fail(it, "go test: process state is nil")
-		}
+		gotest.NotZero(it, cmd.ProcessState, "go test: process state is nil")
 		jsonData := jsonOut.Bytes()
 
 		events, err := gotestspec.ParseEvents(bytes.NewReader(jsonData))
-		if err != nil {
-			gotest.Fail(it, "ParseEvents: %v", err)
-		}
+		gotest.NoError(it, err, "ParseEvents: %v", err)
 
 		tree := gotestspec.BuildTree(events)
 

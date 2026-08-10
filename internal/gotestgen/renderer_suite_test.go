@@ -461,7 +461,7 @@ func (s *RendererTestSuite) TestResolvedFixtures(t *gotest.T) {
 			gotest.Equal(it, "PGSharedFixture", sf.QualifiedType)
 			gotest.Equal(it, "PGSharedFixture", sf.FieldName)
 			gotest.Equal(it, "PGSharedFixture", sf.Identifier)
-			gotest.Equal(it, "", sf.PkgPath, "same-package shared fixture should have empty PkgPath")
+			gotest.Empty(it, sf.PkgPath, "same-package shared fixture should have empty PkgPath")
 			gotest.Equal(it, pkg.PkgPath+".PGSharedFixture", sf.StateKey)
 		})
 	})

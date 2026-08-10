@@ -84,19 +84,16 @@ func TestRenderTerminal_BareFailIsMarked(t *testing.T) {
 		"the failing node must carry a visible mark in the tree")
 }
 
+// statCounts aggregates the CollectStats expectations so a failure reports
+// every mismatched counter at once.
+type statCounts struct{ Failed, Passed, Total int }
+
 func TestCollectStats_CountsInteriorNodeFailure(t *testing.T) {
 	stats := CollectStats(interiorFailurePackages())
 
-	if stats.Failed != 1 {
-		t.Errorf("Failed = %d, want 1", stats.Failed)
-	}
-	if stats.Passed != 2 {
-		t.Errorf("Passed = %d, want 2", stats.Passed)
-	}
-	if stats.Total() != stats.Behaviors+stats.Tests {
-		t.Errorf("Passed+Failed+Skipped = %d, want it to equal Behaviors+Tests = %d",
-			stats.Total(), stats.Behaviors+stats.Tests)
-	}
+	gotest.Equal(t,
+		statCounts{Failed: 1, Passed: 2, Total: stats.Behaviors + stats.Tests},
+		statCounts{Failed: stats.Failed, Passed: stats.Passed, Total: stats.Total()})
 }
 
 func TestRenderSummary_ReportsInteriorNodeFailure(t *testing.T) {
@@ -104,15 +101,9 @@ func TestRenderSummary_ReportsInteriorNodeFailure(t *testing.T) {
 	RenderSummary(&buf, interiorFailurePackages(), WithNoColor())
 	out := buf.String()
 
-	if !strings.Contains(out, "could not release the database") {
-		t.Errorf("expected the node's own diagnostic in the summary, got:\n%s", out)
-	}
-	if !strings.Contains(out, "Boot") {
-		t.Errorf("expected the failing node to be named, got:\n%s", out)
-	}
-	if strings.Contains(out, "tests passed (") {
-		t.Errorf("expected a failure summary, not an all-passed line:\n%s", out)
-	}
+	gotest.Contains(t, out, "could not release the database")
+	gotest.Contains(t, out, "Boot")
+	gotest.NotContains(t, out, "tests passed (")
 }
 
 func TestRenderTerminal_ReportsInteriorNodeFailure(t *testing.T) {
@@ -120,9 +111,7 @@ func TestRenderTerminal_ReportsInteriorNodeFailure(t *testing.T) {
 	RenderTerminal(&buf, interiorFailurePackages(), WithNoColor())
 	out := stripANSI(buf.String())
 
-	if !strings.Contains(out, "could not release the database") {
-		t.Errorf("expected the node's own diagnostic in the tree, got:\n%s", out)
-	}
+	gotest.Contains(t, out, "could not release the database")
 }
 
 // A failed child marks its whole ancestry FAIL. Those ancestors carry only the
@@ -153,15 +142,11 @@ func TestCollectStats_IgnoresFailureInheritedFromAChild(t *testing.T) {
 	}}
 
 	stats := CollectStats(packages)
-	if stats.Failed != 1 {
-		t.Errorf("Failed = %d, want 1 (the leaf only)", stats.Failed)
-	}
+	gotest.Equal(t, 1, stats.Failed, "the leaf only")
 
 	var buf bytes.Buffer
 	RenderSummary(&buf, packages, WithNoColor())
-	if got := strings.Count(buf.String(), "FAIL  example.com/pkg"); got != 1 {
-		t.Errorf("reported %d failures, want 1:\n%s", got, buf.String())
-	}
+	gotest.Equal(t, 1, strings.Count(buf.String(), "FAIL  example.com/pkg"))
 }
 
 // An interior node that merely logged is not a verdict. BeforeEach output lands
@@ -195,13 +180,10 @@ func TestCollectStats_IgnoresInteriorLogWhenADescendantFailed(t *testing.T) {
 	}}
 
 	stats := CollectStats(packages)
-	if stats.Failed != 1 {
-		t.Errorf("Failed = %d, want 1 (the leaf only)", stats.Failed)
-	}
-	if stats.Total() != stats.Behaviors+stats.Tests {
-		t.Errorf("Passed+Failed+Skipped = %d, want it to equal Behaviors+Tests = %d",
-			stats.Total(), stats.Behaviors+stats.Tests)
-	}
+	gotest.Equal(t,
+		statCounts{Failed: 1, Passed: 0, Total: stats.Behaviors + stats.Tests},
+		statCounts{Failed: stats.Failed, Passed: stats.Passed, Total: stats.Total()},
+		"the leaf only")
 
 	// Rendering deliberately uses the weaker hasOwnDiagnostic, not
 	// failedOnItsOwn: it cannot tell this stray t.Log apart from a genuine
@@ -212,9 +194,7 @@ func TestCollectStats_IgnoresInteriorLogWhenADescendantFailed(t *testing.T) {
 	// regress is the count above: Failed stays 1 either way.
 	var buf bytes.Buffer
 	RenderSummary(&buf, packages, WithNoColor())
-	if got := strings.Count(buf.String(), "boot_test.go:9: True failed"); got != 1 {
-		t.Errorf("expected the leaf's own diagnostic exactly once, got %d:\n%s", got, buf.String())
-	}
+	gotest.Equal(t, 1, strings.Count(buf.String(), "boot_test.go:9: True failed"))
 }
 
 // An interior node can carry a genuine diagnostic of its own (AfterAll failed)
@@ -253,19 +233,13 @@ func TestCollectStats_CountsLeafButStillRendersInteriorDiagnostic(t *testing.T) 
 	}}
 
 	stats := CollectStats(packages)
-	if stats.Failed != 1 {
-		t.Errorf("Failed = %d, want 1 (the leaf only)", stats.Failed)
-	}
+	gotest.Equal(t, 1, stats.Failed, "the leaf only")
 
 	var termBuf bytes.Buffer
 	RenderTerminal(&termBuf, packages, WithNoColor())
-	if termOut := stripANSI(termBuf.String()); !strings.Contains(termOut, "could not release the database") {
-		t.Errorf("expected the interior node's own diagnostic in the tree, got:\n%s", termOut)
-	}
+	gotest.Contains(t, stripANSI(termBuf.String()), "could not release the database")
 
 	var summaryBuf bytes.Buffer
 	RenderSummary(&summaryBuf, packages, WithNoColor())
-	if summaryOut := summaryBuf.String(); !strings.Contains(summaryOut, "could not release the database") {
-		t.Errorf("expected the interior node's own diagnostic in the summary, got:\n%s", summaryOut)
-	}
+	gotest.Contains(t, summaryBuf.String(), "could not release the database")
 }

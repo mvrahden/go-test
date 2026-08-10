@@ -50,7 +50,7 @@ func TestParse_ContentBeforeFirstHeader_IsIgnored(t *testing.T) {
 
 func TestSerialize_Empty(t *testing.T) {
 	out := snapfile.Serialize(nil)
-	gotest.Equal(t, "", string(out))
+	gotest.Empty(t, string(out))
 }
 
 func TestSerialize_SingleSection(t *testing.T) {

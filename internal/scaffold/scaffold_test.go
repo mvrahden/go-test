@@ -3,7 +3,6 @@ package scaffold //nolint:stdlib-test
 import (
 	"go/parser"
 	"go/token"
-	"strings"
 	"testing"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -56,20 +55,12 @@ func TestParseTarget(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			pkg, typeName, err := ParseTarget(tc.input)
 			if tc.wantErr {
-				if err == nil {
-					t.Fatalf("expected error, got nil")
-				}
+				gotest.Error(t, err, "expected error, got nil")
 				return
 			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if pkg != tc.wantPkg {
-				t.Errorf("pkg: want %q, got %q", tc.wantPkg, pkg)
-			}
-			if typeName != tc.wantType {
-				t.Errorf("typeName: want %q, got %q", tc.wantType, typeName)
-			}
+			gotest.NoError(t, err, "unexpected error: %v", err)
+			gotest.Equal(t, tc.wantPkg, pkg)
+			gotest.Equal(t, tc.wantType, typeName)
 		})
 	}
 }
@@ -77,82 +68,46 @@ func TestParseTarget(t *testing.T) {
 func TestIntrospectType_Struct(t *testing.T) {
 	// Use the testdata sampletype package
 	info, err := IntrospectType("./testdata/sampletype", "UserService")
-	if err != nil {
-		t.Fatalf("IntrospectType failed: %v", err)
-	}
+	gotest.NoError(t, err, "IntrospectType failed: %v", err)
 
-	if info.Name != "UserService" {
-		t.Errorf("Name: want %q, got %q", "UserService", info.Name)
-	}
-	if info.PkgName != "sampletype" {
-		t.Errorf("PkgName: want %q, got %q", "sampletype", info.PkgName)
-	}
-	if info.IsInterface {
-		t.Error("expected IsInterface=false for struct")
-	}
-	if info.PkgDir == "" {
-		t.Error("PkgDir should not be empty")
-	}
+	gotest.Equal(t, "UserService", info.Name)
+	gotest.Equal(t, "sampletype", info.PkgName)
+	gotest.False(t, info.IsInterface)
+	gotest.NotEmpty(t, info.PkgDir)
 
 	// Should have exactly 3 exported methods: Create, Delete, GetByID (sorted)
-	if len(info.Methods) != 3 {
-		t.Fatalf("expected 3 methods, got %d: %+v", len(info.Methods), info.Methods)
-	}
+	gotest.Len(t, info.Methods, 3)
 
 	wantNames := []string{"Create", "Delete", "GetByID"}
 	for i, want := range wantNames {
-		if info.Methods[i].Name != want {
-			t.Errorf("method[%d]: want %q, got %q", i, want, info.Methods[i].Name)
-		}
+		gotest.Equal(t, want, info.Methods[i].Name)
 	}
 
 	// Create returns error
-	if !info.Methods[0].ReturnsError {
-		t.Error("Create should return error")
-	}
+	gotest.True(t, info.Methods[0].ReturnsError, "Create should return error")
 	// Delete returns error
-	if !info.Methods[1].ReturnsError {
-		t.Error("Delete should return error")
-	}
+	gotest.True(t, info.Methods[1].ReturnsError, "Delete should return error")
 	// GetByID returns error
-	if !info.Methods[2].ReturnsError {
-		t.Error("GetByID should return error")
-	}
+	gotest.True(t, info.Methods[2].ReturnsError, "GetByID should return error")
 }
 
 func TestIntrospectType_Interface(t *testing.T) {
 	info, err := IntrospectType("./testdata/sampletype", "Validator")
-	if err != nil {
-		t.Fatalf("IntrospectType failed: %v", err)
-	}
+	gotest.NoError(t, err, "IntrospectType failed: %v", err)
 
-	if info.Name != "Validator" {
-		t.Errorf("Name: want %q, got %q", "Validator", info.Name)
-	}
-	if !info.IsInterface {
-		t.Error("expected IsInterface=true for interface")
-	}
+	gotest.Equal(t, "Validator", info.Name)
+	gotest.True(t, info.IsInterface)
 
-	if len(info.Methods) != 2 {
-		t.Fatalf("expected 2 methods, got %d: %+v", len(info.Methods), info.Methods)
-	}
+	gotest.Len(t, info.Methods, 2)
 
 	// Sorted: IsValid, Validate
-	if info.Methods[0].Name != "IsValid" {
-		t.Errorf("method[0]: want %q, got %q", "IsValid", info.Methods[0].Name)
-	}
-	if info.Methods[1].Name != "Validate" {
-		t.Errorf("method[1]: want %q, got %q", "Validate", info.Methods[1].Name)
-	}
+	gotest.Equal(t, "IsValid", info.Methods[0].Name)
+	gotest.Equal(t, "Validate", info.Methods[1].Name)
 
 	// IsValid does NOT return error
-	if info.Methods[0].ReturnsError {
-		t.Error("IsValid should not return error")
-	}
+	gotest.False(t, info.Methods[0].ReturnsError, "IsValid should not return error")
 	// Validate returns error
-	if !info.Methods[1].ReturnsError {
-		t.Error("Validate should return error")
-	}
+	gotest.True(t, info.Methods[1].ReturnsError, "Validate should return error")
 }
 
 func TestGenerateScaffold_Struct(t *testing.T) {
@@ -167,54 +122,32 @@ func TestGenerateScaffold_Struct(t *testing.T) {
 	}
 
 	out, err := GenerateScaffold(info)
-	if err != nil {
-		t.Fatalf("GenerateScaffold failed: %v", err)
-	}
+	gotest.NoError(t, err, "GenerateScaffold failed: %v", err)
 
 	src := string(out)
 
 	// Check package declaration
-	if !strings.Contains(src, "package user") {
-		t.Error("missing package declaration")
-	}
+	gotest.Contains(t, src, "package user")
 
 	// Check import
-	if !strings.Contains(src, `"github.com/mvrahden/go-test/pkg/gotest"`) {
-		t.Error("missing gotest import")
-	}
+	gotest.Contains(t, src, `"github.com/mvrahden/go-test/pkg/gotest"`)
 
 	// Check suite struct
-	if !strings.Contains(src, "type UserServiceTestSuite struct") {
-		t.Error("missing test suite struct")
-	}
-	if !strings.Contains(src, "sut *UserService") {
-		t.Error("missing sut field")
-	}
+	gotest.Contains(t, src, "type UserServiceTestSuite struct")
+	gotest.Contains(t, src, "sut *UserService")
 
 	// Check BeforeEach
-	if !strings.Contains(src, "func (s *UserServiceTestSuite) BeforeEach(t *gotest.T)") {
-		t.Error("missing BeforeEach method")
-	}
+	gotest.Contains(t, src, "func (s *UserServiceTestSuite) BeforeEach(t *gotest.T)")
 
 	// Check test methods for error-returning methods
-	if !strings.Contains(src, "func (s *UserServiceTestSuite) TestCreate(t *gotest.T)") {
-		t.Error("missing TestCreate method")
-	}
-	if !strings.Contains(src, `t.It("succeeds"`) {
-		t.Error("missing 'succeeds' It block for error-returning method")
-	}
-	if !strings.Contains(src, `t.It("returns error"`) {
-		t.Error("missing 'returns error' It block for error-returning method")
-	}
+	gotest.Contains(t, src, "func (s *UserServiceTestSuite) TestCreate(t *gotest.T)")
+	gotest.Contains(t, src, `t.It("succeeds"`)
+	gotest.Contains(t, src, `t.It("returns error"`)
 
 	// Check test method for non-error method
-	if !strings.Contains(src, "func (s *UserServiceTestSuite) TestList(t *gotest.T)") {
-		t.Error("missing TestList method")
-	}
+	gotest.Contains(t, src, "func (s *UserServiceTestSuite) TestList(t *gotest.T)")
 	// TestList should have "works" It block
-	if !strings.Contains(src, `t.It("works"`) {
-		t.Error("missing 'works' It block for non-error method")
-	}
+	gotest.Contains(t, src, `t.It("works"`)
 }
 
 func TestGenerateContractScaffold_Interface(t *testing.T) {
@@ -229,42 +162,26 @@ func TestGenerateContractScaffold_Interface(t *testing.T) {
 	}
 
 	out, err := GenerateContractScaffold(info)
-	if err != nil {
-		t.Fatalf("GenerateContractScaffold failed: %v", err)
-	}
+	gotest.NoError(t, err, "GenerateContractScaffold failed: %v", err)
 
 	src := string(out)
 
 	// Check package declaration
-	if !strings.Contains(src, "package validation") {
-		t.Error("missing package declaration")
-	}
+	gotest.Contains(t, src, "package validation")
 
 	// Check generic suite struct
-	if !strings.Contains(src, "type ValidatorContractTestSuite[T Validator] struct") {
-		t.Error("missing generic contract test suite struct")
-	}
-	if !strings.Contains(src, "factory func() T") {
-		t.Error("missing factory field")
-	}
+	gotest.Contains(t, src, "type ValidatorContractTestSuite[T Validator] struct")
+	gotest.Contains(t, src, "factory func() T")
 
 	// Check BeforeEach uses factory
-	if !strings.Contains(src, "s.sut = s.factory()") {
-		t.Error("missing factory call in BeforeEach")
-	}
+	gotest.Contains(t, src, "s.sut = s.factory()")
 
 	// Check test methods
-	if !strings.Contains(src, "func (s *ValidatorContractTestSuite[T]) TestValidate(t *gotest.T)") {
-		t.Error("missing TestValidate method")
-	}
-	if !strings.Contains(src, "func (s *ValidatorContractTestSuite[T]) TestIsValid(t *gotest.T)") {
-		t.Error("missing TestIsValid method")
-	}
+	gotest.Contains(t, src, "func (s *ValidatorContractTestSuite[T]) TestValidate(t *gotest.T)")
+	gotest.Contains(t, src, "func (s *ValidatorContractTestSuite[T]) TestIsValid(t *gotest.T)")
 
 	// Check instantiation comment
-	if !strings.Contains(src, "type MyValidatorTestSuite = ValidatorContractTestSuite[*MyImpl]") {
-		t.Error("missing instantiation comment")
-	}
+	gotest.Contains(t, src, "type MyValidatorTestSuite = ValidatorContractTestSuite[*MyImpl]")
 }
 
 func TestToSnakeCase(t *testing.T) {
@@ -283,50 +200,30 @@ func TestToSnakeCase(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.input, func(t *testing.T) {
 			got := toSnakeCase(tc.input)
-			if got != tc.want {
-				t.Errorf("toSnakeCase(%q): want %q, got %q", tc.input, tc.want, got)
-			}
+			gotest.Equal(t, tc.want, got)
 		})
 	}
 }
 
 func TestIntrospectFile_Funcs(t *testing.T) {
 	info, err := IntrospectFile("./testdata/sampletype", "funcs.go")
-	if err != nil {
-		t.Fatalf("IntrospectFile failed: %v", err)
-	}
+	gotest.NoError(t, err, "IntrospectFile failed: %v", err)
 
-	if info.SuiteName != "FuncsTestSuite" {
-		t.Errorf("SuiteName: want %q, got %q", "FuncsTestSuite", info.SuiteName)
-	}
-	if info.PkgName != "sampletype" {
-		t.Errorf("PkgName: want %q, got %q", "sampletype", info.PkgName)
-	}
-	if info.PkgDir == "" {
-		t.Error("PkgDir should not be empty")
-	}
-	if len(info.Funcs) != 2 {
-		t.Fatalf("expected 2 funcs, got %d: %+v", len(info.Funcs), info.Funcs)
-	}
+	gotest.Equal(t, "FuncsTestSuite", info.SuiteName)
+	gotest.Equal(t, "sampletype", info.PkgName)
+	gotest.NotEmpty(t, info.PkgDir)
+	gotest.Len(t, info.Funcs, 2)
 	wantNames := []string{"ApplyTax", "CalculateDiscount"}
 	for i, want := range wantNames {
-		if info.Funcs[i].Name != want {
-			t.Errorf("func[%d]: want %q, got %q", i, want, info.Funcs[i].Name)
-		}
+		gotest.Equal(t, want, info.Funcs[i].Name)
 	}
 }
 
 func TestIntrospectFile_NoExported(t *testing.T) {
 	info, err := IntrospectFile("./testdata/sampletype", "types.go")
-	if err != nil {
-		t.Fatalf("IntrospectFile failed: %v", err)
-	}
-	if len(info.Funcs) != 1 {
-		t.Fatalf("expected 1 exported func (NewUserService), got %d: %+v", len(info.Funcs), info.Funcs)
-	}
-	if info.Funcs[0].Name != "NewUserService" {
-		t.Errorf("func[0]: want %q, got %q", "NewUserService", info.Funcs[0].Name)
-	}
+	gotest.NoError(t, err, "IntrospectFile failed: %v", err)
+	gotest.Len(t, info.Funcs, 1)
+	gotest.Equal(t, "NewUserService", info.Funcs[0].Name)
 }
 
 func TestGenerateFileScaffold(t *testing.T) {
@@ -340,79 +237,48 @@ func TestGenerateFileScaffold(t *testing.T) {
 	}
 
 	out, err := GenerateFileScaffold(info)
-	if err != nil {
-		t.Fatalf("GenerateFileScaffold failed: %v", err)
-	}
+	gotest.NoError(t, err, "GenerateFileScaffold failed: %v", err)
 
 	src := string(out)
 
-	if !strings.Contains(src, "package pricing") {
-		t.Error("missing package declaration")
-	}
-	if !strings.Contains(src, `"github.com/mvrahden/go-test/pkg/gotest"`) {
-		t.Error("missing gotest import")
-	}
-	if !strings.Contains(src, "type CalcTestSuite struct") {
-		t.Error("missing test suite struct")
-	}
-	if strings.Contains(src, "gotest.TestSuite") {
-		t.Error("scaffold must not embed gotest.TestSuite — no such type exists")
-	}
-	if _, perr := parser.ParseFile(token.NewFileSet(), "scaffold.go", src, 0); perr != nil {
-		t.Errorf("generated scaffold does not parse: %v", perr)
-	}
-	if strings.Contains(src, "sut") {
-		t.Error("file-scoped scaffold should NOT have sut field")
-	}
-	if strings.Contains(src, "BeforeEach") {
-		t.Error("file-scoped scaffold should NOT have BeforeEach")
-	}
-	if !strings.Contains(src, "func (s *CalcTestSuite) TestApplyTax(t *gotest.T)") {
-		t.Error("missing TestApplyTax method")
-	}
-	if !strings.Contains(src, "func (s *CalcTestSuite) TestCalculateDiscount(t *gotest.T)") {
-		t.Error("missing TestCalculateDiscount method")
-	}
+	gotest.Contains(t, src, "package pricing")
+	gotest.Contains(t, src, `"github.com/mvrahden/go-test/pkg/gotest"`)
+	gotest.Contains(t, src, "type CalcTestSuite struct")
+	gotest.NotContains(t, src, "gotest.TestSuite", "scaffold must not embed gotest.TestSuite — no such type exists")
+	_, perr := parser.ParseFile(token.NewFileSet(), "scaffold.go", src, 0)
+	gotest.NoError(t, perr, "generated scaffold does not parse")
+	gotest.NotContains(t, src, "sut", "file-scoped scaffold should NOT have sut field")
+	gotest.NotContains(t, src, "BeforeEach", "file-scoped scaffold should NOT have BeforeEach")
+	gotest.Contains(t, src, "func (s *CalcTestSuite) TestApplyTax(t *gotest.T)")
+	gotest.Contains(t, src, "func (s *CalcTestSuite) TestCalculateDiscount(t *gotest.T)")
 }
 
 func TestScaffoldIntegration_File(t *testing.T) {
 	info, err := IntrospectFile("./testdata/sampletype", "funcs.go")
-	if err != nil {
-		t.Fatalf("IntrospectFile failed: %v", err)
-	}
+	gotest.NoError(t, err, "IntrospectFile failed: %v", err)
 
 	out, err := GenerateFileScaffold(info)
-	if err != nil {
-		t.Fatalf("GenerateFileScaffold failed: %v", err)
-	}
+	gotest.NoError(t, err, "GenerateFileScaffold failed: %v", err)
 
 	gotest.MatchSnapshot(t, string(out))
 }
 
 func TestScaffoldIntegration(t *testing.T) {
 	info, err := IntrospectType("./testdata/sampletype", "UserService")
-	if err != nil {
-		t.Fatalf("IntrospectType failed: %v", err)
-	}
+	gotest.NoError(t, err, "IntrospectType failed: %v", err)
 
 	out, err := GenerateScaffold(info)
-	if err != nil {
-		t.Fatalf("GenerateScaffold failed: %v", err)
-	}
+	gotest.NoError(t, err, "GenerateScaffold failed: %v", err)
 
 	gotest.MatchSnapshot(t, string(out))
 }
 
 func TestScaffoldIntegration_Interface(t *testing.T) {
 	info, err := IntrospectType("./testdata/sampletype", "Validator")
-	if err != nil {
-		t.Fatalf("IntrospectType failed: %v", err)
-	}
+	gotest.NoError(t, err, "IntrospectType failed: %v", err)
 
 	out, err := GenerateContractScaffold(info)
-	if err != nil {
-		t.Fatalf("GenerateContractScaffold failed: %v", err)
-	}
+	gotest.NoError(t, err, "GenerateContractScaffold failed: %v", err)
 
 	gotest.MatchSnapshot(t, string(out))
 }
