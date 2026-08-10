@@ -1275,7 +1275,7 @@ gotest lint ./...                                          # subcommand
 go run github.com/mvrahden/go-test/cmd/gotest-lint ./...   # standalone
 ```
 
-Rules (IDs are canonical — used by `//nolint:<rule>`; `.gotest.yml` `lint.skip` accepts only the adoption-phase rules `stdlib-test` and `testify`):
+Rules (IDs are canonical — used by `//nolint:<rule>`; `.gotest.yml` `lint.skip` accepts any non-integrity rule):
 
 Rules are grouped into three tiers by what breaks when a finding is ignored; the tier derives the suppression policy.
 
@@ -1310,7 +1310,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `stdlib-test` | `func TestX(*testing.T)` — migration aid suggesting a suite method (fires in any package; coexisting stdlib tests are legitimate, see The Two Runners) |
 | `testify` | Any `github.com/stretchr/testify/*` import — migration incomplete |
 
-One construct yields one finding: integrity rules own the constructs they flag, and expressiveness rules stand down on them (a guard whose body escapes the poll scope gets the `poll-scope` finding, not a `fail-guard` rewrite). The assertion surface itself is derived from the gotest package's type information, so the linter cannot drift from the API and lookalike names from other packages never match.
+One construct yields one finding: integrity rules own the constructs they flag, and expressiveness rules stand down on them (a guard whose body escapes the poll scope gets the `poll-scope` finding, not a `fail-guard` rewrite). The assertion surface itself is derived from the gotest package's type information, so the linter cannot drift from the API and lookalike names from other packages never match expressiveness rules. `poll-scope` is the deliberate exception: as an integrity rule it also matches assertion-shaped names from foreign libraries (an escaping testify assertion breaks the poll loop exactly as a gotest one would), and it recognizes polling contexts by the callback's typed `*gotest.R` parameter rather than the callee, so wrapped or re-exported polling helpers stay covered.
 
 Suppression and configuration:
 

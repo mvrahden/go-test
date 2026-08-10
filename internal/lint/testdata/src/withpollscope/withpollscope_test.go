@@ -84,3 +84,58 @@ func TestRedundantInsideCallback(t *testing.T) {
 }
 
 var errSentinelPS = errors.New("sentinel")
+
+// Foreign assertion libraries still escape the poll scope — integrity
+// coverage is deliberately package-agnostic for assertion-shaped names.
+func NoError(t *testing.T, err error, msgAndArgs ...any) {}
+
+func TestForeignAssertionInsideCallback(t *testing.T) {
+	var err error
+	gotest.Eventually(t, time.Second, time.Millisecond, func(poll *gotest.R) {
+		NoError(t, err) // want `use poll instead of t in poll callback passed to Eventually`
+	})
+}
+
+// Receiver methods are matched by type, not name — loggers stay silent.
+type retryLogger struct{}
+
+func (l *retryLogger) Errorf(string, ...any) {}
+
+func TestLoggerInsideCallback(t *testing.T) {
+	log := &retryLogger{}
+	gotest.Eventually(t, time.Second, time.Millisecond, func(poll *gotest.R) {
+		log.Errorf("retrying")
+	})
+}
+
+// Wrapped or re-exported polling functions are recognized by the typed
+// *gotest.R callback parameter, not by the callee's name or package.
+var eventually = gotest.Eventually
+
+func TestWrappedEventually(t *testing.T) {
+	eventually(t, time.Second, time.Millisecond, func(poll *gotest.R) {
+		t.Errorf("boom") // want `t\.Errorf in poll callback bypasses assertion recording — use poll`
+	})
+}
+
+// Other functions taking func(*gotest.R) callbacks (Record-style harnesses)
+// are not polling contexts — only Eventually/Consistently shapes are.
+func record(fn func(r *gotest.R)) {}
+
+func TestRecordStyleCallback(t *testing.T) {
+	record(func(r *gotest.R) {
+		gotest.Eventually(r, time.Second, time.Millisecond, func(poll *gotest.R) {
+			gotest.True(poll, true)
+		})
+	})
+}
+
+// A nested poll callback owns its subtree — the outer scope must not
+// claim the inner poll's assertions.
+func TestNestedEventually(t *testing.T) {
+	gotest.Eventually(t, time.Second, time.Millisecond, func(outer *gotest.R) {
+		gotest.Consistently(outer, time.Millisecond, time.Millisecond, func(inner *gotest.R) {
+			gotest.True(inner, true)
+		})
+	})
+}

@@ -1123,6 +1123,24 @@ func isLifecycleHook(name string) bool {
 
 // --- poll-scope check ---
 
+// foreignAssertionNames is deliberately syntactic and package-agnostic:
+// poll-scope is an integrity rule, and an assertion from a foreign library
+// (testify et al.) escaping the poll loop is exactly as broken as a gotest
+// one. This vocabulary cannot be derived from gotest's type information.
+var foreignAssertionNames = map[string]bool{
+	"Consistently": true, "Contains": true, "ElementsMatch": true,
+	"Empty": true, "Equal": true, "Error": true,
+	"ErrorAs": true, "ErrorContains": true, "ErrorIs": true,
+	"Eventually": true, "Fail": true, "FailNow": true,
+	"False": true, "Greater": true, "GreaterOrEqual": true,
+	"InDelta": true, "JSONEq": true, "Len": true,
+	"Less": true, "LessOrEqual": true, "Nil": true,
+	"NoError": true, "NotContains": true, "NotEmpty": true,
+	"NotEqual": true, "NotNil": true, "NotZero": true,
+	"Panics": true, "Regexp": true, "Subset": true,
+	"True": true, "Zero": true,
+}
+
 var pollScopeMethodNames = map[string]bool{
 	"Errorf":  true,
 	"Fatal":   true,
@@ -1134,24 +1152,39 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 	insp.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(n ast.Node) {
 		call := n.(*ast.CallExpr)
 
-		fnName := assertionFuncName(pass, call.Fun)
-		if fnName != "Eventually" && fnName != "Consistently" {
+		// A polling context needs both signals: an Eventually/Consistently
+		// callee shape (case-insensitive so wrappers and re-exports stay
+		// covered, package-agnostic by design) and a callback with a typed
+		// *gotest.R parameter (so foreign lookalike R types and other
+		// func(*R)-taking harnesses like Record stay excluded).
+		fnName := calleeName(call.Fun)
+		if !strings.EqualFold(fnName, "Eventually") && !strings.EqualFold(fnName, "Consistently") {
 			return
 		}
-
-		pollParam, funcLit := extractPollCallback(call)
+		pollParam, funcLit := extractPollCallback(pass, call)
 		if funcLit == nil {
 			return
 		}
 
 		ast.Inspect(funcLit.Body, func(n ast.Node) bool {
+			// A nested poll callback owns its subtree; it is visited by its
+			// own enclosing call.
+			if lit, ok := n.(*ast.FuncLit); ok && lit != funcLit && hasTypedRParam(pass, lit) {
+				return false
+			}
 			innerCall, ok := n.(*ast.CallExpr)
 			if !ok {
 				return true
 			}
 
-			// Case 1: gotest assertion with wrong first arg — gotest.Equal(t, ...) or Equal(t, ...)
-			if name := assertionFuncName(pass, innerCall.Fun); name != "" && len(innerCall.Args) > 0 {
+			// Case 1: assertion with wrong first arg — gotest.Equal(t, ...) or a
+			// foreign library's Equal(t, ...): integrity coverage is deliberately
+			// package-agnostic for assertion-shaped names.
+			name := assertionFuncName(pass, innerCall.Fun)
+			if name == "" && foreignAssertionNames[calleeName(innerCall.Fun)] {
+				name = calleeName(innerCall.Fun)
+			}
+			if name != "" && len(innerCall.Args) > 0 {
 				if ident, ok := innerCall.Args[0].(*ast.Ident); ok && ident.Name != pollParam {
 					cl.add(PollScope, innerCall.Pos())
 					report(pass, PollScope, ident.Pos(),
@@ -1170,7 +1203,9 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 			if !ok {
 				return true
 			}
-			if pollScopeMethodNames[sel.Sel.Name] && ident.Name != pollParam {
+			onTestT := namedPtrType(pass.TypesInfo.TypeOf(ident), "testing", "T") ||
+				namedPtrType(pass.TypesInfo.TypeOf(ident), gotestImportPath, "T")
+			if pollScopeMethodNames[sel.Sel.Name] && onTestT && ident.Name != pollParam {
 				cl.add(PollScope, innerCall.Pos())
 				report(pass, PollScope, ident.Pos(),
 					"%s.%s in poll callback bypasses assertion recording — use %s",
@@ -1181,7 +1216,14 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 	})
 }
 
-func extractPollCallback(call *ast.CallExpr) (string, *ast.FuncLit) {
+func hasTypedRParam(pass *analysis.Pass, lit *ast.FuncLit) bool {
+	if lit.Type.Params == nil || len(lit.Type.Params.List) != 1 {
+		return false
+	}
+	return namedPtrType(pass.TypesInfo.TypeOf(lit.Type.Params.List[0].Type), gotestImportPath, "R")
+}
+
+func extractPollCallback(pass *analysis.Pass, call *ast.CallExpr) (string, *ast.FuncLit) {
 	if len(call.Args) == 0 {
 		return "", nil
 	}
@@ -1193,28 +1235,30 @@ func extractPollCallback(call *ast.CallExpr) (string, *ast.FuncLit) {
 	if funcLit.Type.Params == nil || len(funcLit.Type.Params.List) != 1 {
 		return "", nil
 	}
-	param := funcLit.Type.Params.List[0]
-	if !isStarR(param.Type) {
+	if !hasTypedRParam(pass, funcLit) {
 		return "", nil
 	}
+	param := funcLit.Type.Params.List[0]
 	if len(param.Names) == 0 {
 		return "", nil
 	}
 	return param.Names[0].Name, funcLit
 }
 
-func isStarR(expr ast.Expr) bool {
-	star, ok := expr.(*ast.StarExpr)
-	if !ok {
-		return false
-	}
-	switch x := star.X.(type) {
-	case *ast.Ident:
-		return x.Name == "R"
+// calleeName returns the last identifier of a call target, for matching and
+// messages that should be independent of qualification.
+func calleeName(fun ast.Expr) string {
+	switch fn := fun.(type) {
 	case *ast.SelectorExpr:
-		return x.Sel.Name == "R"
+		return fn.Sel.Name
+	case *ast.Ident:
+		return fn.Name
+	case *ast.IndexExpr:
+		return calleeName(fn.X)
+	case *ast.IndexListExpr:
+		return calleeName(fn.X)
 	}
-	return false
+	return ""
 }
 
 func levenshtein(a, b string) int {
