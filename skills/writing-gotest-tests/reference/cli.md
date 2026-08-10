@@ -13,8 +13,11 @@ invocation runs tests — there is NO `test` subcommand:
   `summary --input`), so replaying a saved stream in CI needs no pipefail
   gymnastics — the render step itself is the verdict.
 - `go tool gotest watch ./...` — rerun on change; supports `--spec`.
-- `go tool gotest lint ./...` — the 14-rule linter; `-fix` applies
-  suggested fixes (textual only — follow with goimports, see SKILL.md).
+- `go tool gotest lint ./...` — the linter; `-fix` applies suggested
+  fixes (textual only — follow with goimports, see SKILL.md; fixes can
+  compose, so re-run until clean). Integrity rules suppress per line only
+  (`//nolint:<rule>`); others also via `.gotest.yml` `lint.skip` /
+  `-skip-<rule>`.
 - `go tool gotest discover ./...` — static suite metadata as JSON (methods
   and direct suite→fixture edges; it cannot see `Each` rows — they are
   runtime values).

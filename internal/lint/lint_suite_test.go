@@ -156,17 +156,15 @@ func (s *LintTestSuite) TestParseNolint(t *gotest.T) {
 	}
 }
 
-// DisableNolintTestSuite runs separately and non-parallel because it
-// temporarily mutates the shared analyzer flag.
 // SkippedStyleTestSuite runs separately and non-parallel because it
 // temporarily mutates the shared analyzer flags.
 type SkippedStyleTestSuite struct{}
 
+func (s *SkippedStyleTestSuite) BeforeEach(_ *gotest.T) { lint.ExportSetSkip(lint.FailGuard, true) }
+func (s *SkippedStyleTestSuite) AfterEach(_ *gotest.T)  { lint.ExportSetSkip(lint.FailGuard, false) }
+
 func (s *SkippedStyleTestSuite) TestSkipSilencesExpressivenessRule(t *gotest.T) {
 	testdata := analysistest.TestData()
-
-	lint.ExportSetSkip(lint.FailGuard, true)
-	defer lint.ExportSetSkip(lint.FailGuard, false)
 
 	t.When("skip-fail-guard is set", func(w *gotest.T) {
 		w.It("reports nothing for fail-guard findings", func(it *gotest.T) {
@@ -179,11 +177,11 @@ func (s *SkippedStyleTestSuite) TestSkipSilencesExpressivenessRule(t *gotest.T) 
 // temporarily mutates the shared analyzer flags.
 type SkippedEscapeTestSuite struct{}
 
+func (s *SkippedEscapeTestSuite) BeforeEach(_ *gotest.T) { lint.ExportSetSkip(lint.TEscape, true) }
+func (s *SkippedEscapeTestSuite) AfterEach(_ *gotest.T)  { lint.ExportSetSkip(lint.TEscape, false) }
+
 func (s *SkippedEscapeTestSuite) TestSkippedRuleReleasesClaims(t *gotest.T) {
 	testdata := analysistest.TestData()
-
-	lint.ExportSetSkip(lint.TEscape, true)
-	defer lint.ExportSetSkip(lint.TEscape, false)
 
 	t.When("skip-t-escape is set", func(w *gotest.T) {
 		w.It("lets fail-guard take over escaped halting guards", func(it *gotest.T) {
@@ -192,13 +190,15 @@ func (s *SkippedEscapeTestSuite) TestSkippedRuleReleasesClaims(t *gotest.T) {
 	})
 }
 
+// DisableNolintTestSuite runs separately and non-parallel because it
+// temporarily mutates the shared analyzer flags.
 type DisableNolintTestSuite struct{}
+
+func (s *DisableNolintTestSuite) BeforeEach(_ *gotest.T) { lint.ExportSetDisableNolint(true) }
+func (s *DisableNolintTestSuite) AfterEach(_ *gotest.T)  { lint.ExportSetDisableNolint(false) }
 
 func (s *DisableNolintTestSuite) TestNolintDirectivesIgnored(t *gotest.T) {
 	testdata := analysistest.TestData()
-
-	lint.ExportSetDisableNolint(true)
-	defer lint.ExportSetDisableNolint(false)
 
 	t.When("disable-nolint is set", func(w *gotest.T) {
 		w.It("reports all diagnostics regardless of nolint directives", func(it *gotest.T) {
