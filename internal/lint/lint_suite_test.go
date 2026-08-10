@@ -100,7 +100,7 @@ func (s *LintTestSuite) TestTierPolicy(t *gotest.T) {
 				gotest.NotZero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "missing skip flag for %s", rule)
 				gotest.True(it, lint.SkippableRules[rule], "rule %s should be skippable", rule)
 			}
-			for _, rule := range []lint.Rule{lint.Focus, lint.PollScope, lint.TestSignature} {
+			for _, rule := range []lint.Rule{lint.Focus, lint.PollScope, lint.TestSignature, lint.SuiteLifecycle} {
 				gotest.Zero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "unexpected skip flag for %s", rule)
 				gotest.False(it, lint.SkippableRules[rule], "integrity rule %s must not be skippable", rule)
 			}

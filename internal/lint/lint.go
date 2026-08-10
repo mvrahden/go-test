@@ -37,6 +37,7 @@ const (
 	AssertionTypeGuard Rule = "assertion-type-guard"
 	AssertionRedundant Rule = "assertion-redundant"
 	TEscape            Rule = "t-escape"
+	SuiteLifecycle     Rule = "suite-lifecycle"
 )
 
 // Tier classifies what breaks when a rule's finding is ignored, and derives
@@ -80,6 +81,7 @@ var ruleMeta = map[Rule]struct {
 	AssertionTypeGuard: {TierIntegrity, ScopeGotestFiles},
 	AssertionRedundant: {TierExpressiveness, ScopeGotestFiles},
 	TEscape:            {TierExpressiveness, ScopeSuites},
+	SuiteLifecycle:     {TierIntegrity, ScopeSuites},
 	FailGuard:          {TierExpressiveness, ScopeGotestFiles},
 }
 
@@ -194,6 +196,21 @@ func fileContaining(pass *analysis.Pass, pos token.Pos) *ast.File {
 	return nil
 }
 
+// nolintAliases maps a rule to the historical umbrella ID whose nolint
+// comments also suppress it: suite-lifecycle was split out of t-escape, and
+// committed //nolint:t-escape comments must keep working.
+var nolintAliases = map[Rule]Rule{
+	SuiteLifecycle: TEscape,
+}
+
+func ruleMatched(rules map[Rule]bool, rule Rule) bool {
+	if rules == nil || rules[rule] {
+		return true
+	}
+	umbrella, ok := nolintAliases[rule]
+	return ok && rules[umbrella]
+}
+
 func isSuppressed(pass *analysis.Pass, pos token.Pos, rule Rule) bool {
 	file := fileContaining(pass, pos)
 	if file == nil {
@@ -207,7 +224,7 @@ func isSuppressed(pass *analysis.Pass, pos token.Pos, rule Rule) bool {
 			if !ok {
 				continue
 			}
-			if rules != nil && !rules[rule] {
+			if !ruleMatched(rules, rule) {
 				continue
 			}
 			cLine := pass.Fset.Position(c.Pos()).Line
@@ -228,7 +245,7 @@ func docSuppressed(doc *ast.CommentGroup, rule Rule) bool {
 		if !ok {
 			continue
 		}
-		if rules == nil || rules[rule] {
+		if ruleMatched(rules, rule) {
 			return true
 		}
 	}
@@ -436,9 +453,9 @@ var escapeConfigs = map[string]escapeConfig{
 	"TempDir":  {TEscape, "TempDir is available on gotest.T — unnecessary T escape", false, true, false},
 	"Skip":     {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
 	"SkipNow":  {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
-	"Cleanup":  {TEscape, "use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle", true, false, false},
-	"Parallel": {TEscape, "use SuiteConfig.Parallel instead — T.Parallel bypasses suite lifecycle coordination", true, false, false},
-	"Run":      {TEscape, "use It or When instead — T.Run bypasses gotest wrapping", true, false, false},
+	"Cleanup":  {SuiteLifecycle, "use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle", true, false, false},
+	"Parallel": {SuiteLifecycle, "use SuiteConfig.Parallel instead — T.Parallel bypasses suite lifecycle coordination", true, false, false},
+	"Run":      {SuiteLifecycle, "use It or When instead — T.Run bypasses gotest wrapping", true, false, false},
 	"Helper":   {TEscape, "never call Helper — gotest resolves call sites automatically; Helper degrades failure locations", false, false, true},
 	"Log":      {TEscape, "use assertion message args instead — T.Log bypasses the failure report", false, false, true},
 	"Fatal":    {TEscape, "use assertions instead — T.Fatal bypasses the assertion tracer", false, false, true},
