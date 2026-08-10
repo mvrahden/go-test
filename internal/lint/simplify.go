@@ -16,7 +16,7 @@ import (
 func checkAssertionSimplify(pass *analysis.Pass, insp *inspector.Inspector) {
 	insp.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(n ast.Node) {
 		call := n.(*ast.CallExpr)
-		name := resolveAssertionName(call.Fun)
+		name := assertionFuncName(pass, call.Fun)
 		if name == "" {
 			return
 		}

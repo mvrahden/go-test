@@ -34,6 +34,12 @@ func (s *LintTestSuite) TestAnalyzer(t *gotest.T) {
 		})
 	})
 
+	t.When("foreign lookalikes", func(w *gotest.T) {
+		w.It("ignores assertion and polling names from other packages", func(it *gotest.T) {
+			analysistest.Run(it.T(), testdata, lint.Analyzer, "withforeign")
+		})
+	})
+
 	t.When("poll scope", func(w *gotest.T) {
 		w.It("detects poll scope violations", func(it *gotest.T) {
 			analysistest.Run(it.T(), testdata, lint.Analyzer, "withpollscope")

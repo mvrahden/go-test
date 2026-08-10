@@ -462,20 +462,6 @@ var escapeConfigs = map[string]escapeConfig{
 	"Fatalf":   {TEscape, "use assertions instead — T.Fatalf bypasses the assertion tracer", false, false, true},
 }
 
-var gotestAssertionFuncs = map[string]bool{
-	"True": true, "False": true,
-	"Equal": true, "NotEqual": true,
-	"Greater": true, "GreaterOrEqual": true,
-	"Less": true, "LessOrEqual": true,
-	"Zero": true, "NotZero": true,
-	"Empty": true, "NotEmpty": true,
-	"Len": true, "Contains": true, "NotContains": true,
-	"NoError": true, "Error": true,
-	"ErrorIs": true, "ErrorContains": true,
-	"Regexp": true, "MatchSnapshot": true,
-	"Eventually": true, "Consistently": true,
-}
-
 type deferredReport struct {
 	rule    Rule
 	pos     token.Pos
@@ -594,7 +580,7 @@ func reportDirectEscape(pass *analysis.Pass, call *ast.CallExpr, isSuiteMethod b
 		}
 	}
 
-	if gotestAssertionFuncs[sel.Sel.Name] && isGotestPkgRef(pass, sel.X) && len(call.Args) > 0 {
+	if assertionFuncName(pass, call.Fun) != "" && len(call.Args) > 0 {
 		arg := call.Args[0]
 		if inner, ok := arg.(*ast.CallExpr); ok && isTMethodCall(inner) {
 			reported[inner.Pos()] = true
@@ -632,20 +618,38 @@ func collectInterproceduralEscape(call *ast.CallExpr, tVars, gotestTVars map[str
 
 var gotestImportPath = about.Repo + "/pkg/gotest"
 
-func isGotestPkgRef(pass *analysis.Pass, expr ast.Expr) bool {
-	id, ok := expr.(*ast.Ident)
-	if !ok {
-		return false
+// assertionFuncName resolves fun to an exported gotest function whose first
+// parameter is the package's testingT interface — the assertion shape — and
+// returns its name. Deriving the surface from type information means the
+// linter can never drift from the API, and lookalike names from other
+// packages never match.
+func assertionFuncName(pass *analysis.Pass, fun ast.Expr) string {
+	var id *ast.Ident
+	switch fn := fun.(type) {
+	case *ast.SelectorExpr:
+		id = fn.Sel
+	case *ast.Ident:
+		id = fn
+	case *ast.IndexExpr:
+		return assertionFuncName(pass, fn.X)
+	case *ast.IndexListExpr:
+		return assertionFuncName(pass, fn.X)
+	default:
+		return ""
 	}
-	obj := pass.TypesInfo.Uses[id]
-	if obj == nil {
-		return false
+	fn, ok := pass.TypesInfo.Uses[id].(*types.Func)
+	if !ok || fn.Pkg() == nil || fn.Pkg().Path() != gotestImportPath {
+		return ""
 	}
-	pkgName, ok := obj.(*types.PkgName)
-	if !ok {
-		return false
+	sig, ok := fn.Type().(*types.Signature)
+	if !ok || sig.Params().Len() == 0 {
+		return ""
 	}
-	return pkgName.Imported().Path() == gotestImportPath
+	named, ok := sig.Params().At(0).Type().(*types.Named)
+	if !ok || named.Obj().Name() != "testingT" {
+		return ""
+	}
+	return fn.Name()
 }
 
 func isGotestTType(pass *analysis.Pass, field *ast.Field) bool {
@@ -1062,22 +1066,6 @@ func isLifecycleHook(name string) bool {
 
 // --- poll-scope check ---
 
-var pollScopeAssertionFuncs = map[string]bool{
-	"Consistently": true, "Contains": true, "ElementsMatch": true,
-	"Empty": true, "Equal": true, "Error": true,
-	"ErrorAs": true, "ErrorContains": true, "ErrorIs": true,
-	"Eventually": true, "Fail": true, "False": true,
-	"Greater": true, "GreaterOrEqual": true, "InDelta": true,
-	"JSONEq": true, "Len": true, "Less": true,
-	"LessOrEqual": true, "MatchSnapshot": true, "Nil": true,
-	"NoError":     true,
-	"NotContains": true, "NotEmpty": true, "NotEqual": true,
-	"NotNil":  true,
-	"NotZero": true, "Panics": true, "Regexp": true,
-	"Subset": true, "TimeIsNow": true, "TimeWithin": true,
-	"True": true, "Zero": true,
-}
-
 var pollScopeMethodNames = map[string]bool{
 	"Errorf":  true,
 	"Fatal":   true,
@@ -1089,8 +1077,8 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector) {
 	insp.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(n ast.Node) {
 		call := n.(*ast.CallExpr)
 
-		fnName := pollingFuncName(call)
-		if fnName == "" {
+		fnName := assertionFuncName(pass, call.Fun)
+		if fnName != "Eventually" && fnName != "Consistently" {
 			return
 		}
 
@@ -1106,7 +1094,7 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector) {
 			}
 
 			// Case 1: gotest assertion with wrong first arg — gotest.Equal(t, ...) or Equal(t, ...)
-			if name := resolveAssertionName(innerCall.Fun); name != "" && len(innerCall.Args) > 0 {
+			if name := assertionFuncName(pass, innerCall.Fun); name != "" && len(innerCall.Args) > 0 {
 				if ident, ok := innerCall.Args[0].(*ast.Ident); ok && ident.Name != pollParam {
 					report(pass, PollScope, ident.Pos(),
 						"use %s instead of %s in poll callback passed to %s",
@@ -1132,20 +1120,6 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector) {
 			return true
 		})
 	})
-}
-
-func pollingFuncName(call *ast.CallExpr) string {
-	switch fn := call.Fun.(type) {
-	case *ast.SelectorExpr:
-		if fn.Sel.Name == "Eventually" || fn.Sel.Name == "Consistently" {
-			return fn.Sel.Name
-		}
-	case *ast.Ident:
-		if fn.Name == "Eventually" || fn.Name == "Consistently" {
-			return fn.Name
-		}
-	}
-	return ""
 }
 
 func extractPollCallback(call *ast.CallExpr) (string, *ast.FuncLit) {
@@ -1182,24 +1156,6 @@ func isStarR(expr ast.Expr) bool {
 		return x.Sel.Name == "R"
 	}
 	return false
-}
-
-func resolveAssertionName(expr ast.Expr) string {
-	switch fn := expr.(type) {
-	case *ast.SelectorExpr:
-		if pollScopeAssertionFuncs[fn.Sel.Name] {
-			return fn.Sel.Name
-		}
-	case *ast.Ident:
-		if pollScopeAssertionFuncs[fn.Name] {
-			return fn.Name
-		}
-	case *ast.IndexExpr:
-		return resolveAssertionName(fn.X)
-	case *ast.IndexListExpr:
-		return resolveAssertionName(fn.X)
-	}
-	return ""
 }
 
 func levenshtein(a, b string) int {

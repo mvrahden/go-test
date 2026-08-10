@@ -205,7 +205,7 @@ func extractHaltingUnit(pass *analysis.Pass, body *ast.BlockStmt) *failGuardUnit
 		return nil
 	}
 
-	if isGotestCallNamed(pass, call, "Fail") && len(call.Args) >= 1 {
+	if assertionFuncName(pass, call.Fun) == "Fail" && len(call.Args) >= 1 {
 		return &failGuardUnit{
 			tArg:    call.Args[0],
 			msgArgs: call.Args[1:],
@@ -356,22 +356,6 @@ func splitOr(expr ast.Expr) []ast.Expr {
 		return append(splitOr(bin.X), splitOr(bin.Y)...)
 	}
 	return []ast.Expr{expr}
-}
-
-// isGotestCallNamed reports whether call invokes the named function from the
-// gotest package, whether qualified (gotest.Fail) or dot-imported (Fail).
-func isGotestCallNamed(pass *analysis.Pass, call *ast.CallExpr, name string) bool {
-	switch fn := call.Fun.(type) {
-	case *ast.SelectorExpr:
-		return fn.Sel.Name == name && isGotestPkgRef(pass, fn.X)
-	case *ast.Ident:
-		if fn.Name != name {
-			return false
-		}
-		obj := pass.TypesInfo.Uses[fn]
-		return obj != nil && obj.Pkg() != nil && obj.Pkg().Path() == gotestImportPath
-	}
-	return false
 }
 
 // msgArgsSafe reports whether every message arg is trivially total to
