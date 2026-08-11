@@ -119,6 +119,8 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `migrate` | Convert testify/suite tests to go-test suites |
 | `spec` | Run tests and render behavioral specification |
 | `summary` | Run tests and render a failure-focused summary (CI mode) |
+| `bench` | Run `BenchmarkX` suite methods serially via `go test -bench` |
+| `fuzz` | Orchestrate `FuzzX` suite targets with a shared time budget |
 | `lint` | Run gotest-specific linter checks |
 | `refactor` | Toggle focus prefixes: `refactor toggle-focus <file> <Suite[.Method]>` |
 | `discover` | Discover test suites and output JSON metadata |
@@ -147,6 +149,14 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--input=<path>` | Replay a saved `go test -json` stream in `spec`/`summary` (`-` reads stdin) |
 | `--github` | Emit GitHub annotations and step summary (auto-enabled in GitHub Actions) |
 | `--coverage=<path>` | Coverage profile path for `summary` subcommand |
+| `--bench` | Benchmark mode for `watch`: re-run benchmarks on change with ns/op deltas |
+| `--save=<path>` | Save a benchmark run as a JSON baseline (`bench`) |
+| `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`) |
+| `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`) |
+| `--for=<dur>` | Total fuzz time budget, split evenly across targets (`fuzz`; per-target share floors at 10s) |
+| `--jobs=<n>` | Max concurrent fuzz targets (`fuzz`; default: max(1, GOMAXPROCS/2)) |
+| `--no-harvest` | Disable table-test seed harvesting for this run |
+| `--fuzz` | Generate fuzz round-trip skeletons (`scaffold`) |
 
 ### Disambiguation
 

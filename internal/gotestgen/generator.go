@@ -1,6 +1,7 @@
 package gotestgen
 
 import (
+	"fmt"
 	"go/ast"
 	"maps"
 	"path/filepath"

@@ -183,11 +183,14 @@ func displayArgs(args []corpusArg) string {
 // of fuzz targets.
 func loadFuzzOverlayTargets(args []string) (*gotestrunner.OverlayResult, []gotestrunner.FuzzTarget, func(), error) {
 	patterns := ExtractPackagePatterns(args)
-	loaded, err := gotestgen.LoadPackages(patterns, nil)
+	loaded, broken, err := gotestgen.LoadPackages(patterns, nil)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, false, false, false)
+	if len(broken) > 0 {
+		return nil, nil, nil, fmt.Errorf("cannot triage crashers in uncompilable packages: %s", broken[0].PkgPath)
+	}
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, broken, false, false, false)
 	if err != nil {
 		return nil, nil, nil, err
 	}

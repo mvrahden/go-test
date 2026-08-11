@@ -304,7 +304,7 @@ func (s *RendererTestSuite) TestUndeclaredBudgetIsZero(t *gotest.T) {
 	t.When("a suite declares no SuiteConfig", func(w *gotest.T) {
 		w.It("passes a zero budget to every lifecycle phase", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestLifecycle_UndeclaredBudget")
-			source, _ := renderTestPkg(it.T(), pkg)
+			source, _ := renderTestPkg(it.T(), pkg, false)
 
 			// A suite with no marker method gets the defaults for its contexts
 			// and a zero budget, so nothing holds it to a number it never wrote.
@@ -417,7 +417,7 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 			// "imported and not used". So the assertion is on the rendered import
 			// block, not on the render succeeding.
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ParallelSuite_AllCasesExcluded")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, false)
 
 			gotest.NotContains(it, output, `"sync/atomic"`,
 				"an unused sync/atomic import makes go test refuse the generated package")
@@ -509,9 +509,9 @@ func (s *RendererTestSuite) TestDeterministicOutput(t *gotest.T) {
 			{"fixture-bound suite", "TestRenderer_FixtureWithChildSuite"},
 		}) {
 			pkg := gotestgen.ExportMustTestPkg(sub.T(), tC.pkgName)
-			first, _ := renderTestPkg(sub.T(), pkg)
+			first, _ := renderTestPkg(sub.T(), pkg, false)
 			for range 3 {
-				again, _ := renderTestPkg(sub.T(), pkg)
+				again, _ := renderTestPkg(sub.T(), pkg, false)
 				gotest.Equal(sub, first, again, "rendering must be byte-identical across runs")
 			}
 		}
@@ -658,7 +658,11 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 
 			gotest.Contains(it, out, "s.FuzzParse(gotest.NewF(f, s.BeforeEach, s.AfterEach))")
 			gotest.NotContains(it, out, "ƒ_fuzzdec_")
-			gotest.NotContains(it, out, "gotestruntime")
+			// gotestruntime itself is imported by every generated harness
+			// (exec sentinel, lifecycle wiring) — codec-free output must
+			// merely stay free of the codec primitives built on it.
+			gotest.NotContains(it, out, "gotestruntime.NewFuzzReader")
+			gotest.NotContains(it, out, "gotestruntime.NewFuzzWriter")
 		})
 	})
 }

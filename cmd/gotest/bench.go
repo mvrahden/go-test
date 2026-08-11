@@ -78,13 +78,18 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 
 	classified := gotestrunner.ClassifyGoTestArgs(goTestArgs)
 	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
-	loaded, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
+	loaded, broken, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
+	// Timing numbers from a partially built tree are meaningless: fail fast
+	// like generate/prepare rather than book-and-continue like run.
+	if reportBrokenPackages(broken) {
+		return 2
+	}
 
-	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, cfg.Debug, cfg.NoCache, cfg.HarvestSeeds)
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, broken, cfg.Debug, cfg.NoCache, cfg.HarvestSeeds)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

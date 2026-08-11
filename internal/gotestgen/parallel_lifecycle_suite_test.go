@@ -48,7 +48,7 @@ func runGeneratedSuite(t *gotest.T, name string) childRun {
 	dir := gotestgen.ExportTestPkgDir(t.T(), name)
 	pkg := gotestgen.ExportMustTestPkg(t.T(), name)
 
-	source, _ := renderTestPkg(t.T(), pkg)
+	source, _ := renderTestPkg(t.T(), pkg, false)
 	gotest.NotContains(t, source, "sync.WaitGroup", "generated parallel harness must not gate cleanup on a WaitGroup")
 
 	harness := filepath.Join(dir, "gotest_psuite_test.go")
