@@ -639,7 +639,7 @@ lint:
 | `parallel` | int | `--parallel` | Total concurrent test method budget |
 | `compile-parallel` | int | `--compile-parallel` | Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan) |
 | `debounce` | duration | `--debounce` | Watch mode re-run delay |
-| `lint.skip` | list | — | Lint rules to disable project-wide |
+| `lint.skip` | list | — | Non-integrity lint rules to disable project-wide |
 
 ## Test Selection
 
@@ -718,8 +718,14 @@ Catch common mistakes in test suites with static analysis:
 gotest lint ./...
 ```
 
-Detects: lifecycle hook typos, value receivers on suite methods, missing `AfterAll` when `BeforeAll` exists, committed `F_` prefixes, and orphaned generated files.
-Also available as a standalone binary (`gotest-lint`) compatible with `golangci-lint` via `go/analysis`.
+Sixteen rules in three tiers:
+
+- **Integrity** — test outcomes can lie or resources can leak: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, and generated files checked into version control.
+- **Expressiveness** — the test is correct but says it worse: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, and unnecessary `t.T()` escapes. `-fix` applies the safe rewrites.
+- **Migration** — legitimate coexistence, nudged: stdlib test functions and testify imports.
+
+Suppress per line with `//nolint:<rule>` (same line or the comment block directly above); expressiveness and migration rules can also be disabled project-wide via `.gotest.yml` (`lint.skip`). See the [design spec](docs/design/spec.md#linter) for the full rule table.
+Also available as a standalone `go/analysis` binary (`gotest-lint`). There is no golangci-lint plugin — run it as its own CI step alongside your existing linter.
 
 ## GitHub Actions
 

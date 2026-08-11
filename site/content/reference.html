@@ -473,7 +473,7 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
           <tr><td><code>min-coverage</code></td><td>int</td><td>0 (off)</td><td><code>--min</code></td><td>Minimum coverage percentage, 0–100.</td></tr>
           <tr><td><code>parallel</code></td><td>int</td><td>0 (auto)</td><td><code>--parallel</code></td><td>Total concurrent test method budget. 0 means 2×GOMAXPROCS.</td></tr>
           <tr><td><code>debounce</code></td><td>duration</td><td>200ms</td><td><code>--debounce</code></td><td>Watch mode re-run delay.</td></tr>
-          <tr><td><code>lint.skip</code></td><td>[string]</td><td><em>none</em></td><td>—</td><td>Lint rules to disable: <code>stdlib-test</code>, <code>testify</code>.</td></tr>
+          <tr><td><code>lint.skip</code></td><td>[string]</td><td><em>none</em></td><td>—</td><td>Non-integrity lint rules to disable: <code>assertion-simplify</code>, <code>assertion-redundant</code>, <code>fail-guard</code>, <code>t-escape</code>, <code>stdlib-test</code>, <code>testify</code>.</td></tr>
         </tbody>
       </table>
       <div class="code-block">

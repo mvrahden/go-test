@@ -47,3 +47,36 @@ func TestFailGuardNolint(t *testing.T) { //nolint:stdlib-test
 		gotest.Fail(t, "boom")
 	}
 }
+
+// AboveTestSuite exercises nolint suppression via the comment block
+// directly above the diagnostic line, for all rules.
+type AboveTestSuite struct{}
+
+// suppressed: standalone nolint on the line directly above
+//
+//nolint:receiver
+func (s AboveTestSuite) TestReceiverAbove(t *testing.T) {}
+
+// suppressed: nolint:receiver is not the last line of the attached block
+//
+//nolint:receiver
+//nolint:testify
+func (s AboveTestSuite) TestReceiverDocBlock(t *testing.T) {}
+
+// NOT suppressed: wrong rule above
+//
+//nolint:testify
+func (s AboveTestSuite) TestWrongRuleAbove(t *testing.T) {} // want `suite method AboveTestSuite.TestWrongRuleAbove should use a pointer receiver`
+
+var _ = 0 //nolint:receiver
+// NOT suppressed: the nolint above trails other code, it does not start the line
+func (s AboveTestSuite) TestTrailingAbove(t *testing.T) {} // want `suite method AboveTestSuite.TestTrailingAbove should use a pointer receiver`
+
+// suppressed: standalone nolint above a statement-level finding
+func TestFailGuardNolintAbove(t *testing.T) { //nolint:stdlib-test
+	var err error
+	//nolint:fail-guard
+	if err != nil {
+		gotest.Fail(t, "boom")
+	}
+}

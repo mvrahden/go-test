@@ -1268,7 +1268,7 @@ Method-parallel suites additionally emit the `ƒfailed` coordination described u
 
 ## Linter
 
-Available as a subcommand and as a standalone binary, built on `go/analysis` and compatible with `golangci-lint`:
+Available as a subcommand and as a standalone binary, built on `go/analysis`. `pkg/lint` exports the analyzer for external `go/analysis` drivers; there is no golangci-lint plugin — the linter runs as its own step alongside a project's existing linter:
 
 ```bash
 gotest lint ./...                                          # subcommand
@@ -1314,7 +1314,7 @@ One construct yields one finding: integrity rules own the constructs they flag, 
 
 Suppression and configuration:
 
-- `//nolint:<rule>` on a line; on the `package` line it applies file-wide
+- `//nolint:<rule>` on the diagnostic's line, or in a standalone comment block ending on the line directly above it (a comment trailing other code does not reach the next line); on the `package` line it applies file-wide
 - `.gotest.yml` → `lint.skip: [<rule>, ...]` disables non-integrity rules project-wide
 - `.gotest.yml` `lint.skip` naming an integrity rule is a hard error — integrity rules can only be suppressed per line; unknown rule IDs are also a hard error
 - Flags: `-fix` applies suggested fixes; `-skip-<rule>` for every non-integrity rule; `-disable-nolint`
