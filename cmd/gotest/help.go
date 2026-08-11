@@ -344,14 +344,20 @@ Rules:
   poll-scope            Outer t used inside Eventually/Consistently callbacks
   test-signature        Test methods not accepting *gotest.T or *testing.T
   x-lifecycle           X_ prefix on a lifecycle hook (a no-op)
+  suite-lifecycle       Cleanup/Parallel/Run via t.T() — bypass the suite lifecycle
   assertion-simplify    Simplifiable assertions (True(t, a == b) → Equal, …)
   assertion-type-guard  Nil/Empty on types their runtime guards reject
   assertion-redundant   Assertions made redundant by the following assertion
-  t-escape              Unnecessary or harmful t.T() escapes (incl. Helper/Fatal/Log)
+  fail-guard            if cond { Fail/Fatal(...) } guards — use assertions directly
+  t-escape              Unnecessary t.T() convenience escapes (incl. Helper/Fatal/Log)
+
+Integrity rules can only be suppressed per line with //nolint. All other
+rules also accept a project-wide skip flag (mirrored by .gotest.yml lint.skip):
 
 Flags:
-  -skip-stdlib-test       Disable the stdlib-test rule
-  -skip-testify           Disable the testify rule
+  -skip-<rule>            Disable a non-integrity rule, e.g. -skip-fail-guard
+                          (assertion-simplify, assertion-redundant, fail-guard,
+                          t-escape, stdlib-test, testify)
   -disable-nolint         Ignore //nolint comments
   -fix                    Apply suggested fixes
 

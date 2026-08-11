@@ -76,6 +76,7 @@ Runners split). Missing traps are in the fixture backlog (§8).
 | C12 | Old-version consumer (v1.25.0, no replace): parallelize + async task | v1.25.x exceptions applied (literal config form, no Test*Async) |
 | C13 | Fixture without tool directive: "run the tests" | bootstrap path |
 | C14 | File with lint-fixable violations that strand imports | lint -fix + goimports caveat |
+| C15 | Port a stdlib test full of `if err != nil { t.Fatal }` guards | assertions stated directly (fail-guard) — no guarded fails survive; expected value first in `Equal` |
 
 **Harm traps (H):** skill arm only; blind rule-following must NOT act.
 

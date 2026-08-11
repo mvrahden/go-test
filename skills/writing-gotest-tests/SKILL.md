@@ -89,12 +89,24 @@ of it fails on missing go.sum entries), then always run
 `go tool goimports -w .` after `-fix` and re-run the loop.
 
 The linter catches direct misuse (`t.T()` escapes even inside closures,
-outer-`t` in poll callbacks, testify idioms, focus leftovers). Its
-`stdlib-test` rule flags every stdlib `TestXxx(*testing.T)` — when a stdlib
-test is intentional (assertion-layer tests, benchmarks-adjacent code), mark
-its package clause with `//nolint:stdlib-test`, or the lint run fails. It
-does NOT catch: plain `defer` cleanup, shared mutable state in parallel
-suites, or structural problems — those are your job, below.
+outer-`t` in poll callbacks, testify idioms, focus leftovers, and
+`fail-guard`: any `if cond { gotest.Fail(t, …) }` or `if err != nil {
+t.Fatal(err) }` guard — assertions halt on failure, so state them
+directly: `gotest.NoError(t, err)`, never a guarded fail). Fixes can
+compose — a rewritten guard may itself be simplifiable — so re-run
+`lint -fix` until it reports nothing. When two findings share a construct
+the linter reports only the stronger one (integrity over style); fix what
+it says before expecting style suggestions there.
+
+Suppression follows rule tiers: integrity rules (`poll-scope`,
+`suite-lifecycle`, `focus`, …) accept only per-line `//nolint:<rule>`;
+style and migration rules can also be skipped project-wide via
+`.gotest.yml` `lint.skip` or `-skip-<rule>` flags. The `stdlib-test` rule
+flags every stdlib `TestXxx(*testing.T)` — when a stdlib test is
+intentional (assertion-layer tests, benchmarks-adjacent code), mark its
+package clause with `//nolint:stdlib-test`, or the lint run fails. The
+linter does NOT catch: plain `defer` cleanup, shared mutable state in
+parallel suites, or structural problems — those are your job, below.
 
 ## Core rules
 

@@ -135,3 +135,8 @@ type escapeHelper struct{}
 func (h *escapeHelper) doErrorf(t *testing.T) {
 	t.Errorf("msg") // want `Errorf is available on gotest.T — unnecessary T escape`
 }
+
+// Package-level var function literals are part of the traversal too.
+var packageLevelCheck = func(t *gotest.T) {
+	t.T().Errorf("boom") // want `Errorf is available on gotest.T — unnecessary T escape`
+}

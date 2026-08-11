@@ -103,3 +103,13 @@ type cleanupHelper struct{}
 func (h *cleanupHelper) doCleanup(t *testing.T) {
 	t.Cleanup(func() {}) // want `use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle`
 }
+
+// The new suite-lifecycle ID suppresses directly, and the historical
+// t-escape ID keeps working as an umbrella alias.
+func (s *ResourceTestSuite) TestNolintNewID(t *gotest.T) {
+	t.T().Cleanup(func() {}) //nolint:suite-lifecycle
+}
+
+func (s *ResourceTestSuite) TestNolintAlias(t *gotest.T) {
+	t.T().Cleanup(func() {}) //nolint:t-escape
+}

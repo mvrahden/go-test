@@ -13,11 +13,14 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-func checkAssertionSimplify(pass *analysis.Pass, insp *inspector.Inspector) {
+func checkAssertionSimplify(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) {
 	insp.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(n ast.Node) {
 		call := n.(*ast.CallExpr)
-		name := resolveAssertionName(call.Fun)
+		name := assertionFuncName(pass, call.Fun)
 		if name == "" {
+			return
+		}
+		if cl.anyWithin(call.Pos(), call.End()) {
 			return
 		}
 
@@ -60,94 +63,111 @@ func checkAssertionSimplify(pass *analysis.Pass, insp *inspector.Inspector) {
 
 // --- True / False ---
 
+// conditionMapping is the outcome of mapping a boolean expression onto a
+// stronger assertion: the target assertion name, its arguments after the
+// t argument, and a short description of the recognized pattern.
+type conditionMapping struct {
+	target string
+	args   []ast.Expr
+	desc   string
+}
+
 func simplifyBoolAssertion(pass *analysis.Pass, call *ast.CallExpr, negated bool) {
 	if len(call.Args) < 2 {
 		return
 	}
-	tArg := call.Args[0]
-	expr := call.Args[1]
-	msgArgs := call.Args[2:]
-	source := "True"
-	if negated {
-		source = "False"
+	m, ok := mapBoolExpr(pass, call.Args[1], negated)
+	if !ok {
+		return
 	}
-
-	switch e := expr.(type) {
-	case *ast.UnaryExpr:
-		if e.Op != token.NOT {
-			return
-		}
-		if s, sub, ok := isStringsContains(e.X); ok {
-			target := "NotContains"
-			if negated {
-				target = "Contains"
-			}
-			emitSimplify(pass, call, source, target, []ast.Expr{tArg, s, sub}, msgArgs, "negated strings.Contains call")
-			return
-		}
-		target := "False"
-		if negated {
-			target = "True"
-		}
-		emitSimplify(pass, call, source, target, []ast.Expr{tArg, e.X}, msgArgs, "negation")
-
-	case *ast.BinaryExpr:
-		simplifyBoolBinary(pass, call, e, tArg, msgArgs, negated, source)
-
-	case *ast.CallExpr:
-		simplifyBoolCall(pass, call, e, tArg, msgArgs, negated, source)
-	}
+	source := pick(negated, "False", "True")
+	emitSimplify(pass, call, source, m.target, append([]ast.Expr{call.Args[0]}, m.args...), call.Args[2:], m.desc)
 }
 
-func simplifyBoolBinary(pass *analysis.Pass, call *ast.CallExpr, bin *ast.BinaryExpr, tArg ast.Expr, msgArgs []ast.Expr, negated bool, source string) {
+// mapBoolExpr maps a boolean expression to the assertion that expresses it
+// directly. With negated set, the mapping targets the expression's negation
+// (the False(t, expr) reading).
+func mapBoolExpr(pass *analysis.Pass, expr ast.Expr, negated bool) (conditionMapping, bool) {
+	switch e := expr.(type) {
+	case *ast.ParenExpr:
+		return mapBoolExpr(pass, e.X, negated)
+
+	case *ast.UnaryExpr:
+		if e.Op != token.NOT {
+			return conditionMapping{}, false
+		}
+		// !X asserted is X asserted with flipped polarity.
+		if m, ok := mapBoolExpr(pass, e.X, !negated); ok {
+			return m, true
+		}
+		return conditionMapping{pick(negated, "True", "False"), []ast.Expr{e.X}, "negation"}, true
+
+	case *ast.BinaryExpr:
+		return mapBoolBinary(pass, e, negated)
+
+	case *ast.CallExpr:
+		return mapBoolCall(pass, e, negated)
+	}
+	return conditionMapping{}, false
+}
+
+func mapBoolBinary(pass *analysis.Pass, bin *ast.BinaryExpr, negated bool) (conditionMapping, bool) {
 	left, right := bin.X, bin.Y
 
 	switch bin.Op {
 	case token.EQL:
-		if simplifyNilComparison(pass, call, left, right, tArg, msgArgs, negated, source, false) {
-			return
+		if m, ok, handled := mapNilComparison(pass, left, right, negated, false); handled {
+			return m, ok
 		}
-		if simplifyLenEqNeq(pass, call, left, right, tArg, msgArgs, negated, source, false) {
-			return
+		if m, ok := mapLenEqNeq(left, right, negated, false); ok {
+			return m, true
 		}
-		target := pick(negated, "NotEqual", "Equal")
-		emitSimplify(pass, call, source, target, []ast.Expr{tArg, left, right}, msgArgs, "== comparison")
+		if m, ok := mapEmptyStrEqNeq(pass, left, right, negated, false); ok {
+			return m, true
+		}
+		l, r := constFirst(pass, left, right)
+		return conditionMapping{pick(negated, "NotEqual", "Equal"), []ast.Expr{l, r}, "== comparison"}, true
 
 	case token.NEQ:
-		if simplifyNilComparison(pass, call, left, right, tArg, msgArgs, negated, source, true) {
-			return
+		if m, ok, handled := mapNilComparison(pass, left, right, negated, true); handled {
+			return m, ok
 		}
-		if simplifyLenEqNeq(pass, call, left, right, tArg, msgArgs, negated, source, true) {
-			return
+		if m, ok := mapLenEqNeq(left, right, negated, true); ok {
+			return m, true
 		}
-		target := pick(negated, "Equal", "NotEqual")
-		emitSimplify(pass, call, source, target, []ast.Expr{tArg, left, right}, msgArgs, "!= comparison")
+		if m, ok := mapEmptyStrEqNeq(pass, left, right, negated, true); ok {
+			return m, true
+		}
+		l, r := constFirst(pass, left, right)
+		return conditionMapping{pick(negated, "Equal", "NotEqual"), []ast.Expr{l, r}, "!= comparison"}, true
 
 	case token.GTR:
 		if inner, ok := isLenCall(left); ok && isIntLit(right, 0) {
-			emitSimplify(pass, call, source, pick(negated, "Empty", "NotEmpty"), []ast.Expr{tArg, inner}, msgArgs, "len > 0 check")
-			return
+			return conditionMapping{pick(negated, "Empty", "NotEmpty"), []ast.Expr{inner}, "len > 0 check"}, true
 		}
-		emitSimplify(pass, call, source, pick(negated, "LessOrEqual", "Greater"), []ast.Expr{tArg, left, right}, msgArgs, "> comparison")
+		return conditionMapping{pick(negated, "LessOrEqual", "Greater"), []ast.Expr{left, right}, "> comparison"}, true
 
 	case token.GEQ:
 		if inner, ok := isLenCall(left); ok && isIntLit(right, 1) {
-			emitSimplify(pass, call, source, pick(negated, "Empty", "NotEmpty"), []ast.Expr{tArg, inner}, msgArgs, "len >= 1 check")
-			return
+			return conditionMapping{pick(negated, "Empty", "NotEmpty"), []ast.Expr{inner}, "len >= 1 check"}, true
 		}
-		emitSimplify(pass, call, source, pick(negated, "Less", "GreaterOrEqual"), []ast.Expr{tArg, left, right}, msgArgs, ">= comparison")
+		return conditionMapping{pick(negated, "Less", "GreaterOrEqual"), []ast.Expr{left, right}, ">= comparison"}, true
 
 	case token.LSS:
-		emitSimplify(pass, call, source, pick(negated, "GreaterOrEqual", "Less"), []ast.Expr{tArg, left, right}, msgArgs, "< comparison")
+		return conditionMapping{pick(negated, "GreaterOrEqual", "Less"), []ast.Expr{left, right}, "< comparison"}, true
 
 	case token.LEQ:
-		emitSimplify(pass, call, source, pick(negated, "Greater", "LessOrEqual"), []ast.Expr{tArg, left, right}, msgArgs, "<= comparison")
+		return conditionMapping{pick(negated, "Greater", "LessOrEqual"), []ast.Expr{left, right}, "<= comparison"}, true
 	}
+	return conditionMapping{}, false
 }
 
-func simplifyNilComparison(pass *analysis.Pass, call *ast.CallExpr, left, right, tArg ast.Expr, msgArgs []ast.Expr, negated bool, source string, isNeq bool) bool {
+// mapNilComparison handles comparisons against nil. handled reports that the
+// expression is a nil comparison and no other mapping should be attempted,
+// even when no assertion fits the operand's type category.
+func mapNilComparison(pass *analysis.Pass, left, right ast.Expr, negated, isNeq bool) (m conditionMapping, ok, handled bool) {
 	if !isNilIdent(left) && !isNilIdent(right) {
-		return false
+		return conditionMapping{}, false, false
 	}
 	other := left
 	if isNilIdent(left) {
@@ -160,33 +180,20 @@ func simplifyNilComparison(pass *analysis.Pass, call *ast.CallExpr, left, right,
 	}
 	switch {
 	case isErrorType(pass, other):
-		target := "NoError"
-		if !positive {
-			target = "Error"
-		}
-		emitSimplify(pass, call, source, target, []ast.Expr{tArg, other}, msgArgs, "error nil check")
+		return conditionMapping{pick(!positive, "Error", "NoError"), []ast.Expr{other}, "error nil check"}, true, true
 	case isComparableType(pass, other):
-		target := "Zero"
-		if !positive {
-			target = "NotZero"
-		}
-		emitSimplify(pass, call, source, target, []ast.Expr{tArg, other}, msgArgs, "nil check")
+		return conditionMapping{pick(!positive, "NotZero", "Zero"), []ast.Expr{other}, "nil check"}, true, true
 	case isNonComparableNilableType(pass, other):
-		target := "Nil"
-		if !positive {
-			target = "NotNil"
-		}
-		emitSimplify(pass, call, source, target, []ast.Expr{tArg, other}, msgArgs, "nil check")
+		return conditionMapping{pick(!positive, "NotNil", "Nil"), []ast.Expr{other}, "nil check"}, true, true
 	}
-	return true
+	return conditionMapping{}, false, true
 }
 
-func simplifyLenEqNeq(pass *analysis.Pass, call *ast.CallExpr, left, right, tArg ast.Expr, msgArgs []ast.Expr, negated bool, source string, isNeq bool) bool {
-	inner, lenExpr, other, ok := extractLenSide(left, right)
+func mapLenEqNeq(left, right ast.Expr, negated, isNeq bool) (conditionMapping, bool) {
+	inner, _, other, ok := extractLenSide(left, right)
 	if !ok {
-		return false
+		return conditionMapping{}, false
 	}
-	_ = lenExpr
 
 	// len(x) == 0 or 0 == len(x)
 	if isIntLit(other, 0) {
@@ -194,17 +201,53 @@ func simplifyLenEqNeq(pass *analysis.Pass, call *ast.CallExpr, left, right, tArg
 		if negated {
 			positive = !positive
 		}
-		emitSimplify(pass, call, source, pick(!positive, "NotEmpty", "Empty"), []ast.Expr{tArg, inner}, msgArgs, "len == 0 check")
-		return true
+		return conditionMapping{pick(!positive, "NotEmpty", "Empty"), []ast.Expr{inner}, "len == 0 check"}, true
 	}
 
-	// len(x) == n where n is not 0 — suggest Len in non-negated EQL context only
-	if !isNeq && !negated {
-		emitSimplify(pass, call, source, "Len", []ast.Expr{tArg, inner, other}, msgArgs, "len comparison")
-		return true
+	// len(x) == n where n is not 0 — Len fits whenever the asserted reading
+	// is the equality: EQL non-negated, or NEQ negated.
+	if isNeq == negated {
+		return conditionMapping{"Len", []ast.Expr{inner, other}, "len comparison"}, true
 	}
 
-	return false
+	return conditionMapping{}, false
+}
+
+// mapEmptyStrEqNeq handles comparisons of string operands against the empty
+// string literal, which Empty/NotEmpty express directly.
+func mapEmptyStrEqNeq(pass *analysis.Pass, left, right ast.Expr, negated, isNeq bool) (conditionMapping, bool) {
+	var other ast.Expr
+	switch {
+	case isEmptyStringLit(left):
+		other = right
+	case isEmptyStringLit(right):
+		other = left
+	default:
+		return conditionMapping{}, false
+	}
+	if !isStringType(pass, other) {
+		return conditionMapping{}, false
+	}
+	positive := !isNeq
+	if negated {
+		positive = !positive
+	}
+	return conditionMapping{pick(!positive, "NotEmpty", "Empty"), []ast.Expr{other}, "empty string check"}, true
+}
+
+// constFirst orders Equal/NotEqual operands: a lone constant operand —
+// literal, negative literal, or named constant — is the expected value and
+// belongs in the expected slot.
+func constFirst(pass *analysis.Pass, left, right ast.Expr) (ast.Expr, ast.Expr) {
+	if isConstExpr(pass, right) && !isConstExpr(pass, left) {
+		return right, left
+	}
+	return left, right
+}
+
+func isConstExpr(pass *analysis.Pass, expr ast.Expr) bool {
+	tv, ok := pass.TypesInfo.Types[expr]
+	return ok && tv.Value != nil
 }
 
 func extractLenSide(left, right ast.Expr) (inner, lenExpr, other ast.Expr, ok bool) {
@@ -217,30 +260,29 @@ func extractLenSide(left, right ast.Expr) (inner, lenExpr, other ast.Expr, ok bo
 	return nil, nil, nil, false
 }
 
-func simplifyBoolCall(pass *analysis.Pass, call *ast.CallExpr, inner *ast.CallExpr, tArg ast.Expr, msgArgs []ast.Expr, negated bool, source string) {
+func mapBoolCall(pass *analysis.Pass, inner *ast.CallExpr, negated bool) (conditionMapping, bool) {
 	if s, sub, ok := isStringsContains(inner); ok {
-		emitSimplify(pass, call, source, pick(negated, "NotContains", "Contains"), []ast.Expr{tArg, s, sub}, msgArgs, "strings.Contains call")
-		return
+		return conditionMapping{pick(negated, "NotContains", "Contains"), []ast.Expr{s, sub}, "strings.Contains call"}, true
 	}
 
 	if err, target, ok := isErrorsIs(inner); ok {
 		if isNilIdent(target) {
-			emitSimplify(pass, call, source, pick(negated, "Error", "NoError"), []ast.Expr{tArg, err}, msgArgs, "errors.Is nil check")
-		} else if !negated {
-			emitSimplify(pass, call, source, "ErrorIs", []ast.Expr{tArg, err, target}, msgArgs, "errors.Is call")
+			return conditionMapping{pick(negated, "Error", "NoError"), []ast.Expr{err}, "errors.Is nil check"}, true
 		}
-		return
+		if !negated {
+			return conditionMapping{"ErrorIs", []ast.Expr{err, target}, "errors.Is call"}, true
+		}
+		return conditionMapping{}, false
 	}
 
 	if re, s, ok := isRegexpMatchString(pass, inner); ok && !negated {
-		emitSimplify(pass, call, source, "Regexp", []ast.Expr{tArg, re, s}, msgArgs, "MatchString call")
-		return
+		return conditionMapping{"Regexp", []ast.Expr{re, s}, "MatchString call"}, true
 	}
 
 	if a, b, ok := isReflectDeepEqual(inner); ok {
-		emitSimplify(pass, call, source, pick(negated, "NotEqual", "Equal"), []ast.Expr{tArg, a, b}, msgArgs, "reflect.DeepEqual call")
-		return
+		return conditionMapping{pick(negated, "NotEqual", "Equal"), []ast.Expr{a, b}, "reflect.DeepEqual call"}, true
 	}
+	return conditionMapping{}, false
 }
 
 // --- Equal / NotEqual ---
@@ -260,6 +302,18 @@ func simplifyEquality(pass *analysis.Pass, call *ast.CallExpr, negated bool) {
 		positive := v != negated // true+Equal or false+NotEqual → True; otherwise False
 		emitSimplify(pass, call, source, pick(!positive, "False", "True"), []ast.Expr{tArg, expr}, msgArgs, "bool literal comparison")
 		return
+	}
+
+	// Empty-string literals: Equal(t, "", x) / Equal(t, x, "")
+	if isEmptyStringLit(expected) || isEmptyStringLit(actual) {
+		other := expected
+		if isEmptyStringLit(expected) {
+			other = actual
+		}
+		if isStringType(pass, other) {
+			emitSimplify(pass, call, source, pick(negated, "NotEmpty", "Empty"), []ast.Expr{tArg, other}, msgArgs, "empty string comparison")
+			return
+		}
 	}
 
 	// Nil literals: Equal(t, nil, x) / Equal(t, x, nil)
@@ -447,15 +501,7 @@ func guardErrorContains(pass *analysis.Pass, call *ast.CallExpr) {
 
 func emitSimplify(pass *analysis.Pass, call *ast.CallExpr, from, to string, newArgs, msgArgs []ast.Expr, desc string) {
 	qual := assertionQualifier(call.Fun)
-
-	var parts []string
-	for _, arg := range newArgs {
-		parts = append(parts, renderExpr(pass.Fset, arg))
-	}
-	for _, arg := range msgArgs {
-		parts = append(parts, renderExpr(pass.Fset, arg))
-	}
-	newText := qual + to + "(" + strings.Join(parts, ", ") + ")"
+	newText := renderAssertion(pass.Fset, qual, to, newArgs, msgArgs)
 
 	reportWithFix(pass, AssertionSimplify, call.Pos(),
 		[]analysis.SuggestedFix{{
@@ -467,6 +513,17 @@ func emitSimplify(pass *analysis.Pass, call *ast.CallExpr, from, to string, newA
 			}},
 		}},
 		"use %s instead of %s for %s", to, from, desc)
+}
+
+func renderAssertion(fset *token.FileSet, qual, target string, args, msgArgs []ast.Expr) string {
+	var parts []string
+	for _, arg := range args {
+		parts = append(parts, renderExpr(fset, arg))
+	}
+	for _, arg := range msgArgs {
+		parts = append(parts, renderExpr(fset, arg))
+	}
+	return qual + target + "(" + strings.Join(parts, ", ") + ")"
 }
 
 // --- expression helpers ---
@@ -566,24 +623,10 @@ func isRegexpMatchString(pass *analysis.Pass, expr ast.Expr) (re, s ast.Expr, ok
 	if !ok || sel.Sel.Name != "MatchString" {
 		return nil, nil, false
 	}
-	t := pass.TypesInfo.TypeOf(sel.X)
-	if t == nil || !isRegexpType(t) {
+	if !namedPtrType(pass.TypesInfo.TypeOf(sel.X), "regexp", "Regexp") {
 		return nil, nil, false
 	}
 	return sel.X, call.Args[0], true
-}
-
-func isRegexpType(t types.Type) bool {
-	ptr, ok := t.(*types.Pointer)
-	if !ok {
-		return false
-	}
-	named, ok := ptr.Elem().(*types.Named)
-	if !ok {
-		return false
-	}
-	obj := named.Obj()
-	return obj.Name() == "Regexp" && obj.Pkg() != nil && obj.Pkg().Path() == "regexp"
 }
 
 func isReflectDeepEqual(expr ast.Expr) (a, b ast.Expr, ok bool) {
@@ -660,6 +703,15 @@ func isConcreteComparableNilableType(pass *analysis.Pass, expr ast.Expr) bool {
 		return true
 	}
 	return false
+}
+
+func isStringType(pass *analysis.Pass, expr ast.Expr) bool {
+	t := pass.TypesInfo.TypeOf(expr)
+	if t == nil {
+		return false
+	}
+	b, ok := t.Underlying().(*types.Basic)
+	return ok && b.Info()&types.IsString != 0
 }
 
 func isPointerType(pass *analysis.Pass, expr ast.Expr) bool {

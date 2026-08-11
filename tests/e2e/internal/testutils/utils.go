@@ -89,18 +89,14 @@ func sortTestBlocks(s string) string {
 
 func openGolden(t *testing.T, testFS embed.FS, name string) *bytes.Buffer {
 	buf, err := testFS.ReadFile("testdata/" + name)
-	if err != nil {
-		t.Fatalf("failed reading golden: %s", err)
-	}
+	gotest.NoError(t, err, "failed reading golden: %s", err)
 	return bytes.NewBuffer(buf)
 }
 
 func CopyModuleUnderTestToTmp(t *testing.T, tmp string, modPath string, skipByPrefix ...string) {
 	t.Helper()
 	err := copyFS(tmp, os.DirFS(modPath), skipByPrefix...)
-	if err != nil {
-		t.Fatalf("failed copying: %s", err)
-	}
+	gotest.NoError(t, err, "failed copying: %s", err)
 }
 
 // ActivateTests replaces ".go.test" suffix of file names to ".go".
@@ -115,9 +111,7 @@ func ActivateTests(t *testing.T, tmp string) {
 		}
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("failed renaming file: %s", err)
-	}
+	gotest.NoError(t, err, "failed renaming file: %s", err)
 }
 
 // AssertFilesInTmp activates test files, which are intended to be executed only
@@ -125,17 +119,13 @@ func ActivateTests(t *testing.T, tmp string) {
 func AssertFilesInTmp(t *testing.T, path string, expectedFiles ...string) {
 	t.Helper()
 	_, notFound := determineNotFoundFiles(t, path, expectedFiles...)
-	if len(notFound) > 0 {
-		t.Fatalf("could not find expected files: %+v", notFound)
-	}
+	gotest.Empty(t, notFound, "could not find expected files: %+v", notFound)
 }
 
 func AssertFilesNotInTmp(t *testing.T, path string, unexpectedFiles ...string) {
 	t.Helper()
 	found, _ := determineNotFoundFiles(t, path, unexpectedFiles...)
-	if len(found) > 0 {
-		t.Fatalf("found unexpected files: %+v", found)
-	}
+	gotest.Empty(t, found, "found unexpected files: %+v", found)
 }
 
 func determineNotFoundFiles(t *testing.T, path string, searchFiles ...string) (found, notFound []string) {
@@ -143,9 +133,7 @@ func determineNotFoundFiles(t *testing.T, path string, searchFiles ...string) (f
 	for _, v := range searchFiles {
 		_, err := os.Stat(filepath.Join(path, v))
 		notExists := errors.Is(err, os.ErrNotExist)
-		if err != nil && !notExists {
-			t.Fatalf("failed reading pwd: %s", err)
-		}
+		gotest.False(t, err != nil && !notExists, "failed reading pwd: %s", err)
 		if notExists {
 			notFound = append(notFound, v)
 		} else {
@@ -159,19 +147,16 @@ func HackGoWork(t *testing.T, tmp string) {
 	t.Helper()
 	tidy := exec.Command("go", "mod", "tidy")
 	tidy.Dir = tmp
-	if out, err := tidy.CombinedOutput(); err != nil {
-		t.Fatalf("go mod tidy failed: %s: output: %s", err, string(out))
-	}
+	out, err := tidy.CombinedOutput()
+	gotest.NoError(t, err, "go mod tidy output: %s", string(out))
 	init := exec.Command("go", "work", "init", tmp)
 	init.Dir = tmp
-	if out, err := init.CombinedOutput(); err != nil {
-		t.Fatalf("go work init failed: %s: output: %s", err, string(out))
-	}
+	out, err = init.CombinedOutput()
+	gotest.NoError(t, err, "go work init output: %s", string(out))
 	use := exec.Command("go", "work", "use", filepath.Join(tmp, "examples")) //nolint:gosec // G204: go tool with controlled arguments
 	use.Dir = tmp
-	if out, err := use.CombinedOutput(); err != nil {
-		t.Fatalf("go work use failed: %s: output: %s", err, string(out))
-	}
+	out, err = use.CombinedOutput()
+	gotest.NoError(t, err, "go work use output: %s", string(out))
 }
 
 // copied from: https://github.com/golang/go/issues/62484#issue-1884498794

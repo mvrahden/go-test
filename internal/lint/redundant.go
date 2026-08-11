@@ -8,13 +8,16 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-func checkRedundantAssertion(pass *analysis.Pass, insp *inspector.Inspector) {
+func checkRedundantAssertion(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) {
 	insp.Preorder([]ast.Node{(*ast.BlockStmt)(nil)}, func(n ast.Node) {
 		block := n.(*ast.BlockStmt)
 		for i := 0; i < len(block.List)-1; i++ {
-			first := extractAssertionCall(block.List[i])
-			second := extractAssertionCall(block.List[i+1])
+			first := extractAssertionCall(pass, block.List[i])
+			second := extractAssertionCall(pass, block.List[i+1])
 			if first == nil || second == nil {
+				continue
+			}
+			if cl.anyWithin(first.call.Pos(), first.call.End()) || cl.anyWithin(second.call.Pos(), second.call.End()) {
 				continue
 			}
 			if !sameExprText(pass, first.guardedArg, second.guardedArg) {
@@ -45,7 +48,7 @@ type parsedAssertion struct {
 	guardedArg ast.Expr
 }
 
-func extractAssertionCall(stmt ast.Stmt) *parsedAssertion {
+func extractAssertionCall(pass *analysis.Pass, stmt ast.Stmt) *parsedAssertion {
 	es, ok := stmt.(*ast.ExprStmt)
 	if !ok {
 		return nil
@@ -54,7 +57,7 @@ func extractAssertionCall(stmt ast.Stmt) *parsedAssertion {
 	if !ok {
 		return nil
 	}
-	name := resolveAssertionName(call.Fun)
+	name := assertionFuncName(pass, call.Fun)
 	if name == "" || len(call.Args) < 2 {
 		return nil
 	}

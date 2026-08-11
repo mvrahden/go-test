@@ -41,7 +41,7 @@ func (s *RecordTestSuite) TestRecord(t *gotest.T) {
 			})
 			gotest.True(it, rec.Failed())
 			gotest.False(it, reached)
-			gotest.Equal(it, "", rec.Message())
+			gotest.Empty(it, rec.Message())
 		})
 	})
 
@@ -74,7 +74,7 @@ func (s *RecordTestSuite) TestRecord(t *gotest.T) {
 				r.Errorf("")
 			})
 			gotest.True(it, rec.Failed())
-			gotest.Equal(it, "", rec.Message())
+			gotest.Empty(it, rec.Message())
 		})
 	})
 }

@@ -34,6 +34,12 @@ func (s *LintTestSuite) TestAnalyzer(t *gotest.T) {
 		})
 	})
 
+	t.When("foreign lookalikes", func(w *gotest.T) {
+		w.It("ignores assertion and polling names from other packages", func(it *gotest.T) {
+			analysistest.Run(it.T(), testdata, lint.Analyzer, "withforeign")
+		})
+	})
+
 	t.When("poll scope", func(w *gotest.T) {
 		w.It("detects poll scope violations", func(it *gotest.T) {
 			analysistest.Run(it.T(), testdata, lint.Analyzer, "withpollscope")
@@ -43,6 +49,12 @@ func (s *LintTestSuite) TestAnalyzer(t *gotest.T) {
 	t.When("assertion simplify", func(w *gotest.T) {
 		w.It("detects sub-optimal assertion patterns", func(it *gotest.T) {
 			analysistest.RunWithSuggestedFixes(it.T(), testdata, lint.Analyzer, "withsimplify")
+		})
+	})
+
+	t.When("fail guard", func(w *gotest.T) {
+		w.It("detects if+Fail guards that assertions express directly", func(it *gotest.T) {
+			analysistest.RunWithSuggestedFixes(it.T(), testdata, lint.Analyzer, "withfailguard", "withfailguard_noimport")
 		})
 	})
 
@@ -87,6 +99,23 @@ func (s *LintTestSuite) TestDisableNolintFlag(t *gotest.T) {
 	})
 }
 
+func (s *LintTestSuite) TestTierPolicy(t *gotest.T) {
+	t.When("tier-derived skip surface", func(w *gotest.T) {
+		w.It("registers a skip flag for every non-integrity rule and none for integrity rules", func(it *gotest.T) {
+			for _, rule := range []lint.Rule{lint.StdlibTest, lint.Testify, lint.AssertionSimplify, lint.AssertionRedundant, lint.FailGuard, lint.TEscape} {
+				gotest.NotZero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "missing skip flag for %s", rule)
+				gotest.True(it, lint.SkippableRules[rule], "rule %s should be skippable", rule)
+			}
+			for _, rule := range []lint.Rule{lint.Focus, lint.PollScope, lint.TestSignature, lint.SuiteLifecycle} {
+				gotest.Zero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "unexpected skip flag for %s", rule)
+				gotest.False(it, lint.SkippableRules[rule], "integrity rule %s must not be skippable", rule)
+			}
+			gotest.True(it, lint.Known(lint.Focus))
+			gotest.False(it, lint.Known(lint.Rule("nope")))
+		})
+	})
+}
+
 func (s *LintTestSuite) TestParseNolint(t *gotest.T) {
 	tests := []struct {
 		desc      string
@@ -127,15 +156,49 @@ func (s *LintTestSuite) TestParseNolint(t *gotest.T) {
 	}
 }
 
+// SkippedStyleTestSuite runs separately and non-parallel because it
+// temporarily mutates the shared analyzer flags.
+type SkippedStyleTestSuite struct{}
+
+func (s *SkippedStyleTestSuite) BeforeEach(_ *gotest.T) { lint.ExportSetSkip(lint.FailGuard, true) }
+func (s *SkippedStyleTestSuite) AfterEach(_ *gotest.T)  { lint.ExportSetSkip(lint.FailGuard, false) }
+
+func (s *SkippedStyleTestSuite) TestSkipSilencesExpressivenessRule(t *gotest.T) {
+	testdata := analysistest.TestData()
+
+	t.When("skip-fail-guard is set", func(w *gotest.T) {
+		w.It("reports nothing for fail-guard findings", func(it *gotest.T) {
+			analysistest.Run(it.T(), testdata, lint.Analyzer, "withskippedstyle")
+		})
+	})
+}
+
+// SkippedEscapeTestSuite runs separately and non-parallel because it
+// temporarily mutates the shared analyzer flags.
+type SkippedEscapeTestSuite struct{}
+
+func (s *SkippedEscapeTestSuite) BeforeEach(_ *gotest.T) { lint.ExportSetSkip(lint.TEscape, true) }
+func (s *SkippedEscapeTestSuite) AfterEach(_ *gotest.T)  { lint.ExportSetSkip(lint.TEscape, false) }
+
+func (s *SkippedEscapeTestSuite) TestSkippedRuleReleasesClaims(t *gotest.T) {
+	testdata := analysistest.TestData()
+
+	t.When("skip-t-escape is set", func(w *gotest.T) {
+		w.It("lets fail-guard take over escaped halting guards", func(it *gotest.T) {
+			analysistest.Run(it.T(), testdata, lint.Analyzer, "withskippedtescape")
+		})
+	})
+}
+
 // DisableNolintTestSuite runs separately and non-parallel because it
-// temporarily mutates the shared analyzer flag.
+// temporarily mutates the shared analyzer flags.
 type DisableNolintTestSuite struct{}
+
+func (s *DisableNolintTestSuite) BeforeEach(_ *gotest.T) { lint.ExportSetDisableNolint(true) }
+func (s *DisableNolintTestSuite) AfterEach(_ *gotest.T)  { lint.ExportSetDisableNolint(false) }
 
 func (s *DisableNolintTestSuite) TestNolintDirectivesIgnored(t *gotest.T) {
 	testdata := analysistest.TestData()
-
-	lint.ExportSetDisableNolint(true)
-	defer lint.ExportSetDisableNolint(false)
 
 	t.When("disable-nolint is set", func(w *gotest.T) {
 		w.It("reports all diagnostics regardless of nolint directives", func(it *gotest.T) {

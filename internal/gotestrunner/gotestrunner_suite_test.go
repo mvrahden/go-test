@@ -805,7 +805,7 @@ func (s *GotestrunnerTestSuite) TestOutputCollector(t *gotest.T) {
 			c.Register("example.com/c", 1)
 
 			c.RecordResult("example.com/c", 0, pass(30*time.Millisecond))
-			gotest.Equal(it, "", stdout.String(), "c should be buffered because a and b are not done")
+			gotest.Empty(it, stdout.String(), "c should be buffered because a and b are not done")
 
 			c.RecordResult("example.com/a", 0, pass(10*time.Millisecond))
 			gotest.Equal(it, "ok  \texample.com/a\t0.010s\n", stdout.String(), "a should flush as the head")
@@ -919,7 +919,7 @@ func (s *GotestrunnerTestSuite) TestOutputCollector(t *gotest.T) {
 			c.RecordResult("example.com/a", 0, gotestrunner.SuiteResult{ExitCode: 1})
 			stdout.Reset()
 			c.Finalize([]string{"example.com/empty"})
-			gotest.Equal(it, "", stdout.String())
+			gotest.Empty(it, stdout.String())
 		})
 	})
 

@@ -261,20 +261,15 @@ func normalizeJSONOutput(raw string) string {
 func placeFixture(t *testing.T, tmpDir, srcName, dstRel string) {
 	t.Helper()
 	src, err := testdataFS.Open("testdata/" + srcName)
-	if err != nil {
-		t.Fatalf("open fixture %s: %v", srcName, err)
-	}
+	gotest.NoError(t, err, "open fixture %s: %v", srcName, err)
 	defer src.Close()
 	dst := filepath.Join(tmpDir, dstRel)
 	_ = os.MkdirAll(filepath.Dir(dst), 0o755)
 	f, err := os.Create(dst)
-	if err != nil {
-		t.Fatalf("create %s: %v", dst, err)
-	}
+	gotest.NoError(t, err, "create %s: %v", dst, err)
 	defer f.Close()
-	if _, err := io.Copy(f, src); err != nil {
-		t.Fatalf("copy fixture: %v", err)
-	}
+	_, err = io.Copy(f, src)
+	gotest.NoError(t, err, "copy fixture")
 }
 
 func (s *E2ETestSuite) performTest(t *testing.T, basedir, pkgPath, pkgName, goldenName string) {
@@ -291,9 +286,7 @@ func (s *E2ETestSuite) performTest(t *testing.T, basedir, pkgPath, pkgName, gold
 	testutils.CompareTestOutputWithGolden(t, s.workDir, bytes.NewBuffer(out), testdataFS, goldenName)
 
 	_ = fs.WalkDir(os.DirFS(s.workDir), basedir, func(path string, d fs.DirEntry, err error) error {
-		if about.PSuiteRegex.MatchString(path) {
-			t.Fatalf("found test suite after execution")
-		}
+		gotest.False(t, about.PSuiteRegex.MatchString(path), "found test suite after execution")
 		return nil
 	})
 }

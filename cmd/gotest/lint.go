@@ -44,6 +44,9 @@ func lintSkipFlags(args []string, cfg config.ProjectConfig) ([]string, error) { 
 	var flags []string
 	for _, rule := range cfg.Lint.Skip {
 		if !lint.SkippableRules[lint.Rule(rule)] {
+			if lint.Known(lint.Rule(rule)) {
+				return nil, fmt.Errorf("integrity lint rule in %s: %q can only be suppressed per line with //nolint", config.FileName, rule)
+			}
 			return nil, fmt.Errorf("unknown lint rule in %s: %q", config.FileName, rule)
 		}
 		flag := "-skip-" + rule
