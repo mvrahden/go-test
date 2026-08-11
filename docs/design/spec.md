@@ -1318,6 +1318,7 @@ Suppression and configuration:
 - `.gotest.yml` → `lint.skip: [<rule>, ...]` disables non-integrity rules project-wide
 - `.gotest.yml` `lint.skip` naming an integrity rule is a hard error — integrity rules can only be suppressed per line; unknown rule IDs are also a hard error
 - Flags: `-fix` applies suggested fixes; `-skip-<rule>` for every non-integrity rule; `-disable-nolint`
+- Exit codes: `0` no findings; `1` uncompilable target packages (the preflight fails loudly — nothing was proven about them); `2` usage or configuration error; `3` findings reported
 
 ---
 

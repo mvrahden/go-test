@@ -365,6 +365,12 @@ Suppress individual diagnostics with //nolint comments:
   //nolint:stdlib-test             Same line or the comment block directly above
   package foo //nolint:stdlib-test  Suppress for entire file
 
+Exit codes:
+  0   No findings
+  1   Uncompilable target packages (nothing was proven about them)
+  2   Usage or configuration error (e.g. an integrity rule in lint.skip)
+  3   Findings reported
+
 Examples:
   gotest lint ./...                          Lint all packages
   gotest lint -skip-testify ./...            Skip testify rule
