@@ -24,6 +24,7 @@ aliases: ["/reference.html"]
         <li><a href="#configuration">Configuration</a> <span class="toc-desc">— project file, suite config, fixture config</span></li>
         <li><a href="#coverage">Coverage</a> <span class="toc-desc">— statement-weighted calculation and thresholds</span></li>
         <li><a href="#cli">CLI Reference</a> <span class="toc-desc">— commands, flags, go test passthrough</span></li>
+        <li><a href="#linter">Linter</a> <span class="toc-desc">— rule tiers, suppression, exit codes</span></li>
         <li><a href="#ci-integration">CI Integration</a> <span class="toc-desc">— summary output, GitHub Action, PR annotations</span></li>
       </ol>
     </div>
@@ -473,7 +474,7 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
           <tr><td><code>min-coverage</code></td><td>int</td><td>0 (off)</td><td><code>--min</code></td><td>Minimum coverage percentage, 0–100.</td></tr>
           <tr><td><code>parallel</code></td><td>int</td><td>0 (auto)</td><td><code>--parallel</code></td><td>Total concurrent test method budget. 0 means 2×GOMAXPROCS.</td></tr>
           <tr><td><code>debounce</code></td><td>duration</td><td>200ms</td><td><code>--debounce</code></td><td>Watch mode re-run delay.</td></tr>
-          <tr><td><code>lint.skip</code></td><td>[string]</td><td><em>none</em></td><td>—</td><td>Lint rules to disable: <code>stdlib-test</code>, <code>testify</code>.</td></tr>
+          <tr><td><code>lint.skip</code></td><td>[string]</td><td><em>none</em></td><td>—</td><td>Non-integrity lint rules to disable: <code>assertion-simplify</code>, <code>assertion-redundant</code>, <code>fail-guard</code>, <code>t-escape</code>, <code>stdlib-test</code>, <code>testify</code>.</td></tr>
         </tbody>
       </table>
       <div class="code-block">
@@ -566,7 +567,7 @@ percentage = covered / total</div>
           <tr><td><code>gotest watch ./...</code></td><td>Re-run on file changes. Only affected packages re-run.</td></tr>
           <tr><td><code>gotest spec ./...</code></td><td>Run tests and render the behavioral specification.</td></tr>
           <tr><td><code>gotest summary ./...</code></td><td>Failure-focused summary for CI. Shows only failing tests with assertion output.</td></tr>
-          <tr><td><code>gotest lint ./...</code></td><td>Static analysis for test suites.</td></tr>
+          <tr><td><code>gotest lint ./...</code></td><td>Static analysis for test suites — see <a href="#linter">Linter</a>.</td></tr>
           <tr><td><code>gotest scaffold ./pkg/user.Svc</code></td><td>Generate a suite skeleton from any Go type.</td></tr>
           <tr><td><code>gotest migrate ./...</code></td><td>Convert testify/suite tests automatically.</td></tr>
           <tr><td><code>gotest generate ./...</code></td><td>Generate suite files without running tests.</td></tr>
@@ -598,6 +599,70 @@ percentage = covered / total</div>
 
       <div class="callout">
         Standard <code>go test</code> flags work unchanged: <code>-v</code>, <code>-race</code>, <code>-cover</code>, <code>-count</code>, <code>-run</code>, <code>-json</code>, <code>-short</code>, <code>-timeout</code>.
+      </div>
+    </section>
+
+    <!-- 9. Linter -->
+    <section class="ref-section" id="linter">
+      <h2>Linter</h2>
+      <p class="lead">Sixteen rules in three tiers. A rule's tier determines how it may be suppressed.</p>
+
+      <h3>Integrity rules</h3>
+      <p>Violations can make test outcomes unreliable or leak resources. These rules can only be suppressed per line — never project-wide.</p>
+      <table class="ref-table">
+        <thead><tr><th>Rule</th><th>Detects</th></tr></thead>
+        <tbody>
+          <tr><td><code>focus</code></td><td>Committed <code>F_</code> prefixes on suites or methods.</td></tr>
+          <tr><td><code>receiver</code></td><td>Suite methods with value receivers instead of pointer receivers.</td></tr>
+          <tr><td><code>lifecycle-typo</code></td><td>Method names one typo away from a lifecycle hook (<code>BeforAll</code>, <code>AfterEeach</code>).</td></tr>
+          <tr><td><code>lifecycle-pair</code></td><td><code>BeforeAll</code> without <code>AfterAll</code> — resources may leak.</td></tr>
+          <tr><td><code>x-lifecycle</code></td><td><code>X_</code> prefix on a lifecycle hook — a no-op.</td></tr>
+          <tr><td><code>test-signature</code></td><td>Test methods not accepting <code>*gotest.T</code> (or <code>*testing.T</code>).</td></tr>
+          <tr><td><code>suite-lifecycle</code></td><td><code>Cleanup</code>/<code>Parallel</code>/<code>Run</code> via <code>t.T()</code> — they bypass the suite lifecycle.</td></tr>
+          <tr><td><code>poll-scope</code></td><td>Assertions inside <code>Eventually</code>/<code>Consistently</code> callbacks using the outer <code>t</code> instead of <code>poll</code>.</td></tr>
+          <tr><td><code>assertion-type-guard</code></td><td><code>Nil</code>/<code>Empty</code> on types their runtime guards would reject.</td></tr>
+          <tr><td><code>generated-file</code></td><td>Generated overlay files present in source control.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Expressiveness rules</h3>
+      <p>The test is correct but its syntax can be improved. These rules can be suppressed per line or project-wide via <code>lint.skip</code>; <code>-fix</code> applies the safe rewrites.</p>
+      <table class="ref-table">
+        <thead><tr><th>Rule</th><th>Detects</th></tr></thead>
+        <tbody>
+          <tr><td><code>assertion-simplify</code></td><td>Simplifiable assertions: <code>True(t, a == b)</code> → <code>Equal</code>, <code>Len(t, x, 0)</code> → <code>Empty</code>, …</td></tr>
+          <tr><td><code>assertion-redundant</code></td><td>An assertion made redundant by the next one on the same argument.</td></tr>
+          <tr><td><code>fail-guard</code></td><td><code>if cond { Fail/Fatal(...) }</code> guards — the assertion expresses the check directly.</td></tr>
+          <tr><td><code>t-escape</code></td><td>Unnecessary <code>t.T()</code> convenience escapes (<code>Errorf</code>, <code>Helper</code>, <code>Log</code>, <code>Fatal</code>, …).</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Migration rules</h3>
+      <p>Adoption aids for codebases moving to gotest — coexistence is legitimate. These rules can be suppressed per line or project-wide via <code>lint.skip</code>.</p>
+      <table class="ref-table">
+        <thead><tr><th>Rule</th><th>Detects</th></tr></thead>
+        <tbody>
+          <tr><td><code>stdlib-test</code></td><td><code>func TestX(*testing.T)</code> — consider a suite method; coexisting stdlib tests are legitimate.</td></tr>
+          <tr><td><code>testify</code></td><td>Any <code>github.com/stretchr/testify/*</code> import — migration incomplete.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Suppression</h3>
+      <p>Silence a single diagnostic with <code>//nolint:&lt;rule&gt;</code> on its line or in the comment block directly above it; on the <code>package</code> line it applies file-wide. Non-integrity rules can also be disabled per run (<code>-skip-&lt;rule&gt;</code>) or project-wide (<code>.gotest.yml</code> → <code>lint.skip</code>).</p>
+
+      <h3>Exit codes</h3>
+      <table class="ref-table">
+        <thead><tr><th>Code</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>0</code></td><td>No findings.</td></tr>
+          <tr><td><code>1</code></td><td>One or more target packages do not compile — they could not be analyzed, so the run fails instead of passing silently.</td></tr>
+          <tr><td><code>2</code></td><td>Usage or configuration error (e.g. an integrity rule in <code>lint.skip</code>).</td></tr>
+          <tr><td><code>3</code></td><td>Findings reported.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">
+        The linter is a standard <code>go/analysis</code> analyzer (also available as the standalone <code>gotest-lint</code> binary). There is no golangci-lint plugin — run it as its own CI step alongside your existing linter.
       </div>
     </section>
 

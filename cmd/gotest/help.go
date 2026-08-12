@@ -362,8 +362,14 @@ Flags:
   -fix                    Apply suggested fixes
 
 Suppress individual diagnostics with //nolint comments:
-  //nolint:stdlib-test             Suppress on same line or line above
+  //nolint:stdlib-test             Same line or the comment block directly above
   package foo //nolint:stdlib-test  Suppress for entire file
+
+Exit codes:
+  0   No findings
+  1   Uncompilable target packages (nothing was proven about them)
+  2   Usage or configuration error (e.g. an integrity rule in lint.skip)
+  3   Findings reported
 
 Examples:
   gotest lint ./...                          Lint all packages
@@ -476,7 +482,8 @@ Fields:
   lint:
     skip: [<rule>, ...]     Lint rules to disable globally
 
-Skippable lint rules: stdlib-test, testify
+Skippable lint rules (non-integrity only): assertion-redundant,
+assertion-simplify, fail-guard, stdlib-test, t-escape, testify
 
 Example .gotest.yml:
 

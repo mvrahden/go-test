@@ -8,7 +8,7 @@ import (
 
 type UserServiceTestSuite struct{}
 
-func (s *UserServiceTestSuite) TestCreate()                                  {} // want `test method UserServiceTestSuite.TestCreate has wrong signature`
+func (s *UserServiceTestSuite) TestCreate()                                  {} // want `test method UserServiceTestSuite.TestCreate has wrong signature — must accept \*gotest\.T \(or \*testing\.T\)`
 func (s *UserServiceTestSuite) TestCorrectSig(t *gotest.T)                   {}
 func (s *UserServiceTestSuite) TestContextualSig(t *gotest.T, ctx *struct{}) {}
 func (s *UserServiceTestSuite) TestStdlibSig(t *testing.T)                   {}

@@ -259,25 +259,31 @@ func isSuppressed(pass *analysis.Pass, pos token.Pos, rule Rule) bool {
 			if cLine == pkgLine || cLine == line {
 				return true
 			}
+			if pass.Fset.Position(cg.End()).Line == line-1 && startsItsLine(pass, file, cg) {
+				return true
+			}
 		}
 	}
 	return false
 }
 
-func docSuppressed(doc *ast.CommentGroup, rule Rule) bool {
-	if doc == nil {
-		return false
-	}
-	for _, c := range doc.List {
-		rules, ok := parseNolint(c.Text)
-		if !ok {
-			continue
+// startsItsLine reports whether no code precedes the comment group on its
+// opening line — a comment trailing the previous statement must not suppress
+// the line below it.
+func startsItsLine(pass *analysis.Pass, file *ast.File, cg *ast.CommentGroup) bool {
+	cgLine := pass.Fset.Position(cg.Pos()).Line
+	standalone := true
+	ast.Inspect(file, func(n ast.Node) bool {
+		if n == nil || !standalone {
+			return false
 		}
-		if ruleMatched(rules, rule) {
-			return true
+		if n.End() <= cg.Pos() && pass.Fset.Position(n.End()).Line == cgLine {
+			standalone = false
+			return false
 		}
-	}
-	return false
+		return n.Pos() < cg.Pos()
+	})
+	return standalone
 }
 
 func parseNolint(text string) (rules map[Rule]bool, ok bool) {
@@ -429,7 +435,7 @@ func checkMethods(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 					"focused method %s.%s should not be committed", recvName, methodName)
 			}
 			if !hasValidTestSignature(fd) {
-				report(pass, TestSignature, fd.Pos(), "test method %s.%s has wrong signature — must accept *gotest.T", recvName, methodName)
+				report(pass, TestSignature, fd.Pos(), "test method %s.%s has wrong signature — must accept *gotest.T (or *testing.T)", recvName, methodName)
 			}
 			return
 		}
@@ -1011,9 +1017,6 @@ func checkStdlibTests(pass *analysis.Pass, insp *inspector.Inspector) {
 			return
 		}
 		if !isTestingT(fd.Type.Params.List[0].Type) {
-			return
-		}
-		if !cfg.disableNolint && docSuppressed(fd.Doc, StdlibTest) {
 			return
 		}
 		report(pass, StdlibTest, fd.Pos(), "stdlib test %s — consider using a gotest suite", name)
