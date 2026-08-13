@@ -22,8 +22,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"sync"
 	"time"
 )
@@ -50,18 +52,84 @@ type FuzzRunConfig struct {
 // the ordinary suite grace budget.
 const fuzzGrace = 30 * time.Second
 
+// FuzzTargetOutcome records how one fuzz target's run ended. Interpretation
+// is deliberately separated from raw observation: a `go test -fuzz`
+// subprocess cut down by the session ending (deadline or interrupt) exits
+// non-zero without having found anything, and one killed mid-crash can die
+// before its FAIL output — so neither the exit code nor the output alone is
+// trustworthy. The new-crasher-file scan is the finding signal that
+// survives both.
+type FuzzTargetOutcome struct {
+	Func        string
+	ExitCode    int      // raw subprocess exit code (0 when it never started)
+	Canceled    bool     // the session context was done when the process exited
+	Skipped     bool     // never started: the session ended before a job slot freed
+	NewCrashers []string // corpus entry files that appeared under testdata/fuzz/<Func>/ during the run
+}
+
+// EffectiveExitCode maps the raw observation onto the session's exit
+// contract: 0 = ran (or was stopped by the session ending) without a
+// finding, 1 = a genuine finding — a failing target, or a new crasher file
+// even when the shutdown killed the process mid-crash — and 2 = the
+// subprocess could not run at all.
+func (o FuzzTargetOutcome) EffectiveExitCode() int {
+	if o.Skipped {
+		return 0
+	}
+	code := o.ExitCode
+	if o.Canceled && len(o.NewCrashers) == 0 {
+		// The non-zero exit here is the shutdown this session caused, not a
+		// verdict. A genuine failure racing the deadline is still caught:
+		// a crash writes a corpus file (the scan sees it), and a failing
+		// seed is deterministic (the next run reproduces it).
+		code = 0
+	}
+	if code == 0 && len(o.NewCrashers) > 0 {
+		code = 1
+	}
+	return code
+}
+
+// FuzzRunResult aggregates every target's outcome for one session.
+type FuzzRunResult struct {
+	Outcomes []FuzzTargetOutcome
+}
+
+// ExitCode returns the worst effective exit code across all targets.
+func (r FuzzRunResult) ExitCode() int {
+	worst := 0
+	for _, o := range r.Outcomes {
+		if c := o.EffectiveExitCode(); c > worst {
+			worst = c
+		}
+	}
+	return worst
+}
+
+// CutShort names the targets the session ending stopped or skipped without
+// a finding — the ones whose time share was not honored.
+func (r FuzzRunResult) CutShort() []string {
+	var names []string
+	for _, o := range r.Outcomes {
+		if (o.Skipped || o.Canceled) && o.EffectiveExitCode() == 0 {
+			names = append(names, o.Func)
+		}
+	}
+	return names
+}
+
 // RunFuzzTargets runs each target as its own `go test -fuzz=...` subprocess,
 // with bounded concurrency (cfg.Jobs, default max(1, GOMAXPROCS/2)). The
 // --for budget (cfg.Total) is split evenly across all targets via
 // splitBudget. Stdout and stderr of every subprocess are streamed live,
 // line by line, each line prefixed with "[<Func>] ", so long fuzz runs show
 // progress rather than going silent until they finish (unlike the buffered
-// RunSingleSuite path used elsewhere). It returns the worst (highest) exit
-// code across all targets; on a non-zero exit it also prints a hint to the
-// target's crasher artifact directory.
-func RunFuzzTargets(ctx context.Context, targets []FuzzTarget, cfg FuzzRunConfig) int {
+// RunSingleSuite path used elsewhere). The caller derives the session exit
+// code from the returned outcomes — see FuzzTargetOutcome.EffectiveExitCode
+// for the contract.
+func RunFuzzTargets(ctx context.Context, targets []FuzzTarget, cfg FuzzRunConfig) FuzzRunResult {
 	if len(targets) == 0 {
-		return 0
+		return FuzzRunResult{}
 	}
 
 	jobs := resolveFuzzJobs(cfg.Jobs)
@@ -71,34 +139,63 @@ func RunFuzzTargets(ctx context.Context, targets []FuzzTarget, cfg FuzzRunConfig
 	sem := make(chan struct{}, jobs)
 	var out sync.Mutex // serializes writes to os.Stdout/os.Stderr across targets
 
-	var mu sync.Mutex
-	worst := 0
+	// Each goroutine writes only its own index; wg.Wait is the barrier.
+	outcomes := make([]FuzzTargetOutcome, len(targets))
 
-	for _, target := range targets { //nolint:gocritic // rangeValCopy: intentional
+	for i, target := range targets { //nolint:gocritic // rangeValCopy: intentional
 		wg.Add(1)
-		go func(t FuzzTarget) {
+		go func(i int, t FuzzTarget) {
 			defer wg.Done()
 			select {
 			case sem <- struct{}{}:
 			case <-ctx.Done():
 				out.Lock()
-				fmt.Fprintf(os.Stderr, "[%s] skipped: global timeout reached before this target started\n", t.Func)
+				fmt.Fprintf(os.Stderr, "[%s] skipped: session ended before this target started\n", t.Func)
 				out.Unlock()
+				outcomes[i] = FuzzTargetOutcome{Func: t.Func, Skipped: true}
 				return
 			}
 			defer func() { <-sem }()
 
-			code := runOneFuzzTarget(ctx, t, cfg, budget, &out)
-
-			mu.Lock()
-			if code > worst {
-				worst = code
-			}
-			mu.Unlock()
-		}(target)
+			outcomes[i] = runOneFuzzTarget(ctx, t, cfg, budget, &out)
+		}(i, target)
 	}
 	wg.Wait()
-	return worst
+	return FuzzRunResult{Outcomes: outcomes}
+}
+
+// crasherDir is the corpus directory `go test -fuzz` writes new crashers to
+// for target t.
+func crasherDir(t FuzzTarget) string { //nolint:gocritic // hugeParam: stable API
+	return filepath.Join(t.Dir, "testdata", "fuzz", t.Func)
+}
+
+// snapshotCrashers returns the corpus entry names currently on disk for t.
+// A missing directory (no crasher ever recorded) is an empty snapshot.
+func snapshotCrashers(t FuzzTarget) map[string]bool { //nolint:gocritic // hugeParam: stable API
+	entries, err := os.ReadDir(crasherDir(t))
+	if err != nil {
+		return nil
+	}
+	set := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		if !e.IsDir() {
+			set[e.Name()] = true
+		}
+	}
+	return set
+}
+
+// newCrasherNames returns the names present in after but not before, sorted.
+func newCrasherNames(before, after map[string]bool) []string {
+	var fresh []string
+	for name := range after {
+		if !before[name] {
+			fresh = append(fresh, name)
+		}
+	}
+	sort.Strings(fresh)
+	return fresh
 }
 
 // splitBudget divides total evenly across n targets, flooring at 10s so no
@@ -158,7 +255,7 @@ func buildFuzzCmd(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, d time.D
 }
 
 // runOneFuzzTarget runs a single target to completion, streaming its output
-// live with a "[<Func>] " prefix, and returns its exit code.
+// live with a "[<Func>] " prefix, and returns its outcome.
 //
 // Output is streamed by assigning a lineWriter directly to cmd.Stdout /
 // cmd.Stderr (rather than reading from cmd.StdoutPipe()/StderrPipe() on a
@@ -171,7 +268,8 @@ func buildFuzzCmd(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, d time.D
 // reads complete, since Wait closes the pipes as soon as it sees the process
 // exit, silently truncating whatever the reader hadn't drained yet (exactly
 // where a FAIL summary or a crasher path would go missing).
-func runOneFuzzTarget(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, budget time.Duration, out *sync.Mutex) int { //nolint:gocritic // hugeParam: stable API
+func runOneFuzzTarget(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, budget time.Duration, out *sync.Mutex) FuzzTargetOutcome { //nolint:gocritic // hugeParam: stable API
+	before := snapshotCrashers(t)
 	cmd := buildFuzzCmd(ctx, t, cfg, budget)
 
 	stdoutW := newLineWriter(os.Stdout, t.Func, out)
@@ -185,10 +283,15 @@ func runOneFuzzTarget(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, budg
 	})
 	if err := mp.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "[%s] FAIL: %s\n", t.Func, err)
-		return 2
+		return FuzzTargetOutcome{Func: t.Func, ExitCode: 2}
 	}
 
 	_ = mp.WaitWithGrace(ctx)
+	// Sampled immediately after the process exits: a deadline firing in the
+	// window between exit and this line misclassifies only a failing-seed
+	// exit (crashes are covered by the file scan), and a failing seed is
+	// deterministic on the next run. See EffectiveExitCode.
+	canceled := ctx.Err() != nil
 	// Flush whatever partial (unterminated) line remains once the process
 	// has exited and exec.Cmd's internal copy has finished.
 	_ = stdoutW.Close()
@@ -199,13 +302,28 @@ func runOneFuzzTarget(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, budg
 		exitCode = cmd.ProcessState.ExitCode()
 	}
 
-	if exitCode != 0 {
-		out.Lock()
-		fmt.Fprintf(os.Stderr, "[%s] crasher artifacts (if any): %s/testdata/fuzz/%s/\n", t.Func, t.Dir, t.Func)
-		out.Unlock()
+	outcome := FuzzTargetOutcome{
+		Func:        t.Func,
+		ExitCode:    exitCode,
+		Canceled:    canceled,
+		NewCrashers: newCrasherNames(before, snapshotCrashers(t)),
 	}
 
-	return exitCode
+	out.Lock()
+	switch {
+	case len(outcome.NewCrashers) > 0:
+		for _, name := range outcome.NewCrashers {
+			fmt.Fprintf(os.Stderr, "[%s] new crasher: %s\n", t.Func, filepath.Join(crasherDir(t), name))
+		}
+		fmt.Fprintf(os.Stderr, "[%s] inspect it with `gotest fuzz triage`, then `gotest fuzz promote` to keep it as a typed seed\n", t.Func)
+	case exitCode != 0 && canceled:
+		fmt.Fprintf(os.Stderr, "[%s] stopped: session ended before this target finished (no failures found)\n", t.Func)
+	case exitCode != 0:
+		fmt.Fprintf(os.Stderr, "[%s] failing without a new crasher file — a seed or existing corpus entry fails; it reproduces on a regular `gotest` run\n", t.Func)
+	}
+	out.Unlock()
+
+	return outcome
 }
 
 // lineWriterMaxBuf caps how much of an unterminated line lineWriter will

@@ -760,8 +760,8 @@ Reusing the shared compiled binary the way `gotest`/`gotest bench` do would run 
 So each target gets its own `go test -fuzz` process instead, at the cost of losing the binary-reuse speedup everywhere else in gotest.
 
 `--for=<dur>` splits the total budget evenly across all targets (each target's share floors at 10s, so a small `--for` on many targets doesn't starve any of them).
-Omit `--for` and no `-fuzztime` is passed — targets fuzz until interrupted, bounded only by the global `--timeout` (default 15m).
-`--jobs=<n>` caps concurrent targets (default `max(1, GOMAXPROCS/2)`); every target still shares the one global `--timeout` deadline, so with more targets than `--jobs`, later waves may not start before it expires — gotest prints `[<Func>] skipped: global timeout reached before this target started` for each one that doesn't.
+Omit `--for` and no `-fuzztime` is passed — targets fuzz until interrupted, bounded only by the global `--timeout` (default 15m). Ending by timeout or interrupt is the normal end of an open-ended search, not a failure: the session exits 0 unless something was actually found (a failing target or a new crasher file — detected by scanning each target's `testdata/fuzz/<Func>/` directory, so a crash still counts even when the deadline killed the process mid-report).
+`--jobs=<n>` caps concurrent targets (default `max(1, GOMAXPROCS/2)`); every target still shares the one global `--timeout` deadline, so with more targets than `--jobs`, later waves may not start before it expires — gotest prints `[<Func>] skipped: session ended before this target started` for each one that doesn't, and (when `--for` was given) summarizes which targets did not get their full share.
 Give `--for` an explicit value on a run with many targets rather than relying on `--timeout` alone.
 
 Output streams live, line by line, each line prefixed `[<Func>] `:
@@ -775,8 +775,7 @@ Output streams live, line by line, each line prefixed `[<Func>] `:
 [FuzzNotificationServiceTestSuite_FuzzTrim] ok  	github.com/mvrahden/go-test/examples/notification	10.115s
 ```
 
-On a crashing input, the target's exit code is non-zero and gotest prints the crasher directory: `[<Func>] crasher artifacts (if any): <dir>/testdata/fuzz/<Func>/`.
-Commit the failing corpus entry under that path to turn the crash into a permanent regression test — it replays automatically per the seed-replay section above.
+On a crashing input, the session exits 1 and gotest names each new corpus file it detected — `[<Func>] new crasher: <dir>/testdata/fuzz/<Func>/<hash>` — followed by a pointer to `gotest fuzz triage` (to see the decoded input) and `gotest fuzz promote` (to keep it as a typed `f.Add` seed that replays on every ordinary run). A target that fails without writing a new file (a failing seed or existing corpus entry) is called out as such: it reproduces on a regular `gotest` run.
 
 With no `Fuzz*` methods anywhere, `gotest fuzz` prints `no fuzz targets found` and exits 0 without invoking `go test`.
 

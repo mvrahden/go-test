@@ -435,11 +435,16 @@ If a crasher's originating method can't be located with confidence, it is
 skipped with a warning and the crasher file is left in place — promote never
 partially edits or corrupts user source.
 
-On a crashing input, the target's exit code is non-zero and gotest prints
-the crasher artifact directory go reports, e.g.:
-  [FuzzParserTestSuite_FuzzParse] crasher artifacts (if any): /abs/pkg/testdata/fuzz/FuzzParserTestSuite_FuzzParse/
-Commit the failing corpus entry under that path to turn the crash into a
-permanent regression test — it replays automatically in ordinary runs.
+On a crashing input, the session exits 1 and gotest names each new corpus
+file it detected, e.g.:
+  [FuzzParserTestSuite_FuzzParse] new crasher: /abs/pkg/testdata/fuzz/FuzzParserTestSuite_FuzzParse/1a2b3c
+Inspect it with "gotest fuzz triage", then "gotest fuzz promote" to keep it
+as a typed f.Add seed that replays automatically in ordinary runs.
+
+A session that ends by the global --timeout or an interrupt without a
+finding exits 0 — time exhaustion is the normal end of an open-ended
+search, not a failure. Exit 1 means a finding (a failing target or a new
+crasher); exit 2 means the session could not run as requested.
 
 Examples:
   gotest fuzz ./pkg/parser/...                Fuzz until interrupted or timeout

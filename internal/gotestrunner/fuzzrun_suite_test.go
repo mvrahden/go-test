@@ -80,14 +80,87 @@ func (s *FuzzRunTestSuite) TestBuildFuzzArgs(t *gotest.T) {
 }
 
 func (s *FuzzRunTestSuite) TestRunFuzzTargetsJobsDefault(t *gotest.T) {
-	t.It("returns 0 immediately for zero targets without needing Jobs", func(it *gotest.T) {
-		code := gotestrunner.RunFuzzTargets(context.Background(), nil, gotestrunner.FuzzRunConfig{})
-		gotest.Equal(it, 0, code)
+	t.It("returns an empty result for zero targets without needing Jobs", func(it *gotest.T) {
+		res := gotestrunner.RunFuzzTargets(context.Background(), nil, gotestrunner.FuzzRunConfig{})
+		gotest.Equal(it, 0, res.ExitCode())
+		gotest.Empty(it, res.Outcomes)
 	})
 
 	t.It("defaults Jobs to max(1, GOMAXPROCS/2) when unset", func(it *gotest.T) {
 		gotest.Equal(it, gotestrunner.ExportDefaultFuzzJobs(), gotestrunner.ExportResolveFuzzJobs(0))
 		gotest.Equal(it, 3, gotestrunner.ExportResolveFuzzJobs(3))
+	})
+}
+
+// TestExitContract pins the session exit-code semantics: time exhaustion is
+// the expected end of a search and never a failure by itself; findings —
+// a genuine FAIL, or a new crasher file even when the shutdown killed the
+// process mid-crash — are what drive a non-zero exit.
+func (s *FuzzRunTestSuite) TestExitContract(t *gotest.T) {
+	t.When("a target is stopped by the session ending without a finding", func(it *gotest.T) {
+		o := gotestrunner.FuzzTargetOutcome{Func: "FuzzA", ExitCode: 1, Canceled: true}
+
+		it.It("maps the shutdown-caused non-zero exit to 0", func(it *gotest.T) {
+			gotest.Equal(it, 0, o.EffectiveExitCode())
+		})
+		it.It("counts as cut short in the session result", func(it *gotest.T) {
+			res := gotestrunner.FuzzRunResult{Outcomes: []gotestrunner.FuzzTargetOutcome{o}}
+			gotest.Equal(it, 0, res.ExitCode())
+			gotest.Equal(it, []string{"FuzzA"}, res.CutShort())
+		})
+	})
+
+	t.When("a target was killed mid-crash after writing a corpus file", func(it *gotest.T) {
+		o := gotestrunner.FuzzTargetOutcome{Func: "FuzzB", ExitCode: 1, Canceled: true, NewCrashers: []string{"582528dd"}}
+
+		it.It("still reports the finding despite the cancellation", func(it *gotest.T) {
+			gotest.Equal(it, 1, o.EffectiveExitCode())
+		})
+	})
+
+	t.When("a target fails genuinely while the session is still live", func(it *gotest.T) {
+		it.It("keeps the subprocess exit code", func(it *gotest.T) {
+			o := gotestrunner.FuzzTargetOutcome{Func: "FuzzC", ExitCode: 1}
+			gotest.Equal(it, 1, o.EffectiveExitCode())
+		})
+		it.It("keeps a tool-level exit 2", func(it *gotest.T) {
+			o := gotestrunner.FuzzTargetOutcome{Func: "FuzzC", ExitCode: 2}
+			gotest.Equal(it, 2, o.EffectiveExitCode())
+		})
+	})
+
+	t.When("a new crasher appears even though the process exited 0", func(it *gotest.T) {
+		it.It("treats the crasher file as the authoritative finding signal", func(it *gotest.T) {
+			o := gotestrunner.FuzzTargetOutcome{Func: "FuzzD", NewCrashers: []string{"deadbeef"}}
+			gotest.Equal(it, 1, o.EffectiveExitCode())
+		})
+	})
+
+	t.When("a target never started because the session ended first", func(it *gotest.T) {
+		o := gotestrunner.FuzzTargetOutcome{Func: "FuzzE", Skipped: true}
+
+		it.It("is not a failure", func(it *gotest.T) {
+			gotest.Equal(it, 0, o.EffectiveExitCode())
+		})
+		it.It("is reported as cut short", func(it *gotest.T) {
+			res := gotestrunner.FuzzRunResult{Outcomes: []gotestrunner.FuzzTargetOutcome{o}}
+			gotest.Equal(it, []string{"FuzzE"}, res.CutShort())
+		})
+	})
+
+	t.When("outcomes mix findings and cut-short targets", func(it *gotest.T) {
+		res := gotestrunner.FuzzRunResult{Outcomes: []gotestrunner.FuzzTargetOutcome{
+			{Func: "FuzzA", ExitCode: 1, Canceled: true},
+			{Func: "FuzzB", ExitCode: 1},
+			{Func: "FuzzC", Skipped: true},
+		}}
+
+		it.It("returns the worst effective code", func(it *gotest.T) {
+			gotest.Equal(it, 1, res.ExitCode())
+		})
+		it.It("excludes the finding from the cut-short list", func(it *gotest.T) {
+			gotest.Equal(it, []string{"FuzzA", "FuzzC"}, res.CutShort())
+		})
 	})
 }
 

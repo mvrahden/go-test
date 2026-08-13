@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -18,6 +20,13 @@ import (
 // gotestrunner.RunFuzzTargets. Unlike runTest/runBench, it does not run the
 // shared compiled suite binary — see the doc comment on
 // internal/gotestrunner/fuzzrun.go for why.
+//
+// Exit contract: 0 = the search ran and found nothing — including sessions
+// ended by the global --timeout or an interrupt, which is the normal way an
+// open-ended run (no --for) terminates; 1 = a finding (a failing target or
+// a new crasher); 2 = the session could not run as requested (bad flags,
+// broken packages). Time exhaustion is the expected end of a search, never
+// a failure by itself.
 func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if sub, rest, ok := extractFuzzSubcommand(inv.Args); ok {
 		switch sub {
@@ -87,15 +96,28 @@ func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		defer cancel()
 	}
 
-	code := gotestrunner.RunFuzzTargets(ctx, targets, gotestrunner.FuzzRunConfig{
+	res := gotestrunner.RunFuzzTargets(ctx, targets, gotestrunner.FuzzRunConfig{
 		OverlayFlag: overlay.OverlayFlag,
 		Total:       forDuration,
 		Jobs:        jobs,
 		BuildFlags:  classified.BuildFlags,
 	})
+	code := res.ExitCode()
 
-	if cfg.GlobalTimeout > 0 && ctx.Err() == context.DeadlineExceeded && code == 0 {
-		code = 1
+	if err := ctx.Err(); err != nil {
+		reason := "interrupted"
+		if errors.Is(err, context.DeadlineExceeded) {
+			reason = fmt.Sprintf("global --timeout (%s) reached", cfg.GlobalTimeout)
+		}
+		if cut := res.CutShort(); forDuration > 0 && len(cut) > 0 {
+			// An explicit --for budget was not honored — say which targets
+			// lost time, so the shortfall is visible in CI logs even though
+			// it is not by itself a failure.
+			fmt.Fprintf(os.Stderr, "%s: %d target(s) did not get their full --for share: %s\n",
+				reason, len(cut), strings.Join(cut, ", "))
+		} else if code == 0 {
+			fmt.Fprintf(os.Stderr, "%s; no failures found\n", reason)
+		}
 	}
 
 	return code

@@ -52,7 +52,8 @@ $ go run ./cmd/gotest fuzz ./examples/fuzzing --for=60s
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip] FAIL
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip] exit status 1
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip] FAIL	github.com/mvrahden/go-test/examples/fuzzing	0.033s
-[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip] crasher artifacts (if any): .../examples/fuzzing/testdata/fuzz/FuzzFrameCodecTestSuite_FuzzFrameRoundTrip/
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip] new crasher: .../examples/fuzzing/testdata/fuzz/FuzzFrameCodecTestSuite_FuzzFrameRoundTrip/582528ddfad69eb5
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip] inspect it with `gotest fuzz triage`, then `gotest fuzz promote` to keep it as a typed seed
 ```
 
 `gotest fuzz triage` decodes the crasher back through the generated codec and prints the actual
