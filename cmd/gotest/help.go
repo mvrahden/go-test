@@ -388,21 +388,27 @@ persistently via "fuzz: harvest: false" in .gotest.yml (see "gotest help
 config").
 
 Flags:
-  --for=<dur>             Total fuzz time budget, split evenly across all
-                           targets (each target's share floors at 10s). When
-                           omitted, no -fuzztime is passed and go's own
-                           default applies per target — fuzzing runs until
-                           interrupted or until the global --timeout expires.
+  --for=<dur>             Approximate wall-clock fuzz budget for the whole
+                           session: each target's -fuzztime share is
+                           --for × min(--jobs, targets) / targets, floored
+                           at 10s, so concurrent waves add back up to ≈--for.
+                           The resolved schedule is printed before fuzzing
+                           starts. When omitted, no -fuzztime is passed and
+                           go's own default applies per target — fuzzing
+                           runs until interrupted or until the global
+                           --timeout expires (which exits 0 when nothing
+                           was found).
   --jobs=<n>               Max concurrent targets (default: max(1, GOMAXPROCS/2))
   --no-cache               Disable overlay cache, force fresh generation
   --debug                  Keep generated overlay for inspection
   --timeout=<dur>          Global pipeline deadline (default: 15m, 0 to disable)
 
-All targets share the one global --timeout deadline: if there are more
-targets than --jobs, later waves may not get to start before it expires —
-gotest prints "[<Func>] skipped: ..." for each one that doesn't. Use --for
-to give every target an explicit, bounded budget instead of relying on
---timeout alone.
+All targets share the one global --timeout deadline. A --for that cannot
+fit inside it is rejected up front (raise --timeout, lower --for, or pass
+--timeout=0); if the deadline still expires mid-run (build overhead), the
+targets that lost time are listed — gotest prints "[<Func>] skipped: ..."
+for each one that never started. Use --for to give the session an explicit,
+bounded budget instead of relying on --timeout alone.
 
 If no packages contain any FuzzX methods, prints "no fuzz targets found"
 and exits 0 without invoking go test.
@@ -448,7 +454,7 @@ crasher); exit 2 means the session could not run as requested.
 
 Examples:
   gotest fuzz ./pkg/parser/...                Fuzz until interrupted or timeout
-  gotest fuzz --for=5m ./...                  5-minute budget split across all targets
+  gotest fuzz --for=5m ./...                  ~5 minutes of fuzzing wall-clock across all targets
   gotest fuzz --for=1m --jobs=2 ./...         Cap concurrency to 2 targets at a time
 `)
 }

@@ -41,9 +41,55 @@ type FuzzTarget struct {
 // FuzzRunConfig configures a RunFuzzTargets invocation.
 type FuzzRunConfig struct {
 	OverlayFlag string        // "-overlay=..." from GenerateOverlay's OverlayResult
-	Total       time.Duration // --for budget, split evenly across all targets; 0 => go's own default per target (no -fuzztime)
+	Total       time.Duration // --for budget, approximate wall-clock for the whole session; 0 => go's own default per target (no -fuzztime)
 	Jobs        int           // concurrent targets; <=0 => defaultFuzzJobs()
 	BuildFlags  []string      // additional go test build flags (-tags etc.)
+}
+
+// FuzzSchedule is the concrete plan a --for budget resolves to: how many
+// targets run at a time, each target's -fuzztime share, and what that adds
+// up to in wall-clock. One function owns this arithmetic so the up-front
+// plan the CLI prints, the config validation, and the actual run can never
+// disagree.
+type FuzzSchedule struct {
+	Targets   int
+	Jobs      int           // resolved effective concurrency (min(jobs, targets))
+	Waves     int           // ceil(targets / jobs)
+	PerTarget time.Duration // -fuzztime per target; 0 = no -fuzztime (go's default)
+	Floored   bool          // the 10s per-target floor raised PerTarget
+	EstWall   time.Duration // Waves × PerTarget; 0 when PerTarget is 0
+}
+
+// PlanFuzzSchedule resolves total (the --for budget; <=0 = open-ended) into
+// a schedule for n targets at the given concurrency (<=0 = default).
+//
+// The contract is wall-clock: a user writing --for=5m means "this command
+// fuzzes for about five minutes", so each target's share is
+// total × min(jobs, n) / n — waves of concurrent targets multiply back out
+// to ≈total. (The previous jobs-blind total/n split made the session take
+// total/jobs instead, quietly finishing a 10-minute budget in under two on
+// a six-core default.) The 10s floor keeps a small budget over many targets
+// from starving each one; when it engages, EstWall exceeds total and
+// Floored says so, so the caller can surface the stretch instead of
+// silently overrunning.
+func PlanFuzzSchedule(total time.Duration, n, jobs int) FuzzSchedule {
+	jobs = min(resolveFuzzJobs(jobs), n)
+	s := FuzzSchedule{Targets: n, Jobs: jobs}
+	if n <= 0 {
+		return s
+	}
+	s.Waves = (n + jobs - 1) / jobs
+	if total <= 0 {
+		return s
+	}
+	per := total * time.Duration(jobs) / time.Duration(n)
+	if per < 10*time.Second {
+		per = 10 * time.Second
+		s.Floored = true
+	}
+	s.PerTarget = per
+	s.EstWall = time.Duration(s.Waves) * per
+	return s
 }
 
 // fuzzGrace is the fixed grace period given to a `go test -fuzz` subprocess
@@ -132,8 +178,9 @@ func RunFuzzTargets(ctx context.Context, targets []FuzzTarget, cfg FuzzRunConfig
 		return FuzzRunResult{}
 	}
 
-	jobs := resolveFuzzJobs(cfg.Jobs)
-	budget := splitBudget(cfg.Total, len(targets))
+	plan := PlanFuzzSchedule(cfg.Total, len(targets), cfg.Jobs)
+	jobs := plan.Jobs
+	budget := plan.PerTarget
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, jobs)
@@ -196,20 +243,6 @@ func newCrasherNames(before, after map[string]bool) []string {
 	}
 	sort.Strings(fresh)
 	return fresh
-}
-
-// splitBudget divides total evenly across n targets, flooring at 10s so no
-// target gets a budget too short to be useful. A zero total stays zero,
-// signaling "no -fuzztime flag; use go's own default" to buildFuzzArgs.
-func splitBudget(total time.Duration, n int) time.Duration {
-	if total <= 0 || n <= 0 {
-		return 0
-	}
-	d := total / time.Duration(n)
-	if d < 10*time.Second {
-		return 10 * time.Second
-	}
-	return d
 }
 
 // defaultFuzzJobs returns the default concurrent-target cap when Jobs is

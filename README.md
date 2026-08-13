@@ -750,7 +750,7 @@ A user-supplied `-run` filter wins over this widening — fuzz seeds only replay
 
 ```bash
 gotest fuzz ./...                     # fuzz until interrupted or timeout
-gotest fuzz --for=5m ./...            # 5-minute budget split across all targets
+gotest fuzz --for=5m ./...            # ~5 minutes of fuzzing wall-clock, shared across all targets
 gotest fuzz --for=1m --jobs=2 ./...   # cap concurrency to 2 targets at a time
 ```
 
@@ -759,7 +759,7 @@ This is unlike every other gotest subcommand: a suite binary compiled once with 
 Reusing the shared compiled binary the way `gotest`/`gotest bench` do would run uninstrumented — coverage-guided mutation would silently degrade to undirected random input.
 So each target gets its own `go test -fuzz` process instead, at the cost of losing the binary-reuse speedup everywhere else in gotest.
 
-`--for=<dur>` splits the total budget evenly across all targets (each target's share floors at 10s, so a small `--for` on many targets doesn't starve any of them).
+`--for=<dur>` is approximate wall-clock for the whole session: each target's `-fuzztime` share is `--for × min(--jobs, targets) / targets`, so concurrent waves multiply back out to ≈`--for` (shares floor at 10s, so a small `--for` on many targets doesn't starve any of them — the floor stretches the session instead, and gotest says so). The resolved schedule is printed before fuzzing starts, and a `--for` that cannot fit inside the global `--timeout` is rejected up front rather than cut down mid-run.
 Omit `--for` and no `-fuzztime` is passed — targets fuzz until interrupted, bounded only by the global `--timeout` (default 15m). Ending by timeout or interrupt is the normal end of an open-ended search, not a failure: the session exits 0 unless something was actually found (a failing target or a new crasher file — detected by scanning each target's `testdata/fuzz/<Func>/` directory, so a crash still counts even when the deadline killed the process mid-report).
 `--jobs=<n>` caps concurrent targets (default `max(1, GOMAXPROCS/2)`); every target still shares the one global `--timeout` deadline, so with more targets than `--jobs`, later waves may not start before it expires — gotest prints `[<Func>] skipped: session ended before this target started` for each one that doesn't, and (when `--for` was given) summarizes which targets did not get their full share.
 Give `--for` an explicit value on a run with many targets rather than relying on `--timeout` alone.

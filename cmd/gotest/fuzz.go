@@ -91,6 +91,23 @@ func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 0
 	}
 
+	// Print the schedule the budget resolves to before spending any of it,
+	// and reject an impossible --for/--timeout combination here rather than
+	// letting the deadline cut the run down mid-flight.
+	plan := gotestrunner.PlanFuzzSchedule(forDuration, len(targets), jobs)
+	if forDuration > 0 {
+		if cfg.GlobalTimeout > 0 && plan.EstWall >= cfg.GlobalTimeout {
+			fmt.Fprintf(os.Stderr, "FAIL: --for=%s needs ~%s of fuzzing wall-clock (%d target(s), %d at a time) but the global --timeout is %s — raise --timeout, lower --for, or pass --timeout=0\n",
+				forDuration, plan.EstWall, plan.Targets, plan.Jobs, cfg.GlobalTimeout)
+			return 2
+		}
+		fmt.Fprintf(os.Stderr, "fuzzing %d target(s), %d at a time, %s each (~%s wall-clock)\n",
+			plan.Targets, plan.Jobs, plan.PerTarget, plan.EstWall)
+		if plan.Floored {
+			fmt.Fprintf(os.Stderr, "note: the 10s per-target floor stretches this run past --for=%s\n", forDuration)
+		}
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
 	defer stop()
 

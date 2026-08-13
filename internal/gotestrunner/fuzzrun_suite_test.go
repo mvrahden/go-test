@@ -15,22 +15,58 @@ import (
 // splitting) and per-target `go test -fuzz` command construction.
 type FuzzRunTestSuite struct{}
 
-func (s *FuzzRunTestSuite) TestSplitBudget(t *gotest.T) {
-	t.When("total splits evenly across targets", func(it *gotest.T) {
+// TestPlanFuzzSchedule pins the --for contract: the budget is approximate
+// wall-clock for the whole session, so per-target shares scale with the
+// effective concurrency and waves multiply back out to ≈total.
+func (s *FuzzRunTestSuite) TestPlanFuzzSchedule(t *gotest.T) {
+	t.When("targets run one at a time", func(it *gotest.T) {
+		plan := gotestrunner.PlanFuzzSchedule(10*time.Minute, 2, 1)
+
 		it.It("divides total by n", func(it *gotest.T) {
-			gotest.Equal(it, 5*time.Minute, gotestrunner.ExportSplitBudget(10*time.Minute, 2))
+			gotest.Equal(it, 5*time.Minute, plan.PerTarget)
+			gotest.Equal(it, 2, plan.Waves)
+			gotest.Equal(it, 10*time.Minute, plan.EstWall)
 		})
 	})
 
-	t.When("the even split would fall below the floor", func(it *gotest.T) {
-		it.It("floors at 10s", func(it *gotest.T) {
-			gotest.Equal(it, 10*time.Second, gotestrunner.ExportSplitBudget(30*time.Second, 10))
+	t.When("jobs run several targets concurrently", func(it *gotest.T) {
+		plan := gotestrunner.PlanFuzzSchedule(10*time.Minute, 10, 5)
+
+		it.It("scales each share by the concurrency so wall-clock stays ≈total", func(it *gotest.T) {
+			gotest.Equal(it, 5*time.Minute, plan.PerTarget)
+			gotest.Equal(it, 2, plan.Waves)
+			gotest.Equal(it, 10*time.Minute, plan.EstWall)
+		})
+	})
+
+	t.When("there are fewer targets than jobs", func(it *gotest.T) {
+		plan := gotestrunner.PlanFuzzSchedule(time.Minute, 2, 8)
+
+		it.It("caps concurrency at the target count so shares never exceed total", func(it *gotest.T) {
+			gotest.Equal(it, 2, plan.Jobs)
+			gotest.Equal(it, time.Minute, plan.PerTarget)
+			gotest.Equal(it, 1, plan.Waves)
+			gotest.Equal(it, time.Minute, plan.EstWall)
+		})
+	})
+
+	t.When("the share would fall below the floor", func(it *gotest.T) {
+		plan := gotestrunner.PlanFuzzSchedule(30*time.Second, 10, 1)
+
+		it.It("floors at 10s and reports the stretch", func(it *gotest.T) {
+			gotest.Equal(it, 10*time.Second, plan.PerTarget)
+			gotest.True(it, plan.Floored)
+			gotest.Equal(it, 100*time.Second, plan.EstWall)
 		})
 	})
 
 	t.When("total is zero", func(it *gotest.T) {
-		it.It("stays zero (go's default per target)", func(it *gotest.T) {
-			gotest.Equal(it, time.Duration(0), gotestrunner.ExportSplitBudget(0, 5))
+		plan := gotestrunner.PlanFuzzSchedule(0, 5, 2)
+
+		it.It("leaves PerTarget zero (go's default per target)", func(it *gotest.T) {
+			gotest.Equal(it, time.Duration(0), plan.PerTarget)
+			gotest.False(it, plan.Floored)
+			gotest.Equal(it, time.Duration(0), plan.EstWall)
 		})
 	})
 }

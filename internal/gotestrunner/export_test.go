@@ -49,7 +49,6 @@ func ExportSetTeardownTimeout(p *SharedFixtureProcess, d time.Duration) {
 	p.teardownTimeout = d
 }
 
-var ExportSplitBudget = splitBudget
 var ExportBuildFuzzArgs = buildFuzzArgs
 var ExportDefaultFuzzJobs = defaultFuzzJobs
 var ExportResolveFuzzJobs = resolveFuzzJobs

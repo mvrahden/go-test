@@ -153,7 +153,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--save=<path>` | Save a benchmark run as a JSON baseline (`bench`) |
 | `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`) |
 | `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`) |
-| `--for=<dur>` | Total fuzz time budget, split evenly across targets (`fuzz`; per-target share floors at 10s) |
+| `--for=<dur>` | Approximate wall-clock fuzz budget for the session, split jobs-aware across targets (`fuzz`; per-target share floors at 10s) |
 | `--jobs=<n>` | Max concurrent fuzz targets (`fuzz`; default: max(1, GOMAXPROCS/2)) |
 | `--no-harvest` | Disable table-test seed harvesting for this run |
 | `--fuzz` | Generate fuzz round-trip skeletons (`scaffold`) |
