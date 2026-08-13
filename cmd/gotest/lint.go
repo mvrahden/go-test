@@ -45,7 +45,7 @@ func runLint(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		}
 	}
 
-	os.Args = append([]string{"gotest-lint"}, append(flagArgs, args...)...)
+	os.Args = append([]string{"gotest lint"}, append(flagArgs, args...)...)
 	singlechecker.Main(lint.Analyzer)
 
 	fmt.Fprintln(os.Stderr, "lint: unexpected return from singlechecker.Main")

@@ -1271,8 +1271,8 @@ Method-parallel suites additionally emit the `ƒfailed` coordination described u
 Available as a subcommand and as a standalone binary, built on `go/analysis`. `pkg/lint` exports the analyzer for external `go/analysis` drivers; there is no golangci-lint plugin — the linter runs as its own step alongside a project's existing linter:
 
 ```bash
-gotest lint ./...                                          # subcommand
-go run github.com/mvrahden/go-test/cmd/gotest-lint ./...   # standalone
+gotest lint ./...                                        # installed
+go run github.com/mvrahden/go-test/cmd/gotest lint ./... # without installing
 ```
 
 Rules (IDs are canonical — used by `//nolint:<rule>`; `.gotest.yml` `lint.skip` accepts any non-integrity rule):
@@ -1521,12 +1521,10 @@ They never alter how the tests themselves are executed — the spec view is rend
 
 ```
 cmd/gotest/                  CLI entrypoint, subcommands, arg handling
+  ├── internal/lint/           go/analysis analyzer (lint subcommand)
   └── internal/gotestrunner/   Suite generation I/O, go test execution, overlay
         └── internal/gotestgen/   Package loading, collection, fixture resolution, rendering
               └── internal/gotestast/   AST analysis, spec model, regex classification
-
-cmd/gotest-lint/             Standalone linter binary (singlechecker)
-  └── internal/lint/           go/analysis analyzer
 
 internal/config/             .gotest.yml project configuration loading
 internal/gotestspec/         Spec tree builder and renderers (terminal, markdown, json)

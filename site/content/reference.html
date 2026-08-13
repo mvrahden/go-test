@@ -662,7 +662,7 @@ percentage = covered / total</div>
       </table>
 
       <div class="callout">
-        The linter is a standard <code>go/analysis</code> analyzer (also available as the standalone <code>gotest-lint</code> binary). There is no golangci-lint plugin — run it as its own CI step alongside your existing linter. In GitHub Actions, <code>gotest lint</code> auto-detects the runner (<code>GITHUB_ACTIONS=true</code>, or explicitly via <code>--github</code>) and additionally emits inline PR annotations per finding plus a findings table in the step summary; exit codes and suppression are unchanged.
+        The linter is a standard <code>go/analysis</code> analyzer, built into the CLI as <code>gotest lint</code>. There is no golangci-lint plugin — run it as its own CI step alongside your existing linter. In GitHub Actions, <code>gotest lint</code> auto-detects the runner (<code>GITHUB_ACTIONS=true</code>, or explicitly via <code>--github</code>) and additionally emits inline PR annotations per finding plus a findings table in the step summary; exit codes and suppression are unchanged.
       </div>
     </section>
 

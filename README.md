@@ -725,7 +725,7 @@ Sixteen rules in three tiers:
 - **Migration** — adoption aids for codebases moving to gotest: stdlib test functions and testify imports; coexistence is legitimate.
 
 Suppress per line with `//nolint:<rule>` (same line or the comment block directly above); expressiveness and migration rules can also be disabled project-wide via `.gotest.yml` (`lint.skip`). See the [design spec](docs/design/spec.md#linter) for the full rule table.
-Also available as a standalone `go/analysis` binary (`gotest-lint`). There is no golangci-lint plugin — run it as its own CI step alongside your existing linter. Inside GitHub Actions (or with `--github`), findings additionally surface as inline PR annotations and a step-summary table.
+There is no golangci-lint plugin — run `gotest lint` as its own CI step alongside your existing linter. Inside GitHub Actions (or with `--github`), findings additionally surface as inline PR annotations and a step-summary table. (The standalone `gotest-lint` binary was retired; `gotest lint` accepts the same targets and driver flags.)
 
 ## GitHub Actions
 
