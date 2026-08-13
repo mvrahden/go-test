@@ -1242,7 +1242,7 @@ func Render(n int) string { return "" }
 		gotest.Contains(it, src, "Render(in)")
 	})
 
-	t.It("falls back to a TODO stub when the parameter isn't natively fuzzable", func(it *gotest.T) {
+	t.It("scaffolds a real skeleton for a codec-fuzzable struct parameter", func(it *gotest.T) {
 		out, code, dir := s.runScaffoldFuzzCLI(it, `package codec
 
 type Config struct{ Name string }
@@ -1250,14 +1250,31 @@ type Config struct{ Name string }
 func ApplyConfig(c Config) string { return c.Name }
 `, "ApplyConfig")
 		gotest.Equal(it, 0, code)
-		gotest.Contains(it, out, "codec.Config is not natively fuzzable for ApplyConfig — generated TODO stub (struct fuzzing is not yet supported)")
+		gotest.Contains(it, out, "no inverse pair found for ApplyConfig — generated crash-safety skeleton")
 		gotest.Contains(it, out, "Generated: codec/apply_config_fuzz_test.go")
 
 		generated, err := os.ReadFile(filepath.Join(dir, "codec", "apply_config_fuzz_test.go"))
 		gotest.NoError(it, err)
 		src := string(generated)
+		gotest.Contains(it, src, "gotest.Fuzz(")
+		gotest.Contains(it, src, "f.Add(Config{})")
+	})
+
+	t.It("falls back to a TODO stub carrying the codec emitter's rejection", func(it *gotest.T) {
+		out, code, dir := s.runScaffoldFuzzCLI(it, `package codec
+
+func ApplyOptions(opts map[string]string) string { return opts["name"] }
+`, "ApplyOptions")
+		gotest.Equal(it, 0, code)
+		gotest.Contains(it, out, "cannot fuzz map[string]string for ApplyOptions — generated TODO stub: ")
+		gotest.Contains(it, out, "maps have no canonical encoding")
+		gotest.Contains(it, out, "Generated: codec/apply_options_fuzz_test.go")
+
+		generated, err := os.ReadFile(filepath.Join(dir, "codec", "apply_options_fuzz_test.go"))
+		gotest.NoError(it, err)
+		src := string(generated)
 		gotest.NotContains(it, src, "gotest.Fuzz(")
-		gotest.Contains(it, src, "not natively fuzzable")
+		gotest.Contains(it, src, "maps have no canonical encoding")
 	})
 }
 

@@ -553,15 +553,17 @@ generated method seeds a corpus entry and asserts the round-trip property
       })
   }
 
-When no compatible inverse is found (but A is still natively fuzzable), it
-falls back to a crash-safety skeleton that only calls the function — no
-assertions beyond "doesn't panic" — and prints:
+When no compatible inverse is found (but A is still fuzzable — natively,
+or through a generated codec for a struct or named type), it falls back to
+a crash-safety skeleton that only calls the function — no assertions
+beyond "doesn't panic" — and prints:
   no inverse pair found for Encode — generated crash-safety skeleton
 
-When A itself isn't a natively fuzzable type (a struct, say), neither
-skeleton can call gotest.Fuzz on it — struct fuzzing isn't supported yet
-— so scaffold instead emits a stub method with a TODO comment, and prints:
-  MyStruct is not natively fuzzable for Encode — generated TODO stub (struct fuzzing is not yet supported)
+When gotest cannot fuzz A at all (a map, an interface, a struct with
+unexported fields — the same shapes "gotest generate" rejects), scaffold
+emits a stub method carrying the generator's own rejection reason, and
+prints:
+  cannot fuzz map[string]string for Encode — generated TODO stub: <the generator's reason>
 
 Examples:
   gotest scaffold ./pkg/auth.UserService        Suite for UserService type

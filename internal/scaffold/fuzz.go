@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/format"
 	"go/types"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -19,9 +20,11 @@ type FuzzTarget struct {
 	PkgDir       string // absolute dir for output file placement
 	FuncName     string
 	ParamType    types.Type
-	ParamTypeStr string // human-readable/Go-syntax form of ParamType
-	Fuzzable     bool   // whether ParamType is one of Go's natively fuzzable types
-	ZeroLiteral  string // Go literal for f.Add(...) when Fuzzable
+	ParamTypeStr string   // Go-syntax form of ParamType, relative to the target package
+	Fuzzable     bool     // gotest can fuzz ParamType — natively, or via a generated codec
+	RejectReason string   // the codec emitter's rejection, set iff !Fuzzable
+	ZeroLiteral  string   // Go literal for a f.Add(...) seed; "" = no self-contained zero literal
+	ExtraImports []string // packages ParamTypeStr references beyond the target package, sorted
 	Pair         *InversePair
 }
 
@@ -231,16 +234,50 @@ func IntrospectFuzzTarget(pkgPattern, funcName string) (*FuzzTarget, error) {
 	}
 
 	paramType := sig.Params().At(0).Type()
+
+	// Render the type relative to the target package (the skeleton lives
+	// there — a self-qualified "codec.Config" would not compile inside
+	// package codec), collecting every external package the rendering
+	// references so the template can import it.
+	external := map[string]bool{}
+	relQual := func(p *types.Package) string {
+		if p == nil || p == pkg.Types {
+			return ""
+		}
+		external[p.Path()] = true
+		return p.Name()
+	}
+	paramTypeStr := types.TypeString(paramType, relQual)
+	extraImports := make([]string, 0, len(external))
+	for path := range external {
+		extraImports = append(extraImports, path)
+	}
+	sort.Strings(extraImports)
+
 	zero, fuzzable := nativeFuzzable(paramType)
+	reject := ""
+	if !fuzzable {
+		// One source of truth: the codec emitter's own validation decides
+		// whether a non-native type generates, so scaffold's verdict can
+		// never drift from what `gotest generate` actually accepts.
+		if err := gotestgen.CheckFuzzArgType(pkg, paramType); err != nil {
+			reject = err.Error()
+		} else {
+			fuzzable = true
+			zero = codecSeedLiteral(paramType, paramTypeStr)
+		}
+	}
 
 	target := &FuzzTarget{
 		PkgName:      pkg.Name,
 		PkgDir:       gotestgen.DeterminePkgDir(pkg),
 		FuncName:     funcName,
 		ParamType:    paramType,
-		ParamTypeStr: types.TypeString(paramType, shortQualifier),
+		ParamTypeStr: paramTypeStr,
 		Fuzzable:     fuzzable,
+		RejectReason: reject,
 		ZeroLiteral:  zero,
+		ExtraImports: extraImports,
 	}
 	if fuzzable {
 		target.Pair = findInversePair(scope, funcName, sig)
@@ -248,22 +285,44 @@ func IntrospectFuzzTarget(pkgPattern, funcName string) (*FuzzTarget, error) {
 	return target, nil
 }
 
+// codecSeedLiteral returns a zero-value Go literal usable as a f.Add seed
+// for a codec-backed (non-native) parameter type, or "" when the shape has
+// no self-contained zero literal — the skeleton then carries a TODO line
+// instead of a seed.
+func codecSeedLiteral(t types.Type, ref string) string {
+	switch u := t.Underlying().(type) {
+	case *types.Struct, *types.Slice, *types.Array:
+		return ref + "{}"
+	case *types.Basic:
+		info := u.Info()
+		switch {
+		case info&types.IsString != 0:
+			return ref + `("")`
+		case info&types.IsBoolean != 0:
+			return ref + "(false)"
+		case info&types.IsNumeric != 0:
+			return ref + "(0)"
+		}
+	}
+	return ""
+}
+
 var fuzzTemplate = template.Must(template.New("fuzz").ParseFS(templates, "static/scaffold.fuzz.go.tpl"))
 
 // GenerateFuzzScaffold renders a fuzz test suite skeleton for target: a
-// round-trip property test when a compatible inverse pair was found and
-// the target's parameter is natively fuzzable, a crash-safety skeleton
-// (calls the function, asserts nothing beyond "doesn't panic") when no
-// inverse pair was found, or a TODO stub when the parameter isn't
-// natively fuzzable at all (struct fuzzing isn't supported yet). status
-// is a human-readable line describing the fallback taken, or "" when a
-// full round-trip skeleton was generated.
+// round-trip property test when a compatible inverse pair was found, a
+// crash-safety skeleton (calls the function, asserts nothing beyond
+// "doesn't panic") when no inverse pair was found, or a TODO stub carrying
+// the codec emitter's rejection reason when gotest cannot fuzz the
+// parameter type at all (neither natively nor via a generated codec).
+// status is a human-readable line describing the fallback taken, or ""
+// when a full round-trip skeleton was generated.
 func GenerateFuzzScaffold(target *FuzzTarget) (src []byte, status string, err error) {
 	var body string
 	switch {
 	case !target.Fuzzable:
-		body = notFuzzableBody(target.ParamTypeStr)
-		status = fmt.Sprintf("%s is not natively fuzzable for %s — generated TODO stub (struct fuzzing is not yet supported)", target.ParamTypeStr, target.FuncName)
+		body = notFuzzableBody(target.RejectReason)
+		status = fmt.Sprintf("cannot fuzz %s for %s — generated TODO stub: %s", target.ParamTypeStr, target.FuncName, target.RejectReason)
 	case target.Pair != nil:
 		body = roundTripBody(target.FuncName, target.Pair, target.ParamTypeStr, target.ZeroLiteral)
 	default:
@@ -272,15 +331,17 @@ func GenerateFuzzScaffold(target *FuzzTarget) (src []byte, status string, err er
 	}
 
 	data := struct {
-		PkgName   string
-		SuiteName string
-		FuncName  string
-		Body      string
+		PkgName      string
+		SuiteName    string
+		FuncName     string
+		Body         string
+		ExtraImports []string
 	}{
-		PkgName:   target.PkgName,
-		SuiteName: target.FuncName + "TestSuite",
-		FuncName:  target.FuncName,
-		Body:      body,
+		PkgName:      target.PkgName,
+		SuiteName:    target.FuncName + "TestSuite",
+		FuncName:     target.FuncName,
+		Body:         body,
+		ExtraImports: target.ExtraImports,
 	}
 
 	var buf strings.Builder
@@ -299,8 +360,7 @@ func GenerateFuzzScaffold(target *FuzzTarget) (src []byte, status string, err er
 // (optionally) assert no error, then assert the round trip.
 func roundTripBody(funcName string, pair *InversePair, paramTypeStr, zero string) string {
 	var b strings.Builder
-	b.WriteString("\t// TODO: seed with representative inputs\n")
-	fmt.Fprintf(&b, "\tf.Add(%s)\n", zero)
+	writeSeed(&b, zero)
 	fmt.Fprintf(&b, "\tgotest.Fuzz(f, func(t *gotest.T, in %s) {\n", paramTypeStr)
 	if pair.FuncReturnsErr {
 		fmt.Fprintf(&b, "\t\tencoded, err := %s(in)\n", funcName)
@@ -324,20 +384,31 @@ func roundTripBody(funcName string, pair *InversePair, paramTypeStr, zero string
 // no inverse pair was found.
 func crashSafetyBody(funcName, paramTypeStr, zero string) string {
 	var b strings.Builder
-	b.WriteString("\t// TODO: seed with representative inputs\n")
-	fmt.Fprintf(&b, "\tf.Add(%s)\n", zero)
+	writeSeed(&b, zero)
 	fmt.Fprintf(&b, "\tgotest.Fuzz(f, func(t *gotest.T, in %s) {\n", paramTypeStr)
 	fmt.Fprintf(&b, "\t\t%s(in) // TODO: assert an invariant beyond \"doesn't crash\" (e.g. idempotence)\n", funcName)
 	b.WriteString("\t})\n")
 	return b.String()
 }
 
-// notFuzzableBody renders a TODO stub for a parameter type Go's fuzzer
-// can't drive directly (a struct, say) — no f.Add/gotest.Fuzz call, since
-// that would panic at run time rather than fail to compile.
-func notFuzzableBody(paramTypeStr string) string {
+// writeSeed emits the f.Add seed line, or a TODO when the parameter's shape
+// has no self-contained zero literal to seed with.
+func writeSeed(b *strings.Builder, zero string) {
+	if zero == "" {
+		b.WriteString("\t// TODO: add representative f.Add seeds\n")
+		return
+	}
+	b.WriteString("\t// TODO: seed with representative inputs\n")
+	fmt.Fprintf(b, "\tf.Add(%s)\n", zero)
+}
+
+// notFuzzableBody renders a TODO stub carrying the codec emitter's
+// rejection reason — no f.Add/gotest.Fuzz call, since that would panic at
+// run time rather than fail to compile. The reason already names the
+// offending field path and the suggested alternative.
+func notFuzzableBody(reason string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "\t// %s is not natively fuzzable — struct fuzzing is not yet supported.\n", paramTypeStr)
-	b.WriteString("\t// TODO: fuzz individual fields, or add a conversion to/from a native type.\n")
+	fmt.Fprintf(&b, "\t// Cannot fuzz this parameter: %s\n", reason)
+	b.WriteString("\t// TODO: apply the suggested alternative, then re-run gotest scaffold --fuzz.\n")
 	return b.String()
 }

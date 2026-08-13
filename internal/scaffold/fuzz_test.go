@@ -197,13 +197,32 @@ func TestIntrospectFuzzTarget(t *testing.T) {
 		}
 	})
 
-	t.Run("ApplyConfig's struct param is not fuzzable", func(t *testing.T) {
+	t.Run("ApplyConfig's struct param is codec-fuzzable", func(t *testing.T) {
 		target, err := IntrospectFuzzTarget("./testdata/sampletype", "ApplyConfig")
 		if err != nil {
 			t.Fatalf("IntrospectFuzzTarget failed: %v", err)
 		}
+		if !target.Fuzzable {
+			t.Fatalf("expected struct param to be codec-fuzzable, got reject: %s", target.RejectReason)
+		}
+		if target.ParamTypeStr != "Config" {
+			t.Errorf("ParamTypeStr = %q, want %q (package-relative, so the skeleton compiles in place)", target.ParamTypeStr, "Config")
+		}
+		if target.ZeroLiteral != "Config{}" {
+			t.Errorf("ZeroLiteral = %q, want %q", target.ZeroLiteral, "Config{}")
+		}
+	})
+
+	t.Run("ApplyOptions' map param is rejected with the emitter's reason", func(t *testing.T) {
+		target, err := IntrospectFuzzTarget("./testdata/sampletype", "ApplyOptions")
+		if err != nil {
+			t.Fatalf("IntrospectFuzzTarget failed: %v", err)
+		}
 		if target.Fuzzable {
-			t.Fatal("expected struct param to not be fuzzable")
+			t.Fatal("expected map param to not be fuzzable")
+		}
+		if !strings.Contains(target.RejectReason, "maps have no canonical encoding") {
+			t.Errorf("RejectReason = %q, want the codec emitter's map rejection", target.RejectReason)
 		}
 	})
 
@@ -273,7 +292,7 @@ func TestGenerateFuzzScaffold(t *testing.T) {
 		}
 	})
 
-	t.Run("non-fuzzable param falls back to a TODO stub", func(t *testing.T) {
+	t.Run("codec-fuzzable struct param gets a real skeleton", func(t *testing.T) {
 		target, err := IntrospectFuzzTarget("./testdata/sampletype", "ApplyConfig")
 		if err != nil {
 			t.Fatalf("IntrospectFuzzTarget failed: %v", err)
@@ -282,16 +301,39 @@ func TestGenerateFuzzScaffold(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GenerateFuzzScaffold failed: %v", err)
 		}
-		wantStatus := "sampletype.Config is not natively fuzzable for ApplyConfig — generated TODO stub (struct fuzzing is not yet supported)"
-		if status != wantStatus {
-			t.Errorf("status = %q, want %q", status, wantStatus)
+		if status != "no inverse pair found for ApplyConfig — generated crash-safety skeleton" {
+			t.Errorf("unexpected status: %q", status)
+		}
+		src := string(out)
+		if !strings.Contains(src, "gotest.Fuzz(") {
+			t.Error("codec-fuzzable struct should get a gotest.Fuzz skeleton, not a stub")
+		}
+		if !strings.Contains(src, "f.Add(Config{})") {
+			t.Error("missing typed zero seed for the struct param")
+		}
+	})
+
+	t.Run("rejected param falls back to a TODO stub with the emitter's reason", func(t *testing.T) {
+		target, err := IntrospectFuzzTarget("./testdata/sampletype", "ApplyOptions")
+		if err != nil {
+			t.Fatalf("IntrospectFuzzTarget failed: %v", err)
+		}
+		out, status, err := GenerateFuzzScaffold(target)
+		if err != nil {
+			t.Fatalf("GenerateFuzzScaffold failed: %v", err)
+		}
+		if !strings.HasPrefix(status, "cannot fuzz map[string]string for ApplyOptions — generated TODO stub: ") {
+			t.Errorf("status = %q, want the cannot-fuzz prefix", status)
+		}
+		if !strings.Contains(status, "maps have no canonical encoding") {
+			t.Errorf("status = %q, want the emitter's map rejection reason", status)
 		}
 		src := string(out)
 		if strings.Contains(src, "gotest.Fuzz(") {
-			t.Error("non-fuzzable stub should not call gotest.Fuzz")
+			t.Error("rejected stub should not call gotest.Fuzz")
 		}
-		if !strings.Contains(src, "not natively fuzzable") {
-			t.Error("missing not-fuzzable comment")
+		if !strings.Contains(src, "maps have no canonical encoding") {
+			t.Error("missing the emitter's rejection reason in the stub comment")
 		}
 	})
 }
@@ -400,7 +442,7 @@ func vetGeneratedFuzzFile(t *testing.T, filename string, src []byte) {
 // substring assertions alone can't catch a bug like referencing a
 // gotest.TestSuite type that doesn't exist.
 func TestGenerateFuzzScaffold_Compiles(t *testing.T) {
-	for _, funcName := range []string{"Encode", "Render", "ApplyConfig"} {
+	for _, funcName := range []string{"Encode", "Render", "ApplyConfig", "ApplyOptions"} {
 		t.Run(funcName, func(t *testing.T) {
 			target, err := IntrospectFuzzTarget("./testdata/sampletype", funcName)
 			if err != nil {

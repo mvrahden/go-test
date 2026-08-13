@@ -175,6 +175,26 @@ func BuildFuzzCodecs(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) (
 	}, nil
 }
 
+// CheckFuzzArgType reports whether gotest can fuzz an argument of type t —
+// natively, or through a generated codec. It returns nil when a single-
+// argument gotest.Fuzz target of this type will generate, and the emitter's
+// own rejection error (naming the offending field path and the suggested
+// alternative) when it will not. Callers outside the generator (scaffold)
+// use this instead of re-deriving the supported set, so their verdicts can
+// never drift from what the generator actually accepts.
+func CheckFuzzArgType(pkg *packages.Package, t types.Type) error {
+	if nativeFuzzType(t) {
+		return nil
+	}
+	e := newFuzzEmitter(pkg)
+	typ := types.Unalias(t)
+	e.path = []string{types.TypeString(typ, e.qual)}
+	// The decode walk visits exactly the shapes the encode walk does, so
+	// one direction suffices for validation.
+	_, err := e.readCall(typ)
+	return err
+}
+
 // nativeFuzzType reports whether Go's fuzzing engine accepts t directly.
 // The set is exactly the fifteen types testing.F.Fuzz allows; a named type
 // over one of them does NOT qualify (testing matches on reflect.Type
