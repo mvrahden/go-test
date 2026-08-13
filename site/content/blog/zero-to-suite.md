@@ -166,8 +166,7 @@ func (s *CounterTestSuite) TestInc(t *gotest.T) {
         })
     })
 
-    t.When("incrementing three times", func(w *gotest.T) {
-        s.c.Inc()
+    t.When("incrementing twice more", func(w *gotest.T) {
         s.c.Inc()
         s.c.Inc()
 
@@ -189,6 +188,7 @@ func (s *CounterTestSuite) TestDec(t *gotest.T) {
     })
 
     t.When("decrementing past zero", func(w *gotest.T) {
+        s.c.Dec()
         s.c.Dec()
 
         w.It("goes negative", func(it *gotest.T) {
@@ -213,6 +213,8 @@ func (s *CounterTestSuite) TestReset(t *gotest.T) {
 
 The structure reads like a specification: *Counter → Inc → when incrementing once → it has value 1*. Each `When` block establishes a context (the setup and action), and each `It` block makes an assertion about the outcome.
 
+One rule to internalize: `BeforeEach` runs once per test *method*, not once per `When` block. Within a method, the `When` blocks execute in order and share the suite's state — that is why the second block says "twice more" and asserts 3: it continues from the counter the first block left at 1, and `TestDec`'s last block needs two `Dec` calls to get below zero. If two contexts need genuinely independent state, put them in separate test methods.
+
 Run it again:
 
 ```sh
@@ -230,20 +232,20 @@ gotest spec ./...
 Output:
 
 {{< spec title="gotest spec ./..." >}}
-Counter
-  Inc
-    when incrementing once
-      <span class="t-pass">✓</span> has value 1
-    when incrementing three times
-      <span class="t-pass">✓</span> has value 3
-  Dec
-    when decrementing from 2
-      <span class="t-pass">✓</span> has value 1
-    when decrementing past zero
-      <span class="t-pass">✓</span> goes negative
-  Reset
-    when resetting after increments
-      <span class="t-pass">✓</span> returns to zero
+Counter <span class="t-time">(<1ms)</span>
+  Inc <span class="t-time">(<1ms)</span>
+    incrementing once <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> has value 1 <span class="t-time">(<1ms)</span>
+    incrementing twice more <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> has value 3 <span class="t-time">(<1ms)</span>
+  Dec <span class="t-time">(<1ms)</span>
+    decrementing from 2 <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> has value 1 <span class="t-time">(<1ms)</span>
+    decrementing past zero <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> goes negative <span class="t-time">(<1ms)</span>
+  Reset <span class="t-time">(<1ms)</span>
+    resetting after increments <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> returns to zero <span class="t-time">(<1ms)</span>
 {{< /spec >}}
 
 This is generated from the test names and `When`/`It` labels. The suite name is stripped of its `TestSuite` suffix, method names lose their `Test` prefix, and the hierarchy is indented. The result is a behavioral specification that non-developers can read.
@@ -287,27 +289,27 @@ func (s *BoundaryTestSuite) TestResetIdempotent(t *gotest.T) {
 Run `gotest spec ./...` again and both suites appear in the output:
 
 {{< spec title="gotest spec ./..." >}}
-Boundary
-  NewCounter
-    <span class="t-pass">✓</span> starts at zero
-  ResetIdempotent
-    when resetting a counter that is already zero
-      <span class="t-pass">✓</span> stays at zero
+Boundary <span class="t-time">(<1ms)</span>
+  NewCounter <span class="t-time">(<1ms)</span>
+    <span class="t-pass">✓</span> starts at zero <span class="t-time">(<1ms)</span>
+  ResetIdempotent <span class="t-time">(<1ms)</span>
+    resetting a counter that is already zero <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> stays at zero <span class="t-time">(<1ms)</span>
 
-Counter
-  Inc
-    when incrementing once
-      <span class="t-pass">✓</span> has value 1
-    when incrementing three times
-      <span class="t-pass">✓</span> has value 3
-  Dec
-    when decrementing from 2
-      <span class="t-pass">✓</span> has value 1
-    when decrementing past zero
-      <span class="t-pass">✓</span> goes negative
-  Reset
-    when resetting after increments
-      <span class="t-pass">✓</span> returns to zero
+Counter <span class="t-time">(<1ms)</span>
+  Inc <span class="t-time">(<1ms)</span>
+    incrementing once <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> has value 1 <span class="t-time">(<1ms)</span>
+    incrementing twice more <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> has value 3 <span class="t-time">(<1ms)</span>
+  Dec <span class="t-time">(<1ms)</span>
+    decrementing from 2 <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> has value 1 <span class="t-time">(<1ms)</span>
+    decrementing past zero <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> goes negative <span class="t-time">(<1ms)</span>
+  Reset <span class="t-time">(<1ms)</span>
+    resetting after increments <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> returns to zero <span class="t-time">(<1ms)</span>
 {{< /spec >}}
 
 Both suites ran in separate processes, concurrently. Neither can affect the other, even if one panics or leaks goroutines.

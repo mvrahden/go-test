@@ -95,7 +95,7 @@ No boilerplate. No manual file paths. No flag wiring. The test reads exactly lik
 Snapshot files are stored in `testdata/__snapshots__/`, next to the test file. One `.snap` file is created per top-level test suite. Each subtest gets its own named section within the file:
 
 ```text {title="testdata/__snapshots__/TestUserAPITestSuite.snap"}
-=== SNAP TestRenderProfile/when_the_user_has_roles/renders_the_profile ===
+=== SNAP TestRenderProfile/the_user_has_roles/renders_the_profile ===
 {
   "id": "usr-123",
   "name": "Alice Smith",
@@ -106,7 +106,7 @@ Snapshot files are stored in `testdata/__snapshots__/`, next to the test file. O
     "notifications": true
   }
 }
-=== SNAP TestRenderProfile/when_the_user_is_new/renders_the_profile ===
+=== SNAP TestRenderProfile/the_user_is_new/renders_the_profile ===
 {
   "id": "usr-456",
   "name": "Bob Jones",
@@ -127,6 +127,7 @@ Sections are sorted alphabetically within the file, so the order is deterministi
 
 1. **`string`** — used directly as the snapshot content.
 1. **`[]byte`** — converted to string.
+1. **`json.RawMessage`** — pretty-printed as JSON (an explicit case: since Go 1.27, `RawMessage` has a `String()` method and would otherwise fall through to the `Stringer` branch unindented).
 1. **`encoding.TextMarshaler`** — calls `MarshalText()`.
 1. **`fmt.Stringer`** — calls `String()`.
 1. **`json.Marshaler`** — marshals and pretty-prints the JSON.
@@ -157,7 +158,7 @@ gotest.MatchSnapshot(t, renderProfile(admin), "admin-profile")
 gotest.MatchSnapshot(t, renderProfile(guest), "guest-profile")
 ```
 
-The name becomes part of the section key in the snapshot file. Without it, multiple `MatchSnapshot` calls in the same test would overwrite each other. With it, each snapshot gets its own section and can be compared independently.
+The name becomes part of the section key in the snapshot file. Without it, both calls would resolve to the same section key — the second call gets compared against the first call's stored snapshot and fails. With it, each snapshot gets its own section and can be compared independently.
 
 ## Updating snapshots
 
@@ -186,7 +187,7 @@ Reviewers see the actual output, not an assertion about it. If a change to `rend
 In CI mode (`--ci` flag, or auto-detected from the `CI` environment variable), snapshots are read-only:
 
 - Existing snapshots are compared normally — mismatches still fail the test.
-- New baseline snapshots cannot be created. If a test calls `MatchSnapshot` and no snapshot file exists, the test fails with: *"no baseline snapshot — run tests locally to generate."*
+- New baseline snapshots cannot be created. If a test calls `MatchSnapshot` and no stored snapshot exists for that section, the test fails with: *"no baseline snapshot for … — run tests locally to generate."*
 
 This prevents a specific failure mode: a developer adds a new `MatchSnapshot` call, runs tests locally (which creates the baseline), but forgets to commit the snapshot file. Without CI protection, the test would silently pass in CI by creating a fresh snapshot, and the next run would compare against that. With CI protection, the missing file is caught immediately.
 
@@ -195,15 +196,20 @@ This prevents a specific failure mode: a developer adds a new `MatchSnapshot` ca
 `MatchSnapshot` is safe to call from parallel tests. Each snapshot file has its own mutex. Concurrent writes to the same file are serialized, and section ordering is deterministic regardless of execution order.
 
 ```go
-for i := range 10 {
-    t.It(fmt.Sprintf("goroutine %d", i), func(it *gotest.T) {
-        it.T().Parallel()
-        gotest.MatchSnapshot(it, fmt.Sprintf("value-%d", i))
-    })
+func (s *RenderTestSuite) SuiteConfig() gotest.SuiteConfig {
+    return gotest.SuiteConfig{Parallel: true}
+}
+
+func (s *RenderTestSuite) TestAdminProfile(t *gotest.T) {
+    gotest.MatchSnapshot(t, renderProfile(admin))
+}
+
+func (s *RenderTestSuite) TestGuestProfile(t *gotest.T) {
+    gotest.MatchSnapshot(t, renderProfile(guest))
 }
 ```
 
-All 10 goroutines can call `MatchSnapshot` concurrently. The snapshot file ends up with 10 sections, sorted alphabetically, and the result is identical whether the goroutines ran sequentially or in parallel.
+With `Parallel: true`, both test methods run concurrently and write to the same `.snap` file. The writes are serialized by the file's mutex, sections are sorted on write, and the resulting file is identical whether the methods ran sequentially or in parallel.
 
 ## When to use snapshot testing
 
@@ -221,7 +227,7 @@ All 10 goroutines can call `MatchSnapshot` concurrently. The snapshot file ends 
 - **Simple scalar values.** If the expected value is a single integer or a short string, `gotest.Equal` is clearer. Snapshots are for cases where writing out the expected value inline hurts readability.
 - **Binary data.** Snapshots are text-based. Binary content will produce unreadable diffs.
 
-## A complete example
+## Prior art
 
 Snapshot testing isn't a new idea. Jest popularized it in JavaScript, and the pattern exists in most testing ecosystems. In Go, cupaloy and go-snaps are established snapshot libraries that offer this workflow as standalone packages; gotest's version differs mainly in being integrated with its assertion set, safe to call from parallel tests, and read-only in CI mode.
 

@@ -47,7 +47,7 @@ AST discovery → code generation → overlay injection
 
 ### Stage 1: AST discovery
 
-gotest uses Go's `go/parser` and `go/ast` packages to walk your source files. It looks for naming conventions:
+gotest loads your packages with `golang.org/x/tools/go/packages` and walks the syntax trees using Go's `go/ast` and `go/types` packages. It looks for naming conventions:
 
 - **Structs ending in `TestSuite`**: recognized as test suites
 - **Methods starting with `Test`** on suite types: recognized as test cases
@@ -81,13 +81,15 @@ func TestUserServiceTestSuite(t *testing.T) {
     s := &UserServiceTestSuite{}
 
     t.Run("TestCreate", func(t *testing.T) {
-        s.BeforeEach(gotest.NewT(t))
-        s.TestCreate(gotest.NewT(t))
+        it := gotest.NewT(t)
+        s.BeforeEach(it)
+        s.TestCreate(it)
     })
 
     t.Run("TestDelete", func(t *testing.T) {
-        s.BeforeEach(gotest.NewT(t))
-        s.TestDelete(gotest.NewT(t))
+        it := gotest.NewT(t)
+        s.BeforeEach(it)
+        s.TestDelete(it)
     })
 }
 ```
@@ -100,20 +102,20 @@ For suites with fixtures, the generated code also includes fixture initializatio
 
 Here's the part that makes code generation practical: the generated files never touch your source tree.
 
-Go 1.16 introduced the `-overlay` flag for the `go` toolchain. It takes a JSON file that maps virtual file paths to actual file paths on disk. When the compiler encounters a file reference, it checks the overlay map first. This means a file can appear to exist at `pkg/user/gotest_psuite_test.go` while actually living in a temp directory.
+Go 1.16 introduced the `-overlay` flag for the `go` toolchain. It takes a JSON file that maps virtual file paths to actual file paths on disk. When the compiler encounters a file reference, it checks the overlay map first. This means a file can appear to exist at `pkg/user/gotest_psuite_test.go` while actually living in gotest's cache directory.
 
-```go {title="overlay.json"}
+```json {title="overlay.json"}
 {
   "Replace": {
-    "pkg/user/gotest_psuite_test.go": "/tmp/gotest-overlay/0/gotest_psuite_test.go",
-    "pkg/order/gotest_psuite_test.go": "/tmp/gotest-overlay/1/gotest_psuite_test.go"
+    "/home/you/project/pkg/user/gotest_psuite_test.go": "/home/you/.cache/gotest/overlays/3f2a…/0/gotest_psuite_test.go",
+    "/home/you/project/pkg/order/gotest_psuite_test.go": "/home/you/.cache/gotest/overlays/3f2a…/1/gotest_psuite_test.go"
   }
 }
 ```
 
-gotest writes the generated files to a content-addressable cache directory, creates the overlay JSON, and passes it to `go test -overlay=overlay.json`. After the run, nothing is left behind. Your source directory stays clean, your git status stays unchanged, and pull requests don't include generated code.
+gotest writes the generated files to a content-addressable cache directory, creates the overlay JSON, and passes it to `go test -overlay=...`. Nothing is ever written into your project. Your source directory stays clean, your git status stays unchanged, and pull requests don't include generated code.
 
-The cache uses SHA-256 hashing of the generated content. If you run tests twice without changing any suite code, the second run reuses the cached overlay; no regeneration needed.
+The cache is keyed by a SHA-256 hash of the generated content. If you run tests twice without changing any suite code, the second run hashes to the same entry and reuses the existing overlay files — and because the overlay path stays stable, Go's own build cache can reuse the compiled test packages.
 
 ## What code generation gains over reflection
 
@@ -123,8 +125,8 @@ The code generation approach has several concrete advantages over reflection:
 
 If your `BeforeEach` method takes `(ctx context.Context)` instead of `(t *gotest.T)`, gotest tells you at generation time:
 
-```go
-user_test.go:12: BeforeEach: expected signature func(t *gotest.T), got func(ctx context.Context)
+```text
+user_test.go:12: unsupported param type for signature of "UserServiceTestSuite.BeforeEach": must be *gotest.T or *testing.T
 ```
 
 With reflection, this would either panic at runtime or, worse, silently skip the hook because the framework doesn't recognize the method signature.
@@ -149,7 +151,7 @@ func TestUserSuite(t *testing.T) {
 
 ### Zero runtime overhead
 
-The generated code compiles to direct function calls. No `reflect.ValueOf`, no `reflect.Method`, no interface dispatch. At test execution time, there's no framework code in the call stack: just your suite methods being called directly.
+The generated code compiles to direct function calls. No `reflect.ValueOf`, no `reflect.Method`. At test execution time, your suite methods are called directly — there is no reflective dispatch between the test runner and your code.
 
 ## The pipeline in practice
 
@@ -163,7 +165,7 @@ When you run `gotest ./...`, the full pipeline executes automatically:
 1. **Overlay**: create the overlay JSON mapping
 1. **Compile & run**: invoke `go test -overlay=...`
 
-Steps 1--6 are fast; they operate on parse trees, not compiled code. And with caching, steps 4--6 are skipped entirely on repeat runs if the source hasn't changed.
+Steps 1--6 are fast; they operate on parse trees, not compiled code. And caching keeps repeat runs cheap: unchanged sources hash to the same overlay entry, so nothing is rewritten and the compile step hits Go's build cache.
 
 For large projects, gotest also uses streaming compilation: test packages start running as soon as they're compiled, without waiting for all packages to finish compiling. This overlaps compilation time with execution time, reducing wall-clock duration for multi-package test runs — the place this matters most is CI, as covered in [Go Tests in GitHub Actions]({{< ref "/blog/gotest-in-ci" >}}).
 
@@ -186,10 +188,10 @@ The generated files are standard Go test files. They import your package, refere
 
 ## The trade-off
 
-Code generation isn't free. It adds a build step: the AST discovery and generation that runs before `go test`. If you run `go test` directly without `gotest`, you'll get a compilation error because the generated bridge file doesn't exist.
+Code generation isn't free. It adds a build step: the AST discovery and generation that runs before `go test`. And plain `go test` has no idea your suites exist — without the generated bridge, the package compiles cleanly and simply reports no tests. Your suites are structs with methods; nothing runs them until the bridge does.
 
-This is a deliberate design choice. A missing generated file produces a clear compiler error that tells you what to do. The alternative, silently doing nothing when the bridge is absent, would be worse.
+If part of your workflow has to invoke `go test` directly, run `gotest generate ./...` first to materialize the bridge files on disk, and `gotest clean` to remove them afterwards.
 
-Day to day, the build step mostly disappears: the overlay cache means repeat runs skip generation entirely, so the edit-test loop stays as fast as plain `go test`. [Go Test Watch Mode and Focused Tests]({{< ref "/blog/the-inner-loop" >}}) covers what that loop looks like in practice.
+Day to day, the build step mostly disappears: generation operates on parse trees, and the overlay cache keeps the compile step warm, so the edit-test loop stays close to plain `go test`. [Go Test Watch Mode and Focused Tests]({{< ref "/blog/the-inner-loop" >}}) covers what that loop looks like in practice.
 
 The code generation approach aligns with Go's broader philosophy: explicit over implicit, compile-time over runtime, readable code over framework magic. The generated code is what a careful developer would write by hand. gotest just writes it for you.

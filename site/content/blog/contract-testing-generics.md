@@ -146,27 +146,27 @@ type SQLStorageTestSuite = StorageContractTestSuite[*SQLStorage]
 Each alias is a full, independent test suite. The code generator picks up each alias and generates the test wiring for it. The spec output shows each implementation separately:
 
 {{< spec title="gotest spec ./..." >}}
-MemoryStorage (StorageContract)
-  Put
-    when key is new
-      <span class="t-pass">✓</span> stores the value without error
-      <span class="t-pass">✓</span> makes the value retrievable
-    when key already exists
-      <span class="t-pass">✓</span> overwrites the value
-  Get
-    when key does not exist
-      <span class="t-pass">✓</span> returns ErrNotFound
-  Delete
-    when key exists
-      <span class="t-pass">✓</span> removes the value
-    when key does not exist
-      <span class="t-pass">✓</span> returns no error
+MemoryStorage <span class="t-time">(2ms)</span>
+  Put <span class="t-time">(1ms)</span>
+    key is new <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> stores the value without error <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> makes the value retrievable <span class="t-time">(<1ms)</span>
+    key already exists <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> overwrites the value <span class="t-time">(<1ms)</span>
+  Get <span class="t-time">(<1ms)</span>
+    key does not exist <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> returns ErrNotFound <span class="t-time">(<1ms)</span>
+  Delete <span class="t-time">(<1ms)</span>
+    key exists <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> removes the value <span class="t-time">(<1ms)</span>
+    key does not exist <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> returns no error <span class="t-time">(<1ms)</span>
 
-RedisStorage (StorageContract)
-  Put
-    when key is new
-      <span class="t-pass">✓</span> stores the value without error
-      <span class="t-pass">✓</span> makes the value retrievable
+RedisStorage <span class="t-time">(48ms)</span>
+  Put <span class="t-time">(23ms)</span>
+    key is new <span class="t-time">(14ms)</span>
+      <span class="t-pass">✓</span> stores the value without error <span class="t-time">(8ms)</span>
+      <span class="t-pass">✓</span> makes the value retrievable <span class="t-time">(6ms)</span>
     ...
 {{< /spec >}}
 
@@ -174,24 +174,24 @@ Same contract, same behaviors, different implementations. If Redis handles delet
 
 ## Providing implementation-specific setup
 
-The `factory` field in the generic suite is set during suite initialization. Each alias can provide its own factory through `BeforeAll` or the suite's struct fields.
+A type alias cannot add methods or fields of its own, so per-implementation setup lives on the generic suite itself. The straightforward way is a `BeforeAll` that picks the right constructor for the instantiated type:
 
-For simple cases (in-memory), the factory is trivial. For infrastructure-backed implementations, use [fixtures]({{< ref "/blog/test-fixtures-in-go" >}}):
-
-```go {title="redis_setup_test.go"}
-type RedisStorageTestSuite = StorageContractTestSuite[*RedisStorage]
-
-// The RedisStorageTestSuite uses a RedisFixture for connection management
-type redisSetup struct {
-    Redis *RedisFixture
+```go {title="storage_contract_test.go"}
+func (s *StorageContractTestSuite[T]) BeforeAll(t *gotest.T) {
+    switch any(s.store).(type) {
+    case *MemoryStorage:
+        s.factory = func() T { return any(NewMemoryStorage()).(T) }
+    case *RedisStorage:
+        s.factory = func() T { return any(NewRedisStorage(testRedisAddr)).(T) }
+    }
 }
 ```
 
-Or initialize the factory directly in a test helper. The point is that the contract tests are the same; only the setup differs. When multiple contract suites share the same backing infrastructure, [Advanced Go Test Fixtures]({{< ref "/blog/advanced-fixture-patterns" >}}) covers patterns for composing and reusing that setup across suites.
+Alternatively, skip the factory entirely and construct instances with a generic function inside the tests, the way the search index example below does. For infrastructure-backed implementations, keep connection management in [fixtures]({{< ref "/blog/test-fixtures-in-go" >}}) and let the factory close over them. The point is that the contract tests are the same; only the setup differs. When multiple contract suites share the same backing infrastructure, [Advanced Go Test Fixtures]({{< ref "/blog/advanced-fixture-patterns" >}}) covers patterns for composing and reusing that setup across suites.
 
 ## A real example: search index contract
 
-The gotest codebase itself uses this pattern. The search index is generic over any type that satisfies the `Indexable` constraint:
+The gotest repository's search example uses this pattern. The search index is generic over any type that satisfies the `Indexable` constraint:
 
 ```go {title="index_contract_test.go"}
 type Indexable interface {
@@ -226,7 +226,7 @@ type ArticleIndexTestSuite = IndexContractTestSuite[Article]
 type ProductIndexTestSuite = IndexContractTestSuite[Product]
 ```
 
-Two types, same contract, full parallel execution. The `SuiteConfig` method enables method-level parallelism, so all behaviors within a single suite run concurrently. Because each type alias produces an independent suite, the cross-suite parallelism is automatic.
+Two types, same contract, full parallel execution. The `SuiteConfig` method enables method-level parallelism, so the test methods within a single suite run concurrently. Because each type alias produces an independent suite, the cross-suite parallelism is automatic.
 
 ## Constraints and trade-offs
 
@@ -234,7 +234,7 @@ Generic suites are not universally applicable. The pattern has real constraints 
 
 ### Same-package only
 
-Generic aliases must be in the same package as the generic suite. This is a Go compiler constraint: type aliases with type parameters cannot cross package boundaries the same way non-generic aliases can. In gotest terms, this means the contract suite and its aliases live in the `ptest` (white-box) package, not `pxtest` (black-box). If the contract suite and the implementations are in different packages, the aliases must live alongside the generic suite definition.
+Generic aliases must live in the same package as the generic suite. Go only allows methods to be declared in the package that defines the type, and the generator discovers a suite's methods in the package where its aliases are declared — so the contract methods and the aliases that instantiate them have to travel together. gotest additionally requires generic aliases to live in the internal (white-box) test package: declaring one in an external `_test` package fails at generation time with *"generic alias suite … must not be in an external test package (pxtest); move it to the internal test file."* If the contract suite and the implementations are in different packages, the aliases must live alongside the generic suite definition.
 
 ### Factory pattern
 
@@ -251,10 +251,10 @@ This is a feature, not a limitation. It forces a clear distinction between "what
 gotest can generate a contract suite from an interface:
 
 ```sh
-gotest scaffold io.ReadCloser
+gotest scaffold ./pkg/storage.Storage
 ```
 
-This generates a generic suite with test method stubs for each method on the interface. You fill in the behavioral assertions; it handles the boilerplate. The generated suite follows the same naming conventions as any other gotest suite, so the code generator picks it up without additional configuration.
+When the target type is an interface, this generates a generic contract suite — a `StorageContractTestSuite[T Storage]` with a `factory` field, a `BeforeEach`, and test method stubs for each method on the interface. You fill in the behavioral assertions and add a type alias per implementation; the generated file ends with a comment showing exactly that. The suite follows the same naming conventions as any other gotest suite, so the code generator picks up the aliases without additional configuration.
 
 ## When to use contract testing
 
