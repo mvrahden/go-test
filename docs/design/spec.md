@@ -1268,11 +1268,11 @@ Method-parallel suites additionally emit the `ƒfailed` coordination described u
 
 ## Linter
 
-Available as a subcommand and as a standalone binary, built on `go/analysis`. `pkg/lint` exports the analyzer for external `go/analysis` drivers; there is no golangci-lint plugin — the linter runs as its own step alongside a project's existing linter:
+Available as the `gotest lint` subcommand, built on `go/analysis`. `pkg/lint` exports the analyzer for external `go/analysis` drivers; there is no golangci-lint plugin — the linter runs as its own step alongside a project's existing linter:
 
 ```bash
-gotest lint ./...                                          # subcommand
-go run github.com/mvrahden/go-test/cmd/gotest-lint ./...   # standalone
+gotest lint ./...                                        # installed
+go run github.com/mvrahden/go-test/cmd/gotest lint ./... # without installing
 ```
 
 Rules (IDs are canonical — used by `//nolint:<rule>`; `.gotest.yml` `lint.skip` accepts any non-integrity rule):
@@ -1319,6 +1319,8 @@ Suppression and configuration:
 - `.gotest.yml` `lint.skip` naming an integrity rule is a hard error — integrity rules can only be suppressed per line; unknown rule IDs are also a hard error
 - Flags: `-fix` applies suggested fixes; `-skip-<rule>` for every non-integrity rule; `-disable-nolint`
 - Exit codes: `0` no findings; `1` uncompilable target packages (the preflight fails loudly — nothing was proven about them); `2` usage or configuration error; `3` findings reported
+
+GitHub annotations (subcommand only): `gotest lint --github` additionally emits one `::error file=…,line=…,col=…,title=<rule>::<message>` workflow command per finding on stdout and appends a findings table (rule, location, message) to `$GITHUB_STEP_SUMMARY` — the complete record when GitHub caps rendered annotations. Like `summary`, the mode is implied when `GITHUB_ACTIONS=true`, so an existing CI lint step gains PR annotations without workflow changes. Annotation paths are relative to the working directory (the repository root in a workflow). Plain-text findings, exit codes, `.gotest.yml` handling, and `//nolint` semantics are unchanged. Driver flags this mode does not own (`-fix`, `-json`, `-c`, …) defer to the `go/analysis` driver, which keeps their exact semantics but cannot emit annotations.
 
 ---
 
@@ -1519,12 +1521,10 @@ They never alter how the tests themselves are executed — the spec view is rend
 
 ```
 cmd/gotest/                  CLI entrypoint, subcommands, arg handling
+  ├── internal/lint/           go/analysis analyzer (lint subcommand)
   └── internal/gotestrunner/   Suite generation I/O, go test execution, overlay
         └── internal/gotestgen/   Package loading, collection, fixture resolution, rendering
               └── internal/gotestast/   AST analysis, spec model, regex classification
-
-cmd/gotest-lint/             Standalone linter binary (singlechecker)
-  └── internal/lint/           go/analysis analyzer
 
 internal/config/             .gotest.yml project configuration loading
 internal/gotestspec/         Spec tree builder and renderers (terminal, markdown, json)
@@ -1538,7 +1538,7 @@ pkg/gotest/                  User-facing API (T, R, assertions, Each, Eventually
   └── internal/snapfile/       Snapshot file I/O and diffing
 
 pkg/gotestruntime/           Fixture DAG runtime imported by generated fixture code
-pkg/lint/                    Exported analyzer for golangci-lint integration
+pkg/lint/                    Exported analyzer for external go/analysis drivers
 internal/protocol/           CLI↔test-process env var and naming constants
 internal/about/              Build metadata, file naming constants
 ```

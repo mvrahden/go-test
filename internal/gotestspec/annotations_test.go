@@ -377,6 +377,38 @@ func TestWriteGitHubAnnotations_TruncatesLongMessage(t *testing.T) {
 	}
 }
 
+func TestWriteGitHubAnnotations_IncludesColumn(t *testing.T) {
+	annotations := []Annotation{
+		{
+			File:    "internal/foo/suite_test.go",
+			Line:    42,
+			Col:     7,
+			Title:   "fail-guard",
+			Message: "assertion result ignored",
+		},
+		{
+			File:    "internal/bar/suite_test.go",
+			Line:    9,
+			Title:   "testify",
+			Message: "testify import",
+		},
+	}
+
+	var buf bytes.Buffer
+	WriteGitHubAnnotations(&buf, annotations)
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 annotation lines, got %d: %s", len(lines), buf.String())
+	}
+	if !strings.Contains(lines[0], "::error file=internal/foo/suite_test.go,line=42,col=7,title=fail-guard::") {
+		t.Errorf("first annotation should carry col when set: %s", lines[0])
+	}
+	if strings.Contains(lines[1], "col=") {
+		t.Errorf("second annotation should not have col when col=0: %s", lines[1])
+	}
+}
+
 func TestStripStdlibFrames(t *testing.T) {
 	t.Run("simple two-goroutine race", func(t *testing.T) {
 		input := strings.Join([]string{
