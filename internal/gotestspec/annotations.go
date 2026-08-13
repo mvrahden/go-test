@@ -13,6 +13,7 @@ import (
 type Annotation struct {
 	File    string
 	Line    int
+	Col     int
 	Title   string
 	Message string
 }
@@ -99,10 +100,14 @@ func WriteGitHubAnnotations(w io.Writer, annotations []Annotation) {
 		msg = strings.ReplaceAll(msg, "\n", "%0A")
 		msg = strings.ReplaceAll(msg, "\r", "")
 
-		if a.Line > 0 {
+		switch {
+		case a.Line > 0 && a.Col > 0:
+			fmt.Fprintf(w, "::error file=%s,line=%d,col=%d,title=%s::%s\n",
+				a.File, a.Line, a.Col, a.Title, msg)
+		case a.Line > 0:
 			fmt.Fprintf(w, "::error file=%s,line=%d,title=%s::%s\n",
 				a.File, a.Line, a.Title, msg)
-		} else {
+		default:
 			fmt.Fprintf(w, "::error file=%s,title=%s::%s\n",
 				a.File, a.Title, msg)
 		}

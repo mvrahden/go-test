@@ -47,6 +47,10 @@ jobs:
   `go tool gotest lint` as its own step next to the project's existing
   linter; configure gotest rule skips in `.gotest.yml` (`lint:` /
   `skip: [rule-ids]`), never in `.golangci.yml`.
+- Inside GitHub Actions the lint step auto-arms `--github`
+  (`GITHUB_ACTIONS=true`): findings surface as inline PR annotations and a
+  step-summary table on top of the plain output. No workflow changes
+  needed; exit codes are unchanged.
 - Gate formatting too (`gofmt -l`, goimports): `lint -fix` edits are
   textual and unformatted — see SKILL.md's write loop.
 

@@ -1,5 +1,13 @@
 package main
 
+import "github.com/mvrahden/go-test/internal/lint"
+
+// ExportResetLintSkipFlag restores an analyzer skip flag after a test has
+// set it through the GitHub lint mode; the flag set is process-global.
+func ExportResetLintSkipFlag(name string) error {
+	return lint.Analyzer.Flags.Set(name, "false")
+}
+
 type ExportDiscoverOutput = discoverOutput
 type ExportDiscoverPackage = discoverPackage
 type ExportDiscoverSuite = discoverSuite
@@ -22,6 +30,8 @@ var ExportReplacePatterns = replacePatterns
 var ExportRunScaffold = runScaffold
 var ExportDetectCIEnv = detectCIEnv
 var ExportKnownSubcommands = knownSubcommands
+var ExportLintGitHubArmed = lintGitHubArmed
+var ExportRunLintGitHub = runLintGitHub
 var ExportGotestFlags = gotestFlags
 var ExportTestAllowed = testAllowed
 var ExportSpecAllowed = specAllowed

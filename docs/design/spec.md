@@ -1320,6 +1320,8 @@ Suppression and configuration:
 - Flags: `-fix` applies suggested fixes; `-skip-<rule>` for every non-integrity rule; `-disable-nolint`
 - Exit codes: `0` no findings; `1` uncompilable target packages (the preflight fails loudly — nothing was proven about them); `2` usage or configuration error; `3` findings reported
 
+GitHub annotations (subcommand only): `gotest lint --github` additionally emits one `::error file=…,line=…,col=…,title=<rule>::<message>` workflow command per finding on stdout and appends a findings table (rule, location, message) to `$GITHUB_STEP_SUMMARY` — the complete record when GitHub caps rendered annotations. Like `summary`, the mode is implied when `GITHUB_ACTIONS=true`, so an existing CI lint step gains PR annotations without workflow changes. Annotation paths are relative to the working directory (the repository root in a workflow). Plain-text findings, exit codes, `.gotest.yml` handling, and `//nolint` semantics are unchanged. Driver flags this mode does not own (`-fix`, `-json`, `-c`, …) defer to the `go/analysis` driver, which keeps their exact semantics but cannot emit annotations.
+
 ---
 
 ## CI Integration

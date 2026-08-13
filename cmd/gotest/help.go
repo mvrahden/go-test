@@ -360,6 +360,10 @@ Flags:
                           t-escape, stdlib-test, testify)
   -disable-nolint         Ignore //nolint comments
   -fix                    Apply suggested fixes
+  --github                Also emit GitHub ::error annotations and append a
+                          findings table to $GITHUB_STEP_SUMMARY. Implied when
+                          GITHUB_ACTIONS=true; ignored alongside driver flags
+                          such as -fix or -json.
 
 Suppress individual diagnostics with //nolint comments:
   //nolint:stdlib-test             Same line or the comment block directly above
