@@ -21,6 +21,14 @@ func Echo[T any](v T) T { return v }
 // must be skipped by the harvester.
 var computedInput = "computed-at-runtime"
 
+// Msg is the struct parameter of HandleMsg — the struct-typed fuzz target
+// used to pin the harvester's native-only invariant.
+type Msg struct{ Text string }
+
+// HandleMsg is the callee shared by MsgTestSuite's struct-typed fuzz
+// callback and its composite-literal table test.
+func HandleMsg(m Msg) int { return len(m.Text) }
+
 // callParseFromProduction calls Parse with a literal argument from
 // PRODUCTION code, inside a real function body (harvesting only inspects
 // *ast.FuncDecl bodies, so the literal has to live inside one to actually

@@ -95,7 +95,7 @@ type SeedsTestSuite struct{}
 func (s *SeedsTestSuite) TestHarvestSeeds(t *gotest.T) {
 	ptestPkg, _ := loadHarvestTestPkgs(t.T())
 	suites := collectHarvestSuites(t.T(), ptestPkg)
-	gotest.Len(t, suites, 2)
+	gotest.Len(t, suites, 3)
 
 	seeds, err := gotestast.HarvestSeeds(ptestPkg, suites)
 	gotest.NoError(t, err)
@@ -132,6 +132,21 @@ func (s *SeedsTestSuite) TestHarvestSeeds(t *gotest.T) {
 				args = append(args, sl.Args[0])
 			}
 			gotest.NotContains(it, args, `"from production code — must not be harvested"`)
+		})
+	})
+
+	t.When("a fuzz callback takes a struct type", func(w *gotest.T) {
+		w.It("harvests nothing, even from matching composite-literal rows", func(it *gotest.T) {
+			// Load-bearing invariant, not a coverage gap: the generated
+			// wrapper adds harvested seeds through raw *testing.F.Add
+			// BEFORE the codec-carrying *gotest.F exists (gotest.fuzz.tpl),
+			// where a struct seed panics with "unsupported type to Add".
+			// Widening the harvester to composite literals (Phase B)
+			// therefore requires moving that routing behind *gotest.F.Add
+			// first — this assertion is the tripwire.
+			got, ok := seeds["FuzzMsgTestSuite_FuzzHandleMsg"]
+			gotest.False(it, ok)
+			gotest.Empty(it, got)
 		})
 	})
 

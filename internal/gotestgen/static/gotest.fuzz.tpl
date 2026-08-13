@@ -42,7 +42,10 @@ func Fuzz{{ $ts.Identifier }}_{{ $fz.Identifier }}(f *testing.F) {
   param can satisfy, so struct targets harvest nothing. If harvesting is ever
   widened to struct composite literals, these lines must move below the
   gotest.NewF call and go through *gotest.F — testing.F.Add panics on a
-  struct with "unsupported type to Add".
+  struct with "unsupported type to Add". This invariant is pinned by
+  SeedsTestSuite's struct-target assertion (internal/gotestast, "a fuzz
+  callback takes a struct type"), which fails the moment a struct target
+  harvests anything.
 */}}
 {{- range index $.HarvestedSeeds $funcName }}
   f.Add({{ . }})
