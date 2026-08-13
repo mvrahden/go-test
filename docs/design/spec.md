@@ -1268,7 +1268,7 @@ Method-parallel suites additionally emit the `ƒfailed` coordination described u
 
 ## Linter
 
-Available as a subcommand and as a standalone binary, built on `go/analysis`. `pkg/lint` exports the analyzer for external `go/analysis` drivers; there is no golangci-lint plugin — the linter runs as its own step alongside a project's existing linter:
+Available as the `gotest lint` subcommand, built on `go/analysis`. `pkg/lint` exports the analyzer for external `go/analysis` drivers; there is no golangci-lint plugin — the linter runs as its own step alongside a project's existing linter:
 
 ```bash
 gotest lint ./...                                        # installed
@@ -1538,7 +1538,7 @@ pkg/gotest/                  User-facing API (T, R, assertions, Each, Eventually
   └── internal/snapfile/       Snapshot file I/O and diffing
 
 pkg/gotestruntime/           Fixture DAG runtime imported by generated fixture code
-pkg/lint/                    Exported analyzer for golangci-lint integration
+pkg/lint/                    Exported analyzer for external go/analysis drivers
 internal/protocol/           CLI↔test-process env var and naming constants
 internal/about/              Build metadata, file naming constants
 ```
