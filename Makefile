@@ -10,7 +10,7 @@ lint: vet
 	go run ./cmd/gotest-lint ./...
 
 vet:
-	go vet ./...
+	go vet ./... ./examples/...
 
 build:
 	go build -o gotest ./cmd/gotest
@@ -22,10 +22,11 @@ extension-package:
 	cd vscode-gotest && npx @vscode/vsce package --no-dependencies
 
 vuln:
-	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+	go run golang.org/x/vuln/cmd/govulncheck@latest ./... ./examples/...
 
 fmt-check:
-	@test -z "$$(gofmt -l .)" || (echo "gofmt needed on:" && gofmt -l . && exit 1)
+	@unformatted=$$(find . -name testdata -prune -o -name '*.go' -print | xargs -r gofmt -l); \
+	test -z "$$unformatted" || (echo "gofmt needed on:" && echo "$$unformatted" && exit 1)
 
 golangci-lint:
 	golangci-lint run ./...
