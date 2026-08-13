@@ -68,9 +68,7 @@ func (s *CmdGotestTestSuite) runCLIExit(t *gotest.T, args ...string) (string, in
 	cmd.Dir = s.repoRoot
 	out, err := cmd.CombinedOutput()
 	var exitErr *exec.ExitError
-	if err != nil && !errors.As(err, &exitErr) {
-		t.T().Fatalf("running gotest binary: %v\n%s", err, out)
-	}
+	gotest.True(t, err == nil || errors.As(err, &exitErr), "running gotest binary: %v\n%s", err, out)
 	code := 0
 	if cmd.ProcessState != nil {
 		code = cmd.ProcessState.ExitCode()
@@ -1197,9 +1195,7 @@ func (s *CmdGotestTestSuite) runScaffoldFuzzCLI(t *gotest.T, codecSrc, funcName 
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	var exitErr *exec.ExitError
-	if err != nil && !errors.As(err, &exitErr) {
-		t.T().Fatalf("running gotest binary: %v\n%s", err, out)
-	}
+	gotest.True(t, err == nil || errors.As(err, &exitErr), "running gotest binary: %v\n%s", err, out)
 	code := 0
 	if cmd.ProcessState != nil {
 		code = cmd.ProcessState.ExitCode()

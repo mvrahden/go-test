@@ -3,7 +3,6 @@ package main //nolint:stdlib-test
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -15,88 +14,65 @@ func writeCorpusFile(t *testing.T, body string) string {
 	t.Helper()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "seed")
-	if err := os.WriteFile(path, []byte(body), 0600); err != nil {
-		t.Fatal(err)
-	}
+	gotest.NoError(t, os.WriteFile(path, []byte(body), 0600))
 	return path
 }
 
 func TestParseCorpusFile_StringWithEscapes(t *testing.T) {
 	path := writeCorpusFile(t, "go test fuzz v1\nstring(\"a@\\x00\")\n")
 	args, err := parseCorpusFile(path)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(args) != 1 {
-		t.Fatalf("expected 1 arg, got %d", len(args))
-	}
-	if args[0].TypeName != "string" {
-		t.Fatalf("expected type string, got %q", args[0].TypeName)
-	}
-	if args[0].SourceExpr != `"a@\x00"` {
-		t.Fatalf("expected verbatim source expr %q, got %q", `"a@\x00"`, args[0].SourceExpr)
-	}
+	gotest.NoError(t, err)
+	gotest.Len(t, args, 1)
+	gotest.Equal(t, "string", args[0].TypeName)
+	gotest.Equal(t, `"a@\x00"`, args[0].SourceExpr, "expected verbatim source expr")
 }
 
 func TestParseCorpusFile_Int64Negative(t *testing.T) {
 	path := writeCorpusFile(t, "go test fuzz v1\nint64(-3)\n")
 	args, err := parseCorpusFile(path)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(args) != 1 || args[0].TypeName != "int64" || args[0].SourceExpr != "-3" {
-		t.Fatalf("unexpected parse result: %+v", args)
-	}
+	gotest.NoError(t, err)
+	gotest.Len(t, args, 1)
+	gotest.Equal(t, "int64", args[0].TypeName)
+	gotest.Equal(t, "-3", args[0].SourceExpr)
 }
 
 func TestParseCorpusFile_ByteSlice(t *testing.T) {
 	path := writeCorpusFile(t, "go test fuzz v1\n[]byte(\"abc\")\n")
 	args, err := parseCorpusFile(path)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(args) != 1 || args[0].TypeName != "[]byte" || args[0].SourceExpr != `"abc"` {
-		t.Fatalf("unexpected parse result: %+v", args)
-	}
+	gotest.NoError(t, err)
+	gotest.Len(t, args, 1)
+	gotest.Equal(t, "[]byte", args[0].TypeName)
+	gotest.Equal(t, `"abc"`, args[0].SourceExpr)
 }
 
 func TestParseCorpusFile_MultiArg(t *testing.T) {
 	path := writeCorpusFile(t, "go test fuzz v1\nstring(\"hi\")\nint(5)\nbool(true)\n")
 	args, err := parseCorpusFile(path)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(args) != 3 {
-		t.Fatalf("expected 3 args, got %d: %+v", len(args), args)
-	}
-	if args[0].TypeName != "string" || args[1].TypeName != "int" || args[2].TypeName != "bool" {
-		t.Fatalf("unexpected types: %+v", args)
-	}
-	if args[1].SourceExpr != "5" || args[2].SourceExpr != "true" {
-		t.Fatalf("unexpected source exprs: %+v", args)
-	}
+	gotest.NoError(t, err)
+	gotest.Len(t, args, 3)
+	gotest.Equal(t, "string", args[0].TypeName)
+	gotest.Equal(t, "int", args[1].TypeName)
+	gotest.Equal(t, "bool", args[2].TypeName)
+	gotest.Equal(t, "5", args[1].SourceExpr)
+	gotest.Equal(t, "true", args[2].SourceExpr)
 }
 
 func TestParseCorpusFile_MalformedHeader(t *testing.T) {
 	path := writeCorpusFile(t, "not a corpus file\nstring(\"hi\")\n")
 	_, err := parseCorpusFile(path)
-	if err == nil {
-		t.Fatal("expected error for malformed header")
-	}
+	gotest.Error(t, err, "expected error for malformed header")
 }
 
 func TestParseCorpusFile_UnsupportedEntry(t *testing.T) {
 	path := writeCorpusFile(t, "go test fuzz v1\nstruct{X int}{1}\n")
 	_, err := parseCorpusFile(path)
-	if err == nil {
-		t.Fatal("expected error for unsupported corpus entry")
-	}
+	gotest.Error(t, err, "expected error for unsupported corpus entry")
 }
 
 func TestExtractDecodedInput(t *testing.T) {
 	out := "=== RUN   FuzzX\n" + protocol.FuzzInputPrefix + `Request{Name: "a"}` + "\n--- FAIL: FuzzX\n"
 	gotest.Equal(t, `Request{Name: "a"}`, extractDecodedInput(out))
-	gotest.Equal(t, "", extractDecodedInput("no marker here\n"))
+	gotest.Empty(t, extractDecodedInput("no marker here\n"))
 }
 
 func TestCorpusArg_SpliceExpr(t *testing.T) {
@@ -110,9 +86,7 @@ func TestCorpusArg_SpliceExpr(t *testing.T) {
 		{corpusArg{TypeName: "[]byte", SourceExpr: `"abc"`}, `[]byte("abc")`},
 	}
 	for _, c := range cases {
-		if got := c.arg.spliceExpr(); got != c.want {
-			t.Errorf("spliceExpr(%+v) = %q, want %q", c.arg, got, c.want)
-		}
+		gotest.Equal(t, c.want, c.arg.spliceExpr(), "spliceExpr(%+v)", c.arg)
 	}
 }
 
@@ -143,34 +117,21 @@ func (s *FooTestSuite) FuzzTrim(x int) {
 }
 `
 	suitePath := filepath.Join(dir, "suite_test.go")
-	if err := os.WriteFile(suitePath, []byte(src), 0600); err != nil {
-		t.Fatal(err)
-	}
+	gotest.NoError(t, os.WriteFile(suitePath, []byte(src), 0600))
 
 	corpusPath := filepath.Join(dir, "crasher-seed")
-	if err := os.WriteFile(corpusPath, []byte("go test fuzz v1\nstring(\"stale\")\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
+	gotest.NoError(t, os.WriteFile(corpusPath, []byte("go test fuzz v1\nstring(\"stale\")\n"), 0600))
 
 	target := gotestrunner.FuzzTarget{Package: "example.com/foo", Dir: dir, Func: "FuzzFooTestSuite_FuzzTrim"}
 	overlay := &gotestrunner.OverlayResult{}
 	msg, ok := promoteCrasher(overlay, target, "FooTestSuite", "FuzzTrim", corpusPath)
 
-	if ok {
-		t.Fatalf("expected promoteCrasher to report failure, got ok=true, msg=%q", msg)
-	}
-	if !strings.Contains(msg, "skipped:") {
-		t.Fatalf("expected a %q message, got %q", "skipped:", msg)
-	}
+	gotest.False(t, ok, "expected promoteCrasher to report failure, msg=%q", msg)
+	gotest.Contains(t, msg, "skipped:")
 
-	if _, err := os.Stat(corpusPath); err != nil {
-		t.Fatalf("expected the crasher file to survive a skipped promote, but os.Stat failed: %v", err)
-	}
+	_, err := os.Stat(corpusPath)
+	gotest.NoError(t, err, "expected the crasher file to survive a skipped promote")
 	got, err := os.ReadFile(suitePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != src {
-		t.Fatalf("expected the suite source file to be left untouched; got:\n%s", got)
-	}
+	gotest.NoError(t, err)
+	gotest.Equal(t, src, string(got), "expected the suite source file to be left untouched")
 }

@@ -69,7 +69,7 @@ func (s *BaselineTestSuite) TestFromPackages(t *gotest.T) {
 
 			gotest.Len(it, b.Results, 1)
 			r := b.Results[0]
-			gotest.Equal(it, "", r.Suite)
+			gotest.Empty(it, r.Suite)
 			gotest.Equal(it, "BenchmarkStandalone", r.Name)
 			gotest.Len(it, r.Samples, 1)
 		})
