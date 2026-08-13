@@ -293,7 +293,11 @@ func runFuzzTriage(args []string) int {
 		for _, file := range files {
 			corpusArgs, perr := parseCorpusFile(file)
 			if perr != nil {
+				// A crasher that cannot even be read is a failure, exactly
+				// as promote treats it — exiting 0 here would let a
+				// directory of unreadable crashers "pass" triage.
 				fmt.Printf("triage: %s: %s\n", file, perr)
+				failed = true
 				continue
 			}
 

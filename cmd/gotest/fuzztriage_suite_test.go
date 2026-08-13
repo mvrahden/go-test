@@ -130,6 +130,23 @@ func (s *FuzzTriagePromoteTestSuite) TestTriage_StructCrasherShowsDecodedInput(t
 	})
 }
 
+// TestTriage_UnparseableCrasherFails pins the exit contract shared with
+// promote: a crasher file that cannot even be read is a failure, not a
+// silent skip — a directory of unreadable crashers must not "pass" triage.
+func (s *FuzzTriagePromoteTestSuite) TestTriage_UnparseableCrasherFails(t *gotest.T) {
+	bad := filepath.Join(s.fuzzRootDir, "FuzzNotificationServiceTestSuite_FuzzTrim", "garbled")
+	gotest.NoError(t, os.WriteFile(bad, []byte("not a corpus file\n"), 0600))
+
+	out, code := s.runCLIExit(t, "fuzz", "triage", "./examples/notification")
+
+	t.It("reports the unreadable crasher", func(it *gotest.T) {
+		gotest.Contains(it, out, "garbled")
+	})
+	t.It("exits 1 like promote does", func(it *gotest.T) {
+		gotest.Equal(it, 1, code)
+	})
+}
+
 // TestSubcommandGrammar pins the strictly positional subcommand grammar: a
 // misplaced or flag-preceded triage/promote is a loud usage error, never a
 // silent reinterpretation — the historical readings either started a fuzz
