@@ -302,24 +302,6 @@ func startsItsLine(pass *analysis.Pass, file *ast.File, cg *ast.CommentGroup) bo
 	return standalone
 }
 
-// docSuppressed reports whether a declaration's doc comment carries a
-// //nolint directive matching rule.
-func docSuppressed(doc *ast.CommentGroup, rule Rule) bool {
-	if doc == nil {
-		return false
-	}
-	for _, c := range doc.List {
-		rules, ok := parseNolint(c.Text)
-		if !ok {
-			continue
-		}
-		if ruleMatched(rules, rule) {
-			return true
-		}
-	}
-	return false
-}
-
 func parseNolint(text string) (rules map[Rule]bool, ok bool) {
 	var rest string
 	switch {
