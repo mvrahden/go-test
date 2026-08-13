@@ -683,8 +683,10 @@ Codegen emits one top-level function per `Fuzz*` method, named `Fuzz<SuiteIdenti
 
 ### Struct arguments
 
-Go's fuzzing engine accepts exactly fifteen argument types, and everything real takes structs.
-`gotest.Fuzz` accepts a struct — or any named type over a native one, like `type Priority int` — and codegen emits a decoder/encoder for it, attaches it to the `*gotest.F` the wrapper builds, and reroutes the target to a native `[]byte` one:
+Go's fuzzing engine accepts exactly fifteen argument types — and the hand-written wire and message types you most want to fuzz are structs.
+`gotest.Fuzz` accepts a struct — or any named type over a native one, like `type Priority int` — and codegen emits a decoder/encoder for it, attaches it to the `*gotest.F` the wrapper builds, and reroutes the target to a native `[]byte` one.
+The supported set is deliberately strict: structs of exported fields with simple shapes.
+Maps, unexported fields (which excludes `time.Time` and protobuf-generated types), interfaces, and recursion are refused at generation time with a suggested alternative — the full table is below.
 
 ```go
 func (s *UserServiceTestSuite) FuzzCreate(f *gotest.F) {
@@ -705,7 +707,8 @@ Pointer fields included: a `*int` renders as `&[]int{5}[0]`, since `&5` is not v
 
 Fields decode in declaration order from a byte cursor, and decoding is total: a short or empty input yields zero values rather than a rejected execution.
 **Appending a field is therefore corpus-safe** — new trailing fields read from an exhausted cursor and decode as zero, leaving every existing field's value intact.
-Reordering or inserting fields reinterprets the cached corpus; promoting crashers to source is the mitigation.
+Reordering or inserting fields reinterprets the cached corpus — silently, since the bytes still decode.
+Promoting crashers to source is the durable answer, and the `fuzz-struct-corpus` lint rule is the backstop: it flags any on-disk corpus entries for a struct-typed target and points at `gotest fuzz promote`, so a format-bound file can't quietly linger as a regression test that no longer tests what it caught.
 
 Codegen refuses, at generation time, anything it cannot encode faithfully — permitting it would generate code that lies:
 
@@ -743,8 +746,12 @@ gotest ./...
 ```
 
 Every seed added via `f.Add`, plus any crasher corpus already discovered under `testdata/fuzz/`, replays as an ordinary subtest under a plain run — `gotest ./...`, `gotest spec`, `gotest watch`, and `gotest summary` all do this, at zero extra cost, with no `-fuzz` flag involved.
-A past crasher becomes a permanent regression test the moment its corpus file is committed.
+For a **native-typed** target, committing a crasher's corpus file makes it a permanent regression test; for a **struct-typed** target, run `gotest fuzz promote` instead — its corpus files are bound to gotest's internal wire format (the `fuzz-struct-corpus` lint rule will remind you), while a promoted `f.Add` literal is ordinary Go source.
 A user-supplied `-run` filter wins over this widening — fuzz seeds only replay if a generated `Fuzz<Suite>_<Method>` name happens to match the filter on its own merit.
+
+One caveat to state plainly: suite fuzz methods exist only through gotest's generated wrappers.
+Plain `go test` (and external fuzzing infrastructure like OSS-Fuzz, which needs on-disk `FuzzXxx` functions) never sees them, and promoted seeds replay only under gotest runs.
+If a target must also run under stock tooling, write it as a top-level `func FuzzXxx(*testing.F)` — `gotest.NewF`/`gotest.Fuzz` work there too, as plain library calls, though with native argument types only: codecs exist solely in generated suite wrappers.
 
 ### Running
 

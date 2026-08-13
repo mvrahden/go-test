@@ -341,7 +341,10 @@ which was unreadable *and* format-bound.
 
 - **Reordering fields reinterprets the cached corpus.** Mitigated by promote-to-source and by
   codec versioning; not eliminated. If real usage shows this hurts, tags can be added *behind the
-  same API* — the format is internal.
+  same API* — the format is internal. Since shipped: the `fuzz-struct-corpus` lint rule
+  (integrity tier) flags on-disk corpus entries for struct-typed targets and points at promote,
+  so the format-bound state can no longer linger silently — the reinterpretation risk survives
+  only for entries created and kept with a per-line suppression.
 - **The type assertion.** If gotest ever wants a literally zero-runtime-dispatch story, the
   overlay rewrite is the escape hatch, and adopting it requires no user change.
 - **Strictness on unexported fields will annoy someone.** That is the correct direction to be
