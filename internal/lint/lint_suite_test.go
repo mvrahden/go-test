@@ -114,11 +114,17 @@ func (s *LintTestSuite) TestDisableNolintFlag(t *gotest.T) {
 func (s *LintTestSuite) TestTierPolicy(t *gotest.T) {
 	t.When("tier-derived skip surface", func(w *gotest.T) {
 		w.It("registers a skip flag for every non-integrity rule and none for integrity rules", func(it *gotest.T) {
-			for _, rule := range []lint.Rule{lint.StdlibTest, lint.Testify, lint.AssertionSimplify, lint.AssertionRedundant, lint.FailGuard, lint.TEscape} {
+			for _, rule := range []lint.Rule{
+				lint.StdlibTest, lint.Testify, lint.AssertionSimplify, lint.AssertionRedundant, lint.FailGuard, lint.TEscape,
+				lint.BenchFixtureIO, lint.FuzzNoOracle, lint.FuzzSeed, lint.FuzzHookIO, lint.FuzzRawSeed,
+			} {
 				gotest.NotZero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "missing skip flag for %s", rule)
 				gotest.True(it, lint.SkippableRules[rule], "rule %s should be skippable", rule)
 			}
-			for _, rule := range []lint.Rule{lint.Focus, lint.PollScope, lint.TestSignature, lint.SuiteLifecycle} {
+			for _, rule := range []lint.Rule{
+				lint.Focus, lint.PollScope, lint.TestSignature, lint.SuiteLifecycle,
+				lint.BenchLoop, lint.FuzzDeterminism, lint.FuzzStructCorpus,
+			} {
 				gotest.Zero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "unexpected skip flag for %s", rule)
 				gotest.False(it, lint.SkippableRules[rule], "integrity rule %s must not be skippable", rule)
 			}

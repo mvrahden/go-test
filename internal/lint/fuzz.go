@@ -3,8 +3,11 @@ package lint
 import (
 	"go/ast"
 	"go/types"
+	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/protocol"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
@@ -326,6 +329,282 @@ func fuzzBodyHasAdd(body *ast.BlockStmt, param string) bool {
 		return true
 	})
 	return found
+}
+
+// fuzzStructArgType returns the instantiated argument type of the first
+// single-argument gotest.Fuzz call in body whose type argument is outside
+// Go's native fuzzable set — the type the generated wrapper will carry a
+// codec for — or nil when every adapter call in body fuzzes natively. The
+// native set comes from gotestast.NativeFuzzType, the same source the
+// codec emitter uses, so lint and generator can never disagree about which
+// targets are codec-backed.
+func fuzzStructArgType(pass *analysis.Pass, body *ast.BlockStmt) types.Type {
+	var found types.Type
+	ast.Inspect(body, func(n ast.Node) bool {
+		if found != nil {
+			return false
+		}
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel := fuzzAdapterSelector(call.Fun)
+		if sel == nil || sel.Sel.Name != "Fuzz" || !isGotestPkgRef(pass, sel.X) {
+			return true
+		}
+		inst, ok := pass.TypesInfo.Instances[sel.Sel]
+		if !ok || inst.TypeArgs == nil || inst.TypeArgs.Len() != 1 {
+			return true
+		}
+		if arg := inst.TypeArgs.At(0); !gotestast.NativeFuzzType(arg) {
+			found = arg
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+// stripMarkerPrefixes removes the F_/X_ marker prefixes, mirroring how the
+// generated wrapper names its Fuzz<Suite>_<Method> function.
+func stripMarkerPrefixes(name string) string {
+	return strings.TrimPrefix(strings.TrimPrefix(name, protocol.PrefixFocused), protocol.PrefixExcluded)
+}
+
+// shortTypeStr renders t package-name-qualified, for messages.
+func shortTypeStr(t types.Type) string {
+	return types.TypeString(t, func(p *types.Package) string { return p.Name() })
+}
+
+// checkFuzzStructCorpus flags a struct-typed fuzz target whose corpus
+// directory (testdata/fuzz/<wrapper>/) holds on-disk entries. A native
+// target's corpus files are engine-owned and human-readable; a codec-backed
+// target's entries are opaque bytes in gotest's internal wire format,
+// decoded by field order — reordering or inserting a field silently
+// reinterprets every one of them, turning a kept regression input into a
+// different test with no error anywhere. The durable form of a struct
+// crasher is a typed f.Add seed: `gotest fuzz promote` emits it and deletes
+// the file. Integrity tier: a silently reinterpreted corpus makes test
+// outcomes lie; the transient state between finding a crasher and promoting
+// it is suppressible per line.
+func checkFuzzStructCorpus(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo) {
+	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
+		fd := n.(*ast.FuncDecl)
+		if fd.Body == nil || fd.Recv == nil || len(fd.Recv.List) == 0 {
+			return
+		}
+		recvName := receiverTypeName(fd.Recv)
+		if _, ok := suites[recvName]; !ok {
+			return
+		}
+		if !isFuzzMethodName(fd.Name.Name) {
+			return
+		}
+		structArg := fuzzStructArgType(pass, fd.Body)
+		if structArg == nil {
+			return
+		}
+		wrapper := "Fuzz" + stripMarkerPrefixes(recvName) + "_" + stripMarkerPrefixes(fd.Name.Name)
+		dir := filepath.Join(filepath.Dir(pass.Fset.Position(fd.Pos()).Filename), "testdata", "fuzz", wrapper)
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return // no corpus directory — nothing recorded for this target
+		}
+		count := 0
+		for _, e := range entries {
+			if !e.IsDir() {
+				count++
+			}
+		}
+		if count == 0 {
+			return
+		}
+		plural := "ies"
+		if count == 1 {
+			plural = "y"
+		}
+		report(pass, FuzzStructCorpus, fd.Pos(),
+			"fuzz target %s keeps %d corpus entr%s under testdata/fuzz/%s/ bound to gotest's internal wire format — they are silently reinterpreted when %s changes shape; run gotest fuzz promote to turn them into typed f.Add seeds",
+			recvName+"."+fd.Name.Name, count, plural, wrapper, shortTypeStr(structArg))
+	})
+}
+
+// perExecutionHooks are the lifecycle hooks the generated fuzz wrapper
+// replays around every single execution (see pkg/gotest.F.each).
+var perExecutionHooks = map[string]bool{"BeforeEach": true, "AfterEach": true}
+
+// slowOSFuncs are os package functions that touch the filesystem.
+var slowOSFuncs = map[string]bool{
+	"Open": true, "OpenFile": true, "Create": true, "CreateTemp": true,
+	"ReadFile": true, "WriteFile": true, "ReadDir": true,
+	"Mkdir": true, "MkdirAll": true, "MkdirTemp": true,
+	"Remove": true, "RemoveAll": true,
+}
+
+// checkFuzzHookIO flags IO-shaped calls in the BeforeEach/AfterEach hooks
+// of suites that declare fuzz targets. Those hooks replay around EVERY fuzz
+// execution — a fuzzer that does 100k execs/sec against in-memory code does
+// 10/sec against a hook that dials or reads disk, silently, with no signal
+// beyond a low execs/sec number scrolling past. Detection follows the
+// fuzz-determinism recipe: import-path based, one hop into same-package
+// callees. Heuristic (a cheap os.Open of a tiny file may be fine), so
+// expressiveness tier — skippable, suppressible.
+func checkFuzzHookIO(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo) {
+	fuzzSuites := map[string]bool{}
+	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
+		fd := n.(*ast.FuncDecl)
+		if fd.Recv == nil || len(fd.Recv.List) == 0 {
+			return
+		}
+		recvName := receiverTypeName(fd.Recv)
+		if _, ok := suites[recvName]; ok && isFuzzMethodName(fd.Name.Name) {
+			fuzzSuites[recvName] = true
+		}
+	})
+	if len(fuzzSuites) == 0 {
+		return
+	}
+
+	funcDecls := collectFuncDecls(pass, insp)
+	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
+		fd := n.(*ast.FuncDecl)
+		if fd.Body == nil || fd.Recv == nil || len(fd.Recv.List) == 0 {
+			return
+		}
+		recvName := receiverTypeName(fd.Recv)
+		if !fuzzSuites[recvName] || !perExecutionHooks[fd.Name.Name] {
+			return
+		}
+		hook := recvName + "." + fd.Name.Name
+
+		reportSlowHookCalls(pass, fd.Body, hook)
+		visited := map[*ast.FuncDecl]bool{fd: true}
+		ast.Inspect(fd.Body, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			callee := resolveSamePackageCall(pass, funcDecls, call)
+			if callee == nil || callee.Body == nil || visited[callee] {
+				return true
+			}
+			visited[callee] = true
+			reportSlowHookCalls(pass, callee.Body, hook)
+			return true
+		})
+	})
+}
+
+// reportSlowHookCalls walks body and reports every IO-shaped call: anything
+// from net/*, os/exec, or database/sql, time.Sleep, and filesystem-touching
+// os functions.
+func reportSlowHookCalls(pass *analysis.Pass, body ast.Node, hook string) {
+	ast.Inspect(body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		id, ok := sel.X.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		pkgName, ok := pass.TypesInfo.Uses[id].(*types.PkgName)
+		if !ok {
+			return true
+		}
+
+		path := pkgName.Imported().Path()
+		slow := path == "net" || strings.HasPrefix(path, "net/") ||
+			path == "os/exec" || path == "database/sql" ||
+			(path == "time" && sel.Sel.Name == "Sleep") ||
+			(path == "os" && slowOSFuncs[sel.Sel.Name])
+		if !slow {
+			return true
+		}
+
+		report(pass, FuzzHookIO, call.Pos(),
+			"%s replays around every fuzz execution of this suite — %s here throttles the fuzzer to IO speed; move it to BeforeAll/AfterAll or a shared fixture",
+			hook, id.Name+"."+sel.Sel.Name)
+		return true
+	})
+}
+
+// checkFuzzRawSeed flags a raw []byte seed on a struct-typed fuzz target.
+// The rerouted target's native signature IS []byte, so testing.F accepts
+// the seed without complaint and the codec decodes those bytes as whatever
+// struct they happen to spell — the one seed shape the seed-type mismatch
+// guard in pkg/gotest cannot catch. A typed literal seed says what it
+// means and survives wire-format changes; `gotest fuzz promote` emits the
+// []byte form itself only as a last-resort fallback when no literal could
+// be scraped, which is why this is expressiveness tier rather than a hard
+// error.
+func checkFuzzRawSeed(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo) {
+	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
+		fd := n.(*ast.FuncDecl)
+		if fd.Body == nil || fd.Recv == nil || len(fd.Recv.List) == 0 {
+			return
+		}
+		recvName := receiverTypeName(fd.Recv)
+		if _, ok := suites[recvName]; !ok {
+			return
+		}
+		if !isFuzzMethodName(fd.Name.Name) {
+			return
+		}
+		structArg := fuzzStructArgType(pass, fd.Body)
+		if structArg == nil {
+			return
+		}
+		param := fuzzParamName(fd)
+		if param == "" {
+			return
+		}
+		target := recvName + "." + fd.Name.Name
+
+		ast.Inspect(fd.Body, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || sel.Sel.Name != "Add" {
+				return true
+			}
+			if id, ok := sel.X.(*ast.Ident); !ok || id.Name != param {
+				return true
+			}
+			for _, arg := range call.Args {
+				if isUnnamedByteSlice(pass.TypesInfo.Types[arg].Type) {
+					report(pass, FuzzRawSeed, arg.Pos(),
+						"raw []byte seed on struct-typed fuzz target %s decodes through gotest's internal wire format as whatever %s those bytes spell — write a typed %s literal instead (gotest fuzz promote emits one)",
+						target, shortTypeStr(structArg), shortTypeStr(structArg))
+				}
+			}
+			return true
+		})
+	})
+}
+
+// isUnnamedByteSlice reports whether t is literally []byte (not a named
+// type over it — a named byte-slice target has its own codec and the seed
+// mismatch guard already covers it).
+func isUnnamedByteSlice(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+	if _, named := t.(*types.Named); named {
+		return false
+	}
+	sl, ok := types.Unalias(t).(*types.Slice)
+	if !ok {
+		return false
+	}
+	eb, ok := types.Unalias(sl.Elem()).(*types.Basic)
+	return ok && eb.Kind() == types.Uint8
 }
 
 // isGotestPkgRef reports whether expr is an identifier referring to the

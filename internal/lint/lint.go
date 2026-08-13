@@ -43,6 +43,9 @@ const (
 	FuzzDeterminism    Rule = "fuzz-determinism"
 	FuzzNoOracle       Rule = "fuzz-no-oracle"
 	FuzzSeed           Rule = "fuzz-seed"
+	FuzzStructCorpus   Rule = "fuzz-struct-corpus"
+	FuzzHookIO         Rule = "fuzz-hook-io"
+	FuzzRawSeed        Rule = "fuzz-raw-seed"
 )
 
 // Tier classifies what breaks when a rule's finding is ignored, and derives
@@ -94,6 +97,23 @@ var ruleMeta = map[Rule]struct {
 	// skippable.
 	BenchLoop:      {TierIntegrity, ScopeSuites},
 	BenchFixtureIO: {TierExpressiveness, ScopeSuites},
+	// fuzz-determinism is integrity: a target reading the clock/RNG/env
+	// breaks the replayability the corpus depends on — its outcomes lie.
+	// fuzz-struct-corpus is integrity for the same reason from the other
+	// side: format-bound corpus entries silently become different tests
+	// when the struct changes shape; the legitimate transient state
+	// (crasher found, not yet promoted) is suppressible per line.
+	// fuzz-no-oracle and fuzz-seed are guidance (crash-only fuzzing and
+	// harvester-seeded targets are legitimate), and fuzz-hook-io and
+	// fuzz-raw-seed are heuristics with legitimate exceptions (a cheap
+	// file read; promote's own last-resort []byte fallback) — all four
+	// stay skippable.
+	FuzzDeterminism:  {TierIntegrity, ScopeSuites},
+	FuzzNoOracle:     {TierExpressiveness, ScopeSuites},
+	FuzzSeed:         {TierExpressiveness, ScopeSuites},
+	FuzzStructCorpus: {TierIntegrity, ScopeSuites},
+	FuzzHookIO:       {TierExpressiveness, ScopeSuites},
+	FuzzRawSeed:      {TierExpressiveness, ScopeSuites},
 }
 
 // Known reports whether the rule ID exists.
@@ -174,6 +194,9 @@ func run(pass *analysis.Pass) (any, error) {
 	checkFuzzDeterminism(pass, insp, suites)
 	checkFuzzNoOracle(pass, insp, suites)
 	checkFuzzSeed(pass, insp, suites)
+	checkFuzzStructCorpus(pass, insp, suites)
+	checkFuzzHookIO(pass, insp, suites)
+	checkFuzzRawSeed(pass, insp, suites)
 
 	return nil, nil
 }

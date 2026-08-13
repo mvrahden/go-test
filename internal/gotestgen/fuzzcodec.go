@@ -195,25 +195,10 @@ func CheckFuzzArgType(pkg *packages.Package, t types.Type) error {
 	return err
 }
 
-// nativeFuzzType reports whether Go's fuzzing engine accepts t directly.
-// The set is exactly the fifteen types testing.F.Fuzz allows; a named type
-// over one of them does NOT qualify (testing matches on reflect.Type
-// identity), which is why "type Age int" needs a codec just as a struct
-// does.
+// nativeFuzzType delegates to gotestast.NativeFuzzType — the single source
+// of truth for the fifteen-type native set, shared with the lint rules.
 func nativeFuzzType(t types.Type) bool {
-	switch u := types.Unalias(t).(type) {
-	case *types.Basic:
-		switch u.Kind() {
-		case types.String, types.Bool,
-			types.Int, types.Int8, types.Int16, types.Int32, types.Int64,
-			types.Uint, types.Uint8, types.Uint16, types.Uint32, types.Uint64,
-			types.Float32, types.Float64:
-			return true
-		}
-	case *types.Slice:
-		return isUnnamedByte(u.Elem())
-	}
-	return false
+	return gotestast.NativeFuzzType(t)
 }
 
 // fuzzEmitter builds decoder/encoder source for a package's non-native fuzz

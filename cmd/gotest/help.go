@@ -374,8 +374,14 @@ mutating and searching for new failing inputs.
 
 "gotest lint" flags common fuzz-writing mistakes: fuzz-determinism (reading
 time.Now/math-rand/os.Getenv from a fuzz target breaks corpus replay),
-fuzz-no-oracle (a callback that asserts nothing only catches panics), and
-fuzz-seed (no f.Add seeds means coverage-guided exploration starts blind).
+fuzz-no-oracle (a callback that asserts nothing only catches panics),
+fuzz-seed (no f.Add seeds means coverage-guided exploration starts blind),
+fuzz-struct-corpus (on-disk corpus entries for a struct-typed target are
+bound to gotest's internal wire format and silently reinterpreted when the
+struct changes shape — promote them to typed seeds), fuzz-hook-io (a
+BeforeEach/AfterEach that does IO replays around every execution and
+throttles the fuzzer), and fuzz-raw-seed (a raw []byte seed on a
+struct-typed target decodes as whatever struct those bytes spell).
 
 Seed harvesting (on by default): at generation time, gotest mines your
 test files' table-test literals and direct call-site arguments that flow
@@ -598,6 +604,16 @@ Rules:
   assertion-redundant   Assertions made redundant by the following assertion
   fail-guard            if cond { Fail/Fatal(...) } guards — use assertions directly
   t-escape              Unnecessary t.T() convenience escapes (incl. Helper/Fatal/Log)
+  bench-loop            Benchmark methods that never iterate (b.Loop()/b.N)
+  bench-fixture-io      Fixture-backed reads inside the measured loop
+  fuzz-determinism      Fuzz targets reading time.Now/math-rand/os.Getenv
+  fuzz-no-oracle        Fuzz callbacks that assert nothing (panic-only)
+  fuzz-seed             Fuzz targets with no f.Add seeds
+  fuzz-struct-corpus    On-disk corpus entries for struct-typed targets
+                        (format-bound — promote them to typed seeds)
+  fuzz-hook-io          IO in BeforeEach/AfterEach of fuzzing suites
+                        (hooks replay around every execution)
+  fuzz-raw-seed         Raw []byte seeds on struct-typed targets
 
 Integrity rules can only be suppressed per line with //nolint. All other
 rules also accept a project-wide skip flag (mirrored by .gotest.yml lint.skip):
@@ -605,7 +621,9 @@ rules also accept a project-wide skip flag (mirrored by .gotest.yml lint.skip):
 Flags:
   -skip-<rule>            Disable a non-integrity rule, e.g. -skip-fail-guard
                           (assertion-simplify, assertion-redundant, fail-guard,
-                          t-escape, stdlib-test, testify)
+                          t-escape, stdlib-test, testify, bench-fixture-io,
+                          fuzz-no-oracle, fuzz-seed, fuzz-hook-io,
+                          fuzz-raw-seed)
   -disable-nolint         Ignore //nolint comments
   -fix                    Apply suggested fixes
   --github                Also emit GitHub ::error annotations and append a
@@ -741,7 +759,8 @@ Fields:
                              the --no-harvest CLI flag overrides this per-run)
 
 Skippable lint rules (non-integrity only): assertion-redundant,
-assertion-simplify, fail-guard, stdlib-test, t-escape, testify
+assertion-simplify, bench-fixture-io, fail-guard, fuzz-hook-io,
+fuzz-no-oracle, fuzz-raw-seed, fuzz-seed, stdlib-test, t-escape, testify
 
 Example .gotest.yml:
 
