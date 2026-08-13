@@ -2,6 +2,7 @@ package gotest_test
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"testing"
 
@@ -172,6 +173,11 @@ func FuzzCodecRightTypeSeedWithTwoCodecs(f *testing.F) {
 // FuzzCodecReportsDecodedInputOnFailure proves the codec path prints the
 // decoded value when an execution fails, which is what makes a struct
 // crasher readable in triage and promotable back into source.
+//
+// The deliberate failure is armed by GOTEST_TEST_FUZZ_FAIL_INPUT (the same
+// idiom as GOTEST_TEST_EACH_FAIL_FIRST): unarmed, the target replays its
+// seed and passes, so a plain `go test ./pkg/gotest/` stays green. Only
+// TestDecodedInputReporting's subprocess arms it to scrape the marker line.
 func FuzzCodecReportsDecodedInputOnFailure(f *testing.F) {
 	type req struct{ Name string }
 	codec := gotest.Codec[req]{
@@ -182,7 +188,7 @@ func FuzzCodecReportsDecodedInputOnFailure(f *testing.F) {
 	f.Add([]byte("boom"))
 	gf := gotest.NewF(f, nil, nil, codec)
 	gotest.Fuzz(gf, func(t *gotest.T, v req) {
-		if v.Name == "boom" {
+		if v.Name == "boom" && os.Getenv("GOTEST_TEST_FUZZ_FAIL_INPUT") != "" {
 			t.Errorf("deliberate failure for input reporting")
 		}
 	})
@@ -264,11 +270,15 @@ func (s *FWrapperTestSuite) TestSeedTypeMismatch(t *gotest.T) {
 
 func (s *FWrapperTestSuite) TestDecodedInputReporting(t *gotest.T) {
 	t.It("prints the decoded literal to stderr when an execution fails", func(it *gotest.T) {
-		// The target fuzz func fails deliberately, so "go test" exits
-		// non-zero; the error is expected and not the thing under test —
-		// see e.g. e2e_suite_test.go's identical out, _ := ... idiom for a
-		// subprocess whose non-zero exit is the point, not a defect.
-		out, _ := exec.Command("go", "test", "-run", "^FuzzCodecReportsDecodedInputOnFailure$", ".").CombinedOutput()
+		// The target fuzz func fails deliberately once armed via env, so
+		// "go test" exits non-zero; the error is expected and not the thing
+		// under test — see e.g. e2e_suite_test.go's identical out, _ := ...
+		// idiom for a subprocess whose non-zero exit is the point, not a
+		// defect. -count=1 defeats the test cache: a cached pass from an
+		// unarmed run would otherwise be replayed here with no output.
+		cmd := exec.Command("go", "test", "-count=1", "-run", "^FuzzCodecReportsDecodedInputOnFailure$", ".")
+		cmd.Env = append(os.Environ(), "GOTEST_TEST_FUZZ_FAIL_INPUT=1")
+		out, _ := cmd.CombinedOutput()
 		gotest.Contains(it, string(out), protocol.FuzzInputPrefix+`req{Name: "boom"}`)
 	})
 }
