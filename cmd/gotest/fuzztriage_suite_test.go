@@ -130,6 +130,39 @@ func (s *FuzzTriagePromoteTestSuite) TestTriage_StructCrasherShowsDecodedInput(t
 	})
 }
 
+// TestSubcommandGrammar pins the strictly positional subcommand grammar: a
+// misplaced or flag-preceded triage/promote is a loud usage error, never a
+// silent reinterpretation — the historical readings either started a fuzz
+// run the user did not ask for or dropped their flags on the floor.
+func (s *FuzzTriagePromoteTestSuite) TestSubcommandGrammar(t *gotest.T) {
+	t.When("the subcommand trails the package pattern", func(it *gotest.T) {
+		out, code := s.runCLIExit(it, "fuzz", "./examples/notification", "triage")
+
+		it.It("rejects it instead of starting a fuzz run", func(it *gotest.T) {
+			gotest.Equal(it, 2, code)
+			gotest.Contains(it, out, "must come immediately after fuzz")
+		})
+	})
+
+	t.When("a flag precedes the subcommand", func(it *gotest.T) {
+		out, code := s.runCLIExit(it, "fuzz", "--for=5m", "promote")
+
+		it.It("rejects it instead of dropping the flag", func(it *gotest.T) {
+			gotest.Equal(it, 2, code)
+			gotest.Contains(it, out, "must come immediately after fuzz")
+		})
+	})
+
+	t.When("a flag is passed to a subcommand", func(it *gotest.T) {
+		out, code := s.runCLIExit(it, "fuzz", "triage", "--for=5m", "./examples/notification")
+
+		it.It("rejects it instead of silently ignoring it", func(it *gotest.T) {
+			gotest.Equal(it, 2, code)
+			gotest.Contains(it, out, "takes no flags")
+		})
+	})
+}
+
 func (s *FuzzTriagePromoteTestSuite) TestPromote_SplicesSeedAndDeletesCrasher(t *gotest.T) {
 	out, code := s.runCLIExit(t, "fuzz", "promote", "./examples/notification")
 

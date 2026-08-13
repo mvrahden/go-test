@@ -36,6 +36,10 @@ func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 			return runFuzzPromote(rest)
 		}
 	}
+	if w := misplacedFuzzSubcommand(inv.Args); w != "" {
+		fmt.Fprintf(os.Stderr, "FAIL: the %s subcommand must come immediately after fuzz: gotest fuzz %s [packages...]\n", w, w)
+		return 2
+	}
 
 	ownArgs, goTestArgs, err := SplitArgs(inv.DefaultArgs(), fuzzAllowed)
 	if err != nil {

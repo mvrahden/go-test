@@ -18,25 +18,49 @@ import (
 	"github.com/mvrahden/go-test/internal/refactor"
 )
 
-// extractFuzzSubcommand reports whether the first non-flag argument in args
-// is "triage" or "promote", returning it along with the remaining args (with
-// that one entry removed, order preserved) for the subcommand to parse as
-// package patterns. It returns ok=false for plain "gotest fuzz [packages]"
-// invocations, so runFuzz falls through to its existing behavior.
+// extractFuzzSubcommand reports whether args begins with the "triage" or
+// "promote" subcommand. The grammar is strictly positional — `gotest fuzz
+// triage [packages...]` — because anything looser has to guess: a previous
+// scan-for-the-first-non-flag version read `gotest fuzz --for=5m triage` as
+// triage (silently dropping the flag) and `gotest fuzz ./... triage` as a
+// fuzz run (silently treating "triage" as a package pattern). A subcommand
+// word anywhere past the first position is rejected loudly by
+// misplacedFuzzSubcommand instead of being reinterpreted either way.
 func extractFuzzSubcommand(args []string) (sub string, rest []string, ok bool) {
+	if len(args) == 0 || (args[0] != "triage" && args[0] != "promote") {
+		return "", nil, false
+	}
+	return args[0], args[1:], true
+}
+
+// misplacedFuzzSubcommand returns the first bare "triage"/"promote" word
+// found past position 0, or "" when there is none. runFuzz turns a match
+// into a usage error: a misplaced subcommand is always a mistake, and both
+// silent readings of it (package pattern or dropped word) start a fuzz run
+// the user did not ask for.
+func misplacedFuzzSubcommand(args []string) string {
 	for i, a := range args {
-		if strings.HasPrefix(a, "-") {
+		if i == 0 {
 			continue
 		}
-		if a != "triage" && a != "promote" {
-			return "", nil, false
+		if a == "triage" || a == "promote" {
+			return a
 		}
-		rest = make([]string, 0, len(args)-1)
-		rest = append(rest, args[:i]...)
-		rest = append(rest, args[i+1:]...)
-		return a, rest, true
 	}
-	return "", nil, false
+	return ""
+}
+
+// rejectFuzzSubcommandFlags returns an error when args carries any flag.
+// triage and promote take package patterns only; accepting-and-ignoring a
+// flag (the previous behavior) silently discarded whatever the user thought
+// it did.
+func rejectFuzzSubcommandFlags(sub string, args []string) error {
+	for _, a := range args {
+		if strings.HasPrefix(a, "-") {
+			return fmt.Errorf("fuzz %s takes no flags, only package patterns: unexpected %q", sub, a)
+		}
+	}
+	return nil
 }
 
 // corpusArg is one decoded argument from a Go fuzz corpus file
@@ -238,6 +262,10 @@ func pluralS(n int) string {
 // "no crashers here", so it must not be allowed to pass as exit 0. Mirrors
 // runFuzzPromote's equivalent `failed` handling below.
 func runFuzzTriage(args []string) int {
+	if err := rejectFuzzSubcommandFlags("triage", args); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 	overlay, targets, cleanup, err := loadFuzzOverlayTargets(args)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -408,6 +436,10 @@ func lookupSuiteMethod(overlay *gotestrunner.OverlayResult, pkg, funcName string
 // parsed or promoted (the file is left in place so it isn't silently lost);
 // 0 otherwise, including when no crashers exist.
 func runFuzzPromote(args []string) int {
+	if err := rejectFuzzSubcommandFlags("promote", args); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 	overlay, targets, cleanup, err := loadFuzzOverlayTargets(args)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
