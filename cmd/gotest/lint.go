@@ -72,11 +72,12 @@ func stripFlag(args []string, name string) []string {
 }
 
 // runLintGitHub runs the analyzer programmatically and renders the findings
-// three ways: plain text on stderr (matching the singlechecker driver),
-// ::error workflow commands on stdout, and a markdown table appended to
-// $GITHUB_STEP_SUMMARY. It owns only the analyzer's own flags; ok=false
-// means an unrecognized driver flag was present and the caller must fall
-// back to the singlechecker.
+// two ways: ::error workflow commands on stdout and a markdown table appended
+// to $GITHUB_STEP_SUMMARY. Findings deliberately stay off stderr — setup-go
+// registers a problem matcher for file:line:col text, and a stderr mirror
+// would surface every finding as a second, job-titled annotation. It owns
+// only the analyzer's own flags; ok=false means an unrecognized driver flag
+// was present and the caller must fall back to the singlechecker.
 //
 // dir is the module directory to load from; "" means the current directory.
 // Annotation paths are relative to dir, which inside a workflow is the
@@ -112,7 +113,6 @@ func runLintGitHub(stdout, stderr io.Writer, dir string, args []string) (code in
 	annotations := make([]gotestspec.Annotation, 0, len(findings))
 	for _, f := range findings {
 		file := relPath(base, f.File)
-		fmt.Fprintf(stderr, "%s:%d:%d: %s\n", file, f.Line, f.Col, f.Message)
 		annotations = append(annotations, gotestspec.Annotation{
 			File:    file,
 			Line:    f.Line,

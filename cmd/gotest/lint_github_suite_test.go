@@ -65,8 +65,8 @@ func (s *LintGitHubTestSuite) TestGitHubMode(t *gotest.T) {
 			gotest.Contains(it, stdout.String(), ",title=stdlib-test::")
 		})
 
-		w.It("keeps plain findings on stderr", func(it *gotest.T) {
-			gotest.Contains(it, stderr.String(), "probe_test.go:")
+		w.It("keeps findings off stderr so problem matchers cannot double-annotate", func(it *gotest.T) {
+			gotest.Empty(it, stderr.String())
 		})
 
 		w.It("appends the step summary", func(it *gotest.T) {
