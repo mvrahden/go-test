@@ -139,6 +139,22 @@ func (s *NotificationServiceTestSuite) FuzzTrim(f *gotest.F) {
 	})
 }
 
+// FuzzSummary is a struct-typed fuzz target: Notification is not one of the
+// fifteen types Go's fuzzing engine accepts, so gotest generates a codec for
+// it and reroutes the target to a []byte one. The seed below is a plain Go
+// literal — F.Add encodes it on the way in.
+func (s *NotificationServiceTestSuite) FuzzSummary(f *gotest.F) {
+	f.Add(Notification{To: "a@b.c", Subject: "welcome", Priority: PriorityHigh})
+	gotest.Fuzz(f, func(t *gotest.T, n Notification) {
+		out := formatSummary(delivery{Notification: n})
+		// Property: the summary always reproduces the recipient and subject
+		// verbatim, behind exactly one known priority label.
+		gotest.Contains(t, out, n.Subject)
+		gotest.Contains(t, out, n.To)
+		gotest.Regexp(t, `^\[(LOW|NORMAL|HIGH)\] `, out)
+	})
+}
+
 func (s *NotificationServiceTestSuite) TestDeadlineContext(t *gotest.T) {
 	t.When("a deadline is configured for the test", func(t *gotest.T) {
 		dt := gotest.NewTWithDeadline(t.T(), 5*time.Second)

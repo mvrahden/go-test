@@ -571,4 +571,52 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 			gotest.NotContains(it, fuzzFn, "f.Add(")
 		})
 	})
+
+	t.When("a fuzz target takes a struct", func(w *gotest.T) {
+		w.It("emits the codec source and attaches it to every NewF in the file", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestFuzzCodec_StructTarget")
+			out, _ := renderTestPkg(it.T(), pkg, true)
+
+			gotest.Contains(it, out, `"github.com/mvrahden/go-test/pkg/gotestruntime"`)
+			gotest.Contains(it, out, "func ƒ_fuzzdec_v1_Request(ƒb []byte) Request {")
+			gotest.Contains(it, out, "gotest.Codec[Request]{Decode: ƒ_fuzzdec_v1_Request, Encode: ƒ_fuzzenc_v1_Request, Literal: ƒ_fuzzlit_v1_Request}")
+			gotest.Contains(it, out, "s.FuzzCreate(gotest.NewF(f, s.BeforeEach, s.AfterEach, gotest.Codec[Request]{")
+			gotest.Contains(it, out, "s.FuzzNative(gotest.NewF(f, s.BeforeEach, s.AfterEach, gotest.Codec[Request]{")
+		})
+
+		w.It("emits the codec source exactly once per file", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestFuzzCodec_StructTarget")
+			out, _ := renderTestPkg(it.T(), pkg, true)
+
+			gotest.Equal(it, 1, strings.Count(out, "func ƒ_fuzzdec_v1_Request("))
+			gotest.Equal(it, 1, strings.Count(out, "func ƒ_fuzzread_v1_Address("))
+		})
+	})
+
+	t.When("a fuzz target's struct pulls in a type from another package", func(w *gotest.T) {
+		w.It("imports that package in the generated header, alongside gotestruntime", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestFuzzCodec_CrossPackage")
+			out, _ := renderTestPkg(it.T(), pkg, true)
+
+			gotest.Contains(it, out, `"github.com/mvrahden/go-test/pkg/gotestruntime"`)
+			gotest.Contains(it, out, `"testpkg/TestFuzzCodec_CrossDep"`,
+				"without this import the generated file references crossdep.Setting and does not compile")
+			gotest.Contains(it, out, "crossdep.Setting")
+		})
+	})
+
+	t.When("no fuzz target needs a codec", func(w *gotest.T) {
+		w.It("leaves the NewF call and the import list exactly as before", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzMethod")
+			out, _ := renderTestPkg(it.T(), pkg, true)
+
+			gotest.Contains(it, out, "s.FuzzParse(gotest.NewF(f, s.BeforeEach, s.AfterEach))")
+			gotest.NotContains(it, out, "ƒ_fuzzdec_")
+			// gotestruntime itself is imported by every generated harness
+			// (exec sentinel, lifecycle wiring) — codec-free output must
+			// merely stay free of the codec primitives built on it.
+			gotest.NotContains(it, out, "gotestruntime.NewFuzzReader")
+			gotest.NotContains(it, out, "gotestruntime.NewFuzzWriter")
+		})
+	})
 }

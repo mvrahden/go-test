@@ -77,8 +77,15 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	sfNodeVMs := buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures)
 	hasFixtures := len(resolved.RootFixtures) > 0 || len(sfNodeVMs) > 0
 
+	// Resolved before anything is written: a non-fuzzable argument type is a
+	// generation-time refusal, not a half-written file.
+	codecs, err := BuildFuzzCodecs(pkg, spec.EffectiveTestSuites)
+	if err != nil {
+		return nil, err
+	}
+
 	buf := bytes.NewBuffer(nil)
-	if err := r.renderFileHeader(buf, pkg, spec, hasFixtures, resolved.SuiteSharedFixtures, allFixtures, sfNodeVMs); err != nil {
+	if err := r.renderFileHeader(buf, pkg, spec, hasFixtures, resolved.SuiteSharedFixtures, allFixtures, sfNodeVMs, codecs); err != nil {
 		return nil, fmt.Errorf("failed rendering file header. err: %w", err)
 	}
 
@@ -108,14 +115,14 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 		}
 	}
 
-	if err := r.renderFuzzSuites(buf, pkg, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields, harvestSeeds); err != nil {
+	if err := r.renderFuzzSuites(buf, pkg, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields, harvestSeeds, codecs); err != nil {
 		return nil, fmt.Errorf("failed rendering fuzz suites. err: %w", err)
 	}
 
 	return r.formatOutput(buf)
 }
 
-func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, sfNodes []*SharedFixtureNodeVM) error { //nolint:gocritic // hugeParam: stable API
+func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, sfNodes []*SharedFixtureNodeVM, codecs *FuzzCodecSet) error { //nolint:gocritic // hugeParam: stable API
 	type TplData struct {
 		RepoName    string
 		PackageName string
@@ -128,12 +135,40 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		{Path: about.Repo + "/pkg/gotest"},
 		{Path: about.Repo + "/pkg/gotestruntime"},
 	}
+	// Every path goes through addImport: gotestruntime is reachable from two
+	// independent sources (fixtures and fuzz codecs), and a duplicated import
+	// line is a compile error in the generated file.
+	seenPkg := map[string]bool{}
+	addImport := func(path string) {
+		if path == "" || seenPkg[path] {
+			return
+		}
+		seenPkg[path] = true
+		imports = append(imports, headerImport{Path: path})
+	}
 	if hasFixtures {
-		imports = append(imports,
-			headerImport{Path: "context"},
-			headerImport{Path: "sync/atomic"},
-			headerImport{Path: "time"},
-		)
+		addImport("context")
+		addImport("sync/atomic")
+		addImport("time")
+	}
+	if codecs != nil {
+		// Generated codecs are built on the FuzzReader/FuzzWriter primitives.
+		addImport(fuzzCodecRuntimeImport)
+		for _, path := range codecs.PkgPaths {
+			addImport(path)
+		}
+		// strings/strconv/math back the literal-rendering functions, and are
+		// only pulled in when at least one was actually emitted — unlike
+		// gotestruntime above, they are not needed by every codec set.
+		if codecs.NeedsStrings {
+			addImport("strings")
+		}
+		if codecs.NeedsStrconv {
+			addImport("strconv")
+		}
+		if codecs.NeedsMath {
+			addImport("math")
+		}
 	}
 	// This condition must stay identical to the one guarding the ƒfailed
 	// declaration in gotest.suites.tpl. A parallel suite whose every method is
@@ -144,40 +179,26 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	if !hasFixtures && slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
 		return v.IsMethodParallel() && len(v.TestCases()) > 0
 	}) {
-		imports = append(imports, headerImport{Path: "sync/atomic"})
+		addImport("sync/atomic")
 	}
-	seenPkg := map[string]bool{}
 	for _, rf := range allFixtures {
-		if rf.PkgPath != "" && !seenPkg[rf.PkgPath] {
-			imports = append(imports, headerImport{Path: rf.PkgPath})
-			seenPkg[rf.PkgPath] = true
-		}
+		addImport(rf.PkgPath)
 		for _, sf := range rf.SharedFixtures {
-			if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
-				imports = append(imports, headerImport{Path: sf.PkgPath})
-				seenPkg[sf.PkgPath] = true
-			}
+			addImport(sf.PkgPath)
 		}
 	}
 	for _, refs := range suiteSharedFixtures {
 		for _, sf := range refs {
-			if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
-				imports = append(imports, headerImport{Path: sf.PkgPath})
-				seenPkg[sf.PkgPath] = true
-			}
+			addImport(sf.PkgPath)
 		}
 	}
 	for _, sf := range sfNodes {
-		if sf.PkgPath != "" && sf.PkgPath != pkg.PkgPath && !seenPkg[sf.PkgPath] {
-			imports = append(imports, headerImport{Path: sf.PkgPath})
-			seenPkg[sf.PkgPath] = true
+		if sf.PkgPath != pkg.PkgPath {
+			addImport(sf.PkgPath)
 		}
 	}
 	for _, ts := range spec.EffectiveTestSuites {
-		if pkgPath := ts.ContextTypePkgPath(); pkgPath != "" && !seenPkg[pkgPath] {
-			imports = append(imports, headerImport{Path: pkgPath})
-			seenPkg[pkgPath] = true
-		}
+		addImport(ts.ContextTypePkgPath())
 	}
 	data := TplData{
 		RepoName:    about.ShortInfo(),
@@ -194,7 +215,7 @@ func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSh
 	})
 }
 
-func (r *renderer) renderFuzzSuites(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, suiteFixtureFields map[string][]FixtureFieldBinding, harvestSeeds bool) error { //nolint:gocritic // hugeParam: stable API
+func (r *renderer) renderFuzzSuites(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, suiteFixtureFields map[string][]FixtureFieldBinding, harvestSeeds bool, codecs *FuzzCodecSet) error { //nolint:gocritic // hugeParam: stable API
 	// Reuse the exact same fixture-bound view model gotest.bench.tpl renders
 	// Benchmark<Suite> from, reshaped as a map for O(1) per-suite template lookup.
 	suiteFixtures := make(map[string]*FlatFixtureSuite)
@@ -205,11 +226,21 @@ func (r *renderer) renderFuzzSuites(buf *bytes.Buffer, pkg *packages.Package, sp
 	if err != nil {
 		return err
 	}
+	// Passed as two flat values rather than the set itself, so the template
+	// never has to dereference a nil *FuzzCodecSet.
+	var codecRefs []FuzzCodecRef
+	var codecSource string
+	if codecs != nil {
+		codecRefs = codecs.Codecs
+		codecSource = codecs.Source
+	}
 	return gotestTpl.ExecuteTemplate(buf, "gotest.fuzz.tpl", map[string]any{
 		"Spec":                spec,
 		"SuiteSharedFixtures": suiteSharedFixtures,
 		"SuiteFixtures":       suiteFixtures,
 		"HarvestedSeeds":      harvested,
+		"FuzzCodecs":          codecRefs,
+		"FuzzCodecSource":     codecSource,
 	})
 }
 

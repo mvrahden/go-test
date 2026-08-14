@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -68,6 +69,12 @@ func TestParseCorpusFile_UnsupportedEntry(t *testing.T) {
 	gotest.Error(t, err, "expected error for unsupported corpus entry")
 }
 
+func TestExtractDecodedInput(t *testing.T) {
+	out := "=== RUN   FuzzX\n" + protocol.FuzzInputPrefix + `Request{Name: "a"}` + "\n--- FAIL: FuzzX\n"
+	gotest.Equal(t, `Request{Name: "a"}`, extractDecodedInput(out))
+	gotest.Empty(t, extractDecodedInput("no marker here\n"))
+}
+
 func TestCorpusArg_SpliceExpr(t *testing.T) {
 	cases := []struct {
 		arg  corpusArg
@@ -116,7 +123,8 @@ func (s *FooTestSuite) FuzzTrim(x int) {
 	gotest.NoError(t, os.WriteFile(corpusPath, []byte("go test fuzz v1\nstring(\"stale\")\n"), 0600))
 
 	target := gotestrunner.FuzzTarget{Package: "example.com/foo", Dir: dir, Func: "FuzzFooTestSuite_FuzzTrim"}
-	msg, ok := promoteCrasher(target, "FooTestSuite", "FuzzTrim", corpusPath)
+	overlay := &gotestrunner.OverlayResult{}
+	msg, ok := promoteCrasher(overlay, target, "FooTestSuite", "FuzzTrim", corpusPath)
 
 	gotest.False(t, ok, "expected promoteCrasher to report failure, msg=%q", msg)
 	gotest.Contains(t, msg, "skipped:")
