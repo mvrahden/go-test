@@ -175,6 +175,13 @@ export class GoTestCodeLensProvider
             command: "gotest.runBench",
             arguments: [importPath, suite.name, method.name],
           }),
+          // Five repetitions give the CLI enough samples for a trustworthy
+          // Welch comparison and an honest ± spread on the annotation.
+          new vscode.CodeLens(range, {
+            title: "5×",
+            command: "gotest.runBenchStable",
+            arguments: [importPath, suite.name, method.name],
+          }),
         );
 
         // The last measured numbers, right where the code is — but only

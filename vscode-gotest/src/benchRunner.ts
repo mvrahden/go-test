@@ -5,6 +5,9 @@
 
 import * as vscode from "vscode";
 import { spawn } from "node:child_process";
+import { mkdtemp } from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import {
@@ -25,6 +28,12 @@ export interface BenchTarget {
   suiteName: string;
   /** Absent = every benchmark method in the suite. */
   methodName?: string;
+  /**
+   * go test -count: repetitions per benchmark. The CLI harvests one sample
+   * per rep, and its significance machinery consumes them natively — this
+   * is how a "stable" run gets an honest mean ± spread with zero TS stats.
+   */
+  count?: number;
 }
 
 /**
@@ -64,6 +73,29 @@ export function benchTargetFromItemId(id: string): BenchTarget | undefined {
   const importPath = parts.slice(0, -2).join("/");
   if (!methodName.startsWith("Benchmark")) return undefined;
   return { importPath, suiteName, methodName };
+}
+
+export type ProfileKind = "cpu" | "mem";
+
+/**
+ * buildProfileArgs is the profiling variant of a bench invocation: the same
+ * scoped run plus go test's own -cpuprofile/-memprofile, written into a
+ * caller-owned directory (absolute path — the suite subprocess runs in the
+ * package dir, and profiles must never land in the source tree).
+ */
+export function buildProfileArgs(
+  target: BenchTarget,
+  kind: ProfileKind,
+  outDir: string,
+): string[] {
+  const args = buildBenchArgs(
+    target.importPath,
+    target.suiteName,
+    target.methodName,
+  );
+  args.push(`-${kind}profile=${outDir}/${kind}.pprof`);
+  args.push("--json");
+  return args;
 }
 
 export class BenchRunner {
@@ -145,6 +177,63 @@ export class BenchRunner {
       if (this.active === cts) this.active = undefined;
       cts.dispose();
     }
+  }
+
+  /**
+   * profileTarget runs one scoped benchmark with go test's own profiler and
+   * opens `go tool pprof -http` on the result. The profile lands in a fresh
+   * temp directory, never in the source tree; the run's numbers are recorded
+   * like any other bench run.
+   */
+  async profileTarget(target: BenchTarget, kind: ProfileKind): Promise<void> {
+    const workspaceDir = this.cache.getWorkspaceDir(target.importPath);
+    if (!workspaceDir) {
+      vscode.window.showErrorMessage(
+        `gotest bench: no workspace dir for ${target.importPath}`,
+      );
+      return;
+    }
+
+    const outDir = await mkdtemp(path.join(os.tmpdir(), "gotest-bench-prof-"));
+    const cmd = await buildCliCommand(
+      buildProfileArgs(target, kind, outDir),
+      workspaceDir,
+      this.outputChannel,
+    );
+    this.outputChannel.info(`[bench] ${formatCliCommand(cmd)}`);
+
+    const cts = new vscode.CancellationTokenSource();
+    this.active?.cancel();
+    this.active = cts;
+    try {
+      const { stdout, stderr, code } = await this.spawnBench(
+        cmd,
+        workspaceDir,
+        cts.token,
+      );
+      if (stderr.trim()) this.outputChannel.warn(stderr.trimEnd());
+      if (!stdout.trim()) {
+        throw new Error(`gotest bench exited with code ${code}`);
+      }
+      this.recordAndLog(parseBenchReport(stdout));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      vscode.window.showErrorMessage(`gotest bench failed: ${message}`);
+      return;
+    } finally {
+      if (this.active === cts) this.active = undefined;
+      cts.dispose();
+    }
+
+    const profile = path.join(outDir, `${kind}.pprof`);
+    // pprof owns its lifetime: it picks a free port and opens the browser.
+    // Detached on purpose — closing the editor must not kill the analysis.
+    spawn("go", ["tool", "pprof", "-http=127.0.0.1:0", profile], {
+      cwd: workspaceDir,
+      detached: true,
+      stdio: "ignore",
+    }).unref();
+    this.outputChannel.info(`[bench] pprof UI launched for ${profile}`);
   }
 
   /**
@@ -292,18 +381,18 @@ export class BenchRunner {
         continue;
       }
 
-      const cmd = await buildCliCommand(
-        [
-          ...buildBenchArgs(
-            target.importPath,
-            target.suiteName,
-            target.methodName,
-          ),
-          "--json",
-        ],
-        workspaceDir,
-        this.outputChannel,
-      );
+      const args = [
+        ...buildBenchArgs(
+          target.importPath,
+          target.suiteName,
+          target.methodName,
+        ),
+      ];
+      if (target.count && target.count > 1) {
+        args.push(`-count=${target.count}`);
+      }
+      args.push("--json");
+      const cmd = await buildCliCommand(args, workspaceDir, this.outputChannel);
       this.outputChannel.info(`[bench] ${formatCliCommand(cmd)}`);
 
       let report: BenchReport;
@@ -347,20 +436,26 @@ export class BenchRunner {
 
     for (const result of report.baseline.results) {
       const n = result.samples.length;
-      const mean =
-        result.samples.reduce((sum, s) => sum + s.nsPerOp, 0) / Math.max(1, n);
+      const nsValues = result.samples.map((s) => s.nsPerOp);
+      const mean = nsValues.reduce((sum, v) => sum + v, 0) / Math.max(1, n);
       const last = result.samples[n - 1];
+      let line = formatBenchAnnotation(
+        {
+          nsPerOp: mean,
+          bytesPerOp: last?.bytesPerOp ?? 0,
+          allocsPerOp: last?.allocsPerOp ?? 0,
+          iterations: last?.iterations ?? 0,
+        },
+        now,
+        now,
+      );
+      if (n > 1 && mean > 0) {
+        const halfSpreadPct =
+          (((Math.max(...nsValues) - Math.min(...nsValues)) / 2) * 100) / mean;
+        line += ` (mean of ${n}×, ±${halfSpreadPct.toFixed(1)}%)`;
+      }
       this.outputChannel.info(
-        `[bench] ${result.suite}/${result.name}: ${formatBenchAnnotation(
-          {
-            nsPerOp: mean,
-            bytesPerOp: last?.bytesPerOp ?? 0,
-            allocsPerOp: last?.allocsPerOp ?? 0,
-            iterations: last?.iterations ?? 0,
-          },
-          now,
-          now,
-        )}`,
+        `[bench] ${result.suite}/${result.name}: ${line}`,
       );
     }
   }

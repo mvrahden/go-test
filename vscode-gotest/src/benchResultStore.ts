@@ -39,6 +39,9 @@ export interface BenchEntry {
   iterations: number;
   /** Number of samples behind the mean (>1 under -count=N). */
   sampleCount: number;
+  /** Fastest/slowest rep of a multi-sample run (equal to nsPerOp for 1×). */
+  minNsPerOp: number;
+  maxNsPerOp: number;
   recordedAt: number;
   goos: string;
   goarch: string;
@@ -46,9 +49,20 @@ export interface BenchEntry {
   delta?: BenchEntryDelta;
 }
 
+/** One point of a benchmark's run-over-run trend. */
+export interface BenchHistoryPoint {
+  nsPerOp: number;
+  recordedAt: number;
+  sampleCount: number;
+}
+
+/** Bounded run-over-run history per key; the trend a hover shows. */
+const MAX_HISTORY = 50;
+
 interface StoredData {
   version: 1;
   entries: Record<string, BenchEntry>;
+  history?: Record<string, BenchHistoryPoint[]>;
 }
 
 const STORAGE_KEY = "gotest.benchResults";
@@ -84,6 +98,7 @@ export function hostPlatform(
 
 export class BenchResultStore {
   private entries = new Map<string, BenchEntry>();
+  private history = new Map<string, BenchHistoryPoint[]>();
   private listeners: Array<() => void> = [];
 
   constructor(private readonly memento: MementoLike) {
@@ -94,6 +109,9 @@ export class BenchResultStore {
     if (stored && stored.version === 1) {
       for (const [key, entry] of Object.entries(stored.entries)) {
         this.entries.set(key, entry);
+      }
+      for (const [key, points] of Object.entries(stored.history ?? {})) {
+        this.history.set(key, points);
       }
     }
   }
@@ -132,25 +150,40 @@ export class BenchResultStore {
       if (n === 0) continue;
       const mean = (pick: (s: (typeof result.samples)[number]) => number) =>
         result.samples.reduce((sum, s) => sum + pick(s), 0) / n;
+      const nsValues = result.samples.map((s) => s.nsPerOp);
+      const meanNs = mean((s) => s.nsPerOp);
 
-      this.entries.set(
-        benchKey(result.package, result.suite, result.name, goos, goarch),
-        {
-          nsPerOp: mean((s) => s.nsPerOp),
-          bytesPerOp: Math.round(mean((s) => s.bytesPerOp)),
-          allocsPerOp: Math.round(mean((s) => s.allocsPerOp)),
-          iterations: result.samples[0].iterations,
-          sampleCount: n,
-          recordedAt,
-          goos,
-          goarch,
-          // A run without a comparison clears any stale delta: the verdict
-          // belonged to the numbers it was computed against.
-          delta: deltaByKey.get(
-            `${result.package} ${result.suite}/${result.name}`,
-          ),
-        },
+      const key = benchKey(
+        result.package,
+        result.suite,
+        result.name,
+        goos,
+        goarch,
       );
+      this.entries.set(key, {
+        nsPerOp: meanNs,
+        bytesPerOp: Math.round(mean((s) => s.bytesPerOp)),
+        allocsPerOp: Math.round(mean((s) => s.allocsPerOp)),
+        iterations: result.samples[0].iterations,
+        sampleCount: n,
+        minNsPerOp: Math.min(...nsValues),
+        maxNsPerOp: Math.max(...nsValues),
+        recordedAt,
+        goos,
+        goarch,
+        // A run without a comparison clears any stale delta: the verdict
+        // belonged to the numbers it was computed against.
+        delta: deltaByKey.get(
+          `${result.package} ${result.suite}/${result.name}`,
+        ),
+      });
+
+      const points = this.history.get(key) ?? [];
+      points.push({ nsPerOp: meanNs, recordedAt, sampleCount: n });
+      if (points.length > MAX_HISTORY) {
+        points.splice(0, points.length - MAX_HISTORY);
+      }
+      this.history.set(key, points);
     }
     void this.persist();
     for (const listener of this.listeners) {
@@ -175,10 +208,31 @@ export class BenchResultStore {
     );
   }
 
+  /** getHistory returns the trend for one key, oldest first. */
+  getHistory(
+    importPath: string,
+    suiteName: string,
+    methodName: string,
+    platform: PlatformKey,
+  ): BenchHistoryPoint[] {
+    return (
+      this.history.get(
+        benchKey(
+          importPath,
+          suiteName,
+          methodName,
+          platform.goos,
+          platform.goarch,
+        ),
+      ) ?? []
+    );
+  }
+
   private persist(): Thenable<void> {
     const data: StoredData = {
       version: 1,
       entries: Object.fromEntries(this.entries),
+      history: Object.fromEntries(this.history),
     };
     return this.memento.update(STORAGE_KEY, data);
   }
