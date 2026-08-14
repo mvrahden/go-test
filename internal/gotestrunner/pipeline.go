@@ -187,12 +187,14 @@ func buildBaseEnv(cfg PipelineConfig) []string {
 	return env
 }
 
-// prepareTestRun compiles the suite packages and starts shared fixtures
-// concurrently. Per-package compile failures are package verdicts, not run
-// aborts: they are returned for booking and do not stop the fixtures or the
-// packages that did compile. Only a fixture setup failure is fatal — without
-// the fixtures no surviving suite can run.
-func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []string, setupTimeout time.Duration, compileParallel int) ([]CompileResult, []BuildFailure, *SharedFixtureProcess, context.CancelFunc, error) {
+// prepareTestRun compiles the suite packages and starts the given shared
+// fixtures concurrently. fixtures is the run's residency plan (see
+// planFixtureWindows), not the full overlay set: a fixture no scheduled suite
+// requires never starts. Per-package compile failures are package verdicts,
+// not run aborts: they are returned for booking and do not stop the fixtures
+// or the packages that did compile. Only a fixture setup failure is fatal —
+// without the fixtures no surviving suite can run.
+func prepareTestRun(ctx context.Context, overlay *OverlayResult, fixtures []gotestgen.SharedFixtureInfo, buildFlags []string, setupTimeout time.Duration, compileParallel int) ([]CompileResult, []BuildFailure, *SharedFixtureProcess, context.CancelFunc, error) {
 	setupTimeout = resolveSetupTimeout(setupTimeout)
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -208,11 +210,11 @@ func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []st
 		compiled, compileFailures = CompilePackages(ctx, overlay.SuitePackages, overlay.OverlayFlag, buildFlags, overlay.WorkDir, compileParallel)
 	}()
 
-	if len(overlay.SharedFixtures) > 0 {
+	if len(fixtures) > 0 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			setupProc, setupErr = StartSharedFixtures(ctx, overlay.WorkDir, overlay.SharedFixtures, setupTimeout)
+			setupProc, setupErr = StartSharedFixtures(ctx, overlay.WorkDir, fixtures, setupTimeout)
 			if setupErr != nil {
 				cancel()
 				return
@@ -276,7 +278,9 @@ func setupCoverage(targets []SuiteTarget, overlay *OverlayResult, userCoverProfi
 }
 
 func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (result PipelineResult, err error) { //nolint:gocritic // hugeParam: stable API
-	compiled, compileFailures, setupProc, cancelPrepare, err := prepareTestRun(ctx, overlay, pf.BuildFlags, cfg.SetupTimeout, cfg.CompileParallel)
+	win := planFixtureWindows(overlay, pf.UserRunFilter)
+	win.reportSkipped()
+	compiled, compileFailures, setupProc, cancelPrepare, err := prepareTestRun(ctx, overlay, win.Fixtures, pf.BuildFlags, cfg.SetupTimeout, cfg.CompileParallel)
 	if err != nil {
 		return PipelineResult{ExitCode: 2}, err
 	}
@@ -344,6 +348,9 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	resolvedSetupTimeout := resolveSetupTimeout(cfg.SetupTimeout)
 	baseEnv := buildBaseEnv(cfg)
 
+	win := planFixtureWindows(overlay, pf.UserRunFilter)
+	win.reportSkipped()
+
 	// Exclusive suites collected during the stream, run serially after it.
 	type deferredTarget struct {
 		t   SuiteTarget
@@ -360,7 +367,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	streamCtx, streamCancel := context.WithCancel(ctx)
 	defer streamCancel()
 
-	if len(overlay.SharedFixtures) > 0 {
+	if len(win.Fixtures) > 0 {
 		fixtureWg.Add(1)
 		go func() {
 			defer fixtureWg.Done()
@@ -371,7 +378,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 			// owner of shutdown, and it runs only after every suite has stopped.
 			// The pipeline ctx stays attached as the safety net so an abnormal
 			// runner death still releases the process group.
-			setupProc, err = StartSharedFixtures(ctx, overlay.WorkDir, overlay.SharedFixtures, resolvedSetupTimeout)
+			setupProc, err = StartSharedFixtures(ctx, overlay.WorkDir, win.Fixtures, resolvedSetupTimeout)
 			if err != nil {
 				fixtureStartErr = err
 				sharedSetupFailed.Store(true)

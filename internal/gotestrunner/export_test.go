@@ -67,6 +67,12 @@ func ExportNewSharedFixtureProcess(sharedDir string, state map[string]json.RawMe
 	}
 }
 
+type ExportFixtureWindows = fixtureWindows
+
+var ExportPlanFixtureWindows = planFixtureWindows
+var ExportPlanSuitePhases = planSuitePhases
+var ExportAliveFixtureKeys = aliveFixtureKeys
+
 var ExportSortTargetIndices = sortTargetIndices
 var ExportLogSlowBuild = logSlowBuild
 var ExportComputeDispatchConcurrency = computeDispatchConcurrency

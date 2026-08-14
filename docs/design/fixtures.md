@@ -8,7 +8,8 @@ Any struct whose name ends in `Fixture` is a package fixture; any struct ending 
 
 ## Package Fixture (`*Fixture` suffix)
 
-A package fixture runs `BeforeAll` once per package, then injects state into child test suites via named pointer fields.
+A package fixture runs `BeforeAll` once per suite process, then injects state into child test suites via named pointer fields.
+Each suite is dispatched in its own test process, so suites binding the same package fixture each get a fresh instance — package fixtures share code, not runtime state, across suites.
 
 ```go
 // fixture_test.go
@@ -354,6 +355,13 @@ gotest ./tests/e2e ./tests/integration -v
 6. Send SIGTERM to the setup subprocess (calls `AfterAll` in reverse order)
 
 ## Execution Model
+
+### Never speculative
+
+Shared fixtures are never speculative: a shared fixture is resident exactly while a scheduled suite needs it.
+Before anything starts, the runner computes the set of suites the run will dispatch — after `-run` filtering and config-level skips — and starts only the shared fixtures some scheduled suite requires, closed over the dependency DAG.
+A fixture nothing scheduled needs is never started, and can therefore never fail the run.
+When fixtures are skipped this way, the runner emits one debug line to stderr: `gotest: N shared fixture(s) not started (no scheduled suite requires them)`.
 
 ### Lazy, reference-counted lifecycle
 
