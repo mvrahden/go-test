@@ -571,6 +571,73 @@ Or when running `go test` directly:
 GOTEST_UPDATE_SNAPSHOTS=1 go test ./...
 ```
 
+## Benchmarking
+
+Benchmark methods live on the same suites as tests — same struct, same lifecycle, own subcommand.
+
+### Authoring
+
+```go
+type ParserTestSuite struct {
+    p *Parser
+}
+
+func (s *ParserTestSuite) BeforeEach(t *gotest.T) { s.p = NewParser() }
+
+func (s *ParserTestSuite) BenchmarkParse(b *gotest.B) {
+    doc := loadTestdata("large.json")
+    for b.Loop() {
+        s.p.Parse(doc)
+    }
+}
+```
+
+`Benchmark*` methods take `*gotest.B` (or `*testing.B`) and honor the same `F_`/`X_` focus/exclude prefixes as test methods.
+`BeforeEach`/`AfterEach` run once per benchmark method, outside the timing window — the generated wrapper stops the timer before `BeforeEach`, starts and resets it right before your method runs, and stops it again before `AfterEach`.
+Use `b.Loop()` (Go 1.24+) rather than `b.N` — it excludes setup before the loop from timing automatically.
+
+The suite must be named `*TestSuite`, even if it only has benchmarks — a struct without that suffix is never discovered, so its `Benchmark*` methods are silently dropped.
+Benchmarks can't coexist with a returning `BeforeEach` (its context type can't thread through `*gotest.B`), and every lifecycle hook on a benchmark suite must take `*gotest.T`, not `*testing.T`.
+Fixture-bound suites work — fixtures hydrate before benchmarks run — but a fixture with `BeforeEach`/`AfterEach` bound to a suite that has `Benchmark*` methods is rejected at generation time: per-method fixture hooks aren't supported for benchmarks.
+
+### Running
+
+```bash
+gotest bench ./...                     # all benchmarks
+gotest bench ./pkg/parser -run Parse   # filter by suite name
+gotest bench ./pkg/parser -bench Parse # filter by benchmark name
+```
+
+`gotest ./...` never runs benchmarks — use `gotest bench` explicitly.
+
+Benchmark suites always run serially, one suite process at a time, regardless of `--parallel`/`-test.parallel`.
+Running benchmarks concurrently makes their timing numbers meaningless — the runner disables streaming and compiles everything up front so `go test -c` never competes with a running benchmark for CPU.
+A fresh process per suite is also a methodological win, not just an implementation detail: GC pressure from one benchmark can't pollute another's numbers.
+
+`-test.benchmem` is on by default — every benchmark line reports `B/op`/`allocs/op` alongside `ns/op`.
+`-benchtime` and `-count` are forwarded to `go test` unchanged.
+`-coverprofile` works; `--min` (coverage gate) isn't available in bench mode.
+`-run` and `-bench` both filter which suites run, both matched against each suite's `Benchmark<SuiteName>` wrapper function — `-run` the same way it scopes suites for `gotest ./...`, `-bench` by benchmark function name.
+Given both, a suite must match both to run (AND semantics).
+`-run Test<Suite>`-style values match nothing in bench mode — filter by the suite name itself, not the `Test` prefix.
+
+With no matching benchmarks, `gotest bench` prints `no benchmarks found` and exits 0.
+
+### Spec view
+
+```bash
+gotest bench --spec ./examples/notification -benchtime=10x
+```
+
+```
+BenchmarkNotificationDispatchBench
+  ✓ Dispatch  810.6 ns/op · 596 B/op · 2 allocs/op
+
+1 suites, 1 benchmarks: 
+```
+
+Each line reports `ns/op`, `B/op`, and `allocs/op` — the same numbers `go test -bench` prints, rendered as a spec.
+
 ## Configuration
 
 Every fixture and suite runs with sensible defaults — 2-minute fixture timeout, 30-second per-test timeout.
@@ -748,6 +815,7 @@ The action emits `::error` annotations that appear inline on PR diffs and writes
 
 ```bash
 gotest ./... -v -race          # generate overlays and run tests (default)
+gotest bench ./...             # run BenchmarkX suite methods, serially
 gotest spec ./...              # behavioral specification view
 gotest summary ./...           # failure-focused summary for CI
 gotest watch ./... -v          # watch mode with auto-rerun
