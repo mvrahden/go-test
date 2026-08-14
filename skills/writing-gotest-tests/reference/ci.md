@@ -45,6 +45,15 @@ jobs:
   `permissions: contents: write`. Embed it as
   `https://raw.githubusercontent.com/<owner>/<repo>/ci/badges/coverage.svg`.
   The badge needs no shields.io, gist or token setup — do not add any.
+- **v1.27+ bench inputs:** `bench: true` runs `gotest bench --spec --json`
+  after the tests (the `flags` input is forwarded to it — the place for
+  `-benchtime=1x` smoke runs); `bench-baseline` compares (`--against`),
+  `bench-gate` fails on regressions above the percentage, and `bench-save`
+  writes a baseline (a path; an explicit empty string saves to
+  `bench.baseline` from `.gotest.yml`; the `false` default saves nothing).
+  Outputs: `bench-report` (path to the `--json` report file) and
+  `bench-breached-keys` (comma-joined gate offenders). README.md's inputs/
+  outputs tables are canonical and drift-guarded.
 - CI environments auto-arm `--ci` (any non-falsy `CI`/`GOTEST_CI` value):
   committed `F_` focus prefixes FAIL the run, and snapshots become
   read-only (`--update-snapshots` will not write). Opt out with
