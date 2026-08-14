@@ -95,7 +95,7 @@ func (s *LintTestSuite) TestAnalyzer(t *gotest.T) {
 	})
 
 	t.When("benchmark methods", func(w *gotest.T) {
-		w.It("detects bench-loop and bench-fixture-io violations", func(it *gotest.T) {
+		w.It("detects bench-loop, bench-fixture-io and bench-wait violations", func(it *gotest.T) {
 			analysistest.Run(it.T(), testdata, lint.Analyzer, "bench")
 		})
 	})
@@ -116,7 +116,7 @@ func (s *LintTestSuite) TestTierPolicy(t *gotest.T) {
 		w.It("registers a skip flag for every non-integrity rule and none for integrity rules", func(it *gotest.T) {
 			for _, rule := range []lint.Rule{
 				lint.StdlibTest, lint.Testify, lint.AssertionSimplify, lint.AssertionRedundant, lint.FailGuard, lint.TEscape,
-				lint.BenchFixtureIO,
+				lint.BenchFixtureIO, lint.BenchWait,
 			} {
 				gotest.NotZero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "missing skip flag for %s", rule)
 				gotest.True(it, lint.SkippableRules[rule], "rule %s should be skippable", rule)

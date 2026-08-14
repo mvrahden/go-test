@@ -1315,6 +1315,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `fail-guard` | `if cond { gotest.Fail(…) }` guards (also halting `Fatal`/`Fatalf`/`FailNow` bodies) — the assertion expresses the check directly; `\|\|` conditions and `else if` chains decompose into sequential assertions, non-halting `Errorf` bodies and init-scoped guards report without a fix; fires only in files that import gotest |
 | `t-escape` | Unnecessary `t.T()` convenience escapes: `Errorf`/`FailNow`/`Skipf`/`Setenv`/`TempDir` (available on `gotest.T`), `Skip`/`SkipNow` (use `Skipf`), `Helper` (degrades call-site reporting), `Log`/`Fatal`/`Fatalf` (use assertions and their message args) |
 | `bench-fixture-io` | `Benchmark*` methods reading fixture-backed state inside the measured loop — times whatever backs the fixture, not the code under test (heuristic; hoist the read above the loop) |
+| `bench-wait` | `time.Sleep`/`gotest.Eventually`/`gotest.Consistently` inside the measured loop — times the wait, not the code |
 
 **Migration** — legitimate coexistence, nudged. Suppressible per line or project-wide via `lint.skip`.
 
