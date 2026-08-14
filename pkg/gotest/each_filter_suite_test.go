@@ -21,8 +21,8 @@ import (
 // The suite is sequential: each case owns the child process it spawns.
 type EachFilterTestSuite struct{}
 
-const eachChildTimeout = 15 * time.Second
-const eachChildWallClock = 90 * time.Second
+const eachChildTimeout = 60 * time.Second
+const eachChildWallClock = 120 * time.Second
 
 const eachChildSource = `package eachchild
 

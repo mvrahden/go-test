@@ -1518,6 +1518,28 @@ func normalizeJSON(raw string) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
+func (s *GotestrunnerTestSuite) TestLogSlowBuild(t *gotest.T) {
+	t.When("a build outlives the threshold", func(w *gotest.T) {
+		w.It("logs the breach while running and the effective duration after", func(it *gotest.T) {
+			var buf strings.Builder
+			done := gotestrunner.ExportLogSlowBuild(&buf, "test binary for example.com/pkg", 10*time.Millisecond)
+			time.Sleep(40 * time.Millisecond)
+			done()
+			gotest.Contains(it, buf.String(), "has been building for 10ms and is still running")
+			gotest.Contains(it, buf.String(), "finished building after")
+		})
+	})
+
+	t.When("a build finishes under the threshold", func(w *gotest.T) {
+		w.It("stays silent — fast builds are the expected case", func(it *gotest.T) {
+			var buf strings.Builder
+			done := gotestrunner.ExportLogSlowBuild(&buf, "x", time.Minute)
+			done()
+			gotest.Zero(it, buf.String())
+		})
+	})
+}
+
 func (s *GotestrunnerTestSuite) TestSanitizerAwareDispatch(t *gotest.T) {
 	procs := runtime.GOMAXPROCS(0)
 

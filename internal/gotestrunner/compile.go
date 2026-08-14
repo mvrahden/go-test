@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 // CompileResult holds the result of compiling a single test package.
@@ -50,6 +52,8 @@ func compilePackage(ctx context.Context, pkgPath, overlayFlag string, buildFlags
 	cmd := exec.CommandContext(ctx, "go", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
+
+	defer logSlowBuild(os.Stderr, "test binary for "+pkgPath, slowBuildThreshold)()
 
 	mp := NewManagedProcess(cmd, ProcessConfig{Grace: GraceKill})
 	if err := mp.Start(); err != nil {
@@ -162,4 +166,27 @@ func sanitizePkgName(pkgPath string) string {
 	parts := strings.Split(pkgPath, "/")
 	short := parts[len(parts)-1]
 	return fmt.Sprintf("%s_%x", short, h[:4])
+}
+
+// slowBuildThreshold is when a single build is called out as unexpectedly
+// long. Deliberately a log line, never a verdict: a first-ever -race build
+// recompiles the stdlib's instrumented variant and legitimately runs for
+// minutes — a hard cap here would be a number the user did not choose.
+const slowBuildThreshold = 15 * time.Second
+
+// logSlowBuild arms a one-shot notice for a long-running build and returns a
+// done func: past threshold it logs that the build is still running, and on
+// completion past threshold it logs the effective duration — so slowness is
+// visible without ever being failed.
+func logSlowBuild(w io.Writer, what string, threshold time.Duration) (done func()) {
+	start := time.Now()
+	timer := time.AfterFunc(threshold, func() {
+		fmt.Fprintf(w, "gotest: %s has been building for %s and is still running\n", what, threshold)
+	})
+	return func() {
+		timer.Stop()
+		if d := time.Since(start); d >= threshold {
+			fmt.Fprintf(w, "gotest: %s finished building after %s\n", what, d.Round(time.Second))
+		}
+	}
 }

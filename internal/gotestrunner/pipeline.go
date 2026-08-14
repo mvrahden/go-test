@@ -15,6 +15,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/protocol"
+	"github.com/mvrahden/go-test/internal/schedinfo"
 )
 
 const DefaultSetupTimeout = 2 * time.Minute
@@ -230,7 +231,9 @@ func prepareTestRun(ctx context.Context, overlay *OverlayResult, buildFlags []st
 		if setupProc != nil {
 			_ = setupProc.Teardown()
 		}
-		return nil, nil, nil, nil, fmt.Errorf("shared fixture setup: %w", setupErr)
+		// Scheduling context: fixture setup deadlines are wall-clock verdicts
+		// too, and a starved build looks exactly like a broken one.
+		return nil, nil, nil, nil, fmt.Errorf("shared fixture setup: %w %s", setupErr, schedinfo.Summary())
 	}
 
 	return compiled, compileFailures, setupProc, cancel, nil

@@ -278,6 +278,7 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	if runtime.GOOS == "windows" {
 		setupBin += ".exe"
 	}
+	defer logSlowBuild(os.Stderr, "shared fixture setup binary", slowBuildThreshold)()
 	buildCmd := exec.CommandContext(ctx, "go", "build", "-o", setupBin, setupFile)
 	buildCmd.Stderr = os.Stderr
 	buildMp := NewManagedProcess(buildCmd, ProcessConfig{Grace: GraceKill})
