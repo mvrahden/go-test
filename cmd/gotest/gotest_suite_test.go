@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -24,10 +26,43 @@ import (
 
 // CmdGotestTestSuite tests CLI argument parsing, subcommands,
 // discovery, spec rendering, and code generation.
-type CmdGotestTestSuite struct{}
+type CmdGotestTestSuite struct {
+	binary   string
+	repoRoot string
+}
 
 func (s *CmdGotestTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true}
+}
+
+func (s *CmdGotestTestSuite) BeforeAll(t *gotest.T) {
+	absRoot, err := filepath.Abs("../..")
+	gotest.NoError(t, err)
+	s.repoRoot = absRoot
+
+	binDir := t.TempDir()
+	binaryName := "gotest"
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+	s.binary = filepath.Join(binDir, binaryName)
+	cmd := exec.Command("go", "build", "-o", s.binary, "./cmd/gotest") //nolint:gosec // G204: go tool with controlled arguments
+	cmd.Dir = absRoot
+	out, err := cmd.CombinedOutput()
+	gotest.NoError(t, err, "build gotest binary: %s", string(out))
+}
+
+// runCLI runs the built gotest binary from the repo root and returns its
+// combined stdout+stderr output.
+func (s *CmdGotestTestSuite) runCLI(t *gotest.T, args ...string) string {
+	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Dir = s.repoRoot
+	out, err := cmd.CombinedOutput()
+	var exitErr *exec.ExitError
+	if err != nil && !errors.As(err, &exitErr) {
+		t.T().Fatalf("running gotest binary: %v\n%s", err, out)
+	}
+	return string(out)
 }
 
 func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
@@ -1065,5 +1100,17 @@ func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 			result := ExportReplacePatterns(tc.original, tc.newPatterns)
 			gotest.Equal(sub, tc.expected, result)
 		}
+	})
+}
+
+func (s *CmdGotestTestSuite) TestBenchSubcommand(t *gotest.T) {
+	t.It("runs suite benchmarks serially and prints ns/op lines", func(it *gotest.T) {
+		out := s.runCLI(it, "bench", "./examples/notification", "-benchtime=10x")
+		gotest.Contains(it, out, "BenchmarkNotificationDispatchBenchTestSuite")
+		gotest.Contains(it, out, "ns/op")
+	})
+	t.It("reports when no benchmarks exist", func(it *gotest.T) {
+		out := s.runCLI(it, "bench", "./internal/protocol")
+		gotest.Contains(it, out, "no benchmarks found")
 	})
 }

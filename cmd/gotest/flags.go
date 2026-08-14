@@ -53,6 +53,10 @@ var watchAllowed = flagSet(
 	"--setup-timeout", "--timeout", "--debounce", "--parallel", "--compile-parallel",
 )
 
+var benchAllowed = flagSet(
+	"--timeout", "--setup-timeout", "--no-cache", "--debug", "--spec", "--no-color",
+)
+
 func flagSet(names ...string) map[string]bool {
 	s := make(map[string]bool, len(names))
 	for _, n := range names {

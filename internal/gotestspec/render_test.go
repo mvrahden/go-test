@@ -135,6 +135,35 @@ func TestRenderTerminal_SummaryLine(t *testing.T) {
 	}
 }
 
+func TestRenderTerminal_BenchmarkLeaf(t *testing.T) {
+	packages := []*Package{{
+		Path: "p",
+		Nodes: []*Node{{
+			Kind:    KindSuite,
+			Display: "Foo",
+			Children: []*Node{{
+				Kind:        KindBenchmark,
+				Display:     "Parse",
+				Status:      StatusPass,
+				Iterations:  1201,
+				NsPerOp:     985.2,
+				BytesPerOp:  24,
+				AllocsPerOp: 3,
+			}},
+		}},
+	}}
+
+	var buf bytes.Buffer
+	RenderTerminal(&buf, packages)
+	out := stripANSI(buf.String())
+
+	for _, want := range []string{"Parse", "985.2 ns/op", "24 B/op", "3 allocs/op", "1 benchmarks"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestRenderMarkdown_SuiteHierarchy(t *testing.T) {
 	packages := []*Package{{
 		Path: "example.com/pkg",
@@ -163,6 +192,38 @@ func TestRenderMarkdown_SuiteHierarchy(t *testing.T) {
 		"## UserService",
 		"### Create",
 		"| returns ok | PASS | 8ms |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRenderMarkdown_BenchmarkTable(t *testing.T) {
+	packages := []*Package{{
+		Path: "p",
+		Nodes: []*Node{{
+			Kind:    KindSuite,
+			Display: "Foo",
+			Children: []*Node{{
+				Kind:        KindBenchmark,
+				Display:     "Parse",
+				Status:      StatusPass,
+				Iterations:  1201,
+				NsPerOp:     985.2,
+				BytesPerOp:  24,
+				AllocsPerOp: 3,
+			}},
+		}},
+	}}
+
+	var buf bytes.Buffer
+	RenderMarkdown(&buf, packages)
+	out := buf.String()
+
+	for _, want := range []string{
+		"| Benchmark | ns/op | B/op | allocs/op |",
+		"| Parse | 985.2 | 24 | 3 |",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)

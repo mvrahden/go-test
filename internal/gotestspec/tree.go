@@ -1,9 +1,13 @@
 package gotestspec
 
 import (
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/mvrahden/go-test/internal/protocol"
 )
@@ -26,21 +30,28 @@ const (
 	KindMethod
 	KindBlock
 	KindTest
+	// KindBenchmark is appended at the end of the iota block to keep the
+	// numeric values of the existing kinds stable across serialized state.
+	KindBenchmark
 )
 
 type Node struct {
-	Name      string
-	Display   string
-	Kind      NodeKind
-	Status    Status
-	Duration  time.Duration
-	Output    []string
-	Children  []*Node
-	Focused   bool
-	Excluded  bool
-	External  bool
-	Variant   int
-	duplicate bool
+	Name        string
+	Display     string
+	Kind        NodeKind
+	Status      Status
+	Duration    time.Duration
+	Output      []string
+	Children    []*Node
+	Focused     bool
+	Excluded    bool
+	External    bool
+	Variant     int
+	duplicate   bool
+	Iterations  int
+	NsPerOp     float64
+	BytesPerOp  int64
+	AllocsPerOp int64
 }
 
 type Package struct {
@@ -52,12 +63,13 @@ type Package struct {
 }
 
 type Stats struct {
-	Suites    int
-	Behaviors int
-	Tests     int
-	Passed    int
-	Failed    int
-	Skipped   int
+	Suites     int
+	Behaviors  int
+	Tests      int
+	Benchmarks int
+	Passed     int
+	Failed     int
+	Skipped    int
 	// FailedPackages counts packages whose verdict sits on the package itself
 	// — a build failure, a TestMain os.Exit, a crash outside any test. These
 	// carry no failing behavior, so folding them into Failed would break the
@@ -148,6 +160,33 @@ func BuildTree(events []TestEvent) []*Package {
 		switch ev.Action {
 		case ActionOutput:
 			node.Output = append(node.Output, ev.Output)
+			lastSegment := resolvedSegments[len(resolvedSegments)-1]
+			if isBenchmarkName(lastSegment) {
+				// test2json "output" events are not guaranteed line-aligned;
+				// under real subprocess pipe timing a bench result line can
+				// arrive split mid-token across two consecutive events. Scan
+				// the node's joined output (not just this single event) so a
+				// line only completed by a later event is still found. This
+				// mirrors the defense harvestPackageOutputSamples applies to
+				// the untagged package-output path (see baseline.go).
+				if iters, nsPerOp, bPerOp, allocsPerOp, ok := scanBenchOutput(node.Output); ok {
+					node.Iterations = iters
+					node.NsPerOp = nsPerOp
+					node.BytesPerOp = bPerOp
+					node.AllocsPerOp = allocsPerOp
+					// go test's own -json encoder never emits a "pass"
+					// event for a benchmark (see ActionBench doc comment);
+					// reaching a parsed ns/op line is the only success
+					// signal a real benchmark run ever produces.
+					if node.Status == StatusNone {
+						node.Status = StatusPass
+					}
+				}
+			}
+		case ActionBench:
+			if node.Status == StatusNone {
+				node.Status = StatusPass
+			}
 		case ActionPass, ActionFail, ActionSkip:
 			node.Status = statusFrom(ev.Action)
 			node.Duration = elapsed(ev.Elapsed)
@@ -239,6 +278,66 @@ func stripDuplicateSuffix(s string) string {
 	return s[:idx]
 }
 
+// isBenchmarkName reports whether name is a Go benchmark identifier:
+// "Benchmark" followed by nothing or a non-lowercase character — mirroring
+// the stdlib's TestXxx/BenchmarkXxx convention. This is boundary-aware so
+// that names like "Benchmarking_the_new_endpoint" (lowercase continuation)
+// are not mistaken for benchmark identifiers.
+func isBenchmarkName(name string) bool {
+	rest, ok := strings.CutPrefix(name, protocol.PrefixBenchmark)
+	if !ok {
+		return false
+	}
+	if rest == "" {
+		return true
+	}
+	r, _ := utf8.DecodeRuneInString(rest)
+	return !unicode.IsLower(r)
+}
+
+var benchLineRe = regexp.MustCompile(`^Benchmark\S+?(?:-\d+)?\s+(\d+)\s+([\d.]+) ns/op(?:\s+(\d+) B/op)?(?:\s+(\d+) allocs/op)?`)
+
+// parseBenchOutput parses a go test benchmark result line, e.g.:
+//
+//	BenchmarkFoo-8   	    1201	     985.2 ns/op	      24 B/op	       3 allocs/op
+//
+// B/op and allocs/op are optional (absent unless -benchmem is set).
+func parseBenchOutput(line string) (iters int, nsPerOp float64, bPerOp, allocsPerOp int64, ok bool) {
+	m := benchLineRe.FindStringSubmatch(strings.TrimSpace(line))
+	if m == nil {
+		return 0, 0, 0, 0, false
+	}
+	iters, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0, 0, 0, 0, false
+	}
+	nsPerOp, err = strconv.ParseFloat(m[2], 64)
+	if err != nil {
+		return 0, 0, 0, 0, false
+	}
+	if m[3] != "" {
+		bPerOp, _ = strconv.ParseInt(m[3], 10, 64)
+	}
+	if m[4] != "" {
+		allocsPerOp, _ = strconv.ParseInt(m[4], 10, 64)
+	}
+	return iters, nsPerOp, bPerOp, allocsPerOp, true
+}
+
+// scanBenchOutput joins a node's accumulated output events back into a
+// single stream and re-splits it on "\n" before scanning for a bench result
+// line, so a line split mid-token across two output events (as test2json
+// may produce under real pipe timing) is still parsed correctly.
+func scanBenchOutput(output []string) (iters int, nsPerOp float64, bPerOp, allocsPerOp int64, ok bool) {
+	joined := strings.Join(output, "")
+	for _, line := range strings.Split(joined, "\n") {
+		if iters, nsPerOp, bPerOp, allocsPerOp, ok = parseBenchOutput(line); ok {
+			return
+		}
+	}
+	return 0, 0, 0, 0, false
+}
+
 func CollectStats(packages []*Package) Stats {
 	var s Stats
 	for _, pkg := range packages {
@@ -270,6 +369,10 @@ func PkgFailedOnItsOwn(pkg *Package) bool {
 }
 
 func collectStats(n *Node, s *Stats, inStdlib bool) {
+	if n.Kind == KindBenchmark && len(n.Children) == 0 {
+		s.Benchmarks++
+		return
+	}
 	if n.Kind == KindSuite {
 		s.Suites++
 	}
@@ -308,6 +411,7 @@ func classify(n *Node, topLevel bool) {
 	name := n.Name
 
 	if topLevel {
+		hasTestPrefix := strings.HasPrefix(name, "Test")
 		raw := strings.TrimPrefix(name, "Test")
 
 		if strings.HasPrefix(raw, protocol.PrefixFocused) {
@@ -325,6 +429,14 @@ func classify(n *Node, topLevel bool) {
 		case strings.HasSuffix(raw, protocol.SuffixTestSuite):
 			n.Kind = KindSuite
 			n.Display = strings.TrimSuffix(raw, protocol.SuffixTestSuite)
+		case !hasTestPrefix && isBenchmarkName(raw):
+			// A bare top-level Benchmark* node (no enclosing TestSuite),
+			// e.g. from a plain go test -bench=. -json stream fed via
+			// `gotest spec --input`. Names that started with "Test" (e.g.
+			// "TestBenchmarkFoo", a legitimate stdlib test) must never
+			// reach this branch — hasTestPrefix guards against that.
+			n.Kind = KindBenchmark
+			n.Display = strings.TrimPrefix(raw, protocol.PrefixBenchmark)
 		default:
 			n.Kind = KindTest
 			n.Display = strings.TrimPrefix(raw, "_")
@@ -339,6 +451,9 @@ func classify(n *Node, topLevel bool) {
 		}
 
 		switch {
+		case isBenchmarkName(name):
+			n.Kind = KindBenchmark
+			n.Display = strings.TrimPrefix(name, protocol.PrefixBenchmark)
 		case strings.HasPrefix(name, "Test"):
 			n.Kind = KindMethod
 			n.Display = strings.TrimPrefix(name, "Test")
