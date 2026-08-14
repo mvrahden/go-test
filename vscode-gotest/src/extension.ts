@@ -2,6 +2,8 @@ import * as vscode from "vscode";
 import { DiscoveryCache, DiscoveryService } from "./discovery.js";
 import { GoTestController } from "./testController.js";
 import { TestRunner } from "./runner.js";
+import { BenchRunner } from "./benchRunner.js";
+import { BenchResultStore } from "./benchResultStore.js";
 import { GoTestCodeLensProvider } from "./codeLens.js";
 import { DebugLauncher } from "./debug.js";
 import { FocusExcludeProvider } from "./focusExclude.js";
@@ -53,6 +55,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   let runner!: TestRunner;
   let coverageRunner!: CoverageRunner;
+  let benchRunner!: BenchRunner;
+
+  const benchResultStore = new BenchResultStore(context.workspaceState);
 
   const controller = new GoTestController(
     cache,
@@ -71,6 +76,7 @@ export function activate(context: vscode.ExtensionContext): void {
       ),
     (request, token) => coverageRunner.run(request, token),
     (request, token) => runner.run(request, token, { updateSnapshots: true }),
+    (request, token) => benchRunner.runProfile(request, token),
   );
 
   controller.testController.refreshHandler = async () => {
@@ -125,6 +131,14 @@ export function activate(context: vscode.ExtensionContext): void {
     coverageStore,
   );
 
+  benchRunner = new BenchRunner(
+    controller,
+    cache,
+    benchResultStore,
+    outputChannel,
+  );
+  context.subscriptions.push(benchRunner);
+
   const specViewRefreshDisposable = runner.onDidComplete((jsonOutput) => {
     specView.refresh(jsonOutput, "run");
   });
@@ -142,10 +156,11 @@ export function activate(context: vscode.ExtensionContext): void {
   const diagnostics = new FocusDiagnostics(cache);
   debugLauncher.registerCleanupOnSessionEnd(context);
 
-  const providerDisposables = registerProviders(cache);
+  const providerDisposables = registerProviders(cache, benchResultStore);
   const commandDisposables = registerCommands({
     controller,
     runner,
+    benchRunner,
     debugLauncher,
     discoveryService,
     diagnostics,
@@ -220,8 +235,11 @@ function resolveActiveWorkspaceDir(): string | undefined {
   return folder?.uri.fsPath;
 }
 
-function registerProviders(cache: DiscoveryCache): vscode.Disposable[] {
-  const codeLensProvider = new GoTestCodeLensProvider(cache);
+function registerProviders(
+  cache: DiscoveryCache,
+  benchResultStore?: BenchResultStore,
+): vscode.Disposable[] {
+  const codeLensProvider = new GoTestCodeLensProvider(cache, benchResultStore);
   const codeLensDisposable = vscode.languages.registerCodeLensProvider(
     { language: "go", pattern: "**/*_test.go" },
     codeLensProvider,
@@ -258,6 +276,7 @@ function registerProviders(cache: DiscoveryCache): vscode.Disposable[] {
 function registerCommands(deps: {
   controller: GoTestController;
   runner: TestRunner;
+  benchRunner: BenchRunner;
   debugLauncher: DebugLauncher;
   discoveryService: DiscoveryService;
   diagnostics: FocusDiagnostics;
@@ -271,6 +290,7 @@ function registerCommands(deps: {
   const {
     controller,
     runner,
+    benchRunner,
     debugLauncher,
     discoveryService,
     diagnostics,
@@ -298,6 +318,13 @@ function registerCommands(deps: {
         } finally {
           cts.dispose();
         }
+      },
+    ),
+
+    vscode.commands.registerCommand(
+      "gotest.runBench",
+      async (importPath: string, suiteName: string, methodName?: string) => {
+        await benchRunner.runTarget({ importPath, suiteName, methodName });
       },
     ),
 
