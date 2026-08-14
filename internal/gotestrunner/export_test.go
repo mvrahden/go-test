@@ -57,7 +57,7 @@ func ExportNewLineWriter(dst io.Writer, label string, mu *sync.Mutex) io.WriteCl
 	return newLineWriter(dst, label, mu)
 }
 
-func ExportAutoDetectCI(cfg PipelineConfig) PipelineConfig {
+func ExportAutoDetectCI(cfg PipelineConfig) PipelineConfig { //nolint:gocritic // hugeParam: stable API
 	if !cfg.CI && os.Getenv(protocol.EnvCI) == "" && os.Getenv("CI") != "" {
 		cfg.CI = true
 	}

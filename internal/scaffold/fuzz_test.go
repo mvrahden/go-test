@@ -57,7 +57,7 @@ func newTestSignature(param, result types.Type, withErr bool) *types.Signature {
 	} else {
 		results = types.NewTuple(types.NewVar(0, nil, "", result))
 	}
-	return types.NewSignature(nil, params, results, false)
+	return types.NewSignature(nil, params, results, false) //nolint:staticcheck // SA1019: type parameters irrelevant for this fixture signature
 }
 
 func TestSignaturesInverse(t *testing.T) {

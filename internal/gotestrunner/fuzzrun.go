@@ -282,7 +282,7 @@ func buildFuzzArgs(t FuzzTarget, cfg FuzzRunConfig, d time.Duration) []string { 
 }
 
 func buildFuzzCmd(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, d time.Duration) *exec.Cmd { //nolint:gocritic // hugeParam: stable API
-	cmd := exec.CommandContext(ctx, "go", buildFuzzArgs(t, cfg, d)...)
+	cmd := exec.CommandContext(ctx, "go", buildFuzzArgs(t, cfg, d)...) //nolint:gosec // G204: go tool with arguments the runner assembled itself
 	cmd.Dir = t.Dir
 	return cmd
 }

@@ -248,7 +248,7 @@ func (r *renderer) renderFuzzSuites(buf *bytes.Buffer, pkg *packages.Package, sp
 // func, the pre-joined comma-separated f.Add(...) argument strings for its
 // harvested seed corpus. Returns nil (no-op) when harvesting is disabled or
 // no fuzz methods are present.
-func harvestedSeedsForTemplate(pkg *packages.Package, spec SpecOutcome, harvestSeeds bool) (map[string][]string, error) {
+func harvestedSeedsForTemplate(pkg *packages.Package, spec SpecOutcome, harvestSeeds bool) (map[string][]string, error) { //nolint:gocritic // hugeParam: stable API
 	if !harvestSeeds {
 		return nil, nil
 	}

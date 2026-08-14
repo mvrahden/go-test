@@ -56,7 +56,7 @@ func (s *CmdGotestTestSuite) BeforeAll(t *gotest.T) {
 
 // runCLI runs the built gotest binary from the repo root and returns its
 // combined stdout+stderr output.
-func (s *CmdGotestTestSuite) runCLI(t *gotest.T, args ...string) string {
+func (s *CmdGotestTestSuite) runCLI(t *gotest.T, args ...string) string { //nolint:unused // exercised by the bench stack; kept so the sibling branches merge coherently
 	out, _ := s.runCLIExit(t, args...)
 	return out
 }
@@ -300,7 +300,7 @@ func (s *CmdGotestTestSuite) TestCLISurfaceMatchesSpec(t *gotest.T) {
 type CmdEnvTestSuite struct{}
 
 func (s *CmdEnvTestSuite) TestDetectCIEnv(t *gotest.T) {
-	for sub, tc := range gotest.Each(t, []struct {
+	for sub, tc := range gotest.Each(t, []struct { //nolint:gocritic // rangeValCopy: intentional
 		Desc     string
 		gotestCI string
 		ci       string
@@ -546,7 +546,7 @@ func (s *CmdGotestTestSuite) TestParseSetupTimeoutFlag(t *gotest.T) {
 
 func (s *CmdGotestTestSuite) TestParseExecFlags_HarvestSeeds(t *gotest.T) {
 	falsePtr := false
-	for sub, tc := range gotest.Each(t, []struct {
+	for sub, tc := range gotest.Each(t, []struct { //nolint:gocritic // rangeValCopy: intentional
 		Desc    string
 		ownArgs []string
 		cfg     config.ProjectConfig

@@ -534,7 +534,9 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzMethod")
 		out, _ := renderTestPkg(it.T(), pkg, true)
 
-		fuzzFn := out[strings.Index(out, "func FuzzFuzzTestSuite_FuzzParse"):]
+		idx := strings.Index(out, "func FuzzFuzzTestSuite_FuzzParse")
+		gotest.GreaterOrEqual(it, idx, 0, "fuzz wrapper missing from output")
+		fuzzFn := out[idx:]
 		gotest.Contains(it, fuzzFn, "ƒlifecycleT := gotest.NewTFromTB(f)")
 		gotest.Contains(it, fuzzFn, "f.Cleanup(func() { s.AfterAll(gotest.NewTFromTB(f)) })")
 		gotest.Contains(it, fuzzFn, "s.BeforeAll(ƒlifecycleT)")
@@ -545,7 +547,9 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBoundFuzz")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
-			fuzzFn := out[strings.Index(out, "func FuzzParserFuzzTestSuite_FuzzParse"):]
+			idx := strings.Index(out, "func FuzzParserFuzzTestSuite_FuzzParse")
+			gotest.GreaterOrEqual(it, idx, 0, "fuzz wrapper missing from output")
+			fuzzFn := out[idx:]
 			gotest.Contains(it, fuzzFn, "ƒ_setupFixtures(f)")
 			gotest.Contains(it, fuzzFn, "ParserFuzzTestSuite: ParserFuzzTestSuite{")
 			gotest.Contains(it, fuzzFn, "PoolFixture: ƒ_PoolFixture")
@@ -557,7 +561,9 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 			pkg := loadFuzzHarvestTestPkg(it.T())
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
-			fuzzFn := out[strings.Index(out, "func FuzzHarvestFuzzTestSuite_FuzzTrim"):]
+			idx := strings.Index(out, "func FuzzHarvestFuzzTestSuite_FuzzTrim")
+			gotest.GreaterOrEqual(it, idx, 0, "fuzz wrapper missing from output")
+			fuzzFn := out[idx:]
 			gotest.Contains(it, fuzzFn, `f.Add("hello")`)
 			gotest.Contains(it, fuzzFn, `f.Add("  hi  ")`)
 			gotest.Less(it, strings.Index(fuzzFn, `f.Add(`), strings.Index(fuzzFn, "s.FuzzTrim("), "f.Add(...) lines must precede the user method call")
@@ -567,7 +573,9 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 			pkg := loadFuzzHarvestTestPkg(it.T())
 			out, _ := renderTestPkg(it.T(), pkg, false)
 
-			fuzzFn := out[strings.Index(out, "func FuzzHarvestFuzzTestSuite_FuzzTrim"):]
+			idx := strings.Index(out, "func FuzzHarvestFuzzTestSuite_FuzzTrim")
+			gotest.GreaterOrEqual(it, idx, 0, "fuzz wrapper missing from output")
+			fuzzFn := out[idx:]
 			gotest.NotContains(it, fuzzFn, "f.Add(")
 		})
 	})
