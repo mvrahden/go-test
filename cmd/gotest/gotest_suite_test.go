@@ -18,6 +18,7 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
+	"github.com/mvrahden/go-test/internal/lint"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -177,12 +178,18 @@ func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
 // specTableEntries extracts `name` from rows shaped `| `name` | ... |` within the
 // doc section starting at heading until the next heading of the same level.
 func specTableEntries(doc, heading string) map[string]bool {
+	return specTableEntriesUntil(doc, heading, "\n### ")
+}
+
+// specTableEntriesUntil is specTableEntries with an explicit section
+// terminator, for sections delimited by a different heading level.
+func specTableEntriesUntil(doc, heading, next string) map[string]bool {
 	start := strings.Index(doc, heading)
 	if start < 0 {
 		return nil
 	}
 	section := doc[start:]
-	if end := strings.Index(section[len(heading):], "\n### "); end >= 0 {
+	if end := strings.Index(section[len(heading):], next); end >= 0 {
 		section = section[:len(heading)+end]
 	}
 	entries := map[string]bool{}
@@ -224,6 +231,20 @@ func (s *CmdGotestTestSuite) TestCLISurfaceMatchesSpec(t *gotest.T) {
 			for flag := range documented {
 				_, known := ExportGotestFlags[flag]
 				gotest.True(it, known, "spec.md documents unknown flag %q", flag)
+			}
+		})
+	})
+
+	t.When("comparing the Linter rule tables", func(w *gotest.T) {
+		documented := specTableEntriesUntil(doc, "## Linter", "\n## ")
+		w.It("documents every registered lint rule", func(it *gotest.T) {
+			for _, rule := range lint.RuleIDs() {
+				gotest.True(it, documented[string(rule)], "lint rule %q missing from spec.md", rule)
+			}
+		})
+		w.It("documents no phantom lint rules", func(it *gotest.T) {
+			for id := range documented {
+				gotest.True(it, lint.Known(lint.Rule(id)), "spec.md documents unknown lint rule %q", id)
 			}
 		})
 	})

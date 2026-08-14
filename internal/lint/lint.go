@@ -97,6 +97,17 @@ func Known(r Rule) bool {
 	return ok
 }
 
+// RuleIDs returns every registered rule ID, sorted — the registry surface
+// drift guards compare against documentation.
+func RuleIDs() []Rule {
+	ids := make([]Rule, 0, len(ruleMeta))
+	for r := range ruleMeta {
+		ids = append(ids, r)
+	}
+	slices.Sort(ids)
+	return ids
+}
+
 // SkippableRules is derived from the tier table: every non-integrity rule
 // supports opt-out via a skip flag (and .gotest.yml lint.skip).
 var SkippableRules = func() map[Rule]bool {
