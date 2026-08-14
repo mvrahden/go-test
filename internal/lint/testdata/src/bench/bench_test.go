@@ -2,6 +2,7 @@ package bench
 
 import (
 	"testing"
+	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -115,5 +116,42 @@ func (s *CacheBenchTestSuite) BenchmarkNInsideLoop(b *testing.B) { // want `benc
 func (s *CacheBenchTestSuite) BenchmarkDocSuppressed(b *gotest.B) {
 	for b.Loop() {
 		_ = s.fixture
+	}
+}
+
+// WaitBenchTestSuite exercises bench-wait: waiting primitives inside the
+// measured loop time the wait, not the code.
+type WaitBenchTestSuite struct{}
+
+func (s *WaitBenchTestSuite) BenchmarkSleepInLoop(b *gotest.B) {
+	for b.Loop() {
+		time.Sleep(time.Millisecond) // want `benchmark WaitBenchTestSuite.BenchmarkSleepInLoop calls time.Sleep inside the measured loop — this times the wait, not the code; move it outside the loop`
+	}
+}
+
+func (s *WaitBenchTestSuite) BenchmarkEventuallyInLoop(b *gotest.B) {
+	for b.Loop() {
+		gotest.Eventually(b, time.Second, time.Millisecond, func(poll *gotest.R) {}) // want `benchmark WaitBenchTestSuite.BenchmarkEventuallyInLoop calls gotest.Eventually inside the measured loop — this times the wait, not the code; move it outside the loop`
+	}
+}
+
+func (s *WaitBenchTestSuite) BenchmarkConsistentlyInNLoop(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		gotest.Consistently(b, time.Second, time.Millisecond, func(poll *gotest.R) {}) // want `benchmark WaitBenchTestSuite.BenchmarkConsistentlyInNLoop calls gotest.Consistently inside the measured loop — this times the wait, not the code; move it outside the loop`
+	}
+}
+
+// BenchmarkSleepAboveLoop settles before the measured region — clean.
+func (s *WaitBenchTestSuite) BenchmarkSleepAboveLoop(b *gotest.B) {
+	time.Sleep(time.Millisecond)
+	for b.Loop() {
+		_ = 1
+	}
+}
+
+// BenchmarkSleepSuppressed opts out per line — a deliberate settle.
+func (s *WaitBenchTestSuite) BenchmarkSleepSuppressed(b *gotest.B) {
+	for b.Loop() {
+		time.Sleep(time.Millisecond) //nolint:bench-wait
 	}
 }

@@ -34,6 +34,7 @@ var diagnosticFixtures = []string{
 	"withdirectcalls",
 	"withnolint_file",
 	"withsharedfixture",
+	"bench",
 }
 
 // rewriteFixtures are the packages that additionally pin the rewrite a rule
@@ -61,12 +62,6 @@ func (s *LintTestSuite) TestSuggestedFixes(t *gotest.T) {
 			analysistest.RunWithSuggestedFixes(it.T(), analysistest.TestData(), lint.Analyzer, rewriteFixtures...)
 		})
 	})
-
-	t.When("benchmark methods", func(w *gotest.T) {
-		w.It("detects bench-loop and bench-fixture-io violations", func(it *gotest.T) {
-			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "bench")
-		})
-	})
 }
 
 func (s *LintTestSuite) TestDisableNolintFlag(t *gotest.T) {
@@ -84,7 +79,7 @@ func (s *LintTestSuite) TestTierPolicy(t *gotest.T) {
 		w.It("registers a skip flag for every non-integrity rule and none for integrity rules", func(it *gotest.T) {
 			for _, rule := range []lint.Rule{
 				lint.StdlibTest, lint.Testify, lint.AssertionSimplify, lint.AssertionRedundant, lint.FailGuard, lint.TEscape,
-				lint.BenchFixtureIO,
+				lint.BenchFixtureIO, lint.BenchWait,
 			} {
 				gotest.NotZero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "missing skip flag for %s", rule)
 				gotest.True(it, lint.SkippableRules[rule], "rule %s should be skippable", rule)

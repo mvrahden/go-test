@@ -43,6 +43,7 @@ const (
 	BehaviorWording Rule = "behavior-wording"
 	BenchLoop       Rule = "bench-loop"
 	BenchFixtureIO  Rule = "bench-fixture-io"
+	BenchWait       Rule = "bench-wait"
 	// SharedFixtureUndeclared is integrity: window scheduling starts only
 	// the fixtures scheduled suites declare, so an undeclared read may hit
 	// a fixture that never started or is already released.
@@ -99,6 +100,9 @@ var ruleMeta = map[Rule]struct {
 	// skippable.
 	BenchLoop:      {TierIntegrity, ScopeSuites},
 	BenchFixtureIO: {TierExpressiveness, ScopeSuites},
+	// bench-wait sits with bench-fixture-io: a deliberate settle inside
+	// the loop can be legitimate, so it stays skippable.
+	BenchWait: {TierExpressiveness, ScopeSuites},
 
 	SharedFixtureUndeclared: {TierIntegrity, ScopeSuites},
 }
@@ -191,6 +195,7 @@ func run(pass *analysis.Pass) (any, error) {
 	checkBehaviorWording(pass, insp)
 	checkBenchLoop(pass, insp, suites)
 	checkBenchFixtureIO(pass, insp, suites)
+	checkBenchWait(pass, insp, suites)
 
 	return nil, nil
 }

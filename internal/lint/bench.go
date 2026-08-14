@@ -3,6 +3,7 @@ package lint
 import (
 	"go/ast"
 	"go/token"
+	"go/types"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/protocol"
@@ -95,6 +96,74 @@ func checkBenchFixtureIO(pass *analysis.Pass, insp *inspector.Inspector, suites 
 			"benchmark %s reads fixture-backed state %s inside the measured loop — hoist the read above the loop, or you are timing whatever backs the fixture",
 			recvName+"."+methodName, recvIdent+"."+field)
 	})
+}
+
+// checkBenchWait flags waiting primitives inside the measured loop of a
+// Benchmark* suite method: time.Sleep and gotest's Eventually/Consistently
+// pollers. The loop then times the wait, not the code — a result that says
+// nothing about the operation being benchmarked. Settling belongs above
+// the loop; a property that needs polling belongs in a test, not a
+// benchmark.
+func checkBenchWait(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo) {
+	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
+		fd := n.(*ast.FuncDecl)
+		if fd.Body == nil || !isPointerReceiver(fd.Recv) {
+			return
+		}
+
+		recvName := receiverTypeName(fd.Recv)
+		if _, ok := suites[recvName]; !ok {
+			return
+		}
+
+		methodName := fd.Name.Name
+		if !isBenchmarkMethodName(methodName) {
+			return
+		}
+
+		param := benchParamName(fd)
+		if param == "" {
+			return
+		}
+		region := benchMeasuredRegion(fd.Body, param)
+		if region == nil {
+			return
+		}
+
+		ast.Inspect(region, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			if name := waitingCallName(pass, call); name != "" {
+				report(pass, BenchWait, call.Pos(),
+					"benchmark %s calls %s inside the measured loop — this times the wait, not the code; move it outside the loop",
+					recvName+"."+methodName, name)
+			}
+			return true
+		})
+	})
+}
+
+// waitingCallName resolves call to a known waiting primitive — time.Sleep
+// (matched by import path, so aliased imports stay covered) or gotest's
+// Eventually/Consistently — and returns its display name, or "".
+func waitingCallName(pass *analysis.Pass, call *ast.CallExpr) string {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return ""
+	}
+	if id, ok := sel.X.(*ast.Ident); ok && sel.Sel.Name == "Sleep" {
+		if pkgName, ok := pass.TypesInfo.Uses[id].(*types.PkgName); ok && pkgName.Imported().Path() == "time" {
+			return "time.Sleep"
+		}
+	}
+	if fn, ok := pass.TypesInfo.Uses[sel.Sel].(*types.Func); ok && fn.Pkg() != nil && fn.Pkg().Path() == gotestImportPath {
+		if fn.Name() == "Eventually" || fn.Name() == "Consistently" {
+			return "gotest." + fn.Name()
+		}
+	}
+	return ""
 }
 
 // receiverIdentName returns the receiver's identifier name (e.g. "s" in
