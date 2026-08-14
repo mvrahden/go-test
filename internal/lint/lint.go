@@ -38,6 +38,10 @@ const (
 	AssertionRedundant Rule = "assertion-redundant"
 	TEscape            Rule = "t-escape"
 	SuiteLifecycle     Rule = "suite-lifecycle"
+	// SharedFixtureUndeclared is integrity: window scheduling starts only
+	// the fixtures scheduled suites declare, so an undeclared read may hit
+	// a fixture that never started or is already released.
+	SharedFixtureUndeclared Rule = "shared-fixture-undeclared"
 )
 
 // Tier classifies what breaks when a rule's finding is ignored, and derives
@@ -83,6 +87,8 @@ var ruleMeta = map[Rule]struct {
 	TEscape:            {TierExpressiveness, ScopeSuites},
 	SuiteLifecycle:     {TierIntegrity, ScopeSuites},
 	FailGuard:          {TierExpressiveness, ScopeGotestFiles},
+
+	SharedFixtureUndeclared: {TierIntegrity, ScopeSuites},
 }
 
 // Known reports whether the rule ID exists.
@@ -143,6 +149,7 @@ func run(pass *analysis.Pass) (any, error) {
 		checkMethods(pass, insp, suites)
 		checkFocusPrefixes(pass, suites)
 		checkLifecyclePairs(pass, suites)
+		checkSharedFixtureUndeclared(pass, insp, suites)
 	}
 
 	checkOrphanedFiles(pass)

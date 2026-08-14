@@ -1296,6 +1296,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `poll-scope` | Assertions inside `Eventually`/`Consistently` callbacks using the outer `t` instead of `poll` |
 | `assertion-type-guard` | `Nil`/`Empty` on types their runtime guards would reject |
 | `generated-file` | `gotest_p(x)suite_test.go` files present in source control |
+| `shared-fixture-undeclared` | Suite-method reads of a `*SharedFixture` value the suite never declared as a pointer field (directly or through the fixture DAG) — window scheduling starts only declared fixtures, so the value may be absent; locally-constructed fixtures (fixture self-tests) are exempt |
 
 **Expressiveness** — the test is correct but says it worse. Suppressible per line or project-wide via `lint.skip`.
 
