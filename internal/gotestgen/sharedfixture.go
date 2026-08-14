@@ -26,6 +26,10 @@ type SharedFixtureInfo struct {
 	LocalFields      []string          // exported fields assigned in Hydrate
 	Dependencies     []string          // state keys of shared fixtures this one depends on
 	DependencyFields map[string]string // dep state key → field name in this struct
+	// Deferred is runner scheduling, not discovery output: a deferred fixture
+	// is compiled into the setup program but not started up-front — it starts
+	// when a StartKeys command names it (the bulk→tail barrier).
+	Deferred bool
 }
 
 type sharedSetupData struct {
@@ -61,6 +65,7 @@ type sharedSetupFixture struct {
 	DependsOnVars     []string           // var names of fixtures this depends on (e.g. ["sf0"])
 	DependsOnIndices  []int              // indices of dependency fixtures in the Fixtures slice
 	ParentAssignments []parentAssignment // parent var → field name assignments
+	Deferred          bool               // excluded from the up-front phase; starts on StartKeys
 }
 
 // GenerateSharedSetup generates a standalone Go main package source that
@@ -131,6 +136,7 @@ func GenerateSharedSetup(fixtures []SharedFixtureInfo) ([]byte, error) {
 			DependsOnVars:     dependsOnVars,
 			DependsOnIndices:  dependsOnIndices,
 			ParentAssignments: parentAssigns,
+			Deferred:          sf.Deferred,
 		})
 	}
 

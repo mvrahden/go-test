@@ -460,6 +460,7 @@ func (f *PostgresSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 
 Suites reference shared fixtures via pointer fields (same as package fixtures).
 Shared fixtures must not live in `internal/` packages.
+Shared fixtures are window-scheduled: each is resident exactly while a scheduled suite needs it — never started when no dispatched suite requires it, and released or started at the bulk→exclusive-tail barrier as the phases' needs differ.
 
 ### Generic test suites (contract testing)
 

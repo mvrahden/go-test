@@ -3,6 +3,7 @@ package gotestrunner
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -94,6 +95,34 @@ func applyTeardownFailure(result *PipelineResult, err error) {
 	if result.CapturedJSON != nil {
 		result.CapturedJSON = appendRunFailureEvents(result.CapturedJSON, "shared fixtures", err.Error())
 	}
+}
+
+// fixtureBarrier performs the bulk→tail window transition on the setup
+// process: release what only the bulk needed (the subprocess applies
+// reverse-DAG order), then start what only the tail needs (DAG order).
+// Skipped entirely on cancellation — the terminal Teardown owns shutdown.
+// refreshStateFile is batch mode's concern: its suites read the one global
+// state file, which must gain the late-started fixtures' state.
+func fixtureBarrier(ctx context.Context, proc *SharedFixtureProcess, bulkAlive, tailAlive map[string]bool, setupTimeout time.Duration, refreshStateFile bool) error {
+	if proc == nil || ctx.Err() != nil {
+		return nil
+	}
+	var errs []error
+	if release := diffKeys(bulkAlive, tailAlive); len(release) > 0 {
+		if err := proc.TeardownKeys(release, proc.teardownBudget()); err != nil {
+			errs = append(errs, fmt.Errorf("early shared fixture teardown: %w", err))
+		}
+	}
+	if acquire := diffKeys(tailAlive, bulkAlive); len(acquire) > 0 {
+		err := proc.StartKeys(acquire, setupTimeout)
+		if err == nil && refreshStateFile {
+			err = proc.RefreshStateFile()
+		}
+		if err != nil {
+			errs = append(errs, fmt.Errorf("shared fixture start for exclusive tail: %w", err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // stageFailurePkg names the synthetic package under which a build failure
@@ -285,8 +314,11 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		return PipelineResult{ExitCode: 2}, err
 	}
 	defer cancelPrepare()
+	// barrierErr collects window-boundary failures (early teardown, tail
+	// start); they merge with the terminal Teardown's verdict below.
+	var barrierErr error
 	if setupProc != nil {
-		defer func() { applyTeardownFailure(&result, setupProc.Teardown()) }()
+		defer func() { applyTeardownFailure(&result, errors.Join(barrierErr, setupProc.Teardown())) }()
 	}
 
 	select {
@@ -329,7 +361,25 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		defer mergeCoverProfiles(targets, pf.UserCoverProfile)
 	}
 
-	RunSuites(ctx, targets, extraEnv, maxParallel, collector)
+	// The barrier re-windows shared fixtures between the parallel bulk and
+	// the exclusive tail. Alive(tail) comes from the actual exclusive targets
+	// — the plan narrowed by compile results — so a fixture whose only tail
+	// suite never became runnable is released, not started.
+	var tailTargets []SuiteTarget
+	for i := range targets {
+		if targets[i].Exclusive {
+			tailTargets = append(tailTargets, targets[i])
+		}
+	}
+	barrier := func() {
+		if len(tailTargets) == 0 {
+			return // nothing dispatches after the bulk; run-end teardown owns the rest
+		}
+		tailAlive := aliveFromTargets(tailTargets, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
+		barrierErr = fixtureBarrier(ctx, setupProc, win.Bulk, tailAlive, resolveSetupTimeout(cfg.SetupTimeout), true)
+	}
+
+	RunSuites(ctx, targets, extraEnv, maxParallel, collector, barrier)
 	collector.Finalize(overlay.NoSuitePackages)
 
 	return PipelineResult{
@@ -573,6 +623,21 @@ loop:
 
 	wg.Wait()
 
+	// Bulk→tail barrier: re-window shared fixtures for the exclusive tail.
+	// Alive(tail) comes from the actual deferred targets — suites whose
+	// packages never compiled are not in it. Skipped entirely on cancellation
+	// or when nothing dispatches after the bulk: the terminal Teardown owns
+	// whatever is still resident.
+	var barrierErr error
+	if len(deferredExclusive) > 0 && setupProc != nil && !sharedSetupFailed.Load() {
+		tailTargets := make([]SuiteTarget, 0, len(deferredExclusive))
+		for i := range deferredExclusive {
+			tailTargets = append(tailTargets, deferredExclusive[i].t)
+		}
+		tailAlive := aliveFromTargets(tailTargets, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
+		barrierErr = fixtureBarrier(streamCtx, setupProc, win.Bulk, tailAlive, resolvedSetupTimeout, false)
+	}
+
 	// Exclusive suites own the machine: after the stream has fully drained,
 	// one at a time, in deterministic order. Shared fixture processes stay up
 	// — they are infrastructure the suites talk to, not competing suites —
@@ -615,7 +680,7 @@ loop:
 	// its own from one that simply obeyed the signal it never sent.
 	var teardownErr error
 	if setupProc != nil {
-		teardownErr = setupProc.Teardown()
+		teardownErr = errors.Join(barrierErr, setupProc.Teardown())
 	}
 	streamCancel()
 

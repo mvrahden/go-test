@@ -426,12 +426,14 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 				}
 			}
 			gotest.Equal(it, []string{
+				"bufio",
 				"context",
 				"encoding/json",
 				"errors",
 				"fmt",
 				"os",
 				"os/signal",
+				"strings",
 				"sync",
 				"syscall",
 				"time",

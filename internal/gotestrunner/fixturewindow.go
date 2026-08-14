@@ -3,6 +3,7 @@ package gotestrunner
 import (
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 )
@@ -39,13 +40,46 @@ func planFixtureWindows(overlay *OverlayResult, userRunFilter string) fixtureWin
 		Tail: aliveFixtureKeys(tail, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures),
 	}
 	for i := range overlay.SharedFixtures {
-		if key := sharedFixtureKey(&overlay.SharedFixtures[i]); w.Bulk[key] || w.Tail[key] {
+		key := sharedFixtureKey(&overlay.SharedFixtures[i])
+		switch {
+		case w.Bulk[key]:
 			w.Fixtures = append(w.Fixtures, overlay.SharedFixtures[i])
-		} else {
+		case w.Tail[key]:
+			// Tail-only fixtures ride along deferred: compiled into the setup
+			// program, started by StartKeys at the bulk→tail barrier.
+			sf := overlay.SharedFixtures[i]
+			sf.Deferred = true
+			w.Fixtures = append(w.Fixtures, sf)
+		default:
 			w.Skipped++
 		}
 	}
 	return w
+}
+
+// aliveFromTargets computes the alive set for one phase's actual targets —
+// the plan narrowed by compile results. Targets carry test function names in
+// SuiteName, matching the required-keys maps.
+func aliveFromTargets(targets []SuiteTarget, reqKeys map[string]map[string][]string, fixtures []gotestgen.SharedFixtureInfo) map[string]bool {
+	phase := map[string][]string{}
+	for i := range targets {
+		phase[targets[i].Package] = append(phase[targets[i].Package], targets[i].SuiteName)
+	}
+	return aliveFixtureKeys(phase, reqKeys, fixtures)
+}
+
+// diffKeys returns set ∖ minus, sorted for deterministic commands and
+// messages. Execution order is the subprocess's job — it applies its
+// generated (reverse-)topological order regardless of the order sent.
+func diffKeys(set, minus map[string]bool) []string {
+	var out []string
+	for k := range set {
+		if !minus[k] {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // reportSkipped emits the one debug line for fixtures the plan never starts.

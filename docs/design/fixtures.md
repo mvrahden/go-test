@@ -363,6 +363,21 @@ Before anything starts, the runner computes the set of suites the run will dispa
 A fixture nothing scheduled needs is never started, and can therefore never fail the run.
 When fixtures are skipped this way, the runner emits one debug line to stderr: `gotest: N shared fixture(s) not started (no scheduled suite requires them)`.
 
+### Window scheduling
+
+A run dispatches in two phases: the parallel bulk, then the serial tail of `Exclusive` suites.
+Each phase has an alive set — `Alive(phase)` is the DAG-closure of the union of the shared fixture keys the phase's suites require — and a shared fixture is resident exactly for the phases that need it:
+
+- Fixtures in neither alive set never start.
+- `Alive(bulk)` starts up-front, concurrent with package compilation.
+- At the bulk→tail barrier — every parallel suite drained, no exclusive suite dispatched yet — the runner tears down `Alive(bulk) ∖ Alive(tail)` in reverse dependency order, then starts `Alive(tail) ∖ Alive(bulk)` in dependency order, under the same per-fixture retry and budget policy as the up-front phase.
+- Run-end teardown releases whatever is still resident. Fixtures released at the barrier are skipped there: every fixture's teardown has exactly one owner.
+
+The barrier speaks two verbs to the setup subprocess over its stdin — start and teardown, each naming a set of state keys — acknowledged on stdout after any late state lines.
+`Alive(tail)` is computed from the tail suites that actually became runnable, so a fixture whose only exclusive suite failed to compile is released at the barrier, not started for nothing.
+On cancellation the barrier is skipped entirely and run-end teardown owns everything.
+Window scheduling is always on; there is no configuration.
+
 ### Lazy, reference-counted lifecycle
 
 Fixture setup does not run at package init.
@@ -381,6 +396,7 @@ The default `gotest` run streams: each shared fixture's state is emitted as its 
 - Shared-fixture setup failure aborts the run: exit code 2 in batch modes (`watch`/`spec`/`summary`/`prepare`); in the default streaming run the affected suites are reported as failures (exit 1).
   In-test-process package-fixture setup failure is a `t.Fatalf` (exit 1).
 - Fixture teardown failure flips an otherwise passing run to a failure (`fixture teardown failed`).
+- Barrier-time failures — an early teardown or a tail-phase start — fail the run through the same aggregation as run-end teardown failures; the terminal teardown still runs and owns the remainder.
 
 ### Config markers
 

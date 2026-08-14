@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -45,6 +46,10 @@ type SharedFixtureProcess struct {
 	allDone  chan struct{}
 	setupErr error
 	waitErr  error // exit status of the subprocess; valid once done is closed
+
+	stdin   io.WriteCloser // command channel for window verbs (StartKeys/TeardownKeys)
+	cmdMu   sync.Mutex     // serializes commands: one in flight, one _cmd ack each
+	cmdResp chan string    // _cmd ack payloads (error text, "" on success)
 }
 
 // StateFile returns the path to the shared fixture state JSON file.
@@ -185,6 +190,89 @@ func (p *SharedFixtureProcess) WriteStateFileForKeys(name string, keys []string)
 	return path, nil
 }
 
+// StartKeys asks the setup subprocess to start the given fixtures now — the
+// opening half of a window boundary. The subprocess runs them in dependency
+// order under the same per-fixture retry and budget policy as the up-front
+// phase, and streams their state lines before acknowledging. Blocks until the
+// acknowledgement; timeout 0 means no deadline.
+func (p *SharedFixtureProcess) StartKeys(keys []string, timeout time.Duration) error {
+	return p.command("start", keys, timeout)
+}
+
+// TeardownKeys asks the setup subprocess to tear down the given fixtures now,
+// in reverse dependency order — the releasing half of a window boundary.
+// Teardown (the terminal owner) later skips keys already released here.
+// Blocks until the acknowledgement; timeout 0 means no deadline.
+func (p *SharedFixtureProcess) TeardownKeys(keys []string, timeout time.Duration) error {
+	return p.command("teardown", keys, timeout)
+}
+
+func (p *SharedFixtureProcess) command(verb string, keys []string, timeout time.Duration) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	if p.stdin == nil {
+		return fmt.Errorf("shared fixture process has no command channel")
+	}
+	p.cmdMu.Lock()
+	defer p.cmdMu.Unlock()
+
+	// Drain a stale ack a timed-out predecessor left behind: every command
+	// gets exactly one ack, and it must be its own.
+	select {
+	case <-p.cmdResp:
+	default:
+	}
+
+	line, err := json.Marshal(struct {
+		Verb string   `json:"verb"`
+		Keys []string `json:"keys"`
+	}{Verb: verb, Keys: keys})
+	if err != nil {
+		return err
+	}
+	if _, err := p.stdin.Write(append(line, '\n')); err != nil {
+		return fmt.Errorf("send %s to shared fixture process: %w", verb, err)
+	}
+
+	var deadline <-chan time.Time
+	if timeout > 0 {
+		timer := time.NewTimer(timeout)
+		defer timer.Stop()
+		deadline = timer.C
+	}
+	select {
+	case msg := <-p.cmdResp:
+		if msg != "" {
+			return fmt.Errorf("shared fixture %s: %s", verb, msg)
+		}
+		return nil
+	case <-p.done:
+		return fmt.Errorf("shared fixture process exited before acknowledging %s", verb)
+	case <-deadline:
+		return fmt.Errorf("shared fixture %s timed out after %v", verb, timeout)
+	}
+}
+
+// RefreshStateFile rewrites the global state file (the one WaitAllReady wrote
+// and every batch suite's env points at) from the current accumulated state —
+// after StartKeys added late fixtures, the file must contain them.
+func (p *SharedFixtureProcess) RefreshStateFile() error {
+	if p.stateFile == "" {
+		return nil
+	}
+	p.mu.Lock()
+	data, err := json.Marshal(p.state)
+	p.mu.Unlock()
+	if err != nil {
+		return fmt.Errorf("re-marshal shared fixture state: %w", err)
+	}
+	if err := os.WriteFile(p.stateFile, data, 0600); err != nil {
+		return fmt.Errorf("refresh shared fixture state file: %w", err)
+	}
+	return nil
+}
+
 // Teardown signals the shared fixture subprocess to shut down and waits for it
 // to complete within its teardown budget (30 seconds if none was reported). A
 // process that outlives the budget is forcibly killed, and that is reported as
@@ -303,6 +391,10 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	if err != nil {
 		return nil, err
 	}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
 
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start shared fixture process: %w", err)
@@ -327,6 +419,8 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		ready:           ready,
 		state:           state,
 		allDone:         allDone,
+		stdin:           stdin,
+		cmdResp:         make(chan string, 1),
 	}
 
 	go func() {
@@ -335,8 +429,12 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 			close(waitDone)
 		}()
 		closedReady := make(map[string]bool, len(ready))
+		doneSeen := false
 		scanner := bufio.NewScanner(stdout)
 		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		// The scan outlives _done: window verbs keep the stream alive with
+		// late state lines (deferred StartKeys) and _cmd acknowledgements,
+		// until EOF at process exit.
 		for scanner.Scan() {
 			var entry fixtureStateEntry
 			if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
@@ -355,8 +453,18 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 						proc.mu.Unlock()
 					}
 				}
+				doneSeen = true
 				close(allDone)
-				return
+				continue
+			}
+			if entry.Key == "_cmd" {
+				// Ack for the one in-flight command; drop it if no one waits
+				// (the commander timed out) rather than stall the scan.
+				select {
+				case proc.cmdResp <- entry.Error:
+				default:
+				}
+				continue
 			}
 			proc.mu.Lock()
 			state[entry.Key] = entry.State
@@ -365,6 +473,9 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 				close(ch)
 				closedReady[entry.Key] = true
 			}
+		}
+		if doneSeen {
+			return
 		}
 		if err := scanner.Err(); err != nil {
 			proc.setupErr = fmt.Errorf("reading subprocess stdout: %w", err)

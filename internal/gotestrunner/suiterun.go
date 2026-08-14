@@ -66,7 +66,10 @@ const (
 // RunSuites executes each suite target in its own subprocess with bounded
 // concurrency. Results are recorded via the collector, which handles
 // mode-specific output formatting, JSON event filtering, and package ordering.
-func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int, collector *OutputCollector) {
+// barrier, when non-nil, runs at the bulk→tail boundary — after every
+// parallel suite has drained, before the first exclusive suite dispatches —
+// so the caller can re-window shared fixtures.
+func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int, collector *OutputCollector, barrier func()) {
 	if maxParallel <= 0 {
 		maxParallel = 2 * runtime.GOMAXPROCS(0)
 	}
@@ -115,6 +118,10 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 		}(i, target)
 	}
 	wg.Wait()
+
+	if barrier != nil {
+		barrier()
+	}
 
 	// Exclusive suites own the machine: strictly after the parallel bulk,
 	// one at a time, in deterministic order. Their verdicts measure
