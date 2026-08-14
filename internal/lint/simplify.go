@@ -126,6 +126,10 @@ func mapBoolBinary(pass *analysis.Pass, bin *ast.BinaryExpr, negated bool) (cond
 			return m, true
 		}
 		l, r := constFirst(pass, left, right)
+		l, r, ok := unifyEqualOperands(pass, l, r)
+		if !ok {
+			return conditionMapping{}, false
+		}
 		return conditionMapping{pick(negated, "NotEqual", "Equal"), []ast.Expr{l, r}, "== comparison"}, true
 
 	case token.NEQ:
@@ -139,6 +143,10 @@ func mapBoolBinary(pass *analysis.Pass, bin *ast.BinaryExpr, negated bool) (cond
 			return m, true
 		}
 		l, r := constFirst(pass, left, right)
+		l, r, ok := unifyEqualOperands(pass, l, r)
+		if !ok {
+			return conditionMapping{}, false
+		}
 		return conditionMapping{pick(negated, "Equal", "NotEqual"), []ast.Expr{l, r}, "!= comparison"}, true
 
 	case token.GTR:
@@ -235,6 +243,70 @@ func mapEmptyStrEqNeq(pass *analysis.Pass, left, right ast.Expr, negated, isNeq 
 	return conditionMapping{pick(!positive, "NotEmpty", "Empty"), []ast.Expr{other}, "empty string check"}, true
 }
 
+// unifyEqualOperands vets l and r as Equal/NotEqual operands, which must
+// unify to the single type parameter V — == and reflect.DeepEqual accept
+// mixed static types. An any-typed side bridges the mismatch via
+// conversion; any other mismatch maps to no assertion. Ordered comparisons
+// need no vetting: Go demands identical basic types there.
+func unifyEqualOperands(pass *analysis.Pass, l, r ast.Expr) (ast.Expr, ast.Expr, bool) {
+	tl := pass.TypesInfo.TypeOf(l)
+	tr := pass.TypesInfo.TypeOf(r)
+	if tl == nil || tr == nil {
+		return nil, nil, false
+	}
+	if types.Identical(tl, tr) {
+		return l, r, true
+	}
+	switch {
+	case isAnyInterface(tl):
+		return l, convertToAny(pass, r), true
+	case isAnyInterface(tr):
+		return convertToAny(pass, l), r, true
+	}
+	return nil, nil, false
+}
+
+// isAnyInterface reports whether t is the unnamed empty interface; a
+// defined empty-interface type would still not unify with any(x).
+func isAnyInterface(t types.Type) bool {
+	iface, ok := types.Unalias(t).(*types.Interface)
+	return ok && iface.Empty()
+}
+
+// convertToAny wraps expr in an any(...) conversion; untyped constants
+// adapt to the inferred type on their own and pass through bare.
+func convertToAny(pass *analysis.Pass, expr ast.Expr) ast.Expr {
+	if isUntypedConstExpr(pass, expr) {
+		return expr
+	}
+	return &ast.CallExpr{Fun: ast.NewIdent("any"), Args: []ast.Expr{expr}}
+}
+
+func isUntypedConstExpr(pass *analysis.Pass, expr ast.Expr) bool {
+	switch e := expr.(type) {
+	case *ast.ParenExpr:
+		return isUntypedConstExpr(pass, e.X)
+	case *ast.BasicLit:
+		return true
+	case *ast.UnaryExpr:
+		return (e.Op == token.ADD || e.Op == token.SUB) && isUntypedConstExpr(pass, e.X)
+	case *ast.Ident:
+		return isUntypedConstObj(pass.TypesInfo.Uses[e])
+	case *ast.SelectorExpr:
+		return isUntypedConstObj(pass.TypesInfo.Uses[e.Sel])
+	}
+	return false
+}
+
+func isUntypedConstObj(obj types.Object) bool {
+	c, ok := obj.(*types.Const)
+	if !ok {
+		return false
+	}
+	b, ok := c.Type().(*types.Basic)
+	return ok && b.Info()&types.IsUntyped != 0
+}
+
 // constFirst orders Equal/NotEqual operands: a lone constant operand —
 // literal, negative literal, or named constant — is the expected value and
 // belongs in the expected slot.
@@ -280,7 +352,9 @@ func mapBoolCall(pass *analysis.Pass, inner *ast.CallExpr, negated bool) (condit
 	}
 
 	if a, b, ok := isReflectDeepEqual(inner); ok {
-		return conditionMapping{pick(negated, "NotEqual", "Equal"), []ast.Expr{a, b}, "reflect.DeepEqual call"}, true
+		if a, b, ok := unifyEqualOperands(pass, a, b); ok {
+			return conditionMapping{pick(negated, "NotEqual", "Equal"), []ast.Expr{a, b}, "reflect.DeepEqual call"}, true
+		}
 	}
 	return conditionMapping{}, false
 }

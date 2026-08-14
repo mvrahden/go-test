@@ -474,3 +474,24 @@ func TestConstFirstSimplify(t *testing.T) {
 	x := 7
 	gotest.True(t, x == limit) // want `use Equal instead of True for == comparison`
 }
+
+// === mixed static operand types: any-typed sides bridge via conversion;
+// other mismatches stay untouched ===
+
+type mixedErr struct{ msg string }
+
+func (e *mixedErr) Error() string { return e.msg }
+
+func TestMixedTypeSimplify(t *testing.T) {
+	row := map[string]any{"id": "a"}
+	id := "b"
+	gotest.True(t, row["id"] == id)     // want `use Equal instead of True for == comparison`
+	gotest.False(t, row["id"] == id)    // want `use NotEqual instead of False for == comparison`
+	gotest.True(t, row["id"] == "gone") // want `use Equal instead of True for == comparison`
+	var boom error = &mixedErr{msg: "boom"}
+	target := &mixedErr{msg: "boom"}
+	gotest.True(t, boom == target)
+	xs := []int{1}
+	ys := []string{"a"}
+	gotest.True(t, reflect.DeepEqual(xs, ys))
+}

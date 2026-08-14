@@ -2,6 +2,7 @@ package withsimplify //nolint:stdlib-test
 
 import (
 	"errors"
+	"reflect"
 	"regexp"
 	"testing"
 
@@ -471,4 +472,25 @@ func TestConstFirstSimplify(t *testing.T) {
 	const limit = 9
 	x := 7
 	gotest.Equal(t, limit, x) // want `use Equal instead of True for == comparison`
+}
+
+// === mixed static operand types: any-typed sides bridge via conversion;
+// other mismatches stay untouched ===
+
+type mixedErr struct{ msg string }
+
+func (e *mixedErr) Error() string { return e.msg }
+
+func TestMixedTypeSimplify(t *testing.T) {
+	row := map[string]any{"id": "a"}
+	id := "b"
+	gotest.Equal(t, row["id"], any(id))    // want `use Equal instead of True for == comparison`
+	gotest.NotEqual(t, row["id"], any(id)) // want `use NotEqual instead of False for == comparison`
+	gotest.Equal(t, "gone", row["id"])     // want `use Equal instead of True for == comparison`
+	var boom error = &mixedErr{msg: "boom"}
+	target := &mixedErr{msg: "boom"}
+	gotest.True(t, boom == target)
+	xs := []int{1}
+	ys := []string{"a"}
+	gotest.True(t, reflect.DeepEqual(xs, ys))
 }
