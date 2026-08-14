@@ -33,6 +33,9 @@ inputs:
   bench-gate:
     description: "Fail the run if any benchmark regresses by more than this percent (gotest bench --gate)"
     required: false
+  bench-save:
+    description: "Save the benchmark run as a JSON baseline at this path (gotest bench --save); an explicit empty string saves to bench.baseline from .gotest.yml"
+    default: "false"
   version:
     description: "gotest version: 'gomod' (default) resolves from go.mod, or a version tag (e.g. v1.0.0, latest) to install globally."
     default: "gomod"
@@ -44,6 +47,12 @@ outputs:
   coverage:
     description: "Coverage percentage (empty if coverage not enabled)"
     value: ${{ steps.test.outputs.coverage }}
+  bench-report:
+    description: "Path to the gotest bench --json report file (empty if bench not enabled)"
+    value: ${{ steps.bench.outputs.bench-report }}
+  bench-breached-keys:
+    description: "Comma-joined benchmark keys that breached the gate (empty if none or no gate)"
+    value: ${{ steps.bench.outputs.bench-breached-keys }}
 
 runs:
   using: "composite"
@@ -120,12 +129,15 @@ runs:
         exit "$exit_code"
 
     - name: Run benchmarks
+      id: bench
       if: ${{ inputs.bench == 'true' }}
       shell: bash
       env:
         INPUT_PACKAGES: ${{ inputs.packages }}
         INPUT_BENCH_BASELINE: ${{ inputs.bench-baseline }}
         INPUT_BENCH_GATE: ${{ inputs.bench-gate }}
+        INPUT_BENCH_SAVE: ${{ inputs.bench-save }}
+        INPUT_FLAGS: ${{ inputs.flags }}
         INPUT_VERSION: ${{ inputs.version }}
       run: |
         if [ "$INPUT_VERSION" != "gomod" ]; then
@@ -136,9 +148,11 @@ runs:
 
         # gotest bench's own --spec/--github wiring writes the markdown
         # delta table to $GITHUB_STEP_SUMMARY automatically (mirroring how
-        # `gotest summary --github` does it above), so this step only
-        # needs to invoke it with the right flags.
-        args=(bench --spec)
+        # `gotest summary --github` does it above). Under --json the human
+        # rendering moves entirely into the step summary: stdout carries
+        # the versioned report document, captured to a file for consumers.
+        report="$(mktemp -t gotest-bench-XXXXXX.json)"
+        args=(bench --spec --json)
 
         if [ -n "$INPUT_BENCH_BASELINE" ]; then
           args+=("--against=$INPUT_BENCH_BASELINE")
@@ -148,7 +162,34 @@ runs:
           args+=("--gate=$INPUT_BENCH_GATE")
         fi
 
+        # bench-save: "false" (the default) skips saving; an explicit empty
+        # string becomes bare --save= (the bench.baseline config fallback);
+        # anything else is the baseline path.
+        if [ "$INPUT_BENCH_SAVE" != "false" ]; then
+          args+=("--save=$INPUT_BENCH_SAVE")
+        fi
+
+        if [ -n "$INPUT_FLAGS" ]; then
+          read -ra extra <<< "$INPUT_FLAGS"
+          args+=("${extra[@]}")
+        fi
+
         read -ra pkgs <<< "$INPUT_PACKAGES"
         args+=("${pkgs[@]}")
 
-        "${cmd[@]}" "${args[@]}"
+        set +e
+        "${cmd[@]}" "${args[@]}" > "$report"
+        exit_code=$?
+        set -e
+
+        echo "bench-report=$report" >> "$GITHUB_OUTPUT"
+
+        # Comma-join gate.breachedKeys from the report without requiring
+        # jq on the runner (python3 ships on all hosted images).
+        breached=""
+        if [ -s "$report" ]; then
+          breached=$(python3 -c 'import json, sys; r = json.load(open(sys.argv[1])); g = r.get("gate") or {}; print(",".join(g.get("breachedKeys") or []), end="")' "$report" 2>/dev/null || true)
+        fi
+        echo "bench-breached-keys=$breached" >> "$GITHUB_OUTPUT"
+
+        exit "$exit_code"

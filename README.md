@@ -809,7 +809,36 @@ Use the official action for CI pipelines with failure summaries, inline PR annot
 
 By default (`version: gomod`), the action resolves `gotest` from your `go.mod` — no version drift between CI and local development. Set `version: latest` or a specific tag to install a standalone binary instead.
 
-The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel. See the [reference](https://mvrahden.github.io/go-test/reference/#ci-integration) for the full inputs/outputs table.
+The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel.
+
+With `bench: true`, a benchmark step runs after the tests (`gotest bench --spec --json`): the spec view plus delta table land in the step summary, the versioned JSON report lands in a temp file exposed as the `bench-report` output, and a breached gate fails the step with the offending keys in `bench-breached-keys`.
+
+### Inputs
+
+The tables below are the canonical action surface — a drift guard test keeps them in sync with `action.yml`.
+
+| Input | Description |
+|---|---|
+| `packages` | Package patterns to test (default `./...`) |
+| `race` | Enable the race detector (default `false`) |
+| `coverage` | Enable coverage profiling and reporting (default `false`) |
+| `min-coverage` | Minimum coverage percentage (0-100, fails if below) |
+| `flags` | Additional gotest flags (`--double-dash` style; also forwarded to the bench step) |
+| `go-test-flags` | Additional go test flags (`-single-dash` style) |
+| `bench` | Run benchmarks after tests via `gotest bench --spec --json` (default `false`) |
+| `bench-baseline` | Baseline JSON file to compare benchmarks against (`--against`) |
+| `bench-gate` | Fail if any benchmark regresses by more than this percent (`--gate`) |
+| `bench-save` | Save the run as a JSON baseline at this path (`--save`); an explicit empty string saves to `bench.baseline` from `.gotest.yml`; default `false` saves nothing |
+| `version` | `gomod` (default) resolves from go.mod; a tag (e.g. `v1.0.0`, `latest`) installs globally |
+
+### Outputs
+
+| Output | Description |
+|---|---|
+| `exit-code` | Test process exit code |
+| `coverage` | Coverage percentage (empty if coverage not enabled) |
+| `bench-report` | Path to the `gotest bench --json` report file (empty if bench not enabled) |
+| `bench-breached-keys` | Comma-joined benchmark keys that breached the gate (empty if none or no gate) |
 
 ## Commands
 

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"go.yaml.in/yaml/v3"
 	"golang.org/x/tools/go/packages"
 
 	. "github.com/mvrahden/go-test/cmd/gotest"
@@ -292,6 +293,55 @@ func (s *CmdGotestTestSuite) TestCLISurfaceMatchesSpec(t *gotest.T) {
 		w.It("documents no phantom lint rules", func(it *gotest.T) {
 			for id := range documented {
 				gotest.True(it, lint.Known(lint.Rule(id)), "spec.md documents unknown lint rule %q", id)
+			}
+		})
+	})
+}
+
+// TestActionSurfaceMatchesSpec is a drift guard: README.md's GitHub Actions
+// inputs/outputs tables are the canonical documented action surface and must
+// stay in sync with action.yml.
+func (s *CmdGotestTestSuite) TestActionSurfaceMatchesSpec(t *gotest.T) {
+	actionRaw, err := os.ReadFile(filepath.Join("..", "..", "action.yml"))
+	gotest.NoError(t, err)
+	var action struct {
+		Inputs  map[string]any `yaml:"inputs"`
+		Outputs map[string]any `yaml:"outputs"`
+	}
+	gotest.NoError(t, yaml.Unmarshal(actionRaw, &action))
+
+	readme, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
+	gotest.NoError(t, err)
+	doc := string(readme)
+
+	t.When("comparing the Inputs table", func(w *gotest.T) {
+		documented := specTableEntries(doc, "### Inputs")
+		w.It("documents every action input", func(it *gotest.T) {
+			for name := range action.Inputs {
+				gotest.True(it, documented[name], "action input %q missing from README.md", name)
+			}
+		})
+		w.It("documents no phantom inputs", func(it *gotest.T) {
+			for name := range documented {
+				_, known := action.Inputs[name]
+				gotest.True(it, known, "README.md documents unknown action input %q", name)
+			}
+		})
+	})
+
+	t.When("comparing the Outputs table", func(w *gotest.T) {
+		// The Outputs table is the last subsection of its ## section, so it
+		// ends at the next ## heading, not at a ### one.
+		documented := specTableEntriesUntil(doc, "### Outputs", "\n## ")
+		w.It("documents every action output", func(it *gotest.T) {
+			for name := range action.Outputs {
+				gotest.True(it, documented[name], "action output %q missing from README.md", name)
+			}
+		})
+		w.It("documents no phantom outputs", func(it *gotest.T) {
+			for name := range documented {
+				_, known := action.Outputs[name]
+				gotest.True(it, known, "README.md documents unknown action output %q", name)
 			}
 		})
 	})
