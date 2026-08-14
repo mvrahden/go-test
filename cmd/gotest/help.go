@@ -302,6 +302,17 @@ those replay as regular subtests, at zero extra cost, without -fuzz and
 without this subcommand. Reach for "gotest fuzz" specifically to spend time
 mutating and searching for new failing inputs.
 
+"gotest lint" flags common fuzz-writing mistakes: fuzz-determinism (reading
+time.Now/math-rand/os.Getenv from a fuzz target breaks corpus replay),
+fuzz-no-oracle (a callback that asserts nothing only catches panics),
+fuzz-seed (no f.Add seeds means coverage-guided exploration starts blind),
+fuzz-struct-corpus (on-disk corpus entries for a struct-typed target are
+bound to gotest's internal wire format and silently reinterpreted when the
+struct changes shape — promote them to typed seeds), fuzz-hook-io (a
+BeforeEach/AfterEach that does IO replays around every execution and
+throttles the fuzzer), and fuzz-raw-seed (a raw []byte seed on a
+struct-typed target decodes as whatever struct those bytes spell).
+
 Seed harvesting (on by default): at generation time, gotest mines your
 test files' table-test literals and direct call-site arguments that flow
 into a fuzz target's function-under-test, and injects them as f.Add(...)
@@ -436,13 +447,59 @@ func printScaffoldHelp() {
 
 Usage:
   gotest scaffold <target>
+  gotest scaffold --fuzz <./pkg/path.FuncName>
 
 Target is one of:
   ./pkg/path.TypeName      Generate suite for a specific type
   ./pkg/path/file.go       Generate a suite over the file's exported functions
+  ./pkg/path.FuncName      With --fuzz: generate a fuzz skeleton for a
+                           single-parameter package-level function
 
 Creates a new _test.go file with a suite struct, a runner function,
 and stub methods for each exported method on the target type.
+
+Flags:
+  --fuzz    Scaffold a Fuzz<Func> method for a package-level function
+            instead of a type/file suite (see below)
+
+--fuzz (round-trip and crash-safety skeletons):
+
+Looks for an inverse of the target function by name — Marshal<->Unmarshal,
+Encode<->Decode, Parse<->Format, Parse<->String, and same-suffix prefix
+pairs like ParseJSON<->FormatJSON — then checks the two signatures are
+actually compatible inverses: f: A -> (B[, error]) and g: B -> (A[, error]),
+modulo the error result, compared with go/types' Identical (so two named
+types with the same underlying type never match).
+
+When a compatible inverse is found and A is one of Go's natively fuzzable
+types (string, []byte, bool, and the int/uint/float variants), the
+generated method seeds a corpus entry and asserts the round-trip property
+— decoding what was just encoded returns the original input:
+
+  func (s *EncodeTestSuite) FuzzEncode(f *gotest.F) {
+      f.Add("")
+      gotest.Fuzz(f, func(t *gotest.T, in string) {
+          encoded, err := Encode(in)
+          if err != nil {
+              return
+          }
+          decoded, err := Decode(encoded)
+          gotest.NoError(t, err)
+          gotest.Equal(t, in, decoded) // round-trip property
+      })
+  }
+
+When no compatible inverse is found (but A is still fuzzable — natively,
+or through a generated codec for a struct or named type), it falls back to
+a crash-safety skeleton that only calls the function — no assertions
+beyond "doesn't panic" — and prints:
+  no inverse pair found for Encode — generated crash-safety skeleton
+
+When gotest cannot fuzz A at all (a map, an interface, a struct with
+unexported fields — the same shapes "gotest generate" rejects), scaffold
+emits a stub method carrying the generator's own rejection reason, and
+prints:
+  cannot fuzz map[string]string for Encode — generated TODO stub: <the generator's reason>
 
 Examples:
   gotest scaffold ./pkg/auth.UserService        Suite for UserService type
@@ -476,6 +533,14 @@ Rules:
   assertion-redundant   Assertions made redundant by the following assertion
   fail-guard            if cond { Fail/Fatal(...) } guards — use assertions directly
   t-escape              Unnecessary t.T() convenience escapes (incl. Helper/Fatal/Log)
+  fuzz-determinism      Fuzz targets reading time.Now/math-rand/os.Getenv
+  fuzz-no-oracle        Fuzz callbacks that assert nothing (panic-only)
+  fuzz-seed             Fuzz targets with no f.Add seeds
+  fuzz-struct-corpus    On-disk corpus entries for struct-typed targets
+                        (format-bound — promote them to typed seeds)
+  fuzz-hook-io          IO in BeforeEach/AfterEach of fuzzing suites
+                        (hooks replay around every execution)
+  fuzz-raw-seed         Raw []byte seeds on struct-typed targets
 
 Integrity rules can only be suppressed per line with //nolint. All other
 rules also accept a project-wide skip flag (mirrored by .gotest.yml lint.skip):
@@ -483,7 +548,9 @@ rules also accept a project-wide skip flag (mirrored by .gotest.yml lint.skip):
 Flags:
   -skip-<rule>            Disable a non-integrity rule, e.g. -skip-fail-guard
                           (assertion-simplify, assertion-redundant, fail-guard,
-                          t-escape, stdlib-test, testify)
+                          t-escape, stdlib-test, testify,
+                          fuzz-no-oracle, fuzz-seed, fuzz-hook-io,
+                          fuzz-raw-seed)
   -disable-nolint         Ignore //nolint comments
   -fix                    Apply suggested fixes
   --github                Also emit GitHub ::error annotations and append a
@@ -616,7 +683,8 @@ Fields:
                              the --no-harvest CLI flag overrides this per-run)
 
 Skippable lint rules (non-integrity only): assertion-redundant,
-assertion-simplify, fail-guard, stdlib-test, t-escape, testify
+assertion-simplify, fail-guard, fuzz-hook-io,
+fuzz-no-oracle, fuzz-raw-seed, fuzz-seed, stdlib-test, t-escape, testify
 
 Example .gotest.yml:
 

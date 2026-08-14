@@ -188,7 +188,7 @@ func FuzzCodecReportsDecodedInputOnFailure(f *testing.F) {
 	f.Add([]byte("boom"))
 	gf := gotest.NewF(f, nil, nil, codec)
 	gotest.Fuzz(gf, func(t *gotest.T, v req) {
-		if v.Name == "boom" && os.Getenv("GOTEST_TEST_FUZZ_FAIL_INPUT") != "" {
+		if v.Name == "boom" && os.Getenv("GOTEST_TEST_FUZZ_FAIL_INPUT") != "" { //nolint:fail-guard // a deliberate failure trigger, not an assertion about v
 			t.Errorf("deliberate failure for input reporting")
 		}
 	})

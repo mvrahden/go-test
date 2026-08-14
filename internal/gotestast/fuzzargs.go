@@ -23,6 +23,30 @@ type FuzzArg struct {
 	Pos      token.Pos  // position of the adapter call
 }
 
+// NativeFuzzType reports whether Go's fuzzing engine accepts t directly.
+// The set is exactly the fifteen types testing.F.Fuzz allows; a named type
+// over one of them does NOT qualify (testing matches on reflect.Type
+// identity), which is why "type Age int" needs a codec just as a struct
+// does. This is the single source of truth for the native set — the codec
+// emitter and the lint rules both key off it, so they can never disagree
+// about which targets are codec-backed.
+func NativeFuzzType(t types.Type) bool {
+	switch u := types.Unalias(t).(type) {
+	case *types.Basic:
+		switch u.Kind() {
+		case types.String, types.Bool,
+			types.Int, types.Int8, types.Int16, types.Int32, types.Int64,
+			types.Uint, types.Uint8, types.Uint16, types.Uint32, types.Uint64,
+			types.Float32, types.Float64:
+			return true
+		}
+	case *types.Slice:
+		eb, ok := types.Unalias(u.Elem()).(*types.Basic)
+		return ok && eb.Kind() == types.Uint8
+	}
+	return false
+}
+
 // CollectFuzzArgs walks every suite fuzz method's body for gotest.Fuzz
 // adapter calls and returns their type arguments in deterministic
 // (suite, method, call, argument) order. Returns nil when the package fuzzes

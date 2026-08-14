@@ -38,6 +38,12 @@ const (
 	AssertionRedundant Rule = "assertion-redundant"
 	TEscape            Rule = "t-escape"
 	SuiteLifecycle     Rule = "suite-lifecycle"
+	FuzzDeterminism    Rule = "fuzz-determinism"
+	FuzzNoOracle       Rule = "fuzz-no-oracle"
+	FuzzSeed           Rule = "fuzz-seed"
+	FuzzStructCorpus   Rule = "fuzz-struct-corpus"
+	FuzzHookIO         Rule = "fuzz-hook-io"
+	FuzzRawSeed        Rule = "fuzz-raw-seed"
 	// SharedFixtureUndeclared is integrity: window scheduling starts only
 	// the fixtures scheduled suites declare, so an undeclared read may hit
 	// a fixture that never started or is already released.
@@ -87,8 +93,25 @@ var ruleMeta = map[Rule]struct {
 	TEscape:            {TierExpressiveness, ScopeSuites},
 	SuiteLifecycle:     {TierIntegrity, ScopeSuites},
 	FailGuard:          {TierExpressiveness, ScopeGotestFiles},
-
 	SharedFixtureUndeclared: {TierIntegrity, ScopeSuites},
+
+	// fuzz-determinism is integrity: a target reading the clock/RNG/env
+	// breaks the replayability the corpus depends on — its outcomes lie.
+	// fuzz-struct-corpus is integrity for the same reason from the other
+	// side: format-bound corpus entries silently become different tests
+	// when the struct changes shape; the legitimate transient state
+	// (crasher found, not yet promoted) is suppressible per line.
+	// fuzz-no-oracle and fuzz-seed are guidance (crash-only fuzzing and
+	// harvester-seeded targets are legitimate), and fuzz-hook-io and
+	// fuzz-raw-seed are heuristics with legitimate exceptions (a cheap
+	// file read; promote's own last-resort []byte fallback) — all four
+	// stay skippable.
+	FuzzDeterminism:  {TierIntegrity, ScopeSuites},
+	FuzzNoOracle:     {TierExpressiveness, ScopeSuites},
+	FuzzSeed:         {TierExpressiveness, ScopeSuites},
+	FuzzStructCorpus: {TierIntegrity, ScopeSuites},
+	FuzzHookIO:       {TierExpressiveness, ScopeSuites},
+	FuzzRawSeed:      {TierExpressiveness, ScopeSuites},
 }
 
 // Known reports whether the rule ID exists.
@@ -176,6 +199,12 @@ func run(pass *analysis.Pass) (any, error) {
 	checkAssertionSimplify(pass, insp, cl)
 	checkFailGuard(pass, insp, cl)
 	checkRedundantAssertion(pass, insp, cl)
+	checkFuzzDeterminism(pass, insp, suites)
+	checkFuzzNoOracle(pass, insp, suites)
+	checkFuzzSeed(pass, insp, suites)
+	checkFuzzStructCorpus(pass, insp, suites)
+	checkFuzzHookIO(pass, insp, suites)
+	checkFuzzRawSeed(pass, insp, suites)
 
 	return nil, nil
 }
