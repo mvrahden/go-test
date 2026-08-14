@@ -47,7 +47,7 @@ func ExportSetTeardownTimeout(p *SharedFixtureProcess, d time.Duration) {
 	p.teardownTimeout = d
 }
 
-func ExportAutoDetectCI(cfg PipelineConfig) PipelineConfig {
+func ExportAutoDetectCI(cfg PipelineConfig) PipelineConfig { //nolint:gocritic // hugeParam: stable API
 	if !cfg.CI && os.Getenv(protocol.EnvCI) == "" && os.Getenv("CI") != "" {
 		cfg.CI = true
 	}

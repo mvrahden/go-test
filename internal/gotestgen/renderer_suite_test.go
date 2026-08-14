@@ -507,7 +507,9 @@ func (s *RendererTestSuite) TestRenderer_BenchmarkWrapper(t *gotest.T) {
 		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_BenchmarkMethod")
 		out, _ := renderTestPkg(it.T(), pkg)
 
-		benchFn := out[strings.Index(out, "func BenchmarkBenchTestSuite"):]
+		idx := strings.Index(out, "func BenchmarkBenchTestSuite")
+		gotest.GreaterOrEqual(it, idx, 0, "bench wrapper missing from output")
+		benchFn := out[idx:]
 		gotest.NotContains(it, benchFn, "NewTWithDeadline", "bench wrapper must not apply a suite-config deadline")
 	})
 
@@ -527,7 +529,9 @@ func (s *RendererTestSuite) TestRenderer_BenchmarkWrapper(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBoundBenchmark")
 			out, _ := renderTestPkg(it.T(), pkg)
 
-			benchFn := out[strings.Index(out, "func BenchmarkParserTestSuite"):]
+			idx := strings.Index(out, "func BenchmarkParserTestSuite")
+			gotest.GreaterOrEqual(it, idx, 0, "bench wrapper missing from output")
+			benchFn := out[idx:]
 			gotest.Contains(it, benchFn, "ƒ_setupFixtures(b)")
 			gotest.Contains(it, benchFn, "ParserTestSuite: ParserTestSuite{")
 			gotest.Contains(it, benchFn, "PoolFixture: ƒ_PoolFixture")

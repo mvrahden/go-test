@@ -38,7 +38,7 @@ type Delta struct {
 // returns one Delta per benchmark present in both baselines. Benchmarks
 // present in only one baseline are omitted. The returned slice is sorted
 // by Key for deterministic output.
-func Compare(old, new Baseline) []Delta {
+func Compare(old, new Baseline) []Delta { //nolint:gocritic // hugeParam: stable API
 	oldIndex := make(map[string]Result, len(old.Results))
 	for _, r := range old.Results {
 		oldIndex[resultKey(r)] = r

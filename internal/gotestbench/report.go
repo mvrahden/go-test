@@ -36,7 +36,7 @@ type Gate struct {
 
 // NewReport assembles the document for one run. deltas may be nil when no
 // comparison ran; gate may be nil when no gate is active.
-func NewReport(b Baseline, deltas []Delta, gate *Gate) Report {
+func NewReport(b Baseline, deltas []Delta, gate *Gate) Report { //nolint:gocritic // hugeParam: stable API
 	return Report{
 		SchemaVersion: reportSchemaVersion,
 		Baseline:      b,
@@ -69,6 +69,6 @@ func GateVerdict(deltas []Delta, thresholdPct float64) Gate {
 
 // MarshalReport renders r as indented JSON, the exact bytes `--json` writes
 // to stdout.
-func MarshalReport(r Report) ([]byte, error) {
+func MarshalReport(r Report) ([]byte, error) { //nolint:gocritic // hugeParam: stable API
 	return json.MarshalIndent(r, "", "  ")
 }

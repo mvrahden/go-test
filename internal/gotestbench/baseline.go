@@ -235,12 +235,12 @@ func splitBenchFullName(full string) (suite, name string) {
 }
 
 // Save writes b to path as indented JSON (0644).
-func Save(path string, b Baseline) error {
+func Save(path string, b Baseline) error { //nolint:gocritic // hugeParam: stable API
 	data, err := json.MarshalIndent(b, "", "  ")
 	if err != nil {
 		return fmt.Errorf("gotestbench: marshal baseline: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return fmt.Errorf("gotestbench: write baseline: %w", err)
 	}
 	return nil
