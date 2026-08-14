@@ -107,6 +107,10 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 		}
 	}
 
+	if err := r.renderBenchSuites(buf, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields); err != nil {
+		return nil, fmt.Errorf("failed rendering benchmark suites. err: %w", err)
+	}
+
 	return r.formatOutput(buf)
 }
 
@@ -186,6 +190,21 @@ func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSh
 	return gotestTpl.ExecuteTemplate(buf, "gotest.suites.tpl", map[string]any{
 		"Spec":                spec,
 		"SuiteSharedFixtures": suiteSharedFixtures,
+	})
+}
+
+func (r *renderer) renderBenchSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, suiteFixtureFields map[string][]FixtureFieldBinding) error { //nolint:gocritic // hugeParam: stable API
+	// Reuse the exact same fixture-bound view model gotest.fixture.tpl renders
+	// Test<Suite> from, reshaped as a map for O(1) per-suite template lookup
+	// (mirroring how SuiteSharedFixtures is already passed as a lookup map).
+	suiteFixtures := make(map[string]*FlatFixtureSuite)
+	for _, fs := range flattenSuitesDAG(allFixtures, suiteFixtureFields) {
+		suiteFixtures[fs.Suite.Identifier()] = &fs
+	}
+	return gotestTpl.ExecuteTemplate(buf, "gotest.bench.tpl", map[string]any{
+		"Spec":                spec,
+		"SuiteSharedFixtures": suiteSharedFixtures,
+		"SuiteFixtures":       suiteFixtures,
 	})
 }
 

@@ -449,6 +449,21 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			gotest.ErrorContains(it, err, "channel")
 		})
 	})
+
+	t.When("benchmark suite is bound to a fixture that defines BeforeEach", func(w *gotest.T) {
+		w.It("rejects with a per-method fixture hooks error", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_Benchmark_FixtureBeforeEachRejected")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+
+			spec, err := c.ApplyTestSuiteSpecs(result)
+			gotest.NoError(it, err)
+
+			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.ErrorContains(it, err, "WorkerTestSuite has benchmark methods but fixture HookedFixture defines BeforeEach/AfterEach")
+		})
+	})
 }
 
 func (s *ResolverTestSuite) TestMixedFieldStylesSameFixture(t *gotest.T) {

@@ -41,7 +41,7 @@ var ƒ_fixtureTestNames = []string{
 }
 var ƒ_pending atomic.Int32
 
-func ƒ_setupFixtures(t *testing.T) {
+func ƒ_setupFixtures(t testing.TB) {
     if err := ƒ_fixtureOnce.Do(func() error {
 {{- /*
   Each config is derived exactly once, but inside ƒ_fixtureOnce.Do rather than at
