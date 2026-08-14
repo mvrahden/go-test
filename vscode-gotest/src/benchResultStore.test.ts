@@ -159,3 +159,51 @@ describe("hostPlatform", () => {
     });
   });
 });
+
+describe("BenchResultStore deltas", () => {
+  function compareReport(pct: number, significant: boolean): BenchReport {
+    const r = report("linux", "amd64", 112.3);
+    r.deltas = [
+      {
+        key: "example.com/pkg CacheTestSuite/BenchmarkGetHit",
+        oldNs: 100,
+        newNs: 112.3,
+        percentChange: pct,
+        significant,
+        insufficientSample: false,
+      },
+    ];
+    return r;
+  }
+
+  it("attaches the CLI's delta verdict to the matching entry", () => {
+    const store = new BenchResultStore(fakeMemento());
+    store.recordReport(compareReport(12.3, true), Date.now());
+
+    const entry = store.getLatest(
+      "example.com/pkg",
+      "CacheTestSuite",
+      "BenchmarkGetHit",
+      { goos: "linux", goarch: "amd64" },
+    );
+    expect(entry?.delta).toEqual({
+      percentChange: 12.3,
+      significant: true,
+      insufficientSample: false,
+    });
+  });
+
+  it("clears a stale delta when a later run has no comparison", () => {
+    const store = new BenchResultStore(fakeMemento());
+    store.recordReport(compareReport(12.3, true), Date.now());
+    store.recordReport(report("linux", "amd64", 60), Date.now());
+
+    const entry = store.getLatest(
+      "example.com/pkg",
+      "CacheTestSuite",
+      "BenchmarkGetHit",
+      { goos: "linux", goarch: "amd64" },
+    );
+    expect(entry?.delta).toBeUndefined();
+  });
+});

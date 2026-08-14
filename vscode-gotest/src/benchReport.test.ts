@@ -119,3 +119,42 @@ describe("formatBenchAnnotation", () => {
     expect(line).toBe("56 ns/op · 0 allocs/op — 42s ago");
   });
 });
+
+describe("formatBenchAnnotation deltas", () => {
+  const now = Date.parse("2026-08-14T12:00:00Z");
+  const numbers = {
+    nsPerOp: 1240,
+    bytesPerOp: 480,
+    allocsPerOp: 3,
+    iterations: 100,
+  };
+
+  it("appends a significant regression as +N.N% vs baseline", () => {
+    const line = formatBenchAnnotation(numbers, now - 120_000, now, {
+      percentChange: 12.34,
+      significant: true,
+      insufficientSample: false,
+    });
+    expect(line).toBe(
+      "1.24µs/op · 480 B/op · 3 allocs/op — 2m ago · +12.3% vs baseline",
+    );
+  });
+
+  it("appends a significant improvement with a minus sign", () => {
+    const line = formatBenchAnnotation(numbers, now - 120_000, now, {
+      percentChange: -8.1,
+      significant: true,
+      insufficientSample: false,
+    });
+    expect(line).toContain("· −8.1% vs baseline");
+  });
+
+  it("stays neutral for a delta the CLI did not mark significant", () => {
+    const line = formatBenchAnnotation(numbers, now - 120_000, now, {
+      percentChange: 40,
+      significant: false,
+      insufficientSample: false,
+    });
+    expect(line).toBe("1.24µs/op · 480 B/op · 3 allocs/op — 2m ago");
+  });
+});

@@ -22,12 +22,16 @@ type Report struct {
 
 // Gate is the report's gate verdict: the configured threshold, the worst
 // significant regression the comparison found, and whether it breached.
-// WorstKey is empty when no significant regression exists.
+// WorstKey is empty when no significant regression exists. BreachedKeys
+// lists every delta the gate rule condemns (significant AND above the
+// threshold) so consumers can mark each offender without re-deriving the
+// rule — the rule lives here, nowhere else.
 type Gate struct {
-	ThresholdPct float64 `json:"thresholdPct"`
-	WorstPct     float64 `json:"worstPct"`
-	WorstKey     string  `json:"worstKey,omitempty"`
-	Breached     bool    `json:"breached"`
+	ThresholdPct float64  `json:"thresholdPct"`
+	WorstPct     float64  `json:"worstPct"`
+	WorstKey     string   `json:"worstKey,omitempty"`
+	Breached     bool     `json:"breached"`
+	BreachedKeys []string `json:"breachedKeys,omitempty"`
 }
 
 // NewReport assembles the document for one run. deltas may be nil when no
@@ -48,9 +52,15 @@ func NewReport(b Baseline, deltas []Delta, gate *Gate) Report {
 func GateVerdict(deltas []Delta, thresholdPct float64) Gate {
 	g := Gate{ThresholdPct: thresholdPct}
 	for _, d := range deltas {
-		if d.Significant && d.PercentChange > g.WorstPct {
+		if !d.Significant {
+			continue
+		}
+		if d.PercentChange > g.WorstPct {
 			g.WorstPct = d.PercentChange
 			g.WorstKey = d.Key
+		}
+		if d.PercentChange > thresholdPct {
+			g.BreachedKeys = append(g.BreachedKeys, d.Key)
 		}
 	}
 	g.Breached = g.WorstPct > thresholdPct

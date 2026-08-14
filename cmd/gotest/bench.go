@@ -36,6 +36,16 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	verboseRequested := gotestrunner.HasVerboseFlag(goTestArgs)
 
 	saveTarget := extractStringFlag(ownArgs, "--save", "")
+	if saveTarget == "" && hasFlag(ownArgs, "--save") {
+		// `--save=` with no value asks for the configured baseline path —
+		// the same fallback --against already has. Config resolution stays
+		// in the CLI so tooling never parses .gotest.yml itself.
+		saveTarget = inv.Config.Bench.Baseline
+		if saveTarget == "" {
+			fmt.Fprintln(os.Stderr, "FAIL: --save needs a path (or bench.baseline in .gotest.yml)")
+			return 2
+		}
+	}
 
 	againstPath := extractStringFlag(ownArgs, "--against", "")
 	if againstPath == "" {
