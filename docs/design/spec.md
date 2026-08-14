@@ -142,7 +142,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--setup-timeout=<dur>` | Total budget for shared fixture setup (default: 2m; 0 disables) |
 | `--timeout=<dur>` | Global pipeline deadline (default: 15m; 0 disables) |
 | `--debounce=<dur>` | Debounce interval for watch mode (default 200ms) |
-| `--parallel=<n>` | Total concurrent test method budget (default: 2×GOMAXPROCS) |
+| `--parallel=<n>` | Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for -race/-msan/-asan) |
 | `--compile-parallel=<n>` | Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan) |
 | `--input=<path>` | Replay a saved `go test -json` stream in `spec`/`summary` (`-` reads stdin) |
 | `--github` | Emit GitHub annotations and step summary (auto-enabled in GitHub Actions) |

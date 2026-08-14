@@ -34,3 +34,18 @@ copying default-restating markers between suites is an observed failure).
 Fixtures use the same literal rule via `FixtureConfig()` /
 `SharedFixtureConfig()` markers: no marker → `DefaultFixtureConfig()` (2m);
 `ContainerFixtureConfig()` (5m, 1 retry) suits container startups.
+
+## Exclusive suites (v1.27+)
+
+`SuiteConfig{Exclusive: true}` is parsed statically exactly like
+`Parallel` — assign a boolean literal (the compose form works:
+`cfg.Exclusive = true`). Exclusive suites are held back until every
+non-exclusive suite has finished, then dispatched strictly alone, one at
+a time, in deterministic (package, suite) order — batch and streaming
+runs alike. Use it for suites whose *verdicts* measure wall-clock
+behavior or that fight over machine-wide resources (timing budgets,
+containers, ports, per-invocation child builds): a budget verdict taken
+on a saturated machine is not a verdict you can act on. Shared fixtures
+stay up across the exclusive tail — they are infrastructure, not
+competing suites. Exclusive is not a serialization tool for shared
+mutable state; use non-parallel suites for that.

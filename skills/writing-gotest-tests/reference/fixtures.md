@@ -38,3 +38,21 @@ resources) but its `AfterAll` still runs, because what it built exists.
 Parallel suites + fixtures: a shared fixture means a shared live resource
 across processes. `-race` cannot see two tests mutating the same rows.
 Parallelize only with per-test keys/schemas/transactions or read-only use.
+
+## Fixture windows (v1.27+)
+
+Shared fixture start is never speculative: a fixture is resident exactly
+while a scheduled suite that DECLARES it (as a pointer field, directly or
+through the fixture DAG) needs it. Two consequences:
+
+- A fixture no scheduled suite requires never starts — and can therefore
+  never fail the run. Do not "test" a fixture by leaving it wired to
+  nothing; nothing will execute it.
+- A shared fixture you read without declaring may be absent: never
+  started, or already torn down at the bulk→exclusive-tail barrier.
+  Reaching one through a package-level variable or another struct
+  compiles and then lies at run time. Declare a pointer field for every
+  fixture a suite touches (or reach it through a declared fixture); the
+  `shared-fixture-undeclared` lint rule (integrity tier) flags undeclared
+  reads. Fixture self-tests that construct the fixture locally are
+  exempt.

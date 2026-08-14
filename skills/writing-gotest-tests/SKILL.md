@@ -33,6 +33,13 @@ applies EXCEPT these four, which fail there:
    `-test.timeout` kills it with no teardown, and so does any entry after
    a `-failfast` trip. Filter whole suites or methods only there.
 
+Sections tagged **v1.27+** below need v1.27.0 or newer and fail hard on
+v1.26.x rather than degrading: `SuiteConfig.Exclusive` is an unknown
+field there (compile error) and the `shared-fixture-undeclared` lint rule
+does not exist (its findings are simply never reported — do not rely on
+the linter for fixture-window mistakes on v1.26.x). Skip those sections
+on v1.26.x and earlier.
+
 Exit codes on v1.25.x are weaker than they look — never treat a green
 gotest exit alone as proof there: a package failing to compile mid-run, a
 suite binary killed by a signal, and `spec --input` on a failing stream
@@ -155,6 +162,14 @@ parallel suites, or structural problems — those are your job, below.
    linter flags it. Reach for `t.T()` only when nothing on `gotest.T`
    (`It`, `When`, `Context`, `TempDir`, `Setenv`, `Skipf`, `Errorf`,
    `FailNow`) covers the need.
+7. **Ask "why is this wall-clock-asserting suite NOT Exclusive?"
+   (v1.27+)** — the counterpart to rule 4. A suite whose assertions or
+   timeout budgets measure elapsed time (latency bounds, timing budgets,
+   contended ports/containers) cannot share a saturated machine: mark it
+   `SuiteConfig{Exclusive: true}` (statically parsed like `Parallel` —
+   boolean literal only; see `reference/config.md`) and it dispatches
+   strictly alone after all other suites finish. A budget verdict taken
+   under load is not a verdict you can act on.
 
 ## Restructuring existing suites (the blue phase)
 
