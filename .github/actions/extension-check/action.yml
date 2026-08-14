@@ -15,7 +15,7 @@ runs:
     - run: npm run format:check
       shell: bash
       working-directory: vscode-gotest
-    - run: npx tsc --noEmit
+    - run: npm run typecheck
       shell: bash
       working-directory: vscode-gotest
     - run: npm test

@@ -780,7 +780,7 @@ All `go test` flags work unchanged: `-race`, `-cover`, `-count`, `-run`, `-json`
 | `*SharedFixture` suffix | Cross-package shared fixture |
 | `FixtureConfig()` method | Fixture timeout/retry config |
 | `SharedFixtureConfig()` method | Shared fixture timeout/retry config |
-| `SuiteConfig()` method | Suite timeout/parallelism/failfast config |
+| `SuiteConfig()` method | Suite timeout/parallelism/exclusive/failfast config |
 | `Hydrate` / `Dehydrate` | SharedFixture test-process resource reconstruction |
 
 ## VS Code Extension

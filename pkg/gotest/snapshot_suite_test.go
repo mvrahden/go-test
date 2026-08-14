@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"testing"
 
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -326,5 +327,37 @@ func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "unsupported snapshot type")
 		})
+	})
+}
+
+// SnapshotTBBackedTestSuite tests snapshot behavior with TB-backed T from benchmarks.
+type SnapshotTBBackedTestSuite struct{ snapPath string }
+
+func (s *SnapshotTBBackedTestSuite) BeforeEach(_ *gotest.T) {
+	s.snapPath = filepath.Join("testdata", "__snapshots__", "TestSnapshotTBBackedTestSuite_ext.snap")
+}
+
+func (s *SnapshotTBBackedTestSuite) AfterEach(_ *gotest.T) {
+	os.Remove(s.snapPath)
+	os.Remove(filepath.Join("testdata", "__snapshots__", "unknown_ext.snap"))
+}
+
+func (s *SnapshotTBBackedTestSuite) TestMatchSnapshotWithTBBacked(t *gotest.T) {
+	t.Setenv(protocol.EnvCI, "0")
+
+	t.It("does not panic on TB-backed T", func(it *gotest.T) {
+		recovered := ""
+		testing.Benchmark(func(b *testing.B) {
+			defer func() {
+				if r := recover(); r != nil {
+					recovered = fmt.Sprintf("%v", r)
+				}
+			}()
+			tb := gotest.NewTFromTB(b)
+			gotest.MatchSnapshot(tb, "snapshot-value", "tb_backed")
+			for b.Loop() {
+			}
+		})
+		gotest.Zero(it, recovered)
 	})
 }

@@ -2,6 +2,7 @@ package gotestrunner_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"time"
@@ -22,6 +23,13 @@ import (
 // The suite is sequential: it configures the subprocess through the environment,
 // which t.Setenv forbids sharing with parallel tests.
 type SharedFixtureTeardownTestSuite struct{}
+
+// SuiteConfig: Exclusive because every method builds and force-kills real
+// subprocesses against configured budgets — the one workload that must not
+// share the machine with concurrent compiles.
+func (s *SharedFixtureTeardownTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Exclusive: true}
+}
 
 // slowTeardownFixture is the fixture description the generator would produce for
 // tests/sharedfixture/fixtures.SlowTeardownSharedFixture.
@@ -109,6 +117,81 @@ func (s *SharedFixtureTeardownTestSuite) TestTeardownGetsItsConfiguredBudget(t *
 				"AfterAll never finished: the fixture was killed part-way through and whatever it held is leaked")
 			gotest.NoError(it, err)
 		})
+	})
+}
+
+// windowFixtures pairs an up-front Alpha with a deferred Beta — the smallest
+// input that exercises both window verbs against a real subprocess.
+func windowFixtures() []gotestgen.SharedFixtureInfo {
+	return []gotestgen.SharedFixtureInfo{
+		{
+			Identifier:     "AlphaSharedFixture",
+			PkgPath:        "github.com/mvrahden/go-test/tests/sharedfixture/fixtures",
+			PkgName:        "fixtures",
+			QualifiedType:  "fixtures.AlphaSharedFixture",
+			TransferFields: []string{"DataPath"},
+		},
+		{
+			Identifier:     "BetaSharedFixture",
+			PkgPath:        "github.com/mvrahden/go-test/tests/sharedfixture/fixtures",
+			PkgName:        "fixtures",
+			QualifiedType:  "fixtures.BetaSharedFixture",
+			TransferFields: []string{"Label", "Count"},
+			Deferred:       true,
+		},
+	}
+}
+
+func (s *SharedFixtureTeardownTestSuite) TestWindowVerbs(t *gotest.T) {
+	const (
+		alphaKey = "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.AlphaSharedFixture"
+		betaKey  = "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.BetaSharedFixture"
+	)
+
+	t.When("a deferred fixture rides along an up-front one", func(w *gotest.T) {
+		ctx, cancel := context.WithCancel(w.Context())
+
+		proc, err := gotestrunner.StartSharedFixtures(ctx, w.TempDir(), windowFixtures(), 30*time.Second)
+		gotest.NoError(w, err, "starting the shared fixture subprocess")
+		gotest.NoError(w, proc.WaitAllReady(ctx, 30*time.Second), "waiting for the up-front phase")
+
+		var alphaState struct{ DataPath string }
+		gotest.NoError(w, json.Unmarshal(proc.State([]string{alphaKey})[alphaKey], &alphaState))
+		gotest.NotEmpty(w, alphaState.DataPath)
+
+		w.It("holds the deferred fixture out of the up-front phase", func(it *gotest.T) {
+			_, hasBeta := proc.State([]string{betaKey})[betaKey]
+			gotest.False(it, hasBeta, "a deferred fixture must not start before its window opens")
+		})
+
+		w.It("starts it on StartKeys and streams its state", func(it *gotest.T) {
+			gotest.NoError(it, proc.StartKeys([]string{betaKey}, 30*time.Second))
+
+			var betaState struct {
+				Label string
+				Count int
+			}
+			raw, hasBeta := proc.State([]string{betaKey})[betaKey]
+			gotest.True(it, hasBeta, "StartKeys must not acknowledge before the state line")
+			gotest.NoError(it, json.Unmarshal(raw, &betaState))
+			gotest.Equal(it, "beta-shared", betaState.Label)
+			gotest.Equal(it, 42, betaState.Count)
+		})
+
+		w.It("releases early keys on TeardownKeys", func(it *gotest.T) {
+			gotest.NoError(it, proc.TeardownKeys([]string{alphaKey}, 30*time.Second))
+			_, statErr := os.Stat(alphaState.DataPath)
+			gotest.Error(it, statErr, "Alpha's AfterAll must have removed its data file")
+		})
+
+		w.It("leaves exactly the remainder to the terminal Teardown", func(it *gotest.T) {
+			// A clean exit doubles as the single-ownership proof: if the
+			// epilogue re-ran Alpha's AfterAll, the second os.Remove would
+			// fail and flip the exit status to teardown-failed.
+			gotest.NoError(it, proc.Teardown())
+		})
+
+		cancel()
 	})
 }
 

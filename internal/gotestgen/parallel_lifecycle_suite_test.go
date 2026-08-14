@@ -16,7 +16,10 @@ import (
 // childTimeout is the -test.timeout of the compiled suite binary. If suite
 // cleanup ever waits on work that is itself blocked behind that cleanup, the
 // child dies here with "test timed out" instead of hanging this package.
-const childTimeout = 15 * time.Second
+// 60s: generous headroom over the harness's own promptness assertions —
+// under a loaded gate a runnable-but-unscheduled child is starvation, not a
+// hang, and must not be executed by this backstop alarm.
+const childTimeout = 60 * time.Second
 
 // childWallClock bounds the whole subprocess, so even a child that ignores its
 // own timeout cannot stall the parent run.
@@ -33,7 +36,9 @@ const childWallClock = 90 * time.Second
 type ParallelLifecycleTestSuite struct{}
 
 func (s *ParallelLifecycleTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 3 * time.Minute}
+	// Exclusive: these methods hold child suites to wall-clock budgets, and a
+	// budget verdict taken on a saturated machine is not a verdict to act on.
+	return gotest.SuiteConfig{Parallel: true, Exclusive: true, Timeout: 3 * time.Minute}
 }
 
 type childRun struct {

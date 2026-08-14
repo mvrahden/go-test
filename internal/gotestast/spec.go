@@ -205,6 +205,10 @@ func (ts *TestSuiteSpec) HasGuard() bool { return ts.th.Guard != nil }
 // FOR RENDERING
 func (ts *TestSuiteSpec) IsMethodParallel() bool { return ts.th.ConfigParallel }
 
+// IsExclusive returns true when SuiteConfig has Exclusive: true — the runner
+// then dispatches this suite strictly alone, after the parallel bulk.
+func (ts *TestSuiteSpec) IsExclusive() bool { return ts.th.ConfigExclusive }
+
 // HasReturningBeforeEach returns true when BeforeEach is defined and returns a context value.
 //
 // FOR RENDERING
@@ -287,6 +291,9 @@ type TestSuiteHarness struct {
 	Config         *types.Func // SuiteConfig() method, may be nil
 	Guard          *types.Func // SuiteGuard() method, may be nil
 	ConfigParallel bool
+	// ConfigExclusive mirrors SuiteConfig.Exclusive, resolved statically so
+	// the runner can schedule the suite outside the parallel bulk.
+	ConfigExclusive bool
 }
 
 type TestSuiteMethod struct {
@@ -340,12 +347,20 @@ func (m *TestSuiteMethod) Identifier() string {
 }
 
 // suiteConfigBodyErr describes the statically-parseable forms: the generator
-// needs Parallel at generation time, so SuiteConfig bodies cannot be arbitrary Go.
+// needs Parallel and Exclusive at generation time, so SuiteConfig bodies
+// cannot be arbitrary Go.
 const suiteConfigBodyErr = "SuiteConfig method body must return a gotest.SuiteConfig literal or preset call, optionally composed as `cfg := <literal|preset>` followed by plain `cfg.<Field> = <value>` assignments"
 
-func parseSuiteConfigAST(pkg *packages.Package, funcDecl *ast.FuncDecl) (parallel bool, err error) {
+// staticSuiteConfig carries the SuiteConfig fields the generator and runner
+// resolve statically. Everything else in SuiteConfig is runtime-only.
+type staticSuiteConfig struct {
+	Parallel  bool
+	Exclusive bool
+}
+
+func parseSuiteConfigAST(pkg *packages.Package, funcDecl *ast.FuncDecl) (cfg staticSuiteConfig, err error) {
 	if funcDecl.Body == nil || len(funcDecl.Body.List) == 0 {
-		return false, errors.New(suiteConfigBodyErr)
+		return cfg, errors.New(suiteConfigBodyErr)
 	}
 	stmts := funcDecl.Body.List
 
@@ -353,78 +368,82 @@ func parseSuiteConfigAST(pkg *packages.Package, funcDecl *ast.FuncDecl) (paralle
 	if len(stmts) == 1 {
 		retStmt, ok := stmts[0].(*ast.ReturnStmt)
 		if !ok || len(retStmt.Results) != 1 {
-			return false, errors.New(suiteConfigBodyErr)
+			return cfg, errors.New(suiteConfigBodyErr)
 		}
 		switch result := retStmt.Results[0].(type) {
 		case *ast.CompositeLit:
-			return suiteConfigParallelFromLiteral(result)
+			return suiteConfigFromLiteral(result)
 		case *ast.CallExpr:
 			if !isKnownSuitePreset(result, pkg) {
-				return false, fmt.Errorf("SuiteConfig: only the gotest presets (DefaultSuiteConfig, IntegrationSuiteConfig) may be called — Parallel is resolved statically and a custom helper would silently drop it")
+				return cfg, fmt.Errorf("SuiteConfig: only the gotest presets (DefaultSuiteConfig, IntegrationSuiteConfig) may be called — Parallel and Exclusive are resolved statically and a custom helper would silently drop them")
 			}
-			return false, nil
+			return cfg, nil
 		default:
-			return false, errors.New(suiteConfigBodyErr)
+			return cfg, errors.New(suiteConfigBodyErr)
 		}
 	}
 
 	// Compose form: cfg := <literal|preset>; cfg.Field = value ...; return cfg.
 	first, ok := stmts[0].(*ast.AssignStmt)
 	if !ok || first.Tok != token.DEFINE || len(first.Lhs) != 1 || len(first.Rhs) != 1 {
-		return false, errors.New(suiteConfigBodyErr)
+		return cfg, errors.New(suiteConfigBodyErr)
 	}
 	cfgIdent, ok := first.Lhs[0].(*ast.Ident)
 	if !ok {
-		return false, errors.New(suiteConfigBodyErr)
+		return cfg, errors.New(suiteConfigBodyErr)
 	}
 	switch rhs := first.Rhs[0].(type) {
 	case *ast.CompositeLit:
-		parallel, err = suiteConfigParallelFromLiteral(rhs)
+		cfg, err = suiteConfigFromLiteral(rhs)
 		if err != nil {
-			return false, err
+			return staticSuiteConfig{}, err
 		}
 	case *ast.CallExpr:
 		if !isKnownSuitePreset(rhs, pkg) {
-			return false, fmt.Errorf("SuiteConfig: only the gotest presets (DefaultSuiteConfig, IntegrationSuiteConfig) may be called — Parallel is resolved statically and a custom helper would silently drop it")
+			return cfg, fmt.Errorf("SuiteConfig: only the gotest presets (DefaultSuiteConfig, IntegrationSuiteConfig) may be called — Parallel and Exclusive are resolved statically and a custom helper would silently drop them")
 		}
 	default:
-		return false, errors.New(suiteConfigBodyErr)
+		return cfg, errors.New(suiteConfigBodyErr)
 	}
 
 	last, ok := stmts[len(stmts)-1].(*ast.ReturnStmt)
 	if !ok || len(last.Results) != 1 {
-		return false, errors.New(suiteConfigBodyErr)
+		return staticSuiteConfig{}, errors.New(suiteConfigBodyErr)
 	}
 	if retIdent, ok := last.Results[0].(*ast.Ident); !ok || retIdent.Name != cfgIdent.Name {
-		return false, errors.New(suiteConfigBodyErr)
+		return staticSuiteConfig{}, errors.New(suiteConfigBodyErr)
 	}
 
 	for _, stmt := range stmts[1 : len(stmts)-1] {
 		assign, ok := stmt.(*ast.AssignStmt)
 		if !ok || assign.Tok != token.ASSIGN || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
-			return false, errors.New(suiteConfigBodyErr)
+			return staticSuiteConfig{}, errors.New(suiteConfigBodyErr)
 		}
 		sel, ok := assign.Lhs[0].(*ast.SelectorExpr)
 		if !ok {
-			return false, errors.New(suiteConfigBodyErr)
+			return staticSuiteConfig{}, errors.New(suiteConfigBodyErr)
 		}
 		if base, ok := sel.X.(*ast.Ident); !ok || base.Name != cfgIdent.Name {
-			return false, errors.New(suiteConfigBodyErr)
+			return staticSuiteConfig{}, errors.New(suiteConfigBodyErr)
 		}
-		if sel.Sel.Name == "Parallel" {
+		if sel.Sel.Name == "Parallel" || sel.Sel.Name == "Exclusive" {
 			val, ok := assign.Rhs[0].(*ast.Ident)
 			if !ok || (val.Name != "true" && val.Name != "false") {
-				return false, fmt.Errorf("SuiteConfig: Parallel must be assigned a boolean literal — the generator resolves it statically")
+				return staticSuiteConfig{}, fmt.Errorf("SuiteConfig: %s must be assigned a boolean literal — the generator resolves it statically", sel.Sel.Name)
 			}
-			parallel = val.Name == "true"
+			if sel.Sel.Name == "Parallel" {
+				cfg.Parallel = val.Name == "true"
+			} else {
+				cfg.Exclusive = val.Name == "true"
+			}
 		}
 	}
-	return parallel, nil
+	return cfg, nil
 }
 
 // isKnownSuitePreset accepts only the gotest-shipped presets as config bases:
-// they are known to leave Parallel false, so static Parallel detection stays
-// sound. The call must resolve to pkg/gotest — a same-named function or method
+// they are known to leave Parallel and Exclusive false, so static detection
+// of both stays sound. The call must resolve to pkg/gotest — a same-named function or method
 // from anywhere else could return Parallel: true and be silently mis-read.
 func isKnownSuitePreset(call *ast.CallExpr, pkg *packages.Package) bool {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
@@ -441,27 +460,32 @@ func isKnownSuitePreset(call *ast.CallExpr, pkg *packages.Package) bool {
 	return obj.Pkg().Path() == about.Repo+"/pkg/gotest"
 }
 
-func suiteConfigParallelFromLiteral(lit *ast.CompositeLit) (bool, error) {
+func suiteConfigFromLiteral(lit *ast.CompositeLit) (staticSuiteConfig, error) {
+	var cfg staticSuiteConfig
 	for _, elt := range lit.Elts {
 		kv, ok := elt.(*ast.KeyValueExpr)
 		if !ok {
 			// A positional literal sets fields the scan below cannot see, so a
-			// Parallel value would silently read as false.
-			return false, fmt.Errorf("SuiteConfig literal must use keyed fields (Field: value) — Parallel is resolved statically from the Parallel: key")
+			// Parallel or Exclusive value would silently read as false.
+			return staticSuiteConfig{}, fmt.Errorf("SuiteConfig literal must use keyed fields (Field: value) — Parallel and Exclusive are resolved statically from their keys")
 		}
 		key, ok := kv.Key.(*ast.Ident)
 		if !ok {
 			continue
 		}
-		if key.Name == "Parallel" {
+		if key.Name == "Parallel" || key.Name == "Exclusive" {
 			ident, ok := kv.Value.(*ast.Ident)
 			if !ok || (ident.Name != "true" && ident.Name != "false") {
-				return false, fmt.Errorf("SuiteConfig: Parallel must be assigned a boolean literal — the generator resolves it statically")
+				return staticSuiteConfig{}, fmt.Errorf("SuiteConfig: %s must be assigned a boolean literal — the generator resolves it statically", key.Name)
 			}
-			return ident.Name == "true", nil
+			if key.Name == "Parallel" {
+				cfg.Parallel = ident.Name == "true"
+			} else {
+				cfg.Exclusive = ident.Name == "true"
+			}
 		}
 	}
-	return false, nil
+	return cfg, nil
 }
 
 func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, token.Pos, error) {
@@ -569,11 +593,12 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 			return m.Pos(), fmt.Errorf("unsupported return type for %q: expected gotest.SuiteConfig, got %s", methodID, resType)
 		}
 		s.th.Config = m
-		parallel, err := parseSuiteConfigAST(pkg, decl)
+		staticCfg, err := parseSuiteConfigAST(pkg, decl)
 		if err != nil {
 			return m.Pos(), fmt.Errorf("%s.SuiteConfig: %w", s.ts.Name.Name, err)
 		}
-		s.th.ConfigParallel = parallel
+		s.th.ConfigParallel = staticCfg.Parallel
+		s.th.ConfigExclusive = staticCfg.Exclusive
 		return -1, nil
 	}
 

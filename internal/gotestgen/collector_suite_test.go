@@ -380,6 +380,27 @@ func (s *CollectorTestSuite) TestSuiteConfig(t *gotest.T) {
 		})
 	})
 
+	t.When("Exclusive appears in the literal", func(w *gotest.T) {
+		w.It("is resolved statically like Parallel", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_ExclusiveParsed")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "expected no errors, got: %v", result.Errs)
+			gotest.True(it, result.Suites[0].IsExclusive(), "Exclusive: true in the literal must be detected")
+			gotest.False(it, result.Suites[0].IsMethodParallel())
+		})
+	})
+
+	t.When("Exclusive is assigned in the compose form over a preset", func(w *gotest.T) {
+		w.It("is resolved statically", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_ExclusiveCompose")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "expected no errors, got: %v", result.Errs)
+			gotest.True(it, result.Suites[0].IsExclusive(), "cfg.Exclusive = true over a preset must be detected")
+		})
+	})
+
 	t.When("Parallel is overridden back to false", func(w *gotest.T) {
 		w.It("reports not parallel", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_ParallelFalseOverride")

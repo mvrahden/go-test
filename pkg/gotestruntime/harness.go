@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/schedinfo"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -118,9 +119,17 @@ func watchDeadline(t *gotest.T, timeout time.Duration, what, budget string, done
 	// output when it does — so if the process is later killed by go test
 	// -timeout, this line is the only trace that a budget was blown, and which
 	// one.
-	fmt.Fprintf(os.Stderr, "gotest: %s %sexceeded its configured %s of %s and is still running\n",
-		t.T().Name(), what, budget, timeout)
-	t.Errorf("%sexceeded its configured %s of %s and is still running", what, budget, timeout)
+	// One line of scheduling context, because this verdict has a known false
+	// positive: on a saturated machine a phase can be runnable yet never
+	// scheduled, and without this the dump reads like a deadlock.
+	sched := schedinfo.Summary()
+	suffix := "\n" + sched
+	if hint := schedinfo.StarvationHint(); hint != "" {
+		suffix += "\n" + hint
+	}
+	fmt.Fprintf(os.Stderr, "gotest: %s %sexceeded its configured %s of %s and is still running %s\n",
+		t.T().Name(), what, budget, timeout, sched)
+	t.Errorf("%sexceeded its configured %s of %s and is still running%s", what, budget, timeout, suffix)
 }
 
 // testScopedT applies the timeout convention shared by the phases that run while

@@ -2,12 +2,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -24,8 +26,24 @@ func ƒquote(s string) string {
 	return string(b)
 }
 
+// ƒcommand is one runner instruction on stdin: start or tear down a set of
+// fixtures by state key, mid-run, at a window boundary.
+type ƒcommand struct {
+	Verb string   `json:"verb"`
+	Keys []string `json:"keys"`
+}
+
+func ƒhasKey(keys []string, key string) bool {
+	for _, k := range keys {
+		if k == key {
+			return true
+		}
+	}
+	return false
+}
+
 {{- /*
-  Configs start as the defaults and are derived inside each fixture's goroutine,
+  Configs start as the defaults and are derived inside each fixture's setup,
   not here: a config marker that panics at the top of main would kill the
   process before the handshake, attributed to nothing. A fixture whose
   derivation fails reports the error, its dependents and its teardown skip it,
@@ -44,15 +62,24 @@ func main() {
 	ƒcfg_{{ $f.VarName }} := gotest.DefaultFixtureConfig()
 {{ end }}
 	ƒerrs := make([]error, {{ len .Fixtures }})
+	ƒstarted := make([]bool, {{ len .Fixtures }})
+	ƒtorn := make([]bool, {{ len .Fixtures }})
 {{ range $f := .Fixtures }}
 	ƒdone_{{ $f.VarName }} := make(chan struct{})
 {{- end }}
 
-	var ƒwg sync.WaitGroup
+{{- /*
+  One setup body per fixture, shared verbatim by the up-front phase and the
+  StartKeys verb: same config derivation, same dependency gating, same retry
+  and budget policy through RunFixtureSetup. A fixture starts at most once —
+  its window opens exactly one time per run.
+*/}}
 {{ range $i, $f := .Fixtures }}
-	ƒwg.Add(1)
-	go func() {
-		defer ƒwg.Done()
+	ƒsetup_{{ $f.VarName }} := func() {
+		if ƒstarted[{{ $i }}] {
+			return
+		}
+		ƒstarted[{{ $i }}] = true
 		defer close(ƒdone_{{ $f.VarName }})
 {{- if $f.HasConfig }}
 {{- /*
@@ -117,7 +144,52 @@ func main() {
 {{- else }}
 		fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":{}}\n", ƒquote("{{ $f.StateKey }}"))
 {{- end }}
+	}
+{{ end }}
+
+{{- /*
+  One teardown body per fixture, shared by the TeardownKeys verb and the
+  epilogue: whichever fires first wins, the other finds ƒtorn set and skips —
+  the terminal teardown owns exactly the remainder. A fixture that never
+  started, or whose setup failed, has nothing to release; one whose setup
+  merely overran its budget still initialized, so it is torn down like a
+  success. Panics are contained and a declared Timeout is a verdict — the
+  same policy the in-process DAG runs under.
+*/}}
+{{ range $f := .Fixtures }}
+	ƒteardown_{{ $f.VarName }} := func() bool {
+		if ƒtorn[{{ $f.Index }}] || !ƒstarted[{{ $f.Index }}] {
+			ƒtorn[{{ $f.Index }}] = true
+			return false
+		}
+		ƒtorn[{{ $f.Index }}] = true
+		if ƒerrs[{{ $f.Index }}] == nil || errors.Is(ƒerrs[{{ $f.Index }}], gotestruntime.ErrSetupOverran) {
+			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "{{ $f.Identifier }}",
+				Timeout:  ƒcfg_{{ $f.VarName }}.Timeout,
+				Budget:   {{ if $f.HasConfig }}ƒcfg_{{ $f.VarName }}.Timeout{{ else }}0{{ end }},
+				AfterAll: {{ $f.VarName }}.AfterAll,
+			})
+		}
+		return false
+	}
+{{ end }}
+
+{{- /*
+  Up-front phase: every non-deferred fixture, concurrently, gated by the
+  dependency channels. Deferred fixtures wait for their StartKeys window —
+  their dependencies are non-deferred or ordered earlier in the same command,
+  so their channel waits can never deadlock.
+*/}}
+	var ƒwg sync.WaitGroup
+{{ range $f := .Fixtures }}
+{{- if not $f.Deferred }}
+	ƒwg.Add(1)
+	go func() {
+		defer ƒwg.Done()
+		ƒsetup_{{ $f.VarName }}()
 	}()
+{{- end }}
 {{ end }}
 	ƒwg.Wait()
 
@@ -130,10 +202,12 @@ func main() {
 	}
 
 {{- /*
-  Teardown here is strictly sequential, so the budget the supervisor gets is
-  the SUM of the members' budgets: a max would force-kill a set of teardowns
-  that each obeyed its own declared Timeout. Reported on both _done forms —
-  a failed setup still has succeeded siblings to release under this budget.
+  Teardown is strictly sequential, so the budget the supervisor gets is the
+  SUM of the members' budgets: a max would force-kill a set of teardowns that
+  each obeyed its own declared Timeout. Deferred fixtures are counted at their
+  default config — their derivation runs at StartKeys time. Reported on both
+  _done forms — a failed setup still has succeeded siblings to release under
+  this budget.
 */}}
 	var ƒbudget time.Duration
 {{ range $f := .Fixtures }}
@@ -147,40 +221,86 @@ func main() {
 		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
-{{- /*
-  The runner owns shutdown TIMING — only it knows when every suite has stopped
-  using the fixtures — so even a failed setup reports and then waits for the
-  signal instead of tearing down on its own; this process owns shutdown
-  EXECUTION. A SIGTERM that already arrived (canceling setup above) has ƒctx
-  closed and falls straight through.
-*/}}
-	<-ƒctx.Done()
+	ƒteardownFailed := false
 
 {{- /*
-  One teardown policy, shared with the in-process DAG: panics are contained so
-  every sibling still releases, and a declared Timeout is a verdict, not just
-  a context the teardown may ignore. A fixture whose setup overran its budget
-  still initialized — its resources exist, so it is torn down like a success.
+  Window commands until shutdown. The runner owns shutdown TIMING — only it
+  knows when every suite has stopped using the fixtures — so even a failed
+  setup reports and then serves commands until the signal instead of tearing
+  down on its own; this process owns shutdown EXECUTION. StartKeys runs in
+  DAG order and TeardownKeys in reverse-DAG order because the fixture lists
+  below are generated in topological order. Each command is acknowledged on
+  stdout with a _cmd line carrying the joined per-fixture failures. A SIGTERM
+  that already arrived (canceling setup above) has ƒctx closed and falls
+  straight through.
 */}}
-	ƒteardownFailed := false
-{{ range .TeardownFixtures }}
-	if ƒerrs[{{ .Index }}] == nil || errors.Is(ƒerrs[{{ .Index }}], gotestruntime.ErrSetupOverran) {
-		if gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "{{ .Identifier }}",
-			Timeout:  ƒcfg_{{ .VarName }}.Timeout,
-			Budget:   {{ if .HasConfig }}ƒcfg_{{ .VarName }}.Timeout{{ else }}0{{ end }},
-			AfterAll: {{ .VarName }}.AfterAll,
-		}) {
-			ƒteardownFailed = true
+	ƒcmds := make(chan ƒcommand)
+	go func() {
+		ƒsc := bufio.NewScanner(os.Stdin)
+		for ƒsc.Scan() {
+			var ƒc ƒcommand
+			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
+				continue
+			}
+			select {
+			case ƒcmds <- ƒc:
+			case <-ƒctx.Done():
+				return
+			}
 		}
+	}()
+
+ƒloop:
+	for {
+		select {
+		case <-ƒctx.Done():
+			break ƒloop
+		case ƒc := <-ƒcmds:
+			var ƒcmdErrs []string
+			switch ƒc.Verb {
+			case "start":
+{{- range $f := .Fixtures }}
+				if ƒhasKey(ƒc.Keys, "{{ $f.StateKey }}") {
+					ƒsetup_{{ $f.VarName }}()
+					if ƒerrs[{{ $f.Index }}] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "{{ $f.Identifier }}: "+ƒerrs[{{ $f.Index }}].Error())
+					}
+				}
+{{- end }}
+			case "teardown":
+{{- range .TeardownFixtures }}
+				if ƒhasKey(ƒc.Keys, "{{ .StateKey }}") {
+					if ƒteardown_{{ .VarName }}() {
+						ƒteardownFailed = true
+						ƒcmdErrs = append(ƒcmdErrs, "{{ .Identifier }}: teardown failed")
+					}
+				}
+{{- end }}
+			default:
+				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
+			}
+			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+		}
+	}
+
+{{- /*
+  Terminal teardown: everything still resident, in reverse-DAG order. Keys an
+  earlier TeardownKeys already released are skipped via ƒtorn — one owner per
+  fixture teardown, always.
+*/}}
+{{ range .TeardownFixtures }}
+	if ƒteardown_{{ .VarName }}() {
+		ƒteardownFailed = true
 	}
 {{- end }}
 
 {{- /*
   Exit 1 for a lifecycle failure of either kind. The runner reads a teardown
   failure from this exact status (gotestrunner.sharedTeardownFailedExit) when
-  setup succeeded; a setup failure was already reported on the _done line. A
-  clean exit is the runner's only proof that teardown ran and passed.
+  setup succeeded; a setup failure was already reported on the _done line, and
+  a StartKeys failure on its _cmd line — deferred errors are the runner's to
+  book, not this status's. A clean exit is the runner's only proof that
+  teardown ran and passed.
 */}}
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)

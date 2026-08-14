@@ -142,7 +142,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--setup-timeout=<dur>` | Total budget for shared fixture setup (default: 2m; 0 disables) |
 | `--timeout=<dur>` | Global pipeline deadline (default: 15m; 0 disables) |
 | `--debounce=<dur>` | Debounce interval for watch mode (default 200ms) |
-| `--parallel=<n>` | Total concurrent test method budget (default: 2×GOMAXPROCS) |
+| `--parallel=<n>` | Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for -race/-msan/-asan) |
 | `--compile-parallel=<n>` | Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan) |
 | `--input=<path>` | Replay a saved `go test -json` stream in `spec`/`summary` (`-` reads stdin) |
 | `--github` | Emit GitHub annotations and step summary (auto-enabled in GitHub Actions) |
@@ -621,8 +621,11 @@ type SuiteConfig struct {
     SetupTimeout time.Duration // BeforeAll/AfterAll deadline
     FailFast     bool          // stop suite on first failure
     Parallel     bool          // method-level parallelism (requires returning BeforeEach)
+    Exclusive    bool          // dispatched strictly alone, after every non-exclusive suite
 }
 ```
+
+`Exclusive` is resolved statically like `Parallel` and consumed by the runner, not the harness: exclusive suites are held back until every non-exclusive suite has finished, then dispatched one at a time in deterministic (package, suite) order — in batch and streaming pipelines alike. It exists for suites whose verdicts measure wall-clock behavior or fight over resources (timing budgets, containers, ports, per-invocation child builds): a budget verdict taken on a saturated machine is not a verdict you can act on. Shared fixture processes stay up for exclusive suites — they are infrastructure, not competing suites. Under `-race`/`-msan`/`-asan`, dispatch and compile concurrency defaults are additionally halved (an explicit `--parallel`/`--compile-parallel` always wins): instrumentation at least doubles the CPU cost per instruction stream, and the uninstrumented defaults would oversubscribe the machine.
 
 (Test-case retries are deliberately not offered — retrying flaky tests hides real defects; fixture `Retries` exist because infrastructure setup is legitimately flaky.)
 
@@ -1293,6 +1296,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `poll-scope` | Assertions inside `Eventually`/`Consistently` callbacks using the outer `t` instead of `poll` |
 | `assertion-type-guard` | `Nil`/`Empty` on types their runtime guards would reject |
 | `generated-file` | `gotest_p(x)suite_test.go` files present in source control |
+| `shared-fixture-undeclared` | Suite-method reads of a `*SharedFixture` value the suite never declared as a pointer field (directly or through the fixture DAG) — window scheduling starts only declared fixtures, so the value may be absent; locally-constructed fixtures (fixture self-tests) are exempt |
 
 **Expressiveness** — the test is correct but says it worse. Suppressible per line or project-wide via `lint.skip`.
 

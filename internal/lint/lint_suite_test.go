@@ -87,6 +87,12 @@ func (s *LintTestSuite) TestAnalyzer(t *gotest.T) {
 			analysistest.Run(it.T(), testdata, lint.Analyzer, "withnolint_file")
 		})
 	})
+
+	t.When("shared fixture declarations", func(w *gotest.T) {
+		w.It("flags undeclared shared fixture reads and exempts local construction", func(it *gotest.T) {
+			analysistest.Run(it.T(), testdata, lint.Analyzer, "withsharedfixture")
+		})
+	})
 }
 
 func (s *LintTestSuite) TestDisableNolintFlag(t *gotest.T) {
@@ -106,7 +112,7 @@ func (s *LintTestSuite) TestTierPolicy(t *gotest.T) {
 				gotest.NotZero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "missing skip flag for %s", rule)
 				gotest.True(it, lint.SkippableRules[rule], "rule %s should be skippable", rule)
 			}
-			for _, rule := range []lint.Rule{lint.Focus, lint.PollScope, lint.TestSignature, lint.SuiteLifecycle} {
+			for _, rule := range []lint.Rule{lint.Focus, lint.PollScope, lint.TestSignature, lint.SuiteLifecycle, lint.SharedFixtureUndeclared} {
 				gotest.Zero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "unexpected skip flag for %s", rule)
 				gotest.False(it, lint.SkippableRules[rule], "integrity rule %s must not be skippable", rule)
 			}

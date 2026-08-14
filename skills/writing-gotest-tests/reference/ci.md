@@ -53,6 +53,14 @@ jobs:
   needed; exit codes are unchanged.
 - Gate formatting too (`gofmt -l`, goimports): `lint -fix` edits are
   textual and unformatted — see SKILL.md's write loop.
+- **v1.27+:** `Exclusive` suites run as a serial tail after the parallel
+  bulk, so CI wall-clock time grows by the SUM of exclusive suite
+  durations — keep the exclusive set small and its suites short. Under
+  `-race`/`-msan`/`-asan` the dispatch and compile concurrency defaults
+  are additionally auto-halved (instrumented code costs ≥2× CPU per
+  instruction stream); an explicit width always wins — pass it through
+  the action's `flags` input (e.g. `flags: "--parallel 8"`) when a CI
+  runner's shape is known and the halved default wastes it.
 
 ## gotest-exclusive projects: drop the stdlib step
 

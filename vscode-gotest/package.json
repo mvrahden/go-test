@@ -236,6 +236,7 @@
   "scripts": {
     "compile": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",

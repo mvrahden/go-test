@@ -480,7 +480,7 @@ Fields:
   setup-timeout: <duration> Total budget for all shared fixture setup (default: 2m, 0 to disable)
   timeout: <duration>       Global pipeline deadline (default: 15m, 0 to disable)
   min-coverage: <int>       Minimum coverage percentage, 0-100
-  parallel: <int>           Total concurrent test method budget (default: 2×GOMAXPROCS)
+  parallel: <int>           Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for -race/-msan/-asan)
   compile-parallel: <int>   Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan)
   debounce: <duration>      Watch mode re-run delay (e.g., "500ms", default: 200ms)
   lint:

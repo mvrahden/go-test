@@ -791,6 +791,37 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 
 // --- OutputCollector tests ---
 
+func (s *GotestrunnerTestSuite) TestExclusiveDispatch(t *gotest.T) {
+	t.When("BuildSuiteTargets sees a suite marked exclusive", func(w *gotest.T) {
+		compiled := []gotestrunner.CompileResult{{Package: "example.com/pkg", BinaryPath: "/tmp/pkg.test"}}
+		suitesByPkg := map[string][]string{"example.com/pkg": {"TimingTestSuite", "PlainTestSuite"}}
+		exclusiveByPkg := map[string]map[string]bool{"example.com/pkg": {"TimingTestSuite": true}}
+		targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, map[string]string{"example.com/pkg": "/src"}, exclusiveByPkg, nil, "")
+
+		w.It("carries the flag on exactly that suite's target", func(it *gotest.T) {
+			byName := map[string]bool{}
+			for i := range targets {
+				byName[targets[i].SuiteName] = targets[i].Exclusive
+			}
+			gotest.True(it, byName["TestTimingTestSuite"])
+			gotest.False(it, byName["TestPlainTestSuite"])
+		})
+	})
+
+	t.When("ordering exclusive targets for serial dispatch", func(w *gotest.T) {
+		w.It("sorts deterministically by package then suite name", func(it *gotest.T) {
+			targets := []gotestrunner.SuiteTarget{
+				{SuiteSpec: gotestrunner.SuiteSpec{Package: "b", SuiteName: "TestZ"}},
+				{SuiteSpec: gotestrunner.SuiteSpec{Package: "a", SuiteName: "TestB"}},
+				{SuiteSpec: gotestrunner.SuiteSpec{Package: "a", SuiteName: "TestA"}},
+			}
+			idx := []int{0, 1, 2}
+			gotestrunner.ExportSortTargetIndices(targets, idx)
+			gotest.Equal(it, []int{2, 1, 0}, idx)
+		})
+	})
+}
+
 func (s *GotestrunnerTestSuite) TestOutputCollector(t *gotest.T) {
 	pass := func(d time.Duration) gotestrunner.SuiteResult {
 		return gotestrunner.SuiteResult{Stdout: []byte("PASS\n"), ExitCode: 0, Duration: d}
@@ -1485,6 +1516,61 @@ func normalizeJSON(raw string) string {
 		lines = append(lines, string(normalized))
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func (s *GotestrunnerTestSuite) TestLogSlowBuild(t *gotest.T) {
+	t.When("a build outlives the threshold", func(w *gotest.T) {
+		w.It("logs the breach while running and the effective duration after", func(it *gotest.T) {
+			// A plain strings.Builder is the point: logSlowBuild owns the
+			// synchronization between its timer goroutine and done(), so a
+			// non-concurrent-safe writer must be race-free under -race.
+			var buf strings.Builder
+			done := gotestrunner.ExportLogSlowBuild(&buf, "test binary for example.com/pkg", 10*time.Millisecond)
+			time.Sleep(40 * time.Millisecond)
+			done()
+			gotest.Contains(it, buf.String(), "has been building for 10ms and is still running")
+			gotest.Contains(it, buf.String(), "finished building after")
+		})
+	})
+
+	t.When("a build finishes under the threshold", func(w *gotest.T) {
+		w.It("stays silent — fast builds are the expected case", func(it *gotest.T) {
+			var buf strings.Builder
+			done := gotestrunner.ExportLogSlowBuild(&buf, "x", time.Minute)
+			done()
+			gotest.Zero(it, buf.String())
+		})
+	})
+}
+
+func (s *GotestrunnerTestSuite) TestSanitizerAwareDispatch(t *gotest.T) {
+	procs := runtime.GOMAXPROCS(0)
+
+	t.When("an instrumentation build flag is active with default parallelism", func(w *gotest.T) {
+		w.It("halves the process cap so instrumented suites keep scheduling headroom", func(it *gotest.T) {
+			runFlags := []string{}
+			got := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 0, 64, true)
+			gotest.Equal(it, max(1, procs/2), got)
+		})
+
+		w.It("keeps an explicit --parallel budget untouched — the user's number wins", func(it *gotest.T) {
+			runFlags := []string{}
+			withRace := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 10, 64, true)
+			runFlags = []string{}
+			without := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 10, 64, false)
+			gotest.Equal(it, without, withRace)
+		})
+	})
+
+	t.When("detecting instrumentation from build flags", func(w *gotest.T) {
+		w.It("recognizes -race, -msan and -asan and nothing else", func(it *gotest.T) {
+			gotest.True(it, gotestrunner.SanitizerActive([]string{"-tags=integration", "-race"}))
+			gotest.True(it, gotestrunner.SanitizerActive([]string{"-msan"}))
+			gotest.True(it, gotestrunner.SanitizerActive([]string{"-asan"}))
+			gotest.False(it, gotestrunner.SanitizerActive([]string{"-tags=integration", "-cover"}))
+			gotest.False(it, gotestrunner.SanitizerActive(nil))
+		})
+	})
 }
 
 func (s *GotestrunnerTestSuite) TestOutputGolden(t *gotest.T) {
