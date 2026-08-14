@@ -1,6 +1,7 @@
 package gotestgen
 
 import (
+	"fmt"
 	"go/ast"
 	"maps"
 	"path/filepath"
@@ -20,6 +21,7 @@ type GenerateResult struct {
 	PTest                          []byte              // generated internal test source
 	PXTest                         []byte              // generated external test source
 	SuiteNames                     []string            // suite struct identifiers (e.g. "FooTestSuite")
+	FuzzFuncsBySuite               map[string][]string // suite identifier → generated Fuzz<Suite>_<Method> func names
 	SkippedSuiteNames              []string            // identifiers of suites excluded by focus/X_ rules
 	ExclusiveSuiteNames            []string            // identifiers of suites with SuiteConfig{Exclusive: true} — dispatched alone, after the parallel bulk
 	FixtureDepSuites               []string            // test function names that depend on shared fixtures (e.g. "TestFooSuite")
@@ -316,6 +318,22 @@ func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFix
 			}
 		}
 
+		fuzzFuncsBySuite := map[string][]string{}
+		seenFuzzFuncs := map[string]bool{}
+		for _, effective := range []gotestast.TestSuiteSpecSet{ptestSpec.EffectiveTestSuites, pxtestSpec.EffectiveTestSuites} {
+			for _, s := range effective {
+				for _, fz := range s.Fuzzers() {
+					id := s.Identifier()
+					name := fmt.Sprintf("Fuzz%s_%s", id, fz.Identifier())
+					if seenFuzzFuncs[name] {
+						continue
+					}
+					seenFuzzFuncs[name] = true
+					fuzzFuncsBySuite[id] = append(fuzzFuncsBySuite[id], name)
+				}
+			}
+		}
+
 		var skippedNames []string
 		for _, s := range ptestSpec.SkippedTestSuites {
 			id := s.Identifier()
@@ -340,12 +358,18 @@ func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFix
 			maps.Copy(mergedReqKeys, pxtestReqKeys)
 		}
 
+		var fuzzFuncsBySuiteResult map[string][]string
+		if len(fuzzFuncsBySuite) > 0 {
+			fuzzFuncsBySuiteResult = fuzzFuncsBySuite
+		}
+
 		return &GenerateResult{
 			AbsPath:                        lr.PkgDir,
 			PkgPath:                        lr.PkgPath,
 			PTest:                          ptestBuf,
 			PXTest:                         pxtestBuf,
 			SuiteNames:                     suiteNames,
+			FuzzFuncsBySuite:               fuzzFuncsBySuiteResult,
 			SkippedSuiteNames:              skippedNames,
 			ExclusiveSuiteNames:            exclusiveNames,
 			FixtureDepSuites:               append(ptestFixtureDeps, pxtestFixtureDeps...),

@@ -107,6 +107,10 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 		}
 	}
 
+	if err := r.renderFuzzSuites(buf, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields); err != nil {
+		return nil, fmt.Errorf("failed rendering fuzz suites. err: %w", err)
+	}
+
 	return r.formatOutput(buf)
 }
 
@@ -186,6 +190,20 @@ func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSh
 	return gotestTpl.ExecuteTemplate(buf, "gotest.suites.tpl", map[string]any{
 		"Spec":                spec,
 		"SuiteSharedFixtures": suiteSharedFixtures,
+	})
+}
+
+func (r *renderer) renderFuzzSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, suiteFixtureFields map[string][]FixtureFieldBinding) error { //nolint:gocritic // hugeParam: stable API
+	// Reuse the exact same fixture-bound view model gotest.bench.tpl renders
+	// Benchmark<Suite> from, reshaped as a map for O(1) per-suite template lookup.
+	suiteFixtures := make(map[string]*FlatFixtureSuite)
+	for _, fs := range flattenSuitesDAG(allFixtures, suiteFixtureFields) {
+		suiteFixtures[fs.Suite.Identifier()] = &fs
+	}
+	return gotestTpl.ExecuteTemplate(buf, "gotest.fuzz.tpl", map[string]any{
+		"Spec":                spec,
+		"SuiteSharedFixtures": suiteSharedFixtures,
+		"SuiteFixtures":       suiteFixtures,
 	})
 }
 

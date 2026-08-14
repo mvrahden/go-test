@@ -488,3 +488,38 @@ func (s *RendererTestSuite) TestDeterministicOutput(t *gotest.T) {
 		}
 	})
 }
+
+// --- Fuzz wrapper rendering tests ---
+
+func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
+	t.It("emits one Fuzz<Suite>_<Method> function per fuzz method, with per-execution lifecycle hooks", func(it *gotest.T) {
+		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzMethod")
+		out, _ := renderTestPkg(it.T(), pkg)
+
+		gotest.Contains(it, out, "func FuzzFuzzTestSuite_FuzzParse(f *testing.F)")
+		gotest.Contains(it, out, "s.FuzzParse(gotest.NewF(f, s.BeforeEach, s.AfterEach))")
+		gotest.NotContains(it, out, "X_FuzzOld")
+	})
+
+	t.It("wires the suite lifecycle around each generated fuzz function", func(it *gotest.T) {
+		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzMethod")
+		out, _ := renderTestPkg(it.T(), pkg)
+
+		fuzzFn := out[strings.Index(out, "func FuzzFuzzTestSuite_FuzzParse"):]
+		gotest.Contains(it, fuzzFn, "ƒlifecycleT := gotest.NewTFromTB(f)")
+		gotest.Contains(it, fuzzFn, "f.Cleanup(func() { s.AfterAll(gotest.NewTFromTB(f)) })")
+		gotest.Contains(it, fuzzFn, "s.BeforeAll(ƒlifecycleT)")
+	})
+
+	t.When("fuzz suite is bound to a package fixture", func(w *gotest.T) {
+		w.It("calls ƒ_setupFixtures and constructs the suite with fixture fields populated", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBoundFuzz")
+			out, _ := renderTestPkg(it.T(), pkg)
+
+			fuzzFn := out[strings.Index(out, "func FuzzParserFuzzTestSuite_FuzzParse"):]
+			gotest.Contains(it, fuzzFn, "ƒ_setupFixtures(f)")
+			gotest.Contains(it, fuzzFn, "ParserFuzzTestSuite: ParserFuzzTestSuite{")
+			gotest.Contains(it, fuzzFn, "PoolFixture: ƒ_PoolFixture")
+		})
+	})
+}
