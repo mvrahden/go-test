@@ -28,6 +28,19 @@ import (
 // broken packages). Time exhaustion is the expected end of a search, never
 // a failure by itself.
 func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+	if sub, rest, ok := extractFuzzSubcommand(inv.Args); ok {
+		switch sub {
+		case "triage":
+			return runFuzzTriage(rest)
+		case "promote":
+			return runFuzzPromote(rest)
+		}
+	}
+	if w := misplacedFuzzSubcommand(inv.Args); w != "" {
+		fmt.Fprintf(os.Stderr, "FAIL: the %s subcommand must come immediately after fuzz: gotest fuzz %s [packages...]\n", w, w)
+		return 2
+	}
+
 	ownArgs, goTestArgs, err := SplitArgs(inv.DefaultArgs(), fuzzAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

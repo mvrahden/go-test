@@ -279,6 +279,8 @@ func printFuzzHelp() {
 
 Usage:
   gotest fuzz [flags] [packages...]
+  gotest fuzz triage [packages...]     Re-run each crasher, report if it still fails
+  gotest fuzz promote [packages...]    Splice crashers into f.Add(...) seeds
 
 Discovers suites containing FuzzX methods (written with gotest.F and
 gotest.Fuzz, see "gotest help scaffold") and runs each one's generated
@@ -335,6 +337,34 @@ bounded budget instead of relying on --timeout alone.
 
 If no packages contain any FuzzX methods, prints "no fuzz targets found"
 and exits 0 without invoking go test.
+
+Triage and promote (crasher management):
+
+"gotest fuzz triage [packages...]" scans every discovered fuzz target's
+testdata/fuzz/<Func>/ directory (a plain filesystem scan — no go test -fuzz
+invoked) and, for each corpus entry found there, prints its decoded input
+and re-runs just that entry via "go test -run='^<Func>/<hash>$'":
+  FuzzParserTestSuite_FuzzParse: 1 crasher
+    file:  testdata/fuzz/FuzzParserTestSuite_FuzzParse/1a2b3c
+    input: string("a@\x00")
+    cause: panic: runtime error: index out of range [3] with length 3
+A crasher whose re-run now passes (e.g. after a fix landed) is reported as
+"status: no longer failing" instead of a cause line. Exits 0 if there are no
+crashers, or every crasher found turns out to no longer fail; exits 1 if any
+crasher's re-run still fails. Corpus entries only decode Go's native
+primitive types (string, []byte, bool, and the int/uint/float variants) —
+one with an unsupported entry is reported and skipped, one file at a time.
+
+"gotest fuzz promote [packages...]" does the same discovery, but instead of
+re-running each crasher, splices it into its originating FuzzX method as a
+permanent f.Add(...) seed (via internal/refactor's AST edit + go/format
+machinery, directly after the method's last existing f.Add call, or as the
+first statement if it has none), then deletes the crasher file — it's now a
+committed regression test that replays for free on every ordinary run:
+  promoted FuzzParserTestSuite_FuzzParse/1a2b3c -> f.Add("a@\x00") in parser_test.go:42
+If a crasher's originating method can't be located with confidence, it is
+skipped with a warning and the crasher file is left in place — promote never
+partially edits or corrupts user source.
 
 On a crashing input, the session exits 1 and gotest names each new corpus
 file it detected, e.g.:
