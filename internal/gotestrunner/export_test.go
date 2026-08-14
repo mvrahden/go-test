@@ -66,3 +66,5 @@ func ExportNewSharedFixtureProcess(sharedDir string, state map[string]json.RawMe
 		state:     state,
 	}
 }
+
+var ExportSortTargetIndices = sortTargetIndices

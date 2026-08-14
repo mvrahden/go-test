@@ -44,6 +44,15 @@ type SuiteConfig struct {
 	// Parallel runs test methods concurrently. Requires a returning BeforeEach
 	// so each parallel test gets its own isolated state. Default: false.
 	Parallel bool
+	// Exclusive schedules the suite's process strictly alone: after every
+	// non-exclusive suite has finished, one exclusive suite at a time, in
+	// deterministic order. For suites whose verdicts depend on wall-clock
+	// behavior or contended resources (timing budgets, containers, ports,
+	// heavy child builds) — a budget verdict taken on a saturated machine is
+	// not a verdict you can act on. Resolved statically by the generator,
+	// like Parallel; scheduling-only, no effect inside the suite process.
+	// Default: false.
+	Exclusive bool
 }
 
 // DefaultFixtureConfig returns a baseline configuration for package fixtures:

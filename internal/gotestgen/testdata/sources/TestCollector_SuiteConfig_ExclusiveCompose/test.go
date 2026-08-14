@@ -1,14 +1,12 @@
 package testpkg
 
-import (
-	"time"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
+import "github.com/mvrahden/go-test/pkg/gotest"
 
 type MyTestSuite struct{}
 
 func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{30 * time.Second, 30 * time.Second, false, true, false}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Exclusive = true
+	return cfg
 }
 func (s *MyTestSuite) TestOne(t *gotest.T) {}

@@ -621,8 +621,11 @@ type SuiteConfig struct {
     SetupTimeout time.Duration // BeforeAll/AfterAll deadline
     FailFast     bool          // stop suite on first failure
     Parallel     bool          // method-level parallelism (requires returning BeforeEach)
+    Exclusive    bool          // dispatched strictly alone, after every non-exclusive suite
 }
 ```
+
+`Exclusive` is resolved statically like `Parallel` and consumed by the runner, not the harness: exclusive suites are held back until every non-exclusive suite has finished, then dispatched one at a time in deterministic (package, suite) order — in batch and streaming pipelines alike. It exists for suites whose verdicts measure wall-clock behavior or fight over resources (timing budgets, containers, ports, per-invocation child builds): a budget verdict taken on a saturated machine is not a verdict you can act on. Shared fixture processes stay up for exclusive suites — they are infrastructure, not competing suites. Under `-race`/`-msan`/`-asan`, dispatch and compile concurrency defaults are additionally halved (an explicit `--parallel`/`--compile-parallel` always wins): instrumentation at least doubles the CPU cost per instruction stream, and the uninstrumented defaults would oversubscribe the machine.
 
 (Test-case retries are deliberately not offered — retrying flaky tests hides real defects; fixture `Retries` exist because infrastructure setup is legitimately flaky.)
 

@@ -33,7 +33,9 @@ const childWallClock = 90 * time.Second
 type ParallelLifecycleTestSuite struct{}
 
 func (s *ParallelLifecycleTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 3 * time.Minute}
+	// Exclusive: these methods hold child suites to wall-clock budgets, and a
+	// budget verdict taken on a saturated machine is not a verdict to act on.
+	return gotest.SuiteConfig{Parallel: true, Exclusive: true, Timeout: 3 * time.Minute}
 }
 
 type childRun struct {

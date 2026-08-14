@@ -29,6 +29,16 @@ type E2ETestSuite struct {
 	workDir string
 }
 
+// SuiteConfig: Exclusive — every test method here shells the built CLI,
+// which compiles packages (often with -race) per invocation. That load must
+// never run beside the timing-budget harnesses. Keep invocations frugal
+// too: one CLI run per distinct pipeline behavior, assertions merged into
+// it, binaries and module copies built once in BeforeAll, workloads pinned
+// tiny (-benchtime=10x scale).
+func (s *E2ETestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Exclusive: true}
+}
+
 func (s *E2ETestSuite) BeforeAll(t *gotest.T) {
 	absRoot, err := filepath.Abs("../..")
 	gotest.NoError(t, err)

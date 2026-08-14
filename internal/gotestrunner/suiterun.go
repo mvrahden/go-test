@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +33,7 @@ type SuiteTarget struct {
 	RunFlags     []string // test binary flags (with -test. prefix)
 	CoverProfile string   // per-suite cover profile path (empty if no -coverprofile)
 	BudgetFile   string   // sidecar path for teardown budget (empty = use default)
+	Exclusive    bool     // SuiteConfig{Exclusive: true}: dispatched strictly alone, after every non-exclusive suite
 }
 
 // SuiteResult holds the output from running a single suite subprocess.
@@ -93,7 +95,12 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 		env = append(env, k+"="+v)
 	}
 
+	var exclusiveIdx []int
 	for i, target := range targets { //nolint:gocritic // rangeValCopy: intentional
+		if target.Exclusive {
+			exclusiveIdx = append(exclusiveIdx, i)
+			continue
+		}
 		wg.Add(1)
 		go func(idx int, t SuiteTarget) {
 			defer wg.Done()
@@ -108,6 +115,19 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 		}(i, target)
 	}
 	wg.Wait()
+
+	// Exclusive suites own the machine: strictly after the parallel bulk,
+	// one at a time, in deterministic order. Their verdicts measure
+	// wall-clock behavior — timing budgets, contended resources — that
+	// concurrently running suites would corrupt.
+	sortTargetIndices(targets, exclusiveIdx)
+	for _, i := range exclusiveIdx {
+		if ctx.Err() != nil {
+			return
+		}
+		r := RunSingleSuite(ctx, targets[i], env, useTest2JSON)
+		collector.RecordResult(targets[i].Package, localIdx[i], r)
+	}
 }
 
 func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2json bool) *exec.Cmd { //nolint:gocritic // hugeParam: stable API
@@ -243,7 +263,11 @@ func WritePackageSummary(pkg string, failed bool, d time.Duration, verbose bool)
 //
 // If userRunFilter is non-empty, only suites whose test function name
 // matches the filter regex are included.
-func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, runFlags []string, userRunFilter string) []SuiteTarget {
+//
+// exclusiveByPkg (import path → suite struct name → true) marks suites with
+// SuiteConfig{Exclusive: true}; their targets carry Exclusive and are
+// dispatched strictly alone, after every non-exclusive suite (see RunSuites).
+func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, exclusiveByPkg map[string]map[string]bool, runFlags []string, userRunFilter string) []SuiteTarget {
 	binByPkg := make(map[string]string, len(compiled))
 	for _, cr := range compiled {
 		binByPkg[cr.Package] = cr.BinaryPath
@@ -273,6 +297,7 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 				},
 				BinaryPath: bin,
 				RunFlags:   translatedFlags,
+				Exclusive:  exclusiveByPkg[pkg][suiteName],
 			}
 			if rf := suiteRunFilter(userRunFilter, testFuncName); rf != "" {
 				target.RunFilter = rf
@@ -281,6 +306,18 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 		}
 	}
 	return targets
+}
+
+// sortTargetIndices orders target indices by (Package, SuiteName) so
+// exclusive dispatch is deterministic run over run.
+func sortTargetIndices(targets []SuiteTarget, idx []int) {
+	sort.Slice(idx, func(a, b int) bool {
+		ta, tb := targets[idx[a]], targets[idx[b]]
+		if ta.Package != tb.Package {
+			return ta.Package < tb.Package
+		}
+		return ta.SuiteName < tb.SuiteName
+	})
 }
 
 // matchesSuiteFunc checks if the user's -run regex could match a given

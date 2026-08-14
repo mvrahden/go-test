@@ -791,6 +791,37 @@ func (s *GotestrunnerTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 
 // --- OutputCollector tests ---
 
+func (s *GotestrunnerTestSuite) TestExclusiveDispatch(t *gotest.T) {
+	t.When("BuildSuiteTargets sees a suite marked exclusive", func(w *gotest.T) {
+		compiled := []gotestrunner.CompileResult{{Package: "example.com/pkg", BinaryPath: "/tmp/pkg.test"}}
+		suitesByPkg := map[string][]string{"example.com/pkg": {"TimingTestSuite", "PlainTestSuite"}}
+		exclusiveByPkg := map[string]map[string]bool{"example.com/pkg": {"TimingTestSuite": true}}
+		targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, map[string]string{"example.com/pkg": "/src"}, exclusiveByPkg, nil, "")
+
+		w.It("carries the flag on exactly that suite's target", func(it *gotest.T) {
+			byName := map[string]bool{}
+			for _, tg := range targets {
+				byName[tg.SuiteName] = tg.Exclusive
+			}
+			gotest.True(it, byName["TestTimingTestSuite"])
+			gotest.False(it, byName["TestPlainTestSuite"])
+		})
+	})
+
+	t.When("ordering exclusive targets for serial dispatch", func(w *gotest.T) {
+		w.It("sorts deterministically by package then suite name", func(it *gotest.T) {
+			targets := []gotestrunner.SuiteTarget{
+				{SuiteSpec: gotestrunner.SuiteSpec{Package: "b", SuiteName: "TestZ"}},
+				{SuiteSpec: gotestrunner.SuiteSpec{Package: "a", SuiteName: "TestB"}},
+				{SuiteSpec: gotestrunner.SuiteSpec{Package: "a", SuiteName: "TestA"}},
+			}
+			idx := []int{0, 1, 2}
+			gotestrunner.ExportSortTargetIndices(targets, idx)
+			gotest.Equal(it, []int{2, 1, 0}, idx)
+		})
+	})
+}
+
 func (s *GotestrunnerTestSuite) TestOutputCollector(t *gotest.T) {
 	pass := func(d time.Duration) gotestrunner.SuiteResult {
 		return gotestrunner.SuiteResult{Stdout: []byte("PASS\n"), ExitCode: 0, Duration: d}

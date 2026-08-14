@@ -23,6 +23,13 @@ import (
 // which t.Setenv forbids sharing with parallel tests.
 type SharedFixtureTeardownTestSuite struct{}
 
+// SuiteConfig: Exclusive because every method builds and force-kills real
+// subprocesses against configured budgets — the one workload that must not
+// share the machine with concurrent compiles.
+func (s *SharedFixtureTeardownTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Exclusive: true}
+}
+
 // slowTeardownFixture is the fixture description the generator would produce for
 // tests/sharedfixture/fixtures.SlowTeardownSharedFixture.
 func slowTeardownFixture() []gotestgen.SharedFixtureInfo {

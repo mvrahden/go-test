@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -283,8 +284,7 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		runFlags = append(append([]string(nil), runFlags...), "-v")
 	}
 	maxParallel := computeDispatchConcurrency(&runFlags, cfg.Parallel, totalSuites)
-
-	targets := BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, runFlags, pf.UserRunFilter)
+	targets := BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, overlay.ExclusiveSuitesByPkg, runFlags, pf.UserRunFilter)
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
@@ -325,6 +325,13 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 
 	resolvedSetupTimeout := resolveSetupTimeout(cfg.SetupTimeout)
 	baseEnv := buildBaseEnv(cfg)
+
+	// Exclusive suites collected during the stream, run serially after it.
+	type deferredTarget struct {
+		t   SuiteTarget
+		idx int
+	}
+	var deferredExclusive []deferredTarget
 
 	fixtureStarted := make(chan struct{})
 	var setupProc *SharedFixtureProcess
@@ -436,7 +443,7 @@ loop:
 
 		singleCompiled := []CompileResult{cr}
 		singleSuites := map[string][]string{cr.Package: overlay.SuitesByPkg[cr.Package]}
-		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, pf.RunFlags, pf.UserRunFilter)
+		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter)
 
 		if len(targets) == 0 {
 			continue
@@ -457,6 +464,14 @@ loop:
 
 		for i := range targets { //nolint:gocritic // hugeParam: stable API
 			target := targets[i]
+			if target.Exclusive {
+				// Deferred past the stream: exclusive suites run strictly
+				// alone, after every concurrent suite has drained. Their
+				// slot in the collector's per-package count is already
+				// registered above; the index travels with them.
+				deferredExclusive = append(deferredExclusive, deferredTarget{t: target, idx: i})
+				continue
+			}
 			wg.Add(1)
 			go func(t SuiteTarget, idx int) {
 				defer wg.Done()
@@ -532,6 +547,39 @@ loop:
 	}
 
 	wg.Wait()
+
+	// Exclusive suites own the machine: after the stream has fully drained,
+	// one at a time, in deterministic order. Shared fixture processes stay up
+	// — they are infrastructure the suites talk to, not competing suites —
+	// and tear down only after the last exclusive finishes.
+	sort.Slice(deferredExclusive, func(a, b int) bool {
+		ta, tb := deferredExclusive[a].t, deferredExclusive[b].t
+		if ta.Package != tb.Package {
+			return ta.Package < tb.Package
+		}
+		return ta.SuiteName < tb.SuiteName
+	}) //nolint:gocritic // mirror of sortTargetIndices over a local pair type
+	for _, d := range deferredExclusive {
+		if streamCtx.Err() != nil {
+			collector.RecordResult(d.t.Package, d.idx, SuiteResult{ExitCode: 1})
+			continue
+		}
+		env := baseEnv
+		if requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[d.t.Package][d.t.SuiteName]; len(requiredKeys) > 0 && setupProc != nil {
+			stateFile, err := setupProc.WriteStateFileForKeys(d.t.SuiteName, requiredKeys)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "WARN: write state file for %s: %s\n", d.t.SuiteName, err)
+				collector.RecordResult(d.t.Package, d.idx, SuiteResult{ExitCode: 1})
+				continue
+			}
+			env = make([]string, len(baseEnv), len(baseEnv)+1)
+			copy(env, baseEnv)
+			env = append(env, protocol.EnvSharedStateFile+"="+stateFile)
+		}
+		r := RunSingleSuite(streamCtx, d.t, env, collector.UsesTest2JSON())
+		collector.RecordResult(d.t.Package, d.idx, r)
+	}
+
 	fixtureWg.Wait()
 
 	// Teardown owns the shared fixture process's shutdown: it signals, then
