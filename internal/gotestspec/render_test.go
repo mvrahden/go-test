@@ -164,6 +164,86 @@ func TestRenderTerminal_BenchmarkLeaf(t *testing.T) {
 	}
 }
 
+func TestRenderTerminal_WithBenchDeltas(t *testing.T) {
+	packages := []*Package{{
+		Path: "p",
+		Nodes: []*Node{{
+			Kind:       KindBenchmark,
+			Display:    "BenchmarkFoo",
+			Status:     StatusPass,
+			Iterations: 100,
+			NsPerOp:    120,
+		}},
+	}}
+
+	deltas := []BenchDelta{
+		{Key: "p Foo/BenchmarkFoo", OldNs: 100, NewNs: 150, PercentChange: 50, Significant: true},
+	}
+
+	var buf bytes.Buffer
+	RenderTerminal(&buf, packages, WithBenchDeltas(deltas))
+	out := stripANSI(buf.String())
+
+	if !strings.Contains(out, "ns/op") {
+		t.Errorf("expected the benchmark result line to render, got:\n%s", out)
+	}
+	if !strings.Contains(out, "BENCHMARK  OLD ns/op  NEW ns/op  Δ") {
+		t.Errorf("expected delta table header, got:\n%s", out)
+	}
+	if !strings.Contains(out, "p Foo/BenchmarkFoo  100.0  150.0  +50.0% ⚠") {
+		t.Errorf("expected regression row, got:\n%s", out)
+	}
+	if !strings.Contains(out, "1 benchmarks:") {
+		t.Errorf("expected the trailing counts line, got:\n%s", out)
+	}
+	if strings.Contains(out, "tests passed (") {
+		t.Errorf("expected a single summary trailer, not a stacked RenderSummary one, got:\n%s", out)
+	}
+}
+
+func TestRenderTerminal_WithBenchDeltas_FilteredToEmptyStillPrintsHeader(t *testing.T) {
+	packages := []*Package{{
+		Path: "p",
+		Nodes: []*Node{{
+			Kind:       KindBenchmark,
+			Display:    "BenchmarkFoo",
+			Status:     StatusPass,
+			Iterations: 100,
+			NsPerOp:    120,
+		}},
+	}}
+
+	// An empty-but-non-nil slice models what the CLI passes when a
+	// comparison ran but every delta was filtered out (no significant
+	// regression, -v not passed): the header should still prove a
+	// comparison happened, alongside the tree's own ns/op line.
+	var buf bytes.Buffer
+	RenderTerminal(&buf, packages, WithBenchDeltas([]BenchDelta{}))
+	out := stripANSI(buf.String())
+
+	if !strings.Contains(out, "ns/op") {
+		t.Errorf("expected the benchmark result line to render, got:\n%s", out)
+	}
+	if !strings.Contains(out, "BENCHMARK  OLD ns/op  NEW ns/op  Δ") {
+		t.Errorf("expected delta table header even with zero rows, got:\n%s", out)
+	}
+}
+
+func TestRenderTerminal_NoBenchDeltas(t *testing.T) {
+	packages := []*Package{{
+		Path:  "p",
+		Nodes: []*Node{{Kind: KindTest, Display: "Foo", Status: StatusPass, Duration: time.Millisecond}},
+	}}
+
+	var buf bytes.Buffer
+	RenderTerminal(&buf, packages)
+	out := stripANSI(buf.String())
+
+	if strings.Contains(out, "BENCHMARK") {
+		t.Errorf("expected no delta table when WithBenchDeltas wasn't given, got:\n%s", out)
+	}
+}
+
 func TestRenderMarkdown_SuiteHierarchy(t *testing.T) {
 	packages := []*Package{{
 		Path: "example.com/pkg",

@@ -24,9 +24,10 @@ var ansiColors = colors{
 var noColors = colors{}
 
 type renderConfig struct {
-	color    bool
-	coverage *CoverageReport
-	elapsed  time.Duration
+	color       bool
+	coverage    *CoverageReport
+	elapsed     time.Duration
+	benchDeltas []BenchDelta
 }
 
 type RenderOption func(*renderConfig)
@@ -41,6 +42,28 @@ func WithCoverage(report *CoverageReport) RenderOption {
 
 func WithElapsed(d time.Duration) RenderOption {
 	return func(c *renderConfig) { c.elapsed = d }
+}
+
+// BenchDelta is one benchmark's old-vs-new comparison, as rendered by
+// RenderSummary and RenderMarkdownSummary via WithBenchDeltas. It mirrors
+// gotestbench.Delta's shape but lives here (rather than being consumed
+// directly) so that gotestspec never has to import gotestbench — callers
+// (cmd/gotest/bench.go) convert []gotestbench.Delta to []BenchDelta at the
+// call site. Filtering (e.g. significant-only vs. every row for -v) is
+// also the caller's responsibility: the renderers show exactly the rows
+// they're given.
+type BenchDelta struct {
+	Key           string // "pkg Suite/Name", matching gotestbench.Delta.Key
+	OldNs, NewNs  float64
+	PercentChange float64
+	Significant   bool
+}
+
+// WithBenchDeltas attaches a benchmark old-vs-new comparison table to be
+// rendered by RenderTerminal, RenderSummary, and RenderMarkdownSummary. A
+// nil or empty slice renders no table.
+func WithBenchDeltas(deltas []BenchDelta) RenderOption {
+	return func(c *renderConfig) { c.benchDeltas = deltas }
 }
 
 func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
@@ -80,6 +103,7 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
 		}
 	}
 
+	renderBenchDeltaTable(w, cfg.benchDeltas, c)
 	fmt.Fprintln(w)
 	stats := CollectStats(packages)
 	renderSummary(w, stats, c)
@@ -234,6 +258,38 @@ func filterOutput(output []string) []string {
 		filtered[i] = line[minIndent:]
 	}
 	return filtered
+}
+
+// renderBenchDeltaTable renders the "old vs new ns/op" comparison table in
+// the same column format `gotest bench --against` established
+// (cmd/gotest/bench.go's printBenchDeltaTable), so the table looks
+// identical whether it's driven directly by the bench command or via a
+// spec/summary render pass. deltas is rendered as given — filtering
+// significant-only vs. every row (-v) is the caller's responsibility (see
+// WithBenchDeltas). No-ops when deltas is empty.
+func renderBenchDeltaTable(w io.Writer, deltas []BenchDelta, c colors) {
+	// nil (WithBenchDeltas never called) means "no comparison happened at
+	// all" -> no-op. An empty-but-non-nil slice (a comparison ran but every
+	// row was filtered out, e.g. no significant deltas without -v) still
+	// prints the header, so the reader can see a comparison was attempted
+	// even when it found nothing worth flagging.
+	if deltas == nil {
+		return
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "%sBENCHMARK  OLD ns/op  NEW ns/op  Δ%s\n", c.bold, c.reset)
+	for _, d := range deltas {
+		sign := ""
+		if d.PercentChange >= 0 {
+			sign = "+"
+		}
+		warn, clr, reset := "", "", ""
+		if d.Significant && d.PercentChange > 0 {
+			warn, clr, reset = " ⚠", c.red, c.reset
+		}
+		fmt.Fprintf(w, "%s%s  %.1f  %.1f  %s%.1f%%%s%s\n",
+			clr, d.Key, d.OldNs, d.NewNs, sign, d.PercentChange, warn, reset)
+	}
 }
 
 func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hugeParam: stable API
