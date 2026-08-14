@@ -290,7 +290,8 @@ Flags:
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
   --save=<path>           Save this run's results as a JSON baseline (forces
                            capture mode; the spec view is still rendered so
-                           results remain visible)
+                           results remain visible). A bare --save= saves to
+                           bench.baseline from .gotest.yml
   --against=<path>        Compare this run against a saved baseline and print
                            a delta table (defaults to bench.baseline in
                            .gotest.yml when omitted)

@@ -4,6 +4,7 @@ import { GoTestController } from "./testController.js";
 import { TestRunner } from "./runner.js";
 import { BenchRunner } from "./benchRunner.js";
 import { BenchResultStore } from "./benchResultStore.js";
+import { BenchGateDiagnostics } from "./benchDiagnostics.js";
 import { GoTestCodeLensProvider } from "./codeLens.js";
 import { DebugLauncher } from "./debug.js";
 import { FocusExcludeProvider } from "./focusExclude.js";
@@ -131,13 +132,15 @@ export function activate(context: vscode.ExtensionContext): void {
     coverageStore,
   );
 
+  const benchGateDiagnostics = new BenchGateDiagnostics(cache);
   benchRunner = new BenchRunner(
     controller,
     cache,
     benchResultStore,
     outputChannel,
+    (report) => benchGateDiagnostics.apply(report),
   );
-  context.subscriptions.push(benchRunner);
+  context.subscriptions.push(benchRunner, benchGateDiagnostics);
 
   const specViewRefreshDisposable = runner.onDidComplete((jsonOutput) => {
     specView.refresh(jsonOutput, "run");
@@ -327,6 +330,24 @@ function registerCommands(deps: {
         await benchRunner.runTarget({ importPath, suiteName, methodName });
       },
     ),
+
+    vscode.commands.registerCommand("gotest.saveBenchBaseline", async () => {
+      const wsDir = resolveActiveWorkspaceDir();
+      if (!wsDir) {
+        outputChannel.warn("[command] saveBenchBaseline: no workspace dir");
+        return;
+      }
+      await benchRunner.saveBaseline(wsDir);
+    }),
+
+    vscode.commands.registerCommand("gotest.compareBenchBaseline", async () => {
+      const wsDir = resolveActiveWorkspaceDir();
+      if (!wsDir) {
+        outputChannel.warn("[command] compareBenchBaseline: no workspace dir");
+        return;
+      }
+      await benchRunner.compareBaseline(wsDir);
+    }),
 
     vscode.commands.registerCommand(
       "gotest.debugTest",

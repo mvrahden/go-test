@@ -189,7 +189,12 @@ export class GoTestCodeLensProvider
         if (latest) {
           lenses.push(
             new vscode.CodeLens(range, {
-              title: formatBenchAnnotation(latest, latest.recordedAt),
+              title: formatBenchAnnotation(
+                latest,
+                latest.recordedAt,
+                Date.now(),
+                latest.delta,
+              ),
               command: "",
             }),
           );

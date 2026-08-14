@@ -74,6 +74,8 @@ export class BenchRunner {
     private readonly cache: DiscoveryCache,
     private readonly store: BenchResultStore,
     private readonly outputChannel: vscode.LogOutputChannel,
+    /** Called with every parsed report — gate diagnostics hang off this. */
+    private readonly onReport?: (report: BenchReport) => void,
   ) {}
 
   dispose(): void {
@@ -145,6 +147,126 @@ export class BenchRunner {
     }
   }
 
+  /**
+   * saveBaseline runs every benchmark in the workspace and saves a baseline.
+   * The path comes from bench.baseline in .gotest.yml — resolved by the CLI,
+   * never parsed here — with a save dialog as the fallback when the project
+   * has no configured baseline.
+   */
+  async saveBaseline(workspaceDir: string): Promise<void> {
+    const first = await this.runWorkspace(workspaceDir, ["--save="]);
+    if (first.ok) {
+      vscode.window.showInformationMessage("Bench baseline saved.");
+      return;
+    }
+    if (!/--save needs a path/.test(first.error)) {
+      vscode.window.showErrorMessage(`gotest bench failed: ${first.error}`);
+      return;
+    }
+    const picked = await vscode.window.showSaveDialog({
+      title: "Save Bench Baseline",
+      filters: { "Bench baseline": ["json"] },
+    });
+    if (!picked) return;
+    const second = await this.runWorkspace(workspaceDir, [
+      `--save=${picked.fsPath}`,
+    ]);
+    if (second.ok) {
+      vscode.window.showInformationMessage(
+        `Bench baseline saved to ${picked.fsPath}.`,
+      );
+    } else {
+      vscode.window.showErrorMessage(`gotest bench failed: ${second.error}`);
+    }
+  }
+
+  /**
+   * compareBaseline runs every benchmark in the workspace and compares. The
+   * CLI compares against bench.baseline automatically when configured; when
+   * the run comes back without deltas, the user picks a baseline file and
+   * the comparison reruns explicitly.
+   */
+  async compareBaseline(workspaceDir: string): Promise<void> {
+    let outcome = await this.runWorkspace(workspaceDir, []);
+    if (outcome.ok && !outcome.report.deltas) {
+      const picked = await vscode.window.showOpenDialog({
+        title: "Compare vs Bench Baseline",
+        canSelectMany: false,
+        filters: { "Bench baseline": ["json"] },
+      });
+      if (!picked || picked.length === 0) return;
+      outcome = await this.runWorkspace(workspaceDir, [
+        `--against=${picked[0].fsPath}`,
+      ]);
+    }
+    if (!outcome.ok) {
+      vscode.window.showErrorMessage(`gotest bench failed: ${outcome.error}`);
+      return;
+    }
+
+    const deltas = outcome.report.deltas ?? [];
+    const significant = deltas.filter((d) => d.significant).length;
+    const gate = outcome.report.gate;
+    if (gate?.breached) {
+      vscode.window.showWarningMessage(
+        `Bench gate breached: ${gate.worstKey} +${gate.worstPct.toFixed(1)}% exceeds ${gate.thresholdPct}%.`,
+      );
+    } else {
+      vscode.window.showInformationMessage(
+        `Compared ${deltas.length} benchmark${deltas.length === 1 ? "" : "s"}: ${
+          significant === 0
+            ? "no significant change"
+            : `${significant} significant change${significant === 1 ? "" : "s"}`
+        }.`,
+      );
+    }
+  }
+
+  /**
+   * runWorkspace runs `gotest bench ./... --json` with extra flags in one
+   * workspace, records the report, and surfaces the outcome to the caller
+   * instead of the UI — the baseline commands own their own messaging.
+   */
+  private async runWorkspace(
+    workspaceDir: string,
+    extra: string[],
+  ): Promise<{ ok: true; report: BenchReport } | { ok: false; error: string }> {
+    const cmd = await buildCliCommand(
+      ["bench", "./...", ...extra, "--json"],
+      workspaceDir,
+      this.outputChannel,
+    );
+    this.outputChannel.info(`[bench] ${formatCliCommand(cmd)}`);
+
+    const cts = new vscode.CancellationTokenSource();
+    this.active?.cancel();
+    this.active = cts;
+    try {
+      const { stdout, stderr, code } = await this.spawnBench(
+        cmd,
+        workspaceDir,
+        cts.token,
+      );
+      if (stderr.trim()) this.outputChannel.warn(stderr.trimEnd());
+      if (!stdout.trim()) {
+        return {
+          ok: false,
+          error: stderr.trim() || `gotest bench exited with code ${code}`,
+        };
+      }
+      const report = parseBenchReport(stdout);
+      this.recordAndLog(report);
+      return { ok: true, report };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.outputChannel.error(`[bench] failed: ${message}`);
+      return { ok: false, error: message };
+    } finally {
+      if (this.active === cts) this.active = undefined;
+      cts.dispose();
+    }
+  }
+
   private async execute(
     plan: BenchTarget[],
     token: vscode.CancellationToken,
@@ -206,31 +328,40 @@ export class BenchRunner {
         continue;
       }
 
-      const now = Date.now();
-      this.store.recordReport(report, now);
-
-      // The supplementary log: one line per method, the same numbers the
-      // annotation shows, so the channel remains a readable record.
+      this.recordAndLog(report);
       for (const result of report.baseline.results) {
-        const n = result.samples.length;
-        const mean =
-          result.samples.reduce((sum, s) => sum + s.nsPerOp, 0) /
-          Math.max(1, n);
-        const last = result.samples[n - 1];
-        this.outputChannel.info(
-          `[bench] ${result.suite}/${result.name}: ${formatBenchAnnotation(
-            {
-              nsPerOp: mean,
-              bytesPerOp: last?.bytesPerOp ?? 0,
-              allocsPerOp: last?.allocsPerOp ?? 0,
-              iterations: last?.iterations ?? 0,
-            },
-            now,
-            now,
-          )}`,
-        );
         hooks.onResult?.(result.package, result.suite, result.name, true);
       }
+    }
+  }
+
+  /**
+   * recordAndLog persists the report and writes the supplementary log: one
+   * line per method with the same numbers the annotation shows, so the
+   * channel remains a readable record of every run.
+   */
+  private recordAndLog(report: BenchReport): void {
+    const now = Date.now();
+    this.store.recordReport(report, now);
+    this.onReport?.(report);
+
+    for (const result of report.baseline.results) {
+      const n = result.samples.length;
+      const mean =
+        result.samples.reduce((sum, s) => sum + s.nsPerOp, 0) / Math.max(1, n);
+      const last = result.samples[n - 1];
+      this.outputChannel.info(
+        `[bench] ${result.suite}/${result.name}: ${formatBenchAnnotation(
+          {
+            nsPerOp: mean,
+            bytesPerOp: last?.bytesPerOp ?? 0,
+            allocsPerOp: last?.allocsPerOp ?? 0,
+            iterations: last?.iterations ?? 0,
+          },
+          now,
+          now,
+        )}`,
+      );
     }
   }
 

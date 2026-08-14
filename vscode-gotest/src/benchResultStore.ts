@@ -21,6 +21,17 @@ export interface PlatformKey {
 }
 
 /** The stored summary of one benchmark's most recent run. */
+/**
+ * The CLI's comparison verdict for one entry, copied verbatim from the
+ * report. `significant` is Welch's t-test speaking — the UI never overrides
+ * it, and an insignificant delta renders as nothing at all.
+ */
+export interface BenchEntryDelta {
+  percentChange: number;
+  significant: boolean;
+  insufficientSample: boolean;
+}
+
 export interface BenchEntry {
   nsPerOp: number;
   bytesPerOp: number;
@@ -31,6 +42,8 @@ export interface BenchEntry {
   recordedAt: number;
   goos: string;
   goarch: string;
+  /** Present only when the recording run compared against a baseline. */
+  delta?: BenchEntryDelta;
 }
 
 interface StoredData {
@@ -102,6 +115,18 @@ export class BenchResultStore {
    */
   recordReport(report: BenchReport, recordedAt: number): void {
     const { goos, goarch } = report.baseline;
+
+    // Delta rows are keyed "pkg Suite/Name" by the CLI; import paths never
+    // contain spaces and suite/method names never contain slashes.
+    const deltaByKey = new Map<string, BenchEntryDelta>();
+    for (const d of report.deltas ?? []) {
+      deltaByKey.set(d.key, {
+        percentChange: d.percentChange,
+        significant: d.significant,
+        insufficientSample: d.insufficientSample,
+      });
+    }
+
     for (const result of report.baseline.results) {
       const n = result.samples.length;
       if (n === 0) continue;
@@ -119,6 +144,11 @@ export class BenchResultStore {
           recordedAt,
           goos,
           goarch,
+          // A run without a comparison clears any stale delta: the verdict
+          // belonged to the numbers it was computed against.
+          delta: deltaByKey.get(
+            `${result.package} ${result.suite}/${result.name}`,
+          ),
         },
       );
     }

@@ -150,7 +150,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--coverage=<path>` | Coverage profile path for `summary` subcommand |
 | `--render-only` | With `--input`, exit 0 on a failing stream: the code reports whether rendering succeeded, not whether the tests passed (requires `--input`) |
 | `--bench` | Benchmark mode for `watch`: re-run benchmarks on change with ns/op deltas |
-| `--save=<path>` | Save a benchmark run as a JSON baseline (`bench`) |
+| `--save=<path>` | Save a benchmark run as a JSON baseline (`bench`; a bare `--save=` uses `bench.baseline` from `.gotest.yml`) |
 | `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`) |
 | `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`) |
 | `--json` | Emit one versioned JSON report to stdout — results, deltas, gate verdict — instead of human output (`bench`; for tooling) |

@@ -53,6 +53,14 @@
         "title": "Go Test: Run Benchmark"
       },
       {
+        "command": "gotest.saveBenchBaseline",
+        "title": "Go Test: Save Bench Baseline"
+      },
+      {
+        "command": "gotest.compareBenchBaseline",
+        "title": "Go Test: Compare vs Baseline"
+      },
+      {
         "command": "gotest.refreshTests",
         "title": "Go Test: Refresh"
       },

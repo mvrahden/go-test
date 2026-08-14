@@ -36,6 +36,8 @@ export interface BenchGate {
   worstPct: number;
   worstKey?: string;
   breached: boolean;
+  /** Every delta the CLI's gate rule condemned — the rule lives in Go. */
+  breachedKeys?: string[];
 }
 
 export interface BenchBaseline {
@@ -107,20 +109,37 @@ export interface BenchNumbers {
   allocsPerOp: number;
 }
 
+/** The comparison verdict attached to an entry (see BenchEntryDelta). */
+export interface AnnotationDelta {
+  percentChange: number;
+  significant: boolean;
+  insufficientSample: boolean;
+}
+
 /**
  * formatBenchAnnotation renders the CodeLens line above a benchmark method:
  * "1.24µs/op · 480 B/op · 3 allocs/op — 2m ago". Allocation-free benchmarks
  * skip the B/op term rather than shouting "0 B/op".
+ *
+ * A delta is appended ONLY when the CLI marked it significant — a UI that
+ * confidently displays noise is worse than no UI. Everything else renders
+ * exactly as if no comparison had happened.
  */
 export function formatBenchAnnotation(
   numbers: BenchNumbers,
   recordedAt: number,
   now: number = Date.now(),
+  delta?: AnnotationDelta,
 ): string {
   const parts = [formatNsPerOp(numbers.nsPerOp)];
   if (numbers.bytesPerOp > 0) {
     parts.push(`${numbers.bytesPerOp} B/op`);
   }
   parts.push(`${numbers.allocsPerOp} allocs/op`);
-  return `${parts.join(" · ")} — ${formatAge(recordedAt, now)}`;
+  let line = `${parts.join(" · ")} — ${formatAge(recordedAt, now)}`;
+  if (delta?.significant) {
+    const sign = delta.percentChange >= 0 ? "+" : "−";
+    line += ` · ${sign}${Math.abs(delta.percentChange).toFixed(1)}% vs baseline`;
+  }
+  return line;
 }

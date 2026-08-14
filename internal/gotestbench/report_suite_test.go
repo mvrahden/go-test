@@ -71,8 +71,13 @@ func (s *ReportTestSuite) TestGateVerdict(t *gotest.T) {
 			gotest.True(it, verdict.Breached)
 		})
 
+		w.It("lists exactly the significant deltas above the threshold as breached", func(it *gotest.T) {
+			gotest.Equal(it, []string{"pkg C/D"}, verdict.BreachedKeys)
+		})
+
 		w.It("never lets an insignificant delta drive the verdict", func(it *gotest.T) {
 			gotest.NotEqual(it, "pkg E/F", verdict.WorstKey)
+			gotest.NotContains(it, verdict.BreachedKeys, "pkg E/F")
 		})
 	})
 
@@ -84,6 +89,7 @@ func (s *ReportTestSuite) TestGateVerdict(t *gotest.T) {
 		w.It("does not breach", func(it *gotest.T) {
 			gotest.False(it, verdict.Breached)
 			gotest.Equal(it, 3.0, verdict.WorstPct)
+			gotest.Empty(it, verdict.BreachedKeys)
 		})
 	})
 
