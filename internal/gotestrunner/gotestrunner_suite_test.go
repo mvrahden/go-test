@@ -917,8 +917,8 @@ func (s *GotestrunnerTestSuite) TestBuildBenchTargets(t *gotest.T) {
 			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "^BenchmarkFoo$/^BenchmarkA$|^BenchmarkBar$/^BenchmarkB$")
 			gotest.Len(it, targets, 2)
 			byName := map[string]string{}
-			for _, tg := range targets {
-				byName[tg.SuiteName] = tg.BenchFilter
+			for i := range targets {
+				byName[targets[i].SuiteName] = targets[i].BenchFilter
 			}
 			gotest.Equal(it, "^BenchmarkFoo$/^BenchmarkA$", byName["Foo"])
 			gotest.Equal(it, "^BenchmarkBar$/^BenchmarkB$", byName["Bar"])

@@ -267,7 +267,7 @@ func filterOutput(output []string) []string {
 // spec/summary render pass. deltas is rendered as given — filtering
 // significant-only vs. every row (-v) is the caller's responsibility (see
 // WithBenchDeltas). No-ops when deltas is empty.
-func renderBenchDeltaTable(w io.Writer, deltas []BenchDelta, c colors) {
+func renderBenchDeltaTable(w io.Writer, deltas []BenchDelta, c colors) { //nolint:gocritic // hugeParam: stable API
 	// nil (WithBenchDeltas never called) means "no comparison happened at
 	// all" -> no-op. An empty-but-non-nil slice (a comparison ran but every
 	// row was filtered out, e.g. no significant deltas without -v) still

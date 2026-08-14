@@ -290,7 +290,7 @@ func toSpecDeltas(deltas []gotestbench.Delta) []gotestspec.BenchDelta {
 
 // emitBenchReport writes the versioned --json document to stdout. It returns
 // a non-zero exit code only when the document itself cannot be produced.
-func emitBenchReport(b gotestbench.Baseline, deltas []gotestbench.Delta, gate *gotestbench.Gate) int {
+func emitBenchReport(b gotestbench.Baseline, deltas []gotestbench.Delta, gate *gotestbench.Gate) int { //nolint:gocritic // hugeParam: stable API
 	data, err := gotestbench.MarshalReport(gotestbench.NewReport(b, deltas, gate))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
