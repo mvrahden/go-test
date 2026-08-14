@@ -24,6 +24,14 @@ func (t *T) T() *testing.T         { return nil }
 func (t *T) It(string, func(*T))   {}
 func (t *T) When(string, func(*T)) {}
 
+type B struct{}
+
+func (b *B) Loop() bool                        { return false }
+func (b *B) B() *testing.B                     { return nil }
+func (b *B) ReportAllocs()                     {}
+func (b *B) Errorf(format string, args ...any) {}
+func (b *B) FailNow()                          {}
+
 type testingT interface {
 	Errorf(format string, args ...any)
 	FailNow()

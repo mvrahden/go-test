@@ -41,11 +41,9 @@ type jsonStats struct {
 	Behaviors  int `json:"behaviors"`
 	Tests      int `json:"tests"`
 	Benchmarks int `json:"benchmarks"`
-	// FailedPackages carries package-level verdicts (build failures, deaths
-	// outside any test); the packages array shows which via status "fail".
-	Passed  int `json:"passed"`
-	Failed  int `json:"failed"`
-	Skipped int `json:"skipped"`
+	Passed     int `json:"passed"`
+	Failed     int `json:"failed"`
+	Skipped    int `json:"skipped"`
 	// FailedPackages carries package-level verdicts (build failures, deaths
 	// outside any test); the packages array shows which via status "fail".
 	FailedPackages int `json:"failedPackages,omitempty"`

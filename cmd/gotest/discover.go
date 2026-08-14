@@ -42,17 +42,18 @@ type discoverPackage struct {
 }
 
 type discoverSuite struct {
-	Name      string           `json:"name"`
-	Parallel  bool             `json:"parallel"`
-	Focused   bool             `json:"focused"`
-	Excluded  bool             `json:"excluded"`
-	Guarded   bool             `json:"guarded"`
-	File      string           `json:"file"`
-	Line      int              `json:"line"`
-	Col       int              `json:"col"`
-	Lifecycle []string         `json:"lifecycle"`
-	Fixtures  []string         `json:"fixtures"`
-	Methods   []discoverMethod `json:"methods"`
+	Name       string           `json:"name"`
+	Parallel   bool             `json:"parallel"`
+	Focused    bool             `json:"focused"`
+	Excluded   bool             `json:"excluded"`
+	Guarded    bool             `json:"guarded"`
+	File       string           `json:"file"`
+	Line       int              `json:"line"`
+	Col        int              `json:"col"`
+	Lifecycle  []string         `json:"lifecycle"`
+	Fixtures   []string         `json:"fixtures"`
+	Methods    []discoverMethod `json:"methods"`
+	Benchmarks []discoverMethod `json:"benchmarks"`
 }
 
 type discoverMethod struct {
@@ -210,6 +211,25 @@ func buildDiscoverSuite(suite *gotestast.TestSuiteSpec) discoverSuite {
 		methods = []discoverMethod{}
 	}
 	ds.Methods = methods
+
+	// Benchmarks (Benchmark* methods)
+	var benchmarks []discoverMethod
+	for _, bm := range suite.Benchmarks() {
+		bPos := fset.Position(bm.Pos())
+		benchmarks = append(benchmarks, discoverMethod{
+			Name:     bm.Identifier(),
+			Parallel: false,
+			Focused:  bm.IsFocused(),
+			Excluded: bm.IsExcluded(),
+			File:     filepath.Base(bPos.Filename),
+			Line:     bPos.Line,
+			Col:      bPos.Column,
+		})
+	}
+	if benchmarks == nil {
+		benchmarks = []discoverMethod{}
+	}
+	ds.Benchmarks = benchmarks
 
 	return ds
 }
