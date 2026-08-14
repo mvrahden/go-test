@@ -209,6 +209,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode bool) 
 		CompileParallel: cfg.CompileParallel,
 		Streaming:       false,
 		OutputMode:      mode,
+		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

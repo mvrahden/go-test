@@ -66,6 +66,7 @@ type ExecConfig struct {
 var knownSubcommands = map[string]bool{
 	"discover": true,
 	"prepare":  true,
+	"fuzz":     true,
 	"generate": true,
 	"scaffold": true,
 	"migrate":  true,

@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -24,10 +26,54 @@ import (
 
 // CmdGotestTestSuite tests CLI argument parsing, subcommands,
 // discovery, spec rendering, and code generation.
-type CmdGotestTestSuite struct{}
+//
+//nolint:lifecycle-pair // BeforeAll's binary lives under t.TempDir(), which the framework removes automatically
+type CmdGotestTestSuite struct {
+	binary   string
+	repoRoot string
+}
 
 func (s *CmdGotestTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true}
+}
+
+func (s *CmdGotestTestSuite) BeforeAll(t *gotest.T) {
+	absRoot, err := filepath.Abs("../..")
+	gotest.NoError(t, err)
+	s.repoRoot = absRoot
+
+	binDir := t.TempDir()
+	binaryName := "gotest"
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+	s.binary = filepath.Join(binDir, binaryName)
+	cmd := exec.Command("go", "build", "-o", s.binary, "./cmd/gotest") //nolint:gosec // G204: go tool with controlled arguments
+	cmd.Dir = absRoot
+	out, err := cmd.CombinedOutput()
+	gotest.NoError(t, err, "build gotest binary: %s", string(out))
+}
+
+// runCLI runs the built gotest binary from the repo root and returns its
+// combined stdout+stderr output.
+func (s *CmdGotestTestSuite) runCLI(t *gotest.T, args ...string) string {
+	out, _ := s.runCLIExit(t, args...)
+	return out
+}
+
+// runCLIExit runs the built gotest binary from the repo root and returns its
+// combined stdout+stderr output along with its exit code.
+func (s *CmdGotestTestSuite) runCLIExit(t *gotest.T, args ...string) (string, int) {
+	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Dir = s.repoRoot
+	out, err := cmd.CombinedOutput()
+	var exitErr *exec.ExitError
+	gotest.True(t, err == nil || errors.As(err, &exitErr), "running gotest binary: %v\n%s", err, out)
+	code := 0
+	if cmd.ProcessState != nil {
+		code = cmd.ProcessState.ExitCode()
+	}
+	return string(out), code
 }
 
 func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
@@ -1065,5 +1111,13 @@ func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 			result := ExportReplacePatterns(tc.original, tc.newPatterns)
 			gotest.Equal(sub, tc.expected, result)
 		}
+	})
+}
+
+func (s *CmdGotestTestSuite) TestFuzzSubcommand(t *gotest.T) {
+	t.It("reports when no fuzz targets exist", func(it *gotest.T) {
+		out, code := s.runCLIExit(it, "fuzz", "./internal/protocol")
+		gotest.Contains(it, out, "no fuzz targets found")
+		gotest.Equal(it, 0, code)
 	})
 }

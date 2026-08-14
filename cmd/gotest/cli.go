@@ -50,6 +50,8 @@ func main() {
 		os.Exit(runSummary(inv))
 	case "watch":
 		os.Exit(runWatch(inv))
+	case "fuzz":
+		os.Exit(runFuzz(inv))
 	case "refactor":
 		os.Exit(runRefactor(inv))
 	case "lint":

@@ -31,6 +31,8 @@ func showHelp(topic string) {
 		printSummaryHelp()
 	case "watch":
 		printWatchHelp()
+	case "fuzz":
+		printFuzzHelp()
 	case "discover":
 		printDiscoverHelp()
 	case "scaffold":
@@ -65,6 +67,7 @@ Usage:
   gotest <subcommand> [flags] [packages...]
 
 Subcommands:
+  fuzz        Run FuzzX suite methods with go test -fuzz
   spec        Render behavioral specification from test output
   summary     Show failure-focused test summary for CI
   watch       Watch for file changes and re-run tests
@@ -259,6 +262,76 @@ Examples:
   gotest watch ./pkg/auth/... -v             Watch with verbose output
   gotest watch ./... --spec                  Spec view on every change
   gotest watch --debounce=500ms ./...        Slower debounce for large projects
+`)
+}
+
+func printFuzzHelp() {
+	fmt.Print(`gotest fuzz — run FuzzX suite methods with go test -fuzz
+
+Usage:
+  gotest fuzz [flags] [packages...]
+
+Discovers suites containing FuzzX methods (written with gotest.F and
+gotest.Fuzz, see "gotest help scaffold") and runs each one's generated
+Fuzz<SuiteName>_<MethodName> wrapper as its own "go test -fuzz=..." process,
+one target per invocation of go test. This is unlike every other gotest
+subcommand: a suite binary compiled once with "go test -c" has no native
+fuzz instrumentation, because cmd/go only weaves it in when -fuzz is present
+at "go test" time. So fuzzing cannot reuse the shared compiled binary and
+each target gets its own background "go test -fuzz" process instead.
+
+Multiple targets run concurrently (bounded by --jobs) and each one streams
+its output live, line by line, prefixed with "[<Func>] ", so long-running
+fuzz sessions show progress rather than going silent until they exit.
+
+Seed corpus replay (the seeds added via f.Add in a FuzzX method, plus any
+corpus gotest fuzz has since discovered under testdata/fuzz/) already
+happens for free as part of an ordinary "gotest" or "gotest test" run —
+those replay as regular subtests, at zero extra cost, without -fuzz and
+without this subcommand. Reach for "gotest fuzz" specifically to spend time
+mutating and searching for new failing inputs.
+
+Flags:
+  --for=<dur>             Approximate wall-clock fuzz budget for the whole
+                           session: each target's -fuzztime share is
+                           --for × min(--jobs, targets) / targets, floored
+                           at 10s, so concurrent waves add back up to ≈--for.
+                           The resolved schedule is printed before fuzzing
+                           starts. When omitted, no -fuzztime is passed and
+                           go's own default applies per target — fuzzing
+                           runs until interrupted or until the global
+                           --timeout expires (which exits 0 when nothing
+                           was found).
+  --jobs=<n>               Max concurrent targets (default: max(1, GOMAXPROCS/2))
+  --no-cache               Disable overlay cache, force fresh generation
+  --debug                  Keep generated overlay for inspection
+  --timeout=<dur>          Global pipeline deadline (default: 15m, 0 to disable)
+
+All targets share the one global --timeout deadline. A --for that cannot
+fit inside it is rejected up front (raise --timeout, lower --for, or pass
+--timeout=0); if the deadline still expires mid-run (build overhead), the
+targets that lost time are listed — gotest prints "[<Func>] skipped: ..."
+for each one that never started. Use --for to give the session an explicit,
+bounded budget instead of relying on --timeout alone.
+
+If no packages contain any FuzzX methods, prints "no fuzz targets found"
+and exits 0 without invoking go test.
+
+On a crashing input, the session exits 1 and gotest names each new corpus
+file it detected, e.g.:
+  [FuzzParserTestSuite_FuzzParse] new crasher: /abs/pkg/testdata/fuzz/FuzzParserTestSuite_FuzzParse/1a2b3c
+Inspect it with "gotest fuzz triage", then "gotest fuzz promote" to keep it
+as a typed f.Add seed that replays automatically in ordinary runs.
+
+A session that ends by the global --timeout or an interrupt without a
+finding exits 0 — time exhaustion is the normal end of an open-ended
+search, not a failure. Exit 1 means a finding (a failing target or a new
+crasher); exit 2 means the session could not run as requested.
+
+Examples:
+  gotest fuzz ./pkg/parser/...                Fuzz until interrupted or timeout
+  gotest fuzz --for=5m ./...                  ~5 minutes of fuzzing wall-clock across all targets
+  gotest fuzz --for=1m --jobs=2 ./...         Cap concurrency to 2 targets at a time
 `)
 }
 

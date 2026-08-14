@@ -70,6 +70,7 @@ type PipelineConfig struct {
 	CompileParallel int
 	Streaming       bool
 	OutputMode      RunMode
+	FuzzFuncsByPkg  map[string]map[string][]string
 }
 
 type PipelineResult struct {
@@ -338,7 +339,7 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		runFlags = append(append([]string(nil), runFlags...), "-v")
 	}
 	maxParallel := computeDispatchConcurrency(&runFlags, cfg.Parallel, totalSuites, SanitizerActive(pf.BuildFlags))
-	targets := BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, overlay.ExclusiveSuitesByPkg, runFlags, pf.UserRunFilter)
+	targets := BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.ExclusiveSuitesByPkg, runFlags, pf.UserRunFilter)
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
@@ -518,7 +519,7 @@ loop:
 
 		singleCompiled := []CompileResult{cr}
 		singleSuites := map[string][]string{cr.Package: overlay.SuitesByPkg[cr.Package]}
-		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter)
+		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter)
 
 		if len(targets) == 0 {
 			continue

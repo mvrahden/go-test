@@ -497,19 +497,24 @@ RunFuzzTargets(ctx, targets, cfg)
       stdout/stderr → lineWriter → os.Stdout/os.Stderr, each line
       prefixed "[<Func>] ", flushed live (not buffered to end-of-run)
       │
-      exit code != 0 → print "[<Func>] crasher artifacts (if any): <dir>/testdata/fuzz/<Func>/"
+      testdata/fuzz/<Func>/ snapshotted before and after the run;
+      new entries are reported as "[<Func>] new crasher: <path>"
   │
-  returns the worst (highest) exit code across all targets
+  returns per-target outcomes (exit code, canceled?, skipped?, new crashers);
+  the session exit code is the worst *effective* code: a target stopped by
+  the deadline or an interrupt without a finding maps to 0, a new crasher
+  file maps to 1 even if the shutdown killed the process mid-crash
 ```
 
 This is slower than the binary-reuse path everywhere else in gotest — every
 target pays its own compile cost — but it is the only way to get real,
 coverage-guided fuzzing. A target whose semaphore slot doesn't open before
 the context is cancelled (all targets share the pipeline's one global
-`--timeout`) is skipped with `[<Func>] skipped: global timeout reached before
-this target started` rather than silently dropped; `--for` gives every
+`--timeout`) is skipped with `[<Func>] skipped: session ended before this
+target started` rather than silently dropped; `--for` gives every
 target its own explicit budget so a run with more targets than `--jobs`
-doesn't starve later waves.
+doesn't starve later waves. Time exhaustion never fails the session by
+itself: findings do.
 
 ### Streaming Execution (Compile-Execute Overlap)
 
