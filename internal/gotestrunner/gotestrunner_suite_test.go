@@ -902,6 +902,61 @@ func (s *GotestrunnerTestSuite) TestBuildBenchTargets(t *gotest.T) {
 			gotest.Contains(it, targets[0].RunFlags, "-test.benchtime=2x")
 		})
 	})
+
+	t.When("the -bench pattern carries sub-benchmark segments", func(w *gotest.T) {
+		w.It("selects the suite by the first segment and carries the full pattern as BenchFilter", func(it *gotest.T) {
+			benchesByPkg := map[string][]string{"example.com/pkg": {"CacheTestSuite", "OtherSuite"}}
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "^BenchmarkCacheTestSuite$/^BenchmarkGetHit$")
+			gotest.Len(it, targets, 1)
+			gotest.Equal(it, "CacheTestSuite", targets[0].SuiteName)
+			gotest.Equal(it, "^BenchmarkCacheTestSuite$/^BenchmarkGetHit$", targets[0].BenchFilter)
+		})
+
+		w.It("keeps only the alternation branches that match each suite's wrapper", func(it *gotest.T) {
+			benchesByPkg := map[string][]string{"example.com/pkg": {"Foo", "Bar"}}
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "^BenchmarkFoo$/^BenchmarkA$|^BenchmarkBar$/^BenchmarkB$")
+			gotest.Len(it, targets, 2)
+			byName := map[string]string{}
+			for _, tg := range targets {
+				byName[tg.SuiteName] = tg.BenchFilter
+			}
+			gotest.Equal(it, "^BenchmarkFoo$/^BenchmarkA$", byName["Foo"])
+			gotest.Equal(it, "^BenchmarkBar$/^BenchmarkB$", byName["Bar"])
+		})
+
+		w.It("leaves BenchFilter empty for a suite-only pattern", func(it *gotest.T) {
+			benchesByPkg := map[string][]string{"example.com/pkg": {"CacheTestSuite"}}
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "^BenchmarkCacheTestSuite$")
+			gotest.Len(it, targets, 1)
+			gotest.Zero(it, targets[0].BenchFilter)
+		})
+	})
+
+	t.When("building the bench subprocess command", func(w *gotest.T) {
+		ctx := context.Background()
+
+		w.It("forces the exact wrapper pattern without a BenchFilter", func(it *gotest.T) {
+			target := gotestrunner.SuiteTarget{
+				SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "CacheTestSuite"},
+				BinaryPath: "/tmp/pkg.test",
+				Bench:      true,
+			}
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, nil, false)
+			gotest.Contains(it, cmd.Args, `-test.bench=^BenchmarkCacheTestSuite$`)
+		})
+
+		w.It("hands a BenchFilter to the binary verbatim so go test scopes sub-benchmarks", func(it *gotest.T) {
+			target := gotestrunner.SuiteTarget{
+				SuiteSpec:   gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "CacheTestSuite"},
+				BinaryPath:  "/tmp/pkg.test",
+				Bench:       true,
+				BenchFilter: "^BenchmarkCacheTestSuite$/^BenchmarkGetHit$",
+			}
+			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, nil, false)
+			gotest.Contains(it, cmd.Args, `-test.bench=^BenchmarkCacheTestSuite$/^BenchmarkGetHit$`)
+			gotest.NotContains(it, cmd.Args, `-test.bench=^BenchmarkCacheTestSuite$`)
+		})
+	})
 }
 
 func (s *GotestrunnerTestSuite) TestExclusiveDispatch(t *gotest.T) {

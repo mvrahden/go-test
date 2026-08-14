@@ -119,6 +119,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `migrate` | Convert testify/suite tests to go-test suites |
 | `spec` | Run tests and render behavioral specification |
 | `summary` | Run tests and render a failure-focused summary (CI mode) |
+| `bench` | Run `BenchmarkX` suite methods serially via `go test -bench` |
 | `lint` | Run gotest-specific linter checks |
 | `refactor` | Toggle focus prefixes: `refactor toggle-focus <file> <Suite[.Method]>` |
 | `discover` | Discover test suites and output JSON metadata |
@@ -150,6 +151,11 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--badge=<path>` | Write a self-contained coverage badge SVG (`summary` only); adds `-coverprofile` when neither the caller nor `--min` did |
 | `--render-only` | With `--input`, exit 0 on a failing stream: the code reports whether rendering succeeded, not whether the tests passed (requires `--input`) |
 | `--static` | Render the specification from source without running the suites (`spec` only); nodes carry no verdict, and methods whose behaviors depend on runtime values are reported as incomplete on stderr |
+| `--bench` | Benchmark mode for `watch`: re-run benchmarks on change with ns/op deltas |
+| `--save=<path>` | Save a benchmark run as a JSON baseline (`bench`) |
+| `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`) |
+| `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`) |
+| `--json` | Emit one versioned JSON report to stdout — results, deltas, gate verdict — instead of human output (`bench`; for tooling) |
 
 ### Disambiguation
 

@@ -33,6 +33,7 @@ var gotestFlags = map[string]FlagKind{
 	"--save":             ValueFlag,
 	"--against":          ValueFlag,
 	"--gate":             ValueFlag,
+	"--json":             BoolFlag,
 }
 
 var testAllowed = flagSet(
@@ -61,7 +62,7 @@ var watchAllowed = flagSet(
 
 var benchAllowed = flagSet(
 	"--timeout", "--setup-timeout", "--no-cache", "--debug", "--spec", "--no-color",
-	"--save", "--against", "--gate",
+	"--save", "--against", "--gate", "--json",
 )
 
 func flagSet(names ...string) map[string]bool {
