@@ -5,7 +5,11 @@ vi.mock("vscode", () => ({
   window: { showErrorMessage: vi.fn() },
 }));
 
-import { planBenchInvocations, benchTargetFromItemId } from "./benchRunner.js";
+import {
+  planBenchInvocations,
+  benchTargetFromItemId,
+  buildProfileArgs,
+} from "./benchRunner.js";
 
 describe("planBenchInvocations", () => {
   it("keeps distinct method targets in selection order", () => {
@@ -59,5 +63,32 @@ describe("benchTargetFromItemId", () => {
 
   it("refuses ids that are too short to carry a method", () => {
     expect(benchTargetFromItemId("pkg/Suite")).toBeUndefined();
+  });
+});
+
+describe("buildProfileArgs", () => {
+  it("adds the go test profile flag with an absolute output path", () => {
+    expect(
+      buildProfileArgs(
+        { importPath: "a/b", suiteName: "S", methodName: "BenchmarkX" },
+        "cpu",
+        "/tmp/prof",
+      ),
+    ).toEqual([
+      "bench",
+      "a/b",
+      "-bench=^BenchmarkS$/^BenchmarkX$",
+      "-cpuprofile=/tmp/prof/cpu.pprof",
+      "--json",
+    ]);
+  });
+
+  it("uses -memprofile for the memory kind", () => {
+    const args = buildProfileArgs(
+      { importPath: "a/b", suiteName: "S" },
+      "mem",
+      "/tmp/prof",
+    );
+    expect(args).toContain("-memprofile=/tmp/prof/mem.pprof");
   });
 });

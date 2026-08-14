@@ -67,6 +67,7 @@ Test results persist across sessions, so you see pass/fail state immediately aft
 
 **Run** and **Debug** buttons appear inline above every suite and test method in `_test.go` files.
 Click to execute immediately.
+Benchmark methods get **Bench**, **5×**, and a persistent result annotation (see [Benchmarks](#benchmarks)).
 
 Package-level and file-level actions appear on the `package` declaration line:
 
@@ -110,6 +111,40 @@ Place your cursor on a suite or method definition and use the **Quick Fix** menu
 
 A status bar warning and inline diagnostics alert you when focused tests exist, preventing CI failures from `gotest --ci`.
 
+### Benchmarks
+
+A benchmark answers with a number, and a number is meaningless in isolation.
+Every surface here exists to close the loop between "I changed this code" and
+"what happened to the number" — powered by `gotest bench --json`; all
+statistics (Welch's t-test significance, deltas, the gate rule) are computed
+by the CLI, never re-derived in the extension:
+
+- **▶ Bench** CodeLens on every `Benchmark*` method — runs exactly that
+  method (go test's sub-benchmark scoping). **▶ Bench Suite** on the suite
+  runs them all; **5×** runs with `-count=5` for a trustworthy mean ± spread.
+- **Result annotations** — the last measured numbers render right above the
+  method (`1.24µs/op · 480 B/op · 3 allocs/op — 2m ago`) and survive editor
+  reloads. Results are keyed per goos/goarch: a number measured on another
+  platform is a different number and is never shown on this host.
+- **Trend on hover** — hovering a benchmark shows its run-over-run sparkline
+  with the endpoints spelled out, from a bounded local history (last 50 runs).
+- **Baselines** — *Go Test: Save Bench Baseline* and *Go Test: Compare vs
+  Baseline* wrap `--save`/`--against`, defaulting to `bench.baseline` from
+  `.gotest.yml`. After a compare, significant deltas render inline
+  (`+12.3% vs baseline`); deltas the CLI did not mark significant display
+  nothing — the UI never dresses up noise.
+- **Gate warnings** — when `bench.gate` is configured and a run breaches it,
+  the offending methods get warning diagnostics at their definitions.
+- **Test Explorer** — benchmarks appear under their suites with a dedicated
+  **Bench** run profile. They never run as part of a normal test run: timing
+  numbers taken while tests hammer the machine are noise.
+- **Profiling** — *Go Test: Profile Benchmark (CPU/Mem)* runs one benchmark
+  with `-cpuprofile`/`-memprofile` and opens `go tool pprof -http` on the
+  result.
+
+Benchmarks are deliberate acts: there is no bench-on-save and watch mode
+never benchmarks.
+
 ### Scaffold
 
 Generate test suite skeletons from existing code:
@@ -140,6 +175,11 @@ Projects using `go.work` are also supported.
 | Go Test: Show Spec View | Open the BDD spec output panel |
 | Go Test: Start Watch | Start continuous testing for a package scope |
 | Go Test: Stop Watch | Stop all active watch processes |
+| Go Test: Run Benchmark | Run a suite's or method's benchmarks via `gotest bench` |
+| Go Test: Bench (stable, 5×) | Run a benchmark with `-count=5` for mean ± spread |
+| Go Test: Save Bench Baseline | Save the workspace's benchmark results as a baseline |
+| Go Test: Compare vs Baseline | Compare current numbers against a saved baseline |
+| Go Test: Profile Benchmark (CPU/Mem) | Profile one benchmark and open `go tool pprof` |
 | Go Test: Scaffold Suite | Generate a test suite from a target |
 | Go Test: Scaffold Target | Generate a test suite for a specific target |
 | Go Test: Copy Coverage Summary | Copy coverage table to clipboard |

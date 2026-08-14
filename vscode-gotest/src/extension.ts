@@ -5,6 +5,7 @@ import { TestRunner } from "./runner.js";
 import { BenchRunner } from "./benchRunner.js";
 import { BenchResultStore } from "./benchResultStore.js";
 import { BenchGateDiagnostics } from "./benchDiagnostics.js";
+import { BenchHoverProvider } from "./benchHover.js";
 import { GoTestCodeLensProvider } from "./codeLens.js";
 import { DebugLauncher } from "./debug.js";
 import { FocusExcludeProvider } from "./focusExclude.js";
@@ -248,6 +249,16 @@ function registerProviders(
     codeLensProvider,
   );
 
+  const extraDisposables: vscode.Disposable[] = [];
+  if (benchResultStore) {
+    extraDisposables.push(
+      vscode.languages.registerHoverProvider(
+        { language: "go", pattern: "**/*_test.go" },
+        new BenchHoverProvider(cache, benchResultStore),
+      ),
+    );
+  }
+
   const focusExcludeProvider = new FocusExcludeProvider(cache);
   const codeActionsDisposable = vscode.languages.registerCodeActionsProvider(
     { language: "go", pattern: "**/*_test.go" },
@@ -269,6 +280,7 @@ function registerProviders(
   return [
     codeLensProvider,
     codeLensDisposable,
+    ...extraDisposables,
     focusExcludeProvider,
     codeActionsDisposable,
     scaffoldProvider,
@@ -328,6 +340,75 @@ function registerCommands(deps: {
       "gotest.runBench",
       async (importPath: string, suiteName: string, methodName?: string) => {
         await benchRunner.runTarget({ importPath, suiteName, methodName });
+      },
+    ),
+
+    vscode.commands.registerCommand(
+      "gotest.runBenchStable",
+      async (importPath: string, suiteName: string, methodName?: string) => {
+        await benchRunner.runTarget({
+          importPath,
+          suiteName,
+          methodName,
+          count: 5,
+        });
+      },
+    ),
+
+    vscode.commands.registerCommand(
+      "gotest.profileBench",
+      async (importPath?: string, suiteName?: string, methodName?: string) => {
+        // Palette invocations carry no target: offer every discovered
+        // benchmark. CodeLens/explorer callers pass the target directly.
+        if (!importPath || !suiteName) {
+          const picks: Array<
+            vscode.QuickPickItem & {
+              target: {
+                importPath: string;
+                suiteName: string;
+                methodName: string;
+              };
+            }
+          > = [];
+          for (const pkg of cache.packages) {
+            for (const suite of pkg.suites) {
+              for (const bench of suite.benchmarks ?? []) {
+                picks.push({
+                  label: `${suite.name}/${bench.name}`,
+                  description: pkg.importPath,
+                  target: {
+                    importPath: pkg.importPath,
+                    suiteName: suite.name,
+                    methodName: bench.name,
+                  },
+                });
+              }
+            }
+          }
+          if (picks.length === 0) {
+            vscode.window.showInformationMessage(
+              "No benchmarks discovered in this workspace.",
+            );
+            return;
+          }
+          const picked = await vscode.window.showQuickPick(picks, {
+            title: "Profile Benchmark",
+          });
+          if (!picked) return;
+          ({ importPath, suiteName, methodName } = picked.target);
+        }
+        const kind = await vscode.window.showQuickPick(
+          [
+            { label: "CPU", profileKind: "cpu" as const },
+            { label: "Memory", profileKind: "mem" as const },
+          ],
+          { title: "Profile kind" },
+        );
+        if (!kind) return;
+        await benchRunner.profileTarget(
+          { importPath, suiteName, methodName },
+          kind.profileKind,
+        );
       },
     ),
 
