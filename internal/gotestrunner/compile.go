@@ -93,12 +93,26 @@ func compileConcurrency(compileParallel int, buildFlags []string) int {
 		return compileParallel
 	}
 	n := runtime.NumCPU()
-	for _, f := range buildFlags {
-		if f == "-race" || f == "-msan" || f == "-asan" {
-			return max(1, n/2)
-		}
+	if SanitizerActive(buildFlags) {
+		return max(1, n/2)
 	}
 	return n
+}
+
+// SanitizerActive reports whether buildFlags enable an instrumentation mode
+// (-race/-msan/-asan) that at least doubles the CPU cost per instruction
+// stream. Compile and dispatch concurrency halve their defaults under it:
+// the ordinary defaults are tuned for uninstrumented workloads, and keeping
+// them would oversubscribe the machine — starving exactly the wall-clock
+// budget verdicts that must stay trustworthy. An explicit --parallel or
+// --compile-parallel always wins over this heuristic.
+func SanitizerActive(buildFlags []string) bool {
+	for _, f := range buildFlags {
+		if f == "-race" || f == "-msan" || f == "-asan" {
+			return true
+		}
+	}
+	return false
 }
 
 func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir string, compileParallel int) <-chan CompileOutcome {

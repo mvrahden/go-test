@@ -30,14 +30,29 @@ func resolveSetupTimeout(d time.Duration) time.Duration {
 	}
 }
 
-func computeDispatchConcurrency(runFlags *[]string, budget, totalSuites int) int {
+func computeDispatchConcurrency(runFlags *[]string, budget, totalSuites int, sanitized bool) int {
 	userParallel := ExtractParallelValue(*runFlags)
 
 	if userParallel > 0 && budget == 0 {
+		// The user pinned intra-process parallelism; the process count is
+		// still ours to choose — halved under instrumentation like every
+		// other default (see SanitizerActive).
+		if sanitized {
+			return runtime.GOMAXPROCS(0)
+		}
 		return 2 * runtime.GOMAXPROCS(0)
 	}
 
-	inter, intra := ComputeConcurrency(budget, totalSuites, runtime.GOMAXPROCS(0))
+	procs := runtime.GOMAXPROCS(0)
+	if sanitized && budget == 0 {
+		// Halve both dimensions: the budget (total concurrent test methods)
+		// and the process cap. Halving the budget alone would not reduce the
+		// process count — ComputeConcurrency caps inter at procs first — and
+		// the OS process running an instrumented binary is the costly unit.
+		budget = procs
+		procs = max(1, procs/2)
+	}
+	inter, intra := ComputeConcurrency(budget, totalSuites, procs)
 	if userParallel == 0 {
 		*runFlags = InjectParallel(*runFlags, intra)
 	}
@@ -283,7 +298,7 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	if cfg.OutputMode == RunCaptureJSON {
 		runFlags = append(append([]string(nil), runFlags...), "-v")
 	}
-	maxParallel := computeDispatchConcurrency(&runFlags, cfg.Parallel, totalSuites)
+	maxParallel := computeDispatchConcurrency(&runFlags, cfg.Parallel, totalSuites, SanitizerActive(pf.BuildFlags))
 	targets := BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, overlay.ExclusiveSuitesByPkg, runFlags, pf.UserRunFilter)
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
@@ -393,7 +408,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	for _, suites := range overlay.SuitesByPkg {
 		totalSuites += len(suites)
 	}
-	maxParallel := computeDispatchConcurrency(&pf.RunFlags, cfg.Parallel, totalSuites)
+	maxParallel := computeDispatchConcurrency(&pf.RunFlags, cfg.Parallel, totalSuites, SanitizerActive(pf.BuildFlags))
 	sem := make(chan struct{}, maxParallel)
 	var wg sync.WaitGroup
 	anyTargets := false

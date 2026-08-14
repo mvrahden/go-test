@@ -1518,6 +1518,36 @@ func normalizeJSON(raw string) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
+func (s *GotestrunnerTestSuite) TestSanitizerAwareDispatch(t *gotest.T) {
+	procs := runtime.GOMAXPROCS(0)
+
+	t.When("an instrumentation build flag is active with default parallelism", func(w *gotest.T) {
+		w.It("halves the process cap so instrumented suites keep scheduling headroom", func(it *gotest.T) {
+			runFlags := []string{}
+			got := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 0, 64, true)
+			gotest.Equal(it, max(1, procs/2), got)
+		})
+
+		w.It("keeps an explicit --parallel budget untouched — the user's number wins", func(it *gotest.T) {
+			runFlags := []string{}
+			withRace := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 10, 64, true)
+			runFlags = []string{}
+			without := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 10, 64, false)
+			gotest.Equal(it, without, withRace)
+		})
+	})
+
+	t.When("detecting instrumentation from build flags", func(w *gotest.T) {
+		w.It("recognizes -race, -msan and -asan and nothing else", func(it *gotest.T) {
+			gotest.True(it, gotestrunner.SanitizerActive([]string{"-tags=integration", "-race"}))
+			gotest.True(it, gotestrunner.SanitizerActive([]string{"-msan"}))
+			gotest.True(it, gotestrunner.SanitizerActive([]string{"-asan"}))
+			gotest.False(it, gotestrunner.SanitizerActive([]string{"-tags=integration", "-cover"}))
+			gotest.False(it, gotestrunner.SanitizerActive(nil))
+		})
+	})
+}
+
 func (s *GotestrunnerTestSuite) TestOutputGolden(t *gotest.T) {
 	t.When("text non-verbose", func(w *gotest.T) {
 		w.It("single passing package", func(it *gotest.T) {

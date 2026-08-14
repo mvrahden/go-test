@@ -68,3 +68,4 @@ func ExportNewSharedFixtureProcess(sharedDir string, state map[string]json.RawMe
 }
 
 var ExportSortTargetIndices = sortTargetIndices
+var ExportComputeDispatchConcurrency = computeDispatchConcurrency
