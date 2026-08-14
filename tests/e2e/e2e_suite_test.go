@@ -237,6 +237,84 @@ func (s *E2ETestSuite) TestOutputFormatGolden(t *gotest.T) {
 	})
 }
 
+func (s *E2ETestSuite) TestBenchJSONReport(t *gotest.T) {
+	baselinePath := filepath.Join(t.TempDir(), "baseline.json")
+
+	runBench := func(it *gotest.T, extra ...string) []byte {
+		args := append([]string{"bench", "github.com/mvrahden/go-test/examples/benchmarking",
+			"-bench=^BenchmarkCacheTestSuite$/^BenchmarkGetHit$", "-benchtime=10x"}, extra...)
+		cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
+		cmd.Dir = filepath.Join(s.workDir, "examples")
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		gotest.NoError(it, cmd.Run(), "bench run failed:\nstdout: %s\nstderr: %s", stdout.String(), stderr.String())
+		return stdout.Bytes()
+	}
+
+	type reportDoc struct {
+		SchemaVersion int `json:"schemaVersion"`
+		Baseline      struct {
+			SchemaVersion int    `json:"schemaVersion"`
+			GOOS          string `json:"goos"`
+			Results       []struct {
+				Suite   string `json:"suite"`
+				Name    string `json:"name"`
+				Samples []struct {
+					Iterations int     `json:"iterations"`
+					NsPerOp    float64 `json:"nsPerOp"`
+				} `json:"samples"`
+			} `json:"results"`
+		} `json:"baseline"`
+		Deltas []struct {
+			Key         string `json:"key"`
+			Significant bool   `json:"significant"`
+		} `json:"deltas"`
+		Gate *struct {
+			ThresholdPct float64 `json:"thresholdPct"`
+			Breached     bool    `json:"breached"`
+		} `json:"gate"`
+	}
+
+	// Two CLI invocations total, not three: the save run doubles as the
+	// plain-report probe. Every bench invocation compiles the example with
+	// -race, and this suite runs concurrently with the timing-sensitive
+	// budget harnesses — the gate has no headroom for redundant load.
+	t.When("--json runs a slash-scoped single method and saves a baseline", func(w *gotest.T) {
+		out := runBench(w, "--save="+baselinePath, "--json")
+		var report reportDoc
+		gotest.NoError(w, json.Unmarshal(out, &report), "stdout must be one JSON document:\n%s", out)
+
+		w.It("emits the versioned report with exactly the scoped method", func(it *gotest.T) {
+			gotest.Equal(it, 1, report.SchemaVersion)
+			gotest.Equal(it, 1, report.Baseline.SchemaVersion)
+			gotest.Len(it, report.Baseline.Results, 1)
+			gotest.Equal(it, "CacheTestSuite", report.Baseline.Results[0].Suite)
+			gotest.Equal(it, "BenchmarkGetHit", report.Baseline.Results[0].Name)
+			gotest.Equal(it, 10, report.Baseline.Results[0].Samples[0].Iterations)
+		})
+
+		w.It("omits deltas and gate when no comparison ran", func(it *gotest.T) {
+			gotest.Empty(it, report.Deltas)
+			gotest.Zero(it, report.Gate)
+		})
+	})
+
+	t.When("--json compares against the saved baseline with a gate", func(w *gotest.T) {
+		out := runBench(w, "--against="+baselinePath, "--gate=1000", "--json")
+		var report reportDoc
+		gotest.NoError(w, json.Unmarshal(out, &report), "stdout must be one JSON document:\n%s", out)
+
+		w.It("carries one delta per matched benchmark and the gate verdict", func(it *gotest.T) {
+			gotest.Len(it, report.Deltas, 1)
+			gotest.Contains(it, report.Deltas[0].Key, "CacheTestSuite/BenchmarkGetHit")
+			gotest.NotZero(it, report.Gate)
+			gotest.Equal(it, 1000.0, report.Gate.ThresholdPct)
+			gotest.False(it, report.Gate.Breached)
+		})
+	})
+}
+
 func normalizeOutput(raw string, workDir string) string {
 	s := strings.ReplaceAll(raw, workDir, "<REPLACED>")
 	s = strings.ReplaceAll(s, "\r\n", "\n")

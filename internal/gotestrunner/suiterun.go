@@ -144,9 +144,18 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 	var testArgs []string
 	switch {
 	case target.Bench:
-		testArgs = append(testArgs,
-			"-test.run=^$",
-			fmt.Sprintf("-test.bench=^Benchmark%s$", regexp.QuoteMeta(target.SuiteName)))
+		// BenchFilter carries a user -bench pattern with sub-benchmark
+		// segments ("^BenchmarkSuite$/^BenchmarkMethod$"): the generated
+		// wrapper runs each method under b.Run with its method name, so go
+		// test's own slash matching scopes the run to single methods. The
+		// suite was already selected by the pattern's first segment in
+		// BuildBenchTargets; without segments the exact wrapper name runs
+		// every method, as before.
+		benchArg := fmt.Sprintf("-test.bench=^Benchmark%s$", regexp.QuoteMeta(target.SuiteName))
+		if target.BenchFilter != "" {
+			benchArg = "-test.bench=" + target.BenchFilter
+		}
+		testArgs = append(testArgs, "-test.run=^$", benchArg)
 		if !slices.Contains(target.RunFlags, "-test.benchmem") {
 			testArgs = append(testArgs, "-test.benchmem")
 		}
@@ -331,9 +340,16 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 //
 // userRunFilter (from -run) and userBenchFilter (from -bench) are applied
 // independently, each matched against the benchmark wrapper name exactly as
-// matchesSuiteFunc does elsewhere. When both are non-empty, a suite must
-// satisfy both (AND semantics) to be included; either one alone filters on
-// its own, and when both are empty all suites are included.
+// matchesSuiteFunc does elsewhere (first slash segment only). When both are
+// non-empty, a suite must satisfy both (AND semantics) to be included;
+// either one alone filters on its own, and when both are empty all suites
+// are included.
+//
+// A userBenchFilter with sub-benchmark segments additionally scopes what
+// runs inside the wrapper: the per-suite portion of the pattern (extracted
+// with suiteRunFilter, the same helper -run uses for subtest scoping) is
+// carried on the target as BenchFilter and becomes the binary's -test.bench
+// value, where go test's slash matching selects the b.Run sub-benchmarks.
 func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]string, dirsByPkg map[string]string, runFlags []string, userRunFilter, userBenchFilter string) []SuiteTarget {
 	binByPkg := make(map[string]string, len(compiled))
 	for _, cr := range compiled {
@@ -356,7 +372,7 @@ func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]strin
 			if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, benchFuncName) {
 				continue
 			}
-			if userBenchFilter != "" && !matchesSuiteFunc(userBenchFilter, benchFuncName) {
+			if userBenchFilter != "" && !anyBranchMatchesSuiteFunc(userBenchFilter, benchFuncName) {
 				continue
 			}
 			target := SuiteTarget{
@@ -365,9 +381,10 @@ func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]strin
 					Dir:       pkgDir,
 					SuiteName: suiteName,
 				},
-				BinaryPath: bin,
-				RunFlags:   translatedFlags,
-				Bench:      true,
+				BinaryPath:  bin,
+				RunFlags:    translatedFlags,
+				Bench:       true,
+				BenchFilter: suiteRunFilter(userBenchFilter, benchFuncName),
 			}
 			targets = append(targets, target)
 		}
@@ -390,6 +407,20 @@ func sortTargetIndices(targets []SuiteTarget, idx []int) {
 // matchesSuiteFunc checks if the user's -run regex could match a given
 // test function name. The first segment (before /) of the regex is tested
 // against the function name.
+// anyBranchMatchesSuiteFunc reports whether any top-level alternation branch
+// of pattern selects funcName by its first slash segment. matchesSuiteFunc
+// alone takes the first segment of the whole pattern, which drops every
+// suite but the first from "^BenchmarkFoo$/^A$|^BenchmarkBar$/^B$"-shaped
+// filters; sub-benchmark scoping needs each branch judged on its own.
+func anyBranchMatchesSuiteFunc(pattern, funcName string) bool {
+	for _, alt := range splitTopLevelOr(pattern) {
+		if matchesSuiteFunc(alt, funcName) {
+			return true
+		}
+	}
+	return false
+}
+
 func matchesSuiteFunc(runRegex string, funcName string) bool {
 	parts := strings.SplitN(runRegex, "/", 2)
 	topLevel := parts[0]

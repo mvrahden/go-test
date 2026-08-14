@@ -28,6 +28,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 
 	specRequested := hasFlag(ownArgs, "--spec")
 	noColor := hasFlag(ownArgs, "--no-color")
+	jsonRequested := hasFlag(ownArgs, "--json")
 
 	// -v is forced further down for benchmark result visibility; capture
 	// whether the caller actually asked for it first, since that's also our
@@ -58,7 +59,9 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	benchAnalysisRequested := saveTarget != "" || againstPath != ""
+	// --json needs the harvested results even without --save/--against, so it
+	// rides the same capture path.
+	benchAnalysisRequested := saveTarget != "" || againstPath != "" || jsonRequested
 
 	// Unlike ordinary tests, benchmark results are the point of running
 	// gotest bench at all: stdlib `go test -bench=.` always prints result
@@ -97,6 +100,10 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	defer cleanup()
 
 	if len(overlay.BenchesByPkg) == 0 {
+		if jsonRequested {
+			// Machine consumers get a valid empty document, not prose.
+			return emitBenchReport(gotestbench.FromPackages(nil), nil, nil)
+		}
 		fmt.Println("no benchmarks found")
 		return 0
 	}
@@ -182,8 +189,10 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	// delta is significant and -v wasn't passed, nothing at all) with zero
 	// evidence any benchmark actually ran. The delta table (if a comparison
 	// ran) renders as part of this same call, via WithBenchDeltas, rather
-	// than a second stacked summary trailer.
-	if specRequested || saveTarget != "" || againstPath != "" {
+	// than a second stacked summary trailer. Under --json, stdout belongs to
+	// the report document alone: the human rendering is suppressed entirely
+	// (--spec included).
+	if !jsonRequested && (specRequested || saveTarget != "" || againstPath != "") {
 		var renderOpts []gotestspec.RenderOption
 		if noColor {
 			renderOpts = append(renderOpts, gotestspec.WithNoColor())
@@ -194,13 +203,21 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		gotestspec.RenderTerminal(os.Stdout, tree, renderOpts...)
 	}
 
+	var gateVerdict *gotestbench.Gate
 	if againstPath != "" && gateActive {
-		worst := gotestbench.WorstRegression(deltas)
-		if worst > gatePct {
-			fmt.Fprintf(os.Stderr, "bench gate: %s +%.1f%% exceeds %g%% gate\n", worstRegressionKey(deltas, worst), worst, gatePct)
+		verdict := gotestbench.GateVerdict(deltas, gatePct)
+		gateVerdict = &verdict
+		if verdict.Breached {
+			fmt.Fprintf(os.Stderr, "bench gate: %s +%.1f%% exceeds %g%% gate\n", verdict.WorstKey, verdict.WorstPct, gatePct)
 			if code == 0 {
 				code = 1
 			}
+		}
+	}
+
+	if jsonRequested {
+		if jsonCode := emitBenchReport(newBaseline, deltasForReport(deltas, againstPath), gateVerdict); jsonCode != 0 {
+			return jsonCode
 		}
 	}
 
@@ -261,14 +278,28 @@ func toSpecDeltas(deltas []gotestbench.Delta) []gotestspec.BenchDelta {
 	return out
 }
 
-// worstRegressionKey finds the Key of the significant delta whose
-// PercentChange equals worst (as returned by gotestbench.WorstRegression),
-// for use in the --gate failure message.
-func worstRegressionKey(deltas []gotestbench.Delta, worst float64) string {
-	for _, d := range deltas {
-		if d.Significant && d.PercentChange == worst {
-			return d.Key
-		}
+// emitBenchReport writes the versioned --json document to stdout. It returns
+// a non-zero exit code only when the document itself cannot be produced.
+func emitBenchReport(b gotestbench.Baseline, deltas []gotestbench.Delta, gate *gotestbench.Gate) int {
+	data, err := gotestbench.MarshalReport(gotestbench.NewReport(b, deltas, gate))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
 	}
-	return "?"
+	fmt.Println(string(data))
+	return 0
+}
+
+// deltasForReport keeps the report's deltas field absent (nil) when no
+// comparison ran, and present-but-complete when one did: the document always
+// carries every delta, significant or not — what to display is the
+// consumer's call, significance is theirs to respect.
+func deltasForReport(deltas []gotestbench.Delta, againstPath string) []gotestbench.Delta {
+	if againstPath == "" {
+		return nil
+	}
+	if deltas == nil {
+		deltas = []gotestbench.Delta{}
+	}
+	return deltas
 }

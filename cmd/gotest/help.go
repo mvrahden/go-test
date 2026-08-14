@@ -299,20 +299,31 @@ Flags:
                            10%); requires --against or bench.baseline in
                            .gotest.yml (defaults to bench.gate in
                            .gotest.yml, 0 disables)
+  --json                  Emit one versioned JSON document to stdout instead
+                           of human output: the run's results (baseline
+                           shape), every delta when a comparison ran
+                           (significant or not), and the gate verdict when a
+                           gate is active. Suppresses --spec rendering;
+                           intended for tooling (the VS Code extension).
 
 All standard go test flags (-single-dash) are forwarded automatically.
 Use a bare "--" to pass unrecognized flags without validation.
 
 Filtering:
   -bench=<regexp>         Select which benchmark suites run, matched against
-                           each suite's Benchmark<SuiteName> wrapper name
+                           each suite's Benchmark<SuiteName> wrapper name.
+                           Sub-benchmark segments scope to single methods:
+                           -bench='^BenchmarkFooTestSuite$/^BenchmarkParse$'
+                           runs only that method, since the generated wrapper
+                           runs each method under b.Run with its method name
   -benchtime=<x>          Iterations or duration per benchmark (e.g. 100x, 2s)
   -count=<n>              Run each benchmark n times
 
 Note: -run and -bench both filter which suites run in bench mode, matched
 against each suite's Benchmark<SuiteName> wrapper name — -run the same
-way it scopes suites for "gotest test", -bench by benchmark function
-name. When both are given, a suite must match both to run (e.g.
+way it scopes suites for "gotest test", -bench by its pattern's first
+slash segment (later segments select sub-benchmarks inside the wrapper).
+When both are given, a suite must match both to run (e.g.
 "gotest bench ./pkg/parser -run Parse" filters by suite).
 
 If no packages contain any BenchmarkX methods, prints "no benchmarks

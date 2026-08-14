@@ -23,13 +23,15 @@ const significanceLevel = 0.05
 const insufficientSampleThresholdPct = 20.0
 
 // Delta is the comparison result for one benchmark that exists in both
-// baselines.
+// baselines. The JSON tags are part of the versioned Report document (see
+// report.go); renaming a tag is a report schema change.
 type Delta struct {
-	Key                string  // "pkg Suite/Name"
-	OldNs, NewNs       float64 // means
-	PercentChange      float64
-	Significant        bool // Welch's t-test, p < 0.05; requires >=4 samples each side
-	InsufficientSample bool
+	Key                string  `json:"key"`   // "pkg Suite/Name"
+	OldNs              float64 `json:"oldNs"` // means
+	NewNs              float64 `json:"newNs"`
+	PercentChange      float64 `json:"percentChange"`
+	Significant        bool    `json:"significant"` // Welch's t-test, p < 0.05; requires >=4 samples each side
+	InsufficientSample bool    `json:"insufficientSample"`
 }
 
 // Compare matches results in old and new by (Package, Suite, Name) and
