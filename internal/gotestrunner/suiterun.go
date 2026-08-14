@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -33,6 +34,8 @@ type SuiteTarget struct {
 	RunFlags     []string // test binary flags (with -test. prefix)
 	CoverProfile string   // per-suite cover profile path (empty if no -coverprofile)
 	BudgetFile   string   // sidecar path for teardown budget (empty = use default)
+	Bench        bool     // when true, run the Benchmark<SuiteName> wrapper instead of the suite's tests
+	BenchFilter  string   // raw -test.bench value carrying the user's sub-benchmark segments (empty = the exact Benchmark<SuiteName> wrapper)
 	Exclusive    bool     // SuiteConfig{Exclusive: true}: dispatched strictly alone, after every non-exclusive suite
 }
 
@@ -138,15 +141,20 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 }
 
 func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2json bool) *exec.Cmd { //nolint:gocritic // hugeParam: stable API
-	var runArg string
-	if target.RunFilter != "" {
-		runArg = "-test.run=" + target.RunFilter
-	} else {
-		runArg = fmt.Sprintf("-test.run=^%s$", regexp.QuoteMeta(target.SuiteName))
-	}
-
 	var testArgs []string
-	testArgs = append(testArgs, runArg)
+	switch {
+	case target.Bench:
+		testArgs = append(testArgs,
+			"-test.run=^$",
+			fmt.Sprintf("-test.bench=^Benchmark%s$", regexp.QuoteMeta(target.SuiteName)))
+		if !slices.Contains(target.RunFlags, "-test.benchmem") {
+			testArgs = append(testArgs, "-test.benchmem")
+		}
+	case target.RunFilter != "":
+		testArgs = append(testArgs, "-test.run="+target.RunFilter)
+	default:
+		testArgs = append(testArgs, fmt.Sprintf("-test.run=^%s$", regexp.QuoteMeta(target.SuiteName)))
+	}
 
 	if test2json {
 		testArgs = append(testArgs, "-test.v=test2json")
@@ -308,6 +316,58 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 			}
 			if rf := suiteRunFilter(userRunFilter, testFuncName); rf != "" {
 				target.RunFilter = rf
+			}
+			targets = append(targets, target)
+		}
+	}
+	return targets
+}
+
+// BuildBenchTargets constructs SuiteTarget entries for benchmark suites from
+// compiled binaries and bench-eligible suite names. benchesByPkg maps import
+// path to a list of suite struct names (e.g., "FooTestSuite") that have at
+// least one effective benchmark. The generated benchmark wrapper function
+// name is "Benchmark" + suite struct name.
+//
+// userRunFilter (from -run) and userBenchFilter (from -bench) are applied
+// independently, each matched against the benchmark wrapper name exactly as
+// matchesSuiteFunc does elsewhere. When both are non-empty, a suite must
+// satisfy both (AND semantics) to be included; either one alone filters on
+// its own, and when both are empty all suites are included.
+func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]string, dirsByPkg map[string]string, runFlags []string, userRunFilter, userBenchFilter string) []SuiteTarget {
+	binByPkg := make(map[string]string, len(compiled))
+	for _, cr := range compiled {
+		binByPkg[cr.Package] = cr.BinaryPath
+	}
+
+	translatedFlags := TranslateToTestBinaryFlags(runFlags)
+
+	var targets []SuiteTarget
+	for pkg, suites := range benchesByPkg {
+		bin, ok := binByPkg[pkg]
+		if !ok {
+			continue
+		}
+
+		pkgDir := dirsByPkg[pkg]
+
+		for _, suiteName := range suites {
+			benchFuncName := "Benchmark" + suiteName
+			if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, benchFuncName) {
+				continue
+			}
+			if userBenchFilter != "" && !matchesSuiteFunc(userBenchFilter, benchFuncName) {
+				continue
+			}
+			target := SuiteTarget{
+				SuiteSpec: SuiteSpec{
+					Package:   pkg,
+					Dir:       pkgDir,
+					SuiteName: suiteName,
+				},
+				BinaryPath: bin,
+				RunFlags:   translatedFlags,
+				Bench:      true,
 			}
 			targets = append(targets, target)
 		}

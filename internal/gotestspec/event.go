@@ -19,6 +19,13 @@ const (
 	// thing that makes its own timestamps untrustworthy — see Node.Paused.
 	ActionPause Action = "pause"
 	ActionCont  Action = "cont"
+	// ActionBench is not emitted by go test's own -json encoder (real
+	// benchmark runs only ever produce "run"/"output", plus "fail" on
+	// failure — there is no terminal "pass"-equivalent event for a
+	// benchmark). It is accepted here so BuildTree can also finalize a
+	// benchmark node's status when fed synthetic or hand-authored event
+	// streams (e.g. via `gotest spec --input`) that choose to emit one.
+	ActionBench Action = "bench"
 )
 
 type TestEvent struct {
