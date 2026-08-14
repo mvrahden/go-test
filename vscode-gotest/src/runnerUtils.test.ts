@@ -170,9 +170,14 @@ describe("buildRunFilter", () => {
     expect(buildRunFilter([pkg as any])).toBeUndefined();
   });
 
-  it("returns suite filter for depth-1 items", () => {
+  it("widens depth-1 suite selections to include the suite's fuzz wrappers", () => {
+    // Parity with CLI package runs: whole-suite selections must replay
+    // fuzz seeds, and the generated wrappers are top-level Fuzz<Suite>_*
+    // names that ^Test<Suite>$ can never match.
     const { suite } = makeTree();
-    expect(buildRunFilter([suite as any])).toBe("^TestMySuite$");
+    expect(buildRunFilter([suite as any])).toBe(
+      "^TestMySuite$|^FuzzMySuite_.*$",
+    );
   });
 
   it("returns suite/method filter for depth-2 items", () => {
@@ -196,7 +201,9 @@ describe("buildRunFilter", () => {
       "FixtureSuite",
       pkg,
     );
-    expect(buildRunFilter([suite as any])).toBe("^TestFixtureSuite$");
+    expect(buildRunFilter([suite as any])).toBe(
+      "^TestFixtureSuite$|^FuzzFixtureSuite_.*$",
+    );
   });
 
   it("joins multiple methods with alternation", () => {
@@ -208,6 +215,55 @@ describe("buildRunFilter", () => {
     const m2 = createItem("example.com/pkg/MySuite/TestB", "TestB", suite);
     expect(buildRunFilter([m1 as any, m2 as any])).toBe(
       "^TestMySuite$/^(TestA|TestB)$",
+    );
+  });
+
+  it("maps a fuzz target item to its top-level wrapper name", () => {
+    const pkg = createItem("example.com/pkg", "example.com/pkg", undefined, [
+      { id: "package" },
+    ]);
+    const suite = createItem("example.com/pkg/MySuite", "MySuite", pkg);
+    const fuzz = createItem(
+      "example.com/pkg/MySuite/FuzzParse",
+      "FuzzParse",
+      suite,
+    );
+    expect(buildRunFilter([fuzz as any])).toBe("^FuzzMySuite_FuzzParse$");
+  });
+
+  it("keeps fuzz targets additive beside test methods", () => {
+    const pkg = createItem("example.com/pkg", "example.com/pkg", undefined, [
+      { id: "package" },
+    ]);
+    const suite = createItem("example.com/pkg/MySuite", "MySuite", pkg);
+    const m = createItem("example.com/pkg/MySuite/TestA", "TestA", suite);
+    const fuzz = createItem(
+      "example.com/pkg/MySuite/FuzzParse",
+      "FuzzParse",
+      suite,
+    );
+    expect(buildRunFilter([m as any, fuzz as any])).toBe(
+      "^TestMySuite$/^TestA$|^FuzzMySuite_FuzzParse$",
+    );
+  });
+
+  it("scopes a fuzz seed subtest under the wrapper, not under ^Test...$", () => {
+    const pkg = createItem("example.com/pkg", "example.com/pkg", undefined, [
+      { id: "package" },
+    ]);
+    const suite = createItem("example.com/pkg/MySuite", "MySuite", pkg);
+    const fuzz = createItem(
+      "example.com/pkg/MySuite/FuzzParse",
+      "FuzzParse",
+      suite,
+    );
+    const seed = createItem(
+      "example.com/pkg/MySuite/FuzzParse/dynamic/seed#0",
+      "seed#0",
+      fuzz,
+    );
+    expect(buildRunFilter([seed as any])).toBe(
+      "^FuzzMySuite_FuzzParse$/^seed#0$",
     );
   });
 });

@@ -150,6 +150,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--coverage=<path>` | Coverage profile path for `summary` subcommand |
 | `--render-only` | With `--input`, exit 0 on a failing stream: the code reports whether rendering succeeded, not whether the tests passed (requires `--input`) |
 | `--for=<dur>` | Approximate wall-clock fuzz budget for the session, split jobs-aware across targets (`fuzz`; per-target share floors at 10s) |
+| `--target=<name>` | Fuzz exactly one generated wrapper by name; unmatched names error with the available list (`fuzz`) |
 | `--jobs=<n>` | Max concurrent fuzz targets (`fuzz`; default: max(1, GOMAXPROCS/2)) |
 | `--no-harvest` | Disable table-test seed harvesting for this run |
 | `--fuzz` | Generate fuzz round-trip skeletons (`scaffold`) |

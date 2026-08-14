@@ -145,6 +145,19 @@ func (s *FuzzTriagePromoteTestSuite) TestTriage_UnparseableCrasherFails(t *gotes
 	})
 }
 
+// TestFuzzTargetFlag_UnknownName pins the --target contract end-to-end: a
+// name that matches no generated wrapper is a usage error listing the
+// available targets, never a silent fall-through to fuzzing everything.
+func (s *FuzzTriagePromoteTestSuite) TestFuzzTargetFlag_UnknownName(t *gotest.T) {
+	out, code := s.runCLIExit(t, "fuzz", "--target=FuzzNoSuchTestSuite_FuzzNothing", "./examples/notification")
+
+	t.It("exits 2 and lists the real targets", func(it *gotest.T) {
+		gotest.Equal(it, 2, code)
+		gotest.Contains(it, out, `no fuzz target named "FuzzNoSuchTestSuite_FuzzNothing"`)
+		gotest.Contains(it, out, "FuzzNotificationServiceTestSuite_FuzzTrim")
+	})
+}
+
 // TestSubcommandGrammar pins the strictly positional subcommand grammar: a
 // misplaced or flag-preceded triage/promote is a loud usage error, never a
 // silent reinterpretation — the historical readings either started a fuzz

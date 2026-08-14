@@ -86,6 +86,13 @@ func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	defer cleanup()
 
 	targets := collectFuzzTargets(overlay)
+	if name := extractStringFlag(ownArgs, "--target", ""); name != "" {
+		targets, err = selectFuzzTargets(targets, name)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+			return 2
+		}
+	}
 	if len(targets) == 0 {
 		fmt.Println("no fuzz targets found")
 		return 0
@@ -169,6 +176,24 @@ func collectFuzzTargets(overlay *gotestrunner.OverlayResult) []gotestrunner.Fuzz
 		return targets[i].Func < targets[j].Func
 	})
 	return targets
+}
+
+// selectFuzzTargets narrows targets to the one generated wrapper --target
+// names. An unmatched name is a usage error listing what exists — a typo
+// (or a rename that outdated an editor invocation) must never silently
+// fall back to fuzzing everything.
+func selectFuzzTargets(targets []gotestrunner.FuzzTarget, name string) ([]gotestrunner.FuzzTarget, error) {
+	names := make([]string, 0, len(targets))
+	for i := range targets {
+		if targets[i].Func == name {
+			return targets[i : i+1 : i+1], nil
+		}
+		names = append(names, targets[i].Func)
+	}
+	if len(names) == 0 {
+		return nil, fmt.Errorf("no fuzz target named %q: the matched packages declare no fuzz targets", name)
+	}
+	return nil, fmt.Errorf("no fuzz target named %q; available: %s", name, strings.Join(names, ", "))
 }
 
 func parseForFlag(args []string) (time.Duration, error) {

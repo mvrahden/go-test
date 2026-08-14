@@ -30,6 +30,7 @@ var gotestFlags = map[string]FlagKind{
 	"--timeout":          ValueFlag,
 	"--for":              ValueFlag,
 	"--jobs":             ValueFlag,
+	"--target":           ValueFlag,
 	"--no-harvest":       BoolFlag,
 	"--fuzz":             BoolFlag,
 }
@@ -58,7 +59,7 @@ var watchAllowed = flagSet(
 	"--setup-timeout", "--timeout", "--debounce", "--parallel", "--compile-parallel",
 )
 
-var fuzzAllowed = flagSet("--for", "--jobs", "--no-cache", "--debug", "--timeout", "--no-harvest")
+var fuzzAllowed = flagSet("--for", "--jobs", "--no-cache", "--debug", "--timeout", "--no-harvest", "--target")
 
 var scaffoldAllowed = flagSet("--fuzz")
 

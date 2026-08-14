@@ -335,6 +335,12 @@ Flags:
                            --timeout expires (which exits 0 when nothing
                            was found).
   --jobs=<n>               Max concurrent targets (default: max(1, GOMAXPROCS/2))
+  --target=<Fuzz...>       Fuzz exactly one generated target, named by its
+                           wrapper (e.g. FuzzParserTestSuite_FuzzParse, as
+                           shown in session output). An unmatched name is an
+                           error listing the available targets. This is the
+                           editor's unit of invocation; combined with --for
+                           the whole budget goes to that one target.
   --no-cache               Disable overlay cache, force fresh generation
   --debug                  Keep generated overlay for inspection
   --timeout=<dur>          Global pipeline deadline (default: 15m, 0 to disable)

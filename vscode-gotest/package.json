@@ -17,6 +17,7 @@
     "test",
     "testing",
     "suite",
+    "fuzzing",
     "bdd",
     "specification",
     "coverage",
@@ -47,6 +48,22 @@
       {
         "command": "gotest.runFile",
         "title": "Go Test: Run File"
+      },
+      {
+        "command": "gotest.runFuzz",
+        "title": "Go Test: Fuzz Target"
+      },
+      {
+        "command": "gotest.debugFuzz",
+        "title": "Go Test: Debug Fuzz Seeds"
+      },
+      {
+        "command": "gotest.triageCrashers",
+        "title": "Go Test: Triage Fuzz Crashers"
+      },
+      {
+        "command": "gotest.promoteCrashers",
+        "title": "Go Test: Promote Fuzz Crashers"
       },
       {
         "command": "gotest.refreshTests",

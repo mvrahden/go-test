@@ -689,6 +689,8 @@ gotest fuzz --for=5m ./...            # ~5 minutes of fuzzing wall-clock, shared
 gotest fuzz --for=1m --jobs=2 ./...   # cap concurrency to 2 targets at a time
 ```
 
+`--target=<Fuzz...>` narrows a session to exactly one generated wrapper (an unmatched name errors with the available list) — this is also what the VS Code extension invokes: fuzz methods get **Fuzz** / **Debug Seeds** CodeLenses, budgeted cancellable sessions, crasher notifications wired to triage/promote/debug, and Test Explorer items whose runs replay seeds (see `vscode-gotest/README.md`).
+
 `gotest fuzz` discovers every generated `Fuzz<Suite>_<Method>` target and runs each one as its own `go test -fuzz=...` subprocess — one target per invocation of `go test`.
 This is unlike every other gotest subcommand: a suite binary compiled once with `go test -c` has no native fuzz instrumentation, because `cmd/go` only weaves it in when `-fuzz` is present at `go test` invocation time.
 Reusing the shared compiled binary the way `gotest`/`gotest bench` do would run uninstrumented — coverage-guided mutation would silently degrade to undirected random input.

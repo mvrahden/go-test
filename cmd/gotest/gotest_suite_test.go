@@ -746,6 +746,46 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 	})
 }
 
+func (s *CmdGotestTestSuite) TestRunDiscover_Benchmarks(t *gotest.T) {
+	t.It("includes fuzz methods in discover JSON, marking exclusions", func(it *gotest.T) {
+		srcPath := filepath.Join(
+			s.repoRoot, "internal", "gotestgen", "testdata", "sources",
+			"TestCollector_FuzzMethod", "test.go",
+		)
+		src, err := os.ReadFile(srcPath)
+		gotest.NoError(it, err)
+
+		fixtureDir, err := os.MkdirTemp(filepath.Join(s.repoRoot, "examples"), "discoverfuzz-")
+		gotest.NoError(it, err)
+		defer os.RemoveAll(fixtureDir)
+		gotest.NoError(it, os.WriteFile(filepath.Join(fixtureDir, "fuzz_fixture.go"), src, 0600))
+
+		pkgs, err := packages.Load(&packages.Config{
+			Mode: packages.NeedModule | packages.NeedSyntax | packages.NeedName |
+				packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps,
+		}, fixtureDir)
+		gotest.NoError(it, err)
+		gotest.Len(it, pkgs, 1)
+		gotest.Empty(it, pkgs[0].Errors, "expected no package load errors, got: %v", pkgs[0].Errors)
+
+		c := gotestgen.NewCollector()
+		result := c.CollectSuiteSpecs(pkgs[0])
+		gotest.Empty(it, result.Errs, "expected no collector errors, got: %v", result.Errs)
+		gotest.Len(it, result.Suites, 1)
+
+		ds := ExportBuildDiscoverSuite(result.Suites[0])
+		data, err := json.Marshal(ds)
+		gotest.NoError(it, err)
+		payload := string(data)
+
+		gotest.Contains(it, payload, `"fuzzers":[{"name":"FuzzParse"`)
+		gotest.Contains(it, payload, `"X_FuzzOld"`)
+		gotest.Contains(it, payload, `"excluded":true`)
+		// The plain test method must stay out of the fuzzers list.
+		gotest.NotContains(it, payload, `"fuzzers":[{"name":"TestOne"`)
+	})
+}
+
 func (s *CmdGotestTestSuite) TestFocusViolation_String(t *gotest.T) {
 	for sub, tc := range gotest.Each(t, []struct {
 		Desc     string
