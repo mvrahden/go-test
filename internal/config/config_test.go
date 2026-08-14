@@ -22,6 +22,8 @@ lint:
   skip:
     - stdlib-test
     - testify
+fuzz:
+  harvest: false
 `)
 
 	cfg, err := Load(dir)
@@ -37,6 +39,10 @@ lint:
 	assertEqual(t, "compile-parallel", cfg.CompileParallel, 2)
 	assertDuration(t, "debounce", cfg.Debounce, 500*time.Millisecond)
 	assertSliceEqual(t, "lint.skip", cfg.Lint.Skip, []string{"stdlib-test", "testify"})
+	if cfg.Fuzz.Harvest == nil || *cfg.Fuzz.Harvest {
+		t.Errorf("fuzz.harvest: got %v, want pointer to false", cfg.Fuzz.Harvest)
+	}
+	assertEqual(t, "fuzz.HarvestSeeds()", cfg.Fuzz.HarvestSeeds(), false)
 }
 
 func TestLoad_NoFile_ReturnsZero(t *testing.T) {
@@ -58,6 +64,10 @@ func TestLoad_NoFile_ReturnsZero(t *testing.T) {
 	if len(cfg.Lint.Skip) != 0 {
 		t.Errorf("lint.skip: got %v, want empty", cfg.Lint.Skip)
 	}
+	if cfg.Fuzz.Harvest != nil {
+		t.Errorf("fuzz.harvest: got %v, want nil", *cfg.Fuzz.Harvest)
+	}
+	assertEqual(t, "fuzz.HarvestSeeds()", cfg.Fuzz.HarvestSeeds(), true)
 }
 
 func TestLoad_PartialConfig(t *testing.T) {

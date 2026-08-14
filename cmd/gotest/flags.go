@@ -30,11 +30,13 @@ var gotestFlags = map[string]FlagKind{
 	"--timeout":          ValueFlag,
 	"--for":              ValueFlag,
 	"--jobs":             ValueFlag,
+	"--no-harvest":       BoolFlag,
 }
 
 var testAllowed = flagSet(
 	"--debug", "--ci", "--spec", "--update-snapshots", "--no-cache",
 	"--min", "--setup-timeout", "--timeout", "--parallel", "--compile-parallel",
+	"--no-harvest",
 )
 
 var specAllowed = flagSet(
@@ -55,7 +57,7 @@ var watchAllowed = flagSet(
 	"--setup-timeout", "--timeout", "--debounce", "--parallel", "--compile-parallel",
 )
 
-var fuzzAllowed = flagSet("--for", "--jobs", "--no-cache", "--debug", "--timeout")
+var fuzzAllowed = flagSet("--for", "--jobs", "--no-cache", "--debug", "--timeout", "--no-harvest")
 
 func flagSet(names ...string) map[string]bool {
 	s := make(map[string]bool, len(names))

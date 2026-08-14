@@ -255,10 +255,17 @@ func LoadPackagesForDiscovery(targetPkgs []string, buildFlags []string) ([]*Load
 }
 
 func GenerateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {
-	return generateFromLoaded(loadResults)
+	return generateFromLoaded(loadResults, true)
 }
 
-func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {
+// GenerateFromLoadedOpts is GenerateFromLoaded with an explicit harvestSeeds
+// switch — when false, no gotest.Each/literal-call scanning happens and
+// generated fuzz wrappers get no harvested f.Add(...) seed lines.
+func GenerateFromLoadedOpts(loadResults []*LoadResult, harvestSeeds bool) (GenerateResults, []SharedFixtureInfo, error) {
+	return generateFromLoaded(loadResults, harvestSeeds)
+}
+
+func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateResults, []SharedFixtureInfo, error) {
 	sharedSeen := map[string]bool{}
 	var allSharedFixtures []SharedFixtureInfo
 
@@ -282,11 +289,11 @@ func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFix
 			return nil, err
 		}
 
-		ptestBuf, ptestFixtureDeps, ptestReqKeys, err := generateForPkg(lr.Ptest, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures)
+		ptestBuf, ptestFixtureDeps, ptestReqKeys, err := generateForPkg(lr.Ptest, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds)
 		if err != nil {
 			return nil, err
 		}
-		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, err := generateForPkg(lr.Pxtest, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures)
+		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, err := generateForPkg(lr.Pxtest, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds)
 		if err != nil {
 			return nil, err
 		}
@@ -389,7 +396,7 @@ func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFix
 	return results, allSharedFixtures, nil
 }
 
-func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo) ([]byte, []string, map[string][]string, error) { //nolint:gocritic // hugeParam: stable API
+func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo, harvestSeeds bool) ([]byte, []string, map[string][]string, error) { //nolint:gocritic // hugeParam: stable API
 	if pkg == nil || len(spec.EffectiveTestSuites) == 0 {
 		return nil, nil, nil, nil
 	}
@@ -436,7 +443,7 @@ func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected Collector
 	}
 
 	r := renderer{}
-	buf, err := r.RenderTestSuiteSpec(pkg, spec, resolved)
+	buf, err := r.RenderTestSuiteSpec(pkg, spec, resolved, harvestSeeds)
 	return buf, fixtureDeps, suiteReqKeys, err
 }
 

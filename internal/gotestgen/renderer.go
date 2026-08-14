@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"go/format"
+	"strings"
 	"text/template"
 
 	"github.com/mvrahden/go-test/internal/about"
@@ -62,7 +63,7 @@ type headerImport struct {
 
 type renderer struct{}
 
-func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, resolved *ResolveResult) ([]byte, error) { //nolint:gocritic // hugeParam: stable API
+func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, resolved *ResolveResult, harvestSeeds bool) ([]byte, error) { //nolint:gocritic // hugeParam: stable API
 	if pkg == nil {
 		return nil, nil
 	}
@@ -107,7 +108,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 		}
 	}
 
-	if err := r.renderFuzzSuites(buf, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields); err != nil {
+	if err := r.renderFuzzSuites(buf, pkg, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields, harvestSeeds); err != nil {
 		return nil, fmt.Errorf("failed rendering fuzz suites. err: %w", err)
 	}
 
@@ -193,18 +194,55 @@ func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSh
 	})
 }
 
-func (r *renderer) renderFuzzSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, suiteFixtureFields map[string][]FixtureFieldBinding) error { //nolint:gocritic // hugeParam: stable API
+func (r *renderer) renderFuzzSuites(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, suiteFixtureFields map[string][]FixtureFieldBinding, harvestSeeds bool) error { //nolint:gocritic // hugeParam: stable API
 	// Reuse the exact same fixture-bound view model gotest.bench.tpl renders
 	// Benchmark<Suite> from, reshaped as a map for O(1) per-suite template lookup.
 	suiteFixtures := make(map[string]*FlatFixtureSuite)
 	for _, fs := range flattenSuitesDAG(allFixtures, suiteFixtureFields) {
 		suiteFixtures[fs.Suite.Identifier()] = &fs
 	}
+	harvested, err := harvestedSeedsForTemplate(pkg, spec, harvestSeeds)
+	if err != nil {
+		return err
+	}
 	return gotestTpl.ExecuteTemplate(buf, "gotest.fuzz.tpl", map[string]any{
 		"Spec":                spec,
 		"SuiteSharedFixtures": suiteSharedFixtures,
 		"SuiteFixtures":       suiteFixtures,
+		"HarvestedSeeds":      harvested,
 	})
+}
+
+// harvestedSeedsForTemplate computes, for each generated Fuzz<Suite>_<Method>
+// func, the pre-joined comma-separated f.Add(...) argument strings for its
+// harvested seed corpus. Returns nil (no-op) when harvesting is disabled or
+// no fuzz methods are present.
+func harvestedSeedsForTemplate(pkg *packages.Package, spec SpecOutcome, harvestSeeds bool) (map[string][]string, error) {
+	if !harvestSeeds {
+		return nil, nil
+	}
+	hasFuzzers := slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
+		return len(v.Fuzzers()) > 0
+	})
+	if !hasFuzzers {
+		return nil, nil
+	}
+	seeds, err := gotestast.HarvestSeeds(pkg, spec.EffectiveTestSuites)
+	if err != nil {
+		return nil, fmt.Errorf("failed harvesting fuzz seeds. err: %w", err)
+	}
+	if len(seeds) == 0 {
+		return nil, nil
+	}
+	out := make(map[string][]string, len(seeds))
+	for funcName, literals := range seeds {
+		joined := make([]string, len(literals))
+		for i, lit := range literals {
+			joined[i] = strings.Join(lit.Args, ", ")
+		}
+		out[funcName] = joined
+	}
+	return out, nil
 }
 
 func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, allFixtures []*ResolvedFixture, suiteFixtureFields map[string][]FixtureFieldBinding, sfNodes []*SharedFixtureNodeVM, fixtureTestNames []string) error {

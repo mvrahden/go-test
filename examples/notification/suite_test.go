@@ -109,6 +109,26 @@ func (s *NotificationServiceTestSuite) TestNotificationPayload(t *gotest.T) {
 	})
 }
 
+// TestTrimSpaceTable exercises the same strings.TrimSpace call FuzzTrim's
+// callback invokes — gotest generate harvests its literal table rows as
+// extra f.Add(...) seeds for FuzzNotificationServiceTestSuite_FuzzTrim.
+func (s *NotificationServiceTestSuite) TestTrimSpaceTable(t *gotest.T) {
+	type tc struct {
+		Desc string
+		In   string
+		Want string
+	}
+	for t, c := range gotest.Each(t, []tc{
+		{"leading and trailing spaces", "  hello  ", "hello"},
+		{"already trimmed", "hello", "hello"},
+		{"tabs and newlines", "\thello\n", "hello"},
+	}) {
+		t.It("trims to the expected result", func(t *gotest.T) {
+			gotest.Equal(t, c.Want, strings.TrimSpace(c.In))
+		})
+	}
+}
+
 func (s *NotificationServiceTestSuite) FuzzTrim(f *gotest.F) {
 	f.Add("  x ")
 	gotest.Fuzz(f, func(t *gotest.T, in string) {

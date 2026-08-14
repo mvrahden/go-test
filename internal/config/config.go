@@ -37,12 +37,29 @@ type ProjectConfig struct {
 	Debounce *Duration `yaml:"debounce"`
 	// Lint holds lint-specific configuration.
 	Lint LintConfig `yaml:"lint"`
+	// Fuzz holds fuzz seed-harvesting configuration.
+	Fuzz FuzzConfig `yaml:"fuzz"`
 }
 
 // LintConfig controls which lint rules are disabled project-wide.
 type LintConfig struct {
 	// Skip lists lint rule names to disable (e.g. "stdlib-test", "testify").
 	Skip []string `yaml:"skip"`
+}
+
+// FuzzConfig controls default seed-harvesting behavior for generated fuzz
+// targets. The CLI flag (--no-harvest) takes precedence over this value.
+type FuzzConfig struct {
+	// Harvest enables/disables harvesting literal seeds from table tests
+	// into generated fuzz wrappers. Nil (the zero value) means harvesting
+	// is ON by default; set to false to disable it project-wide.
+	Harvest *bool `yaml:"harvest"`
+}
+
+// HarvestSeeds reports whether seed harvesting is enabled — true unless
+// explicitly disabled via `fuzz: harvest: false`.
+func (f FuzzConfig) HarvestSeeds() bool {
+	return f.Harvest == nil || *f.Harvest
 }
 
 // Duration wraps time.Duration with human-readable YAML unmarshaling.

@@ -31,6 +31,10 @@ func Fuzz{{ $ts.Identifier }}_{{ $fz.Identifier }}(f *testing.F) {
   ƒlifecycleT := gotest.NewTFromTB(f)
   f.Cleanup(func() { s.AfterAll(gotest.NewTFromTB(f)) })
   s.BeforeAll(ƒlifecycleT)
+{{- $funcName := printf "Fuzz%s_%s" $ts.Identifier $fz.Identifier }}
+{{- range index $.HarvestedSeeds $funcName }}
+  f.Add({{ . }})
+{{- end }}
   s.{{ $fz.Identifier }}(gotest.NewF(f, s.BeforeEach, s.AfterEach))
 }
 {{ end }}

@@ -16,7 +16,7 @@ func (s *RendererTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true}
 }
 
-func renderTestPkg(t testing.TB, pkg *packages.Package) (string, gotestgen.SpecOutcome) {
+func renderTestPkg(t testing.TB, pkg *packages.Package, harvestSeeds bool) (string, gotestgen.SpecOutcome) {
 	t.Helper()
 	c := gotestgen.NewCollector()
 	result := c.CollectSuiteSpecs(pkg)
@@ -32,9 +32,38 @@ func renderTestPkg(t testing.TB, pkg *packages.Package) (string, gotestgen.SpecO
 	}
 
 	r := gotestgen.ExportRenderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec, resolved)
+	out, err := r.RenderTestSuiteSpec(pkg, spec, resolved, harvestSeeds)
 	gotest.NoError(t, err)
 	return string(out), spec
+}
+
+// loadFuzzHarvestTestPkg loads testdata/fuzzharvest directly with Tests:
+// true, so its production file (prod.go) and its _test.go file stay
+// distinguishable by filename — the split gotestast.HarvestSeeds' _test.go
+// filter depends on. The shared gotestgen.ExportMustTestPkg harness (used by
+// every other fixture in this file) batch-loads testdata/sources/*/test.go
+// WITHOUT Tests: true, which collapses that distinction, so it can't be used
+// for this fixture.
+func loadFuzzHarvestTestPkg(t testing.TB) *packages.Package {
+	t.Helper()
+	cfg := &packages.Config{
+		Mode: packages.NeedModule | packages.NeedSyntax | packages.NeedName |
+			packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps,
+		Tests: true,
+		Dir:   ".",
+	}
+	pkgs, err := packages.Load(cfg, "./testdata/fuzzharvest")
+	gotest.NoError(t, err)
+	for _, p := range pkgs {
+		gotest.Empty(t, p.Errors, "package load errors for %s: %v", p.ID, p.Errors)
+	}
+	for _, p := range pkgs {
+		if strings.HasSuffix(p.ID, ".test]") && !strings.HasSuffix(p.Name, "_test") {
+			return p
+		}
+	}
+	t.Fatal("expected to find the ptest package variant for testdata/fuzzharvest")
+	return nil
 }
 
 // --- Fixture rendering tests ---
@@ -43,7 +72,7 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 	t.When("fixture with child suite", func(w *gotest.T) {
 		w.It("renders structural elements correctly", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithChildSuite")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			gotest.NotContains(it, output, "func TestMain(m *testing.M)", "should NOT have TestMain")
@@ -56,7 +85,7 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 	t.When("fixture without AfterAll", func(w *gotest.T) {
 		w.It("omits AfterAll from cleanup", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithoutAfterAll")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			gotest.NotContains(it, output, "ƒ_SimpleFixture.AfterAll", "should NOT have AfterAll call")
@@ -66,7 +95,7 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 	t.When("mixed fixture-bound and standalone", func(w *gotest.T) {
 		w.It("renders both fixture-bound and standalone suites", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_MixedFixtureBoundAndStandalone")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			gotest.NotContains(it, output, "func TestMain(m *testing.M)", "should NOT have TestMain")
@@ -77,7 +106,7 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 	t.When("fixture with BeforeEach/AfterEach", func(w *gotest.T) {
 		w.It("renders lifecycle methods with proper ordering", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithBeforeAfterEach")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 		})
 	})
@@ -85,7 +114,7 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 	t.When("fixture without BeforeEach/AfterEach", func(w *gotest.T) {
 		w.It("omits fixture BeforeEach/AfterEach calls", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithoutBeforeAfterEach")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			gotest.NotContains(it, output, "ƒ_MinimalFixture.BeforeEach", "should NOT have fixture BeforeEach")
@@ -96,7 +125,7 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 	t.When("nested fixture with BeforeEach/AfterEach", func(w *gotest.T) {
 		w.It("renders parent and child hooks with proper ordering", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_NestedFixtureWithBeforeAfterEach")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 		})
 	})
@@ -108,7 +137,7 @@ func (s *RendererTestSuite) TestAsyncTestCases(t *gotest.T) {
 	t.When("a suite has an async test case", func(w *gotest.T) {
 		w.It("renders a done channel and deadline wait", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_AsyncTestCases")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, false)
 			gotest.Contains(it, output, "ƒdone := make(chan struct{}, 1)")
 			gotest.Contains(it, output, "case <-ƒdone:")
 			gotest.Contains(it, output, "done() was not called")
@@ -121,7 +150,7 @@ func (s *RendererTestSuite) TestAsyncTestCases(t *gotest.T) {
 func (s *RendererTestSuite) TestParallelAllExcluded(t *gotest.T) {
 	t.It("compiles — no unused ƒfailed when every case is excluded", func(it *gotest.T) {
 		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ParallelAllExcluded")
-		output, _ := renderTestPkg(it.T(), pkg)
+		output, _ := renderTestPkg(it.T(), pkg, false)
 		gotest.NotContains(it, output, "ƒfailed", "ƒfailed must only be declared when test cases exist")
 	})
 }
@@ -130,7 +159,7 @@ func (s *RendererTestSuite) TestParallelFailFast(t *gotest.T) {
 	t.When("method-parallel suite with FailFast", func(w *gotest.T) {
 		w.It("emits a shared failure flag that skips not-yet-started subtests", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ParallelFailFast")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, false)
 			gotest.Contains(it, output, "ƒfailed.Load()", "parallel subtests must consult the shared failure flag")
 			gotest.Contains(it, output, "ƒfailed.Store(true)", "failing subtests must set the shared failure flag")
 			gotest.Contains(it, output, "it.Skip(", "flagged subtests must skip instead of running")
@@ -142,7 +171,7 @@ func (s *RendererTestSuite) TestStdlibTSupport(t *gotest.T) {
 	t.When("standalone suite", func(w *gotest.T) {
 		w.It("unwraps via .T() and uses adapter lambdas", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_StdlibT_StandaloneSuite")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 		})
 	})
@@ -150,7 +179,7 @@ func (s *RendererTestSuite) TestStdlibTSupport(t *gotest.T) {
 	t.When("mixed suite", func(w *gotest.T) {
 		w.It("unwraps stdlib methods and uses direct reference for gotest methods", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_StdlibT_MixedSuite")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			gotest.NotContains(it, output, `s.TestGotest(t.T())`, "TestGotest should NOT have adapter")
@@ -160,7 +189,7 @@ func (s *RendererTestSuite) TestStdlibTSupport(t *gotest.T) {
 	t.When("fixture-bound suite", func(w *gotest.T) {
 		w.It("unwraps lifecycle methods and uses adapter for test cases", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_StdlibT_FixtureBoundSuite")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 		})
 	})
@@ -172,7 +201,7 @@ func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 	t.When("embedding", func(w *gotest.T) {
 		w.It("renders shared fixture as DAG node", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SharedFixtureEmbedding")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			gotest.NotContains(it, output, "func TestMain(m *testing.M)", "should NOT have TestMain")
@@ -185,7 +214,7 @@ func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 	t.When("cross-package transitive dependency", func(w *gotest.T) {
 		w.It("imports the transitive shared fixture package", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_CrossPkgTransitiveSharedFixture")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 		})
 	})
@@ -193,7 +222,7 @@ func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 	t.When("empty struct", func(w *gotest.T) {
 		w.It("renders shared fixture as DAG node and struct literal wiring", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SharedFixtureEmptyStruct")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 		})
 	})
@@ -205,7 +234,7 @@ func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 	t.When("fixture with config", func(w *gotest.T) {
 		w.It("uses the marker's config verbatim in the fixture node", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithConfig")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			// The marker method is called once, so the config that bounds the
@@ -228,7 +257,7 @@ func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 	t.When("fixture without config", func(w *gotest.T) {
 		w.It("falls back to the defaults and declares no budget", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithoutConfig_UsesDefault")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			// The defaults still bound the fixture's context, but no Budget field
@@ -247,7 +276,7 @@ func (s *RendererTestSuite) TestSuiteConfig(t *gotest.T) {
 	t.When("suite with config", func(w *gotest.T) {
 		w.It("uses the marker's config verbatim and renders the deadline", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SuiteWithConfig")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			gotest.Contains(it, output, "ƒcfg := s.ConfiguredTestSuite.SuiteConfig()", "marker config must be used as-is")
@@ -258,7 +287,7 @@ func (s *RendererTestSuite) TestSuiteConfig(t *gotest.T) {
 	t.When("suite without config", func(w *gotest.T) {
 		w.It("falls back to the defaults and declares no budget", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SuiteWithoutConfig_UsesDefault")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			// The default 30s still bounds t.Context(); the zero budget is what
@@ -275,7 +304,7 @@ func (s *RendererTestSuite) TestUndeclaredBudgetIsZero(t *gotest.T) {
 	t.When("a suite declares no SuiteConfig", func(w *gotest.T) {
 		w.It("passes a zero budget to every lifecycle phase", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestLifecycle_UndeclaredBudget")
-			source, _ := renderTestPkg(it.T(), pkg)
+			source, _ := renderTestPkg(it.T(), pkg, false)
 
 			// A suite with no marker method gets the defaults for its contexts
 			// and a zero budget, so nothing holds it to a number it never wrote.
@@ -295,7 +324,7 @@ func (s *RendererTestSuite) TestNamedFields(t *gotest.T) {
 	t.When("suite to fixture", func(w *gotest.T) {
 		w.It("uses named field in struct literal", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_NamedField_SuiteToFixture")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			gotest.NotContains(it, output, "DBFixture: ƒ_DBFixture", "should NOT use type name as field name")
@@ -305,7 +334,7 @@ func (s *RendererTestSuite) TestNamedFields(t *gotest.T) {
 	t.When("child to parent fixture", func(w *gotest.T) {
 		w.It("uses named parent field in struct literal", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_NamedField_ChildToParentFixture")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 		})
 	})
@@ -313,7 +342,7 @@ func (s *RendererTestSuite) TestNamedFields(t *gotest.T) {
 	t.When("shared fixture in fixture", func(w *gotest.T) {
 		w.It("uses named field for shared fixture injection via struct literal", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_NamedField_SharedFixtureInFixture")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			gotest.NotContains(it, output, "ƒ_AppFixture.PGSharedFixture", "should NOT use type name for shared fixture field")
@@ -328,7 +357,7 @@ func (s *RendererTestSuite) TestMixedFieldStyles(t *gotest.T) {
 	t.When("same fixture with embedded and named fields", func(w *gotest.T) {
 		w.It("uses type name for embedded and custom name for named field", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_MixedFieldStyles_SameFixture")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 		})
 	})
@@ -340,7 +369,7 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 	t.When("void BeforeEach sequential", func(w *gotest.T) {
 		w.It("renders sequential suite without parallel markers", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_VoidBeforeEach_Sequential")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			gotest.NotContains(it, output, "t.Parallel()", "suite-level t.Parallel() should not be emitted — isolation is subprocess-level")
@@ -352,7 +381,7 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 	t.When("returning BeforeEach sequential", func(w *gotest.T) {
 		w.It("renders context passing to test methods", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ReturningBeforeEach_Sequential")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			gotest.NotContains(it, output, "t.Parallel()", "suite-level t.Parallel() should not be emitted")
@@ -362,7 +391,7 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 	t.When("returning BeforeEach parallel", func(w *gotest.T) {
 		w.It("renders parallel markers without a WaitGroup", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ReturningBeforeEach_Parallel")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			stripped := strings.ReplaceAll(output, "it.Parallel()", "")
@@ -388,7 +417,7 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 			// "imported and not used". So the assertion is on the rendered import
 			// block, not on the render succeeding.
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ParallelSuite_AllCasesExcluded")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, false)
 
 			gotest.NotContains(it, output, `"sync/atomic"`,
 				"an unused sync/atomic import makes go test refuse the generated package")
@@ -402,7 +431,7 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 	t.When("fixture-bound returning BeforeEach", func(w *gotest.T) {
 		w.It("renders context passing with fixture binding", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBound_ReturningBeforeEach")
-			output, _ := renderTestPkg(it.T(), pkg)
+			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
 			gotest.NotContains(it, output, "t.Parallel()", "suite-level t.Parallel() should not be emitted")
@@ -480,9 +509,9 @@ func (s *RendererTestSuite) TestDeterministicOutput(t *gotest.T) {
 			{"fixture-bound suite", "TestRenderer_FixtureWithChildSuite"},
 		}) {
 			pkg := gotestgen.ExportMustTestPkg(sub.T(), tC.pkgName)
-			first, _ := renderTestPkg(sub.T(), pkg)
+			first, _ := renderTestPkg(sub.T(), pkg, false)
 			for range 3 {
-				again, _ := renderTestPkg(sub.T(), pkg)
+				again, _ := renderTestPkg(sub.T(), pkg, false)
 				gotest.Equal(sub, first, again, "rendering must be byte-identical across runs")
 			}
 		}
@@ -494,7 +523,7 @@ func (s *RendererTestSuite) TestDeterministicOutput(t *gotest.T) {
 func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 	t.It("emits one Fuzz<Suite>_<Method> function per fuzz method, with per-execution lifecycle hooks", func(it *gotest.T) {
 		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzMethod")
-		out, _ := renderTestPkg(it.T(), pkg)
+		out, _ := renderTestPkg(it.T(), pkg, true)
 
 		gotest.Contains(it, out, "func FuzzFuzzTestSuite_FuzzParse(f *testing.F)")
 		gotest.Contains(it, out, "s.FuzzParse(gotest.NewF(f, s.BeforeEach, s.AfterEach))")
@@ -503,7 +532,7 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 
 	t.It("wires the suite lifecycle around each generated fuzz function", func(it *gotest.T) {
 		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzMethod")
-		out, _ := renderTestPkg(it.T(), pkg)
+		out, _ := renderTestPkg(it.T(), pkg, true)
 
 		fuzzFn := out[strings.Index(out, "func FuzzFuzzTestSuite_FuzzParse"):]
 		gotest.Contains(it, fuzzFn, "ƒlifecycleT := gotest.NewTFromTB(f)")
@@ -514,12 +543,32 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 	t.When("fuzz suite is bound to a package fixture", func(w *gotest.T) {
 		w.It("calls ƒ_setupFixtures and constructs the suite with fixture fields populated", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBoundFuzz")
-			out, _ := renderTestPkg(it.T(), pkg)
+			out, _ := renderTestPkg(it.T(), pkg, true)
 
 			fuzzFn := out[strings.Index(out, "func FuzzParserFuzzTestSuite_FuzzParse"):]
 			gotest.Contains(it, fuzzFn, "ƒ_setupFixtures(f)")
 			gotest.Contains(it, fuzzFn, "ParserFuzzTestSuite: ParserFuzzTestSuite{")
 			gotest.Contains(it, fuzzFn, "PoolFixture: ƒ_PoolFixture")
+		})
+	})
+
+	t.When("the fuzz callback's callee is exercised by a table test elsewhere in the package", func(w *gotest.T) {
+		w.It("emits harvested f.Add(...) seed lines before the user method call when harvesting is enabled", func(it *gotest.T) {
+			pkg := loadFuzzHarvestTestPkg(it.T())
+			out, _ := renderTestPkg(it.T(), pkg, true)
+
+			fuzzFn := out[strings.Index(out, "func FuzzHarvestFuzzTestSuite_FuzzTrim"):]
+			gotest.Contains(it, fuzzFn, `f.Add("hello")`)
+			gotest.Contains(it, fuzzFn, `f.Add("  hi  ")`)
+			gotest.Less(it, strings.Index(fuzzFn, `f.Add(`), strings.Index(fuzzFn, "s.FuzzTrim("), "f.Add(...) lines must precede the user method call")
+		})
+
+		w.It("emits no f.Add(...) seed lines when harvesting is disabled", func(it *gotest.T) {
+			pkg := loadFuzzHarvestTestPkg(it.T())
+			out, _ := renderTestPkg(it.T(), pkg, false)
+
+			fuzzFn := out[strings.Index(out, "func FuzzHarvestFuzzTestSuite_FuzzTrim"):]
+			gotest.NotContains(it, fuzzFn, "f.Add(")
 		})
 	})
 }

@@ -359,6 +359,8 @@ func (s *CmdGotestTestSuite) TestSplitArgs(t *gotest.T) {
 		{Desc: "watch: debug and ci", inArgs: []string{"--debug", "--ci", "-v", "./..."}, allowed: ExportWatchAllowed, expectOwn: []string{"--debug", "--ci"}, expectGoTest: []string{"-v", "./..."}},
 		{Desc: "timeout flag with equals", inArgs: []string{"--timeout=15m", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--timeout=15m"}, expectGoTest: []string{"-v"}},
 		{Desc: "timeout flag with space", inArgs: []string{"--timeout", "15m", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--timeout", "15m"}, expectGoTest: []string{"-v"}},
+		{Desc: "no-harvest allowed for test", inArgs: []string{"--no-harvest", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--no-harvest"}, expectGoTest: []string{"-v"}},
+		{Desc: "no-harvest allowed for fuzz", inArgs: []string{"--no-harvest", "--for=1m"}, allowed: ExportFuzzAllowed, expectOwn: []string{"--no-harvest", "--for=1m"}, expectGoTest: nil},
 	}) {
 		own, goTest, err := SplitArgs(tc.inArgs, tc.allowed)
 		if tc.expectErr {
@@ -539,6 +541,25 @@ func (s *CmdGotestTestSuite) TestParseSetupTimeoutFlag(t *gotest.T) {
 			gotest.NoError(sub, err)
 			gotest.Equal(sub, tc.expect, got)
 		}
+	}
+}
+
+func (s *CmdGotestTestSuite) TestParseExecFlags_HarvestSeeds(t *gotest.T) {
+	falsePtr := false
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc    string
+		ownArgs []string
+		cfg     config.ProjectConfig
+		expect  bool
+	}{
+		{Desc: "default: no flag, no config", ownArgs: nil, cfg: config.ProjectConfig{}, expect: true},
+		{Desc: "--no-harvest disables it", ownArgs: []string{"--no-harvest"}, cfg: config.ProjectConfig{}, expect: false},
+		{Desc: "config fuzz.harvest=false disables it", ownArgs: nil, cfg: config.ProjectConfig{Fuzz: config.FuzzConfig{Harvest: &falsePtr}}, expect: false},
+		{Desc: "flag and config both disabling stays disabled", ownArgs: []string{"--no-harvest"}, cfg: config.ProjectConfig{Fuzz: config.FuzzConfig{Harvest: &falsePtr}}, expect: false},
+	}) {
+		got, err := ExportParseExecFlags(tc.ownArgs, nil, &tc.cfg)
+		gotest.NoError(sub, err)
+		gotest.Equal(sub, tc.expect, got.HarvestSeeds)
 	}
 }
 
