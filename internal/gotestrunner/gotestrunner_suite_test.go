@@ -800,8 +800,8 @@ func (s *GotestrunnerTestSuite) TestExclusiveDispatch(t *gotest.T) {
 
 		w.It("carries the flag on exactly that suite's target", func(it *gotest.T) {
 			byName := map[string]bool{}
-			for _, tg := range targets {
-				byName[tg.SuiteName] = tg.Exclusive
+			for i := range targets {
+				byName[targets[i].SuiteName] = targets[i].Exclusive
 			}
 			gotest.True(it, byName["TestTimingTestSuite"])
 			gotest.False(it, byName["TestPlainTestSuite"])

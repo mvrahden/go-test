@@ -577,7 +577,8 @@ loop:
 		}
 		return ta.SuiteName < tb.SuiteName
 	}) //nolint:gocritic // mirror of sortTargetIndices over a local pair type
-	for _, d := range deferredExclusive {
+	for i := range deferredExclusive {
+		d := &deferredExclusive[i]
 		if streamCtx.Err() != nil {
 			collector.RecordResult(d.t.Package, d.idx, SuiteResult{ExitCode: 1})
 			continue
