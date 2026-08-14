@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/about"
@@ -1518,10 +1519,30 @@ func normalizeJSON(raw string) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
+// lockedWriter is a mutex-guarded string sink: logSlowBuild's AfterFunc
+// goroutine writes it while the test reads it, and timer.Stop provides no
+// happens-before edge between the two.
+type lockedWriter struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (w *lockedWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.Write(p)
+}
+
+func (w *lockedWriter) String() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.String()
+}
+
 func (s *GotestrunnerTestSuite) TestLogSlowBuild(t *gotest.T) {
 	t.When("a build outlives the threshold", func(w *gotest.T) {
 		w.It("logs the breach while running and the effective duration after", func(it *gotest.T) {
-			var buf strings.Builder
+			var buf lockedWriter
 			done := gotestrunner.ExportLogSlowBuild(&buf, "test binary for example.com/pkg", 10*time.Millisecond)
 			time.Sleep(40 * time.Millisecond)
 			done()
@@ -1532,7 +1553,7 @@ func (s *GotestrunnerTestSuite) TestLogSlowBuild(t *gotest.T) {
 
 	t.When("a build finishes under the threshold", func(w *gotest.T) {
 		w.It("stays silent — fast builds are the expected case", func(it *gotest.T) {
-			var buf strings.Builder
+			var buf lockedWriter
 			done := gotestrunner.ExportLogSlowBuild(&buf, "x", time.Minute)
 			done()
 			gotest.Zero(it, buf.String())
