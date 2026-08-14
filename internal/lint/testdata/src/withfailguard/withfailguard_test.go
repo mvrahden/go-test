@@ -2,6 +2,7 @@ package withfailguard //nolint:stdlib-test
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -292,5 +293,39 @@ var packageGuard = func(t *gotest.T) {
 	err := errors.New("boom")
 	if err != nil {
 		t.T().FailNow() // want `FailNow is available on gotest.T — unnecessary T escape`
+	}
+}
+
+// === mixed static operand types: any-typed sides bridge via conversion,
+// the rest fall back to False ===
+
+type mixedErr struct{ msg string }
+
+func (e *mixedErr) Error() string { return e.msg }
+
+func TestMixedTypeGuards(t *testing.T) {
+	row := map[string]any{"id": "a"}
+	id := "b"
+	if row["id"] == id { // want `use NotEqual instead of if\+Fail for == comparison`
+		gotest.Fail(t, "deleted row still appears")
+	}
+	if id != row["id"] { // want `use Equal instead of if\+Fail for != comparison`
+		gotest.Fail(t, "row mismatch")
+	}
+	// bare literals need no conversion
+	if row["id"] == "gone" { // want `use NotEqual instead of if\+Fail for == comparison`
+		gotest.Fail(t, "row not deleted")
+	}
+	// no spellable common type — False fallback
+	var boom error = &mixedErr{msg: "boom"}
+	target := &mixedErr{msg: "boom"}
+	if boom == target { // want `use False instead of if\+Fail for failure guard`
+		gotest.Fail(t, "matched sentinel")
+	}
+	// mismatched DeepEqual operands — False fallback
+	xs := []int{1}
+	ys := []string{"a"}
+	if reflect.DeepEqual(xs, ys) { // want `use False instead of if\+Fail for failure guard`
+		gotest.Fail(t, "should differ")
 	}
 }
