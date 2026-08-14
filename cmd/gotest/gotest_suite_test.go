@@ -345,6 +345,8 @@ func (s *CmdGotestTestSuite) TestPackagePatterns(t *gotest.T) {
 			{Desc: "stops at -args", args: []string{"-v", "./...", "-args", "-custom", "./not/a/pkg"}, expected: []string{"./..."}},
 			{Desc: "no args defaults to dot", args: nil, expected: []string{"."}},
 			{Desc: "bare relative path", args: []string{"-v", "./cmd/gotest"}, expected: []string{"./cmd/gotest"}},
+			{Desc: "space-separated flag value with a slash is not a package", args: []string{"./pkg/a", "-bench", "^BenchmarkFooTestSuite$/^BenchmarkParse$"}, expected: []string{"./pkg/a"}},
+			{Desc: "space-separated -run value with a slash is not a package", args: []string{"-run", "TestFoo/sub", "./pkg/a"}, expected: []string{"./pkg/a"}},
 		}) {
 			result := ExtractPackagePatterns(tc.args)
 			gotest.Equal(sub, tc.expected, result)

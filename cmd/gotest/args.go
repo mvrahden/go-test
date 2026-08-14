@@ -168,11 +168,21 @@ func extractStringFlag(args []string, name, defaultVal string) string {
 
 func ExtractPackagePatterns(goTestArgs []string) []string {
 	var patterns []string
-	for _, arg := range goTestArgs {
+	for i := 0; i < len(goTestArgs); i++ {
+		arg := goTestArgs[i]
 		if arg == "-args" {
 			break
 		}
 		if strings.HasPrefix(arg, "-") {
+			// Pair space-separated values with their flag, exactly as
+			// SplitArgs does when it builds goTestArgs: the value of
+			// "-bench ^BenchmarkSuite$/^BenchmarkMethod$" carries a "/" that
+			// LooksLikePackagePattern would otherwise claim as a package.
+			if name, _, hasEquals := strings.Cut(arg, "="); !hasEquals {
+				if isValue, known := gotestrunner.IsGoTestFlag(name); known && isValue && i+1 < len(goTestArgs) {
+					i++
+				}
+			}
 			continue
 		}
 		if gotestrunner.LooksLikePackagePattern(arg) {
