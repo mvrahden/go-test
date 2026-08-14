@@ -186,3 +186,88 @@ func (s *FixtureWindowTestSuite) TestRealOverlayFiltering(t *gotest.T) {
 		})
 	})
 }
+
+// benchOverlay extends the synthetic overlay with bench suites:
+//
+//	pkg/a: AlphaSuite (bench, needs Alpha)   MultiSuite (bench, needs Alpha+Beta)
+//	pkg/b: ChainSuite (bench, needs Chain → Alpha)
+//
+// Orphan stays required by nobody.
+func benchOverlay() *gotestrunner.OverlayResult {
+	overlay := windowOverlay()
+	overlay.BenchesByPkg = map[string][]string{
+		"pkg/a": {"AlphaSuite", "MultiSuite"},
+		"pkg/b": {"ChainSuite"},
+	}
+	return overlay
+}
+
+func (s *FixtureWindowTestSuite) TestBenchWindowPlanning(t *gotest.T) {
+	overlay := benchOverlay()
+
+	t.When("no filters are set", func(w *gotest.T) {
+		win := gotestrunner.ExportPlanBenchFixtureWindows(overlay, "", "")
+
+		w.It("starts only the first slot's fixtures up-front and defers the rest", func(it *gotest.T) {
+			// Dispatch order: pkg/a AlphaSuite, pkg/a MultiSuite, pkg/b ChainSuite.
+			gotest.Equal(it, map[string]bool{winKey("Alpha"): true}, win.Bulk)
+			deferred := map[string]bool{}
+			for i := range win.Fixtures {
+				deferred[win.Fixtures[i].Identifier] = win.Fixtures[i].Deferred
+			}
+			gotest.Equal(it, map[string]bool{"Alpha": false, "Beta": true, "Chain": true}, deferred)
+		})
+
+		w.It("never starts the fixture no bench suite requires", func(it *gotest.T) {
+			gotest.Equal(it, 1, win.Skipped, "Orphan is not in the plan")
+		})
+	})
+
+	t.When("-bench selects only the chain suite", func(w *gotest.T) {
+		win := gotestrunner.ExportPlanBenchFixtureWindows(overlay, "", "BenchmarkChainSuite")
+
+		w.It("keeps its DAG-closed needs and nothing else, all up-front", func(it *gotest.T) {
+			gotest.Equal(it, map[string]bool{winKey("Chain"): true, winKey("Alpha"): true}, win.Bulk,
+				"the one slot is the first slot: its closure starts with compile")
+			gotest.ElementsMatch(it, []string{"Alpha", "Chain"}, fixtureIdentifiers(win.Fixtures))
+			gotest.Equal(it, 2, win.Skipped)
+		})
+	})
+
+	t.When("-run matches Benchmark names, not test names", func(w *gotest.T) {
+		win := gotestrunner.ExportPlanBenchFixtureWindows(overlay, "^BenchmarkMultiSuite$", "")
+
+		w.It("plans for the bench suites the filter selects", func(it *gotest.T) {
+			gotest.Equal(it, map[string]bool{winKey("Alpha"): true, winKey("Beta"): true}, win.Bulk)
+			gotest.Equal(it, 2, win.Skipped)
+		})
+	})
+}
+
+func (s *FixtureWindowTestSuite) TestBenchSlotPlan(t *gotest.T) {
+	overlay := benchOverlay()
+	targets := []gotestrunner.SuiteTarget{
+		{SuiteSpec: gotestrunner.SuiteSpec{Package: "pkg/a", SuiteName: "AlphaSuite"}},
+		{SuiteSpec: gotestrunner.SuiteSpec{Package: "pkg/a", SuiteName: "MultiSuite"}},
+		{SuiteSpec: gotestrunner.SuiteSpec{Package: "pkg/b", SuiteName: "ChainSuite"}},
+	}
+
+	t.When("computing per-slot windows", func(w *gotest.T) {
+		needs, laterNeeds := gotestrunner.ExportBenchSlotPlan(targets, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures)
+
+		w.It("resolves each slot's DAG-closed needs", func(it *gotest.T) {
+			gotest.Equal(it, map[string]bool{winKey("Alpha"): true}, needs[0])
+			gotest.Equal(it, map[string]bool{winKey("Alpha"): true, winKey("Beta"): true}, needs[1])
+			gotest.Equal(it, map[string]bool{winKey("Chain"): true, winKey("Alpha"): true}, needs[2])
+		})
+
+		w.It("keeps a fixture resident until its last slot, then releases it", func(it *gotest.T) {
+			// Alpha is needed by every slot: it must survive slot 1 even
+			// though slot 1 also needs Beta — resident through the whole run.
+			gotest.True(it, laterNeeds[1][winKey("Alpha")])
+			gotest.True(it, laterNeeds[2][winKey("Alpha")], "Chain's closure keeps Alpha alive through the last slot")
+			gotest.False(it, laterNeeds[2][winKey("Beta")], "Beta's window closes after its only slot")
+			gotest.Empty(it, laterNeeds[3], "after the final slot nothing is needed")
+		})
+	})
+}
