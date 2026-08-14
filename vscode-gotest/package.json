@@ -49,6 +49,10 @@
         "title": "Go Test: Run File"
       },
       {
+        "command": "gotest.runBench",
+        "title": "Go Test: Run Benchmark"
+      },
+      {
         "command": "gotest.refreshTests",
         "title": "Go Test: Refresh"
       },

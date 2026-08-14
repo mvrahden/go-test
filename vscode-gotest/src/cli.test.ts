@@ -79,7 +79,11 @@ describe("buildBenchArgs", () => {
   });
 
   it("does not pass -run, since it matches the same wrapper name and AND-composes with -bench", () => {
-    const args = buildBenchArgs("example.com/pkg", "FooTestSuite", "BenchmarkParse");
+    const args = buildBenchArgs(
+      "example.com/pkg",
+      "FooTestSuite",
+      "BenchmarkParse",
+    );
     expect(args).not.toContain("-run");
   });
 });

@@ -35,6 +35,7 @@ export interface DiscoverSuite {
   lifecycle: string[];
   fixtures: string[];
   methods: DiscoverMethod[];
+  benchmarks: DiscoverMethod[];
 }
 
 export interface DiscoverMethod {

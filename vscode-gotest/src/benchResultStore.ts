@@ -1,0 +1,155 @@
+// benchResultStore keeps the last benchmark numbers per method so CodeLens
+// annotations survive editor reloads. Entries are keyed by package, suite,
+// method, AND goos/goarch — a number measured on another platform is a
+// different number, and the store refuses to serve it for this host, the
+// same way the CLI refuses cross-platform baseline comparisons.
+//
+// Persistence is the workspace Memento (workspaceState): benchmark numbers
+// are workspace-scoped working state, not artifacts. The store depends only
+// on the minimal MementoLike surface so tests run without a vscode mock.
+
+import type { BenchReport } from "./benchReport.js";
+
+export interface MementoLike {
+  get<T>(key: string, defaultValue: T): T;
+  update(key: string, value: unknown): Thenable<void>;
+}
+
+export interface PlatformKey {
+  goos: string;
+  goarch: string;
+}
+
+/** The stored summary of one benchmark's most recent run. */
+export interface BenchEntry {
+  nsPerOp: number;
+  bytesPerOp: number;
+  allocsPerOp: number;
+  iterations: number;
+  /** Number of samples behind the mean (>1 under -count=N). */
+  sampleCount: number;
+  recordedAt: number;
+  goos: string;
+  goarch: string;
+}
+
+interface StoredData {
+  version: 1;
+  entries: Record<string, BenchEntry>;
+}
+
+const STORAGE_KEY = "gotest.benchResults";
+
+export function benchKey(
+  importPath: string,
+  suiteName: string,
+  methodName: string,
+  goos: string,
+  goarch: string,
+): string {
+  return `${importPath}/${suiteName}/${methodName}@${goos}/${goarch}`;
+}
+
+/** hostPlatform maps Node's platform/arch names onto GOOS/GOARCH. */
+export function hostPlatform(
+  proc: { platform: string; arch: string } = process,
+): PlatformKey {
+  const goos =
+    proc.platform === "win32"
+      ? "windows"
+      : proc.platform === "sunos"
+        ? "solaris"
+        : proc.platform;
+  const archMap: Record<string, string> = {
+    x64: "amd64",
+    ia32: "386",
+    arm64: "arm64",
+    arm: "arm",
+  };
+  return { goos, goarch: archMap[proc.arch] ?? proc.arch };
+}
+
+export class BenchResultStore {
+  private entries = new Map<string, BenchEntry>();
+  private listeners: Array<() => void> = [];
+
+  constructor(private readonly memento: MementoLike) {
+    const stored = this.memento.get<StoredData | undefined>(
+      STORAGE_KEY,
+      undefined,
+    );
+    if (stored && stored.version === 1) {
+      for (const [key, entry] of Object.entries(stored.entries)) {
+        this.entries.set(key, entry);
+      }
+    }
+  }
+
+  onDidUpdate(listener: () => void): { dispose(): void } {
+    this.listeners.push(listener);
+    return {
+      dispose: () => {
+        this.listeners = this.listeners.filter((l) => l !== listener);
+      },
+    };
+  }
+
+  /**
+   * recordReport stores one entry per result in the report, stamped with the
+   * report's own goos/goarch. Multi-sample runs (-count=N) store the mean —
+   * the CLI's comparison logic consumes the full samples, the annotation
+   * only needs one honest number.
+   */
+  recordReport(report: BenchReport, recordedAt: number): void {
+    const { goos, goarch } = report.baseline;
+    for (const result of report.baseline.results) {
+      const n = result.samples.length;
+      if (n === 0) continue;
+      const mean = (pick: (s: (typeof result.samples)[number]) => number) =>
+        result.samples.reduce((sum, s) => sum + pick(s), 0) / n;
+
+      this.entries.set(
+        benchKey(result.package, result.suite, result.name, goos, goarch),
+        {
+          nsPerOp: mean((s) => s.nsPerOp),
+          bytesPerOp: Math.round(mean((s) => s.bytesPerOp)),
+          allocsPerOp: Math.round(mean((s) => s.allocsPerOp)),
+          iterations: result.samples[0].iterations,
+          sampleCount: n,
+          recordedAt,
+          goos,
+          goarch,
+        },
+      );
+    }
+    void this.persist();
+    for (const listener of this.listeners) {
+      listener();
+    }
+  }
+
+  getLatest(
+    importPath: string,
+    suiteName: string,
+    methodName: string,
+    platform: PlatformKey,
+  ): BenchEntry | undefined {
+    return this.entries.get(
+      benchKey(
+        importPath,
+        suiteName,
+        methodName,
+        platform.goos,
+        platform.goarch,
+      ),
+    );
+  }
+
+  private persist(): Thenable<void> {
+    const data: StoredData = {
+      version: 1,
+      entries: Object.fromEntries(this.entries),
+    };
+    return this.memento.update(STORAGE_KEY, data);
+  }
+}

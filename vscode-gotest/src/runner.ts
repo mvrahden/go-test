@@ -76,8 +76,19 @@ export class TestRunner {
     let recordId: string | undefined;
 
     try {
-      const items = collectItems(this.controller, request);
+      // Benchmarks never run as part of a normal test run: they answer with
+      // a number, and that number is garbage when tests hammer the machine
+      // at the same time. The Bench profile (tag-scoped) is their only door.
+      const collected = collectItems(this.controller, request);
+      const items = collected.filter(
+        (i) => !i.tags.some((t) => t.id === "benchmark"),
+      );
       if (items.length === 0) {
+        if (collected.length > 0) {
+          vscode.window.showInformationMessage(
+            "Benchmarks run through the Bench profile or the ▶ Bench CodeLens, not a test run.",
+          );
+        }
         return;
       }
 
@@ -304,3 +315,7 @@ export class TestRunner {
     return this._lastJsonOutput.includes("MatchSnapshot: snapshot mismatch");
   }
 }
+
+// Benchmark execution lives in benchRunner.ts: `gotest bench --json` parsed
+// into typed results, recorded in the BenchResultStore, rendered as CodeLens
+// annotations. Nothing here runs benchmarks.
