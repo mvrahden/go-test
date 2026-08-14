@@ -140,6 +140,58 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 	}
 }
 
+// SortTargetsSerial orders targets in place by (Package, SuiteName) — the
+// deterministic dispatch order RunBenchSuites executes them in.
+func SortTargetsSerial(targets []SuiteTarget) {
+	sort.Slice(targets, func(a, b int) bool {
+		if targets[a].Package != targets[b].Package {
+			return targets[a].Package < targets[b].Package
+		}
+		return targets[a].SuiteName < targets[b].SuiteName
+	}) //nolint:gocritic // mirror of sortTargetIndices over the targets themselves
+}
+
+// RunBenchSuites executes bench targets strictly one at a time, in slice
+// order (see SortTargetsSerial): benchmarks own the machine, and their
+// verdicts are wall-clock measurements no concurrent suite may corrupt.
+// beforeSlot/afterSlot (nil-safe) bracket each slot with its index, so the
+// caller can open and close per-slot fixture windows.
+func RunBenchSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, collector *OutputCollector, beforeSlot, afterSlot func(i int)) {
+	pkgCount := map[string]int{}
+	var pkgOrder []string
+	localIdx := make([]int, len(targets))
+	for i := range targets {
+		if _, seen := pkgCount[targets[i].Package]; !seen {
+			pkgOrder = append(pkgOrder, targets[i].Package)
+		}
+		localIdx[i] = pkgCount[targets[i].Package]
+		pkgCount[targets[i].Package]++
+	}
+	for _, pkg := range pkgOrder {
+		collector.Register(pkg, pkgCount[pkg])
+	}
+
+	useTest2JSON := collector.UsesTest2JSON()
+	env := os.Environ()
+	for k, v := range extraEnv {
+		env = append(env, k+"="+v)
+	}
+
+	for i := range targets {
+		if ctx.Err() != nil {
+			return
+		}
+		if beforeSlot != nil {
+			beforeSlot(i)
+		}
+		r := RunSingleSuite(ctx, targets[i], env, useTest2JSON)
+		collector.RecordResult(targets[i].Package, localIdx[i], r)
+		if afterSlot != nil {
+			afterSlot(i)
+		}
+	}
+}
+
 func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2json bool) *exec.Cmd { //nolint:gocritic // hugeParam: stable API
 	var testArgs []string
 	switch {
