@@ -180,11 +180,17 @@ const slowBuildThreshold = 15 * time.Second
 // visible without ever being failed.
 func logSlowBuild(w io.Writer, what string, threshold time.Duration) (done func()) {
 	start := time.Now()
+	fired := make(chan struct{})
 	timer := time.AfterFunc(threshold, func() {
+		defer close(fired)
 		fmt.Fprintf(w, "gotest: %s has been building for %s and is still running\n", what, threshold)
 	})
 	return func() {
-		timer.Stop()
+		if !timer.Stop() {
+			// The notice is firing on the timer goroutine; wait it out so the
+			// two writes never overlap on a non-concurrent-safe writer.
+			<-fired
+		}
 		if d := time.Since(start); d >= threshold {
 			fmt.Fprintf(w, "gotest: %s finished building after %s\n", what, d.Round(time.Second))
 		}
