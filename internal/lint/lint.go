@@ -41,6 +41,8 @@ const (
 	// BehaviorWording is expressiveness: a When or It description that opens
 	// with the word the spec renders for it says it twice.
 	BehaviorWording Rule = "behavior-wording"
+	BenchLoop       Rule = "bench-loop"
+	BenchFixtureIO  Rule = "bench-fixture-io"
 	// SharedFixtureUndeclared is integrity: window scheduling starts only
 	// the fixtures scheduled suites declare, so an undeclared read may hit
 	// a fixture that never started or is already released.
@@ -91,6 +93,12 @@ var ruleMeta = map[Rule]struct {
 	SuiteLifecycle:     {TierIntegrity, ScopeSuites},
 	FailGuard:          {TierExpressiveness, ScopeGotestFiles},
 	BehaviorWording:    {TierExpressiveness, ScopeGotestFiles},
+	// A benchmark that never iterates measures nothing — its numbers lie,
+	// so bench-loop is integrity. bench-fixture-io is a heuristic about
+	// what the timed loop includes; legitimate setups exist, so it stays
+	// skippable.
+	BenchLoop:      {TierIntegrity, ScopeSuites},
+	BenchFixtureIO: {TierExpressiveness, ScopeSuites},
 
 	SharedFixtureUndeclared: {TierIntegrity, ScopeSuites},
 }
@@ -181,6 +189,8 @@ func run(pass *analysis.Pass) (any, error) {
 	checkFailGuard(pass, insp, cl)
 	checkRedundantAssertion(pass, insp, cl)
 	checkBehaviorWording(pass, insp)
+	checkBenchLoop(pass, insp, suites)
+	checkBenchFixtureIO(pass, insp, suites)
 
 	return nil, nil
 }
@@ -351,6 +361,7 @@ type suiteInfo struct {
 	pos               token.Pos
 	methods           map[string]token.Pos
 	recvTypePositions []token.Pos
+	fixtureFields     map[string]bool // names of *...Fixture / *...SharedFixture fields (see bench-fixture-io)
 }
 
 func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
@@ -370,9 +381,10 @@ func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
 			stripped := strings.TrimPrefix(strings.TrimPrefix(name, protocol.PrefixFocused), protocol.PrefixExcluded)
 			if strings.HasSuffix(stripped, protocol.SuffixTestSuite) {
 				suites[name] = &suiteInfo{
-					name:    name,
-					pos:     ts.Pos(),
-					methods: make(map[string]token.Pos),
+					name:          name,
+					pos:           ts.Pos(),
+					methods:       make(map[string]token.Pos),
+					fixtureFields: structFixtureFieldNames(ts.Type),
 				}
 			}
 		}
