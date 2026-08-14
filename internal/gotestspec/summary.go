@@ -100,6 +100,7 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 		if cfg.coverage != nil {
 			fmt.Fprintf(w, "%sCoverage: %.1f%%%s\n", c.dim, cfg.coverage.Total, c.reset)
 		}
+		renderBenchDeltaTable(w, cfg.benchDeltas, c)
 		return
 	}
 
@@ -142,6 +143,7 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 	if cfg.coverage != nil {
 		fmt.Fprintf(w, "%sCoverage: %.1f%%%s\n", c.dim, cfg.coverage.Total, c.reset)
 	}
+	renderBenchDeltaTable(w, cfg.benchDeltas, c)
 	renderSummary(w, stats, c)
 }
 
@@ -161,6 +163,7 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 		if cfg.coverage != nil {
 			renderMarkdownCoverage(w, cfg.coverage)
 		}
+		renderMarkdownBenchDeltaTable(w, cfg.benchDeltas)
 		return
 	}
 
@@ -205,6 +208,8 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 		renderMarkdownCoverage(w, cfg.coverage)
 	}
 
+	renderMarkdownBenchDeltaTable(w, cfg.benchDeltas)
+
 	fmt.Fprint(w, "---\n")
 	var parts []string
 	if stats.Suites > 0 {
@@ -224,6 +229,33 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 		trailer += fmt.Sprintf(", %d failed packages", stats.FailedPackages)
 	}
 	fmt.Fprintf(w, "%s: %s\n", strings.Join(parts, ", "), trailer)
+}
+
+// renderMarkdownBenchDeltaTable renders deltas as a markdown table mirroring
+// renderBenchDeltaTable's terminal columns. deltas is rendered as given —
+// filtering significant-only vs. every row (-v) is the caller's
+// responsibility (see WithBenchDeltas). A nil slice (WithBenchDeltas never
+// called) no-ops; an empty-but-non-nil slice still prints the header (see
+// renderBenchDeltaTable for why).
+func renderMarkdownBenchDeltaTable(w io.Writer, deltas []BenchDelta) {
+	if deltas == nil {
+		return
+	}
+	fmt.Fprintln(w, "| Benchmark | old ns/op | new ns/op | Δ |")
+	fmt.Fprintln(w, "|---|---|---|---|")
+	for _, d := range deltas {
+		sign := ""
+		if d.PercentChange >= 0 {
+			sign = "+"
+		}
+		warn := ""
+		if d.Significant && d.PercentChange > 0 {
+			warn = " ⚠"
+		}
+		fmt.Fprintf(w, "| %s | %.1f | %.1f | %s%.1f%%%s |\n",
+			d.Key, d.OldNs, d.NewNs, sign, d.PercentChange, warn)
+	}
+	fmt.Fprintln(w)
 }
 
 func renderMarkdownCoverage(w io.Writer, report *CoverageReport) {

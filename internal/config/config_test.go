@@ -22,6 +22,9 @@ lint:
   skip:
     - stdlib-test
     - testify
+bench:
+  baseline: bench-baseline.json
+  gate: 10.5
 `)
 
 	cfg, err := Load(dir)
@@ -37,6 +40,8 @@ lint:
 	assertEqual(t, "compile-parallel", cfg.CompileParallel, 2)
 	assertDuration(t, "debounce", cfg.Debounce, 500*time.Millisecond)
 	assertSliceEqual(t, "lint.skip", cfg.Lint.Skip, []string{"stdlib-test", "testify"})
+	assertEqual(t, "bench.baseline", cfg.Bench.Baseline, "bench-baseline.json")
+	assertEqual(t, "bench.gate", cfg.Bench.Gate, 10.5)
 }
 
 func TestLoad_NoFile_ReturnsZero(t *testing.T) {
@@ -58,6 +63,8 @@ func TestLoad_NoFile_ReturnsZero(t *testing.T) {
 	if len(cfg.Lint.Skip) != 0 {
 		t.Errorf("lint.skip: got %v, want empty", cfg.Lint.Skip)
 	}
+	assertEqual(t, "bench.baseline", cfg.Bench.Baseline, "")
+	assertEqual(t, "bench.gate", cfg.Bench.Gate, 0.0)
 }
 
 func TestLoad_PartialConfig(t *testing.T) {
