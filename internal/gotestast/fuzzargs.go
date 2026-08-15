@@ -47,6 +47,44 @@ func NativeFuzzType(t types.Type) bool {
 	return false
 }
 
+// PassthroughFuzzType reports whether gotest hands an argument of type t to
+// the engine exactly as declared: the unnamed string, bool, and []byte, and
+// nothing else. Every other type — a struct, a named type, a plain number —
+// gets a generated fan. Numbers fan on purpose: as fixed-width []byte leaves
+// they get the engine's richest mutator instead of its poorest (see the
+// leaf encoding policy in docs/design/fuzz-structs.md).
+func PassthroughFuzzType(t types.Type) bool {
+	t = types.Unalias(t)
+	if _, isNamed := t.(*types.Named); isNamed {
+		return false
+	}
+	switch u := t.(type) {
+	case *types.Basic:
+		return u.Kind() == types.String || u.Kind() == types.Bool
+	case *types.Slice:
+		eb, ok := types.Unalias(u.Elem()).(*types.Basic)
+		return ok && eb.Kind() == types.Uint8
+	}
+	return false
+}
+
+// FuzzCorpusShapeBound reports whether corpus entries for a fuzz argument
+// of type t depend on a field layout — a struct, pointer, array, or
+// non-byte slice, whose fanned positions follow declaration order. A
+// same-kind field reorder silently reinterprets such entries and an added
+// or removed field rejects them; a scalar or byte slice has no layout to
+// drift.
+func FuzzCorpusShapeBound(t types.Type) bool {
+	switch u := types.Unalias(t).Underlying().(type) {
+	case *types.Struct, *types.Pointer, *types.Array:
+		return true
+	case *types.Slice:
+		eb, ok := types.Unalias(u.Elem()).(*types.Basic)
+		return !(ok && eb.Kind() == types.Uint8)
+	}
+	return false
+}
+
 // CollectFuzzArgs walks every suite fuzz method's body for gotest.Fuzz
 // adapter calls and returns their type arguments in deterministic
 // (suite, method, call, argument) order. Returns nil when the package fuzzes
