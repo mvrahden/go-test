@@ -172,6 +172,8 @@ Flags:
   --input=<file>          Render from saved JSON ("-" for stdin)
   --render-only           With --input, exit 0 on a failing stream: report
                           whether rendering succeeded, not the test verdict
+  --static                Read the specification from source without running
+                          the suites; nodes carry no verdict
   --no-color              Disable ANSI color codes
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay

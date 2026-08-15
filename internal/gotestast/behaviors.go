@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-
 )
 
 // Behaviors are the `When`/`It` blocks a test method declares. They are the
@@ -214,50 +213,37 @@ func (w *behaviorWalker) eachRows(s *ast.RangeStmt) []*Behavior {
 		return nil // caller flags it as incomplete
 	}
 
+	// Behaviors declared in the loop body run once per row, so they are the
+	// children of every row rather than siblings of the table.
+	var perRow []*Behavior
+	if s.Body != nil {
+		perRow = w.walkBlock(s.Body)
+	}
+
 	rows := make([]*Behavior, 0, len(composite.Elts))
 	for i, elt := range composite.Elts {
-		name, ok := eachEntryLiteralName(elt)
-		if !ok {
-			name = fmt.Sprintf("#%d", i)
-		}
+		name := w.eachEntryName(elt, i)
 		rows = append(rows, &Behavior{
-			Name:    SubtestName(name),
-			Display: name,
-			Kind:    BehaviorEach,
-			Line:    w.line(elt.Pos()),
+			Name:     SubtestName(name),
+			Display:  name,
+			Kind:     BehaviorEach,
+			Line:     w.line(elt.Pos()),
+			Children: cloneBehaviors(perRow),
 		})
-	}
-	// Behaviors declared inside the loop body would be nested under each row;
-	// that shape is not modelled, so say so rather than under-report.
-	if s.Body != nil {
-		for _, stmt := range s.Body.List {
-			w.flagHiddenNested(stmt)
-		}
 	}
 	return rows
 }
 
-func (w *behaviorWalker) flagHiddenNested(stmt ast.Stmt) {
-	ast.Inspect(stmt, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-		if sel, ok := call.Fun.(*ast.SelectorExpr); ok &&
-			(sel.Sel.Name == "When" || sel.Sel.Name == "It") && w.isGotestT(sel.X) {
-			w.incomplete(call.Pos(), "%s nested inside an Each row", sel.Sel.Name)
-			return false
-		}
-		return true
-	})
-}
-
-// eachEntryLiteralName mirrors eachEntryName: the Desc field wins, then Name.
-func eachEntryLiteralName(elt ast.Expr) (string, bool) {
+// eachEntryName mirrors the runtime's eachEntryName: the Desc field wins, then
+// Name, then the index. Both the keyed and the positional literal forms are
+// resolved, because a table written as `{"too short", ...}` names its rows just
+// as surely as one written as `{Desc: "too short"}`.
+func (w *behaviorWalker) eachEntryName(elt ast.Expr, index int) string {
 	composite, ok := elt.(*ast.CompositeLit)
 	if !ok {
-		return "", false
+		return fmt.Sprintf("#%d", index)
 	}
+
 	for _, field := range []string{"Desc", "Name"} {
 		for _, e := range composite.Elts {
 			kv, ok := e.(*ast.KeyValueExpr)
@@ -269,11 +255,55 @@ func eachEntryLiteralName(elt ast.Expr) (string, bool) {
 				continue
 			}
 			if value, ok := stringLiteral(kv.Value); ok && value != "" {
-				return value, true
+				return value
 			}
 		}
 	}
-	return "", false
+
+	if st := w.structOf(composite); st != nil {
+		for _, field := range []string{"Desc", "Name"} {
+			for i := 0; i < st.NumFields() && i < len(composite.Elts); i++ {
+				if st.Field(i).Name() != field {
+					continue
+				}
+				if _, keyed := composite.Elts[i].(*ast.KeyValueExpr); keyed {
+					continue
+				}
+				if value, ok := stringLiteral(composite.Elts[i]); ok && value != "" {
+					return value
+				}
+			}
+		}
+	}
+
+	return fmt.Sprintf("#%d", index)
+}
+
+func (w *behaviorWalker) structOf(expr ast.Expr) *types.Struct {
+	if w.info == nil {
+		return nil
+	}
+	typ := w.info.TypeOf(expr)
+	if typ == nil {
+		return nil
+	}
+	st, _ := typ.Underlying().(*types.Struct)
+	return st
+}
+
+// cloneBehaviors gives each table row its own subtree; sharing the nodes would
+// alias rows that the runtime keeps entirely separate.
+func cloneBehaviors(in []*Behavior) []*Behavior {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]*Behavior, 0, len(in))
+	for _, b := range in {
+		clone := *b
+		clone.Children = cloneBehaviors(b.Children)
+		out = append(out, &clone)
+	}
+	return out
 }
 
 func (w *behaviorWalker) isGotestT(expr ast.Expr) bool {

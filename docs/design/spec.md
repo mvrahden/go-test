@@ -148,6 +148,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--github` | Emit GitHub annotations and step summary (auto-enabled in GitHub Actions) |
 | `--coverage=<path>` | Coverage profile path for `summary` subcommand |
 | `--render-only` | With `--input`, exit 0 on a failing stream: the code reports whether rendering succeeded, not whether the tests passed (requires `--input`) |
+| `--static` | Render the specification from source without running the suites (`spec` only); nodes carry no verdict, and methods whose behaviors depend on runtime values are reported as incomplete on stderr |
 
 ### Disambiguation
 

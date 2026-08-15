@@ -38,6 +38,12 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return runSpecFromInput(input, format, output, noColor, renderOnly)
 	}
 
+	if hasFlag(ownArgs, "--static") {
+		// The specification is written in the source; reading it should not
+		// require executing it.
+		return runStaticSpec(ownArgs, goTestArgs, &inv.Config, format, output, noColor)
+	}
+
 	minCoverage, err := parseMinFlag(ownArgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
