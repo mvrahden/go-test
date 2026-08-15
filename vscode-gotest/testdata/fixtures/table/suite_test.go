@@ -3,6 +3,8 @@ package table
 import "github.com/mvrahden/go-test/pkg/gotest"
 
 // Table-driven cases via gotest.Each: one behavior per row, named from Desc.
+// The function under test lives in classify.go so this package also carries
+// real source for coverage runs to measure.
 type TableTestSuite struct{}
 
 func (s *TableTestSuite) TestClassify(t *gotest.T) {
@@ -19,15 +21,4 @@ func (s *TableTestSuite) TestClassify(t *gotest.T) {
 			gotest.Equal(sub, tc.expect, classify(tc.in))
 		}
 	})
-}
-
-func classify(n int) string {
-	switch {
-	case n < 0:
-		return "negative"
-	case n == 0:
-		return "zero"
-	default:
-		return "positive"
-	}
 }
