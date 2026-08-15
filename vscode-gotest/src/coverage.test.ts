@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import * as path from "node:path";
 
 vi.mock("vscode", () => {
   class Position {
@@ -446,6 +449,35 @@ describe("filterSupplementaryProfiles", () => {
 
   it("returns empty when both inputs are empty", () => {
     expect(filterSupplementaryProfiles([], [])).toHaveLength(0);
+  });
+});
+
+describe("CoverageStore.clear", () => {
+  let CoverageStoreCls: typeof import("./coverageStore.js").CoverageStore;
+
+  beforeAll(async () => {
+    const mod = await import("./coverageStore.js");
+    CoverageStoreCls = mod.CoverageStore;
+  });
+
+  // Clearing memory alone would leave the stored profiles to be restored on
+  // the next window activation, which reads as the clear not having worked.
+  it("empties the store and does not restore on reload", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "gotest-cov-clear-"));
+    const store = new CoverageStoreCls({ fsPath: dir } as never);
+    store.update(
+      "example.com/pkg",
+      "mode: set\nexample.com/pkg/main.go:1.1,2.2 1 1\n",
+    );
+    await store.save();
+    expect(store.size).toBeGreaterThan(0);
+
+    await store.clear();
+    expect(store.size).toBe(0);
+
+    const reloaded = new CoverageStoreCls({ fsPath: dir } as never);
+    await reloaded.load();
+    expect(reloaded.size).toBe(0);
   });
 });
 

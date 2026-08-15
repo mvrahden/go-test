@@ -24,6 +24,29 @@ func BudgetFilePath(binaryPath string) string {
 	return binaryPath + ".budget"
 }
 
+// SplitTestPath cuts a go test name into its subtest levels. The separator is a
+// single slash: a run of them is left alone, so a description like
+// "https:// URI" stays one level instead of becoming three. Both readers of a
+// test path need this rule — the one parsing a run and the one predicting it
+// from source — and they have to agree, so it lives in one place.
+func SplitTestPath(path string) []string {
+	var segments []string
+	var cur strings.Builder
+	for i := 0; i < len(path); i++ {
+		if path[i] == '/' && (i+1 >= len(path) || path[i+1] != '/') &&
+			(i == 0 || path[i-1] != '/') {
+			segments = append(segments, cur.String())
+			cur.Reset()
+		} else {
+			cur.WriteByte(path[i])
+		}
+	}
+	if cur.Len() > 0 {
+		segments = append(segments, cur.String())
+	}
+	return segments
+}
+
 // IsPackageSummaryLine reports whether s is a go test package-level summary
 // line (e.g. "PASS", "FAIL", "ok  \tpkg\t0.01s") rather than diagnostic
 // output that should be surfaced to the user.

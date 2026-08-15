@@ -96,7 +96,7 @@ function makeTree() {
     suite,
   );
   const dynamic = createItem(
-    "example.com/pkg/MySuite/TestFoo/dynamic/sub1",
+    "example.com/pkg/MySuite/TestFoo/sub1",
     "sub1",
     method,
   );
@@ -224,7 +224,7 @@ function makeTreeWithDirs() {
     suite,
   );
   const dynamic = createItem(
-    "example.com/pkg/MySuite/TestFoo/dynamic/sub1",
+    "example.com/pkg/MySuite/TestFoo/sub1",
     "sub1",
     method,
   );

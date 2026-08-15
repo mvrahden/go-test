@@ -451,6 +451,27 @@ function registerCommands(deps: {
       copyCoverageSummary(coverageStore, cache),
     ),
 
+    // The Test Explorer's built-in "Clear all results" only empties VS Code's
+    // own in-memory view; it is not observable by an extension on stable API
+    // (tests.onDidChangeTestResults is still proposed). Everything this
+    // extension persists would therefore come back on the next window reload.
+    // This command clears the persisted state as well, so a clear survives a
+    // reload — results, coverage, and the spec view together.
+    vscode.commands.registerCommand("gotest.clearResults", async () => {
+      testResultStore.clear();
+      specView.clear();
+      controller.testController.items.forEach((item) =>
+        controller.clearResults(item),
+      );
+      try {
+        await coverageStore.clear();
+      } catch (err: unknown) {
+        outputChannel.error(`[coverage] clear failed: ${err}`);
+      }
+      await testResultStore.flush();
+      outputChannel.info("[results] cleared results, coverage and spec view");
+    }),
+
     vscode.commands.registerCommand(
       "gotest.copyTestResults",
       (item?: vscode.TestItem) =>
@@ -657,9 +678,15 @@ async function initializeAsync(deps: {
       resultRequest,
       "Restored Results",
     );
+    let applied = 0;
     testResultStore.forEach((result, itemId) => {
       const item = controller.findItem(itemId);
+      // A stored id with no item is a test that no longer exists, or one the
+      // tree cannot name yet. Counting only what landed keeps the log honest:
+      // reporting the store's size implies a restore that may not have
+      // happened.
       if (!item) return;
+      applied++;
       if (result.status === "pass") resultRun.passed(item, result.duration);
       else if (result.status === "fail")
         resultRun.failed(
@@ -672,7 +699,7 @@ async function initializeAsync(deps: {
     resolveAncestorItems(resultRun, controller);
     resultRun.end();
     outputChannel.info(
-      `[results] restored ${testResultStore.size} result(s) from storage`,
+      `[results] restored ${applied} of ${testResultStore.size} result(s) from storage`,
     );
   }
 }

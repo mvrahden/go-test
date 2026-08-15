@@ -29,18 +29,23 @@ const (
 )
 
 type Node struct {
-	Name      string
-	Display   string
-	Kind      NodeKind
-	Status    Status
-	Duration  time.Duration
-	Output    []string
-	Children  []*Node
-	Focused   bool
-	Excluded  bool
-	External  bool
-	Variant   int
-	duplicate bool
+	Name     string
+	Display  string
+	Kind     NodeKind
+	Status   Status
+	Duration time.Duration
+	Output   []string
+	Children []*Node
+	Focused  bool
+	Excluded bool
+	External bool
+	// Incomplete marks a node whose children are known not to be the whole
+	// list — a statically read method that declares behaviors whose names or
+	// existence depend on runtime values. A tree stream never sets it, because
+	// what ran is by definition all there was.
+	Incomplete bool
+	Variant    int
+	duplicate  bool
 }
 
 type Package struct {
@@ -225,6 +230,12 @@ func hasDuplicateSuffix(s string) bool {
 	return true
 }
 
+// StripDuplicateSuffix removes the "#01" the testing package appends to a
+// subtest whose name repeats among its siblings. The tree shows both under the
+// name the developer wrote, so a tree assembled from a source other than a test
+// stream has to drop the suffix the same way rather than inventing its own rule.
+func StripDuplicateSuffix(s string) string { return stripDuplicateSuffix(s) }
+
 func stripDuplicateSuffix(s string) string {
 	idx := strings.LastIndex(s, "#")
 	if idx <= 0 {
@@ -367,23 +378,7 @@ func classify(n *Node, topLevel bool) {
 // Go uses "/" as the subtest separator, but description strings may contain
 // "/" too (e.g. "https:// URI"). We treat consecutive slashes as literal
 // characters within a segment rather than multiple separators.
-func splitTestPath(path string) []string {
-	var segments []string
-	var cur strings.Builder
-	for i := 0; i < len(path); i++ {
-		if path[i] == '/' && (i+1 >= len(path) || path[i+1] != '/') &&
-			(i == 0 || path[i-1] != '/') {
-			segments = append(segments, cur.String())
-			cur.Reset()
-		} else {
-			cur.WriteByte(path[i])
-		}
-	}
-	if cur.Len() > 0 {
-		segments = append(segments, cur.String())
-	}
-	return segments
-}
+func splitTestPath(path string) []string { return protocol.SplitTestPath(path) }
 
 // failedOnItsOwn reports whether an interior node carries a verdict of its own:
 // a suite whose AfterAll failed, a test method that blew its configured
@@ -459,4 +454,15 @@ func statusFrom(a Action) Status {
 
 func elapsed(s float64) time.Duration {
 	return time.Duration(s * float64(time.Second))
+}
+
+// ClassifyRoots applies the tree's naming rules — kind, display text, focus and
+// exclusion prefixes — to nodes assembled from a source other than a test
+// stream. A statically derived tree must classify identically to an observed
+// one, so both go through this single implementation rather than duplicating
+// the rules.
+func ClassifyRoots(nodes []*Node) {
+	for _, n := range nodes {
+		classify(n, true)
+	}
 }

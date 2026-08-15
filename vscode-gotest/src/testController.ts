@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { DiscoverBehavior } from "./types.js";
 import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
 import { TestResultStore, type TestResult } from "./testResultStore.js";
@@ -11,6 +12,10 @@ export class GoTestController implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private coverageProfile: vscode.TestRunProfile | undefined;
   private dynamicOverflow = new Map<string, number>();
+  // Items created from run events rather than from source. Behavior ids no
+  // longer carry a marker segment — they are the go test path — so membership
+  // is tracked instead of inferred from the string.
+  private dynamicIds = new Set<string>();
 
   constructor(
     private readonly cache: DiscoveryCache,
@@ -403,32 +408,45 @@ export class GoTestController implements vscode.Disposable {
           method.excluded,
           method.parallel,
         );
+        // Deliberately not canResolveChildren: that tells VS Code a handler can
+        // fetch the missing children on demand, and they cannot be known
+        // without running the test. An expand arrow that resolves to nothing is
+        // a worse lie than a partial list. Say it in words instead.
+        this.addBehaviors(
+          methodItem,
+          method.behaviors ?? [],
+          methodUri,
+          method.behaviorsComplete === false,
+        );
         suiteItem.children.add(methodItem);
       }
 
       suiteItem.children.forEach((child) => {
-        if (!seenMethodIds.has(child.id) && !child.id.includes("/dynamic/")) {
+        if (!seenMethodIds.has(child.id) && !this.dynamicIds.has(child.id)) {
+          this.forgetDynamic(child);
           suiteItem.children.delete(child.id);
         }
       });
     }
 
     pkgItem.children.forEach((child) => {
-      if (!seenSuiteIds.has(child.id) && !child.id.includes("/dynamic/")) {
+      if (!seenSuiteIds.has(child.id) && !this.dynamicIds.has(child.id)) {
+        this.forgetDynamic(child);
         pkgItem.children.delete(child.id);
       }
     });
   }
 
   clearDynamicChildren(item: vscode.TestItem): void {
-    const toDelete: string[] = [];
+    const toDelete: vscode.TestItem[] = [];
     item.children.forEach((child) => {
-      if (child.id.includes("/dynamic/")) {
-        toDelete.push(child.id);
+      if (this.dynamicIds.has(child.id)) {
+        toDelete.push(child);
       }
     });
-    for (const id of toDelete) {
-      item.children.delete(id);
+    for (const child of toDelete) {
+      this.forgetDynamic(child);
+      item.children.delete(child.id);
     }
     if (this.dynamicOverflow.delete(item.id)) {
       item.description = undefined;
@@ -440,7 +458,10 @@ export class GoTestController implements vscode.Disposable {
     subtestPath: string,
     label: string,
   ): vscode.TestItem {
-    const id = `${parentItem.id}/dynamic/${subtestPath}`;
+    // The id is the go test path: one segment appended to the parent. A
+    // statically discovered behavior has the identical id, so an observed
+    // result lands on the declared item instead of creating a second one.
+    const id = `${parentItem.id}/${subtestPath}`;
     const existing = parentItem.children.get(id);
     if (existing) {
       return existing;
@@ -454,8 +475,73 @@ export class GoTestController implements vscode.Disposable {
     }
 
     const item = this.controller.createTestItem(id, label, parentItem.uri);
+    this.dynamicIds.add(id);
     parentItem.children.add(item);
     return item;
+  }
+
+  // addBehaviors builds the specification a method declares, so the tree shows
+  // behaviors before anything has run and the run counter has a real total.
+  private addBehaviors(
+    parent: vscode.TestItem,
+    behaviors: DiscoverBehavior[],
+    uri: vscode.Uri,
+    incomplete = false,
+  ): void {
+    const seen = new Set<string>();
+    // The same ceiling the runtime path uses. A table with thousands of rows
+    // would otherwise materialise thousands of tree items at discovery, before
+    // the developer has asked for anything — one policy for declared and
+    // observed behaviors rather than two.
+    const shown = behaviors.slice(0, GoTestController.MAX_DYNAMIC_SUBTESTS);
+    const hidden = behaviors.length - shown.length;
+    // Both truths fit in one description, and a method can hold both: a table
+    // longer than the ceiling whose rows also depend on runtime values. Setting
+    // them separately meant the second overwrote the first.
+    const notes: string[] = [];
+    if (hidden > 0) {
+      notes.push(`${behaviors.length} behaviors (${shown.length} shown)`);
+    }
+    if (incomplete) {
+      notes.push("+ behaviors known only at run time");
+    }
+    parent.description = notes.length > 0 ? notes.join(", ") : undefined;
+    for (const behavior of shown) {
+      const id = `${parent.id}/${behavior.name}`;
+      seen.add(id);
+      let item = parent.children.get(id);
+      if (!item) {
+        item = this.controller.createTestItem(id, behavior.display, uri);
+      }
+      // Source now claims this id, so it is no longer a run-time discovery:
+      // forgetting that would exempt it from pruning when it leaves the source.
+      this.dynamicIds.delete(id);
+      if (behavior.line > 0) {
+        item.range = new vscode.Range(
+          new vscode.Position(behavior.line - 1, 0),
+          new vscode.Position(behavior.line - 1, 0),
+        );
+      }
+      parent.children.add(item);
+      this.addBehaviors(item, behavior.children ?? [], uri);
+    }
+    // Behaviors that no longer exist in source go away; ones discovered at run
+    // time stay, because source never claimed them in the first place.
+    parent.children.forEach((child) => {
+      if (!seen.has(child.id) && !this.dynamicIds.has(child.id)) {
+        this.forgetDynamic(child);
+        parent.children.delete(child.id);
+      }
+    });
+  }
+
+  // forgetDynamic drops a deleted subtree from the dynamic registry. The set
+  // decides what survives pruning, so an id left in it after its item is gone
+  // would grant a later item of the same name an exemption it never earned.
+  private forgetDynamic(item: vscode.TestItem): void {
+    this.dynamicIds.delete(item.id);
+    this.dynamicOverflow.delete(item.id);
+    item.children.forEach((child) => this.forgetDynamic(child));
   }
 
   setCoverageDetailProvider(

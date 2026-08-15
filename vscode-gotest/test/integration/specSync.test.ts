@@ -312,6 +312,32 @@ describe("layer accumulation across refreshes", () => {
   });
 });
 
+describe("clearing drops the accumulated layers", () => {
+  // The panel keeps every run/coverage/watch layer and re-renders their
+  // concatenation. Clearing has to drop the layers, not just repaint, or the
+  // next refresh would resurrect what was cleared.
+  it("empties the panel and starts the next refresh from nothing", async () => {
+    const { panel, recorder } = newPanel();
+    await panel.show();
+
+    await panel.refresh(stream("mixed"), "run");
+    await panel.refresh(stream("other-package-fail"), "coverage");
+    expect(renderedHtml()).toContain("rejects an expired card");
+
+    panel.clear();
+    const cleared = renderedHtml();
+    expect(cleared).not.toContain("rejects an expired card");
+    expect(cleared).not.toContain("totals the basket");
+
+    // A later run shows only itself — the cleared layers are gone for good.
+    await panel.refresh(stream("all-pass"), "run");
+    const html = renderedHtml();
+    expect(recorder.errors).toEqual([]);
+    expect(html).toContain("2 passed");
+    expect(html).not.toContain("rejects an expired card");
+  });
+});
+
 describe("autoRefresh honours the user's setting", () => {
   it("does not repaint the panel when autoRefresh is off", async () => {
     const { panel, recorder } = newPanel();

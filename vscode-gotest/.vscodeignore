@@ -5,6 +5,7 @@ scripts/**
 node_modules/**
 docs/**
 tsconfig.json
+tsconfig.test.json
 esbuild.config.mjs
 vitest.config.ts
 vitest.integration.config.ts

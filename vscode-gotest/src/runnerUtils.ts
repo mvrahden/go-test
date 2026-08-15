@@ -161,12 +161,39 @@ export function expandToPackages(items: vscode.TestItem[]): vscode.TestItem[] {
   return result.length > 0 ? result : items;
 }
 
+// splitTestPath cuts a go test name into its subtest levels. A single slash
+// separates levels, but a run of them does not: `t.When("https:// URI")` is one
+// subtest whose name happens to contain slashes, and go test reports it that
+// way. Splitting on every slash invented two levels that no run ever produced,
+// so an observed result landed beside its declared behavior instead of on it.
+// The CLI applies the identical rule on both sides of the boundary.
+function splitTestPath(path: string): string[] {
+  const segments: string[] = [];
+  let cur = "";
+  for (let i = 0; i < path.length; i++) {
+    const isSeparator =
+      path[i] === "/" &&
+      (i + 1 >= path.length || path[i + 1] !== "/") &&
+      (i === 0 || path[i - 1] !== "/");
+    if (isSeparator) {
+      segments.push(cur);
+      cur = "";
+    } else {
+      cur += path[i];
+    }
+  }
+  if (cur.length > 0) {
+    segments.push(cur);
+  }
+  return segments;
+}
+
 export function resolveTestItem(
   controller: GoTestController,
   testPath: string,
   importPath: string,
 ): vscode.TestItem | undefined {
-  const segments = testPath.split("/");
+  const segments = splitTestPath(testPath);
   if (segments.length === 0) {
     return undefined;
   }
@@ -199,13 +226,11 @@ export function resolveTestItem(
 
   let parentItem = methodItem;
   for (let i = 2; i < segments.length; i++) {
-    const subtestLabel = segments[i];
-    const subtestPath = segments.slice(2, i + 1).join("/");
-    parentItem = controller.createDynamicSubtest(
-      parentItem,
-      subtestPath,
-      subtestLabel,
-    );
+    const segment = segments[i];
+    // One segment per level: the id is the go test path, which is also what a
+    // statically declared behavior uses. createDynamicSubtest returns the
+    // declared item when there is one and only fabricates when there is not.
+    parentItem = controller.createDynamicSubtest(parentItem, segment, segment);
   }
 
   return parentItem;
@@ -490,7 +515,11 @@ export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
       let current = item;
       const subtestParts: string[] = [];
       while (getPackageDepth(current) > 2) {
-        subtestParts.unshift(current.label);
+        // The id segment, not the label: a behavior is labelled with the text
+        // the developer wrote ("classifying a number") while go test knows it
+        // by its rewritten name ("classifying_a_number"). Filtering on the
+        // label would never match.
+        subtestParts.unshift(subtestSegmentOf(current));
         current = current.parent!;
       }
       const methodName = current.label;
@@ -501,7 +530,9 @@ export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
         suiteGroups.set(suiteName, group);
       }
       group.subtests.push(
-        `^Test${suiteName}$/^${methodName}$/^${subtestParts.join("/")}$`,
+        `^Test${suiteName}$/^${methodName}$/^${subtestParts
+          .map(escapeRunPattern)
+          .join("/")}$`,
       );
     }
   }
@@ -742,4 +773,22 @@ function resolveItemRecursive(
   }
 
   return { anyFailed, anyResolved };
+}
+
+// subtestSegmentOf returns the single go test path segment an item adds to its
+// parent. Ids are the test path, so the segment is what follows the parent's id.
+function subtestSegmentOf(item: vscode.TestItem): string {
+  const parentId = item.parent?.id;
+  if (parentId && item.id.startsWith(parentId + "/")) {
+    return item.id.slice(parentId.length + 1);
+  }
+  return item.label;
+}
+
+// escapeRunPattern quotes regex metacharacters in a subtest name. Behavior
+// descriptions are prose — "handles (nested) values" is an ordinary thing to
+// write — and go test's -run is a regular expression, so the name has to be
+// matched literally rather than interpreted.
+function escapeRunPattern(segment: string): string {
+  return segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

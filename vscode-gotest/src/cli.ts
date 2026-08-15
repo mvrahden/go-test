@@ -100,25 +100,32 @@ export async function buildCliCommand(
     }
   }
 
-  // 3–4. Project-pinned version from go.mod
+  // 3. Replace directive → go run without version (respects go.mod resolution)
+  //
+  // Checked before the version gate on purpose. A replace directive redirects
+  // the module to local source, and the require version beside it is
+  // conventionally a placeholder (v0.0.0-00010101000000-000000000000) that says
+  // nothing about the code that will actually run. Gating on it rejects the
+  // developer's own working tree and silently downloads a release instead.
+  if (effectiveDir && !modulePath.includes("@")) {
+    if (await hasReplaceDirective(effectiveDir, modulePath)) {
+      const goBin = await resolveGoBinary(log, workspaceDir);
+      log?.debug(
+        `[cli] go.mod has replace directive: ${goBin} run ${modulePath}`,
+      );
+      return {
+        bin: goBin,
+        args: ["run", modulePath, ...subcommandArgs],
+      };
+    }
+  }
+
+  // 4. Project-pinned version from go.mod
   if (effectiveDir && !modulePath.includes("@")) {
     const version = await extractVersionFromGoMod(effectiveDir, modulePath);
     if (version !== "latest") {
       if (compareVersions(version, MIN_CLI_VERSION) >= 0) {
         const goBin = await resolveGoBinary(log, workspaceDir);
-
-        // 3. Replace directive → go run without version (respects go.mod resolution)
-        if (await hasReplaceDirective(effectiveDir, modulePath)) {
-          log?.debug(
-            `[cli] go.mod has replace directive: ${goBin} run ${modulePath}`,
-          );
-          return {
-            bin: goBin,
-            args: ["run", modulePath, ...subcommandArgs],
-          };
-        }
-
-        // 4. Pinned version → go run module@version
         const qualified = `${modulePath}@${version}`;
         log?.debug(`[cli] using go.mod: ${goBin} run ${qualified}`);
         return {

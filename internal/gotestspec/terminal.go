@@ -23,9 +23,10 @@ var ansiColors = colors{
 var noColors = colors{}
 
 type renderConfig struct {
-	color    bool
-	coverage *CoverageReport
-	elapsed  time.Duration
+	color           bool
+	coverage        *CoverageReport
+	elapsed         time.Duration
+	withoutVerdicts bool
 }
 
 type RenderOption func(*renderConfig)
@@ -40,6 +41,14 @@ func WithCoverage(report *CoverageReport) RenderOption {
 
 func WithElapsed(d time.Duration) RenderOption {
 	return func(c *renderConfig) { c.elapsed = d }
+}
+
+// WithoutVerdicts renders the tree as a specification rather than as a result:
+// no status glyph and no duration. A statically derived spec has executed
+// nothing, so showing "?" beside every behavior would invite the reader to
+// think a verdict was expected and missing.
+func WithoutVerdicts() RenderOption {
+	return func(c *renderConfig) { c.withoutVerdicts = true }
 }
 
 func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
@@ -63,7 +72,7 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
 			fmt.Fprintln(w)
 		}
 		for _, node := range pkg.Nodes {
-			renderNode(w, node, 0, &c)
+			renderNode(w, node, 0, &c, cfg.withoutVerdicts)
 		}
 		// A verdict that sits on the package itself — a build failure, a death
 		// outside any test — has no node to render it; it must still show
@@ -84,7 +93,23 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
 	renderSummary(w, stats, c)
 }
 
-func renderNode(w io.Writer, n *Node, depth int, c *colors) {
+// bareSuffix annotates a node in a tree that has not run. Exclusion is a
+// property of the declaration, so it is worth stating; "SKIPPED" is not, because
+// nothing was there to skip. Incompleteness is stated for the same reason the
+// walker records it: a partial list that presents itself as whole is worse than
+// no list at all.
+func bareSuffix(n *Node) string {
+	suffix := ""
+	if n.Excluded {
+		suffix += " — EXCLUDED"
+	}
+	if n.Incomplete {
+		suffix += " — INCOMPLETE: behaviors known only at run time"
+	}
+	return suffix
+}
+
+func renderNode(w io.Writer, n *Node, depth int, c *colors, bare bool) {
 	indent := strings.Repeat("  ", depth)
 	isLeaf := len(n.Children) == 0
 
@@ -95,6 +120,11 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors) {
 		suffix := ""
 		if n.Excluded || n.Status == StatusSkip {
 			suffix = " — SKIPPED"
+		}
+
+		if bare {
+			fmt.Fprintf(w, "%s%s%s\n", indent, n.Display, bareSuffix(n))
+			return
 		}
 
 		fmt.Fprintf(w, "%s%s%s%s %s%s %s(%s)%s\n",
@@ -123,6 +153,16 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors) {
 		suffix = fmt.Sprintf(" %s— SKIPPED%s", c.yellow, c.reset)
 	}
 
+	if bare {
+		// Nothing ran, so the container says what it is rather than what
+		// happened to it, and it says when its children are not the whole list.
+		fmt.Fprintf(w, "%s%s%s\n", indent, label, bareSuffix(n))
+		for _, child := range n.Children {
+			renderNode(w, child, depth+1, c, bare)
+		}
+		return
+	}
+
 	// A node that failed on its own account must show a mark even when it left
 	// no output — a bare t.Fail() otherwise renders as a green line beside a
 	// red exit code.
@@ -143,7 +183,7 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors) {
 	}
 
 	for _, child := range n.Children {
-		renderNode(w, child, depth+1, c)
+		renderNode(w, child, depth+1, c, bare)
 	}
 }
 
@@ -242,5 +282,11 @@ func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hu
 		counts = append(counts, "0 suites")
 	}
 
+	if len(parts) == 0 {
+		// A spec that has not run has counts but no verdicts. Printing the
+		// colon anyway reads as a line that lost its tail.
+		fmt.Fprintf(w, "%s\n", strings.Join(counts, ", "))
+		return
+	}
 	fmt.Fprintf(w, "%s: %s\n", strings.Join(counts, ", "), strings.Join(parts, ", "))
 }

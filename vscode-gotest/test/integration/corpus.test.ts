@@ -118,6 +118,31 @@ const FIXTURES: Record<string, Expectation> = {
     mustNotContain: ["<script>alert", "<img src=x onerror"],
   },
   jsonish: { status: "pass", passed: 2, failed: 0, skipped: 0 },
+  // Behaviors guarded by a condition: readable only by running. The walker
+  // reports the method incomplete rather than passing off what it can see as
+  // the whole specification.
+  runtimebehaviors: { status: "pass", passed: 2, failed: 0, skipped: 0 },
+  // Descriptions carrying every regex metacharacter in Go's QuoteMeta set, so
+  // that addressing one exercises the -run escaping rather than a happy-path
+  // name. The slash case is included because -run splits on "/" before
+  // compiling, which escaping cannot influence either way.
+  metachars: {
+    status: "pass",
+    passed: 6,
+    failed: 0,
+    skipped: 0,
+    mustContain: ["a description has {braces}", "handles https:// URIs"],
+  },
+  // Descriptions that repeat among their siblings, and descriptions carrying a
+  // single slash. go test numbers the one and nests the other, and discovery
+  // has to predict both or the declared item and the observed one are two.
+  duplicates: {
+    status: "pass",
+    passed: 5,
+    failed: 0,
+    skipped: 0,
+    mustContain: ["names the first", "names the third", "shares it too"],
+  },
   bigoutput: { status: "pass", passed: 2, failed: 0, skipped: 0 },
   unicode: {
     status: "fail",

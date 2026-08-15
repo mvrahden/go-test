@@ -144,6 +144,7 @@ Projects using `go.work` are also supported.
 | Go Test: Scaffold Target | Generate a test suite for a specific target |
 | Go Test: Copy Coverage Summary | Copy coverage table to clipboard |
 | Go Test: Copy Test Results | Copy test results to clipboard (also available as context menu on test items) |
+| Go Test: Clear Results | Forget stored results, coverage and spec output, so a window reload does not restore them. The Test Explorer's own "Clear all results" only empties VS Code's in-memory view; clearing the icons in the tree is still its job, because no stable API lets an extension retract them. |
 
 ## Settings
 
