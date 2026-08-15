@@ -26,6 +26,14 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	noColor := hasFlag(ownArgs, "--no-color")
 	renderOnly := hasFlag(ownArgs, "--render-only")
 
+	if hasFlag(ownArgs, "--static") && input != "" {
+		// One asks for the specification in the source, the other for the
+		// specification in a recorded run. Silently honouring --input would
+		// hand back a tree the caller did not ask for.
+		fmt.Fprintf(os.Stderr, "FAIL: --static and --input are mutually exclusive\n")
+		return 2
+	}
+
 	if renderOnly && input == "" {
 		// Suppressing the verdict of a real run would turn a red pipeline
 		// green. The flag only makes sense where the exit code describes a

@@ -45,6 +45,11 @@ func buildStaticSpec(loadResults []*gotestgen.LoadResult, broken []gotestgen.Bro
 			}
 			result := collector.CollectSuiteSpecs(pkg)
 			if len(result.Errs) > 0 {
+				// Dropping the package silently would present "no suites here"
+				// as a fact about the source rather than about the reader.
+				for _, e := range result.Errs {
+					notes = append(notes, fmt.Sprintf("%s: %s", pkg.PkgPath, e.Err))
+				}
 				continue
 			}
 			for _, suite := range result.Suites {
@@ -84,6 +89,10 @@ func staticSuiteNode(suite *gotestast.TestSuiteSpec) (*gotestspec.Node, []string
 		spec := suite.BehaviorsOf(method)
 		methodNode.Children = staticBehaviorNodes(spec.Behaviors)
 		if !spec.Complete {
+			// Carried on the node, not only on stderr: a spec written to a file
+			// or piped as JSON has to state its own limits, or the reader has
+			// no way to know the list is a floor.
+			methodNode.Incomplete = true
 			for _, note := range spec.Notes {
 				notes = append(notes, suite.Identifier()+"."+methodName+": "+note)
 			}
@@ -97,7 +106,11 @@ func staticSuiteNode(suite *gotestast.TestSuiteSpec) (*gotestspec.Node, []string
 func staticBehaviorNodes(behaviors []*gotestast.Behavior) []*gotestspec.Node {
 	var out []*gotestspec.Node
 	for _, b := range behaviors {
-		node := &gotestspec.Node{Name: b.Name}
+		// The behavior carries the exact go test segment, "#01" and all,
+		// because that is what an observed result is keyed by. The tree shows
+		// duplicates under the name the developer wrote, so it drops the
+		// suffix here exactly as the stream parser does.
+		node := &gotestspec.Node{Name: gotestspec.StripDuplicateSuffix(b.Name)}
 		node.Children = staticBehaviorNodes(b.Children)
 		out = append(out, node)
 	}
@@ -144,7 +157,7 @@ func runStaticSpec(ownArgs, goTestArgs []string, projectConfig *config.ProjectCo
 
 	switch format {
 	case "md", "markdown":
-		gotestspec.RenderMarkdown(w, tree)
+		gotestspec.RenderMarkdown(w, tree, renderOpts...)
 	case "json":
 		gotestspec.RenderJSON(w, tree)
 	default:

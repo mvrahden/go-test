@@ -6,7 +6,11 @@ import (
 	"strings"
 )
 
-func RenderMarkdown(w io.Writer, packages []*Package) {
+func RenderMarkdown(w io.Writer, packages []*Package, opts ...RenderOption) {
+	cfg := renderConfig{color: true}
+	for _, o := range opts {
+		o(&cfg)
+	}
 	stats := CollectStats(packages)
 
 	fmt.Fprintln(w, "# Behavior Specification")
@@ -21,22 +25,65 @@ func RenderMarkdown(w io.Writer, packages []*Package) {
 	if stats.Tests > 0 {
 		counts = append(counts, fmt.Sprintf("%d stdlib tests", stats.Tests))
 	}
-	fmt.Fprintf(w, "%s: %d passed, %d failed, %d skipped.\n",
-		strings.Join(counts, ", "), stats.Passed, stats.Failed, stats.Skipped)
+	if cfg.withoutVerdicts {
+		// "0 passed, 0 failed, 0 skipped" beside a document nothing ran reads
+		// as a run that lost its results, rather than as a specification.
+		fmt.Fprintf(w, "%s. Read from source; nothing was executed.\n", strings.Join(counts, ", "))
+	} else {
+		fmt.Fprintf(w, "%s: %d passed, %d failed, %d skipped.\n",
+			strings.Join(counts, ", "), stats.Passed, stats.Failed, stats.Skipped)
+	}
 	fmt.Fprintln(w)
 
 	for _, pkg := range packages {
 		for _, node := range pkg.Nodes {
-			renderMarkdownNode(w, node, 2)
+			renderMarkdownNode(w, node, 2, cfg.withoutVerdicts)
 		}
 	}
 }
 
-func renderMarkdownNode(w io.Writer, n *Node, headingLevel int) {
+const incompleteNote = "this method declares further behaviors whose names or existence depend on runtime values"
+
+// markdownRow renders one behavior row. A specification carries no Status or
+// Duration column, because a document that prints "<1ms" beside a behavior
+// nothing ran is stating a measurement that was never taken.
+func markdownRow(w io.Writer, indent, display string, n *Node, bare bool) {
+	if n.Incomplete {
+		// A method with no behaviors to tabulate is rendered as a row of its
+		// suite's table. Without the marker it reads as a behavior that simply
+		// has nothing beneath it.
+		display += " — _incomplete: behaviors known only at run time_"
+	}
+	if bare {
+		fmt.Fprintf(w, "| %s%s |\n", indent, display)
+		return
+	}
+	fmt.Fprintf(w, "| %s%s | %s | %s |\n", indent, display, statusText(n.Status), formatDuration(n.Duration))
+}
+
+func markdownHeader(w io.Writer, bare bool) {
+	if bare {
+		fmt.Fprintln(w, "| Behavior |")
+		fmt.Fprintln(w, "|----------|")
+		return
+	}
+	fmt.Fprintln(w, "| Behavior | Status | Duration |")
+	fmt.Fprintln(w, "|----------|--------|----------|")
+}
+
+// markdownNote states what a heading cannot: that the behaviors listed under it
+// are a floor rather than the whole list.
+func markdownNote(w io.Writer, n *Node) {
+	if n.Incomplete {
+		fmt.Fprintf(w, "_Incomplete: %s._\n\n", incompleteNote)
+	}
+}
+
+func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 	switch n.Kind {
 	case KindFixture:
 		for _, child := range n.Children {
-			renderMarkdownNode(w, child, headingLevel)
+			renderMarkdownNode(w, child, headingLevel, bare)
 		}
 
 	case KindSuite:
@@ -64,46 +111,58 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int) {
 		}
 
 		if len(leafChildren) > 0 {
-			fmt.Fprintln(w, "| Behavior | Status | Duration |")
-			fmt.Fprintln(w, "|----------|--------|----------|")
+			markdownHeader(w, bare)
 			for _, c := range leafChildren {
-				fmt.Fprintf(w, "| %s | %s | %s |\n",
-					c.Display, statusText(c.Status), formatDuration(c.Duration))
+				markdownRow(w, "", c.Display, c, bare)
 			}
 			fmt.Fprintln(w)
 		}
 
 		for _, c := range nestedChildren {
-			renderMarkdownNode(w, c, headingLevel+1)
+			renderMarkdownNode(w, c, headingLevel+1, bare)
 		}
 
 	case KindMethod, KindTest:
+		heading := strings.Repeat("#", headingLevel)
 		if len(n.Children) == 0 {
+			// A method whose every behavior is runtime-dependent has nothing to
+			// tabulate, but dropping it would delete a declared method from the
+			// specification without saying so.
+			if n.Incomplete {
+				fmt.Fprintf(w, "%s %s\n\n", heading, n.Display)
+				markdownNote(w, n)
+			}
 			return
 		}
-		heading := strings.Repeat("#", headingLevel)
 		fmt.Fprintf(w, "%s %s\n\n", heading, n.Display)
-		fmt.Fprintln(w, "| Behavior | Status | Duration |")
-		fmt.Fprintln(w, "|----------|--------|----------|")
-		renderMarkdownTable(w, n.Children, 0)
+		markdownNote(w, n)
+		markdownHeader(w, bare)
+		renderMarkdownTable(w, n.Children, 0, bare)
 		fmt.Fprintln(w)
 
 	default:
 		if len(n.Children) == 0 {
+			if bare {
+				fmt.Fprintf(w, "- %s\n", n.Display)
+				return
+			}
 			fmt.Fprintf(w, "- %s %s (%s)\n", statusText(n.Status), n.Display, formatDuration(n.Duration))
 		}
 	}
 }
 
-func renderMarkdownTable(w io.Writer, nodes []*Node, depth int) {
+func renderMarkdownTable(w io.Writer, nodes []*Node, depth int, bare bool) {
 	indent := strings.Repeat("&nbsp;&nbsp;", depth)
 	for _, n := range nodes {
 		if len(n.Children) > 0 {
-			fmt.Fprintf(w, "| %s**%s** | | |\n", indent, n.Display)
-			renderMarkdownTable(w, n.Children, depth+1)
+			if bare {
+				fmt.Fprintf(w, "| %s**%s** |\n", indent, n.Display)
+			} else {
+				fmt.Fprintf(w, "| %s**%s** | | |\n", indent, n.Display)
+			}
+			renderMarkdownTable(w, n.Children, depth+1, bare)
 		} else {
-			fmt.Fprintf(w, "| %s%s | %s | %s |\n",
-				indent, n.Display, statusText(n.Status), formatDuration(n.Duration))
+			markdownRow(w, indent, n.Display, n, bare)
 		}
 	}
 }

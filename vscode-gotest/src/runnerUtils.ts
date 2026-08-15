@@ -161,12 +161,39 @@ export function expandToPackages(items: vscode.TestItem[]): vscode.TestItem[] {
   return result.length > 0 ? result : items;
 }
 
+// splitTestPath cuts a go test name into its subtest levels. A single slash
+// separates levels, but a run of them does not: `t.When("https:// URI")` is one
+// subtest whose name happens to contain slashes, and go test reports it that
+// way. Splitting on every slash invented two levels that no run ever produced,
+// so an observed result landed beside its declared behavior instead of on it.
+// The CLI applies the identical rule on both sides of the boundary.
+function splitTestPath(path: string): string[] {
+  const segments: string[] = [];
+  let cur = "";
+  for (let i = 0; i < path.length; i++) {
+    const isSeparator =
+      path[i] === "/" &&
+      (i + 1 >= path.length || path[i + 1] !== "/") &&
+      (i === 0 || path[i - 1] !== "/");
+    if (isSeparator) {
+      segments.push(cur);
+      cur = "";
+    } else {
+      cur += path[i];
+    }
+  }
+  if (cur.length > 0) {
+    segments.push(cur);
+  }
+  return segments;
+}
+
 export function resolveTestItem(
   controller: GoTestController,
   testPath: string,
   importPath: string,
 ): vscode.TestItem | undefined {
-  const segments = testPath.split("/");
+  const segments = splitTestPath(testPath);
   if (segments.length === 0) {
     return undefined;
   }
