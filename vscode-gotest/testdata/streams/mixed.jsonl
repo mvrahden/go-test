@@ -1,0 +1,8 @@
+{"Action":"run","Package":"example.com/cart","Test":"TestCartTestSuite"}
+{"Action":"run","Package":"example.com/cart","Test":"TestCartTestSuite/adds_an_item"}
+{"Action":"pass","Package":"example.com/cart","Test":"TestCartTestSuite/adds_an_item","Elapsed":0.01}
+{"Action":"run","Package":"example.com/cart","Test":"TestCartTestSuite/totals_the_basket"}
+{"Action":"output","Package":"example.com/cart","Test":"TestCartTestSuite/totals_the_basket","Output":"    cart_test.go:42: expected 300, got 250\n"}
+{"Action":"fail","Package":"example.com/cart","Test":"TestCartTestSuite/totals_the_basket","Elapsed":0.02}
+{"Action":"fail","Package":"example.com/cart","Test":"TestCartTestSuite","Elapsed":0.03}
+{"Action":"fail","Package":"example.com/cart","Elapsed":0.04}

@@ -1,0 +1,6 @@
+{"Action":"run","Package":"example.com/checkout","Test":"TestCheckoutTestSuite"}
+{"Action":"run","Package":"example.com/checkout","Test":"TestCheckoutTestSuite/rejects_an_expired_card"}
+{"Action":"output","Package":"example.com/checkout","Test":"TestCheckoutTestSuite/rejects_an_expired_card","Output":"    checkout_test.go:31: expected rejection\n"}
+{"Action":"fail","Package":"example.com/checkout","Test":"TestCheckoutTestSuite/rejects_an_expired_card","Elapsed":0.05}
+{"Action":"fail","Package":"example.com/checkout","Test":"TestCheckoutTestSuite","Elapsed":0.06}
+{"Action":"fail","Package":"example.com/checkout","Elapsed":0.07}

@@ -1,0 +1,6 @@
+{"Action":"run","Package":"example.com/cart","Test":"TestCartTestSuite"}
+{"Action":"run","Package":"example.com/cart","Test":"TestCartTestSuite/adds_an_item"}
+{"Action":"output","Package":"example.com/cart","Test":"TestCartTestSuite/adds_an_item","Output":"    cart_test.go:17: not implemented yet\n"}
+{"Action":"skip","Package":"example.com/cart","Test":"TestCartTestSuite/adds_an_item","Elapsed":0}
+{"Action":"pass","Package":"example.com/cart","Test":"TestCartTestSuite","Elapsed":0.01}
+{"Action":"pass","Package":"example.com/cart","Elapsed":0.02}

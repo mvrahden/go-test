@@ -1,0 +1,65 @@
+name: contract
+
+# Guards the interface between the CLI and the VS Code extension that consumes
+# it. This workflow exists because `test.yml` ignores vscode-gotest/** and
+# `extension.yml` only fires on vscode-gotest/**, so a change to the CLI has
+# never run the consumer's tests. A spec-view regression shipped through
+# exactly that gap: the commit that changed `spec --input`'s exit rule touched
+# no extension file, so the extension suite never ran on it.
+#
+# Trigger scope is the point of this file. Keep the CLI paths listed here.
+
+on:
+  pull_request:
+    paths:
+      - cmd/**
+      - internal/**
+      - pkg/**
+      - go.mod
+      - go.sum
+      - vscode-gotest/**
+      - .github/workflows/contract.yml
+  push:
+    branches: [main]
+    paths:
+      - cmd/**
+      - internal/**
+      - pkg/**
+      - go.mod
+      - go.sum
+      - vscode-gotest/**
+      - .github/workflows/contract.yml
+
+concurrency:
+  group: contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vscode-gotest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: vscode-gotest/package-lock.json
+      - run: npm ci
+
+      # Re-record first, then assert meaning, then assert the recording did not
+      # move. Running the tests before the diff check means a genuine behaviour
+      # change reports what broke, not just that a file differs.
+      - name: Record the CLI contract
+        run: npm run contract:record
+      - name: Assert the recorded contract still means what we expect
+        run: npm test
+      - name: Fail on undeclared contract drift
+        run: npm run contract:verify
+      - name: Cross the process boundary for real
+        run: npm run test:integration

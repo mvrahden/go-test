@@ -236,10 +236,14 @@
   "scripts": {
     "compile": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "test": "vitest run",
-    "format": "prettier --write 'src/**/*.ts'",
-    "format:check": "prettier --check 'src/**/*.ts'",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "contract:record": "node scripts/record-cli-contract.mjs",
+    "contract:verify": "git diff --exit-code -- testdata/cli-contract.json",
+    "contract:check": "npm run contract:record && npm run contract:verify",
+    "format": "prettier --write 'src/**/*.ts' 'test/**/*.ts' 'scripts/**/*.mjs'",
+    "format:check": "prettier --check 'src/**/*.ts' 'test/**/*.ts' 'scripts/**/*.mjs'",
     "vscode:prepublish": "node esbuild.config.mjs",
     "package": "vsce package"
   },
