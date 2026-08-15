@@ -136,7 +136,8 @@ func runStaticSpec(ownArgs, goTestArgs []string, projectConfig *config.ProjectCo
 		w = f
 	}
 
-	var renderOpts []gotestspec.RenderOption
+	// Nothing ran, so nothing has a verdict or a duration to show.
+	renderOpts := []gotestspec.RenderOption{gotestspec.WithoutVerdicts()}
 	if noColor {
 		renderOpts = append(renderOpts, gotestspec.WithNoColor())
 	}

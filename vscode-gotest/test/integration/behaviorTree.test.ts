@@ -30,7 +30,7 @@ import { DiscoveryCache, DiscoveryService } from "../../src/discovery.js";
 import { GoTestController } from "../../src/testController.js";
 import { TestResultStore } from "../../src/testResultStore.js";
 import { executeBatch } from "../../src/batchRunner.js";
-import { enqueueDescendants } from "../../src/runnerUtils.js";
+import { enqueueDescendants, buildRunFilter } from "../../src/runnerUtils.js";
 import { createRecordingChannel } from "./vscodeStub.js";
 import { FakeTestRun, FakeTestController } from "./vscodeTestApi.js";
 
@@ -206,5 +206,46 @@ describe("the run counter has its total up front", () => {
     expect(idsUnder(pkg("table")).some((id) => id.includes("/dynamic/"))).toBe(
       false,
     );
+  }, 300_000);
+});
+
+describe("a single behavior can be run on its own", () => {
+  // The payoff of declaring behaviors up front: a developer can run one row of
+  // a table without running the other nineteen. The filter has to speak go
+  // test's language — the rewritten subtest name, not the prose label.
+  it("filters the run down to exactly the selected behavior", async () => {
+    const behaviorId = `${pkg("table")}/TableTestSuite/TestClassify/classifying_a_number/negative`;
+    const behavior = controller.findItem(behaviorId)!;
+    expect(behavior.label).toBe("negative");
+
+    const filter = buildRunFilter([behavior]);
+    expect(filter).toBe(
+      "^TestTableTestSuite$/^TestClassify$/^classifying_a_number/negative$",
+    );
+
+    const run = new FakeTestRun();
+    await executeBatch({
+      pkgInfos: [
+        {
+          importPath: pkg("table"),
+          items: [behavior] as never,
+          dir: path.join(fixturesDir, "table"),
+        },
+      ],
+      filter,
+      workspaceDir: fixturesDir,
+      testFlags: [],
+      run: run as never,
+      token: token as never,
+      controller,
+      outputChannel: createRecordingChannel().channel as never,
+      label: "one-behavior",
+    });
+
+    const passed = run.verdictsMatching("passed");
+    expect(passed).toContain(behaviorId);
+    // The siblings were not run, which is the entire point of the filter.
+    expect(passed.some((id) => id.endsWith("/zero"))).toBe(false);
+    expect(passed.some((id) => id.endsWith("/positive"))).toBe(false);
   }, 300_000);
 });

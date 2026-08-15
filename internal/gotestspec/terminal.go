@@ -23,9 +23,10 @@ var ansiColors = colors{
 var noColors = colors{}
 
 type renderConfig struct {
-	color    bool
-	coverage *CoverageReport
-	elapsed  time.Duration
+	color           bool
+	coverage        *CoverageReport
+	elapsed         time.Duration
+	withoutVerdicts bool
 }
 
 type RenderOption func(*renderConfig)
@@ -40,6 +41,14 @@ func WithCoverage(report *CoverageReport) RenderOption {
 
 func WithElapsed(d time.Duration) RenderOption {
 	return func(c *renderConfig) { c.elapsed = d }
+}
+
+// WithoutVerdicts renders the tree as a specification rather than as a result:
+// no status glyph and no duration. A statically derived spec has executed
+// nothing, so showing "?" beside every behavior would invite the reader to
+// think a verdict was expected and missing.
+func WithoutVerdicts() RenderOption {
+	return func(c *renderConfig) { c.withoutVerdicts = true }
 }
 
 func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
@@ -63,7 +72,7 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
 			fmt.Fprintln(w)
 		}
 		for _, node := range pkg.Nodes {
-			renderNode(w, node, 0, &c)
+			renderNode(w, node, 0, &c, cfg.withoutVerdicts)
 		}
 		// A verdict that sits on the package itself — a build failure, a death
 		// outside any test — has no node to render it; it must still show
@@ -84,7 +93,7 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
 	renderSummary(w, stats, c)
 }
 
-func renderNode(w io.Writer, n *Node, depth int, c *colors) {
+func renderNode(w io.Writer, n *Node, depth int, c *colors, bare bool) {
 	indent := strings.Repeat("  ", depth)
 	isLeaf := len(n.Children) == 0
 
@@ -95,6 +104,15 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors) {
 		suffix := ""
 		if n.Excluded || n.Status == StatusSkip {
 			suffix = " — SKIPPED"
+		}
+
+		if bare {
+			suffix = ""
+			if n.Excluded {
+				suffix = " — EXCLUDED"
+			}
+			fmt.Fprintf(w, "%s%s%s\n", indent, n.Display, suffix)
+			return
 		}
 
 		fmt.Fprintf(w, "%s%s%s%s %s%s %s(%s)%s\n",
@@ -143,7 +161,7 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors) {
 	}
 
 	for _, child := range n.Children {
-		renderNode(w, child, depth+1, c)
+		renderNode(w, child, depth+1, c, bare)
 	}
 }
 

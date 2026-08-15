@@ -7,11 +7,17 @@
 export class FakeTestItemCollection {
   private items = new Map<string, FakeTestItem>();
 
+  // The real API sets `parent` when an item joins a collection, and code that
+  // walks up the tree (run filters, package depth) depends on it. Without the
+  // owner link the double silently reports every item as parentless.
+  constructor(private readonly owner?: FakeTestItem) {}
+
   get size(): number {
     return this.items.size;
   }
 
   add(item: FakeTestItem): void {
+    item.parent = this.owner;
     this.items.set(item.id, item);
   }
 
@@ -25,7 +31,10 @@ export class FakeTestItemCollection {
 
   replace(items: FakeTestItem[]): void {
     this.items.clear();
-    for (const item of items) this.items.set(item.id, item);
+    for (const item of items) {
+      item.parent = this.owner;
+      this.items.set(item.id, item);
+    }
   }
 
   forEach(callback: (item: FakeTestItem) => void): void {
@@ -38,7 +47,7 @@ export class FakeTestItemCollection {
 }
 
 export class FakeTestItem {
-  children = new FakeTestItemCollection();
+  children: FakeTestItemCollection = new FakeTestItemCollection(this);
   parent: FakeTestItem | undefined;
   range: unknown;
   tags: unknown[] = [];

@@ -488,7 +488,11 @@ export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
       let current = item;
       const subtestParts: string[] = [];
       while (getPackageDepth(current) > 2) {
-        subtestParts.unshift(current.label);
+        // The id segment, not the label: a behavior is labelled with the text
+        // the developer wrote ("classifying a number") while go test knows it
+        // by its rewritten name ("classifying_a_number"). Filtering on the
+        // label would never match.
+        subtestParts.unshift(subtestSegmentOf(current));
         current = current.parent!;
       }
       const methodName = current.label;
@@ -499,7 +503,9 @@ export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
         suiteGroups.set(suiteName, group);
       }
       group.subtests.push(
-        `^Test${suiteName}$/^${methodName}$/^${subtestParts.join("/")}$`,
+        `^Test${suiteName}$/^${methodName}$/^${subtestParts
+          .map(escapeRunPattern)
+          .join("/")}$`,
       );
     }
   }
@@ -740,4 +746,22 @@ function resolveItemRecursive(
   }
 
   return { anyFailed, anyResolved };
+}
+
+// subtestSegmentOf returns the single go test path segment an item adds to its
+// parent. Ids are the test path, so the segment is what follows the parent's id.
+function subtestSegmentOf(item: vscode.TestItem): string {
+  const parentId = item.parent?.id;
+  if (parentId && item.id.startsWith(parentId + "/")) {
+    return item.id.slice(parentId.length + 1);
+  }
+  return item.label;
+}
+
+// escapeRunPattern quotes regex metacharacters in a subtest name. Behavior
+// descriptions are prose — "handles (nested) values" is an ordinary thing to
+// write — and go test's -run is a regular expression, so the name has to be
+// matched literally rather than interpreted.
+function escapeRunPattern(segment: string): string {
+  return segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
