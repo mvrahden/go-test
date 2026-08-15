@@ -21,8 +21,8 @@ type FuzzTarget struct {
 	FuncName     string
 	ParamType    types.Type
 	ParamTypeStr string   // Go-syntax form of ParamType, relative to the target package
-	Fuzzable     bool     // gotest can fuzz ParamType — natively, or via a generated codec
-	RejectReason string   // the codec emitter's rejection, set iff !Fuzzable
+	Fuzzable     bool     // gotest can fuzz ParamType — natively, or via a generated fan
+	RejectReason string   // the fan emitter's rejection, set iff !Fuzzable
 	ZeroLiteral  string   // Go literal for a f.Add(...) seed; "" = no self-contained zero literal
 	ExtraImports []string // packages ParamTypeStr references beyond the target package, sorted
 	Pair         *InversePair
@@ -257,14 +257,14 @@ func IntrospectFuzzTarget(pkgPattern, funcName string) (*FuzzTarget, error) {
 	zero, fuzzable := nativeFuzzable(paramType)
 	reject := ""
 	if !fuzzable {
-		// One source of truth: the codec emitter's own validation decides
+		// One source of truth: the fan emitter's own validation decides
 		// whether a non-native type generates, so scaffold's verdict can
 		// never drift from what `gotest generate` actually accepts.
 		if err := gotestgen.CheckFuzzArgType(pkg, paramType); err != nil {
 			reject = err.Error()
 		} else {
 			fuzzable = true
-			zero = codecSeedLiteral(paramType, paramTypeStr)
+			zero = fannedSeedLiteral(paramType, paramTypeStr)
 		}
 	}
 
@@ -285,11 +285,11 @@ func IntrospectFuzzTarget(pkgPattern, funcName string) (*FuzzTarget, error) {
 	return target, nil
 }
 
-// codecSeedLiteral returns a zero-value Go literal usable as a f.Add seed
-// for a codec-backed (non-native) parameter type, or "" when the shape has
-// no self-contained zero literal — the skeleton then carries a TODO line
+// fannedSeedLiteral returns a zero-value Go literal usable as a f.Add seed
+// for a fanned (non-native) parameter type, or "" when the shape has no
+// self-contained zero literal — the skeleton then carries a TODO line
 // instead of a seed.
-func codecSeedLiteral(t types.Type, ref string) string {
+func fannedSeedLiteral(t types.Type, ref string) string {
 	switch u := t.Underlying().(type) {
 	case *types.Struct, *types.Slice, *types.Array:
 		return ref + "{}"
@@ -313,8 +313,8 @@ var fuzzTemplate = template.Must(template.New("fuzz").ParseFS(templates, "static
 // round-trip property test when a compatible inverse pair was found, a
 // crash-safety skeleton (calls the function, asserts nothing beyond
 // "doesn't panic") when no inverse pair was found, or a TODO stub carrying
-// the codec emitter's rejection reason when gotest cannot fuzz the
-// parameter type at all (neither natively nor via a generated codec).
+// the fan emitter's rejection reason when gotest cannot fuzz the parameter
+// type at all (neither natively nor via a generated fan).
 // status is a human-readable line describing the fallback taken, or ""
 // when a full round-trip skeleton was generated.
 func GenerateFuzzScaffold(target *FuzzTarget) (src []byte, status string, err error) {
@@ -402,7 +402,7 @@ func writeSeed(b *strings.Builder, zero string) {
 	fmt.Fprintf(b, "\tf.Add(%s)\n", zero)
 }
 
-// notFuzzableBody renders a TODO stub carrying the codec emitter's
+// notFuzzableBody renders a TODO stub carrying the fan emitter's
 // rejection reason — no f.Add/gotest.Fuzz call, since that would panic at
 // run time rather than fail to compile. The reason already names the
 // offending field path and the suggested alternative.

@@ -140,9 +140,9 @@ func (s *NotificationServiceTestSuite) FuzzTrim(f *gotest.F) {
 }
 
 // FuzzSummary is a struct-typed fuzz target: Notification is not one of the
-// fifteen types Go's fuzzing engine accepts, so gotest generates a codec for
-// it and reroutes the target to a []byte one. The seed below is a plain Go
-// literal — F.Add encodes it on the way in.
+// fifteen types Go's fuzzing engine accepts, so gotest fans it out into one
+// engine argument per field and reassembles it before each execution. The
+// seed below is a plain Go literal — F.Add explodes it through the same fan.
 func (s *NotificationServiceTestSuite) FuzzSummary(f *gotest.F) {
 	f.Add(Notification{To: "a@b.c", Subject: "welcome", Priority: PriorityHigh})
 	gotest.Fuzz(f, func(t *gotest.T, n Notification) {

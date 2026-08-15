@@ -62,14 +62,16 @@ its own `go test -fuzz` process:
 - `go tool gotest fuzz promote ./...` — splice each crasher into its
   method as a permanent typed `f.Add(...)` seed and delete the file —
   the durable form, especially for struct-typed targets whose corpus
-  files are wire-format-bound (the `fuzz-struct-corpus` lint rule flags
-  them).
+  files are bound to the type's field order (the `fuzz-struct-corpus`
+  lint rule flags them).
 
-Struct-typed targets (any non-native `gotest.Fuzz[T]`) fuzz through
-generated codecs; write typed `f.Add` literals, never raw `[]byte` seeds
-(`fuzz-raw-seed`), keep targets deterministic (`fuzz-determinism`), give
-the callback a property to assert (`fuzz-no-oracle`), and keep
-per-execution hooks IO-free (`fuzz-hook-io`).
+Any non-native argument (`gotest.Fuzz[T]`, and every position of `Fuzz2`
+/`Fuzz3`) fuzzes through a generated fan — one engine argument per leaf
+field. Write typed `f.Add` literals, never raw `[]byte` seeds
+(`fuzz-raw-seed`; a wrong-typed seed is rejected at `gotest.Fuzz`), keep
+targets deterministic (`fuzz-determinism`), give the callback a property
+to assert (`fuzz-no-oracle`), and keep per-execution hooks IO-free
+(`fuzz-hook-io`).
 
 Machine-readable capture, verified end-to-end:
 

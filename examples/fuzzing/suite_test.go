@@ -68,9 +68,10 @@ func (s *FrameCodecTestSuite) TestEncodeDecodeExamples(t *gotest.T) {
 }
 
 // FuzzFrameRoundTrip is the flagship target: Frame is not one of the
-// fifteen types Go's fuzzing engine accepts, so gotest generates a codec
-// for it and reroutes the target to a native []byte one. The seed below is
-// a plain Go literal — F.Add encodes it on the way in.
+// fifteen types Go's fuzzing engine accepts, so gotest fans it out into one
+// engine argument per leaf field — eight of them here — and reassembles the
+// Frame before each execution. The seed below is a plain Go literal; F.Add
+// buffers it and gotest.Fuzz explodes it through the same fan.
 func (s *FrameCodecTestSuite) FuzzFrameRoundTrip(f *gotest.F) {
 	f.Add(Frame{
 		Version: 1,
@@ -127,13 +128,27 @@ func (s *FrameCodecTestSuite) FuzzNormalizeTopicIdempotent(f *gotest.F) {
 	})
 }
 
-// FuzzTopicMatches — multi-argument fuzz targets take only Go's native
-// fuzzable types; structured input (like Frame above) belongs in a single
-// struct-typed target instead, not spread across Fuzz2/Fuzz3 arguments.
+// FuzzTopicMatches — two arguments because the property is about two
+// independent topics, not because the shape had to be split. Every position
+// of Fuzz2/Fuzz3 takes the same types gotest.Fuzz does; when the arguments
+// belong together, a named struct (like Frame above) still says so better.
 func (s *FrameCodecTestSuite) FuzzTopicMatches(f *gotest.F) {
 	f.Add("orders.created", "ORDERS.CREATED")
 	gotest.Fuzz2(f, func(t *gotest.T, a, b string) {
 		// Property: matching is symmetric, whatever the input.
 		gotest.Equal(t, TopicMatches(a, b), TopicMatches(b, a))
+	})
+}
+
+// FuzzHeaderRoundTrip mixes a struct with a native argument: Header rides as
+// its own two string leaves and the topic as one more, all in the same
+// engine tuple, so the mutator moves them independently.
+func (s *FrameCodecTestSuite) FuzzHeaderRoundTrip(f *gotest.F) {
+	f.Add(Header{Name: "content-type", Value: "application/json"}, "orders.created")
+	gotest.Fuzz2(f, func(t *gotest.T, h Header, topic string) {
+		in := Frame{Topic: NormalizeTopic(topic), Headers: []Header{h}}
+		out, err := Decode(Encode(in))
+		gotest.NoError(t, err)
+		gotest.Equal(t, in, out) // property: a header survives the round trip
 	})
 }

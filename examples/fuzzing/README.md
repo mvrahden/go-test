@@ -20,7 +20,8 @@ most common real use of fuzzing in Go.
 | `FuzzFrameRoundTrip` | struct-typed target, typed `f.Add(Frame{...})` seed, **round-trip** property |
 | `FuzzDecodeNeverPanics` | native `[]byte` target, **invariant** property with a real oracle: never panics, and anything that decodes must re-encode and decode again to the same value |
 | `FuzzNormalizeTopicIdempotent` | native `string` target, **idempotence** property |
-| `FuzzTopicMatches` | `gotest.Fuzz2` over two native strings, symmetry property |
+| `FuzzTopicMatches` | `gotest.Fuzz2` over two pass-through strings, symmetry property |
+| `FuzzHeaderRoundTrip` | `gotest.Fuzz2` mixing a struct with a pass-through string, **round-trip** property |
 
 `BeforeEach` rebuilds `s.codec` before every execution, not just before every top-level test — fuzz
 targets replay `BeforeEach`/`AfterEach` around each individual execution, the same as any other test.
@@ -56,8 +57,8 @@ $ go run ./cmd/gotest fuzz ./examples/fuzzing --for=60s
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip] inspect it with `gotest fuzz triage`, then `gotest fuzz promote` to keep it as a typed seed
 ```
 
-`gotest fuzz triage` decodes the crasher back through the generated codec and prints the actual
-`Frame` value, not a raw byte blob:
+`gotest fuzz triage` re-runs the crasher and prints the `Frame` the target reassembled from it, not
+the raw per-leaf corpus values:
 
 ```
 $ go run ./cmd/gotest fuzz triage ./examples/fuzzing
@@ -85,14 +86,18 @@ out from either direction.)
 
 `Frame` exercises every struct shape gotest's fuzzing supports: a named basic (`Kind`, whose
 promoted literals render as `Kind(3)`), a nested struct slice (`[]Header`), a pointer-to-struct
-(`*TraceID`), `[]byte`, and `string`. `gotest generate` turns each non-native argument type into a
-total decoder/encoder pair so `FuzzFrameRoundTrip` compiles and runs at all — Go's own fuzzing
-engine only accepts fifteen primitive types, and `Frame` isn't one of them.
+(`*TraceID`), `[]byte`, and `string`. Go's own fuzzing engine only accepts fifteen primitive types,
+and `Frame` isn't one of them — so `gotest generate` fans it out into one engine argument per leaf
+field and reassembles the `Frame` before each execution. `Frame` comes to eight leaves: `Version`
+and `Kind` each as their own little-endian `[]byte`, `Topic` as a `string` and `Payload` as a
+`[]byte` (both passed through untouched), `Headers` packed into one `[]byte`, and `Trace` as a
+`bool` nil-flag followed by `Hi` and `Lo`. Each leaf is something the mutator moves on its own,
+which is what puts a boundary value like `Version: 48` one mutation away.
 
-`FuzzTopicMatches` uses `gotest.Fuzz2` instead, and deliberately stays on two plain `string`
-arguments: multi-argument fuzz targets (`Fuzz2`, `Fuzz3`) support Go's native fuzzable types only,
-never struct arguments. Structured input belongs in a single struct-typed `gotest.Fuzz` target, the
-way `FuzzFrameRoundTrip` uses `Frame`.
+`Fuzz2`/`Fuzz3` take exactly the same types `gotest.Fuzz` does, each position with its own fan —
+`FuzzHeaderRoundTrip` mixes a `Header` with a plain `string`. Two arguments because the property is
+about two independent values, though: when they belong together, a named struct still says so
+better than a wider tuple, the way `FuzzFrameRoundTrip` uses `Frame`.
 
 Some shapes are rejected at generation time rather than silently mis-encoded:
 
@@ -108,8 +113,9 @@ A rejection is a generation-time error naming the offending field, not a runtime
 
 A careful reader may wonder whether a nil `Headers`/`Payload` and a genuinely empty one are
 distinguishable after a round trip: they aren't, by convention parity — `Decode` collapses a
-zero-length read to `nil`, exactly like the generated codec that manufactures `FuzzFrameRoundTrip`'s
-seed values, so the two sides never disagree on which one to produce.
+zero-length read to `nil`, and so does the fan on its way in (the engine does not preserve the
+distinction either: a nil `[]byte` seed comes back as `[]byte{}` after a trip through the corpus
+format). Both sides agree on which one to produce, under replay and under `-fuzz` alike.
 
 `go run ./cmd/gotest lint ./examples/fuzzing/...` reports nothing and exits 0 — but only because
 `FuzzNormalizeTopicIdempotent` carries a `//nolint:fuzz-seed` directive. Without it the `fuzz-seed`

@@ -257,7 +257,8 @@ func FuzzFooTestSuite_FuzzParse(f *testing.F) {
     ƒlifecycleT := gotest.NewTFromTB(f)
     f.Cleanup(func() { s.AfterAll(gotest.NewTFromTB(f)) })
     s.BeforeAll(ƒlifecycleT)
-    s.FuzzParse(gotest.NewF(f, s.BeforeEach, s.AfterEach))
+    ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach)   // plus one fan per target tuple
+    s.FuzzParse(ƒf)
 }
 ```
 
@@ -269,6 +270,18 @@ adapters (`pkg/gotest/f.go`): `BeforeEach` runs immediately before each
 execution's body, `AfterEach` is deferred to run immediately after,
 for every seed replay and every generated input — not once for the whole
 target.
+
+Any target position the engine cannot take directly rides on a **fan**: the
+same `NewF` call carries a `gotestfuzz.Fan[T]`/`Fan2`/`Fan3` adapter per
+fuzzed tuple, built by `internal/gotestgen/fuzzfan.go`, and the adapter is
+what registers the real `(*testing.F).Fuzz` callback — one engine argument
+per leaf field, reassembled into the declared type before each execution.
+The runtime side lives in its own leaf package, `pkg/gotestfuzz` (fan types,
+the `Leaf*` fixed-width helpers, and the packed-slice reader/writer), because
+`pkg/gotestruntime` imports `pkg/gotest` and the fan types have to be
+reachable from both. `gotest.Fuzz` looks its fan up on the `*gotest.F` by
+type assertion; a target whose every position passes through natively takes
+the plain native path with no fan at all.
 
 When seed harvesting is enabled (`gotestast.HarvestSeeds`, on by default —
 see the README's "Seed harvesting" section), the renderer additionally
