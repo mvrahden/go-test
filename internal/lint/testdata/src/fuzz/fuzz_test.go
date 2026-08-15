@@ -198,9 +198,9 @@ func (s *FuzzSeedTestSuite) FuzzBlankLineSeparated(f *gotest.F) { // want `fuzz 
 
 // --- fuzz-struct-corpus ---
 
-// Frame is the struct argument type shared by the codec-backed targets
-// below — anything outside the native fifteen-type set exercises the
-// struct-target rules.
+// Frame is the struct argument type shared by the fanned targets below —
+// a struct's corpus entries are one value per leaf in field order, which is
+// what the shape-bound rules key on.
 type Frame struct {
 	Version uint8
 	Topic   string
@@ -210,12 +210,12 @@ type Frame struct {
 // has a fixture entry under testdata/fuzz/FuzzFuzzStructCorpusTestSuite_FuzzFrame/
 // (the generated wrapper name is Fuzz<Suite>_<Method>, and this suite's own
 // name already starts with Fuzz), FuzzFrameClean has no corpus directory at
-// all, and FuzzNativeCorpus has a fixture entry too but fuzzes a native
-// type — engine-owned corpus files for native targets are fine and must
-// not fire.
+// all, and FuzzNativeCorpus has a fixture entry too but fuzzes a
+// pass-through type — its corpus files are not bound to any field order and
+// must not fire.
 type FuzzStructCorpusTestSuite struct{}
 
-func (s *FuzzStructCorpusTestSuite) FuzzFrame(f *gotest.F) { // want `fuzz target FuzzStructCorpusTestSuite.FuzzFrame keeps 1 corpus entry under testdata/fuzz/FuzzFuzzStructCorpusTestSuite_FuzzFrame/ bound to gotest's internal wire format — they are silently reinterpreted when fuzz.Frame changes shape; run gotest fuzz promote to turn them into typed f.Add seeds`
+func (s *FuzzStructCorpusTestSuite) FuzzFrame(f *gotest.F) { // want `fuzz target FuzzStructCorpusTestSuite.FuzzFrame keeps 1 corpus entry under testdata/fuzz/FuzzFuzzStructCorpusTestSuite_FuzzFrame/ bound to the declaration order of fuzz.Frame's fields — a same-kind reorder silently reinterprets them and an added or removed field rejects them; run gotest fuzz promote to turn them into typed f.Add seeds`
 	f.Add(Frame{Version: 1, Topic: "orders"})
 	gotest.Fuzz(f, func(t *gotest.T, in Frame) {
 		gotest.Equal(t, in, in)
@@ -296,7 +296,7 @@ func (s *NoFuzzHookTestSuite) TestSomething(t *gotest.T) {
 type FuzzRawSeedTestSuite struct{}
 
 func (s *FuzzRawSeedTestSuite) FuzzFrameRaw(f *gotest.F) {
-	f.Add([]byte("junk")) // want `raw \[\]byte seed on struct-typed fuzz target FuzzRawSeedTestSuite.FuzzFrameRaw decodes through gotest's internal wire format as whatever fuzz.Frame those bytes spell — write a typed fuzz.Frame literal instead \(gotest fuzz promote emits one\)`
+	f.Add([]byte("junk")) // want `raw \[\]byte seed on fuzz target FuzzRawSeedTestSuite.FuzzFrameRaw — the target takes fuzz.Frame and gotest.Fuzz rejects a seed of another type; write a typed fuzz.Frame literal instead \(gotest fuzz promote emits one\)`
 	f.Add(Frame{Version: 3, Topic: "typed"})
 	gotest.Fuzz(f, func(t *gotest.T, in Frame) {
 		gotest.Equal(t, in, in)
@@ -309,5 +309,16 @@ func (s *FuzzRawSeedTestSuite) FuzzBytesNative(f *gotest.F) {
 	f.Add([]byte("ok"))
 	gotest.Fuzz(f, func(t *gotest.T, in []byte) {
 		gotest.Len(t, in, len(in))
+	})
+}
+
+// FuzzMixedPositions pairs a struct with a native []byte: the rule is
+// per-position, so only the seed facing the struct fires and the one facing
+// the []byte position stays untouched.
+func (s *FuzzRawSeedTestSuite) FuzzMixedPositions(f *gotest.F) {
+	f.Add([]byte("junk"), []byte("ok")) // want `raw \[\]byte seed on fuzz target FuzzRawSeedTestSuite.FuzzMixedPositions — the target takes fuzz.Frame and gotest.Fuzz rejects a seed of another type; write a typed fuzz.Frame literal instead \(gotest fuzz promote emits one\)`
+	gotest.Fuzz2(f, func(t *gotest.T, in Frame, raw []byte) {
+		gotest.Equal(t, in, in)
+		gotest.Len(t, raw, len(raw))
 	})
 }

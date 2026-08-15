@@ -1305,7 +1305,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `generated-file` | `gotest_p(x)suite_test.go` files present in source control |
 | `shared-fixture-undeclared` | Suite-method reads of a `*SharedFixture` value the suite never declared as a pointer field (directly or through the fixture DAG) — window scheduling starts only declared fixtures, so the value may be absent; locally-constructed fixtures (fixture self-tests) are exempt |
 | `fuzz-determinism` | Fuzz targets (one hop into same-package callees) reading nondeterministic state — `time.Now`, `math/rand{,/v2}`, `os.Getenv` — corpus replay and coverage guidance degrade |
-| `fuzz-struct-corpus` | On-disk corpus entries for a struct-typed fuzz target — bound to gotest's internal wire format, silently reinterpreted when the struct changes shape; `gotest fuzz promote` turns them into typed `f.Add` seeds |
+| `fuzz-struct-corpus` | On-disk corpus entries for a shape-bound fuzz target (struct, pointer, array, non-byte slice) — one value per leaf in field order, so a same-kind reorder silently reinterprets them and an added or removed field rejects them; `gotest fuzz promote` turns them into typed `f.Add` seeds |
 
 **Expressiveness** — the test is correct but says it worse. Suppressible per line or project-wide via `lint.skip`.
 
@@ -1318,7 +1318,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `fuzz-no-oracle` | `gotest.Fuzz*` callbacks that never use their `*gotest.T` — only panics are caught, which defeats property-based fuzzing |
 | `fuzz-seed` | Fuzz targets that never call `f.Add` — coverage-guided exploration starts blind (table-test harvesting may still seed them) |
 | `fuzz-hook-io` | IO-shaped calls (`net/*`, `os/exec`, `database/sql`, `time.Sleep`, filesystem `os` functions) in `BeforeEach`/`AfterEach` of fuzz-declaring suites — the hooks replay around every execution and throttle the fuzzer |
-| `fuzz-raw-seed` | Raw `[]byte` seeds on struct-typed fuzz targets — the bytes decode through the internal wire format as an arbitrary struct; write a typed literal instead |
+| `fuzz-raw-seed` | Raw `[]byte` seeds on a fuzz position that does not take `[]byte` — seeds are target-directed, so `gotest.Fuzz` rejects them outright; write a typed literal instead |
 
 **Migration** — legitimate coexistence, nudged. Suppressible per line or project-wide via `lint.skip`.
 

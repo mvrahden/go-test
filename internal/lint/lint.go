@@ -98,14 +98,14 @@ var ruleMeta = map[Rule]struct {
 	// fuzz-determinism is integrity: a target reading the clock/RNG/env
 	// breaks the replayability the corpus depends on — its outcomes lie.
 	// fuzz-struct-corpus is integrity for the same reason from the other
-	// side: format-bound corpus entries silently become different tests
-	// when the struct changes shape; the legitimate transient state
+	// side: entries bound to a type's field order silently become different
+	// tests when two same-kind fields swap; the legitimate transient state
 	// (crasher found, not yet promoted) is suppressible per line.
 	// fuzz-no-oracle and fuzz-seed are guidance (crash-only fuzzing and
 	// harvester-seeded targets are legitimate), and fuzz-hook-io and
 	// fuzz-raw-seed are heuristics with legitimate exceptions (a cheap
-	// file read; promote's own last-resort []byte fallback) — all four
-	// stay skippable.
+	// file read; a seed deliberately left for a signature about to change)
+	// — all four stay skippable.
 	FuzzDeterminism:  {TierIntegrity, ScopeSuites},
 	FuzzNoOracle:     {TierExpressiveness, ScopeSuites},
 	FuzzSeed:         {TierExpressiveness, ScopeSuites},

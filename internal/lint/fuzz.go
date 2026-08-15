@@ -331,15 +331,11 @@ func fuzzBodyHasAdd(body *ast.BlockStmt, param string) bool {
 	return found
 }
 
-// fuzzStructArgType returns the instantiated argument type of the first
-// single-argument gotest.Fuzz call in body whose type argument is outside
-// Go's native fuzzable set — the type the generated wrapper will carry a
-// codec for — or nil when every adapter call in body fuzzes natively. The
-// native set comes from gotestast.NativeFuzzType, the same source the
-// codec emitter uses, so lint and generator can never disagree about which
-// targets are codec-backed.
-func fuzzStructArgType(pass *analysis.Pass, body *ast.BlockStmt) types.Type {
-	var found types.Type
+// fuzzArgTypes returns the instantiated type arguments of the first
+// gotest.Fuzz/Fuzz2/Fuzz3 call in body — the types the target's callback
+// declares, in engine-position order — or nil when body calls no adapter.
+func fuzzArgTypes(pass *analysis.Pass, body *ast.BlockStmt) []types.Type {
+	var found []types.Type
 	ast.Inspect(body, func(n ast.Node) bool {
 		if found != nil {
 			return false
@@ -349,20 +345,37 @@ func fuzzStructArgType(pass *analysis.Pass, body *ast.BlockStmt) types.Type {
 			return true
 		}
 		sel := fuzzAdapterSelector(call.Fun)
-		if sel == nil || sel.Sel.Name != "Fuzz" || !isGotestPkgRef(pass, sel.X) {
+		if sel == nil || !fuzzAdapterNames[sel.Sel.Name] || !isGotestPkgRef(pass, sel.X) {
 			return true
 		}
 		inst, ok := pass.TypesInfo.Instances[sel.Sel]
-		if !ok || inst.TypeArgs == nil || inst.TypeArgs.Len() != 1 {
+		if !ok || inst.TypeArgs == nil {
 			return true
 		}
-		if arg := inst.TypeArgs.At(0); !gotestast.NativeFuzzType(arg) {
-			found = arg
-			return false
+		args := make([]types.Type, inst.TypeArgs.Len())
+		for i := range args {
+			args[i] = inst.TypeArgs.At(i)
 		}
-		return true
+		found = args
+		return false
 	})
 	return found
+}
+
+// fuzzShapeBoundArgType returns the first argument type of body's fuzz
+// target whose corpus entries are bound to the type's own shape — a struct,
+// pointer, array, or non-byte slice, fanned out to one corpus value per leaf
+// in declaration order — or nil when every position is one the engine feeds
+// directly. The predicate comes from gotestast.FuzzCorpusShapeBound, the same
+// source the fan emitter uses, so lint and generator can never disagree about
+// which targets carry a shape-bound corpus.
+func fuzzShapeBoundArgType(pass *analysis.Pass, body *ast.BlockStmt) types.Type {
+	for _, arg := range fuzzArgTypes(pass, body) {
+		if gotestast.FuzzCorpusShapeBound(arg) {
+			return arg
+		}
+	}
+	return nil
 }
 
 // stripMarkerPrefixes removes the F_/X_ marker prefixes, mirroring how the
@@ -376,17 +389,18 @@ func shortTypeStr(t types.Type) string {
 	return types.TypeString(t, func(p *types.Package) string { return p.Name() })
 }
 
-// checkFuzzStructCorpus flags a struct-typed fuzz target whose corpus
-// directory (testdata/fuzz/<wrapper>/) holds on-disk entries. A native
-// target's corpus files are engine-owned and human-readable; a codec-backed
-// target's entries are opaque bytes in gotest's internal wire format,
-// decoded by field order — reordering or inserting a field silently
-// reinterprets every one of them, turning a kept regression input into a
-// different test with no error anywhere. The durable form of a struct
-// crasher is a typed f.Add seed: `gotest fuzz promote` emits it and deletes
-// the file. Integrity tier: a silently reinterpreted corpus makes test
-// outcomes lie; the transient state between finding a crasher and promoting
-// it is suppressible per line.
+// checkFuzzStructCorpus flags a shape-bound fuzz target whose corpus
+// directory (testdata/fuzz/<wrapper>/) holds on-disk entries. A pass-through
+// target's corpus files are engine-owned and stable; a fanned target's
+// entries are one value per leaf, positional and unlabelled, so they only
+// mean what the type's current field order says they mean. Adding or
+// removing a field changes the count and the entry is rejected loudly — but
+// swapping two same-kind fields keeps it loading and silently turns a kept
+// regression input into a different test. The durable form of such a crasher
+// is a typed f.Add seed: `gotest fuzz promote` emits it and deletes the file.
+// Integrity tier: a silently reinterpreted corpus makes test outcomes lie;
+// the transient state between finding a crasher and promoting it is
+// suppressible per line.
 func checkFuzzStructCorpus(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo) {
 	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
 		fd := n.(*ast.FuncDecl)
@@ -400,8 +414,8 @@ func checkFuzzStructCorpus(pass *analysis.Pass, insp *inspector.Inspector, suite
 		if !isFuzzMethodName(fd.Name.Name) {
 			return
 		}
-		structArg := fuzzStructArgType(pass, fd.Body)
-		if structArg == nil {
+		boundArg := fuzzShapeBoundArgType(pass, fd.Body)
+		if boundArg == nil {
 			return
 		}
 		wrapper := "Fuzz" + stripMarkerPrefixes(recvName) + "_" + stripMarkerPrefixes(fd.Name.Name)
@@ -424,8 +438,8 @@ func checkFuzzStructCorpus(pass *analysis.Pass, insp *inspector.Inspector, suite
 			plural = "y"
 		}
 		report(pass, FuzzStructCorpus, fd.Pos(),
-			"fuzz target %s keeps %d corpus entr%s under testdata/fuzz/%s/ bound to gotest's internal wire format — they are silently reinterpreted when %s changes shape; run gotest fuzz promote to turn them into typed f.Add seeds",
-			recvName+"."+fd.Name.Name, count, plural, wrapper, shortTypeStr(structArg))
+			"fuzz target %s keeps %d corpus entr%s under testdata/fuzz/%s/ bound to the declaration order of %s's fields — a same-kind reorder silently reinterprets them and an added or removed field rejects them; run gotest fuzz promote to turn them into typed f.Add seeds",
+			recvName+"."+fd.Name.Name, count, plural, wrapper, shortTypeStr(boundArg))
 	})
 }
 
@@ -533,15 +547,13 @@ func reportSlowHookCalls(pass *analysis.Pass, body ast.Node, hook string) {
 	})
 }
 
-// checkFuzzRawSeed flags a raw []byte seed on a struct-typed fuzz target.
-// The rerouted target's native signature IS []byte, so testing.F accepts
-// the seed without complaint and the codec decodes those bytes as whatever
-// struct they happen to spell — the one seed shape the seed-type mismatch
-// guard in pkg/gotest cannot catch. A typed literal seed says what it
-// means and survives wire-format changes; `gotest fuzz promote` emits the
-// []byte form itself only as a last-resort fallback when no literal could
-// be scraped, which is why this is expressiveness tier rather than a hard
-// error.
+// checkFuzzRawSeed flags a raw []byte seed handed to a fuzz position that
+// does not take []byte — the habit left over from the days when a
+// non-native target was rerouted to a []byte signature and its seeds were
+// encoded blobs. Seeds are target-directed now: gotest.Fuzz rejects one of
+// another type outright, so the []byte is not a subtly-decoded value, it is
+// a run that never starts. Expressiveness tier: the fix is mechanical and
+// the failure is loud either way.
 func checkFuzzRawSeed(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo) {
 	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
 		fd := n.(*ast.FuncDecl)
@@ -555,12 +567,9 @@ func checkFuzzRawSeed(pass *analysis.Pass, insp *inspector.Inspector, suites map
 		if !isFuzzMethodName(fd.Name.Name) {
 			return
 		}
-		structArg := fuzzStructArgType(pass, fd.Body)
-		if structArg == nil {
-			return
-		}
+		declared := fuzzArgTypes(pass, fd.Body)
 		param := fuzzParamName(fd)
-		if param == "" {
+		if len(declared) == 0 || param == "" {
 			return
 		}
 		target := recvName + "." + fd.Name.Name
@@ -577,12 +586,19 @@ func checkFuzzRawSeed(pass *analysis.Pass, insp *inspector.Inspector, suites map
 			if id, ok := sel.X.(*ast.Ident); !ok || id.Name != param {
 				return true
 			}
-			for _, arg := range call.Args {
-				if isUnnamedByteSlice(pass.TypesInfo.Types[arg].Type) {
-					report(pass, FuzzRawSeed, arg.Pos(),
-						"raw []byte seed on struct-typed fuzz target %s decodes through gotest's internal wire format as whatever %s those bytes spell — write a typed %s literal instead (gotest fuzz promote emits one)",
-						target, shortTypeStr(structArg), shortTypeStr(structArg))
+			// A seed of the wrong arity is its own error at run time; with
+			// no position to compare against, there is nothing to say here.
+			if len(call.Args) != len(declared) {
+				return true
+			}
+			for i, arg := range call.Args {
+				want := declared[i]
+				if isUnnamedByteSlice(want) || !isUnnamedByteSlice(pass.TypesInfo.Types[arg].Type) {
+					continue
 				}
+				report(pass, FuzzRawSeed, arg.Pos(),
+					"raw []byte seed on fuzz target %s — the target takes %s and gotest.Fuzz rejects a seed of another type; write a typed %s literal instead (gotest fuzz promote emits one)",
+					target, shortTypeStr(want), shortTypeStr(want))
 			}
 			return true
 		})

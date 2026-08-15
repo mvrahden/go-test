@@ -307,11 +307,11 @@ time.Now/math-rand/os.Getenv from a fuzz target breaks corpus replay),
 fuzz-no-oracle (a callback that asserts nothing only catches panics),
 fuzz-seed (no f.Add seeds means coverage-guided exploration starts blind),
 fuzz-struct-corpus (on-disk corpus entries for a struct-typed target are
-bound to gotest's internal wire format and silently reinterpreted when the
-struct changes shape — promote them to typed seeds), fuzz-hook-io (a
+bound to its field order and silently reinterpreted when two same-kind
+fields swap — promote them to typed seeds), fuzz-hook-io (a
 BeforeEach/AfterEach that does IO replays around every execution and
-throttles the fuzzer), and fuzz-raw-seed (a raw []byte seed on a
-struct-typed target decodes as whatever struct those bytes spell).
+throttles the fuzzer), and fuzz-raw-seed (a raw []byte seed on a position
+that does not take []byte is rejected outright).
 
 Seed harvesting (on by default): at generation time, gotest mines your
 test files' table-test literals and direct call-site arguments that flow
@@ -543,10 +543,10 @@ Rules:
   fuzz-no-oracle        Fuzz callbacks that assert nothing (panic-only)
   fuzz-seed             Fuzz targets with no f.Add seeds
   fuzz-struct-corpus    On-disk corpus entries for struct-typed targets
-                        (format-bound — promote them to typed seeds)
+                        (field-order-bound — promote them to typed seeds)
   fuzz-hook-io          IO in BeforeEach/AfterEach of fuzzing suites
                         (hooks replay around every execution)
-  fuzz-raw-seed         Raw []byte seeds on struct-typed targets
+  fuzz-raw-seed         Raw []byte seeds on positions not taking []byte
 
 Integrity rules can only be suppressed per line with //nolint. All other
 rules also accept a project-wide skip flag (mirrored by .gotest.yml lint.skip):
