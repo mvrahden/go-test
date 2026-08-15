@@ -326,10 +326,11 @@ ${SCRIPT}
         stderr += data.toString();
       });
       child.on("close", (code) => {
-        if (code !== 0 && stderr) {
-          reject(new Error(`gotest spec exited with code ${code}: ${stderr}`));
+        const outcome = interpretSpecExit(code, stdout, stderr);
+        if (outcome.ok) {
+          resolve(outcome.stdout);
         } else {
-          resolve(stdout);
+          reject(new Error(outcome.message));
         }
       });
       child.on("error", (err: Error) => {
@@ -341,6 +342,36 @@ ${SCRIPT}
       child.stdin.end();
     });
   }
+}
+
+export type SpecExitOutcome =
+  | { ok: true; stdout: string }
+  | { ok: false; message: string };
+
+// interpretSpecExit decides whether a finished `gotest spec --input=-` left a
+// usable spec behind. Exit 1 means the piped stream carried failures — a
+// verdict about the tests, not a rendering error — so the spec on stdout still
+// stands. Only an exit that produced no spec is an error worth reporting.
+export function interpretSpecExit(
+  code: number | null,
+  stdout: string,
+  stderr: string,
+): SpecExitOutcome {
+  if (code === 0 || (code === 1 && stdout.trim() !== "")) {
+    return { ok: true, stdout };
+  }
+  // `go run` echoes "exit status N" after any non-zero child; it restates the
+  // code we already have and would otherwise bury the real diagnostic.
+  const detail = stderr
+    .split("\n")
+    .filter((line) => !/^exit status \d+$/.test(line.trim()))
+    .join("\n")
+    .trim();
+  const suffix = detail ? `: ${detail}` : "";
+  return {
+    ok: false,
+    message: `gotest spec exited with code ${code}${suffix}`,
+  };
 }
 
 // --- Types ---

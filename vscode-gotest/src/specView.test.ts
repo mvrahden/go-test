@@ -12,7 +12,7 @@ vi.mock("vscode", () => ({
   commands: {},
 }));
 
-import { specDataToReport } from "./specView.js";
+import { specDataToReport, interpretSpecExit } from "./specView.js";
 
 function leaf(
   name: string,
@@ -346,5 +346,72 @@ describe("specDataToReport broken packages", () => {
     const report = specDataToReport(data, ["example.com"]);
     expect(report).not.toContain("1 failed,");
     expect(report).toContain("1 passed");
+  });
+});
+
+describe("interpretSpecExit", () => {
+  const SPEC_JSON = '{"packages":[],"stats":{}}';
+
+  it("keeps the rendered spec when the stream carried failures", () => {
+    // `gotest spec --input=-` exits 1 to report "this tree has failures".
+    // That is a verdict about the tests, not a failure to render.
+    const outcome = interpretSpecExit(1, SPEC_JSON, "");
+    expect(outcome).toEqual({ ok: true, stdout: SPEC_JSON });
+  });
+
+  it("keeps the rendered spec when go run appends its exit status epilogue", () => {
+    // The extension resolves the CLI through `go run` by default, which
+    // prints "exit status 1" on stderr whenever the child exits non-zero.
+    const outcome = interpretSpecExit(1, SPEC_JSON, "exit status 1\n");
+    expect(outcome).toEqual({ ok: true, stdout: SPEC_JSON });
+  });
+
+  it("keeps the rendered spec on a clean run", () => {
+    const outcome = interpretSpecExit(0, SPEC_JSON, "");
+    expect(outcome).toEqual({ ok: true, stdout: SPEC_JSON });
+  });
+
+  it("reports an operational failure that produced no spec", () => {
+    const outcome = interpretSpecExit(
+      2,
+      "",
+      "FAIL: parsing test events: unexpected EOF\n",
+    );
+    expect(outcome).toEqual({
+      ok: false,
+      message:
+        "gotest spec exited with code 2: FAIL: parsing test events: unexpected EOF",
+    });
+  });
+
+  it("reports a go run build failure instead of swallowing it as a verdict", () => {
+    // `go run` also exits 1 when the module fails to build. There is no spec
+    // on stdout, so this must not be mistaken for a failing test tree.
+    const outcome = interpretSpecExit(1, "", "spec.go:12:2: undefined: Foo\n");
+    expect(outcome).toEqual({
+      ok: false,
+      message: "gotest spec exited with code 1: spec.go:12:2: undefined: Foo",
+    });
+  });
+
+  it("strips the go run epilogue from a reported failure", () => {
+    const outcome = interpretSpecExit(
+      2,
+      "",
+      "FAIL: opening input file: no such file\nexit status 2\n",
+    );
+    expect(outcome).toEqual({
+      ok: false,
+      message:
+        "gotest spec exited with code 2: FAIL: opening input file: no such file",
+    });
+  });
+
+  it("reports a signal death that left no spec behind", () => {
+    const outcome = interpretSpecExit(null, "", "");
+    expect(outcome).toEqual({
+      ok: false,
+      message: "gotest spec exited with code null",
+    });
   });
 });
