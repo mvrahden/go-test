@@ -248,4 +248,50 @@ describe("a single behavior can be run on its own", () => {
     expect(passed.some((id) => id.endsWith("/zero"))).toBe(false);
     expect(passed.some((id) => id.endsWith("/positive"))).toBe(false);
   }, 300_000);
+
+  // Descriptions are prose, and go test's -run is a regular expression. Every
+  // metacharacter in Go's QuoteMeta set appears in the metachars fixture, so
+  // each of these addresses a behavior whose name would otherwise be read as a
+  // pattern. Without escaping the filter matches nothing at all.
+  it("addresses behaviors whose descriptions contain regex metacharacters", async () => {
+    const whenId = `${pkg("metachars")}/MetacharsTestSuite/TestPunctuation/a_description_has_{braces}`;
+    const whenItem = controller.findItem(whenId);
+    expect(
+      whenItem,
+      "the When block should be declared statically",
+    ).toBeDefined();
+
+    const behaviors: string[] = [];
+    whenItem!.children.forEach((child) => behaviors.push(child.id));
+    expect(behaviors.length).toBeGreaterThanOrEqual(6);
+
+    for (const id of behaviors) {
+      const item = controller.findItem(id)!;
+      const filter = buildRunFilter([item]);
+      const run = new FakeTestRun();
+
+      await executeBatch({
+        pkgInfos: [
+          {
+            importPath: pkg("metachars"),
+            items: [item] as never,
+            dir: path.join(fixturesDir, "metachars"),
+          },
+        ],
+        filter,
+        workspaceDir: fixturesDir,
+        testFlags: [],
+        run: run as never,
+        token: token as never,
+        controller,
+        outputChannel: createRecordingChannel().channel as never,
+        label: "metachars",
+      });
+
+      const passedLeaves = run
+        .verdictsMatching("passed")
+        .filter((passedId) => behaviors.includes(passedId));
+      expect(passedLeaves, `filter for ${id} was ${filter}`).toEqual([id]);
+    }
+  }, 600_000);
 });

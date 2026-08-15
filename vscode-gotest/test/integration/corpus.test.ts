@@ -118,6 +118,17 @@ const FIXTURES: Record<string, Expectation> = {
     mustNotContain: ["<script>alert", "<img src=x onerror"],
   },
   jsonish: { status: "pass", passed: 2, failed: 0, skipped: 0 },
+  // Descriptions carrying every regex metacharacter in Go's QuoteMeta set, so
+  // that addressing one exercises the -run escaping rather than a happy-path
+  // name. The slash case is included because -run splits on "/" before
+  // compiling, which escaping cannot influence either way.
+  metachars: {
+    status: "pass",
+    passed: 6,
+    failed: 0,
+    skipped: 0,
+    mustContain: ["a description has {braces}", "handles https:// URIs"],
+  },
   bigoutput: { status: "pass", passed: 2, failed: 0, skipped: 0 },
   unicode: {
     status: "fail",
