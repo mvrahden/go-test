@@ -37,22 +37,37 @@ const streamDir = path.join(extensionDir, "testdata", "streams");
 const stream = (name: string) =>
   readFileSync(path.join(streamDir, `${name}.jsonl`), "utf-8");
 
+let realBinary = "";
 let prebuiltBinary = "";
 let brokenBinary = "";
 
 beforeAll(() => {
   const dir = mkdtempSync(path.join(tmpdir(), "gotest-integration-"));
 
-  prebuiltBinary = path.join(dir, "gotest");
-  const built = spawnSync(
-    "go",
-    ["build", "-o", prebuiltBinary, "./cmd/gotest"],
-    {
-      cwd: repoRoot,
-      encoding: "utf-8",
-    },
-  );
+  realBinary = path.join(dir, "gotest-real");
+  const built = spawnSync("go", ["build", "-o", realBinary, "./cmd/gotest"], {
+    cwd: repoRoot,
+    encoding: "utf-8",
+  });
   expect(built.status, `go build failed: ${built.stderr}`).toBe(0);
+
+  // A build from a working tree reports a pseudo-version below MIN_CLI_VERSION,
+  // which the extension rejects — correctly, but that would silently turn the
+  // cliPath axis into a second `go run` axis. The wrapper reports a releasable
+  // version and delegates everything else to the real binary, so the axis tests
+  // cliPath resolution rather than this tree's version string.
+  prebuiltBinary = path.join(dir, "gotest");
+  writeFileSync(
+    prebuiltBinary,
+    [
+      "#!/bin/sh",
+      'if [ "$1" = "version" ]; then echo "gotest v99.0.0 integration"; exit 0; fi',
+      `exec ${realBinary} "$@"`,
+      "",
+    ].join("\n"),
+    "utf-8",
+  );
+  chmodSync(prebuiltBinary, 0o755);
 
   // A binary that passes the extension's version probe but fails to produce a
   // spec. This is the shape of a toolchain or build failure, and it must stay
@@ -190,6 +205,28 @@ describe("CLI resolution is the mode the test intends", () => {
     await panel.refresh(stream("mixed"), "run");
 
     expect(debug.some((m) => m.includes("cliPath override"))).toBe(true);
+  });
+
+  // The extension now sends --render-only, which older CLIs would reject. The
+  // version floor is what keeps that from reaching them, so its enforcement is
+  // asserted against a real binary rather than only against mocked probes.
+  it("refuses a cliPath binary below the version floor and falls back to go run", async () => {
+    const debug: string[] = [];
+    const warnings: string[] = [];
+    const channel = {
+      info: () => {},
+      error: () => {},
+      warn: (m: string) => warnings.push(m),
+      debug: (m: string) => debug.push(m),
+    };
+    const panel = new SpecViewPanel(channel as never);
+    state.cliPath = realBinary; // reports a working-tree pseudo-version
+    await panel.show();
+    await panel.refresh(stream("mixed"), "run");
+
+    expect(warnings.some((m) => m.includes("requires >="))).toBe(true);
+    expect(debug.some((m) => m.includes("cliPath override"))).toBe(false);
+    expect(debug.some((m) => m.includes("go run"))).toBe(true);
   });
 });
 

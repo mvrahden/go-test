@@ -310,7 +310,10 @@ ${SCRIPT}
   private async runSpecFromInput(jsonInput: string): Promise<string> {
     const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const cmd = await buildCliCommand(
-      ["spec", "--input=-", "--format=json"],
+      // --render-only: this is a renderer, not a CI gate. Without it the exit
+      // code also reports whether the tests passed, which says nothing about
+      // whether a spec was produced.
+      ["spec", "--input=-", "--format=json", "--render-only"],
       workspaceDir,
       this.outputChannel,
     );

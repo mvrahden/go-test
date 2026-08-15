@@ -4,6 +4,9 @@
 // produced (see scripts/record-cli-contract.mjs), not bytes we imagined. The
 // regression this guards shipped because the CLI's exit rule and the
 // extension's reading of it were each tested in isolation and never together.
+//
+// Two variants are recorded per stream: the gating form, whose exit code CI
+// depends on, and the --render-only form the Spec View sends.
 
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
@@ -27,13 +30,18 @@ interface Invocation {
   stderr: string;
 }
 
-interface ContractCase {
+interface Variant {
   direct: Invocation;
   goRun: {
     exitCode: number | null;
     stderr: string;
     stdoutMatchesDirect: boolean;
   };
+}
+
+interface ContractCase {
+  gating: Variant;
+  renderOnly: Variant;
 }
 
 const golden = JSON.parse(
@@ -50,32 +58,32 @@ const golden = JSON.parse(
 const EXPECTED: Record<
   string,
   {
-    exitCode: number;
+    gatingExitCode: number;
     goRunEpilogue: string;
     stats: Record<string, number>;
     packages: string[];
   }
 > = {
   "all-pass": {
-    exitCode: 0,
+    gatingExitCode: 0,
     goRunEpilogue: "",
     stats: { passed: 2, failed: 0, skipped: 0 },
     packages: ["example.com/cart:pass"],
   },
   mixed: {
-    exitCode: 1,
+    gatingExitCode: 1,
     goRunEpilogue: "exit status 1\n",
     stats: { passed: 1, failed: 1, skipped: 0 },
     packages: ["example.com/cart:fail"],
   },
   "all-fail": {
-    exitCode: 1,
+    gatingExitCode: 1,
     goRunEpilogue: "exit status 1\n",
     stats: { passed: 0, failed: 1, skipped: 0 },
     packages: ["example.com/cart:fail"],
   },
   "skip-only": {
-    exitCode: 0,
+    gatingExitCode: 0,
     goRunEpilogue: "",
     stats: { passed: 0, failed: 0, skipped: 1 },
     packages: ["example.com/cart:pass"],
@@ -84,13 +92,13 @@ const EXPECTED: Record<
   // exit code and failedPackages say anything is wrong, which is exactly why a
   // consumer must not treat a non-zero exit as "the renderer broke".
   "package-failure": {
-    exitCode: 1,
+    gatingExitCode: 1,
     goRunEpilogue: "exit status 1\n",
     stats: { passed: 0, failed: 0, skipped: 0, failedPackages: 1 },
     packages: ["example.com/broken:fail"],
   },
   empty: {
-    exitCode: 0,
+    gatingExitCode: 0,
     goRunEpilogue: "",
     stats: { passed: 0, failed: 0, skipped: 0 },
     packages: [],
@@ -98,7 +106,7 @@ const EXPECTED: Record<
   // A second package, used by the layer-accumulation tests: concatenating it
   // with a passing layer must still render both.
   "other-package-fail": {
-    exitCode: 1,
+    gatingExitCode: 1,
     goRunEpilogue: "exit status 1\n",
     stats: { passed: 0, failed: 1, skipped: 0 },
     packages: ["example.com/checkout:fail"],
@@ -118,12 +126,12 @@ describe("recorded CLI contract", () => {
     describe(name, () => {
       const recorded = golden.cases[name];
 
-      it("exits with the documented code", () => {
-        expect(recorded.direct.exitCode).toBe(expected.exitCode);
+      it("gates on the documented exit code", () => {
+        expect(recorded.gating.direct.exitCode).toBe(expected.gatingExitCode);
       });
 
       it("renders the spec on stdout regardless of that code", () => {
-        const spec = JSON.parse(recorded.direct.stdout);
+        const spec = JSON.parse(recorded.gating.direct.stdout);
         expect(spec).toHaveProperty("packages");
         expect(
           spec.packages.map(
@@ -134,41 +142,74 @@ describe("recorded CLI contract", () => {
       });
 
       it("keeps stderr clean when invoked directly", () => {
-        expect(recorded.direct.stderr).toBe("");
+        expect(recorded.gating.direct.stderr).toBe("");
       });
 
       it("gains only go run's exit-status epilogue on stderr, never a changed spec", () => {
-        expect(recorded.goRun.exitCode).toBe(expected.exitCode);
-        expect(recorded.goRun.stderr).toBe(expected.goRunEpilogue);
-        expect(recorded.goRun.stdoutMatchesDirect).toBe(true);
+        expect(recorded.gating.goRun.exitCode).toBe(expected.gatingExitCode);
+        expect(recorded.gating.goRun.stderr).toBe(expected.goRunEpilogue);
+        expect(recorded.gating.goRun.stdoutMatchesDirect).toBe(true);
+      });
+
+      // --render-only exists to separate "did you render" from "did the tests
+      // pass". It must drop the verdict and change nothing else.
+      it("renders byte-identically under --render-only", () => {
+        expect(recorded.renderOnly.direct.stdout).toBe(
+          recorded.gating.direct.stdout,
+        );
+      });
+
+      it("always succeeds under --render-only, whatever the verdict", () => {
+        expect(recorded.renderOnly.direct.exitCode).toBe(0);
+        expect(recorded.renderOnly.direct.stderr).toBe("");
+      });
+
+      it("leaves go run with nothing to append under --render-only", () => {
+        // With no non-zero exit there is no epilogue, so the hazard that broke
+        // the Spec View cannot arise on this path at all.
+        expect(recorded.renderOnly.goRun.exitCode).toBe(0);
+        expect(recorded.renderOnly.goRun.stderr).toBe("");
+        expect(recorded.renderOnly.goRun.stdoutMatchesDirect).toBe(true);
       });
 
       it("is read as a usable spec when invoked directly", () => {
         expect(
           interpretSpecExit(
-            recorded.direct.exitCode,
-            recorded.direct.stdout,
-            recorded.direct.stderr,
+            recorded.gating.direct.exitCode,
+            recorded.gating.direct.stdout,
+            recorded.gating.direct.stderr,
           ),
-        ).toEqual({ ok: true, stdout: recorded.direct.stdout });
+        ).toEqual({ ok: true, stdout: recorded.gating.direct.stdout });
       });
 
-      // The regression in one assertion: same bytes, same verdict, but reached
-      // through the extension's default `go run` resolution.
+      // The original regression in one assertion: same bytes, same verdict, but
+      // reached through the extension's default `go run` resolution. The client
+      // now sends --render-only, but this must keep holding — it is the safety
+      // net for any CLI that predates the flag.
       it("is read as a usable spec when resolved through go run", () => {
         expect(
           interpretSpecExit(
-            recorded.goRun.exitCode,
-            recorded.direct.stdout,
-            recorded.goRun.stderr,
+            recorded.gating.goRun.exitCode,
+            recorded.gating.direct.stdout,
+            recorded.gating.goRun.stderr,
           ),
-        ).toEqual({ ok: true, stdout: recorded.direct.stdout });
+        ).toEqual({ ok: true, stdout: recorded.gating.direct.stdout });
+      });
+
+      it("is read as a usable spec on the render-only path the extension uses", () => {
+        expect(
+          interpretSpecExit(
+            recorded.renderOnly.goRun.exitCode,
+            recorded.renderOnly.direct.stdout,
+            recorded.renderOnly.goRun.stderr,
+          ),
+        ).toEqual({ ok: true, stdout: recorded.renderOnly.direct.stdout });
       });
     });
   }
 
   it("covers both a failing and a passing verdict, so a green-only fixture set cannot pass", () => {
-    const codes = Object.values(EXPECTED).map((e) => e.exitCode);
+    const codes = Object.values(EXPECTED).map((e) => e.gatingExitCode);
     expect(codes).toContain(0);
     expect(codes).toContain(1);
   });
@@ -180,5 +221,17 @@ describe("recorded CLI contract", () => {
       (e) => e.goRunEpilogue !== "",
     );
     expect(withEpilogue.length).toBeGreaterThan(0);
+  });
+
+  it("keeps the gating verdict meaningful, so --render-only cannot become the only behaviour", () => {
+    // If a future change made every stream exit 0, CI would silently stop
+    // gating. The recorded gating variant is what keeps that honest.
+    const failing = Object.entries(EXPECTED).filter(
+      ([, e]) => e.gatingExitCode === 1,
+    );
+    for (const [name] of failing) {
+      expect(golden.cases[name].gating.direct.exitCode).toBe(1);
+    }
+    expect(failing.length).toBeGreaterThan(0);
   });
 });

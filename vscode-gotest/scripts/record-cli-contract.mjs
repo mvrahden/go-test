@@ -22,7 +22,14 @@ const repoRoot = path.resolve(extensionDir, "..");
 const streamDir = path.join(extensionDir, "testdata", "streams");
 const goldenPath = path.join(extensionDir, "testdata", "cli-contract.json");
 
-const SPEC_ARGS = ["spec", "--input=-", "--format=json"];
+// Both invocations the contract has to hold for: the gating form, and the
+// render-only form the Spec View actually uses. Recording only the one the
+// extension sends would leave the CI-facing verdict unpinned, and recording
+// only the gating form is how the original regression stayed invisible.
+const VARIANTS = {
+  gating: ["spec", "--input=-", "--format=json"],
+  renderOnly: ["spec", "--input=-", "--format=json", "--render-only"],
+};
 
 function buildBinary() {
   const dir = mkdtempSync(path.join(tmpdir(), "gotest-contract-"));
@@ -59,19 +66,22 @@ for (const file of readdirSync(streamDir).sort()) {
   const name = file.replace(/\.jsonl$/, "");
   const input = readFileSync(path.join(streamDir, file), "utf-8");
 
-  const direct = run(bin, SPEC_ARGS, input);
-  const goRun = run("go", ["run", "./cmd/gotest", ...SPEC_ARGS], input);
+  cases[name] = {};
+  for (const [variant, args] of Object.entries(VARIANTS)) {
+    const direct = run(bin, args, input);
+    const goRun = run("go", ["run", "./cmd/gotest", ...args], input);
 
-  cases[name] = {
-    direct,
-    goRun: {
-      exitCode: goRun.exitCode,
-      stderr: goRun.stderr,
-      // `go run` must not alter what the CLI renders — it only wraps the exit
-      // status. If this ever goes false the composition changed, not the CLI.
-      stdoutMatchesDirect: goRun.stdout === direct.stdout,
-    },
-  };
+    cases[name][variant] = {
+      direct,
+      goRun: {
+        exitCode: goRun.exitCode,
+        stderr: goRun.stderr,
+        // `go run` must not alter what the CLI renders — it only wraps the exit
+        // status. If this ever goes false the composition changed, not the CLI.
+        stdoutMatchesDirect: goRun.stdout === direct.stdout,
+      },
+    };
+  }
 }
 
 const golden = {
