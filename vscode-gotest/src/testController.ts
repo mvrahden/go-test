@@ -408,9 +408,14 @@ export class GoTestController implements vscode.Disposable {
           method.excluded,
           method.parallel,
         );
-        // A method whose behaviors cannot all be read from source is expandable
-        // but unresolved, rather than presenting a partial list as the whole.
-        methodItem.canResolveChildren = method.behaviorsComplete === false;
+        // Deliberately not canResolveChildren: that tells VS Code a handler can
+        // fetch the missing children on demand, and they cannot be known
+        // without running the test. An expand arrow that resolves to nothing is
+        // a worse lie than a partial list. Say it in words instead.
+        methodItem.description =
+          method.behaviorsComplete === false
+            ? "+ behaviors known only at run time"
+            : undefined;
         this.addBehaviors(methodItem, method.behaviors ?? [], methodUri);
         suiteItem.children.add(methodItem);
       }
@@ -480,7 +485,16 @@ export class GoTestController implements vscode.Disposable {
     uri: vscode.Uri,
   ): void {
     const seen = new Set<string>();
-    for (const behavior of behaviors) {
+    // The same ceiling the runtime path uses. A table with thousands of rows
+    // would otherwise materialise thousands of tree items at discovery, before
+    // the developer has asked for anything — one policy for declared and
+    // observed behaviors rather than two.
+    const shown = behaviors.slice(0, GoTestController.MAX_DYNAMIC_SUBTESTS);
+    const hidden = behaviors.length - shown.length;
+    if (hidden > 0) {
+      parent.description = `${behaviors.length} behaviors (${shown.length} shown)`;
+    }
+    for (const behavior of shown) {
       const id = `${parent.id}/${behavior.name}`;
       seen.add(id);
       let item = parent.children.get(id);

@@ -40,6 +40,16 @@ does not exist (its findings are simply never reported — do not rely on
 the linter for fixture-window mistakes on v1.26.x). Skip those sections
 on v1.26.x and earlier.
 
+Also v1.27+: `gotest spec --static` renders the specification from source
+without running anything, so you can read what a package promises before
+(or instead of) executing it. It reports on stderr any method whose
+behaviors it could not enumerate — a `When`/`It` inside a condition or a
+loop, a non-literal description, an `Each` over a non-literal table — so
+treat "incomplete:" lines as a prompt to write the behavior literally if
+you want it visible in tooling. `spec --input --render-only` exits 0 on a
+failing stream, for callers that render results rather than gate on them;
+without it `--input` exits 1 whenever the stream carries a failure.
+
 Exit codes on v1.25.x are weaker than they look — never treat a green
 gotest exit alone as proof there: a package failing to compile mid-run, a
 suite binary killed by a signal, and `spec --input` on a failing stream

@@ -118,6 +118,10 @@ const FIXTURES: Record<string, Expectation> = {
     mustNotContain: ["<script>alert", "<img src=x onerror"],
   },
   jsonish: { status: "pass", passed: 2, failed: 0, skipped: 0 },
+  // Behaviors guarded by a condition: readable only by running. The walker
+  // reports the method incomplete rather than passing off what it can see as
+  // the whole specification.
+  runtimebehaviors: { status: "pass", passed: 2, failed: 0, skipped: 0 },
   // Descriptions carrying every regex metacharacter in Go's QuoteMeta set, so
   // that addressing one exercises the -run escaping rather than a happy-path
   // name. The slash case is included because -run splits on "/" before

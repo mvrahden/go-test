@@ -131,13 +131,65 @@ describe("the specification is in the tree before anything runs", () => {
   });
 
   // A method whose behaviors depend on runtime values must not present its
-  // partial list as the whole truth.
-  it("marks a method with runtime-determined behaviors as resolvable", () => {
+  // partial list as the whole truth — but it must not promise VS Code a
+  // resolve handler either, since the missing children cannot be fetched
+  // without running the test.
+  it("says so when a method's behaviors are only knowable at run time", () => {
+    const partial = controller.findItem(
+      `${pkg("runtimebehaviors")}/RuntimeBehaviorsTestSuite/TestConditional`,
+    );
+    expect(partial?.description).toBe("+ behaviors known only at run time");
+    expect(partial?.canResolveChildren).toBe(false);
+
+    // Only the behavior that is written unconditionally is declared.
+    const declared: string[] = [];
+    partial!.children.forEach((when) =>
+      when.children.forEach((b) => declared.push(b.label)),
+    );
+    expect(declared).toEqual(["always states this one"]);
+  });
+
+  it("leaves a fully declared method unannotated", () => {
     const complete = controller.findItem(
       `${pkg("table")}/TableTestSuite/TestClassify`,
     );
+    expect(complete?.description).toBeUndefined();
     expect(complete?.canResolveChildren).toBe(false);
   });
+
+  // The conditional behavior appears once it has actually run, on the same
+  // canonical id, alongside the declared one.
+  it("adds a run-time-only behavior to the declared tree when it appears", async () => {
+    const method = `${pkg("runtimebehaviors")}/RuntimeBehaviorsTestSuite/TestConditional`;
+    const run = new FakeTestRun();
+    await executeBatch({
+      pkgInfos: [
+        {
+          importPath: pkg("runtimebehaviors"),
+          items: [controller.findItem(pkg("runtimebehaviors"))!] as never,
+          dir: path.join(fixturesDir, "runtimebehaviors"),
+        },
+      ],
+      filter: undefined,
+      workspaceDir: fixturesDir,
+      testFlags: [],
+      run: run as never,
+      token: token as never,
+      controller,
+      outputChannel: createRecordingChannel().channel as never,
+      label: "runtime",
+    });
+
+    const passed = run.verdictsMatching("passed");
+    expect(
+      passed.some((id) =>
+        id.startsWith(`${method}/the_feature_flag_decides_what_is_specified/`),
+      ),
+    ).toBe(true);
+    expect(
+      passed.filter((id) => id.startsWith(`${method}/`)).length,
+    ).toBeGreaterThanOrEqual(3);
+  }, 300_000);
 });
 
 describe("the run counter has its total up front", () => {
@@ -207,6 +259,38 @@ describe("the run counter has its total up front", () => {
       false,
     );
   }, 300_000);
+});
+
+describe("results survive a reload", () => {
+  // Restoring a stored result does `findItem(id)` and drops anything it cannot
+  // resolve. Behavior ids used to exist only during a run, so every behavior
+  // result was persisted, aged, and then silently discarded on load. Declaring
+  // behaviors at discovery is what makes the lookup succeed.
+  it("resolves a stored behavior id against the declared tree", () => {
+    const behaviorId = `${pkg("table")}/TableTestSuite/TestClassify/classifying_a_number/negative`;
+
+    // Exactly the operation restoreResults performs on each stored key.
+    expect(controller.findItem(behaviorId)).toBeDefined();
+
+    controller.recordResult(behaviorId, "pass", 12);
+    expect(controller.getResult(behaviorId)).toMatchObject({ status: "pass" });
+  });
+
+  it("persists and reloads behavior results under the current store version", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "gotest-restore-"));
+    const behaviorId = `${pkg("table")}/TableTestSuite/TestClassify/classifying_a_number/zero`;
+
+    const store = new TestResultStore({ fsPath: dir });
+    store.record(behaviorId, "fail", 7);
+    // record only mutates memory; save schedules the write and flush forces it.
+    store.save();
+    await store.flush();
+
+    const reloaded = new TestResultStore({ fsPath: dir });
+    await reloaded.load();
+
+    expect(reloaded.get(behaviorId)).toMatchObject({ status: "fail" });
+  });
 });
 
 describe("a single behavior can be run on its own", () => {
