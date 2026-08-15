@@ -133,6 +133,16 @@ const FIXTURES: Record<string, Expectation> = {
     skipped: 0,
     mustContain: ["a description has {braces}", "handles https:// URIs"],
   },
+  // Descriptions that repeat among their siblings, and descriptions carrying a
+  // single slash. go test numbers the one and nests the other, and discovery
+  // has to predict both or the declared item and the observed one are two.
+  duplicates: {
+    status: "pass",
+    passed: 5,
+    failed: 0,
+    skipped: 0,
+    mustContain: ["names the first", "names the third", "shares it too"],
+  },
   bigoutput: { status: "pass", passed: 2, failed: 0, skipped: 0 },
   unicode: {
     status: "fail",

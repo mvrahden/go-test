@@ -16,6 +16,7 @@ var ExportParseMinFlag = parseMinFlag
 var ExportRunSpecFromInput = runSpecFromInput
 var ExportRunSummaryFromInput = runSummaryFromInput
 var ExportRunSpec = runSpec
+var ExportRunStaticSpec = runStaticSpec
 var ExportRunSummary = runSummary
 var ExportParseParallelFlag = parseParallelFlag
 var ExportParseCompileParallelFlag = parseCompileParallelFlag

@@ -192,6 +192,91 @@ describe("the specification is in the tree before anything runs", () => {
   }, 300_000);
 });
 
+// Two names a run produces that the source does not spell out. Getting either
+// wrong is invisible until a run happens, and then it shows up as a second tree
+// node beside the declared one.
+describe("declared names match the ones go test invents", () => {
+  it("numbers a description that repeats among its siblings", () => {
+    expect(
+      idsUnder(
+        `${pkg("duplicates")}/DuplicatesTestSuite/TestRepeatedDescriptions`,
+      ),
+    ).toEqual([
+      `${pkg("duplicates")}/DuplicatesTestSuite/TestRepeatedDescriptions`,
+      `${pkg("duplicates")}/DuplicatesTestSuite/TestRepeatedDescriptions/the_same_words`,
+      `${pkg("duplicates")}/DuplicatesTestSuite/TestRepeatedDescriptions/the_same_words#01`,
+      `${pkg("duplicates")}/DuplicatesTestSuite/TestRepeatedDescriptions/the_same_words#01/names_the_second`,
+      `${pkg("duplicates")}/DuplicatesTestSuite/TestRepeatedDescriptions/the_same_words#02`,
+      `${pkg("duplicates")}/DuplicatesTestSuite/TestRepeatedDescriptions/the_same_words#02/names_the_third`,
+      `${pkg("duplicates")}/DuplicatesTestSuite/TestRepeatedDescriptions/the_same_words/names_the_first`,
+    ]);
+  });
+
+  it("makes a slash a level, and lets two descriptions share it", () => {
+    expect(
+      idsUnder(`${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping`),
+    ).toEqual([
+      `${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping`,
+      `${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping/a`,
+      `${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping/a/b_grouping`,
+      `${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping/a/b_grouping/shares_the_first_level`,
+      `${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping/a/c_grouping`,
+      `${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping/a/c_grouping/shares_it_too`,
+    ]);
+  });
+
+  // A run of slashes is not a separator: "https:// URIs" is one subtest whose
+  // name contains slashes, and go test reports it as one level.
+  it("keeps a run of slashes inside a single level", () => {
+    const id =
+      `${pkg("metachars")}/MetacharsTestSuite/TestPunctuation/a_description_has_{braces}/handles_https:%2F%2F_URIs`.replace(
+        /%2F/g,
+        "/",
+      );
+    expect(controller.findItem(id)?.label).toBe("handles https:// URIs");
+  });
+
+  // The failure this guards against is silent: an observed result can build a
+  // second item whose id string equals the declared one but whose parent does
+  // not, so comparing ids alone sees nothing wrong. Counting the tree does.
+  it.each(["duplicates", "metachars"])(
+    "gains no tree items when %s actually runs",
+    async (name) => {
+      const before = idsUnder(pkg(name));
+      const run = new FakeTestRun();
+      await executeBatch({
+        pkgInfos: [
+          {
+            importPath: pkg(name),
+            items: [controller.findItem(pkg(name))!] as never,
+            dir: path.join(fixturesDir, name),
+          },
+        ],
+        filter: undefined,
+        workspaceDir: fixturesDir,
+        testFlags: [],
+        run: run as never,
+        token: token as never,
+        controller,
+        outputChannel: createRecordingChannel().channel as never,
+        label: name,
+      });
+
+      expect(idsUnder(pkg(name))).toEqual(before);
+
+      // Every declared leaf reported, so the run landed on the declared items
+      // rather than on look-alikes built beside them.
+      const leaves = before.filter(
+        (id) => !before.some((other) => other.startsWith(id + "/")),
+      );
+      expect(run.verdictsMatching("passed")).toEqual(
+        expect.arrayContaining(leaves),
+      );
+    },
+    300_000,
+  );
+});
+
 describe("the run counter has its total up front", () => {
   it("enqueues every behavior at run start and gains no items during the run", async () => {
     const before = idsUnder(pkg("table"));
