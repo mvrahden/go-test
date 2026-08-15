@@ -132,11 +132,7 @@ export class SpecViewPanel implements vscode.Disposable {
             vscode.env.clipboard.writeText(text);
           }
         } else if (msg.type === "clearResults") {
-          this.lastSpecData = undefined;
-          this.jsonLayers.clear();
-          if (this.panel) {
-            this.panel.webview.html = this.buildHtml({ type: "empty" });
-          }
+          this.clear();
         } else if (msg.type === "goToLocation" && msg.file && msg.line) {
           const uri = vscode.Uri.file(msg.file);
           const line = Math.max(0, msg.line - 1);
@@ -172,6 +168,17 @@ export class SpecViewPanel implements vscode.Disposable {
       null,
       this.disposables,
     );
+  }
+
+  // clear drops the accumulated run layers and empties the panel. Called both
+  // by the panel's own Clear button and when the Test Explorer's results are
+  // cleared, so the two surfaces cannot disagree about what has been run.
+  clear(): void {
+    this.lastSpecData = undefined;
+    this.jsonLayers.clear();
+    if (this.panel) {
+      this.panel.webview.html = this.buildHtml({ type: "empty" });
+    }
   }
 
   async refresh(jsonOutput: string, tag = "default"): Promise<void> {

@@ -1,7 +1,7 @@
 {
   "name": "gotest",
   "displayName": "Go - Test Suites",
-  "description": "Specification-driven test suites for Go — Spec View, Test Explorer, coverage, and debug integration",
+  "description": "Specification-driven test suites for Go \u2014 Spec View, Test Explorer, coverage, and debug integration",
   "version": "0.1.0",
   "publisher": "mvrahden",
   "license": "MIT",
@@ -94,6 +94,11 @@
         "command": "gotest.copyTestResults",
         "title": "Go Test: Copy Test Results",
         "icon": "$(copy)"
+      },
+      {
+        "command": "gotest.clearResults",
+        "title": "Go Test: Clear Results",
+        "icon": "$(clear-all)"
       }
     ],
     "menus": {
@@ -108,6 +113,11 @@
         {
           "command": "gotest.copyCoverage",
           "when": "view == workbench.view.testCoverage",
+          "group": "navigation"
+        },
+        {
+          "command": "gotest.clearResults",
+          "when": "view == workbench.view.testing",
           "group": "navigation"
         }
       ],

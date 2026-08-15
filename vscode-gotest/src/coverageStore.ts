@@ -75,13 +75,14 @@ export class CoverageStore implements vscode.Disposable {
     return deleted;
   }
 
-  clear(): void {
-    if (this.packages.size === 0) {
-      return;
-    }
+  // clear drops every profile and persists the empty state, so a window reload
+  // cannot restore coverage the developer has dismissed. Memory-only clearing
+  // would leave the stored copy to come back on the next activation.
+  clear(): Promise<void> {
     this.packages.clear();
     this.parsed.clear();
     this.cachedDetails.clear();
+    return this.save();
   }
 
   buildFileCoverages(cache: DiscoveryCache): CoverageResult {

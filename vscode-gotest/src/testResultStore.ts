@@ -117,6 +117,14 @@ export class TestResultStore {
     await writeFile(this.storagePath, JSON.stringify(data), "utf-8");
   }
 
+  // clear drops every result and schedules the empty state to disk. Clearing
+  // memory alone would leave the persisted copy intact, and the next window
+  // reload would restore exactly the results the developer just dismissed.
+  clear(): void {
+    this.results.clear();
+    this.save();
+  }
+
   dispose(): void {
     if (this.debounceTimer !== undefined) {
       clearTimeout(this.debounceTimer);
