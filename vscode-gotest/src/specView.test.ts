@@ -12,7 +12,11 @@ vi.mock("vscode", () => ({
   commands: {},
 }));
 
-import { specDataToReport, interpretSpecExit } from "./specView.js";
+import {
+  specDataToReport,
+  interpretSpecExit,
+  encodeStateForScript,
+} from "./specView.js";
 
 function leaf(
   name: string,
@@ -413,5 +417,33 @@ describe("interpretSpecExit", () => {
       ok: false,
       message: "gotest spec exited with code null",
     });
+  });
+});
+
+describe("encodeStateForScript", () => {
+  // Regression: the spec is embedded inside a <script> block, and a test whose
+  // failure output contained "</script>" closed that block early, spilling the
+  // rest of the document into the page as live markup. Found by running a
+  // suite whose assertion message carried markup.
+  it("does not let test output close the script block", () => {
+    const encoded = encodeStateForScript({
+      message: "</script><script>alert('xss')</script>",
+    });
+    expect(encoded).not.toContain("</script>");
+    expect(encoded).not.toContain("<script>");
+  });
+
+  it("round-trips to the identical value", () => {
+    const data = {
+      message: "</script><img src=x onerror=alert(1)>",
+      nested: { markup: "<b>&amp;</b>", unicode: "日本語 🧪" },
+    };
+    expect(JSON.parse(encodeStateForScript(data))).toEqual(data);
+  });
+
+  it("leaves ordinary payloads parseable", () => {
+    expect(
+      JSON.parse(encodeStateForScript({ packages: [], stats: {} })),
+    ).toEqual({ packages: [], stats: {} });
   });
 });

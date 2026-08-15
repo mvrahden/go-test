@@ -286,7 +286,7 @@ export class SpecViewPanel implements vscode.Disposable {
         ? buildEmptyBody(gopherUri)
         : buildSpecBody(msg.data, this.modulePaths, locationMap);
     const stateJson =
-      msg.type === "specData" ? JSON.stringify(msg.data) : "null";
+      msg.type === "specData" ? encodeStateForScript(msg.data) : "null";
 
     return `<!DOCTYPE html>
 <html>
@@ -345,6 +345,18 @@ ${SCRIPT}
       child.stdin.end();
     });
   }
+}
+
+// encodeStateForScript serialises the spec for embedding inside a <script>
+// block. JSON.stringify leaves "<" alone, so a test whose output contains
+// "</script>" would close the block early and spill the rest of the document
+// into the page as live markup. Escaping the angle brackets as unicode
+// escapes leaves the parsed value identical while making that impossible.
+export function encodeStateForScript(data: unknown): string {
+  return JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
 }
 
 export type SpecExitOutcome =
