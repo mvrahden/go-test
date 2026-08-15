@@ -1099,8 +1099,21 @@ gotest spec ./... --no-color                         # terminal (plain)
 gotest spec ./... --format=md --output=behavior.md   # markdown
 gotest spec ./... --format=json                      # machine-readable tree
 gotest spec --input=events.json                      # replay a saved go test -json stream (no test run)
+gotest spec ./... --static                           # read the spec from source (nothing runs)
 gotest ./... -v --spec                               # spec view instead of default output
 ```
+
+### `--static`
+
+Builds the same tree from the source instead of from a run: no node carries a status or a duration, because nothing executed.
+The names are the ones `go test` would produce, including the `#01` it appends to a description repeated among its siblings and the extra level a single slash introduces — a statically read behavior and an observed one have to be the same node, not two.
+
+Where a method declares behaviors whose names or existence depend on runtime values — a `When` behind a condition, a non-literal description, an `Each` over a table that is not a literal — the method node is marked incomplete and the detail goes to stderr as `incomplete: …` lines.
+That marking is on the node, not only on stderr, so it survives into every format: `— INCOMPLETE` in the terminal tree, an `_Incomplete: …_` note in markdown, and `"incomplete": true` in JSON.
+A run-derived tree never sets the field, since what ran is by definition all there was.
+
+`--static` and `--input` are mutually exclusive: one asks for the specification in the source, the other for the one in a recorded run.
+Exit code is 0 when the source could be read and 2 when a package does not compile.
 
 ---
 
@@ -1138,7 +1151,7 @@ $ gotest discover ./...
 Emits the static suite model as JSON — the integration surface for editors and AI tooling (the VS Code extension's test explorer runs on it).
 No tests are executed.
 
-`behaviors` carries the `When`/`It` tree each method declares, read from source: `name` is the subtest segment `go test` will produce (so it matches an observed run byte for byte), `display` is the text the developer wrote, and `line` locates it. `behaviorsComplete` reports whether that tree is exhaustive — `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears only once the method has run. Consumers must not present an incomplete list as the whole specification.
+`behaviors` carries the `When`/`It` tree each method declares, read from source: `name` is the subtest segment `go test` will produce (so it matches an observed run byte for byte), `display` is the text the developer wrote, and `line` locates it. Two rewrites the source does not spell out are applied so that `name` really does match: a description repeated among its siblings gains the `#01` suffix the testing package appends, and a description containing a single slash becomes one node per level (a run of slashes, as in `https://`, is not a separator and stays within one level). `behaviorsComplete` reports whether that tree is exhaustive — `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears only once the method has run. Consumers must not present an incomplete list as the whole specification.
 
 ```
 { "packages": [ {

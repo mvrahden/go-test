@@ -185,6 +185,13 @@ Render the spec view instead of the default output (also works in watch mode):
 gotest ./... -v --spec
 ```
 
+Read the spec without running it. `--static` builds the tree from the source, so nothing carries a verdict or a duration. Where a method's behaviors depend on runtime values — a `When` behind a condition, an `Each` over a table that is not a literal — the node says so and the detail goes to stderr, because a partial spec that presents itself as whole is worse than none:
+
+```bash
+gotest spec ./... --static
+gotest spec ./... --static --format=md --output=docs/behavior-spec.md
+```
+
 ## Isolation
 
 Each suite runs in its own process with zero shared state.
