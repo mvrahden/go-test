@@ -186,6 +186,13 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 	}
 	pf := ParseExecFlags(cfg.GoTestArgs)
 
+	// Only when seed corpora actually replay in this run: a stale entry is
+	// what would fail, and the engine's own error names the wrapper, not the
+	// field that moved.
+	if len(cfg.FuzzFuncsByPkg) > 0 {
+		ReportStaleFuzzCorpora(os.Stderr, overlay)
+	}
+
 	if cfg.Streaming {
 		return runStreaming(ctx, cfg, overlay, pf)
 	}

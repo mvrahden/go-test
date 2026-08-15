@@ -98,6 +98,11 @@ func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 0
 	}
 
+	// Before spending any of the budget: a corpus entry left over from an
+	// older shape of the fuzzed type aborts its target's run seconds in, and
+	// the engine's own message names only the generated wrapper.
+	gotestrunner.ReportStaleFuzzCorporaFor(os.Stderr, overlay, targets)
+
 	// Print the schedule the budget resolves to before spending any of it,
 	// and reject an impossible --for/--timeout combination here rather than
 	// letting the deadline cut the run down mid-flight.

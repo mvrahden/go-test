@@ -63,12 +63,16 @@ type headerImport struct {
 
 type renderer struct{}
 
-func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, resolved *ResolveResult, harvestSeeds bool) ([]byte, error) { //nolint:gocritic // hugeParam: stable API
+// RenderTestSuiteSpec renders the generated test file for pkg. The returned
+// FuzzFanSet is the fan-out the file was rendered with — nil when the package
+// fuzzes nothing; its ParamsByFunc is what the stale-corpus pre-flight
+// compares each target's corpus entries against.
+func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, resolved *ResolveResult, harvestSeeds bool) ([]byte, *FuzzFanSet, error) { //nolint:gocritic // hugeParam: stable API
 	if pkg == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if len(spec.EffectiveTestSuites) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	fixtureBound := resolved.FixtureBound
@@ -81,12 +85,12 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	// generation-time refusal, not a half-written file.
 	fans, err := BuildFuzzFans(pkg, spec.EffectiveTestSuites)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	buf := bytes.NewBuffer(nil)
 	if err := r.renderFileHeader(buf, pkg, spec, hasFixtures, resolved.SuiteSharedFixtures, allFixtures, sfNodeVMs, fans); err != nil {
-		return nil, fmt.Errorf("failed rendering file header. err: %w", err)
+		return nil, nil, fmt.Errorf("failed rendering file header. err: %w", err)
 	}
 
 	if len(fixtureBound) > 0 || len(sfNodeVMs) > 0 {
@@ -100,7 +104,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 			}
 		}
 		if err := r.renderFixtures(buf, fixtureBound, allFixtures, resolved.SuiteFixtureFields, sfNodeVMs, fixtureTestNames); err != nil {
-			return nil, fmt.Errorf("failed rendering fixture suites. err: %w", err)
+			return nil, nil, fmt.Errorf("failed rendering fixture suites. err: %w", err)
 		}
 	}
 
@@ -111,15 +115,16 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 			SkippedTestCases:    spec.SkippedTestCases,
 		}
 		if err := r.renderTestSuites(buf, standaloneSpec, resolved.SuiteSharedFixtures); err != nil {
-			return nil, fmt.Errorf("failed rendering test suites. err: %w", err)
+			return nil, nil, fmt.Errorf("failed rendering test suites. err: %w", err)
 		}
 	}
 
 	if err := r.renderFuzzSuites(buf, pkg, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields, harvestSeeds, fans); err != nil {
-		return nil, fmt.Errorf("failed rendering fuzz suites. err: %w", err)
+		return nil, nil, fmt.Errorf("failed rendering fuzz suites. err: %w", err)
 	}
 
-	return r.formatOutput(buf)
+	out, err := r.formatOutput(buf)
+	return out, fans, err
 }
 
 func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, sfNodes []*SharedFixtureNodeVM, fans *FuzzFanSet) error { //nolint:gocritic // hugeParam: stable API

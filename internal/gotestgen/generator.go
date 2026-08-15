@@ -22,6 +22,7 @@ type GenerateResult struct {
 	PXTest                         []byte              // generated external test source
 	SuiteNames                     []string            // suite struct identifiers (e.g. "FooTestSuite")
 	FuzzFuncsBySuite               map[string][]string // suite identifier → generated Fuzz<Suite>_<Method> func names
+	FuzzParamsByFunc               map[string][]string // generated fuzz func name → corpus type of each value the engine feeds it
 	SkippedSuiteNames              []string            // identifiers of suites excluded by focus/X_ rules
 	ExclusiveSuiteNames            []string            // identifiers of suites with SuiteConfig{Exclusive: true} — dispatched alone, after the parallel bulk
 	FixtureDepSuites               []string            // test function names that depend on shared fixtures (e.g. "TestFooSuite")
@@ -289,11 +290,12 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 			return nil, err
 		}
 
-		ptestBuf, ptestFixtureDeps, ptestReqKeys, err := generateForPkg(lr.Ptest, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds)
+		fuzzParams := map[string][]string{}
+		ptestBuf, ptestFixtureDeps, ptestReqKeys, err := generateForPkg(lr.Ptest, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams)
 		if err != nil {
 			return nil, err
 		}
-		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, err := generateForPkg(lr.Pxtest, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds)
+		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, err := generateForPkg(lr.Pxtest, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams)
 		if err != nil {
 			return nil, err
 		}
@@ -369,6 +371,10 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		if len(fuzzFuncsBySuite) > 0 {
 			fuzzFuncsBySuiteResult = fuzzFuncsBySuite
 		}
+		var fuzzParamsResult map[string][]string
+		if len(fuzzParams) > 0 {
+			fuzzParamsResult = fuzzParams
+		}
 
 		return &GenerateResult{
 			AbsPath:                        lr.PkgDir,
@@ -377,6 +383,7 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 			PXTest:                         pxtestBuf,
 			SuiteNames:                     suiteNames,
 			FuzzFuncsBySuite:               fuzzFuncsBySuiteResult,
+			FuzzParamsByFunc:               fuzzParamsResult,
 			SkippedSuiteNames:              skippedNames,
 			ExclusiveSuiteNames:            exclusiveNames,
 			FixtureDepSuites:               append(ptestFixtureDeps, pxtestFixtureDeps...),
@@ -396,7 +403,10 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 	return results, allSharedFixtures, nil
 }
 
-func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo, harvestSeeds bool) ([]byte, []string, map[string][]string, error) { //nolint:gocritic // hugeParam: stable API
+// generateForPkg renders one package variant. fuzzParams is filled in place
+// with the corpus shape of every fuzz target the variant declares, so the
+// internal and external variants of the same package accumulate into one map.
+func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo, harvestSeeds bool, fuzzParams map[string][]string) ([]byte, []string, map[string][]string, error) { //nolint:gocritic // hugeParam: stable API
 	if pkg == nil || len(spec.EffectiveTestSuites) == 0 {
 		return nil, nil, nil, nil
 	}
@@ -443,7 +453,10 @@ func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected Collector
 	}
 
 	r := renderer{}
-	buf, err := r.RenderTestSuiteSpec(pkg, spec, resolved, harvestSeeds)
+	buf, fans, err := r.RenderTestSuiteSpec(pkg, spec, resolved, harvestSeeds)
+	if fans != nil {
+		maps.Copy(fuzzParams, fans.ParamsByFunc)
+	}
 	return buf, fixtureDeps, suiteReqKeys, err
 }
 

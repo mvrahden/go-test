@@ -59,11 +59,12 @@ func (s *FuzzTriagePromoteTestSuite) BeforeAll(t *gotest.T) {
 //     fails FuzzTrim's property, so triage reports it as resolved rather
 //     than as a real regression, and promote has exactly one well-known
 //     seed to splice.
-//   - a single crasher for FuzzSummary, the struct-typed target: its
-//     corpus file is a native []byte entry (that's the real on-disk shape
-//     for any struct-rerouted fuzz target), which triage must re-run
-//     through the codec and report as a decoded Notification{...} literal
-//     rather than the raw []byte(...) corpus text.
+//   - a single crasher for FuzzSummary, the struct-typed target: its corpus
+//     file holds one native value per leaf of Notification's fan (three
+//     strings and the []byte carrying Priority — that's the real on-disk
+//     shape for any fanned fuzz target), which triage must re-run and report
+//     as the decoded Notification{...} literal the target echoes, rather
+//     than as the raw per-leaf corpus text.
 func (s *FuzzTriagePromoteTestSuite) BeforeEach(t *gotest.T) {
 	orig, err := os.ReadFile(s.suiteTestPath)
 	gotest.NoError(t, err)
@@ -77,7 +78,7 @@ func (s *FuzzTriagePromoteTestSuite) BeforeEach(t *gotest.T) {
 	structDir := filepath.Join(s.fuzzRootDir, "FuzzNotificationServiceTestSuite_FuzzSummary")
 	gotest.NoError(t, os.MkdirAll(structDir, 0755))
 	s.structCorpusFile = filepath.Join(structDir, "struct-seed")
-	gotest.NoError(t, os.WriteFile(s.structCorpusFile, []byte("go test fuzz v1\n[]byte(\"hello\")\n"), 0600))
+	gotest.NoError(t, os.WriteFile(s.structCorpusFile, []byte("go test fuzz v1\nstring(\"a@b.c\")\nstring(\"welcome\")\nstring(\"\")\n[]byte(\"\\x02\")\n"), 0600))
 }
 
 func (s *FuzzTriagePromoteTestSuite) AfterEach(t *gotest.T) {

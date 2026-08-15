@@ -2,9 +2,6 @@ package main
 
 import (
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -63,112 +60,27 @@ func rejectFuzzSubcommandFlags(sub string, args []string) error {
 	return nil
 }
 
-// corpusArg is one decoded argument from a Go fuzz corpus file
-// (testdata/fuzz/<Func>/<hash>), restricted to Go's native primitive corpus
-// types (string, []byte, bool, and the int/uint/float variants). For a
+// corpusArg is one decoded argument from a Go fuzz corpus file, as triage and
+// promote consume it. The parsing lives in gotestrunner, which needs the same
+// shape for the stale-corpus pre-flight; this is the local view of it, with
+// the display and splice rendering the two subcommands add on top. For a
 // fanned target these are the raw leaves; the readable form comes from the
 // echo a re-run prints, and this decoding is the fallback display.
-//
-// SourceExpr is always the VERBATIM source text of the value as it appeared
-// in the corpus file (e.g. `"a@\x00"`, `-3`) — never reconstructed by
-// round-tripping through a decoded value — so both triage's display output
-// and promote's splice never risk subtly rewriting the original bytes.
-type corpusArg struct {
-	TypeName   string
-	SourceExpr string
-}
+type corpusArg gotestrunner.CorpusArg
 
-// supportedCorpusTypes is the set of Go identifiers understood as native
-// fuzz corpus type names (aside from the []byte special case, handled
-// separately since it's a composite type, not an identifier).
-var supportedCorpusTypes = map[string]bool{
-	"string": true, "bool": true,
-	"int": true, "int8": true, "int16": true, "int32": true, "int64": true,
-	"uint": true, "uint8": true, "uint16": true, "uint32": true, "uint64": true,
-	"float32": true, "float64": true,
-	"rune": true, "byte": true,
-}
-
-// parseCorpusFile parses a Go fuzz corpus file: a "go test fuzz v1" header
-// line followed by one "Type(value)" line per fuzz-callback argument. It
-// returns an error for a missing/invalid header, or as soon as it hits a
-// line it doesn't recognize as a supported primitive type conversion —
-// callers are expected to report that error and skip the whole file, per
-// the documented per-file-graceful-skip triage/promote behavior.
+// parseCorpusFile decodes a Go fuzz corpus file. Any error is the caller's cue
+// to report it and skip the whole file, per the documented
+// per-file-graceful-skip triage/promote behavior.
 func parseCorpusFile(path string) ([]corpusArg, error) {
-	data, err := os.ReadFile(path)
+	parsed, err := gotestrunner.ParseCorpusFile(path)
 	if err != nil {
 		return nil, err
 	}
-	lines := strings.Split(string(data), "\n")
-	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "go test fuzz v1" {
-		return nil, fmt.Errorf("missing or invalid corpus header")
-	}
-
-	var args []corpusArg
-	for _, raw := range lines[1:] {
-		line := strings.TrimSpace(raw)
-		if line == "" {
-			continue
-		}
-		arg, err := parseCorpusArgLine(line)
-		if err != nil {
-			return nil, fmt.Errorf("unsupported corpus entry: %s", line)
-		}
-		args = append(args, arg)
-	}
-	if len(args) == 0 {
-		return nil, fmt.Errorf("no corpus arguments found")
+	args := make([]corpusArg, len(parsed))
+	for i, a := range parsed {
+		args[i] = corpusArg(a)
 	}
 	return args, nil
-}
-
-// parseCorpusArgLine parses a single "Type(value)" corpus line. It parses
-// the line as a Go expression (a type-conversion call is valid Go syntax)
-// purely to validate its shape and to locate the value's exact byte range —
-// the extracted SourceExpr is always a direct slice of the original line
-// text, never a reformatted/reconstructed rendering.
-func parseCorpusArgLine(line string) (corpusArg, error) {
-	fset := token.NewFileSet()
-	expr, err := parser.ParseExprFrom(fset, "", []byte(line), 0)
-	if err != nil {
-		return corpusArg{}, err
-	}
-	ce, ok := expr.(*ast.CallExpr)
-	if !ok || len(ce.Args) != 1 || ce.Ellipsis != token.NoPos {
-		return corpusArg{}, fmt.Errorf("not a recognized Type(value) corpus entry")
-	}
-
-	typeName, ok := corpusTypeNameOf(ce.Fun)
-	if !ok {
-		return corpusArg{}, fmt.Errorf("unsupported corpus type")
-	}
-
-	startOff := fset.Position(ce.Args[0].Pos()).Offset
-	endOff := fset.Position(ce.Args[0].End()).Offset
-	if startOff < 0 || endOff > len(line) || startOff > endOff {
-		return corpusArg{}, fmt.Errorf("could not extract corpus value")
-	}
-
-	return corpusArg{TypeName: typeName, SourceExpr: line[startOff:endOff]}, nil
-}
-
-// corpusTypeNameOf reports the corpus type name a type-conversion call's
-// Fun expression names, if it's one Go's native fuzz corpus format supports.
-func corpusTypeNameOf(fun ast.Expr) (string, bool) {
-	switch f := fun.(type) {
-	case *ast.Ident:
-		if supportedCorpusTypes[f.Name] {
-			return f.Name, true
-		}
-	case *ast.ArrayType:
-		if f.Len == nil {
-			if elt, ok := f.Elt.(*ast.Ident); ok && elt.Name == "byte" {
-				return "[]byte", true
-			}
-		}
-	}
-	return "", false
 }
 
 // display renders the arg the way it appears in the corpus file, e.g.

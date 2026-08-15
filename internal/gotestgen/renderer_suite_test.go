@@ -32,7 +32,7 @@ func renderTestPkg(t testing.TB, pkg *packages.Package, harvestSeeds bool) (stri
 	}
 
 	r := gotestgen.ExportRenderer{}
-	out, err := r.RenderTestSuiteSpec(pkg, spec, resolved, harvestSeeds)
+	out, _, err := r.RenderTestSuiteSpec(pkg, spec, resolved, harvestSeeds)
 	gotest.NoError(t, err)
 	return string(out), spec
 }
