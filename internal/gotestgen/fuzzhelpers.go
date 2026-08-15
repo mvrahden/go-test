@@ -6,7 +6,6 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/mvrahden/go-test/internal/gotestast"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -16,12 +15,6 @@ import (
 // cached corpus: the identifiers move, the generated file changes, and the
 // old positions are read by nothing.
 const fuzzFanVersion = "v1"
-
-// nativeFuzzType delegates to gotestast.NativeFuzzType — the fifteen types
-// Go's engine accepts, used by the hybrid-leaf codec's own validation.
-func nativeFuzzType(t types.Type) bool {
-	return gotestast.NativeFuzzType(t)
-}
 
 // fuzzEmitter builds decoder/encoder source for a package's non-native fuzz
 // argument types, memoising one read/write helper pair per composite type.

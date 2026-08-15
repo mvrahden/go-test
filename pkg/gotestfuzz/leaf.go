@@ -23,9 +23,9 @@ func leafWord(b []byte, width int) uint64 {
 	return binary.LittleEndian.Uint64(buf[:])
 }
 
-func LeafUint8(b []byte) uint8     { return uint8(leafWord(b, 1)) }
-func LeafUint16(b []byte) uint16   { return uint16(leafWord(b, 2)) }
-func LeafUint32(b []byte) uint32   { return uint32(leafWord(b, 4)) }
+func LeafUint8(b []byte) uint8     { return uint8(leafWord(b, 1)) }  //nolint:gosec // G115: the leaf IS one byte wide
+func LeafUint16(b []byte) uint16   { return uint16(leafWord(b, 2)) } //nolint:gosec // G115: the leaf IS two bytes wide
+func LeafUint32(b []byte) uint32   { return uint32(leafWord(b, 4)) } //nolint:gosec // G115: the leaf IS four bytes wide
 func LeafUint64(b []byte) uint64   { return leafWord(b, 8) }
 func LeafUint(b []byte) uint       { return uint(leafWord(b, 8)) }
 func LeafInt8(b []byte) int8       { return int8(LeafUint8(b)) }   //nolint:gosec // G115: deliberate bit reinterpretation

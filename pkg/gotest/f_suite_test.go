@@ -286,7 +286,7 @@ func (s *FWrapperTestSuite) TestSeedBuffering(t *gotest.T) {
 // ... idiom. -count=1 defeats the test cache: a cached pass from an unarmed
 // run would otherwise be replayed with no output.
 func runArmedFuzzTarget(target, armEnv string) string {
-	cmd := exec.Command("go", "test", "-count=1", "-run", "^"+target+"$", ".")
+	cmd := exec.Command("go", "test", "-count=1", "-run", "^"+target+"$", ".") //nolint:gosec // G204: target is a test-local constant, not user input
 	cmd.Env = append(os.Environ(), armEnv+"=1")
 	out, _ := cmd.CombinedOutput()
 	return string(out)

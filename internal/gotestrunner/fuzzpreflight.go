@@ -133,7 +133,7 @@ type CorpusMismatch struct {
 // both ways out, because neither is right in every case: a crasher worth
 // keeping becomes a typed seed, and one that only ever mattered to the old
 // shape is noise.
-func (m CorpusMismatch) Message() string {
+func (m *CorpusMismatch) Message() string {
 	return fmt.Sprintf("fuzz: %s: %s has %d values of [%s], but the target now takes %d [%s] — it predates a change to the fuzzed type's fields; run gotest fuzz promote to turn it into a typed f.Add seed, or delete it",
 		m.Func, m.File, len(m.Got), strings.Join(m.Got, ", "), len(m.Want), strings.Join(m.Want, ", "))
 }
@@ -232,7 +232,7 @@ func reportStaleCorpus(w io.Writer, dir, funcName string, want []string) {
 	if err != nil {
 		return
 	}
-	for _, m := range mismatches {
-		fmt.Fprintln(w, m.Message())
+	for i := range mismatches {
+		fmt.Fprintln(w, mismatches[i].Message())
 	}
 }

@@ -137,7 +137,7 @@ func (s *FuzzFanTestSuite) TestStructTarget(t *gotest.T) {
 
 	t.It("emits no fan and no source when every target is pass-through, but still the shapes", func(it *gotest.T) {
 		set := s.build(it, "TestCollector_FuzzMethod")
-		gotest.NotNil(it, set)
+		gotest.NotZero(it, set)
 		gotest.Empty(it, set.Fans)
 		gotest.Empty(it, set.Source)
 		gotest.NotEmpty(it, set.ParamsByFunc)
@@ -145,7 +145,7 @@ func (s *FuzzFanTestSuite) TestStructTarget(t *gotest.T) {
 
 	t.It("returns nothing at all for a package without fuzz targets", func(it *gotest.T) {
 		set := s.build(it, "TestRenderer_FixtureWithChildSuite")
-		gotest.Nil(it, set)
+		gotest.Zero(it, set)
 	})
 }
 
