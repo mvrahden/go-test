@@ -230,6 +230,55 @@ describe("DiscoveryService", () => {
     });
   });
 
+  describe("when a suite has benchmarks", () => {
+    it("carries the benchmarks array through into the cache", async () => {
+      mockExecFileAsync.mockResolvedValueOnce({
+        stdout: JSON.stringify({
+          packages: [
+            {
+              importPath: "example.com/pkg",
+              dir: "/ws/pkg",
+              suites: [
+                {
+                  name: "FooTestSuite",
+                  parallel: false,
+                  focused: false,
+                  excluded: false,
+                  guarded: false,
+                  file: "foo_test.go",
+                  line: 1,
+                  col: 1,
+                  lifecycle: [],
+                  fixtures: [],
+                  methods: [],
+                  benchmarks: [
+                    {
+                      name: "BenchmarkParse",
+                      parallel: false,
+                      focused: false,
+                      excluded: false,
+                      file: "foo_test.go",
+                      line: 8,
+                      col: 1,
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+        stderr: "",
+      });
+
+      await service.discover("/ws", ["./..."]);
+
+      const pkg = cache.getPackage("example.com/pkg");
+      expect(pkg?.suites[0].benchmarks).toEqual([
+        expect.objectContaining({ name: "BenchmarkParse", excluded: false }),
+      ]);
+    });
+  });
+
   describe("when discovery recovers after a previous total failure", () => {
     it("re-enables the warning toast for future failures", async () => {
       mockExecFileAsync.mockRejectedValue(new Error("fail"));
@@ -293,6 +342,7 @@ describe("DiscoveryCache broken packages", () => {
       lifecycle: [],
       fixtures: [],
       methods: [],
+      benchmarks: [],
     };
   }
 

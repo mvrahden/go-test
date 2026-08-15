@@ -93,6 +93,12 @@ func (s *LintTestSuite) TestAnalyzer(t *gotest.T) {
 			analysistest.Run(it.T(), testdata, lint.Analyzer, "withsharedfixture")
 		})
 	})
+
+	t.When("benchmark methods", func(w *gotest.T) {
+		w.It("detects bench-loop, bench-fixture-io and bench-wait violations", func(it *gotest.T) {
+			analysistest.Run(it.T(), testdata, lint.Analyzer, "bench")
+		})
+	})
 }
 
 func (s *LintTestSuite) TestDisableNolintFlag(t *gotest.T) {
@@ -108,11 +114,17 @@ func (s *LintTestSuite) TestDisableNolintFlag(t *gotest.T) {
 func (s *LintTestSuite) TestTierPolicy(t *gotest.T) {
 	t.When("tier-derived skip surface", func(w *gotest.T) {
 		w.It("registers a skip flag for every non-integrity rule and none for integrity rules", func(it *gotest.T) {
-			for _, rule := range []lint.Rule{lint.StdlibTest, lint.Testify, lint.AssertionSimplify, lint.AssertionRedundant, lint.FailGuard, lint.TEscape} {
+			for _, rule := range []lint.Rule{
+				lint.StdlibTest, lint.Testify, lint.AssertionSimplify, lint.AssertionRedundant, lint.FailGuard, lint.TEscape,
+				lint.BenchFixtureIO, lint.BenchWait,
+			} {
 				gotest.NotZero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "missing skip flag for %s", rule)
 				gotest.True(it, lint.SkippableRules[rule], "rule %s should be skippable", rule)
 			}
-			for _, rule := range []lint.Rule{lint.Focus, lint.PollScope, lint.TestSignature, lint.SuiteLifecycle, lint.SharedFixtureUndeclared} {
+			for _, rule := range []lint.Rule{
+				lint.Focus, lint.PollScope, lint.TestSignature, lint.SuiteLifecycle,
+				lint.BenchLoop, lint.SharedFixtureUndeclared,
+			} {
 				gotest.Zero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "unexpected skip flag for %s", rule)
 				gotest.False(it, lint.SkippableRules[rule], "integrity rule %s must not be skippable", rule)
 			}

@@ -244,6 +244,40 @@ No `TestMain` is generated — both `package foo` and `package foo_test`
 can define fixture-bound suites without conflict. Teardown runs via
 `t.Cleanup` (reverse-wavefront: leaves first, roots last).
 
+For suites with `Benchmark*` methods, one `Benchmark<Suite>` wrapper is
+generated (standalone or fixture-bound, same shape as above), with one
+`b.Run` per benchmark method and the timer fenced around each:
+
+```go
+func BenchmarkFooTestSuite(b *testing.B) {
+    ƒ_setupFixtures(b)                    // only if fixture-bound
+    s := &ƒƒ_GOTEST_FooTestSuite{...}
+    b.Cleanup(func() { s.AfterAll(lifecycleT) })
+    s.BeforeAll(lifecycleT)
+
+    b.Run("BenchmarkParse", func(b *testing.B) {
+        b.StopTimer()
+        s.BeforeEach(eachT)                // outside timing
+        b.StartTimer()
+        b.ResetTimer()
+        s.BenchmarkParse(gotest.NewB(b))   // user's b.Loop() bounds measurement
+        b.StopTimer()
+        s.AfterEach(eachT)                 // outside timing
+    })
+}
+```
+
+A suite must be named `*TestSuite` for its `Benchmark*` methods to be
+collected at all — Pass 1 discovery matches on that suffix regardless of
+whether the struct has `Test*` methods. A bench-only struct without the
+suffix is invisible to the collector; its methods are silently dropped.
+`ValidateContextConsistency` (Pass 4) additionally rejects a suite that
+mixes `Benchmark*` methods with a returning `BeforeEach` (its context type
+can't thread through `*gotest.B`) or with any stdlib `*testing.T` lifecycle
+hook. The resolver rejects a fixture with `BeforeEach`/`AfterEach` bound to
+a suite with `Benchmark*` methods — per-method fixture hooks aren't
+supported for benchmarks.
+
 The overlay filesystem (`-overlay=path/overlay.json`) injects generated files
 without modifying source. Go's compiler reads virtual paths from the overlay.
 
@@ -424,6 +458,23 @@ The system has **four levels of parallelism**, each with distinct mechanisms:
 │  └──────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
+
+### Bench mode: serial, non-streaming
+
+`gotest bench` runs the same pipeline with `PipelineConfig.Bench: true`, and
+that flag changes two things:
+
+- `resolveMaxParallel` short-circuits to `maxParallel = 1` — Level 3 above
+  collapses to one suite subprocess at a time, `--parallel`/`-test.parallel`
+  are ignored for scheduling. Running benchmarks concurrently would make
+  their timing numbers meaningless.
+- `Streaming: false` — compilation and execution are not overlapped for
+  bench runs; `runBatch` compiles every package first, then runs. `go test -c`
+  never competes with a running benchmark for CPU.
+
+Process-per-suite isolation (Level 3's existing design) is also a
+methodological benefit for benchmarks: GC pressure from one benchmark
+cannot pollute another's numbers, without any extra bench-specific code.
 
 ### Streaming Execution (Compile-Execute Overlap)
 
@@ -643,6 +694,46 @@ Or without test2json:
 ```
 <binary> -test.run=^TestFooTestSuite$ [flags]
 ```
+
+### Bench Target Construction
+
+`BuildBenchTargets` is the bench-mode sibling of `BuildSuiteTargets` — it
+walks `overlay.BenchesByPkg` (suites with `Benchmark*` methods) instead of
+`overlay.SuitesByPkg`, and filters on two independent regexes matched
+against the same `Benchmark<SuiteName>` function name:
+
+```
+BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, runFlags, userRunFilter, userBenchFilter)
+  │
+  for each package:
+    for each bench-suite name (e.g., "FooTestSuite"):
+      │
+      ├─ benchFuncName = "Benchmark" + "FooTestSuite" = "BenchmarkFooTestSuite"
+      │
+      ├─ userRunFilter set  (from -run)    → must match benchFuncName, else skip
+      ├─ userBenchFilter set (from -bench) → must match benchFuncName, else skip
+      │   (both apply — AND semantics; a -run Test<Suite> value matches nothing
+      │    here since the wrapper is named Benchmark<Suite>, not Test<Suite>)
+      │
+      └─ SuiteTarget{ ..., Bench: true }
+```
+
+A user-supplied `-bench` value is extracted out of `RunFlags` by
+`ExtractBenchFilter`/`StripBenchFilter` before target construction — it must
+not reach `buildSuiteCmd` as a raw `-test.bench` flag, since that would be
+appended after the generated one and silently win, defeating per-suite
+scoping. `buildSuiteCmd` builds the actual test binary invocation for a
+bench target as:
+
+```
+<binary> -test.run=^$ -test.bench=^BenchmarkFooTestSuite$ -test.benchmem [flags]
+```
+
+`-test.run=^$` disables ordinary tests for the run; `-test.benchmem` is
+appended unless already present in the forwarded flags.
+`resolveMaxParallel` returns `1` whenever `PipelineConfig.Bench` is set, so
+`RunSuites` dispatches these targets one at a time regardless of
+`--parallel`.
 
 ---
 

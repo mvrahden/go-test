@@ -292,6 +292,25 @@ export function formatCliCommand(cmd: CliCommand): string {
   return `${cmd.bin} ${cmd.args.join(" ")}`;
 }
 
+// buildBenchArgs constructs the `gotest bench` subcommand arguments for a
+// single suite. The generated wrapper is named "Benchmark<Suite>" and runs
+// each method under b.Run with its method name, so go test's slash matching
+// scopes runs: "-bench=^Benchmark<Suite>$" runs the whole suite, and
+// "-bench=^Benchmark<Suite>$/^<Method>$" a single method. Always the =
+// form: the CLI pairs space-separated values too, but = keeps the argv
+// unambiguous.
+export function buildBenchArgs(
+  importPath: string,
+  suiteName: string,
+  methodName?: string,
+): string[] {
+  const pattern = methodName
+    ? `^Benchmark${suiteName}$/^${methodName}$`
+    : `^Benchmark${suiteName}$`;
+  return ["bench", importPath, `-bench=${pattern}`];
+}
+
+
 export function scopedConfig(
   workspaceDir?: string,
 ): vscode.WorkspaceConfiguration {

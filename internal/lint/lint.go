@@ -38,6 +38,9 @@ const (
 	AssertionRedundant Rule = "assertion-redundant"
 	TEscape            Rule = "t-escape"
 	SuiteLifecycle     Rule = "suite-lifecycle"
+	BenchLoop          Rule = "bench-loop"
+	BenchFixtureIO     Rule = "bench-fixture-io"
+	BenchWait          Rule = "bench-wait"
 	// SharedFixtureUndeclared is integrity: window scheduling starts only
 	// the fixtures scheduled suites declare, so an undeclared read may hit
 	// a fixture that never started or is already released.
@@ -87,6 +90,15 @@ var ruleMeta = map[Rule]struct {
 	TEscape:            {TierExpressiveness, ScopeSuites},
 	SuiteLifecycle:     {TierIntegrity, ScopeSuites},
 	FailGuard:          {TierExpressiveness, ScopeGotestFiles},
+	// A benchmark that never iterates measures nothing — its numbers lie,
+	// so bench-loop is integrity. bench-fixture-io is a heuristic about
+	// what the timed loop includes; legitimate setups exist, so it stays
+	// skippable.
+	BenchLoop:      {TierIntegrity, ScopeSuites},
+	BenchFixtureIO: {TierExpressiveness, ScopeSuites},
+	// bench-wait sits with bench-fixture-io: a deliberate settle inside
+	// the loop can be legitimate, so it stays skippable.
+	BenchWait: {TierExpressiveness, ScopeSuites},
 
 	SharedFixtureUndeclared: {TierIntegrity, ScopeSuites},
 }
@@ -176,6 +188,9 @@ func run(pass *analysis.Pass) (any, error) {
 	checkAssertionSimplify(pass, insp, cl)
 	checkFailGuard(pass, insp, cl)
 	checkRedundantAssertion(pass, insp, cl)
+	checkBenchLoop(pass, insp, suites)
+	checkBenchFixtureIO(pass, insp, suites)
+	checkBenchWait(pass, insp, suites)
 
 	return nil, nil
 }
@@ -346,6 +361,7 @@ type suiteInfo struct {
 	pos               token.Pos
 	methods           map[string]token.Pos
 	recvTypePositions []token.Pos
+	fixtureFields     map[string]bool // names of *...Fixture / *...SharedFixture fields (see bench-fixture-io)
 }
 
 func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
@@ -365,9 +381,10 @@ func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
 			stripped := strings.TrimPrefix(strings.TrimPrefix(name, protocol.PrefixFocused), protocol.PrefixExcluded)
 			if strings.HasSuffix(stripped, protocol.SuffixTestSuite) {
 				suites[name] = &suiteInfo{
-					name:    name,
-					pos:     ts.Pos(),
-					methods: make(map[string]token.Pos),
+					name:          name,
+					pos:           ts.Pos(),
+					methods:       make(map[string]token.Pos),
+					fixtureFields: structFixtureFieldNames(ts.Type),
 				}
 			}
 		}

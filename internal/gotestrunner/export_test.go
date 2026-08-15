@@ -28,6 +28,7 @@ var ExportOverlayContentHash = overlayContentHash
 var ExportCacheRoot = cacheRoot
 var ExportFilterPackageLevelEvents = filterPackageLevelEvents
 var ExportIsPackageSummaryLine = protocol.IsPackageSummaryLine
+var ResolveBenchParallelismForTest = resolveMaxParallel
 
 // ExportProcessPID and ExportProcessDone let the teardown tests observe the
 // shared fixture subprocess directly: whether it is still alive, and when it is
@@ -46,7 +47,7 @@ func ExportSetTeardownTimeout(p *SharedFixtureProcess, d time.Duration) {
 	p.teardownTimeout = d
 }
 
-func ExportAutoDetectCI(cfg PipelineConfig) PipelineConfig {
+func ExportAutoDetectCI(cfg PipelineConfig) PipelineConfig { //nolint:gocritic // hugeParam: stable API
 	if !cfg.CI && os.Getenv(protocol.EnvCI) == "" && os.Getenv("CI") != "" {
 		cfg.CI = true
 	}
@@ -70,9 +71,10 @@ func ExportNewSharedFixtureProcess(sharedDir string, state map[string]json.RawMe
 type ExportFixtureWindows = fixtureWindows
 
 var ExportPlanFixtureWindows = planFixtureWindows
+var ExportPlanBenchFixtureWindows = planBenchFixtureWindows
+var ExportBenchSlotPlan = benchSlotPlan
 var ExportPlanSuitePhases = planSuitePhases
 var ExportAliveFixtureKeys = aliveFixtureKeys
 
 var ExportSortTargetIndices = sortTargetIndices
 var ExportLogSlowBuild = logSlowBuild
-var ExportComputeDispatchConcurrency = computeDispatchConcurrency

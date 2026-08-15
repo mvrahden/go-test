@@ -686,3 +686,89 @@ describe("GoTestController broken packages", () => {
     expect(pkgItem.error).toBeUndefined();
   });
 });
+
+describe("GoTestController benchmark items", () => {
+  beforeEach(() => {
+    mockWorkspaceFolders.length = 0;
+    mockGetWorkspaceFolder.mockReset();
+    mockWorkspaceFolders.push({ name: "ws", uri: { fsPath: "/ws" } });
+  });
+
+  it("registers benchmark methods beside tests, tagged for the Bench profile", () => {
+    const suite = makeSuite("CacheSuite");
+    suite.benchmarks = [
+      {
+        name: "BenchmarkGetHit",
+        parallel: false,
+        focused: false,
+        excluded: false,
+        file: "cachesuite_test.go",
+        line: 20,
+        col: 1,
+      },
+    ];
+    const cache = createMockCache([
+      {
+        importPath: "example.com/proj/pkg",
+        dir: "/ws/pkg",
+        wsDir: "/ws",
+        suites: [suite],
+      },
+    ]);
+
+    const ctrl = createController(cache);
+    ctrl.rebuild();
+
+    const pkgItem = (ctrl.testController.items as any)._map.get(
+      "example.com/proj/pkg",
+    );
+    const suiteItem = pkgItem.children.get("example.com/proj/pkg/CacheSuite");
+    const benchItem = suiteItem.children.get(
+      "example.com/proj/pkg/CacheSuite/BenchmarkGetHit",
+    );
+    expect(benchItem).toBeDefined();
+    expect(benchItem.description).toBe("bench");
+    expect(benchItem.tags.map((t: any) => t.id)).toContain("benchmark");
+
+    const testItem = suiteItem.children.get(
+      "example.com/proj/pkg/CacheSuite/TestOne",
+    );
+    expect(testItem.tags.map((t: any) => t.id)).not.toContain("benchmark");
+  });
+
+  it("removes a benchmark item when the method disappears from discovery", () => {
+    const suite = makeSuite("CacheSuite");
+    suite.benchmarks = [
+      {
+        name: "BenchmarkGetHit",
+        parallel: false,
+        focused: false,
+        excluded: false,
+        file: "cachesuite_test.go",
+        line: 20,
+        col: 1,
+      },
+    ];
+    const cache = createMockCache([
+      {
+        importPath: "example.com/proj/pkg",
+        dir: "/ws/pkg",
+        wsDir: "/ws",
+        suites: [suite],
+      },
+    ]);
+
+    const ctrl = createController(cache);
+    ctrl.rebuild();
+    suite.benchmarks = [];
+    ctrl.rebuild();
+
+    const pkgItem = (ctrl.testController.items as any)._map.get(
+      "example.com/proj/pkg",
+    );
+    const suiteItem = pkgItem.children.get("example.com/proj/pkg/CacheSuite");
+    expect(
+      suiteItem.children.get("example.com/proj/pkg/CacheSuite/BenchmarkGetHit"),
+    ).toBeUndefined();
+  });
+});

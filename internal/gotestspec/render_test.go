@@ -135,6 +135,115 @@ func TestRenderTerminal_SummaryLine(t *testing.T) {
 	}
 }
 
+func TestRenderTerminal_BenchmarkLeaf(t *testing.T) {
+	packages := []*Package{{
+		Path: "p",
+		Nodes: []*Node{{
+			Kind:    KindSuite,
+			Display: "Foo",
+			Children: []*Node{{
+				Kind:        KindBenchmark,
+				Display:     "Parse",
+				Status:      StatusPass,
+				Iterations:  1201,
+				NsPerOp:     985.2,
+				BytesPerOp:  24,
+				AllocsPerOp: 3,
+			}},
+		}},
+	}}
+
+	var buf bytes.Buffer
+	RenderTerminal(&buf, packages)
+	out := stripANSI(buf.String())
+
+	for _, want := range []string{"Parse", "985.2 ns/op", "24 B/op", "3 allocs/op", "1 benchmarks"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRenderTerminal_WithBenchDeltas(t *testing.T) {
+	packages := []*Package{{
+		Path: "p",
+		Nodes: []*Node{{
+			Kind:       KindBenchmark,
+			Display:    "BenchmarkFoo",
+			Status:     StatusPass,
+			Iterations: 100,
+			NsPerOp:    120,
+		}},
+	}}
+
+	deltas := []BenchDelta{
+		{Key: "p Foo/BenchmarkFoo", OldNs: 100, NewNs: 150, PercentChange: 50, Significant: true},
+	}
+
+	var buf bytes.Buffer
+	RenderTerminal(&buf, packages, WithBenchDeltas(deltas))
+	out := stripANSI(buf.String())
+
+	if !strings.Contains(out, "ns/op") {
+		t.Errorf("expected the benchmark result line to render, got:\n%s", out)
+	}
+	if !strings.Contains(out, "BENCHMARK  OLD ns/op  NEW ns/op  Δ") {
+		t.Errorf("expected delta table header, got:\n%s", out)
+	}
+	if !strings.Contains(out, "p Foo/BenchmarkFoo  100.0  150.0  +50.0% ⚠") {
+		t.Errorf("expected regression row, got:\n%s", out)
+	}
+	if !strings.Contains(out, "1 benchmarks:") {
+		t.Errorf("expected the trailing counts line, got:\n%s", out)
+	}
+	if strings.Contains(out, "tests passed (") {
+		t.Errorf("expected a single summary trailer, not a stacked RenderSummary one, got:\n%s", out)
+	}
+}
+
+func TestRenderTerminal_WithBenchDeltas_FilteredToEmptyStillPrintsHeader(t *testing.T) {
+	packages := []*Package{{
+		Path: "p",
+		Nodes: []*Node{{
+			Kind:       KindBenchmark,
+			Display:    "BenchmarkFoo",
+			Status:     StatusPass,
+			Iterations: 100,
+			NsPerOp:    120,
+		}},
+	}}
+
+	// An empty-but-non-nil slice models what the CLI passes when a
+	// comparison ran but every delta was filtered out (no significant
+	// regression, -v not passed): the header should still prove a
+	// comparison happened, alongside the tree's own ns/op line.
+	var buf bytes.Buffer
+	RenderTerminal(&buf, packages, WithBenchDeltas([]BenchDelta{}))
+	out := stripANSI(buf.String())
+
+	if !strings.Contains(out, "ns/op") {
+		t.Errorf("expected the benchmark result line to render, got:\n%s", out)
+	}
+	if !strings.Contains(out, "BENCHMARK  OLD ns/op  NEW ns/op  Δ") {
+		t.Errorf("expected delta table header even with zero rows, got:\n%s", out)
+	}
+}
+
+func TestRenderTerminal_NoBenchDeltas(t *testing.T) {
+	packages := []*Package{{
+		Path:  "p",
+		Nodes: []*Node{{Kind: KindTest, Display: "Foo", Status: StatusPass, Duration: time.Millisecond}},
+	}}
+
+	var buf bytes.Buffer
+	RenderTerminal(&buf, packages)
+	out := stripANSI(buf.String())
+
+	if strings.Contains(out, "BENCHMARK") {
+		t.Errorf("expected no delta table when WithBenchDeltas wasn't given, got:\n%s", out)
+	}
+}
+
 func TestRenderMarkdown_SuiteHierarchy(t *testing.T) {
 	packages := []*Package{{
 		Path: "example.com/pkg",
@@ -163,6 +272,38 @@ func TestRenderMarkdown_SuiteHierarchy(t *testing.T) {
 		"## UserService",
 		"### Create",
 		"| returns ok | PASS | 8ms |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRenderMarkdown_BenchmarkTable(t *testing.T) {
+	packages := []*Package{{
+		Path: "p",
+		Nodes: []*Node{{
+			Kind:    KindSuite,
+			Display: "Foo",
+			Children: []*Node{{
+				Kind:        KindBenchmark,
+				Display:     "Parse",
+				Status:      StatusPass,
+				Iterations:  1201,
+				NsPerOp:     985.2,
+				BytesPerOp:  24,
+				AllocsPerOp: 3,
+			}},
+		}},
+	}}
+
+	var buf bytes.Buffer
+	RenderMarkdown(&buf, packages)
+	out := buf.String()
+
+	for _, want := range []string{
+		"| Benchmark | ns/op | B/op | allocs/op |",
+		"| Parse | 985.2 | 24 | 3 |",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)

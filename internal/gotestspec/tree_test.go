@@ -3,6 +3,8 @@ package gotestspec //nolint:stdlib-test
 import (
 	"strings"
 	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 func TestBuildTree_SuiteHierarchy(t *testing.T) {
@@ -17,65 +19,33 @@ func TestBuildTree_SuiteHierarchy(t *testing.T) {
 {"Action":"pass","Package":"example.com/pkg","Elapsed":0.5}`
 
 	events, err := ParseEvents(strings.NewReader(input))
-	if err != nil {
-		t.Fatal(err)
-	}
+	gotest.NoError(t, err)
 
 	tree := BuildTree(events)
-	if len(tree) != 1 {
-		t.Fatalf("expected 1 package, got %d", len(tree))
-	}
+	gotest.Len(t, tree, 1, "packages")
 	pkg := tree[0]
-	if pkg.Path != "example.com/pkg" {
-		t.Errorf("package path = %q", pkg.Path)
-	}
-	if len(pkg.Nodes) != 1 {
-		t.Fatalf("expected 1 root node, got %d", len(pkg.Nodes))
-	}
+	gotest.Equal(t, "example.com/pkg", pkg.Path)
+	gotest.Len(t, pkg.Nodes, 1, "root nodes")
 
 	suite := pkg.Nodes[0]
-	if suite.Kind != KindSuite {
-		t.Errorf("root kind = %d, want KindSuite", suite.Kind)
-	}
-	if suite.Display != "UserService" {
-		t.Errorf("suite display = %q, want UserService", suite.Display)
-	}
+	gotest.Equal(t, KindSuite, suite.Kind)
+	gotest.Equal(t, "UserService", suite.Display)
 
-	if len(suite.Children) != 1 {
-		t.Fatalf("expected 1 method, got %d", len(suite.Children))
-	}
+	gotest.Len(t, suite.Children, 1, "methods")
 	method := suite.Children[0]
-	if method.Kind != KindMethod {
-		t.Errorf("method kind = %d, want KindMethod", method.Kind)
-	}
-	if method.Display != "Create" {
-		t.Errorf("method display = %q, want Create", method.Display)
-	}
+	gotest.Equal(t, KindMethod, method.Kind)
+	gotest.Equal(t, "Create", method.Display)
 
-	if len(method.Children) != 1 {
-		t.Fatalf("expected 1 when block, got %d", len(method.Children))
-	}
+	gotest.Len(t, method.Children, 1, "when blocks")
 	when := method.Children[0]
-	if when.Kind != KindBlock {
-		t.Errorf("when kind = %d, want KindBlock", when.Kind)
-	}
-	if when.Display != "when email is valid" {
-		t.Errorf("when display = %q", when.Display)
-	}
+	gotest.Equal(t, KindBlock, when.Kind)
+	gotest.Equal(t, "when email is valid", when.Display)
 
-	if len(when.Children) != 1 {
-		t.Fatalf("expected 1 it block, got %d", len(when.Children))
-	}
+	gotest.Len(t, when.Children, 1, "it blocks")
 	it := when.Children[0]
-	if it.Kind != KindBlock {
-		t.Errorf("it kind = %d, want KindBlock", it.Kind)
-	}
-	if it.Display != "creates the user" {
-		t.Errorf("it display = %q", it.Display)
-	}
-	if it.Status != StatusPass {
-		t.Errorf("it status = %d, want StatusPass", it.Status)
-	}
+	gotest.Equal(t, KindBlock, it.Kind)
+	gotest.Equal(t, "creates the user", it.Display)
+	gotest.Equal(t, StatusPass, it.Status)
 }
 
 func TestBuildTree_FixtureHierarchy(t *testing.T) {
@@ -90,43 +60,25 @@ func TestBuildTree_FixtureHierarchy(t *testing.T) {
 {"Action":"pass","Package":"example.com/e2e","Elapsed":0.1}`
 
 	events, err := ParseEvents(strings.NewReader(input))
-	if err != nil {
-		t.Fatal(err)
-	}
+	gotest.NoError(t, err)
 
 	tree := BuildTree(events)
 	pkg := tree[0]
 	fixture := pkg.Nodes[0]
-	if fixture.Kind != KindFixture {
-		t.Errorf("root kind = %d, want KindFixture", fixture.Kind)
-	}
-	if fixture.Display != "Infra" {
-		t.Errorf("fixture display = %q, want Infra", fixture.Display)
-	}
+	gotest.Equal(t, KindFixture, fixture.Kind)
+	gotest.Equal(t, "Infra", fixture.Display)
 
 	child := fixture.Children[0]
-	if child.Kind != KindFixture {
-		t.Errorf("child kind = %d, want KindFixture", child.Kind)
-	}
-	if child.Display != "API" {
-		t.Errorf("child display = %q, want API", child.Display)
-	}
+	gotest.Equal(t, KindFixture, child.Kind)
+	gotest.Equal(t, "API", child.Display)
 
 	suite := child.Children[0]
-	if suite.Kind != KindSuite {
-		t.Errorf("suite kind = %d, want KindSuite", suite.Kind)
-	}
-	if suite.Display != "Batch" {
-		t.Errorf("suite display = %q, want Batch", suite.Display)
-	}
+	gotest.Equal(t, KindSuite, suite.Kind)
+	gotest.Equal(t, "Batch", suite.Display)
 
 	method := suite.Children[0]
-	if method.Kind != KindMethod {
-		t.Errorf("method kind = %d, want KindMethod", method.Kind)
-	}
-	if method.Display != "Dispatch" {
-		t.Errorf("method display = %q, want Dispatch", method.Display)
-	}
+	gotest.Equal(t, KindMethod, method.Kind)
+	gotest.Equal(t, "Dispatch", method.Display)
 }
 
 func TestBuildTree_FocusedSuite(t *testing.T) {
@@ -140,12 +92,8 @@ func TestBuildTree_FocusedSuite(t *testing.T) {
 	tree := BuildTree(events)
 
 	suite := tree[0].Nodes[0]
-	if !suite.Focused {
-		t.Error("expected suite to be focused")
-	}
-	if suite.Display != "PaymentService" {
-		t.Errorf("display = %q, want PaymentService", suite.Display)
-	}
+	gotest.True(t, suite.Focused, "expected suite to be focused")
+	gotest.Equal(t, "PaymentService", suite.Display)
 }
 
 func TestBuildTree_ExcludedSuite(t *testing.T) {
@@ -157,15 +105,9 @@ func TestBuildTree_ExcludedSuite(t *testing.T) {
 	tree := BuildTree(events)
 
 	suite := tree[0].Nodes[0]
-	if !suite.Excluded {
-		t.Error("expected suite to be excluded")
-	}
-	if suite.Display != "Broken" {
-		t.Errorf("display = %q, want Broken", suite.Display)
-	}
-	if suite.Status != StatusSkip {
-		t.Errorf("status = %d, want StatusSkip", suite.Status)
-	}
+	gotest.True(t, suite.Excluded, "expected suite to be excluded")
+	gotest.Equal(t, "Broken", suite.Display)
+	gotest.Equal(t, StatusSkip, suite.Status)
 }
 
 func TestCollectStats(t *testing.T) {
@@ -185,24 +127,12 @@ func TestCollectStats(t *testing.T) {
 	tree := BuildTree(events)
 	stats := CollectStats(tree)
 
-	if stats.Suites != 2 {
-		t.Errorf("suites = %d, want 2", stats.Suites)
-	}
-	if stats.Behaviors != 3 {
-		t.Errorf("behaviors = %d, want 3", stats.Behaviors)
-	}
-	if stats.Tests != 0 {
-		t.Errorf("tests = %d, want 0", stats.Tests)
-	}
-	if stats.Passed != 1 {
-		t.Errorf("passed = %d, want 1", stats.Passed)
-	}
-	if stats.Failed != 1 {
-		t.Errorf("failed = %d, want 1", stats.Failed)
-	}
-	if stats.Skipped != 1 {
-		t.Errorf("skipped = %d, want 1", stats.Skipped)
-	}
+	gotest.Equal(t, 2, stats.Suites, "suites")
+	gotest.Equal(t, 3, stats.Behaviors, "behaviors")
+	gotest.Equal(t, 0, stats.Tests, "tests")
+	gotest.Equal(t, 1, stats.Passed, "passed")
+	gotest.Equal(t, 1, stats.Failed, "failed")
+	gotest.Equal(t, 1, stats.Skipped, "skipped")
 }
 
 func TestBuildTree_StdlibTest(t *testing.T) {
@@ -215,32 +145,18 @@ func TestBuildTree_StdlibTest(t *testing.T) {
 {"Action":"pass","Package":"example.com/pkg","Elapsed":0.01}`
 
 	events, err := ParseEvents(strings.NewReader(input))
-	if err != nil {
-		t.Fatal(err)
-	}
+	gotest.NoError(t, err)
 
 	tree := BuildTree(events)
 	pkg := tree[0]
-	if len(pkg.Nodes) != 1 {
-		t.Fatalf("expected 1 root node, got %d", len(pkg.Nodes))
-	}
+	gotest.Len(t, pkg.Nodes, 1, "root nodes")
 
 	test := pkg.Nodes[0]
-	if test.Kind != KindTest {
-		t.Errorf("root kind = %d, want KindTest", test.Kind)
-	}
-	if test.Display != "CreateUser" {
-		t.Errorf("display = %q, want CreateUser", test.Display)
-	}
-	if len(test.Children) != 2 {
-		t.Fatalf("expected 2 subtests, got %d", len(test.Children))
-	}
-	if test.Children[0].Kind != KindBlock {
-		t.Errorf("subtest kind = %d, want KindBlock", test.Children[0].Kind)
-	}
-	if test.Children[0].Display != "valid email" {
-		t.Errorf("subtest display = %q, want 'valid email'", test.Children[0].Display)
-	}
+	gotest.Equal(t, KindTest, test.Kind)
+	gotest.Equal(t, "CreateUser", test.Display)
+	gotest.Len(t, test.Children, 2, "subtests")
+	gotest.Equal(t, KindBlock, test.Children[0].Kind)
+	gotest.Equal(t, "valid email", test.Children[0].Display)
 }
 
 func TestCollectStats_Mixed(t *testing.T) {
@@ -260,18 +176,10 @@ func TestCollectStats_Mixed(t *testing.T) {
 	tree := BuildTree(events)
 	stats := CollectStats(tree)
 
-	if stats.Suites != 1 {
-		t.Errorf("suites = %d, want 1", stats.Suites)
-	}
-	if stats.Behaviors != 1 {
-		t.Errorf("behaviors = %d, want 1", stats.Behaviors)
-	}
-	if stats.Tests != 2 {
-		t.Errorf("tests = %d, want 2", stats.Tests)
-	}
-	if stats.Passed != 3 {
-		t.Errorf("passed = %d, want 3", stats.Passed)
-	}
+	gotest.Equal(t, 1, stats.Suites, "suites")
+	gotest.Equal(t, 1, stats.Behaviors, "behaviors")
+	gotest.Equal(t, 2, stats.Tests, "tests")
+	gotest.Equal(t, 3, stats.Passed, "passed")
 }
 
 func TestCollectStats_StdlibOnly(t *testing.T) {
@@ -285,18 +193,10 @@ func TestCollectStats_StdlibOnly(t *testing.T) {
 	tree := BuildTree(events)
 	stats := CollectStats(tree)
 
-	if stats.Suites != 0 {
-		t.Errorf("suites = %d, want 0", stats.Suites)
-	}
-	if stats.Behaviors != 0 {
-		t.Errorf("behaviors = %d, want 0", stats.Behaviors)
-	}
-	if stats.Tests != 2 {
-		t.Errorf("tests = %d, want 2", stats.Tests)
-	}
-	if stats.Passed != 2 {
-		t.Errorf("passed = %d, want 2", stats.Passed)
-	}
+	gotest.Equal(t, 0, stats.Suites, "suites")
+	gotest.Equal(t, 0, stats.Behaviors, "behaviors")
+	gotest.Equal(t, 2, stats.Tests, "tests")
+	gotest.Equal(t, 2, stats.Passed, "passed")
 }
 
 func TestSplitTestPath(t *testing.T) {
@@ -320,13 +220,9 @@ func TestSplitTestPath(t *testing.T) {
 			if len(got) == 0 && len(tt.want) == 0 {
 				return
 			}
-			if len(got) != len(tt.want) {
-				t.Fatalf("splitTestPath(%q) = %v, want %v", tt.path, got, tt.want)
-			}
+			gotest.Len(t, got, len(tt.want), "splitTestPath(%q) = %v, want %v", tt.path, got, tt.want)
 			for i := range got {
-				if got[i] != tt.want[i] {
-					t.Errorf("splitTestPath(%q)[%d] = %q, want %q", tt.path, i, got[i], tt.want[i])
-				}
+				gotest.Equal(t, tt.want[i], got[i], "splitTestPath(%q)[%d]", tt.path, i)
 			}
 		})
 	}
@@ -350,73 +246,41 @@ func TestBuildTree_DuplicateSuite_PtestPxtest(t *testing.T) {
 {"Action":"pass","Package":"example.com/stdlib","Elapsed":0.05}`
 
 	events, err := ParseEvents(strings.NewReader(input))
-	if err != nil {
-		t.Fatal(err)
-	}
+	gotest.NoError(t, err)
 
 	tree := BuildTree(events)
-	if len(tree) != 1 {
-		t.Fatalf("expected 1 package, got %d", len(tree))
-	}
+	gotest.Len(t, tree, 1, "packages")
 	pkg := tree[0]
 
 	// Should produce 2 separate suite nodes, not 1 merged one.
-	if len(pkg.Nodes) != 2 {
-		t.Fatalf("expected 2 root nodes, got %d", len(pkg.Nodes))
-	}
+	gotest.Len(t, pkg.Nodes, 2, "root nodes")
 
 	suite1 := pkg.Nodes[0]
 	suite2 := pkg.Nodes[1]
 
-	if suite1.Kind != KindSuite {
-		t.Errorf("suite1 kind = %d, want KindSuite", suite1.Kind)
-	}
-	if suite2.Kind != KindSuite {
-		t.Errorf("suite2 kind = %d, want KindSuite", suite2.Kind)
-	}
-	if suite1.Display != "Unit" {
-		t.Errorf("suite1 display = %q, want Unit", suite1.Display)
-	}
-	if suite2.Display != "Unit" {
-		t.Errorf("suite2 display = %q, want Unit", suite2.Display)
-	}
+	gotest.Equal(t, KindSuite, suite1.Kind, "suite1 kind")
+	gotest.Equal(t, KindSuite, suite2.Kind, "suite2 kind")
+	gotest.Equal(t, "Unit", suite1.Display, "suite1 display")
+	gotest.Equal(t, "Unit", suite2.Display, "suite2 display")
 
 	// Each suite should have 2 methods (not 4 merged).
-	if len(suite1.Children) != 2 {
-		t.Fatalf("suite1 expected 2 children, got %d", len(suite1.Children))
-	}
-	if len(suite2.Children) != 2 {
-		t.Fatalf("suite2 expected 2 children, got %d", len(suite2.Children))
-	}
+	gotest.Len(t, suite1.Children, 2, "suite1 children")
+	gotest.Len(t, suite2.Children, 2, "suite2 children")
 
 	// Children of suite2 should NOT have #01 suffix.
 	for _, c := range suite2.Children {
-		if strings.Contains(c.Name, "#") {
-			t.Errorf("suite2 child %q still has # suffix", c.Name)
-		}
-		if strings.Contains(c.Display, "#") {
-			t.Errorf("suite2 child display %q still has # suffix", c.Display)
-		}
+		gotest.NotContains(t, c.Name, "#", "suite2 child name still has # suffix")
+		gotest.NotContains(t, c.Display, "#", "suite2 child display still has # suffix")
 	}
 
 	// suite2 should be marked as variant 2 and external.
-	if suite2.Variant != 2 {
-		t.Errorf("suite2 variant = %d, want 2", suite2.Variant)
-	}
-	if !suite2.External {
-		t.Error("expected suite2 to be external")
-	}
-	if suite1.External {
-		t.Error("expected suite1 to not be external")
-	}
+	gotest.Equal(t, 2, suite2.Variant, "suite2 variant")
+	gotest.True(t, suite2.External, "expected suite2 to be external")
+	gotest.False(t, suite1.External, "expected suite1 to not be external")
 
 	// Both should have pass status.
-	if suite1.Status != StatusPass {
-		t.Errorf("suite1 status = %d, want StatusPass", suite1.Status)
-	}
-	if suite2.Status != StatusPass {
-		t.Errorf("suite2 status = %d, want StatusPass", suite2.Status)
-	}
+	gotest.Equal(t, StatusPass, suite1.Status, "suite1 status")
+	gotest.Equal(t, StatusPass, suite2.Status, "suite2 status")
 }
 
 func TestClassify_ParallelMethod(t *testing.T) {
@@ -430,12 +294,100 @@ func TestClassify_ParallelMethod(t *testing.T) {
 	tree := BuildTree(events)
 
 	method := tree[0].Nodes[0].Children[0]
-	if method.Kind != KindMethod {
-		t.Errorf("kind = %d, want KindMethod", method.Kind)
+	gotest.Equal(t, KindMethod, method.Kind)
+	gotest.Equal(t, "ParallelCreate", method.Display)
+}
+
+func TestBuildTree_BenchmarkEvents(t *testing.T) {
+	events := []TestEvent{
+		{Action: ActionOutput, Package: "p", Test: "BenchmarkFooTestSuite/BenchmarkParse",
+			Output: "BenchmarkFooTestSuite/BenchmarkParse-8   \t 1201 \t 985.2 ns/op \t 24 B/op \t 3 allocs/op\n"},
+		{Action: ActionBench, Package: "p", Test: "BenchmarkFooTestSuite/BenchmarkParse"},
 	}
-	if method.Display != "ParallelCreate" {
-		t.Errorf("display = %q, want ParallelCreate", method.Display)
+	pkgs := BuildTree(events)
+	leaf := pkgs[0].Nodes[0].Children[0]
+	gotest.Equal(t, KindBenchmark, leaf.Kind)
+	gotest.Equal(t, StatusPass, leaf.Status)
+	gotest.InDelta(t, 985.2, leaf.NsPerOp, 0.001)
+	gotest.Equal(t, int64(24), leaf.BytesPerOp)
+	gotest.Equal(t, int64(3), leaf.AllocsPerOp)
+	stats := CollectStats(pkgs)
+	gotest.Equal(t, 1, stats.Benchmarks)
+	gotest.Equal(t, 0, stats.Behaviors)
+}
+
+func TestBuildTree_BenchmarkOutputSplitAcrossEvents(t *testing.T) {
+	// test2json "output" events are not guaranteed line-aligned; under real
+	// subprocess pipe timing a bench result line can arrive split mid-token
+	// across two consecutive events for the same tagged Test. Metrics must
+	// still be recovered by scanning the node's joined output, not just the
+	// single event that happens to complete the line.
+	events := []TestEvent{
+		{Action: ActionOutput, Package: "p", Test: "BenchmarkFoo",
+			Output: "BenchmarkFoo-8   \t 12"},
+		{Action: ActionOutput, Package: "p", Test: "BenchmarkFoo",
+			Output: "01 \t 985.2 ns/op\n"},
+		{Action: ActionBench, Package: "p", Test: "BenchmarkFoo"},
 	}
+	pkgs := BuildTree(events)
+	leaf := pkgs[0].Nodes[0]
+	gotest.Equal(t, KindBenchmark, leaf.Kind)
+	gotest.Equal(t, StatusPass, leaf.Status)
+	gotest.Equal(t, 1201, leaf.Iterations)
+	gotest.InDelta(t, 985.2, leaf.NsPerOp, 0.001)
+}
+
+func TestClassify_TopLevelTestNamedBenchmarkIsNotABenchmark(t *testing.T) {
+	// "TestBenchmarkFoo" is a legitimate stdlib test whose name merely
+	// starts with "Benchmark" after the "Test" prefix is trimmed. It must
+	// resolve through the ordinary test classification, never the bench
+	// branch.
+	input := `{"Action":"run","Package":"p","Test":"TestBenchmarkFoo"}
+{"Action":"pass","Package":"p","Test":"TestBenchmarkFoo","Elapsed":0.01}
+{"Action":"pass","Package":"p","Elapsed":0.01}`
+
+	events, err := ParseEvents(strings.NewReader(input))
+	gotest.NoError(t, err)
+	tree := BuildTree(events)
+
+	node := tree[0].Nodes[0]
+	gotest.Equal(t, KindTest, node.Kind)
+	gotest.Equal(t, "BenchmarkFoo", node.Display)
+}
+
+func TestClassify_NestedBenchmarkingPrefixIsNotABenchmark(t *testing.T) {
+	// "Benchmarking_the_new_endpoint" starts with "Benchmark" but continues
+	// with a lowercase letter ("ing..."), so it is an ordinary "when/it"
+	// style block name, not a Go benchmark identifier.
+	input := `{"Action":"run","Package":"p","Test":"TestFooTestSuite"}
+{"Action":"run","Package":"p","Test":"TestFooTestSuite/TestBar"}
+{"Action":"run","Package":"p","Test":"TestFooTestSuite/TestBar/Benchmarking_the_new_endpoint"}
+{"Action":"pass","Package":"p","Test":"TestFooTestSuite/TestBar/Benchmarking_the_new_endpoint","Elapsed":0.01}
+{"Action":"pass","Package":"p","Test":"TestFooTestSuite/TestBar","Elapsed":0.01}
+{"Action":"pass","Package":"p","Test":"TestFooTestSuite","Elapsed":0.01}
+{"Action":"pass","Package":"p","Elapsed":0.01}`
+
+	events, err := ParseEvents(strings.NewReader(input))
+	gotest.NoError(t, err)
+	tree := BuildTree(events)
+
+	block := tree[0].Nodes[0].Children[0].Children[0]
+	gotest.Equal(t, KindBlock, block.Kind)
+	gotest.Equal(t, "Benchmarking the new endpoint", block.Display)
+}
+
+func TestClassify_NestedBenchmarkName(t *testing.T) {
+	input := `{"Action":"run","Package":"p","Test":"TestFooTestSuite"}
+{"Action":"run","Package":"p","Test":"TestFooTestSuite/BenchmarkParse"}
+{"Action":"output","Package":"p","Test":"TestFooTestSuite/BenchmarkParse","Output":"BenchmarkParse-8   \t 100 \t 10.0 ns/op\n"}`
+
+	events, err := ParseEvents(strings.NewReader(input))
+	gotest.NoError(t, err)
+	tree := BuildTree(events)
+
+	leaf := tree[0].Nodes[0].Children[0]
+	gotest.Equal(t, KindBenchmark, leaf.Kind)
+	gotest.Equal(t, "Parse", leaf.Display)
 }
 
 func TestBuildTree_PackageLevelOutput(t *testing.T) {
@@ -452,44 +404,26 @@ func TestBuildTree_PackageLevelOutput(t *testing.T) {
 {"Action":"fail","Package":"p","Elapsed":1.0}`
 
 	events, err := ParseEvents(strings.NewReader(input))
-	if err != nil {
-		t.Fatal(err)
-	}
+	gotest.NoError(t, err)
 
 	tree := BuildTree(events)
-	if len(tree) != 1 {
-		t.Fatalf("expected 1 package, got %d", len(tree))
-	}
+	gotest.Len(t, tree, 1, "packages")
 	pkg := tree[0]
 
 	// Test node should be present and passed
-	if len(pkg.Nodes) != 1 {
-		t.Fatalf("expected 1 node, got %d", len(pkg.Nodes))
-	}
-	if pkg.Nodes[0].Status != StatusPass {
-		t.Errorf("test status = %d, want StatusPass", pkg.Nodes[0].Status)
-	}
+	gotest.Len(t, pkg.Nodes, 1, "nodes")
+	gotest.Equal(t, StatusPass, pkg.Nodes[0].Status)
 
 	// Package should have failed
-	if pkg.Status != StatusFail {
-		t.Errorf("package status = %d, want StatusFail", pkg.Status)
-	}
+	gotest.Equal(t, StatusFail, pkg.Status)
 
 	// Package-level diagnostic output should be collected
-	if len(pkg.Output) == 0 {
-		t.Fatal("expected package-level output, got none")
-	}
+	gotest.NotEmpty(t, pkg.Output, "expected package-level output")
 
 	combined := strings.Join(pkg.Output, "")
-	if !strings.Contains(combined, "WARNING: DATA RACE") {
-		t.Errorf("package output should contain race warning, got:\n%s", combined)
-	}
-	if !strings.Contains(combined, "Found 1 data race(s)") {
-		t.Errorf("package output should contain race count, got:\n%s", combined)
-	}
+	gotest.Contains(t, combined, "WARNING: DATA RACE")
+	gotest.Contains(t, combined, "Found 1 data race(s)")
 
 	// Summary lines should NOT be in package output
-	if strings.Contains(combined, "FAIL\tp\t") {
-		t.Errorf("package output should not contain summary line, got:\n%s", combined)
-	}
+	gotest.NotContains(t, combined, "FAIL\tp\t", "package output should not contain summary line")
 }

@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
+import { hostPlatform, type BenchResultStore } from "./benchResultStore.js";
+import { formatBenchAnnotation } from "./benchReport.js";
 
 export class GoTestCodeLensProvider
   implements vscode.CodeLensProvider, vscode.Disposable
@@ -9,12 +11,20 @@ export class GoTestCodeLensProvider
   readonly onDidChangeCodeLenses: vscode.Event<void> =
     this._onDidChangeCodeLenses.event;
 
-  private subscription: vscode.Disposable;
+  private subscriptions: vscode.Disposable[] = [];
 
-  constructor(private readonly cache: DiscoveryCache) {
-    this.subscription = cache.onDidUpdate(() =>
-      this._onDidChangeCodeLenses.fire(),
+  constructor(
+    private readonly cache: DiscoveryCache,
+    private readonly benchStore?: BenchResultStore,
+  ) {
+    this.subscriptions.push(
+      cache.onDidUpdate(() => this._onDidChangeCodeLenses.fire()),
     );
+    if (benchStore) {
+      this.subscriptions.push(
+        benchStore.onDidUpdate(() => this._onDidChangeCodeLenses.fire()),
+      );
+    }
   }
 
   provideCodeLenses(
@@ -140,6 +150,64 @@ export class GoTestCodeLensProvider
         }
       }
 
+      const fileBenchmarks = suite.benchmarks.filter(
+        (m) => path.join(pkg.dir, m.file) === docPath,
+      );
+
+      if (suiteInFile && fileBenchmarks.length > 1) {
+        const range = new vscode.Range(suite.line - 1, 0, suite.line - 1, 0);
+        lenses.push(
+          new vscode.CodeLens(range, {
+            title: "▶ Bench Suite",
+            command: "gotest.runBench",
+            arguments: [importPath, suite.name],
+          }),
+        );
+      }
+
+      const platform = hostPlatform();
+      for (const method of fileBenchmarks) {
+        const range = new vscode.Range(method.line - 1, 0, method.line - 1, 0);
+
+        lenses.push(
+          new vscode.CodeLens(range, {
+            title: "▶ Bench",
+            command: "gotest.runBench",
+            arguments: [importPath, suite.name, method.name],
+          }),
+          // Five repetitions give the CLI enough samples for a trustworthy
+          // Welch comparison and an honest ± spread on the annotation.
+          new vscode.CodeLens(range, {
+            title: "5×",
+            command: "gotest.runBenchStable",
+            arguments: [importPath, suite.name, method.name],
+          }),
+        );
+
+        // The last measured numbers, right where the code is — but only
+        // numbers taken on this host's goos/goarch: a result from another
+        // platform is a different number and never shown here.
+        const latest = this.benchStore?.getLatest(
+          importPath,
+          suite.name,
+          method.name,
+          platform,
+        );
+        if (latest) {
+          lenses.push(
+            new vscode.CodeLens(range, {
+              title: formatBenchAnnotation(
+                latest,
+                latest.recordedAt,
+                Date.now(),
+                latest.delta,
+              ),
+              command: "",
+            }),
+          );
+        }
+      }
+
       if (suiteInFile && suiteHasSnapshots) {
         const range = new vscode.Range(suite.line - 1, 0, suite.line - 1, 0);
         const testPath = `${importPath}/${suite.name}`;
@@ -157,7 +225,10 @@ export class GoTestCodeLensProvider
   }
 
   dispose(): void {
-    this.subscription.dispose();
+    for (const sub of this.subscriptions) {
+      sub.dispose();
+    }
+    this.subscriptions = [];
     this._onDidChangeCodeLenses.dispose();
   }
 }

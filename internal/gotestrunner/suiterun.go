@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -33,6 +34,8 @@ type SuiteTarget struct {
 	RunFlags     []string // test binary flags (with -test. prefix)
 	CoverProfile string   // per-suite cover profile path (empty if no -coverprofile)
 	BudgetFile   string   // sidecar path for teardown budget (empty = use default)
+	Bench        bool     // when true, run the Benchmark<SuiteName> wrapper instead of the suite's tests
+	BenchFilter  string   // raw -test.bench value carrying the user's sub-benchmark segments (empty = the exact Benchmark<SuiteName> wrapper)
 	Exclusive    bool     // SuiteConfig{Exclusive: true}: dispatched strictly alone, after every non-exclusive suite
 }
 
@@ -137,16 +140,82 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 	}
 }
 
-func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2json bool) *exec.Cmd { //nolint:gocritic // hugeParam: stable API
-	var runArg string
-	if target.RunFilter != "" {
-		runArg = "-test.run=" + target.RunFilter
-	} else {
-		runArg = fmt.Sprintf("-test.run=^%s$", regexp.QuoteMeta(target.SuiteName))
+// SortTargetsSerial orders targets in place by (Package, SuiteName) — the
+// deterministic dispatch order RunBenchSuites executes them in.
+func SortTargetsSerial(targets []SuiteTarget) {
+	sort.Slice(targets, func(a, b int) bool {
+		if targets[a].Package != targets[b].Package {
+			return targets[a].Package < targets[b].Package
+		}
+		return targets[a].SuiteName < targets[b].SuiteName
+	}) //nolint:gocritic // mirror of sortTargetIndices over the targets themselves
+}
+
+// RunBenchSuites executes bench targets strictly one at a time, in slice
+// order (see SortTargetsSerial): benchmarks own the machine, and their
+// verdicts are wall-clock measurements no concurrent suite may corrupt.
+// beforeSlot/afterSlot (nil-safe) bracket each slot with its index, so the
+// caller can open and close per-slot fixture windows.
+func RunBenchSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, collector *OutputCollector, beforeSlot, afterSlot func(i int)) {
+	pkgCount := map[string]int{}
+	var pkgOrder []string
+	localIdx := make([]int, len(targets))
+	for i := range targets {
+		if _, seen := pkgCount[targets[i].Package]; !seen {
+			pkgOrder = append(pkgOrder, targets[i].Package)
+		}
+		localIdx[i] = pkgCount[targets[i].Package]
+		pkgCount[targets[i].Package]++
+	}
+	for _, pkg := range pkgOrder {
+		collector.Register(pkg, pkgCount[pkg])
 	}
 
+	useTest2JSON := collector.UsesTest2JSON()
+	env := os.Environ()
+	for k, v := range extraEnv {
+		env = append(env, k+"="+v)
+	}
+
+	for i := range targets {
+		if ctx.Err() != nil {
+			return
+		}
+		if beforeSlot != nil {
+			beforeSlot(i)
+		}
+		r := RunSingleSuite(ctx, targets[i], env, useTest2JSON)
+		collector.RecordResult(targets[i].Package, localIdx[i], r)
+		if afterSlot != nil {
+			afterSlot(i)
+		}
+	}
+}
+
+func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2json bool) *exec.Cmd { //nolint:gocritic // hugeParam: stable API
 	var testArgs []string
-	testArgs = append(testArgs, runArg)
+	switch {
+	case target.Bench:
+		// BenchFilter carries a user -bench pattern with sub-benchmark
+		// segments ("^BenchmarkSuite$/^BenchmarkMethod$"): the generated
+		// wrapper runs each method under b.Run with its method name, so go
+		// test's own slash matching scopes the run to single methods. The
+		// suite was already selected by the pattern's first segment in
+		// BuildBenchTargets; without segments the exact wrapper name runs
+		// every method, as before.
+		benchArg := fmt.Sprintf("-test.bench=^Benchmark%s$", regexp.QuoteMeta(target.SuiteName))
+		if target.BenchFilter != "" {
+			benchArg = "-test.bench=" + target.BenchFilter
+		}
+		testArgs = append(testArgs, "-test.run=^$", benchArg)
+		if !slices.Contains(target.RunFlags, "-test.benchmem") {
+			testArgs = append(testArgs, "-test.benchmem")
+		}
+	case target.RunFilter != "":
+		testArgs = append(testArgs, "-test.run="+target.RunFilter)
+	default:
+		testArgs = append(testArgs, fmt.Sprintf("-test.run=^%s$", regexp.QuoteMeta(target.SuiteName)))
+	}
 
 	if test2json {
 		testArgs = append(testArgs, "-test.v=test2json")
@@ -315,6 +384,66 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 	return targets
 }
 
+// BuildBenchTargets constructs SuiteTarget entries for benchmark suites from
+// compiled binaries and bench-eligible suite names. benchesByPkg maps import
+// path to a list of suite struct names (e.g., "FooTestSuite") that have at
+// least one effective benchmark. The generated benchmark wrapper function
+// name is "Benchmark" + suite struct name.
+//
+// userRunFilter (from -run) and userBenchFilter (from -bench) are applied
+// independently, each matched against the benchmark wrapper name exactly as
+// matchesSuiteFunc does elsewhere (first slash segment only). When both are
+// non-empty, a suite must satisfy both (AND semantics) to be included;
+// either one alone filters on its own, and when both are empty all suites
+// are included.
+//
+// A userBenchFilter with sub-benchmark segments additionally scopes what
+// runs inside the wrapper: the per-suite portion of the pattern (extracted
+// with suiteRunFilter, the same helper -run uses for subtest scoping) is
+// carried on the target as BenchFilter and becomes the binary's -test.bench
+// value, where go test's slash matching selects the b.Run sub-benchmarks.
+func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]string, dirsByPkg map[string]string, runFlags []string, userRunFilter, userBenchFilter string) []SuiteTarget {
+	binByPkg := make(map[string]string, len(compiled))
+	for _, cr := range compiled {
+		binByPkg[cr.Package] = cr.BinaryPath
+	}
+
+	translatedFlags := TranslateToTestBinaryFlags(runFlags)
+
+	var targets []SuiteTarget
+	for pkg, suites := range benchesByPkg {
+		bin, ok := binByPkg[pkg]
+		if !ok {
+			continue
+		}
+
+		pkgDir := dirsByPkg[pkg]
+
+		for _, suiteName := range suites {
+			benchFuncName := "Benchmark" + suiteName
+			if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, benchFuncName) {
+				continue
+			}
+			if userBenchFilter != "" && !anyBranchMatchesSuiteFunc(userBenchFilter, benchFuncName) {
+				continue
+			}
+			target := SuiteTarget{
+				SuiteSpec: SuiteSpec{
+					Package:   pkg,
+					Dir:       pkgDir,
+					SuiteName: suiteName,
+				},
+				BinaryPath:  bin,
+				RunFlags:    translatedFlags,
+				Bench:       true,
+				BenchFilter: suiteRunFilter(userBenchFilter, benchFuncName),
+			}
+			targets = append(targets, target)
+		}
+	}
+	return targets
+}
+
 // sortTargetIndices orders target indices by (Package, SuiteName) so
 // exclusive dispatch is deterministic run over run.
 func sortTargetIndices(targets []SuiteTarget, idx []int) {
@@ -330,6 +459,20 @@ func sortTargetIndices(targets []SuiteTarget, idx []int) {
 // matchesSuiteFunc checks if the user's -run regex could match a given
 // test function name. The first segment (before /) of the regex is tested
 // against the function name.
+// anyBranchMatchesSuiteFunc reports whether any top-level alternation branch
+// of pattern selects funcName by its first slash segment. matchesSuiteFunc
+// alone takes the first segment of the whole pattern, which drops every
+// suite but the first from "^BenchmarkFoo$/^A$|^BenchmarkBar$/^B$"-shaped
+// filters; sub-benchmark scoping needs each branch judged on its own.
+func anyBranchMatchesSuiteFunc(pattern, funcName string) bool {
+	for _, alt := range splitTopLevelOr(pattern) {
+		if matchesSuiteFunc(alt, funcName) {
+			return true
+		}
+	}
+	return false
+}
+
 func matchesSuiteFunc(runRegex string, funcName string) bool {
 	parts := strings.SplitN(runRegex, "/", 2)
 	topLevel := parts[0]

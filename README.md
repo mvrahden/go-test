@@ -571,6 +571,73 @@ Or when running `go test` directly:
 GOTEST_UPDATE_SNAPSHOTS=1 go test ./...
 ```
 
+## Benchmarking
+
+Benchmark methods live on the same suites as tests — same struct, same lifecycle, own subcommand.
+
+### Authoring
+
+```go
+type ParserTestSuite struct {
+    p *Parser
+}
+
+func (s *ParserTestSuite) BeforeEach(t *gotest.T) { s.p = NewParser() }
+
+func (s *ParserTestSuite) BenchmarkParse(b *gotest.B) {
+    doc := loadTestdata("large.json")
+    for b.Loop() {
+        s.p.Parse(doc)
+    }
+}
+```
+
+`Benchmark*` methods take `*gotest.B` (or `*testing.B`) and honor the same `F_`/`X_` focus/exclude prefixes as test methods.
+`BeforeEach`/`AfterEach` run once per benchmark method, outside the timing window — the generated wrapper stops the timer before `BeforeEach`, starts and resets it right before your method runs, and stops it again before `AfterEach`.
+Use `b.Loop()` (Go 1.24+) rather than `b.N` — it excludes setup before the loop from timing automatically.
+
+The suite must be named `*TestSuite`, even if it only has benchmarks — a struct without that suffix is never discovered, so its `Benchmark*` methods are silently dropped.
+Benchmarks can't coexist with a returning `BeforeEach` (its context type can't thread through `*gotest.B`), and every lifecycle hook on a benchmark suite must take `*gotest.T`, not `*testing.T`.
+Fixture-bound suites work — fixtures hydrate before benchmarks run — but a fixture with `BeforeEach`/`AfterEach` bound to a suite that has `Benchmark*` methods is rejected at generation time: per-method fixture hooks aren't supported for benchmarks.
+
+### Running
+
+```bash
+gotest bench ./...                     # all benchmarks
+gotest bench ./pkg/parser -run Parse   # filter by suite name
+gotest bench ./pkg/parser -bench Parse # filter by benchmark name
+```
+
+`gotest ./...` never runs benchmarks — use `gotest bench` explicitly.
+
+Benchmark suites always run serially, one suite process at a time, regardless of `--parallel`/`-test.parallel`.
+Running benchmarks concurrently makes their timing numbers meaningless — the runner disables streaming and compiles everything up front so `go test -c` never competes with a running benchmark for CPU.
+A fresh process per suite is also a methodological win, not just an implementation detail: GC pressure from one benchmark can't pollute another's numbers.
+
+`-test.benchmem` is on by default — every benchmark line reports `B/op`/`allocs/op` alongside `ns/op`.
+`-benchtime` and `-count` are forwarded to `go test` unchanged.
+`-coverprofile` works; `--min` (coverage gate) isn't available in bench mode.
+`-run` and `-bench` both filter which suites run, both matched against each suite's `Benchmark<SuiteName>` wrapper function — `-run` the same way it scopes suites for `gotest ./...`, `-bench` by benchmark function name.
+Given both, a suite must match both to run (AND semantics).
+`-run Test<Suite>`-style values match nothing in bench mode — filter by the suite name itself, not the `Test` prefix.
+
+With no matching benchmarks, `gotest bench` prints `no benchmarks found` and exits 0.
+
+### Spec view
+
+```bash
+gotest bench --spec ./examples/notification -benchtime=10x
+```
+
+```
+BenchmarkNotificationDispatchBench
+  ✓ Dispatch  810.6 ns/op · 596 B/op · 2 allocs/op
+
+1 suites, 1 benchmarks: 
+```
+
+Each line reports `ns/op`, `B/op`, and `allocs/op` — the same numbers `go test -bench` prints, rendered as a spec.
+
 ## Configuration
 
 Every fixture and suite runs with sensible defaults — 2-minute fixture timeout, 30-second per-test timeout.
@@ -742,12 +809,42 @@ Use the official action for CI pipelines with failure summaries, inline PR annot
 
 By default (`version: gomod`), the action resolves `gotest` from your `go.mod` — no version drift between CI and local development. Set `version: latest` or a specific tag to install a standalone binary instead.
 
-The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel. See the [reference](https://mvrahden.github.io/go-test/reference/#ci-integration) for the full inputs/outputs table.
+The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel.
+
+With `bench: true`, a benchmark step runs after the tests (`gotest bench --spec --json`): the spec view plus delta table land in the step summary, the versioned JSON report lands in a temp file exposed as the `bench-report` output, and a breached gate fails the step with the offending keys in `bench-breached-keys`.
+
+### Inputs
+
+The tables below are the canonical action surface — a drift guard test keeps them in sync with `action.yml`.
+
+| Input | Description |
+|---|---|
+| `packages` | Package patterns to test (default `./...`) |
+| `race` | Enable the race detector (default `false`) |
+| `coverage` | Enable coverage profiling and reporting (default `false`) |
+| `min-coverage` | Minimum coverage percentage (0-100, fails if below) |
+| `flags` | Additional gotest flags (`--double-dash` style; also forwarded to the bench step) |
+| `go-test-flags` | Additional go test flags (`-single-dash` style) |
+| `bench` | Run benchmarks after tests via `gotest bench --spec --json` (default `false`) |
+| `bench-baseline` | Baseline JSON file to compare benchmarks against (`--against`) |
+| `bench-gate` | Fail if any benchmark regresses by more than this percent (`--gate`) |
+| `bench-save` | Save the run as a JSON baseline at this path (`--save`); an explicit empty string saves to `bench.baseline` from `.gotest.yml`; default `false` saves nothing |
+| `version` | `gomod` (default) resolves from go.mod; a tag (e.g. `v1.0.0`, `latest`) installs globally |
+
+### Outputs
+
+| Output | Description |
+|---|---|
+| `exit-code` | Test process exit code |
+| `coverage` | Coverage percentage (empty if coverage not enabled) |
+| `bench-report` | Path to the `gotest bench --json` report file (empty if bench not enabled) |
+| `bench-breached-keys` | Comma-joined benchmark keys that breached the gate (empty if none or no gate) |
 
 ## Commands
 
 ```bash
 gotest ./... -v -race          # generate overlays and run tests (default)
+gotest bench ./...             # run BenchmarkX suite methods, serially
 gotest spec ./...              # behavioral specification view
 gotest summary ./...           # failure-focused summary for CI
 gotest watch ./... -v          # watch mode with auto-rerun

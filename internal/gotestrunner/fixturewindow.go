@@ -146,3 +146,97 @@ func aliveFixtureKeys(phaseSuites map[string][]string, reqKeys map[string]map[st
 func sharedFixtureKey(sf *gotestgen.SharedFixtureInfo) string {
 	return sf.PkgPath + "." + sf.Identifier
 }
+
+// Bench windows: bench dispatch is strictly serial, so every slot is its own
+// phase. A fixture is resident from the first slot that needs it until the
+// last — opened by StartKeys just before the first, released by TeardownKeys
+// right after the last, never restarted in between.
+
+// planBenchFixtureWindows computes the residency plan for a bench run. The
+// selection mirrors BuildBenchTargets minus compile results: -run and -bench
+// are matched against Benchmark<Suite>, not the test function names the
+// default plan uses. Bulk is the first planned slot's needs — started
+// up-front, concurrent with compile; every other fixture rides deferred and
+// opens with its slot.
+func planBenchFixtureWindows(overlay *OverlayResult, userRunFilter, userBenchFilter string) fixtureWindows {
+	type slot struct {
+		pkg   string
+		suite string
+	}
+	var slots []slot
+	for pkg, suites := range overlay.BenchesByPkg {
+		for _, suiteName := range suites {
+			benchFuncName := "Benchmark" + suiteName
+			if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, benchFuncName) {
+				continue
+			}
+			if userBenchFilter != "" && !anyBranchMatchesSuiteFunc(userBenchFilter, benchFuncName) {
+				continue
+			}
+			slots = append(slots, slot{pkg: pkg, suite: suiteName})
+		}
+	}
+	// Dispatch order: the same deterministic (Package, SuiteName) order the
+	// serial dispatcher applies.
+	sort.Slice(slots, func(a, b int) bool {
+		if slots[a].pkg != slots[b].pkg {
+			return slots[a].pkg < slots[b].pkg
+		}
+		return slots[a].suite < slots[b].suite
+	})
+
+	all := map[string][]string{}
+	for _, sl := range slots {
+		all[sl.pkg] = append(all[sl.pkg], "Test"+sl.suite)
+	}
+	w := fixtureWindows{
+		Bulk: map[string]bool{},
+		Tail: map[string]bool{},
+	}
+	if len(slots) > 0 {
+		first := map[string][]string{slots[0].pkg: {"Test" + slots[0].suite}}
+		w.Bulk = aliveFixtureKeys(first, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures)
+	}
+	alive := aliveFixtureKeys(all, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures)
+	for i := range overlay.SharedFixtures {
+		key := sharedFixtureKey(&overlay.SharedFixtures[i])
+		switch {
+		case w.Bulk[key]:
+			w.Fixtures = append(w.Fixtures, overlay.SharedFixtures[i])
+		case alive[key]:
+			sf := overlay.SharedFixtures[i]
+			sf.Deferred = true
+			w.Fixtures = append(w.Fixtures, sf)
+		default:
+			w.Skipped++
+		}
+	}
+	return w
+}
+
+// benchSlotPlan computes each slot's needed keys and the union of every later
+// slot's needs, for bench targets already in dispatch order. laterNeeds has
+// len(targets)+1 entries; the final one is empty — after the last slot,
+// nothing is needed.
+func benchSlotPlan(targets []SuiteTarget, reqKeys map[string]map[string][]string, fixtures []gotestgen.SharedFixtureInfo) (needs, laterNeeds []map[string]bool) {
+	needs = make([]map[string]bool, len(targets))
+	for i := range targets {
+		// Bench targets carry the bare suite identifier; required keys are
+		// keyed by test function name.
+		phase := map[string][]string{targets[i].Package: {"Test" + targets[i].SuiteName}}
+		needs[i] = aliveFixtureKeys(phase, reqKeys, fixtures)
+	}
+	laterNeeds = make([]map[string]bool, len(targets)+1)
+	laterNeeds[len(targets)] = map[string]bool{}
+	for i := len(targets) - 1; i >= 0; i-- {
+		later := make(map[string]bool, len(laterNeeds[i+1])+len(needs[i]))
+		for k := range laterNeeds[i+1] {
+			later[k] = true
+		}
+		for k := range needs[i] {
+			later[k] = true
+		}
+		laterNeeds[i] = later
+	}
+	return needs, laterNeeds
+}

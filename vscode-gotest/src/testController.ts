@@ -32,6 +32,10 @@ export class GoTestController implements vscode.Disposable {
       request: vscode.TestRunRequest,
       token: vscode.CancellationToken,
     ) => Promise<void>,
+    benchHandler?: (
+      request: vscode.TestRunRequest,
+      token: vscode.CancellationToken,
+    ) => Promise<void>,
   ) {
     this.controller = vscode.tests.createTestController("gotest", "gotest");
 
@@ -62,6 +66,21 @@ export class GoTestController implements vscode.Disposable {
       (request, token) => updateSnapshotsHandler(request, token),
       false,
     );
+
+    // Benchmarks get their own profile, scoped to the "benchmark" tag so it
+    // is only offered on benchmark items — and benchmark items never run as
+    // part of a normal test run (the run handler filters the tag out).
+    // A benchmark answers with a number, not pass/fail; mixing the two run
+    // kinds would produce meaningless timings on loaded machines.
+    if (benchHandler) {
+      this.controller.createRunProfile(
+        "Bench",
+        vscode.TestRunProfileKind.Run,
+        (request, token) => benchHandler(request, token),
+        false,
+        new vscode.TestTag("benchmark"),
+      );
+    }
 
     let rebuildTimer: ReturnType<typeof setTimeout> | undefined;
     this.disposables.push(
@@ -404,6 +423,35 @@ export class GoTestController implements vscode.Disposable {
           method.parallel,
         );
         suiteItem.children.add(methodItem);
+      }
+
+      // Benchmark methods sit beside tests and fuzzers under their suite —
+      // names are disjoint by prefix (Benchmark*), so they share the id
+      // namespace. They carry the "benchmark" tag: the tag routes them to
+      // the Bench run profile and keeps them out of ordinary runs.
+      for (const bench of suite.benchmarks ?? []) {
+        const benchId = `${suiteId}/${bench.name}`;
+        seenMethodIds.add(benchId);
+
+        const benchUri = vscode.Uri.file(path.join(pkg.dir, bench.file));
+        let benchItem = suiteItem.children.get(benchId);
+        if (!benchItem) {
+          benchItem = this.controller.createTestItem(
+            benchId,
+            bench.name,
+            benchUri,
+          );
+        }
+        benchItem.range = new vscode.Range(
+          new vscode.Position(bench.line - 1, bench.col - 1),
+          new vscode.Position(bench.line - 1, bench.col - 1),
+        );
+        benchItem.tags = [
+          new vscode.TestTag("benchmark"),
+          ...this.buildTags(bench.focused, bench.excluded, bench.parallel),
+        ];
+        benchItem.description = "bench";
+        suiteItem.children.add(benchItem);
       }
 
       suiteItem.children.forEach((child) => {

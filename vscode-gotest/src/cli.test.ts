@@ -11,7 +11,12 @@ vi.mock("vscode", () => ({
   window: { showWarningMessage: vi.fn(), showErrorMessage: vi.fn() },
 }));
 
-import { compareVersions, escapeRegExp, formatCliCommand } from "./cli.js";
+import {
+  compareVersions,
+  escapeRegExp,
+  formatCliCommand,
+  buildBenchArgs,
+} from "./cli.js";
 
 describe("compareVersions", () => {
   it("returns 0 for equal versions", () => {
@@ -51,6 +56,35 @@ describe("escapeRegExp", () => {
 
   it("escapes module paths", () => {
     expect(escapeRegExp("github.com/foo/bar")).toBe("github\\.com/foo/bar");
+  });
+});
+
+describe("buildBenchArgs", () => {
+  it("scopes to the suite via -bench=, matching the generated wrapper name", () => {
+    expect(buildBenchArgs("example.com/pkg", "FooTestSuite")).toEqual([
+      "bench",
+      "example.com/pkg",
+      "-bench=^BenchmarkFooTestSuite$",
+    ]);
+  });
+
+  it("scopes to a single method via go test's sub-benchmark slash pattern", () => {
+    expect(
+      buildBenchArgs("example.com/pkg", "FooTestSuite", "BenchmarkParse"),
+    ).toEqual([
+      "bench",
+      "example.com/pkg",
+      "-bench=^BenchmarkFooTestSuite$/^BenchmarkParse$",
+    ]);
+  });
+
+  it("does not pass -run, since it matches the same wrapper name and AND-composes with -bench", () => {
+    const args = buildBenchArgs(
+      "example.com/pkg",
+      "FooTestSuite",
+      "BenchmarkParse",
+    );
+    expect(args).not.toContain("-run");
   });
 });
 

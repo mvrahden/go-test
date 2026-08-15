@@ -29,6 +29,20 @@ jobs:
           packages: "./... ./examples/..."
           race: true
 
+  bench-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+      - name: Bench (examples, single iteration)
+        uses: ./
+        with:
+          packages: "./examples/..."
+          bench: "true"
+          flags: "-benchtime=1x"
+
   test:
     runs-on: ubuntu-latest
     strategy:

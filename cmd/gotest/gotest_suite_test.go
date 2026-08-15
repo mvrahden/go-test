@@ -4,17 +4,21 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
+	"go.yaml.in/yaml/v3"
 	"golang.org/x/tools/go/packages"
 
 	. "github.com/mvrahden/go-test/cmd/gotest"
 	"github.com/mvrahden/go-test/internal/config"
+	"github.com/mvrahden/go-test/internal/gotestbench"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
@@ -24,10 +28,54 @@ import (
 
 // CmdGotestTestSuite tests CLI argument parsing, subcommands,
 // discovery, spec rendering, and code generation.
-type CmdGotestTestSuite struct{}
+//
+//nolint:lifecycle-pair // BeforeAll's binary lives under t.TempDir(), which the framework removes automatically
+type CmdGotestTestSuite struct {
+	binary   string
+	repoRoot string
+}
 
 func (s *CmdGotestTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true}
+}
+
+func (s *CmdGotestTestSuite) BeforeAll(t *gotest.T) {
+	absRoot, err := filepath.Abs("../..")
+	gotest.NoError(t, err)
+	s.repoRoot = absRoot
+
+	binDir := t.TempDir()
+	binaryName := "gotest"
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+	s.binary = filepath.Join(binDir, binaryName)
+	cmd := exec.Command("go", "build", "-o", s.binary, "./cmd/gotest") //nolint:gosec // G204: go tool with controlled arguments
+	cmd.Dir = absRoot
+	out, err := cmd.CombinedOutput()
+	gotest.NoError(t, err, "build gotest binary: %s", string(out))
+}
+
+// runCLI runs the built gotest binary from the repo root and returns its
+// combined stdout+stderr output.
+func (s *CmdGotestTestSuite) runCLI(t *gotest.T, args ...string) string {
+	out, _ := s.runCLIExit(t, args...)
+	return out
+}
+
+// runCLIExit runs the built gotest binary from the repo root and returns its
+// combined stdout+stderr output along with its exit code.
+func (s *CmdGotestTestSuite) runCLIExit(t *gotest.T, args ...string) (string, int) {
+	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Dir = s.repoRoot
+	out, err := cmd.CombinedOutput()
+	var exitErr *exec.ExitError
+	gotest.True(t, err == nil || errors.As(err, &exitErr), "running gotest binary: %v\n%s", err, out)
+	code := 0
+	if cmd.ProcessState != nil {
+		code = cmd.ProcessState.ExitCode()
+	}
+	return string(out), code
 }
 
 func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
@@ -245,6 +293,55 @@ func (s *CmdGotestTestSuite) TestCLISurfaceMatchesSpec(t *gotest.T) {
 		w.It("documents no phantom lint rules", func(it *gotest.T) {
 			for id := range documented {
 				gotest.True(it, lint.Known(lint.Rule(id)), "spec.md documents unknown lint rule %q", id)
+			}
+		})
+	})
+}
+
+// TestActionSurfaceMatchesSpec is a drift guard: README.md's GitHub Actions
+// inputs/outputs tables are the canonical documented action surface and must
+// stay in sync with action.yml.
+func (s *CmdGotestTestSuite) TestActionSurfaceMatchesSpec(t *gotest.T) {
+	actionRaw, err := os.ReadFile(filepath.Join("..", "..", "action.yml"))
+	gotest.NoError(t, err)
+	var action struct {
+		Inputs  map[string]any `yaml:"inputs"`
+		Outputs map[string]any `yaml:"outputs"`
+	}
+	gotest.NoError(t, yaml.Unmarshal(actionRaw, &action))
+
+	readme, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
+	gotest.NoError(t, err)
+	doc := string(readme)
+
+	t.When("comparing the Inputs table", func(w *gotest.T) {
+		documented := specTableEntries(doc, "### Inputs")
+		w.It("documents every action input", func(it *gotest.T) {
+			for name := range action.Inputs {
+				gotest.True(it, documented[name], "action input %q missing from README.md", name)
+			}
+		})
+		w.It("documents no phantom inputs", func(it *gotest.T) {
+			for name := range documented {
+				_, known := action.Inputs[name]
+				gotest.True(it, known, "README.md documents unknown action input %q", name)
+			}
+		})
+	})
+
+	t.When("comparing the Outputs table", func(w *gotest.T) {
+		// The Outputs table is the last subsection of its ## section, so it
+		// ends at the next ## heading, not at a ### one.
+		documented := specTableEntriesUntil(doc, "### Outputs", "\n## ")
+		w.It("documents every action output", func(it *gotest.T) {
+			for name := range action.Outputs {
+				gotest.True(it, documented[name], "action output %q missing from README.md", name)
+			}
+		})
+		w.It("documents no phantom outputs", func(it *gotest.T) {
+			for name := range documented {
+				_, known := action.Outputs[name]
+				gotest.True(it, known, "README.md documents unknown action output %q", name)
 			}
 		})
 	})
@@ -679,6 +776,52 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 	})
 }
 
+func (s *CmdGotestTestSuite) TestRunDiscover_Benchmarks(t *gotest.T) {
+	t.It("includes benchmark methods in discover JSON, marking exclusions", func(it *gotest.T) {
+		srcPath := filepath.Join(
+			s.repoRoot, "internal", "gotestgen", "testdata", "sources",
+			"TestCollector_BenchmarkMethod", "test.go",
+		)
+		src, err := os.ReadFile(srcPath)
+		gotest.NoError(it, err)
+
+		// The Task 3 testdata source isn't its own module, so stage it as a
+		// throwaway package inside the examples module (already `use`d by
+		// go.work) rather than fighting GOWORK for an out-of-workspace dir.
+		fixtureDir, err := os.MkdirTemp(filepath.Join(s.repoRoot, "examples"), "discoverbench-")
+		gotest.NoError(it, err)
+		defer os.RemoveAll(fixtureDir)
+		gotest.NoError(it, os.WriteFile(filepath.Join(fixtureDir, "bench_fixture.go"), src, 0600))
+
+		// gotestgen.LoadPackages requires Tests:true's "[pkg.test]" variant,
+		// which only exists for packages with _test.go files; this fixture
+		// (copied verbatim from the Task 3 testdata, filename "test.go") has
+		// none, so load it as a plain package instead — CollectSuiteSpecs
+		// only needs Syntax/Types, not a test-binary variant.
+		pkgs, err := packages.Load(&packages.Config{
+			Mode: packages.NeedModule | packages.NeedSyntax | packages.NeedName |
+				packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps,
+		}, fixtureDir)
+		gotest.NoError(it, err)
+		gotest.Len(it, pkgs, 1)
+		gotest.Empty(it, pkgs[0].Errors, "expected no package load errors, got: %v", pkgs[0].Errors)
+
+		c := gotestgen.NewCollector()
+		result := c.CollectSuiteSpecs(pkgs[0])
+		gotest.Empty(it, result.Errs, "expected no collector errors, got: %v", result.Errs)
+		gotest.Len(it, result.Suites, 1)
+
+		ds := ExportBuildDiscoverSuite(result.Suites[0])
+		data, err := json.Marshal(ds)
+		gotest.NoError(it, err)
+		payload := string(data)
+
+		gotest.Contains(it, payload, `"benchmarks":[{"name":"BenchmarkParse"`)
+		gotest.Contains(it, payload, `"X_BenchmarkOld"`)
+		gotest.Contains(it, payload, `"excluded":true`)
+	})
+}
+
 func (s *CmdGotestTestSuite) TestFocusViolation_String(t *gotest.T) {
 	for sub, tc := range gotest.Each(t, []struct {
 		Desc     string
@@ -1065,5 +1208,151 @@ func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 			result := ExportReplacePatterns(tc.original, tc.newPatterns)
 			gotest.Equal(sub, tc.expected, result)
 		}
+	})
+}
+
+func (s *CmdGotestTestSuite) TestBenchDeltaLines(t *gotest.T) {
+	t.When("first run", func(w *gotest.T) {
+		w.It("prints no deltas but records ns/op", func(it *gotest.T) {
+			results := []gotestbench.Result{
+				{Package: "p", Suite: "Foo", Name: "BenchmarkBar", Samples: []gotestbench.Sample{{NsPerOp: 100}}},
+			}
+			lines, next := ExportBenchDeltaLines(results, nil)
+			gotest.Empty(it, lines)
+			gotest.Equal(it, 100.0, next["p\x00Foo\x00BenchmarkBar"])
+		})
+	})
+
+	t.When("a benchmark regresses", func(w *gotest.T) {
+		w.It("reports a positive delta", func(it *gotest.T) {
+			results := []gotestbench.Result{
+				{Package: "p", Suite: "Foo", Name: "BenchmarkBar", Samples: []gotestbench.Sample{{NsPerOp: 200}}},
+			}
+			prev := map[string]float64{"p\x00Foo\x00BenchmarkBar": 100}
+
+			lines, next := ExportBenchDeltaLines(results, prev)
+
+			gotest.Len(it, lines, 1)
+			gotest.Contains(it, lines[0], "BenchmarkBar")
+			gotest.Contains(it, lines[0], "200.00 ns/op")
+			gotest.Contains(it, lines[0], "+100.0%")
+			gotest.Equal(it, 200.0, next["p\x00Foo\x00BenchmarkBar"])
+		})
+	})
+
+	t.When("a benchmark improves", func(w *gotest.T) {
+		w.It("reports a negative delta", func(it *gotest.T) {
+			results := []gotestbench.Result{
+				{Package: "p", Suite: "Foo", Name: "BenchmarkBar", Samples: []gotestbench.Sample{{NsPerOp: 50}}},
+			}
+			prev := map[string]float64{"p\x00Foo\x00BenchmarkBar": 100}
+
+			lines, _ := ExportBenchDeltaLines(results, prev)
+
+			gotest.Len(it, lines, 1)
+			gotest.Contains(it, lines[0], "-50.0%")
+		})
+	})
+
+	t.When("a benchmark has multiple samples", func(w *gotest.T) {
+		w.It("averages ns/op across samples", func(it *gotest.T) {
+			results := []gotestbench.Result{
+				{Package: "p", Suite: "", Name: "BenchmarkBaz", Samples: []gotestbench.Sample{{NsPerOp: 100}, {NsPerOp: 200}}},
+			}
+			_, next := ExportBenchDeltaLines(results, nil)
+			gotest.Equal(it, 150.0, next["p\x00\x00BenchmarkBaz"])
+		})
+	})
+
+	t.When("a benchmark is new this run", func(w *gotest.T) {
+		w.It("prints no delta for it", func(it *gotest.T) {
+			results := []gotestbench.Result{
+				{Package: "p", Suite: "Foo", Name: "BenchmarkNew", Samples: []gotestbench.Sample{{NsPerOp: 100}}},
+			}
+			prev := map[string]float64{"p\x00Foo\x00BenchmarkOther": 50}
+
+			lines, next := ExportBenchDeltaLines(results, prev)
+
+			gotest.Empty(it, lines)
+			gotest.Equal(it, 100.0, next["p\x00Foo\x00BenchmarkNew"])
+		})
+	})
+}
+
+func (s *CmdGotestTestSuite) TestBenchSubcommand(t *gotest.T) {
+	t.It("runs suite benchmarks serially and prints ns/op lines", func(it *gotest.T) {
+		out := s.runCLI(it, "bench", "./examples/notification", "-benchtime=10x")
+		gotest.Contains(it, out, "BenchmarkNotificationDispatchBenchTestSuite")
+		gotest.Contains(it, out, "ns/op")
+	})
+	t.It("reports when no benchmarks exist", func(it *gotest.T) {
+		out := s.runCLI(it, "bench", "./internal/protocol")
+		gotest.Contains(it, out, "no benchmarks found")
+	})
+}
+
+func (s *CmdGotestTestSuite) TestBenchSaveAgainstGate(t *gotest.T) {
+	t.It("saves a baseline with one Sample per -count repetition", func(it *gotest.T) {
+		dir := it.TempDir()
+		baselinePath := filepath.Join(dir, "baseline.json")
+
+		out, code := s.runCLIExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=4", "--save="+baselinePath)
+		gotest.Equal(it, 0, code)
+		// --save implies spec rendering (Task 7's spec view), which trims
+		// the suite wrapper's "TestSuite" suffix, so it shows up as
+		// "BenchmarkNotificationDispatchBench" rather than the raw
+		// "BenchmarkNotificationDispatchBenchTestSuite" wrapper name.
+		gotest.Contains(it, out, "NotificationDispatchBench")
+		gotest.Contains(it, out, "ns/op")
+
+		data, err := os.ReadFile(baselinePath)
+		gotest.NoError(it, err)
+		var b gotestbench.Baseline
+		gotest.NoError(it, json.Unmarshal(data, &b))
+		gotest.NotEmpty(it, b.Results)
+		for _, r := range b.Results {
+			gotest.Len(it, r.Samples, 4)
+		}
+	})
+
+	t.It("compares two saved baselines and passes an impossible-to-trip gate", func(it *gotest.T) {
+		dir := it.TempDir()
+		firstPath := filepath.Join(dir, "first.json")
+
+		_, code := s.runCLIExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--save="+firstPath)
+		gotest.Equal(it, 0, code)
+
+		out, code := s.runCLIExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--against="+firstPath, "--gate=500")
+		gotest.Equal(it, 0, code)
+		// A bare --against (no --spec/--save) must still show the benchmark
+		// actually ran, not just a delta table header: the tree's own
+		// ns/op result line has to render alongside the comparison.
+		gotest.Contains(it, out, "ns/op")
+		gotest.Contains(it, out, "BENCHMARK")
+		gotest.Contains(it, out, "OLD ns/op")
+		gotest.Contains(it, out, "NEW ns/op")
+	})
+
+	t.It("errors when --gate is given without a baseline source", func(it *gotest.T) {
+		out, code := s.runCLIExit(it, "bench", "./examples/notification", "-benchtime=10x", "--gate=10")
+		gotest.NotEqual(it, 0, code)
+		gotest.Contains(it, out, "--gate requires --against")
+	})
+
+	t.It("renders exactly one summary trailer for --spec --against", func(it *gotest.T) {
+		dir := it.TempDir()
+		firstPath := filepath.Join(dir, "first.json")
+
+		_, code := s.runCLIExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--save="+firstPath)
+		gotest.Equal(it, 0, code)
+
+		out, code := s.runCLIExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--spec", "--against="+firstPath)
+		gotest.Equal(it, 0, code)
+		// The spec tree's own trailing counts line ("N suites, N
+		// benchmarks: ...") must appear exactly once, with no second,
+		// stacked "N tests passed (...)" trailer from a separate
+		// RenderSummary call.
+		gotest.Contains(it, out, "benchmarks:")
+		gotest.NotContains(it, out, "tests passed (")
 	})
 }

@@ -31,6 +31,8 @@ func showHelp(topic string) {
 		printSummaryHelp()
 	case "watch":
 		printWatchHelp()
+	case "bench":
+		printBenchHelp()
 	case "discover":
 		printDiscoverHelp()
 	case "scaffold":
@@ -65,6 +67,7 @@ Usage:
   gotest <subcommand> [flags] [packages...]
 
 Subcommands:
+  bench       Run BenchmarkX suite methods serially
   spec        Render behavioral specification from test output
   summary     Show failure-focused test summary for CI
   watch       Watch for file changes and re-run tests
@@ -259,6 +262,89 @@ Examples:
   gotest watch ./pkg/auth/... -v             Watch with verbose output
   gotest watch ./... --spec                  Spec view on every change
   gotest watch --debounce=500ms ./...        Slower debounce for large projects
+`)
+}
+
+func printBenchHelp() {
+	fmt.Print(`gotest bench — run BenchmarkX suite methods
+
+Usage:
+  gotest bench [flags] [--] [go-test-flags] [packages...]
+
+Discovers suites containing BenchmarkX methods and runs each suite's
+generated Benchmark<SuiteName> wrapper via "go test -bench". Benchmark
+suites always dispatch serially, one at a time, regardless of --parallel
+or -test.parallel — running benchmarks concurrently would make their
+timing results meaningless. --min is not available in bench mode;
+-coverprofile is still supported and profiles are merged as usual.
+
+The standard go test flag -test.benchmem is enabled by default, so every
+benchmark line reports allocations (B/op, allocs/op) alongside ns/op.
+
+Flags:
+  --spec                  Render spec view instead of raw benchmark output
+  --no-color              Disable ANSI color codes (with --spec)
+  --debug                 Keep generated overlay for inspection
+  --no-cache              Disable overlay cache, force fresh generation
+  --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
+  --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
+  --save=<path>           Save this run's results as a JSON baseline (forces
+                           capture mode; the spec view is still rendered so
+                           results remain visible). A bare --save= saves to
+                           bench.baseline from .gotest.yml
+  --against=<path>        Compare this run against a saved baseline and print
+                           a delta table (defaults to bench.baseline in
+                           .gotest.yml when omitted)
+  --gate=<pct>            Fail (exit 1) if the worst significant regression
+                           against --against exceeds pct percent (e.g. 10 for
+                           10%); requires --against or bench.baseline in
+                           .gotest.yml (defaults to bench.gate in
+                           .gotest.yml, 0 disables)
+  --json                  Emit one versioned JSON document to stdout instead
+                           of human output: the run's results (baseline
+                           shape), every delta when a comparison ran
+                           (significant or not), and the gate verdict when a
+                           gate is active. Suppresses --spec rendering;
+                           intended for tooling (the VS Code extension).
+
+All standard go test flags (-single-dash) are forwarded automatically.
+Use a bare "--" to pass unrecognized flags without validation.
+
+Filtering:
+  -bench=<regexp>         Select which benchmark suites run, matched against
+                           each suite's Benchmark<SuiteName> wrapper name.
+                           Sub-benchmark segments scope to single methods:
+                           -bench='^BenchmarkFooTestSuite$/^BenchmarkParse$'
+                           runs only that method, since the generated wrapper
+                           runs each method under b.Run with its method name
+  -benchtime=<x>          Iterations or duration per benchmark (e.g. 100x, 2s)
+  -count=<n>              Run each benchmark n times
+
+Note: -run and -bench both filter which suites run in bench mode, matched
+against each suite's Benchmark<SuiteName> wrapper name — -run the same
+way it scopes suites for "gotest test", -bench by its pattern's first
+slash segment (later segments select sub-benchmarks inside the wrapper).
+When both are given, a suite must match both to run (e.g.
+"gotest bench ./pkg/parser -run Parse" filters by suite).
+
+If no packages contain any BenchmarkX methods, prints "no benchmarks
+found" and exits 0 without invoking go test.
+
+--against prints a delta table (BENCHMARK / OLD ns/op / NEW ns/op / Δ)
+comparing each benchmark's new mean ns/op against the saved baseline's.
+Only statistically significant deltas are shown by default; pass -v to
+show every row. Significant regressions are marked with a trailing "⚠".
+Deltas alone never change the exit code — only --gate does.
+
+Examples:
+  gotest bench ./...                          Run all benchmark suites
+  gotest bench ./pkg/auth/... -benchtime=2s   Longer per-benchmark budget
+  gotest bench -bench=Cache ./...             Only suites matching "Cache"
+  gotest bench --spec ./...                   Spec-style rendering
+  gotest bench --save=bench.json ./...        Save results as a baseline
+  gotest bench --against=bench.json ./...     Compare against a baseline
+  gotest bench --against=bench.json --gate=10 ./...
+                                               Fail if any benchmark regresses >10%
 `)
 }
 
@@ -489,6 +575,9 @@ Fields:
   debounce: <duration>      Watch mode re-run delay (e.g., "500ms", default: 200ms)
   lint:
     skip: [<rule>, ...]     Lint rules to disable globally
+  bench:
+    baseline: <path>        Default --against baseline path for "gotest bench"
+    gate: <float>           Default --gate regression percentage (0 disables)
 
 Skippable lint rules (non-integrity only): assertion-redundant,
 assertion-simplify, fail-guard, stdlib-test, t-escape, testify
@@ -501,5 +590,8 @@ Example .gotest.yml:
   lint:
     skip:
       - testify
+  bench:
+    baseline: bench-baseline.json
+    gate: 10
 `)
 }
