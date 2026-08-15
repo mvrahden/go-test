@@ -286,7 +286,7 @@ export class SpecViewPanel implements vscode.Disposable {
         ? buildEmptyBody(gopherUri)
         : buildSpecBody(msg.data, this.modulePaths, locationMap);
     const stateJson =
-      msg.type === "specData" ? JSON.stringify(msg.data) : "null";
+      msg.type === "specData" ? encodeStateForScript(msg.data) : "null";
 
     return `<!DOCTYPE html>
 <html>
@@ -310,7 +310,10 @@ ${SCRIPT}
   private async runSpecFromInput(jsonInput: string): Promise<string> {
     const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const cmd = await buildCliCommand(
-      ["spec", "--input=-", "--format=json"],
+      // --render-only: this is a renderer, not a CI gate. Without it the exit
+      // code also reports whether the tests passed, which says nothing about
+      // whether a spec was produced.
+      ["spec", "--input=-", "--format=json", "--render-only"],
       workspaceDir,
       this.outputChannel,
     );
@@ -342,6 +345,18 @@ ${SCRIPT}
       child.stdin.end();
     });
   }
+}
+
+// encodeStateForScript serialises the spec for embedding inside a <script>
+// block. JSON.stringify leaves "<" alone, so a test whose output contains
+// "</script>" would close the block early and spill the rest of the document
+// into the page as live markup. Escaping the angle brackets as unicode
+// escapes leaves the parsed value identical while making that impossible.
+export function encodeStateForScript(data: unknown): string {
+  return JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
 }
 
 export type SpecExitOutcome =

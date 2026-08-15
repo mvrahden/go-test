@@ -915,11 +915,11 @@ func (s *CmdGotestTestSuite) TestInputModesShareOneExitRule(t *gotest.T) {
 		out := filepath.Join(w.TempDir(), "out.txt")
 
 		w.It("spec --input exits nonzero", func(it *gotest.T) {
-			gotest.Equal(it, 1, ExportRunSpecFromInput(input, "terminal", out, true))
+			gotest.Equal(it, 1, ExportRunSpecFromInput(input, "terminal", out, true, false))
 		})
 
 		w.It("summary --input agrees", func(it *gotest.T) {
-			gotest.Equal(it, 1, ExportRunSummaryFromInput(input, "terminal", out, "", true, false))
+			gotest.Equal(it, 1, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, false))
 		})
 	})
 
@@ -928,8 +928,74 @@ func (s *CmdGotestTestSuite) TestInputModesShareOneExitRule(t *gotest.T) {
 		out := filepath.Join(w.TempDir(), "out.txt")
 
 		w.It("both exit zero", func(it *gotest.T) {
-			gotest.Equal(it, 0, ExportRunSpecFromInput(input, "terminal", out, true))
-			gotest.Equal(it, 0, ExportRunSummaryFromInput(input, "terminal", out, "", true, false))
+			gotest.Equal(it, 0, ExportRunSpecFromInput(input, "terminal", out, true, false))
+			gotest.Equal(it, 0, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, false))
+		})
+	})
+}
+
+// TestRenderOnlySeparatesVerdictFromRendering covers the escape hatch for
+// clients that render a stream rather than gate on it. The exit code of
+// `--input` carries two answers at once — "did the tests pass" and "did I
+// render" — and a renderer only ever needed the second. --render-only drops the
+// first without ever hiding the second.
+func (s *CmdGotestTestSuite) TestRenderOnlySeparatesVerdictFromRendering(t *gotest.T) {
+	failingStream := `{"Action":"run","Package":"example.com/pkg","Test":"TestBoom"}
+{"Action":"output","Package":"example.com/pkg","Test":"TestBoom","Output":"--- FAIL: TestBoom (0.00s)\n"}
+{"Action":"fail","Package":"example.com/pkg","Test":"TestBoom"}
+{"Action":"fail","Package":"example.com/pkg"}
+`
+
+	writeStream := func(w *gotest.T, content string) string {
+		path := filepath.Join(w.TempDir(), "events.json")
+		gotest.NoError(w, os.WriteFile(path, []byte(content), 0o600))
+		return path
+	}
+
+	t.When("a failing stream is rendered with --render-only", func(w *gotest.T) {
+		input := writeStream(w, failingStream)
+		out := filepath.Join(w.TempDir(), "out.txt")
+
+		w.It("spec reports success, because rendering succeeded", func(it *gotest.T) {
+			gotest.Equal(it, 0, ExportRunSpecFromInput(input, "terminal", out, true, true))
+		})
+
+		w.It("summary agrees, keeping the two input modes on one rule", func(it *gotest.T) {
+			gotest.Equal(it, 0, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, true))
+		})
+
+		w.It("still renders the failure into the output", func(it *gotest.T) {
+			gotest.Equal(it, 0, ExportRunSpecFromInput(input, "terminal", out, true, true))
+			data, err := os.ReadFile(out)
+			gotest.NoError(it, err)
+			gotest.Contains(it, string(data), "Boom")
+		})
+	})
+
+	t.When("the input cannot be read", func(w *gotest.T) {
+		missing := filepath.Join(w.TempDir(), "absent.json")
+		out := filepath.Join(w.TempDir(), "out.txt")
+
+		// The whole point of the flag is to suppress a verdict about the tests,
+		// never a report that the command itself failed.
+		w.It("spec still fails, because nothing was rendered", func(it *gotest.T) {
+			gotest.Equal(it, 2, ExportRunSpecFromInput(missing, "terminal", out, true, true))
+		})
+
+		w.It("summary still fails too", func(it *gotest.T) {
+			gotest.Equal(it, 2, ExportRunSummaryFromInput(missing, "terminal", out, "", true, false, true))
+		})
+	})
+
+	t.When("--render-only is passed without --input", func(w *gotest.T) {
+		// Suppressing the verdict of a real run would turn a red pipeline green,
+		// so the flag is refused outside the replay path it was built for.
+		w.It("spec rejects it as a usage error", func(it *gotest.T) {
+			gotest.Equal(it, 2, ExportRunSpec(Invocation{Args: []string{"--render-only", "./..."}}))
+		})
+
+		w.It("summary rejects it as a usage error", func(it *gotest.T) {
+			gotest.Equal(it, 2, ExportRunSummary(Invocation{Args: []string{"--render-only", "./..."}}))
 		})
 	})
 }

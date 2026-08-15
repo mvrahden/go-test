@@ -10,7 +10,11 @@ export { resolveGoBinary } from "./goBinary.js";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
-const MIN_CLI_VERSION = "v1.14.0";
+// Raised to the release that introduced `spec --input --render-only`. The Spec
+// View passes that flag, so an older CLI would reject the invocation outright.
+// Treat this as a contract marker: bump it whenever the extension starts
+// depending on CLI behaviour that older versions do not have.
+const MIN_CLI_VERSION = "v1.27.0";
 
 export interface CliCommand {
   bin: string;

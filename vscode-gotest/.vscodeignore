@@ -1,10 +1,13 @@
 src/**
 test/**
+testdata/**
+scripts/**
 node_modules/**
 docs/**
 tsconfig.json
 esbuild.config.mjs
 vitest.config.ts
+vitest.integration.config.ts
 package-lock.json
 .gitignore
 *.vsix
