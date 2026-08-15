@@ -24,9 +24,18 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	output := extractStringFlag(ownArgs, "--output", "")
 	input := extractStringFlag(ownArgs, "--input", "")
 	noColor := hasFlag(ownArgs, "--no-color")
+	renderOnly := hasFlag(ownArgs, "--render-only")
+
+	if renderOnly && input == "" {
+		// Suppressing the verdict of a real run would turn a red pipeline
+		// green. The flag only makes sense where the exit code describes a
+		// rendering, not a test run.
+		fmt.Fprintf(os.Stderr, "FAIL: --render-only requires --input\n")
+		return 2
+	}
 
 	if input != "" {
-		return runSpecFromInput(input, format, output, noColor)
+		return runSpecFromInput(input, format, output, noColor, renderOnly)
 	}
 
 	minCoverage, err := parseMinFlag(ownArgs)
@@ -143,7 +152,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	return enforceCoverage(coverProfile, minCoverage, code)
 }
 
-func runSpecFromInput(input, format, output string, noColor bool) int {
+func runSpecFromInput(input, format, output string, noColor, renderOnly bool) int {
 	var r io.Reader
 	if input == "-" {
 		r = os.Stdin
@@ -192,8 +201,9 @@ func runSpecFromInput(input, format, output string, noColor bool) int {
 
 	// The same exit rule as `summary --input`: a renderer fed a failing stream
 	// must not exit 0 — in a pipe without pipefail this exit code is the only
-	// verdict CI ever sees.
-	if gotestspec.HasFailures(tree) {
+	// verdict CI ever sees. A client that renders rather than gates opts out
+	// with --render-only; every operational failure above still exits 2.
+	if !renderOnly && gotestspec.HasFailures(tree) {
 		return 1
 	}
 	return 0

@@ -147,6 +147,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--input=<path>` | Replay a saved `go test -json` stream in `spec`/`summary` (`-` reads stdin) |
 | `--github` | Emit GitHub annotations and step summary (auto-enabled in GitHub Actions) |
 | `--coverage=<path>` | Coverage profile path for `summary` subcommand |
+| `--render-only` | With `--input`, exit 0 on a failing stream: the code reports whether rendering succeeded, not whether the tests passed (requires `--input`) |
 
 ### Disambiguation
 
@@ -1353,6 +1354,8 @@ Manual setup works without the action:
 ```
 
 Exit codes: 0 = pass, 1 = test failure, 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors).
+
+The exit code of `spec --input` and `summary --input` answers two questions at once: whether the stream carried failures (1) and whether the command itself failed (2). A client that renders a stream rather than gating on it needs only the second, and passes `--render-only` to drop the first; 2 is never suppressed, so an unreadable input or an unparseable stream still fails. Consumers that treat any non-zero exit as "the command broke" — rather than reading the rendered document on stdout — will misread a failing test run as a broken tool.
 
 Every package a pattern matches ends in exactly one verdict. A package that fails to load or compile — a syntax error, a type error, a nonexistent path — is a failed package (exit 2): its diagnostics are booked into the same output stream as suite results, grouped under a `# <import-path>` header, so text output, `--json` events, `spec`, `summary`, and `--input` replays all carry the failure. Packages that did build still run; one broken package never blocks the rest. `run`, `watch`, `spec`, and `summary` book-and-continue this way; `generate` and `prepare` fail fast instead, because generated output for an unbuildable package is meaningless; `discover` reports such packages with `"broken": true` and their diagnostics as warnings. "no test suites to run" (exit 0) is reserved for runs where every matched package loaded and none defined suites.
 

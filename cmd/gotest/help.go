@@ -170,6 +170,8 @@ Flags:
   --format=<fmt>          Output format: terminal (default), md, json
   --output=<file>         Write to file instead of stdout
   --input=<file>          Render from saved JSON ("-" for stdin)
+  --render-only           With --input, exit 0 on a failing stream: report
+                          whether rendering succeeded, not the test verdict
   --no-color              Disable ANSI color codes
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay
@@ -205,6 +207,8 @@ Flags:
   --format=<fmt>          Output format: terminal (default), md, json
   --output=<file>         Write to file instead of stdout
   --input=<file>          Read from saved JSON ("-" for stdin)
+  --render-only           With --input, exit 0 on a failing stream: report
+                          whether rendering succeeded, not the test verdict
   --no-color              Disable ANSI color codes
   --github                GitHub CI mode: emit annotations and step summary
                           (auto-detected via $GITHUB_ACTIONS)

@@ -28,9 +28,15 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	coverageProfile := extractStringFlag(ownArgs, "--coverage", "")
 	noColor := hasFlag(ownArgs, "--no-color")
 	github := hasFlag(ownArgs, "--github") || os.Getenv("GITHUB_ACTIONS") == "true"
+	renderOnly := hasFlag(ownArgs, "--render-only")
+
+	if renderOnly && input == "" {
+		fmt.Fprintf(os.Stderr, "FAIL: --render-only requires --input\n")
+		return 2
+	}
 
 	if input != "" {
-		return runSummaryFromInput(input, format, output, coverageProfile, noColor, github)
+		return runSummaryFromInput(input, format, output, coverageProfile, noColor, github, renderOnly)
 	}
 
 	minCoverage, err := parseMinFlag(ownArgs)
@@ -134,7 +140,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	return enforceCoverage(coverProfile, minCoverage, code)
 }
 
-func runSummaryFromInput(input, format, output, coverageProfile string, noColor, github bool) int {
+func runSummaryFromInput(input, format, output, coverageProfile string, noColor, github, renderOnly bool) int {
 	var r io.Reader
 	if input == "-" {
 		r = os.Stdin
@@ -158,7 +164,7 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 
 	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0)
 
-	if gotestspec.HasFailures(tree) {
+	if !renderOnly && gotestspec.HasFailures(tree) {
 		return 1
 	}
 	return 0
