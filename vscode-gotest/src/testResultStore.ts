@@ -11,7 +11,7 @@ interface StoredTestResult extends TestResult {
 }
 
 interface StoredData {
-  version: 1;
+  version: 2;
   results: Record<string, StoredTestResult>;
 }
 
@@ -72,7 +72,7 @@ export class TestResultStore {
     try {
       const content = await readFile(this.storagePath, "utf-8");
       const data = JSON.parse(content) as StoredData;
-      if (data.version !== 1) return;
+      if (data.version !== 2) return;
       this.results.clear();
       for (const [id, result] of Object.entries(data.results)) {
         this.results.set(id, result);
@@ -110,7 +110,7 @@ export class TestResultStore {
     if (!this.storagePath) return;
     this.evictStale();
     const data: StoredData = {
-      version: 1,
+      version: 2,
       results: Object.fromEntries(this.results),
     };
     await mkdir(path.dirname(this.storagePath), { recursive: true });

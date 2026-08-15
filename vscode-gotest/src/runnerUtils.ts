@@ -199,13 +199,11 @@ export function resolveTestItem(
 
   let parentItem = methodItem;
   for (let i = 2; i < segments.length; i++) {
-    const subtestLabel = segments[i];
-    const subtestPath = segments.slice(2, i + 1).join("/");
-    parentItem = controller.createDynamicSubtest(
-      parentItem,
-      subtestPath,
-      subtestLabel,
-    );
+    const segment = segments[i];
+    // One segment per level: the id is the go test path, which is also what a
+    // statically declared behavior uses. createDynamicSubtest returns the
+    // declared item when there is one and only fabricates when there is not.
+    parentItem = controller.createDynamicSubtest(parentItem, segment, segment);
   }
 
   return parentItem;

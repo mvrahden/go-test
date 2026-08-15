@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { DiscoverBehavior } from "./types.js";
 import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
 import { TestResultStore, type TestResult } from "./testResultStore.js";
@@ -11,6 +12,10 @@ export class GoTestController implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private coverageProfile: vscode.TestRunProfile | undefined;
   private dynamicOverflow = new Map<string, number>();
+  // Items created from run events rather than from source. Behavior ids no
+  // longer carry a marker segment — they are the go test path — so membership
+  // is tracked instead of inferred from the string.
+  private dynamicIds = new Set<string>();
 
   constructor(
     private readonly cache: DiscoveryCache,
@@ -403,18 +408,22 @@ export class GoTestController implements vscode.Disposable {
           method.excluded,
           method.parallel,
         );
+        // A method whose behaviors cannot all be read from source is expandable
+        // but unresolved, rather than presenting a partial list as the whole.
+        methodItem.canResolveChildren = method.behaviorsComplete === false;
+        this.addBehaviors(methodItem, method.behaviors ?? [], methodUri);
         suiteItem.children.add(methodItem);
       }
 
       suiteItem.children.forEach((child) => {
-        if (!seenMethodIds.has(child.id) && !child.id.includes("/dynamic/")) {
+        if (!seenMethodIds.has(child.id) && !this.dynamicIds.has(child.id)) {
           suiteItem.children.delete(child.id);
         }
       });
     }
 
     pkgItem.children.forEach((child) => {
-      if (!seenSuiteIds.has(child.id) && !child.id.includes("/dynamic/")) {
+      if (!seenSuiteIds.has(child.id) && !this.dynamicIds.has(child.id)) {
         pkgItem.children.delete(child.id);
       }
     });
@@ -423,12 +432,13 @@ export class GoTestController implements vscode.Disposable {
   clearDynamicChildren(item: vscode.TestItem): void {
     const toDelete: string[] = [];
     item.children.forEach((child) => {
-      if (child.id.includes("/dynamic/")) {
+      if (this.dynamicIds.has(child.id)) {
         toDelete.push(child.id);
       }
     });
     for (const id of toDelete) {
       item.children.delete(id);
+      this.dynamicIds.delete(id);
     }
     if (this.dynamicOverflow.delete(item.id)) {
       item.description = undefined;
@@ -440,7 +450,10 @@ export class GoTestController implements vscode.Disposable {
     subtestPath: string,
     label: string,
   ): vscode.TestItem {
-    const id = `${parentItem.id}/dynamic/${subtestPath}`;
+    // The id is the go test path: one segment appended to the parent. A
+    // statically discovered behavior has the identical id, so an observed
+    // result lands on the declared item instead of creating a second one.
+    const id = `${parentItem.id}/${subtestPath}`;
     const existing = parentItem.children.get(id);
     if (existing) {
       return existing;
@@ -454,8 +467,42 @@ export class GoTestController implements vscode.Disposable {
     }
 
     const item = this.controller.createTestItem(id, label, parentItem.uri);
+    this.dynamicIds.add(id);
     parentItem.children.add(item);
     return item;
+  }
+
+  // addBehaviors builds the specification a method declares, so the tree shows
+  // behaviors before anything has run and the run counter has a real total.
+  private addBehaviors(
+    parent: vscode.TestItem,
+    behaviors: DiscoverBehavior[],
+    uri: vscode.Uri,
+  ): void {
+    const seen = new Set<string>();
+    for (const behavior of behaviors) {
+      const id = `${parent.id}/${behavior.name}`;
+      seen.add(id);
+      let item = parent.children.get(id);
+      if (!item) {
+        item = this.controller.createTestItem(id, behavior.display, uri);
+      }
+      if (behavior.line > 0) {
+        item.range = new vscode.Range(
+          new vscode.Position(behavior.line - 1, 0),
+          new vscode.Position(behavior.line - 1, 0),
+        );
+      }
+      parent.children.add(item);
+      this.addBehaviors(item, behavior.children ?? [], uri);
+    }
+    // Behaviors that no longer exist in source go away; ones discovered at run
+    // time stay, because source never claimed them in the first place.
+    parent.children.forEach((child) => {
+      if (!seen.has(child.id) && !this.dynamicIds.has(child.id)) {
+        parent.children.delete(child.id);
+      }
+    });
   }
 
   setCoverageDetailProvider(

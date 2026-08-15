@@ -45,6 +45,23 @@ export interface DiscoverMethod {
   file: string;
   line: number;
   col: number;
+  // The When/It blocks the method declares, read from source. Absent on a CLI
+  // that predates static behavior discovery.
+  behaviors?: DiscoverBehavior[];
+  // Whether `behaviors` is exhaustive. False means the method declares
+  // behaviors whose names or existence depend on runtime values, so the list
+  // is a floor and the rest appear only once the method has run.
+  behaviorsComplete?: boolean;
+}
+
+export interface DiscoverBehavior {
+  // The subtest segment go test will produce — identical to the runtime one,
+  // which is what lets a declared behavior and an observed one be the same
+  // tree node rather than two.
+  name: string;
+  display: string;
+  line: number;
+  children?: DiscoverBehavior[];
 }
 
 export interface PrepareOutput {

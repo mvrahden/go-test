@@ -63,6 +63,22 @@ type discoverMethod struct {
 	File     string `json:"file"`
 	Line     int    `json:"line"`
 	Col      int    `json:"col"`
+	// Behaviors are the When/It blocks the method declares, read from source.
+	// BehaviorsComplete reports whether that list is exhaustive: when false the
+	// method declares behaviors whose names or existence depend on runtime
+	// values, and a consumer must treat the list as a floor rather than a total.
+	Behaviors         []discoverBehavior `json:"behaviors"`
+	BehaviorsComplete bool               `json:"behaviorsComplete"`
+}
+
+// discoverBehavior mirrors one node of the specification a method declares.
+// Name is the subtest segment go test will produce, so it lines up with the
+// runtime tree byte for byte; Display is the text the developer wrote.
+type discoverBehavior struct {
+	Name     string             `json:"name"`
+	Display  string             `json:"display"`
+	Line     int                `json:"line"`
+	Children []discoverBehavior `json:"children,omitempty"`
 }
 
 func runDiscover(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
@@ -196,14 +212,17 @@ func buildDiscoverSuite(suite *gotestast.TestSuiteSpec) discoverSuite {
 	var methods []discoverMethod
 	for _, tc := range suite.TestCases() {
 		mPos := fset.Position(tc.Pos())
+		spec := suite.BehaviorsOf(tc)
 		methods = append(methods, discoverMethod{
-			Name:     tc.Identifier(),
-			Parallel: false,
-			Focused:  tc.IsFocused(),
-			Excluded: tc.IsExcluded(),
-			File:     filepath.Base(mPos.Filename),
-			Line:     mPos.Line,
-			Col:      mPos.Column,
+			Name:              tc.Identifier(),
+			Parallel:          false,
+			Focused:           tc.IsFocused(),
+			Excluded:          tc.IsExcluded(),
+			File:              filepath.Base(mPos.Filename),
+			Line:              mPos.Line,
+			Col:               mPos.Column,
+			Behaviors:         discoverBehaviors(spec.Behaviors),
+			BehaviorsComplete: spec.Complete,
 		})
 	}
 	if methods == nil {
@@ -239,4 +258,18 @@ func discoverFixtureNames(suite *gotestast.TestSuiteSpec) []string {
 		return []string{}
 	}
 	return names
+}
+
+// discoverBehaviors converts the walker's tree into the discovery wire shape.
+func discoverBehaviors(in []*gotestast.Behavior) []discoverBehavior {
+	out := make([]discoverBehavior, 0, len(in))
+	for _, b := range in {
+		out = append(out, discoverBehavior{
+			Name:     b.Name,
+			Display:  b.Display,
+			Line:     b.Line,
+			Children: discoverBehaviors(b.Children),
+		})
+	}
+	return out
 }

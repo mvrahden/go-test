@@ -225,6 +225,45 @@ describe("buildCliCommand", () => {
       });
     });
 
+    // A replace directive points at local source, and the require version
+    // beside it is conventionally a placeholder. Gating the replace path on
+    // that version silently downloaded a release instead of building the
+    // developer's own working tree.
+    it("honours replace even when the require version is a placeholder", async () => {
+      setGoMod(
+        "/workspace",
+        [
+          "module gotest.fixtures",
+          "go 1.24.0",
+          "require github.com/mvrahden/go-test v0.0.0-00010101000000-000000000000",
+          `replace github.com/mvrahden/go-test => ../../..`,
+        ].join("\n"),
+      );
+
+      const cmd = await buildCliCommand(["discover", "./..."], "/workspace");
+
+      expect(cmd).toEqual({
+        bin: "/usr/local/go/bin/go",
+        args: ["run", GOTEST_MODULE, "discover", "./..."],
+      });
+    });
+
+    it("honours replace even when the require version is below the minimum", async () => {
+      setGoMod(
+        "/workspace",
+        [
+          "module github.com/myapp",
+          "go 1.24.0",
+          "require github.com/mvrahden/go-test v1.0.0",
+          `replace github.com/mvrahden/go-test => ../go-test`,
+        ].join("\n"),
+      );
+
+      const cmd = await buildCliCommand(["spec"], "/workspace");
+
+      expect(cmd.args).toEqual(["run", GOTEST_MODULE, "spec"]);
+    });
+
     it("detects replace for parent module path", async () => {
       setGoMod(
         "/workspace",
