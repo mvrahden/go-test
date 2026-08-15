@@ -460,3 +460,14 @@ func statusFrom(a Action) Status {
 func elapsed(s float64) time.Duration {
 	return time.Duration(s * float64(time.Second))
 }
+
+// ClassifyRoots applies the tree's naming rules — kind, display text, focus and
+// exclusion prefixes — to nodes assembled from a source other than a test
+// stream. A statically derived tree must classify identically to an observed
+// one, so both go through this single implementation rather than duplicating
+// the rules.
+func ClassifyRoots(nodes []*Node) {
+	for _, n := range nodes {
+		classify(n, true)
+	}
+}
