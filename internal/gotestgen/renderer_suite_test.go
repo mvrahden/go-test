@@ -526,7 +526,8 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 		out, _ := renderTestPkg(it.T(), pkg, true)
 
 		gotest.Contains(it, out, "func FuzzFuzzTestSuite_FuzzParse(f *testing.F)")
-		gotest.Contains(it, out, "s.FuzzParse(gotest.NewF(f, s.BeforeEach, s.AfterEach))")
+		gotest.Contains(it, out, "ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach)")
+		gotest.Contains(it, out, "s.FuzzParse(ƒf)")
 		gotest.NotContains(it, out, "X_FuzzOld")
 	})
 
@@ -581,50 +582,48 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 	})
 
 	t.When("a fuzz target takes a struct", func(w *gotest.T) {
-		w.It("emits the codec source and attaches it to every NewF in the file", func(it *gotest.T) {
+		w.It("emits the fan source and attaches the fan to every NewF in the file", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestFuzzCodec_StructTarget")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
-			gotest.Contains(it, out, `"github.com/mvrahden/go-test/pkg/gotestruntime"`)
-			gotest.Contains(it, out, "func ƒ_fuzzdec_v1_Request(ƒb []byte) Request {")
-			gotest.Contains(it, out, "gotest.Codec[Request]{Decode: ƒ_fuzzdec_v1_Request, Encode: ƒ_fuzzenc_v1_Request, Literal: ƒ_fuzzlit_v1_Request}")
-			gotest.Contains(it, out, "s.FuzzCreate(gotest.NewF(f, s.BeforeEach, s.AfterEach, gotest.Codec[Request]{")
-			gotest.Contains(it, out, "s.FuzzNative(gotest.NewF(f, s.BeforeEach, s.AfterEach, gotest.Codec[Request]{")
+			gotest.Contains(it, out, `"github.com/mvrahden/go-test/pkg/gotestfuzz"`)
+			gotest.Contains(it, out, "func ƒ_fuzzin_v1_Request(ƒ0 string, ƒ1 []byte, ƒ2 []byte, ƒ3 []byte, ƒ4 bool, ƒ5 string, ƒ6 []byte) Request {")
+			gotest.Contains(it, out, "gotestfuzz.Fan[Request]{Register: ƒ_fuzzreg_v1_Request, Explode: ƒ_fuzzout_v1_Request, Literal: ƒ_fuzzlits_v1_Request}")
+			gotest.Contains(it, out, "ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach, gotestfuzz.Fan[Request]{")
+			gotest.Contains(it, out, "s.FuzzCreate(ƒf)")
+			gotest.Contains(it, out, "s.FuzzNative(ƒf)")
 		})
 
-		w.It("emits the codec source exactly once per file", func(it *gotest.T) {
+		w.It("emits the fan source exactly once per file", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestFuzzCodec_StructTarget")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
-			gotest.Equal(it, 1, strings.Count(out, "func ƒ_fuzzdec_v1_Request("))
-			gotest.Equal(it, 1, strings.Count(out, "func ƒ_fuzzread_v1_Address("))
+			gotest.Equal(it, 1, strings.Count(out, "func ƒ_fuzzin_v1_Request("))
+			gotest.Equal(it, 1, strings.Count(out, "func ƒ_fuzzin_v1_Address("))
 		})
 	})
 
 	t.When("a fuzz target's struct pulls in a type from another package", func(w *gotest.T) {
-		w.It("imports that package in the generated header, alongside gotestruntime", func(it *gotest.T) {
+		w.It("imports that package in the generated header, alongside gotestfuzz", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestFuzzCodec_CrossPackage")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
-			gotest.Contains(it, out, `"github.com/mvrahden/go-test/pkg/gotestruntime"`)
+			gotest.Contains(it, out, `"github.com/mvrahden/go-test/pkg/gotestfuzz"`)
 			gotest.Contains(it, out, `"testpkg/TestFuzzCodec_CrossDep"`,
 				"without this import the generated file references crossdep.Setting and does not compile")
 			gotest.Contains(it, out, "crossdep.Setting")
 		})
 	})
 
-	t.When("no fuzz target needs a codec", func(w *gotest.T) {
-		w.It("leaves the NewF call and the import list exactly as before", func(it *gotest.T) {
+	t.When("no fuzz target needs a fan", func(w *gotest.T) {
+		w.It("leaves the NewF call bare and imports no fuzz runtime", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzMethod")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
-			gotest.Contains(it, out, "s.FuzzParse(gotest.NewF(f, s.BeforeEach, s.AfterEach))")
-			gotest.NotContains(it, out, "ƒ_fuzzdec_")
-			// gotestruntime itself is imported by every generated harness
-			// (exec sentinel, lifecycle wiring) — codec-free output must
-			// merely stay free of the codec primitives built on it.
-			gotest.NotContains(it, out, "gotestruntime.NewFuzzReader")
-			gotest.NotContains(it, out, "gotestruntime.NewFuzzWriter")
+			gotest.Contains(it, out, "ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach)")
+			gotest.Contains(it, out, "s.FuzzParse(ƒf)")
+			gotest.NotContains(it, out, "ƒ_fuzzin_")
+			gotest.NotContains(it, out, `"github.com/mvrahden/go-test/pkg/gotestfuzz"`)
 		})
 	})
 }

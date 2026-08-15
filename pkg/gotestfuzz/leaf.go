@@ -52,3 +52,17 @@ func LeafBytesFloat32(v float32) []byte {
 func LeafBytesFloat64(v float64) []byte {
 	return LeafBytesUint64(math.Float64bits(v))
 }
+
+// LeafBytes normalises a []byte leaf on its way into a fanned value: an
+// empty slice becomes nil. The engine does not preserve the nil/empty
+// distinction — a nil seed comes back as []byte{} after a trip through the
+// corpus format — so a struct field would otherwise compare differently
+// under `go test` replay and under `-fuzz`. Collapsing on fan-in makes the
+// field deterministic, matching the mini-codec's own convention. Only a
+// pass-through top-level []byte position is handed over untouched.
+func LeafBytes(b []byte) []byte {
+	if len(b) == 0 {
+		return nil
+	}
+	return b
+}

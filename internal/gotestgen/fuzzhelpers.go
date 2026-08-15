@@ -3,200 +3,22 @@ package gotestgen
 import (
 	"fmt"
 	"go/types"
-	"sort"
 	"strings"
 	"unicode"
 
-	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"golang.org/x/tools/go/packages"
 )
 
-// fuzzCodecVersion stamps every generated codec identifier. The wire format
-// is internal and undocumented on purpose, but it is versioned so a future
-// format change can never silently reinterpret a cached corpus: the
-// identifiers move, the generated file changes, and the old bytes are read
-// by nothing.
-const fuzzCodecVersion = "v1"
+// fuzzFanVersion stamps every generated fuzz identifier. The flatten rules
+// and the hybrid-leaf wire format are internal and undocumented on purpose,
+// but they are versioned so a rule change can never silently reinterpret a
+// cached corpus: the identifiers move, the generated file changes, and the
+// old positions are read by nothing.
+const fuzzFanVersion = "v1"
 
-// fuzzCodecRuntimeImport is the import path every emitted codec needs.
-var fuzzCodecRuntimeImport = about.Repo + "/pkg/gotestfuzz"
-
-// FuzzCodecRef names one generated codec, as the NewF call in the fuzz
-// wrapper needs to reference it.
-type FuzzCodecRef struct {
-	TypeRef    string // Go type expression valid in the generated file, e.g. "Request" or "user.Request"
-	DecodeFunc string // e.g. "ƒ_fuzzdec_v1_Request"
-	EncodeFunc string // e.g. "ƒ_fuzzenc_v1_Request"
-
-	// LiteralFunc is the emitted "func(T) string" identifier, e.g.
-	// "ƒ_fuzzlit_v1_Request", or "" when TypeRef has no self-contained Go
-	// literal form — some reachable part of it is a shape with no syntax
-	// that reconstructs it without referencing generated code (a map, an
-	// interface, ...). "" means the generated Codec[T] leaves Literal nil,
-	// and every consumer falls back to raw corpus bytes.
-	LiteralFunc string
-}
-
-// FuzzCodecSet is everything the renderer needs to emit struct-fuzzing
-// support for one generated file.
-type FuzzCodecSet struct {
-	Codecs   []FuzzCodecRef // one per non-native type the package fuzzes, sorted by TypeRef
-	Source   string         // deduplicated source of every decoder/encoder and helper
-	PkgPaths []string       // import paths Source references, excluding gotestruntime
-
-	// NeedsStrings/NeedsStrconv/NeedsMath report whether Source uses the
-	// corresponding standard library package. They are independent of
-	// PkgPaths (which only tracks packages the FUZZED TYPES themselves
-	// reference) because these three are implementation details of literal
-	// rendering — pulled in only when at least one Literal function was
-	// actually emitted, so a fixture with no literal support adds none of
-	// them and never trips "imported and not used".
-	NeedsStrings bool
-	NeedsStrconv bool
-	NeedsMath    bool
-}
-
-// BuildFuzzCodecs resolves every non-native fuzz argument type in pkg and
-// emits a total decoder/encoder for it. Returns (nil, nil) when every fuzz
-// target already uses one of Go's native fuzzable types.
-//
-// Rejections are errors, not silent skips. Nothing in the toolchain catches
-// this for us: go vet only checks direct (*testing.F).Fuzz calls, and the
-// generic adapter hides the instantiation from it, so an unsupported type
-// compiles cleanly and panics at run time with "unsupported type for
-// fuzzing". Refusing at generation time is the only place a useful message
-// can be produced.
-func BuildFuzzCodecs(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) (*FuzzCodecSet, error) {
-	args := gotestast.CollectFuzzArgs(pkg, suites)
-	if len(args) == 0 {
-		return nil, nil
-	}
-
-	e := newFuzzEmitter(pkg)
-
-	// Collect the distinct non-native types first, so emission order (and
-	// therefore helper naming) depends only on the type set, not on which
-	// target happened to mention a type first.
-	type pending struct {
-		typ      types.Type
-		typeRef  string
-		funcName string
-	}
-	seen := map[string]bool{}
-	var todo []pending
-	for _, a := range args {
-		if nativeFuzzType(a.Type) {
-			continue
-		}
-		if a.Adapter != "Fuzz" {
-			return nil, fmt.Errorf(
-				"fuzz target %s: gotest.%s argument %d has type %s — multi-argument fuzz targets support only Go's native fuzzing types; wrap them in a single struct and use gotest.Fuzz",
-				a.FuncName, a.Adapter, a.Index, types.TypeString(a.Type, e.qual))
-		}
-		// Unaliased, so "type Alias = Inner" and Inner resolve to one codec.
-		// They are the same type, so Codec[Alias] and Codec[Inner] are the
-		// same instantiation — emitting both would put two interchangeable
-		// codecs on every F and make seed attribution ambiguous.
-		typ := types.Unalias(a.Type)
-		ref := types.TypeString(typ, e.qual)
-		if seen[ref] {
-			continue
-		}
-		seen[ref] = true
-		todo = append(todo, pending{typ: typ, typeRef: ref, funcName: a.FuncName})
-	}
-	if len(todo) == 0 {
-		return nil, nil
-	}
-	sort.Slice(todo, func(i, j int) bool { return todo[i].typeRef < todo[j].typeRef })
-
-	var body strings.Builder
-	var refs []FuzzCodecRef
-	for i := range todo {
-		p := &todo[i]
-		ident := e.assignName(p.typeRef)
-		decName := "ƒ_fuzzdec_" + fuzzCodecVersion + "_" + ident
-		encName := "ƒ_fuzzenc_" + fuzzCodecVersion + "_" + ident
-
-		e.path = []string{p.typeRef}
-		readExpr, err := e.readCall(p.typ)
-		if err != nil {
-			return nil, fmt.Errorf("fuzz target %s: %w", p.funcName, err)
-		}
-		writeStmt, err := e.writeStmt(p.typ, "ƒv")
-		if err != nil {
-			return nil, fmt.Errorf("fuzz target %s: %w", p.funcName, err)
-		}
-
-		fmt.Fprintf(&body, "\nfunc %s(ƒb []byte) %s {\n\tƒr := gotestfuzz.NewReader(ƒb)\n\treturn %s\n}\n",
-			decName, p.typeRef, readExpr)
-		fmt.Fprintf(&body, "\nfunc %s(ƒv %s) []byte {\n\tƒw := gotestfuzz.NewWriter()\n\t%s\n\treturn ƒw.Out()\n}\n",
-			encName, p.typeRef, writeStmt)
-
-		litFunc := ""
-		if e.literalSupported(p.typ) {
-			e.path = []string{p.typeRef}
-			litName, err := e.literalHelper(p.typ)
-			if err != nil {
-				return nil, fmt.Errorf("fuzz target %s: %w", p.funcName, err)
-			}
-			litFunc = "ƒ_fuzzlit_" + fuzzCodecVersion + "_" + litName
-		}
-
-		refs = append(refs, FuzzCodecRef{TypeRef: p.typeRef, DecodeFunc: decName, EncodeFunc: encName, LiteralFunc: litFunc})
-	}
-
-	var src strings.Builder
-	for _, name := range e.order {
-		src.WriteString(e.helpers[name])
-	}
-	src.WriteString(body.String())
-	if e.needsMath {
-		fmt.Fprintf(&src, literalFloatHelperTpl, fuzzCodecVersion)
-	}
-	for _, name := range e.literalOrder {
-		src.WriteString(e.literals[name])
-	}
-
-	pkgPaths := make([]string, 0, len(e.pkgPaths))
-	for path := range e.pkgPaths {
-		pkgPaths = append(pkgPaths, path)
-	}
-	sort.Strings(pkgPaths)
-
-	return &FuzzCodecSet{
-		Codecs:       refs,
-		Source:       src.String(),
-		PkgPaths:     pkgPaths,
-		NeedsStrings: e.needsStrings,
-		NeedsStrconv: e.needsStrconv,
-		NeedsMath:    e.needsMath,
-	}, nil
-}
-
-// CheckFuzzArgType reports whether gotest can fuzz an argument of type t —
-// natively, or through a generated codec. It returns nil when a single-
-// argument gotest.Fuzz target of this type will generate, and the emitter's
-// own rejection error (naming the offending field path and the suggested
-// alternative) when it will not. Callers outside the generator (scaffold)
-// use this instead of re-deriving the supported set, so their verdicts can
-// never drift from what the generator actually accepts.
-func CheckFuzzArgType(pkg *packages.Package, t types.Type) error {
-	if nativeFuzzType(t) {
-		return nil
-	}
-	e := newFuzzEmitter(pkg)
-	typ := types.Unalias(t)
-	e.path = []string{types.TypeString(typ, e.qual)}
-	// The decode walk visits exactly the shapes the encode walk does, so
-	// one direction suffices for validation.
-	_, err := e.readCall(typ)
-	return err
-}
-
-// nativeFuzzType delegates to gotestast.NativeFuzzType — the single source
-// of truth for the fifteen-type native set, shared with the lint rules.
+// nativeFuzzType delegates to gotestast.NativeFuzzType — the fifteen types
+// Go's engine accepts, used by the hybrid-leaf codec's own validation.
 func nativeFuzzType(t types.Type) bool {
 	return gotestast.NativeFuzzType(t)
 }
@@ -231,6 +53,19 @@ type fuzzEmitter struct {
 	needsStrings bool
 	needsStrconv bool
 	needsMath    bool
+
+	// fans/fanOrder hold the fan-in/fan-out function pairs (ƒ_fuzzin_*/
+	// ƒ_fuzzout_*) keyed on the same identifiers assignName hands out;
+	// fanInfos memoises the leaf shape per unaliased type string, and
+	// fanStack detects recursion during the fan walk. hybrids/hybridOrder
+	// hold the mini-codec pairs (ƒ_fuzzdec_*/ƒ_fuzzenc_*) of the types that
+	// ride as one []byte leaf.
+	fans        map[string]string
+	fanOrder    []string
+	fanInfos    map[string]*fanInfo
+	fanStack    []string
+	hybrids     map[string]string
+	hybridOrder []string
 }
 
 func newFuzzEmitter(pkg *packages.Package) *fuzzEmitter {
@@ -241,6 +76,9 @@ func newFuzzEmitter(pkg *packages.Package) *fuzzEmitter {
 		taken:    map[string]bool{},
 		helpers:  map[string]string{},
 		literals: map[string]string{},
+		fans:     map[string]string{},
+		fanInfos: map[string]*fanInfo{},
+		hybrids:  map[string]string{},
 	}
 	e.qual = func(p *types.Package) string {
 		if p == nil || p == e.genPkg {
@@ -371,7 +209,7 @@ func (e *fuzzEmitter) helperRead(t types.Type) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return "ƒ_fuzzread_" + fuzzCodecVersion + "_" + name + "(ƒr)", nil
+	return "ƒ_fuzzread_" + fuzzFanVersion + "_" + name + "(ƒr)", nil
 }
 
 func (e *fuzzEmitter) helperWrite(t types.Type, src string) (string, error) {
@@ -379,7 +217,7 @@ func (e *fuzzEmitter) helperWrite(t types.Type, src string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("ƒ_fuzzwrite_%s_%s(ƒw, %s)", fuzzCodecVersion, name, src), nil
+	return fmt.Sprintf("ƒ_fuzzwrite_%s_%s(ƒw, %s)", fuzzFanVersion, name, src), nil
 }
 
 // helper emits the read/write pair for a composite type exactly once and
@@ -413,8 +251,8 @@ func (e *fuzzEmitter) helper(t types.Type) (string, error) {
 }
 
 func (e *fuzzEmitter) helperSource(t types.Type, typeRef, name string) (string, error) {
-	readName := "ƒ_fuzzread_" + fuzzCodecVersion + "_" + name
-	writeName := "ƒ_fuzzwrite_" + fuzzCodecVersion + "_" + name
+	readName := "ƒ_fuzzread_" + fuzzFanVersion + "_" + name
+	writeName := "ƒ_fuzzwrite_" + fuzzFanVersion + "_" + name
 
 	var read, write strings.Builder
 	fmt.Fprintf(&read, "\nfunc %s(ƒr *gotestfuzz.Reader) %s {\n", readName, typeRef)
@@ -727,7 +565,7 @@ func (e *fuzzEmitter) basicLiteralExpr(b *types.Basic, src string) (string, erro
 		return fmt.Sprintf("strconv.FormatUint(uint64(%s), 10)", src), nil
 	case types.Float32, types.Float64:
 		e.needsMath = true
-		return fmt.Sprintf("ƒ_fuzzlitfloat_%s(float64(%s))", fuzzCodecVersion, src), nil
+		return fmt.Sprintf("ƒ_fuzzlitfloat_%s(float64(%s))", fuzzFanVersion, src), nil
 	case types.String:
 		return fmt.Sprintf("strconv.Quote(string(%s))", src), nil
 	}
@@ -795,7 +633,7 @@ func (e *fuzzEmitter) literalHelperCall(t types.Type, src string) (string, error
 	if err != nil {
 		return "", err
 	}
-	return "ƒ_fuzzlit_" + fuzzCodecVersion + "_" + name + "(" + src + ")", nil
+	return "ƒ_fuzzlit_" + fuzzFanVersion + "_" + name + "(" + src + ")", nil
 }
 
 // literalHelper emits the literal-rendering function for a composite type
@@ -837,7 +675,7 @@ func (e *fuzzEmitter) literalHelper(t types.Type) (string, error) {
 // bare basic or a named type over one (e.g. fuzzing a `type Priority int`
 // argument directly, with no enclosing struct).
 func (e *fuzzEmitter) literalHelperSource(t types.Type, typeRef, name string) (string, error) {
-	funcName := "ƒ_fuzzlit_" + fuzzCodecVersion + "_" + name
+	funcName := "ƒ_fuzzlit_" + fuzzFanVersion + "_" + name
 	var b strings.Builder
 	fmt.Fprintf(&b, "\nfunc %s(ƒv %s) string {\n", funcName, typeRef)
 

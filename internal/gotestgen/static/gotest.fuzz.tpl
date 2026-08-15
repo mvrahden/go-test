@@ -1,4 +1,4 @@
-{{- with $.FuzzCodecSource }}
+{{- with $.FuzzFanSource }}
 {{ . }}
 {{- end }}
 {{ range $i, $ts := .Spec.EffectiveTestSuites }}
@@ -36,21 +36,17 @@ func Fuzz{{ $ts.Identifier }}_{{ $fz.Identifier }}(f *testing.F) {
   s.BeforeAll(ƒlifecycleT)
 {{- $funcName := printf "Fuzz%s_%s" $ts.Identifier $fz.Identifier }}
 {{- /*
-  Harvested seeds go to *testing.F directly, BEFORE gotest.NewF exists, so
-  they are never codec-encoded. Safe today: the harvester only matches basic
-  literals whose type is identical to the callback param, which no struct
-  param can satisfy, so struct targets harvest nothing. If harvesting is ever
-  widened to struct composite literals, these lines must move below the
-  gotest.NewF call and go through *gotest.F — testing.F.Add panics on a
-  struct with "unsupported type to Add". This invariant is pinned by
-  SeedsTestSuite's struct-target assertion (internal/gotestast, "a fuzz
-  callback takes a struct type"), which fails the moment a struct target
-  harvests anything.
+  Harvested seeds go through *gotest.F, never *testing.F directly: F.Add
+  buffers them and gotest.Fuzz explodes them through the target's own fan
+  at flush time, so a harvested int seed on a fanned numeric position is
+  encoded exactly like a hand-written one. They are added before the user's
+  method runs, so they precede the method's own f.Add seeds in replay order.
 */}}
+  ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach{{ range $c := $.FuzzFans }}, {{ $c.Expr }}{{ end }})
 {{- range index $.HarvestedSeeds $funcName }}
-  f.Add({{ . }})
+  ƒf.Add({{ . }})
 {{- end }}
-  s.{{ $fz.Identifier }}(gotest.NewF(f, s.BeforeEach, s.AfterEach{{ range $c := $.FuzzCodecs }}, gotest.Codec[{{ $c.TypeRef }}]{Decode: {{ $c.DecodeFunc }}, Encode: {{ $c.EncodeFunc }}{{ if $c.LiteralFunc }}, Literal: {{ $c.LiteralFunc }}{{ end }}}{{ end }}))
+  s.{{ $fz.Identifier }}(ƒf)
 }
 {{ end }}
 {{- end }}

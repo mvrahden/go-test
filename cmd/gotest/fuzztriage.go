@@ -65,8 +65,9 @@ func rejectFuzzSubcommandFlags(sub string, args []string) error {
 
 // corpusArg is one decoded argument from a Go fuzz corpus file
 // (testdata/fuzz/<Func>/<hash>), restricted to Go's native primitive corpus
-// types (string, []byte, bool, and the int/uint/float variants) — struct-typed
-// fuzz callbacks are out of scope (no ƒ_fuzzenc/dec codecs exist).
+// types (string, []byte, bool, and the int/uint/float variants). For a
+// fanned target these are the raw leaves; the readable form comes from the
+// echo a re-run prints, and this decoding is the fallback display.
 //
 // SourceExpr is always the VERBATIM source text of the value as it appeared
 // in the corpus file (e.g. `"a@\x00"`, `-3`) — never reconstructed by
@@ -517,16 +518,15 @@ func promoteCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.Fuz
 	for i, a := range corpusArgs {
 		spliceArgs[i] = a.spliceExpr()
 	}
-	// A struct target's corpus entry is an opaque []byte. Re-run it with input
-	// echo on and splice the decoded literal instead, so the promoted seed is
-	// readable source that survives any future change to the wire format.
-	// Guarded to single-corpus-argument targets: only those can carry a
-	// codec — Fuzz2/Fuzz3 are native-types-only by design (Phase A).
-	if len(corpusArgs) == 1 {
-		out, _ := rerunCrasher(overlay, target, hashBase)
-		if lit := extractDecodedInput(out); lit != "" {
-			spliceArgs = []string{lit}
-		}
+	// A fanned target's corpus entry is one typed line per leaf — numeric
+	// leaves as fixed-width bytes, hybrid leaves opaque. Re-run it with input
+	// echo on and splice the fanned-in literal instead, so the promoted seed
+	// is readable, keyed source that survives any change to the fuzzed type's
+	// field layout. The echo carries a complete f.Add argument list (one
+	// literal per declared position), so it replaces the whole splice.
+	out, _ := rerunCrasher(overlay, target, hashBase)
+	if lit := extractDecodedInput(out); lit != "" {
+		spliceArgs = []string{lit}
 	}
 
 	editedFile, line, err := refactor.PromoteFuzzSeed(target.Dir, suite, method, spliceArgs)

@@ -1,4 +1,4 @@
-package fuzzcodec
+package fuzzfan
 
 type Priority int
 

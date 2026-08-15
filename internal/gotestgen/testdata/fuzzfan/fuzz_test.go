@@ -1,4 +1,4 @@
-package fuzzcodec
+package fuzzfan
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
