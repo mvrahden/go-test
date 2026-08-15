@@ -109,9 +109,14 @@ function renderedHtml(): string {
 // Both resolution modes the extension actually uses. `go run` is the default
 // and the only one that exposes the exit-status epilogue; a suite that tested
 // solely the prebuilt path would have shipped the regression untouched.
+const POSIX = process.platform !== "win32";
+
 const MODES = [
   { name: "go run (extension default)", cliPath: () => "" },
-  { name: "prebuilt cliPath", cliPath: () => prebuiltBinary },
+  // The prebuilt axis routes through a /bin/sh wrapper, so it is POSIX-only.
+  ...(POSIX
+    ? [{ name: "prebuilt cliPath", cliPath: () => prebuiltBinary }]
+    : []),
 ];
 
 describe.each(MODES)("spec sync via $name", (mode) => {
@@ -192,58 +197,70 @@ describe("CLI resolution is the mode the test intends", () => {
     expect(debug.some((m) => m.includes("cliPath override"))).toBe(false);
   });
 
-  it("uses the configured binary when cliPath is set", async () => {
-    const debug: string[] = [];
-    const recorder = createRecordingChannel();
-    const channel = {
-      ...recorder.channel,
-      debug: (m: string) => debug.push(m),
-    };
-    const panel = new SpecViewPanel(channel as never);
-    state.cliPath = prebuiltBinary;
-    await panel.show();
-    await panel.refresh(stream("mixed"), "run");
+  it.skipIf(!POSIX)(
+    "uses the configured binary when cliPath is set",
+    async () => {
+      const debug: string[] = [];
+      const recorder = createRecordingChannel();
+      const channel = {
+        ...recorder.channel,
+        debug: (m: string) => debug.push(m),
+      };
+      const panel = new SpecViewPanel(channel as never);
+      state.cliPath = prebuiltBinary;
+      await panel.show();
+      await panel.refresh(stream("mixed"), "run");
 
-    expect(debug.some((m) => m.includes("cliPath override"))).toBe(true);
-  });
+      expect(debug.some((m) => m.includes("cliPath override"))).toBe(true);
+    },
+  );
 
   // The extension now sends --render-only, which older CLIs would reject. The
   // version floor is what keeps that from reaching them, so its enforcement is
   // asserted against a real binary rather than only against mocked probes.
-  it("refuses a cliPath binary below the version floor and falls back to go run", async () => {
-    const debug: string[] = [];
-    const warnings: string[] = [];
-    const channel = {
-      info: () => {},
-      error: () => {},
-      warn: (m: string) => warnings.push(m),
-      debug: (m: string) => debug.push(m),
-    };
-    const panel = new SpecViewPanel(channel as never);
-    state.cliPath = realBinary; // reports a working-tree pseudo-version
-    await panel.show();
-    await panel.refresh(stream("mixed"), "run");
+  it.skipIf(!POSIX)(
+    "refuses a cliPath binary below the version floor and falls back to go run",
+    async () => {
+      const debug: string[] = [];
+      const warnings: string[] = [];
+      const channel = {
+        info: () => {},
+        error: () => {},
+        warn: (m: string) => warnings.push(m),
+        debug: (m: string) => debug.push(m),
+      };
+      const panel = new SpecViewPanel(channel as never);
+      state.cliPath = realBinary; // reports a working-tree pseudo-version
+      await panel.show();
+      await panel.refresh(stream("mixed"), "run");
 
-    expect(warnings.some((m) => m.includes("requires >="))).toBe(true);
-    expect(debug.some((m) => m.includes("cliPath override"))).toBe(false);
-    expect(debug.some((m) => m.includes("go run"))).toBe(true);
-  });
+      expect(warnings.some((m) => m.includes("requires >="))).toBe(true);
+      expect(debug.some((m) => m.includes("cliPath override"))).toBe(false);
+      expect(debug.some((m) => m.includes("go run"))).toBe(true);
+    },
+  );
 });
 
 describe("a CLI that produced no spec is reported, not swallowed", () => {
-  it("surfaces the real diagnostic when the binary fails to render", async () => {
-    const { panel, recorder } = newPanel();
-    state.cliPath = brokenBinary;
-    await panel.show();
-    await panel.refresh(stream("mixed"), "run");
+  // The stand-in binaries are /bin/sh scripts, so this case is POSIX-only.
+  // Everything above runs on every platform; only the fabricated binaries here
+  // and the cliPath wrapper depend on a shell.
+  it.skipIf(process.platform === "win32")(
+    "surfaces the real diagnostic when the binary fails to render",
+    async () => {
+      const { panel, recorder } = newPanel();
+      state.cliPath = brokenBinary;
+      await panel.show();
+      await panel.refresh(stream("mixed"), "run");
 
-    expect(recorder.errors.length).toBe(1);
-    expect(recorder.errors[0]).toContain("simulated toolchain failure");
-    // The failure must read as a failure, not as an unhelpful parse error
-    // downstream of a silently discarded exit code.
-    expect(recorder.errors[0]).not.toContain("JSON");
-    expect(renderedHtml()).not.toContain("totals the basket");
-  });
+      expect(recorder.errors.length).toBe(1);
+      expect(recorder.errors[0]).toContain("simulated toolchain failure");
+      // The failure must read as a failure, not as an unhelpful parse error
+      // downstream of a silently discarded exit code.
+      expect(recorder.errors[0]).not.toContain("JSON");
+      expect(renderedHtml()).not.toContain("totals the basket");
+    },
+  );
 });
 
 // Tier 2 — refresh() is stateful. jsonLayers accumulates run / coverage /
