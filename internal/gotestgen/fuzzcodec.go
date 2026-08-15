@@ -20,7 +20,7 @@ import (
 const fuzzCodecVersion = "v1"
 
 // fuzzCodecRuntimeImport is the import path every emitted codec needs.
-var fuzzCodecRuntimeImport = about.Repo + "/pkg/gotestruntime"
+var fuzzCodecRuntimeImport = about.Repo + "/pkg/gotestfuzz"
 
 // FuzzCodecRef names one generated codec, as the NewF call in the fuzz
 // wrapper needs to reference it.
@@ -129,9 +129,9 @@ func BuildFuzzCodecs(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) (
 			return nil, fmt.Errorf("fuzz target %s: %w", p.funcName, err)
 		}
 
-		fmt.Fprintf(&body, "\nfunc %s(ƒb []byte) %s {\n\tƒr := gotestruntime.NewFuzzReader(ƒb)\n\treturn %s\n}\n",
+		fmt.Fprintf(&body, "\nfunc %s(ƒb []byte) %s {\n\tƒr := gotestfuzz.NewReader(ƒb)\n\treturn %s\n}\n",
 			decName, p.typeRef, readExpr)
-		fmt.Fprintf(&body, "\nfunc %s(ƒv %s) []byte {\n\tƒw := gotestruntime.NewFuzzWriter()\n\t%s\n\treturn ƒw.Out()\n}\n",
+		fmt.Fprintf(&body, "\nfunc %s(ƒv %s) []byte {\n\tƒw := gotestfuzz.NewWriter()\n\t%s\n\treturn ƒw.Out()\n}\n",
 			encName, p.typeRef, writeStmt)
 
 		litFunc := ""
@@ -417,8 +417,8 @@ func (e *fuzzEmitter) helperSource(t types.Type, typeRef, name string) (string, 
 	writeName := "ƒ_fuzzwrite_" + fuzzCodecVersion + "_" + name
 
 	var read, write strings.Builder
-	fmt.Fprintf(&read, "\nfunc %s(ƒr *gotestruntime.FuzzReader) %s {\n", readName, typeRef)
-	fmt.Fprintf(&write, "\nfunc %s(ƒw *gotestruntime.FuzzWriter, ƒv %s) {\n", writeName, typeRef)
+	fmt.Fprintf(&read, "\nfunc %s(ƒr *gotestfuzz.Reader) %s {\n", readName, typeRef)
+	fmt.Fprintf(&write, "\nfunc %s(ƒw *gotestfuzz.Writer, ƒv %s) {\n", writeName, typeRef)
 
 	switch u := types.Unalias(t).Underlying().(type) {
 	case *types.Struct:

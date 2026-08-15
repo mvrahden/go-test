@@ -4,8 +4,9 @@ import "context"
 
 func ExportTCtx(t *T) context.Context { return t.ctx }
 
-// ExportEncodeSeeds and ExportSeedMismatch expose F's seed-encoding and
-// seed/target type-agreement logic without a *testing.F, which has no public
-// constructor outside a real fuzz target.
-func ExportEncodeSeeds(f *F, args []any) []any { return f.encodeSeeds(args) }
-func ExportSeedMismatch(f *F, want int) int    { return f.seedMismatch(want) }
+// ExportExplodeSeeds and ExportSeeds expose F's buffered-seed logic without
+// a *testing.F, which has no public constructor outside a real fuzz target.
+func ExportExplodeSeeds(f *F, arity int, explode func(seed []any) ([]any, error)) ([][]any, error) {
+	return f.explodeSeeds(arity, explode)
+}
+func ExportSeeds(f *F) [][]any { return f.seeds }

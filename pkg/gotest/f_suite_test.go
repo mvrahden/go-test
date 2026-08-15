@@ -2,12 +2,15 @@ package gotest_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"testing"
 
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/pkg/gotestfuzz"
 )
 
 // FuzzAdapterLifecycle is a top-level stdlib fuzz target — this IS the
@@ -16,12 +19,12 @@ import (
 // beforeEach/afterEach interpose around EACH execution of the fuzz body
 // (not just once around the whole fuzz target).
 func FuzzAdapterLifecycle(f *testing.F) {
-	f.Add("ab")
-	f.Add("cd")
 	var order []string
 	gf := gotest.NewF(f,
 		func(*gotest.T) { order = append(order, "before") },
 		func(*gotest.T) { order = append(order, "after") })
+	gf.Add("ab")
+	gf.Add("cd")
 
 	if gf.F() != f {
 		f.Fatalf("gf.F() = %p, want %p (identity passthrough broken)", gf.F(), f)
@@ -38,10 +41,7 @@ func FuzzAdapterLifecycle(f *testing.F) {
 		// Once a second execution has begun, the FIRST execution's
 		// after hook must already have run and interposed between the
 		// two executions — proving per-execution (not aggregate) hook
-		// interposition. (The after hook for THIS execution hasn't run
-		// yet at this point — it's deferred until fn returns — so the
-		// full triple for THIS execution is checked below, after
-		// gotest.Fuzz returns.)
+		// interposition.
 		if len(order) > 3 {
 			gotest.Equal(t, []string{"before", "body:ab", "after"}, order[:3])
 		}
@@ -64,65 +64,63 @@ func FuzzAdapterLifecycle(f *testing.F) {
 
 // FuzzAdapterNilHooks proves nil before/after hooks don't panic.
 func FuzzAdapterNilHooks(f *testing.F) {
-	f.Add("x")
 	gf := gotest.NewF(f, nil, nil)
+	gf.Add("x")
 	gotest.Fuzz(gf, func(t *gotest.T, s string) {
 		gotest.NotZero(t, s)
 	})
 }
 
-// FuzzAdapter2Args proves Fuzz2 passes both arguments through correctly.
+// FuzzAdapter2Args proves Fuzz2 passes both arguments through on the
+// native path — no fan attached, so the seeds go to the engine as declared.
 func FuzzAdapter2Args(f *testing.F) {
-	f.Add("a", 7)
 	gf := gotest.NewF(f, nil, nil)
+	gf.Add("a", 7)
 	gotest.Fuzz2(gf, func(t *gotest.T, s string, n int) {
 		gotest.Equal(t, "a", s)
 		gotest.Equal(t, 7, n)
 	})
 }
 
-// codecReq is a struct Go's fuzzing engine cannot handle natively —
-// f.Fuzz would panic with "unsupported type for fuzzing" without a codec.
-type codecReq struct {
+// fanReq is a struct Go's fuzzing engine cannot handle natively — f.Fuzz
+// would panic with "unsupported type for fuzzing" without a fan. fanReqFan
+// is what codegen emits for it: Email stays a native string leaf, Age rides
+// as an 8-byte leaf.
+type fanReq struct {
 	Email string
 	Age   int
 }
 
-// encodeCodecReq/decodeCodecReq stand in for what codegen emits. The wire
-// format is irrelevant here; what is under test is the dispatch.
-func encodeCodecReq(v codecReq) []byte {
-	return append([]byte{byte(v.Age)}, v.Email...)
-}
-
-func decodeCodecReq(b []byte) codecReq {
-	if len(b) == 0 {
-		return codecReq{}
+func fanReqFan() gotestfuzz.Fan[fanReq] {
+	return gotestfuzz.Fan[fanReq]{
+		Register: func(f *testing.F, run func(*testing.T, fanReq)) {
+			f.Fuzz(func(t *testing.T, email string, age []byte) {
+				run(t, fanReq{Email: email, Age: gotestfuzz.LeafInt(age)})
+			})
+		},
+		Explode: func(v fanReq) []any { return []any{v.Email, gotestfuzz.LeafBytesInt(v.Age)} },
+		Literal: func(v fanReq) string { return fmt.Sprintf("fanReq{Email: %q, Age: %d}", v.Email, v.Age) },
 	}
-	return codecReq{Age: int(b[0]), Email: string(b[1:])}
 }
 
-func codecReqCodec() gotest.Codec[codecReq] {
-	return gotest.Codec[codecReq]{Decode: decodeCodecReq, Encode: encodeCodecReq}
-}
-
-// FuzzCodecDispatch proves the whole struct-fuzzing mechanism end to end
-// inside a real fuzz target: a typed f.Add seed is encoded on the way in,
-// the target is rerouted to a native []byte target, and the callback still
-// receives a decoded struct — with beforeEach/afterEach interposed per
+// FuzzFanDispatch proves the whole mechanism end to end inside a real fuzz
+// target: a typed f.Add seed is exploded into leaves, the target is
+// registered through the fan's own (*testing.F).Fuzz call, and the callback
+// receives the fanned-in struct — with beforeEach/afterEach interposed per
 // execution, exactly as on the native path.
-func FuzzCodecDispatch(f *testing.F) {
+func FuzzFanDispatch(f *testing.F) {
 	var order []string
 	gf := gotest.NewF(f,
 		func(*gotest.T) { order = append(order, "before") },
 		func(*gotest.T) { order = append(order, "after") },
-		codecReqCodec())
+		fanReqFan())
 
-	gf.Add(codecReq{Email: "a@b.c", Age: 30})
+	gf.Add(fanReq{Email: "a@b.c", Age: 30})
 
-	gotest.Fuzz(gf, func(t *gotest.T, req codecReq) {
+	gotest.Fuzz(gf, func(t *gotest.T, req fanReq) {
 		order = append(order, "body")
 		gotest.Equal(t, "before", order[len(order)-2])
-		// The seed must survive the encode/decode round trip intact.
+		// The seed must survive the explode/fan-in round trip intact.
 		if len(order) == 3 {
 			gotest.Equal(t, "a@b.c", req.Email)
 			gotest.Equal(t, 30, req.Age)
@@ -134,74 +132,90 @@ func FuzzCodecDispatch(f *testing.F) {
 	}
 }
 
-// FuzzCodecNativeUnaffected proves an attached codec does not hijack a
-// target whose argument type Go fuzzes natively — Fuzz[string] must find no
-// Codec[string] and take the native path, and Add must leave a string seed
-// alone rather than handing testing.F a []byte for a string target.
-func FuzzCodecNativeUnaffected(f *testing.F) {
-	gf := gotest.NewF(f, nil, nil, codecReqCodec())
+// FuzzFanNativeUnaffected proves an attached fan does not hijack a target
+// whose argument type is a pass-through kind — Fuzz[string] must find no
+// FuzzFan[string] and take the native path, and the string seed must reach
+// the engine untouched.
+func FuzzFanNativeUnaffected(f *testing.F) {
+	gf := gotest.NewF(f, nil, nil, fanReqFan())
 	gf.Add("plain")
 	gotest.Fuzz(gf, func(t *gotest.T, s string) {
 		gotest.Equal(t, "plain", s)
 	})
 }
 
-// codecOther is a second non-native type, so the package's F carries two
-// codecs — the configuration in which a wrong-typed seed used to be claimed
-// by its own codec and silently decoded as garbage by the other target.
-type codecOther struct{ Label string }
-
-func codecOtherCodec() gotest.Codec[codecOther] {
-	return gotest.Codec[codecOther]{
-		Decode: func(b []byte) codecOther { return codecOther{Label: string(b)} },
-		Encode: func(v codecOther) []byte { return []byte(v.Label) },
+// FuzzFan2Mixed proves a two-argument target fans one position and passes
+// the other through, seeds included.
+func FuzzFan2Mixed(f *testing.F) {
+	fan := gotestfuzz.Fan2[fanReq, string]{
+		Register: func(f *testing.F, run func(*testing.T, fanReq, string)) {
+			f.Fuzz(func(t *testing.T, email string, age []byte, topic string) {
+				run(t, fanReq{Email: email, Age: gotestfuzz.LeafInt(age)}, topic)
+			})
+		},
+		Explode: func(v fanReq, s string) []any { return []any{v.Email, gotestfuzz.LeafBytesInt(v.Age), s} },
+		Literal: func(v fanReq, s string) string {
+			return fmt.Sprintf("fanReq{Email: %q, Age: %d}, %q", v.Email, v.Age, s)
+		},
 	}
-}
-
-// FuzzCodecRightTypeSeedWithTwoCodecs is the control for
-// TestSeedTypeMismatch below: with two codecs attached, a seed of the
-// target's own type must still work untouched.
-func FuzzCodecRightTypeSeedWithTwoCodecs(f *testing.F) {
-	gf := gotest.NewF(f, nil, nil, codecReqCodec(), codecOtherCodec())
-	gf.Add(codecReq{Email: "a@b.c", Age: 30})
-	gotest.Fuzz(gf, func(t *gotest.T, req codecReq) {
-		gotest.Equal(t, "a@b.c", req.Email)
-		gotest.Equal(t, 30, req.Age)
+	gf := gotest.NewF(f, nil, nil, fan)
+	gf.Add(fanReq{Email: "x@y.z", Age: 7}, "orders")
+	gotest.Fuzz2(gf, func(t *gotest.T, req fanReq, topic string) {
+		gotest.Equal(t, "x@y.z", req.Email)
+		gotest.Equal(t, 7, req.Age)
+		gotest.Equal(t, "orders", topic)
 	})
 }
 
-// FuzzCodecReportsDecodedInputOnFailure proves the codec path prints the
-// decoded value when an execution fails, which is what makes a struct
-// crasher readable in triage and promotable back into source.
+// FuzzFanReportsDecodedInputOnFailure proves the fan path prints the
+// fanned-in value when an execution fails, which is what makes a struct
+// crasher readable at the crash site — go test itself prints no input
+// values, only the corpus file path.
 //
 // The deliberate failure is armed by GOTEST_TEST_FUZZ_FAIL_INPUT (the same
 // idiom as GOTEST_TEST_EACH_FAIL_FIRST): unarmed, the target replays its
 // seed and passes, so a plain `go test ./pkg/gotest/` stays green. Only
 // TestDecodedInputReporting's subprocess arms it to scrape the marker line.
-func FuzzCodecReportsDecodedInputOnFailure(f *testing.F) {
-	type req struct{ Name string }
-	codec := gotest.Codec[req]{
-		Decode:  func(b []byte) req { return req{Name: string(b)} },
-		Encode:  func(v req) []byte { return []byte(v.Name) },
-		Literal: func(v req) string { return `req{Name: "` + v.Name + `"}` },
-	}
-	f.Add([]byte("boom"))
-	gf := gotest.NewF(f, nil, nil, codec)
-	gotest.Fuzz(gf, func(t *gotest.T, v req) {
-		if v.Name == "boom" && os.Getenv("GOTEST_TEST_FUZZ_FAIL_INPUT") != "" { //nolint:fail-guard // a deliberate failure trigger, not an assertion about v
+func FuzzFanReportsDecodedInputOnFailure(f *testing.F) {
+	gf := gotest.NewF(f, nil, nil, fanReqFan())
+	gf.Add(fanReq{Email: "boom"})
+	gotest.Fuzz(gf, func(t *gotest.T, v fanReq) {
+		if v.Email == "boom" && os.Getenv("GOTEST_TEST_FUZZ_FAIL_INPUT") != "" { //nolint:fail-guard // a deliberate failure trigger, not an assertion about v
 			t.Errorf("deliberate failure for input reporting")
 		}
 	})
 }
 
+// FuzzSeedTypeMismatch proves a seed of the wrong type is rejected against
+// the target's own type with a message naming both, instead of reaching the
+// engine. Armed by env like the echo target above.
+func FuzzSeedTypeMismatch(f *testing.F) {
+	gf := gotest.NewF(f, nil, nil, fanReqFan())
+	if os.Getenv("GOTEST_TEST_FUZZ_BAD_SEED") != "" {
+		gf.Add("not a fanReq")
+	} else {
+		gf.Add(fanReq{Email: "ok"})
+	}
+	gotest.Fuzz(gf, func(t *gotest.T, v fanReq) {})
+}
+
+// FuzzAddAfterFuzz proves a late f.Add is refused with a message, rather
+// than being silently dropped from the buffer. Armed by env.
+func FuzzAddAfterFuzz(f *testing.F) {
+	gf := gotest.NewF(f, nil, nil)
+	gf.Add("early")
+	gotest.Fuzz(gf, func(t *gotest.T, s string) {})
+	if os.Getenv("GOTEST_TEST_FUZZ_LATE_ADD") != "" {
+		gf.Add("late")
+	}
+}
+
 // FWrapperTestSuite is a normal gotest suite covering what's assertable
 // about *gotest.F outside of a real fuzz target. *testing.F has no public
 // constructor, so an actual *gotest.F can only be built inside a genuine
-// fuzz target — F() identity, Add forwarding (via seed count driving
-// executions), and the generic adapters are exercised end to end by
-// FuzzAdapterLifecycle, FuzzAdapterNilHooks, and FuzzAdapter2Args above.
-// What remains assertable here, without an instance, is the assertion
-// contract *gotest.F promises to satisfy.
+// fuzz target — the targets above cover dispatch end to end. What remains
+// assertable here, without an instance, is the assertion contract and the
+// buffered-seed logic.
 type FWrapperTestSuite struct{}
 
 func (s *FWrapperTestSuite) TestAssertionContract(t *gotest.T) {
@@ -215,70 +229,86 @@ func (s *FWrapperTestSuite) TestAssertionContract(t *gotest.T) {
 	})
 }
 
-func (s *FWrapperTestSuite) TestCodecEncoding(t *gotest.T) {
-	t.It("claims a value of its own type and re-encodes it", func(it *gotest.T) {
-		c := codecReqCodec()
-		got := c.Decode(c.Encode(codecReq{Email: "x@y.z", Age: 7}))
-		gotest.Equal(it, codecReq{Email: "x@y.z", Age: 7}, got)
+func (s *FWrapperTestSuite) TestSeedBuffering(t *gotest.T) {
+	identity := func(seed []any) ([]any, error) { return seed, nil }
+
+	t.It("keeps every f.Add tuple in order until the target flushes it", func(it *gotest.T) {
+		f := gotest.NewF(nil, nil, nil)
+		f.Add("a", 1)
+		f.Add("b", 2)
+		gotest.Equal(it, [][]any{{"a", 1}, {"b", 2}}, gotest.ExportSeeds(f))
+	})
+
+	t.It("copies the caller's slice, so f.Add(vals...) is safe to reuse", func(it *gotest.T) {
+		f := gotest.NewF(nil, nil, nil)
+		vals := []any{"a"}
+		f.Add(vals...)
+		vals[0] = "mutated"
+		gotest.Equal(it, [][]any{{"a"}}, gotest.ExportSeeds(f))
+	})
+
+	t.It("explodes each tuple through the target's own explode function", func(it *gotest.T) {
+		f := gotest.NewF(nil, nil, nil)
+		f.Add(fanReq{Email: "e", Age: 3})
+		fan := fanReqFan()
+		out, err := gotest.ExportExplodeSeeds(f, 1, func(seed []any) ([]any, error) { return fan.Explode(seed[0].(fanReq)), nil })
+		gotest.NoError(it, err)
+		gotest.Equal(it, [][]any{{"e", gotestfuzz.LeafBytesInt(3)}}, out)
+	})
+
+	t.It("rejects a tuple whose arity is not the target's, naming the seed", func(it *gotest.T) {
+		f := gotest.NewF(nil, nil, nil)
+		f.Add("a", "b")
+		f.Add("only one")
+		_, err := gotest.ExportExplodeSeeds(f, 2, identity)
+		gotest.ErrorContains(it, err, "seed #2")
+		gotest.ErrorContains(it, err, "given 1 value, but this fuzz target takes 2")
+	})
+
+	t.It("wraps an explode error with the seed number", func(it *gotest.T) {
+		f := gotest.NewF(nil, nil, nil)
+		f.Add("fine")
+		f.Add("bad")
+		_, err := gotest.ExportExplodeSeeds(f, 1, func(seed []any) ([]any, error) {
+			if seed[0] == "bad" {
+				return nil, errors.New("f.Add was given string, but this fuzz target takes fanReq")
+			}
+			return seed, nil
+		})
+		gotest.ErrorContains(it, err, "seed #2: f.Add was given string, but this fuzz target takes fanReq")
 	})
 }
 
-// TestSeedTypeMismatch pins the guard that stops a seed of the wrong
-// non-native type from being silently decoded as an unrelated value. Every
-// codec in a package is attached to every F, so without it the wrong seed is
-// claimed by its OWN codec, encoded, and handed to a target that reads those
-// bytes as garbage — with the target still passing.
-func (s *FWrapperTestSuite) TestSeedTypeMismatch(t *gotest.T) {
-	// codec index 0 handles codecReq, index 1 handles codecOther
-	newTwoCodecF := func() *gotest.F {
-		return gotest.NewF(nil, nil, nil, codecReqCodec(), codecOtherCodec())
-	}
-
-	t.It("reports no mismatch when the seed matches the target's type", func(it *gotest.T) {
-		f := newTwoCodecF()
-		gotest.ExportEncodeSeeds(f, []any{codecReq{Email: "a@b.c", Age: 1}})
-		gotest.Equal(it, -1, gotest.ExportSeedMismatch(f, 0), "a codecReq seed on a codecReq target is correct")
-	})
-
-	t.It("reports the offending codec when the seed is a different non-native type", func(it *gotest.T) {
-		f := newTwoCodecF()
-		gotest.ExportEncodeSeeds(f, []any{codecOther{Label: "xyz"}})
-		gotest.Equal(it, 1, gotest.ExportSeedMismatch(f, 0), "a codecOther seed on a codecReq target must be caught")
-	})
-
-	t.It("reports a mismatch when a native target was given a codec-claimed seed", func(it *gotest.T) {
-		f := newTwoCodecF()
-		gotest.ExportEncodeSeeds(f, []any{codecOther{Label: "xyz"}})
-		gotest.Equal(it, 1, gotest.ExportSeedMismatch(f, -1), "native targets must encode no seed at all")
-	})
-
-	t.It("leaves native seeds unclaimed, so they never trip the guard", func(it *gotest.T) {
-		f := newTwoCodecF()
-		out := gotest.ExportEncodeSeeds(f, []any{"plain", 7, []byte{1, 2}})
-		gotest.Equal(it, []any{"plain", 7, []byte{1, 2}}, out, "native values must pass through untouched")
-		gotest.Equal(it, -1, gotest.ExportSeedMismatch(f, -1))
-	})
-
-	t.It("encodes a claimed seed to bytes and leaves the caller's slice intact", func(it *gotest.T) {
-		f := newTwoCodecF()
-		args := []any{codecOther{Label: "hi"}}
-		out := gotest.ExportEncodeSeeds(f, args)
-		gotest.Equal[any](it, []byte("hi"), out[0])
-		gotest.Equal[any](it, codecOther{Label: "hi"}, args[0], "f.Add(vals...) must not mutate the caller's slice")
-	})
+// runArmedFuzzTarget re-runs one of the env-armed fuzz targets above in a
+// subprocess with the arming variable set. The target fails deliberately
+// once armed, so "go test" exits non-zero; the error is expected and not
+// the thing under test — see e.g. e2e_suite_test.go's identical out, _ :=
+// ... idiom. -count=1 defeats the test cache: a cached pass from an unarmed
+// run would otherwise be replayed with no output.
+func runArmedFuzzTarget(target, armEnv string) string {
+	cmd := exec.Command("go", "test", "-count=1", "-run", "^"+target+"$", ".")
+	cmd.Env = append(os.Environ(), armEnv+"=1")
+	out, _ := cmd.CombinedOutput()
+	return string(out)
 }
 
 func (s *FWrapperTestSuite) TestDecodedInputReporting(t *gotest.T) {
-	t.It("prints the decoded literal to stderr when an execution fails", func(it *gotest.T) {
-		// The target fuzz func fails deliberately once armed via env, so
-		// "go test" exits non-zero; the error is expected and not the thing
-		// under test — see e.g. e2e_suite_test.go's identical out, _ := ...
-		// idiom for a subprocess whose non-zero exit is the point, not a
-		// defect. -count=1 defeats the test cache: a cached pass from an
-		// unarmed run would otherwise be replayed here with no output.
-		cmd := exec.Command("go", "test", "-count=1", "-run", "^FuzzCodecReportsDecodedInputOnFailure$", ".")
-		cmd.Env = append(os.Environ(), "GOTEST_TEST_FUZZ_FAIL_INPUT=1")
-		out, _ := cmd.CombinedOutput()
-		gotest.Contains(it, string(out), protocol.FuzzInputPrefix+`req{Name: "boom"}`)
+	t.It("prints the fanned-in literal to stderr when an execution fails", func(it *gotest.T) {
+		out := runArmedFuzzTarget("FuzzFanReportsDecodedInputOnFailure", "GOTEST_TEST_FUZZ_FAIL_INPUT")
+		gotest.Contains(it, out, protocol.FuzzInputPrefix+`fanReq{Email: "boom", Age: 0}`)
+	})
+}
+
+func (s *FWrapperTestSuite) TestSeedGuards(t *gotest.T) {
+	t.It("fails the target when a seed is not the target's type", func(it *gotest.T) {
+		out := runArmedFuzzTarget("FuzzSeedTypeMismatch", "GOTEST_TEST_FUZZ_BAD_SEED")
+		gotest.Contains(it, out, "seed #1: f.Add was given string, but this fuzz target takes gotest_test.fanReq")
+		gotest.Contains(it, out, "FAIL")
+	})
+
+	t.It("fails the target when f.Add is called after gotest.Fuzz", func(it *gotest.T) {
+		out := runArmedFuzzTarget("FuzzAddAfterFuzz", "GOTEST_TEST_FUZZ_LATE_ADD")
+		gotest.Contains(it, out, "f.Add called after gotest.Fuzz")
+		gotest.Contains(it, out, "FAIL")
 	})
 }

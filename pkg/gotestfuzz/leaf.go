@@ -1,4 +1,4 @@
-package gotestruntime
+package gotestfuzz
 
 import (
 	"encoding/binary"
