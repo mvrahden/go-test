@@ -34,6 +34,7 @@ type SuiteTarget struct {
 	CoverProfile string   // per-suite cover profile path (empty if no -coverprofile)
 	BudgetFile   string   // sidecar path for teardown budget (empty = use default)
 	Exclusive    bool     // SuiteConfig{Exclusive: true}: dispatched strictly alone, after every non-exclusive suite
+	FuzzFuncs    []string // generated Fuzz<Suite>_<Method> wrapper names whose seed corpus replays alongside SuiteName in a plain run (ignored when Bench is true or RunFilter is set)
 }
 
 // SuiteResult holds the output from running a single suite subprocess.
@@ -138,15 +139,27 @@ func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]s
 }
 
 func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2json bool) *exec.Cmd { //nolint:gocritic // hugeParam: stable API
-	var runArg string
-	if target.RunFilter != "" {
-		runArg = "-test.run=" + target.RunFilter
-	} else {
-		runArg = fmt.Sprintf("-test.run=^%s$", regexp.QuoteMeta(target.SuiteName))
-	}
-
 	var testArgs []string
-	testArgs = append(testArgs, runArg)
+	switch {
+	case target.RunFilter != "":
+		// A user-supplied -run filter already becomes the entire -test.run
+		// value, so it is left untouched: fuzz seeds replay only when a
+		// generated Fuzz<Suite>_<Method> name happens to match the user's
+		// filter on its own merit. We do not widen an explicit user filter
+		// to also include fuzz funcs — user filter wins (controller ruling).
+		testArgs = append(testArgs, "-test.run="+target.RunFilter)
+	case len(target.FuzzFuncs) > 0:
+		// No user filter: widen the run to an alternation of the suite's
+		// Test function and every generated Fuzz<Suite>_<Method> wrapper, so
+		// each fuzz func's seed corpus replays as ordinary subtests under a
+		// plain run (zero-cost regression testing). target.SuiteName already
+		// carries the "Test" prefix (see SuiteSpec.SuiteName), so it is used
+		// as-is here rather than re-prefixed.
+		alternates := append([]string{regexp.QuoteMeta(target.SuiteName)}, quoteAll(target.FuzzFuncs)...)
+		testArgs = append(testArgs, fmt.Sprintf("-test.run=^(?:%s)$", strings.Join(alternates, "|")))
+	default:
+		testArgs = append(testArgs, fmt.Sprintf("-test.run=^%s$", regexp.QuoteMeta(target.SuiteName)))
+	}
 
 	if test2json {
 		testArgs = append(testArgs, "-test.v=test2json")
@@ -266,7 +279,11 @@ func WritePackageSummary(pkg string, failed bool, d time.Duration, verbose bool)
 // BuildSuiteTargets constructs SuiteTarget entries from compiled binaries
 // and suite names. suitesByPkg maps import path to a list of suite struct
 // names (e.g., "FooTestSuite"). The generated test function name is
-// "Test" + suite struct name.
+// "Test" + suite struct name. fuzzFuncsByPkg maps import path to a map of
+// suite struct name to its generated Fuzz<Suite>_<Method> wrapper names
+// (see OverlayResult.FuzzFuncsByPkg); each target's FuzzFuncs is populated
+// from its own pkg+suite entry so its seed corpus replays alongside the
+// suite's Test function in a plain run (see buildSuiteCmd).
 //
 // If userRunFilter is non-empty, only suites whose test function name
 // matches the filter regex are included.
@@ -274,7 +291,7 @@ func WritePackageSummary(pkg string, failed bool, d time.Duration, verbose bool)
 // exclusiveByPkg (import path → suite struct name → true) marks suites with
 // SuiteConfig{Exclusive: true}; their targets carry Exclusive and are
 // dispatched strictly alone, after every non-exclusive suite (see RunSuites).
-func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, exclusiveByPkg map[string]map[string]bool, runFlags []string, userRunFilter string) []SuiteTarget {
+func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, fuzzFuncsByPkg map[string]map[string][]string, exclusiveByPkg map[string]map[string]bool, runFlags []string, userRunFilter string) []SuiteTarget {
 	binByPkg := make(map[string]string, len(compiled))
 	for _, cr := range compiled {
 		binByPkg[cr.Package] = cr.BinaryPath
@@ -304,6 +321,7 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 				},
 				BinaryPath: bin,
 				RunFlags:   translatedFlags,
+				FuzzFuncs:  fuzzFuncsByPkg[pkg][suiteName],
 				Exclusive:  exclusiveByPkg[pkg][suiteName],
 			}
 			if rf := suiteRunFilter(userRunFilter, testFuncName); rf != "" {
@@ -325,6 +343,15 @@ func sortTargetIndices(targets []SuiteTarget, idx []int) {
 		}
 		return ta.SuiteName < tb.SuiteName
 	})
+}
+
+// quoteAll returns regexp.QuoteMeta applied to each name, preserving order.
+func quoteAll(names []string) []string {
+	out := make([]string, len(names))
+	for i, n := range names {
+		out[i] = regexp.QuoteMeta(n)
+	}
+	return out
 }
 
 // matchesSuiteFunc checks if the user's -run regex could match a given

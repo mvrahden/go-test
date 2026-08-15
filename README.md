@@ -571,6 +571,184 @@ Or when running `go test` directly:
 GOTEST_UPDATE_SNAPSHOTS=1 go test ./...
 ```
 
+## Fuzzing
+
+Fuzz methods live on the same suites as tests — same struct, same lifecycle, own subcommand.
+
+### Authoring
+
+```go
+type ParserTestSuite struct {
+    p *Parser
+}
+
+func (s *ParserTestSuite) BeforeEach(t *gotest.T) { s.p = NewParser() }
+
+func (s *ParserTestSuite) FuzzParse(f *gotest.F) {
+    f.Add(`{"a":1}`)
+    gotest.Fuzz(f, func(t *gotest.T, input string) {
+        doc, err := s.p.Parse(input)
+        if err != nil {
+            return // rejecting invalid input is fine
+        }
+        out, err := doc.Marshal()
+        gotest.NoError(t, err)
+        gotest.JSONEq(t, input, out)
+    })
+}
+```
+
+`Fuzz*` methods take `*gotest.F` only — unlike benchmarks, `*testing.F` is rejected: fuzz lifecycle interposition needs `gotest.F`'s `BeforeEach`/`AfterEach` wiring, which the stdlib type can't carry.
+Bodies call the generic adapters `gotest.Fuzz`/`gotest.Fuzz2`/`gotest.Fuzz3` (one, two, or three fuzzed arguments) wrapping a `func(t *gotest.T, ...)`.
+Each execution gets a fresh `*gotest.T`, with the suite's `BeforeEach`/`AfterEach` interposed around every single execution — not once for the whole fuzz target.
+`f.Add(...)` registers seeds exactly like stdlib.
+`F_`/`X_` focus/exclude prefixes carry over from tests.
+
+The same suite-shape rejections as benchmarks apply, with fuzz-specific wording:
+a returning `BeforeEach` is rejected (`suite %s has fuzz methods but a returning BeforeEach — move fuzz targets to a dedicated suite`), any lifecycle hook still typed `*testing.T` is rejected (`suite %s has fuzz methods but %s uses *testing.T — fuzz lifecycles require *gotest.T hooks`), and a fixture with per-method `BeforeEach`/`AfterEach` bound to a fuzzing suite is rejected at generation time (`suite %s has fuzz methods but fixture %s defines BeforeEach/AfterEach — per-execution fixture hooks are not supported for fuzz targets`).
+
+Codegen emits one top-level function per `Fuzz*` method, named `Fuzz<SuiteIdentifier>_<MethodName>` — e.g. `FuzzParserTestSuite_FuzzParse` — since Go's fuzzing engine targets exactly one `FuzzX` symbol per run.
+
+### Struct arguments
+
+Go's fuzzing engine accepts exactly fifteen argument types — and the hand-written wire and message types you most want to fuzz are structs.
+`gotest.Fuzz` accepts a struct — or any named type over a native one, like `type Priority int` — and codegen fans it out: one engine argument per leaf field, reassembled into your type before every execution.
+The engine still sees only types it understands, but it sees the *fields*, so its mutator moves each one independently instead of chewing on one opaque blob.
+The supported set is deliberately strict: structs of exported fields with simple shapes.
+Maps, unexported fields (which excludes `time.Time` and protobuf-generated types), interfaces, and recursion are refused at generation time with a suggested alternative — the full table is below.
+
+```go
+func (s *UserServiceTestSuite) FuzzCreate(f *gotest.F) {
+    f.Add(CreateUserRequest{Email: "a@b.c", Age: 30})
+    gotest.Fuzz(f, func(t *gotest.T, req CreateUserRequest) {
+        gotest.NoError(t, req.Validate())
+    })
+}
+```
+
+Every leaf is one of three shapes: `string`, `bool`, and `[]byte` pass through untouched; every number rides as a fixed-width little-endian `[]byte`, because Go's mutator gives a `[]byte` its richest operators (interesting-value overwrites, bit flips, window arithmetic) and gives a native number only bounded ±100 arithmetic — so boundary values, NaN, and Inf are one mutation away rather than unreachable.
+Nested structs, pointers (a `bool` nil-flag plus the pointee's leaves), and small arrays flatten into the same tuple; a variable-length non-byte slice rides as one packed `[]byte`, since its leaf count isn't fixed.
+The policy applies to declared positions too — `gotest.Fuzz(f, func(t *gotest.T, n int))` fans out to one `[]byte` leaf — and `Fuzz2`/`Fuzz3` take exactly the same types, each position with its own fan.
+
+Seeds you write stay plain Go literals — `f.Add` buffers them and `gotest.Fuzz` explodes each one through the target's own fan, rejecting a seed whose type isn't the one the target fuzzes (`seed #0: f.Add was given []byte, but this fuzz target takes CreateUserRequest`) rather than letting it stand in for an unrelated value.
+
+Crashers stay readable in both directions.
+When a struct-typed execution fails, the decoded value is printed alongside the failure — `CreateUserRequest{Email: "a@\x00", Age: -1}`, not the raw corpus bytes — and `gotest fuzz promote` splices that same literal back into the target as a typed `f.Add(CreateUserRequest{...})` seed.
+A promoted seed is therefore ordinary Go source, which is what makes it outlive any future change to the encoding.
+Literal rendering covers every shape the fan itself accepts, so a promoted crasher is always typed source.
+Pointer fields included: a `*int` renders as `&[]int{5}[0]`, since `&5` is not valid Go and `new(5)` — added in Go 1.26 — would not compile in a module still declaring `go 1.24`.
+
+Fields map to leaves in declaration order, so a corpus entry recorded on disk means what your type's current field list says it means.
+**Changing that list is loud**: adding or removing a field changes the leaf count, and Go's engine rejects every entry of the old shape outright.
+gotest names the drift before the engine's own message does — a pre-flight check runs ahead of `go test` on both plain runs and `gotest fuzz`, printing which entry no longer fits, what it holds, and what the target now takes.
+The one silent case left is swapping two same-kind fields: the count still matches, so the entry loads and quietly becomes a different test.
+Promoting crashers to source is the durable answer, and the `fuzz-struct-corpus` lint rule is the backstop: it flags any on-disk corpus entries for a shape-bound target and points at `gotest fuzz promote`, so a field-order-bound file can't quietly linger as a regression test that no longer tests what it caught.
+
+Codegen refuses, at generation time, anything it cannot encode faithfully — permitting it would generate code that lies:
+
+| Refused | Do this instead |
+|---|---|
+| structs with unexported fields | fuzz the constructor's input, or declare a local wrapper struct |
+| `map` fields | fuzz a slice of key/value pairs and build the map in the callback |
+| interfaces, channels, funcs | — |
+| recursive types | — |
+| `time.Time` and friends (unexported internals) | fuzz an `int64` and convert in the callback |
+
+Each rejection names the offending field path and its type, e.g. `fuzz target FuzzUserServiceTestSuite_FuzzCreate: CreateUserRequest.mu (sync.Mutex) is not fuzzable — unexported fields cannot be set — fuzz the constructor's input, or declare a local wrapper struct`.
+Nothing in the toolchain catches this for us — `go vet` only checks direct `(*testing.F).Fuzz` calls, and the generic adapter hides the instantiation from it — so generation time is the only place a useful message can be produced.
+
+### Seed harvesting
+
+At generation time, gotest mines each `Fuzz*` method's package for literal primitive values that already flow into the function under fuzz — table-test rows (`gotest.Each`) and direct call-site literals in `_test.go` files — and injects them as additional `f.Add(...)` seeds in the generated wrapper, on top of whatever you added by hand.
+Your existing valid-input examples become a starting corpus for free — coverage-guided mutation from real inputs finds interesting states far faster than starting from `""`.
+
+Harvesting only scans test files, never production code, and only lifts literal shapes — basic literals, `true`/`false`, a unary-minus of one, or a single-arg conversion of one — never computed expressions.
+It's on by default; disable it for one run with `--no-harvest`, or persistently with `fuzz: harvest: false` in `.gotest.yml` (see [Project Configuration](#project-configuration)).
+
+### Seed replay
+
+```bash
+gotest ./...
+```
+
+```
+=== RUN   FuzzParserTestSuite_FuzzParse
+=== RUN   FuzzParserTestSuite_FuzzParse/seed#0
+--- PASS: FuzzParserTestSuite_FuzzParse (0.00s)
+    --- PASS: FuzzParserTestSuite_FuzzParse/seed#0 (0.00s)
+```
+
+Every seed added via `f.Add`, plus any crasher corpus already discovered under `testdata/fuzz/`, replays as an ordinary subtest under a plain run — `gotest ./...`, `gotest spec`, `gotest watch`, and `gotest summary` all do this, at zero extra cost, with no `-fuzz` flag involved.
+For a **pass-through** target, committing a crasher's corpus file makes it a permanent regression test; for a **shape-bound** target, run `gotest fuzz promote` instead — its corpus files are bound to the type's field order (the `fuzz-struct-corpus` lint rule will remind you), while a promoted `f.Add` literal is ordinary Go source.
+A user-supplied `-run` filter wins over this widening — fuzz seeds only replay if a generated `Fuzz<Suite>_<Method>` name happens to match the filter on its own merit.
+
+One caveat to state plainly: suite fuzz methods exist only through gotest's generated wrappers.
+Plain `go test` (and external fuzzing infrastructure like OSS-Fuzz, which needs on-disk `FuzzXxx` functions) never sees them, and promoted seeds replay only under gotest runs.
+If a target must also run under stock tooling, write it as a top-level `func FuzzXxx(*testing.F)` — `gotest.NewF`/`gotest.Fuzz` work there too, as plain library calls, though with native argument types only: fans exist solely in generated suite wrappers.
+
+### Running
+
+```bash
+gotest fuzz ./...                     # fuzz until interrupted or timeout
+gotest fuzz --for=5m ./...            # ~5 minutes of fuzzing wall-clock, shared across all targets
+gotest fuzz --for=1m --jobs=2 ./...   # cap concurrency to 2 targets at a time
+```
+
+`--target=<Fuzz...>` narrows a session to exactly one generated wrapper (an unmatched name errors with the available list) — this is also what the VS Code extension invokes: fuzz methods get **Fuzz** / **Debug Seeds** CodeLenses, budgeted cancellable sessions, crasher notifications wired to triage/promote/debug, and Test Explorer items whose runs replay seeds (see `vscode-gotest/README.md`).
+
+`gotest fuzz` discovers every generated `Fuzz<Suite>_<Method>` target and runs each one as its own `go test -fuzz=...` subprocess — one target per invocation of `go test`.
+This is unlike every other gotest subcommand: a suite binary compiled once with `go test -c` has no native fuzz instrumentation, because `cmd/go` only weaves it in when `-fuzz` is present at `go test` invocation time.
+Reusing the shared compiled binary the way `gotest`/`gotest bench` do would run uninstrumented — coverage-guided mutation would silently degrade to undirected random input.
+So each target gets its own `go test -fuzz` process instead, at the cost of losing the binary-reuse speedup everywhere else in gotest.
+
+`--for=<dur>` is approximate wall-clock for the whole session: each target's `-fuzztime` share is `--for × min(--jobs, targets) / targets`, so concurrent waves multiply back out to ≈`--for` (shares floor at 10s, so a small `--for` on many targets doesn't starve any of them — the floor stretches the session instead, and gotest says so). The resolved schedule is printed before fuzzing starts, and a `--for` that cannot fit inside the global `--timeout` is rejected up front rather than cut down mid-run.
+Omit `--for` and no `-fuzztime` is passed — targets fuzz until interrupted, bounded only by the global `--timeout` (default 15m). Ending by timeout or interrupt is the normal end of an open-ended search, not a failure: the session exits 0 unless something was actually found (a failing target or a new crasher file — detected by scanning each target's `testdata/fuzz/<Func>/` directory, so a crash still counts even when the deadline killed the process mid-report).
+`--jobs=<n>` caps concurrent targets (default `max(1, GOMAXPROCS/2)`); every target still shares the one global `--timeout` deadline, so with more targets than `--jobs`, later waves may not start before it expires — gotest prints `[<Func>] skipped: session ended before this target started` for each one that doesn't, and (when `--for` was given) summarizes which targets did not get their full share.
+Give `--for` an explicit value on a run with many targets rather than relying on `--timeout` alone.
+
+Output streams live, line by line, each line prefixed `[<Func>] `:
+
+```
+[FuzzNotificationServiceTestSuite_FuzzTrim] fuzz: elapsed: 0s, gathering baseline coverage: 0/76 completed
+[FuzzNotificationServiceTestSuite_FuzzTrim] fuzz: elapsed: 0s, gathering baseline coverage: 76/76 completed, now fuzzing with 6 workers
+[FuzzNotificationServiceTestSuite_FuzzTrim] fuzz: elapsed: 3s, execs: 393973 (131314/sec), new interesting: 0 (total: 76)
+[FuzzNotificationServiceTestSuite_FuzzTrim] fuzz: elapsed: 10s, execs: 1407280 (131111/sec), new interesting: 1 (total: 77)
+[FuzzNotificationServiceTestSuite_FuzzTrim] PASS
+[FuzzNotificationServiceTestSuite_FuzzTrim] ok  	github.com/mvrahden/go-test/examples/notification	10.115s
+```
+
+On a crashing input, the session exits 1 and gotest names each new corpus file it detected — `[<Func>] new crasher: <dir>/testdata/fuzz/<Func>/<hash>` — followed by a pointer to `gotest fuzz triage` (to see the decoded input) and `gotest fuzz promote` (to keep it as a typed `f.Add` seed that replays on every ordinary run). A target that fails without writing a new file (a failing seed or existing corpus entry) is called out as such: it reproduces on a regular `gotest` run.
+
+With no `Fuzz*` methods anywhere, `gotest fuzz` prints `no fuzz targets found` and exits 0 without invoking `go test`.
+
+### Triage and promote
+
+```bash
+gotest fuzz triage ./...     # re-run every discovered crasher, report pass/fail
+gotest fuzz promote ./...    # splice crashers into f.Add(...) seeds
+```
+
+`gotest fuzz triage` scans each target's `testdata/fuzz/<Func>/` directory (a plain filesystem scan — no `go test -fuzz` invoked) and re-runs every corpus entry found there via `go test -run='^<Func>/<hash>$'`, printing its decoded input and either the panic/failure cause or `status: no longer failing`.
+Exits 1 if any crasher's re-run still fails, 0 otherwise.
+
+`gotest fuzz promote` does the same discovery, then splices each crasher's input into its originating `Fuzz*` method as a permanent `f.Add(...)` seed — an AST-level source edit via `internal/refactor`, inserted after the method's last existing `f.Add` call — and deletes the crasher file once the splice succeeds.
+The crasher is now a committed regression test that replays for free on every ordinary run, same as any seed under [Seed replay](#seed-replay).
+A crasher whose originating method can't be located with confidence is skipped with a warning and left in place; promote never partially edits source.
+
+Struct-typed targets work the same way: triage prints the decoded struct on the `input:` line, and promote splices it as a typed `f.Add(T{...})` seed rather than an opaque byte string.
+See [Struct arguments](#struct-arguments) for the shapes that carry a literal and the raw-bytes fallback for those that don't.
+
+### Known limitation
+
+Top-level stdlib fuzz functions — a bare `func FuzzXxx(f *testing.F)` not attached to any suite — are not discovered or run by the gotest runner at all.
+They only run via `go test -run`/`go test -fuzz` directly; `gotest ./...`, `gotest fuzz`, and every other gotest subcommand silently ignore them.
+Only `Fuzz*` methods on `*TestSuite` structs participate in seed replay and the `gotest fuzz` orchestrator.
+
+### Worked example
+
+[`examples/fuzzing`](examples/fuzzing) fuzzes a message broker's wire-frame codec: a struct-typed round-trip target, a `[]byte` target asserting the decoder never panics on adversarial input, a string idempotence target, and two `Fuzz2` targets — one over two strings, one mixing a struct with a string.
+Its README records a real crash-to-regression-test cycle — the fuzzer finding a framing bug, `triage` decoding it, `promote` splicing it back as a typed seed.
+
 ## Configuration
 
 Every fixture and suite runs with sensible defaults — 2-minute fixture timeout, 30-second per-test timeout.
@@ -748,6 +926,7 @@ The action emits `::error` annotations that appear inline on PR diffs and writes
 
 ```bash
 gotest ./... -v -race          # generate overlays and run tests (default)
+gotest fuzz ./... --for=5m     # run FuzzX suite methods, budgeted
 gotest spec ./...              # behavioral specification view
 gotest summary ./...           # failure-focused summary for CI
 gotest watch ./... -v          # watch mode with auto-rerun

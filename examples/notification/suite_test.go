@@ -3,6 +3,7 @@ package notification
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -105,6 +106,52 @@ func (s *NotificationServiceTestSuite) TestNotificationPayload(t *gotest.T) {
 		t.It("matches the delivery summary snapshot", func(t *gotest.T) {
 			gotest.MatchSnapshot(t, formatSummary(delivered))
 		})
+	})
+}
+
+// TestTrimSpaceTable exercises the same strings.TrimSpace call FuzzTrim's
+// callback invokes — gotest generate harvests its literal table rows as
+// extra f.Add(...) seeds for FuzzNotificationServiceTestSuite_FuzzTrim.
+func (s *NotificationServiceTestSuite) TestTrimSpaceTable(t *gotest.T) {
+	type tc struct {
+		Desc string
+		In   string
+		Want string
+	}
+	for t, c := range gotest.Each(t, []tc{
+		{"leading and trailing spaces", "  hello  ", "hello"},
+		{"already trimmed", "hello", "hello"},
+		{"tabs and newlines", "\thello\n", "hello"},
+	}) {
+		t.It("trims to the expected result", func(t *gotest.T) {
+			gotest.Equal(t, c.Want, strings.TrimSpace(c.In))
+		})
+	}
+}
+
+func (s *NotificationServiceTestSuite) FuzzTrim(f *gotest.F) {
+	f.Add("  x ")
+	gotest.Fuzz(f, func(t *gotest.T, in string) {
+		// Property: strings.TrimSpace is idempotent — trimming an
+		// already-trimmed string is a no-op round-trip.
+		trimmed := strings.TrimSpace(in)
+		gotest.Equal(t, trimmed, strings.TrimSpace(trimmed))
+	})
+}
+
+// FuzzSummary is a struct-typed fuzz target: Notification is not one of the
+// fifteen types Go's fuzzing engine accepts, so gotest fans it out into one
+// engine argument per field and reassembles it before each execution. The
+// seed below is a plain Go literal — F.Add explodes it through the same fan.
+func (s *NotificationServiceTestSuite) FuzzSummary(f *gotest.F) {
+	f.Add(Notification{To: "a@b.c", Subject: "welcome", Priority: PriorityHigh})
+	gotest.Fuzz(f, func(t *gotest.T, n Notification) {
+		out := formatSummary(delivery{Notification: n})
+		// Property: the summary always reproduces the recipient and subject
+		// verbatim, behind exactly one known priority label.
+		gotest.Contains(t, out, n.Subject)
+		gotest.Contains(t, out, n.To)
+		gotest.Regexp(t, `^\[(LOW|NORMAL|HIGH)\] `, out)
 	})
 }
 

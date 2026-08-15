@@ -67,6 +67,7 @@ Test results persist across sessions, so you see pass/fail state immediately aft
 
 **Run** and **Debug** buttons appear inline above every suite and test method in `_test.go` files.
 Click to execute immediately.
+Benchmark methods get **Run Bench**; fuzz methods get **Fuzz** and **Debug Seeds** (see [Fuzzing](#fuzzing)).
 
 Package-level and file-level actions appear on the `package` declaration line:
 
@@ -110,6 +111,19 @@ Place your cursor on a suite or method definition and use the **Quick Fix** menu
 
 A status bar warning and inline diagnostics alert you when focused tests exist, preventing CI failures from `gotest --ci`.
 
+### Fuzzing
+
+Fuzz methods on suites get their own surfaces, built on the `gotest fuzz` CLI and its exit contract:
+
+- **▶ Fuzz** CodeLens on every `Fuzz*` method — pick a budget (30s, 5m, 30m, until stopped, or any Go duration) and the target fuzzes in a cancellable background session with live `execs/sec` progress. Nothing found ends quietly; time exhaustion is not a failure.
+- **Crasher notifications** — when the session finds a new crasher, choose **Show Decoded Input** (triage prints the typed Go literal, not corpus bytes), **Promote to Seed** (splices a typed `f.Add(...)` into the fuzz method and reveals the edit), or **Debug Crasher** (replays exactly that corpus entry under the debugger, suite lifecycle included).
+- **⚠ Promote N crashers** CodeLens — pending corpus entries surface right on the target until promoted.
+- **Debug Seeds** CodeLens — replay a target's whole seed corpus under the debugger.
+- **Test Explorer** — fuzz targets appear under their suite; running one replays its seeds as ordinary subtests. Searching for *new* inputs is deliberately a CodeLens action, never an explorer run: fuzzing burns CPU on demand, not as a side effect.
+- **Suite runs replay seeds** — running a whole suite from the explorer includes its fuzz-seed replay, matching what `gotest ./...` does on the CLI.
+
+Watch mode deliberately never fuzzes: watch is fast, deterministic feedback; fuzzing is a budgeted stochastic search.
+
 ### Scaffold
 
 Generate test suite skeletons from existing code:
@@ -140,6 +154,11 @@ Projects using `go.work` are also supported.
 | Go Test: Show Spec View | Open the BDD spec output panel |
 | Go Test: Start Watch | Start continuous testing for a package scope |
 | Go Test: Stop Watch | Stop all active watch processes |
+| Go Test: Run Benchmark | Run a suite's benchmarks via `gotest bench` |
+| Go Test: Fuzz Target | Start a budgeted fuzz session for one target |
+| Go Test: Debug Fuzz Seeds | Replay a fuzz target's seeds under the debugger |
+| Go Test: Triage Fuzz Crashers | Show decoded inputs for a package's crashers |
+| Go Test: Promote Fuzz Crashers | Turn crashers into typed `f.Add` seeds |
 | Go Test: Scaffold Suite | Generate a test suite from a target |
 | Go Test: Scaffold Target | Generate a test suite for a specific target |
 | Go Test: Copy Coverage Summary | Copy coverage table to clipboard |

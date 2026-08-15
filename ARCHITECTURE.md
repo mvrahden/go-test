@@ -244,6 +244,61 @@ No `TestMain` is generated — both `package foo` and `package foo_test`
 can define fixture-bound suites without conflict. Teardown runs via
 `t.Cleanup` (reverse-wavefront: leaves first, roots last).
 
+For suites with `Fuzz*` methods, codegen emits one top-level `FuzzX`
+function **per method** — not one wrapper with sub-tests like `Benchmark<Suite>`
+above. Go's fuzzing engine targets exactly one `FuzzX` symbol per invocation,
+so there is no shared enclosing scope to sub-test into; each generated
+function independently repeats fixture setup and `BeforeAll`:
+
+```go
+func FuzzFooTestSuite_FuzzParse(f *testing.F) {
+    ƒ_setupFixtures(f)                    // only if fixture-bound
+    s := &ƒƒ_GOTEST_FooTestSuite{...}
+    ƒlifecycleT := gotest.NewTFromTB(f)
+    f.Cleanup(func() { s.AfterAll(gotest.NewTFromTB(f)) })
+    s.BeforeAll(ƒlifecycleT)
+    ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach)   // plus one fan per target tuple
+    s.FuzzParse(ƒf)
+}
+```
+
+Naming: `Fuzz<SuiteIdentifier>_<MethodName>`, full method name kept (e.g.
+`FuzzParserTestSuite_FuzzParse`, not `FuzzParserTestSuite_Parse`) — the
+`gotest.NewF(f, s.BeforeEach, s.AfterEach)` call is what wires per-execution
+lifecycle interposition into the generic `gotest.Fuzz`/`Fuzz2`/`Fuzz3`
+adapters (`pkg/gotest/f.go`): `BeforeEach` runs immediately before each
+execution's body, `AfterEach` is deferred to run immediately after,
+for every seed replay and every generated input — not once for the whole
+target.
+
+Any target position the engine cannot take directly rides on a **fan**: the
+same `NewF` call carries a `gotestfuzz.Fan[T]`/`Fan2`/`Fan3` adapter per
+fuzzed tuple, built by `internal/gotestgen/fuzzfan.go`, and the adapter is
+what registers the real `(*testing.F).Fuzz` callback — one engine argument
+per leaf field, reassembled into the declared type before each execution.
+The runtime side lives in its own leaf package, `pkg/gotestfuzz` (fan types,
+the `Leaf*` fixed-width helpers, and the packed-slice reader/writer), because
+`pkg/gotestruntime` imports `pkg/gotest` and the fan types have to be
+reachable from both. `gotest.Fuzz` looks its fan up on the `*gotest.F` by
+type assertion; a target whose every position passes through natively takes
+the plain native path with no fan at all.
+
+When seed harvesting is enabled (`gotestast.HarvestSeeds`, on by default —
+see the README's "Seed harvesting" section), the renderer additionally
+emits one `f.Add(...)` line per harvested literal directly in the wrapper,
+after `BeforeAll` and before the user method call, so harvested seeds
+replay through the exact same `f.Add` path as hand-written ones.
+
+A suite must be named `*TestSuite` for its `Fuzz*` methods to be collected,
+same as benchmarks. `ValidateContextConsistency` rejects a fuzz suite with a
+returning `BeforeEach`, any lifecycle hook still typed `*testing.T`, and (via
+the resolver) a fixture with per-method `BeforeEach`/`AfterEach` bound to it —
+mirroring the three benchmark rejections above with fuzz-specific error text.
+Unlike benchmarks, a `Fuzz*` method's parameter type is checked more strictly:
+only `*gotest.F` is accepted, never `*testing.F` — the collector rejects the
+stdlib type outright (`detectParamF` in `internal/gotestast/spec.go`, no
+`usesStdlibT` escape hatch the way `detectParamB` has one for `*testing.B`).
+
 The overlay filesystem (`-overlay=path/overlay.json`) injects generated files
 without modifying source. Go's compiler reads virtual paths from the overlay.
 
@@ -424,6 +479,55 @@ The system has **four levels of parallelism**, each with distinct mechanisms:
 │  └──────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
+
+### Fuzz mode: subprocess-per-target, not binary reuse
+
+`gotest fuzz` (`internal/gotestrunner/fuzzrun.go`) does not fit into Levels
+1–3 above at all — it deliberately does **not** reuse the compiled suite
+binaries `BuildSuiteTargets`/`CompilePackagesStream` produce for every other
+subcommand. The reason is a `cmd/go` constraint, not a gotest design choice:
+native fuzz instrumentation (the coverage counters `go test -fuzz` needs to
+drive its mutation engine) is woven in by `cmd/go` at `go test` invocation
+time, only when `-fuzz` is present on *that* invocation. A binary from a
+plain `go test -c` (no `-fuzz`) — exactly what every other gotest subcommand
+compiles once and reuses across suites — has no such instrumentation baked
+in; running it with `-test.fuzz` would silently degrade to undirected random
+input with no crash minimization.
+
+So `RunFuzzTargets` spawns one `go test -fuzz=<Func>` subprocess per
+generated `Fuzz<Suite>_<Method>` target instead, each doing its own
+build+instrument+run via `cmd/go`:
+
+```
+RunFuzzTargets(ctx, targets, cfg)
+  │
+  jobs := resolveFuzzJobs(cfg.Jobs)        // default max(1, GOMAXPROCS/2)
+  budget := splitBudget(cfg.Total, len(targets))  // even split, 10s floor
+  │
+  for each target (bounded by a jobs-sized semaphore):
+    go test <overlay-flag> -run=^$ -fuzz=^<quoted Func>$ [-fuzztime=<budget>] <buildFlags> <pkg>
+      │
+      stdout/stderr → lineWriter → os.Stdout/os.Stderr, each line
+      prefixed "[<Func>] ", flushed live (not buffered to end-of-run)
+      │
+      testdata/fuzz/<Func>/ snapshotted before and after the run;
+      new entries are reported as "[<Func>] new crasher: <path>"
+  │
+  returns per-target outcomes (exit code, canceled?, skipped?, new crashers);
+  the session exit code is the worst *effective* code: a target stopped by
+  the deadline or an interrupt without a finding maps to 0, a new crasher
+  file maps to 1 even if the shutdown killed the process mid-crash
+```
+
+This is slower than the binary-reuse path everywhere else in gotest — every
+target pays its own compile cost — but it is the only way to get real,
+coverage-guided fuzzing. A target whose semaphore slot doesn't open before
+the context is cancelled (all targets share the pipeline's one global
+`--timeout`) is skipped with `[<Func>] skipped: session ended before this
+target started` rather than silently dropped; `--for` gives every
+target its own explicit budget so a run with more targets than `--jobs`
+doesn't starve later waves. Time exhaustion never fails the session by
+itself: findings do.
 
 ### Streaming Execution (Compile-Execute Overlap)
 
@@ -643,6 +747,33 @@ Or without test2json:
 ```
 <binary> -test.run=^TestFooTestSuite$ [flags]
 ```
+
+### Fuzz seed replay: run-filter alternation
+
+`BuildSuiteTargets` (the plain, non-bench path) also takes a
+`fuzzFuncsByPkg map[string]map[string][]string` parameter and attaches each
+suite's generated `Fuzz<Suite>_<Method>` names to `SuiteTarget.FuzzFuncs`.
+`buildSuiteCmd` branches on this in `-test.run` construction, in priority
+order:
+
+```
+target.Bench            → "-test.run=^$" -test.bench=^Benchmark<Suite>$"
+target.RunFilter != ""   → "-test.run=" + RunFilter            (user wins, untouched)
+len(target.FuzzFuncs)>0  → "-test.run=^(?:<Suite>|<Fuzz1>|<Fuzz2>|...)$"  (widened)
+default                  → "-test.run=^<Suite>$"
+```
+
+A user-supplied `-run` filter is never widened to also include the suite's
+fuzz funcs — it becomes the entire `-test.run` value as-is, so a fuzz
+target's seed corpus only replays under a user filter if the generated
+`Fuzz<Suite>_<Method>` name happens to match that filter on its own merit
+(controller ruling: user filter wins over replay widening). With no user
+filter, the alternation runs the suite's `Test<Suite>` function and every
+one of its fuzz funcs' seed corpora as ordinary subtests
+(`Fuzz<Suite>_<Method>/seed#0`) in the same subprocess — this is what makes
+`gotest ./...` — and `spec`/`watch`/`summary`, whose `PipelineConfig`
+literals thread `FuzzFuncsByPkg` the same way — replay fuzz seeds for free,
+at zero `-fuzz` cost.
 
 ---
 

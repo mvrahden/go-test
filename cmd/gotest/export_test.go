@@ -38,3 +38,5 @@ var ExportGotestFlags = gotestFlags
 var ExportTestAllowed = testAllowed
 var ExportSpecAllowed = specAllowed
 var ExportWatchAllowed = watchAllowed
+var ExportFuzzAllowed = fuzzAllowed
+var ExportParseExecFlags = parseExecFlags

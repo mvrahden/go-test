@@ -406,6 +406,37 @@ export class GoTestController implements vscode.Disposable {
         suiteItem.children.add(methodItem);
       }
 
+      // Fuzz targets sit beside test methods in the tree; their names are
+      // disjoint by prefix (Fuzz* vs Test*), so they share the id
+      // namespace. Running one from the explorer replays its seed corpus
+      // as ordinary subtests — searching for new inputs is the CodeLens
+      // "Fuzz" action, deliberately not a Test Explorer run.
+      for (const fuzzer of suite.fuzzers ?? []) {
+        const fuzzerId = `${suiteId}/${fuzzer.name}`;
+        seenMethodIds.add(fuzzerId);
+
+        const fuzzerUri = vscode.Uri.file(path.join(pkg.dir, fuzzer.file));
+        let fuzzerItem = suiteItem.children.get(fuzzerId);
+        if (!fuzzerItem) {
+          fuzzerItem = this.controller.createTestItem(
+            fuzzerId,
+            fuzzer.name,
+            fuzzerUri,
+          );
+        }
+        fuzzerItem.range = new vscode.Range(
+          new vscode.Position(fuzzer.line - 1, fuzzer.col - 1),
+          new vscode.Position(fuzzer.line - 1, fuzzer.col - 1),
+        );
+        fuzzerItem.tags = this.buildTags(
+          fuzzer.focused,
+          fuzzer.excluded,
+          fuzzer.parallel,
+        );
+        fuzzerItem.description = "fuzz";
+        suiteItem.children.add(fuzzerItem);
+      }
+
       suiteItem.children.forEach((child) => {
         if (!seenMethodIds.has(child.id) && !child.id.includes("/dynamic/")) {
           suiteItem.children.delete(child.id);

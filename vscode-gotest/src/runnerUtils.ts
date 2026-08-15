@@ -172,6 +172,39 @@ export function resolveTestItem(
   }
 
   const firstSegment = segments[0];
+
+  // Generated fuzz wrappers are top-level Fuzz<Suite>_<Method> functions,
+  // where <Method> itself starts with "Fuzz". Suite names may contain
+  // underscores, so instead of guessing the split point, try each "_Fuzz"
+  // boundary against the tree — the item that exists is the answer. Falls
+  // through to plain suite resolution when nothing matches (e.g. a suite
+  // whose own name starts with Fuzz).
+  if (firstSegment.startsWith("Fuzz")) {
+    const body = firstSegment.slice(4);
+    for (
+      let idx = body.indexOf("_Fuzz");
+      idx >= 0;
+      idx = body.indexOf("_Fuzz", idx + 1)
+    ) {
+      const fuzzItem = controller.findItem(
+        `${importPath}/${body.slice(0, idx)}/${body.slice(idx + 1)}`,
+      );
+      if (!fuzzItem) continue;
+      if (segments.length === 1) {
+        return fuzzItem;
+      }
+      let parentItem = fuzzItem;
+      for (let i = 1; i < segments.length; i++) {
+        parentItem = controller.createDynamicSubtest(
+          parentItem,
+          segments.slice(1, i + 1).join("/"),
+          segments[i],
+        );
+      }
+      return parentItem;
+    }
+  }
+
   const suiteName = firstSegment.startsWith("Test")
     ? firstSegment.slice(4)
     : firstSegment;
@@ -379,6 +412,7 @@ export function spawnTestProcess(
   label: string,
   env?: Record<string, string>,
   onStdoutLine?: (line: string) => void,
+  onStderrLine?: (line: string) => void,
 ): Promise<SpawnResult> {
   return new Promise<SpawnResult>((resolve, reject) => {
     const child = spawn(bin, args, {
@@ -389,6 +423,7 @@ export function spawnTestProcess(
     let stdout = "";
     let stderr = "";
     let lineBuffer = "";
+    let stderrLineBuffer = "";
     let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
 
     child.stdout.on("data", (data: Buffer) => {
@@ -409,7 +444,20 @@ export function spawnTestProcess(
     });
 
     child.stderr.on("data", (data: Buffer) => {
-      stderr += data.toString();
+      const chunk = data.toString();
+      stderr += chunk;
+
+      if (onStderrLine) {
+        stderrLineBuffer += chunk;
+        const lines = stderrLineBuffer.split("\n");
+        stderrLineBuffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed) {
+            onStderrLine(trimmed);
+          }
+        }
+      }
     });
 
     const cancelListener = token.onCancellationRequested(() => {
@@ -438,6 +486,12 @@ export function spawnTestProcess(
           onStdoutLine(remaining);
         }
       }
+      if (onStderrLine) {
+        const remaining = stderrLineBuffer.trim();
+        if (remaining) {
+          onStderrLine(remaining);
+        }
+      }
       if (stderr) {
         for (const line of stderr.split("\n")) {
           if (line.trim()) {
@@ -457,6 +511,15 @@ export function spawnTestProcess(
   });
 }
 
+// isFuzzMethodLabel mirrors the framework's own method classification: an
+// optional X_/F_ marker prefix, then "Fuzz" plus at least one character.
+// Fuzz methods live in the same tree position as Test methods but map to
+// top-level generated wrappers (Fuzz<Suite>_<Method>), not to subtests of
+// ^Test<Suite>$ — the filter grammar differs, so classification matters.
+export function isFuzzMethodLabel(label: string): boolean {
+  return /^(?:X_|F_)?Fuzz./.test(label);
+}
+
 export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
   if (items.some((item) => getPackageDepth(item) === 0)) {
     return undefined;
@@ -464,28 +527,34 @@ export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
 
   const suiteGroups = new Map<
     string,
-    { wholeSuite: boolean; methods: string[]; subtests: string[] }
+    {
+      wholeSuite: boolean;
+      methods: string[];
+      fuzzers: string[];
+      subtests: string[];
+    }
   >();
+  const groupFor = (suiteName: string) => {
+    let group = suiteGroups.get(suiteName);
+    if (!group) {
+      group = { wholeSuite: false, methods: [], fuzzers: [], subtests: [] };
+      suiteGroups.set(suiteName, group);
+    }
+    return group;
+  };
 
   for (const item of items) {
     const depth = getPackageDepth(item);
 
     if (depth === 1) {
-      const suiteName = item.label;
-      let group = suiteGroups.get(suiteName);
-      if (!group) {
-        group = { wholeSuite: false, methods: [], subtests: [] };
-        suiteGroups.set(suiteName, group);
-      }
-      group.wholeSuite = true;
+      groupFor(item.label).wholeSuite = true;
     } else if (depth === 2) {
-      const suiteName = item.parent!.label;
-      let group = suiteGroups.get(suiteName);
-      if (!group) {
-        group = { wholeSuite: false, methods: [], subtests: [] };
-        suiteGroups.set(suiteName, group);
+      const group = groupFor(item.parent!.label);
+      if (isFuzzMethodLabel(item.label)) {
+        group.fuzzers.push(item.label);
+      } else {
+        group.methods.push(item.label);
       }
-      group.methods.push(item.label);
     } else if (depth >= 3) {
       let current = item;
       const subtestParts: string[] = [];
@@ -495,27 +564,46 @@ export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
       }
       const methodName = current.label;
       const suiteName = current.parent!.label;
-      let group = suiteGroups.get(suiteName);
-      if (!group) {
-        group = { wholeSuite: false, methods: [], subtests: [] };
-        suiteGroups.set(suiteName, group);
+      const group = groupFor(suiteName);
+      if (isFuzzMethodLabel(methodName)) {
+        // Seed subtests of a fuzz target live under its top-level wrapper.
+        group.subtests.push(
+          `^Fuzz${suiteName}_${methodName}$/^${subtestParts.join("/")}$`,
+        );
+      } else {
+        group.subtests.push(
+          `^Test${suiteName}$/^${methodName}$/^${subtestParts.join("/")}$`,
+        );
       }
-      group.subtests.push(
-        `^Test${suiteName}$/^${methodName}$/^${subtestParts.join("/")}$`,
-      );
     }
   }
 
   const filters: string[] = [];
   for (const [suiteName, group] of suiteGroups) {
     if (group.wholeSuite) {
-      filters.push(`^Test${suiteName}$`);
-    } else if (group.subtests.length > 0) {
+      // Parity with CLI package runs: a whole-suite selection must replay
+      // the suite's fuzz seeds too. The generated wrappers are top-level
+      // Fuzz<Suite>_* functions that ^Test<Suite>$ can never match, and
+      // the runner honors explicit filters verbatim — so the widening has
+      // to happen here. A suite without fuzz targets matches nothing
+      // extra, which is why this is unconditional.
+      filters.push(`^Test${suiteName}$`, `^Fuzz${suiteName}_.*$`);
+      continue;
+    }
+    if (group.subtests.length > 0) {
       filters.push(...group.subtests);
     } else if (group.methods.length === 1) {
       filters.push(`^Test${suiteName}$/^${group.methods[0]}$`);
     } else if (group.methods.length > 1) {
       filters.push(`^Test${suiteName}$/^(${group.methods.join("|")})$`);
+    }
+    // Fuzz targets are top-level names, disjoint from the ^Test<Suite>$
+    // grammar above — selecting one alongside test methods or subtests
+    // must include both, so these are additive rather than part of the
+    // else-if chain. Overlap with a seed subtest of the same target is
+    // harmless: the alternatives union into one -run regex.
+    for (const fuzzer of group.fuzzers) {
+      filters.push(`^Fuzz${suiteName}_${fuzzer}$`);
     }
   }
 

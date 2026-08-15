@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"go/format"
+	"strings"
 	"text/template"
 
 	"github.com/mvrahden/go-test/internal/about"
@@ -62,12 +63,16 @@ type headerImport struct {
 
 type renderer struct{}
 
-func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, resolved *ResolveResult) ([]byte, error) { //nolint:gocritic // hugeParam: stable API
+// RenderTestSuiteSpec renders the generated test file for pkg. The returned
+// FuzzFanSet is the fan-out the file was rendered with — nil when the package
+// fuzzes nothing; its ParamsByFunc is what the stale-corpus pre-flight
+// compares each target's corpus entries against.
+func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, resolved *ResolveResult, harvestSeeds bool) ([]byte, *FuzzFanSet, error) { //nolint:gocritic // hugeParam: stable API
 	if pkg == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if len(spec.EffectiveTestSuites) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	fixtureBound := resolved.FixtureBound
@@ -76,9 +81,16 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	sfNodeVMs := buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures)
 	hasFixtures := len(resolved.RootFixtures) > 0 || len(sfNodeVMs) > 0
 
+	// Resolved before anything is written: a non-fuzzable argument type is a
+	// generation-time refusal, not a half-written file.
+	fans, err := BuildFuzzFans(pkg, spec.EffectiveTestSuites)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	buf := bytes.NewBuffer(nil)
-	if err := r.renderFileHeader(buf, pkg, spec, hasFixtures, resolved.SuiteSharedFixtures, allFixtures, sfNodeVMs); err != nil {
-		return nil, fmt.Errorf("failed rendering file header. err: %w", err)
+	if err := r.renderFileHeader(buf, pkg, spec, hasFixtures, resolved.SuiteSharedFixtures, allFixtures, sfNodeVMs, fans); err != nil {
+		return nil, nil, fmt.Errorf("failed rendering file header. err: %w", err)
 	}
 
 	if len(fixtureBound) > 0 || len(sfNodeVMs) > 0 {
@@ -92,7 +104,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 			}
 		}
 		if err := r.renderFixtures(buf, fixtureBound, allFixtures, resolved.SuiteFixtureFields, sfNodeVMs, fixtureTestNames); err != nil {
-			return nil, fmt.Errorf("failed rendering fixture suites. err: %w", err)
+			return nil, nil, fmt.Errorf("failed rendering fixture suites. err: %w", err)
 		}
 	}
 
@@ -103,14 +115,19 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 			SkippedTestCases:    spec.SkippedTestCases,
 		}
 		if err := r.renderTestSuites(buf, standaloneSpec, resolved.SuiteSharedFixtures); err != nil {
-			return nil, fmt.Errorf("failed rendering test suites. err: %w", err)
+			return nil, nil, fmt.Errorf("failed rendering test suites. err: %w", err)
 		}
 	}
 
-	return r.formatOutput(buf)
+	if err := r.renderFuzzSuites(buf, pkg, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields, harvestSeeds, fans); err != nil {
+		return nil, nil, fmt.Errorf("failed rendering fuzz suites. err: %w", err)
+	}
+
+	out, err := r.formatOutput(buf)
+	return out, fans, err
 }
 
-func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, sfNodes []*SharedFixtureNodeVM) error { //nolint:gocritic // hugeParam: stable API
+func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, sfNodes []*SharedFixtureNodeVM, fans *FuzzFanSet) error { //nolint:gocritic // hugeParam: stable API
 	type TplData struct {
 		RepoName    string
 		PackageName string
@@ -123,12 +140,40 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		{Path: about.Repo + "/pkg/gotest"},
 		{Path: about.Repo + "/pkg/gotestruntime"},
 	}
+	// Every path goes through addImport: gotestruntime is reachable from two
+	// independent sources (fixtures and fuzz fans), and a duplicated import
+	// line is a compile error in the generated file.
+	seenPkg := map[string]bool{}
+	addImport := func(path string) {
+		if path == "" || seenPkg[path] {
+			return
+		}
+		seenPkg[path] = true
+		imports = append(imports, headerImport{Path: path})
+	}
 	if hasFixtures {
-		imports = append(imports,
-			headerImport{Path: "context"},
-			headerImport{Path: "sync/atomic"},
-			headerImport{Path: "time"},
-		)
+		addImport("context")
+		addImport("sync/atomic")
+		addImport("time")
+	}
+	if fans != nil && fans.Source != "" {
+		// Generated fans reference the gotestfuzz adapters, leaf helpers,
+		// and the hybrid-leaf reader/writer.
+		addImport(fuzzRuntimeImport)
+		for _, path := range fans.PkgPaths {
+			addImport(path)
+		}
+		// strings/strconv/math back the literal-rendering functions, and are
+		// only pulled in when at least one was actually emitted.
+		if fans.NeedsStrings {
+			addImport("strings")
+		}
+		if fans.NeedsStrconv {
+			addImport("strconv")
+		}
+		if fans.NeedsMath {
+			addImport("math")
+		}
 	}
 	// This condition must stay identical to the one guarding the ƒfailed
 	// declaration in gotest.suites.tpl. A parallel suite whose every method is
@@ -139,40 +184,26 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	if !hasFixtures && slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
 		return v.IsMethodParallel() && len(v.TestCases()) > 0
 	}) {
-		imports = append(imports, headerImport{Path: "sync/atomic"})
+		addImport("sync/atomic")
 	}
-	seenPkg := map[string]bool{}
 	for _, rf := range allFixtures {
-		if rf.PkgPath != "" && !seenPkg[rf.PkgPath] {
-			imports = append(imports, headerImport{Path: rf.PkgPath})
-			seenPkg[rf.PkgPath] = true
-		}
+		addImport(rf.PkgPath)
 		for _, sf := range rf.SharedFixtures {
-			if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
-				imports = append(imports, headerImport{Path: sf.PkgPath})
-				seenPkg[sf.PkgPath] = true
-			}
+			addImport(sf.PkgPath)
 		}
 	}
 	for _, refs := range suiteSharedFixtures {
 		for _, sf := range refs {
-			if sf.PkgPath != "" && !seenPkg[sf.PkgPath] {
-				imports = append(imports, headerImport{Path: sf.PkgPath})
-				seenPkg[sf.PkgPath] = true
-			}
+			addImport(sf.PkgPath)
 		}
 	}
 	for _, sf := range sfNodes {
-		if sf.PkgPath != "" && sf.PkgPath != pkg.PkgPath && !seenPkg[sf.PkgPath] {
-			imports = append(imports, headerImport{Path: sf.PkgPath})
-			seenPkg[sf.PkgPath] = true
+		if sf.PkgPath != pkg.PkgPath {
+			addImport(sf.PkgPath)
 		}
 	}
 	for _, ts := range spec.EffectiveTestSuites {
-		if pkgPath := ts.ContextTypePkgPath(); pkgPath != "" && !seenPkg[pkgPath] {
-			imports = append(imports, headerImport{Path: pkgPath})
-			seenPkg[pkgPath] = true
-		}
+		addImport(ts.ContextTypePkgPath())
 	}
 	data := TplData{
 		RepoName:    about.ShortInfo(),
@@ -187,6 +218,67 @@ func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSh
 		"Spec":                spec,
 		"SuiteSharedFixtures": suiteSharedFixtures,
 	})
+}
+
+func (r *renderer) renderFuzzSuites(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, suiteFixtureFields map[string][]FixtureFieldBinding, harvestSeeds bool, fans *FuzzFanSet) error { //nolint:gocritic // hugeParam: stable API
+	// Reuse the exact same fixture-bound view model gotest.bench.tpl renders
+	// Benchmark<Suite> from, reshaped as a map for O(1) per-suite template lookup.
+	suiteFixtures := make(map[string]*FlatFixtureSuite)
+	for _, fs := range flattenSuitesDAG(allFixtures, suiteFixtureFields) {
+		suiteFixtures[fs.Suite.Identifier()] = &fs
+	}
+	harvested, err := harvestedSeedsForTemplate(pkg, spec, harvestSeeds)
+	if err != nil {
+		return err
+	}
+	// Passed as two flat values rather than the set itself, so the template
+	// never has to dereference a nil *FuzzFanSet.
+	var fanRefs []FuzzFanRef
+	var fanSource string
+	if fans != nil {
+		fanRefs = fans.Fans
+		fanSource = fans.Source
+	}
+	return gotestTpl.ExecuteTemplate(buf, "gotest.fuzz.tpl", map[string]any{
+		"Spec":                spec,
+		"SuiteSharedFixtures": suiteSharedFixtures,
+		"SuiteFixtures":       suiteFixtures,
+		"HarvestedSeeds":      harvested,
+		"FuzzFans":            fanRefs,
+		"FuzzFanSource":       fanSource,
+	})
+}
+
+// harvestedSeedsForTemplate computes, for each generated Fuzz<Suite>_<Method>
+// func, the pre-joined comma-separated f.Add(...) argument strings for its
+// harvested seed corpus. Returns nil (no-op) when harvesting is disabled or
+// no fuzz methods are present.
+func harvestedSeedsForTemplate(pkg *packages.Package, spec SpecOutcome, harvestSeeds bool) (map[string][]string, error) { //nolint:gocritic // hugeParam: stable API
+	if !harvestSeeds {
+		return nil, nil
+	}
+	hasFuzzers := slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
+		return len(v.Fuzzers()) > 0
+	})
+	if !hasFuzzers {
+		return nil, nil
+	}
+	seeds, err := gotestast.HarvestSeeds(pkg, spec.EffectiveTestSuites)
+	if err != nil {
+		return nil, fmt.Errorf("failed harvesting fuzz seeds. err: %w", err)
+	}
+	if len(seeds) == 0 {
+		return nil, nil
+	}
+	out := make(map[string][]string, len(seeds))
+	for funcName, literals := range seeds {
+		joined := make([]string, len(literals))
+		for i, lit := range literals {
+			joined[i] = strings.Join(lit.Args, ", ")
+		}
+		out[funcName] = joined
+	}
+	return out, nil
 }
 
 func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, allFixtures []*ResolvedFixture, suiteFixtureFields map[string][]FixtureFieldBinding, sfNodes []*SharedFixtureNodeVM, fixtureTestNames []string) error {

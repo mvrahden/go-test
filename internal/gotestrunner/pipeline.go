@@ -70,6 +70,7 @@ type PipelineConfig struct {
 	CompileParallel int
 	Streaming       bool
 	OutputMode      RunMode
+	FuzzFuncsByPkg  map[string]map[string][]string
 }
 
 type PipelineResult struct {
@@ -177,7 +178,7 @@ func appendRunFailureEvents(stream []byte, pkg, msg string) []byte {
 	return stream
 }
 
-func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult) (PipelineResult, error) {
+func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult) (PipelineResult, error) { //nolint:gocritic // hugeParam: stable API
 	if !cfg.CI && os.Getenv(protocol.EnvCI) == "" {
 		if v := os.Getenv("CI"); v != "" && v != "0" && v != "false" {
 			cfg.CI = true
@@ -185,13 +186,20 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 	}
 	pf := ParseExecFlags(cfg.GoTestArgs)
 
+	// Only when seed corpora actually replay in this run: a stale entry is
+	// what would fail, and the engine's own error names the wrapper, not the
+	// field that moved.
+	if len(cfg.FuzzFuncsByPkg) > 0 {
+		ReportStaleFuzzCorpora(os.Stderr, overlay)
+	}
+
 	if cfg.Streaming {
 		return runStreaming(ctx, cfg, overlay, pf)
 	}
 	return runBatch(ctx, cfg, overlay, pf)
 }
 
-func buildExtraEnv(cfg PipelineConfig, proc *SharedFixtureProcess) map[string]string {
+func buildExtraEnv(cfg PipelineConfig, proc *SharedFixtureProcess) map[string]string { //nolint:gocritic // hugeParam: stable API
 	env := make(map[string]string)
 	if cfg.UpdateSnapshots {
 		env[protocol.EnvUpdateSnapshots] = "1"
@@ -205,7 +213,7 @@ func buildExtraEnv(cfg PipelineConfig, proc *SharedFixtureProcess) map[string]st
 	return env
 }
 
-func buildBaseEnv(cfg PipelineConfig) []string {
+func buildBaseEnv(cfg PipelineConfig) []string { //nolint:gocritic // hugeParam: stable API
 	env := os.Environ()
 	if cfg.UpdateSnapshots {
 		env = append(env, protocol.EnvUpdateSnapshots+"=1")
@@ -338,7 +346,7 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		runFlags = append(append([]string(nil), runFlags...), "-v")
 	}
 	maxParallel := computeDispatchConcurrency(&runFlags, cfg.Parallel, totalSuites, SanitizerActive(pf.BuildFlags))
-	targets := BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, overlay.ExclusiveSuitesByPkg, runFlags, pf.UserRunFilter)
+	targets := BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.ExclusiveSuitesByPkg, runFlags, pf.UserRunFilter)
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
@@ -518,7 +526,7 @@ loop:
 
 		singleCompiled := []CompileResult{cr}
 		singleSuites := map[string][]string{cr.Package: overlay.SuitesByPkg[cr.Package]}
-		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter)
+		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter)
 
 		if len(targets) == 0 {
 			continue

@@ -31,6 +31,8 @@ func showHelp(topic string) {
 		printSummaryHelp()
 	case "watch":
 		printWatchHelp()
+	case "fuzz":
+		printFuzzHelp()
 	case "discover":
 		printDiscoverHelp()
 	case "scaffold":
@@ -65,6 +67,7 @@ Usage:
   gotest <subcommand> [flags] [packages...]
 
 Subcommands:
+  fuzz        Run FuzzX suite methods with go test -fuzz
   spec        Render behavioral specification from test output
   summary     Show failure-focused test summary for CI
   watch       Watch for file changes and re-run tests
@@ -137,6 +140,7 @@ Flags:
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable overlay cache, force fresh generation
+  --no-harvest            Disable fuzz seed harvesting for this run (see below)
   --min=<pct>             Fail if coverage < pct% (0-100, enables -coverprofile)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
@@ -146,6 +150,14 @@ Use a bare "--" to pass unrecognized flags without validation.
 
 CI auto-detection: when the standard CI env var is set and GOTEST_CI is
 unset, --ci is enabled automatically. Set GOTEST_CI=0 to opt out.
+
+Fuzz seed harvesting (on by default): if any target package has FuzzX
+suite methods, gotest mines your test files' table-test literals and
+call-site arguments into f.Add(...) seeds when it generates their wrapper
+— this happens as part of ordinary overlay generation, whether or not you
+ever run "gotest fuzz". Pass --no-harvest to disable it for this run, or
+set "fuzz: harvest: false" in .gotest.yml to disable it persistently (see
+"gotest help config" and "gotest help fuzz").
 
 Examples:
   gotest ./...                              Run all suites
@@ -262,6 +274,133 @@ Examples:
 `)
 }
 
+func printFuzzHelp() {
+	fmt.Print(`gotest fuzz — run FuzzX suite methods with go test -fuzz
+
+Usage:
+  gotest fuzz [flags] [packages...]
+  gotest fuzz triage [packages...]     Re-run each crasher, report if it still fails
+  gotest fuzz promote [packages...]    Splice crashers into f.Add(...) seeds
+
+Discovers suites containing FuzzX methods (written with gotest.F and
+gotest.Fuzz, see "gotest help scaffold") and runs each one's generated
+Fuzz<SuiteName>_<MethodName> wrapper as its own "go test -fuzz=..." process,
+one target per invocation of go test. This is unlike every other gotest
+subcommand: a suite binary compiled once with "go test -c" has no native
+fuzz instrumentation, because cmd/go only weaves it in when -fuzz is present
+at "go test" time. So fuzzing cannot reuse the shared compiled binary and
+each target gets its own background "go test -fuzz" process instead.
+
+Multiple targets run concurrently (bounded by --jobs) and each one streams
+its output live, line by line, prefixed with "[<Func>] ", so long-running
+fuzz sessions show progress rather than going silent until they exit.
+
+Seed corpus replay (the seeds added via f.Add in a FuzzX method, plus any
+corpus gotest fuzz has since discovered under testdata/fuzz/) already
+happens for free as part of an ordinary "gotest" or "gotest test" run —
+those replay as regular subtests, at zero extra cost, without -fuzz and
+without this subcommand. Reach for "gotest fuzz" specifically to spend time
+mutating and searching for new failing inputs.
+
+"gotest lint" flags common fuzz-writing mistakes: fuzz-determinism (reading
+time.Now/math-rand/os.Getenv from a fuzz target breaks corpus replay),
+fuzz-no-oracle (a callback that asserts nothing only catches panics),
+fuzz-seed (no f.Add seeds means coverage-guided exploration starts blind),
+fuzz-struct-corpus (on-disk corpus entries for a struct-typed target are
+bound to its field order and silently reinterpreted when two same-kind
+fields swap — promote them to typed seeds), fuzz-hook-io (a
+BeforeEach/AfterEach that does IO replays around every execution and
+throttles the fuzzer), and fuzz-raw-seed (a raw []byte seed on a position
+that does not take []byte is rejected outright).
+
+Seed harvesting (on by default): at generation time, gotest mines your
+test files' table-test literals and direct call-site arguments that flow
+into a fuzz target's function-under-test, and injects them as f.Add(...)
+seeds in the generated wrapper — turning your existing valid-input
+examples into a starting corpus without any extra authoring. Only literal
+primitive values from _test.go sources are harvested, never production
+code or computed expressions. Disable it for one run with --no-harvest, or
+persistently via "fuzz: harvest: false" in .gotest.yml (see "gotest help
+config").
+
+Flags:
+  --for=<dur>             Approximate wall-clock fuzz budget for the whole
+                           session: each target's -fuzztime share is
+                           --for × min(--jobs, targets) / targets, floored
+                           at 10s, so concurrent waves add back up to ≈--for.
+                           The resolved schedule is printed before fuzzing
+                           starts. When omitted, no -fuzztime is passed and
+                           go's own default applies per target — fuzzing
+                           runs until interrupted or until the global
+                           --timeout expires (which exits 0 when nothing
+                           was found).
+  --jobs=<n>               Max concurrent targets (default: max(1, GOMAXPROCS/2))
+  --target=<Fuzz...>       Fuzz exactly one generated target, named by its
+                           wrapper (e.g. FuzzParserTestSuite_FuzzParse, as
+                           shown in session output). An unmatched name is an
+                           error listing the available targets. This is the
+                           editor's unit of invocation; combined with --for
+                           the whole budget goes to that one target.
+  --no-cache               Disable overlay cache, force fresh generation
+  --debug                  Keep generated overlay for inspection
+  --timeout=<dur>          Global pipeline deadline (default: 15m, 0 to disable)
+
+All targets share the one global --timeout deadline. A --for that cannot
+fit inside it is rejected up front (raise --timeout, lower --for, or pass
+--timeout=0); if the deadline still expires mid-run (build overhead), the
+targets that lost time are listed — gotest prints "[<Func>] skipped: ..."
+for each one that never started. Use --for to give the session an explicit,
+bounded budget instead of relying on --timeout alone.
+
+If no packages contain any FuzzX methods, prints "no fuzz targets found"
+and exits 0 without invoking go test.
+
+Triage and promote (crasher management):
+
+"gotest fuzz triage [packages...]" scans every discovered fuzz target's
+testdata/fuzz/<Func>/ directory (a plain filesystem scan — no go test -fuzz
+invoked) and, for each corpus entry found there, prints its decoded input
+and re-runs just that entry via "go test -run='^<Func>/<hash>$'":
+  FuzzParserTestSuite_FuzzParse: 1 crasher
+    file:  testdata/fuzz/FuzzParserTestSuite_FuzzParse/1a2b3c
+    input: string("a@\x00")
+    cause: panic: runtime error: index out of range [3] with length 3
+A crasher whose re-run now passes (e.g. after a fix landed) is reported as
+"status: no longer failing" instead of a cause line. Exits 0 if there are no
+crashers, or every crasher found turns out to no longer fail; exits 1 if any
+crasher's re-run still fails. Corpus entries only decode Go's native
+primitive types (string, []byte, bool, and the int/uint/float variants) —
+one with an unsupported entry is reported and skipped, one file at a time.
+
+"gotest fuzz promote [packages...]" does the same discovery, but instead of
+re-running each crasher, splices it into its originating FuzzX method as a
+permanent f.Add(...) seed (via internal/refactor's AST edit + go/format
+machinery, directly after the method's last existing f.Add call, or as the
+first statement if it has none), then deletes the crasher file — it's now a
+committed regression test that replays for free on every ordinary run:
+  promoted FuzzParserTestSuite_FuzzParse/1a2b3c -> f.Add("a@\x00") in parser_test.go:42
+If a crasher's originating method can't be located with confidence, it is
+skipped with a warning and the crasher file is left in place — promote never
+partially edits or corrupts user source.
+
+On a crashing input, the session exits 1 and gotest names each new corpus
+file it detected, e.g.:
+  [FuzzParserTestSuite_FuzzParse] new crasher: /abs/pkg/testdata/fuzz/FuzzParserTestSuite_FuzzParse/1a2b3c
+Inspect it with "gotest fuzz triage", then "gotest fuzz promote" to keep it
+as a typed f.Add seed that replays automatically in ordinary runs.
+
+A session that ends by the global --timeout or an interrupt without a
+finding exits 0 — time exhaustion is the normal end of an open-ended
+search, not a failure. Exit 1 means a finding (a failing target or a new
+crasher); exit 2 means the session could not run as requested.
+
+Examples:
+  gotest fuzz ./pkg/parser/...                Fuzz until interrupted or timeout
+  gotest fuzz --for=5m ./...                  ~5 minutes of fuzzing wall-clock across all targets
+  gotest fuzz --for=1m --jobs=2 ./...         Cap concurrency to 2 targets at a time
+`)
+}
+
 func printDiscoverHelp() {
 	fmt.Print(`gotest discover — discover test suites and output JSON metadata
 
@@ -314,13 +453,59 @@ func printScaffoldHelp() {
 
 Usage:
   gotest scaffold <target>
+  gotest scaffold --fuzz <./pkg/path.FuncName>
 
 Target is one of:
   ./pkg/path.TypeName      Generate suite for a specific type
   ./pkg/path/file.go       Generate a suite over the file's exported functions
+  ./pkg/path.FuncName      With --fuzz: generate a fuzz skeleton for a
+                           single-parameter package-level function
 
 Creates a new _test.go file with a suite struct, a runner function,
 and stub methods for each exported method on the target type.
+
+Flags:
+  --fuzz    Scaffold a Fuzz<Func> method for a package-level function
+            instead of a type/file suite (see below)
+
+--fuzz (round-trip and crash-safety skeletons):
+
+Looks for an inverse of the target function by name — Marshal<->Unmarshal,
+Encode<->Decode, Parse<->Format, Parse<->String, and same-suffix prefix
+pairs like ParseJSON<->FormatJSON — then checks the two signatures are
+actually compatible inverses: f: A -> (B[, error]) and g: B -> (A[, error]),
+modulo the error result, compared with go/types' Identical (so two named
+types with the same underlying type never match).
+
+When a compatible inverse is found and A is one of Go's natively fuzzable
+types (string, []byte, bool, and the int/uint/float variants), the
+generated method seeds a corpus entry and asserts the round-trip property
+— decoding what was just encoded returns the original input:
+
+  func (s *EncodeTestSuite) FuzzEncode(f *gotest.F) {
+      f.Add("")
+      gotest.Fuzz(f, func(t *gotest.T, in string) {
+          encoded, err := Encode(in)
+          if err != nil {
+              return
+          }
+          decoded, err := Decode(encoded)
+          gotest.NoError(t, err)
+          gotest.Equal(t, in, decoded) // round-trip property
+      })
+  }
+
+When no compatible inverse is found (but A is still fuzzable — natively,
+or through a generated codec for a struct or named type), it falls back to
+a crash-safety skeleton that only calls the function — no assertions
+beyond "doesn't panic" — and prints:
+  no inverse pair found for Encode — generated crash-safety skeleton
+
+When gotest cannot fuzz A at all (a map, an interface, a struct with
+unexported fields — the same shapes "gotest generate" rejects), scaffold
+emits a stub method carrying the generator's own rejection reason, and
+prints:
+  cannot fuzz map[string]string for Encode — generated TODO stub: <the generator's reason>
 
 Examples:
   gotest scaffold ./pkg/auth.UserService        Suite for UserService type
@@ -354,6 +539,14 @@ Rules:
   assertion-redundant   Assertions made redundant by the following assertion
   fail-guard            if cond { Fail/Fatal(...) } guards — use assertions directly
   t-escape              Unnecessary t.T() convenience escapes (incl. Helper/Fatal/Log)
+  fuzz-determinism      Fuzz targets reading time.Now/math-rand/os.Getenv
+  fuzz-no-oracle        Fuzz callbacks that assert nothing (panic-only)
+  fuzz-seed             Fuzz targets with no f.Add seeds
+  fuzz-struct-corpus    On-disk corpus entries for struct-typed targets
+                        (field-order-bound — promote them to typed seeds)
+  fuzz-hook-io          IO in BeforeEach/AfterEach of fuzzing suites
+                        (hooks replay around every execution)
+  fuzz-raw-seed         Raw []byte seeds on positions not taking []byte
 
 Integrity rules can only be suppressed per line with //nolint. All other
 rules also accept a project-wide skip flag (mirrored by .gotest.yml lint.skip):
@@ -361,7 +554,9 @@ rules also accept a project-wide skip flag (mirrored by .gotest.yml lint.skip):
 Flags:
   -skip-<rule>            Disable a non-integrity rule, e.g. -skip-fail-guard
                           (assertion-simplify, assertion-redundant, fail-guard,
-                          t-escape, stdlib-test, testify)
+                          t-escape, stdlib-test, testify,
+                          fuzz-no-oracle, fuzz-seed, fuzz-hook-io,
+                          fuzz-raw-seed)
   -disable-nolint         Ignore //nolint comments
   -fix                    Apply suggested fixes
   --github                Also emit GitHub ::error annotations and append a
@@ -489,9 +684,13 @@ Fields:
   debounce: <duration>      Watch mode re-run delay (e.g., "500ms", default: 200ms)
   lint:
     skip: [<rule>, ...]     Lint rules to disable globally
+  fuzz:
+    harvest: <bool>         Seed harvesting for "gotest fuzz" (default: true;
+                             the --no-harvest CLI flag overrides this per-run)
 
 Skippable lint rules (non-integrity only): assertion-redundant,
-assertion-simplify, fail-guard, stdlib-test, t-escape, testify
+assertion-simplify, fail-guard, fuzz-hook-io,
+fuzz-no-oracle, fuzz-raw-seed, fuzz-seed, stdlib-test, t-escape, testify
 
 Example .gotest.yml:
 
@@ -501,5 +700,7 @@ Example .gotest.yml:
   lint:
     skip:
       - testify
+  fuzz:
+    harvest: false
 `)
 }

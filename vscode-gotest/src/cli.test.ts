@@ -11,7 +11,12 @@ vi.mock("vscode", () => ({
   window: { showWarningMessage: vi.fn(), showErrorMessage: vi.fn() },
 }));
 
-import { compareVersions, escapeRegExp, formatCliCommand } from "./cli.js";
+import {
+  compareVersions,
+  escapeRegExp,
+  formatCliCommand,
+  buildFuzzArgs,
+} from "./cli.js";
 
 describe("compareVersions", () => {
   it("returns 0 for equal versions", () => {
@@ -51,6 +56,31 @@ describe("escapeRegExp", () => {
 
   it("escapes module paths", () => {
     expect(escapeRegExp("github.com/foo/bar")).toBe("github\\.com/foo/bar");
+  });
+});
+
+describe("buildFuzzArgs", () => {
+  it("selects the generated wrapper via --target with a --for budget", () => {
+    expect(
+      buildFuzzArgs("example.com/pkg", "FooTestSuite", "FuzzParse", "5m"),
+    ).toEqual([
+      "fuzz",
+      "example.com/pkg",
+      "--target=FuzzFooTestSuite_FuzzParse",
+      "--timeout=0",
+      "--for=5m",
+    ]);
+  });
+
+  it("omits --for for an until-stopped session, bounded by cancel alone", () => {
+    expect(
+      buildFuzzArgs("example.com/pkg", "FooTestSuite", "FuzzParse"),
+    ).toEqual([
+      "fuzz",
+      "example.com/pkg",
+      "--target=FuzzFooTestSuite_FuzzParse",
+      "--timeout=0",
+    ]);
   });
 });
 

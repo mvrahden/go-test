@@ -26,6 +26,27 @@ export class DebugLauncher implements vscode.Disposable {
       return;
     }
 
+    return this.launchWithFilter(pkgDir, buildRunFilter(items), token);
+  }
+
+  // debugPattern launches the debugger against an explicit -test.run
+  // pattern — the entry point for fuzz surfaces, where the target is a
+  // generated top-level wrapper (and optionally a single corpus entry)
+  // rather than a TestItem selection.
+  async debugPattern(pkgDir: string, runFilter: string): Promise<void> {
+    const cts = new vscode.CancellationTokenSource();
+    try {
+      return await this.launchWithFilter(pkgDir, runFilter, cts.token);
+    } finally {
+      cts.dispose();
+    }
+  }
+
+  private async launchWithFilter(
+    pkgDir: string,
+    runFilter: string | undefined,
+    token: vscode.CancellationToken,
+  ): Promise<void> {
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(
       vscode.Uri.file(pkgDir),
     );
@@ -66,8 +87,6 @@ export class DebugLauncher implements vscode.Disposable {
     const prepareKey = `gotest-prepare:${pkgDir}`;
     this.killPrepareProcess(prepareKey);
     this.prepareProcesses.set(prepareKey, child);
-
-    const runFilter = buildRunFilter(items);
 
     const extraBuildFlags = scopedConfig(workspaceFolder.uri.fsPath).get<
       string[]

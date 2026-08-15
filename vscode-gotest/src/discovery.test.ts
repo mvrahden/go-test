@@ -293,6 +293,7 @@ describe("DiscoveryCache broken packages", () => {
       lifecycle: [],
       fixtures: [],
       methods: [],
+      fuzzers: [],
     };
   }
 

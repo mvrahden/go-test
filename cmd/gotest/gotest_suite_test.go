@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -24,10 +26,54 @@ import (
 
 // CmdGotestTestSuite tests CLI argument parsing, subcommands,
 // discovery, spec rendering, and code generation.
-type CmdGotestTestSuite struct{}
+//
+//nolint:lifecycle-pair // BeforeAll's binary lives under t.TempDir(), which the framework removes automatically
+type CmdGotestTestSuite struct {
+	binary   string
+	repoRoot string
+}
 
 func (s *CmdGotestTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true}
+}
+
+func (s *CmdGotestTestSuite) BeforeAll(t *gotest.T) {
+	absRoot, err := filepath.Abs("../..")
+	gotest.NoError(t, err)
+	s.repoRoot = absRoot
+
+	binDir := t.TempDir()
+	binaryName := "gotest"
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+	s.binary = filepath.Join(binDir, binaryName)
+	cmd := exec.Command("go", "build", "-o", s.binary, "./cmd/gotest") //nolint:gosec // G204: go tool with controlled arguments
+	cmd.Dir = absRoot
+	out, err := cmd.CombinedOutput()
+	gotest.NoError(t, err, "build gotest binary: %s", string(out))
+}
+
+// runCLI runs the built gotest binary from the repo root and returns its
+// combined stdout+stderr output.
+func (s *CmdGotestTestSuite) runCLI(t *gotest.T, args ...string) string { //nolint:unused // exercised by the bench stack; kept so the sibling branches merge coherently
+	out, _ := s.runCLIExit(t, args...)
+	return out
+}
+
+// runCLIExit runs the built gotest binary from the repo root and returns its
+// combined stdout+stderr output along with its exit code.
+func (s *CmdGotestTestSuite) runCLIExit(t *gotest.T, args ...string) (string, int) {
+	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Dir = s.repoRoot
+	out, err := cmd.CombinedOutput()
+	var exitErr *exec.ExitError
+	gotest.True(t, err == nil || errors.As(err, &exitErr), "running gotest binary: %v\n%s", err, out)
+	code := 0
+	if cmd.ProcessState != nil {
+		code = cmd.ProcessState.ExitCode()
+	}
+	return string(out), code
 }
 
 func (s *CmdGotestTestSuite) TestDefaultArgs(t *gotest.T) {
@@ -254,7 +300,7 @@ func (s *CmdGotestTestSuite) TestCLISurfaceMatchesSpec(t *gotest.T) {
 type CmdEnvTestSuite struct{}
 
 func (s *CmdEnvTestSuite) TestDetectCIEnv(t *gotest.T) {
-	for sub, tc := range gotest.Each(t, []struct {
+	for sub, tc := range gotest.Each(t, []struct { //nolint:gocritic // rangeValCopy: intentional
 		Desc     string
 		gotestCI string
 		ci       string
@@ -313,6 +359,8 @@ func (s *CmdGotestTestSuite) TestSplitArgs(t *gotest.T) {
 		{Desc: "watch: debug and ci", inArgs: []string{"--debug", "--ci", "-v", "./..."}, allowed: ExportWatchAllowed, expectOwn: []string{"--debug", "--ci"}, expectGoTest: []string{"-v", "./..."}},
 		{Desc: "timeout flag with equals", inArgs: []string{"--timeout=15m", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--timeout=15m"}, expectGoTest: []string{"-v"}},
 		{Desc: "timeout flag with space", inArgs: []string{"--timeout", "15m", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--timeout", "15m"}, expectGoTest: []string{"-v"}},
+		{Desc: "no-harvest allowed for test", inArgs: []string{"--no-harvest", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--no-harvest"}, expectGoTest: []string{"-v"}},
+		{Desc: "no-harvest allowed for fuzz", inArgs: []string{"--no-harvest", "--for=1m"}, allowed: ExportFuzzAllowed, expectOwn: []string{"--no-harvest", "--for=1m"}, expectGoTest: nil},
 	}) {
 		own, goTest, err := SplitArgs(tc.inArgs, tc.allowed)
 		if tc.expectErr {
@@ -496,6 +544,25 @@ func (s *CmdGotestTestSuite) TestParseSetupTimeoutFlag(t *gotest.T) {
 	}
 }
 
+func (s *CmdGotestTestSuite) TestParseExecFlags_HarvestSeeds(t *gotest.T) {
+	falsePtr := false
+	for sub, tc := range gotest.Each(t, []struct { //nolint:gocritic // rangeValCopy: intentional
+		Desc    string
+		ownArgs []string
+		cfg     config.ProjectConfig
+		expect  bool
+	}{
+		{Desc: "default: no flag, no config", ownArgs: nil, cfg: config.ProjectConfig{}, expect: true},
+		{Desc: "--no-harvest disables it", ownArgs: []string{"--no-harvest"}, cfg: config.ProjectConfig{}, expect: false},
+		{Desc: "config fuzz.harvest=false disables it", ownArgs: nil, cfg: config.ProjectConfig{Fuzz: config.FuzzConfig{Harvest: &falsePtr}}, expect: false},
+		{Desc: "flag and config both disabling stays disabled", ownArgs: []string{"--no-harvest"}, cfg: config.ProjectConfig{Fuzz: config.FuzzConfig{Harvest: &falsePtr}}, expect: false},
+	}) {
+		got, err := ExportParseExecFlags(tc.ownArgs, nil, &tc.cfg)
+		gotest.NoError(sub, err)
+		gotest.Equal(sub, tc.expect, got.HarvestSeeds)
+	}
+}
+
 func (s *CmdGotestTestSuite) TestParseDebounceFlag(t *gotest.T) {
 	for sub, tc := range gotest.Each(t, []struct {
 		Desc      string
@@ -676,6 +743,46 @@ func (s *CmdGotestTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 		var roundtrip ExportDiscoverOutput
 		gotest.NoError(it, json.Unmarshal(data, &roundtrip))
 		gotest.Len(it, roundtrip.Packages, 1)
+	})
+}
+
+func (s *CmdGotestTestSuite) TestRunDiscover_Benchmarks(t *gotest.T) {
+	t.It("includes fuzz methods in discover JSON, marking exclusions", func(it *gotest.T) {
+		srcPath := filepath.Join(
+			s.repoRoot, "internal", "gotestgen", "testdata", "sources",
+			"TestCollector_FuzzMethod", "test.go",
+		)
+		src, err := os.ReadFile(srcPath)
+		gotest.NoError(it, err)
+
+		fixtureDir, err := os.MkdirTemp(filepath.Join(s.repoRoot, "examples"), "discoverfuzz-")
+		gotest.NoError(it, err)
+		defer os.RemoveAll(fixtureDir)
+		gotest.NoError(it, os.WriteFile(filepath.Join(fixtureDir, "fuzz_fixture.go"), src, 0600))
+
+		pkgs, err := packages.Load(&packages.Config{
+			Mode: packages.NeedModule | packages.NeedSyntax | packages.NeedName |
+				packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps,
+		}, fixtureDir)
+		gotest.NoError(it, err)
+		gotest.Len(it, pkgs, 1)
+		gotest.Empty(it, pkgs[0].Errors, "expected no package load errors, got: %v", pkgs[0].Errors)
+
+		c := gotestgen.NewCollector()
+		result := c.CollectSuiteSpecs(pkgs[0])
+		gotest.Empty(it, result.Errs, "expected no collector errors, got: %v", result.Errs)
+		gotest.Len(it, result.Suites, 1)
+
+		ds := ExportBuildDiscoverSuite(result.Suites[0])
+		data, err := json.Marshal(ds)
+		gotest.NoError(it, err)
+		payload := string(data)
+
+		gotest.Contains(it, payload, `"fuzzers":[{"name":"FuzzParse"`)
+		gotest.Contains(it, payload, `"X_FuzzOld"`)
+		gotest.Contains(it, payload, `"excluded":true`)
+		// The plain test method must stay out of the fuzzers list.
+		gotest.NotContains(it, payload, `"fuzzers":[{"name":"TestOne"`)
 	})
 }
 
@@ -1065,5 +1172,105 @@ func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 			result := ExportReplacePatterns(tc.original, tc.newPatterns)
 			gotest.Equal(sub, tc.expected, result)
 		}
+	})
+}
+
+func (s *CmdGotestTestSuite) TestFuzzSubcommand(t *gotest.T) {
+	t.It("reports when no fuzz targets exist", func(it *gotest.T) {
+		out, code := s.runCLIExit(it, "fuzz", "./internal/protocol")
+		gotest.Contains(it, out, "no fuzz targets found")
+		gotest.Equal(it, 0, code)
+	})
+}
+
+// runScaffoldFuzzCLI writes files (module + a single "codec.go" source) to
+// an isolated temp module and runs "gotest scaffold --fuzz" from inside it,
+// so the command's writeScaffoldFile output never touches the real repo.
+func (s *CmdGotestTestSuite) runScaffoldFuzzCLI(t *gotest.T, codecSrc, funcName string) (string, int, string) { //nolint:gocritic // hugeParam: test helper
+	dir := t.TempDir()
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module fuzzscaffold\n\ngo 1.24\n"), 0644)) //nolint:gosec // G306: throwaway test module
+	gotest.NoError(t, os.MkdirAll(filepath.Join(dir, "codec"), 0755))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "codec", "codec.go"), []byte(codecSrc), 0644)) //nolint:gosec // G306: throwaway test module
+
+	cmd := exec.Command(s.binary, "scaffold", "--fuzz", "./codec."+funcName) //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	var exitErr *exec.ExitError
+	gotest.True(t, err == nil || errors.As(err, &exitErr), "running gotest binary: %v\n%s", err, out)
+	code := 0
+	if cmd.ProcessState != nil {
+		code = cmd.ProcessState.ExitCode()
+	}
+	return string(out), code, dir
+}
+
+func (s *CmdGotestTestSuite) TestScaffoldFuzzSubcommand(t *gotest.T) {
+	t.It("generates a round-trip skeleton for a found inverse pair", func(it *gotest.T) {
+		out, code, dir := s.runScaffoldFuzzCLI(it, `package codec
+
+func Encode(s string) ([]byte, error) { return []byte(s), nil }
+func Decode(b []byte) (string, error) { return string(b), nil }
+`, "Encode")
+		gotest.Equal(it, 0, code)
+		gotest.Contains(it, out, "Generated: codec/encode_fuzz_test.go")
+
+		generated, err := os.ReadFile(filepath.Join(dir, "codec", "encode_fuzz_test.go"))
+		gotest.NoError(it, err)
+		src := string(generated)
+		gotest.Contains(it, src, "gotest.Fuzz(")
+		gotest.Contains(it, src, "Encode")
+		gotest.Contains(it, src, "Decode")
+		gotest.Contains(it, src, "gotest.Equal(t, in, decoded) // round-trip property")
+	})
+
+	t.It("falls back to a crash-safety skeleton when no inverse pair exists", func(it *gotest.T) {
+		out, code, dir := s.runScaffoldFuzzCLI(it, `package codec
+
+func Render(n int) string { return "" }
+`, "Render")
+		gotest.Equal(it, 0, code)
+		gotest.Contains(it, out, "no inverse pair found for Render — generated crash-safety skeleton")
+		gotest.Contains(it, out, "Generated: codec/render_fuzz_test.go")
+
+		generated, err := os.ReadFile(filepath.Join(dir, "codec", "render_fuzz_test.go"))
+		gotest.NoError(it, err)
+		src := string(generated)
+		gotest.Contains(it, src, "gotest.Fuzz(")
+		gotest.Contains(it, src, "Render(in)")
+	})
+
+	t.It("scaffolds a real skeleton for a codec-fuzzable struct parameter", func(it *gotest.T) {
+		out, code, dir := s.runScaffoldFuzzCLI(it, `package codec
+
+type Config struct{ Name string }
+
+func ApplyConfig(c Config) string { return c.Name }
+`, "ApplyConfig")
+		gotest.Equal(it, 0, code)
+		gotest.Contains(it, out, "no inverse pair found for ApplyConfig — generated crash-safety skeleton")
+		gotest.Contains(it, out, "Generated: codec/apply_config_fuzz_test.go")
+
+		generated, err := os.ReadFile(filepath.Join(dir, "codec", "apply_config_fuzz_test.go"))
+		gotest.NoError(it, err)
+		src := string(generated)
+		gotest.Contains(it, src, "gotest.Fuzz(")
+		gotest.Contains(it, src, "f.Add(Config{})")
+	})
+
+	t.It("falls back to a TODO stub carrying the codec emitter's rejection", func(it *gotest.T) {
+		out, code, dir := s.runScaffoldFuzzCLI(it, `package codec
+
+func ApplyOptions(opts map[string]string) string { return opts["name"] }
+`, "ApplyOptions")
+		gotest.Equal(it, 0, code)
+		gotest.Contains(it, out, "cannot fuzz map[string]string for ApplyOptions — generated TODO stub: ")
+		gotest.Contains(it, out, "maps have no canonical encoding")
+		gotest.Contains(it, out, "Generated: codec/apply_options_fuzz_test.go")
+
+		generated, err := os.ReadFile(filepath.Join(dir, "codec", "apply_options_fuzz_test.go"))
+		gotest.NoError(it, err)
+		src := string(generated)
+		gotest.NotContains(it, src, "gotest.Fuzz(")
+		gotest.Contains(it, src, "maps have no canonical encoding")
 	})
 }

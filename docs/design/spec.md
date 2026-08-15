@@ -119,6 +119,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `migrate` | Convert testify/suite tests to go-test suites |
 | `spec` | Run tests and render behavioral specification |
 | `summary` | Run tests and render a failure-focused summary (CI mode) |
+| `fuzz` | Orchestrate `FuzzX` suite targets with a shared time budget |
 | `lint` | Run gotest-specific linter checks |
 | `refactor` | Toggle focus prefixes: `refactor toggle-focus <file> <Suite[.Method]>` |
 | `discover` | Discover test suites and output JSON metadata |
@@ -148,6 +149,11 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--github` | Emit GitHub annotations and step summary (auto-enabled in GitHub Actions) |
 | `--coverage=<path>` | Coverage profile path for `summary` subcommand |
 | `--render-only` | With `--input`, exit 0 on a failing stream: the code reports whether rendering succeeded, not whether the tests passed (requires `--input`) |
+| `--for=<dur>` | Approximate wall-clock fuzz budget for the session, split jobs-aware across targets (`fuzz`; per-target share floors at 10s) |
+| `--target=<name>` | Fuzz exactly one generated wrapper by name; unmatched names error with the available list (`fuzz`) |
+| `--jobs=<n>` | Max concurrent fuzz targets (`fuzz`; default: max(1, GOMAXPROCS/2)) |
+| `--no-harvest` | Disable table-test seed harvesting for this run |
+| `--fuzz` | Generate fuzz round-trip skeletons (`scaffold`) |
 
 ### Disambiguation
 
@@ -1298,6 +1304,8 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `assertion-type-guard` | `Nil`/`Empty` on types their runtime guards would reject |
 | `generated-file` | `gotest_p(x)suite_test.go` files present in source control |
 | `shared-fixture-undeclared` | Suite-method reads of a `*SharedFixture` value the suite never declared as a pointer field (directly or through the fixture DAG) — window scheduling starts only declared fixtures, so the value may be absent; locally-constructed fixtures (fixture self-tests) are exempt |
+| `fuzz-determinism` | Fuzz targets (one hop into same-package callees) reading nondeterministic state — `time.Now`, `math/rand{,/v2}`, `os.Getenv` — corpus replay and coverage guidance degrade |
+| `fuzz-struct-corpus` | On-disk corpus entries for a shape-bound fuzz target (struct, pointer, array, non-byte slice) — one value per leaf in field order, so a same-kind reorder silently reinterprets them and an added or removed field rejects them; `gotest fuzz promote` turns them into typed `f.Add` seeds |
 
 **Expressiveness** — the test is correct but says it worse. Suppressible per line or project-wide via `lint.skip`.
 
@@ -1307,6 +1315,10 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `assertion-redundant` | An assertion made redundant by the next one on the same argument |
 | `fail-guard` | `if cond { gotest.Fail(…) }` guards (also halting `Fatal`/`Fatalf`/`FailNow` bodies) — the assertion expresses the check directly; `\|\|` conditions and `else if` chains decompose into sequential assertions, non-halting `Errorf` bodies and init-scoped guards report without a fix; fires only in files that import gotest |
 | `t-escape` | Unnecessary `t.T()` convenience escapes: `Errorf`/`FailNow`/`Skipf`/`Setenv`/`TempDir` (available on `gotest.T`), `Skip`/`SkipNow` (use `Skipf`), `Helper` (degrades call-site reporting), `Log`/`Fatal`/`Fatalf` (use assertions and their message args) |
+| `fuzz-no-oracle` | `gotest.Fuzz*` callbacks that never use their `*gotest.T` — only panics are caught, which defeats property-based fuzzing |
+| `fuzz-seed` | Fuzz targets that never call `f.Add` — coverage-guided exploration starts blind (table-test harvesting may still seed them) |
+| `fuzz-hook-io` | IO-shaped calls (`net/*`, `os/exec`, `database/sql`, `time.Sleep`, filesystem `os` functions) in `BeforeEach`/`AfterEach` of fuzz-declaring suites — the hooks replay around every execution and throttle the fuzzer |
+| `fuzz-raw-seed` | Raw `[]byte` seeds on a fuzz position that does not take `[]byte` — seeds are target-directed, so `gotest.Fuzz` rejects them outright; write a typed literal instead |
 
 **Migration** — legitimate coexistence, nudged. Suppressible per line or project-wide via `lint.skip`.
 

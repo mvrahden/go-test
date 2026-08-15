@@ -53,6 +53,7 @@ type discoverSuite struct {
 	Lifecycle []string         `json:"lifecycle"`
 	Fixtures  []string         `json:"fixtures"`
 	Methods   []discoverMethod `json:"methods"`
+	Fuzzers   []discoverMethod `json:"fuzzers"`
 }
 
 type discoverMethod struct {
@@ -210,6 +211,27 @@ func buildDiscoverSuite(suite *gotestast.TestSuiteSpec) discoverSuite {
 		methods = []discoverMethod{}
 	}
 	ds.Methods = methods
+
+	// Fuzzers (Fuzz* methods). The editor needs these for the same reasons
+	// it needs benchmarks — CodeLens targets, test-tree items, and building
+	// run filters that include the generated Fuzz<Suite>_<Method> wrappers.
+	var fuzzers []discoverMethod
+	for _, fz := range suite.Fuzzers() {
+		fPos := fset.Position(fz.Pos())
+		fuzzers = append(fuzzers, discoverMethod{
+			Name:     fz.Identifier(),
+			Parallel: false,
+			Focused:  fz.IsFocused(),
+			Excluded: fz.IsExcluded(),
+			File:     filepath.Base(fPos.Filename),
+			Line:     fPos.Line,
+			Col:      fPos.Column,
+		})
+	}
+	if fuzzers == nil {
+		fuzzers = []discoverMethod{}
+	}
+	ds.Fuzzers = fuzzers
 
 	return ds
 }
