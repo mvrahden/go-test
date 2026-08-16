@@ -337,15 +337,23 @@ func (s *E2ETestSuite) TestOutputFormatGolden(t *gotest.T) {
 	})
 
 	t.When("json", func(w *gotest.T) {
-		w.It("single passing package", func(it *gotest.T) {
-			cmd := exec.Command(s.binary, "github.com/mvrahden/go-test/examples/auth", "-json", "-parallel", "1") //nolint:gosec // G204: controlled binary with fixed args
-			cmd.Dir = filepath.Join(s.workDir, "examples")
-			out, err := cmd.CombinedOutput()
+		cmd := exec.Command(s.binary, "github.com/mvrahden/go-test/examples/auth", "-json", "-parallel", "1") //nolint:gosec // G204: controlled binary with fixed args
+		cmd.Dir = filepath.Join(s.workDir, "examples")
+		out, err := cmd.CombinedOutput()
 
+		w.It("single passing package", func(it *gotest.T) {
 			gotest.NoError(it, err, "auth should pass: %s", string(out))
 			gotest.MatchSnapshot(it, normalizeJSONOutput(string(out)))
 		})
 
+		// -json is a contract with editors and CI parsers. Anything gotest
+		// invents for its own rendering has to stay out of it: a stray log line
+		// becomes a phantom diagnostic in somebody's editor, and the snapshot
+		// above would happily record it as expected.
+		w.It("carries nothing but the tests' own output", func(it *gotest.T) {
+			gotest.NotContains(it, string(out), "ƒƒ", "gotest bookkeeping leaked into -json")
+			gotest.NotContains(it, string(out), "GOTEST_", "gotest bookkeeping leaked into -json")
+		})
 	})
 
 	t.When("verbose", func(w *gotest.T) {
