@@ -112,6 +112,7 @@ func staticBehaviorNodes(behaviors []*gotestast.Behavior) []*gotestspec.Node {
 		// suffix here exactly as the stream parser does.
 		node := &gotestspec.Node{
 			Name:        gotestspec.StripDuplicateSuffix(b.Name),
+			Vocab:       vocabOf(b.Kind),
 			SourceLabel: b.Display,
 		}
 		node.Children = staticBehaviorNodes(b.Children)

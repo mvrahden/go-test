@@ -271,7 +271,7 @@ func discoverBehaviors(in []*gotestast.Behavior) []discoverBehavior {
 	for _, b := range in {
 		out = append(out, discoverBehavior{
 			Name:     b.Name,
-			Display:  b.Display,
+			Display:  renderedBehaviorLabel(b),
 			Kind:     behaviorKindString(b.Kind),
 			Line:     b.Line,
 			Children: discoverBehaviors(b.Children),

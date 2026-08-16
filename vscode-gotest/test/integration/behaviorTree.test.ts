@@ -115,11 +115,23 @@ describe("the specification is in the tree before anything runs", () => {
     );
   });
 
+  // The label is what a human reads: the developer's own text spoken in its
+  // vocabulary, and the same string `gotest spec` renders for this node, so the
+  // tree and the spec view never spell one behavior two ways. The id stays the
+  // subtest name, which is what filters and stored results key on.
   it("labels a behavior with the text the developer wrote, not the subtest name", () => {
-    const item = controller.findItem(
+    const when = controller.findItem(
       `${pkg("table")}/TableTestSuite/TestClassify/classifying_a_number`,
     );
-    expect(item?.label).toBe("classifying a number");
+    expect(when?.label).toBe("when classifying a number");
+    expect(when?.id).toContain("classifying_a_number");
+
+    // Rows and expectations stand on their own — only a context takes a
+    // connective.
+    const row = controller.findItem(
+      `${pkg("table")}/TableTestSuite/TestClassify/classifying_a_number/negative`,
+    );
+    expect(row?.label).toBe("negative");
   });
 
   it("gives each behavior a source position, so it can be decorated in the gutter", () => {

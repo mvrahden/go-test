@@ -8,6 +8,30 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
 
+// vocabOf maps a declaration to the vocabulary it renders in. The two enums are
+// deliberately separate — one describes source, the other display — but this is
+// the single place they meet.
+func vocabOf(k gotestast.BehaviorKind) gotestspec.Vocab {
+	switch k {
+	case gotestast.BehaviorWhen:
+		return gotestspec.VocabWhen
+	case gotestast.BehaviorIt:
+		return gotestspec.VocabIt
+	case gotestast.BehaviorEach:
+		return gotestspec.VocabEach
+	default:
+		return gotestspec.VocabNone
+	}
+}
+
+// renderedBehaviorLabel is what a human should see for a declared behavior: the
+// text the developer wrote, spoken in its vocabulary. Discovery and spec
+// rendering must produce it from the same input by the same rule, or the same
+// behavior reads two different ways in the same editor.
+func renderedBehaviorLabel(b *gotestast.Behavior) string {
+	return vocabOf(b.Kind).Apply(b.Display)
+}
+
 // buildDeclarationIndex reads what every declared behavior is called, keyed by
 // the test path go test will print for it. A run's event stream says which
 // subtests happened, but not what the developer called them: by the time a
@@ -60,7 +84,7 @@ func indexBehaviors(idx gotestspec.DeclarationIndex, pkgPath, parentPath string,
 			paths = map[string]gotestspec.Declaration{}
 			idx[pkgPath] = paths
 		}
-		paths[path] = gotestspec.Declaration{Label: b.Display}
+		paths[path] = gotestspec.Declaration{Label: b.Display, Vocab: vocabOf(b.Kind)}
 		indexBehaviors(idx, pkgPath, path, b.Children)
 	}
 }
