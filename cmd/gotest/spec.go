@@ -136,7 +136,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	tree := gotestspec.BuildTree(events)
+	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))
 
 	var w io.Writer = os.Stdout
 	if output != "" {

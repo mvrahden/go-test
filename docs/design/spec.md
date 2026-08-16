@@ -1091,6 +1091,8 @@ UserService
 
 Internally runs `go test -json`, parses the event stream, reconstructs the suite→method→When/It hierarchy from `/`-separated test paths, and strips Go naming conventions for display.
 
+**Labels come from the source.** A subtest name cannot be turned back into the description that produced it: `go test` writes an underscore for every space, so `returns snake_case keys` and `returns snake case keys` arrive as the same name. The renderer therefore reads the declared descriptions from source — the same walker that backs `--static` and `discover` — and shows each behavior under the words the developer actually wrote. Behaviors source cannot enumerate (a `When` behind a condition, a table that is not a literal), and streams rendered with `--input` where there is no source to read, fall back to reconstructing the label from the name, exactly as before. Subtest *names* are untouched either way, so `-run` filters, snapshot keys and saved baselines are unaffected.
+
 Output formats:
 
 ```bash
@@ -1151,7 +1153,7 @@ $ gotest discover ./...
 Emits the static suite model as JSON — the integration surface for editors and AI tooling (the VS Code extension's test explorer runs on it).
 No tests are executed.
 
-`behaviors` carries the `When`/`It` tree each method declares, read from source: `name` is the subtest segment `go test` will produce (so it matches an observed run byte for byte), `display` is the text the developer wrote, and `line` locates it. Two rewrites the source does not spell out are applied so that `name` really does match: a description repeated among its siblings gains the `#01` suffix the testing package appends, and a description containing a single slash becomes one node per level (a run of slashes, as in `https://`, is not a separator and stays within one level). `behaviorsComplete` reports whether that tree is exhaustive — `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears only once the method has run. Consumers must not present an incomplete list as the whole specification.
+`behaviors` carries the `When`/`It` tree each method declares, read from source: `name` is the subtest segment `go test` will produce (so it matches an observed run byte for byte), `display` is the text the developer wrote — the same string `gotest spec` renders for this node, so an editor showing both never spells one behavior two ways — `kind` names the call it came from (`when`, `it`, `each`), and `line` locates it. Two rewrites the source does not spell out are applied so that `name` really does match: a description repeated among its siblings gains the `#01` suffix the testing package appends, and a description containing a single slash becomes one node per level (a run of slashes, as in `https://`, is not a separator and stays within one level). `behaviorsComplete` reports whether that tree is exhaustive — `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears only once the method has run. Consumers must not present an incomplete list as the whole specification.
 
 ```
 { "packages": [ {
@@ -1163,7 +1165,7 @@ No tests are executed.
       "fixtures": ["E2ESetupFixture", …],
       "methods": [ { "name": …, "file": …, "line": …, "col": …,
                      "focused": bool, "excluded": bool, "parallel": bool,
-                     "behaviors": [ { "name": …, "display": …, "line": …,
+                     "behaviors": [ { "name": …, "display": …, "kind": …, "line": …,
                                       "children": [ … ] } ],
                      "behaviorsComplete": bool } ]
     } ]

@@ -124,7 +124,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	tree := gotestspec.BuildTree(events)
+	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))
 
 	if coverageProfile == "" {
 		for _, arg := range goTestArgs {

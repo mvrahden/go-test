@@ -59,7 +59,12 @@ export interface DiscoverBehavior {
   // which is what lets a declared behavior and an observed one be the same
   // tree node rather than two.
   name: string;
+  // The label to show: the description as the developer wrote it, and the same
+  // string `gotest spec` renders for this node. Do not re-derive it from the
+  // name here, or the test tree and the spec view will drift apart.
   display: string;
+  // Which call declared it: "when" | "it" | "each".
+  kind?: string;
   line: number;
   children?: DiscoverBehavior[];
 }
