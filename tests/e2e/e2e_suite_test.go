@@ -244,6 +244,18 @@ func (s *KeysTestSuite) TestEncode(t *gotest.T) {
 		}
 	})
 
+	// The connective is the point of the vocabulary: it is written once, by the
+	// renderer, so it must appear in every surface and never twice in one label.
+	t.It("speaks the vocabulary on both surfaces", func(it *gotest.T) {
+		gotest.True(it, observed["when the payload uses snake_case"],
+			"a run does not speak the vocabulary; it shows %v", sortedKeys(observed))
+		gotest.True(it, static["when the payload uses snake_case"],
+			"--static does not speak the vocabulary; it shows %v", sortedKeys(static))
+		for _, label := range declared {
+			gotest.NotContains(it, label, "when when", "doubled connective in %q", label)
+		}
+	})
+
 	t.It("says which call declared each behavior", func(it *gotest.T) {
 		gotest.Contains(it, kinds, "when", "no When behavior reported: %v", kinds)
 		gotest.Contains(it, kinds, "it", "no It behavior reported: %v", kinds)

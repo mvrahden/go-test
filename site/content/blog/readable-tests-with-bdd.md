@@ -233,11 +233,12 @@ gotest spec --no-color ./...
 
 There is also `gotest spec --static`, which renders the same tree straight from your source — no run, no status icons, no durations — for reviewing what the tests promise before executing anything.
 
-The rendering strips naming conventions automatically:
+The rendering strips naming conventions automatically — and applies the BDD vocabulary:
 
 - `UserServiceTestSuite` → **UserService** (drops `TestSuite` suffix)
 - `TestCreate` → **Create** (drops `Test` prefix)
 - Underscored subtest names (`sends_a_welcome_email` in `go test` output) → the label as you wrote it ("sends a welcome email")
+- `t.When("email is valid")` → "when email is valid" — gotest reads which subtests came from `When` out of your source, so you write the condition and it supplies the connective. `It` labels render verbatim; the checkmark plays the role of "it". (The subtest *name* stays `email_is_valid` — `-run` filters and snapshot keys are untouched.)
 
 Suite and method names are bold. Passing expectations get a green checkmark, failing ones a red cross, skipped ones a yellow tilde. The summary line at the bottom shows suite and behavior counts. The same spec tree is also available inside your editor — see the [gotest VS Code Extension]({{< ref "/blog/your-editor-knows-your-tests" >}}).
 

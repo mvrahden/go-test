@@ -22,6 +22,7 @@ type jsonNode struct {
 	Name     string  `json:"name"`
 	Display  string  `json:"display"`
 	Kind     string  `json:"kind"`
+	Vocab    string  `json:"vocab,omitempty"`
 	Status   string  `json:"status"`
 	Duration float64 `json:"duration"`
 	Focused  bool    `json:"focused"`
@@ -83,6 +84,7 @@ func convertNodes(nodes []*Node) []jsonNode {
 			Name:       n.Name,
 			Display:    n.Display,
 			Kind:       kindString(n.Kind),
+			Vocab:      vocabString(n.Vocab),
 			Status:     statusString(n.Status),
 			Duration:   EffectiveDuration(n).Seconds(),
 			Focused:    n.Focused,
@@ -110,6 +112,19 @@ func statusString(s Status) string {
 		return "skip"
 	default:
 		return "none"
+	}
+}
+
+func vocabString(v Vocab) string {
+	switch v {
+	case VocabWhen:
+		return "when"
+	case VocabIt:
+		return "it"
+	case VocabEach:
+		return "each"
+	default:
+		return ""
 	}
 }
 
