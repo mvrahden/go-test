@@ -179,7 +179,8 @@ func (s *PanicResilienceTestSuite) TestSetupTimeoutOverrun(t *gotest.T) {
 
 func (s *PanicResilienceTestSuite) TestSetupThatNeverReturns(t *gotest.T) {
 	t.When("BeforeAll hangs past its configured SetupTimeout", func(w *gotest.T) {
-		run := runGeneratedSuite(w, "TestLifecycle_SetupHang")
+		// This child can only be ended by its alarm, so it runs on a short one.
+		run := runGeneratedSuite(w, "TestLifecycle_SetupHang", hangTimeout)
 
 		w.It("names the budget it blew", func(it *gotest.T) {
 			// A setup that returns late can be judged once it returns. One that
@@ -187,12 +188,19 @@ func (s *PanicResilienceTestSuite) TestSetupThatNeverReturns(t *gotest.T) {
 			// with nothing but the -timeout dump, which names no budget at all.
 			// The verdict has to be written while the setup is still stuck.
 			gotest.Contains(it, run.output, "BeforeAll exceeded its configured SetupTimeout of 200ms",
-				"a hung BeforeAll must still report the budget it blew:\n%s", run.output)
+				"a hung BeforeAll must still report the budget it blew; the child ran %s of its %s alarm, "+
+					"so if those are equal the alarm beat the verdict and this is a margin problem, not a regression:\n%s",
+				run.elapsed, run.timeout, run.output)
 			gotest.Contains(it, run.output, "MARK:setup entered", run.output)
 		})
 
 		w.It("fails the run", func(it *gotest.T) {
 			gotest.False(it, run.passed, "a hung setup must not pass:\n%s", run.output)
+		})
+
+		w.It("never reaches the tests it guards", func(it *gotest.T) {
+			gotest.NotContains(it, run.output, "MARK:test ran",
+				"BeforeAll never returned, so no test method may have run:\n%s", run.output)
 		})
 	})
 }
