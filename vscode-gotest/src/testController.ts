@@ -16,6 +16,10 @@ export class GoTestController implements vscode.Disposable {
   // longer carry a marker segment — they are the go test path — so membership
   // is tracked instead of inferred from the string.
   private dynamicIds = new Set<string>();
+  // Open brackets: nodes go test has started and not yet reported on, and
+  // which of them parked themselves with t.Parallel.
+  private pendingStarts = new Map<string, number>();
+  private pendingPaused = new Set<string>();
 
   constructor(
     private readonly cache: DiscoveryCache,
@@ -557,6 +561,11 @@ export class GoTestController implements vscode.Disposable {
   }
 
   createTestRun(request: vscode.TestRunRequest, name: string): vscode.TestRun {
+    // A run that died mid-way leaves brackets open on nodes that never
+    // reported. They are worthless to the next run and would otherwise sit in
+    // the map for the rest of the session.
+    this.pendingStarts.clear();
+    this.pendingPaused.clear();
     return this.controller.createTestRun(request, name);
   }
 
@@ -564,12 +573,35 @@ export class GoTestController implements vscode.Disposable {
     return this.findItemRecursive(this.controller.items, id);
   }
 
+  // noteStart remembers when go test registered a node, so the terminal event
+  // can close the bracket. It is kept off the result store on purpose: an
+  // in-flight node has no verdict, and a run that dies mid-way must not leave
+  // half a result behind to be restored on the next reload.
+  noteStart(itemId: string, at: number): void {
+    this.pendingStarts.set(itemId, at);
+  }
+
+  // notePaused records that the node called t.Parallel. What that costs its
+  // bracket is described on TestResult.paused.
+  notePaused(itemId: string): void {
+    this.pendingPaused.add(itemId);
+  }
+
   recordResult(
     itemId: string,
     status: "pass" | "fail" | "skip",
     duration?: number,
+    endedAt?: number,
   ): void {
-    this.resultStore.record(itemId, status, duration);
+    const startedAt = this.pendingStarts.get(itemId);
+    const paused = this.pendingPaused.has(itemId);
+    this.pendingStarts.delete(itemId);
+    this.pendingPaused.delete(itemId);
+    this.resultStore.record(itemId, status, duration, {
+      startedAt,
+      endedAt,
+      paused,
+    });
   }
 
   getResult(itemId: string): TestResult | undefined {
@@ -591,6 +623,8 @@ export class GoTestController implements vscode.Disposable {
       d.dispose();
     }
     this.disposables = [];
+    this.pendingStarts.clear();
+    this.pendingPaused.clear();
     this.controller.dispose();
   }
 

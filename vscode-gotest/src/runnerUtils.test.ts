@@ -458,6 +458,7 @@ describe("applyResults", () => {
     const controller = {
       findItem: vi.fn((id: string) => itemMap.get(id) ?? undefined),
       recordResult: vi.fn(),
+      noteStart: vi.fn(),
       createDynamicSubtest: vi.fn(),
     };
 
@@ -548,15 +549,18 @@ describe("applyResults", () => {
       passItem.id,
       "pass",
       100,
+      undefined,
     );
     expect(controller.recordResult).toHaveBeenCalledWith(
       failItem.id,
       "fail",
       200,
+      undefined,
     );
     expect(controller.recordResult).toHaveBeenCalledWith(
       skipItem.id,
       "skip",
+      undefined,
       undefined,
     );
 
@@ -722,6 +726,7 @@ describe("applyEvent", () => {
       recordResult: vi.fn((id: string, status: string, duration?: number) => {
         results.set(id, { status, duration });
       }),
+      noteStart: vi.fn(),
       getResult: vi.fn((id: string) => results.get(id)),
       createDynamicSubtest: vi.fn(),
     };
@@ -744,6 +749,31 @@ describe("applyEvent", () => {
       skipItem,
     };
   }
+
+  // Real streams always carry Time; it is what brackets a node against every
+  // other node, including ones from suites running in other processes.
+  const STAMP = "2026-08-16T10:00:00.000Z";
+  const STAMP_MS = Date.parse(STAMP);
+
+  it("processes 'run' event — calls run.started, notes the bracket start", () => {
+    const { controller, run, passItem } = makeApplyEventFixture();
+
+    applyEvent(
+      controller as any,
+      run as any,
+      {
+        Action: "run",
+        Test: "TestMySuite/TestPass",
+        Package: "example.com/pkg",
+        Time: STAMP,
+      } as any,
+      new Map<string, string>(),
+      "example.com/pkg",
+      "/some/dir",
+    );
+
+    expect(controller.noteStart).toHaveBeenCalledWith(passItem.id, STAMP_MS);
+  });
 
   it("processes 'run' event — calls run.started, returns undefined", () => {
     const { controller, run, passItem } = makeApplyEventFixture();
@@ -778,6 +808,7 @@ describe("applyEvent", () => {
         Test: "TestMySuite/TestPass",
         Package: "example.com/pkg",
         Elapsed: 0.1,
+        Time: STAMP,
       } as any,
       outputMap,
       "example.com/pkg",
@@ -794,6 +825,7 @@ describe("applyEvent", () => {
       passItem.id,
       "pass",
       100,
+      STAMP_MS,
     );
   });
 
@@ -808,6 +840,7 @@ describe("applyEvent", () => {
         Action: "skip",
         Test: "TestMySuite/TestSkip",
         Package: "example.com/pkg",
+        Time: STAMP,
       } as any,
       outputMap,
       "example.com/pkg",
@@ -824,6 +857,7 @@ describe("applyEvent", () => {
       skipItem.id,
       "skip",
       undefined,
+      STAMP_MS,
     );
   });
 
@@ -868,6 +902,7 @@ describe("applyEvent", () => {
         Test: "TestMySuite/TestFail",
         Package: "example.com/pkg",
         Elapsed: 0.2,
+        Time: STAMP,
       } as any,
       outputMap,
       "example.com/pkg",
@@ -884,6 +919,7 @@ describe("applyEvent", () => {
       failItem.id,
       "fail",
       200,
+      STAMP_MS,
     );
   });
 
