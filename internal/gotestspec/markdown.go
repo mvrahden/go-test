@@ -58,7 +58,7 @@ func markdownRow(w io.Writer, indent, display string, n *Node, bare bool) {
 		fmt.Fprintf(w, "| %s%s |\n", indent, display)
 		return
 	}
-	fmt.Fprintf(w, "| %s%s | %s | %s |\n", indent, display, statusText(n.Status), formatDuration(n.Duration))
+	fmt.Fprintf(w, "| %s%s | %s | %s |\n", indent, display, statusText(n.Status), formatDuration(EffectiveDuration(n)))
 }
 
 func markdownHeader(w io.Writer, bare bool) {
@@ -146,7 +146,7 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 				fmt.Fprintf(w, "- %s\n", n.Display)
 				return
 			}
-			fmt.Fprintf(w, "- %s %s (%s)\n", statusText(n.Status), n.Display, formatDuration(n.Duration))
+			fmt.Fprintf(w, "- %s %s (%s)\n", statusText(n.Status), n.Display, formatDuration(EffectiveDuration(n)))
 		}
 	}
 }

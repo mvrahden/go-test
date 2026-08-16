@@ -71,7 +71,7 @@ func RenderJSON(w io.Writer, packages []*Package) {
 		root.Packages[i] = jsonPackage{
 			Path:     pkg.Path,
 			Status:   statusString(pkg.Status),
-			Duration: pkg.Duration.Seconds(),
+			Duration: PackageDuration(pkg).Seconds(),
 			Nodes:    convertNodes(pkg.Nodes),
 			Output:   output,
 		}
@@ -93,7 +93,7 @@ func convertNodes(nodes []*Node) []jsonNode {
 			Display:    n.Display,
 			Kind:       kindString(n.Kind),
 			Status:     statusString(n.Status),
-			Duration:   n.Duration.Seconds(),
+			Duration:   EffectiveDuration(n).Seconds(),
 			Focused:    n.Focused,
 			Excluded:   n.Excluded,
 			External:   n.External,

@@ -115,7 +115,7 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, bare bool) {
 
 	if isLeaf {
 		icon, clr := statusIcon(n.Status, c)
-		dur := formatDuration(n.Duration)
+		dur := formatDuration(EffectiveDuration(n))
 
 		suffix := ""
 		if n.Excluded || n.Status == StatusSkip {
@@ -172,7 +172,9 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, bare bool) {
 		suffix += fmt.Sprintf(" %s%s%s", clr, icon, c.reset)
 	}
 
-	fmt.Fprintf(w, "%s%s%s\n", indent, label, suffix)
+	fmt.Fprintf(w, "%s%s%s %s(%s)%s\n",
+		indent, label, suffix,
+		c.dim, formatDuration(EffectiveDuration(n)), c.reset)
 
 	if ownFailure {
 		if len(filterOutput(n.Output)) > 0 {

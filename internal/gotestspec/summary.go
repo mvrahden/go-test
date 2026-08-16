@@ -33,7 +33,7 @@ func collectFailedLeaves(pkgPath string, n *Node, display []string, out *[]failu
 		*out = append(*out, failure{
 			Package:  pkgPath,
 			Display:  d,
-			Duration: n.Duration,
+			Duration: EffectiveDuration(n),
 			Output:   n.Output,
 		})
 	}
@@ -62,12 +62,12 @@ func collectPackageDiagnostics(packages []*Package) []packageDiagnostic {
 	return diags
 }
 
+// effectiveDuration prefers a wall clock the caller measured itself, because
+// that one also covers compiling: the event stream only starts once the first
+// test does. Without it, the union of what the packages occupied is the closest
+// the stream can get.
 func totalDuration(packages []*Package) time.Duration {
-	var d time.Duration
-	for _, pkg := range packages {
-		d += pkg.Duration
-	}
-	return d
+	return TotalDuration(packages)
 }
 
 func effectiveDuration(cfg renderConfig, packages []*Package) time.Duration {
