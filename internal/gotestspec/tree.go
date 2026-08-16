@@ -28,17 +28,56 @@ const (
 	KindTest
 )
 
+// Declaration is what the source says about a subtest. Today that is the
+// description as the developer wrote it; a run cannot report it, because by the
+// time a subtest has a name the description has already been rewritten.
+type Declaration struct {
+	Label string
+}
+
+// DeclarationIndex maps a package's test paths ("TestUserServiceTestSuite/
+// TestCreate/email_is_valid") to what source declares about them. The paths are
+// the ones go test prints, which is what lets a declaration and an observation
+// of the same behavior be one node rather than two.
+type DeclarationIndex map[string]map[string]Declaration
+
+func (i DeclarationIndex) lookup(pkgPath, testPath string) Declaration {
+	if i == nil {
+		return Declaration{}
+	}
+	return i[pkgPath][testPath]
+}
+
+type buildConfig struct {
+	decls DeclarationIndex
+}
+
+type BuildOption func(*buildConfig)
+
+// WithDeclarations supplies what the source declares, so the tree can show the
+// developer's own words. Without it the tree falls back to reconstructing a
+// label from the subtest name, which is lossy.
+func WithDeclarations(idx DeclarationIndex) BuildOption {
+	return func(c *buildConfig) { c.decls = idx }
+}
+
 type Node struct {
-	Name     string
-	Display  string
-	Kind     NodeKind
-	Status   Status
-	Duration time.Duration
-	Output   []string
-	Children []*Node
-	Focused  bool
-	Excluded bool
-	External bool
+	Name    string
+	Display string
+	Kind    NodeKind
+	// SourceLabel is the description as written, when it is known from source.
+	// Rendering prefers it over reconstructing a label from Name: go test turns
+	// every space in a description into an underscore, so the name cannot say
+	// which underscores the developer typed. Empty for anything only a run
+	// revealed.
+	SourceLabel string
+	Status      Status
+	Duration    time.Duration
+	Output      []string
+	Children    []*Node
+	Focused     bool
+	Excluded    bool
+	External    bool
 	// Incomplete marks a node whose children are known not to be the whole
 	// list — a statically read method that declares behaviors whose names or
 	// existence depend on runtime values. A tree stream never sets it, because
@@ -74,7 +113,12 @@ func (s Stats) Total() int {
 	return s.Passed + s.Failed + s.Skipped
 }
 
-func BuildTree(events []TestEvent) []*Package {
+func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
+	var cfg buildConfig
+	for _, o := range opts {
+		o(&cfg)
+	}
+
 	pkgs := map[string]*Package{}
 	nodes := map[string]map[string]*Node{}
 	// Track top-level test run counts per package to detect ptest/pxtest duplicates.
@@ -124,6 +168,14 @@ func BuildTree(events []TestEvent) []*Package {
 			resolvedSegments = resolveDuplicateSegments(segments, nmap)
 		}
 
+		// The index is keyed by the path go test would print for a first,
+		// undisambiguated run, so duplicate bookkeeping is stripped before
+		// lookup: a suite that runs twice declares its behaviors once.
+		cleanSegments := make([]string, len(resolvedSegments))
+		for i, seg := range resolvedSegments {
+			cleanSegments[i] = stripDuplicateSuffix(strings.TrimSuffix(seg, "\x00dup"))
+		}
+
 		for i := range resolvedSegments {
 			path := strings.Join(resolvedSegments[:i+1], "/")
 			if nmap[path] != nil {
@@ -132,7 +184,10 @@ func BuildTree(events []TestEvent) []*Package {
 			name := resolvedSegments[i]
 			// Strip #NN suffix from display for children of duplicate runs.
 			cleanName := stripDuplicateSuffix(name)
-			n := &Node{Name: cleanName}
+			n := &Node{
+				Name:        cleanName,
+				SourceLabel: cfg.decls.lookup(ev.Package, strings.Join(cleanSegments[:i+1], "/")).Label,
+			}
 			nmap[path] = n
 			if i == 0 {
 				pkg.Nodes = append(pkg.Nodes, n)
@@ -361,7 +416,14 @@ func classify(n *Node, topLevel bool) {
 			n.Display = strings.TrimSuffix(name, protocol.SuffixTestSuite)
 		default:
 			n.Kind = KindBlock
-			n.Display = strings.ReplaceAll(name, "_", " ")
+			// Prefer the description as written. Reconstructing it from the
+			// name turns every underscore into a space, which is right for the
+			// ones go test put there and wrong for the ones the developer did.
+			if n.SourceLabel != "" {
+				n.Display = n.SourceLabel
+			} else {
+				n.Display = strings.ReplaceAll(name, "_", " ")
+			}
 		}
 	}
 

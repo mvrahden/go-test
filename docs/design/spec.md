@@ -1091,6 +1091,8 @@ UserService
 
 Internally runs `go test -json`, parses the event stream, reconstructs the suite→method→When/It hierarchy from `/`-separated test paths, and strips Go naming conventions for display.
 
+**Labels come from the source.** A subtest name cannot be turned back into the description that produced it: `go test` writes an underscore for every space, so `returns snake_case keys` and `returns snake case keys` arrive as the same name. The renderer therefore reads the declared descriptions from source — the same walker that backs `--static` and `discover` — and shows each behavior under the words the developer actually wrote. Behaviors source cannot enumerate (a `When` behind a condition, a table that is not a literal), and streams rendered with `--input` where there is no source to read, fall back to reconstructing the label from the name, exactly as before. Subtest *names* are untouched either way, so `-run` filters, snapshot keys and saved baselines are unaffected.
+
 Output formats:
 
 ```bash

@@ -110,7 +110,10 @@ func staticBehaviorNodes(behaviors []*gotestast.Behavior) []*gotestspec.Node {
 		// because that is what an observed result is keyed by. The tree shows
 		// duplicates under the name the developer wrote, so it drops the
 		// suffix here exactly as the stream parser does.
-		node := &gotestspec.Node{Name: gotestspec.StripDuplicateSuffix(b.Name)}
+		node := &gotestspec.Node{
+			Name:        gotestspec.StripDuplicateSuffix(b.Name),
+			SourceLabel: b.Display,
+		}
 		node.Children = staticBehaviorNodes(b.Children)
 		out = append(out, node)
 	}

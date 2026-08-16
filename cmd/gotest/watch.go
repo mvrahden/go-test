@@ -169,6 +169,14 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode bool) 
 		}
 	}
 
+	// Only the spec view renders a tree, and reading the declarations costs a
+	// second walk of every test file — not something to repeat on each save
+	// when nothing will consume it.
+	var decls gotestspec.DeclarationIndex
+	if specMode {
+		decls = buildDeclarationIndex(loaded)
+	}
+
 	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, broken, cfg.Debug, cfg.NoCache)
 	if err != nil {
 		if jsonMode {
@@ -226,7 +234,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode bool) 
 			fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", perr)
 			return 2
 		}
-		gotestspec.RenderTerminal(os.Stdout, gotestspec.BuildTree(events))
+		gotestspec.RenderTerminal(os.Stdout, gotestspec.BuildTree(events, gotestspec.WithDeclarations(decls)))
 	}
 	return result.ExitCode
 }
