@@ -1151,7 +1151,7 @@ $ gotest discover ./...
 Emits the static suite model as JSON — the integration surface for editors and AI tooling (the VS Code extension's test explorer runs on it).
 No tests are executed.
 
-`behaviors` carries the `When`/`It` tree each method declares, read from source: `name` is the subtest segment `go test` will produce (so it matches an observed run byte for byte), `display` is the text the developer wrote, and `line` locates it. Two rewrites the source does not spell out are applied so that `name` really does match: a description repeated among its siblings gains the `#01` suffix the testing package appends, and a description containing a single slash becomes one node per level (a run of slashes, as in `https://`, is not a separator and stays within one level). `behaviorsComplete` reports whether that tree is exhaustive — `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears only once the method has run. Consumers must not present an incomplete list as the whole specification.
+`behaviors` carries the `When`/`It` tree each method declares, read from source: `name` is the subtest segment `go test` will produce (so it matches an observed run byte for byte), `display` is the text the developer wrote — the same string `gotest spec` renders for this node, so an editor showing both never spells one behavior two ways — `kind` names the call it came from (`when`, `it`, `each`), and `line` locates it. Two rewrites the source does not spell out are applied so that `name` really does match: a description repeated among its siblings gains the `#01` suffix the testing package appends, and a description containing a single slash becomes one node per level (a run of slashes, as in `https://`, is not a separator and stays within one level). `behaviorsComplete` reports whether that tree is exhaustive — `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears only once the method has run. Consumers must not present an incomplete list as the whole specification.
 
 ```
 { "packages": [ {
@@ -1163,7 +1163,7 @@ No tests are executed.
       "fixtures": ["E2ESetupFixture", …],
       "methods": [ { "name": …, "file": …, "line": …, "col": …,
                      "focused": bool, "excluded": bool, "parallel": bool,
-                     "behaviors": [ { "name": …, "display": …, "line": …,
+                     "behaviors": [ { "name": …, "display": …, "kind": …, "line": …,
                                       "children": [ … ] } ],
                      "behaviorsComplete": bool } ]
     } ]

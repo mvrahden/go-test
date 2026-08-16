@@ -73,10 +73,15 @@ type discoverMethod struct {
 
 // discoverBehavior mirrors one node of the specification a method declares.
 // Name is the subtest segment go test will produce, so it lines up with the
-// runtime tree byte for byte; Display is the text the developer wrote.
+// runtime tree byte for byte; Display is the text the developer wrote, the same
+// string `gotest spec` renders for this node. Kind names the call it came from,
+// which the names cannot say: a context and an expectation both arrive as
+// subtests, and a consumer that wants to tell them apart has nowhere else to
+// look.
 type discoverBehavior struct {
 	Name     string             `json:"name"`
 	Display  string             `json:"display"`
+	Kind     string             `json:"kind"`
 	Line     int                `json:"line"`
 	Children []discoverBehavior `json:"children,omitempty"`
 }
@@ -267,9 +272,23 @@ func discoverBehaviors(in []*gotestast.Behavior) []discoverBehavior {
 		out = append(out, discoverBehavior{
 			Name:     b.Name,
 			Display:  b.Display,
+			Kind:     behaviorKindString(b.Kind),
 			Line:     b.Line,
 			Children: discoverBehaviors(b.Children),
 		})
 	}
 	return out
+}
+
+func behaviorKindString(k gotestast.BehaviorKind) string {
+	switch k {
+	case gotestast.BehaviorWhen:
+		return "when"
+	case gotestast.BehaviorIt:
+		return "it"
+	case gotestast.BehaviorEach:
+		return "each"
+	default:
+		return ""
+	}
 }
