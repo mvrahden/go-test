@@ -33,22 +33,33 @@ applies EXCEPT these four, which fail there:
    `-test.timeout` kills it with no teardown, and so does any entry after
    a `-failfast` trip. Filter whole suites or methods only there.
 
-Sections tagged **v1.27+** below need v1.27.0 or newer and fail hard on
-v1.26.x rather than degrading: `SuiteConfig.Exclusive` is an unknown
-field there (compile error) and the `shared-fixture-undeclared` lint rule
-does not exist (its findings are simply never reported — do not rely on
-the linter for fixture-window mistakes on v1.26.x). Skip those sections
-on v1.26.x and earlier.
+Sections tagged **v1.27+** below need v1.27.0 or newer; skip them on
+v1.26.x and earlier. What v1.27 adds:
 
-Also v1.27+: `gotest spec --static` renders the specification from source
-without running anything, so you can read what a package promises before
-(or instead of) executing it. It reports on stderr any method whose
-behaviors it could not enumerate — a `When`/`It` inside a condition or a
-loop, a non-literal description, an `Each` over a non-literal table — so
-treat "incomplete:" lines as a prompt to write the behavior literally if
-you want it visible in tooling. `spec --input --render-only` exits 0 on a
-failing stream, for callers that render results rather than gate on them;
-without it `--input` exits 1 whenever the stream carries a failure.
+1. **`SuiteConfig.Exclusive`** — an unknown field on v1.26.x, so a suite
+   declaring it does not compile there.
+2. **The `shared-fixture-undeclared` lint rule** — absent on v1.26.x, and
+   absent silently: its findings are simply never reported, so do not
+   rely on the linter for fixture-window mistakes there.
+3. **`gotest spec --static`** — renders the specification from source
+   without running anything, so you can read what a package promises
+   before (or instead of) executing it. It reports on stderr any method
+   whose behaviors it could not enumerate — a `When`/`It` inside a
+   condition or a loop, a non-literal description, an `Each` over a
+   non-literal table — so treat "incomplete:" lines as a prompt to write
+   the behavior literally if you want it visible in tooling.
+4. **`spec --input --render-only`** — exits 0 on a failing stream, for
+   callers that render results rather than gate on them; without it
+   `--input` exits 1 whenever the stream carries a failure.
+5. **A duration on every `spec` row** — each row carries the wall clock
+   it occupied, never the sum of the rows beneath it. To find what is
+   slow, read top-down and stop where the children stop explaining the
+   parent; never add sibling durations up, because they overlap whenever
+   anything ran in parallel and their total can exceed the clock that
+   passed. A row larger than everything under it held that time itself:
+   a subprocess started in a `When` body, or a `BeforeAll`. On v1.26.x
+   only leaf rows carry a duration at all, so there the expensive test
+   can be the one showing nothing.
 
 Exit codes on v1.25.x are weaker than they look — never treat a green
 gotest exit alone as proof there: a package failing to compile mid-run, a

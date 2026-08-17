@@ -13,84 +13,51 @@ func (s *LintTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true}
 }
 
-func (s *LintTestSuite) TestAnalyzer(t *gotest.T) {
-	testdata := analysistest.TestData()
+// analysistest type-checks the fixture package and everything it imports, which
+// dwarfs the analysis itself: a package loaded on its own measured ~2.2s against
+// ~0.2s marginal once batched into a shared load. So the rules are grouped by
+// call, not split by rule.
+//
+// Two calls because a call has one mode. Checking fixes over the whole set would
+// demand a .golden for every broad fixture, tying sample's expected rewrite to
+// the fix output of every rule that fires in it.
 
-	t.When("sample code", func(w *gotest.T) {
-		w.It("detects violations", func(it *gotest.T) {
-			analysistest.Run(it.T(), testdata, lint.Analyzer, "sample")
+// diagnosticFixtures are the packages whose want comments are the whole
+// expectation; none of them records a suggested fix.
+var diagnosticFixtures = []string{
+	"sample",
+	"withtestify",
+	"withnolint",
+	"withforeign",
+	"withpollscope",
+	"withcleanup",
+	"withdirectcalls",
+	"withnolint_file",
+	"withsharedfixture",
+}
+
+// rewriteFixtures are the packages that additionally pin the rewrite a rule
+// offers, each against its own .golden.
+var rewriteFixtures = []string{
+	"withsimplify",
+	"withfailguard",
+	"withfailguard_noimport",
+	"withredundant",
+	"withtescape",
+}
+
+func (s *LintTestSuite) TestDiagnostics(t *gotest.T) {
+	t.When("every rule's fixture package", func(w *gotest.T) {
+		w.It("reports exactly the diagnostics its want comments declare", func(it *gotest.T) {
+			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, diagnosticFixtures...)
 		})
 	})
+}
 
-	t.When("testify imports", func(w *gotest.T) {
-		w.It("detects testify usage", func(it *gotest.T) {
-			analysistest.Run(it.T(), testdata, lint.Analyzer, "withtestify")
-		})
-	})
-
-	t.When("nolint comments", func(w *gotest.T) {
-		w.It("respects inline nolint", func(it *gotest.T) {
-			analysistest.Run(it.T(), testdata, lint.Analyzer, "withnolint")
-		})
-	})
-
-	t.When("foreign lookalikes", func(w *gotest.T) {
-		w.It("ignores assertion and polling names from other packages", func(it *gotest.T) {
-			analysistest.Run(it.T(), testdata, lint.Analyzer, "withforeign")
-		})
-	})
-
-	t.When("poll scope", func(w *gotest.T) {
-		w.It("detects poll scope violations", func(it *gotest.T) {
-			analysistest.Run(it.T(), testdata, lint.Analyzer, "withpollscope")
-		})
-	})
-
-	t.When("assertion simplify", func(w *gotest.T) {
-		w.It("detects sub-optimal assertion patterns", func(it *gotest.T) {
-			analysistest.RunWithSuggestedFixes(it.T(), testdata, lint.Analyzer, "withsimplify")
-		})
-	})
-
-	t.When("fail guard", func(w *gotest.T) {
-		w.It("detects if+Fail guards that assertions express directly", func(it *gotest.T) {
-			analysistest.RunWithSuggestedFixes(it.T(), testdata, lint.Analyzer, "withfailguard", "withfailguard_noimport")
-		})
-	})
-
-	t.When("assertion redundant", func(w *gotest.T) {
-		w.It("detects redundant guard assertions before stronger ones", func(it *gotest.T) {
-			analysistest.RunWithSuggestedFixes(it.T(), testdata, lint.Analyzer, "withredundant")
-		})
-	})
-
-	t.When("suite cleanup", func(w *gotest.T) {
-		w.It("detects .T().Cleanup in suite methods", func(it *gotest.T) {
-			analysistest.Run(it.T(), testdata, lint.Analyzer, "withcleanup")
-		})
-	})
-
-	t.When("suite direct calls", func(w *gotest.T) {
-		w.It("detects T.Parallel and T.Run in suite methods", func(it *gotest.T) {
-			analysistest.Run(it.T(), testdata, lint.Analyzer, "withdirectcalls")
-		})
-	})
-
-	t.When("t escape", func(w *gotest.T) {
-		w.It("detects unnecessary .T() escape and applies fixes", func(it *gotest.T) {
-			analysistest.RunWithSuggestedFixes(it.T(), testdata, lint.Analyzer, "withtescape")
-		})
-	})
-
-	t.When("file-level nolint", func(w *gotest.T) {
-		w.It("respects file-level nolint", func(it *gotest.T) {
-			analysistest.Run(it.T(), testdata, lint.Analyzer, "withnolint_file")
-		})
-	})
-
-	t.When("shared fixture declarations", func(w *gotest.T) {
-		w.It("flags undeclared shared fixture reads and exempts local construction", func(it *gotest.T) {
-			analysistest.Run(it.T(), testdata, lint.Analyzer, "withsharedfixture")
+func (s *LintTestSuite) TestSuggestedFixes(t *gotest.T) {
+	t.When("a rule that offers a rewrite", func(w *gotest.T) {
+		w.It("produces the fix recorded in the golden file", func(it *gotest.T) {
+			analysistest.RunWithSuggestedFixes(it.T(), analysistest.TestData(), lint.Analyzer, rewriteFixtures...)
 		})
 	})
 }

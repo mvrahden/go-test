@@ -21,6 +21,13 @@ import (
 // hang, and must not be executed by this backstop alarm.
 const childTimeout = 60 * time.Second
 
+// hangTimeout is the alarm for a child that can only be ended by it. A BeforeAll
+// that never returns wedges the binary, so unlike childTimeout this value is paid
+// in full on every run. 1s: the verdict lands at ~250ms — a 200ms budget plus
+// scheduling — and only that scheduling slack varies, because the two-step compile
+// below keeps build time out of the window.
+const hangTimeout = 1 * time.Second
+
 // childWallClock bounds the whole subprocess, so even a child that ignores its
 // own timeout cannot stall the parent run.
 const childWallClock = 90 * time.Second
@@ -45,11 +52,17 @@ type childRun struct {
 	output  string
 	elapsed time.Duration
 	passed  bool
+	timeout time.Duration
 }
 
 // runGeneratedSuite renders the harness for a testdata package, drops it next to
-// the sources inside the throwaway module and runs `go test` over it.
-func runGeneratedSuite(t *gotest.T, name string) childRun {
+// the sources inside the throwaway module and runs `go test` over it. The alarm
+// defaults to childTimeout; pass one only for a child that cannot exit on its own.
+func runGeneratedSuite(t *gotest.T, name string, timeout ...time.Duration) childRun {
+	limit := childTimeout
+	if len(timeout) > 0 {
+		limit = timeout[0]
+	}
 	dir := gotestgen.ExportTestPkgDir(t.T(), name)
 	pkg := gotestgen.ExportMustTestPkg(t.T(), name)
 
@@ -82,12 +95,12 @@ func runGeneratedSuite(t *gotest.T, name string) childRun {
 	defer cancel()
 
 	// -test.v keeps the suite's own stdout markers even when the child passes.
-	cmd := exec.CommandContext(ctx, bin, "-test.v", "-test.count=1", "-test.timeout="+childTimeout.String()) //nolint:gosec // G204: freshly compiled test binary
+	cmd := exec.CommandContext(ctx, bin, "-test.v", "-test.count=1", "-test.timeout="+limit.String()) //nolint:gosec // G204: freshly compiled test binary
 	cmd.Dir = dir
 
 	start := time.Now()
 	out, err := cmd.CombinedOutput()
-	run := childRun{output: string(out), elapsed: time.Since(start), passed: err == nil}
+	run := childRun{output: string(out), elapsed: time.Since(start), passed: err == nil, timeout: limit}
 
 	gotest.NoError(t, ctx.Err(), "child never exited on its own:\n%s", run.output)
 	return run
@@ -98,8 +111,8 @@ func runGeneratedSuite(t *gotest.T, name string) childRun {
 func assertNoDeadlock(t *gotest.T, run childRun) {
 	gotest.NotContains(t, run.output, "test timed out",
 		"suite cleanup deadlocked; the run was terminated by the -timeout alarm:\n%s", run.output)
-	gotest.Less(t, run.elapsed, childTimeout,
-		"child ran for %s, at or beyond its own -test.timeout of %s:\n%s", run.elapsed, childTimeout, run.output)
+	gotest.Less(t, run.elapsed, run.timeout,
+		"child ran for %s, at or beyond its own -test.timeout of %s:\n%s", run.elapsed, run.timeout, run.output)
 }
 
 func (s *ParallelLifecycleTestSuite) TestParallelSuccess(t *gotest.T) {

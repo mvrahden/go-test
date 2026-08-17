@@ -15,6 +15,10 @@ const (
 	ActionPass   Action = "pass"
 	ActionFail   Action = "fail"
 	ActionSkip   Action = "skip"
+	// A test that calls t.Parallel is parked and resumed, which is the one
+	// thing that makes its own timestamps untrustworthy — see Node.Paused.
+	ActionPause Action = "pause"
+	ActionCont  Action = "cont"
 )
 
 type TestEvent struct {

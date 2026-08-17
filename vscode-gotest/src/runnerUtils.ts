@@ -313,11 +313,15 @@ export function applyEvent(
 
   const duration =
     event.Elapsed !== undefined ? event.Elapsed * 1000 : undefined;
+  // The event's own clock, not ours: it brackets the node against every other
+  // node in the stream, including ones from suites running in other processes.
+  const stamp = Date.parse(event.Time);
+  const at = Number.isNaN(stamp) ? undefined : stamp;
 
   switch (event.Action) {
     case "pass":
       run.passed(item, duration);
-      controller.recordResult(item.id, "pass", duration);
+      controller.recordResult(item.id, "pass", duration, at);
       return { itemId: item.id, status: "pass", duration };
     case "fail": {
       const output = outputMap.get(event.Test) ?? "";
@@ -351,15 +355,24 @@ export function applyEvent(
         vscodeMessages.push(fallback);
       }
       run.failed(item, vscodeMessages, duration);
-      controller.recordResult(item.id, "fail", duration);
+      controller.recordResult(item.id, "fail", duration, at);
       return { itemId: item.id, status: "fail", duration };
     }
     case "skip":
       run.skipped(item);
-      controller.recordResult(item.id, "skip", undefined);
+      controller.recordResult(item.id, "skip", undefined, at);
       return { itemId: item.id, status: "skip", duration: undefined };
     case "run":
       run.started(item);
+      if (at !== undefined) {
+        controller.noteStart(item.id, at);
+      }
+      return undefined;
+    case "pause":
+    case "cont":
+      // The node called t.Parallel. That is the one fact its own timestamps
+      // cannot survive, so it has to be carried alongside them.
+      controller.notePaused(item.id);
       return undefined;
   }
 

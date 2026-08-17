@@ -1075,14 +1075,14 @@ Anything the tool cannot convert is annotated in place, so nothing is silently s
 ```
 $ gotest spec ./pkg/user
 
-UserService
-  Create
-    when email is valid
+UserService (133ms)
+  Create (128ms)
+    when email is valid (128ms)
       ✓ creates the user (8ms)
       ✓ sends a welcome email (120ms)
-    when email already exists
+    when email already exists (<1ms)
       ✓ returns ErrDuplicate (<1ms)
-  Delete
+  Delete (5ms)
     ✓ soft-deletes the user (5ms)
     ~ hard-deletes after 30 days — SKIPPED (<1ms)
 
@@ -1092,6 +1092,22 @@ UserService
 Internally runs `go test -json`, parses the event stream, reconstructs the suite→method→When/It hierarchy from `/`-separated test paths, and strips Go naming conventions for display.
 
 **Labels come from the source.** A subtest name cannot be turned back into the description that produced it: `go test` writes an underscore for every space, so `returns snake_case keys` and `returns snake case keys` arrive as the same name. The renderer therefore reads the declared descriptions from source — the same walker that backs `--static` and `discover` — and shows each behavior under the words the developer actually wrote. Behaviors source cannot enumerate (a `When` behind a condition, a table that is not a literal), and streams rendered with `--input` where there is no source to read, fall back to reconstructing the label from the name, exactly as before. Subtest *names* are untouched either way, so `-run` filters, snapshot keys and saved baselines are unaffected.
+
+### Durations
+
+Every row carries the wall clock it occupied, and never the sum of the rows beneath it.
+A sum is an integral over occupancy rather than an interval, so under parallelism it reports more time than the clock did: three 50ms methods sharing 58ms of one suite cost 58ms, not 160ms.
+The difference between a row and its children is therefore information — time the row held itself (the subprocess a `When` starts before its assertions), or children that overlapped.
+
+Which of a node's two measures says that depends on one fact about it.
+A node that called `t.Parallel` reports what `go test` measured, because its own bracket in the event stream is unusable twice over: it opens when the node was registered rather than when it began, and `go test` flushes a parked test's report through its parent, which can delay the close by however long a slower sibling runs — measured at 55s on a test that executed for 300ms.
+Every other node reports its bracket, because a measure that stops when the function returns cannot see parallel children — a suite of parallel methods measures ~0 — while the bracket encloses the whole subtree.
+Descendants of a parked node keep clean timestamps; only the parked node's own terminal event is delayed.
+
+A package row is not something that executes, so it is worth the clock during which one of its suites was running: the union of their windows, overlap counted once, which also drops the gap between windows when a tree holds results from more than one run.
+No row is ever shorter than what it contains — `go test` reports a parked node's measure to 10ms while a child's bracket is exact, so a row is floored by its children, which can only repair that rounding and never invent time.
+
+The same numbers reach `--format=md` and the `duration` field of `--format=json`, in seconds.
 
 Output formats:
 

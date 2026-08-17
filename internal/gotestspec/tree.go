@@ -72,12 +72,31 @@ type Node struct {
 	// revealed.
 	SourceLabel string
 	Status      Status
-	Duration    time.Duration
-	Output      []string
-	Children    []*Node
-	Focused     bool
-	Excluded    bool
-	External    bool
+	// Duration is what go test measured for this node alone. Start and End
+	// bracket it in the stream. Each is wrong in its own way and EffectiveDuration
+	// picks between them; see Paused.
+	Duration time.Duration
+	Start    time.Time
+	End      time.Time
+	// Paused records that the node called t.Parallel, so it was parked before it
+	// ran. That makes its own bracket meaningless twice over: Start is when it
+	// was registered rather than when it began, and go test flushes a parked
+	// test's report through its parent, which can delay End by however long a
+	// slower sibling runs — measured at 55s on a test that executed for 300ms.
+	// Its Duration is exact, though, because go test stops counting while parked.
+	//
+	// The inverse holds for a node that was never parked: its Duration stops
+	// when its function returns, which excludes any parallel children that run
+	// afterwards — a suite of parallel methods measures ~0 — while its bracket
+	// is clean, because go test reports a parent only once every descendant is
+	// done. Descendants of a parked node keep clean timestamps; only the parked
+	// node's own terminal event is delayed.
+	Paused   bool
+	Output   []string
+	Children []*Node
+	Focused  bool
+	Excluded bool
+	External bool
 	// Incomplete marks a node whose children are known not to be the whole
 	// list — a statically read method that declares behaviors whose names or
 	// existence depend on runtime values. A tree stream never sets it, because
@@ -154,7 +173,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			topRunCount[ev.Package][segments[0]]++
 			if topRunCount[ev.Package][segments[0]] > 1 {
 				// Create a duplicate node; children with #NN suffixes will attach here.
-				dup := &Node{Name: segments[0], duplicate: true}
+				dup := &Node{Name: segments[0], duplicate: true, Start: ev.Time}
 				dupPath := segments[0] + "\x00dup"
 				nmap[dupPath] = dup
 				pkg.Nodes = append(pkg.Nodes, dup)
@@ -208,9 +227,16 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 		switch ev.Action {
 		case ActionOutput:
 			node.Output = append(node.Output, ev.Output)
+		case ActionRun:
+			if node.Start.IsZero() {
+				node.Start = ev.Time
+			}
+		case ActionPause, ActionCont:
+			node.Paused = true
 		case ActionPass, ActionFail, ActionSkip:
 			node.Status = statusFrom(ev.Action)
 			node.Duration = elapsed(ev.Elapsed)
+			node.End = ev.Time
 		}
 	}
 
@@ -516,6 +542,134 @@ func statusFrom(a Action) Status {
 
 func elapsed(s float64) time.Duration {
 	return time.Duration(s * float64(time.Second))
+}
+
+// EffectiveDuration is the wall clock a node occupied: an interval, never a sum
+// of its children, which is an integral over occupancy and exceeds the clock as
+// soon as anything runs in parallel.
+//
+// Which of the node's two measures to believe follows from why each one lies.
+// A parked node reports what go test measured, because its bracket carries the
+// wait for a slot and go test's delayed flush. Everything else reports its
+// bracket, because a measure that stops when the function returns cannot see
+// parallel children, while the bracket encloses the whole subtree — and covers
+// work the node did outside any child, such as the subprocess a When starts
+// before its assertions.
+func EffectiveDuration(n *Node) time.Duration {
+	if n.Paused {
+		return max(n.Duration, childFloor(n))
+	}
+	if d, ok := bracket(n); ok {
+		return max(d, childFloor(n))
+	}
+	if len(n.Children) == 0 {
+		return n.Duration
+	}
+	// A tree assembled from something other than a stream — a static spec, a
+	// hand-built fixture — carries no timestamps. The subtree is then bounded
+	// below by both the node's own measure and its children's.
+	sum := time.Duration(0)
+	for _, c := range n.Children {
+		sum += EffectiveDuration(c)
+	}
+	return max(n.Duration, sum)
+}
+
+// childFloor is the least a node can have cost. A child runs inside its parent,
+// so the parent is at least as long as any single one of them, and at least as
+// long as the clock its placeable children occupied between them. Flooring by
+// that repairs the rounding go test applies to a parked node's measure — it
+// reports to 10ms, while a child's bracket is exact — without ever inventing
+// time, because neither bound can exceed what the parent actually ran for.
+func childFloor(n *Node) time.Duration {
+	var floor time.Duration
+	for _, c := range n.Children {
+		floor = max(floor, EffectiveDuration(c))
+	}
+	if d, ok := unionOf(n.Children); ok {
+		floor = max(floor, d)
+	}
+	return floor
+}
+
+func bracket(n *Node) (time.Duration, bool) {
+	if n.Start.IsZero() || n.End.IsZero() || n.End.Before(n.Start) {
+		return 0, false
+	}
+	return n.End.Sub(n.Start), true
+}
+
+// interval is the window a node occupied, for rows that have to be assembled
+// out of several nodes. A parked node cannot be placed on the clock at all —
+// its Duration says how long it ran but both its endpoints are unreliable — so
+// it declines rather than contributing a window in the wrong place. Nothing is
+// lost by that: only top-level nodes are ever unioned, and a suite is not
+// parked, so the parked methods inside it sit within a window that is.
+func interval(n *Node) (start, end time.Time, ok bool) {
+	if n.Paused || n.Start.IsZero() || n.End.IsZero() || n.End.Before(n.Start) {
+		return
+	}
+	return n.Start, n.End, true
+}
+
+// PackageDuration is how long a package was busy. A package is not something
+// that executes, so it has no bracket of its own — the runner dispatches its
+// suites among every other package's, and the summary event it emits carries
+// the sum of their process times rather than any interval. What is left, and
+// what is true, is the union of the windows its suites occupied.
+func PackageDuration(pkg *Package) time.Duration {
+	if d, ok := unionOf(pkg.Nodes); ok {
+		return d
+	}
+	return pkg.Duration
+}
+
+// TotalDuration is the union across every package: the wall clock during which
+// this run was executing something. Gaps are excluded, which is what makes the
+// number survive a tree holding results from more than one run.
+func TotalDuration(packages []*Package) time.Duration {
+	all := make([]*Node, 0, len(packages))
+	for _, pkg := range packages {
+		all = append(all, pkg.Nodes...)
+	}
+	if d, ok := unionOf(all); ok {
+		return d
+	}
+	var sum time.Duration
+	for _, pkg := range packages {
+		sum += pkg.Duration
+	}
+	return sum
+}
+
+// unionOf merges the nodes' windows and totals what is left. Overlap is counted
+// once: two suites that ran side by side for a second cost a second, not two.
+func unionOf(nodes []*Node) (time.Duration, bool) {
+	type window struct{ start, end time.Time }
+	windows := make([]window, 0, len(nodes))
+	for _, n := range nodes {
+		if s, e, ok := interval(n); ok {
+			windows = append(windows, window{s, e})
+		}
+	}
+	if len(windows) == 0 {
+		return 0, false
+	}
+	sort.Slice(windows, func(i, j int) bool { return windows[i].start.Before(windows[j].start) })
+
+	var total time.Duration
+	cur := windows[0]
+	for _, w := range windows[1:] {
+		if w.start.After(cur.end) {
+			total += cur.end.Sub(cur.start)
+			cur = w
+			continue
+		}
+		if w.end.After(cur.end) {
+			cur.end = w.end
+		}
+	}
+	return total + cur.end.Sub(cur.start), true
 }
 
 // ClassifyRoots applies the tree's naming rules — kind, display text, focus and

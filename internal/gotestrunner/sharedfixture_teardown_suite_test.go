@@ -107,7 +107,10 @@ func (s *SharedFixtureTeardownTestSuite) TestTeardownGetsItsConfiguredBudget(t *
 		// silently becomes the budget: a container fixture is given minutes to
 		// stop and gets killed part-way through instead, with the run still
 		// reporting success.
-		proc, marker, cancel := startSlowTeardown(w, 7*time.Second, 60*time.Second)
+		//
+		// 1s: long enough that the regression — a grace of zero — cannot let the
+		// teardown finish, and setup needs ~0.2s of the 10s budget.
+		proc, marker, cancel := startSlowTeardown(w, 1*time.Second, 10*time.Second)
 		cancel()
 		err := proc.Teardown()
 
