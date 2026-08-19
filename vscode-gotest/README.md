@@ -164,6 +164,7 @@ These can be set in `.vscode/settings.json` per workspace folder:
 | `gotest.coverOnSave` | `false` | Re-run package coverage when a `.go` file is saved |
 | `gotest.coverTestOnlyPackages` | `false` | Enable cross-package coverage instrumentation for test-only packages |
 | `gotest.debug.prepareTimeout` | `60` | Seconds to wait for debug preparation before timing out |
+| `gotest.discoveryTimeout` | `120` | Seconds to wait for test discovery before giving up (raise it for a very large workspace) |
 | `gotest.watch.scope` | `./...` | Default package scope for watch mode |
 
 ### Global settings (window scope)

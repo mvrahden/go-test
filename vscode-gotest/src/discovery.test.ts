@@ -54,6 +54,7 @@ vi.mock("./cli.js", () => ({
   buildCliCommand: async () => ({ bin: "go", args: ["run", "discover"] }),
   formatCliCommand: () => "go run discover",
   clearBinaryCache: mockClearBinaryCache,
+  scopedConfig: () => ({ get: () => undefined }),
   // Used by capture.js on a failed exit. A stub, not a copy: what it filters
   // out is pinned in specView.test.ts, where the real one interprets an exit.
   stripGoRunExitEcho: (stderr: string) => stderr.trim(),
@@ -218,10 +219,17 @@ describe("DiscoveryService", () => {
       expect(outputChannel.error).toHaveBeenCalledTimes(1);
     });
 
-    it("shows a warning toast to the user", () => {
+    it("shows a warning toast naming what went wrong", () => {
       expect(mockShowWarningMessage).toHaveBeenCalledTimes(1);
       expect(mockShowWarningMessage).toHaveBeenCalledWith(
-        expect.stringContaining("discovery failed"),
+        expect.stringContaining(
+          "discovery failed: exited with code 2: persistent failure",
+        ),
+        "Open Output",
+      );
+      // The toolchain advice belongs to a missing binary, not to this.
+      expect(mockShowWarningMessage).not.toHaveBeenCalledWith(
+        expect.stringContaining("Ensure 'go' is installed"),
         "Open Output",
       );
     });
@@ -306,16 +314,16 @@ describe("DiscoveryService", () => {
       script.always = { neverExits: true };
 
       const p = service.discover("/ws", ["./..."]);
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(120_000);
       await vi.advanceTimersByTimeAsync(2_000);
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(120_000);
       await vi.advanceTimersByTimeAsync(4_000);
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(120_000);
       await p;
 
       expect(mockKill).toHaveBeenCalledTimes(3);
       expect(outputChannel.error).toHaveBeenCalledWith(
-        expect.stringContaining("timed out after 30s"),
+        expect.stringContaining("timed out after 120s"),
       );
     });
   });
@@ -336,6 +344,10 @@ describe("DiscoveryService", () => {
       expect(mockClearBinaryCache).toHaveBeenCalledTimes(3);
       expect(outputChannel.error).toHaveBeenCalledWith(
         expect.stringContaining("ENOENT"),
+      );
+      expect(mockShowWarningMessage).toHaveBeenCalledWith(
+        expect.stringContaining("Ensure 'go' is installed"),
+        "Open Output",
       );
     });
   });

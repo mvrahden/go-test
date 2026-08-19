@@ -6,7 +6,12 @@ import type {
   DiscoverPackage,
   DiscoverWarning,
 } from "./types.js";
-import { buildCliCommand, clearBinaryCache, formatCliCommand } from "./cli.js";
+import {
+  buildCliCommand,
+  clearBinaryCache,
+  formatCliCommand,
+  scopedConfig,
+} from "./cli.js";
 import { captureStdout } from "./capture.js";
 
 export class DiscoveryCache implements vscode.Disposable {
@@ -263,7 +268,7 @@ export class DiscoveryService {
 
         const stdout = await captureStdout(cmd.bin, cmd.args, {
           cwd: workspaceDir,
-          timeoutSeconds: 30,
+          timeoutSeconds: discoveryTimeoutSeconds(workspaceDir),
         });
 
         const jsonStart = stdout.indexOf("{");
@@ -301,9 +306,15 @@ export class DiscoveryService {
         );
         if (!this.hasShownError) {
           this.hasShownError = true;
+          // Say what went wrong. The advice below is right for a missing
+          // toolchain and misleading for everything else — a timeout, a
+          // package that will not load — which is most of what lands here.
+          const advice = isENOENT
+            ? " Ensure 'go' is installed and the gotest module is accessible."
+            : "";
           vscode.window
             .showWarningMessage(
-              `gotest: discovery failed. Ensure 'go' is installed and the gotest module is accessible.`,
+              `gotest: discovery failed: ${message.split("\n")[0]}.${advice}`,
               "Open Output",
             )
             .then((choice) => {
@@ -315,4 +326,17 @@ export class DiscoveryService {
       }
     }
   }
+}
+
+// A discovery run compiles the CLI on a cold cache and then loads every package
+// in the workspace, so a monorepo can legitimately spend minutes here. The
+// budget is only there to stop a hung child from blocking discovery forever,
+// and it is raisable for a repository that needs longer.
+const DEFAULT_DISCOVERY_TIMEOUT_S = 120;
+
+function discoveryTimeoutSeconds(workspaceDir: string): number {
+  return (
+    scopedConfig(workspaceDir).get<number>("discoveryTimeout") ??
+    DEFAULT_DISCOVERY_TIMEOUT_S
+  );
 }

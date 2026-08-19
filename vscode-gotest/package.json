@@ -233,7 +233,14 @@
           "scope": "resource",
           "description": "Default package scope for watch mode"
         },
-        "gotest.forceKillTimeout": {
+        "gotest.discoveryTimeout": {
+      "type": "number",
+      "default": 120,
+      "minimum": 10,
+      "scope": "resource",
+      "description": "Seconds to wait for test discovery before giving up. A cold build cache or a very large workspace can legitimately need more"
+    },
+    "gotest.forceKillTimeout": {
           "type": "number",
           "default": 600,
           "minimum": 10,
