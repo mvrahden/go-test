@@ -17,7 +17,7 @@ type RunTestSuite struct{}
 // writeProbeModule materializes a one-file module whose stdlib-style test
 // triggers the migration-tier stdlib-test rule without importing gotest.
 func writeProbeModule(t *gotest.T, dir, testSource string) {
-	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.24\n"), 0o600))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.25\n"), 0o600))
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "probe_test.go"), []byte(testSource), 0o600))
 }
 
@@ -48,7 +48,7 @@ func (s *RunTestSuite) TestRun(t *gotest.T) {
 	t.When("a package is clean", func(w *gotest.T) {
 		w.Setenv("GOWORK", "off")
 		dir := w.TempDir()
-		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.24\n"), 0o600))
+		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.25\n"), 0o600))
 		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "probe.go"), []byte("package lintprobe\n\nvar x = 1\n"), 0o600))
 		findings, err := lint.Run(dir, []string{"./..."})
 

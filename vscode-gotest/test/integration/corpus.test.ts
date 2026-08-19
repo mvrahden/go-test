@@ -204,7 +204,7 @@ beforeAll(async () => {
   const workFile = path.join(tmp, "corpus.work");
   writeFileSync(
     workFile,
-    `go 1.24.0\n\nuse (\n\t${repoRoot}\n\t${fixturesDir}\n)\n`,
+    `go 1.25.0\n\nuse (\n\t${repoRoot}\n\t${fixturesDir}\n)\n`,
     "utf-8",
   );
 

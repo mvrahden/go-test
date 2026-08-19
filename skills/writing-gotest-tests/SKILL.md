@@ -74,7 +74,7 @@ no expanded value diffs.
 ## Bootstrap
 
 The repo has the *library*; the CLI runs via Go's tool directive (requires
-Go ≥ 1.24). One-time:
+Go ≥ 1.25). One-time:
 
 ```sh
 go get -tool github.com/mvrahden/go-test/cmd/gotest

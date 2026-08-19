@@ -28,7 +28,7 @@ howto:
 
 Plain `go test` carries you a long way — until you need setup that runs before every test, related cases grouped under a shared context, and output you can actually read. At that point most of us start hand-rolling lifecycle helpers and squinting at walls of `--- PASS` lines. In the next 10 minutes you'll go from `go install` to a structured test suite with lifecycle hooks, BDD-style grouping, and spec output — all running on standard `go test`.
 
-No prior gotest knowledge required. You need Go 1.24+ and a terminal.
+No prior gotest knowledge required. You need Go 1.25+ and a terminal.
 
 ## Install gotest
 

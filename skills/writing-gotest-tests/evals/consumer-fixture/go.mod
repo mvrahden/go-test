@@ -4,7 +4,7 @@
 // (post-v1.25.0) semantics apply.
 module example.com/shopd
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/mvrahden/go-test v1.25.0

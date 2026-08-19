@@ -17,7 +17,7 @@ type LintGitHubTestSuite struct{}
 // writeLintProbe materializes a one-file module whose stdlib-style test
 // triggers the stdlib-test rule without importing gotest.
 func writeLintProbe(t *gotest.T, dir string) {
-	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.24\n"), 0o600))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.25\n"), 0o600))
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "probe_test.go"), []byte("package lintprobe\n\nimport \"testing\"\n\nfunc TestProbe(t *testing.T) {\n\tt.Log(\"probe\")\n}\n"), 0o600))
 }
 
@@ -82,7 +82,7 @@ func (s *LintGitHubTestSuite) TestGitHubMode(t *gotest.T) {
 		summaryPath := filepath.Join(w.TempDir(), "step_summary.md")
 		w.Setenv("GITHUB_STEP_SUMMARY", summaryPath)
 		dir := w.TempDir()
-		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.24\n"), 0o600))
+		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.25\n"), 0o600))
 		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "probe.go"), []byte("package lintprobe\n\nvar x = 1\n"), 0o600))
 
 		var stdout, stderr bytes.Buffer
@@ -127,7 +127,7 @@ func (s *LintGitHubTestSuite) TestGitHubMode(t *gotest.T) {
 	t.When("the target does not compile", func(w *gotest.T) {
 		w.Setenv("GOWORK", "off")
 		dir := w.TempDir()
-		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.24\n"), 0o600))
+		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.25\n"), 0o600))
 		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "probe.go"), []byte("package lintprobe\n\nvar x int = \"nope\"\n"), 0o600))
 
 		var stdout, stderr bytes.Buffer

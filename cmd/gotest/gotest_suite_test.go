@@ -754,7 +754,7 @@ func (s *CmdGotestTestSuite) TestGenerateOverlay(t *gotest.T) {
 			gotest.NoError(it, err, "%v", err)
 			defer os.RemoveAll(tmpDir)
 
-			gotest.NoError(it, os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module nosuite\n\ngo 1.24\n"), 0600))
+			gotest.NoError(it, os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module nosuite\n\ngo 1.25\n"), 0600))
 			gotest.NoError(it, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0600))
 
 			loaded, _, err := gotestgen.LoadPackages([]string{tmpDir}, nil)

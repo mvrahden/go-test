@@ -18,7 +18,7 @@ type PreflightTestSuite struct{}
 // dir as its module root, so no chdir is needed and parallel suites stay
 // undisturbed.
 func writeModule(t *gotest.T, dir, source string) {
-	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module preflightprobe\n\ngo 1.24\n"), 0o600))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module preflightprobe\n\ngo 1.25\n"), 0o600))
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "probe.go"), []byte(source), 0o600))
 }
 

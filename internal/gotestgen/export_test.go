@@ -46,7 +46,7 @@ func loadAllTestPkgs() (map[string]*packages.Package, string, error) {
 	}
 	defer os.RemoveAll(scratch)
 
-	goMod := []byte("module testpkg\n\ngo 1.24\n\nrequire github.com/mvrahden/go-test v0.0.0\n\nreplace github.com/mvrahden/go-test => " + modRoot + "\n")
+	goMod := []byte("module testpkg\n\ngo 1.25\n\nrequire github.com/mvrahden/go-test v0.0.0\n\nreplace github.com/mvrahden/go-test => " + modRoot + "\n")
 	if err := os.WriteFile(filepath.Join(scratch, "go.mod"), goMod, 0600); err != nil {
 		return nil, "", err
 	}

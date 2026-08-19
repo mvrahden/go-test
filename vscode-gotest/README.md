@@ -30,7 +30,7 @@ The **Spec View** renders your test structure as a behavioral specification — 
 
 ### Prerequisites
 
-- **Go** (1.24+)
+- **Go** (1.25+)
 - **VS Code** (1.101+)
 - **[Delve](https://github.com/go-delve/delve)** (for debugging only)
 
@@ -220,7 +220,7 @@ The extension resolves the Go toolchain per workspace folder:
 ## Requirements
 
 - VS Code 1.101 or later
-- Go 1.24 or later
+- Go 1.25 or later
 - A Go project using [gotest](https://github.com/mvrahden/go-test) suites
 - [Delve](https://github.com/go-delve/delve) for debug support
 

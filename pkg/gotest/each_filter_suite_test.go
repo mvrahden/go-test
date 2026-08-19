@@ -52,7 +52,7 @@ func buildEachChild(t *gotest.T, dir, binDir string) string {
 	modRoot, err := filepath.Abs(filepath.Join("..", ".."))
 	gotest.NoError(t, err)
 
-	goMod := "module eachchild\n\ngo 1.24\n\nrequire github.com/mvrahden/go-test v0.0.0\n\nreplace github.com/mvrahden/go-test => " + modRoot + "\n"
+	goMod := "module eachchild\n\ngo 1.25\n\nrequire github.com/mvrahden/go-test v0.0.0\n\nreplace github.com/mvrahden/go-test => " + modRoot + "\n"
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o600))
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "each_test.go"), []byte(eachChildSource), 0o600))
 
