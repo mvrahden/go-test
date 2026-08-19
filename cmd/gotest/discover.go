@@ -168,7 +168,6 @@ func runDiscover(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 	}
 
 	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
 	if err := enc.Encode(out); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

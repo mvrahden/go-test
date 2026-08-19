@@ -1193,6 +1193,9 @@ File paths are basenames; positions are 1-based.
 `methods[].parallel` is reserved and always `false` (parallelism is a suite-level property).
 Respects `-tags`.
 
+Every JSON gotest emits — `discover`, `spec --format=json`, `summary --format=json`, `prepare` — is one compact line, not an indented document.
+The behavior trees carried here make indentation more than half the bytes, and the readers are programs; a human reading it by hand can pipe through `jq`.
+
 ---
 
 ## Debugging Shared Fixtures (`prepare`)

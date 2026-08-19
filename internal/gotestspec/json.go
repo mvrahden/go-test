@@ -78,7 +78,6 @@ func RenderJSON(w io.Writer, packages []*Package) {
 	}
 
 	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
 	_ = enc.Encode(root)
 }
 
