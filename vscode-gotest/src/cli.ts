@@ -310,3 +310,14 @@ export function clearBinaryCache(): void {
   clearGoBinaryCache();
   versionWarningShown = false;
 }
+
+// stripGoRunExitEcho drops the "exit status N" line `go run` appends to stderr
+// after any non-zero child. It restates the code the caller already has and
+// would otherwise bury the real diagnostic under it.
+export function stripGoRunExitEcho(stderr: string): string {
+  return stderr
+    .split("\n")
+    .filter((line) => !/^exit status \d+$/.test(line.trim()))
+    .join("\n")
+    .trim();
+}

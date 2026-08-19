@@ -1,19 +1,35 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockExecFileAsync, mockAccess, mockReadFile, mockShowWarningMessage } =
-  vi.hoisted(() => ({
-    mockExecFileAsync: vi.fn(
-      async (): Promise<{ stdout: string; stderr: string }> => ({
-        stdout: "{}",
-        stderr: "",
-      }),
-    ),
-    mockAccess: vi.fn(async () => {}),
-    mockReadFile: vi.fn(async (): Promise<string> => {
-      throw new Error("ENOENT");
-    }),
-    mockShowWarningMessage: vi.fn(async () => undefined),
-  }));
+// What the next spawned CLI does. `once` is consumed per run and `always` is
+// the fallback, so a test can queue a recovery in front of a standing failure.
+type ScriptedRun = {
+  stdout?: Array<string | Buffer>;
+  stderr?: string;
+  code?: number;
+  error?: NodeJS.ErrnoException;
+  neverExits?: boolean;
+};
+
+const {
+  script,
+  mockKill,
+  mockClearBinaryCache,
+  mockAccess,
+  mockReadFile,
+  mockShowWarningMessage,
+} = vi.hoisted(() => ({
+  script: {
+    once: [] as ScriptedRun[],
+    always: undefined as ScriptedRun | undefined,
+  },
+  mockKill: vi.fn(),
+  mockClearBinaryCache: vi.fn(),
+  mockAccess: vi.fn(async () => {}),
+  mockReadFile: vi.fn(async (): Promise<string> => {
+    throw new Error("ENOENT");
+  }),
+  mockShowWarningMessage: vi.fn(async () => undefined),
+}));
 
 vi.mock("vscode", () => ({
   workspace: {
@@ -40,16 +56,65 @@ vi.mock("node:fs/promises", () => ({
   readFile: mockReadFile,
 }));
 
+// Real streams, not a resolved value: the code under test reads its payload in
+// whatever pieces the pipe delivers, and that is the half of it worth testing.
 vi.mock("node:child_process", async () => {
-  const util = await import("node:util");
-  const execFileFn: Record<symbol, unknown> = vi.fn() as never;
-  execFileFn[util.promisify.custom] = mockExecFileAsync;
-  return { execFile: execFileFn };
+  const { PassThrough } = await import("node:stream");
+  const { EventEmitter } = await import("node:events");
+
+  return {
+    spawn: () => {
+      const run = script.once.shift() ??
+        script.always ?? { stdout: ['{"packages":[]}'] };
+      const child = new EventEmitter() as InstanceType<typeof EventEmitter> & {
+        stdout: InstanceType<typeof PassThrough>;
+        stderr: InstanceType<typeof PassThrough>;
+        kill: () => void;
+      };
+      child.stdout = new PassThrough();
+      child.stderr = new PassThrough();
+
+      const finish = () => {
+        child.stdout.end();
+        child.stderr.end();
+      };
+      child.kill = () => {
+        mockKill();
+        finish();
+      };
+
+      let ended = 0;
+      const closeWhenDrained = () => {
+        if (++ended === 2)
+          child.emit("close", run.error ? null : (run.code ?? 0));
+      };
+      child.stdout.on("end", closeWhenDrained);
+      child.stderr.on("end", closeWhenDrained);
+
+      // A microtask later: the caller attaches its listeners on return.
+      void Promise.resolve().then(() => {
+        if (run.error) {
+          child.emit("error", run.error);
+          finish();
+          return;
+        }
+        for (const chunk of run.stdout ?? []) child.stdout.write(chunk);
+        if (run.stderr) child.stderr.write(run.stderr);
+        if (!run.neverExits) finish();
+      });
+
+      return child;
+    },
+  };
 });
 
 vi.mock("./cli.js", () => ({
   buildCliCommand: async () => ({ bin: "go", args: ["run", "discover"] }),
   formatCliCommand: () => "go run discover",
+  clearBinaryCache: mockClearBinaryCache,
+  // A stub, not a copy: what it filters out is pinned where the real one is
+  // used to interpret an exit, in specView.test.ts.
+  stripGoRunExitEcho: (stderr: string) => stderr.trim(),
 }));
 
 import { DiscoveryCache, DiscoveryService } from "./discovery.js";
@@ -64,17 +129,32 @@ function makeOutputChannel() {
   } as unknown as import("vscode").LogOutputChannel;
 }
 
-function successResponse(pkgs: Array<{ importPath: string; dir: string }>) {
-  return {
-    stdout: JSON.stringify({
-      packages: pkgs.map((p) => ({
-        importPath: p.importPath,
-        dir: p.dir,
-        suites: [],
-      })),
-    }),
-    stderr: "",
-  };
+type Pkg = { importPath: string; dir: string };
+
+function discoverJson(pkgs: Pkg[]): string {
+  return JSON.stringify({
+    packages: pkgs.map((p) => ({
+      importPath: p.importPath,
+      dir: p.dir,
+      suites: [],
+    })),
+  });
+}
+
+function succeedsOnce(pkgs: Pkg[]) {
+  script.once.push({ stdout: [discoverJson(pkgs)] });
+}
+
+function succeedsAlways(pkgs: Pkg[]) {
+  script.always = { stdout: [discoverJson(pkgs)] };
+}
+
+function failsOnce(message: string) {
+  script.once.push({ code: 2, stderr: message });
+}
+
+function failsAlways(message: string) {
+  script.always = { code: 2, stderr: message };
 }
 
 describe("DiscoveryService", () => {
@@ -85,6 +165,8 @@ describe("DiscoveryService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    script.once = [];
+    script.always = undefined;
     mockAccess.mockResolvedValue(undefined);
     mockReadFile.mockRejectedValue(new Error("ENOENT"));
     cache = new DiscoveryCache();
@@ -97,9 +179,7 @@ describe("DiscoveryService", () => {
 
   describe("when discovery succeeds immediately", () => {
     it("updates the cache with discovered packages", async () => {
-      mockExecFileAsync.mockResolvedValueOnce(
-        successResponse([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]),
-      );
+      succeedsOnce([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]);
 
       await service.discover("/ws", ["./..."]);
 
@@ -108,9 +188,7 @@ describe("DiscoveryService", () => {
     });
 
     it("does not show a warning toast", async () => {
-      mockExecFileAsync.mockResolvedValueOnce(
-        successResponse([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]),
-      );
+      succeedsOnce([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]);
 
       await service.discover("/ws", ["./..."]);
 
@@ -118,9 +196,7 @@ describe("DiscoveryService", () => {
     });
 
     it("does not log at debug level", async () => {
-      mockExecFileAsync.mockResolvedValueOnce(
-        successResponse([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]),
-      );
+      succeedsOnce([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]);
 
       await service.discover("/ws", ["./..."]);
 
@@ -130,11 +206,8 @@ describe("DiscoveryService", () => {
 
   describe("when discovery fails transiently then recovers", () => {
     it("retries after 2s and updates cache on success", async () => {
-      mockExecFileAsync
-        .mockRejectedValueOnce(new Error("cannot find package"))
-        .mockResolvedValueOnce(
-          successResponse([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]),
-        );
+      failsOnce("cannot find package");
+      succeedsOnce([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]);
 
       const p = service.discover("/ws", ["./..."]);
       await vi.advanceTimersByTimeAsync(2_000);
@@ -144,11 +217,8 @@ describe("DiscoveryService", () => {
     });
 
     it("logs the transient failure at debug level", async () => {
-      mockExecFileAsync
-        .mockRejectedValueOnce(new Error("cannot find package"))
-        .mockResolvedValueOnce(
-          successResponse([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]),
-        );
+      failsOnce("cannot find package");
+      succeedsOnce([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]);
 
       const p = service.discover("/ws", ["./..."]);
       await vi.advanceTimersByTimeAsync(2_000);
@@ -160,11 +230,8 @@ describe("DiscoveryService", () => {
     });
 
     it("does not show a warning toast", async () => {
-      mockExecFileAsync
-        .mockRejectedValueOnce(new Error("cannot find package"))
-        .mockResolvedValueOnce(
-          successResponse([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]),
-        );
+      failsOnce("cannot find package");
+      succeedsOnce([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]);
 
       const p = service.discover("/ws", ["./..."]);
       await vi.advanceTimersByTimeAsync(2_000);
@@ -174,12 +241,9 @@ describe("DiscoveryService", () => {
     });
 
     it("recovers on third attempt after two failures", async () => {
-      mockExecFileAsync
-        .mockRejectedValueOnce(new Error("fail 1"))
-        .mockRejectedValueOnce(new Error("fail 2"))
-        .mockResolvedValueOnce(
-          successResponse([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]),
-        );
+      failsOnce("fail 1");
+      failsOnce("fail 2");
+      succeedsOnce([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]);
 
       const p = service.discover("/ws", ["./..."]);
       await vi.advanceTimersByTimeAsync(2_000);
@@ -194,7 +258,7 @@ describe("DiscoveryService", () => {
 
   describe("when all retry attempts fail", () => {
     beforeEach(async () => {
-      mockExecFileAsync.mockRejectedValue(new Error("persistent failure"));
+      failsAlways("persistent failure");
       const p = service.discover("/ws", ["./..."]);
       await vi.advanceTimersByTimeAsync(2_000);
       await vi.advanceTimersByTimeAsync(4_000);
@@ -232,7 +296,7 @@ describe("DiscoveryService", () => {
 
   describe("when discovery recovers after a previous total failure", () => {
     it("re-enables the warning toast for future failures", async () => {
-      mockExecFileAsync.mockRejectedValue(new Error("fail"));
+      failsAlways("fail");
 
       const p1 = service.discover("/ws", ["./..."]);
       await vi.advanceTimersByTimeAsync(2_000);
@@ -240,12 +304,10 @@ describe("DiscoveryService", () => {
       await p1;
       expect(mockShowWarningMessage).toHaveBeenCalledTimes(1);
 
-      mockExecFileAsync.mockResolvedValueOnce(
-        successResponse([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]),
-      );
+      succeedsOnce([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]);
       await service.discover("/ws", ["./..."]);
 
-      mockExecFileAsync.mockRejectedValue(new Error("fail again"));
+      failsAlways("fail again");
       const p3 = service.discover("/ws", ["./..."]);
       await vi.advanceTimersByTimeAsync(2_000);
       await vi.advanceTimersByTimeAsync(4_000);
@@ -255,13 +317,91 @@ describe("DiscoveryService", () => {
     });
   });
 
+  // The payload has no bound: it carries every behavior every suite declares.
+  // Reading it through a fixed buffer is what made a large repo undiscoverable,
+  // and the size below is past the 1 MiB such a read used to allow.
+  describe("when the CLI writes more than a buffered read would hold", () => {
+    it("keeps every package in a payload larger than 1 MiB", async () => {
+      const pkgs = Array.from({ length: 9_000 }, (_, i) => ({
+        importPath: `example.com/org/repo/internal/service/component${i}`,
+        dir: `/ws/internal/service/component${i}`,
+      }));
+      const json = discoverJson(pkgs);
+      expect(json.length).toBeGreaterThan(1024 * 1024);
+
+      const chunks: string[] = [];
+      for (let i = 0; i < json.length; i += 64 * 1024) {
+        chunks.push(json.slice(i, i + 64 * 1024));
+      }
+      script.once.push({ stdout: chunks });
+
+      await service.discover("/ws", ["./..."]);
+
+      expect(cache.packages).toHaveLength(9_000);
+      expect(outputChannel.error).not.toHaveBeenCalled();
+    });
+
+    // A read ends wherever the pipe filled, which can be mid-character. Decoding
+    // each chunk on its own would replace the halves with U+FFFD, and the id it
+    // corrupts is the one a run has to match to land on the same tree node.
+    it("decodes a character split across two reads", async () => {
+      const importPath = "example.com/café_日本語_🧪";
+      const json = discoverJson([{ importPath, dir: "/ws/unicode" }]);
+      const bytes = Buffer.from(json, "utf-8");
+      const split = Buffer.byteLength(json.slice(0, json.indexOf("日"))) + 1;
+      script.once.push({
+        stdout: [bytes.subarray(0, split), bytes.subarray(split)],
+      });
+
+      await service.discover("/ws", ["./..."]);
+
+      expect(cache.getPackage(importPath)).toBeDefined();
+    });
+  });
+
+  describe("when the CLI never finishes", () => {
+    it("kills it and reports the timeout", async () => {
+      script.always = { neverExits: true };
+
+      const p = service.discover("/ws", ["./..."]);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(4_000);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await p;
+
+      expect(mockKill).toHaveBeenCalledTimes(3);
+      expect(outputChannel.error).toHaveBeenCalledWith(
+        expect.stringContaining("timed out after 30000ms"),
+      );
+    });
+  });
+
+  // A missing binary arrives as an error event, not an exit code. The cached
+  // path has to be dropped either way, or every later run repeats the mistake.
+  describe("when the go binary has moved", () => {
+    it("clears the cached binary path", async () => {
+      const enoent: NodeJS.ErrnoException = new Error("spawn go ENOENT");
+      enoent.code = "ENOENT";
+      script.always = { error: enoent };
+
+      const p = service.discover("/ws", ["./..."]);
+      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(4_000);
+      await p;
+
+      expect(mockClearBinaryCache).toHaveBeenCalledTimes(3);
+      expect(outputChannel.error).toHaveBeenCalledWith(
+        expect.stringContaining("ENOENT"),
+      );
+    });
+  });
+
   describe("when a newer discovery request is queued during retry", () => {
     it("aborts the retry loop", async () => {
-      mockExecFileAsync
-        .mockRejectedValueOnce(new Error("transient"))
-        .mockResolvedValue(
-          successResponse([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]),
-        );
+      failsOnce("transient");
+      succeedsAlways([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]);
 
       const p1 = service.discover("/ws", ["./..."]);
       // While retrying, queue a second request for same workspace

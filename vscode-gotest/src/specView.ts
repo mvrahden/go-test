@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
-import { buildCliCommand } from "./cli.js";
+import { buildCliCommand, stripGoRunExitEcho } from "./cli.js";
 import { readModulePath } from "./gomod.js";
 import type { DiscoveryCache } from "./discovery.js";
 
@@ -382,13 +382,7 @@ export function interpretSpecExit(
   if (code === 0 || (code === 1 && stdout.trim() !== "")) {
     return { ok: true, stdout };
   }
-  // `go run` echoes "exit status N" after any non-zero child; it restates the
-  // code we already have and would otherwise bury the real diagnostic.
-  const detail = stderr
-    .split("\n")
-    .filter((line) => !/^exit status \d+$/.test(line.trim()))
-    .join("\n")
-    .trim();
+  const detail = stripGoRunExitEcho(stderr);
   const suffix = detail ? `: ${detail}` : "";
   return {
     ok: false,

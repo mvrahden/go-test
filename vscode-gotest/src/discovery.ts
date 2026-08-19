@@ -1,16 +1,18 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { access, readFile } from "node:fs/promises";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { spawn } from "node:child_process";
 import type {
   DiscoverOutput,
   DiscoverPackage,
   DiscoverWarning,
 } from "./types.js";
-import { buildCliCommand, clearBinaryCache, formatCliCommand } from "./cli.js";
-
-const execFileAsync = promisify(execFile);
+import {
+  buildCliCommand,
+  clearBinaryCache,
+  formatCliCommand,
+  stripGoRunExitEcho,
+} from "./cli.js";
 
 export class DiscoveryCache implements vscode.Disposable {
   private cache = new Map<string, DiscoverPackage>();
@@ -264,10 +266,7 @@ export class DiscoveryService {
         );
         this.outputChannel.info(`[discovery] ${formatCliCommand(cmd)}`);
 
-        const { stdout } = await execFileAsync(cmd.bin, cmd.args, {
-          cwd: workspaceDir,
-          timeout: 30_000,
-        });
+        const stdout = await captureStdout(cmd, workspaceDir);
 
         const jsonStart = stdout.indexOf("{");
         const json = jsonStart > 0 ? stdout.substring(jsonStart) : stdout;
@@ -318,4 +317,64 @@ export class DiscoveryService {
       }
     }
   }
+}
+
+const DISCOVERY_TIMEOUT_MS = 30_000;
+
+// captureStdout runs the CLI and streams what it writes. execFile would be
+// shorter, but its default 1 MiB cap is a ceiling discovery has no business
+// having: the payload grows with every behavior a repo declares, and one byte
+// past the cap killed the child mid-write and cost the whole test tree.
+function captureStdout(
+  cmd: { bin: string; args: string[] },
+  cwd: string,
+): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const child = spawn(cmd.bin, cmd.args, { cwd });
+    const stdout: string[] = [];
+    let stderr = "";
+    let timedOut = false;
+    let settled = false;
+
+    // Decode on the stream, not per chunk: a read boundary falls wherever the
+    // pipe fills, and a chunk-wise toString() would corrupt whatever multi-byte
+    // character it lands inside. Behavior names are the developer's own text.
+    child.stdout.setEncoding("utf-8");
+    child.stderr.setEncoding("utf-8");
+    child.stdout.on("data", (chunk: string) => stdout.push(chunk));
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, DISCOVERY_TIMEOUT_MS);
+
+    const settle = (outcome: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      outcome();
+    };
+
+    // A missing binary arrives here rather than as an exit code, and the caller
+    // reads `code` off the error to drop its cached path — so pass it through.
+    child.on("error", (err: Error) => settle(() => reject(err)));
+
+    child.on("close", (code) => {
+      settle(() => {
+        if (timedOut) {
+          reject(new Error(`timed out after ${DISCOVERY_TIMEOUT_MS}ms`));
+        } else if (code === 0) {
+          resolve(stdout.join(""));
+        } else {
+          const detail = stripGoRunExitEcho(stderr);
+          reject(
+            new Error(`exited with code ${code}${detail ? `: ${detail}` : ""}`),
+          );
+        }
+      });
+    });
+  });
 }
