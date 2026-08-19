@@ -429,8 +429,12 @@ export function spawnTestProcess(
     let lineBuffer = "";
     let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
 
-    child.stdout.on("data", (data: Buffer) => {
-      const chunk = data.toString();
+    // Decoded on the stream, so a character split across two reads survives:
+    // test output is the developer's own text, and the line assembly below
+    // would otherwise emit a corrupted event.
+    child.stdout.setEncoding("utf-8");
+    child.stderr.setEncoding("utf-8");
+    child.stdout.on("data", (chunk: string) => {
       stdout += chunk;
 
       if (onStdoutLine) {
@@ -446,8 +450,8 @@ export function spawnTestProcess(
       }
     });
 
-    child.stderr.on("data", (data: Buffer) => {
-      stderr += data.toString();
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
     });
 
     const cancelListener = token.onCancellationRequested(() => {

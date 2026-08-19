@@ -64,13 +64,18 @@ class WatchProcess implements vscode.Disposable {
     this.buffer = "";
     this.cycleBuffer = "";
 
-    this.child.stdout?.on("data", (data: Buffer) => {
-      this.buffer += data.toString();
+    // Decoded on the stream: the watcher runs for hours and its events arrive
+    // in whatever pieces the pipe delivers, boundaries falling mid-character.
+    this.child.stdout?.setEncoding("utf-8");
+    this.child.stderr?.setEncoding("utf-8");
+
+    this.child.stdout?.on("data", (chunk: string) => {
+      this.buffer += chunk;
       this.processBuffer();
     });
 
-    this.child.stderr?.on("data", (data: Buffer) => {
-      this.outputChannel.warn(`[watch] stderr: ${data.toString().trimEnd()}`);
+    this.child.stderr?.on("data", (chunk: string) => {
+      this.outputChannel.warn(`[watch] stderr: ${chunk.trimEnd()}`);
     });
 
     this.child.on("close", () => {

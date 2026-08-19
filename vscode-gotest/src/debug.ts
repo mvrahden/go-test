@@ -158,8 +158,10 @@ export class DebugLauncher implements vscode.Disposable {
         });
       });
 
-      child.stdout.on("data", (data: Buffer) => {
-        stdout += data.toString();
+      child.stdout.setEncoding("utf-8");
+      child.stderr.setEncoding("utf-8");
+      child.stdout.on("data", (chunk: string) => {
+        stdout += chunk;
         if (!settled && stdout.includes("\n")) {
           settle(() => {
             try {
@@ -177,11 +179,9 @@ export class DebugLauncher implements vscode.Disposable {
         }
       });
 
-      child.stderr.on("data", (data: Buffer) => {
-        stderr += data.toString();
-        this.outputChannel.debug(
-          `[debug:prepare] ${data.toString().trimEnd()}`,
-        );
+      child.stderr.on("data", (chunk: string) => {
+        stderr += chunk;
+        this.outputChannel.debug(`[debug:prepare] ${chunk.trimEnd()}`);
       });
 
       child.on("error", (err: Error) => {
