@@ -1,7 +1,7 @@
 # Go - Test Suites
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mvrahden/go-test/main/docs/static/gopher.png" alt="gotest gopher" width="360" />
+  <img src="https://raw.githubusercontent.com/mvrahden/go-test/main/site/static/gopher.png" alt="gotest gopher" width="360" />
 </p>
 
 Specification-driven test suites for Go.
