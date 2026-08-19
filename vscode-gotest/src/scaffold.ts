@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { spawn } from "node:child_process";
 import { buildCliCommand, formatCliCommand } from "./cli.js";
+import { captureStdout } from "./capture.js";
 
 export class ScaffoldCodeActionProvider
   implements vscode.CodeActionProvider, vscode.Disposable
@@ -143,7 +143,9 @@ export async function executeScaffold(
   outputChannel.info(`[scaffold] ${formatCliCommand(cmd)}`);
 
   try {
-    const stdout = await spawnScaffold(cmd, effectiveDir);
+    const stdout = await captureStdout(cmd.bin, cmd.args, {
+      cwd: effectiveDir,
+    });
     const match = /^Generated:\s*(.+)$/m.exec(stdout);
     if (match) {
       const generatedPath = match[1];
@@ -158,35 +160,4 @@ export async function executeScaffold(
     const message = err instanceof Error ? err.message : String(err);
     vscode.window.showErrorMessage(`gotest scaffold failed: ${message}`);
   }
-}
-
-function spawnScaffold(
-  cmd: { bin: string; args: string[] },
-  cwd: string,
-): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const child = spawn(cmd.bin, cmd.args, { cwd });
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout.on("data", (data: Buffer) => {
-      stdout += data.toString();
-    });
-
-    child.stderr.on("data", (data: Buffer) => {
-      stderr += data.toString();
-    });
-
-    child.on("close", (code) => {
-      if (code !== 0) {
-        reject(new Error(stderr || `scaffold exited with code ${code}`));
-      } else {
-        resolve(stdout);
-      }
-    });
-
-    child.on("error", (err: Error) => {
-      reject(err);
-    });
-  });
 }
