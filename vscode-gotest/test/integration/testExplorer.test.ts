@@ -381,3 +381,36 @@ async function waitFor<T>(probe: () => T | undefined, ms: number): Promise<T> {
     await new Promise((r) => setTimeout(r, 250));
   }
 }
+
+// The tree is rebuilt on a debounce, and activation restores stored results the
+// moment discovery returns — two small file reads later, well inside the
+// window. Every restore therefore ran against an empty tree and reported
+// "restored 0 of N", losing a session's results on every reload. Reading the
+// tree has to see the packages the cache already holds, whatever the timer is
+// doing.
+describe("the tree a restore runs against", () => {
+  it("holds the discovered packages as soon as discovery returns", async () => {
+    const recorder = createRecordingChannel();
+    const freshCache = new DiscoveryCache();
+    const freshController = new GoTestController(
+      freshCache,
+      new TestResultStore(undefined),
+      recorder.channel as never,
+      async () => {},
+      async () => {},
+      async () => {},
+      async () => {},
+    );
+    try {
+      await new DiscoveryService(
+        freshCache,
+        recorder.channel as never,
+      ).discover(fixturesDir);
+
+      // No rebuild() call and no sleep: this is the instant activation asks.
+      expect(freshController.findItem(pkg("passing"))).toBeDefined();
+    } finally {
+      freshController.dispose();
+    }
+  }, 300_000);
+});
