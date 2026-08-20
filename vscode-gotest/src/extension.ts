@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { DiscoveryCache, DiscoveryService } from "./discovery.js";
+import { DiscoverySnapshotStore } from "./discoverySnapshotStore.js";
 import { GoTestController } from "./testController.js";
 import { TestRunner } from "./runner.js";
 import { GoTestCodeLensProvider } from "./codeLens.js";
@@ -44,7 +45,12 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   const cache = new DiscoveryCache();
-  const discoveryService = new DiscoveryService(cache, outputChannel);
+  const snapshotStore = new DiscoverySnapshotStore(context.storageUri);
+  const discoveryService = new DiscoveryService(
+    cache,
+    outputChannel,
+    snapshotStore,
+  );
   const debugLauncher = new DebugLauncher(outputChannel);
   const testResultStore = new TestResultStore(context.storageUri);
   const registryDir =
@@ -189,6 +195,7 @@ export function activate(context: vscode.ExtensionContext): void {
       runRegistry.save(),
       coverageStore.flush(),
       testResultStore.flush(),
+      snapshotStore.flush(),
     ]);
   };
 
@@ -202,6 +209,7 @@ export function activate(context: vscode.ExtensionContext): void {
     cache,
     runRegistry,
     context,
+    snapshotStore,
   }).catch((err) => {
     outputChannel.error(`[activate] async initialization failed: ${err}`);
   });
@@ -588,6 +596,7 @@ async function initializeAsync(deps: {
   cache: DiscoveryCache;
   runRegistry: RunRegistry;
   context: vscode.ExtensionContext;
+  snapshotStore: DiscoverySnapshotStore;
 }): Promise<void> {
   const {
     workspaceFolders,
@@ -599,6 +608,7 @@ async function initializeAsync(deps: {
     cache,
     runRegistry,
     context,
+    snapshotStore,
   } = deps;
 
   const firstDir = workspaceFolders[0].uri.fsPath;
@@ -651,55 +661,115 @@ async function initializeAsync(deps: {
     },
   });
 
+  // The tree comes back from the last session before discovery runs. Discovery
+  // costs whatever the Go toolchain charges to load the workspace — seconds
+  // warm, tens of seconds on a cold build cache — and blocking the explorer on
+  // that made every activation as slow as the toolchain's worst case. The
+  // snapshot is stale by definition; the discovery below replaces it.
+  const snapshotStartedAt = Date.now();
+  await snapshotStore.load();
+  let restoredFromSnapshot = false;
+  for (const folder of workspaceFolders) {
+    const snapshot = snapshotStore.get(folder.uri.fsPath);
+    if (!snapshot || snapshot.packages.length === 0) continue;
+    cache.update(snapshot.packages, true, folder.uri.fsPath, snapshot.warnings);
+    restoredFromSnapshot = true;
+    outputChannel.info(
+      `[discovery] restored ${snapshot.packages.length} package(s) from snapshot in ` +
+        `${Date.now() - snapshotStartedAt}ms — refreshing in background`,
+    );
+  }
+
+  const restoreStored = async () => {
+    await restoreCoverage();
+    await restoreResults();
+  };
+  // With no snapshot there is no tree yet, and a restore would have nothing to
+  // decorate — it would only log a run of zeroes before discovery arrives.
+  if (restoredFromSnapshot) {
+    await restoreStored();
+  }
+
+  const before = treeSignature(cache);
   for (const folder of workspaceFolders) {
     await discoveryService.discover(folder.uri.fsPath);
   }
+  // Only worth redoing when discovery actually moved the tree: a restore
+  // against an unchanged tree would decorate the same items twice and leave a
+  // second "Restored Results" run behind for no reason.
+  if (treeSignature(cache) !== before) {
+    await restoreStored();
+  }
 
-  await coverageStore.load();
-  if (coverageStore.size > 0) {
-    const { coverages } = coverageStore.buildFileCoverages(cache);
-    if (coverages.length > 0) {
-      const request = new vscode.TestRunRequest();
-      const run = controller.createTestRun(request, "Restored Coverage");
-      for (const fc of coverages) {
-        run.addCoverage(fc);
+  async function restoreCoverage(): Promise<void> {
+    const coverageStartedAt = Date.now();
+    await coverageStore.load();
+    if (coverageStore.size > 0) {
+      const { coverages } = coverageStore.buildFileCoverages(cache);
+      if (coverages.length > 0) {
+        const request = new vscode.TestRunRequest();
+        const run = controller.createTestRun(request, "Restored Coverage");
+        for (const fc of coverages) {
+          run.addCoverage(fc);
+        }
+        run.end();
+        outputChannel.info(
+          `[coverage] restored ${coverages.length} file(s) from storage in ${Date.now() - coverageStartedAt}ms`,
+        );
       }
-      run.end();
-      outputChannel.info(
-        `[coverage] restored ${coverages.length} file(s) from storage`,
-      );
     }
   }
 
-  await testResultStore.load();
-  if (testResultStore.size > 0) {
-    const resultRequest = new vscode.TestRunRequest();
-    const resultRun = controller.createTestRun(
-      resultRequest,
-      "Restored Results",
-    );
-    let applied = 0;
-    testResultStore.forEach((result, itemId) => {
-      const item = controller.findItem(itemId);
-      // A stored id with no item is a test that no longer exists, or one the
-      // tree cannot name yet. Counting only what landed keeps the log honest:
-      // reporting the store's size implies a restore that may not have
-      // happened.
-      if (!item) return;
-      applied++;
-      if (result.status === "pass") resultRun.passed(item, result.duration);
-      else if (result.status === "fail")
-        resultRun.failed(
-          item,
-          [new vscode.TestMessage("(restored from previous session)")],
-          result.duration,
-        );
-      else if (result.status === "skip") resultRun.skipped(item);
-    });
-    resolveAncestorItems(resultRun, controller);
-    resultRun.end();
-    outputChannel.info(
-      `[results] restored ${applied} of ${testResultStore.size} result(s) from storage`,
-    );
+  async function restoreResults(): Promise<void> {
+    const resultsStartedAt = Date.now();
+    await testResultStore.load();
+    if (testResultStore.size > 0) {
+      const resultRequest = new vscode.TestRunRequest();
+      const resultRun = controller.createTestRun(
+        resultRequest,
+        "Restored Results",
+      );
+      let applied = 0;
+      testResultStore.forEach((result, itemId) => {
+        const item = controller.findItem(itemId);
+        // A stored id with no item is a test that no longer exists, or one the
+        // tree cannot name yet. Counting only what landed keeps the log honest:
+        // reporting the store's size implies a restore that may not have
+        // happened.
+        if (!item) return;
+        applied++;
+        if (result.status === "pass") resultRun.passed(item, result.duration);
+        else if (result.status === "fail")
+          resultRun.failed(
+            item,
+            [new vscode.TestMessage("(restored from previous session)")],
+            result.duration,
+          );
+        else if (result.status === "skip") resultRun.skipped(item);
+      });
+      resolveAncestorItems(resultRun, controller);
+      resultRun.end();
+      outputChannel.info(
+        `[results] restored ${applied} of ${testResultStore.size} result(s) from storage in ${Date.now() - resultsStartedAt}ms`,
+      );
+    }
   }
+}
+
+// treeSignature captures the shape the stored results were applied against —
+// package, suite and method names. Anything that changes an item's id changes
+// this, which is exactly when a restore has to run again.
+function treeSignature(cache: DiscoveryCache): string {
+  return cache.packages
+    .map(
+      (pkg) =>
+        `${pkg.importPath}:${(pkg.suites ?? [])
+          .map(
+            (s) =>
+              `${s.name}(${(s.methods ?? []).map((m) => m.name).join(",")})`,
+          )
+          .join("|")}`,
+    )
+    .sort()
+    .join("\n");
 }

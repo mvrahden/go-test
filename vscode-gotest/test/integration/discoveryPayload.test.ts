@@ -32,6 +32,7 @@ vi.mock("vscode", async () => {
 });
 
 import { DiscoveryCache, DiscoveryService } from "../../src/discovery.js";
+import { DiscoverySnapshotStore } from "../../src/discoverySnapshotStore.js";
 import { buildCliCommand } from "../../src/cli.js";
 import { createRecordingChannel } from "./vscodeStub.js";
 
@@ -53,6 +54,8 @@ let payloadDir: string;
 let savedGoWork: string | undefined;
 let cache: DiscoveryCache;
 let recorder: ReturnType<typeof createRecordingChannel>;
+let snapshots: DiscoverySnapshotStore;
+let storageDir: string;
 
 function generateSuites(): string {
   const lines = [
@@ -131,9 +134,14 @@ beforeAll(async () => {
 
   recorder = createRecordingChannel();
   cache = new DiscoveryCache();
-  await new DiscoveryService(cache, recorder.channel as never).discover(
-    payloadDir,
-  );
+  storageDir = mkdtempSync(path.join(tmpdir(), "gotest-snapshot-"));
+  snapshots = new DiscoverySnapshotStore({ fsPath: storageDir } as never);
+  await new DiscoveryService(
+    cache,
+    recorder.channel as never,
+    snapshots,
+  ).discover(payloadDir);
+  await snapshots.flush();
 }, 300_000);
 
 afterAll(() => {
@@ -179,4 +187,45 @@ describe("a payload larger than a buffered read", () => {
     expect(when?.children).toHaveLength(ROWS);
     expect(when?.children?.[0].children).toHaveLength(EXPECTATIONS);
   });
+});
+
+// The snapshot exists so the explorer does not wait on the Go toolchain. Its
+// whole claim is that a window can reopen with the same tree without loading a
+// single package — so the test rebuilds the tree from disk alone and compares
+// it to what discovery produced, on a payload of real size.
+describe("the tree the next activation starts from", () => {
+  it("is rebuilt from the snapshot without running the CLI", async () => {
+    const reopened = new DiscoverySnapshotStore({
+      fsPath: storageDir,
+    } as never);
+    await reopened.load();
+    const snapshot = reopened.get(payloadDir);
+    expect(snapshot).toBeDefined();
+
+    const restored = new DiscoveryCache();
+    restored.update(snapshot!.packages, true, payloadDir, snapshot!.warnings);
+
+    expect(restored.packages.map((p) => p.importPath).sort()).toEqual(
+      cache.packages.map((p) => p.importPath).sort(),
+    );
+    expect(restored.getPackage("gotest.payload")?.suites).toHaveLength(SUITES);
+  }, 60_000);
+
+  it("keeps the behaviors the tree renders, not just the suite names", async () => {
+    const reopened = new DiscoverySnapshotStore({
+      fsPath: storageDir,
+    } as never);
+    await reopened.load();
+    const restored = new DiscoveryCache();
+    const snapshot = reopened.get(payloadDir)!;
+    restored.update(snapshot.packages, true, payloadDir, snapshot.warnings);
+
+    const from = (c: DiscoveryCache) =>
+      c
+        .getPackage("gotest.payload")
+        ?.suites.find((s) => s.name === "Feature0TestSuite")?.methods[0]
+        .behaviors;
+
+    expect(from(restored)).toEqual(from(cache));
+  }, 60_000);
 });

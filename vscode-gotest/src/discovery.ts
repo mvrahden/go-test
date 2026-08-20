@@ -13,6 +13,7 @@ import {
   scopedConfig,
 } from "./cli.js";
 import { captureStdout } from "./capture.js";
+import type { DiscoverySnapshotStore } from "./discoverySnapshotStore.js";
 
 export class DiscoveryCache implements vscode.Disposable {
   private cache = new Map<string, DiscoverPackage>();
@@ -65,6 +66,24 @@ export class DiscoveryCache implements vscode.Disposable {
 
   getModuleDir(modulePath: string): string | undefined {
     return this.moduleDirs.get(modulePath);
+  }
+
+  /** Returns the packages discovered under a workspace dir. */
+  packagesForWorkspace(workspaceDir: string): DiscoverPackage[] {
+    const result: DiscoverPackage[] = [];
+    for (const [importPath, wsDir] of this.workspaceDirs) {
+      if (wsDir !== workspaceDir) continue;
+      const pkg = this.cache.get(importPath);
+      if (pkg) result.push(pkg);
+    }
+    return result;
+  }
+
+  /** Returns the warnings recorded for a workspace dir. */
+  warningsForWorkspace(workspaceDir: string): DiscoverWarning[] {
+    return this._warnings
+      .filter((w) => w._wsDir === workspaceDir)
+      .map(({ _wsDir, ...warning }) => warning);
   }
 
   /** Returns unique module paths for packages within a workspace dir. */
@@ -156,6 +175,7 @@ export class DiscoveryService {
   constructor(
     private readonly cache: DiscoveryCache,
     private readonly outputChannel: vscode.LogOutputChannel,
+    private readonly snapshots?: DiscoverySnapshotStore,
   ) {}
 
   async discover(workspaceDir: string, patterns?: string[]): Promise<void> {
@@ -264,21 +284,53 @@ export class DiscoveryService {
           workspaceDir,
           this.outputChannel,
         );
-        this.outputChannel.info(`[discovery] ${formatCliCommand(cmd)}`);
+        this.outputChannel.info(
+          `[discovery] ${formatCliCommand(cmd)} (cwd ${workspaceDir})`,
+        );
 
+        // Timed in three parts because they fail differently: a slow build is
+        // the toolchain's, a slow first-to-last byte is the CLI's, and slow
+        // parse/index time is ours. One total would hide which.
+        const startedAt = Date.now();
+        let firstByteMs = -1;
         const stdout = await captureStdout(cmd.bin, cmd.args, {
           cwd: workspaceDir,
           timeoutSeconds: discoveryTimeoutSeconds(workspaceDir),
+          onFirstByte: (ms) => {
+            firstByteMs = ms;
+          },
         });
+        const childMs = Date.now() - startedAt;
 
         const jsonStart = stdout.indexOf("{");
         const json = jsonStart > 0 ? stdout.substring(jsonStart) : stdout;
         const output: DiscoverOutput = JSON.parse(json);
+        const parsedMs = Date.now() - startedAt - childMs;
         const fullScan = effectivePatterns.some((p) => p.includes("..."));
         const warnings = output.warnings ?? [];
         const packages = output.packages ?? [];
+        const indexStartedAt = Date.now();
         this.cache.update(packages, fullScan, workspaceDir, warnings);
+        const indexMs = Date.now() - indexStartedAt;
+        const suites = packages.reduce(
+          (n, p) => n + (p.suites?.length ?? 0),
+          0,
+        );
+        this.outputChannel.info(
+          `[discovery] ${packages.length} package(s), ${suites} suite(s) in ` +
+            `${childMs}ms child (${firstByteMs < 0 ? "no output" : `${firstByteMs}ms to first byte`}), ` +
+            `${parsedMs}ms parse of ${stdout.length}B, ${indexMs}ms index`,
+        );
         this.hasShownError = false;
+        // Snapshot the workspace, not the response: this run may have matched
+        // a single package, and a snapshot standing in for the whole tree has
+        // to describe the whole tree.
+        this.snapshots?.update(
+          workspaceDir,
+          this.cache.packagesForWorkspace(workspaceDir),
+          this.cache.warningsForWorkspace(workspaceDir),
+        );
+        void this.snapshots?.save();
         for (const w of warnings) {
           const loc = w.file ? ` (${w.file}:${w.line ?? 0})` : "";
           this.outputChannel.warn(

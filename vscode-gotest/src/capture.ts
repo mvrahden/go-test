@@ -6,6 +6,11 @@ export interface CaptureOptions {
   // Wall-clock budget. Omitted means none — for a command whose duration is the
   // repository's business, not ours.
   timeoutSeconds?: number;
+  // Called once, when the child's first byte of stdout arrives. Under `go run`
+  // that byte lands only after the compile, so it splits build time from the
+  // work the command was asked to do — the one number that says which of the
+  // two a slow run was spending its time in.
+  onFirstByte?: (elapsedMs: number) => void;
 }
 
 // captureStdout runs a command and returns everything it wrote to stdout.
@@ -32,7 +37,15 @@ export function captureStdout(
     // lands inside. These payloads carry the developer's own text.
     child.stdout.setEncoding("utf-8");
     child.stderr.setEncoding("utf-8");
-    child.stdout.on("data", (chunk: string) => stdout.push(chunk));
+    const started = Date.now();
+    let sawFirstByte = false;
+    child.stdout.on("data", (chunk: string) => {
+      if (!sawFirstByte) {
+        sawFirstByte = true;
+        opts.onFirstByte?.(Date.now() - started);
+      }
+      stdout.push(chunk);
+    });
     child.stderr.on("data", (chunk: string) => {
       stderr += chunk;
     });

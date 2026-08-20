@@ -100,10 +100,31 @@ function failsAlways(message: string) {
   script.always = { code: 2, stderr: message };
 }
 
+function makeSnapshotSink() {
+  return {
+    updated: [] as { workspaceDir: string; importPaths: string[] }[],
+    saves: 0,
+    update(
+      workspaceDir: string,
+      packages: { importPath: string }[],
+      _warnings: unknown[],
+    ) {
+      this.updated.push({
+        workspaceDir,
+        importPaths: packages.map((p) => p.importPath),
+      });
+    },
+    async save() {
+      this.saves++;
+    },
+  };
+}
+
 describe("DiscoveryService", () => {
   let cache: DiscoveryCache;
   let outputChannel: ReturnType<typeof makeOutputChannel>;
   let service: DiscoveryService;
+  let snapshot: ReturnType<typeof makeSnapshotSink>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -114,9 +135,11 @@ describe("DiscoveryService", () => {
     mockReadFile.mockRejectedValue(new Error("ENOENT"));
     cache = new DiscoveryCache();
     outputChannel = makeOutputChannel();
+    snapshot = makeSnapshotSink();
     service = new DiscoveryService(
       cache,
       outputChannel as unknown as import("vscode").LogOutputChannel,
+      snapshot as never,
     );
   });
 
@@ -144,6 +167,36 @@ describe("DiscoveryService", () => {
       await service.discover("/ws", ["./..."]);
 
       expect(outputChannel.debug).not.toHaveBeenCalled();
+    });
+
+    it("persists a snapshot so the next activation has a tree", async () => {
+      succeedsOnce([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]);
+
+      await service.discover("/ws", ["./..."]);
+
+      expect(snapshot.updated).toEqual([
+        { workspaceDir: "/ws", importPaths: ["example.com/pkg"] },
+      ]);
+      expect(snapshot.saves).toBe(1);
+    });
+
+    it("snapshots the whole workspace after a single-package discovery", async () => {
+      succeedsOnce([
+        { importPath: "example.com/a", dir: "/ws/a" },
+        { importPath: "example.com/b", dir: "/ws/b" },
+      ]);
+      await service.discover("/ws", ["./..."]);
+      succeedsOnce([{ importPath: "example.com/a", dir: "/ws/a" }]);
+
+      await service.discoverPackage("/ws", "./a");
+
+      // The pattern matched one package, but the snapshot stands in for the
+      // whole tree — writing only the match would drop every other package
+      // from the next activation.
+      expect(snapshot.updated.at(-1)).toEqual({
+        workspaceDir: "/ws",
+        importPaths: ["example.com/a", "example.com/b"],
+      });
     });
   });
 
