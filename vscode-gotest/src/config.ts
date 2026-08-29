@@ -47,3 +47,10 @@ export function discoveryTimeoutSeconds(workspaceDir?: string): number {
     DEFAULT_DISCOVERY_TIMEOUT_S
   );
 }
+
+// `gotest spec --render-only` is a read, like discovery: it renders JSON it was
+// handed, but on a cold cache it still pays the same `go run` compile first. It
+// shares discovery's budget rather than introducing a sixth number.
+export function specRenderTimeoutSeconds(workspaceDir?: string): number {
+  return discoveryTimeoutSeconds(workspaceDir);
+}

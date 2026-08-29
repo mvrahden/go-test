@@ -2,6 +2,11 @@ import * as vscode from "vscode";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
 import { buildCliCommand, stripGoRunExitEcho } from "./cli.js";
+import { killProcessTree } from "./processTree.js";
+import {
+  CAPTURE_FORCE_KILL_GRACE_MS,
+  specRenderTimeoutSeconds,
+} from "./config.js";
 import { readModulePath } from "./gomod.js";
 import type { DiscoveryCache } from "./discovery.js";
 
@@ -324,10 +329,38 @@ ${SCRIPT}
       workspaceDir,
       this.outputChannel,
     );
+    const budgetSeconds = specRenderTimeoutSeconds(workspaceDir);
     return new Promise<string>((resolve, reject) => {
-      const child = spawn(cmd.bin, cmd.args, { cwd: workspaceDir });
+      // Detached, so the budget below can signal the compiled binary and not
+      // just the `go run` that launched it.
+      const child = spawn(cmd.bin, cmd.args, {
+        cwd: workspaceDir,
+        detached: true,
+      });
       let stdout = "";
       let stderr = "";
+      let timedOut = false;
+      let settled = false;
+      let escalation: ReturnType<typeof setTimeout> | undefined;
+
+      const settle = (outcome: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(budget);
+        clearTimeout(escalation);
+        outcome();
+      };
+
+      // Rendering is a read with no fixtures to tear down, so it gets a budget
+      // and a prompt escalation. Without them a wedged CLI left this promise
+      // pending forever and nothing could end the child.
+      const budget = setTimeout(() => {
+        timedOut = true;
+        escalation = setTimeout(() => {
+          if (!settled) killProcessTree(child, "SIGKILL");
+        }, CAPTURE_FORCE_KILL_GRACE_MS);
+        killProcessTree(child, "SIGTERM");
+      }, budgetSeconds * 1000);
 
       // Decoded on the stream: a spec tree is large enough to arrive in several
       // reads, and a boundary inside a multi-byte character would corrupt the
@@ -340,16 +373,30 @@ ${SCRIPT}
       child.stderr.on("data", (chunk: string) => {
         stderr += chunk;
       });
+      // Once we have given up, `exit` is enough: a surviving grandchild can hold
+      // the pipes open past it, and `close` would never arrive.
+      child.on("exit", () => {
+        if (!timedOut) return;
+        settle(() =>
+          reject(new Error(`spec render timed out after ${budgetSeconds}s`)),
+        );
+      });
       child.on("close", (code) => {
-        const outcome = interpretSpecExit(code, stdout, stderr);
-        if (outcome.ok) {
-          resolve(outcome.stdout);
-        } else {
-          reject(new Error(outcome.message));
-        }
+        settle(() => {
+          if (timedOut) {
+            reject(new Error(`spec render timed out after ${budgetSeconds}s`));
+            return;
+          }
+          const outcome = interpretSpecExit(code, stdout, stderr);
+          if (outcome.ok) {
+            resolve(outcome.stdout);
+          } else {
+            reject(new Error(outcome.message));
+          }
+        });
       });
       child.on("error", (err: Error) => {
-        reject(err);
+        settle(() => reject(err));
       });
 
       child.stdin.on("error", () => {});
