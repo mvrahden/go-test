@@ -58,7 +58,7 @@ jobs:
     needs: package
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: vsix
       - name: Upload .vsix to release
@@ -74,7 +74,7 @@ jobs:
       name: vscode-marketplace
       url: https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: vsix
       - working-directory: .
@@ -89,7 +89,7 @@ jobs:
       name: open-vsx
       url: https://open-vsx.org/extension/mvrahden/gotest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: vsix
       - working-directory: .
