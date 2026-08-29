@@ -65,12 +65,7 @@ export class FakeTestItem {
 }
 
 export type Verdict =
-  | "enqueued"
-  | "started"
-  | "passed"
-  | "failed"
-  | "errored"
-  | "skipped";
+  "enqueued" | "started" | "passed" | "failed" | "errored" | "skipped";
 
 // Records what a run reported, keyed by test item id. Later verdicts overwrite
 // earlier ones, which mirrors how the Test Explorer displays an item.

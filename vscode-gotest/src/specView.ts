@@ -367,8 +367,7 @@ export function encodeStateForScript(data: unknown): string {
 }
 
 export type SpecExitOutcome =
-  | { ok: true; stdout: string }
-  | { ok: false; message: string };
+  { ok: true; stdout: string } | { ok: false; message: string };
 
 // interpretSpecExit decides whether a finished `gotest spec --input=-` left a
 // usable spec behind. Exit 1 means the piped stream carried failures — a
@@ -799,8 +798,7 @@ function fmtTime(seconds: number): string {
 }
 
 type ReportRow =
-  | { label: string; time: string; result: string }
-  | { raw: string };
+  { label: string; time: string; result: string } | { raw: string };
 
 export function specDataToReport(
   data: SpecData,

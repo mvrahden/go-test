@@ -4,17 +4,40 @@ version: 2
 # embeds a copy of the compiler's type system, so a pin that drifts behind the
 # Go version CI tests stops being able to read what that Go writes. Keeping
 # them current is the only real defence, so let a bot do it.
+#
+# One group per ecosystem, so a week's updates arrive as one reviewable pull
+# request each instead of one per dependency.
 updates:
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: weekly
     groups:
-      golang-x:
+      go:
         patterns:
-          - golang.org/x/*
+          - "*"
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /vscode-gotest
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns:
+          - "*"
+    ignore:
+      # @types/node must track the Node bundled by the OLDEST VS Code we
+      # support — engines.vscode ^1.123.0 means Electron 42, Node 24 — not the
+      # newest published types: typing above the runtime lets the extension
+      # call APIs that are not there. Raise this only with engines.vscode.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
