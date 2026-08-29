@@ -668,7 +668,7 @@ async function initializeAsync(deps: {
   // that made every activation as slow as the toolchain's worst case. The
   // snapshot is stale by definition; the discovery below replaces it.
   const snapshotStartedAt = Date.now();
-  await snapshotStore.load();
+  await snapshotStore.load(workspaceFolders.map((f) => f.uri.fsPath));
   let restoredFromSnapshot = false;
   for (const folder of workspaceFolders) {
     const snapshot = snapshotStore.get(folder.uri.fsPath);

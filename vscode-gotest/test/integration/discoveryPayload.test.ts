@@ -198,7 +198,7 @@ describe("the tree the next activation starts from", () => {
     const reopened = new DiscoverySnapshotStore({
       fsPath: storageDir,
     } as never);
-    await reopened.load();
+    await reopened.load([payloadDir]);
     const snapshot = reopened.get(payloadDir);
     expect(snapshot).toBeDefined();
 
@@ -215,7 +215,7 @@ describe("the tree the next activation starts from", () => {
     const reopened = new DiscoverySnapshotStore({
       fsPath: storageDir,
     } as never);
-    await reopened.load();
+    await reopened.load([payloadDir]);
     const restored = new DiscoveryCache();
     const snapshot = reopened.get(payloadDir)!;
     restored.update(snapshot.packages, true, payloadDir, snapshot.warnings);
