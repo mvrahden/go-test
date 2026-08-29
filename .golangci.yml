@@ -1,5 +1,7 @@
+version: "2"
+
 linters:
-  disable-all: true
+  default: none
   enable:
     - bodyclose
     - errcheck
@@ -8,11 +10,21 @@ linters:
     - ineffassign
     - staticcheck
     - unused
-
-linters-settings:
-  gocritic:
-    enabled-tags:
-      - performance
-  gosec:
-    excludes:
-      - G104
+  settings:
+    gocritic:
+      enabled-tags:
+        - performance
+    gosec:
+      excludes:
+        # G104: errcheck already covers unhandled errors.
+        - G104
+        # G703: a developer CLI takes paths from the developer; taint analysis
+        # flags every os.ReadFile/WriteFile that reaches one.
+        - G703
+  # v2 dropped v1's built-in exclusions; these presets restore them.
+  exclusions:
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling

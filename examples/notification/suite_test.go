@@ -103,7 +103,7 @@ func (s *NotificationServiceTestSuite) TestNotificationPayload(t *gotest.T) {
 		})
 
 		t.It("matches the delivery summary snapshot", func(t *gotest.T) {
-			gotest.MatchSnapshot(t, formatSummary(delivered))
+			gotest.MatchSnapshot(t, formatSummary(&delivered))
 		})
 	})
 }

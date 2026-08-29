@@ -32,7 +32,7 @@ func (s *TokenValidatorTestSuite) TestValidateToken(t *gotest.T) {
 		_, err := s.validator.Validate(token)
 
 		t.It("returns a TokenExpiredError", func(t *gotest.T) {
-			gotest.ErrorAs[*TokenExpiredError](t, err)
+			_ = gotest.ErrorAs[*TokenExpiredError](t, err)
 		})
 		t.It("includes expiry in the error message", func(t *gotest.T) {
 			gotest.ErrorContains(t, err, "expired")

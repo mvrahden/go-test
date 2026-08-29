@@ -32,7 +32,7 @@ func runClean(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 				return nil
 			}
 			if about.PSuiteRegex.MatchString(d.Name()) {
-				if err := os.Remove(path); err != nil {
+				if err := os.Remove(path); err != nil { //nolint:gosec // G122: removes only our own generated files, under the module root
 					fmt.Fprintf(os.Stderr, "warning: %s\n", err)
 				} else {
 					fmt.Println(path)

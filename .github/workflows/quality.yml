@@ -28,10 +28,11 @@ jobs:
       - name: Vuln check
         run: make vuln
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          install-mode: goinstall
-          version: v1.64.8
+          # Must ship x/tools >= v0.46.0, the first that reads Go 1.27 export
+          # data. Bump this whenever the Go version above moves.
+          version: v2.13.2
           args: ./... ./examples/...
       - name: Lint (gotest)
         run: go run ./cmd/gotest lint ./... ./examples/...

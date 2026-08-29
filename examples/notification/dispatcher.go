@@ -59,7 +59,7 @@ func (d *dispatcher) DeliveryCount() int {
 	return int(d.count.Load())
 }
 
-func formatSummary(d delivery) string {
+func formatSummary(d *delivery) string {
 	return fmt.Sprintf("[%s] %s → %s", priorityLabel(d.Priority), d.Subject, d.To)
 }
 

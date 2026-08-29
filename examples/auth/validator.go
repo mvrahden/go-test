@@ -44,7 +44,7 @@ func (v *tokenValidator) Validate(token string) (*Claims, error) {
 		return nil, ErrTokenMalformed
 	}
 	var exp int64
-	fmt.Sscanf(parts[2], "%d", &exp)
+	_, _ = fmt.Sscanf(parts[2], "%d", &exp)
 	if time.Unix(exp, 0).Before(time.Now()) {
 		return nil, &TokenExpiredError{ExpiresAt: time.Unix(exp, 0)}
 	}
