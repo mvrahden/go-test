@@ -4,17 +4,24 @@ version: 2
 # embeds a copy of the compiler's type system, so a pin that drifts behind the
 # Go version CI tests stops being able to read what that Go writes. Keeping
 # them current is the only real defence, so let a bot do it.
+#
+# One group per ecosystem, so a week's updates arrive as one reviewable pull
+# request each instead of one per dependency.
 updates:
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: weekly
     groups:
-      golang-x:
+      go:
         patterns:
-          - golang.org/x/*
+          - "*"
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
