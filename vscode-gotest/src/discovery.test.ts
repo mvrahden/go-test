@@ -300,42 +300,43 @@ describe("DiscoveryService", () => {
 
   describe("when a suite has benchmarks", () => {
     it("carries the benchmarks array through into the cache", async () => {
-      mockExecFileAsync.mockResolvedValueOnce({
-        stdout: JSON.stringify({
-          packages: [
-            {
-              importPath: "example.com/pkg",
-              dir: "/ws/pkg",
-              suites: [
-                {
-                  name: "FooTestSuite",
-                  parallel: false,
-                  focused: false,
-                  excluded: false,
-                  guarded: false,
-                  file: "foo_test.go",
-                  line: 1,
-                  col: 1,
-                  lifecycle: [],
-                  fixtures: [],
-                  methods: [],
-                  benchmarks: [
-                    {
-                      name: "BenchmarkParse",
-                      parallel: false,
-                      focused: false,
-                      excluded: false,
-                      file: "foo_test.go",
-                      line: 8,
-                      col: 1,
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        }),
-        stderr: "",
+      script.once.push({
+        stdout: [
+          JSON.stringify({
+            packages: [
+              {
+                importPath: "example.com/pkg",
+                dir: "/ws/pkg",
+                suites: [
+                  {
+                    name: "FooTestSuite",
+                    parallel: false,
+                    focused: false,
+                    excluded: false,
+                    guarded: false,
+                    file: "foo_test.go",
+                    line: 1,
+                    col: 1,
+                    lifecycle: [],
+                    fixtures: [],
+                    methods: [],
+                    benchmarks: [
+                      {
+                        name: "BenchmarkParse",
+                        parallel: false,
+                        focused: false,
+                        excluded: false,
+                        file: "foo_test.go",
+                        line: 8,
+                        col: 1,
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          }),
+        ],
       });
 
       await service.discover("/ws", ["./..."]);

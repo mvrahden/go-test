@@ -317,7 +317,6 @@ export function buildBenchArgs(
   return ["bench", importPath, `-bench=${pattern}`];
 }
 
-
 export function scopedConfig(
   workspaceDir?: string,
 ): vscode.WorkspaceConfiguration {
