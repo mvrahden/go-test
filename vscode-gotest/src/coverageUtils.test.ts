@@ -9,8 +9,18 @@ const { script } = vi.hoisted(() => ({
   script: { once: [], always: undefined, calls: [] } as SpawnScript,
 }));
 
+// capture.ts reaches for stripGoRunExitEcho on any non-zero exit, so a factory
+// without it turns the first failure-path test into a TypeError instead of an
+// assertion.
+vi.mock("vscode", () => ({
+  workspace: { getConfiguration: () => ({ get: () => undefined }) },
+  Uri: { file: (p: string) => ({ fsPath: p }) },
+}));
+
 vi.mock("./cli.js", () => ({
   resolveGoBinary: async () => "/usr/bin/go",
+  stripGoRunExitEcho: (s: string) => s,
+  scopedConfig: () => ({ get: () => undefined }),
 }));
 
 vi.mock("node:child_process", async () => {

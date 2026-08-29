@@ -6,13 +6,9 @@ import type {
   DiscoverPackage,
   DiscoverWarning,
 } from "./types.js";
-import {
-  buildCliCommand,
-  clearBinaryCache,
-  formatCliCommand,
-  scopedConfig,
-} from "./cli.js";
-import { captureStdout } from "./capture.js";
+import { buildCliCommand, clearBinaryCache, formatCliCommand } from "./cli.js";
+import { captureStdout, CaptureTimeoutError } from "./capture.js";
+import { discoveryTimeoutSeconds } from "./config.js";
 import type { DiscoverySnapshotStore } from "./discoverySnapshotStore.js";
 
 export class DiscoveryCache implements vscode.Disposable {
@@ -319,7 +315,7 @@ export class DiscoveryService {
         this.outputChannel.info(
           `[discovery] ${packages.length} package(s), ${suites} suite(s) in ` +
             `${childMs}ms child (${firstByteMs < 0 ? "no output" : `${firstByteMs}ms to first byte`}), ` +
-            `${parsedMs}ms parse of ${stdout.length}B, ${indexMs}ms index`,
+            `${parsedMs}ms parse of ${Buffer.byteLength(stdout)}B, ${indexMs}ms index`,
         );
         this.hasShownError = false;
         // Snapshot the workspace, not the response: this run may have matched
@@ -330,7 +326,7 @@ export class DiscoveryService {
           this.cache.packagesForWorkspace(workspaceDir),
           this.cache.warningsForWorkspace(workspaceDir),
         );
-        void this.snapshots?.save();
+        this.snapshots?.save();
         for (const w of warnings) {
           const loc = w.file ? ` (${w.file}:${w.line ?? 0})` : "";
           this.outputChannel.warn(
@@ -345,7 +341,11 @@ export class DiscoveryService {
         if (isENOENT) {
           clearBinaryCache();
         }
-        if (attempt < DiscoveryService.MAX_RETRIES) {
+        // A timeout already spent the whole budget. Retrying spends it twice
+        // more for the same answer and pushes the first error the user sees
+        // out past six minutes.
+        const retryable = !(err instanceof CaptureTimeoutError);
+        if (retryable && attempt < DiscoveryService.MAX_RETRIES) {
           this.outputChannel.debug(
             `[discovery] attempt ${attempt}/${DiscoveryService.MAX_RETRIES} failed, retrying: ${message}`,
           );
@@ -354,7 +354,9 @@ export class DiscoveryService {
           continue;
         }
         this.outputChannel.error(
-          `[discovery] failed after ${DiscoveryService.MAX_RETRIES} attempts: ${message}`,
+          retryable
+            ? `[discovery] failed after ${DiscoveryService.MAX_RETRIES} attempts: ${message}`
+            : `[discovery] failed: ${message}`,
         );
         if (!this.hasShownError) {
           this.hasShownError = true;
@@ -375,20 +377,8 @@ export class DiscoveryService {
               }
             });
         }
+        return;
       }
     }
   }
-}
-
-// A discovery run compiles the CLI on a cold cache and then loads every package
-// in the workspace, so a monorepo can legitimately spend minutes here. The
-// budget is only there to stop a hung child from blocking discovery forever,
-// and it is raisable for a repository that needs longer.
-const DEFAULT_DISCOVERY_TIMEOUT_S = 120;
-
-function discoveryTimeoutSeconds(workspaceDir: string): number {
-  return (
-    scopedConfig(workspaceDir).get<number>("discoveryTimeout") ??
-    DEFAULT_DISCOVERY_TIMEOUT_S
-  );
 }

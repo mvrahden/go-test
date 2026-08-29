@@ -1,5 +1,17 @@
 import { spawn } from "node:child_process";
 import { stripGoRunExitEcho } from "./cli.js";
+import { killProcessTree } from "./processTree.js";
+import { CAPTURE_FORCE_KILL_GRACE_MS } from "./config.js";
+
+// CaptureTimeoutError marks the one failure that is not worth retrying: the
+// command was given its full budget and did not finish. Retrying spends the
+// budget again for the same answer.
+export class CaptureTimeoutError extends Error {
+  constructor(seconds: number) {
+    super(`timed out after ${seconds}s`);
+    this.name = "CaptureTimeoutError";
+  }
+}
 
 export interface CaptureOptions {
   cwd?: string;
@@ -26,7 +38,9 @@ export function captureStdout(
   opts: CaptureOptions = {},
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    const child = spawn(bin, args, { cwd: opts.cwd });
+    // Own process group, so the timeout below can signal the compiled binary
+    // and not just the `go run` that launched it.
+    const child = spawn(bin, args, { cwd: opts.cwd, detached: true });
     const stdout: string[] = [];
     let stderr = "";
     let timedOut = false;
@@ -50,18 +64,32 @@ export function captureStdout(
       stderr += chunk;
     });
 
+    let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
     const timer =
       opts.timeoutSeconds === undefined
         ? undefined
         : setTimeout(() => {
             timedOut = true;
-            child.kill();
+            // SIGTERM the group, then escalate. Without the escalation a child
+            // that ignores SIGTERM never closes its pipes, `close` never fires,
+            // and this promise never settles — which wedges the caller far more
+            // thoroughly than the slow command the budget was meant to bound.
+            //
+            // Armed before the signal, because a child that dies on SIGTERM
+            // settles us from inside the call below — and a timer armed after
+            // that would outlive the settle that was supposed to clear it.
+            forceKillTimer = setTimeout(() => {
+              if (settled) return;
+              killProcessTree(child, "SIGKILL");
+            }, CAPTURE_FORCE_KILL_GRACE_MS);
+            killProcessTree(child, "SIGTERM");
           }, opts.timeoutSeconds * 1000);
 
     const settle = (outcome: () => void) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearTimeout(forceKillTimer);
       outcome();
     };
 
@@ -69,10 +97,18 @@ export function captureStdout(
     // read `code` off the error to drop a cached path — so pass it through.
     child.on("error", (err: Error) => settle(() => reject(err)));
 
+    // `close` waits for the pipes, which is what we want for the output — but a
+    // surviving grandchild can hold them open forever. Once we have timed out
+    // the output is being discarded anyway, so `exit` is enough to settle.
+    child.on("exit", () => {
+      if (!timedOut) return;
+      settle(() => reject(new CaptureTimeoutError(opts.timeoutSeconds ?? 0)));
+    });
+
     child.on("close", (code) => {
       settle(() => {
         if (timedOut) {
-          reject(new Error(`timed out after ${opts.timeoutSeconds}s`));
+          reject(new CaptureTimeoutError(opts.timeoutSeconds ?? 0));
         } else if (code === 0) {
           resolve(stdout.join(""));
         } else {

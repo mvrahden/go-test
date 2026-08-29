@@ -9,7 +9,7 @@ const {
   mockReadFile,
   mockShowWarningMessage,
 } = vi.hoisted(() => ({
-  script: { once: [], always: undefined } as SpawnScript,
+  script: { once: [], always: undefined, calls: [] } as SpawnScript,
   mockKill: vi.fn(),
   mockClearBinaryCache: vi.fn(),
   mockAccess: vi.fn(async () => {}),
@@ -131,6 +131,7 @@ describe("DiscoveryService", () => {
     vi.useFakeTimers();
     script.once = [];
     script.always = undefined;
+    script.calls = [];
     mockAccess.mockResolvedValue(undefined);
     mockReadFile.mockRejectedValue(new Error("ENOENT"));
     cache = new DiscoveryCache();
@@ -368,13 +369,14 @@ describe("DiscoveryService", () => {
 
       const p = service.discover("/ws", ["./..."]);
       await vi.advanceTimersByTimeAsync(120_000);
-      await vi.advanceTimersByTimeAsync(2_000);
-      await vi.advanceTimersByTimeAsync(120_000);
-      await vi.advanceTimersByTimeAsync(4_000);
-      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(10_000);
       await p;
 
-      expect(mockKill).toHaveBeenCalledTimes(3);
+      // One attempt. A timeout already spent the full budget, so retrying it
+      // twice more only delays the message the user is waiting for.
+      expect(script.calls).toHaveLength(1);
+      expect(mockKill).toHaveBeenCalledTimes(1);
+      expect(mockKill).toHaveBeenCalledWith("SIGTERM");
       expect(outputChannel.error).toHaveBeenCalledWith(
         expect.stringContaining("timed out after 120s"),
       );
