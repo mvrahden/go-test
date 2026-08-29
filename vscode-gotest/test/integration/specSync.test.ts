@@ -45,14 +45,27 @@ beforeAll(() => {
   const dir = mkdtempSync(path.join(tmpdir(), "gotest-integration-"));
 
   realBinary = path.join(dir, "gotest-real");
-  const built = spawnSync("go", ["build", "-o", realBinary, "./cmd/gotest"], {
-    cwd: repoRoot,
-    encoding: "utf-8",
-  });
+  // Stamped, not left to the build's own pseudo-version: that is derived from
+  // the newest reachable tag, so once a release at or above MIN_CLI_VERSION
+  // exists the working-tree build outranks the floor and this fixture silently
+  // becomes a binary the extension accepts. A shallow CI checkout hides it and
+  // a local clone with tags does not.
+  const built = spawnSync(
+    "go",
+    [
+      "build",
+      "-ldflags",
+      "-X github.com/mvrahden/go-test/internal/about.Version=v1.0.0",
+      "-o",
+      realBinary,
+      "./cmd/gotest",
+    ],
+    { cwd: repoRoot, encoding: "utf-8" },
+  );
   expect(built.status, `go build failed: ${built.stderr}`).toBe(0);
 
-  // A build from a working tree reports a pseudo-version below MIN_CLI_VERSION,
-  // which the extension rejects — correctly, but that would silently turn the
+  // realBinary reports a version below MIN_CLI_VERSION, which the extension
+  // rejects — correctly, but that would silently turn the
   // cliPath axis into a second `go run` axis. The wrapper reports a releasable
   // version and delegates everything else to the real binary, so the axis tests
   // cliPath resolution rather than this tree's version string.
