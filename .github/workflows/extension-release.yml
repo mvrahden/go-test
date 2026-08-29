@@ -6,11 +6,12 @@ on:
       tag:
         required: true
         type: string
-    secrets:
-      VSCE_PAT:
-        required: true
-      OVSX_PAT:
-        required: true
+
+# VSCE_PAT and OVSX_PAT are NOT passed in by the caller: each lives in the
+# environment of the job that publishes with it, so neither token is readable
+# by any other job or workflow in this repository. Configure them under
+# Settings > Environments > vscode-marketplace / open-vsx; protection rules
+# there also gate these irreversible publishes.
 
 concurrency:
   group: extension-release
@@ -69,6 +70,9 @@ jobs:
   publish-marketplace:
     runs-on: ubuntu-latest
     needs: package
+    environment:
+      name: vscode-marketplace
+      url: https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -81,6 +85,9 @@ jobs:
   publish-openvsx:
     runs-on: ubuntu-latest
     needs: package
+    environment:
+      name: open-vsx
+      url: https://open-vsx.org/extension/mvrahden/gotest
     steps:
       - uses: actions/download-artifact@v4
         with:
