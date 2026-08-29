@@ -62,6 +62,7 @@ Tests appear in a structured tree: **Package > Suite > Method > Subtest**.
 Run or debug at any level — a single method, an entire suite, or all tests in a package.
 Multi-select is fully supported.
 Test results persist across sessions, so you see pass/fail state immediately after reopening the editor.
+The tree itself is restored from disk on startup, so suites are browsable straight away instead of waiting for the Go toolchain to finish discovery.
 
 ### CodeLens
 
@@ -165,6 +166,7 @@ These can be set in `.vscode/settings.json` per workspace folder:
 | `gotest.coverTestOnlyPackages` | `false` | Enable cross-package coverage instrumentation for test-only packages |
 | `gotest.debug.prepareTimeout` | `60` | Seconds to wait for debug preparation before timing out |
 | `gotest.discoveryTimeout` | `120` | Seconds to wait for test discovery before giving up (raise it for a very large workspace) |
+| `gotest.forceKillTimeout` | `600` | Seconds to wait after SIGTERM before sending SIGKILL to a cancelled process |
 | `gotest.watch.scope` | `./...` | Default package scope for watch mode |
 
 ### Global settings (window scope)
