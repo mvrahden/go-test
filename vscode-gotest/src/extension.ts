@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { DiscoveryCache, DiscoveryService } from "./discovery.js";
+import { treeSignature } from "./treeSignature.js";
 import { DiscoverySnapshotStore } from "./discoverySnapshotStore.js";
 import { GoTestController } from "./testController.js";
 import { TestRunner } from "./runner.js";
@@ -680,6 +681,13 @@ async function initializeAsync(deps: {
     );
   }
 
+  // Loaded once. Both load() implementations clear their map before reading,
+  // so calling them again after discovery would throw away anything a run
+  // started on the restored tree had recorded in the meantime — and the
+  // restored tree exists precisely so runs can start during discovery.
+  await coverageStore.load();
+  await testResultStore.load();
+
   const restoreStored = async () => {
     await restoreCoverage();
     await restoreResults();
@@ -690,20 +698,19 @@ async function initializeAsync(deps: {
     await restoreStored();
   }
 
-  const before = treeSignature(cache);
+  const before = treeSignature(cache.packages);
   for (const folder of workspaceFolders) {
     await discoveryService.discover(folder.uri.fsPath);
   }
   // Only worth redoing when discovery actually moved the tree: a restore
   // against an unchanged tree would decorate the same items twice and leave a
   // second "Restored Results" run behind for no reason.
-  if (treeSignature(cache) !== before) {
+  if (treeSignature(cache.packages) !== before) {
     await restoreStored();
   }
 
   async function restoreCoverage(): Promise<void> {
     const coverageStartedAt = Date.now();
-    await coverageStore.load();
     if (coverageStore.size > 0) {
       const { coverages } = coverageStore.buildFileCoverages(cache);
       if (coverages.length > 0) {
@@ -722,7 +729,6 @@ async function initializeAsync(deps: {
 
   async function restoreResults(): Promise<void> {
     const resultsStartedAt = Date.now();
-    await testResultStore.load();
     if (testResultStore.size > 0) {
       const resultRequest = new vscode.TestRunRequest();
       const resultRun = controller.createTestRun(
@@ -754,22 +760,4 @@ async function initializeAsync(deps: {
       );
     }
   }
-}
-
-// treeSignature captures the shape the stored results were applied against —
-// package, suite and method names. Anything that changes an item's id changes
-// this, which is exactly when a restore has to run again.
-function treeSignature(cache: DiscoveryCache): string {
-  return cache.packages
-    .map(
-      (pkg) =>
-        `${pkg.importPath}:${(pkg.suites ?? [])
-          .map(
-            (s) =>
-              `${s.name}(${(s.methods ?? []).map((m) => m.name).join(",")})`,
-          )
-          .join("|")}`,
-    )
-    .sort()
-    .join("\n");
 }
