@@ -1404,11 +1404,11 @@ func (s *CmdGotestTestSuite) TestBenchSaveAgainstGate(t *gotest.T) {
 
 		out, code := s.runCLIExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--spec", "--against="+firstPath)
 		gotest.Equal(it, 0, code)
-		// The spec tree's own trailing counts line ("N suites, N
-		// benchmarks: ...") must appear exactly once, with no second,
-		// stacked "N tests passed (...)" trailer from a separate
-		// RenderSummary call.
-		gotest.Contains(it, out, "benchmarks:")
+		// The spec tree's own trailing counts line must appear exactly
+		// once, with no second, stacked "N tests passed (...)" trailer
+		// from a separate RenderSummary call. Benchmarks carry no
+		// pass/fail verdicts, so this trailer ends after the counts.
+		gotest.Contains(it, out, "1 suites, 1 benchmarks")
 		gotest.NotContains(it, out, "tests passed (")
 	})
 }
