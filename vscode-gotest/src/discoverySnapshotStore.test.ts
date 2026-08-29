@@ -49,7 +49,8 @@ describe("DiscoverySnapshotStore", () => {
     ];
     const store = new DiscoverySnapshotStore(storage);
     store.update("/ws", [pkg("example.com/m/a")], warnings);
-    await store.save();
+    store.save();
+    await store.flush();
 
     const reloaded = new DiscoverySnapshotStore(storage);
     await reloaded.load();
@@ -62,7 +63,8 @@ describe("DiscoverySnapshotStore", () => {
     const store = new DiscoverySnapshotStore(storage);
     store.update("/ws1", [pkg("example.com/m/a")], []);
     store.update("/ws2", [pkg("example.com/m/b")], []);
-    await store.save();
+    store.save();
+    await store.flush();
 
     const reloaded = new DiscoverySnapshotStore(storage);
     await reloaded.load();
@@ -75,7 +77,8 @@ describe("DiscoverySnapshotStore", () => {
     const store = new DiscoverySnapshotStore(storage);
     store.update("/ws", [pkg("example.com/m/a"), pkg("example.com/m/b")], []);
     store.update("/ws", [pkg("example.com/m/a")], []);
-    await store.save();
+    store.save();
+    await store.flush();
 
     const reloaded = new DiscoverySnapshotStore(storage);
     await reloaded.load();
@@ -107,7 +110,8 @@ describe("DiscoverySnapshotStore", () => {
   it("never touches disk without a storage location", async () => {
     const store = new DiscoverySnapshotStore(undefined);
     store.update("/ws", [pkg("example.com/m/a")], []);
-    await expect(store.save()).resolves.toBeUndefined();
+    store.save();
+    await expect(store.flush()).resolves.toBeUndefined();
     await expect(store.load()).resolves.toBeUndefined();
     expect(mockWriteFile).not.toHaveBeenCalled();
     expect(mockReadFile).not.toHaveBeenCalled();
@@ -116,9 +120,50 @@ describe("DiscoverySnapshotStore", () => {
   it("writes compactly", async () => {
     const store = new DiscoverySnapshotStore(storage);
     store.update("/ws", [pkg("example.com/m/a")], []);
-    await store.save();
+    store.save();
+    await store.flush();
     // A large project's snapshot is megabytes; indentation is pure cost on a
     // file written after every discovery.
     expect(files.get(SNAPSHOT)).not.toContain("\n");
+  });
+});
+
+describe("DiscoverySnapshotStore write behaviour", () => {
+  beforeEach(() => {
+    files.clear();
+    vi.clearAllMocks();
+  });
+
+  // Every save of a _test.go file rediscovers its package, and each one used to
+  // rewrite the whole workspace tree synchronously.
+  it("coalesces a burst of saves into one write", async () => {
+    const store = new DiscoverySnapshotStore(storage);
+    for (let i = 0; i < 5; i++) {
+      store.update("/ws", [pkg(`example.com/m/p${i}`)], []);
+      store.save();
+    }
+    await store.flush();
+    expect(mockWriteFile).toHaveBeenCalledTimes(1);
+  });
+
+  // activate() registers the file watchers before initializeAsync awaits the
+  // load, so a save in that window produces a discovery whose result must not
+  // be thrown away by the load that arrives afterwards.
+  it("does not let a late load discard what discovery already found", async () => {
+    files.set(
+      SNAPSHOT,
+      JSON.stringify({
+        version: 1,
+        workspaces: {
+          "/ws": { packages: [pkg("example.com/m/stale")], warnings: [] },
+        },
+      }),
+    );
+
+    const store = new DiscoverySnapshotStore(storage);
+    store.update("/ws", [pkg("example.com/m/fresh")], []);
+    await store.load();
+
+    expect(store.get("/ws")?.packages).toEqual([pkg("example.com/m/fresh")]);
   });
 });
