@@ -57,6 +57,15 @@ func fileMutex(path string) *sync.Mutex {
 	return mu.(*sync.Mutex)
 }
 
+// indentJSON pretty-prints valid JSON; anything else is returned verbatim.
+func indentJSON(b []byte) string {
+	var buf bytes.Buffer
+	if err := json.Indent(&buf, b, "", "  "); err != nil {
+		return string(b)
+	}
+	return buf.String()
+}
+
 func snapshotContent(value any) (string, error) {
 	if value == nil {
 		return "", fmt.Errorf("unsupported snapshot value: nil")
@@ -69,6 +78,10 @@ func snapshotContent(value any) (string, error) {
 		return v, nil
 	case []byte:
 		return string(v), nil
+	case json.RawMessage:
+		// Explicit: since Go 1.27 (jsonv2) RawMessage aliases jsontext.Value,
+		// which has String() and would otherwise take the Stringer branch.
+		return indentJSON(v), nil
 	case encoding.TextMarshaler:
 		b, err := v.MarshalText()
 		if err != nil {
@@ -82,11 +95,7 @@ func snapshotContent(value any) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("MarshalJSON failed: %w", err)
 		}
-		var buf bytes.Buffer
-		if err := json.Indent(&buf, b, "", "  "); err == nil {
-			return buf.String(), nil
-		}
-		return string(b), nil
+		return indentJSON(b), nil
 	case error:
 		return v.Error(), nil
 	case io.Reader:

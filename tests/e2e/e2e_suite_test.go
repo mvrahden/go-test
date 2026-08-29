@@ -388,6 +388,9 @@ func normalizeJSONOutput(raw string) string {
 			continue
 		}
 		ev["Time"] = "<TIMESTAMP>"
+		// Go 1.27's test2json tags output events with OutputType; older
+		// toolchains omit it. Drop it so one golden fits every Go version.
+		delete(ev, "OutputType")
 		if _, ok := ev["Elapsed"]; ok {
 			ev["Elapsed"] = "<TIMESTAMP>"
 		}
