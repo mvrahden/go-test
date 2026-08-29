@@ -1,6 +1,11 @@
 name: test
 
 on:
+  # main is tested after merge too: a direct push, or a merge result that no
+  # pull request ever built, otherwise reaches a release unverified.
+  push:
+    branches: [main]
+    paths-ignore: [vscode-gotest/**]
   pull_request:
     types: [opened, synchronize, reopened]
     paths-ignore: [vscode-gotest/**]

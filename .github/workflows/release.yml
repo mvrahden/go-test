@@ -18,7 +18,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: stable
+          # Pinned, not "stable": a release must never be the first
+          # place a new toolchain runs. Keep in step with quality.yml.
+          go-version: "1.27"
       - run: go vet ./... ./examples/...
       - run: go test -ldflags=-checklinkname=0 ./... -race
       - run: go run ./cmd/gotest spec --no-color --min=40 ./... ./examples/... -race
@@ -45,7 +47,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: stable
+          # Pinned, not "stable": a release must never be the first
+          # place a new toolchain runs. Keep in step with quality.yml.
+          go-version: "1.27"
       - name: Build
         env:
           GOOS: ${{ matrix.goos }}
