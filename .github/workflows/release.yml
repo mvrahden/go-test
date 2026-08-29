@@ -86,5 +86,5 @@ jobs:
     with:
       tag: ${{ github.event.release.tag_name }}
     secrets:
-      VSCE_PAT: ${{ secrets.VSCE_PAT }}
-      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+      MARKETPLACE_TOKEN: ${{ secrets.VSCE_PAT }}
+      OPENVSX_TOKEN: ${{ secrets.OVSX_PAT }}

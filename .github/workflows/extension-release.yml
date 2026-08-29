@@ -7,9 +7,9 @@ on:
         required: true
         type: string
     secrets:
-      VSCE_PAT:
+      MARKETPLACE_TOKEN:
         required: true
-      OVSX_PAT:
+      OPENVSX_TOKEN:
         required: true
 
 concurrency:
@@ -78,13 +78,14 @@ jobs:
         with:
           name: vsix
       - name: Require a marketplace token
+        working-directory: .
         env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          VSCE_PAT: ${{ secrets.MARKETPLACE_TOKEN }}
         run: test -n "$VSCE_PAT" || { echo "::error::VSCE_PAT is empty — the token never reached this job"; exit 1; }
       - working-directory: .
         run: npx @vscode/vsce publish --no-dependencies --packagePath *.vsix
         env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          VSCE_PAT: ${{ secrets.MARKETPLACE_TOKEN }}
 
   publish-openvsx:
     runs-on: ubuntu-latest
@@ -98,10 +99,11 @@ jobs:
         with:
           name: vsix
       - name: Require an Open VSX token
+        working-directory: .
         env:
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          OVSX_PAT: ${{ secrets.OPENVSX_TOKEN }}
         run: test -n "$OVSX_PAT" || { echo "::error::OVSX_PAT is empty — the token never reached this job"; exit 1; }
       - working-directory: .
         run: npx ovsx publish *.vsix
         env:
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          OVSX_PAT: ${{ secrets.OPENVSX_TOKEN }}
