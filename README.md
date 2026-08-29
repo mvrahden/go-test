@@ -4,7 +4,7 @@
   <img src="https://raw.githubusercontent.com/mvrahden/go-test/main/site/static/gopher.png" alt="gotest gopher" width="360" />
 </p>
 
-[![CI](https://github.com/mvrahden/go-test/actions/workflows/test.yml/badge.svg)](https://github.com/mvrahden/go-test/actions/workflows/test.yml)
+[![CI](https://github.com/mvrahden/go-test/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/mvrahden/go-test/actions/workflows/test.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/mvrahden/go-test.svg)](https://pkg.go.dev/github.com/mvrahden/go-test)
 [![Quality](https://github.com/mvrahden/go-test/actions/workflows/quality.yml/badge.svg?branch=main)](https://github.com/mvrahden/go-test/actions/workflows/quality.yml)
 [![Go 1.25+](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go)](https://go.dev/)
