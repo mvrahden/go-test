@@ -9,7 +9,7 @@
       "gating": {
         "direct": {
           "exitCode": 1,
-          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"fail\",\"duration\":0.03,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"fail\",\"duration\":0.02,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"fail\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    cart_test.go:17: boom\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":1,\"tests\":0,\"passed\":0,\"failed\":1,\"skipped\":0}}\n",
+          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"fail\",\"duration\":0.03,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"fail\",\"duration\":0.02,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"fail\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    cart_test.go:17: boom\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":1,\"tests\":0,\"benchmarks\":0,\"passed\":0,\"failed\":1,\"skipped\":0}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -21,7 +21,7 @@
       "renderOnly": {
         "direct": {
           "exitCode": 0,
-          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"fail\",\"duration\":0.03,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"fail\",\"duration\":0.02,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"fail\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    cart_test.go:17: boom\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":1,\"tests\":0,\"passed\":0,\"failed\":1,\"skipped\":0}}\n",
+          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"fail\",\"duration\":0.03,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"fail\",\"duration\":0.02,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"fail\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    cart_test.go:17: boom\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":1,\"tests\":0,\"benchmarks\":0,\"passed\":0,\"failed\":1,\"skipped\":0}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -35,7 +35,7 @@
       "gating": {
         "direct": {
           "exitCode": 0,
-          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"pass\",\"duration\":0.04,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.03,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"=== RUN   TestCartTestSuite/adds_an_item\\n\"],\"children\":[]},{\"name\":\"totals_the_basket\",\"display\":\"totals the basket\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0.02,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":2,\"tests\":0,\"passed\":2,\"failed\":0,\"skipped\":0}}\n",
+          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"pass\",\"duration\":0.04,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.03,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"=== RUN   TestCartTestSuite/adds_an_item\\n\"],\"children\":[]},{\"name\":\"totals_the_basket\",\"display\":\"totals the basket\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0.02,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":2,\"tests\":0,\"benchmarks\":0,\"passed\":2,\"failed\":0,\"skipped\":0}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -47,7 +47,7 @@
       "renderOnly": {
         "direct": {
           "exitCode": 0,
-          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"pass\",\"duration\":0.04,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.03,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"=== RUN   TestCartTestSuite/adds_an_item\\n\"],\"children\":[]},{\"name\":\"totals_the_basket\",\"display\":\"totals the basket\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0.02,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":2,\"tests\":0,\"passed\":2,\"failed\":0,\"skipped\":0}}\n",
+          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"pass\",\"duration\":0.04,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.03,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"=== RUN   TestCartTestSuite/adds_an_item\\n\"],\"children\":[]},{\"name\":\"totals_the_basket\",\"display\":\"totals the basket\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0.02,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":2,\"tests\":0,\"benchmarks\":0,\"passed\":2,\"failed\":0,\"skipped\":0}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -87,7 +87,7 @@
       "gating": {
         "direct": {
           "exitCode": 0,
-          "stdout": "{\"packages\":[],\"stats\":{\"suites\":0,\"behaviors\":0,\"tests\":0,\"passed\":0,\"failed\":0,\"skipped\":0}}\n",
+          "stdout": "{\"packages\":[],\"stats\":{\"suites\":0,\"behaviors\":0,\"tests\":0,\"benchmarks\":0,\"passed\":0,\"failed\":0,\"skipped\":0}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -99,7 +99,7 @@
       "renderOnly": {
         "direct": {
           "exitCode": 0,
-          "stdout": "{\"packages\":[],\"stats\":{\"suites\":0,\"behaviors\":0,\"tests\":0,\"passed\":0,\"failed\":0,\"skipped\":0}}\n",
+          "stdout": "{\"packages\":[],\"stats\":{\"suites\":0,\"behaviors\":0,\"tests\":0,\"benchmarks\":0,\"passed\":0,\"failed\":0,\"skipped\":0}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -113,7 +113,7 @@
       "gating": {
         "direct": {
           "exitCode": 1,
-          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"fail\",\"duration\":0.04,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"fail\",\"duration\":0.03,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]},{\"name\":\"totals_the_basket\",\"display\":\"totals the basket\",\"kind\":\"block\",\"status\":\"fail\",\"duration\":0.02,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    cart_test.go:42: expected 300, got 250\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":2,\"tests\":0,\"passed\":1,\"failed\":1,\"skipped\":0}}\n",
+          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"fail\",\"duration\":0.04,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"fail\",\"duration\":0.03,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]},{\"name\":\"totals_the_basket\",\"display\":\"totals the basket\",\"kind\":\"block\",\"status\":\"fail\",\"duration\":0.02,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    cart_test.go:42: expected 300, got 250\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":2,\"tests\":0,\"benchmarks\":0,\"passed\":1,\"failed\":1,\"skipped\":0}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -125,7 +125,7 @@
       "renderOnly": {
         "direct": {
           "exitCode": 0,
-          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"fail\",\"duration\":0.04,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"fail\",\"duration\":0.03,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]},{\"name\":\"totals_the_basket\",\"display\":\"totals the basket\",\"kind\":\"block\",\"status\":\"fail\",\"duration\":0.02,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    cart_test.go:42: expected 300, got 250\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":2,\"tests\":0,\"passed\":1,\"failed\":1,\"skipped\":0}}\n",
+          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"fail\",\"duration\":0.04,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"fail\",\"duration\":0.03,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]},{\"name\":\"totals_the_basket\",\"display\":\"totals the basket\",\"kind\":\"block\",\"status\":\"fail\",\"duration\":0.02,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    cart_test.go:42: expected 300, got 250\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":2,\"tests\":0,\"benchmarks\":0,\"passed\":1,\"failed\":1,\"skipped\":0}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -139,7 +139,7 @@
       "gating": {
         "direct": {
           "exitCode": 1,
-          "stdout": "{\"packages\":[{\"path\":\"example.com/checkout\",\"status\":\"fail\",\"duration\":0.07,\"nodes\":[{\"name\":\"TestCheckoutTestSuite\",\"display\":\"Checkout\",\"kind\":\"suite\",\"status\":\"fail\",\"duration\":0.06,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"rejects_an_expired_card\",\"display\":\"rejects an expired card\",\"kind\":\"block\",\"status\":\"fail\",\"duration\":0.05,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    checkout_test.go:31: expected rejection\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":1,\"tests\":0,\"passed\":0,\"failed\":1,\"skipped\":0}}\n",
+          "stdout": "{\"packages\":[{\"path\":\"example.com/checkout\",\"status\":\"fail\",\"duration\":0.07,\"nodes\":[{\"name\":\"TestCheckoutTestSuite\",\"display\":\"Checkout\",\"kind\":\"suite\",\"status\":\"fail\",\"duration\":0.06,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"rejects_an_expired_card\",\"display\":\"rejects an expired card\",\"kind\":\"block\",\"status\":\"fail\",\"duration\":0.05,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    checkout_test.go:31: expected rejection\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":1,\"tests\":0,\"benchmarks\":0,\"passed\":0,\"failed\":1,\"skipped\":0}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -151,7 +151,7 @@
       "renderOnly": {
         "direct": {
           "exitCode": 0,
-          "stdout": "{\"packages\":[{\"path\":\"example.com/checkout\",\"status\":\"fail\",\"duration\":0.07,\"nodes\":[{\"name\":\"TestCheckoutTestSuite\",\"display\":\"Checkout\",\"kind\":\"suite\",\"status\":\"fail\",\"duration\":0.06,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"rejects_an_expired_card\",\"display\":\"rejects an expired card\",\"kind\":\"block\",\"status\":\"fail\",\"duration\":0.05,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    checkout_test.go:31: expected rejection\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":1,\"tests\":0,\"passed\":0,\"failed\":1,\"skipped\":0}}\n",
+          "stdout": "{\"packages\":[{\"path\":\"example.com/checkout\",\"status\":\"fail\",\"duration\":0.07,\"nodes\":[{\"name\":\"TestCheckoutTestSuite\",\"display\":\"Checkout\",\"kind\":\"suite\",\"status\":\"fail\",\"duration\":0.06,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"rejects_an_expired_card\",\"display\":\"rejects an expired card\",\"kind\":\"block\",\"status\":\"fail\",\"duration\":0.05,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    checkout_test.go:31: expected rejection\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":1,\"tests\":0,\"benchmarks\":0,\"passed\":0,\"failed\":1,\"skipped\":0}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -165,7 +165,7 @@
       "gating": {
         "direct": {
           "exitCode": 1,
-          "stdout": "{\"packages\":[{\"path\":\"example.com/broken\",\"status\":\"fail\",\"duration\":0,\"nodes\":[],\"output\":[\"# example.com/broken\\n\",\"./broken.go:7:2: undefined: helper\\n\"]}],\"stats\":{\"suites\":0,\"behaviors\":0,\"tests\":0,\"passed\":0,\"failed\":0,\"skipped\":0,\"failedPackages\":1}}\n",
+          "stdout": "{\"packages\":[{\"path\":\"example.com/broken\",\"status\":\"fail\",\"duration\":0,\"nodes\":[],\"output\":[\"# example.com/broken\\n\",\"./broken.go:7:2: undefined: helper\\n\"]}],\"stats\":{\"suites\":0,\"behaviors\":0,\"tests\":0,\"benchmarks\":0,\"passed\":0,\"failed\":0,\"skipped\":0,\"failedPackages\":1}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -177,7 +177,7 @@
       "renderOnly": {
         "direct": {
           "exitCode": 0,
-          "stdout": "{\"packages\":[{\"path\":\"example.com/broken\",\"status\":\"fail\",\"duration\":0,\"nodes\":[],\"output\":[\"# example.com/broken\\n\",\"./broken.go:7:2: undefined: helper\\n\"]}],\"stats\":{\"suites\":0,\"behaviors\":0,\"tests\":0,\"passed\":0,\"failed\":0,\"skipped\":0,\"failedPackages\":1}}\n",
+          "stdout": "{\"packages\":[{\"path\":\"example.com/broken\",\"status\":\"fail\",\"duration\":0,\"nodes\":[],\"output\":[\"# example.com/broken\\n\",\"./broken.go:7:2: undefined: helper\\n\"]}],\"stats\":{\"suites\":0,\"behaviors\":0,\"tests\":0,\"benchmarks\":0,\"passed\":0,\"failed\":0,\"skipped\":0,\"failedPackages\":1}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -191,7 +191,7 @@
       "gating": {
         "direct": {
           "exitCode": 0,
-          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"pass\",\"duration\":0.02,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"skip\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    cart_test.go:17: not implemented yet\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":1,\"tests\":0,\"passed\":0,\"failed\":0,\"skipped\":1}}\n",
+          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"pass\",\"duration\":0.02,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"skip\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    cart_test.go:17: not implemented yet\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":1,\"tests\":0,\"benchmarks\":0,\"passed\":0,\"failed\":0,\"skipped\":1}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -203,7 +203,7 @@
       "renderOnly": {
         "direct": {
           "exitCode": 0,
-          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"pass\",\"duration\":0.02,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"skip\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    cart_test.go:17: not implemented yet\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":1,\"tests\":0,\"passed\":0,\"failed\":0,\"skipped\":1}}\n",
+          "stdout": "{\"packages\":[{\"path\":\"example.com/cart\",\"status\":\"pass\",\"duration\":0.02,\"nodes\":[{\"name\":\"TestCartTestSuite\",\"display\":\"Cart\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"adds_an_item\",\"display\":\"adds an item\",\"kind\":\"block\",\"status\":\"skip\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"    cart_test.go:17: not implemented yet\\n\"],\"children\":[]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":1,\"tests\":0,\"benchmarks\":0,\"passed\":0,\"failed\":0,\"skipped\":1}}\n",
           "stderr": ""
         },
         "goRun": {
