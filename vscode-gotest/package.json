@@ -242,10 +242,10 @@
         },
         "gotest.forceKillTimeout": {
           "type": "number",
-          "default": 120,
+          "default": 360,
           "minimum": 10,
           "scope": "resource",
-          "description": "Seconds to wait after SIGTERM before sending SIGKILL to a cancelled process"
+          "description": "Seconds to wait after SIGTERM before sending SIGKILL to a cancelled process. Must outlast the CLI's own shutdown budget (5m30s), which covers container fixture teardown"
         }
       }
     }

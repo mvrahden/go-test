@@ -16,12 +16,8 @@ import {
   resolveAncestorItems,
   skipUnresolved,
 } from "./runnerUtils.js";
+import { forceKillTimeoutSeconds } from "./config.js";
 import type { RunRegistry } from "./runRegistry.js";
-
-// VS Code gives deactivate only a few seconds before it tears the extension
-// host down, so a watch disposed at shutdown gets this instead of the
-// configured teardown budget — a longer timer would never fire.
-const SHUTDOWN_GRACE_MS = 5_000;
 
 /**
  * Wraps a single `gotest watch -json <scope>` child process.
@@ -198,10 +194,12 @@ class WatchProcess implements vscode.Disposable {
     }, delay);
   }
 
-  // graceMs overrides the configured budget. Shutdown passes a short one: the
-  // extension host is going away, and a timer longer than VS Code's deactivate
-  // window never fires at all, which orphans the child instead of killing it.
-  dispose(graceMs?: number): void {
+  // forceKill=false is for shutdown. VS Code's deactivate window is seconds,
+  // so any SIGKILL timer long enough to respect a fixture teardown would never
+  // fire, and any timer short enough to fire would cut that teardown off. The
+  // child is in its own process group with the CLI's own force-kill backstop,
+  // so SIGTERM alone is both the most and the least we can honestly do.
+  dispose(forceKill = true): void {
     this.disposed = true;
 
     if (this.child) {
@@ -211,19 +209,17 @@ class WatchProcess implements vscode.Disposable {
       this.outputChannel.info(`[watch] sending SIGTERM (pid ${child.pid})`);
       killProcessTree(child, "SIGTERM");
 
-      const killTimeout =
-        graceMs ??
-        vscode.workspace
-          .getConfiguration("gotest")
-          .get<number>("forceKillTimeout", 120) * 1000;
-      const forceKill = setTimeout(() => {
+      if (!forceKill) return;
+
+      const killTimeout = forceKillTimeoutSeconds(this.cwd) * 1000;
+      const forceKillTimer = setTimeout(() => {
         if (!child.killed) {
           killProcessTree(child, "SIGKILL");
         }
       }, killTimeout);
 
       child.on("close", () => {
-        clearTimeout(forceKill);
+        clearTimeout(forceKillTimer);
       });
     }
   }
@@ -373,7 +369,7 @@ export class WatchManager implements vscode.Disposable {
     this.updateStatusBar();
   }
 
-  stopAll(graceMs?: number): void {
+  stopAll(forceKill = true): void {
     this.outputChannel.info(
       `[watch] stopping all (${this.watchers.size} active)`,
     );
@@ -382,7 +378,7 @@ export class WatchManager implements vscode.Disposable {
       if (recordId) {
         this.registry.cancel(recordId);
       }
-      watcher.dispose(graceMs);
+      watcher.dispose(forceKill);
       const run = this.activeRuns.get(scope);
       if (run) {
         run.end();
@@ -399,7 +395,7 @@ export class WatchManager implements vscode.Disposable {
   }
 
   dispose(): void {
-    this.stopAll(SHUTDOWN_GRACE_MS);
+    this.stopAll(false);
     this.statusBar.dispose();
   }
 
