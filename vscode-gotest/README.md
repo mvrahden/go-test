@@ -31,7 +31,7 @@ The **Spec View** renders your test structure as a behavioral specification — 
 ### Prerequisites
 
 - **Go** (1.25+)
-- **VS Code** (1.101+)
+- **VS Code** (1.123+)
 - **[Delve](https://github.com/go-delve/delve)** (for debugging only)
 
 The extension invokes the gotest CLI automatically — no separate install needed.
@@ -219,7 +219,7 @@ The extension resolves the Go toolchain per workspace folder:
 
 ## Requirements
 
-- VS Code 1.101 or later
+- VS Code 1.123 or later
 - Go 1.25 or later
 - A Go project using [gotest](https://github.com/mvrahden/go-test) suites
 - [Delve](https://github.com/go-delve/delve) for debug support

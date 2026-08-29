@@ -35,8 +35,9 @@ updates:
         patterns:
           - "*"
     ignore:
-      # @types/node must track the Node that VS Code bundles, not the newest
-      # published types: typing against a newer Node lets the extension call
-      # APIs that do not exist at its actual runtime.
+      # @types/node must track the Node bundled by the OLDEST VS Code we
+      # support — engines.vscode ^1.123.0 means Electron 42, Node 24 — not the
+      # newest published types: typing above the runtime lets the extension
+      # call APIs that are not there. Raise this only with engines.vscode.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
