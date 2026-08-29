@@ -85,3 +85,6 @@ jobs:
     uses: ./.github/workflows/extension-release.yml
     with:
       tag: ${{ github.event.release.tag_name }}
+    secrets:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
