@@ -52,15 +52,7 @@ func RenderJSON(w io.Writer, packages []*Package) {
 
 	root := jsonRoot{
 		Packages: make([]jsonPackage, len(packages)),
-		Stats: jsonStats{
-			Suites:         stats.Suites,
-			Behaviors:      stats.Behaviors,
-			Tests:          stats.Tests,
-			Passed:         stats.Passed,
-			Failed:         stats.Failed,
-			Skipped:        stats.Skipped,
-			FailedPackages: stats.FailedPackages,
-		},
+		Stats:    jsonStats(stats),
 	}
 
 	for i, pkg := range packages {
