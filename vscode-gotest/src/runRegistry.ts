@@ -1,5 +1,6 @@
 import * as path from "node:path";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { atomicWrite } from "./jsonStore.js";
 
 export type RunKind = "test" | "coverage" | "watch" | "prepare";
 export type RunStatus = "running" | "completed" | "cancelled" | "crashed";
@@ -87,9 +88,10 @@ export class RunRegistry {
   }
 
   async save(): Promise<void> {
-    await mkdir(this.storageDir, { recursive: true });
-    const data = JSON.stringify([...this.records.values()], null, 2);
-    await writeFile(path.join(this.storageDir, REGISTRY_FILE), data, "utf-8");
+    await atomicWrite(
+      path.join(this.storageDir, REGISTRY_FILE),
+      JSON.stringify([...this.records.values()], null, 2),
+    );
   }
 
   async load(): Promise<void> {

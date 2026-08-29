@@ -4,6 +4,7 @@ const {
   mockReadFile,
   mockWriteFile,
   mockMkdir,
+  mockRename,
   mockReaddir,
   mockStat,
   mockUnlink,
@@ -25,6 +26,12 @@ const {
       if (!mtimes.has(p)) mtimes.set(p, Date.now());
     }),
     mockMkdir: vi.fn(async () => undefined),
+    mockRename: vi.fn(async (from: string, to: string) => {
+      const content = files.get(from);
+      if (content === undefined) throw new Error("ENOENT");
+      files.set(to, content);
+      files.delete(from);
+    }),
     mockReaddir: vi.fn(async () =>
       [...files.keys()].map((p) => p.split("/").pop()!),
     ),
@@ -42,6 +49,7 @@ vi.mock("node:fs/promises", () => ({
   readFile: mockReadFile,
   writeFile: mockWriteFile,
   mkdir: mockMkdir,
+  rename: mockRename,
   readdir: mockReaddir,
   stat: mockStat,
   unlink: mockUnlink,

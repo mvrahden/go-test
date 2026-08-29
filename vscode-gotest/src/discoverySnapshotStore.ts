@@ -1,14 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { createHash } from "node:crypto";
-import {
-  readFile,
-  writeFile,
-  mkdir,
-  readdir,
-  stat,
-  unlink,
-} from "node:fs/promises";
+import { readFile, readdir, stat, unlink } from "node:fs/promises";
+import { atomicWrite, LoadOnce, reportStoreError } from "./jsonStore.js";
 import type { DiscoverPackage, DiscoverWarning } from "./types.js";
 
 export interface DiscoverySnapshot {
@@ -57,10 +51,11 @@ export class DiscoverySnapshotStore {
   private saveChain = Promise.resolve();
   private debounceTimer: ReturnType<typeof setTimeout> | undefined;
   private pendingWrites = new Set<string>();
-  // Set by the first update(). Discovery can run before load() resolves —
-  // activate() registers the file watchers before initializeAsync awaits the
-  // load — and what discovery just found beats what the last session stored.
-  private dirty = false;
+  // Discovery can run before load() resolves — activate() registers the file
+  // watchers before initializeAsync awaits the load — and what discovery just
+  // found beats what the last session stored. Same latch as JsonStore's, so the
+  // rule has one implementation rather than one per store.
+  private readonly latch = new LoadOnce();
 
   // A tree is hundreds of kilobytes to serialize, and every save of a _test.go
   // file triggers a package rediscovery. Coalesce, the way TestResultStore does,
@@ -89,14 +84,14 @@ export class DiscoverySnapshotStore {
   ): void {
     this.workspaces.set(workspaceDir, { packages, warnings });
     this.pendingWrites.add(workspaceDir);
-    this.dirty = true;
+    this.latch.markMutated();
   }
 
   // load reads the snapshots for the workspaces currently open, and prunes
   // whatever has gone stale. Only the open workspaces are read: the rest are
   // files on disk that cost nothing until someone opens them again.
-  async load(workspaceDirs: string[] = []): Promise<void> {
-    if (!this.storageDir || this.dirty) {
+  async load(workspaceDirs: string[]): Promise<void> {
+    if (!this.storageDir || this.latch.blocked) {
       return;
     }
     for (const dir of workspaceDirs) {
@@ -143,21 +138,23 @@ export class DiscoverySnapshotStore {
     this.pendingWrites.clear();
     this.saveChain = this.saveChain
       .then(() => this.writeToDisk(dirs))
-      .catch(() => {
+      .catch((err) => {
         // A snapshot is a cache; a failed write costs the next activation its
-        // head start and nothing else.
+        // head start and nothing else — but it is said out loud.
+        reportStoreError("write discovery snapshot", err);
       });
   }
 
   private async writeToDisk(dirs: string[]): Promise<void> {
     if (!this.storageDir) return;
-    await mkdir(this.storageDir, { recursive: true });
     for (const dir of dirs) {
       const snapshot = this.workspaces.get(dir);
       if (!snapshot) continue;
       const data: StoredData = { version: 2, workspaceDir: dir, snapshot };
-      const target = path.join(this.storageDir, fileFor(dir));
-      await writeFile(target, JSON.stringify(data), "utf-8");
+      await atomicWrite(
+        path.join(this.storageDir, fileFor(dir)),
+        JSON.stringify(data),
+      );
     }
   }
 

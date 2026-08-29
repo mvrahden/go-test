@@ -141,7 +141,8 @@ export class CoverOnSave implements vscode.Disposable {
       run.addCoverage(fc);
     }
     run.end();
-    await this.store.save();
+    this.store.save();
+    await this.store.flush();
   }
 
   dispose(): void {

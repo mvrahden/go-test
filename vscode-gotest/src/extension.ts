@@ -562,9 +562,7 @@ function setupFileWatchers(
 
     if (coverageStore.invalidate(importPath)) {
       outputChannel.debug(`[coverage] invalidated ${importPath}`);
-      coverageStore.save().catch((err) => {
-        outputChannel.error(`[coverage] save after invalidate failed: ${err}`);
-      });
+      coverageStore.save();
     }
 
     triggerCoverOnSave(importPath, uri);

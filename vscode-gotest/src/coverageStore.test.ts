@@ -1,25 +1,35 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockReadFile, mockWriteFile, mockMkdir, files } = vi.hoisted(() => {
-  const files = new Map<string, string>();
-  return {
-    files,
-    mockReadFile: vi.fn(async (p: string) => {
-      const content = files.get(p);
-      if (content === undefined) throw new Error("ENOENT");
-      return content;
-    }),
-    mockWriteFile: vi.fn(async (p: string, content: string) => {
-      files.set(p, content);
-    }),
-    mockMkdir: vi.fn(async () => undefined),
-  };
-});
+const { mockReadFile, mockWriteFile, mockMkdir, mockRename, files } =
+  vi.hoisted(() => {
+    const files = new Map<string, string>();
+    return {
+      files,
+      mockReadFile: vi.fn(async (p: string) => {
+        const content = files.get(p);
+        if (content === undefined) throw new Error("ENOENT");
+        return content;
+      }),
+      mockWriteFile: vi.fn(async (p: string, content: string) => {
+        files.set(p, content);
+      }),
+      mockMkdir: vi.fn(async () => undefined),
+      // The shared store writes to a sibling temp file and renames it into place.
+      mockRename: vi.fn(async (from: string, to: string) => {
+        const content = files.get(from);
+        if (content !== undefined) {
+          files.set(to, content);
+          files.delete(from);
+        }
+      }),
+    };
+  });
 
 vi.mock("node:fs/promises", () => ({
   readFile: mockReadFile,
   writeFile: mockWriteFile,
   mkdir: mockMkdir,
+  rename: mockRename,
 }));
 
 vi.mock("vscode", () => ({
@@ -44,7 +54,8 @@ describe("CoverageStore load ordering", () => {
   it("round-trips a stored profile", async () => {
     const store = new CoverageStore(storage);
     store.update("example.com/m/a", "mode: set\n");
-    await store.save();
+    store.save();
+    await store.flush();
 
     const reopened = new CoverageStore(storage);
     await reopened.load();
@@ -59,7 +70,8 @@ describe("CoverageStore load ordering", () => {
   it("does not let a late load undo an invalidation", async () => {
     const seed = new CoverageStore(storage);
     seed.update("example.com/m/a", "mode: set\n");
-    await seed.save();
+    seed.save();
+    await seed.flush();
 
     const store = new CoverageStore(storage);
     expect(store.invalidate("example.com/m/a")).toBe(false);
@@ -74,7 +86,8 @@ describe("CoverageStore load ordering", () => {
   it("still loads when nothing has been recorded yet", async () => {
     const seed = new CoverageStore(storage);
     seed.update("example.com/m/a", "mode: set\n");
-    await seed.save();
+    seed.save();
+    await seed.flush();
 
     const store = new CoverageStore(storage);
     await store.load();
