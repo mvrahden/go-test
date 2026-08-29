@@ -35,6 +35,11 @@ export class CoverageStore implements vscode.Disposable {
   private cachedDetails = new Map<string, vscode.FileCoverageDetail[]>();
   private readonly storagePath: string | undefined;
   private saveChain = Promise.resolve();
+  // Set by the first mutation. The file watchers are registered synchronously
+  // in activate(), so a .go file touched before initializeAsync awaits load()
+  // invalidates a package in memory — and a load that cleared it afterwards
+  // would read the pre-invalidation state back and resurrect stale coverage.
+  private dirty = false;
 
   constructor(storageUri: vscode.Uri | undefined) {
     if (storageUri) {
@@ -64,6 +69,7 @@ export class CoverageStore implements vscode.Disposable {
     });
     this.parsed.delete(importPath);
     this.cachedDetails.clear();
+    this.dirty = true;
   }
 
   invalidate(importPath: string): boolean {
@@ -71,6 +77,7 @@ export class CoverageStore implements vscode.Disposable {
     if (deleted) {
       this.parsed.delete(importPath);
       this.cachedDetails.clear();
+      this.dirty = true;
     }
     return deleted;
   }
@@ -82,6 +89,7 @@ export class CoverageStore implements vscode.Disposable {
     this.packages.clear();
     this.parsed.clear();
     this.cachedDetails.clear();
+    this.dirty = true;
     return this.save();
   }
 
@@ -133,7 +141,7 @@ export class CoverageStore implements vscode.Disposable {
   }
 
   async load(): Promise<void> {
-    if (!this.storagePath) {
+    if (!this.storagePath || this.dirty) {
       return;
     }
     try {
