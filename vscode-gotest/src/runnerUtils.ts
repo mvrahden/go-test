@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
+import { killProcessTree } from "./processTree.js";
+import { forceKillTimeoutSeconds } from "./config.js";
 import { readFile } from "node:fs/promises";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
@@ -12,20 +14,7 @@ import {
   type TestEvent,
 } from "./outputParser.js";
 
-export function killProcessTree(
-  child: ChildProcess,
-  signal: NodeJS.Signals = "SIGTERM",
-): void {
-  if (child.pid && process.platform !== "win32") {
-    try {
-      process.kill(-child.pid, signal);
-      return;
-    } catch {
-      // process group already exited
-    }
-  }
-  child.kill(signal);
-}
+export { killProcessTree };
 
 export function enqueueDescendants(
   run: vscode.TestRun,
@@ -459,10 +448,7 @@ export function spawnTestProcess(
         `[${label}] cancellation requested, sending SIGTERM (pid ${child.pid})`,
       );
       killProcessTree(child, "SIGTERM");
-      const killTimeout =
-        vscode.workspace
-          .getConfiguration("gotest")
-          .get<number>("forceKillTimeout", 120) * 1000;
+      const killTimeout = forceKillTimeoutSeconds(cwd) * 1000;
       forceKillTimer = setTimeout(() => {
         outputChannel.warn(
           `[${label}] process did not exit after SIGTERM, sending SIGKILL`,
