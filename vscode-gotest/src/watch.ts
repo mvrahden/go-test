@@ -16,6 +16,7 @@ import {
   resolveAncestorItems,
   skipUnresolved,
 } from "./runnerUtils.js";
+import { forceKillTimeoutSeconds } from "./config.js";
 import type { RunRegistry } from "./runRegistry.js";
 
 /**
@@ -64,13 +65,18 @@ class WatchProcess implements vscode.Disposable {
     this.buffer = "";
     this.cycleBuffer = "";
 
-    this.child.stdout?.on("data", (data: Buffer) => {
-      this.buffer += data.toString();
+    // Decoded on the stream: the watcher runs for hours and its events arrive
+    // in whatever pieces the pipe delivers, boundaries falling mid-character.
+    this.child.stdout?.setEncoding("utf-8");
+    this.child.stderr?.setEncoding("utf-8");
+
+    this.child.stdout?.on("data", (chunk: string) => {
+      this.buffer += chunk;
       this.processBuffer();
     });
 
-    this.child.stderr?.on("data", (data: Buffer) => {
-      this.outputChannel.warn(`[watch] stderr: ${data.toString().trimEnd()}`);
+    this.child.stderr?.on("data", (chunk: string) => {
+      this.outputChannel.warn(`[watch] stderr: ${chunk.trimEnd()}`);
     });
 
     this.child.on("close", () => {
@@ -188,7 +194,12 @@ class WatchProcess implements vscode.Disposable {
     }, delay);
   }
 
-  dispose(): void {
+  // forceKill=false is for shutdown. VS Code's deactivate window is seconds,
+  // so any SIGKILL timer long enough to respect a fixture teardown would never
+  // fire, and any timer short enough to fire would cut that teardown off. The
+  // child is in its own process group with the CLI's own force-kill backstop,
+  // so SIGTERM alone is both the most and the least we can honestly do.
+  dispose(forceKill = true): void {
     this.disposed = true;
 
     if (this.child) {
@@ -198,18 +209,17 @@ class WatchProcess implements vscode.Disposable {
       this.outputChannel.info(`[watch] sending SIGTERM (pid ${child.pid})`);
       killProcessTree(child, "SIGTERM");
 
-      const killTimeout =
-        vscode.workspace
-          .getConfiguration("gotest")
-          .get<number>("forceKillTimeout", 600) * 1000;
-      const forceKill = setTimeout(() => {
+      if (!forceKill) return;
+
+      const killTimeout = forceKillTimeoutSeconds(this.cwd) * 1000;
+      const forceKillTimer = setTimeout(() => {
         if (!child.killed) {
           killProcessTree(child, "SIGKILL");
         }
       }, killTimeout);
 
       child.on("close", () => {
-        clearTimeout(forceKill);
+        clearTimeout(forceKillTimer);
       });
     }
   }
@@ -359,7 +369,7 @@ export class WatchManager implements vscode.Disposable {
     this.updateStatusBar();
   }
 
-  stopAll(): void {
+  stopAll(forceKill = true): void {
     this.outputChannel.info(
       `[watch] stopping all (${this.watchers.size} active)`,
     );
@@ -368,7 +378,7 @@ export class WatchManager implements vscode.Disposable {
       if (recordId) {
         this.registry.cancel(recordId);
       }
-      watcher.dispose();
+      watcher.dispose(forceKill);
       const run = this.activeRuns.get(scope);
       if (run) {
         run.end();
@@ -385,7 +395,7 @@ export class WatchManager implements vscode.Disposable {
   }
 
   dispose(): void {
-    this.stopAll();
+    this.stopAll(false);
     this.statusBar.dispose();
   }
 

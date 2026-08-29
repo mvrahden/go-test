@@ -1,8 +1,5 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { resolveGoBinary } from "./cli.js";
-
-const execFileAsync = promisify(execFile);
+import { captureStdout } from "./capture.js";
 
 export function splitCoverByPackage(
   content: string,
@@ -74,13 +71,10 @@ export async function runGoToolCoverFunc(
   workspaceDir: string,
 ): Promise<string> {
   const goBin = await resolveGoBinary(undefined, workspaceDir);
-  const { stdout } = await execFileAsync(
-    goBin,
-    ["tool", "cover", `-func=${coverFile}`],
-    {
-      cwd: workspaceDir,
-      timeout: 10_000,
-    },
-  );
-  return stdout;
+  // One line per function in the profile: a repository large enough to have a
+  // coverage problem is large enough to write past a buffered read.
+  return captureStdout(goBin, ["tool", "cover", `-func=${coverFile}`], {
+    cwd: workspaceDir,
+    timeoutSeconds: 10,
+  });
 }

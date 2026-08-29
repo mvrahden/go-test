@@ -1,18 +1,15 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { access, readFile } from "node:fs/promises";
-import { spawn } from "node:child_process";
 import type {
   DiscoverOutput,
   DiscoverPackage,
   DiscoverWarning,
 } from "./types.js";
-import {
-  buildCliCommand,
-  clearBinaryCache,
-  formatCliCommand,
-  stripGoRunExitEcho,
-} from "./cli.js";
+import { buildCliCommand, clearBinaryCache, formatCliCommand } from "./cli.js";
+import { captureStdout, CaptureTimeoutError } from "./capture.js";
+import { discoveryTimeoutSeconds } from "./config.js";
+import type { DiscoverySnapshotStore } from "./discoverySnapshotStore.js";
 
 export class DiscoveryCache implements vscode.Disposable {
   private cache = new Map<string, DiscoverPackage>();
@@ -65,6 +62,24 @@ export class DiscoveryCache implements vscode.Disposable {
 
   getModuleDir(modulePath: string): string | undefined {
     return this.moduleDirs.get(modulePath);
+  }
+
+  /** Returns the packages discovered under a workspace dir. */
+  packagesForWorkspace(workspaceDir: string): DiscoverPackage[] {
+    const result: DiscoverPackage[] = [];
+    for (const [importPath, wsDir] of this.workspaceDirs) {
+      if (wsDir !== workspaceDir) continue;
+      const pkg = this.cache.get(importPath);
+      if (pkg) result.push(pkg);
+    }
+    return result;
+  }
+
+  /** Returns the warnings recorded for a workspace dir. */
+  warningsForWorkspace(workspaceDir: string): DiscoverWarning[] {
+    return this._warnings
+      .filter((w) => w._wsDir === workspaceDir)
+      .map(({ _wsDir, ...warning }) => warning);
   }
 
   /** Returns unique module paths for packages within a workspace dir. */
@@ -156,6 +171,7 @@ export class DiscoveryService {
   constructor(
     private readonly cache: DiscoveryCache,
     private readonly outputChannel: vscode.LogOutputChannel,
+    private readonly snapshots?: DiscoverySnapshotStore,
   ) {}
 
   async discover(workspaceDir: string, patterns?: string[]): Promise<void> {
@@ -264,18 +280,53 @@ export class DiscoveryService {
           workspaceDir,
           this.outputChannel,
         );
-        this.outputChannel.info(`[discovery] ${formatCliCommand(cmd)}`);
+        this.outputChannel.info(
+          `[discovery] ${formatCliCommand(cmd)} (cwd ${workspaceDir})`,
+        );
 
-        const stdout = await captureStdout(cmd, workspaceDir);
+        // Timed in three parts because they fail differently: a slow build is
+        // the toolchain's, a slow first-to-last byte is the CLI's, and slow
+        // parse/index time is ours. One total would hide which.
+        const startedAt = Date.now();
+        let firstByteMs = -1;
+        const stdout = await captureStdout(cmd.bin, cmd.args, {
+          cwd: workspaceDir,
+          timeoutSeconds: discoveryTimeoutSeconds(workspaceDir),
+          onFirstByte: (ms) => {
+            firstByteMs = ms;
+          },
+        });
+        const childMs = Date.now() - startedAt;
 
         const jsonStart = stdout.indexOf("{");
         const json = jsonStart > 0 ? stdout.substring(jsonStart) : stdout;
         const output: DiscoverOutput = JSON.parse(json);
+        const parsedMs = Date.now() - startedAt - childMs;
         const fullScan = effectivePatterns.some((p) => p.includes("..."));
         const warnings = output.warnings ?? [];
         const packages = output.packages ?? [];
+        const indexStartedAt = Date.now();
         this.cache.update(packages, fullScan, workspaceDir, warnings);
+        const indexMs = Date.now() - indexStartedAt;
+        const suites = packages.reduce(
+          (n, p) => n + (p.suites?.length ?? 0),
+          0,
+        );
+        this.outputChannel.info(
+          `[discovery] ${packages.length} package(s), ${suites} suite(s) in ` +
+            `${childMs}ms child (${firstByteMs < 0 ? "no output" : `${firstByteMs}ms to first byte`}), ` +
+            `${parsedMs}ms parse of ${Buffer.byteLength(stdout)}B, ${indexMs}ms index`,
+        );
         this.hasShownError = false;
+        // Snapshot the workspace, not the response: this run may have matched
+        // a single package, and a snapshot standing in for the whole tree has
+        // to describe the whole tree.
+        this.snapshots?.update(
+          workspaceDir,
+          this.cache.packagesForWorkspace(workspaceDir),
+          this.cache.warningsForWorkspace(workspaceDir),
+        );
+        this.snapshots?.save();
         for (const w of warnings) {
           const loc = w.file ? ` (${w.file}:${w.line ?? 0})` : "";
           this.outputChannel.warn(
@@ -290,7 +341,11 @@ export class DiscoveryService {
         if (isENOENT) {
           clearBinaryCache();
         }
-        if (attempt < DiscoveryService.MAX_RETRIES) {
+        // A timeout already spent the whole budget. Retrying spends it twice
+        // more for the same answer and pushes the first error the user sees
+        // out past six minutes.
+        const retryable = !(err instanceof CaptureTimeoutError);
+        if (retryable && attempt < DiscoveryService.MAX_RETRIES) {
           this.outputChannel.debug(
             `[discovery] attempt ${attempt}/${DiscoveryService.MAX_RETRIES} failed, retrying: ${message}`,
           );
@@ -299,13 +354,21 @@ export class DiscoveryService {
           continue;
         }
         this.outputChannel.error(
-          `[discovery] failed after ${DiscoveryService.MAX_RETRIES} attempts: ${message}`,
+          retryable
+            ? `[discovery] failed after ${DiscoveryService.MAX_RETRIES} attempts: ${message}`
+            : `[discovery] failed: ${message}`,
         );
         if (!this.hasShownError) {
           this.hasShownError = true;
+          // Say what went wrong. The advice below is right for a missing
+          // toolchain and misleading for everything else — a timeout, a
+          // package that will not load — which is most of what lands here.
+          const advice = isENOENT
+            ? " Ensure 'go' is installed and the gotest module is accessible."
+            : "";
           vscode.window
             .showWarningMessage(
-              `gotest: discovery failed. Ensure 'go' is installed and the gotest module is accessible.`,
+              `gotest: discovery failed: ${message.split("\n")[0]}.${advice}`,
               "Open Output",
             )
             .then((choice) => {
@@ -314,67 +377,8 @@ export class DiscoveryService {
               }
             });
         }
+        return;
       }
     }
   }
-}
-
-const DISCOVERY_TIMEOUT_MS = 30_000;
-
-// captureStdout runs the CLI and streams what it writes. execFile would be
-// shorter, but its default 1 MiB cap is a ceiling discovery has no business
-// having: the payload grows with every behavior a repo declares, and one byte
-// past the cap killed the child mid-write and cost the whole test tree.
-function captureStdout(
-  cmd: { bin: string; args: string[] },
-  cwd: string,
-): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const child = spawn(cmd.bin, cmd.args, { cwd });
-    const stdout: string[] = [];
-    let stderr = "";
-    let timedOut = false;
-    let settled = false;
-
-    // Decode on the stream, not per chunk: a read boundary falls wherever the
-    // pipe fills, and a chunk-wise toString() would corrupt whatever multi-byte
-    // character it lands inside. Behavior names are the developer's own text.
-    child.stdout.setEncoding("utf-8");
-    child.stderr.setEncoding("utf-8");
-    child.stdout.on("data", (chunk: string) => stdout.push(chunk));
-    child.stderr.on("data", (chunk: string) => {
-      stderr += chunk;
-    });
-
-    const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill();
-    }, DISCOVERY_TIMEOUT_MS);
-
-    const settle = (outcome: () => void) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      outcome();
-    };
-
-    // A missing binary arrives here rather than as an exit code, and the caller
-    // reads `code` off the error to drop its cached path — so pass it through.
-    child.on("error", (err: Error) => settle(() => reject(err)));
-
-    child.on("close", (code) => {
-      settle(() => {
-        if (timedOut) {
-          reject(new Error(`timed out after ${DISCOVERY_TIMEOUT_MS}ms`));
-        } else if (code === 0) {
-          resolve(stdout.join(""));
-        } else {
-          const detail = stripGoRunExitEcho(stderr);
-          reject(
-            new Error(`exited with code ${code}${detail ? `: ${detail}` : ""}`),
-          );
-        }
-      });
-    });
-  });
 }

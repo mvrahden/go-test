@@ -1,14 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-
-// What the next spawned CLI does. `once` is consumed per run and `always` is
-// the fallback, so a test can queue a recovery in front of a standing failure.
-type ScriptedRun = {
-  stdout?: Array<string | Buffer>;
-  stderr?: string;
-  code?: number;
-  error?: NodeJS.ErrnoException;
-  neverExits?: boolean;
-};
+import type { SpawnScript } from "./scriptedSpawn.test-support.js";
 
 const {
   script,
@@ -18,10 +9,7 @@ const {
   mockReadFile,
   mockShowWarningMessage,
 } = vi.hoisted(() => ({
-  script: {
-    once: [] as ScriptedRun[],
-    always: undefined as ScriptedRun | undefined,
-  },
+  script: { once: [], always: undefined, calls: [] } as SpawnScript,
   mockKill: vi.fn(),
   mockClearBinaryCache: vi.fn(),
   mockAccess: vi.fn(async () => {}),
@@ -56,64 +44,19 @@ vi.mock("node:fs/promises", () => ({
   readFile: mockReadFile,
 }));
 
-// Real streams, not a resolved value: the code under test reads its payload in
-// whatever pieces the pipe delivers, and that is the half of it worth testing.
 vi.mock("node:child_process", async () => {
-  const { PassThrough } = await import("node:stream");
-  const { EventEmitter } = await import("node:events");
-
-  return {
-    spawn: () => {
-      const run = script.once.shift() ??
-        script.always ?? { stdout: ['{"packages":[]}'] };
-      const child = new EventEmitter() as InstanceType<typeof EventEmitter> & {
-        stdout: InstanceType<typeof PassThrough>;
-        stderr: InstanceType<typeof PassThrough>;
-        kill: () => void;
-      };
-      child.stdout = new PassThrough();
-      child.stderr = new PassThrough();
-
-      const finish = () => {
-        child.stdout.end();
-        child.stderr.end();
-      };
-      child.kill = () => {
-        mockKill();
-        finish();
-      };
-
-      let ended = 0;
-      const closeWhenDrained = () => {
-        if (++ended === 2)
-          child.emit("close", run.error ? null : (run.code ?? 0));
-      };
-      child.stdout.on("end", closeWhenDrained);
-      child.stderr.on("end", closeWhenDrained);
-
-      // A microtask later: the caller attaches its listeners on return.
-      void Promise.resolve().then(() => {
-        if (run.error) {
-          child.emit("error", run.error);
-          finish();
-          return;
-        }
-        for (const chunk of run.stdout ?? []) child.stdout.write(chunk);
-        if (run.stderr) child.stderr.write(run.stderr);
-        if (!run.neverExits) finish();
-      });
-
-      return child;
-    },
-  };
+  const { createScriptedSpawn } =
+    await import("./scriptedSpawn.test-support.js");
+  return { spawn: createScriptedSpawn(script, mockKill) };
 });
 
 vi.mock("./cli.js", () => ({
   buildCliCommand: async () => ({ bin: "go", args: ["run", "discover"] }),
   formatCliCommand: () => "go run discover",
   clearBinaryCache: mockClearBinaryCache,
-  // A stub, not a copy: what it filters out is pinned where the real one is
-  // used to interpret an exit, in specView.test.ts.
+  scopedConfig: () => ({ get: () => undefined }),
+  // Used by capture.js on a failed exit. A stub, not a copy: what it filters
+  // out is pinned in specView.test.ts, where the real one interprets an exit.
   stripGoRunExitEcho: (stderr: string) => stderr.trim(),
 }));
 
@@ -157,23 +100,47 @@ function failsAlways(message: string) {
   script.always = { code: 2, stderr: message };
 }
 
+function makeSnapshotSink() {
+  return {
+    updated: [] as { workspaceDir: string; importPaths: string[] }[],
+    saves: 0,
+    update(
+      workspaceDir: string,
+      packages: { importPath: string }[],
+      _warnings: unknown[],
+    ) {
+      this.updated.push({
+        workspaceDir,
+        importPaths: packages.map((p) => p.importPath),
+      });
+    },
+    async save() {
+      this.saves++;
+    },
+  };
+}
+
 describe("DiscoveryService", () => {
   let cache: DiscoveryCache;
   let outputChannel: ReturnType<typeof makeOutputChannel>;
   let service: DiscoveryService;
+  let snapshot: ReturnType<typeof makeSnapshotSink>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     script.once = [];
     script.always = undefined;
+    script.calls = [];
     mockAccess.mockResolvedValue(undefined);
     mockReadFile.mockRejectedValue(new Error("ENOENT"));
     cache = new DiscoveryCache();
     outputChannel = makeOutputChannel();
+    snapshot = makeSnapshotSink();
     service = new DiscoveryService(
       cache,
       outputChannel as unknown as import("vscode").LogOutputChannel,
+      snapshot as never,
     );
   });
 
@@ -201,6 +168,36 @@ describe("DiscoveryService", () => {
       await service.discover("/ws", ["./..."]);
 
       expect(outputChannel.debug).not.toHaveBeenCalled();
+    });
+
+    it("persists a snapshot so the next activation has a tree", async () => {
+      succeedsOnce([{ importPath: "example.com/pkg", dir: "/ws/pkg" }]);
+
+      await service.discover("/ws", ["./..."]);
+
+      expect(snapshot.updated).toEqual([
+        { workspaceDir: "/ws", importPaths: ["example.com/pkg"] },
+      ]);
+      expect(snapshot.saves).toBe(1);
+    });
+
+    it("snapshots the whole workspace after a single-package discovery", async () => {
+      succeedsOnce([
+        { importPath: "example.com/a", dir: "/ws/a" },
+        { importPath: "example.com/b", dir: "/ws/b" },
+      ]);
+      await service.discover("/ws", ["./..."]);
+      succeedsOnce([{ importPath: "example.com/a", dir: "/ws/a" }]);
+
+      await service.discoverPackage("/ws", "./a");
+
+      // The pattern matched one package, but the snapshot stands in for the
+      // whole tree — writing only the match would drop every other package
+      // from the next activation.
+      expect(snapshot.updated.at(-1)).toEqual({
+        workspaceDir: "/ws",
+        importPaths: ["example.com/a", "example.com/b"],
+      });
     });
   });
 
@@ -276,10 +273,17 @@ describe("DiscoveryService", () => {
       expect(outputChannel.error).toHaveBeenCalledTimes(1);
     });
 
-    it("shows a warning toast to the user", () => {
+    it("shows a warning toast naming what went wrong", () => {
       expect(mockShowWarningMessage).toHaveBeenCalledTimes(1);
       expect(mockShowWarningMessage).toHaveBeenCalledWith(
-        expect.stringContaining("discovery failed"),
+        expect.stringContaining(
+          "discovery failed: exited with code 2: persistent failure",
+        ),
+        "Open Output",
+      );
+      // The toolchain advice belongs to a missing binary, not to this.
+      expect(mockShowWarningMessage).not.toHaveBeenCalledWith(
+        expect.stringContaining("Ensure 'go' is installed"),
         "Open Output",
       );
     });
@@ -364,16 +368,17 @@ describe("DiscoveryService", () => {
       script.always = { neverExits: true };
 
       const p = service.discover("/ws", ["./..."]);
-      await vi.advanceTimersByTimeAsync(30_000);
-      await vi.advanceTimersByTimeAsync(2_000);
-      await vi.advanceTimersByTimeAsync(30_000);
-      await vi.advanceTimersByTimeAsync(4_000);
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(10_000);
       await p;
 
-      expect(mockKill).toHaveBeenCalledTimes(3);
+      // One attempt. A timeout already spent the full budget, so retrying it
+      // twice more only delays the message the user is waiting for.
+      expect(script.calls).toHaveLength(1);
+      expect(mockKill).toHaveBeenCalledTimes(1);
+      expect(mockKill).toHaveBeenCalledWith("SIGTERM");
       expect(outputChannel.error).toHaveBeenCalledWith(
-        expect.stringContaining("timed out after 30000ms"),
+        expect.stringContaining("timed out after 120s"),
       );
     });
   });
@@ -394,6 +399,10 @@ describe("DiscoveryService", () => {
       expect(mockClearBinaryCache).toHaveBeenCalledTimes(3);
       expect(outputChannel.error).toHaveBeenCalledWith(
         expect.stringContaining("ENOENT"),
+      );
+      expect(mockShowWarningMessage).toHaveBeenCalledWith(
+        expect.stringContaining("Ensure 'go' is installed"),
+        "Open Output",
       );
     });
   });

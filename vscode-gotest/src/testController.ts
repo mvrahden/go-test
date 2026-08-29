@@ -72,6 +72,9 @@ export class GoTestController implements vscode.Disposable {
       false,
     );
 
+    // Coalesces bursts — a watch event can touch several packages at once, and
+    // each one fires the cache's update. Anything that reads the tree flushes
+    // it first, so the delay never becomes visible as a missing item.
     let rebuildTimer: ReturnType<typeof setTimeout> | undefined;
     this.disposables.push(
       this.cache.onDidUpdate(() => {
@@ -80,6 +83,12 @@ export class GoTestController implements vscode.Disposable {
           rebuildTimer = undefined;
           this.rebuild();
         }, 50);
+        this.flushPendingRebuild = () => {
+          if (!rebuildTimer) return;
+          clearTimeout(rebuildTimer);
+          rebuildTimer = undefined;
+          this.rebuild();
+        };
       }),
     );
   }
@@ -569,7 +578,16 @@ export class GoTestController implements vscode.Disposable {
     return this.controller.createTestRun(request, name);
   }
 
+  // flushPendingRebuild applies a debounced rebuild that has not fired yet. It
+  // is a no-op until the cache has updated at least once.
+  private flushPendingRebuild: () => void = () => {};
+
   findItem(id: string): vscode.TestItem | undefined {
+    // The tree is the answer to this question, so it has to be current. A
+    // caller reading it moments after discovery — restoring the last session's
+    // results, say — would otherwise search an empty tree and conclude the
+    // tests no longer exist.
+    this.flushPendingRebuild();
     return this.findItemRecursive(this.controller.items, id);
   }
 

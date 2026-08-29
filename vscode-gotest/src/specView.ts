@@ -329,11 +329,16 @@ ${SCRIPT}
       let stdout = "";
       let stderr = "";
 
-      child.stdout.on("data", (data: Buffer) => {
-        stdout += data.toString();
+      // Decoded on the stream: a spec tree is large enough to arrive in several
+      // reads, and a boundary inside a multi-byte character would corrupt the
+      // behavior name it lands in.
+      child.stdout.setEncoding("utf-8");
+      child.stderr.setEncoding("utf-8");
+      child.stdout.on("data", (chunk: string) => {
+        stdout += chunk;
       });
-      child.stderr.on("data", (data: Buffer) => {
-        stderr += data.toString();
+      child.stderr.on("data", (chunk: string) => {
+        stderr += chunk;
       });
       child.on("close", (code) => {
         const outcome = interpretSpecExit(code, stdout, stderr);

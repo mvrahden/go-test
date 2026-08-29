@@ -233,12 +233,19 @@
           "scope": "resource",
           "description": "Default package scope for watch mode"
         },
-        "gotest.forceKillTimeout": {
+        "gotest.discoveryTimeout": {
           "type": "number",
-          "default": 600,
+          "default": 120,
           "minimum": 10,
           "scope": "resource",
-          "description": "Seconds to wait after SIGTERM before sending SIGKILL to a cancelled process"
+          "description": "Seconds to wait for test discovery before giving up. A cold build cache or a very large workspace can legitimately need more"
+        },
+        "gotest.forceKillTimeout": {
+          "type": "number",
+          "default": 360,
+          "minimum": 10,
+          "scope": "resource",
+          "description": "Seconds to wait after SIGTERM before sending SIGKILL to a cancelled process. Must outlast the CLI's own shutdown budget (5m30s), which covers container fixture teardown"
         }
       }
     }
@@ -252,8 +259,8 @@
     "contract:record": "node scripts/record-cli-contract.mjs",
     "contract:verify": "git diff --exit-code -- testdata/cli-contract.json",
     "contract:check": "npm run contract:record && npm run contract:verify",
-    "format": "prettier --write 'src/**/*.ts' 'test/**/*.ts' 'scripts/**/*.mjs'",
-    "format:check": "prettier --check 'src/**/*.ts' 'test/**/*.ts' 'scripts/**/*.mjs'",
+    "format": "prettier --write 'src/**/*.ts' 'test/**/*.ts' 'scripts/**/*.mjs' package.json",
+    "format:check": "prettier --check 'src/**/*.ts' 'test/**/*.ts' 'scripts/**/*.mjs' package.json",
     "vscode:prepublish": "node esbuild.config.mjs",
     "package": "vsce package"
   },
