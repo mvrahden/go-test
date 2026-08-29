@@ -462,7 +462,7 @@ export function spawnTestProcess(
       const killTimeout =
         vscode.workspace
           .getConfiguration("gotest")
-          .get<number>("forceKillTimeout", 600) * 1000;
+          .get<number>("forceKillTimeout", 120) * 1000;
       forceKillTimer = setTimeout(() => {
         outputChannel.warn(
           `[${label}] process did not exit after SIGTERM, sending SIGKILL`,

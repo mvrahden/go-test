@@ -18,6 +18,11 @@ import {
 } from "./runnerUtils.js";
 import type { RunRegistry } from "./runRegistry.js";
 
+// VS Code gives deactivate only a few seconds before it tears the extension
+// host down, so a watch disposed at shutdown gets this instead of the
+// configured teardown budget — a longer timer would never fire.
+const SHUTDOWN_GRACE_MS = 5_000;
+
 /**
  * Wraps a single `gotest watch -json <scope>` child process.
  * Handles line-buffered parsing of the JSON event stream,
@@ -193,7 +198,10 @@ class WatchProcess implements vscode.Disposable {
     }, delay);
   }
 
-  dispose(): void {
+  // graceMs overrides the configured budget. Shutdown passes a short one: the
+  // extension host is going away, and a timer longer than VS Code's deactivate
+  // window never fires at all, which orphans the child instead of killing it.
+  dispose(graceMs?: number): void {
     this.disposed = true;
 
     if (this.child) {
@@ -204,9 +212,10 @@ class WatchProcess implements vscode.Disposable {
       killProcessTree(child, "SIGTERM");
 
       const killTimeout =
+        graceMs ??
         vscode.workspace
           .getConfiguration("gotest")
-          .get<number>("forceKillTimeout", 600) * 1000;
+          .get<number>("forceKillTimeout", 120) * 1000;
       const forceKill = setTimeout(() => {
         if (!child.killed) {
           killProcessTree(child, "SIGKILL");
@@ -364,7 +373,7 @@ export class WatchManager implements vscode.Disposable {
     this.updateStatusBar();
   }
 
-  stopAll(): void {
+  stopAll(graceMs?: number): void {
     this.outputChannel.info(
       `[watch] stopping all (${this.watchers.size} active)`,
     );
@@ -373,7 +382,7 @@ export class WatchManager implements vscode.Disposable {
       if (recordId) {
         this.registry.cancel(recordId);
       }
-      watcher.dispose();
+      watcher.dispose(graceMs);
       const run = this.activeRuns.get(scope);
       if (run) {
         run.end();
@@ -390,7 +399,7 @@ export class WatchManager implements vscode.Disposable {
   }
 
   dispose(): void {
-    this.stopAll();
+    this.stopAll(SHUTDOWN_GRACE_MS);
     this.statusBar.dispose();
   }
 

@@ -242,7 +242,7 @@
         },
         "gotest.forceKillTimeout": {
           "type": "number",
-          "default": 600,
+          "default": 120,
           "minimum": 10,
           "scope": "resource",
           "description": "Seconds to wait after SIGTERM before sending SIGKILL to a cancelled process"
