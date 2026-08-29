@@ -63,6 +63,7 @@ class WatchProcess implements vscode.Disposable {
     // in whatever pieces the pipe delivers, boundaries falling mid-character.
     this.managed = new ManagedChild(this.cmd.bin, this.cmd.args, {
       cwd: this.cwd,
+      kind: "watch",
     });
     this.child = this.managed.child;
     this.buffer = "";

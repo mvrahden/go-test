@@ -35,7 +35,7 @@ export async function captureStdout(
   args: string[],
   opts: CaptureOptions = {},
 ): Promise<string> {
-  const mc = new ManagedChild(bin, args, { cwd: opts.cwd });
+  const mc = new ManagedChild(bin, args, { cwd: opts.cwd, kind: "read" });
   const stdout: string[] = [];
   let stderr = "";
   let timedOut = false;

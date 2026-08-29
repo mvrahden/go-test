@@ -133,7 +133,7 @@ export class DebugLauncher implements vscode.Disposable {
     return new Promise((resolve, reject) => {
       // A daemon: `prepare` blocks until SIGTERM holding shared fixtures open,
       // so it gets the teardown grace when it is eventually ended.
-      const managed = new ManagedChild(bin, args, { cwd });
+      const managed = new ManagedChild(bin, args, { cwd, kind: "prepare" });
       const child = managed.child;
       let stdout = "";
       let stderr = "";

@@ -19,6 +19,24 @@ export type TerminationGrace = "prompt" | "teardown";
 export interface ManagedChildOptions {
   cwd?: string;
   env?: Record<string, string>;
+  // What this child is, for the process registry. Coarse on purpose — the
+  // registry only needs enough to name what it reaped in a log line.
+  kind?: string;
+}
+
+// Observes every child this extension starts, so something outside can know
+// what is running. Installed once at activation; a module-level hook rather
+// than a constructor argument because the alternative is threading a registry
+// through five call sites that have no other use for it.
+export interface ChildObserver {
+  spawned(pid: number | undefined, kind: string): string | undefined;
+  exited(token: string | undefined): void;
+}
+
+let observer: ChildObserver | undefined;
+
+export function setChildObserver(next: ChildObserver | undefined): void {
+  observer = next;
 }
 
 export interface Exit {
@@ -47,6 +65,7 @@ export class ManagedChild {
   private escalation: ReturnType<typeof setTimeout> | undefined;
   private settle!: (exit: Exit) => void;
   private settled = false;
+  private registration: string | undefined;
 
   constructor(
     bin: string,
@@ -69,11 +88,15 @@ export class ManagedChild {
     this.child.stdout?.setEncoding("utf-8");
     this.child.stderr?.setEncoding("utf-8");
 
+    this.registration = observer?.spawned(this.child.pid, opts.kind ?? "child");
+
     this.exited = new Promise<Exit>((resolve) => {
       this.settle = (exit: Exit) => {
         if (this.settled) return;
         this.settled = true;
         clearTimeout(this.escalation);
+        observer?.exited(this.registration);
+        this.registration = undefined;
         resolve(exit);
       };
     });

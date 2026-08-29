@@ -406,7 +406,7 @@ export async function spawnTestProcess(
   env?: Record<string, string>,
   onStdoutLine?: (line: string) => void,
 ): Promise<SpawnResult> {
-  const mc = new ManagedChild(bin, args, { cwd, env });
+  const mc = new ManagedChild(bin, args, { cwd, env, kind: "test" });
   let stdout = "";
   let stderr = "";
   let lineBuffer = "";

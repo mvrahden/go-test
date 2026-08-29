@@ -326,7 +326,10 @@ ${SCRIPT}
       this.outputChannel,
     );
     const budgetSeconds = specRenderTimeoutSeconds(workspaceDir);
-    const mc = new ManagedChild(cmd.bin, cmd.args, { cwd: workspaceDir });
+    const mc = new ManagedChild(cmd.bin, cmd.args, {
+      cwd: workspaceDir,
+      kind: "spec",
+    });
     let stdout = "";
     let stderr = "";
     let timedOut = false;
