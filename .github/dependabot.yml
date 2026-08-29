@@ -25,3 +25,18 @@ updates:
       github-actions:
         patterns:
           - "*"
+
+  - package-ecosystem: npm
+    directory: /vscode-gotest
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns:
+          - "*"
+    ignore:
+      # @types/node must track the Node that VS Code bundles, not the newest
+      # published types: typing against a newer Node lets the extension call
+      # APIs that do not exist at its actual runtime.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
