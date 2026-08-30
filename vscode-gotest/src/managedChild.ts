@@ -76,10 +76,17 @@ export class ManagedChild {
     // `go run <module> ...`: the direct child is `go` and the process holding
     // the pipes is the binary it compiled. Signalling only the child leaves
     // that grandchild alive.
+    //
+    // Not on Windows, where detaching is all cost and no benefit:
+    // killProcessTree has no group path there and falls back to child.kill(),
+    // and the process registry records nothing because identity is unavailable.
+    // What detaching *would* buy is a child that outlives the extension host —
+    // the exact orphan this class exists to prevent, on the one platform with
+    // no reaper to clean it up.
     this.child = spawn(bin, args, {
       cwd: opts.cwd,
       env: opts.env ? { ...process.env, ...opts.env } : undefined,
-      detached: true,
+      detached: process.platform !== "win32",
     });
 
     // Decoded on the stream, not per chunk: a read ends wherever the pipe

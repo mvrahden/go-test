@@ -89,6 +89,15 @@ describe("ManagedChild", () => {
     expect(mockKill).not.toHaveBeenCalled();
   });
 
+  // Detaching is what makes group signalling possible — and on Windows there is
+  // no group path (killProcessTree falls back to child.kill) and no registry to
+  // reap with, so it would only buy a child that outlives the extension host.
+  it("detaches only where the group can actually be signalled", async () => {
+    script.always = { stdout: [], code: 0 };
+    drain(new ManagedChild("go", ["run", "."]));
+    expect(script.calls?.[0].opts?.detached).toBe(process.platform !== "win32");
+  });
+
   it("resolves immediately when terminating an already-dead child", async () => {
     script.always = { stdout: [], code: 0 };
     const mc = drain(new ManagedChild("go", ["run", "."]));

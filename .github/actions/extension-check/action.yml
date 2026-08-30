@@ -1,6 +1,16 @@
 name: "Extension Check"
 description: "Lint, typecheck, test, and compile the VS Code extension"
 
+inputs:
+  format:
+    description: >-
+      Run the formatting check. Off outside Linux: only *.snap is pinned to LF
+      in .gitattributes, so a Windows checkout is CRLF and prettier would flag
+      every file. Formatting does not vary by platform, so checking it once is
+      enough.
+    required: false
+    default: "true"
+
 runs:
   using: "composite"
   steps:
@@ -13,6 +23,7 @@ runs:
       shell: bash
       working-directory: vscode-gotest
     - run: npm run format:check
+      if: inputs.format == 'true'
       shell: bash
       working-directory: vscode-gotest
     - run: npm run typecheck

@@ -47,7 +47,9 @@ describe("runGoToolCoverFunc", () => {
     const out = await runGoToolCoverFunc("/tmp/cover.out", "/ws");
 
     expect(out).toHaveLength(report.length);
-    expect(script.calls?.[0]).toEqual({
+    // toMatchObject, not toEqual: the fake also records spawn options, which
+    // this test has no opinion about.
+    expect(script.calls?.[0]).toMatchObject({
       bin: "/usr/bin/go",
       args: ["tool", "cover", "-func=/tmp/cover.out"],
     });

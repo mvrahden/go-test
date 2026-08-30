@@ -63,3 +63,30 @@ jobs:
         run: npm run contract:verify
       - name: Cross the process boundary for real
         run: npm run test:integration
+
+  # The unit suite mocks node:child_process, so nothing in it crosses a real
+  # process boundary. This job is the only place the extension spawns the actual
+  # CLI on Windows — where the child-process APIs differ most from a developer's
+  # machine, and where killProcessTree has no process-group path at all.
+  #
+  # Integration only: contract:record/verify is a `git diff` against a recorded
+  # file, and a Windows checkout is CRLF (.gitattributes pins only *.snap to
+  # LF), so the diff would fail for line endings rather than for drift.
+  contract-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: vscode-gotest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: vscode-gotest/package-lock.json
+      - run: npm ci
+      - name: Cross the process boundary for real
+        run: npm run test:integration
