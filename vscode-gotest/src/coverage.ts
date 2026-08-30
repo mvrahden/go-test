@@ -437,7 +437,8 @@ export class CoverageRunner implements vscode.Disposable {
       for (const fc of allCoverages) {
         run.addCoverage(fc);
       }
-      await this.store.save();
+      this.store.save();
+      await this.store.flush();
       await this.controller.saveResults();
 
       if (allJsonOutput) {

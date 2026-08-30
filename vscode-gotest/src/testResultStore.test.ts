@@ -137,8 +137,7 @@ describe("TestResultStore", () => {
       const filePath = path.join(tmpDir, "testResults.json");
       const raw = await readFile(filePath, "utf-8");
       const data = JSON.parse(raw);
-      data.results["pkg/stale"].timestamp =
-        Date.now() - 8 * 24 * 60 * 60 * 1000;
+      data.data["pkg/stale"].timestamp = Date.now() - 8 * 24 * 60 * 60 * 1000;
       await writeFile(filePath, JSON.stringify(data), "utf-8");
 
       const reader = new TestResultStore({ fsPath: tmpDir });

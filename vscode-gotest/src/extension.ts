@@ -20,6 +20,10 @@ import { CoverOnSave } from "./coverOnSave.js";
 import { CoverageStore } from "./coverageStore.js";
 import { TestResultStore } from "./testResultStore.js";
 import { RunRegistry } from "./runRegistry.js";
+import { ProcessRegistry } from "./processRegistry.js";
+import { setChildObserver } from "./managedChild.js";
+import { forceKillTimeoutSeconds } from "./config.js";
+import { setStoreErrorLogger } from "./jsonStore.js";
 import { validateGoBinary, scopedConfig } from "./cli.js";
 import {
   buildRunFilter,
@@ -45,6 +49,8 @@ export function activate(context: vscode.ExtensionContext): void {
     return;
   }
 
+  setStoreErrorLogger((message) => outputChannel.error(message));
+
   const cache = new DiscoveryCache();
   const snapshotStore = new DiscoverySnapshotStore(context.storageUri);
   const discoveryService = new DiscoveryService(
@@ -57,6 +63,13 @@ export function activate(context: vscode.ExtensionContext): void {
   const registryDir =
     context.storageUri?.fsPath ?? context.globalStorageUri.fsPath;
   const runRegistry = new RunRegistry(registryDir);
+  // Installed before anything can spawn, so no child escapes the table that
+  // makes it reapable after a crash.
+  const processRegistry = new ProcessRegistry(registryDir);
+  setChildObserver({
+    spawned: (pid, kind) => processRegistry.add(pid, kind),
+    exited: (token) => processRegistry.remove(token),
+  });
 
   let runner!: TestRunner;
   let coverageRunner!: CoverageRunner;
@@ -172,6 +185,15 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
+    {
+      dispose() {
+        // The reaper's escalation timer, and the hook that would otherwise keep
+        // recording into a registry nobody is reading any more.
+        setChildObserver(undefined);
+        setStoreErrorLogger(undefined);
+        processRegistry.dispose();
+      },
+    },
     outputChannel,
     cache,
     controller,
@@ -197,6 +219,7 @@ export function activate(context: vscode.ExtensionContext): void {
       coverageStore.flush(),
       testResultStore.flush(),
       snapshotStore.flush(),
+      processRegistry.flush(),
     ]);
   };
 
@@ -209,6 +232,7 @@ export function activate(context: vscode.ExtensionContext): void {
     controller,
     cache,
     runRegistry,
+    processRegistry,
     context,
     snapshotStore,
   }).catch((err) => {
@@ -562,9 +586,7 @@ function setupFileWatchers(
 
     if (coverageStore.invalidate(importPath)) {
       outputChannel.debug(`[coverage] invalidated ${importPath}`);
-      coverageStore.save().catch((err) => {
-        outputChannel.error(`[coverage] save after invalidate failed: ${err}`);
-      });
+      coverageStore.save();
     }
 
     triggerCoverOnSave(importPath, uri);
@@ -596,6 +618,7 @@ async function initializeAsync(deps: {
   controller: GoTestController;
   cache: DiscoveryCache;
   runRegistry: RunRegistry;
+  processRegistry: ProcessRegistry;
   context: vscode.ExtensionContext;
   snapshotStore: DiscoverySnapshotStore;
 }): Promise<void> {
@@ -608,6 +631,7 @@ async function initializeAsync(deps: {
     controller,
     cache,
     runRegistry,
+    processRegistry,
     context,
     snapshotStore,
   } = deps;
@@ -640,6 +664,30 @@ async function initializeAsync(deps: {
     ensureGitExclude(folder.uri.fsPath, outputChannel);
   }
 
+  // End what a previous session left running. A detached child survives the
+  // extension host that started it, and until now nothing ever went back for
+  // it — sweepStale only rewrote a status.
+  //
+  // Only inherited records are eligible: anything this session spawned while
+  // activation was still getting here belongs to us, not to the reaper.
+  await processRegistry.load();
+  if (processRegistry.inheritedSize > 0) {
+    const { signalled, vanished } = processRegistry.reapOrphans({
+      kill: (pid, signal) => process.kill(pid, signal),
+      graceMs: forceKillTimeoutSeconds(firstDir) * 1000,
+    });
+    for (const record of signalled) {
+      outputChannel.info(
+        `[processes] terminating orphaned ${record.kind} (pid ${record.pid}) from a previous session`,
+      );
+    }
+    if (vanished.length > 0) {
+      outputChannel.debug(
+        `[processes] ${vanished.length} recorded process(es) were already gone`,
+      );
+    }
+  }
+
   await runRegistry.load();
   const crashed = runRegistry.sweepStale();
   if (crashed.length > 0) {
@@ -668,7 +716,7 @@ async function initializeAsync(deps: {
   // that made every activation as slow as the toolchain's worst case. The
   // snapshot is stale by definition; the discovery below replaces it.
   const snapshotStartedAt = Date.now();
-  await snapshotStore.load();
+  await snapshotStore.load(workspaceFolders.map((f) => f.uri.fsPath));
   let restoredFromSnapshot = false;
   for (const folder of workspaceFolders) {
     const snapshot = snapshotStore.get(folder.uri.fsPath);

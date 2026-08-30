@@ -1,5 +1,6 @@
 import * as path from "node:path";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { atomicWrite } from "./jsonStore.js";
 
 export type RunKind = "test" | "coverage" | "watch" | "prepare";
 export type RunStatus = "running" | "completed" | "cancelled" | "crashed";
@@ -20,6 +21,16 @@ export interface RegisterInput {
 
 const TTL_MS = 15 * 60 * 1000;
 const REGISTRY_FILE = "run-registry.json";
+
+// Bump when RunRecord's shape changes. Without this the file was a bare array,
+// so a shape change had no way to invalidate records written by an older build
+// — they would be read back and reasoned about as if they were current.
+const STORE_VERSION = 1;
+
+interface StoredData {
+  version: number;
+  records: RunRecord[];
+}
 
 export class RunRegistry {
   private records = new Map<string, RunRecord>();
@@ -87,9 +98,14 @@ export class RunRegistry {
   }
 
   async save(): Promise<void> {
-    await mkdir(this.storageDir, { recursive: true });
-    const data = JSON.stringify([...this.records.values()], null, 2);
-    await writeFile(path.join(this.storageDir, REGISTRY_FILE), data, "utf-8");
+    const payload: StoredData = {
+      version: STORE_VERSION,
+      records: [...this.records.values()],
+    };
+    await atomicWrite(
+      path.join(this.storageDir, REGISTRY_FILE),
+      JSON.stringify(payload),
+    );
   }
 
   async load(): Promise<void> {
@@ -98,9 +114,12 @@ export class RunRegistry {
         path.join(this.storageDir, REGISTRY_FILE),
         "utf-8",
       );
-      const records: RunRecord[] = JSON.parse(data);
+      const parsed = JSON.parse(data) as StoredData | RunRecord[];
+      // A bare array is the pre-versioning file. Its records are 15-minute
+      // bookkeeping, so dropping them costs nothing and beats guessing.
+      if (Array.isArray(parsed) || parsed.version !== STORE_VERSION) return;
       this.records.clear();
-      for (const r of records) {
+      for (const r of parsed.records ?? []) {
         this.records.set(r.id, r);
       }
     } catch {

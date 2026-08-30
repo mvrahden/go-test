@@ -1,7 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { spawn } from "node:child_process";
 import { buildCliCommand, stripGoRunExitEcho } from "./cli.js";
+import { specRenderTimeoutSeconds } from "./config.js";
+import { ManagedChild } from "./managedChild.js";
 import { readModulePath } from "./gomod.js";
 import type { DiscoveryCache } from "./discovery.js";
 
@@ -324,38 +325,54 @@ ${SCRIPT}
       workspaceDir,
       this.outputChannel,
     );
-    return new Promise<string>((resolve, reject) => {
-      const child = spawn(cmd.bin, cmd.args, { cwd: workspaceDir });
-      let stdout = "";
-      let stderr = "";
-
-      // Decoded on the stream: a spec tree is large enough to arrive in several
-      // reads, and a boundary inside a multi-byte character would corrupt the
-      // behavior name it lands in.
-      child.stdout.setEncoding("utf-8");
-      child.stderr.setEncoding("utf-8");
-      child.stdout.on("data", (chunk: string) => {
-        stdout += chunk;
-      });
-      child.stderr.on("data", (chunk: string) => {
-        stderr += chunk;
-      });
-      child.on("close", (code) => {
-        const outcome = interpretSpecExit(code, stdout, stderr);
-        if (outcome.ok) {
-          resolve(outcome.stdout);
-        } else {
-          reject(new Error(outcome.message));
-        }
-      });
-      child.on("error", (err: Error) => {
-        reject(err);
-      });
-
-      child.stdin.on("error", () => {});
-      child.stdin.write(jsonInput);
-      child.stdin.end();
+    const budgetSeconds = specRenderTimeoutSeconds(workspaceDir);
+    const mc = new ManagedChild(cmd.bin, cmd.args, {
+      cwd: workspaceDir,
+      kind: "spec",
     });
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    let spawnError: Error | undefined;
+
+    // Decoded on the stream by ManagedChild: a spec tree is large enough to
+    // arrive in several reads, and a boundary inside a multi-byte character
+    // would corrupt the behavior name it lands in.
+    mc.child.stdout?.on("data", (chunk: string) => {
+      stdout += chunk;
+    });
+    mc.child.stderr?.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    mc.child.on("error", (err: Error) => {
+      spawnError = err;
+    });
+
+    // Rendering is a read: it has no fixtures to tear down, so it gets a budget
+    // and the prompt escalation. Without them a wedged CLI left this promise
+    // pending forever and nothing could end the child.
+    const budget = setTimeout(() => {
+      timedOut = true;
+      void mc.terminate("prompt");
+    }, budgetSeconds * 1000);
+
+    mc.child.stdin?.on("error", () => {});
+    mc.child.stdin?.write(jsonInput);
+    mc.child.stdin?.end();
+
+    try {
+      const { code } = await mc.exited;
+      if (spawnError) throw spawnError;
+      if (timedOut) {
+        throw new Error(`spec render timed out after ${budgetSeconds}s`);
+      }
+      const outcome = interpretSpecExit(code, stdout, stderr);
+      if (!outcome.ok) throw new Error(outcome.message);
+      return outcome.stdout;
+    } finally {
+      clearTimeout(budget);
+      mc.dispose();
+    }
   }
 }
 

@@ -1,9 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockReadFile, mockWriteFile, mockMkdir, files } = vi.hoisted(() => {
+const {
+  mockReadFile,
+  mockWriteFile,
+  mockMkdir,
+  mockRename,
+  mockReaddir,
+  mockStat,
+  mockUnlink,
+  files,
+  mtimes,
+} = vi.hoisted(() => {
   const files = new Map<string, string>();
+  const mtimes = new Map<string, number>();
   return {
     files,
+    mtimes,
     mockReadFile: vi.fn(async (p: string) => {
       const content = files.get(p);
       if (content === undefined) throw new Error("ENOENT");
@@ -11,8 +23,25 @@ const { mockReadFile, mockWriteFile, mockMkdir, files } = vi.hoisted(() => {
     }),
     mockWriteFile: vi.fn(async (p: string, content: string) => {
       files.set(p, content);
+      if (!mtimes.has(p)) mtimes.set(p, Date.now());
     }),
     mockMkdir: vi.fn(async () => undefined),
+    mockRename: vi.fn(async (from: string, to: string) => {
+      const content = files.get(from);
+      if (content === undefined) throw new Error("ENOENT");
+      files.set(to, content);
+      files.delete(from);
+    }),
+    mockReaddir: vi.fn(async () =>
+      [...files.keys()].map((p) => p.split("/").pop()!),
+    ),
+    mockStat: vi.fn(async (p: string) => ({
+      mtimeMs: mtimes.get(p) ?? Date.now(),
+    })),
+    mockUnlink: vi.fn(async (p: string) => {
+      files.delete(p);
+      mtimes.delete(p);
+    }),
   };
 });
 
@@ -20,13 +49,16 @@ vi.mock("node:fs/promises", () => ({
   readFile: mockReadFile,
   writeFile: mockWriteFile,
   mkdir: mockMkdir,
+  rename: mockRename,
+  readdir: mockReaddir,
+  stat: mockStat,
+  unlink: mockUnlink,
 }));
 
 import { DiscoverySnapshotStore } from "./discoverySnapshotStore.js";
 import type { DiscoverPackage, DiscoverWarning } from "./types.js";
 
 const storage = { fsPath: "/storage" } as import("vscode").Uri;
-const SNAPSHOT = "/storage/discovery.json";
 
 function pkg(importPath: string): DiscoverPackage {
   return {
@@ -40,6 +72,7 @@ function pkg(importPath: string): DiscoverPackage {
 describe("DiscoverySnapshotStore", () => {
   beforeEach(() => {
     files.clear();
+    mtimes.clear();
     vi.clearAllMocks();
   });
 
@@ -53,90 +86,46 @@ describe("DiscoverySnapshotStore", () => {
     await store.flush();
 
     const reloaded = new DiscoverySnapshotStore(storage);
-    await reloaded.load();
+    await reloaded.load(["/ws"]);
     const snap = reloaded.get("/ws");
     expect(snap?.packages).toEqual([pkg("example.com/m/a")]);
     expect(snap?.warnings).toEqual(warnings);
   });
 
-  it("keeps workspaces apart", async () => {
+  // The reason for one file per workspace: updating one tree used to rewrite
+  // every tree the extension had ever seen.
+  it("writes only the workspace that changed", async () => {
     const store = new DiscoverySnapshotStore(storage);
-    store.update("/ws1", [pkg("example.com/m/a")], []);
-    store.update("/ws2", [pkg("example.com/m/b")], []);
+    store.update("/ws/a", [pkg("example.com/a")], []);
+    store.update("/ws/b", [pkg("example.com/b")], []);
     store.save();
     await store.flush();
+    expect(files.size).toBe(2);
+
+    mockWriteFile.mockClear();
+    store.update("/ws/a", [pkg("example.com/a2")], []);
+    store.save();
+    await store.flush();
+
+    expect(mockWriteFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps workspaces apart, so one corrupt file costs one tree", async () => {
+    const store = new DiscoverySnapshotStore(storage);
+    store.update("/ws/a", [pkg("example.com/a")], []);
+    store.update("/ws/b", [pkg("example.com/b")], []);
+    store.save();
+    await store.flush();
+
+    const [first] = [...files.keys()];
+    files.set(first, "{ not json");
 
     const reloaded = new DiscoverySnapshotStore(storage);
-    await reloaded.load();
-    expect(reloaded.get("/ws1")?.packages).toEqual([pkg("example.com/m/a")]);
-    expect(reloaded.get("/ws2")?.packages).toEqual([pkg("example.com/m/b")]);
-    expect(reloaded.get("/ws3")).toBeUndefined();
+    await reloaded.load(["/ws/a", "/ws/b"]);
+    expect(reloaded.size).toBe(1);
   });
 
-  it("replaces a workspace's snapshot rather than merging it", async () => {
-    const store = new DiscoverySnapshotStore(storage);
-    store.update("/ws", [pkg("example.com/m/a"), pkg("example.com/m/b")], []);
-    store.update("/ws", [pkg("example.com/m/a")], []);
-    store.save();
-    await store.flush();
-
-    const reloaded = new DiscoverySnapshotStore(storage);
-    await reloaded.load();
-    // A package deleted from the workspace must not survive in the snapshot,
-    // or the tree would show it again on every activation.
-    expect(reloaded.get("/ws")?.packages).toEqual([pkg("example.com/m/a")]);
-  });
-
-  it("ignores a snapshot written by a different schema version", async () => {
-    files.set(SNAPSHOT, JSON.stringify({ version: 99, workspaces: {} }));
-    const store = new DiscoverySnapshotStore(storage);
-    await store.load();
-    expect(store.get("/ws")).toBeUndefined();
-  });
-
-  it("starts fresh on a corrupt snapshot instead of throwing", async () => {
-    files.set(SNAPSHOT, "{not json");
-    const store = new DiscoverySnapshotStore(storage);
-    await expect(store.load()).resolves.toBeUndefined();
-    expect(store.get("/ws")).toBeUndefined();
-  });
-
-  it("starts fresh when nothing has been stored yet", async () => {
-    const store = new DiscoverySnapshotStore(storage);
-    await store.load();
-    expect(store.get("/ws")).toBeUndefined();
-  });
-
-  it("never touches disk without a storage location", async () => {
-    const store = new DiscoverySnapshotStore(undefined);
-    store.update("/ws", [pkg("example.com/m/a")], []);
-    store.save();
-    await expect(store.flush()).resolves.toBeUndefined();
-    await expect(store.load()).resolves.toBeUndefined();
-    expect(mockWriteFile).not.toHaveBeenCalled();
-    expect(mockReadFile).not.toHaveBeenCalled();
-  });
-
-  it("writes compactly", async () => {
-    const store = new DiscoverySnapshotStore(storage);
-    store.update("/ws", [pkg("example.com/m/a")], []);
-    store.save();
-    await store.flush();
-    // A large project's snapshot is megabytes; indentation is pure cost on a
-    // file written after every discovery.
-    expect(files.get(SNAPSHOT)).not.toContain("\n");
-  });
-});
-
-describe("DiscoverySnapshotStore write behaviour", () => {
-  beforeEach(() => {
-    files.clear();
-    vi.clearAllMocks();
-  });
-
-  // Every save of a _test.go file rediscovers its package, and each one used to
-  // rewrite the whole workspace tree synchronously.
-  it("coalesces a burst of saves into one write", async () => {
+  it("coalesces a burst of saves into one write per workspace", async () => {
     const store = new DiscoverySnapshotStore(storage);
     for (let i = 0; i < 5; i++) {
       store.update("/ws", [pkg(`example.com/m/p${i}`)], []);
@@ -150,20 +139,57 @@ describe("DiscoverySnapshotStore write behaviour", () => {
   // load, so a save in that window produces a discovery whose result must not
   // be thrown away by the load that arrives afterwards.
   it("does not let a late load discard what discovery already found", async () => {
-    files.set(
-      SNAPSHOT,
-      JSON.stringify({
-        version: 1,
-        workspaces: {
-          "/ws": { packages: [pkg("example.com/m/stale")], warnings: [] },
-        },
-      }),
-    );
+    const seed = new DiscoverySnapshotStore(storage);
+    seed.update("/ws", [pkg("example.com/m/stale")], []);
+    seed.save();
+    await seed.flush();
 
     const store = new DiscoverySnapshotStore(storage);
     store.update("/ws", [pkg("example.com/m/fresh")], []);
-    await store.load();
+    await store.load(["/ws"]);
 
     expect(store.get("/ws")?.packages).toEqual([pkg("example.com/m/fresh")]);
+  });
+
+  it("drops snapshots for workspaces nobody has opened in a month", async () => {
+    const store = new DiscoverySnapshotStore(storage);
+    store.update("/ws/old", [pkg("example.com/old")], []);
+    store.save();
+    await store.flush();
+
+    const [stale] = [...files.keys()];
+    mtimes.set(stale, Date.now() - 40 * 24 * 60 * 60 * 1000);
+
+    const reopened = new DiscoverySnapshotStore(storage);
+    await reopened.load(["/ws/current"]);
+
+    expect(files.has(stale)).toBe(false);
+  });
+
+  it("never touches disk without a storage location", async () => {
+    const store = new DiscoverySnapshotStore(undefined);
+    store.update("/ws", [pkg("example.com/m/a")], []);
+    store.save();
+    await expect(store.flush()).resolves.toBeUndefined();
+    await expect(store.load(["/ws"])).resolves.toBeUndefined();
+    expect(mockWriteFile).not.toHaveBeenCalled();
+    expect(mockReadFile).not.toHaveBeenCalled();
+  });
+
+  it("writes compactly", async () => {
+    const store = new DiscoverySnapshotStore(storage);
+    store.update("/ws", [pkg("example.com/m/a")], []);
+    store.save();
+    await store.flush();
+    // A large project's snapshot is hundreds of kilobytes; indentation is pure
+    // cost on a file only this extension reads.
+    expect([...files.values()][0]).not.toContain("\n");
+  });
+
+  it("ignores a snapshot written by an older layout", async () => {
+    files.set("/storage/discovery.json", JSON.stringify({ version: 1 }));
+    const store = new DiscoverySnapshotStore(storage);
+    await store.load(["/ws"]);
+    expect(store.size).toBe(0);
   });
 });

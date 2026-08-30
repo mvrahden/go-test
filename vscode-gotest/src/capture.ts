@@ -1,7 +1,5 @@
-import { spawn } from "node:child_process";
 import { stripGoRunExitEcho } from "./cli.js";
-import { killProcessTree } from "./processTree.js";
-import { CAPTURE_FORCE_KILL_GRACE_MS } from "./config.js";
+import { ManagedChild } from "./managedChild.js";
 
 // CaptureTimeoutError marks the one failure that is not worth retrying: the
 // command was given its full budget and did not finish. Retrying spends the
@@ -32,92 +30,55 @@ export interface CaptureOptions {
 // is killed mid-write and everything it produced is discarded — which is how a
 // large project's test tree disappeared from the explorer. Nothing gotest emits
 // on stdout is bounded, so nothing reading it may be.
-export function captureStdout(
+export async function captureStdout(
   bin: string,
   args: string[],
   opts: CaptureOptions = {},
 ): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    // Own process group, so the timeout below can signal the compiled binary
-    // and not just the `go run` that launched it.
-    const child = spawn(bin, args, { cwd: opts.cwd, detached: true });
-    const stdout: string[] = [];
-    let stderr = "";
-    let timedOut = false;
-    let settled = false;
+  const mc = new ManagedChild(bin, args, { cwd: opts.cwd, kind: "read" });
+  const stdout: string[] = [];
+  let stderr = "";
+  let timedOut = false;
 
-    // Decode on the stream, not per chunk: a read ends wherever the pipe filled,
-    // and a chunk-wise toString() would corrupt whatever multi-byte character it
-    // lands inside. These payloads carry the developer's own text.
-    child.stdout.setEncoding("utf-8");
-    child.stderr.setEncoding("utf-8");
-    const started = Date.now();
-    let sawFirstByte = false;
-    child.stdout.on("data", (chunk: string) => {
-      if (!sawFirstByte) {
-        sawFirstByte = true;
-        opts.onFirstByte?.(Date.now() - started);
-      }
-      stdout.push(chunk);
-    });
-    child.stderr.on("data", (chunk: string) => {
-      stderr += chunk;
-    });
-
-    let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
-    const timer =
-      opts.timeoutSeconds === undefined
-        ? undefined
-        : setTimeout(() => {
-            timedOut = true;
-            // SIGTERM the group, then escalate. Without the escalation a child
-            // that ignores SIGTERM never closes its pipes, `close` never fires,
-            // and this promise never settles — which wedges the caller far more
-            // thoroughly than the slow command the budget was meant to bound.
-            //
-            // Armed before the signal, because a child that dies on SIGTERM
-            // settles us from inside the call below — and a timer armed after
-            // that would outlive the settle that was supposed to clear it.
-            forceKillTimer = setTimeout(() => {
-              if (settled) return;
-              killProcessTree(child, "SIGKILL");
-            }, CAPTURE_FORCE_KILL_GRACE_MS);
-            killProcessTree(child, "SIGTERM");
-          }, opts.timeoutSeconds * 1000);
-
-    const settle = (outcome: () => void) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      clearTimeout(forceKillTimer);
-      outcome();
-    };
-
-    // A missing binary arrives here rather than as an exit code, and callers
-    // read `code` off the error to drop a cached path — so pass it through.
-    child.on("error", (err: Error) => settle(() => reject(err)));
-
-    // `close` waits for the pipes, which is what we want for the output — but a
-    // surviving grandchild can hold them open forever. Once we have timed out
-    // the output is being discarded anyway, so `exit` is enough to settle.
-    child.on("exit", () => {
-      if (!timedOut) return;
-      settle(() => reject(new CaptureTimeoutError(opts.timeoutSeconds ?? 0)));
-    });
-
-    child.on("close", (code) => {
-      settle(() => {
-        if (timedOut) {
-          reject(new CaptureTimeoutError(opts.timeoutSeconds ?? 0));
-        } else if (code === 0) {
-          resolve(stdout.join(""));
-        } else {
-          const detail = stripGoRunExitEcho(stderr);
-          reject(
-            new Error(`exited with code ${code}${detail ? `: ${detail}` : ""}`),
-          );
-        }
-      });
-    });
+  const started = Date.now();
+  let sawFirstByte = false;
+  mc.child.stdout?.on("data", (chunk: string) => {
+    if (!sawFirstByte) {
+      sawFirstByte = true;
+      opts.onFirstByte?.(Date.now() - started);
+    }
+    stdout.push(chunk);
   });
+  mc.child.stderr?.on("data", (chunk: string) => {
+    stderr += chunk;
+  });
+
+  // A missing binary arrives as an error event rather than an exit code, and
+  // callers read `code` off it to drop a cached path — so keep the real error.
+  let spawnError: Error | undefined;
+  mc.child.on("error", (err: Error) => {
+    spawnError = err;
+  });
+
+  // A read: no fixtures to tear down, and past the budget the output is being
+  // discarded anyway, so it gets the prompt escalation.
+  const budget =
+    opts.timeoutSeconds === undefined
+      ? undefined
+      : setTimeout(() => {
+          timedOut = true;
+          void mc.terminate("prompt");
+        }, opts.timeoutSeconds * 1000);
+
+  try {
+    const { code } = await mc.exited;
+    if (spawnError) throw spawnError;
+    if (timedOut) throw new CaptureTimeoutError(opts.timeoutSeconds ?? 0);
+    if (code === 0) return stdout.join("");
+    const detail = stripGoRunExitEcho(stderr);
+    throw new Error(`exited with code ${code}${detail ? `: ${detail}` : ""}`);
+  } finally {
+    clearTimeout(budget);
+    mc.dispose();
+  }
 }

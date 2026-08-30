@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
-import * as path from "node:path";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { JsonStore } from "./jsonStore.js";
 import {
   type ParsedFileCoverage,
   type CoverageResult,
@@ -19,10 +18,11 @@ interface StoredPackageCoverage {
   supplementary?: boolean;
 }
 
-interface StoredData {
-  version: 1;
-  packages: Record<string, StoredPackageCoverage>;
-}
+type StoredData = Record<string, StoredPackageCoverage>;
+
+// 2, not 1: the on-disk envelope moved to the shared { version, data } shape.
+// A mismatch purges, which is right for a cache.
+const STORE_VERSION = 2;
 
 interface ParsedPackageCache {
   profiles: ParsedFileCoverage[];
@@ -33,13 +33,14 @@ export class CoverageStore implements vscode.Disposable {
   private packages = new Map<string, StoredPackageCoverage>();
   private parsed = new Map<string, ParsedPackageCache>();
   private cachedDetails = new Map<string, vscode.FileCoverageDetail[]>();
-  private readonly storagePath: string | undefined;
-  private saveChain = Promise.resolve();
+  private readonly store: JsonStore<StoredData>;
 
   constructor(storageUri: vscode.Uri | undefined) {
-    if (storageUri) {
-      this.storagePath = path.join(storageUri.fsPath, "coverage.json");
-    }
+    this.store = new JsonStore<StoredData>(
+      storageUri?.fsPath,
+      "coverage.json",
+      STORE_VERSION,
+    );
   }
 
   get size(): number {
@@ -64,6 +65,7 @@ export class CoverageStore implements vscode.Disposable {
     });
     this.parsed.delete(importPath);
     this.cachedDetails.clear();
+    this.store.markMutated();
   }
 
   invalidate(importPath: string): boolean {
@@ -71,6 +73,7 @@ export class CoverageStore implements vscode.Disposable {
     if (deleted) {
       this.parsed.delete(importPath);
       this.cachedDetails.clear();
+      this.store.markMutated();
     }
     return deleted;
   }
@@ -82,7 +85,11 @@ export class CoverageStore implements vscode.Disposable {
     this.packages.clear();
     this.parsed.clear();
     this.cachedDetails.clear();
-    return this.save();
+    this.store.markMutated();
+    this.save();
+    // The one caller that must not race the write: the developer dismissed
+    // these results and a reload before the flush would bring them back.
+    return this.flush();
   }
 
   buildFileCoverages(cache: DiscoveryCache): CoverageResult {
@@ -133,43 +140,23 @@ export class CoverageStore implements vscode.Disposable {
   }
 
   async load(): Promise<void> {
-    if (!this.storagePath) {
-      return;
-    }
-    try {
-      const content = await readFile(this.storagePath, "utf-8");
-      const data = JSON.parse(content) as StoredData;
-      if (data.version !== 1) {
-        return;
-      }
-      this.packages.clear();
-      this.parsed.clear();
-      for (const [importPath, pkg] of Object.entries(data.packages)) {
-        this.packages.set(importPath, pkg);
-      }
-    } catch {
-      // No stored data or corrupt — start fresh
+    const data = await this.store.read();
+    if (!data) return;
+    this.packages.clear();
+    this.parsed.clear();
+    for (const [importPath, pkg] of Object.entries(data)) {
+      this.packages.set(importPath, pkg);
     }
   }
 
-  save(): Promise<void> {
-    const op = this.saveChain.then(() => this.writeToDisk());
-    this.saveChain = op.catch(() => {});
-    return op;
+  // Void and debounced, like every other store: no call site has to know
+  // whether this particular one returns something to await.
+  save(): void {
+    this.store.save(() => Object.fromEntries(this.packages));
   }
 
   flush(): Promise<void> {
-    return this.saveChain;
-  }
-
-  private async writeToDisk(): Promise<void> {
-    if (!this.storagePath) return;
-    const data: StoredData = {
-      version: 1,
-      packages: Object.fromEntries(this.packages),
-    };
-    await mkdir(path.dirname(this.storagePath), { recursive: true });
-    await writeFile(this.storagePath, JSON.stringify(data), "utf-8");
+    return this.store.flush();
   }
 
   dispose(): void {

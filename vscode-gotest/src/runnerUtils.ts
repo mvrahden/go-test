@@ -1,8 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { spawn } from "node:child_process";
 import { killProcessTree } from "./processTree.js";
-import { forceKillTimeoutSeconds } from "./config.js";
+import { ManagedChild } from "./managedChild.js";
 import { readFile } from "node:fs/promises";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
@@ -397,7 +396,7 @@ export interface SpawnResult {
   exitCode: number;
 }
 
-export function spawnTestProcess(
+export async function spawnTestProcess(
   bin: string,
   args: string[],
   cwd: string,
@@ -407,82 +406,72 @@ export function spawnTestProcess(
   env?: Record<string, string>,
   onStdoutLine?: (line: string) => void,
 ): Promise<SpawnResult> {
-  return new Promise<SpawnResult>((resolve, reject) => {
-    const child = spawn(bin, args, {
-      cwd,
-      env: env ? { ...process.env, ...env } : undefined,
-      detached: true,
-    });
-    let stdout = "";
-    let stderr = "";
-    let lineBuffer = "";
-    let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
+  const mc = new ManagedChild(bin, args, { cwd, env, kind: "test" });
+  let stdout = "";
+  let stderr = "";
+  let lineBuffer = "";
+  let spawnError: Error | undefined;
 
-    // Decoded on the stream, so a character split across two reads survives:
-    // test output is the developer's own text, and the line assembly below
-    // would otherwise emit a corrupted event.
-    child.stdout.setEncoding("utf-8");
-    child.stderr.setEncoding("utf-8");
-    child.stdout.on("data", (chunk: string) => {
-      stdout += chunk;
+  // Line assembly is the caller's job: ManagedChild decodes the stream so a
+  // character split across two reads survives, but what counts as an event is
+  // specific to this surface.
+  mc.child.stdout?.on("data", (chunk: string) => {
+    stdout += chunk;
 
-      if (onStdoutLine) {
-        lineBuffer += chunk;
-        const lines = lineBuffer.split("\n");
-        lineBuffer = lines.pop() ?? "";
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed) {
-            onStdoutLine(trimmed);
-          }
+    if (onStdoutLine) {
+      lineBuffer += chunk;
+      const lines = lineBuffer.split("\n");
+      lineBuffer = lines.pop() ?? "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed) {
+          onStdoutLine(trimmed);
         }
       }
-    });
-
-    child.stderr.on("data", (chunk: string) => {
-      stderr += chunk;
-    });
-
-    const cancelListener = token.onCancellationRequested(() => {
-      outputChannel.info(
-        `[${label}] cancellation requested, sending SIGTERM (pid ${child.pid})`,
-      );
-      killProcessTree(child, "SIGTERM");
-      const killTimeout = forceKillTimeoutSeconds(cwd) * 1000;
-      forceKillTimer = setTimeout(() => {
-        outputChannel.warn(
-          `[${label}] process did not exit after SIGTERM, sending SIGKILL`,
-        );
-        killProcessTree(child, "SIGKILL");
-      }, killTimeout);
-    });
-
-    child.on("close", (code) => {
-      if (forceKillTimer) clearTimeout(forceKillTimer);
-      cancelListener.dispose();
-      if (onStdoutLine) {
-        const remaining = lineBuffer.trim();
-        if (remaining) {
-          onStdoutLine(remaining);
-        }
-      }
-      if (stderr) {
-        for (const line of stderr.split("\n")) {
-          if (line.trim()) {
-            outputChannel.warn(`[${label}] stderr: ${line}`);
-          }
-        }
-      }
-      resolve({ stdout, stderr, exitCode: code ?? 1 });
-    });
-
-    child.on("error", (err: Error) => {
-      if (forceKillTimer) clearTimeout(forceKillTimer);
-      cancelListener.dispose();
-      outputChannel.error(`[${label}] ${err.message}`);
-      reject(err);
-    });
+    }
   });
+
+  mc.child.stderr?.on("data", (chunk: string) => {
+    stderr += chunk;
+  });
+
+  mc.child.on("error", (err: Error) => {
+    spawnError = err;
+  });
+
+  // A run: SIGTERM is what starts fixture teardown, so it gets the teardown
+  // grace rather than the prompt one.
+  const cancelListener = token.onCancellationRequested(() => {
+    outputChannel.info(
+      `[${label}] cancellation requested, sending SIGTERM (pid ${mc.pid})`,
+    );
+    void mc.terminate("teardown");
+  });
+
+  try {
+    const { code } = await mc.exited;
+    if (spawnError) {
+      outputChannel.error(`[${label}] ${spawnError.message}`);
+      throw spawnError;
+    }
+    if (onStdoutLine) {
+      const remaining = lineBuffer.trim();
+      if (remaining) {
+        onStdoutLine(remaining);
+      }
+    }
+    if (stderr) {
+      for (const line of stderr.split("\n")) {
+        if (line.trim()) {
+          outputChannel.warn(`[${label}] stderr: ${line}`);
+        }
+      }
+    }
+    return { stdout, stderr, exitCode: code ?? 1 };
+  } finally {
+    cancelListener.dispose();
+    mc.dispose();
+  }
 }
 
 export function buildRunFilter(items: vscode.TestItem[]): string | undefined {

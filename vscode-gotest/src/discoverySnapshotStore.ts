@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readFile, readdir, stat, unlink } from "node:fs/promises";
+import { atomicWrite, LoadOnce, reportStoreError } from "./jsonStore.js";
 import type { DiscoverPackage, DiscoverWarning } from "./types.js";
 
 export interface DiscoverySnapshot {
@@ -9,8 +11,22 @@ export interface DiscoverySnapshot {
 }
 
 interface StoredData {
-  version: 1;
-  workspaces: Record<string, DiscoverySnapshot>;
+  version: 2;
+  workspaceDir: string;
+  snapshot: DiscoverySnapshot;
+}
+
+const PREFIX = "discovery-";
+const SUFFIX = ".json";
+
+// Snapshots for workspaces nobody has opened in this long are dropped. Without
+// it, one file per workspace only trades an unbounded number of entries in one
+// file for an unbounded number of files in a directory.
+const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+function fileFor(workspaceDir: string): string {
+  const digest = createHash("sha256").update(workspaceDir).digest("hex");
+  return `${PREFIX}${digest.slice(0, 16)}${SUFFIX}`;
 }
 
 // DiscoverySnapshotStore persists the last known test tree.
@@ -25,25 +41,29 @@ interface StoredData {
 // The snapshot is a cache, never a source of truth: it is whatever was true
 // when the window last closed, and the discovery that follows it replaces it
 // wholesale.
+//
+// One file per workspace. A single shared file meant every save of a _test.go
+// file rewrote the tree of every workspace ever opened to update one of them,
+// and one corrupt file cost all of them their head start.
 export class DiscoverySnapshotStore {
   private workspaces = new Map<string, DiscoverySnapshot>();
-  private readonly storagePath: string | undefined;
+  private readonly storageDir: string | undefined;
   private saveChain = Promise.resolve();
   private debounceTimer: ReturnType<typeof setTimeout> | undefined;
-  // Set by the first update(). Discovery can run before load() resolves —
-  // activate() registers the file watchers before initializeAsync awaits the
-  // load — and what discovery just found beats what the last session stored.
-  private dirty = false;
+  private pendingWrites = new Set<string>();
+  // Discovery can run before load() resolves — activate() registers the file
+  // watchers before initializeAsync awaits the load — and what discovery just
+  // found beats what the last session stored. Same latch as JsonStore's, so the
+  // rule has one implementation rather than one per store.
+  private readonly latch = new LoadOnce();
 
-  // A whole-workspace tree is hundreds of kilobytes to serialize, and every
-  // save of a _test.go file triggers a package rediscovery. Coalesce, the way
-  // TestResultStore does, rather than rewriting the file per keystroke-save.
+  // A tree is hundreds of kilobytes to serialize, and every save of a _test.go
+  // file triggers a package rediscovery. Coalesce, the way TestResultStore does,
+  // rather than rewriting on every keystroke-save.
   private static readonly SAVE_DEBOUNCE_MS = 500;
 
   constructor(storageUri: vscode.Uri | undefined) {
-    if (storageUri) {
-      this.storagePath = path.join(storageUri.fsPath, "discovery.json");
-    }
+    this.storageDir = storageUri?.fsPath;
   }
 
   get size(): number {
@@ -63,29 +83,35 @@ export class DiscoverySnapshotStore {
     warnings: DiscoverWarning[],
   ): void {
     this.workspaces.set(workspaceDir, { packages, warnings });
-    this.dirty = true;
+    this.pendingWrites.add(workspaceDir);
+    this.latch.markMutated();
   }
 
-  async load(): Promise<void> {
-    if (!this.storagePath || this.dirty) {
+  // load reads the snapshots for the workspaces currently open, and prunes
+  // whatever has gone stale. Only the open workspaces are read: the rest are
+  // files on disk that cost nothing until someone opens them again.
+  async load(workspaceDirs: string[]): Promise<void> {
+    if (!this.storageDir || this.latch.blocked) {
       return;
     }
-    try {
-      const content = await readFile(this.storagePath, "utf-8");
-      const data = JSON.parse(content) as StoredData;
-      if (data.version !== 1) {
-        return;
-      }
-      this.workspaces.clear();
-      for (const [dir, snapshot] of Object.entries(data.workspaces ?? {})) {
+    for (const dir of workspaceDirs) {
+      try {
+        const content = await readFile(
+          path.join(this.storageDir, fileFor(dir)),
+          "utf-8",
+        );
+        const data = JSON.parse(content) as StoredData;
+        if (data.version !== 2 || data.workspaceDir !== dir) continue;
         this.workspaces.set(dir, {
-          packages: snapshot.packages ?? [],
-          warnings: snapshot.warnings ?? [],
+          packages: data.snapshot?.packages ?? [],
+          warnings: data.snapshot?.warnings ?? [],
         });
+      } catch {
+        // No stored data or corrupt — this workspace starts without a head
+        // start, and the others are unaffected.
       }
-    } catch {
-      // No stored data or corrupt — start fresh
     }
+    await this.prune();
   }
 
   save(): void {
@@ -108,21 +134,45 @@ export class DiscoverySnapshotStore {
   }
 
   private enqueueWrite(): void {
+    const dirs = [...this.pendingWrites];
+    this.pendingWrites.clear();
     this.saveChain = this.saveChain
-      .then(() => this.writeToDisk())
-      .catch(() => {
+      .then(() => this.writeToDisk(dirs))
+      .catch((err) => {
         // A snapshot is a cache; a failed write costs the next activation its
-        // head start and nothing else.
+        // head start and nothing else — but it is said out loud.
+        reportStoreError("write discovery snapshot", err);
       });
   }
 
-  private async writeToDisk(): Promise<void> {
-    if (!this.storagePath) return;
-    const data: StoredData = {
-      version: 1,
-      workspaces: Object.fromEntries(this.workspaces),
-    };
-    await mkdir(path.dirname(this.storagePath), { recursive: true });
-    await writeFile(this.storagePath, JSON.stringify(data), "utf-8");
+  private async writeToDisk(dirs: string[]): Promise<void> {
+    if (!this.storageDir) return;
+    for (const dir of dirs) {
+      const snapshot = this.workspaces.get(dir);
+      if (!snapshot) continue;
+      const data: StoredData = { version: 2, workspaceDir: dir, snapshot };
+      await atomicWrite(
+        path.join(this.storageDir, fileFor(dir)),
+        JSON.stringify(data),
+      );
+    }
+  }
+
+  private async prune(): Promise<void> {
+    if (!this.storageDir) return;
+    try {
+      const entries = await readdir(this.storageDir);
+      const now = Date.now();
+      for (const entry of entries) {
+        if (!entry.startsWith(PREFIX) || !entry.endsWith(SUFFIX)) continue;
+        const full = path.join(this.storageDir, entry);
+        const info = await stat(full);
+        if (now - info.mtimeMs > MAX_AGE_MS) {
+          await unlink(full);
+        }
+      }
+    } catch {
+      // Pruning is housekeeping; failing it must not fail activation.
+    }
   }
 }

@@ -1,5 +1,4 @@
-import * as path from "node:path";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { JsonStore } from "./jsonStore.js";
 
 export interface TestResult {
   status: "pass" | "fail" | "skip";
@@ -39,20 +38,20 @@ interface StoredTestResult extends TestResult {
 // cannot catch a store left by an unreleased v1.27 build, which predates these
 // fields without saying so; that one falls back to the pre-bracket numbers
 // until the next run replaces it.
-const STORE_VERSION = 2;
+// 3, not 2: the on-disk envelope moved to the shared { version, data } shape.
+// Keeping the number while changing the payload is precisely the trap the
+// version exists to prevent — a newer build would read an older file's fields
+// as if they were current. A mismatch purges, which is correct for a cache.
+// (3 and 4 were used mid-development and never released, so this reuses 3.)
+const STORE_VERSION = 3;
 
-interface StoredData {
-  version: number;
-  results: Record<string, StoredTestResult>;
-}
+type StoredData = Record<string, StoredTestResult>;
 
 const DEFAULT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export class TestResultStore {
   private results = new Map<string, StoredTestResult>();
-  private readonly storagePath: string | undefined;
-  private saveChain = Promise.resolve();
-  private debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly store: JsonStore<StoredData>;
   private readonly maxAge: number;
 
   constructor(
@@ -60,9 +59,11 @@ export class TestResultStore {
     maxAge = DEFAULT_MAX_AGE_MS,
   ) {
     this.maxAge = maxAge;
-    if (storageUri) {
-      this.storagePath = path.join(storageUri.fsPath, "testResults.json");
-    }
+    this.store = new JsonStore<StoredData>(
+      storageUri?.fsPath,
+      "testResults.json",
+      STORE_VERSION,
+    );
   }
 
   get size(): number {
@@ -75,6 +76,7 @@ export class TestResultStore {
     duration?: number,
     bracket?: { startedAt?: number; endedAt?: number; paused?: boolean },
   ): void {
+    this.store.markMutated();
     this.results.set(itemId, {
       status,
       duration,
@@ -90,6 +92,7 @@ export class TestResultStore {
   }
 
   delete(itemId: string): void {
+    this.store.markMutated();
     this.results.delete(itemId);
   }
 
@@ -107,68 +110,36 @@ export class TestResultStore {
   }
 
   async load(): Promise<void> {
-    if (!this.storagePath) return;
-    try {
-      const content = await readFile(this.storagePath, "utf-8");
-      const data = JSON.parse(content) as StoredData;
-      if (data.version !== STORE_VERSION) return;
-      this.results.clear();
-      for (const [id, result] of Object.entries(data.results)) {
-        this.results.set(id, result);
-      }
-      this.evictStale();
-    } catch {
-      /* No stored data or corrupt — start fresh */
+    const data = await this.store.read();
+    if (!data) return;
+    this.results.clear();
+    for (const [id, result] of Object.entries(data)) {
+      this.results.set(id, result);
     }
+    this.evictStale();
   }
 
   save(): void {
-    if (this.debounceTimer !== undefined) {
-      clearTimeout(this.debounceTimer);
-    }
-    this.debounceTimer = setTimeout(() => {
-      this.debounceTimer = undefined;
-      this.saveChain = this.saveChain
-        .then(() => this.writeToDisk())
-        .catch(() => {});
-    }, 500);
+    this.store.save(() => {
+      this.evictStale();
+      return Object.fromEntries(this.results);
+    });
   }
 
   flush(): Promise<void> {
-    if (this.debounceTimer !== undefined) {
-      clearTimeout(this.debounceTimer);
-      this.debounceTimer = undefined;
-      this.saveChain = this.saveChain
-        .then(() => this.writeToDisk())
-        .catch(() => {});
-    }
-    return this.saveChain;
-  }
-
-  private async writeToDisk(): Promise<void> {
-    if (!this.storagePath) return;
-    this.evictStale();
-    const data: StoredData = {
-      version: STORE_VERSION,
-      results: Object.fromEntries(this.results),
-    };
-    await mkdir(path.dirname(this.storagePath), { recursive: true });
-    await writeFile(this.storagePath, JSON.stringify(data), "utf-8");
+    return this.store.flush();
   }
 
   // clear drops every result and schedules the empty state to disk. Clearing
   // memory alone would leave the persisted copy intact, and the next window
   // reload would restore exactly the results the developer just dismissed.
   clear(): void {
+    this.store.markMutated();
     this.results.clear();
     this.save();
   }
 
   dispose(): void {
-    if (this.debounceTimer !== undefined) {
-      clearTimeout(this.debounceTimer);
-      this.debounceTimer = undefined;
-    }
     this.results.clear();
   }
 }
