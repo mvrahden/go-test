@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import * as nodePath from "node:path";
 
 const {
   mockReadFile,
@@ -33,7 +34,7 @@ const {
       files.delete(from);
     }),
     mockReaddir: vi.fn(async () =>
-      [...files.keys()].map((p) => p.split(/[\\/]/).pop()!),
+      [...files.keys()].map((p) => nodePath.basename(p)),
     ),
     mockStat: vi.fn(async (p: string) => ({
       mtimeMs: mtimes.get(p) ?? Date.now(),
