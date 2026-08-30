@@ -30,10 +30,11 @@ vi.mock("node:fs/promises", () => ({
   rename: mockRename,
 }));
 
+import * as path from "node:path";
 import { JsonStore } from "./jsonStore.js";
 
-const DIR = "/storage";
-const FILE = "/storage/thing.json";
+const DIR = path.join(path.sep, "storage");
+const FILE = path.join(DIR, "thing.json");
 
 describe("JsonStore", () => {
   beforeEach(() => {
@@ -84,7 +85,12 @@ describe("JsonStore", () => {
     await store.flush();
 
     const [tmpPath] = mockWriteFile.mock.calls[0];
-    expect(tmpPath).toMatch(/^\/storage\/thing\.json\.\d+\.\d+\.tmp$/);
+    // Built from FILE, not a literal: the separator is the platform's.
+    expect(tmpPath).toMatch(
+      new RegExp(
+        `^${FILE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.\\d+\\.\\d+\\.tmp$`,
+      ),
+    );
     expect(mockRename).toHaveBeenCalledWith(tmpPath, FILE);
     expect(files.has(tmpPath)).toBe(false);
   });

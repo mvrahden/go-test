@@ -54,14 +54,15 @@ vi.mock("./processIdentity.js", () => ({
   readProcessStartToken: mockToken,
 }));
 
+import * as path from "node:path";
 import { ProcessRegistry } from "./processRegistry.js";
 
-const DIR = "/storage";
+const DIR = path.join(path.sep, "storage");
 const GRACE = 360_000;
 
 // Each session owns one file; tests address them by the session id they chose.
 function fileFor(session: string): string {
-  return `${DIR}/child-processes-${session}.json`;
+  return path.join(DIR, `child-processes-${session}.json`);
 }
 
 function storedIn(session: string): { pid: number; kind: string }[] {

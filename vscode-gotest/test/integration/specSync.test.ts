@@ -206,7 +206,10 @@ describe("CLI resolution is the mode the test intends", () => {
     await panel.show();
     await panel.refresh(stream("mixed"), "run");
 
-    expect(debug.some((m) => m.includes("go run"))).toBe(true);
+    // Every go-run branch logs "<goBin> run <target>", and goBin carries the
+    // executable's own name — `go` on POSIX, `go.exe` on Windows. Match the
+    // invocation, not the filename.
+    expect(debug.some((m) => / run /.test(m))).toBe(true);
     expect(debug.some((m) => m.includes("cliPath override"))).toBe(false);
   });
 
