@@ -1,3 +1,4 @@
+import * as path from "node:path";
 import { describe, it, expect } from "vitest";
 import {
   parseTestEvents,
@@ -56,7 +57,7 @@ describe("extractTestMessages", () => {
 
     expect(messages).toHaveLength(1);
     expect(messages[0]).toEqual({
-      file: "/abs/pkg/foo_test.go",
+      file: path.join("/abs/pkg", "foo_test.go"),
       line: 42,
       message: "expected 1, got 2",
     });
@@ -209,7 +210,7 @@ describe("extractDiagnosticLocation", () => {
   it("prepends pkgDir to relative paths", () => {
     const output = "      foo.go:10 +0x1a4\n";
     const loc = extractDiagnosticLocation(output, "/abs/pkg");
-    expect(loc).toEqual({ file: "/abs/pkg/foo.go", line: 10 });
+    expect(loc).toEqual({ file: path.join("/abs/pkg", "foo.go"), line: 10 });
   });
 
   it("returns undefined when no .go file references", () => {

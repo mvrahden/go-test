@@ -28,8 +28,13 @@ export interface SpawnScript {
   // front of a standing failure.
   once: ScriptedRun[];
   always?: ScriptedRun;
-  // What was spawned, in order, for tests that care about the command itself.
-  calls?: Array<{ bin: string; args: string[] }>;
+  // What was spawned, in order, for tests that care about the command itself
+  // or the options it was given.
+  calls?: Array<{
+    bin: string;
+    args: string[];
+    opts?: Record<string, unknown>;
+  }>;
 }
 
 export interface FakeChild extends EventEmitter {
@@ -43,9 +48,9 @@ export interface FakeChild extends EventEmitter {
 export function createScriptedSpawn(
   script: SpawnScript,
   onKill: (signal?: NodeJS.Signals) => void = () => {},
-): (bin: string, args: string[]) => FakeChild {
-  return (bin: string, args: string[]) => {
-    script.calls?.push({ bin, args });
+): (bin: string, args: string[], opts?: Record<string, unknown>) => FakeChild {
+  return (bin: string, args: string[], opts?: Record<string, unknown>) => {
+    script.calls?.push({ bin, args, opts });
     const run = script.once.shift() ?? script.always ?? { stdout: [] };
     const child = new EventEmitter() as FakeChild;
     child.stdout = new PassThrough();

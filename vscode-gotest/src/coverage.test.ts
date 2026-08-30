@@ -112,7 +112,7 @@ describe("parseCoverProfile", () => {
 
     const result = parseCoverProfile(content, moduleToDir);
     expect(result).toHaveLength(1);
-    expect(result[0].absPath).toBe("/abs/pkg/main.go");
+    expect(result[0].absPath).toBe(path.join("/abs/pkg", "main.go"));
     expect(result[0].statements).toHaveLength(2);
   });
 
@@ -139,7 +139,9 @@ describe("parseCoverProfile", () => {
     const result = parseCoverProfile(content, moduleToDir);
     expect(result).toHaveLength(2);
 
-    const aFile = result.find((r) => r.absPath === "/abs/pkg/a.go");
+    const aFile = result.find(
+      (r) => r.absPath === path.join("/abs/pkg", "a.go"),
+    );
     expect(aFile).toBeDefined();
     expect(aFile!.statements).toHaveLength(2);
   });
@@ -184,7 +186,10 @@ describe("parseCoverProfile", () => {
     const result = parseCoverProfile(content, moduleToDir);
     expect(result).toHaveLength(2);
     const paths = result.map((r) => r.absPath).sort();
-    expect(paths).toEqual(["/abs/other/util.go", "/abs/pkg/main.go"]);
+    expect(paths).toEqual([
+      path.join("/abs/other", "util.go"),
+      path.join("/abs/pkg", "main.go"),
+    ]);
   });
 });
 
@@ -203,7 +208,7 @@ describe("parseFuncCoverage", () => {
 
     const result = parseFuncCoverage(content, moduleToDir);
     expect(result.size).toBe(1);
-    const decls = result.get("/abs/pkg/main.go")!;
+    const decls = result.get(path.join("/abs/pkg", "main.go"))!;
     expect(decls).toHaveLength(2);
     expect(decls[0].name).toBe("Login");
     expect(decls[0].executed).toBeCloseTo(0.857);
@@ -214,7 +219,7 @@ describe("parseFuncCoverage", () => {
   it("marks 0% functions as not executed", () => {
     const content = "example.com/pkg/main.go:5:\tUnused\t\t0.0%\n";
     const result = parseFuncCoverage(content, moduleToDir);
-    const decls = result.get("/abs/pkg/main.go")!;
+    const decls = result.get(path.join("/abs/pkg", "main.go"))!;
     expect(decls[0].executed).toBe(false);
   });
 
@@ -245,10 +250,10 @@ describe("buildFileCoverages", () => {
     );
     const { coverages, details } = buildFileCoverages(parsed);
     expect(coverages).toHaveLength(1);
-    expect(coverages[0].uri.fsPath).toBe("/abs/pkg/main.go");
+    expect(coverages[0].uri.fsPath).toBe(path.join("/abs/pkg", "main.go"));
     expect(coverages[0].statementCoverage.covered).toBe(5);
     expect(coverages[0].statementCoverage.total).toBe(8);
-    expect(details.get("/abs/pkg/main.go")).toHaveLength(2);
+    expect(details.get(path.join("/abs/pkg", "main.go"))).toHaveLength(2);
   });
 
   it("includes declarations in details but not in sidebar metric", () => {
@@ -264,7 +269,7 @@ describe("buildFileCoverages", () => {
     const { coverages, details } = buildFileCoverages(parsed, declarations);
     expect(coverages).toHaveLength(1);
     expect(coverages[0].declarationCoverage).toBeUndefined();
-    expect(details.get("/abs/pkg/main.go")).toHaveLength(3);
+    expect(details.get(path.join("/abs/pkg", "main.go"))).toHaveLength(3);
   });
 
   it("has no declarationCoverage regardless of input", () => {
@@ -282,7 +287,7 @@ describe("buildFileCoverages", () => {
       moduleToDir,
     );
     const { details } = buildFileCoverages(parsed);
-    const d = details.get("/abs/pkg/main.go")!;
+    const d = details.get(path.join("/abs/pkg", "main.go"))!;
     expect(d).toHaveLength(2);
   });
 });
@@ -304,8 +309,8 @@ describe("deduplicateProfiles", () => {
     );
     const result = deduplicateProfiles(parsed);
     expect(result).toHaveLength(2);
-    const a = result.find((r) => r.absPath === "/abs/pkg/a.go")!;
-    const b = result.find((r) => r.absPath === "/abs/pkg/b.go")!;
+    const a = result.find((r) => r.absPath === path.join("/abs/pkg", "a.go"))!;
+    const b = result.find((r) => r.absPath === path.join("/abs/pkg", "b.go"))!;
     expect(a.statements).toHaveLength(1);
     expect(b.statements).toHaveLength(1);
   });
@@ -323,7 +328,7 @@ describe("deduplicateProfiles", () => {
     const result = deduplicateProfiles(combined);
 
     expect(result).toHaveLength(1);
-    expect(result[0].absPath).toBe("/abs/pkg/main.go");
+    expect(result[0].absPath).toBe(path.join("/abs/pkg", "main.go"));
     expect(result[0].statements).toHaveLength(1);
     expect(result[0].statements[0].executed).toBe(5);
     expect(result[0].numStatements).toEqual([4]);
@@ -422,7 +427,7 @@ describe("filterSupplementaryProfiles", () => {
     );
     const result = filterSupplementaryProfiles(primary, supplementary);
     expect(result).toHaveLength(1);
-    expect(result[0].absPath).toBe("/abs/pkg/a.go");
+    expect(result[0].absPath).toBe(path.join("/abs/pkg", "a.go"));
   });
 
   it("returns empty when no supplementary files match primary scope", () => {
@@ -500,7 +505,7 @@ describe("CoverageStore.getDetails", () => {
         ip === "example.com/pkg" ? "/abs/pkg" : undefined,
     };
     store.buildFileCoverages(mockCache as any);
-    const details = store.getDetails("/abs/pkg/main.go");
+    const details = store.getDetails(path.join("/abs/pkg", "main.go"));
     expect(details.length).toBeGreaterThan(0);
   });
 
@@ -520,9 +525,11 @@ describe("CoverageStore.getDetails", () => {
         ip === "example.com/pkg" ? "/abs/pkg" : undefined,
     };
     store.buildFileCoverages(mockCache as any);
-    expect(store.getDetails("/abs/pkg/main.go").length).toBeGreaterThan(0);
+    expect(
+      store.getDetails(path.join("/abs/pkg", "main.go")).length,
+    ).toBeGreaterThan(0);
     store.invalidate("example.com/pkg");
-    expect(store.getDetails("/abs/pkg/main.go")).toEqual([]);
+    expect(store.getDetails(path.join("/abs/pkg", "main.go"))).toEqual([]);
   });
 
   it("clears cached details on clear", () => {
@@ -536,8 +543,10 @@ describe("CoverageStore.getDetails", () => {
         ip === "example.com/pkg" ? "/abs/pkg" : undefined,
     };
     store.buildFileCoverages(mockCache as any);
-    expect(store.getDetails("/abs/pkg/main.go").length).toBeGreaterThan(0);
+    expect(
+      store.getDetails(path.join("/abs/pkg", "main.go")).length,
+    ).toBeGreaterThan(0);
     store.clear();
-    expect(store.getDetails("/abs/pkg/main.go")).toEqual([]);
+    expect(store.getDetails(path.join("/abs/pkg", "main.go"))).toEqual([]);
   });
 });

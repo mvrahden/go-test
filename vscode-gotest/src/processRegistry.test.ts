@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import * as nodePath from "node:path";
 
 const {
   mockReadFile,
@@ -32,7 +33,9 @@ const {
     mockIdentify: vi.fn((_pid: number, _token: string) => "same-process"),
     mockToken: vi.fn((_pid: number) => "tok" as string | undefined),
     mockReaddir: vi.fn(async () =>
-      [...files.keys()].map((p) => p.split("/").pop()!),
+      // readdir yields basenames, and only path.basename knows which separator
+      // this platform used to build the key.
+      [...files.keys()].map((p) => nodePath.basename(p)),
     ),
     mockUnlink: vi.fn(async (p: string) => {
       if (!files.delete(p)) throw new Error("ENOENT");
@@ -54,14 +57,15 @@ vi.mock("./processIdentity.js", () => ({
   readProcessStartToken: mockToken,
 }));
 
+import * as path from "node:path";
 import { ProcessRegistry } from "./processRegistry.js";
 
-const DIR = "/storage";
+const DIR = path.join(path.sep, "storage");
 const GRACE = 360_000;
 
 // Each session owns one file; tests address them by the session id they chose.
 function fileFor(session: string): string {
-  return `${DIR}/child-processes-${session}.json`;
+  return path.join(DIR, `child-processes-${session}.json`);
 }
 
 function storedIn(session: string): { pid: number; kind: string }[] {
@@ -182,6 +186,12 @@ describe("ProcessRegistry", () => {
     // Two windows on one folder share workspace storage. Neither may touch the
     // other's children, and a shared table could not tell them apart.
     it("leaves a live sibling window's processes strictly alone", async () => {
+      // A dead session is seeded alongside the live one on purpose. Asserting
+      // only that the sibling was spared cannot tell "correctly skipped" from
+      // "read nothing at all" — a Windows run passed this test while load()
+      // was absorbing no files whatsoever. The dead session is the control.
+      await seedDeadSession(2222);
+
       const sibling = new ProcessRegistry(DIR, {
         sessionId: "other",
         hostPid: 700,
@@ -189,17 +199,18 @@ describe("ProcessRegistry", () => {
       sibling.add(3333, "test");
       await sibling.flush();
 
-      aliveExcept([]); // every host is alive, including 700
+      aliveExcept([900]); // the old host is gone; the sibling's host is not
 
       const registry = newRegistry("me");
       await registry.load();
       const kill = vi.fn();
       const { signalled } = registry.reapOrphans({ kill, graceMs: GRACE });
 
-      expect(registry.inheritedSize).toBe(0);
-      expect(signalled).toHaveLength(0);
-      expect(kill).not.toHaveBeenCalled();
-      // And its table is untouched.
+      // The dead session's child is reaped...
+      expect(signalled.map((r) => r.pid)).toEqual([2222]);
+      expect(kill).toHaveBeenCalledWith(-2222, "SIGTERM");
+      // ...and the live sibling's is not, nor is its table touched.
+      expect(kill).not.toHaveBeenCalledWith(-3333, "SIGTERM");
       expect(storedIn("other").map((r) => r.pid)).toEqual([3333]);
     });
 

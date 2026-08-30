@@ -1,3 +1,4 @@
+import * as path from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const {
@@ -59,7 +60,7 @@ import { buildCliCommand } from "./cli.js";
 
 function setGoMod(dir: string, content: string) {
   mockReadFile.mockImplementation(async (filePath: unknown) => {
-    if (filePath === `${dir}/go.mod`) return content;
+    if (filePath === path.join(dir, "go.mod")) return content;
     throw new Error("ENOENT");
   });
 }
@@ -150,7 +151,7 @@ describe("buildCliCommand", () => {
 
       const cmd = await buildCliCommand(["spec"], "/workspace");
 
-      expect(cmd.bin).toBe("/workspace/bin/gotest");
+      expect(cmd.bin).toBe(path.resolve("/workspace", "bin/gotest"));
     });
   });
 
