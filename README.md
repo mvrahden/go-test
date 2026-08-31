@@ -49,7 +49,7 @@ func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
         gotest.NoError(it, err)
     })
 
-    t.When("email already exists", func(w *gotest.T) {
+    t.When("when email already exists", func(w *gotest.T) {
         w.It("returns ErrDuplicate", func(it *gotest.T) {
             err := s.svc.Create("alice@example.com")
             gotest.NoError(it, err)
@@ -72,8 +72,8 @@ Standard `go test` output:
 === RUN   TestUserServiceTestSuite
 === RUN   TestUserServiceTestSuite/TestCreate
 === RUN   TestUserServiceTestSuite/TestCreate/creates_a_user_with_valid_input
-=== RUN   TestUserServiceTestSuite/TestCreate/email_already_exists
-=== RUN   TestUserServiceTestSuite/TestCreate/email_already_exists/returns_ErrDuplicate
+=== RUN   TestUserServiceTestSuite/TestCreate/when_email_already_exists
+=== RUN   TestUserServiceTestSuite/TestCreate/when_email_already_exists/returns_ErrDuplicate
 --- PASS: TestUserServiceTestSuite (0.01s)
 ```
 
@@ -138,7 +138,7 @@ Tests are structured as behavioral specifications using BDD vocabulary.
 
 ```go
 func (s *Suite) TestCreate(t *gotest.T) {
-    t.When("input is valid", func(w *gotest.T) {
+    t.When("when input is valid", func(w *gotest.T) {
         w.It("creates the record", func(it *gotest.T) {
             // ...
         })
@@ -170,7 +170,7 @@ UserService (133ms)
     ✓ soft-deletes the user (5ms)
     ~ hard-deletes after 30 days — SKIPPED (<1ms)
 
-2 suites, 5 behaviors: 4 passed, 1 skipped
+1 suites, 5 behaviors: 4 passed, 1 skipped
 ```
 
 Every row shows the wall clock it occupied, never the sum of the rows beneath it — so a row that exceeds its children is time it held itself, and one that falls short of their total is children that overlapped.
@@ -439,6 +439,7 @@ gotest ./... -parallel 8            # explicit per-suite, no budget management
 | `--parallel N -parallel M` | `min(S, GOMAXPROCS, N/M)` | `M` | `~N` |
 
 Where *S* is the number of suites and *inter* is the computed process count.
+Under `-race`/`-msan`/`-asan` the default budget halves (as does compile concurrency) — instrumentation at least doubles the CPU cost per instruction stream, and keeping the uninstrumented defaults would oversubscribe the machine. An explicit `--parallel`/`--compile-parallel` always wins over this heuristic.
 
 ## Testing Toolkit
 
@@ -458,6 +459,8 @@ gotest.False(t, condition)
 // Zero / nil
 gotest.Zero(t, value)                        // [V comparable] — value == zero value for type
 gotest.NotZero(t, value)                     // [V comparable] — also covers pointer/interface nil
+gotest.Nil(t, object)                        // non-comparable nilables (slices, maps, funcs); type-guarded
+gotest.NotNil(t, object)
 
 // Errors
 gotest.NoError(t, err)
@@ -503,6 +506,9 @@ gotest.Fail(t, "unreachable")                // immediate unconditional failure
 // Async polling
 gotest.Eventually(t, 5*time.Second, 100*time.Millisecond, func(poll *gotest.R) { ... })
 gotest.Consistently(t, 500*time.Millisecond, 50*time.Millisecond, func(poll *gotest.R) { ... })
+
+// Panic-safe goroutines
+wait := gotest.Go(t, func() { ... })         // captures a goroutine panic and re-raises it on the test's goroutine
 ```
 
 Unwrap `(T, error)` or `(T, bool)` pairs in test setup:
@@ -610,6 +616,10 @@ func (s *BatchTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 The returned config is used as-is — a zero (or omitted) duration means no timeout, and without a `SuiteConfig()`/`FixtureConfig()` method the defaults apply.
 Start from a preset to combine defaults with overrides (`cfg := gotest.DefaultSuiteConfig(); cfg.Parallel = true; return cfg`).
+
+`Exclusive: true` schedules the suite's process strictly alone: after every non-exclusive suite has finished, one exclusive suite at a time, in deterministic order.
+Use it for suites whose verdicts depend on wall-clock behavior or contended resources (timing budgets, containers, ports, heavy child builds) — a budget verdict taken on a saturated machine is not a verdict you can act on.
+Like `Parallel`, it is resolved statically by the generator and affects scheduling only.
 
 Preset constructors for common scenarios:
 
@@ -727,9 +737,9 @@ Catch common mistakes in test suites with static analysis:
 gotest lint ./...
 ```
 
-Sixteen rules in three tiers:
+Seventeen rules in three tiers:
 
-- **Integrity** — violations can make test outcomes unreliable or leak resources: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, and generated files checked into version control.
+- **Integrity** — violations can make test outcomes unreliable or leak resources: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, reads of shared fixtures a suite never declared (window scheduling only starts what is declared), and generated files checked into version control.
 - **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, and unnecessary `t.T()` escapes. `-fix` applies the safe rewrites.
 - **Migration** — adoption aids for codebases moving to gotest: stdlib test functions and testify imports; coexistence is legitimate.
 
