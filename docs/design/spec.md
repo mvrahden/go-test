@@ -93,10 +93,10 @@ This is deliberate: `go test` stays fully usable with its caching and ecosystem,
 A complete run is both commands; the canonical CI shape is two steps — `go test ./...` followed by `gotest`.
 
 `gotest` reports the half it does not run:
-packages with stdlib tests but no suites print `?   <pkg>  [no suites]` (never the false `[no test files]`), and a run that skipped stdlib tests ends with a note on stderr:
+packages with stdlib tests but no suites print `?   <pkg>  [no suites]` (never the false `[no test files]`), and a run that skipped stdlib tests ends with a note on stderr naming the affected packages (sorted, truncated after three with `… N more`):
 
 ```
-note: 8 stdlib test(s) in 1 package(s) not run — gotest runs suites; use 'go test' for stdlib tests
+note: 8 stdlib test(s) in pkg/legacy, pkg/util not run — gotest runs suites; use 'go test' for stdlib tests
 ```
 
 ---
@@ -175,7 +175,7 @@ gotest ./... --debug                     # keep generated files for inspection
 Registered `go test` flags pass through to the underlying run; unknown single-dash flags are rejected rather than forwarded (guard against typos) — use a bare `--` or `-args` to forward unvalidated flags verbatim.
 `-json` is intercepted and re-emitted by the runner, and `-ldflags=-checklinkname=0` is injected into every `go test` invocation (required for the assertion tracer on Go 1.23+).
 Each subcommand accepts its own subset of the `--gotest` flags; out-of-scope flags error with "not valid for this subcommand".
-`--github` is `summary`-only; `--no-color` applies to `spec`/`summary`.
+`--github` applies to `summary` and `lint`; `--no-color` applies to `spec`/`summary`.
 
 ---
 
@@ -1173,7 +1173,7 @@ No tests are executed.
 
 ```
 { "packages": [ {
-    "importPath": …, "dir": …, "modulePath": …, "testOnly": bool,
+    "importPath": …, "dir": …, "modulePath": …, "testOnly": bool, "broken": bool,
     "suites": [ {
       "name": …, "file": …, "line": …, "col": …,
       "parallel": bool, "focused": bool, "excluded": bool, "guarded": bool,
@@ -1394,7 +1394,7 @@ Manual setup works without the action:
 - run: gotest spec ./... --format=md --output=behavior-spec.md
 ```
 
-Exit codes: 0 = pass, 1 = test failure, 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors).
+Exit codes: 0 = pass, 1 = test failure, 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors), 130 = run interrupted (SIGINT/SIGTERM).
 
 The exit code of `spec --input` and `summary --input` answers two questions at once: whether the stream carried failures (1) and whether the command itself failed (2). A client that renders a stream rather than gating on it needs only the second, and passes `--render-only` to drop the first; 2 is never suppressed, so an unreadable input or an unparseable stream still fails. Consumers that treat any non-zero exit as "the command broke" — rather than reading the rendered document on stdout — will misread a failing test run as a broken tool.
 
