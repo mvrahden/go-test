@@ -15,29 +15,31 @@ gotest's spec view renders the same test results as a structured document. Other
 
 ## From test output to specification
 
-The same tests, two views. First, standard `go test -v`:
+The same tests, two views. First, the standard verbose stream from `gotest ./... -v` (suites run through the `gotest` runner, which emits regular `go test` output):
 
-{{< gotest-output title="go test -v" >}}
+{{< gotest-output title="gotest ./... -v" >}}
 === RUN   TestCartTestSuite
 === RUN   TestCartTestSuite/TestAddItem
-=== RUN   TestCartTestSuite/TestAddItem/when_the_cart_is_empty/adds_the_item
---- PASS: TestCartTestSuite/TestAddItem/when_the_cart_is_empty/adds_the_item (0.00s)
-=== RUN   TestCartTestSuite/TestAddItem/when_the_cart_is_empty/sets_quantity_to_1
---- PASS: TestCartTestSuite/TestAddItem/when_the_cart_is_empty/sets_quantity_to_1 (0.00s)
-=== RUN   TestCartTestSuite/TestAddItem/when_the_item_already_exists/increments_the_quantity
---- PASS: TestCartTestSuite/TestAddItem/when_the_item_already_exists/increments_the_quantity (0.00s)
+=== RUN   TestCartTestSuite/TestAddItem/the_cart_is_empty
+=== RUN   TestCartTestSuite/TestAddItem/the_cart_is_empty/adds_the_item
+--- PASS: TestCartTestSuite/TestAddItem/the_cart_is_empty/adds_the_item (0.00s)
+=== RUN   TestCartTestSuite/TestAddItem/the_cart_is_empty/sets_quantity_to_1
+--- PASS: TestCartTestSuite/TestAddItem/the_cart_is_empty/sets_quantity_to_1 (0.00s)
+=== RUN   TestCartTestSuite/TestAddItem/the_item_already_exists
+=== RUN   TestCartTestSuite/TestAddItem/the_item_already_exists/increments_the_quantity
+--- PASS: TestCartTestSuite/TestAddItem/the_item_already_exists/increments_the_quantity (0.00s)
 {{< /gotest-output >}}
 
 Now the same results through `gotest spec`:
 
 {{< spec title="gotest spec ./..." >}}
-Cart
-  AddItem
-    when the cart is empty
-      <span class="t-pass">✓</span> adds the item
-      <span class="t-pass">✓</span> sets quantity to 1
-    when the item already exists
-      <span class="t-pass">✓</span> increments the quantity
+Cart <span class="t-time">(2ms)</span>
+  AddItem <span class="t-time">(2ms)</span>
+    the cart is empty <span class="t-time">(1ms)</span>
+      <span class="t-pass">✓</span> adds the item <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> sets quantity to 1 <span class="t-time">(<1ms)</span>
+    the item already exists <span class="t-time">(<1ms)</span>
+      <span class="t-pass">✓</span> increments the quantity <span class="t-time">(<1ms)</span>
 {{< /spec >}}
 
 The second version is something a product manager can read. It describes what the Cart does, under what conditions, with what outcomes. It is not a test report. It is a behavioral specification, generated from tests that the build enforces. To be fair, tools like gotestsum and Ginkgo's reporters already improve the formatting of `go test` output; the spec view differs in that it renders the behavioral hierarchy itself — suite, method, `When`, `It` — rather than a better-formatted stream of test names.
@@ -69,7 +71,7 @@ The markdown output is a self-contained document with a summary header and per-s
 ```md {title="docs/behavior-spec.md"}
 # Behavior Specification
 
-4 suites, 12 behaviors: 28 passed, 0 failed, 0 skipped.
+4 suites, 28 behaviors: 28 passed, 0 failed, 0 skipped.
 
 ## Cart
 
@@ -77,10 +79,10 @@ The markdown output is a self-contained document with a summary header and per-s
 
 | Behavior | Status | Duration |
 |----------|--------|----------|
-| **when the cart is empty** | | |
+| **the cart is empty** | | |
 | &nbsp;&nbsp;adds the item | PASS | <1ms |
 | &nbsp;&nbsp;sets quantity to 1 | PASS | <1ms |
-| **when the item already exists** | | |
+| **the item already exists** | | |
 | &nbsp;&nbsp;increments the quantity | PASS | <1ms |
 ```
 
@@ -96,13 +98,23 @@ gotest spec ./... --format=json
 
 The JSON output includes full metadata: package names, node kinds (suite, method, block, test), status, duration, focused/excluded flags, and the complete child hierarchy. This is the machine-readable format for building custom reports, dashboards, or integrations.
 
+## A spec without a run: `--static`
+
+Everything above renders results. Since v1.27, `gotest spec --static` renders the same tree straight from source — no run, no event stream:
+
+```sh
+gotest spec --static ./...
+```
+
+The static view lists suites, methods, and `When`/`It` blocks with no status icons and no durations, because nothing has executed. It answers "what do these tests promise?" where a regular `spec` answers "what did they do?" — useful for reviewing a package's behavioral surface before running anything.
+
 ## Post-processing with `--input`
 
-You don't have to run tests to generate specs. The `--input` flag reads saved `go test -json` output:
+You also don't have to render the spec on the machine that ran the tests. The `--input` flag reads a saved test event stream in `go test -json` format — which `gotest ./... -json` emits for your suites:
 
 ```sh
 # Save test output in CI
-go test -json ./... > test-output.json
+gotest ./... -json > test-output.json
 
 # Generate spec from saved output (on any machine, later)
 gotest spec --input=test-output.json --format=md --output=spec.md
@@ -111,7 +123,7 @@ gotest spec --input=test-output.json --format=md --output=spec.md
 Or pipe directly:
 
 ```sh
-go test -json ./... | gotest spec --input=- --format=md
+gotest ./... -json | gotest spec --input=- --format=md
 ```
 
 This separation is powerful: run tests on one machine, generate documentation on another. Save test output as a CI artifact, then render specs from it in a post-processing step. The spec generation is fast because it doesn't compile or execute any code — it just transforms JSON into a structured view.
@@ -150,29 +162,29 @@ gotest spec ./... --format=md --output=new-spec.md
 diff old-spec.md new-spec.md
 ```
 
-When a PR adds or changes tests, the spec diff shows exactly which behaviors were added, modified, or removed — in plain English. "Added: UserService / Create / when email is duplicate / returns ErrDuplicate" is a more useful PR description than a list of changed files.
+When a PR adds or changes tests, the spec diff shows exactly which behaviors were added, modified, or removed — in plain English. "Added: UserService / Create / email is duplicate / returns ErrDuplicate" is a more useful PR description than a list of changed files.
 
 ## The specification as a contract
 
 When tests follow the BDD structure — suite as subject, method as capability, `When` as context, `It` as behavior — the spec output is more than a report. It is a behavioral contract. ([BDD in Go]({{< ref "/blog/what-bdd-means-in-go" >}}) explores why this structure maps so naturally onto Go's type system.)
 
 - **For developers:** the spec lists every behavior the system promises. Adding a feature means adding a behavior. Changing a behavior is visible in the spec diff.
-- **For reviewers:** the spec in a PR shows what changed at the behavior level, not just the code level. "Added: UserService / Create / when email is duplicate / returns ErrDuplicate" is easier to review than reading test code.
+- **For reviewers:** the spec in a PR shows what changed at the behavior level, not just the code level. "Added: UserService / Create / email is duplicate / returns ErrDuplicate" is easier to review than reading test code.
 - **For product:** the markdown spec is a living requirements document. If a requirement isn't in the spec, it isn't tested. If it's tested, it's in the spec.
 
 This works because the spec is not written separately from the tests. It *is* the tests, rendered in a format that non-developers can read. There is no synchronization problem because there is only one source of truth.
 
 ## Structured output for language models
 
-The JSON format from `gotest spec --format=json` contains the full behavioral tree of your project. Feeding this to an LLM gives it a structured understanding of what the system does — not how it's implemented, but what it promises. "UserService / Create / when email is valid / creates the user" communicates the system's contract without requiring the model to parse implementation details. This is more compact and more reliable than feeding raw source code.
+The JSON format from `gotest spec --format=json` contains the full behavioral tree of your project. Feeding this to an LLM gives it a structured understanding of what the system does — not how it's implemented, but what it promises. "UserService / Create / email is valid / creates the user" communicates the system's contract without requiring the model to parse implementation details. This is more compact and more reliable than feeding raw source code.
 
 ## Tests that don't document themselves
 
 Not all tests are good documentation. A test named `TestFoo` with no `When`/`It` blocks produces a spec line that says nothing:
 
 {{< spec title="gotest spec" >}}
-Foo
-  <span class="t-pass">✓</span> TestFoo
+Foo <span class="t-time">(<1ms)</span>
+  <span class="t-pass">✓</span> Foo <span class="t-time">(<1ms)</span>
 {{< /spec >}}
 
 The spec view rewards structure. When you invest in clear naming — descriptive suite names, verb-based method names, specific `When`/`It` descriptions — the spec output becomes genuinely useful documentation. When you don't, it reflects that too. The tool is honest.

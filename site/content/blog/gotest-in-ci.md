@@ -24,7 +24,7 @@ If you haven't written a gotest suite yet, start with [Your First Go Test Suite 
 
 ## The problem with `go test -v` in CI
 
-The default `go test -v` output is verbose. For every test, it prints three lines: `=== RUN`, `=== CONT` (for parallel tests), and `--- PASS` or `--- FAIL`. In a 200-test suite, that is 600+ lines of output. When two tests fail, the failure messages are buried in the middle of 590 lines of passing noise.
+The default `go test -v` output is verbose. For every test, it prints two or three lines: `=== RUN`, `=== CONT` (for parallel tests), and `--- PASS` or `--- FAIL`. In a 200-test suite, that is 400–600 lines of output. When two tests fail, the failure messages are buried in the middle of hundreds of lines of passing noise.
 
 Most teams work around this by piping output through `grep` or `gotestfmt`. gotest has a built-in answer: the `summary` command.
 
@@ -150,7 +150,7 @@ If your project does not depend on gotest as a library, set `version: latest` or
 gotest has a CI mode that activates two safety behaviors:
 
 1. **Focus-prefix guard.** If any suite or method has an `F_` prefix (`F_TestSomething`, `F_MyTestSuite`), the build fails immediately. The `F_` prefix means "run only this" — useful during development, dangerous in CI. Without the guard, a committed `F_` prefix silently skips every other test in the package.
-1. **Snapshot read-only mode.** Snapshot files cannot be updated in CI. If a snapshot does not match, the test fails instead of silently updating the expected value.
+1. **Snapshot read-only mode.** Snapshot baselines cannot be created in CI. Locally, a first run writes the missing baseline file; in CI mode, a missing baseline fails the test instead — so a brand-new snapshot can never slip in unreviewed. (Mismatches fail in any mode; updating a baseline always requires an explicit `--update-snapshots` run.)
 
 How focus prefixes fit into day-to-day development is covered in depth in [the inner loop post]({{< ref "/blog/the-inner-loop" >}}).
 
@@ -258,10 +258,9 @@ steps:
       race: true
       coverage: true
       min-coverage: 80
-      go-test-flags: "-coverprofile=coverage-suites.out"
 ```
 
-`go test` runs standard test functions. gotest runs suite tests. Both produce coverage profiles that you can merge if needed. The gotest action's `--ci` mode (auto-detected) catches focus prefixes and locks snapshots regardless of which step they appear in.
+`go test` runs standard test functions. gotest runs suite tests — stdlib `func Test*` functions are reported but not executed by gotest, so nothing runs twice. Each step enforces its own coverage: the stdlib step writes `coverage-stdlib.out`, and the gotest step reports its percentage through the action's `coverage` output. The gotest step's CI mode (auto-detected via the `CI` environment variable) catches committed focus prefixes and locks snapshots.
 
 ## Project configuration with `.gotest.yml`
 
@@ -276,7 +275,7 @@ lint:
     - testify
 ```
 
-CLI flags override `.gotest.yml`, so a developer can always run `gotest --min=0 ./...` locally to skip the coverage check during development. But the default, both locally and in CI, is whatever the project file says.
+CLI flags override `.gotest.yml`, so a one-off `gotest --min=90 ./...` can tighten the gate for a single run. (A `--min` of zero is treated as unset, so it does not disable a configured threshold.) The default, both locally and in CI, is whatever the project file says.
 
 ## A complete workflow
 

@@ -18,7 +18,7 @@ gotest exists to fill those gaps without replacing what works. This post explain
 
 Most Go projects hit the same set of problems as their test suite grows past a few dozen files:
 
-- **No structural grouping.** The stdlib gives you `func TestX` and `t.Run` for subtests. But subtests are closures inside flat functions, not first-class groups. If you have 30 test functions for `UserService` and 20 for `OrderService` in the same package, they are an alphabetical list. There is no way to say "these tests belong together" at the structural level.
+- **No structural grouping.** The stdlib gives you `func TestX` and `t.Run` for subtests. But subtests are closures inside flat functions, not first-class groups. If you have 30 test functions for `UserService` and 20 for `OrderService` in the same package, they are one flat list. There is no way to say "these tests belong together" at the structural level.
 - **No lifecycle hooks.** There is no built-in "run this before each test" or "run this once before the suite." `TestMain` gives you one entry point per package, but it runs before all tests and has no per-test granularity. `t.Cleanup` runs after a test, but there is no corresponding setup hook. [Go Test Lifecycle]({{< ref "/blog/go-test-lifecycle" >}}) walks through what the stdlib gives you and where it stops.
 - **No fixture management.** If three test functions need a Postgres container, each one either starts its own (slow) or they share a package-level variable (fragile). The stdlib has no concept of "this resource has a lifecycle and these tests depend on it."
 - **No cross-package sharing.** `go test` runs each package as a separate OS process. There is no way for `pkg/user` and `pkg/order` to share a database container through Go code. Most teams fall back to Makefiles or CI scripts to start infrastructure before running tests. [Sharing Test Fixtures Across Go Packages]({{< ref "/blog/shared-fixtures" >}}) looks at this problem in depth.
@@ -55,7 +55,7 @@ This means there is no lock-in at the output level. CI pipelines that parse `go 
 
 ## Principle 2: The naming IS the API
 
-gotest has no configuration files, no struct tags, no annotations, and no registration calls. The entire API is naming conventions:
+Declaring a suite takes no configuration file, no struct tags, no annotations, and no registration calls. The entire API is naming conventions:
 
 - A struct whose name ends in `TestSuite` is a test suite.
 - A method whose name starts with `Test` is a test case.
@@ -79,6 +79,10 @@ func (s *UserServiceTestSuite) BeforeEach(t *gotest.T) {
     s.svc = NewUserService(s.db)
 }
 
+func (s *UserServiceTestSuite) AfterEach(t *gotest.T) {
+    s.db.Close()
+}
+
 func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
     t.When("email is valid", func(w *gotest.T) {
         w.It("creates the user", func(it *gotest.T) {
@@ -89,19 +93,19 @@ func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
 }
 ```
 
-There is no registration call, no embedded base type, no interface to implement. The struct name ends in `TestSuite`, so the generator recognizes it. The method name starts with `Test`, so it becomes a test case. `BeforeEach` runs before every test method. Everything else is plain Go.
+There is no registration call, no embedded base type, no interface to implement. The struct name ends in `TestSuite`, so the generator recognizes it. The method name starts with `Test`, so it becomes a test case. `BeforeEach` runs before every test method, and `AfterEach` cleans up after it. Everything else is plain Go.
 
 The code generator reads these source files with `go/parser`, walks the AST looking for the naming patterns, and produces the lifecycle wiring. Discovery is purely static: no code runs during the generation step.
 
 ## Principle 3: Zero runtime cost
 
-At test execution time, there is no framework orchestration code in your call stack. The only runtime component is the thin `gotest.T` wrapper that provides `When`/`It` methods and standalone assertion functions like `gotest.Equal`. Everything else is generated: struct initialization, `t.Run` calls, `t.Cleanup` calls, direct method invocations. No reflection, no interface dispatch, no type assertions.
+At test execution time, there is no discovery or dispatch machinery in your call stack. The runtime surface is thin: the `gotest.T` wrapper that provides `When`/`It` methods and standalone assertion functions like `gotest.Equal`, plus a small runtime package the generated code calls for timeouts and panic containment. The orchestration itself is generated: struct initialization, `t.Run` calls, `t.Cleanup` calls, direct method invocations. No reflection, no interface dispatch, no type assertions in the wiring.
 
 This has practical consequences. Stack traces point to your code, not to framework internals. Refactoring tools can follow the call chain because every call is a direct call. The `gotest` package that your tests import is a thin layer of helper types and functions; it has no transitive dependencies beyond the standard library.
 
 The code generator runs before `go test` and produces Go source files. Those files are injected via Go's `-overlay` flag, a built-in mechanism that maps virtual file paths to real files on disk. The compiler sees the generated files; your source directory does not. After the run, nothing is left behind. Your `git status` stays clean.
 
-This extends to isolation. Each suite runs in its own OS process: a generated test binary, compiled and executed separately. A panicking test in one suite cannot crash another. Memory is isolated by the OS, not by convention. Goroutine leaks, global state mutations, and port conflicts stay contained to the process that caused them.
+This extends to isolation. Each suite runs in its own OS process: the package's test binary is compiled once and executed separately per suite, filtered to just that suite. A panicking test in one suite cannot crash another. Memory is isolated by the OS, not by convention. Goroutine leaks, global state mutations, and port conflicts stay contained to the process that caused them.
 
 This structural isolation is what makes suite-level parallelism safe by default: suites run concurrently without any opt-in, because they cannot interfere with each other.
 
@@ -109,13 +113,13 @@ This structural isolation is what makes suite-level parallelism safe by default:
 
 A developer who has never heard of gotest can read a test suite struct and understand what it does. The struct has fields, methods with descriptive names, and assertions that are standalone function calls. There is nothing to decode.
 
-A developer who runs `go test` directly (without the CLI) gets a compilation error for the missing generated file, not silent wrong behavior. The error is clear and points to the solution.
+A developer who runs `go test` directly (without the CLI) loses nothing that was already there: existing flat `func Test*` tests run exactly as before. The suites simply stay inert — their `func Test*` entry points exist only in gotest's overlay, so `go test` never sees them. The two runners split the work: `go test` runs the flat tests, `gotest` runs the suites.
 
 And a developer who decides to stop using gotest can look at the generated code to see exactly what to write by hand. The generated file is a complete, readable Go test file. It is not a binary artifact or a compressed intermediate representation. It is the code you would have written yourself if you had the patience.
 
 ## Principle 5: Adopt incrementally, eject freely
 
-Existing `func Test*` tests coexist with suites in the same package. You do not need to convert everything at once. A single suite can live next to 50 flat test functions, and `gotest` handles both. If you want to try it, [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) is the place to start.
+Existing `func Test*` tests coexist with suites in the same package. You do not need to convert everything at once. A single suite can live next to 50 flat test functions: `go test` keeps running the flat functions, `gotest` runs the suites (and reports the flat tests it leaves to `go test`), and a complete run is both commands. If you want to try it, [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) is the place to start.
 
 Ejecting is real work, but it is straightforward work. You replace `*gotest.T` parameters with `*testing.T`, swap gotest assertions for your preferred alternative, and write the `func Test*` entry points that the generator was producing for you. The generated code shows exactly what those entry points look like. There is no data to migrate, no configuration to unwind, no runtime state to reconstruct.
 
@@ -139,6 +143,6 @@ These principles are not abstract. They directly shaped every feature in gotest:
 - **Parallel execution** is safe by default at the suite level: each suite runs as a separate OS process, so suites cannot interfere with each other. Method-level parallelism is opt-in via `SuiteConfig{Parallel: true}`, with a returning `BeforeEach` giving each test its own isolated state. [More in the reference.]({{< ref "/reference#lifecycle" >}})
 - **Fixtures** are structs with `Fixture` suffix. Dependencies between fixtures are expressed as pointer fields, forming a DAG that the generator resolves automatically. Shared fixtures cross the process boundary through JSON serialization. [More on fixtures.]({{< ref "/blog/test-fixtures-in-go" >}})
 - **BDD structure** uses `t.When()` and `t.It()` method calls that map directly to `t.Run`. The `gotest spec` command renders this structure as a behavioral specification, because the hierarchy is already there in the test code. [More on BDD-style tests.]({{< ref "/blog/readable-tests-with-bdd" >}})
-- **AST-based discovery** uses `go/parser` to read source files without importing or compiling them. This keeps the generation step fast and means the generator never executes user code. [More on code generation.]({{< ref "/blog/code-generation-not-reflection" >}})
+- **AST-based discovery** reads source files as syntax trees and never executes them. This keeps the generation step fast and means no user code runs during generation. [More on code generation.]({{< ref "/blog/code-generation-not-reflection" >}})
 
 Each of these deserves a deeper look. The common thread is the same: gotest is not trying to replace Go's testing model. It is trying to generate the code that Go's testing model requires you to write by hand once your project outgrows flat functions and subtests.

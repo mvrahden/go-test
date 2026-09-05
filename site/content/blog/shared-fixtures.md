@@ -67,7 +67,7 @@ Both approaches have the same root cause: Go's process-per-package model has no 
 
 ## Shared fixtures: the model
 
-gotest's answer is **shared fixtures**: structs whose name ends in `SharedFixture`. A shared fixture runs in its own subprocess, once for the entire test run. Its state is serialized as JSON and transferred to every test package that needs it.
+gotest's answer is **shared fixtures**: structs whose name ends in `SharedFixture`. Shared fixtures run in a dedicated setup subprocess — one subprocess for all of them, separate from every test process — once for the entire test run. Their state is serialized as JSON and transferred to every test package that needs it.
 
 The lifecycle looks like this:
 
@@ -75,16 +75,16 @@ The lifecycle looks like this:
 1. gotest starts a fixture subprocess
 2. SharedFixture.BeforeAll runs (start container, run migrations)
 3. Exported fields are serialized to JSON (the "transfer state")
-4. For each test package that needs this fixture:
+4. For each suite process that needs this fixture (each suite runs in its own process):
    a. Transfer state is deserialized into a new instance
    b. SharedFixture.Hydrate runs (open connections from transfer state)
    c. Tests run
    d. SharedFixture.Dehydrate runs (close connections)
-5. All test packages finish
+5. All suite processes finish
 6. SharedFixture.AfterAll runs (stop container, cleanup)
 ```
 
-The key insight is the split between what can cross a process boundary (data) and what cannot (connections, file handles, goroutines). The fixture struct's **exported fields** are the transfer state: they get serialized to JSON and sent to each test process. The **unexported fields** hold local resources that are reconstructed by `Hydrate` in each process.
+The key insight is the split between what can cross a process boundary (data) and what cannot (connections, file handles, goroutines). The fixture's **transfer fields** — exported fields that `Hydrate` leaves alone — get serialized to JSON and sent to each test process. Its **local fields** — anything `Hydrate` assigns, plus all unexported fields — hold resources that are reconstructed by `Hydrate` in each process.
 
 ## A concrete example
 
@@ -101,8 +101,10 @@ import (
 )
 
 type PostgresSharedFixture struct {
-    DSN  string   // exported: serialized to JSON, transferred to test packages
-    conn *sql.DB  // unexported: local to each process, created by Hydrate
+    DSN string // transfer: serialized to JSON, sent to test packages
+
+    container *postgresContainer // local: only lives in the fixture subprocess
+    conn      *sql.DB            // local: created by Hydrate in each test process
 }
 
 func (f *PostgresSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
@@ -116,6 +118,7 @@ func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error {
     if err != nil {
         return err
     }
+    f.container = container
     f.DSN = container.DSN()
 
     f.conn, err = sql.Open("postgres", f.DSN)
@@ -130,8 +133,7 @@ func (f *PostgresSharedFixture) AfterAll(ctx context.Context) error {
     if f.conn != nil {
         f.conn.Close()
     }
-    // Stop the container.
-    return nil
+    return f.container.Terminate(ctx)
 }
 
 func (f *PostgresSharedFixture) Hydrate(ctx context.Context) error {
@@ -159,9 +161,9 @@ func (f *PostgresSharedFixture) Conn() *sql.DB {
 The lifecycle methods map to distinct moments:
 
 - **`BeforeAll`** runs once, in the fixture subprocess. Start the container, run migrations, set the DSN. The expensive work happens here, exactly once.
-- **`Hydrate`** runs in each test package's process, after the exported fields (`DSN`) have been deserialized from JSON. It reconstructs the local resources: opens a database connection from the DSN. This is cheap — the container is already running.
-- **`Dehydrate`** runs when a test package's process finishes. It cleans up local resources: closes the connection. The container stays running for the next package.
-- **`AfterAll`** runs once, after all test packages are done. Stop the container, delete temp files, release any remaining resources.
+- **`Hydrate`** runs in each suite's process (a package with two consuming suites hydrates twice), after the exported fields (`DSN`) have been deserialized from JSON. It reconstructs the local resources: opens a database connection from the DSN. This is cheap — the container is already running.
+- **`Dehydrate`** runs when a suite's process finishes. It cleans up local resources: closes the connection. The container stays running for the next suite.
+- **`AfterAll`** runs once, after all consuming suites are done. Stop the container, delete temp files, release any remaining resources.
 
 For the ordering and cleanup guarantees behind hooks like these — what runs when, and what still runs after a failure — see [Go Test Lifecycle]({{< ref "/blog/go-test-lifecycle" >}}).
 
@@ -224,14 +226,14 @@ Both suites reference `*testinfra.PostgresSharedFixture`. gotest sees the pointe
 
 ## Transfer fields vs. local fields
 
-The distinction between exported and unexported fields is the core of the shared fixture model. It maps directly to what can and cannot cross a process boundary:
+The distinction between transfer fields and local fields is the core of the shared fixture model. It maps directly to what can and cannot cross a process boundary:
 
-- **Exported fields** (`DSN string`, `Port int`, `Token string`) are serialized to JSON. They must be JSON-marshalable. These are the connection coordinates: the information another process needs to reach the same resource.
-- **Unexported fields** (`conn *sql.DB`, `handle *os.File`) are local to each process. They are assigned by `Hydrate`, cleaned up by `Dehydrate`. They represent the live connection, not the address.
+- **Transfer fields** (`DSN string`, `Port int`, `Token string`) are exported fields that `Hydrate` does not assign. They are serialized to JSON, so they must be JSON-marshalable. These are the connection coordinates: the information another process needs to reach the same resource.
+- **Local fields** (`conn *sql.DB`, `handle *os.File`) are local to each process. They are assigned by `Hydrate`, cleaned up by `Dehydrate`. They represent the live connection, not the address.
 
-This split is explicit and enforced by Go's export rules. You cannot accidentally serialize a `*sql.DB` because it is unexported and `encoding/json` ignores unexported fields.
+The classification goes by assignment, not just by export rules: the generator analyzes the `Hydrate` body (following one level of receiver method calls, so a `f.connect()` helper counts too), and any field assigned there is treated as local and excluded from the snapshot — even an exported one, such as a `Pool *pgxpool.Pool` that `Hydrate` populates. Unexported fields never cross the boundary regardless, because `encoding/json` ignores them.
 
-> Not every shared fixture needs `Hydrate` and `Dehydrate`. If the fixture's exported fields are sufficient for test code to work with (a port number, a URL, a token), you can skip them. `Hydrate`/`Dehydrate` are for resources that need to be opened and closed in each process.
+> Not every shared fixture needs `Hydrate` and `Dehydrate`. If the fixture's exported fields are sufficient for test code to work with (a port number, a URL, a token), you can skip them. `Hydrate`/`Dehydrate` are for resources that need to be opened and closed in each process — and they come as a pair: defining only one of the two is a generation error.
 
 ## Shared fixture dependencies
 

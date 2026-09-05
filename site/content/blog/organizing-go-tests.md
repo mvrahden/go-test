@@ -113,14 +113,14 @@ func TestUserService(t *testing.T) {
 
     t.Run("Create", func(t *testing.T) {
         t.Run("valid user", func(t *testing.T) {
-            err := db.CreateUser(User{Name: "Alice"})
+            err := db.CreateUser(User{Name: "Alice", Email: "alice@example.com"})
             if err != nil {
                 t.Fatal(err)
             }
         })
         t.Run("duplicate email", func(t *testing.T) {
-            err := db.CreateUser(User{Name: "Alice"})
-            // this fails: Create/valid_user already inserted Alice
+            err := db.CreateUser(User{Name: "Bob", Email: "alice@example.com"})
+            // only errors because Create/valid_user already inserted this email
             if err == nil {
                 t.Fatal("expected error")
             }
@@ -218,7 +218,7 @@ func (s *UserServiceTestSuite) BeforeEach(t *gotest.T) {
 }
 
 func (s *UserServiceTestSuite) TestCreateUser(t *gotest.T) {
-    t.When("the input is valid", func(w *gotest.T) {
+    t.When("when the input is valid", func(w *gotest.T) {
         err := s.db.CreateUser(User{Name: "Alice", Email: "alice@example.com"})
 
         w.It("succeeds without error", func(it *gotest.T) {
@@ -226,7 +226,7 @@ func (s *UserServiceTestSuite) TestCreateUser(t *gotest.T) {
         })
     })
 
-    t.When("the email already exists", func(w *gotest.T) {
+    t.When("when the email already exists", func(w *gotest.T) {
         s.db.CreateUser(User{Name: "Alice", Email: "alice@example.com"})
         err := s.db.CreateUser(User{Name: "Bob", Email: "alice@example.com"})
 
@@ -237,7 +237,7 @@ func (s *UserServiceTestSuite) TestCreateUser(t *gotest.T) {
 }
 
 func (s *UserServiceTestSuite) TestDeleteUser(t *gotest.T) {
-    t.When("the user exists", func(w *gotest.T) {
+    t.When("when the user exists", func(w *gotest.T) {
         s.db.CreateUser(User{Name: "Alice", Email: "alice@example.com"})
         err := s.db.DeleteUser("alice@example.com")
 
@@ -253,7 +253,7 @@ A few things to notice:
 - **No framework embedding.** The struct has only your fields. No `suite.Suite`, no interface to satisfy.
 - **Lifecycle via naming conventions.** `BeforeEach` is recognized by name. It runs before every `Test*` method, giving each test a fresh `db`. The full hook ordering is laid out in [Go Test Lifecycle]({{< ref "/blog/go-test-lifecycle" >}}).
 - **BDD structure inside methods.** `t.When` and `t.It` create labeled subtests via `t.Run`. They're just method calls: no DSL, no magic. [Readable Go Tests with BDD-Style Subtests]({{< ref "/blog/readable-tests-with-bdd" >}}) covers this structure in detail.
-- **Type-safe assertions.** `gotest.NoError`, `gotest.Equal`, and others are generic functions. Pass the wrong type and the compiler catches it.
+- **Type-safe assertions.** `gotest.NoError`, `gotest.Equal`, and the rest are standalone, type-safe functions; comparisons like `Equal` are generic, so passing mismatched types is a compile error.
 
 Running `gotest ./...` generates the `t.Run` nesting, lifecycle calls, and process isolation behind the scenes, then invokes `go test`. The generated code is injected via Go's `-overlay` flag; it never touches your source tree.
 
@@ -264,16 +264,16 @@ There's a useful consequence of this structure. Because test methods, `When` blo
 {{< terminal title="gotest spec ./..." >}}
 <span class="t-prompt">$</span> <span class="t-cmd">gotest spec ./...</span>
 
-<span class="t-suite">UserService</span>
-  <span class="t-test">CreateUser</span>
-    <span class="t-when">when the input is valid</span>
+<span class="t-suite">UserService</span> <span class="t-time">(9ms)</span>
+  <span class="t-test">CreateUser</span> <span class="t-time">(6ms)</span>
+    <span class="t-when">when the input is valid</span> <span class="t-time">(5ms)</span>
       <span class="t-pass">✓</span> succeeds without error <span class="t-time">(5ms)</span>
-    <span class="t-when">when the email already exists</span>
+    <span class="t-when">when the email already exists</span> <span class="t-time">(<1ms)</span>
       <span class="t-pass">✓</span> returns an error <span class="t-time">(<1ms)</span>
-  <span class="t-test">DeleteUser</span>
-    <span class="t-when">when the user exists</span>
+  <span class="t-test">DeleteUser</span> <span class="t-time">(3ms)</span>
+    <span class="t-when">when the user exists</span> <span class="t-time">(3ms)</span>
       <span class="t-pass">✓</span> succeeds without error <span class="t-time">(3ms)</span>
-<span class="t-summary">1 suite, 3 behaviors: <span class="t-pass">3 passed</span>, 0 failed, 0 skipped</span>
+<span class="t-summary">1 suites, 3 behaviors: <span class="t-pass">3 passed</span></span>
 {{< /terminal >}}
 
 This isn't generated documentation; it's a direct rendering of your test structure. If a test is missing, the spec has a gap. If a test fails, the spec shows it. The test *is* the specification.

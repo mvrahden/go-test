@@ -68,7 +68,7 @@ Golden testing is a 43% practice with a 7% workflow. Every team reinvents the re
 
 Postgres appears in 82 repos, nearly twice its closest rival. If you are building test infrastructure for Go, this ranking is a priority list.
 
-The structural finding matters more than the ranking: **26 repos have the multi-package `TestMain` container pattern** — several packages, each with a `TestMain` that starts its own container, directly or through a helper package. coder/coder has 61 such packages; telegraf has 477 test packages that reach container code. `go test` runs each package as a separate OS process, so these packages cannot share a container through Go code. Each one pays startup independently, or the team gives up and orchestrates containers outside the test run. gotest's `SharedFixture` exists for exactly this boundary: one setup process starts the container, and its state is serialized and rehydrated into each package's process. The full mechanics are in [Sharing Test Fixtures Across Go Packages]({{< ref "/blog/shared-fixtures" >}}).
+The structural finding matters more than the ranking: **26 repos have the multi-package `TestMain` container pattern** — several packages, each with a `TestMain` that starts its own container, directly or through a helper package. coder/coder has 61 such packages; telegraf has 477 test packages that reach container code. `go test` runs each package as a separate OS process, so these packages cannot share a container through Go code. Each one pays startup independently, or the team gives up and orchestrates containers outside the test run. gotest's `SharedFixture` exists for exactly this boundary: one setup process starts the container, and its state is serialized and rehydrated into each consuming suite's process. The full mechanics are in [Sharing Test Fixtures Across Go Packages]({{< ref "/blog/shared-fixtures" >}}).
 
 ## The workaround gradient
 
@@ -129,7 +129,7 @@ The census was a bet that the problems gotest targets are common, not local to o
 
 | The data says | The gotest answer |
 |---|---|
-| 68% of repos sleep in tests; 225+ hours of fixed waiting | `Eventually` / `Consistently` polling assertions |
+| 68% of repos sleep in tests; 251+ hours of fixed waiting | `Eventually` / `Consistently` polling assertions |
 | 11.2% of tests run in parallel; independence is the blocker | process-isolated suites, per-test state via returning `BeforeEach` |
 | 64% hand-annotate helpers with `t.Helper()` | assertions resolve the test-file caller automatically |
 | 42% wire `TestMain`; 53% scatter `t.Cleanup` | suite and fixture lifecycle with ordering guarantees |

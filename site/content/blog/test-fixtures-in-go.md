@@ -54,7 +54,7 @@ func TestListUsers(t *testing.T) {
 This works until it doesn't:
 
 - **Tests share state.** `TestListUsers` sees rows that `TestCreateUser` inserted. Tests become order-dependent. Add `t.Parallel()` and they become race-condition-dependent.
-- **Teardown is fragile.** If any test panics, `defer testDB.Close()` might not run. If `TestMain` itself fails, the process exits with no cleanup.
+- **Teardown is fragile.** `os.Exit(m.Run())` terminates the process without running deferred calls, so that `defer testDB.Close()` never fires at all. And if `TestMain` itself fails, the process exits with no cleanup either.
 - **One fixture per package.** `TestMain` can only be defined once. Need a database *and* a cache? Everything goes into one function.
 - **No per-test reset.** There's no hook to truncate tables between tests. You'd need to write that into every test function manually.
 
@@ -128,7 +128,7 @@ Looking at the patterns above, a fixture system needs to handle four concerns:
 
 1. **Lifecycle hooks.** Setup and teardown at both the suite level (once) and the test level (per-test). Fixtures that take `context.Context` and return `error`, so expensive operations can be cancelled and failures can be handled.
 1. **Dependency ordering.** If fixture B depends on fixture A, A's setup must complete before B's begins. Teardown runs in reverse order. This is a DAG (directed acyclic graph) problem.
-1. **Scope control.** Some fixtures are package-scoped (shared across suites in one package). Some are shared across multiple packages. The fixture system needs to understand these scopes.
+1. **Scope control.** Some fixtures are suite-scoped (set up once per suite). Some are shared across suites and packages. The fixture system needs to understand these scopes.
 1. **Isolation.** Per-test hooks that reset state between test methods, so tests don't inherit side effects from each other.
 
 ## Fixtures as structs with lifecycle conventions
@@ -163,7 +163,7 @@ func (f *DatabaseFixture) BeforeEach(_ context.Context) error {
 A few things to notice:
 
 - **Lifecycle methods take `context.Context` and return `error`.** This is different from suite lifecycle hooks (which take `*gotest.T`). Fixtures represent infrastructure; they need cancellation and error propagation.
-- **`BeforeAll`/`AfterAll`** run once for the package. The database is opened once and closed once.
+- **`BeforeAll`/`AfterAll`** run once per suite process. The database is opened once and closed once for each suite that uses the fixture.
 - **`BeforeEach`** runs before every test method in every suite that uses this fixture. Tables get truncated, so each test starts clean.
 - **`FixtureConfig`** controls timeout and retry behavior. `ContainerFixtureConfig()` gives a 5-minute timeout with one retry, appropriate for infrastructure that might need time to start.
 
@@ -202,7 +202,7 @@ The lifecycle order for each test method is:
 1. Suite `AfterEach`
 1. Fixture `AfterEach`
 
-If multiple suites in the same package reference `*DatabaseFixture`, they all share the same instance. `BeforeAll` runs once for the package, not once per suite.
+If multiple suites in the same package reference `*DatabaseFixture`, each suite runs in its own process and constructs its own instance — `BeforeAll` runs once per suite. When the setup cost should be paid once for the whole run, promote it to a `SharedFixture`.
 
 ## Fixture dependencies form a DAG
 
@@ -214,10 +214,10 @@ type CacheFixture struct {
     Cache *redis.Client
 }
 
-func (f *CacheFixture) BeforeAll(_ context.Context) error {
+func (f *CacheFixture) BeforeAll(ctx context.Context) error {
     f.Cache = redis.NewClient(&redis.Options{Addr: "localhost:6379"})
     // f.DB.DB is already initialized. DatabaseFixture.BeforeAll ran first
-    return f.Cache.Ping(context.Background()).Err()
+    return f.Cache.Ping(ctx).Err()
 }
 ```
 
@@ -237,7 +237,7 @@ The stdlib has no answer for this. Most teams fall back to external orchestratio
 
 ## Sharing fixtures across packages
 
-gotest has **shared fixtures** for this: structs whose name ends in `SharedFixture`. A shared fixture runs in its own subprocess, once for the entire test run. Its state is serialized as JSON and transferred to every test package that needs it.
+gotest has **shared fixtures** for this: structs whose name ends in `SharedFixture`. Shared fixtures run in a dedicated setup subprocess, separate from every test binary, once for the entire test run. Their state is serialized as JSON and transferred to every test package that needs it.
 
 The core idea is a split between transfer fields and local fields. Exported fields like a DSN are serialized and cross the process boundary; resources that can't be serialized — connections, file handles, goroutines — are reconstructed in each test package's process by a `Hydrate` method and cleaned up by `Dehydrate`. The container starts once; every package connects to it.
 

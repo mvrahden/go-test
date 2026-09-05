@@ -12,7 +12,7 @@ You write gotest suites, open VS Code's Testing sidebar — and it's empty. No t
 
 The [gotest VS Code extension](https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest) exists to close this gap. Because it's purpose-built for suite-based testing rather than a generic test runner, it can surface things standard tooling can't: the suite hierarchy, the behavioral spec view, and coverage that survives across runs.
 
-Installation is one command — `code --install-extension mvrahden.gotest` — or grab it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest) or [Open VSX](https://open-vsx.org/extension/mvrahden/gotest). The rest of this post is the feature tour.
+Installation is one command — `code --install-extension mvrahden.gotest` — or grab it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest) or [Open VSX](https://open-vsx.org/extension/mvrahden/gotest). The extension requires gotest v1.27.0 or newer and validates the CLI version on activation. The rest of this post is the feature tour.
 
 ## Why your editor can't see gotest suites
 
@@ -53,9 +53,9 @@ This is the gap the extension closes.
 
 The extension's first job is the most fundamental: making your suites visible as tests.
 
-On activation, it scans your workspace for Go files, parses the AST, and identifies suite types (structs ending in `TestSuite`) and their test methods (methods starting with `Test`). It registers these with VS Code's Test Controller, and they appear in the Testing sidebar as a structured tree: **Package > Suite > Method**, with a fourth level — **Subtests** — populated after the first execution.
+On activation, it runs the `gotest discover` subcommand, which loads your test packages, identifies suite types (structs ending in `TestSuite`) and their test methods (methods starting with `Test`), and reports them as structured JSON — the same discovery the test runner itself uses, so the editor and the CLI can never disagree about what counts as a suite. The extension registers these with VS Code's Test Controller, and they appear in the Testing sidebar as a structured tree: **Package > Suite > Method**, with a fourth level — **Subtests** — populated after the first execution.
 
-This is four levels of hierarchy. The standard Go Test Explorer, even in projects that use stdlib tests, shows two: Package > Function. And for testify/suite projects, it effectively shows one — the single `func TestRunSuite(t *testing.T)` entry point that wraps the entire suite. Individual methods are invisible.
+This is four levels of hierarchy. The standard Go Test Explorer, even in projects that use stdlib tests, has no structural level between the package and the test function — there is no suite level. And for testify/suite projects, it effectively shows a single entry — the `func TestRunSuite(t *testing.T)` entry point that wraps the entire suite. Individual methods are invisible until a run happens to reach them.
 
 Discovery re-runs automatically when `_test.go` files change. The tree stays in sync with your code without manual refresh.
 
@@ -63,7 +63,7 @@ Discovery re-runs automatically when `_test.go` files change. The tree stays in 
 
 Once suites are discovered, CodeLens buttons appear inline above every suite type and test method in your `_test.go` files: **Run** and **Debug**. Click to execute immediately.
 
-Package-level and file-level actions appear on the `package` declaration line. When a file contains multiple suites, a "Run File" action runs just the suites in that file.
+Package-level and file-level actions appear at the top of the file. When a file contains multiple suites, a "Run File" action runs just the suites in that file.
 
 You can also run from the Testing sidebar: click a suite to run all its methods, click a method to run just that one. Multi-select is fully supported — pick three methods across two suites and run them in one action.
 
@@ -80,15 +80,15 @@ After each test run, the **Spec View** panel renders your test results as a beha
 {{< spec title="Spec View" >}}
 Cart
   AddItem
-    when the cart is empty
+    the cart is empty
       <span class="t-pass">✓</span> adds the item
       <span class="t-pass">✓</span> sets quantity to 1
-    when the item already exists
+    the item already exists
       <span class="t-pass">✓</span> increments the quantity
   RemoveItem
-    when the item exists
+    the item exists
       <span class="t-pass">✓</span> removes it from the cart
-    when the item does not exist
+    the item does not exist
       <span class="t-fail">✗</span> returns ErrNotFound
 {{< /spec >}}
 
@@ -126,7 +126,7 @@ Combined with the Spec View, this creates a tight feedback loop: save a file, wa
 
 The extension's export capabilities — spec output, test results, and coverage summaries — produce structured data that feeds directly into AI-assisted development workflows.
 
-Copy the Spec View output and paste it into an AI conversation. The behavioral specification tells the model what the system does at the level stakeholders care about: "UserService / Create / when email is valid / creates the user." That's more useful context than raw source code for understanding system behavior.
+Copy the Spec View output and paste it into an AI conversation. The behavioral specification tells the model what the system does at the level stakeholders care about: "UserService / Create / email is valid / creates the user." That's more useful context than raw source code for understanding system behavior.
 
 Copy test results with status filtering — failures only, for instance — and paste them alongside the relevant source. The AI sees exactly which behaviors broke and what the assertion messages said, without wading through passing tests.
 
@@ -139,7 +139,7 @@ These aren't AI-specific features. They're structured export features that happe
 Reducing the friction of creating new suites matters, especially for teams adopting gotest incrementally. The extension offers scaffold generation through multiple entry points:
 
 - **Code action on a type declaration** — place your cursor on a type and use the Quick Fix menu to generate a test suite for it.
-- **Code action on a Go file** — generate suites for all types in the file.
+- **Code action on a Go file** — generate a suite covering the file's exported functions.
 - **Command palette** — manual target entry for full control.
 
 The generated file opens automatically, and discovery refreshes to include the new suite immediately.

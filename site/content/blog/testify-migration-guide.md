@@ -9,16 +9,16 @@ cta_command: "gotest migrate ./..."
 howto:
   name: "Migrate a testify/suite codebase to gotest"
   steps:
-    - name: "Preview the changes"
-      text: "Run gotest migrate ./... --dry-run to see what the AST-level rewrite would change without writing any files."
+    - name: "Start from a clean tree"
+      text: "Commit or stash first — the tool rewrites files in place, so git diff is your preview and git checkout your undo."
     - name: "Migrate one package"
       text: "Run gotest migrate ./pkg/user on a package with a few well-understood suites and verify the tests still pass."
     - name: "Resolve manual-review TODOs"
-      text: "Search for the // TODO: manual review comments the tool leaves for s.T() calls, custom suite helpers, BeforeTest/AfterTest/SetupSubTest hooks, and direct testify/assert or testify/require usage."
+      text: "Search for the // TODO(gotest-migrate) comments the tool leaves for direct suite assertion calls like s.Equal, unmapped assertions, and BeforeTest/AfterTest/SetupSubTest/TearDownSubTest hooks."
     - name: "Run testify and gotest side by side"
-      text: "Leave unmigrated packages on testify; both run via go test without conflict while you migrate package by package."
+      text: "Leave unmigrated packages on testify; they keep running under go test while migrated suites run under gotest, without conflict."
     - name: "Track progress with the linter"
-      text: "Run gotest lint to flag testify/suite imports in packages that also use gotest suites, catching packages where migration is incomplete."
+      text: "Run gotest lint to flag remaining testify imports, catching packages where migration is incomplete."
     - name: "Drop testify"
       text: "Once the last suite is migrated, remove the testify dependency from go.mod."
 aliases: ["/blog/testify-migration-guide.html"]
@@ -32,14 +32,14 @@ aliases: ["/blog/testify-migration-guide.html"]
 
 ## What won't migrate automatically
 
-`gotest migrate` handles the mechanical bulk of the transformation. Four patterns are flagged with `// TODO: manual review` comments instead of being rewritten:
+`gotest migrate` handles the mechanical bulk of the transformation. Four patterns are flagged with `// TODO(gotest-migrate)` comments — or left to the compiler — instead of being silently rewritten:
 
-- **`s.T()` handoffs.** Helper functions that receive `s.T()` need to use the `t` parameter that test methods now receive.
-- **Custom suite helpers.** Methods that aren't lifecycle hooks or test methods are left unchanged; assertion calls via `s.Require()` inside them need manual conversion.
+- **Assertions called directly on the suite.** `s.Equal(a, b)`, `s.Contains(...)` — calls through the embedded `suite.Suite` — are left in place with a TODO naming the `gotest.*` replacement.
+- **Custom suite helpers.** Methods that aren't lifecycle hooks or test methods keep their shape; the tool doesn't add a `t *gotest.T` parameter to them, so rewritten assertions inside them need you to thread `t` through.
 - **`BeforeTest` / `AfterTest` / `SetupSubTest` / `TearDownSubTest`.** testify's per-test-name and subtest-level hooks have no direct gotest equivalent.
-- **Direct `testify/assert` or `testify/require` usage.** Calls that don't go through the suite aren't touched.
+- **Testify assertions outside suite methods.** `assert.*`/`require.*` calls in standalone functions aren't converted.
 
-Each of these gets a detailed treatment in the "What needs manual review" section below. And `--dry-run` makes the whole run a no-op preview, so you can see every change before a single file is written.
+Each of these gets a detailed treatment in the "What needs manual review" section below. The tool rewrites files in place, so run it on a clean working tree — `git diff` is your preview, `git checkout` your undo.
 
 ## testify to gotest: what maps to what
 
@@ -62,7 +62,7 @@ The biggest conceptual shift is that test methods now receive a `t` parameter. I
 
 ## Before and after: a full suite migration
 
-Here's a complete testify/suite test file and what it looks like after migration:
+Here's a complete testify/suite test file and what it looks like after migration — the tool's rewrite plus the handful of TODO fixes it flags (the direct `s.Equal`/`s.Contains`/`s.ErrorIs` calls below):
 
 ```go {title="before: user_test.go (testify/suite)"}
 package user
@@ -177,7 +177,7 @@ And what changed shape:
 
 Once a suite is migrated, several things change beyond the syntax:
 
-- **Compile-time safety.** A typo in a lifecycle hook name (`SetUpTest` instead of `SetupTest`) silently does nothing in testify. In gotest, the code generator validates hook names and signatures at generation time. Wrong name? Clear error with file and line number.
+- **Generation-time safety.** A typo in a lifecycle hook name (`SetUpTest` instead of `SetupTest`) silently does nothing in testify. In gotest, a hook with the wrong signature is a generation-time error with file and line number, and `gotest lint` flags near-miss hook names like `BeforEach` before they silently become ordinary methods.
 - **No framework in the stack trace.** When a test fails, the stack trace shows your code calling a gotest assertion function. There's no reflection layer, no `suite.Run` orchestration, no `reflect.Value.Call` in between.
 - **BDD structure.** Test methods can use `t.When()` and `t.It()` to create labeled subtests. Combined with `gotest spec`, your test hierarchy renders as a behavioral specification. [More on BDD-style tests.]({{< ref "/blog/readable-tests-with-bdd" >}})
 - **Process isolation.** Each suite runs as a separate OS process. A panicking test in one suite cannot crash another. Suite-level parallelism is safe by default.
@@ -194,10 +194,9 @@ $ gotest migrate ./...
 
 # migrate a specific package
 $ gotest migrate ./pkg/user
-
-# preview changes without writing (dry run)
-$ gotest migrate ./... --dry-run
 ```
+
+There is no dry-run mode — the tool writes rewritten files directly. Run it on a clean git tree and use `git diff` to review every change (and `git checkout` to back out).
 
 The tool performs an AST-level transformation, not a text find-and-replace. It parses your Go source files, identifies testify/suite patterns, and rewrites them while preserving comments, formatting, and non-suite code in the same file.
 
@@ -207,18 +206,18 @@ The migration tool covers the common cases that make up the bulk of a typical mi
 
 1. **Renames the suite struct** to follow the `*TestSuite` convention.
 1. **Renames lifecycle hooks:** `SetupSuite` to `BeforeAll`, `TearDownSuite` to `AfterAll`, `SetupTest` to `BeforeEach`, `TearDownTest` to `AfterEach`.
-1. **Transforms assertion calls:** `s.Require().Equal(a, b)` and `s.Equal(a, b)` both become `gotest.Equal(t, a, b)`.
+1. **Transforms assertion calls:** `s.Require().Equal(a, b)` and `s.Assert().Equal(a, b)` become `gotest.Equal(t, a, b)`, as do `require.Equal(s.T(), a, b)`-style calls inside suite methods. Direct `s.Equal(a, b)` calls are annotated with a TODO instead (see below).
 1. **Removes the `suite.Suite` embed** from the struct.
 1. **Removes the `suite.Run` boilerplate** function.
 1. **Updates imports:** removes `testify/suite`, adds `gotest`.
 
 ### What needs manual review
 
-The tool handles the 90% case. For the remaining edge cases, it leaves `// TODO: manual review` comments so you can find and address them:
+The tool handles the 90% case. For the remaining edge cases, it leaves `// TODO(gotest-migrate)` comments so you can find and address them:
 
-- **`s.T()` calls outside assertions.** If your suite passes `s.T()` to helper functions, you'll need to replace those with the `t` parameter that test methods now receive.
-- **Custom helper methods on the suite.** Methods that aren't lifecycle hooks or test methods are left unchanged. If they call assertions via `s.Require()`, those calls need manual conversion.
-- **Testify assertions not in `suite`.** If the same file uses `testify/assert` or `testify/require` directly (not through the suite), those imports and calls aren't touched. Replace them with the equivalent `gotest.*` functions.
+- **Assertions called directly on the suite.** `s.Equal(...)`, `s.Contains(...)` — testify's assert-flavored calls through the embedded `suite.Suite` — are left as written, each with a TODO naming the `gotest.*` replacement. Since the embedding is removed, they won't compile until you convert them.
+- **Custom helper methods on the suite.** Methods that aren't lifecycle hooks or test methods don't get a `t *gotest.T` parameter added. Assertion calls inside them are still rewritten to `gotest.*(t, ...)`, so you need to thread a `t` parameter through yourself. The same applies to `s.T()` handoffs, which the tool rewrites to `t.T()` everywhere.
+- **Testify assertions outside suite methods.** `assert.*` or `require.*` calls in standalone functions aren't converted — but the testify imports in a migrated file are removed, so the compiler will point you at every remaining call. Replace them with the equivalent `gotest.*` functions. (Inside suite methods, `assert.Equal(s.T(), ...)`-style calls are converted automatically.)
 - **`BeforeTest` / `AfterTest`.** testify has additional per-test hooks that receive the suite and test names as parameters: `BeforeTest(suiteName, testName string)` and `AfterTest(suiteName, testName string)`. These have no direct gotest equivalent and need manual conversion.
 - **`SetupSubTest` / `TearDownSubTest`.** testify/suite has subtest-level hooks that gotest doesn't map to directly. These are flagged for manual review.
 
@@ -239,7 +238,7 @@ The good news: it's a mechanical transformation. The assertion names are almost 
 | `s.Nil(ptr)` | `gotest.Nil(t, ptr)` |
 | `s.NotNil(ptr)` | `gotest.NotNil(t, ptr)` |
 
-`Nil` and `NotNil` deserve a note: testify's `Nil` checks specifically for `nil` using reflection, while gotest's `Zero` checks for the zero value of the type. They behave the same for pointers and interfaces (where `nil` is the zero value), but differ for other types. If your code uses `s.Nil` on non-pointer values, review those call sites manually.
+`Nil` and `NotNil` deserve a note: gotest's versions are type-guarded. They accept only nilable types — pointers, interfaces, slices, maps, channels, functions — and fail with a guard error on anything else, pointing you to `Zero`/`NotZero` for comparable value types. testify's `Nil` accepts any value and reports a plain assertion failure. If your code calls `s.Nil` on non-nilable values, switch those call sites to `gotest.Zero`.
 
 One difference worth noting: testify distinguishes between `s.Assert()` (continues on failure) and `s.Require()` (stops on failure). Calling assertions directly on the suite (`s.Equal(...)`, `s.Contains(...)`) also continues on failure, because the suite embeds `*assert.Assertions`. Only `s.Require().Equal(...)` stops. All gotest assertions stop on failure, like `Require`. This is a deliberate choice: a test that continues after a failed precondition typically produces confusing follow-on errors. If you need soft assertions, you can use `t.Errorf` directly.
 
@@ -250,11 +249,11 @@ Another difference: gotest assertions are generic. `gotest.Equal[V any](t, expec
 You don't have to migrate everything at once. gotest suites and `func Test*` functions coexist in the same package. A practical approach for larger codebases:
 
 1. **Start with one package.** Pick a package with a few well-understood suites. Run `gotest migrate ./pkg/user` and verify the tests pass.
-1. **Run both side by side.** Unmigrated packages keep using testify. Migrated packages use gotest. Both run via `go test` (or `gotest`) without conflict.
+1. **Run both side by side.** Unmigrated packages keep using testify under `go test`. Migrated suites run under `gotest` — the two runners partition the work and ignore each other's tests, so a complete run is both commands: `go test ./...` for the stdlib/testify half, `gotest ./...` for the suites.
 1. **Migrate package by package.** There's no deadline. Each package is independent. A half-migrated codebase works fine.
 1. **Remove testify when ready.** Once the last suite is migrated, drop the `testify` dependency from `go.mod`.
 
-The linter can help track progress. `gotest lint` flags `testify/suite` imports in packages that also use gotest suites, catching packages where migration is incomplete. Wiring that check into your pipeline keeps half-migrated packages from lingering; [Go Tests in GitHub Actions]({{< ref "/blog/gotest-in-ci" >}}) covers the CI setup.
+The linter can help track progress. `gotest lint` flags every remaining testify import ("testify import ... — consider migrating to gotest"), which makes half-migrated packages easy to list. Wiring that check into your pipeline keeps half-migrated packages from lingering; [Go Tests in GitHub Actions]({{< ref "/blog/gotest-in-ci" >}}) covers the CI setup.
 
 ## Common questions
 
@@ -272,4 +271,4 @@ Yes. All lifecycle hooks and test methods accept either `*gotest.T` or `*testing
 
 ### What if I have hundreds of suites?
 
-`gotest migrate ./...` processes all packages in one pass. Review the `// TODO: manual review` comments it leaves, fix the edge cases, and run your tests. For large codebases, doing this package by package is safer, but the tool handles batch migration too.
+`gotest migrate ./...` processes all packages in one pass. Review the `// TODO(gotest-migrate)` comments it leaves, fix the edge cases, and run your tests. For large codebases, doing this package by package is safer, but the tool handles batch migration too.

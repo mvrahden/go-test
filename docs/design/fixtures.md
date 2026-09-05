@@ -392,7 +392,7 @@ The default `gotest` run streams: each shared fixture's state is emitted as its 
 ### Failure semantics
 
 - A panic inside a fixture *setup* hook is recovered and converted to an error — it fails setup, it does not crash the process.
-  Teardown-side panics (`AfterAll`/`Dehydrate`) are not recovered and crash the test process.
+  Teardown-side panics are contained the same way: a panicking `AfterAll` is recovered and reported as `<fixture>.AfterAll panicked`, a panicking `Dehydrate` as `dehydrate panicked` — both become teardown failures, and teardown of the remaining fixtures continues.
 - Shared-fixture setup failure aborts the run: exit code 2 in batch modes (`watch`/`spec`/`summary`/`prepare`); in the default streaming run the affected suites are reported as failures (exit 1).
   In-test-process package-fixture setup failure is a `t.Fatalf` (exit 1).
 - Fixture teardown failure flips an otherwise passing run to a failure (`fixture teardown failed`).
