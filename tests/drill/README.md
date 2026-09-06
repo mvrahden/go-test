@@ -5,6 +5,7 @@ in gotest's core could hide a failure from gotest itself. The checks that
 close that loophole (the census, the ring-0 suites and the canary) are only
 worth trusting if they demonstrably catch such bugs. `make drill` plants one
 deliberate bug at a time and requires those checks to fail.
+The checks themselves are described in `ARCHITECTURE.md` under "Testing gotest".
 
 ## What a run does
 

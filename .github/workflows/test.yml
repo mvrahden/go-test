@@ -26,8 +26,6 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: "1.27"
-      - name: Test (stdlib)
-        run: go test -ldflags=-checklinkname=0 ./... -race
       - name: Test (suites)
         uses: ./
         with:
@@ -77,24 +75,15 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go-version }}
-      - name: Test (stdlib)
-        run: go test -ldflags=-checklinkname=0 -coverprofile=coverage-stdlib.out ./... -race
+      # gotest tests itself with one runner. The census, the ring-0 suites,
+      # the canary and the drill (quality.yml) replace the stdlib step; see
+      # ARCHITECTURE.md, "Testing gotest".
       - name: Test (suites)
         uses: ./
         with:
           packages: "./... ./examples/..."
           race: true
-          min-coverage: 40
-          go-test-flags: "-coverprofile=coverage-suites.out"
+          min-coverage: 70
           # One matrix cell publishes the badge; the others would only race
           # it for the same number.
           badge: ${{ matrix.go-version == '1.27' }}
-      - name: Merge coverage
-        run: |
-          awk '
-            FNR==1 && /^mode:/ { if(!mode){mode=$0}; next }
-            { key=$1" "$2; if(!(key in max)||$3+0>max[key]+0){max[key]=$3+0;line[key]=$0} }
-            END { print mode; n=asorti(line,sorted); for(i=1;i<=n;i++) print line[sorted[i]] }
-          ' coverage-stdlib.out coverage-suites.out > coverage.out
-          pct=$(go tool cover -func=coverage.out | tail -1 | awk '{print $NF}')
-          echo "**Combined coverage: ${pct}**" >> "$GITHUB_STEP_SUMMARY"

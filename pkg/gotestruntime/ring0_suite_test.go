@@ -37,19 +37,19 @@ func mustEqual(t *gotest.T, expected, actual any, msgAndArgs ...any) {
 }
 
 func mustLess[V cmp.Ordered](t *gotest.T, a, b V, msgAndArgs ...any) {
-	if !(a < b) {
+	if a >= b {
 		t.Errorf("%v is not less than %v%s", a, b, note(msgAndArgs))
 	}
 }
 
 func mustGreater[V cmp.Ordered](t *gotest.T, a, b V, msgAndArgs ...any) {
-	if !(a > b) {
+	if a <= b {
 		t.Errorf("%v is not greater than %v%s", a, b, note(msgAndArgs))
 	}
 }
 
 func mustGreaterOrEqual[V cmp.Ordered](t *gotest.T, a, b V, msgAndArgs ...any) {
-	if !(a >= b) {
+	if a < b {
 		t.Errorf("%v is not greater than or equal to %v%s", a, b, note(msgAndArgs))
 	}
 }

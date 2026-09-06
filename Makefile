@@ -3,7 +3,6 @@
 test:
 	go build ./...
 	go vet ./...
-	go test -ldflags=-checklinkname=0 ./... ./examples/... -race
 	go run ./cmd/gotest spec ./... ./examples/... -race
 
 lint: vet
