@@ -1,6 +1,7 @@
 package gotestspec
 
 import (
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -43,30 +44,35 @@ const (
 
 // Apply renders a label in its vocabulary. A When block reads as "when email is
 // valid"; It and Each labels stand on their own, because the ✓/✗ glyph already
-// plays the role of "it". A label that opens with the word itself is left alone
-// rather than doubled.
+// plays the role of "it". A label that already opens with a connective of its
+// own — "when", but also "with", "given", "after", … — is left alone rather
+// than doubled: "when with an empty cache" is not a sentence.
 func (v Vocab) Apply(label string) string {
-	if v != VocabWhen || opensWithWhen(label) {
+	if v != VocabWhen || opensWithConnective(label) {
 		return label
 	}
 	return "when " + label
 }
 
-// opensWithWhen reports whether a label already says "when" as its first word.
+// connectives are the words that already turn a label into a clause, so no
+// "when" goes in front of them. Matched as whole words, case-insensitively.
+var connectives = []string{
+	"when", "whenever", "with", "without", "given", "if", "unless",
+	"after", "before", "while", "once", "on", "upon", "as", "for",
+	"during", "under",
+}
+
+// opensWithConnective reports whether a label's first word is a connective.
 // The separator may be a space or an underscore: the same label reaches this
 // rule both as the developer typed it and as it survives a subtest name, where
 // every space is an underscore. Judging the two differently is how one behavior
 // ends up spelled two ways.
-func opensWithWhen(label string) bool {
-	const word = "when"
-	if len(label) < len(word) || !strings.EqualFold(label[:len(word)], word) {
-		return false
+func opensWithConnective(label string) bool {
+	word := label
+	if i := strings.IndexAny(label, " _\t"); i >= 0 {
+		word = label[:i]
 	}
-	rest := label[len(word):]
-	if rest == "" {
-		return true
-	}
-	return rest[0] == ' ' || rest[0] == '_' || rest[0] == '\t'
+	return slices.ContainsFunc(connectives, func(c string) bool { return strings.EqualFold(word, c) })
 }
 
 // Declaration is what the source says about a subtest: the description as the

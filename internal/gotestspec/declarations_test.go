@@ -112,8 +112,29 @@ func TestVocabApply(t *testing.T) {
 		{"when_in_doubt", "when_in_doubt"},
 		{"When_in_doubt", "When_in_doubt"},
 		{"when", "when"},
-		// "whenever" only starts with the letters; it does not say "when".
-		{"whenever it rains", "when whenever it rains"},
+		// "whenever" is a connective in its own right, not a doubled "when".
+		{"whenever it rains", "whenever it rains"},
+		// A label that already opens with a connective of its own reads as a
+		// clause without help; "when with an empty cache" is not English.
+		{"with an empty cache", "with an empty cache"},
+		{"without a token", "without a token"},
+		{"given an admin", "given an admin"},
+		{"if the cache is cold", "if the cache is cold"},
+		{"unless the flag is set", "unless the flag is set"},
+		{"after a restart", "after a restart"},
+		{"before the first request", "before the first request"},
+		{"while the lock is held", "while the lock is held"},
+		{"once the cache is warm", "once the cache is warm"},
+		{"on a second call", "on a second call"},
+		{"upon retry", "upon retry"},
+		{"as an admin", "as an admin"},
+		{"for an unknown key", "for an unknown key"},
+		{"during shutdown", "during shutdown"},
+		{"under load", "under load"},
+		{"Given_an_admin", "Given_an_admin"},
+		// Only the whole word counts: "withdrawing" does not open with "with".
+		{"withdrawing funds", "when withdrawing funds"},
+		{"asking twice", "when asking twice"},
 	}
 	for _, tc := range cases {
 		if got := VocabWhen.Apply(tc.label); got != tc.want {
