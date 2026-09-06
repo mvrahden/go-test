@@ -123,3 +123,25 @@ func (s *CensusTestSuite) TestEnforcementRules(t *gotest.T, _ *censusCtx) {
 		})
 	})
 }
+
+func (s *CensusTestSuite) TestRunsAreCensused(t *gotest.T, _ *censusCtx) {
+	// Real pipeline runs over tiny fixture packages. A whole-suite skip and a
+	// filtered run must stay green; a misjudged census would turn either into 2.
+	t.When("a suite skips itself in BeforeAll", func(w *gotest.T) {
+		w.It("summary stays green: the skip covers the suite's methods", func(it *gotest.T) {
+			gotest.Equal(it, 0, main.ExportRunSummary(main.Invocation{Args: []string{"./testdata/census/skipped/"}}))
+		})
+	})
+
+	t.When("the run is filtered to nothing", func(w *gotest.T) {
+		w.It("spec stands down instead of reporting every method missing", func(it *gotest.T) {
+			gotest.Equal(it, 0, main.ExportRunSpec(main.Invocation{Args: []string{"./testdata/census/plain/", "-run", "TestNothingMatches"}}))
+		})
+	})
+
+	t.When("a plain package runs in -json mode", func(w *gotest.T) {
+		w.It("is censused through the observer and stays green", func(it *gotest.T) {
+			gotest.Equal(it, 0, main.Run(main.ExecConfig{PackagePatterns: []string{"./testdata/census/plain/"}, JSON: true}))
+		})
+	})
+}
