@@ -1035,7 +1035,7 @@ func (s *CmdGotestTestSuite) TestInputReadsTheSourceItCanReach(t *gotest.T) {
 
 		w.It("summary titles the failure the same way", func(it *gotest.T) {
 			out := filepath.Join(it.TempDir(), "summary.txt")
-			gotest.Equal(it, 0, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, true))
+			gotest.Equal(it, 0, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, true, ""))
 			data, err := os.ReadFile(out)
 			gotest.NoError(it, err)
 			gotest.Contains(it, string(data), "when searching for a title keyword")
