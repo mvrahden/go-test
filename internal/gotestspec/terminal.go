@@ -29,6 +29,7 @@ type renderConfig struct {
 	elapsed         time.Duration
 	withoutVerdicts bool
 	benchDeltas     []BenchDelta
+	benchGate       *BenchGate
 }
 
 type RenderOption func(*renderConfig)
@@ -73,6 +74,21 @@ type BenchDelta struct {
 // nil or empty slice renders no table.
 func WithBenchDeltas(deltas []BenchDelta) RenderOption {
 	return func(c *renderConfig) { c.benchDeltas = deltas }
+}
+
+// BenchGate is the gate verdict of a bench run, mirroring gotestbench.Gate
+// (which imports this package, so it cannot be used here directly).
+type BenchGate struct {
+	ThresholdPct float64
+	WorstPct     float64
+	WorstKey     string
+	Breached     bool
+}
+
+// WithBenchGate attaches a gate verdict to RenderMarkdownBenchSummary.
+// nil renders no verdict: no gate was set.
+func WithBenchGate(gate *BenchGate) RenderOption {
+	return func(c *renderConfig) { c.benchGate = gate }
 }
 
 func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
