@@ -39,3 +39,5 @@ var ExportGotestFlags = gotestFlags
 var ExportTestAllowed = testAllowed
 var ExportSpecAllowed = specAllowed
 var ExportWatchAllowed = watchAllowed
+var ExportSummaryAllowed = summaryAllowed
+var ExportEnsureCoverProfile = ensureCoverProfile

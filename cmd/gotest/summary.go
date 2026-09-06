@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	output := extractStringFlag(ownArgs, "--output", "")
 	input := extractStringFlag(ownArgs, "--input", "")
 	coverageProfile := extractStringFlag(ownArgs, "--coverage", "")
+	badgePath := extractStringFlag(ownArgs, "--badge", "")
 	noColor := hasFlag(ownArgs, "--no-color")
 	github := hasFlag(ownArgs, "--github") || os.Getenv("GITHUB_ACTIONS") == "true"
 	renderOnly := hasFlag(ownArgs, "--render-only")
@@ -36,7 +38,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	if input != "" {
-		return runSummaryFromInput(input, format, output, coverageProfile, noColor, github, renderOnly)
+		return runSummaryFromInput(input, format, output, coverageProfile, noColor, github, renderOnly, badgePath)
 	}
 
 	minCoverage, err := parseMinFlag(ownArgs)
@@ -48,7 +50,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		minCoverage = inv.Config.MinCoverage
 	}
 
-	goTestArgs, coverProfile, coverCleanup, err := ensureCoverProfile(goTestArgs, minCoverage)
+	goTestArgs, coverProfile, coverCleanup, err := ensureCoverProfile(goTestArgs, minCoverage > 0 || badgePath != "")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -135,12 +137,12 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	elapsed := time.Since(pipelineStart)
-	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed)
+	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed, badgePath)
 
 	return enforceCoverage(coverProfile, minCoverage, code)
 }
 
-func runSummaryFromInput(input, format, output, coverageProfile string, noColor, github, renderOnly bool) int {
+func runSummaryFromInput(input, format, output, coverageProfile string, noColor, github, renderOnly bool, badgePath string) int {
 	var r io.Reader
 	if input == "-" {
 		r = os.Stdin
@@ -162,7 +164,7 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 
 	tree := gotestspec.BuildTree(events)
 
-	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0)
+	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0, badgePath)
 
 	if !renderOnly && gotestspec.HasFailures(tree) {
 		return 1
@@ -170,7 +172,7 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 	return 0
 }
 
-func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool, elapsed time.Duration) {
+func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool, elapsed time.Duration, badgePath string) {
 	var w io.Writer = os.Stdout
 	var closeFunc func()
 	if output != "" {
@@ -200,6 +202,9 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 			fmt.Fprintf(os.Stderr, "warning: reading coverage profile: %s\n", err)
 		} else {
 			renderOpts = append(renderOpts, gotestspec.WithCoverage(report))
+			if badgePath != "" {
+				writeCoverageBadge(badgePath, report.Total)
+			}
 		}
 	}
 
@@ -224,5 +229,23 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 				sf.Close()
 			}
 		}
+	}
+}
+
+// writeCoverageBadge renders the badge SVG to path. It never fails the run:
+// the badge is a by-product of the summary, so problems are warnings.
+func writeCoverageBadge(path string, pct float64) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: writing coverage badge: %s\n", err)
+		return
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: writing coverage badge: %s\n", err)
+		return
+	}
+	defer f.Close()
+	if err := gotestspec.RenderCoverageBadge(f, pct); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: writing coverage badge: %s\n", err)
 	}
 }

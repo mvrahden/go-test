@@ -763,6 +763,37 @@ By default (`version: gomod`), the action resolves `gotest` from your `go.mod` â
 
 The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel. See the [reference](https://mvrahden.github.io/go-test/reference/#ci-integration) for the full inputs/outputs table.
 
+### Coverage Badge
+
+The action can add a coverage badge to your README. `gotest` draws the badge as an SVG file and the workflow commits it to a branch of your own repository using the built-in `GITHUB_TOKEN`. Nothing outside GitHub is involved and there is no account or secret to set up.
+
+```yaml
+permissions:
+  contents: write
+
+steps:
+  - uses: actions/checkout@v4
+  - uses: mvrahden/go-test@v1
+    with:
+      packages: ./...
+      min-coverage: 80
+      badge: true
+```
+
+`badge: true` turns coverage reporting on by itself. The badge lands on the `ci/badges` branch (change it with `badge-branch`); embed it from there:
+
+```markdown
+![Coverage](https://raw.githubusercontent.com/<owner>/<repo>/ci/badges/coverage.svg)
+```
+
+Three rules keep the badge trustworthy:
+
+- It is published from the default branch only. Pull requests and feature branches never change it.
+- It is published only when the suites ran to completion. A build failure publishes nothing, while a failed test run or a missed `min-coverage` still publishes the coverage that run measured.
+- It never affects test results. Several jobs publishing at once (a version matrix, for example) simply take turns, and a missing permission or a protected branch produces a warning, not a failed build.
+
+Outside GitHub Actions, `gotest summary --badge=coverage.svg ./...` renders the same file for you to publish however you like.
+
 ## Commands
 
 ```bash

@@ -919,7 +919,7 @@ func (s *CmdGotestTestSuite) TestInputModesShareOneExitRule(t *gotest.T) {
 		})
 
 		w.It("summary --input agrees", func(it *gotest.T) {
-			gotest.Equal(it, 1, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, false))
+			gotest.Equal(it, 1, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, false, ""))
 		})
 	})
 
@@ -929,7 +929,7 @@ func (s *CmdGotestTestSuite) TestInputModesShareOneExitRule(t *gotest.T) {
 
 		w.It("both exit zero", func(it *gotest.T) {
 			gotest.Equal(it, 0, ExportRunSpecFromInput(input, "terminal", out, true, false))
-			gotest.Equal(it, 0, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, false))
+			gotest.Equal(it, 0, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, false, ""))
 		})
 	})
 }
@@ -961,7 +961,7 @@ func (s *CmdGotestTestSuite) TestRenderOnlySeparatesVerdictFromRendering(t *gote
 		})
 
 		w.It("summary agrees, keeping the two input modes on one rule", func(it *gotest.T) {
-			gotest.Equal(it, 0, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, true))
+			gotest.Equal(it, 0, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, true, ""))
 		})
 
 		w.It("still renders the failure into the output", func(it *gotest.T) {
@@ -983,7 +983,7 @@ func (s *CmdGotestTestSuite) TestRenderOnlySeparatesVerdictFromRendering(t *gote
 		})
 
 		w.It("summary still fails too", func(it *gotest.T) {
-			gotest.Equal(it, 2, ExportRunSummaryFromInput(missing, "terminal", out, "", true, false, true))
+			gotest.Equal(it, 2, ExportRunSummaryFromInput(missing, "terminal", out, "", true, false, true, ""))
 		})
 	})
 
