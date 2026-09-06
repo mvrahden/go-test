@@ -63,6 +63,22 @@ func (s *E2ETestSuite) BeforeAll(t *gotest.T) {
 
 func (s *E2ETestSuite) AfterAll(t *gotest.T) {}
 
+// command prepares a run of the built CLI. The GitHub Actions variables
+// never pass through from the parent: under CI they would make every child
+// append to the job's real step summary.
+func (s *E2ETestSuite) command(args ...string) *exec.Cmd {
+	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
+	var env []string
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "GITHUB_ACTIONS=") || strings.HasPrefix(kv, "GITHUB_STEP_SUMMARY=") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	cmd.Env = env
+	return cmd
+}
+
 func (s *E2ETestSuite) TestT(t *gotest.T) {
 	tmp := t.TempDir()
 	excludedPaths := append(append([]string(nil), testutils.DefaultExcludePaths...),
@@ -87,7 +103,7 @@ func (s *E2ETestSuite) TestT(t *gotest.T) {
 	testutils.AssertFilesInTmp(t.T(), tmp, "go.mod", "pkg/gotest/t_test.go", "pkg/gotest/t.go")
 	testutils.HackGoWork(t.T(), tmp)
 
-	cmd := exec.Command(s.binary, filepath.Join(tmp, "pkg/gotest"), "-v") //nolint:gosec // G204: controlled binary with fixed args
+	cmd := s.command(filepath.Join(tmp, "pkg/gotest"), "-v")
 	cmd.Dir = tmp
 	out, _ := cmd.CombinedOutput()
 	testutils.CompareTestOutputWithGolden(t.T(), tmp, bytes.NewBuffer(out), testdataFS, "t.golden")
@@ -110,7 +126,7 @@ func (s *E2ETestSuite) TestTestsuiteCLI(t *gotest.T) {
 }
 
 func (s *E2ETestSuite) TestTestsuiteCLIParallelSuite(t *gotest.T) {
-	cmd := exec.Command(s.binary, filepath.Join(s.workDir, "examples", "search"), "-v") //nolint:gosec // G204: controlled binary with fixed args
+	cmd := s.command(filepath.Join(s.workDir, "examples", "search"), "-v")
 	cmd.Dir = filepath.Join(s.workDir, "examples")
 	out, err := cmd.CombinedOutput()
 	output := string(out)
@@ -128,7 +144,7 @@ func (s *E2ETestSuite) TestTestsuiteCLIParallelSuite(t *gotest.T) {
 }
 
 func (s *E2ETestSuite) TestTestsuiteCLIAllPackages(t *gotest.T) {
-	cmd := exec.Command(s.binary, "github.com/mvrahden/go-test/examples/...", "-v") //nolint:gosec // G204: controlled binary with fixed args
+	cmd := s.command("github.com/mvrahden/go-test/examples/...", "-v")
 	cmd.Dir = filepath.Join(s.workDir, "examples")
 	out, _ := cmd.CombinedOutput()
 	output := string(out)
@@ -145,7 +161,7 @@ func (s *E2ETestSuite) TestTestsuiteCLIExitCode(t *gotest.T) {
 	defer os.RemoveAll(failDir)
 	_ = os.WriteFile(filepath.Join(failDir, "ptest_test.go"), []byte("package failsuite\n\nimport \"github.com/mvrahden/go-test/pkg/gotest\"\n\ntype FailTestSuite struct{}\n\nfunc (s *FailTestSuite) TestAlwaysFails(t *gotest.T) { t.FailNow() }\n"), 0o600)
 
-	cmd := exec.Command(s.binary, failDir, "-v") //nolint:gosec // G204: controlled binary with fixed args
+	cmd := s.command(failDir, "-v")
 	cmd.Dir = filepath.Join(s.workDir, "examples")
 	_, err := cmd.CombinedOutput()
 
@@ -158,7 +174,7 @@ func (s *E2ETestSuite) TestTestsuiteCLIExitCode(t *gotest.T) {
 func (s *E2ETestSuite) TestSharedFixtureExitTiming(t *gotest.T) {
 	t.When("running packages with shared fixtures", func(w *gotest.T) {
 		w.It("exits promptly after all tests complete", func(it *gotest.T) {
-			cmd := exec.Command(s.binary, //nolint:gosec // G204: controlled binary with fixed args
+			cmd := s.command(
 				"github.com/mvrahden/go-test/tests/sharedfixture/...",
 				"-json", "-count=1")
 			cmd.Dir = s.workDir
@@ -198,7 +214,7 @@ func (s *KeysTestSuite) TestEncode(t *gotest.T) {
 `), 0o600))
 
 	run := func(args ...string) []byte {
-		cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
+		cmd := s.command(args...)
 		cmd.Dir = filepath.Join(s.workDir, "examples")
 		out, _ := cmd.CombinedOutput()
 		return out
@@ -260,7 +276,7 @@ func (s *KeysTestSuite) TestEncode(t *gotest.T) {
 	// produced. That replay reads the same source the run did, so it renders
 	// the same labels — the one pair of surfaces that shares no code path.
 	t.It("replays a captured stream under those same labels", func(it *gotest.T) {
-		capture := exec.Command(s.binary, "./declared_labels", "-json") //nolint:gosec // G204: controlled binary with fixed args
+		capture := s.command("./declared_labels", "-json")
 		capture.Dir = filepath.Join(s.workDir, "examples")
 		stream, err := capture.Output()
 		gotest.NoError(it, err, "capturing -json: %s", string(stream))
@@ -327,7 +343,7 @@ func specLabels(out string) map[string]bool {
 func (s *E2ETestSuite) TestOutputFormatGolden(t *gotest.T) {
 	t.When("non-verbose", func(w *gotest.T) {
 		w.It("single passing package", func(it *gotest.T) {
-			cmd := exec.Command(s.binary, "github.com/mvrahden/go-test/examples/auth") //nolint:gosec // G204: controlled binary with fixed args
+			cmd := s.command("github.com/mvrahden/go-test/examples/auth")
 			cmd.Dir = filepath.Join(s.workDir, "examples")
 			out, err := cmd.CombinedOutput()
 
@@ -336,7 +352,7 @@ func (s *E2ETestSuite) TestOutputFormatGolden(t *gotest.T) {
 		})
 
 		w.It("multi-package all passing", func(it *gotest.T) {
-			cmd := exec.Command(s.binary, //nolint:gosec // G204: controlled binary with fixed args
+			cmd := s.command(
 				"github.com/mvrahden/go-test/examples/cart",
 				"github.com/mvrahden/go-test/examples/auth",
 			)
@@ -355,7 +371,7 @@ func (s *E2ETestSuite) TestOutputFormatGolden(t *gotest.T) {
 				"package failgolden\n\nimport \"github.com/mvrahden/go-test/pkg/gotest\"\n\ntype FailGoldenTestSuite struct{}\n\nfunc (s *FailGoldenTestSuite) TestAlwaysFails(t *gotest.T) { t.FailNow() }\n",
 			), 0o600))
 
-			cmd := exec.Command(s.binary, //nolint:gosec // G204: controlled binary with fixed args
+			cmd := s.command(
 				"github.com/mvrahden/go-test/examples/fail_golden",
 				"github.com/mvrahden/go-test/examples/auth",
 			)
@@ -367,7 +383,7 @@ func (s *E2ETestSuite) TestOutputFormatGolden(t *gotest.T) {
 	})
 
 	t.When("json", func(w *gotest.T) {
-		cmd := exec.Command(s.binary, "github.com/mvrahden/go-test/examples/auth", "-json", "-parallel", "1") //nolint:gosec // G204: controlled binary with fixed args
+		cmd := s.command("github.com/mvrahden/go-test/examples/auth", "-json", "-parallel", "1")
 		cmd.Dir = filepath.Join(s.workDir, "examples")
 		out, err := cmd.CombinedOutput()
 
@@ -388,7 +404,7 @@ func (s *E2ETestSuite) TestOutputFormatGolden(t *gotest.T) {
 
 	t.When("verbose", func(w *gotest.T) {
 		w.It("single passing package", func(it *gotest.T) {
-			cmd := exec.Command(s.binary, "github.com/mvrahden/go-test/examples/auth", "-v", "-parallel", "1") //nolint:gosec // G204: controlled binary with fixed args
+			cmd := s.command("github.com/mvrahden/go-test/examples/auth", "-v", "-parallel", "1")
 			cmd.Dir = filepath.Join(s.workDir, "examples")
 			out, err := cmd.CombinedOutput()
 
@@ -404,7 +420,7 @@ func (s *E2ETestSuite) TestBenchJSONReport(t *gotest.T) {
 	runBench := func(it *gotest.T, extra ...string) []byte {
 		args := append([]string{"bench", "github.com/mvrahden/go-test/examples/benchmarking",
 			"-bench=^BenchmarkCacheTestSuite$/^BenchmarkGetHit$", "-benchtime=10x"}, extra...)
-		cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
+		cmd := s.command(args...)
 		cmd.Dir = filepath.Join(s.workDir, "examples")
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout = &stdout
@@ -532,7 +548,7 @@ func (s *E2ETestSuite) performTest(t *testing.T, basedir, pkgPath, pkgName, gold
 		unifiedPkgDescriptor = filepath.Join(s.workDir, basedir, pkgPath)
 	}
 
-	cmd := exec.Command(s.binary, unifiedPkgDescriptor, "-v", "-parallel", "1") //nolint:gosec // G204: controlled binary with fixed args
+	cmd := s.command(unifiedPkgDescriptor, "-v", "-parallel", "1")
 	cmd.Dir = filepath.Join(s.workDir, basedir)
 	out, _ := cmd.CombinedOutput()
 
