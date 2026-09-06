@@ -846,6 +846,8 @@ The tables below are the canonical action surface — a drift guard test keeps t
 | `min-coverage` | Minimum coverage percentage (0-100, fails if below) |
 | `flags` | Additional gotest flags (`--double-dash` style; also forwarded to the bench step) |
 | `go-test-flags` | Additional go test flags (`-single-dash` style) |
+| `badge` | Render a coverage badge and, on the default branch, publish it as `coverage.svg` to `badge-branch` (needs `contents: write`; turns coverage on; default `false`) |
+| `badge-branch` | Branch the coverage badge is published to; created on first use (default `ci/badges`) |
 | `bench` | Run benchmarks after tests via `gotest bench --spec --json` (default `false`) |
 | `bench-baseline` | Baseline JSON file to compare benchmarks against (`--against`) |
 | `bench-gate` | Fail if any benchmark regresses by more than this percent (`--gate`) |
@@ -858,6 +860,7 @@ The tables below are the canonical action surface — a drift guard test keeps t
 |---|---|
 | `exit-code` | Test process exit code |
 | `coverage` | Coverage percentage (empty if coverage not enabled) |
+| `badge` | Path of the rendered coverage badge SVG (empty unless badge is enabled and the tests ran) |
 | `bench-report` | Path to the `gotest bench --json` report file (empty if bench not enabled) |
 | `bench-breached-keys` | Comma-joined benchmark keys that breached the gate (empty if none or no gate) |
 
