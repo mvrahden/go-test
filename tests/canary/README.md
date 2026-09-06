@@ -3,7 +3,7 @@
 The canary checks gotest's verdicts from outside gotest. Every other test in
 this repository reports its result through gotest's own runner, so a bug in
 that runner could turn a failure into a pass without any test noticing. The
-canary closes that gap: it builds the `gotest` binary, runs it over seven
+canary closes that gap: it builds the `gotest` binary, runs it over eight
 small fixture packages written to fail in specific ways, and compares what
 the binary reports with a checked-in expectation. It checks with plain Go
 only, so nothing under test takes part in the verdict.
@@ -19,6 +19,7 @@ Each directory under `testdata/` is one package with one suite:
 | `failnow` | a failed assertion halts the method; the statement after it never runs |
 | `aftereach` | `AfterEach` runs even when the test failed |
 | `lifecycle` | `BeforeAll`, the methods and `AfterAll` run in that order |
+| `benching` | a capturing bench run reports a result for every declared benchmark |
 | `broken` | a package that does not compile exits 2 |
 | `panicking` | a panic fails its method and the run is red |
 

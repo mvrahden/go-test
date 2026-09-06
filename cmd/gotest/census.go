@@ -47,6 +47,64 @@ func declaredCases(loaded []*gotestgen.LoadResult) []censusCase {
 	return out
 }
 
+// declaredBenchCases lists every benchmark method the loaded packages
+// declare, after focus and exclusion, as "Benchmark<Suite>/Benchmark<Name>",
+// the path the bench harness runs them under.
+func declaredBenchCases(loaded []*gotestgen.LoadResult) []censusCase {
+	var out []censusCase
+	collector := gotestgen.NewCollector()
+	for _, lr := range loaded {
+		for _, pkg := range []*packages.Package{lr.Ptest, lr.Pxtest} {
+			if pkg == nil {
+				continue
+			}
+			result := collector.CollectSuiteSpecs(pkg)
+			if len(result.Errs) > 0 {
+				continue
+			}
+			spec, err := collector.ApplyTestSuiteSpecs(result)
+			if err != nil {
+				continue
+			}
+			for _, suite := range spec.EffectiveTestSuites {
+				for _, m := range suite.Benchmarks() {
+					out = append(out, censusCase{Pkg: lr.PkgPath, Path: "Benchmark" + suite.Identifier() + "/" + m.Identifier()})
+				}
+			}
+		}
+	}
+	return out
+}
+
+// executedBenchCases lists every benchmark that produced a verdict. go test
+// emits no pass event for a benchmark: the result line ("ns/op") is its
+// verdict, a fail or skip action the other kind. A benchmark that only
+// started does not count.
+func executedBenchCases(events []gotestspec.TestEvent) []censusCase {
+	var out []censusCase
+	seen := map[censusCase]bool{}
+	for _, ev := range events {
+		if ev.Test == "" || !strings.HasPrefix(ev.Test, "Benchmark") || strings.Count(ev.Test, "/") != 1 {
+			continue
+		}
+		switch ev.Action {
+		case gotestspec.ActionFail, gotestspec.ActionSkip, gotestspec.ActionBench:
+		case gotestspec.ActionOutput:
+			if !strings.Contains(ev.Output, " ns/op") {
+				continue
+			}
+		default:
+			continue
+		}
+		c := censusCase{Pkg: ev.Package, Path: ev.Test}
+		if !seen[c] {
+			seen[c] = true
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 // executedCases lists every Suite/Method pair with a terminal verdict. A
 // suite skipped as a whole appears as a bare suite path; censusMissing treats
 // that as covering the suite's methods. Behaviors below the method are not
@@ -94,10 +152,16 @@ func censusMissing(declared, executed []censusCase) []censusCase {
 	return missing
 }
 
-// censusStandsDown reports whether the go test flags change which tests run.
-func censusStandsDown(goTestArgs []string) bool {
+var (
+	testSelectionFlags  = []string{"-run", "-skip", "-list", "-test.run", "-test.skip", "-test.list"}
+	benchSelectionFlags = append([]string{"-bench", "-test.bench"}, testSelectionFlags...)
+)
+
+// hasSelectionFlag reports whether the go test flags carry one of flags,
+// which change which tests or benchmarks run.
+func hasSelectionFlag(goTestArgs, flags []string) bool {
 	for _, a := range goTestArgs {
-		for _, f := range []string{"-run", "-skip", "-list", "-test.run", "-test.skip", "-test.list"} {
+		for _, f := range flags {
 			if a == f || strings.HasPrefix(a, f+"=") {
 				return true
 			}
@@ -106,22 +170,38 @@ func censusStandsDown(goTestArgs []string) bool {
 	return false
 }
 
+// censusStandsDown reports whether the go test flags change which tests run.
+func censusStandsDown(goTestArgs []string) bool {
+	return hasSelectionFlag(goTestArgs, testSelectionFlags)
+}
+
 // enforceCensus turns a green run that left declared tests unexecuted into
 // exit 2: not a failed test, a run that cannot be believed. Red runs pass
 // through, since they are already not false green.
 func enforceCensus(w io.Writer, code int, goTestArgs []string, declared, executed []censusCase) int {
+	return enforceCensusOf(w, code, censusStandsDown(goTestArgs), "test", declared, executed)
+}
+
+// enforceBenchCensus is the census of a bench run: every declared benchmark
+// must have produced a result. -bench selects benchmarks, so it stands the
+// census down like -run does.
+func enforceBenchCensus(w io.Writer, code int, goTestArgs []string, declared, executed []censusCase) int {
+	return enforceCensusOf(w, code, hasSelectionFlag(goTestArgs, benchSelectionFlags), "benchmark", declared, executed)
+}
+
+func enforceCensusOf(w io.Writer, code int, standsDown bool, kind string, declared, executed []censusCase) int {
 	if code != 0 {
 		return code
 	}
-	if censusStandsDown(goTestArgs) {
-		fmt.Fprintln(w, "note: census skipped under -run/-skip/-list")
+	if standsDown {
+		fmt.Fprintln(w, "note: census skipped under -run/-skip/-list/-bench")
 		return code
 	}
 	missing := censusMissing(declared, executed)
 	if len(missing) == 0 {
 		return code
 	}
-	fmt.Fprintf(w, "\nFAIL: census: %d declared test(s) never ran\n", len(missing))
+	fmt.Fprintf(w, "\nFAIL: census: %d declared %s(s) never ran\n", len(missing), kind)
 	for _, m := range missing {
 		fmt.Fprintf(w, "  %s %s\n", m.Pkg, m.Path)
 	}

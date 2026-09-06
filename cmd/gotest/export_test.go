@@ -57,3 +57,6 @@ type ExportCensusCase = censusCase
 var ExportExecutedCases = executedCases
 var ExportCensusMissing = censusMissing
 var ExportEnforceCensus = enforceCensus
+var ExportExecutedBenchCases = executedBenchCases
+var ExportEnforceBenchCensus = enforceBenchCensus
+var ExportRunBench = runBench

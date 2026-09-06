@@ -361,6 +361,11 @@ When both are given, a suite must match both to run (e.g.
 If no packages contain any BenchmarkX methods, prints "no benchmarks
 found" and exits 0 without invoking go test.
 
+A capturing run (--spec, --json, --save or --against) is believed only
+when every declared BenchmarkX method reported a result. If one never ran,
+the run exits 2 with "FAIL: census: N declared benchmark(s) never ran";
+-run and -bench stand the census down with a note on stderr.
+
 --against prints a delta table (BENCHMARK / OLD ns/op / NEW ns/op / Δ)
 comparing each benchmark's new mean ns/op against the saved baseline's.
 Only statistically significant deltas are shown by default; pass -v to

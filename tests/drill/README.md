@@ -41,6 +41,7 @@ The drill exits 0 only when every mutant was caught. It runs in CI
 | `assert-always-passes` | `CheckEqual` reports success for every input | ring-0 assert suite: its raw checks see the wrong verdict string |
 | `fail-is-noop` | `fail()` in `pkg/gotest` records nothing | canary: the fixtures that must fail stay green |
 | `harness-drops-methods` | the suites template omits every other method | census: declared methods have no verdict |
+| `bench-harness-drops-methods` | the bench template omits the first benchmark of each suite | bench census, exercised by the canary's benchmark fixture |
 | `exit-code-zero` | `WorstExitCode` always returns 0 | canary: exit codes differ from the golden list |
 | `tree-fail-is-pass` | `BuildTree` classifies `fail` events as `pass` | canary golden list, and the ring-0 tree suite |
 

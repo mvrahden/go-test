@@ -145,3 +145,59 @@ func (s *CensusTestSuite) TestRunsAreCensused(t *gotest.T, _ *censusCtx) {
 		})
 	})
 }
+
+const benchStream = `{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite/BenchmarkGetHit"}
+{"Action":"output","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite/BenchmarkGetHit","Output":"BenchmarkCacheTestSuite/BenchmarkGetHit\n"}
+{"Action":"output","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite/BenchmarkGetHit","Output":"BenchmarkCacheTestSuite/BenchmarkGetHit-6   \t 1\t 260.0 ns/op\n"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite/BenchmarkStarted"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite/BenchmarkBroken"}
+{"Action":"fail","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite/BenchmarkBroken"}
+{"Action":"pass","Package":"example.com/pkg"}
+`
+
+func (s *CensusTestSuite) TestExecutedBenchCasesReadTheStream(t *gotest.T, _ *censusCtx) {
+	// A benchmark never gets a pass event: its verdict is the result line.
+	t.It("counts a benchmark with a result line or a failure, not one that merely started", func(it *gotest.T) {
+		got := main.ExportExecutedBenchCases(parseStream(it, benchStream))
+		gotest.Equal(it, []main.ExportCensusCase{
+			{Pkg: "example.com/pkg", Path: "BenchmarkCacheTestSuite/BenchmarkGetHit"},
+			{Pkg: "example.com/pkg", Path: "BenchmarkCacheTestSuite/BenchmarkBroken"},
+		}, got)
+	})
+
+	t.It("reports the missing benchmark with its own wording", func(it *gotest.T) {
+		declared := []main.ExportCensusCase{
+			{Pkg: "example.com/pkg", Path: "BenchmarkCacheTestSuite/BenchmarkGetHit"},
+			{Pkg: "example.com/pkg", Path: "BenchmarkCacheTestSuite/BenchmarkStarted"},
+		}
+		var out bytes.Buffer
+		code := main.ExportEnforceBenchCensus(&out, 0, nil, declared, main.ExportExecutedBenchCases(parseStream(it, benchStream)))
+		gotest.Equal(it, 2, code)
+		gotest.Contains(it, out.String(), "FAIL: census: 1 declared benchmark(s) never ran")
+		gotest.Contains(it, out.String(), "example.com/pkg BenchmarkCacheTestSuite/BenchmarkStarted")
+	})
+
+	t.It("stands down under -bench as well as -run", func(it *gotest.T) {
+		declared := []main.ExportCensusCase{{Pkg: "example.com/pkg", Path: "BenchmarkCacheTestSuite/BenchmarkStarted"}}
+		for _, args := range [][]string{{"-bench=^X$"}, {"-bench", "."}, {"-run=X"}} {
+			var out bytes.Buffer
+			gotest.Equal(it, 0, main.ExportEnforceBenchCensus(&out, 0, args, declared, nil), "%v", args)
+			gotest.Contains(it, out.String(), "note: census skipped")
+		}
+	})
+}
+
+func (s *CensusTestSuite) TestBenchRunsAreCensused(t *gotest.T, _ *censusCtx) {
+	t.When("a bench run renders the spec", func(w *gotest.T) {
+		w.It("stays green when every declared benchmark produced a result", func(it *gotest.T) {
+			gotest.Equal(it, 0, main.ExportRunBench(main.Invocation{Args: []string{"--spec", "--no-color", "./testdata/census/benchplain/", "-benchtime=1x"}}))
+		})
+	})
+
+	t.When("the caller selects benchmarks with -bench", func(w *gotest.T) {
+		w.It("stands down instead of reporting the unselected ones", func(it *gotest.T) {
+			gotest.Equal(it, 0, main.ExportRunBench(main.Invocation{Args: []string{"--spec", "--no-color", "./testdata/census/benchplain/", "-benchtime=1x", "-bench=^BenchmarkBenchPlainTestSuite$/^BenchmarkA$"}}))
+		})
+	})
+}

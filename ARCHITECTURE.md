@@ -1052,21 +1052,24 @@ recorded by `testing`.
    flags change the declared set with `go test`'s per-level regexp
    semantics, and CI runs are unfiltered. The plain text run
    (`gotest ./...`) has no event stream and is not censused; every CI gate
-   is.
+   is. A capturing `bench` run (`--spec`, `--json`, `--save`, `--against`)
+   is censused over the declared benchmark methods, whose verdict is the
+   `ns/op` result line or a `fail`; `-bench` stands it down.
 2. **Ring-0 raw checks** catch a swallowed failure in the kernel: the tests
    of the assertion kernel never call it, so a kernel that always passes
    cannot pass them.
 3. **Canary** (`tests/canary`) catches a misreported verdict, and a
-   swallowed failure end to end. It builds the CLI, runs it over seven
+   swallowed failure end to end. It builds the CLI, runs it over eight
    fixture packages written to fail in specific ways (a green suite, one failing assertion per family, a halting
-   `FailNow`, `AfterEach` after a failure, lifecycle order, an uncompilable package, a panicking method), and compares exit codes and the raw `-json`
+   `FailNow`, `AfterEach` after a failure, lifecycle order, a benchmark
+   suite, an uncompilable package, a panicking method), and compares exit codes and the raw `-json`
    verdicts with a checked-in golden list (`testdata/expected.txt`), checking
    with plain Go. The golden list is a third source of truth that shares no
    code with discovery or generation. That closes the census's one blind
    spot: `discover` and the generator both read `gotestast`, so a bug that
    broke both identically would make the census agree on the wrong set; the
    golden list would still disagree.
-4. **Drill** (`make drill`, `tests/drill`, five mutants) turns the argument
+4. **Drill** (`make drill`, `tests/drill`, six mutants) turns the argument
    into evidence. Each patch in `tests/drill/mutants/` plants one bug in a
    core component in a scratch copy of the tree; a `gotest` built from the
    unmodified tree then runs the copy's ring-0 packages and canary and must

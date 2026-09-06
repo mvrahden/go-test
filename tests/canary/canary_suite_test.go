@@ -199,3 +199,27 @@ func (s *CanaryTestSuite) TestAnUncompilablePackageIsExit2(t *gotest.T) {
 func (s *CanaryTestSuite) TestAPanicFailsTheMethod(t *gotest.T) {
 	s.check(t, "panicking")
 }
+
+// A bench run is believed only when every declared benchmark reported a
+// result: the spec must name both, and the exit code must be 0.
+func (s *CanaryTestSuite) TestEveryBenchmarkReportsAResult(t *gotest.T) {
+	cmd := exec.Command(s.binary, "bench", "--spec", "--no-color", "./testdata/benching/", "-benchtime=1x") //nolint:gosec // G204: controlled binary with fixed args
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	code := 0
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			fatalf(t, "run bench: %v", err)
+		}
+		code = exitErr.ExitCode()
+	}
+	if code != 0 {
+		t.Errorf("bench: exit code %d, want 0\nstderr:\n%s", code, stderr.String())
+	}
+	for _, want := range []string{"First", "Second", "2 benchmarks"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Errorf("bench spec output lacks %q:\n%s", want, stdout.String())
+		}
+	}
+}
