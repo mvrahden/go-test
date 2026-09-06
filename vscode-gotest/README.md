@@ -36,6 +36,7 @@ The **Spec View** renders your test structure as a behavioral specification — 
 
 The extension invokes the gotest CLI automatically — no separate install needed.
 It resolves the version from your `go.mod` and uses `go run` to execute it.
+The CLI must be **v1.27.0 or newer**; older versions are rejected at activation.
 
 ### Install
 
@@ -68,6 +69,7 @@ The tree itself is restored from disk on startup, so suites are browsable straig
 
 **Run** and **Debug** buttons appear inline above every suite and test method in `_test.go` files.
 Click to execute immediately.
+An **↻ Update Snapshots** lens additionally appears above methods that call `MatchSnapshot` (and their suite), re-running them with `--update-snapshots`.
 
 Package-level and file-level actions appear on the `package` declaration line:
 
@@ -143,6 +145,7 @@ Projects using `go.work` are also supported.
 | Go Test: Stop Watch | Stop all active watch processes |
 | Go Test: Scaffold Suite | Generate a test suite from a target |
 | Go Test: Scaffold Target | Generate a test suite for a specific target |
+| Go Test: Update Snapshots | Re-run tests with `--update-snapshots` to rewrite `MatchSnapshot` baselines (also a run profile and a CodeLens on snapshot tests) |
 | Go Test: Copy Coverage Summary | Copy coverage table to clipboard |
 | Go Test: Copy Test Results | Copy test results to clipboard (also available as context menu on test items) |
 | Go Test: Clear Results | Forget stored results, coverage and spec output, so a window reload does not restore them. The Test Explorer's own "Clear all results" only empties VS Code's in-memory view; clearing the icons in the tree is still its job, because no stable API lets an extension retract them. |

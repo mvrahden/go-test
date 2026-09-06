@@ -132,8 +132,8 @@ There is an important signature difference. Fixture hooks use `(ctx context.Cont
 
 ```go {title="fixtures.go"}
 type DatabaseFixture struct {
-    DB    *sql.DB
-    store map[string]any
+    DB *sql.DB
+    Tx *sql.Tx
 }
 
 func (f *DatabaseFixture) BeforeAll(ctx context.Context) error {
@@ -150,17 +150,17 @@ func (f *DatabaseFixture) AfterAll(ctx context.Context) error {
 }
 
 func (f *DatabaseFixture) BeforeEach(ctx context.Context) error {
-    _, err := f.DB.ExecContext(ctx, "BEGIN")
+    tx, err := f.DB.BeginTx(ctx, nil)
+    f.Tx = tx
     return err
 }
 
 func (f *DatabaseFixture) AfterEach(ctx context.Context) error {
-    _, err := f.DB.ExecContext(ctx, "ROLLBACK")
-    return err
+    return f.Tx.Rollback()
 }
 ```
 
-The fixture's `BeforeEach` begins a transaction before each test, and `AfterEach` rolls it back afterward. The suite's own `BeforeEach` and test method run inside that transaction. This gives you per-test isolation at the database level without any coordination between the fixture and the suite.
+The fixture's `BeforeEach` begins a transaction before each test, and `AfterEach` rolls it back afterward. Suite hooks and test methods that query through the fixture's `Tx` run inside that transaction, so no test's writes survive into the next one. This gives you per-test isolation at the database level with no cleanup logic in the suite itself.
 
 ## Fixture composition: stacking lifecycles
 

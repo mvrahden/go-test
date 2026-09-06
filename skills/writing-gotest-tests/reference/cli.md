@@ -11,7 +11,11 @@ invocation runs tests — there is NO `test` subcommand:
   captured `go test -json` stream WITHOUT running. `--input` exits
   non-zero when the stream contains failures (same rule as
   `summary --input`), so replaying a saved stream in CI needs no pipefail
-  gymnastics — the render step itself is the verdict.
+  gymnastics — the render step itself is the verdict; `--render-only`
+  lifts that rule for pure renderers (exit 0 on a failing stream, 2 on an
+  unreadable one). `--static` renders the spec from source without
+  running anything — nodes carry no verdict, and incompletely enumerable
+  methods are reported on stderr.
 - `go tool gotest watch ./...` — rerun on change; supports `--spec`.
 - `go tool gotest lint ./...` — the linter; `-fix` applies suggested
   fixes (textual only — follow with goimports, see SKILL.md; fixes can
@@ -35,7 +39,10 @@ Flags shared by run modes: `--ci` (or env `GOTEST_CI`/`CI`; values `0` and
 the run) AND makes snapshots read-only, so `MatchSnapshot` cannot write
 baselines in CI-detected environments. `--update-snapshots` rewrites
 `MatchSnapshot` baselines (outside CI). `--spec` renders the spec view
-instead of default output.
+instead of default output. `--timeout <dur>` is the global pipeline
+deadline (default 15m) and `--setup-timeout <dur>` the shared-fixture
+setup budget (default 2m) — `0` disables either; `--min <pct>` gates
+coverage, `--no-cache` forces fresh generation, `--debug` keeps overlays.
 
 Machine-readable capture, verified end-to-end:
 

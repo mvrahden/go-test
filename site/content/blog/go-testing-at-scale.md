@@ -218,7 +218,7 @@ go test (package)
 
 The three suites from the earlier example now run in parallel by default. No `t.Parallel()`, no careful state management, no package splitting. The OS guarantees memory isolation. A panic in `PaymentSuite` cannot crash `UserSuite`. A goroutine leak in one process does not affect the others.
 
-The concurrency budget defaults to `2 x GOMAXPROCS`, split between inter-suite parallelism (number of concurrent processes) and intra-suite parallelism (goroutines within each process). On an 8-core machine, up to 8 suite processes run concurrently, each with its own goroutine budget for method-level parallelism.
+The concurrency budget defaults to `2 x GOMAXPROCS` (halved under `-race` and the sanitizers, whose instrumentation multiplies each process's footprint), split between inter-suite parallelism (number of concurrent processes) and intra-suite parallelism (goroutines within each process). On an 8-core machine, up to 8 suite processes run concurrently, each with its own goroutine budget for method-level parallelism.
 
 ### Method-level parallelism
 
@@ -269,16 +269,23 @@ func (f *DatabaseFixture) FixtureConfig() gotest.FixtureConfig {
     return gotest.ContainerFixtureConfig()
 }
 
-func (f *DatabaseFixture) BeforeAll(t *gotest.T) {
-    f.Container = startPostgres(t.T())
-    f.DB = connectDB(f.Container.DSN())
+func (f *DatabaseFixture) BeforeAll(ctx context.Context) error {
+    container, err := startPostgres(ctx)
+    if err != nil {
+        return err
+    }
+    f.Container = container
+    f.DB, err = connectDB(container.DSN())
+    return err
 }
 
-func (f *DatabaseFixture) AfterAll(t *gotest.T) {
+func (f *DatabaseFixture) AfterAll(ctx context.Context) error {
     f.DB.Close()
-    f.Container.Stop()
+    return f.Container.Stop(ctx)
 }
 ```
+
+Fixture hooks receive a `context.Context` and return an `error` — unlike suite hooks, which receive `*gotest.T`. A failed `BeforeAll` is reported with automatic attribution (`DatabaseFixture.BeforeAll failed: ...`) rather than a stack trace from deep inside a helper.
 
 `BeforeAll` runs once per suite process, not once per test. All test methods in the suite share the fixture. Dependencies between fixtures are expressed as pointer fields: if `DatabaseFixture` has a `*DockerFixture` field, the Docker fixture sets up first. The generator resolves the DAG automatically. [Advanced Go Test Fixtures]({{< ref "/blog/advanced-fixture-patterns" >}}) goes deeper into DAG design and fixture composition.
 

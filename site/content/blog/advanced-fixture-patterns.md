@@ -43,7 +43,7 @@ CacheFixture ─────┘        │
                       └── WorkerTestSuite
 ```
 
-Multiple suites can reference the same fixture. It is initialized once per package, shared across suites. `APITestSuite` and `WorkerTestSuite` both get the same `ServiceFixture` instance, which in turn shares the same `DatabaseFixture` and `CacheFixture`. No duplication, no coordination code.
+Multiple suites can reference the same fixture graph. Each suite runs in its own test process, so each suite constructs its own instances and pays its own `BeforeAll` — `APITestSuite` and `WorkerTestSuite` each get a `ServiceFixture` wired to its own `DatabaseFixture` and `CacheFixture`. The wiring is declared once and there is no coordination code; when the setup cost must be paid once for the whole run, promote the fixture to a `SharedFixture`.
 
 ## Embedding vs. referencing
 
@@ -149,23 +149,26 @@ func (f *PostgresFixture) AfterAll(ctx context.Context) error {
 
 ## Per-test isolation with BeforeEach/AfterEach
 
-Fixture-level `BeforeEach`/`AfterEach` wraps the suite's own hooks. This is perfect for transaction-per-test isolation:
+Fixture-level `BeforeEach`/`AfterEach` wraps the suite's own hooks. This is perfect for transaction-per-test isolation. Give the fixture a `Tx pgx.Tx` field and manage it per test:
 
 ```go {title="postgres_fixture_test.go"}
 func (f *PostgresFixture) BeforeEach(ctx context.Context) error {
-    _, err := f.Pool.Exec(ctx, "BEGIN")
-    return err
+    tx, err := f.Pool.Begin(ctx)
+    if err != nil {
+        return err
+    }
+    f.Tx = tx
+    return nil
 }
 
 func (f *PostgresFixture) AfterEach(ctx context.Context) error {
-    _, err := f.Pool.Exec(ctx, "ROLLBACK")
-    return err
+    return f.Tx.Rollback(ctx)
 }
 ```
 
-Every test in every suite that uses this fixture automatically runs in a transaction that rolls back after the test. The suite does not need to know. Isolation is a fixture concern, not a test concern.
+Note that the transaction has to be held as a `pgx.Tx`, not issued as a bare `BEGIN` through the pool — each `Pool.Exec` call can land on a different pooled connection, so a `BEGIN` on one would not enclose the statements that follow. Tests and suite hooks run their queries through `f.Tx`, and every statement lands inside a transaction that rolls back after the test. The suite does not need to manage any of it. Isolation is a fixture concern, not a test concern.
 
-This pattern separates two lifecycle scopes cleanly. The container lifecycle (`BeforeAll`/`AfterAll`) runs once per package. The transaction lifecycle (`BeforeEach`/`AfterEach`) runs once per test. A suite that references `PostgresFixture` gets both: the container is already running when the suite starts, and each test gets a fresh transaction.
+This pattern separates two lifecycle scopes cleanly. The container lifecycle (`BeforeAll`/`AfterAll`) runs once per suite process — two suites referencing the fixture start two containers; use a `SharedFixture` to pay for one. The transaction lifecycle (`BeforeEach`/`AfterEach`) runs once per test. A suite that references `PostgresFixture` gets both: the container is already running when the suite starts, and each test gets a fresh transaction.
 
 ## Custom configuration and presets
 
@@ -224,7 +227,7 @@ func (f *InMemoryStoreFixture) Get(key string) (any, bool) {
 
 Tests interact with the fixture through its methods, never touching internal state directly. The fixture owns its synchronization. A `RWMutex` allows concurrent reads while serializing writes, which is the common pattern for test state that is read-heavy.
 
-This matters when a suite declares `SuiteConfig{Parallel: true}`. The suite's tests run concurrently, and any shared fixture must handle that. The fixture's API boundary is where thread safety lives.
+This matters when a suite declares `SuiteConfig{Parallel: true}`. The suite's tests run concurrently, and any shared fixture must handle that. (Parallel suites also require a *returning* `BeforeEach` — per-test state lives in the returned context struct, not on the shared suite struct.) The fixture's API boundary is where thread safety lives.
 
 ## Binding shared fixtures to local resources
 
@@ -238,7 +241,8 @@ type InfraFixture struct {
 
 func (f *InfraFixture) BeforeAll(ctx context.Context) error {
     // Alpha is already hydrated with cross-package state
-    conn, err := grpc.Dial(f.Alpha.ServiceAddr)
+    conn, err := grpc.NewClient(f.Alpha.ServiceAddr,
+        grpc.WithTransportCredentials(insecure.NewCredentials()))
     if err != nil {
         return err
     }

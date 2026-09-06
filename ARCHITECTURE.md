@@ -425,6 +425,27 @@ The system has **four levels of parallelism**, each with distinct mechanisms:
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+### Dispatch Phases and Sanitizer Awareness
+
+Level 3 dispatch runs in **two phases**. The parallel bulk dispatches every
+non-exclusive suite through the semaphore. Suites with
+`SuiteConfig{Exclusive: true}` are held back and run strictly after the bulk
+drains — one at a time, in deterministic order — because their verdicts
+measure wall-clock behavior (timing budgets, contended resources) that
+concurrently running suites would corrupt. At the bulk→tail barrier the
+runner re-windows shared fixtures for the exclusive tail: fixtures only the
+tail needs are started there (`StartKeys`), fixtures nothing in the tail
+needs are torn down (`TeardownKeys`).
+
+The Level 1 and Level 3 semaphore defaults (`NumCPU`, `2×GOMAXPROCS`) apply
+to uninstrumented builds; under `-race`/`-msan`/`-asan` both halve, since
+instrumentation at least doubles the CPU cost per instruction stream. An
+explicit `--compile-parallel`/`--parallel` always wins. Two aids keep
+wall-clock verdicts diagnosable: builds running past 15s log a slow-build
+notice (a log line, never a verdict), and scheduling context (`schedinfo`)
+is appended to fixture-setup deadline failures — a starved build looks
+exactly like a broken one.
+
 ### Streaming Execution (Compile-Execute Overlap)
 
 `RunPipeline` with `Streaming: true` is the primary execution path. It overlaps
@@ -456,12 +477,13 @@ and dispatches suites as soon as their specific dependencies are all ready:
 ```
 Suite goroutine:
   │
-  ├─ needsFixture? ──yes──▶ waitForFixtureKeys(suite.SharedFixtureKeys)
+  ├─ needsFixture? ──yes──▶ wait on SharedFixtureProcess.Ready(key)
+  │                          for each declared key
   │                              │
   │                              ├─ Blocks until all keys in the suite's
   │                              │   dependency set have emitted state
-  │                              ├─ Writes per-suite state file (only
-  │                              │   the entries this suite needs)
+  │                              ├─ WriteStateFileForKeys writes a per-suite
+  │                              │   state file (only the entries it needs)
   │                              ├─ Returns env with GOTEST_SHARED_STATE_FILE
   │                              └─ Error? → streamCancel(), return
   │
@@ -472,6 +494,13 @@ Suites that only need `PostgresSharedFixture` start as soon as Postgres
 is ready — they don't wait for `SchemaSharedFixture` or other unrelated
 fixtures. This reduces wall-clock time when fixtures have different
 startup durations.
+
+Fixture *lifetimes* are window-scheduled: `planFixtureWindows` computes,
+from the actual runnable suites, when each shared fixture is first needed
+and when its last consumer finishes. The setup subprocess starts and tears
+fixtures down on command (`StartKeys`/`TeardownKeys` verbs over its stdin),
+so a fixture is resident only while a scheduled suite that declared it can
+still run — never speculatively.
 
 ---
 
@@ -584,7 +613,7 @@ to the entire group, not just the leader process.
 ```
 ┌─ RunBatchText (default) ────────────────────────────────────────────┐
 │                                                                      │
-│  PackageBatcher collects results per package.                        │
+│  OutputCollector collects results per package.                       │
 │  When ALL suites for a package complete → flush in deterministic     │
 │  order (by registration index, not completion time).                 │
 │                                                                      │
@@ -610,7 +639,7 @@ to the entire group, not just the leader process.
 ## 7. Suite Target Construction
 
 ```
-BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, runFlags, userRunFilter)
+BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, exclusiveByPkg, runFlags, userRunFilter)
   │
   for each package:
     for each suite struct name (e.g., "FooTestSuite"):
@@ -657,26 +686,26 @@ t=0s    CLI starts
         │
 t=0.5s  RunPipeline begins (Streaming: true)
         ├─ Start goroutine: CompilePackagesStream → compileCh
-        ├─ Start goroutine: startSharedFixtures (if any)
+        ├─ Start goroutine: StartSharedFixtures (if any)
         │
 t=1s    pkg/auth compiles first → CompileResult on compileCh
         ├─ BuildSuiteTargets → [AuthTestSuite, TokenTestSuite]
-        ├─ AuthTestSuite needs shared fixtures → blocks on resolveFixtureEnv()
+        ├─ AuthTestSuite needs shared fixtures → blocks on Ready(key)
         └─ TokenTestSuite doesn't → acquires sem slot, starts subprocess
            └─ ./auth_hash.test -test.run=^TestTokenTestSuite$ -test.v=test2json
         │
 t=2s    pkg/cart compiles → 2 more suites start
         │
 t=3s    Shared fixture setup completes → JSON state written
-        ├─ resolveFixtureEnv() unblocks
+        ├─ Ready(key) unblocks; WriteStateFileForKeys → per-suite state file
         └─ AuthTestSuite now starts (had been waiting)
         │
 t=4s    TokenTestSuite finishes (exit 0)
-        ├─ batcher.Record("pkg/auth", 1, result) → not all done yet
+        ├─ collector.RecordResult("pkg/auth", 1, result) → not all done yet
         │
 t=5s    AuthTestSuite finishes (exit 0)
-        ├─ batcher.Record("pkg/auth", 0, result) → all done!
-        └─ batcher.Flush("pkg/auth") → print both suites, package summary
+        ├─ collector.RecordResult("pkg/auth", 0, result) → all done!
+        └─ collector flushes pkg/auth → print both suites, package summary
         │
 t=8s    All suites done, wg.Wait() returns
         ├─ setupProc.Teardown()

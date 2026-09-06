@@ -69,8 +69,8 @@ func TestDeliverNotification(t *testing.T) {
 This is better. The test checks every 10ms and gives up after 500ms. If the dispatcher finishes in 20ms, the test returns in ~30ms instead of sleeping for the full 500. But it comes with its own problems:
 
 - **Verbose.** Seven lines of polling infrastructure to assert one thing. The actual check (`DeliveryCount() == 1`) is buried inside a select loop.
-- **Error handling is awkward.** You can't call `t.Fatal` inside a goroutine; it panics. So if you ever need to poll from a separate goroutine, this pattern breaks.
-- **No standard pattern.** Every team reinvents it. Different timeout values, different tick intervals, different error messages. Some use channels, some use contexts, some use `time.Tick` (which leaks). There's no shared vocabulary.
+- **Error handling is awkward.** `t.Fatal` only works from the goroutine running the test function — called from any other goroutine, it stops that goroutine, not the test. So if you ever need to poll from a separate goroutine, this pattern breaks.
+- **No standard pattern.** Every team reinvents it. Different timeout values, different tick intervals, different error messages. Some use channels, some use contexts, some use `time.Tick`. There's no shared vocabulary.
 
 ## Eventually: poll until true
 
@@ -82,7 +82,7 @@ This is better. The test checks every 10ms and gives up after 500ms. If the disp
 
 If the callback succeeds on any tick (no assertion failures), `Eventually` returns immediately. If the deadline passes without a successful tick, it reports the last failure message to the test runner.
 
-The vocabulary here has prior art worth crediting: gomega's `Eventually` and `Consistently` established this pattern in the Go ecosystem, and testify offers `require.Eventually` for the polling case. gotest's version is distinguished by the details the examples below rely on — the `*gotest.R` recorder that lets ordinary assertions run inside polling callbacks, and the explicit `waitFor`/`tick` separation.
+The vocabulary here has prior art worth crediting: gomega's `Eventually` and `Consistently` established this pattern in the Go ecosystem, and testify offers `require.Eventually` for the polling case. gotest's version is distinguished by the detail the examples below rely on — the `*gotest.R` recorder that lets ordinary assertions run inside polling callbacks.
 
 Here's the notification dispatcher test rewritten with `Eventually`, using [BDD-style structure]({{< ref "/blog/readable-tests-with-bdd" >}}):
 
@@ -145,7 +145,7 @@ func (s *NotificationServiceTestSuite) TestIdleDispatcher(t *gotest.T) {
 
 This checks every 50ms for 200ms that the delivery count remains zero. If a bug causes a spurious delivery, the test catches it on the tick where it happens rather than after a blind sleep.
 
-`Consistently` is especially useful for race condition tests. If you're verifying that a mutex correctly prevents concurrent access, `Consistently` gives you repeated checks over time rather than a single snapshot that might miss the race.
+`Consistently` is also useful for guarding invariants over time — verifying that a counter never goes negative or a queue never exceeds its bound while background work runs. For actual data races, though, use the race detector: `-race` passes through gotest just as it does with `go test`, and polling assertions are not a substitute for it.
 
 ## Eventually as a synchronization barrier
 
@@ -154,7 +154,6 @@ A powerful pattern is using `Eventually` to synchronize, then asserting properti
 ```go {title="dispatcher_test.go"}
 func (s *NotificationServiceTestSuite) TestDeliveryTimestamp(t *gotest.T) {
     t.When("a notification is delivered", func(t *gotest.T) {
-        before := time.Now()
         s.dispatcher.Send(Notification{To: "user@example.com", Subject: "Timestamp check"})
 
         gotest.Eventually(t, 500*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {

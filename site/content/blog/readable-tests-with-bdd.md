@@ -87,6 +87,10 @@ type UserServiceTestSuite struct {
     svc *UserService
 }
 
+func (s *UserServiceTestSuite) BeforeEach(t *gotest.T) {
+    s.svc = NewUserService()
+}
+
 func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
     t.When("email is valid", func(w *gotest.T) {
         user := User{Name: "Alice", Email: "alice@example.com"}
@@ -96,7 +100,7 @@ func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
             gotest.NoError(it, err)
         })
         w.It("sends a welcome email", func(it *gotest.T) {
-            gotest.Equal(it, s.svc.EmailsSent(), 1)
+            gotest.Equal(it, 1, s.svc.EmailsSent())
         })
     })
 
@@ -131,40 +135,42 @@ A few things to notice:
 The structure in the code is only half the value. The other half is what you see when the tests run. `gotest spec` transforms the test output into an indented tree:
 
 {{< spec title="gotest spec ./..." >}}
-<span class="t-suite">UserService</span>
-  <span class="t-test">Create</span>
-    <span class="t-when">when email is valid</span>
+<span class="t-suite">UserService</span> <span class="t-time">(136ms)</span>
+  <span class="t-test">Create</span> <span class="t-time">(130ms)</span>
+    <span class="t-when">email is valid</span> <span class="t-time">(129ms)</span>
       <span class="t-pass">✓</span> creates the user <span class="t-time">(8ms)</span>
       <span class="t-pass">✓</span> sends a welcome email <span class="t-time">(120ms)</span>
-    <span class="t-when">when email already exists</span>
+    <span class="t-when">email already exists</span> <span class="t-time">(<1ms)</span>
       <span class="t-pass">✓</span> returns ErrDuplicate <span class="t-time">(<1ms)</span>
-  <span class="t-test">Delete</span>
+  <span class="t-test">Delete</span> <span class="t-time">(5ms)</span>
     <span class="t-pass">✓</span> soft-deletes the user <span class="t-time">(5ms)</span>
 
-<span class="t-summary">1 suite, 4 passed in 0.34s</span>
+<span class="t-summary">1 suites, 4 behaviors: 4 passed</span>
 {{< /spec >}}
 
-Compare this with the `go test -v` output for the same tests. The spec output is:
+Compare this with the `gotest ./... -v` output for the same tests — the standard verbose stream, since suites run through the `gotest` runner. The spec output is:
 
-- **8 lines** instead of 20+. No repetition, no `=== RUN` / `--- PASS` noise.
-- **Hierarchical.** 2-space indentation shows structure at a glance. Suite name is bold. Method names are bold. Contexts are dimmed. Expectations get checkmarks.
+- **9 lines** instead of 20+. No repetition, no `=== RUN` / `--- PASS` noise.
+- **Hierarchical.** 2-space indentation shows structure at a glance. Suite and method names are bold. Expectations get checkmarks.
 - **Human-readable names.** `UserServiceTestSuite` becomes "UserService" (suffix stripped). `TestCreate` becomes "Create" (prefix stripped). No CamelCase, no underscores.
 
 When a test fails, the tree structure tells you exactly where:
 
 {{< spec title="gotest spec ./..." >}}
-<span class="t-suite">UserService</span>
-  <span class="t-test">Create</span>
-    <span class="t-when">when email is valid</span>
+<span class="t-suite">UserService</span> <span class="t-time">(136ms)</span>
+  <span class="t-test">Create</span> <span class="t-time">(130ms)</span>
+    <span class="t-when">email is valid</span> <span class="t-time">(129ms)</span>
       <span class="t-pass">✓</span> creates the user <span class="t-time">(8ms)</span>
       <span class="t-fail">✗</span> sends a welcome email <span class="t-time">(120ms)</span>
-    <span class="t-when">when email already exists</span>
+    <span class="t-when">email already exists</span> <span class="t-time">(<1ms)</span>
       <span class="t-pass">✓</span> returns ErrDuplicate <span class="t-time">(<1ms)</span>
+  <span class="t-test">Delete</span> <span class="t-time">(5ms)</span>
+    <span class="t-pass">✓</span> soft-deletes the user <span class="t-time">(5ms)</span>
 
-<span class="t-summary">1 suite, 2 passed, <span class="t-fail">1 failed</span> in 0.34s</span>
+<span class="t-summary">1 suites, 4 behaviors: 3 passed, <span class="t-fail">1 failed</span></span>
 {{< /spec >}}
 
-The red cross at "sends a welcome email" under "when email is valid" is a sentence: *UserService Create, when email is valid, fails to send a welcome email.* You know what's broken without reading any code.
+The red cross at "sends a welcome email" under "email is valid" is a sentence: *UserService Create, when email is valid, fails to send a welcome email.* You know what's broken without reading any code.
 
 ## When and It can nest arbitrarily
 
@@ -193,45 +199,47 @@ func (s *OrderServiceTestSuite) TestCheckout(t *gotest.T) {
 The spec output reflects the nesting:
 
 {{< spec title="gotest spec ./..." >}}
-<span class="t-suite">OrderService</span>
-  <span class="t-test">Checkout</span>
-    <span class="t-when">when the cart is not empty</span>
-      <span class="t-when">when payment succeeds</span>
+<span class="t-suite">OrderService</span> <span class="t-time">(19ms)</span>
+  <span class="t-test">Checkout</span> <span class="t-time">(18ms)</span>
+    <span class="t-when">the cart is not empty</span> <span class="t-time">(17ms)</span>
+      <span class="t-when">payment succeeds</span> <span class="t-time">(15ms)</span>
         <span class="t-pass">✓</span> creates an order <span class="t-time">(12ms)</span>
         <span class="t-pass">✓</span> clears the cart <span class="t-time">(3ms)</span>
-      <span class="t-when">when payment fails</span>
+      <span class="t-when">payment fails</span> <span class="t-time">(2ms)</span>
         <span class="t-pass">✓</span> does not create an order <span class="t-time">(2ms)</span>
 
-<span class="t-summary">1 suite, 3 passed in 0.21s</span>
+<span class="t-summary">1 suites, 3 behaviors: 3 passed</span>
 {{< /spec >}}
 
 Each level of `When` narrows the context. The spec reads as a decision tree: checkout, when the cart is not empty, when payment succeeds, creates an order. You can trace any path from root to leaf and get a complete behavioral statement.
 
 ## The spec command
 
-`gotest spec` works by running `gotest test` with `-json` output, then transforming the structured test events into the indented tree. It accepts the same package patterns as `go test`:
+`gotest spec` works by running your suites through the same pipeline as plain `gotest`, capturing the `go test -json` event stream, and transforming the structured test events into the indented tree. It accepts the same package patterns as `go test`:
 
 ```sh
 # spec output for all packages
 gotest spec ./...
 
-# verbose mode: show durations for passing tests
-gotest spec -v ./...
+# write a markdown spec to a file
+gotest spec --format=md --output=spec.md ./...
 
-# filter by test name
-gotest spec --run UserService ./...
+# filter by test name (a regular go test flag)
+gotest spec -run UserService ./...
 
 # disable color for CI logs
 gotest spec --no-color ./...
 ```
 
+There is also `gotest spec --static`, which renders the same tree straight from your source — no run, no status icons, no durations — for reviewing what the tests promise before executing anything.
+
 The rendering strips naming conventions automatically:
 
 - `UserServiceTestSuite` → **UserService** (drops `TestSuite` suffix)
 - `TestCreate` → **Create** (drops `Test` prefix)
-- Underscores in `When`/`It` labels → spaces
+- Underscored subtest names (`sends_a_welcome_email` in `go test` output) → the label as you wrote it ("sends a welcome email")
 
-Suite and method names are bold. Contexts are dimmed. Passing expectations get a green checkmark, failing ones a red cross. The summary line at the bottom shows total counts and duration. The same spec tree is also available inside your editor — see the [gotest VS Code Extension]({{< ref "/blog/your-editor-knows-your-tests" >}}).
+Suite and method names are bold. Passing expectations get a green checkmark, failing ones a red cross, skipped ones a yellow tilde. The summary line at the bottom shows suite and behavior counts. The same spec tree is also available inside your editor — see the [gotest VS Code Extension]({{< ref "/blog/your-editor-knows-your-tests" >}}).
 
 ## Tests that document themselves
 

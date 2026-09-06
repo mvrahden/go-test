@@ -167,14 +167,14 @@ AfterAll <span class="d">(via t.Cleanup — always runs)</span></div>
       <p><code>When</code> groups context. <code>It</code> specifies behavior. Nest them freely to build a specification tree:</p>
       <div class="code-block">
         <pre><span class="kw">func</span> (s *<span class="tp">MySuite</span>) <span class="fn">TestCreate</span>(t *gotest.T) {
-    t.When(<span class="st">"email is valid"</span>, <span class="kw">func</span>(w *gotest.T) {
+    t.When(<span class="st">"when email is valid"</span>, <span class="kw">func</span>(w *gotest.T) {
         w.It(<span class="st">"creates the user"</span>, <span class="kw">func</span>(it *gotest.T) {
             err := s.svc.Create(ctx, validUser)
             gotest.NoError(it, err)
         })
     })
 
-    t.When(<span class="st">"email already exists"</span>, <span class="kw">func</span>(w *gotest.T) {
+    t.When(<span class="st">"when email already exists"</span>, <span class="kw">func</span>(w *gotest.T) {
         w.It(<span class="st">"returns ErrDuplicate"</span>, <span class="kw">func</span>(it *gotest.T) {
             s.svc.Create(ctx, validUser)
             err := s.svc.Create(ctx, validUser)
@@ -376,6 +376,8 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
           <tr><td><code>NotEqual(t, a, b)</code></td><td>Inverse of Equal.</td></tr>
           <tr><td><code>Zero(t, value)</code></td><td>Value equals its zero value.</td></tr>
           <tr><td><code>NotZero(t, value)</code></td><td>Value is not zero.</td></tr>
+          <tr><td><code>Nil(t, obj)</code></td><td>Nil check for non-comparable nilables (slices, maps, funcs). Type-guarded; comparable nilables use <code>Zero</code>.</td></tr>
+          <tr><td><code>NotNil(t, obj)</code></td><td>Inverse of Nil.</td></tr>
           <tr><td><code>Empty(t, obj)</code></td><td>Slice, map, string, or channel is empty.</td></tr>
           <tr><td><code>NotEmpty(t, obj)</code></td><td>Not empty.</td></tr>
         </tbody>
@@ -438,6 +440,7 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
         <tbody>
           <tr><td><code>Eventually(t, timeout, tick, fn)</code></td><td>Poll <code>func(poll *R)</code> until assertions pass or timeout.</td></tr>
           <tr><td><code>Consistently(t, duration, tick, fn)</code></td><td>Assert <code>func(poll *R)</code> holds for the full duration.</td></tr>
+          <tr><td><code>Go(t, fn)</code></td><td>Run <code>fn</code> on a goroutine that captures panics and re-raises them on the test's goroutine. Returns a <code>wait</code> func; also registered as cleanup.</td></tr>
         </tbody>
       </table>
       <div class="callout">
@@ -462,7 +465,7 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
       <p><strong>Code scope</strong> — marker methods override built-in presets. These control individual suites and fixtures:</p>
       <div class="diagram">1. In-code config       <span class="d">SuiteConfig(), FixtureConfig(), SharedFixtureConfig()</span>
 2. Built-in defaults    <span class="d">DefaultSuiteConfig(), DefaultFixtureConfig()</span></div>
-      <p>The two scopes are independent — they don't override each other. For shared fixture timeouts specifically, <code>--setup-timeout</code> is an outer wall-clock budget on the entire setup phase, while <code>SharedFixtureConfig().Timeout</code> is an inner per-fixture deadline. Both run concurrently — whichever fires first wins. When <code>--setup-timeout</code> is omitted, only the per-fixture timeouts apply.</p>
+      <p>The two scopes are independent — they don't override each other. For shared fixture timeouts specifically, <code>--setup-timeout</code> is an outer wall-clock budget on the entire setup phase, while <code>SharedFixtureConfig().Timeout</code> is an inner per-fixture deadline. Both run concurrently — whichever fires first wins. When <code>--setup-timeout</code> is omitted, the default outer budget of 2 minutes applies; set it to <code>0</code> to disable the outer budget and let only the per-fixture timeouts govern.</p>
 
       <h3>Project file — <code>.gotest.yml</code></h3>
       <p>Place a <code>.gotest.yml</code> in your project root. gotest finds it by walking up from the working directory, stopping at the first match or at a <code>go.mod</code> boundary. CLI flags always take precedence; zero or omitted fields use defaults.</p>
@@ -470,9 +473,11 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
         <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>CLI override</th><th>Effect</th></tr></thead>
         <tbody>
           <tr><td><code>tags</code></td><td>string</td><td><em>none</em></td><td><code>-tags</code></td><td>Build tags, comma-separated (e.g. <code>"integration,e2e"</code>).</td></tr>
-          <tr><td><code>setup-timeout</code></td><td>duration</td><td><em>none</em></td><td><code>--setup-timeout</code></td><td>Total budget for all shared fixture setup. Omit to let each fixture's own config govern. Negative disables.</td></tr>
+          <tr><td><code>setup-timeout</code></td><td>duration</td><td>2m</td><td><code>--setup-timeout</code></td><td>Total budget for all shared fixture setup. <code>0</code> disables.</td></tr>
+          <tr><td><code>timeout</code></td><td>duration</td><td>15m</td><td><code>--timeout</code></td><td>Global pipeline deadline. <code>0</code> disables.</td></tr>
           <tr><td><code>min-coverage</code></td><td>int</td><td>0 (off)</td><td><code>--min</code></td><td>Minimum coverage percentage, 0–100.</td></tr>
-          <tr><td><code>parallel</code></td><td>int</td><td>0 (auto)</td><td><code>--parallel</code></td><td>Total concurrent test method budget. 0 means 2×GOMAXPROCS.</td></tr>
+          <tr><td><code>parallel</code></td><td>int</td><td>0 (auto)</td><td><code>--parallel</code></td><td>Total concurrent test method budget. 0 means 2×GOMAXPROCS, auto-halved under <code>-race</code>/<code>-msan</code>/<code>-asan</code>.</td></tr>
+          <tr><td><code>compile-parallel</code></td><td>int</td><td>0 (auto)</td><td><code>--compile-parallel</code></td><td>Concurrent compilation processes. 0 means NumCPU, auto-halved under <code>-race</code>/<code>-msan</code>/<code>-asan</code>.</td></tr>
           <tr><td><code>debounce</code></td><td>duration</td><td>200ms</td><td><code>--debounce</code></td><td>Watch mode re-run delay.</td></tr>
           <tr><td><code>lint.skip</code></td><td>[string]</td><td><em>none</em></td><td>—</td><td>Non-integrity lint rules to disable: <code>assertion-simplify</code>, <code>assertion-redundant</code>, <code>fail-guard</code>, <code>t-escape</code>, <code>stdlib-test</code>, <code>testify</code>.</td></tr>
         </tbody>
@@ -495,9 +500,9 @@ lint:
         <tbody>
           <tr><td><code>Timeout</code></td><td>30s</td><td>Per-test-case deadline.</td></tr>
           <tr><td><code>SetupTimeout</code></td><td>30s</td><td>BeforeAll / AfterAll deadline.</td></tr>
-          <tr><td><code>Retries</code></td><td>0</td><td>Per-test-case retry attempts on failure.</td></tr>
           <tr><td><code>FailFast</code></td><td>false</td><td>Stop the suite on first failure.</td></tr>
           <tr><td><code>Parallel</code></td><td>false</td><td>Run test methods concurrently.</td></tr>
+          <tr><td><code>Exclusive</code></td><td>false</td><td>Schedule the suite's process strictly alone — after every non-exclusive suite has finished, one exclusive suite at a time. For wall-clock-sensitive or resource-contended suites.</td></tr>
         </tbody>
       </table>
 
@@ -524,7 +529,7 @@ lint:
       </table>
 
       <div class="callout">
-        Use a negative duration (<code>Timeout: -1</code>) to explicitly disable a timeout. Zero means "keep the default."
+        The returned config is used as-is: a zero (or omitted) duration means <em>no deadline</em>, not "keep the default." To inherit defaults and override individual fields, start from a preset: <code>cfg := gotest.DefaultSuiteConfig(); cfg.Parallel = true; return cfg</code>.
       </div>
     </section>
 
@@ -542,12 +547,8 @@ percentage = covered / total</div>
 
       <p>A directory's percentage is the weighted sum of its children, weighted by statement count. This means a parent's number is always derivable from its children — no rounding surprises, no averaging artifacts.</p>
 
-      <h3>Breadth indicator</h3>
-      <p>Coverage percentage answers: <em>"How well-tested is the code my tests reach?"</em></p>
-      <p>The breadth indicator answers a complementary question: <em>"How much of my codebase do my tests reach at all?"</em> It shows profiled source files vs. total source files per directory. A file at 0% still counts as reached — it was instrumented.</p>
-
-      <h3>Cross-package coverage</h3>
-      <p>Test-only packages (no production code) run with <code>-coverpkg=./...</code>, which instruments the entire module. These cross-package profiles are supplementary — they can increase coverage for files already in scope, but don't expand the file scope. This prevents integration test packages from inflating coverage numbers for code they touch incidentally.</p>
+      <h3>Merged and cross-package profiles</h3>
+      <p>Merged profiles — concatenated per-suite profiles, or overlapping <code>-coverpkg</code> runs — can repeat the same block. Each unique file and range is counted once, keeping the maximum execution count, matching <code>go tool cover</code> behavior. <code>-coverpkg</code> itself is a standard <code>go test</code> flag and passes through unchanged.</p>
 
       <div class="callout">
         Coverage uses the profile's <code>numStatements</code> as the sole metric. No line counting, no token scanning, no filesystem heuristics. The profile is the source of truth.
@@ -565,14 +566,18 @@ percentage = covered / total</div>
         <tbody>
           <tr><td><code>gotest ./...</code></td><td>Generate overlays and run tests. The default workflow.</td></tr>
           <tr><td><code>gotest watch ./...</code></td><td>Re-run on file changes. Only affected packages re-run.</td></tr>
-          <tr><td><code>gotest spec ./...</code></td><td>Run tests and render the behavioral specification.</td></tr>
+          <tr><td><code>gotest spec ./...</code></td><td>Run tests and render the behavioral specification. With <code>--static</code>, render it from source without running.</td></tr>
+          <tr><td><code>gotest discover ./...</code></td><td>Discover test suites and output JSON (feeds editor integrations).</td></tr>
           <tr><td><code>gotest summary ./...</code></td><td>Failure-focused summary for CI. Shows only failing tests with assertion output.</td></tr>
           <tr><td><code>gotest lint ./...</code></td><td>Static analysis for test suites — see <a href="#linter">Linter</a>.</td></tr>
           <tr><td><code>gotest scaffold ./pkg/user.Svc</code></td><td>Generate a suite skeleton from any Go type.</td></tr>
           <tr><td><code>gotest migrate ./...</code></td><td>Convert testify/suite tests automatically.</td></tr>
           <tr><td><code>gotest generate ./...</code></td><td>Generate suite files without running tests.</td></tr>
-          <tr><td><code>gotest clean ./...</code></td><td>Remove cached overlays (debugging).</td></tr>
+          <tr><td><code>gotest clean ./...</code></td><td>Remove orphaned generated files.</td></tr>
           <tr><td><code>gotest refactor toggle-focus &lt;file&gt; &lt;id&gt;</code></td><td>Toggle <code>F_</code>/<code>X_</code> prefixes programmatically.</td></tr>
+          <tr><td><code>gotest prepare ./...</code></td><td>Start shared fixtures for debugging; blocks until SIGTERM.</td></tr>
+          <tr><td><code>gotest version</code></td><td>Print version information.</td></tr>
+          <tr><td><code>gotest help [subcommand]</code></td><td>General or subcommand-specific help.</td></tr>
         </tbody>
       </table>
 
@@ -589,7 +594,12 @@ percentage = covered / total</div>
           <tr><td><code>--output=&lt;path&gt;</code></td><td>Write formatted output to file.</td></tr>
           <tr><td><code>--no-color</code></td><td>Strip ANSI codes from output.</td></tr>
           <tr><td><code>--debug</code></td><td>Preserve overlays after the run for inspection.</td></tr>
-          <tr><td><code>--setup-timeout=&lt;dur&gt;</code></td><td>Total budget for all shared fixture setup. Omit to let each fixture's own config govern. Use a negative value (e.g. <code>-1s</code>) to disable.</td></tr>
+          <tr><td><code>--setup-timeout=&lt;dur&gt;</code></td><td>Total budget for all shared fixture setup (default: 2m, <code>0</code> to disable).</td></tr>
+          <tr><td><code>--timeout=&lt;dur&gt;</code></td><td>Global pipeline deadline (default: 15m, <code>0</code> to disable).</td></tr>
+          <tr><td><code>--parallel=&lt;n&gt;</code></td><td>Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for <code>-race</code>/<code>-msan</code>/<code>-asan</code>).</td></tr>
+          <tr><td><code>--compile-parallel=&lt;n&gt;</code></td><td>Concurrent compilation processes (default: NumCPU, auto-halved for <code>-race</code>/<code>-msan</code>/<code>-asan</code>).</td></tr>
+          <tr><td><code>--static</code></td><td>Read the specification from source without running the suites; nodes carry no verdict (<code>spec</code> command).</td></tr>
+          <tr><td><code>--render-only</code></td><td>With <code>--input</code>, exit 0 on a failing stream: report whether rendering succeeded, not the test verdict.</td></tr>
           <tr><td><code>--debounce=&lt;dur&gt;</code></td><td>Watch mode debounce interval (default 200ms).</td></tr>
           <tr><td><code>--input=&lt;path&gt;</code></td><td>Read test output from file instead of running tests (<code>spec</code>, <code>summary</code>).</td></tr>
           <tr><td><code>--github</code></td><td>GitHub CI mode: emit <code>::error</code> annotations and write step summary (<code>summary</code> command). Auto-detected via <code>$GITHUB_ACTIONS</code>.</td></tr>
@@ -605,7 +615,7 @@ percentage = covered / total</div>
     <!-- 9. Linter -->
     <section class="ref-section" id="linter">
       <h2>Linter</h2>
-      <p class="lead">Sixteen rules in three tiers. A rule's tier determines how it may be suppressed.</p>
+      <p class="lead">Seventeen rules in three tiers. A rule's tier determines how it may be suppressed.</p>
 
       <h3>Integrity rules</h3>
       <p>Violations can make test outcomes unreliable or leak resources. These rules can only be suppressed per line — never project-wide.</p>
@@ -621,6 +631,7 @@ percentage = covered / total</div>
           <tr><td><code>suite-lifecycle</code></td><td><code>Cleanup</code>/<code>Parallel</code>/<code>Run</code> via <code>t.T()</code> — they bypass the suite lifecycle.</td></tr>
           <tr><td><code>poll-scope</code></td><td>Assertions inside <code>Eventually</code>/<code>Consistently</code> callbacks using the outer <code>t</code> instead of <code>poll</code>.</td></tr>
           <tr><td><code>assertion-type-guard</code></td><td><code>Nil</code>/<code>Empty</code> on types their runtime guards would reject.</td></tr>
+          <tr><td><code>shared-fixture-undeclared</code></td><td>Suite reads a shared fixture it never declared — window scheduling only starts declared fixtures, so the read may hit one that never started or is already released.</td></tr>
           <tr><td><code>generated-file</code></td><td>Generated overlay files present in source control.</td></tr>
         </tbody>
       </table>

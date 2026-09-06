@@ -13,12 +13,12 @@ gotest has three features that compress the inner loop: watch mode for automatic
 
 The whole post in one command:
 
-{{< terminal title="gotest watch ./..." >}}
-$ gotest watch ./...
-UserService
-  Create
-    when email is valid
-      <span class="t-pass">✓</span> persists the user
+{{< terminal title="gotest watch ./... --spec" >}}
+$ gotest watch ./... --spec
+UserService <span class="t-time">(4ms)</span>
+  Create <span class="t-time">(4ms)</span>
+    email is valid <span class="t-time">(3ms)</span>
+      <span class="t-pass">✓</span> persists the user <span class="t-time">(3ms)</span>
 {{< /terminal >}}
 
 ## The default Go inner loop
@@ -36,7 +36,7 @@ This works. It is reliable and well-understood. But three things slow it down.
 
 **Manual re-runs.** Every save requires a conscious decision to switch to the terminal and re-run. This sounds trivial, but it breaks flow. The context switch is not just physical (alt-tab, type command, press enter). It is cognitive: you interrupt whatever you were thinking about to operate the test runner.
 
-**Verbose targeting.** The `-run` flag uses regex matching, which is powerful but verbose. If you want to run a single test method in a suite, you write something like `go test -run "TestUserService/TestCreate/when_email_is_valid" ./pkg/user/`. That is a lot to type, easy to get wrong, and fragile when test names change.
+**Verbose targeting.** The `-run` flag uses regex matching, which is powerful but verbose. If you want to run a single test method in a suite, you write something like `go test -run "TestUserService/TestCreate/email_is_valid" ./pkg/user/`. That is a lot to type, easy to get wrong, and fragile when test names change.
 
 **Flat output.** `go test -v` prints one line per test, interleaved with log output. When you have 40 tests in a package and three of them fail, finding the failures means scanning every line. There is no hierarchy, no grouping, no visual distinction between passing and failing branches.
 
@@ -50,7 +50,7 @@ The first friction point is the manual re-run. Watch mode eliminates it entirely
 gotest watch ./...
 ```
 
-That is the entire setup. After this command, the terminal clears and runs your tests. Every time you save a `.go` file, it clears the terminal and re-runs. You never switch to the terminal to type a command again.
+That is the entire setup. After this command, your tests run once. Every time you save a `.go` file, it clears the terminal and re-runs. Add `--spec` to render the spec tree after each run instead of the default output. You never switch to the terminal to type a command again.
 
 Under the hood, watch mode uses fsnotify to monitor your source tree for `.go` file changes. When a file changes, it waits 200 milliseconds for the save to settle (this debounce is configurable via `--debounce`), then converts the changed file's directory into a package pattern and re-runs only that package.
 
@@ -96,7 +96,7 @@ func (s *UserServiceTestSuite) X_TestSlowIntegration(t *gotest.T) {
 The rules are simple:
 
 - `F_` works on both suite types and test methods.
-- When any `F_` exists in a package, only focused items run.
+- A focused suite skips the other suites in its package; a focused method skips the other methods in its suite.
 - `X_` always skips, regardless of whether focus is active.
 - `X_` takes precedence over `F_`.
 
@@ -126,8 +126,8 @@ gotest's CI mode catches this. When running with the `--ci` flag (or when the `C
 
 {{< terminal title="CI output" >}}
 FAIL: focus prefix detected — remove F_ before merging:
-  type F_UserServiceTestSuite
-  OrderServiceTestSuite.F_TestCreate
+  pkg/user/user_test.go:12  type F_UserServiceTestSuite
+  pkg/order/order_test.go:48  OrderServiceTestSuite.F_TestCreate
 {{< /terminal >}}
 
 This turns a silent skip into a loud failure. The error message lists every focused item so you know exactly what to fix. No test suite runs with incomplete coverage because someone forgot to remove a prefix.
@@ -141,16 +141,16 @@ Watch mode handles re-running. Focus prefixes handle scoping. The third piece is
 Standard `go test -v` output looks like this:
 
 {{< gotest-output title="go test -v output" >}}
-=== RUN   TestUserService
-=== RUN   TestUserService/TestCreate
-=== RUN   TestUserService/TestCreate/when_email_is_valid
-=== RUN   TestUserService/TestCreate/when_email_is_valid/persists_the_user
---- PASS: TestUserService/TestCreate/when_email_is_valid/persists_the_user (0.00s)
-=== RUN   TestUserService/TestCreate/when_email_is_valid/returns_no_error
---- PASS: TestUserService/TestCreate/when_email_is_valid/returns_no_error (0.00s)
-=== RUN   TestUserService/TestCreate/when_email_is_duplicate
-=== RUN   TestUserService/TestCreate/when_email_is_duplicate/returns_ErrDuplicate
---- PASS: TestUserService/TestCreate/when_email_is_duplicate/returns_ErrDuplicate (0.00s)
+=== RUN   TestUserServiceTestSuite
+=== RUN   TestUserServiceTestSuite/TestCreate
+=== RUN   TestUserServiceTestSuite/TestCreate/email_is_valid
+=== RUN   TestUserServiceTestSuite/TestCreate/email_is_valid/persists_the_user
+--- PASS: TestUserServiceTestSuite/TestCreate/email_is_valid/persists_the_user (0.00s)
+=== RUN   TestUserServiceTestSuite/TestCreate/email_is_valid/returns_no_error
+--- PASS: TestUserServiceTestSuite/TestCreate/email_is_valid/returns_no_error (0.00s)
+=== RUN   TestUserServiceTestSuite/TestCreate/email_is_duplicate
+=== RUN   TestUserServiceTestSuite/TestCreate/email_is_duplicate/returns_ErrDuplicate
+--- PASS: TestUserServiceTestSuite/TestCreate/email_is_duplicate/returns_ErrDuplicate (0.00s)
 {{< /gotest-output >}}
 
 Every line repeats the full path. The hierarchy is encoded in the names, but the output is flat. With 40 tests, this becomes a wall of text where your eyes glaze over looking for the word "FAIL."
@@ -158,13 +158,13 @@ Every line repeats the full path. The hierarchy is encoded in the names, but the
 The `gotest spec` command renders the same information as a tree:
 
 {{< spec title="gotest spec output" >}}
-UserService
-  Create
-    when email is valid
-      <span class="t-pass">✓</span> persists the user
-      <span class="t-pass">✓</span> returns no error
-    when email is duplicate
-      <span class="t-pass">✓</span> returns ErrDuplicate
+UserService <span class="t-time">(7ms)</span>
+  Create <span class="t-time">(7ms)</span>
+    email is valid <span class="t-time">(5ms)</span>
+      <span class="t-pass">✓</span> persists the user <span class="t-time">(3ms)</span>
+      <span class="t-pass">✓</span> returns no error <span class="t-time">(2ms)</span>
+    email is duplicate <span class="t-time">(1ms)</span>
+      <span class="t-pass">✓</span> returns ErrDuplicate <span class="t-time">(1ms)</span>
 {{< /spec >}}
 
 The structure is immediately visible. Suite names become headings, methods become groups, `When`/`It` calls become nested branches. Passing tests get a checkmark. Failing tests get a clear marker with the failure message indented beneath them. You see the shape of your test coverage at a glance.
@@ -201,4 +201,4 @@ Watch mode eliminates manual re-runs. You save, results appear. Focus prefixes e
 
 Separately, each feature removes one friction point. Together, they compress the inner loop from a 30-second manual process to a sub-second automatic one. The shift is not just in speed. It is in how you think. When feedback is instant, you write differently: smaller steps, more experiments, fewer assumptions carried in your head.
 
-If you are new to gotest, [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) walks through setting up your first test suite. For CI integration, [gotest in CI]({{< ref "/blog/gotest-in-ci" >}}) covers the `--ci` flag, caching, and parallel execution in detail. And the [VS Code extension](https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest) brings the entire workflow into your editor.
+If you are new to gotest, [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) walks through setting up your first test suite. For CI integration, [gotest in CI]({{< ref "/blog/gotest-in-ci" >}}) covers the `--ci` flag, coverage thresholds, and PR annotations in detail. And the [VS Code extension](https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest) brings the entire workflow into your editor.
