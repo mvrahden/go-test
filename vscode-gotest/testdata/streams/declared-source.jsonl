@@ -1,0 +1,9 @@
+{"Action":"run","Package":"github.com/mvrahden/go-test/examples/search","Test":"TestArticleSearchTestSuite"}
+{"Action":"run","Package":"github.com/mvrahden/go-test/examples/search","Test":"TestArticleSearchTestSuite/TestSearchByTitle"}
+{"Action":"run","Package":"github.com/mvrahden/go-test/examples/search","Test":"TestArticleSearchTestSuite/TestSearchByTitle/searching_for_a_title_keyword"}
+{"Action":"run","Package":"github.com/mvrahden/go-test/examples/search","Test":"TestArticleSearchTestSuite/TestSearchByTitle/searching_for_a_title_keyword/finds_the_matching_article"}
+{"Action":"pass","Package":"github.com/mvrahden/go-test/examples/search","Test":"TestArticleSearchTestSuite/TestSearchByTitle/searching_for_a_title_keyword/finds_the_matching_article","Elapsed":0.01}
+{"Action":"pass","Package":"github.com/mvrahden/go-test/examples/search","Test":"TestArticleSearchTestSuite/TestSearchByTitle/searching_for_a_title_keyword","Elapsed":0.01}
+{"Action":"pass","Package":"github.com/mvrahden/go-test/examples/search","Test":"TestArticleSearchTestSuite/TestSearchByTitle","Elapsed":0.01}
+{"Action":"pass","Package":"github.com/mvrahden/go-test/examples/search","Test":"TestArticleSearchTestSuite","Elapsed":0.02}
+{"Action":"pass","Package":"github.com/mvrahden/go-test/examples/search","Elapsed":0.03}
