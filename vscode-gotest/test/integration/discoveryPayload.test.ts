@@ -181,8 +181,10 @@ describe("a payload larger than a buffered read", () => {
       ?.suites.find((s) => s.name === "Feature0TestSuite");
     const when = suite?.methods[0].behaviors?.[0];
 
+    // The label is the developer's text spoken in its vocabulary: a When
+    // context gains the connective the spec renders for it.
     expect(when?.display).toBe(
-      `subsystem 0 handles a request while ${CONDITION}`,
+      `when subsystem 0 handles a request while ${CONDITION}`,
     );
     expect(when?.children).toHaveLength(ROWS);
     expect(when?.children?.[0].children).toHaveLength(EXPECTATIONS);
