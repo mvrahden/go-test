@@ -215,6 +215,7 @@ Flags:
   --github                GitHub CI mode: emit annotations and step summary
                           (auto-detected via $GITHUB_ACTIONS)
   --coverage=<file>       Include coverage from profile in summary output
+  --badge=<file>          Write a coverage badge SVG (enables -coverprofile)
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay
   --update-snapshots      Regenerate snapshot files

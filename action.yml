@@ -24,6 +24,12 @@ inputs:
   go-test-flags:
     description: "Additional go test flags (-single-dash style)"
     required: false
+  badge:
+    description: "Render a coverage badge and, on the default branch, publish it as coverage.svg to the badge-branch of this repository (needs contents: write). Turns coverage on."
+    default: "false"
+  badge-branch:
+    description: "Branch the coverage badge is published to; created automatically on first use"
+    default: "ci/badges"
   version:
     description: "gotest version: 'gomod' (default) resolves from go.mod, or a version tag (e.g. v1.0.0, latest) to install globally."
     default: "gomod"
@@ -35,6 +41,9 @@ outputs:
   coverage:
     description: "Coverage percentage (empty if coverage not enabled)"
     value: ${{ steps.test.outputs.coverage }}
+  badge:
+    description: "Path of the rendered coverage badge SVG (empty unless badge is enabled and the tests ran)"
+    value: ${{ steps.test.outputs.badge }}
 
 runs:
   using: "composite"
@@ -54,6 +63,7 @@ runs:
         INPUT_MIN_COVERAGE: ${{ inputs.min-coverage }}
         INPUT_FLAGS: ${{ inputs.flags }}
         INPUT_GO_TEST_FLAGS: ${{ inputs.go-test-flags }}
+        INPUT_BADGE: ${{ inputs.badge }}
         INPUT_VERSION: ${{ inputs.version }}
       run: |
         if [ "$INPUT_VERSION" != "gomod" ]; then
@@ -64,10 +74,38 @@ runs:
 
         args=(summary --github)
 
+        gtflags=()
+        if [ -n "$INPUT_GO_TEST_FLAGS" ]; then
+          read -ra gtflags <<< "$INPUT_GO_TEST_FLAGS"
+        fi
+
+        # A -coverprofile the caller passes through go-test-flags is the
+        # run's profile; the action only adds a temporary one when nobody did.
+        user_profile=""
+        for ((i = 0; i < ${#gtflags[@]}; i++)); do
+          case "${gtflags[i]}" in
+            -coverprofile=*) user_profile="${gtflags[i]#-coverprofile=}" ;;
+            -coverprofile) user_profile="${gtflags[i+1]:-}" ;;
+          esac
+        done
+
         cover_profile=""
-        if [ "$INPUT_COVERAGE" = "true" ]; then
-          cover_profile="$(mktemp -t gotest-cover-XXXXXX.out)"
+        temp_profile=""
+        if [ "$INPUT_COVERAGE" = "true" ] || [ "$INPUT_BADGE" = "true" ]; then
+          if [ -n "$user_profile" ]; then
+            cover_profile="$user_profile"
+          else
+            cover_profile="$(mktemp -t gotest-cover-XXXXXX.out)"
+            temp_profile="$cover_profile"
+          fi
           args+=("--coverage=$cover_profile")
+        fi
+
+        badge_file=""
+        if [ "$INPUT_BADGE" = "true" ]; then
+          badge_file="${RUNNER_TEMP}/gotest-coverage-badge.svg"
+          rm -f "$badge_file"
+          args+=("--badge=$badge_file")
         fi
 
         if [ -n "$INPUT_MIN_COVERAGE" ]; then
@@ -86,12 +124,11 @@ runs:
           args+=(-race)
         fi
 
-        if [ -n "$cover_profile" ]; then
-          args+=("-coverprofile=$cover_profile")
+        if [ -n "$temp_profile" ]; then
+          args+=("-coverprofile=$temp_profile")
         fi
 
-        if [ -n "$INPUT_GO_TEST_FLAGS" ]; then
-          read -ra gtflags <<< "$INPUT_GO_TEST_FLAGS"
+        if [ ${#gtflags[@]} -gt 0 ]; then
           args+=("${gtflags[@]}")
         fi
 
@@ -103,9 +140,89 @@ runs:
         echo "exit-code=$exit_code" >> "$GITHUB_OUTPUT"
 
         if [ -n "$cover_profile" ] && [ -f "$cover_profile" ]; then
-          cov=$(go tool cover -func="$cover_profile" | tail -1 | awk '{print $NF}' | sed 's/%//')
-          echo "coverage=$cov" >> "$GITHUB_OUTPUT"
-          rm -f "$cover_profile"
+          # A profile go tool cover rejects must not fail a step whose tests
+          # already have their verdict; the coverage output just stays empty.
+          if cov=$(go tool cover -func="$cover_profile" | tail -1 | awk '{print $NF}' | sed 's/%//'); then
+            echo "coverage=$cov" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Could not compute the coverage output from ${cover_profile}"
+          fi
+          [ -n "$temp_profile" ] && rm -f "$temp_profile"
+        fi
+
+        if [ -n "$badge_file" ] && [ -f "$badge_file" ]; then
+          echo "badge=$badge_file" >> "$GITHUB_OUTPUT"
         fi
 
         exit "$exit_code"
+
+    # The badge follows the default branch only: a pull request or feature
+    # branch must never rewrite it. Exit code 2 means the suites did not run
+    # to completion (build failure, bad invocation), so there is nothing
+    # trustworthy to publish; 0 and 1 (tests failed or the minimum was
+    # missed) still describe the real coverage of the branch.
+    - name: Publish coverage badge
+      if: ${{ !cancelled() && inputs.badge == 'true' && steps.test.outputs.badge != '' && steps.test.outputs.exit-code != '2' }}
+      shell: bash
+      env:
+        BADGE_FILE: ${{ steps.test.outputs.badge }}
+        BADGE_BRANCH: ${{ inputs.badge-branch }}
+        COVERAGE: ${{ steps.test.outputs.coverage }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        if [ -z "$DEFAULT_BRANCH" ] && command -v gh >/dev/null 2>&1; then
+          DEFAULT_BRANCH=$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch 2>/dev/null || true)
+        fi
+        if [ "$GITHUB_REF" != "refs/heads/${DEFAULT_BRANCH}" ]; then
+          echo "Coverage badge is published from ${DEFAULT_BRANCH:-the default branch} only; skipping on ${GITHUB_REF}"
+          exit 0
+        fi
+
+        remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        work="${RUNNER_TEMP}/gotest-badge-publish"
+        trap 'rm -rf "$work"' EXIT
+
+        # Each attempt starts from the branch's current tip, so a concurrent
+        # job's push (e.g. another matrix cell) only costs a retry.
+        for attempt in 1 2 3; do
+          rm -rf "$work"
+          mkdir -p "$work"
+          cd "$work"
+          git init -q
+          git remote add origin "$remote"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git fetch -q --depth 1 origin "refs/heads/${BADGE_BRANCH}" 2>/dev/null; then
+            git checkout -q -B "$BADGE_BRANCH" FETCH_HEAD
+          else
+            git checkout -q --orphan "$BADGE_BRANCH"
+          fi
+
+          cp "$BADGE_FILE" coverage.svg
+          {
+            echo "# ${BADGE_BRANCH}"
+            echo
+            echo "Files on this branch are written by the gotest GitHub Action (\`badge: true\`); edits are overwritten on the next run."
+            echo
+            echo "![Coverage](https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${BADGE_BRANCH}/coverage.svg)"
+          } > README.md
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Coverage badge unchanged (${COVERAGE}%)"
+            exit 0
+          fi
+          git commit -q -m "coverage: ${COVERAGE}%"
+          if git push -q origin "HEAD:refs/heads/${BADGE_BRANCH}" 2>push.log; then
+            echo "Coverage badge published: https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${BADGE_BRANCH}/coverage.svg"
+            exit 0
+          fi
+          echo "push attempt ${attempt} failed:"
+          cat push.log
+          sleep "$attempt"
+        done
+
+        echo "::warning::Coverage badge not published: could not push to ${BADGE_BRANCH}. Does the job grant 'contents: write'?"
+        exit 0

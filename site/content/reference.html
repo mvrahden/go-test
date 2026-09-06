@@ -604,6 +604,7 @@ percentage = covered / total</div>
           <tr><td><code>--input=&lt;path&gt;</code></td><td>Read test output from file instead of running tests (<code>spec</code>, <code>summary</code>).</td></tr>
           <tr><td><code>--github</code></td><td>GitHub CI mode: emit <code>::error</code> annotations and write step summary (<code>summary</code> command). Auto-detected via <code>$GITHUB_ACTIONS</code>.</td></tr>
           <tr><td><code>--coverage=&lt;file&gt;</code></td><td>Include coverage from profile in summary output (<code>summary</code> command).</td></tr>
+          <tr><td><code>--badge=&lt;file&gt;</code></td><td>Write a self-contained coverage badge SVG; enables <code>-coverprofile</code> when nothing else does (<code>summary</code> command).</td></tr>
         </tbody>
       </table>
 
@@ -731,6 +732,8 @@ FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
           <tr><td><code>min-coverage</code></td><td><em>none</em></td><td>Minimum coverage percentage (0–100). Fails the step if below.</td></tr>
           <tr><td><code>flags</code></td><td><em>none</em></td><td>Additional gotest flags (<code>--double-dash</code> style).</td></tr>
           <tr><td><code>go-test-flags</code></td><td><em>none</em></td><td>Additional go test flags (<code>-single-dash</code> style).</td></tr>
+          <tr><td><code>badge</code></td><td><code>false</code></td><td>Render a coverage badge and publish it as <code>coverage.svg</code> to <code>badge-branch</code>, from the default branch only. Turns <code>coverage</code> on; needs <code>contents: write</code>.</td></tr>
+          <tr><td><code>badge-branch</code></td><td><code>ci/badges</code></td><td>Branch the badge is published to; created automatically on first use.</td></tr>
           <tr><td><code>version</code></td><td><code>gomod</code></td><td>Version to install, or <code>gomod</code> to resolve from <code>go.mod</code>.</td></tr>
         </tbody>
       </table>
@@ -741,6 +744,7 @@ FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
         <tbody>
           <tr><td><code>exit-code</code></td><td>Test process exit code.</td></tr>
           <tr><td><code>coverage</code></td><td>Coverage percentage (empty if coverage not enabled).</td></tr>
+          <tr><td><code>badge</code></td><td>Path of the rendered coverage badge SVG (empty unless <code>badge</code> is enabled and the tests ran).</td></tr>
         </tbody>
       </table>
 

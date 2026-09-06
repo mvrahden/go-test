@@ -36,8 +36,15 @@ jobs:
   resolved from the consumer's go.mod — the same skew-free property as the
   tool directive. Other inputs: `packages`, `race`, `coverage`,
   `min-coverage`, `flags` (`--double-dash` style), `go-test-flags`
-  (`-single-dash` style). The action adds a failure-focused summary,
-  GitHub annotations, and coverage reporting on top of the plain CLI run.
+  (`-single-dash` style), `badge` (+ `badge-branch`, default `ci/badges`).
+  The action adds a failure-focused summary, GitHub annotations, and
+  coverage reporting on top of the plain CLI run.
+- **Coverage badge:** `badge: true` makes gotest render `coverage.svg` and
+  the action commit it to the `badge-branch` of the consumer's own repo —
+  from the default branch only, never from a PR — so the job needs
+  `permissions: contents: write`. Embed it as
+  `https://raw.githubusercontent.com/<owner>/<repo>/ci/badges/coverage.svg`.
+  The badge needs no shields.io, gist or token setup — do not add any.
 - CI environments auto-arm `--ci` (any non-falsy `CI`/`GOTEST_CI` value):
   committed `F_` focus prefixes FAIL the run, and snapshots become
   read-only (`--update-snapshots` will not write). Opt out with

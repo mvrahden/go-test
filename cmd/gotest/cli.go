@@ -97,7 +97,7 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		minCoverage = inv.Config.MinCoverage
 	}
 
-	goTestArgs, coverProfile, coverCleanup, err := ensureCoverProfile(goTestArgs, minCoverage)
+	goTestArgs, coverProfile, coverCleanup, err := ensureCoverProfile(goTestArgs, minCoverage > 0)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -226,9 +226,12 @@ func parseExecFlags(ownArgs, goTestArgs []string, projCfg *config.ProjectConfig)
 	}, nil
 }
 
-func ensureCoverProfile(goTestArgs []string, minCoverage int) ([]string, string, func(), error) {
+// ensureCoverProfile makes sure a -coverprofile is in play when a coverage
+// consumer (--min, --badge) needs one: the caller's own profile wins, else
+// a temporary one is added and removed by the returned cleanup.
+func ensureCoverProfile(goTestArgs []string, needed bool) ([]string, string, func(), error) {
 	noop := func() {}
-	if minCoverage <= 0 {
+	if !needed {
 		return goTestArgs, "", noop, nil
 	}
 	for _, arg := range goTestArgs {
