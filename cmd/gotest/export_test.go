@@ -51,3 +51,9 @@ var ExportPlanFuzzSession = planFuzzSession
 type ExportFuzzSession = fuzzSession
 
 var ExportParseJobsFlag = parseJobsFlag
+
+type ExportCensusCase = censusCase
+
+var ExportExecutedCases = executedCases
+var ExportCensusMissing = censusMissing
+var ExportEnforceCensus = enforceCensus
