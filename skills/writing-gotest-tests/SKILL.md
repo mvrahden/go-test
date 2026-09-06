@@ -61,6 +61,25 @@ v1.26.x and earlier. What v1.27 adds:
    only leaf rows carry a duration at all, so there the expensive test
    can be the one showing nothing.
 
+Sections tagged **v1.29+** need v1.29.0 or newer. What v1.29 adds:
+
+1. **The spec speaks the `When` vocabulary (rule 8)** — every `When` label
+   renders as `when <condition>` on every surface, and a label that opens
+   with its own connective (`with`, `given`, `after`, `if`, …) renders as
+   written. Below v1.29 a `When` label renders verbatim, so a bare
+   condition reads as a bare phrase there; still write the condition
+   alone — it is what the framework's own suites always did, and the
+   connective arrives with the upgrade instead of having to be edited out.
+2. **The `behavior-wording` lint rule** — absent below v1.29, and absent
+   silently (like `shared-fixture-undeclared` on v1.26.x): a `When("when
+   …")` is never reported there, so apply rule 8 by hand.
+3. **`spec --input` reads source** — a replayed stream renders the
+   declared labels and vocabulary when the packages it names are loadable
+   from the working directory. Below v1.29 a replay renders from subtest
+   names alone (underscores become spaces, no connective), so a replay and
+   a live run can spell one behavior two ways there; judge wording from a
+   live `gotest spec` on those versions.
+
 Exit codes on v1.25.x are weaker than they look — never treat a green
 gotest exit alone as proof there: a package failing to compile mid-run, a
 suite binary killed by a signal, and `spec --input` on a failing stream

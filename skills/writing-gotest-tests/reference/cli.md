@@ -25,9 +25,15 @@ invocation runs tests — there is NO `test` subcommand:
   compose, so re-run until clean). Integrity rules suppress per line only
   (`//nolint:<rule>`); others also via `.gotest.yml` `lint.skip` /
   `-skip-<rule>`.
-- `go tool gotest discover ./...` — static suite metadata as JSON (methods
-  and direct suite→fixture edges; it cannot see `Each` rows — they are
-  runtime values).
+- `go tool gotest discover ./...` — static suite metadata as JSON: suites,
+  methods, direct suite→fixture edges, and (v1.27+) each method's declared
+  `When`/`It` tree — `name` is the subtest segment `go test` will print,
+  `display` the label as the spec renders it (v1.29+: spoken in its
+  vocabulary, so `When("email is valid")` reads `when email is valid`),
+  `kind` the call it came from. Literal `Each` tables appear as rows;
+  anything runtime-valued (a `When` behind a condition, a non-literal
+  description or table) is missing and `behaviorsComplete: false` says
+  so — never present an incomplete list as the whole specification.
 - `go tool gotest scaffold ./pkg/path.TypeName` — generate a suite; an
   interface target generates a generic contract suite. Own-module targets
   only (it writes into the target package's directory).
