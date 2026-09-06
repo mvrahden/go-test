@@ -37,12 +37,25 @@ type ProjectConfig struct {
 	Debounce *Duration `yaml:"debounce"`
 	// Lint holds lint-specific configuration.
 	Lint LintConfig `yaml:"lint"`
+	// Bench holds benchmark baseline/gate configuration.
+	Bench BenchConfig `yaml:"bench"`
 }
 
 // LintConfig controls which lint rules are disabled project-wide.
 type LintConfig struct {
 	// Skip lists lint rule names to disable (e.g. "stdlib-test", "testify").
 	Skip []string `yaml:"skip"`
+}
+
+// BenchConfig controls default baseline comparison settings for
+// "gotest bench". CLI flags (--against, --gate) take precedence over these.
+type BenchConfig struct {
+	// Baseline is the default path used for --against when not given on the
+	// CLI.
+	Baseline string `yaml:"baseline"`
+	// Gate is the default regression gate percentage used for --gate when
+	// not given on the CLI. Zero disables the gate.
+	Gate float64 `yaml:"gate"`
 }
 
 // Duration wraps time.Duration with human-readable YAML unmarshaling.

@@ -29,6 +29,9 @@ function tree(behaviors: DiscoverBehavior[]): DiscoverPackage[] {
           col: 1,
           lifecycle: [],
           fixtures: [],
+          // Benchmarks are a sibling list to methods; the signature covers the
+          // ids the test tree builds, and benchmark items are not among them.
+          benchmarks: [],
           methods: [
             {
               name: "TestIt",

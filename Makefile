@@ -1,4 +1,4 @@
-.PHONY: test lint build vet vuln fmt-check golangci-lint checks extension-test extension-package
+.PHONY: test lint build vet vuln fmt-check golangci-lint checks extension-test extension-contract extension-package
 
 test:
 	go build ./...
@@ -15,8 +15,14 @@ vet:
 build:
 	go build -o gotest ./cmd/gotest
 
-extension-test:
+extension-test: extension-contract
 	cd vscode-gotest && npm test
+
+# Re-records the CLI/extension contract and fails on drift, as CI's contract
+# workflow does. A CLI change that moves the recorded output surfaces here
+# instead of in a CI job the Go gate never runs.
+extension-contract:
+	cd vscode-gotest && npm run contract:check
 
 extension-package:
 	cd vscode-gotest && npx @vscode/vsce package --no-dependencies

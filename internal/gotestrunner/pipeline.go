@@ -61,6 +61,18 @@ func computeDispatchConcurrency(runFlags *[]string, budget, totalSuites int, san
 	return inter
 }
 
+// resolveMaxParallel computes the dispatch concurrency for a batch run. In
+// bench mode, dispatch is always serial (1) — benchmarks must not run
+// concurrently with each other for meaningful timing — and this entirely
+// skips computeDispatchConcurrency's -parallel intra-injection, since
+// benchmark suites must not be told to run their methods in parallel either.
+func resolveMaxParallel(cfg PipelineConfig, runFlags *[]string, totalSuites int, sanitized bool) int { //nolint:gocritic // hugeParam: stable API
+	if cfg.Bench {
+		return 1
+	}
+	return computeDispatchConcurrency(runFlags, cfg.Parallel, totalSuites, sanitized)
+}
+
 type PipelineConfig struct {
 	GoTestArgs      []string
 	SetupTimeout    time.Duration
@@ -70,6 +82,8 @@ type PipelineConfig struct {
 	CompileParallel int
 	Streaming       bool
 	OutputMode      RunMode
+	Bench           bool
+	BenchesByPkg    map[string][]string
 }
 
 type PipelineResult struct {
@@ -177,7 +191,7 @@ func appendRunFailureEvents(stream []byte, pkg, msg string) []byte {
 	return stream
 }
 
-func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult) (PipelineResult, error) {
+func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult) (PipelineResult, error) { //nolint:gocritic // hugeParam: stable API
 	if !cfg.CI && os.Getenv(protocol.EnvCI) == "" {
 		if v := os.Getenv("CI"); v != "" && v != "0" && v != "false" {
 			cfg.CI = true
@@ -185,13 +199,17 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 	}
 	pf := ParseExecFlags(cfg.GoTestArgs)
 
+	if cfg.Bench {
+		cfg.Streaming = false
+	}
+
 	if cfg.Streaming {
 		return runStreaming(ctx, cfg, overlay, pf)
 	}
 	return runBatch(ctx, cfg, overlay, pf)
 }
 
-func buildExtraEnv(cfg PipelineConfig, proc *SharedFixtureProcess) map[string]string {
+func buildExtraEnv(cfg PipelineConfig, proc *SharedFixtureProcess) map[string]string { //nolint:gocritic // hugeParam: stable API
 	env := make(map[string]string)
 	if cfg.UpdateSnapshots {
 		env[protocol.EnvUpdateSnapshots] = "1"
@@ -205,7 +223,7 @@ func buildExtraEnv(cfg PipelineConfig, proc *SharedFixtureProcess) map[string]st
 	return env
 }
 
-func buildBaseEnv(cfg PipelineConfig) []string {
+func buildBaseEnv(cfg PipelineConfig) []string { //nolint:gocritic // hugeParam: stable API
 	env := os.Environ()
 	if cfg.UpdateSnapshots {
 		env = append(env, protocol.EnvUpdateSnapshots+"=1")
@@ -307,7 +325,15 @@ func setupCoverage(targets []SuiteTarget, overlay *OverlayResult, userCoverProfi
 }
 
 func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (result PipelineResult, err error) { //nolint:gocritic // hugeParam: stable API
-	win := planFixtureWindows(overlay, pf.UserRunFilter)
+	// Bench runs dispatch bench targets, not test suites, and match -run and
+	// -bench against Benchmark<Suite>: their residency plan must come from
+	// the same selection, or fixtures would follow the wrong schedule.
+	var win fixtureWindows
+	if cfg.Bench {
+		win = planBenchFixtureWindows(overlay, pf.UserRunFilter, ExtractBenchFilter(pf.RunFlags))
+	} else {
+		win = planFixtureWindows(overlay, pf.UserRunFilter)
+	}
 	win.reportSkipped()
 	compiled, compileFailures, setupProc, cancelPrepare, err := prepareTestRun(ctx, overlay, win.Fixtures, pf.BuildFlags, cfg.SetupTimeout, cfg.CompileParallel)
 	if err != nil {
@@ -337,8 +363,28 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	if cfg.OutputMode == RunCaptureJSON {
 		runFlags = append(append([]string(nil), runFlags...), "-v")
 	}
-	maxParallel := computeDispatchConcurrency(&runFlags, cfg.Parallel, totalSuites, SanitizerActive(pf.BuildFlags))
-	targets := BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, overlay.ExclusiveSuitesByPkg, runFlags, pf.UserRunFilter)
+
+	var targets []SuiteTarget
+	var maxParallel int
+	if cfg.Bench {
+		// A user-supplied -bench value arrives in RunFlags via normal flag
+		// classification. It must not reach buildSuiteCmd as a raw
+		// -test.bench flag — that would be appended after the generated
+		// -test.bench=^Benchmark<Suite>$ and silently win, defeating
+		// per-suite scoping. Extract and strip it here, then feed it to
+		// BuildBenchTargets as a bench-name filter, matched against
+		// Benchmark<Suite>. -run (pf.UserRunFilter) is passed through
+		// alongside it as an independent suite filter — both compose with
+		// AND semantics, e.g. `gotest bench ./pkg/parser -run Parse`
+		// filters by suite while -bench filters by benchmark name.
+		userBenchFilter := ExtractBenchFilter(runFlags)
+		runFlags = StripBenchFilter(runFlags)
+		targets = BuildBenchTargets(compiled, cfg.BenchesByPkg, overlay.DirsByPkg, runFlags, pf.UserRunFilter, userBenchFilter)
+		maxParallel = resolveMaxParallel(cfg, &runFlags, totalSuites, SanitizerActive(pf.BuildFlags))
+	} else {
+		maxParallel = resolveMaxParallel(cfg, &runFlags, totalSuites, SanitizerActive(pf.BuildFlags))
+		targets = BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, overlay.ExclusiveSuitesByPkg, runFlags, pf.UserRunFilter)
+	}
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
@@ -361,25 +407,78 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		defer mergeCoverProfiles(targets, pf.UserCoverProfile)
 	}
 
-	// The barrier re-windows shared fixtures between the parallel bulk and
-	// the exclusive tail. Alive(tail) comes from the actual exclusive targets
-	// — the plan narrowed by compile results — so a fixture whose only tail
-	// suite never became runnable is released, not started.
-	var tailTargets []SuiteTarget
-	for i := range targets {
-		if targets[i].Exclusive {
-			tailTargets = append(tailTargets, targets[i])
+	if cfg.Bench {
+		// Serial dispatch, one window per slot: StartKeys(needed ∖ alive)
+		// before each bench suite, TeardownKeys(alive ∖ needed-by-any-later-
+		// target) after it. A fixture is resident exactly from the first slot
+		// that needs it through the last.
+		SortTargetsSerial(targets)
+		needs, laterNeeds := benchSlotPlan(targets, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
+		alive := make(map[string]bool, len(win.Bulk))
+		for k := range win.Bulk {
+			alive[k] = true
 		}
-	}
-	barrier := func() {
-		if len(tailTargets) == 0 {
-			return // nothing dispatches after the bulk; run-end teardown owns the rest
+		var windowErrs []error
+		beforeSlot := func(i int) {
+			if setupProc == nil || ctx.Err() != nil {
+				return
+			}
+			start := diffKeys(needs[i], alive)
+			if len(start) == 0 {
+				return
+			}
+			// Marked alive on failure too: the subprocess counts a failed
+			// fixture as started, so retrying on a later slot would only
+			// re-report the same failure.
+			for _, k := range start {
+				alive[k] = true
+			}
+			err := setupProc.StartKeys(start, resolveSetupTimeout(cfg.SetupTimeout))
+			if err == nil {
+				err = setupProc.RefreshStateFile()
+			}
+			if err != nil {
+				windowErrs = append(windowErrs, fmt.Errorf("bench fixture window open (%s): %w", targets[i].SuiteName, err))
+			}
 		}
-		tailAlive := aliveFromTargets(tailTargets, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
-		barrierErr = fixtureBarrier(ctx, setupProc, win.Bulk, tailAlive, resolveSetupTimeout(cfg.SetupTimeout), true)
-	}
+		afterSlot := func(i int) {
+			if setupProc == nil || ctx.Err() != nil {
+				return
+			}
+			release := diffKeys(alive, laterNeeds[i+1])
+			if len(release) == 0 {
+				return
+			}
+			for _, k := range release {
+				delete(alive, k)
+			}
+			if err := setupProc.TeardownKeys(release, setupProc.teardownBudget()); err != nil {
+				windowErrs = append(windowErrs, fmt.Errorf("bench fixture window close (%s): %w", targets[i].SuiteName, err))
+			}
+		}
+		RunBenchSuites(ctx, targets, extraEnv, collector, beforeSlot, afterSlot)
+		barrierErr = errors.Join(windowErrs...)
+	} else {
+		// The barrier re-windows shared fixtures between the parallel bulk and
+		// the exclusive tail. Alive(tail) comes from the actual exclusive targets
+		// — the plan narrowed by compile results — so a fixture whose only tail
+		// suite never became runnable is released, not started.
+		var tailTargets []SuiteTarget
+		for i := range targets {
+			if targets[i].Exclusive {
+				tailTargets = append(tailTargets, targets[i])
+			}
+		}
+		barrier := func() {
+			if len(tailTargets) == 0 {
+				return // nothing dispatches after the bulk; run-end teardown owns the rest
+			}
+			tailAlive := aliveFromTargets(tailTargets, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
+			barrierErr = fixtureBarrier(ctx, setupProc, win.Bulk, tailAlive, resolveSetupTimeout(cfg.SetupTimeout), true)
+		}
 
-	RunSuites(ctx, targets, extraEnv, maxParallel, collector, barrier)
+		RunSuites(ctx, targets, extraEnv, maxParallel, collector, barrier)
+	}
 	collector.Finalize(overlay.NoSuitePackages)
 
 	return PipelineResult{

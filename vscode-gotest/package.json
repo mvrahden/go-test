@@ -49,6 +49,26 @@
         "title": "Go Test: Run File"
       },
       {
+        "command": "gotest.runBench",
+        "title": "Go Test: Run Benchmark"
+      },
+      {
+        "command": "gotest.runBenchStable",
+        "title": "Go Test: Bench (stable, 5×)"
+      },
+      {
+        "command": "gotest.profileBench",
+        "title": "Go Test: Profile Benchmark (CPU/Mem)"
+      },
+      {
+        "command": "gotest.saveBenchBaseline",
+        "title": "Go Test: Save Bench Baseline"
+      },
+      {
+        "command": "gotest.compareBenchBaseline",
+        "title": "Go Test: Compare vs Baseline"
+      },
+      {
         "command": "gotest.refreshTests",
         "title": "Go Test: Refresh"
       },

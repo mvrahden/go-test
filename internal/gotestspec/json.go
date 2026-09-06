@@ -30,19 +30,24 @@ type jsonNode struct {
 	External bool    `json:"external"`
 	// Incomplete says the children are a floor, not the whole list. Only a
 	// statically read tree can set it, so it is absent from a rendered run.
-	Incomplete bool       `json:"incomplete,omitempty"`
-	Variant    int        `json:"variant,omitempty"`
-	Output     []string   `json:"output"`
-	Children   []jsonNode `json:"children"`
+	Incomplete  bool       `json:"incomplete,omitempty"`
+	Variant     int        `json:"variant,omitempty"`
+	Output      []string   `json:"output"`
+	Children    []jsonNode `json:"children"`
+	Iterations  int        `json:"iterations,omitempty"`
+	NsPerOp     float64    `json:"ns_per_op,omitempty"`
+	BytesPerOp  int64      `json:"bytes_per_op,omitempty"`
+	AllocsPerOp int64      `json:"allocs_per_op,omitempty"`
 }
 
 type jsonStats struct {
-	Suites    int `json:"suites"`
-	Behaviors int `json:"behaviors"`
-	Tests     int `json:"tests"`
-	Passed    int `json:"passed"`
-	Failed    int `json:"failed"`
-	Skipped   int `json:"skipped"`
+	Suites     int `json:"suites"`
+	Behaviors  int `json:"behaviors"`
+	Tests      int `json:"tests"`
+	Benchmarks int `json:"benchmarks"`
+	Passed     int `json:"passed"`
+	Failed     int `json:"failed"`
+	Skipped    int `json:"skipped"`
 	// FailedPackages carries package-level verdicts (build failures, deaths
 	// outside any test); the packages array shows which via status "fail".
 	FailedPackages int `json:"failedPackages,omitempty"`
@@ -81,19 +86,23 @@ func convertNodes(nodes []*Node) []jsonNode {
 	result := make([]jsonNode, len(nodes))
 	for i, n := range nodes {
 		result[i] = jsonNode{
-			Name:       n.Name,
-			Display:    n.Display,
-			Kind:       kindString(n.Kind),
-			Vocab:      vocabString(n.Vocab),
-			Status:     statusString(n.Status),
-			Duration:   EffectiveDuration(n).Seconds(),
-			Focused:    n.Focused,
-			Excluded:   n.Excluded,
-			External:   n.External,
-			Incomplete: n.Incomplete,
-			Variant:    n.Variant,
-			Output:     n.Output,
-			Children:   convertNodes(n.Children),
+			Name:        n.Name,
+			Display:     n.Display,
+			Kind:        kindString(n.Kind),
+			Vocab:       vocabString(n.Vocab),
+			Status:      statusString(n.Status),
+			Duration:    EffectiveDuration(n).Seconds(),
+			Focused:     n.Focused,
+			Excluded:    n.Excluded,
+			External:    n.External,
+			Incomplete:  n.Incomplete,
+			Variant:     n.Variant,
+			Output:      n.Output,
+			Children:    convertNodes(n.Children),
+			Iterations:  n.Iterations,
+			NsPerOp:     n.NsPerOp,
+			BytesPerOp:  n.BytesPerOp,
+			AllocsPerOp: n.AllocsPerOp,
 		}
 		if result[i].Output == nil {
 			result[i].Output = []string{}
@@ -140,6 +149,8 @@ func kindString(k NodeKind) string {
 		return "block"
 	case KindTest:
 		return "test"
+	case KindBenchmark:
+		return "benchmark"
 	default:
 		return "unknown"
 	}

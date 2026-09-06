@@ -100,6 +100,7 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 		if cfg.coverage != nil {
 			fmt.Fprintf(w, "%sCoverage: %.1f%%%s\n", c.dim, cfg.coverage.Total, c.reset)
 		}
+		renderBenchDeltaTable(w, cfg.benchDeltas, c)
 		return
 	}
 
@@ -142,6 +143,7 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 	if cfg.coverage != nil {
 		fmt.Fprintf(w, "%sCoverage: %.1f%%%s\n", c.dim, cfg.coverage.Total, c.reset)
 	}
+	renderBenchDeltaTable(w, cfg.benchDeltas, c)
 	renderSummary(w, stats, c)
 }
 
@@ -161,6 +163,7 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 		if cfg.coverage != nil {
 			renderMarkdownCoverage(w, cfg.coverage)
 		}
+		renderMarkdownBenchDeltaTable(w, cfg.benchDeltas)
 		return
 	}
 
@@ -170,23 +173,7 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 		fmt.Fprintf(w, "### %d tests passed — package failure detected\n", stats.Total())
 	}
 
-	for _, f := range failures {
-		displayPath := strings.Join(f.Display, " / ")
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "<details>\n<summary><b>%s</b> — %s (%s)</summary>\n\n",
-			f.Package, displayPath, formatDuration(f.Duration))
-
-		lines := filterOutput(f.Output)
-		if len(lines) == 0 {
-			lines = []string{noDiagnosticNote}
-		}
-		for _, line := range lines {
-			fmt.Fprintf(w, "    %s\n", line)
-		}
-		fmt.Fprintln(w)
-
-		fmt.Fprintln(w, "</details>")
-	}
+	renderMarkdownFailures(w, failures)
 
 	for _, d := range diags {
 		fmt.Fprintln(w)
@@ -204,6 +191,8 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 	if cfg.coverage != nil {
 		renderMarkdownCoverage(w, cfg.coverage)
 	}
+
+	renderMarkdownBenchDeltaTable(w, cfg.benchDeltas)
 
 	fmt.Fprint(w, "---\n")
 	var parts []string
@@ -224,6 +213,131 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 		trailer += fmt.Sprintf(", %d failed packages", stats.FailedPackages)
 	}
 	fmt.Fprintf(w, "%s: %s\n", strings.Join(parts, ", "), trailer)
+}
+
+func renderMarkdownFailures(w io.Writer, failures []failure) {
+	for _, f := range failures {
+		displayPath := strings.Join(f.Display, " / ")
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "<details>\n<summary><b>%s</b> — %s (%s)</summary>\n\n",
+			f.Package, displayPath, formatDuration(f.Duration))
+
+		lines := filterOutput(f.Output)
+		if len(lines) == 0 {
+			lines = []string{noDiagnosticNote}
+		}
+		for _, line := range lines {
+			fmt.Fprintf(w, "    %s\n", line)
+		}
+		fmt.Fprintln(w)
+
+		fmt.Fprintln(w, "</details>")
+	}
+}
+
+// RenderMarkdownBenchSummary writes the job summary of a bench run: how many
+// benchmarks ran, each one's results, the delta table when a baseline was
+// compared, and the gate verdict when one was set. Benchmarks are not
+// tests, so the test headline never appears here.
+func RenderMarkdownBenchSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
+	cfg := renderConfig{}
+	for _, o := range opts {
+		o(&cfg)
+	}
+
+	stats := CollectStats(packages)
+	failures := collectFailures(packages)
+	dur := formatDuration(effectiveDuration(cfg, packages))
+	if len(failures) == 0 {
+		fmt.Fprintf(w, "### %d benchmarks ran (%s)\n", stats.Benchmarks, dur)
+	} else {
+		fmt.Fprintf(w, "### %d of %d benchmarks failed (%s)\n", len(failures), stats.Benchmarks, dur)
+		renderMarkdownFailures(w, failures)
+	}
+
+	for _, pkg := range packages {
+		var rows []benchRow
+		for _, n := range pkg.Nodes {
+			collectBenchRows(n, n, &rows)
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(w, "\n**%s**\n\n", pkg.Path)
+		fmt.Fprintln(w, "| Benchmark | ns/op | B/op | allocs/op |")
+		fmt.Fprintln(w, "|---|---|---|---|")
+		for _, r := range rows {
+			if r.node.Iterations == 0 {
+				fmt.Fprintf(w, "| %s | — | — | — |\n", r.key)
+				continue
+			}
+			fmt.Fprintf(w, "| %s | %s | %d | %d |\n",
+				r.key, formatNs(r.node.NsPerOp), r.node.BytesPerOp, r.node.AllocsPerOp)
+		}
+	}
+
+	if cfg.benchDeltas != nil {
+		fmt.Fprintln(w)
+		renderMarkdownBenchDeltaTable(w, cfg.benchDeltas)
+	}
+	if g := cfg.benchGate; g != nil {
+		if g.Breached {
+			fmt.Fprintf(w, "**Bench gate breached:** %s +%.1f%% exceeds the %g%% gate\n", g.WorstKey, g.WorstPct, g.ThresholdPct)
+		} else {
+			fmt.Fprintf(w, "**Bench gate passed:** no regression above %g%%\n", g.ThresholdPct)
+		}
+	}
+}
+
+// benchRow pairs a benchmark leaf with the "Suite/Name" key the delta table
+// uses, so the two tables read against each other.
+type benchRow struct {
+	key  string
+	node *Node
+}
+
+// collectBenchRows gathers the benchmark leaves under n. top is the
+// package-level ancestor whose name (minus "Benchmark") is the suite; a leaf
+// that is itself top has no suite and is keyed by its own name.
+func collectBenchRows(top, n *Node, out *[]benchRow) {
+	if n.Kind == KindBenchmark && len(n.Children) == 0 {
+		key := n.Name
+		if n != top {
+			key = strings.TrimPrefix(top.Name, "Benchmark") + "/" + n.Name
+		}
+		*out = append(*out, benchRow{key: key, node: n})
+		return
+	}
+	for _, c := range n.Children {
+		collectBenchRows(top, c, out)
+	}
+}
+
+// renderMarkdownBenchDeltaTable renders deltas as a markdown table mirroring
+// renderBenchDeltaTable's terminal columns. deltas is rendered as given —
+// filtering significant-only vs. every row (-v) is the caller's
+// responsibility (see WithBenchDeltas). A nil slice (WithBenchDeltas never
+// called) no-ops; an empty-but-non-nil slice still prints the header (see
+// renderBenchDeltaTable for why).
+func renderMarkdownBenchDeltaTable(w io.Writer, deltas []BenchDelta) {
+	if deltas == nil {
+		return
+	}
+	fmt.Fprintln(w, "| Benchmark | old ns/op | new ns/op | Δ |")
+	fmt.Fprintln(w, "|---|---|---|---|")
+	for _, d := range deltas {
+		sign := ""
+		if d.PercentChange >= 0 {
+			sign = "+"
+		}
+		warn := ""
+		if d.Significant && d.PercentChange > 0 {
+			warn = " ⚠"
+		}
+		fmt.Fprintf(w, "| %s | %.1f | %.1f | %s%.1f%%%s |\n",
+			d.Key, d.OldNs, d.NewNs, sign, d.PercentChange, warn)
+	}
+	fmt.Fprintln(w)
 }
 
 func renderMarkdownCoverage(w io.Writer, report *CoverageReport) {

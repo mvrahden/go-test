@@ -41,3 +41,4 @@ var ExportSpecAllowed = specAllowed
 var ExportWatchAllowed = watchAllowed
 var ExportSummaryAllowed = summaryAllowed
 var ExportEnsureCoverProfile = ensureCoverProfile
+var ExportBenchDeltaLines = benchDeltaLines

@@ -3,6 +3,7 @@ package gotestspec
 import (
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"time"
 )
@@ -27,6 +28,8 @@ type renderConfig struct {
 	coverage        *CoverageReport
 	elapsed         time.Duration
 	withoutVerdicts bool
+	benchDeltas     []BenchDelta
+	benchGate       *BenchGate
 }
 
 type RenderOption func(*renderConfig)
@@ -49,6 +52,43 @@ func WithElapsed(d time.Duration) RenderOption {
 // think a verdict was expected and missing.
 func WithoutVerdicts() RenderOption {
 	return func(c *renderConfig) { c.withoutVerdicts = true }
+}
+
+// BenchDelta is one benchmark's old-vs-new comparison, as rendered by
+// RenderSummary and RenderMarkdownSummary via WithBenchDeltas. It mirrors
+// gotestbench.Delta's shape but lives here (rather than being consumed
+// directly) so that gotestspec never has to import gotestbench — callers
+// (cmd/gotest/bench.go) convert []gotestbench.Delta to []BenchDelta at the
+// call site. Filtering (e.g. significant-only vs. every row for -v) is
+// also the caller's responsibility: the renderers show exactly the rows
+// they're given.
+type BenchDelta struct {
+	Key           string // "pkg Suite/Name", matching gotestbench.Delta.Key
+	OldNs, NewNs  float64
+	PercentChange float64
+	Significant   bool
+}
+
+// WithBenchDeltas attaches a benchmark old-vs-new comparison table to be
+// rendered by RenderTerminal, RenderSummary, and RenderMarkdownSummary. A
+// nil or empty slice renders no table.
+func WithBenchDeltas(deltas []BenchDelta) RenderOption {
+	return func(c *renderConfig) { c.benchDeltas = deltas }
+}
+
+// BenchGate is the gate verdict of a bench run, mirroring gotestbench.Gate
+// (which imports this package, so it cannot be used here directly).
+type BenchGate struct {
+	ThresholdPct float64
+	WorstPct     float64
+	WorstKey     string
+	Breached     bool
+}
+
+// WithBenchGate attaches a gate verdict to RenderMarkdownBenchSummary.
+// nil renders no verdict: no gate was set.
+func WithBenchGate(gate *BenchGate) RenderOption {
+	return func(c *renderConfig) { c.benchGate = gate }
 }
 
 func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
@@ -88,6 +128,7 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
 		}
 	}
 
+	renderBenchDeltaTable(w, cfg.benchDeltas, c)
 	fmt.Fprintln(w)
 	stats := CollectStats(packages)
 	renderSummary(w, stats, c)
@@ -115,6 +156,18 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, bare bool) {
 
 	if isLeaf {
 		icon, clr := statusIcon(n.Status, c)
+
+		if n.Kind == KindBenchmark && n.Iterations > 0 {
+			fmt.Fprintf(w, "%s%s%s%s %s  %s ns/op · %d B/op · %d allocs/op%s\n",
+				indent, clr, icon, c.reset,
+				n.Display, formatNs(n.NsPerOp), n.BytesPerOp, n.AllocsPerOp, c.reset)
+
+			if n.Status == StatusFail {
+				renderErrorOutput(w, n.Output, depth+2, c)
+			}
+			return
+		}
+
 		dur := formatDuration(EffectiveDuration(n))
 
 		suffix := ""
@@ -139,7 +192,7 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, bare bool) {
 	}
 
 	label := n.Display
-	if n.Kind == KindSuite || n.Kind == KindFixture || n.Kind == KindMethod || n.Kind == KindTest {
+	if n.Kind == KindSuite || n.Kind == KindFixture || n.Kind == KindMethod || n.Kind == KindTest || n.Kind == KindBenchmark {
 		label = c.bold + label + c.reset
 	}
 
@@ -202,6 +255,16 @@ func statusIcon(s Status, c *colors) (string, string) {
 	}
 }
 
+// formatNs renders a ns/op value the way Go's own benchmark output does:
+// no trailing decimal for whole numbers ("1243"), one decimal place
+// otherwise ("985.2").
+func formatNs(ns float64) string {
+	if ns == math.Trunc(ns) {
+		return fmt.Sprintf("%.0f", ns)
+	}
+	return fmt.Sprintf("%.1f", ns)
+}
+
 func formatDuration(d time.Duration) string {
 	ms := d.Milliseconds()
 	if ms < 1 {
@@ -255,6 +318,38 @@ func filterOutput(output []string) []string {
 	return filtered
 }
 
+// renderBenchDeltaTable renders the "old vs new ns/op" comparison table in
+// the same column format `gotest bench --against` established
+// (cmd/gotest/bench.go's printBenchDeltaTable), so the table looks
+// identical whether it's driven directly by the bench command or via a
+// spec/summary render pass. deltas is rendered as given — filtering
+// significant-only vs. every row (-v) is the caller's responsibility (see
+// WithBenchDeltas). No-ops when deltas is empty.
+func renderBenchDeltaTable(w io.Writer, deltas []BenchDelta, c colors) { //nolint:gocritic // hugeParam: stable API
+	// nil (WithBenchDeltas never called) means "no comparison happened at
+	// all" -> no-op. An empty-but-non-nil slice (a comparison ran but every
+	// row was filtered out, e.g. no significant deltas without -v) still
+	// prints the header, so the reader can see a comparison was attempted
+	// even when it found nothing worth flagging.
+	if deltas == nil {
+		return
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "%sBENCHMARK  OLD ns/op  NEW ns/op  Δ%s\n", c.bold, c.reset)
+	for _, d := range deltas {
+		sign := ""
+		if d.PercentChange >= 0 {
+			sign = "+"
+		}
+		warn, clr, reset := "", "", ""
+		if d.Significant && d.PercentChange > 0 {
+			warn, clr, reset = " ⚠", c.red, c.reset
+		}
+		fmt.Fprintf(w, "%s%s  %.1f  %.1f  %s%.1f%%%s%s\n",
+			clr, d.Key, d.OldNs, d.NewNs, sign, d.PercentChange, warn, reset)
+	}
+}
+
 func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hugeParam: stable API
 	var parts []string
 	if stats.Passed > 0 {
@@ -279,6 +374,9 @@ func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hu
 	}
 	if stats.Tests > 0 {
 		counts = append(counts, fmt.Sprintf("%d stdlib tests", stats.Tests))
+	}
+	if stats.Benchmarks > 0 {
+		counts = append(counts, fmt.Sprintf("%d benchmarks", stats.Benchmarks))
 	}
 	if len(counts) == 0 {
 		counts = append(counts, "0 suites")

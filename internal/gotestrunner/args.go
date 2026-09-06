@@ -249,6 +249,12 @@ func ExtractRunFilter(runFlags []string) string { return extractFlag(runFlags, "
 // StripRunFilter removes -run and its value from run flags.
 func StripRunFilter(runFlags []string) []string { return stripFlag(runFlags, "-run") }
 
+// ExtractBenchFilter returns the value of -bench from run flags, if present.
+func ExtractBenchFilter(runFlags []string) string { return extractFlag(runFlags, "-bench") }
+
+// StripBenchFilter removes -bench and its value from run flags.
+func StripBenchFilter(runFlags []string) []string { return stripFlag(runFlags, "-bench") }
+
 // ExtractCoverProfile returns the value of -coverprofile from run flags, if present.
 func ExtractCoverProfile(runFlags []string) string { return extractFlag(runFlags, "-coverprofile") }
 

@@ -20,6 +20,7 @@ type GenerateResult struct {
 	PTest                          []byte              // generated internal test source
 	PXTest                         []byte              // generated external test source
 	SuiteNames                     []string            // suite struct identifiers (e.g. "FooTestSuite")
+	BenchSuiteNames                []string            // suite struct identifiers with >=1 effective benchmark method
 	SkippedSuiteNames              []string            // identifiers of suites excluded by focus/X_ rules
 	ExclusiveSuiteNames            []string            // identifiers of suites with SuiteConfig{Exclusive: true} — dispatched alone, after the parallel bulk
 	FixtureDepSuites               []string            // test function names that depend on shared fixtures (e.g. "TestFooSuite")
@@ -316,6 +317,29 @@ func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFix
 			}
 		}
 
+		benchSeen := map[string]bool{}
+		var benchNames []string
+		for _, s := range ptestSpec.EffectiveTestSuites {
+			if len(s.Benchmarks()) == 0 {
+				continue
+			}
+			id := s.Identifier()
+			if !benchSeen[id] {
+				benchSeen[id] = true
+				benchNames = append(benchNames, id)
+			}
+		}
+		for _, s := range pxtestSpec.EffectiveTestSuites {
+			if len(s.Benchmarks()) == 0 {
+				continue
+			}
+			id := s.Identifier()
+			if !benchSeen[id] {
+				benchSeen[id] = true
+				benchNames = append(benchNames, id)
+			}
+		}
+
 		var skippedNames []string
 		for _, s := range ptestSpec.SkippedTestSuites {
 			id := s.Identifier()
@@ -346,6 +370,7 @@ func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFix
 			PTest:                          ptestBuf,
 			PXTest:                         pxtestBuf,
 			SuiteNames:                     suiteNames,
+			BenchSuiteNames:                benchNames,
 			SkippedSuiteNames:              skippedNames,
 			ExclusiveSuiteNames:            exclusiveNames,
 			FixtureDepSuites:               append(ptestFixtureDeps, pxtestFixtureDeps...),

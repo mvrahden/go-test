@@ -174,6 +174,100 @@ func TestRenderJSON_ErrorOutput(t *testing.T) {
 	}
 }
 
+func TestRenderJSON_BenchmarkNode(t *testing.T) {
+	packages := []*Package{{
+		Path: "p",
+		Nodes: []*Node{{
+			Kind:    KindSuite,
+			Display: "Foo",
+			Children: []*Node{
+				{
+					Kind:        KindBenchmark,
+					Display:     "Parse",
+					Status:      StatusPass,
+					Iterations:  1201,
+					NsPerOp:     985.2,
+					BytesPerOp:  24,
+					AllocsPerOp: 3,
+				},
+				{Kind: KindMethod, Display: "Regular", Status: StatusPass, Duration: time.Millisecond},
+			},
+		}},
+	}}
+
+	var buf bytes.Buffer
+	RenderJSON(&buf, packages)
+
+	var raw map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &raw); err != nil {
+		t.Fatalf("invalid JSON: %s", err)
+	}
+
+	pkgs, _ := raw["packages"].([]any)
+	nodes, _ := pkgs[0].(map[string]any)["nodes"].([]any)
+	suite, _ := nodes[0].(map[string]any)
+	children, _ := suite["children"].([]any)
+	bench, _ := children[0].(map[string]any)
+	regular, _ := children[1].(map[string]any)
+
+	if bench["kind"] != "benchmark" {
+		t.Errorf("kind = %v, want benchmark", bench["kind"])
+	}
+
+	benchKeys := []string{"ns_per_op", "bytes_per_op", "allocs_per_op", "iterations"}
+	for _, key := range benchKeys {
+		if _, ok := bench[key]; !ok {
+			t.Errorf("bench node missing key %q, got: %v", key, bench)
+		}
+	}
+	if bench["ns_per_op"] != 985.2 {
+		t.Errorf("ns_per_op = %v, want 985.2", bench["ns_per_op"])
+	}
+	if bench["bytes_per_op"] != float64(24) {
+		t.Errorf("bytes_per_op = %v, want 24", bench["bytes_per_op"])
+	}
+	if bench["allocs_per_op"] != float64(3) {
+		t.Errorf("allocs_per_op = %v, want 3", bench["allocs_per_op"])
+	}
+	if bench["iterations"] != float64(1201) {
+		t.Errorf("iterations = %v, want 1201", bench["iterations"])
+	}
+
+	for _, key := range benchKeys {
+		if _, ok := regular[key]; ok {
+			t.Errorf("non-bench node should omit key %q, got present: %v", key, regular)
+		}
+	}
+}
+
+func TestRenderJSON_IncludesBenchmarkStats(t *testing.T) {
+	packages := []*Package{{
+		Path: "p",
+		Nodes: []*Node{{
+			Kind:    KindSuite,
+			Display: "Foo",
+			Children: []*Node{
+				{Kind: KindBenchmark, Display: "Parse", Status: StatusPass, Iterations: 10, NsPerOp: 1.0},
+			},
+		}},
+	}}
+
+	var buf bytes.Buffer
+	RenderJSON(&buf, packages)
+
+	var result jsonRoot
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("invalid JSON: %s", err)
+	}
+
+	if result.Stats.Benchmarks != 1 {
+		t.Errorf("benchmarks = %d, want 1", result.Stats.Benchmarks)
+	}
+	if result.Stats.Behaviors != 0 {
+		t.Errorf("behaviors = %d, want 0", result.Stats.Behaviors)
+	}
+}
+
 func TestRenderJSON_IncludesPackageOutput(t *testing.T) {
 	packages := []*Package{{
 		Path:   "p",
