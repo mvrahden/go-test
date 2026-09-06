@@ -1,4 +1,4 @@
-=== SNAP _ ===
+=== SNAP TestTransformFile ===
 package basic
 
 import (
