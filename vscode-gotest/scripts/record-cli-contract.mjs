@@ -39,7 +39,10 @@ const VARIANTS = {
 
 function buildBinary() {
   const dir = mkdtempSync(path.join(tmpdir(), "gotest-contract-"));
-  const bin = path.join(dir, "gotest");
+  const bin = path.join(
+    dir,
+    process.platform === "win32" ? "gotest.exe" : "gotest",
+  );
   const built = spawnSync("go", ["build", "-o", bin, "./cmd/gotest"], {
     cwd: repoRoot,
     encoding: "utf-8",

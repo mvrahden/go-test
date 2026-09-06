@@ -52,7 +52,12 @@ let brokenBinary = "";
 beforeAll(() => {
   const dir = mkdtempSync(path.join(tmpdir(), "gotest-integration-"));
 
-  realBinary = path.join(dir, "gotest-real");
+  // Named as the platform expects an executable to be named: Windows will not
+  // spawn a file without the suffix, however valid its contents.
+  realBinary = path.join(
+    dir,
+    process.platform === "win32" ? "gotest-real.exe" : "gotest-real",
+  );
   // Stamped, not left to the build's own pseudo-version: that is derived from
   // the newest reachable tag, so once a release at or above MIN_CLI_VERSION
   // exists the working-tree build outranks the floor and this fixture silently
@@ -404,6 +409,7 @@ describe("the Spec View speaks the vocabulary the tree speaks", () => {
       cwd: fixturesDir,
       encoding: "utf-8",
     });
+    expect(run.error, "spawning the built CLI").toBeUndefined();
     expect(run.status, run.stderr).toBe(0);
     captured = run.stdout;
   }, 300_000);
