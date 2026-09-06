@@ -5,7 +5,7 @@
 # shell judges by exit code alone, so nothing in gotest grades its own exam.
 set -uo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
-pkgs=(./pkg/gotest/internal/... ./pkg/gotestruntime/... ./internal/gotestspec/...)
+pkgs=(./pkg/gotest/internal/... ./pkg/gotestruntime/... ./internal/gotestspec/... ./tests/canary/...)
 failed=0
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT

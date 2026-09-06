@@ -2,7 +2,7 @@
 
 The drill is a test of the tests. gotest runs its own test suites, so a bug
 in gotest's core could hide a failure from gotest itself. The checks that
-close that loophole (the census, the ring-0 suites) are only
+close that loophole (the census, the ring-0 suites and the canary) are only
 worth trusting if they demonstrably catch such bugs. `make drill` plants one
 deliberate bug at a time and requires those checks to fail.
 
@@ -12,7 +12,7 @@ For every `mutants/<name>.patch`, `drill.sh`:
 
 1. copies the repository to a scratch directory;
 2. applies the patch, which introduces one bug in a core component;
-3. runs the ring-0 test packages in the copy with
+3. runs the ring-0 test packages and the canary in the copy with
    `gotest summary`;
 4. expects that run to exit non-zero.
 
