@@ -16,8 +16,11 @@ For every `mutants/<name>.patch`, `drill.sh`:
    `gotest summary`;
 4. expects that run to exit non-zero.
 
-Each run uses `go run ./cmd/gotest` from inside the copy, so the CLI,
-runtime and assertion code under judgement are the copy's own.
+The `gotest` that judges each run is built from the unmodified tree before
+any patch is applied. The copy's test binaries still link the copy's mutated
+runtime and assertion code, and the canary inside the copy builds and tests
+the copy's own CLI. This is what lets a bug in the CLI's exit-code path be
+caught: a mutated CLI cannot be trusted to report on itself.
 
 The drill exits 0 only when every mutant was caught. It runs in CI
 (`quality.yml`) on every push and pull request.
@@ -28,12 +31,17 @@ The drill exits 0 only when every mutant was caught. It runs in CI
   the log tail shows what the run reported. Fix the check, not the mutant.
 - `DRILL  <name>: patch does not apply, refresh it` — the code the mutant
   targets has changed. Re-create the patch against the current source.
+- `DRILL  could not build the judge` — the unmodified tree does not compile.
 
 ## The mutants
 
 | Patch | Bug it plants | Check that must catch it |
 |---|---|---|
+| `assert-always-passes` | `CheckEqual` reports success for every input | ring-0 assert suite: its raw checks see the wrong verdict string |
+| `fail-is-noop` | `fail()` in `pkg/gotest` records nothing | canary: the fixtures that must fail stay green |
 | `harness-drops-methods` | the suites template omits every other method | census: declared methods have no verdict |
+| `exit-code-zero` | `WorstExitCode` always returns 0 | canary: exit codes differ from the golden list |
+| `tree-fail-is-pass` | `BuildTree` classifies `fail` events as `pass` | canary golden list, and the ring-0 tree suite |
 
 ## Adding a mutant
 
