@@ -7,7 +7,10 @@ import (
 	"strings"
 )
 
-const gotestDirMarker = "/pkg/gotest/"
+// gotestDirMarkers name the directories of gotest's own runtime code: the
+// assertion library and the harness that runs suite methods. Frames from
+// either are machinery, never the user's call site.
+var gotestDirMarkers = []string{"/pkg/gotest/", "/pkg/gotestruntime/"}
 
 // CallerFrame returns the user's call site as "file:line",
 // or "" if no user frame is found.
@@ -69,11 +72,20 @@ func IsBoundary(fn string) bool {
 }
 
 func IsGotestSource(file string) bool {
-	return !strings.HasSuffix(file, "_test.go") &&
-		strings.Contains(file, gotestDirMarker)
+	if strings.HasSuffix(file, "_test.go") {
+		return false
+	}
+	for _, marker := range gotestDirMarkers {
+		if strings.Contains(file, marker) {
+			return true
+		}
+	}
+	return false
 }
 
+// IsGeneratedBridge reports whether file is a generated suite harness, with
+// or without the generated-file prefix.
 func IsGeneratedBridge(file string) bool {
 	name := filepath.Base(file)
-	return name == "gotest_psuite_test.go" || name == "gotest_pxsuite_test.go"
+	return strings.HasSuffix(name, "gotest_psuite_test.go") || strings.HasSuffix(name, "gotest_pxsuite_test.go")
 }
