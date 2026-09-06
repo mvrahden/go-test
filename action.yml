@@ -74,9 +74,30 @@ runs:
 
         args=(summary --github)
 
+        gtflags=()
+        if [ -n "$INPUT_GO_TEST_FLAGS" ]; then
+          read -ra gtflags <<< "$INPUT_GO_TEST_FLAGS"
+        fi
+
+        # A -coverprofile the caller passes through go-test-flags is the
+        # run's profile; the action only adds a temporary one when nobody did.
+        user_profile=""
+        for ((i = 0; i < ${#gtflags[@]}; i++)); do
+          case "${gtflags[i]}" in
+            -coverprofile=*) user_profile="${gtflags[i]#-coverprofile=}" ;;
+            -coverprofile) user_profile="${gtflags[i+1]:-}" ;;
+          esac
+        done
+
         cover_profile=""
+        temp_profile=""
         if [ "$INPUT_COVERAGE" = "true" ] || [ "$INPUT_BADGE" = "true" ]; then
-          cover_profile="$(mktemp -t gotest-cover-XXXXXX.out)"
+          if [ -n "$user_profile" ]; then
+            cover_profile="$user_profile"
+          else
+            cover_profile="$(mktemp -t gotest-cover-XXXXXX.out)"
+            temp_profile="$cover_profile"
+          fi
           args+=("--coverage=$cover_profile")
         fi
 
@@ -103,12 +124,11 @@ runs:
           args+=(-race)
         fi
 
-        if [ -n "$cover_profile" ]; then
-          args+=("-coverprofile=$cover_profile")
+        if [ -n "$temp_profile" ]; then
+          args+=("-coverprofile=$temp_profile")
         fi
 
-        if [ -n "$INPUT_GO_TEST_FLAGS" ]; then
-          read -ra gtflags <<< "$INPUT_GO_TEST_FLAGS"
+        if [ ${#gtflags[@]} -gt 0 ]; then
           args+=("${gtflags[@]}")
         fi
 
@@ -120,9 +140,14 @@ runs:
         echo "exit-code=$exit_code" >> "$GITHUB_OUTPUT"
 
         if [ -n "$cover_profile" ] && [ -f "$cover_profile" ]; then
-          cov=$(go tool cover -func="$cover_profile" | tail -1 | awk '{print $NF}' | sed 's/%//')
-          echo "coverage=$cov" >> "$GITHUB_OUTPUT"
-          rm -f "$cover_profile"
+          # A profile go tool cover rejects must not fail a step whose tests
+          # already have their verdict; the coverage output just stays empty.
+          if cov=$(go tool cover -func="$cover_profile" | tail -1 | awk '{print $NF}' | sed 's/%//'); then
+            echo "coverage=$cov" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Could not compute the coverage output from ${cover_profile}"
+          fi
+          [ -n "$temp_profile" ] && rm -f "$temp_profile"
         fi
 
         if [ -n "$badge_file" ] && [ -f "$badge_file" ]; then

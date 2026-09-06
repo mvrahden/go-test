@@ -6,6 +6,7 @@
 
 [![Tests](https://github.com/mvrahden/go-test/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/mvrahden/go-test/actions/workflows/test.yml?query=branch%3Amain)
 [![Quality](https://github.com/mvrahden/go-test/actions/workflows/quality.yml/badge.svg?branch=main)](https://github.com/mvrahden/go-test/actions/workflows/quality.yml?query=branch%3Amain)
+[![Coverage](https://raw.githubusercontent.com/mvrahden/go-test/ci/badges/coverage.svg)](https://github.com/mvrahden/go-test/actions/workflows/test.yml?query=branch%3Amain)
 [![Go Reference](https://pkg.go.dev/badge/github.com/mvrahden/go-test.svg)](https://pkg.go.dev/github.com/mvrahden/go-test)
 [![Go 1.25+](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

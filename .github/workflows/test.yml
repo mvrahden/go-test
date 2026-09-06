@@ -36,6 +36,10 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # The coverage badge is pushed to ci/badges; the action publishes it from
+    # main only, so pull-request runs never use the write scope.
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -54,6 +58,9 @@ jobs:
           race: true
           min-coverage: 40
           go-test-flags: "-coverprofile=coverage-suites.out"
+          # One matrix cell publishes the badge; the others would only race
+          # it for the same number.
+          badge: ${{ matrix.go-version == '1.27' }}
       - name: Merge coverage
         run: |
           awk '
