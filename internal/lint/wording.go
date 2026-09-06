@@ -62,9 +62,13 @@ func checkBehaviorWording(pass *analysis.Pass, insp *inspector.Inspector) {
 // afterLeadingWord returns what follows word at the start of s when s opens
 // with it as a whole word — case-insensitively, separated by a space, an
 // underscore or a tab — and something follows. "whenever" does not open with
-// "when", and "when" alone has nothing after it.
+// "when", "when" alone has nothing after it, and a word in capitals is an
+// acronym, not the pronoun: "IT department is notified" says nothing twice.
 func afterLeadingWord(s, word string) (string, bool) {
 	if len(s) <= len(word) || !strings.EqualFold(s[:len(word)], word) {
+		return "", false
+	}
+	if s[:len(word)] == strings.ToUpper(word) {
 		return "", false
 	}
 	if c := s[len(word)]; c != ' ' && c != '_' && c != '\t' {

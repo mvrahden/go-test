@@ -18,6 +18,8 @@ func (s *WordingTestSuite) TestConnectives(t *gotest.T) {
 	// that is nothing but the connective, and one that is not a literal.
 	t.When("whenever it rains", func(w *gotest.T) {})
 	t.It("iterates twice", func(it *gotest.T) {})
+	// An acronym is not the pronoun: "IT" in capitals opens a noun phrase.
+	t.It("IT department is notified", func(it *gotest.T) {})
 	t.When("when", func(w *gotest.T) {})
 	name := "when computed"
 	t.When(name, func(w *gotest.T) {})
