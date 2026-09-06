@@ -8,7 +8,10 @@ invocation runs tests — there is NO `test` subcommand:
   `-json` (streams `go test -json` events incl. every subtest name).
 - `go tool gotest spec ./...` — run + render the behavioral spec view.
   `--format terminal|md|json` (terminal is the default), `--output <file>`; `--input <file|->` re-renders a
-  captured `go test -json` stream WITHOUT running. `--input` exits
+  captured `go test -json` stream WITHOUT running (v1.29+: it still reads
+  the declared labels and `When` vocabulary from the source it can reach
+  from the working directory, so a replay renders exactly like the run;
+  packages it cannot load render from the names alone). `--input` exits
   non-zero when the stream contains failures (same rule as
   `summary --input`), so replaying a saved stream in CI needs no pipefail
   gymnastics — the render step itself is the verdict; `--render-only`

@@ -25,6 +25,8 @@ so structure settles before names (renaming first means renaming twice):
    names; one behavior per `It` clause. The renderer strips
    `Test`/`TestSuite` affixes and shows the rest verbatim (no camel-case
    splitting) — sentence-level prose lives in `It`/`When`/`Desc` strings.
+   `When` strings are bare conditions (the spec prefixes "when"), `It`
+   strings bare behaviors (the glyph plays "it") — SKILL.md rule 8.
    Judge the result by rendering `gotest spec` ONCE at the end (it runs the
    full pipeline) or replay the invariant capture via `spec --input`.
 6. **Hygiene** — delete default-restating `SuiteConfig` markers; sized

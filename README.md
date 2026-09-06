@@ -50,7 +50,7 @@ func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
         gotest.NoError(it, err)
     })
 
-    t.When("when email already exists", func(w *gotest.T) {
+    t.When("email already exists", func(w *gotest.T) {
         w.It("returns ErrDuplicate", func(it *gotest.T) {
             err := s.svc.Create("alice@example.com")
             gotest.NoError(it, err)
@@ -139,7 +139,7 @@ Tests are structured as behavioral specifications using BDD vocabulary.
 
 ```go
 func (s *Suite) TestCreate(t *gotest.T) {
-    t.When("when input is valid", func(w *gotest.T) {
+    t.When("input is valid", func(w *gotest.T) {
         w.It("creates the record", func(it *gotest.T) {
             // ...
         })
@@ -150,6 +150,7 @@ func (s *Suite) TestCreate(t *gotest.T) {
 `When` groups context.
 `It` specifies behavior.
 Both map to `t.Run` under the hood.
+Write the condition, not the connective: the spec renders `When("input is valid")` as *when input is valid*, and the ✓ glyph plays the role of "it".
 
 ### Behavior Specification
 
@@ -738,10 +739,10 @@ Catch common mistakes in test suites with static analysis:
 gotest lint ./...
 ```
 
-Seventeen rules in three tiers:
+Eighteen rules in three tiers:
 
 - **Integrity** — violations can make test outcomes unreliable or leak resources: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, reads of shared fixtures a suite never declared (window scheduling only starts what is declared), and generated files checked into version control.
-- **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, and unnecessary `t.T()` escapes. `-fix` applies the safe rewrites.
+- **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, unnecessary `t.T()` escapes, and `When("when …")`/`It("it …")` descriptions that spell the word the spec already supplies. `-fix` applies the safe rewrites.
 - **Migration** — adoption aids for codebases moving to gotest: stdlib test functions and testify imports; coexistence is legitimate.
 
 Suppress per line with `//nolint:<rule>` (same line or the comment block directly above); expressiveness and migration rules can also be disabled project-wide via `.gotest.yml` (`lint.skip`). See the [design spec](docs/design/spec.md#linter) for the full rule table.

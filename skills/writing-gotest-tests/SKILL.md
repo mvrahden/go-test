@@ -191,6 +191,16 @@ parallel suites, or structural problems — those are your job, below.
    boolean literal only; see `reference/config.md`) and it dispatches
    strictly alone after all other suites finish. A budget verdict taken
    under load is not a verdict you can act on.
+8. **Write the condition, not the connective (v1.29+).** `t.When("email
+   is valid")`, never `t.When("when email is valid")`; `t.It("creates the
+   user")`, never `t.It("it creates the user")`. The spec renders every
+   `When` label as `when <condition>` on every surface (terminal, JSON,
+   discovery, the editor's tree and Spec View) and the ✓/✗ glyph plays
+   the role of "it", so the word in the source is said twice. A `When`
+   that opens with its own connective (`with …`, `given …`, `after …`,
+   `if …`, …) is rendered as written. The `behavior-wording` rule flags
+   the redundant word and `lint -fix` drops it. Subtest *names* never
+   carry the connective — `-run` filters and snapshot keys are unaffected.
 
 ## Restructuring existing suites (the blue phase)
 
