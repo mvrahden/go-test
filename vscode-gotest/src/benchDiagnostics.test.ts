@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import * as path from "node:path";
 
 const collections: MockCollection[] = [];
 
@@ -120,7 +121,9 @@ describe("BenchGateDiagnostics", () => {
 
     diags.apply(gateReport(["example.com/pkg CacheTestSuite/BenchmarkGetHit"]));
 
-    const fileDiags = collection.entries.get("/ws/pkg/cache_test.go") as Array<{
+    const fileDiags = collection.entries.get(
+      path.join("/ws/pkg", "cache_test.go"),
+    ) as Array<{
       message: string;
     }>;
     expect(fileDiags).toHaveLength(1);
