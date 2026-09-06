@@ -1,4 +1,4 @@
-.PHONY: test lint build vet vuln fmt-check golangci-lint checks extension-test extension-contract extension-package
+.PHONY: test lint build vet vuln fmt-check golangci-lint checks drill extension-test extension-contract extension-package
 
 test:
 	go build ./...
@@ -8,6 +8,9 @@ test:
 
 lint: vet
 	go run ./cmd/gotest lint ./...
+
+drill:
+	bash tests/drill/drill.sh
 
 vet:
 	go vet ./... ./examples/...
