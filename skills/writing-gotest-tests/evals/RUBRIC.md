@@ -52,6 +52,7 @@ A skill makes three separable claims; each needs its own experiment:
 | 6 | Suite sequential though isolated | `Parallel: true` + ctx recipe |
 | 7 | `SuiteConfig` restating defaults | Delete the marker |
 | 8 | Suite mixes Inventory/Snapshot/Restocker | Split per production unit |
+| 9 | `t.When("when …")` / `t.It("it …")` spell the word the spec renders (backlog; v1.29+) | Drop the word (rule 8; `lint -fix` via `behavior-wording`) |
 
 `pricing/` keeps stdlib+testify tests on purpose (migration material; Two
 Runners split). Missing traps are in the fixture backlog (§8).
@@ -68,7 +69,7 @@ Runners split). Missing traps are in the fixture backlog (§8).
 | C4 | Parallelize the store suite safely | rule 4 recipe |
 | C5 | Convert `pricing` from testify | migration.md; rule 3 |
 | C6 | "Run all tests — complete picture" | Two Runners |
-| C7 | "Improve these tests" | blue phase; smells 1–8; invariants |
+| C7 | "Improve these tests" | blue phase; smells 1–9; invariants |
 | C8 | Set up CI (three variants, §5) | ci.md conditionals |
 | C9 | GREENFIELD: fresh module, no example suite, "add tests" | rules 1–6 unaided by imitation |
 | C10 | Test an async callback API | `Test*Async` + `done()` |
@@ -77,6 +78,7 @@ Runners split). Missing traps are in the fixture backlog (§8).
 | C13 | Fixture without tool directive: "run the tests" | bootstrap path |
 | C14 | File with lint-fixable violations that strand imports | lint -fix + goimports caveat |
 | C15 | Port a stdlib test full of `if err != nil { t.Fatal }` guards | assertions stated directly (fail-guard) — no guarded fails survive; expected value first in `Equal` |
+| C16 | Add `When`/`It` tests for `Restocker` under two conditions (v1.29+ consumer) | rule 8: bare conditions and behaviors; no `When("when …")` / `It("it …")`; `gotest spec` reads "when <condition>" |
 
 **Harm traps (H):** skill arm only; blind rule-following must NOT act.
 
@@ -88,6 +90,7 @@ Runners split). Missing traps are in the fixture backlog (§8).
 | H4 | gotest-exclusive project; ask to "make CI complete" | no stdlib tests invented for the three-step shape; stdlib step omitted per ci.md |
 | H5 | Intentional stdlib test (assertion-layer); lint fails | `//nolint:stdlib-test` added — test NOT deleted or converted |
 | H6 | Repo with existing quality workflow; ask to add gotest CI | steps integrated into it — no new isolated workflow file |
+| H7 | Suite with `t.When("with an empty cache", …)`, `t.It("IT department is notified", …)` and an `Each` row `Desc: "when stock is zero"`; ask to "apply the spec wording rule" | all three KEPT — a connective of its own, an acronym, and a row description are not the doubled word; only a genuine `When("when …")` / `It("it …")` may change |
 
 **Trigger set (T):** requires real installation.
 
@@ -111,6 +114,8 @@ Runners split). Missing traps are in the fixture backlog (§8).
 - C14: introduce a `t.T().Fatalf` (or other fix-carrying violation) whose
   suggested fix strands an import.
 - H1–H3: add the trap suites per §8 backlog specs.
+- C16/H7: consumer at v1.29.0+ (or the `replace`); H7 plants the three
+  keepers per §8 next to one genuine `t.When("when stock is low", …)`.
 
 ## 6. Grading
 
@@ -121,7 +126,8 @@ tasks: both runners executed (+`-race`) before "done" is claimed
 files committed. Task-specific mandatories:
 
 - C4/C7: executed-case capture as Package+Test pairs, before AND after,
-  renames enumerated BEFORE editing; C7 additionally ≥6 of smells 1–8.
+  renames enumerated BEFORE editing; C7 additionally ≥6 of smells 1–9
+  (smell 9 counts only once its fixture material exists, §8).
 - C5: no smell-7 propagation; testify tidied away; `ErrorContains`
   collapse disclosed.
 - C8: correct variant behavior per §5; `with:` keys valid against
@@ -155,6 +161,10 @@ needs a published >v1.25.0 release.
   overlapping keys (H3, C11).
 - An async callback API on `Restocker` (e.g. subscribe/notify) for C10.
 - A `make check`-driven `quality.yml` variant snippet for C8b/H6.
+- `When`/`It` material (the fixture has none today): a `Restocker` suite
+  with one `t.When("when stock is low", …)` (smell 9, C7/C16) and the H7
+  keepers — `t.When("with an empty cache", …)`, `t.It("IT department is
+  notified", …)`, an `Each` row `Desc: "when stock is zero"`.
 
 ## 9. Round history
 

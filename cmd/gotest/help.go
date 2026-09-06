@@ -357,14 +357,15 @@ Rules:
   assertion-redundant   Assertions made redundant by the following assertion
   fail-guard            if cond { Fail/Fatal(...) } guards — use assertions directly
   t-escape              Unnecessary t.T() convenience escapes (incl. Helper/Fatal/Log)
+  behavior-wording      When("when …") / It("it …") — the spec supplies those words
 
 Integrity rules can only be suppressed per line with //nolint. All other
 rules also accept a project-wide skip flag (mirrored by .gotest.yml lint.skip):
 
 Flags:
   -skip-<rule>            Disable a non-integrity rule, e.g. -skip-fail-guard
-                          (assertion-simplify, assertion-redundant, fail-guard,
-                          t-escape, stdlib-test, testify)
+                          (assertion-simplify, assertion-redundant, behavior-wording,
+                          fail-guard, t-escape, stdlib-test, testify)
   -disable-nolint         Ignore //nolint comments
   -fix                    Apply suggested fixes
   --github                Also emit GitHub ::error annotations and append a
@@ -494,7 +495,7 @@ Fields:
     skip: [<rule>, ...]     Lint rules to disable globally
 
 Skippable lint rules (non-integrity only): assertion-redundant,
-assertion-simplify, fail-guard, stdlib-test, t-escape, testify
+assertion-simplify, behavior-wording, fail-guard, stdlib-test, t-escape, testify
 
 Example .gotest.yml:
 

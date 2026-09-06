@@ -6,7 +6,15 @@
 // integration test that used a prebuilt binary or merged stdout with stderr —
 // so resolution mode is an explicit axis and the streams are kept apart.
 
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  vi,
+} from "vitest";
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync, mkdtempSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -44,7 +52,12 @@ let brokenBinary = "";
 beforeAll(() => {
   const dir = mkdtempSync(path.join(tmpdir(), "gotest-integration-"));
 
-  realBinary = path.join(dir, "gotest-real");
+  // Named as the platform expects an executable to be named: Windows will not
+  // spawn a file without the suffix, however valid its contents.
+  realBinary = path.join(
+    dir,
+    process.platform === "win32" ? "gotest-real.exe" : "gotest-real",
+  );
   // Stamped, not left to the build's own pseudo-version: that is derived from
   // the newest reachable tag, so once a release at or above MIN_CLI_VERSION
   // exists the working-tree build outranks the floor and this fixture silently
@@ -366,4 +379,59 @@ describe("autoRefresh honours the user's setting", () => {
     expect(recorder.errors).toEqual([]);
     expect(renderedHtml()).toBe(before);
   });
+});
+
+// Tier 2 with the source present. The Test Explorer labels a behavior from
+// discovery; the Spec View labels the same behavior from a replay of the run's
+// stream. The two share no code path, so they are the pair that can drift —
+// and did: a replay rendered "classifying a number" while the tree next to it
+// said "when classifying a number". The fixture streams above name packages no
+// checkout can load, so only this case exercises the replay reading source.
+describe("the Spec View speaks the vocabulary the tree speaks", () => {
+  const fixturesDir = path.join(extensionDir, "testdata", "fixtures");
+  let savedGoWork: string | undefined;
+  let captured = "";
+
+  beforeAll(() => {
+    // The same workspace behaviorTree.test.ts discovers: the fixture module
+    // resolves gotest through a go.work that spans this checkout.
+    const tmp = mkdtempSync(path.join(tmpdir(), "gotest-spec-vocab-"));
+    const workFile = path.join(tmp, "corpus.work");
+    writeFileSync(
+      workFile,
+      `go 1.25.0\n\nuse (\n\t${repoRoot}\n\t${path.join(repoRoot, "examples")}\n\t${fixturesDir}\n)\n`,
+      "utf-8",
+    );
+    savedGoWork = process.env.GOWORK;
+    process.env.GOWORK = workFile;
+
+    const run = spawnSync(realBinary, ["gotest.fixtures/table", "-json"], {
+      cwd: fixturesDir,
+      encoding: "utf-8",
+    });
+    expect(run.error, "spawning the built CLI").toBeUndefined();
+    expect(run.status, run.stderr).toBe(0);
+    captured = run.stdout;
+  }, 300_000);
+
+  afterAll(() => {
+    if (savedGoWork === undefined) delete process.env.GOWORK;
+    else process.env.GOWORK = savedGoWork;
+  });
+
+  it("labels a context in the replay exactly as the tree labels it", async () => {
+    state.workspaceDir = fixturesDir;
+    const { panel, recorder } = newPanel();
+    await panel.show();
+    await panel.refresh(captured, "run");
+
+    const html = renderedHtml();
+    expect(recorder.errors).toEqual([]);
+    // The string behaviorTree.test.ts expects as this item's label in the tree.
+    expect(html).toContain('data-display="when classifying a number"');
+    expect(html).not.toContain("when when");
+    // Rows and expectations stand on their own — only a context takes a
+    // connective.
+    expect(html).toContain('data-display="negative"');
+  }, 300_000);
 });

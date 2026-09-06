@@ -616,7 +616,7 @@ percentage = covered / total</div>
     <!-- 9. Linter -->
     <section class="ref-section" id="linter">
       <h2>Linter</h2>
-      <p class="lead">Seventeen rules in three tiers. A rule's tier determines how it may be suppressed.</p>
+      <p class="lead">Eighteen rules in three tiers. A rule's tier determines how it may be suppressed.</p>
 
       <h3>Integrity rules</h3>
       <p>Violations can make test outcomes unreliable or leak resources. These rules can only be suppressed per line — never project-wide.</p>
@@ -646,6 +646,7 @@ percentage = covered / total</div>
           <tr><td><code>assertion-redundant</code></td><td>An assertion made redundant by the next one on the same argument.</td></tr>
           <tr><td><code>fail-guard</code></td><td><code>if cond { Fail/Fatal(...) }</code> guards — the assertion expresses the check directly.</td></tr>
           <tr><td><code>t-escape</code></td><td>Unnecessary <code>t.T()</code> convenience escapes (<code>Errorf</code>, <code>Helper</code>, <code>Log</code>, <code>Fatal</code>, …).</td></tr>
+          <tr><td><code>behavior-wording</code></td><td><code>When("when …")</code> or <code>It("it …")</code> — the spec renders the connective and the ✓ glyph plays "it"; the fix drops the word.</td></tr>
         </tbody>
       </table>
 

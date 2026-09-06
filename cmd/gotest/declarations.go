@@ -8,6 +8,57 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
 
+// vocabOf maps a declaration to the vocabulary it renders in. The two enums are
+// deliberately separate — one describes source, the other display — but this is
+// the single place they meet.
+func vocabOf(k gotestast.BehaviorKind) gotestspec.Vocab {
+	switch k {
+	case gotestast.BehaviorWhen:
+		return gotestspec.VocabWhen
+	case gotestast.BehaviorIt:
+		return gotestspec.VocabIt
+	case gotestast.BehaviorEach:
+		return gotestspec.VocabEach
+	default:
+		return gotestspec.VocabNone
+	}
+}
+
+// renderedBehaviorLabel is what a human should see for a declared behavior: the
+// text the developer wrote, spoken in its vocabulary. Discovery and spec
+// rendering must produce it from the same input by the same rule, or the same
+// behavior reads two different ways in the same editor.
+func renderedBehaviorLabel(b *gotestast.Behavior) string {
+	return vocabOf(b.Kind).Apply(b.Display)
+}
+
+// declarationsForStream reads declarations for the packages a captured stream
+// names, from whatever source the working directory can reach. A replay is how
+// the editor's Spec View renders every run, so it must read the labels the
+// live run read, or the two panes spell one behavior two ways. Packages that
+// cannot be loaded here — a stream from another module, a checkout without
+// the source — simply contribute nothing, and their labels are reconstructed
+// from the names as before. Nothing about loading may fail the render.
+func declarationsForStream(events []gotestspec.TestEvent) gotestspec.DeclarationIndex {
+	seen := map[string]bool{}
+	var pkgs []string
+	for _, ev := range events {
+		if ev.Package == "" || seen[ev.Package] {
+			continue
+		}
+		seen[ev.Package] = true
+		pkgs = append(pkgs, ev.Package)
+	}
+	if len(pkgs) == 0 {
+		return nil
+	}
+	loaded, _, err := gotestgen.LoadPackagesForDiscovery(pkgs, nil)
+	if err != nil {
+		return nil
+	}
+	return buildDeclarationIndex(loaded)
+}
+
 // buildDeclarationIndex reads what every declared behavior is called, keyed by
 // the test path go test will print for it. A run's event stream says which
 // subtests happened, but not what the developer called them: by the time a
@@ -60,7 +111,7 @@ func indexBehaviors(idx gotestspec.DeclarationIndex, pkgPath, parentPath string,
 			paths = map[string]gotestspec.Declaration{}
 			idx[pkgPath] = paths
 		}
-		paths[path] = gotestspec.Declaration{Label: b.Display}
+		paths[path] = gotestspec.Declaration{Label: b.Display, Vocab: vocabOf(b.Kind)}
 		indexBehaviors(idx, pkgPath, path, b.Children)
 	}
 }

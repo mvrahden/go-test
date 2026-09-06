@@ -62,6 +62,9 @@ const EXPECTED: Record<
     goRunEpilogue: string;
     stats: Record<string, number>;
     packages: string[];
+    // Set only for a stream whose package the recorder could load: the
+    // replay then reads the declared label and speaks its vocabulary.
+    speaks?: { display: string; vocab: string };
   }
 > = {
   "all-pass": {
@@ -111,6 +114,18 @@ const EXPECTED: Record<
     stats: { passed: 0, failed: 1, skipped: 0 },
     packages: ["example.com/checkout:fail"],
   },
+  // The one stream naming a package of this repository. Every other case
+  // pins the name-only fallback; this one pins what the Spec View actually
+  // gets in a workspace: the label the developer wrote, spoken in its
+  // vocabulary, with `vocab` on the wire — and nothing on stderr while the
+  // package loads.
+  "declared-source": {
+    gatingExitCode: 0,
+    goRunEpilogue: "",
+    stats: { passed: 1, failed: 0, skipped: 0 },
+    packages: ["github.com/mvrahden/go-test/examples/search:pass"],
+    speaks: { display: "when searching for a title keyword", vocab: "when" },
+  },
 };
 
 describe("recorded CLI contract", () => {
@@ -144,6 +159,14 @@ describe("recorded CLI contract", () => {
       it("keeps stderr clean when invoked directly", () => {
         expect(recorded.gating.direct.stderr).toBe("");
       });
+
+      if (expected.speaks) {
+        it("speaks the declared vocabulary when the source is reachable", () => {
+          const stdout = recorded.gating.direct.stdout;
+          expect(stdout).toContain(`"display":"${expected.speaks!.display}"`);
+          expect(stdout).toContain(`"vocab":"${expected.speaks!.vocab}"`);
+        });
+      }
 
       it("gains only go run's exit-status epilogue on stderr, never a changed spec", () => {
         expect(recorded.gating.goRun.exitCode).toBe(expected.gatingExitCode);

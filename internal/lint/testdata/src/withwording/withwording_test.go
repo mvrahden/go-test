@@ -1,0 +1,27 @@
+package withwording
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type WordingTestSuite struct{}
+
+func (s *WordingTestSuite) TestConnectives(t *gotest.T) {
+	t.When("when email is valid", func(w *gotest.T) { // want `When description opens with "when" — the spec supplies the connective; write the condition alone`
+		w.It("it creates the user", func(it *gotest.T) {}) // want `It description opens with "it" — the ✓ glyph already plays that role; write the behavior alone`
+	})
+
+	// Case and separator do not matter: "When_" is how the word survives a
+	// subtest name, and a description typed that way reads the same.
+	t.When("When_underscored", func(w *gotest.T) {})      // want `When description opens with "when"`
+	t.It(`it handles raw strings`, func(it *gotest.T) {}) // want `It description opens with "it"`
+
+	// Not findings: a word that merely starts with the letters, a description
+	// that is nothing but the connective, and one that is not a literal.
+	t.When("whenever it rains", func(w *gotest.T) {})
+	t.It("iterates twice", func(it *gotest.T) {})
+	// An acronym is not the pronoun: "IT" in capitals opens a noun phrase.
+	t.It("IT department is notified", func(it *gotest.T) {})
+	t.When("when", func(w *gotest.T) {})
+	name := "when computed"
+	t.When(name, func(w *gotest.T) {})
+	t.When("email is valid", func(w *gotest.T) {})
+}

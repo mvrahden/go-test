@@ -186,7 +186,7 @@ func runSpecFromInput(input, format, output string, noColor, renderOnly bool) in
 		return 2
 	}
 
-	tree := gotestspec.BuildTree(events)
+	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(declarationsForStream(events)))
 
 	var w io.Writer = os.Stdout
 	if output != "" {

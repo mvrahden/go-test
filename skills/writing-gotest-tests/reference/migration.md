@@ -8,7 +8,10 @@ are manual:
 
 1. External test package (`package foo_test`), one `FooTestSuite` struct
    per subject; each `TestXxx(t *testing.T)` becomes a
-   `func (s *FooTestSuite) TestXxx(t *gotest.T)` method.
+   `func (s *FooTestSuite) TestXxx(t *gotest.T)` method. Where a test's
+   `t.Run` cases become `When`/`It` blocks, word them per SKILL.md rule 8:
+   a bare condition for `When`, a bare behavior for `It` — the spec
+   supplies "when" and the glyph plays "it".
 2. Map assertions: `require.NoError` → `gotest.NoError`;
    `require.Equal(t, want, got)` → `gotest.Equal(t, want, got)` (same
    expected-first order); collapse `require.Error` + `Contains(err.Error(),

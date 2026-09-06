@@ -57,6 +57,32 @@
         }
       }
     },
+    "declared-source": {
+      "gating": {
+        "direct": {
+          "exitCode": 0,
+          "stdout": "{\"packages\":[{\"path\":\"github.com/mvrahden/go-test/examples/search\",\"status\":\"pass\",\"duration\":0.03,\"nodes\":[{\"name\":\"TestArticleSearchTestSuite\",\"display\":\"ArticleSearch\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.02,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"TestSearchByTitle\",\"display\":\"SearchByTitle\",\"kind\":\"method\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"searching_for_a_title_keyword\",\"display\":\"when searching for a title keyword\",\"kind\":\"block\",\"vocab\":\"when\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"finds_the_matching_article\",\"display\":\"finds the matching article\",\"kind\":\"block\",\"vocab\":\"it\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]}]}]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":1,\"tests\":0,\"passed\":1,\"failed\":0,\"skipped\":0}}\n",
+          "stderr": ""
+        },
+        "goRun": {
+          "exitCode": 0,
+          "stderr": "",
+          "stdoutMatchesDirect": true
+        }
+      },
+      "renderOnly": {
+        "direct": {
+          "exitCode": 0,
+          "stdout": "{\"packages\":[{\"path\":\"github.com/mvrahden/go-test/examples/search\",\"status\":\"pass\",\"duration\":0.03,\"nodes\":[{\"name\":\"TestArticleSearchTestSuite\",\"display\":\"ArticleSearch\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.02,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"TestSearchByTitle\",\"display\":\"SearchByTitle\",\"kind\":\"method\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"searching_for_a_title_keyword\",\"display\":\"when searching for a title keyword\",\"kind\":\"block\",\"vocab\":\"when\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"finds_the_matching_article\",\"display\":\"finds the matching article\",\"kind\":\"block\",\"vocab\":\"it\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]}]}]}]}],\"output\":[]}],\"stats\":{\"suites\":1,\"behaviors\":1,\"tests\":0,\"passed\":1,\"failed\":0,\"skipped\":0}}\n",
+          "stderr": ""
+        },
+        "goRun": {
+          "exitCode": 0,
+          "stderr": "",
+          "stdoutMatchesDirect": true
+        }
+      }
+    },
     "empty": {
       "gating": {
         "direct": {

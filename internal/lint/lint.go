@@ -38,6 +38,9 @@ const (
 	AssertionRedundant Rule = "assertion-redundant"
 	TEscape            Rule = "t-escape"
 	SuiteLifecycle     Rule = "suite-lifecycle"
+	// BehaviorWording is expressiveness: a When or It description that opens
+	// with the word the spec renders for it says it twice.
+	BehaviorWording Rule = "behavior-wording"
 	// SharedFixtureUndeclared is integrity: window scheduling starts only
 	// the fixtures scheduled suites declare, so an undeclared read may hit
 	// a fixture that never started or is already released.
@@ -87,6 +90,7 @@ var ruleMeta = map[Rule]struct {
 	TEscape:            {TierExpressiveness, ScopeSuites},
 	SuiteLifecycle:     {TierIntegrity, ScopeSuites},
 	FailGuard:          {TierExpressiveness, ScopeGotestFiles},
+	BehaviorWording:    {TierExpressiveness, ScopeGotestFiles},
 
 	SharedFixtureUndeclared: {TierIntegrity, ScopeSuites},
 }
@@ -176,6 +180,7 @@ func run(pass *analysis.Pass) (any, error) {
 	checkAssertionSimplify(pass, insp, cl)
 	checkFailGuard(pass, insp, cl)
 	checkRedundantAssertion(pass, insp, cl)
+	checkBehaviorWording(pass, insp)
 
 	return nil, nil
 }

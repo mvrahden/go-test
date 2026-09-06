@@ -1,6 +1,7 @@
 package gotestspec
 
 import (
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -28,11 +29,59 @@ const (
 	KindTest
 )
 
-// Declaration is what the source says about a subtest. Today that is the
-// description as the developer wrote it; a run cannot report it, because by the
-// time a subtest has a name the description has already been rewritten.
+// Vocab records which gotest call declared a subtest. Like the description, it
+// is a property of the source: `t.When(...)` is visible long before anything
+// executes, and a run cannot report it because a context and an expectation
+// both arrive as plain subtests.
+type Vocab int
+
+const (
+	VocabNone Vocab = iota
+	VocabWhen
+	VocabIt
+	VocabEach
+)
+
+// Apply renders a label in its vocabulary. A When block reads as "when email is
+// valid"; It and Each labels stand on their own, because the ✓/✗ glyph already
+// plays the role of "it". A label that already opens with a connective of its
+// own — "when", but also "with", "given", "after", … — is left alone rather
+// than doubled: "when with an empty cache" is not a sentence.
+func (v Vocab) Apply(label string) string {
+	if v != VocabWhen || opensWithConnective(label) {
+		return label
+	}
+	return "when " + label
+}
+
+// connectives are the words that already turn a label into a clause, so no
+// "when" goes in front of them. Matched as whole words, case-insensitively.
+var connectives = []string{
+	"when", "whenever", "with", "without", "given", "if", "unless",
+	"after", "before", "while", "once", "on", "upon", "as", "for",
+	"during", "under",
+}
+
+// opensWithConnective reports whether a label's first word is a connective.
+// The separator may be a space or an underscore: the same label reaches this
+// rule both as the developer typed it and as it survives a subtest name, where
+// every space is an underscore. Judging the two differently is how one behavior
+// ends up spelled two ways.
+func opensWithConnective(label string) bool {
+	word := label
+	if i := strings.IndexAny(label, " _\t"); i >= 0 {
+		word = label[:i]
+	}
+	return slices.ContainsFunc(connectives, func(c string) bool { return strings.EqualFold(word, c) })
+}
+
+// Declaration is what the source says about a subtest: the description as the
+// developer wrote it, and which call declared it. A run can report neither —
+// by the time a subtest has a name, the description has been rewritten and the
+// call that made it is gone.
 type Declaration struct {
 	Label string
+	Vocab Vocab
 }
 
 // DeclarationIndex maps a package's test paths ("TestUserServiceTestSuite/
@@ -65,6 +114,8 @@ type Node struct {
 	Name    string
 	Display string
 	Kind    NodeKind
+	// Vocab is the call that declared this node, when it is known from source.
+	Vocab Vocab
 	// SourceLabel is the description as written, when it is known from source.
 	// Rendering prefers it over reconstructing a label from Name: go test turns
 	// every space in a description into an underscore, so the name cannot say
@@ -203,9 +254,11 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			name := resolvedSegments[i]
 			// Strip #NN suffix from display for children of duplicate runs.
 			cleanName := stripDuplicateSuffix(name)
+			decl := cfg.decls.lookup(ev.Package, strings.Join(cleanSegments[:i+1], "/"))
 			n := &Node{
 				Name:        cleanName,
-				SourceLabel: cfg.decls.lookup(ev.Package, strings.Join(cleanSegments[:i+1], "/")).Label,
+				Vocab:       decl.Vocab,
+				SourceLabel: decl.Label,
 			}
 			nmap[path] = n
 			if i == 0 {
@@ -445,11 +498,11 @@ func classify(n *Node, topLevel bool) {
 			// Prefer the description as written. Reconstructing it from the
 			// name turns every underscore into a space, which is right for the
 			// ones go test put there and wrong for the ones the developer did.
-			if n.SourceLabel != "" {
-				n.Display = n.SourceLabel
-			} else {
-				n.Display = strings.ReplaceAll(name, "_", " ")
+			label := n.SourceLabel
+			if label == "" {
+				label = strings.ReplaceAll(name, "_", " ")
 			}
+			n.Display = n.Vocab.Apply(label)
 		}
 	}
 

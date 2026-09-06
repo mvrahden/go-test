@@ -9,6 +9,12 @@
 // Regenerate with `npm run contract:record`. CI runs `npm run contract:check`,
 // so a change in CLI behaviour lands as a reviewable diff instead of a silent
 // break in a consumer nobody re-ran.
+//
+// Most streams name packages no checkout can load, which pins the name-only
+// fallback. `declared-source.jsonl` names a package of this repository, so with
+// the repo root as cwd the replay reads its source: it pins the label rendered
+// in its vocabulary, the `vocab` field on the wire, and a silent stderr while
+// the package loads. It is the one case that pays a type-check.
 
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync, readdirSync, mkdtempSync } from "node:fs";
@@ -33,7 +39,10 @@ const VARIANTS = {
 
 function buildBinary() {
   const dir = mkdtempSync(path.join(tmpdir(), "gotest-contract-"));
-  const bin = path.join(dir, "gotest");
+  const bin = path.join(
+    dir,
+    process.platform === "win32" ? "gotest.exe" : "gotest",
+  );
   const built = spawnSync("go", ["build", "-o", bin, "./cmd/gotest"], {
     cwd: repoRoot,
     encoding: "utf-8",

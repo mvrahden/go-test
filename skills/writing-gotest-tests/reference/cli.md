@@ -8,7 +8,10 @@ invocation runs tests — there is NO `test` subcommand:
   `-json` (streams `go test -json` events incl. every subtest name).
 - `go tool gotest spec ./...` — run + render the behavioral spec view.
   `--format terminal|md|json` (terminal is the default), `--output <file>`; `--input <file|->` re-renders a
-  captured `go test -json` stream WITHOUT running. `--input` exits
+  captured `go test -json` stream WITHOUT running (v1.29+: it still reads
+  the declared labels and `When` vocabulary from the source it can reach
+  from the working directory, so a replay renders exactly like the run;
+  packages it cannot load render from the names alone). `--input` exits
   non-zero when the stream contains failures (same rule as
   `summary --input`), so replaying a saved stream in CI needs no pipefail
   gymnastics — the render step itself is the verdict; `--render-only`
@@ -22,9 +25,15 @@ invocation runs tests — there is NO `test` subcommand:
   compose, so re-run until clean). Integrity rules suppress per line only
   (`//nolint:<rule>`); others also via `.gotest.yml` `lint.skip` /
   `-skip-<rule>`.
-- `go tool gotest discover ./...` — static suite metadata as JSON (methods
-  and direct suite→fixture edges; it cannot see `Each` rows — they are
-  runtime values).
+- `go tool gotest discover ./...` — static suite metadata as JSON: suites,
+  methods, direct suite→fixture edges, and (v1.27+) each method's declared
+  `When`/`It` tree — `name` is the subtest segment `go test` will print,
+  `display` the label as the spec renders it (v1.29+: spoken in its
+  vocabulary, so `When("email is valid")` reads `when email is valid`),
+  `kind` the call it came from. Literal `Each` tables appear as rows;
+  anything runtime-valued (a `When` behind a condition, a non-literal
+  description or table) is missing and `behaviorsComplete: false` says
+  so — never present an incomplete list as the whole specification.
 - `go tool gotest scaffold ./pkg/path.TypeName` — generate a suite; an
   interface target generates a generic contract suite. Own-module targets
   only (it writes into the target package's directory).

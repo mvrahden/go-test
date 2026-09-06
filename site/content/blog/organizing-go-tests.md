@@ -218,7 +218,7 @@ func (s *UserServiceTestSuite) BeforeEach(t *gotest.T) {
 }
 
 func (s *UserServiceTestSuite) TestCreateUser(t *gotest.T) {
-    t.When("when the input is valid", func(w *gotest.T) {
+    t.When("the input is valid", func(w *gotest.T) {
         err := s.db.CreateUser(User{Name: "Alice", Email: "alice@example.com"})
 
         w.It("succeeds without error", func(it *gotest.T) {
@@ -226,7 +226,7 @@ func (s *UserServiceTestSuite) TestCreateUser(t *gotest.T) {
         })
     })
 
-    t.When("when the email already exists", func(w *gotest.T) {
+    t.When("the email already exists", func(w *gotest.T) {
         s.db.CreateUser(User{Name: "Alice", Email: "alice@example.com"})
         err := s.db.CreateUser(User{Name: "Bob", Email: "alice@example.com"})
 
@@ -237,7 +237,7 @@ func (s *UserServiceTestSuite) TestCreateUser(t *gotest.T) {
 }
 
 func (s *UserServiceTestSuite) TestDeleteUser(t *gotest.T) {
-    t.When("when the user exists", func(w *gotest.T) {
+    t.When("the user exists", func(w *gotest.T) {
         s.db.CreateUser(User{Name: "Alice", Email: "alice@example.com"})
         err := s.db.DeleteUser("alice@example.com")
 

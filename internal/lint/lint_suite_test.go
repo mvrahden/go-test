@@ -44,6 +44,7 @@ var rewriteFixtures = []string{
 	"withfailguard_noimport",
 	"withredundant",
 	"withtescape",
+	"withwording",
 }
 
 func (s *LintTestSuite) TestDiagnostics(t *gotest.T) {
