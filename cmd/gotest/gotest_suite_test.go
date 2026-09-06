@@ -1000,6 +1000,62 @@ func (s *CmdGotestTestSuite) TestRenderOnlySeparatesVerdictFromRendering(t *gote
 	})
 }
 
+// TestInputReadsTheSourceItCanReach covers the replay path the editor's Spec
+// View runs on. A captured stream names its packages, and when their source is
+// reachable from the working directory the renderer reads the declared labels
+// from it — exactly as a live run does — so a replay and a run never spell one
+// behavior two ways. A stream whose packages are nowhere to be found still
+// renders, from the names alone.
+func (s *CmdGotestTestSuite) TestInputReadsTheSourceItCanReach(t *gotest.T) {
+	const pkg = "github.com/mvrahden/go-test/examples/search"
+	const when = "TestArticleSearchTestSuite/TestSearchByTitle/searching_for_a_title_keyword"
+	stream := `{"Action":"run","Package":"` + pkg + `","Test":"TestArticleSearchTestSuite"}
+{"Action":"run","Package":"` + pkg + `","Test":"TestArticleSearchTestSuite/TestSearchByTitle"}
+{"Action":"run","Package":"` + pkg + `","Test":"` + when + `"}
+{"Action":"run","Package":"` + pkg + `","Test":"` + when + `/finds_the_matching_article"}
+{"Action":"output","Package":"` + pkg + `","Test":"` + when + `/finds_the_matching_article","Output":"    suite_test.go:31: Len failed\n"}
+{"Action":"fail","Package":"` + pkg + `","Test":"` + when + `/finds_the_matching_article"}
+{"Action":"fail","Package":"` + pkg + `","Test":"` + when + `"}
+{"Action":"fail","Package":"` + pkg + `","Test":"TestArticleSearchTestSuite/TestSearchByTitle"}
+{"Action":"fail","Package":"` + pkg + `","Test":"TestArticleSearchTestSuite"}
+{"Action":"fail","Package":"` + pkg + `"}
+`
+	input := filepath.Join(t.TempDir(), "events.json")
+	gotest.NoError(t, os.WriteFile(input, []byte(stream), 0o600))
+
+	t.When("the stream's packages are in the module the command runs in", func(w *gotest.T) {
+		w.It("spec renders the declared label in its vocabulary", func(it *gotest.T) {
+			out := filepath.Join(it.TempDir(), "spec.json")
+			gotest.Equal(it, 0, ExportRunSpecFromInput(input, "json", out, true, true))
+			data, err := os.ReadFile(out)
+			gotest.NoError(it, err)
+			gotest.Contains(it, string(data), `"display":"when searching for a title keyword"`)
+			gotest.Contains(it, string(data), `"vocab":"when"`)
+		})
+
+		w.It("summary titles the failure the same way", func(it *gotest.T) {
+			out := filepath.Join(it.TempDir(), "summary.txt")
+			gotest.Equal(it, 0, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, true))
+			data, err := os.ReadFile(out)
+			gotest.NoError(it, err)
+			gotest.Contains(it, string(data), "when searching for a title keyword")
+		})
+	})
+
+	t.When("the stream's packages cannot be found", func(w *gotest.T) {
+		foreign := filepath.Join(w.TempDir(), "events.json")
+		gotest.NoError(w, os.WriteFile(foreign, []byte(strings.ReplaceAll(stream, pkg, "example.com/elsewhere")), 0o600))
+
+		w.It("spec still renders, from the names alone", func(it *gotest.T) {
+			out := filepath.Join(it.TempDir(), "spec.json")
+			gotest.Equal(it, 0, ExportRunSpecFromInput(foreign, "json", out, true, true))
+			data, err := os.ReadFile(out)
+			gotest.NoError(it, err)
+			gotest.Contains(it, string(data), `"display":"searching for a title keyword"`)
+		})
+	})
+}
+
 func (s *CmdGotestTestSuite) TestWatchHelpers(t *gotest.T) {
 	t.When("IsGoFile", func(w *gotest.T) {
 		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional

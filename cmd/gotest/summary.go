@@ -162,7 +162,7 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 		return 2
 	}
 
-	tree := gotestspec.BuildTree(events)
+	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(declarationsForStream(events)))
 
 	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0, badgePath)
 

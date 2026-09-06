@@ -256,6 +256,24 @@ func (s *KeysTestSuite) TestEncode(t *gotest.T) {
 		}
 	})
 
+	// The editor's Spec View never runs anything: it replays the stream a run
+	// produced. That replay reads the same source the run did, so it renders
+	// the same labels — the one pair of surfaces that shares no code path.
+	t.It("replays a captured stream under those same labels", func(it *gotest.T) {
+		capture := exec.Command(s.binary, "./declared_labels", "-json") //nolint:gosec // G204: controlled binary with fixed args
+		capture.Dir = filepath.Join(s.workDir, "examples")
+		stream, err := capture.Output()
+		gotest.NoError(it, err, "capturing -json: %s", string(stream))
+		path := filepath.Join(it.TempDir(), "events.json")
+		gotest.NoError(it, os.WriteFile(path, stream, 0o600))
+
+		replayed := specLabels(string(run("spec", "--no-color", "--input="+path)))
+		for _, label := range declared {
+			gotest.True(it, replayed[label],
+				"discovery shows %q, which a replay never renders; it shows %v", label, sortedKeys(replayed))
+		}
+	})
+
 	t.It("says which call declared each behavior", func(it *gotest.T) {
 		gotest.Contains(it, kinds, "when", "no When behavior reported: %v", kinds)
 		gotest.Contains(it, kinds, "it", "no It behavior reported: %v", kinds)
