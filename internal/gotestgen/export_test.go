@@ -1,4 +1,4 @@
-package gotestgen //nolint:stdlib-test
+package gotestgen
 
 import (
 	"embed"
