@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestbench"
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -132,6 +133,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		mode = gotestrunner.RunCaptureJSON
 	}
 
+	pipelineStart := time.Now()
 	result, err := gotestrunner.RunPipeline(ctx, gotestrunner.PipelineConfig{
 		GoTestArgs:      cfg.GoTestArgs,
 		SetupTimeout:    cfg.SetupTimeout,
@@ -232,19 +234,28 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	// Mirror gotest summary --github's own $GITHUB_STEP_SUMMARY wiring:
-	// under GitHub Actions, append a markdown rendering (with the delta
-	// table, when --against ran) so bench results show up in the job
-	// summary alongside the annotations/summary the "summary" subcommand
-	// already writes there.
+	// under GitHub Actions, append the bench run's own markdown — results,
+	// delta table when --against ran, gate verdict when one was set — so
+	// it sits in the job summary beside what "summary" writes there.
 	if tree != nil && os.Getenv("GITHUB_ACTIONS") == "true" {
 		if summaryPath := os.Getenv("GITHUB_STEP_SUMMARY"); summaryPath != "" {
 			sf, err := os.OpenFile(summaryPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err == nil {
-				var mdOpts []gotestspec.RenderOption
+				// Wall clock, as summary does: a bench tree's own package
+				// durations are near zero and would headline "<1ms".
+				mdOpts := []gotestspec.RenderOption{gotestspec.WithElapsed(time.Since(pipelineStart))}
 				if againstPath != "" {
 					mdOpts = append(mdOpts, gotestspec.WithBenchDeltas(specDeltas))
 				}
-				gotestspec.RenderMarkdownSummary(sf, tree, mdOpts...)
+				if gateVerdict != nil {
+					mdOpts = append(mdOpts, gotestspec.WithBenchGate(&gotestspec.BenchGate{
+						ThresholdPct: gateVerdict.ThresholdPct,
+						WorstPct:     gateVerdict.WorstPct,
+						WorstKey:     gateVerdict.WorstKey,
+						Breached:     gateVerdict.Breached,
+					}))
+				}
+				gotestspec.RenderMarkdownBenchSummary(sf, tree, mdOpts...)
 				sf.Close()
 			}
 		}

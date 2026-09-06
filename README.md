@@ -832,7 +832,7 @@ By default (`version: gomod`), the action resolves `gotest` from your `go.mod` â
 
 The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel.
 
-With `bench: true`, a benchmark step runs after the tests (`gotest bench --spec --json`): the spec view plus delta table land in the step summary, the versioned JSON report lands in a temp file exposed as the `bench-report` output, and a breached gate fails the step with the offending keys in `bench-breached-keys`.
+With `bench: true`, a benchmark step runs after the tests (`gotest bench --spec --json`): the step summary gets the benchmark count, a per-package results table (ns/op, B/op, allocs/op), the delta table when a baseline was compared, and the gate verdict when one was set; the versioned JSON report lands in a temp file exposed as the `bench-report` output, and a breached gate fails the step with the offending keys in `bench-breached-keys`.
 
 ### Inputs
 

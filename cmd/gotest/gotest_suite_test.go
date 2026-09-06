@@ -66,8 +66,16 @@ func (s *CmdGotestTestSuite) runCLI(t *gotest.T, args ...string) string {
 // runCLIExit runs the built gotest binary from the repo root and returns its
 // combined stdout+stderr output along with its exit code.
 func (s *CmdGotestTestSuite) runCLIExit(t *gotest.T, args ...string) (string, int) {
+	return s.runCLIEnv(t, nil, args...)
+}
+
+// runCLIEnv is runCLIExit with extra environment entries. The GitHub
+// Actions variables never pass through from the parent: under CI they would
+// make every child append to the job's real step summary.
+func (s *CmdGotestTestSuite) runCLIEnv(t *gotest.T, env []string, args ...string) (string, int) {
 	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = s.repoRoot
+	cmd.Env = append(withoutGitHubEnv(os.Environ()), env...)
 	out, err := cmd.CombinedOutput()
 	var exitErr *exec.ExitError
 	gotest.True(t, err == nil || errors.As(err, &exitErr), "running gotest binary: %v\n%s", err, out)
@@ -1341,9 +1349,33 @@ func (s *CmdGotestTestSuite) TestBenchSubcommand(t *gotest.T) {
 		gotest.Contains(it, out, "BenchmarkNotificationDispatchBenchTestSuite")
 		gotest.Contains(it, out, "ns/op")
 	})
+	t.When("running under GitHub Actions", func(w *gotest.T) {
+		w.It("writes the benchmark results to the step summary", func(it *gotest.T) {
+			summaryPath := filepath.Join(it.TempDir(), "summary.md")
+			env := []string{"GITHUB_ACTIONS=true", "GITHUB_STEP_SUMMARY=" + summaryPath}
+
+			_, code := s.runCLIEnv(it, env, "bench", "--spec", "./examples/notification", "-benchtime=10x")
+			gotest.Equal(it, 0, code)
+
+			summary, err := os.ReadFile(summaryPath)
+			gotest.NoError(it, err)
+			gotest.Contains(it, string(summary), "### 1 benchmarks ran (")
+			gotest.Contains(it, string(summary), "| Benchmark | ns/op | B/op | allocs/op |")
+			gotest.Contains(it, string(summary), "| NotificationDispatchBenchTestSuite/BenchmarkDispatch | ")
+			gotest.NotContains(it, string(summary), "tests passed")
+		})
+	})
 	t.It("reports when no benchmarks exist", func(it *gotest.T) {
 		out := s.runCLI(it, "bench", "./internal/protocol")
 		gotest.Contains(it, out, "no benchmarks found")
+	})
+}
+
+func (s *CmdGotestTestSuite) TestChildEnvironment(t *gotest.T) {
+	t.It("keeps the GitHub Actions variables away from spawned CLIs", func(it *gotest.T) {
+		env := []string{"PATH=/bin", "GITHUB_ACTIONS=true", "GITHUB_STEP_SUMMARY=/tmp/summary.md", "GITHUB_REPOSITORY=x/y"}
+
+		gotest.Equal(it, []string{"PATH=/bin", "GITHUB_REPOSITORY=x/y"}, withoutGitHubEnv(env))
 	})
 }
 
@@ -1411,4 +1443,16 @@ func (s *CmdGotestTestSuite) TestBenchSaveAgainstGate(t *gotest.T) {
 		gotest.Contains(it, out, "1 suites, 1 benchmarks")
 		gotest.NotContains(it, out, "tests passed (")
 	})
+}
+
+// withoutGitHubEnv drops the GitHub Actions variables the CLI auto-arms on.
+func withoutGitHubEnv(env []string) []string {
+	kept := env[:0:0]
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "GITHUB_ACTIONS=") || strings.HasPrefix(kv, "GITHUB_STEP_SUMMARY=") {
+			continue
+		}
+		kept = append(kept, kv)
+	}
+	return kept
 }
