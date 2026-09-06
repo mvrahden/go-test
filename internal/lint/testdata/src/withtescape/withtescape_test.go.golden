@@ -140,3 +140,14 @@ func (h *escapeHelper) doErrorf(t *testing.T) {
 var packageLevelCheck = func(t *gotest.T) {
 	t.Errorf("boom") // want `Errorf is available on gotest.T — unnecessary T escape`
 }
+
+// A helper taking gotest.T and calling its own Errorf is the recommended
+// shape, not an escape, even when a suite method hands it its t.
+func (s *EscapeTestSuite) TestInterproceduralGotestTOwnMethod(t *gotest.T) {
+	helperGotestOwnErrorf(t)
+}
+
+func helperGotestOwnErrorf(t *gotest.T) {
+	t.Errorf("msg")
+	t.FailNow()
+}
