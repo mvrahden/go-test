@@ -54,6 +54,12 @@ func (s *CmdGotestTestSuite) BeforeAll(t *gotest.T) {
 	cmd.Dir = absRoot
 	out, err := cmd.CombinedOutput()
 	gotest.NoError(t, err, "build gotest binary: %s", string(out))
+
+	// Every child CLI inherits this process's environment. Under CI the
+	// GitHub Actions variables would make each one append to the job's real
+	// step summary, so they leave the process here.
+	os.Unsetenv("GITHUB_ACTIONS")
+	os.Unsetenv("GITHUB_STEP_SUMMARY")
 }
 
 // runCLI runs the built gotest binary from the repo root and returns its
@@ -69,13 +75,15 @@ func (s *CmdGotestTestSuite) runCLIExit(t *gotest.T, args ...string) (string, in
 	return s.runCLIEnv(t, nil, args...)
 }
 
-// runCLIEnv is runCLIExit with extra environment entries. The GitHub
-// Actions variables never pass through from the parent: under CI they would
-// make every child append to the job's real step summary.
+// runCLIEnv is runCLIExit with extra environment entries. A nil env keeps
+// cmd.Env nil, which is when exec sets the child's PWD from cmd.Dir; an
+// explicit env has to carry that itself.
 func (s *CmdGotestTestSuite) runCLIEnv(t *gotest.T, env []string, args ...string) (string, int) {
 	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = s.repoRoot
-	cmd.Env = append(withoutGitHubEnv(os.Environ()), env...)
+	if env != nil {
+		cmd.Env = append(append(os.Environ(), "PWD="+s.repoRoot), env...)
+	}
 	out, err := cmd.CombinedOutput()
 	var exitErr *exec.ExitError
 	gotest.True(t, err == nil || errors.As(err, &exitErr), "running gotest binary: %v\n%s", err, out)
@@ -1372,10 +1380,12 @@ func (s *CmdGotestTestSuite) TestBenchSubcommand(t *gotest.T) {
 }
 
 func (s *CmdGotestTestSuite) TestChildEnvironment(t *gotest.T) {
-	t.It("keeps the GitHub Actions variables away from spawned CLIs", func(it *gotest.T) {
-		env := []string{"PATH=/bin", "GITHUB_ACTIONS=true", "GITHUB_STEP_SUMMARY=/tmp/summary.md", "GITHUB_REPOSITORY=x/y"}
+	t.It("carries no GitHub Actions variables for spawned CLIs to inherit", func(it *gotest.T) {
+		_, actions := os.LookupEnv("GITHUB_ACTIONS")
+		_, summary := os.LookupEnv("GITHUB_STEP_SUMMARY")
 
-		gotest.Equal(it, []string{"PATH=/bin", "GITHUB_REPOSITORY=x/y"}, withoutGitHubEnv(env))
+		gotest.False(it, actions, "GITHUB_ACTIONS still set")
+		gotest.False(it, summary, "GITHUB_STEP_SUMMARY still set")
 	})
 }
 
@@ -1443,16 +1453,4 @@ func (s *CmdGotestTestSuite) TestBenchSaveAgainstGate(t *gotest.T) {
 		gotest.Contains(it, out, "1 suites, 1 benchmarks")
 		gotest.NotContains(it, out, "tests passed (")
 	})
-}
-
-// withoutGitHubEnv drops the GitHub Actions variables the CLI auto-arms on.
-func withoutGitHubEnv(env []string) []string {
-	kept := env[:0:0]
-	for _, kv := range env {
-		if strings.HasPrefix(kv, "GITHUB_ACTIONS=") || strings.HasPrefix(kv, "GITHUB_STEP_SUMMARY=") {
-			continue
-		}
-		kept = append(kept, kv)
-	}
-	return kept
 }
