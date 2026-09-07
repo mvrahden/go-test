@@ -254,6 +254,8 @@ The extension resolves the gotest CLI in this order:
 4. **`go.mod` pinned version** — If `go.mod` references the gotest module, uses `go run modulePath@version` with the pinned version.
 5. **`go run @latest`** — Fallback when none of the above apply.
 
+The pin is read from the workspace folder's own `go.mod`. A root that has only a `go.work` currently falls through to `@latest`, so open the module folder as the workspace folder. The `tool` directive (`go tool gotest`) is not used yet.
+
 ### Go binary resolution
 
 The extension resolves the Go toolchain per workspace folder:

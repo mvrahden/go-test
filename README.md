@@ -22,9 +22,20 @@ No third-party runtime dependencies. No reflection in discovery or registration.
 
 ## Install
 
+Add gotest to your module as a Go tool. Its version and its Go toolchain then follow your `go.mod`:
+
 ```bash
-go install github.com/mvrahden/go-test/cmd/gotest@latest
+go get -tool github.com/mvrahden/go-test/cmd/gotest@latest
+go tool gotest ./...
 ```
+
+`go get -tool` pins the CLI and the `pkg/gotest` runtime to the same release, and `go tool` rebuilds the CLI with the Go version your module declares. Upgrading is the same `go get -tool` command again.
+
+Do not install a standalone binary with `go install`. That binary is detached from your projects: it keeps the gotest version and the Go toolchain it was built with, and either one drifting from `go.mod` ends in compile errors inside generated code. If you need one anyway, keep it on the release your `go.mod` pins and rebuild it after every Go upgrade. gotest refuses to run against a pinned runtime older than v1.27.0.
+
+The examples below write `gotest …` for brevity. With the tool directive that is `go tool gotest …`, or `alias gotest='go tool gotest'`.
+
+The VS Code extension builds the CLI from the version your `go.mod` pins, so the same pin governs the editor. It does not run `go tool` yet, and it reads the pin only from the workspace folder's own `go.mod`: for a `go.work` root, open the module folder as the workspace folder.
 
 ## 30-Second Example
 
