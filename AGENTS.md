@@ -6,6 +6,9 @@ The generated code is not hand-edited.
 
 All assertions accept both `*gotest.T` and `*testing.T` as first argument.
 
+Run the CLI through Go's tool directive — `go get -tool github.com/mvrahden/go-test/cmd/gotest`, then `go tool gotest <args>` — so its version and its Go toolchain follow go.mod.
+Never `go install` a global binary or call one already on PATH; it drifts from the pin and from the module's Go version, and the CLI refuses to run on either drift.
+
 ## Rules
 
 These override any default instincts from stdlib `testing` or other Go test frameworks.
