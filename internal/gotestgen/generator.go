@@ -9,6 +9,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
+	"github.com/mvrahden/go-test/internal/goversion"
 	"github.com/mvrahden/go-test/internal/x/slices"
 	"golang.org/x/tools/go/packages"
 )
@@ -137,6 +138,9 @@ func loadPackages(mode packages.LoadMode, targetPkgs []string, buildFlags []stri
 	}
 	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
 	if err != nil {
+		return nil, nil, err
+	}
+	if err := goversion.Check(totalFoundPkgs); err != nil {
 		return nil, nil, err
 	}
 

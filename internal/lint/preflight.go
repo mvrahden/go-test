@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/goversion"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -21,12 +22,15 @@ func PreflightLoad(dir string, patterns []string) error {
 		Dir: dir,
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
 			packages.NeedImports | packages.NeedDeps | packages.NeedTypes |
-			packages.NeedSyntax | packages.NeedTypesInfo,
+			packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedModule,
 		Tests: true,
 	}
 	pkgs, err := packages.Load(cfg, patterns...)
 	if err != nil {
 		return fmt.Errorf("load packages: %w", err)
+	}
+	if err := goversion.Check(pkgs); err != nil {
+		return err
 	}
 
 	var broken []string
