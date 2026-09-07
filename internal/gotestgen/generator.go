@@ -258,6 +258,9 @@ func GenerateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFix
 }
 
 func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {
+	if err := CheckRuntimeVersion(loadResults); err != nil {
+		return nil, nil, err
+	}
 	sharedSeen := map[string]bool{}
 	var allSharedFixtures []SharedFixtureInfo
 

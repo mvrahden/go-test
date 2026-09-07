@@ -13,7 +13,9 @@ const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 // Raised to the release that introduced `spec --input --render-only`. The Spec
 // View passes that flag, so an older CLI would reject the invocation outright.
 // Treat this as a contract marker: bump it whenever the extension starts
-// depending on CLI behaviour that older versions do not have.
+// depending on CLI behaviour that older versions do not have. The CLI's
+// gotestgen.MinRuntimeVersion mirrors this value and a Go test keeps the two
+// equal, so bump both together.
 const MIN_CLI_VERSION = "v1.27.0";
 
 export interface CliCommand {
