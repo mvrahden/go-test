@@ -35,6 +35,15 @@ describe("compareVersions", () => {
     expect(compareVersions("v1.0.2", "v1.0.1")).toBeGreaterThan(0);
   });
 
+  it("orders a pseudo-version by its base version", () => {
+    // A commit pin such as v1.28.2-0.<timestamp>-<sha> sits after v1.28.1
+    // and must clear a v1.27.0 floor rather than parse as NaN.
+    const pseudo = "v1.28.2-0.20260901120000-abcdef012345";
+    expect(compareVersions(pseudo, "v1.27.0")).toBeGreaterThan(0);
+    expect(compareVersions(pseudo, "v1.28.1")).toBeGreaterThan(0);
+    expect(compareVersions("v1.27.0-rc.1+meta", "v1.27.0")).toBe(0);
+  });
+
   it("handles missing patch component", () => {
     expect(compareVersions("v1.0", "v1.0.0")).toBe(0);
     expect(compareVersions("v1.0", "v1.0.1")).toBeLessThan(0);

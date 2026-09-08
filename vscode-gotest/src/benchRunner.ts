@@ -195,11 +195,18 @@ export class BenchRunner {
     }
 
     const outDir = await mkdtemp(path.join(os.tmpdir(), "gotest-bench-prof-"));
-    const cmd = await buildCliCommand(
-      buildProfileArgs(target, kind, outDir),
-      workspaceDir,
-      this.outputChannel,
-    );
+    let cmd: CliCommand;
+    try {
+      cmd = await buildCliCommand(
+        buildProfileArgs(target, kind, outDir),
+        workspaceDir,
+        this.outputChannel,
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      vscode.window.showErrorMessage(`gotest bench: ${message}`);
+      return;
+    }
     this.outputChannel.info(`[bench] ${formatCliCommand(cmd)}`);
 
     const cts = new vscode.CancellationTokenSource();
@@ -320,11 +327,19 @@ export class BenchRunner {
     workspaceDir: string,
     extra: string[],
   ): Promise<{ ok: true; report: BenchReport } | { ok: false; error: string }> {
-    const cmd = await buildCliCommand(
-      ["bench", "./...", ...extra, "--json"],
-      workspaceDir,
-      this.outputChannel,
-    );
+    let cmd: CliCommand;
+    try {
+      cmd = await buildCliCommand(
+        ["bench", "./...", ...extra, "--json"],
+        workspaceDir,
+        this.outputChannel,
+      );
+    } catch (err: unknown) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
     this.outputChannel.info(`[bench] ${formatCliCommand(cmd)}`);
 
     const cts = new vscode.CancellationTokenSource();
@@ -392,7 +407,15 @@ export class BenchRunner {
         args.push(`-count=${target.count}`);
       }
       args.push("--json");
-      const cmd = await buildCliCommand(args, workspaceDir, this.outputChannel);
+      let cmd: CliCommand;
+      try {
+        cmd = await buildCliCommand(args, workspaceDir, this.outputChannel);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.outputChannel.error(`[bench] ${msg}`);
+        hooks.onError?.(target, msg);
+        continue;
+      }
       this.outputChannel.info(`[bench] ${formatCliCommand(cmd)}`);
 
       let report: BenchReport;

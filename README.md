@@ -22,9 +22,16 @@ No third-party runtime dependencies. No reflection in discovery or registration.
 
 ## Install
 
+Add gotest to your module as a Go tool. Its version and its Go toolchain then follow your `go.mod`:
+
 ```bash
-go install github.com/mvrahden/go-test/cmd/gotest@latest
+go get -tool github.com/mvrahden/go-test/cmd/gotest@latest
+go tool gotest ./...
 ```
+
+`go get -tool` pins the CLI and the `pkg/gotest` runtime to the same release, and `go tool` rebuilds the CLI with your module's Go. Upgrading is the same command again. Avoid a global `go install` binary: it drifts from `go.mod` on both axes, and gotest refuses to run on that drift.
+
+The examples below write `gotest` for brevity; with the tool directive, read `go tool gotest`. The VS Code extension and the GitHub action run the same CLI your `go.mod` selects.
 
 ## 30-Second Example
 
@@ -828,7 +835,7 @@ Use the official action for CI pipelines with failure summaries, inline PR annot
     min-coverage: 80
 ```
 
-By default (`version: gomod`), the action resolves `gotest` from your `go.mod` — no version drift between CI and local development. Set `version: latest` or a specific tag to install a standalone binary instead.
+By default (`version: gomod`), the action runs the `gotest` your `go.mod` selects (`go tool` when declared, else `go run -mod=mod`) — no version drift between CI and local development. Set `version: latest` or a specific tag to install a standalone binary instead.
 
 The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel.
 
@@ -852,7 +859,7 @@ The tables below are the canonical action surface — a drift guard test keeps t
 | `bench-baseline` | Baseline JSON file to compare benchmarks against (`--against`) |
 | `bench-gate` | Fail if any benchmark regresses by more than this percent (`--gate`) |
 | `bench-save` | Save the run as a JSON baseline at this path (`--save`); an explicit empty string saves to `bench.baseline` from `.gotest.yml`; default `false` saves nothing |
-| `version` | `gomod` (default) resolves from go.mod; a tag (e.g. `v1.0.0`, `latest`) installs globally |
+| `version` | `gomod` (default) runs the CLI from go.mod; a tag (e.g. `v1.0.0`, `latest`) installs globally |
 
 ### Outputs
 

@@ -6,6 +6,8 @@ The generated code is not hand-edited.
 
 All assertions accept both `*gotest.T` and `*testing.T` as first argument.
 
+Run the CLI as `go tool gotest <args>`, declared once with `go get -tool github.com/mvrahden/go-test/cmd/gotest@<the version go.mod already requires>` (unversioned `go get -tool` upgrades the pin). Never a global `go install` binary: it drifts from go.mod and the CLI refuses to run on drift.
+
 ## Rules
 
 These override any default instincts from stdlib `testing` or other Go test frameworks.

@@ -43,7 +43,7 @@ inputs:
     description: "Save the benchmark run as a JSON baseline at this path (gotest bench --save); an explicit empty string saves to bench.baseline from .gotest.yml"
     default: "false"
   version:
-    description: "gotest version: 'gomod' (default) resolves from go.mod, or a version tag (e.g. v1.0.0, latest) to install globally."
+    description: "gotest version: 'gomod' (default) runs the CLI from go.mod, or a version tag (e.g. v1.0.0, latest) to install globally."
     default: "gomod"
 
 outputs:
@@ -71,6 +71,26 @@ runs:
       shell: bash
       run: go install github.com/mvrahden/go-test/cmd/gotest@${{ inputs.version }}
 
+    - name: Resolve the gotest command
+      if: ${{ inputs.version == 'gomod' }}
+      shell: bash
+      run: |
+        # Bare `go run <pkg>` fails on a tidy consumer (the CLI's own deps are
+        # pruned from go.sum); -mod=mod lets this throwaway checkout add them,
+        # except in workspace mode, where the flag is rejected and the
+        # workspace go.sum is the union of its modules'.
+        pkg=github.com/mvrahden/go-test/cmd/gotest
+        notice="::notice title=gotest::go.mod does not declare the gotest tool; declare it with: go get -tool $pkg@<pinned version>"
+        if go tool 2>/dev/null | grep -q "($pkg)"; then
+          echo "GOTEST_CMD=go tool $pkg" >> "$GITHUB_ENV"
+        elif [ -n "$(go env GOWORK)" ]; then
+          go list -m 2>/dev/null | grep -qx github.com/mvrahden/go-test || echo "$notice"
+          echo "GOTEST_CMD=go run $pkg" >> "$GITHUB_ENV"
+        else
+          echo "$notice"
+          echo "GOTEST_CMD=go run -mod=mod $pkg" >> "$GITHUB_ENV"
+        fi
+
     - name: Run tests
       id: test
       shell: bash
@@ -87,7 +107,7 @@ runs:
         if [ "$INPUT_VERSION" != "gomod" ]; then
           cmd=(gotest)
         else
-          cmd=(go run github.com/mvrahden/go-test/cmd/gotest)
+          read -ra cmd <<< "$GOTEST_CMD"
         fi
 
         args=(summary --github)
@@ -260,7 +280,7 @@ runs:
         if [ "$INPUT_VERSION" != "gomod" ]; then
           cmd=(gotest)
         else
-          cmd=(go run github.com/mvrahden/go-test/cmd/gotest)
+          read -ra cmd <<< "$GOTEST_CMD"
         fi
 
         # gotest bench writes its own markdown to $GITHUB_STEP_SUMMARY

@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
+	"github.com/mvrahden/go-test/internal/goversion"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -90,13 +91,16 @@ func ParseTarget(target string) (pkgPattern, typeName string, err error) {
 // given type name. It works in non-test mode to access production types.
 func IntrospectType(pkgPattern, typeName string) (*TypeInfo, error) {
 	cfg := &packages.Config{
-		Mode:  packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps | packages.NeedFiles,
+		Mode:  packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps | packages.NeedFiles | packages.NeedModule,
 		Tests: false,
 	}
 
 	pkgs, err := packages.Load(cfg, pkgPattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load package %q: %w", pkgPattern, err)
+	}
+	if err := goversion.Check(pkgs); err != nil {
+		return nil, err
 	}
 
 	if len(pkgs) == 0 {
@@ -154,13 +158,16 @@ func IntrospectType(pkgPattern, typeName string) (*TypeInfo, error) {
 // from the specified file. It returns a FileInfo suitable for file-scoped scaffold generation.
 func IntrospectFile(pkgPattern, filename string) (*FileInfo, error) {
 	cfg := &packages.Config{
-		Mode:  packages.NeedName | packages.NeedTypes | packages.NeedSyntax | packages.NeedFiles,
+		Mode:  packages.NeedName | packages.NeedTypes | packages.NeedSyntax | packages.NeedFiles | packages.NeedModule,
 		Tests: false,
 	}
 
 	pkgs, err := packages.Load(cfg, pkgPattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load package %q: %w", pkgPattern, err)
+	}
+	if err := goversion.Check(pkgs); err != nil {
+		return nil, err
 	}
 
 	if len(pkgs) == 0 {

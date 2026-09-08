@@ -7,9 +7,23 @@ const {
   mockFileExists,
   mockResolveGoBinary,
   mockConfigValues,
+  mockConfigUpdate,
+  mockShowInformationMessage,
+  mockShowWarningMessage,
 } = vi.hoisted(() => ({
+  mockConfigUpdate: vi.fn(async () => undefined),
+  mockShowInformationMessage: vi.fn<
+    (message: string, ...items: string[]) => Promise<string | undefined>
+  >(async () => undefined),
+  mockShowWarningMessage: vi.fn<
+    (message: string, ...items: string[]) => Promise<string | undefined>
+  >(async () => undefined),
   mockExecFileAsync: vi.fn(
-    async (): Promise<{ stdout: string; stderr: string }> => ({
+    async (
+      _file: string,
+      _args: string[],
+      _opts?: unknown,
+    ): Promise<{ stdout: string; stderr: string }> => ({
       stdout: "",
       stderr: "",
     }),
@@ -17,7 +31,7 @@ const {
   mockReadFile: vi.fn(async (_path?: unknown): Promise<string> => {
     throw new Error("ENOENT");
   }),
-  mockFileExists: vi.fn(async () => false),
+  mockFileExists: vi.fn(async (_p: string) => false),
   mockResolveGoBinary: vi.fn(async () => "/usr/local/go/bin/go"),
   mockConfigValues: new Map<string, unknown>(),
 }));
@@ -30,11 +44,14 @@ vi.mock("vscode", () => ({
         (mockConfigValues.has(key)
           ? mockConfigValues.get(key)
           : defaultValue) as T | undefined,
+      update: mockConfigUpdate,
     })),
   },
   Uri: { file: (p: string) => ({ fsPath: p }) },
+  ConfigurationTarget: { WorkspaceFolder: 3 },
   window: {
-    showWarningMessage: vi.fn(async () => undefined),
+    showWarningMessage: mockShowWarningMessage,
+    showInformationMessage: mockShowInformationMessage,
     showErrorMessage: vi.fn(),
   },
 }));
@@ -56,14 +73,43 @@ vi.mock("node:child_process", async () => {
   return { execFile: execFileFn };
 });
 
-import { buildCliCommand } from "./cli.js";
+import {
+  buildCliCommand,
+  clearBinaryCache,
+  CliUnavailableError,
+} from "./cli.js";
 
 function setGoMod(dir: string, content: string) {
+  setFiles({ [path.join(dir, "go.mod")]: content });
+}
+
+// setFiles makes readFile answer for exactly these absolute paths. Both
+// sides are resolved so the fixtures read the same on Windows.
+function setFiles(files: Record<string, string>) {
+  const resolved = new Map(
+    Object.entries(files).map(([p, c]) => [path.resolve(p), c]),
+  );
   mockReadFile.mockImplementation(async (filePath: unknown) => {
-    if (filePath === path.join(dir, "go.mod")) return content;
+    const content = resolved.get(path.resolve(String(filePath)));
+    if (content !== undefined) return content;
     throw new Error("ENOENT");
   });
 }
+
+// flush lets the fire-and-forget prompt chains settle.
+async function flush() {
+  for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+}
+
+const PINNED = (version: string, extra: string[] = []) =>
+  [
+    "module github.com/myapp",
+    "go 1.25.0",
+    "require (",
+    `\tgithub.com/mvrahden/go-test ${version}`,
+    ")",
+    ...extra,
+  ].join("\n");
 
 const GOTEST_MODULE = "github.com/mvrahden/go-test/cmd/gotest";
 
@@ -75,6 +121,7 @@ describe("buildCliCommand", () => {
     mockFileExists.mockResolvedValue(false);
     mockResolveGoBinary.mockResolvedValue("/usr/local/go/bin/go");
     mockExecFileAsync.mockResolvedValue({ stdout: "", stderr: "" });
+    clearBinaryCache();
   });
 
   describe("step 1: cliPath override", () => {
@@ -430,21 +477,57 @@ describe("buildCliCommand", () => {
   });
 
   describe("version below minimum", () => {
-    it("falls through to fallback when pinned version is too old", async () => {
-      setGoMod(
-        "/workspace",
-        [
-          "module github.com/myapp",
-          "go 1.24.0",
-          "require (",
-          "\tgithub.com/mvrahden/go-test v1.0.0",
-          ")",
-        ].join("\n"),
+    it("refuses instead of substituting a newer CLI", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
+
+      await expect(buildCliCommand(["spec"], "/workspace")).rejects.toThrow(
+        CliUnavailableError,
       );
+      await expect(buildCliCommand(["spec"], "/workspace")).rejects.toThrow(
+        /v1\.0\.0.*v1\.27\.0/,
+      );
+      expect(mockExecFileAsync).not.toHaveBeenCalled();
+    });
 
-      const cmd = await buildCliCommand(["spec"], "/workspace");
+    it("shows the upgrade warning once per session", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
 
-      expect(cmd.args[1]).toBe(`${GOTEST_MODULE}@latest`);
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+
+      expect(mockShowWarningMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it("Upgrade declares the tool at latest in the module that pins", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await flush();
+
+      expect(mockExecFileAsync).toHaveBeenCalledWith(
+        "/usr/local/go/bin/go",
+        ["get", "-tool", `${GOTEST_MODULE}@latest`],
+        expect.objectContaining({ cwd: "/workspace" }),
+      );
+    });
+
+    it("Upgrade re-vendors a vendored module", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
+      mockFileExists.mockImplementation(
+        async (p: string) =>
+          p === path.join("/workspace", "vendor", "modules.txt"),
+      );
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await flush();
+
+      const calls = mockExecFileAsync.mock.calls.map((c) => c[1]);
+      expect(calls).toEqual([
+        ["get", "-tool", `${GOTEST_MODULE}@latest`],
+        ["mod", "vendor"],
+      ]);
     });
   });
 
@@ -510,6 +593,259 @@ describe("buildCliCommand", () => {
 
       expect(cmd.args[1]).toBe(GOTEST_MODULE);
       expect(cmd.args).not.toContain(`${GOTEST_MODULE}@v1.27.0`);
+    });
+  });
+
+  describe("tool directive", () => {
+    it("runs go tool with the full package path when go.mod declares it", async () => {
+      setGoMod("/workspace", PINNED("v1.28.1", [`tool ${GOTEST_MODULE}`]));
+
+      const cmd = await buildCliCommand(["spec", "./..."], "/workspace");
+
+      expect(cmd).toEqual({
+        bin: "/usr/local/go/bin/go",
+        args: ["tool", GOTEST_MODULE, "spec", "./..."],
+      });
+    });
+
+    it("recognises the block form", async () => {
+      setGoMod(
+        "/workspace",
+        PINNED("v1.28.1", [
+          "tool (",
+          "\tgolang.org/x/tools/cmd/stringer",
+          `\t${GOTEST_MODULE}`,
+          ")",
+        ]),
+      );
+
+      const cmd = await buildCliCommand(["spec"], "/workspace");
+
+      expect(cmd.args.slice(0, 2)).toEqual(["tool", GOTEST_MODULE]);
+    });
+
+    it("ignores tool lines for other packages", async () => {
+      setGoMod(
+        "/workspace",
+        PINNED("v1.28.1", ["tool golang.org/x/tools/cmd/stringer"]),
+      );
+
+      const cmd = await buildCliCommand(["spec"], "/workspace");
+
+      expect(cmd.args.slice(0, 2)).toEqual(["run", `${GOTEST_MODULE}@v1.28.1`]);
+    });
+
+    it("uses the configured module path, so a fork resolves to its own tool", async () => {
+      const fork = "github.com/fork/go-test/cmd/gotest";
+      mockConfigValues.set("modulePath", fork);
+      setGoMod(
+        "/workspace",
+        [
+          "module github.com/myapp",
+          "go 1.25.0",
+          "require github.com/fork/go-test v1.28.1",
+          `tool ${fork}`,
+        ].join("\n"),
+      );
+
+      const cmd = await buildCliCommand(["spec"], "/workspace");
+
+      expect(cmd.args.slice(0, 2)).toEqual(["tool", fork]);
+    });
+
+    it("wins over a replace directive, which go tool honours natively", async () => {
+      setGoMod(
+        "/workspace",
+        PINNED("v0.0.0-00010101000000-000000000000", [
+          "replace github.com/mvrahden/go-test => ../go-test",
+          `tool ${GOTEST_MODULE}`,
+        ]),
+      );
+
+      const cmd = await buildCliCommand(["spec"], "/workspace");
+
+      expect(cmd.args.slice(0, 2)).toEqual(["tool", GOTEST_MODULE]);
+    });
+
+    it("still refuses a pin below the floor", async () => {
+      setGoMod("/workspace", PINNED("v1.26.0", [`tool ${GOTEST_MODULE}`]));
+
+      await expect(buildCliCommand(["spec"], "/workspace")).rejects.toThrow(
+        CliUnavailableError,
+      );
+    });
+
+    it("does not offer to add the directive when it is already declared", async () => {
+      setGoMod("/workspace", PINNED("v1.28.1", [`tool ${GOTEST_MODULE}`]));
+
+      await buildCliCommand(["spec"], "/workspace");
+      await flush();
+
+      expect(mockShowInformationMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("go.work root", () => {
+    const work = "go 1.25.0\n\nuse (\n\t./a\n\t./b\n)\n";
+
+    it("pins the workspace's selected version, the max over use modules", async () => {
+      setFiles({
+        "/workspace/go.work": work,
+        "/workspace/a/go.mod": PINNED("v1.28.0"),
+        "/workspace/b/go.mod": PINNED("v1.28.1"),
+      });
+
+      const cmd = await buildCliCommand(["spec"], "/workspace");
+
+      expect(cmd.args.slice(0, 2)).toEqual(["run", `${GOTEST_MODULE}@v1.28.1`]);
+    });
+
+    it("runs go tool when any use module declares the directive", async () => {
+      setFiles({
+        "/workspace/go.work": work,
+        "/workspace/a/go.mod": PINNED("v1.28.0"),
+        "/workspace/b/go.mod": PINNED("v1.28.1", [`tool ${GOTEST_MODULE}`]),
+      });
+
+      const cmd = await buildCliCommand(["spec"], "/workspace");
+
+      expect(cmd.args.slice(0, 2)).toEqual(["tool", GOTEST_MODULE]);
+    });
+
+    it("accepts single-line use directives and a dot entry", async () => {
+      setFiles({
+        "/workspace/go.work": "go 1.25.0\n\nuse .\nuse ./lib\n",
+        "/workspace/go.mod": "module github.com/myapp\n\ngo 1.25.0\n",
+        "/workspace/lib/go.mod": PINNED("v1.28.1"),
+      });
+
+      const cmd = await buildCliCommand(["spec"], "/workspace");
+
+      expect(cmd.args.slice(0, 2)).toEqual(["run", `${GOTEST_MODULE}@v1.28.1`]);
+    });
+
+    it("refuses when the workspace selects a version below the floor", async () => {
+      setFiles({
+        "/workspace/go.work": work,
+        "/workspace/a/go.mod": PINNED("v1.25.0"),
+        "/workspace/b/go.mod": PINNED("v1.26.0"),
+      });
+
+      await expect(buildCliCommand(["spec"], "/workspace")).rejects.toThrow(
+        /v1\.26\.0/,
+      );
+    });
+
+    it("keeps the bootstrap fallback when no use module requires gotest", async () => {
+      setFiles({
+        "/workspace/go.work": work,
+        "/workspace/a/go.mod": "module github.com/a\n\ngo 1.25.0\n",
+        "/workspace/b/go.mod": "module github.com/b\n\ngo 1.25.0\n",
+      });
+
+      const cmd = await buildCliCommand(["spec"], "/workspace");
+
+      expect(cmd.args[1]).toBe(`${GOTEST_MODULE}@latest`);
+    });
+
+    it("Upgrade runs in every use module that pins gotest", async () => {
+      setFiles({
+        "/workspace/go.work": work,
+        "/workspace/a/go.mod": PINNED("v1.25.0"),
+        "/workspace/b/go.mod": "module github.com/b\n\ngo 1.25.0\n",
+      });
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await flush();
+
+      expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
+      expect(mockExecFileAsync).toHaveBeenCalledWith(
+        "/usr/local/go/bin/go",
+        ["get", "-tool", `${GOTEST_MODULE}@latest`],
+        expect.objectContaining({ cwd: path.resolve("/workspace", "a") }),
+      );
+    });
+  });
+
+  describe("tool directive suggestion", () => {
+    it("offers once per root when the pin is usable but no directive exists", async () => {
+      setGoMod("/workspace", PINNED("v1.28.1"));
+
+      await buildCliCommand(["spec"], "/workspace");
+      await buildCliCommand(["discover"], "/workspace");
+      await flush();
+
+      expect(mockShowInformationMessage).toHaveBeenCalledTimes(1);
+      expect(mockShowInformationMessage.mock.calls[0][0]).toMatch(
+        /go get -tool/,
+      );
+    });
+
+    it("adds the directive at the pinned version, never at latest", async () => {
+      setGoMod("/workspace", PINNED("v1.28.1"));
+      mockShowInformationMessage.mockResolvedValue("Add to go.mod");
+
+      await buildCliCommand(["spec"], "/workspace");
+      await flush();
+
+      expect(mockExecFileAsync).toHaveBeenCalledWith(
+        "/usr/local/go/bin/go",
+        ["get", "-tool", `${GOTEST_MODULE}@v1.28.1`],
+        expect.objectContaining({ cwd: "/workspace" }),
+      );
+    });
+
+    it("stays silent in a vendored module", async () => {
+      setGoMod("/workspace", PINNED("v1.28.1"));
+      mockFileExists.mockImplementation(
+        async (p: string) =>
+          p === path.join("/workspace", "vendor", "modules.txt"),
+      );
+
+      await buildCliCommand(["spec"], "/workspace");
+      await flush();
+
+      expect(mockShowInformationMessage).not.toHaveBeenCalled();
+    });
+
+    it("stays silent when the setting is off", async () => {
+      mockConfigValues.set("suggestToolDirective", false);
+      setGoMod("/workspace", PINNED("v1.28.1"));
+
+      await buildCliCommand(["spec"], "/workspace");
+      await flush();
+
+      expect(mockShowInformationMessage).not.toHaveBeenCalled();
+    });
+
+    it("Don't ask again turns the setting off for the folder", async () => {
+      setGoMod("/workspace", PINNED("v1.28.1"));
+      mockShowInformationMessage.mockResolvedValue("Don't ask again");
+
+      await buildCliCommand(["spec"], "/workspace");
+      await flush();
+
+      expect(mockConfigUpdate).toHaveBeenCalledWith(
+        "suggestToolDirective",
+        false,
+        3,
+      );
+      expect(mockExecFileAsync).not.toHaveBeenCalled();
+    });
+
+    it("does not offer when a replace directive is in play", async () => {
+      setGoMod(
+        "/workspace",
+        PINNED("v1.28.1", [
+          "replace github.com/mvrahden/go-test => ../go-test",
+        ]),
+      );
+
+      await buildCliCommand(["spec"], "/workspace");
+      await flush();
+
+      expect(mockShowInformationMessage).not.toHaveBeenCalled();
     });
   });
 });

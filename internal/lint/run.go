@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/mvrahden/go-test/internal/goversion"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/checker"
 	"golang.org/x/tools/go/packages"
@@ -31,12 +32,15 @@ type Finding struct {
 func Run(dir string, patterns []string) ([]Finding, error) {
 	cfg := &packages.Config{
 		Dir:   dir,
-		Mode:  packages.LoadAllSyntax,
+		Mode:  packages.LoadAllSyntax | packages.NeedModule,
 		Tests: true,
 	}
 	pkgs, err := packages.Load(cfg, patterns...)
 	if err != nil {
 		return nil, fmt.Errorf("load packages: %w", err)
+	}
+	if err := goversion.Check(pkgs); err != nil {
+		return nil, err
 	}
 	for _, p := range pkgs {
 		if len(p.Errors) > 0 {

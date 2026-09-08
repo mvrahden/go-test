@@ -96,14 +96,30 @@ The repo has the *library*; the CLI runs via Go's tool directive (requires
 Go ≥ 1.25). One-time:
 
 ```sh
-go get -tool github.com/mvrahden/go-test/cmd/gotest
+go get -tool github.com/mvrahden/go-test/cmd/gotest@$(go list -m -f '{{.Version}}' github.com/mvrahden/go-test)
 go tool gotest version
 ```
 
-Then every command is `go tool gotest <args>`. Never `go install` a global
-binary — it goes stale against the pinned library version. (Bare
+Keep the `@version`: without it `go get -tool` upgrades the library pin,
+which setup must never do (`@latest` only in a project with no pin yet). In
+a vendored module (`vendor/modules.txt`) the go.mod edit breaks every build
+until `go mod vendor` reruns, and gotest cannot run vendored at all (the
+overlay's `pkg/gotestruntime` import is never vendored) — report, do not
+work around.
+
+Then every command is `go tool gotest <args>`; if Go reports the short name
+ambiguous, use `go tool github.com/mvrahden/go-test/cmd/gotest`. Never a
+global `go install` binary: it drifts from the pin and from the module's Go,
+and releases after v1.28.1 refuse to run on either drift (`FAIL:` naming the
+version or the Go it was built with, exit 2). That refusal is never a fault
+in the tests; switch to `go tool gotest` instead of bumping the pin. (Bare
 `go run github.com/mvrahden/go-test/cmd/gotest` fails on fresh consumers:
 module pruning leaves the CLI's deps out of go.sum.)
+
+In a `go.work` workspace the tool declared in any `use` module works from
+the root and inside each module, at the highest pin. `./...` is rejected at
+the root, so name each module (`go tool gotest ./svc/... ./lib/...`) or run
+inside one. The `go.work` go line must be at least the modules' go lines.
 
 ## The Two Runners — a complete run is BOTH commands
 

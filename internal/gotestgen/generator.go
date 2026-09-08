@@ -9,6 +9,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
+	"github.com/mvrahden/go-test/internal/goversion"
 	"github.com/mvrahden/go-test/internal/x/slices"
 	"golang.org/x/tools/go/packages"
 )
@@ -139,6 +140,9 @@ func loadPackages(mode packages.LoadMode, targetPkgs []string, buildFlags []stri
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := goversion.Check(totalFoundPkgs); err != nil {
+		return nil, nil, err
+	}
 
 	brokenByPath := map[string]*BrokenPackage{}
 	brokenMsgSeen := map[string]map[string]bool{}
@@ -258,6 +262,9 @@ func GenerateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFix
 }
 
 func generateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {
+	if err := CheckRuntimeVersion(loadResults); err != nil {
+		return nil, nil, err
+	}
 	sharedSeen := map[string]bool{}
 	var allSharedFixtures []SharedFixtureInfo
 
