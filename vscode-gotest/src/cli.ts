@@ -1,10 +1,16 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { resolveGoBinary, fileExists, clearGoBinaryCache } from "./goBinary.js";
-import { readModulePath } from "./gomod.js";
+import {
+  hasReplaceDirective,
+  parseToolDirectives,
+  readModulePath,
+  readModuleRoots,
+  requireVersion,
+  type ModuleRoot,
+} from "./gomod.js";
 
 export { resolveGoBinary } from "./goBinary.js";
 
@@ -13,9 +19,8 @@ const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 // Raised to the release that introduced `spec --input --render-only`. The Spec
 // View passes that flag, so an older CLI would reject the invocation outright.
 // Treat this as a contract marker: bump it whenever the extension starts
-// depending on CLI behaviour that older versions do not have. The CLI's
-// gotestgen.MinRuntimeVersion mirrors this value and a Go test keeps the two
-// equal, so bump both together.
+// depending on CLI behaviour that older versions do not have. Equals the
+// CLI's gotestgen.MinRuntimeVersion; a Go test keeps them in step.
 const MIN_CLI_VERSION = "v1.27.0";
 
 export interface CliCommand {
@@ -102,51 +107,90 @@ export async function buildCliCommand(
     }
   }
 
-  // 3. Replace directive → go run without version (respects go.mod resolution)
-  //
-  // Checked before the version gate on purpose. A replace directive redirects
-  // the module to local source, and the require version beside it is
-  // conventionally a placeholder (v0.0.0-00010101000000-000000000000) that says
-  // nothing about the code that will actually run. Gating on it rejects the
-  // developer's own working tree and silently downloads a release instead.
-  if (effectiveDir && !modulePath.includes("@")) {
-    if (await hasReplaceDirective(effectiveDir, modulePath)) {
+  // 3. Module roots: the go.work `use` modules, else the folder's go.mod.
+  // A workspace builds from one list: the highest pin wins and a tool
+  // declared by any module is available at the root.
+  const roots =
+    effectiveDir && !modulePath.includes("@")
+      ? await readModuleRoots(effectiveDir)
+      : [];
+  const pinned = roots
+    .map((root) => ({ root, version: requireVersion(root.goMod, modulePath) }))
+    .filter((p): p is { root: ModuleRoot; version: string } => !!p.version);
+  const pin = pinned
+    .map((p) => p.version)
+    .sort(compareVersions)
+    .at(-1);
+  const replaced = roots.some((r) => hasReplaceDirective(r.goMod, modulePath));
+  const toolDeclared = roots.some((r) =>
+    parseToolDirectives(r.goMod).includes(modulePath),
+  );
+
+  // 4. Tool directive → go tool <package path>. Go builds it from the
+  // module's own build list, so replace applies. The full path is deliberate:
+  // a short name is shadowed by built-in tools and can be ambiguous.
+  // Checked before the version gate because a replaced module's require
+  // version is a placeholder.
+  if (toolDeclared && (replaced || (pin && meetsFloor(pin)))) {
+    const goBin = await resolveGoBinary(log, workspaceDir);
+    log?.debug(`[cli] go.mod declares the tool: ${goBin} tool ${modulePath}`);
+    return { bin: goBin, args: ["tool", modulePath, ...subcommandArgs] };
+  }
+
+  // 5. Replace directive → go run without version. The require version
+  // beside a replace is a placeholder, so it is not gated.
+  if (replaced) {
+    const goBin = await resolveGoBinary(log, workspaceDir);
+    log?.debug(
+      `[cli] go.mod has replace directive: ${goBin} run ${modulePath}`,
+    );
+    return { bin: goBin, args: ["run", modulePath, ...subcommandArgs] };
+  }
+
+  // 6. Project-pinned version from go.mod
+  if (pin && effectiveDir) {
+    if (meetsFloor(pin)) {
       const goBin = await resolveGoBinary(log, workspaceDir);
-      log?.debug(
-        `[cli] go.mod has replace directive: ${goBin} run ${modulePath}`,
-      );
-      return {
-        bin: goBin,
-        args: ["run", modulePath, ...subcommandArgs],
-      };
+      const qualified = `${modulePath}@${pin}`;
+      log?.debug(`[cli] using go.mod: ${goBin} run ${qualified}`);
+      suggestToolDirective(effectiveDir, modulePath, pinned, log);
+      return { bin: goBin, args: ["run", qualified, ...subcommandArgs] };
     }
+    // Below the floor a newer CLI would generate code the pinned runtime
+    // cannot compile, so refuse rather than substitute one.
+    log?.warn(`[cli] go.mod pins ${pin}, requires >= ${MIN_CLI_VERSION}`);
+    showVersionWarning(
+      pin,
+      modulePath,
+      pinned.map((p) => p.root.dir),
+      log,
+    );
+    throw new CliUnavailableError(
+      `go.mod pins gotest ${pin}, but >= ${MIN_CLI_VERSION} is required. ` +
+        `Run: go get -tool ${modulePath}@latest`,
+    );
   }
 
-  // 4. Project-pinned version from go.mod
-  if (effectiveDir && !modulePath.includes("@")) {
-    const version = await extractVersionFromGoMod(effectiveDir, modulePath);
-    if (version !== "latest") {
-      if (compareVersions(version, MIN_CLI_VERSION) >= 0) {
-        const goBin = await resolveGoBinary(log, workspaceDir);
-        const qualified = `${modulePath}@${version}`;
-        log?.debug(`[cli] using go.mod: ${goBin} run ${qualified}`);
-        return {
-          bin: goBin,
-          args: ["run", qualified, ...subcommandArgs],
-        };
-      }
-      log?.warn(`[cli] go.mod pins ${version}, requires >= ${MIN_CLI_VERSION}`);
-      showVersionWarning(version, effectiveDir, log);
-    }
-  }
-
-  // 5. Fallback: go run @latest
+  // 7. Fallback: go run @latest, only when no module requires gotest yet
+  // (scaffold runs before a pin exists) or modulePath carries its own @version.
   const goBin = await resolveGoBinary(log, workspaceDir);
   const qualified = modulePath.includes("@")
     ? modulePath
     : `${modulePath}@latest`;
   log?.debug(`[cli] using fallback: ${goBin} run ${qualified}`);
   return { bin: goBin, args: ["run", qualified, ...subcommandArgs] };
+}
+
+// CliUnavailableError carries the user-facing fix when no CLI can run.
+export class CliUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CliUnavailableError";
+  }
+}
+
+function meetsFloor(version: string): boolean {
+  return compareVersions(version, MIN_CLI_VERSION) >= 0;
 }
 
 function resolveCliPath(cliPath: string, workspaceDir?: string): string {
@@ -165,7 +209,8 @@ function resolveCliPath(cliPath: string, workspaceDir?: string): string {
 
 function showVersionWarning(
   version: string,
-  effectiveDir: string,
+  modulePath: string,
+  pinnedDirs: string[],
   log?: vscode.LogOutputChannel,
 ): void {
   if (versionWarningShown) {
@@ -180,16 +225,17 @@ function showVersionWarning(
     .then(async (choice) => {
       if (choice !== "Upgrade") return;
       try {
-        const goBin = await resolveGoBinary(log, effectiveDir);
-        const args = ["get", `${DEFAULT_MODULE_PATH}@latest`];
-        log?.info(`[cli] upgrading: ${goBin} ${args.join(" ")}`);
-        await execFileAsync(goBin, args, {
-          cwd: effectiveDir,
-          timeout: 30_000,
-        });
+        // One go get per pinning module: a go.work root has no module.
+        for (const dir of pinnedDirs) {
+          await runGoInModule(
+            dir,
+            ["get", "-tool", `${modulePath}@latest`],
+            log,
+          );
+        }
         log?.info("[cli] upgrade complete");
         vscode.window.showInformationMessage(
-          "gotest: gotest dependency upgraded to latest.",
+          "gotest: dependency upgraded to latest and declared as a tool.",
         );
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -197,6 +243,84 @@ function showVersionWarning(
         vscode.window.showErrorMessage(`gotest: upgrade failed. ${msg}`);
       }
     });
+}
+
+// suggestedRoots: folders already offered the directive this session.
+const suggestedRoots = new Set<string>();
+
+// suggestToolDirective offers once per folder to declare the pinned CLI as a
+// tool, at the pinned version. Silent in vendored modules, where a go.mod
+// edit breaks every build until `go mod vendor` reruns.
+function suggestToolDirective(
+  effectiveDir: string,
+  modulePath: string,
+  pinned: { root: ModuleRoot; version: string }[],
+  log?: vscode.LogOutputChannel,
+): void {
+  if (suggestedRoots.has(effectiveDir)) return;
+  suggestedRoots.add(effectiveDir);
+  const config = scopedConfig(effectiveDir);
+  if (!config.get<boolean>("suggestToolDirective", true)) return;
+  void (async () => {
+    for (const p of pinned) {
+      if (await isVendored(p.root.dir)) return;
+    }
+    const first = pinned[0];
+    const choice = await vscode.window.showInformationMessage(
+      `gotest: declare the CLI as a tool so the editor runs it through Go's tool directive ` +
+        `(faster, offline, replace-aware): go get -tool ${modulePath}@${first.version}`,
+      "Add to go.mod",
+      "Not now",
+      "Don't ask again",
+    );
+    if (choice === "Don't ask again") {
+      await config.update(
+        "suggestToolDirective",
+        false,
+        vscode.ConfigurationTarget.WorkspaceFolder,
+      );
+      return;
+    }
+    if (choice !== "Add to go.mod") return;
+    try {
+      for (const p of pinned) {
+        await runGoInModule(
+          p.root.dir,
+          ["get", "-tool", `${modulePath}@${p.version}`],
+          log,
+        );
+      }
+      vscode.window.showInformationMessage(
+        "gotest: tool directive added; the editor now runs go tool gotest.",
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log?.error(`[cli] go get -tool failed: ${msg}`);
+      vscode.window.showErrorMessage(`gotest: adding the tool failed. ${msg}`);
+    }
+  })();
+}
+
+async function isVendored(dir: string): Promise<boolean> {
+  return fileExists(path.join(dir, "vendor", "modules.txt"));
+}
+
+// runGoInModule runs a go command in a module, re-vendoring when it vendors.
+async function runGoInModule(
+  dir: string,
+  args: string[],
+  log?: vscode.LogOutputChannel,
+): Promise<void> {
+  const goBin = await resolveGoBinary(log, dir);
+  log?.info(`[cli] ${goBin} ${args.join(" ")} (cwd ${dir})`);
+  await execFileAsync(goBin, args, { cwd: dir, timeout: 60_000 });
+  if (await isVendored(dir)) {
+    log?.info(`[cli] ${goBin} mod vendor (cwd ${dir})`);
+    await execFileAsync(goBin, ["mod", "vendor"], {
+      cwd: dir,
+      timeout: 60_000,
+    });
+  }
 }
 
 async function queryBinaryVersion(
@@ -221,69 +345,15 @@ async function queryBinaryVersion(
   return undefined;
 }
 
-async function hasReplaceDirective(
-  workspaceDir: string,
-  modulePath: string,
-): Promise<boolean> {
-  try {
-    const content = await readFile(path.join(workspaceDir, "go.mod"), "utf-8");
-    let candidate = modulePath;
-    while (candidate) {
-      const escaped = escapeRegExp(candidate);
-      if (
-        new RegExp(`^\\s*replace\\s+${escaped}(?:\\s|$)`, "m").test(content)
-      ) {
-        return true;
-      }
-      const entryPattern = new RegExp(`^\\s*${escaped}(?:\\s|$)`, "m");
-      for (const block of content.matchAll(/^\s*replace\s*\(([\s\S]*?)\)/gm)) {
-        if (entryPattern.test(block[1])) {
-          return true;
-        }
-      }
-      const lastSlash = candidate.lastIndexOf("/");
-      if (lastSlash <= 0) break;
-      candidate = candidate.substring(0, lastSlash);
-    }
-  } catch {
-    // go.mod not found
-  }
-  return false;
-}
-
-async function extractVersionFromGoMod(
-  workspaceDir: string,
-  modulePath: string,
-): Promise<string> {
-  try {
-    const goModPath = path.join(workspaceDir, "go.mod");
-    const content = await readFile(goModPath, "utf-8");
-
-    let candidate = modulePath;
-    while (candidate) {
-      const escaped = escapeRegExp(candidate);
-      const patterns = [
-        new RegExp(`^\\s*${escaped}\\s+(v[^\\s]+)`, "m"),
-        new RegExp(`^\\s*require\\s+${escaped}\\s+(v[^\\s]+)`, "m"),
-      ];
-      for (const pattern of patterns) {
-        const match = pattern.exec(content);
-        if (match) return match[1];
-      }
-      const lastSlash = candidate.lastIndexOf("/");
-      if (lastSlash <= 0) {
-        break;
-      }
-      candidate = candidate.substring(0, lastSlash);
-    }
-  } catch {
-    // go.mod not found or unreadable
-  }
-  return "latest";
-}
-
+// compareVersions orders by major.minor.patch; pre-release and build suffixes
+// are dropped so a pseudo-version sorts by its base version.
 export function compareVersions(a: string, b: string): number {
-  const parse = (v: string) => v.replace(/^v/, "").split(".").map(Number);
+  const parse = (v: string) =>
+    v
+      .replace(/^v/, "")
+      .replace(/[-+].*$/, "")
+      .split(".")
+      .map(Number);
   const pa = parse(a);
   const pb = parse(b);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
@@ -293,9 +363,7 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-export function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+export { escapeRegExp } from "./gomod.js";
 
 export function formatCliCommand(cmd: CliCommand): string {
   return `${cmd.bin} ${cmd.args.join(" ")}`;
@@ -329,6 +397,7 @@ export function scopedConfig(
 export function clearBinaryCache(): void {
   clearGoBinaryCache();
   versionWarningShown = false;
+  suggestedRoots.clear();
 }
 
 // stripGoRunExitEcho drops the "exit status N" line `go run` appends to stderr

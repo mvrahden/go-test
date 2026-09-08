@@ -35,7 +35,7 @@ The **Spec View** renders your test structure as a behavioral specification — 
 - **[Delve](https://github.com/go-delve/delve)** (for debugging only)
 
 The extension invokes the gotest CLI automatically — no separate install needed.
-It resolves the version from your `go.mod` and uses `go run` to execute it.
+It runs the CLI your `go.mod` selects: `go tool` when the tool directive is declared, otherwise `go run` at the pinned version.
 The CLI must be **v1.27.0 or newer**; older versions are rejected at activation.
 
 ### Install
@@ -199,7 +199,8 @@ These can be set in `.vscode/settings.json` per workspace folder:
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `gotest.cliPath` | `""` | Path to a gotest binary (overrides all other resolution) |
-| `gotest.modulePath` | `github.com/mvrahden/go-test/cmd/gotest` | Go module path for the gotest CLI |
+| `gotest.modulePath` | `github.com/mvrahden/go-test/cmd/gotest` | Package path of the gotest CLI |
+| `gotest.suggestToolDirective` | `true` | Offer once per folder to declare the pinned CLI as a tool in `go.mod` |
 | `gotest.buildTags` | `""` | Comma-separated Go build tags (e.g. `integration,e2e`) |
 | `gotest.testFlags` | `[]` | Additional flags passed to gotest (`--` prefixed) and `go test` (`-` prefixed) |
 | `gotest.buildFlags` | `[]` | Additional build flags passed to Delve |
@@ -246,24 +247,25 @@ These can be set in `.vscode/settings.json` per workspace folder:
 
 ### Gotest CLI resolution
 
-The extension resolves the gotest CLI in this order:
+The extension runs whatever `go.mod` selects, in this order:
 
 1. **`gotest.cliPath`** — Explicit path to a binary. Highest priority; version-validated against the minimum required version.
 2. **Workspace is gotest module** — If the workspace's `go.mod` declares the gotest module itself (development or `go.work` overlap), uses `go run ./cmd/gotest`.
-3. **`go.mod` + replace directive** — If `go.mod` has a `replace` directive for the gotest module, uses `go run modulePath` (no version, respects replace resolution).
-4. **`go.mod` pinned version** — If `go.mod` references the gotest module, uses `go run modulePath@version` with the pinned version.
-5. **`go run @latest`** — Fallback when none of the above apply.
+3. **Tool directive** — If `go.mod` declares the CLI as a tool (`go get -tool github.com/mvrahden/go-test/cmd/gotest@<version>`), uses `go tool <modulePath>`.
+4. **`go.mod` + replace directive** — If `go.mod` has a `replace` directive for the gotest module, uses `go run modulePath` (no version, respects replace resolution).
+5. **`go.mod` pinned version** — If `go.mod` requires gotest at v1.27.0 or newer, uses `go run modulePath@version`, and offers once to declare the tool at that version (`gotest.suggestToolDirective`; never in a vendored module).
+6. **Pinned below v1.27.0** — Refused with an **Upgrade** action; a newer CLI would generate code the pinned runtime cannot compile.
+7. **`go run @latest`** — Only when no module requires gotest yet, so `scaffold` can run before a pin exists.
 
-The pin is read from the workspace folder's own `go.mod`. A root that has only a `go.work` currently falls through to `@latest`, so open the module folder as the workspace folder. The `tool` directive (`go tool gotest`) is not used yet.
+In a `go.work` root every `use` module is read: a tool declared by any of them counts, and the pin is the highest across modules, which is what the workspace builds.
 
 ### Go binary resolution
 
-The extension resolves the Go toolchain per workspace folder:
+The extension finds one `go` and leaves the toolchain to Go: `go run` and `go tool` honour the module's `go` directive and pass their own `go` to the CLI.
 
-1. **`go.mod` go directive** — If `go.mod` declares `go 1.26.2`, the extension looks for `~/sdk/go1.26.2/bin/go` or `go1.26.2` on PATH.
-2. **`GOROOT`** — `$GOROOT/bin/go` if set.
-3. **Login shell** — Runs `bash -lc 'command -v go'` to find Go on the user's full PATH.
-4. **Common paths** — `/usr/local/go/bin/go`, `~/go/bin/go`, `/usr/bin/go`, `~/sdk/go*/bin/go`.
+1. **`GOROOT`** — `$GOROOT/bin/go` if set.
+2. **Login shell** — Runs `bash -lc 'command -v go'` to find Go on the user's full PATH.
+3. **Common paths** — `/usr/local/go/bin/go`, `~/go/bin/go`, `/usr/bin/go`, `~/sdk/go*/bin/go`.
 
 ## Requirements
 

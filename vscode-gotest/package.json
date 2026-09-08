@@ -161,13 +161,19 @@
           "type": "string",
           "default": "github.com/mvrahden/go-test/cmd/gotest",
           "scope": "resource",
-          "description": "Go module path for gotest CLI (used with 'go run')"
+          "description": "Package path of the gotest CLI ('go tool' when go.mod declares it, else 'go run' at the pinned version)"
         },
         "gotest.cliPath": {
           "type": "string",
           "default": "",
           "scope": "resource",
-          "description": "Override: path to a pre-installed gotest binary (bypasses 'go run')"
+          "description": "Override: path to a pre-installed gotest binary (bypasses go.mod resolution)"
+        },
+        "gotest.suggestToolDirective": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Offer once per folder to declare the pinned gotest CLI as a tool in go.mod"
         },
         "gotest.discoverOnSave": {
           "type": "boolean",

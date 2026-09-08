@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { readFile, readdir, access, constants } from "node:fs/promises";
+import { readdir, access, constants } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -22,60 +22,12 @@ export async function resolveGoBinary(
     return cached;
   }
 
-  // 1. Try project-specific Go version from go.mod
-  if (workspaceDir) {
-    const projectGo = await resolveProjectGoBinary(workspaceDir, log);
-    if (projectGo) {
-      goBinaryCache.set(cacheKey, projectGo);
-      return projectGo;
-    }
-  }
-
+  // The go directive is a minimum, not a choice; GOTOOLCHAIN satisfies it
+  // from whichever go runs `go run`/`go tool`.
   // 2. Generic detection
   const generic = await resolveGenericGoBinary(log);
   goBinaryCache.set(cacheKey, generic);
   return generic;
-}
-
-async function resolveProjectGoBinary(
-  workspaceDir: string,
-  log?: vscode.LogOutputChannel,
-): Promise<string | undefined> {
-  const goVersion = await readGoVersionFromMod(workspaceDir);
-  if (!goVersion) {
-    return undefined;
-  }
-
-  log?.debug(`[go] go.mod declares go ${goVersion}`);
-
-  const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-  const goBin = process.platform === "win32" ? "go.exe" : "go";
-  const sdkBin = path.join(home, "sdk", `go${goVersion}`, "bin", goBin);
-  if (await fileExists(sdkBin)) {
-    log?.debug(`[go] resolved go ${goVersion} via SDK: ${sdkBin}`);
-    return sdkBin;
-  }
-
-  // go1.26.2 on PATH (installed via `go install golang.org/dl/go1.26.2`)
-  // These can be wrapper stubs that fail when the SDK isn't downloaded,
-  // so validate before accepting.
-  const versionedName = `go${goVersion}`;
-  const shellVersioned = await whichFromShell(versionedName);
-  if (shellVersioned && (await validateBinary(shellVersioned))) {
-    log?.debug(`[go] resolved go ${goVersion} via shell: ${shellVersioned}`);
-    return shellVersioned;
-  }
-
-  const whichVersioned = await which(versionedName);
-  if (whichVersioned && (await validateBinary(whichVersioned))) {
-    log?.debug(`[go] resolved go ${goVersion} via PATH: ${whichVersioned}`);
-    return whichVersioned;
-  }
-
-  log?.debug(
-    `[go] go ${goVersion} not found, falling back to generic detection`,
-  );
-  return undefined;
 }
 
 async function resolveGenericGoBinary(
@@ -112,28 +64,6 @@ async function resolveGenericGoBinary(
 
   log?.warn("[go] could not resolve binary, using bare 'go'");
   return "go";
-}
-
-async function readGoVersionFromMod(
-  workspaceDir: string,
-): Promise<string | undefined> {
-  try {
-    const goModPath = path.join(workspaceDir, "go.mod");
-    const content = await readFile(goModPath, "utf-8");
-    const match = /^\s*go\s+(\d+\.\d+(?:\.\d+)?)\s*$/m.exec(content);
-    return match?.[1];
-  } catch {
-    return undefined;
-  }
-}
-
-async function validateBinary(bin: string): Promise<boolean> {
-  try {
-    await execFileAsync(bin, ["version"], { timeout: 5_000 });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export async function fileExists(p: string): Promise<boolean> {

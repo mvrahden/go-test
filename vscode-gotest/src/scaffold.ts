@@ -139,10 +139,9 @@ export async function executeScaffold(
     return;
   }
 
-  const cmd = await buildCliCommand(["scaffold", target], effectiveDir);
-  outputChannel.info(`[scaffold] ${formatCliCommand(cmd)}`);
-
   try {
+    const cmd = await buildCliCommand(["scaffold", target], effectiveDir);
+    outputChannel.info(`[scaffold] ${formatCliCommand(cmd)}`);
     const stdout = await captureStdout(cmd.bin, cmd.args, {
       cwd: effectiveDir,
     });
