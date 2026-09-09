@@ -155,7 +155,7 @@ func (s *FixtureWindowTestSuite) TestRealOverlayFiltering(t *gotest.T) {
 	gotest.NoError(t, err)
 	gotest.Empty(t, broken)
 
-	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, nil, false, true)
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, nil, false, true, false)
 	gotest.NoError(t, err)
 	s.cleanup = cleanup
 

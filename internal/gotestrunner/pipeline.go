@@ -84,6 +84,7 @@ type PipelineConfig struct {
 	OutputMode      RunMode
 	Bench           bool
 	BenchesByPkg    map[string][]string
+	FuzzFuncsByPkg  map[string]map[string][]string
 }
 
 type PipelineResult struct {
@@ -201,6 +202,13 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 
 	if cfg.Bench {
 		cfg.Streaming = false
+	}
+
+	// Only when seed corpora actually replay in this run: a stale entry is
+	// what would fail, and the engine's own error names the wrapper, not the
+	// field that moved.
+	if len(cfg.FuzzFuncsByPkg) > 0 {
+		ReportStaleFuzzCorpora(os.Stderr, overlay)
 	}
 
 	if cfg.Streaming {
@@ -383,7 +391,7 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		maxParallel = resolveMaxParallel(cfg, &runFlags, totalSuites, SanitizerActive(pf.BuildFlags))
 	} else {
 		maxParallel = resolveMaxParallel(cfg, &runFlags, totalSuites, SanitizerActive(pf.BuildFlags))
-		targets = BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, overlay.ExclusiveSuitesByPkg, runFlags, pf.UserRunFilter)
+		targets = BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.ExclusiveSuitesByPkg, runFlags, pf.UserRunFilter)
 	}
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
@@ -617,7 +625,7 @@ loop:
 
 		singleCompiled := []CompileResult{cr}
 		singleSuites := map[string][]string{cr.Package: overlay.SuitesByPkg[cr.Package]}
-		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter)
+		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter)
 
 		if len(targets) == 0 {
 			continue
