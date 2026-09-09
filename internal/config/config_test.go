@@ -25,6 +25,8 @@ lint:
 bench:
   baseline: bench-baseline.json
   gate: 10.5
+fuzz:
+  harvest: false
 `)
 
 	cfg, err := Load(dir)
@@ -42,6 +44,10 @@ bench:
 	assertSliceEqual(t, "lint.skip", cfg.Lint.Skip, []string{"stdlib-test", "testify"})
 	assertEqual(t, "bench.baseline", cfg.Bench.Baseline, "bench-baseline.json")
 	assertEqual(t, "bench.gate", cfg.Bench.Gate, 10.5)
+	if cfg.Fuzz.Harvest == nil || *cfg.Fuzz.Harvest {
+		t.Errorf("fuzz.harvest: got %v, want pointer to false", cfg.Fuzz.Harvest)
+	}
+	assertEqual(t, "fuzz.HarvestSeeds()", cfg.Fuzz.HarvestSeeds(), false)
 }
 
 func TestLoad_NoFile_ReturnsZero(t *testing.T) {
@@ -65,6 +71,10 @@ func TestLoad_NoFile_ReturnsZero(t *testing.T) {
 	}
 	assertEqual(t, "bench.baseline", cfg.Bench.Baseline, "")
 	assertEqual(t, "bench.gate", cfg.Bench.Gate, 0.0)
+	if cfg.Fuzz.Harvest != nil {
+		t.Errorf("fuzz.harvest: got %v, want nil", *cfg.Fuzz.Harvest)
+	}
+	assertEqual(t, "fuzz.HarvestSeeds()", cfg.Fuzz.HarvestSeeds(), true)
 }
 
 func TestLoad_PartialConfig(t *testing.T) {

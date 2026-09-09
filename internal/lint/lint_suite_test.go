@@ -35,6 +35,7 @@ var diagnosticFixtures = []string{
 	"withnolint_file",
 	"withsharedfixture",
 	"bench",
+	"fuzz",
 }
 
 // rewriteFixtures are the packages that additionally pin the rewrite a rule
@@ -80,13 +81,14 @@ func (s *LintTestSuite) TestTierPolicy(t *gotest.T) {
 			for _, rule := range []lint.Rule{
 				lint.StdlibTest, lint.Testify, lint.AssertionSimplify, lint.AssertionRedundant, lint.FailGuard, lint.TEscape,
 				lint.BenchFixtureIO, lint.BenchWait,
+				lint.FuzzNoOracle, lint.FuzzSeed, lint.FuzzHookIO, lint.FuzzRawSeed,
 			} {
 				gotest.NotZero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "missing skip flag for %s", rule)
 				gotest.True(it, lint.SkippableRules[rule], "rule %s should be skippable", rule)
 			}
 			for _, rule := range []lint.Rule{
 				lint.Focus, lint.PollScope, lint.TestSignature, lint.SuiteLifecycle,
-				lint.BenchLoop, lint.SharedFixtureUndeclared,
+				lint.BenchLoop, lint.FuzzDeterminism, lint.FuzzStructCorpus, lint.SharedFixtureUndeclared,
 			} {
 				gotest.Zero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "unexpected skip flag for %s", rule)
 				gotest.False(it, lint.SkippableRules[rule], "integrity rule %s must not be skippable", rule)
