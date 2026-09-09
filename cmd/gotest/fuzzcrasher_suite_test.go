@@ -54,7 +54,7 @@ func (s *FuzzCrasherLoopTestSuite) TestCrasherLoop(t *gotest.T) {
 			gotest.Contains(it, out, "1m0s each (~1m0s wall-clock, hard stop at 3m0s; --for defaulted to 1m0s, --for=0 removes the budget)")
 		})
 		w.It("names the new corpus file and the commands that act on it", func(it *gotest.T) {
-			gotest.Regexp(it, `\[`+target+`\] new crasher: .*`+regexpPath("testdata/fuzz/"+target)+`/`, out)
+			gotest.Regexp(it, `\[`+target+`\] new crasher: .*`+regexpPath("testdata/fuzz/"+target+"/"), out)
 			gotest.Contains(it, out, "gotest fuzz triage")
 			gotest.Contains(it, out, "gotest fuzz promote")
 		})
