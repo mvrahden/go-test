@@ -79,6 +79,11 @@ Sections tagged **v1.29+** need v1.29.0 or newer. What v1.29 adds:
    names alone (underscores become spaces, no connective), so a replay and
    a live run can spell one behavior two ways there; judge wording from a
    live `gotest spec` on those versions.
+4. **Fuzz targets on suites (rule 9)** — `Fuzz*` methods taking
+   `*gotest.F`, `gotest fuzz` with `triage`/`promote`, and the six `fuzz-*`
+   lint rules; see `reference/fuzzing.md`. Below v1.29 write no fuzz
+   targets at all: a stdlib `func FuzzX(*testing.F)` is invisible to gotest
+   on every version, and the suite form does not compile there.
 
 Exit codes on v1.25.x are weaker than they look — never treat a green
 gotest exit alone as proof there: a package failing to compile mid-run, a
@@ -237,6 +242,18 @@ parallel suites, or structural problems — those are your job, below.
    the redundant word and `lint -fix` drops it. Subtest *names* never
    carry the connective — `-run` filters and snapshot keys are unaffected.
 
+9. **Fuzz targets are suite methods, and they assert a property
+   (v1.29+).** `func (s *XTestSuite) FuzzParse(f *gotest.F)`: `f.Add`
+   typed seeds first, then `f.Fuzz(func(t *gotest.T, in …) { … })` whose
+   body asserts something the input must satisfy (round-trip, idempotence,
+   no panic is not enough — `fuzz-no-oracle`). Never a top-level
+   `func FuzzX(*testing.F)`: gotest ignores it on every version. Struct
+   and named-type arguments are fine and fan out per field; the refused
+   shapes and the crasher loop are in `reference/fuzzing.md`. Search with
+   `go tool gotest fuzz --for=30s ./...`; a crasher becomes a seed through
+   `gotest fuzz promote`, never a hand-committed corpus file for a struct
+   target.
+
 ## Restructuring existing suites (the blue phase)
 
 Enter only at a green pause point when: setup is duplicated across tests, a
@@ -300,3 +317,4 @@ func (s *CartTestSuite) TestTotalsItems(t *gotest.T) {
 - `reference/refactoring.md` — restructuring ladder, smells → moves
 - `reference/ci.md` — CI workflow shape, the gotest action, linter coexistence
 - `reference/migration.md` — testify/stdlib → gotest
+- `reference/fuzzing.md` — fuzz targets, seeds, struct arguments, the crasher loop

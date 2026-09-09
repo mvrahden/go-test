@@ -88,6 +88,48 @@ promote a new baseline by re-running `--save=` after accepting a change.
 In CI, prefer the action's `bench`/`bench-baseline`/`bench-gate`/
 `bench-save` inputs (see `ci.md`).
 
+## Fuzzing — `gotest fuzz` (v1.29+)
+
+Suite methods named `Fuzz*` (`func (s *X) FuzzParse(f *gotest.F)`) declare
+fuzz targets; inside, `f.Fuzz(func(t *gotest.T, in …) { … })` binds the
+callback — any number of arguments after the `*gotest.T`, checked when
+gotest generates. Plain `gotest ./...` already replays every
+`f.Add` seed and committed corpus entry as regular subtests — reach for
+the subcommand only to SPEND TIME SEARCHING for new inputs.
+`go test -fuzz` cannot see suite targets (generated wrappers need the
+overlay), so the orchestrator runs each `Fuzz<Suite>_<Method>` wrapper as
+its own `go test -fuzz` process:
+
+- `go tool gotest fuzz ./...` — fuzz every discovered target. Flags:
+  `--for=<dur>` splits an approximate wall-clock budget jobs-aware across
+  targets (default 1m; `--for=0` fuzzes
+  until interrupted; per-target share floors at 10s; the schedule prints
+  up front);
+  `--jobs=<n>` (default max(1, GOMAXPROCS/2)) bounds concurrent targets;
+  `--target=<FuzzSuite_Method>` fuzzes exactly one wrapper (unmatched
+  names error with the available list); `--no-harvest` disables
+  table-test seed harvesting for the run. `--for` is the session's only
+  clock — the deadline follows it — and `gotest fuzz` refuses `--timeout`.
+- Every session ends with one closing line (targets, execs, new
+  interesting inputs, crashers); under GitHub Actions it also lands in the
+  step summary as a per-target table.
+- `go tool gotest fuzz triage ./...` — re-run each on-disk crasher under
+  `testdata/fuzz/<Func>/`, print decoded input and cause; exit 1 while
+  any still fails.
+- `go tool gotest fuzz promote ./...` — splice each crasher into its
+  method as a permanent typed `f.Add(...)` seed and delete the file —
+  the durable form, especially for struct-typed targets whose corpus
+  files are bound to the type's field order (the `fuzz-struct-corpus`
+  lint rule flags them).
+
+Any non-native argument, in any position, fuzzes through a generated fan
+— one engine argument per leaf field. Write typed `f.Add` literals, never
+raw `[]byte` seeds (`fuzz-raw-seed`; a wrong-typed seed is rejected at
+`f.Fuzz`), keep
+targets deterministic (`fuzz-determinism`), give the callback a property
+to assert (`fuzz-no-oracle`), and keep per-execution hooks IO-free
+(`fuzz-hook-io`).
+
 Machine-readable capture, verified end-to-end:
 
 ```sh

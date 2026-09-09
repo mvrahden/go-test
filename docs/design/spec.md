@@ -120,6 +120,8 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `spec` | Run tests and render behavioral specification |
 | `summary` | Run tests and render a failure-focused summary (CI mode) |
 | `bench` | Run `BenchmarkX` suite methods serially via `go test -bench` |
+
+| `fuzz` | Orchestrate `FuzzX` suite targets with a shared time budget |
 | `lint` | Run gotest-specific linter checks |
 | `refactor` | Toggle focus prefixes: `refactor toggle-focus <file> <Suite[.Method]>` |
 | `discover` | Discover test suites and output JSON metadata |
@@ -141,7 +143,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--no-color` | Strip ANSI codes from terminal output |
 | `--min=<pct>` | Fail if coverage below threshold (enables `-coverprofile`) |
 | `--setup-timeout=<dur>` | Total budget for shared fixture setup (default: 2m; 0 disables) |
-| `--timeout=<dur>` | Global pipeline deadline (default: 15m; 0 disables) |
+| `--timeout=<dur>` | Global pipeline deadline (default: 15m; 0 disables); refused by `fuzz`, whose deadline follows `--for` |
 | `--debounce=<dur>` | Debounce interval for watch mode (default 200ms) |
 | `--parallel=<n>` | Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for -race/-msan/-asan) |
 | `--compile-parallel=<n>` | Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan) |
@@ -156,6 +158,12 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`) |
 | `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`) |
 | `--json` | Emit one versioned JSON report to stdout — results, deltas, gate verdict — instead of human output (`bench`; for tooling) |
+
+| `--for=<dur>` | Approximate wall-clock fuzz budget for the session, split jobs-aware across targets (`fuzz`; default 1m or half of a shorter `--timeout`; `0` removes the budget; per-target share floors at 10s) |
+| `--target=<name>` | Fuzz exactly one generated wrapper by name; unmatched names error with the available list (`fuzz`) |
+| `--jobs=<n>` | Max concurrent fuzz targets (`fuzz`; default: max(1, GOMAXPROCS/2)) |
+| `--no-harvest` | Disable table-test seed harvesting for this run |
+| `--fuzz` | Generate fuzz round-trip skeletons (`scaffold`) |
 
 ### Disambiguation
 
@@ -1350,6 +1358,9 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `shared-fixture-undeclared` | Suite-method reads of a `*SharedFixture` value the suite never declared as a pointer field (directly or through the fixture DAG) — window scheduling starts only declared fixtures, so the value may be absent; locally-constructed fixtures (fixture self-tests) are exempt |
 | `bench-loop` | `Benchmark*` suite methods that never touch `b.Loop()`/`b.N` — nothing iterates, so the numbers lie |
 
+| `fuzz-determinism` | Fuzz targets (one hop into same-package callees) reading nondeterministic state — `time.Now`, `math/rand{,/v2}`, `os.Getenv` — corpus replay and coverage guidance degrade |
+| `fuzz-struct-corpus` | On-disk corpus entries for a shape-bound fuzz target (struct, pointer, array, non-byte slice) — one value per leaf in field order, so a same-kind reorder silently reinterprets them and an added or removed field rejects them; `gotest fuzz promote` turns them into typed `f.Add` seeds |
+
 **Expressiveness** — the test is correct but says it worse. Suppressible per line or project-wide via `lint.skip`.
 
 | Rule ID | Detects |
@@ -1361,6 +1372,11 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `behavior-wording` | A `When` description that opens with "when", or an `It` description that opens with "it" — the spec renders the connective and the ✓ glyph plays "it", so the word is said twice; the fix drops it (whole word, any case except all capitals — `IT department…` is an acronym — space or underscore after it; a description that is only the word is left alone) |
 | `bench-fixture-io` | `Benchmark*` methods reading fixture-backed state inside the measured loop — times whatever backs the fixture, not the code under test (heuristic; hoist the read above the loop) |
 | `bench-wait` | `time.Sleep`/`gotest.Eventually`/`gotest.Consistently` inside the measured loop — times the wait, not the code |
+
+| `fuzz-no-oracle` | `f.Fuzz` callbacks that never use their `*gotest.T` — only panics are caught, which defeats property-based fuzzing |
+| `fuzz-seed` | Fuzz targets that never call `f.Add` — coverage-guided exploration starts blind (table-test harvesting may still seed them) |
+| `fuzz-hook-io` | IO-shaped calls (`net/*`, `os/exec`, `database/sql`, `time.Sleep`, filesystem `os` functions) in `BeforeEach`/`AfterEach` of fuzz-declaring suites — the hooks replay around every execution and throttle the fuzzer |
+| `fuzz-raw-seed` | Raw `[]byte` seeds on a fuzz position that does not take `[]byte` — seeds are target-directed, so `f.Fuzz` rejects them outright; write a typed literal instead |
 
 **Migration** — legitimate coexistence, nudged. Suppressible per line or project-wide via `lint.skip`.
 
