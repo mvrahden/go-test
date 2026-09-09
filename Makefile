@@ -35,6 +35,6 @@ fmt-check:
 	test -z "$$unformatted" || (echo "gofmt needed on:" && echo "$$unformatted" && exit 1)
 
 golangci-lint:
-	golangci-lint run ./... ./examples/...
+	golangci-lint run --allow-parallel-runners ./... ./examples/...
 
 checks: fmt-check vuln golangci-lint
