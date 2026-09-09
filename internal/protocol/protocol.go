@@ -8,7 +8,16 @@ const (
 	EnvUpdateSnapshots    = "GOTEST_UPDATE_SNAPSHOTS"
 	EnvCI                 = "GOTEST_CI"
 	EnvCacheDir           = "GOTEST_CACHE_DIR"
+
+	// EnvFuzzEchoInput makes the codec path report every execution's decoded
+	// input, not just failing ones. Set by triage/promote when re-running a
+	// single corpus entry, so a no-longer-failing crasher is still readable.
+	EnvFuzzEchoInput = "GOTEST_FUZZ_ECHO_INPUT"
 )
+
+// FuzzInputPrefix marks a line carrying the decoded input of a struct-typed
+// fuzz execution. The runtime emits it on failure; triage and promote scrape it.
+const FuzzInputPrefix = "ƒƒGOTEST_FUZZ_INPUT: "
 
 const (
 	SuffixFixture       = "Fixture"
