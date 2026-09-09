@@ -1025,7 +1025,7 @@ By default (`version: gomod`), the action runs the `gotest` your `go.mod` select
 
 The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel.
 
-With `fuzz: true`, a fuzz step runs after the tests (`gotest fuzz` over the same packages, for `fuzz-for` or the CLI's default minute): the session's per-target table lands in the step summary, a new crasher fails the step and its corpus file is left in the checkout, listed in the `fuzz-crashers` output for an `upload-artifact` step or a `gotest fuzz promote` follow-up. Seed replay needs no such step, since every ordinary run already replays seeds. A job that restores the Go build cache between runs (as `actions/setup-go` does by default) also restores the fuzz cache inside it, so each session resumes where the last one stopped and a short budget accumulates across runs.
+With `fuzz: true`, a fuzz step runs after the tests (`gotest fuzz` over the same packages, for `fuzz-for` or the CLI's default minute): the session's per-target table lands in the step summary, a new crasher fails the step and its corpus file is left in the checkout, listed in the `fuzz-crashers` output for an `upload-artifact` step or a `gotest fuzz promote` follow-up. Seed replay needs no such step, since every ordinary run already replays seeds. The step also carries Go's fuzz cache between runs: it restores the latest corpus of the branch or its base and saves this run's under its own key, so a short budget compounds into a deeper search over time, main's corpus feeds every pull request, and no pull request pollutes main. `fuzz-cache: false` runs from the seeds alone. (The build cache `actions/setup-go` keeps is not enough for this: it is keyed on go.sum and never re-saved on a hit, so a corpus would only survive a dependency bump.)
 
 With `bench: true`, a benchmark step runs after the tests (`gotest bench --spec --json`): the step summary gets the benchmark count, a per-package results table (ns/op, B/op, allocs/op), the delta table when a baseline was compared, and the gate verdict when one was set; the versioned JSON report lands in a temp file exposed as the `bench-report` output, and a breached gate fails the step with the offending keys in `bench-breached-keys`.
 
@@ -1049,6 +1049,7 @@ The tables below are the canonical action surface — a drift guard test keeps t
 | `bench-save` | Save the run as a JSON baseline at this path (`--save`); an explicit empty string saves to `bench.baseline` from `.gotest.yml`; default `false` saves nothing |
 | `fuzz` | Run a budgeted fuzz session after tests via `gotest fuzz --for`; a new crasher fails the step (default `false`) |
 | `fuzz-for` | Approximate wall-clock budget for the whole fuzz session (default: the CLI's own, one minute) |
+| `fuzz-cache` | Carry Go's fuzz cache between runs so each session resumes where the last stopped; `false` for a from-seeds run (default `true`) |
 | `version` | `gomod` (default) runs the CLI from go.mod; a tag (e.g. `v1.0.0`, `latest`) installs globally |
 
 ### Outputs

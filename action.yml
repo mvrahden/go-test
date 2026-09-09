@@ -48,6 +48,9 @@ inputs:
   fuzz-for:
     description: "Approximate wall-clock budget for the whole fuzz session (gotest fuzz --for); empty uses the CLI's default of one minute"
     default: ""
+  fuzz-cache:
+    description: "Carry Go's fuzz cache (the inputs a session found interesting) between runs, so each session resumes where the last one stopped; set to false for a from-seeds run"
+    default: "true"
   version:
     description: "gotest version: 'gomod' (default) runs the CLI from go.mod, or a version tag (e.g. v1.0.0, latest) to install globally."
     default: "gomod"
@@ -340,6 +343,25 @@ runs:
 
         exit "$exit_code"
 
+    # Go keeps the inputs a session found interesting in its build cache.
+    # setup-go's cache is keyed on go.sum and never re-saved on a hit, so a
+    # corpus would only survive a dependency bump; this pair restores the
+    # latest corpus of the branch or its base and saves this run's under a
+    # key of its own, so a short budget compounds across runs.
+    - name: Locate the Go fuzz cache
+      id: fuzz-cache-dir
+      if: ${{ inputs.fuzz == 'true' && inputs.fuzz-cache == 'true' }}
+      shell: bash
+      run: echo "dir=$(go env GOCACHE)/fuzz" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the fuzz cache
+      if: ${{ inputs.fuzz == 'true' && inputs.fuzz-cache == 'true' }}
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ steps.fuzz-cache-dir.outputs.dir }}
+        key: gotest-fuzz-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: gotest-fuzz-${{ runner.os }}-
+
     - name: Run fuzz session
       id: fuzz
       if: ${{ inputs.fuzz == 'true' }}
@@ -375,3 +397,10 @@ runs:
         echo "fuzz-crashers=$crashers" >> "$GITHUB_OUTPUT"
 
         exit "$exit_code"
+
+    - name: Save the fuzz cache
+      if: ${{ always() && inputs.fuzz == 'true' && inputs.fuzz-cache == 'true' }}
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ steps.fuzz-cache-dir.outputs.dir }}
+        key: gotest-fuzz-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
