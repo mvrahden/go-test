@@ -839,6 +839,8 @@ By default (`version: gomod`), the action runs the `gotest` your `go.mod` select
 
 The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel.
 
+With `fuzz: true`, a fuzz step runs after the tests (`gotest fuzz` over the same packages, for `fuzz-for` or the CLI's default minute): the session's per-target table lands in the step summary, a new crasher fails the step and its corpus file is left in the checkout, listed in the `fuzz-crashers` output for an `upload-artifact` step or a `gotest fuzz promote` follow-up. Seed replay needs no such step, since every ordinary run already replays seeds.
+
 With `bench: true`, a benchmark step runs after the tests (`gotest bench --spec --json`): the step summary gets the benchmark count, a per-package results table (ns/op, B/op, allocs/op), the delta table when a baseline was compared, and the gate verdict when one was set; the versioned JSON report lands in a temp file exposed as the `bench-report` output, and a breached gate fails the step with the offending keys in `bench-breached-keys`.
 
 ### Inputs
@@ -859,6 +861,8 @@ The tables below are the canonical action surface — a drift guard test keeps t
 | `bench-baseline` | Baseline JSON file to compare benchmarks against (`--against`) |
 | `bench-gate` | Fail if any benchmark regresses by more than this percent (`--gate`) |
 | `bench-save` | Save the run as a JSON baseline at this path (`--save`); an explicit empty string saves to `bench.baseline` from `.gotest.yml`; default `false` saves nothing |
+| `fuzz` | Run a budgeted fuzz session after tests via `gotest fuzz --for`; a new crasher fails the step (default `false`) |
+| `fuzz-for` | Approximate wall-clock budget for the whole fuzz session (default: the CLI's own, one minute) |
 | `version` | `gomod` (default) runs the CLI from go.mod; a tag (e.g. `v1.0.0`, `latest`) installs globally |
 
 ### Outputs
@@ -870,6 +874,7 @@ The tables below are the canonical action surface — a drift guard test keeps t
 | `badge` | Path of the rendered coverage badge SVG (empty unless badge is enabled and the tests ran) |
 | `bench-report` | Path to the `gotest bench --json` report file (empty if bench not enabled) |
 | `bench-breached-keys` | Comma-joined benchmark keys that breached the gate (empty if none or no gate) |
+| `fuzz-crashers` | Comma-joined workspace-relative paths of the corpus files the fuzz session added (empty if none or fuzz not enabled) |
 
 ### Coverage Badge
 
