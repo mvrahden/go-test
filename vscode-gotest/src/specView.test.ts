@@ -78,6 +78,62 @@ function suite(
   };
 }
 
+describe("specDataToReport with a fuzz target", () => {
+  const seed = (n: number) => ({
+    kind: "block",
+    name: `seed#${n - 1}`,
+    display: `seed #${n}`,
+    status: "pass",
+    duration: 0,
+    children: [],
+    output: [],
+    focused: false,
+    excluded: false,
+    external: false,
+  });
+  const data = {
+    packages: [
+      {
+        path: "example.com/pkg",
+        status: "pass",
+        duration: 0.1,
+        nodes: [
+          suite("Parser", [
+            leaf("parses", "pass", 0.05),
+            {
+              kind: "fuzz",
+              name: "FuzzRoundTrip",
+              display: "RoundTrip",
+              status: "pass",
+              duration: 0.01,
+              children: [seed(1), seed(2), seed(3)],
+              output: [],
+              focused: false,
+              excluded: false,
+              external: false,
+            } as never,
+          ]),
+        ],
+      },
+    ],
+    stats: {
+      suites: 1,
+      behaviors: 1,
+      tests: 0,
+      fuzzers: 1,
+      passed: 2,
+      failed: 0,
+      skipped: 0,
+    },
+  };
+
+  it("marks the target as FUZZ with its seed count, and counts it in the trailer", () => {
+    const report = specDataToReport(data as never, []);
+    expect(report).toContain("RoundTrip — FUZZ (3 seeds)");
+    expect(report).toContain("1 suites, 1 behaviors, 1 fuzz targets:");
+  });
+});
+
 describe("specDataToReport", () => {
   const data = {
     packages: [

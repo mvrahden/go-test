@@ -70,7 +70,7 @@ The tree itself is restored from disk on startup, so suites are browsable straig
 **Run** and **Debug** buttons appear inline above every suite and test method in `_test.go` files.
 Click to execute immediately.
 An **↻ Update Snapshots** lens additionally appears above methods that call `MatchSnapshot` (and their suite), re-running them with `--update-snapshots`.
-Benchmark methods get **Bench**, **5×**, and a persistent result annotation (see [Benchmarks](#benchmarks)).
+Benchmark methods get **Bench**, **5×**, and a persistent result annotation (see [Benchmarks](#benchmarks)); fuzz methods get **Fuzz** and **Debug Seeds** (see [Fuzzing](#fuzzing)).
 
 Package-level and file-level actions appear on the `package` declaration line:
 
@@ -148,6 +148,19 @@ by the CLI, never re-derived in the extension:
 Benchmarks are deliberate acts: there is no bench-on-save and watch mode
 never benchmarks.
 
+### Fuzzing
+
+Fuzz methods on suites get their own surfaces, built on the `gotest fuzz` CLI and its exit contract:
+
+- **▶ Fuzz** CodeLens on every `Fuzz*` method — pick a budget (30s, 5m, 30m, until stopped, or any Go duration) and the target fuzzes in a cancellable background session with live `execs/sec` progress. Nothing found ends quietly; time exhaustion is not a failure.
+- **Crasher notifications** — when the session finds a new crasher, choose **Show Decoded Input** (triage prints the typed Go literal, not corpus bytes), **Promote to Seed** (splices a typed `f.Add(...)` into the fuzz method and reveals the edit), or **Debug Crasher** (replays exactly that corpus entry under the debugger, suite lifecycle included).
+- **⚠ Promote N crashers** CodeLens — pending corpus entries surface right on the target until promoted.
+- **Debug Seeds** CodeLens — replay a target's whole seed corpus under the debugger.
+- **Test Explorer and Spec View** — fuzz targets appear under their suite in both, the Spec View as a property row beside the suite's examples, marked `FUZZ` with its seed count and counted as fuzz targets in the trailer; running one replays its seeds as ordinary subtests. Searching for *new* inputs is deliberately a CodeLens action, never an explorer run: fuzzing burns CPU on demand, not as a side effect.
+- **Suite runs replay seeds** — running a whole suite from the explorer includes its fuzz-seed replay, matching what `gotest ./...` does on the CLI.
+
+Watch mode deliberately never fuzzes: watch is fast, deterministic feedback; fuzzing is a budgeted stochastic search.
+
 ### Scaffold
 
 Generate test suite skeletons from existing code:
@@ -183,6 +196,10 @@ Projects using `go.work` are also supported.
 | Go Test: Save Bench Baseline | Save the workspace's benchmark results as a baseline |
 | Go Test: Compare vs Baseline | Compare current numbers against a saved baseline |
 | Go Test: Profile Benchmark (CPU/Mem) | Profile one benchmark and open `go tool pprof` |
+| Go Test: Fuzz Target | Start a budgeted fuzz session for one target |
+| Go Test: Debug Fuzz Seeds | Replay a fuzz target's seeds under the debugger |
+| Go Test: Triage Fuzz Crashers | Show decoded inputs for a package's crashers |
+| Go Test: Promote Fuzz Crashers | Turn crashers into typed `f.Add` seeds |
 | Go Test: Scaffold Suite | Generate a test suite from a target |
 | Go Test: Scaffold Target | Generate a test suite for a specific target |
 | Go Test: Update Snapshots | Re-run tests with `--update-snapshots` to rewrite `MatchSnapshot` baselines (also a run profile and a CodeLens on snapshot tests) |

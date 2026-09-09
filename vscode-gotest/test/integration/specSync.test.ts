@@ -35,6 +35,7 @@ vi.mock("vscode", async () => {
 });
 
 import { SpecViewPanel } from "../../src/specView.js";
+import { DiscoveryCache } from "../../src/discovery.js";
 import { createRecordingChannel } from "./vscodeStub.js";
 import { clearBinaryCache } from "../../src/cli.js";
 
@@ -175,6 +176,85 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     expect(html).toContain("expected 300, got 250");
     expect(html).toContain("1 passed");
     expect(html).toContain("1 failed");
+  });
+
+  it("renders a fuzz target as a property row under its suite", async () => {
+    const { panel, recorder } = newPanel();
+    await panel.show();
+    await panel.refresh(stream("fuzz"), "run");
+
+    const html = renderedHtml();
+    expect(html).toContain('class="node fuzz"');
+    expect(html).toContain("TrimIdempotent");
+    expect(html).toContain("drops surrounding spaces");
+    // The row is tagged as a property backed by seeds, and the trailer counts
+    // the target the way the CLI does.
+    expect(html).toContain('<span class="tag fuzz">FUZZ · 3 seeds</span>');
+    expect(html).toContain("1 fuzz targets");
+    expect(recorder.errors).toEqual([]);
+  });
+
+  it("links a fuzz target's row to its method, as it does for test methods", async () => {
+    // The location map is fed by discovery; the fuzz target sits beside the
+    // methods there and must reach the row the same way.
+    const cache = new DiscoveryCache();
+    const fuzzingDir = path.join(
+      extensionDir,
+      "testdata",
+      "fixtures",
+      "fuzzing",
+    );
+    const method = {
+      parallel: false,
+      focused: false,
+      excluded: false,
+      file: "suite_test.go",
+      col: 1,
+    };
+    cache.update(
+      [
+        {
+          importPath: "gotest.fixtures/fuzzing",
+          dir: fuzzingDir,
+          suites: [
+            {
+              name: "FuzzingTestSuite",
+              parallel: false,
+              focused: false,
+              excluded: false,
+              guarded: false,
+              file: "suite_test.go",
+              line: 11,
+              col: 6,
+              lifecycle: [],
+              fixtures: [],
+              methods: [{ ...method, name: "TestTrim", line: 13 }],
+              benchmarks: [],
+              fuzzers: [{ ...method, name: "FuzzTrimIdempotent", line: 19 }],
+            },
+          ],
+        } as never,
+      ],
+      true,
+      path.join(extensionDir, "testdata", "fixtures"),
+    );
+    const recorder = createRecordingChannel();
+    const panel = new SpecViewPanel(recorder.channel as never, cache);
+    await panel.show();
+    await panel.refresh(stream("fuzz"), "run");
+
+    const html = renderedHtml();
+    const fuzzRow = html.slice(
+      html.indexOf('class="node fuzz"'),
+      html.indexOf("</summary>", html.indexOf('class="node fuzz"')),
+    );
+    expect(fuzzRow).toContain('data-loc-line="19"');
+    expect(fuzzRow).toContain("fuzzing");
+    const methodRow = html.slice(
+      html.indexOf('class="node method"'),
+      html.indexOf("</summary>", html.indexOf('class="node method"')),
+    );
+    expect(methodRow).toContain('data-loc-line="13"');
   });
 
   it("renders a package that failed to build, which has no failing behaviour to speak for it", async () => {

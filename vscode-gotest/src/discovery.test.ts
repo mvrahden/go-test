@@ -493,6 +493,7 @@ describe("DiscoveryCache broken packages", () => {
       fixtures: [],
       methods: [],
       benchmarks: [],
+      fuzzers: [],
     };
   }
 

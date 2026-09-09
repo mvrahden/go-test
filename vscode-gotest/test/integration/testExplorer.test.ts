@@ -120,6 +120,14 @@ describe("discovery builds the Test Explorer tree", () => {
     ).toBeDefined();
   });
 
+  it("places a fuzz target beside the methods of its suite", () => {
+    const suite = `${pkg("fuzzing")}/FuzzingTestSuite`;
+    expect(controller.findItem(`${suite}/TestTrim`)).toBeDefined();
+    const fuzzer = controller.findItem(`${suite}/FuzzTrimIdempotent`);
+    expect(fuzzer).toBeDefined();
+    expect(fuzzer!.label).toBe("FuzzTrimIdempotent");
+  });
+
   it("marks a package that could not be loaded rather than dropping it", () => {
     // A broken package's suites are unknowable, not absent. Losing the item
     // would make the failure invisible in the tree.
@@ -158,6 +166,36 @@ describe("executeBatch maps events onto test items", () => {
     expect(passed).toContain(pkg("passing"));
     expect(passed.some((id) => id.endsWith("returns_their_sum"))).toBe(true);
     expect(passed.some((id) => id.endsWith("is_commutative"))).toBe(true);
+  });
+
+  it("replays a fuzz target's seeds as verdicts on its item", async () => {
+    const run = newRun();
+    const result = await executeBatch({
+      pkgInfos: [
+        {
+          importPath: pkg("fuzzing"),
+          items: itemsFor(pkg("fuzzing")) as never,
+          dir: path.join(fixturesDir, "fuzzing"),
+        },
+      ],
+      filter: undefined,
+      workspaceDir: fixturesDir,
+      testFlags: [],
+      run: run as never,
+      token: token as never,
+      controller,
+      outputChannel: createRecordingChannel().channel as never,
+      label: "test",
+    });
+
+    expect(result.stdout.length).toBeGreaterThan(0);
+    expect(run.verdictsMatching("failed")).toEqual([]);
+    const passed = run.verdictsMatching("passed");
+    expect(passed.some((id) => id.endsWith("drops_surrounding_spaces"))).toBe(
+      true,
+    );
+    // The generated wrapper's seed subtests land on the fuzz target's item.
+    expect(passed.some((id) => id.includes("FuzzTrimIdempotent"))).toBe(true);
   });
 
   it("fails only the behaviors that failed, leaving siblings passing", async () => {

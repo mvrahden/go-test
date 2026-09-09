@@ -1,0 +1,30 @@
+{"Time":"2026-09-09T11:17:03.900236871+02:00","Action":"run","Package":"gotest.fixtures/fuzzing","Test":"TestFuzzingTestSuite"}
+{"Time":"2026-09-09T11:17:03.900292126+02:00","Action":"output","Package":"gotest.fixtures/fuzzing","Test":"TestFuzzingTestSuite","Output":"=== RUN   TestFuzzingTestSuite\n","OutputType":"frame"}
+{"Time":"2026-09-09T11:17:03.900338454+02:00","Action":"run","Package":"gotest.fixtures/fuzzing","Test":"TestFuzzingTestSuite/TestTrim"}
+{"Time":"2026-09-09T11:17:03.900344084+02:00","Action":"output","Package":"gotest.fixtures/fuzzing","Test":"TestFuzzingTestSuite/TestTrim","Output":"=== RUN   TestFuzzingTestSuite/TestTrim\n","OutputType":"frame"}
+{"Time":"2026-09-09T11:17:03.90035247+02:00","Action":"run","Package":"gotest.fixtures/fuzzing","Test":"TestFuzzingTestSuite/TestTrim/drops_surrounding_spaces"}
+{"Time":"2026-09-09T11:17:03.900360586+02:00","Action":"output","Package":"gotest.fixtures/fuzzing","Test":"TestFuzzingTestSuite/TestTrim/drops_surrounding_spaces","Output":"=== RUN   TestFuzzingTestSuite/TestTrim/drops_surrounding_spaces\n","OutputType":"frame"}
+{"Time":"2026-09-09T11:17:03.900378911+02:00","Action":"output","Package":"gotest.fixtures/fuzzing","Test":"TestFuzzingTestSuite/TestTrim/drops_surrounding_spaces","Output":"--- PASS: TestFuzzingTestSuite/TestTrim/drops_surrounding_spaces (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-09-09T11:17:03.900381245+02:00","Action":"pass","Package":"gotest.fixtures/fuzzing","Test":"TestFuzzingTestSuite/TestTrim/drops_surrounding_spaces","Elapsed":0}
+{"Time":"2026-09-09T11:17:03.900390322+02:00","Action":"output","Package":"gotest.fixtures/fuzzing","Test":"TestFuzzingTestSuite/TestTrim","Output":"--- PASS: TestFuzzingTestSuite/TestTrim (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-09-09T11:17:03.900392576+02:00","Action":"pass","Package":"gotest.fixtures/fuzzing","Test":"TestFuzzingTestSuite/TestTrim","Elapsed":0}
+{"Time":"2026-09-09T11:17:03.90039476+02:00","Action":"output","Package":"gotest.fixtures/fuzzing","Test":"TestFuzzingTestSuite","Output":"--- PASS: TestFuzzingTestSuite (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-09-09T11:17:03.900396824+02:00","Action":"pass","Package":"gotest.fixtures/fuzzing","Test":"TestFuzzingTestSuite","Elapsed":0}
+{"Time":"2026-09-09T11:17:03.900398678+02:00","Action":"run","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent"}
+{"Time":"2026-09-09T11:17:03.900400371+02:00","Action":"output","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent","Output":"=== RUN   FuzzFuzzingTestSuite_FuzzTrimIdempotent\n","OutputType":"frame"}
+{"Time":"2026-09-09T11:17:03.900407624+02:00","Action":"run","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#0"}
+{"Time":"2026-09-09T11:17:03.900409329+02:00","Action":"output","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#0","Output":"=== RUN   FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#0\n","OutputType":"frame"}
+{"Time":"2026-09-09T11:17:03.900411533+02:00","Action":"output","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#0","Output":"--- PASS: FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#0 (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-09-09T11:17:03.900414889+02:00","Action":"pass","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#0","Elapsed":0}
+{"Time":"2026-09-09T11:17:03.900416682+02:00","Action":"run","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#1"}
+{"Time":"2026-09-09T11:17:03.900418356+02:00","Action":"output","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#1","Output":"=== RUN   FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#1\n","OutputType":"frame"}
+{"Time":"2026-09-09T11:17:03.90042055+02:00","Action":"output","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#1","Output":"--- PASS: FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#1 (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-09-09T11:17:03.900422533+02:00","Action":"pass","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#1","Elapsed":0}
+{"Time":"2026-09-09T11:17:03.900424317+02:00","Action":"run","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#2"}
+{"Time":"2026-09-09T11:17:03.90042598+02:00","Action":"output","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#2","Output":"=== RUN   FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#2\n","OutputType":"frame"}
+{"Time":"2026-09-09T11:17:03.900428114+02:00","Action":"output","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#2","Output":"--- PASS: FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#2 (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-09-09T11:17:03.900430829+02:00","Action":"pass","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent/seed#2","Elapsed":0}
+{"Time":"2026-09-09T11:17:03.900432853+02:00","Action":"output","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent","Output":"--- PASS: FuzzFuzzingTestSuite_FuzzTrimIdempotent (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-09-09T11:17:03.900434787+02:00","Action":"pass","Package":"gotest.fixtures/fuzzing","Test":"FuzzFuzzingTestSuite_FuzzTrimIdempotent","Elapsed":0}
+{"Action":"output","Output":"ok  \tgotest.fixtures/fuzzing\t0.050s\n","Package":"gotest.fixtures/fuzzing","Time":"2026-09-09T11:17:03.905563764+02:00"}
+{"Action":"pass","Elapsed":0.049577072,"Package":"gotest.fixtures/fuzzing","Time":"2026-09-09T11:17:03.905563764+02:00"}

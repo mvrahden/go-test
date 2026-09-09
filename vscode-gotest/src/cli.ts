@@ -387,6 +387,29 @@ export function buildBenchArgs(
   return ["bench", importPath, `-bench=${pattern}`];
 }
 
+// buildFuzzArgs constructs the `gotest fuzz` arguments for one target: the
+// generated wrapper is Fuzz<Suite>_<Method>, selected exactly via --target.
+// A budget becomes --for (approximate wall-clock; with one target it is
+// that target's -fuzztime). --timeout=0 always: the session is bounded by
+// its --for budget or by the user's cancel, and the CLI's default 15m
+// pipeline deadline must neither end an "until stopped" session behind the
+// user's back nor reject a long --for up front.
+export function buildFuzzArgs(
+  importPath: string,
+  suiteName: string,
+  methodName: string,
+  budget?: string,
+): string[] {
+  // --for is the session's only clock (the CLI refuses --timeout here);
+  // "until stopped" is its explicit opt-out, and cancellation the only end.
+  return [
+    "fuzz",
+    importPath,
+    `--target=Fuzz${suiteName}_${methodName}`,
+    budget ? `--for=${budget}` : "--for=0",
+  ];
+}
+
 export function scopedConfig(
   workspaceDir?: string,
 ): vscode.WorkspaceConfiguration {

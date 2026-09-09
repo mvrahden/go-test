@@ -119,6 +119,14 @@ const EXPECTED: Record<
   // gets in a workspace: the label the developer wrote, spoken in its
   // vocabulary, with `vocab` on the wire — and nothing on stderr while the
   // package loads.
+  // A fuzz target counts once in the stats and is a `fuzz` node under its
+  // suite; its seed rows are evidence, not behaviors.
+  fuzz: {
+    gatingExitCode: 0,
+    goRunEpilogue: "",
+    stats: { passed: 2, failed: 0, skipped: 0 },
+    packages: ["gotest.fixtures/fuzzing:pass"],
+  },
   "declared-source": {
     gatingExitCode: 0,
     goRunEpilogue: "",
