@@ -28,6 +28,9 @@ func RenderMarkdown(w io.Writer, packages []*Package, opts ...RenderOption) {
 	if stats.Benchmarks > 0 {
 		counts = append(counts, fmt.Sprintf("%d benchmarks", stats.Benchmarks))
 	}
+	if stats.Fuzzers > 0 {
+		counts = append(counts, fmt.Sprintf("%d fuzz targets", stats.Fuzzers))
+	}
 	if cfg.withoutVerdicts {
 		// "0 passed, 0 failed, 0 skipped" beside a document nothing ran reads
 		// as a run that lost its results, rather than as a specification.
@@ -132,8 +135,13 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 			renderMarkdownNode(w, c, headingLevel+1, bare)
 		}
 
-	case KindMethod, KindTest:
+	case KindMethod, KindTest, KindFuzz:
 		heading := strings.Repeat("#", headingLevel)
+		if n.Kind == KindFuzz && len(n.Children) == 0 {
+			// A declared target, or one that replayed nothing.
+			fmt.Fprintf(w, "%s %s (fuzz target)\n\n", heading, n.Display)
+			return
+		}
 		if len(n.Children) == 0 {
 			// A method whose every behavior is runtime-dependent has nothing to
 			// tabulate, but dropping it would delete a declared method from the

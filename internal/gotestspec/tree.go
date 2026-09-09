@@ -1,6 +1,7 @@
 package gotestspec
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
 	"sort"
@@ -34,7 +35,14 @@ const (
 	// KindBenchmark is appended at the end of the iota block to keep the
 	// numeric values of the existing kinds stable across serialized state.
 	KindBenchmark
+	// KindFuzz is a suite's fuzz target: a generated Fuzz<Suite>_<Method>
+	// wrapper re-homed under its suite, its seed replays as children.
+	KindFuzz
 )
+
+// fuzzWrapperRe matches a generated fuzz wrapper name and captures the
+// suite type and the method.
+var fuzzWrapperRe = regexp.MustCompile(`^Fuzz([A-Za-z0-9_]+TestSuite)_(.+)$`)
 
 // Vocab records which gotest call declared a subtest. Like the description, it
 // is a property of the source: `t.When(...)` is visible long before anything
@@ -181,6 +189,7 @@ type Stats struct {
 	Behaviors  int
 	Tests      int
 	Benchmarks int
+	Fuzzers    int
 	Passed     int
 	Failed     int
 	Skipped    int
@@ -264,8 +273,13 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 				continue
 			}
 			name := resolvedSegments[i]
-			// Strip #NN suffix from display for children of duplicate runs.
+			// Strip #NN suffix from display for children of duplicate runs —
+			// except under a fuzz wrapper, where seed#N is the engine's own
+			// numbering, not a duplicate.
 			cleanName := stripDuplicateSuffix(name)
+			if i == 1 && fuzzWrapperRe.MatchString(resolvedSegments[0]) {
+				cleanName = name
+			}
 			decl := cfg.decls.lookup(ev.Package, strings.Join(cleanSegments[:i+1], "/"))
 			n := &Node{
 				Name:        cleanName,
@@ -333,6 +347,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 	}
 
 	for _, pkg := range pkgs {
+		attachFuzzWrappers(pkg)
 		seen := map[string]int{}
 		for _, n := range pkg.Nodes {
 			classify(n, true)
@@ -518,6 +533,19 @@ func collectStats(n *Node, s *Stats, inStdlib bool) {
 		s.Benchmarks++
 		return
 	}
+	if n.Kind == KindFuzz {
+		// One verdict per target; its seeds are evidence, not behaviors.
+		s.Fuzzers++
+		switch n.Status {
+		case StatusPass:
+			s.Passed++
+		case StatusFail:
+			s.Failed++
+		case StatusSkip:
+			s.Skipped++
+		}
+		return
+	}
 	if n.Kind == KindSuite {
 		s.Suites++
 	}
@@ -553,6 +581,9 @@ func collectStats(n *Node, s *Stats, inStdlib bool) {
 }
 
 func classify(n *Node, topLevel bool) {
+	if n.Kind == KindFuzz {
+		return // shaped by attachFuzzWrappers, children included
+	}
 	name := n.Name
 
 	if topLevel {
@@ -850,3 +881,63 @@ func ClassifyRoots(nodes []*Node) {
 		classify(n, true)
 	}
 }
+
+// attachFuzzWrappers re-homes every generated Fuzz<Suite>_<Method> wrapper
+// under its suite: the wrapper is a top-level test only because Go's engine
+// needs one symbol per target, while the specification it belongs to is
+// the suite's. A suite that did not run (a -run filter, a fuzz-only
+// package) is synthesized so the target still has a home; its verdict is
+// its children's.
+func attachFuzzWrappers(pkg *Package) {
+	suites := map[string]*Node{}
+	for _, n := range pkg.Nodes {
+		if strings.HasSuffix(n.Name, protocol.SuffixTestSuite) && strings.HasPrefix(n.Name, "Test") && !n.duplicate {
+			suites[n.Name] = n
+		}
+	}
+	var kept []*Node
+	var synthesized []*Node
+	for _, n := range pkg.Nodes {
+		m := fuzzWrapperRe.FindStringSubmatch(n.Name)
+		if m == nil || n.duplicate {
+			kept = append(kept, n)
+			continue
+		}
+		suiteName := "Test" + m[1]
+		suite := suites[suiteName]
+		if suite == nil {
+			suite = &Node{Name: suiteName, Status: StatusPass, Start: n.Start, End: n.End}
+			suites[suiteName] = suite
+			synthesized = append(synthesized, suite)
+			kept = append(kept, suite)
+		}
+		if suite.synthesized() && n.Status == StatusFail {
+			suite.Status = StatusFail
+		}
+		n.Kind = KindFuzz
+		n.Name = m[2]
+		n.Display = strings.TrimPrefix(m[2], protocol.PrefixFuzz)
+		for _, c := range n.Children {
+			c.Kind = KindBlock
+			c.Display = c.Name
+			if rest, ok := strings.CutPrefix(c.Name, "seed#"); ok {
+				if i, err := strconv.Atoi(rest); err == nil {
+					c.Display = fmt.Sprintf("seed #%d", i+1)
+				}
+			}
+		}
+		suite.Children = append(suite.Children, n)
+	}
+	for _, suite := range synthesized {
+		for _, c := range suite.Children {
+			if c.Status == StatusFail {
+				suite.Status = StatusFail
+			}
+		}
+	}
+	pkg.Nodes = kept
+}
+
+// synthesized reports whether the node was created by attachFuzzWrappers
+// rather than by an event: it has no start time of its own.
+func (n *Node) synthesized() bool { return n.Start.IsZero() && n.Duration == 0 && len(n.Output) == 0 }

@@ -45,6 +45,7 @@ type jsonStats struct {
 	Behaviors  int `json:"behaviors"`
 	Tests      int `json:"tests"`
 	Benchmarks int `json:"benchmarks"`
+	Fuzzers    int `json:"fuzzers"`
 	Passed     int `json:"passed"`
 	Failed     int `json:"failed"`
 	Skipped    int `json:"skipped"`
@@ -151,6 +152,8 @@ func kindString(k NodeKind) string {
 		return "test"
 	case KindBenchmark:
 		return "benchmark"
+	case KindFuzz:
+		return "fuzz"
 	default:
 		return "unknown"
 	}
