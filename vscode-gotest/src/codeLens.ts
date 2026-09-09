@@ -216,10 +216,15 @@ export class GoTestCodeLensProvider
       for (const method of fileFuzzers) {
         const range = new vscode.Range(method.line - 1, 0, method.line - 1, 0);
 
-        // "Fuzz" starts a budgeted search; "Debug Seeds" replays the
-        // target's seed corpus under the debugger. Plain seed replay runs
-        // through the Test Explorer item, like any other test.
+        // "Run" replays the target's seeds as an ordinary test run, through
+        // the same explorer item a click in the tree would use; "Fuzz" starts
+        // a budgeted search; "Debug Seeds" replays the seeds under the debugger.
         lenses.push(
+          new vscode.CodeLens(range, {
+            title: "▶ Run",
+            command: "gotest.runTest",
+            arguments: [`${importPath}/${suite.name}/${method.name}`],
+          }),
           new vscode.CodeLens(range, {
             title: "▶ Fuzz",
             command: "gotest.runFuzz",
