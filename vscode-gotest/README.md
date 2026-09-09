@@ -152,6 +152,7 @@ never benchmarks.
 
 Fuzz methods on suites get their own surfaces, built on the `gotest fuzz` CLI and its exit contract:
 
+- **Fuzz run profile** in the Test Explorer's run dropdown, beside Bench — offered where fuzz targets are selected, it searches every selected target for the `gotest.fuzz.for` budget (the CLI's minute by default): one session per package when all of its targets are selected, one per target otherwise. A target passes with the session line, fails with its new crasher files named, and a cancelled search is skipped, not failed.
 - **▶ Run** CodeLens on every `Fuzz*` method replays its seeds as an ordinary test run, like a test method's Run.
 - **▶ Fuzz** CodeLens on every `Fuzz*` method — pick a budget (30s, 5m, 30m, until stopped, or any Go duration) and the target fuzzes in a cancellable background session with live `execs/sec` progress. Nothing found ends quietly; time exhaustion is not a failure.
 - **Crasher notifications** — when the session finds a new crasher, choose **Show Decoded Input** (triage prints the typed Go literal, not corpus bytes), **Promote to Seed** (splices a typed `f.Add(...)` into the fuzz method and reveals the edit), or **Debug Crasher** (replays exactly that corpus entry under the debugger, suite lifecycle included).
@@ -229,6 +230,7 @@ These can be set in `.vscode/settings.json` per workspace folder:
 | `gotest.debug.prepareTimeout` | `60` | Seconds to wait for debug preparation before timing out |
 | `gotest.discoveryTimeout` | `120` | Seconds to wait for test discovery before giving up (raise it for a very large workspace) |
 | `gotest.forceKillTimeout` | `360` | Seconds to wait after SIGTERM before sending SIGKILL to a cancelled process. SIGTERM is what triggers shared-fixture teardown, and the CLI allows that up to 5m30s, so this must outlast it |
+| `gotest.fuzz.for` | `""` | Budget for fuzz sessions started from the Test Explorer's Fuzz profile (a Go duration; empty uses the CLI's default of one minute) |
 | `gotest.watch.scope` | `./...` | Default package scope for watch mode |
 
 ### Global settings (window scope)

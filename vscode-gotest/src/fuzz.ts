@@ -46,6 +46,14 @@ export function parseNewCrasher(line: string): string | undefined {
   return m?.[1];
 }
 
+// parseCrasherLine reads the wrapper and the file from the same line.
+export function parseCrasherLine(
+  line: string,
+): { wrapper: string; path: string } | undefined {
+  const m = /^\[(\S+)\] new crasher: (.+)$/.exec(line);
+  return m ? { wrapper: m[1], path: m[2] } : undefined;
+}
+
 // parsePromotedSeed reads promote's confirmation line:
 //   promoted FuzzX/1a2b3c -> f.Add(...) in examples/fuzzing/suite_test.go:83
 export function parsePromotedSeed(
@@ -206,27 +214,13 @@ export async function runFuzzCommand(
   }
 
   if (result.exitCode === 1 && crashers.length > 0) {
-    const entry = path.basename(crashers[0]);
-    const plural = crashers.length === 1 ? "crasher" : "crashers";
-    const action = await vscode.window.showWarningMessage(
-      `Fuzzing ${wrapper}: ${crashers.length} new ${plural} found.`,
-      "Show Decoded Input",
-      "Promote to Seed",
-      "Debug Crasher",
+    await offerCrasherActions(
+      importPath,
+      suiteName,
+      methodName,
+      crashers,
+      deps,
     );
-    if (action === "Show Decoded Input") {
-      await triageCrashers(importPath, deps);
-    } else if (action === "Promote to Seed") {
-      await promoteCrashers(importPath, deps);
-    } else if (action === "Debug Crasher") {
-      await vscode.commands.executeCommand(
-        "gotest.debugFuzz",
-        importPath,
-        suiteName,
-        methodName,
-        entry,
-      );
-    }
     return;
   }
 
@@ -242,6 +236,39 @@ export async function runFuzzCommand(
     "Open Output",
   );
   if (open) deps.outputChannel.show();
+}
+
+// offerCrasherActions is the crasher notification every fuzz surface ends
+// on: see the decoded input, promote it to a seed, or debug that entry.
+export async function offerCrasherActions(
+  importPath: string,
+  suiteName: string,
+  methodName: string,
+  crashers: string[],
+  deps: FuzzDeps,
+): Promise<void> {
+  const wrapper = `Fuzz${suiteName}_${methodName}`;
+  const entry = path.basename(crashers[0]);
+  const plural = crashers.length === 1 ? "crasher" : "crashers";
+  const action = await vscode.window.showWarningMessage(
+    `Fuzzing ${wrapper}: ${crashers.length} new ${plural} found.`,
+    "Show Decoded Input",
+    "Promote to Seed",
+    "Debug Crasher",
+  );
+  if (action === "Show Decoded Input") {
+    await triageCrashers(importPath, deps);
+  } else if (action === "Promote to Seed") {
+    await promoteCrashers(importPath, deps);
+  } else if (action === "Debug Crasher") {
+    await vscode.commands.executeCommand(
+      "gotest.debugFuzz",
+      importPath,
+      suiteName,
+      methodName,
+      entry,
+    );
+  }
 }
 
 export async function triageCrashers(

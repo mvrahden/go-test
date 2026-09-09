@@ -45,6 +45,10 @@ export class GoTestController implements vscode.Disposable {
       request: vscode.TestRunRequest,
       token: vscode.CancellationToken,
     ) => Promise<void>,
+    fuzzHandler?: (
+      request: vscode.TestRunRequest,
+      token: vscode.CancellationToken,
+    ) => Promise<void>,
   ) {
     this.controller = vscode.tests.createTestController("gotest", "gotest");
 
@@ -88,6 +92,18 @@ export class GoTestController implements vscode.Disposable {
         (request, token) => benchHandler(request, token),
         false,
         new vscode.TestTag("benchmark"),
+      );
+    }
+
+    // Fuzz mirrors Bench: opt-in from the dropdown, offered only where fuzz
+    // targets are selected, never part of plain Run (which replays seeds).
+    if (fuzzHandler) {
+      this.controller.createRunProfile(
+        "Fuzz",
+        vscode.TestRunProfileKind.Run,
+        (request, token) => fuzzHandler(request, token),
+        false,
+        new vscode.TestTag("fuzz"),
       );
     }
 
@@ -479,11 +495,12 @@ export class GoTestController implements vscode.Disposable {
           new vscode.Position(fuzzer.line - 1, fuzzer.col - 1),
           new vscode.Position(fuzzer.line - 1, fuzzer.col - 1),
         );
-        fuzzerItem.tags = this.buildTags(
-          fuzzer.focused,
-          fuzzer.excluded,
-          fuzzer.parallel,
-        );
+        // The "fuzz" tag routes the item to the Fuzz run profile; plain Run
+        // still replays its seeds, since only "benchmark" is filtered there.
+        fuzzerItem.tags = [
+          ...this.buildTags(fuzzer.focused, fuzzer.excluded, fuzzer.parallel),
+          new vscode.TestTag("fuzz"),
+        ];
         fuzzerItem.description = "fuzz";
         suiteItem.children.add(fuzzerItem);
       }

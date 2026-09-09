@@ -270,6 +270,12 @@
           "scope": "window",
           "description": "Auto-restart watch process on crash"
         },
+        "gotest.fuzz.for": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Budget for fuzz sessions started from the Test Explorer's Fuzz profile, as a Go duration; empty uses the CLI's default of one minute"
+        },
         "gotest.watch.scope": {
           "type": "string",
           "default": "./...",

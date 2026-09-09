@@ -8,6 +8,7 @@ import { BenchRunner } from "./benchRunner.js";
 import { BenchResultStore } from "./benchResultStore.js";
 import { BenchGateDiagnostics } from "./benchDiagnostics.js";
 import { BenchHoverProvider } from "./benchHover.js";
+import { runFuzzProfile } from "./fuzzProfile.js";
 import {
   runFuzzCommand,
   triageCrashers,
@@ -105,6 +106,16 @@ export function activate(context: vscode.ExtensionContext): void {
     (request, token) => coverageRunner.run(request, token),
     (request, token) => runner.run(request, token, { updateSnapshots: true }),
     (request, token) => benchRunner.runProfile(request, token),
+    (request, token) =>
+      runFuzzProfile(request, token, {
+        cache,
+        outputChannel,
+        onSourceChanged: (importPath: string) => {
+          const wsDir = cache.getWorkspaceDir(importPath);
+          if (wsDir) void discoveryService.discoverPackage(wsDir, importPath);
+        },
+        controller,
+      }),
   );
 
   controller.testController.refreshHandler = async () => {
