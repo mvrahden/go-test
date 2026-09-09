@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	"golang.org/x/tools/go/packages"
 
@@ -98,6 +99,15 @@ func staticSuiteNode(suite *gotestast.TestSuiteSpec) (*gotestspec.Node, []string
 			}
 		}
 		node.Children = append(node.Children, methodNode)
+	}
+	// Fuzz targets are properties the suite states; they sit beside its
+	// examples, named as the run tree names them.
+	for _, fz := range suite.Fuzzers() {
+		node.Children = append(node.Children, &gotestspec.Node{
+			Kind:    gotestspec.KindFuzz,
+			Name:    fz.Identifier(),
+			Display: strings.TrimPrefix(fz.Identifier(), "Fuzz"),
+		})
 	}
 
 	return node, notes

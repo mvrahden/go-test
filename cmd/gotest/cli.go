@@ -52,6 +52,8 @@ func main() {
 		os.Exit(runWatch(inv))
 	case "bench":
 		os.Exit(runBench(inv))
+	case "fuzz":
+		os.Exit(runFuzz(inv))
 	case "refactor":
 		os.Exit(runRefactor(inv))
 	case "lint":
@@ -225,6 +227,7 @@ func parseExecFlags(ownArgs, goTestArgs []string, projCfg *config.ProjectConfig)
 		NoCache:         slices.Contains(ownArgs, "--no-cache"),
 		Parallel:        parallel,
 		CompileParallel: compileParallel,
+		HarvestSeeds:    !slices.Contains(ownArgs, "--no-harvest") && projCfg.Fuzz.HarvestSeeds(),
 	}, nil
 }
 
