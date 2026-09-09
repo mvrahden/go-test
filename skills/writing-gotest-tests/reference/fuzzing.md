@@ -53,6 +53,9 @@ better.
   Promote is the durable form: a struct target's corpus file is bound to
   its field order, a promoted literal is source. After promoting, fix the
   bug the seed now reproduces; the seed stays as the regression test.
+- "New interesting inputs" in the session line live in Go's build cache
+  (`fuzz/<package>/<Func>/` under `go env GOCACHE`), resume the next
+  session, and are not committed; `go clean -fuzzcache` starts over.
 - Seed harvesting is on by default: literal arguments from table tests and
   call sites in `_test.go` files become extra seeds at generation time
   (`--no-harvest`, or `fuzz: harvest: false` in `.gotest.yml`).

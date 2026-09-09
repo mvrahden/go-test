@@ -59,7 +59,9 @@ jobs:
   table lands in the step summary, a new crasher fails the step and its
   corpus file stays in the checkout, listed in the `fuzz-crashers` output
   for an upload-artifact step or `gotest fuzz promote`. Seed replay needs
-  no input: every ordinary run already replays seeds.
+  no input: every ordinary run already replays seeds. Restoring the Go
+  build cache between runs (setup-go's default) also restores the fuzz
+  cache, so sessions accumulate across runs.
 - CI environments auto-arm `--ci` (any non-falsy `CI`/`GOTEST_CI` value):
   committed `F_` focus prefixes FAIL the run, and snapshots become
   read-only (`--update-snapshots` will not write). Opt out with
