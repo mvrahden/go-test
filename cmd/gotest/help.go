@@ -33,7 +33,6 @@ func showHelp(topic string) {
 		printWatchHelp()
 	case "bench":
 		printBenchHelp()
-
 	case "fuzz":
 		printFuzzHelp()
 	case "discover":
@@ -71,7 +70,6 @@ Usage:
 
 Subcommands:
   bench       Run BenchmarkX suite methods serially
-
   fuzz        Run FuzzX suite methods with go test -fuzz
   spec        Render behavioral specification from test output
   summary     Show failure-focused test summary for CI
@@ -780,7 +778,6 @@ Fields:
   bench:
     baseline: <path>        Default --against baseline path for "gotest bench"
     gate: <float>           Default --gate regression percentage (0 disables)
-
   fuzz:
     harvest: <bool>         Seed harvesting for "gotest fuzz" (default: true;
                              the --no-harvest CLI flag overrides this per-run)
@@ -800,7 +797,6 @@ Example .gotest.yml:
   bench:
     baseline: bench-baseline.json
     gate: 10
-
   fuzz:
     harvest: false
 `)

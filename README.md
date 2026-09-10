@@ -1099,7 +1099,6 @@ Outside GitHub Actions, `gotest summary --badge=coverage.svg ./...` renders the 
 ```bash
 gotest ./... -v -race          # generate overlays and run tests (default)
 gotest bench ./...             # run BenchmarkX suite methods, serially
-
 gotest fuzz ./... --for=5m     # run FuzzX suite methods, budgeted
 gotest spec ./...              # behavioral specification view
 gotest summary ./...           # failure-focused summary for CI
