@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
+import { countCrasherEntries } from "./fuzz.js";
 import { hostPlatform, type BenchResultStore } from "./benchResultStore.js";
 import { formatBenchAnnotation } from "./benchReport.js";
 
@@ -27,10 +28,10 @@ export class GoTestCodeLensProvider
     }
   }
 
-  provideCodeLenses(
+  async provideCodeLenses(
     document: vscode.TextDocument,
     _token: vscode.CancellationToken,
-  ): vscode.CodeLens[] {
+  ): Promise<vscode.CodeLens[]> {
     if (!document.fileName.endsWith("_test.go")) {
       return [];
     }
@@ -203,6 +204,53 @@ export class GoTestCodeLensProvider
                 latest.delta,
               ),
               command: "",
+            }),
+          );
+        }
+      }
+
+      const fileFuzzers = (suite.fuzzers ?? []).filter(
+        (m) => path.join(pkg.dir, m.file) === docPath,
+      );
+
+      for (const method of fileFuzzers) {
+        const range = new vscode.Range(method.line - 1, 0, method.line - 1, 0);
+
+        // "Run" replays the target's seeds as an ordinary test run, through
+        // the same explorer item a click in the tree would use; "Fuzz" starts
+        // a budgeted search; "Debug Seeds" replays the seeds under the debugger.
+        lenses.push(
+          new vscode.CodeLens(range, {
+            title: "▶ Run",
+            command: "gotest.runTest",
+            arguments: [`${importPath}/${suite.name}/${method.name}`],
+          }),
+          new vscode.CodeLens(range, {
+            title: "▶ Fuzz",
+            command: "gotest.runFuzz",
+            arguments: [importPath, suite.name, method.name],
+          }),
+          new vscode.CodeLens(range, {
+            title: "Debug Seeds",
+            command: "gotest.debugFuzz",
+            arguments: [importPath, suite.name, method.name],
+          }),
+        );
+
+        // Pending crashers surface exactly where the target lives. For
+        // struct-typed targets the corpus files are format-bound (the
+        // fuzz-struct-corpus lint rule's concern); promote is the durable
+        // answer either way.
+        const crasherCount = await countCrasherEntries(
+          pkg.dir,
+          `Fuzz${suite.name}_${method.name}`,
+        );
+        if (crasherCount > 0) {
+          lenses.push(
+            new vscode.CodeLens(range, {
+              title: `⚠ Promote ${crasherCount} crasher${crasherCount === 1 ? "" : "s"}`,
+              command: "gotest.promoteCrashers",
+              arguments: [importPath],
             }),
           );
         }

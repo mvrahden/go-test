@@ -42,6 +42,15 @@ inputs:
   bench-save:
     description: "Save the benchmark run as a JSON baseline at this path (gotest bench --save); an explicit empty string saves to bench.baseline from .gotest.yml"
     default: "false"
+  fuzz:
+    description: "Run a budgeted fuzz session after tests (gotest fuzz --for); a new crasher fails the step"
+    default: "false"
+  fuzz-for:
+    description: "Approximate wall-clock budget for the whole fuzz session (gotest fuzz --for); empty uses the CLI's default of one minute"
+    default: ""
+  fuzz-cache:
+    description: "Carry Go's fuzz cache (the inputs a session found interesting) between runs, so each session resumes where the last one stopped; set to false for a from-seeds run"
+    default: "true"
   version:
     description: "gotest version: 'gomod' (default) runs the CLI from go.mod, or a version tag (e.g. v1.0.0, latest) to install globally."
     default: "gomod"
@@ -62,6 +71,9 @@ outputs:
   bench-breached-keys:
     description: "Comma-joined benchmark keys that breached the gate (empty if none or no gate)"
     value: ${{ steps.bench.outputs.bench-breached-keys }}
+  fuzz-crashers:
+    description: "Comma-joined workspace-relative paths of the corpus files the fuzz session added (empty if none or fuzz not enabled)"
+    value: ${{ steps.fuzz.outputs.fuzz-crashers }}
 
 runs:
   using: "composite"
@@ -330,3 +342,65 @@ runs:
         echo "bench-breached-keys=$breached" >> "$GITHUB_OUTPUT"
 
         exit "$exit_code"
+
+    # Go keeps the inputs a session found interesting in its build cache.
+    # setup-go's cache is keyed on go.sum and never re-saved on a hit, so a
+    # corpus would only survive a dependency bump; this pair restores the
+    # latest corpus of the branch or its base and saves this run's under a
+    # key of its own, so a short budget compounds across runs.
+    - name: Locate the Go fuzz cache
+      id: fuzz-cache-dir
+      if: ${{ inputs.fuzz == 'true' && inputs.fuzz-cache == 'true' }}
+      shell: bash
+      run: echo "dir=$(go env GOCACHE)/fuzz" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the fuzz cache
+      if: ${{ inputs.fuzz == 'true' && inputs.fuzz-cache == 'true' }}
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ steps.fuzz-cache-dir.outputs.dir }}
+        key: gotest-fuzz-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: gotest-fuzz-${{ runner.os }}-
+
+    - name: Run fuzz session
+      id: fuzz
+      if: ${{ inputs.fuzz == 'true' }}
+      shell: bash
+      env:
+        INPUT_PACKAGES: ${{ inputs.packages }}
+        INPUT_FUZZ_FOR: ${{ inputs.fuzz-for }}
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        if [ "$INPUT_VERSION" != "gomod" ]; then
+          cmd=(gotest)
+        else
+          read -ra cmd <<< "$GOTEST_CMD"
+        fi
+
+        # gotest fuzz writes its own session table to $GITHUB_STEP_SUMMARY.
+        # The session exits 1 on a finding and 0 when the budget ran out
+        # with nothing found; the crasher files it names stay in the
+        # checkout for a later upload-artifact step or `gotest fuzz promote`.
+        log="$(mktemp -t gotest-fuzz-XXXXXX.log)"
+        read -ra pkgs <<< "$INPUT_PACKAGES"
+
+        set +e
+        args=(fuzz)
+        if [ -n "$INPUT_FUZZ_FOR" ]; then
+          args+=("--for=$INPUT_FUZZ_FOR")
+        fi
+        "${cmd[@]}" "${args[@]}" "${pkgs[@]}" 2>&1 | tee "$log"
+        exit_code=${PIPESTATUS[0]}
+        set -e
+
+        crashers=$(sed -n 's/^\[[^]]*\] new crasher: //p' "$log" | python3 -c 'import os, sys; print(",".join(os.path.relpath(p.strip()) for p in sys.stdin if p.strip()), end="")')
+        echo "fuzz-crashers=$crashers" >> "$GITHUB_OUTPUT"
+
+        exit "$exit_code"
+
+    - name: Save the fuzz cache
+      if: ${{ always() && inputs.fuzz == 'true' && inputs.fuzz-cache == 'true' }}
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ steps.fuzz-cache-dir.outputs.dir }}
+        key: gotest-fuzz-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}

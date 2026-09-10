@@ -336,3 +336,35 @@ func findIncomplete(doc specDocument, method string) bool {
 	}
 	return false
 }
+
+func (s *StaticSpecTestSuite) TestDeclaresFuzzTargets(t *gotest.T) {
+	out := s.render(t, "json", "../../examples/fuzzing")
+	var doc struct {
+		Packages []struct {
+			Nodes []struct {
+				Display  string `json:"display"`
+				Children []struct {
+					Kind    string `json:"kind"`
+					Name    string `json:"name"`
+					Display string `json:"display"`
+				} `json:"children"`
+			} `json:"nodes"`
+		} `json:"packages"`
+		Stats struct {
+			Fuzzers int `json:"fuzzers"`
+		} `json:"stats"`
+	}
+	gotest.NoError(t, json.Unmarshal([]byte(out), &doc))
+
+	t.It("lists every fuzz method under its suite as a fuzz target", func(it *gotest.T) {
+		gotest.Equal(it, 5, doc.Stats.Fuzzers)
+		var kinds []string
+		for _, c := range doc.Packages[0].Nodes[0].Children {
+			if c.Kind == "fuzz" {
+				kinds = append(kinds, c.Name+"="+c.Display)
+			}
+		}
+		gotest.Contains(it, kinds, "FuzzFrameRoundTrip=FrameRoundTrip")
+		gotest.Len(it, kinds, 5)
+	})
+}

@@ -25,20 +25,25 @@ type OverlayResult struct {
 	// BrokenPackages are pattern-matched packages that failed to load. The
 	// pipeline books each one as a failed package so the run cannot report
 	// success while some of its packages never became runnable.
-	BrokenPackages                 []gotestgen.BrokenPackage
-	NoSuitePackages                []string
-	StdlibTestsByPkg               map[string]int // stdlib func TestX counts per package — gotest reports but does not run them
-	SuitesByPkg                    map[string][]string
-	ExclusiveSuitesByPkg           map[string]map[string]bool
-	BenchesByPkg                   map[string][]string
+	BrokenPackages       []gotestgen.BrokenPackage
+	NoSuitePackages      []string
+	StdlibTestsByPkg     map[string]int // stdlib func TestX counts per package — gotest reports but does not run them
+	SuitesByPkg          map[string][]string
+	ExclusiveSuitesByPkg map[string]map[string]bool
+	BenchesByPkg         map[string][]string
+	FuzzFuncsByPkg       map[string]map[string][]string
+	// FuzzParamsByFunc is, per package, the corpus shape of every generated
+	// fuzz target: the type of each value the engine feeds it. The
+	// stale-corpus pre-flight compares recorded corpus entries against it.
+	FuzzParamsByFunc               map[string]map[string][]string
 	DirsByPkg                      map[string]string
 	SkippedSuitesByPkg             map[string][]string
 	FixtureDepSuites               map[string]map[string]bool
 	SuiteRequiredSharedFixtureKeys map[string]map[string][]string
 }
 
-func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPackage, debug bool, noCache bool) (*OverlayResult, func(), error) {
-	allResults, allSharedFixtures, err := gotestgen.GenerateFromLoaded(loaded)
+func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPackage, debug bool, noCache bool, harvestSeeds bool) (*OverlayResult, func(), error) {
+	allResults, allSharedFixtures, err := gotestgen.GenerateFromLoadedOpts(loaded, harvestSeeds)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -74,6 +79,8 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 	stdlibByPkg := map[string]int{}
 	suitesByPkg := map[string][]string{}
 	benchesByPkg := map[string][]string{}
+	fuzzFuncsByPkg := map[string]map[string][]string{}
+	fuzzParamsByPkg := map[string]map[string][]string{}
 	dirsByPkg := map[string]string{}
 	skippedSuitesByPkg := map[string][]string{}
 	exclusiveSuitesByPkg := map[string]map[string]bool{}
@@ -93,6 +100,12 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		}
 		if len(r.BenchSuiteNames) > 0 {
 			benchesByPkg[r.PkgPath] = r.BenchSuiteNames
+		}
+		if len(r.FuzzFuncsBySuite) > 0 {
+			fuzzFuncsByPkg[r.PkgPath] = r.FuzzFuncsBySuite
+		}
+		if len(r.FuzzParamsByFunc) > 0 {
+			fuzzParamsByPkg[r.PkgPath] = r.FuzzParamsByFunc
 		}
 		if r.AbsPath != "" {
 			dirsByPkg[r.PkgPath] = r.AbsPath
@@ -131,6 +144,8 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		SuitesByPkg:                    suitesByPkg,
 		ExclusiveSuitesByPkg:           exclusiveSuitesByPkg,
 		BenchesByPkg:                   benchesByPkg,
+		FuzzFuncsByPkg:                 fuzzFuncsByPkg,
+		FuzzParamsByFunc:               fuzzParamsByPkg,
 		DirsByPkg:                      dirsByPkg,
 		SkippedSuitesByPkg:             skippedSuitesByPkg,
 		FixtureDepSuites:               fixtureDepSuites,

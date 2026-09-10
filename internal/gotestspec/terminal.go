@@ -154,6 +154,16 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, bare bool) {
 	indent := strings.Repeat("  ", depth)
 	isLeaf := len(n.Children) == 0
 
+	// A passing fuzz target reads as one line: its seeds are evidence, not
+	// behaviors. A failing one opens up so the offending entry is named.
+	if n.Kind == KindFuzz && !anyDescendantFailed(n) && !bare {
+		icon, clr := statusIcon(n.Status, c)
+		fmt.Fprintf(w, "%s%s%s%s %s  %d seeds %s(%s)%s\n",
+			indent, clr, icon, c.reset, n.Display, len(n.Children),
+			c.dim, formatDuration(EffectiveDuration(n)), c.reset)
+		return
+	}
+
 	if isLeaf {
 		icon, clr := statusIcon(n.Status, c)
 
@@ -192,7 +202,7 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, bare bool) {
 	}
 
 	label := n.Display
-	if n.Kind == KindSuite || n.Kind == KindFixture || n.Kind == KindMethod || n.Kind == KindTest || n.Kind == KindBenchmark {
+	if n.Kind == KindSuite || n.Kind == KindFixture || n.Kind == KindMethod || n.Kind == KindTest || n.Kind == KindBenchmark || n.Kind == KindFuzz {
 		label = c.bold + label + c.reset
 	}
 
@@ -377,6 +387,9 @@ func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hu
 	}
 	if stats.Benchmarks > 0 {
 		counts = append(counts, fmt.Sprintf("%d benchmarks", stats.Benchmarks))
+	}
+	if stats.Fuzzers > 0 {
+		counts = append(counts, fmt.Sprintf("%d fuzz targets", stats.Fuzzers))
 	}
 	if len(counts) == 0 {
 		counts = append(counts, "0 suites")

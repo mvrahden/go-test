@@ -60,6 +60,7 @@ type ExecConfig struct {
 	NoCache         bool
 	Parallel        int
 	CompileParallel int
+	HarvestSeeds    bool
 }
 
 // knownSubcommands is the set of recognized subcommands.
@@ -67,6 +68,7 @@ var knownSubcommands = map[string]bool{
 	"discover": true,
 	"prepare":  true,
 	"bench":    true,
+	"fuzz":     true,
 	"generate": true,
 	"scaffold": true,
 	"migrate":  true,

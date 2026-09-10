@@ -51,6 +51,8 @@ interface Expectation {
 // by the completeness guard.
 const FIXTURES: Record<string, Expectation> = {
   passing: { status: "pass", passed: 2, failed: 0, skipped: 0 },
+  // One behavior plus one fuzz target; its three seed rows are evidence.
+  fuzzing: { status: "pass", passed: 2, failed: 0, skipped: 0 },
   nested: {
     status: "pass",
     passed: 3,
@@ -169,6 +171,7 @@ const FIXTURES: Record<string, Expectation> = {
 interface SpecNode {
   display: string;
   status: string;
+  kind?: string;
   children: SpecNode[];
 }
 interface SpecPackage {
@@ -183,8 +186,10 @@ let spec: { packages: SpecPackage[]; stats: Record<string, number> };
 let html = "";
 let renderErrors: string[] = [];
 
+// A fuzz target counts once, as the CLI's stats count it: its seed rows
+// are evidence for one property, not behaviors of their own.
 function leavesOf(node: SpecNode, acc: SpecNode[] = []): SpecNode[] {
-  if (!node.children || node.children.length === 0) {
+  if (node.kind === "fuzz" || !node.children || node.children.length === 0) {
     acc.push(node);
     return acc;
   }

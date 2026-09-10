@@ -42,3 +42,12 @@ var ExportWatchAllowed = watchAllowed
 var ExportSummaryAllowed = summaryAllowed
 var ExportEnsureCoverProfile = ensureCoverProfile
 var ExportBenchDeltaLines = benchDeltaLines
+
+var ExportFuzzAllowed = fuzzAllowed
+var ExportParseExecFlags = parseExecFlags
+var ExportParseForFlag = parseForFlag
+var ExportPlanFuzzSession = planFuzzSession
+
+type ExportFuzzSession = fuzzSession
+
+var ExportParseJobsFlag = parseJobsFlag

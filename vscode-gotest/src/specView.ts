@@ -254,7 +254,10 @@ export class SpecViewPanel implements vscode.Disposable {
           file: path.join(pkg.dir, suite.file),
           line: suite.line,
         };
-        for (const method of suite.methods) {
+        // Fuzz targets sit beside the methods in the tree and in the map:
+        // the spec re-homes the generated wrapper under its suite by the
+        // method name, so the same key shape reaches both.
+        for (const method of [...suite.methods, ...(suite.fuzzers ?? [])]) {
           map[`${testName}/${method.name}`] = {
             file: path.join(pkg.dir, method.file),
             line: method.line,
@@ -443,6 +446,8 @@ interface SpecStats {
   suites: number;
   behaviors: number;
   tests: number;
+  // Fuzz targets: each is one property under its suite, counted once.
+  fuzzers?: number;
   passed: number;
   failed: number;
   skipped: number;
@@ -627,7 +632,7 @@ function locationKey(node: SpecNode, parentName: string): string {
   if (node.kind === "suite") {
     return node.name;
   }
-  if (node.kind === "method" && parentName) {
+  if ((node.kind === "method" || node.kind === "fuzz") && parentName) {
     return `${parentName}/${node.name}`;
   }
   return "";
@@ -658,7 +663,7 @@ function buildLeafHtml(
 ): string {
   const iconHtml = buildIconHtml(node.status, node, parentName, locationMap);
   const dur = formatDuration(node.duration);
-  let suffix = "";
+  let suffix = fuzzTagHtml(node);
   if (node.external) suffix += ` <span class="tag external">EXT.</span>`;
   if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
   else if (node.excluded || node.status === "skip") suffix += " — SKIPPED";
@@ -700,12 +705,13 @@ function buildBranchHtml(
     node.kind === "suite" ||
     node.kind === "fixture" ||
     node.kind === "method" ||
-    node.kind === "test"
+    node.kind === "test" ||
+    node.kind === "fuzz"
   ) {
     label = `<strong>${label}</strong>`;
   }
 
-  let suffix = "";
+  let suffix = fuzzTagHtml(node);
   if (node.external) suffix += ` <span class="tag external">EXT.</span>`;
   if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
   else if (node.excluded) suffix += ` <span class="tag skipped">SKIPPED</span>`;
@@ -763,6 +769,7 @@ function buildSummary(stats: SpecStats): string {
   const counts: string[] = [];
   if (stats.suites > 0) counts.push(`${stats.suites} suites`);
   if (stats.behaviors > 0) counts.push(`${stats.behaviors} behaviors`);
+  if ((stats.fuzzers ?? 0) > 0) counts.push(`${stats.fuzzers} fuzz targets`);
   if (stats.tests > 0) counts.push(`${stats.tests} stdlib tests`);
 
   const failedPackages = stats.failedPackages ?? 0;
@@ -912,6 +919,8 @@ export function specDataToReport(
   if (data.stats.suites > 0) counts.push(`${data.stats.suites} suites`);
   if (data.stats.behaviors > 0)
     counts.push(`${data.stats.behaviors} behaviors`);
+  if ((data.stats.fuzzers ?? 0) > 0)
+    counts.push(`${data.stats.fuzzers} fuzz targets`);
   if (data.stats.tests > 0) counts.push(`${data.stats.tests} stdlib tests`);
   const results: string[] = [];
   if (totalAgg.passed > 0) results.push(`${totalAgg.passed} passed`);
@@ -944,6 +953,7 @@ function walkReportNode(
     if (hidden && hidden.has(node.status)) return;
     let label = node.display;
     const tags: string[] = [];
+    if (node.kind === "fuzz") tags.push(fuzzTagText(node));
     if (node.external) tags.push("EXTERNAL");
     if (node.focused) tags.push("FOCUSED");
     else if (node.excluded) tags.push("SKIPPED");
@@ -970,6 +980,7 @@ function walkReportNode(
 
   let label = node.display;
   const tags: string[] = [];
+  if (node.kind === "fuzz") tags.push(fuzzTagText(node));
   if (node.external) tags.push("EXTERNAL");
   if (node.focused) tags.push("FOCUSED");
   else if (node.excluded) tags.push("SKIPPED");
@@ -983,6 +994,23 @@ function walkReportNode(
   for (const c of node.children) {
     walkReportNode(rows, c, indent + 1, hidden);
   }
+}
+
+// A fuzz target is a property backed by seeds, not an example; the marker
+// says so and how much evidence sits beneath it, as the CLI's own view does.
+function seedCount(node: SpecNode): number {
+  return node.children.length;
+}
+
+function fuzzTagText(node: SpecNode): string {
+  const n = seedCount(node);
+  return `FUZZ (${n} seed${n === 1 ? "" : "s"})`;
+}
+
+function fuzzTagHtml(node: SpecNode): string {
+  if (node.kind !== "fuzz") return "";
+  const n = seedCount(node);
+  return ` <span class="tag fuzz">FUZZ · ${n} seed${n === 1 ? "" : "s"}</span>`;
 }
 
 function escapeHtml(s: string): string {
@@ -1203,6 +1231,7 @@ summary.node.block { color: var(--vscode-terminal-ansiYellow); }
 .tag.focused { color: var(--vscode-testing-iconSkipped); }
 .tag.skipped { color: var(--vscode-testing-iconSkipped); }
 .tag.external { color: var(--vscode-descriptionForeground); }
+.tag.fuzz { color: var(--vscode-textLink-foreground); }
 
 /* Icon hover swap: status icon → go-to-source */
 .icon .goto-text { display: none; }

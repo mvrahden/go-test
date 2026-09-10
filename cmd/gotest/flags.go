@@ -35,11 +35,18 @@ var gotestFlags = map[string]FlagKind{
 	"--gate":             ValueFlag,
 	"--bench":            BoolFlag,
 	"--json":             BoolFlag,
+
+	"--for":        ValueFlag,
+	"--jobs":       ValueFlag,
+	"--target":     ValueFlag,
+	"--no-harvest": BoolFlag,
+	"--fuzz":       BoolFlag,
 }
 
 var testAllowed = flagSet(
 	"--debug", "--ci", "--spec", "--update-snapshots", "--no-cache",
 	"--min", "--setup-timeout", "--timeout", "--parallel", "--compile-parallel",
+	"--no-harvest",
 )
 
 var specAllowed = flagSet(
@@ -66,6 +73,10 @@ var benchAllowed = flagSet(
 	"--timeout", "--setup-timeout", "--no-cache", "--debug", "--spec", "--no-color",
 	"--save", "--against", "--gate", "--json",
 )
+
+var fuzzAllowed = flagSet("--for", "--jobs", "--no-cache", "--debug", "--no-harvest", "--target")
+
+var scaffoldAllowed = flagSet("--fuzz")
 
 func flagSet(names ...string) map[string]bool {
 	s := make(map[string]bool, len(names))

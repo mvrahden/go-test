@@ -8,6 +8,13 @@ import { BenchRunner } from "./benchRunner.js";
 import { BenchResultStore } from "./benchResultStore.js";
 import { BenchGateDiagnostics } from "./benchDiagnostics.js";
 import { BenchHoverProvider } from "./benchHover.js";
+import { runFuzzProfile } from "./fuzzProfile.js";
+import {
+  runFuzzCommand,
+  triageCrashers,
+  promoteCrashers,
+  type FuzzDeps,
+} from "./fuzz.js";
 import { GoTestCodeLensProvider } from "./codeLens.js";
 import { DebugLauncher } from "./debug.js";
 import { FocusExcludeProvider } from "./focusExclude.js";
@@ -99,6 +106,16 @@ export function activate(context: vscode.ExtensionContext): void {
     (request, token) => coverageRunner.run(request, token),
     (request, token) => runner.run(request, token, { updateSnapshots: true }),
     (request, token) => benchRunner.runProfile(request, token),
+    (request, token) =>
+      runFuzzProfile(request, token, {
+        cache,
+        outputChannel,
+        onSourceChanged: (importPath: string) => {
+          const wsDir = cache.getWorkspaceDir(importPath);
+          if (wsDir) void discoveryService.discoverPackage(wsDir, importPath);
+        },
+        controller,
+      }),
   );
 
   controller.testController.refreshHandler = async () => {
@@ -350,6 +367,18 @@ function registerCommands(deps: {
     outputChannel,
   } = deps;
 
+  // Promote edits user source (typed f.Add seeds), so the fuzz surfaces
+  // re-run discovery for the touched package to refresh the tree and the
+  // crasher CodeLenses.
+  const fuzzDeps = (): FuzzDeps => ({
+    cache,
+    outputChannel,
+    onSourceChanged: (importPath: string) => {
+      const wsDir = cache.getWorkspaceDir(importPath);
+      if (wsDir) void discoveryService.discoverPackage(wsDir, importPath);
+    },
+  });
+
   return [
     vscode.commands.registerCommand(
       "gotest.runTest",
@@ -462,6 +491,46 @@ function registerCommands(deps: {
       }
       await benchRunner.compareBaseline(wsDir);
     }),
+
+    vscode.commands.registerCommand(
+      "gotest.runFuzz",
+      (importPath: string, suiteName: string, methodName: string) =>
+        runFuzzCommand(importPath, suiteName, methodName, fuzzDeps()),
+    ),
+
+    vscode.commands.registerCommand(
+      "gotest.triageCrashers",
+      (importPath: string) => triageCrashers(importPath, fuzzDeps()),
+    ),
+
+    vscode.commands.registerCommand(
+      "gotest.promoteCrashers",
+      (importPath: string) => promoteCrashers(importPath, fuzzDeps()),
+    ),
+
+    // Debugs a fuzz wrapper's seed replay, or — when a corpus entry name is
+    // given (e.g. from a session's crasher notification) — exactly that
+    // one failing input, under the suite's real lifecycle.
+    vscode.commands.registerCommand(
+      "gotest.debugFuzz",
+      async (
+        importPath: string,
+        suiteName: string,
+        methodName: string,
+        entry?: string,
+      ) => {
+        const pkgDir = cache.resolveImportPath(importPath);
+        if (!pkgDir) {
+          outputChannel.warn(
+            `[command] debugFuzz: no package dir for ${importPath}`,
+          );
+          return;
+        }
+        const wrapper = `Fuzz${suiteName}_${methodName}`;
+        const filter = entry ? `^${wrapper}$/^${entry}$` : `^${wrapper}$`;
+        await debugLauncher.debugPattern(pkgDir, filter);
+      },
+    ),
 
     vscode.commands.registerCommand(
       "gotest.debugTest",

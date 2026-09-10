@@ -32,6 +32,10 @@ function tree(behaviors: DiscoverBehavior[]): DiscoverPackage[] {
           // Benchmarks are a sibling list to methods; the signature covers the
           // ids the test tree builds, and benchmark items are not among them.
           benchmarks: [],
+
+          // Fuzzers are a sibling list to methods; the signature covers the
+          // ids the test tree builds, and fuzz targets are not among them.
+          fuzzers: [],
           methods: [
             {
               name: "TestIt",

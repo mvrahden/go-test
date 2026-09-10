@@ -40,10 +40,16 @@ const (
 	SuiteLifecycle     Rule = "suite-lifecycle"
 	// BehaviorWording is expressiveness: a When or It description that opens
 	// with the word the spec renders for it says it twice.
-	BehaviorWording Rule = "behavior-wording"
-	BenchLoop       Rule = "bench-loop"
-	BenchFixtureIO  Rule = "bench-fixture-io"
-	BenchWait       Rule = "bench-wait"
+	BehaviorWording  Rule = "behavior-wording"
+	BenchLoop        Rule = "bench-loop"
+	BenchFixtureIO   Rule = "bench-fixture-io"
+	BenchWait        Rule = "bench-wait"
+	FuzzDeterminism  Rule = "fuzz-determinism"
+	FuzzNoOracle     Rule = "fuzz-no-oracle"
+	FuzzSeed         Rule = "fuzz-seed"
+	FuzzStructCorpus Rule = "fuzz-struct-corpus"
+	FuzzHookIO       Rule = "fuzz-hook-io"
+	FuzzRawSeed      Rule = "fuzz-raw-seed"
 	// SharedFixtureUndeclared is integrity: window scheduling starts only
 	// the fixtures scheduled suites declare, so an undeclared read may hit
 	// a fixture that never started or is already released.
@@ -105,6 +111,24 @@ var ruleMeta = map[Rule]struct {
 	BenchWait: {TierExpressiveness, ScopeSuites},
 
 	SharedFixtureUndeclared: {TierIntegrity, ScopeSuites},
+
+	// fuzz-determinism is integrity: a target reading the clock/RNG/env
+	// breaks the replayability the corpus depends on — its outcomes lie.
+	// fuzz-struct-corpus is integrity for the same reason from the other
+	// side: entries bound to a type's field order silently become different
+	// tests when two same-kind fields swap; the legitimate transient state
+	// (crasher found, not yet promoted) is suppressible per line.
+	// fuzz-no-oracle and fuzz-seed are guidance (crash-only fuzzing and
+	// harvester-seeded targets are legitimate), and fuzz-hook-io and
+	// fuzz-raw-seed are heuristics with legitimate exceptions (a cheap
+	// file read; a seed deliberately left for a signature about to change)
+	// — all four stay skippable.
+	FuzzDeterminism:  {TierIntegrity, ScopeSuites},
+	FuzzNoOracle:     {TierExpressiveness, ScopeSuites},
+	FuzzSeed:         {TierExpressiveness, ScopeSuites},
+	FuzzStructCorpus: {TierIntegrity, ScopeSuites},
+	FuzzHookIO:       {TierExpressiveness, ScopeSuites},
+	FuzzRawSeed:      {TierExpressiveness, ScopeSuites},
 }
 
 // Known reports whether the rule ID exists.
@@ -196,6 +220,12 @@ func run(pass *analysis.Pass) (any, error) {
 	checkBenchLoop(pass, insp, suites)
 	checkBenchFixtureIO(pass, insp, suites)
 	checkBenchWait(pass, insp, suites)
+	checkFuzzDeterminism(pass, insp, suites)
+	checkFuzzNoOracle(pass, insp, suites)
+	checkFuzzSeed(pass, insp, suites)
+	checkFuzzStructCorpus(pass, insp, suites)
+	checkFuzzHookIO(pass, insp, suites)
+	checkFuzzRawSeed(pass, insp, suites)
 
 	return nil, nil
 }

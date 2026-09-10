@@ -4,37 +4,79 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/scaffold"
 )
 
 func runScaffold(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	for _, arg := range inv.Args {
-		if isFlag(arg) {
-			fmt.Fprintf(os.Stderr, "FAIL: unknown flag %s — scaffold takes no flags\n", arg)
-			return 2
-		}
+	ownArgs, rest, err := SplitArgs(inv.Args, scaffoldAllowed)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
+		return 2
 	}
 
-	if len(inv.Args) > 1 {
-		fmt.Fprintf(os.Stderr, "FAIL: scaffold takes exactly one target, got %d\n", len(inv.Args))
+	// SplitArgs routes unrecognized flags into rest rather than erroring, so
+	// the hardening lives here: anything flag-shaped that is not --fuzz is a
+	// usage error, and real targets stay countable.
+	var targets []string
+	for _, arg := range rest {
+		if isFlag(arg) {
+			fmt.Fprintf(os.Stderr, "FAIL: unknown flag %s — scaffold accepts only --fuzz\n", arg)
+			return 2
+		}
+		targets = append(targets, arg)
+	}
+
+	if len(targets) > 1 {
+		fmt.Fprintf(os.Stderr, "FAIL: scaffold takes exactly one target, got %d\n", len(targets))
 		return 2
 	}
 	var target string
-	if len(inv.Args) > 0 {
-		target = inv.Args[0]
+	if len(targets) == 1 {
+		target = targets[0]
 	}
 
 	if target == "" {
-		fmt.Fprintln(os.Stderr, "usage: gotest scaffold <./pkg/path.TypeName | ./pkg/path/file.go>")
+		fmt.Fprintln(os.Stderr, "usage: gotest scaffold [--fuzz] <./pkg/path.TypeName | ./pkg/path/file.go | ./pkg/path.FuncName>")
 		return 1
+	}
+
+	if slices.Contains(ownArgs, "--fuzz") {
+		return runScaffoldFuzz(target)
 	}
 
 	if strings.HasSuffix(target, ".go") {
 		return runScaffoldFile(target)
 	}
 	return runScaffoldType(target)
+}
+
+func runScaffoldFuzz(target string) int {
+	pkgPattern, funcName, err := scaffold.ParseTarget(target)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "scaffold: %v\n", err)
+		return 1
+	}
+
+	info, err := scaffold.IntrospectFuzzTarget(pkgPattern, funcName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "scaffold: %v\n", err)
+		return 1
+	}
+
+	out, status, err := scaffold.GenerateFuzzScaffold(info)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "scaffold: %v\n", err)
+		return 1
+	}
+	if status != "" {
+		fmt.Println(status)
+	}
+
+	filename := scaffold.ToSnakeCase(funcName) + "_fuzz_test.go"
+	return writeScaffoldFile(info.PkgDir, filename, out)
 }
 
 func runScaffoldType(target string) int {

@@ -16,6 +16,7 @@ import {
   escapeRegExp,
   formatCliCommand,
   buildBenchArgs,
+  buildFuzzArgs,
 } from "./cli.js";
 
 describe("compareVersions", () => {
@@ -65,6 +66,30 @@ describe("escapeRegExp", () => {
 
   it("escapes module paths", () => {
     expect(escapeRegExp("github.com/foo/bar")).toBe("github\\.com/foo/bar");
+  });
+});
+
+describe("buildFuzzArgs", () => {
+  it("selects the generated wrapper via --target with a --for budget and no --timeout, which fuzz refuses", () => {
+    expect(
+      buildFuzzArgs("example.com/pkg", "FooTestSuite", "FuzzParse", "5m"),
+    ).toEqual([
+      "fuzz",
+      "example.com/pkg",
+      "--target=FuzzFooTestSuite_FuzzParse",
+      "--for=5m",
+    ]);
+  });
+
+  it("passes --for=0 for an until-stopped session, opting out of the CLI's default budget", () => {
+    expect(
+      buildFuzzArgs("example.com/pkg", "FooTestSuite", "FuzzParse"),
+    ).toEqual([
+      "fuzz",
+      "example.com/pkg",
+      "--target=FuzzFooTestSuite_FuzzParse",
+      "--for=0",
+    ]);
   });
 });
 

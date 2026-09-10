@@ -39,7 +39,7 @@ func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	ctx, stop := signal.NotifyContext(context.Background(),
 		shutdownSignals...)
 
-	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, nil, false, false)
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, nil, false, false, true)
 	if err != nil {
 		stop()
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

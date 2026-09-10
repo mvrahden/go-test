@@ -36,6 +36,7 @@ export interface DiscoverSuite {
   fixtures: string[];
   methods: DiscoverMethod[];
   benchmarks: DiscoverMethod[];
+  fuzzers: DiscoverMethod[];
 }
 
 export interface DiscoverMethod {

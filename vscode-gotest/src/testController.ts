@@ -45,6 +45,10 @@ export class GoTestController implements vscode.Disposable {
       request: vscode.TestRunRequest,
       token: vscode.CancellationToken,
     ) => Promise<void>,
+    fuzzHandler?: (
+      request: vscode.TestRunRequest,
+      token: vscode.CancellationToken,
+    ) => Promise<void>,
   ) {
     this.controller = vscode.tests.createTestController("gotest", "gotest");
 
@@ -88,6 +92,18 @@ export class GoTestController implements vscode.Disposable {
         (request, token) => benchHandler(request, token),
         false,
         new vscode.TestTag("benchmark"),
+      );
+    }
+
+    // Fuzz mirrors Bench: opt-in from the dropdown, offered only where fuzz
+    // targets are selected, never part of plain Run (which replays seeds).
+    if (fuzzHandler) {
+      this.controller.createRunProfile(
+        "Fuzz",
+        vscode.TestRunProfileKind.Run,
+        (request, token) => fuzzHandler(request, token),
+        false,
+        new vscode.TestTag("fuzz"),
       );
     }
 
@@ -455,6 +471,38 @@ export class GoTestController implements vscode.Disposable {
           method.behaviorsComplete === false,
         );
         suiteItem.children.add(methodItem);
+      }
+
+      // Fuzz targets sit beside test methods in the tree; their names are
+      // disjoint by prefix (Fuzz* vs Test*), so they share the id
+      // namespace. Running one from the explorer replays its seed corpus
+      // as ordinary subtests — searching for new inputs is the CodeLens
+      // "Fuzz" action, deliberately not a Test Explorer run.
+      for (const fuzzer of suite.fuzzers ?? []) {
+        const fuzzerId = `${suiteId}/${fuzzer.name}`;
+        seenMethodIds.add(fuzzerId);
+
+        const fuzzerUri = vscode.Uri.file(path.join(pkg.dir, fuzzer.file));
+        let fuzzerItem = suiteItem.children.get(fuzzerId);
+        if (!fuzzerItem) {
+          fuzzerItem = this.controller.createTestItem(
+            fuzzerId,
+            fuzzer.name,
+            fuzzerUri,
+          );
+        }
+        fuzzerItem.range = new vscode.Range(
+          new vscode.Position(fuzzer.line - 1, fuzzer.col - 1),
+          new vscode.Position(fuzzer.line - 1, fuzzer.col - 1),
+        );
+        // The "fuzz" tag routes the item to the Fuzz run profile; plain Run
+        // still replays its seeds, since only "benchmark" is filtered there.
+        fuzzerItem.tags = [
+          ...this.buildTags(fuzzer.focused, fuzzer.excluded, fuzzer.parallel),
+          new vscode.TestTag("fuzz"),
+        ];
+        fuzzerItem.description = "fuzz";
+        suiteItem.children.add(fuzzerItem);
       }
 
       // Benchmark methods sit beside tests and fuzzers under their suite —

@@ -2,7 +2,9 @@ package gotestrunner
 
 import (
 	"encoding/json"
+	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -47,6 +49,15 @@ func ExportSetTeardownTimeout(p *SharedFixtureProcess, d time.Duration) {
 	p.teardownTimeout = d
 }
 
+var ExportBuildFuzzArgs = buildFuzzArgs
+var ExportDefaultFuzzJobs = defaultFuzzJobs
+var ExportResolveFuzzJobs = resolveFuzzJobs
+var ExportLineWriterMaxBuf = lineWriterMaxBuf
+
+func ExportNewLineWriter(dst io.Writer, label string, mu *sync.Mutex) io.WriteCloser {
+	return newLineWriter(dst, label, mu)
+}
+
 func ExportAutoDetectCI(cfg PipelineConfig) PipelineConfig { //nolint:gocritic // hugeParam: stable API
 	if !cfg.CI && os.Getenv(protocol.EnvCI) == "" && os.Getenv("CI") != "" {
 		cfg.CI = true
@@ -78,3 +89,9 @@ var ExportAliveFixtureKeys = aliveFixtureKeys
 
 var ExportSortTargetIndices = sortTargetIndices
 var ExportLogSlowBuild = logSlowBuild
+
+// ExportLineWriterProgress reads the progress a line writer captured.
+func ExportLineWriterProgress(w io.WriteCloser) FuzzProgress { return w.(*lineWriter).progress }
+
+var ExportSnapshotCrashers = snapshotCrashers
+var ExportNewCrasherNames = newCrasherNames
