@@ -84,6 +84,10 @@ Sections tagged **v1.29+** need v1.29.0 or newer. What v1.29 adds:
    lint rules; see `reference/fuzzing.md`. Below v1.29 write no fuzz
    targets at all: a stdlib `func FuzzX(*testing.F)` is invisible to gotest
    on every version, and the suite form does not compile there.
+5. **Benchmark methods on suites** — `Benchmark*` methods taking
+   `*gotest.B`, `gotest bench` with baselines and gates, the action's
+   `bench` inputs, and the three `bench-*` lint rules; see
+   `reference/cli.md`. Below v1.29 `*gotest.B` does not exist.
 
 Exit codes on v1.25.x are weaker than they look — never treat a green
 gotest exit alone as proof there: a package failing to compile mid-run, a

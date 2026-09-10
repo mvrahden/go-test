@@ -220,8 +220,7 @@ For GitLab CI, CircleCI, or any other system, run `gotest summary` directly. CI 
 test:
   image: golang:1.25
   script:
-    - go install github.com/mvrahden/go-test/cmd/gotest@latest
-    - gotest summary ./... -race -coverprofile=coverage.out
+    - go tool gotest summary ./... -race -coverprofile=coverage.out
     - go tool cover -html=coverage.out -o coverage.html
   artifacts:
     paths:

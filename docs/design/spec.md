@@ -1054,7 +1054,7 @@ $ gotest scaffold ./pkg/user/service.go
 ```
 
 Output is written as `<snake_case>_suite_test.go` next to the target; existing files are never overwritten.
-The subcommand takes no flags — unknown flags are rejected.
+`--fuzz` is the subcommand's only flag (a fuzz skeleton for a package-level function); unknown flags are rejected.
 Uses `packages.Load` for type introspection.
 
 ---
@@ -1408,8 +1408,9 @@ The repository root ships a composite GitHub Action (`action.yml`, "Go - Test Su
     min-coverage: "80"
 ```
 
-Inputs: `packages`, `race`, `coverage`, `min-coverage`, `flags`, `go-test-flags`, `version`.
-Outputs: `exit-code`, `coverage`.
+Inputs: `packages`, `race`, `coverage`, `min-coverage`, `flags`, `go-test-flags`, `badge`, `badge-branch`, `bench`, `bench-baseline`, `bench-gate`, `bench-save`, `fuzz`, `fuzz-for`, `fuzz-cache`, `version`.
+Outputs: `exit-code`, `coverage`, `badge`, `bench-report`, `bench-breached-keys`, `fuzz-crashers`.
+README.md's input and output tables are canonical; a drift guard keeps them in step with `action.yml`.
 
 Manual setup works without the action:
 

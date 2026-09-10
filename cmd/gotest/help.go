@@ -551,8 +551,10 @@ Target is one of:
   ./pkg/path.FuncName      With --fuzz: generate a fuzz skeleton for a
                            single-parameter package-level function
 
-Creates a new _test.go file with a suite struct, a runner function,
-and stub methods for each exported method on the target type.
+Creates a new _test.go file next to the target: a suite struct holding
+the subject, a BeforeEach that constructs it, and one Test method per
+exported method with It stubs (a happy path and an error case for
+methods that return an error). Existing files are never overwritten.
 
 Flags:
   --fuzz    Scaffold a Fuzz<Func> method for a package-level function
@@ -624,12 +626,21 @@ Rules:
   test-signature        Test methods not accepting *gotest.T or *testing.T
   x-lifecycle           X_ prefix on a lifecycle hook (a no-op)
   suite-lifecycle       Cleanup/Parallel/Run via t.T() — bypass the suite lifecycle
+  shared-fixture-undeclared
+                        Reads of a shared fixture the suite never declared as a
+                        field (only declared fixtures are started)
   assertion-simplify    Simplifiable assertions (True(t, a == b) → Equal, …)
   assertion-type-guard  Nil/Empty on types their runtime guards reject
   assertion-redundant   Assertions made redundant by the following assertion
   fail-guard            if cond { Fail/Fatal(...) } guards — use assertions directly
   t-escape              Unnecessary t.T() convenience escapes (incl. Helper/Fatal/Log)
   behavior-wording      When("when …") / It("it …") — the spec supplies those words
+  bench-loop            Benchmark methods that never call b.Loop()/b.N (nothing
+                        iterates, so the numbers lie)
+  bench-fixture-io      Fixture-backed reads inside the measured loop (times the
+                        fixture, not the code)
+  bench-wait            time.Sleep/Eventually/Consistently inside the measured
+                        loop (times the wait, not the code)
   fuzz-determinism      Fuzz targets reading time.Now/math-rand/os.Getenv
   fuzz-no-oracle        Fuzz callbacks that assert nothing (panic-only)
   fuzz-seed             Fuzz targets with no f.Add seeds
@@ -644,10 +655,10 @@ rules also accept a project-wide skip flag (mirrored by .gotest.yml lint.skip):
 
 Flags:
   -skip-<rule>            Disable a non-integrity rule, e.g. -skip-fail-guard
-                          (assertion-simplify, assertion-redundant, behavior-wording, fail-guard,
-                          t-escape, stdlib-test, testify,
-                          fuzz-no-oracle, fuzz-seed, fuzz-hook-io,
-                          fuzz-raw-seed)
+                          (assertion-simplify, assertion-redundant, behavior-wording,
+                          bench-fixture-io, bench-wait, fail-guard, t-escape,
+                          stdlib-test, testify, fuzz-no-oracle, fuzz-seed,
+                          fuzz-hook-io, fuzz-raw-seed)
   -disable-nolint         Ignore //nolint comments
   -fix                    Apply suggested fixes
   --github                Also emit GitHub ::error annotations and append a
@@ -783,8 +794,9 @@ Fields:
                              the --no-harvest CLI flag overrides this per-run)
 
 Skippable lint rules (non-integrity only): assertion-redundant,
-assertion-simplify, behavior-wording, fail-guard, fuzz-hook-io,
-fuzz-no-oracle, fuzz-raw-seed, fuzz-seed, stdlib-test, t-escape, testify
+assertion-simplify, behavior-wording, bench-fixture-io, bench-wait,
+fail-guard, fuzz-hook-io, fuzz-no-oracle, fuzz-raw-seed, fuzz-seed,
+stdlib-test, t-escape, testify
 
 Example .gotest.yml:
 

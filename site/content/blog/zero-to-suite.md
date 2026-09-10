@@ -1,17 +1,17 @@
 ---
 title: "Your First Go Test Suite in 10 Minutes: A gotest Tutorial"
 date: 2026-07-12
-description: "Go test suite tutorial: from go install to a running gotest suite with lifecycle hooks, BDD structure, and readable spec output — in 10 minutes."
+description: "Go test suite tutorial: from an empty module to a running gotest suite with lifecycle hooks, BDD structure, and readable spec output — in 10 minutes."
 tags: ["Tutorial"]
 keywords: ["go test suite tutorial", "gotest getting started", "go testing framework", "go bdd tutorial"]
 cta_text: "Scaffold your first suite today."
 howto:
   name: "Write your first gotest suite"
   steps:
-    - name: "Install gotest"
-      text: "Install the gotest binary with go install and verify it with gotest version."
     - name: "Set up a project"
       text: "Create a small Go module with a counter package to test."
+    - name: "Install gotest"
+      text: "Add gotest to the module as a Go tool with go get -tool and verify it with go tool gotest version."
     - name: "Write the suite"
       text: "Declare a struct whose name ends in TestSuite, add a BeforeEach hook, and write Test methods that use gotest's generic assertions."
     - name: "Run the suite"
@@ -26,23 +26,9 @@ howto:
       text: "Run gotest watch ./... to re-run affected packages automatically on every save."
 ---
 
-Plain `go test` carries you a long way — until you need setup that runs before every test, related cases grouped under a shared context, and output you can actually read. At that point most of us start hand-rolling lifecycle helpers and squinting at walls of `--- PASS` lines. In the next 10 minutes you'll go from `go install` to a structured test suite with lifecycle hooks, BDD-style grouping, and spec output — all running on standard `go test`.
+Plain `go test` carries you a long way — until you need setup that runs before every test, related cases grouped under a shared context, and output you can actually read. At that point most of us start hand-rolling lifecycle helpers and squinting at walls of `--- PASS` lines. In the next 10 minutes you'll go from an empty module to a structured test suite with lifecycle hooks, BDD-style grouping, and spec output — all running on standard `go test`.
 
 No prior gotest knowledge required. You need Go 1.25+ and a terminal.
-
-## Install gotest
-
-gotest is a single binary. Install it with `go install`:
-
-```sh
-go install github.com/mvrahden/go-test/cmd/gotest@latest
-```
-
-Verify the installation:
-
-```sh
-gotest version
-```
 
 ## Set up a project
 
@@ -71,15 +57,27 @@ func (c *Counter) Reset()       { c.value = 0 }
 
 Nothing special so far. Now let's test it.
 
+## Install gotest
+
+gotest is a Go tool. Add it to the module with the tool directive, which pins the CLI and the `gotest` library to the same release:
+
+```sh
+go get -tool github.com/mvrahden/go-test/cmd/gotest@latest
+```
+
+Verify the installation:
+
+```sh
+go tool gotest version
+```
+
+The rest of this post writes `gotest` for brevity; run every command as `go tool gotest`.
+
 ## Write a test suite
 
 A gotest suite is a Go struct whose name ends in `TestSuite`. Test methods are pointer-receiver methods whose names start with `Test`. That is the entire API — naming conventions.
 
-Add the gotest library to your module and create a test file:
-
-```sh
-go get github.com/mvrahden/go-test/pkg/gotest
-```
+Create a test file:
 
 ```go {title="counter_test.go"}
 package counter
