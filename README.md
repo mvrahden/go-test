@@ -1153,6 +1153,24 @@ All `go test` flags work unchanged: `-race`, `-cover`, `-count`, `-run`, `-json`
 | `SuiteConfig()` method | Suite timeout/parallelism/exclusive/failfast config |
 | `Hydrate` / `Dehydrate` | SharedFixture test-process resource reconstruction |
 
+## Coding Agents
+
+The repository ships a skill that teaches a coding agent to write suites the way gotest expects: lifecycle hooks instead of `defer`, polling instead of `time.Sleep`, the parallel recipe, condition-only `When` labels, and the version differences between releases.
+It is written in the open [Agent Skills](https://agentskills.io) format, which Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot and [many other agents](https://agentskills.io/clients) load on demand.
+Install it by unpacking the folder into the directory your agent reads skills from; each client documents that directory, and the client list above links to the instructions:
+
+```bash
+SKILLS_DIR=<your agent's skills directory>
+mkdir -p "$SKILLS_DIR" && curl -sL https://github.com/mvrahden/go-test/archive/refs/heads/main.tar.gz \
+  | tar -xz -C "$SKILLS_DIR" --strip-components=2 go-test-main/skills/writing-gotest-tests
+```
+
+> **Tip:** most agents can do this themselves. Ask yours to install the `writing-gotest-tests` skill from `github.com/mvrahden/go-test`, and it will fetch the folder and place it where it reads skills.
+
+An agent without skill support can still be pointed at the unpacked `SKILL.md` from its instructions file, such as `AGENTS.md`. The skill source lives in [`skills/writing-gotest-tests`](skills/writing-gotest-tests).
+
+Two commands give an agent the specification without the source. `gotest spec --static ./...` prints what a package promises before anything runs, and `gotest discover ./...` emits the same tree as JSON with a `behaviorsComplete` flag per method, so an agent never presents a partial list as the whole specification.
+
 ## VS Code Extension
 
 The **gotest** extension brings first-class IDE support: suite-aware Test Explorer, CodeLens run/debug buttons, coverage gutters, watch mode, spec view, focus/exclude quick fixes, and suite scaffolding.
