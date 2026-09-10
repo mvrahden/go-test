@@ -60,3 +60,15 @@ var ExportEnforceCensus = enforceCensus
 var ExportExecutedBenchCases = executedBenchCases
 var ExportEnforceBenchCensus = enforceBenchCensus
 var ExportRunBench = runBench
+
+type ExportCorpusArg = corpusArg
+
+var ExportSelectFuzzTargets = selectFuzzTargets
+var ExportFuzzSessionLine = fuzzSessionLine
+var ExportRenderFuzzSessionMarkdown = renderFuzzSessionMarkdown
+var ExportParseCorpusFile = parseCorpusFile
+var ExportExtractDecodedInput = extractDecodedInput
+var ExportExtractCause = extractCause
+var ExportPromoteCrasher = promoteCrasher
+
+func ExportSpliceExpr(a corpusArg) string { return a.spliceExpr() }
