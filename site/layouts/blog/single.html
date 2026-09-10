@@ -23,7 +23,7 @@
 
       <div class="cta">
         <p><strong>{{ .Params.cta_text | default "Try gotest on your next project." }}</strong></p>
-        {{ $cmd := .Params.cta_command | default "go install github.com/mvrahden/go-test/cmd/gotest@latest" }}
+        {{ $cmd := .Params.cta_command | default "go get -tool github.com/mvrahden/go-test/cmd/gotest@latest" }}
         <div class="install-cmd">
           <code>{{ $cmd }}</code>
           <button onclick="navigator.clipboard.writeText('{{ $cmd }}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})" aria-label="Copy command">Copy</button>
