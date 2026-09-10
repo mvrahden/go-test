@@ -1,0 +1,12 @@
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -21,6 +21,9 @@
+ }
+ 
+ func fail(t testingT, msg string, msgAndArgs []any) {
++	if t != nil {
++		return
++	}
+ 	if userMsg := assert.FormatMessage(msgAndArgs); userMsg != "" {
+ 		msg = msg + "\n  message: " + userMsg
+ 	}

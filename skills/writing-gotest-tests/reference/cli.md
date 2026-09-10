@@ -139,3 +139,14 @@ grep -q 'TestProbeTargetTestSuite/TestAddsNumbers' cases.txt
 grep -q 'two_plus_two' cases.txt
 go tool gotest spec --input events.json > /dev/null
 ```
+
+**v1.29+ census:** after a green `spec`, `summary` or `-json` run, every
+suite method the source declares must have a verdict in the event stream.
+If one is missing the run exits 2 with `FAIL: census: N declared test(s)
+never ran` and the list: a harness that silently dropped a test is not a
+passed test but an untrustworthy run. `bench --spec`, `--json`, `--save`
+and `--against` runs apply the same rule to declared benchmark methods
+(`... declared benchmark(s) never ran`). The census only judges green,
+unfiltered runs; `-run`, `-skip`, `-list` and, for bench, `-bench` print
+`note: census skipped` instead. The plain text run is never censused, so
+gate CI on `summary`, `spec`, `-json` or a capturing `bench` run.

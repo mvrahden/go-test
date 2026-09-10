@@ -167,6 +167,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 			return 2
 		}
 		tree = gotestspec.BuildTree(events)
+		code = enforceBenchCensus(os.Stderr, code, goTestArgs, declaredBenchCases(loaded), executedBenchCases(events))
 	}
 
 	var newBaseline gotestbench.Baseline

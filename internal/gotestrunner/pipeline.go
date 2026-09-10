@@ -85,6 +85,8 @@ type PipelineConfig struct {
 	Bench           bool
 	BenchesByPkg    map[string][]string
 	FuzzFuncsByPkg  map[string]map[string][]string
+	// OnSuiteResult, when set, receives every suite result as it is recorded.
+	OnSuiteResult func(pkg string, r SuiteResult)
 }
 
 type PipelineResult struct {
@@ -394,7 +396,7 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		targets = BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.ExclusiveSuitesByPkg, runFlags, pf.UserRunFilter)
 	}
 
-	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
+	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose, collectorOptions(cfg)...)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
 	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
 	bookBuildFailures(collector, overlay.BrokenPackages, compileFailures)
@@ -582,7 +584,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	buildFailed := len(overlay.BrokenPackages) > 0
 	var allTargets []SuiteTarget
 
-	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
+	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose, collectorOptions(cfg)...)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
 	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
 	// Broken packages flush ahead of the suite packages: their verdicts are
@@ -826,4 +828,12 @@ loop:
 	}
 	applyTeardownFailure(&result, teardownErr)
 	return result, nil
+}
+
+// collectorOptions turns the optional pipeline hooks into collector options.
+func collectorOptions(cfg PipelineConfig) []OutputOption { //nolint:gocritic // hugeParam: stable API
+	if cfg.OnSuiteResult == nil {
+		return nil
+	}
+	return []OutputOption{WithSuiteObserver(cfg.OnSuiteResult)}
 }

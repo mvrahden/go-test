@@ -2322,3 +2322,35 @@ func (s *GotestrunnerTestSuite) TestSharedFixtureProcess(t *gotest.T) {
 		})
 	})
 }
+
+func (s *GotestrunnerTestSuite) TestOutputCollectorObserver(t *gotest.T) {
+	t.When("an observer is registered", func(w *gotest.T) {
+		var seen []string
+		c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false,
+			gotestrunner.WithWriters(&bytes.Buffer{}, &bytes.Buffer{}),
+			gotestrunner.WithSuiteObserver(func(pkg string, r gotestrunner.SuiteResult) {
+				seen = append(seen, pkg+":"+string(r.Stdout)+":"+strconv.Itoa(r.ExitCode))
+			}))
+		c.Register("a", 1)
+		c.Register("b", 1)
+		c.RecordResult("a", 0, gotestrunner.SuiteResult{Stdout: []byte(`{"Action":"pass","Package":"a"}` + "\n")})
+		c.RecordResult("b", 0, gotestrunner.SuiteResult{Stdout: []byte(`{"Action":"fail","Package":"b"}` + "\n"), ExitCode: -1})
+
+		w.It("sees every recorded result, raw, with the normalized exit code", func(it *gotest.T) {
+			gotest.Equal(it, []string{
+				"a:" + `{"Action":"pass","Package":"a"}` + "\n:0",
+				"b:" + `{"Action":"fail","Package":"b"}` + "\n:1",
+			}, seen)
+		})
+	})
+
+	t.When("no observer is registered", func(w *gotest.T) {
+		c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&bytes.Buffer{}, &bytes.Buffer{}))
+		c.Register("a", 1)
+
+		w.It("records results as before", func(it *gotest.T) {
+			c.RecordResult("a", 0, gotestrunner.SuiteResult{Stdout: []byte("ok\n")})
+			gotest.Equal(it, 0, c.WorstExitCode())
+		})
+	})
+}

@@ -27,6 +27,7 @@ type OutputCollector struct {
 	flushed  int
 	worst    int
 	captured bytes.Buffer
+	observer func(pkg string, r SuiteResult)
 
 	// StdlibTestsByPkg lets Finalize distinguish packages that truly have no
 	// test files from packages whose tests gotest does not run (stdlib tests).
@@ -42,6 +43,13 @@ type pkgState struct {
 }
 
 type OutputOption func(*OutputCollector)
+
+// WithSuiteObserver reports every recorded suite result, raw, to fn. The
+// census reads the JSON stream this way in -json mode, where nothing else
+// keeps the events once they are written out.
+func WithSuiteObserver(fn func(pkg string, r SuiteResult)) OutputOption {
+	return func(c *OutputCollector) { c.observer = fn }
+}
 
 func WithWriters(stdout, stderr io.Writer) OutputOption {
 	return func(c *OutputCollector) {
@@ -121,6 +129,9 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //n
 	s := c.pkgs[pkg]
 	s.results[idx] = r
 	s.completed++
+	if c.observer != nil {
+		c.observer(pkg, r)
+	}
 
 	switch c.mode {
 	case RunBatchText:

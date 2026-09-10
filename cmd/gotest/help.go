@@ -183,6 +183,13 @@ Usage:
 Runs test suites and renders a BDD-style specification tree showing
 pass/fail/skip status for each suite, method, and subtest.
 
+A green run is believed only when every declared test method produced a
+verdict. If a method the source declares never ran, the run exits 2 with
+"FAIL: census: N declared test(s) never ran" and the missing methods: a
+dropped test is not a failed test but a run that cannot be trusted. The
+census applies to green runs only and stands down under -run, -skip and
+-list with a note on stderr.
+
 Flags:
   --format=<fmt>          Output format: terminal (default), md, json
   --output=<file>         Write to file instead of stdout
@@ -221,6 +228,13 @@ Designed for CI pipelines where the full spec tree is too verbose.
 
 When all tests pass, prints a single success line. When tests fail,
 prints each failure with its package, test path, and assertion output.
+
+A green run is believed only when every declared test method produced a
+verdict. If a method the source declares never ran, the run exits 2 with
+"FAIL: census: N declared test(s) never ran" and the missing methods: a
+dropped test is not a failed test but a run that cannot be trusted. The
+census applies to green runs only and stands down under -run, -skip and
+-list with a note on stderr.
 
 Flags:
   --format=<fmt>          Output format: terminal (default), md, json
@@ -346,6 +360,11 @@ When both are given, a suite must match both to run (e.g.
 
 If no packages contain any BenchmarkX methods, prints "no benchmarks
 found" and exits 0 without invoking go test.
+
+A capturing run (--spec, --json, --save or --against) is believed only
+when every declared BenchmarkX method reported a result. If one never ran,
+the run exits 2 with "FAIL: census: N declared benchmark(s) never ran";
+-run and -bench stand the census down with a note on stderr.
 
 --against prints a delta table (BENCHMARK / OLD ns/op / NEW ns/op / Δ)
 comparing each benchmark's new mean ns/op against the saved baseline's.

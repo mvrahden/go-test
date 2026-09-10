@@ -1,0 +1,11 @@
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -533,7 +533,7 @@
+ 	case ActionPass:
+ 		return StatusPass
+ 	case ActionFail:
+-		return StatusFail
++		return StatusPass
+ 	case ActionSkip:
+ 		return StatusSkip
+ 	}

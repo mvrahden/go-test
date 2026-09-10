@@ -1,0 +1,20 @@
+--- a/internal/gotestgen/static/gotest.suites.tpl
++++ b/internal/gotestgen/static/gotest.suites.tpl
+@@ -53,7 +53,7 @@
+   })
+   gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
+ 
+-{{ range $tc := $ts.TestCases }}
++{{ range $i, $tc := $ts.TestCases }}{{ if ne $i 0 }}
+   t.Run("{{ $tc.Identifier }}", func(it *testing.T) {
+ {{- if $ts.IsMethodParallel }}
+     it.Parallel()
+@@ -102,7 +102,7 @@
+     return
+   }
+ {{- end }}
+-{{ end }}
++{{ end }}{{ end }}
+ }
+ {{- end }}
+ 

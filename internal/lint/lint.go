@@ -852,6 +852,24 @@ func (mr *methodReach) mark(fd *ast.FuncDecl, paramIdx int, method string, pos t
 	return true
 }
 
+// isStdlibT reports whether id denotes a *testing.T (or an untyped ident the
+// type checker could not resolve, kept conservative as before).
+func (mr *methodReach) isStdlibT(id *ast.Ident) bool {
+	obj := mr.pass.TypesInfo.Uses[id]
+	if obj == nil {
+		return true
+	}
+	ptr, ok := obj.Type().(*types.Pointer)
+	if !ok {
+		return false
+	}
+	named, ok := ptr.Elem().(*types.Named)
+	if !ok || named.Obj().Pkg() == nil {
+		return false
+	}
+	return named.Obj().Pkg().Path() == "testing" && named.Obj().Name() == "T"
+}
+
 func (mr *methodReach) resolveCallee(call *ast.CallExpr) *ast.FuncDecl {
 	var ident *ast.Ident
 	switch fn := call.Fun.(type) {
@@ -885,7 +903,10 @@ func (mr *methodReach) scanDirect(fd *ast.FuncDecl) {
 			if ok {
 				if esc, ok := escapeConfigs[sel.Sel.Name]; ok && !esc.directOnly {
 					method := sel.Sel.Name
-					if id, ok := sel.X.(*ast.Ident); ok {
+					// A method called on the parameter itself is an escape only
+					// when the parameter is the stdlib T: Errorf on a *gotest.T
+					// helper parameter is the call the rule recommends.
+					if id, ok := sel.X.(*ast.Ident); ok && mr.isStdlibT(id) {
 						if idx, ok := aliases[id.Name]; ok {
 							mr.mark(fd, idx, method, node.Pos())
 						}

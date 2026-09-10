@@ -970,6 +970,133 @@ t=8s    All suites done, wg.Wait() returns
 
 ---
 
+## 9. Testing gotest
+
+gotest runs its own tests with gotest; there is no `go test` step. A framework
+that tests itself has one structural risk: a bug in the framework can make a
+red run look green, because a check that reports through the broken
+machinery cannot see the break. What keeps the single runner from being
+circular is a small trust base, a rule about which tests may use gotest's
+assertions, and four guards, one per way a broken core could turn red into
+green.
+
+**The trust base.** Everything below relies only on what Go guarantees
+regardless of gotest; everything else is under test.
+
+- `go test` computes the exit status and the `-json` event stream from
+  `testing.T` state. Nothing outside the `testing` package can un-fail a
+  `testing.T`.
+- `gotest.T.Errorf` and `FailNow` delegate to the embedded `*testing.T`
+  (`pkg/gotest/t.go`), and the generated harness invokes every suite method
+  inside a real `t.Run`. A check written as plain `if` plus `t.Errorf`
+  inside a suite method is therefore recorded by Go, not by gotest.
+- `go/ast` parses source without running anything; `encoding/json` decodes
+  the event stream; the CI shell can invert an exit code.
+
+**The failure modes.** A broken core can only do harm as a false green; a
+false red fails CI and a person looks. Each way to a false green has one
+guard:
+
+| Failure mode | Example | Guard |
+|---|---|---|
+| Absence: a declared test never runs | the generator omits a method, the harness skips it, discovery misses the suite | census |
+| Swallowed failure: the test runs but its failure is not recorded | a wrong assertion predicate, `fail` is a no-op, `T` wired to the wrong `testing.T` | ring 0 and the canary |
+| Misreported verdict: the failure is recorded but the run says green | exit-code aggregation returns 0, the event parser drops `fail` events, the tree classifies `fail` as `pass` | canary |
+| Lifecycle: hooks or fixtures misbehave | `BeforeEach` not called, teardown skipped | a swallowed failure, for any test that records the order |
+
+**Two rings.** Ring 0 is the code every other test's *reporting* depends
+on: `pkg/gotest/internal/assert`, `pkg/gotest/internal/snapfile`,
+`pkg/gotestruntime`, the event, tree and stats layer of `internal/gotestspec`,
+and the canary in `tests/canary`. Ring 1 is everything else.
+
+Ring-0 tests are gotest suites, but their bodies check with plain Go:
+`if got != want { t.Errorf(...) }`, and `t.FailNow()` to halt. They never
+call a `gotest.*` assertion, so a broken assertion kernel cannot pass the
+tests of the kernel. The rule is stated on each file's package clause with
+`//nolint:fail-guard`; packages with several such files keep their raw-check
+helpers in a `ring0_suite_test.go`. The rule is an allowlist, not a ban on
+the `gotest` import: a ring-0 suite may call `gotest.DefaultSuiteConfig`,
+`DefaultFixtureConfig`, `Each`, `Must`, the `Export*` shims and, in the
+suite that tests it, `gotest.MatchSnapshot`. Any other exported `gotest`
+function is an assertion and must not appear. Ring-0 suites live in
+external test packages (`assert_test`, `gotestruntime_test`, …) so that the
+harness can import `gotest`; internals reach them through `export_test.go`
+shims. `package gotest` itself cannot host a suite, because the harness
+would import the package it lives in.
+
+Ring-1 tests are ordinary suites: gotest assertions, `When`/`It` structure,
+parallel by default. A ring-1 suite may exercise ring-0 code, and constantly
+does; it may not be the only test of it.
+
+A ring-0 suite protects as well as the stdlib test it replaced. It can fail
+to protect in only two ways: it never ran, which the census catches, or its
+failure was misreported, which the canary catches. Its own checks are
+recorded by `testing`.
+
+**The guards.**
+
+1. **Census** (`cmd/gotest/census.go`) catches absence. After a green
+   `spec`, `summary` or `-json` run, every method the source declares must
+   have a verdict in the event stream. The declared set is read from the AST
+   through `gotestast`, the same source `discover` uses, after focus and
+   exclusion; the executed set is every `Suite/Method` pair with a terminal
+   action (`pass`, `fail`, `skip`), and a suite skipped as a whole covers
+   its methods. A missing verdict makes the run exit 2, printing the missing
+   methods. It is exit 2, not 1: a dropped test is not a failed test but a
+   run that cannot be believed, the same code an uncompilable package gets.
+   Granularity is the method, which is exact; `When`/`It` rows can depend
+   on runtime values. Only green runs are censused, since a red run is
+   already not a false green, and a `FailFast` stop or a `-failfast` run
+   legitimately leaves methods unexecuted. Under `-run`, `-skip` and
+   `-list` the census stands down with a note on stderr, because those
+   flags change the declared set with `go test`'s per-level regexp
+   semantics, and CI runs are unfiltered. The plain text run
+   (`gotest ./...`) has no event stream and is not censused; every CI gate
+   is. A capturing `bench` run (`--spec`, `--json`, `--save`, `--against`)
+   is censused over the declared benchmark methods, whose verdict is the
+   `ns/op` result line or a `fail`; `-bench` stands it down.
+2. **Ring-0 raw checks** catch a swallowed failure in the kernel: the tests
+   of the assertion kernel never call it, so a kernel that always passes
+   cannot pass them.
+3. **Canary** (`tests/canary`) catches a misreported verdict, and a
+   swallowed failure end to end. It builds the CLI, runs it over eight
+   fixture packages written to fail in specific ways (a green suite, one failing assertion per family, a halting
+   `FailNow`, `AfterEach` after a failure, lifecycle order, a benchmark
+   suite, an uncompilable package, a panicking method), and compares exit codes and the raw `-json`
+   verdicts with a checked-in golden list (`testdata/expected.txt`), checking
+   with plain Go. The golden list is a third source of truth that shares no
+   code with discovery or generation. That closes the census's one blind
+   spot: `discover` and the generator both read `gotestast`, so a bug that
+   broke both identically would make the census agree on the wrong set; the
+   golden list would still disagree.
+4. **Drill** (`make drill`, `tests/drill`, six mutants) turns the argument
+   into evidence. Each patch in `tests/drill/mutants/` plants one bug in a
+   core component in a scratch copy of the tree; a `gotest` built from the
+   unmodified tree then runs the copy's ring-0 packages and canary and must
+   report them red. The judge is built pristine because the first drill
+   showed the alternative: the mutant that zeroes the exit code graded the
+   very run that was judging it. Which check catches which mutant is in
+   `tests/drill/README.md`. A patch that no longer applies fails the drill,
+   so mutants cannot silently stop testing anything. The drill runs in CI on
+   every push and pull request.
+
+**Boundaries.**
+
+- The plain text run is not censused; that would need test2json in the
+  fast loop.
+- Filtered runs are not censused. `gotestruntime.CountMatchingTests`
+  already models the per-level regexp semantics, if a filtered census is
+  ever wanted.
+- `When`/`It` rows are not censused; that would need the static spec's
+  handling of behaviors it cannot enumerate.
+- The extension's runs use `-json` and inherit the census. Showing its
+  message in the editor is an open UI question.
+
+The migration that established this found a real defect the stdlib tests could
+not: called under the harness of a parallel suite, the call-site tracer
+reported `harness.go:38` as the user's frame. The tracer now treats
+`pkg/gotestruntime/` as gotest code.
+
 ## Key Design Decisions
 
 1. **AST over reflection**: Discovery is compile-time, not runtime. This

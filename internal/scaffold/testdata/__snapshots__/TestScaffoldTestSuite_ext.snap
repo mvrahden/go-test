@@ -1,0 +1,97 @@
+=== SNAP TestScaffoldIntegration ===
+package sampletype
+
+import (
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type UserServiceTestSuite struct {
+	sut *UserService
+}
+
+func (s *UserServiceTestSuite) BeforeEach(t *gotest.T) {
+	s.sut = nil // TODO: initialize UserService
+}
+
+func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
+	t.It("succeeds", func(it *gotest.T) {
+		// TODO: test UserService.Create(ctx context.Context, name string) error
+	})
+	t.It("returns error", func(it *gotest.T) {
+		// TODO: test error case
+	})
+}
+
+func (s *UserServiceTestSuite) TestDelete(t *gotest.T) {
+	t.It("succeeds", func(it *gotest.T) {
+		// TODO: test UserService.Delete(ctx context.Context, id string) error
+	})
+	t.It("returns error", func(it *gotest.T) {
+		// TODO: test error case
+	})
+}
+
+func (s *UserServiceTestSuite) TestGetByID(t *gotest.T) {
+	t.It("succeeds", func(it *gotest.T) {
+		// TODO: test UserService.GetByID(ctx context.Context, id string) (*sampletype.UserService, error)
+	})
+	t.It("returns error", func(it *gotest.T) {
+		// TODO: test error case
+	})
+}
+
+=== SNAP TestScaffoldIntegration_File ===
+package sampletype
+
+import (
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type FuncsTestSuite struct{}
+
+func (s *FuncsTestSuite) TestApplyTax(t *gotest.T) {
+	t.It("works", func(it *gotest.T) {
+		// TODO: test ApplyTax(amount float64, region string) float64
+	})
+}
+
+func (s *FuncsTestSuite) TestCalculateDiscount(t *gotest.T) {
+	t.It("works", func(it *gotest.T) {
+		// TODO: test CalculateDiscount(amount float64, tier string) float64
+	})
+}
+
+=== SNAP TestScaffoldIntegration_Interface ===
+package sampletype
+
+import (
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type ValidatorContractTestSuite[T Validator] struct {
+	factory func() T
+	sut     T
+}
+
+func (s *ValidatorContractTestSuite[T]) BeforeEach(t *gotest.T) {
+	s.sut = s.factory()
+}
+
+func (s *ValidatorContractTestSuite[T]) TestIsValid(t *gotest.T) {
+	t.It("works", func(it *gotest.T) {
+		// TODO: test Validator.IsValid(input string) bool
+	})
+}
+
+func (s *ValidatorContractTestSuite[T]) TestValidate(t *gotest.T) {
+	t.It("succeeds", func(it *gotest.T) {
+		// TODO: test Validator.Validate(input string) error
+	})
+	t.It("returns error", func(it *gotest.T) {
+		// TODO: test error case
+	})
+}
+
+// Instantiate the contract for a concrete implementation:
+// type MyValidatorTestSuite = ValidatorContractTestSuite[*MyImpl]
+

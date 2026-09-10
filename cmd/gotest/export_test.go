@@ -51,3 +51,24 @@ var ExportPlanFuzzSession = planFuzzSession
 type ExportFuzzSession = fuzzSession
 
 var ExportParseJobsFlag = parseJobsFlag
+
+type ExportCensusCase = censusCase
+
+var ExportExecutedCases = executedCases
+var ExportCensusMissing = censusMissing
+var ExportEnforceCensus = enforceCensus
+var ExportExecutedBenchCases = executedBenchCases
+var ExportEnforceBenchCensus = enforceBenchCensus
+var ExportRunBench = runBench
+
+type ExportCorpusArg = corpusArg
+
+var ExportSelectFuzzTargets = selectFuzzTargets
+var ExportFuzzSessionLine = fuzzSessionLine
+var ExportRenderFuzzSessionMarkdown = renderFuzzSessionMarkdown
+var ExportParseCorpusFile = parseCorpusFile
+var ExportExtractDecodedInput = extractDecodedInput
+var ExportExtractCause = extractCause
+var ExportPromoteCrasher = promoteCrasher
+
+func ExportSpliceExpr(a corpusArg) string { return a.spliceExpr() }

@@ -10,3 +10,15 @@ func ExportExplodeSeeds(f *F, explode func(seed []any) ([]any, error)) ([][]any,
 	return f.explodeSeeds(explode)
 }
 func ExportSeeds(f *F) [][]any { return f.seeds }
+
+var (
+	ExportIsExternalPackage = isExternalPackage
+	ExportSplitTestName     = splitTestName
+	ExportSnapshotReadonly  = snapshotReadonly
+	ExportReadAndRestore    = readAndRestore
+	ExportPkgCache          = &pkgCache
+)
+
+// ExportMatchSnapshotFromPtest calls MatchSnapshot from this internal test
+// file, so caller-package detection sees a ptest caller and picks no suffix.
+func ExportMatchSnapshotFromPtest(t testingT, value any) { MatchSnapshot(t, value) }
