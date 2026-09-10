@@ -126,7 +126,7 @@ BenchmarkCache
   ✓ PutEviction  141.7 ns/op · 55 B/op · 1 allocs/op
   ✓ FillFromEmpty  291740 ns/op · 415091 B/op · 4114 allocs/op
 
-1 suites, 4 benchmarks: 
+1 suite, 4 benchmarks: 
 ```
 
 ### Baseline, compare, gate
@@ -139,7 +139,7 @@ BenchmarkCache
   ✓ PutEviction  146.1 ns/op · 55 B/op · 1 allocs/op
   ✓ FillFromEmpty  328712 ns/op · 415093 B/op · 4114 allocs/op
 
-1 suites, 4 benchmarks: 
+1 suite, 4 benchmarks: 
 ```
 
 ```
@@ -152,7 +152,7 @@ BenchmarkCache
 
 BENCHMARK  OLD ns/op  NEW ns/op  Δ
 
-1 suites, 4 benchmarks: 
+1 suite, 4 benchmarks: 
 ```
 
 ```
@@ -165,7 +165,7 @@ BenchmarkCache
 
 BENCHMARK  OLD ns/op  NEW ns/op  Δ
 
-1 suites, 4 benchmarks: 
+1 suite, 4 benchmarks: 
 ```
 
 The command above exits `0`.

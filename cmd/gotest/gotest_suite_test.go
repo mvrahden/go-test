@@ -1432,7 +1432,7 @@ func (s *CmdGotestTestSuite) TestBenchSubcommand(t *gotest.T) {
 
 			summary, err := os.ReadFile(summaryPath)
 			gotest.NoError(it, err)
-			gotest.Contains(it, string(summary), "### 1 benchmarks ran (")
+			gotest.Contains(it, string(summary), "### 1 benchmark ran (")
 			gotest.Contains(it, string(summary), "| Benchmark | ns/op | B/op | allocs/op |")
 			gotest.Contains(it, string(summary), "| NotificationDispatchBenchTestSuite/BenchmarkDispatch | ")
 			gotest.NotContains(it, string(summary), "tests passed")
@@ -1513,7 +1513,7 @@ func (s *CmdGotestTestSuite) TestBenchSaveAgainstGate(t *gotest.T) {
 		// once, with no second, stacked "N tests passed (...)" trailer
 		// from a separate RenderSummary call. Benchmarks carry no
 		// pass/fail verdicts, so this trailer ends after the counts.
-		gotest.Contains(it, out, "1 suites, 1 benchmarks")
+		gotest.Contains(it, out, "1 suite, 1 benchmark")
 		gotest.NotContains(it, out, "tests passed (")
 	})
 }

@@ -158,7 +158,7 @@ func (s *FuzzNodeTestSuite) TestRendering(t *gotest.T) {
 		out := buf.String()
 		gotest.Contains(it, out, "RoundTrip  2 seeds")
 		gotest.NotContains(it, out, "seed #1")
-		gotest.Contains(it, out, "1 fuzz targets")
+		gotest.Contains(it, out, "1 fuzz target")
 	})
 
 	t.It("lists the seeds when one of them failed", func(it *gotest.T) {
@@ -178,7 +178,7 @@ func (s *FuzzNodeTestSuite) TestRendering(t *gotest.T) {
 	t.It("counts fuzz targets in the markdown trailer", func(it *gotest.T) {
 		var buf bytes.Buffer
 		gotestspec.RenderMarkdown(&buf, pkgs)
-		gotest.Contains(it, buf.String(), "1 fuzz targets")
+		gotest.Contains(it, buf.String(), "1 fuzz target")
 		gotest.Contains(it, buf.String(), "RoundTrip")
 	})
 }

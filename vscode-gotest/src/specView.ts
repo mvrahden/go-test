@@ -767,9 +767,10 @@ function formatDuration(seconds: number): string {
 
 function buildSummary(stats: SpecStats): string {
   const counts: string[] = [];
-  if (stats.suites > 0) counts.push(`${stats.suites} suites`);
-  if (stats.behaviors > 0) counts.push(`${stats.behaviors} behaviors`);
-  if ((stats.fuzzers ?? 0) > 0) counts.push(`${stats.fuzzers} fuzz targets`);
+  if (stats.suites > 0) counts.push(countNoun(stats.suites, "suite"));
+  if (stats.behaviors > 0) counts.push(countNoun(stats.behaviors, "behavior"));
+  if ((stats.fuzzers ?? 0) > 0)
+    counts.push(countNoun(stats.fuzzers ?? 0, "fuzz target"));
   if (stats.tests > 0) counts.push(`${stats.tests} stdlib tests`);
 
   const failedPackages = stats.failedPackages ?? 0;
@@ -828,6 +829,11 @@ function fmtTime(seconds: number): string {
 
 type ReportRow =
   { label: string; time: string; result: string } | { raw: string };
+
+/** Spells a count with its noun, singular for exactly one, as the CLI trailer does. */
+export function countNoun(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? "" : "s"}`;
+}
 
 export function specDataToReport(
   data: SpecData,
@@ -916,11 +922,11 @@ export function specDataToReport(
   lines.push(separator);
 
   const counts: string[] = [];
-  if (data.stats.suites > 0) counts.push(`${data.stats.suites} suites`);
+  if (data.stats.suites > 0) counts.push(countNoun(data.stats.suites, "suite"));
   if (data.stats.behaviors > 0)
-    counts.push(`${data.stats.behaviors} behaviors`);
+    counts.push(countNoun(data.stats.behaviors, "behavior"));
   if ((data.stats.fuzzers ?? 0) > 0)
-    counts.push(`${data.stats.fuzzers} fuzz targets`);
+    counts.push(countNoun(data.stats.fuzzers ?? 0, "fuzz target"));
   if (data.stats.tests > 0) counts.push(`${data.stats.tests} stdlib tests`);
   const results: string[] = [];
   if (totalAgg.passed > 0) results.push(`${totalAgg.passed} passed`);

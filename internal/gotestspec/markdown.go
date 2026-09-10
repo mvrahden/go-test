@@ -15,22 +15,7 @@ func RenderMarkdown(w io.Writer, packages []*Package, opts ...RenderOption) {
 
 	fmt.Fprintln(w, "# Behavior Specification")
 	fmt.Fprintln(w)
-	var counts []string
-	if stats.Suites > 0 {
-		counts = append(counts, fmt.Sprintf("%d suites", stats.Suites))
-	}
-	if stats.Behaviors > 0 {
-		counts = append(counts, fmt.Sprintf("%d behaviors", stats.Behaviors))
-	}
-	if stats.Tests > 0 {
-		counts = append(counts, fmt.Sprintf("%d stdlib tests", stats.Tests))
-	}
-	if stats.Benchmarks > 0 {
-		counts = append(counts, fmt.Sprintf("%d benchmarks", stats.Benchmarks))
-	}
-	if stats.Fuzzers > 0 {
-		counts = append(counts, fmt.Sprintf("%d fuzz targets", stats.Fuzzers))
-	}
+	counts := countParts(stats)
 	if cfg.withoutVerdicts {
 		// "0 passed, 0 failed, 0 skipped" beside a document nothing ran reads
 		// as a run that lost its results, rather than as a specification.

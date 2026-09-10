@@ -273,7 +273,7 @@ There's a useful consequence of this structure. Because test methods, `When` blo
   <span class="t-test">DeleteUser</span> <span class="t-time">(3ms)</span>
     <span class="t-when">when the user exists</span> <span class="t-time">(3ms)</span>
       <span class="t-pass">✓</span> succeeds without error <span class="t-time">(3ms)</span>
-<span class="t-summary">1 suites, 3 behaviors: <span class="t-pass">3 passed</span></span>
+<span class="t-summary">1 suite, 3 behaviors: <span class="t-pass">3 passed</span></span>
 {{< /terminal >}}
 
 This isn't generated documentation; it's a direct rendering of your test structure. If a test is missing, the spec has a gap. If a test fails, the spec shows it. The test *is* the specification.

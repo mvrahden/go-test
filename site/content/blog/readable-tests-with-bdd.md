@@ -145,7 +145,7 @@ The structure in the code is only half the value. The other half is what you see
   <span class="t-test">Delete</span> <span class="t-time">(5ms)</span>
     <span class="t-pass">✓</span> soft-deletes the user <span class="t-time">(5ms)</span>
 
-<span class="t-summary">1 suites, 4 behaviors: 4 passed</span>
+<span class="t-summary">1 suite, 4 behaviors: 4 passed</span>
 {{< /spec >}}
 
 Compare this with the `gotest ./... -v` output for the same tests — the standard verbose stream, since suites run through the `gotest` runner. The spec output is:
@@ -167,7 +167,7 @@ When a test fails, the tree structure tells you exactly where:
   <span class="t-test">Delete</span> <span class="t-time">(5ms)</span>
     <span class="t-pass">✓</span> soft-deletes the user <span class="t-time">(5ms)</span>
 
-<span class="t-summary">1 suites, 4 behaviors: 3 passed, <span class="t-fail">1 failed</span></span>
+<span class="t-summary">1 suite, 4 behaviors: 3 passed, <span class="t-fail">1 failed</span></span>
 {{< /spec >}}
 
 The red cross at "sends a welcome email" under "email is valid" is a sentence: *UserService Create, when email is valid, fails to send a welcome email.* You know what's broken without reading any code.
@@ -208,7 +208,7 @@ The spec output reflects the nesting:
       <span class="t-when">payment fails</span> <span class="t-time">(2ms)</span>
         <span class="t-pass">✓</span> does not create an order <span class="t-time">(2ms)</span>
 
-<span class="t-summary">1 suites, 3 behaviors: 3 passed</span>
+<span class="t-summary">1 suite, 3 behaviors: 3 passed</span>
 {{< /spec >}}
 
 Each level of `When` narrows the context. The spec reads as a decision tree: checkout, when the cart is not empty, when payment succeeds, creates an order. You can trace any path from root to leaf and get a complete behavioral statement.
