@@ -45,24 +45,25 @@ jobs:
   `permissions: contents: write`. Embed it as
   `https://raw.githubusercontent.com/<owner>/<repo>/ci/badges/coverage.svg`.
   The badge needs no shields.io, gist or token setup — do not add any.
-- **v1.27+ bench inputs:** `bench: true` runs `gotest bench --spec --json`
-  after the tests (the `flags` input is forwarded to it — the place for
-  `-benchtime=1x` smoke runs); `bench-baseline` compares (`--against`),
+- **v1.29+ bench inputs:** `bench: true` runs `gotest bench --spec --json`
+  after the tests. The `flags` input is forwarded to it, which is where a
+  `-benchtime=1x` smoke run goes. `bench-baseline` compares (`--against`),
   `bench-gate` fails on regressions above the percentage, and `bench-save`
-  writes a baseline (a path; an explicit empty string saves to
-  `bench.baseline` from `.gotest.yml`; the `false` default saves nothing).
+  writes a baseline: a path, or an explicit empty string for
+  `bench.baseline` from `.gotest.yml`; the `false` default saves nothing.
   Outputs: `bench-report` (path to the `--json` report file) and
-  `bench-breached-keys` (comma-joined gate offenders). README.md's inputs/
-  outputs tables are canonical and drift-guarded.
+  `bench-breached-keys` (comma-joined gate offenders). README.md's input
+  and output tables are canonical and drift-guarded.
 - **v1.29+ fuzz inputs:** `fuzz: true` runs `gotest fuzz` over the same
-  packages after the tests, for `fuzz-for` (default: the CLI's own minute); the session's
-  table lands in the step summary, a new crasher fails the step and its
-  corpus file stays in the checkout, listed in the `fuzz-crashers` output
-  for an upload-artifact step or `gotest fuzz promote`. Seed replay needs
-  no input: every ordinary run already replays seeds. The step carries
-  Go's fuzz cache between runs by default (`fuzz-cache: false` opts out),
-  so sessions compound; setup-go's build cache alone would not, since it
-  is never re-saved on a key hit.
+  packages after the tests, for `fuzz-for` (default: the CLI's own
+  minute). The session's table lands in the step summary. A new crasher
+  fails the step; its corpus file stays in the checkout and is listed in
+  the `fuzz-crashers` output, for an upload-artifact step or
+  `gotest fuzz promote`. Seed replay needs no input, since every ordinary
+  run already replays seeds. The step carries Go's fuzz cache between
+  runs by default, so sessions compound; `fuzz-cache: false` opts out.
+  setup-go's build cache alone would not carry it: that cache is never
+  re-saved on a key hit.
 - CI environments auto-arm `--ci` (any non-falsy `CI`/`GOTEST_CI` value):
   committed `F_` focus prefixes FAIL the run, and snapshots become
   read-only (`--update-snapshots` will not write). Opt out with

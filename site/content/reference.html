@@ -569,6 +569,8 @@ percentage = covered / total</div>
           <tr><td><code>gotest spec ./...</code></td><td>Run tests and render the behavioral specification. With <code>--static</code>, render it from source without running.</td></tr>
           <tr><td><code>gotest discover ./...</code></td><td>Discover test suites and output JSON (feeds editor integrations).</td></tr>
           <tr><td><code>gotest summary ./...</code></td><td>Failure-focused summary for CI. Shows only failing tests with assertion output.</td></tr>
+          <tr><td><code>gotest bench ./...</code></td><td>Run <code>Benchmark*</code> suite methods serially; <code>--save</code>, <code>--against</code> and <code>--gate</code> keep and compare baselines.</td></tr>
+          <tr><td><code>gotest fuzz ./...</code></td><td>Search for new failing inputs with <code>Fuzz*</code> suite methods for a time budget (<code>--for</code>); <code>fuzz triage</code> and <code>fuzz promote</code> handle what it finds.</td></tr>
           <tr><td><code>gotest lint ./...</code></td><td>Static analysis for test suites — see <a href="#linter">Linter</a>.</td></tr>
           <tr><td><code>gotest scaffold ./pkg/user.Svc</code></td><td>Generate a suite skeleton from any Go type.</td></tr>
           <tr><td><code>gotest migrate ./...</code></td><td>Convert testify/suite tests automatically.</td></tr>
@@ -598,6 +600,14 @@ percentage = covered / total</div>
           <tr><td><code>--timeout=&lt;dur&gt;</code></td><td>Global pipeline deadline (default: 15m, <code>0</code> to disable).</td></tr>
           <tr><td><code>--parallel=&lt;n&gt;</code></td><td>Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for <code>-race</code>/<code>-msan</code>/<code>-asan</code>).</td></tr>
           <tr><td><code>--compile-parallel=&lt;n&gt;</code></td><td>Concurrent compilation processes (default: NumCPU, auto-halved for <code>-race</code>/<code>-msan</code>/<code>-asan</code>).</td></tr>
+          <tr><td><code>--save=&lt;path&gt;</code></td><td>Save a benchmark run as a JSON baseline (<code>bench</code>).</td></tr>
+          <tr><td><code>--against=&lt;path&gt;</code></td><td>Compare a benchmark run against a saved baseline and print the delta table (<code>bench</code>).</td></tr>
+          <tr><td><code>--gate=&lt;pct&gt;</code></td><td>Fail if the worst significant benchmark regression exceeds the threshold (<code>bench</code>).</td></tr>
+          <tr><td><code>--json</code></td><td>Emit one versioned JSON report instead of human output (<code>bench</code>).</td></tr>
+          <tr><td><code>--for=&lt;dur&gt;</code></td><td>Approximate wall-clock budget for the whole fuzz session, split across targets (<code>fuzz</code>; default 1m, <code>0</code> removes the budget).</td></tr>
+          <tr><td><code>--jobs=&lt;n&gt;</code></td><td>Maximum concurrent fuzz targets (<code>fuzz</code>; default max(1, GOMAXPROCS/2)).</td></tr>
+          <tr><td><code>--target=&lt;name&gt;</code></td><td>Fuzz exactly one generated target by its wrapper name (<code>fuzz</code>).</td></tr>
+          <tr><td><code>--no-harvest</code></td><td>Do not mine table-test literals into fuzz seeds for this run.</td></tr>
           <tr><td><code>--static</code></td><td>Read the specification from source without running the suites; nodes carry no verdict (<code>spec</code> command).</td></tr>
           <tr><td><code>--render-only</code></td><td>With <code>--input</code>, exit 0 on a failing stream: report whether rendering succeeded, not the test verdict.</td></tr>
           <tr><td><code>--debounce=&lt;dur&gt;</code></td><td>Watch mode debounce interval (default 200ms).</td></tr>
@@ -634,6 +644,9 @@ percentage = covered / total</div>
           <tr><td><code>assertion-type-guard</code></td><td><code>Nil</code>/<code>Empty</code> on types their runtime guards would reject.</td></tr>
           <tr><td><code>shared-fixture-undeclared</code></td><td>Suite reads a shared fixture it never declared — window scheduling only starts declared fixtures, so the read may hit one that never started or is already released.</td></tr>
           <tr><td><code>generated-file</code></td><td>Generated overlay files present in source control.</td></tr>
+          <tr><td><code>bench-loop</code></td><td><code>Benchmark*</code> methods that never touch <code>b.Loop()</code>/<code>b.N</code> — nothing iterates, so the numbers lie.</td></tr>
+          <tr><td><code>fuzz-determinism</code></td><td>Fuzz targets reading <code>time.Now</code>, <code>math/rand</code> or <code>os.Getenv</code> — corpus replay and coverage guidance degrade.</td></tr>
+          <tr><td><code>fuzz-struct-corpus</code></td><td>On-disk corpus entries for a struct-typed fuzz target — bound to the field order; <code>gotest fuzz promote</code> turns them into typed seeds.</td></tr>
         </tbody>
       </table>
 
@@ -647,6 +660,12 @@ percentage = covered / total</div>
           <tr><td><code>fail-guard</code></td><td><code>if cond { Fail/Fatal(...) }</code> guards — the assertion expresses the check directly.</td></tr>
           <tr><td><code>t-escape</code></td><td>Unnecessary <code>t.T()</code> convenience escapes (<code>Errorf</code>, <code>Helper</code>, <code>Log</code>, <code>Fatal</code>, …).</td></tr>
           <tr><td><code>behavior-wording</code></td><td><code>When("when …")</code> or <code>It("it …")</code> — the spec renders the connective and the ✓ glyph plays "it"; the fix drops the word.</td></tr>
+          <tr><td><code>bench-fixture-io</code></td><td>Fixture-backed reads inside the measured loop — times the fixture, not the code.</td></tr>
+          <tr><td><code>bench-wait</code></td><td><code>time.Sleep</code>/<code>Eventually</code>/<code>Consistently</code> inside the measured loop — times the wait.</td></tr>
+          <tr><td><code>fuzz-no-oracle</code></td><td>Fuzz callbacks that assert nothing — only panics are caught.</td></tr>
+          <tr><td><code>fuzz-seed</code></td><td>Fuzz targets with no <code>f.Add</code> seed — exploration starts blind.</td></tr>
+          <tr><td><code>fuzz-hook-io</code></td><td>IO in <code>BeforeEach</code>/<code>AfterEach</code> of a fuzzing suite — the hooks replay around every execution.</td></tr>
+          <tr><td><code>fuzz-raw-seed</code></td><td>Raw <code>[]byte</code> seeds on a position that does not take <code>[]byte</code> — write a typed literal.</td></tr>
         </tbody>
       </table>
 

@@ -1,8 +1,10 @@
 # benchmarking — LRU Cache Hot Path
 
-A fixed-capacity in-process LRU cache sitting in front of a slow store — the
-kind of thing almost every service ends up writing, and the one place "is
-this allocation-free?" is a question people actually ask about a hot path.
+This example shows benchmarks on a suite: `BeforeEach` outside the timer, a
+`BeforeAll`-only fixture, and the baseline, compare and gate loop. The subject
+is a fixed-capacity in-process LRU cache in front of a slow store, the kind of
+thing almost every service ends up writing, and the one place "is this
+allocation-free?" is a question people ask about a hot path.
 
 ## Structure
 
@@ -23,16 +25,16 @@ this allocation-free?" is a question people actually ask about a hot path.
 | `BenchmarkFillFromEmpty` | Building a cache from scratch: one op fills a fresh, exactly-sized cache end to end, so eviction is impossible by construction. |
 
 `BenchmarkFillFromEmpty`'s "op" is a full fill of `fillSize` (4096) entries,
-not a single `Put` — its ns/op and allocs/op measure that whole fill, so
-don't read it side by side with the single-`Put` numbers from the other
-three rows. An earlier version tried to get the same "never evicts"
-property from a single cache with headroom (`New(1<<20)`) instead of an
-exact-fit fresh cache per op; at default `-benchtime` it ran millions of
-iterations, filled that headroom about a fifth of the way through, and then
-quietly evicted for the remaining 77% of the run — measuring
-`BenchmarkPutEviction`'s path under `BenchmarkPutCold`'s name. Filling a
-cache whose capacity exactly equals what gets put into it makes eviction
-impossible by construction, independent of how many times `b.Loop()` runs.
+not a single `Put`. Its ns/op and allocs/op measure the whole fill, so do not
+read it beside the single-`Put` numbers of the other three rows.
+
+An earlier version tried to get the same "never evicts" property from a single
+cache with headroom (`New(1<<20)`) instead of a fresh exact-fit cache per op.
+At the default `-benchtime` it ran millions of iterations, filled the headroom
+about a fifth of the way through, and then quietly evicted for the remaining
+77% of the run, measuring `BenchmarkPutEviction`'s path under another name. A
+cache whose capacity equals what gets put into it cannot evict, however many
+times `b.Loop()` runs.
 
 ## The teaching point: `BeforeEach` is outside the timer
 
@@ -89,30 +91,30 @@ PASS
 ok  	github.com/mvrahden/go-test/examples/benchmarking	4.842s
 ```
 
-`BenchmarkGetHit` really is 0 B/op, 0 allocs/op — a map lookup plus a
-handful of pointer swaps to move the entry to the front of the list, never
-a heap allocation.
+`BenchmarkGetHit` really is 0 B/op, 0 allocs/op: a map lookup plus a handful
+of pointer swaps to move the entry to the front of the list, never a heap
+allocation.
 
-The two write benchmarks allocate for different reasons, not the same one.
-`BenchmarkPutEviction` puts a key that has never existed before on every
-call (an ever-incrementing counter through `strconv.Itoa`), so it allocates
-a new `*entry` on every call, and a new key string on nearly every call too
-(`strconv.Itoa` only avoids allocating for the first 100 integers, out of
-the millions this benchmark runs through) — that's 55 B/op here. Its
-reported allocs/op flips between 1 and 2 from run to run at that same 55
-B/op; that's not the code behaving differently, it's how the metric is
-computed. `testing.BenchmarkResult.AllocsPerOp()` is `int64(MemAllocs) /
-int64(N)` — integer division, so it can only ever report a whole number.
-The true per-call average sits close to 2 (essentially every call allocates
-twice) but drifts either side of that boundary run to run, from ordinary
-timing and allocation-count variance across a run's iterations — and
-integer truncation turns "close to 2" into a clean "1" or "2" depending on
-which side it lands on, never a fraction. `BenchmarkFillFromEmpty` reuses
-the corpus's pre-built key/value strings, so it never allocates a key; its
-4114 allocs/op is consistently just under one `*entry` per `fillSize`
-(4096) entries inserted, plus a handful of allocations from the destination
-cache's map growing to size as it fills. Both land far from
-`BenchmarkGetHit`'s zero — that's the contrast this example exists to show.
+The two write benchmarks allocate for different reasons:
+
+- `BenchmarkPutEviction` puts a key that never existed before on every call
+  (an ever-incrementing counter through `strconv.Itoa`), so it allocates a new
+  `*entry` every call and a new key string on nearly every call, since
+  `strconv.Itoa` only avoids allocating for the first 100 integers. That is
+  the 55 B/op.
+- Its allocs/op flips between 1 and 2 from run to run at that same 55 B/op.
+  The code does not behave differently; the metric does. `AllocsPerOp()` is
+  `int64(MemAllocs) / int64(N)`, integer division, so it reports a whole
+  number. The true average sits close to 2 and drifts either side of the
+  boundary with ordinary variance, and truncation turns "close to 2" into a
+  clean 1 or 2.
+- `BenchmarkFillFromEmpty` reuses the corpus's pre-built key/value strings, so
+  it never allocates a key. Its 4114 allocs/op is just under one `*entry` per
+  `fillSize` (4096) entries, plus a handful from the destination cache's map
+  growing as it fills.
+
+Both land far from `BenchmarkGetHit`'s zero, which is the contrast this
+example exists to show.
 
 ### Spec view
 
@@ -168,15 +170,12 @@ BENCHMARK  OLD ns/op  NEW ns/op  Δ
 
 The command above exits `0`.
 
-None of the four benchmarks appear in the delta table in this pair of
-runs — every old-vs-new difference here is small enough that it didn't
-clear the statistical significance test, so it's correctly reported as
-noise rather than a real change, and there's nothing for `--gate=10` to
-act on. Had a row cleared significance in the slow direction by more than
-10%, it would appear with a trailing `⚠` and the command would exit 1;
-`gotest bench`'s own `--against` docs (`gotest help bench`) describe the
-same delta table appearing with rows in it when that happens. Deltas alone
-never change the exit code — only `--gate` does.
+None of the four benchmarks appear in the delta table in this pair of runs:
+every difference is too small to clear the significance test, so it is
+reported as noise, and there is nothing for `--gate=10` to act on. A row that
+cleared significance in the slow direction by more than 10% would appear with
+a trailing `⚠` and the command would exit 1. Deltas alone never change the
+exit code; only `--gate` does.
 
 ## Why these numbers are trustworthy
 

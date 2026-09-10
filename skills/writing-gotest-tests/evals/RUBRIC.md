@@ -12,9 +12,10 @@ grade it.
 A skill makes three separable claims; each needs its own experiment:
 
 - **T (trigger):** the skill loads when it should and never when it
-  shouldn't. Requires REAL installation (`~/.claude/skills/` or the
-  consumer's `.claude/skills/`) — "read this file first" instructions test
-  content, not discovery, and cannot measure T.
+  shouldn't. Requires REAL installation in the harness's skills directory
+  (user-level or in the consumer repository, wherever the client under
+  test looks) — "read this file first" instructions test content, not
+  discovery, and cannot measure T.
 - **C (content):** with the skill loaded, behavior improves on the target
   gaps versus a paired baseline run.
 - **H (harm / over-application):** the skill does not cause damage where

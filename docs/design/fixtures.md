@@ -77,7 +77,7 @@ TestKeyTestSuite/TestCreate            PASS
 
 Filter with `-run TestBatchTestSuite` to run only batch tests.
 
-## Fixture Dependencies (Level 2)
+## Fixture Dependencies
 
 Fixtures can reference other fixtures via named pointer fields to form a DAG.
 Setup runs in topological order (dependencies first; independent fixtures in parallel).
@@ -189,7 +189,7 @@ TestBatchTestSuite/TestDispatch     PASS
 
 Filter with `-run TestReconcilerTestSuite` to run only reconciler tests.
 
-## Shared Fixtures (Level 3, `*SharedFixture` suffix)
+## Shared Fixtures (`*SharedFixture` suffix)
 
 Shared fixtures run in a subprocess managed by the `gotest` CLI.
 They start once per CLI invocation and are shared across all packages.

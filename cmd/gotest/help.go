@@ -33,7 +33,6 @@ func showHelp(topic string) {
 		printWatchHelp()
 	case "bench":
 		printBenchHelp()
-
 	case "fuzz":
 		printFuzzHelp()
 	case "discover":
@@ -71,7 +70,6 @@ Usage:
 
 Subcommands:
   bench       Run BenchmarkX suite methods serially
-
   fuzz        Run FuzzX suite methods with go test -fuzz
   spec        Render behavioral specification from test output
   summary     Show failure-focused test summary for CI
@@ -385,130 +383,83 @@ Examples:
 }
 
 func printFuzzHelp() {
-	fmt.Print(`gotest fuzz — run FuzzX suite methods with go test -fuzz
+	fmt.Print(`gotest fuzz — search for failing inputs with FuzzX suite methods
 
 Usage:
   gotest fuzz [flags] [packages...]
   gotest fuzz triage [packages...]     Re-run each crasher, report if it still fails
   gotest fuzz promote [packages...]    Splice crashers into f.Add(...) seeds
 
-Discovers suites containing FuzzX methods (written with gotest.F and
-f.Fuzz, see "gotest help scaffold") and runs each one's generated
-Fuzz<SuiteName>_<MethodName> wrapper as its own "go test -fuzz=..." process,
-one target per invocation of go test. This is unlike every other gotest
-subcommand: a suite binary compiled once with "go test -c" has no native
-fuzz instrumentation, because cmd/go only weaves it in when -fuzz is present
-at "go test" time. So fuzzing cannot reuse the shared compiled binary and
-each target gets its own background "go test -fuzz" process instead.
+Runs every Fuzz<SuiteName>_<MethodName> wrapper the target packages
+generate as its own "go test -fuzz" process, several at a time (--jobs),
+for a shared time budget (--for). Output streams live, one line at a
+time, prefixed "[<Func>] ".
 
-Multiple targets run concurrently (bounded by --jobs) and each one streams
-its output live, line by line, prefixed with "[<Func>] ", so long-running
-fuzz sessions show progress rather than going silent until they exit.
-
-Seed corpus replay (the seeds added via f.Add in a FuzzX method, plus any
-corpus gotest fuzz has since discovered under testdata/fuzz/) already
-happens for free as part of an ordinary "gotest" or "gotest test" run —
-those replay as regular subtests, at zero extra cost, without -fuzz and
-without this subcommand. Reach for "gotest fuzz" specifically to spend time
-mutating and searching for new failing inputs.
-
-"gotest lint" flags common fuzz-writing mistakes: fuzz-determinism (reading
-time.Now/math-rand/os.Getenv from a fuzz target breaks corpus replay),
-fuzz-no-oracle (a callback that asserts nothing only catches panics),
-fuzz-seed (no f.Add seeds means coverage-guided exploration starts blind),
-fuzz-struct-corpus (on-disk corpus entries for a struct-typed target are
-bound to its field order and silently reinterpreted when two same-kind
-fields swap — promote them to typed seeds), fuzz-hook-io (a
-BeforeEach/AfterEach that does IO replays around every execution and
-throttles the fuzzer), and fuzz-raw-seed (a raw []byte seed on a position
-that does not take []byte is rejected outright).
-
-Seed harvesting (on by default): at generation time, gotest mines your
-test files' table-test literals and direct call-site arguments that flow
-into a fuzz target's function-under-test, and injects them as f.Add(...)
-seeds in the generated wrapper — turning your existing valid-input
-examples into a starting corpus without any extra authoring. Only literal
-primitive values from _test.go sources are harvested, never production
-code or computed expressions. Disable it for one run with --no-harvest, or
-persistently via "fuzz: harvest: false" in .gotest.yml (see "gotest help
-config").
+Seeds already replay without this subcommand: every f.Add seed and every
+corpus entry under testdata/fuzz/ runs as an ordinary subtest of a plain
+"gotest" run. Use "gotest fuzz" to spend time searching for new inputs.
 
 Flags:
-  --for=<dur>             Approximate wall-clock fuzz budget for the whole
-                           session: each target's -fuzztime share is
-                           --for × min(--jobs, targets) / targets, floored
-                           at 10s, so concurrent waves add back up to ≈--for.
-                           The resolved schedule is printed before fuzzing
-                           starts. Default: 1m. --for=0 removes the budget:
-                           targets then fuzz until interrupted (exit 0 when
-                           nothing was found).
-  --jobs=<n>               Max concurrent targets (default: max(1, GOMAXPROCS/2))
-  --target=<Fuzz...>       Fuzz exactly one generated target, named by its
-                           wrapper (e.g. FuzzParserTestSuite_FuzzParse, as
-                           shown in session output). An unmatched name is an
-                           error listing the available targets. This is the
-                           editor's unit of invocation; combined with --for
-                           the whole budget goes to that one target.
-  --no-cache               Disable overlay cache, force fresh generation
-  --debug                  Keep generated overlay for inspection
+  --for=<dur>             Wall-clock budget for the whole session (default 1m).
+                          Each target gets --for × min(--jobs, targets) / targets,
+                          never less than 10s; the resolved schedule prints
+                          before the search starts. --for=0 removes the budget:
+                          targets fuzz until interrupted.
+  --jobs=<n>              Max concurrent targets (default: max(1, GOMAXPROCS/2))
+  --target=<Fuzz...>      Fuzz one target, named by its wrapper as printed in
+                          session output; an unmatched name lists the targets
+  --no-harvest            Do not mine table-test literals into seeds for this run
+  --no-cache              Disable overlay cache, force fresh generation
+  --debug                 Keep generated overlay for inspection
 
---for is the session's only clock: the deadline follows it (the schedule
-plus headroom for builds), so --timeout is refused here rather than left to
-compete. If that deadline still expires, the targets that lost time are
-listed and gotest prints "[<Func>] skipped: ..." for each one that never
-started. With --for=0 there is no deadline and only the first --jobs targets
-run, since each holds its slot until interrupted.
+--for is the session's only clock: the deadline follows it, so --timeout
+is refused here. With --for=0 only the first --jobs targets run, since
+each holds its slot until interrupted.
 
-Every session closes with one line saying what ran and what was found
-(targets, executions, new interesting inputs, crashers); under GitHub
-Actions the session is also appended to $GITHUB_STEP_SUMMARY as a table.
+Exit codes:
+  0   The budget ran out or the session was interrupted with nothing found
+  1   A finding: a failing target or a new crasher file
+  2   The session could not run as requested
 
-If no packages contain any FuzzX methods, prints "no fuzz targets found"
-and exits 0 without invoking go test.
+A new crasher is named as it is found:
+  [FuzzParserTestSuite_FuzzParse] new crasher: <pkg>/testdata/fuzz/FuzzParserTestSuite_FuzzParse/1a2b3c
+Inspect it with "gotest fuzz triage", keep it with "gotest fuzz promote".
+Every session closes with one line (targets, executions, new interesting
+inputs, crashers); under GitHub Actions the same session is appended to
+$GITHUB_STEP_SUMMARY as a table. With no FuzzX methods anywhere, the
+command prints "no fuzz targets found" and exits 0.
 
-Triage and promote (crasher management):
+Triage:
+  "gotest fuzz triage" scans each target's testdata/fuzz/<Func>/ directory
+  and re-runs every entry via "go test -run='^<Func>/<hash>$'", printing
+  its decoded input and the failure cause, or "status: no longer failing":
+    FuzzParserTestSuite_FuzzParse: 1 crasher
+      file:  testdata/fuzz/FuzzParserTestSuite_FuzzParse/1a2b3c
+      input: string("a@\x00")
+      cause: panic: runtime error: index out of range [3] with length 3
+  Exits 1 while any crasher still fails, 0 otherwise. Entries of a type it
+  cannot decode are reported and skipped, one file at a time.
 
-"gotest fuzz triage [packages...]" scans every discovered fuzz target's
-testdata/fuzz/<Func>/ directory (a plain filesystem scan — no go test -fuzz
-invoked) and, for each corpus entry found there, prints its decoded input
-and re-runs just that entry via "go test -run='^<Func>/<hash>$'":
-  FuzzParserTestSuite_FuzzParse: 1 crasher
-    file:  testdata/fuzz/FuzzParserTestSuite_FuzzParse/1a2b3c
-    input: string("a@\x00")
-    cause: panic: runtime error: index out of range [3] with length 3
-A crasher whose re-run now passes (e.g. after a fix landed) is reported as
-"status: no longer failing" instead of a cause line. Exits 0 if there are no
-crashers, or every crasher found turns out to no longer fail; exits 1 if any
-crasher's re-run still fails. Corpus entries only decode Go's native
-primitive types (string, []byte, bool, and the int/uint/float variants) —
-one with an unsupported entry is reported and skipped, one file at a time.
+Promote:
+  "gotest fuzz promote" splices each crasher into its FuzzX method as a
+  permanent f.Add(...) seed, after the method's last f.Add, and deletes
+  the file; the seed then replays on every ordinary run:
+    promoted FuzzParserTestSuite_FuzzParse/1a2b3c -> f.Add("a@\x00") in parser_test.go:42
+  A crasher whose method cannot be located with confidence is left in
+  place with a warning; promote never partially edits source.
 
-"gotest fuzz promote [packages...]" does the same discovery, but instead of
-re-running each crasher, splices it into its originating FuzzX method as a
-permanent f.Add(...) seed (via internal/refactor's AST edit + go/format
-machinery, directly after the method's last existing f.Add call, or as the
-first statement if it has none), then deletes the crasher file — it's now a
-committed regression test that replays for free on every ordinary run:
-  promoted FuzzParserTestSuite_FuzzParse/1a2b3c -> f.Add("a@\x00") in parser_test.go:42
-If a crasher's originating method can't be located with confidence, it is
-skipped with a warning and the crasher file is left in place — promote never
-partially edits or corrupts user source.
-
-On a crashing input, the session exits 1 and gotest names each new corpus
-file it detected, e.g.:
-  [FuzzParserTestSuite_FuzzParse] new crasher: /abs/pkg/testdata/fuzz/FuzzParserTestSuite_FuzzParse/1a2b3c
-Inspect it with "gotest fuzz triage", then "gotest fuzz promote" to keep it
-as a typed f.Add seed that replays automatically in ordinary runs.
-
-A session that ends by the global --timeout or an interrupt without a
-finding exits 0 — time exhaustion is the normal end of an open-ended
-search, not a failure. Exit 1 means a finding (a failing target or a new
-crasher); exit 2 means the session could not run as requested.
+Seed harvesting is on by default: literal arguments from table tests and
+call sites in _test.go files become extra f.Add seeds at generation time
+(--no-harvest, or "fuzz: harvest: false" in .gotest.yml). "gotest lint"
+checks fuzz targets with the fuzz-* rules (see "gotest help lint"). Why
+each target needs its own "go test -fuzz" process, and how struct
+arguments fan out, is in the README's Fuzzing section.
 
 Examples:
   gotest fuzz ./pkg/parser/...                Fuzz for the default minute
-  gotest fuzz --for=5m ./...                  ~5 minutes of fuzzing wall-clock across all targets
-  gotest fuzz --for=1m --jobs=2 ./...         Cap concurrency to 2 targets at a time
+  gotest fuzz --for=5m ./...                  About five minutes across all targets
+  gotest fuzz --for=1m --jobs=2 ./...         Two targets at a time
+  gotest fuzz --target=FuzzParserTestSuite_FuzzParse ./pkg/parser
 `)
 }
 
@@ -572,8 +523,10 @@ Target is one of:
   ./pkg/path.FuncName      With --fuzz: generate a fuzz skeleton for a
                            single-parameter package-level function
 
-Creates a new _test.go file with a suite struct, a runner function,
-and stub methods for each exported method on the target type.
+Creates a new _test.go file next to the target: a suite struct holding
+the subject, a BeforeEach that constructs it, and one Test method per
+exported method with It stubs (a happy path and an error case for
+methods that return an error). Existing files are never overwritten.
 
 Flags:
   --fuzz    Scaffold a Fuzz<Func> method for a package-level function
@@ -645,12 +598,21 @@ Rules:
   test-signature        Test methods not accepting *gotest.T or *testing.T
   x-lifecycle           X_ prefix on a lifecycle hook (a no-op)
   suite-lifecycle       Cleanup/Parallel/Run via t.T() — bypass the suite lifecycle
+  shared-fixture-undeclared
+                        Reads of a shared fixture the suite never declared as a
+                        field (only declared fixtures are started)
   assertion-simplify    Simplifiable assertions (True(t, a == b) → Equal, …)
   assertion-type-guard  Nil/Empty on types their runtime guards reject
   assertion-redundant   Assertions made redundant by the following assertion
   fail-guard            if cond { Fail/Fatal(...) } guards — use assertions directly
   t-escape              Unnecessary t.T() convenience escapes (incl. Helper/Fatal/Log)
   behavior-wording      When("when …") / It("it …") — the spec supplies those words
+  bench-loop            Benchmark methods that never call b.Loop()/b.N (nothing
+                        iterates, so the numbers lie)
+  bench-fixture-io      Fixture-backed reads inside the measured loop (times the
+                        fixture, not the code)
+  bench-wait            time.Sleep/Eventually/Consistently inside the measured
+                        loop (times the wait, not the code)
   fuzz-determinism      Fuzz targets reading time.Now/math-rand/os.Getenv
   fuzz-no-oracle        Fuzz callbacks that assert nothing (panic-only)
   fuzz-seed             Fuzz targets with no f.Add seeds
@@ -665,10 +627,10 @@ rules also accept a project-wide skip flag (mirrored by .gotest.yml lint.skip):
 
 Flags:
   -skip-<rule>            Disable a non-integrity rule, e.g. -skip-fail-guard
-                          (assertion-simplify, assertion-redundant, behavior-wording, fail-guard,
-                          t-escape, stdlib-test, testify,
-                          fuzz-no-oracle, fuzz-seed, fuzz-hook-io,
-                          fuzz-raw-seed)
+                          (assertion-simplify, assertion-redundant, behavior-wording,
+                          bench-fixture-io, bench-wait, fail-guard, t-escape,
+                          stdlib-test, testify, fuzz-no-oracle, fuzz-seed,
+                          fuzz-hook-io, fuzz-raw-seed)
   -disable-nolint         Ignore //nolint comments
   -fix                    Apply suggested fixes
   --github                Also emit GitHub ::error annotations and append a
@@ -799,14 +761,14 @@ Fields:
   bench:
     baseline: <path>        Default --against baseline path for "gotest bench"
     gate: <float>           Default --gate regression percentage (0 disables)
-
   fuzz:
     harvest: <bool>         Seed harvesting for "gotest fuzz" (default: true;
                              the --no-harvest CLI flag overrides this per-run)
 
 Skippable lint rules (non-integrity only): assertion-redundant,
-assertion-simplify, behavior-wording, fail-guard, fuzz-hook-io,
-fuzz-no-oracle, fuzz-raw-seed, fuzz-seed, stdlib-test, t-escape, testify
+assertion-simplify, behavior-wording, bench-fixture-io, bench-wait,
+fail-guard, fuzz-hook-io, fuzz-no-oracle, fuzz-raw-seed, fuzz-seed,
+stdlib-test, t-escape, testify
 
 Example .gotest.yml:
 
@@ -819,7 +781,6 @@ Example .gotest.yml:
   bench:
     baseline: bench-baseline.json
     gate: 10
-
   fuzz:
     harvest: false
 `)

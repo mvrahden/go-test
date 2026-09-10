@@ -53,7 +53,7 @@ deadline (default 15m) and `--setup-timeout <dur>` the shared-fixture
 setup budget (default 2m) — `0` disables either; `--min <pct>` gates
 coverage, `--no-cache` forces fresh generation, `--debug` keeps overlays.
 
-## Benchmarks — `gotest bench` (v1.27+)
+## Benchmarks — `gotest bench` (v1.29+)
 
 `go tool gotest bench ./...` runs `Benchmark*` suite methods (signature
 `func (s *X) BenchmarkParse(b *gotest.B)`, or stdlib `*testing.B`) through

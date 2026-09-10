@@ -1,8 +1,8 @@
 # fuzzing — Wire Protocol Fuzzing, Crash to Regression Test
 
-A message broker's binary frame codec — the thing every service that speaks a custom protocol has,
-and the classic place adversarial input causes CVEs. Fuzzing a codec is not a toy; it is the single
-most common real use of fuzzing in Go.
+This example shows a fuzz-found bug becoming a committed regression test.
+The subject is a message broker's binary frame codec: the code every service with a custom
+protocol has, and the classic place where adversarial input causes CVEs.
 
 ## Structure
 
@@ -23,16 +23,16 @@ most common real use of fuzzing in Go.
 | `FuzzTopicMatches` | two pass-through string arguments, symmetry property |
 | `FuzzHeaderRoundTrip` | a struct beside a pass-through string, **round-trip** property |
 
-`BeforeEach` rebuilds `s.codec` before every execution, not just before every top-level test — fuzz
-targets replay `BeforeEach`/`AfterEach` around each individual execution, the same as any other test.
+`BeforeEach` rebuilds `s.codec` before every execution, not only before every top-level test:
+fuzz targets replay `BeforeEach`/`AfterEach` around each execution, the same as any other test.
 
 ## From crash to regression test
 
-`Frame` packed `Version` and `Kind` into a single byte to save space on the wire — a realistic
-trick that looked safe because `Kind` only ever needs 3 bits today. Neither field was actually
-bounded to fit its share of the byte, so a `Version >= 32` or a `Kind >= 8` silently corrupted the
-other field, breaking `FuzzFrameRoundTrip`'s round-trip property. `gotest fuzz` found it in 11
-executions, under a second:
+`Frame` packed `Version` and `Kind` into one byte to save space on the wire.
+`Kind` needs three bits today, so the trick looked safe.
+Neither field was bounded to its share of the byte, so a `Version >= 32` or a `Kind >= 8` silently
+corrupted the other field and broke `FuzzFrameRoundTrip`'s round-trip property.
+`gotest fuzz` found it in 11 executions, under a second:
 
 ```
 $ go run ./cmd/gotest fuzz ./examples/fuzzing --for=60s
@@ -76,28 +76,35 @@ $ go run ./cmd/gotest fuzz promote ./examples/fuzzing
 promoted FuzzFrameCodecTestSuite_FuzzFrameRoundTrip/582528ddfad69eb5 -> f.Add(Frame{Version: 48, Kind: Kind(0), Topic: "", Headers: nil, Payload: nil, Trace: nil}) in examples/fuzzing/suite_test.go:83
 ```
 
-`Version` and `Kind` were then given their own byte each, and `go run ./cmd/gotest ./examples/fuzzing -v`
-went green — the promoted seed now replays as `FuzzFrameRoundTrip/seed#1` on every run, a permanent
-regression test for the packed-byte bug. (The fuzzer reached the bug via `Version: 48` overflowing
-the 5 bits it shared with `Kind`, rather than via `Kind >= 8` — the same flaw, the byte just gives
-out from either direction.)
+`Version` and `Kind` were then given a byte each, and `go run ./cmd/gotest ./examples/fuzzing -v`
+went green. The promoted seed now replays as `FuzzFrameRoundTrip/seed#1` on every run: a permanent
+regression test for the packed-byte bug. (The fuzzer reached it through `Version: 48` overflowing
+the five bits it shared with `Kind`, not through `Kind >= 8`; the byte gives out from either
+direction.)
 
 ## What the fuzzer can and cannot take
 
 `Frame` exercises every struct shape gotest's fuzzing supports: a named basic (`Kind`, whose
 promoted literals render as `Kind(3)`), a nested struct slice (`[]Header`), a pointer-to-struct
-(`*TraceID`), `[]byte`, and `string`. Go's own fuzzing engine only accepts fifteen primitive types,
-and `Frame` isn't one of them — so `gotest generate` fans it out into one engine argument per leaf
-field and reassembles the `Frame` before each execution. `Frame` comes to eight leaves: `Version`
-and `Kind` each as their own little-endian `[]byte`, `Topic` as a `string` and `Payload` as a
-`[]byte` (both passed through untouched), `Headers` packed into one `[]byte`, and `Trace` as a
-`bool` nil-flag followed by `Hi` and `Lo`. Each leaf is something the mutator moves on its own,
-which is what puts a boundary value like `Version: 48` one mutation away.
+(`*TraceID`), `[]byte` and `string`. Go's engine accepts only fifteen primitive types, and `Frame`
+is not one of them, so `gotest generate` fans it into one engine argument per leaf field and
+reassembles the `Frame` before each execution. `Frame` comes to eight leaves:
 
-Every position of the callback fans on its own — `FuzzHeaderRoundTrip` mixes a `Header` with a
-plain `string`. Two arguments because the property is
-about two independent values, though: when they belong together, a named struct still says so
-better than a wider tuple, the way `FuzzFrameRoundTrip` uses `Frame`.
+| Field | Leaves |
+|---|---|
+| `Version`, `Kind` | one little-endian `[]byte` each |
+| `Topic` | one `string`, passed through |
+| `Payload` | one `[]byte`, passed through |
+| `Headers` | one packed `[]byte` |
+| `Trace` | a `bool` nil-flag, then `Hi` and `Lo` |
+
+Each leaf is something the mutator moves on its own, which is what puts a boundary value like
+`Version: 48` one mutation away. The mapping rules are in ARCHITECTURE.md, "Code Generation".
+
+Every position of the callback fans on its own: `FuzzHeaderRoundTrip` mixes a `Header` with a plain
+`string`. It takes two arguments because the property is about two independent values; when values
+belong together, a named struct says so better than a wider tuple, the way `FuzzFrameRoundTrip`
+uses `Frame`.
 
 Some shapes are rejected at generation time rather than silently mis-encoded:
 
@@ -111,15 +118,15 @@ Some shapes are rejected at generation time rather than silently mis-encoded:
 
 A rejection is a generation-time error naming the offending field, not a runtime surprise.
 
-A careful reader may wonder whether a nil `Headers`/`Payload` and a genuinely empty one are
-distinguishable after a round trip: they aren't, by convention parity — `Decode` collapses a
-zero-length read to `nil`, and so does the fan on its way in (the engine does not preserve the
-distinction either: a nil `[]byte` seed comes back as `[]byte{}` after a trip through the corpus
-format). Both sides agree on which one to produce, under replay and under `-fuzz` alike.
+Two details a careful reader may check:
 
-`go run ./cmd/gotest lint ./examples/fuzzing/...` reports nothing and exits 0 — but only because
-`FuzzNormalizeTopicIdempotent` carries a `//nolint:fuzz-seed` directive. Without it the `fuzz-seed`
-rule would flag that target for having no explicit `f.Add` seed of its own, which is intentional
-here, not an oversight: its seeds are harvested from `TestNormalizeTopicTable`'s literals (see the
-Targets table above). Suppressing a rule you can justify — and leaving the reason in the source —
-is the intended workflow.
+- A nil `Headers`/`Payload` and an empty one are not distinguishable after a round trip, by
+  convention parity: `Decode` collapses a zero-length read to `nil`, and so does the fan on its way
+  in. The engine does not preserve the distinction either; a nil `[]byte` seed comes back as
+  `[]byte{}` after a trip through the corpus format. Both sides agree, under replay and under
+  `-fuzz` alike.
+- `go run ./cmd/gotest lint ./examples/fuzzing/...` reports nothing only because
+  `FuzzNormalizeTopicIdempotent` carries a `//nolint:fuzz-seed` directive. Its seeds are harvested
+  from `TestNormalizeTopicTable`'s literals (see the Targets table), so the missing `f.Add` is
+  intentional. Suppressing a rule you can justify, with the reason in the source, is the intended
+  workflow.

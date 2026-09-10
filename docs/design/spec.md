@@ -120,7 +120,6 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `spec` | Run tests and render behavioral specification |
 | `summary` | Run tests and render a failure-focused summary (CI mode) |
 | `bench` | Run `BenchmarkX` suite methods serially via `go test -bench` |
-
 | `fuzz` | Orchestrate `FuzzX` suite targets with a shared time budget |
 | `lint` | Run gotest-specific linter checks |
 | `refactor` | Toggle focus prefixes: `refactor toggle-focus <file> <Suite[.Method]>` |
@@ -158,7 +157,6 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`) |
 | `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`) |
 | `--json` | Emit one versioned JSON report to stdout — results, deltas, gate verdict — instead of human output (`bench`; for tooling) |
-
 | `--for=<dur>` | Approximate wall-clock fuzz budget for the session, split jobs-aware across targets (`fuzz`; default 1m or half of a shorter `--timeout`; `0` removes the budget; per-target share floors at 10s) |
 | `--target=<name>` | Fuzz exactly one generated wrapper by name; unmatched names error with the available list (`fuzz`) |
 | `--jobs=<n>` | Max concurrent fuzz targets (`fuzz`; default: max(1, GOMAXPROCS/2)) |
@@ -642,7 +640,12 @@ type SuiteConfig struct {
 }
 ```
 
-`Exclusive` is resolved statically like `Parallel` and consumed by the runner, not the harness: exclusive suites are held back until every non-exclusive suite has finished, then dispatched one at a time in deterministic (package, suite) order — in batch and streaming pipelines alike. It exists for suites whose verdicts measure wall-clock behavior or fight over resources (timing budgets, containers, ports, per-invocation child builds): a budget verdict taken on a saturated machine is not a verdict you can act on. Shared fixture processes stay up for exclusive suites — they are infrastructure, not competing suites. Under `-race`/`-msan`/`-asan`, dispatch and compile concurrency defaults are additionally halved (an explicit `--parallel`/`--compile-parallel` always wins): instrumentation at least doubles the CPU cost per instruction stream, and the uninstrumented defaults would oversubscribe the machine.
+`Exclusive` is resolved statically like `Parallel` and consumed by the runner, not the harness:
+
+- Exclusive suites are held back until every non-exclusive suite has finished, then dispatched one at a time in deterministic (package, suite) order, in batch and streaming pipelines alike.
+- It exists for suites whose verdicts measure wall-clock behavior or fight over resources (timing budgets, containers, ports, per-invocation child builds): a budget verdict taken on a saturated machine is not a verdict you can act on.
+- Shared fixture processes stay up for exclusive suites; they are infrastructure, not competing suites.
+- Under `-race`/`-msan`/`-asan` the dispatch and compile concurrency defaults are halved, since instrumentation at least doubles the CPU cost per instruction stream; an explicit `--parallel`/`--compile-parallel` always wins.
 
 (Test-case retries are deliberately not offered — retrying flaky tests hides real defects; fixture `Retries` exist because infrastructure setup is legitimately flaky.)
 
@@ -1056,7 +1059,7 @@ $ gotest scaffold ./pkg/user/service.go
 ```
 
 Output is written as `<snake_case>_suite_test.go` next to the target; existing files are never overwritten.
-The subcommand takes no flags — unknown flags are rejected.
+`--fuzz` is the subcommand's only flag (a fuzz skeleton for a package-level function); unknown flags are rejected.
 Uses `packages.Load` for type introspection.
 
 ---
@@ -1106,9 +1109,17 @@ UserService (133ms)
 
 Internally runs `go test -json`, parses the event stream, reconstructs the suite→method→When/It hierarchy from `/`-separated test paths, and strips Go naming conventions for display.
 
-**Labels come from the source.** A subtest name cannot be turned back into the description that produced it: `go test` writes an underscore for every space, so `returns snake_case keys` and `returns snake case keys` arrive as the same name. The renderer therefore reads the declared descriptions from source — the same walker that backs `--static` and `discover` — and shows each behavior under the words the developer actually wrote. A stream replayed with `--input` reads declarations too: the packages the stream names are loaded from the working directory, so an editor rendering a captured run shows the labels the run showed. Behaviors source cannot enumerate (a `When` behind a condition, a table that is not a literal), and packages a replay cannot reach (a stream from another module, a checkout without the source), fall back to reconstructing the label from the name, exactly as before — loading never fails a render. Subtest *names* are untouched either way, so `-run` filters, snapshot keys and saved baselines are unaffected.
+**Labels come from the source.** A subtest name cannot be turned back into the description that produced it: `go test` writes an underscore for every space, so `returns snake_case keys` and `returns snake case keys` arrive as the same name. The renderer therefore reads the declared descriptions from source, with the same walker that backs `--static` and `discover`, and shows each behavior under the words the developer wrote.
 
-**Vocabulary.** The `when` prefix above is applied by the renderer, not written in the label: `t.When("email is valid")` displays as `when email is valid`, while `It` labels render verbatim (the ✓/✗/~ icon plays the role of "it"). You write the condition; gotest supplies the connective. Which call declared a subtest is read from source alongside the description, and travels with it, so `gotest spec`, `gotest discover` and a replayed stream (`--input`) render one behavior one way. A label that already opens with a connective of its own is left alone rather than doubled — "when" itself, and also with, without, given, if, unless, after, before, while, once, on, upon, as, for, during, under, whenever — matched as a whole word in any case, whether the separator is a space or an underscore; "with an empty cache" stays as written, "withdrawing funds" becomes "when withdrawing funds". The vocabulary is display metadata only — `vocab` in the JSON tree, `kind` in discovery — and never reaches a subtest name. The `behavior-wording` lint rule flags a description that spells the connective anyway.
+- A stream replayed with `--input` reads declarations too: the packages the stream names are loaded from the working directory, so an editor rendering a captured run shows the labels the run showed.
+- Behaviors the source cannot enumerate (a `When` behind a condition, a table that is not a literal) and packages a replay cannot reach (a stream from another module, a checkout without the source) fall back to reconstructing the label from the name. Loading never fails a render.
+- Subtest *names* are untouched either way, so `-run` filters, snapshot keys and saved baselines are unaffected.
+
+**Vocabulary.** The `when` prefix above is applied by the renderer, not written in the label: `t.When("email is valid")` displays as `when email is valid`, while `It` labels render verbatim (the ✓/✗/~ icon plays the role of "it"). You write the condition; gotest supplies the connective.
+
+- Which call declared a subtest is read from source alongside the description and travels with it, so `gotest spec`, `gotest discover` and a replayed stream render one behavior one way.
+- A label that already opens with a connective of its own is left alone rather than doubled. The connectives: when, with, without, given, if, unless, after, before, while, once, on, upon, as, for, during, under, whenever, matched as a whole word in any case, with a space or an underscore after it. "with an empty cache" stays as written; "withdrawing funds" becomes "when withdrawing funds".
+- The vocabulary is display metadata only (`vocab` in the JSON tree, `kind` in discovery) and never reaches a subtest name. The `behavior-wording` lint rule flags a description that spells the connective anyway.
 
 ### Durations
 
@@ -1186,7 +1197,12 @@ $ gotest discover ./...
 Emits the static suite model as JSON — the integration surface for editors and AI tooling (the VS Code extension's test explorer runs on it).
 No tests are executed.
 
-`behaviors` carries the `When`/`It` tree each method declares, read from source: `name` is the subtest segment `go test` will produce (so it matches an observed run byte for byte), `display` is the text the developer wrote, spoken in its vocabulary — the same string `gotest spec` renders for this node, so an editor showing both never spells one behavior two ways — `kind` names the call it came from (`when`, `it`, `each`), and `line` locates it. Two rewrites the source does not spell out are applied so that `name` really does match: a description repeated among its siblings gains the `#01` suffix the testing package appends, and a description containing a single slash becomes one node per level (a run of slashes, as in `https://`, is not a separator and stays within one level). `behaviorsComplete` reports whether that tree is exhaustive — `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears only once the method has run. Consumers must not present an incomplete list as the whole specification.
+`behaviors` carries the `When`/`It` tree each method declares, read from source:
+
+- `name` is the subtest segment `go test` will produce, so it matches an observed run byte for byte. Two rewrites the source does not spell out make that true: a description repeated among its siblings gains the `#01` suffix the testing package appends, and a description containing a single slash becomes one node per level (a run of slashes, as in `https://`, is not a separator and stays within one level).
+- `display` is the text the developer wrote, spoken in its vocabulary: the same string `gotest spec` renders for this node, so an editor showing both never spells one behavior two ways.
+- `kind` names the call it came from (`when`, `it`, `each`); `line` locates it.
+- `behaviorsComplete` reports whether the tree is exhaustive. `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears only once the method has run. Consumers must not present an incomplete list as the whole specification.
 
 ```
 { "packages": [ {
@@ -1357,7 +1373,6 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `generated-file` | `gotest_p(x)suite_test.go` files present in source control |
 | `shared-fixture-undeclared` | Suite-method reads of a `*SharedFixture` value the suite never declared as a pointer field (directly or through the fixture DAG) — window scheduling starts only declared fixtures, so the value may be absent; locally-constructed fixtures (fixture self-tests) are exempt |
 | `bench-loop` | `Benchmark*` suite methods that never touch `b.Loop()`/`b.N` — nothing iterates, so the numbers lie |
-
 | `fuzz-determinism` | Fuzz targets (one hop into same-package callees) reading nondeterministic state — `time.Now`, `math/rand{,/v2}`, `os.Getenv` — corpus replay and coverage guidance degrade |
 | `fuzz-struct-corpus` | On-disk corpus entries for a shape-bound fuzz target (struct, pointer, array, non-byte slice) — one value per leaf in field order, so a same-kind reorder silently reinterprets them and an added or removed field rejects them; `gotest fuzz promote` turns them into typed `f.Add` seeds |
 
@@ -1372,7 +1387,6 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `behavior-wording` | A `When` description that opens with "when", or an `It` description that opens with "it" — the spec renders the connective and the ✓ glyph plays "it", so the word is said twice; the fix drops it (whole word, any case except all capitals — `IT department…` is an acronym — space or underscore after it; a description that is only the word is left alone) |
 | `bench-fixture-io` | `Benchmark*` methods reading fixture-backed state inside the measured loop — times whatever backs the fixture, not the code under test (heuristic; hoist the read above the loop) |
 | `bench-wait` | `time.Sleep`/`gotest.Eventually`/`gotest.Consistently` inside the measured loop — times the wait, not the code |
-
 | `fuzz-no-oracle` | `f.Fuzz` callbacks that never use their `*gotest.T` — only panics are caught, which defeats property-based fuzzing |
 | `fuzz-seed` | Fuzz targets that never call `f.Add` — coverage-guided exploration starts blind (table-test harvesting may still seed them) |
 | `fuzz-hook-io` | IO-shaped calls (`net/*`, `os/exec`, `database/sql`, `time.Sleep`, filesystem `os` functions) in `BeforeEach`/`AfterEach` of fuzz-declaring suites — the hooks replay around every execution and throttle the fuzzer |
@@ -1412,8 +1426,9 @@ The repository root ships a composite GitHub Action (`action.yml`, "Go - Test Su
     min-coverage: "80"
 ```
 
-Inputs: `packages`, `race`, `coverage`, `min-coverage`, `flags`, `go-test-flags`, `version`.
-Outputs: `exit-code`, `coverage`.
+Inputs: `packages`, `race`, `coverage`, `min-coverage`, `flags`, `go-test-flags`, `badge`, `badge-branch`, `bench`, `bench-baseline`, `bench-gate`, `bench-save`, `fuzz`, `fuzz-for`, `fuzz-cache`, `version`.
+Outputs: `exit-code`, `coverage`, `badge`, `bench-report`, `bench-breached-keys`, `fuzz-crashers`.
+README.md's input and output tables are canonical; a drift guard keeps them in step with `action.yml`.
 
 Manual setup works without the action:
 
@@ -1438,7 +1453,13 @@ A `bench` run that captures events (`--spec`, `--json`, `--save`, `--against`) i
 
 The exit code of `spec --input` and `summary --input` answers two questions at once: whether the stream carried failures (1) and whether the command itself failed (2). A client that renders a stream rather than gating on it needs only the second, and passes `--render-only` to drop the first; 2 is never suppressed, so an unreadable input or an unparseable stream still fails. Consumers that treat any non-zero exit as "the command broke" — rather than reading the rendered document on stdout — will misread a failing test run as a broken tool.
 
-Every package a pattern matches ends in exactly one verdict. A package that fails to load or compile — a syntax error, a type error, a nonexistent path — is a failed package (exit 2): its diagnostics are booked into the same output stream as suite results, grouped under a `# <import-path>` header, so text output, `--json` events, `spec`, `summary`, and `--input` replays all carry the failure. Packages that did build still run; one broken package never blocks the rest. `run`, `watch`, `spec`, and `summary` book-and-continue this way; `generate` and `prepare` fail fast instead, because generated output for an unbuildable package is meaningless; `discover` reports such packages with `"broken": true` and their diagnostics as warnings. "no test suites to run" (exit 0) is reserved for runs where every matched package loaded and none defined suites.
+Every package a pattern matches ends in exactly one verdict. A package that fails to load or compile (a syntax error, a type error, a nonexistent path) is a failed package, exit 2:
+
+- Its diagnostics are booked into the same output stream as suite results, grouped under a `# <import-path>` header, so text output, `--json` events, `spec`, `summary` and `--input` replays all carry the failure.
+- Packages that did build still run; one broken package never blocks the rest. `run`, `watch`, `spec` and `summary` book and continue this way.
+- `generate` and `prepare` fail fast instead, because generated output for an unbuildable package is meaningless.
+- `discover` reports such packages with `"broken": true` and their diagnostics as warnings.
+- "no test suites to run" (exit 0) is reserved for runs where every matched package loaded and none defined suites.
 
 The `--ci` flag fails the run when any `F_` (focus) prefix is committed, preventing accidental focus leaks in CI.
 
