@@ -8,6 +8,7 @@ import (
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"golang.org/x/mod/semver"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -78,12 +79,13 @@ func (s *RuntimeVersionTestSuite) TestCheckRuntimeVersion(t *gotest.T) {
 	})
 }
 
-func (s *RuntimeVersionTestSuite) TestFloorMatchesExtension(t *gotest.T) {
-	t.It("equals MIN_CLI_VERSION in vscode-gotest/src/cli.ts", func(it *gotest.T) {
+func (s *RuntimeVersionTestSuite) TestFloorOrdersWithExtension(t *gotest.T) {
+	t.It("is not above the extension's MIN_CLI_VERSION", func(it *gotest.T) {
 		src, err := os.ReadFile(filepath.Join("..", "..", "vscode-gotest", "src", "cli.ts"))
 		gotest.NoError(it, err)
 		m := regexp.MustCompile(`MIN_CLI_VERSION = "(v[^"]+)"`).FindSubmatch(src)
 		gotest.NotNil(it, m)
-		gotest.Equal(it, string(m[1]), gotestgen.MinRuntimeVersion)
+		gotest.True(it, semver.IsValid(string(m[1])), "MIN_CLI_VERSION %q", m[1])
+		gotest.GreaterOrEqual(it, semver.Compare(string(m[1]), gotestgen.MinRuntimeVersion), 0, "extension floor %s is below the runtime floor %s", m[1], gotestgen.MinRuntimeVersion)
 	})
 }
