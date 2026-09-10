@@ -1188,6 +1188,21 @@ The repository's composite GitHub Action (`action.yml`) wraps this subcommand.
 
 ---
 
+## OpenSpec Reconciliation
+
+```
+$ gotest spec --format=json ./... | gotest-openspec openspec/specs
+```
+
+A separate binary (`cmd/gotest-openspec`) that joins an [OpenSpec](https://openspec.dev/) specs directory with a spec tree: every `#### Scenario:` heading (level three or four, any `.md` file under the directory, file order) is looked up among the tree's `It` leaves.
+A scenario matches when its title equals an `It` label, or a `When` condition (the `display` string minus its `when ` prefix) followed by the `It` label; case, punctuation and spacing are folded before comparison, so `Clamps to zero.` meets `clamps to zero`.
+The tree may come from a run or from `--static`; a static tree carries no verdicts and every match reads as declared.
+
+One line per scenario — `✓ verified`, `✗ failing`, `~ skipped`, `· declared`, `? no behavior` — then a summary line counting each.
+Exit 0 when every scenario has a behavior and none failed; 1 when a scenario has no behavior or a failing one, so the command gates a CI step or an agent's verify pass; 2 when the inputs cannot be read.
+
+---
+
 ## Machine-Readable Discovery
 
 ```

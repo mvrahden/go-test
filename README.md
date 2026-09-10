@@ -203,6 +203,15 @@ gotest spec ./... --static
 gotest spec ./... --static --format=md --output=docs/behavior-spec.md
 ```
 
+### Scenarios from OpenSpec
+
+If the project keeps [OpenSpec](https://openspec.dev/) specs, `gotest-openspec` joins them with the spec tree: each `#### Scenario:` heading is looked up among the `It` leaves (by its title, or by the `When` condition followed by the `It` label), and the command prints one verdict per scenario and exits 1 when any scenario has no behavior or a failing one.
+
+```bash
+go get -tool github.com/mvrahden/go-test/cmd/gotest-openspec@latest
+gotest spec --format=json ./... | go tool gotest-openspec openspec/specs
+```
+
 ## Isolation
 
 Each suite runs in its own process with zero shared state.
