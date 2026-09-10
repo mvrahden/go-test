@@ -320,34 +320,41 @@ Without a target — a top-level stdlib `FuzzX` using gotest as a library —
 `f.Fuzz` binds by reflection and accepts native argument types only.
 
 The fan is a pure function of the declared type, depth-first in
-declaration order: `string`, `[]byte` and `bool` leaves pass through;
-every number rides as a fixed-width little-endian `[]byte` (`pkg/gotestfuzz`
-`Leaf*` codecs, total by construction: short input zero-extends, long input
-truncates); a named type fans as its underlying kind; a nested struct
-inlines its leaves; a pointer becomes a `bool` nil-flag plus the pointee's
-leaves; a `[N]byte` is one `[]byte` leaf and a `[N]T` fans `T` N times; any
-other fuzzable shape (a slice of non-bytes) rides as one packed `[]byte`
-leaf. Numbers ride as bytes on purpose: Go's mutator gives a native integer
-only bounded ±100 arithmetic and a native float only bounded add/sub/mul/div,
+declaration order:
+
+| Declared shape | Engine leaves |
+|---|---|
+| `string`, `[]byte`, `bool` | one leaf, passed through |
+| any number | one fixed-width little-endian `[]byte` (`pkg/gotestfuzz` `Leaf*` codecs; short input zero-extends and long input truncates, so decoding is total) |
+| named type | fans as its underlying kind |
+| nested struct | its leaves, inlined |
+| pointer | a `bool` nil-flag, then the pointee's leaves |
+| `[N]byte` | one `[]byte` leaf |
+| `[N]T` | `T` fanned N times |
+| slice of non-bytes, any other fuzzable shape | one packed `[]byte` leaf |
+| unexported fields, maps, interfaces, channels, funcs, recursive types | refused at generation time with the alternative named (the README's "Struct arguments" table), because generated code that cannot round-trip faithfully would lie |
+
+Numbers ride as bytes on purpose. Go's mutator gives a native integer only
+bounded ±100 arithmetic and a native float only bounded add/sub/mul/div,
 while a `[]byte` gets interesting-value overwrites, bit flips and window
 arithmetic, so a boundary value, `NaN` or `Inf` is one mutation away instead
-of unreachable. The cost is that numeric corpus lines are unreadable; that is
+of unreachable. The cost is unreadable numeric corpus lines. That is
 acceptable only because a failing execution echoes the decoded literal
-(`Frame{Version: 7, …}`) and `triage`/`promote` decode by field path, so the
-two decisions are coupled. The flatten rules, leaf widths and nil-flag
-placement are part of the versioned generated identifier family
-(`ƒ_fuzzfan_v1_…`): changing any of them re-means every corpus position, so
-it is a `v1 → v2` bump. Go's corpus format is positional, which is why
-adding or removing a field invalidates the target's on-disk entries loudly
-(the runner's stale-corpus pre-flight names the entry and the change before
-the engine's own message), why swapping two same-kind fields is the one
-silent case (the `fuzz-struct-corpus` lint rule and `promote` are the
-mitigation), and why a promoted `f.Add(T{…})` literal is the durable
-artifact: `Explode` re-derives positions from the current type on every run.
-Unexported fields, maps, interfaces, channels, funcs and recursive types are
-refused at generation time with the alternative named (the README's
-"Struct arguments" table), because generating code that cannot round-trip
-faithfully would lie.
+(`Frame{Version: 7, …}`) and `triage`/`promote` decode by field path; the
+two decisions are coupled.
+
+The flatten rules, leaf widths and nil-flag placement are part of the
+versioned generated identifier family (`ƒ_fuzzfan_v1_…`): changing any of
+them re-means every corpus position, so it is a `v1 → v2` bump. Go's corpus
+format is positional, which has three consequences:
+
+- adding or removing a field invalidates the target's on-disk entries loudly
+  (the runner's stale-corpus pre-flight names the entry and the change
+  before the engine's own message);
+- swapping two same-kind fields is the one silent case (the
+  `fuzz-struct-corpus` lint rule and `promote` are the mitigation);
+- a promoted `f.Add(T{…})` literal is the durable artifact, because
+  `Explode` re-derives positions from the current type on every run.
 
 When seed harvesting is enabled (`gotestast.HarvestSeeds`, on by default —
 see the README's "Seed harvesting" section), the renderer additionally
