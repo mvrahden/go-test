@@ -96,7 +96,7 @@ Cart
     when the discount exceeds 100 percent
       clamps to zero
 
-1 suites, 1 behaviors
+1 suite, 1 behavior
 {{< /spec >}}
 
 Nothing has run. This is the list of promises the code currently makes, read from source. Put it next to the delta spec and the missing coupon scenario is visible without reading any Go. The reconciliation program below does that comparison for you; for now, note that this is the point at which the spec and the test are the same document, and the document compiles.
@@ -121,7 +121,7 @@ Cart <span class="t-time">(<1ms)</span>
     when the discount exceeds 100 percent <span class="t-time">(<1ms)</span>
       <span class="t-pass">✓</span> clamps to zero <span class="t-time">(<1ms)</span>
 
-1 suites, 1 behaviors: 1 passed
+1 suite, 1 behavior: 1 passed
 {{< /spec >}}
 
 Same tree, now with verdicts. Every line that was a promise in step 3 is a result here, and the result came from executing the behavior, not from an agent's reading of the code.

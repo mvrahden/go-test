@@ -71,7 +71,7 @@ Cart
     when the discount exceeds 100 percent
       clamps to zero
 
-1 suites, 1 behaviors
+1 suite, 1 behavior
 {{< /spec >}}
 
 That is the spec as declared so far. No verdicts, no durations, because nothing has executed. It is the artifact you review at the stage where OpenSpec has you review `proposal.md`, and it is already a compiling Go file. Then the implementation lands, and the same command without `--static` runs the suite:
@@ -85,7 +85,7 @@ Cart <span class="t-time">(<1ms)</span>
                 expected: 0
                 actual:   -5
 
-1 suites, 1 behaviors: 1 failed
+1 suite, 1 behavior: 1 failed
 {{< /spec >}}
 
 The scenario now carries a verdict, and the verdict came from execution rather than from an agent's reading of the code. Fix the clamp, run again, and the `✗` becomes a `✓`. Render with `--format=md` and the same tree becomes the document you attach to the pull request. [Go Tests as Living Documentation]({{< ref "/blog/tests-as-documentation" >}}) covers the terminal, Markdown and JSON forms; the point of this post is only that all three are views of one artifact, and that artifact is the test.
