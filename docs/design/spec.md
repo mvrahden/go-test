@@ -640,7 +640,12 @@ type SuiteConfig struct {
 }
 ```
 
-`Exclusive` is resolved statically like `Parallel` and consumed by the runner, not the harness: exclusive suites are held back until every non-exclusive suite has finished, then dispatched one at a time in deterministic (package, suite) order — in batch and streaming pipelines alike. It exists for suites whose verdicts measure wall-clock behavior or fight over resources (timing budgets, containers, ports, per-invocation child builds): a budget verdict taken on a saturated machine is not a verdict you can act on. Shared fixture processes stay up for exclusive suites — they are infrastructure, not competing suites. Under `-race`/`-msan`/`-asan`, dispatch and compile concurrency defaults are additionally halved (an explicit `--parallel`/`--compile-parallel` always wins): instrumentation at least doubles the CPU cost per instruction stream, and the uninstrumented defaults would oversubscribe the machine.
+`Exclusive` is resolved statically like `Parallel` and consumed by the runner, not the harness:
+
+- Exclusive suites are held back until every non-exclusive suite has finished, then dispatched one at a time in deterministic (package, suite) order, in batch and streaming pipelines alike.
+- It exists for suites whose verdicts measure wall-clock behavior or fight over resources (timing budgets, containers, ports, per-invocation child builds): a budget verdict taken on a saturated machine is not a verdict you can act on.
+- Shared fixture processes stay up for exclusive suites; they are infrastructure, not competing suites.
+- Under `-race`/`-msan`/`-asan` the dispatch and compile concurrency defaults are halved, since instrumentation at least doubles the CPU cost per instruction stream; an explicit `--parallel`/`--compile-parallel` always wins.
 
 (Test-case retries are deliberately not offered — retrying flaky tests hides real defects; fixture `Retries` exist because infrastructure setup is legitimately flaky.)
 
@@ -1104,9 +1109,17 @@ UserService (133ms)
 
 Internally runs `go test -json`, parses the event stream, reconstructs the suite→method→When/It hierarchy from `/`-separated test paths, and strips Go naming conventions for display.
 
-**Labels come from the source.** A subtest name cannot be turned back into the description that produced it: `go test` writes an underscore for every space, so `returns snake_case keys` and `returns snake case keys` arrive as the same name. The renderer therefore reads the declared descriptions from source — the same walker that backs `--static` and `discover` — and shows each behavior under the words the developer actually wrote. A stream replayed with `--input` reads declarations too: the packages the stream names are loaded from the working directory, so an editor rendering a captured run shows the labels the run showed. Behaviors source cannot enumerate (a `When` behind a condition, a table that is not a literal), and packages a replay cannot reach (a stream from another module, a checkout without the source), fall back to reconstructing the label from the name, exactly as before — loading never fails a render. Subtest *names* are untouched either way, so `-run` filters, snapshot keys and saved baselines are unaffected.
+**Labels come from the source.** A subtest name cannot be turned back into the description that produced it: `go test` writes an underscore for every space, so `returns snake_case keys` and `returns snake case keys` arrive as the same name. The renderer therefore reads the declared descriptions from source, with the same walker that backs `--static` and `discover`, and shows each behavior under the words the developer wrote.
 
-**Vocabulary.** The `when` prefix above is applied by the renderer, not written in the label: `t.When("email is valid")` displays as `when email is valid`, while `It` labels render verbatim (the ✓/✗/~ icon plays the role of "it"). You write the condition; gotest supplies the connective. Which call declared a subtest is read from source alongside the description, and travels with it, so `gotest spec`, `gotest discover` and a replayed stream (`--input`) render one behavior one way. A label that already opens with a connective of its own is left alone rather than doubled — "when" itself, and also with, without, given, if, unless, after, before, while, once, on, upon, as, for, during, under, whenever — matched as a whole word in any case, whether the separator is a space or an underscore; "with an empty cache" stays as written, "withdrawing funds" becomes "when withdrawing funds". The vocabulary is display metadata only — `vocab` in the JSON tree, `kind` in discovery — and never reaches a subtest name. The `behavior-wording` lint rule flags a description that spells the connective anyway.
+- A stream replayed with `--input` reads declarations too: the packages the stream names are loaded from the working directory, so an editor rendering a captured run shows the labels the run showed.
+- Behaviors the source cannot enumerate (a `When` behind a condition, a table that is not a literal) and packages a replay cannot reach (a stream from another module, a checkout without the source) fall back to reconstructing the label from the name. Loading never fails a render.
+- Subtest *names* are untouched either way, so `-run` filters, snapshot keys and saved baselines are unaffected.
+
+**Vocabulary.** The `when` prefix above is applied by the renderer, not written in the label: `t.When("email is valid")` displays as `when email is valid`, while `It` labels render verbatim (the ✓/✗/~ icon plays the role of "it"). You write the condition; gotest supplies the connective.
+
+- Which call declared a subtest is read from source alongside the description and travels with it, so `gotest spec`, `gotest discover` and a replayed stream render one behavior one way.
+- A label that already opens with a connective of its own is left alone rather than doubled. The connectives: when, with, without, given, if, unless, after, before, while, once, on, upon, as, for, during, under, whenever, matched as a whole word in any case, with a space or an underscore after it. "with an empty cache" stays as written; "withdrawing funds" becomes "when withdrawing funds".
+- The vocabulary is display metadata only (`vocab` in the JSON tree, `kind` in discovery) and never reaches a subtest name. The `behavior-wording` lint rule flags a description that spells the connective anyway.
 
 ### Durations
 
@@ -1184,7 +1197,12 @@ $ gotest discover ./...
 Emits the static suite model as JSON — the integration surface for editors and AI tooling (the VS Code extension's test explorer runs on it).
 No tests are executed.
 
-`behaviors` carries the `When`/`It` tree each method declares, read from source: `name` is the subtest segment `go test` will produce (so it matches an observed run byte for byte), `display` is the text the developer wrote, spoken in its vocabulary — the same string `gotest spec` renders for this node, so an editor showing both never spells one behavior two ways — `kind` names the call it came from (`when`, `it`, `each`), and `line` locates it. Two rewrites the source does not spell out are applied so that `name` really does match: a description repeated among its siblings gains the `#01` suffix the testing package appends, and a description containing a single slash becomes one node per level (a run of slashes, as in `https://`, is not a separator and stays within one level). `behaviorsComplete` reports whether that tree is exhaustive — `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears only once the method has run. Consumers must not present an incomplete list as the whole specification.
+`behaviors` carries the `When`/`It` tree each method declares, read from source:
+
+- `name` is the subtest segment `go test` will produce, so it matches an observed run byte for byte. Two rewrites the source does not spell out make that true: a description repeated among its siblings gains the `#01` suffix the testing package appends, and a description containing a single slash becomes one node per level (a run of slashes, as in `https://`, is not a separator and stays within one level).
+- `display` is the text the developer wrote, spoken in its vocabulary: the same string `gotest spec` renders for this node, so an editor showing both never spells one behavior two ways.
+- `kind` names the call it came from (`when`, `it`, `each`); `line` locates it.
+- `behaviorsComplete` reports whether the tree is exhaustive. `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears only once the method has run. Consumers must not present an incomplete list as the whole specification.
 
 ```
 { "packages": [ {
@@ -1424,7 +1442,13 @@ Exit codes: 0 = pass, 1 = test failure, 2 = usage, generation, or build error (s
 
 The exit code of `spec --input` and `summary --input` answers two questions at once: whether the stream carried failures (1) and whether the command itself failed (2). A client that renders a stream rather than gating on it needs only the second, and passes `--render-only` to drop the first; 2 is never suppressed, so an unreadable input or an unparseable stream still fails. Consumers that treat any non-zero exit as "the command broke" — rather than reading the rendered document on stdout — will misread a failing test run as a broken tool.
 
-Every package a pattern matches ends in exactly one verdict. A package that fails to load or compile — a syntax error, a type error, a nonexistent path — is a failed package (exit 2): its diagnostics are booked into the same output stream as suite results, grouped under a `# <import-path>` header, so text output, `--json` events, `spec`, `summary`, and `--input` replays all carry the failure. Packages that did build still run; one broken package never blocks the rest. `run`, `watch`, `spec`, and `summary` book-and-continue this way; `generate` and `prepare` fail fast instead, because generated output for an unbuildable package is meaningless; `discover` reports such packages with `"broken": true` and their diagnostics as warnings. "no test suites to run" (exit 0) is reserved for runs where every matched package loaded and none defined suites.
+Every package a pattern matches ends in exactly one verdict. A package that fails to load or compile (a syntax error, a type error, a nonexistent path) is a failed package, exit 2:
+
+- Its diagnostics are booked into the same output stream as suite results, grouped under a `# <import-path>` header, so text output, `--json` events, `spec`, `summary` and `--input` replays all carry the failure.
+- Packages that did build still run; one broken package never blocks the rest. `run`, `watch`, `spec` and `summary` book and continue this way.
+- `generate` and `prepare` fail fast instead, because generated output for an unbuildable package is meaningless.
+- `discover` reports such packages with `"broken": true` and their diagnostics as warnings.
+- "no test suites to run" (exit 0) is reserved for runs where every matched package loaded and none defined suites.
 
 The `--ci` flag fails the run when any `F_` (focus) prefix is committed, preventing accidental focus leaks in CI.
 
