@@ -16,12 +16,14 @@ export { resolveGoBinary } from "./goBinary.js";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
-// Raised to the release that introduced `spec --input --render-only`. The Spec
-// View passes that flag, so an older CLI would reject the invocation outright.
-// Treat this as a contract marker: bump it whenever the extension starts
-// depending on CLI behaviour that older versions do not have. Equals the
-// CLI's gotestgen.MinRuntimeVersion; a Go test keeps them in step.
-const MIN_CLI_VERSION = "v1.27.0";
+// Raised to the release that introduced `gotest bench` and `gotest fuzz`,
+// which the Bench and Fuzz surfaces drive; an older CLI rejects the
+// subcommands outright. Treat this as a contract marker: bump it whenever
+// the extension starts depending on CLI behaviour that older versions do
+// not have. Never below the CLI's gotestgen.MinRuntimeVersion (a Go test
+// guards the order): a CLI the extension accepts must enforce a runtime
+// floor no newer than itself.
+const MIN_CLI_VERSION = "v1.29.0";
 
 export interface CliCommand {
   bin: string;

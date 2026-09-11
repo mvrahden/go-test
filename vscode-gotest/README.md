@@ -36,7 +36,7 @@ The **Spec View** renders your test structure as a behavioral specification — 
 
 The extension invokes the gotest CLI automatically — no separate install needed.
 It runs the CLI your `go.mod` selects: `go tool` when the tool directive is declared, otherwise `go run` at the pinned version.
-The CLI must be **v1.27.0 or newer**; older versions are rejected at activation.
+The CLI must be **v1.29.0 or newer**; older versions are rejected at activation.
 
 ### Install
 
@@ -273,8 +273,8 @@ The extension runs whatever `go.mod` selects, in this order:
 2. **Workspace is gotest module** — If the workspace's `go.mod` declares the gotest module itself (development or `go.work` overlap), uses `go run ./cmd/gotest`.
 3. **Tool directive** — If `go.mod` declares the CLI as a tool (`go get -tool github.com/mvrahden/go-test/cmd/gotest@<version>`), uses `go tool <modulePath>`.
 4. **`go.mod` + replace directive** — If `go.mod` has a `replace` directive for the gotest module, uses `go run modulePath` (no version, respects replace resolution).
-5. **`go.mod` pinned version** — If `go.mod` requires gotest at v1.27.0 or newer, uses `go run modulePath@version`, and offers once to declare the tool at that version (`gotest.suggestToolDirective`; never in a vendored module).
-6. **Pinned below v1.27.0** — Refused with an **Upgrade** action; a newer CLI would generate code the pinned runtime cannot compile.
+5. **`go.mod` pinned version** — If `go.mod` requires gotest at v1.29.0 or newer, uses `go run modulePath@version`, and offers once to declare the tool at that version (`gotest.suggestToolDirective`; never in a vendored module).
+6. **Pinned below v1.29.0** — Refused with an **Upgrade** action; the pinned CLI lacks the bench and fuzz sessions the extension drives, and a newer CLI would generate code the pinned runtime cannot compile.
 7. **`go run @latest`** — Only when no module requires gotest yet, so `scaffold` can run before a pin exists.
 
 In a `go.work` root every `use` module is read: a tool declared by any of them counts, and the pin is the highest across modules, which is what the workspace builds.
