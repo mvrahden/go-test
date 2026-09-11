@@ -645,7 +645,6 @@ type SuiteConfig struct {
 - Exclusive suites are held back until every non-exclusive suite has finished, then dispatched one at a time in deterministic (package, suite) order, in batch and streaming pipelines alike.
 - It exists for suites whose verdicts measure wall-clock behavior or fight over resources (timing budgets, containers, ports, per-invocation child builds): a budget verdict taken on a saturated machine is not a verdict you can act on.
 - Shared fixture processes stay up for exclusive suites; they are infrastructure, not competing suites.
-- Under `-race`/`-msan`/`-asan` the dispatch and compile concurrency defaults are halved, since instrumentation at least doubles the CPU cost per instruction stream; an explicit `--parallel`/`--compile-parallel` always wins.
 
 (Test-case retries are deliberately not offered — retrying flaky tests hides real defects; fixture `Retries` exist because infrastructure setup is legitimately flaky.)
 
@@ -1637,6 +1636,9 @@ cmd/gotest/                  CLI entrypoint, subcommands, arg handling
 
 internal/config/             .gotest.yml project configuration loading
 internal/gotestspec/         Spec tree builder and renderers (terminal, markdown, json)
+internal/gotestbench/        Benchmark baseline format, deltas and the gate (bench subcommand)
+internal/goversion/          Refuses a gotest binary built by an older Go than the module declares
+internal/schedinfo/          Scheduling context appended to deadline failures
 internal/x/                  Small generic helper libraries (slices)
 internal/scaffold/           Type-to-suite skeleton generator
 internal/migrate/            testify/suite AST transformer
@@ -1647,6 +1649,7 @@ pkg/gotest/                  User-facing API (T, R, assertions, Each, Eventually
   └── internal/snapfile/       Snapshot file I/O and diffing
 
 pkg/gotestruntime/           Fixture DAG runtime imported by generated fixture code
+pkg/gotestfuzz/              Leaf codecs imported by generated fuzz fans
 pkg/lint/                    Exported analyzer for external go/analysis drivers
 internal/protocol/           CLI↔test-process env var and naming constants
 internal/about/              Build metadata, file naming constants
@@ -1668,8 +1671,8 @@ Resolution is demand-driven: it starts from targeted suites and walks the Go typ
 ### Key Invariant
 
 The pipeline is always: **static analysis → code generation → standard `go test`**.
-The only runtime components are the thin `gotest.T` wrapper (with its assertion engine) and, for fixture-bound suites, the `pkg/gotestruntime` DAG orchestrator.
-If a feature can't be implemented as (a) generated code, (b) a method on `gotest.T`, (c) fixture orchestration in `pkg/gotestruntime`, or (d) post-processing of `go test -json`, it doesn't belong in this project.
+The only runtime components are the thin `gotest.T` wrapper (with its assertion engine), for fixture-bound suites the `pkg/gotestruntime` DAG orchestrator, and for fanned fuzz arguments the `pkg/gotestfuzz` leaf codecs.
+If a feature can't be implemented as (a) generated code, (b) a method on `gotest.T`, (c) runtime support in `pkg/gotestruntime` or `pkg/gotestfuzz`, or (d) post-processing of `go test -json`, it doesn't belong in this project.
 
 ---
 

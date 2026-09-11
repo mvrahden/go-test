@@ -474,22 +474,15 @@ State is transferred via JSON serialization, streamed as each fixture completes.
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-**Transfer vs Local fields:**
-- Transfer fields: exported, JSON-serializable, sent across processes.
-  These should be stable connection parameters (host, port, credentials),
-  not ephemeral handles or runtime state.
-- Local fields: assigned inside `Hydrate()`, reconstructed in each test
-  process (e.g., `*sql.DB` handles that can't serialize)
-
 **Design intent:** the state file is a connection-parameter snapshot, not a
 general data bus. `Hydrate()` turns those parameters into live connections;
 `Dehydrate()` releases them. This keeps fixture state deterministic across
 the N test processes that read the same snapshot.
 
-The `ClassifyLocalFieldsRaw()` function performs AST analysis on the Hydrate
-method body to determine which exported fields are assigned (and therefore
-"local"). It also follows one level of receiver method calls
-(e.g., `f.connect()` → inspects `connect` body for assignments).
+Which exported fields transfer and which are local is decided by
+`ClassifyLocalFieldsRaw()`, an AST walk of `Hydrate` and one level of the
+receiver methods it calls; the rule itself is spec.md's Field
+classification.
 
 ---
 
@@ -561,9 +554,8 @@ non-exclusive suite through the semaphore. Suites with
 drains — one at a time, in deterministic order — because their verdicts
 measure wall-clock behavior (timing budgets, contended resources) that
 concurrently running suites would corrupt. At the bulk→tail barrier the
-runner re-windows shared fixtures for the exclusive tail: fixtures only the
-tail needs are started there (`StartKeys`), fixtures nothing in the tail
-needs are torn down (`TeardownKeys`).
+runner re-windows shared fixtures for the tail (see Per-Suite Fixture
+Readiness).
 
 The Level 1 and Level 3 semaphore defaults (`NumCPU`, `2×GOMAXPROCS`) apply
 to uninstrumented builds; under `-race`/`-msan`/`-asan` both halve, since
@@ -833,7 +825,7 @@ to the entire group, not just the leader process.
 ## 7. Suite Target Construction
 
 ```
-BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, exclusiveByPkg, runFlags, userRunFilter)
+BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, exclusiveByPkg, runFlags, userRunFilter)
   │
   for each package:
     for each suite struct name (e.g., "FooTestSuite"):
@@ -1044,24 +1036,14 @@ guard:
 
 1. **Census** (`cmd/gotest/census.go`) catches absence. After a green
    `spec`, `summary` or `-json` run, every method the source declares must
-   have a verdict in the event stream. The declared set is read from the AST
-   through `gotestast`, the same source `discover` uses, after focus and
-   exclusion; the executed set is every `Suite/Method` pair with a terminal
-   action (`pass`, `fail`, `skip`), and a suite skipped as a whole covers
-   its methods. A missing verdict makes the run exit 2, printing the missing
-   methods. It is exit 2, not 1: a dropped test is not a failed test but a
+   have a verdict in the event stream, or the run exits 2. The declared set
+   comes from the AST through `gotestast`, the same source `discover` uses;
+   the executed set is every `Suite/Method` pair with a terminal action.
+   It is exit 2, not 1, because a dropped test is not a failed test but a
    run that cannot be believed, the same code an uncompilable package gets.
-   Granularity is the method, which is exact; `When`/`It` rows can depend
-   on runtime values. Only green runs are censused, since a red run is
-   already not a false green, and a `FailFast` stop or a `-failfast` run
-   legitimately leaves methods unexecuted. Under `-run`, `-skip` and
-   `-list` the census stands down with a note on stderr, because those
-   flags change the declared set with `go test`'s per-level regexp
-   semantics, and CI runs are unfiltered. The plain text run
-   (`gotest ./...`) has no event stream and is not censused; every CI gate
-   is. A capturing `bench` run (`--spec`, `--json`, `--save`, `--against`)
-   is censused over the declared benchmark methods, whose verdict is the
-   `ns/op` result line or a `fail`; `-bench` stands it down.
+   Only green runs are censused: a red run is already not a false green.
+   The user-facing rules, when the census stands down and how bench runs
+   are censused, are in spec.md under CI Integration.
 2. **Ring-0 raw checks** catch a swallowed failure in the kernel: the tests
    of the assertion kernel never call it, so a kernel that always passes
    cannot pass them.
