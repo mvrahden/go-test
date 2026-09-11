@@ -95,3 +95,4 @@ func ExportLineWriterProgress(w io.WriteCloser) FuzzProgress { return w.(*lineWr
 
 var ExportSnapshotCrashers = snapshotCrashers
 var ExportNewCrasherNames = newCrasherNames
+var ExportExitCodeAfterDispatch = exitCodeAfterDispatch

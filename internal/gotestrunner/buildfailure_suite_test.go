@@ -125,3 +125,21 @@ func (s *BuildFailureVerdictsTestSuite) TestPipelineCleanWhenNothingMatched(t *g
 			"no matched packages and no failures is the only clean empty run")
 	}
 }
+
+func (s *BuildFailureVerdictsTestSuite) TestExitCodeAfterDispatch(t *gotest.T) {
+	for sub, tC := range gotest.Each(t, []struct {
+		Desc  string
+		worst int
+		err   error
+		want  int
+	}{
+		{"no cancellation keeps the verdict", 1, nil, 1},
+		{"an interrupt is 130 over a green run", 0, context.Canceled, 130},
+		{"an interrupt is 130 over the failures it caused", 1, context.Canceled, 130},
+		{"an interrupt is 130 over a build failure", 2, context.Canceled, 130},
+		{"a deadline leaves a green run to the command's timeout verdict", 0, context.DeadlineExceeded, 0},
+		{"a deadline keeps a red verdict", 1, context.DeadlineExceeded, 1},
+	}) {
+		gotest.Equal(sub, tC.want, gotestrunner.ExportExitCodeAfterDispatch(tC.worst, tC.err))
+	}
+}

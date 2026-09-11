@@ -1437,7 +1437,7 @@ Manual setup works without the action:
 - run: gotest spec ./... --format=md --output=behavior-spec.md
 ```
 
-Exit codes: 0 = pass, 1 = test failure, 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors) or a census failure, 130 = run interrupted (SIGINT/SIGTERM).
+Exit codes: 0 = pass, 1 = test failure, 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors) or a census failure, 130 = run interrupted (SIGINT/SIGTERM) before the last verdict, whatever the suites the interrupt killed reported; their failures are the interrupt's, not verdicts. An interrupt that arrives later, while fixtures tear down, leaves the verdict alone.
 
 **Census.** A green run is believed only when every declared test method produced a verdict. After a green `spec`, `summary` or `-json` run, gotest compares two sets:
 

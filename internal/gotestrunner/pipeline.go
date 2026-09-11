@@ -489,12 +489,27 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 
 		RunSuites(ctx, targets, extraEnv, maxParallel, collector, barrier)
 	}
+	dispatchErr := ctx.Err()
 	collector.Finalize(overlay.NoSuitePackages)
 
 	return PipelineResult{
-		ExitCode:     collector.WorstExitCode(),
+		ExitCode:     exitCodeAfterDispatch(collector.WorstExitCode(), dispatchErr),
 		CapturedJSON: collector.CapturedJSON(),
 	}, nil
+}
+
+// exitCodeAfterDispatch folds the context error seen when the last verdict
+// landed into the suites' worst exit code. An interrupt during dispatch is
+// 130 whatever the suites it cut short reported: their failures are the
+// interrupt's, not verdicts. A deadline is not an interrupt: the verdict
+// stands, and the command turns a green one into 1 for the timeout. A signal
+// that arrives later, while fixtures tear down, is not consulted — the
+// verdicts were complete.
+func exitCodeAfterDispatch(worst int, dispatchErr error) int {
+	if errors.Is(dispatchErr, context.Canceled) {
+		return 130
+	}
+	return worst
 }
 
 func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (PipelineResult, error) { //nolint:gocritic // hugeParam: stable API
@@ -779,6 +794,9 @@ loop:
 		r := RunSingleSuite(streamCtx, d.t, env, collector.UsesTest2JSON())
 		collector.RecordResult(d.t.Package, d.idx, r)
 	}
+	// The last verdict is in; what the context says from here on is not the
+	// run's business (see exitCodeAfterDispatch).
+	dispatchErr := ctx.Err()
 
 	fixtureWg.Wait()
 
@@ -814,11 +832,7 @@ loop:
 
 	collector.Finalize(overlay.NoSuitePackages)
 
-	exitCode := collector.WorstExitCode()
-	if ctx.Err() != nil && exitCode == 0 {
-		exitCode = 130
-	}
-
+	exitCode := exitCodeAfterDispatch(collector.WorstExitCode(), dispatchErr)
 	if sharedSetupFailed.Load() && exitCode == 0 {
 		exitCode = 1
 	}
