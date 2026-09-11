@@ -822,13 +822,7 @@ func (s *CmdGotestTestSuite) TestRunDiscover_Benchmarks(t *gotest.T) {
 		src, err := os.ReadFile(srcPath)
 		gotest.NoError(it, err)
 
-		// The Task 3 testdata source isn't its own module, so stage it as a
-		// throwaway package inside the examples module (already `use`d by
-		// go.work) rather than fighting GOWORK for an out-of-workspace dir.
-		fixtureDir, err := os.MkdirTemp(filepath.Join(s.repoRoot, "examples"), "discoverbench-")
-		gotest.NoError(it, err)
-		defer os.RemoveAll(fixtureDir)
-		gotest.NoError(it, os.WriteFile(filepath.Join(fixtureDir, "bench_fixture.go"), src, 0600))
+		fixtureDir := stageFixtureModule(it, s.repoRoot, it.TempDir(), "bench_fixture.go", src)
 
 		// gotestgen.LoadPackages requires Tests:true's "[pkg.test]" variant,
 		// which only exists for packages with _test.go files; this fixture
@@ -838,7 +832,8 @@ func (s *CmdGotestTestSuite) TestRunDiscover_Benchmarks(t *gotest.T) {
 		pkgs, err := packages.Load(&packages.Config{
 			Mode: packages.NeedModule | packages.NeedSyntax | packages.NeedName |
 				packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps,
-		}, fixtureDir)
+			Dir: fixtureDir,
+		}, ".")
 		gotest.NoError(it, err)
 		gotest.Len(it, pkgs, 1)
 		gotest.Empty(it, pkgs[0].Errors, "expected no package load errors, got: %v", pkgs[0].Errors)
@@ -866,15 +861,13 @@ func (s *CmdGotestTestSuite) TestRunDiscover_Benchmarks(t *gotest.T) {
 		src, err := os.ReadFile(srcPath)
 		gotest.NoError(it, err)
 
-		fixtureDir, err := os.MkdirTemp(filepath.Join(s.repoRoot, "examples"), "discoverfuzz-")
-		gotest.NoError(it, err)
-		defer os.RemoveAll(fixtureDir)
-		gotest.NoError(it, os.WriteFile(filepath.Join(fixtureDir, "fuzz_fixture.go"), src, 0600))
+		fixtureDir := stageFixtureModule(it, s.repoRoot, it.TempDir(), "fuzz_fixture.go", src)
 
 		pkgs, err := packages.Load(&packages.Config{
 			Mode: packages.NeedModule | packages.NeedSyntax | packages.NeedName |
 				packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps,
-		}, fixtureDir)
+			Dir: fixtureDir,
+		}, ".")
 		gotest.NoError(it, err)
 		gotest.Len(it, pkgs, 1)
 		gotest.Empty(it, pkgs[0].Errors, "expected no package load errors, got: %v", pkgs[0].Errors)
@@ -895,6 +888,20 @@ func (s *CmdGotestTestSuite) TestRunDiscover_Benchmarks(t *gotest.T) {
 		// The plain test method must stay out of the fuzzers list.
 		gotest.NotContains(it, payload, `"fuzzers":[{"name":"TestOne"`)
 	})
+}
+
+// stageFixtureModule writes one fixture source into its own module under
+// dir, with a go.work that pairs it with the checkout under test. Staging
+// inside the repository (examples/ used to host it) leaks into the editor's
+// discovery snapshot: the extension watches the tree and indexes the package
+// before the test removes it.
+func stageFixtureModule(t *gotest.T, repoRoot, dir, filename string, src []byte) string {
+	goMod := "module testpkg\n\ngo 1.25.0\n\nrequire github.com/mvrahden/go-test v0.0.0-00010101000000-000000000000\n\nreplace github.com/mvrahden/go-test => " + repoRoot + "\n"
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o600))
+	work := "go 1.25.0\n\nuse (\n\t.\n\t" + repoRoot + "\n)\n"
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.work"), []byte(work), 0o600))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, filename), src, 0o600))
+	return dir
 }
 
 func (s *CmdGotestTestSuite) TestFocusViolation_String(t *gotest.T) {
