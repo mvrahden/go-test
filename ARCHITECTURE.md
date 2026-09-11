@@ -1087,6 +1087,29 @@ recorded by `testing`.
    so mutants cannot silently stop testing anything. The drill runs in CI on
    every push and pull request.
 
+**Adding a test.** Four questions decide where a new test goes and what
+protects it:
+
+1. Does any other test's *verdict* depend on the code under test? Then it
+   is ring 0: an external test package, raw checks only, `//nolint:fail-guard`
+   on the package clause. Everything else is a ring-1 suite with gotest
+   assertions and `When`/`It` structure.
+2. Which false green would a bug here produce, and which guard catches it?
+   A dropped test is the census's job; a swallowed failure the ring-0 suites'
+   and the canary's; a misreported verdict the canary's. A guard nothing
+   demonstrates is a claim: a change that adds a new way to drop or
+   misreport a verdict adds a drill mutant for it.
+3. Why is the suite not parallel, and if it is `Exclusive`, which wall-clock
+   verdict does it take? State the reason in a comment; the default is
+   parallel with a returning `BeforeEach`.
+4. Render `gotest spec` once. The suite is a subject, the method a
+   capability, each `It` one behavior. If the render reads as a list of
+   functions, the names are wrong.
+
+Case accounting for any restructuring is by `gotest -json` capture
+(`Package`+`Test` pairs) before and after, never by grepping sources: grep
+miscounts test functions embedded in string fixtures.
+
 **Boundaries.**
 
 - The plain text run is not censused; that would need test2json in the

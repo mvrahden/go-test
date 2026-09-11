@@ -50,8 +50,8 @@ func NativeFuzzType(t types.Type) bool {
 // the engine exactly as declared: the unnamed string, bool, and []byte, and
 // nothing else. Every other type — a struct, a named type, a plain number —
 // gets a generated fan. Numbers fan on purpose: as fixed-width []byte leaves
-// they get the engine's richest mutator instead of its poorest (see the
-// leaf encoding policy in docs/design/fuzz-structs.md).
+// they get the engine's richest mutator instead of its poorest (the fan
+// table under "Code Generation" in ARCHITECTURE.md).
 func PassthroughFuzzType(t types.Type) bool {
 	t = types.Unalias(t)
 	if _, isNamed := t.(*types.Named); isNamed {
