@@ -1,0 +1,10 @@
+=== RUN   TestServiceTestSuite
+=== RUN   TestServiceTestSuite/TestAlphaViaFixture
+--- PASS: TestServiceTestSuite (<TIMESTAMP>)
+    --- PASS: TestServiceTestSuite/TestAlphaViaFixture (<TIMESTAMP>)
+=== RUN   TestServiceExtTestSuite
+=== RUN   TestServiceExtTestSuite/TestAlphaViaFixtureFromExt
+--- PASS: TestServiceExtTestSuite (<TIMESTAMP>)
+    --- PASS: TestServiceExtTestSuite/TestAlphaViaFixtureFromExt (<TIMESTAMP>)
+PASS
+ok  	github.com/mvrahden/go-test/tests/sharedfixture/fixturebound	<TIMESTAMP>

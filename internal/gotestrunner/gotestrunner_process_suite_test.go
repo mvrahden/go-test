@@ -20,7 +20,9 @@ import (
 type GotestrunnerProcessTestSuite struct{}
 
 func (s *GotestrunnerProcessTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *GotestrunnerProcessTestSuite) TestGracefulTermination(t *gotest.T) {

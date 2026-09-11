@@ -392,7 +392,9 @@ type ParallelMethodTestSuite struct{}
 type TestCtx struct{ conn *sql.Conn }
 
 func (s *ParallelMethodTestSuite) SuiteConfig() gotest.SuiteConfig {
-    return gotest.SuiteConfig{Parallel: true}
+    cfg := gotest.DefaultSuiteConfig()
+    cfg.Parallel = true
+    return cfg
 }
 func (s *ParallelMethodTestSuite) BeforeEach(t *gotest.T) *TestCtx {
     return &TestCtx{conn: s.pool.Acquire()}
@@ -1383,6 +1385,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `assertion-redundant` | An assertion made redundant by the next one on the same argument |
 | `fail-guard` | `if cond { gotest.Fail(…) }` guards (also halting `Fatal`/`Fatalf`/`FailNow` bodies) — the assertion expresses the check directly; `\|\|` conditions and `else if` chains decompose into sequential assertions, non-halting `Errorf` bodies and init-scoped guards report without a fix; fires only in files that import gotest |
 | `t-escape` | Unnecessary `t.T()` convenience escapes: `Errorf`/`FailNow`/`Skipf`/`Setenv`/`TempDir` (available on `gotest.T`), `Skip`/`SkipNow` (use `Skipf`), `Helper` (degrades call-site reporting), `Log`/`Fatal`/`Fatalf` (use assertions and their message args) |
+| `suite-config-partial` | A `SuiteConfig` built from a `gotest.SuiteConfig{…}` literal that leaves `Timeout` or `SetupTimeout` unset — the literal replaces the defaults wholesale, so an unset timeout is no deadline rather than the 30-second default; the fix composes the same fields onto `DefaultSuiteConfig()` |
 | `behavior-wording` | A `When` description that opens with "when", or an `It` description that opens with "it" — the spec renders the connective and the ✓ glyph plays "it", so the word is said twice; the fix drops it (whole word, any case except all capitals — `IT department…` is an acronym — space or underscore after it; a description that is only the word is left alone) |
 | `bench-fixture-io` | `Benchmark*` methods reading fixture-backed state inside the measured loop — times whatever backs the fixture, not the code under test (heuristic; hoist the read above the loop) |
 | `bench-wait` | `time.Sleep`/`gotest.Eventually`/`gotest.Consistently` inside the measured loop — times the wait, not the code |

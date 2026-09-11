@@ -8,7 +8,9 @@ import "github.com/mvrahden/go-test/pkg/gotest"
 type ParallelTestSuite struct{}
 
 func (s *ParallelTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *ParallelTestSuite) TestConcurrentWork(t *gotest.T) {

@@ -17,7 +17,9 @@ import (
 type RuntimeVersionTestSuite struct{}
 
 func (s *RuntimeVersionTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func loadedWith(mod *packages.Module, external bool) []*gotestgen.LoadResult {

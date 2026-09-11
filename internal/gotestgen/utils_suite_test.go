@@ -12,7 +12,9 @@ import (
 type UtilsTestSuite struct{}
 
 func (s *UtilsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *UtilsTestSuite) TestDeterminePkgDir(t *gotest.T) {

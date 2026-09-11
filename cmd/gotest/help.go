@@ -609,6 +609,8 @@ Rules:
   fail-guard            if cond { Fail/Fatal(...) } guards — use assertions directly
   t-escape              Unnecessary t.T() convenience escapes (incl. Helper/Fatal/Log)
   behavior-wording      When("when …") / It("it …") — the spec supplies those words
+  suite-config-partial  SuiteConfig literal without Timeout/SetupTimeout (no
+                        deadline, not the default — compose from DefaultSuiteConfig)
   bench-loop            Benchmark methods that never call b.Loop()/b.N (nothing
                         iterates, so the numbers lie)
   bench-fixture-io      Fixture-backed reads inside the measured loop (times the
@@ -630,9 +632,9 @@ rules also accept a project-wide skip flag (mirrored by .gotest.yml lint.skip):
 Flags:
   -skip-<rule>            Disable a non-integrity rule, e.g. -skip-fail-guard
                           (assertion-simplify, assertion-redundant, behavior-wording,
-                          bench-fixture-io, bench-wait, fail-guard, t-escape,
-                          stdlib-test, testify, fuzz-no-oracle, fuzz-seed,
-                          fuzz-hook-io, fuzz-raw-seed)
+                          suite-config-partial, bench-fixture-io, bench-wait,
+                          fail-guard, t-escape, stdlib-test, testify,
+                          fuzz-no-oracle, fuzz-seed, fuzz-hook-io, fuzz-raw-seed)
   -disable-nolint         Ignore //nolint comments
   -fix                    Apply suggested fixes
   --github                Also emit GitHub ::error annotations and append a
@@ -770,7 +772,7 @@ Fields:
 Skippable lint rules (non-integrity only): assertion-redundant,
 assertion-simplify, behavior-wording, bench-fixture-io, bench-wait,
 fail-guard, fuzz-hook-io, fuzz-no-oracle, fuzz-raw-seed, fuzz-seed,
-stdlib-test, t-escape, testify
+stdlib-test, suite-config-partial, t-escape, testify
 
 Example .gotest.yml:
 

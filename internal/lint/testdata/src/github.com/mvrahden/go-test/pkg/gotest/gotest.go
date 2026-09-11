@@ -42,6 +42,22 @@ func (f *F) Skipf(format string, args ...any)  {}
 
 func (f *F) Fuzz(fn any) {}
 
+type SuiteConfig struct {
+	Timeout      time.Duration
+	SetupTimeout time.Duration
+	FailFast     bool
+	Parallel     bool
+	Exclusive    bool
+}
+
+func DefaultSuiteConfig() SuiteConfig {
+	return SuiteConfig{Timeout: 30 * time.Second, SetupTimeout: 30 * time.Second}
+}
+
+func IntegrationSuiteConfig() SuiteConfig {
+	return SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 5 * time.Minute}
+}
+
 type testingT interface {
 	Errorf(format string, args ...any)
 	FailNow()

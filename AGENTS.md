@@ -472,7 +472,9 @@ Generic suite structs define contract tests once; type aliases instantiate them 
 type IndexContractTestSuite[T Indexable] struct{}
 
 func (s *IndexContractTestSuite[T]) SuiteConfig() gotest.SuiteConfig {
-    return gotest.SuiteConfig{Parallel: true}
+    cfg := gotest.DefaultSuiteConfig()
+    cfg.Parallel = true
+    return cfg
 }
 
 func (s *IndexContractTestSuite[T]) TestEmptyIndex(t *gotest.T) {

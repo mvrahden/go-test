@@ -12,7 +12,9 @@ import (
 type GoVersionTestSuite struct{}
 
 func (s *GoVersionTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func pkgsDeclaring(goVersion string) []*packages.Package {

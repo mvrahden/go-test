@@ -7,7 +7,9 @@ A `SuiteConfig()` marker method OWNS the config verbatim:
 
 - No marker → `DefaultSuiteConfig()` (30s test timeout, 30s setup timeout).
 - Marker present → the returned value is used AS-IS. Partial literals
-  inherit nothing: `SuiteConfig{Parallel: true}` has NO timeouts.
+  inherit nothing: `SuiteConfig{Parallel: true}` has NO timeouts. From
+  v1.29.1 `gotest lint` reports such a literal (`suite-config-partial`) and
+  `-fix` rewrites it to the compose form below.
 - Zero or negative duration = no deadline (matches `go test -timeout 0`).
 
 Marker bodies are parsed statically (the generator needs `Parallel` at

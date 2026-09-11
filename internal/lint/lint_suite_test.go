@@ -10,7 +10,9 @@ import (
 type LintTestSuite struct{}
 
 func (s *LintTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.IntegrationSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 // analysistest type-checks the fixture package and everything it imports, which
@@ -47,6 +49,7 @@ var rewriteFixtures = []string{
 	"withredundant",
 	"withtescape",
 	"withwording",
+	"withsuiteconfig",
 }
 
 func (s *LintTestSuite) TestDiagnostics(t *gotest.T) {
@@ -80,7 +83,7 @@ func (s *LintTestSuite) TestTierPolicy(t *gotest.T) {
 		w.It("registers a skip flag for every non-integrity rule and none for integrity rules", func(it *gotest.T) {
 			for _, rule := range []lint.Rule{
 				lint.StdlibTest, lint.Testify, lint.AssertionSimplify, lint.AssertionRedundant, lint.FailGuard, lint.TEscape,
-				lint.BenchFixtureIO, lint.BenchWait,
+				lint.BenchFixtureIO, lint.BenchWait, lint.SuiteConfigPartial,
 				lint.FuzzNoOracle, lint.FuzzSeed, lint.FuzzHookIO, lint.FuzzRawSeed,
 			} {
 				gotest.NotZero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "missing skip flag for %s", rule)

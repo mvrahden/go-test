@@ -17,7 +17,9 @@ import (
 type FuzzCorpusTestSuite struct{}
 
 func (s *FuzzCorpusTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func writeCorpusFile(t *gotest.T, dir, body string) string {

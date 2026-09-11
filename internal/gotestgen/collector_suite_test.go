@@ -10,7 +10,9 @@ import (
 type CollectorTestSuite struct{}
 
 func (s *CollectorTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *CollectorTestSuite) TestFixtureCollection(t *gotest.T) {

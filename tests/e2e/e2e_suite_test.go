@@ -37,7 +37,9 @@ type E2ETestSuite struct {
 // it, binaries and module copies built once in BeforeAll, workloads pinned
 // tiny (-benchtime=10x scale).
 func (s *E2ETestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Exclusive: true}
+	cfg := gotest.IntegrationSuiteConfig()
+	cfg.Exclusive = true
+	return cfg
 }
 
 func (s *E2ETestSuite) BeforeAll(t *gotest.T) {
@@ -74,7 +76,7 @@ func (s *E2ETestSuite) AfterAll(t *gotest.T) {}
 func (s *E2ETestSuite) TestT(t *gotest.T) {
 	tmp := t.TempDir()
 	excludedPaths := append(append([]string(nil), testutils.DefaultExcludePaths...),
-		"pkg/gotest/assertions_suite_test.go",
+		"pkg/gotest/assertions_",
 		"pkg/gotest/b_suite_test.go",
 		"pkg/gotest/config_suite_test.go",
 		"pkg/gotest/each_filter_suite_test.go",
@@ -111,8 +113,9 @@ func (s *E2ETestSuite) TestTestsuiteCLI(t *gotest.T) {
 		goldenName string
 	}{
 		{Desc: "auth by relative path", basedir: "examples", pkgPath: "auth", goldenName: "auth_output.txt"},
-		{Desc: "cart by relative path", basedir: "examples", pkgPath: "cart", goldenName: "cart_output.txt"},
+		{Desc: "notification by relative path", basedir: "examples", pkgPath: "notification", goldenName: "notification_output.txt"},
 		{Desc: "auth by package name", basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/auth", goldenName: "auth_output.txt"},
+		{Desc: "fixture-bound suites in both test packages", basedir: "tests/sharedfixture", pkgPath: "fixturebound", goldenName: "fixturebound_output.txt"},
 	}) {
 		s.performTest(sub.T(), tc.basedir, tc.pkgPath, tc.pkgName, tc.goldenName)
 	}

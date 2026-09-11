@@ -22,7 +22,9 @@ type FuzzCrasherLoopTestSuite struct {
 }
 
 func (s *FuzzCrasherLoopTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Exclusive: true}
+	cfg := gotest.IntegrationSuiteConfig()
+	cfg.Exclusive = true
+	return cfg
 }
 
 func (s *FuzzCrasherLoopTestSuite) BeforeAll(t *gotest.T) {

@@ -13,7 +13,9 @@ import (
 type RendererTestSuite struct{}
 
 func (s *RendererTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.IntegrationSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func renderTestPkg(t testing.TB, pkg *packages.Package, harvestSeeds bool) (string, gotestgen.SpecOutcome) {

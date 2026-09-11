@@ -12,7 +12,9 @@ import (
 type ResolverTestSuite struct{}
 
 func (s *ResolverTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *ResolverTestSuite) TestIsInternalPkgPath(t *gotest.T) {

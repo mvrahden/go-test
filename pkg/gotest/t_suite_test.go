@@ -13,7 +13,9 @@ import (
 type TTestSuite struct{}
 
 func (s *TTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *TTestSuite) TestNewTWithDeadline(t *gotest.T) {
