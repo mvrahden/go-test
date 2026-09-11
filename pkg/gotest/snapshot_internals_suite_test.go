@@ -15,7 +15,8 @@ import (
 
 // SnapshotInternalsTestSuite covers the machinery below MatchSnapshot:
 // caller-package detection and its cache, test-name splitting, the read-only
-// CI switch, CRLF normalization, and reader restoration. Sequential: Setenv.
+// CI switch, CRLF normalization, and reader restoration.
+// Sequential: Setenv.
 type SnapshotInternalsTestSuite struct {
 	dir     string
 	snapDir string

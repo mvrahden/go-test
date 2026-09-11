@@ -11,6 +11,7 @@ import (
 
 // FixtureSetupTestSuite covers the one policy both the in-process fixture DAG
 // and the generated shared-fixture subprocess run BeforeAll under.
+// Sequential: asserts wall-clock budgets.
 type FixtureSetupTestSuite struct{}
 
 func (s *FixtureSetupTestSuite) TestPanicIsContained(t *gotest.T) {

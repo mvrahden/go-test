@@ -18,18 +18,24 @@ import (
 // renderer fed from the collector's stream. "no test suites to run" (exit 0)
 // is reserved for runs where every matched package loaded and none had
 // suites.
-type BuildFailureVerdictsTestSuite struct{ tmpDir string }
+type BuildFailureVerdictsTestSuite struct{}
 
-func (s *BuildFailureVerdictsTestSuite) BeforeEach(t *gotest.T) {
-	dir, err := os.MkdirTemp("", "gotest-buildfailure-*")
-	gotest.NoError(t, err)
-	s.tmpDir = dir
+type buildFailureCtx struct{ tmpDir string }
+
+func (s *BuildFailureVerdictsTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
-func (s *BuildFailureVerdictsTestSuite) AfterEach(_ *gotest.T) {
-	if s.tmpDir != "" {
-		os.RemoveAll(s.tmpDir)
-	}
+func (s *BuildFailureVerdictsTestSuite) BeforeEach(t *gotest.T) *buildFailureCtx {
+	dir, err := os.MkdirTemp("", "gotest-buildfailure-*")
+	gotest.NoError(t, err)
+	return &buildFailureCtx{tmpDir: dir}
+}
+
+func (s *BuildFailureVerdictsTestSuite) AfterEach(_ *gotest.T, c *buildFailureCtx) {
+	os.RemoveAll(c.tmpDir)
 }
 
 func brokenOverlay(workDir string) *gotestrunner.OverlayResult {
@@ -42,7 +48,7 @@ func brokenOverlay(workDir string) *gotestrunner.OverlayResult {
 	}
 }
 
-func (s *BuildFailureVerdictsTestSuite) TestBrokenPackageMessage(t *gotest.T) {
+func (s *BuildFailureVerdictsTestSuite) TestBrokenPackageMessage(t *gotest.T, c *buildFailureCtx) {
 	t.It("renders diagnostics in the go build shape", func(it *gotest.T) {
 		msg := gotestrunner.ExportBrokenPackageMessage(&gotestgen.BrokenPackage{
 			PkgPath: "example.com/broken",
@@ -52,7 +58,7 @@ func (s *BuildFailureVerdictsTestSuite) TestBrokenPackageMessage(t *gotest.T) {
 	})
 }
 
-func (s *BuildFailureVerdictsTestSuite) TestCollectorBooksBrokenPackages(t *gotest.T) {
+func (s *BuildFailureVerdictsTestSuite) TestCollectorBooksBrokenPackages(t *gotest.T, c *buildFailureCtx) {
 	t.When("in batch text mode", func(w *gotest.T) {
 		w.It("prints the diagnostics and a FAIL line, and exits 2", func(it *gotest.T) {
 			var stdout, stderr bytes.Buffer
@@ -86,7 +92,7 @@ func (s *BuildFailureVerdictsTestSuite) TestCollectorBooksBrokenPackages(t *gote
 	})
 }
 
-func (s *BuildFailureVerdictsTestSuite) TestPipelineFailsOnBrokenPackages(t *gotest.T) {
+func (s *BuildFailureVerdictsTestSuite) TestPipelineFailsOnBrokenPackages(t *gotest.T, c *buildFailureCtx) {
 	for sub, tC := range gotest.Each(t, []struct {
 		Desc      string
 		streaming bool
@@ -97,7 +103,7 @@ func (s *BuildFailureVerdictsTestSuite) TestPipelineFailsOnBrokenPackages(t *got
 		result, err := gotestrunner.RunPipeline(context.Background(), gotestrunner.PipelineConfig{
 			Streaming:  tC.streaming,
 			OutputMode: gotestrunner.RunCaptureJSON,
-		}, brokenOverlay(s.tmpDir))
+		}, brokenOverlay(c.tmpDir))
 		gotest.NoError(sub, err)
 		gotest.Equal(sub, 2, result.ExitCode,
 			"a run with an unbuildable package must exit 2, never report success")
@@ -108,7 +114,7 @@ func (s *BuildFailureVerdictsTestSuite) TestPipelineFailsOnBrokenPackages(t *got
 	}
 }
 
-func (s *BuildFailureVerdictsTestSuite) TestPipelineCleanWhenNothingMatched(t *gotest.T) {
+func (s *BuildFailureVerdictsTestSuite) TestPipelineCleanWhenNothingMatched(t *gotest.T, c *buildFailureCtx) {
 	for sub, tC := range gotest.Each(t, []struct {
 		Desc      string
 		streaming bool
@@ -119,14 +125,14 @@ func (s *BuildFailureVerdictsTestSuite) TestPipelineCleanWhenNothingMatched(t *g
 		result, err := gotestrunner.RunPipeline(context.Background(), gotestrunner.PipelineConfig{
 			Streaming:  tC.streaming,
 			OutputMode: gotestrunner.RunCaptureJSON,
-		}, &gotestrunner.OverlayResult{WorkDir: s.tmpDir})
+		}, &gotestrunner.OverlayResult{WorkDir: c.tmpDir})
 		gotest.NoError(sub, err)
 		gotest.Equal(sub, 0, result.ExitCode,
 			"no matched packages and no failures is the only clean empty run")
 	}
 }
 
-func (s *BuildFailureVerdictsTestSuite) TestExitCodeAfterDispatch(t *gotest.T) {
+func (s *BuildFailureVerdictsTestSuite) TestExitCodeAfterDispatch(t *gotest.T, _ *buildFailureCtx) {
 	for sub, tC := range gotest.Each(t, []struct {
 		Desc  string
 		worst int

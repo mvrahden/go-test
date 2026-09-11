@@ -9,14 +9,22 @@ import (
 // FixtureWindowTestSuite pins the alive-set math behind fixture window
 // scheduling: which shared fixtures a run keeps resident, per phase, given
 // the suites it will actually dispatch.
-type FixtureWindowTestSuite struct {
-	cleanup func()
+type FixtureWindowTestSuite struct{}
+
+func (s *FixtureWindowTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
-func (s *FixtureWindowTestSuite) AfterEach(_ *gotest.T) {
-	if s.cleanup != nil {
-		s.cleanup()
-		s.cleanup = nil
+// windowCtx holds the overlay cleanup a test registers, if any.
+type windowCtx struct{ cleanup func() }
+
+func (s *FixtureWindowTestSuite) BeforeEach(_ *gotest.T) *windowCtx { return &windowCtx{} }
+
+func (s *FixtureWindowTestSuite) AfterEach(_ *gotest.T, ctx *windowCtx) {
+	if ctx.cleanup != nil {
+		ctx.cleanup()
 	}
 }
 
@@ -75,7 +83,7 @@ func fixtureIdentifiers(fixtures []gotestgen.SharedFixtureInfo) []string {
 	return ids
 }
 
-func (s *FixtureWindowTestSuite) TestAliveSets(t *gotest.T) {
+func (s *FixtureWindowTestSuite) TestAliveSets(t *gotest.T, _ *windowCtx) {
 	overlay := windowOverlay()
 
 	t.When("no run filter is set", func(w *gotest.T) {
@@ -122,7 +130,7 @@ func (s *FixtureWindowTestSuite) TestAliveSets(t *gotest.T) {
 	})
 }
 
-func (s *FixtureWindowTestSuite) TestPhasePlanning(t *gotest.T) {
+func (s *FixtureWindowTestSuite) TestPhasePlanning(t *gotest.T, _ *windowCtx) {
 	overlay := windowOverlay()
 
 	t.When("splitting the dispatch plan into phases", func(w *gotest.T) {
@@ -147,7 +155,7 @@ func (s *FixtureWindowTestSuite) TestPhasePlanning(t *gotest.T) {
 // TestRealOverlayFiltering runs the planner over the real tests/sharedfixture
 // packages — the same overlay the pipeline computes — so the filtering path is
 // pinned against genuine discovery output, not hand-built maps.
-func (s *FixtureWindowTestSuite) TestRealOverlayFiltering(t *gotest.T) {
+func (s *FixtureWindowTestSuite) TestRealOverlayFiltering(t *gotest.T, ctx *windowCtx) {
 	loaded, broken, err := gotestgen.LoadPackages([]string{
 		"github.com/mvrahden/go-test/tests/sharedfixture/standalone/...",
 		"github.com/mvrahden/go-test/tests/sharedfixture/fixturebound/...",
@@ -157,7 +165,7 @@ func (s *FixtureWindowTestSuite) TestRealOverlayFiltering(t *gotest.T) {
 
 	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, nil, false, true, false)
 	gotest.NoError(t, err)
-	s.cleanup = cleanup
+	ctx.cleanup = cleanup
 
 	t.When("the run filter matches only the fixture-free suite", func(w *gotest.T) {
 		win := gotestrunner.ExportPlanFixtureWindows(overlay, "TestPlainTestSuite")
@@ -202,7 +210,7 @@ func benchOverlay() *gotestrunner.OverlayResult {
 	return overlay
 }
 
-func (s *FixtureWindowTestSuite) TestBenchWindowPlanning(t *gotest.T) {
+func (s *FixtureWindowTestSuite) TestBenchWindowPlanning(t *gotest.T, _ *windowCtx) {
 	overlay := benchOverlay()
 
 	t.When("no filters are set", func(w *gotest.T) {
@@ -244,7 +252,7 @@ func (s *FixtureWindowTestSuite) TestBenchWindowPlanning(t *gotest.T) {
 	})
 }
 
-func (s *FixtureWindowTestSuite) TestBenchSlotPlan(t *gotest.T) {
+func (s *FixtureWindowTestSuite) TestBenchSlotPlan(t *gotest.T, _ *windowCtx) {
 	overlay := benchOverlay()
 	targets := []gotestrunner.SuiteTarget{
 		{SuiteSpec: gotestrunner.SuiteSpec{Package: "pkg/a", SuiteName: "AlphaSuite"}},

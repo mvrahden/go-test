@@ -25,6 +25,7 @@ import (
 var testdataFS embed.FS
 
 // E2ETestSuite tests the gotest CLI end-to-end against real packages.
+// Sequential: every method runs against one shared module copy, and performTest asserts it is clean afterwards.
 type E2ETestSuite struct {
 	binary  string
 	workDir string

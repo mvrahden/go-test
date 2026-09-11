@@ -12,6 +12,7 @@ import (
 // The driver itself skips an uncompilable package and still exits 0 — a
 // skipped analysis reported as a pass — so the gate is what makes a broken
 // tree fail the lint step.
+// Sequential: Setenv.
 type PreflightTestSuite struct{}
 
 // writeModule materializes a one-file module in dir; the load runs with that

@@ -11,6 +11,12 @@ import (
 
 type FixtureOnceTestSuite struct{}
 
+func (s *FixtureOnceTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *FixtureOnceTestSuite) TestDo(t *gotest.T) {
 	t.When("called once with nil error", func(w *gotest.T) {
 		w.It("returns nil", func(it *gotest.T) {

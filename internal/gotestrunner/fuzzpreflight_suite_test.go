@@ -13,24 +13,30 @@ import (
 // recorded before the fuzzed type changed shape still parses, so nothing but
 // this comparison can tell the user why their next run dies on a type error
 // naming a generated wrapper.
-type FuzzPreflightTestSuite struct{ dir string }
+type FuzzPreflightTestSuite struct{}
 
-func (s *FuzzPreflightTestSuite) BeforeEach(t *gotest.T) {
+type fuzzPreflightCtx struct{ dir string }
+
+func (s *FuzzPreflightTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
+func (s *FuzzPreflightTestSuite) BeforeEach(t *gotest.T) *fuzzPreflightCtx {
 	dir, err := os.MkdirTemp("", "gotest-preflight-*")
 	gotest.NoError(t, err)
-	s.dir = dir
+	return &fuzzPreflightCtx{dir: dir}
 }
 
-func (s *FuzzPreflightTestSuite) AfterEach(_ *gotest.T) {
-	if s.dir != "" {
-		os.RemoveAll(s.dir)
-	}
+func (s *FuzzPreflightTestSuite) AfterEach(_ *gotest.T, c *fuzzPreflightCtx) {
+	os.RemoveAll(c.dir)
 }
 
-// writeCorpus writes one corpus entry for funcName, with the given
-// already-rendered "Type(value)" lines.
-func (s *FuzzPreflightTestSuite) writeCorpus(t *gotest.T, funcName, name string, lines ...string) {
-	dir := filepath.Join(s.dir, "testdata", "fuzz", funcName)
+// writeCorpus writes one corpus entry for funcName under root, with the
+// given already-rendered "Type(value)" lines.
+func writeCorpus(t *gotest.T, root, funcName, name string, lines ...string) {
+	dir := filepath.Join(root, "testdata", "fuzz", funcName)
 	gotest.NoError(t, os.MkdirAll(dir, 0o755))
 	body := "go test fuzz v1\n"
 	for _, l := range lines {
@@ -39,12 +45,12 @@ func (s *FuzzPreflightTestSuite) writeCorpus(t *gotest.T, funcName, name string,
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600))
 }
 
-func (s *FuzzPreflightTestSuite) TestCheckFuzzCorpus(t *gotest.T) {
+func (s *FuzzPreflightTestSuite) TestCheckFuzzCorpus(t *gotest.T, c *fuzzPreflightCtx) {
 	t.When("every entry matches the target's current shape", func(w *gotest.T) {
 		w.It("reports no mismatch", func(it *gotest.T) {
-			s.writeCorpus(it, "FuzzT_Match", "aaa", `string("hi")`, `[]byte("\x01\x02")`)
+			writeCorpus(it, c.dir, "FuzzT_Match", "aaa", `string("hi")`, `[]byte("\x01\x02")`)
 
-			got, err := gotestrunner.CheckFuzzCorpus(s.dir, "FuzzT_Match", []string{"string", "[]byte"})
+			got, err := gotestrunner.CheckFuzzCorpus(c.dir, "FuzzT_Match", []string{"string", "[]byte"})
 
 			gotest.NoError(it, err)
 			gotest.Empty(it, got)
@@ -53,9 +59,9 @@ func (s *FuzzPreflightTestSuite) TestCheckFuzzCorpus(t *gotest.T) {
 
 	t.When("an entry holds fewer values than the target takes", func(w *gotest.T) {
 		w.It("reports the count drift with both shapes", func(it *gotest.T) {
-			s.writeCorpus(it, "FuzzT_Count", "bbb", `string("hi")`)
+			writeCorpus(it, c.dir, "FuzzT_Count", "bbb", `string("hi")`)
 
-			got, err := gotestrunner.CheckFuzzCorpus(s.dir, "FuzzT_Count", []string{"string", "[]byte"})
+			got, err := gotestrunner.CheckFuzzCorpus(c.dir, "FuzzT_Count", []string{"string", "[]byte"})
 
 			gotest.NoError(it, err)
 			gotest.Len(it, got, 1)
@@ -67,9 +73,9 @@ func (s *FuzzPreflightTestSuite) TestCheckFuzzCorpus(t *gotest.T) {
 
 	t.When("an entry holds the right count but the wrong types", func(w *gotest.T) {
 		w.It("reports the type drift — a same-arity field swap reinterprets the leaves", func(it *gotest.T) {
-			s.writeCorpus(it, "FuzzT_Types", "ccc", `[]byte("\x01")`, `string("hi")`)
+			writeCorpus(it, c.dir, "FuzzT_Types", "ccc", `[]byte("\x01")`, `string("hi")`)
 
-			got, err := gotestrunner.CheckFuzzCorpus(s.dir, "FuzzT_Types", []string{"string", "[]byte"})
+			got, err := gotestrunner.CheckFuzzCorpus(c.dir, "FuzzT_Types", []string{"string", "[]byte"})
 
 			gotest.NoError(it, err)
 			gotest.Len(it, got, 1)
@@ -79,9 +85,9 @@ func (s *FuzzPreflightTestSuite) TestCheckFuzzCorpus(t *gotest.T) {
 
 	t.When("an entry cannot be parsed", func(w *gotest.T) {
 		w.It("skips it — an unreadable entry is triage's business, not shape drift", func(it *gotest.T) {
-			s.writeCorpus(it, "FuzzT_Unparsed", "ddd", `Request{Kind: 1}`)
+			writeCorpus(it, c.dir, "FuzzT_Unparsed", "ddd", `Request{Kind: 1}`)
 
-			got, err := gotestrunner.CheckFuzzCorpus(s.dir, "FuzzT_Unparsed", []string{"string"})
+			got, err := gotestrunner.CheckFuzzCorpus(c.dir, "FuzzT_Unparsed", []string{"string"})
 
 			gotest.NoError(it, err)
 			gotest.Empty(it, got)
@@ -90,7 +96,7 @@ func (s *FuzzPreflightTestSuite) TestCheckFuzzCorpus(t *gotest.T) {
 
 	t.When("the target has no corpus directory", func(w *gotest.T) {
 		w.It("reports nothing and no error", func(it *gotest.T) {
-			got, err := gotestrunner.CheckFuzzCorpus(s.dir, "FuzzT_Missing", []string{"string"})
+			got, err := gotestrunner.CheckFuzzCorpus(c.dir, "FuzzT_Missing", []string{"string"})
 
 			gotest.NoError(it, err)
 			gotest.Empty(it, got)
@@ -98,7 +104,7 @@ func (s *FuzzPreflightTestSuite) TestCheckFuzzCorpus(t *gotest.T) {
 	})
 }
 
-func (s *FuzzPreflightTestSuite) TestCorpusMismatchMessage(t *gotest.T) {
+func (s *FuzzPreflightTestSuite) TestCorpusMismatchMessage(t *gotest.T, c *fuzzPreflightCtx) {
 	t.It("names the entry, both shapes, and both ways out", func(it *gotest.T) {
 		m := gotestrunner.CorpusMismatch{
 			Func: "FuzzT_A",
@@ -111,13 +117,13 @@ func (s *FuzzPreflightTestSuite) TestCorpusMismatchMessage(t *gotest.T) {
 	})
 }
 
-func (s *FuzzPreflightTestSuite) TestReportStaleFuzzCorpora(t *gotest.T) {
+func (s *FuzzPreflightTestSuite) TestReportStaleFuzzCorpora(t *gotest.T, c *fuzzPreflightCtx) {
 	t.When("the overlay records a target whose corpus drifted", func(w *gotest.T) {
 		w.It("writes one warning per stale entry", func(it *gotest.T) {
-			s.writeCorpus(it, "FuzzT_A", "bbb", `string("hi")`)
-			s.writeCorpus(it, "FuzzT_B", "ccc", `string("hi")`)
+			writeCorpus(it, c.dir, "FuzzT_A", "bbb", `string("hi")`)
+			writeCorpus(it, c.dir, "FuzzT_B", "ccc", `string("hi")`)
 			overlay := &gotestrunner.OverlayResult{
-				DirsByPkg: map[string]string{"example.com/p": s.dir},
+				DirsByPkg: map[string]string{"example.com/p": c.dir},
 				FuzzParamsByFunc: map[string]map[string][]string{"example.com/p": {
 					"FuzzT_A": {"string", "[]byte"},
 					"FuzzT_B": {"string"},
@@ -134,10 +140,10 @@ func (s *FuzzPreflightTestSuite) TestReportStaleFuzzCorpora(t *gotest.T) {
 
 	t.When("the session runs a subset of the targets", func(w *gotest.T) {
 		w.It("checks only those, so --target never reports another target's drift", func(it *gotest.T) {
-			s.writeCorpus(it, "FuzzT_A", "bbb", `string("hi")`)
-			s.writeCorpus(it, "FuzzT_B", "ccc", `string("hi")`)
+			writeCorpus(it, c.dir, "FuzzT_A", "bbb", `string("hi")`)
+			writeCorpus(it, c.dir, "FuzzT_B", "ccc", `string("hi")`)
 			overlay := &gotestrunner.OverlayResult{
-				DirsByPkg: map[string]string{"example.com/p": s.dir},
+				DirsByPkg: map[string]string{"example.com/p": c.dir},
 				FuzzParamsByFunc: map[string]map[string][]string{"example.com/p": {
 					"FuzzT_A": {"string", "[]byte"},
 					"FuzzT_B": {"bool"},
@@ -146,7 +152,7 @@ func (s *FuzzPreflightTestSuite) TestReportStaleFuzzCorpora(t *gotest.T) {
 
 			var buf bytes.Buffer
 			gotestrunner.ReportStaleFuzzCorporaFor(&buf, overlay, []gotestrunner.FuzzTarget{
-				{Package: "example.com/p", Dir: s.dir, Func: "FuzzT_B"},
+				{Package: "example.com/p", Dir: c.dir, Func: "FuzzT_B"},
 			})
 
 			gotest.Contains(it, buf.String(), "fuzz: FuzzT_B:")

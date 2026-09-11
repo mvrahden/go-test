@@ -17,6 +17,12 @@ import (
 // splitting) and per-target `go test -fuzz` command construction.
 type FuzzRunTestSuite struct{}
 
+func (s *FuzzRunTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 // TestPlanFuzzSchedule pins the --for contract: the budget is approximate
 // wall-clock for the whole session, so per-target shares scale with the
 // effective concurrency and waves multiply back out to ≈total.

@@ -22,6 +22,7 @@ import (
 //
 // The suite is sequential: it configures the subprocess through the environment,
 // which t.Setenv forbids sharing with parallel tests.
+// Sequential: Setenv.
 type SharedFixtureTeardownTestSuite struct{}
 
 // SuiteConfig: Exclusive because every method builds and force-kills real

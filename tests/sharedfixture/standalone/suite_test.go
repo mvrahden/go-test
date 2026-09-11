@@ -11,6 +11,12 @@ type AlphaTestSuite struct {
 	Alpha *fixtures.AlphaSharedFixture
 }
 
+func (s *AlphaTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *AlphaTestSuite) TestDataPathSet(t *gotest.T) {
 	gotest.NotEmpty(t, s.Alpha.DataPath)
 }
@@ -29,6 +35,12 @@ type MultiTestSuite struct {
 	Beta  *fixtures.BetaSharedFixture
 }
 
+func (s *MultiTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *MultiTestSuite) TestAlphaAvailable(t *gotest.T) {
 	gotest.NotEmpty(t, s.Alpha.DataPath)
 	gotest.NotEmpty(t, s.Alpha.Handle)
@@ -41,6 +53,12 @@ func (s *MultiTestSuite) TestBetaAvailable(t *gotest.T) {
 
 type GammaTestSuite struct {
 	Gamma *fixtures.GammaSharedFixture
+}
+
+func (s *GammaTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *GammaTestSuite) TestDerivedFromAlpha(t *gotest.T) {

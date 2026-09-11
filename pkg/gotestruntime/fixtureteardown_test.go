@@ -11,6 +11,7 @@ import (
 
 // FixtureTeardownTestSuite covers the one policy both the in-process fixture
 // DAG and the generated shared-fixture subprocess run AfterAll under.
+// Sequential: asserts wall-clock budgets.
 type FixtureTeardownTestSuite struct{}
 
 func (s *FixtureTeardownTestSuite) TestPanicIsContained(t *gotest.T) {

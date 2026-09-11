@@ -21,11 +21,21 @@ import (
 // is written to be adverse — tables, duplicates, slashes, and behaviors the
 // walker deliberately cannot see.
 type StaticSpecTestSuite struct {
+	workDir  string
+	corpus   string
+	rendered map[string]string
+}
+
+func (s *StaticSpecTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
+// staticCtx is one test's work dir and the overlay a run of the corpus writes.
+type staticCtx struct {
 	dir        string
-	workDir    string
 	overlayDir string
-	corpus     string
-	rendered   map[string]string
 }
 
 func (s *StaticSpecTestSuite) BeforeAll(t *gotest.T) {
@@ -38,7 +48,7 @@ func (s *StaticSpecTestSuite) BeforeAll(t *gotest.T) {
 
 	s.rendered = map[string]string{}
 	for _, format := range []string{"terminal", "md", "json"} {
-		s.rendered[format] = s.render(t, format, corpus)
+		s.rendered[format] = s.render(t, s.workDir, format, corpus)
 	}
 }
 
@@ -46,24 +56,23 @@ func (s *StaticSpecTestSuite) AfterAll(t *gotest.T) {
 	gotest.NoError(t, os.RemoveAll(s.workDir))
 }
 
-func (s *StaticSpecTestSuite) BeforeEach(t *gotest.T) {
+func (s *StaticSpecTestSuite) BeforeEach(t *gotest.T) *staticCtx {
 	dir, err := os.MkdirTemp("", "gotest-staticspec-")
 	gotest.NoError(t, err)
-	s.dir = dir
-	s.overlayDir = ""
+	return &staticCtx{dir: dir}
 }
 
-func (s *StaticSpecTestSuite) AfterEach(t *gotest.T) {
-	gotest.NoError(t, os.RemoveAll(s.dir))
-	if s.overlayDir != "" {
-		gotest.NoError(t, os.RemoveAll(s.overlayDir))
+func (s *StaticSpecTestSuite) AfterEach(t *gotest.T, ctx *staticCtx) {
+	gotest.NoError(t, os.RemoveAll(ctx.dir))
+	if ctx.overlayDir != "" {
+		gotest.NoError(t, os.RemoveAll(ctx.overlayDir))
 	}
 }
 
 // render runs the subcommand into a file, which is also how a caller publishes
 // a specification, and returns what it wrote.
-func (s *StaticSpecTestSuite) render(t *gotest.T, format, pattern string) string {
-	out := filepath.Join(s.workDir, "spec."+format)
+func (s *StaticSpecTestSuite) render(t *gotest.T, dir, format, pattern string) string {
+	out := filepath.Join(dir, "spec."+format)
 	code := ExportRunStaticSpec(nil, []string{pattern}, &config.ProjectConfig{}, format, out, true)
 	gotest.Equal(t, 0, code, "spec --static --format=%s", format)
 
@@ -75,10 +84,10 @@ func (s *StaticSpecTestSuite) render(t *gotest.T, format, pattern string) string
 // The contract the whole feature rests on: where the walker reports the list is
 // exhaustive, the names it predicts are the names go test actually produces.
 // Anything else puts a behavior in the tree under a name no run will report.
-func (s *StaticSpecTestSuite) TestPredictsTheNamesARunProduces(t *gotest.T) {
+func (s *StaticSpecTestSuite) TestPredictsTheNamesARunProduces(t *gotest.T, ctx *staticCtx) {
 	t.When("the corpus is both read and run", func(w *gotest.T) {
 		static := s.staticPaths(w)
-		observed := s.observedPaths(w)
+		observed := s.observedPaths(w, ctx)
 
 		w.It("predicts every complete method exactly", func(it *gotest.T) {
 			for method, want := range static.complete {
@@ -128,7 +137,7 @@ func (s *StaticSpecTestSuite) staticPaths(t *gotest.T) staticTrees {
 
 // observedPaths runs the corpus for real and reads the same paths back out of
 // the tree the stream produces.
-func (s *StaticSpecTestSuite) observedPaths(t *gotest.T) map[string][]string {
+func (s *StaticSpecTestSuite) observedPaths(t *gotest.T, ctx *staticCtx) map[string][]string {
 	loaded, _, err := gotestgen.LoadPackages([]string{s.corpus}, nil)
 	gotest.NoError(t, err)
 	results, _, err := gotestgen.GenerateFromLoaded(loaded)
@@ -136,7 +145,7 @@ func (s *StaticSpecTestSuite) observedPaths(t *gotest.T) map[string][]string {
 
 	overlayDir, err := gotestrunner.WriteOverlay(results)
 	gotest.NoError(t, err)
-	s.overlayDir = overlayDir
+	ctx.overlayDir = overlayDir
 
 	cmd := exec.CommandContext(context.Background(), "go", //nolint:gosec // G204: go tool with controlled arguments
 		"test", "-json", "-ldflags=-checklinkname=0",
@@ -164,7 +173,7 @@ func (s *StaticSpecTestSuite) observedPaths(t *gotest.T) map[string][]string {
 	return observed
 }
 
-func (s *StaticSpecTestSuite) TestCarriesNoVerdicts(t *gotest.T) {
+func (s *StaticSpecTestSuite) TestCarriesNoVerdicts(t *gotest.T, _ *staticCtx) {
 	t.When("the terminal spec is rendered from source", func(w *gotest.T) {
 		out := s.rendered["terminal"]
 
@@ -217,7 +226,7 @@ func (s *StaticSpecTestSuite) TestCarriesNoVerdicts(t *gotest.T) {
 
 // A partial list that presents itself as whole is worse than no list, so every
 // surface has to carry the admission — not only the stderr notes.
-func (s *StaticSpecTestSuite) TestDeclaresIncompletenessOnEverySurface(t *gotest.T) {
+func (s *StaticSpecTestSuite) TestDeclaresIncompletenessOnEverySurface(t *gotest.T, _ *staticCtx) {
 	t.When("a method declares behaviors the walker cannot see", func(w *gotest.T) {
 		w.It("marks it in the terminal tree", func(it *gotest.T) {
 			gotest.Contains(it, s.rendered["terminal"], "Conditional — INCOMPLETE")
@@ -245,29 +254,29 @@ func (s *StaticSpecTestSuite) TestDeclaresIncompletenessOnEverySurface(t *gotest
 	})
 }
 
-func (s *StaticSpecTestSuite) TestExitCodes(t *gotest.T) {
+func (s *StaticSpecTestSuite) TestExitCodes(t *gotest.T, ctx *staticCtx) {
 	t.When("the source can be read", func(w *gotest.T) {
 		w.It("exits 0", func(it *gotest.T) {
-			out := filepath.Join(s.dir, "ok.txt")
+			out := filepath.Join(ctx.dir, "ok.txt")
 			gotest.Equal(it, 0, ExportRunStaticSpec(nil, []string{s.corpus}, &config.ProjectConfig{}, "terminal", out, true))
 		})
 	})
 
 	t.When("a package does not compile", func(w *gotest.T) {
-		broken := filepath.Join(s.dir, "broken")
+		broken := filepath.Join(ctx.dir, "broken")
 		gotest.NoError(w, os.MkdirAll(broken, 0o750))
 		gotest.NoError(w, os.WriteFile(filepath.Join(broken, "x_test.go"),
 			[]byte("package broken\n\nfunc Nope() { undefinedSymbol() }\n"), 0o600))
 
 		w.It("exits 2 rather than reporting an empty specification", func(it *gotest.T) {
-			out := filepath.Join(s.dir, "broken.txt")
+			out := filepath.Join(ctx.dir, "broken.txt")
 			gotest.Equal(it, 2, ExportRunStaticSpec(nil, []string{broken}, &config.ProjectConfig{}, "terminal", out, true))
 		})
 	})
 
 	t.When("the output file cannot be created", func(w *gotest.T) {
 		w.It("exits 2", func(it *gotest.T) {
-			out := filepath.Join(s.dir, "no-such-dir", "spec.txt")
+			out := filepath.Join(ctx.dir, "no-such-dir", "spec.txt")
 			gotest.Equal(it, 2, ExportRunStaticSpec(nil, []string{s.corpus}, &config.ProjectConfig{}, "terminal", out, true))
 		})
 	})
@@ -276,7 +285,7 @@ func (s *StaticSpecTestSuite) TestExitCodes(t *gotest.T) {
 // --static reads the specification in the source, --input the one in a recorded
 // run. Honouring one silently while the caller asked for both hands back a tree
 // they did not ask for.
-func (s *StaticSpecTestSuite) TestStaticAndInputAreMutuallyExclusive(t *gotest.T) {
+func (s *StaticSpecTestSuite) TestStaticAndInputAreMutuallyExclusive(t *gotest.T, _ *staticCtx) {
 	t.It("rejects the pair instead of picking one", func(it *gotest.T) {
 		code := ExportRunSpec(Invocation{Args: []string{"--static", "--input=events.json"}})
 		gotest.Equal(it, 2, code)
@@ -337,8 +346,8 @@ func findIncomplete(doc specDocument, method string) bool {
 	return false
 }
 
-func (s *StaticSpecTestSuite) TestDeclaresFuzzTargets(t *gotest.T) {
-	out := s.render(t, "json", "../../examples/fuzzing")
+func (s *StaticSpecTestSuite) TestDeclaresFuzzTargets(t *gotest.T, ctx *staticCtx) {
+	out := s.render(t, ctx.dir, "json", "../../examples/fuzzing")
 	var doc struct {
 		Packages []struct {
 			Nodes []struct {

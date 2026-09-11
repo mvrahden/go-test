@@ -1082,8 +1082,12 @@ protects it:
    demonstrates is a claim: a change that adds a new way to drop or
    misreport a verdict adds a drill mutant for it.
 3. Why is the suite not parallel, and if it is `Exclusive`, which wall-clock
-   verdict does it take? State the reason in a comment; the default is
-   parallel with a returning `BeforeEach`.
+   verdict does it take? The default is parallel with a returning
+   `BeforeEach`. A suite with more than one test method that is neither
+   `Parallel` nor `Exclusive` says why on a `// Sequential:` line in its doc
+   comment, naming a real constraint: `Setenv`, a swapped `os.Stdout`, a
+   golden that pins output order, state the framework forbids moving into a
+   context. `tests/conventions` fails the run for a suite without one.
 4. Render `gotest spec` once. The suite is a subject, the method a
    capability, each `It` one behavior. If the render reads as a list of
    functions, the names are wrong.

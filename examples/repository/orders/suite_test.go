@@ -2,6 +2,7 @@ package orders
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
+// Sequential: both methods place orders into the one store BeforeAll builds.
 type OrderRepositoryTestSuite struct {
 	store *orderStore
 }

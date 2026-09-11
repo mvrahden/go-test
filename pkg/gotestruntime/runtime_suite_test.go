@@ -17,7 +17,8 @@ import (
 
 // RuntimeTestSuite covers the fixture runtime: lifecycle order, exit-code
 // forwarding, retries, timeouts, the fixture tree and DAG, budget files and
-// teardown failures. Sequential: it sets environment variables.
+// teardown failures.
+// Sequential: Setenv and wall-clock budgets.
 type RuntimeTestSuite struct{}
 
 type recorder struct {

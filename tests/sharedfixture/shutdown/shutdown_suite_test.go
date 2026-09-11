@@ -16,6 +16,7 @@ import (
 // shared fixtures down: an interrupt exits 130 and a FailFast trip skips the
 // remaining methods, and the fixture's AfterAll runs either way. Exclusive:
 // it spawns full CLI runs and times a signal.
+// Sequential: each test times a full CLI run against the wall clock.
 //
 //nolint:lifecycle-pair // BeforeAll's binary and module live under t.TempDir(), which the framework removes
 type ShutdownTestSuite struct {

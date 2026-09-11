@@ -26,6 +26,12 @@ func brokenloadDir(t *gotest.T) string {
 // excluded from the loaded results, in every variant.
 type BrokenLoadTestSuite struct{}
 
+func (s *BrokenLoadTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *BrokenLoadTestSuite) TestBrokenPackageVerdicts(t *gotest.T) {
 	loaded, broken, err := gotestgen.LoadPackages([]string{filepath.Join(brokenloadDir(t), "...")}, nil)
 	gotest.NoError(t, err)

@@ -9,7 +9,6 @@ import (
 )
 
 // SharedFixtureProcessTestSuite covers the setup subprocess protocol from the runner's side.
-// Sequential: spawns the shared-fixture setup subprocess.
 type SharedFixtureProcessTestSuite struct{}
 
 func (s *SharedFixtureProcessTestSuite) TestSharedFixtureProcess(t *gotest.T) {

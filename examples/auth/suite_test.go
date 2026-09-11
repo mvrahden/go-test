@@ -6,6 +6,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// Sequential: the tests/e2e goldens pin its -v output order.
 type TokenValidatorTestSuite struct {
 	validator *tokenValidator
 }

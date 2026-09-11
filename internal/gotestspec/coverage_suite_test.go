@@ -15,6 +15,12 @@ import (
 // deduplication of blocks that appear multiple times in merged profiles.
 type CoverageTestSuite struct{}
 
+func (s *CoverageTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *CoverageTestSuite) TestProfileBlockDeduplication(t *gotest.T) {
 	writeProfile := func(it *gotest.T, content string) string {
 		path := filepath.Join(it.TempDir(), "cover.out")

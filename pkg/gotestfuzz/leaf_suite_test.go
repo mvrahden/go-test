@@ -14,6 +14,12 @@ import (
 // wasted execution.
 type FuzzLeafTestSuite struct{}
 
+func (s *FuzzLeafTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *FuzzLeafTestSuite) TestRoundTrip(t *gotest.T) {
 	t.It("round-trips every signed width at its extremes", func(it *gotest.T) {
 		for _, v := range []int8{0, 1, -1, math.MinInt8, math.MaxInt8} {

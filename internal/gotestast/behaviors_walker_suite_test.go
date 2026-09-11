@@ -20,6 +20,12 @@ type BehaviorWalkerTestSuite struct {
 	specs map[string]gotestast.MethodSpec
 }
 
+func (s *BehaviorWalkerTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *BehaviorWalkerTestSuite) BeforeAll(t *gotest.T) {
 	dir, err := filepath.Abs(filepath.Join("testdata", "behaviors"))
 	gotest.NoError(t, err)

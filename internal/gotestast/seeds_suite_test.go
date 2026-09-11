@@ -92,6 +92,12 @@ func collectHarvestSuites(t *testing.T, pkg *packages.Package) gotestast.TestSui
 // never be harvested.
 type SeedsTestSuite struct{}
 
+func (s *SeedsTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *SeedsTestSuite) TestHarvestSeeds(t *gotest.T) {
 	ptestPkg, _ := loadHarvestTestPkgs(t.T())
 	suites := collectHarvestSuites(t.T(), ptestPkg)

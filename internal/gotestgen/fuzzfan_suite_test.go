@@ -16,6 +16,12 @@ import (
 // fuzzfan_compile_test.go type-checks and round-trips the real output.
 type FuzzFanTestSuite struct{}
 
+func (s *FuzzFanTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 // collectCalls is the discovery half of the pipeline, run over one of the
 // shared testdata/sources fixtures.
 func collectCalls(t *gotest.T, fixture string) (*packages.Package, []gotestast.FuzzCall) {

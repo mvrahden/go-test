@@ -14,8 +14,8 @@ import (
 
 // PrepareCLITestSuite drives "gotest prepare" through the built binary: it
 // starts the shared fixtures, prints one JSON line an editor can act on,
-// blocks, and tears down on the shutdown signal. Sequential: it spawns a
-// full prepare and waits on a signal.
+// blocks, and tears down on the shutdown signal.
+// Sequential: it spawns a full prepare and waits on a signal.
 //
 //nolint:lifecycle-pair // BeforeAll's binary lives under t.TempDir(), which the framework removes automatically
 type PrepareCLITestSuite struct {
@@ -24,7 +24,7 @@ type PrepareCLITestSuite struct {
 }
 
 func (s *PrepareCLITestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
+	cfg := gotest.IntegrationSuiteConfig()
 	cfg.Timeout = 3 * time.Minute
 	return cfg
 }

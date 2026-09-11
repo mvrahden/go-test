@@ -12,6 +12,7 @@ import (
 // planted the way the engine writes them. Each test gets its own copy of
 // the module under t.TempDir(), so promote's source edit and the corpus
 // files never touch the repository and nothing needs restoring.
+// Sequential: BeforeEach stages the per-test module copy on the struct.
 //
 //nolint:lifecycle-pair // BeforeAll's binary lives under t.TempDir(), which the framework removes automatically
 type FuzzTriagePromoteTestSuite struct {
@@ -21,6 +22,12 @@ type FuzzTriagePromoteTestSuite struct {
 	suiteTestPath    string
 	corpusFile       string
 	structCorpusFile string
+}
+
+// SuiteConfig: the binary link in BeforeAll and a promote's rebuild per test
+// need the integration deadlines, not the 30-second default.
+func (s *FuzzTriagePromoteTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.IntegrationSuiteConfig()
 }
 
 func (s *FuzzTriagePromoteTestSuite) BeforeAll(t *gotest.T) {

@@ -4,6 +4,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// Sequential: fuzz targets rule out a returning BeforeEach, so the codec lives on the struct.
 type FrameCodecTestSuite struct {
 	codec *Codec
 }

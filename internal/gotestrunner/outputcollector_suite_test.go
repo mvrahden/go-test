@@ -16,7 +16,7 @@ import (
 // OutputCollectorTestSuite covers the output collector: per-package flushing in registration
 // order, package-level event filtering, skipped-suite notes, formatting, the
 // golden output and the result observer.
-// Sequential: EmitSkippedSuites captures os.Stdout and os.Stderr.
+// Sequential: TestOutputFormatting swaps os.Stdout to capture WritePackageSummary.
 type OutputCollectorTestSuite struct{}
 
 func (s *OutputCollectorTestSuite) TestOutputCollector(t *gotest.T) {

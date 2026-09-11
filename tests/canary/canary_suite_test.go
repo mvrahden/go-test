@@ -21,8 +21,8 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// CanaryTestSuite runs one fixture package per method. Sequential: it builds
-// the CLI once and each method spawns a full pipeline run.
+// CanaryTestSuite runs one fixture package per method.
+// Sequential: it builds the CLI once and each method spawns a full pipeline run.
 type CanaryTestSuite struct {
 	binary   string
 	expected map[string]expectation
