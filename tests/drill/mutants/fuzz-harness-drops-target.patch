@@ -1,0 +1,18 @@
+--- a/internal/gotestgen/static/gotest.fuzz.tpl
++++ b/internal/gotestgen/static/gotest.fuzz.tpl
+@@ -2,7 +2,7 @@
+ {{ . }}
+ {{- end }}
+ {{ range $i, $ts := .Spec.EffectiveTestSuites }}
+-{{- range $fz := $ts.Fuzzers }}
++{{- range $i, $fz := $ts.Fuzzers }}{{ if ne $i 0 }}
+ func Fuzz{{ $ts.Identifier }}_{{ $fz.Identifier }}(f *testing.F) {
+ {{- $fx := index $.SuiteFixtures $ts.Identifier }}
+ {{- $sfRefs := index $.SuiteSharedFixtures $ts.Identifier }}
+@@ -48,5 +48,5 @@
+ {{- end }}
+   s.{{ $fz.Identifier }}(ƒf)
+ }
+-{{ end }}
++{{ end }}{{ end }}
+ {{- end }}

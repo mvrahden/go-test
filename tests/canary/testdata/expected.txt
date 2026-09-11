@@ -37,3 +37,16 @@ panicking exit 1
 panicking fail -
 panicking fail TestPanickingTestSuite
 panicking fail TestPanickingTestSuite/TestPanics
+fuzzing exit 1
+fuzzing fail -
+fuzzing fail FuzzFuzzingTestSuite_FuzzBroken
+fuzzing fail FuzzFuzzingTestSuite_FuzzBroken/seed#0
+fuzzing pass FuzzFuzzingTestSuite_FuzzHolds
+fuzzing pass FuzzFuzzingTestSuite_FuzzHolds/seed#0
+fuzzing pass TestFuzzingTestSuite
+fuzzing pass TestFuzzingTestSuite/TestSeedsReplay
+asynchronous exit 1
+asynchronous fail -
+asynchronous fail TestAsyncTestSuite
+asynchronous fail TestAsyncTestSuite/TestNeverDoneAsync
+asynchronous pass TestAsyncTestSuite/TestCallsDoneAsync
