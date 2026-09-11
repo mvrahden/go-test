@@ -1,18 +1,15 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"os/signal"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
-	"github.com/mvrahden/go-test/internal/gotestspec"
 )
 
 func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
@@ -50,21 +47,6 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 		defer cancel()
 	}
 
-	// The text run streams suite output without test2json, so only the JSON
-	// run keeps the events the census needs; the observer collects them.
-	var (
-		streamMu sync.Mutex
-		stream   bytes.Buffer
-		observe  func(pkg string, r gotestrunner.SuiteResult)
-	)
-	if cfg.JSON {
-		observe = func(_ string, r gotestrunner.SuiteResult) { //nolint:gocritic // hugeParam: observer signature
-			streamMu.Lock()
-			stream.Write(r.Stdout)
-			streamMu.Unlock()
-		}
-	}
-
 	result, err := gotestrunner.RunPipeline(ctx, gotestrunner.PipelineConfig{
 		GoTestArgs:      cfg.GoTestArgs,
 		SetupTimeout:    cfg.SetupTimeout,
@@ -75,34 +57,19 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 		Streaming:       true,
 		OutputMode:      modeFromJSON(cfg.JSON),
 		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
-		OnSuiteResult:   observe,
+		GlobalTimeout:   cfg.GlobalTimeout,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	code := result.ExitCode
-	if cfg.GlobalTimeout > 0 && ctx.Err() == context.DeadlineExceeded {
-		fmt.Fprintf(os.Stderr, "FAIL: global --timeout exceeded after %v\n", cfg.GlobalTimeout)
-		if code == 0 {
-			return 1
-		}
-	}
-	if total, names := sumStdlibTests(overlay.StdlibTestsByPkg); total > 0 && !cfg.JSON {
-		fmt.Fprintf(os.Stderr, "note: %d stdlib test(s) in %s not run — gotest runs suites; use 'go test' for stdlib tests\n", total, names)
-	}
 	if !cfg.JSON {
-		noteBenchmarksNotRun(os.Stderr, cfg.GoTestArgs, declaredBenchCases(loaded), nil)
-	}
-	if cfg.JSON {
-		events, perr := gotestspec.ParseEvents(bytes.NewReader(stream.Bytes()))
-		if perr != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", perr)
-			return 2
+		if total, names := sumStdlibTests(overlay.StdlibTestsByPkg); total > 0 {
+			fmt.Fprintf(os.Stderr, "note: %d stdlib test(s) in %s not run — gotest runs suites; use 'go test' for stdlib tests\n", total, names)
 		}
-		code = enforceRunCensus(os.Stderr, code, cfg.GoTestArgs, loaded, events)
+		gotestrunner.NoteBenchmarksNotRun(os.Stderr, cfg.GoTestArgs, len(overlay.Declared.Benchmarks))
 	}
-	return code
+	return result.ExitCode
 }
 
 // sumStdlibTests totals the stdlib tests gotest reports but does not run, and

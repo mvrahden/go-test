@@ -185,9 +185,12 @@ A green run is believed only when every declared test method and fuzz
 target produced a verdict. If one never ran, the run exits 2 with
 "FAIL: census: N declared test(s) never ran" (or "fuzz target(s)") and the
 missing names: a dropped test is not a failed test but a run that cannot be
-trusted. The census applies to green runs only and stands down under -run,
--skip and -list with a note on stderr. Declared benchmarks never run here;
-the run says how many with "note: N benchmark(s) not run".
+trusted. Each missing unit is also booked into the event stream as a failed
+test whose output is the census, and its suite and package fail with it, so
+the rendered spec and -json consumers name it too. The census applies to
+green runs only and stands down under -run, -skip and -list with a note on
+stderr. Declared benchmarks a test run left unexecuted are counted with
+"note: N benchmark(s) not run"; -bench runs them here instead.
 
 Flags:
   --format=<fmt>          Output format: terminal (default), md, json
@@ -232,9 +235,12 @@ A green run is believed only when every declared test method and fuzz
 target produced a verdict. If one never ran, the run exits 2 with
 "FAIL: census: N declared test(s) never ran" (or "fuzz target(s)") and the
 missing names: a dropped test is not a failed test but a run that cannot be
-trusted. The census applies to green runs only and stands down under -run,
--skip and -list with a note on stderr. Declared benchmarks never run here;
-the run says how many with "note: N benchmark(s) not run".
+trusted. Each missing unit is also booked into the event stream as a failed
+test whose output is the census, and its suite and package fail with it, so
+the rendered spec and -json consumers name it too. The census applies to
+green runs only and stands down under -run, -skip and -list with a note on
+stderr. Declared benchmarks a test run left unexecuted are counted with
+"note: N benchmark(s) not run"; -bench runs them here instead.
 
 Flags:
   --format=<fmt>          Output format: terminal (default), md, json
@@ -363,7 +369,8 @@ found" and exits 0 without invoking go test.
 
 A capturing run (--spec, --json, --save or --against) is believed only
 when every declared BenchmarkX method reported a result. If one never ran,
-the run exits 2 with "FAIL: census: N declared benchmark(s) never ran";
+the run exits 2 with "FAIL: census: N declared benchmark(s) never ran" and
+books each missing benchmark into the captured stream as a failed one;
 -run and -bench stand the census down with a note on stderr.
 
 --against prints a delta table (BENCHMARK / OLD ns/op / NEW ns/op / Δ)

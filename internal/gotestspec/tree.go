@@ -40,10 +40,6 @@ const (
 	KindFuzz
 )
 
-// fuzzWrapperRe matches a generated fuzz wrapper name and captures the
-// suite type and the method.
-var fuzzWrapperRe = regexp.MustCompile(`^Fuzz([A-Za-z0-9_]+TestSuite)_(.+)$`)
-
 // Vocab records which gotest call declared a subtest. Like the description, it
 // is a property of the source: `t.When(...)` is visible long before anything
 // executes, and a run cannot report it because a context and an expectation
@@ -277,7 +273,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			// except under a fuzz wrapper, where seed#N is the engine's own
 			// numbering, not a duplicate.
 			cleanName := stripDuplicateSuffix(name)
-			if i == 1 && fuzzWrapperRe.MatchString(resolvedSegments[0]) {
+			if _, _, wrapper := protocol.SplitFuzzWrapper(resolvedSegments[0]); i == 1 && wrapper {
 				cleanName = name
 			}
 			decl := cfg.decls.lookup(ev.Package, strings.Join(cleanSegments[:i+1], "/"))
@@ -898,12 +894,12 @@ func attachFuzzWrappers(pkg *Package) {
 	var kept []*Node
 	var synthesized []*Node
 	for _, n := range pkg.Nodes {
-		m := fuzzWrapperRe.FindStringSubmatch(n.Name)
-		if m == nil || n.duplicate {
+		suiteType, method, ok := protocol.SplitFuzzWrapper(n.Name)
+		if !ok || n.duplicate {
 			kept = append(kept, n)
 			continue
 		}
-		suiteName := "Test" + m[1]
+		suiteName := "Test" + suiteType
 		suite := suites[suiteName]
 		if suite == nil {
 			suite = &Node{Name: suiteName, Status: StatusPass, Start: n.Start, End: n.End}
@@ -915,8 +911,8 @@ func attachFuzzWrappers(pkg *Package) {
 			suite.Status = StatusFail
 		}
 		n.Kind = KindFuzz
-		n.Name = m[2]
-		n.Display = strings.TrimPrefix(m[2], protocol.PrefixFuzz)
+		n.Name = method
+		n.Display = strings.TrimPrefix(method, protocol.PrefixFuzz)
 		for _, c := range n.Children {
 			c.Kind = KindBlock
 			c.Display = c.Name

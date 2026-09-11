@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -132,6 +133,33 @@ func (s *BuildFailureVerdictsTestSuite) TestPipelineCleanWhenNothingMatched(t *g
 	}
 }
 
+func (s *BuildFailureVerdictsTestSuite) TestPipelineCutShortBeforeAnySuite(t *gotest.T, c *buildFailureCtx) {
+	for sub, tC := range gotest.Each(t, []struct {
+		Desc      string
+		streaming bool
+		deadline  bool
+		want      int
+	}{
+		{"batch mode, interrupted", false, false, 130},
+		{"batch mode, past its deadline", false, true, 1},
+		{"streaming mode, interrupted", true, false, 130},
+		{"streaming mode, past its deadline", true, true, 1},
+	}) {
+		ctx, cancel := context.WithCancel(context.Background())
+		if tC.deadline {
+			ctx, cancel = context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+		}
+		cancel()
+		result, err := gotestrunner.RunPipeline(ctx, gotestrunner.PipelineConfig{
+			Streaming:     tC.streaming,
+			OutputMode:    gotestrunner.RunCaptureJSON,
+			GlobalTimeout: time.Minute,
+		}, &gotestrunner.OverlayResult{WorkDir: c.tmpDir})
+		gotest.NoError(sub, err)
+		gotest.Equal(sub, tC.want, result.ExitCode, "a run that never reached a verdict must not exit 0")
+	}
+}
+
 func (s *BuildFailureVerdictsTestSuite) TestExitCodeAfterDispatch(t *gotest.T, _ *buildFailureCtx) {
 	for sub, tC := range gotest.Each(t, []struct {
 		Desc  string
@@ -143,9 +171,40 @@ func (s *BuildFailureVerdictsTestSuite) TestExitCodeAfterDispatch(t *gotest.T, _
 		{"an interrupt is 130 over a green run", 0, context.Canceled, 130},
 		{"an interrupt is 130 over the failures it caused", 1, context.Canceled, 130},
 		{"an interrupt is 130 over a build failure", 2, context.Canceled, 130},
-		{"a deadline leaves a green run to the command's timeout verdict", 0, context.DeadlineExceeded, 0},
+		{"a deadline keeps the verdict for the deadline failure", 0, context.DeadlineExceeded, 0},
 		{"a deadline keeps a red verdict", 1, context.DeadlineExceeded, 1},
 	}) {
 		gotest.Equal(sub, tC.want, gotestrunner.ExportExitCodeAfterDispatch(tC.worst, tC.err))
 	}
+}
+
+func (s *BuildFailureVerdictsTestSuite) TestDeadlineFailsTheRun(t *gotest.T, _ *buildFailureCtx) {
+	t.When("the global --timeout expires before a green run's last verdict", func(w *gotest.T) {
+		result := gotestrunner.PipelineResult{CapturedJSON: []byte{}}
+		gotestrunner.ExportApplyDeadlineFailure(&result, 3*time.Second, context.DeadlineExceeded)
+
+		w.It("exits 1 and books the timeout into the stream every renderer reads", func(it *gotest.T) {
+			gotest.Equal(it, 1, result.ExitCode)
+			gotest.Contains(it, string(result.CapturedJSON), `{"Action":"output","Package":"global --timeout","Output":"FAIL: global --timeout exceeded after 3s\n"}`)
+			gotest.Contains(it, string(result.CapturedJSON), `{"Action":"fail","Package":"global --timeout"}`)
+		})
+	})
+
+	t.When("the run was red already", func(w *gotest.T) {
+		result := gotestrunner.PipelineResult{ExitCode: 2, CapturedJSON: []byte{}}
+		gotestrunner.ExportApplyDeadlineFailure(&result, 3*time.Second, context.DeadlineExceeded)
+
+		w.It("keeps its exit code", func(it *gotest.T) {
+			gotest.Equal(it, 2, result.ExitCode)
+		})
+	})
+
+	t.When("no deadline cut the run short", func(w *gotest.T) {
+		for sub, err := range gotest.Each(w, []error{nil, context.Canceled}) {
+			result := gotestrunner.PipelineResult{CapturedJSON: []byte{}}
+			gotestrunner.ExportApplyDeadlineFailure(&result, 3*time.Second, err)
+			gotest.Equal(sub, 0, result.ExitCode)
+			gotest.Empty(sub, result.CapturedJSON)
+		}
+	})
 }

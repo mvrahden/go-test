@@ -89,6 +89,20 @@ Sections tagged **v1.29+** need v1.29.0 or newer. What v1.29 adds:
    `bench` inputs, and the three `bench-*` lint rules; see
    `reference/cli.md`. Below v1.29 `*gotest.B` does not exist.
 
+Sections tagged **v1.30+** need v1.30.0 or newer. What v1.30 adds:
+
+1. **Census bookings in the stream** — a declared method with no verdict
+   is booked into `-json`, `spec`, `summary` and `watch -- -json` as a
+   failed test, its suite and package failing with it; see
+   `reference/cli.md`. Below v1.30 the census speaks only on stderr and
+   through exit 2.
+2. **The `suite-config-partial` lint rule** — a `gotest.SuiteConfig{…}`
+   literal that leaves `Timeout` or `SetupTimeout` unset replaces the
+   defaults wholesale, so the suite runs with no deadline; the rule reports
+   it (expressiveness tier) and `lint -fix` composes the same fields onto
+   `gotest.DefaultSuiteConfig()`. Below v1.30 it is not reported, so write
+   the compose form by hand.
+
 Exit codes on v1.25.x are weaker than they look — never treat a green
 gotest exit alone as proof there: a package failing to compile mid-run, a
 suite binary killed by a signal, and `spec --input` on a failing stream

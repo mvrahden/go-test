@@ -150,3 +150,14 @@ and `--against` runs apply the same rule to declared benchmark methods
 unfiltered runs; `-run`, `-skip`, `-list` and, for bench, `-bench` print
 `note: census skipped` instead. The plain text run is never censused, so
 gate CI on `summary`, `spec`, `-json` or a capturing `bench` run.
+
+**v1.30+ census bookings:** a unit the census finds missing is also booked
+into the event stream as a test that ran and failed, with
+`census: declared test never ran` as its output, and its suite and package
+fail with it. Every run that writes the event stream carries the booking
+(`spec`, `summary`, `-json`, `watch --spec`, `watch -- -json`, a capturing
+`bench`), so a stream consumer (the editor's Spec View included) can name the
+method that vanished instead of seeing "all passed" beside exit 2. A run cut
+short is not censused: an interrupt exits 130, and a `--timeout` that expires
+before the last verdict exits 1 on every command, booked into the stream as a
+failed `global --timeout` package.

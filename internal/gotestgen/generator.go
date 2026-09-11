@@ -30,6 +30,9 @@ type GenerateResult struct {
 	FixtureDepSuites               []string            // test function names that depend on shared fixtures (e.g. "TestFooSuite")
 	SuiteRequiredSharedFixtureKeys map[string][]string // test func name → required state keys
 	StdlibTestCount                int                 // stdlib func TestX(*testing.T) declarations — reported, never run by gotest
+	TestCases                      []string            // "Test<Suite>/<Method>" of every effective test method, in source order
+	FuzzCases                      []string            // generated Fuzz<Suite>_<Method> wrapper names, in source order
+	BenchCases                     []string            // "Benchmark<Suite>/<Method>" of every effective benchmark method, in source order
 }
 
 // countStdlibTests counts top-level runnable stdlib test functions — Test*,
@@ -360,6 +363,7 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 
 		fuzzFuncsBySuite := map[string][]string{}
 		seenFuzzFuncs := map[string]bool{}
+		var fuzzCases []string
 		for _, effective := range []gotestast.TestSuiteSpecSet{ptestSpec.EffectiveTestSuites, pxtestSpec.EffectiveTestSuites} {
 			for _, s := range effective {
 				for _, fz := range s.Fuzzers() {
@@ -370,6 +374,25 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 					}
 					seenFuzzFuncs[name] = true
 					fuzzFuncsBySuite[id] = append(fuzzFuncsBySuite[id], name)
+					fuzzCases = append(fuzzCases, name)
+				}
+			}
+		}
+
+		var testCases, benchCases []string
+		caseSeen := map[string]bool{}
+		for _, effective := range []gotestast.TestSuiteSpecSet{ptestSpec.EffectiveTestSuites, pxtestSpec.EffectiveTestSuites} {
+			for _, s := range effective {
+				id := s.Identifier()
+				if caseSeen[id] {
+					continue
+				}
+				caseSeen[id] = true
+				for _, m := range s.TestCases() {
+					testCases = append(testCases, "Test"+id+"/"+m.Identifier())
+				}
+				for _, m := range s.Benchmarks() {
+					benchCases = append(benchCases, "Benchmark"+id+"/"+m.Identifier())
 				}
 			}
 		}
@@ -421,6 +444,9 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 			FixtureDepSuites:               append(ptestFixtureDeps, pxtestFixtureDeps...),
 			SuiteRequiredSharedFixtureKeys: mergedReqKeys,
 			StdlibTestCount:                countStdlibTests(lr.Ptest, lr.Pxtest),
+			TestCases:                      testCases,
+			FuzzCases:                      fuzzCases,
+			BenchCases:                     benchCases,
 		}, nil
 	})
 	if err != nil {

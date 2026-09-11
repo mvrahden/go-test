@@ -53,19 +53,6 @@ type ExportFuzzSession = fuzzSession
 
 var ExportParseJobsFlag = parseJobsFlag
 
-type ExportCensusCase = censusCase
-
-var ExportExecutedCases = executedCases
-var ExportCensusMissing = censusMissing
-var ExportEnforceCensus = enforceCensus
-var ExportExecutedBenchCases = executedBenchCases
-var ExportEnforceBenchCensus = enforceBenchCensus
-var ExportExecutedFuzzCases = executedFuzzCases
-var ExportEnforceCensusGroups = enforceCensusGroups
-var ExportNoteBenchmarksNotRun = noteBenchmarksNotRun
-
-type ExportCensusGroup = censusGroup
-
 var ExportRunBench = runBench
 
 type ExportCorpusArg = corpusArg

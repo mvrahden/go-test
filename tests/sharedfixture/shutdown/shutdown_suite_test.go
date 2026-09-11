@@ -1,6 +1,7 @@
 package shutdown_test
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"os/exec"
@@ -88,6 +89,19 @@ func (s *ShutdownTestSuite) startWith(t *gotest.T, markers string, env []string,
 	cmd.Env = append(append(os.Environ(), "GOTEST_SHUTDOWN_DIR="+markers, "GOTEST_CI=0"), env...)
 	gotest.NoError(t, cmd.Start())
 	return cmd
+}
+
+// runWith runs the CLI to completion and returns its combined output and
+// exit code.
+func (s *ShutdownTestSuite) runWith(t *gotest.T, markers string, args ...string) (string, int) {
+	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Dir = s.module
+	cmd.Env = append(os.Environ(), "GOTEST_SHUTDOWN_DIR="+markers, "GOTEST_CI=0")
+	var out bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &out
+	gotest.NoError(t, cmd.Start())
+	code := exitCode(t, cmd)
+	return out.String(), code
 }
 
 // interruptWhen sends an interrupt to cmd once the marker file appears.
@@ -180,4 +194,23 @@ func (s *ShutdownTestSuite) TestInterruptDuringTeardown(t *gotest.T) {
 	t.It("lets the teardown finish", func(it *gotest.T) {
 		gotest.True(it, marker(markers, "fixture-down"), "AfterAll did not finish")
 	})
+}
+
+// A --timeout that expires mid-run fails it with 1 on the streaming and the
+// batch pipeline alike; the suites it cut short are not censused.
+func (s *ShutdownTestSuite) TestGlobalTimeout(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct { //nolint:gocritic // rangeValCopy: intentional
+		Desc string
+		args []string
+	}{
+		{Desc: "gotest ./...", args: []string{"--timeout=20s", "./slow/"}},
+		{Desc: "gotest spec", args: []string{"spec", "--no-color", "--timeout=20s", "./slow/"}},
+	}) {
+		markers := sub.TempDir()
+		out, code := s.runWith(sub, markers, tc.args...)
+		gotest.Equal(sub, 1, code, out)
+		gotest.Contains(sub, out, "FAIL: global --timeout exceeded after 20s")
+		gotest.NotContains(sub, out, "census")
+		gotest.True(sub, marker(markers, "fixture-down"), "AfterAll did not run")
+	}
 }

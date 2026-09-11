@@ -1034,11 +1034,14 @@ guard:
 
 **The guards.**
 
-1. **Census** (`cmd/gotest/census.go`) catches absence. After a green
-   `spec`, `summary` or `-json` run, every method the source declares must
-   have a verdict in the event stream, or the run exits 2. The declared set
-   comes from the AST through `gotestast`, the same source `discover` uses;
-   the executed set is every `Suite/Method` pair with a terminal action.
+1. **Census** (`internal/gotestrunner/census.go`) catches absence. The
+   output collector indexes every verdict as the test2json stream is written;
+   after a green run that ran to completion, every unit the source declares
+   must have one, or the run exits 2 and the missing units are booked into
+   the stream. Living in the pipeline, it covers every command and output
+   mode that writes the stream without any of them wiring it. The declared
+   set comes from the AST through `gotestast`, the same source `discover`
+   uses; the executed set is every `Suite/Method` pair with a terminal action.
    It is exit 2, not 1, because a dropped test is not a failed test but a
    run that cannot be believed, the same code an uncompilable package gets.
    Only green runs are censused: a red run is already not a false green.
@@ -1105,8 +1108,10 @@ miscounts test functions embedded in string fixtures.
   ever wanted.
 - `When`/`It` rows are not censused; that would need the static spec's
   handling of behaviors it cannot enumerate.
-- The extension's runs use `-json` and inherit the census. Showing its
-  message in the editor is an open UI question.
+- The extension's runs use `-json` and inherit the census: the missing
+  units arrive in the stream as failed tests, so the Test Explorer marks
+  the method and the Spec View names it. Nothing in the editor knows the
+  census exists.
 
 The migration that established this found a real defect the stdlib tests could
 not: called under the harness of a parallel suite, the call-site tracer

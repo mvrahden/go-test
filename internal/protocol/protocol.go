@@ -1,6 +1,9 @@
 package protocol
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 const (
 	EnvSharedStateFile    = "GOTEST_SHARED_STATE_FILE"
@@ -65,4 +68,17 @@ func IsPackageSummaryLine(s string) bool {
 		strings.HasPrefix(s, "ok  \t") ||
 		strings.HasPrefix(s, "FAIL\t") ||
 		strings.HasPrefix(s, "?   \t")
+}
+
+// fuzzWrapperRe matches a generated fuzz wrapper name, Fuzz<Suite>_<Method>.
+var fuzzWrapperRe = regexp.MustCompile(`^Fuzz([A-Za-z0-9_]+TestSuite)_(.+)$`)
+
+// SplitFuzzWrapper splits a generated fuzz wrapper name into its suite type
+// and method ("FuzzCartTestSuite_FuzzAdd" -> "CartTestSuite", "FuzzAdd").
+func SplitFuzzWrapper(name string) (suite, method string, ok bool) {
+	m := fuzzWrapperRe.FindStringSubmatch(name)
+	if m == nil {
+		return "", "", false
+	}
+	return m[1], m[2], true
 }

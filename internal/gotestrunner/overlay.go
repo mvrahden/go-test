@@ -40,6 +40,9 @@ type OverlayResult struct {
 	SkippedSuitesByPkg             map[string][]string
 	FixtureDepSuites               map[string]map[string]bool
 	SuiteRequiredSharedFixtureKeys map[string]map[string][]string
+	// Declared are the units the packages declare, which the census holds a
+	// green run to.
+	Declared DeclaredUnits
 }
 
 func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPackage, debug bool, noCache bool, harvestSeeds bool) (*OverlayResult, func(), error) {
@@ -86,7 +89,11 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 	exclusiveSuitesByPkg := map[string]map[string]bool{}
 	fixtureDepSuites := map[string]map[string]bool{}
 	suiteReqKeys := map[string]map[string][]string{}
+	var declared DeclaredUnits
 	for _, r := range allResults {
+		declared.Tests = appendCases(declared.Tests, r.PkgPath, r.TestCases)
+		declared.Fuzz = appendCases(declared.Fuzz, r.PkgPath, r.FuzzCases)
+		declared.Benchmarks = appendCases(declared.Benchmarks, r.PkgPath, r.BenchCases)
 		if len(r.PTest) > 0 || len(r.PXTest) > 0 {
 			suitePkgs = append(suitePkgs, r.PkgPath)
 		} else {
@@ -150,6 +157,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		SkippedSuitesByPkg:             skippedSuitesByPkg,
 		FixtureDepSuites:               fixtureDepSuites,
 		SuiteRequiredSharedFixtureKeys: suiteReqKeys,
+		Declared:                       declared,
 	}, cleanup, nil
 }
 
