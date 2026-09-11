@@ -136,7 +136,8 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
 		return 2
 	}
-	code = enforceCensus(os.Stderr, code, goTestArgs, declaredCases(loaded), executedCases(events))
+	code = enforceRunCensus(os.Stderr, code, goTestArgs, loaded, events)
+	noteBenchmarksNotRun(os.Stderr, goTestArgs, declaredBenchCases(loaded), events)
 
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))
 

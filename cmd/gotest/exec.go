@@ -91,13 +91,16 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 	if total, names := sumStdlibTests(overlay.StdlibTestsByPkg); total > 0 && !cfg.JSON {
 		fmt.Fprintf(os.Stderr, "note: %d stdlib test(s) in %s not run — gotest runs suites; use 'go test' for stdlib tests\n", total, names)
 	}
+	if !cfg.JSON {
+		noteBenchmarksNotRun(os.Stderr, cfg.GoTestArgs, declaredBenchCases(loaded), nil)
+	}
 	if cfg.JSON {
 		events, perr := gotestspec.ParseEvents(bytes.NewReader(stream.Bytes()))
 		if perr != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", perr)
 			return 2
 		}
-		code = enforceCensus(os.Stderr, code, cfg.GoTestArgs, declaredCases(loaded), executedCases(events))
+		code = enforceRunCensus(os.Stderr, code, cfg.GoTestArgs, loaded, events)
 	}
 	return code
 }

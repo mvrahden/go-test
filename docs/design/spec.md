@@ -1441,12 +1441,12 @@ Exit codes: 0 = pass, 1 = test failure, 2 = usage, generation, or build error (s
 
 **Census.** A green run is believed only when every declared test method produced a verdict. After a green `spec`, `summary` or `-json` run, gotest compares two sets:
 
-- declared: the suite methods the source declares, read from the AST after focus and exclusion (the same set `discover` reports);
+- declared: the suite methods and the fuzz targets the source declares, read from the AST after focus and exclusion (the same set `discover` reports); a fuzz target counts through its `Fuzz<Suite>_<Method>` wrapper, whose seeds replay as subtests;
 - executed: the `Suite/Method` pairs for which the event stream carries a `pass`, `fail` or `skip`; a suite skipped as a whole covers its methods.
 
 A declared method without a verdict makes the run exit 2, printing `FAIL: census: N declared test(s) never ran` and the missing methods. It is exit 2, not 1, because a harness that silently dropped a test did not produce a failed test; it produced a run that cannot be believed, the same situation as a package that failed to build.
 
-The census applies to green runs only: a red run is already not a false green, and a `FailFast` stop or a `-failfast` run legitimately leaves methods unexecuted. It stands down under `-run`, `-skip` and `-list`, printing `note: census skipped under -run/-skip/-list/-bench` on stderr, because those flags change the declared set. The text run (`gotest ./...`) streams suite output without test2json and is not censused; every CI path (`summary --github` through the action, `spec` in `make test`) is.
+The census applies to green runs only: a red run is already not a false green, and a `FailFast` stop or a `-failfast` run legitimately leaves methods unexecuted. It stands down under `-run`, `-skip` and `-list`, printing `note: census skipped under -run/-skip/-list/-bench` on stderr, because those flags change the declared set. The text run (`gotest ./...`) streams suite output without test2json and is not censused; every CI path (`summary --github` through the action, `spec` in `make test`) is. Benchmarks never run in a test run; when the packages declare some, the run ends with `note: N benchmark(s) not run — gotest runs tests; use 'gotest bench'` on stderr, so silence never implies the packages were fully exercised.
 
 A `bench` run that captures events (`--spec`, `--json`, `--save`, `--against`) is censused the same way over the declared benchmark methods. go test emits no `pass` event for a benchmark, so its verdict is the `ns/op` result line or a `fail`; `-bench` stands the census down like `-run` does.
 

@@ -60,6 +60,25 @@ func (s *CensusTestSuite) TestExecutedCasesReadTheStream(t *gotest.T, _ *censusC
 	})
 }
 
+const fuzzStream = `{"Action":"run","Package":"example.com/pkg","Test":"FuzzCartTestSuite_FuzzTrim"}
+{"Action":"run","Package":"example.com/pkg","Test":"FuzzCartTestSuite_FuzzTrim/seed#0"}
+{"Action":"pass","Package":"example.com/pkg","Test":"FuzzCartTestSuite_FuzzTrim/seed#0"}
+{"Action":"pass","Package":"example.com/pkg","Test":"FuzzCartTestSuite_FuzzTrim"}
+{"Action":"run","Package":"example.com/pkg","Test":"FuzzCartTestSuite_FuzzStarted"}
+{"Action":"pass","Package":"example.com/pkg"}
+`
+
+func (s *CensusTestSuite) TestExecutedFuzzCasesReadTheStream(t *gotest.T, _ *censusCtx) {
+	t.It("counts a wrapper with a terminal verdict, not its seeds and not one that merely started", func(it *gotest.T) {
+		got := main.ExportExecutedFuzzCases(parseStream(it, fuzzStream))
+		gotest.Equal(it, []main.ExportCensusCase{{Pkg: "example.com/pkg", Path: "FuzzCartTestSuite_FuzzTrim"}}, got)
+	})
+
+	t.It("does not count a wrapper as a test method", func(it *gotest.T) {
+		gotest.Empty(it, main.ExportExecutedCases(parseStream(it, fuzzStream)))
+	})
+}
+
 func (s *CensusTestSuite) TestMissingIsDeclaredMinusExecuted(t *gotest.T, _ *censusCtx) {
 	declared := []main.ExportCensusCase{
 		{Pkg: "example.com/pkg", Path: "TestCartTestSuite/TestAdd"},
@@ -113,6 +132,22 @@ func (s *CensusTestSuite) TestEnforcementRules(t *gotest.T, _ *censusCtx) {
 		}
 	})
 
+	t.When("a green run is missing a declared fuzz target", func(w *gotest.T) {
+		var out bytes.Buffer
+		code := main.ExportEnforceCensusGroups(&out, 0, false,
+			main.ExportCensusGroup{Kind: "test", Declared: executed, Executed: executed},
+			main.ExportCensusGroup{Kind: "fuzz target",
+				Declared: []main.ExportCensusCase{{Pkg: "example.com/pkg", Path: "FuzzCartTestSuite_FuzzStarted"}},
+				Executed: main.ExportExecutedFuzzCases(parseStream(w, fuzzStream))})
+
+		w.It("exits 2 and names the target with its own wording", func(it *gotest.T) {
+			gotest.Equal(it, 2, code)
+			gotest.Contains(it, out.String(), "FAIL: census: 1 declared fuzz target(s) never ran")
+			gotest.Contains(it, out.String(), "example.com/pkg FuzzCartTestSuite_FuzzStarted")
+			gotest.NotContains(it, out.String(), "test(s) never ran")
+		})
+	})
+
 	t.When("nothing is missing", func(w *gotest.T) {
 		var out bytes.Buffer
 		code := main.ExportEnforceCensus(&out, 0, []string{"-race", "-count=2"}, executed, executed)
@@ -136,6 +171,12 @@ func (s *CensusTestSuite) TestRunsAreCensused(t *gotest.T, _ *censusCtx) {
 	t.When("the run is filtered to nothing", func(w *gotest.T) {
 		w.It("spec stands down instead of reporting every method missing", func(it *gotest.T) {
 			gotest.Equal(it, 0, main.ExportRunSpec(main.Invocation{Args: []string{"./testdata/census/plain/", "-run", "TestNothingMatches"}}))
+		})
+	})
+
+	t.When("a package declares a fuzz target", func(w *gotest.T) {
+		w.It("spec replays its seeds and the census counts the wrapper", func(it *gotest.T) {
+			gotest.Equal(it, 0, main.ExportRunSpec(main.Invocation{Args: []string{"./testdata/census/fuzzplain/"}}))
 		})
 	})
 
@@ -185,6 +226,45 @@ func (s *CensusTestSuite) TestExecutedBenchCasesReadTheStream(t *gotest.T, _ *ce
 			gotest.Equal(it, 0, main.ExportEnforceBenchCensus(&out, 0, args, declared, nil), "%v", args)
 			gotest.Contains(it, out.String(), "note: census skipped")
 		}
+	})
+}
+
+func (s *CensusTestSuite) TestBenchmarksNotRunNote(t *gotest.T, _ *censusCtx) {
+	declared := []main.ExportCensusCase{
+		{Pkg: "example.com/pkg", Path: "BenchmarkCartTestSuite/BenchmarkAdd"},
+		{Pkg: "example.com/pkg", Path: "BenchmarkCartTestSuite/BenchmarkRemove"},
+		{Pkg: "example.com/pkg", Path: "BenchmarkCartTestSuite/BenchmarkTotal"},
+	}
+	note := func(args []string, events []gotestspec.TestEvent) string {
+		var out bytes.Buffer
+		main.ExportNoteBenchmarksNotRun(&out, args, declared, events)
+		return out.String()
+	}
+
+	t.It("names the count when a test run leaves declared benchmarks unexecuted", func(it *gotest.T) {
+		gotest.Equal(it, "note: 3 benchmark(s) not run — gotest runs tests; use 'gotest bench'\n", note(nil, nil))
+	})
+
+	t.It("counts only the benchmarks the stream carries no result for", func(it *gotest.T) {
+		ran := parseStream(it, `{"Action":"output","Package":"example.com/pkg","Test":"BenchmarkCartTestSuite/BenchmarkAdd","Output":"BenchmarkCartTestSuite/BenchmarkAdd-8 1000 1200 ns/op\n"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkCartTestSuite/BenchmarkRemove"}
+{"Action":"fail","Package":"example.com/pkg","Test":"BenchmarkCartTestSuite/BenchmarkRemove"}
+`)
+		gotest.Equal(it, "note: 1 benchmark(s) not run — gotest runs tests; use 'gotest bench'\n", note(nil, ran))
+	})
+
+	t.It("stays silent when -bench selected them: the run was asked to run benchmarks", func(it *gotest.T) {
+		gotest.Empty(it, note([]string{"-bench=."}, nil))
+	})
+
+	t.It("stays silent under -run: a filtered run makes no claim about the rest", func(it *gotest.T) {
+		gotest.Empty(it, note([]string{"-run", "TestAdd"}, nil))
+	})
+
+	t.It("stays silent when the packages declare none", func(it *gotest.T) {
+		var out bytes.Buffer
+		main.ExportNoteBenchmarksNotRun(&out, nil, nil, nil)
+		gotest.Empty(it, out.String())
 	})
 }
 
