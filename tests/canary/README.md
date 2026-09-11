@@ -15,7 +15,7 @@ Each directory under `testdata/` is one package with one suite:
 | Fixture | Behavior it pins |
 |---|---|
 | `passing` | a green suite exits 0 and every method and behavior gets `pass` |
-| `failing` | one failing assertion per assertion family, each reported as `fail` |
+| `failing` | one failing call per assertion function, all 34, each reported as `fail` |
 | `failnow` | a failed assertion halts the method; the statement after it never runs |
 | `aftereach` | `AfterEach` runs even when the test failed |
 | `lifecycle` | `BeforeAll`, the methods and `AfterAll` run in that order |

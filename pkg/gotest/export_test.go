@@ -1,6 +1,10 @@
 package gotest
 
-import "context"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
+)
 
 func ExportTCtx(t *T) context.Context { return t.ctx }
 
@@ -15,7 +19,7 @@ var (
 	ExportIsExternalPackage = isExternalPackage
 	ExportSplitTestName     = splitTestName
 	ExportSnapshotReadonly  = snapshotReadonly
-	ExportReadAndRestore    = readAndRestore
+	ExportReadAndRestore    = assert.ReadAndRestore
 	ExportPkgCache          = &pkgCache
 )
 
