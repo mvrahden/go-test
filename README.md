@@ -98,7 +98,7 @@ UserService (12ms)
     when email already exists (<1ms)
       ✓ returns ErrDuplicate (<1ms)
 
-1 suites, 2 behaviors: 2 passed
+1 suite, 2 behaviors: 2 passed
 ```
 
 No generated code leaks into your workflow.
@@ -179,7 +179,7 @@ UserService (133ms)
     ✓ soft-deletes the user (5ms)
     ~ hard-deletes after 30 days — SKIPPED (<1ms)
 
-1 suites, 5 behaviors: 4 passed, 1 skipped
+1 suite, 5 behaviors: 4 passed, 1 skipped
 ```
 
 Every row shows the wall clock it occupied, never the sum of the rows beneath it — so a row that exceeds its children is time it held itself, and one that falls short of their total is children that overlapped.
@@ -657,7 +657,7 @@ gotest bench --spec ./examples/notification -benchtime=10x
 BenchmarkNotificationDispatchBench
   ✓ Dispatch  810.6 ns/op · 596 B/op · 2 allocs/op
 
-1 suites, 1 benchmarks: 
+1 suite, 1 benchmark: 
 ```
 
 Each line reports `ns/op`, `B/op`, and `allocs/op` — the same numbers `go test -bench` prints, rendered as a spec.

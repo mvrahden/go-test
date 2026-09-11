@@ -130,7 +130,7 @@ describe("specDataToReport with a fuzz target", () => {
   it("marks the target as FUZZ with its seed count, and counts it in the trailer", () => {
     const report = specDataToReport(data as never, []);
     expect(report).toContain("RoundTrip — FUZZ (3 seeds)");
-    expect(report).toContain("1 suites, 1 behaviors, 1 fuzz targets:");
+    expect(report).toContain("1 suite, 1 behavior, 1 fuzz target:");
   });
 });
 
@@ -230,7 +230,7 @@ describe("specDataToReport", () => {
 
   it("preserves structural counts in summary", () => {
     const report = specDataToReport(data, [], new Set(["pass"]));
-    expect(report).toContain("1 suites");
+    expect(report).toContain("1 suite");
     expect(report).toContain("3 behaviors");
   });
 

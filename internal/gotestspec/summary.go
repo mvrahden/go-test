@@ -197,20 +197,20 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 	fmt.Fprint(w, "---\n")
 	var parts []string
 	if stats.Suites > 0 {
-		parts = append(parts, fmt.Sprintf("%d suites", stats.Suites))
+		parts = append(parts, countNoun(stats.Suites, "suite", "suites"))
 	}
 	if stats.Behaviors > 0 {
-		parts = append(parts, fmt.Sprintf("%d behaviors", stats.Behaviors))
+		parts = append(parts, countNoun(stats.Behaviors, "behavior", "behaviors"))
 	}
 	if stats.Tests > 0 {
-		parts = append(parts, fmt.Sprintf("%d stdlib tests", stats.Tests))
+		parts = append(parts, countNoun(stats.Tests, "stdlib test", "stdlib tests"))
 	}
 	if len(parts) == 0 {
 		parts = append(parts, "0 suites")
 	}
 	trailer := fmt.Sprintf("%d passed, %d failed, %d skipped", stats.Passed, stats.Failed, stats.Skipped)
 	if stats.FailedPackages > 0 {
-		trailer += fmt.Sprintf(", %d failed packages", stats.FailedPackages)
+		trailer += ", " + countNoun(stats.FailedPackages, "failed package", "failed packages")
 	}
 	fmt.Fprintf(w, "%s: %s\n", strings.Join(parts, ", "), trailer)
 }
@@ -249,7 +249,7 @@ func RenderMarkdownBenchSummary(w io.Writer, packages []*Package, opts ...Render
 	failures := collectFailures(packages)
 	dur := formatDuration(effectiveDuration(cfg, packages))
 	if len(failures) == 0 {
-		fmt.Fprintf(w, "### %d benchmarks ran (%s)\n", stats.Benchmarks, dur)
+		fmt.Fprintf(w, "### %s ran (%s)\n", countNoun(stats.Benchmarks, "benchmark", "benchmarks"), dur)
 	} else {
 		fmt.Fprintf(w, "### %d of %d benchmarks failed (%s)\n", len(failures), stats.Benchmarks, dur)
 		renderMarkdownFailures(w, failures)

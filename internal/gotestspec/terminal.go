@@ -372,28 +372,10 @@ func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hu
 		parts = append(parts, fmt.Sprintf("%s%d skipped%s", c.yellow, stats.Skipped, c.reset))
 	}
 	if stats.FailedPackages > 0 {
-		parts = append(parts, fmt.Sprintf("%s%d failed packages%s", c.red, stats.FailedPackages, c.reset))
+		parts = append(parts, fmt.Sprintf("%s%s%s", c.red, countNoun(stats.FailedPackages, "failed package", "failed packages"), c.reset))
 	}
 
-	var counts []string
-	if stats.Suites > 0 {
-		counts = append(counts, fmt.Sprintf("%d suites", stats.Suites))
-	}
-	if stats.Behaviors > 0 {
-		counts = append(counts, fmt.Sprintf("%d behaviors", stats.Behaviors))
-	}
-	if stats.Tests > 0 {
-		counts = append(counts, fmt.Sprintf("%d stdlib tests", stats.Tests))
-	}
-	if stats.Benchmarks > 0 {
-		counts = append(counts, fmt.Sprintf("%d benchmarks", stats.Benchmarks))
-	}
-	if stats.Fuzzers > 0 {
-		counts = append(counts, fmt.Sprintf("%d fuzz targets", stats.Fuzzers))
-	}
-	if len(counts) == 0 {
-		counts = append(counts, "0 suites")
-	}
+	counts := countParts(stats)
 
 	if len(parts) == 0 {
 		// A spec that has not run has counts but no verdicts. Printing the

@@ -190,7 +190,7 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     // The row is tagged as a property backed by seeds, and the trailer counts
     // the target the way the CLI does.
     expect(html).toContain('<span class="tag fuzz">FUZZ · 3 seeds</span>');
-    expect(html).toContain("1 fuzz targets");
+    expect(html).toContain("1 fuzz target");
     expect(recorder.errors).toEqual([]);
   });
 

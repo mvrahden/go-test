@@ -93,7 +93,7 @@ func (s *RenderTestSuite) TestRenderTerminal_SummaryLine(t *gotest.T, _ *renderC
 	}{
 		{Desc: "suites only", stats: gotestspec.Stats{Suites: 2, Behaviors: 5, Passed: 5}, want: "2 suites, 5 behaviors: 5 passed"},
 		{Desc: "stdlib only", stats: gotestspec.Stats{Tests: 3, Passed: 2, Failed: 1}, want: "3 stdlib tests: 2 passed, 1 failed"},
-		{Desc: "mixed", stats: gotestspec.Stats{Suites: 1, Behaviors: 2, Tests: 1, Passed: 2, Skipped: 1}, want: "1 suites, 2 behaviors, 1 stdlib tests: 2 passed, 1 skipped"},
+		{Desc: "mixed", stats: gotestspec.Stats{Suites: 1, Behaviors: 2, Tests: 1, Passed: 2, Skipped: 1}, want: "1 suite, 2 behaviors, 1 stdlib test: 2 passed, 1 skipped"},
 	}) {
 		var buf bytes.Buffer
 		gotestspec.ExportRenderSummaryLine(&buf, tc.stats, gotestspec.ExportANSIColors)
@@ -166,7 +166,7 @@ func renderTerminalWith(packages []*gotestspec.Package, opts ...gotestspec.Rende
 
 func (s *RenderTestSuite) TestRenderTerminal_BenchmarkLeaf(t *gotest.T, _ *renderCtx) {
 	out := renderTerminal(benchmarkLeaf())
-	for _, want := range []string{"Parse", "985.2 ns/op", "24 B/op", "3 allocs/op", "1 benchmarks"} {
+	for _, want := range []string{"Parse", "985.2 ns/op", "24 B/op", "3 allocs/op", "1 benchmark"} {
 		gotest.Contains(t, out, want)
 	}
 }
@@ -182,7 +182,7 @@ func (s *RenderTestSuite) TestRenderTerminal_WithBenchDeltas(t *gotest.T, _ *ren
 	gotest.Contains(t, out, "p Foo/BenchmarkFoo  100.0  150.0  +50.0% ⚠", "regression row")
 	// A bench-only run has counts but no pass/fail verdicts, so the trailer
 	// stops at the counts: the colon would have nothing after it.
-	gotest.Contains(t, out, "1 benchmarks", "the trailing counts line")
+	gotest.Contains(t, out, "1 benchmark", "the trailing counts line")
 	gotest.NotContains(t, out, "tests passed (", "a single summary trailer, not a stacked one")
 }
 
