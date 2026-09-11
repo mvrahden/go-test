@@ -87,11 +87,11 @@ func (s *DiscoverTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 		// Verify ptest ShoppingCartTestSuite
 		st := suiteByNameAndFile["ShoppingCartTestSuite:suite_test.go"]
 		gotest.Equal(it, "ShoppingCartTestSuite", st.Name)
-		gotest.False(it, st.Parallel)
+		gotest.True(it, st.Parallel)
 		gotest.False(it, st.Focused)
 		gotest.False(it, st.Excluded)
 		gotest.Equal(it, "suite_test.go", st.File)
-		gotest.Equal(it, 5, st.Line)
+		gotest.Equal(it, 9, st.Line)
 		gotest.Equal(it, 6, st.Col)
 
 		expectedLifecycle := []string{"BeforeEach"}
@@ -100,7 +100,7 @@ func (s *DiscoverTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 
 		gotest.Len(it, st.Methods, 9)
 		gotest.Equal(it, "TestAddSingleItem", st.Methods[0].Name)
-		gotest.Equal(it, 15, st.Methods[0].Line)
+		gotest.Equal(it, 22, st.Methods[0].Line)
 		gotest.Equal(it, 1, st.Methods[0].Col)
 		gotest.Equal(it, "TestAddMultipleItems", st.Methods[1].Name)
 
