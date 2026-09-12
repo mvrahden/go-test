@@ -474,22 +474,15 @@ State is transferred via JSON serialization, streamed as each fixture completes.
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-**Transfer vs Local fields:**
-- Transfer fields: exported, JSON-serializable, sent across processes.
-  These should be stable connection parameters (host, port, credentials),
-  not ephemeral handles or runtime state.
-- Local fields: assigned inside `Hydrate()`, reconstructed in each test
-  process (e.g., `*sql.DB` handles that can't serialize)
-
 **Design intent:** the state file is a connection-parameter snapshot, not a
 general data bus. `Hydrate()` turns those parameters into live connections;
 `Dehydrate()` releases them. This keeps fixture state deterministic across
 the N test processes that read the same snapshot.
 
-The `ClassifyLocalFieldsRaw()` function performs AST analysis on the Hydrate
-method body to determine which exported fields are assigned (and therefore
-"local"). It also follows one level of receiver method calls
-(e.g., `f.connect()` → inspects `connect` body for assignments).
+Which exported fields transfer and which are local is decided by
+`ClassifyLocalFieldsRaw()`, an AST walk of `Hydrate` and one level of the
+receiver methods it calls; the rule itself is spec.md's Field
+classification.
 
 ---
 
@@ -561,9 +554,8 @@ non-exclusive suite through the semaphore. Suites with
 drains — one at a time, in deterministic order — because their verdicts
 measure wall-clock behavior (timing budgets, contended resources) that
 concurrently running suites would corrupt. At the bulk→tail barrier the
-runner re-windows shared fixtures for the exclusive tail: fixtures only the
-tail needs are started there (`StartKeys`), fixtures nothing in the tail
-needs are torn down (`TeardownKeys`).
+runner re-windows shared fixtures for the tail (see Per-Suite Fixture
+Readiness).
 
 The Level 1 and Level 3 semaphore defaults (`NumCPU`, `2×GOMAXPROCS`) apply
 to uninstrumented builds; under `-race`/`-msan`/`-asan` both halve, since
@@ -833,7 +825,7 @@ to the entire group, not just the leader process.
 ## 7. Suite Target Construction
 
 ```
-BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, exclusiveByPkg, runFlags, userRunFilter)
+BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, exclusiveByPkg, runFlags, userRunFilter)
   │
   for each package:
     for each suite struct name (e.g., "FooTestSuite"):
@@ -1000,17 +992,6 @@ regardless of gotest; everything else is under test.
 - `go/ast` parses source without running anything; `encoding/json` decodes
   the event stream; the CI shell can invert an exit code.
 
-**The failure modes.** A broken core can only do harm as a false green; a
-false red fails CI and a person looks. Each way to a false green has one
-guard:
-
-| Failure mode | Example | Guard |
-|---|---|---|
-| Absence: a declared test never runs | the generator omits a method, the harness skips it, discovery misses the suite | census |
-| Swallowed failure: the test runs but its failure is not recorded | a wrong assertion predicate, `fail` is a no-op, `T` wired to the wrong `testing.T` | ring 0 and the canary |
-| Misreported verdict: the failure is recorded but the run says green | exit-code aggregation returns 0, the event parser drops `fail` events, the tree classifies `fail` as `pass` | canary |
-| Lifecycle: hooks or fixtures misbehave | `BeforeEach` not called, teardown skipped | a swallowed failure, for any test that records the order |
-
 **Two rings.** Ring 0 is the code every other test's *reporting* depends
 on: `pkg/gotest/internal/assert`, `pkg/gotest/internal/snapfile`,
 `pkg/gotestruntime`, the event, tree and stats layer of `internal/gotestspec`,
@@ -1040,28 +1021,29 @@ to protect in only two ways: it never ran, which the census catches, or its
 failure was misreported, which the canary catches. Its own checks are
 recorded by `testing`.
 
+**The failure modes.** A broken core can only do harm as a false green; a
+false red fails CI and a person looks. Each way to a false green has one
+guard:
+
+| Failure mode | Example | Guard |
+|---|---|---|
+| Absence: a declared test never runs | the generator omits a method, the harness skips it, discovery misses the suite | census |
+| Swallowed failure: the test runs but its failure is not recorded | a wrong assertion predicate, `fail` is a no-op, `T` wired to the wrong `testing.T` | ring 0 and the canary |
+| Misreported verdict: the failure is recorded but the run says green | exit-code aggregation returns 0, the event parser drops `fail` events, the tree classifies `fail` as `pass` | canary |
+| Lifecycle: hooks or fixtures misbehave | `BeforeEach` not called, teardown skipped | a swallowed failure, for any test that records the order |
+
 **The guards.**
 
 1. **Census** (`cmd/gotest/census.go`) catches absence. After a green
    `spec`, `summary` or `-json` run, every method the source declares must
-   have a verdict in the event stream. The declared set is read from the AST
-   through `gotestast`, the same source `discover` uses, after focus and
-   exclusion; the executed set is every `Suite/Method` pair with a terminal
-   action (`pass`, `fail`, `skip`), and a suite skipped as a whole covers
-   its methods. A missing verdict makes the run exit 2, printing the missing
-   methods. It is exit 2, not 1: a dropped test is not a failed test but a
+   have a verdict in the event stream, or the run exits 2. The declared set
+   comes from the AST through `gotestast`, the same source `discover` uses;
+   the executed set is every `Suite/Method` pair with a terminal action.
+   It is exit 2, not 1, because a dropped test is not a failed test but a
    run that cannot be believed, the same code an uncompilable package gets.
-   Granularity is the method, which is exact; `When`/`It` rows can depend
-   on runtime values. Only green runs are censused, since a red run is
-   already not a false green, and a `FailFast` stop or a `-failfast` run
-   legitimately leaves methods unexecuted. Under `-run`, `-skip` and
-   `-list` the census stands down with a note on stderr, because those
-   flags change the declared set with `go test`'s per-level regexp
-   semantics, and CI runs are unfiltered. The plain text run
-   (`gotest ./...`) has no event stream and is not censused; every CI gate
-   is. A capturing `bench` run (`--spec`, `--json`, `--save`, `--against`)
-   is censused over the declared benchmark methods, whose verdict is the
-   `ns/op` result line or a `fail`; `-bench` stands it down.
+   Only green runs are censused: a red run is already not a false green.
+   The user-facing rules, when the census stands down and how bench runs
+   are censused, are in spec.md under CI Integration.
 2. **Ring-0 raw checks** catch a swallowed failure in the kernel: the tests
    of the assertion kernel never call it, so a kernel that always passes
    cannot pass them.
@@ -1086,6 +1068,29 @@ recorded by `testing`.
    `tests/drill/README.md`. A patch that no longer applies fails the drill,
    so mutants cannot silently stop testing anything. The drill runs in CI on
    every push and pull request.
+
+**Adding a test.** Four questions decide where a new test goes and what
+protects it:
+
+1. Does any other test's *verdict* depend on the code under test? Then it
+   is ring 0: an external test package, raw checks only, `//nolint:fail-guard`
+   on the package clause. Everything else is a ring-1 suite with gotest
+   assertions and `When`/`It` structure.
+2. Which false green would a bug here produce, and which guard catches it?
+   A dropped test is the census's job; a swallowed failure the ring-0 suites'
+   and the canary's; a misreported verdict the canary's. A guard nothing
+   demonstrates is a claim: a change that adds a new way to drop or
+   misreport a verdict adds a drill mutant for it.
+3. Why is the suite not parallel, and if it is `Exclusive`, which wall-clock
+   verdict does it take? State the reason in a comment; the default is
+   parallel with a returning `BeforeEach`.
+4. Render `gotest spec` once. The suite is a subject, the method a
+   capability, each `It` one behavior. If the render reads as a list of
+   functions, the names are wrong.
+
+Case accounting for any restructuring is by `gotest -json` capture
+(`Package`+`Test` pairs) before and after, never by grepping sources: grep
+miscounts test functions embedded in string fixtures.
 
 **Boundaries.**
 
@@ -1141,3 +1146,31 @@ reported `harness.go:38` as the user's frame. The tracer now treats
    delegates to `internal/gotestrunner.RunPipeline`. The pipeline encapsulates
    the compile -> fixture-setup -> execute -> teardown -> output flow and
    supports both streaming (`Streaming: true`) and batch modes.
+
+## Glossary
+
+Project-specific terms, one definition each; the section named elaborates.
+
+- **Verdict** — the recorded outcome of one test in the `go test -json` stream: `pass`, `fail` or `skip`. A run's exit code aggregates verdicts; a declared test with no verdict is what the census catches. (Testing gotest)
+- **False green** — a run that should be red and reports green. The only harm a broken core can do; every guard closes one way to it. (Testing gotest)
+- **Trust base** — what Go guarantees regardless of gotest: `testing.T` cannot be un-failed, `go/ast` and `encoding/json` need nothing of ours, the shell can invert an exit code. (Testing gotest)
+- **Ring 0** — the code every other test's reporting depends on: the assertion kernel, snapshot files, the runtime, the event/tree/stats layer and the canary. Its tests use raw checks. **Ring 1** is everything else. (Testing gotest)
+- **Raw check** — `if got != want { t.Errorf(...) }` and `t.FailNow()`, never a `gotest.*` assertion; declared on a file's package clause with `//nolint:fail-guard`. (Testing gotest)
+- **Guard** — one of the four mechanisms that keep the single runner from grading its own exam: census, ring-0 raw checks, canary, drill. (Testing gotest)
+- **Census** — after a green `spec`, `summary` or `-json` run, every method the source declares must have a verdict, or the run exits 2. Stands down under `-run`, `-skip`, `-list` and `-bench`. (Testing gotest)
+- **Canary** — `tests/canary`: builds the CLI, runs it over fixture packages written to fail in specific ways, and compares exit codes and raw verdicts with the **golden list**, `testdata/expected.txt`, using plain Go. (Testing gotest)
+- **Drill** — `make drill`: applies each **mutant** (a patch planting one bug) to a scratch copy and requires the **judge**, a `gotest` built from the unmodified tree, to report the copy red. (Testing gotest, `tests/drill/README.md`)
+- **Harness** — the generated code that runs a suite: the `Test<Suite>` function, the `t.Run` nesting, lifecycle wiring and the `pkg/gotestruntime` calls it makes. Never committed. (Code Generation)
+- **Overlay** — Go's `-overlay` mechanism, through which the harness reaches the compiler without touching the source tree. (Code Generation)
+- **ptest / pxtest** — the two test-package variants `packages.Load` returns for one directory: the in-package tests (`package foo`) and the external ones (`package foo_test`). Each gets its own generated file. (Discovery)
+- **Bound / budget** — a *bound* is the deadline on a phase's context; a *budget* is the duration the phase is held to by verdict, which applies only when the suite or fixture declared a config of its own. (Timeout Architecture; spec.md, Generated Behavior)
+- **Teardown budget** — the grace period a suite subprocess computes for itself and writes to a sidecar file; the runner waits that long after SIGTERM before SIGKILL. (Timeout Architecture)
+- **Bulk / tail / barrier** — the two dispatch phases: the parallel bulk of ordinary suites, then the serial tail of `Exclusive` suites; the barrier between them is where shared fixtures are re-windowed. (Dispatch Phases)
+- **Exclusive** — a suite dispatched strictly alone in the tail, for verdicts that measure wall-clock behavior or contend for a resource. (Dispatch Phases)
+- **Fixture window** — the span during which a shared fixture is resident: from the first phase that needs it to the last, never speculatively. (Per-Suite Fixture Readiness; fixtures.md, Execution Model)
+- **Transfer field / local field / hydrate** — a shared fixture's exported, JSON-serialized fields cross the process boundary; fields assigned in `Hydrate` are local and rebuilt in each test process. (SharedFixture Lifecycle)
+- **Fan / leaf** — the generated decomposition of a fuzz argument into the native values Go's engine accepts, one per leaf field, reassembled before every execution. (Code Generation)
+- **Pass-through / shape-bound target** — a fuzz target whose arguments are all native passes them through unchanged; one with a fanned argument is shape-bound: its corpus positions mean whatever the type's current field order says. (Code Generation; README, Struct arguments)
+- **Seed / crasher / interesting input** — a seed is an `f.Add` value, replayed as an ordinary subtest on every run; a crasher is the corpus file the engine writes under `testdata/fuzz/<Func>/` for a failing input; interesting inputs reached new coverage and live in Go's build cache, never beside the code. (Fuzz mode; README, Fuzzing)
+- **Capturing bench run** — a `gotest bench` run with `--spec`, `--json`, `--save` or `--against`, which captures the event stream and is therefore censused over the declared benchmarks. (Testing gotest)
+- **Subject / capability / behavior** — what a suite, a method and an `It` are in the rendered specification; the full vocabulary is spec.md's Conceptual Model.
