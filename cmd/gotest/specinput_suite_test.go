@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -25,7 +24,18 @@ func (s *SpecInputTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return cfg
 }
 
-func (s *SpecInputTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
+// specInputCtx holds the overlay dir a live run of the examples writes.
+type specInputCtx struct{ overlayDir string }
+
+func (s *SpecInputTestSuite) BeforeEach(_ *gotest.T) *specInputCtx { return &specInputCtx{} }
+
+func (s *SpecInputTestSuite) AfterEach(t *gotest.T, ctx *specInputCtx) {
+	if ctx.overlayDir != "" {
+		gotest.NoError(t, os.RemoveAll(ctx.overlayDir))
+	}
+}
+
+func (s *SpecInputTestSuite) TestRunSpec_InputStdin(t *gotest.T, ctx *specInputCtx) {
 	t.It("renders spec output from stdin-like JSON", func(it *gotest.T) {
 		absExamples, err := filepath.Abs(filepath.Join("..", "..", "examples"))
 		gotest.NoError(it, err, "%v", err)
@@ -40,20 +50,11 @@ func (s *SpecInputTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 
 		tmpDir, err := gotestrunner.WriteOverlay(results)
 		gotest.NoError(it, err, "WriteOverlay: %v", err)
-		defer os.RemoveAll(tmpDir)
+		ctx.overlayDir = tmpDir
 
-		cmd := exec.CommandContext(context.Background(), "go", //nolint:gosec // G204: go tool with controlled arguments
-			"test", "-json", "-ldflags=-checklinkname=0",
-			"-overlay="+filepath.Join(tmpDir, "overlay.json"), "./cart")
-		cmd.Dir = absExamples
-		var jsonOut bytes.Buffer
-		cmd.Stdout = &jsonOut
-		cmd.Stderr = os.Stderr
-		mp := gotestrunner.NewManagedProcess(cmd, gotestrunner.ProcessConfig{Grace: gotestrunner.GraceKill})
-		gotest.NoError(it, mp.Start(), "go test start")
-		_ = mp.WaitWithGrace(context.Background())
-		gotest.NotZero(it, cmd.ProcessState, "go test: process state is nil")
-		jsonData := jsonOut.Bytes()
+		jsonData, _, err := gotestrunner.StdlibRunTestsJSONIn(context.Background(), absExamples,
+			[]string{"-overlay=" + filepath.Join(tmpDir, "overlay.json"), "./cart"})
+		gotest.NoError(it, err, "go test: %v", err)
 
 		events, err := gotestspec.ParseEvents(bytes.NewReader(jsonData))
 		gotest.NoError(it, err, "ParseEvents: %v", err)
@@ -68,7 +69,7 @@ func (s *SpecInputTestSuite) TestRunSpec_InputStdin(t *gotest.T) {
 	})
 }
 
-func (s *SpecInputTestSuite) TestInputModesShareOneExitRule(t *gotest.T) {
+func (s *SpecInputTestSuite) TestInputModesShareOneExitRule(t *gotest.T, _ *specInputCtx) {
 	// One failing and one passing stream, saved the way CI replays them. In a
 	// pipe without pipefail the exit code of the rendering command is the only
 	// verdict CI ever sees — and `spec --input` used to return 0 on anything.
@@ -112,12 +113,9 @@ func (s *SpecInputTestSuite) TestInputModesShareOneExitRule(t *gotest.T) {
 	})
 }
 
-// TestRenderOnlySeparatesVerdictFromRendering covers the escape hatch for
-// clients that render a stream rather than gate on it. The exit code of
-// `--input` carries two answers at once — "did the tests pass" and "did I
-// render" — and a renderer only ever needed the second. --render-only drops the
-// first without ever hiding the second.
-func (s *SpecInputTestSuite) TestRenderOnlySeparatesVerdictFromRendering(t *gotest.T) {
+// TestRenderOnlySeparatesVerdictFromRendering covers --render-only: the exit
+// code drops the test verdict but still reports a failure to render.
+func (s *SpecInputTestSuite) TestRenderOnlySeparatesVerdictFromRendering(t *gotest.T, _ *specInputCtx) {
 	failingStream := `{"Action":"run","Package":"example.com/pkg","Test":"TestBoom"}
 {"Action":"output","Package":"example.com/pkg","Test":"TestBoom","Output":"--- FAIL: TestBoom (0.00s)\n"}
 {"Action":"fail","Package":"example.com/pkg","Test":"TestBoom"}
@@ -178,13 +176,9 @@ func (s *SpecInputTestSuite) TestRenderOnlySeparatesVerdictFromRendering(t *gote
 	})
 }
 
-// TestInputReadsTheSourceItCanReach covers the replay path the editor's Spec
-// View runs on. A captured stream names its packages, and when their source is
-// reachable from the working directory the renderer reads the declared labels
-// from it — exactly as a live run does — so a replay and a run never spell one
-// behavior two ways. A stream whose packages are nowhere to be found still
-// renders, from the names alone.
-func (s *SpecInputTestSuite) TestInputReadsTheSourceItCanReach(t *gotest.T) {
+// TestInputReadsTheSourceItCanReach covers replay labels: read from source when
+// the stream's packages are reachable, from subtest names otherwise.
+func (s *SpecInputTestSuite) TestInputReadsTheSourceItCanReach(t *gotest.T, _ *specInputCtx) {
 	const pkg = "github.com/mvrahden/go-test/examples/search"
 	const when = "TestArticleSearchTestSuite/TestSearchByTitle/searching_for_a_title_keyword"
 	stream := `{"Action":"run","Package":"` + pkg + `","Test":"TestArticleSearchTestSuite"}

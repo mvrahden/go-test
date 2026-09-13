@@ -19,7 +19,18 @@ import (
 // Sequential: Setenv (the cache directory).
 type OverlayTestSuite struct{}
 
-func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T) {
+// overlayDirsCtx collects the directories a test creates, for AfterEach to remove.
+type overlayDirsCtx struct{ dirs []string }
+
+func (s *OverlayTestSuite) BeforeEach(_ *gotest.T) *overlayDirsCtx { return &overlayDirsCtx{} }
+
+func (s *OverlayTestSuite) AfterEach(t *gotest.T, ctx *overlayDirsCtx) {
+	for _, dir := range ctx.dirs {
+		gotest.NoError(t, os.RemoveAll(dir))
+	}
+}
+
+func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T, ctx *overlayDirsCtx) {
 	t.When("writing overlay", func(w *gotest.T) {
 		w.It("creates correct overlay entries for PTest and PXTest", func(it *gotest.T) {
 			results := gotestgen.GenerateResults{
@@ -29,7 +40,7 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T) {
 
 			tmpDir, err := gotestrunner.WriteOverlay(results)
 			gotest.NoError(it, err)
-			defer os.RemoveAll(tmpDir)
+			ctx.dirs = append(ctx.dirs, tmpDir)
 
 			data, err := os.ReadFile(filepath.Join(tmpDir, "overlay.json"))
 			gotest.NoError(it, err)
@@ -61,11 +72,11 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T) {
 
 			dir1, err := gotestrunner.WriteOverlay(results)
 			gotest.NoError(it, err)
-			defer os.RemoveAll(dir1)
+			ctx.dirs = append(ctx.dirs, dir1)
 
 			dir2, err := gotestrunner.WriteOverlay(results)
 			gotest.NoError(it, err)
-			defer os.RemoveAll(dir2)
+			ctx.dirs = append(ctx.dirs, dir2)
 
 			gotest.NotEqual(it, dir1, dir2)
 		})
@@ -77,7 +88,7 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T) {
 
 			tmpDir, err := gotestrunner.WriteOverlay(results)
 			gotest.NoError(it, err)
-			defer os.RemoveAll(tmpDir)
+			ctx.dirs = append(ctx.dirs, tmpDir)
 
 			data, err := os.ReadFile(filepath.Join(tmpDir, ".pid"))
 			gotest.NoError(it, err)
@@ -90,7 +101,7 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T) {
 		w.It("creates an empty overlay for nil results", func(it *gotest.T) {
 			tmpDir, err := gotestrunner.WriteOverlay(nil)
 			gotest.NoError(it, err)
-			defer os.RemoveAll(tmpDir)
+			ctx.dirs = append(ctx.dirs, tmpDir)
 
 			data, err := os.ReadFile(filepath.Join(tmpDir, "overlay.json"))
 			gotest.NoError(it, err)
@@ -105,6 +116,7 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T) {
 		w.It("removes overlay with dead PID", func(it *gotest.T) {
 			dir, err := os.MkdirTemp(os.TempDir(), "gotest-overlay-test-")
 			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
 			// Write a PID that doesn't exist (use a very high PID)
 			_ = os.WriteFile(filepath.Join(dir, ".pid"), []byte("999999999"), 0600)
 
@@ -117,7 +129,7 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T) {
 		w.It("keeps overlay with live PID", func(it *gotest.T) {
 			dir, err := os.MkdirTemp(os.TempDir(), "gotest-overlay-test-")
 			gotest.NoError(it, err)
-			defer os.RemoveAll(dir)
+			ctx.dirs = append(ctx.dirs, dir)
 
 			// Write our own PID -- guaranteed alive
 			_ = os.WriteFile(filepath.Join(dir, ".pid"), []byte(strconv.Itoa(os.Getpid())), 0600)
@@ -131,6 +143,7 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T) {
 		w.It("removes overlay with no PID file", func(it *gotest.T) {
 			dir, err := os.MkdirTemp(os.TempDir(), "gotest-overlay-test-")
 			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
 
 			gotestrunner.CleanStaleOverlays()
 
@@ -141,7 +154,7 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T) {
 		w.It("ignores non-overlay directories", func(it *gotest.T) {
 			dir, err := os.MkdirTemp(os.TempDir(), "unrelated-")
 			gotest.NoError(it, err)
-			defer os.RemoveAll(dir)
+			ctx.dirs = append(ctx.dirs, dir)
 
 			gotestrunner.CleanStaleOverlays()
 
@@ -151,7 +164,7 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T) {
 	})
 }
 
-func (s *OverlayTestSuite) TestOverlayCache(t *gotest.T) {
+func (s *OverlayTestSuite) TestOverlayCache(t *gotest.T, ctx *overlayDirsCtx) {
 	t.When("computing content hash", func(w *gotest.T) {
 		w.It("produces deterministic hash for same content", func(it *gotest.T) {
 			results := gotestgen.GenerateResults{
@@ -284,7 +297,7 @@ func (s *OverlayTestSuite) TestOverlayCache(t *gotest.T) {
 
 			dir, err := gotestrunner.ExportWriteOverlayCached(results, true)
 			gotest.NoError(it, err)
-			defer os.RemoveAll(dir)
+			ctx.dirs = append(ctx.dirs, dir)
 
 			// Should be in tmpdir, not in cache.
 			gotest.False(it, strings.HasPrefix(dir, cacheDir))

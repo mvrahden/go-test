@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	. "github.com/mvrahden/go-test/cmd/gotest"
@@ -147,17 +146,11 @@ func (s *StaticSpecTestSuite) observedPaths(t *gotest.T, ctx *staticCtx) map[str
 	gotest.NoError(t, err)
 	ctx.overlayDir = overlayDir
 
-	cmd := exec.CommandContext(context.Background(), "go", //nolint:gosec // G204: go tool with controlled arguments
-		"test", "-json", "-ldflags=-checklinkname=0",
-		"-overlay="+filepath.Join(overlayDir, "overlay.json"), s.corpus)
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = os.Stderr
-	mp := gotestrunner.NewManagedProcess(cmd, gotestrunner.ProcessConfig{Grace: gotestrunner.GraceKill})
-	gotest.NoError(t, mp.Start())
-	_ = mp.WaitWithGrace(context.Background())
+	stdout, _, err := gotestrunner.StdlibRunTestsJSON(context.Background(),
+		[]string{"-overlay=" + filepath.Join(overlayDir, "overlay.json"), s.corpus})
+	gotest.NoError(t, err)
 
-	events, err := gotestspec.ParseEvents(bytes.NewReader(stdout.Bytes()))
+	events, err := gotestspec.ParseEvents(bytes.NewReader(stdout))
 	gotest.NoError(t, err)
 	tree := gotestspec.BuildTree(events)
 

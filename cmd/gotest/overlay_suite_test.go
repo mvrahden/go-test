@@ -19,7 +19,18 @@ func (s *OverlayTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return cfg
 }
 
-func (s *OverlayTestSuite) TestGenerateOverlay(t *gotest.T) {
+// overlayCtx holds the overlay dir a test's WriteOverlay call creates.
+type overlayCtx struct{ dir string }
+
+func (s *OverlayTestSuite) BeforeEach(_ *gotest.T) *overlayCtx { return &overlayCtx{} }
+
+func (s *OverlayTestSuite) AfterEach(t *gotest.T, ctx *overlayCtx) {
+	if ctx.dir != "" {
+		gotest.NoError(t, os.RemoveAll(ctx.dir))
+	}
+}
+
+func (s *OverlayTestSuite) TestGenerateOverlay(t *gotest.T, ctx *overlayCtx) {
 	t.When("suites are present", func(w *gotest.T) {
 		w.It("produces valid overlay JSON", func(it *gotest.T) {
 			absExamples, err := filepath.Abs(filepath.Join("..", "..", "examples"))
@@ -36,7 +47,7 @@ func (s *OverlayTestSuite) TestGenerateOverlay(t *gotest.T) {
 
 			tmpDir, err := gotestrunner.WriteOverlay(results)
 			gotest.NoError(it, err, "WriteOverlay: %v", err)
-			defer os.RemoveAll(tmpDir)
+			ctx.dir = tmpDir
 
 			overlayFile := filepath.Join(tmpDir, "overlay.json")
 			_, err = os.Stat(overlayFile)
@@ -54,9 +65,7 @@ func (s *OverlayTestSuite) TestGenerateOverlay(t *gotest.T) {
 
 	t.When("no suites", func(w *gotest.T) {
 		w.It("returns empty results for package without suites", func(it *gotest.T) {
-			tmpDir, err := os.MkdirTemp("", "overlay-test-nosuite-*")
-			gotest.NoError(it, err, "%v", err)
-			defer os.RemoveAll(tmpDir)
+			tmpDir := it.TempDir()
 
 			gotest.NoError(it, os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module nosuite\n\ngo 1.25\n"), 0600))
 			gotest.NoError(it, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0600))
