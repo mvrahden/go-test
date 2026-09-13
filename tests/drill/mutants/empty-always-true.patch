@@ -1,3 +1,5 @@
+Expect: pkg/gotest/internal/assert Predicates / IsEmpty
+Expect: ^ *failing pass TestFailingTestSuite/TestEmpty$
 --- a/pkg/gotest/internal/assert/predicates.go
 +++ b/pkg/gotest/internal/assert/predicates.go
 @@ -102,6 +102,7 @@

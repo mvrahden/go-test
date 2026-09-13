@@ -1,3 +1,5 @@
+Expect: benching: exit code 2, want 0
+Expect: benching: results \[BenchmarkContext BenchmarkSecond\]
 --- a/internal/gotestgen/static/gotest.bench.tpl
 +++ b/internal/gotestgen/static/gotest.bench.tpl
 @@ -31,7 +31,7 @@

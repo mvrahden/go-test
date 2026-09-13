@@ -1,3 +1,5 @@
+Expect: passing: exit code 2, want 0
+Expect: ^ *passing fail TestPassingTestSuite/TestOne$
 --- a/internal/gotestgen/static/gotest.suites.tpl
 +++ b/internal/gotestgen/static/gotest.suites.tpl
 @@ -53,7 +53,7 @@

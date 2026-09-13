@@ -1,3 +1,4 @@
+Expect: fuzzing: verdicts differ from the golden list
 --- a/internal/gotestgen/static/gotest.fuzz.tpl
 +++ b/internal/gotestgen/static/gotest.fuzz.tpl
 @@ -2,7 +2,7 @@

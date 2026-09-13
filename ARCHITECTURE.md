@@ -1029,7 +1029,7 @@ guard:
 |---|---|---|
 | Absence: a declared test never runs | the generator omits a method, the harness skips it, discovery misses the suite | census |
 | Swallowed failure: the test runs but its failure is not recorded | a wrong assertion predicate, `fail` is a no-op, `T` wired to the wrong `testing.T` | ring 0 and the canary |
-| Misreported verdict: the failure is recorded but the run says green | exit-code aggregation returns 0, the event parser drops `fail` events, the tree classifies `fail` as `pass` | canary |
+| Misreported verdict: the failure is recorded but the run says green | exit-code aggregation returns 0, the event parser drops `fail` events, the tree classifies `fail` as `pass` | canary; the tree's classification, its ring-0 suite |
 | Lifecycle: hooks or fixtures misbehave | `BeforeEach` not called, teardown skipped | a swallowed failure, for any test that records the order |
 
 **The guards.**
@@ -1061,15 +1061,16 @@ guard:
    spot: `discover` and the generator both read `gotestast`, so a bug that
    broke both identically would make the census agree on the wrong set; the
    golden list would still disagree.
-4. **Drill** (`make drill`, `tests/drill`, six mutants) turns the argument
+4. **Drill** (`make drill`, `tests/drill`, nine mutants) turns the argument
    into evidence. Each patch in `tests/drill/mutants/` plants one bug in a
    core component in a scratch copy of the tree; a `gotest` built from the
    unmodified tree then runs the copy's ring-0 packages and canary and must
    report them red. The judge is built pristine because the first drill
    showed the alternative: the mutant that zeroes the exit code graded the
    very run that was judging it. Which check catches which mutant is in
-   `tests/drill/README.md`. A patch that no longer applies fails the drill,
-   so mutants cannot silently stop testing anything. The drill runs in CI on
+   `tests/drill/README.md`. A patch that no longer applies exactly, does not
+   compile, or is caught by any check but the one its row names fails the
+   drill, so mutants cannot silently stop testing anything. The drill runs in CI on
    every push and pull request.
 
 **Adding a test.** Four questions decide where a new test goes and what

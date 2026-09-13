@@ -1,3 +1,4 @@
+Expect: ^ *failing pass TestFailingTestSuite/TestBehavior$
 --- a/pkg/gotest/t.go
 +++ b/pkg/gotest/t.go
 @@ -110,7 +110,7 @@
