@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/signal"
@@ -245,8 +246,10 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench
 		return 2, benchNs
 	}
 
-	if bench {
-		benchNs = renderBenchRun(result.CapturedJSON, jsonMode, benchNs)
+	benchNs, err = renderWatchRun(os.Stdout, result.CapturedJSON, jsonMode, specMode, bench, decls, benchNs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
+		return 2, benchNs
 	}
 
 	if cfg.GlobalTimeout > 0 && runCtx.Err() == context.DeadlineExceeded {
@@ -255,18 +258,23 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench
 			return 1, benchNs
 		}
 	}
-	if bench {
-		// Bench rendering already draws the full tree, so it subsumes --spec.
-		benchNs = renderBenchRun(result.CapturedJSON, jsonMode, benchNs)
-	} else if specMode {
-		events, perr := gotestspec.ParseEvents(bytes.NewReader(result.CapturedJSON))
-		if perr != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", perr)
-			return 2, benchNs
-		}
-		gotestspec.RenderTerminal(os.Stdout, gotestspec.BuildTree(events, gotestspec.WithDeclarations(decls)))
-	}
 	return result.ExitCode, benchNs
+}
+
+// renderWatchRun draws one iteration's result exactly once: the bench tree
+// with its deltas when bench is set (it subsumes --spec), else the spec tree.
+func renderWatchRun(w io.Writer, capturedJSON []byte, jsonMode, specMode, bench bool, decls gotestspec.DeclarationIndex, benchNs map[string]float64) (map[string]float64, error) {
+	if bench {
+		return renderBenchRun(w, capturedJSON, jsonMode, benchNs), nil
+	}
+	if specMode {
+		events, err := gotestspec.ParseEvents(bytes.NewReader(capturedJSON))
+		if err != nil {
+			return benchNs, err
+		}
+		gotestspec.RenderTerminal(w, gotestspec.BuildTree(events, gotestspec.WithDeclarations(decls)))
+	}
+	return benchNs, nil
 }
 
 // renderBenchRun parses a bench run's captured test2json output into a
@@ -276,9 +284,9 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench
 // are written through as-is instead (mirroring what RunStreamJSON would
 // have streamed live) and no delta lines are printed, since JSON consumers
 // expect only test2json-shaped lines on stdout.
-func renderBenchRun(capturedJSON []byte, jsonMode bool, prevNs map[string]float64) map[string]float64 {
+func renderBenchRun(w io.Writer, capturedJSON []byte, jsonMode bool, prevNs map[string]float64) map[string]float64 {
 	if jsonMode {
-		os.Stdout.Write(capturedJSON) //nolint:errcheck // best-effort watch output
+		w.Write(capturedJSON) //nolint:errcheck // best-effort watch output
 		return prevNs
 	}
 
@@ -288,12 +296,12 @@ func renderBenchRun(capturedJSON []byte, jsonMode bool, prevNs map[string]float6
 		return prevNs
 	}
 	tree := gotestspec.BuildTree(events)
-	gotestspec.RenderTerminal(os.Stdout, tree)
+	gotestspec.RenderTerminal(w, tree)
 
 	baseline := gotestbench.FromPackages(tree)
 	lines, nextNs := benchDeltaLines(baseline.Results, prevNs)
 	for _, line := range lines {
-		fmt.Println(line)
+		fmt.Fprintln(w, line)
 	}
 	return nextNs
 }

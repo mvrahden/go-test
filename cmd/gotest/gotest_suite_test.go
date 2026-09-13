@@ -1416,6 +1416,42 @@ func (s *CmdGotestTestSuite) TestBenchDeltaLines(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CmdGotestTestSuite) TestRenderWatchRun(t *gotest.T) {
+	stream := []byte(`{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkParse"}
+{"Action":"output","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkParse","Output":"BenchmarkFooTestSuite/BenchmarkParse-8   \t 1201 \t 985.2 ns/op\n"}
+{"Action":"pass","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite","Elapsed":0.01}
+{"Action":"pass","Package":"example.com/pkg","Elapsed":0.02}
+`)
+
+	t.When("a bench iteration follows an earlier one", func(w *gotest.T) {
+		first, err := ExportRenderWatchRun(&bytes.Buffer{}, stream, false, false, true, nil, nil)
+		gotest.NoError(w, err)
+		prev := map[string]float64{}
+		for key, ns := range first {
+			prev[key] = ns / 2
+		}
+		var out bytes.Buffer
+		_, err = ExportRenderWatchRun(&out, stream, false, false, true, nil, prev)
+
+		w.It("draws it once, with the delta against the previous iteration", func(it *gotest.T) {
+			gotest.NoError(it, err)
+			gotest.Equal(it, 1, strings.Count(out.String(), "(Δ "), out.String())
+			gotest.Contains(it, out.String(), "(Δ +100.0%)")
+		})
+	})
+
+	t.When("the editor watches a bench run as JSON", func(w *gotest.T) {
+		var out bytes.Buffer
+		_, err := ExportRenderWatchRun(&out, stream, true, false, true, nil, nil)
+
+		w.It("passes the captured stream through once", func(it *gotest.T) {
+			gotest.NoError(it, err)
+			gotest.Equal(it, string(stream), out.String())
+		})
+	})
+}
 func (s *CmdGotestTestSuite) TestBenchSubcommand(t *gotest.T) {
 	t.It("runs suite benchmarks serially and prints ns/op lines", func(it *gotest.T) {
 		out := s.runCLI(it, "bench", "./examples/notification", "-benchtime=10x")
