@@ -9,12 +9,16 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestbench"
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/tests/gotestcli"
 )
 
 // BenchCommandTestSuite drives 'gotest bench' through the built binary: its output, its baseline and the gate.
 //
-//nolint:lifecycle-pair // BeforeAll's binary lives under t.TempDir(), which the framework removes automatically
-type BenchCommandTestSuite struct{ cli cliRunner }
+//nolint:lifecycle-pair // BeforeAll only wraps the shared binary, which its fixture removes
+type BenchCommandTestSuite struct {
+	CLI *gotestcli.BinarySharedFixture
+	cli cliRunner
+}
 
 func (s *BenchCommandTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.IntegrationSuiteConfig()
@@ -23,7 +27,7 @@ func (s *BenchCommandTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func (s *BenchCommandTestSuite) BeforeAll(t *gotest.T) {
-	s.cli = newCLIRunner(t)
+	s.cli = newCLIRunner(s.CLI)
 }
 
 func (s *BenchCommandTestSuite) TestBenchDeltaLines(t *gotest.T) {

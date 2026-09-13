@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/tests/gotestcli"
 )
 
 // PrepareCLITestSuite drives "gotest prepare" through the built binary: it
@@ -17,10 +17,10 @@ import (
 // blocks, and tears down on the shutdown signal.
 // Sequential: it spawns a full prepare and waits on a signal.
 //
-//nolint:lifecycle-pair // BeforeAll's binary lives under t.TempDir(), which the framework removes automatically
+//nolint:lifecycle-pair // BeforeAll only wraps the shared binary, which its fixture removes
 type PrepareCLITestSuite struct {
-	binary   string
-	repoRoot string
+	CLI *gotestcli.BinarySharedFixture
+	cli cliRunner
 }
 
 func (s *PrepareCLITestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -30,10 +30,7 @@ func (s *PrepareCLITestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func (s *PrepareCLITestSuite) BeforeAll(t *gotest.T) {
-	absRoot, err := filepath.Abs("../..")
-	gotest.NoError(t, err)
-	s.repoRoot = absRoot
-	s.binary = buildGotestBinary(t, absRoot, t.TempDir())
+	s.cli = newCLIRunner(s.CLI)
 }
 
 type prepareOutput struct {
@@ -46,8 +43,8 @@ func (s *PrepareCLITestSuite) TestPrepare(t *gotest.T) {
 	if runtime.GOOS == "windows" {
 		t.Skipf("no way to deliver a shutdown signal to a child process on Windows")
 	}
-	cmd := exec.Command(s.binary, "prepare", "./tests/sharedfixture/standalone/") //nolint:gosec // G204: controlled binary with fixed args
-	cmd.Dir = s.repoRoot
+	cmd := exec.Command(s.cli.binary, "prepare", "./tests/sharedfixture/standalone/") //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Dir = s.cli.repoRoot
 	cmd.Env = append(os.Environ(), "GOTEST_CI=0")
 	stdout, err := cmd.StdoutPipe()
 	gotest.NoError(t, err)

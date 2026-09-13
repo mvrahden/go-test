@@ -1,18 +1,20 @@
 package main_test
 
 import (
-	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/tests/gotestcli"
 )
 
 // FuzzCommandTestSuite drives 'gotest fuzz' and 'gotest scaffold fuzz' through the built binary.
 //
-//nolint:lifecycle-pair // BeforeAll's binary lives under t.TempDir(), which the framework removes automatically
-type FuzzCommandTestSuite struct{ cli cliRunner }
+//nolint:lifecycle-pair // BeforeAll only wraps the shared binary, which its fixture removes
+type FuzzCommandTestSuite struct {
+	CLI *gotestcli.BinarySharedFixture
+	cli cliRunner
+}
 
 func (s *FuzzCommandTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.IntegrationSuiteConfig()
@@ -21,7 +23,7 @@ func (s *FuzzCommandTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func (s *FuzzCommandTestSuite) BeforeAll(t *gotest.T) {
-	s.cli = newCLIRunner(t)
+	s.cli = newCLIRunner(s.CLI)
 }
 
 func (s *FuzzCommandTestSuite) TestFuzzSubcommand(t *gotest.T) {
@@ -66,16 +68,8 @@ func (s *FuzzCommandTestSuite) runScaffoldFuzzCLI(t *gotest.T, codecSrc, funcNam
 	gotest.NoError(t, os.MkdirAll(filepath.Join(dir, "codec"), 0755))
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "codec", "codec.go"), []byte(codecSrc), 0644)) //nolint:gosec // G306: throwaway test module
 
-	cmd := exec.Command(s.cli.binary, "scaffold", "--fuzz", "./codec."+funcName) //nolint:gosec // G204: controlled binary with fixed args
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	var exitErr *exec.ExitError
-	gotest.True(t, err == nil || errors.As(err, &exitErr), "running gotest binary: %v\n%s", err, out)
-	code := 0
-	if cmd.ProcessState != nil {
-		code = cmd.ProcessState.ExitCode()
-	}
-	return string(out), code, dir
+	out, code := runGotestIn(t, s.cli.binary, dir, nil, "scaffold", "--fuzz", "./codec."+funcName)
+	return out, code, dir
 }
 
 func (s *FuzzCommandTestSuite) TestScaffoldFuzzSubcommand(t *gotest.T) {

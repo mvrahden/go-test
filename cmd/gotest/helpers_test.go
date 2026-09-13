@@ -6,29 +6,22 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/tests/gotestcli"
 )
 
-// cliRunner is the built gotest binary, run from the repo root. Suites that
-// drive a subcommand end to end build one in BeforeAll.
+// cliRunner is the run's shared gotest binary, run from the repo root.
 type cliRunner struct {
 	binary   string
 	repoRoot string
 }
 
-func newCLIRunner(t *gotest.T) cliRunner {
-	absRoot, err := filepath.Abs("../..")
-	gotest.NoError(t, err)
-	scrubActionsEnv()
-	return cliRunner{binary: buildGotestBinary(t, absRoot, t.TempDir()), repoRoot: absRoot}
-}
-
-// scrubActionsEnv removes the GitHub Actions variables from this process.
-// Every child CLI inherits its environment; under CI each one would
-// otherwise append to the job's real step summary.
-func scrubActionsEnv() {
-	os.Unsetenv("GITHUB_ACTIONS")
-	os.Unsetenv("GITHUB_STEP_SUMMARY")
+// newCLIRunner wraps the shared binary and scrubs this process's Actions
+// env, which every child CLI inherits. Call it from BeforeAll.
+func newCLIRunner(cli *gotestcli.BinarySharedFixture) cliRunner {
+	testkit.ScrubActionsEnv()
+	return cliRunner{binary: cli.Binary, repoRoot: cli.RepoRoot}
 }
 
 // run returns the binary's combined stdout+stderr output.
@@ -79,10 +72,7 @@ func specTableEntriesUntil(doc, heading, next string) map[string]bool {
 // discovery snapshot: the extension watches the tree and indexes the package
 // before the test removes it.
 func stageFixtureModule(t *gotest.T, repoRoot, dir, filename string, src []byte) string {
-	goMod := "module testpkg\n\ngo 1.25.0\n\nrequire github.com/mvrahden/go-test v0.0.0-00010101000000-000000000000\n\nreplace github.com/mvrahden/go-test => " + repoRoot + "\n"
-	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o600))
-	work := "go 1.25.0\n\nuse (\n\t.\n\t" + repoRoot + "\n)\n"
-	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.work"), []byte(work), 0o600))
+	gotest.NoError(t, testkit.WriteModule(repoRoot, dir, "testpkg"))
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, filename), src, 0o600))
 	return dir
 }

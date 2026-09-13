@@ -7,10 +7,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/tests/gotestcli"
 )
 
 // ShutdownTestSuite proves that a run which ends early still tears its
@@ -19,8 +20,9 @@ import (
 // it spawns full CLI runs and times a signal.
 // Sequential: each test times a full CLI run against the wall clock.
 //
-//nolint:lifecycle-pair // BeforeAll's binary and module live under t.TempDir(), which the framework removes
+//nolint:lifecycle-pair // BeforeAll's module lives under t.TempDir(), which the framework removes; the binary is the shared fixture's
 type ShutdownTestSuite struct {
+	CLI    *gotestcli.BinarySharedFixture
 	binary string
 	module string
 }
@@ -34,46 +36,11 @@ func (s *ShutdownTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func (s *ShutdownTestSuite) BeforeAll(t *gotest.T) {
-	repoRoot, err := filepath.Abs("../../..")
-	gotest.NoError(t, err)
-
-	name := "gotest"
-	if runtime.GOOS == "windows" {
-		name += ".exe"
-	}
-	s.binary = filepath.Join(t.TempDir(), name)
-	build := exec.Command("go", "build", "-o", s.binary, "./cmd/gotest") //nolint:gosec // G204: go tool with controlled arguments
-	build.Dir = repoRoot
-	out, err := build.CombinedOutput()
-	gotest.NoError(t, err, "build gotest: %s", out)
-
-	s.module = stageModule(t, repoRoot, filepath.Join(repoRoot, "tests", "sharedfixture", "testdata", "shutdownmod"), t.TempDir())
-}
-
-// stageModule copies the fixture module into dir, points its replace
-// directive at the checkout under test, and pairs the two in a go.work.
-func stageModule(t *gotest.T, repoRoot, src, dir string) string {
-	gotest.NoError(t, filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, _ := filepath.Rel(src, path)
-		target := filepath.Join(dir, rel)
-		if d.IsDir() {
-			return os.MkdirAll(target, 0o750)
-		}
-		data, err := os.ReadFile(path) //nolint:gosec // G122: copies the repo's own fixture into a fresh temp dir
-		if err != nil {
-			return err
-		}
-		if d.Name() == "go.mod" {
-			data = []byte(strings.ReplaceAll(string(data), "REPO_ROOT", repoRoot))
-		}
-		return os.WriteFile(target, data, 0o600)
-	}))
-	work := "go 1.25.0\n\nuse (\n\t.\n\t" + repoRoot + "\n)\n"
-	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.work"), []byte(work), 0o600))
-	return dir
+	testkit.ScrubActionsEnv()
+	s.binary = s.CLI.Binary
+	s.module = t.TempDir()
+	src := filepath.Join(s.CLI.RepoRoot, "tests", "sharedfixture", "testdata", "shutdownmod")
+	gotest.NoError(t, testkit.StageModule(s.CLI.RepoRoot, src, s.module))
 }
 
 // start launches the CLI over one package of the staged module with the

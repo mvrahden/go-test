@@ -10,15 +10,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/about"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/e2e/internal/testutils"
+	"github.com/mvrahden/go-test/tests/gotestcli"
 )
 
 //go:embed testdata
@@ -27,6 +28,7 @@ var testdataFS embed.FS
 // E2ETestSuite tests the gotest CLI end-to-end against real packages.
 // Sequential: every method runs against one shared module copy, and performTest asserts it is clean afterwards.
 type E2ETestSuite struct {
+	CLI     *gotestcli.BinarySharedFixture
 	binary  string
 	workDir string
 }
@@ -35,8 +37,8 @@ type E2ETestSuite struct {
 // which compiles packages (often with -race) per invocation. That load must
 // never run beside the timing-budget harnesses. Keep invocations frugal
 // too: one CLI run per distinct pipeline behavior, assertions merged into
-// it, binaries and module copies built once in BeforeAll, workloads pinned
-// tiny (-benchtime=10x scale).
+// it, module copies built once in BeforeAll, workloads pinned tiny
+// (-benchtime=10x scale).
 func (s *E2ETestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.IntegrationSuiteConfig()
 	cfg.Exclusive = true
@@ -44,27 +46,11 @@ func (s *E2ETestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func (s *E2ETestSuite) BeforeAll(t *gotest.T) {
-	absRoot, err := filepath.Abs("../..")
-	gotest.NoError(t, err)
-
-	binDir := t.TempDir()
-	binaryName := "gotest"
-	if runtime.GOOS == "windows" {
-		binaryName += ".exe"
-	}
-	s.binary = filepath.Join(binDir, binaryName)
-	cmd := exec.Command("go", "build", "-o", s.binary, "./cmd/gotest") //nolint:gosec // G204: go tool with controlled arguments
-	cmd.Dir = absRoot
-	out, err := cmd.CombinedOutput()
-	gotest.NoError(t, err, "build gotest binary: %s", string(out))
-
-	// Every child CLI inherits this process's environment. Under CI the
-	// GitHub Actions variables would make each one append to the job's real
-	// step summary, so they leave the process here. Children keep a nil
-	// cmd.Env on purpose: exec sets the child's PWD from cmd.Dir only then,
-	// and a symlinked temp dir (macOS) resolves to the wrong go.work without it.
-	os.Unsetenv("GITHUB_ACTIONS")
-	os.Unsetenv("GITHUB_STEP_SUMMARY")
+	s.binary = s.CLI.Binary
+	// Scrubbed here because children keep a nil cmd.Env: exec sets the
+	// child's PWD from cmd.Dir only then, and a symlinked temp dir (macOS)
+	// resolves to the wrong go.work without it.
+	testkit.ScrubActionsEnv()
 
 	s.workDir = t.TempDir()
 	testutils.CopyModuleUnderTestToTmp(t.T(), s.workDir, "../..", testutils.DefaultExcludePaths...)

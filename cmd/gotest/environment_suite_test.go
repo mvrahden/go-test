@@ -5,6 +5,7 @@ import (
 
 	. "github.com/mvrahden/go-test/cmd/gotest"
 
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -16,7 +17,7 @@ import (
 type CmdEnvTestSuite struct{}
 
 func (s *CmdEnvTestSuite) BeforeAll(t *gotest.T) {
-	scrubActionsEnv()
+	testkit.ScrubActionsEnv()
 }
 
 func (s *CmdEnvTestSuite) TestDetectCIEnv(t *gotest.T) {

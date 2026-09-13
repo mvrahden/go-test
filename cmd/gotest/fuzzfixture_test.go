@@ -5,45 +5,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
-	"strings"
 
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// buildGotestBinary builds the CLI under test into binDir, a temp dir the
-// caller took from its own t.TempDir() so the framework removes it.
-func buildGotestBinary(t *gotest.T, repoRoot, binDir string) string {
-	name := "gotest"
-	if runtime.GOOS == "windows" {
-		name += ".exe"
-	}
-	binary := filepath.Join(binDir, name)
-	cmd := exec.Command("go", "build", "-o", binary, "./cmd/gotest") //nolint:gosec // G204: go tool with controlled arguments
-	cmd.Dir = repoRoot
-	out, err := cmd.CombinedOutput()
-	gotest.NoError(t, err, "build gotest binary: %s", string(out))
-	return binary
-}
-
 // stageFuzzModule copies testdata/fuzzcrash into dir (the caller's fresh
-// t.TempDir()), points its replace at repoRoot and writes a go.work beside
-// it, so the CLI resolves gotest the way a user's module does — outside the
-// repository tree, where no editor watcher or ./... pattern can see it.
+// t.TempDir()), so the CLI resolves gotest the way a user's module does —
+// outside the repository tree, where no editor watcher or ./... pattern can see it.
 func stageFuzzModule(t *gotest.T, repoRoot, dir string) string {
 	src := filepath.Join(repoRoot, "cmd", "gotest", "testdata", "fuzzcrash")
-	entries, err := os.ReadDir(src)
-	gotest.NoError(t, err)
-	for _, e := range entries {
-		data, err := os.ReadFile(filepath.Join(src, e.Name()))
-		gotest.NoError(t, err)
-		if e.Name() == "go.mod" {
-			data = []byte(strings.ReplaceAll(string(data), "REPO_ROOT", repoRoot))
-		}
-		gotest.NoError(t, os.WriteFile(filepath.Join(dir, e.Name()), data, 0o600))
-	}
-	work := "go 1.25.0\n\nuse (\n\t.\n\t" + repoRoot + "\n)\n"
-	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.work"), []byte(work), 0o600))
+	gotest.NoError(t, testkit.StageModule(repoRoot, src, dir))
 	return dir
 }
 

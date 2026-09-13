@@ -13,11 +13,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -43,16 +43,12 @@ func (s *CanaryTestSuite) BeforeAll(t *gotest.T) {
 	if err != nil {
 		fatalf(t, "abs: %v", err)
 	}
-	name := "gotest"
-	if runtime.GOOS == "windows" {
-		name += ".exe"
+	// The plain build, never the shared fixture: the canary guards that machinery.
+	s.binary, err = testkit.BuildCLI(t.Context(), root, t.TempDir())
+	if err != nil {
+		fatalf(t, "%v", err)
 	}
-	s.binary = filepath.Join(t.TempDir(), name)
-	build := exec.Command("go", "build", "-o", s.binary, "./cmd/gotest") //nolint:gosec // G204: go tool with controlled arguments
-	build.Dir = root
-	if out, err := build.CombinedOutput(); err != nil {
-		fatalf(t, "build gotest: %v\n%s", err, out)
-	}
+	testkit.ScrubActionsEnv()
 	s.expected = readExpected(t, filepath.Join("testdata", "expected.txt"))
 }
 
