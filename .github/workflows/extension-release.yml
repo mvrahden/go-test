@@ -69,7 +69,7 @@ jobs:
   publish-marketplace:
     runs-on: ubuntu-latest
     needs: package
-    timeout-minutes: 15
+    timeout-minutes: 30
     environment:
       name: vscode-marketplace
       url: https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest
@@ -82,10 +82,25 @@ jobs:
         env:
           VSCE_PAT: ${{ secrets.MARKETPLACE_TOKEN }}
         run: test -n "$VSCE_PAT" || { echo "::error::VSCE_PAT is empty — the token never reached this job"; exit 1; }
-      - working-directory: .
-        run: npx @vscode/vsce publish --no-dependencies --packagePath *.vsix
+      - name: Publish to the marketplace, retrying gallery timeouts
+        working-directory: .
+        shell: bash
         env:
           VSCE_PAT: ${{ secrets.MARKETPLACE_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if npx @vscode/vsce publish --no-dependencies --skip-duplicate --packagePath *.vsix 2>&1 | tee publish.log; then
+              exit 0
+            fi
+            grep -q "Request timeout" publish.log || exit 1
+            [ "$attempt" -lt 5 ] || break
+            delay=$((attempt * 30))
+            echo "::warning::marketplace publish attempt $attempt timed out; retrying in ${delay}s"
+            sleep "$delay"
+          done
+          echo "::error::marketplace publish timed out 5 times; the runner-to-marketplace path is the usual culprit. Publish from a workstation: gh release download \"$TAG\" -p '*.vsix' && npx @vscode/vsce publish --no-dependencies --packagePath *.vsix --pat <token>"
+          exit 1
 
   publish-openvsx:
     runs-on: ubuntu-latest
