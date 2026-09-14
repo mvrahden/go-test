@@ -176,7 +176,7 @@ This works because the spec is not written separately from the tests. It *is* th
 
 ## Structured output for language models
 
-The JSON format from `gotest spec --format=json` contains the full behavioral tree of your project. Feeding this to an LLM gives it a structured understanding of what the system does — not how it's implemented, but what it promises. "UserService / Create / email is valid / creates the user" communicates the system's contract without requiring the model to parse implementation details. This is more compact and more reliable than feeding raw source code.
+The spec is also the right thing to hand a language model when you want it to understand what a system does — not how it's implemented, but what it promises. "UserService / Create / email is valid / creates the user" communicates the contract without asking the model to parse implementation details. Pick the format by the reader: the JSON from `--format=json` carries every node's status, timing, flags and captured output, which is what a script or an editor wants, and it is the largest of the artifacts — on gotest's own examples it is more than twice the size of the test sources. The terminal and Markdown renderings are a third to a fifth the size of those sources and say the same thing in prose, so they are what a model should read. [Specs Calcify. Tests Don't.]({{< ref "/blog/spec-driven-development-go" >}}) has the measurements.
 
 ## Tests that don't document themselves
 
