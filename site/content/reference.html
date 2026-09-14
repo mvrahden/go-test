@@ -568,6 +568,7 @@ percentage = covered / total</div>
           <tr><td><code>gotest watch ./...</code></td><td>Re-run on file changes. Only affected packages re-run.</td></tr>
           <tr><td><code>gotest spec ./...</code></td><td>Run tests and render the behavioral specification. With <code>--static</code>, render it from source without running.</td></tr>
           <tr><td><code>gotest discover ./...</code></td><td>Discover test suites and output JSON (feeds editor integrations).</td></tr>
+          <tr><td><code>gotest spec --format=json ./... | gotest-openspec openspec/specs</code></td><td>Join OpenSpec scenarios with the spec tree; one verdict per scenario, exit 1 on a missing or failing behavior.</td></tr>
           <tr><td><code>gotest summary ./...</code></td><td>Failure-focused summary for CI. Shows only failing tests with assertion output.</td></tr>
           <tr><td><code>gotest bench ./...</code></td><td>Run <code>Benchmark*</code> suite methods serially; <code>--save</code>, <code>--against</code> and <code>--gate</code> keep and compare baselines.</td></tr>
           <tr><td><code>gotest fuzz ./...</code></td><td>Search for new failing inputs with <code>Fuzz*</code> suite methods for a time budget (<code>--for</code>); <code>fuzz triage</code> and <code>fuzz promote</code> handle what it finds.</td></tr>
