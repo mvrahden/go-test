@@ -110,6 +110,11 @@ func (p *ManagedProcess) Terminate() {
 	if p.cmd.Process == nil {
 		return
 	}
+	select {
+	case <-p.done:
+		return
+	default:
+	}
 	_ = TerminateProcessGroup(p.cmd.Process.Pid)
 	grace := p.graceTimeout()
 	select {

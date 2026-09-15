@@ -18,6 +18,16 @@ const (
 	BuildShutdownDelay = 10 * time.Second
 )
 
+// signalIfRunning sends signal to pid only while running reports it alive. On
+// Windows a console control event aimed at a group that no longer exists is
+// delivered to every process on the console, the caller included.
+func signalIfRunning(pid int, running func(int) bool, signal func(int) error) error {
+	if !running(pid) {
+		return os.ErrProcessDone
+	}
+	return signal(pid)
+}
+
 func SetProcessGroup(cmd *exec.Cmd) {
 	setProcessGroupAttr(cmd)
 	cmd.Cancel = func() error {

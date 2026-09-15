@@ -136,6 +136,11 @@ func (p *SharedFixtureProcess) shutdown() {
 	if p.cmd == nil || p.cmd.Process == nil {
 		return
 	}
+	select {
+	case <-p.done:
+		return
+	default:
+	}
 	_ = TerminateProcessGroup(p.cmd.Process.Pid)
 	p.awaitExit(p.teardownBudget())
 }
@@ -289,9 +294,9 @@ func (p *SharedFixtureProcess) Teardown() error {
 	}
 	budget := p.teardownBudget()
 
-	// Noted before signalling only to sharpen the message below: an exit that
-	// predates the shutdown request happened while tests may still have been
-	// running, which is a different story than dying mid-teardown.
+	// Noted before signalling: a process already gone is not signalled again,
+	// and an exit that predates the shutdown request happened while tests may
+	// still have been running, a different story than dying mid-teardown.
 	diedEarly := false
 	select {
 	case <-p.done:
@@ -299,7 +304,9 @@ func (p *SharedFixtureProcess) Teardown() error {
 	default:
 	}
 
-	_ = TerminateProcessGroup(p.cmd.Process.Pid)
+	if !diedEarly {
+		_ = TerminateProcessGroup(p.cmd.Process.Pid)
+	}
 	forceKilled := p.awaitExit(budget)
 	if p.sharedDir != "" {
 		os.RemoveAll(p.sharedDir)
