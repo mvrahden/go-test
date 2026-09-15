@@ -162,14 +162,28 @@ func (s *E2ETestSuite) TestSharedFixtureExitTiming(t *gotest.T) {
 				"-json", "-count=1")
 			cmd.Dir = s.workDir
 
-			start := time.Now()
 			out, err := cmd.CombinedOutput()
-			elapsed := time.Since(start)
+			exited := time.Now()
 
 			gotest.NoError(it, err, "shared fixture tests should pass: %s", string(out))
-			gotest.Less(it, elapsed, 60*time.Second, "should exit promptly after tests complete (no process hang), took %v", elapsed)
+			last := lastEventTime(out)
+			gotest.False(it, last.IsZero(), "the -json stream carried no timestamped event: %s", string(out))
+			// Measured from the last event, so slower suites under the pattern cannot fail it.
+			gotest.Less(it, exited.Sub(last), 15*time.Second, "should exit promptly after the last test event (no process hang), exited %v after it", exited.Sub(last))
 		})
 	})
+}
+
+// lastEventTime returns the latest Time among the -json events in out.
+func lastEventTime(out []byte) time.Time {
+	var last time.Time
+	for _, line := range bytes.Split(out, []byte("\n")) {
+		var ev struct{ Time time.Time }
+		if json.Unmarshal(line, &ev) == nil && ev.Time.After(last) {
+			last = ev.Time
+		}
+	}
+	return last
 }
 
 // Discovery and spec rendering reach a behavior's label by different routes:
