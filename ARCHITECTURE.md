@@ -524,7 +524,7 @@ The system has **four levels of parallelism**, each with distinct mechanisms:
 │  │ -run │ │ -run │ │ -run │ │ -run │ │ -run │ │ -run │            │
 │  │ ^A$) │ │ ^B$) │ │ ^C$) │ │ ^D$) │ │ ^E$) │ │ ^F$) │           │
 │  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘ └──────┘           │
-│  Each suite = separate OS subprocess with own process group         │
+│  Each suite = separate OS subprocess with own process tree          │
 │  One compiled binary may serve multiple suites (diff -test.run)     │
 ├─────────────────────────────────────────────────────────────────────┤
 │ Level 4: Within-suite test PARALLELISM     (optional, in-process)  │
@@ -729,9 +729,6 @@ still run — never speculatively.
 │  └─ Fallback when no budget file exists                                │
 │     Must cover longest possible fixture teardown                       │
 │                                                                        │
-│  BuildShutdownDelay (hardcoded: 10s)                                   │
-│  └─ WaitDelay for go build / go test -c compile commands               │
-│                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -752,11 +749,11 @@ still run — never speculatively.
             │ cmd      │  │ fixture  │  │ cmd      │
             │          │  │ cmd      │  │          │
             │ Cancel:  │  │ Cancel:  │  │ Cancel:  │
-            │ SIGTERM  │  │ SIGTERM  │  │ SIGTERM  │
-            │ →pgroup  │  │ →pgroup  │  │ →pgroup  │
+            │ kill     │  │ interrupt│  │ interrupt│
+            │ →tree    │  │ →tree    │  │ →tree    │
             │          │  │          │  │          │
             │ WaitDly: │  │ WaitDly: │  │ WaitDly: │
-            │ 10s      │  │ 0 (mgd)  │  │ 0 (mgd)  │
+            │ 0 (mgd)  │  │ 5m30s    │  │ 0 (mgd)  │
             └──────────┘  └──────────┘  └──────────┘
                                              │
                                  On ctx.Done():
@@ -773,24 +770,42 @@ still run — never speculatively.
                                  │
                          yes ────┼──── no
                           │             │
-                   ForceKillProcess   normal
-                   Group(SIGKILL)     exit
+                   Kill the tree      normal
+                                      exit
 ```
 
-### Process Group Isolation
+### Process Tree Isolation
 
-All subprocesses are managed by `ManagedProcess`, which sets `Setpgid: true`
-internally and handles the full lifecycle: start, signal (SIGTERM to the
-process group via negative PID), grace period, and escalation to SIGKILL.
-Three grace strategies control post-signal behavior:
+Every subprocess the runner starts is the root of its own process tree
+(`internal/proctree`). A tree has two verbs, and both reach the root and
+everything it started, and nothing else:
 
-- `GraceFixed` — wait a fixed duration (e.g., 10s for compile commands).
+- **Interrupt** asks the tree to shut down. On Unix it is SIGTERM to the
+  tree's process group. On Windows it is CTRL_BREAK on the tree's own hidden
+  console (`CREATE_NO_WINDOW`), which Go delivers as `os.Interrupt`.
+- **Kill** stops the tree at once: SIGKILL to the group on Unix,
+  `TerminateJobObject` on Windows.
+
+Windows needs the private console because a console control event is
+addressed to a console, not a process. On a shared console an event aimed at
+a group can be held back and then delivered to every attached process, the
+sender included (microsoft/terminal#335); a Go process that has stopped
+listening then exits with `0xC000013A`. A process can only send an event to
+its own console, so the runner starts a short-lived helper run of its own
+executable (`GOTEST_INTERNAL_INTERRUPT_CONSOLE`, handled in an `init` of
+`internal/proctree`) with no console; it attaches to the tree's console and
+sends the event there. The job object, with kill-on-close, is also what stops
+the tree when the runner itself is killed.
+
+A tree holds its root until `Release`, which runs once the root has been
+waited for; after it, the root's pid may name another process, so nothing is
+signalled. On Windows, `Release` also kills what the root left running.
+
+`ManagedProcess` stops a tree by one of three grace strategies:
+
+- `GraceFixed` — wait a fixed duration after the interrupt.
 - `GraceBudget` — read the teardown budget from a sidecar file at runtime.
-- `GraceKill` — skip SIGTERM and send SIGKILL immediately.
-
-This ensures that when a suite subprocess is terminated, all its child
-processes (e.g., processes spawned by tests) are also killed. SIGTERM goes
-to the entire group, not just the leader process.
+- `GraceKill` — skip the interrupt and kill immediately.
 
 ---
 
@@ -962,7 +977,7 @@ t=5s    AuthTestSuite finishes (exit 0)
         │
 t=8s    All suites done, wg.Wait() returns
         ├─ setupProc.Teardown()
-        │   ├─ TerminateProcessGroup(pid) → SIGTERM
+        │   ├─ tree.Interrupt() → SIGTERM / CTRL_BREAK
         │   └─ Shared fixture subprocess runs AfterAll, exits
         └─ Return worst exit code
 ```
@@ -1137,10 +1152,10 @@ reported `harness.go:38` as the user's frame. The tracer now treats
    channel as each package finishes. Test execution begins before all packages
    are compiled, reducing total wall-clock time.
 
-5. **Process groups via ManagedProcess**: Every subprocess is wrapped in a
-   `ManagedProcess` that sets `Setpgid: true` internally. Signals target
-   the group (negative PID), ensuring child processes spawned by tests are
-   also cleaned up. Grace period strategy is configuration, not per-callsite
+5. **Process trees via ManagedProcess**: Every subprocess runs as the root of
+   its own process tree (see Process Tree Isolation): a shutdown request and a
+   force-kill reach the processes tests spawn and never the runner or a
+   sibling. Grace period strategy is configuration, not per-callsite
    reimplementation.
 
 6. **Budget-based teardown**: Each suite subprocess computes its own teardown

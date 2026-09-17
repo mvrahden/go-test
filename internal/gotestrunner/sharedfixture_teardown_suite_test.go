@@ -328,7 +328,7 @@ func (s *SharedFixtureTeardownTestSuite) TestTeardownForceKilled(t *gotest.T) {
 func (s *SharedFixtureTeardownTestSuite) TestProcessThatDiedOnItsOwn(t *gotest.T) {
 	t.When("the fixture process is killed outright, as an OOM would", func(w *gotest.T) {
 		proc, marker, _ := startSlowTeardown(w, 0, 30*time.Second)
-		gotest.NoError(w, gotestrunner.ForceKillProcessGroup(gotestrunner.ExportProcessPID(proc)))
+		gotest.NoError(w, gotestrunner.ExportKillTree(proc))
 		select {
 		case <-gotestrunner.ExportProcessDone(proc):
 		case <-time.After(10 * time.Second):

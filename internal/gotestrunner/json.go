@@ -22,7 +22,6 @@ func StdlibRunTestsJSONIn(ctx context.Context, dir string, args []string, extraE
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr
-	SetProcessGroup(cmd)
 
 	if len(extraEnv) > 0 && len(extraEnv[0]) > 0 {
 		cmd.Env = os.Environ()
@@ -31,7 +30,7 @@ func StdlibRunTestsJSONIn(ctx context.Context, dir string, args []string, extraE
 		}
 	}
 
-	err := cmd.Run()
+	err := runTree(cmd)
 	if cmd.ProcessState != nil {
 		return stdout.Bytes(), cmd.ProcessState.ExitCode(), nil
 	}

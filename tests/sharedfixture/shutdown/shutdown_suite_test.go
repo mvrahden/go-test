@@ -6,9 +6,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/proctree"
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/gotestcli"
@@ -43,44 +43,58 @@ func (s *ShutdownTestSuite) BeforeAll(t *gotest.T) {
 	gotest.NoError(t, testkit.StageModule(s.CLI.RepoRoot, src, s.module))
 }
 
+// cliRun is a CLI started as the root of its own process tree.
+type cliRun struct {
+	cmd  *exec.Cmd
+	tree *proctree.Tree
+}
+
 // start launches the CLI over one package of the staged module with the
 // marker directory in its environment.
-func (s *ShutdownTestSuite) start(t *gotest.T, markers, pkg string) *exec.Cmd {
+func (s *ShutdownTestSuite) start(t *gotest.T, markers, pkg string) *cliRun {
 	return s.startWith(t, markers, nil, "./"+pkg+"/")
 }
 
 // startWith launches the CLI with the given arguments and extra environment.
-func (s *ShutdownTestSuite) startWith(t *gotest.T, markers string, env []string, args ...string) *exec.Cmd {
+func (s *ShutdownTestSuite) startWith(t *gotest.T, markers string, env []string, args ...string) *cliRun {
+	return s.launch(t, s.command(markers, env, args))
+}
+
+func (s *ShutdownTestSuite) command(markers string, env, args []string) *exec.Cmd {
 	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = s.module
 	cmd.Env = append(append(os.Environ(), "GOTEST_SHUTDOWN_DIR="+markers, "GOTEST_CI=0"), env...)
-	gotest.NoError(t, cmd.Start())
 	return cmd
+}
+
+// launch starts cmd as the root of its own process tree.
+func (s *ShutdownTestSuite) launch(t *gotest.T, cmd *exec.Cmd) *cliRun {
+	tree, err := testkit.StartCLI(cmd)
+	gotest.NoError(t, err)
+	return &cliRun{cmd: cmd, tree: tree}
 }
 
 // runWith runs the CLI to completion and returns its combined output and
 // exit code.
 func (s *ShutdownTestSuite) runWith(t *gotest.T, markers string, args ...string) (string, int) {
-	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
-	cmd.Dir = s.module
-	cmd.Env = append(os.Environ(), "GOTEST_SHUTDOWN_DIR="+markers, "GOTEST_CI=0")
+	cmd := s.command(markers, nil, args)
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
-	gotest.NoError(t, cmd.Start())
-	code := exitCode(t, cmd)
+	code := exitCode(t, s.launch(t, cmd))
 	return out.String(), code
 }
 
-// interruptWhen sends an interrupt to cmd once the marker file appears.
-func interruptWhen(t *gotest.T, cmd *exec.Cmd, markers, name string) {
+// interruptWhen interrupts the run once the marker file appears.
+func interruptWhen(t *gotest.T, run *cliRun, markers, name string) {
 	gotest.Eventually(t, 90*time.Second, 100*time.Millisecond, func(poll *gotest.R) {
 		gotest.True(poll, marker(markers, name), "%s never appeared", name)
 	})
-	gotest.NoError(t, cmd.Process.Signal(os.Interrupt))
+	gotest.NoError(t, testkit.Interrupt(run.cmd, run.tree))
 }
 
-func exitCode(t *gotest.T, cmd *exec.Cmd) int {
-	err := cmd.Wait()
+func exitCode(t *gotest.T, run *cliRun) int {
+	err := run.cmd.Wait()
+	run.tree.Release()
 	if err == nil {
 		return 0
 	}
@@ -95,13 +109,10 @@ func marker(dir, name string) bool {
 }
 
 func (s *ShutdownTestSuite) TestInterrupt(t *gotest.T) {
-	if runtime.GOOS == "windows" {
-		t.Skipf("no way to deliver an interrupt to a child process on Windows")
-	}
 	markers := t.TempDir()
-	cmd := s.start(t, markers, "slow")
-	interruptWhen(t, cmd, markers, "test-running")
-	code := exitCode(t, cmd)
+	run := s.start(t, markers, "slow")
+	interruptWhen(t, run, markers, "test-running")
+	code := exitCode(t, run)
 
 	t.It("exits 130", func(it *gotest.T) {
 		gotest.Equal(it, 130, code)
@@ -128,13 +139,10 @@ func (s *ShutdownTestSuite) TestFailFastTrip(t *gotest.T) {
 // The spec, summary and bench commands run the batch pipeline, not the
 // streaming one; an interrupt must mean 130 on both.
 func (s *ShutdownTestSuite) TestInterruptDuringSpec(t *gotest.T) {
-	if runtime.GOOS == "windows" {
-		t.Skipf("no way to deliver an interrupt to a child process on Windows")
-	}
 	markers := t.TempDir()
-	cmd := s.startWith(t, markers, nil, "spec", "./slow/")
-	interruptWhen(t, cmd, markers, "test-running")
-	code := exitCode(t, cmd)
+	run := s.startWith(t, markers, nil, "spec", "./slow/")
+	interruptWhen(t, run, markers, "test-running")
+	code := exitCode(t, run)
 
 	t.It("exits 130", func(it *gotest.T) {
 		gotest.Equal(it, 130, code)
@@ -147,13 +155,10 @@ func (s *ShutdownTestSuite) TestInterruptDuringSpec(t *gotest.T) {
 // Once every verdict is in, an interrupt has nothing left to cut short: a
 // green run that is interrupted while its fixture tears down is still green.
 func (s *ShutdownTestSuite) TestInterruptDuringTeardown(t *gotest.T) {
-	if runtime.GOOS == "windows" {
-		t.Skipf("no way to deliver an interrupt to a child process on Windows")
-	}
 	markers := t.TempDir()
-	cmd := s.startWith(t, markers, []string{"GOTEST_SHUTDOWN_TEARDOWN_SLEEP=3s"}, "./quick/")
-	interruptWhen(t, cmd, markers, "fixture-tearing-down")
-	code := exitCode(t, cmd)
+	run := s.startWith(t, markers, []string{"GOTEST_SHUTDOWN_TEARDOWN_SLEEP=3s"}, "./quick/")
+	interruptWhen(t, run, markers, "fixture-tearing-down")
+	code := exitCode(t, run)
 
 	t.It("keeps the suites' verdict", func(it *gotest.T) {
 		gotest.Equal(it, 0, code)

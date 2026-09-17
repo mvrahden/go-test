@@ -33,10 +33,9 @@ var ExportFilterPackageLevelEvents = filterPackageLevelEvents
 var ExportIsPackageSummaryLine = protocol.IsPackageSummaryLine
 var ResolveBenchParallelismForTest = resolveMaxParallel
 
-// ExportProcessPID and ExportProcessDone let the teardown tests observe the
-// shared fixture subprocess directly: whether it is still alive, and when it is
-// finally reaped.
-func ExportProcessPID(p *SharedFixtureProcess) int { return p.cmd.Process.Pid }
+// ExportKillTree and ExportProcessDone let the teardown tests act on the shared
+// fixture subprocess directly: kill it outright, and see when it is reaped.
+func ExportKillTree(p *SharedFixtureProcess) error { return p.tree.Kill() }
 
 func ExportProcessDone(p *SharedFixtureProcess) <-chan struct{} { return p.done }
 
@@ -71,8 +70,6 @@ func ExportWriteOverlayCached(results gotestgen.GenerateResults, noCache bool) (
 	return dir, err
 }
 
-var SetBuildProcessGroup = setBuildProcessGroup
-
 func ExportNewSharedFixtureProcess(sharedDir string, state map[string]json.RawMessage) *SharedFixtureProcess {
 	return &SharedFixtureProcess{
 		sharedDir: sharedDir,
@@ -97,7 +94,6 @@ func ExportLineWriterProgress(w io.WriteCloser) FuzzProgress { return w.(*lineWr
 var ExportSnapshotCrashers = snapshotCrashers
 var ExportNewCrasherNames = newCrasherNames
 var ExportExitCodeAfterDispatch = exitCodeAfterDispatch
-var ExportSignalIfRunning = signalIfRunning
 
 // ExportApplyDeadlineFailure applies a run's deadline failure under the given
 // --timeout.

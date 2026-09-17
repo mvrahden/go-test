@@ -2,10 +2,7 @@ package gotestrunner_test
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -15,67 +12,14 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// GotestrunnerProcessTestSuite tests process group lifecycle,
-// signal-based cancellation, and teardown budget enforcement.
+// GotestrunnerProcessTestSuite tests how a suite subprocess is launched and how
+// long it may take to tear down.
 type GotestrunnerProcessTestSuite struct{}
 
 func (s *GotestrunnerProcessTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
 	cfg.Parallel = true
 	return cfg
-}
-
-func (s *GotestrunnerProcessTestSuite) TestGracefulTermination(t *gotest.T) {
-	t.When("sending termination signal to a process", func(w *gotest.T) {
-		w.It("allows the process to run cleanup before exiting", func(it *gotest.T) {
-			if os.Getenv("GOTEST_GRACEFUL_CHILD") == "1" {
-				marker := os.Getenv("GOTEST_MARKER_FILE")
-				sig := make(chan os.Signal, 1)
-				signal.Notify(sig, gracefulSignals...)
-				fmt.Println("ready")
-				<-sig
-				_ = os.WriteFile(marker, []byte("cleanup-ran"), 0600)
-				os.Exit(0)
-			}
-
-			marker := filepath.Join(it.TempDir(), "marker")
-
-			cmd := exec.CommandContext(context.Background(), os.Args[0], //nolint:gosec // G204: test-only subprocess with hardcoded args
-				"-test.run=^TestGotestrunnerProcessTestSuite$/^TestGracefulTermination$")
-			cmd.Env = append(os.Environ(),
-				"GOTEST_GRACEFUL_CHILD=1",
-				"GOTEST_MARKER_FILE="+marker)
-			gotestrunner.SetProcessGroup(cmd)
-			cmd.WaitDelay = 5 * time.Second
-
-			stdout, err := cmd.StdoutPipe()
-			gotest.NoError(it, err)
-			err = cmd.Start()
-			gotest.NoError(it, err)
-
-			buf := make([]byte, 256)
-			n, _ := stdout.Read(buf)
-			gotest.Contains(it, string(buf[:n]), "ready",
-				"child not ready: %q", string(buf[:n]))
-
-			err = gotestrunner.TerminateProcessGroup(cmd.Process.Pid)
-			gotest.NoError(it, err)
-
-			done := make(chan error, 1)
-			go func() { done <- cmd.Wait() }()
-
-			select {
-			case <-done:
-			case <-time.After(5 * time.Second):
-				_ = cmd.Process.Kill()
-				gotest.Fail(it, "process did not exit after TerminateProcessGroup")
-			}
-
-			data, err := os.ReadFile(marker)
-			gotest.NoError(it, err)
-			gotest.Equal(it, "cleanup-ran", string(data))
-		})
-	})
 }
 
 func (s *GotestrunnerProcessTestSuite) TestTeardownBudget(t *gotest.T) {
@@ -136,6 +80,19 @@ func (s *GotestrunnerProcessTestSuite) TestTeardownBudget(t *gotest.T) {
 				}
 				cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, env, false)
 				gotest.Contains(it, cmd.Env, protocol.EnvTeardownBudgetFile+"=/tmp/pkg.test.budget", "GOTEST_TEARDOWN_BUDGET_FILE not found in cmd.Env")
+			})
+		})
+
+		w.When("any target", func(w *gotest.T) {
+			w.It("leaves process attributes to the process tree", func(it *gotest.T) {
+				for _, test2json := range []bool{false, true} {
+					target := gotestrunner.SuiteTarget{
+						SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFoo"},
+						BinaryPath: "/tmp/pkg.test",
+					}
+					cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, env, test2json)
+					gotest.Zero(it, cmd.SysProcAttr, "NewManagedProcess sets them")
+				}
 			})
 		})
 

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/mvrahden/go-test/internal/proctree"
 )
 
 // goLine is the go directive of every staged go.mod and go.work.
@@ -81,4 +83,21 @@ func writeGoWork(repoRoot, dir string) error {
 func ScrubActionsEnv() {
 	os.Unsetenv("GITHUB_ACTIONS")
 	os.Unsetenv("GITHUB_STEP_SUMMARY")
+}
+
+// StartCLI starts cmd as the root of its own process tree, so Interrupt can
+// reach it on every platform.
+func StartCLI(cmd *exec.Cmd) (*proctree.Tree, error) {
+	tree := proctree.New(cmd)
+	return tree, tree.Start()
+}
+
+// Interrupt sends a CLI started by StartCLI the interrupt a terminal sends:
+// SIGINT on Unix. Windows has no signal for one process, so the tree's console
+// gets CTRL_BREAK, which Go also delivers as os.Interrupt.
+func Interrupt(cmd *exec.Cmd, tree *proctree.Tree) error {
+	if runtime.GOOS == "windows" {
+		return tree.Interrupt()
+	}
+	return cmd.Process.Signal(os.Interrupt)
 }

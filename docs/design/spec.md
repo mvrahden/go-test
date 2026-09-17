@@ -416,7 +416,7 @@ the subtest that would release such a wait is still parked inside `t.Run`, so an
 generated wait deadlocks against the panic unwind.
 With `FailFast`, parallel suites additionally share a `ƒfailed` atomic flag: a failed subtest sets it, and subtests that start afterwards skip themselves.
 
-On Windows, suite subprocesses run under job objects so that cancellation and teardown terminate the whole process tree.
+On Windows, suite subprocesses run on a hidden console of their own and under a job object, so that a shutdown request and a force-kill reach the whole process tree and nothing outside it.
 
 ### Generic Suites
 
@@ -1634,8 +1634,9 @@ They never alter how the tests themselves are executed — the spec view is rend
 cmd/gotest/                  CLI entrypoint, subcommands, arg handling
   ├── internal/lint/           go/analysis analyzer (lint subcommand)
   └── internal/gotestrunner/   Suite generation I/O, go test execution, overlay
-        └── internal/gotestgen/   Package loading, collection, fixture resolution, rendering
-              └── internal/gotestast/   AST analysis, spec model, regex classification
+        ├── internal/gotestgen/   Package loading, collection, fixture resolution, rendering
+        │     └── internal/gotestast/   AST analysis, spec model, regex classification
+        └── internal/proctree/    Subprocess trees stopped as a whole and alone (group, console, job)
 
 internal/config/             .gotest.yml project configuration loading
 internal/gotestspec/         Spec tree builder and renderers (terminal, markdown, json)

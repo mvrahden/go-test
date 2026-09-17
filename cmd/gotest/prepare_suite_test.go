@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
-	"runtime"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/gotestcli"
 )
@@ -40,15 +40,13 @@ type prepareOutput struct {
 }
 
 func (s *PrepareCLITestSuite) TestPrepare(t *gotest.T) {
-	if runtime.GOOS == "windows" {
-		t.Skipf("no way to deliver a shutdown signal to a child process on Windows")
-	}
 	cmd := exec.Command(s.cli.binary, "prepare", "./tests/sharedfixture/standalone/") //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = s.cli.repoRoot
 	cmd.Env = append(os.Environ(), "GOTEST_CI=0")
 	stdout, err := cmd.StdoutPipe()
 	gotest.NoError(t, err)
-	gotest.NoError(t, cmd.Start())
+	tree, err := testkit.StartCLI(cmd)
+	gotest.NoError(t, err)
 
 	lines := make(chan string, 1)
 	wait := gotest.Go(t, func() {
@@ -63,7 +61,7 @@ func (s *PrepareCLITestSuite) TestPrepare(t *gotest.T) {
 	select {
 	case line = <-lines:
 	case <-time.After(2 * time.Minute):
-		_ = cmd.Process.Kill()
+		_ = tree.Kill()
 		gotest.Fail(t, "prepare printed nothing within two minutes")
 	}
 
@@ -78,8 +76,9 @@ func (s *PrepareCLITestSuite) TestPrepare(t *gotest.T) {
 		gotest.NoError(it, err)
 	})
 
-	gotest.NoError(t, cmd.Process.Signal(os.Interrupt))
+	gotest.NoError(t, testkit.Interrupt(cmd, tree))
 	err = cmd.Wait()
+	tree.Release()
 	wait()
 
 	t.It("tears down and exits 0 on the shutdown signal", func(it *gotest.T) {
