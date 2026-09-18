@@ -91,6 +91,21 @@ func (s *OutputCollectorTestSuite) TestOutputCollector(t *gotest.T) {
 				"the binary's own output ends mid-stream, so the verdict must say what happened")
 		})
 
+		w.It("registers a binary the system terminated as a failure", func(it *gotest.T) {
+			var stdout, stderr bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &stderr))
+			c.Register("example.com/timeout", 1)
+			// Windows reports the termination status itself: a suite the
+			// --timeout interrupted exits 0xC000013A, which is no verdict and
+			// towers over every real exit code, so the run exited with it.
+			c.RecordResult("example.com/timeout", 0, gotestrunner.SuiteResult{ExitCode: 0xC000013A})
+			gotest.True(it, c.AnyFailed())
+			gotest.Equal(it, 1, c.WorstExitCode(),
+				"a termination status must read as a failure, not become the run's exit code")
+			gotest.Contains(it, stdout.String()+stderr.String(), "terminated by the system (status 0xC000013A)",
+				"the status the binary never chose belongs in the output, named")
+		})
+
 		w.It("books a failed compile as a failed package", func(it *gotest.T) {
 			var stdout, stderr bytes.Buffer
 			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &stderr))
