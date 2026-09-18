@@ -65,11 +65,11 @@ func ƒ_setupFixtures(t testing.TB) {
 {{ range $fs := .FlatSuites }}
         {
 {{- if $fs.Suite.HasConfig }}
-            ƒscfg := (&{{ $fs.Suite.Identifier }}{
+            ƒscfg := gotestruntime.WithSuiteDefaults((&{{ $fs.Suite.Identifier }}{
 {{- range $id, $field := $fs.FixtureFields }}
                 {{ $field }}: ƒ_{{ $id }},
 {{- end }}
-            }).SuiteConfig()
+            }).SuiteConfig())
 {{- else }}
             ƒscfg := gotest.DefaultSuiteConfig()
 {{- end }}
@@ -84,7 +84,7 @@ func ƒ_setupFixtures(t testing.TB) {
                 {
                     Name: "{{ $sf.Identifier }}",
 {{- if $sf.HasConfig }}
-                    Config: ƒcfg_sf_{{ $sf.Identifier }},
+                    Config: gotestruntime.WithFixtureDefaults(ƒcfg_sf_{{ $sf.Identifier }}),
                     Budget: ƒcfg_sf_{{ $sf.Identifier }}.Timeout,
 {{- else }}
                     Config: gotest.DefaultFixtureConfig(),
@@ -154,8 +154,8 @@ func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
     }
 {{- end }}
 {{- if $fs.Suite.HasConfig }}
-    ƒcfg := s.{{ $fs.Suite.Identifier }}.SuiteConfig()
-    ƒbudget := ƒcfg
+    ƒbudget := s.{{ $fs.Suite.Identifier }}.SuiteConfig()
+    ƒcfg := gotestruntime.WithSuiteDefaults(ƒbudget)
 {{- else }}
     ƒcfg := gotest.DefaultSuiteConfig()
     ƒbudget := gotest.SuiteConfig{}
@@ -248,7 +248,7 @@ func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
             {
                 Name: "{{ .Identifier }}",
 {{- if .HasConfig }}
-                Config: ƒcfg_{{ .Identifier }},
+                Config: gotestruntime.WithFixtureDefaults(ƒcfg_{{ .Identifier }}),
                 Budget: ƒcfg_{{ .Identifier }}.Timeout,
 {{- else }}
                 Config: gotest.DefaultFixtureConfig(),

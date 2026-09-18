@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/protocol"
@@ -47,6 +48,8 @@ type SuiteResult struct {
 	Stderr   []byte
 	ExitCode int
 	Duration time.Duration
+	// CutShort reports that the run's context ended while the process ran.
+	CutShort bool
 }
 
 // RunMode controls how RunSuites executes and collects output.
@@ -287,6 +290,13 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		Grace:      GraceBudget,
 		BudgetFile: target.BudgetFile,
 	})
+	// exec cancels only a process still running when ctx ends.
+	var cutShort atomic.Bool
+	cancel := cmd.Cancel
+	cmd.Cancel = func() error {
+		cutShort.Store(true)
+		return cancel()
+	}
 	if err := mp.Start(); err != nil {
 		return SuiteResult{Target: target, ExitCode: 2, Duration: time.Since(start)}
 	}
@@ -305,6 +315,7 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		Stderr:   stderr.Bytes(),
 		ExitCode: exitCode,
 		Duration: duration,
+		CutShort: cutShort.Load(),
 	}
 }
 

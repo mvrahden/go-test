@@ -317,7 +317,7 @@ func (s *RuntimeTestSuite) TestTimeout_BeforeAllCompletesWithinTimeout(t *gotest
 func (s *RuntimeTestSuite) TestTimeout_DisabledWithNegativeOne(t *gotest.T) {
 	node := &gotestruntime.FixtureNode{
 		Name:   "Root",
-		Config: gotest.FixtureConfig{Timeout: -1},
+		Config: gotest.FixtureConfig{Timeout: -1}, //nolint:config-no-deadline // the raw -1 is the contract under test: any negative disables a deadline, not only the named constant
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			deadline, hasDeadline := ctx.Deadline()
@@ -800,23 +800,23 @@ func (s *RuntimeTestSuite) TestBudgetFile_WrittenCorrectly(t *gotest.T) {
 	mustEqual(t, expected, string(data))
 }
 
-func (s *RuntimeTestSuite) TestBudgetFile_ZeroTimeoutIsNotZeroBudget(t *gotest.T) {
+func (s *RuntimeTestSuite) TestBudgetFile_NoDeadlineIsNotZeroBudget(t *gotest.T) {
 	budgetFile := filepath.Join(t.TempDir(), "budget")
 	t.Setenv(protocol.EnvTeardownBudgetFile, budgetFile)
 
-	// Under literal config a zero Timeout is the spelling of "no deadline", not
-	// "takes no time". Reading it as zero would hand the supervisor a budget short
-	// enough to force-kill a teardown still releasing resources — and a signalled
-	// process reports no meaningful exit status, so the run would still be green.
+	// NoDeadline means "no deadline", not "takes no time". Reading it as zero
+	// would hand the supervisor a budget short enough to force-kill a teardown
+	// still releasing resources — and a signalled process reports no meaningful
+	// exit status, so the run would still be green.
 	root := &gotestruntime.FixtureNode{
 		Name:      "Root",
-		Config:    gotest.FixtureConfig{Timeout: 0},
+		Config:    gotest.FixtureConfig{Timeout: gotest.NoDeadline},
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
 		Children: []*gotestruntime.FixtureNode{
 			{
 				Name:      "Child",
-				Config:    gotest.FixtureConfig{Timeout: 0},
+				Config:    gotest.FixtureConfig{Timeout: gotest.NoDeadline},
 				Init:      func() {},
 				BeforeAll: func(ctx context.Context) error { return nil },
 			},
@@ -841,7 +841,7 @@ func (s *RuntimeTestSuite) TestBudgetFile_TreeAndDAGAgreeOnUndeclaredTimeouts(t 
 	// computeMaxTreePath (Roots) and computeMaxDAGPath (Fixtures) must read the
 	// same declared value the same way. They drifted once: the DAG floored a
 	// non-positive Timeout while the tree mapped it to zero.
-	for _, timeout := range []time.Duration{0, -1, 90 * time.Second} {
+	for _, timeout := range []time.Duration{0, gotest.NoDeadline, 90 * time.Second} {
 		tree := gotestruntime.ExportComputeMaxTreePath([]*gotestruntime.FixtureNode{{
 			Name:     "Root",
 			Config:   gotest.FixtureConfig{Timeout: timeout},

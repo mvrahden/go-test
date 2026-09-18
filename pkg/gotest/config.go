@@ -5,8 +5,9 @@ import "time"
 // FixtureConfig controls timeout and retry behavior for package fixtures and
 // shared fixtures. Returned by the optional FixtureConfig() or
 // SharedFixtureConfig() marker method on a fixture struct.
-// The returned value is used as-is: a zero (or negative) Timeout means no
-// deadline. Without a marker method, DefaultFixtureConfig applies.
+// A zero Timeout gets DefaultFixtureConfig's, as if the marker were absent;
+// NoDeadline (any negative value) disables it. Retries and RetryDelay are used
+// as written.
 //
 // For shared fixtures, state is captured once during setup and distributed to
 // all test processes as a JSON snapshot. Transfer fields (exported, not assigned
@@ -15,7 +16,7 @@ import "time"
 // to establish live connections from those parameters.
 type FixtureConfig struct {
 	// Timeout is the deadline for each lifecycle operation (BeforeAll/AfterAll).
-	// Zero or negative means no deadline. DefaultFixtureConfig uses 2m.
+	// Zero means the 2m default; NoDeadline disables it.
 	Timeout time.Duration
 	// Retries is how many times to retry BeforeAll on failure. Default: 0.
 	Retries int
@@ -25,19 +26,19 @@ type FixtureConfig struct {
 
 // SuiteConfig controls timeout, parallelism, and failure behavior for a test
 // suite. Returned by the optional SuiteConfig() marker method on a suite struct.
-// The returned value is used as-is: a zero (or negative) duration means no
-// deadline. Without a marker method, DefaultSuiteConfig applies.
-// Start from a preset to combine defaults with overrides:
+// A duration left at zero gets DefaultSuiteConfig's, as if the marker were
+// absent; NoDeadline (any negative value) disables it. Booleans are used as
+// written. Start from a preset to override its durations:
 //
 //	cfg := gotest.DefaultSuiteConfig()
 //	cfg.Parallel = true
 //	return cfg
 type SuiteConfig struct {
-	// Timeout is the per-test-method deadline. Zero or negative means no
-	// deadline. DefaultSuiteConfig uses 30s.
+	// Timeout is the per-test-method deadline. Zero means the 30s default;
+	// NoDeadline disables it.
 	Timeout time.Duration
-	// SetupTimeout is the deadline for BeforeAll/AfterAll. Zero or negative
-	// means no deadline. DefaultSuiteConfig uses 30s.
+	// SetupTimeout is the deadline for BeforeAll/AfterAll. Zero means the 30s
+	// default; NoDeadline disables it.
 	SetupTimeout time.Duration
 	// FailFast stops the suite after the first test failure. Default: false.
 	FailFast bool
@@ -66,6 +67,11 @@ func DefaultFixtureConfig() FixtureConfig {
 func ContainerFixtureConfig() FixtureConfig {
 	return FixtureConfig{Timeout: 5 * time.Minute, Retries: 1, RetryDelay: 5 * time.Second}
 }
+
+// NoDeadline disables a timeout: a SuiteConfig or FixtureConfig duration set
+// to it (or any negative value) runs without a deadline, where zero would get
+// the default.
+const NoDeadline time.Duration = -1
 
 // DefaultSuiteConfig returns a baseline suite configuration: 30s test timeout,
 // 30s setup timeout, no retries, sequential execution.

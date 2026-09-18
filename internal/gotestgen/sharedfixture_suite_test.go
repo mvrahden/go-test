@@ -229,6 +229,11 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			gotest.NotContains(it, code, "ƒcfg_sf0 := sf0.SharedFixtureConfig()",
 				"the marker must not be called outside the containment frame")
 
+			// A zero Timeout bounds the context with the default, as if the marker
+			// were absent; only the declared value becomes a verdict.
+			gotest.Contains(it, code, "ƒbudget_sf0 = ƒcfg.Timeout\n\t\tƒcfg_sf0 = gotestruntime.WithFixtureDefaults(ƒcfg)",
+				"the declared Timeout is the budget; the defaulted one bounds the context")
+
 			gotest.MatchSnapshot(it, code)
 		})
 	})
@@ -249,7 +254,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 
 			code := string(src)
 
-			// A declared Timeout of 0 means "no deadline", not "takes no time",
+			// A NoDeadline Timeout means "no deadline", not "takes no time",
 			// so each member's contribution goes through the shared floor. And
 			// because the generated teardown loop is strictly sequential, the
 			// budget is the SUM of the members' floored budgets — a max would
@@ -336,7 +341,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 				"teardown must go through the shared policy")
 			gotest.NotContains(it, code, "func ƒteardown(",
 				"no second copy of the teardown policy may remain")
-			gotest.Contains(it, code, "Budget:   ƒcfg_sf0.Timeout,",
+			gotest.Contains(it, code, "Budget:   ƒbudget_sf0,",
 				"a declared Timeout must become a teardown verdict")
 			gotest.Contains(it, code, "if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {",
 				"a setup that overran its budget still initialized — its resources exist and must be released")

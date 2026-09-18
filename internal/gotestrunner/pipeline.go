@@ -106,8 +106,9 @@ func applyTeardownFailure(result *PipelineResult, err error) {
 }
 
 // applyDeadlineFailure fails a run whose deadline expired before its last
-// verdict: the suites it cut short never reported one.
-func applyDeadlineFailure(result *PipelineResult, cfg PipelineConfig, dispatchErr error) { //nolint:gocritic // hugeParam: stable API
+// verdict, naming the units it cut short. With none to name, the failure is
+// booked as a synthetic package so the reason still reaches every renderer.
+func applyDeadlineFailure(result *PipelineResult, cfg PipelineConfig, dispatchErr error, running []CensusCase) { //nolint:gocritic // hugeParam: stable API
 	if !errors.Is(dispatchErr, context.DeadlineExceeded) {
 		return
 	}
@@ -115,7 +116,14 @@ func applyDeadlineFailure(result *PipelineResult, cfg PipelineConfig, dispatchEr
 	if cfg.GlobalTimeout > 0 {
 		msg = fmt.Sprintf("global --timeout exceeded after %v", cfg.GlobalTimeout)
 	}
-	failRun(result, "global --timeout", msg)
+	if len(running) == 0 {
+		failRun(result, "global --timeout", msg)
+		return
+	}
+	fmt.Fprintf(os.Stderr, "FAIL: %s while running: %s\n", msg, unitNames(running))
+	if result.ExitCode == 0 {
+		result.ExitCode = 1
+	}
 }
 
 // failRun reports msg and fails a run that would otherwise pass. The captured
@@ -376,7 +384,7 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 
 	if prepareErr := ctx.Err(); prepareErr != nil {
 		result = PipelineResult{ExitCode: exitCodeAfterDispatch(0, prepareErr)}
-		applyDeadlineFailure(&result, cfg, prepareErr)
+		applyDeadlineFailure(&result, cfg, prepareErr, nil)
 		return result, nil
 	}
 
@@ -510,8 +518,9 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	collector.Finalize(overlay.NoSuitePackages)
 
 	exitCode := collector.takeCensus(cfg, overlay.Declared, exitCodeAfterDispatch(collector.WorstExitCode(), dispatchErr), dispatchErr)
+	running := collector.bookDeadline(dispatchErr)
 	result = PipelineResult{ExitCode: exitCode, CapturedJSON: collector.CapturedJSON()}
-	applyDeadlineFailure(&result, cfg, dispatchErr)
+	applyDeadlineFailure(&result, cfg, dispatchErr, running)
 	return result, nil
 }
 
@@ -841,7 +850,7 @@ loop:
 		if sharedSetupFailed.Load() && result.ExitCode == 0 {
 			result.ExitCode = 1
 		}
-		applyDeadlineFailure(&result, cfg, dispatchErr)
+		applyDeadlineFailure(&result, cfg, dispatchErr, nil)
 		applyTeardownFailure(&result, teardownErr)
 		return result, nil
 	}
@@ -853,11 +862,12 @@ loop:
 		exitCode = 1
 	}
 	exitCode = collector.takeCensus(cfg, overlay.Declared, exitCode, dispatchErr)
+	running := collector.bookDeadline(dispatchErr)
 	result := PipelineResult{
 		ExitCode:     exitCode,
 		CapturedJSON: collector.CapturedJSON(),
 	}
-	applyDeadlineFailure(&result, cfg, dispatchErr)
+	applyDeadlineFailure(&result, cfg, dispatchErr, running)
 	applyTeardownFailure(&result, teardownErr)
 	return result, nil
 }

@@ -41,9 +41,9 @@ func ƒ_setupFixtures(t testing.TB) {
 		var ƒmaxSuiteSetup time.Duration
 
 		{
-			ƒscfg := (&AppTestSuite{
+			ƒscfg := gotestruntime.WithSuiteDefaults((&AppTestSuite{
 				App: ƒ_AppFixture,
-			}).SuiteConfig()
+			}).SuiteConfig())
 			if ƒscfg.SetupTimeout > ƒmaxSuiteSetup {
 				ƒmaxSuiteSetup = ƒscfg.SetupTimeout
 			}
@@ -54,7 +54,7 @@ func ƒ_setupFixtures(t testing.TB) {
 			Fixtures: []*gotestruntime.FixtureNode{
 				{
 					Name:   "AppFixture",
-					Config: ƒcfg_AppFixture,
+					Config: gotestruntime.WithFixtureDefaults(ƒcfg_AppFixture),
 					Budget: ƒcfg_AppFixture.Timeout,
 					Init: func() {
 						ƒ_AppFixture = &AppFixture{}
@@ -90,8 +90,8 @@ func TestAppTestSuite(t *testing.T) {
 			App: ƒ_AppFixture,
 		},
 	}
-	ƒcfg := s.AppTestSuite.SuiteConfig()
-	ƒbudget := ƒcfg
+	ƒbudget := s.AppTestSuite.SuiteConfig()
+	ƒcfg := gotestruntime.WithSuiteDefaults(ƒbudget)
 
 	t.Cleanup(func() {
 		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)

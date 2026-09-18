@@ -2,7 +2,9 @@ package gotestrunner
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -71,14 +73,17 @@ type streamEvent struct {
 }
 
 // verdictIndex keeps, from the JSON stream written through it, the last
-// verdict of every package, suite, method and fuzz wrapper, and the
-// benchmarks that reported a result. Deeper subtests are not kept.
+// verdict of every package, suite, method and fuzz wrapper, the benchmarks
+// that reported a result, and the units still running. Deeper subtests are not
+// kept.
 type verdictIndex struct {
 	partial    []byte
 	last       map[CensusCase]streamEvent
 	order      []CensusCase
 	benched    map[CensusCase]bool
 	benchOrder []CensusCase
+	running    map[CensusCase]bool
+	started    []CensusCase
 }
 
 func (x *verdictIndex) Write(p []byte) (int, error) {
@@ -97,11 +102,26 @@ func (x *verdictIndex) Write(p []byte) (int, error) {
 // verdictMarkers are the substrings a line needs before it is worth decoding.
 var verdictMarkers = [][]byte{
 	[]byte(`"Action":"pass"`), []byte(`"Action":"fail"`), []byte(`"Action":"skip"`),
-	[]byte(`"Action":"bench"`), []byte(" ns/op"),
+	[]byte(`"Action":"bench"`), []byte(" ns/op"), []byte(`"Action":"run"`),
+}
+
+var testField = []byte(`"Test":"`)
+
+// rawTestDepth counts the slashes in a line's undecoded Test value. An escaped
+// quote ends the count early, so it never exceeds the decoded depth.
+func rawTestDepth(line []byte) int {
+	_, value, ok := bytes.Cut(line, testField)
+	if !ok {
+		return 0
+	}
+	if end := bytes.IndexByte(value, '"'); end >= 0 {
+		value = value[:end]
+	}
+	return bytes.Count(value, []byte("/"))
 }
 
 func (x *verdictIndex) observe(line []byte) {
-	if !slices.ContainsFunc(verdictMarkers, func(m []byte) bool { return bytes.Contains(line, m) }) {
+	if !slices.ContainsFunc(verdictMarkers, func(m []byte) bool { return bytes.Contains(line, m) }) || rawTestDepth(line) > 1 {
 		return
 	}
 	var ev streamEvent
@@ -110,26 +130,75 @@ func (x *verdictIndex) observe(line []byte) {
 	}
 	key := CensusCase{Pkg: ev.Package, Path: ev.Test}
 	depth := strings.Count(ev.Test, "/")
+	if depth > 1 {
+		return
+	}
 	switch ev.Action {
+	case "run":
+		if ev.Test != "" {
+			if x.running == nil {
+				x.running = map[CensusCase]bool{}
+			}
+			if _, seen := x.running[key]; !seen {
+				x.started = append(x.started, key)
+			}
+			x.running[key] = true
+		}
 	case "pass", "fail", "skip":
-		if depth <= 1 {
-			if x.last == nil {
-				x.last = map[CensusCase]streamEvent{}
+		if x.last == nil {
+			x.last = map[CensusCase]streamEvent{}
+		}
+		if _, seen := x.last[key]; !seen {
+			x.order = append(x.order, key)
+		}
+		ev.Output = ""
+		x.last[key] = ev
+		x.settle(key)
+	}
+	if depth == 1 && strings.HasPrefix(ev.Test, protocol.PrefixBenchmark) && benchVerdict(ev) {
+		x.settle(key)
+		if !x.benched[key] {
+			if x.benched == nil {
+				x.benched = map[CensusCase]bool{}
 			}
-			if _, seen := x.last[key]; !seen {
-				x.order = append(x.order, key)
-			}
-			ev.Output = ""
-			x.last[key] = ev
+			x.benched[key] = true
+			x.benchOrder = append(x.benchOrder, key)
 		}
 	}
-	if depth == 1 && strings.HasPrefix(ev.Test, protocol.PrefixBenchmark) && benchVerdict(ev) && !x.benched[key] {
-		if x.benched == nil {
-			x.benched = map[CensusCase]bool{}
-		}
-		x.benched[key] = true
-		x.benchOrder = append(x.benchOrder, key)
+}
+
+func (x *verdictIndex) settle(key CensusCase) {
+	if x.running[key] {
+		x.running[key] = false
 	}
+}
+
+// runningUnits lists, in start order, the units without a verdict: methods,
+// fuzz wrappers and benchmarks, and a suite none of whose units is running (a
+// hook hung). A benchmark wrapper never reports a verdict, so it is never
+// named itself.
+func (x *verdictIndex) runningUnits() []CensusCase {
+	busy := map[CensusCase]bool{}
+	for _, k := range x.started {
+		if suite, _, nested := strings.Cut(k.Path, "/"); nested && x.running[k] && !strings.HasPrefix(suite, protocol.PrefixFuzz) {
+			busy[CensusCase{Pkg: k.Pkg, Path: suite}] = true
+		}
+	}
+	var out []CensusCase
+	for _, k := range x.started {
+		if !x.running[k] || busy[k] {
+			continue
+		}
+		suite, _, nested := strings.Cut(k.Path, "/")
+		switch {
+		case nested && strings.HasPrefix(suite, protocol.PrefixFuzz):
+			continue // a seed; its wrapper is named
+		case !nested && strings.HasPrefix(k.Path, protocol.PrefixBenchmark):
+			continue
+		}
+		out = append(out, k)
+	}
+	return out
 }
 
 // benchVerdict reports whether ev settles a benchmark: go test emits no pass
@@ -255,24 +324,71 @@ func bookMissing(kind string, missing []CensusCase) []streamEvent {
 	return events
 }
 
-// suiteFailures fails, once each, the suites of the missing units whose
-// verdict the stream carries, keeping its time and duration: the tree takes a
-// node's last verdict.
-func (x *verdictIndex) suiteFailures(missing []CensusCase) []streamEvent {
+// suiteFailures fails, once each, the suites of the given units that the
+// stream started or settled, keeping a verdict's time and duration: the tree
+// takes a node's last verdict.
+func (x *verdictIndex) suiteFailures(units []CensusCase) []streamEvent {
 	seen := map[CensusCase]bool{}
 	var fail []streamEvent
-	for _, m := range missing {
+	for _, m := range units {
 		path, ok := suitePath(m.Path)
 		suite := CensusCase{Pkg: m.Pkg, Path: path}
 		if !ok || seen[suite] {
 			continue
 		}
 		seen[suite] = true
-		if v, ok := x.last[suite]; ok {
+		v, settled := x.last[suite]
+		if _, started := x.running[suite]; settled || started {
 			fail = append(fail, streamEvent{Time: v.Time, Action: "fail", Package: suite.Pkg, Test: suite.Path, Elapsed: v.Elapsed})
 		}
 	}
 	return fail
+}
+
+// bookDeadline returns the units an expired deadline cut short and books each
+// into the JSON stream as failed, with its suite and package. A suite cut short
+// is failed whether or not it reported a verdict: it never finished. The text
+// run has no stream and names the suites whose process the deadline signalled.
+func (c *OutputCollector) bookDeadline(dispatchErr error) []CensusCase {
+	if !errors.Is(dispatchErr, context.DeadlineExceeded) {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.mode == RunBatchText {
+		return slices.Clone(c.cutShort)
+	}
+	running := c.verdicts.runningUnits()
+	booked := make([]streamEvent, 0, 2*len(running))
+	for _, r := range running {
+		booked = append(booked,
+			streamEvent{Action: "output", Package: r.Pkg, Test: r.Path, Output: "    gotest: --timeout expired while this test was running\n"},
+			streamEvent{Action: "fail", Package: r.Pkg, Test: r.Path},
+		)
+	}
+	booked = append(booked, c.verdicts.suiteFailures(running)...)
+	booked = append(booked, c.verdicts.packageFailures(booked)...)
+	w := c.jsonTarget()
+	for i := range booked {
+		line, _ := json.Marshal(booked[i])
+		_, _ = w.Write(append(line, '\n'))
+	}
+	return running
+}
+
+// maxNamedUnits caps the units a one-line message names.
+const maxNamedUnits = 5
+
+// unitNames joins units as "pkg path", truncated past maxNamedUnits.
+func unitNames(units []CensusCase) string {
+	names := make([]string, 0, maxNamedUnits+1)
+	for _, u := range units[:min(len(units), maxNamedUnits)] {
+		names = append(names, u.Pkg+" "+u.Path)
+	}
+	if len(units) > maxNamedUnits {
+		names = append(names, fmt.Sprintf("… %d more", len(units)-maxNamedUnits))
+	}
+	return strings.Join(names, ", ")
 }
 
 // suitePath is the suite test a unit's verdict folds into; the tree nests a

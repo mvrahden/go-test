@@ -63,12 +63,9 @@ func (s *ConfigTestSuite) TestLiteralSemantics(t *gotest.T) {
 		})
 	})
 
-	t.When("a duration field is zero", func(w *gotest.T) {
-		w.It("means no deadline — use sites gate on > 0", func(it *gotest.T) {
-			cfg := gotest.SuiteConfig{Parallel: true}
-			gotest.True(it, cfg.Parallel)
-			gotest.Equal(it, time.Duration(0), cfg.Timeout)
-			gotest.LessOrEqual(it, cfg.Timeout, time.Duration(0), "zero opts out of the deadline")
+	t.When("a duration is NoDeadline", func(w *gotest.T) {
+		w.It("is negative, which every use site reads as no deadline", func(it *gotest.T) {
+			gotest.Less(it, gotest.NoDeadline, time.Duration(0), "use sites gate a deadline on > 0")
 		})
 	})
 }

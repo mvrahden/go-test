@@ -303,9 +303,9 @@ func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
 Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel`, `Exclusive` (dispatched strictly alone, after every non-exclusive suite — for suites whose verdicts measure wall-clock behavior or contend for resources).
 Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
 
-The returned config is used as-is. A zero or omitted duration means **no deadline**,
-matching `go test -timeout 0` — it does not inherit the preset. Start from a preset when
-you want the defaults plus an override:
+A duration the returned config leaves at zero (omitted or explicit) behaves as if the
+marker were absent: it gets the default. `gotest.NoDeadline` (any negative duration)
+disables the deadline. Booleans are used as written. Composing onto a preset works too:
 
 ```go
 func (s *MySuite) SuiteConfig() gotest.SuiteConfig {
@@ -318,14 +318,14 @@ func (s *MySuite) SuiteConfig() gotest.SuiteConfig {
 A timeout does two things, and only one of them is defaulted.
 
 It always bounds `t.Context()`. And it is a budget the phase is held to, enforced by
-verdict — but only when **you** declare a `SuiteConfig`. `Timeout` cannot interrupt a
+verdict — but only when **you** declare a positive duration in a `SuiteConfig`. `Timeout` cannot interrupt a
 running test, because Go has no way to stop another goroutine, so a method that ignores
 `t.Context()` and outlives the budget is failed instead. That failure is reported the
 moment the deadline passes, while the method is still running, and is written unbuffered
 so it survives a test that never returns at all.
 
-A suite with no `SuiteConfig` method is not held to a budget: being failed against a
-number you did not choose is not a verdict you can act on. Bounding the process remains
+A suite with no `SuiteConfig` method, or a duration its marker leaves at zero, is not held
+to a budget: being failed against a number you did not choose is not a verdict you can act on. Bounding the process remains
 `go test -timeout`'s job either way.
 
 `SetupTimeout` works the same way for `BeforeAll` and `AfterAll`, including for a setup

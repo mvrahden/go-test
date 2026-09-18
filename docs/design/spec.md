@@ -317,7 +317,7 @@ func (s *Suite) TestDeliveryAsync(t *gotest.T, done func()) {
 
 The generated code waits for `done()` or the test deadline, whichever comes first (with the deadline failing the test); calling `done()` more than once is safe.
 With a returning `BeforeEach`, `done` comes last: `(t, ctx, done)`.
-With `Timeout: 0` (no per-test deadline), a never-called `done()` waits until an outer bound fires — always give async suites a positive `Timeout`.
+With `Timeout: gotest.NoDeadline`, a never-called `done()` waits until an outer bound fires — give async suites a deadline (a zero `Timeout` gets the 30s default).
 For polling-style asynchrony, prefer `Eventually`.
 
 ### Focus and Exclude
@@ -622,7 +622,7 @@ The serialization boundary only exists between the subprocess and test processes
 ### Configuration
 
 Every fixture and suite runs with sensible defaults.
-Defining the optional marker method takes full ownership: the returned config is used as-is; without the marker, the defaults apply.
+The optional marker method states the config; a duration it leaves at zero behaves as if the marker were absent and gets the default, and `gotest.NoDeadline` (any negative duration) disables that deadline. Booleans, `Retries` and `RetryDelay` are used as written.
 
 #### Config Types
 
@@ -715,7 +715,7 @@ func (f *InfraFixture) FixtureConfig() gotest.FixtureConfig {
 }
 ```
 
-A partial literal opts out of whatever it omits: `SuiteConfig{Parallel: true}` runs with no per-test deadline (the global `--timeout` still bounds the run).
+A partial literal gets the default for every duration it omits: `SuiteConfig{Parallel: true}` runs with the 30s deadlines, but is held to no budget by verdict, like a suite without a marker. Before v1.31 an omitted duration meant no deadline.
 
 #### Generated Behavior
 
@@ -1336,9 +1336,11 @@ method — and its `Timeout`/`SetupTimeout` bound the context that `gotestruntim
 and `RunSetup`/`RunTeardown` hand to each phase. `ƒbudget` is different: it is the
 config `RunTest`, `RunSetup` and `RunTeardown` are told to *enforce by verdict*, and it
 stays a zero-value `gotest.SuiteConfig{}` unless the suite declared one. With a
-`SuiteConfig()` marker, `ƒcfg := s.MyTestSuite.SuiteConfig()` replaces the default and
-`ƒbudget := ƒcfg` — the same values the author wrote now double as the enforced budget,
-used verbatim, including a zero or negative duration meaning no deadline.
+`SuiteConfig()` marker, `ƒbudget := s.MyTestSuite.SuiteConfig()` holds the values the author wrote as the enforced
+budget, and `ƒcfg := gotestruntime.WithSuiteDefaults(ƒbudget)` replaces the default for the
+contexts: a duration left at zero gets the default and no verdict, exactly as without a marker,
+and a negative one (`gotest.NoDeadline`) gets neither. Fixture markers are normalized the same
+way through `WithFixtureDefaults`, with the declared `Timeout` as their `Budget`.
 Ordering nuance: in the returning-`BeforeEach` form, `ctx := s.BeforeEach(ttt)` runs *before* `defer s.AfterEach(ttt, ctx)` is registered — a fatal failure inside `BeforeEach` means `AfterEach` never runs.
 In the void form shown above, the deferred `AfterEach` is registered first and runs even when `BeforeEach` fails fatally.
 Method-parallel suites additionally emit the `ƒfailed` coordination described under Parallel Execution.
@@ -1385,7 +1387,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `assertion-redundant` | An assertion made redundant by the next one on the same argument |
 | `fail-guard` | `if cond { gotest.Fail(…) }` guards (also halting `Fatal`/`Fatalf`/`FailNow` bodies) — the assertion expresses the check directly; `\|\|` conditions and `else if` chains decompose into sequential assertions, non-halting `Errorf` bodies and init-scoped guards report without a fix; fires only in files that import gotest |
 | `t-escape` | Unnecessary `t.T()` convenience escapes: `Errorf`/`FailNow`/`Skipf`/`Setenv`/`TempDir` (available on `gotest.T`), `Skip`/`SkipNow` (use `Skipf`), `Helper` (degrades call-site reporting), `Log`/`Fatal`/`Fatalf` (use assertions and their message args) |
-| `suite-config-partial` | A `SuiteConfig` built from a `gotest.SuiteConfig{…}` literal that leaves `Timeout` or `SetupTimeout` unset — the literal replaces the defaults wholesale, so an unset timeout is no deadline rather than the 30-second default; the fix composes the same fields onto `DefaultSuiteConfig()` |
+| `config-no-deadline` | A literal negative duration on `SuiteConfig.Timeout`/`SetupTimeout` or `FixtureConfig.Timeout`, in a keyed literal or a field assignment (aliases and pointers included) — every negative disables the deadline, so the fix spells it `gotest.NoDeadline`, which reads as what it does and makes every unbounded suite greppable. The rewrite keeps the meaning; the fix is withheld in a file that does not import gotest. `NoDeadline` itself, zeros, runtime values and non-deadline fields are not reported |
 | `behavior-wording` | A `When` description that opens with "when", or an `It` description that opens with "it" — the spec renders the connective and the ✓ glyph plays "it", so the word is said twice; the fix drops it (whole word, any case except all capitals — `IT department…` is an acronym — space or underscore after it; a description that is only the word is left alone) |
 | `bench-fixture-io` | `Benchmark*` methods reading fixture-backed state inside the measured loop — times whatever backs the fixture, not the code under test (heuristic; hoist the read above the loop) |
 | `bench-wait` | `time.Sleep`/`gotest.Eventually`/`gotest.Consistently` inside the measured loop — times the wait, not the code |
@@ -1440,7 +1442,7 @@ Manual setup works without the action:
 - run: gotest spec ./... --format=md --output=behavior-spec.md
 ```
 
-Exit codes: 0 = pass, 1 = test failure or a `--timeout` that expired before the last verdict (booked into the event stream as a failed `global --timeout` package), 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors) or a census failure, 130 = run interrupted (SIGINT/SIGTERM) before the last verdict, whatever the suites the interrupt killed reported; their failures are the interrupt's, not verdicts. An interrupt that arrives later, while fixtures tear down, leaves the verdict alone. A suite binary the run stopped from outside — a signal on Unix, the console interrupt a `--timeout` sends on Windows — reports a status it never chose (`-1`, `0xC000013A`); it is read as a failed suite, named on stderr, and never becomes the run's own exit code.
+Exit codes: 0 = pass, 1 = test failure or a `--timeout` that expired before the last verdict (`FAIL: global --timeout exceeded after <d> while running: <pkg> <test>, …` names up to five units still running, the suites in the text run; each is booked into the event stream as failed at the method, followed by its suite and package, and a deadline with nothing to name, during compilation or fixture setup, is booked as a failed `global --timeout` package), 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors) or a census failure, 130 = run interrupted (SIGINT/SIGTERM) before the last verdict, whatever the suites the interrupt killed reported; their failures are the interrupt's, not verdicts. An interrupt that arrives later, while fixtures tear down, leaves the verdict alone. A suite binary the run stopped from outside — a signal on Unix, the console interrupt a `--timeout` sends on Windows — reports a status it never chose (`-1`, `0xC000013A`); it is read as a failed suite, named on stderr, and never becomes the run's own exit code.
 
 **Census.** A green run is believed only when every declared test method produced a verdict. After a green run that writes a test2json stream (`spec`, `summary`, `-json`, `watch --spec` or `--json`, a capturing `bench`), the pipeline compares two sets as the stream is written:
 
@@ -1449,7 +1451,7 @@ Exit codes: 0 = pass, 1 = test failure or a `--timeout` that expired before the 
 
 A declared method without a verdict makes the run exit 2, printing `FAIL: census: N declared test(s) never ran` and the missing methods. It is exit 2, not 1, because a harness that silently dropped a test did not produce a failed test; it produced a run that cannot be believed, the same situation as a package that failed to build. The missing units are also booked into the event stream, each as a test that ran and failed with `census: declared test never ran` as its output, followed by a `fail` verdict for its suite (when the run streamed one) and for its package, each carrying the time and duration the overridden verdict had: the stream is what the spec, the summary, a saved `--input` replay and the editor's Spec View derive from, so every one of them shows the missing method beside the exit code, and `-json` consumers see the same events appended after the run's own.
 
-The census applies to green runs that ran to completion: a red run is already not a false green, a `FailFast` stop or a `-failfast` run legitimately leaves methods unexecuted, and an interrupt or an expired `--timeout` cut the run short. It stands down under `-run`, `-skip` and `-list`, printing `note: census skipped under -run/-skip/-list/-bench` on stderr, because those flags change the declared set. The text run (`gotest ./...`) streams suite output without test2json and is not censused; every CI path (`summary --github` through the action, `spec` in `make test`) is. Benchmarks never run in a test run; when the packages declare some, the run ends with `note: N benchmark(s) not run — gotest runs tests; use 'gotest bench'` on stderr, so silence never implies the packages were fully exercised.
+The census applies to green runs that ran to completion: a red run is already not a false green, a `FailFast` stop or a `-failfast` run legitimately leaves methods unexecuted, and an interrupt or an expired `--timeout` cut the run short; a deadline books the tests it cut short instead (see the exit codes above). It stands down under `-run`, `-skip` and `-list`, printing `note: census skipped under -run/-skip/-list/-bench` on stderr, because those flags change the declared set. The text run (`gotest ./...`) streams suite output without test2json and is not censused; every CI path (`summary --github` through the action, `spec` in `make test`) is. Benchmarks never run in a test run; when the packages declare some, the run ends with `note: N benchmark(s) not run — gotest runs tests; use 'gotest bench'` on stderr, so silence never implies the packages were fully exercised.
 
 A `bench` run that captures events (`--spec`, `--json`, `--save`, `--against`) is censused the same way over the declared benchmark methods. go test emits no `pass` event for a benchmark, so its verdict is the `ns/op` result line or a `fail`; `-bench` stands the census down like `-run` does.
 

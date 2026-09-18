@@ -33,6 +33,11 @@ applies EXCEPT these four, which fail there:
    `-test.timeout` kills it with no teardown, and so does any entry after
    a `-failfast` trip. Filter whole suites or methods only there.
 
+**Config durations (rule 3) changed twice:** from v1.31 a duration a
+marker leaves at zero gets the default and `gotest.NoDeadline` (any
+negative value) disables it; on v1.26–v1.30 a zero duration meant no
+deadline; v1.25.x merged the marker over the defaults (below).
+
 Sections tagged **v1.27+** below need v1.27.0 or newer; skip them on
 v1.26.x and earlier. What v1.27 adds:
 
@@ -96,12 +101,20 @@ Sections tagged **v1.30+** need v1.30.0 or newer. What v1.30 adds:
    failed test, its suite and package failing with it; see
    `reference/cli.md`. Below v1.30 the census speaks only on stderr and
    through exit 2.
-2. **The `suite-config-partial` lint rule** — a `gotest.SuiteConfig{…}`
-   literal that leaves `Timeout` or `SetupTimeout` unset replaces the
-   defaults wholesale, so the suite runs with no deadline; the rule reports
-   it (expressiveness tier) and `lint -fix` composes the same fields onto
-   `gotest.DefaultSuiteConfig()`. Below v1.30 it is not reported, so write
-   the compose form by hand.
+
+Sections tagged **v1.31+** need v1.31.0 or newer. What v1.31 adds:
+
+1. **A zero duration means the default deadline** — on
+   `SuiteConfig.Timeout`/`SetupTimeout` and `FixtureConfig.Timeout`, omitted
+   and explicit zeros alike, so a partial literal is no longer a suite
+   without deadlines. `gotest.NoDeadline` disables one. A suite that
+   relied on `0` for no deadline (v1.26–v1.30) now fails when it exceeds
+   the default; write `gotest.NoDeadline` where that was the intent.
+
+2. **The `config-no-deadline` lint rule** — a literal negative duration on
+   those fields; every negative disables the deadline, so the rule reports
+   it (expressiveness tier) and `lint -fix` spells it `gotest.NoDeadline`.
+   The rewrite keeps the meaning. Below v1.31 it is not reported.
 
 Exit codes on v1.25.x are weaker than they look — never treat a green
 gotest exit alone as proof there: a package failing to compile mid-run, a
@@ -209,8 +222,10 @@ parallel suites, or structural problems — those are your job, below.
 3. **Do not imitate existing tests blindly.** Observed failure: agents copy
    a repo's existing `SuiteConfig()` verbatim, propagating anti-patterns. A
    `SuiteConfig()` marker states *intent*: omit it entirely for defaults.
-   The returned config is used literally — partial literals inherit
-   NOTHING; a zero/omitted timeout means NO deadline, not "default".
+   A duration the marker leaves at zero gets the default, as if the marker
+   were absent; `gotest.NoDeadline` disables one. On v1.26–v1.30 a
+   zero/omitted duration meant NO deadline instead — compose onto a preset
+   there.
 4. **Ask "why is this suite NOT parallel?"** Observed failure: agents never
    parallelize unprompted, even when asked to improve tests. The recipe:
 
