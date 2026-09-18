@@ -67,6 +67,10 @@ func ContainerFixtureConfig() FixtureConfig {
 	return FixtureConfig{Timeout: 5 * time.Minute, Retries: 1, RetryDelay: 5 * time.Second}
 }
 
+// NoDeadline disables a timeout: a SuiteConfig or FixtureConfig duration set
+// to it runs without a deadline.
+const NoDeadline time.Duration = -1
+
 // DefaultSuiteConfig returns a baseline suite configuration: 30s test timeout,
 // 30s setup timeout, no retries, sequential execution.
 func DefaultSuiteConfig() SuiteConfig {
