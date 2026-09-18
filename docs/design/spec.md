@@ -317,7 +317,7 @@ func (s *Suite) TestDeliveryAsync(t *gotest.T, done func()) {
 
 The generated code waits for `done()` or the test deadline, whichever comes first (with the deadline failing the test); calling `done()` more than once is safe.
 With a returning `BeforeEach`, `done` comes last: `(t, ctx, done)`.
-With `Timeout: 0` (no per-test deadline), a never-called `done()` waits until an outer bound fires — always give async suites a positive `Timeout`.
+With `Timeout: gotest.NoDeadline`, a never-called `done()` waits until an outer bound fires — give async suites a deadline (a zero `Timeout` gets the 30s default).
 For polling-style asynchrony, prefer `Eventually`.
 
 ### Focus and Exclude
@@ -622,7 +622,7 @@ The serialization boundary only exists between the subprocess and test processes
 ### Configuration
 
 Every fixture and suite runs with sensible defaults.
-Defining the optional marker method takes full ownership: the returned config is used as-is; without the marker, the defaults apply.
+The optional marker method states the config; a duration it leaves at zero behaves as if the marker were absent and gets the default, and `gotest.NoDeadline` (any negative duration) disables that deadline. Booleans, `Retries` and `RetryDelay` are used as written.
 
 #### Config Types
 
@@ -715,7 +715,7 @@ func (f *InfraFixture) FixtureConfig() gotest.FixtureConfig {
 }
 ```
 
-A partial literal opts out of whatever it omits: `SuiteConfig{Parallel: true}` runs with no per-test deadline (the global `--timeout` still bounds the run).
+A partial literal gets the default for every duration it omits: `SuiteConfig{Parallel: true}` runs with the 30s deadlines, but is held to no budget by verdict, like a suite without a marker. Before v1.31 an omitted duration meant no deadline.
 
 #### Generated Behavior
 
@@ -1336,9 +1336,11 @@ method — and its `Timeout`/`SetupTimeout` bound the context that `gotestruntim
 and `RunSetup`/`RunTeardown` hand to each phase. `ƒbudget` is different: it is the
 config `RunTest`, `RunSetup` and `RunTeardown` are told to *enforce by verdict*, and it
 stays a zero-value `gotest.SuiteConfig{}` unless the suite declared one. With a
-`SuiteConfig()` marker, `ƒcfg := s.MyTestSuite.SuiteConfig()` replaces the default and
-`ƒbudget := ƒcfg` — the same values the author wrote now double as the enforced budget,
-used verbatim, including a zero or negative duration meaning no deadline.
+`SuiteConfig()` marker, `ƒbudget := s.MyTestSuite.SuiteConfig()` holds the values the author wrote as the enforced
+budget, and `ƒcfg := gotestruntime.WithSuiteDefaults(ƒbudget)` replaces the default for the
+contexts: a duration left at zero gets the default and no verdict, exactly as without a marker,
+and a negative one (`gotest.NoDeadline`) gets neither. Fixture markers are normalized the same
+way through `WithFixtureDefaults`, with the declared `Timeout` as their `Budget`.
 Ordering nuance: in the returning-`BeforeEach` form, `ctx := s.BeforeEach(ttt)` runs *before* `defer s.AfterEach(ttt, ctx)` is registered — a fatal failure inside `BeforeEach` means `AfterEach` never runs.
 In the void form shown above, the deferred `AfterEach` is registered first and runs even when `BeforeEach` fails fatally.
 Method-parallel suites additionally emit the `ƒfailed` coordination described under Parallel Execution.

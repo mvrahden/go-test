@@ -33,6 +33,11 @@ applies EXCEPT these four, which fail there:
    `-test.timeout` kills it with no teardown, and so does any entry after
    a `-failfast` trip. Filter whole suites or methods only there.
 
+**Config durations (rule 3) changed twice:** from v1.31 a duration a
+marker leaves at zero gets the default and `gotest.NoDeadline` (any
+negative value) disables it; on v1.26–v1.30 a zero duration meant no
+deadline; v1.25.x merged the marker over the defaults (below).
+
 Sections tagged **v1.27+** below need v1.27.0 or newer; skip them on
 v1.26.x and earlier. What v1.27 adds:
 
@@ -209,8 +214,10 @@ parallel suites, or structural problems — those are your job, below.
 3. **Do not imitate existing tests blindly.** Observed failure: agents copy
    a repo's existing `SuiteConfig()` verbatim, propagating anti-patterns. A
    `SuiteConfig()` marker states *intent*: omit it entirely for defaults.
-   The returned config is used literally — partial literals inherit
-   NOTHING; a zero/omitted timeout means NO deadline, not "default".
+   A duration the marker leaves at zero gets the default, as if the marker
+   were absent; `gotest.NoDeadline` disables one. On v1.26–v1.30 a
+   zero/omitted duration meant NO deadline instead — compose onto a preset
+   there.
 4. **Ask "why is this suite NOT parallel?"** Observed failure: agents never
    parallelize unprompted, even when asked to improve tests. The recipe:
 

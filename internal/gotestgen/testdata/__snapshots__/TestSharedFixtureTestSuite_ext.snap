@@ -2348,6 +2348,7 @@ func main() {
 
 	sf0 := &sfpkg0.PGFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	var ƒbudget_sf0 time.Duration
 
 	ƒerrs := make([]error, 1)
 	ƒstarted := make([]bool, 1)
@@ -2366,11 +2367,12 @@ func main() {
 			ƒerrs[0] = ƒerr
 			return
 		}
-		ƒcfg_sf0 = ƒcfg
+		ƒbudget_sf0 = ƒcfg.Timeout
+		ƒcfg_sf0 = gotestruntime.WithFixtureDefaults(ƒcfg)
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
-			Budget:     ƒcfg_sf0.Timeout,
+			Budget:     ƒbudget_sf0,
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
@@ -2404,7 +2406,7 @@ func main() {
 			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
 				Name:     "PGFixture",
 				Timeout:  ƒcfg_sf0.Timeout,
-				Budget:   ƒcfg_sf0.Timeout,
+				Budget:   ƒbudget_sf0,
 				AfterAll: sf0.AfterAll,
 			})
 		}

@@ -1,16 +1,21 @@
-# Configuration — literal semantics
+# Configuration — zero means default
 
-> Applies to gotest v1.26.0+ only — see SKILL.md's version gate; v1.25.x
-> and older have inverted zero/-1 semantics.
+> Describes gotest v1.31.0+. On v1.26–v1.30 a zero duration meant NO
+> deadline (so compose onto a preset there); v1.25.x merged the marker
+> over the defaults — see SKILL.md's version gate.
 
-A `SuiteConfig()` marker method OWNS the config verbatim:
+A `SuiteConfig()` marker method states the config; durations it leaves at
+zero behave as if the marker were absent:
 
 - No marker → `DefaultSuiteConfig()` (30s test timeout, 30s setup timeout).
-- Marker present → the returned value is used AS-IS. Partial literals
-  inherit nothing: `SuiteConfig{Parallel: true}` has NO timeouts. From
-  v1.29.1 `gotest lint` reports such a literal (`suite-config-partial`) and
-  `-fix` rewrites it to the compose form below.
-- Zero or negative duration = no deadline (matches `go test -timeout 0`).
+- Marker present → booleans (`Parallel`, `Exclusive`, `FailFast`) are used
+  as written. From v1.31 a duration left at zero (omitted or explicit) gets
+  the default: `SuiteConfig{Parallel: true}` runs with 30s/30s (v1.26–v1.30
+  it meant no deadline).
+- `gotest.NoDeadline` (any negative duration) disables the deadline.
+- From v1.31 `gotest lint` reports an explicit `0` timeout
+  (`config-zero-timeout`) and `-fix` writes `gotest.NoDeadline`, keeping the
+  pre-v1.31 meaning; drop the field instead when the default was intended.
 
 Marker bodies are parsed statically (the generator needs `Parallel` at
 generation time), so only three forms are legal:
@@ -33,8 +38,9 @@ func (s *ShopTestSuite) SuiteConfig() gotest.SuiteConfig {
 defaults — a marker is a statement of intent, not boilerplate (agents
 copying default-restating markers between suites is an observed failure).
 
-Fixtures use the same literal rule via `FixtureConfig()` /
-`SharedFixtureConfig()` markers: no marker → `DefaultFixtureConfig()` (2m);
+Fixtures follow the same rule via `FixtureConfig()` /
+`SharedFixtureConfig()` markers: no marker or a zero `Timeout` →
+`DefaultFixtureConfig()`'s 2m; `Retries`/`RetryDelay` are used as written;
 `ContainerFixtureConfig()` (5m, 1 retry) suits container startups.
 
 ## Exclusive suites (v1.27+)

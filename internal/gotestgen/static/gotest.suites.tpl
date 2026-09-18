@@ -32,8 +32,8 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
   }
 {{- end }}
 {{- if $ts.HasConfig }}
-  ƒcfg := s.{{ $ts.Identifier }}.SuiteConfig()
-  ƒbudget := ƒcfg
+  ƒbudget := s.{{ $ts.Identifier }}.SuiteConfig()
+  ƒcfg := gotestruntime.WithSuiteDefaults(ƒbudget)
 {{- else }}
   ƒcfg := gotest.DefaultSuiteConfig()
   ƒbudget := gotest.SuiteConfig{}

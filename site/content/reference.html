@@ -529,7 +529,7 @@ lint:
       </table>
 
       <div class="callout">
-        The returned config is used as-is: a zero (or omitted) duration means <em>no deadline</em>, not "keep the default." To inherit defaults and override individual fields, start from a preset: <code>cfg := gotest.DefaultSuiteConfig(); cfg.Parallel = true; return cfg</code>.
+        A duration the returned config leaves at zero (omitted or explicit) gets the default, as if the marker were absent; <code>gotest.NoDeadline</code> disables a deadline. Booleans, <code>Retries</code> and <code>RetryDelay</code> are used as written, so <code>gotest.SuiteConfig{Parallel: true}</code> runs in parallel with the 30s defaults.
       </div>
     </section>
 

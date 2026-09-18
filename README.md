@@ -896,8 +896,9 @@ func (s *BatchTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-The returned config is used as-is — a zero (or omitted) duration means no timeout, and without a `SuiteConfig()`/`FixtureConfig()` method the defaults apply.
-Start from a preset to combine defaults with overrides (`cfg := gotest.DefaultSuiteConfig(); cfg.Parallel = true; return cfg`).
+A duration the returned config leaves at zero (omitted or explicit) gets the default, exactly as if the marker were absent, so `gotest.SuiteConfig{Parallel: true}` runs with the 30-second timeouts.
+`gotest.NoDeadline` (or any negative duration) disables a deadline; booleans, `Retries` and `RetryDelay` are used as written.
+Start from a preset to override its durations (`cfg := gotest.IntegrationSuiteConfig(); cfg.Parallel = true; return cfg`).
 
 `Exclusive: true` schedules the suite's process strictly alone: after every non-exclusive suite has finished, one exclusive suite at a time, in deterministic order.
 Use it for suites whose verdicts depend on wall-clock behavior or contended resources (timing budgets, containers, ports, heavy child builds) — a budget verdict taken on a saturated machine is not a verdict you can act on.

@@ -79,13 +79,12 @@ func RunFixtureTeardown(ctx context.Context, td FixtureTeardown) (failed bool) {
 // generated shared-fixture subprocess reports its budget through this too — it
 // used to carry a textual mirror, held in sync only by a generator test.
 //
-// Under literal config semantics a zero Timeout is the spelling of "no
-// deadline", and a negative one is the documented "disabled" — neither means
-// "takes no time". Reading them as zero would hand the supervisor a budget
-// short enough to force-kill a teardown that is still releasing resources, and
-// a signalled process reports no meaningful exit status, so the run would
-// still be green. An unbounded fixture still needs headroom: fall back to the
-// default floor.
+// A negative Timeout (gotest.NoDeadline) means "no deadline", not "takes no
+// time", and a zero one only reaches here from a hand-built node. Reading either
+// as zero would hand the supervisor a budget short enough to force-kill a
+// teardown that is still releasing resources, and a signalled process reports
+// no meaningful exit status, so the run would still be green. An unbounded
+// fixture still needs headroom: fall back to the default floor.
 func SupervisorBudget(timeout time.Duration) time.Duration {
 	if timeout <= 0 {
 		return gotest.DefaultFixtureConfig().Timeout
