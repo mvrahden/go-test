@@ -392,7 +392,9 @@ type ParallelMethodTestSuite struct{}
 type TestCtx struct{ conn *sql.Conn }
 
 func (s *ParallelMethodTestSuite) SuiteConfig() gotest.SuiteConfig {
-    return gotest.SuiteConfig{Parallel: true}
+    cfg := gotest.DefaultSuiteConfig()
+    cfg.Parallel = true
+    return cfg
 }
 func (s *ParallelMethodTestSuite) BeforeEach(t *gotest.T) *TestCtx {
     return &TestCtx{conn: s.pool.Acquire()}
@@ -414,7 +416,7 @@ the subtest that would release such a wait is still parked inside `t.Run`, so an
 generated wait deadlocks against the panic unwind.
 With `FailFast`, parallel suites additionally share a `ƒfailed` atomic flag: a failed subtest sets it, and subtests that start afterwards skip themselves.
 
-On Windows, suite subprocesses run under job objects so that cancellation and teardown terminate the whole process tree.
+On Windows, suite subprocesses run on a hidden console of their own and under a job object, so that a shutdown request and a force-kill reach the whole process tree and nothing outside it.
 
 ### Generic Suites
 
@@ -1383,6 +1385,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `assertion-redundant` | An assertion made redundant by the next one on the same argument |
 | `fail-guard` | `if cond { gotest.Fail(…) }` guards (also halting `Fatal`/`Fatalf`/`FailNow` bodies) — the assertion expresses the check directly; `\|\|` conditions and `else if` chains decompose into sequential assertions, non-halting `Errorf` bodies and init-scoped guards report without a fix; fires only in files that import gotest |
 | `t-escape` | Unnecessary `t.T()` convenience escapes: `Errorf`/`FailNow`/`Skipf`/`Setenv`/`TempDir` (available on `gotest.T`), `Skip`/`SkipNow` (use `Skipf`), `Helper` (degrades call-site reporting), `Log`/`Fatal`/`Fatalf` (use assertions and their message args) |
+| `suite-config-partial` | A `SuiteConfig` built from a `gotest.SuiteConfig{…}` literal that leaves `Timeout` or `SetupTimeout` unset — the literal replaces the defaults wholesale, so an unset timeout is no deadline rather than the 30-second default; the fix composes the same fields onto `DefaultSuiteConfig()` |
 | `behavior-wording` | A `When` description that opens with "when", or an `It` description that opens with "it" — the spec renders the connective and the ✓ glyph plays "it", so the word is said twice; the fix drops it (whole word, any case except all capitals — `IT department…` is an acronym — space or underscore after it; a description that is only the word is left alone) |
 | `bench-fixture-io` | `Benchmark*` methods reading fixture-backed state inside the measured loop — times whatever backs the fixture, not the code under test (heuristic; hoist the read above the loop) |
 | `bench-wait` | `time.Sleep`/`gotest.Eventually`/`gotest.Consistently` inside the measured loop — times the wait, not the code |
@@ -1437,16 +1440,16 @@ Manual setup works without the action:
 - run: gotest spec ./... --format=md --output=behavior-spec.md
 ```
 
-Exit codes: 0 = pass, 1 = test failure, 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors) or a census failure, 130 = run interrupted (SIGINT/SIGTERM).
+Exit codes: 0 = pass, 1 = test failure or a `--timeout` that expired before the last verdict (booked into the event stream as a failed `global --timeout` package), 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors) or a census failure, 130 = run interrupted (SIGINT/SIGTERM) before the last verdict, whatever the suites the interrupt killed reported; their failures are the interrupt's, not verdicts. An interrupt that arrives later, while fixtures tear down, leaves the verdict alone. A suite binary the run stopped from outside — a signal on Unix, the console interrupt a `--timeout` sends on Windows — reports a status it never chose (`-1`, `0xC000013A`); it is read as a failed suite, named on stderr, and never becomes the run's own exit code.
 
-**Census.** A green run is believed only when every declared test method produced a verdict. After a green `spec`, `summary` or `-json` run, gotest compares two sets:
+**Census.** A green run is believed only when every declared test method produced a verdict. After a green run that writes a test2json stream (`spec`, `summary`, `-json`, `watch --spec` or `--json`, a capturing `bench`), the pipeline compares two sets as the stream is written:
 
-- declared: the suite methods the source declares, read from the AST after focus and exclusion (the same set `discover` reports);
+- declared: the suite methods and the fuzz targets the source declares, read from the AST after focus and exclusion (the same set `discover` reports); a fuzz target counts through its `Fuzz<Suite>_<Method>` wrapper, whose seeds replay as subtests;
 - executed: the `Suite/Method` pairs for which the event stream carries a `pass`, `fail` or `skip`; a suite skipped as a whole covers its methods.
 
-A declared method without a verdict makes the run exit 2, printing `FAIL: census: N declared test(s) never ran` and the missing methods. It is exit 2, not 1, because a harness that silently dropped a test did not produce a failed test; it produced a run that cannot be believed, the same situation as a package that failed to build.
+A declared method without a verdict makes the run exit 2, printing `FAIL: census: N declared test(s) never ran` and the missing methods. It is exit 2, not 1, because a harness that silently dropped a test did not produce a failed test; it produced a run that cannot be believed, the same situation as a package that failed to build. The missing units are also booked into the event stream, each as a test that ran and failed with `census: declared test never ran` as its output, followed by a `fail` verdict for its suite (when the run streamed one) and for its package, each carrying the time and duration the overridden verdict had: the stream is what the spec, the summary, a saved `--input` replay and the editor's Spec View derive from, so every one of them shows the missing method beside the exit code, and `-json` consumers see the same events appended after the run's own.
 
-The census applies to green runs only: a red run is already not a false green, and a `FailFast` stop or a `-failfast` run legitimately leaves methods unexecuted. It stands down under `-run`, `-skip` and `-list`, printing `note: census skipped under -run/-skip/-list/-bench` on stderr, because those flags change the declared set. The text run (`gotest ./...`) streams suite output without test2json and is not censused; every CI path (`summary --github` through the action, `spec` in `make test`) is.
+The census applies to green runs that ran to completion: a red run is already not a false green, a `FailFast` stop or a `-failfast` run legitimately leaves methods unexecuted, and an interrupt or an expired `--timeout` cut the run short. It stands down under `-run`, `-skip` and `-list`, printing `note: census skipped under -run/-skip/-list/-bench` on stderr, because those flags change the declared set. The text run (`gotest ./...`) streams suite output without test2json and is not censused; every CI path (`summary --github` through the action, `spec` in `make test`) is. Benchmarks never run in a test run; when the packages declare some, the run ends with `note: N benchmark(s) not run — gotest runs tests; use 'gotest bench'` on stderr, so silence never implies the packages were fully exercised.
 
 A `bench` run that captures events (`--spec`, `--json`, `--save`, `--against`) is censused the same way over the declared benchmark methods. go test emits no `pass` event for a benchmark, so its verdict is the `ns/op` result line or a `fail`; `-bench` stands the census down like `-run` does.
 
@@ -1631,8 +1634,9 @@ They never alter how the tests themselves are executed — the spec view is rend
 cmd/gotest/                  CLI entrypoint, subcommands, arg handling
   ├── internal/lint/           go/analysis analyzer (lint subcommand)
   └── internal/gotestrunner/   Suite generation I/O, go test execution, overlay
-        └── internal/gotestgen/   Package loading, collection, fixture resolution, rendering
-              └── internal/gotestast/   AST analysis, spec model, regex classification
+        ├── internal/gotestgen/   Package loading, collection, fixture resolution, rendering
+        │     └── internal/gotestast/   AST analysis, spec model, regex classification
+        └── internal/proctree/    Subprocess trees stopped as a whole and alone (group, console, job)
 
 internal/config/             .gotest.yml project configuration loading
 internal/gotestspec/         Spec tree builder and renderers (terminal, markdown, json)

@@ -11,7 +11,7 @@ import (
 
 // LintGitHubTestSuite covers the GitHub-annotation mode of the lint
 // subcommand: arming, rendering, step summary, and driver fallback.
-// Not parallel: Setenv is incompatible with parallel subtests.
+// Sequential: Setenv.
 type LintGitHubTestSuite struct{}
 
 // writeLintProbe materializes a one-file module whose stdlib-style test

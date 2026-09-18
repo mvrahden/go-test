@@ -1,0 +1,75 @@
+=== RUN   TestNotificationDispatchBenchTestSuite
+--- PASS: TestNotificationDispatchBenchTestSuite (<TIMESTAMP>)
+=== RUN   TestNotificationServiceTestSuite
+=== RUN   TestNotificationServiceTestSuite/TestDeliverNotification
+=== RUN   TestNotificationServiceTestSuite/TestDeliverNotification/a_single_notification_is_dispatched
+=== RUN   TestNotificationServiceTestSuite/TestDeliverNotification/a_single_notification_is_dispatched/eventually_delivers_the_message
+=== RUN   TestNotificationServiceTestSuite/TestBatchDelivery
+=== RUN   TestNotificationServiceTestSuite/TestBatchDelivery/multiple_notifications_are_sent_at_once
+=== RUN   TestNotificationServiceTestSuite/TestBatchDelivery/multiple_notifications_are_sent_at_once/eventually_delivers_all_messages
+=== RUN   TestNotificationServiceTestSuite/TestIdleDispatcher
+=== RUN   TestNotificationServiceTestSuite/TestIdleDispatcher/no_notifications_have_been_sent
+=== RUN   TestNotificationServiceTestSuite/TestIdleDispatcher/no_notifications_have_been_sent/consistently_reports_zero_deliveries
+=== RUN   TestNotificationServiceTestSuite/TestDeliveryTimestamp
+=== RUN   TestNotificationServiceTestSuite/TestDeliveryTimestamp/a_notification_is_delivered
+=== RUN   TestNotificationServiceTestSuite/TestDeliveryTimestamp/a_notification_is_delivered/records_a_recent_timestamp
+=== RUN   TestNotificationServiceTestSuite/TestDeliveryTimestamp/a_notification_is_delivered/records_the_timestamp_close_to_send_time
+=== RUN   TestNotificationServiceTestSuite/TestNotificationPayload
+=== RUN   TestNotificationServiceTestSuite/TestNotificationPayload/a_high-priority_notification_is_delivered
+=== RUN   TestNotificationServiceTestSuite/TestNotificationPayload/a_high-priority_notification_is_delivered/serializes_to_the_expected_JSON
+=== RUN   TestNotificationServiceTestSuite/TestNotificationPayload/a_high-priority_notification_is_delivered/matches_the_delivery_summary_snapshot
+=== RUN   TestNotificationServiceTestSuite/TestTrimSpaceTable
+=== RUN   TestNotificationServiceTestSuite/TestTrimSpaceTable/leading_and_trailing_spaces
+=== RUN   TestNotificationServiceTestSuite/TestTrimSpaceTable/leading_and_trailing_spaces/trims_to_the_expected_result
+=== RUN   TestNotificationServiceTestSuite/TestTrimSpaceTable/already_trimmed
+=== RUN   TestNotificationServiceTestSuite/TestTrimSpaceTable/already_trimmed/trims_to_the_expected_result
+=== RUN   TestNotificationServiceTestSuite/TestTrimSpaceTable/tabs_and_newlines
+=== RUN   TestNotificationServiceTestSuite/TestTrimSpaceTable/tabs_and_newlines/trims_to_the_expected_result
+=== RUN   TestNotificationServiceTestSuite/TestDeadlineContext
+=== RUN   TestNotificationServiceTestSuite/TestDeadlineContext/a_deadline_is_configured_for_the_test
+=== RUN   TestNotificationServiceTestSuite/TestDeadlineContext/a_deadline_is_configured_for_the_test/exposes_the_deadline_on_the_context
+--- PASS: TestNotificationServiceTestSuite (<TIMESTAMP>)
+    --- PASS: TestNotificationServiceTestSuite/TestDeliverNotification (<TIMESTAMP>)
+        --- PASS: TestNotificationServiceTestSuite/TestDeliverNotification/a_single_notification_is_dispatched (<TIMESTAMP>)
+            --- PASS: TestNotificationServiceTestSuite/TestDeliverNotification/a_single_notification_is_dispatched/eventually_delivers_the_message (<TIMESTAMP>)
+    --- PASS: TestNotificationServiceTestSuite/TestBatchDelivery (<TIMESTAMP>)
+        --- PASS: TestNotificationServiceTestSuite/TestBatchDelivery/multiple_notifications_are_sent_at_once (<TIMESTAMP>)
+            --- PASS: TestNotificationServiceTestSuite/TestBatchDelivery/multiple_notifications_are_sent_at_once/eventually_delivers_all_messages (<TIMESTAMP>)
+    --- PASS: TestNotificationServiceTestSuite/TestIdleDispatcher (<TIMESTAMP>)
+        --- PASS: TestNotificationServiceTestSuite/TestIdleDispatcher/no_notifications_have_been_sent (<TIMESTAMP>)
+            --- PASS: TestNotificationServiceTestSuite/TestIdleDispatcher/no_notifications_have_been_sent/consistently_reports_zero_deliveries (<TIMESTAMP>)
+    --- PASS: TestNotificationServiceTestSuite/TestDeliveryTimestamp (<TIMESTAMP>)
+        --- PASS: TestNotificationServiceTestSuite/TestDeliveryTimestamp/a_notification_is_delivered (<TIMESTAMP>)
+            --- PASS: TestNotificationServiceTestSuite/TestDeliveryTimestamp/a_notification_is_delivered/records_a_recent_timestamp (<TIMESTAMP>)
+            --- PASS: TestNotificationServiceTestSuite/TestDeliveryTimestamp/a_notification_is_delivered/records_the_timestamp_close_to_send_time (<TIMESTAMP>)
+    --- PASS: TestNotificationServiceTestSuite/TestNotificationPayload (<TIMESTAMP>)
+        --- PASS: TestNotificationServiceTestSuite/TestNotificationPayload/a_high-priority_notification_is_delivered (<TIMESTAMP>)
+            --- PASS: TestNotificationServiceTestSuite/TestNotificationPayload/a_high-priority_notification_is_delivered/serializes_to_the_expected_JSON (<TIMESTAMP>)
+            --- PASS: TestNotificationServiceTestSuite/TestNotificationPayload/a_high-priority_notification_is_delivered/matches_the_delivery_summary_snapshot (<TIMESTAMP>)
+    --- PASS: TestNotificationServiceTestSuite/TestTrimSpaceTable (<TIMESTAMP>)
+        --- PASS: TestNotificationServiceTestSuite/TestTrimSpaceTable/leading_and_trailing_spaces (<TIMESTAMP>)
+            --- PASS: TestNotificationServiceTestSuite/TestTrimSpaceTable/leading_and_trailing_spaces/trims_to_the_expected_result (<TIMESTAMP>)
+        --- PASS: TestNotificationServiceTestSuite/TestTrimSpaceTable/already_trimmed (<TIMESTAMP>)
+            --- PASS: TestNotificationServiceTestSuite/TestTrimSpaceTable/already_trimmed/trims_to_the_expected_result (<TIMESTAMP>)
+        --- PASS: TestNotificationServiceTestSuite/TestTrimSpaceTable/tabs_and_newlines (<TIMESTAMP>)
+            --- PASS: TestNotificationServiceTestSuite/TestTrimSpaceTable/tabs_and_newlines/trims_to_the_expected_result (<TIMESTAMP>)
+    --- PASS: TestNotificationServiceTestSuite/TestDeadlineContext (<TIMESTAMP>)
+        --- PASS: TestNotificationServiceTestSuite/TestDeadlineContext/a_deadline_is_configured_for_the_test (<TIMESTAMP>)
+            --- PASS: TestNotificationServiceTestSuite/TestDeadlineContext/a_deadline_is_configured_for_the_test/exposes_the_deadline_on_the_context (<TIMESTAMP>)
+=== RUN   FuzzNotificationServiceTestSuite_FuzzTrim
+=== RUN   FuzzNotificationServiceTestSuite_FuzzTrim/seed#0
+=== RUN   FuzzNotificationServiceTestSuite_FuzzTrim/seed#1
+=== RUN   FuzzNotificationServiceTestSuite_FuzzTrim/seed#2
+=== RUN   FuzzNotificationServiceTestSuite_FuzzTrim/seed#3
+--- PASS: FuzzNotificationServiceTestSuite_FuzzTrim (<TIMESTAMP>)
+    --- PASS: FuzzNotificationServiceTestSuite_FuzzTrim/seed#0 (<TIMESTAMP>)
+    --- PASS: FuzzNotificationServiceTestSuite_FuzzTrim/seed#1 (<TIMESTAMP>)
+    --- PASS: FuzzNotificationServiceTestSuite_FuzzTrim/seed#2 (<TIMESTAMP>)
+    --- PASS: FuzzNotificationServiceTestSuite_FuzzTrim/seed#3 (<TIMESTAMP>)
+=== RUN   FuzzNotificationServiceTestSuite_FuzzSummary
+=== RUN   FuzzNotificationServiceTestSuite_FuzzSummary/seed#0
+--- PASS: FuzzNotificationServiceTestSuite_FuzzSummary (<TIMESTAMP>)
+    --- PASS: FuzzNotificationServiceTestSuite_FuzzSummary/seed#0 (<TIMESTAMP>)
+PASS
+ok  	github.com/mvrahden/go-test/examples/notification	<TIMESTAMP>
+note: 1 benchmark(s) not run — gotest runs tests; use 'gotest bench'

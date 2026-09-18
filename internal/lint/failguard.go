@@ -308,16 +308,11 @@ func sourceIndent(fset *token.FileSet, read func(string) []byte, pos token.Pos) 
 }
 
 func namedPtrType(t types.Type, pkgPath, name string) bool {
-	ptr, ok := t.(*types.Pointer)
+	ptr, ok := types.Unalias(t).(*types.Pointer)
 	if !ok {
 		return false
 	}
-	named, ok := ptr.Elem().(*types.Named)
-	if !ok {
-		return false
-	}
-	obj := named.Obj()
-	return obj.Name() == name && obj.Pkg() != nil && obj.Pkg().Path() == pkgPath
+	return namedType(ptr.Elem(), pkgPath, name)
 }
 
 // gotestQualifier resolves how the file containing pos refers to the gotest

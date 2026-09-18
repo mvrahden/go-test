@@ -18,7 +18,11 @@ type PanicResilienceTestSuite struct{}
 
 func (s *PanicResilienceTestSuite) SuiteConfig() gotest.SuiteConfig {
 	// Exclusive: see ParallelLifecycleTestSuite — same wall-clock budget harness.
-	return gotest.SuiteConfig{Parallel: true, Exclusive: true, Timeout: 3 * time.Minute}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	cfg.Exclusive = true
+	cfg.Timeout = 3 * time.Minute
+	return cfg
 }
 
 func (s *PanicResilienceTestSuite) TestPanicInPollFunction(t *gotest.T) {

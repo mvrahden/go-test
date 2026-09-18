@@ -145,6 +145,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		OutputMode:      mode,
 		Bench:           true,
 		BenchesByPkg:    overlay.BenchesByPkg,
+		GlobalTimeout:   cfg.GlobalTimeout,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -152,13 +153,6 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	code := result.ExitCode
-	if cfg.GlobalTimeout > 0 && ctx.Err() == context.DeadlineExceeded {
-		fmt.Fprintf(os.Stderr, "FAIL: global --timeout exceeded after %v\n", cfg.GlobalTimeout)
-		if code == 0 {
-			code = 1
-		}
-	}
-
 	var tree []*gotestspec.Package
 	if mode == gotestrunner.RunCaptureJSON {
 		events, err := gotestspec.ParseEvents(bytes.NewReader(result.CapturedJSON))
@@ -167,7 +161,6 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 			return 2
 		}
 		tree = gotestspec.BuildTree(events)
-		code = enforceBenchCensus(os.Stderr, code, goTestArgs, declaredBenchCases(loaded), executedBenchCases(events))
 	}
 
 	var newBaseline gotestbench.Baseline

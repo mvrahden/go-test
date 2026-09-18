@@ -10,7 +10,9 @@ type articleCtx struct {
 type ArticleSearchTestSuite struct{}
 
 func (s *ArticleSearchTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *ArticleSearchTestSuite) BeforeEach(t *gotest.T) *articleCtx {
@@ -85,7 +87,9 @@ func (s *ArticleSearchTestSuite) TestAllLabels(t *gotest.T, ctx *articleCtx) {
 type IndexContractTestSuite[T Indexable] struct{}
 
 func (s *IndexContractTestSuite[T]) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *IndexContractTestSuite[T]) TestEmptyIndex(t *gotest.T) {

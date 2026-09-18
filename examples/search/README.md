@@ -6,7 +6,7 @@ Demonstrates generic test suites with type alias instantiation, parallel test ex
 
 - **index.go** — Generic `Indexable` interface, `Article`/`Product` types, full-text search index
 - **suite_test.go** — `ArticleSearchTestSuite` (parallel, returning `BeforeEach`), `IndexContractTestSuite[T]` (generic), type aliases `ArticleIndexTestSuite` and `ProductIndexTestSuite`
-- **suite_ext_test.go** — `SearchResultTestSuite` (external package variant)
+- **suite_ext_test.go** — `SearchResultTestSuite` (external package variant, parallel, returning `BeforeEach`)
 
 ## Features
 

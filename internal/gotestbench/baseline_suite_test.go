@@ -16,7 +16,9 @@ import (
 type BaselineTestSuite struct{}
 
 func (s *BaselineTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 // buildTree parses a go test -json stream (one JSON object per line) into a

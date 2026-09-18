@@ -64,8 +64,6 @@ func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		}
 	}
 
-	stop()
-
 	out := prepareOutput{
 		OverlayFile: filepath.Join(overlay.CacheDir, "overlay.json"),
 		Dir:         overlay.WorkDir,
@@ -75,6 +73,7 @@ func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	if err := json.NewEncoder(os.Stdout).Encode(out); err != nil {
+		stop()
 		if setupProc != nil {
 			_ = setupProc.Teardown()
 		}
@@ -83,9 +82,10 @@ func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, shutdownSignals...)
-	<-sigCh
+	// The handler stays installed from setup to shutdown: a signal that lands
+	// right after the JSON line must still tear the fixtures down.
+	<-ctx.Done()
+	stop()
 
 	if setupProc != nil {
 		_ = setupProc.Teardown()

@@ -147,6 +147,7 @@ func (m snapshotJSONMarshaler) MarshalJSON() ([]byte, error) { return json.Marsh
 type snapshotNamedString string
 
 // SnapshotTestSuite tests snapshot matching, custom naming, and value serialization.
+// Sequential: Setenv, and both methods write one snapshot file.
 type SnapshotTestSuite struct{ snapPath string }
 
 func (s *SnapshotTestSuite) BeforeEach(_ *gotest.T) {

@@ -99,7 +99,7 @@ func snapshotContent(value any) (string, error) {
 	case error:
 		return v.Error(), nil
 	case io.Reader:
-		b, err := readAndRestore(v)
+		b, err := assert.ReadAndRestore(v)
 		if err != nil {
 			return "", fmt.Errorf("failed to read: %w", err)
 		}

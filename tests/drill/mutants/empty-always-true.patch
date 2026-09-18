@@ -1,0 +1,12 @@
+Expect: pkg/gotest/internal/assert Predicates / IsEmpty
+Expect: ^ *failing pass TestFailingTestSuite/TestEmpty$
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -102,6 +102,7 @@
+ // IsEmpty reports whether a value is considered empty: nil, zero-length
+ // (slices, maps, arrays, channels, strings), or a pointer to an empty value.
+ func IsEmpty(object any) bool {
++	return true
+ 	if object == nil {
+ 		return true
+ 	}

@@ -12,7 +12,9 @@ import (
 type ReportTestSuite struct{}
 
 func (s *ReportTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *ReportTestSuite) TestNewReport(t *gotest.T) {

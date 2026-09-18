@@ -13,16 +13,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// CanaryTestSuite runs one fixture package per method. Sequential: it builds
-// the CLI once and each method spawns a full pipeline run.
+// CanaryTestSuite runs one fixture package per method.
+// Sequential: it builds the CLI once and each method spawns a full pipeline run.
 type CanaryTestSuite struct {
 	binary   string
 	expected map[string]expectation
@@ -43,16 +43,12 @@ func (s *CanaryTestSuite) BeforeAll(t *gotest.T) {
 	if err != nil {
 		fatalf(t, "abs: %v", err)
 	}
-	name := "gotest"
-	if runtime.GOOS == "windows" {
-		name += ".exe"
+	// The plain build, never the shared fixture: the canary guards that machinery.
+	s.binary, err = testkit.BuildCLI(t.Context(), root, t.TempDir())
+	if err != nil {
+		fatalf(t, "%v", err)
 	}
-	s.binary = filepath.Join(t.TempDir(), name)
-	build := exec.Command("go", "build", "-o", s.binary, "./cmd/gotest") //nolint:gosec // G204: go tool with controlled arguments
-	build.Dir = root
-	if out, err := build.CombinedOutput(); err != nil {
-		fatalf(t, "build gotest: %v\n%s", err, out)
-	}
+	testkit.ScrubActionsEnv()
 	s.expected = readExpected(t, filepath.Join("testdata", "expected.txt"))
 }
 
@@ -200,26 +196,78 @@ func (s *CanaryTestSuite) TestAPanicFailsTheMethod(t *gotest.T) {
 	s.check(t, "panicking")
 }
 
-// A bench run is believed only when every declared benchmark reported a
-// result: the spec must name both, and the exit code must be 0.
-func (s *CanaryTestSuite) TestEveryBenchmarkReportsAResult(t *gotest.T) {
-	cmd := exec.Command(s.binary, "bench", "--spec", "--no-color", "./testdata/benching/", "-benchtime=1x") //nolint:gosec // G204: controlled binary with fixed args
+// Seeds replay as subtests of the fuzz wrapper on an ordinary run; a seed
+// that fails fails its wrapper, and the census counts wrappers.
+func (s *CanaryTestSuite) TestSeedsReplayWithVerdicts(t *gotest.T) {
+	s.check(t, "fuzzing")
+}
+
+// An async method completes when done() is called from any goroutine; one
+// that never calls it fails at the suite's deadline instead of hanging.
+func (s *CanaryTestSuite) TestAsyncMethodsWaitForDone(t *gotest.T) {
+	s.check(t, "asynchronous")
+}
+
+// benchReport is the part of a bench --json report the canary reads.
+type benchReport struct {
+	Baseline struct {
+		Results []struct {
+			Name string `json:"name"`
+		} `json:"results"`
+	} `json:"baseline"`
+}
+
+// bench runs a capturing bench run over one fixture package and returns its
+// exit code and the benchmark names the report carries a sample for.
+func (s *CanaryTestSuite) bench(t *gotest.T, pkg, canaryDir string) (int, []string) {
+	cmd := exec.Command(s.binary, "bench", "--json", "./testdata/"+pkg+"/", "-benchtime=1x") //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Env = append(os.Environ(), "GOTEST_CANARY_DIR="+canaryDir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	code := 0
 	if err := cmd.Run(); err != nil {
 		var exitErr *exec.ExitError
 		if !errors.As(err, &exitErr) {
-			fatalf(t, "run bench: %v", err)
+			fatalf(t, "run bench %s: %v", pkg, err)
 		}
 		code = exitErr.ExitCode()
 	}
-	if code != 0 {
-		t.Errorf("bench: exit code %d, want 0\nstderr:\n%s", code, stderr.String())
+	var report benchReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		fatalf(t, "bench %s: report is not the JSON document bench --json promises: %v\nstdout:\n%s\nstderr:\n%s", pkg, err, stdout.String(), stderr.String())
 	}
-	for _, want := range []string{"First", "Second", "2 benchmarks"} {
-		if !strings.Contains(stdout.String(), want) {
-			t.Errorf("bench spec output lacks %q:\n%s", want, stdout.String())
-		}
+	names := make([]string, 0, len(report.Baseline.Results))
+	for _, r := range report.Baseline.Results {
+		names = append(names, r.Name)
+	}
+	sort.Strings(names)
+	return code, names
+}
+
+// A green bench run reports a sample for every declared benchmark and exits
+// 0; a missing one is the bench census's job.
+func (s *CanaryTestSuite) TestEveryBenchmarkReportsAResult(t *gotest.T) {
+	code, names := s.bench(t, "benching", t.TempDir())
+	if code != 0 {
+		t.Errorf("benching: exit code %d, want 0", code)
+	}
+	if want := []string{"BenchmarkContext", "BenchmarkFirst", "BenchmarkSecond"}; strings.Join(names, ",") != strings.Join(want, ",") {
+		t.Errorf("benching: results %v, want %v", names, want)
+	}
+}
+
+// A benchmark that fails, halts or skips reports no sample and turns the run
+// red; FailNow stops the method where it is called.
+func (s *CanaryTestSuite) TestFailingBenchmarksReportNoResult(t *gotest.T) {
+	dir := t.TempDir()
+	code, names := s.bench(t, "benchfailing", dir)
+	if code != 1 {
+		t.Errorf("benchfailing: exit code %d, want 1", code)
+	}
+	if len(names) != 0 {
+		t.Errorf("benchfailing: results %v, want none", names)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "after-failnow")); err == nil {
+		t.Errorf("the statement after FailNow ran: the benchmark did not halt")
 	}
 }

@@ -4,7 +4,6 @@ package gotest_test //nolint:fail-guard
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,7 +14,8 @@ import (
 
 // SnapshotInternalsTestSuite covers the machinery below MatchSnapshot:
 // caller-package detection and its cache, test-name splitting, the read-only
-// CI switch, CRLF normalization, and reader restoration. Sequential: Setenv.
+// CI switch and CRLF normalization.
+// Sequential: Setenv.
 type SnapshotInternalsTestSuite struct {
 	dir     string
 	snapDir string
@@ -236,33 +236,4 @@ func (s *SnapshotInternalsTestSuite) TestMatchSnapshot_CIMode_ComparesExistingBa
 
 	t.Setenv("GOTEST_CI", "1")
 	gotest.MatchSnapshot(t, "expected value")
-}
-
-func (s *SnapshotInternalsTestSuite) TestReadAndRestore_SeekableReader(t *gotest.T) {
-	r := strings.NewReader("test data")
-	b, err := gotest.ExportReadAndRestore(r)
-	if err != nil {
-		fatalf(t, "readAndRestore: %v", err)
-	}
-	if string(b) != "test data" {
-		fatalf(t, "want %q, got %q", "test data", string(b))
-	}
-	again := gotest.Must(io.ReadAll(r))
-	if string(again) != "test data" {
-		fatalf(t, "reader should be restored; re-read got %q", again)
-	}
-}
-
-func (s *SnapshotInternalsTestSuite) TestReadAndRestore_NonSeekableReader(t *gotest.T) {
-	r := io.NopCloser(strings.NewReader("ephemeral"))
-	b, err := gotest.ExportReadAndRestore(r)
-	if err != nil {
-		fatalf(t, "readAndRestore: %v", err)
-	}
-	if string(b) != "ephemeral" {
-		fatalf(t, "want %q, got %q", "ephemeral", string(b))
-	}
-	if remaining := gotest.Must(io.ReadAll(r)); len(remaining) != 0 {
-		fatalf(t, "non-seekable reader should be consumed, got %q", remaining)
-	}
 }

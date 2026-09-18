@@ -1,0 +1,101 @@
+package withsuiteconfig
+
+import (
+	"time"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type PartialTestSuite struct{}
+
+func (s *PartialTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg // want `SuiteConfig literal leaves Timeout and SetupTimeout unset — the literal replaces the defaults wholesale, so an unset timeout is no deadline; compose from DefaultSuiteConfig\(\)`
+}
+
+type OnlySetupMissingTestSuite struct{}
+
+func (s *OnlySetupMissingTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	cfg.Exclusive = true
+	cfg.Timeout = 3 * time.Minute
+	return cfg // want `SuiteConfig literal leaves SetupTimeout unset`
+}
+
+type EmptyTestSuite struct{}
+
+func (s *EmptyTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.DefaultSuiteConfig() // want `SuiteConfig literal leaves Timeout and SetupTimeout unset`
+}
+
+type ComposedFromLiteralTestSuite struct{}
+
+func (s *ComposedFromLiteralTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.FailFast = true // want `SuiteConfig literal leaves Timeout and SetupTimeout unset`
+	cfg.Parallel = true
+	return cfg
+}
+
+type AssignedTimeoutOnlyTestSuite struct{}
+
+func (s *AssignedTimeoutOnlyTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true // want `SuiteConfig literal leaves SetupTimeout unset`
+	cfg.Timeout = time.Minute
+	return cfg
+}
+
+// Cfg is the same type under another name; the literal is still partial.
+type Cfg = gotest.SuiteConfig
+
+type AliasTestSuite struct{}
+
+func (s *AliasTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg // want `SuiteConfig literal leaves Timeout and SetupTimeout unset`
+}
+
+// Not findings: both timeouts stated, whether in the literal or assigned
+// onto it afterwards, a preset base, and a SuiteConfig method on a type
+// that is not a suite.
+type ExplicitTestSuite struct{}
+
+func (s *ExplicitTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Timeout: time.Minute, SetupTimeout: 2 * time.Minute, FailFast: true}
+}
+
+type AssignedTimeoutsTestSuite struct{}
+
+func (s *AssignedTimeoutsTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.SuiteConfig{FailFast: true}
+	cfg.Timeout = time.Minute
+	cfg.SetupTimeout = time.Minute
+	return cfg
+}
+
+type ComposedTestSuite struct{}
+
+func (s *ComposedTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
+type notASuite struct{}
+
+func (n *notASuite) SuiteConfig() gotest.SuiteConfig { return gotest.SuiteConfig{Parallel: true} }
+
+// Not a finding: the generator rejects a compose body holding anything but
+// field assignments, and reports it itself.
+type TrailingStatementTestSuite struct{}
+
+func (s *TrailingStatementTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.SuiteConfig{Parallel: true}
+	cfg.Timeout = time.Minute
+	_ = cfg.FailFast
+	return cfg
+}

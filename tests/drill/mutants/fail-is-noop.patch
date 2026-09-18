@@ -1,6 +1,8 @@
+Expect: failing: exit code 0, want 1
+Expect: ^ *failing pass TestFailingTestSuite$
 --- a/pkg/gotest/assertions.go
 +++ b/pkg/gotest/assertions.go
-@@ -21,6 +21,9 @@
+@@ -20,6 +20,9 @@
  }
  
  func fail(t testingT, msg string, msgAndArgs []any) {

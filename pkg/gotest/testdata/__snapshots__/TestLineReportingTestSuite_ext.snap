@@ -1,11 +1,11 @@
 === SNAP TestConsistently/assertion_fails_during_polling/failure_references_this_file ===
 linereport_suite_test.go:35: Consistently failed on poll 3:
-    linereport_suite_test.go:197: True failed:
+    linereport_suite_test.go:199: True failed:
   expected: true
   actual:   false
   message: broke on poll 3
 === SNAP TestDirectAssertion/called_via_*R_(Record)/reports_this_file_as_the_call_site ===
-linereport_suite_test.go:73: Equal failed:
+linereport_suite_test.go:75: Equal failed:
   expected: 1
   actual:   2
 === SNAP TestDirectAssertion/called_via_spyT_(no_Helper_method)/reports_this_file_as_the_call_site ===
@@ -15,13 +15,13 @@ linereport_suite_test.go:35: Equal failed:
 === SNAP TestEventually/called_directly_from_test_(no_helper)/timeout_references_this_file ===
 linereport_suite_test.go:35: Eventually failed after 200ms (N polls):
   last failure:
-    linereport_suite_test.go:160: True failed:
+    linereport_suite_test.go:162: True failed:
   expected: true
   actual:   false
 === SNAP TestEventually/inner_assertion_fails_(via_*R)/timeout_includes_inner_assertion_call_site ===
 linereport_suite_test.go:35: Eventually failed after 200ms (N polls):
   last failure:
-    linereport_suite_test.go:146: True failed:
+    linereport_suite_test.go:148: True failed:
   expected: true
   actual:   false
   message: condition not met
@@ -33,7 +33,7 @@ linereport_suite_test.go:35: Eventually failed after 200ms (N polls):
   actual:   false
   message: condition not met
 === SNAP TestNestedHelpers/called_via_*R_through_two_levels_of_helpers/reports_this_file_as_the_outermost_call_site ===
-linereport_suite_test.go:121: Equal failed:
+linereport_suite_test.go:123: Equal failed:
   expected: 1
   actual:   2
 === SNAP TestNestedHelpers/called_via_spyT_through_two_levels_of_helpers/reports_this_file_as_the_outermost_call_site ===
@@ -41,7 +41,7 @@ linereport_suite_test.go:35: Equal failed:
   expected: 1
   actual:   2
 === SNAP TestSingleHelper/called_via_*R_through_a_helper_in_another_file/reports_this_file_not_the_helper_file ===
-linereport_suite_test.go:97: Equal failed:
+linereport_suite_test.go:99: Equal failed:
   expected: 1
   actual:   2
 === SNAP TestSingleHelper/called_via_spyT_through_a_helper_in_another_file/reports_this_file_not_the_helper_file ===

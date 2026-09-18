@@ -181,12 +181,16 @@ Usage:
 Runs test suites and renders a BDD-style specification tree showing
 pass/fail/skip status for each suite, method, and subtest.
 
-A green run is believed only when every declared test method produced a
-verdict. If a method the source declares never ran, the run exits 2 with
-"FAIL: census: N declared test(s) never ran" and the missing methods: a
-dropped test is not a failed test but a run that cannot be trusted. The
-census applies to green runs only and stands down under -run, -skip and
--list with a note on stderr.
+A green run is believed only when every declared test method and fuzz
+target produced a verdict. If one never ran, the run exits 2 with
+"FAIL: census: N declared test(s) never ran" (or "fuzz target(s)") and the
+missing names: a dropped test is not a failed test but a run that cannot be
+trusted. Each missing unit is also booked into the event stream as a failed
+test whose output is the census, and its suite and package fail with it, so
+the rendered spec and -json consumers name it too. The census applies to
+green runs only and stands down under -run, -skip and -list with a note on
+stderr. Declared benchmarks a test run left unexecuted are counted with
+"note: N benchmark(s) not run"; -bench runs them here instead.
 
 Flags:
   --format=<fmt>          Output format: terminal (default), md, json
@@ -227,12 +231,16 @@ Designed for CI pipelines where the full spec tree is too verbose.
 When all tests pass, prints a single success line. When tests fail,
 prints each failure with its package, test path, and assertion output.
 
-A green run is believed only when every declared test method produced a
-verdict. If a method the source declares never ran, the run exits 2 with
-"FAIL: census: N declared test(s) never ran" and the missing methods: a
-dropped test is not a failed test but a run that cannot be trusted. The
-census applies to green runs only and stands down under -run, -skip and
--list with a note on stderr.
+A green run is believed only when every declared test method and fuzz
+target produced a verdict. If one never ran, the run exits 2 with
+"FAIL: census: N declared test(s) never ran" (or "fuzz target(s)") and the
+missing names: a dropped test is not a failed test but a run that cannot be
+trusted. Each missing unit is also booked into the event stream as a failed
+test whose output is the census, and its suite and package fail with it, so
+the rendered spec and -json consumers name it too. The census applies to
+green runs only and stands down under -run, -skip and -list with a note on
+stderr. Declared benchmarks a test run left unexecuted are counted with
+"note: N benchmark(s) not run"; -bench runs them here instead.
 
 Flags:
   --format=<fmt>          Output format: terminal (default), md, json
@@ -361,7 +369,8 @@ found" and exits 0 without invoking go test.
 
 A capturing run (--spec, --json, --save or --against) is believed only
 when every declared BenchmarkX method reported a result. If one never ran,
-the run exits 2 with "FAIL: census: N declared benchmark(s) never ran";
+the run exits 2 with "FAIL: census: N declared benchmark(s) never ran" and
+books each missing benchmark into the captured stream as a failed one;
 -run and -bench stand the census down with a note on stderr.
 
 --against prints a delta table (BENCHMARK / OLD ns/op / NEW ns/op / Δ)
@@ -607,6 +616,8 @@ Rules:
   fail-guard            if cond { Fail/Fatal(...) } guards — use assertions directly
   t-escape              Unnecessary t.T() convenience escapes (incl. Helper/Fatal/Log)
   behavior-wording      When("when …") / It("it …") — the spec supplies those words
+  suite-config-partial  SuiteConfig literal without Timeout/SetupTimeout (no
+                        deadline, not the default — compose from DefaultSuiteConfig)
   bench-loop            Benchmark methods that never call b.Loop()/b.N (nothing
                         iterates, so the numbers lie)
   bench-fixture-io      Fixture-backed reads inside the measured loop (times the
@@ -628,9 +639,9 @@ rules also accept a project-wide skip flag (mirrored by .gotest.yml lint.skip):
 Flags:
   -skip-<rule>            Disable a non-integrity rule, e.g. -skip-fail-guard
                           (assertion-simplify, assertion-redundant, behavior-wording,
-                          bench-fixture-io, bench-wait, fail-guard, t-escape,
-                          stdlib-test, testify, fuzz-no-oracle, fuzz-seed,
-                          fuzz-hook-io, fuzz-raw-seed)
+                          suite-config-partial, bench-fixture-io, bench-wait,
+                          fail-guard, t-escape, stdlib-test, testify,
+                          fuzz-no-oracle, fuzz-seed, fuzz-hook-io, fuzz-raw-seed)
   -disable-nolint         Ignore //nolint comments
   -fix                    Apply suggested fixes
   --github                Also emit GitHub ::error annotations and append a
@@ -768,7 +779,7 @@ Fields:
 Skippable lint rules (non-integrity only): assertion-redundant,
 assertion-simplify, behavior-wording, bench-fixture-io, bench-wait,
 fail-guard, fuzz-hook-io, fuzz-no-oracle, fuzz-raw-seed, fuzz-seed,
-stdlib-test, t-escape, testify
+stdlib-test, suite-config-partial, t-escape, testify
 
 Example .gotest.yml:
 

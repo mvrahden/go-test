@@ -22,13 +22,16 @@ import (
 //
 // The suite is sequential: it configures the subprocess through the environment,
 // which t.Setenv forbids sharing with parallel tests.
+// Sequential: Setenv.
 type SharedFixtureTeardownTestSuite struct{}
 
 // SuiteConfig: Exclusive because every method builds and force-kills real
 // subprocesses against configured budgets — the one workload that must not
 // share the machine with concurrent compiles.
 func (s *SharedFixtureTeardownTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Exclusive: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Exclusive = true
+	return cfg
 }
 
 // slowTeardownFixture is the fixture description the generator would produce for
@@ -325,7 +328,7 @@ func (s *SharedFixtureTeardownTestSuite) TestTeardownForceKilled(t *gotest.T) {
 func (s *SharedFixtureTeardownTestSuite) TestProcessThatDiedOnItsOwn(t *gotest.T) {
 	t.When("the fixture process is killed outright, as an OOM would", func(w *gotest.T) {
 		proc, marker, _ := startSlowTeardown(w, 0, 30*time.Second)
-		gotest.NoError(w, gotestrunner.ForceKillProcessGroup(gotestrunner.ExportProcessPID(proc)))
+		gotest.NoError(w, gotestrunner.ExportKillTree(proc))
 		select {
 		case <-gotestrunner.ExportProcessDone(proc):
 		case <-time.After(10 * time.Second):

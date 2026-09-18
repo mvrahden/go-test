@@ -1,3 +1,4 @@
+Expect: broken: exit code 0, want 2
 --- a/internal/gotestrunner/output_collector.go
 +++ b/internal/gotestrunner/output_collector.go
 @@ -216,7 +216,7 @@

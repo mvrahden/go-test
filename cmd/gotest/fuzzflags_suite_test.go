@@ -11,7 +11,9 @@ import (
 type FuzzFlagsTestSuite struct{}
 
 func (s *FuzzFlagsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *FuzzFlagsTestSuite) TestForFlag(t *gotest.T) {

@@ -1,7 +1,6 @@
 package gotestast
 
 import (
-	"errors"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -424,84 +423,26 @@ type staticSuiteConfig struct {
 }
 
 func parseSuiteConfigAST(pkg *packages.Package, funcDecl *ast.FuncDecl) (cfg staticSuiteConfig, err error) {
-	if funcDecl.Body == nil || len(funcDecl.Body.List) == 0 {
-		return cfg, errors.New(suiteConfigBodyErr)
+	body, err := ParseSuiteConfigBody(pkg.TypesInfo, funcDecl)
+	if err != nil {
+		return cfg, err
 	}
-	stmts := funcDecl.Body.List
-
-	// Single-statement form: return <literal | preset call>.
-	if len(stmts) == 1 {
-		retStmt, ok := stmts[0].(*ast.ReturnStmt)
-		if !ok || len(retStmt.Results) != 1 {
-			return cfg, errors.New(suiteConfigBodyErr)
-		}
-		switch result := retStmt.Results[0].(type) {
-		case *ast.CompositeLit:
-			return suiteConfigFromLiteral(result)
-		case *ast.CallExpr:
-			if !isKnownSuitePreset(result, pkg) {
-				return cfg, fmt.Errorf("SuiteConfig: only the gotest presets (DefaultSuiteConfig, IntegrationSuiteConfig) may be called — Parallel and Exclusive are resolved statically and a custom helper would silently drop them")
-			}
-			return cfg, nil
-		default:
-			return cfg, errors.New(suiteConfigBodyErr)
+	// Assignments follow the literal, so a later value wins.
+	set := func(field string, value ast.Expr) {
+		switch field {
+		case "Parallel":
+			cfg.Parallel, _ = boolLiteral(value)
+		case "Exclusive":
+			cfg.Exclusive, _ = boolLiteral(value)
 		}
 	}
-
-	// Compose form: cfg := <literal|preset>; cfg.Field = value ...; return cfg.
-	first, ok := stmts[0].(*ast.AssignStmt)
-	if !ok || first.Tok != token.DEFINE || len(first.Lhs) != 1 || len(first.Rhs) != 1 {
-		return cfg, errors.New(suiteConfigBodyErr)
+	for _, kv := range body.Fields {
+		if key, ok := kv.Key.(*ast.Ident); ok {
+			set(key.Name, kv.Value)
+		}
 	}
-	cfgIdent, ok := first.Lhs[0].(*ast.Ident)
-	if !ok {
-		return cfg, errors.New(suiteConfigBodyErr)
-	}
-	switch rhs := first.Rhs[0].(type) {
-	case *ast.CompositeLit:
-		cfg, err = suiteConfigFromLiteral(rhs)
-		if err != nil {
-			return staticSuiteConfig{}, err
-		}
-	case *ast.CallExpr:
-		if !isKnownSuitePreset(rhs, pkg) {
-			return cfg, fmt.Errorf("SuiteConfig: only the gotest presets (DefaultSuiteConfig, IntegrationSuiteConfig) may be called — Parallel and Exclusive are resolved statically and a custom helper would silently drop them")
-		}
-	default:
-		return cfg, errors.New(suiteConfigBodyErr)
-	}
-
-	last, ok := stmts[len(stmts)-1].(*ast.ReturnStmt)
-	if !ok || len(last.Results) != 1 {
-		return staticSuiteConfig{}, errors.New(suiteConfigBodyErr)
-	}
-	if retIdent, ok := last.Results[0].(*ast.Ident); !ok || retIdent.Name != cfgIdent.Name {
-		return staticSuiteConfig{}, errors.New(suiteConfigBodyErr)
-	}
-
-	for _, stmt := range stmts[1 : len(stmts)-1] {
-		assign, ok := stmt.(*ast.AssignStmt)
-		if !ok || assign.Tok != token.ASSIGN || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
-			return staticSuiteConfig{}, errors.New(suiteConfigBodyErr)
-		}
-		sel, ok := assign.Lhs[0].(*ast.SelectorExpr)
-		if !ok {
-			return staticSuiteConfig{}, errors.New(suiteConfigBodyErr)
-		}
-		if base, ok := sel.X.(*ast.Ident); !ok || base.Name != cfgIdent.Name {
-			return staticSuiteConfig{}, errors.New(suiteConfigBodyErr)
-		}
-		if sel.Sel.Name == "Parallel" || sel.Sel.Name == "Exclusive" {
-			val, ok := assign.Rhs[0].(*ast.Ident)
-			if !ok || (val.Name != "true" && val.Name != "false") {
-				return staticSuiteConfig{}, fmt.Errorf("SuiteConfig: %s must be assigned a boolean literal — the generator resolves it statically", sel.Sel.Name)
-			}
-			if sel.Sel.Name == "Parallel" {
-				cfg.Parallel = val.Name == "true"
-			} else {
-				cfg.Exclusive = val.Name == "true"
-			}
-		}
+	for _, assign := range body.Assigns {
+		set(assign.Lhs[0].(*ast.SelectorExpr).Sel.Name, assign.Rhs[0])
 	}
 	return cfg, nil
 }
@@ -510,7 +451,7 @@ func parseSuiteConfigAST(pkg *packages.Package, funcDecl *ast.FuncDecl) (cfg sta
 // they are known to leave Parallel and Exclusive false, so static detection
 // of both stays sound. The call must resolve to pkg/gotest — a same-named function or method
 // from anywhere else could return Parallel: true and be silently mis-read.
-func isKnownSuitePreset(call *ast.CallExpr, pkg *packages.Package) bool {
+func isKnownSuitePreset(call *ast.CallExpr, info *types.Info) bool {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
 		return false
@@ -518,39 +459,11 @@ func isKnownSuitePreset(call *ast.CallExpr, pkg *packages.Package) bool {
 	if sel.Sel.Name != "DefaultSuiteConfig" && sel.Sel.Name != "IntegrationSuiteConfig" {
 		return false
 	}
-	obj := pkg.TypesInfo.ObjectOf(sel.Sel)
+	obj := info.ObjectOf(sel.Sel)
 	if obj == nil || obj.Pkg() == nil {
 		return false
 	}
 	return obj.Pkg().Path() == about.Repo+"/pkg/gotest"
-}
-
-func suiteConfigFromLiteral(lit *ast.CompositeLit) (staticSuiteConfig, error) {
-	var cfg staticSuiteConfig
-	for _, elt := range lit.Elts {
-		kv, ok := elt.(*ast.KeyValueExpr)
-		if !ok {
-			// A positional literal sets fields the scan below cannot see, so a
-			// Parallel or Exclusive value would silently read as false.
-			return staticSuiteConfig{}, fmt.Errorf("SuiteConfig literal must use keyed fields (Field: value) — Parallel and Exclusive are resolved statically from their keys")
-		}
-		key, ok := kv.Key.(*ast.Ident)
-		if !ok {
-			continue
-		}
-		if key.Name == "Parallel" || key.Name == "Exclusive" {
-			ident, ok := kv.Value.(*ast.Ident)
-			if !ok || (ident.Name != "true" && ident.Name != "false") {
-				return staticSuiteConfig{}, fmt.Errorf("SuiteConfig: %s must be assigned a boolean literal — the generator resolves it statically", key.Name)
-			}
-			if key.Name == "Parallel" {
-				cfg.Parallel = ident.Name == "true"
-			} else {
-				cfg.Exclusive = ident.Name == "true"
-			}
-		}
-	}
-	return cfg, nil
 }
 
 func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, token.Pos, error) {

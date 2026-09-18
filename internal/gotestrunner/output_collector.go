@@ -27,7 +27,8 @@ type OutputCollector struct {
 	flushed  int
 	worst    int
 	captured bytes.Buffer
-	observer func(pkg string, r SuiteResult)
+	// verdicts indexes the JSON stream for the census as it is written.
+	verdicts verdictIndex
 
 	// StdlibTestsByPkg lets Finalize distinguish packages that truly have no
 	// test files from packages whose tests gotest does not run (stdlib tests).
@@ -43,13 +44,6 @@ type pkgState struct {
 }
 
 type OutputOption func(*OutputCollector)
-
-// WithSuiteObserver reports every recorded suite result, raw, to fn. The
-// census reads the JSON stream this way in -json mode, where nothing else
-// keeps the events once they are written out.
-func WithSuiteObserver(fn func(pkg string, r SuiteResult)) OutputOption {
-	return func(c *OutputCollector) { c.observer = fn }
-}
 
 func WithWriters(stdout, stderr io.Writer) OutputOption {
 	return func(c *OutputCollector) {
@@ -113,15 +107,17 @@ func (c *OutputCollector) Register(pkg string, count int) {
 func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //nolint:gocritic // hugeParam: stable API
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	// A signal-terminated binary reports -1, which the worst-code comparison
-	// below never registers — a suite OOM-killed mid-run exited the whole run
-	// green in text mode. Failure is any nonzero status: normalize the signal
-	// case to a positive code at this choke point so every downstream
-	// comparison agrees, and say what happened, because the binary's own
-	// output ends mid-stream with no verdict of its own.
-	if r.ExitCode < 0 {
-		r.ExitCode = 1
-		r.Stderr = append(r.Stderr, []byte("gotest: suite binary terminated by signal\n")...)
+	// A binary stopped from outside reports a status it never chose: -1 for a
+	// signal on Unix, the raw termination status on Windows (0xC000013A for the
+	// console interrupt that a --timeout sends). Neither is a verdict, and
+	// neither survives the worst-code comparison below intact — -1 slips under
+	// it and a Windows status towers over it, becoming the run's own exit code.
+	// Normalize both to a failure at this choke point so every downstream
+	// comparison agrees, and say what happened, because the binary's own output
+	// ends mid-stream with no verdict of its own.
+	if code, how := exitStatusVerdict(r.ExitCode); how != "" {
+		r.ExitCode = code
+		r.Stderr = append(r.Stderr, fmt.Appendf(nil, "gotest: suite binary terminated %s\n", how)...)
 	}
 	if r.ExitCode > c.worst {
 		c.worst = r.ExitCode
@@ -129,9 +125,6 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //n
 	s := c.pkgs[pkg]
 	s.results[idx] = r
 	s.completed++
-	if c.observer != nil {
-		c.observer(pkg, r)
-	}
 
 	switch c.mode {
 	case RunBatchText:
@@ -304,7 +297,13 @@ func (c *OutputCollector) flushTextPkg(s *pkgState, pkg string) {
 	}
 }
 
+// jsonWriter is where JSON events are written; the census indexes them on
+// the way.
 func (c *OutputCollector) jsonWriter() io.Writer {
+	return io.MultiWriter(c.jsonTarget(), &c.verdicts)
+}
+
+func (c *OutputCollector) jsonTarget() io.Writer {
 	if c.mode == RunCaptureJSON {
 		return &c.captured
 	}

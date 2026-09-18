@@ -10,7 +10,9 @@ import (
 type FuzzTargetSelectionTestSuite struct{}
 
 func (s *FuzzTargetSelectionTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func fuzzTargetsFixture() []gotestrunner.FuzzTarget {

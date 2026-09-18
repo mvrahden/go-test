@@ -85,8 +85,9 @@ type PipelineConfig struct {
 	Bench           bool
 	BenchesByPkg    map[string][]string
 	FuzzFuncsByPkg  map[string]map[string][]string
-	// OnSuiteResult, when set, receives every suite result as it is recorded.
-	OnSuiteResult func(pkg string, r SuiteResult)
+	// GlobalTimeout names the deadline in the failure of a run that outlives
+	// it; the deadline itself arrives on ctx.
+	GlobalTimeout time.Duration
 }
 
 type PipelineResult struct {
@@ -101,16 +102,32 @@ func applyTeardownFailure(result *PipelineResult, err error) {
 	if err == nil {
 		return
 	}
-	fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
+	failRun(result, "shared fixtures", err.Error())
+}
+
+// applyDeadlineFailure fails a run whose deadline expired before its last
+// verdict: the suites it cut short never reported one.
+func applyDeadlineFailure(result *PipelineResult, cfg PipelineConfig, dispatchErr error) { //nolint:gocritic // hugeParam: stable API
+	if !errors.Is(dispatchErr, context.DeadlineExceeded) {
+		return
+	}
+	msg := "run deadline exceeded"
+	if cfg.GlobalTimeout > 0 {
+		msg = fmt.Sprintf("global --timeout exceeded after %v", cfg.GlobalTimeout)
+	}
+	failRun(result, "global --timeout", msg)
+}
+
+// failRun reports msg and fails a run that would otherwise pass. The captured
+// stream is what every renderer derives from, so the failure is booked into it
+// as a failed synthetic package instead of living on the exit code alone.
+func failRun(result *PipelineResult, pkg, msg string) {
+	fmt.Fprintf(os.Stderr, "FAIL: %s\n", msg)
 	if result.ExitCode == 0 {
 		result.ExitCode = 1
 	}
-	// The captured stream is the single source every renderer derives from —
-	// spec, summary, markdown artifacts, saved --input replays. A failure that
-	// only mutated the exit code left all of them saying "all passed" beside
-	// exit 1, so it goes into the stream itself as a failed synthetic package.
 	if result.CapturedJSON != nil {
-		result.CapturedJSON = appendRunFailureEvents(result.CapturedJSON, "shared fixtures", err.Error())
+		result.CapturedJSON = appendRunFailureEvents(result.CapturedJSON, pkg, msg)
 	}
 }
 
@@ -357,10 +374,10 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		defer func() { applyTeardownFailure(&result, errors.Join(barrierErr, setupProc.Teardown())) }()
 	}
 
-	select {
-	case <-ctx.Done():
-		return PipelineResult{ExitCode: 130}, nil
-	default:
+	if prepareErr := ctx.Err(); prepareErr != nil {
+		result = PipelineResult{ExitCode: exitCodeAfterDispatch(0, prepareErr)}
+		applyDeadlineFailure(&result, cfg, prepareErr)
+		return result, nil
 	}
 
 	extraEnv := buildExtraEnv(cfg, setupProc)
@@ -396,7 +413,7 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		targets = BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.ExclusiveSuitesByPkg, runFlags, pf.UserRunFilter)
 	}
 
-	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose, collectorOptions(cfg)...)
+	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
 	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
 	bookBuildFailures(collector, overlay.BrokenPackages, compileFailures)
@@ -489,12 +506,24 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 
 		RunSuites(ctx, targets, extraEnv, maxParallel, collector, barrier)
 	}
+	dispatchErr := ctx.Err()
 	collector.Finalize(overlay.NoSuitePackages)
 
-	return PipelineResult{
-		ExitCode:     collector.WorstExitCode(),
-		CapturedJSON: collector.CapturedJSON(),
-	}, nil
+	exitCode := collector.takeCensus(cfg, overlay.Declared, exitCodeAfterDispatch(collector.WorstExitCode(), dispatchErr), dispatchErr)
+	result = PipelineResult{ExitCode: exitCode, CapturedJSON: collector.CapturedJSON()}
+	applyDeadlineFailure(&result, cfg, dispatchErr)
+	return result, nil
+}
+
+// exitCodeAfterDispatch folds the context error seen when the last verdict
+// landed into the suites' worst exit code: an interrupt is 130 whatever the
+// suites it cut short reported. A deadline keeps the verdict for
+// applyDeadlineFailure to fail.
+func exitCodeAfterDispatch(worst int, dispatchErr error) int {
+	if errors.Is(dispatchErr, context.Canceled) {
+		return 130
+	}
+	return worst
 }
 
 func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (PipelineResult, error) { //nolint:gocritic // hugeParam: stable API
@@ -584,7 +613,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	buildFailed := len(overlay.BrokenPackages) > 0
 	var allTargets []SuiteTarget
 
-	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose, collectorOptions(cfg)...)
+	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
 	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
 	// Broken packages flush ahead of the suite packages: their verdicts are
@@ -779,6 +808,9 @@ loop:
 		r := RunSingleSuite(streamCtx, d.t, env, collector.UsesTest2JSON())
 		collector.RecordResult(d.t.Package, d.idx, r)
 	}
+	// The last verdict is in; what the context says from here on is not the
+	// run's business (see exitCodeAfterDispatch).
+	dispatchErr := ctx.Err()
 
 	fixtureWg.Wait()
 
@@ -801,39 +833,31 @@ loop:
 	// became runnable and none of them reports through Finalize. A booked
 	// build failure makes the run a failure regardless of target count.
 	if !anyTargets && len(overlay.NoSuitePackages) == 0 && !buildFailed {
-		if cfg.OutputMode == RunBatchText {
+		// A run cut short while compiling reaches here too; it is not empty.
+		if cfg.OutputMode == RunBatchText && dispatchErr == nil {
 			fmt.Fprintln(os.Stderr, "no test suites to run")
 		}
-		result := PipelineResult{}
-		if sharedSetupFailed.Load() {
+		result := PipelineResult{ExitCode: exitCodeAfterDispatch(0, dispatchErr)}
+		if sharedSetupFailed.Load() && result.ExitCode == 0 {
 			result.ExitCode = 1
 		}
+		applyDeadlineFailure(&result, cfg, dispatchErr)
 		applyTeardownFailure(&result, teardownErr)
 		return result, nil
 	}
 
 	collector.Finalize(overlay.NoSuitePackages)
 
-	exitCode := collector.WorstExitCode()
-	if ctx.Err() != nil && exitCode == 0 {
-		exitCode = 130
-	}
-
+	exitCode := exitCodeAfterDispatch(collector.WorstExitCode(), dispatchErr)
 	if sharedSetupFailed.Load() && exitCode == 0 {
 		exitCode = 1
 	}
+	exitCode = collector.takeCensus(cfg, overlay.Declared, exitCode, dispatchErr)
 	result := PipelineResult{
 		ExitCode:     exitCode,
 		CapturedJSON: collector.CapturedJSON(),
 	}
+	applyDeadlineFailure(&result, cfg, dispatchErr)
 	applyTeardownFailure(&result, teardownErr)
 	return result, nil
-}
-
-// collectorOptions turns the optional pipeline hooks into collector options.
-func collectorOptions(cfg PipelineConfig) []OutputOption { //nolint:gocritic // hugeParam: stable API
-	if cfg.OnSuiteResult == nil {
-		return nil
-	}
-	return []OutputOption{WithSuiteObserver(cfg.OnSuiteResult)}
 }

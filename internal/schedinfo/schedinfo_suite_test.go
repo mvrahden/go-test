@@ -12,7 +12,9 @@ import (
 type SchedinfoTestSuite struct{}
 
 func (s *SchedinfoTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *SchedinfoTestSuite) TestHistogramPercentiles(t *gotest.T) {

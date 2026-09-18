@@ -240,6 +240,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench
 		Bench:           bench,
 		BenchesByPkg:    overlay.BenchesByPkg,
 		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
+		GlobalTimeout:   cfg.GlobalTimeout,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -250,13 +251,6 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
 		return 2, benchNs
-	}
-
-	if cfg.GlobalTimeout > 0 && runCtx.Err() == context.DeadlineExceeded {
-		fmt.Fprintf(os.Stderr, "FAIL: global --timeout exceeded after %v\n", cfg.GlobalTimeout)
-		if result.ExitCode == 0 {
-			return 1, benchNs
-		}
 	}
 	return result.ExitCode, benchNs
 }

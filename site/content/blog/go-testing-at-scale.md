@@ -233,7 +233,9 @@ type UserServiceCtx struct {
 }
 
 func (s *UserServiceTestSuite) SuiteConfig() gotest.SuiteConfig {
-    return gotest.SuiteConfig{Parallel: true}
+    cfg := gotest.DefaultSuiteConfig()
+    cfg.Parallel = true
+    return cfg
 }
 
 func (s *UserServiceTestSuite) BeforeEach(t *gotest.T) *UserServiceCtx {

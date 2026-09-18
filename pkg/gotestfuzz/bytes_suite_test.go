@@ -12,6 +12,12 @@ import (
 // decoder that can reject its input wastes a coverage-guided execution.
 type FuzzBytesTestSuite struct{}
 
+func (s *FuzzBytesTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *FuzzBytesTestSuite) TestScalarRoundTrip(t *gotest.T) {
 	t.It("round-trips every fixed-width scalar in declaration order", func(it *gotest.T) {
 		w := gotestfuzz.NewWriter()

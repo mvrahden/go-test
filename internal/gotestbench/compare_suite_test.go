@@ -10,7 +10,9 @@ import (
 type CompareTestSuite struct{}
 
 func (s *CompareTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func mkResult(pkg, suite, name string, ns []float64) gotestbench.Result {

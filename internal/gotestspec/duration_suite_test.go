@@ -15,6 +15,12 @@ import (
 // as soon as anything runs in parallel.
 type DurationTestSuite struct{}
 
+func (s *DurationTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 var base = time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC)
 
 // at builds a node bracketed from offset to offset+span, measuring measured.

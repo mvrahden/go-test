@@ -1,6 +1,7 @@
 package gotestrunner
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"os"
@@ -32,10 +33,9 @@ var ExportFilterPackageLevelEvents = filterPackageLevelEvents
 var ExportIsPackageSummaryLine = protocol.IsPackageSummaryLine
 var ResolveBenchParallelismForTest = resolveMaxParallel
 
-// ExportProcessPID and ExportProcessDone let the teardown tests observe the
-// shared fixture subprocess directly: whether it is still alive, and when it is
-// finally reaped.
-func ExportProcessPID(p *SharedFixtureProcess) int { return p.cmd.Process.Pid }
+// ExportKillTree and ExportProcessDone let the teardown tests act on the shared
+// fixture subprocess directly: kill it outright, and see when it is reaped.
+func ExportKillTree(p *SharedFixtureProcess) error { return p.tree.Kill() }
 
 func ExportProcessDone(p *SharedFixtureProcess) <-chan struct{} { return p.done }
 
@@ -70,8 +70,6 @@ func ExportWriteOverlayCached(results gotestgen.GenerateResults, noCache bool) (
 	return dir, err
 }
 
-var SetBuildProcessGroup = setBuildProcessGroup
-
 func ExportNewSharedFixtureProcess(sharedDir string, state map[string]json.RawMessage) *SharedFixtureProcess {
 	return &SharedFixtureProcess{
 		sharedDir: sharedDir,
@@ -95,3 +93,35 @@ func ExportLineWriterProgress(w io.WriteCloser) FuzzProgress { return w.(*lineWr
 
 var ExportSnapshotCrashers = snapshotCrashers
 var ExportNewCrasherNames = newCrasherNames
+var ExportExitCodeAfterDispatch = exitCodeAfterDispatch
+
+// ExportApplyDeadlineFailure applies a run's deadline failure under the given
+// --timeout.
+func ExportApplyDeadlineFailure(result *PipelineResult, globalTimeout time.Duration, dispatchErr error) {
+	applyDeadlineFailure(result, PipelineConfig{GlobalTimeout: globalTimeout}, dispatchErr)
+}
+
+// ExportExecuted indexes the stream written in chunks and lists the test
+// methods, fuzz wrappers and benchmarks it settles.
+func ExportExecuted(chunks ...string) (tests, fuzz, benchmarks []CensusCase) {
+	var x verdictIndex
+	for _, c := range chunks {
+		_, _ = io.WriteString(&x, c)
+	}
+	return x.executedTests(), x.executedFuzz(), x.benchOrder
+}
+
+// ExportCensus writes stream through a collector's JSON writer, takes the
+// census over it and returns the exit code, stderr and the booked events.
+func ExportCensus(mode RunMode, stream string, declared DeclaredUnits, goTestArgs []string, bench bool, code int, dispatchErr error) (exit int, stderr, booked string) { //nolint:gocritic // hugeParam: test hook
+	var stdout, errw bytes.Buffer
+	c := NewOutputCollector(mode, false, WithWriters(&stdout, &errw))
+	_, _ = io.WriteString(c.jsonWriter(), stream)
+	target := &stdout
+	if mode == RunCaptureJSON {
+		target = &c.captured
+	}
+	before := target.Len()
+	exit = c.takeCensus(PipelineConfig{GoTestArgs: goTestArgs, Bench: bench}, declared, code, dispatchErr)
+	return exit, errw.String(), target.String()[before:]
+}

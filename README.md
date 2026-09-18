@@ -404,7 +404,9 @@ type MethodParallelCtx struct {
 type MyTestSuite struct{}
 
 func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
-    return gotest.SuiteConfig{Parallel: true}
+    cfg := gotest.DefaultSuiteConfig()
+    cfg.Parallel = true
+    return cfg
 }
 
 func (s *MyTestSuite) BeforeEach(t *gotest.T) *MethodParallelCtx {
@@ -1017,10 +1019,10 @@ Catch common mistakes in test suites with static analysis:
 gotest lint ./...
 ```
 
-Twenty-seven rules in three tiers:
+Twenty-eight rules in three tiers:
 
 - **Integrity** — violations can make test outcomes unreliable or leak resources: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, reads of shared fixtures a suite never declared (window scheduling only starts what is declared), and generated files checked into version control.
-- **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, unnecessary `t.T()` escapes, and `When("when …")`/`It("it …")` descriptions that spell the word the spec already supplies. `-fix` applies the safe rewrites.
+- **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, unnecessary `t.T()` escapes, `When("when …")`/`It("it …")` descriptions that spell the word the spec already supplies, and `SuiteConfig` literals that leave a timeout unset (no deadline, not the default). `-fix` applies the safe rewrites.
 - **Migration** — adoption aids for codebases moving to gotest: stdlib test functions and testify imports; coexistence is legitimate.
 
 Suppress per line with `//nolint:<rule>` (same line or the comment block directly above); expressiveness and migration rules can also be disabled project-wide via `.gotest.yml` (`lint.skip`). See the [design spec](docs/design/spec.md#linter) for the full rule table.

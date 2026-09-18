@@ -16,6 +16,12 @@ import (
 // corpus entries depend on a field layout.
 type FuzzArgsTestSuite struct{}
 
+func (s *FuzzArgsTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func named(name string, under types.Type) *types.Named {
 	return types.NewNamed(types.NewTypeName(token.NoPos, nil, name, nil), under, nil)
 }

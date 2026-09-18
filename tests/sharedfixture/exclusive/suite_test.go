@@ -14,7 +14,9 @@ type ExclusiveDeltaTestSuite struct {
 }
 
 func (s *ExclusiveDeltaTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Exclusive: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Exclusive = true
+	return cfg
 }
 
 func (s *ExclusiveDeltaTestSuite) TestDeltaAvailable(t *gotest.T) {

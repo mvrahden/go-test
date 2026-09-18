@@ -3,7 +3,7 @@
 The canary checks gotest's verdicts from outside gotest. Every other test in
 this repository reports its result through gotest's own runner, so a bug in
 that runner could turn a failure into a pass without any test noticing. The
-canary closes that gap: it builds the `gotest` binary, runs it over eight
+canary closes that gap: it builds the `gotest` binary, runs it over eleven
 small fixture packages written to fail in specific ways, and compares what
 the binary reports with a checked-in expectation. It checks with plain Go
 only, so nothing under test takes part in the verdict.
@@ -15,11 +15,14 @@ Each directory under `testdata/` is one package with one suite:
 | Fixture | Behavior it pins |
 |---|---|
 | `passing` | a green suite exits 0 and every method and behavior gets `pass` |
-| `failing` | one failing assertion per assertion family, each reported as `fail` |
+| `failing` | one failing call per assertion function, all 34, each reported as `fail` |
 | `failnow` | a failed assertion halts the method; the statement after it never runs |
 | `aftereach` | `AfterEach` runs even when the test failed |
 | `lifecycle` | `BeforeAll`, the methods and `AfterAll` run in that order |
-| `benching` | a capturing bench run reports a result for every declared benchmark |
+| `benching` | a capturing bench run reports a result for every declared benchmark, read from `bench --json` |
+| `benchfailing` | a benchmark that fails, halts at `FailNow` or skips reports no result and turns the run red |
+| `fuzzing` | seeds replay as subtests of their wrapper; a failing seed fails the wrapper |
+| `asynchronous` | an async method passes when `done()` is called from another goroutine and fails at the deadline when it never is |
 | `broken` | a package that does not compile exits 2 |
 | `panicking` | a panic fails its method and the run is red |
 

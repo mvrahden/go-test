@@ -15,7 +15,6 @@ var (
 	ExportIsExternalPackage = isExternalPackage
 	ExportSplitTestName     = splitTestName
 	ExportSnapshotReadonly  = snapshotReadonly
-	ExportReadAndRestore    = readAndRestore
 	ExportPkgCache          = &pkgCache
 )
 

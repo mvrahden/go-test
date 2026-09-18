@@ -14,7 +14,9 @@ import (
 type SharedFixtureTestSuite struct{}
 
 func (s *SharedFixtureTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {

@@ -22,7 +22,9 @@ func terminationSignals() []os.Signal {
 type ManagedProcessTestSuite struct{}
 
 func (s *ManagedProcessTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *ManagedProcessTestSuite) TestWaitWithGrace_ProcessExitsNormally(t *gotest.T) {

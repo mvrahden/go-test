@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
+	"github.com/mvrahden/go-test/internal/proctree"
 )
 
 // sharedTeardownFailedExit is the status the generated setup program exits with
@@ -35,6 +36,7 @@ type fixtureStateEntry struct {
 // then blocks until SIGTERM/SIGINT triggers teardown.
 type SharedFixtureProcess struct {
 	cmd             *exec.Cmd
+	tree            *proctree.Tree
 	stateFile       string
 	sharedDir       string
 	done            chan struct{}
@@ -136,7 +138,12 @@ func (p *SharedFixtureProcess) shutdown() {
 	if p.cmd == nil || p.cmd.Process == nil {
 		return
 	}
-	_ = TerminateProcessGroup(p.cmd.Process.Pid)
+	select {
+	case <-p.done:
+		return
+	default:
+	}
+	_ = p.tree.Interrupt()
 	p.awaitExit(p.teardownBudget())
 }
 
@@ -149,7 +156,7 @@ func (p *SharedFixtureProcess) awaitExit(budget time.Duration) (forceKilled bool
 		return false
 	case <-time.After(budget):
 		fmt.Fprintf(os.Stderr, "WARN: shared fixture process did not exit within %v, forcing termination\n", budget)
-		_ = ForceKillProcessGroup(p.cmd.Process.Pid)
+		_ = p.tree.Kill()
 		<-p.done
 		return true
 	}
@@ -289,9 +296,9 @@ func (p *SharedFixtureProcess) Teardown() error {
 	}
 	budget := p.teardownBudget()
 
-	// Noted before signalling only to sharpen the message below: an exit that
-	// predates the shutdown request happened while tests may still have been
-	// running, which is a different story than dying mid-teardown.
+	// Noted before signalling: a process already gone is not signalled again,
+	// and an exit that predates the shutdown request happened while tests may
+	// still have been running, a different story than dying mid-teardown.
 	diedEarly := false
 	select {
 	case <-p.done:
@@ -299,7 +306,9 @@ func (p *SharedFixtureProcess) Teardown() error {
 	default:
 	}
 
-	_ = TerminateProcessGroup(p.cmd.Process.Pid)
+	if !diedEarly {
+		_ = p.tree.Interrupt()
+	}
 	forceKilled := p.awaitExit(budget)
 	if p.sharedDir != "" {
 		os.RemoveAll(p.sharedDir)
@@ -380,12 +389,13 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	cmd := exec.CommandContext(ctx, setupBin)
 	cmd.Stderr = os.Stderr
 
-	// SetProcessGroup's WaitDelay is the backstop for a process that ignores
-	// SIGTERM, and it has to stay looser than any teardown budget. Tighten it
+	// WaitDelay is the backstop for a process that ignores the shutdown
+	// request, and it has to stay looser than any teardown budget. Tighten it
 	// below one and it becomes the budget: a fixture given minutes to stop its
 	// containers is killed part-way through instead, and because a signalled
 	// process reports no meaningful exit status, the run still says ok.
-	SetProcessGroup(cmd)
+	tree := proctree.New(cmd)
+	cmd.WaitDelay = GracefulShutdownDelay
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -396,7 +406,7 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		return nil, err
 	}
 
-	if err := cmd.Start(); err != nil {
+	if err := tree.Start(); err != nil {
 		return nil, fmt.Errorf("start shared fixture process: %w", err)
 	}
 
@@ -413,6 +423,7 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 
 	proc := &SharedFixtureProcess{
 		cmd:             cmd,
+		tree:            tree,
 		sharedDir:       sharedDir,
 		done:            waitDone,
 		teardownTimeout: setupTimeout,
@@ -426,6 +437,7 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	go func() {
 		defer func() {
 			proc.waitErr = cmd.Wait()
+			tree.Release()
 			close(waitDone)
 		}()
 		closedReady := make(map[string]bool, len(ready))

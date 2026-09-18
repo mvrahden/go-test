@@ -12,6 +12,12 @@ import (
 // fixtures in testdata_e2e/.
 type GeneratorTestSuite struct{}
 
+func (s *GeneratorTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *GeneratorTestSuite) TestStdlibPackageReturnsEmpty(t *gotest.T) {
 	t.When("loading a stdlib package", func(w *gotest.T) {
 		w.It("returns empty results", func(it *gotest.T) {

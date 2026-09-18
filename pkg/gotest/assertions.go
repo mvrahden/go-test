@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math"
-	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -36,146 +34,6 @@ func failf(t testingT, format string, args ...any) {
 }
 
 // --- private helpers ---
-
-func didPanic(f func()) (recovered any, panicked bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			recovered = r
-			panicked = true
-		}
-	}()
-	f()
-	return nil, false
-}
-
-func includesElement(s, element any) (found, valid bool) {
-	if s == nil {
-		return false, true
-	}
-	if str, ok := s.(string); ok {
-		sub, ok := element.(string)
-		if !ok {
-			return false, true
-		}
-		return strings.Contains(str, sub), true
-	}
-	rv := reflect.ValueOf(s)
-	switch rv.Kind() {
-	case reflect.Slice, reflect.Array:
-		for i := 0; i < rv.Len(); i++ {
-			if reflect.DeepEqual(rv.Index(i).Interface(), element) {
-				return true, true
-			}
-		}
-		return false, true
-	case reflect.Map:
-		mapKey := reflect.ValueOf(element)
-		if !mapKey.IsValid() || !mapKey.Type().AssignableTo(rv.Type().Key()) {
-			return false, true
-		}
-		return rv.MapIndex(mapKey).IsValid(), true
-	}
-	return false, false
-}
-
-func isNil(object any) bool {
-	if object == nil {
-		return true
-	}
-	rv := reflect.ValueOf(object)
-	switch rv.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface,
-		reflect.Map, reflect.Ptr, reflect.Slice, reflect.UnsafePointer:
-		return rv.IsNil()
-	}
-	return false
-}
-
-func isNilable(object any) bool {
-	if object == nil {
-		return true
-	}
-	rv := reflect.ValueOf(object)
-	switch rv.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface,
-		reflect.Map, reflect.Ptr, reflect.Slice, reflect.UnsafePointer:
-		return true
-	}
-	return false
-}
-
-func isEmptyable(object any) bool {
-	if object == nil {
-		return true
-	}
-	rv := reflect.ValueOf(object)
-	switch rv.Kind() {
-	case reflect.Slice, reflect.Map, reflect.Array,
-		reflect.Chan, reflect.String, reflect.Ptr:
-		return true
-	}
-	return false
-}
-
-// isEmpty reports whether a value is considered empty: nil, zero-length
-// (slices, maps, arrays, channels, strings), or a pointer to an empty value.
-func isEmpty(object any) bool {
-	if object == nil {
-		return true
-	}
-	rv := reflect.ValueOf(object)
-	switch rv.Kind() {
-	case reflect.Slice, reflect.Map, reflect.Array, reflect.Chan, reflect.String:
-		return rv.Len() == 0
-	case reflect.Ptr:
-		if rv.IsNil() {
-			return true
-		}
-		return isEmpty(rv.Elem().Interface())
-	}
-	return false
-}
-
-func readAndRestore(r io.Reader) ([]byte, error) {
-	if seeker, ok := r.(io.Seeker); ok {
-		pos, err := seeker.Seek(0, io.SeekCurrent)
-		if err == nil {
-			defer func() { _, _ = seeker.Seek(pos, io.SeekStart) }()
-		}
-	}
-	return io.ReadAll(r)
-}
-
-// normalizeJSON converts a value to a JSON-comparable form.
-// Accepts string, []byte, json.RawMessage, io.Reader, or any JSON-marshalable value.
-func normalizeJSON(v any) (any, error) {
-	var raw []byte
-	switch val := v.(type) {
-	case string:
-		raw = []byte(val)
-	case []byte:
-		raw = val
-	case json.RawMessage:
-		raw = []byte(val)
-	case io.Reader:
-		b, err := readAndRestore(val)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read value: %w", err)
-		}
-		raw = b
-	default:
-		var err error
-		raw, err = json.Marshal(val)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal value: %w", err)
-		}
-	}
-	var out any
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
-	}
-	return out, nil
-}
 
 type numeric interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 |
@@ -215,7 +73,7 @@ func Consistently(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
 
 // Contains asserts that s contains the given element (substring for strings, element for slices/arrays, key for maps).
 func Contains(t testingT, s, contains any, msgAndArgs ...any) {
-	found, valid := includesElement(s, contains)
+	found, valid := assert.IncludesElement(s, contains)
 	if !valid {
 		fail(t, fmt.Sprintf("Contains failed:\n  object of type %T is not a string, slice, array, or map", s), msgAndArgs)
 		return
@@ -248,11 +106,11 @@ func ElementsMatch[V comparable](t testingT, listA, listB []V, msgAndArgs ...any
 // Applies to slices, maps, arrays, channels, strings, and pointers. Fails with a type
 // guard error for non-emptyable types (e.g. int, bool, func); use Nil or Zero instead.
 func Empty(t testingT, object any, msgAndArgs ...any) {
-	if !isEmptyable(object) {
+	if !assert.IsEmptyable(object) {
 		fail(t, fmt.Sprintf("Empty: type %T cannot be empty; for nil checks, use Nil; for zero-value checks, use Zero", object), msgAndArgs)
 		return
 	}
-	if !isEmpty(object) {
+	if !assert.IsEmpty(object) {
 		fail(t, fmt.Sprintf("Empty failed:\n  object is not empty: %#v", object), msgAndArgs)
 	}
 }
@@ -371,17 +229,17 @@ func InDelta[V numeric](t testingT, expected, actual V, delta float64, msgAndArg
 // JSONEq asserts that expected and actual represent the same JSON structure, ignoring key order.
 // Accepts string, []byte, json.RawMessage, io.Reader, or any JSON-marshalable value.
 func JSONEq(t testingT, expected, actual any, msgAndArgs ...any) {
-	expNorm, err := normalizeJSON(expected)
+	expNorm, err := assert.NormalizeJSON(expected)
 	if err != nil {
 		fail(t, fmt.Sprintf("JSONEq failed:\n  could not normalize expected: %v", err), msgAndArgs)
 		return
 	}
-	actNorm, err := normalizeJSON(actual)
+	actNorm, err := assert.NormalizeJSON(actual)
 	if err != nil {
 		fail(t, fmt.Sprintf("JSONEq failed:\n  could not normalize actual: %v", err), msgAndArgs)
 		return
 	}
-	if !reflect.DeepEqual(expNorm, actNorm) {
+	if !assert.JSONEqual(expNorm, actNorm) {
 		expJSON, _ := json.Marshal(expNorm)
 		actJSON, _ := json.Marshal(actNorm)
 		fail(t, fmt.Sprintf("JSONEq failed:\n  expected: %s\n  actual:   %s", expJSON, actJSON), msgAndArgs)
@@ -394,14 +252,13 @@ func Len(t testingT, object any, length int, msgAndArgs ...any) {
 		fail(t, fmt.Sprintf("Len failed:\n  object is nil, expected length %d", length), msgAndArgs)
 		return
 	}
-	rv := reflect.ValueOf(object)
-	switch rv.Kind() {
-	case reflect.Slice, reflect.Array, reflect.Map, reflect.Chan, reflect.String:
-		if rv.Len() != length {
-			fail(t, fmt.Sprintf("Len failed:\n  expected length %d\n  actual length %d", length, rv.Len()), msgAndArgs)
-		}
-	default:
+	n, ok := assert.Length(object)
+	if !ok {
 		fail(t, fmt.Sprintf("Len failed:\n  object of type %T does not have a length", object), msgAndArgs)
+		return
+	}
+	if n != length {
+		fail(t, fmt.Sprintf("Len failed:\n  expected length %d\n  actual length %d", length, n), msgAndArgs)
 	}
 }
 
@@ -428,7 +285,7 @@ func NoError(t testingT, err error, msgAndArgs ...any) {
 
 // NotContains asserts that s does NOT contain the given element.
 func NotContains(t testingT, s, contains any, msgAndArgs ...any) {
-	found, valid := includesElement(s, contains)
+	found, valid := assert.IncludesElement(s, contains)
 	if !valid {
 		fail(t, fmt.Sprintf("NotContains failed:\n  object of type %T is not a string, slice, array, or map", s), msgAndArgs)
 		return
@@ -441,11 +298,11 @@ func NotContains(t testingT, s, contains any, msgAndArgs ...any) {
 // Nil asserts that object is nil. Intended for non-comparable nilable types (slices, maps, funcs).
 // Fails with a type guard error for non-nilable types; for comparable nilables use Zero.
 func Nil(t testingT, object any, msgAndArgs ...any) {
-	if !isNilable(object) {
+	if !assert.IsNilable(object) {
 		fail(t, fmt.Sprintf("Nil: type %T is not nilable; for zero-value checks, use Zero", object), msgAndArgs)
 		return
 	}
-	if !isNil(object) {
+	if !assert.IsNil(object) {
 		fail(t, fmt.Sprintf("Nil failed:\n  expected nil, got: %#v", object), msgAndArgs)
 	}
 }
@@ -454,11 +311,11 @@ func Nil(t testingT, object any, msgAndArgs ...any) {
 // Applies to slices, maps, arrays, channels, strings, and pointers. Fails with a type
 // guard error for non-emptyable types (e.g. int, bool, func); use NotNil or NotZero instead.
 func NotEmpty(t testingT, object any, msgAndArgs ...any) {
-	if !isEmptyable(object) {
+	if !assert.IsEmptyable(object) {
 		fail(t, fmt.Sprintf("NotEmpty: type %T cannot be empty; for nil checks, use NotNil; for zero-value checks, use NotZero", object), msgAndArgs)
 		return
 	}
-	if isEmpty(object) {
+	if assert.IsEmpty(object) {
 		fail(t, fmt.Sprintf("NotEmpty failed:\n  object is empty: %#v", object), msgAndArgs)
 	}
 }
@@ -466,11 +323,11 @@ func NotEmpty(t testingT, object any, msgAndArgs ...any) {
 // NotNil asserts that object is not nil. Intended for non-comparable nilable types (slices, maps, funcs).
 // Fails with a type guard error for non-nilable types; for comparable nilables use NotZero.
 func NotNil(t testingT, object any, msgAndArgs ...any) {
-	if !isNilable(object) {
+	if !assert.IsNilable(object) {
 		fail(t, fmt.Sprintf("NotNil: type %T is not nilable; for zero-value checks, use NotZero", object), msgAndArgs)
 		return
 	}
-	if isNil(object) {
+	if assert.IsNil(object) {
 		fail(t, "NotNil failed:\n  expected a non-nil value", msgAndArgs)
 	}
 }
@@ -492,7 +349,7 @@ func NotZero[V comparable](t testingT, value V, msgAndArgs ...any) {
 
 // Panics asserts that f panics and returns the recovered value.
 func Panics(t testingT, f func(), msgAndArgs ...any) any {
-	recovered, didPanic := didPanic(f)
+	recovered, didPanic := assert.DidPanic(f)
 	if !didPanic {
 		fail(t, "Panics failed:\n  expected the function to panic but it did not", msgAndArgs)
 	}

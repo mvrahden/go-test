@@ -197,7 +197,9 @@ This prevents a specific failure mode: a developer adds a new `MatchSnapshot` ca
 
 ```go
 func (s *RenderTestSuite) SuiteConfig() gotest.SuiteConfig {
-    return gotest.SuiteConfig{Parallel: true}
+    cfg := gotest.DefaultSuiteConfig()
+    cfg.Parallel = true
+    return cfg
 }
 
 func (s *RenderTestSuite) TestAdminProfile(t *gotest.T) {

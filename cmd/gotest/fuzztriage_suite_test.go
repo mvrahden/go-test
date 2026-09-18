@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/tests/gotestcli"
 )
 
 // FuzzTriagePromoteTestSuite exercises "gotest fuzz triage" and "gotest fuzz
@@ -12,22 +13,26 @@ import (
 // planted the way the engine writes them. Each test gets its own copy of
 // the module under t.TempDir(), so promote's source edit and the corpus
 // files never touch the repository and nothing needs restoring.
+// Sequential: BeforeEach stages the per-test module copy on the struct.
 //
-//nolint:lifecycle-pair // BeforeAll's binary lives under t.TempDir(), which the framework removes automatically
+//nolint:lifecycle-pair // BeforeAll only wraps the shared binary, which its fixture removes
 type FuzzTriagePromoteTestSuite struct {
-	binary           string
-	repoRoot         string
+	CLI              *gotestcli.BinarySharedFixture
+	cli              cliRunner
 	pkgDir           string
 	suiteTestPath    string
 	corpusFile       string
 	structCorpusFile string
 }
 
+// SuiteConfig: a promote's rebuild per test needs the integration
+// deadlines, not the 30-second default.
+func (s *FuzzTriagePromoteTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.IntegrationSuiteConfig()
+}
+
 func (s *FuzzTriagePromoteTestSuite) BeforeAll(t *gotest.T) {
-	absRoot, err := filepath.Abs("../..")
-	gotest.NoError(t, err)
-	s.repoRoot = absRoot
-	s.binary = buildGotestBinary(t, absRoot, t.TempDir())
+	s.cli = newCLIRunner(s.CLI)
 }
 
 // BeforeEach stages the module and plants two crasher fixtures:
@@ -42,7 +47,7 @@ func (s *FuzzTriagePromoteTestSuite) BeforeAll(t *gotest.T) {
 //     target), which triage must re-run and report as the decoded
 //     Message{...} literal rather than as the raw per-leaf corpus text.
 func (s *FuzzTriagePromoteTestSuite) BeforeEach(t *gotest.T) {
-	s.pkgDir = stageFuzzModule(t, s.repoRoot, t.TempDir())
+	s.pkgDir = stageFuzzModule(t, s.cli.repoRoot, t.TempDir())
 	s.suiteTestPath = filepath.Join(s.pkgDir, "suite_test.go")
 	fuzzRoot := filepath.Join(s.pkgDir, "testdata", "fuzz")
 
@@ -58,7 +63,7 @@ func (s *FuzzTriagePromoteTestSuite) BeforeEach(t *gotest.T) {
 }
 
 func (s *FuzzTriagePromoteTestSuite) runCLIExit(t *gotest.T, args ...string) (string, int) {
-	return runGotestIn(t, s.binary, s.pkgDir, nil, args...)
+	return runGotestIn(t, s.cli.binary, s.pkgDir, nil, args...)
 }
 
 func (s *FuzzTriagePromoteTestSuite) TestTriage_StaleCrasherNoLongerFailing(t *gotest.T) {

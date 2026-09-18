@@ -9,6 +9,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// Sequential: the tests/e2e golden pins its -v output order.
 type NotificationServiceTestSuite struct {
 	dispatcher *dispatcher
 }

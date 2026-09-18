@@ -14,7 +14,9 @@ import (
 type HarnessTTestSuite struct{}
 
 func (s *HarnessTTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *HarnessTTestSuite) TestSetupAndTestT(t *gotest.T) {

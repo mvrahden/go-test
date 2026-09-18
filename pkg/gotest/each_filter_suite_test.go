@@ -17,9 +17,31 @@ import (
 // filtered by -run/-skip, or once -failfast has tripped, and eachRun blocked
 // forever on a handoff that was never coming — until -test.timeout shot the
 // process with no AfterAll and no fixture teardown.
-//
-// The suite is sequential: each case owns the child process it spawns.
-type EachFilterTestSuite struct{}
+type EachFilterTestSuite struct {
+	dir string
+	bin string
+}
+
+func (s *EachFilterTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
+// BeforeAll compiles the child once; every test only runs it.
+func (s *EachFilterTestSuite) BeforeAll(t *gotest.T) {
+	dir, err := os.MkdirTemp("", "gotest-eachfilter-")
+	gotest.NoError(t, err)
+	s.dir = dir
+	modDir, binDir := filepath.Join(dir, "mod"), filepath.Join(dir, "bin")
+	gotest.NoError(t, os.Mkdir(modDir, 0o750))
+	gotest.NoError(t, os.Mkdir(binDir, 0o750))
+	s.bin = buildEachChild(t, modDir, binDir)
+}
+
+func (s *EachFilterTestSuite) AfterAll(t *gotest.T) {
+	gotest.NoError(t, os.RemoveAll(s.dir))
+}
 
 const eachChildTimeout = 60 * time.Second
 const eachChildWallClock = 120 * time.Second
@@ -90,10 +112,8 @@ func runEachChild(bin string, env []string, args ...string) (output string, elap
 }
 
 func (s *EachFilterTestSuite) TestFilteredEntry(t *gotest.T) {
-	bin := buildEachChild(t, t.TempDir(), t.TempDir())
-
 	t.When("a single table entry is selected with -run", func(w *gotest.T) {
-		output, elapsed, passed := runEachChild(bin, nil, "-test.run", "TestEach/#1")
+		output, elapsed, passed := runEachChild(s.bin, nil, "-test.run", "TestEach/#1")
 
 		w.It("completes instead of hanging until the timeout kills it", func(it *gotest.T) {
 			gotest.NotContains(it, output, "test timed out",
@@ -112,10 +132,8 @@ func (s *EachFilterTestSuite) TestFilteredEntry(t *gotest.T) {
 }
 
 func (s *EachFilterTestSuite) TestFailFast(t *gotest.T) {
-	bin := buildEachChild(t, t.TempDir(), t.TempDir())
-
 	t.When("-failfast trips on the first entry", func(w *gotest.T) {
-		output, elapsed, passed := runEachChild(bin,
+		output, elapsed, passed := runEachChild(s.bin,
 			[]string{"GOTEST_TEST_EACH_FAIL_FIRST=1"}, "-test.failfast")
 
 		w.It("finishes red instead of hanging on the suppressed entries", func(it *gotest.T) {

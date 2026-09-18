@@ -282,6 +282,12 @@ func FuzzAddAfterFuzz(f *testing.F) {
 // real fuzz target: the assertion contract and the buffered-seed logic.
 type FWrapperTestSuite struct{}
 
+func (s *FWrapperTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *FWrapperTestSuite) TestAssertionContract(t *gotest.T) {
 	t.It("satisfies Errorf/FailNow/Skipf/Context like B and T", func(it *gotest.T) {
 		var _ interface {

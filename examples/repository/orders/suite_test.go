@@ -2,12 +2,15 @@ package orders
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
+// Sequential: both methods place orders into the one store BeforeAll builds.
 type OrderRepositoryTestSuite struct {
 	store *orderStore
 }
 
 func (s *OrderRepositoryTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{FailFast: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.FailFast = true
+	return cfg
 }
 
 func (s *OrderRepositoryTestSuite) BeforeAll(t *gotest.T) {

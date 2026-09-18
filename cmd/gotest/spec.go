@@ -117,6 +117,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		Streaming:       false,
 		OutputMode:      gotestrunner.RunCaptureJSON,
 		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
+		GlobalTimeout:   cfg.GlobalTimeout,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -124,19 +125,12 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	code := result.ExitCode
-	if cfg.GlobalTimeout > 0 && ctx.Err() == context.DeadlineExceeded {
-		fmt.Fprintf(os.Stderr, "FAIL: global --timeout exceeded after %v\n", cfg.GlobalTimeout)
-		if code == 0 {
-			code = 1
-		}
-	}
-
 	events, err := gotestspec.ParseEvents(bytes.NewReader(result.CapturedJSON))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
 		return 2
 	}
-	code = enforceCensus(os.Stderr, code, goTestArgs, declaredCases(loaded), executedCases(events))
+	gotestrunner.NoteBenchmarksNotRun(os.Stderr, goTestArgs, len(overlay.Declared.Benchmarks))
 
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))
 

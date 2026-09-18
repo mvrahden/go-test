@@ -2,10 +2,9 @@
 
 `consumer-fixture/` is a standalone consumer module (own `go.work`,
 `replace` to this repository) — the shared instrument for every eval round.
-Run `go build ./...` inside it before each round: nothing rebuilds it
-automatically, so its go.sum rots silently after dependency bumps. This
-document is the complete protocol: what to measure, how to run it, how to
-grade it.
+The quality workflow builds, vets and runs it on every push, so a dependency
+bump that breaks it fails CI rather than the next round. This document is
+the complete protocol: what to measure, how to run it, how to grade it.
 
 ## 1. The three claims under test
 

@@ -2,9 +2,10 @@ package gotestrunner
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"time"
+
+	"github.com/mvrahden/go-test/internal/proctree"
 )
 
 type GraceStrategy int
@@ -21,58 +22,45 @@ type ProcessConfig struct {
 	BudgetFile    string
 }
 
+// ManagedProcess runs a command as the root of its own process tree and stops
+// the tree by its grace strategy.
 type ManagedProcess struct {
 	cmd    *exec.Cmd
+	tree   *proctree.Tree
 	config ProcessConfig
 	done   chan struct{}
-	job    *jobObject
 }
 
 func NewManagedProcess(cmd *exec.Cmd, cfg ProcessConfig) *ManagedProcess {
-	setProcessGroupAttr(cmd)
+	tree := proctree.New(cmd)
 	cmd.WaitDelay = 0
-	job, _ := newJobObject()
-	mp := &ManagedProcess{cmd: cmd, config: cfg, done: make(chan struct{}), job: job}
-	cmd.Cancel = func() error {
-		if cmd.Process == nil {
+	if cfg.Grace == GraceKill && cmd.Cancel != nil {
+		cmd.Cancel = func() error {
+			_ = tree.Kill()
 			return nil
 		}
-		if cfg.Grace == GraceKill {
-			mp.forceKill()
-			return nil
-		}
-		if err := TerminateProcessGroup(cmd.Process.Pid); err != nil {
-			return os.ErrProcessDone
-		}
-		return nil
 	}
-	return mp
+	return &ManagedProcess{cmd: cmd, tree: tree, config: cfg, done: make(chan struct{})}
 }
 
 func (p *ManagedProcess) Start() error {
-	if err := p.cmd.Start(); err != nil {
+	if err := p.tree.Start(); err != nil {
 		return err
 	}
-	p.assignJob()
-	go func() { _ = p.cmd.Wait(); p.closeJob(); close(p.done) }()
+	go p.wait()
 	return nil
 }
 
+// Adopt takes over a command the caller started after NewManagedProcess.
 func (p *ManagedProcess) Adopt() {
-	p.assignJob()
-	go func() { _ = p.cmd.Wait(); p.closeJob(); close(p.done) }()
+	p.tree.Adopt()
+	go p.wait()
 }
 
-func (p *ManagedProcess) assignJob() {
-	if p.job != nil && p.cmd.Process != nil {
-		_ = p.job.assign(p.cmd.Process.Pid)
-	}
-}
-
-func (p *ManagedProcess) closeJob() {
-	if p.job != nil {
-		p.job.close()
-	}
+func (p *ManagedProcess) wait() {
+	_ = p.cmd.Wait()
+	p.tree.Release()
+	close(p.done)
 }
 
 func (p *ManagedProcess) Done() <-chan struct{} { return p.done }
@@ -110,7 +98,12 @@ func (p *ManagedProcess) Terminate() {
 	if p.cmd.Process == nil {
 		return
 	}
-	_ = TerminateProcessGroup(p.cmd.Process.Pid)
+	select {
+	case <-p.done:
+		return
+	default:
+	}
+	_ = p.tree.Interrupt()
 	grace := p.graceTimeout()
 	select {
 	case <-p.done:
@@ -121,13 +114,7 @@ func (p *ManagedProcess) Terminate() {
 }
 
 func (p *ManagedProcess) forceKill() {
-	if p.job != nil {
-		_ = p.job.terminate(1)
-		return
-	}
-	if p.cmd.Process != nil {
-		_ = ForceKillProcessGroup(p.cmd.Process.Pid)
-	}
+	_ = p.tree.Kill()
 }
 
 func (p *ManagedProcess) graceTimeout() time.Duration {

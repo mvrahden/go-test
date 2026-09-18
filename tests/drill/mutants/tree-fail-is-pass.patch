@@ -1,6 +1,7 @@
+Expect: internal/gotestspec Tree / CollectStats
 --- a/internal/gotestspec/tree.go
 +++ b/internal/gotestspec/tree.go
-@@ -533,7 +533,7 @@
+@@ -742,7 +742,7 @@
  	case ActionPass:
  		return StatusPass
  	case ActionFail:

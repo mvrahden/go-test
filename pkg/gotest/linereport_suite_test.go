@@ -61,7 +61,9 @@ func maskPollCount(msg string) (masked string, count int) {
 type LineReportingTestSuite struct{}
 
 func (s *LineReportingTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 // --- Direct assertions (no helper chain) ---
