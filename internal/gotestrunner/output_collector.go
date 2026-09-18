@@ -115,7 +115,7 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //n
 	// Normalize both to a failure at this choke point so every downstream
 	// comparison agrees, and say what happened, because the binary's own output
 	// ends mid-stream with no verdict of its own.
-	if code, how := exitStatusVerdict(r.ExitCode); how != "" {
+	if code, how := ExitStatusVerdict(r.ExitCode); how != "" {
 		r.ExitCode = code
 		r.Stderr = append(r.Stderr, fmt.Appendf(nil, "gotest: suite binary terminated %s\n", how)...)
 	}

@@ -344,7 +344,7 @@ func runOneFuzzTarget(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, budg
 		var how string
 		// A target the session stopped reports a status it never chose; read
 		// as a verdict it would outrank every real finding.
-		exitCode, how = exitStatusVerdict(cmd.ProcessState.ExitCode())
+		exitCode, how = ExitStatusVerdict(cmd.ProcessState.ExitCode())
 		if how != "" {
 			fmt.Fprintf(os.Stderr, "[%s] fuzz target terminated %s\n", t.Func, how)
 		}
