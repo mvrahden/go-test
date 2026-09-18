@@ -159,5 +159,10 @@ fail with it. Every run that writes the event stream carries the booking
 `bench`), so a stream consumer (the editor's Spec View included) can name the
 method that vanished instead of seeing "all passed" beside exit 2. A run cut
 short is not censused: an interrupt exits 130, and a `--timeout` that expires
-before the last verdict exits 1 on every command, booked into the stream as a
-failed `global --timeout` package.
+before the last verdict exits 1 on every command. It prints `FAIL: global
+--timeout exceeded after <d> while running: <pkg> <test>` (up to five, then
+`… N more`), naming the hung method, or only its suite in the plain text run.
+Each one is booked into the stream as failed with `gotest: --timeout expired
+while this test was running` as its output, and its suite and package fail
+with it. A deadline that hits before any test runs is booked as a failed
+`global --timeout` package.

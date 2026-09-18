@@ -29,6 +29,8 @@ type OutputCollector struct {
 	captured bytes.Buffer
 	// verdicts indexes the JSON stream for the census as it is written.
 	verdicts verdictIndex
+	// cutShort names the suites whose process the run's context ended.
+	cutShort []CensusCase
 
 	// StdlibTestsByPkg lets Finalize distinguish packages that truly have no
 	// test files from packages whose tests gotest does not run (stdlib tests).
@@ -121,6 +123,13 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //n
 	}
 	if r.ExitCode > c.worst {
 		c.worst = r.ExitCode
+	}
+	if r.CutShort {
+		name := r.Target.SuiteName
+		if r.Target.Bench {
+			name = protocol.PrefixBenchmark + name
+		}
+		c.cutShort = append(c.cutShort, CensusCase{Pkg: pkg, Path: name})
 	}
 	s := c.pkgs[pkg]
 	s.results[idx] = r

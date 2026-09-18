@@ -181,7 +181,7 @@ func (s *BuildFailureVerdictsTestSuite) TestExitCodeAfterDispatch(t *gotest.T, _
 func (s *BuildFailureVerdictsTestSuite) TestDeadlineFailsTheRun(t *gotest.T, _ *buildFailureCtx) {
 	t.When("the global --timeout expires before a green run's last verdict", func(w *gotest.T) {
 		result := gotestrunner.PipelineResult{CapturedJSON: []byte{}}
-		gotestrunner.ExportApplyDeadlineFailure(&result, 3*time.Second, context.DeadlineExceeded)
+		gotestrunner.ExportApplyDeadlineFailure(&result, 3*time.Second, context.DeadlineExceeded, nil)
 
 		w.It("exits 1 and books the timeout into the stream every renderer reads", func(it *gotest.T) {
 			gotest.Equal(it, 1, result.ExitCode)
@@ -192,17 +192,27 @@ func (s *BuildFailureVerdictsTestSuite) TestDeadlineFailsTheRun(t *gotest.T, _ *
 
 	t.When("the run was red already", func(w *gotest.T) {
 		result := gotestrunner.PipelineResult{ExitCode: 2, CapturedJSON: []byte{}}
-		gotestrunner.ExportApplyDeadlineFailure(&result, 3*time.Second, context.DeadlineExceeded)
+		gotestrunner.ExportApplyDeadlineFailure(&result, 3*time.Second, context.DeadlineExceeded, nil)
 
 		w.It("keeps its exit code", func(it *gotest.T) {
 			gotest.Equal(it, 2, result.ExitCode)
 		})
 	})
 
+	t.When("it names the units it cut short", func(w *gotest.T) {
+		result := gotestrunner.PipelineResult{CapturedJSON: []byte{}}
+		gotestrunner.ExportApplyDeadlineFailure(&result, 3*time.Second, context.DeadlineExceeded, []gotestrunner.CensusCase{{Pkg: "example.com/pkg", Path: "TestXTestSuite/TestHang"}})
+
+		w.It("exits 1 and books no synthetic package: the units carry the failure", func(it *gotest.T) {
+			gotest.Equal(it, 1, result.ExitCode)
+			gotest.Empty(it, result.CapturedJSON)
+		})
+	})
+
 	t.When("no deadline cut the run short", func(w *gotest.T) {
 		for sub, err := range gotest.Each(w, []error{nil, context.Canceled}) {
 			result := gotestrunner.PipelineResult{CapturedJSON: []byte{}}
-			gotestrunner.ExportApplyDeadlineFailure(&result, 3*time.Second, err)
+			gotestrunner.ExportApplyDeadlineFailure(&result, 3*time.Second, err, nil)
 			gotest.Equal(sub, 0, result.ExitCode)
 			gotest.Empty(sub, result.CapturedJSON)
 		}
