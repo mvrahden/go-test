@@ -22,8 +22,10 @@ type FuzzScaffoldTestSuite struct {
 	goSum []byte
 }
 
+// SuiteConfig: introspection stages a module and builds it, which the
+// 30-second default does not cover on a slow machine.
 func (s *FuzzScaffoldTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
+	cfg := gotest.IntegrationSuiteConfig()
 	cfg.Parallel = true
 	return cfg
 }

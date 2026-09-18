@@ -22,8 +22,10 @@ const exitWithin = 30 * time.Second
 // outside the tree.
 type TreeTestSuite struct{}
 
+// SuiteConfig: every behavior starts child processes and waits for them
+// to stop, which the 30-second default does not cover on a slow machine.
 func (s *TreeTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
+	cfg := gotest.IntegrationSuiteConfig()
 	cfg.Parallel = true
 	return cfg
 }
