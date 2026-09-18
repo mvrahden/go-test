@@ -12,10 +12,12 @@ zero behave as if the marker were absent:
   as written. From v1.31 a duration left at zero (omitted or explicit) gets
   the default: `SuiteConfig{Parallel: true}` runs with 30s/30s (v1.26–v1.30
   it meant no deadline).
-- `gotest.NoDeadline` (any negative duration) disables the deadline.
-- From v1.31 `gotest lint` reports an explicit `0` timeout
-  (`config-zero-timeout`) and `-fix` writes `gotest.NoDeadline`, keeping the
-  pre-v1.31 meaning; drop the field instead when the default was intended.
+- `gotest.NoDeadline` (any negative duration) disables the deadline. Write the
+  constant, not a bare negative: from v1.31 `gotest lint` reports a literal
+  negative (`config-no-deadline`) and `-fix` spells it `gotest.NoDeadline`.
+- Upgrading from v1.26–v1.30: a suite that relied on `Timeout: 0` for no
+  deadline now gets the default one and fails when it exceeds it. Write
+  `gotest.NoDeadline` where that was the intent.
 
 Marker bodies are parsed statically (the generator needs `Parallel` at
 generation time), so only three forms are legal:

@@ -40,9 +40,11 @@ func (s *ConfigDefaultsTestSuite) TestWithSuiteDefaults(t *gotest.T) {
 			want:     gotest.SuiteConfig{Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline},
 		},
 		{
+			// The raw durations are the contract under test: any negative
+			// disables a deadline, not only the named constant.
 			Desc:     "any negative duration stays",
-			declared: gotest.SuiteConfig{Timeout: -time.Second},
-			want:     gotest.SuiteConfig{Timeout: -time.Second, SetupTimeout: 30 * time.Second},
+			declared: gotest.SuiteConfig{Timeout: -time.Second},                                 //nolint:config-no-deadline // see above
+			want:     gotest.SuiteConfig{Timeout: -time.Second, SetupTimeout: 30 * time.Second}, //nolint:config-no-deadline // see above
 		},
 		{Desc: "a preset passes through", declared: gotest.IntegrationSuiteConfig(), want: gotest.IntegrationSuiteConfig()},
 	}) {

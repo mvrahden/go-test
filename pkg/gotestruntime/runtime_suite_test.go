@@ -317,7 +317,7 @@ func (s *RuntimeTestSuite) TestTimeout_BeforeAllCompletesWithinTimeout(t *gotest
 func (s *RuntimeTestSuite) TestTimeout_DisabledWithNegativeOne(t *gotest.T) {
 	node := &gotestruntime.FixtureNode{
 		Name:   "Root",
-		Config: gotest.FixtureConfig{Timeout: -1},
+		Config: gotest.FixtureConfig{Timeout: -1}, //nolint:config-no-deadline // the raw -1 is the contract under test: any negative disables a deadline, not only the named constant
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
 			deadline, hasDeadline := ctx.Deadline()

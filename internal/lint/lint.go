@@ -41,18 +41,18 @@ const (
 	// BehaviorWording is expressiveness: a When or It description that opens
 	// with the word the spec renders for it says it twice.
 	BehaviorWording Rule = "behavior-wording"
-	// SuiteConfigPartial is expressiveness: a SuiteConfig literal that leaves
-	// a timeout unset replaces the default with no deadline, silently.
-	SuiteConfigPartial Rule = "suite-config-partial"
-	BenchLoop          Rule = "bench-loop"
-	BenchFixtureIO     Rule = "bench-fixture-io"
-	BenchWait          Rule = "bench-wait"
-	FuzzDeterminism    Rule = "fuzz-determinism"
-	FuzzNoOracle       Rule = "fuzz-no-oracle"
-	FuzzSeed           Rule = "fuzz-seed"
-	FuzzStructCorpus   Rule = "fuzz-struct-corpus"
-	FuzzHookIO         Rule = "fuzz-hook-io"
-	FuzzRawSeed        Rule = "fuzz-raw-seed"
+	// ConfigNoDeadline is expressiveness: a negative duration disables a
+	// deadline, and the name says so where the number does not.
+	ConfigNoDeadline Rule = "config-no-deadline"
+	BenchLoop        Rule = "bench-loop"
+	BenchFixtureIO   Rule = "bench-fixture-io"
+	BenchWait        Rule = "bench-wait"
+	FuzzDeterminism  Rule = "fuzz-determinism"
+	FuzzNoOracle     Rule = "fuzz-no-oracle"
+	FuzzSeed         Rule = "fuzz-seed"
+	FuzzStructCorpus Rule = "fuzz-struct-corpus"
+	FuzzHookIO       Rule = "fuzz-hook-io"
+	FuzzRawSeed      Rule = "fuzz-raw-seed"
 	// SharedFixtureUndeclared is integrity: window scheduling starts only
 	// the fixtures scheduled suites declare, so an undeclared read may hit
 	// a fixture that never started or is already released.
@@ -103,7 +103,9 @@ var ruleMeta = map[Rule]struct {
 	SuiteLifecycle:     {TierIntegrity, ScopeSuites},
 	FailGuard:          {TierExpressiveness, ScopeGotestFiles},
 	BehaviorWording:    {TierExpressiveness, ScopeGotestFiles},
-	SuiteConfigPartial: {TierExpressiveness, ScopeSuites},
+	// The rewrite keeps the meaning either way, so config-no-deadline is a
+	// matter of saying it in a word: skippable.
+	ConfigNoDeadline: {TierExpressiveness, ScopeEverywhere},
 	// A benchmark that never iterates measures nothing — its numbers lie,
 	// so bench-loop is integrity. bench-fixture-io is a heuristic about
 	// what the timed loop includes; legitimate setups exist, so it stays
@@ -205,7 +207,6 @@ func run(pass *analysis.Pass) (any, error) {
 		checkFocusPrefixes(pass, suites)
 		checkLifecyclePairs(pass, suites)
 		checkSharedFixtureUndeclared(pass, insp, suites)
-		checkSuiteConfigPartial(pass, insp, suites)
 	}
 
 	checkOrphanedFiles(pass)
@@ -222,6 +223,7 @@ func run(pass *analysis.Pass) (any, error) {
 	checkFailGuard(pass, insp, cl)
 	checkRedundantAssertion(pass, insp, cl)
 	checkBehaviorWording(pass, insp)
+	checkConfigNoDeadline(pass, insp)
 	checkBenchLoop(pass, insp, suites)
 	checkBenchFixtureIO(pass, insp, suites)
 	checkBenchWait(pass, insp, suites)

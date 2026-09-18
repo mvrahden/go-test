@@ -101,12 +101,20 @@ Sections tagged **v1.30+** need v1.30.0 or newer. What v1.30 adds:
    failed test, its suite and package failing with it; see
    `reference/cli.md`. Below v1.30 the census speaks only on stderr and
    through exit 2.
-2. **The `suite-config-partial` lint rule** — a `gotest.SuiteConfig{…}`
-   literal that leaves `Timeout` or `SetupTimeout` unset replaces the
-   defaults wholesale, so the suite runs with no deadline; the rule reports
-   it (expressiveness tier) and `lint -fix` composes the same fields onto
-   `gotest.DefaultSuiteConfig()`. Below v1.30 it is not reported, so write
-   the compose form by hand.
+
+Sections tagged **v1.31+** need v1.31.0 or newer. What v1.31 adds:
+
+1. **A zero duration means the default deadline** — on
+   `SuiteConfig.Timeout`/`SetupTimeout` and `FixtureConfig.Timeout`, omitted
+   and explicit zeros alike, so a partial literal is no longer a suite
+   without deadlines. `gotest.NoDeadline` disables one. A suite that
+   relied on `0` for no deadline (v1.26–v1.30) now fails when it exceeds
+   the default; write `gotest.NoDeadline` where that was the intent.
+
+2. **The `config-no-deadline` lint rule** — a literal negative duration on
+   those fields; every negative disables the deadline, so the rule reports
+   it (expressiveness tier) and `lint -fix` spells it `gotest.NoDeadline`.
+   The rewrite keeps the meaning. Below v1.31 it is not reported.
 
 Exit codes on v1.25.x are weaker than they look — never treat a green
 gotest exit alone as proof there: a package failing to compile mid-run, a

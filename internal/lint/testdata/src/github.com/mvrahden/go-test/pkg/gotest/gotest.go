@@ -50,6 +50,14 @@ type SuiteConfig struct {
 	Exclusive    bool
 }
 
+type FixtureConfig struct {
+	Timeout    time.Duration
+	Retries    int
+	RetryDelay time.Duration
+}
+
+const NoDeadline time.Duration = -1
+
 func DefaultSuiteConfig() SuiteConfig {
 	return SuiteConfig{Timeout: 30 * time.Second, SetupTimeout: 30 * time.Second}
 }
