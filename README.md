@@ -847,7 +847,7 @@ gotest fuzz triage ./...     # re-run every discovered crasher, report pass/fail
 gotest fuzz promote ./...    # splice crashers into f.Add(...) seeds
 ```
 
-`gotest fuzz triage` scans each target's `testdata/fuzz/<Func>/` directory (a plain filesystem scan — no `go test -fuzz` invoked) and re-runs every corpus entry found there via `go test -run='^<Func>/<hash>$'`, printing its decoded input and either the panic/failure cause or `status: no longer failing`.
+`gotest fuzz triage` scans each target's `testdata/fuzz/<Func>/` directory (a plain filesystem scan — no `go test -fuzz` invoked) and re-runs every corpus entry found there via `go test -run='^<Func>/<hash>$'`, printing its decoded input and either the panic/failure cause or `status: no longer failing`. A re-run that produced no exit status of its own — it was terminated, or never started — reports `status: unverified` and fails the triage: nothing was proven about that crasher.
 Exits 1 if any crasher's re-run still fails, 0 otherwise.
 
 `gotest fuzz promote` does the same discovery, then splices each crasher's input into its originating `Fuzz*` method as a permanent `f.Add(...)` seed — an AST-level source edit via `internal/refactor`, inserted after the method's last existing `f.Add` call — and deletes the crasher file once the splice succeeds.

@@ -216,16 +216,22 @@ func runFuzzTriage(args []string) int {
 
 			fmt.Printf("  file:  %s\n", displayPath(file))
 
-			out, code := rerunCrasher(overlay, target, filepath.Base(file))
+			out, status, ran := rerunCrasher(overlay, target, filepath.Base(file))
 			if lit := extractDecodedInput(out); lit != "" {
 				fmt.Printf("  input: %s\n", lit)
 			} else {
 				fmt.Printf("  input: %s\n", displayArgs(corpusArgs))
 			}
-			if code != 0 {
+			switch state, detail := classifyRerun(status, ran); state {
+			case crasherUnverified:
+				// Unverified is a triage failure, not a pass: nothing was
+				// proven about a crasher whose re-run produced no verdict.
+				failed = true
+				fmt.Printf("  status: unverified — %s\n", detail)
+			case crasherFailing:
 				anyStillFailing = true
 				fmt.Printf("  cause: %s\n", extractCause(out))
-			} else {
+			default:
 				fmt.Println("  status: no longer failing")
 			}
 		}
@@ -241,10 +247,37 @@ func runFuzzTriage(args []string) int {
 	return 0
 }
 
+// What a crasher re-run proved.
+const (
+	crasherFailing    = "failing"
+	crasherFixed      = "fixed"
+	crasherUnverified = "unverified"
+)
+
+// classifyRerun reads what a re-run proved from its exit status. A status the
+// process never chose — a signal, or a Windows termination status such as
+// 0xC000013A — and a run that never started both prove nothing: the crasher is
+// unverified, not still failing, and triage says so instead of printing a
+// cause it did not observe.
+func classifyRerun(status int, ran bool) (state, detail string) {
+	if !ran {
+		return crasherUnverified, "the re-run never started"
+	}
+	code, how := gotestrunner.ExitStatusVerdict(status)
+	switch {
+	case how != "":
+		return crasherUnverified, "the re-run was terminated " + how
+	case code != 0:
+		return crasherFailing, ""
+	}
+	return crasherFixed, ""
+}
+
 // rerunCrasher re-runs a single corpus entry as an ordinary (non-fuzzing)
 // subtest via `go test -run='^<Func>/<hashBasename>$'` against the
-// generated overlay, returning its combined output and exit code.
-func rerunCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzTarget, hashBase string) (string, int) { //nolint:gocritic // hugeParam: stable API
+// generated overlay. It returns the combined output, the re-run's exit status
+// and whether it ran at all.
+func rerunCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzTarget, hashBase string) (string, int, bool) { //nolint:gocritic // hugeParam: stable API
 	goArgs := []string{"test"}
 	if overlay.OverlayFlag != "" {
 		goArgs = append(goArgs, overlay.OverlayFlag)
@@ -268,15 +301,12 @@ func rerunCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzT
 	// is what makes a no-longer-failing (stale) crasher still show its
 	// decoded struct rather than printing no marker line at all.
 	cmd.Env = append(os.Environ(), protocol.EnvFuzzEchoInput+"=1")
-	out, err := cmd.CombinedOutput()
+	out, _ := cmd.CombinedOutput()
 
-	code := 0
-	if cmd.ProcessState != nil {
-		code = cmd.ProcessState.ExitCode()
-	} else if err != nil {
-		code = 1
+	if cmd.ProcessState == nil {
+		return string(out), 0, false
 	}
-	return string(out), code
+	return string(out), cmd.ProcessState.ExitCode(), true
 }
 
 // extractDecodedInput scans a re-run's combined output for
@@ -454,7 +484,7 @@ func promoteCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.Fuz
 	// is readable, keyed source that survives any change to the fuzzed type's
 	// field layout. The echo carries a complete f.Add argument list (one
 	// literal per declared position), so it replaces the whole splice.
-	out, _ := rerunCrasher(overlay, target, hashBase)
+	out, _, _ := rerunCrasher(overlay, target, hashBase)
 	if lit := extractDecodedInput(out); lit != "" {
 		spliceArgs = []string{lit}
 	}

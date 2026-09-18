@@ -66,3 +66,5 @@ var ExportExtractCause = extractCause
 var ExportPromoteCrasher = promoteCrasher
 
 func ExportSpliceExpr(a corpusArg) string { return a.spliceExpr() }
+
+var ExportClassifyRerun = classifyRerun
