@@ -60,6 +60,9 @@ func main() {
 {{ range $f := .Fixtures }}
 	{{ $f.VarName }} := &{{ $f.QualifiedType }}{}
 	ƒcfg_{{ $f.VarName }} := gotest.DefaultFixtureConfig()
+{{- if $f.HasConfig }}
+	var ƒbudget_{{ $f.VarName }} time.Duration
+{{- end }}
 {{ end }}
 	ƒerrs := make([]error, {{ len .Fixtures }})
 	ƒstarted := make([]bool, {{ len .Fixtures }})
@@ -91,7 +94,8 @@ func main() {
 			ƒerrs[{{ $i }}] = ƒerr
 			return
 		}
-		ƒcfg_{{ $f.VarName }} = ƒcfg
+		ƒbudget_{{ $f.VarName }} = ƒcfg.Timeout
+		ƒcfg_{{ $f.VarName }} = gotestruntime.WithFixtureDefaults(ƒcfg)
 {{- end }}
 {{- range $dep := $f.DependsOnVars }}
 		<-ƒdone_{{ $dep }}
@@ -114,7 +118,7 @@ func main() {
 		ƒerrs[{{ $i }}] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "{{ $f.Identifier }}",
 			Timeout:    ƒcfg_{{ $f.VarName }}.Timeout,
-			Budget:     {{ if $f.HasConfig }}ƒcfg_{{ $f.VarName }}.Timeout{{ else }}0{{ end }},
+			Budget:     {{ if $f.HasConfig }}ƒbudget_{{ $f.VarName }}{{ else }}0{{ end }},
 			Retries:    ƒcfg_{{ $f.VarName }}.Retries,
 			RetryDelay: ƒcfg_{{ $f.VarName }}.RetryDelay,
 			BeforeAll:  {{ $f.VarName }}.BeforeAll,
@@ -167,7 +171,7 @@ func main() {
 			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
 				Name:     "{{ $f.Identifier }}",
 				Timeout:  ƒcfg_{{ $f.VarName }}.Timeout,
-				Budget:   {{ if $f.HasConfig }}ƒcfg_{{ $f.VarName }}.Timeout{{ else }}0{{ end }},
+				Budget:   {{ if $f.HasConfig }}ƒbudget_{{ $f.VarName }}{{ else }}0{{ end }},
 				AfterAll: {{ $f.VarName }}.AfterAll,
 			})
 		}

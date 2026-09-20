@@ -25,8 +25,10 @@ type StaticSpecTestSuite struct {
 	rendered map[string]string
 }
 
+// SuiteConfig: the rendered corpus comes from a real run, which the
+// 30-second default does not cover on a slow machine.
 func (s *StaticSpecTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
+	cfg := gotest.IntegrationSuiteConfig()
 	cfg.Parallel = true
 	return cfg
 }

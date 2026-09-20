@@ -14,6 +14,12 @@ import (
 // Sequential: Setenv.
 type LintGitHubTestSuite struct{}
 
+// SuiteConfig: the mode is exercised through real lint runs over the
+// repository, which the 30-second default does not cover on a slow machine.
+func (s *LintGitHubTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.IntegrationSuiteConfig()
+}
+
 // writeLintProbe materializes a one-file module whose stdlib-style test
 // triggers the stdlib-test rule without importing gotest.
 func writeLintProbe(t *gotest.T, dir string) {

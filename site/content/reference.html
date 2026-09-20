@@ -529,7 +529,7 @@ lint:
       </table>
 
       <div class="callout">
-        The returned config is used as-is: a zero (or omitted) duration means <em>no deadline</em>, not "keep the default." To inherit defaults and override individual fields, start from a preset: <code>cfg := gotest.DefaultSuiteConfig(); cfg.Parallel = true; return cfg</code>.
+        A duration the returned config leaves at zero (omitted or explicit) gets the default, as if the marker were absent; <code>gotest.NoDeadline</code> disables a deadline. Booleans, <code>Retries</code> and <code>RetryDelay</code> are used as written, so <code>gotest.SuiteConfig{Parallel: true}</code> runs in parallel with the 30s defaults.
       </div>
     </section>
 
@@ -659,7 +659,7 @@ percentage = covered / total</div>
           <tr><td><code>assertion-redundant</code></td><td>An assertion made redundant by the next one on the same argument.</td></tr>
           <tr><td><code>fail-guard</code></td><td><code>if cond { Fail/Fatal(...) }</code> guards — the assertion expresses the check directly.</td></tr>
           <tr><td><code>t-escape</code></td><td>Unnecessary <code>t.T()</code> convenience escapes (<code>Errorf</code>, <code>Helper</code>, <code>Log</code>, <code>Fatal</code>, …).</td></tr>
-          <tr><td><code>suite-config-partial</code></td><td>A <code>gotest.SuiteConfig{…}</code> literal that leaves <code>Timeout</code> or <code>SetupTimeout</code> unset — no deadline, not the default; the fix composes onto <code>DefaultSuiteConfig()</code>.</td></tr>
+          <tr><td><code>config-no-deadline</code></td><td>A literal negative duration on <code>SuiteConfig.Timeout</code>/<code>SetupTimeout</code> or <code>FixtureConfig.Timeout</code> — every negative disables the deadline; the fix spells it <code>gotest.NoDeadline</code>.</td></tr>
           <tr><td><code>behavior-wording</code></td><td><code>When("when …")</code> or <code>It("it …")</code> — the spec renders the connective and the ✓ glyph plays "it"; the fix drops the word.</td></tr>
           <tr><td><code>bench-fixture-io</code></td><td>Fixture-backed reads inside the measured loop — times the fixture, not the code.</td></tr>
           <tr><td><code>bench-wait</code></td><td><code>time.Sleep</code>/<code>Eventually</code>/<code>Consistently</code> inside the measured loop — times the wait.</td></tr>

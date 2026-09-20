@@ -896,8 +896,9 @@ func (s *BatchTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-The returned config is used as-is — a zero (or omitted) duration means no timeout, and without a `SuiteConfig()`/`FixtureConfig()` method the defaults apply.
-Start from a preset to combine defaults with overrides (`cfg := gotest.DefaultSuiteConfig(); cfg.Parallel = true; return cfg`).
+A duration the returned config leaves at zero (omitted or explicit) gets the default, exactly as if the marker were absent, so `gotest.SuiteConfig{Parallel: true}` runs with the 30-second timeouts.
+`gotest.NoDeadline` (or any negative duration) disables a deadline; booleans, `Retries` and `RetryDelay` are used as written.
+Start from a preset to override its durations (`cfg := gotest.IntegrationSuiteConfig(); cfg.Parallel = true; return cfg`).
 
 `Exclusive: true` schedules the suite's process strictly alone: after every non-exclusive suite has finished, one exclusive suite at a time, in deterministic order.
 Use it for suites whose verdicts depend on wall-clock behavior or contended resources (timing budgets, containers, ports, heavy child builds) — a budget verdict taken on a saturated machine is not a verdict you can act on.
@@ -1022,7 +1023,7 @@ gotest lint ./...
 Twenty-eight rules in three tiers:
 
 - **Integrity** — violations can make test outcomes unreliable or leak resources: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, reads of shared fixtures a suite never declared (window scheduling only starts what is declared), and generated files checked into version control.
-- **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, unnecessary `t.T()` escapes, `When("when …")`/`It("it …")` descriptions that spell the word the spec already supplies, and `SuiteConfig` literals that leave a timeout unset (no deadline, not the default). `-fix` applies the safe rewrites.
+- **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, unnecessary `t.T()` escapes, `When("when …")`/`It("it …")` descriptions that spell the word the spec already supplies, and an explicit `0` on a `SuiteConfig`/`FixtureConfig` timeout (now the default deadline; the fix writes `gotest.NoDeadline`, keeping the old meaning). `-fix` applies the safe rewrites.
 - **Migration** — adoption aids for codebases moving to gotest: stdlib test functions and testify imports; coexistence is legitimate.
 
 Suppress per line with `//nolint:<rule>` (same line or the comment block directly above); expressiveness and migration rules can also be disabled project-wide via `.gotest.yml` (`lint.skip`). See the [design spec](docs/design/spec.md#linter) for the full rule table.

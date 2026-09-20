@@ -18,8 +18,10 @@ import (
 //nolint:lifecycle-pair // BeforeAll only records the repo root; nothing is acquired
 type DiscoverTestSuite struct{ repoRoot string }
 
+// SuiteConfig: discovery stages a module and builds it, which the
+// 30-second default does not cover on a slow machine.
 func (s *DiscoverTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
+	cfg := gotest.IntegrationSuiteConfig()
 	cfg.Parallel = true
 	return cfg
 }

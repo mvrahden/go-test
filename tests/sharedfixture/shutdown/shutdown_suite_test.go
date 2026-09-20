@@ -30,7 +30,7 @@ type ShutdownTestSuite struct {
 func (s *ShutdownTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
 	cfg.Exclusive = true
-	cfg.Timeout = 2 * time.Minute
+	cfg.Timeout = 3 * time.Minute
 	cfg.SetupTimeout = 2 * time.Minute
 	return cfg
 }
@@ -169,19 +169,31 @@ func (s *ShutdownTestSuite) TestInterruptDuringTeardown(t *gotest.T) {
 }
 
 // A --timeout that expires mid-run fails it with 1 on the streaming and the
-// batch pipeline alike; the suites it cut short are not censused.
+// batch pipeline alike and names what was still running: the method where a
+// stream exists, the suite in the text run. It is not censused.
 func (s *ShutdownTestSuite) TestGlobalTimeout(t *gotest.T) {
 	for sub, tc := range gotest.Each(t, []struct { //nolint:gocritic // rangeValCopy: intentional
-		Desc string
-		args []string
+		Desc    string
+		args    []string
+		running string
+		shows   string
 	}{
-		{Desc: "gotest ./...", args: []string{"--timeout=20s", "./slow/"}},
-		{Desc: "gotest spec", args: []string{"spec", "--no-color", "--timeout=20s", "./slow/"}},
+		{Desc: "gotest ./...", args: []string{"--timeout=20s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite\n"},
+		{
+			Desc: "gotest -json", args: []string{"-json", "--timeout=20s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
+			shows: `{"Action":"fail","Package":"shutdownmod/slow","Test":"TestSlowTestSuite/TestSleeps"}`,
+		},
+		{
+			Desc: "gotest spec", args: []string{"spec", "--no-color", "--timeout=20s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
+			shows: "✗ Sleeps",
+		},
 	}) {
 		markers := sub.TempDir()
 		out, code := s.runWith(sub, markers, tc.args...)
 		gotest.Equal(sub, 1, code, out)
-		gotest.Contains(sub, out, "FAIL: global --timeout exceeded after 20s")
+		gotest.Contains(sub, out, "FAIL: global --timeout exceeded after 20s while running: "+tc.running)
+		gotest.Contains(sub, out, tc.shows)
+		gotest.NotContains(sub, out, "=== global --timeout")
 		gotest.NotContains(sub, out, "census")
 		gotest.True(sub, marker(markers, "fixture-down"), "AfterAll did not run")
 	}

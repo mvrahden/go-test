@@ -234,7 +234,7 @@ func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 
 func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 	t.When("fixture with config", func(w *gotest.T) {
-		w.It("uses the marker's config verbatim in the fixture node", func(it *gotest.T) {
+		w.It("defaults the node's zero Timeout and enforces only the declared one", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithConfig")
 			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
@@ -246,12 +246,14 @@ func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 			// binary before TestMain instead of being reported as a setup failure,
 			// and it would read the environment TestMain had not set up yet.
 			gotest.Contains(it, output, "var ƒcfg_CFGFixture gotest.FixtureConfig", "the config is declared, not derived, at package scope")
-			gotest.Contains(it, output, "ƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()", "marker config must be used as-is")
+			gotest.Contains(it, output, "ƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()", "the marker is called once")
 			gotest.Contains(it, output,
 				"ƒ_fixtureOnce.Do(func() error {\n\t\tƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()",
 				"the config must be derived inside the containment frame, before anything reads it")
-			gotest.Contains(it, output, "Config: ƒcfg_CFGFixture,", "the node reads the hoisted config")
-			gotest.Contains(it, output, "Budget: ƒcfg_CFGFixture.Timeout,", "a declared Timeout is also the enforced budget")
+			gotest.Contains(it, output, "Config: gotestruntime.WithFixtureDefaults(ƒcfg_CFGFixture),",
+				"a zero Timeout bounds the context with the default, as if the marker were absent")
+			gotest.Contains(it, output, "Budget: ƒcfg_CFGFixture.Timeout,",
+				"the declared Timeout is the enforced budget, so a zero one is never enforced")
 			gotest.NotContains(it, output, "OverlayFixtureConfig", "literal semantics: no overlay")
 		})
 	})
@@ -276,12 +278,15 @@ func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 
 func (s *RendererTestSuite) TestSuiteConfig(t *gotest.T) {
 	t.When("suite with config", func(w *gotest.T) {
-		w.It("uses the marker's config verbatim and renders the deadline", func(it *gotest.T) {
+		w.It("defaults the zero durations and enforces only the declared ones", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SuiteWithConfig")
 			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
-			gotest.Contains(it, output, "ƒcfg := s.ConfiguredTestSuite.SuiteConfig()", "marker config must be used as-is")
+			gotest.Contains(it, output, "ƒbudget := s.ConfiguredTestSuite.SuiteConfig()",
+				"the declared config is the enforced budget, so a zero duration is never enforced")
+			gotest.Contains(it, output, "ƒcfg := gotestruntime.WithSuiteDefaults(ƒbudget)",
+				"a zero duration bounds the context with the default, as if the marker were absent")
 			gotest.NotContains(it, output, "OverlaySuiteConfig", "literal semantics: no overlay")
 		})
 	})

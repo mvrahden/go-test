@@ -24,7 +24,7 @@ type FuzzFanCompileTestSuite struct{}
 func (s *FuzzFanCompileTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
 	cfg.Parallel = true
-	cfg.Timeout = 0
+	cfg.Timeout = gotest.NoDeadline
 	return cfg
 }
 

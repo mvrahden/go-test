@@ -18,8 +18,10 @@ import (
 // SpecInputTestSuite covers where 'gotest spec' takes its events from — stdin, a file or a live run — and the one exit rule they share.
 type SpecInputTestSuite struct{}
 
+// SuiteConfig: the live-run case runs the examples through the
+// pipeline, which the 30-second default does not cover on a slow machine.
 func (s *SpecInputTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
+	cfg := gotest.IntegrationSuiteConfig()
 	cfg.Parallel = true
 	return cfg
 }

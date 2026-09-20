@@ -1,0 +1,53 @@
+package withnodeadline
+
+import (
+	"time"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type LiteralTestSuite struct{}
+
+func (s *LiteralTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline} // want `SuiteConfig.Timeout is negative, which disables the deadline; write gotest.NoDeadline to say so` `SuiteConfig.SetupTimeout is negative`
+}
+
+type ComposeTestSuite struct{}
+
+func (s *ComposeTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Timeout = gotest.NoDeadline // want `SuiteConfig.Timeout is negative, which disables the deadline; write gotest.NoDeadline to say so`
+	return cfg
+}
+
+type DBFixture struct{}
+
+func (f *DBFixture) FixtureConfig() gotest.FixtureConfig {
+	return gotest.FixtureConfig{Timeout: gotest.NoDeadline, Retries: 1} // want `FixtureConfig.Timeout is negative`
+}
+
+func tune(cfg *gotest.FixtureConfig) {
+	cfg.Timeout = gotest.NoDeadline // want `FixtureConfig.Timeout is negative`
+}
+
+// Cfg is the same type under another name.
+type Cfg = gotest.SuiteConfig
+
+func aliased() Cfg {
+	cfg := &Cfg{SetupTimeout: gotest.NoDeadline} // want `SuiteConfig.SetupTimeout is negative`
+	cfg.Timeout = gotest.NoDeadline // want `SuiteConfig.Timeout is negative`
+	return *cfg
+}
+
+// Not findings: NoDeadline itself, which is negative and already named; a
+// zero, which is the default deadline; a positive duration; a runtime value;
+// and a negative on a field that is not a deadline.
+func untouched(runtime time.Duration) {
+	_ = gotest.SuiteConfig{Timeout: gotest.NoDeadline, SetupTimeout: time.Minute}
+	_ = gotest.SuiteConfig{Parallel: true, Timeout: 0}
+	_ = gotest.FixtureConfig{Timeout: runtime, RetryDelay: -1}
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Timeout = gotest.NoDeadline
+	cfg.SetupTimeout = runtime
+	_ = cfg
+}
