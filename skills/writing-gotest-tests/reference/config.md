@@ -1,6 +1,6 @@
 # Configuration — zero means default
 
-> Describes gotest v1.31.0+. On v1.26–v1.30 a zero duration meant NO
+> Describes gotest v1.30.0+. On v1.26–v1.29 a zero duration meant NO
 > deadline (so compose onto a preset there); v1.25.x merged the marker
 > over the defaults — see SKILL.md's version gate.
 
@@ -9,13 +9,13 @@ zero behave as if the marker were absent:
 
 - No marker → `DefaultSuiteConfig()` (30s test timeout, 30s setup timeout).
 - Marker present → booleans (`Parallel`, `Exclusive`, `FailFast`) are used
-  as written. From v1.31 a duration left at zero (omitted or explicit) gets
-  the default: `SuiteConfig{Parallel: true}` runs with 30s/30s (v1.26–v1.30
+  as written. From v1.30 a duration left at zero (omitted or explicit) gets
+  the default: `SuiteConfig{Parallel: true}` runs with 30s/30s (v1.26–v1.29
   it meant no deadline).
 - `gotest.NoDeadline` (any negative duration) disables the deadline. Write the
-  constant, not a bare negative: from v1.31 `gotest lint` reports a literal
+  constant, not a bare negative: from v1.30 `gotest lint` reports a literal
   negative (`config-no-deadline`) and `-fix` spells it `gotest.NoDeadline`.
-- Upgrading from v1.26–v1.30: a suite that relied on `Timeout: 0` for no
+- Upgrading from v1.26–v1.29: a suite that relied on `Timeout: 0` for no
   deadline now gets the default one and fails when it exceeds it. Write
   `gotest.NoDeadline` where that was the intent.
 

@@ -104,7 +104,7 @@ beforeAll(async () => {
     [
       "module gotest.payload",
       "",
-      "go 1.25.0",
+      "go 1.26.0",
       "",
       `replace github.com/mvrahden/go-test => ${repoRoot}`,
       "",
@@ -122,7 +122,7 @@ beforeAll(async () => {
   const workFile = path.join(tmp, "payload.work");
   writeFileSync(
     workFile,
-    `go 1.25.0\n\nuse (\n\t${repoRoot}\n\t${payloadDir}\n)\n`,
+    `go 1.26.0\n\nuse (\n\t${repoRoot}\n\t${payloadDir}\n)\n`,
     "utf-8",
   );
   savedGoWork = process.env.GOWORK;

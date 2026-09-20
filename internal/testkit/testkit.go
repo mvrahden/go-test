@@ -15,7 +15,7 @@ import (
 )
 
 // goLine is the go directive of every staged go.mod and go.work.
-const goLine = "go 1.25.0"
+const goLine = "go 1.26.0"
 
 // BuildCLI builds repoRoot's ./cmd/gotest into dir and returns the binary's path.
 func BuildCLI(ctx context.Context, repoRoot, dir string) (string, error) {

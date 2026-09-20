@@ -41,3 +41,8 @@ updates:
       # call APIs that are not there. Raise this only with engines.vscode.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # @types/vscode is the API surface of the OLDEST VS Code we support,
+      # not the newest published: typing above engines.vscode ^1.123.0 lets
+      # the extension compile against APIs that are not there at runtime. It
+      # moves when engines.vscode does, deliberately, never on its own.
+      - dependency-name: "@types/vscode"
