@@ -1,6 +1,7 @@
 ---
 title: "Why Your Go Tests Are Slow (and What to Do About It)"
 date: 2026-07-11
+lastmod: 2026-09-20
 description: "Most slow Go test suites aren't slow because of slow tests. Sequential execution, redundant setup, and shared state are what prevent parallelism."
 tags: ["Performance"]
 keywords: ["why are my go tests slow", "speed up go tests", "go test parallelism", "go test t.parallel", "go test slow"]
@@ -311,6 +312,10 @@ The three-suite example from earlier, on an 8-core machine:
 The improvement from 6 seconds to 0.5 seconds comes entirely from structural changes: process isolation between suites and goroutine parallelism within them. No test logic was changed. No assertion was added or removed. The test code is identical; only the execution model is different.
 
 These are simplified numbers. Real workloads have uneven test durations, fixture setup costs, and I/O contention. But the pattern holds: structural parallelism is multiplicative. `t.Parallel()` on individual tests is additive.
+
+## Measuring one function, not the suite
+
+Everything above is about the wall-clock cost of running your tests. The other performance question — whether the code under test got slower — is a different tool: benchmarks as suite methods, a saved baseline, and a gate that fails a pull request when a regression is statistically real. [Failing a Pull Request on a Go Benchmark Regression]({{< ref "/blog/benchmark-regression-gate" >}}) covers it.
 
 ## Where to start
 

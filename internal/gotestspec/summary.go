@@ -70,7 +70,7 @@ func totalDuration(packages []*Package) time.Duration {
 	return TotalDuration(packages)
 }
 
-func effectiveDuration(cfg renderConfig, packages []*Package) time.Duration {
+func effectiveDuration(cfg *renderConfig, packages []*Package) time.Duration {
 	if cfg.elapsed > 0 {
 		return cfg.elapsed
 	}
@@ -96,7 +96,7 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 	if len(failures) == 0 && len(diags) == 0 && stats.FailedPackages == 0 {
 		fmt.Fprintf(w, "%s%d tests passed%s (%s)\n",
 			c.green, stats.Total(), c.reset,
-			formatDuration(effectiveDuration(cfg, packages)))
+			formatDuration(effectiveDuration(&cfg, packages)))
 		if cfg.coverage != nil {
 			fmt.Fprintf(w, "%sCoverage: %.1f%%%s\n", c.dim, cfg.coverage.Total, c.reset)
 		}
@@ -159,7 +159,7 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 
 	if len(failures) == 0 && len(diags) == 0 && stats.FailedPackages == 0 {
 		fmt.Fprintf(w, "### All %d tests passed (%s)\n",
-			stats.Total(), formatDuration(effectiveDuration(cfg, packages)))
+			stats.Total(), formatDuration(effectiveDuration(&cfg, packages)))
 		if cfg.coverage != nil {
 			renderMarkdownCoverage(w, cfg.coverage)
 		}
@@ -247,7 +247,7 @@ func RenderMarkdownBenchSummary(w io.Writer, packages []*Package, opts ...Render
 
 	stats := CollectStats(packages)
 	failures := collectFailures(packages)
-	dur := formatDuration(effectiveDuration(cfg, packages))
+	dur := formatDuration(effectiveDuration(&cfg, packages))
 	if len(failures) == 0 {
 		fmt.Fprintf(w, "### %s ran (%s)\n", countNoun(stats.Benchmarks, "benchmark", "benchmarks"), dur)
 	} else {
@@ -279,6 +279,9 @@ func RenderMarkdownBenchSummary(w io.Writer, packages []*Package, opts ...Render
 	if cfg.benchDeltas != nil {
 		fmt.Fprintln(w)
 		renderMarkdownBenchDeltaTable(w, cfg.benchDeltas)
+	}
+	if cfg.benchEnvWarning != "" {
+		fmt.Fprintf(w, "\n**Warning:** %s\n", cfg.benchEnvWarning)
 	}
 	if g := cfg.benchGate; g != nil {
 		if g.Breached {

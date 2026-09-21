@@ -18,6 +18,11 @@ type Report struct {
 	Baseline      Baseline `json:"baseline"`
 	Deltas        []Delta  `json:"deltas,omitempty"`
 	Gate          *Gate    `json:"gate,omitempty"`
+	// EnvMismatch is non-empty when the baseline compared against was
+	// recorded under a different toolchain or platform, which makes every
+	// delta suspect. Present as data, not as a verdict: nothing refuses the
+	// comparison, and consumers decide how loudly to say so.
+	EnvMismatch []EnvDiff `json:"envMismatch,omitempty"`
 }
 
 // Gate is the report's gate verdict: the configured threshold, the worst
@@ -35,13 +40,15 @@ type Gate struct {
 }
 
 // NewReport assembles the document for one run. deltas may be nil when no
-// comparison ran; gate may be nil when no gate is active.
-func NewReport(b Baseline, deltas []Delta, gate *Gate) Report { //nolint:gocritic // hugeParam: stable API
+// comparison ran; gate may be nil when no gate is active; envMismatch is nil
+// unless the baseline came from another toolchain or platform.
+func NewReport(b Baseline, deltas []Delta, gate *Gate, envMismatch []EnvDiff) Report { //nolint:gocritic // hugeParam: stable API
 	return Report{
 		SchemaVersion: reportSchemaVersion,
 		Baseline:      b,
 		Deltas:        deltas,
 		Gate:          gate,
+		EnvMismatch:   envMismatch,
 	}
 }
 

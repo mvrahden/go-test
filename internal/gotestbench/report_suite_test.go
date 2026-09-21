@@ -23,7 +23,7 @@ func (s *ReportTestSuite) TestNewReport(t *gotest.T) {
 	}}
 
 	t.When("no comparison ran", func(w *gotest.T) {
-		report := gotestbench.NewReport(base, nil, nil)
+		report := gotestbench.NewReport(base, nil, nil, nil)
 
 		w.It("stamps schema version 1", func(it *gotest.T) {
 			gotest.Equal(it, 1, report.SchemaVersion)
@@ -43,7 +43,7 @@ func (s *ReportTestSuite) TestNewReport(t *gotest.T) {
 			{Key: "pkg CacheTestSuite/BenchmarkGetHit", OldNs: 100, NewNs: 112.3, PercentChange: 12.3, Significant: true},
 		}
 		gate := gotestbench.GateVerdict(deltas, 5)
-		report := gotestbench.NewReport(base, deltas, &gate)
+		report := gotestbench.NewReport(base, deltas, &gate, nil)
 
 		w.It("round-trips deltas with their contract field names", func(it *gotest.T) {
 			data, err := gotestbench.MarshalReport(report)

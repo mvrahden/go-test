@@ -1,6 +1,7 @@
 ---
 title: "Go Tests in GitHub Actions: The gotest CI Setup Guide"
 date: 2026-07-22
+lastmod: 2026-09-20
 description: "Run Go tests in GitHub Actions with the gotest action: failure-focused summaries, inline PR annotations, coverage thresholds, and the focus-prefix guard."
 tags: ["CI"]
 keywords: ["go test github actions", "go ci coverage threshold", "go test pr annotations", "gotest github action"]
@@ -105,6 +106,8 @@ The action accepts these inputs:
 | `flags` | | Additional gotest flags (`--double-dash` style). |
 | `go-test-flags` | | Additional `go test` flags (`-single-dash` style). |
 | `version` | `gomod` | gotest version: `gomod` resolves from `go.mod`, or a version tag (e.g. `v1.0.0`, `latest`) to install globally. |
+
+The same action also runs benchmarks and fuzzing when you ask it to: `bench` with `bench-baseline` and `bench-gate` turns a regression into a failed step (see [Failing a Pull Request on a Go Benchmark Regression]({{< ref "/blog/benchmark-regression-gate" >}})), and `fuzz` with `fuzz-for` spends a budget searching for new inputs, caching the corpus between runs (see [From Crasher to Regression Test]({{< ref "/blog/fuzz-crasher-triage" >}})).
 
 ### Action outputs
 
