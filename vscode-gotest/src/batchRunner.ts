@@ -9,6 +9,7 @@ import { buildCliCommand, clearBinaryCache, formatCliCommand } from "./cli.js";
 import { readModulePath } from "./gomod.js";
 import {
   applyEvent,
+  getPackageItem,
   skipUnresolved,
   spawnTestProcess,
   resolveRunPatterns,
@@ -105,6 +106,8 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     outputChannel.info(`[${label}] ${formatCliCommand(cmd)}`);
 
     const streamedPkgs = new Set<string>();
+    // Whether the stream carried a verdict the tree can show as red.
+    let streamedFailure = false;
     const pkgOutputMaps = new Map<string, Map<string, string>>();
     const pkgDirMap = new Map(pkgInfos.map((p) => [p.importPath, p.dir]));
 
@@ -135,6 +138,10 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         dir,
       );
       if (result) onResults?.([result]);
+
+      if (event.Action === "fail") {
+        streamedFailure = true;
+      }
 
       const isTerminal =
         !event.Test &&
@@ -187,6 +194,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         run.appendOutput(stderrFiltered.replace(/\n/g, "\r\n") + "\r\n");
       }
 
+      let attributed = false;
       for (const info of pkgInfos) {
         if (streamedPkgs.has(info.importPath)) {
           continue;
@@ -202,6 +210,31 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         for (const item of info.items) {
           run.errored(item, new vscode.TestMessage(diagnostic));
           skipUnresolved(run, item, controller);
+        }
+        attributed = true;
+      }
+
+      // Every package reported, the stream carried no failing verdict, and the
+      // run still failed: the reason is not a test's — a shared fixture that
+      // would not release what it holds, a census, a deadline. Nothing above
+      // carries it, so the tree would read green for a run the CLI failed.
+      // Mark the packages instead; their tests did pass, and the failure is
+      // the package's, not theirs. A stream that did carry a failure is left
+      // alone: the tree already shows red, and overwriting that verdict would
+      // lose which test it was. The -json stream is not part of the message
+      // here — it is the whole run's output, not something to read on an item.
+      if (!attributed && !streamedFailure) {
+        const diagnostic = [stderrFiltered, `exit code ${result.exitCode}`]
+          .filter(Boolean)
+          .join("\n\n");
+        const seen = new Set<string>();
+        for (const info of pkgInfos) {
+          for (const item of info.items) {
+            const pkgItem = getPackageItem(item);
+            if (seen.has(pkgItem.id)) continue;
+            seen.add(pkgItem.id);
+            run.errored(pkgItem, new vscode.TestMessage(diagnostic));
+          }
         }
       }
     }
