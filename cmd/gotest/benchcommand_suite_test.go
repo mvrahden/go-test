@@ -127,6 +127,61 @@ func (s *BenchCommandTestSuite) TestBenchSubcommand(t *gotest.T) {
 	})
 }
 
+// hookFenceSrc is a suite whose per-test hooks each sleep far longer than the
+// benchmark body takes. What the measurement reports says whether the
+// generated wrapper fenced them out of the timer.
+const hookFenceSrc = `package testpkg
+
+import (
+	"time"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type FenceTestSuite struct{}
+
+func (s *FenceTestSuite) BeforeEach(t *gotest.T) { time.Sleep(20 * time.Millisecond) }
+func (s *FenceTestSuite) AfterEach(t *gotest.T)  { time.Sleep(20 * time.Millisecond) }
+
+// The loop is written the old way on purpose: b.Loop() resets the timer
+// itself, which would hide a missing fence. b.N times what the wrapper left
+// running.
+func (s *FenceTestSuite) BenchmarkAdd(b *gotest.B) {
+	x := 0
+	for i := 0; i < b.B().N; i++ {
+		x++
+	}
+	_ = x
+}
+`
+
+// A benchmark measures the method, not the suite around it. The wrapper fences
+// BeforeEach and AfterEach out of the timer; the renderer test pins the
+// b.StopTimer() call, and this pins what that call is for — a hook that sleeps
+// for 20ms must not show up in ns/op. Verified by removing the fence from the
+// template: this fails, while the same fixture written with b.Loop() does not,
+// because Loop resets the timer on its own.
+func (s *BenchCommandTestSuite) TestBenchExcludesPerTestHooks(t *gotest.T) {
+	dir := stageFixtureModule(t, s.cli.repoRoot, t.TempDir(), "fence_suite_test.go", []byte(hookFenceSrc))
+	baselinePath := filepath.Join(dir, "baseline.json")
+
+	_, code := runGotestIn(t, s.cli.binary, dir, nil, "bench", "./", "-benchtime=50x", "--save="+baselinePath)
+	gotest.Equal(t, 0, code)
+
+	data, err := os.ReadFile(baselinePath)
+	gotest.NoError(t, err)
+	var b gotestbench.Baseline
+	gotest.NoError(t, json.Unmarshal(data, &b))
+	gotest.Len(t, b.Results, 1)
+	gotest.NotEmpty(t, b.Results[0].Samples)
+
+	t.It("reports the method's own time, not the hooks'", func(it *gotest.T) {
+		// 20ms of sleep over 50 iterations would be 400000 ns/op even if only
+		// one hook leaked; an increment is single-digit nanoseconds.
+		gotest.Less(it, b.Results[0].Samples[0].NsPerOp, 1000.0)
+	})
+}
+
 func (s *BenchCommandTestSuite) TestBenchSaveAgainstGate(t *gotest.T) {
 	t.It("saves a baseline with one Sample per -count repetition", func(it *gotest.T) {
 		dir := it.TempDir()
