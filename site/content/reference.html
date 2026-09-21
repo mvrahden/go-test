@@ -23,6 +23,8 @@ aliases: ["/reference.html"]
         <li><a href="#assertions">Assertions</a> <span class="toc-desc">— type-safe generics for equality, errors, collections</span></li>
         <li><a href="#configuration">Configuration</a> <span class="toc-desc">— project file, suite config, fixture config</span></li>
         <li><a href="#coverage">Coverage</a> <span class="toc-desc">— statement-weighted calculation and thresholds</span></li>
+        <li><a href="#benchmarking">Benchmarking</a> <span class="toc-desc">— benchmark suites, baselines, deltas, and the gate</span></li>
+        <li><a href="#fuzzing">Fuzzing</a> <span class="toc-desc">— fuzz targets, struct inputs, sessions, crashers</span></li>
         <li><a href="#cli">CLI Reference</a> <span class="toc-desc">— commands, flags, go test passthrough</span></li>
         <li><a href="#linter">Linter</a> <span class="toc-desc">— rule tiers, suppression, exit codes</span></li>
         <li><a href="#ci-integration">CI Integration</a> <span class="toc-desc">— summary output, GitHub Action, PR annotations</span></li>
@@ -555,7 +557,100 @@ percentage = covered / total</div>
       </div>
     </section>
 
-    <!-- 8. CLI Reference -->
+    <!-- 8. Benchmarking -->
+    <section class="ref-section" id="benchmarking">
+      <h2>Benchmarking</h2>
+      <p class="lead">Benchmarks are suite methods. A baseline is a file. A gate is a number.</p>
+
+      <h3>Writing benchmarks</h3>
+      <p>A <code>Benchmark</code>-prefixed method on any suite takes a <code>*gotest.B</code>. The suite's fixtures and lifecycle hooks apply as they do to tests, so setup happens where it always does — outside the measured loop.</p>
+      <div class="code-block">
+        <pre><span class="kw">func</span> (s *<span class="tp">CacheTestSuite</span>) <span class="fn">BenchmarkGetHit</span>(b *gotest.B) {
+    key := s.Corpus.Keys[0]        <span class="cm">// read fixture state above the loop</span>
+    <span class="kw">for</span> b.Loop() {
+        s.cache.Get(key)
+    }
+}</pre>
+      </div>
+      <div class="callout">
+        Reading fixture-backed state <em>inside</em> <code>b.Loop()</code> times the fixture, not the code under test. The <code>bench-fixture-io</code> lint rule flags it.
+      </div>
+
+      <h3>Running them</h3>
+      <table class="ref-table">
+        <thead><tr><th>Command</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>gotest bench ./...</code></td><td>Run every suite's generated <code>Benchmark&lt;SuiteName&gt;</code> wrapper, one suite at a time.</td></tr>
+          <tr><td><code>gotest bench --spec ./...</code></td><td>Render the results as a spec tree instead of raw benchmark lines.</td></tr>
+          <tr><td><code>-bench='^BenchmarkCacheTestSuite$/^BenchmarkGetHit$'</code></td><td>Scope to one method: the wrapper runs each method under <code>b.Run</code> with its own name.</td></tr>
+          <tr><td><code>-benchtime=100x</code>, <code>-count=3</code></td><td>Standard <code>go test</code> flags, forwarded unchanged.</td></tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        Benchmark suites always dispatch serially, one at a time, whatever <code>--parallel</code> says: concurrent benchmarks measure each other. <code>-test.benchmem</code> is on by default, so every line carries <code>B/op</code> and <code>allocs/op</code>.
+      </div>
+
+      <h3>Baselines, deltas, and the gate</h3>
+      <table class="ref-table">
+        <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>--save=&lt;path&gt;</code></td><td>Write this run's results as a JSON baseline. Bare <code>--save=</code> uses <code>bench.baseline</code> from <code>.gotest.yml</code>.</td></tr>
+          <tr><td><code>--against=&lt;path&gt;</code></td><td>Compare this run to a saved baseline and print a delta table. Defaults to <code>bench.baseline</code>.</td></tr>
+          <tr><td><code>--gate=&lt;pct&gt;</code></td><td>Exit 1 when the worst significant regression exceeds <code>pct</code> percent. Needs a comparison; defaults to <code>bench.gate</code>, where <code>0</code> disables.</td></tr>
+          <tr><td><code>--json</code></td><td>One versioned JSON document: the run's results, every delta when a comparison ran, and the gate verdict when a gate is active. For tooling, including the editor.</td></tr>
+        </tbody>
+      </table>
+      <p>In <code>.gotest.yml</code>, <code>bench.baseline</code> and <code>bench.gate</code> set the defaults, so CI and a laptop agree on what a regression is without repeating flags.</p>
+    </section>
+
+    <!-- 9. Fuzzing -->
+    <section class="ref-section" id="fuzzing">
+      <h2>Fuzzing</h2>
+      <p class="lead">Fuzz targets are suite methods, and their inputs are Go types — including structs the engine cannot take.</p>
+
+      <h3>Writing a fuzz target</h3>
+      <p>A <code>Fuzz</code>-prefixed method takes a <code>*gotest.F</code>. Seeds go in with <code>f.Add</code>, the property goes in <code>f.Fuzz</code>, and the generator emits one <code>Fuzz&lt;SuiteName&gt;_&lt;MethodName&gt;</code> wrapper per method.</p>
+      <div class="code-block">
+        <pre><span class="kw">func</span> (s *<span class="tp">FrameCodecTestSuite</span>) <span class="fn">FuzzFrameRoundTrip</span>(f *gotest.F) {
+    f.Add(<span class="tp">Frame</span>{Version: 1, Topic: <span class="st">"orders.created"</span>, Payload: []<span class="tp">byte</span>(<span class="st">`{"id":1}`</span>)})
+    f.Fuzz(<span class="kw">func</span>(t *gotest.T, in <span class="tp">Frame</span>) {
+        out, err := Decode(Encode(in))
+        gotest.NoError(t, err)
+        gotest.Equal(t, in, out)   <span class="cm">// property: round trip</span>
+    })
+}</pre>
+      </div>
+
+      <h3>Struct inputs</h3>
+      <p>Go's fuzzing engine accepts fifteen types, none of them a struct. gotest fans a struct into one engine argument per leaf field at generation time and reassembles the value before each execution. Two consequences follow: a type the fan cannot express is refused when you generate, not hours into a session, and a seed stays an ordinary Go literal instead of a byte blob.</p>
+
+      <h3>Sessions</h3>
+      <table class="ref-table">
+        <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>--for=&lt;dur&gt;</code></td><td>Wall-clock budget for the whole session (default 1m), split across targets — never less than 10s each. <code>--for=0</code> fuzzes until interrupted.</td></tr>
+          <tr><td><code>--jobs=&lt;n&gt;</code></td><td>Concurrent targets (default <code>max(1, GOMAXPROCS/2)</code>). Each target is its own <code>go test -fuzz</code> process.</td></tr>
+          <tr><td><code>--target=&lt;Fuzz...&gt;</code></td><td>Fuzz one target by wrapper name; an unmatched name lists what exists.</td></tr>
+          <tr><td><code>--no-harvest</code></td><td>Skip mining table-test literals into seeds for this run (<code>fuzz.harvest</code> in <code>.gotest.yml</code>).</td></tr>
+        </tbody>
+      </table>
+      <p>Exit codes: <code>0</code> when the budget ran out with nothing found, <code>1</code> for a finding — a failing target or a new crasher file — and <code>2</code> when the session could not run as asked.</p>
+      <div class="callout">
+        Seeds replay without this command: every <code>f.Add</code> seed and every corpus entry under <code>testdata/fuzz/</code> runs as an ordinary subtest of a plain <code>gotest</code> run. <code>gotest fuzz</code> is how you spend time looking for new inputs.
+      </div>
+
+      <h3>Crashers</h3>
+      <table class="ref-table">
+        <thead><tr><th>Command</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>gotest fuzz triage ./...</code></td><td>Re-run every corpus entry, printing its decoded input and the failure cause, or <code>status: no longer failing</code>. Exits 1 while any crasher still fails.</td></tr>
+          <tr><td><code>gotest fuzz promote ./...</code></td><td>Splice each crasher into its method as a permanent <code>f.Add(...)</code> seed, after the last existing seed, and delete the corpus file.</td></tr>
+        </tbody>
+      </table>
+      <p>A crasher whose method cannot be located with confidence is left in place with a warning; promote never partially edits source.</p>
+    </section>
+
+    <!-- 10. CLI Reference -->
     <section class="ref-section" id="cli">
       <h2>CLI Reference</h2>
       <p class="lead">One command, multiple modes. All <code>go test</code> flags pass through unchanged.</p>
@@ -623,7 +718,7 @@ percentage = covered / total</div>
       </div>
     </section>
 
-    <!-- 9. Linter -->
+    <!-- 11. Linter -->
     <section class="ref-section" id="linter">
       <h2>Linter</h2>
       <p class="lead">Twenty-eight rules in three tiers. A rule's tier determines how it may be suppressed.</p>
@@ -699,7 +794,7 @@ percentage = covered / total</div>
       </div>
     </section>
 
-    <!-- 10. CI Integration -->
+    <!-- 12. CI Integration -->
     <section class="ref-section" id="ci-integration">
       <h2>CI Integration</h2>
       <p class="lead">Failure-focused summaries, inline PR annotations, and coverage reports — out of the box.</p>

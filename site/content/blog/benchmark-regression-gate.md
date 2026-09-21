@@ -1,0 +1,180 @@
+---
+title: "Failing a Pull Request on a Go Benchmark Regression"
+date: 2026-09-16
+description: "Turn Go benchmarks into a CI gate: save a baseline, compare a branch against it, and fail the build when a regression is statistically real."
+tags: ["Performance"]
+keywords: ["go benchmark regression ci", "benchmark gate pull request go", "continuous benchmarking go", "benchstat alternative"]
+cta_text: "Put a benchmark gate on your next pull request."
+---
+
+Most Go repositories have benchmarks. Far fewer have an answer to the question a reviewer actually asks: *is this pull request slower than main?*
+
+The benchmarks usually run somewhere — a nightly job, a make target, a CI step that prints `ns/op` into a log. The numbers scroll past. Nobody diffs them against last week. A 15% regression lands, and six months later someone bisects a performance complaint back to a commit whose CI was green the whole time.
+
+The gap is not measurement. Go's benchmark tooling is excellent. The gap is that a benchmark result is a number, a pull request needs a verdict, and turning one into the other means storing a baseline, comparing against it, and deciding which differences are real.
+
+`gotest bench` does those three things with `--save`, `--against` and `--gate`.
+
+## Why "is it slower?" is hard to answer
+
+Say you run `go test -bench=. ./...` on main, then on your branch, and put the two outputs side by side. Three problems appear immediately.
+
+**The runs are not comparable.** Different machine, different CPU governor, a noisy neighbour on the CI runner — a 10% difference between two runs can be entirely environmental. Compare a laptop to a runner and the numbers are meaningless.
+
+**One sample is not a measurement.** A single `ns/op` figure is one estimate of a noisy quantity. Rerun the same binary on the same machine and it moves. Without repetitions, you cannot tell 3% of noise from 3% of regression.
+
+**Eyeballing does not scale.** [benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) exists precisely because this comparison needs statistics, and it does the statistics well. What it does not do is decide: it prints a table for a human to read. A gate needs a process that exits non-zero.
+
+## Benchmarks as suite methods
+
+In gotest, a benchmark is a method on a suite, the same way a test is:
+
+```go {title="cache_suite_test.go"}
+func (s *CacheTestSuite) BenchmarkGetHit(b *gotest.B) {
+    key := s.Corpus.Keys[0]
+    for b.Loop() {
+        s.cache.Get(key)
+    }
+}
+```
+
+The suite's fixtures and lifecycle hooks apply. `BeforeEach` runs with the timer stopped and `AfterEach` after it stops again, so per-iteration setup never lands in the measurement. What the loop times is what is inside the loop.
+
+That `key := s.Corpus.Keys[0]` line above the loop is deliberate. Reading fixture-backed state *inside* `b.Loop()` measures the fixture — if the fixture were a database handle, the loop would time the query. The `bench-fixture-io` lint rule flags exactly that pattern.
+
+Two execution details matter for trustworthy numbers. Benchmark suites dispatch **serially**, one at a time, whatever `--parallel` says — concurrent benchmarks measure each other. And each suite runs as **its own OS process**, so allocation pressure from one suite cannot distort the next one's `allocs/op`.
+
+## Save a baseline
+
+`--save` writes the run's results as JSON:
+
+{{< terminal title="gotest bench --save=bench.json -count=5 ./..." >}}
+BenchmarkCache <span class="t-time">(1.2s)</span>
+  <span class="t-pass">✓</span> GetHit   225.7 ns/op · 0 B/op · 0 allocs/op
+  <span class="t-pass">✓</span> GetMiss  118.3 ns/op · 0 B/op · 0 allocs/op
+
+1 suite, 2 benchmarks
+{{< /terminal >}}
+
+`-count=5` matters, and the next section explains why. The file it writes is small and readable:
+
+```json {title="bench.json"}
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-16T09:12:47Z",
+  "goVersion": "go1.27.0",
+  "goos": "linux",
+  "goarch": "amd64",
+  "results": [
+    {
+      "package": "example.com/cache",
+      "suite": "CacheTestSuite",
+      "name": "BenchmarkGetHit",
+      "samples": [
+        { "iterations": 5116533, "nsPerOp": 225.7, "bytesPerOp": 0, "allocsPerOp": 0 }
+      ]
+    }
+  ]
+}
+```
+
+One entry per benchmark and one sample per `-count` repetition — the array above is trimmed to a single sample — plus the toolchain and platform that produced them. The platform fields are there because a baseline recorded on an M3 laptop says nothing useful about a Linux runner.
+
+## Compare against it
+
+`--against` reads a baseline and prints a delta table beneath the results:
+
+{{< terminal title="gotest bench --against=bench.json -count=5 ./..." >}}
+BenchmarkCache <span class="t-time">(1.3s)</span>
+  <span class="t-pass">✓</span> GetHit   254.8 ns/op · 0 B/op · 0 allocs/op
+
+BENCHMARK                                 OLD ns/op  NEW ns/op  Δ
+example.com/cache CacheTestSuite/BenchmarkGetHit  223.0  248.2  <span class="t-fail">+11.3% ⚠</span>
+{{< /terminal >}}
+
+Benchmarks are matched by package, suite and name. One that exists on only one side is skipped rather than reported as an infinite change — a renamed benchmark is not a regression.
+
+By default the table shows only significant rows. Pass `-v` and every comparison prints, significant or not, which is what you want when you are exploring rather than gating.
+
+## What counts as a regression
+
+This is the part that decides whether a gate is useful or merely annoying.
+
+gotest compares the mean `ns/op` of the baseline samples against the mean of the new samples with **Welch's t-test**, two-tailed, at **p < 0.05**. It needs at least **four samples on each side** to run the test — that is what `-count=5` is for. Below four, it falls back to a blunt rule: a change counts only if it is at least **20%**.
+
+The consequence is worth internalising. During a run for this post, a benchmark moved **+173%** and the gate stayed quiet, because a single outlier iteration inflated the mean while the distributions still overlapped. The percentage is not the decision. The test is.
+
+`--gate=<pct>` turns that into a verdict: the worst *significant* positive change is compared to your threshold, and the run exits 1 if it exceeds it.
+
+{{< terminal title="gotest bench --against=bench.json --gate=10 -count=5 ./..." >}}
+BENCHMARK                                 OLD ns/op  NEW ns/op  Δ
+example.com/cache CacheTestSuite/BenchmarkGetHit  223.0  248.2  <span class="t-fail">+11.3% ⚠</span>
+
+<span class="t-fail">bench gate: example.com/cache CacheTestSuite/BenchmarkGetHit +11.3% exceeds 10% gate</span>
+$ echo $?
+1
+{{< /terminal >}}
+
+One honest limitation: the comparison and the gate look at `ns/op` only. `B/op` and `allocs/op` are recorded in every baseline and printed in every result, but they do not gate. If allocation count is the number you care about most, keep reading them in review — the gate will not watch them for you.
+
+## In CI
+
+The GitHub Action wires this up with three inputs:
+
+```yaml {title=".github/workflows/bench.yml"}
+- uses: mvrahden/go-test@v1
+  with:
+    bench: true
+    bench-baseline: .bench/main.json
+    bench-gate: "10"
+```
+
+The step runs `gotest bench --spec --json`, so the run is both human-readable in the job log and machine-readable afterwards. It sets two outputs: `bench-report`, the path to the JSON document, and `bench-breached-keys`, the comma-joined list of benchmarks that crossed the gate — enough to post a comment naming them, or to fan out to an issue.
+
+Under GitHub Actions the CLI also appends a table to the job summary, so the result is visible without opening the log:
+
+```text
+### 1 benchmark ran (6.9s)
+
+| Benchmark | old ns/op | new ns/op | Δ |
+|---|---|---|---|
+| example.com/cache CacheTestSuite/BenchmarkGetHit | 223.0 | 404.7 | +81.5% ⚠ |
+
+**Bench gate breached:** example.com/cache CacheTestSuite/BenchmarkGetHit +81.5% exceeds the 10% gate
+```
+
+Set the defaults once in `.gotest.yml` and the flags disappear from both the workflow and your shell:
+
+```yaml {title=".gotest.yml"}
+bench:
+  baseline: .bench/main.json
+  gate: 10
+```
+
+## Where the baseline comes from
+
+Two approaches, and the choice matters more than the threshold.
+
+**Commit the baseline.** A file in the repository, regenerated deliberately when a change is meant to move the numbers. Reviewable: the diff shows the number changing, in the same pull request that justifies it. The cost is that it is only valid for the machine class that produced it, so regenerate it from CI, not a laptop.
+
+**Generate the baseline from main on every run.** Check out main, benchmark it, benchmark the branch, compare. Immune to machine drift because both halves run on the same runner, minutes apart. The cost is double the benchmark time on every pull request.
+
+Start with the committed baseline: it is cheaper and the drift is visible. Move to per-run generation when your runners are heterogeneous enough that the drift starts producing false gates.
+
+Whichever you choose, use `-count=5` or more. With fewer samples the t-test cannot run, and the 20% fallback will either miss real regressions or fire on noise.
+
+## In the editor
+
+The VS Code extension reads the same `--json` document. Each benchmark method gets a CodeLens to run it, and a `5×` lens that runs it with `-count=5` — enough samples for the comparison to be statistically meaningful. Under the method, an annotation shows the last numbers recorded *on this machine's platform*, with a percentage against the baseline only when the CLI marked that delta significant. Hovering draws a sparkline of the method's history, and a breached gate becomes a squiggle on exactly the methods named in `breachedKeys`.
+
+## What to gate
+
+Not everything. A gate on forty benchmarks is a gate that gets disabled the first busy week.
+
+Pick the handful that represent work your users wait for: the hot path of your parser, the serialization on your request path, the cache lookup in your inner loop. Gate those at a threshold you would actually block a merge over — 10% is a reasonable start, 5% needs quiet runners, 20% only catches disasters. Leave the rest ungated: they still run, still print, still land in the baseline, and are there when you go looking.
+
+A gate's job is not to notice every change. It is to make the specific regressions you care about impossible to merge without someone deciding to.
+
+## Further reading
+
+For the CI setup this builds on — summaries, annotations, coverage thresholds — see [Go Tests in GitHub Actions]({{< ref "/blog/gotest-in-ci" >}}). For the fixture model the benchmark suites above rely on, [Test Fixtures in Go]({{< ref "/blog/test-fixtures-in-go" >}}) covers the fundamentals. And if your performance work is about the whole suite rather than one hot path, [Why Your Go Tests Are Slow]({{< ref "/blog/go-testing-at-scale" >}}) looks at the run itself.

@@ -5,7 +5,9 @@ enableRobotsTXT = true
 enableGitInfo = true
 
 [frontmatter]
-  lastmod = [':git', 'lastmod', 'date']
+  # An explicit lastmod is an editorial statement about the content and wins;
+  # everything else takes its update date from the commit that last touched it.
+  lastmod = ['lastmod', ':git', 'date']
 
 [params]
   description = 'Specification-Driven Test Suites for Go'
