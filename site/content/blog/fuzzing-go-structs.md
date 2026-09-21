@@ -7,7 +7,7 @@ keywords: ["go fuzzing struct", "go fuzz complex types", "structure aware fuzzin
 cta_text: "Fuzz your own types with gotest."
 ---
 
-Go's fuzzing engine accepts fifteen argument types: `string`, `[]byte`, `bool`, the sized integers, the two floats. That list is the entire contract of `f.Fuzz`. Your domain types are not on it.
+Go's fuzzing engine accepts fifteen argument types: `string`, `[]byte`, `bool`, `int` and `uint` with their sized forms, and the two floats. That list is the entire contract of `f.Fuzz`. Your domain types are not on it.
 
 So the first time you try to fuzz the thing you actually want to fuzz — a wire frame, a request payload, a config struct — you hit a wall that has only two doors. Either you fuzz a `[]byte` and decode it into your type by hand, or you do not fuzz that type at all. Most codebases pick the second door quietly.
 
@@ -22,6 +22,8 @@ The first door is the one the ecosystem documents. You write a consumer: take th
 **A refactor silently reinterprets the corpus.** Add a field in the middle of the struct, or swap two fields, and every stored corpus entry now decodes to a different value than the one that was interesting. Nothing fails. Your regression corpus quietly stops testing what it was saved to test.
 
 **The consumer is code with bugs.** It is parsing logic, written under no test, sitting between the fuzzer and the code under test. When it is wrong, the fuzzer explores a space that does not correspond to reality.
+
+The third cost is not unique to hand-written consumers, and it is worth being straight about: gotest's own corpus files are positional too, so a field reorder reinterprets them the same way. What escapes it is the *seed* — a typed literal in source, which is where gotest puts anything worth keeping. [From Crasher to Regression Test]({{< ref "/blog/fuzz-crasher-triage" >}}) covers that trade in full.
 
 None of this is the engine's fault. Fifteen types is a reasonable contract for a mutator that works on bytes. The question is who builds the bridge from those bytes to your type, and when.
 
@@ -101,7 +103,7 @@ The example this post draws on is a broker frame codec. `Frame` packed `Version`
 
 `Version: 48` overflowed the five bits it shared with `Kind`, and the decoded frame came back as `Version: 16`. The property that caught it is one line: encode, decode, compare. No oracle to write, no expected output to maintain.
 
-Note which field the fuzzer reached. `Version` is a `uint8` that, in the fanned form, is its own little-endian argument — so "try 48" is a single mutation, not a coincidence of blob layout.
+Note which field the fuzzer reached. In the fanned form `Version` is its own fixed-width `[]byte` argument rather than bytes four and five of a blob, so "try 48 here" is a single mutation instead of a lucky coincidence of layout.
 
 ## Seeds you can read, and seeds you get for free
 

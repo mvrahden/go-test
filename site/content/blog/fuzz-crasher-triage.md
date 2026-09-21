@@ -134,7 +134,19 @@ Fuzzing in CI is a search, not a test. It runs for a budget, and most runs find 
     fuzz-for: 10m
 ```
 
-`fuzz-for` is the budget for the whole session, split across targets — each gets `--for × min(--jobs, targets) / targets`, never less than ten seconds, and the schedule prints before the search starts. The action caches the corpus between runs (`fuzz-cache`, on by default), restoring the most recent one for the branch and falling back to the base, so coverage accumulated on main gives every pull request a head start. It sets a `fuzz-crashers` output listing any new files, which is what you hang a comment or an issue on.
+`fuzz-for` is the budget for the whole session, split across targets — each gets `--for × min(--jobs, targets) / targets`, never less than ten seconds, and the schedule prints before the search starts.
+
+It helps to keep three places an input can live apart, because CI touches all three:
+
+| Where | What it holds | Lifetime |
+|---|---|---|
+| `f.Add` seeds in source | inputs you decided to keep | forever, reviewed, replayed on every run |
+| `testdata/fuzz/<Func>/` | crashers the engine saved | until you triage and promote them |
+| Go's fuzz cache | inputs a session found *interesting*, not failing | between sessions, disposable |
+
+`fuzz-cache` (on by default) carries only the third one: the action saves and restores `$(go env GOCACHE)/fuzz` so a short budget compounds instead of restarting from the seeds each time. Restores fall back through a key prefix, and GitHub's own cache scoping is what makes a pull request see the branch's cache and then the base branch's — so time spent on main gives every branch a head start. The committed corpus needs none of this: it is source.
+
+The step sets a `fuzz-crashers` output listing any new files, which is what you hang a comment or an issue on.
 
 Then the local half of the loop:
 

@@ -38,25 +38,27 @@ func (s *CacheTestSuite) BenchmarkGetHit(b *gotest.B) {
 }
 ```
 
-The suite's fixtures and lifecycle hooks apply. `BeforeEach` runs with the timer stopped and `AfterEach` after it stops again, so per-iteration setup never lands in the measurement. What the loop times is what is inside the loop.
+The suite's lifecycle hooks apply. `BeforeEach` runs once per benchmark method with the timer stopped, and `AfterEach` after it stops again, so suite setup never lands in the measurement — a hook that sleeps for 50ms leaves a 3ns benchmark reading 3ns. Setup that has to happen *per iteration* is different: that belongs inside the loop, fenced with `b.StopTimer()` and `b.StartTimer()` yourself.
+
+A fixture bound to a benchmark suite may define `BeforeAll`/`AfterAll` only. Per-method fixture hooks assume a fresh invocation per test case, which a benchmark loop does not give them, so the generator rejects them by name rather than emitting code that ignores them.
 
 That `key := s.Corpus.Keys[0]` line above the loop is deliberate. Reading fixture-backed state *inside* `b.Loop()` measures the fixture — if the fixture were a database handle, the loop would time the query. The `bench-fixture-io` lint rule flags exactly that pattern.
 
-Two execution details matter for trustworthy numbers. Benchmark suites dispatch **serially**, one at a time, whatever `--parallel` says — concurrent benchmarks measure each other. And each suite runs as **its own OS process**, so one suite's heap and GC behaviour does not follow the next one into its measurement.
+Two execution details matter for trustworthy numbers. Benchmark suites dispatch **serially**, one at a time, whatever `--parallel` says — concurrent benchmarks measure each other. And each suite runs as **its own OS process**, so one suite's heap, garbage collector and resident memory do not follow the next one into its measurement, and two suites never compete for the same cores.
 
 ## Save a baseline
 
 `--save` writes the run's results as JSON:
 
 {{< terminal title="gotest bench --save=bench.json -count=5 ./..." >}}
-BenchmarkCache <span class="t-time">(1.2s)</span>
+BenchmarkCache <span class="t-time">(&lt;1ms)</span>
   <span class="t-pass">✓</span> GetHit   225.7 ns/op · 0 B/op · 0 allocs/op
   <span class="t-pass">✓</span> GetMiss  118.3 ns/op · 0 B/op · 0 allocs/op
 
 1 suite, 2 benchmarks
 {{< /terminal >}}
 
-`-count=5` matters, for a reason the section on regressions below comes back to. The file it writes is small and readable:
+The time in parentheses is the wall clock of the test that drove the benchmark, not the measurement — the per-operation numbers beside each name are. `-count=5` matters too, for a reason the section on regressions below comes back to. The file it writes is small and readable:
 
 ```json {title="bench.json"}
 {
@@ -78,14 +80,14 @@ BenchmarkCache <span class="t-time">(1.2s)</span>
 }
 ```
 
-One entry per benchmark and one sample per `-count` repetition — the array above is trimmed to a single sample — plus the toolchain and platform that produced them. The platform fields are there because a baseline recorded on an M3 laptop says nothing useful about a Linux runner.
+One entry per benchmark and one sample per `-count` repetition — the array above is trimmed to a single sample — plus the toolchain and platform that produced them. Those last fields are provenance, not a guard: nothing stops you comparing a baseline recorded on an M3 laptop against a run on a Linux runner, and nothing good comes of it. They are how you recognise that mistake when a delta table looks absurd.
 
 ## Compare against it
 
 `--against` reads a baseline and prints a delta table beneath the results:
 
 {{< terminal title="gotest bench --against=bench.json -count=5 ./..." >}}
-BenchmarkCache <span class="t-time">(1.3s)</span>
+BenchmarkCache <span class="t-time">(&lt;1ms)</span>
   <span class="t-pass">✓</span> GetHit   254.8 ns/op · 0 B/op · 0 allocs/op
 
 BENCHMARK                             OLD ns/op  NEW ns/op  Δ
@@ -100,7 +102,7 @@ By default the table shows only significant rows. Pass `-v` and every comparison
 
 This is the part that decides whether a gate is useful or merely annoying.
 
-gotest compares the mean `ns/op` of the baseline samples against the mean of the new samples with **Welch's t-test**, two-tailed, at **p < 0.05**. It needs at least **four samples on each side** to run the test — that is what `-count=5` is for. Below four, it falls back to a blunt rule: a change counts only if it is at least **20%**.
+gotest compares the mean `ns/op` of the baseline samples against the mean of the new samples with **Welch's t-test**, two-tailed, at **p < 0.05**. It needs at least **four samples on each side** to run the test. `-count=5` clears that with one to spare; `-count=1`, the default, does not come close. Below four, it falls back to a blunt rule: a change counts only if it is at least **20%**.
 
 The consequence is worth internalising. During a run for this post, a benchmark moved **+173%** and the gate stayed quiet, because a single outlier iteration inflated the mean while the distributions still overlapped. The percentage is not the decision. The test is.
 
@@ -129,9 +131,9 @@ The GitHub Action wires this up with three inputs:
     bench-gate: "10"
 ```
 
-The step runs `gotest bench --spec --json`, so the run is both human-readable in the job log and machine-readable afterwards. It sets two outputs: `bench-report`, the path to the JSON document, and `bench-breached-keys`, the comma-joined list of benchmarks that crossed the gate — enough to post a comment naming them, or to fan out to an issue.
+The step runs `gotest bench --spec --json`. Under `--json` the human rendering moves out of the job log entirely: stdout carries the versioned report, which the step captures to a file, and the readable results, delta table and gate verdict go to the job summary. The step sets two outputs: `bench-report`, the path to the JSON document, and `bench-breached-keys`, the comma-joined list of benchmarks that crossed the gate — enough to post a comment naming them, or to fan out to an issue.
 
-Under GitHub Actions the CLI also appends a table to the job summary, so the result is visible without opening the log:
+That job summary is where a reviewer reads the outcome:
 
 ```text
 ### 1 benchmark ran (6.9s)
@@ -161,7 +163,7 @@ Two approaches, and the choice matters more than the threshold.
 
 Start with the committed baseline: it is cheaper and the drift is visible. Move to per-run generation when your runners are heterogeneous enough that the drift starts producing false gates.
 
-Whichever you choose, use `-count=5` or more. With fewer samples the t-test cannot run, and the 20% fallback will either miss real regressions or fire on noise.
+Whichever you choose, run at least `-count=4`, and prefer five or more. Below four samples the t-test cannot run at all, and the 20% fallback will either miss real regressions or fire on noise.
 
 ## In the editor
 
