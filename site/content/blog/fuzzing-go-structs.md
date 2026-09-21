@@ -129,4 +129,4 @@ When the bridge to your types is generated instead of hand-written, the set of t
 
 ## Further reading
 
-For what to do with what the fuzzer finds, [From Crasher to Regression Test]({{< ref "/blog/fuzz-crasher-triage" >}}) covers `triage`, `promote`, and why a re-run that produced no verdict is reported as unverified. For the suite model these targets live in — fixtures, hooks, and why `BeforeEach` runs around every fuzz execution — start with [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) and [Go Test Lifecycle]({{< ref "/blog/go-test-lifecycle" >}}).
+For what to do with what the fuzzer finds, [From Crasher to Regression Test]({{< ref "/blog/fuzz-crasher-triage" >}}) covers `triage`, `promote`, and why a re-run that produced no verdict is reported as unverified. For the suite model these targets live in — fixtures, hooks, and why `BeforeEach` runs around every fuzz execution — start with [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) and [Go Test Lifecycle]({{< ref "/blog/go-test-lifecycle" >}}). The flags, session rules and rejection list are in the [Fuzzing reference](/reference/#fuzzing).

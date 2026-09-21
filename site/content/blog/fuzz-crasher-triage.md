@@ -25,7 +25,7 @@ A corpus entry is the engine's encoding of one input, one value per line:
 go test fuzz v1
 string("0")
 string("0")
-[]byte("\xf5\x3a\x00\x00\x00\x00\x00\x00")
+[]byte("0000000\xf5")
 []byte("\x30")
 ```
 
@@ -147,4 +147,4 @@ Step four is the point of the whole exercise. The pull request that fixes the bu
 
 ## Further reading
 
-For why a struct-typed target's corpus arrives as separate leaves — and why seeds do not — see [Fuzzing Go Structs]({{< ref "/blog/fuzzing-go-structs" >}}). For the CI wiring around this, including summaries and annotations, see [Go Tests in GitHub Actions]({{< ref "/blog/gotest-in-ci" >}}).
+For why a struct-typed target's corpus arrives as separate leaves — and why seeds do not — see [Fuzzing Go Structs]({{< ref "/blog/fuzzing-go-structs" >}}). For the CI wiring around this, including summaries and annotations, see [Go Tests in GitHub Actions]({{< ref "/blog/gotest-in-ci" >}}). The commands, flags and exit codes are in the [Fuzzing reference](/reference/#fuzzing).

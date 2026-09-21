@@ -42,7 +42,7 @@ The suite's fixtures and lifecycle hooks apply. `BeforeEach` runs with the timer
 
 That `key := s.Corpus.Keys[0]` line above the loop is deliberate. Reading fixture-backed state *inside* `b.Loop()` measures the fixture — if the fixture were a database handle, the loop would time the query. The `bench-fixture-io` lint rule flags exactly that pattern.
 
-Two execution details matter for trustworthy numbers. Benchmark suites dispatch **serially**, one at a time, whatever `--parallel` says — concurrent benchmarks measure each other. And each suite runs as **its own OS process**, so allocation pressure from one suite cannot distort the next one's `allocs/op`.
+Two execution details matter for trustworthy numbers. Benchmark suites dispatch **serially**, one at a time, whatever `--parallel` says — concurrent benchmarks measure each other. And each suite runs as **its own OS process**, so one suite's heap and GC behaviour does not follow the next one into its measurement.
 
 ## Save a baseline
 
@@ -56,7 +56,7 @@ BenchmarkCache <span class="t-time">(1.2s)</span>
 1 suite, 2 benchmarks
 {{< /terminal >}}
 
-`-count=5` matters, and the next section explains why. The file it writes is small and readable:
+`-count=5` matters, for a reason the section on regressions below comes back to. The file it writes is small and readable:
 
 ```json {title="bench.json"}
 {
@@ -67,7 +67,7 @@ BenchmarkCache <span class="t-time">(1.2s)</span>
   "goarch": "amd64",
   "results": [
     {
-      "package": "example.com/cache",
+      "package": "cache",
       "suite": "CacheTestSuite",
       "name": "BenchmarkGetHit",
       "samples": [
@@ -88,8 +88,8 @@ One entry per benchmark and one sample per `-count` repetition — the array abo
 BenchmarkCache <span class="t-time">(1.3s)</span>
   <span class="t-pass">✓</span> GetHit   254.8 ns/op · 0 B/op · 0 allocs/op
 
-BENCHMARK                                 OLD ns/op  NEW ns/op  Δ
-example.com/cache CacheTestSuite/BenchmarkGetHit  223.0  248.2  <span class="t-fail">+11.3% ⚠</span>
+BENCHMARK                             OLD ns/op  NEW ns/op  Δ
+cache CacheTestSuite/BenchmarkGetHit      225.7      254.8  <span class="t-fail">+12.9% ⚠</span>
 {{< /terminal >}}
 
 Benchmarks are matched by package, suite and name. One that exists on only one side is skipped rather than reported as an infinite change — a renamed benchmark is not a regression.
@@ -107,13 +107,13 @@ The consequence is worth internalising. During a run for this post, a benchmark 
 `--gate=<pct>` turns that into a verdict: the worst *significant* positive change is compared to your threshold, and the run exits 1 if it exceeds it.
 
 {{< terminal title="gotest bench --against=bench.json --gate=10 -count=5 ./..." >}}
-BENCHMARK                                 OLD ns/op  NEW ns/op  Δ
-example.com/cache CacheTestSuite/BenchmarkGetHit  223.0  248.2  <span class="t-fail">+11.3% ⚠</span>
+BENCHMARK                             OLD ns/op  NEW ns/op  Δ
+cache CacheTestSuite/BenchmarkGetHit      225.7      254.8  <span class="t-fail">+12.9% ⚠</span>
 
-<span class="t-fail">bench gate: example.com/cache CacheTestSuite/BenchmarkGetHit +11.3% exceeds 10% gate</span>
-$ echo $?
-1
+<span class="t-fail">bench gate: cache CacheTestSuite/BenchmarkGetHit +12.9% exceeds 10% gate</span>
 {{< /terminal >}}
+
+The run exits 1, which is all a CI step needs.
 
 One honest limitation: the comparison and the gate look at `ns/op` only. `B/op` and `allocs/op` are recorded in every baseline and printed in every result, but they do not gate. If allocation count is the number you care about most, keep reading them in review — the gate will not watch them for you.
 
@@ -138,9 +138,9 @@ Under GitHub Actions the CLI also appends a table to the job summary, so the res
 
 | Benchmark | old ns/op | new ns/op | Δ |
 |---|---|---|---|
-| example.com/cache CacheTestSuite/BenchmarkGetHit | 223.0 | 404.7 | +81.5% ⚠ |
+| cache CacheTestSuite/BenchmarkGetHit | 225.7 | 404.7 | +79.3% ⚠ |
 
-**Bench gate breached:** example.com/cache CacheTestSuite/BenchmarkGetHit +81.5% exceeds the 10% gate
+**Bench gate breached:** cache CacheTestSuite/BenchmarkGetHit +79.3% exceeds the 10% gate
 ```
 
 Set the defaults once in `.gotest.yml` and the flags disappear from both the workflow and your shell:
@@ -177,4 +177,4 @@ A gate's job is not to notice every change. It is to make the specific regressio
 
 ## Further reading
 
-For the CI setup this builds on — summaries, annotations, coverage thresholds — see [Go Tests in GitHub Actions]({{< ref "/blog/gotest-in-ci" >}}). For the fixture model the benchmark suites above rely on, [Test Fixtures in Go]({{< ref "/blog/test-fixtures-in-go" >}}) covers the fundamentals. And if your performance work is about the whole suite rather than one hot path, [Why Your Go Tests Are Slow]({{< ref "/blog/go-testing-at-scale" >}}) looks at the run itself.
+For the CI setup this builds on — summaries, annotations, coverage thresholds — see [Go Tests in GitHub Actions]({{< ref "/blog/gotest-in-ci" >}}). For the fixture model the benchmark suites above rely on, [Test Fixtures in Go]({{< ref "/blog/test-fixtures-in-go" >}}) covers the fundamentals. And if your performance work is about the whole suite rather than one hot path, [Why Your Go Tests Are Slow]({{< ref "/blog/go-testing-at-scale" >}}) looks at the run itself. The full flag surface lives in the [Benchmarking reference](/reference/#benchmarking).
