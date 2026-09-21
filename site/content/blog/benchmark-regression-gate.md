@@ -80,7 +80,14 @@ The time in parentheses is the wall clock of the test that drove the benchmark, 
 }
 ```
 
-One entry per benchmark and one sample per `-count` repetition — the array above is trimmed to a single sample — plus the toolchain and platform that produced them. Those last fields are provenance, not a guard: nothing stops you comparing a baseline recorded on an M3 laptop against a run on a Linux runner, and nothing good comes of it. They are how you recognise that mistake when a delta table looks absurd.
+One entry per benchmark and one sample per `-count` repetition — the array above is trimmed to a single sample — plus the toolchain and platform that produced them. Those last three fields are what stops you reading an absurd delta table as a regression. Compare an M3 laptop's baseline against a Linux runner and the next section's command says so before the table:
+
+```text
+WARN: baseline was recorded in a different environment (goos darwin, now linux;
+goarch arm64, now amd64); the deltas compare runs that are not alike
+```
+
+It warns and carries on rather than refusing, because comparing across a deliberate toolchain upgrade is a real thing to want, and only you know whether two runners are alike enough to mean something.
 
 ## Compare against it
 
@@ -157,7 +164,7 @@ bench:
 
 Two approaches, and the choice matters more than the threshold.
 
-**Commit the baseline.** A file in the repository, regenerated deliberately when a change is meant to move the numbers. Reviewable: the diff shows the number changing, in the same pull request that justifies it. The cost is that it is only valid for the machine class that produced it, so regenerate it from CI, not a laptop.
+**Commit the baseline.** A file in the repository, regenerated deliberately when a change is meant to move the numbers. Reviewable: the diff shows the number changing, in the same pull request that justifies it. The cost is that it is only valid for the machine class that produced it, so regenerate it from CI, not a laptop — the environment warning catches the crudest version of that mistake, but not two Linux runners of different sizes.
 
 **Generate the baseline from main on every run.** Check out main, benchmark it, benchmark the branch, compare. Immune to machine drift because both halves run on the same runner, minutes apart. The cost is double the benchmark time on every pull request.
 

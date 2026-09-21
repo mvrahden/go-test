@@ -113,7 +113,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if len(overlay.BenchesByPkg) == 0 {
 		if jsonRequested {
 			// Machine consumers get a valid empty document, not prose.
-			return emitBenchReport(gotestbench.FromPackages(nil), nil, nil)
+			return emitBenchReport(gotestbench.FromPackages(nil), nil, nil, nil)
 		}
 		fmt.Println("no benchmarks found")
 		return 0
@@ -177,6 +177,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 
 	var deltas []gotestbench.Delta
 	var specDeltas []gotestspec.BenchDelta
+	var envMismatch []gotestbench.EnvDiff
 
 	if againstPath != "" {
 		oldBaseline, err := gotestbench.Load(againstPath)
@@ -187,6 +188,14 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 
 		deltas = gotestbench.Compare(oldBaseline, newBaseline)
 		specDeltas = toSpecDeltas(filterDeltas(deltas, verboseRequested))
+
+		// A baseline from another toolchain or machine class measures the
+		// machines, not the change. Say so and carry on: refusing would
+		// strand anyone deliberately comparing across an upgrade.
+		envMismatch = gotestbench.EnvMismatch(oldBaseline, newBaseline)
+		if note := gotestbench.FormatEnvMismatch(envMismatch); note != "" {
+			fmt.Fprintf(os.Stderr, "WARN: %s\n", note)
+		}
 	}
 
 	// Render the spec view exactly once. --spec/--save always want the full
@@ -222,7 +231,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	if jsonRequested {
-		if jsonCode := emitBenchReport(newBaseline, deltasForReport(deltas, againstPath), gateVerdict); jsonCode != 0 {
+		if jsonCode := emitBenchReport(newBaseline, deltasForReport(deltas, againstPath), gateVerdict, envMismatch); jsonCode != 0 {
 			return jsonCode
 		}
 	}
@@ -240,6 +249,9 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 				mdOpts := []gotestspec.RenderOption{gotestspec.WithElapsed(time.Since(pipelineStart))}
 				if againstPath != "" {
 					mdOpts = append(mdOpts, gotestspec.WithBenchDeltas(specDeltas))
+				}
+				if note := gotestbench.FormatEnvMismatch(envMismatch); note != "" {
+					mdOpts = append(mdOpts, gotestspec.WithBenchEnvWarning(note))
 				}
 				if gateVerdict != nil {
 					mdOpts = append(mdOpts, gotestspec.WithBenchGate(&gotestspec.BenchGate{
@@ -295,8 +307,8 @@ func toSpecDeltas(deltas []gotestbench.Delta) []gotestspec.BenchDelta {
 
 // emitBenchReport writes the versioned --json document to stdout. It returns
 // a non-zero exit code only when the document itself cannot be produced.
-func emitBenchReport(b gotestbench.Baseline, deltas []gotestbench.Delta, gate *gotestbench.Gate) int { //nolint:gocritic // hugeParam: stable API
-	data, err := gotestbench.MarshalReport(gotestbench.NewReport(b, deltas, gate))
+func emitBenchReport(b gotestbench.Baseline, deltas []gotestbench.Delta, gate *gotestbench.Gate, envMismatch []gotestbench.EnvDiff) int { //nolint:gocritic // hugeParam: stable API
+	data, err := gotestbench.MarshalReport(gotestbench.NewReport(b, deltas, gate, envMismatch))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

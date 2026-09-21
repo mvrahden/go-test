@@ -601,6 +601,9 @@ percentage = covered / total</div>
         </tbody>
       </table>
       <p>In <code>.gotest.yml</code>, <code>bench.baseline</code> and <code>bench.gate</code> set the defaults, so CI and a laptop agree on what a regression is without repeating flags.</p>
+      <div class="callout">
+        A baseline records the <code>goos</code>, <code>goarch</code> and Go version that produced it. Compare against one recorded elsewhere and <code>--against</code> says so on stderr — <code>WARN: baseline was recorded in a different environment</code>, naming each field — while <code>--json</code> carries the same under <code>envMismatch</code>. The comparison still runs and the exit code is unchanged: across machine classes the deltas measure the machines too, and only you know whether two runners are alike enough for that to matter.
+      </div>
     </section>
 
     <!-- 9. Fuzzing -->

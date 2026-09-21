@@ -379,6 +379,14 @@ Only statistically significant deltas are shown by default; pass -v to
 show every row. Significant regressions are marked with a trailing "⚠".
 Deltas alone never change the exit code — only --gate does.
 
+A baseline records the goos, goarch and Go version that produced it. When
+any of them differ from this run, --against prints "WARN: baseline was
+recorded in a different environment" naming each field, and the --json
+report carries the same under "envMismatch". The comparison still runs and
+the exit code is unchanged: the deltas then measure the machines as much as
+the code, and only you know whether the two are alike enough to mean
+something.
+
 Examples:
   gotest bench ./...                          Run all benchmark suites
   gotest bench ./pkg/auth/... -benchtime=2s   Longer per-benchmark budget

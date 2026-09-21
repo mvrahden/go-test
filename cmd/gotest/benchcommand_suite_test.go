@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 
 	. "github.com/mvrahden/go-test/cmd/gotest"
 
@@ -190,4 +191,65 @@ func (s *BenchCommandTestSuite) TestBenchSaveAgainstGate(t *gotest.T) {
 		gotest.Contains(it, out, "1 suite, 1 benchmark")
 		gotest.NotContains(it, out, "tests passed (")
 	})
+}
+
+func (s *BenchCommandTestSuite) TestBenchForeignBaseline(t *gotest.T) {
+	// A baseline carries the platform and toolchain that produced it. When
+	// they do not match the run, the deltas measure the machines. The run
+	// says so and still reports: only the operator knows whether two
+	// runners are alike, and refusing would strand a deliberate comparison
+	// across a toolchain upgrade.
+	t.When("the baseline records another platform", func(w *gotest.T) {
+		w.It("warns, keeps the delta table, and leaves the exit code alone", func(it *gotest.T) {
+			baselinePath := saveForeignBaseline(it, s.cli)
+
+			out, code := s.cli.runExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--against="+baselinePath)
+			gotest.Equal(it, 0, code)
+			gotest.Contains(it, out, "WARN: baseline was recorded in a different environment")
+			gotest.Contains(it, out, "goos plan9, now ")
+			gotest.Contains(it, out, "OLD ns/op")
+		})
+
+		w.It("carries the mismatch in the --json report", func(it *gotest.T) {
+			baselinePath := saveForeignBaseline(it, s.cli)
+
+			out, code := s.cli.runExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--against="+baselinePath, "--json")
+			gotest.Equal(it, 0, code)
+
+			var report gotestbench.Report
+			gotest.NoError(it, json.Unmarshal([]byte(jsonDoc(it, out)), &report))
+			gotest.Len(it, report.EnvMismatch, 1)
+			gotest.Equal(it, "goos", report.EnvMismatch[0].Field)
+			gotest.Equal(it, "plan9", report.EnvMismatch[0].Baseline)
+		})
+	})
+}
+
+// jsonDoc pulls the report out of a combined stdout+stderr capture: the
+// document is the only brace-bearing thing either stream carries, and the
+// warning this test asks for arrives on stderr ahead of it.
+func jsonDoc(t *gotest.T, out string) string {
+	start := strings.Index(out, "{")
+	end := strings.LastIndex(out, "}")
+	gotest.True(t, start >= 0 && end > start, "no JSON document in output:\n%s", out)
+	return out[start : end+1]
+}
+
+// saveForeignBaseline writes a baseline and rewrites its goos, so the next
+// run reads one no machine in the test could have produced.
+func saveForeignBaseline(t *gotest.T, cli cliRunner) string {
+	path := filepath.Join(t.TempDir(), "foreign.json")
+
+	_, code := cli.runExit(t, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--save="+path)
+	gotest.Equal(t, 0, code)
+
+	data, err := os.ReadFile(path)
+	gotest.NoError(t, err)
+	var b gotestbench.Baseline
+	gotest.NoError(t, json.Unmarshal(data, &b))
+	b.GOOS = "plan9"
+	data, err = json.Marshal(b)
+	gotest.NoError(t, err)
+	gotest.NoError(t, os.WriteFile(path, data, 0o600))
+	return path
 }

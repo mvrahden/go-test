@@ -69,14 +69,19 @@ is on by default. Flags:
 - `--against=<path>` — compare against a saved baseline and render the
   delta table (significant rows only unless `-v`; defaults to
   `bench.baseline`). Significance is Welch-tested, so run with `-count`
-  high enough to give it samples.
+  high enough to give it samples. A baseline whose `goos`, `goarch` or
+  `goVersion` differs from the run warns on stderr (`WARN: baseline was
+  recorded in a different environment`) and reports the same under
+  `envMismatch` in `--json`; the comparison still runs and the exit code
+  is unchanged.
 - `--gate=<pct>` — exit 1 when the worst significant regression exceeds
   the threshold (needs `--against` or `bench.baseline`).
 - `--json` — emit ONE versioned report document to stdout instead of
   human output: `schemaVersion` 1, the run's results in baseline shape,
-  `deltas` when a comparison ran, and `gate` with `breachedKeys` (every
-  significant delta above the threshold) when a gate was active. Consume
-  this, never scrape text.
+  `deltas` when a comparison ran, `gate` with `breachedKeys` (every
+  significant delta above the threshold) when a gate was active, and
+  `envMismatch` when the baseline came from elsewhere. Consume this,
+  never scrape text.
 - Scoping: `-bench` matches the generated `Benchmark<Suite>` wrapper by
   its first slash segment; later segments select methods —
   `-bench='^BenchmarkFooTestSuite$/^BenchmarkParse$'` runs one method.

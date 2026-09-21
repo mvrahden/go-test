@@ -29,6 +29,7 @@ type renderConfig struct {
 	elapsed         time.Duration
 	withoutVerdicts bool
 	benchDeltas     []BenchDelta
+	benchEnvWarning string
 	benchGate       *BenchGate
 }
 
@@ -83,6 +84,13 @@ type BenchGate struct {
 	WorstPct     float64
 	WorstKey     string
 	Breached     bool
+}
+
+// WithBenchEnvWarning attaches the one-line warning that the baseline came
+// from another toolchain or platform to RenderMarkdownBenchSummary. An empty
+// string renders nothing. The terminal says this on stderr, as the gate does.
+func WithBenchEnvWarning(note string) RenderOption {
+	return func(c *renderConfig) { c.benchEnvWarning = note }
 }
 
 // WithBenchGate attaches a gate verdict to RenderMarkdownBenchSummary.
