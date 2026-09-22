@@ -28,6 +28,7 @@ var buildSpecialValueFlags = map[string]bool{
 var buildValueFlags = map[string]bool{
 	"-covermode": true,
 	"-coverpkg":  true,
+	"-vet":       true,
 	"-tags":      true,
 	"-ldflags":   true,
 	"-gcflags":   true,
@@ -261,9 +262,10 @@ func ExtractCoverProfile(runFlags []string) string { return extractFlag(runFlags
 // StripCoverProfile removes -coverprofile and its value from run flags.
 func StripCoverProfile(runFlags []string) []string { return stripFlag(runFlags, "-coverprofile") }
 
-// StripCoverBuildFlags removes coverage-related build flags (-cover,
-// -covermode, -coverpkg) that break packages.Load when passed as BuildFlags.
-func StripCoverBuildFlags(flags []string) []string {
+// StripNonLoadFlags removes the build flags only `go test -c` understands
+// (-cover, -covermode, -coverpkg, -vet), which packages.Load rejects when
+// passed as BuildFlags.
+func StripNonLoadFlags(flags []string) []string {
 	var out []string
 	for i := 0; i < len(flags); i++ {
 		f := flags[i]
@@ -271,7 +273,7 @@ func StripCoverBuildFlags(flags []string) []string {
 		if name == "-cover" {
 			continue
 		}
-		if name == "-covermode" || name == "-coverpkg" {
+		if name == "-covermode" || name == "-coverpkg" || name == "-vet" {
 			if !hasEquals && i+1 < len(flags) {
 				i++
 			}

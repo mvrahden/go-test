@@ -142,7 +142,7 @@ func runStaticSpec(ownArgs, goTestArgs []string, projectConfig *config.ProjectCo
 	}
 
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
-	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
+	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)
 
 	loaded, broken, err := gotestgen.LoadPackagesForDiscovery(cfg.PackagePatterns, loadFlags)
 	if err != nil {

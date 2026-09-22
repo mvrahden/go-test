@@ -38,11 +38,31 @@ func (s *ArgsTestSuite) TestIsGoTestFlag(t *gotest.T) {
 		{"args", "-args", false, true},
 		{"unknown", "-zzz", false, false},
 		{"double dash unknown", "--debug", false, false},
+		{"vet is a build value flag", "-vet", true, true},
 	}) {
 		isValue, known := gotestrunner.IsGoTestFlag(tc.flag)
 		gotest.Equal(sub, tc.isValue, isValue)
 		gotest.Equal(sub, tc.known, known)
 	}
+}
+
+// -vet reaches `go test -c`, where vet runs, and must never reach
+// packages.Load, which rejects it like the cover flags.
+func (s *ArgsTestSuite) TestVetFlag(t *gotest.T) {
+	t.It("is classified as a build flag in both spellings", func(it *gotest.T) {
+		c := gotestrunner.ClassifyGoTestArgs([]string{"-vet=off", "-v"})
+		gotest.Equal(it, []string{"-vet=off"}, c.BuildFlags)
+		gotest.Equal(it, []string{"-v"}, c.RunFlags)
+
+		c = gotestrunner.ClassifyGoTestArgs([]string{"-vet", "off", "-v"})
+		gotest.Equal(it, []string{"-vet", "off"}, c.BuildFlags)
+		gotest.Equal(it, []string{"-v"}, c.RunFlags)
+	})
+
+	t.It("is stripped before the load, with the cover flags", func(it *gotest.T) {
+		gotest.Equal(it, []string{"-race"}, gotestrunner.StripNonLoadFlags([]string{"-vet=off", "-race", "-cover"}))
+		gotest.Equal(it, []string{"-race"}, gotestrunner.StripNonLoadFlags([]string{"-vet", "off", "-race", "-covermode", "atomic"}))
+	})
 }
 
 func (s *ArgsTestSuite) TestCoverProfile(t *gotest.T) {

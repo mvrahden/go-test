@@ -210,6 +210,20 @@ func (s *FlagParsingTestSuite) TestSplitArgs(t *gotest.T) {
 	}
 }
 
+func (s *FlagParsingTestSuite) TestVetFlag(t *gotest.T) {
+	t.It("forwards -vet to go test", func(it *gotest.T) {
+		own, goTest, err := SplitArgs([]string{"-vet=off", "./..."}, ExportTestAllowed)
+		gotest.NoError(it, err)
+		gotest.Empty(it, own)
+		gotest.Equal(it, []string{"-vet=off", "./..."}, goTest)
+	})
+
+	t.It("still rejects --vet, which is nobody's flag", func(it *gotest.T) {
+		_, _, err := SplitArgs([]string{"--vet", "./..."}, ExportTestAllowed)
+		gotest.ErrorContains(it, err, "unknown flag: --vet")
+	})
+}
+
 func (s *FlagParsingTestSuite) TestParseSubcommand(t *gotest.T) {
 	for sub, tc := range gotest.Each(t, []struct {
 		Desc            string

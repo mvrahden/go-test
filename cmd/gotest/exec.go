@@ -13,7 +13,7 @@ import (
 
 func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
-	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
+	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)
 	loaded, broken, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
