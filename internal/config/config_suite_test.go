@@ -165,3 +165,39 @@ func (s *ConfigTestSuite) TestLoad_InvalidDuration(t *gotest.T, ctx *configCtx) 
 	_, err := config.Load(ctx.dir)
 	gotest.Error(t, err)
 }
+
+// A key the loader does not know is a typo the user will never see
+// otherwise: `timeoutt: 1m` loaded cleanly and silently did nothing.
+func (s *ConfigTestSuite) TestLoad_UnknownKey(t *gotest.T, ctx *configCtx) {
+	writeFile(t, ctx.dir, "go.mod", "module test\n")
+	writeFile(t, ctx.dir, config.FileName, "timeoutt: 1m\n")
+
+	_, err := config.Load(ctx.dir)
+
+	t.It("is an error naming the key and the file", func(it *gotest.T) {
+		gotest.ErrorContains(it, err, "timeoutt")
+		gotest.ErrorContains(it, err, filepath.Join(ctx.dir, config.FileName))
+	})
+
+	t.It("applies to nested keys too", func(it *gotest.T) {
+		writeFile(it, ctx.dir, config.FileName, "lint:\n  skipp: [focus]\n")
+		_, err := config.Load(ctx.dir)
+		gotest.ErrorContains(it, err, "skipp")
+	})
+}
+
+func (s *ConfigTestSuite) TestLoad_EmptyFile(t *gotest.T, ctx *configCtx) {
+	writeFile(t, ctx.dir, "go.mod", "module test\n")
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc    string
+		content string
+	}{
+		{"empty file", ""},
+		{"comment only", "# nothing configured yet\n"},
+	}) {
+		writeFile(sub, ctx.dir, config.FileName, tc.content)
+		cfg, err := config.Load(ctx.dir)
+		gotest.NoError(sub, err)
+		gotest.Equal(sub, config.ProjectConfig{}, cfg)
+	}
+}
