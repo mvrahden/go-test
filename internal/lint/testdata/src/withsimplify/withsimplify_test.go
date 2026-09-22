@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unsafe"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -475,8 +476,8 @@ func TestConstFirstSimplify(t *testing.T) {
 	gotest.True(t, x == limit) // want `use Equal instead of True for == comparison`
 }
 
-// === mixed static operand types: any-typed sides bridge via conversion;
-// other mismatches stay untouched ===
+// === mixed static operand types: an any-typed side hides what == compares
+// and maps to nothing; other mismatches stay untouched ===
 
 type mixedErr struct{ msg string }
 
@@ -485,13 +486,30 @@ func (e *mixedErr) Error() string { return e.msg }
 func TestMixedTypeSimplify(t *testing.T) {
 	row := map[string]any{"id": "a"}
 	id := "b"
-	gotest.True(t, row["id"] == id)     // want `use Equal instead of True for == comparison`
-	gotest.False(t, row["id"] == id)    // want `use NotEqual instead of False for == comparison`
-	gotest.True(t, row["id"] == "gone") // want `use Equal instead of True for == comparison`
+	gotest.True(t, row["id"] == id)
+	gotest.False(t, row["id"] == id)
+	gotest.True(t, row["id"] == "gone")
 	var boom error = &mixedErr{msg: "boom"}
 	target := &mixedErr{msg: "boom"}
 	gotest.True(t, boom == target)
 	xs := []int{1}
 	ys := []string{"a"}
 	gotest.True(t, reflect.DeepEqual(xs, ys))
+}
+
+// === identity: == on pointers is identity, which Equal's DeepEqual weakens
+// to structure; interfaces and unsafe pointers hide what they compare ===
+
+type node struct{ v int }
+
+func TestPointerIdentity(t *testing.T) {
+	a, b := &node{1}, &node{1}
+	gotest.True(t, a == b)  // want `use Same instead of True for pointer == comparison`
+	gotest.False(t, a == b) // want `use NotSame instead of False for pointer == comparison`
+	gotest.True(t, a != b)  // want `use NotSame instead of True for pointer != comparison`
+	gotest.False(t, a != b) // want `use Same instead of False for pointer != comparison`
+	var x, y any = a, b
+	gotest.True(t, x == y)
+	u, v := unsafe.Pointer(a), unsafe.Pointer(b)
+	gotest.True(t, u == v)
 }

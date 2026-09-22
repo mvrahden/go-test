@@ -306,14 +306,14 @@ func (e *mixedErr) Error() string { return e.msg }
 func TestMixedTypeGuards(t *testing.T) {
 	row := map[string]any{"id": "a"}
 	id := "b"
-	if row["id"] == id { // want `use NotEqual instead of if\+Fail for == comparison`
+	if row["id"] == id { // want `use False instead of if\+Fail for failure guard`
 		gotest.Fail(t, "deleted row still appears")
 	}
-	if id != row["id"] { // want `use Equal instead of if\+Fail for != comparison`
+	if id != row["id"] { // want `use False instead of if\+Fail for failure guard`
 		gotest.Fail(t, "row mismatch")
 	}
 	// bare literals need no conversion
-	if row["id"] == "gone" { // want `use NotEqual instead of if\+Fail for == comparison`
+	if row["id"] == "gone" { // want `use False instead of if\+Fail for failure guard`
 		gotest.Fail(t, "row not deleted")
 	}
 	// no spellable common type — False fallback

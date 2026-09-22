@@ -36,6 +36,7 @@ var diagnosticFixtures = []string{
 	"withdirectcalls",
 	"withnolint_file",
 	"withsharedfixture",
+	"withalias",
 	"bench",
 	"fuzz",
 }

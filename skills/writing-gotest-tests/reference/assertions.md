@@ -14,6 +14,7 @@ moves constants into that slot.
 | Assertion | Notes |
 |---|---|
 | `Equal[V]` / `NotEqual[V]` | typed; large values render expanded with a line diff |
+| `Same[V]` / `NotSame[V]` | pointer identity on `*V`; `Equal` on pointers compares structure, and `assertion-simplify` points here for `True(t, p == q)` |
 | `NoError` / `Error` | error presence |
 | `ErrorIs` / `ErrorAs[E]` / `ErrorContains` | prefer over `Error`+string poking; `ErrorContains` fails on nil error |
 | `True` / `False` | last resort — the `assertion-simplify` lint rule rewrites `True(t, x != nil)` and friends |

@@ -69,7 +69,7 @@ func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 			for _, cond := range splitOr(u.cond) {
 				m, ok := mapBoolExpr(pass, cond, true)
 				if !ok {
-					m = conditionMapping{"False", []ast.Expr{cond}, "failure guard"}
+					m = conditionMapping{target: "False", args: []ast.Expr{cond}, desc: "failure guard"}
 				}
 				plans = append(plans, failGuardPlan{
 					m:       m,

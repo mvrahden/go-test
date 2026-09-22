@@ -70,6 +70,9 @@ type conditionMapping struct {
 	target string
 	args   []ast.Expr
 	desc   string
+	// adviseOnly reports the target without a fix: the rewrite would need
+	// the author's eyes (Same on a pointer comparison).
+	adviseOnly bool
 }
 
 func simplifyBoolAssertion(pass *analysis.Pass, call *ast.CallExpr, negated bool) {
@@ -81,6 +84,10 @@ func simplifyBoolAssertion(pass *analysis.Pass, call *ast.CallExpr, negated bool
 		return
 	}
 	source := pick(negated, "False", "True")
+	if m.adviseOnly {
+		report(pass, AssertionSimplify, call.Pos(), "use %s instead of %s for %s", m.target, source, m.desc)
+		return
+	}
 	emitSimplify(pass, call, source, m.target, append([]ast.Expr{call.Args[0]}, m.args...), call.Args[2:], m.desc)
 }
 
@@ -100,7 +107,7 @@ func mapBoolExpr(pass *analysis.Pass, expr ast.Expr, negated bool) (conditionMap
 		if m, ok := mapBoolExpr(pass, e.X, !negated); ok {
 			return m, true
 		}
-		return conditionMapping{pick(negated, "True", "False"), []ast.Expr{e.X}, "negation"}, true
+		return conditionMapping{target: pick(negated, "True", "False"), args: []ast.Expr{e.X}, desc: "negation"}, true
 
 	case *ast.BinaryExpr:
 		return mapBoolBinary(pass, e, negated)
@@ -130,7 +137,10 @@ func mapBoolBinary(pass *analysis.Pass, bin *ast.BinaryExpr, negated bool) (cond
 		if !ok {
 			return conditionMapping{}, false
 		}
-		return conditionMapping{pick(negated, "NotEqual", "Equal"), []ast.Expr{l, r}, "== comparison"}, true
+		if m, ok, handled := mapIdentityComparison(pass, l, r, negated, false); handled {
+			return m, ok
+		}
+		return conditionMapping{target: pick(negated, "NotEqual", "Equal"), args: []ast.Expr{l, r}, desc: "== comparison"}, true
 
 	case token.NEQ:
 		if m, ok, handled := mapNilComparison(pass, left, right, negated, true); handled {
@@ -147,27 +157,62 @@ func mapBoolBinary(pass *analysis.Pass, bin *ast.BinaryExpr, negated bool) (cond
 		if !ok {
 			return conditionMapping{}, false
 		}
-		return conditionMapping{pick(negated, "Equal", "NotEqual"), []ast.Expr{l, r}, "!= comparison"}, true
+		if m, ok, handled := mapIdentityComparison(pass, l, r, negated, true); handled {
+			return m, ok
+		}
+		return conditionMapping{target: pick(negated, "Equal", "NotEqual"), args: []ast.Expr{l, r}, desc: "!= comparison"}, true
 
 	case token.GTR:
 		if inner, ok := isLenCall(left); ok && isIntLit(right, 0) {
-			return conditionMapping{pick(negated, "Empty", "NotEmpty"), []ast.Expr{inner}, "len > 0 check"}, true
+			return conditionMapping{target: pick(negated, "Empty", "NotEmpty"), args: []ast.Expr{inner}, desc: "len > 0 check"}, true
 		}
-		return conditionMapping{pick(negated, "LessOrEqual", "Greater"), []ast.Expr{left, right}, "> comparison"}, true
+		return conditionMapping{target: pick(negated, "LessOrEqual", "Greater"), args: []ast.Expr{left, right}, desc: "> comparison"}, true
 
 	case token.GEQ:
 		if inner, ok := isLenCall(left); ok && isIntLit(right, 1) {
-			return conditionMapping{pick(negated, "Empty", "NotEmpty"), []ast.Expr{inner}, "len >= 1 check"}, true
+			return conditionMapping{target: pick(negated, "Empty", "NotEmpty"), args: []ast.Expr{inner}, desc: "len >= 1 check"}, true
 		}
-		return conditionMapping{pick(negated, "Less", "GreaterOrEqual"), []ast.Expr{left, right}, ">= comparison"}, true
+		return conditionMapping{target: pick(negated, "Less", "GreaterOrEqual"), args: []ast.Expr{left, right}, desc: ">= comparison"}, true
 
 	case token.LSS:
-		return conditionMapping{pick(negated, "GreaterOrEqual", "Less"), []ast.Expr{left, right}, "< comparison"}, true
+		return conditionMapping{target: pick(negated, "GreaterOrEqual", "Less"), args: []ast.Expr{left, right}, desc: "< comparison"}, true
 
 	case token.LEQ:
-		return conditionMapping{pick(negated, "Greater", "LessOrEqual"), []ast.Expr{left, right}, "<= comparison"}, true
+		return conditionMapping{target: pick(negated, "Greater", "LessOrEqual"), args: []ast.Expr{left, right}, desc: "<= comparison"}, true
 	}
 	return conditionMapping{}, false
+}
+
+// mapIdentityComparison handles == and != whose operands compare by
+// identity, which Equal's reflect.DeepEqual would weaken to structure.
+// Pointers are pointed at Same/NotSame without a fix; interfaces and unsafe
+// pointers hide what they compare and map to nothing. handled reports that
+// the operand type decided, whichever way.
+func mapIdentityComparison(pass *analysis.Pass, l, r ast.Expr, negated, isNeq bool) (m conditionMapping, ok, handled bool) {
+	// Either side decides: a constant was moved first and an any-typed side
+	// was bridged, so the static type of one operand alone can mislead.
+	for _, operand := range []ast.Expr{l, r} {
+		t := pass.TypesInfo.TypeOf(operand)
+		if t == nil {
+			continue
+		}
+		switch u := types.Unalias(t).Underlying().(type) {
+		case *types.Pointer:
+			same := !isNeq
+			if negated {
+				same = !same
+			}
+			desc := pick(isNeq, "pointer != comparison", "pointer == comparison")
+			return conditionMapping{target: pick(!same, "NotSame", "Same"), desc: desc, adviseOnly: true}, true, true
+		case *types.Interface:
+			return conditionMapping{}, false, true
+		case *types.Basic:
+			if u.Kind() == types.UnsafePointer {
+				return conditionMapping{}, false, true
+			}
+		}
+	}
+	return conditionMapping{}, false, false
 }
 
 // mapNilComparison handles comparisons against nil. handled reports that the
@@ -188,11 +233,11 @@ func mapNilComparison(pass *analysis.Pass, left, right ast.Expr, negated, isNeq 
 	}
 	switch {
 	case isErrorType(pass, other):
-		return conditionMapping{pick(!positive, "Error", "NoError"), []ast.Expr{other}, "error nil check"}, true, true
+		return conditionMapping{target: pick(!positive, "Error", "NoError"), args: []ast.Expr{other}, desc: "error nil check"}, true, true
 	case isComparableType(pass, other):
-		return conditionMapping{pick(!positive, "NotZero", "Zero"), []ast.Expr{other}, "nil check"}, true, true
+		return conditionMapping{target: pick(!positive, "NotZero", "Zero"), args: []ast.Expr{other}, desc: "nil check"}, true, true
 	case isNonComparableNilableType(pass, other):
-		return conditionMapping{pick(!positive, "NotNil", "Nil"), []ast.Expr{other}, "nil check"}, true, true
+		return conditionMapping{target: pick(!positive, "NotNil", "Nil"), args: []ast.Expr{other}, desc: "nil check"}, true, true
 	}
 	return conditionMapping{}, false, true
 }
@@ -209,13 +254,13 @@ func mapLenEqNeq(left, right ast.Expr, negated, isNeq bool) (conditionMapping, b
 		if negated {
 			positive = !positive
 		}
-		return conditionMapping{pick(!positive, "NotEmpty", "Empty"), []ast.Expr{inner}, "len == 0 check"}, true
+		return conditionMapping{target: pick(!positive, "NotEmpty", "Empty"), args: []ast.Expr{inner}, desc: "len == 0 check"}, true
 	}
 
 	// len(x) == n where n is not 0 — Len fits whenever the asserted reading
 	// is the equality: EQL non-negated, or NEQ negated.
 	if isNeq == negated {
-		return conditionMapping{"Len", []ast.Expr{inner, other}, "len comparison"}, true
+		return conditionMapping{target: "Len", args: []ast.Expr{inner, other}, desc: "len comparison"}, true
 	}
 
 	return conditionMapping{}, false
@@ -240,7 +285,7 @@ func mapEmptyStrEqNeq(pass *analysis.Pass, left, right ast.Expr, negated, isNeq 
 	if negated {
 		positive = !positive
 	}
-	return conditionMapping{pick(!positive, "NotEmpty", "Empty"), []ast.Expr{other}, "empty string check"}, true
+	return conditionMapping{target: pick(!positive, "NotEmpty", "Empty"), args: []ast.Expr{other}, desc: "empty string check"}, true
 }
 
 // unifyEqualOperands vets l and r as Equal/NotEqual operands, which must
@@ -334,26 +379,26 @@ func extractLenSide(left, right ast.Expr) (inner, lenExpr, other ast.Expr, ok bo
 
 func mapBoolCall(pass *analysis.Pass, inner *ast.CallExpr, negated bool) (conditionMapping, bool) {
 	if s, sub, ok := isStringsContains(inner); ok {
-		return conditionMapping{pick(negated, "NotContains", "Contains"), []ast.Expr{s, sub}, "strings.Contains call"}, true
+		return conditionMapping{target: pick(negated, "NotContains", "Contains"), args: []ast.Expr{s, sub}, desc: "strings.Contains call"}, true
 	}
 
 	if err, target, ok := isErrorsIs(inner); ok {
 		if isNilIdent(target) {
-			return conditionMapping{pick(negated, "Error", "NoError"), []ast.Expr{err}, "errors.Is nil check"}, true
+			return conditionMapping{target: pick(negated, "Error", "NoError"), args: []ast.Expr{err}, desc: "errors.Is nil check"}, true
 		}
 		if !negated {
-			return conditionMapping{"ErrorIs", []ast.Expr{err, target}, "errors.Is call"}, true
+			return conditionMapping{target: "ErrorIs", args: []ast.Expr{err, target}, desc: "errors.Is call"}, true
 		}
 		return conditionMapping{}, false
 	}
 
 	if re, s, ok := isRegexpMatchString(pass, inner); ok && !negated {
-		return conditionMapping{"Regexp", []ast.Expr{re, s}, "MatchString call"}, true
+		return conditionMapping{target: "Regexp", args: []ast.Expr{re, s}, desc: "MatchString call"}, true
 	}
 
 	if a, b, ok := isReflectDeepEqual(inner); ok {
 		if a, b, ok := unifyEqualOperands(pass, a, b); ok {
-			return conditionMapping{pick(negated, "NotEqual", "Equal"), []ast.Expr{a, b}, "reflect.DeepEqual call"}, true
+			return conditionMapping{target: pick(negated, "NotEqual", "Equal"), args: []ast.Expr{a, b}, desc: "reflect.DeepEqual call"}, true
 		}
 	}
 	return conditionMapping{}, false

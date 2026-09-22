@@ -36,9 +36,11 @@ failing fail TestFailingTestSuite/TestNotContains
 failing fail TestFailingTestSuite/TestNotEmpty
 failing fail TestFailingTestSuite/TestNotEqual
 failing fail TestFailingTestSuite/TestNotNil
+failing fail TestFailingTestSuite/TestNotSame
 failing fail TestFailingTestSuite/TestNotZero
 failing fail TestFailingTestSuite/TestPanics
 failing fail TestFailingTestSuite/TestRegexp
+failing fail TestFailingTestSuite/TestSame
 failing fail TestFailingTestSuite/TestSubset
 failing fail TestFailingTestSuite/TestTimeIsNow
 failing fail TestFailingTestSuite/TestTimeWithin

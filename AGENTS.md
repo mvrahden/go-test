@@ -71,7 +71,11 @@ Prefer over `gotest.True(t, false, "msg")`.
 ```go
 gotest.Equal[V any](t, expected, actual V)          // deep equality (reflect.DeepEqual)
 gotest.NotEqual[V any](t, expected, actual V)        // deep inequality
+gotest.Same[V any](t, expected, actual *V)           // pointer identity (==), never structure
+gotest.NotSame[V any](t, expected, actual *V)        // distinct pointers
 ```
+
+`True(t, p == q)` on pointers is identity; the `assertion-simplify` rule points at `Same`/`NotSame` there and never rewrites it to `Equal`, whose `reflect.DeepEqual` compares structure.
 
 ### Boolean
 

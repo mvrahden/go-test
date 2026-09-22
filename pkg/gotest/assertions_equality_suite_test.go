@@ -209,6 +209,42 @@ func (s *EqualityAssertionsTestSuite) TestZero(t *gotest.T) {
 	})
 }
 
+func (s *EqualityAssertionsTestSuite) TestSame(t *gotest.T) {
+	type node struct{ v int }
+	t.When("both arguments point at one value", func(w *gotest.T) {
+		w.It("passes", func(it *gotest.T) {
+			n := &node{1}
+			m := gotest.Record(func(r *gotest.R) { gotest.Same(r, n, n) })
+			gotest.False(it, m.Failed())
+		})
+	})
+	t.When("they point at equal but distinct values", func(w *gotest.T) {
+		w.It("fails, naming both addresses", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Same(r, &node{1}, &node{1}) })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "Same failed")
+		})
+	})
+}
+
+func (s *EqualityAssertionsTestSuite) TestNotSame(t *gotest.T) {
+	type node struct{ v int }
+	t.When("they point at equal but distinct values", func(w *gotest.T) {
+		w.It("passes", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotSame(r, &node{1}, &node{1}) })
+			gotest.False(it, m.Failed())
+		})
+	})
+	t.When("both arguments point at one value", func(w *gotest.T) {
+		w.It("fails", func(it *gotest.T) {
+			n := &node{1}
+			m := gotest.Record(func(r *gotest.R) { gotest.NotSame(r, n, n) })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "NotSame failed")
+		})
+	})
+}
+
 func (s *EqualityAssertionsTestSuite) TestNotZero(t *gotest.T) {
 	t.When("value is non-zero", func(w *gotest.T) {
 		w.It("passes for int", func(it *gotest.T) {
