@@ -132,7 +132,10 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	elapsed := time.Since(pipelineStart)
-	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed, badgePath)
+	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed, badgePath); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 
 	return enforceCoverage(coverProfile, minCoverage, code)
 }
@@ -159,7 +162,10 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(declarationsForStream(events)))
 
-	writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0, badgePath)
+	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0, badgePath); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 
 	if !renderOnly && gotestspec.HasFailures(tree) {
 		return 1
@@ -167,14 +173,15 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 	return 0
 }
 
-func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool, elapsed time.Duration, badgePath string) {
+// writeSummaryOutput renders the summary to stdout or --output; an --output
+// it cannot create is the command's failure, exit 2 at the callers.
+func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool, elapsed time.Duration, badgePath string) error {
 	var w io.Writer = os.Stdout
 	var closeFunc func()
 	if output != "" {
 		f, err := os.Create(output)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: creating output file: %s\n", err)
-			return
+			return fmt.Errorf("creating output file: %w", err)
 		}
 		closeFunc = func() { f.Close() }
 		w = f
@@ -225,6 +232,7 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 			}
 		}
 	}
+	return nil
 }
 
 // writeCoverageBadge renders the badge SVG to path. It never fails the run:
