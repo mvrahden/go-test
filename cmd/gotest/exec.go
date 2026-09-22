@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"sort"
 	"strings"
 
@@ -37,8 +36,7 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 	}
 	defer cleanup()
 
-	ctx, stop := signal.NotifyContext(context.Background(),
-		shutdownSignals...)
+	ctx, stop := shutdownContext()
 	defer stop()
 
 	if cfg.GlobalTimeout > 0 {

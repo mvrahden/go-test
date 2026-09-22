@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -73,7 +72,7 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	// environment auto-enable the F_ guard mid-iteration; --ci stays explicit.
 	cfg.CI = hasFlag(ownArgs, "--ci")
 
-	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
+	ctx, stop := shutdownContext()
 	defer stop()
 
 	if !jsonMode {

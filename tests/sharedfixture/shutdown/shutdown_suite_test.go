@@ -136,6 +136,35 @@ func (s *ShutdownTestSuite) TestFailFastTrip(t *gotest.T) {
 	})
 }
 
+// The first interrupt starts the graceful shutdown; a second one must end
+// the CLI at once, the way a terminal's Ctrl-C ends any other program, rather
+// than being swallowed for the length of the teardown budget. Under spec the
+// suite runs through go tool test2json, which ignores SIGINT, and the CLI
+// inherits that: the exit must not depend on the default disposition.
+func (s *ShutdownTestSuite) TestSecondInterruptEndsTheRun(t *gotest.T) {
+	markers := t.TempDir()
+	run := s.startWith(t, markers, []string{"GOTEST_SHUTDOWN_TEARDOWN_SLEEP=20s"}, "./slow/")
+	interruptWhen(t, run, markers, "test-running")
+	interruptWhen(t, run, markers, "fixture-tearing-down")
+	sent := time.Now()
+
+	exited := make(chan int, 1)
+	go func() { exited <- exitCode(t, run) }()
+	var code int
+	select {
+	case code = <-exited:
+	case <-time.After(10 * time.Second):
+		_ = run.tree.Kill()
+		gotest.Fail(t, "the CLI was still running 10s after the second interrupt")
+	}
+	elapsed := time.Since(sent)
+
+	t.It("exits 130 at once instead of waiting the teardown out", func(it *gotest.T) {
+		gotest.Less(it, elapsed, 5*time.Second, "took %v", elapsed)
+		gotest.Equal(it, 130, code)
+	})
+}
+
 // The spec, summary and bench commands run the batch pipeline, not the
 // streaming one; an interrupt must mean 130 on both.
 func (s *ShutdownTestSuite) TestInterruptDuringSpec(t *gotest.T) {

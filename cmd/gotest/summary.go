@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -87,7 +86,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 	defer cleanup()
 
-	ctx, cancel := signal.NotifyContext(context.Background(), shutdownSignals...)
+	ctx, cancel := shutdownContext()
 	defer cancel()
 
 	if cfg.GlobalTimeout > 0 {

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/signal"
 	"sort"
 	"strconv"
 	"strings"
@@ -128,7 +127,7 @@ func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		}
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
+	ctx, stop := shutdownContext()
 	defer stop()
 
 	if session.Deadline > 0 {

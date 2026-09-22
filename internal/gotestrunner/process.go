@@ -8,11 +8,18 @@ import (
 	"github.com/mvrahden/go-test/internal/proctree"
 )
 
-// GracefulShutdownDelay is the time a test process has to exit after it is
-// asked to shut down before it is forcibly killed. Must cover the longest
-// fixture teardown (FixtureConfig.Timeout up to 5 min for container fixtures,
-// SuiteConfig.SetupTimeout up to 5 min for AfterAll).
+// GracefulShutdownDelay is the grace a process gets to exit after it is asked
+// to shut down when no teardown budget file names one: the fallback for a
+// suite binary that wrote none, and the grace of the helper trees below. A
+// budget file can name more (see WaitDelayCeiling).
 const GracefulShutdownDelay = 5*time.Minute + 30*time.Second
+
+// WaitDelayCeiling bounds cmd.Wait on a process that is gone, or was asked to
+// go, while a detached grandchild keeps its output pipes open. exec kills the
+// process itself when it passes, so it sits strictly above the largest budget
+// the runtime writes: a 5m fixture path plus a 5m AfterAll plus its 30s
+// margin. Below that, exec's kill would cut a budgeted teardown short.
+const WaitDelayCeiling = 11 * time.Minute
 
 // runTree runs cmd as the root of its own process tree. A canceled context
 // asks the tree to shut down, and GracefulShutdownDelay later kills the root.

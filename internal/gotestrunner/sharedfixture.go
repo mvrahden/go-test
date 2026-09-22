@@ -395,7 +395,7 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	// containers is killed part-way through instead, and because a signalled
 	// process reports no meaningful exit status, the run still says ok.
 	tree := proctree.New(cmd)
-	cmd.WaitDelay = GracefulShutdownDelay
+	cmd.WaitDelay = WaitDelayCeiling
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

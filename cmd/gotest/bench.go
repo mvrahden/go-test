@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"strconv"
 	"time"
 
@@ -119,7 +118,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 0
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
+	ctx, stop := shutdownContext()
 	defer stop()
 
 	if cfg.GlobalTimeout > 0 {

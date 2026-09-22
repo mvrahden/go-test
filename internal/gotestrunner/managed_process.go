@@ -20,6 +20,10 @@ type ProcessConfig struct {
 	Grace         GraceStrategy
 	GraceDuration time.Duration
 	BudgetFile    string
+	// WaitDelay bounds Wait once the process was asked to stop or has exited,
+	// against I/O pipes a detached grandchild keeps open. Zero means
+	// WaitDelayCeiling.
+	WaitDelay time.Duration
 }
 
 // ManagedProcess runs a command as the root of its own process tree and stops
@@ -33,7 +37,10 @@ type ManagedProcess struct {
 
 func NewManagedProcess(cmd *exec.Cmd, cfg ProcessConfig) *ManagedProcess {
 	tree := proctree.New(cmd)
-	cmd.WaitDelay = 0
+	cmd.WaitDelay = cfg.WaitDelay
+	if cmd.WaitDelay == 0 {
+		cmd.WaitDelay = WaitDelayCeiling
+	}
 	if cfg.Grace == GraceKill && cmd.Cancel != nil {
 		cmd.Cancel = func() error {
 			_ = tree.Kill()
