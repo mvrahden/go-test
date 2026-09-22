@@ -173,15 +173,26 @@ func (p *SharedFixtureProcess) teardownBudget() time.Duration {
 	return p.teardownTimeout
 }
 
-// WriteStateFileForKeys writes a state file containing only the specified keys.
-// Returns the path to the written file.
+// WriteSuiteStateFile writes the state file one suite process reads: the
+// keys the suite requires, under a name only that suite in that package has.
+// Two packages may declare a suite of the same name with different fixtures.
+func (p *SharedFixtureProcess) WriteSuiteStateFile(pkg, suite string, keys []string) (string, error) {
+	return p.WriteStateFileForKeys(sanitizePkgName(pkg)+"_"+suite, keys)
+}
+
+// WriteStateFileForKeys writes a state file containing exactly the specified
+// keys and returns its path. A key with no state is refused: the suite would
+// hydrate a zero value and fail somewhere far from the cause.
 func (p *SharedFixtureProcess) WriteStateFileForKeys(name string, keys []string) (string, error) {
 	p.mu.Lock()
 	subset := make(map[string]json.RawMessage, len(keys))
 	for _, k := range keys {
-		if v, ok := p.state[k]; ok {
-			subset[k] = v
+		v, ok := p.state[k]
+		if !ok {
+			p.mu.Unlock()
+			return "", fmt.Errorf("shared fixture %s has no state for %s: it was not started for this run", k, name)
 		}
+		subset[k] = v
 	}
 	p.mu.Unlock()
 

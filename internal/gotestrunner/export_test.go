@@ -155,3 +155,9 @@ func ExportCensus(mode RunMode, stream string, declared DeclaredUnits, goTestArg
 	exit = c.takeCensus(PipelineConfig{GoTestArgs: goTestArgs, Bench: bench}, declared, code, dispatchErr)
 	return exit, errw.String(), target.String()[before:]
 }
+
+// ExportNewStateProcess builds a shared fixture process handle that holds
+// state without a subprocess behind it, for the state-file tests.
+func ExportNewStateProcess(sharedDir string, state map[string]json.RawMessage) *SharedFixtureProcess {
+	return &SharedFixtureProcess{sharedDir: sharedDir, state: state}
+}

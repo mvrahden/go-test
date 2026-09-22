@@ -749,9 +749,9 @@ loop:
 						}
 					}
 
-					stateFile, err := setupProc.WriteStateFileForKeys(t.SuiteName, requiredKeys)
+					stateFile, err := setupProc.WriteSuiteStateFile(t.Package, t.SuiteName, requiredKeys)
 					if err != nil {
-						fmt.Fprintf(os.Stderr, "WARN: write state file for %s: %s\n", t.SuiteName, err)
+						fmt.Fprintf(os.Stderr, "FAIL: %s %s: shared fixture state: %s\n", t.Package, t.SuiteName, err)
 						return
 					}
 
@@ -812,9 +812,9 @@ loop:
 		}
 		env := baseEnv
 		if requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[d.t.Package][d.t.SuiteName]; len(requiredKeys) > 0 && setupProc != nil {
-			stateFile, err := setupProc.WriteStateFileForKeys(d.t.SuiteName, requiredKeys)
+			stateFile, err := setupProc.WriteSuiteStateFile(d.t.Package, d.t.SuiteName, requiredKeys)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "WARN: write state file for %s: %s\n", d.t.SuiteName, err)
+				fmt.Fprintf(os.Stderr, "FAIL: %s %s: shared fixture state: %s\n", d.t.Package, d.t.SuiteName, err)
 				collector.RecordResult(d.t.Package, d.idx, SuiteResult{ExitCode: 1})
 				continue
 			}

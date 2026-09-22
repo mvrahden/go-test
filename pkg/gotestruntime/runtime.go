@@ -242,11 +242,16 @@ func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string
 		if sharedState == nil {
 			return nil
 		}
+		// The file names exactly the fixtures this suite requires; the CLI
+		// refuses to write one with a required key missing. A node it does
+		// not name belongs to a sibling suite of the package and is left
+		// alone: hydrating it from a zero value would fail far from the cause.
 		raw, ok := sharedState[node.SharedState.StateKey]
-		if ok {
-			if err := json.Unmarshal(raw, node.SharedState.Target); err != nil {
-				return fmt.Errorf("unmarshal shared fixture %q: %w", node.SharedState.StateKey, err)
-			}
+		if !ok {
+			return nil
+		}
+		if err := json.Unmarshal(raw, node.SharedState.Target); err != nil {
+			return fmt.Errorf("unmarshal shared fixture %q: %w", node.SharedState.StateKey, err)
 		}
 		if node.Init != nil {
 			node.Init()
