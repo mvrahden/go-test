@@ -485,13 +485,18 @@ func promoteCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.Fuz
 	// field layout. The echo carries a complete f.Add argument list (one
 	// literal per declared position), so it replaces the whole splice.
 	out, _, _ := rerunCrasher(overlay, target, hashBase)
-	if lit := extractDecodedInput(out); lit != "" {
+	lit := extractDecodedInput(out)
+	if lit != "" {
 		spliceArgs = []string{lit}
 	}
 
 	editedFile, line, err := refactor.PromoteFuzzSeed(target.Dir, suite, method, spliceArgs)
 	if err != nil {
-		return fmt.Sprintf("promote: %s/%s: skipped: %s", target.Func, hashBase, err), false
+		note := ""
+		if lit == "" {
+			note = " (the re-run echoed no decoded input, so only the raw corpus values were available)"
+		}
+		return fmt.Sprintf("promote: %s/%s: skipped: %s%s", target.Func, hashBase, err, note), false
 	}
 
 	if err := os.Remove(file); err != nil {

@@ -3,12 +3,14 @@ package refactor
 import (
 	"fmt"
 	"go/ast"
-	"go/format"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+
+	"golang.org/x/tools/imports"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
 )
@@ -39,7 +41,7 @@ func PromoteFuzzSeed(dir, suiteName, methodName string, argExprs []string) (file
 			return "", 0, fmt.Errorf("reading %s: %w", p, err)
 		}
 
-		edited, found, err := InsertFuzzAdd(src, suiteName, methodName, argExprs)
+		edited, found, err := insertFuzzAdd(p, src, suiteName, methodName, argExprs)
 		if err != nil {
 			return "", 0, fmt.Errorf("%s: %w", p, err)
 		}
@@ -66,17 +68,26 @@ func PromoteFuzzSeed(dir, suiteName, methodName string, argExprs []string) (file
 // InsertFuzzAdd parses src (a single Go source file's bytes) looking for the
 // fuzz method suiteName.methodName. If found, it splices
 // `<param>.Add(argExprs...)` into the method body directly after the last
-// existing top-level `<param>.Add(...)` call (or as the first statement if
-// none exist), where <param> is the method's *gotest.F parameter name, and
-// returns the gofmt-formatted result with found=true.
+// existing top-level `<param>.Add(...)` call and its trailing comment (or as
+// the first statement if none exist), where <param> is the method's
+// *gotest.F parameter name, and returns the result with found=true, formatted
+// and with the imports the spliced expressions need. Corpus-file float
+// specials (float64(NaN), float64(+Inf), ...) are spelled as Go on the way.
 //
 // If the method is not present in src, it returns found=false and a nil
 // error — callers scanning multiple candidate files use this to try the
 // next one. err is non-nil only once the method HAS been located but the
-// edit can't be produced or re-parsed as valid Go, so callers can tell "try
+// edit can't be produced or re-parsed as valid Go, or the seed's value count
+// differs from the f.Fuzz callback's arguments, so callers can tell "try
 // another file" apart from "found it, but something is wrong" and abort
 // instead of silently skipping a genuine problem.
 func InsertFuzzAdd(src []byte, suiteName, methodName string, argExprs []string) (edited []byte, found bool, err error) {
+	return insertFuzzAdd("", src, suiteName, methodName, argExprs)
+}
+
+// insertFuzzAdd is InsertFuzzAdd with the file's path, which decides where
+// imports are resolved from.
+func insertFuzzAdd(filename string, src []byte, suiteName, methodName string, argExprs []string) (edited []byte, found bool, err error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "", src, parser.ParseComments)
 	if err != nil {
@@ -96,22 +107,97 @@ func InsertFuzzAdd(src []byte, suiteName, methodName string, argExprs []string) 
 		return nil, true, fmt.Errorf("fuzz method %s.%s: could not identify its *gotest.F parameter", suiteName, methodName)
 	}
 
-	insertOffset, ok := addInsertOffset(fset, decl, paramName)
+	// A seed with the wrong value count is refused before anything is
+	// written: f.Add would reject it at run time, after the source changed.
+	if arity, ok := declaredArity(decl, paramName); ok && arity != len(argExprs) {
+		return nil, true, fmt.Errorf("fuzz method %s.%s takes %d argument%s, the seed has %d value%s",
+			suiteName, methodName, arity, plural(arity), len(argExprs), plural(len(argExprs)))
+	}
+
+	insertOffset, ok := addInsertOffset(fset, file, decl, paramName)
 	if !ok || insertOffset < 0 || insertOffset > len(src) {
 		return nil, true, fmt.Errorf("fuzz method %s.%s: could not determine an insertion point", suiteName, methodName)
 	}
 
-	newStmt := fmt.Sprintf("\n\t%s.Add(%s)", paramName, strings.Join(argExprs, ", "))
+	exprs := make([]string, len(argExprs))
+	for i, e := range argExprs {
+		exprs[i] = rewriteFloatSpecials(e)
+	}
+	newStmt := fmt.Sprintf("\n\t%s.Add(%s)", paramName, strings.Join(exprs, ", "))
 	spliced := make([]byte, 0, len(src)+len(newStmt))
 	spliced = append(spliced, src[:insertOffset]...)
 	spliced = append(spliced, newStmt...)
 	spliced = append(spliced, src[insertOffset:]...)
 
-	formatted, err := format.Source(spliced)
+	formatted, err := imports.Process(filename, spliced, &imports.Options{Comments: true, TabIndent: true, TabWidth: 8})
 	if err != nil {
 		return nil, true, fmt.Errorf("formatting edited source: %w", err)
 	}
 	return formatted, true, nil
+}
+
+func plural(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
+// declaredArity counts the arguments the method's f.Fuzz callback takes
+// after its *gotest.T; false when the callback is not a literal.
+func declaredArity(decl *ast.FuncDecl, paramName string) (int, bool) {
+	for _, stmt := range decl.Body.List {
+		es, ok := stmt.(*ast.ExprStmt)
+		if !ok {
+			continue
+		}
+		ce, ok := es.X.(*ast.CallExpr)
+		if !ok || len(ce.Args) != 1 {
+			continue
+		}
+		sel, ok := ce.Fun.(*ast.SelectorExpr)
+		if !ok || sel.Sel.Name != "Fuzz" {
+			continue
+		}
+		if ident, ok := sel.X.(*ast.Ident); !ok || ident.Name != paramName {
+			continue
+		}
+		lit, ok := ce.Args[0].(*ast.FuncLit)
+		if !ok || lit.Type.Params == nil {
+			return 0, false
+		}
+		n := 0
+		for _, field := range lit.Type.Params.List {
+			n += max(len(field.Names), 1)
+		}
+		return n - 1, n > 0
+	}
+	return 0, false
+}
+
+// floatSpecial matches the corpus file's spelling of a float special, which
+// Go's encoder writes as %v and no Go source can name.
+var floatSpecial = regexp.MustCompile(`^(float32|float64)\(([+-]?Inf|NaN)\)$`)
+
+// rewriteFloatSpecials spells float64(NaN) and its kin as math calls.
+func rewriteFloatSpecials(expr string) string {
+	m := floatSpecial.FindStringSubmatch(strings.TrimSpace(expr))
+	if m == nil {
+		return expr
+	}
+	var call string
+	switch m[2] {
+	case "NaN":
+		call = "math.NaN()"
+	case "-Inf":
+		call = "math.Inf(-1)"
+	default:
+		call = "math.Inf(1)"
+	}
+	if m[1] == "float32" {
+		return "float32(" + call + ")"
+	}
+	return call
 }
 
 // findFuzzFuncDecl returns the FuncDecl in file whose receiver type is
@@ -166,9 +252,10 @@ func isGotestFStar(expr ast.Expr) bool {
 
 // addInsertOffset returns the byte offset in the original source at which a
 // new `<param>.Add(...)` statement should be spliced: right after the last
-// existing top-level `<param>.Add(...)` call in decl's body, or right after
-// the opening brace if none exist.
-func addInsertOffset(fset *token.FileSet, decl *ast.FuncDecl, paramName string) (int, bool) {
+// existing top-level `<param>.Add(...)` call in decl's body and any comment
+// trailing it on the same line, or right after the opening brace if none
+// exist.
+func addInsertOffset(fset *token.FileSet, file *ast.File, decl *ast.FuncDecl, paramName string) (int, bool) {
 	lastIdx := -1
 	for i, stmt := range decl.Body.List {
 		if isParamAddCall(stmt, paramName) {
@@ -176,7 +263,14 @@ func addInsertOffset(fset *token.FileSet, decl *ast.FuncDecl, paramName string) 
 		}
 	}
 	if lastIdx >= 0 {
-		return fset.Position(decl.Body.List[lastIdx].End()).Offset, true
+		end := decl.Body.List[lastIdx].End()
+		line := fset.Position(end).Line
+		for _, cg := range file.Comments {
+			if cg.Pos() > end && fset.Position(cg.Pos()).Line == line {
+				end = cg.End()
+			}
+		}
+		return fset.Position(end).Offset, true
 	}
 	if !decl.Body.Lbrace.IsValid() {
 		return -1, false

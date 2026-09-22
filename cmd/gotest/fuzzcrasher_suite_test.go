@@ -85,8 +85,8 @@ func (s *FuzzCrasherLoopTestSuite) TestCrasherLoop(t *gotest.T) {
 				gotest.Equal(it, 0, code, "promote output:\n%s", out)
 				src, err := os.ReadFile(filepath.Join(s.pkgDir, "suite_test.go"))
 				gotest.NoError(it, err)
-				// The fixture's three targets carry one seed each; promote adds one.
-				gotest.Equal(it, 4, strings.Count(string(src), "f.Add("))
+				// The fixture's four targets carry one seed each; promote adds one.
+				gotest.Equal(it, 5, strings.Count(string(src), "f.Add("))
 				entries, _ := os.ReadDir(corpusDir)
 				gotest.Empty(it, entries)
 			})

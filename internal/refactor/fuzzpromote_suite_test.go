@@ -143,6 +143,86 @@ func (s *FuzzPromoteTestSuite) TestInsertFuzzAdd(t *gotest.T, _ *promoteCtx) {
 	})
 }
 
+const fuzzTrimTrailingComment = `package example
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type FooTestSuite struct{}
+
+func (s *FooTestSuite) FuzzTrim(f *gotest.F) {
+	f.Add("  x ") // note
+	f.Fuzz(func(t *gotest.T, in string) {
+	})
+}
+`
+
+const fuzzScale = `package example
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type FooTestSuite struct{}
+
+func (s *FooTestSuite) FuzzScale(f *gotest.F) {
+	f.Add(1.5)
+	f.Fuzz(func(t *gotest.T, x float64) {
+	})
+}
+
+func (s *FooTestSuite) FuzzScale32(f *gotest.F) {
+	f.Fuzz(func(t *gotest.T, x float32) {
+	})
+}
+`
+
+// The splice is the one edit gotest makes to user source; each case here is
+// a way it used to leave that source changed in meaning or uncompilable.
+func (s *FuzzPromoteTestSuite) TestInsertFuzzAddKeepsTheSourceCompiling(t *gotest.T, _ *promoteCtx) {
+	t.It("lands after a trailing comment instead of moving it onto the new seed", func(it *gotest.T) {
+		edited, found, err := refactor.InsertFuzzAdd([]byte(fuzzTrimTrailingComment), "FooTestSuite", "FuzzTrim", []string{`"stale"`})
+		gotest.NoError(it, err)
+		gotest.True(it, found)
+		gotest.Contains(it, string(edited), "\tf.Add(\"  x \") // note\n\tf.Add(\"stale\")\n")
+	})
+
+	t.It("adds the import a spliced expression needs", func(it *gotest.T) {
+		edited, found, err := refactor.InsertFuzzAdd([]byte(fuzzScale), "FooTestSuite", "FuzzScale", []string{`math.NaN()`})
+		gotest.NoError(it, err)
+		gotest.True(it, found)
+		gotest.Contains(it, string(edited), `"math"`)
+		gotest.Contains(it, string(edited), `f.Add(math.NaN())`)
+	})
+
+	t.When("the seed carries a corpus-file float special", func(w *gotest.T) {
+		for sub, tc := range gotest.Each(w, []struct {
+			Desc   string
+			method string
+			expr   string
+			want   string
+		}{
+			{"NaN", "FuzzScale", "float64(NaN)", "f.Add(math.NaN())"},
+			{"+Inf", "FuzzScale", "float64(+Inf)", "f.Add(math.Inf(1))"},
+			{"-Inf", "FuzzScale", "float64(-Inf)", "f.Add(math.Inf(-1))"},
+			{"float32 NaN", "FuzzScale32", "float32(NaN)", "f.Add(float32(math.NaN()))"},
+		}) {
+			edited, found, err := refactor.InsertFuzzAdd([]byte(fuzzScale), "FooTestSuite", tc.method, []string{tc.expr})
+			gotest.NoError(sub, err)
+			gotest.True(sub, found)
+			gotest.Contains(sub, string(edited), tc.want)
+			gotest.Contains(sub, string(edited), `"math"`)
+		}
+	})
+
+	t.When("the seed's value count differs from the callback's arguments", func(w *gotest.T) {
+		w.It("refuses and names both counts", func(it *gotest.T) {
+			edited, found, err := refactor.InsertFuzzAdd([]byte(fuzzTrimOneSeed), "FooTestSuite", "FuzzTrim", []string{`"a"`, `"b"`, `[]byte("c")`})
+			gotest.True(it, found)
+			gotest.ErrorContains(it, err, "takes 1 argument")
+			gotest.ErrorContains(it, err, "3 values")
+			gotest.Nil(it, edited)
+		})
+	})
+}
+
 func (s *FuzzPromoteTestSuite) TestPromoteFuzzSeed(t *gotest.T, ctx *promoteCtx) {
 	t.It("writes the seed to disk and returns the file and line", func(it *gotest.T) {
 		path := s.writeSuite(it, ctx, fuzzTrimOneSeed)
