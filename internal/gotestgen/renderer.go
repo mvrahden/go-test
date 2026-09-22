@@ -446,26 +446,3 @@ func flattenSuitesDAG(allFixtures []*ResolvedFixture, suiteFixtureFields map[str
 	}
 	return result
 }
-
-func collectTransitiveDepsRF(suiteID string, suiteFixtureFields map[string][]FixtureFieldBinding, rfByID map[string]*ResolvedFixture) map[string]bool {
-	needed := make(map[string]bool)
-	bindings := suiteFixtureFields[suiteID]
-	var visit func(id string)
-	visit = func(id string) {
-		if needed[id] {
-			return
-		}
-		needed[id] = true
-		rf := rfByID[id]
-		if rf == nil {
-			return
-		}
-		for _, p := range rf.Parents {
-			visit(p.Identifier)
-		}
-	}
-	for _, b := range bindings {
-		visit(b.FixtureIdentifier)
-	}
-	return needed
-}

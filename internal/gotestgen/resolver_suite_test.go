@@ -652,4 +652,25 @@ func (s *ResolverTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
 			gotest.Len(it, simpleKeys, 1, "SimpleTestSuite needs only PG")
 		})
 	})
+
+	t.When("a shared fixture is reached only through a parent package fixture", func(w *gotest.T) {
+		w.It("is a required key of the suite bound to the child fixture", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixture_ThreeLevelChain")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+
+			spec, err := c.ApplyTestSuiteSpecs(result)
+			gotest.NoError(it, err)
+
+			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.NoError(it, err)
+
+			// Suite → ChildFixture → ParentFixture → PGSharedFixture: the
+			// runner starts a shared fixture only for suites that list it.
+			deepKeys := resolved.SuiteRequiredSharedFixtureKeys["DeepTestSuite"]
+			gotest.Len(it, deepKeys, 1, "DeepTestSuite needs PG through its parent fixture")
+			gotest.Contains(it, deepKeys[0], "PGSharedFixture")
+		})
+	})
 }

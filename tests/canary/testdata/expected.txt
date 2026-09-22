@@ -93,3 +93,7 @@ teardownfailing fail -
 teardownfailing pass -
 teardownfailing pass TestTeardownFailingTestSuite
 teardownfailing pass TestTeardownFailingTestSuite/TestFixtureIsUp
+fixturechain exit 0
+fixturechain pass -
+fixturechain pass TestChainTestSuite
+fixturechain pass TestChainTestSuite/TestSharedStateArrives

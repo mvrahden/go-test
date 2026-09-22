@@ -155,22 +155,28 @@ func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, loc
 		}
 	}
 
-	// Collect unique root fixtures (fixtures with no parents)
+	// Collect unique root fixtures: every parentless fixture reachable from a
+	// package fixture, through all of its parents.
 	seen := make(map[*types.Named]bool)
+	var addRoots func(rf *ResolvedFixture)
+	addRoots = func(rf *ResolvedFixture) {
+		if len(rf.Parents) > 0 {
+			for _, p := range rf.Parents {
+				addRoots(p)
+			}
+			return
+		}
+		if seen[rf.Named] {
+			return
+		}
+		seen[rf.Named] = true
+		if hasChildSuitesRecursive(rf) {
+			result.RootFixtures = append(result.RootFixtures, rf)
+		}
+	}
 	for _, rf := range r.resolved {
-		if rf.Kind != gotestast.PackageFixture {
-			continue
-		}
-		root := rf
-		for root.Parent != nil {
-			root = root.Parent
-		}
-		if seen[root.Named] {
-			continue
-		}
-		seen[root.Named] = true
-		if hasChildSuitesRecursive(root) {
-			result.RootFixtures = append(result.RootFixtures, root)
+		if rf.Kind == gotestast.PackageFixture {
+			addRoots(rf)
 		}
 	}
 
@@ -209,6 +215,15 @@ func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, loc
 		}
 	}
 
+	rfByID := make(map[string]*ResolvedFixture, len(result.AllFixtures))
+	for _, rf := range result.AllFixtures {
+		rfByID[rf.Identifier] = rf
+	}
+	needed := make(map[string]map[string]bool, len(suites))
+	for _, suite := range suites {
+		needed[suite.Identifier()] = collectTransitiveDepsRF(suite.Identifier(), result.SuiteFixtureFields, rfByID)
+	}
+
 	for _, suite := range suites {
 		id := suite.Identifier()
 		seen := make(map[string]bool)
@@ -220,16 +235,14 @@ func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, loc
 			}
 		}
 
-		// From fixture tree shared fixtures
-		if bindings, ok := result.SuiteFixtureFields[id]; ok {
-			for _, b := range bindings {
-				for _, rf := range result.AllFixtures {
-					if rf.Identifier == b.FixtureIdentifier {
-						for _, sf := range rf.SharedFixtures {
-							collectTransitive(sf.StateKey, seen)
-						}
-					}
-				}
+		// From the fixture tree: every package fixture the suite's bindings
+		// reach through their parents may name a shared fixture.
+		for _, rf := range result.AllFixtures {
+			if !needed[id][rf.Identifier] {
+				continue
+			}
+			for _, sf := range rf.SharedFixtures {
+				collectTransitive(sf.StateKey, seen)
 			}
 		}
 
@@ -1013,4 +1026,31 @@ func pointerNamed(field *types.Var) *types.Named {
 		return nil
 	}
 	return named
+}
+
+// collectTransitiveDepsRF lists the package fixtures a suite's bindings reach,
+// following every parent. The renderer orders fixture setup by it and the
+// resolver derives the suite's shared-fixture keys from it: one walk, so the
+// two cannot disagree.
+func collectTransitiveDepsRF(suiteID string, suiteFixtureFields map[string][]FixtureFieldBinding, rfByID map[string]*ResolvedFixture) map[string]bool {
+	needed := make(map[string]bool)
+	bindings := suiteFixtureFields[suiteID]
+	var visit func(id string)
+	visit = func(id string) {
+		if needed[id] {
+			return
+		}
+		needed[id] = true
+		rf := rfByID[id]
+		if rf == nil {
+			return
+		}
+		for _, p := range rf.Parents {
+			visit(p.Identifier)
+		}
+	}
+	for _, b := range bindings {
+		visit(b.FixtureIdentifier)
+	}
+	return needed
 }

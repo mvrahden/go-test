@@ -246,6 +246,12 @@ func (s *CanaryTestSuite) TestATeardownFailureReachesTheStream(t *gotest.T) {
 	s.check(t, "teardownfailing")
 }
 
+// A shared fixture reached only through a chain of package fixtures is still
+// started for the suite, and the suite reads its transferred state.
+func (s *CanaryTestSuite) TestSharedFixturesReachThroughFixtureChains(t *gotest.T) {
+	s.check(t, "fixturechain")
+}
+
 // benchReport is the part of a bench --json report the canary reads.
 type benchReport struct {
 	Baseline struct {
