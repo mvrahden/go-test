@@ -76,3 +76,15 @@ asynchronous fail -
 asynchronous fail TestAsyncTestSuite
 asynchronous fail TestAsyncTestSuite/TestNeverDoneAsync
 asynchronous pass TestAsyncTestSuite/TestCallsDoneAsync
+fixtureteardown exit 0
+fixtureteardown pass -
+fixtureteardown pass TestFirstBoundTestSuite
+fixtureteardown pass TestFirstBoundTestSuite/TestFixtureAlive
+fixtureteardown pass TestSecondBoundTestSuite
+fixtureteardown pass TestSecondBoundTestSuite/TestFixtureAlive
+fixturefuzzing exit 0
+fixturefuzzing pass -
+fixturefuzzing pass FuzzBoundFuzzTestSuite_FuzzSeesFixture
+fixturefuzzing pass FuzzBoundFuzzTestSuite_FuzzSeesFixture/seed#0
+fixturefuzzing pass TestBoundFuzzTestSuite
+fixturefuzzing pass TestBoundFuzzTestSuite/TestFixtureAlive

@@ -94,13 +94,16 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	}
 
 	if len(fixtureBound) > 0 || len(sfNodeVMs) > 0 {
+		// The countdown counts top-level functions the binary will run, so the
+		// list carries the generated names: the Test function of every suite
+		// that calls ƒ_setupFixtures plus its Fuzz and Benchmark wrappers.
 		var fixtureTestNames []string
 		for _, ts := range fixtureBound {
-			fixtureTestNames = append(fixtureTestNames, ts.Identifier())
+			fixtureTestNames = append(fixtureTestNames, fixtureTestFuncNames(ts)...)
 		}
 		for _, ts := range standalone {
 			if _, hasSF := resolved.SuiteSharedFixtures[ts.Identifier()]; hasSF {
-				fixtureTestNames = append(fixtureTestNames, ts.Identifier())
+				fixtureTestNames = append(fixtureTestNames, fixtureTestFuncNames(ts)...)
 			}
 		}
 		if err := r.renderFixtures(buf, fixtureBound, allFixtures, resolved.SuiteFixtureFields, sfNodeVMs, fixtureTestNames); err != nil {
@@ -128,6 +131,20 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 
 	out, err := r.formatOutput(buf)
 	return out, fans, err
+}
+
+// fixtureTestFuncNames lists the generated top-level functions of one suite,
+// as the fixture-teardown countdown must see them.
+func fixtureTestFuncNames(ts *gotestast.TestSuiteSpec) []string {
+	id := ts.Identifier()
+	names := []string{"Test" + id}
+	for _, fz := range ts.Fuzzers() {
+		names = append(names, "Fuzz"+id+"_"+fz.Identifier())
+	}
+	if len(ts.Benchmarks()) > 0 {
+		names = append(names, "Benchmark"+id)
+	}
+	return names
 }
 
 func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, sfNodes []*SharedFixtureNodeVM, fans *FuzzTargetSet) error { //nolint:gocritic // hugeParam: stable API

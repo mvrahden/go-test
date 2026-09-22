@@ -33,7 +33,7 @@ var ƒ_DBFixture *DBFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"QueryTestSuite",
+	"TestQueryTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -380,7 +380,7 @@ var ƒcfg_CFGFixture gotest.FixtureConfig
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"CFGTestSuite",
+	"TestCFGTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -612,7 +612,7 @@ var ƒ_PlainFixture *PlainFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"PlainTestSuite",
+	"TestPlainTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -832,7 +832,7 @@ var ƒ_EachFixture *EachFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"EachTestSuite",
+	"TestEachTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -949,7 +949,7 @@ var ƒ_DBFixture *DBFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"QueryTestSuite",
+	"TestQueryTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -1070,7 +1070,7 @@ var ƒ_SimpleFixture *SimpleFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"BasicTestSuite",
+	"TestBasicTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -1176,7 +1176,7 @@ var ƒ_MinimalFixture *MinimalFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"MinimalTestSuite",
+	"TestMinimalTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -1282,7 +1282,7 @@ var ƒ_AppFixture *AppFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"BoundTestSuite",
+	"TestBoundTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -1423,7 +1423,7 @@ var ƒ_APIFixture *APIFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"HandlerTestSuite",
+	"TestHandlerTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -1569,8 +1569,8 @@ var ƒ_DBFixture *DBFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"EmbeddedTestSuite",
-	"NamedTestSuite",
+	"TestEmbeddedTestSuite",
+	"TestNamedTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -1724,8 +1724,8 @@ var ƒ_APIFixture *APIFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"LightTestSuite",
-	"FullTestSuite",
+	"TestLightTestSuite",
+	"TestFullTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -1885,7 +1885,7 @@ var ƒ_AppFixture *AppFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"UserTestSuite",
+	"TestUserTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -2004,7 +2004,7 @@ var ƒ_DBFixture *DBFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"QueryTestSuite",
+	"TestQueryTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -2104,7 +2104,7 @@ var ƒ_sf_SchemaSharedFixture = &SchemaSharedFixture{}
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"MigrationTestSuite",
+	"TestMigrationTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -2223,7 +2223,7 @@ var ƒ_E2EFixture *E2EFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"QueryTestSuite",
+	"TestQueryTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -2347,7 +2347,7 @@ var ƒ_AppFixture *AppFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"AppTestSuite",
+	"TestAppTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -2466,7 +2466,7 @@ var ƒ_DBFixture *DBFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"StdlibTestSuite",
+	"TestStdlibTestSuite",
 }
 var ƒ_pending atomic.Int32
 

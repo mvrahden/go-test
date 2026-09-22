@@ -208,6 +208,37 @@ func (s *CanaryTestSuite) TestAsyncMethodsWaitForDone(t *gotest.T) {
 	s.check(t, "asynchronous")
 }
 
+// Two suites share one package fixture and each runs in its own process; the
+// fixture's AfterAll must run in the process that finishes with it last.
+func (s *CanaryTestSuite) TestPackageFixtureTearsDownAfterEverySuite(t *gotest.T) {
+	dir := s.check(t, "fixtureteardown")
+	if _, err := os.Stat(filepath.Join(dir, "fixture-afterall")); err != nil {
+		t.Errorf("the package fixture's AfterAll never ran: %v", err)
+	}
+}
+
+// A bench run selects the benchmark wrapper alone, and the fixture it uses
+// must still be torn down when it finishes.
+func (s *CanaryTestSuite) TestPackageFixtureTearsDownAfterBench(t *gotest.T) {
+	dir := t.TempDir()
+	code, names := s.bench(t, "fixtureteardown", dir)
+	if code != 0 {
+		t.Errorf("fixtureteardown bench: exit code %d, want 0", code)
+	}
+	if want := "BenchmarkFixtureAlive"; strings.Join(names, ",") != want {
+		t.Errorf("fixtureteardown bench: results %v, want %v", names, want)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "fixture-afterall")); err != nil {
+		t.Errorf("the package fixture's AfterAll never ran after the bench: %v", err)
+	}
+}
+
+// Seeds replay after the suite's Test function; a fixture the suite binds
+// must still be up for them.
+func (s *CanaryTestSuite) TestSeedsReplayAgainstLiveFixtures(t *gotest.T) {
+	s.check(t, "fixturefuzzing")
+}
+
 // benchReport is the part of a bench --json report the canary reads.
 type benchReport struct {
 	Baseline struct {
