@@ -239,6 +239,13 @@ func (s *CanaryTestSuite) TestSeedsReplayAgainstLiveFixtures(t *gotest.T) {
 	s.check(t, "fixturefuzzing")
 }
 
+// A shared fixture that fails to release what it holds fails the run after
+// its last verdict; the -json stream must carry that failure, not only the
+// exit code.
+func (s *CanaryTestSuite) TestATeardownFailureReachesTheStream(t *gotest.T) {
+	s.check(t, "teardownfailing")
+}
+
 // benchReport is the part of a bench --json report the canary reads.
 type benchReport struct {
 	Baseline struct {

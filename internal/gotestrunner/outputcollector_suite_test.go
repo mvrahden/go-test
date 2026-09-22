@@ -121,10 +121,13 @@ func (s *OutputCollectorTestSuite) TestOutputCollector(t *gotest.T) {
 	})
 
 	t.When("a shared teardown failure lands after the stream ended", func(w *gotest.T) {
-		w.It("reaches the exit code and every artifact rendered from the stream", func(it *gotest.T) {
-			result := gotestrunner.PipelineResult{CapturedJSON: []byte{}}
-			gotestrunner.ExportApplyTeardownFailure(&result,
-				fmt.Errorf("shared fixture teardown failed; see AfterAll errors above"))
+		teardownErr := fmt.Errorf("shared fixture teardown failed; see AfterAll errors above")
+
+		w.It("reaches the exit code and every artifact rendered from the captured stream", func(it *gotest.T) {
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunCaptureJSON, false, gotestrunner.WithWriters(&bytes.Buffer{}, &bytes.Buffer{}))
+			var result gotestrunner.PipelineResult
+			gotestrunner.ExportApplyTeardownFailure(c, &result, teardownErr)
+			result.CapturedJSON = c.CapturedJSON()
 
 			gotest.Equal(it, 1, result.ExitCode)
 
@@ -141,6 +144,31 @@ func (s *OutputCollectorTestSuite) TestOutputCollector(t *gotest.T) {
 			gotestspec.RenderSummary(&buf, tree, gotestspec.WithNoColor())
 			gotest.Contains(it, buf.String(), "shared fixture teardown failed",
 				"a rendered artifact must carry the teardown failure")
+		})
+
+		w.It("reaches the live -json stream the same way", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			var result gotestrunner.PipelineResult
+			gotestrunner.ExportApplyTeardownFailure(c, &result, teardownErr)
+
+			gotest.Equal(it, 1, result.ExitCode)
+			// A -json consumer reads the run from stdout alone; the booking
+			// must not depend on which mode snapshots the stream.
+			events, err := gotestspec.ParseEvents(bytes.NewReader(stdout.Bytes()))
+			gotest.NoError(it, err)
+			gotest.True(it, gotestspec.HasFailures(gotestspec.BuildTree(events)),
+				"the live stream must carry the failure the exit code reports")
+		})
+
+		w.It("stays on stderr in text mode", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			var result gotestrunner.PipelineResult
+			gotestrunner.ExportApplyTeardownFailure(c, &result, teardownErr)
+
+			gotest.Equal(it, 1, result.ExitCode)
+			gotest.Empty(it, stdout.String(), "text mode has no stream to book into")
 		})
 
 		w.It("tracks worst exit code", func(it *gotest.T) {

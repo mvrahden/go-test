@@ -3,7 +3,7 @@
 The canary checks gotest's verdicts from outside gotest. Every other test in
 this repository reports its result through gotest's own runner, so a bug in
 that runner could turn a failure into a pass without any test noticing. The
-canary closes that gap: it builds the `gotest` binary, runs it over thirteen
+canary closes that gap: it builds the `gotest` binary, runs it over fourteen
 small fixture packages written to fail in specific ways, and compares what
 the binary reports with a checked-in expectation. It checks with plain Go
 only, so nothing under test takes part in the verdict.
@@ -27,6 +27,7 @@ Each directory under `testdata/` is one package with one suite:
 | `panicking` | a panic fails its method and the run is red |
 | `fixtureteardown` | two suites bound to one package fixture, each in its own process: the fixture's `AfterAll` runs after the last of them, and after a bench run |
 | `fixturefuzzing` | a fixture-bound suite's seeds replay while the fixture is still up |
+| `teardownfailing` | a shared fixture whose `AfterAll` fails turns a green run red, and the `-json` stream carries the failure as a failed package |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line
 gives the exit code; `<fixture> <action> <test>` lines list every `pass`,

@@ -97,8 +97,8 @@ var ExportExitCodeAfterDispatch = exitCodeAfterDispatch
 
 // ExportApplyDeadlineFailure applies a run's deadline failure under the given
 // --timeout.
-func ExportApplyDeadlineFailure(result *PipelineResult, globalTimeout time.Duration, dispatchErr error, running []CensusCase) {
-	applyDeadlineFailure(result, PipelineConfig{GlobalTimeout: globalTimeout}, dispatchErr, running)
+func ExportApplyDeadlineFailure(c *OutputCollector, result *PipelineResult, globalTimeout time.Duration, dispatchErr error, running []CensusCase) {
+	applyDeadlineFailure(c, result, PipelineConfig{GlobalTimeout: globalTimeout}, dispatchErr, running)
 }
 
 var ExportUnitNames = unitNames

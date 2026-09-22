@@ -88,3 +88,8 @@ fixturefuzzing pass FuzzBoundFuzzTestSuite_FuzzSeesFixture
 fixturefuzzing pass FuzzBoundFuzzTestSuite_FuzzSeesFixture/seed#0
 fixturefuzzing pass TestBoundFuzzTestSuite
 fixturefuzzing pass TestBoundFuzzTestSuite/TestFixtureAlive
+teardownfailing exit 1
+teardownfailing fail -
+teardownfailing pass -
+teardownfailing pass TestTeardownFailingTestSuite
+teardownfailing pass TestTeardownFailingTestSuite/TestFixtureIsUp

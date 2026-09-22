@@ -1,0 +1,12 @@
+Expect: teardownfailing: verdicts differ from the golden list
+--- a/internal/gotestrunner/output_collector.go
++++ b/internal/gotestrunner/output_collector.go
+@@ -316,7 +316,7 @@
+ // failed synthetic package, on whichever writer this mode's stream goes to.
+ // Text mode has no stream; the caller's stderr line is all it gets.
+ func (c *OutputCollector) bookRunFailure(pkg, msg string) {
+-	if c.mode == RunBatchText {
++	if c.mode != RunCaptureJSON {
+ 		return
+ 	}
+ 	c.mu.Lock()
