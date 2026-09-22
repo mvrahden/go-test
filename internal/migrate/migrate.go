@@ -7,6 +7,7 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -102,11 +103,16 @@ type SuiteMigration struct {
 	ReceiverName  string // receiver variable name (e.g., "s")
 }
 
-// MigrateResult describes what was migrated in a file.
+// MigrateResult describes what was migrated in a file, or why it was not.
 type MigrateResult struct {
 	File    string
 	OldName string
 	NewName string
+	// Markers counts the TODO(gotest-migrate) lines the file was left with.
+	Markers int
+	// Refusal names why the file was not migrated at all; markers stand
+	// where the reason was found.
+	Refusal string
 }
 
 // DeriveNewName computes the new suite name from an old one.
@@ -409,19 +415,25 @@ func TransformFile(fset *token.FileSet, f *ast.File, plan MigrationPlan) {
 			renameReceiverType(d.Recv.List[0], oldToNew[recvTypeName])
 
 			// Rename lifecycle methods and add t parameter
+			gainedT := false
 			if newName, ok := lifecycleRenames[d.Name.Name]; ok {
 				d.Name.Name = newName
 				addGotestTParam(d)
+				gainedT = true
 			}
 
 			// Test methods: add t parameter
 			if strings.HasPrefix(d.Name.Name, "Test") {
 				addGotestTParam(d)
+				gainedT = true
 			}
 
 			// Rewrite assertions in the function body
 			if d.Body != nil {
 				rewriteAssertions(d.Body, recvVarName, assertionMap)
+				if gainedT {
+					rewriteSTCalls(d.Body, recvVarName)
+				}
 			}
 		}
 	}
@@ -630,15 +642,69 @@ func rewriteImports(f *ast.File) {
 	}
 }
 
-// rewriteSTandalone rewrites s.T() when used as an argument (not in assertion chains)
-// to t.T(). This is done as a post-processing step on the formatted source.
-func rewriteSTandalone(src string, recvName string) string {
-	// Replace s.T() with t.T() — but only where it hasn't already been rewritten
-	// The assertion rewriting handles assertion contexts. Here we handle when
-	// s.T() is passed as an argument to non-assertion functions.
-	old := recvName + ".T()"
-	new := "t.T()"
-	return strings.ReplaceAll(src, old, new)
+// rewriteSTCalls rewrites every s.T() in body to t.T(). Only a method that
+// gained the t parameter may call it; elsewhere s.T() is left for a marker.
+func rewriteSTCalls(body *ast.BlockStmt, recvName string) {
+	ast.Inspect(body, func(n ast.Node) bool {
+		if ident := stCallReceiver(n, recvName); ident != nil {
+			ident.Name = "t"
+		}
+		return true
+	})
+}
+
+// stCallReceiver returns the receiver identifier of an s.T() call, nil for
+// any other node.
+func stCallReceiver(n ast.Node, recvName string) *ast.Ident {
+	call, ok := n.(*ast.CallExpr)
+	if !ok || len(call.Args) != 0 {
+		return nil
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != "T" {
+		return nil
+	}
+	ident, ok := sel.X.(*ast.Ident)
+	if !ok || ident.Name != recvName {
+		return nil
+	}
+	return ident
+}
+
+// isRecvRunCall reports whether n is s.Run(...), testify's subtest form,
+// which has no gotest equivalent.
+func isRecvRunCall(n ast.Node, recvName string) bool {
+	call, ok := n.(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != "Run" {
+		return false
+	}
+	ident, ok := sel.X.(*ast.Ident)
+	return ok && ident.Name == recvName
+}
+
+// hasGotestTParam reports whether fd declares a t *gotest.T parameter.
+func hasGotestTParam(fd *ast.FuncDecl) bool {
+	if fd.Type.Params == nil {
+		return false
+	}
+	for _, p := range fd.Type.Params.List {
+		star, ok := p.Type.(*ast.StarExpr)
+		if !ok {
+			continue
+		}
+		sel, ok := star.X.(*ast.SelectorExpr)
+		if !ok || sel.Sel.Name != "T" {
+			continue
+		}
+		if ident, ok := sel.X.(*ast.Ident); ok && ident.Name == "gotest" {
+			return true
+		}
+	}
+	return false
 }
 
 // todoAnnotation marks a line in the migrated output that needs a
@@ -701,14 +767,15 @@ func unconvertedAssertionMsg(call *ast.CallExpr, recvName string) (string, bool)
 
 // annotateUnconverted parses formatted migrated source and inserts
 // `// TODO(gotest-migrate): ...` comments above unconverted testify lifecycle
-// hooks and unmapped assertion calls, so nothing is silently skipped. It
-// operates line-based on the already-formatted output (positions are stable at
-// that point) and re-formats the result.
-func annotateUnconverted(src []byte, suiteNames map[string]bool) ([]byte, error) {
+// hooks, unmapped assertion calls, s.Run and any s.T() left in a method
+// without t, so nothing is silently skipped. It operates line-based on the
+// already-formatted output (positions are stable at that point), re-formats
+// the result and returns how many markers it placed.
+func annotateUnconverted(src []byte, suiteNames map[string]bool) ([]byte, int, error) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "", src, parser.ParseComments)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var anns []todoAnnotation
@@ -744,6 +811,7 @@ func annotateUnconverted(src []byte, suiteNames map[string]bool) ([]byte, error)
 		if fd.Body == nil {
 			continue
 		}
+		hasT := hasGotestTParam(fd)
 		ast.Inspect(fd.Body, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
 			if !ok {
@@ -752,17 +820,30 @@ func annotateUnconverted(src []byte, suiteNames map[string]bool) ([]byte, error)
 			if msg, found := unconvertedAssertionMsg(call, recvVarName); found {
 				add(call.Pos(), msg)
 			}
+			if isRecvRunCall(call, recvVarName) {
+				add(call.Pos(), recvVarName+".Run has no gotest equivalent — use t.When or t.It")
+			}
+			if !hasT && stCallReceiver(call, recvVarName) != nil {
+				add(call.Pos(), recvVarName+".T() outside a migrated method — no t is in scope here")
+			}
 			return true
 		})
 	}
 
+	return insertMarkers(src, anns)
+}
+
+// insertMarkers writes one TODO(gotest-migrate) comment above each annotated
+// line and returns the formatted result with the number of markers added.
+func insertMarkers(src []byte, anns []todoAnnotation) ([]byte, int, error) {
 	if len(anns) == 0 {
-		return src, nil
+		return src, 0, nil
 	}
 
 	// Insert comment lines bottom-up so earlier line numbers stay valid.
 	sort.Slice(anns, func(i, j int) bool { return anns[i].line > anns[j].line })
 	lines := strings.Split(string(src), "\n")
+	added := 0
 	for _, a := range anns {
 		idx := a.line - 1
 		if idx < 0 || idx >= len(lines) {
@@ -774,8 +855,52 @@ func annotateUnconverted(src []byte, suiteNames map[string]bool) ([]byte, error)
 		}
 		indented := leadingWhitespace(lines[idx]) + comment
 		lines = append(lines[:idx], append([]string{indented}, lines[idx:]...)...)
+		added++
 	}
-	return format.Source([]byte(strings.Join(lines, "\n")))
+	out, err := format.Source([]byte(strings.Join(lines, "\n")))
+	return out, added, err
+}
+
+// indirectEmbeddings lists every struct that embeds one of the file's suites
+// instead of suite.Suite. Renaming the base would leave the child behind, so
+// such a file is refused whole.
+func indirectEmbeddings(f *ast.File, plan MigrationPlan) []todoAnnotation {
+	bases := map[string]bool{}
+	for i := range plan.Suites {
+		bases[plan.Suites[i].OldName] = true
+	}
+	var anns []todoAnnotation
+	for _, decl := range f.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok || gd.Tok != token.TYPE {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			st, ok := ts.Type.(*ast.StructType)
+			if !ok || st.Fields == nil {
+				continue
+			}
+			for _, field := range st.Fields.List {
+				if len(field.Names) != 0 {
+					continue
+				}
+				base := gotestast.ReceiverTypeName(field.Type)
+				if !bases[base] {
+					continue
+				}
+				anns = append(anns, todoAnnotation{
+					line: 0, // filled by the caller, which owns the FileSet
+					msg:  ts.Name.Name + " embeds " + base + ", not suite.Suite — migrate this file by hand",
+				})
+				anns[len(anns)-1].line = -int(gd.Pos()) // marker for the caller
+			}
+		}
+	}
+	return anns
 }
 
 // leadingWhitespace returns the leading spaces/tabs of a line.
@@ -788,37 +913,76 @@ func leadingWhitespace(s string) string {
 	return s
 }
 
+// Options steer a migration run.
+type Options struct {
+	// DryRun writes nothing; the unified diff of every edit goes to Out.
+	DryRun bool
+	Out    io.Writer
+}
+
 // MigrateFile processes a single file: parse, analyze, transform, format, write back.
 func MigrateFile(path string) ([]MigrateResult, error) {
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+	return migrateFile(path, Options{})
+}
+
+func migrateFile(path string, opts Options) ([]MigrateResult, error) {
+	before, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("parse %s: %w", path, err)
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+	results, after, err := migrateSource(path, before)
+	if err != nil || after == nil {
+		return results, err
+	}
+	if opts.DryRun {
+		if opts.Out != nil {
+			fmt.Fprint(opts.Out, unifiedDiff(path, before, after))
+		}
+		return results, nil
+	}
+	if err := os.WriteFile(path, after, 0644); err != nil { //nolint:gosec // G306: not sensitive data
+		return nil, fmt.Errorf("write %s: %w", path, err)
+	}
+	return results, nil
+}
+
+// migrateSource returns the migrated form of src, or nil when the file holds
+// no testify suite.
+func migrateSource(path string, src []byte) ([]MigrateResult, []byte, error) {
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, path, src, parser.ParseComments)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse %s: %w", path, err)
 	}
 
 	plan := AnalyzeFile(f)
 	if len(plan.Suites) == 0 {
-		return nil, nil
+		return nil, nil, nil
+	}
+
+	if indirect := indirectEmbeddings(f, plan); len(indirect) > 0 {
+		// The file is left as it is, apart from a marker at every child.
+		reasons := make([]string, 0, len(indirect))
+		for i := range indirect {
+			indirect[i].line = fset.Position(token.Pos(-indirect[i].line)).Line
+			reasons = append(reasons, indirect[i].msg)
+		}
+		marked, added, err := insertMarkers(src, indirect)
+		if err != nil {
+			return nil, nil, fmt.Errorf("annotate %s: %w", path, err)
+		}
+		return []MigrateResult{{File: path, Markers: added, Refusal: strings.Join(reasons, "; ")}}, marked, nil
 	}
 
 	TransformFile(fset, f, plan)
 
 	var buf bytes.Buffer
 	if err := format.Node(&buf, fset, f); err != nil {
-		return nil, fmt.Errorf("format %s: %w", path, err)
+		return nil, nil, fmt.Errorf("format %s: %w", path, err)
 	}
-
-	// Post-process: rewrite remaining s.T() to t.T()
-	src := buf.String()
-	for i := range plan.Suites {
-		if plan.Suites[i].ReceiverName != "" {
-			src = rewriteSTandalone(src, plan.Suites[i].ReceiverName)
-		}
-	}
-
-	formatted, err := format.Source([]byte(src))
+	formatted, err := format.Source(buf.Bytes())
 	if err != nil {
-		return nil, fmt.Errorf("gofmt %s: %w", path, err)
+		return nil, nil, fmt.Errorf("gofmt %s: %w", path, err)
 	}
 
 	// Annotate anything the migrator could not convert with TODO(gotest-migrate)
@@ -827,13 +991,9 @@ func MigrateFile(path string) ([]MigrateResult, error) {
 	for i := range plan.Suites {
 		suiteNames[plan.Suites[i].NewName] = true
 	}
-	formatted, err = annotateUnconverted(formatted, suiteNames)
+	formatted, markers, err := annotateUnconverted(formatted, suiteNames)
 	if err != nil {
-		return nil, fmt.Errorf("annotate %s: %w", path, err)
-	}
-
-	if err := os.WriteFile(path, formatted, 0644); err != nil { //nolint:gosec // G306: not sensitive data
-		return nil, fmt.Errorf("write %s: %w", path, err)
+		return nil, nil, fmt.Errorf("annotate %s: %w", path, err)
 	}
 
 	var results []MigrateResult
@@ -842,13 +1002,15 @@ func MigrateFile(path string) ([]MigrateResult, error) {
 			File:    path,
 			OldName: plan.Suites[i].OldName,
 			NewName: plan.Suites[i].NewName,
+			Markers: markers,
 		})
+		markers = 0 // the file's markers are counted once, on its first suite
 	}
-	return results, nil
+	return results, formatted, nil
 }
 
 // MigratePackages walks directories matching patterns and migrates test files.
-func MigratePackages(patterns []string) ([]MigrateResult, error) {
+func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 	var allResults []MigrateResult
 
 	for _, pattern := range patterns {
@@ -876,7 +1038,7 @@ func MigratePackages(patterns []string) ([]MigrateResult, error) {
 				return nil
 			}
 
-			results, err := MigrateFile(path)
+			results, err := migrateFile(path, opts)
 			if err != nil {
 				return fmt.Errorf("migrate %s: %w", path, err)
 			}

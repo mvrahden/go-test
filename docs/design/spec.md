@@ -162,6 +162,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--jobs=<n>` | Max concurrent fuzz targets (`fuzz`; default: max(1, GOMAXPROCS/2)) |
 | `--no-harvest` | Disable table-test seed harvesting for this run |
 | `--fuzz` | Generate fuzz round-trip skeletons (`scaffold`) |
+| `--dry-run` | Print the unified diff of every edit instead of writing it (`migrate`) |
 
 ### Disambiguation
 
@@ -1076,7 +1077,7 @@ Converts testify/suite tests:
 2. Renames lifecycle hooks (`SetupSuite` → `BeforeAll`, `TearDownSuite` → `AfterAll`, etc.)
 3. Transforms assertion calls (`s.Require().Equal(a, b)` → `gotest.Equal(t, a, b)`)
 4. Removes `suite.Run` boilerplate, the `suite.Suite` embedding, and testify imports (dropping `testing` when it becomes unused)
-5. Injects the `t *gotest.T` parameter into lifecycle and test methods; rewrites standalone `s.T()` to `t.T()`
+5. Injects the `t *gotest.T` parameter into lifecycle and test methods; rewrites `s.T()` to `t.T()` inside those methods
 6. Transforms both `s.Require().X(...)`/`s.Assert().X(...)` chains and `assert.X(s.T(), ...)`/`require.X(...)` forms
 
 Not converted: direct embedded-suite calls (`s.Equal(...)`) — the removed `suite.Suite` embedding makes them compile errors, and they are annotated with a rewrite hint.
@@ -1086,6 +1087,11 @@ Anything the tool cannot convert is annotated in place, so nothing is silently s
 - `// TODO(gotest-migrate): unsupported testify hook <Name> — convert manually` above unconverted lifecycle hooks (`SetupSubTest`, `TearDownSubTest`, `BeforeTest`, `AfterTest`, `HandleStats`)
 - `// TODO(gotest-migrate): unmapped assertion <Name> — convert manually` above assertion calls outside the mapping table (e.g. `ErrorAs`, `Eventually`, `InDelta`)
 - `// TODO(gotest-migrate): unconverted assertion <Name> — embedded-suite call; rewrite as gotest.<Name>(t, ...)` above direct embedded-suite calls with mapped names
+- `// TODO(gotest-migrate): s.Run has no gotest equivalent — use t.When or t.It` above testify subtests, which are left in place
+- `// TODO(gotest-migrate): s.T() outside a migrated method — no t is in scope here` above an `s.T()` in a helper; only methods that gained `t` have theirs rewritten to `t.T()`
+- `// TODO(gotest-migrate): <Child> embeds <Base>, not suite.Suite — migrate this file by hand` above a suite that embeds another suite; the file is refused whole, since renaming the base would strand the child
+
+Exit codes: 0 when every suite converted cleanly, 1 when any marker was left (the run reports how many), 2 when a file could not be parsed or written or a flag is unknown. `--dry-run` prints the unified diff of every edit to stdout, writes nothing, and exits the same way.
 
 ---
 
@@ -1442,7 +1448,7 @@ Manual setup works without the action:
 - run: gotest spec ./... --format=md --output=behavior-spec.md
 ```
 
-Exit codes: 0 = pass, 1 = test failure or a `--timeout` that expired before the last verdict (`FAIL: global --timeout exceeded after <d> while running: <pkg> <test>, …` names up to five units still running, the suites in the text run; each is booked into the event stream as failed at the method, followed by its suite and package, and a deadline with nothing to name, during compilation or fixture setup, is booked as a failed `global --timeout` package), 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors) or a census failure, 130 = run interrupted (SIGINT/SIGTERM) before the last verdict, whatever the suites the interrupt killed reported; their failures are the interrupt's, not verdicts. An interrupt that arrives later, while fixtures tear down, leaves the verdict alone. A suite binary the run stopped from outside — a signal on Unix, the console interrupt a `--timeout` sends on Windows — reports a status it never chose (`-1`, `0xC000013A`); it is read as a failed suite, named on stderr, and never becomes the run's own exit code.
+Exit codes: 0 = pass, 1 = test failure or a `--timeout` that expired before the last verdict (`FAIL: global --timeout exceeded after <d> while running: <pkg> <test>, …` names up to five units still running, the suites in the text run; each is booked into the event stream as failed at the method, followed by its suite and package, and a deadline with nothing to name, during compilation or fixture setup, is booked as a failed `global --timeout` package), 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors) or a census failure, 130 = run interrupted (SIGINT/SIGTERM) before the last verdict, whatever the suites the interrupt killed reported; their failures are the interrupt's, not verdicts. An interrupt that arrives later, while fixtures tear down, leaves the verdict alone. A second interrupt ends the CLI at once with 130, abandoning what is left of the teardown; whatever the fixtures still held is left behind. A suite binary the run stopped from outside — a signal on Unix, the console interrupt a `--timeout` sends on Windows — reports a status it never chose (`-1`, `0xC000013A`); it is read as a failed suite, named on stderr, and never becomes the run's own exit code.
 
 **Census.** A green run is believed only when every declared test method produced a verdict. After a green run that writes a test2json stream (`spec`, `summary`, `-json`, `watch --spec` or `--json`, a capturing `bench`), the pipeline compares two sets as the stream is written:
 

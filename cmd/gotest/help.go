@@ -678,14 +678,19 @@ func printMigrateHelp() {
 	fmt.Print(`gotest migrate — convert testify/suite tests to go-test format
 
 Usage:
-  gotest migrate [packages...]
+  gotest migrate [--dry-run] [packages...]
 
 Scans for testify/suite patterns and rewrites them into gotest suite
 format. Defaults to the current package if no patterns are given.
+Anything it cannot convert is left with a TODO(gotest-migrate) marker,
+and the run exits 1 when any marker was left.
+
+Flags:
+  --dry-run    Print the diff of every edit instead of writing it
 
 Examples:
   gotest migrate ./...                       Migrate all packages
-  gotest migrate ./pkg/auth                  Migrate one package
+  gotest migrate --dry-run ./pkg/auth        Show what one package would become
 `)
 }
 

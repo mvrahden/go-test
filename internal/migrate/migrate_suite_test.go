@@ -61,6 +61,12 @@ func TestSampleSuite(t *testing.T) {
 // TODO(gotest-migrate) markers for constructs the migrator cannot convert.
 type MigrateTestSuite struct{}
 
+func (s *MigrateTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *MigrateTestSuite) migrateSource(t *gotest.T, src string) string {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sample_test.go")
@@ -162,6 +168,121 @@ func TestCleanSuite(t *testing.T) {
 
 		w.It("emits no TODO markers", func(it *gotest.T) {
 			gotest.NotContains(it, out, "TODO(gotest-migrate)")
+		})
+	})
+}
+
+// scopedSrc mixes a test method, which gains t, with a helper that does not.
+const scopedSrc = `package sample
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type ScopedSuite struct {
+	suite.Suite
+}
+
+func (s *ScopedSuite) helper() {
+	s.T().Helper()
+}
+
+func (s *ScopedSuite) TestUsesT() {
+	logTo(s.T())
+	s.Run("sub", func() {
+		s.Require().Equal(1, 1)
+	})
+}
+
+func logTo(t *testing.T) {}
+
+func TestScopedSuite(t *testing.T) {
+	suite.Run(t, new(ScopedSuite))
+}
+`
+
+// indirectSrc embeds one suite in another: the base would be renamed and the
+// child left behind, so the file is refused whole.
+const indirectSrc = `package sample
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type BaseSuite struct {
+	suite.Suite
+}
+
+type OrderSuite struct {
+	BaseSuite
+}
+
+func (s *OrderSuite) TestOrder() {
+	s.Equal(1, 1)
+}
+
+func TestOrderSuite(t *testing.T) {
+	suite.Run(t, new(OrderSuite))
+}
+`
+
+func (s *MigrateTestSuite) TestScopedRewrites(t *gotest.T) {
+	t.When("s.T() appears in a method that gained t and in a helper that did not", func(w *gotest.T) {
+		out := s.migrateSource(w, scopedSrc)
+
+		w.It("rewrites s.T() to t.T() only where t is in scope", func(it *gotest.T) {
+			gotest.Contains(it, out, "logTo(t.T())")
+			gotest.Contains(it, out, "s.T().Helper()")
+		})
+
+		w.It("marks the s.T() that has no t", func(it *gotest.T) {
+			gotest.Contains(it, out,
+				"// TODO(gotest-migrate): s.T() outside a migrated method — no t is in scope here\n\ts.T().Helper()")
+		})
+
+		w.It("marks s.Run, which has no gotest equivalent", func(it *gotest.T) {
+			gotest.Contains(it, out,
+				"// TODO(gotest-migrate): s.Run has no gotest equivalent — use t.When or t.It\n\ts.Run(")
+		})
+	})
+
+	t.When("a suite embeds another suite instead of suite.Suite", func(w *gotest.T) {
+		dir := w.TempDir()
+		path := filepath.Join(dir, "indirect_test.go")
+		gotest.NoError(w, os.WriteFile(path, []byte(indirectSrc), 0600))
+		results, err := migrate.MigrateFile(path)
+		gotest.NoError(w, err)
+		got, err := os.ReadFile(path)
+		gotest.NoError(w, err)
+		out := string(got)
+
+		w.It("refuses the file and says why in the result", func(it *gotest.T) {
+			gotest.Len(it, results, 1)
+			gotest.Contains(it, results[0].Refusal, "OrderSuite embeds BaseSuite")
+			gotest.Equal(it, 1, results[0].Markers)
+		})
+
+		w.It("leaves the source unmigrated apart from the marker", func(it *gotest.T) {
+			gotest.Contains(it, out,
+				"// TODO(gotest-migrate): OrderSuite embeds BaseSuite, not suite.Suite — migrate this file by hand\ntype OrderSuite struct {")
+			gotest.Contains(it, out, "suite.Run(t, new(OrderSuite))")
+			gotest.NotContains(it, out, "BaseTestSuite")
+		})
+	})
+
+	t.When("markers were left", func(w *gotest.T) {
+		w.It("counts them on the result", func(it *gotest.T) {
+			dir := it.TempDir()
+			path := filepath.Join(dir, "sample_test.go")
+			gotest.NoError(it, os.WriteFile(path, []byte(todoInputSrc), 0600))
+			results, err := migrate.MigrateFile(path)
+			gotest.NoError(it, err)
+			gotest.Len(it, results, 1)
+			gotest.Equal(it, 11, results[0].Markers)
 		})
 	})
 }
