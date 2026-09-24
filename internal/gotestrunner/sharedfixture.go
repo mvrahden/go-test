@@ -408,18 +408,29 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	// run still says ok.
 	tree := proctree.New(cmd)
 
-	stdout, err := cmd.StdoutPipe()
+	// The protocol pipe is the runner's own, not exec's StdoutPipe: exec closes
+	// that one as soon as Wait sees the exit, and Wait may not run before the
+	// scan has finished, so a child the fixture left on the pipe would hold
+	// the scan, and with it the teardown verdict, until it let go. Here the
+	// scan is bounded by the drain delay past the exit instead.
+	stdout, stdoutW, err := os.Pipe()
 	if err != nil {
 		return nil, err
 	}
+	cmd.Stdout = stdoutW
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
+		_ = stdout.Close()
+		_ = stdoutW.Close()
 		return nil, err
 	}
 
 	if err := tree.Start(); err != nil {
+		_ = stdout.Close()
+		_ = stdoutW.Close()
 		return nil, fmt.Errorf("start shared fixture process: %w", err)
 	}
+	_ = stdoutW.Close()
 
 	// Build per-fixture readiness channels.
 	ready := make(map[string]chan struct{}, len(fixtures))
@@ -445,12 +456,16 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		cmdResp:         make(chan string, 1),
 	}
 
+	scanned := make(chan struct{})
 	go func() {
-		defer func() {
-			proc.waitErr = cmd.Wait()
-			tree.Release()
-			close(waitDone)
-		}()
+		proc.waitErr = cmd.Wait()
+		tree.Release()
+		drainOutput(scanned, OutputDrainDelay, stdout)
+		close(waitDone)
+	}()
+
+	go func() {
+		defer close(scanned)
 		closedReady := make(map[string]bool, len(ready))
 		doneSeen := false
 		scanner := bufio.NewScanner(stdout)
@@ -500,7 +515,8 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		if doneSeen {
 			return
 		}
-		if err := scanner.Err(); err != nil {
+		// A read end closed by the drain is the end of the stream too.
+		if err := scanner.Err(); err != nil && !errors.Is(err, os.ErrClosed) {
 			proc.setupErr = fmt.Errorf("reading subprocess stdout: %w", err)
 		} else if proc.setupErr == nil {
 			proc.setupErr = fmt.Errorf("subprocess exited without _done sentinel")
