@@ -5,6 +5,7 @@ package gotestrunner_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,11 +38,14 @@ func (s *DetachedGrandchildTestSuite) AfterEach(t *gotest.T) {
 	_ = os.WriteFile(s.stopFile, []byte("stop"), 0o600)
 }
 
-func (s *DetachedGrandchildTestSuite) TestWaitReturnsWithinTheCeiling(t *gotest.T) {
-	const runArg = "-test.run=^TestDetachedGrandchildTestSuite$/^TestWaitReturnsWithinTheCeiling$"
+// playDetachRole is the re-executed test binary's part: the child writes a
+// line, starts a session-leader grandchild on the inherited stdout and exits;
+// the grandchild holds that stdout until the stop file appears. The test
+// process itself returns at once.
+func playDetachRole(runArg string) {
 	switch os.Getenv("GOTEST_MP_DETACH") {
 	case "child":
-		// Start a session-leader grandchild on the inherited stdout and exit.
+		fmt.Println("child ran")
 		grandchild := exec.Command(os.Args[0], runArg) //nolint:gosec // G204: test-only subprocess
 		grandchild.Env = append(os.Environ(), "GOTEST_MP_DETACH=grandchild")
 		grandchild.Stdout = os.Stdout
@@ -60,19 +64,56 @@ func (s *DetachedGrandchildTestSuite) TestWaitReturnsWithinTheCeiling(t *gotest.
 		}
 		os.Exit(0)
 	}
+}
 
-	ctx, cancel := context.WithCancel(context.Background())
+// detachingCommand is the child process with a buffer for stdout, as
+// RunSingleSuite captures it.
+func (s *DetachedGrandchildTestSuite) detachingCommand(ctx context.Context, runArg string) (*exec.Cmd, *bytes.Buffer) {
 	cmd := exec.CommandContext(ctx, os.Args[0], runArg) //nolint:gosec // G204: test-only subprocess
 	cmd.Env = append(os.Environ(), "GOTEST_MP_DETACH=child", "GOTEST_MP_STOP_FILE="+s.stopFile)
-	// A buffer, as RunSingleSuite uses: exec copies through a pipe, and Wait
-	// blocks until every holder of that pipe has closed it.
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
+	return cmd, &stdout
+}
 
+// The child is gone at once and only the grandchild holds its stdout: the
+// wait ends when the output drain delay passes, with the child's output kept,
+// under the default configuration.
+func (s *DetachedGrandchildTestSuite) TestWaitReturnsOnceTheOutputIsDrained(t *gotest.T) {
+	const runArg = "-test.run=^TestDetachedGrandchildTestSuite$/^TestWaitReturnsOnceTheOutputIsDrained$"
+	playDetachRole(runArg)
+
+	cmd, stdout := s.detachingCommand(context.Background(), runArg)
 	mp := gotestrunner.NewManagedProcess(cmd, gotestrunner.ProcessConfig{
 		Grace:         gotestrunner.GraceFixed,
 		GraceDuration: 100 * time.Millisecond,
-		WaitDelay:     time.Second,
+	})
+	gotest.NoError(t, mp.Start())
+
+	start := time.Now()
+	_ = mp.WaitWithGrace(context.Background())
+	elapsed := time.Since(start)
+
+	t.It("returns once the drain delay passes, not when the grandchild lets go", func(it *gotest.T) {
+		gotest.Less(it, elapsed, gotestrunner.OutputDrainDelay+3*time.Second, "Wait blocked %v on a pipe a detached grandchild holds", elapsed)
+	})
+	t.It("keeps what the child wrote", func(it *gotest.T) {
+		gotest.Contains(it, stdout.String(), "child ran")
+	})
+}
+
+// After a shutdown request the same bound holds, from the moment the tree is
+// gone.
+func (s *DetachedGrandchildTestSuite) TestWaitReturnsWithinTheDrainDelayAfterShutdown(t *gotest.T) {
+	const runArg = "-test.run=^TestDetachedGrandchildTestSuite$/^TestWaitReturnsWithinTheDrainDelayAfterShutdown$"
+	playDetachRole(runArg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cmd, _ := s.detachingCommand(ctx, runArg)
+	mp := gotestrunner.NewManagedProcess(cmd, gotestrunner.ProcessConfig{
+		Grace:         gotestrunner.GraceFixed,
+		GraceDuration: 100 * time.Millisecond,
+		DrainDelay:    time.Second,
 	})
 	gotest.NoError(t, mp.Start())
 	// The child is gone at once; the grandchild still holds its stdout.
@@ -83,7 +124,7 @@ func (s *DetachedGrandchildTestSuite) TestWaitReturnsWithinTheCeiling(t *gotest.
 	_ = mp.WaitWithGrace(ctx)
 	elapsed := time.Since(start)
 
-	t.It("returns once the wait ceiling passes, not when the grandchild lets go", func(it *gotest.T) {
+	t.It("returns once the drain delay passes, not when the grandchild lets go", func(it *gotest.T) {
 		gotest.Less(it, elapsed, 5*time.Second, "Wait blocked %v on a pipe a detached grandchild holds", elapsed)
 	})
 }

@@ -301,15 +301,15 @@ func buildFuzzCmd(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, d time.D
 //
 // Output is streamed by assigning a lineWriter directly to cmd.Stdout /
 // cmd.Stderr (rather than reading from cmd.StdoutPipe()/StderrPipe() on a
-// separate goroutine). exec.Cmd's own Wait() already copies from the
-// process into any non-*os.File Writer and blocks until that copy finishes
-// before returning — the same mechanism RunSingleSuite's bytes.Buffer relies
-// on elsewhere in this package. Reading from StdoutPipe/StderrPipe instead
-// would race ManagedProcess.Start's internal async cmd.Wait() call: the
-// os/exec docs are explicit that Wait must not be called before all pipe
-// reads complete, since Wait closes the pipes as soon as it sees the process
-// exit, silently truncating whatever the reader hadn't drained yet (exactly
-// where a FAIL summary or a crasher path would go missing).
+// separate goroutine). ManagedProcess feeds such a writer through a pipe of
+// its own and finishes the copy before Done — the same mechanism
+// RunSingleSuite's bytes.Buffer relies on elsewhere in this package. Reading
+// from StdoutPipe/StderrPipe instead would race its internal async
+// cmd.Wait() call: the os/exec docs are explicit that Wait must not be called
+// before all pipe reads complete, since Wait closes the pipes as soon as it
+// sees the process exit, silently truncating whatever the reader hadn't
+// drained yet (exactly where a FAIL summary or a crasher path would go
+// missing).
 func runOneFuzzTarget(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, budget time.Duration, out *sync.Mutex) FuzzTargetOutcome { //nolint:gocritic // hugeParam: stable API
 	before := snapshotCrashers(t)
 	cmd := buildFuzzCmd(ctx, t, cfg, budget)

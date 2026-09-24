@@ -400,13 +400,13 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	cmd := exec.CommandContext(ctx, setupBin)
 	cmd.Stderr = os.Stderr
 
-	// WaitDelay is the backstop for a process that ignores the shutdown
-	// request, and it has to stay looser than any teardown budget. Tighten it
-	// below one and it becomes the budget: a fixture given minutes to stop its
-	// containers is killed part-way through instead, and because a signalled
-	// process reports no meaningful exit status, the run still says ok.
+	// The teardown budget the process reports is the only kill timer: exec's
+	// WaitDelay stays unset, since any bound set here would have to be chosen
+	// before the budget is known, and one below it becomes the budget — a
+	// fixture given minutes to stop its containers is killed part-way through,
+	// and because a signalled process reports no meaningful exit status, the
+	// run still says ok.
 	tree := proctree.New(cmd)
-	cmd.WaitDelay = WaitDelayCeiling
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

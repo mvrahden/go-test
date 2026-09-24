@@ -105,11 +105,10 @@ func startSlowTeardown(t *gotest.T, delay, budget time.Duration) (proc *gotestru
 
 func (s *SharedFixtureTeardownTestSuite) TestTeardownGetsItsConfiguredBudget(t *gotest.T) {
 	t.When("AfterAll runs longer than the runner's shutdown grace", func(w *gotest.T) {
-		// The pipeline cancels the run context around teardown, which is what
-		// arms exec's WaitDelay. Any grace shorter than the configured budget
-		// silently becomes the budget: a container fixture is given minutes to
-		// stop and gets killed part-way through instead, with the run still
-		// reporting success.
+		// The pipeline cancels the run context around teardown. Any grace
+		// shorter than the configured budget silently becomes the budget: a
+		// container fixture is given minutes to stop and gets killed part-way
+		// through instead, with the run still reporting success.
 		//
 		// 1s: long enough that the regression — a grace of zero — cannot let the
 		// teardown finish, and setup needs ~0.2s of the 10s budget.
