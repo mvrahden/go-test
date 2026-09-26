@@ -91,7 +91,7 @@ Flags (gotest — use --double-dash):
   --debug                 Keep generated overlay for inspection
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable overlay cache, force fresh generation
+  --no-cache              Disable the overlay and test binary caches
   --min=<pct>             Fail if coverage < pct%% (0-100)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
@@ -112,7 +112,7 @@ or to pass unrecognized flags to go test without validation.
 Environment:
   CI=true                 Auto-enables --ci when GOTEST_CI is unset
   GOTEST_CI=0             Opt out of CI auto-detection
-  GOTEST_CACHE_DIR=<dir>  Override overlay cache location (default: ~/.cache/gotest)
+  GOTEST_CACHE_DIR=<dir>  Override the cache location (default: ~/.cache/gotest)
 
 Configuration:
   Place a .gotest.yml in your project root. Run "gotest help config" for details.
@@ -142,7 +142,7 @@ Flags:
   --debug                 Keep generated overlay for inspection
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable overlay cache, force fresh generation
+  --no-cache              Disable the overlay and test binary caches
   --no-harvest            Disable fuzz seed harvesting for this run (see below)
   --min=<pct>             Fail if coverage < pct% (0-100, enables -coverprofile)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
@@ -204,7 +204,7 @@ Flags:
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable overlay cache, force fresh generation
+  --no-cache              Disable the overlay and test binary caches
   --min=<pct>             Fail if coverage < pct% (0-100)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
@@ -256,7 +256,7 @@ Flags:
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable overlay cache, force fresh generation
+  --no-cache              Disable the overlay and test binary caches
   --min=<pct>             Fail if coverage < pct% (0-100)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
@@ -290,7 +290,7 @@ Flags:
   --debug                 Keep generated overlay
   --spec                  Render spec view after each run
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable overlay cache, force fresh generation
+  --no-cache              Disable the overlay and test binary caches
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
 
@@ -322,7 +322,7 @@ Flags:
   --spec                  Render spec view instead of raw benchmark output
   --no-color              Disable ANSI color codes (with --spec)
   --debug                 Keep generated overlay for inspection
-  --no-cache              Disable overlay cache, force fresh generation
+  --no-cache              Disable the overlay and test binary caches
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
   --save=<path>           Save this run's results as a JSON baseline (forces
@@ -426,7 +426,7 @@ Flags:
   --target=<Fuzz...>      Fuzz one target, named by its wrapper as printed in
                           session output; an unmatched name lists the targets
   --no-harvest            Do not mine table-test literals into seeds for this run
-  --no-cache              Disable overlay cache, force fresh generation
+  --no-cache              Disable the overlay and test binary caches
   --debug                 Keep generated overlay for inspection
 
 --for is the session's only clock: the deadline follows it, so --timeout
@@ -756,9 +756,10 @@ Removes generated overlay files (gotest_p(x)suite_test.go) that are no longer
 needed. These files are normally ephemeral but may be left behind
 by --debug runs or interrupted processes.
 
-The overlay cache (used for faster repeated runs) is managed separately
-and auto-evicts entries older than 7 days. Set GOTEST_CACHE_DIR to
-control the cache location; use --no-cache to bypass it entirely.
+The overlay cache and the test binary cache (used for faster repeated
+runs) are managed separately and auto-evict entries older than 7 days.
+Set GOTEST_CACHE_DIR to control the cache location; use --no-cache to
+bypass both entirely.
 
 Examples:
   gotest clean ./...                         Clean all packages

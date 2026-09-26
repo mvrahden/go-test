@@ -289,7 +289,7 @@ func prepareTestRun(ctx context.Context, overlay *OverlayResult, fixtures []gote
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		compiled, compileFailures = CompilePackages(ctx, overlay.SuitePackages, overlay.OverlayFlag, buildFlags, overlay.WorkDir, compileParallel)
+		compiled, compileFailures = CompilePackages(ctx, overlay.SuitePackages, overlay.OverlayFlag, buildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, buildFlags), compileParallel)
 	}()
 
 	if len(fixtures) > 0 {
@@ -617,7 +617,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 		close(fixtureStarted)
 	}
 
-	compileCh := CompilePackagesStream(streamCtx, overlay.SuitePackages, overlay.OverlayFlag, pf.BuildFlags, overlay.WorkDir, cfg.CompileParallel)
+	compileCh := CompilePackagesStream(streamCtx, overlay.SuitePackages, overlay.OverlayFlag, pf.BuildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, pf.BuildFlags), cfg.CompileParallel)
 
 	totalSuites := 0
 	for _, suites := range overlay.SuitesByPkg {

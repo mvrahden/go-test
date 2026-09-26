@@ -41,11 +41,23 @@ type BuildFailure struct {
 // instead of streaming it: the diagnostics belong to the failing package's
 // verdict, and only the collector can place them there. On success any
 // captured stderr (toolchain notices, module downloads) is forwarded.
-func compilePackage(ctx context.Context, pkgPath, overlayFlag string, buildFlags []string, binDir string) (CompileResult, error) {
+//
+// With a cache dir the link targets the cached path, where go skips it when
+// the binary is up to date, and the result is copied to binDir for this run.
+// A cache that cannot be locked is treated as absent: it is an optimization.
+func compilePackage(ctx context.Context, pkgPath, overlayFlag string, buildFlags []string, binDir, cacheDir string) (CompileResult, error) {
 	binaryName := sanitizePkgName(pkgPath) + ".test"
 	binaryPath := filepath.Join(binDir, binaryName)
+	outputPath := binaryPath
+	if cacheDir != "" {
+		cached := filepath.Join(cacheDir, binaryName)
+		if unlock, err := lockFile(cached + ".lock"); err == nil {
+			defer unlock()
+			outputPath = cached
+		}
+	}
 
-	args := []string{"test", "-c", overlayFlag, "-o", binaryPath}
+	args := []string{"test", "-c", overlayFlag, "-o", outputPath}
 	args = append(args, buildFlags...)
 	args = append(args, pkgPath)
 
@@ -65,6 +77,11 @@ func compilePackage(ctx context.Context, pkgPath, overlayFlag string, buildFlags
 	if stderr.Len() > 0 {
 		_, _ = os.Stderr.Write(stderr.Bytes())
 	}
+	if outputPath != binaryPath {
+		if err := copyFile(outputPath, binaryPath); err != nil {
+			return CompileResult{}, compileError(pkgPath, err, nil)
+		}
+	}
 
 	return CompileResult{Package: pkgPath, BinaryPath: binaryPath}, nil
 }
@@ -77,8 +94,8 @@ func compileError(pkgPath string, err error, diagnostics []byte) error {
 	return fmt.Errorf("compile %s: %w\n%s", pkgPath, err, diagnostics)
 }
 
-func CompilePackages(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir string, compileParallel int) ([]CompileResult, []BuildFailure) {
-	ch := CompilePackagesStream(ctx, packages, overlayFlag, buildFlags, outputDir, compileParallel)
+func CompilePackages(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir, cacheDir string, compileParallel int) ([]CompileResult, []BuildFailure) {
+	ch := CompilePackagesStream(ctx, packages, overlayFlag, buildFlags, outputDir, cacheDir, compileParallel)
 	var results []CompileResult
 	var failures []BuildFailure
 	for outcome := range ch {
@@ -119,7 +136,7 @@ func SanitizerActive(buildFlags []string) bool {
 	return false
 }
 
-func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir string, compileParallel int) <-chan CompileOutcome {
+func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir, cacheDir string, compileParallel int) <-chan CompileOutcome {
 	ch := make(chan CompileOutcome)
 
 	binDir := filepath.Join(outputDir, "bin")
@@ -147,7 +164,7 @@ func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag s
 					return
 				}
 
-				cr, err := compilePackage(ctx, pkgPath, overlayFlag, buildFlags, binDir)
+				cr, err := compilePackage(ctx, pkgPath, overlayFlag, buildFlags, binDir, cacheDir)
 				outcome := CompileOutcome{Package: pkgPath, Result: cr, Err: err}
 				select {
 				case ch <- outcome:

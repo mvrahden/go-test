@@ -17,11 +17,14 @@ import (
 )
 
 type OverlayResult struct {
-	CacheDir       string
-	WorkDir        string
-	OverlayFlag    string
-	SharedFixtures []gotestgen.SharedFixtureInfo
-	SuitePackages  []string
+	CacheDir string
+	WorkDir  string
+	// BinaryCacheRoot is the cache root the run's test binaries link under
+	// (see binaryCacheDir); empty under --no-cache or without a usable root.
+	BinaryCacheRoot string
+	OverlayFlag     string
+	SharedFixtures  []gotestgen.SharedFixtureInfo
+	SuitePackages   []string
 	// BrokenPackages are pattern-matched packages that failed to load. The
 	// pipeline books each one as a failed package so the run cannot report
 	// success while some of its packages never became runnable.
@@ -57,6 +60,12 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 	if err != nil {
 		return nil, nil, err
 	}
+	binaryCacheRoot := ""
+	if !noCache {
+		if root, err := cacheRoot(); err == nil {
+			binaryCacheRoot = root
+		}
+	}
 
 	workDir, err := os.MkdirTemp("", "gotest-work-*")
 	if err != nil {
@@ -73,7 +82,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		}
 	}
 	if debug {
-		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s (cached=%v)\nDEBUG: work dir: %s\n", cacheDir, cached, workDir)
+		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s (cached=%v)\nDEBUG: work dir: %s\nDEBUG: binary cache root: %q\n", cacheDir, cached, workDir, binaryCacheRoot)
 		cleanup = func() {}
 	}
 
@@ -141,6 +150,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 
 	return &OverlayResult{
 		CacheDir:                       cacheDir,
+		BinaryCacheRoot:                binaryCacheRoot,
 		WorkDir:                        workDir,
 		OverlayFlag:                    "-overlay=" + filepath.Join(cacheDir, "overlay.json"),
 		SharedFixtures:                 allSharedFixtures,

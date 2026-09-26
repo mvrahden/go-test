@@ -51,7 +51,7 @@ baselines in CI-detected environments. `--update-snapshots` rewrites
 instead of default output. `--timeout <dur>` is the global pipeline
 deadline (default 15m) and `--setup-timeout <dur>` the shared-fixture
 setup budget (default 2m) — `0` disables either; `--min <pct>` gates
-coverage, `--no-cache` forces fresh generation, `--debug` keeps overlays.
+coverage, `--no-cache` forces fresh generation and linking, `--debug` keeps overlays.
 
 ## Benchmarks — `gotest bench` (v1.29+)
 
