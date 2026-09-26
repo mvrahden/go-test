@@ -48,10 +48,14 @@ function buildBinary() {
     dir,
     process.platform === "win32" ? "gotest.exe" : "gotest",
   );
-  const built = spawnSync("go", ["build", "-buildvcs=false", "-o", bin, "./cmd/gotest"], {
-    cwd: repoRoot,
-    encoding: "utf-8",
-  });
+  const built = spawnSync(
+    "go",
+    ["build", "-buildvcs=false", "-o", bin, "./cmd/gotest"],
+    {
+      cwd: repoRoot,
+      encoding: "utf-8",
+    },
+  );
   if (built.status !== 0) {
     throw new Error(`go build failed: ${built.stderr}`);
   }
@@ -83,7 +87,11 @@ for (const file of readdirSync(streamDir).sort()) {
   cases[name] = {};
   for (const [variant, args] of Object.entries(VARIANTS)) {
     const direct = run(bin, args, input);
-    const goRun = run("go", ["run", "-buildvcs=false", "./cmd/gotest", ...args], input);
+    const goRun = run(
+      "go",
+      ["run", "-buildvcs=false", "./cmd/gotest", ...args],
+      input,
+    );
 
     cases[name][variant] = {
       direct,
