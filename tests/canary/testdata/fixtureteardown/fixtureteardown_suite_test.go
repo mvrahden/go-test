@@ -6,8 +6,8 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// FirstBoundTestSuite and SecondBoundTestSuite share one package fixture; the
-// fixture's AfterAll must run once the last suite process is done with it.
+// FirstBoundTestSuite and SecondBoundTestSuite share one package fixture, each
+// in its own process with its own copy; every process tears its copy down.
 type FirstBoundTestSuite struct {
 	Ledger *LedgerFixture
 }

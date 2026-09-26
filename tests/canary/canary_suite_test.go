@@ -208,12 +208,22 @@ func (s *CanaryTestSuite) TestAsyncMethodsWaitForDone(t *gotest.T) {
 	s.check(t, "asynchronous")
 }
 
-// Two suites share one package fixture and each runs in its own process; the
-// fixture's AfterAll must run in the process that finishes with it last.
+// Two suites share one package fixture; each runs in its own process with
+// its own copy of the DAG, so each process must tear its copy down.
 func (s *CanaryTestSuite) TestPackageFixtureTearsDownAfterEverySuite(t *gotest.T) {
 	dir := s.check(t, "fixtureteardown")
-	if _, err := os.Stat(filepath.Join(dir, "fixture-afterall")); err != nil {
-		t.Errorf("the package fixture's AfterAll never ran: %v", err)
+	expectTeardowns(t, dir, 2)
+}
+
+// expectTeardowns checks that the fixture's AfterAll ran in want processes
+// and that none left it up. Markers are keyed by pid.
+func expectTeardowns(t *gotest.T, dir string, want int) {
+	done, _ := filepath.Glob(filepath.Join(dir, "fixture-afterall-*"))
+	if len(done) != want {
+		t.Errorf("the package fixture's AfterAll ran in %d processes, want %d", len(done), want)
+	}
+	if alive, _ := filepath.Glob(filepath.Join(dir, "fixture-alive-*")); len(alive) != 0 {
+		t.Errorf("the package fixture is still up in %d processes", len(alive))
 	}
 }
 
@@ -228,9 +238,7 @@ func (s *CanaryTestSuite) TestPackageFixtureTearsDownAfterBench(t *gotest.T) {
 	if want := "BenchmarkFixtureAlive"; strings.Join(names, ",") != want {
 		t.Errorf("fixtureteardown bench: results %v, want %v", names, want)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "fixture-afterall")); err != nil {
-		t.Errorf("the package fixture's AfterAll never ran after the bench: %v", err)
-	}
+	expectTeardowns(t, dir, 1)
 }
 
 // Seeds replay after the suite's Test function; a fixture the suite binds

@@ -25,7 +25,7 @@ Each directory under `testdata/` is one package with one suite:
 | `asynchronous` | an async method passes when `done()` is called from another goroutine and fails at the deadline when it never is |
 | `broken` | a package that does not compile exits 2 |
 | `panicking` | a panic fails its method and the run is red |
-| `fixtureteardown` | two suites bound to one package fixture, each in its own process: the fixture's `AfterAll` runs after the last of them, and after a bench run |
+| `fixtureteardown` | two suites bound to one package fixture, each in its own process with its own copy of the DAG: every process runs the fixture's `AfterAll`, and so does a bench run |
 | `fixturefuzzing` | a fixture-bound suite's seeds replay while the fixture is still up |
 | `teardownfailing` | a shared fixture whose `AfterAll` fails turns a green run red, and the `-json` stream carries the failure as a failed package |
 | `fixturechain` | a shared fixture reached only through a parent package fixture is started and hydrated for the suite |
