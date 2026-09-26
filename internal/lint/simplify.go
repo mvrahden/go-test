@@ -70,9 +70,9 @@ type conditionMapping struct {
 	target string
 	args   []ast.Expr
 	desc   string
-	// adviseOnly reports the target without a fix: the rewrite would need
-	// the author's eyes (Same on a pointer comparison).
-	adviseOnly bool
+	// noFix, when set, is why the target is reported without a fix: it is
+	// not an equivalence of the source. Reports append it after a dash.
+	noFix string
 }
 
 func simplifyBoolAssertion(pass *analysis.Pass, call *ast.CallExpr, negated bool) {
@@ -84,8 +84,8 @@ func simplifyBoolAssertion(pass *analysis.Pass, call *ast.CallExpr, negated bool
 		return
 	}
 	source := pick(negated, "False", "True")
-	if m.adviseOnly {
-		report(pass, AssertionSimplify, call.Pos(), "use %s instead of %s for %s", m.target, source, m.desc)
+	if m.noFix != "" {
+		report(pass, AssertionSimplify, call.Pos(), "use %s instead of %s for %s — %s", m.target, source, m.desc, m.noFix)
 		return
 	}
 	emitSimplify(pass, call, source, m.target, append([]ast.Expr{call.Args[0]}, m.args...), call.Args[2:], m.desc)
@@ -132,15 +132,7 @@ func mapBoolBinary(pass *analysis.Pass, bin *ast.BinaryExpr, negated bool) (cond
 		if m, ok := mapEmptyStrEqNeq(pass, left, right, negated, false); ok {
 			return m, true
 		}
-		l, r := constFirst(pass, left, right)
-		l, r, ok := unifyEqualOperands(pass, l, r)
-		if !ok {
-			return conditionMapping{}, false
-		}
-		if m, ok, handled := mapIdentityComparison(pass, l, r, negated, false); handled {
-			return m, ok
-		}
-		return conditionMapping{target: pick(negated, "NotEqual", "Equal"), args: []ast.Expr{l, r}, desc: "== comparison"}, true
+		return mapEquality(pass, left, right, negated, false)
 
 	case token.NEQ:
 		if m, ok, handled := mapNilComparison(pass, left, right, negated, true); handled {
@@ -152,15 +144,7 @@ func mapBoolBinary(pass *analysis.Pass, bin *ast.BinaryExpr, negated bool) (cond
 		if m, ok := mapEmptyStrEqNeq(pass, left, right, negated, true); ok {
 			return m, true
 		}
-		l, r := constFirst(pass, left, right)
-		l, r, ok := unifyEqualOperands(pass, l, r)
-		if !ok {
-			return conditionMapping{}, false
-		}
-		if m, ok, handled := mapIdentityComparison(pass, l, r, negated, true); handled {
-			return m, ok
-		}
-		return conditionMapping{target: pick(negated, "Equal", "NotEqual"), args: []ast.Expr{l, r}, desc: "!= comparison"}, true
+		return mapEquality(pass, left, right, negated, true)
 
 	case token.GTR:
 		if inner, ok := isLenCall(left); ok && isIntLit(right, 0) {
@@ -183,36 +167,93 @@ func mapBoolBinary(pass *analysis.Pass, bin *ast.BinaryExpr, negated bool) (cond
 	return conditionMapping{}, false
 }
 
-// mapIdentityComparison handles == and != whose operands compare by
-// identity, which Equal's reflect.DeepEqual would weaken to structure.
-// Pointers are pointed at Same/NotSame without a fix; interfaces and unsafe
-// pointers hide what they compare and map to nothing. handled reports that
-// the operand type decided, whichever way.
-func mapIdentityComparison(pass *analysis.Pass, l, r ast.Expr, negated, isNeq bool) (m conditionMapping, ok, handled bool) {
-	// Either side decides: a constant was moved first and an any-typed side
-	// was bridged, so the static type of one operand alone can mislead.
-	for _, operand := range []ast.Expr{l, r} {
-		t := pass.TypesInfo.TypeOf(operand)
-		if t == nil {
-			continue
-		}
-		switch u := types.Unalias(t).Underlying().(type) {
-		case *types.Pointer:
-			same := !isNeq
-			if negated {
-				same = !same
-			}
-			desc := pick(isNeq, "pointer != comparison", "pointer == comparison")
-			return conditionMapping{target: pick(!same, "NotSame", "Same"), desc: desc, adviseOnly: true}, true, true
-		case *types.Interface:
-			return conditionMapping{}, false, true
-		case *types.Basic:
-			if u.Kind() == types.UnsafePointer {
-				return conditionMapping{}, false, true
-			}
-		}
+// mapEquality maps == and != onto the assertion whose verdict is the
+// comparison's on every input. Equal is reflect.DeepEqual, which agrees with
+// == except where its traversal reaches a pointer: == is identity there and
+// DeepEqual structure. The operand types decide:
+//   - two pointers: Same/NotSame, exact;
+//   - identical types that reach no pointer: Equal/NotEqual, exact;
+//   - an any-typed side beside a concrete type that reaches no pointer: the
+//     comparison pins the dynamic type, so Equal/NotEqual over any(...) is
+//     exact (Go converts the concrete side the same way);
+//   - two errors asserted equal: ErrorIs is named without a fix, since
+//     errors.Is also matches wrapped errors;
+//   - anything else — a struct or array holding a pointer, two interfaces
+//     whose dynamic types are unknown — maps to nothing.
+func mapEquality(pass *analysis.Pass, left, right ast.Expr, negated, isNeq bool) (conditionMapping, bool) {
+	l, r := constFirst(pass, left, right)
+	tl, tr := pass.TypesInfo.TypeOf(l), pass.TypesInfo.TypeOf(r)
+	if tl == nil || tr == nil {
+		return conditionMapping{}, false
 	}
-	return conditionMapping{}, false, false
+	// The asserted reading is equality for True(a == b) and False(a != b).
+	assertEqual := isNeq == negated
+	desc := pick(isNeq, "!= comparison", "== comparison")
+	equal := func(l, r ast.Expr) (conditionMapping, bool) {
+		return conditionMapping{target: pick(assertEqual, "Equal", "NotEqual"), args: []ast.Expr{l, r}, desc: desc}, true
+	}
+	switch {
+	case isPointerType(tl) && isPointerType(tr):
+		return conditionMapping{target: pick(assertEqual, "Same", "NotSame"), args: []ast.Expr{l, r}, desc: "pointer " + desc}, true
+	case types.Identical(tl, tr) && !reachesPointer(tl):
+		return equal(l, r)
+	case isAnyInterface(tl) && bridgesToAny(tr):
+		return equal(l, convertToAny(pass, r))
+	case isAnyInterface(tr) && bridgesToAny(tl):
+		return equal(convertToAny(pass, l), r)
+	case assertEqual && implementsError(tl) && implementsError(tr) && (isInterfaceType(tl) || isInterfaceType(tr)):
+		return conditionMapping{target: "ErrorIs", args: []ast.Expr{l, r}, desc: "error " + desc, noFix: "errors.Is also matches wrapped errors"}, true
+	}
+	return conditionMapping{}, false
+}
+
+// reachesPointer reports whether reflect.DeepEqual's traversal of a value of
+// type t can reach a pointer, where it compares structure and == identity. An
+// interface counts, its dynamic type being unknown, as does a type parameter.
+// chan and unsafe.Pointer do not: DeepEqual compares both with ==.
+func reachesPointer(t types.Type) bool {
+	return reachesPointerSeen(t, map[types.Type]bool{})
+}
+
+func reachesPointerSeen(t types.Type, seen map[types.Type]bool) bool {
+	if seen[t] {
+		return false
+	}
+	seen[t] = true
+	switch u := types.Unalias(t).Underlying().(type) {
+	case *types.Pointer, *types.Interface, *types.TypeParam, *types.Slice, *types.Map, *types.Signature:
+		return true
+	case *types.Struct:
+		for i := range u.NumFields() {
+			if reachesPointerSeen(u.Field(i).Type(), seen) {
+				return true
+			}
+		}
+	case *types.Array:
+		return reachesPointerSeen(u.Elem(), seen)
+	}
+	return false
+}
+
+// bridgesToAny reports whether a concrete operand beside an any-typed one
+// keeps Equal exact: no interface (the dynamic type would stay unknown) and
+// no pointer within reach.
+func bridgesToAny(t types.Type) bool {
+	return !isInterfaceType(t) && !reachesPointer(t)
+}
+
+func isPointerType(t types.Type) bool {
+	_, ok := types.Unalias(t).Underlying().(*types.Pointer)
+	return ok
+}
+
+func isInterfaceType(t types.Type) bool {
+	_, ok := types.Unalias(t).Underlying().(*types.Interface)
+	return ok
+}
+
+func implementsError(t types.Type) bool {
+	return types.AssignableTo(t, types.Universe.Lookup("error").Type())
 }
 
 // mapNilComparison handles comparisons against nil. handled reports that the
@@ -288,11 +329,11 @@ func mapEmptyStrEqNeq(pass *analysis.Pass, left, right ast.Expr, negated, isNeq 
 	return conditionMapping{target: pick(!positive, "NotEmpty", "Empty"), args: []ast.Expr{other}, desc: "empty string check"}, true
 }
 
-// unifyEqualOperands vets l and r as Equal/NotEqual operands, which must
-// unify to the single type parameter V — == and reflect.DeepEqual accept
-// mixed static types. An any-typed side bridges the mismatch via
-// conversion; any other mismatch maps to no assertion. Ordered comparisons
-// need no vetting: Go demands identical basic types there.
+// unifyEqualOperands vets the operands of a reflect.DeepEqual call as
+// Equal/NotEqual operands, which must unify to the single type parameter V.
+// An any-typed side bridges the mismatch via conversion; any other mismatch
+// maps to no assertion. Equal is DeepEqual, so no operand type can change
+// the verdict here.
 func unifyEqualOperands(pass *analysis.Pass, l, r ast.Expr) (ast.Expr, ast.Expr, bool) {
 	tl := pass.TypesInfo.TypeOf(l)
 	tr := pass.TypesInfo.TypeOf(r)
@@ -577,7 +618,7 @@ func guardEmptyNotEmpty(pass *analysis.Pass, call *ast.CallExpr, isNot bool) {
 		emitSimplify(pass, call, source, target, []ast.Expr{tArg, arg}, msgArgs, "error empty check")
 	case isEmptyableType(pass, arg):
 		// OK
-	case isPointerType(pass, arg):
+	case isPointerType(t):
 		// OK — isEmpty recursively dereferences pointers
 	default:
 		report(pass, AssertionTypeGuard, call.Pos(),
@@ -831,15 +872,6 @@ func isStringType(pass *analysis.Pass, expr ast.Expr) bool {
 	}
 	b, ok := t.Underlying().(*types.Basic)
 	return ok && b.Info()&types.IsString != 0
-}
-
-func isPointerType(pass *analysis.Pass, expr ast.Expr) bool {
-	t := pass.TypesInfo.TypeOf(expr)
-	if t == nil {
-		return false
-	}
-	_, ok := t.Underlying().(*types.Pointer)
-	return ok
 }
 
 func isErrorType(pass *analysis.Pass, expr ast.Expr) bool {

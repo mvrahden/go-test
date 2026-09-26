@@ -79,6 +79,8 @@ func True(t testingT, value bool, msgAndArgs ...any)                          {}
 func False(t testingT, value bool, msgAndArgs ...any)                         {}
 func Equal(t testingT, expected, actual any, msgAndArgs ...any)               {}
 func NotEqual(t testingT, expected, actual any, msgAndArgs ...any)            {}
+func Same[V any](t testingT, expected, actual *V, msgAndArgs ...any)          {}
+func NotSame[V any](t testingT, expected, actual *V, msgAndArgs ...any)       {}
 func Greater(t testingT, a, b any, msgAndArgs ...any)                         {}
 func GreaterOrEqual(t testingT, a, b any, msgAndArgs ...any)                  {}
 func Less(t testingT, a, b any, msgAndArgs ...any)                            {}

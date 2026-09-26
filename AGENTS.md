@@ -75,7 +75,7 @@ gotest.Same[V any](t, expected, actual *V)           // pointer identity (==), n
 gotest.NotSame[V any](t, expected, actual *V)        // distinct pointers
 ```
 
-`True(t, p == q)` on pointers is identity; the `assertion-simplify` rule points at `Same`/`NotSame` there and never rewrites it to `Equal`, whose `reflect.DeepEqual` compares structure.
+`True(t, p == q)` on pointers is identity; the `assertion-simplify` rule rewrites it to `Same`/`NotSame`, never to `Equal`, whose `reflect.DeepEqual` compares structure. A struct or array holding a pointer, or two interfaces, is left alone for the same reason; `err == target` on errors names `ErrorIs` without a fix, since `errors.Is` also matches wrapped errors.
 
 ### Boolean
 
