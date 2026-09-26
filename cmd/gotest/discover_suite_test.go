@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	. "github.com/mvrahden/go-test/cmd/gotest"
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -128,6 +130,13 @@ func (s *DiscoverTestSuite) TestRunDiscover_SimpleSuite(t *gotest.T) {
 		gotest.NoError(it, json.Unmarshal(data, &roundtrip))
 		gotest.Len(it, roundtrip.Packages, 1)
 	})
+}
+
+// The document opens with the producing CLI's version.
+func (s *DiscoverTestSuite) TestRunDiscover_VersionOpensTheDocument(t *gotest.T) {
+	data, err := json.Marshal(ExportNewDiscoverOutput())
+	gotest.NoError(t, err)
+	gotest.Regexp(t, `^\{"version":"`+regexp.QuoteMeta(about.ResolvedVersion())+`",`, string(data))
 }
 
 func (s *DiscoverTestSuite) TestRunDiscover_Benchmarks(t *gotest.T) {

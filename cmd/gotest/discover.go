@@ -10,12 +10,15 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 )
 
 // discoverOutput is the top-level JSON structure emitted by "gotest discover".
+// Version opens it: the CLI that produced the document.
 type discoverOutput struct {
+	Version  string            `json:"version"`
 	Packages []discoverPackage `json:"packages"`
 	Warnings []discoverWarning `json:"warnings,omitempty"`
 }
@@ -88,6 +91,10 @@ type discoverBehavior struct {
 	Children []discoverBehavior `json:"children,omitempty"`
 }
 
+func newDiscoverOutput() discoverOutput {
+	return discoverOutput{Version: about.ResolvedVersion()}
+}
+
 func runDiscover(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	tags, remaining := extractTagsFlag(inv.TagArgs())
 	patterns := ExtractPackagePatterns(remaining)
@@ -96,7 +103,7 @@ func runDiscover(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 		buildFlags = append(buildFlags, "-tags="+tags)
 	}
 
-	out := discoverOutput{}
+	out := newDiscoverOutput()
 
 	loadResults, broken, err := gotestgen.LoadPackagesForDiscovery(patterns, buildFlags)
 	if err != nil {

@@ -9,6 +9,9 @@ func ExportResetLintSkipFlag(name string) error {
 }
 
 type ExportDiscoverOutput = discoverOutput
+
+var ExportNewDiscoverOutput = newDiscoverOutput
+
 type ExportDiscoverPackage = discoverPackage
 type ExportDiscoverSuite = discoverSuite
 

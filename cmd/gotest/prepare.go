@@ -6,11 +6,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
+// prepareOutput is the document of "gotest prepare"; Version opens it.
 type prepareOutput struct {
+	Version     string `json:"version"`
 	OverlayFile string `json:"overlayFile"`
 	Dir         string `json:"dir"`
 	StateFile   string `json:"stateFile,omitempty"`
@@ -62,6 +65,7 @@ func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	out := prepareOutput{
+		Version:     about.ResolvedVersion(),
 		OverlayFile: filepath.Join(overlay.CacheDir, "overlay.json"),
 		Dir:         overlay.WorkDir,
 	}

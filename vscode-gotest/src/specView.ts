@@ -417,6 +417,8 @@ export function interpretSpecExit(
 // --- Types ---
 
 interface SpecData {
+  /** The CLI that produced the document; absent before v1.30.2. */
+  version?: string;
   packages: SpecPackage[];
   stats: SpecStats;
 }

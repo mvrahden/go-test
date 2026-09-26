@@ -7,6 +7,8 @@ export interface DiscoverWarning {
 }
 
 export interface DiscoverOutput {
+  /** The CLI that produced the document; absent before v1.30.2. */
+  version?: string;
   packages: DiscoverPackage[];
   warnings?: DiscoverWarning[];
 }
@@ -72,6 +74,8 @@ export interface DiscoverBehavior {
 }
 
 export interface PrepareOutput {
+  /** The CLI that produced the document; absent before v1.30.2. */
+  version?: string;
   overlayFile: string;
   dir: string;
   stateFile?: string;

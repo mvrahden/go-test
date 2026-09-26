@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -67,6 +69,14 @@ func (s *PrepareCLITestSuite) TestPrepare(t *gotest.T) {
 
 	var out prepareOutput
 	gotest.NoError(t, json.Unmarshal([]byte(line), &out), "line: %s", line)
+	// The document opens with the version the same binary reports: a git
+	// checkout build carries a VCS pseudo-version, so the test process's own
+	// resolved version is not the one to compare against.
+	info, err := exec.Command(s.cli.binary, "version").Output() //nolint:gosec // G204: controlled binary with fixed args
+	gotest.NoError(t, err)
+	fields := strings.Fields(string(info))
+	gotest.GreaterOrEqual(t, len(fields), 2, "gotest version output: %q", info)
+	gotest.Regexp(t, `^\{"version":"`+regexp.QuoteMeta(fields[1])+`",`, line)
 
 	t.It("names the overlay, the work dir and a state file that exists while it blocks", func(it *gotest.T) {
 		gotest.NotEmpty(it, out.OverlayFile)

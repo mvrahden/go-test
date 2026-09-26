@@ -1212,7 +1212,8 @@ No tests are executed.
 - `behaviorsComplete` reports whether the tree is exhaustive. `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears only once the method has run. Consumers must not present an incomplete list as the whole specification.
 
 ```
-{ "packages": [ {
+{ "version": …,
+  "packages": [ {
     "importPath": …, "dir": …, "modulePath": …, "testOnly": bool, "broken": bool,
     "suites": [ {
       "name": …, "file": …, "line": …, "col": …,
@@ -1233,7 +1234,7 @@ File paths are basenames; positions are 1-based.
 `methods[].parallel` is reserved and always `false` (parallelism is a suite-level property).
 Respects `-tags`.
 
-Every JSON gotest emits — `discover`, `spec --format=json`, `summary --format=json`, `prepare` — is one compact line, not an indented document.
+Every JSON gotest emits — `discover`, `spec --format=json`, `summary --format=json`, `prepare` — is one compact line, not an indented document, and it opens with `version`: the CLI that produced it, as `gotest version` reports it, so a consumer can gate on the producer before it reads the rest.
 The behavior trees carried here make indentation more than half the bytes, and the readers are programs; a human reading it by hand can pipe through `jq`.
 Nothing bounds the size of this payload, so a consumer must stream it: reading it through a fixed buffer is what once cost the VS Code extension its whole test tree on a repository large enough to exceed the buffer's default.
 
