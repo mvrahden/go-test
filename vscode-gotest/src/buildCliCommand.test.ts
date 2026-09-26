@@ -129,7 +129,7 @@ describe("buildCliCommand", () => {
       mockConfigValues.set("cliPath", "/usr/local/bin/gotest");
       mockFileExists.mockResolvedValue(true);
       mockExecFileAsync.mockResolvedValue({
-        stdout: "gotest v1.29.0\n",
+        stdout: "gotest v1.30.2\n",
         stderr: "",
       });
 
@@ -192,7 +192,7 @@ describe("buildCliCommand", () => {
       mockConfigValues.set("cliPath", "./bin/gotest");
       mockFileExists.mockResolvedValue(true);
       mockExecFileAsync.mockResolvedValue({
-        stdout: "gotest v1.29.0\n",
+        stdout: "gotest v1.30.2\n",
         stderr: "",
       });
 
@@ -240,7 +240,7 @@ describe("buildCliCommand", () => {
           "module github.com/myapp",
           "go 1.24.0",
           "require (",
-          "\tgithub.com/mvrahden/go-test v1.29.0",
+          "\tgithub.com/mvrahden/go-test v1.30.2",
           ")",
         ].join("\n"),
       );
@@ -259,7 +259,7 @@ describe("buildCliCommand", () => {
           "module github.com/myapp",
           "go 1.24.0",
           "require (",
-          "\tgithub.com/mvrahden/go-test v1.29.0",
+          "\tgithub.com/mvrahden/go-test v1.30.2",
           ")",
           `replace github.com/mvrahden/go-test => ../go-test`,
         ].join("\n"),
@@ -319,7 +319,7 @@ describe("buildCliCommand", () => {
           "module github.com/myapp",
           "go 1.24.0",
           "require (",
-          "\tgithub.com/mvrahden/go-test v1.29.0",
+          "\tgithub.com/mvrahden/go-test v1.30.2",
           ")",
           `replace github.com/mvrahden/go-test => ../go-test`,
         ].join("\n"),
@@ -337,7 +337,7 @@ describe("buildCliCommand", () => {
           "module github.com/myapp",
           "go 1.24.0",
           "require (",
-          "\tgithub.com/mvrahden/go-test v1.29.0",
+          "\tgithub.com/mvrahden/go-test v1.30.2",
           ")",
           "replace (",
           "\tgithub.com/mvrahden/go-test => ../go-test",
@@ -357,7 +357,7 @@ describe("buildCliCommand", () => {
           "module github.com/myapp",
           "go 1.24.0",
           "require (",
-          "\tgithub.com/mvrahden/go-test v1.29.0",
+          "\tgithub.com/mvrahden/go-test v1.30.2",
           ")",
           "replace github.com/mvrahden/go-testing => ../go-testing",
         ].join("\n"),
@@ -365,7 +365,7 @@ describe("buildCliCommand", () => {
 
       const cmd = await buildCliCommand(["spec"], "/workspace");
 
-      expect(cmd.args[1]).toBe(`${GOTEST_MODULE}@v1.29.0`);
+      expect(cmd.args[1]).toBe(`${GOTEST_MODULE}@v1.30.2`);
     });
   });
 
@@ -377,7 +377,7 @@ describe("buildCliCommand", () => {
           "module github.com/myapp",
           "go 1.24.0",
           "require (",
-          "\tgithub.com/mvrahden/go-test v1.29.0",
+          "\tgithub.com/mvrahden/go-test v1.30.2",
           ")",
         ].join("\n"),
       );
@@ -386,7 +386,7 @@ describe("buildCliCommand", () => {
 
       expect(cmd).toEqual({
         bin: "/usr/local/go/bin/go",
-        args: ["run", `${GOTEST_MODULE}@v1.29.0`, "spec", "./..."],
+        args: ["run", `${GOTEST_MODULE}@v1.30.2`, "spec", "./..."],
       });
     });
 
@@ -396,13 +396,13 @@ describe("buildCliCommand", () => {
         [
           "module github.com/myapp",
           "go 1.24.0",
-          "require github.com/mvrahden/go-test v1.29.0",
+          "require github.com/mvrahden/go-test v1.30.2",
         ].join("\n"),
       );
 
       const cmd = await buildCliCommand(["spec"], "/workspace");
 
-      expect(cmd.args[1]).toBe(`${GOTEST_MODULE}@v1.29.0`);
+      expect(cmd.args[1]).toBe(`${GOTEST_MODULE}@v1.30.2`);
     });
 
     it("finds version via parent module path walk", async () => {
@@ -412,14 +412,14 @@ describe("buildCliCommand", () => {
           "module github.com/myapp",
           "go 1.24.0",
           "require (",
-          "\tgithub.com/mvrahden/go-test v1.30.0",
+          "\tgithub.com/mvrahden/go-test v1.30.3",
           ")",
         ].join("\n"),
       );
 
       const cmd = await buildCliCommand(["spec"], "/workspace");
 
-      expect(cmd.args[1]).toBe(`${GOTEST_MODULE}@v1.30.0`);
+      expect(cmd.args[1]).toBe(`${GOTEST_MODULE}@v1.30.3`);
     });
 
     it("does not include -- separator", async () => {
@@ -429,7 +429,7 @@ describe("buildCliCommand", () => {
           "module github.com/myapp",
           "go 1.24.0",
           "require (",
-          "\tgithub.com/mvrahden/go-test v1.29.0",
+          "\tgithub.com/mvrahden/go-test v1.30.2",
           ")",
         ].join("\n"),
       );
@@ -468,11 +468,11 @@ describe("buildCliCommand", () => {
     });
 
     it("respects modulePath containing @ as-is", async () => {
-      mockConfigValues.set("modulePath", `${GOTEST_MODULE}@v1.30.0`);
+      mockConfigValues.set("modulePath", `${GOTEST_MODULE}@v1.30.3`);
 
       const cmd = await buildCliCommand(["spec"], "/workspace");
 
-      expect(cmd.args[1]).toBe(`${GOTEST_MODULE}@v1.30.0`);
+      expect(cmd.args[1]).toBe(`${GOTEST_MODULE}@v1.30.3`);
     });
   });
 
@@ -484,7 +484,7 @@ describe("buildCliCommand", () => {
         CliUnavailableError,
       );
       await expect(buildCliCommand(["spec"], "/workspace")).rejects.toThrow(
-        /v1\.0\.0.*v1\.29\.0/,
+        /v1\.0\.0.*v1\.30\.2/,
       );
       expect(mockExecFileAsync).not.toHaveBeenCalled();
     });
@@ -546,7 +546,7 @@ describe("buildCliCommand", () => {
       mockConfigValues.set("cliPath", "/usr/local/bin/gotest");
       mockFileExists.mockResolvedValue(true);
       mockExecFileAsync.mockResolvedValue({
-        stdout: "gotest v1.29.0\n",
+        stdout: "gotest v1.30.2\n",
         stderr: "",
       });
       setGoMod(
@@ -566,7 +566,7 @@ describe("buildCliCommand", () => {
           "module github.com/mvrahden/go-test",
           "go 1.24.0",
           "require (",
-          "\tgithub.com/mvrahden/go-test v1.29.0",
+          "\tgithub.com/mvrahden/go-test v1.30.2",
           ")",
         ].join("\n"),
       );
@@ -583,7 +583,7 @@ describe("buildCliCommand", () => {
           "module github.com/myapp",
           "go 1.24.0",
           "require (",
-          "\tgithub.com/mvrahden/go-test v1.29.0",
+          "\tgithub.com/mvrahden/go-test v1.30.2",
           ")",
           `replace github.com/mvrahden/go-test => ../go-test`,
         ].join("\n"),
@@ -592,13 +592,13 @@ describe("buildCliCommand", () => {
       const cmd = await buildCliCommand(["spec"], "/workspace");
 
       expect(cmd.args[1]).toBe(GOTEST_MODULE);
-      expect(cmd.args).not.toContain(`${GOTEST_MODULE}@v1.29.0`);
+      expect(cmd.args).not.toContain(`${GOTEST_MODULE}@v1.30.2`);
     });
   });
 
   describe("tool directive", () => {
     it("runs go tool with the full package path when go.mod declares it", async () => {
-      setGoMod("/workspace", PINNED("v1.30.1", [`tool ${GOTEST_MODULE}`]));
+      setGoMod("/workspace", PINNED("v1.30.4", [`tool ${GOTEST_MODULE}`]));
 
       const cmd = await buildCliCommand(["spec", "./..."], "/workspace");
 
@@ -611,7 +611,7 @@ describe("buildCliCommand", () => {
     it("recognises the block form", async () => {
       setGoMod(
         "/workspace",
-        PINNED("v1.30.1", [
+        PINNED("v1.30.4", [
           "tool (",
           "\tgolang.org/x/tools/cmd/stringer",
           `\t${GOTEST_MODULE}`,
@@ -627,12 +627,12 @@ describe("buildCliCommand", () => {
     it("ignores tool lines for other packages", async () => {
       setGoMod(
         "/workspace",
-        PINNED("v1.30.1", ["tool golang.org/x/tools/cmd/stringer"]),
+        PINNED("v1.30.4", ["tool golang.org/x/tools/cmd/stringer"]),
       );
 
       const cmd = await buildCliCommand(["spec"], "/workspace");
 
-      expect(cmd.args.slice(0, 2)).toEqual(["run", `${GOTEST_MODULE}@v1.30.1`]);
+      expect(cmd.args.slice(0, 2)).toEqual(["run", `${GOTEST_MODULE}@v1.30.4`]);
     });
 
     it("uses the configured module path, so a fork resolves to its own tool", async () => {
@@ -643,7 +643,7 @@ describe("buildCliCommand", () => {
         [
           "module github.com/myapp",
           "go 1.25.0",
-          "require github.com/fork/go-test v1.30.1",
+          "require github.com/fork/go-test v1.30.4",
           `tool ${fork}`,
         ].join("\n"),
       );
@@ -676,7 +676,7 @@ describe("buildCliCommand", () => {
     });
 
     it("does not offer to add the directive when it is already declared", async () => {
-      setGoMod("/workspace", PINNED("v1.30.1", [`tool ${GOTEST_MODULE}`]));
+      setGoMod("/workspace", PINNED("v1.30.4", [`tool ${GOTEST_MODULE}`]));
 
       await buildCliCommand(["spec"], "/workspace");
       await flush();
@@ -691,20 +691,20 @@ describe("buildCliCommand", () => {
     it("pins the workspace's selected version, the max over use modules", async () => {
       setFiles({
         "/workspace/go.work": work,
-        "/workspace/a/go.mod": PINNED("v1.30.0"),
-        "/workspace/b/go.mod": PINNED("v1.30.1"),
+        "/workspace/a/go.mod": PINNED("v1.30.3"),
+        "/workspace/b/go.mod": PINNED("v1.30.4"),
       });
 
       const cmd = await buildCliCommand(["spec"], "/workspace");
 
-      expect(cmd.args.slice(0, 2)).toEqual(["run", `${GOTEST_MODULE}@v1.30.1`]);
+      expect(cmd.args.slice(0, 2)).toEqual(["run", `${GOTEST_MODULE}@v1.30.4`]);
     });
 
     it("runs go tool when any use module declares the directive", async () => {
       setFiles({
         "/workspace/go.work": work,
-        "/workspace/a/go.mod": PINNED("v1.30.0"),
-        "/workspace/b/go.mod": PINNED("v1.30.1", [`tool ${GOTEST_MODULE}`]),
+        "/workspace/a/go.mod": PINNED("v1.30.3"),
+        "/workspace/b/go.mod": PINNED("v1.30.4", [`tool ${GOTEST_MODULE}`]),
       });
 
       const cmd = await buildCliCommand(["spec"], "/workspace");
@@ -716,12 +716,12 @@ describe("buildCliCommand", () => {
       setFiles({
         "/workspace/go.work": "go 1.25.0\n\nuse .\nuse ./lib\n",
         "/workspace/go.mod": "module github.com/myapp\n\ngo 1.25.0\n",
-        "/workspace/lib/go.mod": PINNED("v1.30.1"),
+        "/workspace/lib/go.mod": PINNED("v1.30.4"),
       });
 
       const cmd = await buildCliCommand(["spec"], "/workspace");
 
-      expect(cmd.args.slice(0, 2)).toEqual(["run", `${GOTEST_MODULE}@v1.30.1`]);
+      expect(cmd.args.slice(0, 2)).toEqual(["run", `${GOTEST_MODULE}@v1.30.4`]);
     });
 
     it("refuses when the workspace selects a version below the floor", async () => {
@@ -770,7 +770,7 @@ describe("buildCliCommand", () => {
 
   describe("tool directive suggestion", () => {
     it("offers once per root when the pin is usable but no directive exists", async () => {
-      setGoMod("/workspace", PINNED("v1.30.1"));
+      setGoMod("/workspace", PINNED("v1.30.4"));
 
       await buildCliCommand(["spec"], "/workspace");
       await buildCliCommand(["discover"], "/workspace");
@@ -783,7 +783,7 @@ describe("buildCliCommand", () => {
     });
 
     it("adds the directive at the pinned version, never at latest", async () => {
-      setGoMod("/workspace", PINNED("v1.30.1"));
+      setGoMod("/workspace", PINNED("v1.30.4"));
       mockShowInformationMessage.mockResolvedValue("Add to go.mod");
 
       await buildCliCommand(["spec"], "/workspace");
@@ -791,13 +791,13 @@ describe("buildCliCommand", () => {
 
       expect(mockExecFileAsync).toHaveBeenCalledWith(
         "/usr/local/go/bin/go",
-        ["get", "-tool", `${GOTEST_MODULE}@v1.30.1`],
+        ["get", "-tool", `${GOTEST_MODULE}@v1.30.4`],
         expect.objectContaining({ cwd: "/workspace" }),
       );
     });
 
     it("stays silent in a vendored module", async () => {
-      setGoMod("/workspace", PINNED("v1.30.1"));
+      setGoMod("/workspace", PINNED("v1.30.4"));
       mockFileExists.mockImplementation(
         async (p: string) =>
           p === path.join("/workspace", "vendor", "modules.txt"),
@@ -811,7 +811,7 @@ describe("buildCliCommand", () => {
 
     it("stays silent when the setting is off", async () => {
       mockConfigValues.set("suggestToolDirective", false);
-      setGoMod("/workspace", PINNED("v1.30.1"));
+      setGoMod("/workspace", PINNED("v1.30.4"));
 
       await buildCliCommand(["spec"], "/workspace");
       await flush();
@@ -820,7 +820,7 @@ describe("buildCliCommand", () => {
     });
 
     it("Don't ask again turns the setting off for the folder", async () => {
-      setGoMod("/workspace", PINNED("v1.30.1"));
+      setGoMod("/workspace", PINNED("v1.30.4"));
       mockShowInformationMessage.mockResolvedValue("Don't ask again");
 
       await buildCliCommand(["spec"], "/workspace");
@@ -837,7 +837,7 @@ describe("buildCliCommand", () => {
     it("does not offer when a replace directive is in play", async () => {
       setGoMod(
         "/workspace",
-        PINNED("v1.30.1", [
+        PINNED("v1.30.4", [
           "replace github.com/mvrahden/go-test => ../go-test",
         ]),
       );
@@ -847,5 +847,52 @@ describe("buildCliCommand", () => {
 
       expect(mockShowInformationMessage).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("checkProducerVersion", () => {
+  beforeEach(() => {
+    mockConfigValues.clear();
+  });
+
+  it("accepts the floor, anything above it, a pseudo-version at the floor and a dev build", async () => {
+    const { checkProducerVersion } = await import("./cli.js");
+    for (const v of [
+      "v1.30.2",
+      "v1.31.0",
+      "v2.0.0",
+      "v1.30.2-0.20260926120923-7362809f09ef",
+      "dev (source checkout)",
+      "dev (replace directive)",
+      "dev",
+    ]) {
+      expect(() => checkProducerVersion(v)).not.toThrow();
+    }
+  });
+
+  it("refuses a version below the floor with the upgrade command", async () => {
+    const { checkProducerVersion, CliUnavailableError } =
+      await import("./cli.js");
+    expect(() => checkProducerVersion("v1.30.1")).toThrow(CliUnavailableError);
+    expect(() => checkProducerVersion("v1.29.0")).toThrow(
+      "the CLI is v1.29.0, but >= v1.30.2 is required. Run: go get -tool github.com/mvrahden/go-test/cmd/gotest@latest",
+    );
+  });
+
+  it("refuses a document without a version as one that predates the floor", async () => {
+    const { checkProducerVersion, CliUnavailableError } =
+      await import("./cli.js");
+    expect(() => checkProducerVersion(undefined)).toThrow(CliUnavailableError);
+    expect(() => checkProducerVersion(undefined)).toThrow(
+      "the CLI wrote no version, so it predates v1.30.2",
+    );
+  });
+
+  it("names the configured module path in the upgrade command", async () => {
+    const { checkProducerVersion } = await import("./cli.js");
+    mockConfigValues.set("modulePath", "example.com/fork/cmd/gotest");
+    expect(() => checkProducerVersion("v1.0.0")).toThrow(
+      "go get -tool example.com/fork/cmd/gotest@latest",
+    );
   });
 });
