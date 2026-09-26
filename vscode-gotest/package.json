@@ -317,7 +317,7 @@
     "@types/node": "^24.13.6",
     "@types/vscode": "^1.123.0",
     "esbuild": "^0.28.0",
-    "prettier": "^3.9.8",
+    "prettier": "^3.9.9",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"
   }
