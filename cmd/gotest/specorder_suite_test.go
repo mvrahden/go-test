@@ -3,6 +3,7 @@ package main_test
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/gotestcli"
@@ -37,5 +38,14 @@ func (s *SpecOrderTestSuite) TestMarkdownIsStableAcrossRuns(t *gotest.T) {
 	}
 	first := render("first.md")
 	second := render("second.md")
-	gotest.Equal(t, first, second)
+	gotest.Equal(t, withoutDurations(first), withoutDurations(second))
+}
+
+// A table row ends in a wall-clock duration, which two runs never share
+// exactly (Windows rounds a short one to 1ms as easily as to <1ms); the
+// order of suites and rows is what the spec must hold stable.
+var durationCell = regexp.MustCompile(`(?m)^(\|.*\|) [^|]+ \|$`)
+
+func withoutDurations(markdown string) string {
+	return durationCell.ReplaceAllString(markdown, "$1")
 }
