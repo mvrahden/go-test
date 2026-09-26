@@ -3,8 +3,10 @@ package gotestspec_test
 import (
 	"bytes"
 	"encoding/json"
+	"regexp"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -29,6 +31,15 @@ func renderJSON(t *gotest.T, packages []*gotestspec.Package) gotestspec.ExportJS
 	var result gotestspec.ExportJSONRoot
 	gotest.NoError(t, json.Unmarshal(buf.Bytes(), &result), "invalid JSON: %s", buf.String())
 	return result
+}
+
+// The document opens with the producing CLI's version, so a consumer can
+// gate on it before streaming the tree.
+func (s *JSONRenderTestSuite) TestRenderJSON_VersionOpensTheDocument(t *gotest.T, _ *jsonRenderCtx) {
+	var buf bytes.Buffer
+	gotestspec.RenderJSON(&buf, nil)
+	gotest.Regexp(t, `^\{"version":"`+regexp.QuoteMeta(about.ResolvedVersion())+`",`, buf.String())
+	gotest.Equal(t, about.ResolvedVersion(), renderJSON(t, nil).Version)
 }
 
 func (s *JSONRenderTestSuite) TestRenderJSON_SuiteHierarchy(t *gotest.T, _ *jsonRenderCtx) {

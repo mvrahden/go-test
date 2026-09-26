@@ -6,6 +6,11 @@
 // prebuilt binary and once through `go run` — the extension's default CLI
 // resolution, and the participant that appends "exit status N" to stderr.
 //
+// Both builds pass -buildvcs=false: since Go 1.24 `go build` stamps the main
+// module's version from git, which the CLI reports in every JSON document's
+// `version` field, so a stamped build would change the recording with every
+// commit and never match the `go run` path.
+//
 // Regenerate with `npm run contract:record`. CI runs `npm run contract:check`,
 // so a change in CLI behaviour lands as a reviewable diff instead of a silent
 // break in a consumer nobody re-ran.
@@ -43,10 +48,14 @@ function buildBinary() {
     dir,
     process.platform === "win32" ? "gotest.exe" : "gotest",
   );
-  const built = spawnSync("go", ["build", "-o", bin, "./cmd/gotest"], {
-    cwd: repoRoot,
-    encoding: "utf-8",
-  });
+  const built = spawnSync(
+    "go",
+    ["build", "-buildvcs=false", "-o", bin, "./cmd/gotest"],
+    {
+      cwd: repoRoot,
+      encoding: "utf-8",
+    },
+  );
   if (built.status !== 0) {
     throw new Error(`go build failed: ${built.stderr}`);
   }
@@ -78,7 +87,11 @@ for (const file of readdirSync(streamDir).sort()) {
   cases[name] = {};
   for (const [variant, args] of Object.entries(VARIANTS)) {
     const direct = run(bin, args, input);
-    const goRun = run("go", ["run", "./cmd/gotest", ...args], input);
+    const goRun = run(
+      "go",
+      ["run", "-buildvcs=false", "./cmd/gotest", ...args],
+      input,
+    );
 
     cases[name][variant] = {
       direct,

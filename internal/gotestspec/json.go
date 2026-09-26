@@ -3,9 +3,15 @@ package gotestspec
 import (
 	"encoding/json"
 	"io"
+
+	"github.com/mvrahden/go-test/internal/about"
 )
 
+// jsonRoot is the document of spec and summary --format=json. Version opens
+// it: the CLI that produced the document, so a consumer streaming a large
+// tree can gate on the producer before reading the rest.
 type jsonRoot struct {
+	Version  string        `json:"version"`
 	Packages []jsonPackage `json:"packages"`
 	Stats    jsonStats     `json:"stats"`
 }
@@ -58,6 +64,7 @@ func RenderJSON(w io.Writer, packages []*Package) {
 	stats := CollectStats(packages)
 
 	root := jsonRoot{
+		Version:  about.ResolvedVersion(),
 		Packages: make([]jsonPackage, len(packages)),
 		Stats:    jsonStats(stats),
 	}
