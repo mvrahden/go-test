@@ -1,9 +1,14 @@
 package lint_test
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/mvrahden/go-test/internal/lint"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"golang.org/x/tools/go/analysis/analysistest"
+	"golang.org/x/tools/go/packages"
 )
 
 // LintTestSuite tests the gotest lint analyzer rules and nolint directive parsing.
@@ -67,6 +72,49 @@ func (s *LintTestSuite) TestSuggestedFixes(t *gotest.T) {
 			analysistest.RunWithSuggestedFixes(it.T(), analysistest.TestData(), lint.Analyzer, rewriteFixtures...)
 		})
 	})
+}
+
+// A golden is the source a fix leaves behind, so it must type-check: a fix
+// whose output does not compile is source damage whatever the diagnostics
+// say, and analysistest only compares text.
+func (s *LintTestSuite) TestGoldenFilesTypeCheck(t *gotest.T) {
+	testdata := analysistest.TestData()
+	t.When("a rewrite fixture's golden files stand in for its sources", func(w *gotest.T) {
+		for _, fixture := range rewriteFixtures {
+			w.It("type-checks "+fixture, func(it *gotest.T) {
+				gotest.Empty(it, goldenTypeErrors(it, testdata, fixture))
+			})
+		}
+	})
+}
+
+// goldenTypeErrors loads fixture the way analysistest does (GOPATH mode over
+// testdata) with every .go file overlaid by its .golden, and returns the
+// errors of the fixture package and its test variants.
+func goldenTypeErrors(t *gotest.T, testdata, fixture string) []string {
+	dir := filepath.Join(testdata, "src", fixture)
+	goldens := gotest.Must(filepath.Glob(filepath.Join(dir, "*.golden")))
+	gotest.NotEmpty(t, goldens, "no golden in %s", fixture)
+	overlay := map[string][]byte{}
+	for _, golden := range goldens {
+		overlay[strings.TrimSuffix(golden, ".golden")] = gotest.Must(os.ReadFile(golden))
+	}
+	cfg := &packages.Config{
+		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedImports |
+			packages.NeedDeps | packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo,
+		Dir:     dir,
+		Env:     append(os.Environ(), "GOPATH="+testdata, "GO111MODULE=off", "GOPROXY=off"),
+		Tests:   true,
+		Overlay: overlay,
+	}
+	pkgs := gotest.Must(packages.Load(cfg, "."))
+	var errs []string
+	for _, pkg := range pkgs {
+		for _, err := range pkg.Errors {
+			errs = append(errs, err.Error())
+		}
+	}
+	return errs
 }
 
 func (s *LintTestSuite) TestDisableNolintFlag(t *gotest.T) {
