@@ -97,8 +97,8 @@ var ExportExitCodeAfterDispatch = exitCodeAfterDispatch
 
 // ExportApplyDeadlineFailure applies a run's deadline failure under the given
 // --timeout.
-func ExportApplyDeadlineFailure(result *PipelineResult, globalTimeout time.Duration, dispatchErr error, running []CensusCase) {
-	applyDeadlineFailure(result, PipelineConfig{GlobalTimeout: globalTimeout}, dispatchErr, running)
+func ExportApplyDeadlineFailure(c *OutputCollector, result *PipelineResult, globalTimeout time.Duration, dispatchErr error, running []CensusCase) {
+	applyDeadlineFailure(c, result, PipelineConfig{GlobalTimeout: globalTimeout}, dispatchErr, running)
 }
 
 var ExportUnitNames = unitNames
@@ -154,4 +154,10 @@ func ExportCensus(mode RunMode, stream string, declared DeclaredUnits, goTestArg
 	before := target.Len()
 	exit = c.takeCensus(PipelineConfig{GoTestArgs: goTestArgs, Bench: bench}, declared, code, dispatchErr)
 	return exit, errw.String(), target.String()[before:]
+}
+
+// ExportNewStateProcess builds a shared fixture process handle that holds
+// state without a subprocess behind it, for the state-file tests.
+func ExportNewStateProcess(sharedDir string, state map[string]json.RawMessage) *SharedFixtureProcess {
+	return &SharedFixtureProcess{sharedDir: sharedDir, state: state}
 }

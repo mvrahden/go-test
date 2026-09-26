@@ -10,6 +10,12 @@ import (
 // fixture-teardown countdown; every ambiguity must resolve high, never low.
 type CountMatchingTestSuite struct{}
 
+func (s *CountMatchingTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *CountMatchingTestSuite) TestCountMatching(t *gotest.T) {
 	names := []string{"TestQueryTestSuite", "TestBatchTestSuite", "TestPricingTestSuite"}
 
@@ -93,5 +99,47 @@ func (s *CountMatchingTestSuite) TestCountMatching(t *gotest.T) {
 
 	t.It("empty name list", func(t *gotest.T) {
 		mustEqual(t, gotestruntime.ExportCountMatching([]string{}, "", ""), 0)
+	})
+}
+
+// The names the renderer emits: the Test function of every fixture-bound
+// suite, every Fuzz<Suite>_<Method> wrapper and every Benchmark<Suite>
+// wrapper. Each flag combination below is one the CLI actually passes.
+func (s *CountMatchingTestSuite) TestCountMatchingRendererNames(t *gotest.T) {
+	names := []string{"TestATestSuite", "TestBTestSuite", "FuzzATestSuite_FuzzX", "BenchmarkATestSuite"}
+	count := func(run, skip, bench, fuzz string) int {
+		return gotestruntime.ExportCountMatchingFilters(names, run, skip, bench, fuzz)
+	}
+
+	t.It("a plain suite run counts that suite's Test function", func(t *gotest.T) {
+		mustEqual(t, 1, count("^TestATestSuite$", "", "", ""))
+	})
+
+	t.It("a run widened to the fuzz wrappers counts the seed replay", func(t *gotest.T) {
+		mustEqual(t, 2, count("^(?:TestATestSuite|FuzzATestSuite_FuzzX)$", "", "", ""))
+	})
+
+	t.It("a bench run matches Benchmark names against -test.bench", func(t *gotest.T) {
+		mustEqual(t, 1, count("^$", "", "^BenchmarkATestSuite$", ""))
+		mustEqual(t, 1, count("^$", "", "^BenchmarkATestSuite$/^BenchmarkFoo$", ""),
+			"a method segment scopes the run inside the wrapper, which still executes once")
+	})
+
+	t.It("no flags run the tests and seeds but never the benchmarks", func(t *gotest.T) {
+		mustEqual(t, 3, count("", "", "", ""))
+	})
+
+	t.It("a fuzzing run counts the engine's call of the target", func(t *gotest.T) {
+		mustEqual(t, 1, count("^$", "", "", "^FuzzATestSuite_FuzzX$"))
+		mustEqual(t, 2, count("^FuzzATestSuite_FuzzX$", "", "", "^FuzzATestSuite_FuzzX$"),
+			"the seed replay under -run and the fuzzing call are two executions")
+	})
+
+	t.It("skip excludes benchmarks too", func(t *gotest.T) {
+		mustEqual(t, 3, count("", "BenchmarkA", ".", ""))
+	})
+
+	t.It("a bench pattern matching nothing resolves high", func(t *gotest.T) {
+		mustEqual(t, 4, count("^$", "", "^BenchmarkNope$", ""))
 	})
 }

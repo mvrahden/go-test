@@ -17,14 +17,13 @@ import (
 // an overcount only defers teardown to process exit. Every ambiguity below
 // therefore resolves high, never low.
 func CountMatchingTests(testNames []string) int {
-	var run, skip string
-	if f := flag.Lookup("test.run"); f != nil {
-		run = f.Value.String()
+	f := testFilters{
+		run:   flagValue("test.run"),
+		skip:  flagValue("test.skip"),
+		bench: flagValue("test.bench"),
+		fuzz:  flagValue("test.fuzz"),
 	}
-	if f := flag.Lookup("test.skip"); f != nil {
-		skip = f.Value.String()
-	}
-	n := countMatching(testNames, run, skip)
+	n := countMatching(testNames, f)
 	// -count=n runs the whole matched set n times in one process. Each
 	// execution decrements the countdown once; the fixtures stay up across
 	// rounds and tear down after the last.
@@ -36,37 +35,68 @@ func CountMatchingTests(testNames []string) int {
 	return n
 }
 
-func countMatching(testNames []string, run, skip string) int {
-	var runRe, skipRe *regexp.Regexp
-	if run != "" {
-		// A compile failure leaves runRe nil — no narrowing, full count.
-		runRe, _ = regexp.Compile(firstPatternSegment(run))
+func flagValue(name string) string {
+	if f := flag.Lookup(name); f != nil {
+		return f.Value.String()
 	}
-	if skip != "" && !strings.Contains(skip, "/") {
+	return ""
+}
+
+// testFilters are the selection flags the countdown reads.
+type testFilters struct {
+	run, skip, bench, fuzz string
+}
+
+func countMatching(testNames []string, f testFilters) int {
+	// A compile failure leaves a pattern nil — no narrowing, full count.
+	runRe := compileSegment(f.run)
+	benchRe := compileSegment(f.bench)
+	fuzzRe := compileSegment(f.fuzz)
+	var skipRe *regexp.Regexp
+	if f.skip != "" && !strings.Contains(f.skip, "/") {
 		// A skip pattern containing '/' names a subtest. The top-level test
 		// still RUNS — only the subtest inside it is skipped — so excluding it
 		// from the count here made the countdown hit zero one test early.
 		// Ignoring such a pattern is exact, not conservative: every top-level
 		// name still produces an execution.
-		skipRe, _ = regexp.Compile(skip)
-	}
-	if runRe == nil && skipRe == nil {
-		return len(testNames)
+		skipRe, _ = regexp.Compile(f.skip)
 	}
 	count := 0
 	for _, name := range testNames {
-		if runRe != nil && !runRe.MatchString(name) {
-			continue
-		}
 		if skipRe != nil && skipRe.MatchString(name) {
 			continue
 		}
-		count++
+		if strings.HasPrefix(name, "Benchmark") {
+			// A benchmark wrapper runs only under -test.bench; bench runs pass
+			// -test.run=^$, which must not count it out.
+			if f.bench != "" && (benchRe == nil || benchRe.MatchString(name)) {
+				count++
+			}
+			continue
+		}
+		if runRe == nil || runRe.MatchString(name) {
+			count++
+		}
+		// Under -test.fuzz the engine calls the target once more, after the
+		// seed replay -test.run may or may not have selected.
+		if strings.HasPrefix(name, "Fuzz") && f.fuzz != "" && (fuzzRe == nil || fuzzRe.MatchString(name)) {
+			count++
+		}
 	}
 	if count == 0 {
 		return len(testNames)
 	}
 	return count
+}
+
+// compileSegment compiles the top-level segment of a -test.run style pattern;
+// nil for an empty or uncompilable pattern.
+func compileSegment(pattern string) *regexp.Regexp {
+	if pattern == "" {
+		return nil
+	}
+	re, _ := regexp.Compile(firstPatternSegment(pattern))
+	return re
 }
 
 // firstPatternSegment cuts a -run pattern at the first '/' that separates test

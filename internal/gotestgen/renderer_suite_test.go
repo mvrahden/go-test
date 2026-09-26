@@ -570,7 +570,32 @@ func (s *RendererTestSuite) TestRenderer_BenchmarkWrapper(t *gotest.T) {
 			gotest.Contains(it, benchFn, "ParserTestSuite: ParserTestSuite{")
 			gotest.Contains(it, benchFn, "PoolFixture: ƒ_PoolFixture")
 		})
+
+		w.It("lists the Test and Benchmark wrappers for the teardown countdown", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBoundBenchmark")
+			out, _ := renderTestPkg(it.T(), pkg, true)
+
+			gotest.Contains(it, fixtureTestNames(it, out), "TestParserTestSuite")
+			gotest.Contains(it, fixtureTestNames(it, out), "BenchmarkParserTestSuite")
+		})
 	})
+}
+
+// fixtureTestNames reads the ƒ_fixtureTestNames literal out of a rendered file.
+func fixtureTestNames(t *gotest.T, out string) []string {
+	start := strings.Index(out, "var ƒ_fixtureTestNames = []string{")
+	gotest.GreaterOrEqual(t, start, 0, "ƒ_fixtureTestNames missing from output")
+	body := out[start:]
+	end := strings.Index(body, "}")
+	gotest.GreaterOrEqual(t, end, 0, "ƒ_fixtureTestNames literal never closes")
+	body = body[:end]
+	var names []string
+	for _, line := range strings.Split(body, "\n")[1:] {
+		if name := strings.Trim(strings.TrimSpace(line), `",`); name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
@@ -607,6 +632,14 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 			gotest.Contains(it, fuzzFn, "ƒ_setupFixtures(f)")
 			gotest.Contains(it, fuzzFn, "ParserFuzzTestSuite: ParserFuzzTestSuite{")
 			gotest.Contains(it, fuzzFn, "PoolFixture: ƒ_PoolFixture")
+		})
+
+		w.It("lists the Test and Fuzz wrappers for the teardown countdown", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBoundFuzz")
+			out, _ := renderTestPkg(it.T(), pkg, true)
+
+			gotest.Contains(it, fixtureTestNames(it, out), "TestParserFuzzTestSuite")
+			gotest.Contains(it, fixtureTestNames(it, out), "FuzzParserFuzzTestSuite_FuzzParse")
 		})
 	})
 

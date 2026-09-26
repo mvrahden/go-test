@@ -59,6 +59,7 @@ The drill exits 0 only when every mutant was caught. It runs in CI
 | `exit-code-zero` | `WorstExitCode` always returns 0 | canary: exit codes differ from the golden list |
 | `tree-fail-is-pass` | `BuildTree` classifies `fail` events as `pass` | ring-0 tree suite (the canary reads raw events, not the tree) |
 | `it-skips-body` | `gotest.T.It` opens the subtest and never runs its closure | canary: the behavior rows under every `It` vanish from the golden list |
+| `run-failure-stays-on-stderr` | `bookRunFailure` books a run-level failure only into the captured stream, never the live `-json` one | canary: the `teardownfailing` fixture's `fail` row for the synthetic package vanishes from the golden list |
 
 ## Adding a mutant
 

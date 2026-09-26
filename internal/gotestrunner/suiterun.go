@@ -277,7 +277,9 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 //
 // On context cancellation, cmd.Cancel sends SIGTERM to the process group.
 // A per-process kill timer (from the teardown budget file) then governs
-// when SIGKILL is sent, rather than Go's built-in WaitDelay.
+// when SIGKILL is sent, and nothing else kills. Output is read by the
+// managed process itself, so a grandchild outside the group that keeps the
+// pipes open holds the result for the drain delay at most.
 func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic // hugeParam: stable API
 	cmd := buildSuiteCmd(ctx, target, env, test2json)
 	var stdout, stderr bytes.Buffer

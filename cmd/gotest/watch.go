@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -73,7 +72,7 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	// environment auto-enable the F_ guard mid-iteration; --ci stays explicit.
 	cfg.CI = hasFlag(ownArgs, "--ci")
 
-	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
+	ctx, stop := shutdownContext()
 	defer stop()
 
 	if !jsonMode {
@@ -153,7 +152,7 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 // only ever populated/consulted when bench is true.
 func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench bool, benchNs map[string]float64) (int, map[string]float64) { //nolint:gocritic // hugeParam: stable API
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
-	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
+	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)
 	loaded, broken, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
 	if err != nil {
 		if jsonMode {

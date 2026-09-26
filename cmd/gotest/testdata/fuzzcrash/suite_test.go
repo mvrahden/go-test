@@ -1,6 +1,7 @@
 package fuzzcrash
 
 import (
+	"math"
 	"strings"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -37,5 +38,16 @@ func (s *MessageTestSuite) FuzzSummary(f *gotest.F) {
 		gotest.Contains(t, out, m.Subject)
 		gotest.Contains(t, out, m.To)
 		gotest.Regexp(t, `^\[(LOW|NORMAL|HIGH)\] `, out)
+	})
+}
+
+// Reading fans to one float leaf. A NaN in it echoes as math.NaN(), which a
+// promoted seed can only spell with the math import.
+type Reading struct{ Value float64 }
+
+func (s *MessageTestSuite) FuzzScale(f *gotest.F) {
+	f.Add(Reading{Value: 1.5})
+	f.Fuzz(func(t *gotest.T, r Reading) {
+		gotest.Equal(t, math.IsNaN(r.Value*2), math.IsNaN(r.Value+r.Value))
 	})
 }

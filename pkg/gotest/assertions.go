@@ -339,6 +339,21 @@ func NotEqual[V any](t testingT, expected, actual V, msgAndArgs ...any) {
 	}
 }
 
+// Same asserts that expected and actual are the same pointer. Equal on
+// pointers compares what they point at; Same compares where they point.
+func Same[V any](t testingT, expected, actual *V, msgAndArgs ...any) {
+	if expected != actual {
+		fail(t, fmt.Sprintf("Same failed:\n  expected: %p\n  actual:   %p", expected, actual), msgAndArgs)
+	}
+}
+
+// NotSame asserts that expected and actual are distinct pointers.
+func NotSame[V any](t testingT, expected, actual *V, msgAndArgs ...any) {
+	if expected == actual {
+		fail(t, fmt.Sprintf("NotSame failed:\n  both: %p", actual), msgAndArgs)
+	}
+}
+
 // NotZero asserts that value is NOT the zero value for its type.
 func NotZero[V comparable](t testingT, value V, msgAndArgs ...any) {
 	var zero V

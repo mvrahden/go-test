@@ -98,17 +98,17 @@ type PipelineResult struct {
 // applyTeardownFailure surfaces a shared fixture teardown failure and makes a
 // run that would otherwise have passed fail instead. Resources the fixtures
 // hold outlive the test process, so leaving them behind must not report ok.
-func applyTeardownFailure(result *PipelineResult, err error) {
+func applyTeardownFailure(c *OutputCollector, result *PipelineResult, err error) {
 	if err == nil {
 		return
 	}
-	failRun(result, "shared fixtures", err.Error())
+	failRun(c, result, "shared fixtures", err.Error())
 }
 
 // applyDeadlineFailure fails a run whose deadline expired before its last
 // verdict, naming the units it cut short. With none to name, the failure is
 // booked as a synthetic package so the reason still reaches every renderer.
-func applyDeadlineFailure(result *PipelineResult, cfg PipelineConfig, dispatchErr error, running []CensusCase) { //nolint:gocritic // hugeParam: stable API
+func applyDeadlineFailure(c *OutputCollector, result *PipelineResult, cfg PipelineConfig, dispatchErr error, running []CensusCase) { //nolint:gocritic // hugeParam: stable API
 	if !errors.Is(dispatchErr, context.DeadlineExceeded) {
 		return
 	}
@@ -117,7 +117,7 @@ func applyDeadlineFailure(result *PipelineResult, cfg PipelineConfig, dispatchEr
 		msg = fmt.Sprintf("global --timeout exceeded after %v", cfg.GlobalTimeout)
 	}
 	if len(running) == 0 {
-		failRun(result, "global --timeout", msg)
+		failRun(c, result, "global --timeout", msg)
 		return
 	}
 	fmt.Fprintf(os.Stderr, "FAIL: %s while running: %s\n", msg, unitNames(running))
@@ -126,17 +126,16 @@ func applyDeadlineFailure(result *PipelineResult, cfg PipelineConfig, dispatchEr
 	}
 }
 
-// failRun reports msg and fails a run that would otherwise pass. The captured
-// stream is what every renderer derives from, so the failure is booked into it
-// as a failed synthetic package instead of living on the exit code alone.
-func failRun(result *PipelineResult, pkg, msg string) {
+// failRun reports msg and fails a run that would otherwise pass. The stream is
+// what every renderer and -json consumer derives from, so the failure is booked
+// into it through the collector as a failed synthetic package, in the live and
+// the captured mode alike, instead of living on the exit code alone.
+func failRun(c *OutputCollector, result *PipelineResult, pkg, msg string) {
 	fmt.Fprintf(os.Stderr, "FAIL: %s\n", msg)
 	if result.ExitCode == 0 {
 		result.ExitCode = 1
 	}
-	if result.CapturedJSON != nil {
-		result.CapturedJSON = appendRunFailureEvents(result.CapturedJSON, pkg, msg)
-	}
+	c.bookRunFailure(pkg, msg)
 }
 
 // fixtureBarrier performs the bulk→tail window transition on the setup
@@ -201,9 +200,10 @@ func bookBuildFailures(c *OutputCollector, broken []gotestgen.BrokenPackage, fai
 	}
 }
 
-// appendRunFailureEvents appends test2json-shaped events recording a run-level
+// runFailureEvents renders test2json-shaped events recording a run-level
 // failure that happened outside any test binary, after its stream ended.
-func appendRunFailureEvents(stream []byte, pkg, msg string) []byte {
+func runFailureEvents(pkg, msg string) []byte {
+	var stream []byte
 	ev := func(action, text string) []byte {
 		e := struct {
 			Action  string `json:"Action"`
@@ -375,16 +375,25 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		return PipelineResult{ExitCode: 2}, err
 	}
 	defer cancelPrepare()
+	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
+	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
 	// barrierErr collects window-boundary failures (early teardown, tail
-	// start); they merge with the terminal Teardown's verdict below.
+	// start); they merge with the terminal Teardown's verdict below. The
+	// snapshot is refreshed after the booking so the result carries it.
 	var barrierErr error
 	if setupProc != nil {
-		defer func() { applyTeardownFailure(&result, errors.Join(barrierErr, setupProc.Teardown())) }()
+		defer func() {
+			if teardownErr := errors.Join(barrierErr, setupProc.Teardown()); teardownErr != nil {
+				applyTeardownFailure(collector, &result, teardownErr)
+				result.CapturedJSON = collector.CapturedJSON()
+			}
+		}()
 	}
 
 	if prepareErr := ctx.Err(); prepareErr != nil {
 		result = PipelineResult{ExitCode: exitCodeAfterDispatch(0, prepareErr)}
-		applyDeadlineFailure(&result, cfg, prepareErr, nil)
+		applyDeadlineFailure(collector, &result, cfg, prepareErr, nil)
+		result.CapturedJSON = collector.CapturedJSON()
 		return result, nil
 	}
 
@@ -421,8 +430,6 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		targets = BuildSuiteTargets(compiled, overlay.SuitesByPkg, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.ExclusiveSuitesByPkg, runFlags, pf.UserRunFilter)
 	}
 
-	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
-	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
 	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
 	bookBuildFailures(collector, overlay.BrokenPackages, compileFailures)
 
@@ -519,8 +526,9 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 
 	exitCode := collector.takeCensus(cfg, overlay.Declared, exitCodeAfterDispatch(collector.WorstExitCode(), dispatchErr), dispatchErr)
 	running := collector.bookDeadline(dispatchErr)
-	result = PipelineResult{ExitCode: exitCode, CapturedJSON: collector.CapturedJSON()}
-	applyDeadlineFailure(&result, cfg, dispatchErr, running)
+	result = PipelineResult{ExitCode: exitCode}
+	applyDeadlineFailure(collector, &result, cfg, dispatchErr, running)
+	result.CapturedJSON = collector.CapturedJSON()
 	return result, nil
 }
 
@@ -741,9 +749,9 @@ loop:
 						}
 					}
 
-					stateFile, err := setupProc.WriteStateFileForKeys(t.SuiteName, requiredKeys)
+					stateFile, err := setupProc.WriteSuiteStateFile(t.Package, t.SuiteName, requiredKeys)
 					if err != nil {
-						fmt.Fprintf(os.Stderr, "WARN: write state file for %s: %s\n", t.SuiteName, err)
+						fmt.Fprintf(os.Stderr, "FAIL: %s %s: shared fixture state: %s\n", t.Package, t.SuiteName, err)
 						return
 					}
 
@@ -804,9 +812,9 @@ loop:
 		}
 		env := baseEnv
 		if requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[d.t.Package][d.t.SuiteName]; len(requiredKeys) > 0 && setupProc != nil {
-			stateFile, err := setupProc.WriteStateFileForKeys(d.t.SuiteName, requiredKeys)
+			stateFile, err := setupProc.WriteSuiteStateFile(d.t.Package, d.t.SuiteName, requiredKeys)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "WARN: write state file for %s: %s\n", d.t.SuiteName, err)
+				fmt.Fprintf(os.Stderr, "FAIL: %s %s: shared fixture state: %s\n", d.t.Package, d.t.SuiteName, err)
 				collector.RecordResult(d.t.Package, d.idx, SuiteResult{ExitCode: 1})
 				continue
 			}
@@ -850,8 +858,11 @@ loop:
 		if sharedSetupFailed.Load() && result.ExitCode == 0 {
 			result.ExitCode = 1
 		}
-		applyDeadlineFailure(&result, cfg, dispatchErr, nil)
-		applyTeardownFailure(&result, teardownErr)
+		applyDeadlineFailure(collector, &result, cfg, dispatchErr, nil)
+		applyTeardownFailure(collector, &result, teardownErr)
+		if result.ExitCode != 0 {
+			result.CapturedJSON = collector.CapturedJSON()
+		}
 		return result, nil
 	}
 
@@ -863,11 +874,9 @@ loop:
 	}
 	exitCode = collector.takeCensus(cfg, overlay.Declared, exitCode, dispatchErr)
 	running := collector.bookDeadline(dispatchErr)
-	result := PipelineResult{
-		ExitCode:     exitCode,
-		CapturedJSON: collector.CapturedJSON(),
-	}
-	applyDeadlineFailure(&result, cfg, dispatchErr, running)
-	applyTeardownFailure(&result, teardownErr)
+	result := PipelineResult{ExitCode: exitCode}
+	applyDeadlineFailure(collector, &result, cfg, dispatchErr, running)
+	applyTeardownFailure(collector, &result, teardownErr)
+	result.CapturedJSON = collector.CapturedJSON()
 	return result, nil
 }

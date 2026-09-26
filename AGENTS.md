@@ -71,7 +71,11 @@ Prefer over `gotest.True(t, false, "msg")`.
 ```go
 gotest.Equal[V any](t, expected, actual V)          // deep equality (reflect.DeepEqual)
 gotest.NotEqual[V any](t, expected, actual V)        // deep inequality
+gotest.Same[V any](t, expected, actual *V)           // pointer identity (==), never structure
+gotest.NotSame[V any](t, expected, actual *V)        // distinct pointers
 ```
+
+`True(t, p == q)` on pointers is identity; the `assertion-simplify` rule rewrites it to `Same`/`NotSame`, never to `Equal`, whose `reflect.DeepEqual` compares structure. A struct or array holding a pointer, or two interfaces, is left alone for the same reason; `err == target` on errors names `ErrorIs` without a fix, since `errors.Is` also matches wrapped errors.
 
 ### Boolean
 

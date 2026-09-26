@@ -296,8 +296,8 @@ var packageGuard = func(t *gotest.T) {
 	}
 }
 
-// === mixed static operand types: any-typed sides bridge via conversion,
-// the rest fall back to False ===
+// === mixed static operand types: an any-typed side beside a pointer-free
+// concrete type bridges via conversion, the rest fall back to False ===
 
 type mixedErr struct{ msg string }
 
@@ -316,7 +316,7 @@ func TestMixedTypeGuards(t *testing.T) {
 	if row["id"] == "gone" { // want `use NotEqual instead of if\+Fail for == comparison`
 		gotest.Fail(t, "row not deleted")
 	}
-	// no spellable common type — False fallback
+	// an error beside a pointer to one, asserted unequal — False fallback
 	var boom error = &mixedErr{msg: "boom"}
 	target := &mixedErr{msg: "boom"}
 	if boom == target { // want `use False instead of if\+Fail for failure guard`
@@ -327,5 +327,49 @@ func TestMixedTypeGuards(t *testing.T) {
 	ys := []string{"a"}
 	if reflect.DeepEqual(xs, ys) { // want `use False instead of if\+Fail for failure guard`
 		gotest.Fail(t, "should differ")
+	}
+}
+
+// === identity: pointers get Same/NotSame; a struct holding one falls back
+// to False; two errors asserted equal name ErrorIs, and a chain holding
+// such a plan is reported without a fix ===
+
+type node struct{ v int }
+
+type holder struct{ p *node }
+
+func TestIdentityGuards(t *testing.T) {
+	a, b := &node{1}, &node{1}
+	if a == b { // want `use NotSame instead of if\+Fail for pointer == comparison`
+		gotest.Fail(t, "aliased")
+	}
+	if a != b { // want `use Same instead of if\+Fail for pointer != comparison`
+		gotest.Fail(t, "not aliased")
+	}
+	h1, h2 := holder{a}, holder{b}
+	if h1 == h2 { // want `use False instead of if\+Fail for failure guard`
+		gotest.Fail(t, "holders alias")
+	}
+	// a dereference is classified by what it yields
+	if *a == (node{1}) { // want `use NotEqual instead of if\+Fail for == comparison`
+		gotest.Fail(t, "value matched")
+	}
+	ho := &h1
+	if *ho == h2 { // want `use False instead of if\+Fail for failure guard`
+		gotest.Fail(t, "holder matched")
+	}
+	pp := &a
+	if *pp == b { // want `use NotSame instead of if\+Fail for pointer == comparison`
+		gotest.Fail(t, "aliased through a double pointer")
+	}
+	var err error = errSentinel
+	if err != errSentinel { // want `use ErrorIs instead of if\+Fail for error != comparison — errors.Is also matches wrapped errors`
+		gotest.Fail(t, "wrong error")
+	}
+	if err == errSentinel { // want `use False instead of if\+Fail for failure guard`
+		gotest.Fail(t, "sentinel leaked")
+	}
+	if err == nil || err != errSentinel { // want `use Error \+ ErrorIs instead of if\+Fail for or-chained failure guard — errors.Is also matches wrapped errors`
+		gotest.Fail(t, "chained")
 	}
 }

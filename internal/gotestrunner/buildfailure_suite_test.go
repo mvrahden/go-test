@@ -179,20 +179,37 @@ func (s *BuildFailureVerdictsTestSuite) TestExitCodeAfterDispatch(t *gotest.T, _
 }
 
 func (s *BuildFailureVerdictsTestSuite) TestDeadlineFailsTheRun(t *gotest.T, _ *buildFailureCtx) {
+	// capture books through a capturing collector and returns the result
+	// with the stream snapshot taken afterwards, as the pipeline does.
+	capture := func(exitCode int, err error, running []gotestrunner.CensusCase) gotestrunner.PipelineResult {
+		c := gotestrunner.NewOutputCollector(gotestrunner.RunCaptureJSON, false, gotestrunner.WithWriters(&bytes.Buffer{}, &bytes.Buffer{}))
+		result := gotestrunner.PipelineResult{ExitCode: exitCode}
+		gotestrunner.ExportApplyDeadlineFailure(c, &result, 3*time.Second, err, running)
+		result.CapturedJSON = c.CapturedJSON()
+		return result
+	}
+
 	t.When("the global --timeout expires before a green run's last verdict", func(w *gotest.T) {
-		result := gotestrunner.PipelineResult{CapturedJSON: []byte{}}
-		gotestrunner.ExportApplyDeadlineFailure(&result, 3*time.Second, context.DeadlineExceeded, nil)
+		result := capture(0, context.DeadlineExceeded, nil)
 
 		w.It("exits 1 and books the timeout into the stream every renderer reads", func(it *gotest.T) {
 			gotest.Equal(it, 1, result.ExitCode)
 			gotest.Contains(it, string(result.CapturedJSON), `{"Action":"output","Package":"global --timeout","Output":"FAIL: global --timeout exceeded after 3s\n"}`)
 			gotest.Contains(it, string(result.CapturedJSON), `{"Action":"fail","Package":"global --timeout"}`)
 		})
+
+		w.It("books it into the live -json stream too", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			var result gotestrunner.PipelineResult
+			gotestrunner.ExportApplyDeadlineFailure(c, &result, 3*time.Second, context.DeadlineExceeded, nil)
+			gotest.Equal(it, 1, result.ExitCode)
+			gotest.Contains(it, stdout.String(), `{"Action":"fail","Package":"global --timeout"}`)
+		})
 	})
 
 	t.When("the run was red already", func(w *gotest.T) {
-		result := gotestrunner.PipelineResult{ExitCode: 2, CapturedJSON: []byte{}}
-		gotestrunner.ExportApplyDeadlineFailure(&result, 3*time.Second, context.DeadlineExceeded, nil)
+		result := capture(2, context.DeadlineExceeded, nil)
 
 		w.It("keeps its exit code", func(it *gotest.T) {
 			gotest.Equal(it, 2, result.ExitCode)
@@ -200,8 +217,7 @@ func (s *BuildFailureVerdictsTestSuite) TestDeadlineFailsTheRun(t *gotest.T, _ *
 	})
 
 	t.When("it names the units it cut short", func(w *gotest.T) {
-		result := gotestrunner.PipelineResult{CapturedJSON: []byte{}}
-		gotestrunner.ExportApplyDeadlineFailure(&result, 3*time.Second, context.DeadlineExceeded, []gotestrunner.CensusCase{{Pkg: "example.com/pkg", Path: "TestXTestSuite/TestHang"}})
+		result := capture(0, context.DeadlineExceeded, []gotestrunner.CensusCase{{Pkg: "example.com/pkg", Path: "TestXTestSuite/TestHang"}})
 
 		w.It("exits 1 and books no synthetic package: the units carry the failure", func(it *gotest.T) {
 			gotest.Equal(it, 1, result.ExitCode)
@@ -211,8 +227,7 @@ func (s *BuildFailureVerdictsTestSuite) TestDeadlineFailsTheRun(t *gotest.T, _ *
 
 	t.When("no deadline cut the run short", func(w *gotest.T) {
 		for sub, err := range gotest.Each(w, []error{nil, context.Canceled}) {
-			result := gotestrunner.PipelineResult{CapturedJSON: []byte{}}
-			gotestrunner.ExportApplyDeadlineFailure(&result, 3*time.Second, err, nil)
+			result := capture(0, err, nil)
 			gotest.Equal(sub, 0, result.ExitCode)
 			gotest.Empty(sub, result.CapturedJSON)
 		}

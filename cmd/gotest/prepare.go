@@ -1,11 +1,9 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -36,8 +34,7 @@ func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(),
-		shutdownSignals...)
+	ctx, stop := shutdownContext()
 
 	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, nil, false, false, true)
 	if err != nil {

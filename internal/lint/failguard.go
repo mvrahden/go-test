@@ -69,7 +69,7 @@ func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 			for _, cond := range splitOr(u.cond) {
 				m, ok := mapBoolExpr(pass, cond, true)
 				if !ok {
-					m = conditionMapping{"False", []ast.Expr{cond}, "failure guard"}
+					m = conditionMapping{target: "False", args: []ast.Expr{cond}, desc: "failure guard"}
 				}
 				plans = append(plans, failGuardPlan{
 					m:       m,
@@ -81,8 +81,13 @@ func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 		}
 
 		var targets []string
-		for _, p := range plans {
+		noFix := ""
+		for i := range plans {
+			p := &plans[i]
 			targets = append(targets, p.m.target)
+			if noFix == "" {
+				noFix = p.m.noFix
+			}
 		}
 		targetList := strings.Join(targets, " + ")
 
@@ -99,7 +104,8 @@ func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 		// index/selector/deref expressions can panic exactly when the guard
 		// would not have fired (errs[0] guarded by len > 0) — so only
 		// trivially total args keep the autofix.
-		for _, p := range plans {
+		for i := range plans {
+			p := &plans[i]
 			if !msgArgsSafe(p.msgArgs) {
 				fixable = false
 			}
@@ -111,6 +117,12 @@ func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 			report(pass, FailGuard, ifStmt.Pos(), "use %s instead of %s for %s — assertions halt where %s continues", targetList, from, desc, weakLabel)
 			return
 		}
+		// A plan that is no equivalence of its guard withholds the fix for
+		// the whole chain and says why.
+		if noFix != "" {
+			report(pass, FailGuard, ifStmt.Pos(), "use %s instead of %s for %s — %s", targetList, from, desc, noFix)
+			return
+		}
 		trailing, interior := spanComments(pass, ifStmt)
 		if !fixable || interior {
 			report(pass, FailGuard, ifStmt.Pos(), "use %s instead of %s for %s", targetList, from, desc)
@@ -119,7 +131,8 @@ func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 
 		indent := "\n" + sourceIndent(pass.Fset, readSource, ifStmt.Pos())
 		var lines []string
-		for _, p := range plans {
+		for i := range plans {
+			p := &plans[i]
 			lines = append(lines, renderAssertion(pass.Fset, p.qual, p.m.target, append([]ast.Expr{p.tArg}, p.m.args...), p.msgArgs))
 		}
 		lines[0] += trailing

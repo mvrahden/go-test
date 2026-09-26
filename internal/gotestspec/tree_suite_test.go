@@ -248,6 +248,28 @@ func (s *TreeTestSuite) TestBuildTree_DuplicateSuite_PtestPxtest(t *gotest.T, _ 
 	mustEq(t, "suite2 status", suite2.Status, gotestspec.StatusPass)
 }
 
+// Suites finish in dispatch order, which parallel processes shuffle; the
+// tree lists them by name so two runs of one package render alike.
+func (s *TreeTestSuite) TestBuildTree_SuitesSortedByName(t *gotest.T, _ *treeCtx) {
+	tree := treeOf(t, `{"Action":"run","Package":"p","Test":"TestZetaTestSuite"}
+{"Action":"run","Package":"p","Test":"TestZetaTestSuite/TestOne"}
+{"Action":"pass","Package":"p","Test":"TestZetaTestSuite/TestOne","Elapsed":0.01}
+{"Action":"pass","Package":"p","Test":"TestZetaTestSuite","Elapsed":0.02}
+{"Action":"run","Package":"p","Test":"TestAlphaTestSuite"}
+{"Action":"run","Package":"p","Test":"TestAlphaTestSuite/TestOne"}
+{"Action":"pass","Package":"p","Test":"TestAlphaTestSuite/TestOne","Elapsed":0.01}
+{"Action":"pass","Package":"p","Test":"TestAlphaTestSuite","Elapsed":0.02}
+{"Action":"run","Package":"p","Test":"TestMidTestSuite"}
+{"Action":"pass","Package":"p","Test":"TestMidTestSuite","Elapsed":0.02}
+{"Action":"pass","Package":"p","Elapsed":0.05}`)
+	mustLen(t, "root nodes", tree[0].Nodes, 3)
+	var names []string
+	for _, n := range tree[0].Nodes {
+		names = append(names, n.Name)
+	}
+	mustEq(t, "order", strings.Join(names, ","), "TestAlphaTestSuite,TestMidTestSuite,TestZetaTestSuite")
+}
+
 func (s *TreeTestSuite) TestClassify_ParallelMethod(t *gotest.T, _ *treeCtx) {
 	tree := treeOf(t, `{"Action":"run","Package":"p","Test":"TestMyTestSuite"}
 {"Action":"run","Package":"p","Test":"TestMyTestSuite/TestParallelCreate"}

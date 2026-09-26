@@ -1,7 +1,10 @@
 package config
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -150,9 +153,17 @@ func parse(path string) (ProjectConfig, error) {
 		return ProjectConfig{}, err
 	}
 
+	// Unknown keys are refused: a typo like `timeoutt` otherwise loads
+	// cleanly and configures nothing. An empty or comment-only file is the
+	// zero config, not an error.
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
 	var cfg ProjectConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return ProjectConfig{}, err
+	if err := dec.Decode(&cfg); err != nil {
+		if errors.Is(err, io.EOF) {
+			return ProjectConfig{}, nil
+		}
+		return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
 	}
 	return cfg, nil
 }

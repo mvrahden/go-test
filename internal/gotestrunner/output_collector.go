@@ -312,6 +312,18 @@ func (c *OutputCollector) jsonWriter() io.Writer {
 	return io.MultiWriter(c.jsonTarget(), &c.verdicts)
 }
 
+// bookRunFailure books a failure that happened outside any test binary as a
+// failed synthetic package, on whichever writer this mode's stream goes to.
+// Text mode has no stream; the caller's stderr line is all it gets.
+func (c *OutputCollector) bookRunFailure(pkg, msg string) {
+	if c.mode == RunBatchText {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, _ = c.jsonTarget().Write(runFailureEvents(pkg, msg))
+}
+
 func (c *OutputCollector) jsonTarget() io.Writer {
 	if c.mode == RunCaptureJSON {
 		return &c.captured

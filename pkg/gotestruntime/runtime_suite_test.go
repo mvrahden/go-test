@@ -1519,6 +1519,50 @@ func (s *RuntimeTestSuite) TestBeforeAllError_ContextCancelIncludesFixtureName(t
 	mustErrorIs(t, err, context.Canceled)
 }
 
+// A suite process reads a state file holding the shared fixtures its suite
+// requires; a node the file does not name belongs to a sibling suite and
+// must be left alone: no Init, no Hydrate, no Dehydrate.
+func (s *RuntimeTestSuite) TestDAG_SharedNodeAbsentFromStateIsLeftAlone(t *gotest.T) {
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	if err := os.WriteFile(stateFile, []byte(`{"example.com/f.Present":{"Value":"present"}}`), 0o600); err != nil {
+		fatalf(t, "write state: %v", err)
+	}
+	t.Setenv(protocol.EnvSharedStateFile, stateFile)
+
+	type shared struct{ Value string }
+	rec := &recorder{}
+	present := &gotestruntime.FixtureNode{
+		Name:   "Present",
+		Config: gotest.DefaultFixtureConfig(),
+		SharedState: &gotestruntime.SharedStateNode{
+			StateKey:  "example.com/f.Present",
+			Target:    &shared{},
+			Hydrate:   func(context.Context) error { rec.record("present.hydrate"); return nil },
+			Dehydrate: func(context.Context) error { rec.record("present.dehydrate"); return nil },
+		},
+	}
+	absent := &gotestruntime.FixtureNode{
+		Name:   "Absent",
+		Config: gotest.DefaultFixtureConfig(),
+		Init:   func() { rec.record("absent.init") },
+		SharedState: &gotestruntime.SharedStateNode{
+			StateKey:  "example.com/f.Absent",
+			Target:    &shared{},
+			Hydrate:   func(context.Context) error { rec.record("absent.hydrate"); return nil },
+			Dehydrate: func(context.Context) error { rec.record("absent.dehydrate"); return nil },
+		},
+	}
+
+	dag, err := gotestruntime.SetupFixtureDAG(context.Background(), gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{present, absent}})
+	if err != nil {
+		fatalf(t, "setup: %v", err)
+	}
+	if dag.Teardown() {
+		t.Errorf("teardown reported failure")
+	}
+	mustEqual(t, []string{"present.hydrate", "present.dehydrate"}, rec.events)
+}
+
 func (s *RuntimeTestSuite) TestDAGSetupError_IncludesFixtureName(t *gotest.T) {
 	node := &gotestruntime.FixtureNode{
 		Name:   "Redis",

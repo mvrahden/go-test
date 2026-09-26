@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unsafe"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -475,8 +476,9 @@ func TestConstFirstSimplify(t *testing.T) {
 	gotest.True(t, x == limit) // want `use Equal instead of True for == comparison`
 }
 
-// === mixed static operand types: any-typed sides bridge via conversion;
-// other mismatches stay untouched ===
+// === mixed static operand types: an any-typed side beside a pointer-free
+// concrete type bridges via conversion — the comparison pins the dynamic
+// type; other mismatches stay untouched ===
 
 type mixedErr struct{ msg string }
 
@@ -488,10 +490,67 @@ func TestMixedTypeSimplify(t *testing.T) {
 	gotest.True(t, row["id"] == id)     // want `use Equal instead of True for == comparison`
 	gotest.False(t, row["id"] == id)    // want `use NotEqual instead of False for == comparison`
 	gotest.True(t, row["id"] == "gone") // want `use Equal instead of True for == comparison`
-	var boom error = &mixedErr{msg: "boom"}
-	target := &mixedErr{msg: "boom"}
-	gotest.True(t, boom == target)
 	xs := []int{1}
 	ys := []string{"a"}
 	gotest.True(t, reflect.DeepEqual(xs, ys))
+}
+
+// === identity: DeepEqual agrees with == except where it reaches a pointer.
+// Pointers get Same/NotSame; a struct or array holding one, and two
+// interfaces, map to nothing; chan and unsafe.Pointer are identity in both ===
+
+type node struct{ v int }
+
+type ref *node
+
+type holder struct{ p *node }
+
+type flat struct{ v int }
+
+func TestPointerIdentity(t *testing.T) {
+	a, b := &node{1}, &node{1}
+	gotest.True(t, a == b)  // want `use Same instead of True for pointer == comparison`
+	gotest.False(t, a == b) // want `use NotSame instead of False for pointer == comparison`
+	gotest.True(t, a != b)  // want `use NotSame instead of True for pointer != comparison`
+	gotest.False(t, a != b) // want `use Same instead of False for pointer != comparison`
+	var p, q ref = a, b
+	gotest.True(t, p == q) // want `use Same instead of True for pointer == comparison`
+	gotest.True(t, p == a) // want `use Same instead of True for pointer == comparison`
+	var x, y any = a, b
+	gotest.True(t, x == y)
+	gotest.True(t, x == a)
+	u, v := unsafe.Pointer(a), unsafe.Pointer(b)
+	gotest.True(t, u == v) // want `use Equal instead of True for == comparison`
+}
+
+func TestReachesPointer(t *testing.T) {
+	h1, h2 := holder{&node{1}}, holder{&node{1}}
+	gotest.True(t, h1 == h2)
+	gotest.False(t, h1 != h2)
+	arr1, arr2 := [1]*node{h1.p}, [1]*node{h2.p}
+	gotest.True(t, arr1 == arr2)
+	var n any = h1
+	gotest.True(t, n == h2)
+	f1, f2 := flat{1}, flat{1}
+	gotest.True(t, f1 == f2) // want `use Equal instead of True for == comparison`
+	var m any = f1
+	gotest.True(t, m == f2) // want `use Equal instead of True for == comparison`
+	c1, c2 := make(chan int), make(chan int)
+	gotest.True(t, c1 == c2) // want `use Equal instead of True for == comparison`
+}
+
+// === errors: == on two errors is identity, which Equal weakens to structure
+// and ErrorIs to the unwrap chain — so ErrorIs is named, never applied ===
+
+var errIdentity = errors.New("identity")
+
+func TestErrorIdentity(t *testing.T) {
+	var err error = errIdentity
+	gotest.True(t, err == errIdentity)  // want `use ErrorIs instead of True for error == comparison — errors.Is also matches wrapped errors`
+	gotest.False(t, err != errIdentity) // want `use ErrorIs instead of False for error != comparison — errors.Is also matches wrapped errors`
+	gotest.False(t, err == errIdentity)
+	gotest.True(t, err != errIdentity)
+	target := &mixedErr{msg: "boom"}
+	gotest.True(t, err == target) // want `use ErrorIs instead of True for error == comparison — errors.Is also matches wrapped errors`
+	gotest.False(t, err == target)
 }

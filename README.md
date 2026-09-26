@@ -462,6 +462,8 @@ Functional API with compile-time type safety:
 // Equality
 gotest.Equal(t, expected, actual)            // [V any] — deep equality; cross-type = compile error
 gotest.NotEqual(t, expected, actual)         // [V any] — deep inequality
+gotest.Same(t, expected, actual)             // [V any] on *V — pointer identity
+gotest.NotSame(t, expected, actual)          // [V any] on *V — distinct pointers
 
 // Boolean
 gotest.True(t, condition)
@@ -1010,7 +1012,7 @@ gotest migrate ./...
 #   pkg/user/user_test.go: UserSuite → UserTestSuite
 ```
 
-Renames lifecycle methods, rewrites assertions, removes testify imports.
+Renames lifecycle methods, rewrites assertions, removes testify imports. Anything it cannot convert gets a `TODO(gotest-migrate)` marker and the run exits 1; `--dry-run` prints the diff without writing.
 
 ### Linter
 

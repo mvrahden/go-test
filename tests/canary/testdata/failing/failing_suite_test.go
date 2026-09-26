@@ -16,6 +16,8 @@ var errBoom = errors.New("boom")
 
 func (s *FailingTestSuite) TestEqual(t *gotest.T)         { gotest.Equal(t, 1, 2) }
 func (s *FailingTestSuite) TestNotEqual(t *gotest.T)      { gotest.NotEqual(t, 1, 1) }
+func (s *FailingTestSuite) TestSame(t *gotest.T)          { gotest.Same(t, new(int), new(int)) }
+func (s *FailingTestSuite) TestNotSame(t *gotest.T)       { p := new(int); gotest.NotSame(t, p, p) }
 func (s *FailingTestSuite) TestTrue(t *gotest.T)          { gotest.True(t, false) }
 func (s *FailingTestSuite) TestFalse(t *gotest.T)         { gotest.False(t, true) }
 func (s *FailingTestSuite) TestZero(t *gotest.T)          { gotest.Zero(t, 1) }

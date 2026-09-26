@@ -8,10 +8,10 @@ import (
 	"github.com/mvrahden/go-test/internal/proctree"
 )
 
-// GracefulShutdownDelay is the time a test process has to exit after it is
-// asked to shut down before it is forcibly killed. Must cover the longest
-// fixture teardown (FixtureConfig.Timeout up to 5 min for container fixtures,
-// SuiteConfig.SetupTimeout up to 5 min for AfterAll).
+// GracefulShutdownDelay is the grace a process gets to exit after it is asked
+// to shut down when no teardown budget file names one: the fallback for a
+// suite binary that wrote none, and the grace of the helper trees below. A
+// budget file can name any length; nothing else bounds a managed process.
 const GracefulShutdownDelay = 5*time.Minute + 30*time.Second
 
 // runTree runs cmd as the root of its own process tree. A canceled context

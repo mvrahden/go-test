@@ -114,3 +114,22 @@ func (s *SummaryBadgeTestSuite) TestRendersBadgeFromReportedProfile(t *gotest.T,
 		})
 	})
 }
+
+// An --output the summary cannot create is the command failing, not the
+// run: the exit code has to say so, as spec's does.
+func (s *SummaryBadgeTestSuite) TestUnwritableOutputExits2(t *gotest.T, ctx *badgeCtx) {
+	stream := filepath.Join(ctx.dir, "events.json")
+	gotest.NoError(t, os.WriteFile(stream, []byte(`{"Action":"run","Package":"example.com/pkg","Test":"TestOK"}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestOK"}
+{"Action":"pass","Package":"example.com/pkg"}
+`), 0o600))
+	blocker := filepath.Join(ctx.dir, "not-a-dir")
+	gotest.NoError(t, os.WriteFile(blocker, []byte("x"), 0o600))
+	out := filepath.Join(blocker, "summary.md")
+
+	code := main.ExportRunSummaryFromInput(stream, "md", out, "", true, false, false, "")
+
+	t.It("exits 2", func(it *gotest.T) {
+		gotest.Equal(it, 2, code)
+	})
+}

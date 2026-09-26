@@ -173,15 +173,26 @@ func (p *SharedFixtureProcess) teardownBudget() time.Duration {
 	return p.teardownTimeout
 }
 
-// WriteStateFileForKeys writes a state file containing only the specified keys.
-// Returns the path to the written file.
+// WriteSuiteStateFile writes the state file one suite process reads: the
+// keys the suite requires, under a name only that suite in that package has.
+// Two packages may declare a suite of the same name with different fixtures.
+func (p *SharedFixtureProcess) WriteSuiteStateFile(pkg, suite string, keys []string) (string, error) {
+	return p.WriteStateFileForKeys(sanitizePkgName(pkg)+"_"+suite, keys)
+}
+
+// WriteStateFileForKeys writes a state file containing exactly the specified
+// keys and returns its path. A key with no state is refused: the suite would
+// hydrate a zero value and fail somewhere far from the cause.
 func (p *SharedFixtureProcess) WriteStateFileForKeys(name string, keys []string) (string, error) {
 	p.mu.Lock()
 	subset := make(map[string]json.RawMessage, len(keys))
 	for _, k := range keys {
-		if v, ok := p.state[k]; ok {
-			subset[k] = v
+		v, ok := p.state[k]
+		if !ok {
+			p.mu.Unlock()
+			return "", fmt.Errorf("shared fixture %s has no state for %s: it was not started for this run", k, name)
 		}
+		subset[k] = v
 	}
 	p.mu.Unlock()
 
@@ -389,26 +400,37 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	cmd := exec.CommandContext(ctx, setupBin)
 	cmd.Stderr = os.Stderr
 
-	// WaitDelay is the backstop for a process that ignores the shutdown
-	// request, and it has to stay looser than any teardown budget. Tighten it
-	// below one and it becomes the budget: a fixture given minutes to stop its
-	// containers is killed part-way through instead, and because a signalled
-	// process reports no meaningful exit status, the run still says ok.
+	// The teardown budget the process reports is the only kill timer: exec's
+	// WaitDelay stays unset, since any bound set here would have to be chosen
+	// before the budget is known, and one below it becomes the budget — a
+	// fixture given minutes to stop its containers is killed part-way through,
+	// and because a signalled process reports no meaningful exit status, the
+	// run still says ok.
 	tree := proctree.New(cmd)
-	cmd.WaitDelay = GracefulShutdownDelay
 
-	stdout, err := cmd.StdoutPipe()
+	// The protocol pipe is the runner's own, not exec's StdoutPipe: exec closes
+	// that one as soon as Wait sees the exit, and Wait may not run before the
+	// scan has finished, so a child the fixture left on the pipe would hold
+	// the scan, and with it the teardown verdict, until it let go. Here the
+	// scan is bounded by the drain delay past the exit instead.
+	stdout, stdoutW, err := os.Pipe()
 	if err != nil {
 		return nil, err
 	}
+	cmd.Stdout = stdoutW
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
+		_ = stdout.Close()
+		_ = stdoutW.Close()
 		return nil, err
 	}
 
 	if err := tree.Start(); err != nil {
+		_ = stdout.Close()
+		_ = stdoutW.Close()
 		return nil, fmt.Errorf("start shared fixture process: %w", err)
 	}
+	_ = stdoutW.Close()
 
 	// Build per-fixture readiness channels.
 	ready := make(map[string]chan struct{}, len(fixtures))
@@ -434,12 +456,16 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		cmdResp:         make(chan string, 1),
 	}
 
+	scanned := make(chan struct{})
 	go func() {
-		defer func() {
-			proc.waitErr = cmd.Wait()
-			tree.Release()
-			close(waitDone)
-		}()
+		proc.waitErr = cmd.Wait()
+		tree.Release()
+		drainOutput(scanned, OutputDrainDelay, stdout)
+		close(waitDone)
+	}()
+
+	go func() {
+		defer close(scanned)
 		closedReady := make(map[string]bool, len(ready))
 		doneSeen := false
 		scanner := bufio.NewScanner(stdout)
@@ -489,7 +515,8 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		if doneSeen {
 			return
 		}
-		if err := scanner.Err(); err != nil {
+		// A read end closed by the drain is the end of the stream too.
+		if err := scanner.Err(); err != nil && !errors.Is(err, os.ErrClosed) {
 			proc.setupErr = fmt.Errorf("reading subprocess stdout: %w", err)
 		} else if proc.setupErr == nil {
 			proc.setupErr = fmt.Errorf("subprocess exited without _done sentinel")

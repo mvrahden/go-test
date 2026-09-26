@@ -1076,7 +1076,7 @@ guard:
    spot: `discover` and the generator both read `gotestast`, so a bug that
    broke both identically would make the census agree on the wrong set; the
    golden list would still disagree.
-4. **Drill** (`make drill`, `tests/drill`, nine mutants) turns the argument
+4. **Drill** (`make drill`, `tests/drill`, ten mutants) turns the argument
    into evidence. Each patch in `tests/drill/mutants/` plants one bug in a
    core component in a scratch copy of the tree; a `gotest` built from the
    unmodified tree then runs the copy's ring-0 packages and canary and must

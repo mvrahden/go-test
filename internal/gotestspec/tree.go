@@ -344,6 +344,10 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 
 	for _, pkg := range pkgs {
 		attachFuzzWrappers(pkg)
+		// Completion order is dispatch order, which parallel suite processes
+		// shuffle; by name, two runs of one package render alike. Stable, so
+		// a suite run twice (ptest and pxtest) keeps its first run first.
+		sort.SliceStable(pkg.Nodes, func(i, j int) bool { return pkg.Nodes[i].Name < pkg.Nodes[j].Name })
 		seen := map[string]int{}
 		for _, n := range pkg.Nodes {
 			classify(n, true)

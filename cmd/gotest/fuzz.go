@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/signal"
 	"sort"
 	"strconv"
 	"strings"
@@ -70,7 +69,7 @@ func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
-	loadFlags := gotestrunner.StripCoverBuildFlags(classified.BuildFlags)
+	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)
 	loaded, broken, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -128,7 +127,7 @@ func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		}
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
+	ctx, stop := shutdownContext()
 	defer stop()
 
 	if session.Deadline > 0 {

@@ -511,7 +511,7 @@ func checkMethods(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 					}},
 					"focused method %s.%s should not be committed", recvName, methodName)
 			}
-			if !hasValidTestSignature(fd) {
+			if !hasValidTestSignature(pass, fd) {
 				report(pass, TestSignature, fd.Pos(), "test method %s.%s has wrong signature — must accept *gotest.T (or *testing.T)", recvName, methodName)
 			}
 			return
@@ -1159,28 +1159,27 @@ func isTestingT(expr ast.Expr) bool {
 	return ident.Name == "testing" && sel.Sel.Name == "T"
 }
 
-func hasValidTestSignature(fd *ast.FuncDecl) bool {
+func hasValidTestSignature(pass *analysis.Pass, fd *ast.FuncDecl) bool {
 	params := fd.Type.Params
 	if params == nil || len(params.List) < 1 || len(params.List) > 2 {
 		return false
 	}
-	return isSupportedT(params.List[0].Type)
+	return isSupportedT(pass, params.List[0].Type)
 }
 
-func isSupportedT(expr ast.Expr) bool {
-	star, ok := expr.(*ast.StarExpr)
+// isSupportedT reports whether expr names *gotest.T or *testing.T, by the
+// type behind it: an aliased import spells the same type another way.
+func isSupportedT(pass *analysis.Pass, expr ast.Expr) bool {
+	ptr, ok := pass.TypesInfo.TypeOf(expr).(*types.Pointer)
 	if !ok {
 		return false
 	}
-	sel, ok := star.X.(*ast.SelectorExpr)
-	if !ok {
+	named, ok := ptr.Elem().(*types.Named)
+	if !ok || named.Obj().Name() != "T" || named.Obj().Pkg() == nil {
 		return false
 	}
-	ident, ok := sel.X.(*ast.Ident)
-	if !ok {
-		return false
-	}
-	return sel.Sel.Name == "T" && (ident.Name == "gotest" || ident.Name == "testing")
+	path := named.Obj().Pkg().Path()
+	return path == gotestImportPath || path == "testing"
 }
 
 func receiverTypeName(recv *ast.FieldList) string {

@@ -30,7 +30,7 @@ var ƒcfg_AppFixture gotest.FixtureConfig
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"AppTestSuite",
+	"TestAppTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -184,8 +184,8 @@ var ƒ_ServiceFixture *ServiceFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"MultiFixtureTestSuite",
-	"ServiceTestSuite",
+	"TestMultiFixtureTestSuite",
+	"TestServiceTestSuite",
 }
 var ƒ_pending atomic.Int32
 
@@ -614,7 +614,7 @@ var ƒ_GuardFixture *GuardFixture
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 var ƒ_fixtureTestNames = []string{
-	"GuardedFixtureBoundTestSuite",
+	"TestGuardedFixtureBoundTestSuite",
 }
 var ƒ_pending atomic.Int32
 
