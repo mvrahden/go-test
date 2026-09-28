@@ -9,9 +9,9 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// RunTestSuite covers the programmatic analysis driver behind `gotest lint
-// --github`, which needs findings as data instead of text on stderr.
-// Not parallel: Setenv(GOWORK) is incompatible with parallel subtests.
+// RunTestSuite covers the programmatic analysis driver behind `gotest lint`,
+// which needs findings as data instead of text on stderr.
+// Sequential: Setenv(GOWORK) is incompatible with parallel subtests.
 type RunTestSuite struct{}
 
 // writeProbeModule materializes a one-file module whose stdlib-style test
@@ -56,5 +56,40 @@ func (s *RunTestSuite) TestRun(t *gotest.T) {
 			gotest.NoError(it, err)
 			gotest.Empty(it, findings)
 		})
+	})
+}
+
+func (s *RunTestSuite) TestLoad(t *gotest.T) {
+	t.Setenv("GOWORK", "off")
+	dir := t.TempDir()
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.25\n"), 0o600))
+	for pkg, source := range map[string]string{
+		"dep":  "package dep\n\nfunc Value() int { return 1 }\n",
+		"root": "package root\n\nimport \"lintprobe/dep\"\n\nvar X = dep.Value()\n",
+	} {
+		gotest.NoError(t, os.Mkdir(filepath.Join(dir, pkg), 0o700))
+		gotest.NoError(t, os.WriteFile(filepath.Join(dir, pkg, pkg+".go"), []byte(source), 0o600))
+	}
+
+	t.It("type-checks the targets and leaves their dependencies unparsed", func(it *gotest.T) {
+		pkgs, err := lint.ExportLoad(dir, []string{"./root"})
+		gotest.NoError(it, err)
+		gotest.Len(it, pkgs, 1)
+		gotest.NotEmpty(it, pkgs[0].Syntax)
+		gotest.NotZero(it, pkgs[0].Imports["lintprobe/dep"])
+		gotest.Empty(it, pkgs[0].Imports["lintprobe/dep"].Syntax)
+	})
+
+	t.It("fails on every package that does not compile", func(it *gotest.T) {
+		broken := t.TempDir()
+		gotest.NoError(it, os.WriteFile(filepath.Join(broken, "go.mod"), []byte("module lintprobe\n\ngo 1.25\n"), 0o600))
+		for _, pkg := range []string{"one", "two"} {
+			gotest.NoError(it, os.Mkdir(filepath.Join(broken, pkg), 0o700))
+			gotest.NoError(it, os.WriteFile(filepath.Join(broken, pkg, "probe.go"), []byte("package "+pkg+"\n\nvar x int = \"nope\"\n"), 0o600))
+		}
+		_, err := lint.Run(broken, []string{"./..."})
+		gotest.ErrorContains(it, err, "cannot lint uncompilable packages")
+		gotest.ErrorContains(it, err, "lintprobe/one\n")
+		gotest.ErrorContains(it, err, "lintprobe/two\n")
 	})
 }

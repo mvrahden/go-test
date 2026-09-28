@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/mvrahden/go-test/internal/goversion"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/checker"
-	"golang.org/x/tools/go/packages"
 )
 
 // Finding is one lint diagnostic with a resolved position, for drivers that
@@ -27,25 +25,12 @@ type Finding struct {
 // current directory, matching the analysis driver's own resolution.
 //
 // Findings are deduplicated across test-variant package loads and sorted by
-// position. A load or analysis failure is an error, never an empty result —
-// the same success-is-proven contract PreflightLoad applies.
+// position. A load or analysis failure is an error, never an empty result:
+// nothing was proven about a package that was not analyzed.
 func Run(dir string, patterns []string) ([]Finding, error) {
-	cfg := &packages.Config{
-		Dir:   dir,
-		Mode:  packages.LoadAllSyntax | packages.NeedModule,
-		Tests: true,
-	}
-	pkgs, err := packages.Load(cfg, patterns...)
+	pkgs, err := load(dir, patterns)
 	if err != nil {
-		return nil, fmt.Errorf("load packages: %w", err)
-	}
-	if err := goversion.Check(pkgs); err != nil {
 		return nil, err
-	}
-	for _, p := range pkgs {
-		if len(p.Errors) > 0 {
-			return nil, fmt.Errorf("cannot lint uncompilable package %s: %v", p.PkgPath, p.Errors[0])
-		}
 	}
 
 	graph, err := checker.Analyze([]*analysis.Analyzer{Analyzer}, pkgs, nil)

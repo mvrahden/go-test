@@ -85,6 +85,7 @@ func ExportSpliceExpr(a corpusArg) string { return a.spliceExpr() }
 var (
 	ExportLintGitHubArmed = lintGitHubArmed
 	ExportRunLintGitHub   = runLintGitHub
+	ExportRunLintPlain    = runLintPlain
 )
 
 // ExportResetLintSkipFlag restores an analyzer skip flag after a test has

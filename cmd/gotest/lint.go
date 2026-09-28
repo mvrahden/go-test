@@ -27,17 +27,19 @@ func runLint(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
+	// Lint owns the analyzer's flags and runs it in-process, from one load.
+	// A driver flag (-fix, -json, -diff, …) goes to the go/analysis driver,
+	// which keeps its exact semantics but cannot emit annotations.
 	if github {
 		if code, ok := runLintGitHub(os.Stdout, os.Stderr, "", append(flagArgs, args...)); ok {
 			return code
 		}
-		// Driver flags this mode does not own (-fix, -json, …): fall through
-		// to the singlechecker, which keeps their exact semantics but cannot
-		// emit annotations.
+	} else if code, ok := runLintPlain(os.Stderr, "", append(flagArgs, args...)); ok {
+		return code
 	}
 
-	// The singlechecker driver skips uncompilable packages and still exits 0,
-	// so a broken tree lints "clean". Prove the targets compile first.
+	// The driver skips uncompilable packages and still exits 0, so a broken
+	// tree lints "clean". Prove the targets compile first.
 	if patterns := lint.PreflightPatterns(args); len(patterns) > 0 {
 		if err := lint.PreflightLoad("", patterns); err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
@@ -75,34 +77,17 @@ func stripFlag(args []string, name string) []string {
 // two ways: ::error workflow commands on stdout and a markdown table appended
 // to $GITHUB_STEP_SUMMARY. Findings deliberately stay off stderr — setup-go
 // registers a problem matcher for file:line:col text, and a stderr mirror
-// would surface every finding as a second, job-titled annotation. It owns
-// only the analyzer's own flags; ok=false means an unrecognized driver flag
-// was present and the caller must fall back to the singlechecker.
+// would surface every finding as a second, job-titled annotation. ok=false
+// means a driver flag was present and the caller must fall back to the
+// go/analysis driver.
 //
 // dir is the module directory to load from; "" means the current directory.
 // Annotation paths are relative to dir, which inside a workflow is the
 // repository root — exactly what GitHub resolves annotations against.
 func runLintGitHub(stdout, stderr io.Writer, dir string, args []string) (code int, ok bool) {
-	var patterns []string
-	for _, a := range args {
-		if !strings.HasPrefix(a, "-") {
-			patterns = append(patterns, a)
-			continue
-		}
-		name, value := splitBoolFlag(a)
-		if !lintAnalyzerFlag(name) {
-			return 0, false
-		}
-		if err := lint.Analyzer.Flags.Set(name, value); err != nil {
-			fmt.Fprintf(stderr, "FAIL: %s\n", err)
-			return 2, true
-		}
-	}
-
-	findings, err := lint.Run(dir, patterns)
-	if err != nil {
-		fmt.Fprintf(stderr, "FAIL: %v\n", err)
-		return 1, true
+	findings, code, ok := lintFindings(stderr, dir, args)
+	if !ok || code != 0 {
+		return code, ok
 	}
 
 	base := dir
@@ -128,6 +113,57 @@ func runLintGitHub(stdout, stderr io.Writer, dir string, args []string) (code in
 	}
 	appendLintStepSummary(annotations)
 	return 3, true
+}
+
+// runLintPlain runs the analyzer programmatically and prints the findings
+// on stderr, one "file:line:col: message" line each, the way the go/analysis
+// driver does. ok=false means a driver flag was present and the caller must
+// fall back to that driver.
+func runLintPlain(stderr io.Writer, dir string, args []string) (code int, ok bool) {
+	findings, code, ok := lintFindings(stderr, dir, args)
+	if !ok || code != 0 {
+		return code, ok
+	}
+	for _, f := range findings {
+		fmt.Fprintf(stderr, "%s:%d:%d: %s\n", f.File, f.Line, f.Col, f.Message)
+	}
+	if len(findings) == 0 {
+		return 0, true
+	}
+	return 3, true
+}
+
+// lintFindings applies the analyzer's own flags and runs it over the
+// patterns in args. A non-zero code is a failure already reported on stderr;
+// ok=false means args carry a flag that is not the analyzer's.
+func lintFindings(stderr io.Writer, dir string, args []string) (findings []lint.Finding, code int, ok bool) {
+	var patterns []string
+	for _, a := range args {
+		if !strings.HasPrefix(a, "-") {
+			patterns = append(patterns, a)
+			continue
+		}
+		if name, _ := splitBoolFlag(a); !lintAnalyzerFlag(name) {
+			return nil, 0, false
+		}
+	}
+	for _, a := range args {
+		if !strings.HasPrefix(a, "-") {
+			continue
+		}
+		name, value := splitBoolFlag(a)
+		if err := lint.Analyzer.Flags.Set(name, value); err != nil {
+			fmt.Fprintf(stderr, "FAIL: %s\n", err)
+			return nil, 2, true
+		}
+	}
+
+	findings, err := lint.Run(dir, patterns)
+	if err != nil {
+		fmt.Fprintf(stderr, "FAIL: %v\n", err)
+		return nil, 1, true
+	}
+	return findings, 0, true
 }
 
 // lintAnalyzerFlag reports whether name (without dashes) is one of the

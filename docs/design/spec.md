@@ -1426,7 +1426,8 @@ Suppression and configuration:
 - `.gotest.yml` → `lint.skip: [<rule>, ...]` disables non-integrity rules project-wide
 - `.gotest.yml` `lint.skip` naming an integrity rule is a hard error — integrity rules can only be suppressed per line; unknown rule IDs are also a hard error
 - Flags: `-fix` applies suggested fixes; `-skip-<rule>` for every non-integrity rule; `-disable-nolint`
-- Exit codes: `0` no findings; `1` uncompilable target packages (the preflight fails loudly — nothing was proven about them); `2` usage or configuration error; `3` findings reported
+- Exit codes: `0` no findings; `1` uncompilable target packages (every one is named — nothing was proven about them); `2` usage or configuration error; `3` findings reported
+- The targets are type-checked once, from source, and their dependencies are read from export data. A driver flag (`-fix`, `-diff`, `-json`, `-c`, …) hands the run to the `go/analysis` driver, which loads the targets itself after they are proven to compile
 
 GitHub annotations (subcommand only): `gotest lint --github` additionally emits one `::error file=…,line=…,col=…,title=<rule>::<message>` workflow command per finding on stdout and appends a findings table (rule, location, message) to `$GITHUB_STEP_SUMMARY` — the complete record when GitHub caps rendered annotations. Like `summary`, the mode is implied when `GITHUB_ACTIONS=true`, so an existing CI lint step gains PR annotations without workflow changes. Annotation paths are relative to the working directory (the repository root in a workflow). Plain-text findings, exit codes, `.gotest.yml` handling, and `//nolint` semantics are unchanged. Driver flags this mode does not own (`-fix`, `-json`, `-c`, …) defer to the `go/analysis` driver, which keeps their exact semantics but cannot emit annotations.
 
