@@ -823,7 +823,8 @@ signalled. On Windows, `Release` also kills what the root left running.
 │                                                                      │
 ├─ RunStreamJSON (-json flag) ─────────────────────────────────────────┤
 │                                                                      │
-│  Each suite wrapped with `go tool test2json -p <pkg> -t <binary>`    │
+│  Each suite wrapped with `test2json -p <pkg> -t <binary>`; the       │
+│  tool's path is resolved once per run (`go tool -n test2json`).      │
 │  JSON events streamed to stdout as each suite completes.             │
 │  No batching; order depends on completion time.                      │
 │                                                                      │
@@ -866,7 +867,7 @@ BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, exclusiveByP
 
 Each target becomes one `exec.Command`:
 ```
-go tool test2json -p <pkg> -t <binary> -test.run=^TestFooTestSuite$ [flags]
+<test2json> -p <pkg> -t <binary> -test.run=^TestFooTestSuite$ [flags]
 ```
 
 Or without test2json:

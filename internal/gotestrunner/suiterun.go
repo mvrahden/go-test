@@ -252,9 +252,8 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 	}
 
 	if test2json {
-		args := []string{"tool", "test2json", "-p", target.Package, "-t", target.BinaryPath}
-		args = append(args, testArgs...)
-		cmd := exec.CommandContext(ctx, "go", args...)
+		argv := test2jsonArgv(test2jsonPath(), target, testArgs)
+		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // G204: the Go toolchain's own converter
 		cmd.Env = env
 		if target.BudgetFile != "" {
 			cmd.Env = append(cmd.Env, protocol.EnvTeardownBudgetFile+"="+target.BudgetFile)
@@ -273,7 +272,7 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 }
 
 // RunSingleSuite executes a single suite subprocess.
-// When test2json is true, the binary is wrapped with `go tool test2json`.
+// When test2json is true, the binary is wrapped with the test2json tool.
 //
 // On context cancellation, cmd.Cancel sends SIGTERM to the process group.
 // A per-process kill timer (from the teardown budget file) then governs

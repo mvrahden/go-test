@@ -17,6 +17,9 @@ type ExportFixtureStateEntry = fixtureStateEntry
 
 var ExportCompileConcurrency = compileConcurrency
 var ExportBuildSuiteCmd = buildSuiteCmd
+var ExportTest2JSONPath = test2jsonPath
+var ExportResolveTest2JSON = resolveTest2JSON
+var ExportTest2JSONArgv = test2jsonArgv
 var ExportReadTeardownBudget = readTeardownBudget
 var ExportBookBuildFailures = bookBuildFailures
 var ExportBrokenPackageMessage = brokenPackageMessage

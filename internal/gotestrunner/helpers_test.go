@@ -47,9 +47,9 @@ func buildTest2JSONArgs(target gotestrunner.SuiteTarget) (path string, args []st
 	if target.CoverProfile != "" {
 		testArgs = append(testArgs, "-test.coverprofile="+target.CoverProfile)
 	}
-	args = []string{"tool", "test2json", "-p", target.Package, "-t", target.BinaryPath}
+	args = []string{"-p", target.Package, "-t", target.BinaryPath}
 	args = append(args, testArgs...)
-	return "go", args
+	return gotestrunner.ExportTest2JSONPath(), args
 }
 
 func capturePackageSummary(pkg string, failed bool, d time.Duration, verbose bool) string {
