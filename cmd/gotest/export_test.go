@@ -36,6 +36,7 @@ type (
 var (
 	ExportNewDiscoverOutput  = newDiscoverOutput
 	ExportBuildDiscoverSuite = buildDiscoverSuite
+	ExportDiscover           = discover
 )
 
 // flags.go

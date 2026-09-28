@@ -269,7 +269,8 @@ func BenchmarkFooTestSuite(b *testing.B) {
 A suite must be named `*TestSuite` for its `Benchmark*` methods to be
 collected at all — Pass 1 discovery matches on that suffix regardless of
 whether the struct has `Test*` methods. A bench-only struct without the
-suffix is invisible to the collector; its methods are silently dropped.
+suffix is invisible to the collector and its methods never run; `discover`
+warns about each one that takes `*gotest.B` or `*gotest.F`.
 `ValidateContextConsistency` (Pass 4) additionally rejects a suite that
 mixes `Benchmark*` methods with a returning `BeforeEach` (its context type
 can't thread through `*gotest.B`) or with any stdlib `*testing.T` lifecycle

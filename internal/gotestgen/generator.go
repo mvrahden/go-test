@@ -93,12 +93,12 @@ func CollectFromLoaded(loadResults []*LoadResult) (gotestast.TestSuiteSpecSet, e
 	c := collector{}
 	for _, lr := range loadResults {
 		ptestCollected := c.CollectSuiteSpecs(lr.Ptest)
-		if len(ptestCollected.Errs) > 0 {
-			return nil, ptestCollected.Errs[0].Err
+		if err := collectorError(lr.Ptest, ptestCollected.Errs); err != nil {
+			return nil, err
 		}
 		pxtestCollected := c.CollectSuiteSpecs(lr.Pxtest)
-		if len(pxtestCollected.Errs) > 0 {
-			return nil, pxtestCollected.Errs[0].Err
+		if err := collectorError(lr.Pxtest, pxtestCollected.Errs); err != nil {
+			return nil, err
 		}
 		allSuites = append(allSuites, ptestCollected.Suites...)
 		allSuites = append(allSuites, pxtestCollected.Suites...)
@@ -280,12 +280,12 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 	results, err := slices.MapErr(loadResults, func(lr *LoadResult, _ int) (*GenerateResult, error) {
 		c := collector{}
 		ptestCollected := c.CollectSuiteSpecs(lr.Ptest)
-		if len(ptestCollected.Errs) > 0 {
-			return nil, ptestCollected.Errs[0].Err
+		if err := collectorError(lr.Ptest, ptestCollected.Errs); err != nil {
+			return nil, err
 		}
 		pxtestCollected := c.CollectSuiteSpecs(lr.Pxtest)
-		if len(pxtestCollected.Errs) > 0 {
-			return nil, pxtestCollected.Errs[0].Err
+		if err := collectorError(lr.Pxtest, pxtestCollected.Errs); err != nil {
+			return nil, err
 		}
 
 		ptestSpec, err := c.ApplyTestSuiteSpecs(ptestCollected)
@@ -300,11 +300,11 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		fuzzParams := map[string][]string{}
 		ptestBuf, ptestFixtureDeps, ptestReqKeys, err := generateForPkg(lr.Ptest, lr.sources, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams)
 		if err != nil {
-			return nil, err
+			return nil, locate(lr.Ptest, err)
 		}
 		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, err := generateForPkg(lr.Pxtest, lr.sources, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams)
 		if err != nil {
-			return nil, err
+			return nil, locate(lr.Pxtest, err)
 		}
 
 		seen := map[string]bool{}

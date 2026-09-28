@@ -1233,6 +1233,12 @@ No tests are executed.
 ```
 
 File paths are basenames; positions are 1-based.
+`warnings` carries what a run would refuse and what it would pass over in silence, each with its position:
+
+- a package that fails to load (`"broken": true`) and a suite the generator refuses — an unsupported hook signature, a method out of step with the suite's context, a fuzz argument that cannot be fuzzed. A refused suite is left out of `suites`, except for a fuzz refusal, which keeps the suite listed;
+- a method that reads like part of the harness and never runs as one: a lifecycle hook that is misspelled or carries `X_` (what `lifecycle-typo` and `x-lifecycle` report, and a `//nolint` for the rule silences the warning as well), and a `Benchmark*`/`Fuzz*` method taking `*gotest.B`/`*gotest.F` on a type that is no test suite.
+
+A run names the same position in front of a generation error (`path/suite_test.go:13:24: …`), relative to the working directory.
 `methods[].parallel` is reserved and always `false` (parallelism is a suite-level property).
 Respects `-tags`.
 

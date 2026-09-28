@@ -99,10 +99,8 @@ func IsFFuzzCall(pkg *packages.Package, ce *ast.CallExpr) bool {
 }
 
 // CollectFuzzCalls finds the f.Fuzz call of every suite fuzz method and
-// returns them in (suite, method) order. A method that never calls f.Fuzz,
-// calls it more than once, or hands it something other than a
-// func(*gotest.T, ...) is an error naming the method — the engine would
-// only fail later, with no pointer at the source.
+// returns them in (suite, method) order, stopping at the first method
+// CollectFuzzCall refuses.
 func CollectFuzzCalls(pkg *packages.Package, suites TestSuiteSpecSet) ([]FuzzCall, error) {
 	if pkg == nil || pkg.TypesInfo == nil || len(suites) == 0 {
 		return nil, nil
@@ -111,38 +109,56 @@ func CollectFuzzCalls(pkg *packages.Package, suites TestSuiteSpecSet) ([]FuzzCal
 	var out []FuzzCall
 	for _, ts := range suites {
 		for _, fz := range ts.Fuzzers() {
-			decl, ok := fz.n.(*ast.FuncDecl)
-			if !ok || decl.Body == nil {
-				continue
-			}
-			method := ts.Identifier() + "." + fz.Identifier()
-			funcName := fmt.Sprintf("Fuzz%s_%s", ts.Identifier(), fz.Identifier())
-			var calls []*ast.CallExpr
-			ast.Inspect(decl.Body, func(n ast.Node) bool {
-				if ce, ok := n.(*ast.CallExpr); ok && IsFFuzzCall(pkg, ce) {
-					calls = append(calls, ce)
-				}
-				return true
-			})
-			switch len(calls) {
-			case 0:
-				return nil, fmt.Errorf("fuzz method %s never calls f.Fuzz", method)
-			case 1:
-			default:
-				return nil, fmt.Errorf("fuzz method %s calls f.Fuzz more than once — one target per method", method)
-			}
-			ce := calls[0]
-			if len(ce.Args) != 1 {
-				return nil, fmt.Errorf("fuzz method %s: f.Fuzz takes exactly one callback", method)
-			}
-			typs, err := fuzzCallbackTypes(pkg.TypesInfo.TypeOf(ce.Args[0]))
+			call, ok, err := CollectFuzzCall(pkg, ts, fz)
 			if err != nil {
-				return nil, fmt.Errorf("fuzz method %s: %w", method, err)
+				return nil, err
 			}
-			out = append(out, FuzzCall{FuncName: funcName, Types: typs, Pos: ce.Pos()})
+			if ok {
+				out = append(out, call)
+			}
 		}
 	}
 	return out, nil
+}
+
+// CollectFuzzCall finds the f.Fuzz call of one fuzz method. A method that
+// never calls f.Fuzz, calls it more than once, or hands it something other
+// than a func(*gotest.T, ...) is an error naming the method and carrying its
+// position — the engine would only fail later, with no pointer at the
+// source. ok is false for a method without a body.
+func CollectFuzzCall(pkg *packages.Package, ts *TestSuiteSpec, fz *TestSuiteMethod) (call FuzzCall, ok bool, err error) {
+	decl, isDecl := fz.n.(*ast.FuncDecl)
+	if !isDecl || decl.Body == nil {
+		return FuzzCall{}, false, nil
+	}
+	method := ts.Identifier() + "." + fz.Identifier()
+	var calls []*ast.CallExpr
+	ast.Inspect(decl.Body, func(n ast.Node) bool {
+		if ce, ok := n.(*ast.CallExpr); ok && IsFFuzzCall(pkg, ce) {
+			calls = append(calls, ce)
+		}
+		return true
+	})
+	switch len(calls) {
+	case 0:
+		return FuzzCall{}, false, At(fz.NamePos(), fmt.Errorf("fuzz method %s never calls f.Fuzz", method))
+	case 1:
+	default:
+		return FuzzCall{}, false, At(calls[1].Pos(), fmt.Errorf("fuzz method %s calls f.Fuzz more than once — one target per method", method))
+	}
+	ce := calls[0]
+	if len(ce.Args) != 1 {
+		return FuzzCall{}, false, At(ce.Pos(), fmt.Errorf("fuzz method %s: f.Fuzz takes exactly one callback", method))
+	}
+	typs, err := fuzzCallbackTypes(pkg.TypesInfo.TypeOf(ce.Args[0]))
+	if err != nil {
+		return FuzzCall{}, false, At(ce.Pos(), fmt.Errorf("fuzz method %s: %w", method, err))
+	}
+	return FuzzCall{
+		FuncName: fmt.Sprintf("Fuzz%s_%s", ts.Identifier(), fz.Identifier()),
+		Types:    typs,
+		Pos:      ce.Pos(),
+	}, true, nil
 }
 
 // fuzzCallbackTypes validates a callback type and returns its parameters
