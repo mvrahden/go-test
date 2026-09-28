@@ -47,6 +47,8 @@ var (
 	ExportWatchAllowed   = watchAllowed
 	ExportSummaryAllowed = summaryAllowed
 	ExportFuzzAllowed    = fuzzAllowed
+	ExportBenchAllowed   = benchAllowed
+	ExportMigrateAllowed = migrateAllowed
 )
 
 // focusguard.go

@@ -15,9 +15,9 @@ import (
 	"github.com/mvrahden/go-test/internal/protocol"
 )
 
-// OutputCollector is a unified, mode-aware output pipeline that replaces
-// PackageBatcher and the scattered JSON / formatting helpers. It is safe
-// for concurrent use from multiple goroutines.
+// OutputCollector is the mode-aware output pipeline every suite result and
+// every run-level failure flows through. It is safe for concurrent use from
+// multiple goroutines.
 type OutputCollector struct {
 	mu       sync.Mutex
 	mode     RunMode

@@ -35,7 +35,7 @@
              ▼                              │
  ┌─────────────────────────────────────────────────────────────┐
  │  4. EXECUTION                                               │
- │     Per-suite subprocesses, 2×GOMAXPROCS concurrency        │
+ │     Per-suite subprocesses, at most GOMAXPROCS at a time    │
  │     Suites needing shared fixtures block on resolveFixture- │
  │     Env(); others start immediately with base env           │
  └──────────────────────────┬──────────────────────────────────┘
@@ -515,7 +515,7 @@ The system has **four levels of parallelism**, each with distinct mechanisms:
 │  │  sf2.BeforeAll() ──┘        │                                    │
 │  └──────────────────────────────┘                                   │
 ├─────────────────────────────────────────────────────────────────────┤
-│ Level 3: Suite EXECUTION           semaphore: 2×GOMAXPROCS(0)      │
+│ Level 3: Suite EXECUTION     semaphore: min(suites, GOMAXPROCS)    │
 │                                                                     │
 │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐           │
 │  │suite │ │suite │ │suite │ │suite │ │suite │ │suite │  ← OS      │
@@ -557,10 +557,15 @@ concurrently running suites would corrupt. At the bulk→tail barrier the
 runner re-windows shared fixtures for the tail (see Per-Suite Fixture
 Readiness).
 
-The Level 1 and Level 3 semaphore defaults (`NumCPU`, `2×GOMAXPROCS`) apply
-to uninstrumented builds; under `-race`/`-msan`/`-asan` both halve, since
-instrumentation at least doubles the CPU cost per instruction stream. An
-explicit `--compile-parallel`/`--parallel` always wins. Two aids keep
+Level 3 is sized from a budget of concurrent test methods, `--parallel`,
+2×GOMAXPROCS by default: at most GOMAXPROCS suite processes run at a time,
+and each gets the budget divided by the process count as its
+`-test.parallel` (`ComputeConcurrency`). A user `-parallel=N` pins that
+in-process value instead; the process count is then 2×GOMAXPROCS, which
+makes it a different axis from `go test -p`. These defaults and Level 1's
+(`NumCPU`) apply to uninstrumented builds; under `-race`/`-msan`/`-asan`
+they halve, since instrumentation at least doubles the CPU cost per
+instruction stream. An explicit `--compile-parallel`/`--parallel` always wins. Two aids keep
 wall-clock verdicts diagnosable: builds running past 15s log a slow-build
 notice (a log line, never a verdict), and scheduling context (`schedinfo`)
 is appended to fixture-setup deadline failures — a starved build looks
@@ -606,7 +611,7 @@ build+instrument+run via `cmd/go`:
 RunFuzzTargets(ctx, targets, cfg)
   │
   jobs := resolveFuzzJobs(cfg.Jobs)        // default max(1, GOMAXPROCS/2)
-  budget := splitBudget(cfg.Total, len(targets))  // even split, 10s floor
+  budget := PlanFuzzSchedule(cfg.Total, len(targets), jobs)  // jobs-aware share, 10s floor
   │
   for each target (bounded by a jobs-sized semaphore):
     go test <overlay-flag> -run=^$ -fuzz=^<quoted Func>$ [-fuzztime=<budget>] <buildFlags> <pkg>
@@ -721,14 +726,18 @@ still run — never speculatively.
 │  └─ Deadline on each t.Run subtest body                                │
 │     Default: 30s                                                       │
 │                                                                        │
+│  -timeout (go test flag, per suite process)                            │
+│  └─ The test binary's own -test.timeout, which panics the process      │
+│     Default: 10m, injected when the run passes none                    │
+│                                                                        │
 │  Teardown Budget (per suite subprocess)                                │
 │  └─ Written to BudgetFile after fixture setup completes                │
 │     = max(fixture tree path timeout) + max(suite setup timeout) + 30s  │
 │     Used by RunSingleSuite on context cancellation before SIGKILL      │
 │                                                                        │
 │  GracefulShutdownDelay (hardcoded: 5m30s)                              │
-│  └─ Fallback when no budget file exists                                │
-│     Must cover longest possible fixture teardown                       │
+│  └─ Fallback when no budget file exists; a budget file can name any    │
+│     length, and nothing else bounds a managed process                  │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
 ```
@@ -754,7 +763,7 @@ still run — never speculatively.
             │ →tree    │  │ →tree    │  │ →tree    │
             │          │  │          │  │          │
             │ WaitDly: │  │ WaitDly: │  │ WaitDly: │
-            │ 0 (mgd)  │  │ 5m30s    │  │ 0 (mgd)  │
+            │ 0 (mgd)  │  │ 0 (mgd)  │  │ 0 (mgd)  │
             └──────────┘  └──────────┘  └──────────┘
                                              │
                                  On ctx.Done():
@@ -1068,10 +1077,13 @@ guard:
    of the assertion kernel never call it, so a kernel that always passes
    cannot pass them.
 3. **Canary** (`tests/canary`) catches a misreported verdict, and a
-   swallowed failure end to end. It builds the CLI, runs it over eight
-   fixture packages written to fail in specific ways (a green suite, one failing assertion per family, a halting
-   `FailNow`, `AfterEach` after a failure, lifecycle order, a benchmark
-   suite, an uncompilable package, a panicking method), and compares exit codes and the raw `-json`
+   swallowed failure end to end. It builds the CLI, runs it over the
+   fixture packages in its `testdata`, each written to pass or fail in one
+   specific way (a green suite, one failing assertion per family, a halting
+   `FailNow`, `AfterEach` after a failure, lifecycle order, async methods,
+   benchmarks, fuzz seeds, an uncompilable package, a panicking method,
+   fixtures torn down and shared fixtures failing to come up or to let go),
+   and compares exit codes and the raw `-json`
    verdicts with a checked-in golden list (`testdata/expected.txt`), checking
    with plain Go. The golden list is a third source of truth that shares no
    code with discovery or generation. That closes the census's one blind

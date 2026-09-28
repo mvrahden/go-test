@@ -249,6 +249,8 @@ func (s *MyTestSuite) TestRead(t *gotest.T) {}
 
 Methods can also accept `*testing.T` for stdlib compatibility.
 
+A method named `Test*Async` with a trailing `done func()` parameter completes when `done()` is called, not when it returns (`(t, done)`, or `(t, ctx, done)` with a returning `BeforeEach`); the suite's `Timeout` fails it if `done()` never is. Prefer `Eventually` for anything that can be polled.
+
 ### Lifecycle methods
 
 ```go

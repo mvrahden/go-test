@@ -716,7 +716,7 @@ func (f *InfraFixture) FixtureConfig() gotest.FixtureConfig {
 }
 ```
 
-A partial literal gets the default for every duration it omits: `SuiteConfig{Parallel: true}` runs with the 30s deadlines, but is held to no budget by verdict, like a suite without a marker. Before v1.31 an omitted duration meant no deadline.
+A partial literal gets the default for every duration it omits: `SuiteConfig{Parallel: true}` runs with the 30s deadlines, but is held to no budget by verdict, like a suite without a marker. Before v1.30 an omitted duration meant no deadline.
 
 #### Generated Behavior
 
@@ -1226,7 +1226,10 @@ No tests are executed.
                      "focused": bool, "excluded": bool, "parallel": bool,
                      "behaviors": [ { "name": …, "display": …, "kind": …, "line": …,
                                       "children": [ … ] } ],
-                     "behaviorsComplete": bool } ]
+                     "behaviorsComplete": bool } ],
+      "benchmarks": [ { "name": …, "file": …, "line": …, "col": …,
+                        "focused": bool, "excluded": bool, "parallel": bool } ],
+      "fuzzers": [ … as "benchmarks" … ]
     } ]
   } ],
   "warnings": [ { "importPath": …, "file": …, "line": …, "col": …, "message": … } ] }

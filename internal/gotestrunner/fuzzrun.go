@@ -175,8 +175,8 @@ func (r FuzzRunResult) CutShort() []string {
 
 // RunFuzzTargets runs each target as its own `go test -fuzz=...` subprocess,
 // with bounded concurrency (cfg.Jobs, default max(1, GOMAXPROCS/2)). The
-// --for budget (cfg.Total) is split evenly across all targets via
-// splitBudget. Stdout and stderr of every subprocess are streamed live,
+// --for budget (cfg.Total) is shared out by PlanFuzzSchedule, which knows
+// how many targets run at a time. Stdout and stderr of every subprocess are streamed live,
 // line by line, each line prefixed with "[<Func>] ", so long fuzz runs show
 // progress rather than going silent until they finish (unlike the buffered
 // RunSingleSuite path used elsewhere). The caller derives the session exit

@@ -271,8 +271,8 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 // filterDeltas returns deltas as-is when showAll (set by -v) is true;
 // otherwise it returns only the significant rows. Used to decide what to
 // display before converting to gotestspec.BenchDelta, since the gate check
-// (WorstRegression / worstRegressionKey) always needs the full, unfiltered
-// deltas regardless of what's shown.
+// (GateVerdict) always needs the full, unfiltered deltas regardless of
+// what's shown.
 func filterDeltas(deltas []gotestbench.Delta, showAll bool) []gotestbench.Delta {
 	if showAll {
 		return deltas
