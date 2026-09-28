@@ -299,7 +299,12 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		return cancel()
 	}
 	if err := mp.Start(); err != nil {
-		return SuiteResult{Target: target, ExitCode: 2, Duration: time.Since(start)}
+		return SuiteResult{
+			Target:   target,
+			Stderr:   fmt.Appendf(nil, "gotest: %s did not start: %v\n", target.SuiteName, err),
+			ExitCode: 2,
+			Duration: time.Since(start),
+		}
 	}
 
 	_ = mp.WaitWithGrace(ctx)

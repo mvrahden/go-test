@@ -35,6 +35,7 @@ var ExportCacheRoot = cacheRoot
 var ExportBinaryCacheKey = binaryCacheKey
 var ExportBinaryCacheDir = binaryCacheDir
 var ExportLockFile = lockFile
+var ExportCopyFile = copyFile
 var ExportFilterPackageLevelEvents = filterPackageLevelEvents
 var ExportIsPackageSummaryLine = protocol.IsPackageSummaryLine
 var ResolveBenchParallelismForTest = resolveMaxParallel

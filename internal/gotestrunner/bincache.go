@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"syscall"
 	"time"
 )
 
@@ -51,13 +52,18 @@ func binaryCacheDir(root string, buildFlags []string) string {
 	return dir
 }
 
-// copyFile writes src's bytes to dst as an executable, replacing dst.
+// copyFile writes src's bytes to dst as an executable, replacing dst. No
+// process is forked while dst is open: a child forked then would hold the
+// write handle until it execs, and the kernel refuses to execute a file
+// anyone holds open for writing ("text file busy").
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
+	syscall.ForkLock.RLock()
+	defer syscall.ForkLock.RUnlock()
 	_ = os.Remove(dst)
 	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o755)
 	if err != nil {

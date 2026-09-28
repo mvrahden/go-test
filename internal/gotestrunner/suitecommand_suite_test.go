@@ -21,6 +21,21 @@ func (s *SuiteCommandTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return cfg
 }
 
+func (s *SuiteCommandTestSuite) TestASuiteThatCannotStart(t *gotest.T) {
+	target := gotestrunner.SuiteTarget{
+		SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFooSuite"},
+		BinaryPath: filepath.Join(t.TempDir(), "gone.test"),
+	}
+	result := gotestrunner.RunSingleSuite(context.Background(), target, nil, false)
+
+	t.It("fails as a run that cannot be believed", func(it *gotest.T) {
+		gotest.Equal(it, 2, result.ExitCode)
+	})
+	t.It("says which suite and why", func(it *gotest.T) {
+		gotest.Regexp(it, `^gotest: TestFooSuite did not start: .*gone\.test`, string(result.Stderr))
+	})
+}
+
 func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 	t.When("plain mode", func(w *gotest.T) {
 		ctx := context.Background()
