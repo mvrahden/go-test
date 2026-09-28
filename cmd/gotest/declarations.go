@@ -42,12 +42,13 @@ func renderedBehaviorLabel(b *gotestast.Behavior) string {
 func declarationsForStream(events []gotestspec.TestEvent) gotestspec.DeclarationIndex {
 	seen := map[string]bool{}
 	var pkgs []string
-	for _, ev := range events {
-		if ev.Package == "" || seen[ev.Package] {
+	for i := range events {
+		pkg := events[i].Package
+		if pkg == "" || seen[pkg] {
 			continue
 		}
-		seen[ev.Package] = true
-		pkgs = append(pkgs, ev.Package)
+		seen[pkg] = true
+		pkgs = append(pkgs, pkg)
 	}
 	if len(pkgs) == 0 {
 		return nil

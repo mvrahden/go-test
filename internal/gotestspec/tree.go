@@ -210,8 +210,19 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 	nodes := map[string]map[string]*Node{}
 	// Track top-level test run counts per package to detect ptest/pxtest duplicates.
 	topRunCount := map[string]map[string]int{}
+	// Build diagnostics are keyed by build, not by package. They are routed
+	// once the stream is read, to every package that build failed.
+	buildOutput := map[string][]string{}
+	failedBuild := map[string]string{}
 
-	for _, ev := range events {
+	for i := range events {
+		ev := &events[i]
+		if ev.Action == ActionBuildOutput || ev.Action == ActionBuildFail {
+			if ev.Output != "" {
+				buildOutput[ev.ImportPath] = append(buildOutput[ev.ImportPath], ev.Output)
+			}
+			continue
+		}
 		pkg := pkgs[ev.Package]
 		if pkg == nil {
 			pkg = &Package{Path: ev.Package}
@@ -225,6 +236,9 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			case ActionPass, ActionFail:
 				pkg.Status = statusFrom(ev.Action)
 				pkg.Duration = elapsed(ev.Elapsed)
+				if ev.FailedBuild != "" {
+					failedBuild[ev.Package] = ev.FailedBuild
+				}
 			case ActionOutput:
 				if !protocol.IsPackageSummaryLine(ev.Output) {
 					pkg.Output = append(pkg.Output, ev.Output)
@@ -340,6 +354,10 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			node.Duration = elapsed(ev.Elapsed)
 			node.End = ev.Time
 		}
+	}
+
+	for path, build := range failedBuild {
+		pkgs[path].Output = append(slices.Clone(buildOutput[build]), pkgs[path].Output...)
 	}
 
 	for _, pkg := range pkgs {

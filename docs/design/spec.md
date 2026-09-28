@@ -1188,6 +1188,8 @@ gotest summary ./... --github                  # ::error annotations + $GITHUB_S
 go test -json ./... | gotest summary --input=- # post-process an existing JSON stream
 ```
 
+A replayed `go test -json` stream carries a failed build as `build-output` and `build-fail` events keyed by the build's `ImportPath`, which the failing package names in its verdict's `FailedBuild` (Go 1.24+). `spec` and `summary` route those diagnostics to every package the build failed, so a compile error replays with its cause.
+
 `--github` is auto-enabled when `GITHUB_ACTIONS=true`.
 The coverage table is statement-weighted with block deduplication (see Coverage Model).
 Formats: terminal (default), `md`, `json`.
