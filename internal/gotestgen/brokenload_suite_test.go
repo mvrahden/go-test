@@ -97,7 +97,7 @@ func (s *BrokenLoadTestSuite) TestBrokenVariantExcludesPackage(t *gotest.T) {
 
 func (s *BrokenLoadTestSuite) TestDiscoveryLoaderAgreesOnBroken(t *gotest.T) {
 	t.It("returns the same broken packages as the full loader", func(it *gotest.T) {
-		_, broken, err := gotestgen.LoadPackagesForDiscovery([]string{filepath.Join(brokenloadDir(t), "brokensyntax")}, nil)
+		_, broken, err := gotestgen.LoadPackages([]string{filepath.Join(brokenloadDir(t), "brokensyntax")}, nil)
 		gotest.NoError(it, err)
 		gotest.Len(it, broken, 1)
 		gotest.Equal(it, brokenloadPkgBase+"/brokensyntax", broken[0].PkgPath)

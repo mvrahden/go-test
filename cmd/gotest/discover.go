@@ -105,7 +105,7 @@ func runDiscover(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 
 	out := newDiscoverOutput()
 
-	loadResults, broken, err := gotestgen.LoadPackagesForDiscovery(patterns, buildFlags)
+	loadResults, broken, err := gotestgen.LoadPackages(patterns, buildFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

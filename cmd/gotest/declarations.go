@@ -52,7 +52,7 @@ func declarationsForStream(events []gotestspec.TestEvent) gotestspec.Declaration
 	if len(pkgs) == 0 {
 		return nil
 	}
-	loaded, _, err := gotestgen.LoadPackagesForDiscovery(pkgs, nil)
+	loaded, _, err := gotestgen.LoadPackages(pkgs, nil)
 	if err != nil {
 		return nil
 	}

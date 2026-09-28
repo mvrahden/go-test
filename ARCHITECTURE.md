@@ -59,13 +59,12 @@ Discovery is fully static -- AST-based, no reflection at runtime.
 ```
 cli.go:runTest() / discover.go:runDiscover()
   │
-  ├─ LoadPackages(patterns, buildFlags)        [exec path]
-  │    mode: NeedModule | NeedSyntax | NeedName | NeedTypes
-  │           | NeedTypesInfo | NeedImports | NeedDeps
-  │
-  └─ LoadPackagesForDiscovery(patterns, ...)   [discover path]
-       mode: same but NeedFiles instead of NeedDeps
-       (avoids type-checking the full transitive dep graph)
+  └─ LoadPackages(patterns, buildFlags)
+       mode: NeedModule | NeedSyntax | NeedName | NeedTypes
+              | NeedTypesInfo | NeedImports | NeedFiles
+       (matched packages from source, dependencies from export data;
+        a dependency that declares a fixture with Hydrate is loaded
+        again as a root, so its fields classify from source)
 ```
 
 `packages.Load()` with `Tests: true` returns both internal-test (`pkg_test.go`

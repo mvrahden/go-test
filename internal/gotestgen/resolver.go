@@ -86,6 +86,7 @@ type ResolveResult struct {
 
 type resolver struct {
 	targetPkg       *packages.Package
+	sources         *sourceLoader
 	localFixtures   []*gotestast.FixtureSpec
 	resolved        map[*types.Named]*ResolvedFixture
 	resolving       map[*types.Named]bool         // cycle detection
@@ -98,9 +99,14 @@ type resolver struct {
 // suites. It walks the type graph recursively to discover all required fixtures
 // (both package and shared), validates constraints, and builds the fixture tree.
 func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, localFixtures []*gotestast.FixtureSpec) (*ResolveResult, error) {
+	return resolve(targetPkg, nil, suites, localFixtures)
+}
+
+func resolve(targetPkg *packages.Package, sources *sourceLoader, suites []*gotestast.TestSuiteSpec, localFixtures []*gotestast.FixtureSpec) (*ResolveResult, error) {
 	result := &ResolveResult{}
 	r := &resolver{
 		targetPkg:       targetPkg,
+		sources:         sources,
 		localFixtures:   localFixtures,
 		resolved:        make(map[*types.Named]*ResolvedFixture),
 		resolving:       make(map[*types.Named]bool),
@@ -767,7 +773,10 @@ func (r *resolver) findPackageForType(named *types.Named) *packages.Package {
 	if targetPath == r.targetPkg.PkgPath {
 		return r.targetPkg
 	}
-	return findImportedPackage(r.targetPkg, targetPath, make(map[string]bool))
+	if pkg := findImportedPackage(r.targetPkg, targetPath, make(map[string]bool)); pkg != nil && len(pkg.Syntax) > 0 {
+		return pkg
+	}
+	return r.sources.load(targetPath)
 }
 
 func findImportedPackage(pkg *packages.Package, targetPath string, visited map[string]bool) *packages.Package {
