@@ -80,7 +80,6 @@ type PipelineConfig struct {
 	CI              bool
 	Parallel        int
 	CompileParallel int
-	Streaming       bool
 	OutputMode      RunMode
 	Bench           bool
 	BenchesByPkg    map[string][]string
@@ -95,6 +94,10 @@ type PipelineResult struct {
 	CapturedJSON []byte
 }
 
+// sharedFixturesPkg names the synthetic package a shared fixture failure is
+// booked under. The space keeps it out of the import-path namespace.
+const sharedFixturesPkg = "shared fixtures"
+
 // applyTeardownFailure surfaces a shared fixture teardown failure and makes a
 // run that would otherwise have passed fail instead. Resources the fixtures
 // hold outlive the test process, so leaving them behind must not report ok.
@@ -102,7 +105,17 @@ func applyTeardownFailure(c *OutputCollector, result *PipelineResult, err error)
 	if err == nil {
 		return
 	}
-	failRun(c, result, "shared fixtures", err.Error())
+	failRun(c, result, sharedFixturesPkg, err.Error())
+}
+
+// applySetupFailure fails a run whose shared fixtures did not come up. The
+// suites that read them never ran, so this is a failed run (1) and not a
+// command that broke (2), in every mode.
+func applySetupFailure(c *OutputCollector, result *PipelineResult, err error) {
+	if err == nil {
+		return
+	}
+	failRun(c, result, sharedFixturesPkg, err.Error())
 }
 
 // applyDeadlineFailure fails a run whose deadline expired before its last
@@ -227,10 +240,6 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 	}
 	pf := ParseExecFlags(cfg.GoTestArgs)
 
-	if cfg.Bench {
-		cfg.Streaming = false
-	}
-
 	// Only when seed corpora actually replay in this run: a stale entry is
 	// what would fail, and the engine's own error names the wrapper, not the
 	// field that moved.
@@ -238,10 +247,12 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 		ReportStaleFuzzCorpora(os.Stderr, overlay)
 	}
 
-	if cfg.Streaming {
-		return runStreaming(ctx, cfg, overlay, pf)
+	// A bench run compiles everything before it dispatches, so no build
+	// competes with a running benchmark. Every other run overlaps the two.
+	if cfg.Bench {
+		return runBatch(ctx, cfg, overlay, pf)
 	}
-	return runBatch(ctx, cfg, overlay, pf)
+	return runStreaming(ctx, cfg, overlay, pf)
 }
 
 func buildExtraEnv(cfg PipelineConfig, proc *SharedFixtureProcess) map[string]string { //nolint:gocritic // hugeParam: stable API
@@ -274,8 +285,8 @@ func buildBaseEnv(cfg PipelineConfig) []string { //nolint:gocritic // hugeParam:
 // planFixtureWindows), not the full overlay set: a fixture no scheduled suite
 // requires never starts. Per-package compile failures are package verdicts,
 // not run aborts: they are returned for booking and do not stop the fixtures
-// or the packages that did compile. Only a fixture setup failure is fatal —
-// without the fixtures no surviving suite can run.
+// or the packages that did compile. Only a fixture setup failure ends the
+// run — without the fixtures no surviving suite can run.
 func prepareTestRun(ctx context.Context, overlay *OverlayResult, fixtures []gotestgen.SharedFixtureInfo, buildFlags []string, setupTimeout time.Duration, compileParallel int) ([]CompileResult, []BuildFailure, *SharedFixtureProcess, context.CancelFunc, error) {
 	setupTimeout = resolveSetupTimeout(setupTimeout)
 	ctx, cancel := context.WithCancel(ctx)
@@ -298,6 +309,7 @@ func prepareTestRun(ctx context.Context, overlay *OverlayResult, fixtures []gote
 			defer wg.Done()
 			setupProc, setupErr = StartSharedFixtures(ctx, overlay.WorkDir, fixtures, setupTimeout)
 			if setupErr != nil {
+				setupErr = fmt.Errorf("shared fixture setup failed: %w", setupErr)
 				cancel()
 				return
 			}
@@ -317,7 +329,7 @@ func prepareTestRun(ctx context.Context, overlay *OverlayResult, fixtures []gote
 		}
 		// Scheduling context: fixture setup deadlines are wall-clock verdicts
 		// too, and a starved build looks exactly like a broken one.
-		return nil, nil, nil, nil, fmt.Errorf("shared fixture setup: %w %s", setupErr, schedinfo.Summary())
+		return nil, nil, nil, nil, fmt.Errorf("%w %s", setupErr, schedinfo.Summary())
 	}
 
 	return compiled, compileFailures, setupProc, cancel, nil
@@ -370,13 +382,20 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		win = planFixtureWindows(overlay, pf.UserRunFilter)
 	}
 	win.reportSkipped()
-	compiled, compileFailures, setupProc, cancelPrepare, err := prepareTestRun(ctx, overlay, win.Fixtures, pf.BuildFlags, cfg.SetupTimeout, cfg.CompileParallel)
-	if err != nil {
-		return PipelineResult{ExitCode: 2}, err
-	}
-	defer cancelPrepare()
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
+	compiled, compileFailures, setupProc, cancelPrepare, err := prepareTestRun(ctx, overlay, win.Fixtures, pf.BuildFlags, cfg.SetupTimeout, cfg.CompileParallel)
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			result = PipelineResult{ExitCode: exitCodeAfterDispatch(0, ctxErr)}
+			applyDeadlineFailure(collector, &result, cfg, ctxErr, nil)
+		} else {
+			applySetupFailure(collector, &result, err)
+		}
+		result.CapturedJSON = collector.CapturedJSON()
+		return result, nil
+	}
+	defer cancelPrepare()
 	// barrierErr collects window-boundary failures (early teardown, tail
 	// start); they merge with the terminal Teardown's verdict below. The
 	// snapshot is refreshed after the booking so the result carries it.
@@ -532,6 +551,11 @@ func runBatch(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	return result, nil
 }
 
+// neverRan is what a suite reports that was given up before it started.
+func neverRan(t SuiteTarget) string { //nolint:gocritic // hugeParam: stable API
+	return t.SuiteName + " never ran: a shared fixture it reads did not come up\n"
+}
+
 // exitCodeAfterDispatch folds the context error seen when the last verdict
 // landed into the suites' worst exit code: an interrupt is 130 whatever the
 // suites it cut short reported. A deadline keeps the verdict for
@@ -563,14 +587,22 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	}
 	var deferredExclusive []deferredTarget
 
+	streamCtx, streamCancel := context.WithCancel(ctx)
+	defer streamCancel()
+
 	fixtureStarted := make(chan struct{})
 	var setupProc *SharedFixtureProcess
 	var fixtureStartErr error
 	var fixtureWg sync.WaitGroup
 	var sharedSetupFailed atomic.Bool
-
-	streamCtx, streamCancel := context.WithCancel(ctx)
-	defer streamCancel()
+	// setupErr is written by the fixture goroutine and read after fixtureWg
+	// has drained.
+	var setupErr error
+	failSetup := func(err error) {
+		setupErr = err
+		sharedSetupFailed.Store(true)
+		streamCancel()
+	}
 
 	if len(win.Fixtures) > 0 {
 		fixtureWg.Add(1)
@@ -586,8 +618,12 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 			setupProc, err = StartSharedFixtures(ctx, overlay.WorkDir, win.Fixtures, resolvedSetupTimeout)
 			if err != nil {
 				fixtureStartErr = err
-				sharedSetupFailed.Store(true)
-				streamCancel()
+				if ctx.Err() == nil {
+					failSetup(fmt.Errorf("shared fixture setup failed: %w", err))
+				} else {
+					sharedSetupFailed.Store(true)
+					streamCancel()
+				}
 			}
 			close(fixtureStarted)
 			if err != nil {
@@ -602,15 +638,11 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 			select {
 			case <-setupProc.AllDone():
 				if err := setupProc.SetupErr(); err != nil {
-					fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup failed: %v\n", err)
-					sharedSetupFailed.Store(true)
-					streamCancel()
+					failSetup(fmt.Errorf("shared fixture setup failed: %w", err))
 				}
 			case <-streamCtx.Done():
 			case <-setupDeadline:
-				fmt.Fprintf(os.Stderr, "FAIL: shared fixture setup timed out after %v\n", resolvedSetupTimeout)
-				sharedSetupFailed.Store(true)
-				streamCancel()
+				failSetup(fmt.Errorf("shared fixture setup timed out after %v %s", resolvedSetupTimeout, schedinfo.Summary()))
 			}
 		}()
 	} else {
@@ -706,8 +738,15 @@ loop:
 			go func(t SuiteTarget, idx int) {
 				defer wg.Done()
 				recorded := false
+				// noFixtures is set where the suite is given up because a
+				// shared fixture it reads did not come up.
+				noFixtures := false
 				defer func() {
-					if !recorded {
+					switch {
+					case recorded:
+					case noFixtures:
+						collector.RecordGivenUp(t.Package, idx, neverRan(t))
+					default:
 						collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
 					}
 				}()
@@ -718,15 +757,18 @@ loop:
 					select {
 					case <-fixtureStarted:
 					case <-streamCtx.Done():
+						noFixtures = sharedSetupFailed.Load()
 						return
 					}
 					if fixtureStartErr != nil {
+						noFixtures = true
 						return
 					}
 
 					for _, key := range requiredKeys {
 						ch := setupProc.Ready(key)
 						if ch == nil {
+							noFixtures = true
 							return
 						}
 						select {
@@ -742,9 +784,11 @@ loop:
 								// This one never came up — the process
 								// crashed, most likely. Waiting on it would
 								// hang the run until the outer deadline.
+								noFixtures = true
 								return
 							}
 						case <-streamCtx.Done():
+							noFixtures = sharedSetupFailed.Load()
 							return
 						}
 					}
@@ -806,12 +850,17 @@ loop:
 	}) //nolint:gocritic // mirror of sortTargetIndices over a local pair type
 	for i := range deferredExclusive {
 		d := &deferredExclusive[i]
+		requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[d.t.Package][d.t.SuiteName]
 		if streamCtx.Err() != nil {
-			collector.RecordResult(d.t.Package, d.idx, SuiteResult{ExitCode: 1})
+			if len(requiredKeys) > 0 && sharedSetupFailed.Load() {
+				collector.RecordGivenUp(d.t.Package, d.idx, neverRan(d.t))
+			} else {
+				collector.RecordResult(d.t.Package, d.idx, SuiteResult{ExitCode: 1})
+			}
 			continue
 		}
 		env := baseEnv
-		if requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[d.t.Package][d.t.SuiteName]; len(requiredKeys) > 0 && setupProc != nil {
+		if len(requiredKeys) > 0 && setupProc != nil {
 			stateFile, err := setupProc.WriteSuiteStateFile(d.t.Package, d.t.SuiteName, requiredKeys)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "FAIL: %s %s: shared fixture state: %s\n", d.t.Package, d.t.SuiteName, err)
@@ -851,7 +900,7 @@ loop:
 	// build failure makes the run a failure regardless of target count.
 	if !anyTargets && len(overlay.NoSuitePackages) == 0 && !buildFailed {
 		// A run cut short while compiling reaches here too; it is not empty.
-		if cfg.OutputMode == RunBatchText && dispatchErr == nil {
+		if cfg.OutputMode == RunBatchText && dispatchErr == nil && !sharedSetupFailed.Load() {
 			fmt.Fprintln(os.Stderr, "no test suites to run")
 		}
 		result := PipelineResult{ExitCode: exitCodeAfterDispatch(0, dispatchErr)}
@@ -859,6 +908,7 @@ loop:
 			result.ExitCode = 1
 		}
 		applyDeadlineFailure(collector, &result, cfg, dispatchErr, nil)
+		applySetupFailure(collector, &result, setupErr)
 		applyTeardownFailure(collector, &result, teardownErr)
 		if result.ExitCode != 0 {
 			result.CapturedJSON = collector.CapturedJSON()
@@ -876,6 +926,7 @@ loop:
 	running := collector.bookDeadline(dispatchErr)
 	result := PipelineResult{ExitCode: exitCode}
 	applyDeadlineFailure(collector, &result, cfg, dispatchErr, running)
+	applySetupFailure(collector, &result, setupErr)
 	applyTeardownFailure(collector, &result, teardownErr)
 	result.CapturedJSON = collector.CapturedJSON()
 	return result, nil

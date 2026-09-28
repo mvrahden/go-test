@@ -384,16 +384,17 @@ Fixture setup does not run at package init.
 The first fixture-bound test triggers it (`gotestruntime.FixtureOnce`); a pending counter — seeded by `CountMatchingTests`, which honors `-run`/`-skip` filters — decrements as fixture-bound tests finish, and teardown fires when it reaches zero.
 Filtered-out tests therefore never pay fixture setup, and teardown runs after the *last matching* test, not the last declared one.
 
-### Streaming vs batch shared-fixture dispatch
+### Shared-fixture dispatch
 
-The default `gotest` run streams: each shared fixture's state is emitted as its `BeforeAll` completes, and suites are dispatched as soon as *their* transitive dependencies are ready, with per-suite state files.
-`watch`, `spec`, and `summary` run in batch mode: they wait for all shared fixtures and write one global state file.
+A run streams: each shared fixture's state is emitted as its `BeforeAll` completes, and suites are dispatched as soon as *their* transitive dependencies are ready, with per-suite state files.
+`spec`, `summary` and `watch` run the same way.
+A `bench` run waits for its first window of shared fixtures instead and writes one global state file: benchmarks dispatch one at a time, after every package is compiled.
 
 ### Failure semantics
 
 - A panic inside a fixture *setup* hook is recovered and converted to an error — it fails setup, it does not crash the process.
   Teardown-side panics are contained the same way: a panicking `AfterAll` is recovered and reported as `<fixture>.AfterAll panicked`, a panicking `Dehydrate` as `dehydrate panicked` — both become teardown failures, and teardown of the remaining fixtures continues.
-- Shared-fixture setup failure aborts the run: exit code 2 in batch modes (`watch`/`spec`/`summary`/`prepare`); in the default streaming run the affected suites are reported as failures (exit 1).
+- Shared-fixture setup failure ends the run with exit code 1, in every command that runs tests or benchmarks. The failure is booked into the event stream as the failed package `shared fixtures`, and a suite that was given up because of it reports `<suite> never ran: a shared fixture it reads did not come up`. `prepare` exits 2: bringing the fixtures up is all it does.
   In-test-process package-fixture setup failure is a `t.Fatalf` (exit 1).
 - Fixture teardown failure flips an otherwise passing run to a failure (`fixture teardown failed`).
 - Barrier-time failures — an early teardown or a tail-phase start — fail the run through the same aggregation as run-end teardown failures; the terminal teardown still runs and owns the remainder.

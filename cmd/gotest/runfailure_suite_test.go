@@ -21,7 +21,9 @@ type RunFailureStreamTestSuite struct {
 }
 
 func (s *RunFailureStreamTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.IntegrationSuiteConfig()
+	cfg := gotest.IntegrationSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *RunFailureStreamTestSuite) BeforeAll(t *gotest.T) {
@@ -63,4 +65,27 @@ func (s *RunFailureStreamTestSuite) TestSharedFixtureTeardownFailure(t *gotest.T
 	t.It("keeps the suite's own package verdict", func(it *gotest.T) {
 		gotest.Contains(it, verdicts, streamVerdict{Action: "pass", Package: "gotest.teardownfail"})
 	})
+}
+
+// A shared fixture that fails to come up fails the run the same way in every
+// mode that runs tests: exit 1, with the failure in what the mode writes.
+func (s *RunFailureStreamTestSuite) TestSharedFixtureSetupFailure(t *gotest.T) {
+	const pkg = "./tests/canary/testdata/setupfailing/"
+
+	for t, tc := range gotest.Each(t, []struct {
+		Desc string
+		args []string
+		want string
+	}{
+		{"the live stream", []string{"-json", pkg}, `"Action":"fail","Package":"shared fixtures"`},
+		{"spec", []string{"spec", "--no-color", pkg}, "shared fixture setup failed: one or more shared fixtures failed"},
+		{"spec as JSON", []string{"spec", "--format=json", pkg}, `"path":"shared fixtures"`},
+		{"summary", []string{"summary", "--no-color", pkg}, "shared fixture setup failed: one or more shared fixtures failed"},
+		{"a text run", []string{pkg}, "FAIL: shared fixture setup failed: one or more shared fixtures failed"},
+	}) {
+		out, code := s.cli.runExit(t, tc.args...)
+		gotest.Equal(t, 1, code, "output:\n%s", out)
+		gotest.Contains(t, out, tc.want)
+		gotest.NotContains(t, out, "no test suites to run")
+	}
 }

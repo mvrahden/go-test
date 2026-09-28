@@ -172,6 +172,18 @@ func (c *OutputCollector) RecordBuildFailure(pkg, msg string) {
 	c.RecordResult(pkg, 0, SuiteResult{Stderr: []byte(msg), ExitCode: 2})
 }
 
+// RecordGivenUp books a suite that never ran as failed and says why: on
+// stderr, and in JSON modes as output of its package, so the stream carries
+// the reason beside the verdict.
+func (c *OutputCollector) RecordGivenUp(pkg string, idx int, reason string) {
+	if c.mode != RunBatchText {
+		c.mu.Lock()
+		writeJSONLine(c.jsonWriter(), map[string]any{"Time": time.Now(), "Action": "output", "Package": pkg, "Output": reason})
+		c.mu.Unlock()
+	}
+	c.RecordResult(pkg, idx, SuiteResult{Stderr: []byte(reason), ExitCode: 1})
+}
+
 // Finalize emits trailing annotations after all suites have run.
 // For RunBatchText: drains remaining completed packages, writes [no test files]
 // annotations, and emits trailing FAIL. For JSON / captured modes: no-op.

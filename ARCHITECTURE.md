@@ -575,9 +575,10 @@ that flag changes two things:
   collapses to one suite subprocess at a time, `--parallel`/`-test.parallel`
   are ignored for scheduling. Running benchmarks concurrently would make
   their timing numbers meaningless.
-- `Streaming: false` — compilation and execution are not overlapped for
-  bench runs; `runBatch` compiles every package first, then runs. `go test -c`
-  never competes with a running benchmark for CPU.
+- `RunPipeline` takes `runBatch` instead of `runStreaming` — compilation and
+  execution are not overlapped for bench runs; every package is compiled
+  first, then the benchmarks run. `go test -c` never competes with a running
+  benchmark for CPU.
 
 Process-per-suite isolation (Level 3's existing design) is also a
 methodological benefit for benchmarks: GC pressure from one benchmark
@@ -634,8 +635,8 @@ itself: findings do.
 
 ### Streaming Execution (Compile-Execute Overlap)
 
-`RunPipeline` with `Streaming: true` is the primary execution path. It overlaps
-compilation with test execution:
+Every run but a bench run streams (`runStreaming`): the plain run, `-json`,
+`spec`, `summary` and `watch`. It overlaps compilation with test execution:
 
 ```
 time ─────────────────────────────────────────────────────────────────▶
@@ -953,7 +954,7 @@ t=0s    CLI starts
         ├─ GenerateOverlay → overlay.json
         ├─ signal.NotifyContext (SIGINT/SIGTERM → ctx cancel)
         │
-t=0.5s  RunPipeline begins (Streaming: true)
+t=0.5s  RunPipeline begins (runStreaming)
         ├─ Start goroutine: CompilePackagesStream → compileCh
         ├─ Start goroutine: StartSharedFixtures (if any)
         │
@@ -1175,8 +1176,8 @@ reported `harness.go:38` as the user's frame. The tracer now treats
 
 8. **Unified pipeline entry point**: `cmd/gotest` is a thin CLI shell that
    delegates to `internal/gotestrunner.RunPipeline`. The pipeline encapsulates
-   the compile -> fixture-setup -> execute -> teardown -> output flow and
-   supports both streaming (`Streaming: true`) and batch modes.
+   the compile -> fixture-setup -> execute -> teardown -> output flow; a
+   bench run takes the batch path, everything else streams.
 
 ## Glossary
 

@@ -140,7 +140,6 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		CI:              cfg.CI,
 		Parallel:        cfg.Parallel,
 		CompileParallel: cfg.CompileParallel,
-		Streaming:       false,
 		OutputMode:      mode,
 		Bench:           true,
 		BenchesByPkg:    overlay.BenchesByPkg,

@@ -113,7 +113,6 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		CI:              cfg.CI,
 		Parallel:        cfg.Parallel,
 		CompileParallel: cfg.CompileParallel,
-		Streaming:       false,
 		OutputMode:      gotestrunner.RunCaptureJSON,
 		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,

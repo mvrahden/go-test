@@ -108,11 +108,11 @@ func (p *SharedFixtureProcess) WaitAllReady(ctx context.Context, timeout time.Du
 		return fmt.Errorf("cancelled: %w", ctx.Err())
 	case <-deadline:
 		p.shutdown()
-		return fmt.Errorf("timed out after %v", timeout)
+		return fmt.Errorf("shared fixture setup timed out after %v", timeout)
 	}
 	if p.setupErr != nil {
 		p.shutdown()
-		return fmt.Errorf("shared fixture setup: %w", p.setupErr)
+		return fmt.Errorf("shared fixture setup failed: %w", p.setupErr)
 	}
 
 	p.mu.Lock()
