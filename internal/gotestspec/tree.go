@@ -214,6 +214,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 	// once the stream is read, to every package that build failed.
 	buildOutput := map[string][]string{}
 	failedBuild := map[string]string{}
+	benchScans := map[*Node]*benchScan{}
 
 	for i := range events {
 		ev := &events[i]
@@ -318,26 +319,12 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			node.Output = append(node.Output, ev.Output)
 			lastSegment := resolvedSegments[len(resolvedSegments)-1]
 			if isBenchmarkName(lastSegment) {
-				// test2json "output" events are not guaranteed line-aligned;
-				// under real subprocess pipe timing a bench result line can
-				// arrive split mid-token across two consecutive events. Scan
-				// the node's joined output (not just this single event) so a
-				// line only completed by a later event is still found. This
-				// mirrors the defense harvestPackageOutputSamples applies to
-				// the untagged package-output path (see baseline.go).
-				if iters, nsPerOp, bPerOp, allocsPerOp, ok := scanBenchOutput(node.Output); ok {
-					node.Iterations = iters
-					node.NsPerOp = nsPerOp
-					node.BytesPerOp = bPerOp
-					node.AllocsPerOp = allocsPerOp
-					// go test's own -json encoder never emits a "pass"
-					// event for a benchmark (see ActionBench doc comment);
-					// reaching a parsed ns/op line is the only success
-					// signal a real benchmark run ever produces.
-					if node.Status == StatusNone {
-						node.Status = StatusPass
-					}
+				scan := benchScans[node]
+				if scan == nil {
+					scan = &benchScan{}
+					benchScans[node] = scan
 				}
+				scan.read(node, ev.Output)
 			}
 		case ActionRun:
 			if node.Start.IsZero() {
@@ -356,6 +343,9 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 		}
 	}
 
+	for node, scan := range benchScans {
+		scan.end(node)
+	}
 	for path, build := range failedBuild {
 		pkgs[path].Output = append(slices.Clone(buildOutput[build]), pkgs[path].Output...)
 	}
@@ -502,18 +492,55 @@ func parseBenchOutput(line string) (iters int, nsPerOp float64, bPerOp, allocsPe
 	return iters, nsPerOp, bPerOp, allocsPerOp, true
 }
 
-// scanBenchOutput joins a node's accumulated output events back into a
-// single stream and re-splits it on "\n" before scanning for a bench result
-// line, so a line split mid-token across two output events (as test2json
-// may produce under real pipe timing) is still parsed correctly.
-func scanBenchOutput(output []string) (iters int, nsPerOp float64, bPerOp, allocsPerOp int64, ok bool) {
-	joined := strings.Join(output, "")
-	for _, line := range strings.Split(joined, "\n") {
-		if iters, nsPerOp, bPerOp, allocsPerOp, ok = parseBenchOutput(line); ok {
+// benchScan finds a benchmark's result line in output that arrives in
+// chunks. test2json's output events are not line-aligned: under real pipe
+// timing a result line can arrive split mid-token across two of them, so
+// only whole lines are read, and what follows the last newline waits for the
+// next chunk. Each chunk is read once.
+type benchScan struct {
+	partial string
+	found   bool
+}
+
+// read takes the next chunk of the node's output.
+func (b *benchScan) read(node *Node, chunk string) {
+	if b.found {
+		return
+	}
+	b.partial += chunk
+	for !b.found {
+		line, rest, whole := strings.Cut(b.partial, "\n")
+		if !whole {
 			return
 		}
+		b.partial = rest
+		b.parse(node, line)
 	}
-	return 0, 0, 0, 0, false
+}
+
+// end reads what the output left behind its last newline.
+func (b *benchScan) end(node *Node) {
+	if !b.found {
+		b.parse(node, b.partial)
+	}
+}
+
+func (b *benchScan) parse(node *Node, line string) {
+	iters, nsPerOp, bPerOp, allocsPerOp, ok := parseBenchOutput(line)
+	if !ok {
+		return
+	}
+	b.found = true
+	node.Iterations = iters
+	node.NsPerOp = nsPerOp
+	node.BytesPerOp = bPerOp
+	node.AllocsPerOp = allocsPerOp
+	// go test's own -json encoder never emits a "pass" event for a
+	// benchmark (see ActionBench doc comment); reaching a parsed ns/op line
+	// is the only success signal a real benchmark run ever produces.
+	if node.Status == StatusNone {
+		node.Status = StatusPass
+	}
 }
 
 func CollectStats(packages []*Package) Stats {
