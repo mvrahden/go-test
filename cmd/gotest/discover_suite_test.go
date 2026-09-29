@@ -164,8 +164,8 @@ func (s *DiscoverTestSuite) TestDiscover_WarnsAboutWhatNeverRuns(t *gotest.T) {
 			got = append(got, located{w.File, w.Line, w.Message})
 		}
 		gotest.Equal(it, []located{
-			{"suite_test.go", 7, "TypoTestSuite.BeforAll is not a lifecycle hook and never runs as one; did you mean BeforeAll?"},
-			{"suite_test.go", 9, "X_ prefix on lifecycle hook TypoTestSuite.X_AfterAll: the method is not a hook and never runs; remove the prefix or the method"},
+			{"suite_test.go", 7, "method BeforAll on suite TypoTestSuite is similar to lifecycle hook BeforeAll"},
+			{"suite_test.go", 9, "X_ prefix on lifecycle hook TypoTestSuite.X_AfterAll has no effect — remove the prefix or the method"},
 			{"suite_test.go", 18, "Helpers.BenchmarkLookup takes *gotest.B, but Helpers is not a test suite (its name must end in TestSuite): the benchmark never runs"},
 			{"suite_test.go", 20, "Helpers.FuzzParse takes *gotest.F, but Helpers is not a test suite (its name must end in TestSuite): the fuzz target never runs"},
 		}, got)

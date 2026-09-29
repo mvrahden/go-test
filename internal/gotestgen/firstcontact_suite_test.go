@@ -88,9 +88,9 @@ func (s *FirstContactTestSuite) TestWarnings(t *gotest.T) {
 
 	t.It("names every method that reads like harness and never runs", func(it *gotest.T) {
 		gotest.Equal(it, []warning{
-			{7, "lifecycle-typo", "TypoTestSuite.BeforAll is not a lifecycle hook and never runs as one; did you mean BeforeAll?"},
-			{9, "x-lifecycle", "X_ prefix on lifecycle hook TypoTestSuite.X_AfterAll: the method is not a hook and never runs; remove the prefix or the method"},
-			{12, "lifecycle-typo", "TypoTestSuite.AfterCall is not a lifecycle hook and never runs as one; did you mean AfterAll?"},
+			{7, "lifecycle-typo", "method BeforAll on suite TypoTestSuite is similar to lifecycle hook BeforeAll"},
+			{9, "x-lifecycle", "X_ prefix on lifecycle hook TypoTestSuite.X_AfterAll has no effect — remove the prefix or the method"},
+			{12, "lifecycle-typo", "method AfterCall on suite TypoTestSuite is similar to lifecycle hook AfterAll"},
 			{18, "", "Helpers.BenchmarkLookup takes *gotest.B, but Helpers is not a test suite (its name must end in TestSuite): the benchmark never runs"},
 			{20, "", "Helpers.FuzzParse takes *gotest.F, but Helpers is not a test suite (its name must end in TestSuite): the fuzz target never runs"},
 		}, got)

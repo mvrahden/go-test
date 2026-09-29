@@ -109,21 +109,25 @@ func hookWarning(recv, name string) (Warning, bool) {
 		if !strings.HasPrefix(name, protocol.PrefixExcluded) {
 			return Warning{}, false
 		}
-		return Warning{
-			Rule: RuleXLifecycle,
-			Msg:  fmt.Sprintf("X_ prefix on lifecycle hook %s.%s: the method is not a hook and never runs; remove the prefix or the method", recv, name),
-		}, true
+		return Warning{Rule: RuleXLifecycle, Msg: ExcludedHookMessage(recv, name)}, true
 	}
 	if strings.HasPrefix(stripped, "Test") {
 		return Warning{}, false
 	}
 	if hook, ok := MisspelledHook(stripped); ok {
-		return Warning{
-			Rule: RuleLifecycleTypo,
-			Msg:  fmt.Sprintf("%s.%s is not a lifecycle hook and never runs as one; did you mean %s?", recv, name, hook),
-		}, true
+		return Warning{Rule: RuleLifecycleTypo, Msg: MisspelledHookMessage(recv, name, hook)}, true
 	}
 	return Warning{}, false
+}
+
+// MisspelledHookMessage and ExcludedHookMessage word the two findings lint
+// and discover share, so one finding reads the same wherever it is reported.
+func MisspelledHookMessage(recv, name, hook string) string {
+	return fmt.Sprintf("method %s on suite %s is similar to lifecycle hook %s", name, recv, hook)
+}
+
+func ExcludedHookMessage(recv, name string) string {
+	return fmt.Sprintf("X_ prefix on lifecycle hook %s.%s has no effect — remove the prefix or the method", recv, name)
 }
 
 // receiverTypeName returns the name of the type a method is declared on,

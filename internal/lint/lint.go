@@ -530,13 +530,13 @@ func checkMethods(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 
 		if isLifecycleHook(stripped) {
 			if strings.HasPrefix(methodName, protocol.PrefixExcluded) {
-				report(pass, XLifecycle, fd.Pos(), "X_ prefix on lifecycle hook %s.%s has no effect — remove the prefix or the method", recvName, methodName)
+				report(pass, XLifecycle, fd.Pos(), "%s", gotestast.ExcludedHookMessage(recvName, methodName))
 			}
 			return
 		}
 
 		if hook, ok := gotestast.MisspelledHook(stripped); ok {
-			report(pass, LifecycleTypo, fd.Pos(), "method %s on suite %s is similar to lifecycle hook %s", methodName, recvName, hook)
+			report(pass, LifecycleTypo, fd.Pos(), "%s", gotestast.MisspelledHookMessage(recvName, methodName, hook))
 		}
 	})
 }
