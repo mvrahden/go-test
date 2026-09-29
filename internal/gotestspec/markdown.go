@@ -21,8 +21,11 @@ func RenderMarkdown(w io.Writer, packages []*Package, opts ...RenderOption) {
 		// as a run that lost its results, rather than as a specification.
 		fmt.Fprintf(w, "%s. Read from source; nothing was executed.\n", strings.Join(counts, ", "))
 	} else {
-		fmt.Fprintf(w, "%s: %d passed, %d failed, %d skipped.\n",
-			strings.Join(counts, ", "), stats.Passed, stats.Failed, stats.Skipped)
+		verdicts := fmt.Sprintf("%d passed, %d failed, %d skipped", stats.Passed, stats.Failed, stats.Skipped)
+		if stats.FailedPackages > 0 {
+			verdicts += ", " + countNoun(stats.FailedPackages, "failed package", "failed packages")
+		}
+		fmt.Fprintf(w, "%s: %s.\n", strings.Join(counts, ", "), verdicts)
 	}
 	fmt.Fprintln(w)
 
@@ -30,7 +33,21 @@ func RenderMarkdown(w io.Writer, packages []*Package, opts ...RenderOption) {
 		for _, node := range pkg.Nodes {
 			renderMarkdownNode(w, node, 2, cfg.withoutVerdicts)
 		}
+		// A build failure, a fixture that failed: no behavior carries it.
+		if !cfg.withoutVerdicts && PkgFailedOnItsOwn(pkg) {
+			fmt.Fprintf(w, "## %s — FAILED\n\n", pkg.Path)
+			markdownOutput(w, pkg.Output)
+		}
 	}
+}
+
+// markdownOutput renders what a failure wrote as a code block.
+func markdownOutput(w io.Writer, output []string) {
+	lines := filterOutput(output)
+	if len(lines) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "```\n%s\n```\n\n", strings.Join(lines, "\n"))
 }
 
 const incompleteNote = "this method declares further behaviors whose names or existence depend on runtime values"
@@ -84,10 +101,17 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 			label += " — FOCUSED"
 		}
 		if len(n.Children) == 0 {
-			if n.Status == StatusSkip || n.Excluded {
+			// A suite without behaviors has no table to carry its verdict.
+			switch {
+			case n.Status == StatusSkip || n.Excluded:
 				label += " — SKIPPED"
+			case n.Status == StatusFail && !bare:
+				label += " — FAILED"
 			}
 			fmt.Fprintf(w, "%s %s\n\n", heading, label)
+			if n.Status == StatusFail && !bare {
+				markdownOutput(w, n.Output)
+			}
 			return
 		}
 		fmt.Fprintf(w, "%s %s\n\n", heading, label)
