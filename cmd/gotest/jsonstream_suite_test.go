@@ -13,8 +13,7 @@ import (
 )
 
 // JSONStreamTestSuite pins the live -json stream to the event schema of
-// go test -json, which is what its consumers parse it as: gotestsum, CI
-// parsers, and go-junit-report's gojson parser for JUnit.
+// go test -json, which is what its consumers parse it as.
 //
 //nolint:lifecycle-pair // BeforeAll only wraps the shared binary, which its fixture removes
 type JSONStreamTestSuite struct {

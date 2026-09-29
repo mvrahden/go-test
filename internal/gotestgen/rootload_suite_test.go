@@ -16,6 +16,9 @@ func (s *RootLoadTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return cfg
 }
 
+// A shared fixture cannot live under internal/, so this suite reads the
+// repository's own: a suite bound to a fixture that another package declares
+// with Hydrate.
 const fixtureBoundPkg = "github.com/mvrahden/go-test/tests/sharedfixture/fixturebound"
 
 func (s *RootLoadTestSuite) TestRunPathLoad(t *gotest.T) {

@@ -1162,7 +1162,7 @@ All `go test` flags work unchanged: `-race`, `-cover`, `-count`, `-run`, `-json`
 
 A run exits `0` when everything passed, `1` on a failed test, a shared fixture that failed to set up or tear down, or an expired `--timeout`, `2` on a usage, generation or build error and on a green run in which a declared test never ran, and `130` when it was interrupted. `lint` and `fuzz` state their own codes in `gotest help lint` and `gotest help fuzz`.
 
-To feed a JUnit consumer, convert the event stream: `gotest -json ./... | go-junit-report -parser gojson`.
+To feed a JUnit consumer, run the tests through a converter that reads the events: `gotestsum --junitfile report.xml --raw-command -- go tool gotest -json ./...`. The report is red whenever the run is — a package that does not build or a shared fixture that fails included — and gotest's exit code passes through. A converter that parses the printed text instead of the events, such as `go-junit-report`, reports those failures as plain output or not at all.
 
 ## Naming Conventions
 

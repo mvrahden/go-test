@@ -158,8 +158,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 	t.When("test2json mode", func(w *gotest.T) {
 		ctx := context.Background()
 		env := []string{"PATH=/usr/bin", "HOME=/home/test"}
-		converter := gotestrunner.ExportTest2JSONPath()
-		gotest.NotEmpty(w, converter)
+		converter := toolchainTest2JSON(w)
 
 		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
 			Name     string
@@ -272,12 +271,8 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 	})
 
 	t.When("resolving the converter", func(w *gotest.T) {
-		w.It("names the test2json binary itself", func(it *gotest.T) {
-			path := gotestrunner.ExportTest2JSONPath()
-			gotest.Regexp(it, `test2json(\.exe)?$`, path)
-			info, err := os.Stat(path)
-			gotest.NoError(it, err)
-			gotest.False(it, info.IsDir())
+		w.It("names the binary the toolchain names", func(it *gotest.T) {
+			gotest.Equal(it, toolchainTest2JSON(it), gotestrunner.ExportTest2JSONPath())
 		})
 		w.It("takes the path go tool -n prints", func(it *gotest.T) {
 			bin := filepath.Join(it.TempDir(), "test2json")

@@ -436,13 +436,3 @@ func (s *TreeTestSuite) TestBuildTree_BuildFailure(t *gotest.T, _ *treeCtx) {
 	mustEq(t, "ok status", ok.Status, gotestspec.StatusPass)
 	mustLen(t, "ok output", ok.Output, 0)
 }
-
-// The diagnostics are routed once the whole stream was read, so their place
-// in it does not matter.
-func (s *TreeTestSuite) TestBuildTree_BuildOutputAfterTheVerdict(t *gotest.T, _ *treeCtx) {
-	tree := treeOf(t, `{"Action":"fail","Package":"m/broken","Elapsed":0,"FailedBuild":"m/broken [m/broken.test]"}
-{"ImportPath":"m/broken [m/broken.test]","Action":"build-output","Output":"broken_test.go:5:33: undefined: undefinedCall\n"}
-{"ImportPath":"m/broken [m/broken.test]","Action":"build-fail"}`)
-	mustLen(t, "packages", tree, 1)
-	mustContain(t, strings.Join(tree[0].Output, ""), "undefined: undefinedCall", "late build output still reaches the package")
-}

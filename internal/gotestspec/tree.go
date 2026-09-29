@@ -210,8 +210,8 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 	nodes := map[string]map[string]*Node{}
 	// Track top-level test run counts per package to detect ptest/pxtest duplicates.
 	topRunCount := map[string]map[string]int{}
-	// Build diagnostics are keyed by build, not by package. They are routed
-	// once the stream is read, to every package that build failed.
+	// Build diagnostics are keyed by build, not by package: they go to every
+	// package that build failed.
 	buildOutput := map[string][]string{}
 	failedBuild := map[string]string{}
 	benchScans := map[*Node]*benchScan{}

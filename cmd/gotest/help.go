@@ -506,7 +506,7 @@ Examples:
 }
 
 func printDiscoverHelp() {
-	fmt.Print(`gotest discover — discover test suites and output JSON metadata
+	fmt.Printf(`gotest discover — discover test suites and output JSON metadata
 
 Usage:
   gotest discover [-tags=<tags>] [packages...]
@@ -517,7 +517,7 @@ test explorer integration.
 
 Output schema:
   {
-    "version": "v1.31.0",
+    "version": %q,
     "packages": [{
       "importPath": "example.com/pkg",
       "dir":        "/absolute/path",
@@ -575,7 +575,7 @@ Examples:
   gotest discover ./...                      All packages
   gotest discover ./pkg/auth/...             Single package tree
   gotest discover -tags=integration ./...    With build tags
-`)
+`, about.ResolvedVersion())
 }
 
 func printScaffoldHelp() {
