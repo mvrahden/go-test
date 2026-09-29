@@ -590,7 +590,7 @@ Subprocess (compiled binary):
 CLI (gotest):
   read JSON from subprocess stdout
   write state files in the work dir — per-suite shared/<Suite>.json in the
-  default streaming run; one global shared/state.json in batch modes
+  test run; one global shared/state.json in a bench run
   set GOTEST_SHARED_STATE_FILE env var for test process
 
 Test process:

@@ -38,7 +38,7 @@ var ExportLockFile = lockFile
 var ExportCopyFile = copyFile
 var ExportFilterPackageLevelEvents = filterPackageLevelEvents
 var ExportIsPackageSummaryLine = protocol.IsPackageSummaryLine
-var ResolveBenchParallelismForTest = resolveMaxParallel
+var ExportComputeDispatchConcurrency = computeDispatchConcurrency
 
 // ExportKillTree and ExportProcessDone let the teardown tests act on the shared
 // fixture subprocess directly: kill it outright, and see when it is reaped.

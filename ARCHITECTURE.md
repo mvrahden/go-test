@@ -576,11 +576,11 @@ exactly like a broken one.
 `gotest bench` runs the same pipeline with `PipelineConfig.Bench: true`, and
 that flag changes two things:
 
-- `resolveMaxParallel` short-circuits to `maxParallel = 1` — Level 3 above
-  collapses to one suite subprocess at a time, `--parallel`/`-test.parallel`
-  are ignored for scheduling. Running benchmarks concurrently would make
-  their timing numbers meaningless.
-- `RunPipeline` takes `runBatch` instead of `runStreaming` — compilation and
+- `RunBenchSuites` dispatches one suite subprocess at a time — Level 3 above
+  collapses, `--parallel`/`-test.parallel` are ignored for scheduling.
+  Running benchmarks concurrently would make their timing numbers
+  meaningless.
+- `RunPipeline` takes `runBench` instead of `runStreaming` — compilation and
   execution are not overlapped for bench runs; every package is compiled
   first, then the benchmarks run. `go test -c` never competes with a running
   benchmark for CPU.
@@ -921,8 +921,7 @@ bench target as:
 
 `-test.run=^$` disables ordinary tests for the run; `-test.benchmem` is
 appended unless already present in the forwarded flags.
-`resolveMaxParallel` returns `1` whenever `PipelineConfig.Bench` is set, so
-`RunSuites` dispatches these targets one at a time regardless of
+`RunBenchSuites` dispatches these targets one at a time regardless of
 `--parallel`.
 
 ### Fuzz seed replay: run-filter alternation
@@ -1189,7 +1188,7 @@ reported `harness.go:38` as the user's frame. The tracer now treats
 8. **Unified pipeline entry point**: `cmd/gotest` is a thin CLI shell that
    delegates to `internal/gotestrunner.RunPipeline`. The pipeline encapsulates
    the compile -> fixture-setup -> execute -> teardown -> output flow; a
-   bench run takes the batch path, everything else streams.
+   bench run compiles before it dispatches, everything else streams.
 
 ## Glossary
 

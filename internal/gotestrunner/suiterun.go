@@ -7,11 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
-	"runtime"
 	"slices"
 	"sort"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -52,7 +50,7 @@ type SuiteResult struct {
 	CutShort bool
 }
 
-// RunMode controls how RunSuites executes and collects output.
+// RunMode controls how a run executes its suites and collects their output.
 type RunMode int
 
 const (
@@ -69,80 +67,6 @@ const (
 	// events into a buffer (nothing written to stdout).
 	RunCaptureJSON
 )
-
-// RunSuites executes each suite target in its own subprocess with bounded
-// concurrency. Results are recorded via the collector, which handles
-// mode-specific output formatting, JSON event filtering, and package ordering.
-// barrier, when non-nil, runs at the bulk→tail boundary — after every
-// parallel suite has drained, before the first exclusive suite dispatches —
-// so the caller can re-window shared fixtures.
-func RunSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, maxParallel int, collector *OutputCollector, barrier func()) {
-	if maxParallel <= 0 {
-		maxParallel = 2 * runtime.GOMAXPROCS(0)
-	}
-
-	pkgCount := map[string]int{}
-	var pkgOrder []string
-	localIdx := make([]int, len(targets))
-	for i := range targets {
-		if _, seen := pkgCount[targets[i].Package]; !seen {
-			pkgOrder = append(pkgOrder, targets[i].Package)
-		}
-		localIdx[i] = pkgCount[targets[i].Package]
-		pkgCount[targets[i].Package]++
-	}
-	for _, pkg := range pkgOrder {
-		collector.Register(pkg, pkgCount[pkg])
-	}
-
-	useTest2JSON := collector.UsesTest2JSON()
-
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, maxParallel)
-
-	env := os.Environ()
-	for k, v := range extraEnv {
-		env = append(env, k+"="+v)
-	}
-
-	var exclusiveIdx []int
-	for i, target := range targets { //nolint:gocritic // rangeValCopy: intentional
-		if target.Exclusive {
-			exclusiveIdx = append(exclusiveIdx, i)
-			continue
-		}
-		wg.Add(1)
-		go func(idx int, t SuiteTarget) {
-			defer wg.Done()
-			select {
-			case sem <- struct{}{}:
-			case <-ctx.Done():
-				return
-			}
-			defer func() { <-sem }()
-			r := RunSingleSuite(ctx, t, env, useTest2JSON)
-			collector.RecordResult(t.Package, localIdx[idx], r)
-		}(i, target)
-	}
-	wg.Wait()
-
-	if barrier != nil {
-		barrier()
-	}
-
-	// Exclusive suites own the machine: strictly after the parallel bulk,
-	// one at a time, in deterministic order. Their verdicts measure
-	// wall-clock behavior — timing budgets, contended resources — that
-	// concurrently running suites would corrupt.
-	sortTargetIndices(targets, exclusiveIdx)
-	for _, i := range exclusiveIdx {
-		if ctx.Err() != nil {
-			return
-		}
-		r := RunSingleSuite(ctx, targets[i], env, useTest2JSON)
-		collector.RecordResult(targets[i].Package, localIdx[i], r)
-	}
-}
 
 // SortTargetsSerial orders targets in place by (Package, SuiteName) — the
 // deterministic dispatch order RunBenchSuites executes them in.
@@ -378,7 +302,7 @@ func WritePackageSummary(pkg string, failed bool, d time.Duration, verbose bool)
 //
 // exclusiveByPkg (import path → suite struct name → true) marks suites with
 // SuiteConfig{Exclusive: true}; their targets carry Exclusive and are
-// dispatched strictly alone, after every non-exclusive suite (see RunSuites).
+// dispatched strictly alone, after every non-exclusive suite.
 func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, fuzzFuncsByPkg map[string]map[string][]string, exclusiveByPkg map[string]map[string]bool, runFlags []string, userRunFilter string) []SuiteTarget {
 	binByPkg := make(map[string]string, len(compiled))
 	for _, cr := range compiled {

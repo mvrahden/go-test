@@ -114,7 +114,7 @@ func (s *OutputCollectorTestSuite) TestOutputCollector(t *gotest.T) {
 			})
 			gotest.True(it, c.AnyFailed())
 			gotest.Equal(it, 2, c.WorstExitCode(),
-				"a compile failure is exit 2, matching batch mode")
+				"a compile failure is exit 2")
 			gotest.Contains(it, stdout.String()+stderr.String(), "compile example.com/broken",
 				"the failed package must be visible in the stream, not only on raw stderr")
 		})
