@@ -254,9 +254,9 @@ func (s *CanaryTestSuite) TestATeardownFailureReachesTheStream(t *gotest.T) {
 	s.check(t, "teardownfailing")
 }
 
-// A shared fixture that fails to come up fails the run before the suites that
-// read it report; the -json stream must carry that failure, not only the exit
-// code.
+// A shared fixture that fails to come up fails the suite that reads it and
+// the run; a suite that reads none runs and reports. The -json stream must
+// carry all three, not only the exit code.
 func (s *CanaryTestSuite) TestASetupFailureReachesTheStream(t *gotest.T) {
 	s.check(t, "setupfailing")
 }

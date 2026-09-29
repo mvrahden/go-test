@@ -296,7 +296,7 @@ func (s *SharedFixtureTeardownTestSuite) TestDeclaredBudgetIsATeardownVerdict(t 
 			// DeriveFixtureConfig in the subprocess, the budget on
 			// RunFixtureTeardown, the teardown-failed exit status, and the
 			// runner's report of it.
-			gotest.ErrorContains(it, err, "teardown failed; see AfterAll errors above",
+			gotest.ErrorContains(it, err, "teardown failed",
 				"a declared Timeout must be a verdict on teardown, not just a context it may ignore")
 		})
 	})

@@ -97,6 +97,11 @@ teardownfailing pass TestTeardownFailingTestSuite
 teardownfailing pass TestTeardownFailingTestSuite/TestFixtureIsUp
 setupfailing exit 1
 setupfailing fail -
+setupfailing fail TestSetupFailingTestSuite
+setupfailing pass TestAloneTestSuite
+setupfailing pass TestAloneTestSuite/TestFixtureIsUp
+setupfailing pass TestIndependentTestSuite
+setupfailing pass TestIndependentTestSuite/TestRuns
 fixturechain exit 0
 fixturechain pass -
 fixturechain pass TestChainTestSuite

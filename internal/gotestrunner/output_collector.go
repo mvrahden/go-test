@@ -173,15 +173,19 @@ func (c *OutputCollector) RecordBuildFailure(pkg, msg string) {
 }
 
 // RecordGivenUp books a suite that never ran as failed and says why: on
-// stderr, and in JSON modes as output of its package, so the stream carries
-// the reason beside the verdict.
-func (c *OutputCollector) RecordGivenUp(pkg string, idx int, reason string) {
+// stderr, and in JSON modes as a test that failed with the reason as its
+// output, so every renderer shows the suite beside its cause.
+func (c *OutputCollector) RecordGivenUp(pkg string, idx int, suite, reason string) {
 	if c.mode != RunBatchText {
 		c.mu.Lock()
-		writeJSONLine(c.jsonWriter(), map[string]any{"Time": time.Now(), "Action": "output", "Package": pkg, "Output": reason})
+		w := c.jsonWriter()
+		now := time.Now()
+		writeJSONLine(w, map[string]any{"Time": now, "Action": "run", "Package": pkg, "Test": suite})
+		writeJSONLine(w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Test": suite, "Output": "    " + reason + "\n"})
+		writeJSONLine(w, map[string]any{"Time": now, "Action": "fail", "Package": pkg, "Test": suite, "Elapsed": 0})
 		c.mu.Unlock()
 	}
-	c.RecordResult(pkg, idx, SuiteResult{Stderr: []byte(reason), ExitCode: 1})
+	c.RecordResult(pkg, idx, SuiteResult{Stderr: []byte(reason + "\n"), ExitCode: 1})
 }
 
 // Finalize emits trailing annotations after all suites have run.
@@ -327,13 +331,13 @@ func (c *OutputCollector) jsonWriter() io.Writer {
 // bookRunFailure books a failure that happened outside any test binary as a
 // failed synthetic package, on whichever writer this mode's stream goes to.
 // Text mode has no stream; the caller's stderr line is all it gets.
-func (c *OutputCollector) bookRunFailure(pkg, msg string) {
+func (c *OutputCollector) bookRunFailure(pkg, msg string, details ...string) {
 	if c.mode == RunBatchText {
 		return
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	_, _ = c.jsonTarget().Write(runFailureEvents(pkg, msg))
+	_, _ = c.jsonTarget().Write(runFailureEvents(pkg, msg, details...))
 }
 
 func (c *OutputCollector) jsonTarget() io.Writer {

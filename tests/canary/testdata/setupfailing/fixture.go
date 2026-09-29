@@ -16,3 +16,16 @@ func (f *DownSharedFixture) BeforeAll(ctx context.Context) error {
 }
 
 func (f *DownSharedFixture) AfterAll(ctx context.Context) error { return nil }
+
+// UpSharedFixture comes up. Only the exclusive suite reads it, so it starts
+// once the other suites are done, after DownSharedFixture has failed.
+type UpSharedFixture struct {
+	State string
+}
+
+func (f *UpSharedFixture) BeforeAll(ctx context.Context) error {
+	f.State = "up"
+	return nil
+}
+
+func (f *UpSharedFixture) AfterAll(ctx context.Context) error { return nil }

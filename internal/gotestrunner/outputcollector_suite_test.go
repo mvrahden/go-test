@@ -120,8 +120,39 @@ func (s *OutputCollectorTestSuite) TestOutputCollector(t *gotest.T) {
 		})
 	})
 
+	t.When("a suite is given up before it starts", func(w *gotest.T) {
+		const reason = "TestFooSuite never ran: shared fixture DBSharedFixture did not come up"
+
+		w.It("is a failed suite in the stream, with the reason as its output", func(it *gotest.T) {
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunCaptureJSON, false, gotestrunner.WithWriters(&bytes.Buffer{}, &bytes.Buffer{}))
+			c.Register("example.com/pkg", 1)
+			c.RecordGivenUp("example.com/pkg", 0, "TestFooSuite", reason)
+
+			gotest.Equal(it, 1, c.WorstExitCode())
+			events, err := gotestspec.ParseEvents(bytes.NewReader(c.CapturedJSON()))
+			gotest.NoError(it, err)
+			tree := gotestspec.BuildTree(events)
+			gotest.Len(it, tree, 1)
+			gotest.Equal(it, gotestspec.StatusFail, tree[0].Status)
+			gotest.Len(it, tree[0].Nodes, 1)
+			gotest.Equal(it, "TestFooSuite", tree[0].Nodes[0].Name)
+			gotest.Equal(it, gotestspec.StatusFail, tree[0].Nodes[0].Status)
+			gotest.Contains(it, strings.Join(tree[0].Nodes[0].Output, ""), reason)
+		})
+
+		w.It("is a failed package with the reason on stderr in a text run", func(it *gotest.T) {
+			var stdout, stderr bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &stderr))
+			c.Register("example.com/pkg", 1)
+			c.RecordGivenUp("example.com/pkg", 0, "TestFooSuite", reason)
+
+			gotest.Contains(it, stderr.String(), reason)
+			gotest.Contains(it, stdout.String(), "FAIL\texample.com/pkg")
+		})
+	})
+
 	t.When("a shared teardown failure lands after the stream ended", func(w *gotest.T) {
-		teardownErr := fmt.Errorf("shared fixture teardown failed; see AfterAll errors above")
+		teardownErr := fmt.Errorf("shared fixture teardown failed")
 
 		w.It("reaches the exit code and every artifact rendered from the captured stream", func(it *gotest.T) {
 			c := gotestrunner.NewOutputCollector(gotestrunner.RunCaptureJSON, false, gotestrunner.WithWriters(&bytes.Buffer{}, &bytes.Buffer{}))

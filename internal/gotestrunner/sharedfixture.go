@@ -52,6 +52,10 @@ type SharedFixtureProcess struct {
 	stdin   io.WriteCloser // command channel for window verbs (StartKeys/TeardownKeys)
 	cmdMu   sync.Mutex     // serializes commands: one in flight, one _cmd ack each
 	cmdResp chan string    // _cmd ack payloads (error text, "" on success)
+
+	// failures keeps what the process reported on stderr about fixtures
+	// that failed.
+	failures *failureLog
 }
 
 // StateFile returns the path to the shared fixture state JSON file.
@@ -71,6 +75,29 @@ func (p *SharedFixtureProcess) AllDone() <-chan struct{} {
 // SetupErr returns the setup error, if any. Only valid after AllDone() closes.
 func (p *SharedFixtureProcess) SetupErr() error {
 	return p.setupErr
+}
+
+// TakeFailures returns the failures fixtures reported since the last call.
+// Reports are complete once the process has exited.
+func (p *SharedFixtureProcess) TakeFailures() []string {
+	if p.failures == nil {
+		return nil
+	}
+	return p.failures.take()
+}
+
+// Came reports whether the fixture with the given state key is up.
+func (p *SharedFixtureProcess) Came(key string) bool {
+	ch := p.ready[key]
+	if ch == nil {
+		return false
+	}
+	select {
+	case <-ch:
+		return true
+	default:
+		return false
+	}
 }
 
 // State returns a snapshot of the accumulated state for the given keys.
@@ -352,7 +379,7 @@ func (p *SharedFixtureProcess) Teardown() error {
 	}
 	var exitErr *exec.ExitError
 	if errors.As(p.waitErr, &exitErr) && exitErr.ExitCode() == sharedTeardownFailedExit {
-		return fmt.Errorf("shared fixture teardown failed; see AfterAll errors above")
+		return fmt.Errorf("shared fixture teardown failed")
 	}
 	if diedEarly {
 		return fmt.Errorf("shared fixture process exited before teardown was requested (%v); its AfterAll may not have run and its resources may be leaked", p.waitErr)
@@ -398,7 +425,6 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	}
 
 	cmd := exec.CommandContext(ctx, setupBin)
-	cmd.Stderr = os.Stderr
 
 	// The teardown budget the process reports is the only kill timer: exec's
 	// WaitDelay stays unset, since any bound set here would have to be chosen
@@ -418,19 +444,31 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		return nil, err
 	}
 	cmd.Stdout = stdoutW
-	stdin, err := cmd.StdinPipe()
+	// Stderr is read the same way, for the same reason, and passed on.
+	stderr, stderrW, err := os.Pipe()
 	if err != nil {
 		_ = stdout.Close()
 		_ = stdoutW.Close()
 		return nil, err
 	}
+	cmd.Stderr = stderrW
+	closePipes := func() {
+		for _, f := range []*os.File{stdout, stdoutW, stderr, stderrW} {
+			_ = f.Close()
+		}
+	}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		closePipes()
+		return nil, err
+	}
 
 	if err := tree.Start(); err != nil {
-		_ = stdout.Close()
-		_ = stdoutW.Close()
+		closePipes()
 		return nil, fmt.Errorf("start shared fixture process: %w", err)
 	}
 	_ = stdoutW.Close()
+	_ = stderrW.Close()
 
 	// Build per-fixture readiness channels.
 	ready := make(map[string]chan struct{}, len(fixtures))
@@ -454,14 +492,21 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		allDone:         allDone,
 		stdin:           stdin,
 		cmdResp:         make(chan string, 1),
+		failures:        newFailureLog(os.Stderr),
 	}
 
 	scanned := make(chan struct{})
+	logged := make(chan struct{})
 	go func() {
 		proc.waitErr = cmd.Wait()
 		tree.Release()
 		drainOutput(scanned, OutputDrainDelay, stdout)
+		drainOutput(logged, OutputDrainDelay, stderr)
 		close(waitDone)
+	}()
+	go func() {
+		defer close(logged)
+		_, _ = io.Copy(proc.failures, stderr)
 	}()
 
 	go func() {
