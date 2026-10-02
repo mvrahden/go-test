@@ -83,22 +83,22 @@ func countStdlibTests(pkgs ...*packages.Package) int {
 	return n
 }
 
-const (
-	packageEvalMode   = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps
-	discoveryEvalMode = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedFiles
-)
+// packageLoadMode type-checks the matched packages from source and reads
+// their dependencies from export data. A dependency's source is loaded only
+// where the resolver needs it, see sourceLoader.
+const packageLoadMode = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedFiles
 
 func CollectFromLoaded(loadResults []*LoadResult) (gotestast.TestSuiteSpecSet, error) {
 	var allSuites gotestast.TestSuiteSpecSet
 	c := collector{}
 	for _, lr := range loadResults {
 		ptestCollected := c.CollectSuiteSpecs(lr.Ptest)
-		if len(ptestCollected.Errs) > 0 {
-			return nil, ptestCollected.Errs[0].Err
+		if err := collectorError(lr.Ptest, ptestCollected.Errs); err != nil {
+			return nil, err
 		}
 		pxtestCollected := c.CollectSuiteSpecs(lr.Pxtest)
-		if len(pxtestCollected.Errs) > 0 {
-			return nil, pxtestCollected.Errs[0].Err
+		if err := collectorError(lr.Pxtest, pxtestCollected.Errs); err != nil {
+			return nil, err
 		}
 		allSuites = append(allSuites, ptestCollected.Suites...)
 		allSuites = append(allSuites, pxtestCollected.Suites...)
@@ -124,6 +124,7 @@ type LoadResult struct {
 	Ptest        *packages.Package
 	Pxtest       *packages.Package
 	hasProdFiles bool
+	sources      *sourceLoader
 }
 
 func (lr *LoadResult) IsTestOnly() bool {
@@ -134,9 +135,9 @@ func (lr *LoadResult) IsTestOnly() bool {
 // packages that fail to load are returned as BrokenPackage entries: every
 // package a pattern matches must end in exactly one verdict, and a load
 // failure is a verdict, not an absence.
-func loadPackages(mode packages.LoadMode, targetPkgs []string, buildFlags []string) ([]*LoadResult, []BrokenPackage, error) {
+func loadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []BrokenPackage, error) {
 	cfg := &packages.Config{
-		Mode:  mode,
+		Mode:  packageLoadMode,
 		Tests: true,
 	}
 	if len(buildFlags) > 0 {
@@ -218,6 +219,7 @@ func loadPackages(mode packages.LoadMode, targetPkgs []string, buildFlags []stri
 		}
 	}
 
+	sources := newSourceLoader(buildFlags)
 	testPkgMap := map[string]*LoadResult{}
 	var res []*LoadResult
 	for _, p := range loadedTestPkgs {
@@ -228,7 +230,7 @@ func loadPackages(mode packages.LoadMode, targetPkgs []string, buildFlags []stri
 		}
 		lr, ok := testPkgMap[pkgPath]
 		if !ok {
-			lr = &LoadResult{PkgPath: pkgPath, PkgDir: DeterminePkgDir(p), hasProdFiles: prodPkgs[pkgPath]}
+			lr = &LoadResult{PkgPath: pkgPath, PkgDir: DeterminePkgDir(p), hasProdFiles: prodPkgs[pkgPath], sources: sources}
 			testPkgMap[pkgPath] = lr
 			res = append(res, lr)
 		}
@@ -254,13 +256,7 @@ func loadPackages(mode packages.LoadMode, targetPkgs []string, buildFlags []stri
 // Broken packages are returned separately; the caller decides whether they
 // abort the command or become failed-package verdicts.
 func LoadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []BrokenPackage, error) {
-	return loadPackages(packageEvalMode, targetPkgs, buildFlags)
-}
-
-// LoadPackagesForDiscovery loads packages using a lightweight mode without
-// NeedDeps, avoiding type-checking of the entire transitive dependency graph.
-func LoadPackagesForDiscovery(targetPkgs []string, buildFlags []string) ([]*LoadResult, []BrokenPackage, error) {
-	return loadPackages(discoveryEvalMode, targetPkgs, buildFlags)
+	return loadPackages(targetPkgs, buildFlags)
 }
 
 func GenerateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {
@@ -284,12 +280,12 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 	results, err := slices.MapErr(loadResults, func(lr *LoadResult, _ int) (*GenerateResult, error) {
 		c := collector{}
 		ptestCollected := c.CollectSuiteSpecs(lr.Ptest)
-		if len(ptestCollected.Errs) > 0 {
-			return nil, ptestCollected.Errs[0].Err
+		if err := collectorError(lr.Ptest, ptestCollected.Errs); err != nil {
+			return nil, err
 		}
 		pxtestCollected := c.CollectSuiteSpecs(lr.Pxtest)
-		if len(pxtestCollected.Errs) > 0 {
-			return nil, pxtestCollected.Errs[0].Err
+		if err := collectorError(lr.Pxtest, pxtestCollected.Errs); err != nil {
+			return nil, err
 		}
 
 		ptestSpec, err := c.ApplyTestSuiteSpecs(ptestCollected)
@@ -302,13 +298,13 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		}
 
 		fuzzParams := map[string][]string{}
-		ptestBuf, ptestFixtureDeps, ptestReqKeys, err := generateForPkg(lr.Ptest, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams)
+		ptestBuf, ptestFixtureDeps, ptestReqKeys, err := generateForPkg(lr.Ptest, lr.sources, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams)
 		if err != nil {
-			return nil, err
+			return nil, locate(lr.Ptest, err)
 		}
-		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, err := generateForPkg(lr.Pxtest, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams)
+		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, err := generateForPkg(lr.Pxtest, lr.sources, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams)
 		if err != nil {
-			return nil, err
+			return nil, locate(lr.Pxtest, err)
 		}
 
 		seen := map[string]bool{}
@@ -464,12 +460,12 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 // generateForPkg renders one package variant. fuzzParams is filled in place
 // with the corpus shape of every fuzz target the variant declares, so the
 // internal and external variants of the same package accumulate into one map.
-func generateForPkg(pkg *packages.Package, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo, harvestSeeds bool, fuzzParams map[string][]string) ([]byte, []string, map[string][]string, error) { //nolint:gocritic // hugeParam: stable API
+func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo, harvestSeeds bool, fuzzParams map[string][]string) ([]byte, []string, map[string][]string, error) { //nolint:gocritic // hugeParam: stable API
 	if pkg == nil || len(spec.EffectiveTestSuites) == 0 {
 		return nil, nil, nil, nil
 	}
 
-	resolved, err := Resolve(pkg, spec.EffectiveTestSuites, collected.Fixtures)
+	resolved, err := resolve(pkg, sources, spec.EffectiveTestSuites, collected.Fixtures)
 	if err != nil {
 		return nil, nil, nil, err
 	}

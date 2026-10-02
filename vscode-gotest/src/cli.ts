@@ -18,12 +18,14 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 // Raised to the release that introduced `gotest bench` and `gotest fuzz`,
 // which the Bench and Fuzz surfaces drive; an older CLI rejects the
-// subcommands outright. Treat this as a contract marker: bump it whenever
-// the extension starts depending on CLI behaviour that older versions do
-// not have. Never below the CLI's gotestgen.MinRuntimeVersion (a Go test
-// guards the order): a CLI the extension accepts must enforce a runtime
-// floor no newer than itself.
-const MIN_CLI_VERSION = "v1.29.0";
+// subcommands outright. v1.30.2 is the release whose every JSON document
+// opens with `version`, which is how the extension learns the version of a
+// CLI it reaches through go run or go tool and gates it (checkProducerVersion).
+// Treat this as a contract marker: bump it whenever the extension starts
+// depending on CLI behaviour that older versions do not have. Never below
+// the CLI's gotestgen.MinRuntimeVersion (a Go test guards the order): a CLI
+// the extension accepts must enforce a runtime floor no newer than itself.
+const MIN_CLI_VERSION = "v1.30.2";
 
 export interface CliCommand {
   bin: string;
@@ -193,6 +195,34 @@ export class CliUnavailableError extends Error {
 
 function meetsFloor(version: string): boolean {
   return compareVersions(version, MIN_CLI_VERSION) >= 0;
+}
+
+// checkProducerVersion gates a CLI that could not be versioned up front: a
+// go run, go tool or replace-directive build first says who it is in the
+// document it writes. Every document opens with `version` from v1.30.2 on,
+// so one without it predates the floor. A dev build — a source checkout or
+// a replace directive — is current by construction.
+export function checkProducerVersion(
+  version: string | undefined,
+  workspaceDir?: string,
+): void {
+  if (version === undefined) {
+    throw new CliUnavailableError(
+      `the CLI wrote no version, so it predates ${MIN_CLI_VERSION}. ${upgradeAdvice(workspaceDir)}`,
+    );
+  }
+  if (version.startsWith("dev") || meetsFloor(version)) {
+    return;
+  }
+  throw new CliUnavailableError(
+    `the CLI is ${version}, but >= ${MIN_CLI_VERSION} is required. ${upgradeAdvice(workspaceDir)}`,
+  );
+}
+
+function upgradeAdvice(workspaceDir?: string): string {
+  const modulePath =
+    scopedConfig(workspaceDir).get<string>("modulePath") ?? DEFAULT_MODULE_PATH;
+  return `Run: go get -tool ${modulePath}@latest`;
 }
 
 function resolveCliPath(cliPath: string, workspaceDir?: string): string {

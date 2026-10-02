@@ -100,7 +100,7 @@ func loadAllTestPkgs() (map[string]*packages.Package, string, error) {
 	}
 
 	pkgs, err := packages.Load(&packages.Config{
-		Mode: packageEvalMode,
+		Mode: packageLoadMode | packages.NeedDeps,
 		Dir:  dir,
 		Env:  append(os.Environ(), "GOWORK=off"),
 	}, "./...")
@@ -152,7 +152,6 @@ type ExportCollector = collector
 type ExportRenderer = renderer
 
 // Function exports for all gotestgen test files (Tasks 10-12).
-var ExportPackageEvalMode = packageEvalMode
 var ExportIsInternalPkgPath = isInternalPkgPath
 
 // ExportMakeFixtureSpec creates a minimal FixtureSpec for validation testing.

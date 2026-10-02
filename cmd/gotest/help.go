@@ -91,17 +91,23 @@ Flags (gotest — use --double-dash):
   --debug                 Keep generated overlay for inspection
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable overlay cache, force fresh generation
+  --no-cache              Disable the overlay and test binary caches
   --min=<pct>             Fail if coverage < pct%% (0-100)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
+  --parallel=<n>          Total concurrent test method budget (default: 2×GOMAXPROCS,
+                          halved under -race/-msan/-asan)
+  --compile-parallel=<n>  Concurrent compilations (default: NumCPU, halved under
+                          -race/-msan/-asan)
+  --no-harvest            Disable fuzz seed harvesting for this run
 
 Flags (go test — use -single-dash, forwarded automatically):
   -v                      Verbose output
   -run=<regexp>           Run only matching tests
-  -count=<n>              Run each test n times (default: cached)
+  -count=<n>              Run each test n times (default: 1; no result is cached)
   -race                   Enable data race detector
-  -timeout=<dur>          Per-test timeout (default: 10m)
+  -timeout=<dur>          Deadline of each suite process (default: 10m); a
+                          test's own deadline is SuiteConfig.Timeout
   -coverprofile=<file>    Write coverage profile
   -tags=<tags>            Build tags (comma-separated)
   -json                   Machine-readable JSON event stream
@@ -112,7 +118,7 @@ or to pass unrecognized flags to go test without validation.
 Environment:
   CI=true                 Auto-enables --ci when GOTEST_CI is unset
   GOTEST_CI=0             Opt out of CI auto-detection
-  GOTEST_CACHE_DIR=<dir>  Override overlay cache location (default: ~/.cache/gotest)
+  GOTEST_CACHE_DIR=<dir>  Override the cache location (default: ~/.cache/gotest)
 
 Configuration:
   Place a .gotest.yml in your project root. Run "gotest help config" for details.
@@ -120,7 +126,7 @@ Configuration:
 Examples:
   gotest ./...                              Run all test suites
   gotest --ci --min=80 ./... -race          CI with coverage gate and race detection
-  gotest spec --no-color -count=1 ./...     Spec report for CI artifacts
+  gotest spec --no-color ./...              Spec report for CI artifacts
   gotest watch ./pkg/auth/...               Re-run on file changes
   gotest scaffold ./pkg/auth.ServiceImpl    Generate test suite skeleton
   gotest lint ./...                         Check for common suite mistakes
@@ -134,19 +140,24 @@ Usage:
   gotest [flags] [--] [go-test-flags] [packages...]
 
 When no subcommand is given, gotest discovers test suites in the target
-packages, generates an overlay with lifecycle wiring, and runs "go test".
-Generated overlays are cached by content hash for faster repeated runs.
+packages, generates an overlay with lifecycle wiring, and runs each suite
+in a process of its own. Test binaries are kept between runs, so a package
+that did not change is not linked again.
 
 Flags:
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay for inspection
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable overlay cache, force fresh generation
+  --no-cache              Disable the overlay and test binary caches
   --no-harvest            Disable fuzz seed harvesting for this run (see below)
   --min=<pct>             Fail if coverage < pct% (0-100, enables -coverprofile)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
+  --parallel=<n>          Total concurrent test method budget (default: 2×GOMAXPROCS,
+                          halved under -race/-msan/-asan)
+  --compile-parallel=<n>  Concurrent compilations (default: NumCPU, halved under
+                          -race/-msan/-asan)
 
 All standard go test flags (-single-dash) are forwarded automatically.
 Use a bare "--" to pass unrecognized flags without validation.
@@ -204,17 +215,21 @@ Flags:
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable overlay cache, force fresh generation
+  --no-cache              Disable the overlay and test binary caches
   --min=<pct>             Fail if coverage < pct% (0-100)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
+  --parallel=<n>          Total concurrent test method budget (default: 2×GOMAXPROCS,
+                          halved under -race/-msan/-asan)
+  --compile-parallel=<n>  Concurrent compilations (default: NumCPU, halved under
+                          -race/-msan/-asan)
 
 Examples:
   gotest spec ./...                                Run and render spec
   gotest spec --format=md --output=spec.md ./...   Markdown report to file
   gotest spec --no-color --output=spec.txt ./...   Plain text for CI artifacts
   gotest spec --input=- < events.json              Render from piped JSON input
-  gotest spec --format=json ./... -count=1         JSON tree, no caching
+  gotest spec --format=json ./...                  JSON tree
 `)
 }
 
@@ -256,10 +271,14 @@ Flags:
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable overlay cache, force fresh generation
+  --no-cache              Disable the overlay and test binary caches
   --min=<pct>             Fail if coverage < pct% (0-100)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
+  --parallel=<n>          Total concurrent test method budget (default: 2×GOMAXPROCS,
+                          halved under -race/-msan/-asan)
+  --compile-parallel=<n>  Concurrent compilations (default: NumCPU, halved under
+                          -race/-msan/-asan)
 
 GitHub CI mode (--github):
   Emits ::error annotations for each failure, showing inline on PR diffs.
@@ -289,10 +308,16 @@ Flags:
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep generated overlay
   --spec                  Render spec view after each run
+  --bench                 Benchmark mode: re-run benchmarks on change, with the
+                          ns/op delta against the previous run
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable overlay cache, force fresh generation
+  --no-cache              Disable the overlay and test binary caches
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
+  --parallel=<n>          Total concurrent test method budget (default: 2×GOMAXPROCS,
+                          halved under -race/-msan/-asan)
+  --compile-parallel=<n>  Concurrent compilations (default: NumCPU, halved under
+                          -race/-msan/-asan)
 
 Examples:
   gotest watch ./...                         Watch all packages
@@ -322,7 +347,7 @@ Flags:
   --spec                  Render spec view instead of raw benchmark output
   --no-color              Disable ANSI color codes (with --spec)
   --debug                 Keep generated overlay for inspection
-  --no-cache              Disable overlay cache, force fresh generation
+  --no-cache              Disable the overlay and test binary caches
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
   --save=<path>           Save this run's results as a JSON baseline (forces
@@ -426,7 +451,7 @@ Flags:
   --target=<Fuzz...>      Fuzz one target, named by its wrapper as printed in
                           session output; an unmatched name lists the targets
   --no-harvest            Do not mine table-test literals into seeds for this run
-  --no-cache              Disable overlay cache, force fresh generation
+  --no-cache              Disable the overlay and test binary caches
   --debug                 Keep generated overlay for inspection
 
 --for is the session's only clock: the deadline follows it, so --timeout
@@ -481,21 +506,24 @@ Examples:
 }
 
 func printDiscoverHelp() {
-	fmt.Print(`gotest discover — discover test suites and output JSON metadata
+	fmt.Printf(`gotest discover — discover test suites and output JSON metadata
 
 Usage:
-  gotest discover [packages...]
+  gotest discover [-tags=<tags>] [packages...]
 
 Loads test packages, discovers suite types and their methods, and outputs
-structured JSON. Used by IDE extensions for test explorer integration.
+structured JSON on one line. Nothing is run. Used by IDE extensions for
+test explorer integration.
 
 Output schema:
   {
+    "version": %q,
     "packages": [{
       "importPath": "example.com/pkg",
       "dir":        "/absolute/path",
       "modulePath": "example.com",
       "testOnly":   false,
+      "broken":     false,
       "suites": [{
         "name":     "UserTestSuite",
         "file":     "user_test.go",
@@ -514,17 +542,40 @@ Output schema:
           "col":  1,
           "focused":  false,
           "excluded": false,
-          "parallel": false
-        }]
+          "parallel": false,
+          "behaviors": [{
+            "name": "email_is_valid", "display": "when email is valid",
+            "kind": "when", "line": 16,
+            "children": [{"name": "creates_the_user", "display": "creates the user",
+                          "kind": "it", "line": 17}]
+          }],
+          "behaviorsComplete": true
+        }],
+        "benchmarks": [{"name": "BenchmarkCreate", "file": "user_test.go", "line": 40, "col": 1}],
+        "fuzzers":    [{"name": "FuzzParse", "file": "user_test.go", "line": 50, "col": 1}]
       }]
     }],
     "warnings": [{"importPath": "...", "file": "...", "line": 1, "col": 1, "message": "..."}]
   }
 
+"version" is the CLI that wrote the document. A package that fails to load
+is listed with "broken": true and no suites. "behaviors" is the When/It
+tree a method declares, read from source; "behaviorsComplete": false means
+the method declares behaviors that depend on runtime values, so the list is
+a floor. "benchmarks" and "fuzzers" carry the same fields as "methods",
+without behaviors.
+
+"warnings" names, with its position, what a run would refuse (a package
+that does not load, an unsupported hook signature, a fuzz argument that
+cannot be fuzzed) and what it would pass over in silence: a lifecycle hook
+that is misspelled or carries X_, and a Benchmark or Fuzz method on a type
+that is no test suite.
+
 Examples:
   gotest discover ./...                      All packages
   gotest discover ./pkg/auth/...             Single package tree
-`)
+  gotest discover -tags=integration ./...    With build tags
+`, about.ResolvedVersion())
 }
 
 func printScaffoldHelp() {
@@ -658,7 +709,8 @@ Flags:
                           such as -fix or -json.
 
 Suppress individual diagnostics with //nolint comments:
-  //nolint:stdlib-test             Same line or the comment block directly above
+  //nolint:stdlib-test             Same line, or a comment block of its own
+                                   ending on the line directly above
   package foo //nolint:stdlib-test  Suppress for entire file
 
 Exit codes:
@@ -752,13 +804,14 @@ func printCleanHelp() {
 Usage:
   gotest clean [packages...]
 
-Removes generated overlay files (gotest_p(x)suite_test.go) that are no longer
-needed. These files are normally ephemeral but may be left behind
-by --debug runs or interrupted processes.
+Removes generated overlay files (gotest_p(x)suite_test.go) from the source
+tree. A run never writes them there; "gotest generate" does, for
+inspection.
 
-The overlay cache (used for faster repeated runs) is managed separately
-and auto-evicts entries older than 7 days. Set GOTEST_CACHE_DIR to
-control the cache location; use --no-cache to bypass it entirely.
+The overlay cache and the test binary cache (used for faster repeated
+runs) are managed separately and auto-evict entries older than 7 days.
+Set GOTEST_CACHE_DIR to control the cache location; use --no-cache to
+bypass both entirely.
 
 Examples:
   gotest clean ./...                         Clean all packages

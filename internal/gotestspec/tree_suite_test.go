@@ -399,3 +399,40 @@ func (s *TreeTestSuite) TestClassify_NestedBenchmarkName(t *gotest.T, _ *treeCtx
 	mustEq(t, "kind", leaf.Kind, gotestspec.KindBenchmark)
 	mustEq(t, "display", leaf.Display, "Parse")
 }
+
+// buildFailureStream is what go test -json (Go 1.24+) writes for a package
+// whose test build fails, a package whose dependency fails, and a green one.
+const buildFailureStream = `{"ImportPath":"m/dep","Action":"build-output","Output":"# m/dep\n"}
+{"ImportPath":"m/dep","Action":"build-output","Output":"dep/dep.go:3:27: undefined: missing\n"}
+{"ImportPath":"m/dep","Action":"build-fail"}
+{"ImportPath":"m/broken [m/broken.test]","Action":"build-output","Output":"# m/broken [m/broken.test]\n"}
+{"ImportPath":"m/broken [m/broken.test]","Action":"build-output","Output":"broken/broken_test.go:5:33: undefined: undefinedCall\n"}
+{"ImportPath":"m/broken [m/broken.test]","Action":"build-fail"}
+{"Action":"start","Package":"m/broken"}
+{"Action":"output","Package":"m/broken","Output":"FAIL\tm/broken [build failed]\n"}
+{"Action":"fail","Package":"m/broken","Elapsed":0,"FailedBuild":"m/broken [m/broken.test]"}
+{"Action":"start","Package":"m/usesdep"}
+{"Action":"output","Package":"m/usesdep","Output":"FAIL\tm/usesdep [build failed]\n"}
+{"Action":"fail","Package":"m/usesdep","Elapsed":0,"FailedBuild":"m/dep"}
+{"Action":"run","Package":"m/ok","Test":"TestOK"}
+{"Action":"pass","Package":"m/ok","Test":"TestOK","Elapsed":0}
+{"Action":"pass","Package":"m/ok","Elapsed":0.006}`
+
+func (s *TreeTestSuite) TestBuildTree_BuildFailure(t *gotest.T, _ *treeCtx) {
+	tree := treeOf(t, buildFailureStream)
+	mustLen(t, "packages", tree, 3)
+	broken, ok, usesdep := tree[0], tree[1], tree[2]
+	mustEq(t, "first package", broken.Path, "m/broken")
+	mustEq(t, "second package", ok.Path, "m/ok")
+	mustEq(t, "third package", usesdep.Path, "m/usesdep")
+
+	mustEq(t, "broken status", broken.Status, gotestspec.StatusFail)
+	mustContain(t, strings.Join(broken.Output, ""), "broken/broken_test.go:5:33: undefined: undefinedCall", "a failed build carries its diagnostics")
+	mustNotContain(t, strings.Join(broken.Output, ""), "dep/dep.go", "another build's diagnostics stay with that build")
+
+	mustEq(t, "usesdep status", usesdep.Status, gotestspec.StatusFail)
+	mustContain(t, strings.Join(usesdep.Output, ""), "dep/dep.go:3:27: undefined: missing", "a failed dependency's diagnostics reach the package it failed")
+
+	mustEq(t, "ok status", ok.Status, gotestspec.StatusPass)
+	mustLen(t, "ok output", ok.Output, 0)
+}

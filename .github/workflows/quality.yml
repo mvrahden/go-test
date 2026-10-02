@@ -3,10 +3,10 @@ name: quality
 on:
   push:
     branches: [main]
-    paths-ignore: [vscode-gotest/**]
+    paths-ignore: [vscode-gotest/**, site/**]
   pull_request:
     types: [opened, synchronize, reopened]
-    paths-ignore: [vscode-gotest/**]
+    paths-ignore: [vscode-gotest/**, site/**]
 
 concurrency:
   group: quality-${{ github.ref }}
@@ -23,19 +23,18 @@ jobs:
           check-latest: true
       - name: Format check
         run: make fmt-check
-      - name: Vet
-        run: make vet
       - name: Vuln check
         run: make vuln
+      - name: Resolve the golangci-lint pin
+        id: golangci
+        run: echo "version=$(make -s golangci-version)" >> "$GITHUB_OUTPUT"
       - name: Lint
         uses: golangci/golangci-lint-action@v9
         with:
-          # Must ship x/tools >= v0.46.0, the first that reads Go 1.27 export
-          # data. Bump this whenever the Go version above moves.
-          version: v2.13.2
-          args: ./... ./examples/...
-      - name: Lint (gotest)
-        run: go run ./cmd/gotest lint ./... ./examples/...
+          version: ${{ steps.golangci.outputs.version }}
+          args: --allow-parallel-runners ./... ./examples/...
+      - name: Vet and lint (gotest)
+        run: make lint
       # The skill's consumer fixture is the only in-repo proof of the
       # consumer-facing API shape; nothing else builds it.
       - name: Consumer fixture (skill evals)

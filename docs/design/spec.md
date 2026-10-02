@@ -134,7 +134,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 |------|--------|
 | `--debug` | Keep generated files after run |
 | `--ci` | CI mode: fail on `F_` prefixes, snapshot read-only |
-| `--no-cache` | Bypass the overlay write cache (generation itself is always fresh) |
+| `--no-cache` | Bypass the overlay write cache and the test binary cache (generation itself is always fresh) |
 | `--spec` | Render the spec view instead of the default output (default and watch modes) |
 | `--update-snapshots` | Regenerate snapshot files |
 | `--format=<fmt>` | Output format for `spec`/`summary` (terminal, md/markdown, json) |
@@ -590,7 +590,7 @@ Subprocess (compiled binary):
 CLI (gotest):
   read JSON from subprocess stdout
   write state files in the work dir — per-suite shared/<Suite>.json in the
-  default streaming run; one global shared/state.json in batch modes
+  test run; one global shared/state.json in a bench run
   set GOTEST_SHARED_STATE_FILE env var for test process
 
 Test process:
@@ -716,7 +716,7 @@ func (f *InfraFixture) FixtureConfig() gotest.FixtureConfig {
 }
 ```
 
-A partial literal gets the default for every duration it omits: `SuiteConfig{Parallel: true}` runs with the 30s deadlines, but is held to no budget by verdict, like a suite without a marker. Before v1.31 an omitted duration meant no deadline.
+A partial literal gets the default for every duration it omits: `SuiteConfig{Parallel: true}` runs with the 30s deadlines, but is held to no budget by verdict, like a suite without a marker. Before v1.30 an omitted duration meant no deadline.
 
 #### Generated Behavior
 
@@ -1188,6 +1188,8 @@ gotest summary ./... --github                  # ::error annotations + $GITHUB_S
 go test -json ./... | gotest summary --input=- # post-process an existing JSON stream
 ```
 
+A replayed `go test -json` stream carries a failed build as `build-output` and `build-fail` events keyed by the build's `ImportPath`, which the failing package names in its verdict's `FailedBuild` (Go 1.24+). `spec` and `summary` route those diagnostics to every package the build failed, so a compile error replays with its cause.
+
 `--github` is auto-enabled when `GITHUB_ACTIONS=true`.
 The coverage table is statement-weighted with block deduplication (see Coverage Model).
 Formats: terminal (default), `md`, `json`.
@@ -1224,13 +1226,22 @@ No tests are executed.
                      "focused": bool, "excluded": bool, "parallel": bool,
                      "behaviors": [ { "name": …, "display": …, "kind": …, "line": …,
                                       "children": [ … ] } ],
-                     "behaviorsComplete": bool } ]
+                     "behaviorsComplete": bool } ],
+      "benchmarks": [ { "name": …, "file": …, "line": …, "col": …,
+                        "focused": bool, "excluded": bool, "parallel": bool } ],
+      "fuzzers": [ … as "benchmarks" … ]
     } ]
   } ],
   "warnings": [ { "importPath": …, "file": …, "line": …, "col": …, "message": … } ] }
 ```
 
 File paths are basenames; positions are 1-based.
+`warnings` carries what a run would refuse and what it would pass over in silence, each with its position:
+
+- a package that fails to load (`"broken": true`) and a suite the generator refuses — an unsupported hook signature, a method out of step with the suite's context, a fuzz argument that cannot be fuzzed. A refused suite is left out of `suites`, except for a fuzz refusal, which keeps the suite listed;
+- a method that reads like part of the harness and never runs as one: a lifecycle hook that is misspelled or carries `X_` (what `lifecycle-typo` and `x-lifecycle` report, and a `//nolint` for the rule silences the warning as well), and a `Benchmark*`/`Fuzz*` method taking `*gotest.B`/`*gotest.F` on a type that is no test suite.
+
+A run names the same position in front of a generation error (`path/suite_test.go:13:24: …`), relative to the working directory.
 `methods[].parallel` is reserved and always `false` (parallelism is a suite-level property).
 Respects `-tags`.
 
@@ -1418,7 +1429,8 @@ Suppression and configuration:
 - `.gotest.yml` → `lint.skip: [<rule>, ...]` disables non-integrity rules project-wide
 - `.gotest.yml` `lint.skip` naming an integrity rule is a hard error — integrity rules can only be suppressed per line; unknown rule IDs are also a hard error
 - Flags: `-fix` applies suggested fixes; `-skip-<rule>` for every non-integrity rule; `-disable-nolint`
-- Exit codes: `0` no findings; `1` uncompilable target packages (the preflight fails loudly — nothing was proven about them); `2` usage or configuration error; `3` findings reported
+- Exit codes: `0` no findings; `1` uncompilable target packages (every one is named — nothing was proven about them); `2` usage or configuration error; `3` findings reported
+- The targets are type-checked once, from source, and their dependencies are read from export data. A driver flag (`-fix`, `-diff`, `-json`, `-c`, …) hands the run to the `go/analysis` driver, which loads the targets itself after they are proven to compile
 
 GitHub annotations (subcommand only): `gotest lint --github` additionally emits one `::error file=…,line=…,col=…,title=<rule>::<message>` workflow command per finding on stdout and appends a findings table (rule, location, message) to `$GITHUB_STEP_SUMMARY` — the complete record when GitHub caps rendered annotations. Like `summary`, the mode is implied when `GITHUB_ACTIONS=true`, so an existing CI lint step gains PR annotations without workflow changes. Annotation paths are relative to the working directory (the repository root in a workflow). Plain-text findings, exit codes, `.gotest.yml` handling, and `//nolint` semantics are unchanged. Driver flags this mode does not own (`-fix`, `-json`, `-c`, …) defer to the `go/analysis` driver, which keeps their exact semantics but cannot emit annotations.
 
@@ -1449,7 +1461,7 @@ Manual setup works without the action:
 - run: gotest spec ./... --format=md --output=behavior-spec.md
 ```
 
-Exit codes: 0 = pass, 1 = test failure or a `--timeout` that expired before the last verdict (`FAIL: global --timeout exceeded after <d> while running: <pkg> <test>, …` names up to five units still running, the suites in the text run; each is booked into the event stream as failed at the method, followed by its suite and package, and a deadline with nothing to name, during compilation or fixture setup, is booked as a failed `global --timeout` package), 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors) or a census failure, 130 = run interrupted (SIGINT/SIGTERM) before the last verdict, whatever the suites the interrupt killed reported; their failures are the interrupt's, not verdicts. An interrupt that arrives later, while fixtures tear down, leaves the verdict alone. A second interrupt ends the CLI at once with 130, abandoning what is left of the teardown; whatever the fixtures still held is left behind. A suite binary the run stopped from outside — a signal on Unix, the console interrupt a `--timeout` sends on Windows — reports a status it never chose (`-1`, `0xC000013A`); it is read as a failed suite, named on stderr, and never becomes the run's own exit code.
+Exit codes: 0 = pass, 1 = test failure, a shared fixture that failed to set up or tear down (booked into the event stream as the failed package `shared fixtures`), or a `--timeout` that expired before the last verdict (`FAIL: global --timeout exceeded after <d> while running: <pkg> <test>, …` names up to five units still running, the suites in the text run; each is booked into the event stream as failed at the method, followed by its suite and package, and a deadline with nothing to name, during compilation or fixture setup, is booked as a failed `global --timeout` package), 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors) or a census failure, 130 = run interrupted (SIGINT/SIGTERM) before the last verdict, whatever the suites the interrupt killed reported; their failures are the interrupt's, not verdicts. An interrupt that arrives later, while fixtures tear down, leaves the verdict alone. A second interrupt ends the CLI at once with 130, abandoning what is left of the teardown; whatever the fixtures still held is left behind. A suite binary the run stopped from outside — a signal on Unix, the console interrupt a `--timeout` sends on Windows — reports a status it never chose (`-1`, `0xC000013A`); it is read as a failed suite, named on stderr, and never becomes the run's own exit code.
 
 **Census.** A green run is believed only when every declared test method produced a verdict. After a green run that writes a test2json stream (`spec`, `summary`, `-json`, `watch --spec` or `--json`, a capturing `bench`), the pipeline compares two sets as the stream is written:
 
@@ -1484,7 +1496,7 @@ User-facing:
 |----------|--------|
 | `GOTEST_UPDATE_SNAPSHOTS=1` | Regenerate snapshot baselines (what `--update-snapshots` sets; the only mechanism under plain `go test`) |
 | `GOTEST_CI` | `1`/`true` forces CI mode; any value suppresses auto-detection from `CI`; unset → auto-detect |
-| `GOTEST_CACHE_DIR` | Overlay write-cache location (default `os.UserCacheDir()/gotest`; entries evicted after 7 days) |
+| `GOTEST_CACHE_DIR` | Cache location for overlays and test binaries (default `os.UserCacheDir()/gotest`; entries evicted after 7 days) |
 
 Internal protocol between the CLI and test/subprocess boundaries (may change without notice): `GOTEST_SHARED_STATE_FILE` (shared-fixture state file for the test process), `GOTEST_TEARDOWN_BUDGET_FILE` (teardown grace-period handshake).
 
@@ -1698,7 +1710,8 @@ If a feature can't be implemented as (a) generated code, (b) a method on `gotest
 
 3. **No incremental generation:** The tool regenerates all suite files on every run.
    There is no staleness detection.
-   (The overlay cache — `--no-cache`, `GOTEST_CACHE_DIR` — is a post-generation, content-addressed write cache: it dedupes disk writes, not generation work.)
+   (The overlay cache — `--no-cache`, `GOTEST_CACHE_DIR` — is a post-generation, content-addressed write cache: it dedupes disk writes, not generation work.
+   The test binary cache beside it keeps each package's linked binary at a path keyed by working directory, build flags, platform and Go version, so a run over unchanged code skips the link; each run copies the binary into its own work dir before executing it.)
 
 4. **Hydrate method walking depth:** The generator follows receiver method calls from `Hydrate` one level deep to classify local fields.
    Assignments hidden behind two or more levels of indirection are not detected.

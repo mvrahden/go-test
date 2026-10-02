@@ -47,10 +47,14 @@ vi.mock("node:fs/promises", () => ({
 vi.mock("node:child_process", async () => {
   const { createScriptedSpawn } =
     await import("./scriptedSpawn.test-support.js");
-  return { spawn: createScriptedSpawn(script, mockKill) };
+  // cli.js promisifies execFile at load; nothing here calls it.
+  return { spawn: createScriptedSpawn(script, mockKill), execFile: vi.fn() };
 });
 
-vi.mock("./cli.js", () => ({
+vi.mock("./cli.js", async (importOriginal) => ({
+  // The producer gate and its error are the real ones: the mock stands in
+  // for command resolution, not for what discovery checks.
+  ...(await importOriginal<typeof import("./cli.js")>()),
   buildCliCommand: async () => ({ bin: "go", args: ["run", "discover"] }),
   formatCliCommand: () => "go run discover",
   clearBinaryCache: mockClearBinaryCache,
@@ -74,8 +78,9 @@ function makeOutputChannel() {
 
 type Pkg = { importPath: string; dir: string };
 
-function discoverJson(pkgs: Pkg[]): string {
+function discoverJson(pkgs: Pkg[], version?: string | null): string {
   return JSON.stringify({
+    ...(version === null ? {} : { version: version ?? "v1.30.2" }),
     packages: pkgs.map((p) => ({
       importPath: p.importPath,
       dir: p.dir,
@@ -253,6 +258,56 @@ describe("DiscoveryService", () => {
     });
   });
 
+  describe("producer version gate", () => {
+    const pkgs = [{ importPath: "example.com/a", dir: "/ws/a" }];
+
+    it("refuses a document without a version, without retrying", async () => {
+      script.always = { stdout: [discoverJson(pkgs, null)] };
+      await service.discover("/ws", ["./..."]);
+      expect(script.calls).toHaveLength(1);
+      expect(cache.packages).toHaveLength(0);
+      expect(mockShowWarningMessage).toHaveBeenCalledWith(
+        expect.stringContaining("wrote no version, so it predates v1.30.2"),
+        "Open Output",
+      );
+    });
+
+    it("refuses a CLI below the floor, naming the version", async () => {
+      script.always = { stdout: [discoverJson(pkgs, "v1.30.1")] };
+      await service.discover("/ws", ["./..."]);
+      expect(script.calls).toHaveLength(1);
+      expect(cache.packages).toHaveLength(0);
+      expect(mockShowWarningMessage).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "the CLI is v1.30.1, but >= v1.30.2 is required",
+        ),
+        "Open Output",
+      );
+    });
+
+    it("accepts a dev build and a pseudo-version at the floor", async () => {
+      script.once.push({
+        stdout: [discoverJson(pkgs, "dev (source checkout)")],
+      });
+      await service.discover("/ws", ["./..."]);
+      expect(cache.packages).toHaveLength(1);
+      script.once.push({
+        stdout: [discoverJson(pkgs, "v1.30.2-0.20260926120923-7362809f09ef")],
+      });
+      await service.discover("/ws", ["./..."]);
+      expect(cache.packages).toHaveLength(1);
+      expect(mockShowWarningMessage).not.toHaveBeenCalled();
+    });
+
+    it("names the producer in the discovery log line", async () => {
+      script.once.push({ stdout: [discoverJson(pkgs, "v1.31.0")] });
+      await service.discover("/ws", ["./..."]);
+      expect(outputChannel.info).toHaveBeenCalledWith(
+        expect.stringContaining("from gotest v1.31.0"),
+      );
+    });
+  });
+
   describe("when all retry attempts fail", () => {
     beforeEach(async () => {
       failsAlways("persistent failure");
@@ -303,6 +358,7 @@ describe("DiscoveryService", () => {
       script.once.push({
         stdout: [
           JSON.stringify({
+            version: "v1.30.2",
             packages: [
               {
                 importPath: "example.com/pkg",

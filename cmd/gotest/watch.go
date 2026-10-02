@@ -234,7 +234,6 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench
 		CI:              cfg.CI,
 		Parallel:        cfg.Parallel,
 		CompileParallel: cfg.CompileParallel,
-		Streaming:       false,
 		OutputMode:      mode,
 		Bench:           bench,
 		BenchesByPkg:    overlay.BenchesByPkg,

@@ -5,10 +5,10 @@ on:
   # pull request ever built, otherwise reaches a release unverified.
   push:
     branches: [main]
-    paths-ignore: [vscode-gotest/**]
+    paths-ignore: [vscode-gotest/**, site/**]
   pull_request:
     types: [opened, synchronize, reopened]
-    paths-ignore: [vscode-gotest/**]
+    paths-ignore: [vscode-gotest/**, site/**]
 
 concurrency:
   group: test-${{ github.ref }}

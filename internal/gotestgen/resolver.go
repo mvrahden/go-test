@@ -86,6 +86,7 @@ type ResolveResult struct {
 
 type resolver struct {
 	targetPkg       *packages.Package
+	sources         *sourceLoader
 	localFixtures   []*gotestast.FixtureSpec
 	resolved        map[*types.Named]*ResolvedFixture
 	resolving       map[*types.Named]bool         // cycle detection
@@ -98,9 +99,14 @@ type resolver struct {
 // suites. It walks the type graph recursively to discover all required fixtures
 // (both package and shared), validates constraints, and builds the fixture tree.
 func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, localFixtures []*gotestast.FixtureSpec) (*ResolveResult, error) {
+	return resolve(targetPkg, nil, suites, localFixtures)
+}
+
+func resolve(targetPkg *packages.Package, sources *sourceLoader, suites []*gotestast.TestSuiteSpec, localFixtures []*gotestast.FixtureSpec) (*ResolveResult, error) {
 	result := &ResolveResult{}
 	r := &resolver{
 		targetPkg:       targetPkg,
+		sources:         sources,
 		localFixtures:   localFixtures,
 		resolved:        make(map[*types.Named]*ResolvedFixture),
 		resolving:       make(map[*types.Named]bool),
@@ -111,18 +117,18 @@ func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, loc
 
 	for _, suite := range suites {
 		if suite.IsGenericAlias() && suite.IsPxTestSuite() {
-			return nil, fmt.Errorf("generic alias suite %q must not be in an external test package (pxtest); move it to the internal test file", suite.Identifier())
+			return nil, gotestast.At(suite.Pos(), fmt.Errorf("generic alias suite %q must not be in an external test package (pxtest); move it to the internal test file", suite.Identifier()))
 		}
 
 		fixtures, err := r.resolveFixturesForSuite(suite)
 		if err != nil {
-			return nil, err
+			return nil, gotestast.At(suite.Pos(), err)
 		}
 		if len(fixtures) > 0 {
 			if len(suite.Benchmarks()) > 0 {
 				for _, fm := range fixtures {
 					if bad := findHookedFixture(fm.resolved); bad != nil {
-						return nil, fmt.Errorf("suite %s has benchmark methods but fixture %s defines BeforeEach/AfterEach — per-method fixture hooks are not supported for benchmarks", suite.Identifier(), bad.Identifier)
+						return nil, gotestast.At(suite.Pos(), fmt.Errorf("suite %s has benchmark methods but fixture %s defines BeforeEach/AfterEach — per-method fixture hooks are not supported for benchmarks", suite.Identifier(), bad.Identifier))
 					}
 				}
 			}
@@ -130,7 +136,7 @@ func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, loc
 			if len(suite.Fuzzers()) > 0 {
 				for _, fm := range fixtures {
 					if bad := findHookedFixture(fm.resolved); bad != nil {
-						return nil, fmt.Errorf("suite %s has fuzz methods but fixture %s defines BeforeEach/AfterEach — per-execution fixture hooks are not supported for fuzz targets", suite.Identifier(), bad.Identifier)
+						return nil, gotestast.At(suite.Pos(), fmt.Errorf("suite %s has fuzz methods but fixture %s defines BeforeEach/AfterEach — per-execution fixture hooks are not supported for fuzz targets", suite.Identifier(), bad.Identifier))
 					}
 				}
 			}
@@ -344,7 +350,8 @@ func (r *resolver) resolveFixturesForSuite(suite *gotestast.TestSuiteSpec) ([]su
 	return fixtures, nil
 }
 
-func (r *resolver) resolveFixture(named *types.Named) (*ResolvedFixture, error) {
+func (r *resolver) resolveFixture(named *types.Named) (_ *ResolvedFixture, err error) {
+	defer func() { err = gotestast.At(named.Obj().Pos(), err) }()
 	if rf, ok := r.resolved[named]; ok {
 		return rf, nil
 	}
@@ -526,7 +533,8 @@ func isInternalPkgPath(pkgPath string) bool {
 		strings.Contains(pkgPath, "/internal/")
 }
 
-func (r *resolver) buildSharedFixtureRef(named *types.Named, idx int) (SharedFixtureRef, error) {
+func (r *resolver) buildSharedFixtureRef(named *types.Named, idx int) (_ SharedFixtureRef, err error) {
+	defer func() { err = gotestast.At(named.Obj().Pos(), err) }()
 	identifier := fixtureIdentifier(named)
 	typePkg := named.Obj().Pkg()
 	typePkgPath := typePkg.Path()
@@ -578,7 +586,8 @@ func (r *resolver) buildSharedFixtureRef(named *types.Named, idx int) (SharedFix
 	return ref, nil
 }
 
-func (r *resolver) registerSharedFixture(named *types.Named) error {
+func (r *resolver) registerSharedFixture(named *types.Named) (err error) {
+	defer func() { err = gotestast.At(named.Obj().Pos(), err) }()
 	typePkg := named.Obj().Pkg()
 	identifier := fixtureIdentifier(named)
 	baseName := named.Obj().Name()
@@ -767,7 +776,10 @@ func (r *resolver) findPackageForType(named *types.Named) *packages.Package {
 	if targetPath == r.targetPkg.PkgPath {
 		return r.targetPkg
 	}
-	return findImportedPackage(r.targetPkg, targetPath, make(map[string]bool))
+	if pkg := findImportedPackage(r.targetPkg, targetPath, make(map[string]bool)); pkg != nil && len(pkg.Syntax) > 0 {
+		return pkg
+	}
+	return r.sources.load(targetPath)
 }
 
 func findImportedPackage(pkg *packages.Package, targetPath string, visited map[string]bool) *packages.Package {

@@ -398,7 +398,11 @@ func qualifier(pkg *types.Package) types.Qualifier {
 	}
 }
 
-func (m *TestSuiteMethod) Pos() token.Pos   { return m.n.Pos() }
+func (m *TestSuiteMethod) Pos() token.Pos { return m.n.Pos() }
+
+// NamePos is where the method's name is written.
+func (m *TestSuiteMethod) NamePos() token.Pos { return m.m.Pos() }
+
 func (m *TestSuiteMethod) IsAsync() bool    { return IS_TEST_CASE_ASYNC.MatchString(m.m.Name()) }
 func (m *TestSuiteMethod) IsFocused() bool  { return strings.HasPrefix(m.m.Name(), "F_") }
 func (m *TestSuiteMethod) IsExcluded() bool { return strings.HasPrefix(m.m.Name(), "X_") }
@@ -761,6 +765,7 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 
 // ValidateContextConsistency checks that all methods in the suite agree on whether
 // they accept a context parameter, and that context types match BeforeEach's return type.
+// The error carries the position of the method it is about (see PosOf).
 func ValidateContextConsistency(ts *TestSuiteSpec) error {
 	be := ts.th.BeforeEach
 	ae := ts.th.AfterEach
@@ -776,69 +781,69 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 	// Bench Rule 1: benchmarks cannot coexist with a returning BeforeEach — a
 	// returning-BeforeEach context type can't thread through *testing.B/*gotest.B.
 	if len(ts.th.Benchmarks) > 0 && be != nil && be.HasReturn() {
-		return fmt.Errorf("suite %s has benchmark methods but a returning BeforeEach — move benchmarks to a dedicated suite", suiteName)
+		return At(be.NamePos(), fmt.Errorf("suite %s has benchmark methods but a returning BeforeEach — move benchmarks to a dedicated suite", suiteName))
 	}
 
 	// Bench Rule 2: bench lifecycles require *gotest.T hooks (not *testing.T).
 	if len(ts.th.Benchmarks) > 0 {
 		if ts.th.BeforeAll != nil && ts.th.BeforeAll.UsesStdlibT() {
-			return fmt.Errorf("suite %s has benchmark methods but %s uses *testing.T — bench lifecycles require *gotest.T hooks", suiteName, "BeforeAll")
+			return At(ts.th.BeforeAll.NamePos(), fmt.Errorf("suite %s has benchmark methods but %s uses *testing.T — bench lifecycles require *gotest.T hooks", suiteName, "BeforeAll"))
 		}
 		if ts.th.AfterAll != nil && ts.th.AfterAll.UsesStdlibT() {
-			return fmt.Errorf("suite %s has benchmark methods but %s uses *testing.T — bench lifecycles require *gotest.T hooks", suiteName, "AfterAll")
+			return At(ts.th.AfterAll.NamePos(), fmt.Errorf("suite %s has benchmark methods but %s uses *testing.T — bench lifecycles require *gotest.T hooks", suiteName, "AfterAll"))
 		}
 		if be != nil && be.UsesStdlibT() {
-			return fmt.Errorf("suite %s has benchmark methods but %s uses *testing.T — bench lifecycles require *gotest.T hooks", suiteName, "BeforeEach")
+			return At(be.NamePos(), fmt.Errorf("suite %s has benchmark methods but %s uses *testing.T — bench lifecycles require *gotest.T hooks", suiteName, "BeforeEach"))
 		}
 		if ae != nil && ae.UsesStdlibT() {
-			return fmt.Errorf("suite %s has benchmark methods but %s uses *testing.T — bench lifecycles require *gotest.T hooks", suiteName, "AfterEach")
+			return At(ae.NamePos(), fmt.Errorf("suite %s has benchmark methods but %s uses *testing.T — bench lifecycles require *gotest.T hooks", suiteName, "AfterEach"))
 		}
 	}
 
 	// Fuzz Rule 1: fuzz methods cannot coexist with a returning BeforeEach — a
 	// returning-BeforeEach context type can't thread through *gotest.F executions.
 	if len(ts.th.Fuzzers) > 0 && be != nil && be.HasReturn() {
-		return fmt.Errorf("suite %s has fuzz methods but a returning BeforeEach — move fuzz targets to a dedicated suite", suiteName)
+		return At(be.NamePos(), fmt.Errorf("suite %s has fuzz methods but a returning BeforeEach — move fuzz targets to a dedicated suite", suiteName))
 	}
 
 	// Fuzz Rule 2: fuzz lifecycles require *gotest.T hooks (not *testing.T).
 	if len(ts.th.Fuzzers) > 0 {
 		if ts.th.BeforeAll != nil && ts.th.BeforeAll.UsesStdlibT() {
-			return fmt.Errorf("suite %s has fuzz methods but %s uses *testing.T — fuzz lifecycles require *gotest.T hooks", suiteName, "BeforeAll")
+			return At(ts.th.BeforeAll.NamePos(), fmt.Errorf("suite %s has fuzz methods but %s uses *testing.T — fuzz lifecycles require *gotest.T hooks", suiteName, "BeforeAll"))
 		}
 		if ts.th.AfterAll != nil && ts.th.AfterAll.UsesStdlibT() {
-			return fmt.Errorf("suite %s has fuzz methods but %s uses *testing.T — fuzz lifecycles require *gotest.T hooks", suiteName, "AfterAll")
+			return At(ts.th.AfterAll.NamePos(), fmt.Errorf("suite %s has fuzz methods but %s uses *testing.T — fuzz lifecycles require *gotest.T hooks", suiteName, "AfterAll"))
 		}
 		if be != nil && be.UsesStdlibT() {
-			return fmt.Errorf("suite %s has fuzz methods but %s uses *testing.T — fuzz lifecycles require *gotest.T hooks", suiteName, "BeforeEach")
+			return At(be.NamePos(), fmt.Errorf("suite %s has fuzz methods but %s uses *testing.T — fuzz lifecycles require *gotest.T hooks", suiteName, "BeforeEach"))
 		}
 		if ae != nil && ae.UsesStdlibT() {
-			return fmt.Errorf("suite %s has fuzz methods but %s uses *testing.T — fuzz lifecycles require *gotest.T hooks", suiteName, "AfterEach")
+			return At(ae.NamePos(), fmt.Errorf("suite %s has fuzz methods but %s uses *testing.T — fuzz lifecycles require *gotest.T hooks", suiteName, "AfterEach"))
 		}
 	}
 
 	// Rule 1/7: Parallel requires returning BeforeEach (void BeforeEach forbidden)
 	if ts.th.ConfigParallel && be != nil && !be.HasReturn() {
-		return fmt.Errorf("%s: SuiteConfig has Parallel: true, but BeforeEach has no return value. Parallel methods require per-test isolation — move per-test fields to a context struct and return it from BeforeEach", suiteName)
+		return At(be.NamePos(), fmt.Errorf("%s: SuiteConfig has Parallel: true, but BeforeEach has no return value. Parallel methods require per-test isolation — move per-test fields to a context struct and return it from BeforeEach", suiteName))
 	}
 
 	if be == nil || !be.HasReturn() {
 		// Void or absent BeforeEach — no methods should have context param
 		for _, tc := range ts.th.TestCases {
 			if tc.HasContextParam() {
-				return fmt.Errorf("%s.%s: has context parameter but BeforeEach does not return a context", suiteName, tc.Identifier())
+				return At(tc.NamePos(), fmt.Errorf("%s.%s: has context parameter but BeforeEach does not return a context", suiteName, tc.Identifier()))
 			}
 		}
 		// Rule 4: No orphan context AfterEach
 		if ae != nil && ae.HasContextParam() {
-			return fmt.Errorf("%s.AfterEach: accepts a context parameter but BeforeEach does not return one", suiteName)
+			return At(ae.NamePos(), fmt.Errorf("%s.AfterEach: accepts a context parameter but BeforeEach does not return one", suiteName))
 		}
 		return nil
 	}
 
 	// Context type must be a pointer to a struct
 	if _, ok := be.returnType.(*types.Pointer); !ok {
-		return fmt.Errorf("%s.BeforeEach: return type %s must be a pointer", suiteName, be.returnType)
+		return At(be.NamePos(), fmt.Errorf("%s.BeforeEach: return type %s must be a pointer", suiteName, be.returnType))
 	}
 
 	// Returning BeforeEach — ALL methods must have context param
@@ -846,21 +851,21 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 
 	for _, tc := range ts.th.TestCases {
 		if !tc.HasContextParam() {
-			return fmt.Errorf("%s.%s: suite has a returning BeforeEach but this method does not accept the context parameter. All methods in a returning-BeforeEach suite must consistently include the context parameter", suiteName, tc.Identifier())
+			return At(tc.NamePos(), fmt.Errorf("%s.%s: suite has a returning BeforeEach but this method does not accept the context parameter. All methods in a returning-BeforeEach suite must consistently include the context parameter", suiteName, tc.Identifier()))
 		}
 		// Rule 6: Type consistency
 		if tc.contextParam.Type().String() != ctxType {
-			return fmt.Errorf("%s.%s: context parameter type %s does not match BeforeEach return type %s", suiteName, tc.Identifier(), tc.contextParam.Type(), be.returnType)
+			return At(tc.NamePos(), fmt.Errorf("%s.%s: context parameter type %s does not match BeforeEach return type %s", suiteName, tc.Identifier(), tc.contextParam.Type(), be.returnType))
 		}
 	}
 
 	// Rule 3: AfterEach matches BeforeEach
 	if ae != nil {
 		if !ae.HasContextParam() {
-			return fmt.Errorf("%s.AfterEach: suite has a returning BeforeEach but AfterEach does not accept the context. Add the context as the second parameter", suiteName)
+			return At(ae.NamePos(), fmt.Errorf("%s.AfterEach: suite has a returning BeforeEach but AfterEach does not accept the context. Add the context as the second parameter", suiteName))
 		}
 		if ae.contextParam.Type().String() != ctxType {
-			return fmt.Errorf("%s.AfterEach: context type %s does not match BeforeEach return type %s", suiteName, ae.contextParam.Type(), be.returnType)
+			return At(ae.NamePos(), fmt.Errorf("%s.AfterEach: context type %s does not match BeforeEach return type %s", suiteName, ae.contextParam.Type(), be.returnType))
 		}
 	}
 

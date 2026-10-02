@@ -1,7 +1,10 @@
 package main_test
 
 import (
+	"bytes"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -40,6 +43,19 @@ func (r cliRunner) runExit(t *gotest.T, args ...string) (string, int) {
 // explicit env has to carry that itself.
 func (r cliRunner) runEnv(t *gotest.T, env []string, args ...string) (string, int) {
 	return runGotestIn(t, r.binary, r.repoRoot, env, args...)
+}
+
+// runSplit returns stdout and stderr apart, with the exit code: what a
+// command renders and what it complains about are different claims.
+func (r cliRunner) runSplit(t *gotest.T, args ...string) (stdout, stderr string, code int) {
+	cmd := exec.Command(r.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Dir = r.repoRoot
+	var out, errs bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errs
+	err := cmd.Run()
+	var exitErr *exec.ExitError
+	gotest.True(t, err == nil || errors.As(err, &exitErr), "running gotest binary: %v\n%s", err, errs.String())
+	return out.String(), errs.String(), cmd.ProcessState.ExitCode()
 }
 
 // specTableEntries extracts `name` from rows shaped `| `name` | ... |` within the

@@ -36,6 +36,7 @@ type (
 var (
 	ExportNewDiscoverOutput  = newDiscoverOutput
 	ExportBuildDiscoverSuite = buildDiscoverSuite
+	ExportDiscover           = discover
 )
 
 // flags.go
@@ -46,6 +47,8 @@ var (
 	ExportWatchAllowed   = watchAllowed
 	ExportSummaryAllowed = summaryAllowed
 	ExportFuzzAllowed    = fuzzAllowed
+	ExportBenchAllowed   = benchAllowed
+	ExportMigrateAllowed = migrateAllowed
 )
 
 // focusguard.go
@@ -84,6 +87,7 @@ func ExportSpliceExpr(a corpusArg) string { return a.spliceExpr() }
 var (
 	ExportLintGitHubArmed = lintGitHubArmed
 	ExportRunLintGitHub   = runLintGitHub
+	ExportRunLintPlain    = runLintPlain
 )
 
 // ExportResetLintSkipFlag restores an analyzer skip flag after a test has

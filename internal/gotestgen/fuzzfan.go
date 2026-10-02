@@ -72,13 +72,9 @@ func BuildFuzzTargets(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) 
 	var refs []FuzzTargetRef
 	params := map[string][]string{}
 	for _, c := range calls {
-		typs := make([]types.Type, len(c.Types))
-		for i, t := range c.Types {
-			typs[i] = types.Unalias(t)
-		}
-		expr, ps, err := e.emitTarget(&body, c.FuncName, typs)
+		expr, ps, err := e.emitCall(&body, c)
 		if err != nil {
-			return nil, fmt.Errorf("fuzz target %s: %w", c.FuncName, err)
+			return nil, err
 		}
 		params[c.FuncName] = ps
 		refs = append(refs, FuzzTargetRef{FuncName: c.FuncName, Expr: expr})
@@ -120,6 +116,28 @@ func BuildFuzzTargets(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) 
 	}, nil
 }
 
+// FuzzRejections lists the fuzz methods of the suites the generator refuses,
+// each with its reason and position. The run path stops at the first; this is
+// for callers that report on a package without running it.
+func FuzzRejections(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) []CollectorError {
+	if pkg == nil || pkg.TypesInfo == nil {
+		return nil
+	}
+	var out []CollectorError
+	for _, ts := range suites {
+		for _, fz := range ts.Fuzzers() {
+			call, ok, err := gotestast.CollectFuzzCall(pkg, ts, fz)
+			if err == nil && ok {
+				_, _, err = newFuzzEmitter(pkg).emitCall(&strings.Builder{}, call)
+			}
+			if err != nil {
+				out = append(out, CollectorError{Err: err, Pos: gotestast.PosOf(err)})
+			}
+		}
+	}
+	return out
+}
+
 // CheckFuzzArgType reports whether gotest can fuzz an argument of type t —
 // as a pass-through kind, or through a generated fan. It returns nil when a
 // gotest.Fuzz target of this type will generate, and the emitter's own
@@ -131,6 +149,20 @@ func CheckFuzzArgType(pkg *packages.Package, t types.Type) error {
 	e := newFuzzEmitter(pkg)
 	_, err := e.fan(types.Unalias(t))
 	return err
+}
+
+// emitCall emits the target of one f.Fuzz call; a refusal carries the call's
+// position.
+func (e *fuzzEmitter) emitCall(body *strings.Builder, c gotestast.FuzzCall) (string, []string, error) {
+	typs := make([]types.Type, len(c.Types))
+	for i, t := range c.Types {
+		typs[i] = types.Unalias(t)
+	}
+	expr, ps, err := e.emitTarget(body, c.FuncName, typs)
+	if err != nil {
+		return "", nil, gotestast.At(c.Pos, fmt.Errorf("fuzz target %s: %w", c.FuncName, err))
+	}
+	return expr, ps, nil
 }
 
 // emitTarget emits the register and explode functions of one target (and

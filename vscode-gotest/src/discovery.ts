@@ -6,7 +6,13 @@ import type {
   DiscoverPackage,
   DiscoverWarning,
 } from "./types.js";
-import { buildCliCommand, clearBinaryCache, formatCliCommand } from "./cli.js";
+import {
+  buildCliCommand,
+  checkProducerVersion,
+  clearBinaryCache,
+  CliUnavailableError,
+  formatCliCommand,
+} from "./cli.js";
 import { captureStdout, CaptureTimeoutError } from "./capture.js";
 import { discoveryTimeoutSeconds } from "./config.js";
 import type { DiscoverySnapshotStore } from "./discoverySnapshotStore.js";
@@ -301,6 +307,7 @@ export class DiscoveryService {
         const jsonStart = stdout.indexOf("{");
         const json = jsonStart > 0 ? stdout.substring(jsonStart) : stdout;
         const output: DiscoverOutput = JSON.parse(json);
+        checkProducerVersion(output.version, workspaceDir);
         const parsedMs = Date.now() - startedAt - childMs;
         const fullScan = effectivePatterns.some((p) => p.includes("..."));
         const warnings = output.warnings ?? [];
@@ -313,7 +320,7 @@ export class DiscoveryService {
           0,
         );
         this.outputChannel.info(
-          `[discovery] ${packages.length} package(s), ${suites} suite(s) in ` +
+          `[discovery] ${packages.length} package(s), ${suites} suite(s) from gotest ${output.version} in ` +
             `${childMs}ms child (${firstByteMs < 0 ? "no output" : `${firstByteMs}ms to first byte`}), ` +
             `${parsedMs}ms parse of ${Buffer.byteLength(stdout)}B, ${indexMs}ms index`,
         );
@@ -343,8 +350,10 @@ export class DiscoveryService {
         }
         // A timeout already spent the whole budget. Retrying spends it twice
         // more for the same answer and pushes the first error the user sees
-        // out past six minutes.
-        const retryable = !(err instanceof CaptureTimeoutError);
+        // out past six minutes. A CLI below the floor stays below it.
+        const retryable =
+          !(err instanceof CaptureTimeoutError) &&
+          !(err instanceof CliUnavailableError);
         if (retryable && attempt < DiscoveryService.MAX_RETRIES) {
           this.outputChannel.debug(
             `[discovery] attempt ${attempt}/${DiscoveryService.MAX_RETRIES} failed, retrying: ${message}`,

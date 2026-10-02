@@ -26,6 +26,11 @@ const (
 	// benchmark node's status when fed synthetic or hand-authored event
 	// streams (e.g. via `gotest spec --input`) that choose to emit one.
 	ActionBench Action = "bench"
+	// go test (Go 1.24+) reports a build as events of its own, keyed by the
+	// ImportPath of what was built; the package that build failed names it
+	// in its verdict's FailedBuild.
+	ActionBuildOutput Action = "build-output"
+	ActionBuildFail   Action = "build-fail"
 )
 
 type TestEvent struct {
@@ -35,6 +40,10 @@ type TestEvent struct {
 	Test    string    `json:"Test"`
 	Output  string    `json:"Output"`
 	Elapsed float64   `json:"Elapsed"`
+	// ImportPath names the build a build-output or build-fail event is about.
+	ImportPath string `json:"ImportPath"`
+	// FailedBuild names the build whose failure failed this package.
+	FailedBuild string `json:"FailedBuild"`
 }
 
 func ParseEvents(r io.Reader) ([]TestEvent, error) {

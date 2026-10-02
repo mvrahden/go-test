@@ -30,7 +30,7 @@ func (s *BehaviorWalkerTestSuite) BeforeAll(t *gotest.T) {
 	dir, err := filepath.Abs(filepath.Join("testdata", "behaviors"))
 	gotest.NoError(t, err)
 
-	loaded, broken, err := gotestgen.LoadPackagesForDiscovery([]string{dir}, nil)
+	loaded, broken, err := gotestgen.LoadPackages([]string{dir}, nil)
 	gotest.NoError(t, err)
 	gotest.Empty(t, broken, "the walker's own source must compile")
 	gotest.NotEmpty(t, loaded)

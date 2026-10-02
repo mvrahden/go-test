@@ -254,6 +254,25 @@ func (s *CanaryTestSuite) TestATeardownFailureReachesTheStream(t *gotest.T) {
 	s.check(t, "teardownfailing")
 }
 
+// A shared fixture that fails to come up fails the suite that reads it and
+// the run; a suite that reads none runs and reports. The -json stream must
+// carry all three, not only the exit code.
+func (s *CanaryTestSuite) TestASetupFailureReachesTheStream(t *gotest.T) {
+	s.check(t, "setupfailing")
+}
+
+// A bench run waits for its fixtures before it dispatches; the same failure
+// is a failed run there, not a command that broke.
+func (s *CanaryTestSuite) TestASetupFailureFailsABenchRun(t *gotest.T) {
+	code, names := s.bench(t, "setupfailing", t.TempDir())
+	if code != 1 {
+		t.Errorf("setupfailing bench: exit code %d, want 1", code)
+	}
+	if len(names) != 0 {
+		t.Errorf("setupfailing bench: results %v, want none", names)
+	}
+}
+
 // A shared fixture reached only through a chain of package fixtures is still
 // started for the suite, and the suite reads its transferred state.
 func (s *CanaryTestSuite) TestSharedFixturesReachThroughFixtureChains(t *gotest.T) {

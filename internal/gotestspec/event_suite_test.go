@@ -55,3 +55,14 @@ func (s *EventTestSuite) TestParseEvents_OutputCaptured(t *gotest.T, _ *eventCtx
 	mustLen(t, "events", events, 1)
 	mustEq(t, "output", events[0].Output, "hello world\n")
 }
+
+func (s *EventTestSuite) TestParseEvents_BuildEvents(t *gotest.T, _ *eventCtx) {
+	events := parseEvents(t, `{"ImportPath":"m/p [m/p.test]","Action":"build-output","Output":"x_test.go:5:2: undefined: f\n"}
+{"ImportPath":"m/p [m/p.test]","Action":"build-fail"}
+{"Action":"fail","Package":"m/p","Elapsed":0,"FailedBuild":"m/p [m/p.test]"}`)
+	mustLen(t, "events", events, 3)
+	mustEq(t, "events[0].Action", events[0].Action, gotestspec.ActionBuildOutput)
+	mustEq(t, "events[0].ImportPath", events[0].ImportPath, "m/p [m/p.test]")
+	mustEq(t, "events[1].Action", events[1].Action, gotestspec.ActionBuildFail)
+	mustEq(t, "events[2].FailedBuild", events[2].FailedBuild, "m/p [m/p.test]")
+}

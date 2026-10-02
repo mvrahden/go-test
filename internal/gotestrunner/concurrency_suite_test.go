@@ -55,18 +55,16 @@ func (s *ConcurrencyTestSuite) TestSanitizerAwareDispatch(t *gotest.T) {
 
 	t.When("an instrumentation build flag is active with default parallelism", func(w *gotest.T) {
 		w.It("halves the process cap so instrumented suites keep scheduling headroom", func(it *gotest.T) {
-			cfg := gotestrunner.PipelineConfig{}
 			runFlags := []string{}
-			got := gotestrunner.ResolveBenchParallelismForTest(cfg, &runFlags, 64, true)
+			got := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 0, 64, true)
 			gotest.Equal(it, max(1, procs/2), got)
 		})
 
 		w.It("keeps an explicit --parallel budget untouched — the user's number wins", func(it *gotest.T) {
-			cfg := gotestrunner.PipelineConfig{Parallel: 10}
 			runFlags := []string{}
-			withRace := gotestrunner.ResolveBenchParallelismForTest(cfg, &runFlags, 64, true)
+			withRace := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 10, 64, true)
 			runFlags = []string{}
-			without := gotestrunner.ResolveBenchParallelismForTest(cfg, &runFlags, 64, false)
+			without := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 10, 64, false)
 			gotest.Equal(it, without, withRace)
 		})
 	})
@@ -147,35 +145,13 @@ func (s *ConcurrencyTestSuite) TestCompileConcurrency(t *gotest.T) {
 	}
 }
 
-func (s *ConcurrencyTestSuite) TestResolveBenchParallelism(t *gotest.T) {
-	t.When("resolving dispatch concurrency", func(w *gotest.T) {
-		w.It("forces serial dispatch (1) in bench mode regardless of budget", func(it *gotest.T) {
-			cfg := gotestrunner.PipelineConfig{Bench: true, Parallel: 8}
-			runFlags := []string{}
-			got := gotestrunner.ResolveBenchParallelismForTest(cfg, &runFlags, 5, false)
-			gotest.Equal(it, 1, got)
-		})
-
-		w.It("does not inject -parallel into run flags in bench mode", func(it *gotest.T) {
-			cfg := gotestrunner.PipelineConfig{Bench: true}
-			runFlags := []string{"-v"}
-			gotestrunner.ResolveBenchParallelismForTest(cfg, &runFlags, 5, false)
-			gotest.Equal(it, []string{"-v"}, runFlags)
-		})
-
-		w.It("falls back to computeDispatchConcurrency (with intra-injection) outside bench mode", func(it *gotest.T) {
-			cfg := gotestrunner.PipelineConfig{Bench: false}
-			runFlags := []string{}
-			got := gotestrunner.ResolveBenchParallelismForTest(cfg, &runFlags, 4, false)
-			gotest.Greater(it, got, 0)
-			found := false
-			for _, f := range runFlags {
-				if strings.HasPrefix(f, "-parallel") {
-					found = true
-				}
-			}
-			gotest.True(it, found, "expected -parallel to be injected outside bench mode, got %v", runFlags)
-		})
+func (s *ConcurrencyTestSuite) TestDispatchConcurrency(t *gotest.T) {
+	t.It("gives each suite process its share of the budget as -parallel", func(it *gotest.T) {
+		runFlags := []string{}
+		got := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 0, 4, false)
+		gotest.Greater(it, got, 0)
+		gotest.Len(it, runFlags, 1)
+		gotest.Regexp(it, `^-parallel=\d+$`, runFlags[0])
 	})
 }
 

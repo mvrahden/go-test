@@ -196,8 +196,6 @@ func skipped(rule Rule) bool {
 	return ok && *b
 }
 
-var lifecycleHooks = []string{"BeforeAll", "AfterAll", "BeforeEach", "AfterEach"}
-
 func run(pass *analysis.Pass) (any, error) {
 	insp := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
@@ -315,12 +313,25 @@ func ruleMatched(rules map[Rule]bool, rule Rule) bool {
 }
 
 func isSuppressed(pass *analysis.Pass, pos token.Pos, rule Rule) bool {
-	file := fileContaining(pass, pos)
+	return Suppressed(pass.Fset, pass.Files, pos, rule)
+}
+
+// Suppressed reports whether a nolint comment covers rule at pos: on the
+// package clause, on the line itself, or in a comment block of its own
+// directly above.
+func Suppressed(fset *token.FileSet, files []*ast.File, pos token.Pos, rule Rule) bool {
+	var file *ast.File
+	for _, f := range files {
+		if pos >= f.FileStart && pos <= f.FileEnd {
+			file = f
+			break
+		}
+	}
 	if file == nil {
 		return false
 	}
-	line := pass.Fset.Position(pos).Line
-	pkgLine := pass.Fset.Position(file.Package).Line
+	line := fset.Position(pos).Line
+	pkgLine := fset.Position(file.Package).Line
 	for _, cg := range file.Comments {
 		for _, c := range cg.List {
 			rules, ok := parseNolint(c.Text)
@@ -330,11 +341,11 @@ func isSuppressed(pass *analysis.Pass, pos token.Pos, rule Rule) bool {
 			if !ruleMatched(rules, rule) {
 				continue
 			}
-			cLine := pass.Fset.Position(c.Pos()).Line
+			cLine := fset.Position(c.Pos()).Line
 			if cLine == pkgLine || cLine == line {
 				return true
 			}
-			if pass.Fset.Position(cg.End()).Line == line-1 && startsItsLine(pass, file, cg) {
+			if fset.Position(cg.End()).Line == line-1 && startsItsLine(fset, file, cg) {
 				return true
 			}
 		}
@@ -345,14 +356,14 @@ func isSuppressed(pass *analysis.Pass, pos token.Pos, rule Rule) bool {
 // startsItsLine reports whether no code precedes the comment group on its
 // opening line — a comment trailing the previous statement must not suppress
 // the line below it.
-func startsItsLine(pass *analysis.Pass, file *ast.File, cg *ast.CommentGroup) bool {
-	cgLine := pass.Fset.Position(cg.Pos()).Line
+func startsItsLine(fset *token.FileSet, file *ast.File, cg *ast.CommentGroup) bool {
+	cgLine := fset.Position(cg.Pos()).Line
 	standalone := true
 	ast.Inspect(file, func(n ast.Node) bool {
 		if n == nil || !standalone {
 			return false
 		}
-		if n.End() <= cg.Pos() && pass.Fset.Position(n.End()).Line == cgLine {
+		if n.End() <= cg.Pos() && fset.Position(n.End()).Line == cgLine {
 			standalone = false
 			return false
 		}
@@ -519,16 +530,13 @@ func checkMethods(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 
 		if isLifecycleHook(stripped) {
 			if strings.HasPrefix(methodName, protocol.PrefixExcluded) {
-				report(pass, XLifecycle, fd.Pos(), "X_ prefix on lifecycle hook %s.%s has no effect — remove the prefix or the method", recvName, methodName)
+				report(pass, XLifecycle, fd.Pos(), "%s", gotestast.ExcludedHookMessage(recvName, methodName))
 			}
 			return
 		}
 
-		for _, hook := range lifecycleHooks {
-			if levenshtein(stripped, hook) <= 2 {
-				report(pass, LifecycleTypo, fd.Pos(), "method %s on suite %s is similar to lifecycle hook %s", methodName, recvName, hook)
-				return
-			}
+		if hook, ok := gotestast.MisspelledHook(stripped); ok {
+			report(pass, LifecycleTypo, fd.Pos(), "%s", gotestast.MisspelledHookMessage(recvName, methodName, hook))
 		}
 	})
 }
@@ -1218,7 +1226,7 @@ func recvTypePos(recv *ast.FieldList) token.Pos {
 }
 
 func isLifecycleHook(name string) bool {
-	return slices.Contains(lifecycleHooks, name)
+	return slices.Contains(gotestast.LifecycleHooks, name)
 }
 
 // --- poll-scope check ---
@@ -1359,34 +1367,4 @@ func calleeName(fun ast.Expr) string {
 		return calleeName(fn.X)
 	}
 	return ""
-}
-
-func levenshtein(a, b string) int {
-	la, lb := len(a), len(b)
-	if la == 0 {
-		return lb
-	}
-	if lb == 0 {
-		return la
-	}
-
-	prev := make([]int, lb+1)
-	curr := make([]int, lb+1)
-	for j := 0; j <= lb; j++ {
-		prev[j] = j
-	}
-
-	for i := 1; i <= la; i++ {
-		curr[0] = i
-		for j := 1; j <= lb; j++ {
-			cost := 1
-			if a[i-1] == b[j-1] {
-				cost = 0
-			}
-			curr[j] = min(curr[j-1]+1, min(prev[j]+1, prev[j-1]+cost))
-		}
-		prev, curr = curr, prev
-	}
-
-	return prev[lb]
 }

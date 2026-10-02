@@ -95,14 +95,14 @@ func (s *BuildFailureVerdictsTestSuite) TestCollectorBooksBrokenPackages(t *gote
 
 func (s *BuildFailureVerdictsTestSuite) TestPipelineFailsOnBrokenPackages(t *gotest.T, c *buildFailureCtx) {
 	for sub, tC := range gotest.Each(t, []struct {
-		Desc      string
-		streaming bool
+		Desc  string
+		bench bool
 	}{
-		{"batch mode", false},
-		{"streaming mode", true},
+		{"a bench run, which compiles before it dispatches", true},
+		{"a test run, which overlaps the two", false},
 	}) {
 		result, err := gotestrunner.RunPipeline(context.Background(), gotestrunner.PipelineConfig{
-			Streaming:  tC.streaming,
+			Bench:      tC.bench,
 			OutputMode: gotestrunner.RunCaptureJSON,
 		}, brokenOverlay(c.tmpDir))
 		gotest.NoError(sub, err)
@@ -117,14 +117,14 @@ func (s *BuildFailureVerdictsTestSuite) TestPipelineFailsOnBrokenPackages(t *got
 
 func (s *BuildFailureVerdictsTestSuite) TestPipelineCleanWhenNothingMatched(t *gotest.T, c *buildFailureCtx) {
 	for sub, tC := range gotest.Each(t, []struct {
-		Desc      string
-		streaming bool
+		Desc  string
+		bench bool
 	}{
-		{"batch mode", false},
-		{"streaming mode", true},
+		{"a bench run, which compiles before it dispatches", true},
+		{"a test run, which overlaps the two", false},
 	}) {
 		result, err := gotestrunner.RunPipeline(context.Background(), gotestrunner.PipelineConfig{
-			Streaming:  tC.streaming,
+			Bench:      tC.bench,
 			OutputMode: gotestrunner.RunCaptureJSON,
 		}, &gotestrunner.OverlayResult{WorkDir: c.tmpDir})
 		gotest.NoError(sub, err)
@@ -135,15 +135,15 @@ func (s *BuildFailureVerdictsTestSuite) TestPipelineCleanWhenNothingMatched(t *g
 
 func (s *BuildFailureVerdictsTestSuite) TestPipelineCutShortBeforeAnySuite(t *gotest.T, c *buildFailureCtx) {
 	for sub, tC := range gotest.Each(t, []struct {
-		Desc      string
-		streaming bool
-		deadline  bool
-		want      int
+		Desc     string
+		bench    bool
+		deadline bool
+		want     int
 	}{
-		{"batch mode, interrupted", false, false, 130},
-		{"batch mode, past its deadline", false, true, 1},
-		{"streaming mode, interrupted", true, false, 130},
-		{"streaming mode, past its deadline", true, true, 1},
+		{"a bench run, interrupted", true, false, 130},
+		{"a bench run, past its deadline", true, true, 1},
+		{"a test run, interrupted", false, false, 130},
+		{"a test run, past its deadline", false, true, 1},
 	}) {
 		ctx, cancel := context.WithCancel(context.Background())
 		if tC.deadline {
@@ -151,7 +151,7 @@ func (s *BuildFailureVerdictsTestSuite) TestPipelineCutShortBeforeAnySuite(t *go
 		}
 		cancel()
 		result, err := gotestrunner.RunPipeline(ctx, gotestrunner.PipelineConfig{
-			Streaming:     tC.streaming,
+			Bench:         tC.bench,
 			OutputMode:    gotestrunner.RunCaptureJSON,
 			GlobalTimeout: time.Minute,
 		}, &gotestrunner.OverlayResult{WorkDir: c.tmpDir})

@@ -26,7 +26,7 @@ func (s *TestOnlyTestSuite) TestIsTestOnly(t *gotest.T) {
 			}
 
 			for _, tc := range tests {
-				results, _, err := gotestgen.LoadPackagesForDiscovery([]string{filepath.Join(absExamples, tc.pattern)}, nil)
+				results, _, err := gotestgen.LoadPackages([]string{filepath.Join(absExamples, tc.pattern)}, nil)
 				gotest.NoError(it, err)
 				gotest.NotEmpty(it, results, "no packages found for %s", tc.pattern)
 

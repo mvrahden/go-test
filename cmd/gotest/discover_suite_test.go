@@ -139,6 +139,63 @@ func (s *DiscoverTestSuite) TestRunDiscover_VersionOpensTheDocument(t *gotest.T)
 	gotest.Regexp(t, `^\{"version":"`+regexp.QuoteMeta(about.ResolvedVersion())+`",`, string(data))
 }
 
+// firstContactDir names a package of the generator's first-contact fixtures.
+func (s *DiscoverTestSuite) firstContactDir(pkg string) string {
+	return filepath.Join(s.repoRoot, "internal", "gotestgen", "testdata", "firstcontact", pkg)
+}
+
+func (s *DiscoverTestSuite) TestDiscover_WarnsAboutWhatNeverRuns(t *gotest.T) {
+	out, err := ExportDiscover([]string{s.firstContactDir("typos")}, nil)
+	gotest.NoError(t, err)
+
+	t.It("keeps the suite listed", func(it *gotest.T) {
+		gotest.Len(it, out.Packages, 1)
+		gotest.Len(it, out.Packages[0].Suites, 1)
+		gotest.Equal(it, "TypoTestSuite", out.Packages[0].Suites[0].Name)
+	})
+	t.It("locates each method, leaving out the one a nolint covers", func(it *gotest.T) {
+		type located struct {
+			File    string
+			Line    int
+			Message string
+		}
+		var got []located
+		for _, w := range out.Warnings {
+			got = append(got, located{w.File, w.Line, w.Message})
+		}
+		gotest.Equal(it, []located{
+			{"suite_test.go", 7, "method BeforAll on suite TypoTestSuite is similar to lifecycle hook BeforeAll"},
+			{"suite_test.go", 9, "X_ prefix on lifecycle hook TypoTestSuite.X_AfterAll has no effect — remove the prefix or the method"},
+			{"suite_test.go", 18, "Helpers.BenchmarkLookup takes *gotest.B, but Helpers is not a test suite (its name must end in TestSuite): the benchmark never runs"},
+			{"suite_test.go", 20, "Helpers.FuzzParse takes *gotest.F, but Helpers is not a test suite (its name must end in TestSuite): the fuzz target never runs"},
+		}, got)
+	})
+}
+
+func (s *DiscoverTestSuite) TestDiscover_WarnsAboutWhatARunRefuses(t *gotest.T) {
+	t.When("a fuzz argument cannot be fuzzed", func(w *gotest.T) {
+		out, err := ExportDiscover([]string{s.firstContactDir("fuzzreject")}, nil)
+		gotest.NoError(w, err)
+
+		w.It("names the refusal at the f.Fuzz call and keeps the suite", func(it *gotest.T) {
+			gotest.Len(it, out.Warnings, 1)
+			gotest.Equal(it, 14, out.Warnings[0].Line)
+			gotest.Contains(it, out.Warnings[0].Message, "Frame.Done (chan struct{}) is not fuzzable")
+			gotest.Len(it, out.Packages[0].Suites, 1)
+		})
+	})
+	t.When("a method is out of step with the suite's context", func(w *gotest.T) {
+		out, err := ExportDiscover([]string{s.firstContactDir("missingctx")}, nil)
+		gotest.NoError(w, err)
+
+		w.It("points at that method", func(it *gotest.T) {
+			gotest.Len(it, out.Warnings, 1)
+			gotest.Equal(it, 13, out.Warnings[0].Line)
+			gotest.Contains(it, out.Warnings[0].Message, "CtxTestSuite.TestWithoutContext")
+		})
+	})
+}
+
 func (s *DiscoverTestSuite) TestRunDiscover_Benchmarks(t *gotest.T) {
 	t.It("includes benchmark methods in discover JSON, marking exclusions", func(it *gotest.T) {
 		srcPath := filepath.Join(

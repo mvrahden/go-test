@@ -2,7 +2,8 @@ package gotestrunner_test
 
 import (
 	"context"
-	"os/exec"
+	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -18,6 +19,21 @@ func (s *SuiteCommandTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
 	cfg.Parallel = true
 	return cfg
+}
+
+func (s *SuiteCommandTestSuite) TestASuiteThatCannotStart(t *gotest.T) {
+	target := gotestrunner.SuiteTarget{
+		SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFooSuite"},
+		BinaryPath: filepath.Join(t.TempDir(), "gone.test"),
+	}
+	result := gotestrunner.RunSingleSuite(context.Background(), target, nil, false)
+
+	t.It("fails as a run that cannot be believed", func(it *gotest.T) {
+		gotest.Equal(it, 2, result.ExitCode)
+	})
+	t.It("says which suite and why", func(it *gotest.T) {
+		gotest.Regexp(it, `^gotest: TestFooSuite did not start: .*gone\.test`, string(result.Stderr))
+	})
 }
 
 func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
@@ -142,12 +158,12 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 	t.When("test2json mode", func(w *gotest.T) {
 		ctx := context.Background()
 		env := []string{"PATH=/usr/bin", "HOME=/home/test"}
+		converter := toolchainTest2JSON(w)
 
 		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
-			Name       string
-			target     gotestrunner.SuiteTarget
-			wantBinary string
-			wantArgs   []string
+			Name     string
+			target   gotestrunner.SuiteTarget
+			wantArgs []string
 		}{
 			{
 				Name: "basic suite",
@@ -155,8 +171,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFooSuite"},
 					BinaryPath: "/tmp/pkg.test",
 				},
-				wantBinary: "go",
-				wantArgs: []string{"go", "tool", "test2json", "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
+				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
 					"-test.run=^TestFooSuite$", "-test.v=test2json"},
 			},
 			{
@@ -165,8 +180,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFooSuite", RunFilter: "^TestFooSuite$/^TestBar$"},
 					BinaryPath: "/tmp/pkg.test",
 				},
-				wantBinary: "go",
-				wantArgs: []string{"go", "tool", "test2json", "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
+				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
 					"-test.run=^TestFooSuite$/^TestBar$", "-test.v=test2json"},
 			},
 			{
@@ -176,8 +190,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					BinaryPath: "/tmp/pkg.test",
 					RunFlags:   []string{"-test.v", "-test.timeout=30s"},
 				},
-				wantBinary: "go",
-				wantArgs: []string{"go", "tool", "test2json", "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
+				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
 					"-test.run=^TestFooSuite$", "-test.v=test2json", "-test.timeout=30s"},
 			},
 			{
@@ -187,8 +200,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					BinaryPath: "/tmp/pkg.test",
 					RunFlags:   []string{"-test.v=true"},
 				},
-				wantBinary: "go",
-				wantArgs: []string{"go", "tool", "test2json", "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
+				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
 					"-test.run=^TestFooSuite$", "-test.v=test2json"},
 			},
 			{
@@ -198,8 +210,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					BinaryPath:   "/tmp/pkg.test",
 					CoverProfile: "/tmp/cover.out",
 				},
-				wantBinary: "go",
-				wantArgs: []string{"go", "tool", "test2json", "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
+				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
 					"-test.run=^TestFooSuite$", "-test.v=test2json", "-test.coverprofile=/tmp/cover.out"},
 			},
 			{
@@ -210,8 +221,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					RunFlags:     []string{"-test.v", "-test.timeout=30s", "-test.count=1"},
 					CoverProfile: "/tmp/cover.out",
 				},
-				wantBinary: "go",
-				wantArgs: []string{"go", "tool", "test2json", "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
+				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
 					"-test.run=^TestFooSuite$/^TestBar$", "-test.v=test2json",
 					"-test.timeout=30s", "-test.count=1",
 					"-test.coverprofile=/tmp/cover.out"},
@@ -222,29 +232,14 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFoo.Bar+Baz"},
 					BinaryPath: "/tmp/pkg.test",
 				},
-				wantBinary: "go",
-				wantArgs: []string{"go", "tool", "test2json", "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
+				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
 					"-test.run=^TestFoo\\.Bar\\+Baz$", "-test.v=test2json"},
 			},
 		}) {
 			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, tc.target, env, true)
 
-			// For "go", cmd.Path is resolved to the absolute path; compare base name loosely.
-			base := filepath.Base(cmd.Path)
-			gotest.True(sub, base == "go" || base == "go.exe",
-				"binary: got %q, want go or go.exe", cmd.Path)
-
-			// Compare full args list.
-			gotest.Len(sub, tc.wantArgs, len(cmd.Args))
-			for i := range cmd.Args {
-				if i == 0 {
-					a0 := filepath.Base(cmd.Args[0])
-					gotest.True(sub, a0 == "go" || a0 == "go.exe",
-						"args[0]: got %q, want go or go.exe", cmd.Args[0])
-					continue
-				}
-				gotest.Equal(sub, tc.wantArgs[i], cmd.Args[i])
-			}
+			gotest.Equal(sub, converter, cmd.Path)
+			gotest.Equal(sub, tc.wantArgs, cmd.Args)
 
 			gotest.Len(sub, env, len(cmd.Env))
 		}
@@ -266,7 +261,6 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 				_, refArgs := buildTest2JSONArgs(target)
 				cmd := gotestrunner.ExportBuildSuiteCmd(refCtx, target, refEnv, true)
 
-				// cmd.Args[1:] against refArgs (which doesn't include "go").
 				gotArgs := cmd.Args[1:]
 				gotest.Len(it, refArgs, len(gotArgs))
 				for i := range gotArgs {
@@ -276,20 +270,32 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 		})
 	})
 
-	t.When("resolving go binary", func(w *gotest.T) {
-		w.It("resolves go to full path in test2json mode", func(it *gotest.T) {
-			ctx := context.Background()
+	t.When("resolving the converter", func(w *gotest.T) {
+		w.It("names the binary the toolchain names", func(it *gotest.T) {
+			gotest.Equal(it, toolchainTest2JSON(it), gotestrunner.ExportTest2JSONPath())
+		})
+		w.It("takes the path go tool -n prints", func(it *gotest.T) {
+			bin := filepath.Join(it.TempDir(), "test2json")
+			gotest.NoError(it, os.WriteFile(bin, nil, 0o600))
+			got := gotestrunner.ExportResolveTest2JSON(func() ([]byte, error) { return []byte(bin + "\n"), nil })
+			gotest.Equal(it, bin, got)
+		})
+		w.It("resolves nothing when go tool fails", func(it *gotest.T) {
+			got := gotestrunner.ExportResolveTest2JSON(func() ([]byte, error) { return nil, errors.New("no go") })
+			gotest.Empty(it, got)
+		})
+		w.It("resolves nothing when the printed path is no file", func(it *gotest.T) {
+			missing := filepath.Join(it.TempDir(), "gone")
+			got := gotestrunner.ExportResolveTest2JSON(func() ([]byte, error) { return []byte(missing), nil })
+			gotest.Empty(it, got)
+		})
+		w.It("falls back to the go tool launcher without a path", func(it *gotest.T) {
 			target := gotestrunner.SuiteTarget{
 				SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFoo"},
 				BinaryPath: "/tmp/pkg.test",
 			}
-			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, target, nil, true)
-
-			goPath, err := exec.LookPath("go")
-			if err != nil {
-				it.Skipf("go not in PATH")
-			}
-			gotest.Equal(it, goPath, cmd.Path)
+			argv := gotestrunner.ExportTest2JSONArgv("", target, []string{"-test.run=^TestFoo$"})
+			gotest.Equal(it, []string{"go", "tool", "test2json", "-p", "example.com/pkg", "-t", "/tmp/pkg.test", "-test.run=^TestFoo$"}, argv)
 		})
 	})
 

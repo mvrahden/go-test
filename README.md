@@ -29,7 +29,7 @@ go get -tool github.com/mvrahden/go-test/cmd/gotest@latest
 go tool gotest ./...
 ```
 
-`go get -tool` pins the CLI and the `pkg/gotest` runtime to the same release, and `go tool` rebuilds the CLI with your module's Go. Upgrading is the same command again. Avoid a global `go install` binary: it drifts from `go.mod` on both axes, and gotest refuses to run on that drift.
+`go get -tool` pins the CLI and the `pkg/gotest` runtime to the same release, and `go tool` rebuilds the CLI with your module's Go. Upgrading is the same command again. In a module that already requires gotest, name that version in place of `@latest` to declare the tool without moving the pin. Avoid a global `go install` binary: it drifts from `go.mod` on both axes, and gotest refuses to run on that drift.
 
 The examples below write `gotest` for brevity; with the tool directive, read `go tool gotest`. The VS Code extension and the GitHub action run the same CLI your `go.mod` selects.
 
@@ -556,6 +556,22 @@ func (s *Suite) TestParsing(t *gotest.T) {
 Each entry becomes a subtest.
 Uses `Desc` or `Name` field for the test name, falls back to `#0`, `#1`, etc.
 
+### Async Test Methods
+
+A method whose name ends in `Async` and whose last parameter is `done func()` completes when `done()` is called, not when it returns; the suite's `Timeout` fails it if `done()` never is.
+
+```go
+func (s *BusTestSuite) TestDeliveryAsync(t *gotest.T, done func()) {
+    s.bus.Subscribe(func(evt Event) {
+        gotest.Equal(t, "created", evt.Kind)
+        done()
+    })
+    s.bus.Publish(Event{Kind: "created"})
+}
+```
+
+For a condition that is polled rather than signalled, use `Eventually`.
+
 ### Async Assertions
 
 ```go
@@ -727,7 +743,7 @@ func (s *UserServiceTestSuite) FuzzCreate(f *gotest.F) {
 What fans out:
 
 - `string`, `bool` and `[]byte` fields pass through unchanged.
-- Numbers ride as fixed-width bytes, which gives the mutator its richest operators: bit flips, interesting values, boundary values. Why that beats a native number is in ARCHITECTURE.md, "Code Generation".
+- Numbers ride as fixed-width bytes, which gives the mutator its richest operators: bit flips, interesting values, boundary values. Why that beats a native number is in ARCHITECTURE.md, "Code Generation". A bare number argument (`func(t *gotest.T, n int)`) rides the same way, so its corpus entries on disk are bytes, not a readable number.
 - Nested structs, pointers and small arrays flatten into the same tuple; a variable-length slice of non-bytes rides as one packed `[]byte`.
 - Every position of a multi-argument callback fans on its own: `f.Fuzz(func(t *gotest.T, h Header, n int))` fans `Header` into its leaves and `n` into one leaf. Two values as arguments and two values in a struct reach the engine identically; use a struct when the values form a concept.
 
@@ -918,7 +934,7 @@ Preset constructors for common scenarios:
 ### Project Configuration
 
 Project-level defaults live in `.gotest.yml` at the repository root (or nearest parent with a `go.mod`).
-CLI flags always take precedence over config values; omitted keys fall back to defaults (an explicit `0` on a duration key disables the deadline).
+CLI flags always take precedence over config values; omitted keys fall back to defaults (an explicit `0` on a duration key disables the deadline — a flag or a key can be absent, so `0` is free to mean off; a `SuiteConfig` field cannot, so there `0` means the default and `gotest.NoDeadline` means off).
 
 ```yaml
 # .gotest.yml
@@ -944,6 +960,9 @@ lint:
 | `compile-parallel` | int | `--compile-parallel` | Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan) |
 | `debounce` | duration | `--debounce` | Watch mode re-run delay |
 | `lint.skip` | list | — | Non-integrity lint rules to disable project-wide |
+| `bench.baseline` | path | `--against`, `--save=` | Baseline `gotest bench` compares against and a bare `--save=` writes |
+| `bench.gate` | float | `--gate` | Regression percentage that fails a bench run (0 disables) |
+| `fuzz.harvest` | bool | `--no-harvest` | Seed harvesting from table tests (default: true) |
 
 ## Test Selection
 
@@ -979,6 +998,7 @@ func (s *IntegrationTestSuite) SuiteGuard() string {
 ```
 
 Returns a non-empty reason to skip the entire suite.
+The guard runs before the suite's config, `BeforeAll` and every test method; package and shared fixtures the suite binds are still set up first.
 Unlike `X_` (static exclude), `SuiteGuard` makes the decision at runtime — useful for integration tests that need external services.
 
 ## Tooling
@@ -1025,10 +1045,10 @@ gotest lint ./...
 Twenty-eight rules in three tiers:
 
 - **Integrity** — violations can make test outcomes unreliable or leak resources: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, reads of shared fixtures a suite never declared (window scheduling only starts what is declared), and generated files checked into version control.
-- **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, unnecessary `t.T()` escapes, `When("when …")`/`It("it …")` descriptions that spell the word the spec already supplies, and an explicit `0` on a `SuiteConfig`/`FixtureConfig` timeout (now the default deadline; the fix writes `gotest.NoDeadline`, keeping the old meaning). `-fix` applies the safe rewrites.
+- **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, unnecessary `t.T()` escapes, `When("when …")`/`It("it …")` descriptions that spell the word the spec already supplies, and a literal negative `SuiteConfig`/`FixtureConfig` timeout (every negative disables the deadline; the fix writes `gotest.NoDeadline`, keeping the old meaning). `-fix` applies the safe rewrites.
 - **Migration** — adoption aids for codebases moving to gotest: stdlib test functions and testify imports; coexistence is legitimate.
 
-Suppress per line with `//nolint:<rule>` (same line or the comment block directly above); expressiveness and migration rules can also be disabled project-wide via `.gotest.yml` (`lint.skip`). See the [design spec](docs/design/spec.md#linter) for the full rule table.
+Suppress per line with `//nolint:<rule>` (on the same line, or in a comment block of its own ending on the line directly above — a comment trailing other code does not reach the next line); expressiveness and migration rules can also be disabled project-wide via `.gotest.yml` (`lint.skip`). See the [design spec](docs/design/spec.md#linter) for the full rule table.
 There is no golangci-lint plugin — run `gotest lint` as its own CI step alongside your existing linter. Inside GitHub Actions (or with `--github`), findings additionally surface as inline PR annotations and a step-summary table. (The standalone `gotest-lint` binary was retired; `gotest lint` accepts the same targets and driver flags, and `pkg/lint` exports the analyzer for external `go/analysis` drivers.)
 
 ## GitHub Actions
@@ -1139,6 +1159,10 @@ gotest help                    # show help
 ```
 
 All `go test` flags work unchanged: `-race`, `-cover`, `-count`, `-run`, `-json`, `-short`, `-timeout`, `-v`.
+
+A run exits `0` when everything passed, `1` on a failed test, a shared fixture that failed to set up or tear down, or an expired `--timeout`, `2` on a usage, generation or build error and on a green run in which a declared test never ran, and `130` when it was interrupted. `lint` and `fuzz` state their own codes in `gotest help lint` and `gotest help fuzz`.
+
+To feed a JUnit consumer, run the tests through a converter that reads the events: `gotestsum --junitfile report.xml --raw-command -- go tool gotest -json ./...`. The report is red whenever the run is — a package that does not build or a shared fixture that fails included — and gotest's exit code passes through. A converter that parses the printed text instead of the events, such as `go-junit-report`, reports those failures as plain output or not at all.
 
 ## Naming Conventions
 

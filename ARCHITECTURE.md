@@ -35,7 +35,7 @@
              ▼                              │
  ┌─────────────────────────────────────────────────────────────┐
  │  4. EXECUTION                                               │
- │     Per-suite subprocesses, 2×GOMAXPROCS concurrency        │
+ │     Per-suite subprocesses, at most GOMAXPROCS at a time    │
  │     Suites needing shared fixtures block on resolveFixture- │
  │     Env(); others start immediately with base env           │
  └──────────────────────────┬──────────────────────────────────┘
@@ -59,13 +59,12 @@ Discovery is fully static -- AST-based, no reflection at runtime.
 ```
 cli.go:runTest() / discover.go:runDiscover()
   │
-  ├─ LoadPackages(patterns, buildFlags)        [exec path]
-  │    mode: NeedModule | NeedSyntax | NeedName | NeedTypes
-  │           | NeedTypesInfo | NeedImports | NeedDeps
-  │
-  └─ LoadPackagesForDiscovery(patterns, ...)   [discover path]
-       mode: same but NeedFiles instead of NeedDeps
-       (avoids type-checking the full transitive dep graph)
+  └─ LoadPackages(patterns, buildFlags)
+       mode: NeedModule | NeedSyntax | NeedName | NeedTypes
+              | NeedTypesInfo | NeedImports | NeedFiles
+       (matched packages from source, dependencies from export data;
+        a dependency that declares a fixture with Hydrate is loaded
+        again as a root, so its fields classify from source)
 ```
 
 `packages.Load()` with `Tests: true` returns both internal-test (`pkg_test.go`
@@ -270,7 +269,8 @@ func BenchmarkFooTestSuite(b *testing.B) {
 A suite must be named `*TestSuite` for its `Benchmark*` methods to be
 collected at all — Pass 1 discovery matches on that suffix regardless of
 whether the struct has `Test*` methods. A bench-only struct without the
-suffix is invisible to the collector; its methods are silently dropped.
+suffix is invisible to the collector and its methods never run; `discover`
+warns about each one that takes `*gotest.B` or `*gotest.F`.
 `ValidateContextConsistency` (Pass 4) additionally rejects a suite that
 mixes `Benchmark*` methods with a returning `BeforeEach` (its context type
 can't thread through `*gotest.B`) or with any stdlib `*testing.T` lifecycle
@@ -515,7 +515,7 @@ The system has **four levels of parallelism**, each with distinct mechanisms:
 │  │  sf2.BeforeAll() ──┘        │                                    │
 │  └──────────────────────────────┘                                   │
 ├─────────────────────────────────────────────────────────────────────┤
-│ Level 3: Suite EXECUTION           semaphore: 2×GOMAXPROCS(0)      │
+│ Level 3: Suite EXECUTION     semaphore: min(suites, GOMAXPROCS)    │
 │                                                                     │
 │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐           │
 │  │suite │ │suite │ │suite │ │suite │ │suite │ │suite │  ← OS      │
@@ -557,10 +557,15 @@ concurrently running suites would corrupt. At the bulk→tail barrier the
 runner re-windows shared fixtures for the tail (see Per-Suite Fixture
 Readiness).
 
-The Level 1 and Level 3 semaphore defaults (`NumCPU`, `2×GOMAXPROCS`) apply
-to uninstrumented builds; under `-race`/`-msan`/`-asan` both halve, since
-instrumentation at least doubles the CPU cost per instruction stream. An
-explicit `--compile-parallel`/`--parallel` always wins. Two aids keep
+Level 3 is sized from a budget of concurrent test methods, `--parallel`,
+2×GOMAXPROCS by default: at most GOMAXPROCS suite processes run at a time,
+and each gets the budget divided by the process count as its
+`-test.parallel` (`ComputeConcurrency`). A user `-parallel=N` pins that
+in-process value instead; the process count is then 2×GOMAXPROCS, which
+makes it a different axis from `go test -p`. These defaults and Level 1's
+(`NumCPU`) apply to uninstrumented builds; under `-race`/`-msan`/`-asan`
+they halve, since instrumentation at least doubles the CPU cost per
+instruction stream. An explicit `--compile-parallel`/`--parallel` always wins. Two aids keep
 wall-clock verdicts diagnosable: builds running past 15s log a slow-build
 notice (a log line, never a verdict), and scheduling context (`schedinfo`)
 is appended to fixture-setup deadline failures — a starved build looks
@@ -571,13 +576,14 @@ exactly like a broken one.
 `gotest bench` runs the same pipeline with `PipelineConfig.Bench: true`, and
 that flag changes two things:
 
-- `resolveMaxParallel` short-circuits to `maxParallel = 1` — Level 3 above
-  collapses to one suite subprocess at a time, `--parallel`/`-test.parallel`
-  are ignored for scheduling. Running benchmarks concurrently would make
-  their timing numbers meaningless.
-- `Streaming: false` — compilation and execution are not overlapped for
-  bench runs; `runBatch` compiles every package first, then runs. `go test -c`
-  never competes with a running benchmark for CPU.
+- `RunBenchSuites` dispatches one suite subprocess at a time — Level 3 above
+  collapses, `--parallel`/`-test.parallel` are ignored for scheduling.
+  Running benchmarks concurrently would make their timing numbers
+  meaningless.
+- `RunPipeline` takes `runBench` instead of `runStreaming` — compilation and
+  execution are not overlapped for bench runs; every package is compiled
+  first, then the benchmarks run. `go test -c` never competes with a running
+  benchmark for CPU.
 
 Process-per-suite isolation (Level 3's existing design) is also a
 methodological benefit for benchmarks: GC pressure from one benchmark
@@ -605,7 +611,7 @@ build+instrument+run via `cmd/go`:
 RunFuzzTargets(ctx, targets, cfg)
   │
   jobs := resolveFuzzJobs(cfg.Jobs)        // default max(1, GOMAXPROCS/2)
-  budget := splitBudget(cfg.Total, len(targets))  // even split, 10s floor
+  budget := PlanFuzzSchedule(cfg.Total, len(targets), jobs)  // jobs-aware share, 10s floor
   │
   for each target (bounded by a jobs-sized semaphore):
     go test <overlay-flag> -run=^$ -fuzz=^<quoted Func>$ [-fuzztime=<budget>] <buildFlags> <pkg>
@@ -634,8 +640,8 @@ itself: findings do.
 
 ### Streaming Execution (Compile-Execute Overlap)
 
-`RunPipeline` with `Streaming: true` is the primary execution path. It overlaps
-compilation with test execution:
+Every run but a bench run streams (`runStreaming`): the plain run, `-json`,
+`spec`, `summary` and `watch`. It overlaps compilation with test execution:
 
 ```
 time ─────────────────────────────────────────────────────────────────▶
@@ -720,14 +726,18 @@ still run — never speculatively.
 │  └─ Deadline on each t.Run subtest body                                │
 │     Default: 30s                                                       │
 │                                                                        │
+│  -timeout (go test flag, per suite process)                            │
+│  └─ The test binary's own -test.timeout, which panics the process      │
+│     Default: 10m, injected when the run passes none                    │
+│                                                                        │
 │  Teardown Budget (per suite subprocess)                                │
 │  └─ Written to BudgetFile after fixture setup completes                │
 │     = max(fixture tree path timeout) + max(suite setup timeout) + 30s  │
 │     Used by RunSingleSuite on context cancellation before SIGKILL      │
 │                                                                        │
 │  GracefulShutdownDelay (hardcoded: 5m30s)                              │
-│  └─ Fallback when no budget file exists                                │
-│     Must cover longest possible fixture teardown                       │
+│  └─ Fallback when no budget file exists; a budget file can name any    │
+│     length, and nothing else bounds a managed process                  │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
 ```
@@ -753,7 +763,7 @@ still run — never speculatively.
             │ →tree    │  │ →tree    │  │ →tree    │
             │          │  │          │  │          │
             │ WaitDly: │  │ WaitDly: │  │ WaitDly: │
-            │ 0 (mgd)  │  │ 5m30s    │  │ 0 (mgd)  │
+            │ 0 (mgd)  │  │ 0 (mgd)  │  │ 0 (mgd)  │
             └──────────┘  └──────────┘  └──────────┘
                                              │
                                  On ctx.Done():
@@ -823,7 +833,8 @@ signalled. On Windows, `Release` also kills what the root left running.
 │                                                                      │
 ├─ RunStreamJSON (-json flag) ─────────────────────────────────────────┤
 │                                                                      │
-│  Each suite wrapped with `go tool test2json -p <pkg> -t <binary>`    │
+│  Each suite wrapped with `test2json -p <pkg> -t <binary>`; the       │
+│  tool's path is resolved once per run (`go tool -n test2json`).      │
 │  JSON events streamed to stdout as each suite completes.             │
 │  No batching; order depends on completion time.                      │
 │                                                                      │
@@ -866,7 +877,7 @@ BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, exclusiveByP
 
 Each target becomes one `exec.Command`:
 ```
-go tool test2json -p <pkg> -t <binary> -test.run=^TestFooTestSuite$ [flags]
+<test2json> -p <pkg> -t <binary> -test.run=^TestFooTestSuite$ [flags]
 ```
 
 Or without test2json:
@@ -910,8 +921,7 @@ bench target as:
 
 `-test.run=^$` disables ordinary tests for the run; `-test.benchmem` is
 appended unless already present in the forwarded flags.
-`resolveMaxParallel` returns `1` whenever `PipelineConfig.Bench` is set, so
-`RunSuites` dispatches these targets one at a time regardless of
+`RunBenchSuites` dispatches these targets one at a time regardless of
 `--parallel`.
 
 ### Fuzz seed replay: run-filter alternation
@@ -952,7 +962,7 @@ t=0s    CLI starts
         ├─ GenerateOverlay → overlay.json
         ├─ signal.NotifyContext (SIGINT/SIGTERM → ctx cancel)
         │
-t=0.5s  RunPipeline begins (Streaming: true)
+t=0.5s  RunPipeline begins (runStreaming)
         ├─ Start goroutine: CompilePackagesStream → compileCh
         ├─ Start goroutine: StartSharedFixtures (if any)
         │
@@ -1066,10 +1076,13 @@ guard:
    of the assertion kernel never call it, so a kernel that always passes
    cannot pass them.
 3. **Canary** (`tests/canary`) catches a misreported verdict, and a
-   swallowed failure end to end. It builds the CLI, runs it over eight
-   fixture packages written to fail in specific ways (a green suite, one failing assertion per family, a halting
-   `FailNow`, `AfterEach` after a failure, lifecycle order, a benchmark
-   suite, an uncompilable package, a panicking method), and compares exit codes and the raw `-json`
+   swallowed failure end to end. It builds the CLI, runs it over the
+   fixture packages in its `testdata`, each written to pass or fail in one
+   specific way (a green suite, one failing assertion per family, a halting
+   `FailNow`, `AfterEach` after a failure, lifecycle order, async methods,
+   benchmarks, fuzz seeds, an uncompilable package, a panicking method,
+   fixtures torn down and shared fixtures failing to come up or to let go),
+   and compares exit codes and the raw `-json`
    verdicts with a checked-in golden list (`testdata/expected.txt`), checking
    with plain Go. The golden list is a third source of truth that shares no
    code with discovery or generation. That closes the census's one blind
@@ -1145,8 +1158,13 @@ reported `harness.go:38` as the user's frame. The tracer now treats
 
 3. **Overlay filesystem**: Generated code is injected via Go's `-overlay` flag.
    Source files are never modified. Overlays are written to a content-addressable
-   cache (`~/.cache/gotest/overlays/<hash>/`) for reuse across runs. Cache entries
-   auto-evict after 7 days. Use `--no-cache` to force fresh generation.
+   cache (`~/.cache/gotest/overlays/<hash>/`), which dedupes the file writes;
+   Go's build cache is path-independent, so the overlay cache itself buys no
+   compile reuse. The test binaries do get reuse: each links into
+   `~/.cache/gotest/bin/<key>/`, keyed by working directory, build flags,
+   platform and Go version, so go skips the link for an unchanged package, and
+   the run copies the binary into its own work dir before executing it. Both
+   caches auto-evict after 7 days. Use `--no-cache` to bypass both.
 
 4. **Streaming compilation**: `CompilePackagesStream` sends results to a
    channel as each package finishes. Test execution begins before all packages
@@ -1169,8 +1187,8 @@ reported `harness.go:38` as the user's frame. The tracer now treats
 
 8. **Unified pipeline entry point**: `cmd/gotest` is a thin CLI shell that
    delegates to `internal/gotestrunner.RunPipeline`. The pipeline encapsulates
-   the compile -> fixture-setup -> execute -> teardown -> output flow and
-   supports both streaming (`Streaming: true`) and batch modes.
+   the compile -> fixture-setup -> execute -> teardown -> output flow; a
+   bench run compiles before it dispatches, everything else streams.
 
 ## Glossary
 

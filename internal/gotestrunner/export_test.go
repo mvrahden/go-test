@@ -17,6 +17,9 @@ type ExportFixtureStateEntry = fixtureStateEntry
 
 var ExportCompileConcurrency = compileConcurrency
 var ExportBuildSuiteCmd = buildSuiteCmd
+var ExportTest2JSONPath = test2jsonPath
+var ExportResolveTest2JSON = resolveTest2JSON
+var ExportTest2JSONArgv = test2jsonArgv
 var ExportReadTeardownBudget = readTeardownBudget
 var ExportBookBuildFailures = bookBuildFailures
 var ExportBrokenPackageMessage = brokenPackageMessage
@@ -29,9 +32,13 @@ var ExportBuildExtraEnv = buildExtraEnv
 var ExportBuildBaseEnv = buildBaseEnv
 var ExportOverlayContentHash = overlayContentHash
 var ExportCacheRoot = cacheRoot
+var ExportBinaryCacheKey = binaryCacheKey
+var ExportBinaryCacheDir = binaryCacheDir
+var ExportLockFile = lockFile
+var ExportCopyFile = copyFile
 var ExportFilterPackageLevelEvents = filterPackageLevelEvents
 var ExportIsPackageSummaryLine = protocol.IsPackageSummaryLine
-var ResolveBenchParallelismForTest = resolveMaxParallel
+var ExportComputeDispatchConcurrency = computeDispatchConcurrency
 
 // ExportKillTree and ExportProcessDone let the teardown tests act on the shared
 // fixture subprocess directly: kill it outright, and see when it is reaped.
@@ -161,3 +168,11 @@ func ExportCensus(mode RunMode, stream string, declared DeclaredUnits, goTestArg
 func ExportNewStateProcess(sharedDir string, state map[string]json.RawMessage) *SharedFixtureProcess {
 	return &SharedFixtureProcess{sharedDir: sharedDir, state: state}
 }
+
+// ExportNewFailureLog, ExportTakeFailures and ExportFailureLogLimit expose
+// what the runner keeps of the shared fixture process's stderr.
+func ExportNewFailureLog(out io.Writer) io.Writer { return newFailureLog(out) }
+
+func ExportTakeFailures(w io.Writer) []string { return w.(*failureLog).take() }
+
+const ExportFailureLogLimit = failureLogLimit

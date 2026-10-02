@@ -35,27 +35,31 @@ func cleanStaleTmpOverlays() {
 
 const cacheMaxAge = 7 * 24 * time.Hour
 
+// cleanOldCacheEntries evicts overlay and test-binary cache entries that no
+// run has touched within cacheMaxAge.
 func cleanOldCacheEntries() {
 	root, err := cacheRoot()
 	if err != nil {
 		return
 	}
-	overlaysDir := filepath.Join(root, "overlays")
-	entries, err := os.ReadDir(overlaysDir)
-	if err != nil {
-		return
-	}
 	now := time.Now()
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		info, err := e.Info()
+	for _, sub := range []string{"overlays", "bin"} {
+		dir := filepath.Join(root, sub)
+		entries, err := os.ReadDir(dir)
 		if err != nil {
 			continue
 		}
-		if now.Sub(info.ModTime()) > cacheMaxAge {
-			os.RemoveAll(filepath.Join(overlaysDir, e.Name()))
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			info, err := e.Info()
+			if err != nil {
+				continue
+			}
+			if now.Sub(info.ModTime()) > cacheMaxAge {
+				os.RemoveAll(filepath.Join(dir, e.Name()))
+			}
 		}
 	}
 }

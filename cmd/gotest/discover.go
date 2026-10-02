@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"go/token"
 	"go/types"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/gotestgen"
+	"github.com/mvrahden/go-test/internal/lint"
 )
 
 // discoverOutput is the top-level JSON structure emitted by "gotest discover".
@@ -103,12 +105,28 @@ func runDiscover(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 		buildFlags = append(buildFlags, "-tags="+tags)
 	}
 
-	out := newDiscoverOutput()
-
-	loadResults, broken, err := gotestgen.LoadPackagesForDiscovery(patterns, buildFlags)
+	out, err := discover(patterns, buildFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
+	}
+	enc := json.NewEncoder(os.Stdout)
+	if err := enc.Encode(out); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	return 0
+}
+
+// discover reads the suites the patterns match from source. What would stop
+// a run (a broken package, a generation error) and what a run passes over in
+// silence (see gotestast.HarnessWarnings) are both warnings here.
+func discover(patterns, buildFlags []string) (discoverOutput, error) {
+	out := newDiscoverOutput()
+
+	loadResults, broken, err := gotestgen.LoadPackages(patterns, buildFlags)
+	if err != nil {
+		return out, err
 	}
 	for i := range broken {
 		for _, msg := range broken[i].Errors {
@@ -140,6 +158,17 @@ func runDiscover(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 		}
 
 		hasWarnings := false
+		warn := func(pkg *packages.Package, pos token.Pos, msg string) {
+			hasWarnings = true
+			w := discoverWarning{ImportPath: lr.PkgPath, Message: msg}
+			if pos.IsValid() {
+				p := pkg.Fset.Position(pos)
+				w.File = filepath.Base(p.Filename)
+				w.Line = p.Line
+				w.Col = p.Column
+			}
+			out.Warnings = append(out.Warnings, w)
+		}
 		pkgs := []*packages.Package{lr.Ptest, lr.Pxtest}
 		for _, pkg := range pkgs {
 			if pkg == nil {
@@ -147,21 +176,19 @@ func runDiscover(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 			}
 			result := c.CollectSuiteSpecs(pkg)
 			if len(result.Errs) > 0 {
-				hasWarnings = true
 				for _, ce := range result.Errs {
-					w := discoverWarning{
-						ImportPath: lr.PkgPath,
-						Message:    ce.Err.Error(),
-					}
-					if ce.Pos.IsValid() {
-						pos := pkg.Fset.Position(ce.Pos)
-						w.File = filepath.Base(pos.Filename)
-						w.Line = pos.Line
-						w.Col = pos.Column
-					}
-					out.Warnings = append(out.Warnings, w)
+					warn(pkg, ce.Pos, ce.Err.Error())
 				}
 				continue
+			}
+			for _, w := range result.Warnings {
+				if w.Rule != "" && lint.Suppressed(pkg.Fset, pkg.Syntax, w.Pos, lint.Rule(w.Rule)) {
+					continue
+				}
+				warn(pkg, w.Pos, w.Msg)
+			}
+			for _, ce := range gotestgen.FuzzRejections(pkg, result.Suites) {
+				warn(pkg, ce.Pos, ce.Err.Error())
 			}
 
 			for _, suite := range result.Suites {
@@ -175,13 +202,7 @@ func runDiscover(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 			out.Packages = append(out.Packages, pkgEntry)
 		}
 	}
-
-	enc := json.NewEncoder(os.Stdout)
-	if err := enc.Encode(out); err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2
-	}
-	return 0
+	return out, nil
 }
 
 func buildDiscoverSuite(suite *gotestast.TestSuiteSpec) discoverSuite {

@@ -115,6 +115,37 @@ func (s *SpecInputTestSuite) TestInputModesShareOneExitRule(t *gotest.T, _ *spec
 	})
 }
 
+// TestBuildFailureCarriesItsCause covers a go test -json stream (Go 1.24+)
+// whose package failed to build: the diagnostics travel as build-output
+// events, apart from the package that failed.
+func (s *SpecInputTestSuite) TestBuildFailureCarriesItsCause(t *gotest.T, _ *specInputCtx) {
+	stream := `{"ImportPath":"example.com/pkg [example.com/pkg.test]","Action":"build-output","Output":"# example.com/pkg [example.com/pkg.test]\n"}
+{"ImportPath":"example.com/pkg [example.com/pkg.test]","Action":"build-output","Output":"pkg_test.go:5:33: undefined: undefinedCall\n"}
+{"ImportPath":"example.com/pkg [example.com/pkg.test]","Action":"build-fail"}
+{"Action":"start","Package":"example.com/pkg"}
+{"Action":"output","Package":"example.com/pkg","Output":"FAIL\texample.com/pkg [build failed]\n"}
+{"Action":"fail","Package":"example.com/pkg","Elapsed":0,"FailedBuild":"example.com/pkg [example.com/pkg.test]"}
+`
+	input := filepath.Join(t.TempDir(), "events.json")
+	gotest.NoError(t, os.WriteFile(input, []byte(stream), 0o600))
+
+	t.It("spec names the compile error and exits 1", func(it *gotest.T) {
+		out := filepath.Join(it.TempDir(), "spec.txt")
+		gotest.Equal(it, 1, ExportRunSpecFromInput(input, "terminal", out, true, false))
+		data, err := os.ReadFile(out)
+		gotest.NoError(it, err)
+		gotest.Contains(it, string(data), "pkg_test.go:5:33: undefined: undefinedCall")
+	})
+
+	t.It("summary names it too", func(it *gotest.T) {
+		out := filepath.Join(it.TempDir(), "summary.txt")
+		gotest.Equal(it, 1, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, false, ""))
+		data, err := os.ReadFile(out)
+		gotest.NoError(it, err)
+		gotest.Contains(it, string(data), "pkg_test.go:5:33: undefined: undefinedCall")
+	})
+}
+
 // TestRenderOnlySeparatesVerdictFromRendering covers --render-only: the exit
 // code drops the test verdict but still reports a failure to render.
 func (s *SpecInputTestSuite) TestRenderOnlySeparatesVerdictFromRendering(t *gotest.T, _ *specInputCtx) {

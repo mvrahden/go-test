@@ -126,6 +126,43 @@ func (s *RenderTestSuite) TestRenderMarkdown_SkippedSuite(t *gotest.T, _ *render
 	gotest.Contains(t, buf.String(), "Broken — SKIPPED")
 }
 
+// A specification of a run is also its record: what failed outside any
+// behavior must not read as absent.
+func (s *RenderTestSuite) TestRenderMarkdown_FailuresOutsideBehaviors(t *gotest.T, _ *renderCtx) {
+	var buf bytes.Buffer
+	gotestspec.RenderMarkdown(&buf, []*gotestspec.Package{
+		{
+			Path:   "example.com/pkg",
+			Status: gotestspec.StatusFail,
+			Nodes: []*gotestspec.Node{{
+				Kind: gotestspec.KindSuite, Display: "Orders", Status: gotestspec.StatusFail,
+				Output: []string{"    TestOrdersTestSuite never ran: shared fixture DBSharedFixture did not come up\n"},
+			}},
+		},
+		{
+			Path:   "shared fixtures",
+			Status: gotestspec.StatusFail,
+			Output: []string{"FAIL: shared fixture setup failed\n", "DBSharedFixture.BeforeAll failed after 1 attempt(s): refused\n"},
+		},
+	})
+	out := buf.String()
+
+	t.It("marks a suite that failed without a behavior, with its reason", func(it *gotest.T) {
+		gotest.Contains(it, out, "## Orders — FAILED\n\n```\nTestOrdersTestSuite never ran: shared fixture DBSharedFixture did not come up\n```\n")
+	})
+	t.It("lists a package that failed on its own, with its output", func(it *gotest.T) {
+		gotest.Contains(it, out, "## shared fixtures — FAILED\n\n```\nFAIL: shared fixture setup failed\nDBSharedFixture.BeforeAll failed after 1 attempt(s): refused\n```\n")
+	})
+	t.It("counts the failed package", func(it *gotest.T) {
+		gotest.Contains(it, out, "1 failed, 0 skipped, 1 failed package.")
+	})
+	t.It("adds nothing to a specification read from source", func(it *gotest.T) {
+		var static bytes.Buffer
+		gotestspec.RenderMarkdown(&static, userServiceTree(), gotestspec.WithoutVerdicts())
+		gotest.NotContains(it, static.String(), "FAILED")
+	})
+}
+
 func benchmarkLeaf() []*gotestspec.Package {
 	return []*gotestspec.Package{{
 		Path: "p",

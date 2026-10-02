@@ -19,6 +19,8 @@ type CollectorResult struct {
 	Suites   gotestast.TestSuiteSpecSet
 	Fixtures []*gotestast.FixtureSpec
 	Errs     []CollectorError
+	// Warnings never stop generation; discover reports them.
+	Warnings []gotestast.Warning
 }
 
 type collector struct{}
@@ -58,7 +60,7 @@ func (collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 	insp.Preorder([]ast.Node{(*ast.GenDecl)(nil)}, func(n ast.Node) {
 		f, err := gotestast.DetermineFixture(n, pkg)
 		if err != nil {
-			errs = append(errs, CollectorError{Err: err})
+			errs = append(errs, CollectorError{Err: err, Pos: n.Pos()})
 			return
 		}
 		if f == nil {
@@ -86,7 +88,7 @@ func (collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 	// validate context consistency
 	for _, s := range suites {
 		if err := gotestast.ValidateContextConsistency(s); err != nil {
-			errs = append(errs, CollectorError{Err: err, Pos: s.Pos()})
+			errs = append(errs, CollectorError{Err: err, Pos: gotestast.PosOf(gotestast.At(s.Pos(), err))})
 		}
 	}
 	if len(errs) > 0 {
@@ -119,7 +121,7 @@ func (collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 	// Fixture embedding and validation are handled by the resolver (resolver.go),
 	// which walks the type graph recursively and supports cross-package fixtures.
 
-	return CollectorResult{Suites: suites, Fixtures: fixtures}
+	return CollectorResult{Suites: suites, Fixtures: fixtures, Warnings: gotestast.HarnessWarnings(pkg, suites)}
 }
 
 type SpecOutcome struct {
@@ -129,7 +131,7 @@ type SpecOutcome struct {
 	Fixtures            []*gotestast.FixtureSpec
 }
 
-func (collector) ApplyTestSuiteSpecs(result CollectorResult) (spec SpecOutcome, _ error) {
+func (collector) ApplyTestSuiteSpecs(result CollectorResult) (spec SpecOutcome, _ error) { //nolint:gocritic // hugeParam: stable API
 	suites, skippedTestSuites, skippedTestCases := result.Suites.ReduceToEffectiveSet()
 
 	// TODO: sort all by name

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"time"
@@ -14,6 +15,16 @@ import (
 )
 
 // --- reference implementations (pre-refactor logic) ---
+
+// toolchainTest2JSON asks the Go toolchain where its converter is, the way a
+// developer would: the expectation the runner's own lookup is held to.
+func toolchainTest2JSON(t *gotest.T) string {
+	out, err := exec.Command("go", "tool", "-n", "test2json").Output()
+	gotest.NoError(t, err)
+	path := strings.TrimSpace(string(out))
+	gotest.Regexp(t, `test2json(\.exe)?$`, path)
+	return path
+}
 
 // buildPlainArgs reproduces the exact arg logic of the old RunSingleSuite.
 func buildPlainArgs(target gotestrunner.SuiteTarget) (path string, args []string) { //nolint:gocritic // hugeParam: stable API
@@ -47,9 +58,9 @@ func buildTest2JSONArgs(target gotestrunner.SuiteTarget) (path string, args []st
 	if target.CoverProfile != "" {
 		testArgs = append(testArgs, "-test.coverprofile="+target.CoverProfile)
 	}
-	args = []string{"tool", "test2json", "-p", target.Package, "-t", target.BinaryPath}
+	args = []string{"-p", target.Package, "-t", target.BinaryPath}
 	args = append(args, testArgs...)
-	return "go", args
+	return "test2json", args
 }
 
 func capturePackageSummary(pkg string, failed bool, d time.Duration, verbose bool) string {

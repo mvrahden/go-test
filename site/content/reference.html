@@ -779,7 +779,7 @@ percentage = covered / total</div>
       </table>
 
       <h3>Suppression</h3>
-      <p>Silence a single diagnostic with <code>//nolint:&lt;rule&gt;</code> on its line or in the comment block directly above it; on the <code>package</code> line it applies file-wide. Non-integrity rules can also be disabled per run (<code>-skip-&lt;rule&gt;</code>) or project-wide (<code>.gotest.yml</code> → <code>lint.skip</code>).</p>
+      <p>Silence a single diagnostic with <code>//nolint:&lt;rule&gt;</code> on its line or in a comment block of its own ending on the line directly above it; on the <code>package</code> line it applies file-wide. Non-integrity rules can also be disabled per run (<code>-skip-&lt;rule&gt;</code>) or project-wide (<code>.gotest.yml</code> → <code>lint.skip</code>).</p>
 
       <h3>Exit codes</h3>
       <table class="ref-table">
@@ -853,6 +853,13 @@ FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
           <tr><td><code>go-test-flags</code></td><td><em>none</em></td><td>Additional go test flags (<code>-single-dash</code> style).</td></tr>
           <tr><td><code>badge</code></td><td><code>false</code></td><td>Render a coverage badge and publish it as <code>coverage.svg</code> to <code>badge-branch</code>, from the default branch only. Turns <code>coverage</code> on; needs <code>contents: write</code>.</td></tr>
           <tr><td><code>badge-branch</code></td><td><code>ci/badges</code></td><td>Branch the badge is published to; created automatically on first use.</td></tr>
+          <tr><td><code>bench</code></td><td><code>false</code></td><td>Run benchmarks after the tests (<code>gotest bench --spec --json</code>).</td></tr>
+          <tr><td><code>bench-baseline</code></td><td><em>none</em></td><td>Baseline JSON file to compare benchmarks against (<code>--against</code>).</td></tr>
+          <tr><td><code>bench-gate</code></td><td><em>none</em></td><td>Fail the run if a benchmark regresses by more than this percent (<code>--gate</code>).</td></tr>
+          <tr><td><code>bench-save</code></td><td><code>false</code></td><td>Save the benchmark run as a JSON baseline at this path (<code>--save</code>); an empty string saves to <code>bench.baseline</code> from <code>.gotest.yml</code>.</td></tr>
+          <tr><td><code>fuzz</code></td><td><code>false</code></td><td>Run a budgeted fuzz session after the tests (<code>gotest fuzz --for</code>); a new crasher fails the step.</td></tr>
+          <tr><td><code>fuzz-for</code></td><td><em>none</em></td><td>Approximate wall-clock budget for the fuzz session; empty uses the CLI's default of one minute.</td></tr>
+          <tr><td><code>fuzz-cache</code></td><td><code>true</code></td><td>Carry Go's fuzz cache between runs, so each session resumes where the last one stopped.</td></tr>
           <tr><td><code>version</code></td><td><code>gomod</code></td><td>Version to install, or <code>gomod</code> to resolve from <code>go.mod</code>.</td></tr>
         </tbody>
       </table>
@@ -864,11 +871,14 @@ FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
           <tr><td><code>exit-code</code></td><td>Test process exit code.</td></tr>
           <tr><td><code>coverage</code></td><td>Coverage percentage (empty if coverage not enabled).</td></tr>
           <tr><td><code>badge</code></td><td>Path of the rendered coverage badge SVG (empty unless <code>badge</code> is enabled and the tests ran).</td></tr>
+          <tr><td><code>bench-report</code></td><td>Path to the <code>gotest bench --json</code> report file (empty if <code>bench</code> is not enabled).</td></tr>
+          <tr><td><code>bench-breached-keys</code></td><td>Comma-joined benchmark keys that breached the gate (empty if none or no gate).</td></tr>
+          <tr><td><code>fuzz-crashers</code></td><td>Comma-joined workspace-relative paths of the corpus files the fuzz session added (empty if none or <code>fuzz</code> is not enabled).</td></tr>
         </tbody>
       </table>
 
       <h3>Version resolution</h3>
-      <p>By default (<code>version: gomod</code>), the action runs <code>go&nbsp;run&nbsp;github.com/mvrahden/go-test/cmd/gotest</code>, which resolves the version pinned in your project's <code>go.mod</code>. This keeps the CLI version in sync with the library you already depend on — no version drift between CI and local development.</p>
+      <p>By default (<code>version: gomod</code>), the action runs the gotest your project's <code>go.mod</code> selects: <code>go&nbsp;tool</code> when the tool is declared there, <code>go&nbsp;run</code> otherwise. This keeps the CLI version in sync with the library you already depend on — no version drift between CI and local development.</p>
       <p>Set <code>version: latest</code> or a specific tag (e.g. <code>v1.2.0</code>) to install a standalone binary via <code>go install</code> instead. This is useful when your project doesn't depend on go-test as a library.</p>
 
       <div class="callout">

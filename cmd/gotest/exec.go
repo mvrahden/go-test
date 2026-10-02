@@ -52,7 +52,6 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 		CI:              cfg.CI,
 		Parallel:        cfg.Parallel,
 		CompileParallel: cfg.CompileParallel,
-		Streaming:       true,
 		OutputMode:      modeFromJSON(cfg.JSON),
 		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,
