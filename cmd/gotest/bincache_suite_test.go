@@ -35,8 +35,9 @@ func cacheEnv(dir string) []string {
 }
 
 // linkStep matches a link action in the build trace GOFLAGS=-x makes go
-// print; the CLI forwards a successful build's stderr.
-var linkStep = regexp.MustCompile(`(?m)(^|[/\\])link(\.exe)? `)
+// print; the CLI forwards a successful build's stderr. Windows quotes the
+// tool path: `"C:\\...\\link.exe" -o`.
+var linkStep = regexp.MustCompile(`(?m)(^|[/\\])link(\.exe)?"? `)
 
 func (s *BinaryCacheTestSuite) TestSecondRunSkipsTheLink(t *gotest.T) {
 	cache := t.TempDir()
