@@ -500,8 +500,8 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	go func() {
 		proc.waitErr = cmd.Wait()
 		tree.Release()
-		drainOutput(scanned, OutputDrainDelay, stdout)
-		drainOutput(logged, OutputDrainDelay, stderr)
+		drainOutput(scanned, sharedFixtureDrainDelay, stdout)
+		drainOutput(logged, sharedFixtureDrainDelay, stderr)
 		close(waitDone)
 	}()
 	go func() {

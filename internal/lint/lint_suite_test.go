@@ -79,10 +79,19 @@ func (s *LintTestSuite) TestSuggestedFixes(t *gotest.T) {
 // say, and analysistest only compares text.
 func (s *LintTestSuite) TestGoldenFilesTypeCheck(t *gotest.T) {
 	testdata := analysistest.TestData()
+	// Each load takes seconds and none depends on another, so they run at once.
+	errs := make([][]string, len(rewriteFixtures))
+	waits := make([]func(), len(rewriteFixtures))
+	for i, fixture := range rewriteFixtures {
+		waits[i] = gotest.Go(t, func() { errs[i] = goldenTypeErrors(testdata, fixture) })
+	}
+	for _, wait := range waits {
+		wait()
+	}
 	t.When("a rewrite fixture's golden files stand in for its sources", func(w *gotest.T) {
-		for _, fixture := range rewriteFixtures {
+		for i, fixture := range rewriteFixtures {
 			w.It("type-checks "+fixture, func(it *gotest.T) {
-				gotest.Empty(it, goldenTypeErrors(it, testdata, fixture))
+				gotest.Empty(it, errs[i])
 			})
 		}
 	})
@@ -90,11 +99,14 @@ func (s *LintTestSuite) TestGoldenFilesTypeCheck(t *gotest.T) {
 
 // goldenTypeErrors loads fixture the way analysistest does (GOPATH mode over
 // testdata) with every .go file overlaid by its .golden, and returns the
-// errors of the fixture package and its test variants.
-func goldenTypeErrors(t *gotest.T, testdata, fixture string) []string {
+// errors of the fixture package and its test variants. A fixture without a
+// golden is reported as an error, since there is nothing to check.
+func goldenTypeErrors(testdata, fixture string) []string {
 	dir := filepath.Join(testdata, "src", fixture)
 	goldens := gotest.Must(filepath.Glob(filepath.Join(dir, "*.golden")))
-	gotest.NotEmpty(t, goldens, "no golden in %s", fixture)
+	if len(goldens) == 0 {
+		return []string{"no golden in " + fixture}
+	}
 	overlay := map[string][]byte{}
 	for _, golden := range goldens {
 		overlay[strings.TrimSuffix(golden, ".golden")] = gotest.Must(os.ReadFile(golden))

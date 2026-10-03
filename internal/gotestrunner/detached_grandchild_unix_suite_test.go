@@ -77,16 +77,17 @@ func (s *DetachedGrandchildTestSuite) detachingCommand(ctx context.Context, runA
 }
 
 // The child is gone at once and only the grandchild holds its stdout: the
-// wait ends when the output drain delay passes, with the child's output kept,
-// under the default configuration.
+// wait ends when the output drain delay passes, with the child's output kept.
 func (s *DetachedGrandchildTestSuite) TestWaitReturnsOnceTheOutputIsDrained(t *gotest.T) {
 	const runArg = "-test.run=^TestDetachedGrandchildTestSuite$/^TestWaitReturnsOnceTheOutputIsDrained$"
 	playDetachRole(runArg)
 
+	const drain = time.Second
 	cmd, stdout := s.detachingCommand(context.Background(), runArg)
 	mp := gotestrunner.NewManagedProcess(cmd, gotestrunner.ProcessConfig{
 		Grace:         gotestrunner.GraceFixed,
 		GraceDuration: 100 * time.Millisecond,
+		DrainDelay:    drain,
 	})
 	gotest.NoError(t, mp.Start())
 
@@ -95,7 +96,7 @@ func (s *DetachedGrandchildTestSuite) TestWaitReturnsOnceTheOutputIsDrained(t *g
 	elapsed := time.Since(start)
 
 	t.It("returns once the drain delay passes, not when the grandchild lets go", func(it *gotest.T) {
-		gotest.Less(it, elapsed, gotestrunner.OutputDrainDelay+3*time.Second, "Wait blocked %v on a pipe a detached grandchild holds", elapsed)
+		gotest.Less(it, elapsed, drain+3*time.Second, "Wait blocked %v on a pipe a detached grandchild holds", elapsed)
 	})
 	t.It("keeps what the child wrote", func(it *gotest.T) {
 		gotest.Contains(it, stdout.String(), "child ran")

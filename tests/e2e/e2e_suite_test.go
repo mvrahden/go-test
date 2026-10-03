@@ -157,8 +157,13 @@ func (s *E2ETestSuite) TestTestsuiteCLIExitCode(t *gotest.T) {
 func (s *E2ETestSuite) TestSharedFixtureExitTiming(t *gotest.T) {
 	t.When("running packages with shared fixtures", func(w *gotest.T) {
 		w.It("exits promptly after all tests complete", func(it *gotest.T) {
+			// The fixture-reading packages, named: tests/sharedfixture/...
+			// would also run the shutdown suite's minute of timeout drills.
 			cmd := exec.Command(s.binary, //nolint:gosec // G204: controlled binary with fixed args
-				"github.com/mvrahden/go-test/tests/sharedfixture/...",
+				"github.com/mvrahden/go-test/tests/sharedfixture/standalone",
+				"github.com/mvrahden/go-test/tests/sharedfixture/fixturebound",
+				"github.com/mvrahden/go-test/tests/sharedfixture/twin",
+				"github.com/mvrahden/go-test/tests/sharedfixture/exclusive",
 				"-json", "-count=1")
 			cmd.Dir = s.workDir
 

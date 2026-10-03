@@ -18,8 +18,12 @@ import (
 // fixture leaves a session-leader child on the protocol pipe. Exclusive: it
 // takes a wall-clock verdict on the teardown. Sequential: Setenv.
 type SharedFixtureDetachedGrandchildTestSuite struct {
-	stopFile string
+	stopFile     string
+	restoreDrain func()
 }
+
+// drain is the delay under test, injected in place of the 5s default.
+const drain = time.Second
 
 func (s *SharedFixtureDetachedGrandchildTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
@@ -30,10 +34,12 @@ func (s *SharedFixtureDetachedGrandchildTestSuite) SuiteConfig() gotest.SuiteCon
 func (s *SharedFixtureDetachedGrandchildTestSuite) BeforeEach(t *gotest.T) {
 	s.stopFile = filepath.Join(t.TempDir(), "stop")
 	t.Setenv(fixtures.EnvDetachingStop, s.stopFile)
+	s.restoreDrain = gotestrunner.ExportSetSharedFixtureDrainDelay(drain)
 }
 
 // AfterEach releases the child, which polls for the stop file.
 func (s *SharedFixtureDetachedGrandchildTestSuite) AfterEach(t *gotest.T) {
+	s.restoreDrain()
 	_ = os.WriteFile(s.stopFile, []byte("stop"), 0o600)
 }
 
@@ -66,6 +72,6 @@ func (s *SharedFixtureDetachedGrandchildTestSuite) TestTeardownDoesNotWaitForThe
 		gotest.NoError(it, err)
 	})
 	t.It("returns once the drain delay passes, not when the grandchild lets go", func(it *gotest.T) {
-		gotest.Less(it, elapsed, gotestrunner.OutputDrainDelay+3*time.Second, "Teardown blocked %v on a pipe a detached grandchild holds", elapsed)
+		gotest.Less(it, elapsed, drain+3*time.Second, "Teardown blocked %v on a pipe a detached grandchild holds", elapsed)
 	})
 }
