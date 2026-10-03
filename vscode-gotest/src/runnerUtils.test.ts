@@ -1,3 +1,4 @@
+import * as path from "node:path";
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("vscode", () => {
@@ -1222,7 +1223,9 @@ describe("applyEvent", () => {
     expect(messages).toHaveLength(1);
     expect(messages[0].message).toContain("undefined: undefinedThing");
     expect(messages[0].message).toContain(`# ${build}`);
-    expect(messages[0].location.uri.fsPath).toBe("/ws/pkg/pkg_suite_test.go");
+    expect(messages[0].location.uri.fsPath).toBe(
+      path.join("/ws", "pkg", "pkg_suite_test.go"),
+    );
     expect(messages[0].location.range.line).toBe(6);
   });
 
