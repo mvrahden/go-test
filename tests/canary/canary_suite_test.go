@@ -262,14 +262,16 @@ func (s *CanaryTestSuite) TestASetupFailureReachesTheStream(t *gotest.T) {
 }
 
 // A bench run waits for its fixtures before it dispatches; the same failure
-// is a failed run there, not a command that broke.
+// is a failed run there, not a command that broke, and it is the failure of
+// the benchmarks that read the fixture alone: the one that reads none and
+// the one that reads a fixture that came up both report a sample.
 func (s *CanaryTestSuite) TestASetupFailureFailsABenchRun(t *gotest.T) {
 	code, names := s.bench(t, "setupfailing", t.TempDir())
 	if code != 1 {
 		t.Errorf("setupfailing bench: exit code %d, want 1", code)
 	}
-	if len(names) != 0 {
-		t.Errorf("setupfailing bench: results %v, want none", names)
+	if want := "BenchmarkFixtureIsUp,BenchmarkRuns"; strings.Join(names, ",") != want {
+		t.Errorf("setupfailing bench: results %v, want %v", names, want)
 	}
 }
 

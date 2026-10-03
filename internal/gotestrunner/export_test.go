@@ -28,7 +28,6 @@ var ExportSplitTopLevelOr = splitTopLevelOr
 var ExportSuiteRunFilter = suiteRunFilter
 var ExportAssignCoverProfiles = assignCoverProfiles
 var ExportResolveSetupTimeout = resolveSetupTimeout
-var ExportBuildExtraEnv = buildExtraEnv
 var ExportBuildBaseEnv = buildBaseEnv
 var ExportOverlayContentHash = overlayContentHash
 var ExportCacheRoot = cacheRoot
