@@ -3,6 +3,7 @@ package gotestgen_test
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -74,6 +75,21 @@ func (s *BrokenLoadTestSuite) TestBrokenPackageVerdicts(t *gotest.T) {
 		}
 		gotest.True(it, len(msgs) > 0 && strings.Contains(strings.Join(msgs, "\n"), "cannot use"),
 			"expected a compiler diagnostic, got %v", msgs)
+	})
+
+	t.It("keeps the compiler's report whole and drops the type errors restating it", func(it *gotest.T) {
+		var msgs []string
+		for i := range broken {
+			if broken[i].PkgPath == brokenloadPkgBase+"/brokentype" {
+				msgs = broken[i].Errors
+			}
+		}
+		gotest.NotEmpty(it, msgs)
+		gotest.Regexp(it, `^# `+regexp.QuoteMeta(brokenloadPkgBase)+`/brokentype\n`, msgs[0])
+		all := strings.Join(msgs, "\n")
+		gotest.Equal(it, 1, strings.Count(all, "svc.go:6:17: cannot use 42"), "each diagnostic once:\n%s", all)
+		gotest.Equal(it, 1, strings.Count(all, "svc.go:7:9: cannot use s"), "each diagnostic once:\n%s", all)
+		gotest.NotContains(it, all, brokenloadDir(it), "positions are the compiler's, relative:\n%s", all)
 	})
 }
 
