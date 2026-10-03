@@ -16,16 +16,18 @@ export { resolveGoBinary } from "./goBinary.js";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
-// Raised to the release that introduced `gotest bench` and `gotest fuzz`,
-// which the Bench and Fuzz surfaces drive; an older CLI rejects the
-// subcommands outright. v1.30.2 is the release whose every JSON document
-// opens with `version`, which is how the extension learns the version of a
-// CLI it reaches through go run or go tool and gates it (checkProducerVersion).
-// Treat this as a contract marker: bump it whenever the extension starts
-// depending on CLI behaviour that older versions do not have. Never below
-// the CLI's gotestgen.MinRuntimeVersion (a Go test guards the order): a CLI
-// the extension accepts must enforce a runtime floor no newer than itself.
-const MIN_CLI_VERSION = "v1.30.2";
+// v1.31.0 is the release whose stream carries every verdict the tree
+// shows: a shared fixture that fails to set up fails the suites that read
+// it, as failed tests with the fixture's own reason, and exits 1 in every
+// mode. Before it those runs reached the editor as a bare exit code. Every
+// JSON document opens with `version` from v1.30.2 on, which is how the
+// extension learns the version of a CLI it reaches through go run or go
+// tool and gates it (checkProducerVersion). Treat this as a contract
+// marker: bump it whenever the extension starts depending on CLI behaviour
+// that older versions do not have. Never below the CLI's
+// gotestgen.MinRuntimeVersion (a Go test guards the order): a CLI the
+// extension accepts must enforce a runtime floor no newer than itself.
+const MIN_CLI_VERSION = "v1.31.0";
 
 export interface CliCommand {
   bin: string;
