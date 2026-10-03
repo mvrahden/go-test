@@ -43,6 +43,9 @@ type pkgState struct {
 	expected  int
 	completed int
 	results   []SuiteResult
+	// failedBuild names the build whose failure failed this package; its
+	// verdict carries the name the way go test's does.
+	failedBuild string
 }
 
 type OutputOption func(*OutputCollector)
@@ -154,22 +157,36 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //n
 // with exit code 2 — the code reserved for build errors, distinct from exit 1
 // for tests that ran and failed. Build failures travel the same collector path
 // as suite results so text output, the JSON stream, and the exit code cannot
-// disagree about them. In JSON modes the diagnostics enter the stream as
-// package-level output events; renderers fed the stream (spec, summary,
-// --input replays) carry them without any side channel.
+// disagree about them. In JSON modes the stream takes go test's own shape:
+// the diagnostics are build-output events keyed by the build, build-fail
+// ends them, and the package's verdict names the build in FailedBuild.
 func (c *OutputCollector) RecordBuildFailure(pkg, msg string) {
 	c.Register(pkg, 1)
+	build := buildName(pkg, msg)
+	c.mu.Lock()
+	c.pkgs[pkg].failedBuild = build
 	if c.mode != RunBatchText {
-		c.mu.Lock()
 		w := c.jsonWriter()
-		now := time.Now()
-		writeJSONLine(w, map[string]any{"Time": now, "Action": "start", "Package": pkg})
 		for line := range strings.Lines(msg) {
-			writeJSONLine(w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Output": line})
+			writeJSONLine(w, map[string]any{"ImportPath": build, "Action": "build-output", "Output": line})
 		}
-		c.mu.Unlock()
+		writeJSONLine(w, map[string]any{"ImportPath": build, "Action": "build-fail"})
+		writeJSONLine(w, map[string]any{"Time": time.Now(), "Action": "start", "Package": pkg})
 	}
+	c.mu.Unlock()
 	c.RecordResult(pkg, 0, SuiteResult{Stderr: []byte(msg), ExitCode: 2})
+}
+
+// buildName is the ImportPath go test gives the build that failed: the `#`
+// header of the compiler's report — `pkg` or `pkg_test [pkg.test]` — else
+// the package itself.
+func buildName(pkg, msg string) string {
+	for line := range strings.Lines(msg) {
+		if h, ok := strings.CutPrefix(line, "# "); ok {
+			return strings.TrimSpace(h)
+		}
+	}
+	return pkg
 }
 
 // RecordGivenUp books a suite that never ran as failed and says why: on
@@ -313,6 +330,8 @@ func (c *OutputCollector) flushTextPkg(s *pkgState, pkg string) {
 		}
 	}
 	switch {
+	case s.failedBuild != "":
+		fmt.Fprintf(c.stdout, "FAIL\t%s [build failed]\n", pkg)
 	case failed:
 		fmt.Fprintf(c.stdout, "FAIL\nFAIL\t%s\t%.3fs\n", pkg, dur.Seconds())
 	case c.verbose:
@@ -358,9 +377,12 @@ func (c *OutputCollector) emitJSONPackageSummary(w io.Writer, pkg string, s *pkg
 	}
 	now := time.Now()
 	var summaryLine string
-	if failed {
+	switch {
+	case s.failedBuild != "":
+		summaryLine = fmt.Sprintf("FAIL\t%s [build failed]\n", pkg)
+	case failed:
 		summaryLine = fmt.Sprintf("FAIL\t%s\t%.3fs\n", pkg, dur.Seconds())
-	} else {
+	default:
 		summaryLine = fmt.Sprintf("ok  \t%s\t%.3fs\n", pkg, dur.Seconds())
 	}
 	writeJSONLine(w, map[string]any{
@@ -370,9 +392,11 @@ func (c *OutputCollector) emitJSONPackageSummary(w io.Writer, pkg string, s *pkg
 	if failed {
 		action = "fail"
 	}
-	writeJSONLine(w, map[string]any{
-		"Time": now, "Action": action, "Package": pkg, "Elapsed": dur.Seconds(),
-	})
+	verdict := map[string]any{"Time": now, "Action": action, "Package": pkg, "Elapsed": dur.Seconds()}
+	if s.failedBuild != "" {
+		verdict["FailedBuild"] = s.failedBuild
+	}
+	writeJSONLine(w, verdict)
 }
 
 // filterPackageLevelEvents writes test-level JSON events (those with a

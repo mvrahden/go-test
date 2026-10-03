@@ -12,6 +12,7 @@ import {
 import {
   resolveTestItem,
   applyResults,
+  BuildOutputs,
   killProcessTree,
   resolveAncestorItems,
   skipUnresolved,
@@ -309,7 +310,7 @@ export class WatchManager implements vscode.Disposable {
         cycleJsonAccumulator += jsonLines;
         const run = this.activeRuns.get(pkgScope);
         if (run) {
-          this.applyWatchEvents(run, jsonLines);
+          this.applyWatchEvents(run, jsonLines, cwd);
         }
       },
       // onError
@@ -417,11 +418,17 @@ export class WatchManager implements vscode.Disposable {
     }
   }
 
-  private applyWatchEvents(run: vscode.TestRun, jsonLines: string): void {
+  private applyWatchEvents(
+    run: vscode.TestRun,
+    jsonLines: string,
+    cwd: string,
+  ): void {
     const events = parseTestEvents(jsonLines);
 
+    const builds = new BuildOutputs();
     const byPackage = new Map<string, TestEvent[]>();
     for (const event of events) {
+      if (builds.absorb(event)) continue;
       let group = byPackage.get(event.Package);
       if (!group) {
         group = [];
@@ -433,7 +440,10 @@ export class WatchManager implements vscode.Disposable {
     for (const [importPath, pkgEvents] of byPackage) {
       const pkgDir = this.cache.resolveImportPath(importPath);
       if (pkgDir) {
-        applyResults(this.controller, run, pkgEvents, importPath, pkgDir);
+        applyResults(this.controller, run, pkgEvents, importPath, pkgDir, {
+          builds,
+          buildDir: cwd,
+        });
       }
     }
 

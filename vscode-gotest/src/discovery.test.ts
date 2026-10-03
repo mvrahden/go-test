@@ -80,7 +80,7 @@ type Pkg = { importPath: string; dir: string };
 
 function discoverJson(pkgs: Pkg[], version?: string | null): string {
   return JSON.stringify({
-    ...(version === null ? {} : { version: version ?? "v1.30.2" }),
+    ...(version === null ? {} : { version: version ?? "v1.31.0" }),
     packages: pkgs.map((p) => ({
       importPath: p.importPath,
       dir: p.dir,
@@ -267,19 +267,19 @@ describe("DiscoveryService", () => {
       expect(script.calls).toHaveLength(1);
       expect(cache.packages).toHaveLength(0);
       expect(mockShowWarningMessage).toHaveBeenCalledWith(
-        expect.stringContaining("wrote no version, so it predates v1.30.2"),
+        expect.stringContaining("wrote no version, so it predates v1.31.0"),
         "Open Output",
       );
     });
 
     it("refuses a CLI below the floor, naming the version", async () => {
-      script.always = { stdout: [discoverJson(pkgs, "v1.30.1")] };
+      script.always = { stdout: [discoverJson(pkgs, "v1.30.2")] };
       await service.discover("/ws", ["./..."]);
       expect(script.calls).toHaveLength(1);
       expect(cache.packages).toHaveLength(0);
       expect(mockShowWarningMessage).toHaveBeenCalledWith(
         expect.stringContaining(
-          "the CLI is v1.30.1, but >= v1.30.2 is required",
+          "the CLI is v1.30.2, but >= v1.31.0 is required",
         ),
         "Open Output",
       );
@@ -292,7 +292,7 @@ describe("DiscoveryService", () => {
       await service.discover("/ws", ["./..."]);
       expect(cache.packages).toHaveLength(1);
       script.once.push({
-        stdout: [discoverJson(pkgs, "v1.30.2-0.20260926120923-7362809f09ef")],
+        stdout: [discoverJson(pkgs, "v1.31.0-0.20261002200000-3b6775a3f0e1")],
       });
       await service.discover("/ws", ["./..."]);
       expect(cache.packages).toHaveLength(1);
@@ -358,7 +358,7 @@ describe("DiscoveryService", () => {
       script.once.push({
         stdout: [
           JSON.stringify({
-            version: "v1.30.2",
+            version: "v1.31.0",
             packages: [
               {
                 importPath: "example.com/pkg",

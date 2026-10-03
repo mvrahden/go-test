@@ -2,11 +2,25 @@ import * as path from "node:path";
 
 export interface TestEvent {
   Time: string;
-  Action: "run" | "pass" | "fail" | "skip" | "output" | "pause" | "cont";
+  Action:
+    | "run"
+    | "pass"
+    | "fail"
+    | "skip"
+    | "output"
+    | "pause"
+    | "cont"
+    | "build-output"
+    | "build-fail";
   Package: string;
   Test?: string;
   Output?: string;
   Elapsed?: number;
+  // A build event (go 1.24+) carries the ImportPath of what was built and
+  // no Package; the package that build failed names it in FailedBuild on
+  // its own verdict.
+  ImportPath?: string;
+  FailedBuild?: string;
 }
 
 export interface TestMessage {

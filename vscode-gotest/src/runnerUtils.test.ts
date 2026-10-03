@@ -48,6 +48,7 @@ import {
   resolveRunPatterns,
   applyResults,
   applyEvent,
+  BuildOutputs,
   enqueueDescendants,
   startAncestors,
   resolveAncestorItems,
@@ -1151,6 +1152,100 @@ describe("applyEvent", () => {
     expect(run.failed).toHaveBeenCalledTimes(1);
     const messages = run.failed.mock.calls[0][1];
     expect(messages).toHaveLength(1);
+    expect(messages[0].message).toBe("Package failed");
+  });
+
+  // go test reports a failed build as build-output events on the build's
+  // ImportPath, then fails the package with FailedBuild naming that build.
+  // The compiler's file names are relative to the directory the CLI ran in,
+  // which is not the package's.
+  it("takes a failed build's diagnostics from the build events, located against the CLI's directory", () => {
+    const { controller, run, pkgItem } = makeApplyEventFixture();
+    const outputMap = new Map<string, string>();
+    const builds = new BuildOutputs();
+    const build = "example.com/pkg_test [example.com/pkg.test]";
+    for (const Output of [
+      `# ${build}\n`,
+      "pkg/pkg_suite_test.go:7:67: undefined: undefinedThing\n",
+    ]) {
+      expect(
+        builds.absorb({
+          Action: "build-output",
+          ImportPath: build,
+          Output,
+        } as any),
+      ).toBe(true);
+    }
+    expect(
+      builds.absorb({ Action: "build-fail", ImportPath: build } as any),
+    ).toBe(true);
+    expect(
+      builds.absorb({ Action: "output", Package: "example.com/pkg" } as any),
+    ).toBe(false);
+
+    applyEvent(
+      controller as any,
+      run as any,
+      {
+        Action: "output",
+        Package: "example.com/pkg",
+        Output: "FAIL\texample.com/pkg [build failed]\n",
+      } as any,
+      outputMap,
+      "example.com/pkg",
+      "/ws/pkg",
+      { builds, buildDir: "/ws" },
+    );
+    const result = applyEvent(
+      controller as any,
+      run as any,
+      {
+        Action: "fail",
+        Package: "example.com/pkg",
+        Elapsed: 0,
+        FailedBuild: build,
+      } as any,
+      outputMap,
+      "example.com/pkg",
+      "/ws/pkg",
+      { builds, buildDir: "/ws" },
+    );
+
+    expect(result).toEqual({
+      itemId: "example.com/pkg",
+      status: "fail",
+      duration: 0,
+    });
+    expect(run.failed).toHaveBeenCalledTimes(1);
+    expect(run.failed.mock.calls[0][0]).toBe(pkgItem);
+    const messages = run.failed.mock.calls[0][1];
+    expect(messages).toHaveLength(1);
+    expect(messages[0].message).toContain("undefined: undefinedThing");
+    expect(messages[0].message).toContain(`# ${build}`);
+    expect(messages[0].location.uri.fsPath).toBe("/ws/pkg/pkg_suite_test.go");
+    expect(messages[0].location.range.line).toBe(6);
+  });
+
+  it("leaves a package that failed on its own tests without a build's diagnostics", () => {
+    const { controller, run } = makeApplyEventFixture();
+    const builds = new BuildOutputs();
+    builds.absorb({
+      Action: "build-output",
+      ImportPath: "example.com/other [example.com/other.test]",
+      Output: "other/x.go:1:1: boom\n",
+    } as any);
+
+    applyEvent(
+      controller as any,
+      run as any,
+      { Action: "fail", Package: "example.com/pkg", Elapsed: 0.5 } as any,
+      new Map(),
+      "example.com/pkg",
+      "/ws/pkg",
+      { builds, buildDir: "/ws" },
+    );
+
+    const messages = run.failed.mock.calls[0][1];
     expect(messages[0].message).toBe("Package failed");
   });
 });

@@ -201,9 +201,12 @@ const stageFailurePkg = "go build"
 
 // brokenPackageMessage renders a load-broken package's diagnostics in the
 // `go build` shape: a `# path` header followed by one diagnostic per line.
+// The compiler's own report brings its header along.
 func brokenPackageMessage(bp *gotestgen.BrokenPackage) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "# %s\n", bp.PkgPath)
+	if len(bp.Errors) == 0 || !strings.HasPrefix(bp.Errors[0], "# ") {
+		fmt.Fprintf(&b, "# %s\n", bp.PkgPath)
+	}
 	for _, e := range bp.Errors {
 		b.WriteString(e)
 		b.WriteByte('\n')

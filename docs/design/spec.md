@@ -1188,7 +1188,7 @@ gotest summary ./... --github                  # ::error annotations + $GITHUB_S
 go test -json ./... | gotest summary --input=- # post-process an existing JSON stream
 ```
 
-A replayed `go test -json` stream carries a failed build as `build-output` and `build-fail` events keyed by the build's `ImportPath`, which the failing package names in its verdict's `FailedBuild` (Go 1.24+). `spec` and `summary` route those diagnostics to every package the build failed, so a compile error replays with its cause.
+A `go test -json` stream — replayed or gotest's own — carries a failed build as `build-output` and `build-fail` events keyed by the build's `ImportPath`, which the failing package names in its verdict's `FailedBuild` (Go 1.24+). `spec` and `summary` route those diagnostics to every package the build failed, so a compile error renders with its cause.
 
 `--github` is auto-enabled when `GITHUB_ACTIONS=true`.
 The coverage table is statement-weighted with block deduplication (see Coverage Model).
@@ -1478,7 +1478,8 @@ The exit code of `spec --input` and `summary --input` answers two questions at o
 
 Every package a pattern matches ends in exactly one verdict. A package that fails to load or compile (a syntax error, a type error, a nonexistent path) is a failed package, exit 2:
 
-- Its diagnostics are booked into the same output stream as suite results, grouped under a `# <import-path>` header, so text output, `--json` events, `spec`, `summary` and `--input` replays all carry the failure.
+- Its diagnostics are the compiler's own report, as `go test` prints it: a `# <build>` header and one line per error, relative to the directory the command ran in. Text output ends the package with `FAIL\t<pkg> [build failed]`.
+- In `-json` the failure takes the shape `go test -json` gives it (Go 1.24+): one `build-output` event per line keyed by the build's `ImportPath` (`pkg` or `pkg_test [pkg.test]`), a `build-fail` event, then the package's `start`, its `FAIL … [build failed]` output and a `fail` verdict whose `FailedBuild` names the build. `spec`, `summary`, `--input` replays, the editor and converters such as gotestsum read it as they read `go test`'s.
 - Packages that did build still run; one broken package never blocks the rest. `run`, `watch`, `spec` and `summary` book and continue this way.
 - `generate` and `prepare` fail fast instead, because generated output for an unbuildable package is meaningless.
 - `discover` reports such packages with `"broken": true` and their diagnostics as warnings.
