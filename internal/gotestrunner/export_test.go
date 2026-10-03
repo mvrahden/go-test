@@ -28,6 +28,15 @@ var ExportSplitTopLevelOr = splitTopLevelOr
 var ExportSuiteRunFilter = suiteRunFilter
 var ExportAssignCoverProfiles = assignCoverProfiles
 var ExportResolveSetupTimeout = resolveSetupTimeout
+
+// ExportSetSharedFixtureDrainDelay sets the shared fixture process's drain
+// delay and returns the call that restores it.
+func ExportSetSharedFixtureDrainDelay(d time.Duration) (restore func()) {
+	prev := sharedFixtureDrainDelay
+	sharedFixtureDrainDelay = d
+	return func() { sharedFixtureDrainDelay = prev }
+}
+
 var ExportBuildBaseEnv = buildBaseEnv
 var ExportOverlayContentHash = overlayContentHash
 var ExportCacheRoot = cacheRoot

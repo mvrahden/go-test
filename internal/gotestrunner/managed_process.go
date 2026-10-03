@@ -34,6 +34,10 @@ type ProcessConfig struct {
 // it is what a detached grandchild can add to a run.
 const OutputDrainDelay = 5 * time.Second
 
+// sharedFixtureDrainDelay is the shared fixture process's DrainDelay, a
+// variable so its tests need not wait the default out.
+var sharedFixtureDrainDelay time.Duration = OutputDrainDelay
+
 // ManagedProcess runs a command as the root of its own process tree and stops
 // the tree by its grace strategy.
 //

@@ -200,6 +200,8 @@ func (s *ShutdownTestSuite) TestInterruptDuringTeardown(t *gotest.T) {
 // A --timeout that expires mid-run fails it with 1 on the streaming and the
 // batch pipeline alike and names what was still running: the method where a
 // stream exists, the suite in the text run. It is not censused.
+// The 5s budget outlasts the slow package's build and the fixture's setup,
+// which measure well under a second, and the method it cuts short sleeps 60s.
 func (s *ShutdownTestSuite) TestGlobalTimeout(t *gotest.T) {
 	for sub, tc := range gotest.Each(t, []struct { //nolint:gocritic // rangeValCopy: intentional
 		Desc    string
@@ -207,20 +209,20 @@ func (s *ShutdownTestSuite) TestGlobalTimeout(t *gotest.T) {
 		running string
 		shows   string
 	}{
-		{Desc: "gotest ./...", args: []string{"--timeout=20s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite\n"},
+		{Desc: "gotest ./...", args: []string{"--timeout=5s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite\n"},
 		{
-			Desc: "gotest -json", args: []string{"-json", "--timeout=20s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
+			Desc: "gotest -json", args: []string{"-json", "--timeout=5s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
 			shows: `{"Action":"fail","Package":"shutdownmod/slow","Test":"TestSlowTestSuite/TestSleeps"}`,
 		},
 		{
-			Desc: "gotest spec", args: []string{"spec", "--no-color", "--timeout=20s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
+			Desc: "gotest spec", args: []string{"spec", "--no-color", "--timeout=5s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
 			shows: "✗ Sleeps",
 		},
 	}) {
 		markers := sub.TempDir()
 		out, code := s.runWith(sub, markers, tc.args...)
 		gotest.Equal(sub, 1, code, out)
-		gotest.Contains(sub, out, "FAIL: global --timeout exceeded after 20s while running: "+tc.running)
+		gotest.Contains(sub, out, "FAIL: global --timeout exceeded after 5s while running: "+tc.running)
 		gotest.Contains(sub, out, tc.shows)
 		gotest.NotContains(sub, out, "=== global --timeout")
 		gotest.NotContains(sub, out, "census")
