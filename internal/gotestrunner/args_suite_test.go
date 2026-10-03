@@ -384,21 +384,15 @@ func (s *ArgsTestSuite) TestAssignCoverProfiles(t *gotest.T) {
 	})
 }
 
-func (s *ArgsTestSuite) TestBuildExtraEnv(t *gotest.T) {
-	t.When("building extra env", func(w *gotest.T) {
+func (s *ArgsTestSuite) TestBuildBaseEnv(t *gotest.T) {
+	t.When("building the base env", func(w *gotest.T) {
 		w.It("includes snapshot flag when set", func(it *gotest.T) {
-			env := gotestrunner.ExportBuildExtraEnv(gotestrunner.PipelineConfig{UpdateSnapshots: true}, nil)
-			gotest.Equal(it, "1", env[protocol.EnvUpdateSnapshots])
+			env := gotestrunner.ExportBuildBaseEnv(gotestrunner.PipelineConfig{UpdateSnapshots: true})
+			gotest.Contains(it, env, protocol.EnvUpdateSnapshots+"=1")
 		})
 		w.It("omits snapshot flag when not set", func(it *gotest.T) {
-			env := gotestrunner.ExportBuildExtraEnv(gotestrunner.PipelineConfig{}, nil)
-			_, ok := env[protocol.EnvUpdateSnapshots]
-			gotest.False(it, ok)
-		})
-		w.It("omits state file when no process", func(it *gotest.T) {
-			env := gotestrunner.ExportBuildExtraEnv(gotestrunner.PipelineConfig{}, nil)
-			_, ok := env[protocol.EnvSharedStateFile]
-			gotest.False(it, ok)
+			env := gotestrunner.ExportBuildBaseEnv(gotestrunner.PipelineConfig{})
+			gotest.NotContains(it, env, protocol.EnvUpdateSnapshots+"=1")
 		})
 	})
 }

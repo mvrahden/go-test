@@ -273,20 +273,6 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 	return runStreaming(ctx, cfg, overlay, pf)
 }
 
-func buildExtraEnv(cfg PipelineConfig, proc *SharedFixtureProcess) map[string]string { //nolint:gocritic // hugeParam: stable API
-	env := make(map[string]string)
-	if cfg.UpdateSnapshots {
-		env[protocol.EnvUpdateSnapshots] = "1"
-	}
-	if cfg.CI {
-		env[protocol.EnvCI] = "1"
-	}
-	if proc != nil {
-		env[protocol.EnvSharedStateFile] = proc.StateFile()
-	}
-	return env
-}
-
 func buildBaseEnv(cfg PipelineConfig) []string { //nolint:gocritic // hugeParam: stable API
 	env := os.Environ()
 	if cfg.UpdateSnapshots {
