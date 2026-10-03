@@ -15,3 +15,9 @@ func (s *AloneTestSuite) SuiteConfig() gotest.SuiteConfig {
 func (s *AloneTestSuite) TestFixtureIsUp(t *gotest.T) {
 	gotest.Equal(t, "up", s.Probe.State)
 }
+
+func (s *AloneTestSuite) BenchmarkFixtureIsUp(b *gotest.B) {
+	for b.Loop() {
+		_ = s.Probe.State
+	}
+}
