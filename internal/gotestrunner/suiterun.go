@@ -83,8 +83,10 @@ func SortTargetsSerial(targets []SuiteTarget) {
 // order (see SortTargetsSerial): benchmarks own the machine, and their
 // verdicts are wall-clock measurements no concurrent suite may corrupt.
 // beforeSlot/afterSlot (nil-safe) bracket each slot with its index, so the
-// caller can open and close per-slot fixture windows.
-func RunBenchSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[string]string, collector *OutputCollector, beforeSlot, afterSlot func(i int)) {
+// caller can open and close per-slot fixture windows. envFor gives a slot
+// its environment, or the reason it is given up: a target whose fixture
+// never came up is booked as failed with that reason and never runs.
+func RunBenchSuites(ctx context.Context, targets []SuiteTarget, collector *OutputCollector, beforeSlot, afterSlot func(i int), envFor func(i int) (env []string, giveUp string)) {
 	pkgCount := map[string]int{}
 	var pkgOrder []string
 	localIdx := make([]int, len(targets))
@@ -100,10 +102,6 @@ func RunBenchSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[str
 	}
 
 	useTest2JSON := collector.UsesTest2JSON()
-	env := os.Environ()
-	for k, v := range extraEnv {
-		env = append(env, k+"="+v)
-	}
 
 	for i := range targets {
 		if ctx.Err() != nil {
@@ -112,8 +110,12 @@ func RunBenchSuites(ctx context.Context, targets []SuiteTarget, extraEnv map[str
 		if beforeSlot != nil {
 			beforeSlot(i)
 		}
-		r := RunSingleSuite(ctx, targets[i], env, useTest2JSON)
-		collector.RecordResult(targets[i].Package, localIdx[i], r)
+		if env, giveUp := envFor(i); giveUp != "" {
+			collector.RecordGivenUp(targets[i].Package, localIdx[i], protocol.PrefixBenchmark+targets[i].SuiteName, giveUp)
+		} else {
+			r := RunSingleSuite(ctx, targets[i], env, useTest2JSON)
+			collector.RecordResult(targets[i].Package, localIdx[i], r)
+		}
 		if afterSlot != nil {
 			afterSlot(i)
 		}

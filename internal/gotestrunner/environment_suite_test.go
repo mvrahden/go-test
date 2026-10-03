@@ -45,17 +45,6 @@ func (s *EnvironmentTestSuite) TestCIAutoDetection(t *gotest.T) {
 	})
 
 	t.When("propagating CI to subprocess env", func(w *gotest.T) {
-		w.It("sets GOTEST_CI in extra env when CI is true", func(it *gotest.T) {
-			env := gotestrunner.ExportBuildExtraEnv(gotestrunner.PipelineConfig{CI: true}, nil)
-			gotest.Equal(it, "1", env[protocol.EnvCI])
-		})
-
-		w.It("omits GOTEST_CI in extra env when CI is false", func(it *gotest.T) {
-			env := gotestrunner.ExportBuildExtraEnv(gotestrunner.PipelineConfig{}, nil)
-			_, ok := env[protocol.EnvCI]
-			gotest.False(it, ok)
-		})
-
 		w.It("appends GOTEST_CI to base env when CI is true", func(it *gotest.T) {
 			it.Setenv("CI", "")
 			it.Setenv(protocol.EnvCI, "")

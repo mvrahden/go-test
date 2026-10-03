@@ -9,3 +9,9 @@ type IndependentTestSuite struct{}
 func (s *IndependentTestSuite) TestRuns(t *gotest.T) {
 	gotest.True(t, true)
 }
+
+func (s *IndependentTestSuite) BenchmarkRuns(b *gotest.B) {
+	for b.Loop() {
+		_ = 1 + 1
+	}
+}
