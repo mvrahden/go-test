@@ -15,6 +15,7 @@ import {
   resolveRunPatterns,
   readWorkspacePatterns,
   type AppliedResult,
+  BuildOutputs,
 } from "./runnerUtils.js";
 import {
   runGoToolCoverFunc,
@@ -110,6 +111,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     let streamedFailure = false;
     const pkgOutputMaps = new Map<string, Map<string, string>>();
     const pkgDirMap = new Map(pkgInfos.map((p) => [p.importPath, p.dir]));
+    const builds = new BuildOutputs();
 
     const handleStdoutLine = (line: string) => {
       let event: TestEvent;
@@ -120,6 +122,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         return;
       }
 
+      if (builds.absorb(event)) return;
       const dir = pkgDirMap.get(event.Package);
       if (!dir) return;
 
@@ -136,6 +139,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         outputMap,
         event.Package,
         dir,
+        { builds, buildDir: workspaceDir },
       );
       if (result) onResults?.([result]);
 

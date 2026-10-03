@@ -113,7 +113,12 @@ func CollectFromLoaded(loadResults []*LoadResult) (gotestast.TestSuiteSpecSet, e
 type BrokenPackage struct {
 	PkgPath string
 	Dir     string
-	Errors  []string
+	// Errors are the diagnostics as go test prints them: the compiler's
+	// report when the build ran, starting with its `# pkg [pkg.test]`
+	// header, else one line per load or type error.
+	Errors []string
+
+	compilerReport bool
 }
 
 // LoadResult holds the parsed packages for a given import path,
@@ -172,8 +177,21 @@ func loadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []Br
 				brokenMsgSeen[pkgPath] = map[string]bool{}
 			}
 			// Package variants (ptest, pxtest) repeat the same diagnostics;
-			// each distinct message is reported once per package.
+			// each distinct message is reported once per package. The
+			// compiler's own report (`# pkg [pkg.test]` and its lines, which
+			// go list relays position-less) is the one go test prints, so it
+			// is kept whole and the type errors restating it are dropped.
 			for _, e := range p.Errors {
+				if e.Kind == packages.ListError && strings.HasPrefix(e.Msg, "# ") {
+					if !bp.compilerReport {
+						bp.compilerReport = true
+						bp.Errors = []string{strings.TrimRight(e.Msg, "\n")}
+					}
+					continue
+				}
+				if bp.compilerReport {
+					continue
+				}
 				msg := e.Error()
 				if !brokenMsgSeen[pkgPath][msg] {
 					brokenMsgSeen[pkgPath][msg] = true

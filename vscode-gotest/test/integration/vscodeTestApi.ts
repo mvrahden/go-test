@@ -72,6 +72,8 @@ export type Verdict =
 export class FakeTestRun {
   readonly verdicts = new Map<string, Verdict>();
   readonly messages = new Map<string, string[]>();
+  // File paths the messages pointed at, as the developer's click would open.
+  readonly locations = new Map<string, string[]>();
   readonly output: string[] = [];
   readonly coverage: unknown[] = [];
   ended = false;
@@ -123,6 +125,13 @@ export class FakeTestRun {
           ? entry
           : ((entry as { message?: string }).message ?? String(entry)),
       );
+      const file = (entry as { location?: { uri?: { fsPath?: string } } })
+        .location?.uri?.fsPath;
+      if (file) {
+        const files = this.locations.get(item.id) ?? [];
+        files.push(file);
+        this.locations.set(item.id, files);
+      }
     }
     this.messages.set(item.id, list);
   }

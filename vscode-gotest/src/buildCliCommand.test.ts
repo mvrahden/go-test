@@ -487,7 +487,7 @@ describe("buildCliCommand", () => {
         CliUnavailableError,
       );
       await expect(buildCliCommand(["spec"], "/workspace")).rejects.toThrow(
-        /v1\.0\.0.*v1\.30\.2/,
+        /v1\.0\.0.*v1\.31\.0/,
       );
       expect(mockExecFileAsync).not.toHaveBeenCalled();
     });
@@ -861,10 +861,10 @@ describe("checkProducerVersion", () => {
   it("accepts the floor, anything above it, a pseudo-version at the floor and a dev build", async () => {
     const { checkProducerVersion } = await import("./cli.js");
     for (const v of [
-      "v1.30.2",
       "v1.31.0",
+      "v1.31.1",
       "v2.0.0",
-      "v1.30.2-0.20260926120923-7362809f09ef",
+      "v1.31.0-0.20261002200000-3b6775a3f0e1",
       "dev (source checkout)",
       "dev (replace directive)",
       "dev",
@@ -876,9 +876,9 @@ describe("checkProducerVersion", () => {
   it("refuses a version below the floor with the upgrade command", async () => {
     const { checkProducerVersion, CliUnavailableError } =
       await import("./cli.js");
-    expect(() => checkProducerVersion("v1.30.1")).toThrow(CliUnavailableError);
+    expect(() => checkProducerVersion("v1.30.2")).toThrow(CliUnavailableError);
     expect(() => checkProducerVersion("v1.29.0")).toThrow(
-      "the CLI is v1.29.0, but >= v1.30.2 is required. Run: go get -tool github.com/mvrahden/go-test/cmd/gotest@latest",
+      "the CLI is v1.29.0, but >= v1.31.0 is required. Run: go get -tool github.com/mvrahden/go-test/cmd/gotest@latest",
     );
   });
 
@@ -887,7 +887,7 @@ describe("checkProducerVersion", () => {
       await import("./cli.js");
     expect(() => checkProducerVersion(undefined)).toThrow(CliUnavailableError);
     expect(() => checkProducerVersion(undefined)).toThrow(
-      "the CLI wrote no version, so it predates v1.30.2",
+      "the CLI wrote no version, so it predates v1.31.0",
     );
   });
 
