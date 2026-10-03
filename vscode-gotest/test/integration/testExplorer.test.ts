@@ -279,9 +279,14 @@ describe("executeBatch maps events onto test items", () => {
     // The CLI books a load failure as a package verdict and keeps going, so the
     // package item carries the failure rather than being errored out of band.
     expect(run.verdictsMatching("failed")).toContain(pkg("broken"));
-    const reported =
-      [...run.messages.values()].flat().join("\n") + result.stdout;
-    expect(reported).toContain("undefinedHelper");
+    // The compiler's words travel as build events keyed by the build, and the
+    // package item shows them, located at the file they name — which the
+    // compiler names relative to the CLI's directory, not the package's.
+    const onItem = (run.messages.get(pkg("broken")) ?? []).join("\n");
+    expect(onItem).toContain("undefined: undefinedHelper");
+    expect(run.locations.get(pkg("broken"))).toEqual([
+      path.join(fixturesDir, "broken", "suite_test.go"),
+    ]);
   });
 
   it("streams output through to the run", async () => {

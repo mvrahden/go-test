@@ -263,6 +263,38 @@ export interface AppliedResult {
   duration?: number;
 }
 
+// BuildOutputs keeps the diagnostics of failed builds until the package
+// verdict that names the build arrives. go test keys them by the build's
+// ImportPath, not by a package: one build can fail several packages.
+export class BuildOutputs {
+  private readonly byBuild = new Map<string, string>();
+
+  // absorb takes a build event and reports whether it was one; every other
+  // event belongs to a package and is the caller's to route.
+  absorb(event: TestEvent): boolean {
+    if (event.Action !== "build-output" && event.Action !== "build-fail") {
+      return false;
+    }
+    if (event.ImportPath && event.Output) {
+      const existing = this.byBuild.get(event.ImportPath) ?? "";
+      this.byBuild.set(event.ImportPath, existing + event.Output);
+    }
+    return true;
+  }
+
+  get(build: string): string {
+    return this.byBuild.get(build) ?? "";
+  }
+}
+
+export interface ApplyOptions {
+  // Where a failed build's diagnostics wait, and the directory the
+  // compiler's relative file names resolve against — the CLI's working
+  // directory, not the package's.
+  builds?: BuildOutputs;
+  buildDir?: string;
+}
+
 export function applyEvent(
   controller: GoTestController,
   run: vscode.TestRun,
@@ -270,6 +302,7 @@ export function applyEvent(
   outputMap: Map<string, string>,
   importPath: string,
   pkgDir: string,
+  options: ApplyOptions = {},
 ): AppliedResult | undefined {
   if (event.Action === "output") {
     const key = event.Test ?? "";
@@ -305,9 +338,14 @@ export function applyEvent(
       const pkgItem = controller.findItem(importPath);
       if (pkgItem) {
         if (event.Action === "fail") {
-          const output = outputMap.get("") ?? "";
+          let output = outputMap.get("") ?? "";
+          let diagnosticsDir = pkgDir;
+          if (event.FailedBuild) {
+            output = (options.builds?.get(event.FailedBuild) ?? "") + output;
+            diagnosticsDir = options.buildDir ?? pkgDir;
+          }
           const message = new vscode.TestMessage(output || "Package failed");
-          const loc = extractDiagnosticLocation(output, pkgDir);
+          const loc = extractDiagnosticLocation(output, diagnosticsDir);
           if (loc) {
             message.location = new vscode.Location(
               vscode.Uri.file(loc.file),
@@ -406,6 +444,7 @@ export function applyResults(
   events: TestEvent[],
   importPath: string,
   pkgDir: string,
+  options: ApplyOptions = {},
 ): AppliedResult[] {
   const outputMap = new Map<string, string>();
   const applied: AppliedResult[] = [];
@@ -417,6 +456,7 @@ export function applyResults(
       outputMap,
       importPath,
       pkgDir,
+      options,
     );
     if (result) applied.push(result);
   }
