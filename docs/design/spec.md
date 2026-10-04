@@ -486,7 +486,7 @@ type BatchTestSuite struct {
 Both paths produce the same lifecycle: deserialize from state file, call `Hydrate`, run tests, call `Dehydrate`.
 
 Fixtures may be defined in a different package from the suite.
-The resolver walks the type graph from targeted suites to discover all required fixtures, including cross-package dependencies.
+Binding walks the type graph from targeted suites to discover all required fixtures, including cross-package dependencies.
 
 Fixtures nest — a root fixture's hooks run first, wrapping the child's:
 
@@ -1689,7 +1689,7 @@ internal/about/              Build metadata, file naming constants
 | **Load** | Package pattern (e.g., `./...`) | `[]*LoadResult` wrapping `*packages.Package` with syntax, types, module info |
 | **Collect** | Package AST | `TestSuiteSpecSet` — suites with attached methods, local fixture specs |
 | **Reduce** | `TestSuiteSpecSet` | Effective set after focus/exclude applied |
-| **Resolve** | Effective suites + local fixtures | `ResolveResult` — fixture trees, shared fixture info, suite→fixture bindings |
+| **Bind** | Effective suites + local fixtures | `Binding` — fixture trees, shared fixture info, suite→fixture bindings |
 | **Render** | Reduced spec + resolve result | Formatted Go source bytes |
 
 Collection is a two-pass AST traversal: find type declarations matching suite patterns, then attach methods by matching receiver types.

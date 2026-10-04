@@ -7,17 +7,17 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// ResolverTestSuite tests fixture binding resolution, including suite-to-fixture,
+// BindingTestSuite tests fixture binding resolution, including suite-to-fixture,
 // parent-child, shared fixture, and lifecycle method detection.
-type ResolverTestSuite struct{}
+type BindingTestSuite struct{}
 
-func (s *ResolverTestSuite) SuiteConfig() gotest.SuiteConfig {
+func (s *BindingTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
 	cfg.Parallel = true
 	return cfg
 }
 
-func (s *ResolverTestSuite) TestIsInternalPkgPath(t *gotest.T) {
+func (s *BindingTestSuite) TestIsInternalPkgPath(t *gotest.T) {
 	t.When("various paths", func(w *gotest.T) {
 		for sub, tc := range gotest.Each(w, []struct {
 			Desc     string
@@ -36,7 +36,7 @@ func (s *ResolverTestSuite) TestIsInternalPkgPath(t *gotest.T) {
 	})
 }
 
-func (s *ResolverTestSuite) TestSuiteToFixtureBinding(t *gotest.T) {
+func (s *BindingTestSuite) TestSuiteToFixtureBinding(t *gotest.T) {
 	t.When("suite embeds fixture", func(w *gotest.T) {
 		w.It("resolves fixture binding via embedding", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_Embedding_SuiteToFixture")
@@ -47,7 +47,7 @@ func (s *ResolverTestSuite) TestSuiteToFixtureBinding(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Len(it, resolved.RootFixtures, 1)
@@ -69,7 +69,7 @@ func (s *ResolverTestSuite) TestSuiteToFixtureBinding(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Len(it, resolved.RootFixtures, 1)
@@ -82,7 +82,7 @@ func (s *ResolverTestSuite) TestSuiteToFixtureBinding(t *gotest.T) {
 	})
 }
 
-func (s *ResolverTestSuite) TestChildToParentFixtureBinding(t *gotest.T) {
+func (s *BindingTestSuite) TestChildToParentFixtureBinding(t *gotest.T) {
 	t.When("child embeds parent fixture", func(w *gotest.T) {
 		w.It("resolves parent-child fixture hierarchy", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_Embedding_ChildToParentFixture")
@@ -93,7 +93,7 @@ func (s *ResolverTestSuite) TestChildToParentFixtureBinding(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Len(it, resolved.RootFixtures, 1)
@@ -116,7 +116,7 @@ func (s *ResolverTestSuite) TestChildToParentFixtureBinding(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Len(it, resolved.RootFixtures, 1)
@@ -130,7 +130,7 @@ func (s *ResolverTestSuite) TestChildToParentFixtureBinding(t *gotest.T) {
 	})
 }
 
-func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
+func (s *BindingTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 	t.When("fixture references shared fixture via named field", func(w *gotest.T) {
 		w.It("resolves shared fixture reference", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_NamedField_FixtureToSharedFixture")
@@ -141,7 +141,7 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Len(it, resolved.RootFixtures, 1)
@@ -165,7 +165,7 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Empty(it, resolved.RootFixtures, "no package fixture")
@@ -195,7 +195,7 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Empty(it, resolved.RootFixtures)
@@ -217,7 +217,7 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Len(it, resolved.RootFixtures, 1, "package fixture found")
@@ -242,7 +242,7 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Empty(it, resolved.RootFixtures)
@@ -272,7 +272,7 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Len(it, resolved.RequiredSharedFixtures, 1)
@@ -286,7 +286,7 @@ func (s *ResolverTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 	})
 }
 
-func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
+func (s *BindingTestSuite) TestResolutionErrors(t *gotest.T) {
 	t.When("fixtures form a cycle", func(w *gotest.T) {
 		w.It("returns an error mentioning cycle", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_CycleDetection")
@@ -297,7 +297,7 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.ErrorContains(it, err, "cycle")
 		})
 	})
@@ -312,7 +312,7 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.ErrorContains(it, err, "must define BeforeAll")
 		})
 	})
@@ -327,7 +327,7 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.ErrorContains(it, err, "cannot depend on package fixture")
 		})
 	})
@@ -345,7 +345,7 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			// The type→field wiring silently kept only the last field; the
 			// first stayed nil until BeforeAll dereferenced it inside the
 			// containment frame — a runtime mystery for a generation-time fact.
-			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.ErrorContains(it, err, "two fields of the same parent fixture type")
 			gotest.ErrorContains(it, err, "Primary")
 			gotest.ErrorContains(it, err, "Secondary")
@@ -362,7 +362,7 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.ErrorContains(it, err, "cycle")
 		})
 	})
@@ -377,7 +377,7 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 			gotest.Len(it, resolved.RootFixtures, 2)
 			gotest.Len(it, resolved.FixtureBound, 1)
@@ -397,7 +397,7 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.ErrorContains(it, err, "must have a BeforeAll")
 		})
 	})
@@ -412,7 +412,7 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 			gotest.Len(it, resolved.RootFixtures, 2, "A and B should be roots")
 			gotest.Len(it, resolved.FixtureBound, 1)
@@ -429,7 +429,7 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 			gotest.Len(it, resolved.RootFixtures, 1, "DB should be the only root")
 			gotest.Len(it, resolved.AllFixtures, 3)
@@ -446,7 +446,7 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.ErrorContains(it, err, "non-JSON-serializable")
 			gotest.ErrorContains(it, err, "channel")
 		})
@@ -462,7 +462,7 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.ErrorContains(it, err, "WorkerTestSuite has benchmark methods but fixture HookedFixture defines BeforeEach/AfterEach")
 		})
 	})
@@ -477,13 +477,13 @@ func (s *ResolverTestSuite) TestResolutionErrors(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.ErrorContains(it, err, "FuzzWorkerTestSuite has fuzz methods but fixture HookedFixture defines BeforeEach/AfterEach")
 		})
 	})
 }
 
-func (s *ResolverTestSuite) TestMixedFieldStylesSameFixture(t *gotest.T) {
+func (s *BindingTestSuite) TestMixedFieldStylesSameFixture(t *gotest.T) {
 	t.When("two suites reference the same fixture with different field styles", func(w *gotest.T) {
 		w.It("resolves each with its own field name", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_MixedFieldStyles_SameFixture")
@@ -494,7 +494,7 @@ func (s *ResolverTestSuite) TestMixedFieldStylesSameFixture(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Len(it, resolved.RootFixtures, 1)
@@ -510,7 +510,7 @@ func (s *ResolverTestSuite) TestMixedFieldStylesSameFixture(t *gotest.T) {
 	})
 }
 
-func (s *ResolverTestSuite) TestNoFixtureStandalone(t *gotest.T) {
+func (s *BindingTestSuite) TestNoFixtureStandalone(t *gotest.T) {
 	t.When("no fixture is defined", func(w *gotest.T) {
 		w.It("resolves suite as standalone", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_NoFixture_Standalone")
@@ -521,7 +521,7 @@ func (s *ResolverTestSuite) TestNoFixtureStandalone(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Empty(it, resolved.RootFixtures)
@@ -532,7 +532,7 @@ func (s *ResolverTestSuite) TestNoFixtureStandalone(t *gotest.T) {
 	})
 }
 
-func (s *ResolverTestSuite) TestLifecycleMethodsDetection(t *gotest.T) {
+func (s *BindingTestSuite) TestLifecycleMethodsDetection(t *gotest.T) {
 	t.When("fixture has all lifecycle methods", func(w *gotest.T) {
 		w.It("detects all lifecycle methods", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_LifecycleMethods_Detection")
@@ -543,7 +543,7 @@ func (s *ResolverTestSuite) TestLifecycleMethodsDetection(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Len(it, resolved.RootFixtures, 1)
@@ -556,7 +556,7 @@ func (s *ResolverTestSuite) TestLifecycleMethodsDetection(t *gotest.T) {
 	})
 }
 
-func (s *ResolverTestSuite) TestUnreferencedFixtureNotInOutput(t *gotest.T) {
+func (s *BindingTestSuite) TestUnreferencedFixtureNotInOutput(t *gotest.T) {
 	t.When("a fixture is not referenced by any suite", func(w *gotest.T) {
 		w.It("excludes the unreferenced fixture from output", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_UnreferencedFixture_NotInOutput")
@@ -567,7 +567,7 @@ func (s *ResolverTestSuite) TestUnreferencedFixtureNotInOutput(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Len(it, resolved.RootFixtures, 1)
@@ -576,13 +576,13 @@ func (s *ResolverTestSuite) TestUnreferencedFixtureNotInOutput(t *gotest.T) {
 	})
 }
 
-func (s *ResolverTestSuite) TestGenericAlias(t *gotest.T) {
+func (s *BindingTestSuite) TestGenericAlias(t *gotest.T) {
 	t.When("generic alias in pxtest package", func(w *gotest.T) {
 		w.It("rejects generic alias", func(it *gotest.T) {
 			suite := gotestast.NewTestSuiteSpecForTest("FooTestSuite", "mypkg_test", true)
 			pkg := &packages.Package{Name: "mypkg_test", PkgPath: "example.com/mypkg_test"}
 
-			_, err := gotestgen.Resolve(pkg, []*gotestast.TestSuiteSpec{suite}, nil)
+			_, err := gotestgen.Bind(pkg, []*gotestast.TestSuiteSpec{suite}, nil)
 			gotest.ErrorContains(it, err, "must not be in an external test package")
 		})
 	})
@@ -592,13 +592,13 @@ func (s *ResolverTestSuite) TestGenericAlias(t *gotest.T) {
 			suite := gotestast.NewTestSuiteSpecForTest("FooTestSuite", "mypkg", true)
 			pkg := &packages.Package{Name: "mypkg", PkgPath: "example.com/mypkg"}
 
-			_, err := gotestgen.Resolve(pkg, []*gotestast.TestSuiteSpec{suite}, nil)
+			_, err := gotestgen.Bind(pkg, []*gotestast.TestSuiteSpec{suite}, nil)
 			gotest.NoError(it, err)
 		})
 	})
 }
 
-func (s *ResolverTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
+func (s *BindingTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
 	t.When("shared fixture depends on another shared fixture", func(w *gotest.T) {
 		w.It("resolves the dependency chain", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixture_DependsOnSharedFixture")
@@ -609,7 +609,7 @@ func (s *ResolverTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			gotest.Len(it, resolved.RequiredSharedFixtures, 2)
@@ -640,7 +640,7 @@ func (s *ResolverTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			// UserTestSuite references Schema which depends on PG → needs both
@@ -663,7 +663,7 @@ func (s *ResolverTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			// Suite → ChildFixture → ParentFixture → PGSharedFixture: the

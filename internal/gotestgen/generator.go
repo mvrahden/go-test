@@ -85,7 +85,7 @@ func countStdlibTests(pkgs ...*packages.Package) int {
 
 // packageLoadMode type-checks the matched packages from source and reads
 // their dependencies from export data. A dependency's source is loaded only
-// where the resolver needs it, see sourceLoader.
+// where binding needs it, see sourceLoader.
 const packageLoadMode = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedFiles
 
 func CollectFromLoaded(loadResults []*LoadResult) (gotestast.TestSuiteSpecSet, error) {
@@ -495,7 +495,7 @@ func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutco
 		return nil, nil, nil, false, nil
 	}
 
-	resolved, err := resolve(pkg, sources, spec.EffectiveTestSuites, collected.Fixtures)
+	resolved, err := bind(pkg, sources, spec.EffectiveTestSuites, collected.Fixtures)
 	if err != nil {
 		return nil, nil, nil, false, err
 	}
@@ -557,7 +557,7 @@ func findUserTestMain(lr *LoadResult) (*ast.FuncDecl, *ast.File, *packages.Packa
 	return nil, nil, nil
 }
 
-func fixtureTreeHasSharedFixtures(roots []*ResolvedFixture) bool {
+func fixtureTreeHasSharedFixtures(roots []*BoundFixture) bool {
 	for _, rf := range roots {
 		if fixtureHasSharedFixtures(rf) {
 			return true
@@ -566,7 +566,7 @@ func fixtureTreeHasSharedFixtures(roots []*ResolvedFixture) bool {
 	return false
 }
 
-func fixtureHasSharedFixtures(rf *ResolvedFixture) bool {
+func fixtureHasSharedFixtures(rf *BoundFixture) bool {
 	if len(rf.SharedFixtures) > 0 {
 		return true
 	}

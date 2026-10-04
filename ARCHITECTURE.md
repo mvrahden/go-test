@@ -14,8 +14,8 @@
                             ▼
  ┌─────────────────────────────────────────────────────────────┐
  │  2. CODE GENERATION                                         │
- │     Collector → Resolver → Renderer → overlay.json          │
- │     (Renderer works directly with ResolvedFixture)          │
+ │     Collector → Binder → Renderer → overlay.json            │
+ │     (Renderer works directly with BoundFixture)             │
  └──────────────────────────┬──────────────────────────────────┘
                             │  overlayResult (tmpDir, fixture info)
                             ▼
@@ -144,7 +144,7 @@ ReduceToEffectiveSet() logic:
 
 ## 2. Code Generation
 
-The resolver walks the type graph starting from discovered suites,
+Binding walks the type graph starting from discovered suites,
 building a fixture tree and collecting shared fixture references.
 
 ### Fixture Resolution
@@ -177,7 +177,7 @@ Fixtures form a **DAG** (directed acyclic graph) via embedding: a fixture may
 have multiple parents, and suites may reference multiple fixtures. The same
 fixture type is deduplicated by identity so each fixture is set up exactly once.
 
-The resolver produces both `RootFixtures` (entry points with no parents) and
+Binding produces both `RootFixtures` (entry points with no parents) and
 `AllFixtures` (every fixture in topological order). The renderer uses
 `AllFixtures` to emit a flat list with `DependsOn` edges for the fixture
 DAG initializer.
@@ -280,7 +280,7 @@ warns about each one that takes `*gotest.B` or `*gotest.F`.
 `ValidateContextConsistency` (Pass 4) additionally rejects a suite that
 mixes `Benchmark*` methods with a returning `BeforeEach` (its context type
 can't thread through `*gotest.B`) or with any stdlib `*testing.T` lifecycle
-hook. The resolver rejects a fixture with `BeforeEach`/`AfterEach` bound to
+hook. Binding rejects a fixture with `BeforeEach`/`AfterEach` bound to
 a suite with `Benchmark*` methods — per-method fixture hooks aren't
 supported for benchmarks.
 
@@ -371,7 +371,7 @@ replay through the exact same `f.Add` path as hand-written ones.
 A suite must be named `*TestSuite` for its `Fuzz*` methods to be collected,
 same as benchmarks. `ValidateContextConsistency` rejects a fuzz suite with a
 returning `BeforeEach`, any lifecycle hook still typed `*testing.T`, and (via
-the resolver) a fixture with per-method `BeforeEach`/`AfterEach` bound to it —
+binding) a fixture with per-method `BeforeEach`/`AfterEach` bound to it —
 mirroring the three benchmark rejections above with fuzz-specific error text.
 Unlike benchmarks, a `Fuzz*` method's parameter type is checked more strictly:
 only `*gotest.F` is accepted, never `*testing.F` — the collector rejects the

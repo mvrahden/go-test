@@ -31,9 +31,9 @@ func renderTestPkgWith(t testing.TB, r gotestgen.ExportRenderer, pkg *packages.P
 	spec, err := c.ApplyTestSuiteSpecs(result)
 	gotest.NoError(t, err)
 
-	var resolved *gotestgen.ResolveResult
+	var resolved *gotestgen.Binding
 	if len(spec.EffectiveTestSuites) > 0 {
-		resolved, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+		resolved, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 		gotest.NoError(t, err)
 	}
 
@@ -504,7 +504,7 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 
 // --- Resolved fixture tests ---
 
-func (s *RendererTestSuite) TestResolvedFixtures(t *gotest.T) {
+func (s *RendererTestSuite) TestBoundFixtures(t *gotest.T) {
 	t.When("root fixture only", func(w *gotest.T) {
 		w.It("resolves correct fixture structure", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestBuildFixtureViewModels_RootFixtureOnly")
@@ -515,7 +515,7 @@ func (s *RendererTestSuite) TestResolvedFixtures(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			fixtures := resolved.AllFixtures
@@ -538,7 +538,7 @@ func (s *RendererTestSuite) TestResolvedFixtures(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			resolved, err := gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.NoError(it, err)
 
 			fixtures := resolved.AllFixtures
