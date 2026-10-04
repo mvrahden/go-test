@@ -142,6 +142,8 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			gotest.Greater(it, to, 0, "ƒ_setupFixtures never closes")
 			setup = setup[:to]
 			gotest.Contains(it, setup, "t.Cleanup(gotestruntime.TeardownIfDying)")
+			gotest.Less(it, strings.Index(setup, "gotestruntime.RequireMain()"), strings.Index(setup, "ƒ_fixtureOnce.Do("), "setup is refused before anything comes up")
+			gotest.GreaterOrEqual(it, strings.Index(setup, "gotestruntime.RequireMain()"), 0)
 			gotest.Contains(it, setup, "gotestruntime.RegisterTeardown(ƒ_fixtureDAG.Teardown)")
 
 			for _, fn := range strings.Split(output, "\nfunc Test")[1:] {

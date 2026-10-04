@@ -94,8 +94,10 @@ func (s *GeneratorTestSuite) TestE2ECLI(t *gotest.T) {
 func (s *GeneratorTestSuite) TestTestMainOwner(t *gotest.T) {
 	cwd, err := os.Getwd()
 	gotest.NoError(t, err)
+	// dir is relative to the package. Packages under testdata_e2e build and run
+	// with the module's tests; one that must not run lives under testdata.
 	gen := func(it *gotest.T, dir string) *gotestgen.GenerateResult {
-		loaded, broken, err := gotestgen.LoadPackages([]string{filepath.Join(cwd, "testdata_e2e", dir)}, nil)
+		loaded, broken, err := gotestgen.LoadPackages([]string{filepath.Join(cwd, dir)}, nil)
 		gotest.NoError(it, err)
 		gotest.Empty(it, broken)
 		results, _, err := gotestgen.GenerateFromLoaded(loaded)
@@ -108,7 +110,7 @@ func (s *GeneratorTestSuite) TestTestMainOwner(t *gotest.T) {
 
 	t.When("both variants bind fixtures", func(w *gotest.T) {
 		w.It("emits the TestMain in the package's own variant only", func(it *gotest.T) {
-			r := gen(it, "testmain_both")
+			r := gen(it, "testdata_e2e/testmain_both")
 			gotest.Equal(it, 1, strings.Count(string(r.PTest), testMain))
 			gotest.NotContains(it, string(r.PXTest), testMain)
 			gotest.Contains(it, string(r.PTest), register)
@@ -118,16 +120,26 @@ func (s *GeneratorTestSuite) TestTestMainOwner(t *gotest.T) {
 
 	t.When("the developer wrote a TestMain that calls the runtime", func(w *gotest.T) {
 		w.It("keeps theirs and emits none", func(it *gotest.T) {
-			r := gen(it, "testmain_user")
+			r := gen(it, "testdata_e2e/testmain_user")
 			gotest.NotContains(it, string(r.PTest), testMain)
 			gotest.NotContains(it, string(r.PXTest), testMain)
 			gotest.Contains(it, string(r.PTest), register)
 		})
 	})
 
+	// Whether a TestMain routes the tests through the runtime is decided at run
+	// time, where it is known exactly; generation neither refuses nor guesses.
+	t.When("the developer wrote a TestMain that calls m.Run", func(w *gotest.T) {
+		w.It("generates, emits no TestMain, and leaves the check to fixture setup", func(it *gotest.T) {
+			r := gen(it, "testdata/testmain_run")
+			gotest.NotContains(it, string(r.PTest), testMain)
+			gotest.Contains(it, string(r.PTest), "gotestruntime.RequireMain()")
+		})
+	})
+
 	t.When("only the external test package binds fixtures", func(w *gotest.T) {
 		w.It("emits the TestMain there", func(it *gotest.T) {
-			r := gen(it, "testmain_xonly")
+			r := gen(it, "testdata_e2e/testmain_xonly")
 			gotest.NotContains(it, string(r.PTest), testMain)
 			gotest.Equal(it, 1, strings.Count(string(r.PXTest), testMain))
 		})

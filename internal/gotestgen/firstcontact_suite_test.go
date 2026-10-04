@@ -56,11 +56,6 @@ func (s *FirstContactTestSuite) TestGenerationErrorsNameTheirPosition(t *gotest.
 			want: []string{`testdata/firstcontact/fuzzreject/suite_test.go:14:2: fuzz target FuzzFrameTestSuite_FuzzFrame: Frame.Done (chan struct{}) is not fuzzable`},
 		},
 		{
-			Desc: "a TestMain that runs the tests itself in a fixture package, at the TestMain",
-			pkg:  "testmainrun",
-			want: []string{`testdata/firstcontact/testmainrun/main_test.go:8:1: TestMain must call gotestruntime.Main(m) so fixtures tear down after the tests: replace m.Run() with gotestruntime.Main(m)`},
-		},
-		{
 			Desc: "a fixture the suite cannot bind, at the suite",
 			pkg:  "badfixture",
 			want: []string{`testdata/firstcontact/badfixture/suite_test.go:15:6: suite StoreTestSuite has benchmark methods but fixture StoreFixture defines BeforeEach/AfterEach`},

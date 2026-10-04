@@ -125,3 +125,37 @@ func (s *TeardownRegistryTestSuite) TestTeardownIfDying(t *gotest.T) {
 		})
 	})
 }
+
+func (s *TeardownRegistryTestSuite) TestRequireMainOutsideTheRun(t *gotest.T) {
+	t.When("the tests did not run through Main or M", func(w *gotest.T) {
+		w.It("refuses fixture setup and names the fix", func(it *gotest.T) {
+			err := gotestruntime.RequireMain()
+			gotest.ErrorContains(it, err, "os.Exit(gotestruntime.Main(m))")
+			gotest.ErrorContains(it, err, "gotestruntime.M(m)")
+		})
+	})
+}
+
+func (s *TeardownRegistryTestSuite) TestRequireMainDuringTheRun(t *gotest.T) {
+	t.When("the tests run through Main or M", func(w *gotest.T) {
+		w.It("allows fixture setup", func(it *gotest.T) {
+			var during error
+			var stderr bytes.Buffer
+			gotestruntime.ExportRunTests(func() int {
+				during = gotestruntime.RequireMain()
+				return 0
+			}, &stderr)
+			gotest.NoError(it, during)
+		})
+	})
+}
+
+func (s *TeardownRegistryTestSuite) TestRequireMainAfterTheRun(t *gotest.T) {
+	t.When("Main or M already tore the fixtures down", func(w *gotest.T) {
+		w.It("refuses fixture setup: the tests ran again", func(it *gotest.T) {
+			var stderr bytes.Buffer
+			gotestruntime.ExportRunTests(func() int { return 0 }, &stderr)
+			gotest.ErrorContains(it, gotestruntime.RequireMain(), "already torn down")
+		})
+	})
+}

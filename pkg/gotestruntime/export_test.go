@@ -23,12 +23,16 @@ func ExportNewNodeTracker() *nodeTracker {
 // ExportFinish applies the after-m.Run step to an exit code.
 func ExportFinish(code int, stderr io.Writer) int { return finish(code, stderr) }
 
+// ExportRunTests runs run as Main and M run m.Run.
+func ExportRunTests(run func() int, stderr io.Writer) int { return runTests(run, stderr) }
+
 // ExportResetTeardowns empties the teardown registry and clears the dying mark.
 func ExportResetTeardowns() {
 	teardownMu.Lock()
 	teardowns = nil
 	teardownMu.Unlock()
 	dying.Reset()
+	runState.Store(runNotStarted)
 }
 
 // ExportDying reports whether the process was marked as dying.

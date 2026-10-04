@@ -28,7 +28,7 @@ func parseFiles(t *gotest.T, srcs ...string) []*ast.File {
 	return files
 }
 
-func (s *TestMainTestSuite) TestCallsRuntimeMain(t *gotest.T) {
+func (s *TestMainTestSuite) TestRoutesThroughRuntime(t *gotest.T) {
 	for t, tc := range gotest.Each(t, []struct {
 		Desc string
 		src  string
@@ -40,6 +40,10 @@ func TestMain(m *testing.M) { os.Exit(gotestruntime.Main(m)) }`, true},
 		{"the runtime under an alias", `package p
 import ("os"; "testing"; rt "github.com/mvrahden/go-test/pkg/gotestruntime")
 func TestMain(m *testing.M) { code := rt.Main(m); os.Exit(code) }`, true},
+		{"the wrapper, handed to a library", `package p
+import ("testing"; "github.com/mvrahden/go-test/pkg/gotestruntime")
+func verify(m interface{ Run() int }) {}
+func TestMain(m *testing.M) { verify(gotestruntime.M(m)) }`, true},
 		{"m.Run", `package p
 import ("os"; "testing")
 func TestMain(m *testing.M) { os.Exit(m.Run()) }`, false},
@@ -49,7 +53,7 @@ func TestMain(m *testing.M) { os.Exit(gotestruntime.Main(m)) }`, false},
 	}) {
 		fd, f := gotestast.FindTestMain(parseFiles(t, tc.src))
 		gotest.NotZero(t, fd)
-		gotest.Equal(t, tc.want, gotestast.CallsRuntimeMain(f, fd))
+		gotest.Equal(t, tc.want, gotestast.RoutesThroughRuntime(f, fd))
 	}
 }
 

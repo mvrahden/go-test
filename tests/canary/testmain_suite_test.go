@@ -10,7 +10,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// TestMainTestSuite runs a generated fixture package under plain go test,
+// TestMainTestSuite runs generated fixture packages under plain go test,
 // where every suite shares one process and nothing but m.Run returning says
 // the last of them is done.
 type TestMainTestSuite struct {
@@ -29,23 +29,38 @@ func (s *TestMainTestSuite) BeforeAll(t *gotest.T) {
 	s.binary, err = testkit.BuildCLI(t.Context(), root, t.TempDir())
 	gotest.NoError(t, err)
 	testkit.ScrubActionsEnv()
-	out, err := exec.Command(s.binary, "generate", "./testdata/testmain/").CombinedOutput() //nolint:gosec // G204: controlled binary with fixed args
-	gotest.NoError(t, err, string(out))
-}
-
-func (s *TestMainTestSuite) AfterAll(t *gotest.T) {
-	generated, _ := filepath.Glob("testdata/testmain/gotest_p*suite_test.go")
-	for _, f := range generated {
-		_ = os.Remove(f)
+	for _, dir := range testMainPackages {
+		out, err := exec.Command(s.binary, "generate", dir).CombinedOutput() //nolint:gosec // G204: controlled binary with fixed args
+		gotest.NoError(t, err, string(out))
 	}
 }
 
-// goTest runs go test on the package and returns its exit code, its output and
-// the fixture's setup and teardown lines.
+func (s *TestMainTestSuite) AfterAll(t *gotest.T) {
+	for _, dir := range testMainPackages {
+		generated, _ := filepath.Glob(filepath.Join(dir, "gotest_p*suite_test.go"))
+		for _, f := range generated {
+			_ = os.Remove(f)
+		}
+	}
+}
+
+var testMainPackages = []string{
+	"./testdata/testmain/",
+	"./testdata/usermain/run/",
+	"./testdata/usermain/wrapped/",
+	"./testdata/usermain/twice/",
+}
+
+// goTest runs go test on testdata/testmain and returns its exit code, its
+// output and the fixture's setup and teardown lines.
 func goTest(t *gotest.T, env []string, args ...string) (code int, out string, events []string) {
+	return goTestIn(t, "./testdata/testmain/", env, args...)
+}
+
+func goTestIn(t *gotest.T, dir string, env []string, args ...string) (code int, out string, events []string) {
 	log := filepath.Join(t.TempDir(), "events")
-	cmd := exec.Command("go", append(append([]string{"test", "-count=1"}, args...), "./testdata/testmain/")...) //nolint:gosec // G204: fixed args
-	cmd.Env = append(append(os.Environ(), "TESTMAIN_LOG="+log), env...)
+	cmd := exec.Command("go", append(append([]string{"test", "-count=1", "-v"}, args...), dir)...) //nolint:gosec // G204: fixed args
+	cmd.Env = append(append(ownEnv(), "TESTMAIN_LOG="+log), env...)
 	raw, err := cmd.CombinedOutput()
 	if err != nil {
 		exit := gotest.ErrorAs[*exec.ExitError](t, err)
@@ -104,4 +119,33 @@ func (s *TestMainTestSuite) TestATeardownFailureFailsThePackage(t *gotest.T) {
 	gotest.Equal(t, 1, code, out)
 	gotest.Contains(t, out, "\nFAIL: fixture teardown failed\n")
 	gotest.NotContains(t, out, "--- FAIL", "a test was failed for the fixture's teardown")
+}
+
+// A TestMain that runs the tests itself would leave the fixtures up: fixture
+// setup refuses, says how to route the tests, and nothing comes up. Suites
+// that bind no fixture still run.
+func (s *TestMainTestSuite) TestATestMainThatRunsTheTestsItselfIsRefused(t *gotest.T) {
+	code, out, events := goTestIn(t, "./testdata/usermain/run/", nil)
+	gotest.Equal(t, 1, code, out)
+	gotest.Contains(t, out, "os.Exit(gotestruntime.Main(m))")
+	gotest.Contains(t, out, "--- PASS: TestUnboundTestSuite")
+	gotest.Empty(t, events, "nothing is set up that could not be torn down")
+}
+
+// A library that runs the tests through the interface it takes them as, as
+// goleak and testscript do, gets the wrapper: the fixture tears down before
+// the library's own check runs.
+func (s *TestMainTestSuite) TestALibraryGetsTheWrapper(t *gotest.T) {
+	code, out, events := goTestIn(t, "./testdata/usermain/wrapped/", nil)
+	gotest.Equal(t, 0, code, out)
+	gotest.Equal(t, []string{"setup", "teardown", "verified"}, events)
+}
+
+// Tests that run again after Main tore the fixtures down would read released
+// fixtures; their setup is refused instead.
+func (s *TestMainTestSuite) TestTestsRunAgainAfterMainAreRefused(t *gotest.T) {
+	code, out, events := goTestIn(t, "./testdata/usermain/twice/", nil)
+	gotest.Equal(t, 1, code, out)
+	gotest.Contains(t, out, "already torn down")
+	gotest.Equal(t, []string{"setup", "teardown"}, events)
 }

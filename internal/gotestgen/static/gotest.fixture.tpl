@@ -36,6 +36,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+    if err := gotestruntime.RequireMain(); err != nil {
+        t.Fatal(err)
+    }
     if err := ƒ_fixtureOnce.Do(func() error {
 {{- /*
   Each config is derived exactly once, but inside ƒ_fixtureOnce.Do rather than at

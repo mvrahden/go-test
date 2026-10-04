@@ -318,19 +318,17 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		fuzzParams := map[string][]string{}
 		// The package and its external test package build into one binary,
 		// which allows one TestMain: the developer's, else the first variant
-		// that sets up fixtures takes it.
-		userMain, userMainFile, userMainPkg := findUserTestMain(lr)
-		ptestBuf, ptestFixtureDeps, ptestReqKeys, ptestSetsUp, err := generateForPkg(lr.Ptest, lr.sources, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, userMain != nil)
+		// that sets up fixtures takes it. Whether the developer's routes the
+		// tests through the runtime is checked where it can be known exactly:
+		// at run time, by gotestruntime.RequireMain.
+		hasUserMain := findUserTestMain(lr)
+		ptestBuf, ptestFixtureDeps, ptestReqKeys, ptestSetsUp, err := generateForPkg(lr.Ptest, lr.sources, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, hasUserMain)
 		if err != nil {
 			return nil, locate(lr.Ptest, err)
 		}
-		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, pxtestSetsUp, err := generateForPkg(lr.Pxtest, lr.sources, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, userMain != nil || ptestSetsUp)
+		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, _, err := generateForPkg(lr.Pxtest, lr.sources, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, hasUserMain || ptestSetsUp)
 		if err != nil {
 			return nil, locate(lr.Pxtest, err)
-		}
-		if userMain != nil && (ptestSetsUp || pxtestSetsUp) && !gotestast.CallsRuntimeMain(userMainFile, userMain) {
-			return nil, locate(userMainPkg, gotestast.At(userMain.Pos(), fmt.Errorf(
-				"TestMain must call %s so fixtures tear down after the tests: replace m.Run() with %s", gotestast.RuntimeMain, gotestast.RuntimeMain)))
 		}
 
 		seen := map[string]bool{}
@@ -543,18 +541,18 @@ func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutco
 	return buf, fixtureDeps, suiteReqKeys, setsUpFixtures, err
 }
 
-// findUserTestMain returns the TestMain the developer declared in either
-// variant of the test binary, with its file and variant.
-func findUserTestMain(lr *LoadResult) (*ast.FuncDecl, *ast.File, *packages.Package) {
+// findUserTestMain reports whether the developer declared a TestMain in
+// either variant of the test binary.
+func findUserTestMain(lr *LoadResult) bool {
 	for _, pkg := range []*packages.Package{lr.Ptest, lr.Pxtest} {
 		if pkg == nil {
 			continue
 		}
-		if fd, f := gotestast.FindTestMain(pkg.Syntax); fd != nil {
-			return fd, f, pkg
+		if fd, _ := gotestast.FindTestMain(pkg.Syntax); fd != nil {
+			return true
 		}
 	}
-	return nil, nil, nil
+	return false
 }
 
 func fixtureTreeHasSharedFixtures(roots []*BoundFixture) bool {

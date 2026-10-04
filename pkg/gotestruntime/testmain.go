@@ -1,10 +1,12 @@
 package gotestruntime
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/mvrahden/go-test/internal/dying"
@@ -28,16 +30,45 @@ func RegisterTeardown(fn func() (failed bool)) {
 	watchStop()
 }
 
-// Main runs the tests, then tears down every fixture DAG the run set up. A
-// package with fixture-bound suites that defines its own TestMain must call it
-// in place of m.Run:
+// Run states of the test binary, as fixture setup sees them.
+const (
+	runNotStarted int32 = iota // m.Run was called directly, or not yet
+	runActive                  // the tests run through Main or M
+	runFinished                // Main or M tore the fixtures down
+)
+
+var runState atomic.Int32
+
+// Main runs the tests, then tears down every fixture DAG the run set up. The
+// TestMain gotest generates calls it; a TestMain of your own in a package
+// whose suites bind fixtures calls it in place of m.Run:
 //
 //	func TestMain(m *testing.M) { os.Exit(gotestruntime.Main(m)) }
 //
 // A teardown failure fails the package: the exit code becomes 1 when the tests
 // passed.
 func Main(m *testing.M) int {
-	return finish(m.Run(), os.Stderr)
+	return runTests(m.Run, os.Stderr)
+}
+
+// M wraps m for a library that runs the tests itself through Run, such as
+// goleak.VerifyTestMain or testscript.Main. Its Run runs the tests and then
+// tears the fixtures down, as [Main] does:
+//
+//	func TestMain(m *testing.M) { goleak.VerifyTestMain(gotestruntime.M(m)) }
+func M(m *testing.M) interface{ Run() int } {
+	return wrappedM{m}
+}
+
+type wrappedM struct{ m *testing.M }
+
+func (w wrappedM) Run() int { return runTests(w.m.Run, os.Stderr) }
+
+func runTests(run func() int, stderr io.Writer) int {
+	runState.Store(runActive)
+	code := run()
+	runState.Store(runFinished)
+	return finish(code, stderr)
 }
 
 func finish(code int, stderr io.Writer) int {
@@ -46,6 +77,22 @@ func finish(code int, stderr io.Writer) int {
 		return 1
 	}
 	return code
+}
+
+// RequireMain reports why fixtures cannot be set up now, or nil. Generated
+// setup calls it before every fixture-bound test, benchmark or fuzz target:
+// fixtures tear down when Main or M finishes, so tests that did not run
+// through either would leave them up, and tests that run after it would find
+// them released.
+func RequireMain() error {
+	switch runState.Load() {
+	case runActive:
+		return nil
+	case runFinished:
+		return errors.New("fixtures were already torn down: the tests ran again after gotestruntime.Main or gotestruntime.M returned; run them once, through either")
+	default:
+		return errors.New("fixtures tear down after the tests only when they run through gotestruntime: in TestMain, call os.Exit(gotestruntime.Main(m)) in place of os.Exit(m.Run()), or pass gotestruntime.M(m) to a library that takes m")
+	}
 }
 
 // runTeardowns runs every registered teardown once, in registration order, and

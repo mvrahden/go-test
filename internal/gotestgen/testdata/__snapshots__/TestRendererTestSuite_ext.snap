@@ -34,6 +34,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -377,6 +380,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		ƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()
 		var ƒmaxSuiteSetup time.Duration
@@ -605,6 +611,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -821,6 +830,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -934,6 +946,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -1052,6 +1067,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -1154,6 +1172,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -1256,6 +1277,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -1396,6 +1420,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -1538,6 +1565,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -1690,6 +1720,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -1848,6 +1881,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -1963,6 +1999,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -2059,6 +2098,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -2174,6 +2216,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -2294,6 +2339,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 
@@ -2409,6 +2457,9 @@ var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
 func ƒ_setupFixtures(t testing.TB) {
+	if err := gotestruntime.RequireMain(); err != nil {
+		t.Fatal(err)
+	}
 	if err := ƒ_fixtureOnce.Do(func() error {
 		var ƒmaxSuiteSetup time.Duration
 

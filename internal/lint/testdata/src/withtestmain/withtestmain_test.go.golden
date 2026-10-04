@@ -20,7 +20,7 @@ type LedgerTestSuite struct {
 
 func (s *LedgerTestSuite) TestRead(t *gotest.T) {}
 
-func TestMain(m *testing.M) { // want `TestMain must call gotestruntime.Main\(m\) so fixtures tear down after the tests: replace m.Run\(\) with gotestruntime.Main\(m\)`
+func TestMain(m *testing.M) { // want `TestMain must run the tests through gotestruntime so fixtures tear down after them: replace m.Run\(\) with gotestruntime.Main\(m\), or pass gotestruntime.M\(m\) to a library that takes m`
 	os.Setenv("LEDGER", "on")
 	os.Exit(gotestruntime.Main(m))
 }

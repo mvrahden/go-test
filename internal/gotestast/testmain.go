@@ -8,8 +8,12 @@ import (
 )
 
 // RuntimeMain names the call a user TestMain makes in place of m.Run in a
-// package whose suites bind fixtures.
-const RuntimeMain = "gotestruntime.Main(m)"
+// package whose suites bind fixtures; RuntimeM the wrapper it passes to a
+// library that runs the tests itself.
+const (
+	RuntimeMain = "gotestruntime.Main(m)"
+	RuntimeM    = "gotestruntime.M(m)"
+)
 
 const runtimePkgPath = about.Repo + "/pkg/gotestruntime"
 
@@ -30,9 +34,11 @@ func FindTestMain(files []*ast.File) (*ast.FuncDecl, *ast.File) {
 	return nil, nil
 }
 
-// CallsRuntimeMain reports whether the TestMain fd, declared in file, calls
-// gotestruntime.Main under whatever name file imports the runtime as.
-func CallsRuntimeMain(file *ast.File, fd *ast.FuncDecl) bool {
+// RoutesThroughRuntime reports whether the TestMain fd, declared in file,
+// calls gotestruntime.Main or gotestruntime.M, under whatever name file
+// imports the runtime as. It reads fd's body only: a call reached through a
+// helper is not seen, which is why the runtime, not this, is the guarantee.
+func RoutesThroughRuntime(file *ast.File, fd *ast.FuncDecl) bool {
 	if fd.Body == nil {
 		return false
 	}
@@ -55,7 +61,7 @@ func CallsRuntimeMain(file *ast.File, fd *ast.FuncDecl) bool {
 			return !found
 		}
 		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok || sel.Sel.Name != "Main" {
+		if !ok || (sel.Sel.Name != "Main" && sel.Sel.Name != "M") {
 			return true
 		}
 		if id, ok := sel.X.(*ast.Ident); ok && names[id.Name] {

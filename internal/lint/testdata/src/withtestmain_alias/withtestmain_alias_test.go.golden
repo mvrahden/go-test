@@ -22,7 +22,7 @@ type LedgerTestSuite struct {
 func (s *LedgerTestSuite) TestRead(t *gotest.T) {}
 
 // The runtime is already imported under an alias; the fix uses it.
-func TestMain(tm *testing.M) { // want `TestMain must call gotestruntime.Main\(m\)`
+func TestMain(tm *testing.M) { // want `TestMain must run the tests through gotestruntime`
 	code := rt.Main(tm)
 	os.Exit(code)
 }
