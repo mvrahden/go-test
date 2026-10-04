@@ -329,7 +329,7 @@ func (f *SchemaSharedFixture) BeforeAll(ctx context.Context) error {
 
 - Dependencies are expressed via `*XSharedFixture` pointer fields on the struct.
 - `BeforeAll` runs in dependency order: parents before children, independent fixtures in parallel.
-- Cyclic dependencies are rejected at resolution time.
+- Cyclic dependencies are rejected at generation time.
 - SharedFixtures cannot depend on PackageFixtures (they run in different processes) — a package-fixture pointer field on a shared fixture is a generation error.
 - A shared fixture without `BeforeAll`, or with only one of `Hydrate`/`Dehydrate`, is a generation error — including fixtures reached transitively from other packages.
 

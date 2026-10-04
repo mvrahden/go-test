@@ -344,7 +344,7 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
       </div>
 
       <h3>SharedFixture dependencies</h3>
-      <p>SharedFixtures can depend on other SharedFixtures via pointer fields — the same pattern used by package fixtures. <code>BeforeAll</code> runs in dependency order (parents first, independent fixtures in parallel). Cyclic dependencies are rejected at resolution time.</p>
+      <p>SharedFixtures can depend on other SharedFixtures via pointer fields — the same pattern used by package fixtures. <code>BeforeAll</code> runs in dependency order (parents first, independent fixtures in parallel). Cyclic dependencies are rejected at generation time.</p>
       <div class="code-block">
         <pre><span class="kw">type</span> <span class="tp">SchemaSharedFixture</span> <span class="kw">struct</span> {
     Postgres *<span class="tp">PostgresSharedFixture</span>  <span class="cm">// dependency — Postgres starts first</span>

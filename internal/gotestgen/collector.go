@@ -118,7 +118,7 @@ func (collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 		return CollectorResult{Errs: errs}
 	}
 
-	// Fixture embedding and validation are handled by the resolver (resolver.go),
+	// Fixture embedding and validation are handled by binding (binding.go),
 	// which walks the type graph recursively and supports cross-package fixtures.
 
 	return CollectorResult{Suites: suites, Fixtures: fixtures, Warnings: gotestast.HarnessWarnings(pkg, suites)}

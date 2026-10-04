@@ -94,7 +94,7 @@ func fixtureNamedType(t types.Type) *types.Named {
 // the DAG-closure of named fixture types reachable from them: each
 // declared pointer field named in declared, then every fixture-typed
 // field of those fixtures' structs, transitively — the same walk the
-// resolver performs when it wires a suite's required fixtures.
+// binding performs when it wires a suite's required fixtures.
 func declaredFixtureClosure(st *types.Struct, declared map[string]bool) map[*types.TypeName]bool {
 	closure := map[*types.TypeName]bool{}
 	var walk func(s *types.Struct, keep map[string]bool)

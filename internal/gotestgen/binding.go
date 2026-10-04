@@ -11,9 +11,9 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// ResolvedFixture represents a fixture resolved from the type graph.
+// BoundFixture represents a fixture resolved from the type graph.
 // It carries all data needed for rendering and setup subprocess generation.
-type ResolvedFixture struct {
+type BoundFixture struct {
 	Kind            gotestast.FixtureKind
 	Identifier      string // unqualified type name, e.g. "InfraFixture"
 	QualifiedType   string // "pkg.Name" for cross-package, "Name" for same
@@ -36,15 +36,15 @@ type ResolvedFixture struct {
 	TransferFields []string // shared fixtures only
 	LocalFields    []string // shared fixtures only
 
-	Parent         *ResolvedFixture            // single parent (backward compat)
-	Parents        []*ResolvedFixture          // all parent fixtures
-	ParentFields   map[*ResolvedFixture]string // parent fixture → field name in this fixture's struct
-	Children       []*ResolvedFixture
+	Parent         *BoundFixture            // single parent (backward compat)
+	Parents        []*BoundFixture          // all parent fixtures
+	ParentFields   map[*BoundFixture]string // parent fixture → field name in this fixture's struct
+	Children       []*BoundFixture
 	SharedFixtures []SharedFixtureRef
 	ChildSuites    []*gotestast.TestSuiteSpec
 }
 
-func (rf *ResolvedFixture) DependsOn() []string {
+func (rf *BoundFixture) DependsOn() []string {
 	ids := make([]string, 0, len(rf.Parents)+len(rf.SharedFixtures))
 	for _, p := range rf.Parents {
 		ids = append(ids, p.Identifier)
@@ -55,7 +55,7 @@ func (rf *ResolvedFixture) DependsOn() []string {
 	return ids
 }
 
-func (rf *ResolvedFixture) ParentFieldNames() map[string]string {
+func (rf *BoundFixture) ParentFieldNames() map[string]string {
 	if len(rf.ParentFields) == 0 {
 		return nil
 	}
@@ -72,10 +72,10 @@ type FixtureFieldBinding struct {
 	FieldName         string
 }
 
-// ResolveResult is the output of fixture resolution for a target package.
-type ResolveResult struct {
-	RootFixtures                   []*ResolvedFixture
-	AllFixtures                    []*ResolvedFixture  // topologically sorted, all fixtures
+// Binding is the output of fixture resolution for a target package.
+type Binding struct {
+	RootFixtures                   []*BoundFixture
+	AllFixtures                    []*BoundFixture     // topologically sorted, all fixtures
 	RequiredSharedFixtures         []SharedFixtureInfo // deduplicated, for setup subprocess
 	FixtureBound                   []*gotestast.TestSuiteSpec
 	Standalone                     []*gotestast.TestSuiteSpec
@@ -84,31 +84,31 @@ type ResolveResult struct {
 	SuiteRequiredSharedFixtureKeys map[string][]string              // suite identifier → all required state keys (transitive)
 }
 
-type resolver struct {
+type binder struct {
 	targetPkg       *packages.Package
 	sources         *sourceLoader
 	localFixtures   []*gotestast.FixtureSpec
-	resolved        map[*types.Named]*ResolvedFixture
+	resolved        map[*types.Named]*BoundFixture
 	resolving       map[*types.Named]bool         // cycle detection
 	sharedSeen      map[string]*SharedFixtureInfo // key: pkgPath.Name
 	sharedResolving map[string]bool               // cycle detection for shared fixtures
-	result          *ResolveResult
+	result          *Binding
 }
 
-// Resolve performs demand-driven fixture resolution starting from targeted test
+// Bind performs demand-driven fixture resolution starting from targeted test
 // suites. It walks the type graph recursively to discover all required fixtures
 // (both package and shared), validates constraints, and builds the fixture tree.
-func Resolve(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, localFixtures []*gotestast.FixtureSpec) (*ResolveResult, error) {
-	return resolve(targetPkg, nil, suites, localFixtures)
+func Bind(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, localFixtures []*gotestast.FixtureSpec) (*Binding, error) {
+	return bind(targetPkg, nil, suites, localFixtures)
 }
 
-func resolve(targetPkg *packages.Package, sources *sourceLoader, suites []*gotestast.TestSuiteSpec, localFixtures []*gotestast.FixtureSpec) (*ResolveResult, error) {
-	result := &ResolveResult{}
-	r := &resolver{
+func bind(targetPkg *packages.Package, sources *sourceLoader, suites []*gotestast.TestSuiteSpec, localFixtures []*gotestast.FixtureSpec) (*Binding, error) {
+	result := &Binding{}
+	r := &binder{
 		targetPkg:       targetPkg,
 		sources:         sources,
 		localFixtures:   localFixtures,
-		resolved:        make(map[*types.Named]*ResolvedFixture),
+		resolved:        make(map[*types.Named]*BoundFixture),
 		resolving:       make(map[*types.Named]bool),
 		sharedSeen:      make(map[string]*SharedFixtureInfo),
 		sharedResolving: make(map[string]bool),
@@ -164,8 +164,8 @@ func resolve(targetPkg *packages.Package, sources *sourceLoader, suites []*gotes
 	// Collect unique root fixtures: every parentless fixture reachable from a
 	// package fixture, through all of its parents.
 	seen := make(map[*types.Named]bool)
-	var addRoots func(rf *ResolvedFixture)
-	addRoots = func(rf *ResolvedFixture) {
+	var addRoots func(rf *BoundFixture)
+	addRoots = func(rf *BoundFixture) {
 		if len(rf.Parents) > 0 {
 			for _, p := range rf.Parents {
 				addRoots(p)
@@ -221,7 +221,7 @@ func resolve(targetPkg *packages.Package, sources *sourceLoader, suites []*gotes
 		}
 	}
 
-	rfByID := make(map[string]*ResolvedFixture, len(result.AllFixtures))
+	rfByID := make(map[string]*BoundFixture, len(result.AllFixtures))
 	for _, rf := range result.AllFixtures {
 		rfByID[rf.Identifier] = rf
 	}
@@ -273,7 +273,7 @@ func resolve(targetPkg *packages.Package, sources *sourceLoader, suites []*gotes
 // wiring fixture BeforeEach/AfterEach around each benchmark method is out of
 // scope for now (see docs/design/bench-fuzz.md Part 1) — reject it at
 // resolve-time instead of generating code that silently ignores the hooks.
-func findHookedFixture(rf *ResolvedFixture) *ResolvedFixture {
+func findHookedFixture(rf *BoundFixture) *BoundFixture {
 	if rf == nil {
 		return nil
 	}
@@ -288,7 +288,7 @@ func findHookedFixture(rf *ResolvedFixture) *ResolvedFixture {
 	return nil
 }
 
-func hasChildSuitesRecursive(rf *ResolvedFixture) bool {
+func hasChildSuitesRecursive(rf *BoundFixture) bool {
 	if len(rf.ChildSuites) > 0 {
 		return true
 	}
@@ -301,11 +301,11 @@ func hasChildSuitesRecursive(rf *ResolvedFixture) bool {
 }
 
 type suiteFixtureMatch struct {
-	resolved  *ResolvedFixture
+	resolved  *BoundFixture
 	fieldName string
 }
 
-func (r *resolver) resolveFixturesForSuite(suite *gotestast.TestSuiteSpec) ([]suiteFixtureMatch, error) {
+func (r *binder) resolveFixturesForSuite(suite *gotestast.TestSuiteSpec) ([]suiteFixtureMatch, error) {
 	typ := suite.StructType()
 	if typ == nil {
 		return nil, nil
@@ -350,7 +350,7 @@ func (r *resolver) resolveFixturesForSuite(suite *gotestast.TestSuiteSpec) ([]su
 	return fixtures, nil
 }
 
-func (r *resolver) resolveFixture(named *types.Named) (_ *ResolvedFixture, err error) {
+func (r *binder) resolveFixture(named *types.Named) (_ *BoundFixture, err error) {
 	defer func() { err = gotestast.At(named.Obj().Pos(), err) }()
 	if rf, ok := r.resolved[named]; ok {
 		return rf, nil
@@ -399,7 +399,7 @@ func (r *resolver) resolveFixture(named *types.Named) (_ *ResolvedFixture, err e
 		return nil, err
 	}
 
-	rf := &ResolvedFixture{
+	rf := &BoundFixture{
 		Kind:         kind,
 		Identifier:   identifier,
 		Named:        named,
@@ -441,7 +441,7 @@ func (r *resolver) resolveFixture(named *types.Named) (_ *ResolvedFixture, err e
 	return rf, nil
 }
 
-func (r *resolver) resolvePackageFixtureFields(rf *ResolvedFixture, st *types.Struct) error {
+func (r *binder) resolvePackageFixtureFields(rf *BoundFixture, st *types.Struct) error {
 	sfIdx := 0
 
 	for i := 0; i < st.NumFields(); i++ {
@@ -467,7 +467,7 @@ func (r *resolver) resolvePackageFixtureFields(rf *ResolvedFixture, st *types.St
 			}
 			rf.Parents = append(rf.Parents, parent)
 			if rf.ParentFields == nil {
-				rf.ParentFields = make(map[*ResolvedFixture]string)
+				rf.ParentFields = make(map[*BoundFixture]string)
 			}
 			rf.ParentFields[parent] = field.Name()
 			parent.Children = append(parent.Children, rf)
@@ -533,7 +533,7 @@ func isInternalPkgPath(pkgPath string) bool {
 		strings.Contains(pkgPath, "/internal/")
 }
 
-func (r *resolver) buildSharedFixtureRef(named *types.Named, idx int) (_ SharedFixtureRef, err error) {
+func (r *binder) buildSharedFixtureRef(named *types.Named, idx int) (_ SharedFixtureRef, err error) {
 	defer func() { err = gotestast.At(named.Obj().Pos(), err) }()
 	identifier := fixtureIdentifier(named)
 	typePkg := named.Obj().Pkg()
@@ -586,7 +586,7 @@ func (r *resolver) buildSharedFixtureRef(named *types.Named, idx int) (_ SharedF
 	return ref, nil
 }
 
-func (r *resolver) registerSharedFixture(named *types.Named) (err error) {
+func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 	defer func() { err = gotestast.At(named.Obj().Pos(), err) }()
 	typePkg := named.Obj().Pkg()
 	identifier := fixtureIdentifier(named)
@@ -771,7 +771,7 @@ func (r *resolver) registerSharedFixture(named *types.Named) (err error) {
 	return nil
 }
 
-func (r *resolver) findPackageForType(named *types.Named) *packages.Package {
+func (r *binder) findPackageForType(named *types.Named) *packages.Package {
 	targetPath := named.Obj().Pkg().Path()
 	if targetPath == r.targetPkg.PkgPath {
 		return r.targetPkg
@@ -800,7 +800,7 @@ func findImportedPackage(pkg *packages.Package, targetPath string, visited map[s
 	return nil
 }
 
-func (r *resolver) findLocalSpec(rf *ResolvedFixture) *gotestast.FixtureSpec {
+func (r *binder) findLocalSpec(rf *BoundFixture) *gotestast.FixtureSpec {
 	if rf.Spec != nil {
 		return rf.Spec
 	}
@@ -927,9 +927,9 @@ func topoSortSharedFixtures(seen map[string]*SharedFixtureInfo) ([]SharedFixture
 	return result, nil
 }
 
-func topologicalSort(resolved map[*types.Named]*ResolvedFixture) ([]*ResolvedFixture, error) {
-	inDegree := make(map[*ResolvedFixture]int)
-	var all []*ResolvedFixture
+func topologicalSort(resolved map[*types.Named]*BoundFixture) ([]*BoundFixture, error) {
+	inDegree := make(map[*BoundFixture]int)
+	var all []*BoundFixture
 	for _, rf := range resolved {
 		if rf.Kind != gotestast.PackageFixture {
 			continue
@@ -947,14 +947,14 @@ func topologicalSort(resolved map[*types.Named]*ResolvedFixture) ([]*ResolvedFix
 		return all[i].Identifier < all[j].Identifier
 	})
 
-	var queue []*ResolvedFixture
+	var queue []*BoundFixture
 	for _, rf := range all {
 		if inDegree[rf] == 0 {
 			queue = append(queue, rf)
 		}
 	}
 
-	var sorted []*ResolvedFixture
+	var sorted []*BoundFixture
 	for len(queue) > 0 {
 		node := queue[0]
 		queue = queue[1:]
@@ -1042,9 +1042,9 @@ func pointerNamed(field *types.Var) *types.Named {
 
 // collectTransitiveDepsRF lists the package fixtures a suite's bindings reach,
 // following every parent. The renderer orders fixture setup by it and the
-// resolver derives the suite's shared-fixture keys from it: one walk, so the
+// binder derives the suite's shared-fixture keys from it: one walk, so the
 // two cannot disagree.
-func collectTransitiveDepsRF(suiteID string, suiteFixtureFields map[string][]FixtureFieldBinding, rfByID map[string]*ResolvedFixture) map[string]bool {
+func collectTransitiveDepsRF(suiteID string, suiteFixtureFields map[string][]FixtureFieldBinding, rfByID map[string]*BoundFixture) map[string]bool {
 	needed := make(map[string]bool)
 	bindings := suiteFixtureFields[suiteID]
 	var visit func(id string)
