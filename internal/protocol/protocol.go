@@ -8,9 +8,13 @@ import (
 const (
 	EnvSharedStateFile    = "GOTEST_SHARED_STATE_FILE"
 	EnvTeardownBudgetFile = "GOTEST_TEARDOWN_BUDGET_FILE"
-	EnvUpdateSnapshots    = "GOTEST_UPDATE_SNAPSHOTS"
-	EnvCI                 = "GOTEST_CI"
-	EnvCacheDir           = "GOTEST_CACHE_DIR"
+	// EnvStopFile names the file the runner creates before it interrupts a
+	// suite process. Its existence tells the process the interrupt is a stop
+	// request, not a signal the code under test sent itself.
+	EnvStopFile        = "GOTEST_STOP_FILE"
+	EnvUpdateSnapshots = "GOTEST_UPDATE_SNAPSHOTS"
+	EnvCI              = "GOTEST_CI"
+	EnvCacheDir        = "GOTEST_CACHE_DIR"
 
 	// EnvFuzzEchoInput makes the codec path report every execution's decoded
 	// input, not just failing ones. Set by triage/promote when re-running a
@@ -34,6 +38,11 @@ const (
 
 func BudgetFilePath(binaryPath string) string {
 	return binaryPath + ".budget"
+}
+
+// StopFilePath returns the stop-request path for the given test binary.
+func StopFilePath(binaryPath string) string {
+	return binaryPath + ".stop"
 }
 
 // SplitTestPath cuts a go test name into its subtest levels. The separator is a

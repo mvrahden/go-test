@@ -239,6 +239,9 @@ func (p *ManagedProcess) Adopt() {
 // be reused from then on, and only then drains what is left in the pipes.
 func (p *ManagedProcess) wait() {
 	_ = p.cmd.Wait()
+	// An interrupted root can exit before the rest of its tree is done
+	// shutting down; the grace it was given covers them too.
+	p.tree.Linger(p.graceTimeout())
 	p.tree.Release()
 	p.drain()
 	close(p.done)
