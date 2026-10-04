@@ -2,16 +2,16 @@ Expect: passing: exit code 2, want 0
 Expect: ^ *passing fail TestPassingTestSuite/TestOne$
 --- a/internal/gotestgen/static/gotest.suites.tpl
 +++ b/internal/gotestgen/static/gotest.suites.tpl
-@@ -53,7 +53,7 @@
+@@ -58,7 +58,7 @@
    })
    gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
  
 -{{ range $tc := $ts.TestCases }}
 +{{ range $i, $tc := $ts.TestCases }}{{ if ne $i 0 }}
    t.Run("{{ $tc.Identifier }}", func(it *testing.T) {
- {{- if $ts.IsMethodParallel }}
-     it.Parallel()
-@@ -102,7 +102,7 @@
+ {{- if $.FixturePackage }}
+     defer gotestruntime.NotePanic()
+@@ -110,7 +110,7 @@
      return
    }
  {{- end }}

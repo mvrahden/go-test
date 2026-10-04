@@ -151,6 +151,10 @@ func ExportTestPkgDir(t testing.TB, name string) string {
 type ExportCollector = collector
 type ExportRenderer = renderer
 
+// ExportRendererTestMainTaken renders a variant whose binary's TestMain the
+// other variant already carries.
+func ExportRendererTestMainTaken() ExportRenderer { return renderer{testMainTaken: true} }
+
 // Function exports for all gotestgen test files (Tasks 10-12).
 var ExportIsInternalPkgPath = isInternalPkgPath
 

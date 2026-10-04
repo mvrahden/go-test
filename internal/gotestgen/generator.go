@@ -316,11 +316,14 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		}
 
 		fuzzParams := map[string][]string{}
-		ptestBuf, ptestFixtureDeps, ptestReqKeys, err := generateForPkg(lr.Ptest, lr.sources, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams)
+		// The package and its external test package build into one binary,
+		// which allows one TestMain: the first variant that sets up fixtures
+		// takes it.
+		ptestBuf, ptestFixtureDeps, ptestReqKeys, ptestMain, err := generateForPkg(lr.Ptest, lr.sources, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, false)
 		if err != nil {
 			return nil, locate(lr.Ptest, err)
 		}
-		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, err := generateForPkg(lr.Pxtest, lr.sources, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams)
+		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, _, err := generateForPkg(lr.Pxtest, lr.sources, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, ptestMain)
 		if err != nil {
 			return nil, locate(lr.Pxtest, err)
 		}
@@ -478,14 +481,17 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 // generateForPkg renders one package variant. fuzzParams is filled in place
 // with the corpus shape of every fuzz target the variant declares, so the
 // internal and external variants of the same package accumulate into one map.
-func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo, harvestSeeds bool, fuzzParams map[string][]string) ([]byte, []string, map[string][]string, error) { //nolint:gocritic // hugeParam: stable API
+//
+// testMainTaken tells it the other variant already carries the binary's
+// TestMain; ownsTestMain reports whether this one emitted it.
+func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo, harvestSeeds bool, fuzzParams map[string][]string, testMainTaken bool) (buf []byte, fixtureDeps []string, suiteReqKeys map[string][]string, ownsTestMain bool, err error) { //nolint:gocritic // hugeParam: stable API
 	if pkg == nil || len(spec.EffectiveTestSuites) == 0 {
-		return nil, nil, nil, nil
+		return nil, nil, nil, false, nil
 	}
 
 	resolved, err := resolve(pkg, sources, spec.EffectiveTestSuites, collected.Fixtures)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, false, err
 	}
 
 	for i := range resolved.RequiredSharedFixtures {
@@ -496,7 +502,6 @@ func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutco
 		}
 	}
 
-	var fixtureDeps []string
 	for id, refs := range resolved.SuiteSharedFixtures {
 		if len(refs) > 0 {
 			fixtureDeps = append(fixtureDeps, "Test"+id)
@@ -516,7 +521,6 @@ func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutco
 	}
 
 	// Convert suite-identifier-keyed required keys to test-func-name-keyed.
-	var suiteReqKeys map[string][]string
 	if len(resolved.SuiteRequiredSharedFixtureKeys) > 0 {
 		suiteReqKeys = make(map[string][]string, len(resolved.SuiteRequiredSharedFixtureKeys))
 		for suiteID, keys := range resolved.SuiteRequiredSharedFixtureKeys {
@@ -524,12 +528,13 @@ func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutco
 		}
 	}
 
-	r := renderer{}
+	r := renderer{testMainTaken: testMainTaken}
 	buf, fans, err := r.RenderTestSuiteSpec(pkg, spec, resolved, harvestSeeds)
 	if fans != nil {
 		maps.Copy(fuzzParams, fans.ParamsByFunc)
 	}
-	return buf, fixtureDeps, suiteReqKeys, err
+	ownsTestMain = !testMainTaken && emitsFixtureSetup(resolved, buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures))
+	return buf, fixtureDeps, suiteReqKeys, ownsTestMain, err
 }
 
 func fixtureTreeHasSharedFixtures(roots []*ResolvedFixture) bool {

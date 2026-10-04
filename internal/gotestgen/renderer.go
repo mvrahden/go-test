@@ -61,7 +61,11 @@ type headerImport struct {
 	Path string
 }
 
-type renderer struct{}
+// renderer renders one package variant. testMainTaken is set when the other
+// variant of the same test binary already carries the TestMain.
+type renderer struct {
+	testMainTaken bool
+}
 
 // RenderTestSuiteSpec renders the generated test file for pkg. The returned
 // FuzzTargetSet is the fan-out the file was rendered with — nil when the package
@@ -80,6 +84,8 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	allFixtures := resolved.AllFixtures
 	sfNodeVMs := buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures)
 	hasFixtures := len(resolved.RootFixtures) > 0 || len(sfNodeVMs) > 0
+	setsUpFixtures := emitsFixtureSetup(resolved, sfNodeVMs)
+	emitTestMain := setsUpFixtures && !r.testMainTaken
 
 	// Resolved before anything is written: a non-fuzzable argument type is a
 	// generation-time refusal, not a half-written file.
@@ -89,24 +95,12 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	}
 
 	buf := bytes.NewBuffer(nil)
-	if err := r.renderFileHeader(buf, pkg, spec, hasFixtures, resolved.SuiteSharedFixtures, allFixtures, sfNodeVMs, fans); err != nil {
+	if err := r.renderFileHeader(buf, pkg, spec, hasFixtures, emitTestMain, resolved.SuiteSharedFixtures, allFixtures, sfNodeVMs, fans); err != nil {
 		return nil, nil, fmt.Errorf("failed rendering file header. err: %w", err)
 	}
 
-	if len(fixtureBound) > 0 || len(sfNodeVMs) > 0 {
-		// The countdown counts top-level functions the binary will run, so the
-		// list carries the generated names: the Test function of every suite
-		// that calls ƒ_setupFixtures plus its Fuzz and Benchmark wrappers.
-		var fixtureTestNames []string
-		for _, ts := range fixtureBound {
-			fixtureTestNames = append(fixtureTestNames, fixtureTestFuncNames(ts)...)
-		}
-		for _, ts := range standalone {
-			if _, hasSF := resolved.SuiteSharedFixtures[ts.Identifier()]; hasSF {
-				fixtureTestNames = append(fixtureTestNames, fixtureTestFuncNames(ts)...)
-			}
-		}
-		if err := r.renderFixtures(buf, fixtureBound, allFixtures, resolved.SuiteFixtureFields, sfNodeVMs, fixtureTestNames); err != nil {
+	if setsUpFixtures {
+		if err := r.renderFixtures(buf, fixtureBound, allFixtures, resolved.SuiteFixtureFields, sfNodeVMs, emitTestMain); err != nil {
 			return nil, nil, fmt.Errorf("failed rendering fixture suites. err: %w", err)
 		}
 	}
@@ -117,7 +111,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 			SkippedTestSuites:   spec.SkippedTestSuites,
 			SkippedTestCases:    spec.SkippedTestCases,
 		}
-		if err := r.renderTestSuites(buf, standaloneSpec, resolved.SuiteSharedFixtures); err != nil {
+		if err := r.renderTestSuites(buf, standaloneSpec, resolved.SuiteSharedFixtures, setsUpFixtures); err != nil {
 			return nil, nil, fmt.Errorf("failed rendering test suites. err: %w", err)
 		}
 	}
@@ -133,21 +127,14 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	return out, fans, err
 }
 
-// fixtureTestFuncNames lists the generated top-level functions of one suite,
-// as the fixture-teardown countdown must see them.
-func fixtureTestFuncNames(ts *gotestast.TestSuiteSpec) []string {
-	id := ts.Identifier()
-	names := []string{"Test" + id}
-	for _, fz := range ts.Fuzzers() {
-		names = append(names, "Fuzz"+id+"_"+fz.Identifier())
-	}
-	if len(ts.Benchmarks()) > 0 {
-		names = append(names, "Benchmark"+id)
-	}
-	return names
+// emitsFixtureSetup reports whether the variant renders ƒ_setupFixtures: it
+// binds a fixture, and there is a fixture to set up.
+func emitsFixtureSetup(resolved *ResolveResult, sfNodes []*SharedFixtureNodeVM) bool {
+	binds := len(resolved.FixtureBound) > 0 || len(sfNodes) > 0
+	return binds && (len(resolved.AllFixtures) > 0 || len(sfNodes) > 0)
 }
 
-func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, sfNodes []*SharedFixtureNodeVM, fans *FuzzTargetSet) error { //nolint:gocritic // hugeParam: stable API
+func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures, emitTestMain bool, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*ResolvedFixture, sfNodes []*SharedFixtureNodeVM, fans *FuzzTargetSet) error { //nolint:gocritic // hugeParam: stable API
 	type TplData struct {
 		RepoName    string
 		PackageName string
@@ -173,8 +160,10 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	}
 	if hasFixtures {
 		addImport("context")
-		addImport("sync/atomic")
 		addImport("time")
+	}
+	if emitTestMain {
+		addImport("os")
 	}
 	if fans != nil && fans.Source != "" {
 		// Generated targets reference the gotestfuzz leaf helpers,
@@ -198,12 +187,12 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		}
 	}
 	// This condition must stay identical to the one guarding the ƒfailed
-	// declaration in gotest.suites.tpl. A parallel suite whose every method is
+	// declaration in gotest.suites.tpl and gotest.fixture.tpl. A parallel suite whose every method is
 	// excluded stays in EffectiveTestSuites with no TestCases, so the template
 	// emits no atomic.Bool. format.Source does not type-check and would let the
 	// stray import through; it is `go test` that then refuses the whole generated
 	// package with "imported and not used".
-	if !hasFixtures && slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
+	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
 		return v.IsMethodParallel() && len(v.TestCases()) > 0
 	}) {
 		addImport("sync/atomic")
@@ -235,10 +224,11 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	return headerTpl.ExecuteTemplate(buf, "header.go.tpl", map[string]any{"Header": data})
 }
 
-func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef) error { //nolint:gocritic // hugeParam: stable API
+func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef, fixturePackage bool) error { //nolint:gocritic // hugeParam: stable API
 	return gotestTpl.ExecuteTemplate(buf, "gotest.suites.tpl", map[string]any{
 		"Spec":                spec,
 		"SuiteSharedFixtures": suiteSharedFixtures,
+		"FixturePackage":      fixturePackage,
 	})
 }
 
@@ -320,17 +310,13 @@ func harvestedSeedsForTemplate(pkg *packages.Package, spec SpecOutcome, harvestS
 	return out, nil
 }
 
-func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, allFixtures []*ResolvedFixture, suiteFixtureFields map[string][]FixtureFieldBinding, sfNodes []*SharedFixtureNodeVM, fixtureTestNames []string) error {
-	if len(allFixtures) == 0 && len(sfNodes) == 0 {
-		return nil
-	}
-
+func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, allFixtures []*ResolvedFixture, suiteFixtureFields map[string][]FixtureFieldBinding, sfNodes []*SharedFixtureNodeVM, emitTestMain bool) error {
 	return gotestTpl.ExecuteTemplate(buf, "gotest.fixture.tpl", map[string]any{
 		"FixtureBoundSuites": fixtureBound,
 		"AllFixtures":        allFixtures,
 		"FlatSuites":         flattenSuitesDAG(allFixtures, suiteFixtureFields),
 		"SharedFixtureNodes": sfNodes,
-		"FixtureTestNames":   fixtureTestNames,
+		"EmitTestMain":       emitTestMain,
 	})
 }
 

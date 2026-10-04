@@ -34,12 +34,6 @@ var ƒcfg_{{ $f.Identifier }} gotest.FixtureConfig
 
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
-var ƒ_fixtureTestNames = []string{
-{{- range $name := .FixtureTestNames }}
-    "{{ $name }}",
-{{- end }}
-}
-var ƒ_pending atomic.Int32
 
 func ƒ_setupFixtures(t testing.TB) {
     if err := ƒ_fixtureOnce.Do(func() error {
@@ -60,7 +54,6 @@ func ƒ_setupFixtures(t testing.TB) {
         ƒcfg_{{ $f.Identifier }} = (&{{ $f.QualifiedType }}{}).FixtureConfig()
 {{- end }}
 {{- end }}
-        ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
         var ƒmaxSuiteSetup time.Duration
 {{ range $fs := .FlatSuites }}
         {
@@ -121,23 +114,26 @@ func ƒ_setupFixtures(t testing.TB) {
             },
             MaxSuiteSetupTimeout: ƒmaxSuiteSetup,
         })
+        if err == nil {
+            gotestruntime.RegisterTeardown(ƒ_fixtureDAG.Teardown)
+        }
         return err
     }); err != nil {
         t.Fatalf("fixture setup: %v", err)
     }
-    t.Cleanup(func() {
-        if ƒ_pending.Add(-1) == 0 {
-            if ƒ_fixtureDAG.Teardown() {
-                t.Errorf("fixture teardown failed")
-            }
-        }
-    })
+{{- /*
+  TestMain tears the DAG down after the tests. A panicking test never gets there:
+  testing runs its cleanups and ends the process. This cleanup, registered
+  before the suite's own, runs after its AfterAll and releases the fixtures then.
+*/}}
+    t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 {{- /* Render fixture-bound suites as top-level Test functions */ -}}
 {{ range $fs := .FlatSuites }}
 
 func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
+    defer gotestruntime.NotePanic()
     ƒ_setupFixtures(t)
 
     s := &ƒƒ_GOTEST_{{ $fs.Suite.Identifier }}{
@@ -177,6 +173,7 @@ func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
 
 {{ range $tc := $fs.Suite.TestCases }}
     t.Run("{{ $tc.Identifier }}", func(it *testing.T) {
+        defer gotestruntime.NotePanic()
 {{- if $fs.Suite.IsMethodParallel }}
         it.Parallel()
         if ƒcfg.FailFast && ƒfailed.Load() {
@@ -284,3 +281,13 @@ func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
 {{- end }}
             },
 {{- end -}}
+{{- if .EmitTestMain }}
+
+{{- /*
+  One TestMain per test binary, which holds the package and its external test
+  package: the generator emits it in one of the two and both register their
+  DAG's teardown with the runtime.
+*/}}
+
+func TestMain(m *testing.M) { os.Exit(gotestruntime.Main(m)) }
+{{- end }}

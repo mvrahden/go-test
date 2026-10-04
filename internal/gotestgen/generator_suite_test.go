@@ -3,6 +3,7 @@ package gotestgen_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -85,6 +86,42 @@ func (s *GeneratorTestSuite) TestE2ECLI(t *gotest.T) {
 				gotest.MatchSnapshot(sub, string(results[i].PXTest), tC.dirName+"-pxtest")
 			}
 		}
+	})
+}
+
+// The package and its external test package build into one binary, which
+// allows one TestMain; both variants still register their own DAG's teardown.
+func (s *GeneratorTestSuite) TestTestMainOwner(t *gotest.T) {
+	cwd, err := os.Getwd()
+	gotest.NoError(t, err)
+	gen := func(it *gotest.T, dir string) *gotestgen.GenerateResult {
+		loaded, broken, err := gotestgen.LoadPackages([]string{filepath.Join(cwd, "testdata_e2e", dir)}, nil)
+		gotest.NoError(it, err)
+		gotest.Empty(it, broken)
+		results, _, err := gotestgen.GenerateFromLoaded(loaded)
+		gotest.NoError(it, err)
+		gotest.Len(it, results, 1)
+		return results[0]
+	}
+	const testMain = "func TestMain(m *testing.M)"
+	const register = "gotestruntime.RegisterTeardown(ƒ_fixtureDAG.Teardown)"
+
+	t.When("both variants bind fixtures", func(w *gotest.T) {
+		w.It("emits the TestMain in the package's own variant only", func(it *gotest.T) {
+			r := gen(it, "testmain_both")
+			gotest.Equal(it, 1, strings.Count(string(r.PTest), testMain))
+			gotest.NotContains(it, string(r.PXTest), testMain)
+			gotest.Contains(it, string(r.PTest), register)
+			gotest.Contains(it, string(r.PXTest), register)
+		})
+	})
+
+	t.When("only the external test package binds fixtures", func(w *gotest.T) {
+		w.It("emits the TestMain there", func(it *gotest.T) {
+			r := gen(it, "testmain_xonly")
+			gotest.NotContains(it, string(r.PTest), testMain)
+			gotest.Equal(it, 1, strings.Count(string(r.PXTest), testMain))
+		})
 	})
 }
 

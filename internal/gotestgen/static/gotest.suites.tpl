@@ -16,8 +16,13 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
 
 func Test{{ $ts.Identifier }}(t *testing.T) {
 {{- $sfRefs := index $.SuiteSharedFixtures $ts.Identifier }}
+{{- if $.FixturePackage }}
+  defer gotestruntime.NotePanic()
+{{- end }}
 {{- if $sfRefs }}
   ƒ_setupFixtures(t)
+{{- else if $.FixturePackage }}
+  t.Cleanup(gotestruntime.TeardownIfDying)
 {{- end }}
   s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
 {{- if $sfRefs }}
@@ -55,6 +60,9 @@ func Test{{ $ts.Identifier }}(t *testing.T) {
 
 {{ range $tc := $ts.TestCases }}
   t.Run("{{ $tc.Identifier }}", func(it *testing.T) {
+{{- if $.FixturePackage }}
+    defer gotestruntime.NotePanic()
+{{- end }}
 {{- if $ts.IsMethodParallel }}
     it.Parallel()
     if ƒcfg.FailFast && ƒfailed.Load() {

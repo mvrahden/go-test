@@ -19,6 +19,10 @@ func (s *RendererTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func renderTestPkg(t testing.TB, pkg *packages.Package, harvestSeeds bool) (string, gotestgen.SpecOutcome) {
+	return renderTestPkgWith(t, gotestgen.ExportRenderer{}, pkg, harvestSeeds)
+}
+
+func renderTestPkgWith(t testing.TB, r gotestgen.ExportRenderer, pkg *packages.Package, harvestSeeds bool) (string, gotestgen.SpecOutcome) {
 	t.Helper()
 	c := gotestgen.NewCollector()
 	result := c.CollectSuiteSpecs(pkg)
@@ -33,7 +37,6 @@ func renderTestPkg(t testing.TB, pkg *packages.Package, harvestSeeds bool) (stri
 		gotest.NoError(t, err)
 	}
 
-	r := gotestgen.ExportRenderer{}
 	out, _, err := r.RenderTestSuiteSpec(pkg, spec, resolved, harvestSeeds)
 	gotest.NoError(t, err)
 	return string(out), spec
@@ -77,7 +80,7 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
-			gotest.NotContains(it, output, "func TestMain(m *testing.M)", "should NOT have TestMain")
+			gotest.Contains(it, output, "func TestMain(m *testing.M) { os.Exit(gotestruntime.Main(m)) }", "a fixture package tears down after m.Run")
 			gotest.NotContains(it, output, "RunFixtureMain", "should NOT have RunFixtureMain")
 			gotest.NotContains(it, output, "func Test_DBFixture(", "should NOT have old-style Test_DBFixture")
 			gotest.NotContains(it, output, "go:linkname", "should NOT have linkname directives")
@@ -100,8 +103,61 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
-			gotest.NotContains(it, output, "func TestMain(m *testing.M)", "should NOT have TestMain")
+			gotest.Contains(it, output, "func TestMain(m *testing.M) { os.Exit(gotestruntime.Main(m)) }", "a fixture package tears down after m.Run")
 			gotest.NotContains(it, output, "RunFixtureMain", "should NOT have RunFixtureMain")
+		})
+	})
+
+	t.When("the other variant of the binary carries the TestMain", func(w *gotest.T) {
+		w.It("registers its DAG's teardown and emits no TestMain of its own", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureWithChildSuite")
+			output, _ := renderTestPkgWith(it.T(), gotestgen.ExportRendererTestMainTaken(), pkg, true)
+
+			gotest.NotContains(it, output, "func TestMain(")
+			gotest.NotContains(it, output, `"os"`)
+			gotest.Contains(it, output, "gotestruntime.RegisterTeardown(ƒ_fixtureDAG.Teardown)")
+		})
+	})
+
+	t.When("the package binds no fixture", func(w *gotest.T) {
+		w.It("emits no TestMain and no panic bookkeeping", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_StdlibT_StandaloneSuite")
+			output, _ := renderTestPkg(it.T(), pkg, true)
+
+			gotest.NotContains(it, output, "func TestMain(")
+			gotest.NotContains(it, output, "NotePanic")
+			gotest.NotContains(it, output, "TeardownIfDying")
+		})
+	})
+
+	t.When("a test panics in a fixture package", func(w *gotest.T) {
+		w.It("notes the panic in the suite and every method, and tears down in a cleanup", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_MixedFixtureBoundAndStandalone")
+			output, _ := renderTestPkg(it.T(), pkg, true)
+
+			from := strings.Index(output, "func ƒ_setupFixtures(")
+			gotest.GreaterOrEqual(it, from, 0, "ƒ_setupFixtures missing")
+			setup := output[from:]
+			to := strings.Index(setup, "\n}\n")
+			gotest.Greater(it, to, 0, "ƒ_setupFixtures never closes")
+			setup = setup[:to]
+			gotest.Contains(it, setup, "t.Cleanup(gotestruntime.TeardownIfDying)")
+			gotest.Contains(it, setup, "gotestruntime.RegisterTeardown(ƒ_fixtureDAG.Teardown)")
+
+			for _, fn := range strings.Split(output, "\nfunc Test")[1:] {
+				if strings.HasPrefix(fn, "Main(") {
+					continue
+				}
+				gotest.Regexp(it, `^\w+\(t \*testing\.T\) \{\n\s*defer gotestruntime\.NotePanic\(\)\n`, fn, "the suite body notes a panic first")
+				// Registered before the suite's own cleanup, so it runs after AfterAll.
+				release := strings.Index(fn, "ƒ_setupFixtures(t)")
+				if release < 0 {
+					release = strings.Index(fn, "t.Cleanup(gotestruntime.TeardownIfDying)")
+				}
+				gotest.GreaterOrEqual(it, release, 0, "the suite releases fixtures when a test panics")
+				gotest.Less(it, release, strings.Index(fn, "gotestruntime.RunTeardown("), "fixtures are released after the suite's AfterAll")
+				gotest.Equal(it, strings.Count(fn, "t.Run("), strings.Count(fn, "func(it *testing.T) {\n\t\tdefer gotestruntime.NotePanic()")+strings.Count(fn, "func(it *testing.T) {\n\t\t\tdefer gotestruntime.NotePanic()"), "every method notes a panic first")
+			}
 		})
 	})
 
@@ -206,7 +262,7 @@ func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
-			gotest.NotContains(it, output, "func TestMain(m *testing.M)", "should NOT have TestMain")
+			gotest.Contains(it, output, "func TestMain(m *testing.M) { os.Exit(gotestruntime.Main(m)) }", "a fixture package tears down after m.Run")
 			gotest.NotContains(it, output, "RunFixtureMain", "should NOT have RunFixtureMain")
 			gotest.NotContains(it, output, "SharedFixtureBinding", "should NOT have old SharedFixtureBinding")
 			gotest.NotContains(it, output, "ƒ_sf0_E2EFixture", "should NOT have old sf0 variable naming")
@@ -571,31 +627,7 @@ func (s *RendererTestSuite) TestRenderer_BenchmarkWrapper(t *gotest.T) {
 			gotest.Contains(it, benchFn, "PoolFixture: ƒ_PoolFixture")
 		})
 
-		w.It("lists the Test and Benchmark wrappers for the teardown countdown", func(it *gotest.T) {
-			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBoundBenchmark")
-			out, _ := renderTestPkg(it.T(), pkg, true)
-
-			gotest.Contains(it, fixtureTestNames(it, out), "TestParserTestSuite")
-			gotest.Contains(it, fixtureTestNames(it, out), "BenchmarkParserTestSuite")
-		})
 	})
-}
-
-// fixtureTestNames reads the ƒ_fixtureTestNames literal out of a rendered file.
-func fixtureTestNames(t *gotest.T, out string) []string {
-	start := strings.Index(out, "var ƒ_fixtureTestNames = []string{")
-	gotest.GreaterOrEqual(t, start, 0, "ƒ_fixtureTestNames missing from output")
-	body := out[start:]
-	end := strings.Index(body, "}")
-	gotest.GreaterOrEqual(t, end, 0, "ƒ_fixtureTestNames literal never closes")
-	body = body[:end]
-	var names []string
-	for _, line := range strings.Split(body, "\n")[1:] {
-		if name := strings.Trim(strings.TrimSpace(line), `",`); name != "" {
-			names = append(names, name)
-		}
-	}
-	return names
 }
 
 func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
@@ -632,14 +664,6 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 			gotest.Contains(it, fuzzFn, "ƒ_setupFixtures(f)")
 			gotest.Contains(it, fuzzFn, "ParserFuzzTestSuite: ParserFuzzTestSuite{")
 			gotest.Contains(it, fuzzFn, "PoolFixture: ƒ_PoolFixture")
-		})
-
-		w.It("lists the Test and Fuzz wrappers for the teardown countdown", func(it *gotest.T) {
-			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBoundFuzz")
-			out, _ := renderTestPkg(it.T(), pkg, true)
-
-			gotest.Contains(it, fixtureTestNames(it, out), "TestParserFuzzTestSuite")
-			gotest.Contains(it, fixtureTestNames(it, out), "FuzzParserFuzzTestSuite_FuzzParse")
 		})
 	})
 
