@@ -208,7 +208,9 @@ parallel suites, or structural problems — those are your job, below.
 ## Core rules
 
 1. **Suites are structs, naming is the API.** `type XxxTestSuite struct{}`,
-   exported, methods `func (s *X) TestBehavior(t *gotest.T)`. No `TestMain`,
+   exported, methods `func (s *X) TestBehavior(t *gotest.T)`. No `TestMain`
+   (one you keep in a package that binds fixtures calls
+   `gotestruntime.Main(m)` instead of `m.Run()` where the runtime has it),
    no registration — the CLI generates the harness invisibly (never commit
    `ƒƒ_*` files). `F_`/`X_` prefixes focus/exclude; `Test*Async(t, done)`
    declares async tests.

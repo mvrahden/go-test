@@ -63,7 +63,8 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
   Teardown runs in reverse topological order.
 - TestSuites reference fixtures via named pointer fields (`Fixture *E2ESetupFixture`).
   A suite may have multiple fixture fields.
-- Fixtures do not use `TestMain`. User-defined `TestMain` functions coexist with fixtures without conflict.
+- Fixtures need no `TestMain` of yours: generated code declares the test binary's `TestMain` when the package binds fixtures.
+  A `TestMain` you keep must call `gotestruntime.Main(m)` in place of `m.Run()` — fixtures tear down inside it. Generation refuses the package otherwise, and the `testmain-fixture-teardown` lint rule rewrites the call.
 
 ### Generated test output
 
@@ -378,11 +379,13 @@ The barrier speaks two verbs to the setup subprocess over its stdin — start an
 On cancellation the barrier is skipped entirely and run-end teardown owns everything.
 Window scheduling is always on; there is no configuration.
 
-### Lazy, reference-counted lifecycle
+### Lazy setup, teardown after the tests
 
 Fixture setup does not run at package init.
-The first fixture-bound test triggers it (`gotestruntime.FixtureOnce`); a pending counter — seeded by `CountMatchingTests`, which honors `-run`/`-skip` filters — decrements as fixture-bound tests finish, and teardown fires when it reaches zero.
-Filtered-out tests therefore never pay fixture setup, and teardown runs after the *last matching* test, not the last declared one.
+The first fixture-bound test, benchmark or fuzz target triggers it (`gotestruntime.FixtureOnce`), so a run whose `-run`/`-skip` selects no fixture-bound unit never pays it.
+Teardown runs once `m.Run()` returns in the generated `TestMain`, after every test the run selected — whatever `-run`, `-skip`, `-count` or `-shuffle` it was given.
+A panicking test never returns from `m.Run()`: the testing package runs its cleanups and ends the process, so the fixtures are released in those cleanups, after the suite's `AfterAll`.
+A panic on a goroutine the test started outside `gotest.Go` ends the process without cleanups, and nothing is released.
 
 ### Shared-fixture dispatch
 
@@ -396,7 +399,7 @@ A `bench` run waits for its first window of shared fixtures instead, and for eve
   Teardown-side panics are contained the same way: a panicking `AfterAll` is recovered and reported as `<fixture>.AfterAll panicked`, a panicking `Dehydrate` as `dehydrate panicked` — both become teardown failures, and teardown of the remaining fixtures continues.
 - Shared-fixture setup failure fails the suites that read the fixture, and the run with exit code 1. Each of those suites is booked into the event stream as failed with `<suite> never ran: shared fixture <fixture> did not come up`; the failure itself is booked as the failed package `shared fixtures`, carrying what the fixture reported (`<fixture>.BeforeAll failed after N attempt(s): …`). Nothing else is affected: fixtures that came up stay up, the suites that read only those run, and so does every suite that reads none. A `bench` run gives up the benchmarks that read the failed fixture the same way — whether it failed in the up-front window or when a later slot asked for it — and runs the rest. `prepare` exits 2: bringing the fixtures up is all it does.
   In-test-process package-fixture setup failure is a `t.Fatalf` (exit 1).
-- Fixture teardown failure flips an otherwise passing run to a failure. For a shared fixture it is booked as the failed package `shared fixtures`, carrying the `<fixture>.AfterAll failed: …` lines.
+- Fixture teardown failure flips an otherwise passing run to a failure. For a shared fixture it is booked as the failed package `shared fixtures`, carrying the `<fixture>.AfterAll failed: …` lines. For a package fixture it fails the package, not a test: after the tests the binary prints the `<fixture>.AfterAll failed: …` lines and `FAIL: fixture teardown failed`, and exits 1.
 - Barrier-time failures — an early teardown or a tail-phase start — fail the run through the same aggregation as run-end teardown failures; the terminal teardown still runs and owns the remainder.
 
 ### Config markers
@@ -456,6 +459,19 @@ Key improvements:
 - `AfterAll` handles teardown (no manual defer chains)
 - No package-level singletons
 - Type-safe field access via named fields
+
+### Keeping a TestMain
+
+A `TestMain` that does process-wide work besides fixture setup can stay. It hands the run to `gotestruntime.Main`, which runs the tests and then tears the fixtures down:
+
+```go
+func TestMain(m *testing.M) {
+    slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+    os.Exit(gotestruntime.Main(m))
+}
+```
+
+`examples/repository` declares one.
 
 ## Resource Management
 

@@ -239,9 +239,15 @@ func TestQueryTestSuite(t *testing.T) {
 }
 ```
 
-No `TestMain` is generated — both `package foo` and `package foo_test`
-can define fixture-bound suites without conflict. Teardown runs via
-`t.Cleanup` (reverse-wavefront: leaves first, roots last).
+A package that binds fixtures gets one `TestMain` per test binary,
+`os.Exit(gotestruntime.Main(m))`: in `package foo` when it binds fixtures,
+else in `package foo_test`. Both variants register their DAG's teardown
+with the runtime, and `Main` runs it once `m.Run()` returns
+(reverse-wavefront: leaves first, roots last). A panicking test never
+returns from `m.Run`; the cleanup `ƒ_setupFixtures` registers releases the
+DAG on that path, after the suite's `AfterAll`. A developer's own
+`TestMain` must call `gotestruntime.Main(m)`; generation refuses it
+otherwise.
 
 For suites with `Benchmark*` methods, one `Benchmark<Suite>` wrapper is
 generated (standalone or fixture-bound, same shape as above), with one
@@ -1132,9 +1138,8 @@ miscounts test functions embedded in string fixtures.
 
 - The plain text run is not censused; that would need test2json in the
   fast loop.
-- Filtered runs are not censused. `gotestruntime.CountMatchingTests`
-  already models the per-level regexp semantics, if a filtered census is
-  ever wanted.
+- Filtered runs are not censused. Nothing in gotest models `go test`'s
+  selection flags; a filtered census would have to start there.
 - `When`/`It` rows are not censused; that would need the static spec's
   handling of behaviors it cannot enumerate.
 - The extension's runs use `-json` and inherit the census: the missing
@@ -1181,9 +1186,9 @@ reported `harness.go:38` as the user's frame. The tracer now treats
    writes it to a sidecar file. The runner reads this before deciding when to
    escalate from SIGTERM to SIGKILL.
 
-7. **No coverage interception needed**: Fixture setup no longer uses
-   `TestMain` + `os.Exit(m.Run())`, so Go's coverage machinery works
-   without interception. The test binary exits normally via `t.Cleanup`.
+7. **No coverage interception needed**: the generated `TestMain` only
+   wraps `m.Run()` (`os.Exit(gotestruntime.Main(m))`), so Go's coverage
+   machinery works without interception.
 
 8. **Unified pipeline entry point**: `cmd/gotest` is a thin CLI shell that
    delegates to `internal/gotestrunner.RunPipeline`. The pipeline encapsulates

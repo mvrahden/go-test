@@ -56,3 +56,11 @@ through the fixture DAG) needs it. Two consequences:
   `shared-fixture-undeclared` lint rule (integrity tier) flags undeclared
   reads. Fixture self-tests that construct the fixture locally are
   exempt.
+
+Package fixtures tear down after the tests, inside the test binary's
+`TestMain`, which the CLI generates. Do not write a `TestMain` to set up
+or tear down what a fixture can own. If the package needs one for other
+process-wide work, call `os.Exit(gotestruntime.Main(m))` instead of
+`os.Exit(m.Run())` where `gotestruntime.Main` exists: generation refuses a
+fixture package whose `TestMain` calls `m.Run()` directly, and the
+`testmain-fixture-teardown` lint rule rewrites it.

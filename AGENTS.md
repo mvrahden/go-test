@@ -391,6 +391,7 @@ func (f *DBFixture) AfterEach(ctx context.Context) error  { return nil }
 
 `BeforeAll` is required. All other methods are optional.
 Fixture hooks use `(ctx context.Context) error` — different from suite hooks.
+A package that binds fixtures and keeps its own `TestMain` calls `os.Exit(gotestruntime.Main(m))` instead of `os.Exit(m.Run())`: fixtures tear down after the tests inside it.
 
 Suites wire fixtures via pointer fields:
 
