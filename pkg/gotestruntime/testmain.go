@@ -13,6 +13,9 @@ import (
 var (
 	teardownMu sync.Mutex
 	teardowns  []func() (failed bool)
+	// teardownRun serializes runs, so a stop that arrives while Main tears
+	// down waits for it instead of ending the process halfway.
+	teardownRun sync.Mutex
 )
 
 // RegisterTeardown queues a fixture DAG's teardown for [Main]. Generated code
@@ -20,8 +23,9 @@ var (
 // release.
 func RegisterTeardown(fn func() (failed bool)) {
 	teardownMu.Lock()
-	defer teardownMu.Unlock()
 	teardowns = append(teardowns, fn)
+	teardownMu.Unlock()
+	watchStop()
 }
 
 // Main runs the tests, then tears down every fixture DAG the run set up. A
@@ -48,6 +52,8 @@ func finish(code int, stderr io.Writer) int {
 // reports whether any failed. Teardowns registered while it runs wait for the
 // next call.
 func runTeardowns() (failed bool) {
+	teardownRun.Lock()
+	defer teardownRun.Unlock()
 	teardownMu.Lock()
 	fns := teardowns
 	teardowns = nil

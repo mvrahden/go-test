@@ -385,7 +385,9 @@ Fixture setup does not run at package init.
 The first fixture-bound test, benchmark or fuzz target triggers it (`gotestruntime.FixtureOnce`), so a run whose `-run`/`-skip` selects no fixture-bound unit never pays it.
 Teardown runs once `m.Run()` returns in the generated `TestMain`, after every test the run selected — whatever `-run`, `-skip`, `-count` or `-shuffle` it was given.
 A panicking test never returns from `m.Run()`: the testing package runs its cleanups and ends the process, so the fixtures are released in those cleanups, after the suite's `AfterAll`.
-A panic on a goroutine the test started outside `gotest.Go` ends the process without cleanups, and nothing is released.
+An interrupt releases them too: Ctrl-C, gotest's `--timeout`, a cancelled run. The process tears its fixtures down, then ends by the signal, and the runner waits for it within the teardown budget — past `test2json`, which ends first.
+Under the runner a signal counts only once the runner has announced the stop, so a signal the code under test sends its own process is left to that code. Under plain `go test` only Ctrl-C (SIGINT) counts.
+A panic on a goroutine the test started outside `gotest.Go`, a process killed outright, or `go test -timeout` expiring ends the process without any of this, and nothing is released. A resource that must never leak belongs in a shared fixture or behind a reaper of its own.
 
 ### Shared-fixture dispatch
 
