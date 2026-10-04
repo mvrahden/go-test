@@ -113,6 +113,27 @@ func (s *sysTree) release() {
 	}
 }
 
+// jobAccounting is JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, which x/sys does
+// not declare.
+type jobAccounting struct {
+	TotalUserTime, TotalKernelTime                     int64
+	ThisPeriodTotalUserTime, ThisPeriodTotalKernelTime int64
+	TotalPageFaultCount, TotalProcesses                uint32
+	ActiveProcesses, TotalTerminatedProcesses          uint32
+}
+
+// alive reports whether any process of the job is left. Without a job there
+// is nothing to count, and nothing is waited for.
+func (s *sysTree) alive(int) bool {
+	if s.job == 0 {
+		return false
+	}
+	var info jobAccounting
+	err := windows.QueryInformationJobObject(s.job, windows.JobObjectBasicAccountingInformation,
+		uintptr(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info)), nil)
+	return err == nil && info.ActiveProcesses > 0
+}
+
 func exited(process windows.Handle) bool {
 	event, err := windows.WaitForSingleObject(process, 0)
 	return err == nil && event == windows.WAIT_OBJECT_0

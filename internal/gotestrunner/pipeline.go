@@ -351,6 +351,7 @@ func prepareBenchRun(ctx context.Context, overlay *OverlayResult, fixtures []got
 func assignBudgetFiles(targets []SuiteTarget) {
 	for i := range targets {
 		targets[i].BudgetFile = protocol.BudgetFilePath(targets[i].BinaryPath)
+		targets[i].StopFile = protocol.StopFilePath(targets[i].BinaryPath)
 	}
 }
 

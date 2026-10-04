@@ -33,6 +33,7 @@ type SuiteTarget struct {
 	RunFlags     []string // test binary flags (with -test. prefix)
 	CoverProfile string   // per-suite cover profile path (empty if no -coverprofile)
 	BudgetFile   string   // sidecar path for teardown budget (empty = use default)
+	StopFile     string   // created before the process is interrupted, so it tears its fixtures down (empty = none)
 	Bench        bool     // when true, run the Benchmark<SuiteName> wrapper instead of the suite's tests
 	BenchFilter  string   // raw -test.bench value carrying the user's sub-benchmark segments (empty = the exact Benchmark<SuiteName> wrapper)
 	Exclusive    bool     // SuiteConfig{Exclusive: true}: dispatched strictly alone, after every non-exclusive suite
@@ -180,21 +181,27 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 	if test2json {
 		argv := test2jsonArgv(test2jsonPath(), target, testArgs)
 		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // G204: the Go toolchain's own converter
-		cmd.Env = env
-		if target.BudgetFile != "" {
-			cmd.Env = append(cmd.Env, protocol.EnvTeardownBudgetFile+"="+target.BudgetFile)
-		}
+		cmd.Env = slices.Concat(env, sidecarEnv(target))
 		cmd.Dir = target.Dir
 		return cmd
 	}
 
 	cmd := exec.CommandContext(ctx, target.BinaryPath, testArgs...) //nolint:gosec // G204: binary built by this tool, not user-supplied
-	cmd.Env = env
-	if target.BudgetFile != "" {
-		cmd.Env = append(cmd.Env, protocol.EnvTeardownBudgetFile+"="+target.BudgetFile)
-	}
+	cmd.Env = slices.Concat(env, sidecarEnv(target))
 	cmd.Dir = target.Dir
 	return cmd
+}
+
+// sidecarEnv names the files a suite process shares with the runner.
+func sidecarEnv(target SuiteTarget) []string { //nolint:gocritic // hugeParam: stable API
+	var env []string
+	if target.BudgetFile != "" {
+		env = append(env, protocol.EnvTeardownBudgetFile+"="+target.BudgetFile)
+	}
+	if target.StopFile != "" {
+		env = append(env, protocol.EnvStopFile+"="+target.StopFile)
+	}
+	return env
 }
 
 // RunSingleSuite executes a single suite subprocess.
@@ -222,6 +229,10 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 	cancel := cmd.Cancel
 	cmd.Cancel = func() error {
 		cutShort.Store(true)
+		// Announced before the interrupt: the process reads it on the signal.
+		if target.StopFile != "" {
+			_ = os.WriteFile(target.StopFile, nil, 0o600)
+		}
 		return cancel()
 	}
 	if err := mp.Start(); err != nil {

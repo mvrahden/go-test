@@ -26,6 +26,13 @@ func (sysTree) kill(pid int) error { return signalGroup(pid, syscall.SIGKILL) }
 
 func (sysTree) release() {}
 
+// alive reports whether any process of the group led by pid is left. The
+// group's id is not reused while it has a member, so probing it after the
+// root was reaped reaches no stranger.
+func (sysTree) alive(pid int) bool {
+	return !errors.Is(syscall.Kill(-pid, 0), syscall.ESRCH)
+}
+
 // signalGroup signals the process group led by pid.
 func signalGroup(pid int, sig syscall.Signal) error {
 	err := syscall.Kill(-pid, sig)
