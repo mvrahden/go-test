@@ -385,10 +385,10 @@ Window scheduling is always on; there is no configuration.
 Fixture setup does not run at package init.
 The first fixture-bound test, benchmark or fuzz target triggers it (`gotestruntime.FixtureOnce`), so a run whose `-run`/`-skip` selects no fixture-bound unit never pays it.
 Teardown runs once `m.Run()` returns in the generated `TestMain`, after every test the run selected — whatever `-run`, `-skip`, `-count` or `-shuffle` it was given.
-A panicking test never returns from `m.Run()`: the testing package runs its cleanups and ends the process, so the fixtures are released in those cleanups, after the suite's `AfterAll`.
-An interrupt releases them too: Ctrl-C, gotest's `--timeout`, a cancelled run. The process tears its fixtures down, then ends by the signal, and the runner waits for it within the teardown budget — past `test2json`, which ends first.
-Under the runner a signal counts only once the runner has announced the stop, so a signal the code under test sends its own process is left to that code. Under plain `go test` only Ctrl-C (SIGINT) counts.
-A panic on a goroutine the test started outside `gotest.Go`, a process killed outright, or `go test -timeout` expiring ends the process without any of this, and nothing is released. A resource that must never leak belongs in a shared fixture or behind a reaper of its own.
+A panicking test never returns from `m.Run()`: the testing package runs its cleanups and ends the process, so the fixtures are released in those cleanups, after the suite's `AfterAll`. The same holds for a panicking benchmark, fuzz body, `It`, `When` or `AfterAll`.
+An interrupt releases them too: Ctrl-C, gotest's `--timeout`, a cancelled run. The process tears its fixtures down, then ends by the signal, and the runner waits for it within the teardown budget — past `test2json`, which ends first. Waiting for the whole process tree also waits for a child process a test left running that ignores the interrupt, up to that budget; a second Ctrl-C ends the CLI at once.
+Under the runner a signal counts only once the runner has announced the stop, so a signal the code under test sends its own process is left to that code. Under plain `go test` only Ctrl-C (SIGINT) counts. Fuzzing is left to Go, which stops on Ctrl-C by itself — stopping the workers, saving what it found — and returns from `m.Run()`, so the fixtures tear down after it; `gotest fuzz` stops its fuzzing processes with the same Ctrl-C.
+A panic on a goroutine the test started outside `gotest.Go`, a panic in a plain `func TestX` beside the suites under plain `go test` (gotest generates nothing around it), a process killed outright, or `go test -timeout` expiring ends the process without any of this, and nothing is released. A resource that must never leak belongs in a shared fixture or behind a reaper of its own.
 
 ### Shared-fixture dispatch
 
