@@ -1,6 +1,7 @@
 package gotestruntime
 
 import (
+	"context"
 	"io"
 
 	"github.com/mvrahden/go-test/internal/dying"
@@ -9,11 +10,9 @@ import (
 // Shims exposing the runtime's internals to the external ring-0 suites.
 
 var (
-	ExportRun                   = run
 	ExportRunBeforeAllWithRetry = runBeforeAllWithRetry
 	ExportSetupDAG              = setupDAG
 	ExportComputeMaxDAGPath     = computeMaxDAGPath
-	ExportComputeMaxTreePath    = computeMaxTreePath
 )
 
 // ExportNewNodeTracker returns an empty tracker of the kind the DAG setup expects.
@@ -34,3 +33,17 @@ func ExportResetTeardowns() {
 
 // ExportDying reports whether the process was marked as dying.
 func ExportDying() bool { return dying.Marked() }
+
+// ExportRun sets the DAG up, runs the tests and tears it down, as a test
+// binary does: exit 2 when setup fails, 1 when only the teardown did.
+func ExportRun(runTests func() int, cfg MainConfig) int {
+	dag, err := SetupFixtureDAG(context.Background(), cfg)
+	if err != nil {
+		return 2
+	}
+	code := runTests()
+	if dag.Teardown() && code == 0 {
+		code = 1
+	}
+	return code
+}
