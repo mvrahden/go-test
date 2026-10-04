@@ -669,6 +669,9 @@ Rules:
   shared-fixture-undeclared
                         Reads of a shared fixture the suite never declared as a
                         field (only declared fixtures are started)
+  testmain-fixture-teardown
+                        A TestMain calling m.Run in a package whose suites bind
+                        fixtures — call gotestruntime.Main(m) so they tear down
   assertion-simplify    Simplifiable assertions (True(t, a == b) → Equal, …)
   assertion-type-guard  Nil/Empty on types their runtime guards reject
   assertion-redundant   Assertions made redundant by the following assertion

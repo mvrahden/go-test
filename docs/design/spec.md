@@ -1393,6 +1393,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `assertion-type-guard` | `Nil`/`Empty` on types their runtime guards would reject |
 | `generated-file` | `gotest_p(x)suite_test.go` files present in source control |
 | `shared-fixture-undeclared` | Suite-method reads of a `*SharedFixture` value the suite never declared as a pointer field (directly or through the fixture DAG) — window scheduling starts only declared fixtures, so the value may be absent; locally-constructed fixtures (fixture self-tests) are exempt |
+| `testmain-fixture-teardown` | A `TestMain` that calls `m.Run()` in a package whose suites bind fixtures — fixtures tear down after the tests inside `gotestruntime.Main(m)`, so they would stay up until the process exits (generation refuses the package too). The fix calls `gotestruntime.Main(m)` and adds the import |
 | `bench-loop` | `Benchmark*` suite methods that never touch `b.Loop()`/`b.N` — nothing iterates, so the numbers lie |
 | `fuzz-determinism` | Fuzz targets (one hop into same-package callees) reading nondeterministic state — `time.Now`, `math/rand{,/v2}`, `os.Getenv` — corpus replay and coverage guidance degrade |
 | `fuzz-struct-corpus` | On-disk corpus entries for a shape-bound fuzz target (struct, pointer, array, non-byte slice) — one value per leaf in field order, so a same-kind reorder silently reinterprets them and an added or removed field rejects them; `gotest fuzz promote` turns them into typed `f.Add` seeds |

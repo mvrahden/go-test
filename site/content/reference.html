@@ -741,6 +741,7 @@ percentage = covered / total</div>
           <tr><td><code>poll-scope</code></td><td>Assertions inside <code>Eventually</code>/<code>Consistently</code> callbacks using the outer <code>t</code> instead of <code>poll</code>.</td></tr>
           <tr><td><code>assertion-type-guard</code></td><td><code>Nil</code>/<code>Empty</code> on types their runtime guards would reject.</td></tr>
           <tr><td><code>shared-fixture-undeclared</code></td><td>Suite reads a shared fixture it never declared — window scheduling only starts declared fixtures, so the read may hit one that never started or is already released.</td></tr>
+          <tr><td><code>testmain-fixture-teardown</code></td><td>A <code>TestMain</code> calling <code>m.Run()</code> in a package whose suites bind fixtures — call <code>gotestruntime.Main(m)</code>, which tears them down after the tests.</td></tr>
           <tr><td><code>generated-file</code></td><td>Generated overlay files present in source control.</td></tr>
           <tr><td><code>bench-loop</code></td><td><code>Benchmark*</code> methods that never touch <code>b.Loop()</code>/<code>b.N</code> — nothing iterates, so the numbers lie.</td></tr>
           <tr><td><code>fuzz-determinism</code></td><td>Fuzz targets reading <code>time.Now</code>, <code>math/rand</code> or <code>os.Getenv</code> — corpus replay and coverage guidance degrade.</td></tr>

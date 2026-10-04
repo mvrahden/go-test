@@ -57,6 +57,10 @@ const (
 	// the fixtures scheduled suites declare, so an undeclared read may hit
 	// a fixture that never started or is already released.
 	SharedFixtureUndeclared Rule = "shared-fixture-undeclared"
+	// TestMainFixtureTeardown is integrity: fixtures tear down after the
+	// tests inside gotestruntime.Main, so a TestMain that calls m.Run
+	// leaves them up until the process exits.
+	TestMainFixtureTeardown Rule = "testmain-fixture-teardown"
 )
 
 // Tier classifies what breaks when a rule's finding is ignored, and derives
@@ -117,6 +121,7 @@ var ruleMeta = map[Rule]struct {
 	BenchWait: {TierExpressiveness, ScopeSuites},
 
 	SharedFixtureUndeclared: {TierIntegrity, ScopeSuites},
+	TestMainFixtureTeardown: {TierIntegrity, ScopeEverywhere},
 
 	// fuzz-determinism is integrity: a target reading the clock/RNG/env
 	// breaks the replayability the corpus depends on — its outcomes lie.
@@ -205,6 +210,7 @@ func run(pass *analysis.Pass) (any, error) {
 		checkFocusPrefixes(pass, suites)
 		checkLifecyclePairs(pass, suites)
 		checkSharedFixtureUndeclared(pass, insp, suites)
+		checkTestMainFixtureTeardown(pass, suites)
 	}
 
 	checkOrphanedFiles(pass)

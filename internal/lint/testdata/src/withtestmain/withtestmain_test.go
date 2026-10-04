@@ -1,0 +1,25 @@
+package withtestmain
+
+import (
+	"context"
+	"os"
+	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type LedgerFixture struct{}
+
+func (f *LedgerFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *LedgerFixture) AfterAll(ctx context.Context) error  { return nil }
+
+type LedgerTestSuite struct {
+	Ledger *LedgerFixture
+}
+
+func (s *LedgerTestSuite) TestRead(t *gotest.T) {}
+
+func TestMain(m *testing.M) { // want `TestMain must call gotestruntime.Main\(m\) so fixtures tear down after the tests: replace m.Run\(\) with gotestruntime.Main\(m\)`
+	os.Setenv("LEDGER", "on")
+	os.Exit(m.Run())
+}
