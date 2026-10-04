@@ -3,8 +3,13 @@
 func Benchmark{{ $ts.Identifier }}(b *testing.B) {
 {{- $fx := index $.SuiteFixtures $ts.Identifier }}
 {{- $sfRefs := index $.SuiteSharedFixtures $ts.Identifier }}
+{{- if $.FixturePackage }}
+  defer gotestruntime.NotePanic()
+{{- end }}
 {{- if or $fx $sfRefs }}
   ƒ_setupFixtures(b)
+{{- else if $.FixturePackage }}
+  b.Cleanup(gotestruntime.TeardownIfDying)
 {{- end }}
 {{- if $fx }}
   s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{
@@ -33,6 +38,14 @@ func Benchmark{{ $ts.Identifier }}(b *testing.B) {
   s.BeforeAll(ƒlifecycleT)
 {{ range $bm := $ts.Benchmarks }}
   b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
+{{- if $.FixturePackage }}
+{{- /*
+  A panicking benchmark runs only its own cleanups before the process ends, not
+  its parent's, so the panic-path teardown is registered here as well.
+*/}}
+    defer gotestruntime.NotePanic()
+    b.Cleanup(gotestruntime.TeardownIfDying)
+{{- end }}
     b.StopTimer()
     ƒeachT := gotest.NewTFromTB(b)
     s.BeforeEach(ƒeachT)

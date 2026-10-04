@@ -30,6 +30,16 @@ func (s *PanickingTestSuite) TestUp(t *gotest.T) {
 	gotest.True(t, Up, "fixture down")
 }
 
+// BenchmarkPanics panics with TESTMAIN_BENCH_PANIC=1: a benchmark runs only
+// its own cleanups on a panic, not its parent's.
+func (s *PanickingTestSuite) BenchmarkPanics(b *gotest.B) {
+	if os.Getenv("TESTMAIN_BENCH_PANIC") == "1" {
+		panic("benchmark panic")
+	}
+	for b.Loop() {
+	}
+}
+
 type UnboundTestSuite struct{}
 
 func (s *UnboundTestSuite) TestAlone(t *gotest.T) {}

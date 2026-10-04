@@ -149,3 +149,10 @@ func (s *TestMainTestSuite) TestTestsRunAgainAfterMainAreRefused(t *gotest.T) {
 	gotest.Contains(t, out, "already torn down")
 	gotest.Equal(t, []string{"setup", "teardown"}, events)
 }
+
+func (s *TestMainTestSuite) TestAPanickingBenchmarkStillReleasesTheFixture(t *gotest.T) {
+	code, out, events := goTest(t, []string{"TESTMAIN_BENCH_PANIC=1"}, "-run", "^$", "-bench", "BenchmarkPanickingTestSuite")
+	gotest.NotEqual(t, 0, code, "exit 0 after a panic\n%s", out)
+	gotest.Contains(t, out, "panic: benchmark panic")
+	gotest.Equal(t, []string{"setup", "teardown"}, events)
+}

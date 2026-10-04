@@ -116,7 +116,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 		}
 	}
 
-	if err := r.renderBenchSuites(buf, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields); err != nil {
+	if err := r.renderBenchSuites(buf, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields, setsUpFixtures); err != nil {
 		return nil, nil, fmt.Errorf("failed rendering benchmark suites. err: %w", err)
 	}
 	if err := r.renderFuzzSuites(buf, pkg, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields, harvestSeeds, fans); err != nil {
@@ -232,7 +232,7 @@ func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSh
 	})
 }
 
-func (r *renderer) renderBenchSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*BoundFixture, suiteFixtureFields map[string][]FixtureFieldBinding) error { //nolint:gocritic // hugeParam: stable API
+func (r *renderer) renderBenchSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*BoundFixture, suiteFixtureFields map[string][]FixtureFieldBinding, fixturePackage bool) error { //nolint:gocritic // hugeParam: stable API
 	// Reuse the exact same fixture-bound view model gotest.fixture.tpl renders
 	// Test<Suite> from, reshaped as a map for O(1) per-suite template lookup
 	// (mirroring how SuiteSharedFixtures is already passed as a lookup map).
@@ -244,6 +244,7 @@ func (r *renderer) renderBenchSuites(buf *bytes.Buffer, spec SpecOutcome, suiteS
 		"Spec":                spec,
 		"SuiteSharedFixtures": suiteSharedFixtures,
 		"SuiteFixtures":       suiteFixtures,
+		"FixturePackage":      fixturePackage,
 	})
 }
 
