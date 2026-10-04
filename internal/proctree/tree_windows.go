@@ -81,7 +81,7 @@ func (s *sysTree) adopt(pid int) {
 
 var errNoHandle = errors.New("proctree: the process could not be opened")
 
-func (s *sysTree) interrupt(pid int) error {
+func (s *sysTree) interrupt(pid int, _ bool) error {
 	if s.process == 0 {
 		return errNoHandle
 	}

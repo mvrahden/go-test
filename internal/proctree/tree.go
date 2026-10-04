@@ -22,6 +22,7 @@ type Tree struct {
 	adopted     bool
 	released    bool
 	interrupted bool
+	ctrlC       bool
 	sys         sysTree
 }
 
@@ -86,7 +87,17 @@ func (t *Tree) Interrupt() error {
 		return nil
 	}
 	t.interrupted = true
-	return t.sys.interrupt(t.cmd.Process.Pid)
+	return t.sys.interrupt(t.cmd.Process.Pid, t.ctrlC)
+}
+
+// InterruptLikeCtrlC makes Interrupt send what a terminal's Ctrl-C sends,
+// SIGINT, in place of SIGTERM on Unix, for a program that stops gracefully on
+// it: go test -fuzz saves what it found. Windows already sends a console
+// control event, which Go reports as an interrupt. Call it before Interrupt.
+func (t *Tree) InterruptLikeCtrlC() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.ctrlC = true
 }
 
 // Linger waits, at most for timeout, until every process of an interrupted

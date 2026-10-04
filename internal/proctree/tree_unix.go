@@ -20,7 +20,12 @@ func prepare(cmd *exec.Cmd) {
 
 func (sysTree) adopt(int) {}
 
-func (sysTree) interrupt(pid int) error { return signalGroup(pid, syscall.SIGTERM) }
+func (sysTree) interrupt(pid int, ctrlC bool) error {
+	if ctrlC {
+		return signalGroup(pid, syscall.SIGINT)
+	}
+	return signalGroup(pid, syscall.SIGTERM)
+}
 
 func (sysTree) kill(pid int) error { return signalGroup(pid, syscall.SIGKILL) }
 

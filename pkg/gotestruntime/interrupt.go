@@ -1,6 +1,7 @@
 package gotestruntime
 
 import (
+	"flag"
 	"os"
 	"os/signal"
 	"sync"
@@ -20,9 +21,14 @@ var watchOnce sync.Once
 // developer sends.
 //
 // It starts with the first DAG that came up; a process with nothing to release
-// keeps Go's defaults.
+// keeps Go's defaults. A fuzzing process keeps them too: Go stops fuzzing on an
+// interrupt by itself, saving what it found, and m.Run returns to Main, which
+// tears down then.
 func watchStop() {
 	watchOnce.Do(func() {
+		if fuzzing() {
+			return
+		}
 		stopFile := os.Getenv(protocol.EnvStopFile)
 		sigs := []os.Signal{os.Interrupt}
 		if stopFile != "" {
@@ -44,6 +50,16 @@ func watchStop() {
 			}
 		}()
 	})
+}
+
+// fuzzing reports whether this process coordinates fuzzing or is one of its
+// workers. Flags are parsed by the time a DAG registers: m.Run parses them.
+func fuzzing() bool {
+	if f := flag.Lookup("test.fuzz"); f != nil && f.Value.String() != "" {
+		return true
+	}
+	f := flag.Lookup("test.fuzzworker")
+	return f != nil && f.Value.String() == "true"
 }
 
 // stopping gives a second signal Go's default action back, so it ends the

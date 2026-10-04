@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -70,15 +71,26 @@ func ownEnv() []string {
 
 // startTree starts cmd as the root of its own process tree, logging to a fresh
 // file, and returns once the test holds the fixture.
+//
+// The wait is a plain poll, not Eventually: control flow that leans on the
+// assertions would let a drill mutant of the assertion engine interrupt a
+// process that has not started, or never return. A tree that does not come up
+// is killed before the test fails, so nothing outlives it; WaitDelay bounds a
+// wait on output pipes a stray grandchild still holds.
 func startTree(t *gotest.T, cmd *exec.Cmd) (tree *proctree.Tree, log string) {
 	log = filepath.Join(t.TempDir(), "events")
 	cmd.Env = append(cmd.Env, "INTERRUPT_LOG="+log)
 	cmd.Stdout, cmd.Stderr = new(strings.Builder), new(strings.Builder)
+	cmd.WaitDelay = 15 * time.Second
 	tree = proctree.New(cmd)
 	gotest.NoError(t, tree.Start())
-	gotest.Eventually(t, 30*time.Second, 20*time.Millisecond, func(poll *gotest.R) {
-		gotest.Contains(poll, readEvents(log), "running")
-	})
+	for deadline := time.Now().Add(30 * time.Second); !slices.Contains(readEvents(log), "running"); time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			_ = tree.Kill()
+			_ = wait(tree, cmd)
+			gotest.Fail(t, "the process never held the fixture:\n%s%s", cmd.Stdout, cmd.Stderr) //nolint:fail-guard // it must kill the tree before failing
+		}
+	}
 	return tree, log
 }
 
@@ -134,7 +146,7 @@ func (s *InterruptTestSuite) TestAnUnannouncedInterruptIsLeftAlone(t *gotest.T) 
 // past test2json, which ends on the interrupt before the binary it runs.
 func (s *InterruptTestSuite) TestTheRunnerWaitsForTheRelease(t *gotest.T) {
 	for _, flags := range [][]string{nil, {"-json"}} {
-		cmd := exec.Command(s.cli, append(flags, "./testdata/interrupt/")...) //nolint:gosec // G204: controlled binary with fixed args
+		cmd := exec.Command(s.cli, append(flags, "-run", "TestHoldingTestSuite", "./testdata/interrupt/")...) //nolint:gosec // G204: controlled binary with fixed args
 		cmd.Env = ownEnv()
 		tree, log := startTree(t, cmd)
 
@@ -144,4 +156,48 @@ func (s *InterruptTestSuite) TestTheRunnerWaitsForTheRelease(t *gotest.T) {
 		gotest.Equal(t, 130, cmd.ProcessState.ExitCode(), "gotest %v", flags)
 		gotest.Equal(t, []string{"setup", "running", "teardown"}, readEvents(log), "gotest %v: released before the CLI exited", flags)
 	}
+}
+
+func countEvents(events []string, kind string) int {
+	n := 0
+	for _, e := range events {
+		if e == kind {
+			n++
+		}
+	}
+	return n
+}
+
+// Go stops fuzzing on Ctrl-C by itself: it stops the workers, saves what it
+// found and returns from m.Run, and every process tears its fixtures down
+// after that. Nothing may cut in first.
+func (s *InterruptTestSuite) TestCtrlCEndsFuzzingGracefully(t *gotest.T) {
+	cmd := exec.Command(s.binary, "-test.run=^$", "-test.fuzz=FuzzFuzzingTestSuite_FuzzSpins", "-test.parallel=2", "-test.fuzztime=60s", "-test.fuzzcachedir="+t.TempDir()) //nolint:gosec // G204: binary built by this suite
+	cmd.Env = append(ownEnv(), "INTERRUPT_FUZZ=1")
+	tree, log := startTree(t, cmd)
+	tree.InterruptLikeCtrlC()
+
+	gotest.NoError(t, tree.Interrupt())
+	err := wait(tree, cmd)
+
+	gotest.NoError(t, err, "fuzzing ends cleanly on Ctrl-C")
+	gotest.Contains(t, cmd.Stdout.(*strings.Builder).String(), "PASS")
+	events := readEvents(log)
+	gotest.Equal(t, countEvents(events, "setup"), countEvents(events, "teardown"), "every fuzzing process released its fixture: %v", events)
+	gotest.GreaterOrEqual(t, countEvents(events, "setup"), 2, "the coordinator and at least one worker")
+}
+
+// gotest fuzz interrupts its fuzzing processes the same way, so they end
+// gracefully and release their fixtures before the CLI exits.
+func (s *InterruptTestSuite) TestStoppingGotestFuzzReleasesTheFixture(t *gotest.T) {
+	cmd := exec.Command(s.cli, "fuzz", "--target", "FuzzFuzzingTestSuite_FuzzSpins", "./testdata/interrupt/") //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Env = append(ownEnv(), "INTERRUPT_FUZZ=1")
+	tree, log := startTree(t, cmd)
+
+	gotest.NoError(t, tree.Interrupt())
+	_ = wait(tree, cmd)
+
+	events := readEvents(log)
+	gotest.Equal(t, countEvents(events, "setup"), countEvents(events, "teardown"), "every fuzzing process released its fixture: %v", events)
+	gotest.GreaterOrEqual(t, countEvents(events, "setup"), 1)
 }
