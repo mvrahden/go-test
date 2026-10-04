@@ -246,8 +246,12 @@ with the runtime, and `Main` runs it once `m.Run()` returns
 (reverse-wavefront: leaves first, roots last). A panicking test never
 returns from `m.Run`; the cleanup `ƒ_setupFixtures` registers releases the
 DAG on that path, after the suite's `AfterAll`. A developer's own
-`TestMain` must call `gotestruntime.Main(m)`; generation refuses it
-otherwise.
+`TestMain` runs the tests through `gotestruntime.Main(m)`, or hands
+`gotestruntime.M(m)` to a library that runs them. Main and M mark the run;
+`ƒ_setupFixtures` calls `gotestruntime.RequireMain` first and fails the test
+when the run was not marked, or already finished. The check sits at run time
+because only there is it exact: a helper, a wrapper type or a branch never
+taken defeats any reading of the source.
 
 For suites with `Benchmark*` methods, one `Benchmark<Suite>` wrapper is
 generated (standalone or fixture-bound, same shape as above), with one

@@ -61,6 +61,9 @@ Package fixtures tear down after the tests, inside the test binary's
 `TestMain`, which the CLI generates. Do not write a `TestMain` to set up
 or tear down what a fixture can own. If the package needs one for other
 process-wide work, call `os.Exit(gotestruntime.Main(m))` instead of
-`os.Exit(m.Run())` where `gotestruntime.Main` exists: generation refuses a
-fixture package whose `TestMain` calls `m.Run()` directly, and the
-`testmain-fixture-teardown` lint rule rewrites it.
+`os.Exit(m.Run())`, or pass `gotestruntime.M(m)` to a library that takes
+`m` (`goleak.VerifyTestMain(gotestruntime.M(m))`), where the runtime has
+them. Otherwise every fixture-bound test fails before setup with the fix in
+its message, and the `testmain-fixture-teardown` lint rule rewrites the
+call. Under gotest a `TestMain` runs once per suite process, so setup placed
+in it repeats for every suite.

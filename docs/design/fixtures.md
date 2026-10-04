@@ -64,7 +64,8 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 - TestSuites reference fixtures via named pointer fields (`Fixture *E2ESetupFixture`).
   A suite may have multiple fixture fields.
 - Fixtures need no `TestMain` of yours: generated code declares the test binary's `TestMain` when the package binds fixtures.
-  A `TestMain` you keep must call `gotestruntime.Main(m)` in place of `m.Run()` — fixtures tear down inside it. Generation refuses the package otherwise, and the `testmain-fixture-teardown` lint rule rewrites the call.
+  A `TestMain` you keep runs the tests through `gotestruntime.Main(m)` in place of `m.Run()`, or passes `gotestruntime.M(m)` to a library that runs them itself (`goleak.VerifyTestMain`, `testscript.Main`) — fixtures tear down inside either.
+  Otherwise a fixture-bound test fails before anything is set up, naming the fix; so does a test run again after `Main` returned. The `testmain-fixture-teardown` lint rule reports the same at the source and rewrites the call.
 
 ### Generated test output
 
@@ -474,6 +475,14 @@ func TestMain(m *testing.M) {
 ```
 
 `examples/repository` declares one.
+
+A library that takes `m` to run the tests itself gets the wrapper, which tears the fixtures down before the library's own check runs:
+
+```go
+func TestMain(m *testing.M) { goleak.VerifyTestMain(gotestruntime.M(m)) }
+```
+
+Under gotest a `TestMain` runs once per suite process, as package fixtures do: the runner starts each suite in a process of its own. Setup placed in a `TestMain` therefore runs for every suite, including those that do not need it, with no timeout, retry, report or teardown on interrupt. Only shared fixtures run once per run.
 
 ## Resource Management
 

@@ -508,7 +508,7 @@ InfraFixture.AfterAll
 
 Generated fixture code imports `pkg/gotestruntime`, the DAG runtime: `SetupFixtureDAG` (topological setup, parallel independent nodes, panic-to-error recovery), `Teardown` (reverse order), `FixtureOnce` (lazy setup on the first fixture-bound test), and `Main` (the generated `TestMain` calls it: it runs the tests, then tears down every DAG registered through `RegisterTeardown`, and fails the package when a teardown failed).
 Its exported node types (`FixtureNode`, `SharedStateNode`, `MainConfig`, `FixtureDAG`) are the struct literals generated code populates.
-Users import it only to call `gotestruntime.Main(m)` from a `TestMain` of their own in a package that binds fixtures.
+Users import it only from a `TestMain` of their own in a package that binds fixtures: to call `gotestruntime.Main(m)`, or to pass `gotestruntime.M(m)` to a library that runs the tests itself. Fixture setup refuses a run that went through neither (`RequireMain`).
 
 #### SharedFixture State Transfer
 
@@ -1393,7 +1393,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `assertion-type-guard` | `Nil`/`Empty` on types their runtime guards would reject |
 | `generated-file` | `gotest_p(x)suite_test.go` files present in source control |
 | `shared-fixture-undeclared` | Suite-method reads of a `*SharedFixture` value the suite never declared as a pointer field (directly or through the fixture DAG) — window scheduling starts only declared fixtures, so the value may be absent; locally-constructed fixtures (fixture self-tests) are exempt |
-| `testmain-fixture-teardown` | A `TestMain` that calls `m.Run()` in a package whose suites bind fixtures — fixtures tear down after the tests inside `gotestruntime.Main(m)`, so they would stay up until the process exits (generation refuses the package too). The fix calls `gotestruntime.Main(m)` and adds the import |
+| `testmain-fixture-teardown` | A `TestMain` that runs the tests without `gotestruntime` in a package whose suites bind fixtures — fixtures tear down inside `gotestruntime.Main(m)` or `gotestruntime.M(m)`, and fixture setup refuses a run that went through neither. The fix replaces `m.Run()` with `gotestruntime.Main(m)`, wraps `m` passed to a library that takes it as an `interface{ Run() int }`, and adds the import. It reads the `TestMain` alone; a helper that routes the tests is suppressed per line |
 | `bench-loop` | `Benchmark*` suite methods that never touch `b.Loop()`/`b.N` — nothing iterates, so the numbers lie |
 | `fuzz-determinism` | Fuzz targets (one hop into same-package callees) reading nondeterministic state — `time.Now`, `math/rand{,/v2}`, `os.Getenv` — corpus replay and coverage guidance degrade |
 | `fuzz-struct-corpus` | On-disk corpus entries for a shape-bound fuzz target (struct, pointer, array, non-byte slice) — one value per leaf in field order, so a same-kind reorder silently reinterprets them and an added or removed field rejects them; `gotest fuzz promote` turns them into typed `f.Add` seeds |
