@@ -317,15 +317,20 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 
 		fuzzParams := map[string][]string{}
 		// The package and its external test package build into one binary,
-		// which allows one TestMain: the first variant that sets up fixtures
-		// takes it.
-		ptestBuf, ptestFixtureDeps, ptestReqKeys, ptestMain, err := generateForPkg(lr.Ptest, lr.sources, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, false)
+		// which allows one TestMain: the developer's, else the first variant
+		// that sets up fixtures takes it.
+		userMain, userMainFile, userMainPkg := findUserTestMain(lr)
+		ptestBuf, ptestFixtureDeps, ptestReqKeys, ptestSetsUp, err := generateForPkg(lr.Ptest, lr.sources, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, userMain != nil)
 		if err != nil {
 			return nil, locate(lr.Ptest, err)
 		}
-		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, _, err := generateForPkg(lr.Pxtest, lr.sources, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, ptestMain)
+		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, pxtestSetsUp, err := generateForPkg(lr.Pxtest, lr.sources, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, userMain != nil || ptestSetsUp)
 		if err != nil {
 			return nil, locate(lr.Pxtest, err)
+		}
+		if userMain != nil && (ptestSetsUp || pxtestSetsUp) && !gotestast.CallsRuntimeMain(userMainFile, userMain) {
+			return nil, locate(userMainPkg, gotestast.At(userMain.Pos(), fmt.Errorf(
+				"TestMain must call %s so fixtures tear down after the tests: replace m.Run() with %s", gotestast.RuntimeMain, gotestast.RuntimeMain)))
 		}
 
 		seen := map[string]bool{}
@@ -482,9 +487,10 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 // with the corpus shape of every fuzz target the variant declares, so the
 // internal and external variants of the same package accumulate into one map.
 //
-// testMainTaken tells it the other variant already carries the binary's
-// TestMain; ownsTestMain reports whether this one emitted it.
-func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo, harvestSeeds bool, fuzzParams map[string][]string, testMainTaken bool) (buf []byte, fixtureDeps []string, suiteReqKeys map[string][]string, ownsTestMain bool, err error) { //nolint:gocritic // hugeParam: stable API
+// testMainTaken tells it the binary's TestMain is already declared elsewhere;
+// setsUpFixtures reports whether this variant sets fixtures up, and so emitted
+// the TestMain unless it was taken.
+func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo, harvestSeeds bool, fuzzParams map[string][]string, testMainTaken bool) (buf []byte, fixtureDeps []string, suiteReqKeys map[string][]string, setsUpFixtures bool, err error) { //nolint:gocritic // hugeParam: stable API
 	if pkg == nil || len(spec.EffectiveTestSuites) == 0 {
 		return nil, nil, nil, false, nil
 	}
@@ -533,8 +539,22 @@ func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutco
 	if fans != nil {
 		maps.Copy(fuzzParams, fans.ParamsByFunc)
 	}
-	ownsTestMain = !testMainTaken && emitsFixtureSetup(resolved, buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures))
-	return buf, fixtureDeps, suiteReqKeys, ownsTestMain, err
+	setsUpFixtures = emitsFixtureSetup(resolved, buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures))
+	return buf, fixtureDeps, suiteReqKeys, setsUpFixtures, err
+}
+
+// findUserTestMain returns the TestMain the developer declared in either
+// variant of the test binary, with its file and variant.
+func findUserTestMain(lr *LoadResult) (*ast.FuncDecl, *ast.File, *packages.Package) {
+	for _, pkg := range []*packages.Package{lr.Ptest, lr.Pxtest} {
+		if pkg == nil {
+			continue
+		}
+		if fd, f := gotestast.FindTestMain(pkg.Syntax); fd != nil {
+			return fd, f, pkg
+		}
+	}
+	return nil, nil, nil
 }
 
 func fixtureTreeHasSharedFixtures(roots []*ResolvedFixture) bool {

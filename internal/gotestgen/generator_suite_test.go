@@ -116,6 +116,15 @@ func (s *GeneratorTestSuite) TestTestMainOwner(t *gotest.T) {
 		})
 	})
 
+	t.When("the developer wrote a TestMain that calls the runtime", func(w *gotest.T) {
+		w.It("keeps theirs and emits none", func(it *gotest.T) {
+			r := gen(it, "testmain_user")
+			gotest.NotContains(it, string(r.PTest), testMain)
+			gotest.NotContains(it, string(r.PXTest), testMain)
+			gotest.Contains(it, string(r.PTest), register)
+		})
+	})
+
 	t.When("only the external test package binds fixtures", func(w *gotest.T) {
 		w.It("emits the TestMain there", func(it *gotest.T) {
 			r := gen(it, "testmain_xonly")
