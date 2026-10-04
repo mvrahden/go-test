@@ -66,6 +66,7 @@ func (s *E2ETestSuite) TestT(t *gotest.T) {
 		"pkg/gotest/assertions_",
 		"pkg/gotest/b_suite_test.go",
 		"pkg/gotest/config_suite_test.go",
+		"pkg/gotest/dying_suite_test.go",
 		"pkg/gotest/each_filter_suite_test.go",
 		"pkg/gotest/each_suite_test.go",
 		"pkg/gotest/export_test.go",

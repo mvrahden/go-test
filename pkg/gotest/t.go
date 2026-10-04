@@ -89,7 +89,10 @@ func (t *T) TempDir() string {
 }
 
 //go:noinline
-func execTestFn(testFn func(it *T), it *T) { testFn(it) }
+func execTestFn(testFn func(it *T), it *T) {
+	defer notePanic()
+	testFn(it)
+}
 
 // sub builds the *T for a nested behavior. A nested subtest gets its own context
 // from the testing package, which carries none of the parent's deadline — so a

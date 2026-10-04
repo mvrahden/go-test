@@ -103,6 +103,7 @@ func (f *F) flushSeeds(explode func(seed []any) ([]any, error)) {
 // before it and afterEach (if non-nil) deferred to immediately after —
 // interposed per execution, not once for the whole fuzz target.
 func (f *F) each(t *testing.T, body func(*T)) {
+	defer notePanic()
 	tt := NewT(t)
 	if f.beforeEach != nil {
 		f.beforeEach(tt)

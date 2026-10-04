@@ -154,6 +154,9 @@ func Go(t *T, fn func()) (wait func()) {
 			}
 		})
 	}
-	t.t.Cleanup(wait)
+	t.t.Cleanup(func() {
+		defer notePanic()
+		wait()
+	})
 	return wait
 }

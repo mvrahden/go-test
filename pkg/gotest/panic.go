@@ -3,6 +3,8 @@ package gotest
 import (
 	"fmt"
 	"runtime/debug"
+
+	"github.com/mvrahden/go-test/internal/dying"
 )
 
 // capturedPanic carries a panic across a boundary the runtime cannot cross on
@@ -42,4 +44,14 @@ func capturedFrom(v any, where string) *capturedPanic {
 		return c // already captured further in; keep the original stack
 	}
 	return &capturedPanic{value: v, stack: debug.Stack(), where: where}
+}
+
+// notePanic marks the process as dying when a panic passes, then lets it go on;
+// fixture teardown reads the mark. Defer it directly, and only in a function
+// the testing package calls: below that, user code may still recover.
+func notePanic() {
+	if r := recover(); r != nil {
+		dying.Mark()
+		panic(r)
+	}
 }

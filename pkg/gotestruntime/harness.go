@@ -50,7 +50,12 @@ func RunSetup(t *testing.T, timeout, budget time.Duration, beforeAll func(*gotes
 // as [RunSetup].
 func RunTeardown(t *testing.T, timeout, budget time.Duration, afterAll func(*gotest.T)) {
 	tt := TeardownT(t, timeout)
-	watchWhile(tt, budget, "AfterAll ", "SetupTimeout", func() { afterAll(tt) })
+	// AfterAll runs in a cleanup, where no deferred NotePanic of the test body
+	// can see it panic.
+	watchWhile(tt, budget, "AfterAll ", "SetupTimeout", func() {
+		defer NotePanic()
+		afterAll(tt)
+	})
 }
 
 // watchWhile runs a lifecycle phase and fails t the moment timeout passes with

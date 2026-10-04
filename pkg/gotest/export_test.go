@@ -1,6 +1,10 @@
 package gotest
 
-import "context"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/internal/dying"
+)
 
 func ExportTCtx(t *T) context.Context { return t.ctx }
 
@@ -21,3 +25,10 @@ var (
 // ExportMatchSnapshotFromPtest calls MatchSnapshot from this internal test
 // file, so caller-package detection sees a ptest caller and picks no suffix.
 func ExportMatchSnapshotFromPtest(t testingT, value any) { MatchSnapshot(t, value) }
+
+// ExportExecTestFn runs fn the way It and When run their bodies.
+func ExportExecTestFn(fn func(*T), it *T) { execTestFn(fn, it) }
+
+// ExportDying reports the dying mark; ExportResetDying clears it.
+func ExportDying() bool { return dying.Marked() }
+func ExportResetDying() { dying.Reset() }
