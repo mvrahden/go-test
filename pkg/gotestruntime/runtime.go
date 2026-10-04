@@ -13,141 +13,6 @@ import (
 	"github.com/mvrahden/go-test/internal/protocol"
 )
 
-func run(runTests func() int, cfg MainConfig) int {
-	tracker := &nodeTracker{succeeded: make(map[*FixtureNode]bool)}
-
-	var sharedState map[string]json.RawMessage
-	if anyNodeHasSharedState(cfg.Fixtures) {
-		if os.Getenv(protocol.EnvSharedStateFile) != "" {
-			var err error
-			sharedState, err = loadSharedState()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
-				return 2
-			}
-		}
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	if len(cfg.Fixtures) > 0 {
-		if err := setupDAG(ctx, cfg.Fixtures, sharedState, tracker); err != nil {
-			_ = teardownDAG(cfg.Fixtures, tracker)
-			return 2
-		}
-
-		writeBudgetFile(cfg)
-
-		code := runTests()
-
-		if teardownDAG(cfg.Fixtures, tracker) && code == 0 {
-			code = 1
-		}
-		return code
-	}
-
-	if err := setupRoots(ctx, cfg.Roots, tracker); err != nil {
-		_ = teardownRoots(cfg.Roots, tracker)
-		return 2
-	}
-
-	writeBudgetFile(cfg)
-
-	code := runTests()
-
-	if teardownRoots(cfg.Roots, tracker) && code == 0 {
-		code = 1
-	}
-
-	return code
-}
-
-func setupRoots(ctx context.Context, roots []*FixtureNode, tracker *nodeTracker) error {
-	errs := make([]error, len(roots))
-	var wg sync.WaitGroup
-
-	childCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	for i, root := range roots {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() {
-				if r := recover(); r != nil {
-					errs[i] = fmt.Errorf("%s: panic: %v", root.Name, r)
-					cancel()
-				}
-			}()
-			if err := setupNode(childCtx, root, tracker); err != nil {
-				errs[i] = err
-				cancel()
-			}
-		}()
-	}
-	wg.Wait()
-
-	for _, err := range errs {
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func setupNode(ctx context.Context, node *FixtureNode, tracker *nodeTracker) error {
-	if node.Init != nil {
-		node.Init()
-	}
-
-	if err := runBeforeAllWithRetry(ctx, node); err != nil {
-		// An overrun setup completed its work before the verdict landed, so the
-		// resources it created exist. Marking it succeeded keeps its AfterAll in
-		// the teardown pass; the run still fails on the returned error.
-		if errors.Is(err, ErrSetupOverran) {
-			tracker.markSucceeded(node)
-		}
-		return err
-	}
-
-	tracker.markSucceeded(node)
-
-	if len(node.Children) > 0 {
-		errs := make([]error, len(node.Children))
-		var wg sync.WaitGroup
-
-		childCtx, cancel := context.WithCancel(ctx)
-		defer cancel()
-
-		for i, child := range node.Children {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				defer func() {
-					if r := recover(); r != nil {
-						errs[i] = fmt.Errorf("%s: panic: %v", child.Name, r)
-						cancel()
-					}
-				}()
-				if err := setupNode(childCtx, child, tracker); err != nil {
-					errs[i] = err
-					cancel()
-				}
-			}()
-		}
-		wg.Wait()
-
-		for _, err := range errs {
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[string]json.RawMessage, tracker *nodeTracker) error {
 	byName := make(map[string]*FixtureNode, len(fixtures))
 	for _, f := range fixtures {
@@ -368,58 +233,6 @@ func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
 	}))
 }
 
-func teardownRoots(roots []*FixtureNode, tracker *nodeTracker) bool {
-	failed := make([]bool, len(roots))
-	var wg sync.WaitGroup
-	for i, root := range roots {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if teardownNode(root, tracker) {
-				failed[i] = true
-			}
-		}()
-	}
-	wg.Wait()
-	for _, f := range failed {
-		if f {
-			return true
-		}
-	}
-	return false
-}
-
-func teardownNode(node *FixtureNode, tracker *nodeTracker) bool {
-	var anyFailed bool
-
-	if len(node.Children) > 0 {
-		childFailed := make([]bool, len(node.Children))
-		var wg sync.WaitGroup
-		for i, child := range node.Children {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				if teardownNode(child, tracker) {
-					childFailed[i] = true
-				}
-			}()
-		}
-		wg.Wait()
-		for _, f := range childFailed {
-			if f {
-				anyFailed = true
-				break
-			}
-		}
-	}
-
-	if tracker.isSucceeded(node) && runAfterAll(node) {
-		anyFailed = true
-	}
-
-	return anyFailed
-}
-
 // runAfterAll adapts a DAG node onto RunFixtureTeardown, the single policy the
 // generated shared-fixture subprocess runs AfterAll under too.
 func runAfterAll(node *FixtureNode) bool {
@@ -455,25 +268,8 @@ func writeBudgetFile(cfg MainConfig) {
 		return
 	}
 
-	var maxPath time.Duration
-	if len(cfg.Fixtures) > 0 {
-		maxPath = computeMaxDAGPath(cfg.Fixtures)
-	} else {
-		maxPath = computeMaxTreePath(cfg.Roots)
-	}
-	budget := maxPath + cfg.MaxSuiteSetupTimeout + 30*time.Second
+	budget := computeMaxDAGPath(cfg.Fixtures) + cfg.MaxSuiteSetupTimeout + 30*time.Second
 	_ = os.WriteFile(path, []byte(budget.String()), 0600)
-}
-
-func computeMaxTreePath(roots []*FixtureNode) time.Duration {
-	var maxPath time.Duration
-	for _, root := range roots {
-		path := nodeTreePath(root)
-		if path > maxPath {
-			maxPath = path
-		}
-	}
-	return maxPath
 }
 
 func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
@@ -516,18 +312,6 @@ func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
 		}
 	}
 	return maxPath
-}
-
-func nodeTreePath(node *FixtureNode) time.Duration {
-	own := SupervisorBudget(node.Config.Timeout)
-	var maxChild time.Duration
-	for _, child := range node.Children {
-		childPath := nodeTreePath(child)
-		if childPath > maxChild {
-			maxChild = childPath
-		}
-	}
-	return own + maxChild
 }
 
 func loadSharedState() (map[string]json.RawMessage, error) {
@@ -591,11 +375,6 @@ func SetupFixtureDAG(ctx context.Context, cfg MainConfig) (*FixtureDAG, error) {
 			_ = teardownDAG(cfg.Fixtures, tracker)
 			return nil, err
 		}
-	} else if len(cfg.Roots) > 0 {
-		if err := setupRoots(ctx, cfg.Roots, tracker); err != nil {
-			_ = teardownRoots(cfg.Roots, tracker)
-			return nil, err
-		}
 	}
 
 	writeBudgetFile(cfg)
@@ -605,11 +384,7 @@ func SetupFixtureDAG(ctx context.Context, cfg MainConfig) (*FixtureDAG, error) {
 
 func (d *FixtureDAG) Teardown() bool {
 	d.torn.Do(func() {
-		if len(d.cfg.Fixtures) > 0 {
-			d.failed = teardownDAG(d.cfg.Fixtures, d.tracker)
-		} else {
-			d.failed = teardownRoots(d.cfg.Roots, d.tracker)
-		}
+		d.failed = teardownDAG(d.cfg.Fixtures, d.tracker)
 	})
 	return d.failed
 }

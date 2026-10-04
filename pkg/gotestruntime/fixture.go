@@ -33,12 +33,10 @@ type FixtureNode struct {
 	BeforeAll   func(ctx context.Context) error
 	AfterAll    func(ctx context.Context) error
 	SharedState *SharedStateNode // non-nil for shared fixture nodes
-	Children    []*FixtureNode   // deprecated: use DependsOn with MainConfig.Fixtures
 	DependsOn   []string
 }
 
 type MainConfig struct {
-	Roots                []*FixtureNode // deprecated: use Fixtures
 	Fixtures             []*FixtureNode
 	MaxSuiteSetupTimeout time.Duration
 }

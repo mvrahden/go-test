@@ -60,7 +60,7 @@ func (s *RuntimeTestSuite) TestSingleRoot_LifecycleOrder(t *gotest.T) {
 	exitCode := gotestruntime.ExportRun(func() int {
 		rec.record("m.run")
 		return 0
-	}, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{node}})
+	}, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 
 	mustEqual(t, 0, exitCode)
 	mustEqual(t, []string{"root.init", "root.beforeAll", "m.run", "root.afterAll"}, rec.names())
@@ -77,7 +77,7 @@ func (s *RuntimeTestSuite) TestSingleRoot_ExitCodeForwarded(t *gotest.T) {
 
 	exitCode := gotestruntime.ExportRun(func() int {
 		return 42
-	}, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{node}})
+	}, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 
 	mustEqual(t, 42, exitCode)
 }
@@ -100,7 +100,7 @@ func (s *RuntimeTestSuite) TestSingleRoot_AfterAllCalledOnNonZeroExit(t *gotest.
 
 	exitCode := gotestruntime.ExportRun(func() int {
 		return 1
-	}, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{node}})
+	}, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 
 	mustEqual(t, 1, exitCode)
 	mustContain(t, rec.names(), "root.afterAll")
@@ -123,7 +123,7 @@ func (s *RuntimeTestSuite) TestSingleRoot_NilAfterAll(t *gotest.T) {
 	exitCode := gotestruntime.ExportRun(func() int {
 		rec.record("m.run")
 		return 0
-	}, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{node}})
+	}, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 
 	mustEqual(t, 0, exitCode)
 	mustEqual(t, []string{"root.init", "root.beforeAll", "m.run"}, rec.names())
@@ -149,7 +149,7 @@ func (s *RuntimeTestSuite) TestSingleRoot_NilInit(t *gotest.T) {
 	exitCode := gotestruntime.ExportRun(func() int {
 		rec.record("m.run")
 		return 0
-	}, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{node}})
+	}, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 
 	mustEqual(t, 0, exitCode)
 	mustEqual(t, []string{"root.beforeAll", "m.run", "root.afterAll"}, rec.names())
@@ -180,7 +180,7 @@ func (s *RuntimeTestSuite) TestRetry_SucceedsOnSecondAttempt(t *gotest.T) {
 	exitCode := gotestruntime.ExportRun(func() int {
 		rec.record("m.run")
 		return 0
-	}, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{node}})
+	}, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 
 	mustEqual(t, 0, exitCode)
 	mustEqual(t, 2, attempts)
@@ -209,7 +209,7 @@ func (s *RuntimeTestSuite) TestRetry_ExhaustedRetriesReturnsExitCode2(t *gotest.
 	exitCode := gotestruntime.ExportRun(func() int {
 		mRunCalled = true
 		return 0
-	}, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{node}})
+	}, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 
 	mustEqual(t, 2, exitCode)
 	mustEqual(t, 2, attempts)
@@ -235,7 +235,7 @@ func (s *RuntimeTestSuite) TestRetry_DelayObservedBetweenAttempts(t *gotest.T) {
 		},
 	}
 
-	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{node}})
+	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 
 	mustEqual(t, 0, exitCode)
 	mustLen(t, timestamps, 2)
@@ -264,7 +264,7 @@ func (s *RuntimeTestSuite) TestTimeout_BeforeAllExceedsTimeout(t *gotest.T) {
 	exitCode := gotestruntime.ExportRun(func() int {
 		mRunCalled = true
 		return 0
-	}, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{node}})
+	}, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 
 	mustEqual(t, 2, exitCode)
 	mustFalse(t, mRunCalled)
@@ -288,7 +288,7 @@ func (s *RuntimeTestSuite) TestTimeout_UndeclaredBudgetIsNotEnforced(t *gotest.T
 	exitCode := gotestruntime.ExportRun(func() int {
 		mRunCalled = true
 		return 0
-	}, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{node}})
+	}, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 
 	mustEqual(t, 0, exitCode)
 	mustTrue(t, mRunCalled, "an undeclared budget must not stop the tests from running")
@@ -309,7 +309,7 @@ func (s *RuntimeTestSuite) TestTimeout_BeforeAllCompletesWithinTimeout(t *gotest
 		},
 	}
 
-	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{node}})
+	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 
 	mustEqual(t, 0, exitCode)
 }
@@ -327,7 +327,7 @@ func (s *RuntimeTestSuite) TestTimeout_DisabledWithNegativeOne(t *gotest.T) {
 		},
 	}
 
-	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{node}})
+	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 	mustEqual(t, 0, exitCode)
 }
 
@@ -373,13 +373,12 @@ func (s *RuntimeTestSuite) TestChildren_SetupOrder(t *gotest.T) {
 			rec.record("root.afterAll")
 			return nil
 		},
-		Children: []*gotestruntime.FixtureNode{childA, childB},
 	}
 
 	exitCode := gotestruntime.ExportRun(func() int {
 		rec.record("m.run")
 		return 0
-	}, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{root}})
+	}, gotestruntime.MainConfig{Fixtures: under(root, childA, childB)})
 
 	mustEqual(t, 0, exitCode)
 
@@ -453,10 +452,9 @@ func (s *RuntimeTestSuite) TestChildren_ConcurrentSetup(t *gotest.T) {
 		Config:    gotest.DefaultFixtureConfig(),
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
-		Children:  []*gotestruntime.FixtureNode{childA, childB},
 	}
 
-	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{root}})
+	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Fixtures: under(root, childA, childB)})
 	mustEqual(t, 0, exitCode)
 }
 
@@ -510,10 +508,9 @@ func (s *RuntimeTestSuite) TestChildFailure_CancelsSiblings(t *gotest.T) {
 			rec.record("root.afterAll")
 			return nil
 		},
-		Children: []*gotestruntime.FixtureNode{childA, childB},
 	}
 
-	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{root}})
+	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Fixtures: under(root, childA, childB)})
 
 	mustEqual(t, 2, exitCode)
 	events := rec.names()
@@ -568,10 +565,9 @@ func (s *RuntimeTestSuite) TestChildFailure_SucceededSiblingGetsAfterAll(t *gote
 			rec.record("root.afterAll")
 			return nil
 		},
-		Children: []*gotestruntime.FixtureNode{childA, childB},
 	}
 
-	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{root}})
+	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Fixtures: under(root, childA, childB)})
 
 	mustEqual(t, 2, exitCode)
 	events := rec.names()
@@ -612,7 +608,6 @@ func (s *RuntimeTestSuite) TestTreeDepth_ThreeLevels(t *gotest.T) {
 			rec.record("child.afterAll")
 			return nil
 		},
-		Children: []*gotestruntime.FixtureNode{grandchild},
 	}
 
 	root := &gotestruntime.FixtureNode{
@@ -627,13 +622,12 @@ func (s *RuntimeTestSuite) TestTreeDepth_ThreeLevels(t *gotest.T) {
 			rec.record("root.afterAll")
 			return nil
 		},
-		Children: []*gotestruntime.FixtureNode{child},
 	}
 
 	exitCode := gotestruntime.ExportRun(func() int {
 		rec.record("m.run")
 		return 0
-	}, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{root}})
+	}, gotestruntime.MainConfig{Fixtures: append(under(root, child), under(child, grandchild)[1:]...)})
 
 	mustEqual(t, 0, exitCode)
 	events := rec.names()
@@ -693,7 +687,7 @@ func (s *RuntimeTestSuite) TestMultipleRoots_ConcurrentSetup(t *gotest.T) {
 		AfterAll: func(ctx context.Context) error { return nil },
 	}
 
-	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{rootA, rootB}})
+	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{rootA, rootB}})
 	mustEqual(t, 0, exitCode)
 }
 
@@ -727,7 +721,7 @@ func (s *RuntimeTestSuite) TestMultipleRoots_OneFailsCancelsOther(t *gotest.T) {
 		},
 	}
 
-	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{rootA, rootB}})
+	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{rootA, rootB}})
 
 	mustEqual(t, 2, exitCode)
 	events := rec.names()
@@ -762,7 +756,7 @@ func (s *RuntimeTestSuite) TestMultipleRoots_ConcurrentTeardown(t *gotest.T) {
 		},
 	}
 
-	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{rootA, rootB}})
+	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{rootA, rootB}})
 	mustEqual(t, 0, exitCode)
 }
 
@@ -775,18 +769,16 @@ func (s *RuntimeTestSuite) TestBudgetFile_WrittenCorrectly(t *gotest.T) {
 		Config:    gotest.FixtureConfig{Timeout: 2 * time.Minute},
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
-		Children: []*gotestruntime.FixtureNode{
-			{
-				Name:      "Child",
-				Config:    gotest.FixtureConfig{Timeout: 1 * time.Minute},
-				Init:      func() {},
-				BeforeAll: func(ctx context.Context) error { return nil },
-			},
-		},
 	}
 
 	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{
-		Roots:                []*gotestruntime.FixtureNode{root},
+		Fixtures: []*gotestruntime.FixtureNode{root, {
+			Name:      "Child",
+			Config:    gotest.FixtureConfig{Timeout: 1 * time.Minute},
+			Init:      func() {},
+			BeforeAll: func(ctx context.Context) error { return nil },
+			DependsOn: []string{"Root"},
+		}},
 		MaxSuiteSetupTimeout: 30 * time.Second,
 	})
 
@@ -795,7 +787,7 @@ func (s *RuntimeTestSuite) TestBudgetFile_WrittenCorrectly(t *gotest.T) {
 	data, err := os.ReadFile(budgetFile)
 	mustNoError(t, err)
 
-	// Budget = max tree path (2m root + 1m child) + max suite setup (30s) + 30s
+	// Budget = longest dependency path (2m root + 1m child) + max suite setup (30s) + 30s
 	expected := (2*time.Minute + 1*time.Minute + 30*time.Second + 30*time.Second).String()
 	mustEqual(t, expected, string(data))
 }
@@ -813,18 +805,16 @@ func (s *RuntimeTestSuite) TestBudgetFile_NoDeadlineIsNotZeroBudget(t *gotest.T)
 		Config:    gotest.FixtureConfig{Timeout: gotest.NoDeadline},
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
-		Children: []*gotestruntime.FixtureNode{
-			{
-				Name:      "Child",
-				Config:    gotest.FixtureConfig{Timeout: gotest.NoDeadline},
-				Init:      func() {},
-				BeforeAll: func(ctx context.Context) error { return nil },
-			},
-		},
 	}
 
 	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{
-		Roots:                []*gotestruntime.FixtureNode{root},
+		Fixtures: []*gotestruntime.FixtureNode{root, {
+			Name:      "Child",
+			Config:    gotest.FixtureConfig{Timeout: gotest.NoDeadline},
+			Init:      func() {},
+			BeforeAll: func(ctx context.Context) error { return nil },
+			DependsOn: []string{"Root"},
+		}},
 		MaxSuiteSetupTimeout: 30 * time.Second,
 	})
 	mustEqual(t, 0, exitCode)
@@ -837,25 +827,6 @@ func (s *RuntimeTestSuite) TestBudgetFile_NoDeadlineIsNotZeroBudget(t *gotest.T)
 	mustEqual(t, expected, string(data))
 }
 
-func (s *RuntimeTestSuite) TestBudgetFile_TreeAndDAGAgreeOnUndeclaredTimeouts(t *gotest.T) {
-	// computeMaxTreePath (Roots) and computeMaxDAGPath (Fixtures) must read the
-	// same declared value the same way. They drifted once: the DAG floored a
-	// non-positive Timeout while the tree mapped it to zero.
-	for _, timeout := range []time.Duration{0, gotest.NoDeadline, 90 * time.Second} {
-		tree := gotestruntime.ExportComputeMaxTreePath([]*gotestruntime.FixtureNode{{
-			Name:     "Root",
-			Config:   gotest.FixtureConfig{Timeout: timeout},
-			Children: []*gotestruntime.FixtureNode{{Name: "Child", Config: gotest.FixtureConfig{Timeout: timeout}}},
-		}})
-		dag := gotestruntime.ExportComputeMaxDAGPath([]*gotestruntime.FixtureNode{
-			{Name: "Root", Config: gotest.FixtureConfig{Timeout: timeout}},
-			{Name: "Child", Config: gotest.FixtureConfig{Timeout: timeout}, DependsOn: []string{"Root"}},
-		})
-		mustEqual(t, dag, tree, "tree and DAG must agree for a declared Timeout of %s", timeout)
-		mustGreater(t, tree, time.Duration(0), "a fixture always gets supervisor headroom")
-	}
-}
-
 func (s *RuntimeTestSuite) TestBudgetFile_NotWrittenWhenEnvUnset(t *gotest.T) {
 	t.Setenv(protocol.EnvTeardownBudgetFile, "")
 
@@ -866,7 +837,7 @@ func (s *RuntimeTestSuite) TestBudgetFile_NotWrittenWhenEnvUnset(t *gotest.T) {
 		BeforeAll: func(ctx context.Context) error { return nil },
 	}
 
-	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{root}})
+	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{root}})
 	mustEqual(t, 0, exitCode)
 }
 
@@ -885,18 +856,16 @@ func (s *RuntimeTestSuite) TestBudgetFile_MultipleRootsUsesMax(t *gotest.T) {
 		Config:    gotest.FixtureConfig{Timeout: 3 * time.Minute},
 		Init:      func() {},
 		BeforeAll: func(ctx context.Context) error { return nil },
-		Children: []*gotestruntime.FixtureNode{
-			{
-				Name:      "ChildB1",
-				Config:    gotest.FixtureConfig{Timeout: 2 * time.Minute},
-				Init:      func() {},
-				BeforeAll: func(ctx context.Context) error { return nil },
-			},
-		},
 	}
 
 	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{
-		Roots:                []*gotestruntime.FixtureNode{rootA, rootB},
+		Fixtures: []*gotestruntime.FixtureNode{rootA, rootB, {
+			Name:      "ChildB1",
+			Config:    gotest.FixtureConfig{Timeout: 2 * time.Minute},
+			Init:      func() {},
+			BeforeAll: func(ctx context.Context) error { return nil },
+			DependsOn: []string{"RootB"},
+		}},
 		MaxSuiteSetupTimeout: 45 * time.Second,
 	})
 
@@ -921,7 +890,7 @@ func (s *RuntimeTestSuite) TestTeardownFailure_SetsExitCode1WhenTestsPassed(t *g
 		},
 	}
 
-	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{node}})
+	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 	mustEqual(t, 1, exitCode)
 }
 
@@ -936,7 +905,7 @@ func (s *RuntimeTestSuite) TestTeardownFailure_PreservesNonZeroExitCode(t *gotes
 		},
 	}
 
-	exitCode := gotestruntime.ExportRun(func() int { return 3 }, gotestruntime.MainConfig{Roots: []*gotestruntime.FixtureNode{node}})
+	exitCode := gotestruntime.ExportRun(func() int { return 3 }, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 	mustEqual(t, 3, exitCode)
 }
 
@@ -1638,4 +1607,13 @@ func indexOf(slice []string, val string) int {
 		}
 	}
 	return -1
+}
+
+// under gives each child a dependency on parent, the DAG form of a fixture
+// tree, and returns parent followed by the children.
+func under(parent *gotestruntime.FixtureNode, children ...*gotestruntime.FixtureNode) []*gotestruntime.FixtureNode {
+	for _, c := range children {
+		c.DependsOn = append(c.DependsOn, parent.Name)
+	}
+	return append([]*gotestruntime.FixtureNode{parent}, children...)
 }
