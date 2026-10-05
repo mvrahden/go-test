@@ -126,12 +126,12 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 
 			gotest.NotContains(it, output, "func TestMain(")
 			gotest.NotContains(it, output, "NotePanic")
-			gotest.NotContains(it, output, "TeardownIfDying")
+			gotest.NotContains(it, output, "GuardBody")
 		})
 	})
 
 	t.When("a test panics in a fixture package", func(w *gotest.T) {
-		w.It("notes the panic in the suite and every method, and tears down in a cleanup", func(it *gotest.T) {
+		w.It("guards every suite body and notes a panic in every method", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_MixedFixtureBoundAndStandalone")
 			output, _ := renderTestPkg(it.T(), pkg, true)
 
@@ -141,7 +141,6 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			to := strings.Index(setup, "\n}\n")
 			gotest.Greater(it, to, 0, "ƒ_setupFixtures never closes")
 			setup = setup[:to]
-			gotest.Contains(it, setup, "t.Cleanup(gotestruntime.TeardownIfDying)")
 			gotest.Less(it, strings.Index(setup, "gotestruntime.RequireMain()"), strings.Index(setup, "ƒ_fixtureOnce.Do("), "setup is refused before anything comes up")
 			gotest.GreaterOrEqual(it, strings.Index(setup, "gotestruntime.RequireMain()"), 0)
 			gotest.Contains(it, setup, "gotestruntime.RegisterTeardown(ƒ_fixtureDAG.Teardown)")
@@ -150,14 +149,8 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 				if strings.HasPrefix(fn, "Main(") {
 					continue
 				}
-				gotest.Regexp(it, `^\w+\(t \*testing\.T\) \{\n\s*defer gotestruntime\.NotePanic\(\)\n`, fn, "the suite body notes a panic first")
-				// Registered before the suite's own cleanup, so it runs after AfterAll.
-				release := strings.Index(fn, "ƒ_setupFixtures(t)")
-				if release < 0 {
-					release = strings.Index(fn, "t.Cleanup(gotestruntime.TeardownIfDying)")
-				}
-				gotest.GreaterOrEqual(it, release, 0, "the suite releases fixtures when a test panics")
-				gotest.Less(it, release, strings.Index(fn, "gotestruntime.RunTeardown("), "fixtures are released after the suite's AfterAll")
+				// First, so its cleanup runs after the suite's AfterAll.
+				gotest.Regexp(it, `^\w+\(t \*testing\.T\) \{\n\s*defer gotestruntime\.GuardBody\(t\)\.End\(\)\n`, fn, "the suite body is guarded first")
 				gotest.Equal(it, strings.Count(fn, "t.Run("), strings.Count(fn, "func(it *testing.T) {\n\t\tdefer gotestruntime.NotePanic()")+strings.Count(fn, "func(it *testing.T) {\n\t\t\tdefer gotestruntime.NotePanic()"), "every method notes a panic first")
 			}
 		})

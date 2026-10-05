@@ -124,19 +124,13 @@ func ƒ_setupFixtures(t testing.TB) {
     }); err != nil {
         t.Fatalf("fixture setup: %v", err)
     }
-{{- /*
-  TestMain tears the DAG down after the tests. A panicking test never gets there:
-  testing runs its cleanups and ends the process. This cleanup, registered
-  before the suite's own, runs after its AfterAll and releases the fixtures then.
-*/}}
-    t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 {{- /* Render fixture-bound suites as top-level Test functions */ -}}
 {{ range $fs := .FlatSuites }}
 
 func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
-    defer gotestruntime.NotePanic()
+    defer gotestruntime.GuardBody(t).End()
     ƒ_setupFixtures(t)
 
     s := &ƒƒ_GOTEST_{{ $fs.Suite.Identifier }}{

@@ -70,11 +70,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestQueryTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_QueryTestSuite{
@@ -421,11 +420,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestCFGTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_CFGTestSuite{
@@ -647,11 +645,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestPlainTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_PlainTestSuite{
@@ -869,11 +866,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestEachTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_EachTestSuite{
@@ -985,11 +981,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestQueryTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_QueryTestSuite{
@@ -1103,11 +1098,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestBasicTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_BasicTestSuite{
@@ -1208,11 +1202,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestMinimalTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_MinimalTestSuite{
@@ -1313,11 +1306,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestBoundTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_BoundTestSuite{
@@ -1360,8 +1352,7 @@ func (ts *ƒƒ_GOTEST_StandaloneTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_StandaloneTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestStandaloneTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
-	t.Cleanup(gotestruntime.TeardownIfDying)
+	defer gotestruntime.GuardBody(t).End()
 	s := &ƒƒ_GOTEST_StandaloneTestSuite{}
 	ƒcfg := gotest.DefaultSuiteConfig()
 	ƒbudget := gotest.SuiteConfig{}
@@ -1471,11 +1462,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestHandlerTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_HandlerTestSuite{
@@ -1608,11 +1598,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestEmbeddedTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_EmbeddedTestSuite{
@@ -1644,7 +1633,7 @@ func TestEmbeddedTestSuite(t *testing.T) {
 }
 
 func TestNamedTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_NamedTestSuite{
@@ -1778,11 +1767,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestLightTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_LightTestSuite{
@@ -1814,7 +1802,7 @@ func TestLightTestSuite(t *testing.T) {
 }
 
 func TestFullTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_FullTestSuite{
@@ -1930,11 +1918,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestUserTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_UserTestSuite{
@@ -2035,11 +2022,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestQueryTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_QueryTestSuite{
@@ -2139,7 +2125,6 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestMain(m *testing.M) { os.Exit(gotestruntime.Main(m)) }
@@ -2154,7 +2139,7 @@ func (ts *ƒƒ_GOTEST_MigrationTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_MigrationTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestMigrationTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 	s := &ƒƒ_GOTEST_MigrationTestSuite{}
 
@@ -2268,11 +2253,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestQueryTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_QueryTestSuite{
@@ -2388,11 +2372,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestAppTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_AppTestSuite{
@@ -2493,11 +2476,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestStdlibTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_StdlibTestSuite{

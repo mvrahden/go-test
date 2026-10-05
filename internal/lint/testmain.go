@@ -35,7 +35,7 @@ func checkTestMainFixtureTeardown(pass *analysis.Pass, suites map[string]*suiteI
 	if !binds {
 		return
 	}
-	fd, file := gotestast.FindTestMain(pass.Files)
+	fd, file := gotestast.FindTestMain(pass.Fset, pass.Files)
 	if fd == nil || gotestast.RoutesThroughRuntime(file, fd) {
 		return
 	}
@@ -59,14 +59,43 @@ func testMainFix(pass *analysis.Pass, file *ast.File, fd *ast.FuncDecl) []analys
 	}
 	qual, imported := runtimeQualifier(file)
 
+	// A TestMain that returns makes Go exit with m.Run's own code, which knows
+	// nothing of the teardown: a discarded m.Run() that ends TestMain becomes
+	// os.Exit(gotestruntime.Main(m)). One elsewhere has no rewrite that keeps
+	// the control flow, so it is reported without one.
+	discarded := map[*ast.CallExpr]bool{}
+	var exitEdit *analysis.TextEdit
+	needOS := false
+	for i, stmt := range fd.Body.List {
+		es, ok := stmt.(*ast.ExprStmt)
+		if !ok {
+			continue
+		}
+		call, ok := es.X.(*ast.CallExpr)
+		if !ok || !isRunOf(call, isM) {
+			continue
+		}
+		discarded[call] = true
+		if i == len(fd.Body.List)-1 {
+			osq, hasOS := importQualifier(file, "os", "os.")
+			needOS = !hasOS
+			exitEdit = &analysis.TextEdit{Pos: es.Pos(), End: es.End(), NewText: []byte(osq + "Exit(" + qual + "Main(" + param.Name + "))")}
+		}
+	}
+
 	var edits []analysis.TextEdit
+	if exitEdit != nil {
+		edits = append(edits, *exitEdit)
+	}
 	ast.Inspect(fd.Body, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
 		if !ok {
 			return true
 		}
-		if sel, ok := call.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Run" && len(call.Args) == 0 && isM(sel.X) {
-			edits = append(edits, analysis.TextEdit{Pos: call.Pos(), End: call.End(), NewText: []byte(qual + "Main(" + param.Name + ")")})
+		if isRunOf(call, isM) {
+			if !discarded[call] {
+				edits = append(edits, analysis.TextEdit{Pos: call.Pos(), End: call.End(), NewText: []byte(qual + "Main(" + param.Name + ")")})
+			}
 			return true
 		}
 		sig, ok := pass.TypesInfo.TypeOf(call.Fun).(*types.Signature)
@@ -83,8 +112,15 @@ func testMainFix(pass *analysis.Pass, file *ast.File, fd *ast.FuncDecl) []analys
 	if len(edits) == 0 {
 		return nil
 	}
+	var paths []string
 	if !imported {
-		edits = append(edits, importEdit(file, runtimeImportPath))
+		paths = append(paths, runtimeImportPath)
+	}
+	if needOS {
+		paths = append(paths, "os")
+	}
+	if len(paths) > 0 {
+		edits = append(edits, importEdit(file, paths...))
 	}
 	return []analysis.SuggestedFix{{Message: "run the tests through gotestruntime", TextEdits: edits}}
 }
@@ -128,8 +164,11 @@ func runtimeQualifier(file *ast.File) (qual string, imported bool) {
 			continue
 		}
 		if imp.Name != nil {
-			if imp.Name.Name == "." {
+			switch imp.Name.Name {
+			case ".":
 				return "", true
+			case "_":
+				continue
 			}
 			return imp.Name.Name + ".", true
 		}
@@ -138,17 +177,53 @@ func runtimeQualifier(file *ast.File) (qual string, imported bool) {
 	return "gotestruntime.", false
 }
 
-// importEdit adds path to file's imports: into the first parenthesized import
-// block, else as a declaration of its own after the package clause.
-func importEdit(file *ast.File, path string) analysis.TextEdit {
+// importQualifier returns how file names the package at path, or fallback and
+// false when it does not import it.
+func importQualifier(file *ast.File, path, fallback string) (string, bool) {
+	for _, imp := range file.Imports {
+		if strings.Trim(imp.Path.Value, `"`) != path {
+			continue
+		}
+		if imp.Name == nil {
+			return fallback, true
+		}
+		switch imp.Name.Name {
+		case ".":
+			return "", true
+		case "_":
+			continue
+		}
+		return imp.Name.Name + ".", true
+	}
+	return fallback, false
+}
+
+// isRunOf reports whether call is m.Run() on the TestMain's m.
+func isRunOf(call *ast.CallExpr, isM func(ast.Expr) bool) bool {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	return ok && sel.Sel.Name == "Run" && len(call.Args) == 0 && isM(sel.X)
+}
+
+// importEdit adds paths to file's imports, in one edit: into the first
+// parenthesized import block, else as a declaration of its own after the
+// package clause.
+func importEdit(file *ast.File, paths ...string) analysis.TextEdit {
 	for _, decl := range file.Decls {
 		gd, ok := decl.(*ast.GenDecl)
 		if !ok || gd.Tok != token.IMPORT {
 			continue
 		}
 		if gd.Lparen.IsValid() {
-			return analysis.TextEdit{Pos: gd.Rparen, End: gd.Rparen, NewText: []byte("\t\"" + path + "\"\n")}
+			var b strings.Builder
+			for _, p := range paths {
+				b.WriteString("\t\"" + p + "\"\n")
+			}
+			return analysis.TextEdit{Pos: gd.Rparen, End: gd.Rparen, NewText: []byte(b.String())}
 		}
 	}
-	return analysis.TextEdit{Pos: file.Name.End(), End: file.Name.End(), NewText: []byte("\n\nimport \"" + path + "\"")}
+	var b strings.Builder
+	for _, p := range paths {
+		b.WriteString("\n\nimport \"" + p + "\"")
+	}
+	return analysis.TextEdit{Pos: file.Name.End(), End: file.Name.End(), NewText: []byte(b.String())}
 }

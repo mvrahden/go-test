@@ -2,7 +2,12 @@ package gotestruntime_test
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"runtime"
+	"time"
+
+	"github.com/mvrahden/go-test/internal/runstate"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
@@ -99,33 +104,6 @@ func (s *TeardownRegistryTestSuite) TestNotePanicOnGoexit(t *gotest.T) {
 	})
 }
 
-func (s *TeardownRegistryTestSuite) TestTeardownIfNotDying(t *gotest.T) {
-	t.When("no panic was noted", func(w *gotest.T) {
-		w.It("leaves the fixtures up for the tests still to run", func(it *gotest.T) {
-			ran := false
-			gotestruntime.RegisterTeardown(func() bool { ran = true; return false })
-			gotestruntime.TeardownIfDying()
-			gotest.False(it, ran)
-		})
-	})
-}
-
-func (s *TeardownRegistryTestSuite) TestTeardownIfDying(t *gotest.T) {
-	t.When("a panic was noted", func(w *gotest.T) {
-		w.It("tears every registered DAG down, once", func(it *gotest.T) {
-			runs := 0
-			gotestruntime.RegisterTeardown(func() bool { runs++; return false })
-			gotest.Panics(it, func() {
-				defer gotestruntime.NotePanic()
-				panic("boom")
-			})
-			gotestruntime.TeardownIfDying()
-			gotestruntime.TeardownIfDying()
-			gotest.Equal(it, 1, runs)
-		})
-	})
-}
-
 func (s *TeardownRegistryTestSuite) TestRequireMainOutsideTheRun(t *gotest.T) {
 	t.When("the tests did not run through Main or M", func(w *gotest.T) {
 		w.It("refuses fixture setup and names the fix", func(it *gotest.T) {
@@ -156,6 +134,73 @@ func (s *TeardownRegistryTestSuite) TestRequireMainAfterTheRun(t *gotest.T) {
 			var stderr bytes.Buffer
 			gotestruntime.ExportRunTests(func() int { return 0 }, &stderr)
 			gotest.ErrorContains(it, gotestruntime.RequireMain(), "already torn down")
+		})
+	})
+}
+
+func (s *TeardownRegistryTestSuite) TestASecondRunIsRefused(t *gotest.T) {
+	t.When("Main or M runs the tests a second time", func(w *gotest.T) {
+		w.It("refuses fixture setup in the second round", func(it *gotest.T) {
+			var stderr bytes.Buffer
+			gotestruntime.ExportRunTests(func() int { return 0 }, &stderr)
+			var second error
+			gotestruntime.ExportRunTests(func() int {
+				second = gotestruntime.RequireMain()
+				return 0
+			}, &stderr)
+			gotest.ErrorContains(it, second, "already torn down")
+		})
+	})
+}
+
+func (s *TeardownRegistryTestSuite) TestSetupDuringAStop(t *gotest.T) {
+	t.When("a stop has begun", func(w *gotest.T) {
+		w.It("refuses new fixture setup", func(it *gotest.T) {
+			gotestruntime.ExportStartRun()
+			gotest.True(it, gotestruntime.ExportBeginStop())
+			gotest.ErrorContains(it, gotestruntime.RequireMain(), "stopping")
+			_, _, err := gotestruntime.ExportBeginSetup(context.Background())
+			gotest.ErrorContains(it, err, "stopping")
+		})
+	})
+}
+
+func (s *TeardownRegistryTestSuite) TestSetupInFlightAtAStop(t *gotest.T) {
+	t.When("a stop arrives while a setup runs", func(w *gotest.T) {
+		w.It("cancels the setup's context", func(it *gotest.T) {
+			gotestruntime.ExportStartRun()
+			ctx, done, err := gotestruntime.ExportBeginSetup(context.Background())
+			gotest.NoError(it, err)
+			defer done()
+			gotest.NoError(it, ctx.Err())
+			runstate.Stop()
+			gotest.Eventually(it, time.Second, time.Millisecond, func(poll *gotest.R) {
+				gotest.ErrorIs(poll, ctx.Err(), context.Canceled)
+			})
+		})
+	})
+}
+
+func (s *TeardownRegistryTestSuite) TestReleaseBound(t *gotest.T) {
+	t.When("no budget was advertised", func(w *gotest.T) {
+		w.It("allows two minutes", func(it *gotest.T) {
+			gotest.Equal(it, 2*time.Minute, gotestruntime.ExportReleaseBound())
+		})
+	})
+	t.When("both test packages advertised a budget", func(w *gotest.T) {
+		w.It("keeps the larger, and stays inside it, ahead of the runner's kill", func(it *gotest.T) {
+			gotestruntime.ExportRecordBudget(3 * time.Minute)
+			gotest.Equal(it, 3*time.Minute, gotestruntime.ExportRecordBudget(time.Minute))
+			gotest.Equal(it, 3*time.Minute-5*time.Second, gotestruntime.ExportReleaseBound())
+		})
+	})
+}
+
+func (s *TeardownRegistryTestSuite) TestAnOlderHarness(t *gotest.T) {
+	t.When("a harness from before teardown-after-m.Run calls the countdown", func(w *gotest.T) {
+		w.It("names the fix", func(it *gotest.T) {
+			got := gotest.Panics(it, func() { gotestruntime.CountMatchingTests(nil) })
+			gotest.Contains(it, fmt.Sprint(got), "gotest generate")
 		})
 	})
 }

@@ -62,9 +62,12 @@ type headerImport struct {
 }
 
 // renderer renders one package variant. testMainTaken is set when the other
-// variant of the same test binary already carries the TestMain.
+// variant of the same test binary already carries the TestMain;
+// binaryFixtures when either variant of the binary sets fixtures up, so this
+// one renders the panic hooks that release them.
 type renderer struct {
-	testMainTaken bool
+	testMainTaken  bool
+	binaryFixtures bool
 }
 
 // RenderTestSuiteSpec renders the generated test file for pkg. The returned
@@ -86,6 +89,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	hasFixtures := len(resolved.RootFixtures) > 0 || len(sfNodeVMs) > 0
 	setsUpFixtures := emitsFixtureSetup(resolved, sfNodeVMs)
 	emitTestMain := setsUpFixtures && !r.testMainTaken
+	fixtureBinary := setsUpFixtures || r.binaryFixtures
 
 	// Resolved before anything is written: a non-fuzzable argument type is a
 	// generation-time refusal, not a half-written file.
@@ -111,15 +115,15 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 			SkippedTestSuites:   spec.SkippedTestSuites,
 			SkippedTestCases:    spec.SkippedTestCases,
 		}
-		if err := r.renderTestSuites(buf, standaloneSpec, resolved.SuiteSharedFixtures, setsUpFixtures); err != nil {
+		if err := r.renderTestSuites(buf, standaloneSpec, resolved.SuiteSharedFixtures, fixtureBinary); err != nil {
 			return nil, nil, fmt.Errorf("failed rendering test suites. err: %w", err)
 		}
 	}
 
-	if err := r.renderBenchSuites(buf, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields, setsUpFixtures); err != nil {
+	if err := r.renderBenchSuites(buf, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields, fixtureBinary); err != nil {
 		return nil, nil, fmt.Errorf("failed rendering benchmark suites. err: %w", err)
 	}
-	if err := r.renderFuzzSuites(buf, pkg, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields, harvestSeeds, fans); err != nil {
+	if err := r.renderFuzzSuites(buf, pkg, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields, harvestSeeds, fans, fixtureBinary); err != nil {
 		return nil, nil, fmt.Errorf("failed rendering fuzz suites. err: %w", err)
 	}
 
@@ -248,7 +252,7 @@ func (r *renderer) renderBenchSuites(buf *bytes.Buffer, spec SpecOutcome, suiteS
 	})
 }
 
-func (r *renderer) renderFuzzSuites(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*BoundFixture, suiteFixtureFields map[string][]FixtureFieldBinding, harvestSeeds bool, fans *FuzzTargetSet) error { //nolint:gocritic // hugeParam: stable API
+func (r *renderer) renderFuzzSuites(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*BoundFixture, suiteFixtureFields map[string][]FixtureFieldBinding, harvestSeeds bool, fans *FuzzTargetSet, fixturePackage bool) error { //nolint:gocritic // hugeParam: stable API
 	// Reuse the exact same fixture-bound view model gotest.bench.tpl renders
 	// Benchmark<Suite> from, reshaped as a map for O(1) per-suite template lookup.
 	suiteFixtures := make(map[string]*FlatFixtureSuite)
@@ -276,6 +280,7 @@ func (r *renderer) renderFuzzSuites(buf *bytes.Buffer, pkg *packages.Package, sp
 		"HarvestedSeeds":      harvested,
 		"FuzzTargets":         targets,
 		"FuzzFanSource":       fanSource,
+		"FixturePackage":      fixturePackage,
 	})
 }
 

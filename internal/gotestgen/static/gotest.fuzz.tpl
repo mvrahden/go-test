@@ -6,6 +6,9 @@
 func Fuzz{{ $ts.Identifier }}_{{ $fz.Identifier }}(f *testing.F) {
 {{- $fx := index $.SuiteFixtures $ts.Identifier }}
 {{- $sfRefs := index $.SuiteSharedFixtures $ts.Identifier }}
+{{- if $.FixturePackage }}
+  defer gotestruntime.GuardBody(f).End()
+{{- end }}
 {{- if or $fx $sfRefs }}
   ƒ_setupFixtures(f)
 {{- end }}
@@ -32,7 +35,7 @@ func Fuzz{{ $ts.Identifier }}_{{ $fz.Identifier }}(f *testing.F) {
 {{- end }}
 {{- end }}
   ƒlifecycleT := gotest.NewTFromTB(f)
-  f.Cleanup(func() { s.AfterAll(gotest.NewTFromTB(f)) })
+  f.Cleanup(func() { {{ if $.FixturePackage }}defer gotestruntime.NotePanic(); {{ end }}s.AfterAll(gotest.NewTFromTB(f)) })
   s.BeforeAll(ƒlifecycleT)
 {{- $funcName := printf "Fuzz%s_%s" $ts.Identifier $fz.Identifier }}
 {{- /*

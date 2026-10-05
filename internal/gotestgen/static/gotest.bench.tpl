@@ -4,12 +4,10 @@ func Benchmark{{ $ts.Identifier }}(b *testing.B) {
 {{- $fx := index $.SuiteFixtures $ts.Identifier }}
 {{- $sfRefs := index $.SuiteSharedFixtures $ts.Identifier }}
 {{- if $.FixturePackage }}
-  defer gotestruntime.NotePanic()
+  defer gotestruntime.GuardBody(b).End()
 {{- end }}
 {{- if or $fx $sfRefs }}
   ƒ_setupFixtures(b)
-{{- else if $.FixturePackage }}
-  b.Cleanup(gotestruntime.TeardownIfDying)
 {{- end }}
 {{- if $fx }}
   s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{
@@ -34,17 +32,16 @@ func Benchmark{{ $ts.Identifier }}(b *testing.B) {
 {{- end }}
 {{- end }}
   ƒlifecycleT := gotest.NewTFromTB(b)
-  b.Cleanup(func() { s.AfterAll(gotest.NewTFromTB(b)) })
+  b.Cleanup(func() { {{ if $.FixturePackage }}defer gotestruntime.NotePanic(); {{ end }}s.AfterAll(gotest.NewTFromTB(b)) })
   s.BeforeAll(ƒlifecycleT)
 {{ range $bm := $ts.Benchmarks }}
   b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
 {{- if $.FixturePackage }}
 {{- /*
-  A panicking benchmark runs only its own cleanups before the process ends, not
-  its parent's, so the panic-path teardown is registered here as well.
+  A panicking sub-benchmark runs only its own cleanups before the process
+  ends, not its parent's, so it guards itself as well.
 */}}
-    defer gotestruntime.NotePanic()
-    b.Cleanup(gotestruntime.TeardownIfDying)
+    defer gotestruntime.GuardBody(b).End()
 {{- end }}
     b.StopTimer()
     ƒeachT := gotest.NewTFromTB(b)

@@ -47,6 +47,8 @@ var diagnosticFixtures = []string{
 	"withtestmain_ok",
 	"withtestmain_nofixture",
 	"withtestmain_wrapped",
+	"withtestmain_dot",
+	"withtestmain_midrun",
 }
 
 // rewriteFixtures are the packages that additionally pin the rewrite a rule
@@ -62,6 +64,8 @@ var rewriteFixtures = []string{
 	"withtestmain",
 	"withtestmain_alias",
 	"withtestmain_runner",
+	"withtestmain_return",
+	"withtestmain_blank",
 }
 
 func (s *LintTestSuite) TestDiagnostics(t *gotest.T) {

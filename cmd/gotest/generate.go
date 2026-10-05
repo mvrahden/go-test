@@ -31,6 +31,11 @@ func runGenerate(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
+	for _, lr := range loaded {
+		for _, path := range gotestgen.ExcludedTestMains(lr) {
+			fmt.Fprintf(os.Stderr, "note: %s declares TestMain behind a build constraint these tags exclude; generate with the -tags the tests are built with, or the harness and that TestMain will not fit\n", path)
+		}
+	}
 
 	for _, r := range results {
 		if len(r.PTest) > 0 {

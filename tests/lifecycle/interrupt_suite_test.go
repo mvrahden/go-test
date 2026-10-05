@@ -1,12 +1,14 @@
-package canary_test
+package lifecycle_test
 
 import (
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/proctree"
@@ -33,6 +35,7 @@ func (s *InterruptTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func (s *InterruptTestSuite) BeforeAll(t *gotest.T) {
+	sigintForChildren()
 	root, err := filepath.Abs("../..")
 	gotest.NoError(t, err)
 	s.cli, err = testkit.BuildCLI(t.Context(), root, t.TempDir())
@@ -54,6 +57,17 @@ func (s *InterruptTestSuite) AfterAll(t *gotest.T) {
 	for _, f := range generated {
 		_ = os.Remove(f)
 	}
+}
+
+// sigintForChildren makes the children this process starts begin with Go's
+// default SIGINT. A process started with SIGINT ignored — as make runs its
+// recipes — passes that on, and a stop by Ctrl-C would then never reach them;
+// a handled signal is reset across exec. The runtime keeps an inherited
+// ignore on purpose, as nohup intends.
+var sigintOnce sync.Once
+
+func sigintForChildren() {
+	sigintOnce.Do(func() { signal.Notify(make(chan os.Signal, 1), os.Interrupt) })
 }
 
 // ownEnv is this process's environment without the files the runner shares
@@ -78,17 +92,23 @@ func ownEnv() []string {
 // is killed before the test fails, so nothing outlives it; WaitDelay bounds a
 // wait on output pipes a stray grandchild still holds.
 func startTree(t *gotest.T, cmd *exec.Cmd) (tree *proctree.Tree, log string) {
+	return startTreeUntil(t, cmd, "INTERRUPT_LOG", "running")
+}
+
+// startTreeUntil is startTree for a package that logs through logEnv and is
+// ready once it logged marker.
+func startTreeUntil(t *gotest.T, cmd *exec.Cmd, logEnv, marker string) (tree *proctree.Tree, log string) {
 	log = filepath.Join(t.TempDir(), "events")
-	cmd.Env = append(cmd.Env, "INTERRUPT_LOG="+log)
+	cmd.Env = append(cmd.Env, logEnv+"="+log)
 	cmd.Stdout, cmd.Stderr = new(strings.Builder), new(strings.Builder)
 	cmd.WaitDelay = 15 * time.Second
 	tree = proctree.New(cmd)
 	gotest.NoError(t, tree.Start())
-	for deadline := time.Now().Add(30 * time.Second); !slices.Contains(readEvents(log), "running"); time.Sleep(20 * time.Millisecond) {
+	for deadline := time.Now().Add(30 * time.Second); !slices.Contains(readEvents(log), marker); time.Sleep(20 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			_ = tree.Kill()
 			_ = wait(tree, cmd)
-			gotest.Fail(t, "the process never held the fixture:\n%s%s", cmd.Stdout, cmd.Stderr) //nolint:fail-guard // it must kill the tree before failing
+			gotest.Fail(t, "the process never logged %q:\n%s%s", marker, cmd.Stdout, cmd.Stderr) //nolint:fail-guard // it must kill the tree before failing
 		}
 	}
 	return tree, log
@@ -101,9 +121,16 @@ func wait(tree *proctree.Tree, cmd *exec.Cmd) error {
 	return err
 }
 
+// readEvents returns the lines a fixture package logged.
 func readEvents(log string) []string {
 	b, _ := os.ReadFile(log)
-	return strings.Fields(string(b))
+	var lines []string
+	for _, l := range strings.Split(string(b), "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			lines = append(lines, l)
+		}
+	}
+	return lines
 }
 
 // Under the runner an interrupt is a stop request only once the runner

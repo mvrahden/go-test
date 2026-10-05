@@ -143,6 +143,39 @@ func (s *GeneratorTestSuite) TestTestMainOwner(t *gotest.T) {
 			gotest.NotContains(it, string(r.PTest), testMain)
 			gotest.Equal(it, 1, strings.Count(string(r.PXTest), testMain))
 		})
+
+		// The fixtures live in the binary, not in one package: a panic in the
+		// internal package must release what the external one set up.
+		w.It("guards the internal package's suites too", func(it *gotest.T) {
+			r := gen(it, "testdata_e2e/testmain_xonly")
+			gotest.Contains(it, string(r.PTest), "defer gotestruntime.GuardBody(t).End()")
+		})
+	})
+}
+
+// gotest generate writes the harness for one set of build tags; a TestMain
+// those tags exclude is named, since the harness would not fit it.
+func (s *GeneratorTestSuite) TestExcludedTestMains(t *gotest.T) {
+	cwd, err := os.Getwd()
+	gotest.NoError(t, err)
+	dir := filepath.Join(cwd, "testdata", "testmain_tagged")
+
+	t.When("the tags exclude the file holding the TestMain", func(w *gotest.T) {
+		w.It("names it", func(it *gotest.T) {
+			loaded, _, err := gotestgen.LoadPackages([]string{dir}, nil)
+			gotest.NoError(it, err)
+			gotest.Len(it, loaded, 1)
+			gotest.Equal(it, []string{filepath.Join(dir, "main_integration_test.go")}, gotestgen.ExcludedTestMains(loaded[0]))
+		})
+	})
+
+	t.When("the tags include it", func(w *gotest.T) {
+		w.It("names nothing", func(it *gotest.T) {
+			loaded, _, err := gotestgen.LoadPackages([]string{dir}, []string{"-tags=integration"})
+			gotest.NoError(it, err)
+			gotest.Len(it, loaded, 1)
+			gotest.Empty(it, gotestgen.ExcludedTestMains(loaded[0]))
+		})
 	})
 }
 

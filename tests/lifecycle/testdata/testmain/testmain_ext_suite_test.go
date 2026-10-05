@@ -2,7 +2,7 @@ package testmain_test
 
 import (
 	"github.com/mvrahden/go-test/pkg/gotest"
-	"github.com/mvrahden/go-test/tests/canary/testdata/testmain"
+	"github.com/mvrahden/go-test/tests/lifecycle/testdata/testmain"
 )
 
 // ExtTestSuite binds the fixture from the external test package, which shares

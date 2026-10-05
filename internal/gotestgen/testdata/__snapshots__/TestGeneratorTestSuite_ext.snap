@@ -74,11 +74,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestAppTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_AppTestSuite{
@@ -264,11 +263,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestMultiFixtureTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_MultiFixtureTestSuite{
@@ -314,7 +312,7 @@ func TestMultiFixtureTestSuite(t *testing.T) {
 }
 
 func TestServiceTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_ServiceTestSuite{
@@ -652,11 +650,10 @@ func ƒ_setupFixtures(t testing.TB) {
 	}); err != nil {
 		t.Fatalf("fixture setup: %v", err)
 	}
-	t.Cleanup(gotestruntime.TeardownIfDying)
 }
 
 func TestGuardedFixtureBoundTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
+	defer gotestruntime.GuardBody(t).End()
 	ƒ_setupFixtures(t)
 
 	s := &ƒƒ_GOTEST_GuardedFixtureBoundTestSuite{
@@ -703,8 +700,7 @@ func (ts *ƒƒ_GOTEST_GuardedTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_GuardedTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestGuardedTestSuite(t *testing.T) {
-	defer gotestruntime.NotePanic()
-	t.Cleanup(gotestruntime.TeardownIfDying)
+	defer gotestruntime.GuardBody(t).End()
 	s := &ƒƒ_GOTEST_GuardedTestSuite{}
 	if ƒreason := s.GuardedTestSuite.SuiteGuard(); ƒreason != "" {
 		t.Skipf("suite guard: %s", ƒreason)

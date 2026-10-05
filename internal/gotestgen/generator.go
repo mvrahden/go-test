@@ -3,6 +3,8 @@ package gotestgen
 import (
 	"fmt"
 	"go/ast"
+	"go/parser"
+	"go/token"
 	"maps"
 	"path/filepath"
 	"sort"
@@ -322,13 +324,34 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		// tests through the runtime is checked where it can be known exactly:
 		// at run time, by gotestruntime.RequireMain.
 		hasUserMain := findUserTestMain(lr)
-		ptestBuf, ptestFixtureDeps, ptestReqKeys, ptestSetsUp, err := generateForPkg(lr.Ptest, lr.sources, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, hasUserMain)
+		ptestBind, err := bindForPkg(lr.Ptest, lr.sources, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures)
 		if err != nil {
 			return nil, locate(lr.Ptest, err)
 		}
-		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, _, err := generateForPkg(lr.Pxtest, lr.sources, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, hasUserMain || ptestSetsUp)
+		pxtestBind, err := bindForPkg(lr.Pxtest, lr.sources, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures)
 		if err != nil {
 			return nil, locate(lr.Pxtest, err)
+		}
+		// The fixture registry is per test binary: a panic in either variant
+		// must release what the other set up, so both render the hooks when
+		// either sets fixtures up.
+		ptestSetsUp := ptestBind != nil && ptestBind.setsUp
+		binaryFixtures := ptestSetsUp || (pxtestBind != nil && pxtestBind.setsUp)
+		ptestBuf, err := renderForPkg(renderer{testMainTaken: hasUserMain, binaryFixtures: binaryFixtures}, lr.Ptest, ptestSpec, ptestBind, harvestSeeds, fuzzParams)
+		if err != nil {
+			return nil, locate(lr.Ptest, err)
+		}
+		pxtestBuf, err := renderForPkg(renderer{testMainTaken: hasUserMain || ptestSetsUp, binaryFixtures: binaryFixtures}, lr.Pxtest, pxtestSpec, pxtestBind, harvestSeeds, fuzzParams)
+		if err != nil {
+			return nil, locate(lr.Pxtest, err)
+		}
+		var ptestFixtureDeps, pxtestFixtureDeps []string
+		var ptestReqKeys, pxtestReqKeys map[string][]string
+		if ptestBind != nil {
+			ptestFixtureDeps, ptestReqKeys = ptestBind.fixtureDeps, ptestBind.suiteReqKeys
+		}
+		if pxtestBind != nil {
+			pxtestFixtureDeps, pxtestReqKeys = pxtestBind.fixtureDeps, pxtestBind.suiteReqKeys
 		}
 
 		seen := map[string]bool{}
@@ -481,21 +504,24 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 	return results, allSharedFixtures, nil
 }
 
-// generateForPkg renders one package variant. fuzzParams is filled in place
-// with the corpus shape of every fuzz target the variant declares, so the
-// internal and external variants of the same package accumulate into one map.
-//
-// testMainTaken tells it the binary's TestMain is already declared elsewhere;
-// setsUpFixtures reports whether this variant sets fixtures up, and so emitted
-// the TestMain unless it was taken.
-func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo, harvestSeeds bool, fuzzParams map[string][]string, testMainTaken bool) (buf []byte, fixtureDeps []string, suiteReqKeys map[string][]string, setsUpFixtures bool, err error) { //nolint:gocritic // hugeParam: stable API
+// variantBinding is one package variant bound to its fixtures, ready to render.
+type variantBinding struct {
+	resolved     *Binding
+	fixtureDeps  []string
+	suiteReqKeys map[string][]string
+	setsUp       bool // the variant renders ƒ_setupFixtures
+}
+
+// bindForPkg binds one package variant's suites to their fixtures. sharedSeen
+// and allShared accumulate the shared fixtures across variants.
+func bindForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo) (*variantBinding, error) { //nolint:gocritic // hugeParam: stable API
 	if pkg == nil || len(spec.EffectiveTestSuites) == 0 {
-		return nil, nil, nil, false, nil
+		return nil, nil
 	}
 
 	resolved, err := bind(pkg, sources, spec.EffectiveTestSuites, collected.Fixtures)
 	if err != nil {
-		return nil, nil, nil, false, err
+		return nil, err
 	}
 
 	for i := range resolved.RequiredSharedFixtures {
@@ -506,39 +532,49 @@ func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutco
 		}
 	}
 
+	vb := &variantBinding{resolved: resolved}
 	for id, refs := range resolved.SuiteSharedFixtures {
 		if len(refs) > 0 {
-			fixtureDeps = append(fixtureDeps, "Test"+id)
+			vb.fixtureDeps = append(vb.fixtureDeps, "Test"+id)
 		}
 	}
 	if fixtureTreeHasSharedFixtures(resolved.RootFixtures) {
-		seen := make(map[string]bool, len(fixtureDeps))
-		for _, d := range fixtureDeps {
+		seen := make(map[string]bool, len(vb.fixtureDeps))
+		for _, d := range vb.fixtureDeps {
 			seen[d] = true
 		}
 		for _, ts := range resolved.FixtureBound {
 			name := "Test" + ts.Identifier()
 			if !seen[name] {
-				fixtureDeps = append(fixtureDeps, name)
+				vb.fixtureDeps = append(vb.fixtureDeps, name)
 			}
 		}
 	}
 
 	// Convert suite-identifier-keyed required keys to test-func-name-keyed.
 	if len(resolved.SuiteRequiredSharedFixtureKeys) > 0 {
-		suiteReqKeys = make(map[string][]string, len(resolved.SuiteRequiredSharedFixtureKeys))
+		vb.suiteReqKeys = make(map[string][]string, len(resolved.SuiteRequiredSharedFixtureKeys))
 		for suiteID, keys := range resolved.SuiteRequiredSharedFixtureKeys {
-			suiteReqKeys["Test"+suiteID] = keys
+			vb.suiteReqKeys["Test"+suiteID] = keys
 		}
 	}
+	vb.setsUp = emitsFixtureSetup(resolved, buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures))
+	return vb, nil
+}
 
-	r := renderer{testMainTaken: testMainTaken}
-	buf, fans, err := r.RenderTestSuiteSpec(pkg, spec, resolved, harvestSeeds)
+// renderForPkg renders one bound package variant. fuzzParams is filled in
+// place with the corpus shape of every fuzz target the variant declares, so
+// the internal and external variants of the same package accumulate into one
+// map.
+func renderForPkg(r renderer, pkg *packages.Package, spec SpecOutcome, vb *variantBinding, harvestSeeds bool, fuzzParams map[string][]string) ([]byte, error) { //nolint:gocritic // hugeParam: stable API
+	if vb == nil {
+		return nil, nil
+	}
+	buf, fans, err := r.RenderTestSuiteSpec(pkg, spec, vb.resolved, harvestSeeds)
 	if fans != nil {
 		maps.Copy(fuzzParams, fans.ParamsByFunc)
 	}
-	setsUpFixtures = emitsFixtureSetup(resolved, buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures))
-	return buf, fixtureDeps, suiteReqKeys, setsUpFixtures, err
+	return buf, err
 }
 
 // findUserTestMain reports whether the developer declared a TestMain in
@@ -548,11 +584,41 @@ func findUserTestMain(lr *LoadResult) bool {
 		if pkg == nil {
 			continue
 		}
-		if fd, _ := gotestast.FindTestMain(pkg.Syntax); fd != nil {
+		if fd, _ := gotestast.FindTestMain(pkg.Fset, pkg.Syntax); fd != nil {
 			return true
 		}
 	}
 	return false
+}
+
+// ExcludedTestMains lists the test files of lr that declare a TestMain but
+// were left out by the build constraints generation ran under. The harness
+// decides whether to declare a TestMain of its own from the files it sees, so
+// one written for other tags than the tests are built with collides with that
+// TestMain, or lacks one.
+func ExcludedTestMains(lr *LoadResult) []string {
+	var found []string
+	seen := map[string]bool{}
+	for _, pkg := range []*packages.Package{lr.Ptest, lr.Pxtest} {
+		if pkg == nil {
+			continue
+		}
+		for _, path := range pkg.IgnoredFiles {
+			if seen[path] || !strings.HasSuffix(path, "_test.go") {
+				continue
+			}
+			seen[path] = true
+			fset := token.NewFileSet()
+			f, err := parser.ParseFile(fset, path, nil, parser.ParseComments|parser.SkipObjectResolution)
+			if err != nil {
+				continue
+			}
+			if fd, _ := gotestast.FindTestMain(fset, []*ast.File{f}); fd != nil {
+				found = append(found, path)
+			}
+		}
+	}
+	return found
 }
 
 func fixtureTreeHasSharedFixtures(roots []*BoundFixture) bool {

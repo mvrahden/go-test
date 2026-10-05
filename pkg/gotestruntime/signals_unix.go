@@ -1,19 +1,27 @@
-//go:build !windows
+//go:build unix
 
 package gotestruntime
 
 import (
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 )
 
 var stopSignals = []os.Signal{syscall.SIGTERM}
 
-// ignoreBrokenPipe keeps writes to a reader that already exited (test2json
-// receives the same signal) from killing the process mid-teardown.
-func ignoreBrokenPipe() { signal.Ignore(syscall.SIGPIPE) }
+var pipeOnce sync.Once
+
+// notePipe keeps a write to a reader that already exited — test2json ends on
+// the runner's group SIGTERM before this process does — from killing the
+// process: with SIGPIPE delivered to a channel, Go returns EPIPE instead.
+// Unlike an ignored SIGPIPE, a handled one is reset across exec, so processes a
+// test starts keep the default.
+func notePipe() {
+	pipeOnce.Do(func() { signal.Notify(make(chan os.Signal, 1), syscall.SIGPIPE) })
+}
 
 // reraise ends the process by sig, so it reports what it would have without
 // the teardown. A process started with sig ignored gets that back from Reset

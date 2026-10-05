@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"runtime/debug"
 
-	"github.com/mvrahden/go-test/internal/dying"
+	"github.com/mvrahden/go-test/internal/runstate"
 )
 
 // capturedPanic carries a panic across a boundary the runtime cannot cross on
@@ -48,10 +48,27 @@ func capturedFrom(v any, where string) *capturedPanic {
 
 // notePanic marks the process as dying when a panic passes, then lets it go on;
 // fixture teardown reads the mark. Defer it directly, and only in a function
-// the testing package calls: below that, user code may still recover.
+// the testing package calls: below that, user code may still recover. Under
+// GODEBUG=panicnil=1 it does not recover at all, so panic(nil) is never
+// swallowed.
 func notePanic() {
+	if runstate.PanicNilLegacy {
+		return
+	}
 	if r := recover(); r != nil {
-		dying.Mark()
+		runstate.MarkDying(r, debug.Stack())
+		panic(r)
+	}
+}
+
+// noteFuzzPanic is notePanic for a fuzz body. While fuzzing, Go recovers a
+// panicking input in the worker and keeps fuzzing, so a worker is not dying.
+func noteFuzzPanic() {
+	if runstate.PanicNilLegacy || runstate.FuzzWorker() {
+		return
+	}
+	if r := recover(); r != nil {
+		runstate.MarkDying(r, debug.Stack())
 		panic(r)
 	}
 }

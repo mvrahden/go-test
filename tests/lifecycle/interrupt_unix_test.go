@@ -1,6 +1,6 @@
 //go:build !windows
 
-package canary_test
+package lifecycle_test
 
 import (
 	"errors"
@@ -33,6 +33,22 @@ func (s *InterruptTestSuite) TestCtrlCReleasesTheFixture(t *gotest.T) {
 	tree, log := startTree(t, cmd)
 
 	gotest.NoError(t, cmd.Process.Signal(os.Interrupt))
+	err := wait(tree, cmd)
+
+	gotest.Equal(t, []string{"setup", "running", "teardown"}, readEvents(log))
+	gotest.True(t, stoppedFromOutside(err), "the process still ends by the signal: %v", err)
+}
+
+// go test -fuzz runs the ordinary tests first; Go's fuzzing engine takes over
+// Ctrl-C only once it has the target. Until then the runtime releases the
+// fixtures as in any run.
+func (s *InterruptTestSuite) TestCtrlCBeforeFuzzingReleasesTheFixture(t *gotest.T) {
+	cmd := exec.Command(s.binary, "-test.fuzz=FuzzFuzzingTestSuite_FuzzSpins", "-test.fuzztime=60s", "-test.fuzzcachedir="+t.TempDir()) //nolint:gosec // G204: binary built by this suite
+	cmd.Env = ownEnv()
+	tree, log := startTree(t, cmd)
+	tree.InterruptLikeCtrlC()
+
+	gotest.NoError(t, tree.Interrupt())
 	err := wait(tree, cmd)
 
 	gotest.Equal(t, []string{"setup", "running", "teardown"}, readEvents(log))

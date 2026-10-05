@@ -1,10 +1,11 @@
-package canary_test
+package lifecycle_test
 
 import (
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -49,6 +50,8 @@ var testMainPackages = []string{
 	"./testdata/usermain/run/",
 	"./testdata/usermain/wrapped/",
 	"./testdata/usermain/twice/",
+	"./testdata/slowteardown/",
+	"./testdata/panics/",
 }
 
 // goTest runs go test on testdata/testmain and returns its exit code, its
@@ -58,9 +61,13 @@ func goTest(t *gotest.T, env []string, args ...string) (code int, out string, ev
 }
 
 func goTestIn(t *gotest.T, dir string, env []string, args ...string) (code int, out string, events []string) {
+	return goTestLog(t, dir, "TESTMAIN_LOG", env, args...)
+}
+
+func goTestLog(t *gotest.T, dir, logEnv string, env []string, args ...string) (code int, out string, events []string) {
 	log := filepath.Join(t.TempDir(), "events")
 	cmd := exec.Command("go", append(append([]string{"test", "-count=1", "-v"}, args...), dir)...) //nolint:gosec // G204: fixed args
-	cmd.Env = append(append(ownEnv(), "TESTMAIN_LOG="+log), env...)
+	cmd.Env = append(append(ownEnv(), logEnv+"="+log), env...)
 	raw, err := cmd.CombinedOutput()
 	if err != nil {
 		exit := gotest.ErrorAs[*exec.ExitError](t, err)
@@ -155,4 +162,38 @@ func (s *TestMainTestSuite) TestAPanickingBenchmarkStillReleasesTheFixture(t *go
 	gotest.NotEqual(t, 0, code, "exit 0 after a panic\n%s", out)
 	gotest.Contains(t, out, "panic: benchmark panic")
 	gotest.Equal(t, []string{"setup", "teardown"}, events)
+}
+
+// m.Run stopped its -test.timeout alarm when it returned; a teardown that runs
+// longer is held to the same deadline, the way the alarm would have.
+func (s *TestMainTestSuite) TestATeardownIsHeldToTheTestTimeout(t *gotest.T) {
+	began := time.Now()
+	code, out, _ := goTestIn(t, "./testdata/slowteardown/", nil, "-timeout=3s")
+	gotest.NotEqual(t, 0, code, out)
+	gotest.Contains(t, out, "test timed out")
+	gotest.Less(t, time.Since(began), 25*time.Second, "the teardown ran to its end")
+}
+
+// A panic releases the fixture wherever it happens: in a subtest or cleanup
+// gotest did not make, on the fuzz or benchmark path, or in the other test
+// package of the binary. The panic is printed before the fixtures go.
+func (s *TestMainTestSuite) TestEveryPanicReleasesTheFixture(t *gotest.T) {
+	for t, tc := range gotest.Each(t, []struct {
+		Desc     string
+		scenario string
+		args     []string
+		value    string
+	}{
+		{"a raw subtest", "raw", []string{"-run", "TestRawTestSuite"}, "raw subtest panic"},
+		{"a user cleanup", "cleanup", []string{"-run", "TestCleanupTestSuite"}, "cleanup panic"},
+		{"BeforeAll on the fuzz path", "fuzzbeforeall", []string{"-run", "FuzzFuzzSetupTestSuite_FuzzInput"}, "fuzz BeforeAll panic"},
+		{"AfterAll on the benchmark path", "benchafterall", []string{"-run", "^$", "-bench", "BenchmarkBenchTeardownTestSuite", "-benchtime=1x"}, "bench AfterAll panic"},
+		{"a suite in the external test package", "xtest", []string{"-run", "TestRawTestSuite|TestStandaloneTestSuite"}, "external package panic"},
+	}) {
+		code, out, events := goTestLog(t, "./testdata/panics/", "PANICS_LOG", []string{"PANICS=" + tc.scenario}, tc.args...)
+		gotest.NotEqual(t, 0, code, out)
+		gotest.Contains(t, out, tc.value)
+		gotest.Contains(t, out, "releasing fixtures before the process ends")
+		gotest.Equal(t, []string{"setup", "teardown"}, events, out)
+	}
 }

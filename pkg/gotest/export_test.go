@@ -3,7 +3,7 @@ package gotest
 import (
 	"context"
 
-	"github.com/mvrahden/go-test/internal/dying"
+	"github.com/mvrahden/go-test/internal/runstate"
 )
 
 func ExportTCtx(t *T) context.Context { return t.ctx }
@@ -30,5 +30,5 @@ func ExportMatchSnapshotFromPtest(t testingT, value any) { MatchSnapshot(t, valu
 func ExportExecTestFn(fn func(*T), it *T) { execTestFn(fn, it) }
 
 // ExportDying reports the dying mark; ExportResetDying clears it.
-func ExportDying() bool { return dying.Marked() }
-func ExportResetDying() { dying.Reset() }
+func ExportDying() bool { return runstate.Dying() }
+func ExportResetDying() { runstate.Reset() }

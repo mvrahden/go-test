@@ -1,6 +1,6 @@
 //go:build windows
 
-package canary_test
+package lifecycle_test
 
 import (
 	"errors"

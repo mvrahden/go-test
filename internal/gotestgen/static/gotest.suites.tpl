@@ -17,12 +17,10 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
 func Test{{ $ts.Identifier }}(t *testing.T) {
 {{- $sfRefs := index $.SuiteSharedFixtures $ts.Identifier }}
 {{- if $.FixturePackage }}
-  defer gotestruntime.NotePanic()
+  defer gotestruntime.GuardBody(t).End()
 {{- end }}
 {{- if $sfRefs }}
   ƒ_setupFixtures(t)
-{{- else if $.FixturePackage }}
-  t.Cleanup(gotestruntime.TeardownIfDying)
 {{- end }}
   s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
 {{- if $sfRefs }}

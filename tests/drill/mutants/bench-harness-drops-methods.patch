@@ -2,16 +2,16 @@ Expect: benching: exit code 2, want 0
 Expect: benching: results \[BenchmarkContext BenchmarkSecond\]
 --- a/internal/gotestgen/static/gotest.bench.tpl
 +++ b/internal/gotestgen/static/gotest.bench.tpl
-@@ -36,7 +36,7 @@
+@@ -34,7 +34,7 @@
    ƒlifecycleT := gotest.NewTFromTB(b)
-   b.Cleanup(func() { s.AfterAll(gotest.NewTFromTB(b)) })
+   b.Cleanup(func() { {{ if $.FixturePackage }}defer gotestruntime.NotePanic(); {{ end }}s.AfterAll(gotest.NewTFromTB(b)) })
    s.BeforeAll(ƒlifecycleT)
 -{{ range $bm := $ts.Benchmarks }}
 +{{ range $i, $bm := $ts.Benchmarks }}{{ if ne $i 0 }}
    b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
  {{- if $.FixturePackage }}
  {{- /*
-@@ -55,7 +55,7 @@
+@@ -52,7 +52,7 @@
      b.StopTimer()
      s.AfterEach(ƒeachT)
    })

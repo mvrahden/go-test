@@ -2,7 +2,9 @@ package gotestast
 
 import (
 	"go/ast"
+	"go/token"
 	"strconv"
+	"strings"
 
 	"github.com/mvrahden/go-test/internal/about"
 )
@@ -18,20 +20,53 @@ const (
 const runtimePkgPath = about.Repo + "/pkg/gotestruntime"
 
 // FindTestMain returns the TestMain the developer wrote among files, and the
-// file holding it. Generated files are skipped: a harness left on disk by
-// gotest generate carries a TestMain of its own.
-func FindTestMain(files []*ast.File) (*ast.FuncDecl, *ast.File) {
+// file holding it: a func(*testing.M) named TestMain in a _test.go file, which
+// is what go test runs. A harness gotest generated is skipped, since a stale
+// one on disk carries a TestMain of its own; a file another generator wrote is
+// the developer's as far as go test is concerned.
+func FindTestMain(fset *token.FileSet, files []*ast.File) (*ast.FuncDecl, *ast.File) {
 	for _, f := range files {
-		if ast.IsGenerated(f) {
+		if !strings.HasSuffix(fset.Position(f.Package).Filename, "_test.go") || IsGotestHarness(f) {
 			continue
 		}
 		for _, decl := range f.Decls {
-			if fd, ok := decl.(*ast.FuncDecl); ok && fd.Recv == nil && fd.Name.Name == "TestMain" {
+			if fd, ok := decl.(*ast.FuncDecl); ok && fd.Recv == nil && fd.Name.Name == "TestMain" && takesTestingM(fd) {
 				return fd, f
 			}
 		}
 	}
 	return nil, nil
+}
+
+// IsGotestHarness reports whether f carries the header of a harness gotest
+// generated.
+func IsGotestHarness(f *ast.File) bool {
+	for _, cg := range f.Comments {
+		if cg.Pos() >= f.Package {
+			break
+		}
+		for _, c := range cg.List {
+			if GEN_TESTSUITE_FILE.MatchString(c.Text) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// takesTestingM reports whether fd has the single *testing.M parameter go test
+// requires of a TestMain, under whatever name the file imports testing as.
+func takesTestingM(fd *ast.FuncDecl) bool {
+	params := fd.Type.Params.List
+	if len(params) != 1 || len(params[0].Names) > 1 {
+		return false
+	}
+	star, ok := params[0].Type.(*ast.StarExpr)
+	if !ok {
+		return false
+	}
+	sel, ok := star.X.(*ast.SelectorExpr)
+	return ok && sel.Sel.Name == "M"
 }
 
 // RoutesThroughRuntime reports whether the TestMain fd, declared in file,
@@ -43,16 +78,20 @@ func RoutesThroughRuntime(file *ast.File, fd *ast.FuncDecl) bool {
 		return false
 	}
 	names := map[string]bool{}
+	dot := false
 	for _, imp := range file.Imports {
 		path, err := strconv.Unquote(imp.Path.Value)
 		if err != nil || path != runtimePkgPath {
 			continue
 		}
-		name := "gotestruntime"
-		if imp.Name != nil {
-			name = imp.Name.Name
+		switch {
+		case imp.Name == nil:
+			names["gotestruntime"] = true
+		case imp.Name.Name == ".":
+			dot = true
+		case imp.Name.Name != "_":
+			names[imp.Name.Name] = true
 		}
-		names[name] = true
 	}
 	found := false
 	ast.Inspect(fd.Body, func(n ast.Node) bool {
@@ -60,12 +99,15 @@ func RoutesThroughRuntime(file *ast.File, fd *ast.FuncDecl) bool {
 		if !ok || found {
 			return !found
 		}
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok || (sel.Sel.Name != "Main" && sel.Sel.Name != "M") {
-			return true
-		}
-		if id, ok := sel.X.(*ast.Ident); ok && names[id.Name] {
-			found = true
+		switch fn := call.Fun.(type) {
+		case *ast.SelectorExpr:
+			if id, ok := fn.X.(*ast.Ident); ok && names[id.Name] && (fn.Sel.Name == "Main" || fn.Sel.Name == "M") {
+				found = true
+			}
+		case *ast.Ident:
+			if dot && (fn.Name == "Main" || fn.Name == "M") {
+				found = true
+			}
 		}
 		return !found
 	})
