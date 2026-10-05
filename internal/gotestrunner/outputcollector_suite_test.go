@@ -106,6 +106,18 @@ func (s *OutputCollectorTestSuite) TestOutputCollector(t *gotest.T) {
 				"the status the binary never chose belongs in the output, named")
 		})
 
+		w.It("registers a binary the race detector failed as a failure", func(it *gotest.T) {
+			var stdout, stderr bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &stderr))
+			c.Register("example.com/race", 1)
+			// -race reports a race it found after the last test — in fixture
+			// teardown, after m.Run — by exiting 66, outside the run's codes.
+			c.RecordResult("example.com/race", 0, gotestrunner.SuiteResult{ExitCode: 66})
+			gotest.True(it, c.AnyFailed())
+			gotest.Equal(it, 1, c.WorstExitCode(), "66 must not become the run's exit code")
+			gotest.Contains(it, stdout.String()+stderr.String(), "race detector")
+		})
+
 		w.It("books a failed compile as a failed package", func(it *gotest.T) {
 			var stdout, stderr bytes.Buffer
 			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &stderr))
@@ -449,6 +461,11 @@ func (s *OutputCollectorTestSuite) TestOutputFormatting(t *gotest.T) {
 				Name:   "strips trailing PASS",
 				input:  "=== RUN   TestFoo\n--- PASS: TestFoo (0.00s)\nPASS\n",
 				expect: "=== RUN   TestFoo\n--- PASS: TestFoo (0.00s)\n",
+			},
+			{
+				Name:   "strips the status that fixture teardown wrote after",
+				input:  "--- PASS: TestFoo (0.00s)\nPASS\nreleasing the pool\n",
+				expect: "--- PASS: TestFoo (0.00s)\nreleasing the pool\n",
 			},
 			{
 				Name:   "strips trailing FAIL",

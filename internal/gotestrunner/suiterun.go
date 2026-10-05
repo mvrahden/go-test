@@ -277,15 +277,19 @@ func readTeardownBudget(path string) time.Duration {
 	return d
 }
 
+// StripTrailingStatus removes the binary's own PASS or FAIL status line, which
+// the runner reprints per package. It is the last such line, not necessarily
+// the last line: fixture teardown runs after m.Run printed it and may write.
 func StripTrailingStatus(data []byte) []byte {
-	s := bytes.TrimRight(data, "\n")
-	idx := bytes.LastIndex(s, []byte("\n"))
-	if idx < 0 {
-		return nil
-	}
-	lastLine := string(s[idx+1:])
-	if lastLine == "PASS" || lastLine == "FAIL" {
-		return s[:idx+1]
+	lines := bytes.SplitAfter(data, []byte("\n"))
+	for i := len(lines) - 1; i >= 0; i-- {
+		if line := string(bytes.TrimRight(lines[i], "\n")); line == "PASS" || line == "FAIL" {
+			rest := lines[i+1:]
+			if len(bytes.TrimSpace(bytes.Join(rest, nil))) == 0 {
+				rest = nil // only blank lines followed the status
+			}
+			return bytes.Join(append(lines[:i:i], rest...), nil)
+		}
 	}
 	return data
 }

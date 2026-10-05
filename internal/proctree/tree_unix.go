@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build unix
 
 package proctree
 
@@ -33,9 +33,15 @@ func (sysTree) release() {}
 
 // alive reports whether any process of the group led by pid is left. The
 // group's id is not reused while it has a member, so probing it after the
-// root was reaped reaches no stranger.
+// root was reaped reaches no stranger. A member that exited but was never
+// reaped — a container whose PID 1 does not reap — still answers the probe,
+// so where the system can say, a group of zombies only is not alive.
 func (sysTree) alive(pid int) bool {
-	return !errors.Is(syscall.Kill(-pid, 0), syscall.ESRCH)
+	if errors.Is(syscall.Kill(-pid, 0), syscall.ESRCH) {
+		return false
+	}
+	live, known := groupHasLiveMember(pid)
+	return !known || live
 }
 
 // signalGroup signals the process group led by pid.
