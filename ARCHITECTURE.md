@@ -214,7 +214,10 @@ at most once per test binary:
 var ƒ_fixtureOnce gotestruntime.FixtureOnce
 var ƒ_fixtureDAG *gotestruntime.FixtureDAG
 
-func ƒ_setupFixtures(t *testing.T) {
+func ƒ_setupFixtures(t testing.TB) {
+    if err := gotestruntime.RequireMain(); err != nil {
+        t.Fatal(err)                   // not run through Main/M, or stopping
+    }
     if err := ƒ_fixtureOnce.Do(func() error {
         // Fixtures is a flat list with DependsOn edges forming a DAG.
         // 1. Read shared fixture state (if needed)
@@ -224,28 +227,42 @@ func ƒ_setupFixtures(t *testing.T) {
         // 3. BeforeAll on each fixture (retries, timeout)
         // 4. Compute teardown budget → write budget file
         var err error
-        ƒ_fixtureDAG, err = gotestruntime.SetupFixtureDAG(ctx, cfg)
+        ƒ_fixtureDAG, err = gotestruntime.SetupFixtureDAG(context.Background(), cfg)
+        if err == nil {
+            gotestruntime.RegisterTeardown(ƒ_fixtureDAG.Teardown)
+        }
         return err
     }); err != nil {
         t.Fatalf("fixture setup: %v", err)
     }
-    t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
 }
 
 func TestQueryTestSuite(t *testing.T) {
+    defer gotestruntime.GuardBody(t).End() // first: releases on a panic
     ƒ_setupFixtures(t)      // idempotent — DAG setup runs at most once
     s := &ƒƒ_GOTEST_QueryTestSuite{...}
-    // ... suite lifecycle (same as standalone) ...
+    // ... suite lifecycle (same as standalone; each method closure
+    //     defers gotestruntime.NotePanic() first) ...
 }
+
+func TestMain(m *testing.M) { os.Exit(gotestruntime.Main(m)) }
 ```
 
 A package that binds fixtures gets one `TestMain` per test binary,
 `os.Exit(gotestruntime.Main(m))`: in `package foo` when it binds fixtures,
 else in `package foo_test`. Both variants register their DAG's teardown
 with the runtime, and `Main` runs it once `m.Run()` returns
-(reverse-wavefront: leaves first, roots last). A panicking test never
-returns from `m.Run`; the cleanup `ƒ_setupFixtures` registers releases the
-DAG on that path, after the suite's `AfterAll`. A developer's own
+(reverse-wavefront: leaves first, roots last), held to the remaining
+`-test.timeout`. A panicking test never returns from `m.Run`: the guard each
+top-level function starts with releases the DAGs in its cleanup, which runs
+after the suite's `AfterAll`, when a panic passed a gotest hook or the body
+had not ended — the testing package runs ancestors' cleanups while their
+bodies are still blocked in `t.Run`. In a binary that sets fixtures up, every
+top-level function of both variants is guarded. `Main` also owns the stop
+watcher for exactly as long as it runs: a stop cancels the contexts of tests
+and of fixture setup (`internal/runstate`), waits for setup in flight,
+releases the DAGs within the advertised budget, and ends the process by the
+signal. A developer's own
 `TestMain` runs the tests through `gotestruntime.Main(m)`, or hands
 `gotestruntime.M(m)` to a library that runs them. Main and M mark the run;
 `ƒ_setupFixtures` calls `gotestruntime.RequireMain` first and fails the test
