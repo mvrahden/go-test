@@ -262,14 +262,15 @@ func runDehydrate(node *FixtureNode) (failed bool) {
 	return false
 }
 
+// writeBudgetFile advertises how long this process may take to release its
+// fixtures: the largest over every DAG it set up, so the DAG of the other test
+// package does not shrink it.
 func writeBudgetFile(cfg MainConfig) {
-	path := os.Getenv(protocol.EnvTeardownBudgetFile)
-	if path == "" {
+	budget := recordBudget(computeMaxDAGPath(cfg.Fixtures) + cfg.MaxSuiteSetupTimeout + 30*time.Second)
+	if budgetFile == "" {
 		return
 	}
-
-	budget := computeMaxDAGPath(cfg.Fixtures) + cfg.MaxSuiteSetupTimeout + 30*time.Second
-	_ = os.WriteFile(path, []byte(budget.String()), 0600)
+	_ = os.WriteFile(budgetFile, []byte(budget.String()), 0600)
 }
 
 func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
@@ -357,6 +358,20 @@ func (t *nodeTracker) isSucceeded(node *FixtureNode) bool {
 }
 
 func SetupFixtureDAG(ctx context.Context, cfg MainConfig) (*FixtureDAG, error) {
+	return setupFixtureDAG(ctx, cfg, nil)
+}
+
+// setupFixtureDAG sets the DAG up and hands it to up, if given, while the
+// setup still counts as in flight: a stop that waits for setups then finds
+// the DAG to release.
+func setupFixtureDAG(ctx context.Context, cfg MainConfig, up func(*FixtureDAG)) (*FixtureDAG, error) {
+	// A stop cancels setup in flight and waits for it; a canceled setup tears
+	// down what came up.
+	ctx, done, err := beginSetup(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
 	tracker := &nodeTracker{succeeded: make(map[*FixtureNode]bool)}
 
 	var sharedState map[string]json.RawMessage
@@ -379,7 +394,11 @@ func SetupFixtureDAG(ctx context.Context, cfg MainConfig) (*FixtureDAG, error) {
 
 	writeBudgetFile(cfg)
 
-	return &FixtureDAG{cfg: cfg, tracker: tracker}, nil
+	dag := &FixtureDAG{cfg: cfg, tracker: tracker}
+	if up != nil {
+		up(dag)
+	}
+	return dag, nil
 }
 
 func (d *FixtureDAG) Teardown() bool {

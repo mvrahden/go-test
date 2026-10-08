@@ -16,20 +16,26 @@ import (
 //
 // The testing package runs that cleanup when a test or subtest below tb
 // panics, too. A panicking sub-benchmark is the exception: see ReleaseOnPanic.
+// While the hold lasts, a stop (Ctrl-C, or one the runner announces) releases
+// the fixtures and ends the process by its signal.
 func HoldFixtures(tb testing.TB, build func() MainConfig) {
 	cfg, err := buildConfig(build)
-	var dag *FixtureDAG
-	if err == nil {
-		dag, err = SetupFixtureDAG(context.Background(), cfg)
-	}
 	if err != nil {
 		tb.Fatalf("fixture setup: %v", err)
 		return
 	}
-	hold(dag)
+	startWatch()
+	dag, err := setupFixtureDAG(context.Background(), cfg, hold)
+	if err != nil {
+		stopWatch()
+		tb.Fatalf("fixture setup: %v", err)
+		return
+	}
 	tb.Cleanup(func() {
-		defer unhold(dag)
-		if dag.Teardown() {
+		failed := dag.Teardown()
+		unhold(dag)
+		stopWatch()
+		if failed {
 			tb.Errorf("fixture teardown failed")
 		}
 	})
@@ -65,7 +71,8 @@ func unhold(dag *FixtureDAG) {
 	heldMu.Unlock()
 }
 
-// releaseHeld tears down every held DAG.
+// releaseHeld tears down every held DAG, waiting for a teardown already
+// under way. The hold's own cleanup drops it.
 func releaseHeld() {
 	heldMu.Lock()
 	dags := make([]*FixtureDAG, 0, len(held))
@@ -75,7 +82,6 @@ func releaseHeld() {
 	heldMu.Unlock()
 	for _, dag := range dags {
 		dag.Teardown()
-		unhold(dag)
 	}
 }
 

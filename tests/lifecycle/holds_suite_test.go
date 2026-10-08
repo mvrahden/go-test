@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -43,19 +42,6 @@ func (s *HoldsTestSuite) AfterAll(t *gotest.T) {
 			_ = os.Remove(f)
 		}
 	}
-}
-
-// ownEnv is this process's environment without the runner's sidecar files,
-// which belong to this suite process, not to the ones it starts.
-func ownEnv() []string {
-	var env []string
-	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, protocol.EnvStopFile+"=") || strings.HasPrefix(kv, protocol.EnvTeardownBudgetFile+"=") {
-			continue
-		}
-		env = append(env, kv)
-	}
-	return env
 }
 
 // goTest runs go test on dir and returns its exit code, its output and the

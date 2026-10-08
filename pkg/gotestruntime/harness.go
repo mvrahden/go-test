@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/runstate"
 	"github.com/mvrahden/go-test/internal/schedinfo"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -135,11 +136,22 @@ func watchDeadline(t *gotest.T, timeout time.Duration, what, budget string, done
 // testScopedT applies the timeout convention shared by the phases that run while
 // the test is still live: a positive timeout becomes a deadline, anything else
 // (including the documented -1 "disabled") leaves the context unbounded.
+//
+// The context also ends when the run is asked to stop, so a test blocked on a
+// resource returns it before the fixtures tear down. AfterAll's context
+// (TeardownT) does not: teardown has to run to the end.
 func testScopedT(t *testing.T, timeout time.Duration) *gotest.T {
-	if timeout <= 0 {
-		return gotest.NewT(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	if timeout > 0 {
+		cancel()
+		ctx, cancel = context.WithTimeout(t.Context(), timeout)
 	}
-	return gotest.NewTWithDeadline(t, timeout)
+	stop := context.AfterFunc(runstate.StopContext(), cancel)
+	t.Cleanup(func() {
+		stop()
+		cancel()
+	})
+	return gotest.NewTWithContext(t, ctx)
 }
 
 // TeardownT builds the *gotest.T handed to a suite's AfterAll, and must be

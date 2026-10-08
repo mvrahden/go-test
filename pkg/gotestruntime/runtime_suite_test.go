@@ -762,7 +762,7 @@ func (s *RuntimeTestSuite) TestMultipleRoots_ConcurrentTeardown(t *gotest.T) {
 
 func (s *RuntimeTestSuite) TestBudgetFile_WrittenCorrectly(t *gotest.T) {
 	budgetFile := filepath.Join(t.TempDir(), "budget")
-	t.Setenv(protocol.EnvTeardownBudgetFile, budgetFile)
+	gotestruntime.ExportUseBudgetFile(budgetFile)
 
 	root := &gotestruntime.FixtureNode{
 		Name:      "Root",
@@ -794,7 +794,7 @@ func (s *RuntimeTestSuite) TestBudgetFile_WrittenCorrectly(t *gotest.T) {
 
 func (s *RuntimeTestSuite) TestBudgetFile_NoDeadlineIsNotZeroBudget(t *gotest.T) {
 	budgetFile := filepath.Join(t.TempDir(), "budget")
-	t.Setenv(protocol.EnvTeardownBudgetFile, budgetFile)
+	gotestruntime.ExportUseBudgetFile(budgetFile)
 
 	// NoDeadline means "no deadline", not "takes no time". Reading it as zero
 	// would hand the supervisor a budget short enough to force-kill a teardown
@@ -828,7 +828,7 @@ func (s *RuntimeTestSuite) TestBudgetFile_NoDeadlineIsNotZeroBudget(t *gotest.T)
 }
 
 func (s *RuntimeTestSuite) TestBudgetFile_NotWrittenWhenEnvUnset(t *gotest.T) {
-	t.Setenv(protocol.EnvTeardownBudgetFile, "")
+	gotestruntime.ExportUseBudgetFile("")
 
 	root := &gotestruntime.FixtureNode{
 		Name:      "Root",
@@ -843,7 +843,7 @@ func (s *RuntimeTestSuite) TestBudgetFile_NotWrittenWhenEnvUnset(t *gotest.T) {
 
 func (s *RuntimeTestSuite) TestBudgetFile_MultipleRootsUsesMax(t *gotest.T) {
 	budgetFile := filepath.Join(t.TempDir(), "budget")
-	t.Setenv(protocol.EnvTeardownBudgetFile, budgetFile)
+	gotestruntime.ExportUseBudgetFile(budgetFile)
 
 	rootA := &gotestruntime.FixtureNode{
 		Name:      "RootA",

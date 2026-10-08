@@ -31,3 +31,19 @@ func ExportRun(runTests func() int, cfg MainConfig) int {
 
 // ExportBuildConfig runs a hold's build the way HoldFixtures does.
 var ExportBuildConfig = buildConfig
+
+// ExportWatching reports whether the stop watcher runs.
+func ExportWatching() bool {
+	watchMu.Lock()
+	defer watchMu.Unlock()
+	return active != nil
+}
+
+// ExportUseBudgetFile points the runtime at path for the budget it advertises,
+// as the runner's environment does at start, and forgets earlier budgets.
+func ExportUseBudgetFile(path string) {
+	budgetMu.Lock()
+	budgetFile = path
+	maxBudget = 0
+	budgetMu.Unlock()
+}

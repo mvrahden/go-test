@@ -1,6 +1,7 @@
 package gotestruntime_test
 
 import (
+	"testing"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -30,6 +31,23 @@ func (s *HoldTestSuite) TestBuildConfig(t *gotest.T) {
 			})
 			gotest.NoError(it, err)
 			gotest.Equal(it, time.Minute, cfg.MaxSuiteSetupTimeout)
+		})
+	})
+}
+
+// Sequential with the rest of the package: the watcher is process-wide.
+type HoldWatchTestSuite struct{}
+
+func (s *HoldWatchTestSuite) TestWatcher(t *gotest.T) {
+	t.When("a function holds fixtures", func(w *gotest.T) {
+		w.It("watches for a stop exactly while the hold lasts", func(it *gotest.T) {
+			var during bool
+			it.T().Run("holder", func(tt *testing.T) { //nolint:suite-lifecycle // the hold must end with a test
+				gotestruntime.HoldFixtures(tt, func() gotestruntime.MainConfig { return gotestruntime.MainConfig{} })
+				during = gotestruntime.ExportWatching()
+			})
+			gotest.True(it, during, "no watcher while the fixtures were held")
+			gotest.False(it, gotestruntime.ExportWatching(), "the watcher outlived the hold: goleak would see it")
 		})
 	})
 }
