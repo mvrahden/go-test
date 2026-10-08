@@ -33,6 +33,9 @@ func Benchmark{{ $ts.Identifier }}(b *testing.B) {
   s.BeforeAll(ƒlifecycleT)
 {{ range $bm := $ts.Benchmarks }}
   b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
+{{- if or $fx $sfRefs }}
+    defer gotestruntime.ReleaseOnPanic(b)
+{{- end }}
     b.StopTimer()
     ƒeachT := gotest.NewTFromTB(b)
     s.BeforeEach(ƒeachT)
