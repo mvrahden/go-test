@@ -206,42 +206,44 @@ func TestFooTestSuite(t *testing.T) {
 }
 ```
 
-For **fixture-bound suites** (have a fixture), a lazy initializer wrapping
-`sync.Once` is generated. Each `TestX` function calls it — the DAG runs
-at most once per test binary:
+For **fixture-bound suites** (have a fixture), every generated top-level
+function — the `TestX` function, each `FuzzX_M` seed-replay wrapper, the
+`BenchmarkX` wrapper — holds the fixtures for itself: it sets the DAG up
+first and tears it down in its own cleanup, which runs after `AfterAll`.
 
 ```go
-var ƒ_fixtureOnce gotestruntime.FixtureOnce
-var ƒ_fixtureDAG *gotestruntime.FixtureDAG
-
-func ƒ_setupFixtures(t *testing.T) {
-    if err := ƒ_fixtureOnce.Do(func() error {
+func ƒ_setupFixtures(t testing.TB) {
+    gotestruntime.HoldFixtures(t, func() gotestruntime.MainConfig {
+        // Built per hold: config methods are called here, and every
+        // fixture variable starts from nil.
         // Fixtures is a flat list with DependsOn edges forming a DAG.
-        // 1. Read shared fixture state (if needed)
-        // 2. DAG wavefront setup via SetupFixtureDAG:
-        //    no-dependency fixtures start concurrently;
-        //    each fixture waits for its DependsOn set
-        // 3. BeforeAll on each fixture (retries, timeout)
-        // 4. Compute teardown budget → write budget file
-        var err error
-        ƒ_fixtureDAG, err = gotestruntime.SetupFixtureDAG(ctx, cfg)
-        return err
-    }); err != nil {
-        t.Fatalf("fixture setup: %v", err)
-    }
-    t.Cleanup(func() { ƒ_fixtureDAG.Teardown() })
+        return gotestruntime.MainConfig{Fixtures: ..., MaxSuiteSetupTimeout: ...}
+    })
+    // HoldFixtures:
+    // 1. Read shared fixture state (if needed)
+    // 2. DAG wavefront setup: no-dependency fixtures start concurrently;
+    //    each fixture waits for its DependsOn set
+    // 3. BeforeAll on each fixture (retries, timeout)
+    // 4. Compute teardown budget → write budget file
+    // 5. t.Cleanup: teardown (reverse-wavefront: leaves first, roots last)
 }
 
 func TestQueryTestSuite(t *testing.T) {
-    ƒ_setupFixtures(t)      // idempotent — DAG setup runs at most once
+    ƒ_setupFixtures(t)      // first, so its teardown runs last
     s := &ƒƒ_GOTEST_QueryTestSuite{...}
     // ... suite lifecycle (same as standalone) ...
 }
 ```
 
 No `TestMain` is generated — both `package foo` and `package foo_test`
-can define fixture-bound suites without conflict. Teardown runs via
-`t.Cleanup` (reverse-wavefront: leaves first, roots last).
+can define fixture-bound suites without conflict, and a `TestMain` of the
+developer's own needs nothing from gotest. Generated top-level functions
+never run in parallel, so holds follow each other and reuse the fixture
+variables. The testing package runs a top-level function's cleanups when a
+test or subtest below it panics; a panicking sub-benchmark runs only its
+own, so each generated `b.Run` defers `gotestruntime.ReleaseOnPanic(b)`.
+While a hold lasts, a stop watcher turns an announced stop (or Ctrl-C
+under plain `go test`) into teardown; see `docs/design/fixtures.md`.
 
 For suites with `Benchmark*` methods, one `Benchmark<Suite>` wrapper is
 generated (standalone or fixture-bound, same shape as above), with one
@@ -1132,9 +1134,8 @@ miscounts test functions embedded in string fixtures.
 
 - The plain text run is not censused; that would need test2json in the
   fast loop.
-- Filtered runs are not censused. `gotestruntime.CountMatchingTests`
-  already models the per-level regexp semantics, if a filtered census is
-  ever wanted.
+- Filtered runs are not censused. Nothing in gotest models `go test`'s
+  selection flags; a filtered census would have to start there.
 - `When`/`It` rows are not censused; that would need the static spec's
   handling of behaviors it cannot enumerate.
 - The extension's runs use `-json` and inherit the census: the missing
