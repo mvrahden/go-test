@@ -207,7 +207,7 @@ func (s *InterruptTestSuite) TestCtrlCEndsFuzzingGracefully(t *gotest.T) {
 	gotest.NoError(t, tree.Interrupt())
 	err := wait(tree, cmd)
 
-	gotest.NoError(t, err, "fuzzing ends cleanly on Ctrl-C")
+	gotest.NoError(t, err, "fuzzing ends cleanly on Ctrl-C:\n%s%s", cmd.Stdout, cmd.Stderr)
 	gotest.Contains(t, cmd.Stdout.(*strings.Builder).String(), "PASS")
 	events := readEvents(log)
 	gotest.Equal(t, countEvents(events, "setup"), countEvents(events, "teardown"), "every fuzzing process released its fixture: %v", events)
