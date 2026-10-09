@@ -16,10 +16,11 @@ export { resolveGoBinary } from "./goBinary.js";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
-// v1.31.0 is the release whose stream carries every verdict the tree
-// shows: a shared fixture that fails to set up fails the suites that read
-// it, as failed tests with the fixture's own reason, and exits 1 in every
-// mode. Before it those runs reached the editor as a bare exit code. Every
+// v1.32.0 is the release whose generated code holds package fixtures per
+// suite function (gotestruntime.HoldFixtures), so the CLI's runtime floor
+// moved there and this floor with it. From v1.31.0 on the stream carries
+// every verdict the tree shows, including a shared fixture that failed to
+// set up. Every
 // JSON document opens with `version` from v1.30.2 on, which is how the
 // extension learns the version of a CLI it reaches through go run or go
 // tool and gates it (checkProducerVersion). Treat this as a contract
@@ -27,7 +28,7 @@ const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 // that older versions do not have. Never below the CLI's
 // gotestgen.MinRuntimeVersion (a Go test guards the order): a CLI the
 // extension accepts must enforce a runtime floor no newer than itself.
-const MIN_CLI_VERSION = "v1.31.0";
+const MIN_CLI_VERSION = "v1.32.0";
 
 export interface CliCommand {
   bin: string;
