@@ -193,7 +193,7 @@ func (s *LineReportingTestSuite) TestConsistently(t *gotest.T) {
 		w.It("failure references this file", func(it *gotest.T) {
 			spy := runSpy(func(t *spyT) {
 				count := 0
-				gotest.Consistently(t, 50*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {
+				gotest.Consistently(t, time.Second, 10*time.Millisecond, func(poll *gotest.R) { // wide: poll 3 fails it at once; Windows ticks are coarse
 					count++
 					if count > 2 {
 						gotest.True(poll, false, "broke on poll %d", count)
