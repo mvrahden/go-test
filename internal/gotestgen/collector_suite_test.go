@@ -709,7 +709,7 @@ func (s *CollectorTestSuite) TestValidation(t *gotest.T) {
 			spec, err := c.ApplyTestSuiteSpecs(result)
 			gotest.NoError(it, err)
 
-			_, err = gotestgen.Resolve(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.ErrorContains(it, err, "value type receiver")
 		})
 	})

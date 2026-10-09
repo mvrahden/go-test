@@ -158,7 +158,7 @@ func DetermineFixtureHarness(n ast.Node, pkg *packages.Package, f *FixtureSpec) 
 	}
 
 	// Must be a pointer receiver. Value receivers are skipped here — incidental
-	// *Fixture-named types must not break collection; the resolver rejects
+	// *Fixture-named types must not break collection; binding rejects
 	// value-receiver hooks on fixtures that suites actually reference.
 	recvPtr, ok := recv.Type().(*types.Pointer)
 	if !ok {
