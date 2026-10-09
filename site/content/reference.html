@@ -76,7 +76,7 @@ aliases: ["/reference.html"]
         </thead>
         <tbody>
           <tr><td><code>*TestSuite</code></td><td>Test suite. Each generates a <code>func Test*</code> entry point.</td></tr>
-          <tr><td><code>*Fixture</code></td><td>Package fixture. Shared setup for all suites in a package.</td></tr>
+          <tr><td><code>*Fixture</code></td><td>Package fixture. Setup each suite of a package can bind; set up per suite.</td></tr>
           <tr><td><code>*SharedFixture</code></td><td>Cross-package fixture. Runs in a subprocess, state transfers via JSON.</td></tr>
         </tbody>
       </table>
@@ -245,7 +245,7 @@ gotest.MatchSnapshot(t, render(other), <span class="st">"variant"</span>)  <span
 
     <section class="ref-section" id="fixtures">
       <h2>Fixtures</h2>
-      <p class="lead">Expensive setup — databases, containers, external services — defined once, shared across suites.</p>
+      <p class="lead">Expensive setup — databases, containers, external services — defined once, wired into every suite that needs it.</p>
 
       <h3>Package fixtures</h3>
       <p>Any struct ending in <code>Fixture</code> is a package fixture. Suites reference it via a named pointer field:</p>
@@ -264,6 +264,8 @@ gotest.MatchSnapshot(t, render(other), <span class="st">"variant"</span>)  <span
       </div>
 
       <p>Fixture hooks use <code>(ctx context.Context) error</code> signatures. Errors are reported with automatic attribution — <code>E2EFixture.BeforeAll failed: connection refused</code>.</p>
+
+      <p>A package fixture lives as long as the suite that binds it: set up before the suite's <code>BeforeAll</code>, torn down after its <code>AfterAll</code>, also when a test panics or the run is stopped. Setup that must happen once per run belongs in a shared fixture.</p>
 
       <p>Package fixtures support all four lifecycle hooks. <code>BeforeEach</code>/<code>AfterEach</code> wrap every individual test case, running outside the suite's own hooks:</p>
       <div class="diagram">Fixture.BeforeEach

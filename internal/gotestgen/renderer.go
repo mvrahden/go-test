@@ -94,19 +94,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	}
 
 	if len(fixtureBound) > 0 || len(sfNodeVMs) > 0 {
-		// The countdown counts top-level functions the binary will run, so the
-		// list carries the generated names: the Test function of every suite
-		// that calls ƒ_setupFixtures plus its Fuzz and Benchmark wrappers.
-		var fixtureTestNames []string
-		for _, ts := range fixtureBound {
-			fixtureTestNames = append(fixtureTestNames, fixtureTestFuncNames(ts)...)
-		}
-		for _, ts := range standalone {
-			if _, hasSF := resolved.SuiteSharedFixtures[ts.Identifier()]; hasSF {
-				fixtureTestNames = append(fixtureTestNames, fixtureTestFuncNames(ts)...)
-			}
-		}
-		if err := r.renderFixtures(buf, fixtureBound, allFixtures, resolved.SuiteFixtureFields, sfNodeVMs, fixtureTestNames); err != nil {
+		if err := r.renderFixtures(buf, fixtureBound, allFixtures, resolved.SuiteFixtureFields, sfNodeVMs); err != nil {
 			return nil, nil, fmt.Errorf("failed rendering fixture suites. err: %w", err)
 		}
 	}
@@ -133,18 +121,18 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	return out, fans, err
 }
 
-// fixtureTestFuncNames lists the generated top-level functions of one suite,
-// as the fixture-teardown countdown must see them.
-func fixtureTestFuncNames(ts *gotestast.TestSuiteSpec) []string {
-	id := ts.Identifier()
-	names := []string{"Test" + id}
-	for _, fz := range ts.Fuzzers() {
-		names = append(names, "Fuzz"+id+"_"+fz.Identifier())
+// usesContext reports whether the fixture section names context: every package
+// fixture node does, a shared fixture node only for Hydrate or Dehydrate.
+func usesContext(allFixtures []*BoundFixture, sfNodes []*SharedFixtureNodeVM) bool {
+	if len(allFixtures) > 0 {
+		return true
 	}
-	if len(ts.Benchmarks()) > 0 {
-		names = append(names, "Benchmark"+id)
+	for _, sf := range sfNodes {
+		if sf.HasHydrate || sf.HasDehydrate {
+			return true
+		}
 	}
-	return names
+	return false
 }
 
 func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*BoundFixture, sfNodes []*SharedFixtureNodeVM, fans *FuzzTargetSet) error { //nolint:gocritic // hugeParam: stable API
@@ -172,8 +160,9 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		imports = append(imports, headerImport{Path: path})
 	}
 	if hasFixtures {
-		addImport("context")
-		addImport("sync/atomic")
+		if usesContext(allFixtures, sfNodes) {
+			addImport("context")
+		}
 		addImport("time")
 	}
 	if fans != nil && fans.Source != "" {
@@ -197,13 +186,13 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 			addImport("math")
 		}
 	}
-	// This condition must stay identical to the one guarding the ƒfailed
-	// declaration in gotest.suites.tpl. A parallel suite whose every method is
+	// This condition must stay identical to the ones guarding the ƒfailed
+	// declarations in gotest.suites.tpl and gotest.fixture.tpl. A parallel suite whose every method is
 	// excluded stays in EffectiveTestSuites with no TestCases, so the template
 	// emits no atomic.Bool. format.Source does not type-check and would let the
 	// stray import through; it is `go test` that then refuses the whole generated
 	// package with "imported and not used".
-	if !hasFixtures && slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
+	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
 		return v.IsMethodParallel() && len(v.TestCases()) > 0
 	}) {
 		addImport("sync/atomic")
@@ -320,7 +309,7 @@ func harvestedSeedsForTemplate(pkg *packages.Package, spec SpecOutcome, harvestS
 	return out, nil
 }
 
-func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, allFixtures []*BoundFixture, suiteFixtureFields map[string][]FixtureFieldBinding, sfNodes []*SharedFixtureNodeVM, fixtureTestNames []string) error {
+func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, allFixtures []*BoundFixture, suiteFixtureFields map[string][]FixtureFieldBinding, sfNodes []*SharedFixtureNodeVM) error {
 	if len(allFixtures) == 0 && len(sfNodes) == 0 {
 		return nil
 	}
@@ -330,7 +319,6 @@ func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.T
 		"AllFixtures":        allFixtures,
 		"FlatSuites":         flattenSuitesDAG(allFixtures, suiteFixtureFields),
 		"SharedFixtureNodes": sfNodes,
-		"FixtureTestNames":   fixtureTestNames,
 	})
 }
 

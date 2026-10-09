@@ -11,16 +11,19 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"time"
 )
 
 // Tree owns one started command and every process it starts.
 type Tree struct {
 	cmd *exec.Cmd
 
-	mu       sync.Mutex
-	adopted  bool
-	released bool
-	sys      sysTree
+	mu          sync.Mutex
+	adopted     bool
+	released    bool
+	interrupted bool
+	ctrlC       bool
+	sys         sysTree
 }
 
 // New prepares cmd to start as the root of its own tree. For a command made by
@@ -83,8 +86,39 @@ func (t *Tree) Interrupt() error {
 	if !t.adopted {
 		return nil
 	}
-	return t.sys.interrupt(t.cmd.Process.Pid)
+	t.interrupted = true
+	return t.sys.interrupt(t.cmd.Process.Pid, t.ctrlC)
 }
+
+// InterruptLikeCtrlC makes Interrupt send what a terminal's Ctrl-C sends,
+// SIGINT, in place of SIGTERM on Unix, for a program that stops gracefully on
+// it: go test -fuzz saves what it found. Windows already sends a console
+// control event, which Go reports as an interrupt. Call it before Interrupt.
+func (t *Tree) InterruptLikeCtrlC() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.ctrlC = true
+}
+
+// Linger waits, at most for timeout, until every process of an interrupted
+// tree has exited; call it once the root has been waited for and before
+// Release. The root may exit first while another process still finishes its
+// shutdown: test2json ends on the interrupt, the test binary it runs is still
+// tearing its fixtures down. A tree nobody interrupted returns at once.
+func (t *Tree) Linger(timeout time.Duration) {
+	t.mu.Lock()
+	wait := t.interrupted && t.adopted && !t.released
+	t.mu.Unlock()
+	if !wait {
+		return
+	}
+	deadline := time.Now().Add(timeout)
+	for t.sys.alive(t.cmd.Process.Pid) && time.Now().Before(deadline) {
+		time.Sleep(lingerPoll)
+	}
+}
+
+const lingerPoll = 50 * time.Millisecond
 
 // Kill stops every process in the tree at once. It returns os.ErrProcessDone
 // once the tree is released, and nil for a command that never started.

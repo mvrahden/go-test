@@ -378,11 +378,26 @@ The barrier speaks two verbs to the setup subprocess over its stdin — start an
 On cancellation the barrier is skipped entirely and run-end teardown owns everything.
 Window scheduling is always on; there is no configuration.
 
-### Lazy, reference-counted lifecycle
+### Lifetime: one hold per top-level function
 
 Fixture setup does not run at package init.
-The first fixture-bound test triggers it (`gotestruntime.FixtureOnce`); a pending counter — seeded by `CountMatchingTests`, which honors `-run`/`-skip` filters — decrements as fixture-bound tests finish, and teardown fires when it reaches zero.
-Filtered-out tests therefore never pay fixture setup, and teardown runs after the *last matching* test, not the last declared one.
+Each generated top-level function that binds fixtures — a suite's `Test` function, each of its `Fuzz` seed-replay wrappers, its `Benchmark` wrapper — holds them for itself (`gotestruntime.HoldFixtures`): it sets the DAG up first and tears it down in its own cleanup, after the suite's `AfterAll`.
+A run whose `-run`/`-skip` selects no fixture-bound function never pays setup, and `-count`, `-shuffle` or any other selection flag cannot tear a fixture down under a test that still uses it: nothing counts tests.
+
+A package fixture is therefore set up once per function that binds it, not once per package.
+Under the runner this changes nothing for tests — each suite runs in a process of its own — but a fixture-bound suite with fuzz methods sets its fixtures up once more for each `Fuzz` wrapper, whose seeds replay in a function of their own; the suite's own `BeforeAll` already runs per wrapper the same way.
+Under plain `go test`, every suite of the package sets the fixtures up for itself.
+A resource too expensive for that belongs in a shared fixture, which comes up once per run.
+
+**A panic.** The testing package runs the cleanups of the panicking test and of every test above it before it ends the process, so a panic anywhere below a holding function — a method, `It`/`When`/`Each`, `BeforeAll`/`AfterAll`, a fuzz body, a parallel or raw subtest, a cleanup — releases the fixtures. A panicking sub-benchmark runs only its own cleanups; every generated `b.Run` defers `gotestruntime.ReleaseOnPanic`, which releases the fixtures and lets the panic go on (not under `GODEBUG=panicnil=1`, where recovering would swallow `panic(nil)`). A suite's `AfterAll` does not run after a panicking benchmark.
+
+**A stop.** Ctrl-C, gotest's `--timeout`, a cancelled run: while a hold lasts, a watcher takes the stop. The contexts of test methods and of fixture setup end first, so a test blocked on a resource returns it; then setup in flight is waited for (a cancelled setup tears down what it brought up), then the held fixtures are released and the process ends by the signal. A setup that would start after the stop is refused. Releasing is bounded by the teardown budget the process gave the runner; past it the process says what it could not release and ends anyway. A hold already tearing down when the signal arrives finishes first.
+Under the runner a signal counts only once the runner has announced the stop, so a signal the code under test sends its own process is left to that code — unless the process's parent is gone (the CLI crashed), when nobody is left to announce it. Under plain `go test` only Ctrl-C (SIGINT) counts, so a test that sends SIGINT to its own process while it holds fixtures ends the run; use SIGTERM there, or run under gotest. A signal ignored when the process started stays ignored. Between holds no watcher runs and a signal has Go's default action: nothing is held.
+Fuzzing is left to Go once its engine has the selected target: it stops on Ctrl-C by itself — stopping the workers, saving what it found — and the target returns, so its fixtures tear down after it. `gotest fuzz` stops its fuzzing processes with the same Ctrl-C. A fuzz worker gets about a second from Go's coordinator to exit before it is killed, so a package fixture whose teardown takes longer is cut in the workers; fuzzing against external resources belongs in a shared fixture, which workers only hydrate.
+
+**What is not released.** A panic on a goroutine the test started outside `gotest.Go`, a process killed outright, `os.Exit` or `log.Fatal` in the code under test, a fatal runtime error, and `go test`'s own `-timeout`, whose alarm ends the process without cleanups. A resource that must never leak belongs in a shared fixture or behind a reaper of its own.
+
+The watcher is a goroutine and a signal handler that live exactly as long as the hold: `goleak.VerifyNone` inside a fixture-bound test sees them, `goleak.VerifyTestMain` does not.
 
 ### Shared-fixture dispatch
 
@@ -396,7 +411,7 @@ A `bench` run waits for its first window of shared fixtures instead, and for eve
   Teardown-side panics are contained the same way: a panicking `AfterAll` is recovered and reported as `<fixture>.AfterAll panicked`, a panicking `Dehydrate` as `dehydrate panicked` — both become teardown failures, and teardown of the remaining fixtures continues.
 - Shared-fixture setup failure fails the suites that read the fixture, and the run with exit code 1. Each of those suites is booked into the event stream as failed with `<suite> never ran: shared fixture <fixture> did not come up`; the failure itself is booked as the failed package `shared fixtures`, carrying what the fixture reported (`<fixture>.BeforeAll failed after N attempt(s): …`). Nothing else is affected: fixtures that came up stay up, the suites that read only those run, and so does every suite that reads none. A `bench` run gives up the benchmarks that read the failed fixture the same way — whether it failed in the up-front window or when a later slot asked for it — and runs the rest. `prepare` exits 2: bringing the fixtures up is all it does.
   In-test-process package-fixture setup failure is a `t.Fatalf` (exit 1).
-- Fixture teardown failure flips an otherwise passing run to a failure. For a shared fixture it is booked as the failed package `shared fixtures`, carrying the `<fixture>.AfterAll failed: …` lines.
+- Fixture teardown failure flips an otherwise passing run to a failure. For a shared fixture it is booked as the failed package `shared fixtures`, carrying the `<fixture>.AfterAll failed: …` lines. For a package fixture it fails the function that held it (`fixture teardown failed`).
 - Barrier-time failures — an early teardown or a tail-phase start — fail the run through the same aggregation as run-end teardown failures; the terminal teardown still runs and owns the remainder.
 
 ### Config markers

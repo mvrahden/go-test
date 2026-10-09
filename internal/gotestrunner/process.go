@@ -35,11 +35,18 @@ func ExitStatusVerdict(status int) (code int, how string) {
 	switch {
 	case status < 0:
 		return 1, "by signal"
+	case status == raceExitCode:
+		// -race reports a race found after the last test — in fixture
+		// teardown, which runs after m.Run — by its own exit code.
+		return 1, "by the race detector (exit status 66)"
 	case status > maxExitCode:
 		return 1, fmt.Sprintf("by the system (status 0x%X)", uint32(status)) //nolint:gosec // G115: a Windows exit status is a DWORD
 	}
 	return status, ""
 }
+
+// raceExitCode is the race detector's default exit status (GORACE exitcode).
+const raceExitCode = 66
 
 // maxExitCode is the highest status a program sets as its own exit code.
 // Windows allows any 32-bit value, but a termination status uses the high bits

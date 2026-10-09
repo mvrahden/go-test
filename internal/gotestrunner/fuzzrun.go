@@ -319,9 +319,12 @@ func runOneFuzzTarget(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, budg
 	cmd.Stdout = stdoutW
 	cmd.Stderr = stderrW
 
+	// Ctrl-C ends fuzzing gracefully: Go saves what it found, the target
+	// returns and its fixtures tear down. SIGTERM would end it on the spot.
 	mp := NewManagedProcess(cmd, ProcessConfig{
 		Grace:         GraceFixed,
 		GraceDuration: fuzzGrace,
+		CtrlC:         true,
 	})
 	if err := mp.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "[%s] FAIL: %s\n", t.Func, err)

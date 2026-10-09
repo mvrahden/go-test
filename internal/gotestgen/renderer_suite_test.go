@@ -239,16 +239,15 @@ func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
-			// The marker method is called once, so the config that bounds the
-			// context and the budget it is judged against cannot drift apart. It is
-			// called inside ƒ_fixtureOnce.Do rather than at package-variable
-			// initialisation: there a panicking FixtureConfig() would abort the
-			// binary before TestMain instead of being reported as a setup failure,
-			// and it would read the environment TestMain had not set up yet.
+			// The marker method is called once per hold, so the config that bounds
+			// the context and the budget it is judged against cannot drift apart.
+			// It is called inside the build HoldFixtures contains rather than at
+			// package-variable initialisation, where a panicking FixtureConfig()
+			// would abort the binary instead of failing a test.
 			gotest.Contains(it, output, "var ƒcfg_CFGFixture gotest.FixtureConfig", "the config is declared, not derived, at package scope")
 			gotest.Contains(it, output, "ƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()", "the marker is called once")
 			gotest.Contains(it, output,
-				"ƒ_fixtureOnce.Do(func() error {\n\t\tƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()",
+				"gotestruntime.HoldFixtures(t, func() gotestruntime.MainConfig {\n\t\tƒ_CFGFixture = nil\n\t\tƒcfg_CFGFixture = (&CFGFixture{}).FixtureConfig()",
 				"the config must be derived inside the containment frame, before anything reads it")
 			gotest.Contains(it, output, "Config: gotestruntime.WithFixtureDefaults(ƒcfg_CFGFixture),",
 				"a zero Timeout bounds the context with the default, as if the marker were absent")
@@ -571,31 +570,18 @@ func (s *RendererTestSuite) TestRenderer_BenchmarkWrapper(t *gotest.T) {
 			gotest.Contains(it, benchFn, "PoolFixture: ƒ_PoolFixture")
 		})
 
-		w.It("lists the Test and Benchmark wrappers for the teardown countdown", func(it *gotest.T) {
+		w.It("guards each sub-benchmark, whose panic skips the wrapper's cleanups", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBoundBenchmark")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
-			gotest.Contains(it, fixtureTestNames(it, out), "TestParserTestSuite")
-			gotest.Contains(it, fixtureTestNames(it, out), "BenchmarkParserTestSuite")
+			idx := strings.Index(out, "func BenchmarkParserTestSuite")
+			gotest.GreaterOrEqual(it, idx, 0, "bench wrapper missing from output")
+			benchFn := out[idx:]
+			sub := strings.Index(benchFn, "b.Run(")
+			gotest.GreaterOrEqual(it, sub, 0, "sub-benchmark missing from output")
+			gotest.Regexp(it, `^b\.Run\("[A-Za-z]+", func\(b \*testing\.B\) \{\s+defer gotestruntime\.ReleaseOnPanic\(b\)`, benchFn[sub:])
 		})
 	})
-}
-
-// fixtureTestNames reads the ƒ_fixtureTestNames literal out of a rendered file.
-func fixtureTestNames(t *gotest.T, out string) []string {
-	start := strings.Index(out, "var ƒ_fixtureTestNames = []string{")
-	gotest.GreaterOrEqual(t, start, 0, "ƒ_fixtureTestNames missing from output")
-	body := out[start:]
-	end := strings.Index(body, "}")
-	gotest.GreaterOrEqual(t, end, 0, "ƒ_fixtureTestNames literal never closes")
-	body = body[:end]
-	var names []string
-	for _, line := range strings.Split(body, "\n")[1:] {
-		if name := strings.Trim(strings.TrimSpace(line), `",`); name != "" {
-			names = append(names, name)
-		}
-	}
-	return names
 }
 
 func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
@@ -634,13 +620,6 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 			gotest.Contains(it, fuzzFn, "PoolFixture: ƒ_PoolFixture")
 		})
 
-		w.It("lists the Test and Fuzz wrappers for the teardown countdown", func(it *gotest.T) {
-			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBoundFuzz")
-			out, _ := renderTestPkg(it.T(), pkg, true)
-
-			gotest.Contains(it, fixtureTestNames(it, out), "TestParserFuzzTestSuite")
-			gotest.Contains(it, fixtureTestNames(it, out), "FuzzParserFuzzTestSuite_FuzzParse")
-		})
 	})
 
 	t.When("the fuzz callback's callee is exercised by a table test elsewhere in the package", func(w *gotest.T) {

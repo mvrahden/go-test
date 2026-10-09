@@ -23,6 +23,9 @@ type ProcessConfig struct {
 	Grace         GraceStrategy
 	GraceDuration time.Duration
 	BudgetFile    string
+	// CtrlC interrupts the tree as a terminal's Ctrl-C does, for a program
+	// that stops gracefully on it (go test -fuzz); see proctree.
+	CtrlC bool
 	// DrainDelay bounds how long the output pipes are still read once the
 	// process has exited, against a detached grandchild that keeps the write
 	// ends open. Zero means OutputDrainDelay.
@@ -67,6 +70,9 @@ type outputPipe struct {
 
 func NewManagedProcess(cmd *exec.Cmd, cfg ProcessConfig) *ManagedProcess {
 	tree := proctree.New(cmd)
+	if cfg.CtrlC {
+		tree.InterruptLikeCtrlC()
+	}
 	// exec's own kill timer never runs: the grace strategy is the only kill,
 	// so a teardown budget is never cut short by a bound set before it was
 	// known.
@@ -239,6 +245,9 @@ func (p *ManagedProcess) Adopt() {
 // be reused from then on, and only then drains what is left in the pipes.
 func (p *ManagedProcess) wait() {
 	_ = p.cmd.Wait()
+	// An interrupted root can exit before the rest of its tree is done
+	// shutting down; the grace it was given covers them too.
+	p.tree.Linger(p.graceTimeout())
 	p.tree.Release()
 	p.drain()
 	close(p.done)

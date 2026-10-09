@@ -32,24 +32,16 @@ var ƒcfg_{{ $f.Identifier }} gotest.FixtureConfig
 {{- end }}
 {{ end }}
 
-var ƒ_fixtureOnce gotestruntime.FixtureOnce
-var ƒ_fixtureDAG *gotestruntime.FixtureDAG
-var ƒ_fixtureTestNames = []string{
-{{- range $name := .FixtureTestNames }}
-    "{{ $name }}",
-{{- end }}
-}
-var ƒ_pending atomic.Int32
-
 func ƒ_setupFixtures(t testing.TB) {
-    if err := ƒ_fixtureOnce.Do(func() error {
+    gotestruntime.HoldFixtures(t, func() gotestruntime.MainConfig {
 {{- /*
-  Each config is derived exactly once, but inside ƒ_fixtureOnce.Do rather than at
-  package-variable initialisation. A config method that panics has to be
-  contained and reported as a setup failure; at package init it would abort the
-  binary before TestMain, attributed to nothing. It also has to observe the
-  environment TestMain set up, not the one that existed before it ran.
+  Built per hold, not at package init: a panicking config method fails the
+  holding test instead of the binary. Every hold starts from nil fixtures, so
+  nothing reads one an earlier hold tore down.
 */}}
+{{- range $f := .AllFixtures }}
+        ƒ_{{ $f.Identifier }} = nil
+{{- end }}
 {{- range $sf := .SharedFixtureNodes }}
 {{- if $sf.HasConfig }}
         ƒcfg_sf_{{ $sf.Identifier }} = ƒ_sf_{{ $sf.Identifier }}.SharedFixtureConfig()
@@ -60,7 +52,6 @@ func ƒ_setupFixtures(t testing.TB) {
         ƒcfg_{{ $f.Identifier }} = (&{{ $f.QualifiedType }}{}).FixtureConfig()
 {{- end }}
 {{- end }}
-        ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
         var ƒmaxSuiteSetup time.Duration
 {{ range $fs := .FlatSuites }}
         {
@@ -77,8 +68,7 @@ func ƒ_setupFixtures(t testing.TB) {
         }
 {{ end }}
 
-        var err error
-        ƒ_fixtureDAG, err = gotestruntime.SetupFixtureDAG(context.Background(), gotestruntime.MainConfig{
+        return gotestruntime.MainConfig{
             Fixtures: []*gotestruntime.FixtureNode{
 {{- range $sf := .SharedFixtureNodes }}
                 {
@@ -120,16 +110,6 @@ func ƒ_setupFixtures(t testing.TB) {
 {{- end }}
             },
             MaxSuiteSetupTimeout: ƒmaxSuiteSetup,
-        })
-        return err
-    }); err != nil {
-        t.Fatalf("fixture setup: %v", err)
-    }
-    t.Cleanup(func() {
-        if ƒ_pending.Add(-1) == 0 {
-            if ƒ_fixtureDAG.Teardown() {
-                t.Errorf("fixture teardown failed")
-            }
         }
     })
 }

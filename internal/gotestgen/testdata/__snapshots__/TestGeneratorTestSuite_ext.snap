@@ -7,7 +7,6 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -27,17 +26,10 @@ func (ts *ƒƒ_GOTEST_AppTestSuite) AfterEach(it *gotest.T)  { ts.AppTestSuite.A
 var ƒ_AppFixture *AppFixture
 var ƒcfg_AppFixture gotest.FixtureConfig
 
-var ƒ_fixtureOnce gotestruntime.FixtureOnce
-var ƒ_fixtureDAG *gotestruntime.FixtureDAG
-var ƒ_fixtureTestNames = []string{
-	"TestAppTestSuite",
-}
-var ƒ_pending atomic.Int32
-
 func ƒ_setupFixtures(t testing.TB) {
-	if err := ƒ_fixtureOnce.Do(func() error {
+	gotestruntime.HoldFixtures(t, func() gotestruntime.MainConfig {
+		ƒ_AppFixture = nil
 		ƒcfg_AppFixture = (&AppFixture{}).FixtureConfig()
-		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -49,8 +41,7 @@ func ƒ_setupFixtures(t testing.TB) {
 			}
 		}
 
-		var err error
-		ƒ_fixtureDAG, err = gotestruntime.SetupFixtureDAG(context.Background(), gotestruntime.MainConfig{
+		return gotestruntime.MainConfig{
 			Fixtures: []*gotestruntime.FixtureNode{
 				{
 					Name:   "AppFixture",
@@ -68,16 +59,6 @@ func ƒ_setupFixtures(t testing.TB) {
 				},
 			},
 			MaxSuiteSetupTimeout: ƒmaxSuiteSetup,
-		})
-		return err
-	}); err != nil {
-		t.Fatalf("fixture setup: %v", err)
-	}
-	t.Cleanup(func() {
-		if ƒ_pending.Add(-1) == 0 {
-			if ƒ_fixtureDAG.Teardown() {
-				t.Errorf("fixture teardown failed")
-			}
 		}
 	})
 }
@@ -149,7 +130,6 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -181,17 +161,11 @@ var ƒ_DatabaseFixture *DatabaseFixture
 
 var ƒ_ServiceFixture *ServiceFixture
 
-var ƒ_fixtureOnce gotestruntime.FixtureOnce
-var ƒ_fixtureDAG *gotestruntime.FixtureDAG
-var ƒ_fixtureTestNames = []string{
-	"TestMultiFixtureTestSuite",
-	"TestServiceTestSuite",
-}
-var ƒ_pending atomic.Int32
-
 func ƒ_setupFixtures(t testing.TB) {
-	if err := ƒ_fixtureOnce.Do(func() error {
-		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
+	gotestruntime.HoldFixtures(t, func() gotestruntime.MainConfig {
+		ƒ_CacheFixture = nil
+		ƒ_DatabaseFixture = nil
+		ƒ_ServiceFixture = nil
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -208,8 +182,7 @@ func ƒ_setupFixtures(t testing.TB) {
 			}
 		}
 
-		var err error
-		ƒ_fixtureDAG, err = gotestruntime.SetupFixtureDAG(context.Background(), gotestruntime.MainConfig{
+		return gotestruntime.MainConfig{
 			Fixtures: []*gotestruntime.FixtureNode{
 				{
 					Name:   "CacheFixture",
@@ -259,16 +232,6 @@ func ƒ_setupFixtures(t testing.TB) {
 				},
 			},
 			MaxSuiteSetupTimeout: ƒmaxSuiteSetup,
-		})
-		return err
-	}); err != nil {
-		t.Fatalf("fixture setup: %v", err)
-	}
-	t.Cleanup(func() {
-		if ƒ_pending.Add(-1) == 0 {
-			if ƒ_fixtureDAG.Teardown() {
-				t.Errorf("fixture teardown failed")
-			}
 		}
 	})
 }
@@ -592,7 +555,6 @@ import (
 	"context"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -611,16 +573,9 @@ func (ts *ƒƒ_GOTEST_GuardedFixtureBoundTestSuite) AfterEach(it *gotest.T)  {}
 
 var ƒ_GuardFixture *GuardFixture
 
-var ƒ_fixtureOnce gotestruntime.FixtureOnce
-var ƒ_fixtureDAG *gotestruntime.FixtureDAG
-var ƒ_fixtureTestNames = []string{
-	"TestGuardedFixtureBoundTestSuite",
-}
-var ƒ_pending atomic.Int32
-
 func ƒ_setupFixtures(t testing.TB) {
-	if err := ƒ_fixtureOnce.Do(func() error {
-		ƒ_pending.Store(int32(gotestruntime.CountMatchingTests(ƒ_fixtureTestNames)))
+	gotestruntime.HoldFixtures(t, func() gotestruntime.MainConfig {
+		ƒ_GuardFixture = nil
 		var ƒmaxSuiteSetup time.Duration
 
 		{
@@ -630,8 +585,7 @@ func ƒ_setupFixtures(t testing.TB) {
 			}
 		}
 
-		var err error
-		ƒ_fixtureDAG, err = gotestruntime.SetupFixtureDAG(context.Background(), gotestruntime.MainConfig{
+		return gotestruntime.MainConfig{
 			Fixtures: []*gotestruntime.FixtureNode{
 				{
 					Name:   "GuardFixture",
@@ -645,16 +599,6 @@ func ƒ_setupFixtures(t testing.TB) {
 				},
 			},
 			MaxSuiteSetupTimeout: ƒmaxSuiteSetup,
-		})
-		return err
-	}); err != nil {
-		t.Fatalf("fixture setup: %v", err)
-	}
-	t.Cleanup(func() {
-		if ƒ_pending.Add(-1) == 0 {
-			if ƒ_fixtureDAG.Teardown() {
-				t.Errorf("fixture teardown failed")
-			}
 		}
 	})
 }

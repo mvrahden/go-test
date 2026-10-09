@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/mvrahden/go-test/internal/protocol"
+	"github.com/mvrahden/go-test/internal/runstate"
 )
 
 // F wraps *testing.F for fuzz targets, pairing it with optional
@@ -153,6 +155,7 @@ func reportFuzzInput(literal string) {
 // binding is reflective; see fuzzWithoutTarget.
 func (f *F) Fuzz(fn any) {
 	f.fuzzed = true
+	f.claimInterrupt()
 	if f.target == nil {
 		f.fuzzWithoutTarget(fn)
 		return
@@ -160,5 +163,19 @@ func (f *F) Fuzz(fn any) {
 	f.flushSeeds(f.target.Explode)
 	if !f.target.Register(f.f, fn, f.run) {
 		f.f.Fatalf("f.Fuzz: callback is %T, but this target was generated for %s — the generated wrapper is stale, re-run gotest", fn, f.target.Signature)
+	}
+}
+
+// claimInterrupt records that Go's fuzzing engine is about to take this target:
+// in the coordinator, for the target -test.fuzz selects. The engine stops on an
+// interrupt by itself, saving what it found, so the runtime leaves it alone
+// from here on. Before — ordinary tests, other targets' seeds — it does not.
+func (f *F) claimInterrupt() {
+	pattern := runstate.FuzzTarget()
+	if pattern == "" || runstate.FuzzWorker() || f.f == nil {
+		return
+	}
+	if ok, err := regexp.MatchString(pattern, f.f.Name()); err == nil && ok {
+		runstate.SetFuzzEngine()
 	}
 }
