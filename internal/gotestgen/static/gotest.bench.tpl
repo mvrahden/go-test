@@ -39,12 +39,14 @@ func Benchmark{{ $ts.Identifier }}(b *testing.B) {
 {{- end }}
     b.StopTimer()
     ƒeachT := gotest.NewTFromTB(b)
+    defer func() {
+      b.StopTimer()
+      s.AfterEach(ƒeachT)
+    }()
     s.BeforeEach(ƒeachT)
     b.StartTimer()
     b.ResetTimer()
     s.{{ $bm.Identifier }}({{ if $bm.UsesStdlibT }}b{{ else }}gotest.NewB(b){{ end }})
-    b.StopTimer()
-    s.AfterEach(ƒeachT)
   })
 {{ end }}
 }

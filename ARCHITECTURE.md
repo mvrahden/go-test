@@ -267,12 +267,14 @@ func BenchmarkFooTestSuite(b *testing.B) {
 
     b.Run("BenchmarkParse", func(b *testing.B) {
         b.StopTimer()
+        defer func() {
+            b.StopTimer()
+            s.AfterEach(eachT)             // outside timing, even on failure or panic
+        }()
         s.BeforeEach(eachT)                // outside timing
         b.StartTimer()
         b.ResetTimer()
         s.BenchmarkParse(gotest.NewB(b))   // user's b.Loop() bounds measurement
-        b.StopTimer()
-        s.AfterEach(eachT)                 // outside timing
     })
 }
 ```

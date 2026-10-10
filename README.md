@@ -637,7 +637,7 @@ func (s *ParserTestSuite) BenchmarkParse(b *gotest.B) {
 ```
 
 `Benchmark*` methods take `*gotest.B` (or `*testing.B`) and honor the same `F_`/`X_` focus/exclude prefixes as test methods.
-`BeforeEach`/`AfterEach` run once per benchmark method, outside the timing window — the generated wrapper stops the timer before `BeforeEach`, starts and resets it right before your method runs, and stops it again before `AfterEach`.
+`BeforeEach`/`AfterEach` run once per benchmark method, outside the timing window — the generated wrapper stops the timer before `BeforeEach`, starts and resets it right before your method runs, and stops it again before `AfterEach`, which runs even when the benchmark fails or panics.
 Use `b.Loop()` (Go 1.24+) rather than `b.N` — it excludes setup before the loop from timing automatically.
 
 The suite must be named `*TestSuite`, even if it only has benchmarks — a struct without that suffix is never discovered, so its `Benchmark*` methods are silently dropped.

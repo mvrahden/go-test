@@ -70,3 +70,19 @@ func (s *BenchFuzzFrameTestSuite) TestSetupOverrun(t *gotest.T) {
 		})
 	}
 }
+
+func (s *BenchFuzzFrameTestSuite) TestBenchmarkAfterEach(t *gotest.T) {
+	for _, c := range []struct{ how, bench string }{
+		{"fails", "BenchmarkFails"},
+		{"panics", "BenchmarkPanics"},
+	} {
+		t.It("runs when the benchmark "+c.how, func(it *gotest.T) {
+			run := runGeneratedSuiteArgs(it, "TestLifecycle_BenchAfterEach", childTimeout,
+				"-test.run=^$", "-test.bench=/"+c.bench+"$", "-test.benchtime=1x")
+			assertNoDeadlock(it, run)
+			gotest.False(it, run.passed, run.output)
+			gotest.Contains(it, run.output, "benchmark "+c.how+" on purpose", run.output)
+			gotest.Contains(it, run.output, "MARK:aftereach ran", run.output)
+		})
+	}
+}

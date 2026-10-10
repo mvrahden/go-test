@@ -11,9 +11,9 @@ Expect: benching: results \[BenchmarkContext BenchmarkSecond\]
    b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
  {{- if or $fx $sfRefs }}
      defer gotestruntime.ReleaseOnPanic(b)
-@@ -46,7 +46,7 @@
-     b.StopTimer()
-     s.AfterEach(ƒeachT)
+@@ -48,7 +48,7 @@
+     b.ResetTimer()
+     s.{{ $bm.Identifier }}({{ if $bm.UsesStdlibT }}b{{ else }}gotest.NewB(b){{ end }})
    })
 -{{ end }}
 +{{ end }}{{ end }}
