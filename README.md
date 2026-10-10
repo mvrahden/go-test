@@ -1001,7 +1001,8 @@ func (s *IntegrationTestSuite) SuiteGuard() string {
 ```
 
 Returns a non-empty reason to skip the entire suite.
-The guard runs before the suite's config, `BeforeAll` and every test method; package and shared fixtures the suite binds are still set up first.
+The guard runs before the suite's fixtures, config, `BeforeAll` and every test method, so a skipped suite sets up none of its package fixtures; its fixture fields are still nil inside the guard.
+A shared fixture the suite binds is still started by the runner, which cannot evaluate the guard.
 Unlike `X_` (static exclude), `SuiteGuard` makes the decision at runtime — useful for integration tests that need external services.
 
 ## Tooling

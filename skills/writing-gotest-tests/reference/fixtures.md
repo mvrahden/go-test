@@ -9,8 +9,8 @@ depend on other fixtures (pointer fields again) — layer infrastructure
 (container → migrations → seed data) instead of building god-fixtures, so
 suites depend only on what they use.
 
-A package fixture lives as long as the suite that binds it: set up before the
-suite's `BeforeAll`, torn down after its `AfterAll` — again for each `Fuzz*`
+A package fixture lives as long as the suite that binds it: set up after the
+suite's `SuiteGuard` and before its `BeforeAll`, torn down after its `AfterAll` — again for each `Fuzz*`
 method's seed replay. It is not shared across suites; setup that must happen
 once per run belongs in a shared fixture. A suite sets up only the fixtures
 it binds and their dependencies, so an unrelated fixture never fails it.

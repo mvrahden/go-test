@@ -355,7 +355,7 @@ CI mode is auto-detected from the standard `CI` environment variable when
 ### SuiteGuard
 
 A suite can define a `SuiteGuard()` method that returns a reason string.
-If non-empty, the entire suite is skipped at runtime with `t.Skipf("suite guard: %s", reason)`:
+If non-empty, the entire suite is skipped at runtime with `t.Skipf("suite guard: %s", reason)`, before its fixtures are set up (its fixture fields are still nil in the guard):
 
 ```go
 func (s *MySuite) SuiteGuard() string {
@@ -1347,7 +1347,8 @@ func TestMyTestSuite(t *testing.T) {
 
 The sample shows a sequential suite without a config marker. `gotestruntime.OpenSuite` is
 the suite frame every Test, Benchmark and Fuzz wrapper shares; a suite with a `SuiteGuard()`
-or `SuiteConfig()` method also passes it as `Guard`/`Config`. `ƒcfg` always carries a
+or `SuiteConfig()` method also passes it as `Guard`/`Config`, and a fixture-bound suite
+passes a `Fixtures` closure that holds its fixtures and wires its fields after the guard. `ƒcfg` always carries a
 config — the declared one, or `DefaultSuiteConfig()` when there is no `SuiteConfig()`
 method — and its `Timeout`/`SetupTimeout` bound the context that `gotestruntime.TestT`
 and `OpenSuite` hand to each phase. `ƒbudget` is different: it is the

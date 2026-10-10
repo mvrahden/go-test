@@ -31,8 +31,8 @@ This is the most common source of runtime panics in gotest code.
 
 **Never use `t.T().Skip()` for environment gating.**
 Use `SuiteGuard() string` instead.
-SuiteGuard runs before the suite's config resolution, `BeforeAll`, and every test method — the suite's own setup never executes.
-(Package/shared fixture setup currently still runs before the guard.)
+SuiteGuard runs before the suite's fixtures, config resolution, `BeforeAll`, and every test method — the suite's own setup never executes.
+A guard reads the environment, not fixture fields: they are still nil when it runs.
 `t.T().Skip()` inside `BeforeAll` runs even later, after suite setup has started.
 
 **`Nil`/`NotNil` are for non-comparable nilables only.**
@@ -354,7 +354,8 @@ func (s *MyTestSuite) SuiteGuard() string {
 ```
 
 Returns empty string to run, non-empty to skip with that reason.
-Runs before the suite's config, `BeforeAll`, and any test method (fixture setup currently still runs first).
+Runs before the suite's fixtures, config, `BeforeAll`, and any test method, so fixture fields are still nil inside it.
+A shared fixture the suite binds is still started by the runner, which cannot evaluate the guard.
 Works for standalone and fixture-bound suites alike.
 
 ### Focus & Exclude prefixes

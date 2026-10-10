@@ -92,7 +92,7 @@ aliases: ["/reference.html"]
           <tr><td><code>AfterAll</code></td><td>Runs once after all tests. Registered as cleanup, so it always runs.</td></tr>
           <tr><td><code>BeforeEach</code></td><td>Runs before every test case.</td></tr>
           <tr><td><code>AfterEach</code></td><td>Runs after every test case. Deferred, so it runs even on fatal errors.</td></tr>
-          <tr><td><code>SuiteGuard()</code></td><td>Returns a reason to skip the suite, or empty string to run. Evaluated at runtime.</td></tr>
+          <tr><td><code>SuiteGuard()</code></td><td>Returns a reason to skip the suite, or empty string to run. Evaluated at runtime, before the suite's fixtures are set up.</td></tr>
           <tr><td><code>SuiteConfig()</code></td><td>Returns timeout, parallelism, and fail-fast settings.</td></tr>
           <tr><td><code>FixtureConfig()</code></td><td>Returns timeout and retry settings for package fixtures.</td></tr>
           <tr><td><code>SharedFixtureConfig()</code></td><td>Returns timeout and retry settings for shared fixtures.</td></tr>
