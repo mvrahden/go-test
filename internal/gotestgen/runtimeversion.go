@@ -12,7 +12,7 @@ import (
 // against; bump it when the renderer uses a newer runtime symbol. The
 // extension's MIN_CLI_VERSION is a separate, CLI-side floor that must never
 // fall below it (a test guards the order).
-const MinRuntimeVersion = "v1.27.0"
+const MinRuntimeVersion = "v1.32.0"
 
 // CheckRuntimeVersion refuses to generate against a runtime older than
 // MinRuntimeVersion. Replaced and main modules have no version to check.
