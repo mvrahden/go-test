@@ -20,11 +20,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version-file: go.mod
       - name: Stdlib tests
         run: go test ./... -race
       - name: Suites
-        uses: mvrahden/go-test@main # pin a release tag in real projects
+        uses: mvrahden/go-test@v1
         with:
           packages: "./..."
           race: "true"

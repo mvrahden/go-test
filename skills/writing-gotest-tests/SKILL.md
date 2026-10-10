@@ -127,7 +127,7 @@ no expanded value diffs.
 ## Bootstrap
 
 The repo has the *library*; the CLI runs via Go's tool directive (requires
-Go ≥ 1.25). One-time:
+Go ≥ 1.25; v1.30+ requires Go ≥ 1.26). One-time:
 
 ```sh
 go get -tool github.com/mvrahden/go-test/cmd/gotest@$(go list -m -f '{{.Version}}' github.com/mvrahden/go-test)
@@ -210,8 +210,9 @@ parallel suites, or structural problems — those are your job, below.
 1. **Suites are structs, naming is the API.** `type XxxTestSuite struct{}`,
    exported, methods `func (s *X) TestBehavior(t *gotest.T)`. No `TestMain`,
    no registration — the CLI generates the harness invisibly (never commit
-   `ƒƒ_*` files). `F_`/`X_` prefixes focus/exclude; `Test*Async(t, done)`
-   declares async tests.
+   the `gotest_psuite_test.go`/`gotest_pxsuite_test.go` files `gotest
+   generate` writes; `gotest clean` removes them). `F_`/`X_` prefixes
+   focus/exclude; `Test*Async(t, done)` declares async tests.
 2. **Lifecycle hooks own resources.** Setup in `BeforeEach` (or `BeforeAll`
    for expensive read-only state), teardown in `AfterEach`/`AfterAll` as
    suite fields — NEVER `defer` or `t.T().Cleanup` in a test method. A plain

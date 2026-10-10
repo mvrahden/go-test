@@ -15,8 +15,9 @@ so structure settles before names (renaming first means renaming twice):
    resources belong in suite fields so `AfterEach` stops them even when an
    assertion aborts the test mid-way.
 3. **Fixture extraction** — near-identical `BeforeAll`s across suites → a
-   `*Fixture`; the same fixture rebuilt in several packages → a shared
-   fixture; split god-fixtures (see `fixtures.md`).
+   `*Fixture`, which removes the duplicated code but still sets up once
+   per suite; setup that must run once for several suites or packages → a
+   shared fixture; split god-fixtures (see `fixtures.md`).
 4. **Parallelization** — the payoff of 2+3, and part of EVERY improvement
    pass (observed: agents skip it unprompted). Recipe and preconditions in
    SKILL.md rule 4; residue that cannot isolate (Setenv, shared writes)
@@ -35,7 +36,7 @@ so structure settles before names (renaming first means renaming twice):
    unexported internals.
 
 Smells → moves: setup×2 → BeforeEach · defer teardown → AfterEach · twin
-BeforeAlls → Fixture · N-package fixture → shared fixture · same
+BeforeAlls → Fixture · setup that must run once → shared fixture · same
 asserts/diff data → Each or When/It · numbered names (Test1/Test2) →
 behavior names · isolated sequential suite → Parallel · sleep+assert →
 Eventually · "And"-named suite → split · per-implementation suite copies →
