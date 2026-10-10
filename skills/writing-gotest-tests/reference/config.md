@@ -2,7 +2,7 @@
 
 > Describes gotest v1.30.0+. On v1.26–v1.29 a zero duration meant NO
 > deadline (so compose onto a preset there); v1.25.x merged the marker
-> over the defaults — see SKILL.md's version gate.
+> over the defaults — see `versions.md`.
 
 A `SuiteConfig()` marker method states the config; durations it leaves at
 zero behave as if the marker were absent:
