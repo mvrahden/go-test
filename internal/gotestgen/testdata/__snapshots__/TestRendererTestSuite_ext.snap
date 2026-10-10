@@ -54,15 +54,14 @@ func (ts *ƒƒ_GOTEST_QueryTestSuite) AfterEach(it *gotest.T, ctx *myCtx) {
 }
 
 func TestQueryTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_DBFixture)
-	s := &ƒƒ_GOTEST_QueryTestSuite{
-		QueryTestSuite: QueryTestSuite{
-			DBFixture: ƒ_DBFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_QueryTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_DBFixture)
+			s.QueryTestSuite.DBFixture = ƒ_DBFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -370,15 +369,14 @@ func (ts *ƒƒ_GOTEST_CFGTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_CFGTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestCFGTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_CFGFixture)
-	s := &ƒƒ_GOTEST_CFGTestSuite{
-		CFGTestSuite: CFGTestSuite{
-			CFGFixture: ƒ_CFGFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_CFGTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_CFGFixture)
+			s.CFGTestSuite.CFGFixture = ƒ_CFGFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -570,15 +568,14 @@ func (ts *ƒƒ_GOTEST_PlainTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_PlainTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestPlainTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_PlainFixture)
-	s := &ƒƒ_GOTEST_PlainTestSuite{
-		PlainTestSuite: PlainTestSuite{
-			PlainFixture: ƒ_PlainFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_PlainTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_PlainFixture)
+			s.PlainTestSuite.PlainFixture = ƒ_PlainFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -766,15 +763,14 @@ func (ts *ƒƒ_GOTEST_EachTestSuite) BeforeEach(it *gotest.T) { ts.EachTestSuite
 func (ts *ƒƒ_GOTEST_EachTestSuite) AfterEach(it *gotest.T)  { ts.EachTestSuite.AfterEach(it) }
 
 func TestEachTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_EachFixture)
-	s := &ƒƒ_GOTEST_EachTestSuite{
-		EachTestSuite: EachTestSuite{
-			EachFixture: ƒ_EachFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_EachTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_EachFixture)
+			s.EachTestSuite.EachFixture = ƒ_EachFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -856,15 +852,14 @@ func (ts *ƒƒ_GOTEST_QueryTestSuite) BeforeEach(it *gotest.T) { ts.QueryTestSui
 func (ts *ƒƒ_GOTEST_QueryTestSuite) AfterEach(it *gotest.T)  { ts.QueryTestSuite.AfterEach(it) }
 
 func TestQueryTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_DBFixture)
-	s := &ƒƒ_GOTEST_QueryTestSuite{
-		QueryTestSuite: QueryTestSuite{
-			DBFixture: ƒ_DBFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_QueryTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_DBFixture)
+			s.QueryTestSuite.DBFixture = ƒ_DBFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -947,15 +942,14 @@ func (ts *ƒƒ_GOTEST_BasicTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_BasicTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestBasicTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_SimpleFixture)
-	s := &ƒƒ_GOTEST_BasicTestSuite{
-		BasicTestSuite: BasicTestSuite{
-			SimpleFixture: ƒ_SimpleFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_BasicTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_SimpleFixture)
+			s.BasicTestSuite.SimpleFixture = ƒ_SimpleFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -1026,15 +1020,14 @@ func (ts *ƒƒ_GOTEST_MinimalTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_MinimalTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestMinimalTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_MinimalFixture)
-	s := &ƒƒ_GOTEST_MinimalTestSuite{
-		MinimalTestSuite: MinimalTestSuite{
-			MinimalFixture: ƒ_MinimalFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_MinimalTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_MinimalFixture)
+			s.MinimalTestSuite.MinimalFixture = ƒ_MinimalFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -1105,15 +1098,14 @@ func (ts *ƒƒ_GOTEST_BoundTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_BoundTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestBoundTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_AppFixture)
-	s := &ƒƒ_GOTEST_BoundTestSuite{
-		BoundTestSuite: BoundTestSuite{
-			AppFixture: ƒ_AppFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_BoundTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_AppFixture)
+			s.BoundTestSuite.AppFixture = ƒ_AppFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -1235,15 +1227,14 @@ func (ts *ƒƒ_GOTEST_HandlerTestSuite) BeforeEach(it *gotest.T) { ts.HandlerTes
 func (ts *ƒƒ_GOTEST_HandlerTestSuite) AfterEach(it *gotest.T)  { ts.HandlerTestSuite.AfterEach(it) }
 
 func TestHandlerTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_InfraFixture, ƒ_node_APIFixture)
-	s := &ƒƒ_GOTEST_HandlerTestSuite{
-		HandlerTestSuite: HandlerTestSuite{
-			APIFixture: ƒ_APIFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_HandlerTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_InfraFixture, ƒ_node_APIFixture)
+			s.HandlerTestSuite.APIFixture = ƒ_APIFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -1330,15 +1321,14 @@ func (ts *ƒƒ_GOTEST_EmbeddedTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_EmbeddedTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestEmbeddedTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_DBFixture)
-	s := &ƒƒ_GOTEST_EmbeddedTestSuite{
-		EmbeddedTestSuite: EmbeddedTestSuite{
-			DBFixture: ƒ_DBFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_EmbeddedTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_DBFixture)
+			s.EmbeddedTestSuite.DBFixture = ƒ_DBFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -1367,15 +1357,14 @@ func (ts *ƒƒ_GOTEST_NamedTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_NamedTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestNamedTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_DBFixture)
-	s := &ƒƒ_GOTEST_NamedTestSuite{
-		NamedTestSuite: NamedTestSuite{
-			db: ƒ_DBFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_NamedTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_DBFixture)
+			s.NamedTestSuite.db = ƒ_DBFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -1467,15 +1456,14 @@ func (ts *ƒƒ_GOTEST_LightTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_LightTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestLightTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_InfraFixture)
-	s := &ƒƒ_GOTEST_LightTestSuite{
-		LightTestSuite: LightTestSuite{
-			InfraFixture: ƒ_InfraFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_LightTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_InfraFixture)
+			s.LightTestSuite.InfraFixture = ƒ_InfraFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -1504,15 +1492,14 @@ func (ts *ƒƒ_GOTEST_FullTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_FullTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestFullTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_InfraFixture, ƒ_node_APIFixture)
-	s := &ƒƒ_GOTEST_FullTestSuite{
-		FullTestSuite: FullTestSuite{
-			APIFixture: ƒ_APIFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_FullTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_InfraFixture, ƒ_node_APIFixture)
+			s.FullTestSuite.APIFixture = ƒ_APIFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -1601,15 +1588,14 @@ func (ts *ƒƒ_GOTEST_UserTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_UserTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestUserTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_PGSharedFixture, ƒ_node_AppFixture)
-	s := &ƒƒ_GOTEST_UserTestSuite{
-		UserTestSuite: UserTestSuite{
-			AppFixture: ƒ_AppFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_UserTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_PGSharedFixture, ƒ_node_AppFixture)
+			s.UserTestSuite.AppFixture = ƒ_AppFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -1680,15 +1666,14 @@ func (ts *ƒƒ_GOTEST_QueryTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_QueryTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestQueryTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_DBFixture)
-	s := &ƒƒ_GOTEST_QueryTestSuite{
-		QueryTestSuite: QueryTestSuite{
-			db: ƒ_DBFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_QueryTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_DBFixture)
+			s.QueryTestSuite.db = ƒ_DBFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -1775,15 +1760,14 @@ func (ts *ƒƒ_GOTEST_MigrationTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_MigrationTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestMigrationTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_extfixtures_PostgresSharedFixture, ƒ_node_SchemaSharedFixture)
-	s := &ƒƒ_GOTEST_MigrationTestSuite{
-		MigrationTestSuite: MigrationTestSuite{
-			Schema: ƒ_sf_SchemaSharedFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_MigrationTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_extfixtures_PostgresSharedFixture, ƒ_node_SchemaSharedFixture)
+			s.MigrationTestSuite.Schema = ƒ_sf_SchemaSharedFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -1875,15 +1859,14 @@ func (ts *ƒƒ_GOTEST_QueryTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_QueryTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestQueryTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_PostgresSharedFixture, ƒ_node_E2EFixture)
-	s := &ƒƒ_GOTEST_QueryTestSuite{
-		QueryTestSuite: QueryTestSuite{
-			E2EFixture: ƒ_E2EFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_QueryTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_PostgresSharedFixture, ƒ_node_E2EFixture)
+			s.QueryTestSuite.E2EFixture = ƒ_E2EFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -1972,15 +1955,14 @@ func (ts *ƒƒ_GOTEST_AppTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_AppTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestAppTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_SetupSharedFixture, ƒ_node_AppFixture)
-	s := &ƒƒ_GOTEST_AppTestSuite{
-		AppTestSuite: AppTestSuite{
-			AppFixture: ƒ_AppFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_AppTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_SetupSharedFixture, ƒ_node_AppFixture)
+			s.AppTestSuite.AppFixture = ƒ_AppFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
@@ -2051,15 +2033,14 @@ func (ts *ƒƒ_GOTEST_StdlibTestSuite) BeforeEach(it *gotest.T) {}
 func (ts *ƒƒ_GOTEST_StdlibTestSuite) AfterEach(it *gotest.T)  { ts.StdlibTestSuite.AfterEach(it.T()) }
 
 func TestStdlibTestSuite(t *testing.T) {
-	ƒ_holdFixtures(t, func() time.Duration {
-		return gotest.DefaultSuiteConfig().SetupTimeout
-	}, ƒ_node_DBFixture)
-	s := &ƒƒ_GOTEST_StdlibTestSuite{
-		StdlibTestSuite: StdlibTestSuite{
-			DBFixture: ƒ_DBFixture,
-		},
-	}
+	s := &ƒƒ_GOTEST_StdlibTestSuite{}
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Fixtures: func(tb testing.TB) {
+			ƒ_holdFixtures(tb, func() time.Duration {
+				return gotest.DefaultSuiteConfig().SetupTimeout
+			}, ƒ_node_DBFixture)
+			s.StdlibTestSuite.DBFixture = ƒ_DBFixture
+		},
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})

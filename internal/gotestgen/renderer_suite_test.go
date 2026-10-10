@@ -183,34 +183,35 @@ func (s *RendererTestSuite) TestFixtureClosure(t *gotest.T) {
 	pkg := gotestgen.ExportMustTestPkg(t.T(), "TestLifecycle_FixtureClosure")
 	output, _ := renderTestPkg(t.T(), pkg, false)
 
-	// preamble returns what a wrapper does between its signature and OpenSuite,
-	// with its testing variable spelled tb.
-	preamble := func(it *gotest.T, signature, tb string) string {
+	// frame returns how a wrapper opens its suite, from its signature through
+	// the OpenSuite call, with its testing variable spelled tb.
+	frame := func(it *gotest.T, signature, tb string) string {
 		start := strings.Index(output, signature)
 		gotest.GreaterOrEqual(it, start, 0, "missing: "+signature)
 		body := output[start+len(signature):]
-		end := strings.Index(body, "gotestruntime.OpenSuite(")
+		end := strings.Index(body, "\n\t})")
 		gotest.GreaterOrEqual(it, end, 0, "no OpenSuite after: "+signature)
-		end = strings.LastIndex(body[:end], "\n")
-		return strings.ReplaceAll(body[:end], "("+tb+",", "(tb,")
+		body = strings.Replace(body[:end], "ƒcfg, ƒbudget := ", "", 1)
+		return strings.ReplaceAll(body, "OpenSuite("+tb+",", "OpenSuite(tb,")
 	}
 
-	t.It("holds and wires a suite's fixtures the same way in every wrapper kind", func(it *gotest.T) {
-		test := preamble(it, "func TestMixedTestSuite(t *testing.T) {", "t")
-		gotest.Equal(it, test, preamble(it, "func BenchmarkMixedTestSuite(b *testing.B) {", "b"))
-		gotest.Equal(it, test, preamble(it, "func FuzzMixedTestSuite_FuzzWired(f *testing.F) {", "f"))
+	t.It("opens the suite and its fixtures the same way in every wrapper kind", func(it *gotest.T) {
+		test := frame(it, "func TestMixedTestSuite(t *testing.T) {", "t")
+		gotest.Equal(it, test, frame(it, "func BenchmarkMixedTestSuite(b *testing.B) {", "b"))
+		gotest.Equal(it, test, frame(it, "func FuzzMixedTestSuite_FuzzWired(f *testing.F) {", "f"))
 	})
 
 	t.It("holds only the suite's part of the fixture DAG, parents included", func(it *gotest.T) {
-		test := preamble(it, "func TestMixedTestSuite(t *testing.T) {", "t")
+		test := frame(it, "func TestMixedTestSuite(t *testing.T) {", "t")
 		gotest.Regexp(it, `\}, ƒ_node_MarkSharedFixture, ƒ_node_RootFixture, ƒ_node_ChildFixture\)`, test)
 		gotest.NotContains(it, test, "ƒ_node_UnusedFixture")
 	})
 
-	t.It("wires the shared fixture field beside the package fixture field", func(it *gotest.T) {
-		test := preamble(it, "func TestMixedTestSuite(t *testing.T) {", "t")
-		gotest.Contains(it, test, "Child:  ƒ_ChildFixture,")
-		gotest.Contains(it, test, "Shared: ƒ_sf_MarkSharedFixture,")
+	t.It("holds and wires the fixtures inside the frame, after the guard", func(it *gotest.T) {
+		test := frame(it, "func TestMixedTestSuite(t *testing.T) {", "t")
+		gotest.Regexp(it, `(?s)Guard: s\.MixedTestSuite\.SuiteGuard,\s+Fixtures: func\(tb testing\.TB\) \{\s+ƒ_holdFixtures\(tb, `, test)
+		gotest.Contains(it, test, "s.MixedTestSuite.Child = ƒ_ChildFixture\n")
+		gotest.Contains(it, test, "s.MixedTestSuite.Shared = ƒ_sf_MarkSharedFixture\n")
 	})
 }
 
@@ -610,16 +611,15 @@ func (s *RendererTestSuite) TestRenderer_BenchmarkWrapper(t *gotest.T) {
 	})
 
 	t.When("benchmark suite is bound to a package fixture", func(w *gotest.T) {
-		w.It("holds the suite's fixtures and constructs the suite with fixture fields populated", func(it *gotest.T) {
+		w.It("holds the suite's fixtures in its frame and wires the fixture fields", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBoundBenchmark")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
 			idx := strings.Index(out, "func BenchmarkParserTestSuite")
 			gotest.GreaterOrEqual(it, idx, 0, "bench wrapper missing from output")
 			benchFn := out[idx:]
-			gotest.Regexp(it, `ƒ_holdFixtures\(b, func\(\) time\.Duration \{[^}]*\}, ƒ_node_PoolFixture\)`, benchFn)
-			gotest.Contains(it, benchFn, "ParserTestSuite: ParserTestSuite{")
-			gotest.Contains(it, benchFn, "PoolFixture: ƒ_PoolFixture")
+			gotest.Regexp(it, `Fixtures: func\(tb testing\.TB\) \{\s+ƒ_holdFixtures\(tb, func\(\) time\.Duration \{[^}]*\}, ƒ_node_PoolFixture\)`, benchFn)
+			gotest.Contains(it, benchFn, "s.ParserTestSuite.PoolFixture = ƒ_PoolFixture\n")
 		})
 
 		w.It("guards each sub-benchmark, whose panic skips the wrapper's cleanups", func(it *gotest.T) {
@@ -659,16 +659,15 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 	})
 
 	t.When("fuzz suite is bound to a package fixture", func(w *gotest.T) {
-		w.It("holds the suite's fixtures and constructs the suite with fixture fields populated", func(it *gotest.T) {
+		w.It("holds the suite's fixtures in its frame and wires the fixture fields", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBoundFuzz")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
 			idx := strings.Index(out, "func FuzzParserFuzzTestSuite_FuzzParse")
 			gotest.GreaterOrEqual(it, idx, 0, "fuzz wrapper missing from output")
 			fuzzFn := out[idx:]
-			gotest.Regexp(it, `ƒ_holdFixtures\(f, func\(\) time\.Duration \{[^}]*\}, ƒ_node_PoolFixture\)`, fuzzFn)
-			gotest.Contains(it, fuzzFn, "ParserFuzzTestSuite: ParserFuzzTestSuite{")
-			gotest.Contains(it, fuzzFn, "PoolFixture: ƒ_PoolFixture")
+			gotest.Regexp(it, `Fixtures: func\(tb testing\.TB\) \{\s+ƒ_holdFixtures\(tb, func\(\) time\.Duration \{[^}]*\}, ƒ_node_PoolFixture\)`, fuzzFn)
+			gotest.Contains(it, fuzzFn, "s.ParserFuzzTestSuite.PoolFixture = ƒ_PoolFixture\n")
 		})
 
 	})

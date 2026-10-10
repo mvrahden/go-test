@@ -2,17 +2,7 @@
 {{- if $ts.Benchmarks }}
 {{- $fx := index $.Fixtures $ts.Identifier }}
 func Benchmark{{ $ts.Identifier }}(b *testing.B) {
-{{- template "suiteInstance" (dict "Suite" $ts "Fixtures" $fx "TB" "b") }}
-  gotestruntime.OpenSuite(b, gotestruntime.Suite{
-{{- if $ts.HasGuard }}
-    Guard: s.{{ $ts.Identifier }}.SuiteGuard,
-{{- end }}
-{{- if $ts.HasConfig }}
-    Config: s.{{ $ts.Identifier }}.SuiteConfig,
-{{- end }}
-    BeforeAll: s.BeforeAll,
-    AfterAll: s.AfterAll,
-  })
+{{- template "suiteFrame" (dict "Suite" $ts "Fixtures" $fx "TB" "b" "Assign" "") }}
 {{ range $bm := $ts.Benchmarks }}
   b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
 {{- if $fx.Nodes }}

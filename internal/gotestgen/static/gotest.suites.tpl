@@ -4,17 +4,7 @@
 {{ template "suiteWrapper" $ts }}
 {{ if $ts.TestCases }}
 func Test{{ $ts.Identifier }}(t *testing.T) {
-{{- template "suiteInstance" (dict "Suite" $ts "Fixtures" $fx "TB" "t") }}
-  ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
-{{- if $ts.HasGuard }}
-    Guard: s.{{ $ts.Identifier }}.SuiteGuard,
-{{- end }}
-{{- if $ts.HasConfig }}
-    Config: s.{{ $ts.Identifier }}.SuiteConfig,
-{{- end }}
-    BeforeAll: s.BeforeAll,
-    AfterAll: s.AfterAll,
-  })
+{{- template "suiteFrame" (dict "Suite" $ts "Fixtures" $fx "TB" "t" "Assign" "ƒcfg, ƒbudget := ") }}
 {{- if $ts.IsMethodParallel }}
   ƒfailed := &atomic.Bool{}
 {{- end }}

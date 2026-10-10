@@ -4,17 +4,7 @@
 {{ range $i, $ts := .Spec.EffectiveTestSuites }}
 {{- range $fz := $ts.Fuzzers }}
 func Fuzz{{ $ts.Identifier }}_{{ $fz.Identifier }}(f *testing.F) {
-{{- template "suiteInstance" (dict "Suite" $ts "Fixtures" (index $.Fixtures $ts.Identifier) "TB" "f") }}
-  gotestruntime.OpenSuite(f, gotestruntime.Suite{
-{{- if $ts.HasGuard }}
-    Guard: s.{{ $ts.Identifier }}.SuiteGuard,
-{{- end }}
-{{- if $ts.HasConfig }}
-    Config: s.{{ $ts.Identifier }}.SuiteConfig,
-{{- end }}
-    BeforeAll: s.BeforeAll,
-    AfterAll: s.AfterAll,
-  })
+{{- template "suiteFrame" (dict "Suite" $ts "Fixtures" (index $.Fixtures $ts.Identifier) "TB" "f" "Assign" "") }}
 {{- $funcName := printf "Fuzz%s_%s" $ts.Identifier $fz.Identifier }}
 {{- /*
   Harvested seeds go through *gotest.F, never *testing.F directly: F.Add

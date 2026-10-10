@@ -16,30 +16,37 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
 {{- end }}
 
 {{- /*
-  Takes dict "Suite", "Fixtures" (its SuiteFixtureSet) and "TB", the wrapper's
-  testing value. Every wrapper builds its suite here, so each holds the same
-  fixtures and wires the same fields. The hold comes first, so its teardown
-  runs after the suite's AfterAll.
+  Takes dict "Suite", "Fixtures" (its SuiteFixtureSet), "TB", the wrapper's
+  testing value, and "Assign", what receives OpenSuite's results. Every wrapper
+  opens its suite here, so each holds the same fixtures, wires the same fields,
+  and does so only once the guard let the suite run.
 */ -}}
-{{- define "suiteInstance" }}{{ $ts := .Suite }}{{ $fx := .Fixtures }}
-{{- if $fx.Nodes }}
-  ƒ_holdFixtures({{ .TB }}, func() time.Duration {
-{{- if $ts.HasConfig }}
-    return gotestruntime.WithSuiteDefaults((&{{ $ts.Identifier }}{}).SuiteConfig()).SetupTimeout
-{{- else }}
-    return gotest.DefaultSuiteConfig().SetupTimeout
+{{- define "suiteFrame" }}{{ $ts := .Suite }}{{ $fx := .Fixtures }}
+  s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
+  {{ .Assign }}gotestruntime.OpenSuite({{ .TB }}, gotestruntime.Suite{
+{{- if $ts.HasGuard }}
+    Guard: s.{{ $ts.Identifier }}.SuiteGuard,
 {{- end }}
-  }{{ range $n := $fx.Nodes }}, ƒ_node_{{ $n }}{{ end }})
-  s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{
-    {{ $ts.Identifier }}: {{ $ts.Identifier }}{
+{{- if $fx.Nodes }}
+    Fixtures: func(tb testing.TB) {
+      ƒ_holdFixtures(tb, func() time.Duration {
+{{- if $ts.HasConfig }}
+        return gotestruntime.WithSuiteDefaults((&{{ $ts.Identifier }}{}).SuiteConfig()).SetupTimeout
+{{- else }}
+        return gotest.DefaultSuiteConfig().SetupTimeout
+{{- end }}
+      }{{ range $n := $fx.Nodes }}, ƒ_node_{{ $n }}{{ end }})
 {{- range $f := $fx.Fields }}
-      {{ $f.Name }}: {{ $f.Var }},
+      s.{{ $ts.Identifier }}.{{ $f.Name }} = {{ $f.Var }}
 {{- end }}
     },
-  }
-{{- else }}
-  s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
 {{- end }}
+{{- if $ts.HasConfig }}
+    Config: s.{{ $ts.Identifier }}.SuiteConfig,
+{{- end }}
+    BeforeAll: s.BeforeAll,
+    AfterAll: s.AfterAll,
+  })
 {{- end }}
 
 {{- /* Takes dict "Suite" and, for a fixture-bound suite, "FixtureOrder". */ -}}

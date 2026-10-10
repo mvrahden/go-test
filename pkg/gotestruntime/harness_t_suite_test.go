@@ -116,10 +116,11 @@ func runFrame(it *gotest.T, s gotestruntime.Suite) (inner *testing.T, cfg, budge
 
 func (s *HarnessTTestSuite) TestOpenSuite(t *gotest.T) {
 	t.When("the guard names a reason", func(w *gotest.T) {
-		w.It("skips the suite before its config and BeforeAll", func(it *gotest.T) {
+		w.It("skips the suite before its fixtures, config and BeforeAll", func(it *gotest.T) {
 			var calls []string
 			inner, _, _ := runFrame(it, gotestruntime.Suite{
 				Guard:     func() string { return "no database" },
+				Fixtures:  func(testing.TB) { calls = append(calls, "fixtures") },
 				Config:    func() gotest.SuiteConfig { calls = append(calls, "config"); return gotest.SuiteConfig{} },
 				BeforeAll: func(*gotest.T) { calls = append(calls, "beforeall") },
 				AfterAll:  func(*gotest.T) { calls = append(calls, "afterall") },
@@ -130,16 +131,20 @@ func (s *HarnessTTestSuite) TestOpenSuite(t *gotest.T) {
 	})
 
 	t.When("the guard returns empty", func(w *gotest.T) {
-		w.It("runs config, BeforeAll and then AfterAll", func(it *gotest.T) {
+		w.It("runs fixtures, config, BeforeAll, AfterAll and then the fixture teardown", func(it *gotest.T) {
 			var calls []string
 			inner, _, _ := runFrame(it, gotestruntime.Suite{
-				Guard:     func() string { return "" },
+				Guard: func() string { return "" },
+				Fixtures: func(tb testing.TB) {
+					calls = append(calls, "fixtures")
+					tb.Cleanup(func() { calls = append(calls, "teardown") })
+				},
 				Config:    func() gotest.SuiteConfig { calls = append(calls, "config"); return gotest.SuiteConfig{} },
 				BeforeAll: func(*gotest.T) { calls = append(calls, "beforeall") },
 				AfterAll:  func(*gotest.T) { calls = append(calls, "afterall") },
 			})
 			gotest.False(it, inner.Skipped())
-			gotest.Equal(it, []string{"config", "beforeall", "afterall"}, calls)
+			gotest.Equal(it, []string{"fixtures", "config", "beforeall", "afterall", "teardown"}, calls)
 		})
 	})
 
@@ -182,6 +187,20 @@ func (s *HarnessTTestSuite) TestOpenSuite(t *gotest.T) {
 			})
 			gotest.NoError(it, afterAllErr)
 			gotest.True(it, bounded)
+		})
+	})
+
+	t.When("the fixtures end the suite early", func(w *gotest.T) {
+		w.It("runs no config, BeforeAll or AfterAll", func(it *gotest.T) {
+			var calls []string
+			inner, _, _ := runFrame(it, gotestruntime.Suite{
+				Fixtures:  func(tb testing.TB) { tb.SkipNow() },
+				Config:    func() gotest.SuiteConfig { calls = append(calls, "config"); return gotest.SuiteConfig{} },
+				BeforeAll: func(*gotest.T) { calls = append(calls, "beforeall") },
+				AfterAll:  func(*gotest.T) { calls = append(calls, "afterall") },
+			})
+			gotest.True(it, inner.Skipped())
+			gotest.Empty(it, calls)
 		})
 	})
 
