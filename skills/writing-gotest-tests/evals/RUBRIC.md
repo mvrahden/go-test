@@ -79,6 +79,7 @@ Runners split). Missing traps are in the fixture backlog (§8).
 | C14 | File with lint-fixable violations that strand imports | lint -fix + goimports caveat |
 | C15 | Port a stdlib test full of `if err != nil { t.Fatal }` guards | assertions stated directly (fail-guard) — no guarded fails survive; expected value first in `Equal` |
 | C16 | Add `When`/`It` tests for `Restocker` under two conditions (v1.29+ consumer) | rule 8: bare conditions and behaviors; no `When("when …")` / `It("it …")`; `gotest spec` reads "when <condition>" |
+| C17 | Test code that needs `DATABASE_URL`; the suite must not fail where it is unset | rule 10: `SuiteGuard` returns the reason; no `t.T().Skip()` in `BeforeAll`, no env check inside tests |
 
 **Harm traps (H):** skill arm only; blind rule-following must NOT act.
 
