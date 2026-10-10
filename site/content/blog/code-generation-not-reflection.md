@@ -96,7 +96,7 @@ func TestUserServiceTestSuite(t *testing.T) {
 
 The generated code is what you'd write by hand if you were wiring up the suite yourself: a top-level `func Test*` that creates the struct, then runs each test method as a subtest with the lifecycle hooks in the right places.
 
-For suites with fixtures, the generated code also includes fixture initialization with proper DAG ordering, `sync.Once` semantics for one-time setup, and `t.Cleanup` registration for teardown.
+For suites with fixtures, the generated test function also sets the fixtures up in dependency (DAG) order before the suite starts, and registers their teardown with `t.Cleanup`, so it runs after the suite's `AfterAll`.
 
 ### Stage 3: Overlay injection
 
