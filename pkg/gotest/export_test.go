@@ -18,6 +18,16 @@ var (
 	ExportPkgCache          = &pkgCache
 )
 
+var ExportDefaultSnapshotDir = defaultSnapshotDir
+
+// ExportRedirectSnapshots makes MatchSnapshot read and write its snapshots in
+// dir until the returned restore runs.
+func ExportRedirectSnapshots(dir string) (restore func()) {
+	prev := snapshotDirFor
+	snapshotDirFor = func(string) string { return dir }
+	return func() { snapshotDirFor = prev }
+}
+
 // ExportMatchSnapshotFromPtest calls MatchSnapshot from this internal test
 // file, so caller-package detection sees a ptest caller and picks no suffix.
 func ExportMatchSnapshotFromPtest(t testingT, value any) { MatchSnapshot(t, value) }

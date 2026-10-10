@@ -15,17 +15,24 @@ import (
 )
 
 // SnapshotGroupingTestSuite tests grouped snapshot file creation with per-subtest sections.
-type SnapshotGroupingTestSuite struct{ snapPath string }
-
-func (s *SnapshotGroupingTestSuite) BeforeEach(_ *gotest.T) {
-	s.snapPath = filepath.Join("testdata", "__snapshots__", "TestSnapshotGroupingTestSuite_ext.snap")
+type SnapshotGroupingTestSuite struct {
+	snapDir  string
+	snapPath string
+	restore  func()
 }
 
-func (s *SnapshotGroupingTestSuite) AfterEach(_ *gotest.T) { os.Remove(s.snapPath) }
+// BeforeEach redirects snapshots into a temp dir, away from the source tree.
+func (s *SnapshotGroupingTestSuite) BeforeEach(t *gotest.T) {
+	s.snapDir = t.TempDir()
+	s.snapPath = filepath.Join(s.snapDir, "TestSnapshotGroupingTestSuite_ext.snap")
+	s.restore = gotest.ExportRedirectSnapshots(s.snapDir)
+}
+
+func (s *SnapshotGroupingTestSuite) AfterEach(_ *gotest.T) { s.restore() }
 
 func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
 	t.Setenv(protocol.EnvCI, "0")
-	snapDir := filepath.Join("testdata", "__snapshots__")
+	snapDir := s.snapDir
 
 	t.When("subtests write snapshots", func(w *gotest.T) {
 		w.It("creates a file with named sections per subtest", func(it *gotest.T) {
@@ -77,13 +84,20 @@ func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
 }
 
 // SnapshotConcurrencyTestSuite tests concurrent snapshot writes from parallel subtests.
-type SnapshotConcurrencyTestSuite struct{ snapPath string }
-
-func (s *SnapshotConcurrencyTestSuite) BeforeEach(_ *gotest.T) {
-	s.snapPath = filepath.Join("testdata", "__snapshots__", "TestSnapshotConcurrencyTestSuite_ext.snap")
+type SnapshotConcurrencyTestSuite struct {
+	snapDir  string
+	snapPath string
+	restore  func()
 }
 
-func (s *SnapshotConcurrencyTestSuite) AfterEach(_ *gotest.T) { os.Remove(s.snapPath) }
+// BeforeEach redirects snapshots into a temp dir, away from the source tree.
+func (s *SnapshotConcurrencyTestSuite) BeforeEach(t *gotest.T) {
+	s.snapDir = t.TempDir()
+	s.snapPath = filepath.Join(s.snapDir, "TestSnapshotConcurrencyTestSuite_ext.snap")
+	s.restore = gotest.ExportRedirectSnapshots(s.snapDir)
+}
+
+func (s *SnapshotConcurrencyTestSuite) AfterEach(_ *gotest.T) { s.restore() }
 
 func (s *SnapshotConcurrencyTestSuite) TestMatchSnapshotConcurrency(t *gotest.T) {
 	t.Setenv(protocol.EnvCI, "0")
@@ -99,17 +113,24 @@ func (s *SnapshotConcurrencyTestSuite) TestMatchSnapshotConcurrency(t *gotest.T)
 }
 
 // SnapshotUpdateTestSuite tests snapshot update mode via GOTEST_UPDATE_SNAPSHOTS.
-type SnapshotUpdateTestSuite struct{ snapPath string }
-
-func (s *SnapshotUpdateTestSuite) BeforeEach(_ *gotest.T) {
-	s.snapPath = filepath.Join("testdata", "__snapshots__", "TestSnapshotUpdateTestSuite_ext.snap")
+type SnapshotUpdateTestSuite struct {
+	snapDir  string
+	snapPath string
+	restore  func()
 }
 
-func (s *SnapshotUpdateTestSuite) AfterEach(_ *gotest.T) { os.Remove(s.snapPath) }
+// BeforeEach redirects snapshots into a temp dir, away from the source tree.
+func (s *SnapshotUpdateTestSuite) BeforeEach(t *gotest.T) {
+	s.snapDir = t.TempDir()
+	s.snapPath = filepath.Join(s.snapDir, "TestSnapshotUpdateTestSuite_ext.snap")
+	s.restore = gotest.ExportRedirectSnapshots(s.snapDir)
+}
+
+func (s *SnapshotUpdateTestSuite) AfterEach(_ *gotest.T) { s.restore() }
 
 func (s *SnapshotUpdateTestSuite) TestMatchSnapshotUpdate(t *gotest.T) {
 	t.Setenv(protocol.EnvCI, "0")
-	snapDir := filepath.Join("testdata", "__snapshots__")
+	snapDir := s.snapDir
 
 	t.When("GOTEST_UPDATE_SNAPSHOTS is set", func(w *gotest.T) {
 		w.It("replaces original content with updated content and removes the old value", func(it *gotest.T) {
@@ -148,17 +169,24 @@ type snapshotNamedString string
 
 // SnapshotTestSuite tests snapshot matching, custom naming, and value serialization.
 // Sequential: Setenv, and both methods write one snapshot file.
-type SnapshotTestSuite struct{ snapPath string }
-
-func (s *SnapshotTestSuite) BeforeEach(_ *gotest.T) {
-	s.snapPath = filepath.Join("testdata", "__snapshots__", "TestSnapshotTestSuite_ext.snap")
+type SnapshotTestSuite struct {
+	snapDir  string
+	snapPath string
+	restore  func()
 }
 
-func (s *SnapshotTestSuite) AfterEach(_ *gotest.T) { os.Remove(s.snapPath) }
+// BeforeEach redirects snapshots into a temp dir, away from the source tree.
+func (s *SnapshotTestSuite) BeforeEach(t *gotest.T) {
+	s.snapDir = t.TempDir()
+	s.snapPath = filepath.Join(s.snapDir, "TestSnapshotTestSuite_ext.snap")
+	s.restore = gotest.ExportRedirectSnapshots(s.snapDir)
+}
+
+func (s *SnapshotTestSuite) AfterEach(_ *gotest.T) { s.restore() }
 
 func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 	t.Setenv(protocol.EnvCI, "0")
-	snapDir := filepath.Join("testdata", "__snapshots__")
+	snapDir := s.snapDir
 
 	t.When("no snapshot exists", func(w *gotest.T) {
 		w.It("creates a grouped snapshot file on first run", func(it *gotest.T) {
@@ -207,8 +235,7 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 
 func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 	t.Setenv(protocol.EnvCI, "0")
-	snapDir := filepath.Join("testdata", "__snapshots__")
-	snapPath := filepath.Join(snapDir, "TestSnapshotTestSuite_ext.snap")
+	snapPath := s.snapPath
 
 	t.When("value is a string", func(w *gotest.T) {
 		w.It("snapshots the string directly", func(it *gotest.T) {
@@ -332,16 +359,20 @@ func (s *SnapshotTestSuite) TestSnapshotContent(t *gotest.T) {
 }
 
 // SnapshotTBBackedTestSuite tests snapshot behavior with TB-backed T from benchmarks.
-type SnapshotTBBackedTestSuite struct{ snapPath string }
-
-func (s *SnapshotTBBackedTestSuite) BeforeEach(_ *gotest.T) {
-	s.snapPath = filepath.Join("testdata", "__snapshots__", "TestSnapshotTBBackedTestSuite_ext.snap")
+type SnapshotTBBackedTestSuite struct {
+	snapDir  string
+	snapPath string
+	restore  func()
 }
 
-func (s *SnapshotTBBackedTestSuite) AfterEach(_ *gotest.T) {
-	os.Remove(s.snapPath)
-	os.Remove(filepath.Join("testdata", "__snapshots__", "unknown_ext.snap"))
+// BeforeEach redirects snapshots into a temp dir, away from the source tree.
+func (s *SnapshotTBBackedTestSuite) BeforeEach(t *gotest.T) {
+	s.snapDir = t.TempDir()
+	s.snapPath = filepath.Join(s.snapDir, "TestSnapshotTBBackedTestSuite_ext.snap")
+	s.restore = gotest.ExportRedirectSnapshots(s.snapDir)
 }
+
+func (s *SnapshotTBBackedTestSuite) AfterEach(_ *gotest.T) { s.restore() }
 
 func (s *SnapshotTBBackedTestSuite) TestMatchSnapshotWithTBBacked(t *gotest.T) {
 	t.Setenv(protocol.EnvCI, "0")
