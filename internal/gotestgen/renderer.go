@@ -18,8 +18,8 @@ import (
 var templates embed.FS
 
 var (
-	headerTpl = template.Must(template.New("header").ParseFS(templates, "static/header.*"))
-	gotestTpl = template.Must(template.New("gotest").Funcs(template.FuncMap{"dict": dict}).ParseFS(templates, "static/gotest.*"))
+	headerTpl = template.Must(template.New("header").ParseFS(templates, "static/header.*.tpl"))
+	gotestTpl = template.Must(template.New("gotest").Funcs(template.FuncMap{"dict": dict}).ParseFS(templates, "static/gotest.*.tpl"))
 )
 
 // dict builds a template argument from key/value pairs.
