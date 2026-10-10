@@ -68,46 +68,31 @@ func TestAppTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestCreate", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer func() {
-			if err := ƒ_AppFixture.AfterEach(context.Background()); err != nil {
-				it.Errorf("AppFixture.AfterEach failed: %v", err)
-			}
-		}()
-		if err := ƒ_AppFixture.BeforeEach(it.Context()); err != nil {
-			it.Fatalf("AppFixture.BeforeEach failed: %v", err)
-		}
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestCreate, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Fixtures: []gotestruntime.EachHooks{
+			{
+				Name:   "AppFixture",
+				Before: func(ctx context.Context) error { return ƒ_AppFixture.BeforeEach(ctx) },
+				After:  func(ctx context.Context) error { return ƒ_AppFixture.AfterEach(ctx) },
+			},
+		},
+		Cases: []gotestruntime.Method{
+			{Name: "TestCreate", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestCreate, ttt)
+				})
+			}},
+			{Name: "TestDelete", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestDelete, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("TestDelete", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer func() {
-			if err := ƒ_AppFixture.AfterEach(context.Background()); err != nil {
-				it.Errorf("AppFixture.AfterEach failed: %v", err)
-			}
-		}()
-		if err := ƒ_AppFixture.BeforeEach(it.Context()); err != nil {
-			it.Fatalf("AppFixture.BeforeEach failed: %v", err)
-		}
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestDelete, ttt)
-		})
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestE2ECLI/CLI-level_generation/multi_fixture multi_fixture-ptest ===
@@ -223,30 +208,24 @@ func TestMultiFixtureTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestDBReady", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestDBReady, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestDBReady", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestDBReady, ttt)
+				})
+			}},
+			{Name: "TestCacheReady", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestCacheReady, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("TestCacheReady", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestCacheReady, ttt)
-		})
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 type ƒƒ_GOTEST_ServiceTestSuite struct {
@@ -271,18 +250,17 @@ func TestServiceTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestServiceReady", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestServiceReady, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestServiceReady", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestServiceReady, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestE2ECLI/CLI-level_generation/no_testsuite no_testsuite-ptest ===
@@ -319,54 +297,38 @@ func TestMyE2ETestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("Test_HelloWorld", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.Test_HelloWorld, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "Test_HelloWorld", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.Test_HelloWorld, ttt)
+				})
+			}},
+			{Name: "Test_HelloWorld_1", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.Test_HelloWorld_1, ttt)
+				})
+			}},
+			{Name: "Test_HelloWorld_2", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.Test_HelloWorld_2, ttt)
+				})
+			}},
+			{Name: "Test_HelloWorld_3", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.Test_HelloWorld_3, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("Test_HelloWorld_1", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.Test_HelloWorld_1, ttt)
-		})
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("Test_HelloWorld_2", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.Test_HelloWorld_2, ttt)
-		})
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("Test_HelloWorld_3", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.Test_HelloWorld_3, ttt)
-		})
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 type ƒƒ_GOTEST_AsyncE2ETestSuite struct {
@@ -385,52 +347,28 @@ func TestAsyncE2ETestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestDoneFromGoroutineAsync", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒdone := make(chan struct{}, 1)
-			s.TestDoneFromGoroutineAsync(ttt, func() {
-				select {
-				case ƒdone <- struct{}{}:
-				default:
-				}
-			})
-			select {
-			case <-ƒdone:
-			case <-ttt.Context().Done():
-				it.Fatalf("%s: done() was not called before the test deadline", "TestDoneFromGoroutineAsync")
-			}
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestDoneFromGoroutineAsync", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					gotestruntime.AwaitDone(ttt, "TestDoneFromGoroutineAsync", func(done func()) {
+						ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestDoneFromGoroutineAsync(t, done) }, ttt)
+					})
+				})
+			}},
+			{Name: "TestDoneInlineAsync", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					gotestruntime.AwaitDone(ttt, "TestDoneInlineAsync", func(done func()) {
+						ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestDoneInlineAsync(t, done) }, ttt)
+					})
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("TestDoneInlineAsync", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒdone := make(chan struct{}, 1)
-			s.TestDoneInlineAsync(ttt, func() {
-				select {
-				case ƒdone <- struct{}{}:
-				default:
-				}
-			})
-			select {
-			case <-ƒdone:
-			case <-ttt.Context().Done():
-				it.Fatalf("%s: done() was not called before the test deadline", "TestDoneInlineAsync")
-			}
-		})
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestE2ECLI/CLI-level_generation/simple_testsuite testsuite-pxtest ===
@@ -463,54 +401,38 @@ func TestMyE2ETestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("Test_HelloWorld", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.Test_HelloWorld, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "Test_HelloWorld", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.Test_HelloWorld, ttt)
+				})
+			}},
+			{Name: "Test_HelloWorld_1", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.Test_HelloWorld_1, ttt)
+				})
+			}},
+			{Name: "Test_HelloWorld_2", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.Test_HelloWorld_2, ttt)
+				})
+			}},
+			{Name: "Test_HelloWorld_3", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.Test_HelloWorld_3, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("Test_HelloWorld_1", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.Test_HelloWorld_1, ttt)
-		})
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("Test_HelloWorld_2", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.Test_HelloWorld_2, ttt)
-		})
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("Test_HelloWorld_3", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.Test_HelloWorld_3, ttt)
-		})
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestE2ECLI/CLI-level_generation/suite_guard suite_guard-ptest ===
@@ -572,30 +494,24 @@ func TestGuardedTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestHello", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestHello, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestHello", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestHello, ttt)
+				})
+			}},
+			{Name: "TestWorld", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestWorld, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("TestWorld", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestWorld, ttt)
-		})
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 type ƒƒ_GOTEST_GuardedFixtureBoundTestSuite struct {
@@ -621,17 +537,16 @@ func TestGuardedFixtureBoundTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestMustNotRun", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestMustNotRun, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestMustNotRun", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestMustNotRun, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 

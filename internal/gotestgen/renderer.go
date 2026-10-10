@@ -154,7 +154,7 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		Imports     []headerImport
 	}
 	// Every harness references gotestruntime: the ƒƒ_GOTEST_exec sentinel takes a
-	// gotestruntime.TestCase, and each Test function builds its lifecycle T there.
+	// gotestruntime.TestCase, and each Test function runs its methods there.
 	imports := []headerImport{
 		{Path: "testing"},
 		{Path: about.Repo + "/pkg/gotest"},
@@ -197,17 +197,6 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		if fans.NeedsMath {
 			addImport("math")
 		}
-	}
-	// This condition must stay identical to the ones guarding the ƒfailed
-	// declaration in gotest.suites.tpl. A parallel suite whose every method is
-	// excluded stays in EffectiveTestSuites with no TestCases, so the template
-	// emits no atomic.Bool. format.Source does not type-check and would let the
-	// stray import through; it is `go test` that then refuses the whole generated
-	// package with "imported and not used".
-	if slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
-		return v.IsMethodParallel() && len(v.TestCases()) > 0
-	}) {
-		addImport("sync/atomic")
 	}
 	for _, rf := range allFixtures {
 		addImport(rf.PkgPath)

@@ -216,3 +216,75 @@ func (s *HarnessTTestSuite) TestOpenSuite(t *gotest.T) {
 		})
 	})
 }
+
+func (s *HarnessTTestSuite) TestRunMethods(t *gotest.T) {
+	t.When("a suite's fixtures have per-method hooks", func(w *gotest.T) {
+		w.It("wraps each method's Run in them, the AfterEach hooks in reverse", func(it *gotest.T) {
+			var calls []string
+			hook := func(name string) func(context.Context) error {
+				return func(context.Context) error { calls = append(calls, name); return nil }
+			}
+			it.T().Run("inner", func(tt *testing.T) { //nolint:t-escape // RunMethods takes the raw testing.T
+				gotestruntime.RunMethods(tt, gotest.DefaultSuiteConfig(), gotest.SuiteConfig{}, gotestruntime.Methods{
+					Fixtures: []gotestruntime.EachHooks{
+						{Name: "Root", Before: hook("root before"), After: hook("root after")},
+						{Name: "Child", Before: hook("child before"), After: hook("child after")},
+					},
+					Cases: []gotestruntime.Method{{Name: "TestOne", Run: func(_ *gotest.T, run func(func())) {
+						calls = append(calls, "suite before")
+						run(func() { calls = append(calls, "method") })
+						calls = append(calls, "suite after")
+					}}},
+				})
+			})
+			gotest.Equal(it, []string{
+				"root before", "child before", "suite before", "method", "suite after", "child after", "root after",
+			}, calls)
+		})
+	})
+
+	t.When("the suite runs its methods in parallel", func(w *gotest.T) {
+		w.It("runs them at the same time", func(it *gotest.T) {
+			started := make(chan struct{})
+			met := make(chan bool, 1)
+			cases := []gotestruntime.Method{
+				{Name: "TestWaits", Run: func(_ *gotest.T, run func(func())) {
+					run(func() {
+						select {
+						case <-started:
+							met <- true
+						case <-time.After(10 * time.Second):
+							met <- false
+						}
+					})
+				}},
+				{Name: "TestStarts", Run: func(_ *gotest.T, run func(func())) { run(func() { close(started) }) }},
+			}
+			it.T().Run("inner", func(tt *testing.T) { //nolint:t-escape // RunMethods takes the raw testing.T
+				gotestruntime.RunMethods(tt, gotest.DefaultSuiteConfig(), gotest.SuiteConfig{}, gotestruntime.Methods{Parallel: true, Cases: cases})
+			})
+			select {
+			case ok := <-met:
+				gotest.True(it, ok, "the first method never saw the second start")
+			default:
+				gotest.Fail(it, "the first method never ran")
+			}
+		})
+	})
+}
+
+func (s *HarnessTTestSuite) TestAwaitDone(t *gotest.T) {
+	t.When("the method calls done from another goroutine", func(w *gotest.T) {
+		w.It("returns once done is called", func(it *gotest.T) {
+			called := false
+			gotestruntime.AwaitDone(it, "TestAsync", func(done func()) {
+				go func() {
+					called = true
+					done()
+					done() // a second call must not block
+				}()
+			})
+			gotest.True(it, called)
+		})
+	})
+}

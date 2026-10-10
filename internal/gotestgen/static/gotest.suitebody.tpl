@@ -49,73 +49,62 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
   })
 {{- end }}
 
-{{- /* Takes dict "Suite" and, for a fixture-bound suite, "FixtureOrder". */ -}}
-{{- define "suiteMethods" }}{{ $ts := .Suite }}{{ $fixtures := .FixtureOrder }}{{ range $tc := $ts.TestCases }}
-    t.Run("{{ $tc.Identifier }}", func(it *testing.T) {
+{{- /*
+  Takes dict "Suite" and, for a fixture-bound suite, "FixtureOrder". The
+  runtime owns the loop; each case keeps what needs the suite's static types:
+  its BeforeEach and AfterEach, with a returned context, and the method call.
+  Every call goes through the ƒƒ_GOTEST_exec trampoline, where assertion call
+  sites stop.
+*/ -}}
+{{- define "suiteMethods" }}{{ $ts := .Suite }}{{ $fixtures := .FixtureOrder }}
+{{- $hooks := false }}{{ range $fix := $fixtures }}{{ if or $fix.BeforeEach $fix.AfterEach }}{{ $hooks = true }}{{ end }}{{ end }}
+  gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 {{- if $ts.IsMethodParallel }}
-        it.Parallel()
-        if ƒcfg.FailFast && ƒfailed.Load() {
-          it.Skip("FailFast: earlier test failed")
-        }
-        defer func() { if it.Failed() { ƒfailed.Store(true) } }()
+    Parallel: true,
 {{- end }}
-        ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-{{- range $fix := $fixtures }}
-{{- if $fix.AfterEach }}
-        defer func() {
-            if err := ƒ_{{ $fix.Identifier }}.AfterEach(context.Background()); err != nil {
-                it.Errorf("{{ $fix.Identifier }}.AfterEach failed: %v", err)
-            }
-        }()
-{{- end }}
-{{- end }}
-{{- range $fix := $fixtures }}
+{{- if $hooks }}
+    Fixtures: []gotestruntime.EachHooks{
+{{- range $fix := $fixtures }}{{ if or $fix.BeforeEach $fix.AfterEach }}
+      {
+        Name: "{{ $fix.Identifier }}",
 {{- if $fix.BeforeEach }}
-        if err := ƒ_{{ $fix.Identifier }}.BeforeEach(it.Context()); err != nil {
-            it.Fatalf("{{ $fix.Identifier }}.BeforeEach failed: %v", err)
-        }
+        Before: func(ctx context.Context) error { return ƒ_{{ $fix.Identifier }}.BeforeEach(ctx) },
 {{- end }}
+{{- if $fix.AfterEach }}
+        After: func(ctx context.Context) error { return ƒ_{{ $fix.Identifier }}.AfterEach(ctx) },
 {{- end }}
+      },
+{{- end }}{{ end }}
+    },
+{{- end }}
+    Cases: []gotestruntime.Method{
+{{- range $tc := $ts.TestCases }}
+{{- $t := "t" }}{{ if $tc.UsesStdlibT }}{{ $t = "t.T()" }}{{ end }}
+{{- $ctx := "" }}{{ if $ts.HasReturningBeforeEach }}{{ $ctx = ", ctx" }}{{ end }}
+      {Name: "{{ $tc.Identifier }}", Run: func(ttt *gotest.T, run func(func())) {
 {{- if $ts.HasReturningBeforeEach }}
         ctx := s.BeforeEach(ttt)
         defer s.AfterEach(ttt, ctx)
-        gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-{{- if $tc.IsAsync }}
-          ƒdone := make(chan struct{}, 1)
-          s.{{ $tc.Identifier }}({{ if $tc.UsesStdlibT }}ttt.T(){{ else }}ttt{{ end }}, ctx, func() { select { case ƒdone <- struct{}{}: default: } })
-          select {
-          case <-ƒdone:
-          case <-ttt.Context().Done():
-            it.Fatalf("%s: done() was not called before the test deadline", "{{ $tc.Identifier }}")
-          }
-{{- else }}
-          s.{{ $tc.Identifier }}({{ if $tc.UsesStdlibT }}ttt.T(){{ else }}ttt{{ end }}, ctx)
-{{- end }}
-        })
 {{- else }}
         defer s.AfterEach(ttt)
         s.BeforeEach(ttt)
-        gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
+{{- end }}
+        run(func() {
 {{- if $tc.IsAsync }}
-          ƒdone := make(chan struct{}, 1)
-          s.{{ $tc.Identifier }}({{ if $tc.UsesStdlibT }}ttt.T(){{ else }}ttt{{ end }}, func() { select { case ƒdone <- struct{}{}: default: } })
-          select {
-          case <-ƒdone:
-          case <-ttt.Context().Done():
-            it.Fatalf("%s: done() was not called before the test deadline", "{{ $tc.Identifier }}")
-          }
+          gotestruntime.AwaitDone(ttt, "{{ $tc.Identifier }}", func(done func()) {
+            ƒƒ_GOTEST_exec(func(t *gotest.T) { s.{{ $tc.Identifier }}({{ $t }}{{ $ctx }}, done) }, ttt)
+          })
+{{- else if or $tc.UsesStdlibT $ts.HasReturningBeforeEach }}
+          ƒƒ_GOTEST_exec(func(t *gotest.T) { s.{{ $tc.Identifier }}({{ $t }}{{ $ctx }}) }, ttt)
 {{- else }}
-          ƒƒ_GOTEST_exec({{ if $tc.UsesStdlibT }}func(t *gotest.T) { s.{{ $tc.Identifier }}(t.T()) }{{ else }}s.{{ $tc.Identifier }}{{ end }}, ttt)
+          ƒƒ_GOTEST_exec(s.{{ $tc.Identifier }}, ttt)
 {{- end }}
         })
+      }},
 {{- end }}
-    })
-{{- if not $ts.IsMethodParallel }}
-    if ƒcfg.FailFast && t.Failed() {
-        return
-    }
+    },
+  })
 {{- end }}
-{{ end }}{{ end }}
 
 {{- /* Skipped TestX of an excluded suite, or of one whose every Test method is excluded. */ -}}
 {{- define "excludedSuite" }}

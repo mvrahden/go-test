@@ -5,10 +5,6 @@
 {{ if $ts.TestCases }}
 func Test{{ $ts.Identifier }}(t *testing.T) {
 {{- template "suiteFrame" (dict "Suite" $ts "Fixtures" $fx "TB" "t" "Assign" "ƒcfg, ƒbudget := ") }}
-{{- if $ts.IsMethodParallel }}
-  ƒfailed := &atomic.Bool{}
-{{- end }}
-
 {{ template "suiteMethods" (dict "Suite" $ts "FixtureOrder" $fx.Order) }}
 }
 {{- else if $ts.DeclaresTests }}
