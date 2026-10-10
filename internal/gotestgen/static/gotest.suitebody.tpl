@@ -82,3 +82,10 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
     }
 {{- end }}
 {{ end }}{{ end }}
+
+{{- /* Skipped TestX of an excluded suite, or of one whose every Test method is excluded. */ -}}
+{{- define "excludedSuite" }}
+func Test{{ .Identifier }}(t *testing.T) {
+  t.Skipf("test suite was excluded by user")
+}
+{{- end }}

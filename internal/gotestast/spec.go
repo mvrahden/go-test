@@ -238,6 +238,12 @@ func (ts *TestSuiteSpec) TestCases() []*TestSuiteMethod {
 	return ts.th.TestCases
 }
 
+// DeclaresTests reports whether the suite declares any Test method, even one
+// excluded or unfocused away. Without one the suite has no test run.
+//
+// FOR RENDERING
+func (ts *TestSuiteSpec) DeclaresTests() bool { return ts.th.DeclaresTests }
+
 // Benchmarks returns the benchmark methods slice.
 //
 // FOR RENDERING
@@ -345,11 +351,13 @@ func NewTestSuiteSpecForTest(name, pkgName string, isGenericAlias bool) *TestSui
 }
 
 type TestSuiteHarness struct {
-	BeforeAll      *TestSuiteMethod
-	BeforeEach     *TestSuiteMethod
-	AfterAll       *TestSuiteMethod
-	AfterEach      *TestSuiteMethod
-	TestCases      []*TestSuiteMethod
+	BeforeAll  *TestSuiteMethod
+	BeforeEach *TestSuiteMethod
+	AfterAll   *TestSuiteMethod
+	AfterEach  *TestSuiteMethod
+	TestCases  []*TestSuiteMethod
+	// DeclaresTests survives the X_/F_ reduction of TestCases.
+	DeclaresTests  bool
 	Benchmarks     []*TestSuiteMethod
 	Fuzzers        []*TestSuiteMethod
 	Config         *types.Func // SuiteConfig() method, may be nil
@@ -728,6 +736,7 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 	}
 
 	s.th.TestCases = append(s.th.TestCases, tm)
+	s.th.DeclaresTests = true
 
 	maxParams := 1
 

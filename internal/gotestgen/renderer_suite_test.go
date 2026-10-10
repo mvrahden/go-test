@@ -157,6 +157,28 @@ func (s *RendererTestSuite) TestParallelAllExcluded(t *gotest.T) {
 	})
 }
 
+func (s *RendererTestSuite) TestCaselessSuites(t *gotest.T) {
+	pkg := gotestgen.ExportMustTestPkg(t.T(), "TestGenerator_CaselessSuites")
+	output, _ := renderTestPkg(t.T(), pkg, false)
+
+	t.It("renders no Test function for a suite without test methods", func(it *gotest.T) {
+		for _, suite := range []string{"BenchOnlyTestSuite", "BoundBenchTestSuite", "FuzzOnlyTestSuite"} {
+			gotest.NotContains(it, output, "func Test"+suite+"(", suite)
+		}
+	})
+
+	t.It("renders a skipped Test function for a suite whose every test method is excluded", func(it *gotest.T) {
+		for _, suite := range []string{"AllExcludedTestSuite", "BoundExcludedTestSuite", "ExcludedWithFuzzTestSuite"} {
+			gotest.Regexp(it, `func Test`+suite+`\(t \*testing\.T\) \{\s*t\.Skipf\("test suite was excluded by user"\)\s*\}`, output)
+		}
+	})
+
+	t.It("opens only the suite with test methods in a Test function", func(it *gotest.T) {
+		gotest.Equal(it, 1, strings.Count(output, "gotestruntime.OpenSuite(t,"), output)
+		gotest.Contains(it, output, "func TestPlainTestSuite(t *testing.T)")
+	})
+}
+
 func (s *RendererTestSuite) TestParallelFailFast(t *gotest.T) {
 	t.When("method-parallel suite with FailFast", func(w *gotest.T) {
 		w.It("emits a shared failure flag that skips not-yet-started subtests", func(it *gotest.T) {

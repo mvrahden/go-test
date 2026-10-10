@@ -1,5 +1,3 @@
-=== RUN   TestNotificationDispatchBenchTestSuite
---- PASS: TestNotificationDispatchBenchTestSuite (<TIMESTAMP>)
 === RUN   TestNotificationServiceTestSuite
 === RUN   TestNotificationServiceTestSuite/TestDeliverNotification
 === RUN   TestNotificationServiceTestSuite/TestDeliverNotification/a_single_notification_is_dispatched

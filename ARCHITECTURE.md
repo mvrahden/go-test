@@ -284,6 +284,11 @@ collected at all — Pass 1 discovery matches on that suffix regardless of
 whether the struct has `Test*` methods. A bench-only struct without the
 suffix is invisible to the collector and its methods never run; `discover`
 warns about each one that takes `*gotest.B` or `*gotest.F`.
+Only a suite with `Test*` methods gets a `Test<Suite>` function, and only a
+suite with `Test*` or `Fuzz*` methods is scheduled for a test run. A
+bench-only suite is therefore never opened outside `gotest bench`. A suite
+whose every `Test*` method is `X_`-excluded gets a `Test<Suite>` that only
+skips.
 `ValidateContextConsistency` (Pass 4) additionally rejects a suite that
 mixes `Benchmark*` methods with a returning `BeforeEach` (its context type
 can't thread through `*gotest.B`) or with any stdlib `*testing.T` lifecycle

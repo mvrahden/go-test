@@ -104,7 +104,7 @@ func ƒ_setupFixtures(t testing.TB) {
 
 {{- /* Render fixture-bound suites as top-level Test functions */ -}}
 {{ range $fs := .FlatSuites }}
-
+{{ if $fs.Suite.TestCases }}
 func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
     ƒ_setupFixtures(t)
 
@@ -115,7 +115,7 @@ func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
 {{- end }}
         },
     }
-    {{ if $fs.Suite.TestCases }}ƒcfg, ƒbudget := {{ end }}gotestruntime.OpenSuite(t, gotestruntime.Suite{
+    ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
 {{- if $fs.Suite.HasGuard }}
       Guard: s.{{ $fs.Suite.Identifier }}.SuiteGuard,
 {{- end }}
@@ -125,12 +125,15 @@ func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
       BeforeAll: s.BeforeAll,
       AfterAll: s.AfterAll,
     })
-{{- if and $fs.Suite.IsMethodParallel $fs.Suite.TestCases }}
+{{- if $fs.Suite.IsMethodParallel }}
     ƒfailed := &atomic.Bool{}
 {{- end }}
 
 {{ template "suiteMethods" (dict "Suite" $fs.Suite "FixtureOrder" $fs.FixtureOrder) }}
 }
+{{- else if $fs.Suite.DeclaresTests }}
+{{ template "excludedSuite" $fs.Suite }}
+{{- end }}
 {{ end }}
 
 {{- define "fixtureNode" -}}

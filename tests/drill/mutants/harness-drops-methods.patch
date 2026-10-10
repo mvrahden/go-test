@@ -11,9 +11,12 @@ Expect: ^ *passing fail TestPassingTestSuite/TestOne$
      t.Run("{{ $tc.Identifier }}", func(it *testing.T) {
  {{- if $ts.IsMethodParallel }}
          it.Parallel()
-@@ -81,4 +81,4 @@
+@@ -81,7 +81,7 @@
          return
      }
  {{- end }}
 -{{ end }}{{ end }}
 +{{ end }}{{ end }}{{ end }}
+ 
+ {{- /* Skipped TestX of an excluded suite, or of one whose every Test method is excluded. */ -}}
+ {{- define "excludedSuite" }}

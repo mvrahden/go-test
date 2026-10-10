@@ -1,13 +1,13 @@
 package gotestgen_test
 
 import (
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// Each wrapper kind runs alone: a suite without Test methods still gets a Test
-// wrapper, which would print the same markers.
+// Each wrapper kind runs alone, so its markers come from that wrapper only.
 var (
 	benchOnly = []string{"-test.run=^$", "-test.bench=.", "-test.benchtime=1x"}
 	fuzzOnly  = []string{"-test.run=^Fuzz"}
@@ -85,4 +85,29 @@ func (s *BenchFuzzFrameTestSuite) TestBenchmarkAfterEach(t *gotest.T) {
 			gotest.Contains(it, run.output, "MARK:aftereach ran", run.output)
 		})
 	}
+}
+
+func (s *BenchFuzzFrameTestSuite) TestCaselessSuitesHaveNoTestRun(t *gotest.T) {
+	run := runGeneratedSuiteArgs(t, "TestLifecycle_CaselessSuites", childTimeout)
+
+	t.It("passes", func(it *gotest.T) {
+		assertNoDeadlock(it, run)
+		gotest.True(it, run.passed, run.output)
+		gotest.Contains(it, run.output, "--- PASS: TestPlainTestSuite", run.output)
+	})
+
+	t.It("never opens a benchmark-only suite or its fixtures", func(it *gotest.T) {
+		gotest.NotContains(it, run.output, "MARK:bench beforeall", run.output)
+		gotest.NotContains(it, run.output, "MARK:fixture beforeall", run.output)
+	})
+
+	t.It("opens a fuzz-only suite once, for its seeds", func(it *gotest.T) {
+		gotest.Equal(it, 1, strings.Count(run.output, "MARK:fuzz beforeall"), run.output)
+		gotest.Contains(it, run.output, "MARK:fuzz seed seed", run.output)
+	})
+
+	t.It("skips a suite whose every test method is excluded", func(it *gotest.T) {
+		gotest.NotContains(it, run.output, "MARK:excluded beforeall", run.output)
+		gotest.Contains(it, run.output, "--- SKIP: TestAllExcludedTestSuite", run.output)
+	})
 }

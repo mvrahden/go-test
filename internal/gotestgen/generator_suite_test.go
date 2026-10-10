@@ -117,6 +117,28 @@ func (s *GeneratorTestSuite) TestGenerateFromLoaded_BenchSuiteNames(t *gotest.T)
 	})
 }
 
+func (s *GeneratorTestSuite) TestGenerateFromLoaded_TestRunSuiteNames(t *gotest.T) {
+	pkg := gotestgen.ExportMustTestPkg(t.T(), "TestGenerator_CaselessSuites")
+	results, _, err := gotestgen.GenerateFromLoaded([]*gotestgen.LoadResult{
+		{PkgPath: pkg.PkgPath, PkgDir: "/fake/dir", Ptest: pkg},
+	})
+	gotest.NoError(t, err)
+	gotest.Len(t, results, 1)
+	r := results[0]
+
+	t.It("schedules suites with test methods or fuzz seeds", func(it *gotest.T) {
+		gotest.ElementsMatch(it, []string{"FuzzOnlyTestSuite", "ExcludedWithFuzzTestSuite", "PlainTestSuite"}, r.SuiteNames)
+	})
+
+	t.It("reports a suite whose every test method is excluded as skipped", func(it *gotest.T) {
+		gotest.ElementsMatch(it, []string{"AllExcludedTestSuite", "BoundExcludedTestSuite"}, r.SkippedSuiteNames)
+	})
+
+	t.It("keeps benchmark-only suites for bench runs", func(it *gotest.T) {
+		gotest.ElementsMatch(it, []string{"BenchOnlyTestSuite", "BoundBenchTestSuite"}, r.BenchSuiteNames)
+	})
+}
+
 func (s *GeneratorTestSuite) TestE2ENoTestSuites(t *gotest.T) {
 	t.When("packages without test suites", func(w *gotest.T) {
 		for sub, tC := range gotest.Each(w, []struct {
