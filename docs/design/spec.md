@@ -1453,12 +1453,11 @@ Inputs: `packages`, `race`, `coverage`, `min-coverage`, `flags`, `go-test-flags`
 Outputs: `exit-code`, `coverage`, `badge`, `bench-report`, `bench-breached-keys`, `fuzz-crashers`.
 README.md's input and output tables are canonical; a drift guard keeps them in step with `action.yml`.
 
-Manual setup works without the action:
+Manual setup works without the action, once the tool is declared in `go.mod` (`go get -tool`, see README.md):
 
 ```yaml
-- run: go install github.com/mvrahden/go-test/cmd/gotest@latest
-- run: gotest --ci ./... -v -race -coverprofile=coverage.out
-- run: gotest spec ./... --format=md --output=behavior-spec.md
+- run: go tool gotest --ci ./... -v -race -coverprofile=coverage.out
+- run: go tool gotest spec ./... --format=md --output=behavior-spec.md
 ```
 
 Exit codes: 0 = pass, 1 = test failure, a suite binary the race detector failed after its tests (exit status 66, read as a failed suite), a shared fixture that failed to set up or tear down (booked into the event stream as the failed package `shared fixtures`), or a `--timeout` that expired before the last verdict (`FAIL: global --timeout exceeded after <d> while running: <pkg> <test>, …` names up to five units still running, the suites in the text run; each is booked into the event stream as failed at the method, followed by its suite and package, and a deadline with nothing to name, during compilation or fixture setup, is booked as a failed `global --timeout` package), 2 = usage, generation, or build error (stricter than `go test`, which exits 1 on build errors) or a census failure, 130 = run interrupted (SIGINT/SIGTERM) before the last verdict, whatever the suites the interrupt killed reported; their failures are the interrupt's, not verdicts. An interrupt that arrives later, while fixtures tear down, leaves the verdict alone. A second interrupt ends the CLI at once with 130, abandoning what is left of the teardown; whatever the fixtures still held is left behind. A suite binary the run stopped from outside — a signal on Unix, the console interrupt a `--timeout` sends on Windows — reports a status it never chose (`-1`, `0xC000013A`); it is read as a failed suite, named on stderr, and never becomes the run's own exit code.
