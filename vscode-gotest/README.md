@@ -290,7 +290,7 @@ The extension finds one `go` and leaves the toolchain to Go: `go run` and `go to
 ## Requirements
 
 - VS Code 1.123 or later
-- Go 1.25 or later
+- Go 1.26 or later
 - A Go project using [gotest](https://github.com/mvrahden/go-test) suites
 - [Delve](https://github.com/go-delve/delve) for debug support
 

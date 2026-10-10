@@ -22,9 +22,9 @@ Shared fixtures (`*SharedFixture`) span packages: gotest sets them up once
 and transfers state by JSON-serializing the fixture's EXPORTED FIELDS into
 a state file each test process reads. One pointer field per parent shared
 fixture TYPE: only one instance of a parent ever exists, so a second field
-of the same type is a generation error (it used to leave the first field
-nil) — keep one wired field and derive the other reference in `BeforeAll`. `Hydrate(ctx) error` runs in each
-test process to reconstruct live handles from that state; `Dehydrate(ctx)
+of the same type is a generation error — keep one wired field and derive
+the other reference in `BeforeAll`. `Hydrate(ctx) error` runs in each test
+process to reconstruct live handles from that state; `Dehydrate(ctx)
 error` is per-test-process CLEANUP (deferred), not a serializer. Serialize
 connection INFO (addresses, DSNs), never live handles — reconstruct them
 in `Hydrate` and keep them in fields assigned there (the "Hydrate-local"

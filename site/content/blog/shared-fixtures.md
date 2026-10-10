@@ -304,10 +304,10 @@ There is also a project-level timeout, `--setup-timeout`, which sets a wall-cloc
 
 The decision is about scope and cost:
 
-- **Package fixtures** (`*Fixture` suffix) are scoped to a single package. They are simpler: no JSON serialization, no `Hydrate`/`Dehydrate`, no subprocess. Use them when the fixture is only needed by suites in one package, or when the setup cost is low enough that duplicating it across packages is acceptable.
-- **Shared fixtures** (`*SharedFixture` suffix) are scoped to the entire test run. Use them when the fixture is expensive (containers, external services, large seed datasets) and needed by suites across multiple packages.
+- **Package fixtures** (`*Fixture` suffix) are scoped to the suite that binds them: each suite sets up its own instance. They are simpler: no JSON serialization, no `Hydrate`/`Dehydrate`, no subprocess. Use them when the setup cost is low enough that paying it once per suite is acceptable.
+- **Shared fixtures** (`*SharedFixture` suffix) are scoped to the entire test run. Use them when the fixture is expensive (containers, external services, large seed datasets) and needed by more than one suite, in one package or across many.
 
-If in doubt, start with package fixtures. Promote to shared fixtures when the per-package setup time becomes a problem. The struct pattern is similar enough that the migration is mechanical: rename the suffix, add `Hydrate`/`Dehydrate` for non-serializable fields, and move the struct to a shared package.
+If in doubt, start with package fixtures. Promote to shared fixtures when the per-suite setup time becomes a problem. The struct pattern is similar enough that the migration is mechanical: rename the suffix, add `Hydrate`/`Dehydrate` for non-serializable fields, and move the struct to a shared package.
 
 ## What this replaces
 

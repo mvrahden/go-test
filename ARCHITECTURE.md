@@ -398,7 +398,7 @@ without modifying source. Go's compiler reads virtual paths from the overlay.
 ### PackageFixture Lifecycle
 
 ```
-┌──────────────────── PER PACKAGE (lazy fixture init) ────────────────┐
+┌───── PER TOP-LEVEL FUNCTION (each Test/Benchmark/Fuzz wrapper) ──────┐
 │                                                                      │
 │  DAG wavefront setup (channel-based parallel scheduling):            │
 │                                                                      │

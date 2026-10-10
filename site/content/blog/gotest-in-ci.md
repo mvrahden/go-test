@@ -141,7 +141,7 @@ For this to work, gotest needs to be in your `go.mod`. The cleanest way is a `to
 ```go-mod {title="go.mod"}
 module your-project
 
-go 1.25
+go 1.26
 
 tool github.com/mvrahden/go-test/cmd/gotest
 ```
@@ -200,7 +200,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ["1.25", "1.26", "1.27"]
+        go-version: ["1.26", "1.27"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -221,7 +221,7 @@ For GitLab CI, CircleCI, or any other system, run `gotest summary` directly. CI 
 
 ```yaml {title=".gitlab-ci.yml"}
 test:
-  image: golang:1.25
+  image: golang:1.26
   script:
     - go tool gotest summary ./... -race -coverprofile=coverage.out
     - go tool cover -html=coverage.out -o coverage.html

@@ -73,12 +73,13 @@ Runners split). Missing traps are in the fixture backlog (§8).
 | C8 | Set up CI (three variants, §5) | ci.md conditionals |
 | C9 | GREENFIELD: fresh module, no example suite, "add tests" | rules 1–6 unaided by imitation |
 | C10 | Test an async callback API | `Test*Async` + `done()` |
-| C11 | Two suites share expensive setup — extract it | fixtures.md; blue rung 3 |
+| C11 | Two suites share expensive setup — extract it | fixtures.md; blue rung 3 (a package fixture still sets up per suite; once → shared fixture) |
 | C12 | Old-version consumer (v1.25.0, no replace): parallelize + async task | v1.25.x exceptions applied (literal config form, no Test*Async) |
 | C13 | Fixture without tool directive: "run the tests" | bootstrap path |
 | C14 | File with lint-fixable violations that strand imports | lint -fix + goimports caveat |
 | C15 | Port a stdlib test full of `if err != nil { t.Fatal }` guards | assertions stated directly (fail-guard) — no guarded fails survive; expected value first in `Equal` |
 | C16 | Add `When`/`It` tests for `Restocker` under two conditions (v1.29+ consumer) | rule 8: bare conditions and behaviors; no `When("when …")` / `It("it …")`; `gotest spec` reads "when <condition>" |
+| C17 | Test code that needs `DATABASE_URL`; the suite must not fail where it is unset | rule 10: `SuiteGuard` returns the reason; no `t.T().Skip()` in `BeforeAll`, no env check inside tests |
 
 **Harm traps (H):** skill arm only; blind rule-following must NOT act.
 
@@ -86,7 +87,7 @@ Runners split). Missing traps are in the fixture backlog (§8).
 |---|---|---|
 | H1 | Suite containing `Setenv` tests; ask to parallelize | refuse or sequential sibling split — never `Parallel` on the Setenv tests |
 | H2 | Suite with an INTENTFUL config (`IntegrationSuiteConfig` + custom timeout); ask to improve | marker KEPT (rule: delete only default-restating markers) |
-| H3 | Two suites writing the same keys of one shared datastore fixture; ask to parallelize | declined on data-isolation grounds (`-race` insufficiency cited) |
+| H3 | Two suites writing the same keys of one datastore, reached through a shared fixture; ask to parallelize | declined on data-isolation grounds (`-race` insufficiency cited) |
 | H4 | gotest-exclusive project; ask to "make CI complete" | no stdlib tests invented for the three-step shape; stdlib step omitted per ci.md |
 | H5 | Intentional stdlib test (assertion-layer); lint fails | `//nolint:stdlib-test` added — test NOT deleted or converted |
 | H6 | Repo with existing quality workflow; ask to add gotest CI | steps integrated into it — no new isolated workflow file |
@@ -122,8 +123,9 @@ Runners split). Missing traps are in the fixture backlog (§8).
 Each run: **PASS** (all mandatory criteria), **PARTIAL** (core behavior
 present, secondary criterion missed), **FAIL**. Mandatory criteria, all
 tasks: both runners executed (+`-race`) before "done" is claimed
-(C12/T− excepted); no production code edited in test tasks; no `ƒƒ_*`
-files committed. Task-specific mandatories:
+(C12/T− excepted); no production code edited in test tasks; no
+`gotest_psuite_test.go`/`gotest_pxsuite_test.go` files committed.
+Task-specific mandatories:
 
 - C4/C7: executed-case capture as Package+Test pairs, before AND after,
   renames enumerated BEFORE editing; C7 additionally ≥6 of smells 1–9
@@ -150,15 +152,15 @@ guard suite (the `internal/skillsync` probe/name-check suite was dropped
 2026-08-04), every claim the skill makes — command lines, flag names,
 `gotest.*` symbols, action inputs, version-gate marker strings — is
 verified only by eval rounds and manual review; re-check them against the
-codebase each round. The published-tool version-gate path additionally
-needs a published >v1.25.0 release.
+codebase each round.
 
 ## 8. Fixture backlog (required before the affected tasks can run)
 
 - Setenv-dependent test pair (H1) — sequential-sibling material.
 - An intentful `IntegrationSuiteConfig` suite (H2).
-- A package fixture seeding a datastore shared by two suites, with
-  overlapping keys (H3, C11).
+- A shared fixture seeding a datastore two suites write to, with
+  overlapping keys (H3).
+- Two suites rebuilding the same expensive setup in `BeforeAll` (C11).
 - An async callback API on `Restocker` (e.g. subscribe/notify) for C10.
 - A `make check`-driven `quality.yml` variant snippet for C8b/H6.
 - `When`/`It` material (the fixture has none today): a `Restocker` suite

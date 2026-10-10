@@ -23,7 +23,7 @@ that release; skip it on older ones.
 ## Bootstrap
 
 The repo has the *library*; the CLI runs via Go's tool directive (requires
-Go ≥ 1.25). One-time:
+Go ≥ 1.25; v1.30+ requires Go ≥ 1.26). One-time:
 
 ```sh
 go get -tool github.com/mvrahden/go-test/cmd/gotest@$(go list -m -f '{{.Version}}' github.com/mvrahden/go-test)
@@ -106,8 +106,9 @@ parallel suites, or structural problems — those are your job, below.
 1. **Suites are structs, naming is the API.** `type XxxTestSuite struct{}`,
    exported, methods `func (s *X) TestBehavior(t *gotest.T)`. No `TestMain`,
    no registration — the CLI generates the harness invisibly (never commit
-   `ƒƒ_*` files). `F_`/`X_` prefixes focus/exclude; `Test*Async(t, done)`
-   declares async tests.
+   the `gotest_psuite_test.go`/`gotest_pxsuite_test.go` files `gotest
+   generate` writes; `gotest clean` removes them). `F_`/`X_` prefixes
+   focus/exclude; `Test*Async(t, done)` declares async tests.
 2. **Lifecycle hooks own resources.** Setup in `BeforeEach` (or `BeforeAll`
    for expensive read-only state), teardown in `AfterEach`/`AfterAll` as
    suite fields — NEVER `defer` or `t.T().Cleanup` in a test method. A plain
@@ -180,6 +181,15 @@ parallel suites, or structural problems — those are your job, below.
    `go tool gotest fuzz --for=30s ./...`; a crasher becomes a seed through
    `gotest fuzz promote`, never a hand-committed corpus file for a struct
    target.
+
+10. **Gate on the environment with `SuiteGuard`, never a skip.** A suite
+    that needs what a machine may lack (a `DATABASE_URL`, Docker, a
+    credential) declares `func (s *X) SuiteGuard() string`: empty runs the
+    suite, anything else skips it with that reason. It runs before the
+    suite's config and `BeforeAll`, so the suite's own setup never starts;
+    `t.T().Skip()` in `BeforeAll` runs after setup has begun. Fixtures the
+    suite binds still set up before the guard, so a guard cannot keep a
+    fixture from starting.
 
 ## Restructuring existing suites (the blue phase)
 
