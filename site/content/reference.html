@@ -92,7 +92,7 @@ aliases: ["/reference.html"]
           <tr><td><code>AfterAll</code></td><td>Runs once after all tests. Registered as cleanup, so it always runs.</td></tr>
           <tr><td><code>BeforeEach</code></td><td>Runs before every test case.</td></tr>
           <tr><td><code>AfterEach</code></td><td>Runs after every test case. Deferred, so it runs even on fatal errors.</td></tr>
-          <tr><td><code>SuiteGuard()</code></td><td>Returns a reason to skip the suite, or empty string to run. Evaluated at runtime.</td></tr>
+          <tr><td><code>SuiteGuard()</code></td><td>Returns a reason to skip the suite, or empty string to run. Evaluated at runtime, before the suite's fixtures are set up.</td></tr>
           <tr><td><code>SuiteConfig()</code></td><td>Returns timeout, parallelism, and fail-fast settings.</td></tr>
           <tr><td><code>FixtureConfig()</code></td><td>Returns timeout and retry settings for package fixtures.</td></tr>
           <tr><td><code>SharedFixtureConfig()</code></td><td>Returns timeout and retry settings for shared fixtures.</td></tr>
@@ -265,7 +265,7 @@ gotest.MatchSnapshot(t, render(other), <span class="st">"variant"</span>)  <span
 
       <p>Fixture hooks use <code>(ctx context.Context) error</code> signatures. Errors are reported with automatic attribution — <code>E2EFixture.BeforeAll failed: connection refused</code>.</p>
 
-      <p>A package fixture lives as long as the suite that binds it: set up before the suite's <code>BeforeAll</code>, torn down after its <code>AfterAll</code>, also when a test panics or the run is stopped. Setup that must happen once per run belongs in a shared fixture.</p>
+      <p>A package fixture lives as long as the suite that binds it: set up before the suite's <code>BeforeAll</code>, torn down after its <code>AfterAll</code>, also when a test panics or the run is stopped. Setup that must happen once per run belongs in a shared fixture. A suite sets up only the fixtures it binds and their dependencies, so a fixture it does not use never delays or fails it.</p>
 
       <p>Package fixtures support all four lifecycle hooks. <code>BeforeEach</code>/<code>AfterEach</code> wrap every individual test case, running outside the suite's own hooks:</p>
       <div class="diagram">Fixture.BeforeEach

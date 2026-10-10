@@ -18,8 +18,8 @@ import (
 var templates embed.FS
 
 var (
-	headerTpl = template.Must(template.New("header").ParseFS(templates, "static/header.*"))
-	gotestTpl = template.Must(template.New("gotest").Funcs(template.FuncMap{"dict": dict}).ParseFS(templates, "static/gotest.*"))
+	headerTpl = template.Must(template.New("header").ParseFS(templates, "static/header.*.tpl"))
+	gotestTpl = template.Must(template.New("gotest").Funcs(template.FuncMap{"dict": dict}).ParseFS(templates, "static/gotest.*.tpl"))
 )
 
 // dict builds a template argument from key/value pairs.
@@ -38,13 +38,18 @@ func dict(kv ...any) (map[string]any, error) {
 	return m, nil
 }
 
-// FlatFixtureSuite describes a suite with its fixture dependency graph,
-// used for generating per-suite Test functions.
-type FlatFixtureSuite struct {
-	Suite         *gotestast.TestSuiteSpec
-	Fixture       *BoundFixture
-	FixtureOrder  []*BoundFixture
-	FixtureFields map[string]string
+// SuiteFixtureSet is the part of the package's fixture DAG one suite reaches.
+// Every wrapper of the suite holds exactly these nodes and wires these fields.
+type SuiteFixtureSet struct {
+	Nodes  []string            // DAG node names: shared fixtures, then package fixtures
+	Fields []SuiteFixtureField // the suite's own fixture fields
+	Order  []*BoundFixture     // package fixtures, dependencies first
+}
+
+// SuiteFixtureField wires one suite field to the variable its fixture lives in.
+type SuiteFixtureField struct {
+	Name string
+	Var  string
 }
 
 // SharedFixtureRef describes a shared fixture embedded in a package fixture.
@@ -91,8 +96,6 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 		return nil, nil, nil
 	}
 
-	fixtureBound := resolved.FixtureBound
-	standalone := resolved.Standalone
 	allFixtures := resolved.AllFixtures
 	sfNodeVMs := buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures)
 	hasFixtures := len(resolved.RootFixtures) > 0 || len(sfNodeVMs) > 0
@@ -104,32 +107,25 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 		return nil, nil, err
 	}
 
+	suiteFixtures := buildSuiteFixtureSets(resolved, sfNodeVMs)
+
 	buf := bytes.NewBuffer(nil)
 	if err := r.renderFileHeader(buf, pkg, spec, hasFixtures, resolved.SuiteSharedFixtures, allFixtures, sfNodeVMs, fans); err != nil {
 		return nil, nil, fmt.Errorf("failed rendering file header. err: %w", err)
 	}
 
-	if len(fixtureBound) > 0 || len(sfNodeVMs) > 0 {
-		if err := r.renderFixtures(buf, fixtureBound, allFixtures, resolved.SuiteFixtureFields, sfNodeVMs); err != nil {
-			return nil, nil, fmt.Errorf("failed rendering fixture suites. err: %w", err)
-		}
+	if err := r.renderFixtures(buf, allFixtures, sfNodeVMs); err != nil {
+		return nil, nil, fmt.Errorf("failed rendering fixtures. err: %w", err)
 	}
 
-	if len(standalone) > 0 || len(spec.SkippedTestSuites) > 0 {
-		standaloneSpec := SpecOutcome{
-			EffectiveTestSuites: standalone,
-			SkippedTestSuites:   spec.SkippedTestSuites,
-			SkippedTestCases:    spec.SkippedTestCases,
-		}
-		if err := r.renderTestSuites(buf, standaloneSpec, resolved.SuiteSharedFixtures); err != nil {
-			return nil, nil, fmt.Errorf("failed rendering test suites. err: %w", err)
-		}
+	if err := r.renderTestSuites(buf, spec, suiteFixtures); err != nil {
+		return nil, nil, fmt.Errorf("failed rendering test suites. err: %w", err)
 	}
 
-	if err := r.renderBenchSuites(buf, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields); err != nil {
+	if err := r.renderBenchSuites(buf, spec, suiteFixtures); err != nil {
 		return nil, nil, fmt.Errorf("failed rendering benchmark suites. err: %w", err)
 	}
-	if err := r.renderFuzzSuites(buf, pkg, spec, resolved.SuiteSharedFixtures, allFixtures, resolved.SuiteFixtureFields, harvestSeeds, fans); err != nil {
+	if err := r.renderFuzzSuites(buf, pkg, spec, suiteFixtures, harvestSeeds, fans); err != nil {
 		return nil, nil, fmt.Errorf("failed rendering fuzz suites. err: %w", err)
 	}
 
@@ -203,7 +199,7 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 		}
 	}
 	// This condition must stay identical to the ones guarding the ƒfailed
-	// declarations in gotest.suites.tpl and gotest.fixture.tpl. A parallel suite whose every method is
+	// declaration in gotest.suites.tpl. A parallel suite whose every method is
 	// excluded stays in EffectiveTestSuites with no TestCases, so the template
 	// emits no atomic.Bool. format.Source does not type-check and would let the
 	// stray import through; it is `go test` that then refuses the whole generated
@@ -240,35 +236,27 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 	return headerTpl.ExecuteTemplate(buf, "header.go.tpl", map[string]any{"Header": data})
 }
 
-func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef) error { //nolint:gocritic // hugeParam: stable API
+// Every wrapper template gets the same per-suite fixture sets, so each kind of
+// wrapper holds and wires a suite's fixtures the same way.
+
+func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteFixtures map[string]SuiteFixtureSet) error { //nolint:gocritic // hugeParam: stable API
+	if len(spec.EffectiveTestSuites) == 0 && len(spec.SkippedTestSuites) == 0 {
+		return nil
+	}
 	return gotestTpl.ExecuteTemplate(buf, "gotest.suites.tpl", map[string]any{
-		"Spec":                spec,
-		"SuiteSharedFixtures": suiteSharedFixtures,
+		"Spec":     spec,
+		"Fixtures": suiteFixtures,
 	})
 }
 
-func (r *renderer) renderBenchSuites(buf *bytes.Buffer, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*BoundFixture, suiteFixtureFields map[string][]FixtureFieldBinding) error { //nolint:gocritic // hugeParam: stable API
-	// Reuse the exact same fixture-bound view model gotest.fixture.tpl renders
-	// Test<Suite> from, reshaped as a map for O(1) per-suite template lookup
-	// (mirroring how SuiteSharedFixtures is already passed as a lookup map).
-	suiteFixtures := make(map[string]*FlatFixtureSuite)
-	for _, fs := range flattenSuitesDAG(allFixtures, suiteFixtureFields) {
-		suiteFixtures[fs.Suite.Identifier()] = &fs
-	}
+func (r *renderer) renderBenchSuites(buf *bytes.Buffer, spec SpecOutcome, suiteFixtures map[string]SuiteFixtureSet) error { //nolint:gocritic // hugeParam: stable API
 	return gotestTpl.ExecuteTemplate(buf, "gotest.bench.tpl", map[string]any{
-		"Spec":                spec,
-		"SuiteSharedFixtures": suiteSharedFixtures,
-		"SuiteFixtures":       suiteFixtures,
+		"Spec":     spec,
+		"Fixtures": suiteFixtures,
 	})
 }
 
-func (r *renderer) renderFuzzSuites(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*BoundFixture, suiteFixtureFields map[string][]FixtureFieldBinding, harvestSeeds bool, fans *FuzzTargetSet) error { //nolint:gocritic // hugeParam: stable API
-	// Reuse the exact same fixture-bound view model gotest.bench.tpl renders
-	// Benchmark<Suite> from, reshaped as a map for O(1) per-suite template lookup.
-	suiteFixtures := make(map[string]*FlatFixtureSuite)
-	for _, fs := range flattenSuitesDAG(allFixtures, suiteFixtureFields) {
-		suiteFixtures[fs.Suite.Identifier()] = &fs
-	}
+func (r *renderer) renderFuzzSuites(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, suiteFixtures map[string]SuiteFixtureSet, harvestSeeds bool, fans *FuzzTargetSet) error { //nolint:gocritic // hugeParam: stable API
 	harvested, err := harvestedSeedsForTemplate(pkg, spec, harvestSeeds)
 	if err != nil {
 		return err
@@ -284,12 +272,11 @@ func (r *renderer) renderFuzzSuites(buf *bytes.Buffer, pkg *packages.Package, sp
 		fanSource = fans.Source
 	}
 	return gotestTpl.ExecuteTemplate(buf, "gotest.fuzz.tpl", map[string]any{
-		"Spec":                spec,
-		"SuiteSharedFixtures": suiteSharedFixtures,
-		"SuiteFixtures":       suiteFixtures,
-		"HarvestedSeeds":      harvested,
-		"FuzzTargets":         targets,
-		"FuzzFanSource":       fanSource,
+		"Spec":           spec,
+		"Fixtures":       suiteFixtures,
+		"HarvestedSeeds": harvested,
+		"FuzzTargets":    targets,
+		"FuzzFanSource":  fanSource,
 	})
 }
 
@@ -325,15 +312,13 @@ func harvestedSeedsForTemplate(pkg *packages.Package, spec SpecOutcome, harvestS
 	return out, nil
 }
 
-func (r *renderer) renderFixtures(buf *bytes.Buffer, fixtureBound []*gotestast.TestSuiteSpec, allFixtures []*BoundFixture, suiteFixtureFields map[string][]FixtureFieldBinding, sfNodes []*SharedFixtureNodeVM) error {
+func (r *renderer) renderFixtures(buf *bytes.Buffer, allFixtures []*BoundFixture, sfNodes []*SharedFixtureNodeVM) error {
 	if len(allFixtures) == 0 && len(sfNodes) == 0 {
 		return nil
 	}
 
 	return gotestTpl.ExecuteTemplate(buf, "gotest.fixture.tpl", map[string]any{
-		"FixtureBoundSuites": fixtureBound,
 		"AllFixtures":        allFixtures,
-		"FlatSuites":         flattenSuitesDAG(allFixtures, suiteFixtureFields),
 		"SharedFixtureNodes": sfNodes,
 	})
 }
@@ -401,52 +386,49 @@ func buildSharedFixtureNodeVMs(sharedFixtures []SharedFixtureInfo) []*SharedFixt
 	return vms
 }
 
-func flattenSuitesDAG(allFixtures []*BoundFixture, suiteFixtureFields map[string][]FixtureFieldBinding) []FlatFixtureSuite {
-	rfByID := make(map[string]*BoundFixture)
-	for _, rf := range allFixtures {
+// buildSuiteFixtureSets gives each suite the part of the fixture DAG it
+// reaches: its package fixtures and their parents, and every shared fixture
+// those or the suite name. Holding no more than that keeps a fixture the suite
+// never uses from costing it time, or failing it.
+func buildSuiteFixtureSets(resolved *Binding, sfNodes []*SharedFixtureNodeVM) map[string]SuiteFixtureSet {
+	rfByID := make(map[string]*BoundFixture, len(resolved.AllFixtures))
+	for _, rf := range resolved.AllFixtures {
 		rfByID[rf.Identifier] = rf
 	}
-
-	type suiteInfo struct {
-		suite   *gotestast.TestSuiteSpec
-		fixture *BoundFixture
+	suiteIDs := map[string]bool{}
+	for id := range resolved.SuiteFixtureFields {
+		suiteIDs[id] = true
 	}
-	var suites []suiteInfo
-	for _, rf := range allFixtures {
-		for _, s := range rf.ChildSuites {
-			suites = append(suites, suiteInfo{suite: s, fixture: rf})
-		}
+	for id := range resolved.SuiteSharedFixtures {
+		suiteIDs[id] = true
 	}
 
-	seen := make(map[string]bool)
-	var result []FlatFixtureSuite
-	for _, si := range suites {
-		if seen[si.suite.Identifier()] {
-			continue
+	sets := make(map[string]SuiteFixtureSet, len(suiteIDs))
+	for id := range suiteIDs {
+		var set SuiteFixtureSet
+		sharedKeys := map[string]bool{}
+		for _, key := range resolved.SuiteRequiredSharedFixtureKeys[id] {
+			sharedKeys[key] = true
 		}
-		seen[si.suite.Identifier()] = true
-
-		fixtureFields := make(map[string]string)
-		bindings := suiteFixtureFields[si.suite.Identifier()]
-		for _, b := range bindings {
-			fixtureFields[b.FixtureIdentifier] = b.FieldName
-		}
-
-		needed := collectTransitiveDepsRF(si.suite.Identifier(), suiteFixtureFields, rfByID)
-
-		var fixtureOrder []*BoundFixture
-		for _, rf := range allFixtures {
-			if needed[rf.Identifier] {
-				fixtureOrder = append(fixtureOrder, rf)
+		for _, sf := range sfNodes {
+			if sharedKeys[sf.StateKey] {
+				set.Nodes = append(set.Nodes, sf.Identifier)
 			}
 		}
-
-		result = append(result, FlatFixtureSuite{
-			Suite:         si.suite,
-			Fixture:       si.fixture,
-			FixtureOrder:  fixtureOrder,
-			FixtureFields: fixtureFields,
-		})
+		needed := collectTransitiveDepsRF(id, resolved.SuiteFixtureFields, rfByID)
+		for _, rf := range resolved.AllFixtures {
+			if needed[rf.Identifier] {
+				set.Nodes = append(set.Nodes, rf.Identifier)
+				set.Order = append(set.Order, rf)
+			}
+		}
+		for _, b := range resolved.SuiteFixtureFields[id] {
+			set.Fields = append(set.Fields, SuiteFixtureField{Name: b.FieldName, Var: "ƒ_" + b.FixtureIdentifier})
+		}
+		for _, ref := range resolved.SuiteSharedFixtures[id] {
+			set.Fields = append(set.Fields, SuiteFixtureField{Name: ref.FieldName, Var: "ƒ_sf_" + ref.Identifier})
+		}
+		sets[id] = set
 	}
-	return result
+	return sets
 }

@@ -186,10 +186,9 @@ parallel suites, or structural problems — those are your job, below.
     that needs what a machine may lack (a `DATABASE_URL`, Docker, a
     credential) declares `func (s *X) SuiteGuard() string`: empty runs the
     suite, anything else skips it with that reason. It runs before the
-    suite's config and `BeforeAll`, so the suite's own setup never starts;
-    `t.T().Skip()` in `BeforeAll` runs after setup has begun. Fixtures the
-    suite binds still set up before the guard, so a guard cannot keep a
-    fixture from starting.
+    suite's fixtures, config and `BeforeAll`, so the suite's own setup never
+    starts; `t.T().Skip()` in `BeforeAll` runs after setup has begun. Read
+    the environment only: fixture fields are still nil in the guard.
 
 ## Restructuring existing suites (the blue phase)
 

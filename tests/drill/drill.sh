@@ -34,7 +34,8 @@ for patch in "$root"/tests/drill/mutants/*.patch; do
   rm -rf "$work"; mkdir -p "$work"
   tar --exclude=./.git --exclude=./.worktrees --exclude=./node_modules --exclude='./vscode-gotest/node_modules' -C "$root" -cf - . | tar -xf - -C "$work"
   # Exact context only; a line offset is fine since the context still matches verbatim.
-  if ! patch -p1 -s --fuzz=0 --forward -r - -d "$work" -i "$patch" >"$work/patch.log" 2>&1; then
+  # No backups: an offset apply would leave a .orig the templates' glob embeds.
+  if ! patch -p1 -s --fuzz=0 --forward --no-backup-if-mismatch -r - -d "$work" -i "$patch" >"$work/patch.log" 2>&1; then
     echo "DRILL  $name: patch does not apply, refresh it"
     sed 's/^/       /' "$work/patch.log" | tail -5
     failed=1

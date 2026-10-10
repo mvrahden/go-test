@@ -210,24 +210,35 @@ func TestFooTestSuite(t *testing.T) {
 ```
 
 `OpenSuite` (`pkg/gotestruntime/harness.go`) is the suite frame every Test,
-Benchmark and Fuzz wrapper shares: it runs `SuiteGuard`, resolves
+Benchmark and Fuzz wrapper shares: it runs `SuiteGuard`, holds the suite's
+fixtures (below), resolves
 `SuiteConfig` (zero durations defaulted; the declared value is the budget),
 runs `BeforeAll` under `SetupTimeout`, and registers `AfterAll` as the
 wrapper's cleanup under a context that survives the cancellation testing
 performs before cleanups.
 
-For **fixture-bound suites** (have a fixture), every generated top-level
-function — the `TestX` function, each `FuzzX_M` seed-replay wrapper, the
-`BenchmarkX` wrapper — holds the fixtures for itself: it sets the DAG up
-first and tears it down in its own cleanup, which runs after `AfterAll`.
+For **suites with fixtures**, every generated top-level function — the
+`TestX` function, each `FuzzX_M` seed-replay wrapper, the `BenchmarkX`
+wrapper — holds the fixtures for itself: `OpenSuite` calls the `Fixtures`
+closure right after the guard, and the hold tears them down in its own
+cleanup, which runs after `AfterAll`. A suite its guard skips sets up no
+fixtures, and its guard sees nil fixture fields. All three open the suite
+through one template define (`suiteFrame`), so each holds the same nodes and
+wires the same fields. The nodes are the suite's part of the
+DAG only: the package fixtures it binds with their parents, and the shared
+fixtures those or the suite name. A fixture the suite does not reach is
+never set up for it, so it neither costs the suite time nor fails it.
 
 ```go
-func ƒ_setupFixtures(t testing.TB) {
-    gotestruntime.HoldFixtures(t, func() gotestruntime.MainConfig {
-        // Built per hold: config methods are called here, and every
-        // fixture variable starts from nil.
+// One constructor per DAG node; config methods are called here.
+func ƒ_node_DBFixture() *gotestruntime.FixtureNode { ... }
+
+func ƒ_holdFixtures(tb testing.TB, setupTimeout func() time.Duration, nodes ...func() *gotestruntime.FixtureNode) {
+    gotestruntime.HoldFixtures(tb, func() gotestruntime.MainConfig {
+        // Built per hold: every fixture variable starts from nil, and only
+        // the given nodes are constructed.
         // Fixtures is a flat list with DependsOn edges forming a DAG.
-        return gotestruntime.MainConfig{Fixtures: ..., MaxSuiteSetupTimeout: ...}
+        return gotestruntime.MainConfig{Fixtures: ..., MaxSuiteSetupTimeout: setupTimeout()}
     })
     // HoldFixtures:
     // 1. Read shared fixture state (if needed)
@@ -239,9 +250,15 @@ func ƒ_setupFixtures(t testing.TB) {
 }
 
 func TestQueryTestSuite(t *testing.T) {
-    ƒ_setupFixtures(t)      // first, so its teardown runs last
-    s := &ƒƒ_GOTEST_QueryTestSuite{...}
-    // ... suite lifecycle (same as standalone) ...
+    s := &ƒƒ_GOTEST_QueryTestSuite{}
+    ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+        Fixtures: func(tb testing.TB) { // after the guard; torn down after AfterAll
+            ƒ_holdFixtures(tb, ƒsetupTimeout, ƒ_node_DBFixture)
+            s.QueryTestSuite.DB = ƒ_DBFixture
+        },
+        // ... Guard, Config, BeforeAll, AfterAll (same as standalone) ...
+    })
+    // ... methods (same as standalone) ...
 }
 ```
 
@@ -261,9 +278,8 @@ generated (standalone or fixture-bound, same shape as above), with one
 
 ```go
 func BenchmarkFooTestSuite(b *testing.B) {
-    ƒ_setupFixtures(b)                    // only if fixture-bound
-    s := &ƒƒ_GOTEST_FooTestSuite{...}
-    gotestruntime.OpenSuite(b, gotestruntime.Suite{...})
+    s := &ƒƒ_GOTEST_FooTestSuite{}
+    gotestruntime.OpenSuite(b, gotestruntime.Suite{...})  // Fixtures only with fixtures
 
     b.Run("BenchmarkParse", func(b *testing.B) {
         b.StopTimer()
@@ -304,9 +320,8 @@ function independently repeats fixture setup and `BeforeAll`:
 
 ```go
 func FuzzFooTestSuite_FuzzParse(f *testing.F) {
-    ƒ_setupFixtures(f)                    // only if fixture-bound
-    s := &ƒƒ_GOTEST_FooTestSuite{...}
-    gotestruntime.OpenSuite(f, gotestruntime.Suite{...})
+    s := &ƒƒ_GOTEST_FooTestSuite{}
+    gotestruntime.OpenSuite(f, gotestruntime.Suite{...})  // Fixtures only with fixtures
     ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach)   // plus one fan per target tuple
     s.FuzzParse(ƒf)
 }

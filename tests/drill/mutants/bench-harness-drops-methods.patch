@@ -2,16 +2,16 @@ Expect: benching: exit code 2, want 0
 Expect: benching: results \[BenchmarkContext BenchmarkSecond\]
 --- a/internal/gotestgen/static/gotest.bench.tpl
 +++ b/internal/gotestgen/static/gotest.bench.tpl
-@@ -32,7 +32,7 @@
-     BeforeAll: s.BeforeAll,
-     AfterAll: s.AfterAll,
-   })
+@@ -3,7 +3,7 @@
+ {{- $fx := index $.Fixtures $ts.Identifier }}
+ func Benchmark{{ $ts.Identifier }}(b *testing.B) {
+ {{- template "suiteFrame" (dict "Suite" $ts "Fixtures" $fx "TB" "b" "Assign" "") }}
 -{{ range $bm := $ts.Benchmarks }}
 +{{ range $i, $bm := $ts.Benchmarks }}{{ if ne $i 0 }}
    b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
- {{- if or $fx $sfRefs }}
+ {{- if $fx.Nodes }}
      defer gotestruntime.ReleaseOnPanic(b)
-@@ -48,7 +48,7 @@
+@@ -19,7 +19,7 @@
      b.ResetTimer()
      s.{{ $bm.Identifier }}({{ if $bm.UsesStdlibT }}b{{ else }}gotest.NewB(b){{ end }})
    })

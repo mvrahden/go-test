@@ -21,24 +21,32 @@ import (
 type TestCase func(*gotest.T)
 
 // Suite is the frame of a suite as a generated wrapper hands it to
-// [OpenSuite]. Guard and Config are nil when the suite declares none.
+// [OpenSuite]. Guard and Config are nil when the suite declares none,
+// Fixtures when it binds none.
 type Suite struct {
-	Guard     func() string
+	Guard func() string
+	// Fixtures holds the suite's fixtures on tb and wires its fixture fields.
+	Fixtures  func(tb testing.TB)
 	Config    func() gotest.SuiteConfig
 	BeforeAll func(*gotest.T)
 	AfterAll  func(*gotest.T)
 }
 
 // OpenSuite runs the frame every generated Test, Benchmark and Fuzz wrapper
-// shares: the guard, the config, BeforeAll, and AfterAll as tb's cleanup. It
-// returns the config the suite runs under and the budget it declared, which is
-// zero without a SuiteConfig.
+// shares: the guard, the fixtures, the config, BeforeAll, and AfterAll as
+// tb's cleanup. A suite its guard skips sets up no fixtures; the fixtures are
+// held before AfterAll is registered, so they are torn down after it. It
+// returns the config the suite runs under and the budget it declared, which
+// is zero without a SuiteConfig.
 func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 	tb.Helper()
 	if s.Guard != nil {
 		if reason := s.Guard(); reason != "" {
 			tb.Skipf("suite guard: %s", reason)
 		}
+	}
+	if s.Fixtures != nil {
+		s.Fixtures(tb)
 	}
 	cfg = gotest.DefaultSuiteConfig()
 	if s.Config != nil {

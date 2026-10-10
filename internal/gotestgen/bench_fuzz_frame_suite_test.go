@@ -111,3 +111,42 @@ func (s *BenchFuzzFrameTestSuite) TestCaselessSuitesHaveNoTestRun(t *gotest.T) {
 		gotest.Contains(it, run.output, "--- SKIP: TestAllExcludedTestSuite", run.output)
 	})
 }
+
+func (s *BenchFuzzFrameTestSuite) TestFixtureClosure(t *gotest.T) {
+	for _, c := range []struct {
+		kind string
+		args []string
+	}{
+		{"test", []string{"-test.run=^TestMixedTestSuite$"}},
+		{"benchmark", []string{"-test.run=^$", "-test.bench=^BenchmarkMixedTestSuite$", "-test.benchtime=1x"}},
+		{"fuzz", []string{"-test.run=^FuzzMixedTestSuite_FuzzWired$"}},
+	} {
+		t.It("wires every fixture field and sets up only the suite's own fixtures in a "+c.kind+" wrapper", func(it *gotest.T) {
+			run := runGeneratedSuiteArgs(it, "TestLifecycle_FixtureClosure", childTimeout, c.args...)
+			assertNoDeadlock(it, run)
+			gotest.True(it, run.passed, run.output)
+			gotest.Contains(it, run.output, "MARK:root setup", run.output)
+			gotest.Contains(it, run.output, "MARK:child setup", run.output)
+			gotest.NotContains(it, run.output, "MARK:unused setup", run.output)
+		})
+	}
+}
+
+func (s *BenchFuzzFrameTestSuite) TestGuardBeforeFixtures(t *gotest.T) {
+	for _, c := range []struct {
+		kind string
+		args []string
+	}{
+		{"test", []string{"-test.run=^TestGuardedTestSuite$"}},
+		{"benchmark", []string{"-test.run=^$", "-test.bench=^BenchmarkGuardedTestSuite$", "-test.benchtime=1x"}},
+		{"fuzz", []string{"-test.run=^FuzzGuardedTestSuite_FuzzGuarded$"}},
+	} {
+		t.It("skips a guarded suite without setting up its fixtures in a "+c.kind+" wrapper", func(it *gotest.T) {
+			run := runGeneratedSuiteArgs(it, "TestLifecycle_FixtureClosure", childTimeout, c.args...)
+			assertNoDeadlock(it, run)
+			gotest.True(it, run.passed, run.output)
+			gotest.Contains(it, run.output, "suite guard: never runs", run.output)
+			gotest.NotContains(it, run.output, "MARK:guarded setup", run.output)
+		})
+	}
+}

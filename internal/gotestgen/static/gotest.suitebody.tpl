@@ -1,4 +1,4 @@
-{{- /* Shared by gotest.suites.tpl and gotest.fixture.tpl. */ -}}
+{{- /* Building blocks of the Test, Benchmark and Fuzz wrapper templates. */ -}}
 {{- define "suiteWrapper" }}{{ $ts := . }}
 type ƒƒ_GOTEST_{{ $ts.Identifier }} struct {
   {{ $ts.Identifier }}
@@ -13,6 +13,40 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T, ctx {{ $ts.C
 func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) BeforeEach(it *gotest.T) { {{ if $ts.BeforeEach -}} ts.{{ $ts.Identifier }}.BeforeEach({{ if $ts.BeforeEach.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
 func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.AfterEach -}} ts.{{ $ts.Identifier }}.AfterEach({{ if $ts.AfterEach.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
 {{- end }}
+{{- end }}
+
+{{- /*
+  Takes dict "Suite", "Fixtures" (its SuiteFixtureSet), "TB", the wrapper's
+  testing value, and "Assign", what receives OpenSuite's results. Every wrapper
+  opens its suite here, so each holds the same fixtures, wires the same fields,
+  and does so only once the guard let the suite run.
+*/ -}}
+{{- define "suiteFrame" }}{{ $ts := .Suite }}{{ $fx := .Fixtures }}
+  s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
+  {{ .Assign }}gotestruntime.OpenSuite({{ .TB }}, gotestruntime.Suite{
+{{- if $ts.HasGuard }}
+    Guard: s.{{ $ts.Identifier }}.SuiteGuard,
+{{- end }}
+{{- if $fx.Nodes }}
+    Fixtures: func(tb testing.TB) {
+      ƒ_holdFixtures(tb, func() time.Duration {
+{{- if $ts.HasConfig }}
+        return gotestruntime.WithSuiteDefaults((&{{ $ts.Identifier }}{}).SuiteConfig()).SetupTimeout
+{{- else }}
+        return gotest.DefaultSuiteConfig().SetupTimeout
+{{- end }}
+      }{{ range $n := $fx.Nodes }}, ƒ_node_{{ $n }}{{ end }})
+{{- range $f := $fx.Fields }}
+      s.{{ $ts.Identifier }}.{{ $f.Name }} = {{ $f.Var }}
+{{- end }}
+    },
+{{- end }}
+{{- if $ts.HasConfig }}
+    Config: s.{{ $ts.Identifier }}.SuiteConfig,
+{{- end }}
+    BeforeAll: s.BeforeAll,
+    AfterAll: s.AfterAll,
+  })
 {{- end }}
 
 {{- /* Takes dict "Suite" and, for a fixture-bound suite, "FixtureOrder". */ -}}

@@ -4,37 +4,7 @@
 {{ range $i, $ts := .Spec.EffectiveTestSuites }}
 {{- range $fz := $ts.Fuzzers }}
 func Fuzz{{ $ts.Identifier }}_{{ $fz.Identifier }}(f *testing.F) {
-{{- $fx := index $.SuiteFixtures $ts.Identifier }}
-{{- $sfRefs := index $.SuiteSharedFixtures $ts.Identifier }}
-{{- if or $fx $sfRefs }}
-  ƒ_setupFixtures(f)
-{{- end }}
-{{- if $fx }}
-  s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{
-    {{ $ts.Identifier }}: {{ $ts.Identifier }}{
-{{- range $id, $field := $fx.FixtureFields }}
-      {{ $field }}: ƒ_{{ $id }},
-{{- end }}
-    },
-  }
-{{- else }}
-  s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
-{{- end }}
-{{- if not $fx }}
-{{- range $sf := $sfRefs }}
-  s.{{ $sf.FieldName }} = ƒ_sf_{{ $sf.Identifier }}
-{{- end }}
-{{- end }}
-  gotestruntime.OpenSuite(f, gotestruntime.Suite{
-{{- if $ts.HasGuard }}
-    Guard: s.{{ $ts.Identifier }}.SuiteGuard,
-{{- end }}
-{{- if $ts.HasConfig }}
-    Config: s.{{ $ts.Identifier }}.SuiteConfig,
-{{- end }}
-    BeforeAll: s.BeforeAll,
-    AfterAll: s.AfterAll,
-  })
+{{- template "suiteFrame" (dict "Suite" $ts "Fixtures" (index $.Fixtures $ts.Identifier) "TB" "f" "Assign" "") }}
 {{- $funcName := printf "Fuzz%s_%s" $ts.Identifier $fz.Identifier }}
 {{- /*
   Harvested seeds go through *gotest.F, never *testing.F directly: F.Add

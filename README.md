@@ -278,6 +278,7 @@ Fixtures replace `TestMain` + package-level singletons with convention-driven se
 Any struct ending in `Fixture` is a package fixture; ending in `SharedFixture` is a cross-package shared fixture.
 A package fixture lives as long as the suite that binds it: set up before the suite's `BeforeAll`, torn down after its `AfterAll`.
 Suites that bind the same package fixture each get their own; setup that must happen once per run belongs in a shared fixture.
+A suite sets up only the fixtures it binds and their dependencies, so a fixture it does not use never delays or fails it.
 
 ```go
 // fixture_test.go
@@ -1000,7 +1001,8 @@ func (s *IntegrationTestSuite) SuiteGuard() string {
 ```
 
 Returns a non-empty reason to skip the entire suite.
-The guard runs before the suite's config, `BeforeAll` and every test method; package and shared fixtures the suite binds are still set up first.
+The guard runs before the suite's fixtures, config, `BeforeAll` and every test method, so a skipped suite sets up none of its package fixtures; its fixture fields are still nil inside the guard.
+A shared fixture the suite binds is still started by the runner, which cannot evaluate the guard.
 Unlike `X_` (static exclude), `SuiteGuard` makes the decision at runtime — useful for integration tests that need external services.
 
 ## Tooling
