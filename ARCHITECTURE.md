@@ -216,18 +216,26 @@ runs `BeforeAll` under `SetupTimeout`, and registers `AfterAll` as the
 wrapper's cleanup under a context that survives the cancellation testing
 performs before cleanups.
 
-For **fixture-bound suites** (have a fixture), every generated top-level
-function — the `TestX` function, each `FuzzX_M` seed-replay wrapper, the
-`BenchmarkX` wrapper — holds the fixtures for itself: it sets the DAG up
-first and tears it down in its own cleanup, which runs after `AfterAll`.
+For **suites with fixtures**, every generated top-level function — the
+`TestX` function, each `FuzzX_M` seed-replay wrapper, the `BenchmarkX`
+wrapper — holds the fixtures for itself: it sets them up first and tears
+them down in its own cleanup, which runs after `AfterAll`. All three build
+the suite through one template define (`suiteInstance`), so each holds the
+same nodes and wires the same fields. The nodes are the suite's part of the
+DAG only: the package fixtures it binds with their parents, and the shared
+fixtures those or the suite name. A fixture the suite does not reach is
+never set up for it, so it neither costs the suite time nor fails it.
 
 ```go
-func ƒ_setupFixtures(t testing.TB) {
-    gotestruntime.HoldFixtures(t, func() gotestruntime.MainConfig {
-        // Built per hold: config methods are called here, and every
-        // fixture variable starts from nil.
+// One constructor per DAG node; config methods are called here.
+func ƒ_node_DBFixture() *gotestruntime.FixtureNode { ... }
+
+func ƒ_holdFixtures(tb testing.TB, setupTimeout func() time.Duration, nodes ...func() *gotestruntime.FixtureNode) {
+    gotestruntime.HoldFixtures(tb, func() gotestruntime.MainConfig {
+        // Built per hold: every fixture variable starts from nil, and only
+        // the given nodes are constructed.
         // Fixtures is a flat list with DependsOn edges forming a DAG.
-        return gotestruntime.MainConfig{Fixtures: ..., MaxSuiteSetupTimeout: ...}
+        return gotestruntime.MainConfig{Fixtures: ..., MaxSuiteSetupTimeout: setupTimeout()}
     })
     // HoldFixtures:
     // 1. Read shared fixture state (if needed)
@@ -239,8 +247,8 @@ func ƒ_setupFixtures(t testing.TB) {
 }
 
 func TestQueryTestSuite(t *testing.T) {
-    ƒ_setupFixtures(t)      // first, so its teardown runs last
-    s := &ƒƒ_GOTEST_QueryTestSuite{...}
+    ƒ_holdFixtures(t, ƒsetupTimeout, ƒ_node_DBFixture) // first, so its teardown runs last
+    s := &ƒƒ_GOTEST_QueryTestSuite{QueryTestSuite: QueryTestSuite{DB: ƒ_DBFixture}}
     // ... suite lifecycle (same as standalone) ...
 }
 ```
@@ -261,7 +269,7 @@ generated (standalone or fixture-bound, same shape as above), with one
 
 ```go
 func BenchmarkFooTestSuite(b *testing.B) {
-    ƒ_setupFixtures(b)                    // only if fixture-bound
+    ƒ_holdFixtures(b, ...)                // only with fixtures
     s := &ƒƒ_GOTEST_FooTestSuite{...}
     gotestruntime.OpenSuite(b, gotestruntime.Suite{...})
 
@@ -304,7 +312,7 @@ function independently repeats fixture setup and `BeforeAll`:
 
 ```go
 func FuzzFooTestSuite_FuzzParse(f *testing.F) {
-    ƒ_setupFixtures(f)                    // only if fixture-bound
+    ƒ_holdFixtures(f, ...)                // only with fixtures
     s := &ƒƒ_GOTEST_FooTestSuite{...}
     gotestruntime.OpenSuite(f, gotestruntime.Suite{...})
     ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach)   // plus one fan per target tuple

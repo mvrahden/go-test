@@ -378,6 +378,7 @@ Focus and exclude apply independently at both suite and test case levels.
 
 Setup that suites in the same package bind. Name must end with `Fixture`.
 Each suite that binds one sets it up for itself and tears it down after its `AfterAll` (once more per `Fuzz*` method, whose seeds replay separately); for setup that must happen once per run, use a shared fixture.
+A suite sets up only the fixtures it binds and their dependencies; a fixture it does not use never runs for it, so it cannot fail it.
 
 ```go
 type DBFixture struct {

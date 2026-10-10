@@ -384,6 +384,10 @@ Fixture setup does not run at package init.
 Each generated top-level function that binds fixtures — a suite's `Test` function, each of its `Fuzz` seed-replay wrappers, its `Benchmark` wrapper — holds them for itself (`gotestruntime.HoldFixtures`): it sets the DAG up first and tears it down in its own cleanup, after the suite's `AfterAll`.
 A run whose `-run`/`-skip` selects no fixture-bound function never pays setup, and `-count`, `-shuffle` or any other selection flag cannot tear a fixture down under a test that still uses it: nothing counts tests.
 
+A hold covers the suite's part of the DAG only: the package fixtures the suite binds, their parents, and the shared fixtures any of those or the suite name.
+A fixture the suite does not reach is never set up for it, so it neither costs the suite time nor fails it; its config method is not even called.
+All generated top-level functions of a suite hold the same nodes and wire the same fields, because all three build the suite through one template define.
+
 A package fixture is therefore set up once per function that binds it, not once per package.
 Under the runner this changes nothing for tests — each suite runs in a process of its own — but a fixture-bound suite with fuzz methods sets its fixtures up once more for each `Fuzz` wrapper, whose seeds replay in a function of their own; the suite's own `BeforeAll` already runs per wrapper the same way.
 Under plain `go test`, every suite of the package sets the fixtures up for itself.

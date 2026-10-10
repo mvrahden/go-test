@@ -12,7 +12,8 @@ suites depend only on what they use.
 A package fixture lives as long as the suite that binds it: set up before the
 suite's `BeforeAll`, torn down after its `AfterAll` — again for each `Fuzz*`
 method's seed replay. It is not shared across suites; setup that must happen
-once per run belongs in a shared fixture.
+once per run belongs in a shared fixture. A suite sets up only the fixtures
+it binds and their dependencies, so an unrelated fixture never fails it.
 
 Package fixtures may also define per-test hooks — `BeforeEach(ctx
 context.Context) error` / `AfterEach(ctx context.Context) error` — with the
