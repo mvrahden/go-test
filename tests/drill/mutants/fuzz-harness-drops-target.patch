@@ -8,9 +8,9 @@ Expect: fuzzing: verdicts differ from the golden list
 -{{- range $fz := $ts.Fuzzers }}
 +{{- range $i, $fz := $ts.Fuzzers }}{{ if ne $i 0 }}
  func Fuzz{{ $ts.Identifier }}_{{ $fz.Identifier }}(f *testing.F) {
- {{- template "suiteInstance" (dict "Suite" $ts "Fixtures" (index $.Fixtures $ts.Identifier) "TB" "f") }}
-   gotestruntime.OpenSuite(f, gotestruntime.Suite{
-@@ -29,5 +29,5 @@
+ {{- template "suiteFrame" (dict "Suite" $ts "Fixtures" (index $.Fixtures $ts.Identifier) "TB" "f" "Assign" "") }}
+ {{- $funcName := printf "Fuzz%s_%s" $ts.Identifier $fz.Identifier }}
+@@ -19,5 +19,5 @@
  {{- end }}
    s.{{ $fz.Identifier }}(ƒf)
  }

@@ -1,0 +1,21 @@
+Expect: guardskip: verdicts differ from the golden list
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -40,14 +40,14 @@
+ // is zero without a SuiteConfig.
+ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
+ 	tb.Helper()
++	if s.Fixtures != nil {
++		s.Fixtures(tb)
++	}
+ 	if s.Guard != nil {
+ 		if reason := s.Guard(); reason != "" {
+ 			tb.Skipf("suite guard: %s", reason)
+ 		}
+ 	}
+-	if s.Fixtures != nil {
+-		s.Fixtures(tb)
+-	}
+ 	cfg = gotest.DefaultSuiteConfig()
+ 	if s.Config != nil {
+ 		budget = s.Config()

@@ -281,6 +281,12 @@ func (s *CanaryTestSuite) TestSharedFixturesReachThroughFixtureChains(t *gotest.
 	s.check(t, "fixturechain")
 }
 
+// A suite its guard skips sets up none of its fixtures, so one that would
+// fail to come up leaves the run green.
+func (s *CanaryTestSuite) TestAGuardRunsBeforeTheFixtures(t *gotest.T) {
+	s.check(t, "guardskip")
+}
+
 // benchReport is the part of a bench --json report the canary reads.
 type benchReport struct {
 	Baseline struct {

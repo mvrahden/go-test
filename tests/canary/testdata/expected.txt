@@ -106,3 +106,6 @@ fixturechain exit 0
 fixturechain pass -
 fixturechain pass TestChainTestSuite
 fixturechain pass TestChainTestSuite/TestSharedStateArrives
+guardskip exit 0
+guardskip pass -
+guardskip skip TestGuardedTestSuite
