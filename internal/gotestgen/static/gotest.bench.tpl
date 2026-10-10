@@ -1,27 +1,8 @@
 {{ range $i, $ts := .Spec.EffectiveTestSuites }}
 {{- if $ts.Benchmarks }}
+{{- $fx := index $.Fixtures $ts.Identifier }}
 func Benchmark{{ $ts.Identifier }}(b *testing.B) {
-{{- $fx := index $.SuiteFixtures $ts.Identifier }}
-{{- $sfRefs := index $.SuiteSharedFixtures $ts.Identifier }}
-{{- if or $fx $sfRefs }}
-  ƒ_setupFixtures(b)
-{{- end }}
-{{- if $fx }}
-  s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{
-    {{ $ts.Identifier }}: {{ $ts.Identifier }}{
-{{- range $id, $field := $fx.FixtureFields }}
-      {{ $field }}: ƒ_{{ $id }},
-{{- end }}
-    },
-  }
-{{- else }}
-  s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
-{{- end }}
-{{- if not $fx }}
-{{- range $sf := $sfRefs }}
-  s.{{ $sf.FieldName }} = ƒ_sf_{{ $sf.Identifier }}
-{{- end }}
-{{- end }}
+{{- template "suiteInstance" (dict "Suite" $ts "Fixtures" $fx "TB" "b") }}
   gotestruntime.OpenSuite(b, gotestruntime.Suite{
 {{- if $ts.HasGuard }}
     Guard: s.{{ $ts.Identifier }}.SuiteGuard,
@@ -34,7 +15,7 @@ func Benchmark{{ $ts.Identifier }}(b *testing.B) {
   })
 {{ range $bm := $ts.Benchmarks }}
   b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
-{{- if or $fx $sfRefs }}
+{{- if $fx.Nodes }}
     defer gotestruntime.ReleaseOnPanic(b)
 {{- end }}
     b.StopTimer()

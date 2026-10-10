@@ -1,4 +1,4 @@
-{{- /* Shared by gotest.suites.tpl and gotest.fixture.tpl. */ -}}
+{{- /* Building blocks of the Test, Benchmark and Fuzz wrapper templates. */ -}}
 {{- define "suiteWrapper" }}{{ $ts := . }}
 type ƒƒ_GOTEST_{{ $ts.Identifier }} struct {
   {{ $ts.Identifier }}
@@ -12,6 +12,33 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T, ctx {{ $ts.C
 {{- else }}
 func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) BeforeEach(it *gotest.T) { {{ if $ts.BeforeEach -}} ts.{{ $ts.Identifier }}.BeforeEach({{ if $ts.BeforeEach.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
 func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.AfterEach -}} ts.{{ $ts.Identifier }}.AfterEach({{ if $ts.AfterEach.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
+{{- end }}
+{{- end }}
+
+{{- /*
+  Takes dict "Suite", "Fixtures" (its SuiteFixtureSet) and "TB", the wrapper's
+  testing value. Every wrapper builds its suite here, so each holds the same
+  fixtures and wires the same fields. The hold comes first, so its teardown
+  runs after the suite's AfterAll.
+*/ -}}
+{{- define "suiteInstance" }}{{ $ts := .Suite }}{{ $fx := .Fixtures }}
+{{- if $fx.Nodes }}
+  ƒ_holdFixtures({{ .TB }}, func() time.Duration {
+{{- if $ts.HasConfig }}
+    return gotestruntime.WithSuiteDefaults((&{{ $ts.Identifier }}{}).SuiteConfig()).SetupTimeout
+{{- else }}
+    return gotest.DefaultSuiteConfig().SetupTimeout
+{{- end }}
+  }{{ range $n := $fx.Nodes }}, ƒ_node_{{ $n }}{{ end }})
+  s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{
+    {{ $ts.Identifier }}: {{ $ts.Identifier }}{
+{{- range $f := $fx.Fields }}
+      {{ $f.Name }}: {{ $f.Var }},
+{{- end }}
+    },
+  }
+{{- else }}
+  s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
 {{- end }}
 {{- end }}
 

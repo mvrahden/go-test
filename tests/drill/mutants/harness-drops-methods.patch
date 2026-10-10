@@ -2,7 +2,7 @@ Expect: passing: exit code 2, want 0
 Expect: ^ *passing fail TestPassingTestSuite/TestOne$
 --- a/internal/gotestgen/static/gotest.suitebody.tpl
 +++ b/internal/gotestgen/static/gotest.suitebody.tpl
-@@ -16,7 +16,7 @@
+@@ -43,7 +43,7 @@
  {{- end }}
  
  {{- /* Takes dict "Suite" and, for a fixture-bound suite, "FixtureOrder". */ -}}
@@ -11,7 +11,7 @@ Expect: ^ *passing fail TestPassingTestSuite/TestOne$
      t.Run("{{ $tc.Identifier }}", func(it *testing.T) {
  {{- if $ts.IsMethodParallel }}
          it.Parallel()
-@@ -81,7 +81,7 @@
+@@ -108,7 +108,7 @@
          return
      }
  {{- end }}
