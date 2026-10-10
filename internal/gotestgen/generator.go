@@ -21,7 +21,7 @@ type GenerateResult struct {
 	PkgPath                        string              // import path (e.g. "github.com/foo/bar")
 	PTest                          []byte              // generated internal test source
 	PXTest                         []byte              // generated external test source
-	SuiteNames                     []string            // suite struct identifiers (e.g. "FooTestSuite")
+	SuiteNames                     []string            // suites with a test run: test methods or fuzz seeds (e.g. "FooTestSuite")
 	BenchSuiteNames                []string            // suite struct identifiers with >=1 effective benchmark method
 	FuzzFuncsBySuite               map[string][]string // suite identifier → generated Fuzz<Suite>_<Method> func names
 	FuzzParamsByFunc               map[string][]string // generated fuzz func name → corpus type of each value the engine feeds it
@@ -328,27 +328,28 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		seen := map[string]bool{}
 		var suiteNames []string
 		var exclusiveNames []string
+		var caselessSkipped []string
 		exclusiveSeen := map[string]bool{}
-		for _, s := range ptestSpec.EffectiveTestSuites {
-			id := s.Identifier()
-			if !seen[id] {
+		for _, effective := range []gotestast.TestSuiteSpecSet{ptestSpec.EffectiveTestSuites, pxtestSpec.EffectiveTestSuites} {
+			for _, s := range effective {
+				id := s.Identifier()
+				if seen[id] {
+					continue
+				}
 				seen[id] = true
+				// A suite runs in a test run for its test methods or its fuzz
+				// seeds. Benchmark-only suites have no test run at all.
+				if len(s.TestCases()) == 0 && len(s.Fuzzers()) == 0 {
+					if s.DeclaresTests() {
+						caselessSkipped = append(caselessSkipped, id)
+					}
+					continue
+				}
 				suiteNames = append(suiteNames, id)
-			}
-			if s.IsExclusive() && !exclusiveSeen[id] {
-				exclusiveSeen[id] = true
-				exclusiveNames = append(exclusiveNames, id)
-			}
-		}
-		for _, s := range pxtestSpec.EffectiveTestSuites {
-			id := s.Identifier()
-			if !seen[id] {
-				seen[id] = true
-				suiteNames = append(suiteNames, id)
-			}
-			if s.IsExclusive() && !exclusiveSeen[id] {
-				exclusiveSeen[id] = true
-				exclusiveNames = append(exclusiveNames, id)
+				if s.IsExclusive() && !exclusiveSeen[id] {
+					exclusiveSeen[id] = true
+					exclusiveNames = append(exclusiveNames, id)
+				}
 			}
 		}
 
@@ -411,7 +412,7 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 			}
 		}
 
-		var skippedNames []string
+		skippedNames := caselessSkipped
 		for _, s := range ptestSpec.SkippedTestSuites {
 			id := s.Identifier()
 			if !seen[id] {

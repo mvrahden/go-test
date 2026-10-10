@@ -57,9 +57,11 @@ func NewTWithDeadline(t *testing.T, timeout time.Duration) *T {
 // context cannot be expressed as a deadline off t.Context() — injected values,
 // or a lifetime that has to differ from the test's own.
 //
-// The caller owns the context; nothing here cancels it.
-func NewTWithContext(t *testing.T, ctx context.Context) *T {
-	return &T{t: t, ctx: ctx}
+// The caller owns the context; nothing here cancels it. A *testing.B or
+// *testing.F yields a TB-backed T, as [NewTFromTB] does.
+func NewTWithContext(tb testing.TB, ctx context.Context) *T {
+	t, _ := tb.(*testing.T)
+	return &T{t: t, tb: tb, ctx: ctx}
 }
 
 func (t *T) Errorf(format string, args ...any) {

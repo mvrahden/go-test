@@ -20,8 +20,42 @@ import (
 // TestCase is the shape of a generated test-method reference.
 type TestCase func(*gotest.T)
 
+// Suite is the frame of a suite as a generated wrapper hands it to
+// [OpenSuite]. Guard and Config are nil when the suite declares none.
+type Suite struct {
+	Guard     func() string
+	Config    func() gotest.SuiteConfig
+	BeforeAll func(*gotest.T)
+	AfterAll  func(*gotest.T)
+}
+
+// OpenSuite runs the frame every generated Test, Benchmark and Fuzz wrapper
+// shares: the guard, the config, BeforeAll, and AfterAll as tb's cleanup. It
+// returns the config the suite runs under and the budget it declared, which is
+// zero without a SuiteConfig.
+func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
+	tb.Helper()
+	if s.Guard != nil {
+		if reason := s.Guard(); reason != "" {
+			tb.Skipf("suite guard: %s", reason)
+		}
+	}
+	cfg = gotest.DefaultSuiteConfig()
+	if s.Config != nil {
+		budget = s.Config()
+		cfg = WithSuiteDefaults(budget)
+	}
+	// Never wait on the suite's subtests here: on panic, testing runs ancestor
+	// cleanups from the panicking goroutine, and the wait would deadlock.
+	tb.Cleanup(func() {
+		RunTeardown(tb, cfg.SetupTimeout, budget.SetupTimeout, s.AfterAll)
+	})
+	RunSetup(tb, cfg.SetupTimeout, budget.SetupTimeout, s.BeforeAll)
+	return cfg, budget
+}
+
 // SetupT builds the *gotest.T handed to a suite's BeforeAll.
-func SetupT(t *testing.T, timeout time.Duration) *gotest.T {
+func SetupT(t testing.TB, timeout time.Duration) *gotest.T {
 	return testScopedT(t, timeout)
 }
 
@@ -36,28 +70,28 @@ func TestT(t *testing.T, timeout time.Duration) *gotest.T {
 // A zero budget means no verdict is enforced; the context handed to the method
 // is bounded separately by [TestT].
 func RunTest(t *gotest.T, budget time.Duration, run func()) {
-	watchWhile(t, budget, "", "Timeout", run)
+	watchWhile(t.T(), t, budget, "", "Timeout", run)
 }
 
 // RunSetup runs a suite's BeforeAll. timeout bounds the context it receives;
 // budget is the deadline it is held to by verdict, or zero for a suite that
 // declared no config of its own.
-func RunSetup(t *testing.T, timeout, budget time.Duration, beforeAll func(*gotest.T)) {
+func RunSetup(t testing.TB, timeout, budget time.Duration, beforeAll func(*gotest.T)) {
 	tt := SetupT(t, timeout)
-	watchWhile(tt, budget, "BeforeAll ", "SetupTimeout", func() { beforeAll(tt) })
+	watchWhile(t, tt, budget, "BeforeAll ", "SetupTimeout", func() { beforeAll(tt) })
 }
 
 // RunTeardown runs a suite's AfterAll from inside t.Cleanup, on the same terms
 // as [RunSetup].
-func RunTeardown(t *testing.T, timeout, budget time.Duration, afterAll func(*gotest.T)) {
+func RunTeardown(t testing.TB, timeout, budget time.Duration, afterAll func(*gotest.T)) {
 	tt := TeardownT(t, timeout)
-	watchWhile(tt, budget, "AfterAll ", "SetupTimeout", func() { afterAll(tt) })
+	watchWhile(t, tt, budget, "AfterAll ", "SetupTimeout", func() { afterAll(tt) })
 }
 
 // watchWhile runs a lifecycle phase and fails t the moment timeout passes with
 // that phase still running. what names the phase for the message ("BeforeAll ",
-// "AfterAll ", or empty for a test method) and budget names the config field it
-// came from.
+// "AfterAll ", or empty for a test method), budget names the config field it
+// came from, and tb names the test in the unbuffered line.
 //
 // The alternative — checking the deadline once the phase returns — cannot judge
 // a phase that never returns, which is the case that matters most. A wedged
@@ -71,14 +105,14 @@ func RunTeardown(t *testing.T, timeout, budget time.Duration, afterAll func(*got
 // subtest would later signal a parent that had already finished. Killing the
 // process is the only true interruption, and that is what go test -timeout is.
 // What this adds is the verdict.
-func watchWhile(t *gotest.T, timeout time.Duration, what, budget string, run func()) {
+func watchWhile(tb testing.TB, t *gotest.T, timeout time.Duration, what, budget string, run func()) {
 	if timeout <= 0 {
 		run()
 		return
 	}
 	done := make(chan struct{})
 	stopped := make(chan struct{})
-	go watchDeadline(t, timeout, what, budget, done, stopped)
+	go watchDeadline(tb, t, timeout, what, budget, done, stopped)
 
 	// close(done) also runs when the phase exits via Goexit. Waiting for the
 	// watchdog to stop is what makes its Errorf legal: the testing package
@@ -94,7 +128,7 @@ func watchWhile(t *gotest.T, timeout time.Duration, what, budget string, run fun
 // watchDeadline fails t if the phase has not finished within timeout. Errorf is
 // safe from another goroutine while the test is still running, which the
 // handshake in watchWhile guarantees it is.
-func watchDeadline(t *gotest.T, timeout time.Duration, what, budget string, done <-chan struct{}, stopped chan<- struct{}) {
+func watchDeadline(tb testing.TB, t *gotest.T, timeout time.Duration, what, budget string, done <-chan struct{}, stopped chan<- struct{}) {
 	defer close(stopped)
 
 	timer := time.NewTimer(timeout)
@@ -129,7 +163,7 @@ func watchDeadline(t *gotest.T, timeout time.Duration, what, budget string, done
 		suffix += "\n" + hint
 	}
 	fmt.Fprintf(os.Stderr, "gotest: %s %sexceeded its configured %s of %s and is still running %s\n",
-		t.T().Name(), what, budget, timeout, sched)
+		tb.Name(), what, budget, timeout, sched)
 	t.Errorf("%sexceeded its configured %s of %s and is still running%s", what, budget, timeout, suffix)
 }
 
@@ -140,7 +174,7 @@ func watchDeadline(t *gotest.T, timeout time.Duration, what, budget string, done
 // The context also ends when the run is asked to stop, so a test blocked on a
 // resource returns it before the fixtures tear down. AfterAll's context
 // (TeardownT) does not: teardown has to run to the end.
-func testScopedT(t *testing.T, timeout time.Duration) *gotest.T {
+func testScopedT(t testing.TB, timeout time.Duration) *gotest.T {
 	ctx, cancel := context.WithCancel(t.Context())
 	if timeout > 0 {
 		cancel()
@@ -162,7 +196,7 @@ func testScopedT(t *testing.T, timeout time.Duration) *gotest.T {
 // context derived from it would reach AfterAll already canceled and every
 // context-aware teardown would fail instantly. Values carry over; cancellation
 // does not; the configured setup/teardown timeout is applied on top.
-func TeardownT(t *testing.T, timeout time.Duration) *gotest.T {
+func TeardownT(t testing.TB, timeout time.Duration) *gotest.T {
 	ctx := context.WithoutCancel(t.Context())
 	if timeout > 0 {
 		var cancel context.CancelFunc

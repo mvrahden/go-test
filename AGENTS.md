@@ -238,7 +238,7 @@ type MyServiceTestSuite struct { /* state */ }           // test suite
 
 - Name must end with `TestSuite`
 - All methods must use pointer receivers
-- Must have at least one `Test*` method
+- Must have at least one `Test*`, `Benchmark*` or `Fuzz*` method. Without a `Test*` method there is no `Test<Suite>` function: a test run opens the suite only to replay its `Fuzz*` seeds
 
 ### Test methods
 

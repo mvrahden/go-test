@@ -19,8 +19,24 @@ var templates embed.FS
 
 var (
 	headerTpl = template.Must(template.New("header").ParseFS(templates, "static/header.*"))
-	gotestTpl = template.Must(template.New("gotest").ParseFS(templates, "static/gotest.*"))
+	gotestTpl = template.Must(template.New("gotest").Funcs(template.FuncMap{"dict": dict}).ParseFS(templates, "static/gotest.*"))
 )
+
+// dict builds a template argument from key/value pairs.
+func dict(kv ...any) (map[string]any, error) {
+	if len(kv)%2 != 0 {
+		return nil, fmt.Errorf("dict: odd number of arguments")
+	}
+	m := make(map[string]any, len(kv)/2)
+	for i := 0; i < len(kv); i += 2 {
+		k, ok := kv[i].(string)
+		if !ok {
+			return nil, fmt.Errorf("dict: key %v is not a string", kv[i])
+		}
+		m[k] = kv[i+1]
+	}
+	return m, nil
+}
 
 // FlatFixtureSuite describes a suite with its fixture dependency graph,
 // used for generating per-suite Test functions.

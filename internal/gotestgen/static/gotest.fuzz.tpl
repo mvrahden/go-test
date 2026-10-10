@@ -20,20 +20,21 @@ func Fuzz{{ $ts.Identifier }}_{{ $fz.Identifier }}(f *testing.F) {
 {{- else }}
   s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
 {{- end }}
-{{- if $ts.HasGuard }}
-  if ƒreason := s.{{ $ts.Identifier }}.SuiteGuard(); ƒreason != "" {
-    f.Skipf("suite guard: %s", ƒreason)
-    return
-  }
-{{- end }}
 {{- if not $fx }}
 {{- range $sf := $sfRefs }}
   s.{{ $sf.FieldName }} = ƒ_sf_{{ $sf.Identifier }}
 {{- end }}
 {{- end }}
-  ƒlifecycleT := gotest.NewTFromTB(f)
-  f.Cleanup(func() { s.AfterAll(gotest.NewTFromTB(f)) })
-  s.BeforeAll(ƒlifecycleT)
+  gotestruntime.OpenSuite(f, gotestruntime.Suite{
+{{- if $ts.HasGuard }}
+    Guard: s.{{ $ts.Identifier }}.SuiteGuard,
+{{- end }}
+{{- if $ts.HasConfig }}
+    Config: s.{{ $ts.Identifier }}.SuiteConfig,
+{{- end }}
+    BeforeAll: s.BeforeAll,
+    AfterAll: s.AfterAll,
+  })
 {{- $funcName := printf "Fuzz%s_%s" $ts.Identifier $fz.Identifier }}
 {{- /*
   Harvested seeds go through *gotest.F, never *testing.F directly: F.Add

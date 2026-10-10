@@ -53,7 +53,7 @@ The drill exits 0 only when every mutant was caught. It runs in CI
 | `assert-always-passes` | `CheckEqual` reports success for every input | ring-0 assert suite: its raw checks see the wrong verdict string |
 | `empty-always-true` | `IsEmpty` reports every value as empty | ring-0 predicates suite, and the canary's `Empty` row |
 | `fail-is-noop` | `fail()` in `pkg/gotest` records nothing | canary: the fixtures that must fail stay green |
-| `harness-drops-methods` | the suites template omits the first method of each suite | census: declared methods have no verdict, exercised by the canary's passing fixture |
+| `harness-drops-methods` | the shared suite-methods template omits the first method of each suite | census: declared methods have no verdict, exercised by the canary's passing fixture |
 | `bench-harness-drops-methods` | the bench template omits the first benchmark of each suite | bench census, exercised by the canary's benchmark fixture |
 | `fuzz-harness-drops-target` | the fuzz template omits the first fuzz target of each suite | canary: the fuzzing fixture's golden list (the fixture is red, so the census stands down) |
 | `exit-code-zero` | `WorstExitCode` always returns 0 | canary: exit codes differ from the golden list |
