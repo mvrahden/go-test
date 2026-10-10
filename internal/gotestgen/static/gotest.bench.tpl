@@ -17,20 +17,21 @@ func Benchmark{{ $ts.Identifier }}(b *testing.B) {
 {{- else }}
   s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
 {{- end }}
-{{- if $ts.HasGuard }}
-  if ƒreason := s.{{ $ts.Identifier }}.SuiteGuard(); ƒreason != "" {
-    b.Skipf("suite guard: %s", ƒreason)
-    return
-  }
-{{- end }}
 {{- if not $fx }}
 {{- range $sf := $sfRefs }}
   s.{{ $sf.FieldName }} = ƒ_sf_{{ $sf.Identifier }}
 {{- end }}
 {{- end }}
-  ƒlifecycleT := gotest.NewTFromTB(b)
-  b.Cleanup(func() { s.AfterAll(gotest.NewTFromTB(b)) })
-  s.BeforeAll(ƒlifecycleT)
+  gotestruntime.OpenSuite(b, gotestruntime.Suite{
+{{- if $ts.HasGuard }}
+    Guard: s.{{ $ts.Identifier }}.SuiteGuard,
+{{- end }}
+{{- if $ts.HasConfig }}
+    Config: s.{{ $ts.Identifier }}.SuiteConfig,
+{{- end }}
+    BeforeAll: s.BeforeAll,
+    AfterAll: s.AfterAll,
+  })
 {{ range $bm := $ts.Benchmarks }}
   b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
 {{- if or $fx $sfRefs }}

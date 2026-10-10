@@ -67,13 +67,10 @@ func TestQueryTestSuite(t *testing.T) {
 			DBFixture: ƒ_DBFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestInsert", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -190,14 +187,12 @@ func (ts *ƒƒ_GOTEST_OrderTestSuite) AfterEach(it *gotest.T, ctx *myCtx) {
 
 func TestOrderTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_OrderTestSuite{}
-	ƒbudget := s.OrderTestSuite.SuiteConfig()
-	ƒcfg := gotestruntime.WithSuiteDefaults(ƒbudget)
-	ƒfailed := &atomic.Bool{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Config:    s.OrderTestSuite.SuiteConfig,
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
+	ƒfailed := &atomic.Bool{}
 
 	t.Run("TestOne", func(it *testing.T) {
 		it.Parallel()
@@ -248,13 +243,10 @@ func (ts *ƒƒ_GOTEST_OrderTestSuite) AfterEach(it *gotest.T, ctx *myCtx) {
 
 func TestOrderTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_OrderTestSuite{}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -307,13 +299,10 @@ func (ts *ƒƒ_GOTEST_OrderTestSuite) AfterEach(it *gotest.T)  { ts.OrderTestSui
 
 func TestOrderTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_OrderTestSuite{}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -400,13 +389,10 @@ func TestCFGTestSuite(t *testing.T) {
 			CFGFixture: ƒ_CFGFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -608,13 +594,10 @@ func TestPlainTestSuite(t *testing.T) {
 			PlainFixture: ƒ_PlainFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -812,13 +795,10 @@ func TestEachTestSuite(t *testing.T) {
 			EachFixture: ƒ_EachFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestCase", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -910,13 +890,10 @@ func TestQueryTestSuite(t *testing.T) {
 			DBFixture: ƒ_DBFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestInsert", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -1009,13 +986,10 @@ func TestBasicTestSuite(t *testing.T) {
 			SimpleFixture: ƒ_SimpleFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -1096,13 +1070,10 @@ func TestMinimalTestSuite(t *testing.T) {
 			MinimalFixture: ƒ_MinimalFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -1183,13 +1154,10 @@ func TestBoundTestSuite(t *testing.T) {
 			AppFixture: ƒ_AppFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestBound", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -1216,13 +1184,10 @@ func (ts *ƒƒ_GOTEST_StandaloneTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestStandaloneTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_StandaloneTestSuite{}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestFree", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -1321,13 +1286,10 @@ func TestHandlerTestSuite(t *testing.T) {
 			APIFixture: ƒ_APIFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestGet", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -1440,13 +1402,10 @@ func TestEmbeddedTestSuite(t *testing.T) {
 			DBFixture: ƒ_DBFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -1470,13 +1429,10 @@ func TestNamedTestSuite(t *testing.T) {
 			db: ƒ_DBFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -1591,13 +1547,10 @@ func TestLightTestSuite(t *testing.T) {
 			InfraFixture: ƒ_InfraFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -1621,13 +1574,10 @@ func TestFullTestSuite(t *testing.T) {
 			APIFixture: ƒ_APIFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -1723,13 +1673,10 @@ func TestUserTestSuite(t *testing.T) {
 			AppFixture: ƒ_AppFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -1810,13 +1757,10 @@ func TestQueryTestSuite(t *testing.T) {
 			db: ƒ_DBFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -1900,13 +1844,10 @@ func TestMigrationTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_MigrationTestSuite{}
 
 	s.Schema = ƒ_sf_SchemaSharedFixture
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -2005,13 +1946,10 @@ func TestQueryTestSuite(t *testing.T) {
 			E2EFixture: ƒ_E2EFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestInsert", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -2107,13 +2045,10 @@ func TestAppTestSuite(t *testing.T) {
 			AppFixture: ƒ_AppFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestRun", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -2194,13 +2129,10 @@ func TestStdlibTestSuite(t *testing.T) {
 			DBFixture: ƒ_DBFixture,
 		},
 	}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestQuery", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -2241,13 +2173,10 @@ func (ts *ƒƒ_GOTEST_MixedTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestMixedTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_MixedTestSuite{}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestStdlib", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -2300,13 +2229,10 @@ func (ts *ƒƒ_GOTEST_PlainTestSuite) AfterEach(it *gotest.T)  { ts.PlainTestSui
 
 func TestPlainTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_PlainTestSuite{}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestFoo", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -2359,13 +2285,11 @@ func (ts *ƒƒ_GOTEST_ConfiguredTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestConfiguredTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_ConfiguredTestSuite{}
-	ƒbudget := s.ConfiguredTestSuite.SuiteConfig()
-	ƒcfg := gotestruntime.WithSuiteDefaults(ƒbudget)
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		Config:    s.ConfiguredTestSuite.SuiteConfig,
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -2461,13 +2385,10 @@ func (ts *ƒƒ_GOTEST_PlainTestSuite) AfterEach(it *gotest.T)  {}
 
 func TestPlainTestSuite(t *testing.T) {
 	s := &ƒƒ_GOTEST_PlainTestSuite{}
-	ƒcfg := gotest.DefaultSuiteConfig()
-	ƒbudget := gotest.SuiteConfig{}
-
-	t.Cleanup(func() {
-		gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+		BeforeAll: s.BeforeAll,
+		AfterAll:  s.AfterAll,
 	})
-	gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 	t.Run("TestOne", func(it *testing.T) {
 		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)

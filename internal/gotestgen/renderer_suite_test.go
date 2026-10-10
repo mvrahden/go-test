@@ -282,10 +282,9 @@ func (s *RendererTestSuite) TestSuiteConfig(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
-			gotest.Contains(it, output, "ƒbudget := s.ConfiguredTestSuite.SuiteConfig()",
-				"the declared config is the enforced budget, so a zero duration is never enforced")
-			gotest.Contains(it, output, "ƒcfg := gotestruntime.WithSuiteDefaults(ƒbudget)",
-				"a zero duration bounds the context with the default, as if the marker were absent")
+			// OpenSuite turns the declared config into the budget and the defaulted
+			// config; the harness only hands it the marker.
+			gotest.Regexp(it, `Config:\s+s\.ConfiguredTestSuite\.SuiteConfig,`, output)
 			gotest.NotContains(it, output, "OverlaySuiteConfig", "literal semantics: no overlay")
 		})
 	})
@@ -296,12 +295,10 @@ func (s *RendererTestSuite) TestSuiteConfig(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
-			// The default 30s still bounds t.Context(); the zero budget is what
-			// keeps the suite from being failed against it.
-			gotest.Contains(it, output, "ƒcfg := gotest.DefaultSuiteConfig()",
-				"a suite with no config falls back to the defaults")
-			gotest.Contains(it, output, "ƒbudget := gotest.SuiteConfig{}",
-				"a suite with no config must declare no budget")
+			// Without a Config, OpenSuite runs the suite under the defaults with a
+			// zero budget.
+			gotest.Contains(it, output, "ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{")
+			gotest.NotContains(it, output, "SuiteConfig", "a suite with no config must pass none")
 		})
 	})
 }
@@ -312,12 +309,10 @@ func (s *RendererTestSuite) TestUndeclaredBudgetIsZero(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestLifecycle_UndeclaredBudget")
 			source, _ := renderTestPkg(it.T(), pkg, false)
 
-			// A suite with no marker method gets the defaults for its contexts
-			// and a zero budget, so nothing holds it to a number it never wrote.
-			gotest.Contains(it, source, "ƒcfg := gotest.DefaultSuiteConfig()")
-			gotest.Contains(it, source, "ƒbudget := gotest.SuiteConfig{}")
-			gotest.Contains(it, source, "gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)")
-			gotest.Contains(it, source, "gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)")
+			// Without a Config, OpenSuite runs the suite under the defaults with a
+			// zero budget, so nothing holds it to a number it never wrote.
+			gotest.Contains(it, source, "ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{")
+			gotest.NotContains(it, source, "SuiteConfig")
 			gotest.Contains(it, source, "gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {")
 			gotest.NotContains(it, source, "sync.WaitGroup")
 		})
@@ -602,9 +597,8 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 		idx := strings.Index(out, "func FuzzFuzzTestSuite_FuzzParse")
 		gotest.GreaterOrEqual(it, idx, 0, "fuzz wrapper missing from output")
 		fuzzFn := out[idx:]
-		gotest.Contains(it, fuzzFn, "ƒlifecycleT := gotest.NewTFromTB(f)")
-		gotest.Contains(it, fuzzFn, "f.Cleanup(func() { s.AfterAll(gotest.NewTFromTB(f)) })")
-		gotest.Contains(it, fuzzFn, "s.BeforeAll(ƒlifecycleT)")
+		gotest.Regexp(it, `(?s)gotestruntime\.OpenSuite\(f, gotestruntime\.Suite\{\s+BeforeAll:\s+s\.BeforeAll,\s+AfterAll:\s+s\.AfterAll,\s+\}\)\s+ƒf := gotest\.NewF\(`, fuzzFn,
+			"the suite opens before the fuzz target sees a seed")
 	})
 
 	t.When("fuzz suite is bound to a package fixture", func(w *gotest.T) {

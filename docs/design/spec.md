@@ -1326,13 +1326,10 @@ type ƒƒ_GOTEST_MyTestSuite struct { MyTestSuite }
 
 func TestMyTestSuite(t *testing.T) {
     s := &ƒƒ_GOTEST_MyTestSuite{}
-    ƒcfg := gotest.DefaultSuiteConfig()
-    ƒbudget := gotest.SuiteConfig{}
-
-    t.Cleanup(func() {
-        gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
+    ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+        BeforeAll: s.BeforeAll,
+        AfterAll:  s.AfterAll,
     })
-    gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
     t.Run("TestSomething", func(it *testing.T) {
         ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
@@ -1348,14 +1345,16 @@ func TestMyTestSuite(t *testing.T) {
 }
 ```
 
-The sample shows a sequential suite without a config marker. `ƒcfg` always carries a
+The sample shows a sequential suite without a config marker. `gotestruntime.OpenSuite` is
+the suite frame every Test, Benchmark and Fuzz wrapper shares; a suite with a `SuiteGuard()`
+or `SuiteConfig()` method also passes it as `Guard`/`Config`. `ƒcfg` always carries a
 config — the declared one, or `DefaultSuiteConfig()` when there is no `SuiteConfig()`
 method — and its `Timeout`/`SetupTimeout` bound the context that `gotestruntime.TestT`
-and `RunSetup`/`RunTeardown` hand to each phase. `ƒbudget` is different: it is the
+and `OpenSuite` hand to each phase. `ƒbudget` is different: it is the
 config `RunTest`, `RunSetup` and `RunTeardown` are told to *enforce by verdict*, and it
 stays a zero-value `gotest.SuiteConfig{}` unless the suite declared one. With a
-`SuiteConfig()` marker, `ƒbudget := s.MyTestSuite.SuiteConfig()` holds the values the author wrote as the enforced
-budget, and `ƒcfg := gotestruntime.WithSuiteDefaults(ƒbudget)` replaces the default for the
+`SuiteConfig()` marker, `ƒbudget` holds the values the author wrote as the enforced
+budget, and `ƒcfg` is `gotestruntime.WithSuiteDefaults(ƒbudget)` for the
 contexts: a duration left at zero gets the default and no verdict, exactly as without a marker,
 and a negative one (`gotest.NoDeadline`) gets neither. Fixture markers are normalized the same
 way through `WithFixtureDefaults`, with the declared `Timeout` as their `Budget`.

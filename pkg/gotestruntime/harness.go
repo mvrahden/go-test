@@ -45,6 +45,8 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 		budget = s.Config()
 		cfg = WithSuiteDefaults(budget)
 	}
+	// Never wait on the suite's subtests here: on panic, testing runs ancestor
+	// cleanups from the panicking goroutine, and the wait would deadlock.
 	tb.Cleanup(func() {
 		RunTeardown(tb, cfg.SetupTimeout, budget.SetupTimeout, s.AfterAll)
 	})

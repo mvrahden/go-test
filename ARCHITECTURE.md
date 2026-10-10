@@ -193,18 +193,28 @@ type ƒƒ_GOTEST_FooTestSuite struct { FooTestSuite }
 // Generated test function
 func TestFooTestSuite(t *testing.T) {
     s := &ƒƒ_GOTEST_FooTestSuite{}
-    // optional: read shared state from GOTEST_SHARED_STATE_FILE
-    // apply SuiteConfig, deadlines
-    s.BeforeAll(setupT)
-    t.Cleanup(func() { s.AfterAll(teardownT) })
+    ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
+        Guard:     s.FooTestSuite.SuiteGuard,  // only if declared
+        Config:    s.FooTestSuite.SuiteConfig, // only if declared
+        BeforeAll: s.BeforeAll,
+        AfterAll:  s.AfterAll,
+    })
 
     t.Run("TestCreateUser", func(it *testing.T) {
-        s.BeforeEach(ttt)
+        ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
         defer s.AfterEach(ttt)
-        s.TestCreateUser(ttt)
+        s.BeforeEach(ttt)
+        gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() { s.TestCreateUser(ttt) })
     })
 }
 ```
+
+`OpenSuite` (`pkg/gotestruntime/harness.go`) is the suite frame every Test,
+Benchmark and Fuzz wrapper shares: it runs `SuiteGuard`, resolves
+`SuiteConfig` (zero durations defaulted; the declared value is the budget),
+runs `BeforeAll` under `SetupTimeout`, and registers `AfterAll` as the
+wrapper's cleanup under a context that survives the cancellation testing
+performs before cleanups.
 
 For **fixture-bound suites** (have a fixture), every generated top-level
 function — the `TestX` function, each `FuzzX_M` seed-replay wrapper, the
@@ -253,8 +263,7 @@ generated (standalone or fixture-bound, same shape as above), with one
 func BenchmarkFooTestSuite(b *testing.B) {
     ƒ_setupFixtures(b)                    // only if fixture-bound
     s := &ƒƒ_GOTEST_FooTestSuite{...}
-    b.Cleanup(func() { s.AfterAll(lifecycleT) })
-    s.BeforeAll(lifecycleT)
+    gotestruntime.OpenSuite(b, gotestruntime.Suite{...})
 
     b.Run("BenchmarkParse", func(b *testing.B) {
         b.StopTimer()
@@ -290,9 +299,7 @@ function independently repeats fixture setup and `BeforeAll`:
 func FuzzFooTestSuite_FuzzParse(f *testing.F) {
     ƒ_setupFixtures(f)                    // only if fixture-bound
     s := &ƒƒ_GOTEST_FooTestSuite{...}
-    ƒlifecycleT := gotest.NewTFromTB(f)
-    f.Cleanup(func() { s.AfterAll(gotest.NewTFromTB(f)) })
-    s.BeforeAll(ƒlifecycleT)
+    gotestruntime.OpenSuite(f, gotestruntime.Suite{...})
     ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach)   // plus one fan per target tuple
     s.FuzzParse(ƒf)
 }

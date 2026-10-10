@@ -67,6 +67,12 @@ func runGeneratedSuite(t *gotest.T, name string, timeout ...time.Duration) child
 	if len(timeout) > 0 {
 		limit = timeout[0]
 	}
+	return runGeneratedSuiteArgs(t, name, limit)
+}
+
+// runGeneratedSuiteArgs is [runGeneratedSuite] with extra flags for the child,
+// such as -test.bench.
+func runGeneratedSuiteArgs(t *gotest.T, name string, limit time.Duration, args ...string) childRun {
 	dir := gotestgen.ExportTestPkgDir(t.T(), name)
 	pkg := gotestgen.ExportMustTestPkg(t.T(), name)
 
@@ -99,7 +105,7 @@ func runGeneratedSuite(t *gotest.T, name string, timeout ...time.Duration) child
 	defer cancel()
 
 	// -test.v keeps the suite's own stdout markers even when the child passes.
-	cmd := exec.CommandContext(ctx, bin, "-test.v", "-test.count=1", "-test.timeout="+limit.String()) //nolint:gosec // G204: freshly compiled test binary
+	cmd := exec.CommandContext(ctx, bin, append([]string{"-test.v", "-test.count=1", "-test.timeout=" + limit.String()}, args...)...) //nolint:gosec // G204: freshly compiled test binary
 	cmd.Dir = dir
 
 	start := time.Now()

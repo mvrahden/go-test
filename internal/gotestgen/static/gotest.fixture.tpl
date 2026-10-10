@@ -127,33 +127,19 @@ func Test{{ $fs.Suite.Identifier }}(t *testing.T) {
 {{- end }}
         },
     }
+    {{ if $fs.Suite.TestCases }}ƒcfg, ƒbudget := {{ end }}gotestruntime.OpenSuite(t, gotestruntime.Suite{
 {{- if $fs.Suite.HasGuard }}
-    if ƒreason := s.{{ $fs.Suite.Identifier }}.SuiteGuard(); ƒreason != "" {
-        t.Skipf("suite guard: %s", ƒreason)
-        return
-    }
+      Guard: s.{{ $fs.Suite.Identifier }}.SuiteGuard,
 {{- end }}
 {{- if $fs.Suite.HasConfig }}
-    ƒbudget := s.{{ $fs.Suite.Identifier }}.SuiteConfig()
-    ƒcfg := gotestruntime.WithSuiteDefaults(ƒbudget)
-{{- else }}
-    ƒcfg := gotest.DefaultSuiteConfig()
-    ƒbudget := gotest.SuiteConfig{}
+      Config: s.{{ $fs.Suite.Identifier }}.SuiteConfig,
 {{- end }}
+      BeforeAll: s.BeforeAll,
+      AfterAll: s.AfterAll,
+    })
 {{- if and $fs.Suite.IsMethodParallel $fs.Suite.TestCases }}
     ƒfailed := &atomic.Bool{}
 {{- end }}
-{{- /*
-  testing runs the suite cleanup only after every subtest started via t.Run has
-  finished, parallel ones included. It must never wait on those subtests itself:
-  on panic the testing package runs ancestor cleanups from the panicking
-  goroutine, so such a wait deadlocks against the panic unwind.
-*/}}
-
-    t.Cleanup(func() {
-        gotestruntime.RunTeardown(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.AfterAll)
-    })
-    gotestruntime.RunSetup(t, ƒcfg.SetupTimeout, ƒbudget.SetupTimeout, s.BeforeAll)
 
 {{ range $tc := $fs.Suite.TestCases }}
     t.Run("{{ $tc.Identifier }}", func(it *testing.T) {
