@@ -244,7 +244,7 @@ The lifecycle gives you four levels of setup and teardown, split across suites a
 - **`BeforeAll` / `AfterAll`** are for expensive, shared resources. Database connections, container startup, service initialization. These run once and are amortized across all tests in the suite. If setup takes more than a few milliseconds, it probably belongs here.
 - **`BeforeEach` / `AfterEach`** are for per-test isolation. Transactions, temp directories, fresh state. These ensure each test starts clean. The cost must be low enough to pay on every test.
 - **Returning `BeforeEach`** is for when tests need isolated context *and* you want method-level parallelism. The returned value gives each test its own state object, making concurrent execution safe without locks.
-- **Fixture hooks** are for infrastructure that multiple suites share. If two suites both need a Postgres connection, extract the connection management into a `DatabaseFixture` with its own `BeforeAll`/`AfterAll`. The suites reference the fixture; the fixture manages the resource.
+- **Fixture hooks** are for infrastructure that multiple suites need. If two suites both need a Postgres connection, extract the connection management into a `DatabaseFixture` with its own `BeforeAll`/`AfterAll`. The suites reference the fixture; the fixture manages the resource. Each suite gets its own instance; to set the resource up once for the whole run, make it a [shared fixture]({{< ref "/blog/shared-fixtures" >}}).
 
 A common pattern combines these levels: a fixture's `BeforeAll` starts a database, the fixture's `BeforeEach` begins a transaction, the suite's returning `BeforeEach` creates service instances using that transaction, and the fixture's `AfterEach` rolls back. Each level handles one concern.
 

@@ -732,7 +732,7 @@ After `BeforeAll`, transferable fields (determined by Hydrate-assignment analysi
 The subprocess is shutdown-capable from birth and never tears down on its own initiative: it reports setup outcome (and its teardown budget) on the `_done` line, then waits for the runner's signal — only the runner knows when every suite has stopped using the fixtures — and a clean exit is the runner's sole proof that teardown ran and passed.
 In the test harness, the deserialized fixture is hydrated via `Hydrate(ctx)` if present, and `Dehydrate(ctx)` is deferred for cleanup.
 
-**Suites:** The test harness uses the marker's config when present (otherwise `DefaultSuiteConfig()`) to bound each phase's context — `gotestruntime.SetupT`/`TestT` apply `NewTWithDeadline` when the timeout is positive — and breaks the test case loop on first failure when `FailFast` is set.
+**Suites:** The test harness uses the marker's config when present (otherwise `DefaultSuiteConfig()`) to bound each phase's context — `gotestruntime.SetupT`/`TestT` bound it by the timeout when positive, and end it when the runner announces a stop — and breaks the test case loop on first failure when `FailFast` is set.
 Bounding the context is not the same as being held to it: `gotestruntime.RunSetup`, `RunTest` and `RunTeardown` additionally take a *budget* duration and fail the phase by verdict if it is still running once the budget elapses, but that budget is the zero value — nothing enforced — unless the suite declared a `SuiteConfig()` of its own. A suite with no marker gets bounded but unenforced defaults; a suite with a marker gets its own values as both the bound and the budget, verbatim.
 
 **`NewTWithDeadline`:** Creates a `*gotest.T` with a context deadline.
@@ -753,8 +753,8 @@ This is what lets `AfterAll` run under a context that survives the cancellation 
   `go test -timeout` acts by panicking the test binary; gotest's own `--timeout` cancels the whole pipeline at the process level.
   Whichever bound expires first ends the run.
 - **Nested fixtures:** Each level resolves config independently — no inheritance between fixture levels.
-- **Hydrate/Dehydrate:** state is deserialized and hydrated lazily — when the first fixture-bound test triggers setup (see fixtures.md, Execution Model).
-  `Dehydrate` runs when the fixture-bound pending counter reaches zero, i.e. after the last matching fixture-bound test.
+- **Hydrate/Dehydrate:** state is deserialized and hydrated as part of the fixture setup each top-level function holds (see fixtures.md, Execution Model).
+  `Dehydrate` runs in that function's cleanup, after the suite's `AfterAll`.
   `Hydrate` receives a context with the SharedFixture's configured timeout; `Dehydrate` receives `context.Background()`.
 
 ---

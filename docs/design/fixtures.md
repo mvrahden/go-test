@@ -67,7 +67,7 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 
 ### Generated test output
 
-Fixture setup runs automatically before the first fixture-bound test — fixture names do not appear in test paths.
+Fixture setup runs automatically before each suite that binds the fixture — fixture names do not appear in test paths.
 Suites bound to a fixture produce the same test names as standalone suites:
 
 ```
@@ -471,6 +471,9 @@ Key improvements:
 - `AfterAll` handles teardown (no manual defer chains)
 - No package-level singletons
 - Type-safe field access via named fields
+
+One difference in cost: `TestMain` ran its setup once per package, the fixture runs it once per suite that binds it.
+When the setup must stay once per run, make it a shared fixture.
 
 ## Resource Management
 

@@ -276,6 +276,8 @@ This keeps resource management declarative and predictable.
 
 Fixtures replace `TestMain` + package-level singletons with convention-driven setup.
 Any struct ending in `Fixture` is a package fixture; ending in `SharedFixture` is a cross-package shared fixture.
+A package fixture lives as long as the suite that binds it: set up before the suite's `BeforeAll`, torn down after its `AfterAll`.
+Suites that bind the same package fixture each get their own; setup that must happen once per run belongs in a shared fixture.
 
 ```go
 // fixture_test.go

@@ -11,7 +11,7 @@ allocation-free?" is a question people ask about a hot path.
 - **cache.go** — `Cache`, a hand-rolled intrusive doubly linked list LRU (not
   `container/list`, whose `Element` boxes its payload into `any` and would
   cost an allocation on every promotion)
-- **fixtures_test.go** — `KeyCorpusFixture`, a `BeforeAll`-only shared fixture
+- **fixtures_test.go** — `KeyCorpusFixture`, a `BeforeAll`-only package fixture
 - **suite_test.go** — `CacheTestSuite`: one correctness test plus four
   benchmarks
 
@@ -54,9 +54,10 @@ to stop; see the comment on `BeforeEach` in `suite_test.go`.
 
 ## Why the fixture is `BeforeAll`-only
 
-`KeyCorpusFixture` builds a deterministic 4096-key/value corpus once for the
-whole package — every benchmark reads the same keys, which is what makes
-`--against` comparisons meaningful run over run. The same corpus warms the
+`KeyCorpusFixture` builds a deterministic 4096-key/value corpus once per run
+of the suite (once for its test, again for its benchmarks). The corpus is
+the same every time — every benchmark reads the same keys, which is what
+makes `--against` comparisons meaningful run over run. The same corpus warms the
 shared `s.cache` used by `BenchmarkGetHit`/`BenchmarkGetMiss`/
 `BenchmarkPutEviction`, and its full size is what `BenchmarkFillFromEmpty`
 fills per op. `KeyCorpusFixture` defines `BeforeAll` and nothing else.
