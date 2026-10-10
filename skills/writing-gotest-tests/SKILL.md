@@ -114,6 +114,21 @@ Sections tagged **v1.30+** need v1.30.0 or newer. What v1.30 adds:
    it (expressiveness tier) and `lint -fix` spells it `gotest.NoDeadline`.
    The rewrite keeps the meaning. Below v1.30 it is not reported.
 
+Sections tagged **v1.32+** need v1.32.0 or newer. What v1.32 changes:
+
+1. **Benchmark and fuzz suites get setup deadlines** — their `BeforeAll`/
+   `AfterAll` contexts carry `SetupTimeout` (default 30s), and a declared
+   one is enforced, as for any other suite. Below v1.32 those contexts had
+   no deadline, so a slow setup there that honors its context (a container
+   start) now needs a declared `SetupTimeout`, e.g.
+   `IntegrationSuiteConfig()`. A benchmark's `AfterEach` now runs even
+   when the benchmark fails or panics.
+2. **A suite without `Test*` methods has no test run** — a benchmark-only
+   suite's `BeforeAll` and fixtures run only when its benchmarks do, and a
+   fuzz-only suite opens once per `Fuzz*` method to replay its seeds.
+   Below v1.32 both also got an empty `Test<Suite>` that ran `BeforeAll`
+   in every test run.
+
 Exit codes on v1.25.x are weaker than they look — never treat a green
 gotest exit alone as proof there: a package failing to compile mid-run, a
 suite binary killed by a signal, and `spec --input` on a failing stream

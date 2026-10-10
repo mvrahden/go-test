@@ -18,6 +18,8 @@ zero behave as if the marker were absent:
 - Upgrading from v1.26–v1.29: a suite that relied on `Timeout: 0` for no
   deadline now gets the default one and fails when it exceeds it. Write
   `gotest.NoDeadline` where that was the intent.
+- `SetupTimeout` bounds `BeforeAll`/`AfterAll` of benchmark and fuzz
+  suites too from v1.32; before, their contexts had no deadline.
 
 Marker bodies are parsed statically (the generator needs `Parallel` at
 generation time), so only three forms are legal:
