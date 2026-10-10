@@ -103,3 +103,97 @@ func (s *HarnessTTestSuite) TestTeardownT(t *gotest.T) {
 		})
 	})
 }
+
+// runFrame opens a suite on a raw subtest, as a generated wrapper does, and
+// returns that subtest once it has ended.
+func runFrame(it *gotest.T, s gotestruntime.Suite) (inner *testing.T, cfg, budget gotest.SuiteConfig) {
+	it.T().Run("inner", func(tt *testing.T) { //nolint:t-escape // observing testing.T cleanup semantics
+		inner = tt
+		cfg, budget = gotestruntime.OpenSuite(tt, s)
+	})
+	return inner, cfg, budget
+}
+
+func (s *HarnessTTestSuite) TestOpenSuite(t *gotest.T) {
+	t.When("the guard names a reason", func(w *gotest.T) {
+		w.It("skips the suite before its config and BeforeAll", func(it *gotest.T) {
+			var calls []string
+			inner, _, _ := runFrame(it, gotestruntime.Suite{
+				Guard:     func() string { return "no database" },
+				Config:    func() gotest.SuiteConfig { calls = append(calls, "config"); return gotest.SuiteConfig{} },
+				BeforeAll: func(*gotest.T) { calls = append(calls, "beforeall") },
+				AfterAll:  func(*gotest.T) { calls = append(calls, "afterall") },
+			})
+			gotest.True(it, inner.Skipped())
+			gotest.Empty(it, calls)
+		})
+	})
+
+	t.When("the guard returns empty", func(w *gotest.T) {
+		w.It("runs config, BeforeAll and then AfterAll", func(it *gotest.T) {
+			var calls []string
+			inner, _, _ := runFrame(it, gotestruntime.Suite{
+				Guard:     func() string { return "" },
+				Config:    func() gotest.SuiteConfig { calls = append(calls, "config"); return gotest.SuiteConfig{} },
+				BeforeAll: func(*gotest.T) { calls = append(calls, "beforeall") },
+				AfterAll:  func(*gotest.T) { calls = append(calls, "afterall") },
+			})
+			gotest.False(it, inner.Skipped())
+			gotest.Equal(it, []string{"config", "beforeall", "afterall"}, calls)
+		})
+	})
+
+	t.When("the suite declares no config", func(w *gotest.T) {
+		w.It("runs under the defaults with no budget", func(it *gotest.T) {
+			_, cfg, budget := runFrame(it, gotestruntime.Suite{
+				BeforeAll: func(*gotest.T) {},
+				AfterAll:  func(*gotest.T) {},
+			})
+			gotest.Equal(it, gotest.DefaultSuiteConfig(), cfg)
+			gotest.Zero(it, budget)
+		})
+	})
+
+	t.When("the suite's config leaves a duration at zero", func(w *gotest.T) {
+		w.It("fills it from the defaults and keeps the declared budget", func(it *gotest.T) {
+			declared := gotest.SuiteConfig{Timeout: time.Minute, FailFast: true}
+			_, cfg, budget := runFrame(it, gotestruntime.Suite{
+				Config:    func() gotest.SuiteConfig { return declared },
+				BeforeAll: func(*gotest.T) {},
+				AfterAll:  func(*gotest.T) {},
+			})
+			gotest.Equal(it, declared, budget)
+			gotest.Equal(it, time.Minute, cfg.Timeout)
+			gotest.Equal(it, gotest.DefaultSuiteConfig().SetupTimeout, cfg.SetupTimeout)
+			gotest.True(it, cfg.FailFast)
+		})
+	})
+
+	t.When("the suite ends", func(w *gotest.T) {
+		w.It("hands AfterAll a live context bounded by SetupTimeout", func(it *gotest.T) {
+			var afterAllErr error
+			var bounded bool
+			runFrame(it, gotestruntime.Suite{
+				BeforeAll: func(*gotest.T) {},
+				AfterAll: func(tt *gotest.T) {
+					afterAllErr = tt.Context().Err()
+					_, bounded = tt.Context().Deadline()
+				},
+			})
+			gotest.NoError(it, afterAllErr)
+			gotest.True(it, bounded)
+		})
+	})
+
+	t.When("BeforeAll ends the suite early", func(w *gotest.T) {
+		w.It("still runs AfterAll", func(it *gotest.T) {
+			ran := false
+			inner, _, _ := runFrame(it, gotestruntime.Suite{
+				BeforeAll: func(tt *gotest.T) { tt.Skipf("not today") },
+				AfterAll:  func(*gotest.T) { ran = true },
+			})
+			gotest.True(it, inner.Skipped())
+			gotest.True(it, ran)
+		})
+	})
+}

@@ -69,6 +69,22 @@ func (s *TTestSuite) TestNewTWithContext(t *gotest.T) {
 			gotest.NoError(it, tt.Context().Err())
 		})
 	})
+
+	t.When("given a benchmark's B", func(w *gotest.T) {
+		w.It("reports the context, nils T() and routes helpers through the B", func(it *gotest.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			res := testing.Benchmark(func(b *testing.B) {
+				tt := gotest.NewTWithContext(b, ctx)
+				gotest.Equal(it, ctx, tt.Context())
+				gotest.Zero(it, tt.T())
+				gotest.NotEmpty(it, tt.TempDir())
+				for b.Loop() {
+				}
+			})
+			gotest.Greater(it, res.N, 0)
+		})
+	})
 }
 
 func (s *TTestSuite) TestTContext(t *gotest.T) {
