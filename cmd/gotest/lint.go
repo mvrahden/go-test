@@ -219,7 +219,7 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 		}
 	}
 
-	targets := lint.Targets{Dir: dir, Patterns: a.patterns, Tests: a.tests, BuildFlags: a.buildFlags()}
+	targets := &lint.Targets{Dir: dir, Patterns: a.patterns, Tests: a.tests, BuildFlags: a.buildFlags()}
 	ctx := context.Background()
 	var written []string // the files -fix wrote, for a second signal to name
 	if a.fix {

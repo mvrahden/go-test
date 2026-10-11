@@ -41,7 +41,7 @@ func (r *Result) PrintJSON(w io.Writer) error {
 // Run executes the analyzer over the packages matched by patterns, test
 // files included. See Analyze.
 func Run(dir string, patterns []string) ([]Finding, error) {
-	res, err := Analyze(context.Background(), Targets{Dir: dir, Patterns: patterns, Tests: true})
+	res, err := Analyze(context.Background(), &Targets{Dir: dir, Patterns: patterns, Tests: true})
 	if err != nil {
 		return nil, err
 	}
@@ -71,12 +71,12 @@ type Targets struct {
 // Findings are deduplicated across test-variant package loads and sorted by
 // position. A load or analysis failure is an error, never an empty result:
 // nothing was proven about a package that was not analyzed.
-func Analyze(ctx context.Context, t Targets) (*Result, error) {
+func Analyze(ctx context.Context, t *Targets) (*Result, error) {
 	return analyze(ctx, t, nil)
 }
 
 // analyze is Analyze with sources read from overlay where it has them.
-func analyze(ctx context.Context, t Targets, overlay map[string][]byte) (*Result, error) {
+func analyze(ctx context.Context, t *Targets, overlay map[string][]byte) (*Result, error) {
 	pkgs, err := load(ctx, t, overlay)
 	if err != nil {
 		return nil, err

@@ -29,7 +29,7 @@ import (
 // instead; this is the same success-is-proven contract the runner applies to
 // compile failures.
 func PreflightLoad(dir string, patterns []string) error {
-	_, err := load(context.Background(), Targets{Dir: dir, Patterns: patterns, Tests: true}, nil)
+	_, err := load(context.Background(), &Targets{Dir: dir, Patterns: patterns, Tests: true}, nil)
 	return err
 }
 
@@ -37,7 +37,7 @@ func PreflightLoad(dir string, patterns []string) error {
 // from export data: the analyzer holds no facts, so it never looks at a
 // dependency's syntax. Every target that does not compile is named in the
 // error. overlay replaces the contents of the files it names.
-func load(ctx context.Context, t Targets, overlay map[string][]byte) ([]*packages.Package, error) {
+func load(ctx context.Context, t *Targets, overlay map[string][]byte) ([]*packages.Package, error) {
 	cfg := &packages.Config{
 		Context: ctx,
 		Dir:     t.Dir,
