@@ -669,7 +669,7 @@ A fresh process per suite is also a methodological win, not just an implementati
 Given both, a suite must match both to run (AND semantics).
 `-run Test<Suite>`-style values match nothing in bench mode — filter by the suite name itself, not the `Test` prefix.
 
-With no matching benchmarks, `gotest bench` prints `no benchmarks found` and exits 0.
+With no matching benchmarks, `gotest bench` prints `no benchmarks found` and exits 0; patterns that match no package at all exit 2, as in every run mode.
 
 ### Spec view
 
@@ -860,7 +860,7 @@ The next session resumes from them, which is why a second run starts with a larg
 They are the search's own memory, not something to commit: the seeds you write and the crashers you promote are the corpus that travels with the code.
 The engine's `To re-run: go test -run=...` advice is dropped from the stream, since plain `go test` cannot see a generated target; the hint after a crasher names the working commands.
 
-With no `Fuzz*` methods anywhere, `gotest fuzz` prints `no fuzz targets found` and exits 0 without invoking `go test`.
+With no `Fuzz*` methods in the matched packages, `gotest fuzz` prints `no fuzz targets found` and exits 0 without invoking `go test`; patterns that match no package at all exit 2.
 
 ### Triage and promote
 
@@ -1165,7 +1165,7 @@ gotest help                    # show help
 
 All `go test` flags work unchanged: `-race`, `-cover`, `-count`, `-run`, `-json`, `-short`, `-timeout`, `-v`.
 
-A run exits `0` when everything passed, `1` on a failed test, a shared fixture that failed to set up or tear down, or an expired `--timeout`, `2` on a usage, generation or build error and on a green run in which a declared test never ran, and `130` when it was interrupted. `lint` and `fuzz` state their own codes in `gotest help lint` and `gotest help fuzz`.
+A run exits `0` when everything passed, `1` on a failed test, a shared fixture that failed to set up or tear down, or an expired `--timeout`, `2` on a usage, generation or build error, on a green run in which a declared test never ran, and when the patterns match no package, and `130` when it was interrupted. `lint` and `fuzz` state their own codes in `gotest help lint` and `gotest help fuzz`.
 
 To feed a JUnit consumer, run the tests through a converter that reads the events: `gotestsum --junitfile report.xml --raw-command -- go tool gotest -json ./...`. The report is red whenever the run is — a package that does not build or a shared fixture that fails included — and gotest's exit code passes through. A converter that parses the printed text instead of the events, such as `go-junit-report`, reports those failures as plain output or not at all.
 

@@ -166,6 +166,13 @@ Use a bare "--" to pass unrecognized flags without validation.
 CI auto-detection: when the standard CI env var is set and GOTEST_CI is
 unset, --ci is enabled automatically. Set GOTEST_CI=0 to opt out.
 
+Every package a pattern matches ends in a verdict. A run whose patterns
+match no package at all verified nothing: in every mode (spec, summary,
+bench and fuzz too) it exits 2 and prints on stderr
+  FAIL: "<pattern>" matched no packages
+A pattern that matches nothing while others do only warns on stderr, as
+go test does.
+
 Fuzz seed harvesting (on by default): if any target package has FuzzX
 suite methods, gotest mines your test files' table-test literals and
 call-site arguments into f.Add(...) seeds when it generates their wrapper
@@ -202,7 +209,8 @@ test whose output is the census, and its suite and package fail with it, so
 the rendered spec and -json consumers name it too. The census applies to
 green runs only and stands down under -run, -skip and -list with a note on
 stderr. Declared benchmarks a test run left unexecuted are counted with
-"note: N benchmark(s) not run"; -bench runs them here instead.
+"note: N benchmark(s) not run"; -bench runs them here instead. Patterns
+that match no package exit 2 as well: a run of nothing is not green.
 
 Flags:
   --format=<fmt>          Output format: terminal (default), md, json
@@ -260,7 +268,8 @@ test whose output is the census, and its suite and package fail with it, so
 the rendered spec and -json consumers name it too. The census applies to
 green runs only and stands down under -run, -skip and -list with a note on
 stderr. Declared benchmarks a test run left unexecuted are counted with
-"note: N benchmark(s) not run"; -bench runs them here instead.
+"note: N benchmark(s) not run"; -bench runs them here instead. Patterns
+that match no package exit 2 as well: a run of nothing is not green.
 
 Flags:
   --format=<fmt>          Output format: terminal (default), md, json
@@ -310,7 +319,9 @@ Usage:
 
 Watches .go files under the target packages and re-runs affected tests
 on every change. The initial run covers all target packages; subsequent
-runs are scoped to the packages containing changed files.
+runs are scoped to the packages containing changed files. A run whose
+patterns match no package yet is reported like a failed load, and watch
+keeps watching: the first package written there runs.
 
 Flags:
   --debounce=<dur>        Re-run delay after change (default: 200ms)
@@ -398,8 +409,9 @@ slash segment (later segments select sub-benchmarks inside the wrapper).
 When both are given, a suite must match both to run (e.g.
 "gotest bench ./pkg/parser -run Parse" filters by suite).
 
-If no packages contain any BenchmarkX methods, prints "no benchmarks
-found" and exits 0 without invoking go test.
+If no matched package contains any BenchmarkX methods, prints "no
+benchmarks found" and exits 0 without invoking go test. Patterns that
+match no package at all exit 2.
 
 A capturing run (--spec, --json, --save or --against) is believed only
 when every declared BenchmarkX method reported a result. If one never ran,
@@ -477,8 +489,9 @@ A new crasher is named as it is found:
 Inspect it with "gotest fuzz triage", keep it with "gotest fuzz promote".
 Every session closes with one line (targets, executions, new interesting
 inputs, crashers); under GitHub Actions the same session is appended to
-$GITHUB_STEP_SUMMARY as a table. With no FuzzX methods anywhere, the
-command prints "no fuzz targets found" and exits 0.
+$GITHUB_STEP_SUMMARY as a table. With no FuzzX methods in the matched
+packages, the command prints "no fuzz targets found" and exits 0; patterns
+that match no package at all exit 2.
 
 Triage:
   "gotest fuzz triage" scans each target's testdata/fuzz/<Func>/ directory

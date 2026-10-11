@@ -1,11 +1,14 @@
 package gotestgen
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
 	"maps"
+	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/about"
@@ -140,8 +143,9 @@ func (lr *LoadResult) IsTestOnly() bool {
 // packages that fail to load are returned as BrokenPackage entries: every
 // package a pattern matches must end in exactly one verdict, and a load
 // failure is a verdict, not an absence. Matched packages without test files
-// are named in noTestFiles, for the same reason.
-func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResult, broken []BrokenPackage, noTestFiles []string, err error) {
+// are named in noTestFiles, for the same reason. matched reports whether the
+// patterns matched any package at all.
+func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResult, broken []BrokenPackage, noTestFiles []string, matched bool, err error) {
 	cfg := &packages.Config{
 		Mode:  packageLoadMode,
 		Tests: true,
@@ -151,11 +155,12 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 	}
 	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, false, err
 	}
 	if err := goversion.Check(totalFoundPkgs); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, false, err
 	}
+	matched = len(totalFoundPkgs) > 0
 
 	brokenByPath := map[string]*BrokenPackage{}
 	brokenMsgSeen := map[string]map[string]bool{}
@@ -221,7 +226,7 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 		}
 	}
 	if len(loadedTestPkgs) == 0 {
-		return nil, broken, noTestFiles, nil
+		return nil, broken, noTestFiles, matched, nil
 	}
 
 	prodPkgs := make(map[string]bool)
@@ -278,21 +283,95 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 	sort.SliceStable(res, func(i, j int) bool {
 		return pkgOrder[res[i].PkgPath] < pkgOrder[res[j].PkgPath]
 	})
-	return res, broken, noTestFiles, nil
+	return res, broken, noTestFiles, matched, nil
 }
 
 // LoadPackages loads and groups test packages for the given target patterns.
 // Broken packages are returned separately; the caller decides whether they
 // abort the command or become failed-package verdicts.
 func LoadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []BrokenPackage, error) {
-	res, broken, _, err := loadPackages(targetPkgs, buildFlags)
+	res, broken, _, _, err := loadPackages(targetPkgs, buildFlags)
 	return res, broken, err
 }
 
-// LoadRunPackages is LoadPackages for a test run, which owes every matched
-// package a verdict: it also names those without test files.
-func LoadRunPackages(targetPkgs []string, buildFlags []string) (res []*LoadResult, broken []BrokenPackage, noTestFiles []string, err error) {
-	return loadPackages(targetPkgs, buildFlags)
+// RunPackages is what a run loads: every matched package, each owed a verdict.
+type RunPackages struct {
+	Loaded []*LoadResult
+	Broken []BrokenPackage
+	// NoTestFiles are the matched packages without test files.
+	NoTestFiles []string
+	// Unmatched are the patterns that matched no package while others did.
+	Unmatched []string
+}
+
+// NoPackagesError is a run whose patterns matched no package: it would verify
+// nothing, so it cannot pass.
+type NoPackagesError struct {
+	Patterns []string
+}
+
+func (e *NoPackagesError) Error() string {
+	quoted := make([]string, len(e.Patterns))
+	for i, p := range e.Patterns {
+		quoted[i] = strconv.Quote(p)
+	}
+	return strings.Join(quoted, ", ") + " matched no packages"
+}
+
+// LoadRunPackages is LoadPackages for a run, which owes every matched package
+// a verdict: it also names those without test files, and fails with a
+// *NoPackagesError when the patterns match no package at all.
+func LoadRunPackages(targetPkgs []string, buildFlags []string) (RunPackages, error) {
+	loaded, broken, noTestFiles, matched, err := loadPackages(targetPkgs, buildFlags)
+	if err != nil {
+		return RunPackages{}, err
+	}
+	if !matched {
+		return RunPackages{}, &NoPackagesError{Patterns: targetPkgs}
+	}
+	return RunPackages{
+		Loaded:      loaded,
+		Broken:      broken,
+		NoTestFiles: noTestFiles,
+		Unmatched:   unmatchedPatterns(targetPkgs, buildFlags),
+	}, nil
+}
+
+// unmatchedPatterns names the patterns that match no package, as go list
+// warns about them. Only a wildcard or meta pattern can match none; any other
+// names a package that loads or fails to. Best effort: the result only warns.
+func unmatchedPatterns(patterns, buildFlags []string) []string {
+	var candidates []string
+	for _, p := range patterns {
+		switch {
+		case strings.Contains(p, "..."), p == "all", p == "std", p == "cmd", p == "tool", p == "work":
+			candidates = append(candidates, p)
+		}
+	}
+	// A lone pattern matched what the run loaded.
+	if len(patterns) < 2 || len(candidates) == 0 {
+		return nil
+	}
+	args := append([]string{"list", "-e", "-find", "-f", "{{.ImportPath}}"}, buildFlags...)
+	cmd := exec.Command("go", append(args, candidates...)...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	_ = cmd.Run()
+	var unmatched []string
+	for line := range strings.Lines(stderr.String()) {
+		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "go: warning: ")
+		if !ok {
+			continue
+		}
+		quoted, ok := strings.CutSuffix(rest, " matched no packages")
+		if !ok {
+			continue
+		}
+		if p, err := strconv.Unquote(quoted); err == nil {
+			unmatched = append(unmatched, p)
+		}
+	}
+	return unmatched
 }
 
 func GenerateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {

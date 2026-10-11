@@ -14,7 +14,8 @@ import (
 func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)
-	loaded, broken, noTestFiles, err := gotestgen.LoadRunPackages(cfg.PackagePatterns, loadFlags)
+	pkgs, err := loadRunPackages(cfg.PackagePatterns, loadFlags)
+	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -68,6 +69,16 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 		gotestrunner.NoteBenchmarksNotRun(os.Stderr, cfg.GoTestArgs, len(overlay.Declared.Benchmarks))
 	}
 	return result.ExitCode
+}
+
+// loadRunPackages loads a run's packages and, as go test does, warns on
+// stderr about each pattern that matched none while others did.
+func loadRunPackages(patterns, loadFlags []string) (gotestgen.RunPackages, error) {
+	pkgs, err := gotestgen.LoadRunPackages(patterns, loadFlags)
+	for _, p := range pkgs.Unmatched {
+		fmt.Fprintf(os.Stderr, "warning: %q matched no packages\n", p)
+	}
+	return pkgs, err
 }
 
 // sumStdlibTests totals the stdlib tests gotest reports but does not run, and

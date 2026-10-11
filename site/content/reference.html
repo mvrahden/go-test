@@ -721,6 +721,7 @@ percentage = covered / total</div>
       <div class="callout">
         Standard <code>go test</code> flags work unchanged: <code>-v</code>, <code>-race</code>, <code>-cover</code>, <code>-count</code>, <code>-run</code>, <code>-json</code>, <code>-short</code>, <code>-timeout</code>.
         Every matched package ends in a verdict, as with <code>go test</code>: one gotest runs nothing in reports <code>[no test files]</code>, <code>[no suites]</code> (stdlib tests only) or <code>[no tests to run]</code> (benchmarks only, or <code>-run</code> deselected every suite), in text and in <code>-json</code>.
+        Patterns that match no package at all verified nothing: every run mode exits <code>2</code> with <code>FAIL: "&lt;pattern&gt;" matched no packages</code> on stderr. A pattern that matches nothing beside others that did only warns, as with <code>go test</code>.
       </div>
     </section>
 
