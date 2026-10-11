@@ -7,6 +7,12 @@ import (
 
 type DeprecatedTestSuite struct{}
 
+func (s *DeprecatedTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *DeprecatedTestSuite) TestAnOlderHarness(t *gotest.T) {
 	t.When("a harness from before HoldFixtures runs against this runtime", func(w *gotest.T) {
 		w.It("fails its setup with the fix instead of a missing symbol", func(it *gotest.T) {

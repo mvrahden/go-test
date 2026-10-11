@@ -10,8 +10,8 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// CallsiteTestSuite covers naming locations as go test does. Not parallel:
-// it sets -test.fullpath.
+// CallsiteTestSuite covers naming locations as go test does.
+// Sequential: sets the process-wide -test.fullpath flag.
 type CallsiteTestSuite struct{}
 
 func (s *CallsiteTestSuite) AfterEach(t *gotest.T) {
