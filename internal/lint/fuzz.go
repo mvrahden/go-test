@@ -617,17 +617,5 @@ func isUnnamedByteSlice(t types.Type) bool {
 // adapter calls, so a package-name check is the right discriminator here —
 // unlike the assertion surface, which is derived from type information.
 func isGotestPkgRef(pass *analysis.Pass, expr ast.Expr) bool {
-	id, ok := expr.(*ast.Ident)
-	if !ok {
-		return false
-	}
-	obj := pass.TypesInfo.Uses[id]
-	if obj == nil {
-		return false
-	}
-	pkgName, ok := obj.(*types.PkgName)
-	if !ok {
-		return false
-	}
-	return pkgName.Imported().Path() == gotestImportPath
+	return isPkgRef(pass, expr, gotestImportPath)
 }

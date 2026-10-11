@@ -419,11 +419,11 @@ func extractLenSide(left, right ast.Expr) (inner, lenExpr, other ast.Expr, ok bo
 }
 
 func mapBoolCall(pass *analysis.Pass, inner *ast.CallExpr, negated bool) (conditionMapping, bool) {
-	if s, sub, ok := isStringsContains(inner); ok {
+	if s, sub, ok := isStringsContains(pass, inner); ok {
 		return conditionMapping{target: pick(negated, "NotContains", "Contains"), args: []ast.Expr{s, sub}, desc: "strings.Contains call"}, true
 	}
 
-	if err, target, ok := isErrorsIs(inner); ok {
+	if err, target, ok := isErrorsIs(pass, inner); ok {
 		if isNilIdent(target) {
 			return conditionMapping{target: pick(negated, "Error", "NoError"), args: []ast.Expr{err}, desc: "errors.Is nil check"}, true
 		}
@@ -437,7 +437,7 @@ func mapBoolCall(pass *analysis.Pass, inner *ast.CallExpr, negated bool) (condit
 		return conditionMapping{target: "Regexp", args: []ast.Expr{re, s}, desc: "MatchString call"}, true
 	}
 
-	if a, b, ok := isReflectDeepEqual(inner); ok {
+	if a, b, ok := isReflectDeepEqual(pass, inner); ok {
 		if a, b, ok := unifyEqualOperands(pass, a, b); ok {
 			return conditionMapping{target: pick(negated, "NotEqual", "Equal"), args: []ast.Expr{a, b}, desc: "reflect.DeepEqual call"}, true
 		}
@@ -742,36 +742,44 @@ func isLenCall(expr ast.Expr) (inner ast.Expr, ok bool) {
 	return call.Args[0], true
 }
 
-func isStringsContains(expr ast.Expr) (s, sub ast.Expr, ok bool) {
+// pkgCall returns the args of a call to the function name of the package
+// at path, under whatever name the file imports it, when it passes n.
+func pkgCall(pass *analysis.Pass, expr ast.Expr, path, name string, n int) ([]ast.Expr, bool) {
 	call, ok := expr.(*ast.CallExpr)
-	if !ok || len(call.Args) != 2 {
-		return nil, nil, false
+	if !ok || len(call.Args) != n {
+		return nil, false
 	}
 	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok || sel.Sel.Name != "Contains" {
-		return nil, nil, false
+	if !ok || sel.Sel.Name != name {
+		return nil, false
 	}
-	id, ok := sel.X.(*ast.Ident)
-	if !ok || id.Name != "strings" {
-		return nil, nil, false
-	}
-	return call.Args[0], call.Args[1], true
+	return call.Args, isPkgRef(pass, sel.X, path)
 }
 
-func isErrorsIs(expr ast.Expr) (err, target ast.Expr, ok bool) {
-	call, ok := expr.(*ast.CallExpr)
-	if !ok || len(call.Args) != 2 {
+// isPkgRef reports whether expr names the imported package at path.
+func isPkgRef(pass *analysis.Pass, expr ast.Expr, path string) bool {
+	id, ok := expr.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	pkg, ok := pass.TypesInfo.Uses[id].(*types.PkgName)
+	return ok && pkg.Imported().Path() == path
+}
+
+func isStringsContains(pass *analysis.Pass, expr ast.Expr) (s, sub ast.Expr, ok bool) {
+	args, ok := pkgCall(pass, expr, "strings", "Contains", 2)
+	if !ok {
 		return nil, nil, false
 	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok || sel.Sel.Name != "Is" {
+	return args[0], args[1], true
+}
+
+func isErrorsIs(pass *analysis.Pass, expr ast.Expr) (err, target ast.Expr, ok bool) {
+	args, ok := pkgCall(pass, expr, "errors", "Is", 2)
+	if !ok {
 		return nil, nil, false
 	}
-	id, ok := sel.X.(*ast.Ident)
-	if !ok || id.Name != "errors" {
-		return nil, nil, false
-	}
-	return call.Args[0], call.Args[1], true
+	return args[0], args[1], true
 }
 
 func isRegexpMatchString(pass *analysis.Pass, expr ast.Expr) (re, s ast.Expr, ok bool) {
@@ -789,20 +797,12 @@ func isRegexpMatchString(pass *analysis.Pass, expr ast.Expr) (re, s ast.Expr, ok
 	return sel.X, call.Args[0], true
 }
 
-func isReflectDeepEqual(expr ast.Expr) (a, b ast.Expr, ok bool) {
-	call, ok := expr.(*ast.CallExpr)
-	if !ok || len(call.Args) != 2 {
+func isReflectDeepEqual(pass *analysis.Pass, expr ast.Expr) (a, b ast.Expr, ok bool) {
+	args, ok := pkgCall(pass, expr, "reflect", "DeepEqual", 2)
+	if !ok {
 		return nil, nil, false
 	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok || sel.Sel.Name != "DeepEqual" {
-		return nil, nil, false
-	}
-	id, ok := sel.X.(*ast.Ident)
-	if !ok || id.Name != "reflect" {
-		return nil, nil, false
-	}
-	return call.Args[0], call.Args[1], true
+	return args[0], args[1], true
 }
 
 func isErrorMethodCall(expr ast.Expr) (recv ast.Expr, ok bool) {
