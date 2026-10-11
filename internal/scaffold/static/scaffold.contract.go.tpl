@@ -5,12 +5,18 @@ import (
 )
 
 type {{.Name}}ContractTestSuite[T {{.Name}}] struct {
-	factory func() T
-	sut     T
+	sut T
 }
 
+// BeforeEach builds a fresh implementation per test. A type alias cannot set
+// fields, so add one case per instantiated type.
 func (s *{{.Name}}ContractTestSuite[T]) BeforeEach(t *gotest.T) {
-	s.sut = s.factory()
+	switch any(s.sut).(type) {
+	// case *MyImpl:
+	// 	s.sut = any(NewMyImpl()).(T)
+	default:
+		gotest.Fail(t, "no constructor for %T: add a case to BeforeEach", s.sut)
+	}
 }
 {{range .Methods}}
 func (s *{{$.Name}}ContractTestSuite[T]) Test{{.Name}}(t *gotest.T) {

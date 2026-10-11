@@ -256,7 +256,7 @@ gotest can generate a contract suite from an interface:
 gotest scaffold ./pkg/storage.Storage
 ```
 
-When the target type is an interface, this generates a generic contract suite — a `StorageContractTestSuite[T Storage]` with a `factory` field, a `BeforeEach`, and test method stubs for each method on the interface. You fill in the behavioral assertions and add a type alias per implementation; the generated file ends with a comment showing exactly that. The suite follows the same naming conventions as any other gotest suite, so the code generator picks up the aliases without additional configuration.
+When the target type is an interface, this generates a generic contract suite — a `StorageContractTestSuite[T Storage]` holding the subject, a `BeforeEach` that switches on the instantiated type to construct it, and test method stubs for each method on the interface. You fill in the behavioral assertions, add a type alias per implementation (the generated file ends with a comment showing exactly that) and a matching case to `BeforeEach`; an alias without one fails with a message naming the missing case. The suite follows the same naming conventions as any other gotest suite, so the code generator picks up the aliases without additional configuration.
 
 ## When to use contract testing
 
