@@ -1,3 +1,6 @@
 package goversion //nolint:stdlib-test
 
-var ExportCheck = check
+var (
+	ExportCheck         = check
+	ExportPinnedVersion = pinnedVersion
+)

@@ -1,9 +1,6 @@
 package goversion_test
 
 import (
-	"os"
-	"path/filepath"
-
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/goversion"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -27,6 +24,19 @@ func pkgsDeclaring(goVersion string) []*packages.Package {
 	}}
 }
 
+// importingGotest makes each package import gotest from the go-test module
+// at version, as the build selected it.
+func importingGotest(pkgs []*packages.Package, version string, replaced bool) []*packages.Package {
+	mod := &packages.Module{Path: about.Repo, Version: version}
+	if replaced {
+		mod.Replace = &packages.Module{Path: "../go-test"}
+	}
+	for _, p := range pkgs {
+		p.Imports = map[string]*packages.Package{about.Repo + "/pkg/gotest": {PkgPath: about.Repo + "/pkg/gotest", Module: mod}}
+	}
+	return pkgs
+}
+
 func (s *GoVersionTestSuite) TestCheck(t *gotest.T) {
 	t.When("the binary's Go is older than the module's go directive", func(w *gotest.T) {
 		w.It("fails naming both versions and the rebuild command", func(it *gotest.T) {
@@ -35,21 +45,33 @@ func (s *GoVersionTestSuite) TestCheck(t *gotest.T) {
 			gotest.ErrorContains(it, err, "go 1.27.1")
 			gotest.ErrorContains(it, err, "go tool gotest")
 		})
-		w.It("names the gotest version go.mod already requires, never @latest", func(it *gotest.T) {
-			goMod := filepath.Join(it.TempDir(), "go.mod")
-			gotest.NoError(it, os.WriteFile(goMod, []byte("module example.com\n\ngo 1.27.1\n\nrequire "+about.Repo+" v1.31.0\n"), 0o600))
-			pkgs := pkgsDeclaring("1.27.1")
-			pkgs[0].Module.GoMod = goMod
-			err := goversion.ExportCheck(pkgs, "go1.26.3")
+		w.It("names the gotest version the build selects, never @latest", func(it *gotest.T) {
+			err := goversion.ExportCheck(importingGotest(pkgsDeclaring("1.27.1"), "v1.31.0", false), "go1.26.3")
 			gotest.ErrorContains(it, err, "go get -tool "+about.Repo+"/cmd/gotest@v1.31.0 && go tool gotest")
-		})
-		w.It("names a placeholder when go.mod requires no gotest version", func(it *gotest.T) {
-			err := goversion.ExportCheck(pkgsDeclaring("1.27.1"), "go1.26.3")
-			gotest.ErrorContains(it, err, "go get -tool "+about.Repo+"/cmd/gotest@<the version go.mod requires>")
-			gotest.NotContains(it, err.Error(), "@latest")
 		})
 		w.It("compares language versions, so a directive without patch still counts", func(it *gotest.T) {
 			gotest.Error(it, goversion.ExportCheck(pkgsDeclaring("1.27"), "go1.26.5"))
+		})
+	})
+
+	t.When("the drift message names the gotest version to pin", func(w *gotest.T) {
+		w.It("takes it from a sibling workspace module when the tripping one requires none", func(it *gotest.T) {
+			sibling := importingGotest([]*packages.Package{{
+				PkgPath: "example.com/m1",
+				Module:  &packages.Module{Path: "example.com/m1", GoVersion: "1.26"},
+			}}, "v1.32.0", false)
+			pkgs := append(pkgsDeclaring("1.27.1"), sibling...)
+			gotest.Equal(it, "v1.32.0", goversion.ExportPinnedVersion(pkgs, "v1.33.0"))
+		})
+		w.It("keeps the pseudo-version a replace directive resolves", func(it *gotest.T) {
+			pkgs := importingGotest(pkgsDeclaring("1.27.1"), "v0.0.0-00010101000000-000000000000", true)
+			gotest.Equal(it, "v0.0.0-00010101000000-000000000000", goversion.ExportPinnedVersion(pkgs, "v1.33.0"))
+		})
+		w.It("falls back to this binary's release when no package imports gotest", func(it *gotest.T) {
+			gotest.Equal(it, "v1.33.0", goversion.ExportPinnedVersion(pkgsDeclaring("1.27.1"), "v1.33.0"))
+		})
+		w.It("falls back to latest for a binary without a release version", func(it *gotest.T) {
+			gotest.Equal(it, "latest", goversion.ExportPinnedVersion(pkgsDeclaring("1.27.1"), "dev (source checkout)"))
 		})
 	})
 
