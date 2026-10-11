@@ -44,9 +44,27 @@ func TestBeforeEach(t *testing.T) {
 }
 `
 
-// runContract runs `go test` on the scaffold plus contractDriver in a module
-// that replaces github.com/mvrahden/go-test with this worktree.
-func runContract(t *gotest.T, src string) (stdout, stderr string, err error) {
+// interfaceDriver instantiates the scaffold with the interface itself, whose
+// zero value carries no dynamic type to name.
+const interfaceDriver = `package sampletype
+
+import (
+	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type IfaceValidatorTestSuite = ValidatorContractTestSuite[Validator]
+
+func TestBeforeEach(t *testing.T) {
+	s := &IfaceValidatorTestSuite{}
+	s.BeforeEach(gotest.NewT(t))
+}
+`
+
+// runContract runs `go test` on the scaffold plus driver in a module that
+// replaces github.com/mvrahden/go-test with this worktree.
+func runContract(t *gotest.T, src, driver string) (stdout, stderr string, err error) {
 	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
 	gotest.NoError(t, err)
 	typesSrc, err := os.ReadFile("testdata/sampletype/types.go")
@@ -57,7 +75,7 @@ func runContract(t *gotest.T, src string) (stdout, stderr string, err error) {
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0600))
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "types.go"), typesSrc, 0600))
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "validator_suite_test.go"), []byte(src), 0600))
-	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "driver_test.go"), []byte(contractDriver), 0600))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "driver_test.go"), []byte(driver), 0600))
 
 	// -mod=mod: the module has no go.sum, and needs none beyond the replace.
 	cmd := exec.CommandContext(t.Context(), "go", "test", "-mod=mod", "-count=1", ".")
@@ -77,7 +95,7 @@ func (s *ContractScaffoldTestSuite) TestRunsUnderAnAlias(t *gotest.T) {
 	src := string(out)
 
 	t.When("no case constructs the implementation", func(w *gotest.T) {
-		stdout, stderr, err := runContract(w, src)
+		stdout, stderr, err := runContract(w, src, contractDriver)
 
 		w.It("fails naming the missing case, not with a nil panic", func(it *gotest.T) {
 			gotest.Error(it, err)
@@ -87,12 +105,21 @@ func (s *ContractScaffoldTestSuite) TestRunsUnderAnAlias(t *gotest.T) {
 		})
 	})
 
+	t.When("the alias instantiates the interface itself", func(w *gotest.T) {
+		stdout, _, err := runContract(w, src, interfaceDriver)
+
+		w.It("names the type parameter, not its nil zero value", func(it *gotest.T) {
+			gotest.Error(it, err)
+			gotest.Contains(it, stdout, "no constructor for sampletype.Validator: add a case to BeforeEach")
+		})
+	})
+
 	t.When("the commented example case is filled in", func(w *gotest.T) {
 		const example = "\t// case *MyImpl:\n\t// \ts.sut = any(NewMyImpl()).(T)\n"
 		gotest.Contains(w, src, example)
 		filled := strings.Replace(src, example, "\tcase *impl:\n\t\ts.sut = any(&impl{}).(T)\n", 1)
 
-		stdout, stderr, err := runContract(w, filled)
+		stdout, stderr, err := runContract(w, filled, contractDriver)
 
 		w.It("constructs it", func(it *gotest.T) {
 			gotest.NoError(it, err, "stdout:\n%s\nstderr:\n%s", stdout, stderr)

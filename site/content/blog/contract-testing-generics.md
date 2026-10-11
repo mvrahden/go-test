@@ -174,7 +174,7 @@ Same contract, same behaviors, different implementations. If Redis handles delet
 
 ## Providing implementation-specific setup
 
-A type alias cannot add methods or fields of its own, so per-implementation setup lives on the generic suite itself. The straightforward way is a `BeforeAll` that picks the right constructor for the instantiated type:
+A type alias cannot add methods or fields of its own, so per-implementation setup lives on the generic suite itself. The straightforward way is a `BeforeAll` that picks the right constructor for the instantiated type, and fails by name for an alias it has no case for (rather than leaving `factory` nil for `BeforeEach` to panic on):
 
 ```go {title="storage_contract_test.go"}
 func (s *StorageContractTestSuite[T]) BeforeAll(t *gotest.T) {
@@ -183,6 +183,8 @@ func (s *StorageContractTestSuite[T]) BeforeAll(t *gotest.T) {
         s.factory = func() T { return any(NewMemoryStorage()).(T) }
     case *RedisStorage:
         s.factory = func() T { return any(NewRedisStorage(testRedisAddr)).(T) }
+    default:
+        gotest.Fail(t, "no constructor for %v: add a case to BeforeAll", reflect.TypeFor[T]())
     }
 }
 ```

@@ -1,6 +1,8 @@
 package {{.PkgName}}
 
 import (
+	"reflect"
+
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -15,7 +17,7 @@ func (s *{{.Name}}ContractTestSuite[T]) BeforeEach(t *gotest.T) {
 	// case *MyImpl:
 	// 	s.sut = any(NewMyImpl()).(T)
 	default:
-		gotest.Fail(t, "no constructor for %T: add a case to BeforeEach", s.sut)
+		gotest.Fail(t, "no constructor for %v: add a case to BeforeEach", reflect.TypeFor[T]())
 	}
 }
 {{range .Methods}}

@@ -1590,8 +1590,19 @@ Generic type definitions + instantiated aliases = reusable behavioral specificat
 
 ```go
 type StorageTestSuite[T Storage] struct {
-    factory func() T
-    store   T
+    store T
+}
+
+// A type alias cannot set fields, so the suite constructs T per instantiation.
+func (s *StorageTestSuite[T]) BeforeEach(t *gotest.T) {
+    switch any(s.store).(type) {
+    case *MemoryStorage:
+        s.store = any(NewMemoryStorage()).(T)
+    case *RedisStorage:
+        s.store = any(NewRedisStorage()).(T)
+    default:
+        gotest.Fail(t, "no constructor for %v: add a case to BeforeEach", reflect.TypeFor[T]())
+    }
 }
 
 func (s *StorageTestSuite[T]) TestPutAndGet(t *gotest.T) { /* ... */ }
