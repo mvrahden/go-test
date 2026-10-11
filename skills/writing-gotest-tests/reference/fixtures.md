@@ -19,26 +19,36 @@ so an unrelated fixture never fails it.
 
 Unlike a suite's, a fixture's `AfterAll` runs only after its `BeforeAll`
 succeeded (or overran): a `BeforeAll` that fails midway must release what
-it acquired before returning its error.
+it acquired before returning its error. When a fixture's setup fails, the
+suite's own `BeforeAll` and `AfterAll` never run.
 
 Package fixtures may also define per-test hooks — `BeforeEach(ctx
 context.Context) error` / `AfterEach(ctx context.Context) error` — with the
-same signatures as the All hooks.
+same signatures as the All hooks. They wrap the suite's: fixture
+`BeforeEach` → suite `BeforeEach` → test → suite `AfterEach` → fixture
+`AfterEach`. A suite with `Fuzz*` methods refuses fixtures that have them.
 
 Shared fixtures (`*SharedFixture`) span packages: gotest sets them up once
 and transfers state by JSON-serializing the fixture's EXPORTED FIELDS into
-a state file each test process reads. One pointer field per parent shared
-fixture TYPE: only one instance of a parent ever exists, so a second field
-of the same type is a generation error — keep one wired field and derive
-the other reference in `BeforeAll`. `Hydrate(ctx) error` runs in each test
-process to reconstruct live handles from that state; `Dehydrate(ctx)
-error` is per-test-process CLEANUP (deferred), not a serializer. Serialize
+a state file each test process reads, so those fields must survive
+`encoding/json`. A shared fixture has no `BeforeEach`/`AfterEach`. Inside
+a shared fixture, one pointer field per parent shared fixture TYPE: only
+one instance of a parent ever exists, so a second field of the same type
+is a generation error — keep one wired field and derive the other
+reference in `BeforeAll`. `Hydrate(ctx) error` runs in each test process
+to reconstruct live handles from that state; `Dehydrate(ctx) error` is
+per-test-process CLEANUP (deferred), not a serializer; define both or
+neither. Below v1.33 also define `AfterAll` on every shared fixture: one
+without it passes generation and then fails to start. Serialize
 connection INFO (addresses, DSNs), never live handles — reconstruct them
 in `Hydrate` and keep them in fields assigned there (the "Hydrate-local"
 pattern). Shared fixture types must live in a NON-internal package: the
 setup subprocess cannot import `internal/` paths.
 
-Timeouts: `FixtureConfig()` marker, literal semantics (see `config.md`).
+Timeouts: `FixtureConfig()` marker; a zero `Timeout` means the default
+(see `config.md`). All shared fixture setup together is also capped by
+`--setup-timeout` (default 2m), so a 5m `ContainerFixtureConfig()` needs
+a larger one.
 A DECLARED `Timeout` is a verdict, not advice: it bounds the hook's
 context AND fails the fixture when `BeforeAll` or `AfterAll` returns after
 it — even when the hook ignores its context. A hook that never returns is

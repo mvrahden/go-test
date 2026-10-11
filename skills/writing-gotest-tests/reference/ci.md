@@ -17,8 +17,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Stdlib tests
@@ -47,7 +47,9 @@ jobs:
   The badge needs no shields.io, gist or token setup — do not add any.
 - **v1.29+ bench inputs:** `bench: true` runs `gotest bench --spec --json`
   after the tests. The `flags` input is forwarded to it, which is where a
-  `-benchtime=1x` smoke run goes. `bench-baseline` compares (`--against`),
+  `-benchtime=1x` smoke run goes — and `gotest bench` rejects
+  `--parallel`, so a width in `flags` breaks this step (exit 2).
+  `bench-baseline` compares (`--against`),
   `bench-gate` fails on regressions above the percentage, and `bench-save`
   writes a baseline: a path, or an explicit empty string for
   `bench.baseline` from `.gotest.yml`; the `false` default saves nothing.
@@ -65,8 +67,9 @@ jobs:
   setup-go's build cache alone would not carry it: that cache is never
   re-saved on a key hit.
 - CI environments auto-arm `--ci` (any non-falsy `CI`/`GOTEST_CI` value):
-  committed `F_` focus prefixes FAIL the run, and snapshots become
-  read-only (`--update-snapshots` will not write). Opt out with
+  committed `F_` focus prefixes FAIL the run, and a missing snapshot
+  baseline fails instead of being created. `--update-snapshots` still
+  rewrites baselines there, so never pass it in CI. Opt out with
   `GOTEST_CI=0`.
 - **Coexisting with golangci-lint:** there is NO golangci-lint plugin for
   gotest's rules — do not attempt to build or wire one. Run
@@ -74,17 +77,19 @@ jobs:
   linter; configure gotest rule skips in `.gotest.yml` (`lint:` /
   `skip: [rule-ids]`), never in `.golangci.yml`.
 - Inside GitHub Actions the lint step auto-arms `--github`
-  (`GITHUB_ACTIONS=true`): findings surface as inline PR annotations and a
-  step-summary table on top of the plain output. No workflow changes
-  needed; exit codes are unchanged.
+  (`GITHUB_ACTIONS=true`): findings surface as inline PR annotations
+  (`::error` lines) and a step-summary table INSTEAD of the plain output.
+  `-json` runs ignore it (and `-fix` runs below v1.33). No workflow changes needed; exit
+  codes are unchanged.
 - **v1.27+:** `Exclusive` suites run as a serial tail after the parallel
   bulk, so CI wall-clock time grows by the SUM of exclusive suite
   durations — keep the exclusive set small and its suites short. Under
   `-race`/`-msan`/`-asan` the dispatch and compile concurrency defaults
   are additionally auto-halved (instrumented code costs ≥2× CPU per
-  instruction stream); an explicit width always wins — pass it through
-  the action's `flags` input (e.g. `flags: "--parallel 8"`) when a CI
-  runner's shape is known and the halved default wastes it.
+  instruction stream); an explicit width always wins — set
+  `parallel:` in `.gotest.yml` when a CI runner's shape is known and the
+  halved default wastes it (the action's `flags` input also reaches
+  `gotest bench`, which rejects `--parallel`).
 
 ## gotest-exclusive projects: drop the stdlib step
 
@@ -94,8 +99,10 @@ step tests nothing and should be omitted: CI is the action + lint steps
 only. On v1.26.0+ it is safe because both remaining steps prove the
 tree: a package that fails to compile fails the run AND fails lint (which
 refuses to lint what it cannot analyze), and the `stdlib-test` rule fails
-the build if someone later adds a stdlib test, so nothing can go silently
-unexecuted. From v1.29 the census adds a third proof: a green `summary`,
+the build if someone later adds a stdlib `TestXxx`. It does not flag a
+stdlib `Benchmark`, `Fuzz` or `Example` function: one of those added
+later shows only in that runner note, so the change that adds one must
+bring back the `go test ./...` step. From v1.29.1 the census adds a third proof: a green `summary`,
 `spec` or `-json` run exits 2 when a declared method produced no verdict,
 so a harness that drops a test cannot pass either. gotest's own repository
 runs this way. On **v1.25.x it is NOT safe**: there a compile-broken package

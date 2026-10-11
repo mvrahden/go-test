@@ -12,7 +12,8 @@ so structure settles before names (renaming first means renaming twice):
 2. **Lifecycle hoisting** — repeated setup → `BeforeEach`; teardown out of
    `defer` into `AfterEach` (also verifies the teardown's own error);
    expensive read-only state → write-once `BeforeAll`. Goroutine-owning
-   resources belong in suite fields so `AfterEach` stops them even when an
+   resources belong in suite fields (the returned context in a parallel
+   suite) so `AfterEach` stops them even when an
    assertion aborts the test mid-way.
 3. **Fixture extraction** — near-identical `BeforeAll`s across suites → a
    `*Fixture`, which removes the duplicated code but still sets up once
@@ -30,7 +31,8 @@ so structure settles before names (renaming first means renaming twice):
    strings bare behaviors (the glyph plays "it") — SKILL.md rule 8.
    Judge the result by rendering `gotest spec` ONCE at the end (it runs the
    full pipeline) or replay the invariant capture via `spec --input`.
-6. **Hygiene** — delete default-restating `SuiteConfig` markers; sized
+6. **Hygiene** — delete default-restating `SuiteConfig` markers (that
+   drops their verdict, not the context bound — see `config.md`); sized
    timeouts (`IntegrationSuiteConfig` for integration suites); no
    `F_`/`X_` survivors; sleep+assert → `Eventually`; assert behavior, not
    unexported internals.

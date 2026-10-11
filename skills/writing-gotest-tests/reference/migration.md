@@ -4,9 +4,17 @@
 leaves `TODO(gotest-migrate)` markers where judgment is needed (embedded
 suite calls get "unconverted assertion" markers; `s.Run` and an `s.T()` in
 a helper without `t` are marked and left in place; a suite embedding
-another suite refuses the whole file). From v1.30.2 it exits 1 whenever a
-marker was left and `--dry-run` prints the diff without writing; grep for
-the markers before calling the migration done. It does NOT convert bare
+another suite refuses the whole file). From v1.30.2 it exits 1 when a run
+leaves a marker and `--dry-run` prints the diff without writing; grep for
+the markers before calling the migration done (below v1.33 a re-run exits
+0 with markers still present). Then run `go vet ./...` and the lint pair
+(`lint -fix`, then `lint`): below v1.33 a clean exit can still leave code
+that does not compile — an assertion in a helper without `t`, the old
+suite type in a free function, a testify import removed while a
+`*testing.T` helper still uses it. `migrate` maps assertions one-to-one,
+so `NotNil` on a pointer or error comes out as `gotest.NotNil` for lint to
+rewrite, and `s.Assert().X` becomes the fatal `gotest.X`: a soft check
+turns into a hard stop. It does NOT convert bare
 `require`/`assert` usage in plain `TestXxx(*testing.T)` functions — those
 are manual:
 

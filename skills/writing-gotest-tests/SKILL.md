@@ -23,83 +23,24 @@ that release; skip it on older ones.
 
 ## Bootstrap and upgrade
 
-The repo has the *library*; the CLI runs via Go's tool directive (requires
-Go ≥ 1.24; v1.28+ requires Go ≥ 1.25, v1.30+ Go ≥ 1.26). Run it at the
-newest release the project can take. Check first:
-
-```sh
-go list -m -u -f '{{.Version}} {{with .Update}}{{.Version}}{{end}} {{with .Replace}}(replaced){{end}}' github.com/mvrahden/go-test
-go list -m -f '{{.GoVersion}}' github.com/mvrahden/go-test@latest
-go list -m -f '{{.GoVersion}}'
-```
-
-The first line prints the pin, then a newer release if one exists; the
-other two print that release's go line and this module's. Upgrade to the
-newer release unless one of these holds:
-
-- `(replaced)` — a source build; there is nothing to upgrade.
-- A vendored module (`vendor/modules.txt`) — see below.
-- The release's go line is newer than this module's: `go get` would
-  silently raise the project's Go for everyone. Report it; the project
-  decides.
-- The user or the repo's instructions rule out dependency changes, or the
-  task only reads code.
-- The check itself fails (no network or module proxy).
-
-```sh
-go get -tool github.com/mvrahden/go-test/cmd/gotest@<newer release>
-go tool gotest version
-```
-
-To keep the pin (no newer release, or a condition above holds), name the
-current version — a bare `go get -tool` upgrades without these checks:
-
-```sh
-go get -tool github.com/mvrahden/go-test/cmd/gotest@$(go list -m -f '{{.Version}}' github.com/mvrahden/go-test)
-go tool gotest version
-```
-
-After an upgrade, before writing anything:
-
-1. Read the `reference/versions.md` entries newer than the old pin — each
-   names the behavior the upgrade replaced.
-2. Run `go tool gotest lint -fix ./...`, then both runners with `-race`.
-3. On a failure, check whether it also fails at the old pin
-   (`git checkout -- go.mod go.sum`, rerun) before blaming the upgrade.
-   Fix one the upgrade caused in test code, per those entries, or revert
-   the upgrade and report it — never fix it in production code.
-4. Tell the user: `go-test <old> → <new>`.
-
-In a vendored module (`vendor/modules.txt`) any go.mod edit breaks every
-build until `go mod vendor` reruns, and gotest cannot run vendored at all
-(the overlay's `pkg/gotestruntime` import is never vendored) — report, do
-not work around.
-
-Then every command is `go tool gotest <args>`; if Go reports the short name
-ambiguous, use `go tool github.com/mvrahden/go-test/cmd/gotest`. Never a
-global `go install` binary: it drifts from the pin and from the module's Go.
-From v1.29 the CLI refuses to run (`FAIL:`, exit 2; 1 from `lint`) when it
-was built with an older Go than the module's go line, or when the pin
-resolves below the oldest runtime it generates for; a binary drifted the
-other way still runs. That refusal is never a fault in the tests: switch to
-`go tool gotest`, which builds the CLI at the pinned version with a Go at
-least as new as the module's go line, and ignore the message's `@latest`:
-upgrade only under the conditions above, never to silence a refusal. (Bare
-`go run github.com/mvrahden/go-test/cmd/gotest` fails on fresh consumers:
-module pruning leaves the CLI's deps out of go.sum.)
-
-In a `go.work` workspace the tool declared in any `use` module works from
-the root and inside each module, at the highest pin. `./...` is rejected at
-the root, so name each module (`go tool gotest ./svc/... ./lib/...`) or run
-inside one. The `go.work` go line must be at least the modules' go lines.
-Upgrade every `use` module that requires go-test to the same release.
+The repo has the *library*; the CLI runs via Go's tool directive, so every
+command is `go tool gotest <args>` — never a global `go install` binary.
+**Upgrade first:** before writing anything, follow `reference/setup.md`.
+It checks for a newer release and upgrades unless something blocks it (a
+`replace`, a vendored module, a release needing a newer Go than the
+module's go line, instructions against dependency changes, a failed
+check), and lists what to do after an upgrade. A `FAIL:` refusal about a
+drifted binary (exit 2) is never a fault in the tests: switch to
+`go tool gotest`; never upgrade just to silence it. `go.work` workspaces
+and vendored modules are covered there too.
 
 ## The Two Runners — a complete run is BOTH commands
 
 `go test` ignores gotest suites (signature incompatibility, by design).
-`gotest` runs suites and never runs stdlib tests — it prints
-`[no suites]` plus a stderr note when it skips them. Running only one
-command silently misses tests. Always finish with:
+`gotest` runs suites and never runs stdlib tests — it prints a stderr
+`note: N stdlib test(s) … not run` when it skips them (and `[no suites]`
+for a package holding nothing else). Running only one command silently
+misses tests. Always finish with:
 
 ```sh
 go tool gotest ./...
@@ -114,18 +55,23 @@ Write → lint → both runners → fix:
 
 ```sh
 go tool gotest lint -fix ./...
+go tool gotest lint ./...
 ```
 
-`lint -fix` formats every file it rewrites and removes the imports its
-fixes left unused, so no gofmt or goimports pass is needed after it.
+`lint -fix` applies every suggested fix, formats the files it rewrites and
+removes the imports its fixes left unused, so no gofmt or goimports pass
+is needed after it. Findings without a fix (`t.T().Helper()`, a `F_`
+leftover, a stdlib test, …) need your edit: from v1.33 `-fix` lists them
+and exits 3; below, it exits 0 and prints nothing, so only the plain
+`lint` run shows them. Move on when plain `lint` exits 0.
 
 The linter catches direct misuse (`t.T()` escapes even inside closures,
 outer-`t` in poll callbacks, testify idioms, focus leftovers, and
 `fail-guard`: any `if cond { gotest.Fail(t, …) }` or `if err != nil {
 t.Fatal(err) }` guard — assertions halt on failure, so state them
 directly: `gotest.NoError(t, err)`, never a guarded fail). Fixes can
-compose — a rewritten guard may itself be simplifiable — so re-run
-`lint -fix` until it reports nothing. When two findings share a construct
+compose — a rewritten guard may itself be simplifiable — so re-run the
+pair until plain `lint` is clean. When two findings share a construct
 the linter reports only the stronger one (integrity over style); fix what
 it says before expecting style suggestions there.
 
@@ -133,15 +79,16 @@ Suppression follows rule tiers: integrity rules (`poll-scope`,
 `suite-lifecycle`, `focus`, …) can never be skipped project-wide; style
 and migration rules can, via `.gotest.yml` `lint.skip` or `-skip-<rule>`
 flags. Any rule yields to a `//nolint:<rule>` comment on the finding's
-line or on a line of its own directly above it — and on the package
-clause, where it covers the whole FILE (not the package), whatever the
-tier. The `stdlib-test` rule flags every stdlib `TestXxx(*testing.T)` —
-when a stdlib test is intentional (assertion-layer tests,
-benchmarks-adjacent code), mark the package clause of each file holding
-one (or the test's own line) with `//nolint:stdlib-test`, or the lint run
-fails. The
-linter does NOT catch: plain `defer` cleanup, shared mutable state in
-parallel suites, or structural problems — those are your job, below.
+line or on a line of its own directly above it — and to one trailing the
+`package` line itself (`package shop_test //nolint:stdlib-test`), which
+covers the whole FILE (not the package), whatever the tier; on the line
+above `package` it suppresses nothing. The `stdlib-test` rule flags every
+stdlib `TestXxx(*testing.T)` (not `Benchmark`, `Fuzz` or `Example`
+functions — those show only in the runner's note) — when a stdlib test is
+intentional (assertion-layer tests, benchmarks-adjacent code), mark it
+that way, or the lint run fails. The linter does NOT catch: plain `defer`
+cleanup, shared mutable state in parallel suites, or structural problems —
+those are your job, below.
 
 ## Core rules
 
@@ -152,36 +99,44 @@ parallel suites, or structural problems — those are your job, below.
    `gotest_pxsuite_test.go` files `gotest generate` writes; `gotest clean`
    removes them). A `TestMain` of your own still runs; keep resource setup
    out of it — that is what fixtures and `BeforeAll` are for. `F_`/`X_`
-   prefixes focus/exclude; `Test*Async(t, done)` declares async tests.
+   prefixes focus/exclude. A `Test*Async` method takes a trailing
+   `done func()` and completes when it is called, not when it returns
+   (the suite's `Timeout` fails it if never); prefer `Eventually` for
+   anything that can be polled. A generic suite runs only through one
+   type alias per concrete type (`type ArticleIndexTestSuite =
+   IndexContractTestSuite[Article]`); without an alias it silently never
+   runs.
 2. **Lifecycle hooks own resources.** Setup in `BeforeEach` (or `BeforeAll`
-   for expensive read-only state), teardown in `AfterEach`/`AfterAll` as
-   suite fields — NEVER `t.T().Cleanup`, and no `defer` releasing a
-   resource in a test method. Such a `defer` lints clean and is still
-   wrong: it sits outside the teardown order the harness guarantees, and
-   the setup cannot be shared or hoisted. Start goroutines with
+   for expensive read-only state), teardown in `AfterEach`/`AfterAll` —
+   per-test state on suite fields in a sequential suite, in the returned
+   context in a parallel one (rule 4). NEVER `t.T().Cleanup`, and no
+   `defer` releasing a resource in a test method. Such a `defer` lints
+   clean and is still wrong: it sits outside the teardown order the
+   harness guarantees, and the setup cannot be shared or hoisted. Start goroutines with
    `gotest.Go(t, fn)`, never a bare `go`: a panic on a bare goroutine kills
    the process before any teardown runs.
    `wait := gotest.Go(…); defer wait()` is the one `defer` that belongs in
    a test, and only for work that finishes on its own — never wait in the
    test on a server or poller that `AfterEach` stops (it deadlocks).
-   A suite's `AfterAll` runs even when its `BeforeAll` failed or panicked
-   midway, so release only what was actually set up — nil-check each
-   field.
+   Every `BeforeAll` needs an `AfterAll` (`lifecycle-pair`, integrity
+   tier). A suite's `AfterAll` runs even when its `BeforeAll` failed or
+   panicked midway, so release only what was actually set up — nil-check
+   each field.
 3. **Do not imitate existing tests blindly.** Observed failure: agents copy
    a repo's existing `SuiteConfig()` verbatim, propagating anti-patterns. A
    `SuiteConfig()` marker states *intent*: omit it entirely for defaults.
-   A duration the marker leaves at zero gets the default, as if the marker
-   were absent; `gotest.NoDeadline` disables one. On v1.26–v1.29 a
-   zero/omitted duration meant NO deadline instead — compose onto a preset
-   there.
+   Every positive duration the marker returns — a preset's included — is a
+   budget: a test that outlives it fails even when it ignores its context.
+   A duration it leaves at zero gets the default and, like having no
+   marker, only bounds the context; `gotest.NoDeadline` disables one. On
+   v1.26–v1.29 a zero/omitted duration meant NO deadline instead — compose
+   onto a preset there (`reference/config.md`).
 4. **Ask "why is this suite NOT parallel?"** Observed failure: agents never
    parallelize unprompted, even when asked to improve tests. The recipe:
 
    ```go
    func (s *ShopTestSuite) SuiteConfig() gotest.SuiteConfig {
-   	cfg := gotest.DefaultSuiteConfig()
-   	cfg.Parallel = true
-   	return cfg
+   	return gotest.SuiteConfig{Parallel: true}
    }
 
    type shopCtx struct{ inv *Inventory }
@@ -191,11 +146,15 @@ parallel suites, or structural problems — those are your job, below.
    }
    ```
 
-   Every test method then takes `(t *gotest.T, ctx *shopCtx)` — the
-   generator enforces this, and rejects a `BeforeEach` that returns
-   nothing in a parallel suite. It cannot see methods writing suite
-   fields — with no `BeforeEach`, or beside a returning one: that
-   compiles, and races. Legitimate reasons to stay sequential: `Setenv`
+   Every test method then takes `(t *gotest.T, ctx *shopCtx)`, and an
+   `AfterEach` takes `(t, ctx)` too — the generator enforces this, and
+   rejects a `BeforeEach` that returns nothing in a parallel suite. A suite
+   without fields (or with fixture pointers only) may be parallel with no
+   `BeforeEach`. The generator cannot see methods writing suite fields —
+   with no `BeforeEach`, or beside a returning one: that compiles, and
+   races. A suite with `Benchmark*` or `Fuzz*` methods refuses a returning
+   `BeforeEach` (and hooks taking `*testing.T`): move those methods to a
+   sequential sibling suite. Legitimate reasons to stay sequential: `Setenv`
    (panics in parallel tests), shared live resources without per-test
    keys/schemas (`-race` is process-local and cannot see datastore
    contention — it is necessary, not sufficient).
@@ -235,12 +194,16 @@ parallel suites, or structural problems — those are your job, below.
    typed seeds first, then `f.Fuzz(func(t *gotest.T, in …) { … })` whose
    body asserts something the input must satisfy (round-trip, idempotence,
    no panic is not enough — `fuzz-no-oracle`). Never a top-level
-   `func FuzzX(*testing.F)`: gotest ignores it on every version. Struct
-   and named-type arguments are fine and fan out per field; the refused
+   `func FuzzX(*testing.F)`: gotest ignores it on every version (the one
+   exception, a target that must also run under plain `go test -fuzz`, is
+   in `reference/fuzzing.md`). Struct and named-type arguments are fine
+   and fan out per field; the refused
    shapes and the crasher loop are in `reference/fuzzing.md`. Search with
    `go tool gotest fuzz --for=30s ./...`; a crasher becomes a seed through
    `gotest fuzz promote`, never a hand-committed corpus file for a struct
-   target.
+   target. Benchmarks are suite methods too:
+   `func (s *XTestSuite) BenchmarkParse(b *gotest.B)` with the measured
+   work inside `for b.Loop() { … }` (`reference/cli.md`).
 
 10. **Gate on the environment with `SuiteGuard`, never a skip.** A suite
     that needs what a machine may lack (a `DATABASE_URL`, Docker, a
@@ -271,12 +234,13 @@ observed failure: agents restructure with no case accounting):
    and diff them:
 
    ```sh
-   go tool gotest -json ./... | grep -o '"Package":"[^"]*","Test":"[^"]*"' | sort -u > cases-before.txt
+   { go tool gotest -json ./...; go test -json ./...; } | grep -o '"Package":"[^"]*","Test":"[^"]*"' | sort -u > cases-before.txt
    test -s cases-before.txt
    ```
 
-   Capture the Package+Test PAIR — bare `Test` names collapse identically
-   named suites across packages, hiding whole-package deletions.
+   Capture both runners (stdlib tests run only under `go test`) and the
+   Package+Test PAIR — bare `Test` names collapse identically named suites
+   across packages, hiding whole-package deletions.
 
    After the refactor, capture `cases-after.txt` the same way and run
    `diff cases-before.txt cases-after.txt`. Enumerate every rename/merge
@@ -316,7 +280,9 @@ func (s *CartTestSuite) TestTotalsItems(t *gotest.T) {
 
 - `reference/assertions.md` — full assertion surface, `Nil`/`NotNil` type
   guards, snapshot testing
-- `reference/config.md` — literal config semantics, presets, compose form
+- `reference/setup.md` — declaring, checking and upgrading the CLI; drift
+  refusals, vendored modules, `go.work`
+- `reference/config.md` — config semantics, budgets, presets, compose form
 - `reference/fixtures.md` — fixture DAG, shared fixtures, hooks
 - `reference/cli.md` — the full CLI surface and flags
 - `reference/refactoring.md` — restructuring ladder, smells → moves

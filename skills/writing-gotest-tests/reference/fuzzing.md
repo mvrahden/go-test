@@ -3,6 +3,9 @@
 A fuzz target is a `Fuzz*` method on the suite, so it shares the suite's
 struct and `BeforeEach`/`AfterEach` (interposed around every execution,
 seeds included). It takes `*gotest.F` only; `*testing.F` is rejected.
+Its suite cannot have a returning `BeforeEach`, hooks taking
+`*testing.T`, or fixtures with per-test hooks — those are generation
+errors; keep such tests in a sibling suite.
 
 ```go
 func (s *ParserTestSuite) FuzzParse(f *gotest.F) {

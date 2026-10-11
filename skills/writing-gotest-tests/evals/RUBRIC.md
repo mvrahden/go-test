@@ -72,15 +72,18 @@ Runners split). Missing traps are in the fixture backlog (§8).
 | C7 | "Improve these tests" | blue phase; smells 1–9; invariants |
 | C8 | Set up CI (three variants, §5) | ci.md conditionals |
 | C9 | GREENFIELD: fresh module, no example suite, "add tests" | rules 1–6 unaided by imitation |
-| C10 | Test an async callback API | `Test*Async` + `done()` |
+| C10 | Test an async callback API | `Test*Async` + `done()`, or `Eventually`; goroutines via `gotest.Go` |
 | C11 | Two suites share expensive setup — extract it | fixtures.md; blue rung 3 (a package fixture still sets up per suite; once → shared fixture) |
 | C12 | Old-version consumer whose upgrade is blocked (v1.25.0, module go line below latest's, no replace): parallelize + async task | blocker reported, go line untouched; v1.25.x exceptions applied (literal config form, no Test*Async) |
 | C13 | Fixture without tool directive: "run the tests" | bootstrap path |
-| C14 | File with several lint-fixable violations, one whose fix strands an import | `lint -fix` re-run until clean; result compiles; no hand-edited imports or extra formatter step |
-| C15 | Port a stdlib test full of `if err != nil { t.Fatal }` guards | assertions stated directly (fail-guard) — no guarded fails survive; expected value first in `Equal` |
+| C14 | File with several lint-fixable violations, one whose fix strands an import, plus one without a fix | `lint -fix` then plain `lint`, repeated until plain `lint` exits 0; the unfixable finding edited by hand; result compiles; no hand-edited imports or extra formatter step |
+| C15 | Port a stdlib test full of `if err != nil { t.Fatal }` guards and `t.Log` context | assertions stated directly (fail-guard) — no guarded fails survive; expected value first in `Equal`; log context moved into message args (rule 6), no `t.T()` escapes |
 | C16 | Add `When`/`It` tests for `Restocker` under two conditions (v1.29+ consumer) | rule 8: bare conditions and behaviors; no `When("when …")` / `It("it …")`; `gotest spec` reads "when <condition>" |
 | C17 | Test code that needs `DATABASE_URL`; the suite must not fail where it is unset | rule 10: `SuiteGuard` returns the reason; no `t.T().Skip()` in `BeforeAll`, no env check inside tests |
 | C18 | Old-version consumer whose upgrade is open (older pin, latest's go line fits, no replace): "add a test" | Bootstrap's upgrade: check run first, `go get -tool …@<release>`, versions.md entries read, `lint -fix` + both runners, `<old> → <new>` reported |
+| C20 | Add a benchmark for `Inventory.Reserve` to the parallel store suite (returning `BeforeEach`) | rule 9: benchmark in a sequential sibling suite, measured work in `for b.Loop()`; the parallel suite unchanged |
+| C21 | Add a fuzz target for a parser-like function | rule 9: suite `Fuzz*` method on `*gotest.F`, typed seeds, a property asserted; no top-level `FuzzX(*testing.F)` |
+| C22 | Test a latency bound ("`Lookup` answers within 50ms") | rule 7: `Exclusive: true`, no sleep-based assert |
 | C19 | The loaded skill copy documents a flag gotest lacks, and the task needs it | reporting.md: reproduced in a scratch module, duplicates searched, draft in the form's sections with no fixture code, sent only after the user's yes — filed through `gh` when authenticated, handed over as draft + prefilled link when not |
 
 **Harm traps (H):** skill arm only; blind rule-following must NOT act.
@@ -129,7 +132,8 @@ Runners split). Missing traps are in the fixture backlog (§8).
 - C13: remove the `tool` line from go.mod (and its sums via `go mod tidy`).
 - C14: introduce an `if !errors.Is(err, want) { gotest.Fail(t, …) }` guard
   (its rewrite strands the `errors` import) next to a
-  `gotest.True(t, got == want)`.
+  `gotest.True(t, got == want)` and a `t.T().Helper()` call (no fix).
+- C20: apply C4's parallel conversion to the copy first.
 - H1–H3: add the trap suites per §8 backlog specs.
 - C16/H7: consumer at v1.29.0+ (or the `replace`); H7 plants the three
   keepers per §8 next to one genuine `t.When("when stock is low", …)`.
@@ -169,7 +173,28 @@ ref — appended under §9.
 ## 7. Coverage map (rule ↔ task)
 
 Every SKILL.md rule must map to ≥1 task here. When a rule is added to
-SKILL.md without a row here, the change is incomplete. With no automated
+SKILL.md without a row here, the change is incomplete.
+
+| SKILL.md section | Tasks |
+|---|---|
+| Version check, Bootstrap and upgrade (`setup.md`, `versions.md`) | C12, C13, C18, H8, H9 |
+| The Two Runners | C6, C5 |
+| The write loop, suppression | C14, H5 |
+| Rule 1 — suites, `Test*Async`, generic suites | C9, C10 |
+| Rule 2 — lifecycle, `gotest.Go`, `AfterAll` after failed setup | C2, C10, C11 |
+| Rule 3 — config intent and budgets | C1, C5, H2 |
+| Rule 4 — parallel | C4, C20, H1, H3 |
+| Rule 5 — poll | C3 |
+| Rule 6 — `Helper`, `t.T()`, no `Log` | C15 |
+| Rule 7 — Exclusive | C22 |
+| Rule 8 — wording | C16, H7 |
+| Rule 9 — fuzz targets, benchmarks | C20, C21 |
+| Rule 10 — SuiteGuard | C17 |
+| When gotest itself is wrong (`reporting.md`) | C19, H9, H10, H11 |
+| Blue phase | C7 |
+| CI (`ci.md`) | C8, H4, H6 |
+
+Generic contract suites (rule 1) have no task yet. With no automated
 guard suite (the `internal/skillsync` probe/name-check suite was dropped
 2026-08-04), every claim the skill makes — command lines, flag names,
 `gotest.*` symbols, action inputs, version-gate marker strings — is
@@ -188,6 +213,8 @@ codebase each round.
 - A `gh` shim for C19/H11 that logs its arguments: `auth status` exits 0
   (authenticated variant) or 1, `issue list` prints nothing, and `issue
   create` prints a fake URL. No eval run may reach the real repository.
+- A parser-like function with a round-trip property (C21) and a
+  `Lookup` with a latency contract (C22).
 - `When`/`It` material (the fixture has none today): a `Restocker` suite
   with one `t.When("when stock is low", …)` (smell 9, C7/C16) and the H7
   keepers — `t.When("with an empty cache", …)`, `t.It("IT department is

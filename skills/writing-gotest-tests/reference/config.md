@@ -12,9 +12,13 @@ zero behave as if the marker were absent:
   as written. From v1.30 a duration left at zero (omitted or explicit) gets
   the default: `SuiteConfig{Parallel: true}` bounds the contexts at
   30s/30s (v1.26–v1.29 it meant no deadline).
-- Only a positive duration you write is also a verdict: a test that
-  outlives it is failed even when it ignores its context. A defaulted
-  duration bounds the context and is never enforced.
+- Every positive duration the marker returns is also a verdict — one you
+  write and one a preset supplies alike: a test that outlives it is failed
+  even when it ignores its context. A defaulted duration (no marker, or
+  zero) bounds the context and is never enforced. So
+  `return gotest.DefaultSuiteConfig()` and the compose form below enforce
+  30s/30s, while `gotest.SuiteConfig{Parallel: true}` only bounds the
+  contexts at 30s/30s.
 - `gotest.NoDeadline` (any negative duration) disables the deadline. Write the
   constant, not a bare negative: from v1.30 `gotest lint` reports a literal
   negative (`config-no-deadline`) and `-fix` spells it `gotest.NoDeadline`.
@@ -32,7 +36,7 @@ generation time), so only three forms are legal:
 2. a gotest preset call — `DefaultSuiteConfig()` or
    `IntegrationSuiteConfig()` (2m/5m) — custom helpers are rejected because
    they would silently drop `Parallel`;
-3. the compose form (preferred for parallel suites):
+3. the compose form, which keeps a preset's durations as budgets:
 
 ```go
 func (s *ShopTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -42,14 +46,20 @@ func (s *ShopTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-`Parallel` must be assigned a boolean literal. Delete markers that restate
-defaults — a marker is a statement of intent, not boilerplate (agents
-copying default-restating markers between suites is an observed failure).
+`Parallel` must be assigned a boolean literal; a literal must use keyed
+fields. Delete markers that restate defaults — a marker is a statement of
+intent, not boilerplate (agents copying default-restating markers between
+suites is an observed failure). Deleting `DefaultSuiteConfig()` also drops
+its 30s verdict (the context stays bounded); keep an explicit `Timeout`
+where a test must be failed at its budget.
 
 Fixtures follow the same rule via `FixtureConfig()` /
 `SharedFixtureConfig()` markers: no marker or a zero `Timeout` →
 `DefaultFixtureConfig()`'s 2m; `Retries`/`RetryDelay` are used as written;
-`ContainerFixtureConfig()` (5m, 1 retry) suits container startups.
+`ContainerFixtureConfig()` (5m, 1 retry) suits container startups. All
+shared fixture setup together is also capped by the run's
+`--setup-timeout` (default 2m; `setup-timeout:` in `.gotest.yml`),
+whatever the marker says — raise it with a long shared fixture.
 
 ## Exclusive suites (v1.27+)
 
