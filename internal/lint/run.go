@@ -55,6 +55,9 @@ type Targets struct {
 	Dir      string
 	Patterns []string
 	Tests    bool // include test files, like the driver's -test flag
+	// BuildFlags go to go list, the loads of the fixed sources included:
+	// -tags=integration, say.
+	BuildFlags []string
 	// TempDir holds the load's temporary files, the go command's work
 	// directories included; "" means the system's. Removing it after a
 	// stopped load removes what the go command left there.

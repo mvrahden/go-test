@@ -38,6 +38,10 @@ func runLint(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	a, _ := parseLintArgs(args)
+	// The driver ignores -tags; it reads GOFLAGS, as go list does.
+	if a.tags != "" {
+		_ = os.Setenv("GOFLAGS", strings.TrimSpace(os.Getenv("GOFLAGS")+" -tags="+a.tags))
+	}
 	// The driver skips uncompilable packages and still exits 0, so a broken
 	// tree lints "clean". Prove the targets compile first.
 	if a.loads() {
@@ -66,10 +70,11 @@ type lintArgs struct {
 	fix      bool
 	diff     bool
 	json     bool
-	tests    bool // -test
-	context  int  // -c; negative prints no source lines
-	noLoad   bool // -flags or -V: the driver answers without loading
-	unknown  bool // a flag nobody defines: the driver reports it
+	tests    bool   // -test
+	context  int    // -c; negative prints no source lines
+	tags     string // -tags, as for go build
+	noLoad   bool   // -flags or -V: the driver answers without loading
+	unknown  bool   // a flag nobody defines: the driver reports it
 }
 
 // lintValueFlags take a value, as -name=value or as the next argument.
@@ -111,7 +116,9 @@ func parseLintArgs(args []string) (lintArgs, error) {
 			a.tests, err = strconv.ParseBool(value)
 		case name == "c":
 			a.context, err = strconv.Atoi(value)
-		case name == "tags" || name == "source" || name == "all":
+		case name == "tags":
+			a.tags = value
+		case name == "source" || name == "all":
 			// No effect in the driver either (deprecated).
 		case name == "flags" || name == "V":
 			a.noLoad = true
@@ -142,6 +149,14 @@ func (a *lintArgs) inProcess() bool {
 // loads reports whether the driver will load the targets.
 func (a *lintArgs) loads() bool {
 	return !a.noLoad && !a.unknown
+}
+
+// buildFlags returns the go build flags the args carry.
+func (a *lintArgs) buildFlags() []string {
+	if a.tags == "" {
+		return nil
+	}
+	return []string{"-tags=" + a.tags}
 }
 
 // argv returns the args for the go/analysis driver, flags first.
@@ -199,7 +214,7 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 		}
 	}
 
-	targets := lint.Targets{Dir: dir, Patterns: a.patterns, Tests: a.tests}
+	targets := lint.Targets{Dir: dir, Patterns: a.patterns, Tests: a.tests, BuildFlags: a.buildFlags()}
 	ctx := context.Background()
 	var written []string // the files -fix wrote, for a second signal to name
 	if a.fix {

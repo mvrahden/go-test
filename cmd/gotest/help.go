@@ -724,6 +724,8 @@ Flags:
                           fail-guard, t-escape, stdlib-test, testify,
                           fuzz-no-oracle, fuzz-seed, fuzz-hook-io, fuzz-raw-seed)
   -disable-nolint         Ignore //nolint comments
+  -tags list              Build tags, a comma-separated list as for go build
+                          (GOFLAGS=-tags=… works too)
   -fix                    Apply suggested fixes, overlapping ones included,
                           then report the findings left as a plain run
                           would (exit 3 if any)

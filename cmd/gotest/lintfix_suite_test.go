@@ -543,6 +543,47 @@ func (s *LintFixTestSuite) TestTargets(t *gotest.T) {
 	})
 }
 
+func (s *LintFixTestSuite) TestTags(t *gotest.T) {
+	// The tagged file has a fixable finding and one -fix leaves.
+	stage := func(t *gotest.T) (dir, tagged string) {
+		dir, _ = s.stageProbe(t, strings.Replace(lintFixProbe, "\tt.T().Helper()\n\tgotest.True(t, 1 == 1)\n", "", 1))
+		tagged = filepath.Join(dir, "tagged_test.go")
+		gotest.NoError(t, os.WriteFile(tagged, []byte("//go:build integration\n\n"+strings.Replace(lintFixSecondProbe, "\tgotest.True", "\tt.T().Helper()\n\tgotest.True", 1)), 0o600))
+		return dir, tagged
+	}
+	taggedFinding := `^\S*tagged_test\.go:8:2: never call Helper .+\n$`
+
+	t.When("-tags names the tag a file needs", func(w *gotest.T) {
+		dir, _ := stage(w)
+		_, plain, plainCode := s.runLintIn(w, dir, nil, "lint", "-tags=integration", "./...")
+		_, driver, driverCode := s.runLintIn(w, dir, nil, "lint", "-tags", "integration", "-debug=", "./...")
+		_, without, withoutCode := s.runLintIn(w, dir, nil, "lint", "./...")
+
+		w.It("lints the file, in process and through the go/analysis driver", func(it *gotest.T) {
+			gotest.Regexp(it, `tagged_test\.go:8:2: never call Helper .+\n\S*tagged_test\.go:9:2: use Equal`, plain)
+			gotest.Equal(it, 3, plainCode, plain)
+			gotest.Regexp(it, `tagged_test\.go:8:2: never call Helper`, driver)
+			gotest.Equal(it, 3, driverCode, driver)
+		})
+		w.It("skips the file without it", func(it *gotest.T) {
+			gotest.Empty(it, without)
+			gotest.Equal(it, 0, withoutCode, without)
+		})
+	})
+
+	t.When("-fix is given -tags", func(w *gotest.T) {
+		dir, tagged := stage(w)
+		stdout, stderr, code := s.runLintIn(w, dir, nil, "lint", "-fix", "-tags=integration", "./...")
+
+		w.It("fixes the file and reports, from the fixed sources, what is left in it", func(it *gotest.T) {
+			gotest.Contains(it, readLintFixFile(it, tagged), "gotest.Equal(t, 2, 2)")
+			gotest.Regexp(it, taggedFinding, stderr)
+			gotest.Empty(it, stdout)
+			gotest.Equal(it, 3, code, stderr)
+		})
+	})
+}
+
 // lintFixSecondProbe adds a second file with a fixable finding.
 const lintFixSecondProbe = `package lintfix
 

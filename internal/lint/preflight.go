@@ -9,6 +9,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -41,6 +42,8 @@ func load(ctx context.Context, t Targets, overlay map[string][]byte) ([]*package
 		Dir:     t.Dir,
 		Mode:    packages.LoadSyntax | packages.NeedModule,
 		Tests:   t.Tests,
+		// withOverlay appends to it.
+		BuildFlags: slices.Clone(t.BuildFlags),
 	}
 	if t.TempDir != "" {
 		// A canceled load interrupts go list, which ignores the interrupt
