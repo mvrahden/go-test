@@ -16,6 +16,11 @@ import (
 func main() {
 	args := os.Args[1:]
 
+	if len(args) > 0 && args[0] == lintFixDriverArg {
+		runLintDriver(args[1:])
+		os.Exit(2)
+	}
+
 	if containsHelpFlag(args) {
 		subcmd, _ := ParseSubcommand(args)
 		showHelp(subcmd)

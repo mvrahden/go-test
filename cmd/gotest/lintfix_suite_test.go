@@ -2,10 +2,15 @@ package main_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
+	"syscall"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -13,7 +18,7 @@ import (
 )
 
 // LintFixTestSuite runs the built CLI's lint -fix, which applies fixes in a
-// child driver and then reports what is left.
+// child driver until none is left and then reports what is left.
 //
 //nolint:lifecycle-pair // BeforeAll only wraps the shared binary, which its fixture removes
 type LintFixTestSuite struct {
@@ -22,13 +27,16 @@ type LintFixTestSuite struct {
 }
 
 func (s *LintFixTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.IntegrationSuiteConfig()
+	cfg := gotest.IntegrationSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *LintFixTestSuite) BeforeAll(t *gotest.T) {
 	s.cli = newCLIRunner(s.CLI)
 }
 
+// lintFixProbe has one fixable finding (True) and one without a fix (Helper).
 const lintFixProbe = `package lintfix
 
 import "github.com/mvrahden/go-test/pkg/gotest"
@@ -41,11 +49,35 @@ func (s *ProbeTestSuite) TestProbe(t *gotest.T) {
 }
 `
 
-// runLintIn runs the binary in dir and returns stdout, stderr and exit code.
-func (s *LintFixTestSuite) runLintIn(t *gotest.T, dir string, args ...string) (stdout, stderr string, code int) {
+// lintFixOverlapProbe has fixes that overlap: the fail-guard rewrite spans
+// the t-escape one, so the driver applies one per pass. Helper has no fix.
+const lintFixOverlapProbe = `package lintfix
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type ProbeTestSuite struct{}
+
+func (s *ProbeTestSuite) TestProbe(t *gotest.T) {
+	x := 3
+	if x != 3 {
+		gotest.Fail(t.T(), "bad")
+	}
+	t.T().Helper()
+	gotest.True(t, 1 == 1)
+}
+`
+
+// helperFinding is the plain-text finding Helper leaves, at line.
+func helperFinding(line string) string {
+	return `^\S*probe_test\.go:` + line + `:2: never call Helper .+\n$`
+}
+
+// runLintIn runs the binary in dir with extra env entries and returns
+// stdout, stderr and exit code.
+func (s *LintFixTestSuite) runLintIn(t *gotest.T, dir string, env []string, args ...string) (stdout, stderr string, code int) {
 	cmd := exec.Command(s.cli.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "PWD="+dir)
+	cmd.Env = append(append(os.Environ(), "PWD="+dir), env...)
 	var out, errs bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errs
 	err := cmd.Run()
@@ -62,18 +94,37 @@ func (s *LintFixTestSuite) stageProbe(t *gotest.T, src string) (dir, file string
 	return dir, file
 }
 
+func readLintFixFile(t *gotest.T, file string) string {
+	src, err := os.ReadFile(file)
+	gotest.NoError(t, err)
+	return string(src)
+}
+
+// goShim puts a `go` ahead of the real one on PATH that runs script before
+// it, and returns the PATH entry. Unix only: the shim is a shell script.
+func goShim(t *gotest.T, script string) string {
+	if runtime.GOOS == "windows" {
+		t.Skipf("the go shim is a shell script")
+	}
+	realGo, err := exec.LookPath("go")
+	gotest.NoError(t, err)
+	dir := t.TempDir()
+	body := "#!/bin/sh\n" + script + "\nexec '" + realGo + "' \"$@\"\n"
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go"), []byte(body), 0o700)) //nolint:gosec // G306: the shim must be executable
+	return "PATH=" + dir + string(os.PathListSeparator) + os.Getenv("PATH")
+}
+
 func (s *LintFixTestSuite) TestFix(t *gotest.T) {
 	t.When("a finding has no fix", func(w *gotest.T) {
 		dir, file := s.stageProbe(w, lintFixProbe)
-		stdout, stderr, code := s.runLintIn(w, dir, "lint", "-fix", "./...")
-		src, err := os.ReadFile(file)
-		gotest.NoError(w, err)
+		stdout, stderr, code := s.runLintIn(w, dir, nil, "lint", "-fix", "./...")
+		src := readLintFixFile(w, file)
 
 		w.It("applies the fixable rewrite", func(it *gotest.T) {
-			gotest.Contains(it, string(src), "gotest.Equal(t, 1, 1)")
+			gotest.Contains(it, src, "gotest.Equal(t, 1, 1)")
 		})
 		w.It("reports the finding it could not fix", func(it *gotest.T) {
-			gotest.Regexp(it, `^\S*probe_test\.go:8:2: never call Helper .+\n$`, stderr)
+			gotest.Regexp(it, helperFinding("8"), stderr)
 			gotest.Empty(it, stdout)
 		})
 		w.It("exits 3", func(it *gotest.T) {
@@ -82,17 +133,291 @@ func (s *LintFixTestSuite) TestFix(t *gotest.T) {
 	})
 
 	t.When("every finding has a fix", func(w *gotest.T) {
-		dir, file := s.stageProbe(w, lintFixProbe)
-		src, err := os.ReadFile(file)
-		gotest.NoError(w, err)
-		gotest.NoError(w, os.WriteFile(file, bytes.Replace(src, []byte("\tt.T().Helper()\n"), nil, 1), 0o600))
-
-		stdout, stderr, code := s.runLintIn(w, dir, "lint", "-fix", "./...")
+		dir, file := s.stageProbe(w, strings.Replace(lintFixProbe, "\tt.T().Helper()\n", "", 1))
+		stdout, stderr, code := s.runLintIn(w, dir, nil, "lint", "-fix", "./...")
 
 		w.It("exits 0 and says nothing", func(it *gotest.T) {
 			gotest.Equal(it, 0, code, stderr)
 			gotest.Empty(it, stderr)
 			gotest.Empty(it, stdout)
+		})
+		w.It("applies the rewrite", func(it *gotest.T) {
+			gotest.Contains(it, readLintFixFile(it, file), "gotest.Equal(t, 1, 1)")
+		})
+	})
+
+	t.When("fixes overlap", func(w *gotest.T) {
+		dir, file := s.stageProbe(w, lintFixOverlapProbe)
+		stdout, stderr, code := s.runLintIn(w, dir, nil, "lint", "-fix", "./...")
+		src := readLintFixFile(w, file)
+
+		w.It("applies every fix in one run", func(it *gotest.T) {
+			gotest.Contains(it, src, `gotest.Equal(t, 3, x, "bad")`)
+			gotest.Contains(it, src, "gotest.Equal(t, 1, 1)")
+			gotest.NotContains(it, src, "t.T(), ")
+		})
+		w.It("reports only the finding without a fix and exits 3", func(it *gotest.T) {
+			gotest.Regexp(it, helperFinding("10"), stderr)
+			gotest.Empty(it, stdout)
+			gotest.Equal(it, 3, code, stderr)
+		})
+	})
+
+	t.When("fixes overlap and every finding has one", func(w *gotest.T) {
+		dir, _ := s.stageProbe(w, strings.Replace(lintFixOverlapProbe, "\tt.T().Helper()\n", "", 1))
+		stdout, stderr, code := s.runLintIn(w, dir, nil, "lint", "-fix", "./...")
+
+		w.It("exits 0 and says nothing", func(it *gotest.T) {
+			gotest.Equal(it, 0, code, stderr)
+			gotest.Empty(it, stderr)
+			gotest.Empty(it, stdout)
+		})
+	})
+
+	t.When("the flag follows the pattern", func(w *gotest.T) {
+		dir, file := s.stageProbe(w, lintFixProbe)
+		stdout, stderr, code := s.runLintIn(w, dir, nil, "lint", "./...", "-fix")
+
+		w.It("still fixes and reports what is left", func(it *gotest.T) {
+			gotest.Contains(it, readLintFixFile(it, file), "gotest.Equal(t, 1, 1)")
+			gotest.Regexp(it, helperFinding("8"), stderr)
+			gotest.Empty(it, stdout)
+			gotest.Equal(it, 3, code, stderr)
+		})
+	})
+}
+
+func (s *LintFixTestSuite) TestLoads(t *gotest.T) {
+	// The shim logs every package load: go/packages runs one go list -json
+	// per load, in lint and in the child driver alike.
+	loads := func(t *gotest.T, log string) int {
+		data, err := os.ReadFile(log)
+		if errors.Is(err, os.ErrNotExist) {
+			return 0
+		}
+		gotest.NoError(t, err)
+		return strings.Count(string(data), "list -e -json=")
+	}
+
+	t.When("no finding has a fix", func(w *gotest.T) {
+		log := filepath.Join(w.TempDir(), "loads")
+		path := goShim(w, `echo "$*" >> '`+log+`'`)
+		dir, file := s.stageProbe(w, strings.Replace(lintFixProbe, "\tgotest.True(t, 1 == 1)\n", "", 1))
+		stdout, stderr, code := s.runLintIn(w, dir, []string{path}, "lint", "-fix", "./...")
+
+		w.It("loads the targets once and starts no driver", func(it *gotest.T) {
+			gotest.Equal(it, 1, loads(it, log))
+		})
+		w.It("reports the finding and leaves the file alone", func(it *gotest.T) {
+			gotest.Regexp(it, helperFinding("8"), stderr)
+			gotest.Empty(it, stdout)
+			gotest.Equal(it, 3, code, stderr)
+			gotest.NotContains(it, readLintFixFile(it, file), "Equal")
+		})
+	})
+
+	t.When("the targets have no findings", func(w *gotest.T) {
+		log := filepath.Join(w.TempDir(), "loads")
+		path := goShim(w, `echo "$*" >> '`+log+`'`)
+		dir, _ := s.stageProbe(w, strings.Replace(lintFixProbe, "\tt.T().Helper()\n\tgotest.True(t, 1 == 1)\n", "", 1))
+		_, stderr, code := s.runLintIn(w, dir, []string{path}, "lint", "-fix", "-test=false", "-c", "2", "./...")
+
+		w.It("loads them once, even with flags the analyzer does not own", func(it *gotest.T) {
+			gotest.Equal(it, 0, code, stderr)
+			gotest.Equal(it, 1, loads(it, log))
+		})
+	})
+}
+
+func (s *LintFixTestSuite) TestOutputModes(t *gotest.T) {
+	t.When("-json is set", func(w *gotest.T) {
+		dir, file := s.stageProbe(w, lintFixOverlapProbe)
+		stdout, stderr, code := s.runLintIn(w, dir, nil, "lint", "-fix", "-json", "./...")
+
+		w.It("prints only the findings left, as JSON on stdout", func(it *gotest.T) {
+			gotest.True(it, json.Valid([]byte(stdout)), stdout)
+			gotest.Equal(it, 1, strings.Count(stdout, `"message"`), stdout)
+			gotest.Contains(it, stdout, "never call Helper")
+			gotest.Empty(it, stderr)
+		})
+		w.It("exits 0, as -json does without -fix", func(it *gotest.T) {
+			gotest.Equal(it, 0, code, stderr)
+		})
+		w.It("applies the fixes", func(it *gotest.T) {
+			gotest.Contains(it, readLintFixFile(it, file), `gotest.Equal(t, 3, x, "bad")`)
+		})
+	})
+
+	t.When("--github is set", func(w *gotest.T) {
+		dir, file := s.stageProbe(w, lintFixOverlapProbe)
+		summary := filepath.Join(w.TempDir(), "summary.md")
+		stdout, stderr, code := s.runLintIn(w, dir, []string{"GITHUB_STEP_SUMMARY=" + summary}, "lint", "-fix", "--github", "./...")
+
+		w.It("annotates only the finding left", func(it *gotest.T) {
+			gotest.Regexp(it, `^::error file=probe_test\.go,line=10,col=2,title=t-escape::never call Helper .+\n$`, stdout)
+			gotest.Empty(it, stderr)
+			gotest.Equal(it, 3, code, stderr)
+		})
+		w.It("applies the fixes", func(it *gotest.T) {
+			gotest.Contains(it, readLintFixFile(it, file), `gotest.Equal(t, 3, x, "bad")`)
+		})
+	})
+
+	t.When("-diff is set", func(w *gotest.T) {
+		dir, file := s.stageProbe(w, lintFixProbe)
+		stdout, stderr, code := s.runLintIn(w, dir, nil, "lint", "-fix", "-diff", "./...")
+
+		w.It("previews the fix on stdout", func(it *gotest.T) {
+			gotest.Contains(it, stdout, "+\tgotest.Equal(t, 1, 1)")
+			gotest.Empty(it, stderr)
+			gotest.Equal(it, 0, code, stderr)
+		})
+		w.It("writes nothing", func(it *gotest.T) {
+			gotest.Equal(it, lintFixProbe, readLintFixFile(it, file))
+		})
+	})
+}
+
+func (s *LintFixTestSuite) TestSkips(t *gotest.T) {
+	// The overlap probe gives the child driver work, so a skip it does not
+	// receive shows as a True rewritten anyway.
+	t.When("lint.skip in .gotest.yml disables a rule", func(w *gotest.T) {
+		dir, file := s.stageProbe(w, lintFixOverlapProbe)
+		gotest.NoError(w, os.WriteFile(filepath.Join(dir, ".gotest.yml"), []byte("lint:\n  skip: [assertion-simplify]\n"), 0o600))
+		_, stderr, code := s.runLintIn(w, dir, nil, "lint", "-fix", "./...")
+		src := readLintFixFile(w, file)
+
+		w.It("leaves that rule's findings unfixed and unreported", func(it *gotest.T) {
+			gotest.Contains(it, src, "gotest.True(t, 1 == 1)")
+			gotest.Contains(it, src, `gotest.Equal(t, 3, x, "bad")`)
+			gotest.Regexp(it, helperFinding("10"), stderr)
+			gotest.Equal(it, 3, code, stderr)
+		})
+	})
+
+	t.When("a -skip flag disables a rule", func(w *gotest.T) {
+		dir, file := s.stageProbe(w, lintFixOverlapProbe)
+		_, stderr, code := s.runLintIn(w, dir, nil, "lint", "-fix", "-skip-assertion-simplify", "./...")
+		src := readLintFixFile(w, file)
+
+		w.It("leaves that rule's findings unfixed and unreported", func(it *gotest.T) {
+			gotest.Contains(it, src, "gotest.True(t, 1 == 1)")
+			gotest.Contains(it, src, `gotest.Equal(t, 3, x, "bad")`)
+			gotest.Regexp(it, helperFinding("10"), stderr)
+			gotest.Equal(it, 3, code, stderr)
+		})
+	})
+}
+
+func (s *LintFixTestSuite) TestTargets(t *gotest.T) {
+	t.When("patterns name modules of a workspace", func(w *gotest.T) {
+		root := w.TempDir()
+		var files []string
+		for _, mod := range []string{"one", "two"} {
+			dir := filepath.Join(root, mod)
+			gotest.NoError(w, os.Mkdir(dir, 0o700))
+			gotest.NoError(w, testkit.WriteModule(s.cli.repoRoot, dir, mod))
+			file := filepath.Join(dir, "probe_test.go")
+			gotest.NoError(w, os.WriteFile(file, []byte(strings.Replace(lintFixProbe, "package lintfix", "package "+mod, 1)), 0o600))
+			files = append(files, file)
+		}
+		work := "go 1.26.0\n\nuse (\n\t./one\n\t./two\n\t" + s.cli.repoRoot + "\n)\n"
+		gotest.NoError(w, os.WriteFile(filepath.Join(root, "go.work"), []byte(work), 0o600))
+
+		stdout, stderr, code := s.runLintIn(w, root, nil, "lint", "-fix", "./one/...", "./two/...")
+
+		w.It("fixes both", func(it *gotest.T) {
+			for _, file := range files {
+				gotest.Contains(it, readLintFixFile(it, file), "gotest.Equal(t, 1, 1)")
+			}
+		})
+		w.It("reports what is left in both and exits 3", func(it *gotest.T) {
+			gotest.Regexp(it, `^\S*one/probe_test\.go:8:2: never call Helper .+\n\S*two/probe_test\.go:8:2: never call Helper .+\n$`, filepath.ToSlash(stderr))
+			gotest.Empty(it, stdout)
+			gotest.Equal(it, 3, code, stderr)
+		})
+	})
+
+	t.When("a target does not compile", func(w *gotest.T) {
+		dir, file := s.stageProbe(w, lintFixProbe)
+		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "broken_test.go"), []byte("package lintfix\n\nvar x int = \"nope\"\n"), 0o600))
+		stdout, stderr, code := s.runLintIn(w, dir, nil, "lint", "-fix", "./...")
+
+		w.It("exits 1 and names it", func(it *gotest.T) {
+			gotest.Equal(it, 1, code, stderr)
+			gotest.Regexp(it, `^FAIL: cannot lint uncompilable packages`, stderr)
+			gotest.Empty(it, stdout)
+		})
+		w.It("touches no file", func(it *gotest.T) {
+			gotest.Equal(it, lintFixProbe, readLintFixFile(it, file))
+		})
+	})
+
+	t.When("GOTEST_LINT_FIX_DRIVER is set", func(w *gotest.T) {
+		dir, _ := s.stageProbe(w, lintFixProbe)
+		stdout, stderr, code := s.runLintIn(w, dir, []string{"GOTEST_LINT_FIX_DRIVER=1"}, "lint", "--github", "./...")
+
+		w.It("lints as without it", func(it *gotest.T) {
+			gotest.Equal(it, 2, strings.Count(stdout, "::error "), stdout)
+			gotest.Empty(it, stderr)
+			gotest.Equal(it, 3, code, stderr)
+		})
+	})
+}
+
+func (s *LintFixTestSuite) TestInterrupt(t *gotest.T) {
+	t.When("lint is stopped while the driver runs", func(w *gotest.T) {
+		// The shim holds the second load, the driver's, so the signal lands
+		// mid-fix.
+		tmp := w.TempDir()
+		count, marker := filepath.Join(tmp, "loads"), filepath.Join(tmp, "driver")
+		path := goShim(w, `case "$*" in *-json=*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then : > '`+marker+`'; sleep 5; fi;; esac`)
+		dir, file := s.stageProbe(w, lintFixProbe)
+
+		cmd := exec.Command(s.cli.binary, "lint", "-fix", "./...") //nolint:gosec // G204: controlled binary with fixed args
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), "PWD="+dir, path)
+		var errs bytes.Buffer
+		cmd.Stderr = &errs
+		gotest.NoError(w, cmd.Start())
+		gotest.Eventually(w, 30*time.Second, 50*time.Millisecond, func(poll *gotest.R) {
+			_, err := os.Stat(marker)
+			gotest.NoError(poll, err)
+		})
+		// The signal goes to lint alone, as from an editor's cancel.
+		gotest.NoError(w, cmd.Process.Signal(syscall.SIGTERM))
+		_ = cmd.Wait()
+		code := cmd.ProcessState.ExitCode()
+
+		w.It("exits 130", func(it *gotest.T) {
+			gotest.Equal(it, 130, code, errs.String())
+			gotest.Contains(it, errs.String(), "lint: interrupted")
+		})
+		w.It("stops the driver with it", func(it *gotest.T) {
+			gotest.Consistently(it, 7*time.Second, 250*time.Millisecond, func(poll *gotest.R) {
+				src, err := os.ReadFile(file)
+				gotest.NoError(poll, err)
+				gotest.Equal(poll, lintFixProbe, string(src))
+			})
+		})
+	})
+}
+
+func (s *LintFixTestSuite) TestDriverFailure(t *gotest.T) {
+	t.When("the driver fails without fixing anything", func(w *gotest.T) {
+		// The shim fails the second load, the driver's.
+		count := filepath.Join(w.TempDir(), "loads")
+		path := goShim(w, `case "$*" in *-json=*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then exit 1; fi;; esac`)
+		dir, file := s.stageProbe(w, lintFixProbe)
+		stdout, stderr, code := s.runLintIn(w, dir, []string{path}, "lint", "-fix", "./...")
+
+		w.It("exits 1 with the driver's own output", func(it *gotest.T) {
+			gotest.Equal(it, 1, code, stderr)
+			gotest.Regexp(it, `^gotestlint: .+\nFAIL: applying fixes: the go/analysis driver exited 1\n$`, stderr)
+			gotest.Empty(it, stdout)
+		})
+		w.It("touches no file", func(it *gotest.T) {
+			gotest.Equal(it, lintFixProbe, readLintFixFile(it, file))
 		})
 	})
 }

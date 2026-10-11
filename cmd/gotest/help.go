@@ -711,14 +711,16 @@ Flags:
                           fail-guard, t-escape, stdlib-test, testify,
                           fuzz-no-oracle, fuzz-seed, fuzz-hook-io, fuzz-raw-seed)
   -disable-nolint         Ignore //nolint comments
-  -fix                    Apply suggested fixes, then report the findings
-                          left (exit 3 if any). With -json the remaining
-                          findings print as JSON; with -diff fixes are only
-                          previewed and nothing else is reported.
+  -fix                    Apply suggested fixes, overlapping ones included,
+                          then report the findings left as a plain run
+                          would (exit 3 if any). With -diff one pass of
+                          fixes is previewed; nothing is written or reported.
+  -json                   Print the findings as JSON on stdout and exit 0,
+                          as the go/analysis driver does (also with -fix)
   --github                Also emit GitHub ::error annotations and append a
                           findings table to $GITHUB_STEP_SUMMARY. Implied when
-                          GITHUB_ACTIONS=true; ignored alongside driver flags
-                          such as -json or -diff.
+                          GITHUB_ACTIONS=true; ignored alongside -json and
+                          flags only the go/analysis driver has, such as -diff.
 
 Suppress individual diagnostics with //nolint comments:
   //nolint:stdlib-test             Same line, or a comment block of its own
@@ -729,7 +731,7 @@ Exit codes:
   0   No findings
   1   Uncompilable target packages (nothing was proven about them)
   2   Usage or configuration error (e.g. an integrity rule in lint.skip)
-  3   Findings reported (with -fix: findings no fix could resolve)
+  3   Findings reported (with -fix: the findings left after fixing)
 
 Examples:
   gotest lint ./...                          Lint all packages

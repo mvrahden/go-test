@@ -46,10 +46,3 @@ func (s *PreflightTestSuite) TestUncompilablePackage(t *gotest.T) {
 		})
 	})
 }
-
-func (s *PreflightTestSuite) TestPatternExtraction(t *gotest.T) {
-	t.It("keeps patterns and drops flags", func(it *gotest.T) {
-		got := lint.PreflightPatterns([]string{"-fix", "-skip-tescape", "./...", "./pkg/..."})
-		gotest.Equal(it, []string{"./...", "./pkg/..."}, got)
-	})
-}

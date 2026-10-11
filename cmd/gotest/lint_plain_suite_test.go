@@ -69,9 +69,9 @@ func (s *LintPlainTestSuite) TestPlainMode(t *gotest.T) {
 		})
 	})
 
-	t.When("a driver flag is present", func(w *gotest.T) {
+	t.When("a flag only the driver implements is present", func(w *gotest.T) {
 		var stderr bytes.Buffer
-		_, ok := ExportRunLintPlain(&stderr, "", []string{"-fix", "./..."})
+		_, ok := ExportRunLintPlain(&stderr, "", []string{"-fix", "-diff", "./..."})
 
 		w.It("defers to the singlechecker driver", func(it *gotest.T) {
 			gotest.False(it, ok)
