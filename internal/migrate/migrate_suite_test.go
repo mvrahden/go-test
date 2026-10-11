@@ -230,6 +230,55 @@ func TestOrderSuite(t *testing.T) {
 }
 `
 
+// sharedImportSrc keeps a plain *testing.T helper that still calls assert.
+const sharedImportSrc = `package sample
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+)
+
+type SharedSuite struct {
+	suite.Suite
+}
+
+func (s *SharedSuite) TestOK() {
+	require.Equal(s.T(), 1, 1)
+}
+
+func plain(t *testing.T) {
+	assert.Equal(t, 1, 1)
+}
+
+func TestSharedSuite(t *testing.T) {
+	suite.Run(t, new(SharedSuite))
+}
+`
+
+func (s *MigrateTestSuite) TestImports(t *gotest.T) {
+	t.When("a non-suite function still uses a testify package", func(w *gotest.T) {
+		out := s.migrateSource(w, sharedImportSrc)
+
+		w.It("keeps that import and the testing import it needs", func(it *gotest.T) {
+			gotest.Contains(it, out, `"github.com/stretchr/testify/assert"`)
+			gotest.Contains(it, out, `"testing"`)
+		})
+
+		w.It("drops the imports nothing uses any more", func(it *gotest.T) {
+			gotest.NotContains(it, out, `"github.com/stretchr/testify/require"`)
+			gotest.NotContains(it, out, `"github.com/stretchr/testify/suite"`)
+		})
+
+		w.It("leaves the helper's call alone", func(it *gotest.T) {
+			gotest.Contains(it, out, "assert.Equal(t, 1, 1)")
+			gotest.Contains(it, out, "gotest.Equal(t, 1, 1)")
+		})
+	})
+}
+
 func (s *MigrateTestSuite) TestScopedRewrites(t *gotest.T) {
 	t.When("s.T() appears in a method that gained t and in a helper that did not", func(w *gotest.T) {
 		out := s.migrateSource(w, scopedSrc)

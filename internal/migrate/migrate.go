@@ -581,23 +581,24 @@ func makeGotestCall(funcName string, args []ast.Expr) *ast.CallExpr {
 	}
 }
 
-// rewriteImports removes testify imports and adds gotest import.
+// rewriteImports removes the testify and testing imports nothing references
+// any more and adds the gotest import. A plain *testing.T helper may still
+// call assert.X, so an import is dropped only once it is unused.
 func rewriteImports(f *ast.File) {
-	testifyPaths := map[string]bool{
+	removable := map[string]bool{
 		"github.com/stretchr/testify/suite":   true,
 		"github.com/stretchr/testify/assert":  true,
 		"github.com/stretchr/testify/require": true,
+		"testing":                             true,
 	}
 
-	// Check if "testing" is still referenced after removing runner funcs
-	testingStillUsed := false
+	// Package names still qualifying a selector after the rewrite.
+	used := map[string]bool{}
 	ast.Inspect(f, func(n ast.Node) bool {
-		sel, ok := n.(*ast.SelectorExpr)
-		if !ok {
-			return true
-		}
-		if ident, ok := sel.X.(*ast.Ident); ok && ident.Name == "testing" {
-			testingStillUsed = true
+		if sel, ok := n.(*ast.SelectorExpr); ok {
+			if ident, ok := sel.X.(*ast.Ident); ok {
+				used[ident.Name] = true
+			}
 		}
 		return true
 	})
@@ -618,11 +619,8 @@ func rewriteImports(f *ast.File) {
 				continue
 			}
 			path := strings.Trim(is.Path.Value, `"`)
-			if testifyPaths[path] {
-				continue // remove testify imports
-			}
-			if path == "testing" && !testingStillUsed {
-				continue // remove testing if no longer needed
+			if removable[path] && !used[importName(is)] {
+				continue
 			}
 			if path == gotestImport {
 				hasGotest = true
@@ -641,6 +639,16 @@ func rewriteImports(f *ast.File) {
 
 		gd.Specs = filtered
 	}
+}
+
+// importName is the name an import is referred to by: its alias, or the
+// last element of its path.
+func importName(is *ast.ImportSpec) string {
+	if is.Name != nil {
+		return is.Name.Name
+	}
+	path := strings.Trim(is.Path.Value, `"`)
+	return path[strings.LastIndex(path, "/")+1:]
 }
 
 // rewriteSTCalls rewrites every s.T() in body to t.T(). Only a method that

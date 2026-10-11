@@ -1076,7 +1076,7 @@ Converts testify/suite tests:
 1. Renames suite struct to `*TestSuite` convention
 2. Renames lifecycle hooks (`SetupSuite` → `BeforeAll`, `TearDownSuite` → `AfterAll`, etc.)
 3. Transforms assertion calls (`s.Require().Equal(a, b)` → `gotest.Equal(t, a, b)`)
-4. Removes `suite.Run` boilerplate, the `suite.Suite` embedding, and testify imports (dropping `testing` when it becomes unused)
+4. Removes `suite.Run` boilerplate, the `suite.Suite` embedding, and the testify and `testing` imports nothing references any more (a plain `*testing.T` helper that still calls `assert.X` keeps its imports)
 5. Injects the `t *gotest.T` parameter into lifecycle and test methods; rewrites `s.T()` to `t.T()` inside those methods
 6. Transforms both `s.Require().X(...)`/`s.Assert().X(...)` chains and `assert.X(s.T(), ...)`/`require.X(...)` forms
 
