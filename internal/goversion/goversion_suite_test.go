@@ -1,6 +1,9 @@
 package goversion_test
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/goversion"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -30,8 +33,20 @@ func (s *GoVersionTestSuite) TestCheck(t *gotest.T) {
 			err := goversion.ExportCheck(pkgsDeclaring("1.27.1"), "go1.26.3")
 			gotest.ErrorContains(it, err, "go1.26.3")
 			gotest.ErrorContains(it, err, "go 1.27.1")
-			gotest.ErrorContains(it, err, "go get -tool "+about.Repo+"/cmd/gotest@latest")
 			gotest.ErrorContains(it, err, "go tool gotest")
+		})
+		w.It("names the gotest version go.mod already requires, never @latest", func(it *gotest.T) {
+			goMod := filepath.Join(it.TempDir(), "go.mod")
+			gotest.NoError(it, os.WriteFile(goMod, []byte("module example.com\n\ngo 1.27.1\n\nrequire "+about.Repo+" v1.31.0\n"), 0o600))
+			pkgs := pkgsDeclaring("1.27.1")
+			pkgs[0].Module.GoMod = goMod
+			err := goversion.ExportCheck(pkgs, "go1.26.3")
+			gotest.ErrorContains(it, err, "go get -tool "+about.Repo+"/cmd/gotest@v1.31.0 && go tool gotest")
+		})
+		w.It("names a placeholder when go.mod requires no gotest version", func(it *gotest.T) {
+			err := goversion.ExportCheck(pkgsDeclaring("1.27.1"), "go1.26.3")
+			gotest.ErrorContains(it, err, "go get -tool "+about.Repo+"/cmd/gotest@<the version go.mod requires>")
+			gotest.NotContains(it, err.Error(), "@latest")
 		})
 		w.It("compares language versions, so a directive without patch still counts", func(it *gotest.T) {
 			gotest.Error(it, goversion.ExportCheck(pkgsDeclaring("1.27"), "go1.26.5"))

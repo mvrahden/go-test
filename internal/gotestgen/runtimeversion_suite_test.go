@@ -45,7 +45,7 @@ func (s *RuntimeVersionTestSuite) TestCheckRuntimeVersion(t *gotest.T) {
 			err := gotestgen.CheckRuntimeVersion(loadedWith(&packages.Module{Path: about.Repo, Version: "v1.25.0"}, false))
 			gotest.ErrorContains(it, err, "v1.25.0")
 			gotest.ErrorContains(it, err, gotestgen.MinRuntimeVersion)
-			gotest.ErrorContains(it, err, "go get -tool "+about.Repo+"/cmd/gotest@latest")
+			gotest.ErrorContains(it, err, "go get -tool "+about.Repo+"/cmd/gotest@"+gotestgen.MinRuntimeVersion+",")
 		})
 		w.It("checks external test packages too", func(it *gotest.T) {
 			err := gotestgen.CheckRuntimeVersion(loadedWith(&packages.Module{Path: about.Repo, Version: "v1.25.0"}, true))

@@ -10,6 +10,7 @@ import (
 	"runtime"
 
 	"github.com/mvrahden/go-test/internal/about"
+	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -33,8 +34,29 @@ func check(pkgs []*packages.Package, builtWith string) error {
 			continue
 		}
 		exe, _ := os.Executable()
-		return fmt.Errorf("%s %s (%s) was built with %s, but module %s declares go %s; run the CLI through the tool directive so the module's Go builds it: go get -tool %s/cmd/gotest@latest && go tool gotest ./... (see README, Install)",
-			about.Application, about.ResolvedVersion(), exe, builtWith, p.Module.Path, p.Module.GoVersion, about.Repo)
+		return fmt.Errorf("%s %s (%s) was built with %s, but module %s declares go %s; run the CLI through the tool directive so the module's Go builds it: go get -tool %s/cmd/gotest@%s && go tool gotest ./... (see README, Install)",
+			about.Application, about.ResolvedVersion(), exe, builtWith, p.Module.Path, p.Module.GoVersion, about.Repo, requiredVersion(p.Module))
 	}
 	return nil
+}
+
+// requiredVersion is the gotest version the module's go.mod requires, so
+// declaring the tool moves no pin (@latest could raise the go line).
+// Without one it names the placeholder.
+func requiredVersion(mod *packages.Module) string {
+	const unknown = "<the version go.mod requires>"
+	data, err := os.ReadFile(mod.GoMod)
+	if err != nil {
+		return unknown
+	}
+	f, err := modfile.ParseLax(mod.GoMod, data, nil)
+	if err != nil {
+		return unknown
+	}
+	for _, r := range f.Require {
+		if r.Mod.Path == about.Repo {
+			return r.Mod.Version
+		}
+	}
+	return unknown
 }
