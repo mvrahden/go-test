@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -22,7 +23,9 @@ type ReplayVerdictTestSuite struct {
 }
 
 func (s *ReplayVerdictTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.IntegrationSuiteConfig()
+	cfg := gotest.IntegrationSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *ReplayVerdictTestSuite) BeforeAll(t *gotest.T) {
@@ -183,5 +186,36 @@ func (s *ReplayVerdictTestSuite) TestStreamsWithoutVerdict(t *gotest.T) {
 				gotest.Empty(it, stderr)
 			})
 		})
+	}
+}
+
+// TestGotestStreamsThatRanNothing replays what gotest -json itself writes for
+// matched packages it runs nothing in: each carries the package verdict go
+// test gives it, so the stream is whole and replays green.
+func (s *ReplayVerdictTestSuite) TestGotestStreamsThatRanNothing(t *gotest.T) {
+	const unrun = "github.com/mvrahden/go-test/cmd/gotest/testdata/unrun/"
+	for t, tc := range gotest.Each(t, []struct {
+		Desc    string
+		args    []string
+		verdict string
+	}{
+		{"a package without test files", []string{"./cmd/gotest/testdata/unrun/notestfiles/"}, "?   \t" + unrun + "notestfiles\t[no test files]\n"},
+		{"a package with stdlib tests only", []string{"./cmd/gotest/testdata/unrun/nosuites/"}, "?   \t" + unrun + "nosuites\t[no suites]\n"},
+		{"a package with benchmarks only", []string{"./cmd/gotest/testdata/unrun/benchonly/"}, "ok  \t" + unrun + "benchonly\t[no tests to run]\n"},
+		{"-run matching no suite", []string{"./cmd/gotest/testdata/census/plain/", "-run", "NoSuchSuite"}, "ok  \tgithub.com/mvrahden/go-test/cmd/gotest/testdata/census/plain\t[no tests to run]\n"},
+	}) {
+		stream, stderr, code := s.cli.runSplit(t, append([]string{"-json"}, tc.args...)...)
+		gotest.Equal(t, 0, code, stderr)
+
+		t.It("streams the package's verdict", func(it *gotest.T) {
+			gotest.Contains(it, stream, `"Output":`+strconv.Quote(tc.verdict))
+		})
+		for _, cmd := range []string{"spec", "summary"} {
+			t.It(cmd+" --input replays it green", func(it *gotest.T) {
+				_, stderr, code := s.replay(it, stream, cmd, "--input=-")
+				gotest.Equal(it, 0, code, stderr)
+				gotest.Empty(it, stderr)
+			})
+		}
 	}
 }

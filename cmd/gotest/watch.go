@@ -153,7 +153,7 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench bool, benchNs map[string]float64) (int, map[string]float64) { //nolint:gocritic // hugeParam: stable API
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)
-	loaded, broken, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
+	loaded, broken, noTestFiles, err := gotestgen.LoadRunPackages(cfg.PackagePatterns, loadFlags)
 	if err != nil {
 		if jsonMode {
 			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
@@ -239,6 +239,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench
 		BenchesByPkg:    overlay.BenchesByPkg,
 		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,
+		NoTestFiles:     noTestFiles,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

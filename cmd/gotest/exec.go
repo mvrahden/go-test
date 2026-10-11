@@ -14,7 +14,7 @@ import (
 func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)
-	loaded, broken, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
+	loaded, broken, noTestFiles, err := gotestgen.LoadRunPackages(cfg.PackagePatterns, loadFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -55,6 +55,7 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 		OutputMode:      modeFromJSON(cfg.JSON),
 		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,
+		NoTestFiles:     noTestFiles,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

@@ -139,8 +139,9 @@ func (lr *LoadResult) IsTestOnly() bool {
 // loadPackages is the shared core for all package-loading variants. Matched
 // packages that fail to load are returned as BrokenPackage entries: every
 // package a pattern matches must end in exactly one verdict, and a load
-// failure is a verdict, not an absence.
-func loadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []BrokenPackage, error) {
+// failure is a verdict, not an absence. Matched packages without test files
+// are named in noTestFiles, for the same reason.
+func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResult, broken []BrokenPackage, noTestFiles []string, err error) {
 	cfg := &packages.Config{
 		Mode:  packageLoadMode,
 		Tests: true,
@@ -150,10 +151,10 @@ func loadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []Br
 	}
 	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if err := goversion.Check(totalFoundPkgs); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	brokenByPath := map[string]*BrokenPackage{}
@@ -204,13 +205,23 @@ func loadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []Br
 			loadedTestPkgs = append(loadedTestPkgs, p)
 		}
 	}
-	broken := make([]BrokenPackage, 0, len(brokenByPath))
+	broken = make([]BrokenPackage, 0, len(brokenByPath))
 	for _, bp := range brokenByPath {
 		broken = append(broken, *bp)
 	}
 	sort.Slice(broken, func(i, j int) bool { return broken[i].PkgPath < broken[j].PkgPath })
+	// A package with test files has a test main, "<id>.test".
+	ids := make(map[string]bool, len(totalFoundPkgs))
+	for _, p := range totalFoundPkgs {
+		ids[p.ID] = true
+	}
+	for _, p := range loadedTestPkgs {
+		if p.ID == p.PkgPath && !ids[p.ID+".test"] && !strings.HasSuffix(p.ID, ".test") {
+			noTestFiles = append(noTestFiles, p.PkgPath)
+		}
+	}
 	if len(loadedTestPkgs) == 0 {
-		return nil, broken, nil
+		return nil, broken, noTestFiles, nil
 	}
 
 	prodPkgs := make(map[string]bool)
@@ -267,13 +278,20 @@ func loadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []Br
 	sort.SliceStable(res, func(i, j int) bool {
 		return pkgOrder[res[i].PkgPath] < pkgOrder[res[j].PkgPath]
 	})
-	return res, broken, nil
+	return res, broken, noTestFiles, nil
 }
 
 // LoadPackages loads and groups test packages for the given target patterns.
 // Broken packages are returned separately; the caller decides whether they
 // abort the command or become failed-package verdicts.
 func LoadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []BrokenPackage, error) {
+	res, broken, _, err := loadPackages(targetPkgs, buildFlags)
+	return res, broken, err
+}
+
+// LoadRunPackages is LoadPackages for a test run, which owes every matched
+// package a verdict: it also names those without test files.
+func LoadRunPackages(targetPkgs []string, buildFlags []string) (res []*LoadResult, broken []BrokenPackage, noTestFiles []string, err error) {
 	return loadPackages(targetPkgs, buildFlags)
 }
 

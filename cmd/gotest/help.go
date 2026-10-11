@@ -110,7 +110,8 @@ Flags (go test — use -single-dash, forwarded automatically):
                           test's own deadline is SuiteConfig.Timeout
   -coverprofile=<file>    Write coverage profile
   -tags=<tags>            Build tags (comma-separated)
-  -json                   Machine-readable JSON event stream
+  -json                   go test -json event stream; every matched package
+                          gets a verdict, including those with no suites
 
 Use a bare "--" to separate gotest flags from go test flags,
 or to pass unrecognized flags to go test without validation.

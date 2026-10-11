@@ -119,3 +119,16 @@ func (s *BrokenLoadTestSuite) TestDiscoveryLoaderAgreesOnBroken(t *gotest.T) {
 		gotest.Equal(it, brokenloadPkgBase+"/brokensyntax", broken[0].PkgPath)
 	})
 }
+
+func (s *BrokenLoadTestSuite) TestPackagesWithoutTestFiles(t *gotest.T) {
+	loaded, broken, noTestFiles, err := gotestgen.LoadRunPackages([]string{filepath.Join(brokenloadDir(t), "...")}, nil)
+	gotest.NoError(t, err)
+
+	t.It("names the loadable package without test files, and no broken one", func(it *gotest.T) {
+		gotest.Equal(it, []string{brokenloadPkgBase + "/notests"}, noTestFiles)
+	})
+	t.It("leaves the loaded and broken results as LoadPackages has them", func(it *gotest.T) {
+		gotest.Len(it, loaded, 1)
+		gotest.Len(it, broken, 4)
+	})
+}

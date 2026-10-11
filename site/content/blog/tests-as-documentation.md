@@ -126,6 +126,8 @@ Or pipe directly:
 gotest ./... -json | gotest spec --input=- --format=md
 ```
 
+The stream carries a verdict for every package the pattern matched, including those without suites, so even a run with nothing to run renders and exits 0. The exit code is the stream's: 1 when it carries failures, 2 when a package failed to build or the stream is empty or cut short, which keeps a truncated artifact from rendering as green.
+
 This separation is powerful: run tests on one machine, generate documentation on another. Save test output as a CI artifact, then render specs from it in a post-processing step. The spec generation is fast because it doesn't compile or execute any code — it just transforms JSON into a structured view.
 
 ## Embedding specs in project documentation

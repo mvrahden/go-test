@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -74,6 +75,9 @@ type PipelineConfig struct {
 	// GlobalTimeout names the deadline in the failure of a run that outlives
 	// it; the deadline itself arrives on ctx.
 	GlobalTimeout time.Duration
+	// NoTestFiles are matched packages without test files; like those
+	// without suites, each is reported as go test reports it.
+	NoTestFiles []string
 }
 
 type PipelineResult struct {
@@ -452,7 +456,8 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	// "Nothing to run" is a clean outcome only when every matched package
 	// became runnable and none of them reports through Finalize. A booked
 	// build failure makes the run a failure regardless of target count.
-	if len(targets) == 0 && !collector.AnyFailed() && len(overlay.NoSuitePackages) == 0 {
+	noSuite := slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
+	if len(targets) == 0 && !collector.AnyFailed() && len(noSuite) == 0 {
 		if cfg.OutputMode != RunCaptureJSON && setupErr == nil {
 			fmt.Fprintln(os.Stderr, "no test suites to run")
 		}
@@ -544,7 +549,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	RunBenchSuites(ctx, targets, collector, beforeSlot, afterSlot, envFor)
 	setupErr = errors.Join(append([]error{setupErr}, openErrs...)...)
 	dispatchErr := ctx.Err()
-	collector.Finalize(overlay.NoSuitePackages)
+	collector.Finalize(noSuite)
 
 	exitCode := collector.takeCensus(cfg, overlay.Declared, exitCodeAfterDispatch(collector.WorstExitCode(), dispatchErr), dispatchErr)
 	running := collector.bookDeadline(dispatchErr)
@@ -678,6 +683,8 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	sem := make(chan struct{}, maxParallel)
 	var wg sync.WaitGroup
 	anyTargets := false
+	// nothingToRun: a package built but none of its suites run.
+	nothingToRun := false
 	buildFailed := len(overlay.BrokenPackages) > 0
 	var allTargets []SuiteTarget
 
@@ -726,6 +733,8 @@ loop:
 		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter)
 
 		if len(targets) == 0 {
+			collector.RecordNothingToRun(cr.Package)
+			nothingToRun = true
 			continue
 		}
 		anyTargets = true
@@ -906,7 +915,8 @@ loop:
 	// "Nothing to run" is a clean outcome only when every matched package
 	// became runnable and none of them reports through Finalize. A booked
 	// build failure makes the run a failure regardless of target count.
-	if !anyTargets && len(overlay.NoSuitePackages) == 0 && !buildFailed {
+	noSuite := slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
+	if !anyTargets && !nothingToRun && len(noSuite) == 0 && !buildFailed {
 		// A run cut short while compiling reaches here too; it is not empty.
 		if cfg.OutputMode == RunBatchText && dispatchErr == nil && !sharedSetupFailed.Load() {
 			fmt.Fprintln(os.Stderr, "no test suites to run")
@@ -924,7 +934,7 @@ loop:
 		return result, nil
 	}
 
-	collector.Finalize(overlay.NoSuitePackages)
+	collector.Finalize(noSuite)
 
 	exitCode := exitCodeAfterDispatch(collector.WorstExitCode(), dispatchErr)
 	if sharedSetupFailed.Load() && exitCode == 0 {

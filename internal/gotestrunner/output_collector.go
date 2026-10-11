@@ -46,6 +46,9 @@ type pkgState struct {
 	// failedBuild names the build whose failure failed this package; its
 	// verdict carries the name the way go test's does.
 	failedBuild string
+	// nothingToRun marks a package none of whose suites run: it passes
+	// having run no tests, as go test reports it.
+	nothingToRun bool
 }
 
 type OutputOption func(*OutputCollector)
@@ -153,6 +156,38 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //n
 	}
 }
 
+// RecordNothingToRun books a package that built but none of whose suites
+// run (-run deselected them, or it declares only benchmarks): a verdict like
+// any other, so text output and the JSON stream both report it.
+func (c *OutputCollector) RecordNothingToRun(pkg string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s, ok := c.pkgs[pkg]
+	if !ok {
+		s = &pkgState{}
+		c.pkgs[pkg] = s
+		c.order = append(c.order, pkg)
+	}
+	s.nothingToRun = true
+	if c.mode == RunBatchText {
+		c.flushReadyText()
+		return
+	}
+	writePackageVerdict(c.jsonWriter(), pkg, fmt.Sprintf("ok  \t%s\t%s\n", pkg, noTestsToRun), "pass")
+}
+
+// noTestsToRun is go test's note for a package that ran no tests.
+const noTestsToRun = "[no tests to run]"
+
+// writePackageVerdict writes the start, summary line and verdict go test
+// gives a package that ran no test binary of ours.
+func writePackageVerdict(w io.Writer, pkg, summary, action string) {
+	now := time.Now()
+	writeJSONLine(w, map[string]any{"Time": now, "Action": "start", "Package": pkg})
+	writeJSONLine(w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Output": summary})
+	writeJSONLine(w, map[string]any{"Time": now, "Action": action, "Package": pkg, "Elapsed": 0})
+}
+
 // RecordBuildFailure books a package that failed to build as a failed package
 // with exit code 2 — the code reserved for build errors, distinct from exit 1
 // for tests that ran and failed. Build failures travel the same collector path
@@ -205,35 +240,44 @@ func (c *OutputCollector) RecordGivenUp(pkg string, idx int, suite, reason strin
 	c.RecordResult(pkg, idx, SuiteResult{Stderr: []byte(reason + "\n"), ExitCode: 1})
 }
 
-// Finalize emits trailing annotations after all suites have run.
-// For RunBatchText: drains remaining completed packages, writes [no test files]
-// annotations, and emits trailing FAIL. For JSON / captured modes: no-op.
-func (c *OutputCollector) Finalize(noTestFilePkgs []string) {
+// Finalize reports the packages without suites after all suites have run:
+// "?   <pkg>  [no test files]", or "[no suites]" for one with stdlib tests.
+// For RunBatchText it also drains remaining completed packages and emits a
+// trailing FAIL; JSON modes give each package go test's skip verdict.
+func (c *OutputCollector) Finalize(noSuitePkgs []string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.mode != RunBatchText {
+		w := c.jsonWriter()
+		for _, pkg := range noSuitePkgs {
+			writePackageVerdict(w, pkg, c.noSuiteLine(pkg), "skip")
+		}
 		return
 	}
 	for c.flushed < len(c.order) {
 		pkg := c.order[c.flushed]
 		s := c.pkgs[pkg]
 		c.flushed++
-		if s.expected > 0 && s.completed >= s.expected {
+		if s.nothingToRun || s.expected > 0 && s.completed >= s.expected {
 			c.flushTextPkg(s, pkg)
 		}
 	}
-	for _, pkg := range noTestFilePkgs {
-		note := "[no test files]"
-		if c.StdlibTestsByPkg[pkg] > 0 {
-			// The package has stdlib tests — gotest runs suites only, so
-			// "[no test files]" would be a lie. Point at the truth instead.
-			note = "[no suites]"
-		}
-		fmt.Fprintf(c.stdout, "?   \t%s\t%s\n", pkg, note)
+	for _, pkg := range noSuitePkgs {
+		fmt.Fprint(c.stdout, c.noSuiteLine(pkg))
 	}
 	if c.anyFailedLocked() {
 		fmt.Fprintln(c.stdout, "FAIL")
 	}
+}
+
+func (c *OutputCollector) noSuiteLine(pkg string) string {
+	note := "[no test files]"
+	if c.StdlibTestsByPkg[pkg] > 0 {
+		// The package has stdlib tests — gotest runs suites only, so
+		// "[no test files]" would be a lie. Point at the truth instead.
+		note = "[no suites]"
+	}
+	return fmt.Sprintf("?   \t%s\t%s\n", pkg, note)
 }
 
 func (c *OutputCollector) CapturedJSON() []byte {
@@ -303,7 +347,7 @@ func (c *OutputCollector) flushReadyText() {
 	for c.flushed < len(c.order) {
 		pkg := c.order[c.flushed]
 		s := c.pkgs[pkg]
-		if s.expected == 0 || s.completed < s.expected {
+		if !s.nothingToRun && (s.expected == 0 || s.completed < s.expected) {
 			break
 		}
 		c.flushTextPkg(s, pkg)
@@ -312,6 +356,10 @@ func (c *OutputCollector) flushReadyText() {
 }
 
 func (c *OutputCollector) flushTextPkg(s *pkgState, pkg string) {
+	if s.nothingToRun {
+		fmt.Fprintf(c.stdout, "ok  \t%s\t%s\n", pkg, noTestsToRun)
+		return
+	}
 	failed := false
 	var dur time.Duration
 	for i := range s.results {

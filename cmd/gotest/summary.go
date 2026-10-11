@@ -64,7 +64,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 
 	classified := gotestrunner.ClassifyGoTestArgs(goTestArgs)
 	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)
-	loaded, broken, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
+	loaded, broken, noTestFiles, err := gotestgen.LoadRunPackages(cfg.PackagePatterns, loadFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -106,6 +106,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		OutputMode:      gotestrunner.RunCaptureJSON,
 		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,
+		NoTestFiles:     noTestFiles,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
