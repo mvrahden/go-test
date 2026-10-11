@@ -80,8 +80,10 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 }
 
 // AwaitDone runs an async method through start and returns once it calls
-// done, failing t when t's context ends first.
-func AwaitDone(t *gotest.T, name string, start func(done func())) {
+// done, failing t when t's context ends first. at is the method's
+// declaration (file:line), the verdict's location: the method has returned,
+// so no frame of the user's is left to name.
+func AwaitDone(t *gotest.T, name, at string, start func(done func())) {
 	done := make(chan struct{}, 1)
 	start(func() {
 		select {
@@ -92,6 +94,7 @@ func AwaitDone(t *gotest.T, name string, start func(done func())) {
 	select {
 	case <-done:
 	case <-t.Context().Done():
-		t.T().Fatalf("%s: done() was not called before the test deadline", name) //nolint:t-escape // runtime verdict, no user call site
+		reportAt(t.T(), at, name+": done() was not called before the test deadline")
+		t.T().FailNow() //nolint:t-escape // runtime verdict, located at the declaration
 	}
 }

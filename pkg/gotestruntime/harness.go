@@ -173,16 +173,20 @@ func watchDeadline(tb testing.TB, gid uint64, timeout time.Duration, what, budge
 	}
 	fmt.Fprintf(os.Stderr, "gotest: %s %sexceeded its configured %s of %s and is still running %s\n",
 		tb.Name(), what, budget, timeout, sched)
-	// Errorf would name this goroutine's frame, inside the Go runtime; the
-	// verdict belongs where the phase is running now. The cost: Go 1.27's
-	// test2json tags only Error/Errorf output as "error", and those always
-	// prefix the reporting goroutine's own frame.
-	where := ""
-	if frame := phaseFrame(gid); frame != "" {
-		where = frame + ": "
+	// The verdict belongs where the phase is running now.
+	reportAt(tb, phaseFrame(gid), fmt.Sprintf("%sexceeded its configured %s of %s and is still running%s", what, budget, timeout, suffix))
+}
+
+// reportAt fails tb with msg located at at (file:line, or empty for none), in
+// the shape Errorf gives a failure. Errorf itself would name its caller, a
+// frame inside gotest, and the editor would link a file the user does not
+// have. The cost: Go 1.27's test2json tags only Error/Errorf output as
+// "error".
+func reportAt(tb testing.TB, at, msg string) {
+	if at != "" {
+		msg = at + ": " + msg
 	}
 	// Indented past the first line, as Errorf indents continuation lines.
-	msg := fmt.Sprintf("%s%sexceeded its configured %s of %s and is still running%s", where, what, budget, timeout, suffix)
 	fmt.Fprintln(tb.Output(), strings.ReplaceAll(msg, "\n", "\n    "))
 	tb.Fail()
 }

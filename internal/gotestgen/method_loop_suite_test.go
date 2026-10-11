@@ -55,6 +55,11 @@ func (s *MethodLoopTestSuite) TestAsyncDeadline(t *gotest.T) {
 		gotest.False(it, run.passed, run.output)
 		gotest.Contains(it, run.output, "TestNeverDoneAsync: done() was not called before the test deadline")
 	})
+	t.It("locates the verdict at the method's declaration, not inside gotest", func(it *gotest.T) {
+		// test.go:56 declares TestNeverDoneAsync in the fixture source.
+		gotest.Regexp(it, `(?m)^\s+test\.go:56: TestNeverDoneAsync: done\(\) was not called`, run.output)
+		gotest.NotContains(it, run.output, "methods.go:", run.output)
+	})
 }
 
 func (s *MethodLoopTestSuite) TestCallSites(t *gotest.T) {

@@ -316,7 +316,7 @@ func (s *Suite) TestDeliveryAsync(t *gotest.T, done func()) {
 }
 ```
 
-The generated code waits for `done()` or the test deadline, whichever comes first (with the deadline failing the test); calling `done()` more than once is safe.
+The generated code waits for `done()` or the test deadline, whichever comes first (with the deadline failing the test); calling `done()` more than once is safe. The deadline's failure, `<Method>: done() was not called before the test deadline`, is located at the method's declaration (`file.go:line`): the method has returned by then, so no line of the user's is running, and the editor links the method rather than a file inside gotest.
 With a returning `BeforeEach`, `done` comes last: `(t, ctx, done)`.
 With `Timeout: gotest.NoDeadline`, a never-called `done()` waits until an outer bound fires — give async suites a deadline (a zero `Timeout` gets the 30s default).
 For polling-style asynchrony, prefer `Eventually`.

@@ -353,7 +353,7 @@ func TestAsyncE2ETestSuite(t *testing.T) {
 				defer s.AfterEach(ttt)
 				s.BeforeEach(ttt)
 				run(func() {
-					gotestruntime.AwaitDone(ttt, "TestDoneFromGoroutineAsync", func(done func()) {
+					gotestruntime.AwaitDone(ttt, "TestDoneFromGoroutineAsync", "ptest_test.go:17", func(done func()) {
 						ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestDoneFromGoroutineAsync(t, done) }, ttt)
 					})
 				})
@@ -362,7 +362,7 @@ func TestAsyncE2ETestSuite(t *testing.T) {
 				defer s.AfterEach(ttt)
 				s.BeforeEach(ttt)
 				run(func() {
-					gotestruntime.AwaitDone(ttt, "TestDoneInlineAsync", func(done func()) {
+					gotestruntime.AwaitDone(ttt, "TestDoneInlineAsync", "ptest_test.go:24", func(done func()) {
 						ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestDoneInlineAsync(t, done) }, ttt)
 					})
 				})

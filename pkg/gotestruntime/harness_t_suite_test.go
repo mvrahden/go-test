@@ -277,7 +277,7 @@ func (s *HarnessTTestSuite) TestAwaitDone(t *gotest.T) {
 	t.When("the method calls done from another goroutine", func(w *gotest.T) {
 		w.It("returns once done is called", func(it *gotest.T) {
 			called := false
-			gotestruntime.AwaitDone(it, "TestAsync", func(done func()) {
+			gotestruntime.AwaitDone(it, "TestAsync", "async_test.go:7", func(done func()) {
 				go func() {
 					called = true
 					done()
