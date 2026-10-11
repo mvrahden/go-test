@@ -9,6 +9,7 @@ import (
 	"go/token"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -169,71 +170,129 @@ func MigrateFile(path string) ([]MigrateResult, error) {
 	return migrateUnit("", []string{path}, nil, Options{})
 }
 
-// MigratePackages migrates the test files of the directories patterns
-// match. A directory is migrated as a whole: a suite's methods, runner and
-// references may sit in any of its files, or in its external _test package.
+// MigratePackages migrates the test files of the packages patterns name:
+// directories (dir/... for every package below dir, as the go command reads
+// it) or import paths. A directory is migrated as a whole: a suite's
+// methods, runner and references may sit in any of its files, or in its
+// external _test package.
 func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 	var dirs []string
-	tests := map[string][]string{}
 	seen := map[string]bool{}
-
 	for _, pattern := range patterns {
-		dir := pattern
-		recursive := false
-		if strings.HasSuffix(dir, "/...") {
-			dir = strings.TrimSuffix(dir, "/...")
-			recursive = true
-		}
-		if dir == "" || dir == "." {
-			dir = "."
-		}
-
-		err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-			if err != nil {
-				if path == dir {
-					return fmt.Errorf("pattern %s: %w", pattern, err)
-				}
-				return nil
-			}
-			if d.IsDir() {
-				if !recursive && path != dir {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if !strings.HasSuffix(d.Name(), "_test.go") {
-				return nil
-			}
-			// Overlapping patterns name a file once.
-			key, err := filepath.Abs(path)
-			if err != nil {
-				return err
-			}
-			if seen[key] {
-				return nil
-			}
-			seen[key] = true
-			parent := filepath.Dir(path)
-			if tests[parent] == nil {
-				dirs = append(dirs, parent)
-			}
-			tests[parent] = append(tests[parent], path)
-			return nil
-		})
+		matched, err := patternDirs(pattern)
 		if err != nil {
 			return nil, err
+		}
+		for _, dir := range matched {
+			// Overlapping patterns name a directory once.
+			key, err := filepath.Abs(dir)
+			if err != nil {
+				return nil, err
+			}
+			if !seen[key] {
+				seen[key] = true
+				dirs = append(dirs, dir)
+			}
 		}
 	}
 
 	var all []MigrateResult
 	for _, dir := range dirs {
-		results, err := migrateUnit(importPath(dir), tests[dir], contextFiles(dir), opts)
+		tests := testFiles(dir)
+		if len(tests) == 0 {
+			continue
+		}
+		results, err := migrateUnit(importPath(dir), tests, contextFiles(dir), opts)
 		all = append(all, results...)
 		if err != nil {
 			return all, err
 		}
 	}
 	return all, nil
+}
+
+// patternDirs lists the directories pattern names. A path (./x, ../x, /x)
+// is read from disk, a path to a file as its directory; anything else is an
+// import path pattern the go command resolves.
+func patternDirs(pattern string) ([]string, error) {
+	if !build.IsLocalImport(pattern) && !filepath.IsAbs(pattern) {
+		return listDirs(pattern)
+	}
+	root, recursive := strings.CutSuffix(pattern, "/...")
+	if root == "" {
+		root = "."
+	}
+	info, err := os.Stat(root)
+	if err != nil {
+		return nil, fmt.Errorf("pattern %s: %w", pattern, err)
+	}
+	if !info.IsDir() {
+		return []string{filepath.Dir(root)}, nil
+	}
+	if !recursive {
+		return []string{root}, nil
+	}
+	var dirs []string
+	err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || !d.IsDir() {
+			return nil
+		}
+		if path != root {
+			// What ./... leaves out: testdata, vendor, hidden and _ dirs,
+			// and nested modules.
+			name := d.Name()
+			if name == "testdata" || name == "vendor" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
+				return filepath.SkipDir
+			}
+			if _, err := os.Stat(filepath.Join(path, "go.mod")); err == nil {
+				return filepath.SkipDir
+			}
+		}
+		dirs = append(dirs, path)
+		return nil
+	})
+	return dirs, err
+}
+
+// listDirs resolves an import path pattern with the go command, as the
+// rest of the CLI does. A directory inside the working directory is named
+// relative to it.
+func listDirs(pattern string) ([]string, error) {
+	cmd := exec.Command("go", "list", "-find", "-f", "{{.Dir}}", pattern)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return nil, fmt.Errorf("pattern %s: %s", pattern, msg)
+	}
+	wd, _ := os.Getwd()
+	var dirs []string
+	for _, dir := range strings.Fields(string(out)) {
+		if rel, err := filepath.Rel(wd, dir); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			dir = rel
+		}
+		dirs = append(dirs, dir)
+	}
+	return dirs, nil
+}
+
+// testFiles lists the _test.go files of dir.
+func testFiles(dir string) []string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var paths []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), "_test.go") {
+			paths = append(paths, filepath.Join(dir, e.Name()))
+		}
+	}
+	return paths
 }
 
 // contextFiles lists the non-test Go files of dir the default build would

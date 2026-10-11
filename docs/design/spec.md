@@ -1072,6 +1072,8 @@ Uses `packages.Load` for type introspection.
 $ gotest migrate ./...
 ```
 
+Patterns name packages as for `go test`: directories (`./...` leaves out `testdata`, `vendor`, hidden and `_` directories, and nested modules, as the go command does) or import paths, which the go command resolves.
+
 Converts testify/suite tests. A directory's test files are migrated together, the package's own and its external `_test` package: a suite's methods, runner and helpers are converted in whichever of those files declares them.
 1. Renames suite struct to `*TestSuite` convention, along with every identifier that resolves to it (an external `_test` package's `pkg.XSuite` included); a struct field, composite-literal key or local variable spelled the same is left alone. A free helper taking the suite is annotated like one of its methods
 2. Renames lifecycle hooks (`SetupSuite` → `BeforeAll`, `TearDownSuite` → `AfterAll`, etc.)
@@ -1094,7 +1096,7 @@ Anything the tool cannot convert is annotated in place, so nothing is silently s
 - `// TODO(gotest-migrate): suite.Run cannot run a gotest suite — gotest generates the runner; move what <Func> sets up into the suite (BeforeAll, SuiteGuard) and delete it` above the `suite.Run` of a runner that does more than run a migrated suite, such as a guard or field values for the suite, which is left in place
 - `// TODO(gotest-migrate): <Child> embeds <Base>, not suite.Suite — migrate this file by hand` above a struct that embeds a suite. Renaming the base would strand the child, so the base is not migrated anywhere: the files declaring the child and the base are refused whole, and so is every suite those files declare or refer to. A refused file without a marker of its own names the suite that holds it back (`<Base> is embedded by <Child> in <file>`, `<Suite> is used in <file>, which is left for hand migration`); a suite whose new name is already declared is refused the same way
 
-Exit codes: 0 when every suite converted cleanly, 1 while any marker is left, including one an earlier run placed in a file it no longer needs to convert (the run reports how many), 2 when a pattern names no existing path, a file could not be parsed or written, or a flag is unknown. `--dry-run` prints the unified diff of every edit to stdout, writes nothing, and exits the same way.
+Exit codes: 0 when every suite converted cleanly, 1 while any marker is left, including one an earlier run placed in a file it no longer needs to convert (the run reports how many), 2 when a pattern names no existing directory or no package the go command can find, a file could not be parsed or written, or a flag is unknown. `--dry-run` prints the unified diff of every edit to stdout, writes nothing, and exits the same way.
 
 ---
 

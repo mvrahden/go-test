@@ -226,6 +226,64 @@ func (s *MigrateCLITestSuite) TestDryRun(t *gotest.T, ctx *migrateCtx) {
 	})
 }
 
+// module lays out a module example.com/m with a suite in pkg and one in a
+// testdata directory, which no package pattern names.
+func (s *MigrateCLITestSuite) module(t *gotest.T, ctx *migrateCtx) {
+	for name, src := range map[string]string{
+		"go.mod":                       "module example.com/m\n\ngo 1.24\n",
+		"pkg/sample_test.go":           migrateCleanSrc,
+		"pkg/testdata/fixture_test.go": migrateCleanSrc,
+	} {
+		path := filepath.Join(ctx.dir, name)
+		gotest.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		gotest.NoError(t, os.WriteFile(path, []byte(src), 0o600))
+	}
+}
+
+func (s *MigrateCLITestSuite) TestImportPathPattern(t *gotest.T, ctx *migrateCtx) {
+	s.module(t, ctx)
+
+	for _, pattern := range []string{"example.com/m/pkg", "example.com/m/..."} {
+		t.When("the pattern is "+pattern, func(w *gotest.T) {
+			stdout, stderr, code := s.cli.runSplitIn(w, ctx.dir, "migrate", "--dry-run", pattern)
+
+			w.It("migrates the package it names", func(it *gotest.T) {
+				gotest.Equal(it, 0, code, stdout+stderr)
+				gotest.Contains(it, stdout, "Would migrate 1 suites:\n  pkg/sample_test.go: CleanSuite → CleanTestSuite\n")
+				gotest.Empty(it, stderr)
+			})
+		})
+	}
+
+	t.When("the import path does not exist", func(w *gotest.T) {
+		stdout, stderr, code := s.cli.runSplitIn(w, ctx.dir, "migrate", "example.com/m/nope")
+
+		w.It("fails as a load error, naming the pattern", func(it *gotest.T) {
+			gotest.Equal(it, 2, code, stdout+stderr)
+			gotest.Regexp(it, `^migrate: pattern example\.com/m/nope: `, stderr)
+			gotest.Empty(it, stdout)
+		})
+	})
+}
+
+func (s *MigrateCLITestSuite) TestTestdataSkipped(t *gotest.T, ctx *migrateCtx) {
+	s.module(t, ctx)
+
+	stdout, stderr, code := s.cli.runSplitIn(t, ctx.dir, "migrate", "./...")
+
+	t.It("migrates the packages ./... names", func(it *gotest.T) {
+		gotest.Equal(it, 0, code, stdout+stderr)
+		gotest.Equal(it, "Migrated 1 suites:\n  pkg/sample_test.go: CleanSuite → CleanTestSuite\n", stdout)
+		gotest.Empty(it, stderr)
+	})
+
+	t.It("leaves a testdata fixture alone", func(it *gotest.T) {
+		got, err := os.ReadFile(filepath.Join(ctx.dir, "pkg", "testdata", "fixture_test.go"))
+		gotest.NoError(it, err)
+		gotest.Equal(it, migrateCleanSrc, string(got))
+	})
+}
+
 func (s *MigrateCLITestSuite) TestMissingPattern(t *gotest.T, ctx *migrateCtx) {
 	stdout, stderr, code := s.cli.runSplitIn(t, ctx.dir, "migrate", "./nonexistent")
 

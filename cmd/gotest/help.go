@@ -742,7 +742,9 @@ Usage:
   gotest migrate [--dry-run] [packages...]
 
 Scans for testify/suite patterns and rewrites them into gotest suite
-format. Defaults to the current package if no patterns are given.
+format. Packages are named as for go test: directories (./pkg, ./...)
+or import paths; the current package if none are given. A package's test
+files are migrated together, its external _test package included.
 Anything it cannot convert is left with a TODO(gotest-migrate) marker,
 and the run exits 1 while any marker is left, including one an earlier
 run placed.
@@ -753,6 +755,7 @@ Flags:
 Examples:
   gotest migrate ./...                       Migrate all packages
   gotest migrate --dry-run ./pkg/auth        Show what one package would become
+  gotest migrate example.com/app/...         Migrate by import path
 `)
 }
 
