@@ -36,6 +36,7 @@ export interface CliCommand {
 }
 
 let versionWarningShown = false;
+let upgradeDialogOpen = false;
 
 export async function validateGoBinary(
   log?: vscode.LogOutputChannel,
@@ -166,16 +167,17 @@ export async function buildCliCommand(
     // Below the floor a newer CLI would generate code the pinned runtime
     // cannot compile, so refuse rather than substitute one.
     log?.warn(`[cli] go.mod pins ${pin}, requires >= ${MIN_CLI_VERSION}`);
-    showVersionWarning(
+    const err = new CliBelowFloorError(
       pin,
       modulePath,
       pinned.map((p) => p.root.dir),
       log,
     );
-    throw new CliUnavailableError(
-      `go.mod pins gotest ${pin}, but >= ${MIN_CLI_VERSION} is required. ` +
-        `Run: go get -tool ${modulePath}@latest`,
-    );
+    if (!versionWarningShown) {
+      versionWarningShown = true;
+      showUpgradeDialog(err);
+    }
+    throw err;
   }
 
   // 7. Fallback: go run @latest, only when no module requires gotest yet
@@ -194,6 +196,32 @@ export class CliUnavailableError extends Error {
     super(message);
     this.name = "CliUnavailableError";
   }
+}
+
+// CliBelowFloorError is a go.mod pin below the floor. The upgrade dialog
+// already tells the user, so callers show no toast of their own.
+export class CliBelowFloorError extends CliUnavailableError {
+  constructor(
+    readonly pin: string,
+    readonly modulePath: string,
+    readonly pinnedDirs: string[],
+    readonly log?: vscode.LogOutputChannel,
+  ) {
+    super(
+      `go.mod pins gotest ${pin}, but >= ${MIN_CLI_VERSION} is required. ` +
+        `Run: go get -tool ${modulePath}@latest`,
+    );
+    this.name = "CliBelowFloorError";
+  }
+}
+
+// offerCliUpgrade answers a user action that failed below the floor with the
+// upgrade dialog, unless one is already open. It reports whether err was
+// that case, so the caller can skip its own toast.
+export function offerCliUpgrade(err: unknown): boolean {
+  if (!(err instanceof CliBelowFloorError)) return false;
+  showUpgradeDialog(err);
+  return true;
 }
 
 function meetsFloor(version: string): boolean {
@@ -242,22 +270,17 @@ function resolveCliPath(cliPath: string, workspaceDir?: string): string {
   return cliPath;
 }
 
-function showVersionWarning(
-  version: string,
-  modulePath: string,
-  pinnedDirs: string[],
-  log?: vscode.LogOutputChannel,
-): void {
-  if (versionWarningShown) {
-    return;
-  }
-  versionWarningShown = true;
+function showUpgradeDialog(err: CliBelowFloorError): void {
+  if (upgradeDialogOpen) return;
+  upgradeDialogOpen = true;
+  const { pin, modulePath, pinnedDirs, log } = err;
   vscode.window
     .showWarningMessage(
-      `gotest: go.mod pins gotest ${version}, but >= ${MIN_CLI_VERSION} is required.`,
+      `gotest: go.mod pins gotest ${pin}, but >= ${MIN_CLI_VERSION} is required.`,
       "Upgrade",
     )
     .then(async (choice) => {
+      upgradeDialogOpen = false;
       if (choice !== "Upgrade") return;
       try {
         // One go get per pinning module: a go.work root has no module.

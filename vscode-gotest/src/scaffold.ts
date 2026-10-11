@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { buildCliCommand, formatCliCommand } from "./cli.js";
+import { buildCliCommand, formatCliCommand, offerCliUpgrade } from "./cli.js";
 import { captureStdout } from "./capture.js";
 
 export class ScaffoldCodeActionProvider
@@ -156,6 +156,7 @@ export async function executeScaffold(
     }
     discoverCallback();
   } catch (err: unknown) {
+    if (offerCliUpgrade(err)) return;
     const message = err instanceof Error ? err.message : String(err);
     vscode.window.showErrorMessage(`gotest scaffold failed: ${message}`);
   }

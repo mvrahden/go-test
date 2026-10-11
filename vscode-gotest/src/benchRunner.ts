@@ -14,6 +14,7 @@ import {
   buildCliCommand,
   buildBenchArgs,
   formatCliCommand,
+  offerCliUpgrade,
   type CliCommand,
 } from "./cli.js";
 import {
@@ -203,6 +204,7 @@ export class BenchRunner {
         this.outputChannel,
       );
     } catch (err: unknown) {
+      if (offerCliUpgrade(err)) return;
       const message = err instanceof Error ? err.message : String(err);
       vscode.window.showErrorMessage(`gotest bench: ${message}`);
       return;
@@ -255,6 +257,7 @@ export class BenchRunner {
       vscode.window.showInformationMessage("Bench baseline saved.");
       return;
     }
+    if (first.upgradeOffered) return;
     if (!/--save needs a path/.test(first.error)) {
       vscode.window.showErrorMessage(`gotest bench failed: ${first.error}`);
       return;
@@ -271,7 +274,7 @@ export class BenchRunner {
       vscode.window.showInformationMessage(
         `Bench baseline saved to ${picked.fsPath}.`,
       );
-    } else {
+    } else if (!second.upgradeOffered) {
       vscode.window.showErrorMessage(`gotest bench failed: ${second.error}`);
     }
   }
@@ -296,7 +299,9 @@ export class BenchRunner {
       ]);
     }
     if (!outcome.ok) {
-      vscode.window.showErrorMessage(`gotest bench failed: ${outcome.error}`);
+      if (!outcome.upgradeOffered) {
+        vscode.window.showErrorMessage(`gotest bench failed: ${outcome.error}`);
+      }
       return;
     }
 
@@ -326,7 +331,10 @@ export class BenchRunner {
   private async runWorkspace(
     workspaceDir: string,
     extra: string[],
-  ): Promise<{ ok: true; report: BenchReport } | { ok: false; error: string }> {
+  ): Promise<
+    | { ok: true; report: BenchReport }
+    | { ok: false; error: string; upgradeOffered?: boolean }
+  > {
     let cmd: CliCommand;
     try {
       cmd = await buildCliCommand(
@@ -338,6 +346,7 @@ export class BenchRunner {
       return {
         ok: false,
         error: err instanceof Error ? err.message : String(err),
+        upgradeOffered: offerCliUpgrade(err),
       };
     }
     this.outputChannel.info(`[bench] ${formatCliCommand(cmd)}`);
