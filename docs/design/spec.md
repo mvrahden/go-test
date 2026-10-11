@@ -15,7 +15,7 @@ No reflection in suite discovery or registration.
 No lock-in.
 Just standard Go tests with lifecycle management and structured organization.
 
-A Go developer should be able to `go install` this tool and immediately write better-organized tests without learning a framework.
+A Go developer should be able to declare this tool with `go get -tool` and immediately write better-organized tests without learning a framework.
 The naming conventions are the API.
 The generated code is the implementation.
 The output is `go test` output.

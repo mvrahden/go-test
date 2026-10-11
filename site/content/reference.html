@@ -887,7 +887,7 @@ FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
       <p>Set <code>version: latest</code> or a specific tag (e.g. <code>v1.2.0</code>) to install a standalone binary via <code>go install</code> instead. This is useful when your project doesn't depend on go-test as a library.</p>
 
       <div class="callout">
-        To use the <code>gomod</code> default, ensure gotest is in your <code>go.mod</code>: use a <code>tool</code> directive (Go 1.24+) or add it via <code>go get github.com/mvrahden/go-test/cmd/gotest</code>.
+        To use the <code>gomod</code> default, ensure gotest is in your <code>go.mod</code>: declare it as a tool with <code>go get -tool github.com/mvrahden/go-test/cmd/gotest@&lt;version&gt;</code>, naming a release whose go line your module takes (a bare or <code>@latest</code> <code>go get</code> can raise your module's go line).
       </div>
 
       <h3>Manual CI setup</h3>
