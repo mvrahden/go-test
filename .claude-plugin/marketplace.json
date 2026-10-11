@@ -1,0 +1,14 @@
+{
+  "name": "go-test",
+  "owner": { "name": "Menno van Rahden", "url": "https://github.com/mvrahden" },
+  "description": "Agent skills for gotest, the Go test suite framework",
+  "plugins": [
+    {
+      "name": "gotest",
+      "source": "./skills",
+      "description": "Write, fix, review and migrate Go test suites that use gotest (github.com/mvrahden/go-test)",
+      "category": "development",
+      "tags": ["go", "golang", "testing", "test-suites"]
+    }
+  ]
+}
