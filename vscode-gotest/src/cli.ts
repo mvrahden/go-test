@@ -1,13 +1,17 @@
 import * as vscode from "vscode";
+import * as os from "node:os";
 import * as path from "node:path";
 import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { resolveGoBinary, fileExists, clearGoBinaryCache } from "./goBinary.js";
 import {
+  goLine,
   hasReplaceDirective,
   parseToolDirectives,
   readModulePath,
   readModuleRoots,
+  requiredModule,
   requireVersion,
   type ModuleRoot,
 } from "./gomod.js";
@@ -199,7 +203,9 @@ export class CliUnavailableError extends Error {
 }
 
 // CliBelowFloorError is a go.mod pin below the floor. The upgrade dialog
-// already tells the user, so callers show no toast of their own.
+// already tells the user, so callers show no toast of their own. The advice
+// names the floor, the smallest move that satisfies it: @latest could raise
+// the go line further than needed. The dialog picks the newest that fits.
 export class CliBelowFloorError extends CliUnavailableError {
   constructor(
     readonly pin: string,
@@ -209,7 +215,7 @@ export class CliBelowFloorError extends CliUnavailableError {
   ) {
     super(
       `go.mod pins gotest ${pin}, but >= ${MIN_CLI_VERSION} is required. ` +
-        `Run: go get -tool ${modulePath}@latest`,
+        `Run: go get -tool ${modulePath}@${MIN_CLI_VERSION}`,
     );
     this.name = "CliBelowFloorError";
   }
@@ -250,10 +256,12 @@ export function checkProducerVersion(
   );
 }
 
+// upgradeAdvice names the floor for the reason CliBelowFloorError does,
+// without asking the module proxy while an error is being built.
 function upgradeAdvice(workspaceDir?: string): string {
   const modulePath =
     scopedConfig(workspaceDir).get<string>("modulePath") ?? DEFAULT_MODULE_PATH;
-  return `Run: go get -tool ${modulePath}@latest`;
+  return `Run: go get -tool ${modulePath}@${MIN_CLI_VERSION}`;
 }
 
 function resolveCliPath(cliPath: string, workspaceDir?: string): string {
@@ -273,34 +281,204 @@ function resolveCliPath(cliPath: string, workspaceDir?: string): string {
 function showUpgradeDialog(err: CliBelowFloorError): void {
   if (upgradeDialogOpen) return;
   upgradeDialogOpen = true;
-  const { pin, modulePath, pinnedDirs, log } = err;
   vscode.window
     .showWarningMessage(
-      `gotest: go.mod pins gotest ${pin}, but >= ${MIN_CLI_VERSION} is required.`,
+      `gotest: go.mod pins gotest ${err.pin}, but >= ${MIN_CLI_VERSION} is required.`,
       "Upgrade",
     )
     .then(async (choice) => {
       upgradeDialogOpen = false;
       if (choice !== "Upgrade") return;
-      try {
-        // One go get per pinning module: a go.work root has no module.
-        for (const dir of pinnedDirs) {
-          await runGoInModule(
-            dir,
-            ["get", "-tool", `${modulePath}@latest`],
-            log,
-          );
-        }
-        log?.info("[cli] upgrade complete");
-        vscode.window.showInformationMessage(
-          "gotest: dependency upgraded to latest and declared as a tool.",
-        );
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        log?.error(`[cli] upgrade failed: ${msg}`);
-        vscode.window.showErrorMessage(`gotest: upgrade failed. ${msg}`);
-      }
+      await upgradeCli(err);
     });
+}
+
+// upgradeCli moves each pinning module to the newest release its go line
+// takes. A module no release fits is named, not upgraded: raising a
+// project's Go is the project's call, so there is no button for it.
+async function upgradeCli({
+  modulePath,
+  pinnedDirs,
+  log,
+}: CliBelowFloorError): Promise<void> {
+  let plan: UpgradePlan;
+  try {
+    const modules = await Promise.all(
+      pinnedDirs.map(async (dir) => {
+        const goMod = await readFile(path.join(dir, "go.mod"), "utf-8");
+        return { dir, goMod };
+      }),
+    );
+    const module = modules
+      .map((m) => requiredModule(m.goMod, modulePath)?.path)
+      .find((p) => p !== undefined);
+    if (!module) throw new Error(`no go.mod requires ${modulePath}`);
+    const goBin = await resolveGoBinary(log, pinnedDirs[0]);
+    plan = await planUpgrade(
+      modules.map((m) => ({ dir: m.dir, goLine: goLine(m.goMod) })),
+      module,
+      MIN_CLI_VERSION,
+      goReleaseQuery(goBin),
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log?.error(`[cli] release lookup failed: ${msg}`);
+    vscode.window.showErrorMessage(
+      `gotest: upgrade failed, go.mod is unchanged: could not look up gotest releases. ${msg}`,
+    );
+    return;
+  }
+  const where = (dir: string) =>
+    pinnedDirs.length > 1 ? `${path.basename(dir)}/go.mod` : "go.mod";
+  if (plan.blocked.length > 0) {
+    const declared = plan.blocked
+      .map((b) => `${where(b.dir)} declares go ${b.goLine}`)
+      .join(", ");
+    log?.warn(`[cli] upgrade blocked: ${declared}`);
+    vscode.window.showWarningMessage(
+      `gotest: ${MIN_CLI_VERSION} and newer need go ${plan.needs.goLine}, but ${declared}. ` +
+        `Raise the go line to upgrade: go get -tool ${modulePath}@${plan.needs.release} raises it.`,
+    );
+  }
+  if (plan.upgrades.length === 0) return;
+  try {
+    // One go get per pinning module: a go.work root has no module.
+    for (const { dir, release } of plan.upgrades) {
+      await runGoInModule(
+        dir,
+        ["get", "-tool", `${modulePath}@${release}`],
+        log,
+      );
+    }
+    const releases = new Set(plan.upgrades.map((u) => u.release));
+    const to =
+      releases.size === 1
+        ? plan.upgrades[0].release
+        : plan.upgrades
+            .map((u) => `${u.release} in ${where(u.dir)}`)
+            .join(", ");
+    log?.info(`[cli] upgrade complete: ${to}`);
+    vscode.window.showInformationMessage(
+      `gotest: upgraded to ${to} and declared as a tool.`,
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log?.error(`[cli] upgrade failed: ${msg}`);
+    vscode.window.showErrorMessage(`gotest: upgrade failed. ${msg}`);
+  }
+}
+
+// ReleaseQuery asks the module proxy for a module's releases and for the
+// go line each of the given versions declares.
+export interface ReleaseQuery {
+  versions(module: string): Promise<string[]>;
+  goLines(module: string, versions: string[]): Promise<Map<string, string>>;
+}
+
+export interface UpgradePlan {
+  upgrades: { dir: string; release: string }[];
+  // blocked: modules whose go line no release at or above the floor fits.
+  blocked: { dir: string; goLine: string }[];
+  // needs: the newest release with the lowest go line at or above the floor.
+  needs: { release: string; goLine: string };
+}
+
+// planUpgrade picks per module the newest release at or above the floor
+// whose go line does not exceed the module's: go get raises a module's go
+// line to the release's. Every candidate is checked, since go lines need
+// not rise with releases; few sit above the floor, and one go list asks
+// for all of them.
+export async function planUpgrade(
+  modules: { dir: string; goLine: string }[],
+  module: string,
+  floor: string,
+  query: ReleaseQuery,
+): Promise<UpgradePlan> {
+  const candidates = (await query.versions(module))
+    .filter((v) => /^v\d+\.\d+\.\d+$/.test(v) && compareVersions(v, floor) >= 0)
+    .sort((a, b) => compareVersions(b, a));
+  if (candidates.length === 0) {
+    throw new Error(
+      `no release of ${module} at or above ${floor} is published`,
+    );
+  }
+  const lines = await query.goLines(module, candidates);
+  const needs = candidates
+    .map((release) => ({ release, goLine: lines.get(release) ?? "" }))
+    .reduce((min, c) =>
+      compareGoVersions(c.goLine, min.goLine) < 0 ? c : min,
+    );
+  const plan: UpgradePlan = { upgrades: [], blocked: [], needs };
+  for (const m of modules) {
+    const release = candidates.find(
+      (v) => compareGoVersions(lines.get(v) ?? "", m.goLine) <= 0,
+    );
+    if (release) plan.upgrades.push({ dir: m.dir, release });
+    else plan.blocked.push(m);
+  }
+  return plan;
+}
+
+// goReleaseQuery runs go list outside any module and workspace, so neither
+// go.sum, vendoring nor a go.work shapes the answer; -mod=mod overrides a
+// -mod=vendor in GOFLAGS.
+function goReleaseQuery(goBin: string): ReleaseQuery {
+  const list = async (args: string[]) => {
+    const { stdout } = await execFileAsync(
+      goBin,
+      ["list", "-mod=mod", "-m", ...args],
+      {
+        cwd: os.tmpdir(),
+        env: { ...process.env, GOWORK: "off" },
+        timeout: 60_000,
+      },
+    );
+    return stdout;
+  };
+  return {
+    versions: async (module) =>
+      (await list(["-versions", module])).trim().split(/\s+/).slice(1),
+    goLines: async (module, versions) => {
+      const out = await list([
+        "-f",
+        "{{.Version}} {{.GoVersion}}",
+        ...versions.map((v) => `${module}@${v}`),
+      ]);
+      return new Map(
+        out
+          .trim()
+          .split("\n")
+          .map((line) => {
+            const [version, goVersion = ""] = line.trim().split(/\s+/);
+            return [version, goVersion] as const;
+          }),
+      );
+    },
+  };
+}
+
+// compareGoVersions orders go lines as Go does: 1.21 < 1.21rc1 < 1.21.0.
+// An empty go line, a module without a go directive, sorts first.
+export function compareGoVersions(a: string, b: string): number {
+  const key = (v: string): number[] => {
+    const m = /^(\d+)(?:\.(\d+))?(?:\.(\d+)|(alpha|beta|rc)(\d+))?$/.exec(v);
+    if (!m) return [];
+    const [, major, minor = "0", patch, pre, preNum] = m;
+    const tier =
+      patch !== undefined
+        ? [3, Number(patch)]
+        : pre
+          ? [["alpha", "beta", "rc"].indexOf(pre), Number(preNum)]
+          : [-1, 0];
+    return [Number(major), Number(minor), ...tier];
+  };
+  const ka = key(a);
+  const kb = key(b);
+  for (let i = 0; i < Math.max(ka.length, kb.length); i++) {
+    const diff = (ka[i] ?? -Infinity) - (kb[i] ?? -Infinity);
+    if (diff !== 0) return diff;
+  }
+  return 0;
 }
 
 // suggestedRoots: folders already offered the directive this session.

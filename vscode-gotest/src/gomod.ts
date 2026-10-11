@@ -71,6 +71,15 @@ export function requireVersion(
   content: string,
   packagePath: string,
 ): string | undefined {
+  return requiredModule(content, packagePath)?.version;
+}
+
+// requiredModule returns the path and required version of the module
+// providing `packagePath`.
+export function requiredModule(
+  content: string,
+  packagePath: string,
+): { path: string; version: string } | undefined {
   for (const candidate of modulePathCandidates(packagePath)) {
     const escaped = escapeRegExp(candidate);
     const patterns = [
@@ -79,10 +88,15 @@ export function requireVersion(
     ];
     for (const pattern of patterns) {
       const match = pattern.exec(content);
-      if (match) return match[1];
+      if (match) return { path: candidate, version: match[1] };
     }
   }
   return undefined;
+}
+
+// goLine returns a go.mod's go directive. Without one Go assumes 1.16.
+export function goLine(content: string): string {
+  return /^[ \t]*go[ \t]+(\S+)/m.exec(content)?.[1] ?? "1.16";
 }
 
 // hasReplaceDirective reports whether go.mod replaces the module providing
