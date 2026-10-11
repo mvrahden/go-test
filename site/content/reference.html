@@ -753,7 +753,7 @@ percentage = covered / total</div>
       </table>
 
       <h3>Expressiveness rules</h3>
-      <p>The test is correct but its syntax can be improved. These rules can be suppressed per line or project-wide via <code>lint.skip</code>; <code>-fix</code> applies the safe rewrites in one run, overlapping ones included, then reports what it could not fix (exit 3 while findings remain); <code>-diff</code> prints exactly what <code>-fix</code> would write, as a unified diff, and writes nothing.</p>
+      <p>The test is correct but its syntax can be improved. These rules can be suppressed per line or project-wide via <code>lint.skip</code>; <code>-fix</code> applies the safe rewrites in one run, overlapping ones included, then reports what it could not fix (exit 3 while findings remain); <code>-diff</code> prints exactly what <code>-fix</code> would write, as a unified diff with paths relative to the current directory, and writes nothing — <code>gotest lint -diff ./... | git apply</code> applies it (a file outside that directory needs <code>git apply --unsafe-paths</code>).</p>
       <table class="ref-table">
         <thead><tr><th>Rule</th><th>Detects</th></tr></thead>
         <tbody>

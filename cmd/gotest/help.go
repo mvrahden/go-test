@@ -729,7 +729,11 @@ Flags:
                           would (exit 3 if any)
   -diff                   Print what -fix would write as a unified diff on
                           stdout and write nothing; report and exit as -fix
-                          would (implies -fix)
+                          would (implies -fix). Paths are a/ and b/ plus
+                          the path from the current directory, so git
+                          apply takes the diff there; a file outside it
+                          gets a ../ path, which needs git apply
+                          --unsafe-paths
   -json                   Print the findings as JSON on stdout and exit 0,
                           as the go/analysis driver does (also with -fix;
                           not with -diff)

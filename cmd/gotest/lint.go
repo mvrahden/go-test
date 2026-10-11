@@ -234,7 +234,7 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 			return 1, true
 		}
 		if a.diff {
-			printLintDiff(stdout, dir, changes)
+			printLintDiff(stdout, stderr, dir, changes)
 			source = lintChangedSource(changes)
 		} else if !writeLintFixes(stderr, changes) {
 			return 1, true
@@ -270,19 +270,28 @@ func writeLintFixes(stderr io.Writer, changes []lint.Change) bool {
 	return ok
 }
 
-// printLintDiff prints changes as one unified diff, with paths relative to
-// dir where they can be, git-style.
-func printLintDiff(stdout io.Writer, dir string, changes []lint.Change) {
+// printLintDiff prints changes as one unified diff. Paths are relative to
+// dir, with a/ and b/ prefixes: git apply resolves the paths of a patch
+// without "diff --git" headers against the directory it runs in, inside a
+// repository or not. A file outside dir gets a ../ path, which git apply
+// only takes with --unsafe-paths; stderr says so.
+func printLintDiff(stdout, stderr io.Writer, dir string, changes []lint.Change) {
 	base := dir
 	if base == "" {
 		base, _ = os.Getwd()
 	}
+	outside := false
 	for _, c := range changes {
 		oldName, newName := filepath.ToSlash(c.File), filepath.ToSlash(c.File)
-		if rel := relPath(base, c.File); rel != c.File {
+		if rel, err := filepath.Rel(base, c.File); err == nil {
+			rel = filepath.ToSlash(rel)
 			oldName, newName = "a/"+rel, "b/"+rel
+			outside = outside || strings.HasPrefix(rel, "../")
 		}
 		fmt.Fprint(stdout, unidiff.Diff(oldName, newName, c.Before, c.After))
+	}
+	if outside {
+		fmt.Fprintln(stderr, "lint: the diff names files outside the current directory; apply it with git apply --unsafe-paths")
 	}
 }
 

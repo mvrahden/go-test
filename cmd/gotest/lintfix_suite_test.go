@@ -436,20 +436,43 @@ func (s *LintFixTestSuite) TestSkips(t *gotest.T) {
 	})
 }
 
+// stageWorkspace writes a workspace of modules one and two, each with
+// lintFixProbe, and returns its root and the probe files.
+func (s *LintFixTestSuite) stageWorkspace(t *gotest.T) (root string, files []string) {
+	root = t.TempDir()
+	for _, mod := range []string{"one", "two"} {
+		dir := filepath.Join(root, mod)
+		gotest.NoError(t, os.Mkdir(dir, 0o700))
+		gotest.NoError(t, testkit.WriteModule(s.cli.repoRoot, dir, mod))
+		// The workspace at root holds both, from either.
+		gotest.NoError(t, os.Remove(filepath.Join(dir, "go.work")))
+		file := filepath.Join(dir, "probe_test.go")
+		gotest.NoError(t, os.WriteFile(file, []byte(strings.Replace(lintFixProbe, "package lintfix", "package "+mod, 1)), 0o600))
+		files = append(files, file)
+	}
+	work := "go 1.26.0\n\nuse (\n\t./one\n\t./two\n\t" + s.cli.repoRoot + "\n)\n"
+	gotest.NoError(t, os.WriteFile(filepath.Join(root, "go.work"), []byte(work), 0o600))
+	return root, files
+}
+
+// gitApply applies patch with git apply and args in dir, inside a fresh
+// repository at root.
+func gitApply(t *gotest.T, root, dir, patch string, args ...string) (string, error) {
+	git := func(dir string, args ...string) (string, error) {
+		cmd := exec.Command("git", args...) //nolint:gosec // G204: fixed git subcommands
+		cmd.Dir = dir
+		cmd.Stdin = strings.NewReader(patch)
+		out, err := cmd.CombinedOutput()
+		return string(out), err
+	}
+	out, err := git(root, "init", "-q")
+	gotest.NoError(t, err, out)
+	return git(dir, append([]string{"apply"}, args...)...)
+}
+
 func (s *LintFixTestSuite) TestTargets(t *gotest.T) {
 	t.When("patterns name modules of a workspace", func(w *gotest.T) {
-		root := w.TempDir()
-		var files []string
-		for _, mod := range []string{"one", "two"} {
-			dir := filepath.Join(root, mod)
-			gotest.NoError(w, os.Mkdir(dir, 0o700))
-			gotest.NoError(w, testkit.WriteModule(s.cli.repoRoot, dir, mod))
-			file := filepath.Join(dir, "probe_test.go")
-			gotest.NoError(w, os.WriteFile(file, []byte(strings.Replace(lintFixProbe, "package lintfix", "package "+mod, 1)), 0o600))
-			files = append(files, file)
-		}
-		work := "go 1.26.0\n\nuse (\n\t./one\n\t./two\n\t" + s.cli.repoRoot + "\n)\n"
-		gotest.NoError(w, os.WriteFile(filepath.Join(root, "go.work"), []byte(work), 0o600))
+		root, files := s.stageWorkspace(w)
 
 		stdout, stderr, code := s.runLintIn(w, root, nil, "lint", "-fix", "./one/...", "./two/...")
 
@@ -462,6 +485,45 @@ func (s *LintFixTestSuite) TestTargets(t *gotest.T) {
 			gotest.Regexp(it, `^\S*one/probe_test\.go:8:2: never call Helper .+\n\S*two/probe_test\.go:8:2: never call Helper .+\n$`, filepath.ToSlash(stderr))
 			gotest.Empty(it, stdout)
 			gotest.Equal(it, 3, code, stderr)
+		})
+	})
+
+	t.When("-diff runs in one module of a workspace and names its sibling", func(w *gotest.T) {
+		root, files := s.stageWorkspace(w)
+		one := filepath.Join(root, "one")
+		stdout, stderr, code := s.runLintIn(w, one, nil, "lint", "-diff", "./...", "../two/...")
+		_, plainErr := gitApply(w, root, one, stdout)
+		out, err := gitApply(w, root, one, stdout, "--unsafe-paths")
+
+		w.It("names each file relative to where lint ran, with a/ and b/", func(it *gotest.T) {
+			gotest.Regexp(it, `^--- a/probe_test\.go\n\+\+\+ b/probe_test\.go\n`, stdout)
+			gotest.Contains(it, stdout, "\n--- a/../two/probe_test.go\n+++ b/../two/probe_test.go\n")
+		})
+		w.It("says git apply needs --unsafe-paths, before the findings", func(it *gotest.T) {
+			gotest.Regexp(it, `^lint: the diff names files outside the current directory; apply it with git apply --unsafe-paths\n`, stderr)
+			gotest.Equal(it, 3, code, stderr)
+		})
+		w.It("applies with git apply --unsafe-paths there, and only with it", func(it *gotest.T) {
+			gotest.Error(it, plainErr)
+			gotest.NoError(it, err, out)
+			for _, file := range files {
+				gotest.Contains(it, readLintFixFile(it, file), "gotest.Equal(t, 1, 1)")
+			}
+		})
+	})
+
+	t.When("-diff runs in a subdirectory of a repository", func(w *gotest.T) {
+		root, files := s.stageWorkspace(w)
+		two := filepath.Join(root, "two")
+		stdout, stderr, code := s.runLintIn(w, two, nil, "lint", "-diff", "./...")
+		out, err := gitApply(w, root, two, stdout)
+
+		w.It("applies with git apply there", func(it *gotest.T) {
+			gotest.Equal(it, 3, code, stderr)
+			gotest.NotContains(it, stderr, "--unsafe-paths")
+			gotest.NoError(it, err, out)
+			gotest.Equal(it, lintFixProbe, strings.Replace(readLintFixFile(it, files[0]), "package one", "package lintfix", 1))
+			gotest.Contains(it, readLintFixFile(it, files[1]), "gotest.Equal(t, 1, 1)")
 		})
 	})
 
