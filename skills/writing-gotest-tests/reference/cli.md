@@ -23,15 +23,18 @@ invocation runs tests — there is NO `test` subcommand:
 - `go tool gotest watch ./...` — rerun on change; supports `--spec`.
 - `go tool gotest lint ./...` — the linter; exit 3 on findings (`-json`
   exits 0 and carries them in the document). `-fix` applies suggested
-  fixes, composed and overlapping ones included (v1.33+), formats the
-  files it rewrites and reports what is left; `-diff` previews exactly
-  what `-fix` would write, as a patch (`… -diff ./... | git apply`), and
-  writes nothing. A fix whose result no longer loads writes nothing
-  either (exit 1). Below v1.33 repeat
-  `lint -fix` + plain `lint` until plain `lint` exits 0, since `-fix`
-  stops after one pass and never shows the findings it cannot fix. Integrity
-  rules yield only to `//nolint:<rule>` (on the line, directly above it,
-  or file-wide trailing the `package` line); others
+  fixes and formats the files it rewrites. From v1.33 it applies composed
+  and overlapping fixes in one run, reports what is left, and writes
+  nothing when the fixed code would not load or a file cannot be written
+  (exit 1); `-diff` previews
+  exactly what `-fix` would write as a patch for `git apply` run in the
+  same directory (files outside it need `git apply --unsafe-paths`),
+  writing nothing. `-tags` reaches the loader. Below v1.33 repeat `lint -fix` + plain `lint` until plain
+  `lint` exits 0 (`-fix` stops after one pass and never shows what it
+  cannot fix), and `-diff` is no preview: alone it only lists findings,
+  and `-fix -diff` prints one pass with headers `git apply` rejects.
+  Integrity rules yield only to `//nolint:<rule>` (on the line, directly
+  above it, or file-wide trailing the `package` line); others
   also to `.gotest.yml` `lint.skip` / `-skip-<rule>`.
 - `go tool gotest discover ./...` — static suite metadata as JSON: suites,
   methods, direct suite→fixture edges, and (v1.27+) each method's declared

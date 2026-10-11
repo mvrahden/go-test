@@ -11,7 +11,7 @@ zero behave as if the marker were absent:
 - Marker present → booleans (`Parallel`, `Exclusive`, `FailFast`) are used
   as written. From v1.30 a duration left at zero (omitted or explicit) gets
   the default: `SuiteConfig{Parallel: true}` bounds the contexts at
-  30s/30s (v1.26–v1.29 it meant no deadline).
+  30s/30s.
 - Every positive duration the marker returns is also a verdict — one you
   write and one a preset supplies alike: a test that outlives it is failed
   even when it ignores its context. A defaulted duration (no marker, or

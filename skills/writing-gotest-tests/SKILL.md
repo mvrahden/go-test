@@ -9,41 +9,37 @@ gotest inverts habits learned from stdlib/testify. Follow this file's rules;
 consult `reference/` only when the task touches that area — except
 `reference/setup.md`, which every task follows before writing anything.
 
-**Version check (do this FIRST):** run `go tool gotest version` (after
-Bootstrap below); `dev (replace directive)` / `dev (source checkout)` mean
-a source build — assume current behavior. Before Bootstrap, read go.mod
-instead, remembering that a `replace` line overrides the `require`
-version.
-
-This skill describes **v1.33**. Upgrade first whenever Bootstrap's
-conditions allow. On a release you could not upgrade from, read
-`reference/versions.md` before writing anything: it lists what each older
-release lacks or does differently, including rules below that fail there
-(on v1.25.x, rules 1–3 and 10). A rule tagged **v1.27+** (or later) needs
-that release; skip it on older ones.
-
-## Bootstrap and upgrade
+## Start here: version and upgrade
 
 The repo has the *library*; the CLI runs via Go's tool directive, so every
 command is `go tool gotest <args>` — never a global `go install` binary.
-
-**Upgrade first, before writing anything.** Check for a newer release:
+Before writing anything, check the pin and what the module can take:
 
 ```sh
 go list -m -u -f '{{.Version}} {{with .Update}}{{.Version}}{{end}} {{with .Replace}}(replaced){{end}}' github.com/mvrahden/go-test
-go list -m -f '{{.GoVersion}}' github.com/mvrahden/go-test@latest
 go list -m -f '{{.GoVersion}}'
+go list -m -f '{{.Version}} {{.GoVersion}}' $(go list -m -versions github.com/mvrahden/go-test | tr ' ' '\n' | sed -n 's|^v|github.com/mvrahden/go-test@v|p')
 ```
 
-When the first line names a newer release, upgrade to it —
-`go get -tool github.com/mvrahden/go-test/cmd/gotest@<newer release>` —
-unless `reference/setup.md` lists a blocker: a `replace`, a vendored
-module, a release whose go line (second line) is newer than the module's
-(third line), instructions against dependency changes, or a failed check.
-Then follow its after-upgrade steps; it also covers keeping the pin, a
-module without go-test yet, `go.work` and vendoring. A `FAIL:` refusal
-about a drifted binary (exit 2) is never a fault in the tests: switch to
-`go tool gotest`; never upgrade just to silence it.
+The first line prints the pin (and a newer release, if any); the second
+the module's go line; the third every release with its go line. Upgrade to
+the newest release whose go line is not newer than the module's, when it
+is newer than the pin —
+`go get -tool github.com/mvrahden/go-test/cmd/gotest@<release>` — never to
+`@latest` blindly: `go get` would silently raise the project's Go. Do not
+upgrade when the pin is `(replaced)` (a source build: assume current
+behavior), the module is vendored, instructions rule out dependency
+changes, the task only reads code, or the check fails. Then follow
+`reference/setup.md` (after-upgrade steps, keeping the pin, a module
+without go-test yet, `go.work`, vendoring). A `FAIL:` refusal about a
+drifted binary is never a fault in the tests: switch to `go tool gotest`;
+never upgrade just to silence it.
+
+This skill describes **v1.33**. On a release you could not upgrade from,
+read `reference/versions.md` before writing anything: it lists what each
+older release lacks or does differently, including rules below that fail
+there (on v1.25.x, rules 1–3 and 10). A rule tagged **v1.27+** (or later)
+needs that release; skip it on older ones.
 
 ## The Two Runners — a complete run is BOTH commands
 
@@ -71,8 +67,8 @@ go tool gotest lint ./...
 
 `lint -fix` applies every suggested fix, formats the files it rewrites and
 removes the imports its fixes left unused, so no gofmt or goimports pass
-is needed after it. Findings without a fix (`t.T().Helper()`, a `F_`
-leftover, a stdlib test, …) need your edit: from v1.33 `-fix` lists them
+is needed after it. Findings without a fix (`t.T().Helper()`, a
+`t.T().Log`, a stdlib test, …) need your edit: from v1.33 `-fix` lists them
 and exits 3; below, it exits 0 and prints nothing, so only the plain
 `lint` run shows them. Move on when plain `lint` exits 0.
 

@@ -1,22 +1,22 @@
 # Migrating to gotest
 
-`go tool gotest migrate ./...` converts testify/**suite**-based code
-(directory or import-path patterns, read as `go test` reads them) and
-leaves `TODO(gotest-migrate)` markers where judgment is needed: an
-unconverted embedded-suite call, an `s.Run`, an assertion or `s.T()` in a
-helper without `t`, a runner that does more than `suite.Run`, a suite
-whose new name is taken. A suite embedding another suite is refused, with
-every file it touches. From v1.33 it converts a suite wherever its
-methods, runner and references are declared in the package, and exits 0
-only when the result compiles; otherwise it exits 1 with a marker on each
-line that needs work, on every run until none is left. `--dry-run` prints
-the diff without writing (v1.30.2+). Grep for the markers before calling
-the migration done, then run `go vet ./...` and the lint pair
-(`lint -fix`, then `lint`). Below v1.33 a clean exit can still leave code
-that does not compile or hooks that never run (methods in another file
-than the suite, a removed import still in use), and a re-run exits 0 with
-markers left. `migrate` maps assertions one-to-one, so `NotNil` on a
-pointer or error comes out as `gotest.NotNil` for lint to rewrite, and
+`go tool gotest migrate ./...` converts testify/**suite** code (directory
+or import-path patterns) and, from v1.33, type-checks the result in every
+build its `//go:build` tags need. Every line that does not compile, and
+every construct it cannot convert, gets a `TODO(gotest-migrate)` marker.
+Exit 0 means every migrated package compiles and every hook and test
+testify ran is one gotest calls; exit 1 means markers are left (on every
+run until none is); exit 2 means a pattern matched nothing or a package
+did not compile before (it is left untouched). The suite's own `s.Equal`,
+`s.Run` (as `t.It`), direct hook calls and most assertions are converted;
+a suite built on a base suite from another package, promoted mixin hooks
+and method values are marked. The module must require go-test first
+(`go get -tool`, see `setup.md`). `--dry-run` prints the diff without
+writing (v1.30.2+). Exit 0 does not run the tests: run both runners
+afterwards, and the lint pair (`lint -fix`, then `lint`). Below v1.33 a
+clean exit can still leave code that does not compile or hooks that never
+run, and a re-run exits 0 with markers left — grep for the markers and
+`go vet ./...` there. `migrate` maps assertions one-to-one by type, so
 `s.Assert().X` becomes the fatal `gotest.X`: a soft check turns into a
 hard stop. It does NOT convert bare
 `require`/`assert` usage in plain `TestXxx(*testing.T)` functions — those

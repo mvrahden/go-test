@@ -222,9 +222,9 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
    the subtest into `t.It`/`t.When`.
 3. **`lint -fix` applies composed and overlapping fixes in one run and
    reports what it could not fix** (exit 3), and `-diff` previews exactly
-   that result; below v1.33 `-fix` stops after one pass and exits 0
-   silently, so re-run it and plain `lint` there, and `-diff` shows one
-   pass only.
+   that result as a patch; below v1.33 `-fix` stops after one pass and
+   exits 0 silently, so re-run it and plain `lint` there, and `-diff`
+   previews nothing usable.
 4. **The runtime floor is v1.33.0** — a v1.33 CLI refuses a pin below
    v1.33.0, which only a CLI not run through `go tool gotest` can meet.
    Drift refusals name the version to pin instead of `@latest`.
@@ -237,12 +237,14 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
    first two exited 0 and a replayed build failure 1. A green pre-v1.33
    run over packages without suites wrote an empty stream, so replay
    those with `--render-only`.
-7. **`migrate` exits 0 only on code that compiles** — it converts a suite
-   wherever the package declares its methods, runner and references, keeps
-   testify imports still in use, and marks every line it cannot convert;
-   a re-run exits 1 while markers remain, a pattern that does not exist
-   exits 2, and import-path patterns work. Below v1.33 hooks declared in
-   another file than the suite silently never ran.
+7. **`migrate` type-checks its result** — exit 0 means every migrated
+   package compiles; every line that does not, and every construct it
+   cannot convert, carries a marker (exit 1, on every run until none is
+   left); a pattern matching nothing or a package that did not compile
+   before exits 2. It converts a suite wherever the package declares its
+   parts. Below v1.33 hooks declared in another file than the suite
+   silently never ran and a clean exit could leave code that does not
+   compile.
 8. **A shared fixture may omit `AfterAll`**; below v1.33 one without it
    passes generation and then fails to start.
 9. **A Timeout or SetupTimeout overrun names the test's file and line**;
@@ -254,10 +256,19 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
     and the suite nil-panicked.
 11. **Patterns that match no package fail** — a run (any mode, bench and
     fuzz included) exits 2 and `lint` exits 1 when no package matched; a
-    pattern that misses beside others that match only warns. Below v1.33
+    wildcard pattern that matches nothing beside others that match only
+    warns (a path that does not exist still fails the run). Below v1.33
     such a run passed green having tested nothing.
-12. **A `Test*Async` method that never calls `done()` fails at its
-    declaration**, not inside gotest.
-13. **Assertion locations survive inlining** — a failure in generic suite
-    code the compiler inlined into the harness names the user's line, not
-    `gotest_psuite_test.go`.
+12. **A `Test*Async` method that never calls `done()` fails once, at its
+    declaration** — not inside gotest, and without a second "still
+    running" overrun verdict.
+13. **Assertion locations name the user's line everywhere** — in generic
+    suite code inlined into the harness, on a plain `*testing.T`, in
+    benchmarks and fuzz bodies, helpers included, and for `Skipf`;
+    `go test -fullpath` is honoured. Below v1.33 these could point into
+    gotest, reflect or `gotest_psuite_test.go`.
+14. **Run output takes `go test`'s shape** — bare import paths and meta
+    patterns (`fmt`, `std`, `all`) run instead of being dropped, standard
+    library packages get `[no suites]`/`[no test files]`, a package whose
+    suites are all `X_` or deselected reads `[no tests to run]`, and every
+    package's `-json` events open with a `start` event.
