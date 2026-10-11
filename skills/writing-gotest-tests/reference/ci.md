@@ -77,8 +77,6 @@ jobs:
   (`GITHUB_ACTIONS=true`): findings surface as inline PR annotations and a
   step-summary table on top of the plain output. No workflow changes
   needed; exit codes are unchanged.
-- Gate formatting too (`gofmt -l`, goimports): `lint -fix` edits are
-  textual and unformatted — see SKILL.md's write loop.
 - **v1.27+:** `Exclusive` suites run as a serial tail after the parallel
   bulk, so CI wall-clock time grows by the SUM of exclusive suite
   durations — keep the exclusive set small and its suites short. Under

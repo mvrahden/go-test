@@ -20,7 +20,10 @@ are manual:
    `require.Equal(t, want, got)` → `gotest.Equal(t, want, got)` (same
    expected-first order); collapse `require.Error` + `Contains(err.Error(),
    x)` into `gotest.ErrorContains(t, err, x)`; `require.Len` →
-   `gotest.Len`; `require.True(t, x != nil)` → `gotest.NotNil(t, x)`.
+   `gotest.Len`; `require.True(t, x != nil)` / `require.NotNil(t, x)` by
+   the type of `x`: `gotest.Error` for an error, `gotest.NotZero` for a
+   pointer, interface or channel, `gotest.NotNil` for a slice, map or
+   func.
 3. Do NOT add a `SuiteConfig()` unless the suite needs non-default
    behavior (see `config.md`) — and do not copy one from a neighboring
    suite out of imitation.

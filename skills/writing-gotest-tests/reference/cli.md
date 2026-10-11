@@ -21,10 +21,10 @@ invocation runs tests — there is NO `test` subcommand:
   methods are reported on stderr.
 - `go tool gotest watch ./...` — rerun on change; supports `--spec`.
 - `go tool gotest lint ./...` — the linter; `-fix` applies suggested
-  fixes (textual only — follow with goimports, see SKILL.md; fixes can
-  compose, so re-run until clean). Integrity rules suppress per line only
-  (`//nolint:<rule>`); others also via `.gotest.yml` `lint.skip` /
-  `-skip-<rule>`.
+  fixes and formats the files it rewrites (fixes can compose, so re-run
+  until clean). Integrity rules yield only to `//nolint:<rule>` (on the
+  line, directly above it, or file-wide on the package clause); others
+  also to `.gotest.yml` `lint.skip` / `-skip-<rule>`.
 - `go tool gotest discover ./...` — static suite metadata as JSON: suites,
   methods, direct suite→fixture edges, and (v1.27+) each method's declared
   `When`/`It` tree — `name` is the subtest segment `go test` will print,

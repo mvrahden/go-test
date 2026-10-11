@@ -14,16 +14,16 @@ a source build — assume current behavior. Before Bootstrap, read go.mod
 instead, remembering that a `replace` line overrides the `require`
 version.
 
-This skill describes **v1.32**. On an older release, read
+This skill describes **v1.33**. On an older release, read
 `reference/versions.md` before writing anything: it lists what each older
 release lacks or does differently, including rules below that fail there
-(on v1.25.x, rules 1, 3 and 4). A rule tagged **v1.27+** (or later) needs
+(on v1.25.x, rules 1–4 and 10). A rule tagged **v1.27+** (or later) needs
 that release; skip it on older ones.
 
 ## Bootstrap
 
 The repo has the *library*; the CLI runs via Go's tool directive (requires
-Go ≥ 1.25; v1.30+ requires Go ≥ 1.26). One-time:
+Go ≥ 1.24; v1.28+ requires Go ≥ 1.25, v1.30+ Go ≥ 1.26). One-time:
 
 ```sh
 go get -tool github.com/mvrahden/go-test/cmd/gotest@$(go list -m -f '{{.Version}}' github.com/mvrahden/go-test)
@@ -39,10 +39,14 @@ work around.
 
 Then every command is `go tool gotest <args>`; if Go reports the short name
 ambiguous, use `go tool github.com/mvrahden/go-test/cmd/gotest`. Never a
-global `go install` binary: it drifts from the pin and from the module's Go,
-and releases after v1.28.1 refuse to run on either drift (`FAIL:` naming the
-version or the Go it was built with, exit 2). That refusal is never a fault
-in the tests; switch to `go tool gotest` instead of bumping the pin. (Bare
+global `go install` binary: it drifts from the pin and from the module's Go.
+From v1.29 the CLI refuses to run (`FAIL:`, exit 2; 1 from `lint`) when it
+was built with an older Go than the module's go line, or when the pin
+resolves below the oldest runtime it generates for; a binary drifted the
+other way still runs. That refusal is never a fault in the tests: switch to
+`go tool gotest`, which builds the CLI at the pinned version with a Go at
+least as new as the module's go line, and ignore the message's `@latest` —
+never bump the pin to silence it. (Bare
 `go run github.com/mvrahden/go-test/cmd/gotest` fails on fresh consumers:
 module pruning leaves the CLI's deps out of go.sum.)
 
@@ -71,15 +75,10 @@ Write → lint → both runners → fix:
 
 ```sh
 go tool gotest lint -fix ./...
-go get -tool golang.org/x/tools/cmd/goimports
-go tool goimports -l .
 ```
 
-`lint -fix` applies suggested fixes as TEXTUAL edits — no formatting pass
-runs. A fix that strands or misses an import leaves the file uncompilable:
-install goimports once via the tool directive (as above — plain `go run`
-of it fails on missing go.sum entries), then always run
-`go tool goimports -w .` after `-fix` and re-run the loop.
+`lint -fix` formats every file it rewrites and removes the imports its
+fixes left unused, so no gofmt or goimports pass is needed after it.
 
 The linter catches direct misuse (`t.T()` escapes even inside closures,
 outer-`t` in poll callbacks, testify idioms, focus leftovers, and
@@ -92,28 +91,40 @@ the linter reports only the stronger one (integrity over style); fix what
 it says before expecting style suggestions there.
 
 Suppression follows rule tiers: integrity rules (`poll-scope`,
-`suite-lifecycle`, `focus`, …) accept only per-line `//nolint:<rule>`;
-style and migration rules can also be skipped project-wide via
-`.gotest.yml` `lint.skip` or `-skip-<rule>` flags. The `stdlib-test` rule
-flags every stdlib `TestXxx(*testing.T)` — when a stdlib test is
-intentional (assertion-layer tests, benchmarks-adjacent code), mark its
-package clause with `//nolint:stdlib-test`, or the lint run fails. The
+`suite-lifecycle`, `focus`, …) can never be skipped project-wide; style
+and migration rules can, via `.gotest.yml` `lint.skip` or `-skip-<rule>`
+flags. Any rule yields to a `//nolint:<rule>` comment on the finding's
+line or on a line of its own directly above it — and on the package
+clause, where it covers the whole FILE (not the package), whatever the
+tier. The `stdlib-test` rule flags every stdlib `TestXxx(*testing.T)` —
+when a stdlib test is intentional (assertion-layer tests,
+benchmarks-adjacent code), mark the package clause of each file holding
+one (or the test's own line) with `//nolint:stdlib-test`, or the lint run
+fails. The
 linter does NOT catch: plain `defer` cleanup, shared mutable state in
 parallel suites, or structural problems — those are your job, below.
 
 ## Core rules
 
 1. **Suites are structs, naming is the API.** `type XxxTestSuite struct{}`,
-   exported, methods `func (s *X) TestBehavior(t *gotest.T)`. No `TestMain`,
-   no registration — the CLI generates the harness invisibly (never commit
-   the `gotest_psuite_test.go`/`gotest_pxsuite_test.go` files `gotest
-   generate` writes; `gotest clean` removes them). `F_`/`X_` prefixes
-   focus/exclude; `Test*Async(t, done)` declares async tests.
+   exported, methods `func (s *X) TestBehavior(t *gotest.T)`. No
+   registration and no `TestMain` needed — the CLI generates the harness
+   invisibly (never commit the `gotest_psuite_test.go`/
+   `gotest_pxsuite_test.go` files `gotest generate` writes; `gotest clean`
+   removes them). A `TestMain` of your own still runs; keep resource setup
+   out of it — that is what fixtures and `BeforeAll` are for. `F_`/`X_`
+   prefixes focus/exclude; `Test*Async(t, done)` declares async tests.
 2. **Lifecycle hooks own resources.** Setup in `BeforeEach` (or `BeforeAll`
    for expensive read-only state), teardown in `AfterEach`/`AfterAll` as
-   suite fields — NEVER `defer` or `t.T().Cleanup` in a test method. A plain
-   `defer` lints clean and is still wrong: it skips teardown verification
-   and blocks parallelization.
+   suite fields — NEVER `t.T().Cleanup`, and no `defer` releasing a
+   resource in a test method. Such a `defer` lints clean and is still
+   wrong: it sits outside the teardown order the harness guarantees, and
+   the setup cannot be shared or hoisted. Start goroutines with
+   `gotest.Go(t, fn)`, never a bare `go`: a panic on a bare goroutine kills
+   the process before any teardown runs.
+   `wait := gotest.Go(…); defer wait()` is the one `defer` that belongs in
+   a test, and only for work that finishes on its own — never wait in the
+   test on a server or poller that `AfterEach` stops (it deadlocks).
 3. **Do not imitate existing tests blindly.** Observed failure: agents copy
    a repo's existing `SuiteConfig()` verbatim, propagating anti-patterns. A
    `SuiteConfig()` marker states *intent*: omit it entirely for defaults.
@@ -150,7 +161,9 @@ parallel suites, or structural problems — those are your job, below.
 6. **Never call `t.T().Helper()`** — call sites resolve automatically; the
    linter flags it. Reach for `t.T()` only when nothing on `gotest.T`
    (`It`, `When`, `Context`, `TempDir`, `Setenv`, `Skipf`, `Errorf`,
-   `FailNow`) covers the need.
+   `FailNow`) covers the need — never for `t.T().Context()`, which carries
+   no suite `Timeout` (v1.33+: `t-escape` flags it, `-fix` writes
+   `t.Context()`).
 7. **Ask "why is this wall-clock-asserting suite NOT Exclusive?"
    (v1.27+)** — the counterpart to rule 4. A suite whose assertions or
    timeout budgets measure elapsed time (latency bounds, timing budgets,
@@ -186,9 +199,11 @@ parallel suites, or structural problems — those are your job, below.
     that needs what a machine may lack (a `DATABASE_URL`, Docker, a
     credential) declares `func (s *X) SuiteGuard() string`: empty runs the
     suite, anything else skips it with that reason. It runs before the
-    suite's fixtures, config and `BeforeAll`, so the suite's own setup never
-    starts; `t.T().Skip()` in `BeforeAll` runs after setup has begun. Read
-    the environment only: fixture fields are still nil in the guard.
+    suite's package fixtures (v1.32+; see `reference/versions.md`), config
+    and `BeforeAll`, so the suite's own setup never starts; `t.T().Skip()`
+    in `BeforeAll` runs after setup has begun. Read the environment only:
+    fixture fields are still nil in the guard. A shared fixture the suite
+    binds is started by the runner regardless — no guard can stop it.
 
 ## Restructuring existing suites (the blue phase)
 

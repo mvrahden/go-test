@@ -76,7 +76,7 @@ Runners split). Missing traps are in the fixture backlog (§8).
 | C11 | Two suites share expensive setup — extract it | fixtures.md; blue rung 3 (a package fixture still sets up per suite; once → shared fixture) |
 | C12 | Old-version consumer (v1.25.0, no replace): parallelize + async task | v1.25.x exceptions applied (literal config form, no Test*Async) |
 | C13 | Fixture without tool directive: "run the tests" | bootstrap path |
-| C14 | File with lint-fixable violations that strand imports | lint -fix + goimports caveat |
+| C14 | File with several lint-fixable violations, one whose fix strands an import | `lint -fix` re-run until clean; result compiles; no hand-edited imports or extra formatter step |
 | C15 | Port a stdlib test full of `if err != nil { t.Fatal }` guards | assertions stated directly (fail-guard) — no guarded fails survive; expected value first in `Equal` |
 | C16 | Add `When`/`It` tests for `Restocker` under two conditions (v1.29+ consumer) | rule 8: bare conditions and behaviors; no `When("when …")` / `It("it …")`; `gotest spec` reads "when <condition>" |
 | C17 | Test code that needs `DATABASE_URL`; the suite must not fail where it is unset | rule 10: `SuiteGuard` returns the reason; no `t.T().Skip()` in `BeforeAll`, no env check inside tests |
@@ -112,8 +112,9 @@ Runners split). Missing traps are in the fixture backlog (§8).
 - C12: remove `replace` + `go.work`, keep `require v1.25.0` (module
   resolves from proxy; tasks need only reach the STOP decision, not run).
 - C13: remove the `tool` line from go.mod (and its sums via `go mod tidy`).
-- C14: introduce a `t.T().Fatalf` (or other fix-carrying violation) whose
-  suggested fix strands an import.
+- C14: introduce an `if !errors.Is(err, want) { gotest.Fail(t, …) }` guard
+  (its rewrite strands the `errors` import) next to a
+  `gotest.True(t, got == want)`.
 - H1–H3: add the trap suites per §8 backlog specs.
 - C16/H7: consumer at v1.29.0+ (or the `replace`); H7 plants the three
   keepers per §8 next to one genuine `t.When("when stock is low", …)`.

@@ -8,8 +8,9 @@ Assertions ARE the control flow: they halt the test on failure, so never
 wrap them (or manual fails) in guards — `if err != nil { gotest.Fail(t,
 …) }` and `if got != want { t.Fatal(…) }` are `fail-guard` lint errors;
 write `gotest.NoError(t, err)` / `gotest.Equal(t, want, got)` directly.
-`Equal`/`NotEqual` take the EXPECTED value first — the linter's autofix
-moves constants into that slot.
+`Equal`/`NotEqual` take the EXPECTED value first. The linter does not
+check the order of an `Equal` you write; it only puts the constant first
+when it rewrites a `True(t, a == b)` or a guard into one.
 
 | Assertion | Notes |
 |---|---|

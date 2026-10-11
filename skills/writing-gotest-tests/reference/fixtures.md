@@ -10,10 +10,12 @@ depend on other fixtures (pointer fields again) — layer infrastructure
 suites depend only on what they use.
 
 A package fixture lives as long as the suite that binds it: set up after the
-suite's `SuiteGuard` and before its `BeforeAll`, torn down after its `AfterAll` — again for each `Fuzz*`
-method's seed replay. It is not shared across suites; setup that must happen
-once per run belongs in a shared fixture. A suite sets up only the fixtures
-it binds and their dependencies, so an unrelated fixture never fails it.
+suite's `SuiteGuard` (v1.32+; before it below — see `versions.md`) and
+before its `BeforeAll`, torn down after its `AfterAll` —
+again for each `Fuzz*` method's seed replay. It is not shared across
+suites; setup that must happen once per run belongs in a shared fixture. A
+suite sets up only the fixtures it binds and their dependencies (v1.32+),
+so an unrelated fixture never fails it.
 
 Package fixtures may also define per-test hooks — `BeforeEach(ctx
 context.Context) error` / `AfterEach(ctx context.Context) error` — with the
