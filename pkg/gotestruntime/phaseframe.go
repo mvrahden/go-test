@@ -27,7 +27,8 @@ func goroutineID() uint64 {
 
 // phaseFrame names the file:line where goroutine gid runs the phase the user
 // wrote: the innermost frame below the harness that called it. Empty when
-// the goroutine or such a frame cannot be found.
+// the goroutine or such a frame cannot be found, as for a phase that returned
+// after the deadline or an async method waiting on done.
 func phaseFrame(gid uint64) string {
 	if gid == 0 {
 		return ""

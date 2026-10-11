@@ -174,7 +174,9 @@ func watchDeadline(tb testing.TB, gid uint64, timeout time.Duration, what, budge
 	fmt.Fprintf(os.Stderr, "gotest: %s %sexceeded its configured %s of %s and is still running %s\n",
 		tb.Name(), what, budget, timeout, sched)
 	// Errorf would name this goroutine's frame, inside the Go runtime; the
-	// verdict belongs where the phase is running now.
+	// verdict belongs where the phase is running now. The cost: Go 1.27's
+	// test2json tags only Error/Errorf output as "error", and those always
+	// prefix the reporting goroutine's own frame.
 	where := ""
 	if frame := phaseFrame(gid); frame != "" {
 		where = frame + ": "
