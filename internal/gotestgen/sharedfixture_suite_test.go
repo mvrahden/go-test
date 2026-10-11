@@ -25,6 +25,7 @@ func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PostgresFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/project/tests/fixtures",
 					TransferFields: []string{"ConnStr"},
 				},
@@ -49,11 +50,13 @@ func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PostgresFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/project/tests/fixtures",
 					TransferFields: []string{"ConnStr"},
 				},
 				{
 					Identifier:     "RedisFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/project/tests/redis",
 					TransferFields: []string{"Addr"},
 				},
@@ -85,6 +88,7 @@ func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "SetupFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					TransferFields: nil,
 				},
@@ -107,6 +111,7 @@ func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PostgresFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					TransferFields: []string{"ConnStr", "Port"},
 					LocalFields:    []string{"Pool"},
@@ -132,11 +137,13 @@ func (s *SharedFixtureTestSuite) TestGenerateSharedSetup(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PostgresFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/shared",
 					TransferFields: []string{"DSN"},
 				},
 				{
 					Identifier:     "RedisFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/shared",
 					TransferFields: []string{"Addr"},
 				},
@@ -166,6 +173,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					TransferFields: []string{"ConnStr"},
 				},
@@ -178,11 +186,30 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 		})
 	})
 
+	t.When("fixture declares no AfterAll", func(w *gotest.T) {
+		w.It("tears down without calling one", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					PkgPath:        "github.com/example/fixtures",
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			// AfterAll is optional; referencing it fails the setup build.
+			gotest.NotContains(it, string(src), "sf0.AfterAll")
+		})
+	})
+
 	t.When("default timeout", func(w *gotest.T) {
 		w.It("uses default fixture config", func(it *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					TransferFields: []string{"ConnStr"},
 				},
@@ -208,6 +235,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					HasConfig:      true,
 					TransferFields: []string{"ConnStr"},
@@ -243,6 +271,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					HasConfig:      true,
 					TransferFields: []string{"ConnStr"},
@@ -272,6 +301,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					TransferFields: []string{"ConnStr"},
 				},
@@ -294,6 +324,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					TransferFields: []string{"ConnStr"},
 				},
@@ -323,6 +354,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					HasConfig:      true,
 					TransferFields: []string{"ConnStr"},
@@ -351,6 +383,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					TransferFields: []string{"ConnStr"},
 				},
@@ -371,6 +404,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					TransferFields: []string{"ConnStr"},
 				},
@@ -403,6 +437,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					HasConfig:      true,
 					TransferFields: []string{"ConnStr"},
@@ -464,6 +499,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					TransferFields: []string{"ConnStr"},
 				},
@@ -481,6 +517,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					TransferFields: []string{"ConnStr"},
 				},
@@ -500,17 +537,20 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "AlphaSharedFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					TransferFields: []string{"A"},
 				},
 				{
 					Identifier:     "BetaSharedFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					TransferFields: []string{"B"},
 				},
 				{
-					Identifier: "GammaSharedFixture",
-					PkgPath:    "github.com/example/fixtures",
+					Identifier:  "GammaSharedFixture",
+					HasAfterAll: true,
+					PkgPath:     "github.com/example/fixtures",
 					Dependencies: []string{
 						"github.com/example/fixtures.AlphaSharedFixture",
 						"github.com/example/fixtures.BetaSharedFixture",
@@ -539,11 +579,13 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PGFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/fixtures",
 					TransferFields: []string{"ConnStr"},
 				},
 				{
 					Identifier:     "RedisFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/redis",
 					TransferFields: []string{"Addr"},
 				},
@@ -568,11 +610,13 @@ func (s *SharedFixtureTestSuite) TestIntegrationGeneratedSetupBinary(t *gotest.T
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{
 					Identifier:     "PostgresFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/project/tests/fixtures",
 					TransferFields: []string{"DSN"},
 				},
 				{
 					Identifier:     "GCSFixture",
+					HasAfterAll:    true,
 					PkgPath:        "github.com/example/project/tests/gcs",
 					TransferFields: []string{"Endpoint", "Bucket"},
 				},

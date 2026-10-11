@@ -48,6 +48,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 
 		alpha, ok := found["AlphaSharedFixture"]
 		gotest.True(w, ok, "expected AlphaSharedFixture")
+		gotest.True(w, alpha.HasAfterAll)
 		gotest.True(w, alpha.HasHydrate)
 		gotest.True(w, alpha.HasDehydrate)
 		gotest.Contains(w, alpha.TransferFields, "DataPath")
@@ -56,6 +57,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 
 		beta, ok := found["BetaSharedFixture"]
 		gotest.True(w, ok, "expected BetaSharedFixture")
+		gotest.False(w, beta.HasAfterAll, "AfterAll is optional")
 		gotest.False(w, beta.HasHydrate)
 		gotest.False(w, beta.HasDehydrate)
 		gotest.Contains(w, beta.TransferFields, "Label")

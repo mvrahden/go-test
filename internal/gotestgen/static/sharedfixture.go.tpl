@@ -172,7 +172,9 @@ func main() {
 				Name:     "{{ $f.Identifier }}",
 				Timeout:  ƒcfg_{{ $f.VarName }}.Timeout,
 				Budget:   {{ if $f.HasConfig }}ƒbudget_{{ $f.VarName }}{{ else }}0{{ end }},
+{{- if $f.HasAfterAll }}
 				AfterAll: {{ $f.VarName }}.AfterAll,
+{{- end }}
 			})
 		}
 		return false

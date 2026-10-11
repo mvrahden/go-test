@@ -2,6 +2,7 @@ package fixtures
 
 import "context"
 
+// BetaSharedFixture has no AfterAll: teardown is optional.
 type BetaSharedFixture struct {
 	Label string
 	Count int
@@ -10,9 +11,5 @@ type BetaSharedFixture struct {
 func (f *BetaSharedFixture) BeforeAll(ctx context.Context) error {
 	f.Label = "beta-shared"
 	f.Count = 42
-	return nil
-}
-
-func (f *BetaSharedFixture) AfterAll(ctx context.Context) error {
 	return nil
 }
