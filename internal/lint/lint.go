@@ -570,15 +570,26 @@ var escapeConfigs = map[string]escapeConfig{
 	"Skipf":    {TEscape, "Skipf is available on gotest.T — unnecessary T escape", false, true, false},
 	"Setenv":   {TEscape, "Setenv is available on gotest.T — unnecessary T escape", false, true, false},
 	"TempDir":  {TEscape, "TempDir is available on gotest.T — unnecessary T escape", false, true, false},
+	"Context":  {TEscape, "Context is available on gotest.T — t.T().Context() drops the suite's Timeout", false, true, false},
+	"Deadline": {TEscape, "use t.Context().Deadline() — t.T().Deadline() reports go test's -timeout, not the suite's Timeout", false, true, false},
 	"Skip":     {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
 	"SkipNow":  {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
 	"Cleanup":  {SuiteLifecycle, "use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle", true, false, false},
 	"Parallel": {SuiteLifecycle, "use SuiteConfig.Parallel instead — T.Parallel bypasses suite lifecycle coordination", true, false, false},
-	"Run":      {SuiteLifecycle, "use It or When instead — T.Run bypasses gotest wrapping", true, false, false},
+	"Run":      {SuiteLifecycle, "use It or When instead — T.Run bypasses gotest wrapping", false, false, false},
 	"Helper":   {TEscape, "never call Helper — gotest resolves call sites automatically; Helper degrades failure locations", false, false, true},
 	"Log":      {TEscape, "use assertion message args instead — T.Log bypasses the failure report", false, false, true},
 	"Fatal":    {TEscape, "use assertions instead — T.Fatal bypasses the assertion tracer", false, false, true},
 	"Fatalf":   {TEscape, "use assertions instead — T.Fatalf bypasses the assertion tracer", false, false, true},
+	"Error":    {TEscape, "use assertions instead — T.Error bypasses the assertion tracer", false, false, true},
+	"Fail":     {TEscape, "use assertions instead — T.Fail bypasses the assertion tracer", false, false, true},
+	"Logf":     {TEscape, "use assertion message args instead — T.Logf bypasses the failure report", false, false, true},
+}
+
+// escapeFixTargets names the gotest.T call an autofix writes when it is not
+// the escaped method itself.
+var escapeFixTargets = map[string]string{
+	"Deadline": "Context().Deadline",
 }
 
 type deferredReport struct {
@@ -710,13 +721,17 @@ func reportDirectEscape(pass *analysis.Pass, cl *claims, call *ast.CallExpr, isS
 				if esc.canAutofix && isDirect {
 					inner := sel.X.(*ast.CallExpr)
 					innerSel := inner.Fun.(*ast.SelectorExpr)
+					target := sel.Sel.Name
+					if to, ok := escapeFixTargets[target]; ok {
+						target = to
+					}
 					reportWithFix(pass, esc.rule, call.Pos(),
 						[]analysis.SuggestedFix{{
-							Message: fmt.Sprintf("call %s directly", sel.Sel.Name),
+							Message: fmt.Sprintf("call %s directly", target),
 							TextEdits: []analysis.TextEdit{{
 								Pos:     innerSel.X.End(),
-								End:     inner.End(),
-								NewText: []byte(""),
+								End:     sel.Sel.End(),
+								NewText: []byte("." + target),
 							}},
 						}},
 						"%s", esc.message)

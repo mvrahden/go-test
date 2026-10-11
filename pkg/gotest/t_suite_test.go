@@ -100,7 +100,7 @@ func (s *TTestSuite) TestTContext(t *gotest.T) {
 		w.It("falls back to testing.T.Context()", func(it *gotest.T) {
 			tt := gotest.NewT(it.T())
 			gotest.Zero(it, gotest.ExportTCtx(tt))
-			gotest.Equal(it, it.T().Context(), tt.Context())
+			gotest.Equal(it, it.T().Context(), tt.Context()) //nolint:t-escape // the stdlib context is what NewT falls back to
 		})
 	})
 }

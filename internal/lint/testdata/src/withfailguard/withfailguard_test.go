@@ -269,8 +269,8 @@ func (s *EscapeGuardTestSuite) TestEscape(it *gotest.T) {
 
 func (s *EscapeGuardTestSuite) TestEscapeError(it *gotest.T) {
 	err := errors.New("boom")
-	if err != nil { // want `use NoError instead of if\+Error for error nil check — assertions halt where Error continues`
-		it.T().Error("boom")
+	if err != nil {
+		it.T().Error("boom") // want `use assertions instead — T.Error bypasses the assertion tracer`
 	}
 }
 

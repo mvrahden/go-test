@@ -739,7 +739,7 @@ percentage = covered / total</div>
           <tr><td><code>lifecycle-pair</code></td><td><code>BeforeAll</code> without <code>AfterAll</code> — resources may leak.</td></tr>
           <tr><td><code>x-lifecycle</code></td><td><code>X_</code> prefix on a lifecycle hook — a no-op.</td></tr>
           <tr><td><code>test-signature</code></td><td>Test methods not accepting <code>*gotest.T</code> (or <code>*testing.T</code>).</td></tr>
-          <tr><td><code>suite-lifecycle</code></td><td><code>Cleanup</code>/<code>Parallel</code>/<code>Run</code> via <code>t.T()</code> — they bypass the suite lifecycle.</td></tr>
+          <tr><td><code>suite-lifecycle</code></td><td><code>Cleanup</code>/<code>Parallel</code>/<code>Run</code> via <code>t.T()</code> — they bypass the suite lifecycle. <code>Run</code> is flagged in any function, since its subtests drop the suite's deadline.</td></tr>
           <tr><td><code>poll-scope</code></td><td>Assertions inside <code>Eventually</code>/<code>Consistently</code> callbacks using the outer <code>t</code> instead of <code>poll</code>.</td></tr>
           <tr><td><code>assertion-type-guard</code></td><td><code>Nil</code>/<code>Empty</code> on types their runtime guards would reject.</td></tr>
           <tr><td><code>shared-fixture-undeclared</code></td><td>Suite reads a shared fixture it never declared — window scheduling only starts declared fixtures, so the read may hit one that never started or is already released.</td></tr>
@@ -758,7 +758,7 @@ percentage = covered / total</div>
           <tr><td><code>assertion-simplify</code></td><td>Simplifiable assertions: <code>True(t, a == b)</code> → <code>Equal</code>, <code>Len(t, x, 0)</code> → <code>Empty</code>, …</td></tr>
           <tr><td><code>assertion-redundant</code></td><td>An assertion made redundant by the next one on the same argument.</td></tr>
           <tr><td><code>fail-guard</code></td><td><code>if cond { Fail/Fatal(...) }</code> guards — the assertion expresses the check directly.</td></tr>
-          <tr><td><code>t-escape</code></td><td>Unnecessary <code>t.T()</code> convenience escapes (<code>Errorf</code>, <code>Helper</code>, <code>Log</code>, <code>Fatal</code>, …).</td></tr>
+          <tr><td><code>t-escape</code></td><td>Unnecessary <code>t.T()</code> convenience escapes (<code>Errorf</code>, <code>Helper</code>, <code>Log</code>, <code>Fatal</code>, …), and <code>t.T().Context()</code>/<code>t.T().Deadline()</code>, which drop the suite's <code>Timeout</code> — also inside <code>*testing.T</code> helpers handed <code>t.T()</code>.</td></tr>
           <tr><td><code>config-no-deadline</code></td><td>A literal negative duration on <code>SuiteConfig.Timeout</code>/<code>SetupTimeout</code> or <code>FixtureConfig.Timeout</code> — every negative disables the deadline; the fix spells it <code>gotest.NoDeadline</code>.</td></tr>
           <tr><td><code>behavior-wording</code></td><td><code>When("when …")</code> or <code>It("it …")</code> — the spec renders the connective and the ✓ glyph plays "it"; the fix drops the word.</td></tr>
           <tr><td><code>bench-fixture-io</code></td><td>Fixture-backed reads inside the measured loop — times the fixture, not the code.</td></tr>
