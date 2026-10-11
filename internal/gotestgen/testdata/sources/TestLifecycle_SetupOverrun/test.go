@@ -7,8 +7,8 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// SetupOverrunTestSuite blows its SetupTimeout in BeforeAll while ignoring the
-// context, so the overrun can only surface once BeforeAll returns.
+// SetupOverrunTestSuite blows its SetupTimeout in BeforeAll and AfterAll while
+// ignoring the context, so neither phase can be stopped, only judged.
 type SetupOverrunTestSuite struct{}
 
 func (s *SetupOverrunTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -21,6 +21,7 @@ func (s *SetupOverrunTestSuite) BeforeAll(t *gotest.T) {
 }
 
 func (s *SetupOverrunTestSuite) AfterAll(t *gotest.T) {
+	time.Sleep(500 * time.Millisecond)
 	fmt.Println("MARK:afterall ran")
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,7 +79,7 @@ func TestT(t *testing.T, timeout time.Duration) *gotest.T {
 // A zero budget means no verdict is enforced; the context handed to the method
 // is bounded separately by [TestT].
 func RunTest(t *gotest.T, budget time.Duration, run func()) {
-	watchWhile(t.T(), t, budget, "", "Timeout", run)
+	watchWhile(t.T(), budget, "", "Timeout", run)
 }
 
 // RunSetup runs a suite's BeforeAll. timeout bounds the context it receives;
@@ -86,20 +87,20 @@ func RunTest(t *gotest.T, budget time.Duration, run func()) {
 // declared no config of its own.
 func RunSetup(t testing.TB, timeout, budget time.Duration, beforeAll func(*gotest.T)) {
 	tt := SetupT(t, timeout)
-	watchWhile(t, tt, budget, "BeforeAll ", "SetupTimeout", func() { beforeAll(tt) })
+	watchWhile(t, budget, "BeforeAll ", "SetupTimeout", func() { beforeAll(tt) })
 }
 
 // RunTeardown runs a suite's AfterAll from inside t.Cleanup, on the same terms
 // as [RunSetup].
 func RunTeardown(t testing.TB, timeout, budget time.Duration, afterAll func(*gotest.T)) {
 	tt := TeardownT(t, timeout)
-	watchWhile(t, tt, budget, "AfterAll ", "SetupTimeout", func() { afterAll(tt) })
+	watchWhile(t, budget, "AfterAll ", "SetupTimeout", func() { afterAll(tt) })
 }
 
-// watchWhile runs a lifecycle phase and fails t the moment timeout passes with
+// watchWhile runs a lifecycle phase and fails tb the moment timeout passes with
 // that phase still running. what names the phase for the message ("BeforeAll ",
-// "AfterAll ", or empty for a test method), budget names the config field it
-// came from, and tb names the test in the unbuffered line.
+// "AfterAll ", or empty for a test method) and budget names the config field it
+// came from.
 //
 // The alternative — checking the deadline once the phase returns — cannot judge
 // a phase that never returns, which is the case that matters most. A wedged
@@ -113,17 +114,17 @@ func RunTeardown(t testing.TB, timeout, budget time.Duration, afterAll func(*got
 // subtest would later signal a parent that had already finished. Killing the
 // process is the only true interruption, and that is what go test -timeout is.
 // What this adds is the verdict.
-func watchWhile(tb testing.TB, t *gotest.T, timeout time.Duration, what, budget string, run func()) {
+func watchWhile(tb testing.TB, timeout time.Duration, what, budget string, run func()) {
 	if timeout <= 0 {
 		run()
 		return
 	}
 	done := make(chan struct{})
 	stopped := make(chan struct{})
-	go watchDeadline(tb, t, timeout, what, budget, done, stopped)
+	go watchDeadline(tb, goroutineID(), timeout, what, budget, done, stopped)
 
 	// close(done) also runs when the phase exits via Goexit. Waiting for the
-	// watchdog to stop is what makes its Errorf legal: the testing package
+	// watchdog to stop is what makes its report legal: the testing package
 	// panics on a log from a test that has already completed, and the test
 	// cannot complete while this frame is still on the stack.
 	defer func() {
@@ -133,10 +134,10 @@ func watchWhile(tb testing.TB, t *gotest.T, timeout time.Duration, what, budget 
 	run()
 }
 
-// watchDeadline fails t if the phase has not finished within timeout. Errorf is
-// safe from another goroutine while the test is still running, which the
-// handshake in watchWhile guarantees it is.
-func watchDeadline(tb testing.TB, t *gotest.T, timeout time.Duration, what, budget string, done <-chan struct{}, stopped chan<- struct{}) {
+// watchDeadline fails tb if the phase, running on goroutine gid, has not
+// finished within timeout. Reporting is safe from another goroutine while the
+// test is still running, which the handshake in watchWhile guarantees it is.
+func watchDeadline(tb testing.TB, gid uint64, timeout time.Duration, what, budget string, done <-chan struct{}, stopped chan<- struct{}) {
 	defer close(stopped)
 
 	timer := time.NewTimer(timeout)
@@ -172,7 +173,16 @@ func watchDeadline(tb testing.TB, t *gotest.T, timeout time.Duration, what, budg
 	}
 	fmt.Fprintf(os.Stderr, "gotest: %s %sexceeded its configured %s of %s and is still running %s\n",
 		tb.Name(), what, budget, timeout, sched)
-	t.Errorf("%sexceeded its configured %s of %s and is still running%s", what, budget, timeout, suffix)
+	// Errorf would name this goroutine's frame, inside the Go runtime; the
+	// verdict belongs where the phase is running now.
+	where := ""
+	if frame := phaseFrame(gid); frame != "" {
+		where = frame + ": "
+	}
+	// Indented past the first line, as Errorf indents continuation lines.
+	msg := fmt.Sprintf("%s%sexceeded its configured %s of %s and is still running%s", where, what, budget, timeout, suffix)
+	fmt.Fprintln(tb.Output(), strings.ReplaceAll(msg, "\n", "\n    "))
+	tb.Fail()
 }
 
 // testScopedT applies the timeout convention shared by the phases that run while
