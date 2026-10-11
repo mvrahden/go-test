@@ -18,10 +18,15 @@ func runGenerate(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 		buildFlags = append(buildFlags, "-tags="+tags)
 	}
 
-	loaded, broken, err := gotestgen.LoadPackages(patterns, buildFlags)
+	loaded, broken, matched, err := gotestgen.LoadPackagesMatching(patterns, buildFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
+	}
+	if !matched {
+		// Nothing to generate for is not an error, as for go generate.
+		warnMatchedNothing(patterns)
+		return 0
 	}
 	if reportBrokenPackages(broken) {
 		return 2

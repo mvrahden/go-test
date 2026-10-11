@@ -595,6 +595,11 @@ cannot be fuzzed) and what it would pass over in silence: a lifecycle hook
 that is misspelled or carries X_, and a Benchmark or Fuzz method on a type
 that is no test suite.
 
+Exit codes: 0 when the document was written, including for patterns that
+match no package ("packages": [], a warning on stderr: an editor's
+workspace may hold no package yet); 2 when the packages cannot be loaded
+at all.
+
 Examples:
   gotest discover ./...                      All packages
   gotest discover ./pkg/auth/...             Single package tree
@@ -834,6 +839,10 @@ Usage:
 Generates the overlay files that gotest normally creates transparently
 during test runs. Useful for inspecting generated code or integrating
 with custom build pipelines.
+
+Exit codes: 0 when every matched package was generated for, including for
+patterns that match no package (nothing to write, a warning on stderr, as
+go generate does); 2 when a package does not build or generation fails.
 
 Examples:
   gotest generate ./...                      Generate for all packages

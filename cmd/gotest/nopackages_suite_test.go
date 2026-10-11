@@ -61,6 +61,26 @@ func (s *NoPackagesTestSuite) TestEveryModeExits2(t *gotest.T) {
 	}
 }
 
+// generate and discover verify nothing, so matching nothing is no failure:
+// generate has nothing to write, as go generate has nothing to run, and an
+// editor's empty workspace must not fail its discovery.
+func (s *NoPackagesTestSuite) TestGenerateAndDiscoverExit0(t *gotest.T) {
+	const warning = "warning: \"" + nogo + "\" matched no packages\n"
+
+	t.It("generate writes nothing and warns", func(it *gotest.T) {
+		stdout, stderr, code := s.cli.runSplit(it, "generate", nogo)
+		gotest.Equal(it, 0, code, stderr)
+		gotest.Empty(it, stdout)
+		gotest.Equal(it, warning, stderr)
+	})
+	t.It("discover writes a document without packages and warns", func(it *gotest.T) {
+		stdout, stderr, code := s.cli.runSplit(it, "discover", nogo)
+		gotest.Equal(it, 0, code, stderr)
+		gotest.Regexp(it, `^\{"version":"[^"]+","packages":\[\]\}\n$`, stdout)
+		gotest.Equal(it, warning, stderr)
+	})
+}
+
 func (s *NoPackagesTestSuite) TestModuleWithoutPackages(t *gotest.T) {
 	dir := t.TempDir()
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/empty\n\ngo 1.26\n"), 0o600))

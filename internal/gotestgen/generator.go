@@ -308,6 +308,13 @@ func LoadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []Br
 	return res, broken, err
 }
 
+// LoadPackagesMatching is LoadPackages that also reports whether the
+// patterns matched any package at all.
+func LoadPackagesMatching(targetPkgs []string, buildFlags []string) (loaded []*LoadResult, broken []BrokenPackage, matched bool, err error) {
+	loaded, broken, _, all, err := loadPackages(targetPkgs, buildFlags)
+	return loaded, broken, len(all) > 0, err
+}
+
 // RunPackages is what a run loads: every matched package, each owed a verdict.
 type RunPackages struct {
 	Loaded []*LoadResult

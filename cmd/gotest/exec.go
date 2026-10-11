@@ -82,6 +82,14 @@ func loadRunPackages(patterns, loadFlags []string) (gotestgen.RunPackages, error
 	return pkgs, err
 }
 
+// warnMatchedNothing warns on stderr, as the go command does, about patterns
+// that together matched no package.
+func warnMatchedNothing(patterns []string) {
+	for _, p := range patterns {
+		fmt.Fprintf(os.Stderr, "warning: %q matched no packages\n", p)
+	}
+}
+
 // sumStdlibTests totals the stdlib tests gotest reports but does not run, and
 // names the affected packages (truncated) so the note is actionable.
 func sumStdlibTests(byPkg map[string]int) (int, string) {
