@@ -19,3 +19,16 @@ func (s *DeprecatedTestSuite) TestAnOlderHarness(t *gotest.T) {
 		})
 	})
 }
+
+func (s *DeprecatedTestSuite) TestAHarnessBeforeAwaitDoneAt(t *gotest.T) {
+	t.It("still compiles and waits for done", func(it *gotest.T) {
+		called := false
+		gotestruntime.AwaitDone(it, "TestAsync", func(done func()) { //nolint:staticcheck // the older harness's shape
+			go func() {
+				called = true
+				done()
+			}()
+		})
+		gotest.True(it, called)
+	})
+}

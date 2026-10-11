@@ -91,7 +91,7 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
 {{- end }}
         run(func() {
 {{- if $tc.IsAsync }}
-          gotestruntime.AwaitDone(ttt, "{{ $tc.Identifier }}", {{ printf "%q" ($tc.DeclaredAt $ts.FileSet) }}, func(done func()) {
+          gotestruntime.AwaitDoneAt(ttt, "{{ $tc.Identifier }}", {{ printf "%q" ($tc.DeclaredAt $ts.FileSet) }}, func(done func()) {
             ƒƒ_GOTEST_exec(func(t *gotest.T) { s.{{ $tc.Identifier }}({{ $t }}{{ $ctx }}, done) }, ttt)
           })
 {{- else if or $tc.UsesStdlibT $ts.HasReturningBeforeEach }}

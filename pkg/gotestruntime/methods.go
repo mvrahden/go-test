@@ -79,11 +79,14 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 	}
 }
 
-// AwaitDone runs an async method through start and returns once it calls
+// AwaitDoneAt runs an async method through start and returns once it calls
 // done, failing t when t's context ends first. at is the method's
 // declaration (file:line), the verdict's location: the method has returned,
 // so no frame of the user's is left to name.
-func AwaitDone(t *gotest.T, name, at string, start func(done func())) {
+//
+// Once start returns, the method's budget watch ends: from then on the
+// method is waiting for done, and the context's deadline is its verdict.
+func AwaitDoneAt(t *gotest.T, name, at string, start func(done func())) {
 	done := make(chan struct{}, 1)
 	start(func() {
 		select {
@@ -91,6 +94,12 @@ func AwaitDone(t *gotest.T, name, at string, start func(done func())) {
 		default:
 		}
 	})
+	endBody(t.T())
+	select {
+	case <-done:
+		return // called in time, even if the deadline has passed since
+	default:
+	}
 	select {
 	case <-done:
 	case <-t.Context().Done():

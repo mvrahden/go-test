@@ -2,9 +2,11 @@ package gotestruntime
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -79,7 +81,22 @@ func TestT(t *testing.T, timeout time.Duration) *gotest.T {
 // A zero budget means no verdict is enforced; the context handed to the method
 // is bounded separately by [TestT].
 func RunTest(t *gotest.T, budget time.Duration, run func()) {
-	watchWhile(t.T(), budget, "", "Timeout", run)
+	end := watchPhase(t.T(), budget, "", "Timeout")
+	bodies.Store(t.T(), end)
+	defer bodies.Delete(t.T())
+	defer end()
+	run()
+}
+
+// bodies holds, per running test method, the end of its budget watch: an
+// async method's body ends before the method does (see [AwaitDoneAt]).
+var bodies sync.Map // *testing.T -> func()
+
+// endBody ends the budget watch of t's method, whose body has returned.
+func endBody(t *testing.T) {
+	if end, ok := bodies.Load(t); ok {
+		end.(func())()
+	}
 }
 
 // RunSetup runs a suite's BeforeAll. timeout bounds the context it receives;
@@ -115,28 +132,34 @@ func RunTeardown(t testing.TB, timeout, budget time.Duration, afterAll func(*got
 // process is the only true interruption, and that is what go test -timeout is.
 // What this adds is the verdict.
 func watchWhile(tb testing.TB, timeout time.Duration, what, budget string, run func()) {
+	// end also runs when the phase exits via Goexit.
+	defer watchPhase(tb, timeout, what, budget)()
+	run()
+}
+
+// watchPhase starts watching the phase the calling goroutine runs next, as
+// [watchWhile] describes, and returns the call that ends the watch. Calls
+// after the first do nothing.
+//
+// Ending waits for the watchdog to stop, which is what makes its report
+// legal: the testing package panics on a log from a test that has already
+// completed, and the test cannot complete before the watch has ended.
+func watchPhase(tb testing.TB, timeout time.Duration, what, budget string) (end func()) {
 	if timeout <= 0 {
-		run()
-		return
+		return func() {}
 	}
 	done := make(chan struct{})
 	stopped := make(chan struct{})
 	go watchDeadline(tb, goroutineID(), timeout, what, budget, done, stopped)
-
-	// close(done) also runs when the phase exits via Goexit. Waiting for the
-	// watchdog to stop is what makes its report legal: the testing package
-	// panics on a log from a test that has already completed, and the test
-	// cannot complete while this frame is still on the stack.
-	defer func() {
+	return sync.OnceFunc(func() {
 		close(done)
 		<-stopped
-	}()
-	run()
+	})
 }
 
 // watchDeadline fails tb if the phase, running on goroutine gid, has not
 // finished within timeout. Reporting is safe from another goroutine while the
-// test is still running, which the handshake in watchWhile guarantees it is.
+// test is still running, which ending the watch (see [watchPhase]) guarantees.
 func watchDeadline(tb testing.TB, gid uint64, timeout time.Duration, what, budget string, done <-chan struct{}, stopped chan<- struct{}) {
 	defer close(stopped)
 
@@ -171,10 +194,20 @@ func watchDeadline(tb testing.TB, gid uint64, timeout time.Duration, what, budge
 	if hint := schedinfo.StarvationHint(); hint != "" {
 		suffix += "\n" + hint
 	}
-	fmt.Fprintf(os.Stderr, "gotest: %s %sexceeded its configured %s of %s and is still running %s\n",
-		tb.Name(), what, budget, timeout, sched)
+	// test2json streams the verdict as it is written, attributed to its
+	// test; a raw line there lands on whichever test printed last.
+	if !test2json() {
+		fmt.Fprintf(os.Stderr, "gotest: %s %sexceeded its configured %s of %s and is still running %s\n",
+			tb.Name(), what, budget, timeout, sched)
+	}
 	// The verdict belongs where the phase is running now.
 	reportAt(tb, phaseFrame(gid), fmt.Sprintf("%sexceeded its configured %s of %s and is still running%s", what, budget, timeout, suffix))
+}
+
+// test2json reports whether the binary runs under -test.v=test2json.
+func test2json() bool {
+	f := flag.Lookup("test.v")
+	return f != nil && f.Value.String() == "test2json"
 }
 
 // reportAt fails tb with msg located at at (file:line, or empty for none), in

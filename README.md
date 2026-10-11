@@ -561,7 +561,7 @@ Uses `Desc` or `Name` field for the test name, falls back to `#0`, `#1`, etc.
 
 ### Async Test Methods
 
-A method whose name ends in `Async` and whose last parameter is `done func()` completes when `done()` is called, not when it returns; the suite's `Timeout` fails it if `done()` never is, and the failure names the method's declaration.
+A method whose name ends in `Async` and whose last parameter is `done func()` completes when `done()` is called, not when it returns; the suite's `Timeout` fails it if `done()` never is, and the failure names the method's declaration. Once the method has returned it is waiting, not running, so that failure is the only one: it is not also reported as an overrun.
 
 ```go
 func (s *BusTestSuite) TestDeliveryAsync(t *gotest.T, done func()) {

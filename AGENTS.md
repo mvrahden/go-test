@@ -249,7 +249,7 @@ func (s *MyTestSuite) TestRead(t *gotest.T) {}
 
 Methods can also accept `*testing.T` for stdlib compatibility.
 
-A method named `Test*Async` with a trailing `done func()` parameter completes when `done()` is called, not when it returns (`(t, done)`, or `(t, ctx, done)` with a returning `BeforeEach`); the suite's `Timeout` fails it if `done()` never is. Prefer `Eventually` for anything that can be polled.
+A method named `Test*Async` with a trailing `done func()` parameter completes when `done()` is called, not when it returns (`(t, done)`, or `(t, ctx, done)` with a returning `BeforeEach`); the suite's `Timeout` fails it if `done()` never is, located at the method's declaration — and only that: a method waiting for `done()` is not reported as still running. Prefer `Eventually` for anything that can be polled.
 
 ### Lifecycle methods
 
@@ -327,8 +327,9 @@ It always bounds `t.Context()`. And it is a budget the phase is held to, enforce
 verdict — but only when **you** declare a positive duration in a `SuiteConfig`. `Timeout` cannot interrupt a
 running test, because Go has no way to stop another goroutine, so a method that ignores
 `t.Context()` and outlives the budget is failed instead. That failure is reported the
-moment the deadline passes, while the method is still running, and is written unbuffered
-so it survives a test that never returns at all.
+moment the deadline passes, while the method is still running, located at the line it is
+running, and is also written unbuffered to stderr so it survives a test that never returns
+at all (under `-json` it streams with its test instead).
 
 A suite with no `SuiteConfig` method, or a duration its marker leaves at zero, is not held
 to a budget: being failed against a number you did not choose is not a verdict you can act on. Bounding the process remains
