@@ -357,7 +357,7 @@ func unmatchedPatterns(patterns, buildFlags []string) []string {
 		return nil
 	}
 	args := append([]string{"list", "-e", "-find", "-f", "{{.ImportPath}}"}, buildFlags...)
-	cmd := exec.Command("go", append(args, candidates...)...)
+	cmd := exec.Command("go", append(args, candidates...)...) //nolint:gosec // G204: the go tool with the run's own patterns
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	_ = cmd.Run()
