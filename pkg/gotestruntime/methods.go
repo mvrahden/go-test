@@ -1,0 +1,97 @@
+package gotestruntime
+
+import (
+	"context"
+	"sync/atomic"
+	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+// Methods is a suite's method loop as a generated Test wrapper hands it to
+// [RunMethods].
+type Methods struct {
+	// Parallel runs every method as a parallel subtest.
+	Parallel bool
+	// Fixtures are the per-method hooks of the suite's package fixtures,
+	// dependencies first.
+	Fixtures []EachHooks
+	Cases    []Method
+}
+
+// EachHooks are one package fixture's per-method hooks; either is nil when
+// the fixture declares none.
+type EachHooks struct {
+	Name   string
+	Before func(context.Context) error
+	After  func(context.Context) error
+}
+
+// Method is one test method. Run calls the suite's BeforeEach, the method
+// through run, and the suite's AfterEach; only it knows their static types.
+type Method struct {
+	Name string
+	Run  func(t *gotest.T, run func(method func()))
+}
+
+// RunMethods runs each method as a subtest of t: fixture BeforeEach hooks,
+// then the method's Run, then fixture AfterEach hooks in reverse. cfg bounds
+// each method's context and budget is the Timeout it is held to, as returned
+// by [OpenSuite]. With cfg.FailFast, a failure stops the methods that have
+// not started yet.
+func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
+	var failed atomic.Bool
+	for _, c := range m.Cases {
+		t.Run(c.Name, func(it *testing.T) {
+			if m.Parallel {
+				it.Parallel()
+				if cfg.FailFast && failed.Load() {
+					it.Skip("FailFast: earlier test failed")
+				}
+				defer func() {
+					if it.Failed() {
+						failed.Store(true)
+					}
+				}()
+			}
+			tt := TestT(it, cfg.Timeout)
+			for _, f := range m.Fixtures {
+				if f.After != nil {
+					defer func() {
+						if err := f.After(context.Background()); err != nil { //nolint:fail-guard // the method has run; report and go on
+							it.Errorf("%s.AfterEach failed: %v", f.Name, err)
+						}
+					}()
+				}
+			}
+			for _, f := range m.Fixtures {
+				if f.Before != nil {
+					if err := f.Before(it.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook
+						it.Fatalf("%s.BeforeEach failed: %v", f.Name, err)
+					}
+				}
+			}
+			c.Run(tt, func(method func()) { RunTest(tt, budget.Timeout, method) })
+		})
+		if !m.Parallel && cfg.FailFast && t.Failed() {
+			return
+		}
+	}
+}
+
+// AwaitDone runs an async method through start and returns once it calls
+// done, failing t when t's context ends first.
+func AwaitDone(t *gotest.T, name string, start func(done func())) {
+	done := make(chan struct{}, 1)
+	start(func() {
+		select {
+		case done <- struct{}{}:
+		default:
+		}
+	})
+	select {
+	case <-done:
+	case <-t.Context().Done():
+		t.T().Fatalf("%s: done() was not called before the test deadline", name) //nolint:t-escape // runtime verdict, no user call site
+	}
+}

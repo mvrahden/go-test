@@ -200,11 +200,16 @@ func TestFooTestSuite(t *testing.T) {
         AfterAll:  s.AfterAll,
     })
 
-    t.Run("TestCreateUser", func(it *testing.T) {
-        ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-        defer s.AfterEach(ttt)
-        s.BeforeEach(ttt)
-        gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() { s.TestCreateUser(ttt) })
+    gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+        Parallel: true,                    // only if the config says so
+        Fixtures: []gotestruntime.EachHooks{...}, // fixtures' BeforeEach/AfterEach
+        Cases: []gotestruntime.Method{
+            {Name: "TestCreateUser", Run: func(ttt *gotest.T, run func(func())) {
+                defer s.AfterEach(ttt)
+                s.BeforeEach(ttt)
+                run(func() { ƒƒ_GOTEST_exec(s.TestCreateUser, ttt) })
+            }},
+        },
     })
 }
 ```
@@ -216,6 +221,17 @@ fixtures (below), resolves
 runs `BeforeAll` under `SetupTimeout`, and registers `AfterAll` as the
 wrapper's cleanup under a context that survives the cancellation testing
 performs before cleanups.
+
+`RunMethods` (`pkg/gotestruntime/methods.go`) is the method loop: one
+subtest per method, `it.Parallel()` and the `FailFast` stop, the method's
+`*gotest.T`, the fixtures' per-method hooks around each method, and the
+`Timeout` budget. Each case's `Run` is the only part left in generated code,
+because it needs the suite's static types: the suite's `BeforeEach` and
+`AfterEach`, with a returned context, and the method call. Every method call
+goes through the `ƒƒ_GOTEST_exec` trampoline, where an assertion's call-site
+search stops; runtime and generated frames are skipped either way. Async
+methods wait in `gotestruntime.AwaitDone`. Benchmark wrappers keep their own
+generated loop, fenced around the timer.
 
 For **suites with fixtures**, every generated top-level function — the
 `TestX` function, each `FuzzX_M` seed-replay wrapper, the `BenchmarkX`
@@ -562,7 +578,7 @@ The system has **four levels of parallelism**, each with distinct mechanisms:
 │                                                                     │
 │  Enabled by: SuiteConfig{ Parallel: true }                          │
 │  Requires:   BeforeEach returns per-test context struct             │
-│  Mechanism:  it.Parallel(); AfterAll via t.Cleanup                  │
+│  Mechanism:  it.Parallel() in RunMethods; AfterAll via t.Cleanup    │
 │  Concurrency governed by `-test.parallel` (default: GOMAXPROCS)     │
 │                                                                     │
 │  ┌─ Suite subprocess ──────────────────────────────────────────┐    │

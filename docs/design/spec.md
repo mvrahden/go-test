@@ -375,7 +375,7 @@ This provides process-level isolation between suites.
 The generated `func Test*` does **not** call `t.Parallel()` — parallelism is at the runner level, not the Go test scheduler level.
 
 **Method-level parallelism** is opt-in via `SuiteConfig{Parallel: true}`.
-Each generated subtest calls `it.Parallel()`; no explicit coordination is needed, because
+`gotestruntime.RunMethods` calls `it.Parallel()` in each method's subtest; no explicit coordination is needed, because
 `testing` itself only returns from the parent `t.Run` — and therefore only runs
 `t.Cleanup` — after every parallel child has finished.
 Method-level parallelism requires a returning `BeforeEach` — per-test state lives in the returned context, not on the shared suite struct.
@@ -411,11 +411,11 @@ When method-level parallelism is enabled, `AfterAll` still waits for every paral
 subtest to complete, but nothing in the generated code makes it wait: `t.Cleanup` — where
 `AfterAll` runs — only fires after `TestMyTestSuite` returns, and `testing` does not
 return from a parent test until all of its `t.Parallel()` children have finished. The
-generated code must never wait on the parallel subtests itself (a `sync.WaitGroup`, a
+method loop must never wait on the parallel subtests itself (a `sync.WaitGroup`, a
 channel): on panic, `testing` runs ancestor cleanups from the panicking goroutine while
 the subtest that would release such a wait is still parked inside `t.Run`, so any
-generated wait deadlocks against the panic unwind.
-With `FailFast`, parallel suites additionally share a `ƒfailed` atomic flag: a failed subtest sets it, and subtests that start afterwards skip themselves.
+wait deadlocks against the panic unwind.
+With `FailFast`, the parallel subtests of a suite additionally share a failure flag: a failed subtest sets it, and subtests that start afterwards skip themselves.
 
 On Windows, suite subprocesses run on a hidden console of their own and under a job object, so that a shutdown request and a force-kill reach the whole process tree and nothing outside it.
 
@@ -1331,17 +1331,17 @@ func TestMyTestSuite(t *testing.T) {
         AfterAll:  s.AfterAll,
     })
 
-    t.Run("TestSomething", func(it *testing.T) {
-        ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-        defer s.AfterEach(ttt)
-        s.BeforeEach(ttt)
-        gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-            ƒƒ_GOTEST_exec(s.TestSomething, ttt)
-        })
+    gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+        Cases: []gotestruntime.Method{
+            {Name: "TestSomething", Run: func(ttt *gotest.T, run func(func())) {
+                defer s.AfterEach(ttt)
+                s.BeforeEach(ttt)
+                run(func() {
+                    ƒƒ_GOTEST_exec(s.TestSomething, ttt)
+                })
+            }},
+        },
     })
-    if ƒcfg.FailFast && t.Failed() {
-        return
-    }
 }
 ```
 
@@ -1359,9 +1359,10 @@ budget, and `ƒcfg` is `gotestruntime.WithSuiteDefaults(ƒbudget)` for the
 contexts: a duration left at zero gets the default and no verdict, exactly as without a marker,
 and a negative one (`gotest.NoDeadline`) gets neither. Fixture markers are normalized the same
 way through `WithFixtureDefaults`, with the declared `Timeout` as their `Budget`.
+`RunMethods` owns the loop: the subtests, `it.Parallel()` and `FailFast`, the method's `*gotest.T` from `TestT`, the fixtures' per-method hooks, and `run`, which holds the method to `ƒbudget.Timeout` through `RunTest`. A case's `Run` keeps only what needs the suite's static types.
 Ordering nuance: in the returning-`BeforeEach` form, `ctx := s.BeforeEach(ttt)` runs *before* `defer s.AfterEach(ttt, ctx)` is registered — a fatal failure inside `BeforeEach` means `AfterEach` never runs.
 In the void form shown above, the deferred `AfterEach` is registered first and runs even when `BeforeEach` fails fatally.
-Method-parallel suites additionally emit the `ƒfailed` coordination described under Parallel Execution.
+Method-parallel suites pass `Parallel: true`; `RunMethods` then coordinates `FailFast` as described under Parallel Execution.
 
 ---
 

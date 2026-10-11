@@ -66,18 +66,17 @@ func TestQueryTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestInsert", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		ctx := s.BeforeEach(ttt)
-		defer s.AfterEach(ttt, ctx)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			s.TestInsert(ttt, ctx)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestInsert", Run: func(ttt *gotest.T, run func(func())) {
+				ctx := s.BeforeEach(ttt)
+				defer s.AfterEach(ttt, ctx)
+				run(func() {
+					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestInsert(t, ctx) }, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestBeforeEachRendering/returning_BeforeEach_parallel/renders_parallel_markers_and_WaitGroup ===
@@ -159,7 +158,6 @@ package testpkg
 import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
-	"sync/atomic"
 	"testing"
 )
 
@@ -186,26 +184,19 @@ func TestOrderTestSuite(t *testing.T) {
 		BeforeAll: s.BeforeAll,
 		AfterAll:  s.AfterAll,
 	})
-	ƒfailed := &atomic.Bool{}
 
-	t.Run("TestOne", func(it *testing.T) {
-		it.Parallel()
-		if ƒcfg.FailFast && ƒfailed.Load() {
-			it.Skip("FailFast: earlier test failed")
-		}
-		defer func() {
-			if it.Failed() {
-				ƒfailed.Store(true)
-			}
-		}()
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		ctx := s.BeforeEach(ttt)
-		defer s.AfterEach(ttt, ctx)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			s.TestOne(ttt, ctx)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Parallel: true,
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				ctx := s.BeforeEach(ttt)
+				defer s.AfterEach(ttt, ctx)
+				run(func() {
+					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestOne(t, ctx) }, ttt)
+				})
+			}},
+		},
 	})
-
 }
 
 === SNAP TestBeforeEachRendering/returning_BeforeEach_sequential/renders_context_passing_to_test_methods ===
@@ -242,30 +233,24 @@ func TestOrderTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		ctx := s.BeforeEach(ttt)
-		defer s.AfterEach(ttt, ctx)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			s.TestOne(ttt, ctx)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				ctx := s.BeforeEach(ttt)
+				defer s.AfterEach(ttt, ctx)
+				run(func() {
+					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestOne(t, ctx) }, ttt)
+				})
+			}},
+			{Name: "TestTwo", Run: func(ttt *gotest.T, run func(func())) {
+				ctx := s.BeforeEach(ttt)
+				defer s.AfterEach(ttt, ctx)
+				run(func() {
+					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestTwo(t, ctx) }, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("TestTwo", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		ctx := s.BeforeEach(ttt)
-		defer s.AfterEach(ttt, ctx)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			s.TestTwo(ttt, ctx)
-		})
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestBeforeEachRendering/void_BeforeEach_sequential/renders_sequential_suite_without_parallel_markers ===
@@ -298,18 +283,17 @@ func TestOrderTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestOne, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestOne, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestFixtureConfig/fixture_with_config/defaults_the_node's_zero_Timeout_and_enforces_only_the_declared_one ===
@@ -381,18 +365,17 @@ func TestCFGTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestOne, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestOne, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestFixtureConfig/fixture_with_config/renders_config_overlay_in_fixture_node ===
@@ -580,18 +563,17 @@ func TestPlainTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestOne, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestOne, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestFixtureConfig/fixture_without_config/uses_default_config_without_overlay ===
@@ -775,26 +757,24 @@ func TestEachTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestCase", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer func() {
-			if err := ƒ_EachFixture.AfterEach(context.Background()); err != nil {
-				it.Errorf("EachFixture.AfterEach failed: %v", err)
-			}
-		}()
-		if err := ƒ_EachFixture.BeforeEach(it.Context()); err != nil {
-			it.Fatalf("EachFixture.BeforeEach failed: %v", err)
-		}
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestCase, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Fixtures: []gotestruntime.EachHooks{
+			{
+				Name:   "EachFixture",
+				Before: func(ctx context.Context) error { return ƒ_EachFixture.BeforeEach(ctx) },
+				After:  func(ctx context.Context) error { return ƒ_EachFixture.AfterEach(ctx) },
+			},
+		},
+		Cases: []gotestruntime.Method{
+			{Name: "TestCase", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestCase, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestFixtureRendering/fixture_with_child_suite/renders_structural_elements_correctly ===
@@ -864,30 +844,24 @@ func TestQueryTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestInsert", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestInsert, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestInsert", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestInsert, ttt)
+				})
+			}},
+			{Name: "TestSelect", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestSelect, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("TestSelect", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestSelect, ttt)
-		})
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestFixtureRendering/fixture_without_AfterAll/omits_AfterAll_from_cleanup ===
@@ -954,18 +928,17 @@ func TestBasicTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestOne, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestOne, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestFixtureRendering/fixture_without_BeforeEach/AfterEach/omits_fixture_BeforeEach/AfterEach_calls ===
@@ -1032,18 +1005,17 @@ func TestMinimalTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestOne, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestOne, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestFixtureRendering/mixed_fixture-bound_and_standalone/renders_both_fixture-bound_and_standalone_suites ===
@@ -1110,18 +1082,17 @@ func TestBoundTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestBound", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestBound, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestBound", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestBound, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 type ƒƒ_GOTEST_StandaloneTestSuite struct {
@@ -1140,18 +1111,17 @@ func TestStandaloneTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestFree", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestFree, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestFree", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestFree, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestFixtureRendering/nested_fixture_with_BeforeEach/AfterEach/renders_parent_and_child_hooks_with_proper_ordering ===
@@ -1239,34 +1209,29 @@ func TestHandlerTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestGet", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer func() {
-			if err := ƒ_InfraFixture.AfterEach(context.Background()); err != nil {
-				it.Errorf("InfraFixture.AfterEach failed: %v", err)
-			}
-		}()
-		defer func() {
-			if err := ƒ_APIFixture.AfterEach(context.Background()); err != nil {
-				it.Errorf("APIFixture.AfterEach failed: %v", err)
-			}
-		}()
-		if err := ƒ_InfraFixture.BeforeEach(it.Context()); err != nil {
-			it.Fatalf("InfraFixture.BeforeEach failed: %v", err)
-		}
-		if err := ƒ_APIFixture.BeforeEach(it.Context()); err != nil {
-			it.Fatalf("APIFixture.BeforeEach failed: %v", err)
-		}
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestGet, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Fixtures: []gotestruntime.EachHooks{
+			{
+				Name:   "InfraFixture",
+				Before: func(ctx context.Context) error { return ƒ_InfraFixture.BeforeEach(ctx) },
+				After:  func(ctx context.Context) error { return ƒ_InfraFixture.AfterEach(ctx) },
+			},
+			{
+				Name:   "APIFixture",
+				Before: func(ctx context.Context) error { return ƒ_APIFixture.BeforeEach(ctx) },
+				After:  func(ctx context.Context) error { return ƒ_APIFixture.AfterEach(ctx) },
+			},
+		},
+		Cases: []gotestruntime.Method{
+			{Name: "TestGet", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestGet, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestMixedFieldStyles/same_fixture_with_embedded_and_named_fields/uses_type_name_for_embedded_and_custom_name_for_named_field ===
@@ -1333,18 +1298,17 @@ func TestEmbeddedTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestOne, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestOne, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 type ƒƒ_GOTEST_NamedTestSuite struct {
@@ -1369,18 +1333,17 @@ func TestNamedTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestOne, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestOne, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestNamedFields/child_to_parent_fixture/uses_named_parent_field_in_struct_literal ===
@@ -1468,18 +1431,17 @@ func TestLightTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestOne, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestOne, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 type ƒƒ_GOTEST_FullTestSuite struct {
@@ -1504,18 +1466,17 @@ func TestFullTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestOne, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestOne, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestNamedFields/shared_fixture_in_fixture/uses_named_field_for_shared_fixture_injection_via_struct_literal ===
@@ -1600,18 +1561,17 @@ func TestUserTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestOne, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestOne, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestNamedFields/suite_to_fixture/uses_named_field_in_struct_literal ===
@@ -1678,18 +1638,17 @@ func TestQueryTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestOne, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestOne, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestSharedFixture/cross-package_transitive_dependency/imports_the_transitive_shared_fixture_package ===
@@ -1772,18 +1731,17 @@ func TestMigrationTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestOne, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestOne, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestSharedFixture/embedding/renders_shared_fixture_as_DAG_node ===
@@ -1871,18 +1829,17 @@ func TestQueryTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestInsert", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestInsert, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestInsert", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestInsert, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestSharedFixture/empty_struct/renders_shared_fixture_as_DAG_node_and_struct_literal_wiring ===
@@ -1967,18 +1924,17 @@ func TestAppTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestRun", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestRun, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestRun", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestRun, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestStdlibTSupport/fixture-bound_suite/unwraps_lifecycle_methods_and_uses_adapter_for_test_cases ===
@@ -2045,18 +2001,17 @@ func TestStdlibTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestQuery", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestQuery(t.T()) }, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestQuery", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestQuery(t.T()) }, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestStdlibTSupport/mixed_suite/unwraps_stdlib_methods_and_uses_direct_reference_for_gotest_methods ===
@@ -2089,30 +2044,24 @@ func TestMixedTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestStdlib", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestStdlib(t.T()) }, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestStdlib", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestStdlib(t.T()) }, ttt)
+				})
+			}},
+			{Name: "TestGotest", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestGotest, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("TestGotest", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestGotest, ttt)
-		})
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestStdlibTSupport/standalone_suite/unwraps_via_.T()_and_uses_adapter_lambdas ===
@@ -2145,30 +2094,24 @@ func TestPlainTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestFoo", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestFoo(t.T()) }, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestFoo", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestFoo(t.T()) }, ttt)
+				})
+			}},
+			{Name: "TestBar", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestBar(t.T()) }, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
-	t.Run("TestBar", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestBar(t.T()) }, ttt)
-		})
-	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestSuiteConfig/suite_with_config/defaults_the_zero_durations_and_enforces_only_the_declared_ones ===
@@ -2202,18 +2145,17 @@ func TestConfiguredTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestOne, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestOne, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestSuiteConfig/suite_with_config/renders_config_overlay_and_deadline ===
@@ -2301,18 +2243,17 @@ func TestPlainTestSuite(t *testing.T) {
 		AfterAll:  s.AfterAll,
 	})
 
-	t.Run("TestOne", func(it *testing.T) {
-		ttt := gotestruntime.TestT(it, ƒcfg.Timeout)
-		defer s.AfterEach(ttt)
-		s.BeforeEach(ttt)
-		gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {
-			ƒƒ_GOTEST_exec(s.TestOne, ttt)
-		})
+	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+		Cases: []gotestruntime.Method{
+			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
+				defer s.AfterEach(ttt)
+				s.BeforeEach(ttt)
+				run(func() {
+					ƒƒ_GOTEST_exec(s.TestOne, ttt)
+				})
+			}},
+		},
 	})
-	if ƒcfg.FailFast && t.Failed() {
-		return
-	}
-
 }
 
 === SNAP TestSuiteConfig/suite_without_config/uses_default_config_without_overlay ===

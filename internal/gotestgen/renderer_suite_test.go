@@ -137,14 +137,12 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 
 func (s *RendererTestSuite) TestAsyncTestCases(t *gotest.T) {
 	t.When("a suite has an async test case", func(w *gotest.T) {
-		w.It("renders a done channel and deadline wait", func(it *gotest.T) {
+		w.It("awaits done in the runtime and calls every case through the trampoline", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_AsyncTestCases")
 			output, _ := renderTestPkg(it.T(), pkg, false)
-			gotest.Contains(it, output, "ƒdone := make(chan struct{}, 1)")
-			gotest.Contains(it, output, "case <-ƒdone:")
-			gotest.Contains(it, output, "done() was not called")
-			gotest.NotContains(it, output, "ƒƒ_GOTEST_exec(s.TestPingAsync", "async cases bypass the exec trampoline")
-			gotest.Contains(it, output, "ƒƒ_GOTEST_exec(s.TestPlain", "sync cases keep the trampoline")
+			gotest.Contains(it, output, `gotestruntime.AwaitDone(ttt, "TestPingAsync", func(done func()) {`)
+			gotest.Contains(it, output, "ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestPingAsync(t, done) }, ttt)")
+			gotest.Contains(it, output, "ƒƒ_GOTEST_exec(s.TestPlain, ttt)")
 		})
 	})
 }
@@ -217,12 +215,10 @@ func (s *RendererTestSuite) TestFixtureClosure(t *gotest.T) {
 
 func (s *RendererTestSuite) TestParallelFailFast(t *gotest.T) {
 	t.When("method-parallel suite with FailFast", func(w *gotest.T) {
-		w.It("emits a shared failure flag that skips not-yet-started subtests", func(it *gotest.T) {
+		w.It("hands the runtime loop a parallel suite and its config", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ParallelFailFast")
 			output, _ := renderTestPkg(it.T(), pkg, false)
-			gotest.Contains(it, output, "ƒfailed.Load()", "parallel subtests must consult the shared failure flag")
-			gotest.Contains(it, output, "ƒfailed.Store(true)", "failing subtests must set the shared failure flag")
-			gotest.Contains(it, output, "it.Skip(", "flagged subtests must skip instead of running")
+			gotest.Regexp(it, `gotestruntime\.RunMethods\(t, ƒcfg, ƒbudget, gotestruntime\.Methods\{\s+Parallel: true,`, output)
 		})
 	})
 }
@@ -371,7 +367,7 @@ func (s *RendererTestSuite) TestUndeclaredBudgetIsZero(t *gotest.T) {
 			// zero budget, so nothing holds it to a number it never wrote.
 			gotest.Contains(it, source, "ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{")
 			gotest.NotContains(it, source, "SuiteConfig")
-			gotest.Contains(it, source, "gotestruntime.RunTest(ttt, ƒbudget.Timeout, func() {")
+			gotest.Contains(it, source, "gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{")
 			gotest.NotContains(it, source, "sync.WaitGroup")
 		})
 	})
@@ -453,14 +449,13 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
-			stripped := strings.ReplaceAll(output, "it.Parallel()", "")
-			gotest.NotContains(it, stripped, "t.Parallel()", "suite-level t.Parallel() should not be emitted")
+			gotest.NotContains(it, output, "t.Parallel()", "the runtime marks methods parallel, never the suite")
 
 			// A suite-scoped barrier in t.Cleanup deadlocks against Go's panic
 			// unwind, which runs ancestor cleanups from the panicking goroutine
 			// while the test method that would release the barrier is still
 			// parked in t.Run. Go already orders cleanup after all subtests.
-			gotest.Contains(it, output, "it.Parallel()", "parallel suite should call it.Parallel()")
+			gotest.Contains(it, output, "Parallel: true,", "parallel suite should run its methods in parallel")
 			gotest.NotContains(it, output, "sync.WaitGroup", "parallel suite must not gate cleanup on a WaitGroup")
 			gotest.NotContains(it, output, "wg.Wait()", "parallel suite must not wait on test methods from t.Cleanup")
 			gotest.NotContains(it, output, `"sync"`, "parallel suite should not import sync")
