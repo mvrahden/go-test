@@ -170,6 +170,7 @@ The first argument is checked (literally) against the known subcommand set.
 If it matches, it's consumed.
 Otherwise, it's a package pattern.
 `gotest ./watch` tests the `watch` package; `gotest watch` enters watch mode.
+Past the first argument, every positional argument that is not a flag's value is a package pattern, as `go test` reads it: import paths such as `fmt` and the meta patterns `all`, `std`, `cmd`, `tool` and `work` included. A flag gotest does not know takes the non-flag after it as its value, as `go test` assumes, and everything after `-args` goes to the test binary.
 
 ### Examples
 

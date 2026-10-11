@@ -169,33 +169,25 @@ func extractStringFlag(args []string, name, defaultVal string) string {
 	return defaultVal
 }
 
-func ExtractPackagePatterns(goTestArgs []string) []string {
+// ExtractPackagePatterns returns the package patterns in args as go test
+// reads them: every positional argument that is not a flag's value, meta
+// patterns (all, std, tool, work) and bare import paths (fmt) included.
+// Without one it is the current directory.
+func ExtractPackagePatterns(args []string) []string {
 	var patterns []string
-	for i := 0; i < len(goTestArgs); i++ {
-		arg := goTestArgs[i]
-		if arg == "-args" {
-			break
-		}
-		if strings.HasPrefix(arg, "-") {
-			// Pair space-separated values with their flag, exactly as
-			// SplitArgs does when it builds goTestArgs: the value of
-			// "-bench ^BenchmarkSuite$/^BenchmarkMethod$" carries a "/" that
-			// LooksLikePackagePattern would otherwise claim as a package.
-			if name, _, hasEquals := strings.Cut(arg, "="); !hasEquals {
-				if isValue, known := gotestrunner.IsGoTestFlag(name); known && isValue && i+1 < len(goTestArgs) {
-					i++
-				}
-			}
-			continue
-		}
-		if gotestrunner.LooksLikePackagePattern(arg) {
-			patterns = append(patterns, arg)
-		}
+	for _, i := range gotestrunner.PatternIndices(args, ownFlag) {
+		patterns = append(patterns, args[i])
 	}
 	if len(patterns) == 0 {
 		return []string{"."}
 	}
 	return patterns
+}
+
+// ownFlag reports whether a gotest flag takes a value.
+func ownFlag(name string) (isValue, known bool) {
+	kind, ok := gotestFlags[name]
+	return kind == ValueFlag, ok
 }
 
 func extractTagsFlag(args []string) (tags string, remaining []string) {

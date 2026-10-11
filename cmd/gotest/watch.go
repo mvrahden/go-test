@@ -378,12 +378,15 @@ func dirsToPatterns(dirs map[string]bool) []string {
 }
 
 func replacePatterns(originalArgs []string, newPatterns []string) []string {
+	drop := map[int]bool{}
+	for _, i := range gotestrunner.PatternIndices(originalArgs, ownFlag) {
+		drop[i] = true
+	}
 	var args []string
-	for _, arg := range originalArgs {
-		if gotestrunner.LooksLikePackagePattern(arg) {
-			continue
+	for i, arg := range originalArgs {
+		if !drop[i] {
+			args = append(args, arg)
 		}
-		args = append(args, arg)
 	}
 	args = append(args, newPatterns...)
 	return args

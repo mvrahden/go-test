@@ -46,6 +46,21 @@ func (s *ArgsTestSuite) TestIsGoTestFlag(t *gotest.T) {
 	}
 }
 
+// Every positional argument that is not a flag's value is a package
+// pattern, as go test reads it, whatever its shape.
+func (s *ArgsTestSuite) TestPackagePatterns(t *gotest.T) {
+	t.It("classifies meta patterns and bare import paths as patterns", func(it *gotest.T) {
+		c := gotestrunner.ClassifyGoTestArgs([]string{"-run", "X", "std", "fmt", "-count", "2", "./a"})
+		gotest.Equal(it, []string{"std", "fmt", "./a"}, c.PkgPatterns)
+		gotest.Equal(it, []string{"-run", "X", "-count", "2"}, c.RunFlags)
+	})
+	t.It("gives an unknown flag the non-flag after it as its value", func(it *gotest.T) {
+		c := gotestrunner.ClassifyGoTestArgs([]string{"-custom", "value", "fmt"})
+		gotest.Equal(it, []string{"-custom", "value"}, c.BuildFlags)
+		gotest.Equal(it, []string{"fmt"}, c.PkgPatterns)
+	})
+}
+
 // -vet reaches `go test -c`, where vet runs, and must never reach
 // packages.Load, which rejects it like the cover flags.
 func (s *ArgsTestSuite) TestVetFlag(t *gotest.T) {

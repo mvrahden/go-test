@@ -73,6 +73,12 @@ func (s *WatchTestSuite) TestWatchHelpers(t *gotest.T) {
 				expected:    []string{"-v", "-race", "./pkg/new"},
 			},
 			{
+				Desc:        "keeps flag values and replaces import paths",
+				original:    []string{"-run", "X", "fmt", "-count", "2"},
+				newPatterns: []string{"./changed"},
+				expected:    []string{"-run", "X", "-count", "2", "./changed"},
+			},
+			{
 				Desc:        "multiple patterns replaced",
 				original:    []string{"-v", "./pkg/a", "./pkg/b", "-race"},
 				newPatterns: []string{"./changed"},

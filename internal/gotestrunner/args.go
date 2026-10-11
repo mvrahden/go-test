@@ -98,9 +98,7 @@ func ClassifyGoTestArgs(args []string) ClassifiedArgs {
 		}
 
 		if !strings.HasPrefix(arg, "-") {
-			if LooksLikePackagePattern(arg) {
-				result.PkgPatterns = append(result.PkgPatterns, arg)
-			}
+			result.PkgPatterns = append(result.PkgPatterns, arg)
 			i++
 			continue
 		}
@@ -161,8 +159,13 @@ func ClassifyGoTestArgs(args []string) ClassifiedArgs {
 
 		// Unrecognized flag: pass to build (conservative — unknown flags
 		// are more likely build-related custom tooling than test binary flags).
+		// As go test does, a non-flag after it is taken as its value.
 		result.BuildFlags = append(result.BuildFlags, arg)
 		i++
+		if !hasEquals && i < len(args) && !strings.HasPrefix(args[i], "-") {
+			result.BuildFlags = append(result.BuildFlags, args[i])
+			i++
+		}
 	}
 
 	if needsCoverBuild {
@@ -367,6 +370,41 @@ func InjectParallel(runFlags []string, n int) []string {
 	return append(runFlags, fmt.Sprintf("-parallel=%d", n))
 }
 
-func LooksLikePackagePattern(s string) bool {
-	return strings.HasPrefix(s, ".") || strings.HasPrefix(s, "/") || strings.Contains(s, "/") || strings.Contains(s, "\\")
+// PatternIndices returns the indices of the package patterns in args, read
+// as go test reads them: every positional argument that is not a flag's
+// value, up to -args. own, if set, names the flags other than go test's
+// that args may carry, reporting whether each takes a value; a flag neither
+// knows takes the non-flag after it as its value, as go test assumes.
+func PatternIndices(args []string, own func(name string) (isValue, known bool)) []int {
+	var idx []int
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "-args" || arg == "--args":
+			return idx
+		case arg == "--":
+			continue
+		case !strings.HasPrefix(arg, "-"):
+			idx = append(idx, i)
+			continue
+		}
+		name, _, hasEquals := strings.Cut(arg, "=")
+		if hasEquals {
+			continue
+		}
+		isValue, known := false, false
+		if own != nil {
+			isValue, known = own(name)
+		}
+		if !known {
+			isValue, known = IsGoTestFlag("-" + strings.TrimLeft(name, "-"))
+		}
+		if !known {
+			isValue = i+1 < len(args) && !strings.HasPrefix(args[i+1], "-")
+		}
+		if isValue {
+			i++
+		}
+	}
+	return idx
 }
