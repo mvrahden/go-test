@@ -5,7 +5,7 @@ package unidiff
 import (
 	"bytes"
 	"fmt"
-	"slices"
+	"math"
 	"strings"
 )
 
@@ -46,96 +46,237 @@ type op struct {
 	i, j int
 }
 
-// script returns a shortest edit script from a to b (Myers' O(ND) diff),
-// after trimming the common prefix and suffix.
+// script returns an edit script from a to b, deletions before insertions
+// within each change. It is a shortest one unless the inputs are so
+// different that the search gives up on minimality to stay fast.
 func script(a, b []string) []op {
-	pre := 0
-	for pre < len(a) && pre < len(b) && a[pre] == b[pre] {
-		pre++
-	}
-	suf := 0
-	for suf < len(a)-pre && suf < len(b)-pre && a[len(a)-1-suf] == b[len(b)-1-suf] {
-		suf++
-	}
-
+	ia, ib := intern(a, b)
 	var ops []op
-	for k := range pre {
-		ops = append(ops, op{' ', k, k})
+	i, j := 0, 0
+	for _, p := range common(ia, ib) {
+		for ; i < p.i; i++ {
+			ops = append(ops, op{'-', i, j})
+		}
+		for ; j < p.j; j++ {
+			ops = append(ops, op{'+', i, j})
+		}
+		ops = append(ops, op{' ', i, j})
+		i, j = i+1, j+1
 	}
-	for _, o := range myers(a[pre:len(a)-suf], b[pre:len(b)-suf]) {
-		ops = append(ops, op{o.kind, o.i + pre, o.j + pre})
+	for ; i < len(a); i++ {
+		ops = append(ops, op{'-', i, j})
 	}
-	for k := suf; k > 0; k-- {
-		ops = append(ops, op{' ', len(a) - k, len(b) - k})
+	for ; j < len(b); j++ {
+		ops = append(ops, op{'+', i, j})
 	}
 	return ops
 }
 
-// myers computes the edit script of a to b, deletions before insertions.
-func myers(a, b []string) []op {
-	n, m := len(a), len(b)
-	maxD := n + m
-	off := maxD + 1
-	v := make([]int, 2*maxD+3)
-	// trace[d] holds v[off-d-1 : off+d+2] as step d found it.
-	var trace [][]int
-	for d := 0; d <= maxD; d++ {
-		trace = append(trace, slices.Clone(v[off-d-1:off+d+2]))
-		for k := -d; k <= d; k += 2 {
-			var x int
-			if k == -d || (k != d && v[off+k-1] < v[off+k+1]) {
-				x = v[off+k+1] // down: an insertion
-			} else {
-				x = v[off+k-1] + 1 // right: a deletion
+// expensiveFloor is the least edit cost at which a split gives up on
+// minimality; it grows with the square root of the input, as in GNU diff.
+var expensiveFloor = 4096
+
+// intern numbers the distinct lines of a and b.
+func intern(a, b []string) (ia, ib []int) {
+	ids := map[string]int{}
+	num := func(lines []string) []int {
+		out := make([]int, len(lines))
+		for k, l := range lines {
+			id, ok := ids[l]
+			if !ok {
+				id = len(ids)
+				ids[l] = id
 			}
-			y := x - k
-			for x < n && y < m && a[x] == b[y] {
-				x++
-				y++
-			}
-			v[off+k] = x
-			if x >= n && y >= m {
-				return backtrack(trace, n, m, d)
-			}
+			out[k] = id
 		}
+		return out
 	}
-	return nil // unreachable: d = n+m always reaches the end
+	return num(a), num(b)
 }
 
-// backtrack walks the saved frontiers from (n, m) back to (0, 0).
-func backtrack(trace [][]int, n, m, d int) []op {
-	var rev []op
-	x, y := n, m
-	for ; d > 0; d-- {
-		prev := trace[d]
-		at := func(k int) int { return prev[k+d+1] } // v[k] before step d
-		k := x - y
-		pk := k - 1
-		if k == -d || (k != d && at(k-1) < at(k+1)) {
-			pk = k + 1
+// pair is a line kept from a[i] to b[j].
+type pair struct{ i, j int }
+
+// common returns a longest common subsequence of a and b as index pairs,
+// in order. A line only one side has can be in none, so the search runs
+// over the lines both have: a file rewritten wholesale costs no search.
+func common(a, b []int) []pair {
+	inA, inB := map[int]bool{}, map[int]bool{}
+	for _, x := range a {
+		inA[x] = true
+	}
+	for _, y := range b {
+		inB[y] = true
+	}
+	var sa, sb []int // the shared lines
+	var ma, mb []int // their indexes in a and b
+	for k, x := range a {
+		if inB[x] {
+			sa, ma = append(sa, x), append(ma, k)
 		}
-		px := at(pk)
-		py := px - pk
-		for x > px && y > py {
-			x--
-			y--
-			rev = append(rev, op{' ', x, y})
+	}
+	for k, y := range b {
+		if inA[y] {
+			sb, mb = append(sb, y), append(mb, k)
 		}
-		if pk == k+1 {
-			y--
-			rev = append(rev, op{'+', x, y})
+	}
+
+	n, m := len(sa), len(sb)
+	s := &search{a: sa, b: sb, fd: make([]int, n+m+3), bd: make([]int, n+m+3), off: m + 1}
+	grow := 1
+	for d := n + m + 3; d != 0; d >>= 2 {
+		grow <<= 1
+	}
+	s.expensive = max(expensiveFloor, grow)
+	s.compare(0, n, 0, m)
+	for k := range s.out {
+		s.out[k] = pair{ma[s.out[k].i], mb[s.out[k].j]}
+	}
+	return s.out
+}
+
+// search finds a longest common subsequence in linear space, after Myers'
+// "An O(ND) Difference Algorithm and Its Variations" (1986), section 4b:
+// the middle of a shortest edit script splits the problem in two.
+type search struct {
+	a, b      []int
+	fd, bd    []int // furthest x per diagonal x-y, forward and backward
+	off       int   // index of diagonal 0 in fd and bd
+	expensive int   // edit cost after which a split stops being optimal
+	out       []pair
+}
+
+// compare appends the common subsequence of a[x0:x1] and b[y0:y1].
+func (s *search) compare(x0, x1, y0, y1 int) {
+	for x0 < x1 && y0 < y1 && s.a[x0] == s.b[y0] {
+		s.out = append(s.out, pair{x0, y0})
+		x0, y0 = x0+1, y0+1
+	}
+	suffix := 0
+	for x1 > x0 && y1 > y0 && s.a[x1-1] == s.b[y1-1] {
+		x1, y1 = x1-1, y1-1
+		suffix++
+	}
+	if x0 < x1 && y0 < y1 {
+		xm, ym := s.middle(x0, x1, y0, y1)
+		s.compare(x0, xm, y0, ym)
+		s.compare(xm, x1, ym, y1)
+	}
+	for k := range suffix {
+		s.out = append(s.out, pair{x1 + k, y1 + k})
+	}
+}
+
+// middle returns a point on a shortest path through a[x0:x1] and b[y0:y1]
+// that leaves both halves smaller, extending the paths from both ends one
+// edit at a time until they overlap. Past s.expensive edits it settles for
+// the point that got furthest. Both sequences are non-empty and differ in
+// their first and last elements.
+func (s *search) middle(x0, x1, y0, y1 int) (xm, ym int) {
+	fd, bd, o := s.fd, s.bd, s.off
+	dmin, dmax := x0-y1, x1-y0 // the diagonals the box spans
+	fmid, bmid := x0-y0, x1-y1 // where each path starts
+	fmin, fmax, bmin, bmax := fmid, fmid, bmid, bmid
+	odd := (fmid-bmid)&1 != 0
+	fd[o+fmid], bd[o+bmid] = x0, x1
+	for c := 1; ; c++ {
+		// One more edit forward; unreachable diagonals hold sentinels.
+		if fmin > dmin {
+			fmin--
+			fd[o+fmin-1] = -1
 		} else {
-			x--
-			rev = append(rev, op{'-', x, y})
+			fmin++
+		}
+		if fmax < dmax {
+			fmax++
+			fd[o+fmax+1] = -1
+		} else {
+			fmax--
+		}
+		for d := fmax; d >= fmin; d -= 2 {
+			x := fd[o+d+1] // an insertion
+			if lo := fd[o+d-1]; lo >= x {
+				x = lo + 1 // a deletion
+			}
+			y := x - d
+			for x < x1 && y < y1 && s.a[x] == s.b[y] {
+				x, y = x+1, y+1
+			}
+			fd[o+d] = x
+			if odd && bmin <= d && d <= bmax && bd[o+d] <= x {
+				return x, y
+			}
+		}
+
+		// One more edit backward.
+		if bmin > dmin {
+			bmin--
+			bd[o+bmin-1] = math.MaxInt
+		} else {
+			bmin++
+		}
+		if bmax < dmax {
+			bmax++
+			bd[o+bmax+1] = math.MaxInt
+		} else {
+			bmax--
+		}
+		for d := bmax; d >= bmin; d -= 2 {
+			x := bd[o+d-1] // a deletion
+			if hi := bd[o+d+1]; hi-1 < x {
+				x = hi - 1 // an insertion
+			}
+			y := x - d
+			for x > x0 && y > y0 && s.a[x-1] == s.b[y-1] {
+				x, y = x-1, y-1
+			}
+			bd[o+d] = x
+			if !odd && fmin <= d && d <= fmax && x <= fd[o+d] {
+				return x, y
+			}
+		}
+
+		if c >= s.expensive {
+			if xm, ym, ok := s.furthest(x0, x1, y0, y1, fmin, fmax, bmin, bmax); ok {
+				return xm, ym
+			}
 		}
 	}
-	for x > 0 && y > 0 {
-		x--
-		y--
-		rev = append(rev, op{' ', x, y})
+}
+
+// furthest returns the end of whichever path, forward or backward, has
+// covered more of the box, unless that point is a corner of the box and so
+// would split nothing off.
+func (s *search) furthest(x0, x1, y0, y1, fmin, fmax, bmin, bmax int) (xm, ym int, ok bool) {
+	fd, bd, o := s.fd, s.bd, s.off
+	fbest, fx := -1, 0
+	for d := fmax; d >= fmin; d -= 2 {
+		x := min(fd[o+d], x1)
+		y := x - d
+		if y > y1 {
+			x, y = y1+d, y1
+		}
+		if x+y > fbest {
+			fbest, fx = x+y, x
+		}
 	}
-	slices.Reverse(rev)
-	return rev
+	bbest, bx := math.MaxInt, 0
+	for d := bmax; d >= bmin; d -= 2 {
+		x := max(x0, bd[o+d])
+		y := x - d
+		if y < y0 {
+			x, y = y0+d, y0
+		}
+		if x+y < bbest {
+			bbest, bx = x+y, x
+		}
+	}
+	xm, ym = bx, bbest-bx
+	if (x1+y1)-bbest < fbest-(x0+y0) {
+		xm, ym = fx, fbest-fx
+	}
+	corner := (xm == x0 && ym == y0) || (xm == x1 && ym == y1)
+	return xm, ym, !corner
 }
 
 // hunks groups ops into runs of changes with up to context kept lines

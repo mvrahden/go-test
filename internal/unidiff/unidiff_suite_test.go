@@ -3,6 +3,7 @@ package unidiff_test
 import (
 	"fmt"
 	"math/rand/v2"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -103,6 +104,167 @@ func (s *UnidiffTestSuite) TestRoundTrip(t *gotest.T) {
 			gotest.Empty(it, failures)
 		})
 	})
+}
+
+func (s *UnidiffTestSuite) TestMinimal(t *gotest.T) {
+	t.When("random edits are diffed", func(w *gotest.T) {
+		rng := rand.New(rand.NewPCG(5, 6)) //nolint:gosec // G404: a fixed seed keeps the cases reproducible
+		var failures []string
+		for i := range 1000 {
+			before := randomText(rng)
+			after := mutate(rng, before)
+			if i%2 == 1 { // unrelated texts, sharing lines
+				before, after = randomLines(rng, rng.IntN(40), 4), randomLines(rng, rng.IntN(40), 4)
+			}
+			diff := unidiff.Diff("a/f", "b/f", []byte(before), []byte(after))
+			want := len(splitLines(before)) - lcsLen(splitLines(before), splitLines(after))
+			if got := deletions(diff); got != want {
+				failures = append(failures, fmt.Sprintf("#%d: %d deletions, want %d\nbefore %q\nafter  %q", i, got, want, before, after))
+			}
+		}
+
+		w.It("deletes only the lines outside a longest common subsequence", func(it *gotest.T) {
+			gotest.Empty(it, failures)
+		})
+	})
+}
+
+// UnidiffCostCapTestSuite holds the diff correct where the search stops
+// looking for a shortest script.
+// Sequential: it lowers the package-wide cost floor.
+type UnidiffCostCapTestSuite struct {
+	restore func()
+}
+
+func (s *UnidiffCostCapTestSuite) BeforeAll(t *gotest.T) {
+	s.restore = unidiff.SetExpensiveFloor(1)
+}
+
+func (s *UnidiffCostCapTestSuite) AfterAll(t *gotest.T) {
+	if s.restore != nil {
+		s.restore()
+	}
+}
+
+func (s *UnidiffCostCapTestSuite) TestRoundTrip(t *gotest.T) {
+	t.When("random texts are diffed past the cost floor", func(w *gotest.T) {
+		rng := rand.New(rand.NewPCG(7, 8)) //nolint:gosec // G404: a fixed seed keeps the cases reproducible
+		var failures []string
+		longer := 0
+		for i := range 500 {
+			before, after := randomLines(rng, 200, 4), randomLines(rng, 200, 4)
+			diff := unidiff.Diff("a/f", "b/f", []byte(before), []byte(after))
+			got, err := apply(before, diff)
+			if err != nil || got != after {
+				failures = append(failures, fmt.Sprintf("#%d: %v\nbefore %q\nafter  %q\ngot    %q", i, err, before, after, got))
+			}
+			if deletions(diff) > len(splitLines(before))-lcsLen(splitLines(before), splitLines(after)) {
+				longer++
+			}
+		}
+
+		w.It("gives up on a shortest script for some", func(it *gotest.T) {
+			gotest.NotZero(it, longer)
+		})
+		w.It("patching the old text with the diff still yields the new", func(it *gotest.T) {
+			gotest.Empty(it, failures)
+		})
+	})
+}
+
+// UnidiffLargeTestSuite bounds what diffing large files allocates.
+// Sequential: it reads the process-wide allocation counter.
+type UnidiffLargeTestSuite struct{}
+
+// allocated returns the bytes f allocates.
+func allocated(f func()) uint64 {
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	f()
+	runtime.ReadMemStats(&after)
+	return after.TotalAlloc - before.TotalAlloc
+}
+
+func (s *UnidiffLargeTestSuite) TestLargeInputs(t *gotest.T) {
+	const limit = 64 << 20
+
+	t.When("every line of 20000 changes", func(w *gotest.T) {
+		// gofmt rewriting a CRLF file to LF changes every line.
+		after := lines(20000, nil)
+		before := strings.ReplaceAll(after, "\n", "\r\n")
+		var diff string
+		n := allocated(func() { diff = unidiff.Diff("a/f", "b/f", []byte(before), []byte(after)) })
+
+		w.It("allocates a bounded amount", func(it *gotest.T) {
+			gotest.Less(it, n, uint64(limit))
+		})
+		w.It("replaces the file in one hunk", func(it *gotest.T) {
+			gotest.Equal(it, 20000, deletions(diff))
+			gotest.Equal(it, 1, strings.Count(diff, "\n@@ "))
+		})
+	})
+
+	t.When("20000 lines share content in no useful order", func(w *gotest.T) {
+		rng := rand.New(rand.NewPCG(9, 10)) //nolint:gosec // G404: a fixed seed keeps the cases reproducible
+		before, after := randomLines(rng, 20000, 10), randomLines(rng, 20000, 10)
+		var diff string
+		n := allocated(func() { diff = unidiff.Diff("a/f", "b/f", []byte(before), []byte(after)) })
+		got, err := apply(before, diff)
+
+		w.It("allocates a bounded amount", func(it *gotest.T) {
+			gotest.Less(it, n, uint64(limit))
+		})
+		w.It("patching the old text with the diff yields the new", func(it *gotest.T) {
+			gotest.NoError(it, err)
+			gotest.Equal(it, after, got)
+		})
+	})
+}
+
+// randomLines returns n lines drawn from alphabet distinct ones.
+func randomLines(rng *rand.Rand, n, alphabet int) string {
+	var b strings.Builder
+	for range n {
+		b.WriteString(strconv.Itoa(rng.IntN(alphabet)) + "\n")
+	}
+	return b.String()
+}
+
+func splitLines(s string) []string {
+	ls := strings.SplitAfter(s, "\n")
+	if ls[len(ls)-1] == "" {
+		ls = ls[:len(ls)-1]
+	}
+	return ls
+}
+
+// lcsLen returns the length of a longest common subsequence, by dynamic
+// programming.
+func lcsLen(a, b []string) int {
+	prev, cur := make([]int, len(b)+1), make([]int, len(b)+1)
+	for i := range a {
+		for j := range b {
+			if a[i] == b[j] {
+				cur[j+1] = prev[j] + 1
+			} else {
+				cur[j+1] = max(prev[j+1], cur[j])
+			}
+		}
+		prev, cur = cur, prev
+	}
+	return prev[len(b)]
+}
+
+// deletions counts a diff's deleted lines.
+func deletions(diff string) int {
+	n := 0
+	rows := strings.Split(diff, "\n")
+	for _, row := range rows[min(2, len(rows)):] { // past the header
+		if strings.HasPrefix(row, "-") {
+			n++
+		}
+	}
+	return n
 }
 
 func randomText(rng *rand.Rand) string {
