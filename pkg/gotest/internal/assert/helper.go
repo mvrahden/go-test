@@ -56,7 +56,9 @@ func SkipInternalFrames(tt *testing.T) string {
 	for {
 		frame, more := frames.Next()
 		if IsGotestSource(frame.File) || IsGeneratedBridge(frame.File) {
-			toMark = append(toMark, frame.PC)
+			if pc, ok := helperPC(&frame); ok {
+				toMark = append(toMark, pc)
+			}
 		} else if firstUserFrame == "" {
 			firstUserFrame = fmt.Sprintf("%s:%d", filepath.Base(frame.File), frame.Line)
 		}
@@ -87,4 +89,14 @@ func SkipInternalFrames(tt *testing.T) string {
 	}
 
 	return firstUserFrame
+}
+
+// helperPC returns frame's PC in the return-address form Helper records, and
+// whether testing resolves it to frame's function. frame.PC is already backed
+// up into the call; testing backs it up again, which next to an inlined call
+// lands in the callee and would hide the user's frame instead.
+func helperPC(frame *runtime.Frame) (uintptr, bool) {
+	pc := frame.PC + 1
+	at, _ := runtime.CallersFrames([]uintptr{pc}).Next()
+	return pc, at.Function == frame.Function
 }
