@@ -37,7 +37,7 @@ type Change struct {
 // fix is left or a pass changes nothing. It writes nothing: it returns the
 // analysis of the fixed sources and the files that changed, sorted. Fixed
 // sources that no longer load are an error, with no changes.
-func Fix(ctx context.Context, dir string, patterns []string, tests bool, res *Result) (*Result, []Change, error) {
+func Fix(ctx context.Context, t Targets, res *Result) (*Result, []Change, error) {
 	f := &fixer{current: map[string][]byte{}, original: map[string][]byte{}}
 	defer f.forget()
 	for range fixPasses {
@@ -51,7 +51,7 @@ func Fix(ctx context.Context, dir string, patterns []string, tests bool, res *Re
 		if !progress {
 			break
 		}
-		if res, err = analyze(ctx, dir, patterns, tests, f.current); err != nil {
+		if res, err = analyze(ctx, t, f.current); err != nil {
 			return nil, nil, fmt.Errorf("after applying fixes: %w", err)
 		}
 	}

@@ -14,5 +14,5 @@ func ExportSetSkip(r Rule, v bool) { *cfg.skip[r] = v }
 
 // ExportLoad loads the targets from disk.
 func ExportLoad(dir string, patterns []string, tests bool) ([]*packages.Package, error) {
-	return load(context.Background(), dir, patterns, tests, nil)
+	return load(context.Background(), Targets{Dir: dir, Patterns: patterns, Tests: tests}, nil)
 }

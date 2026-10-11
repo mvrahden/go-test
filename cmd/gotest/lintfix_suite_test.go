@@ -543,6 +543,92 @@ func (s *LintFixTestSuite) TestTargets(t *gotest.T) {
 	})
 }
 
+// lintFixSecondProbe adds a second file with a fixable finding.
+const lintFixSecondProbe = `package lintfix
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+func (s *ProbeTestSuite) TestSecond(t *gotest.T) {
+	gotest.True(t, 2 == 2)
+}
+`
+
+func (s *LintFixTestSuite) TestWrites(t *gotest.T) {
+	t.When("one of the fixed files cannot be written", func(w *gotest.T) {
+		if runtime.GOOS == "windows" {
+			w.Skipf("read-only files are still renamed over on Windows' permission model")
+		}
+		dir, file := s.stageProbe(w, lintFixProbe)
+		second := filepath.Join(dir, "second_test.go")
+		gotest.NoError(w, os.WriteFile(second, []byte(lintFixSecondProbe), 0o400))
+		before := listDir(w, dir)
+		stdout, stderr, code := s.runLintIn(w, dir, nil, "lint", "-fix", "./...")
+
+		w.It("exits 1 and says nothing was written", func(it *gotest.T) {
+			gotest.Regexp(it, `^FAIL: writing fixes: open \S*second_test\.go: permission denied; nothing was written\n$`, stderr)
+			gotest.Empty(it, stdout)
+			gotest.Equal(it, 1, code, stderr)
+		})
+		w.It("writes none of them and leaves no temporary file", func(it *gotest.T) {
+			gotest.Equal(it, lintFixProbe, readLintFixFile(it, file))
+			gotest.Equal(it, before, listDir(it, dir))
+		})
+	})
+
+	t.When("a fixed file changes on disk while lint fixes it", func(w *gotest.T) {
+		dir, file := s.stageProbe(w, lintFixProbe)
+		// The shim edits the file at the second load, of the fixed sources.
+		count := filepath.Join(w.TempDir(), "loads")
+		path := goShim(w, `case "$*" in *-json=*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then echo '// edited' >> '`+file+`'; fi;; esac`)
+		stdout, stderr, code := s.runLintIn(w, dir, []string{path}, "lint", "-fix", "./...")
+
+		w.It("exits 1, says nothing was written and keeps the edit", func(it *gotest.T) {
+			gotest.Regexp(it, `^FAIL: writing fixes: \S*probe_test\.go changed since lint read it; nothing was written\n$`, stderr)
+			gotest.Empty(it, stdout)
+			gotest.Equal(it, 1, code, stderr)
+			gotest.Equal(it, lintFixProbe+"// edited\n", readLintFixFile(it, file))
+		})
+	})
+
+	t.When("the fixed files are a symlink and a file with its own mode", func(w *gotest.T) {
+		if runtime.GOOS == "windows" {
+			w.Skipf("symlinks and permission bits are POSIX")
+		}
+		dir, file := s.stageProbe(w, lintFixProbe)
+		gotest.NoError(w, os.Chmod(file, 0o640))
+		real := filepath.Join(w.TempDir(), "second.go.txt")
+		gotest.NoError(w, os.WriteFile(real, []byte(lintFixSecondProbe), 0o600))
+		link := filepath.Join(dir, "second_test.go")
+		gotest.NoError(w, os.Symlink(real, link))
+		_, stderr, code := s.runLintIn(w, dir, nil, "lint", "-fix", "./...")
+		info, statErr := os.Stat(file)
+		linkInfo, lstatErr := os.Lstat(link)
+
+		w.It("keeps the mode", func(it *gotest.T) {
+			gotest.Equal(it, 3, code, stderr)
+			gotest.NoError(it, statErr)
+			gotest.Equal(it, os.FileMode(0o640), info.Mode().Perm())
+			gotest.Contains(it, readLintFixFile(it, file), "gotest.Equal(t, 1, 1)")
+		})
+		w.It("fixes the file the link names and keeps the link", func(it *gotest.T) {
+			gotest.NoError(it, lstatErr)
+			gotest.NotZero(it, linkInfo.Mode()&os.ModeSymlink)
+			gotest.Contains(it, readLintFixFile(it, real), "gotest.Equal(t, 2, 2)")
+		})
+	})
+}
+
+// leftovers names the entries left in dir.
+func leftovers(t *gotest.R, dir string) []string {
+	entries, err := os.ReadDir(dir)
+	gotest.NoError(t, err)
+	var out []string
+	for _, e := range entries {
+		out = append(out, e.Name())
+	}
+	return out
+}
+
 func (s *LintFixTestSuite) TestInterrupt(t *gotest.T) {
 	t.When("lint is stopped while it fixes", func(w *gotest.T) {
 		// The shim holds the second load, of the fixed sources, so the
@@ -551,10 +637,11 @@ func (s *LintFixTestSuite) TestInterrupt(t *gotest.T) {
 		count, marker := filepath.Join(tmp, "loads"), filepath.Join(tmp, "driver")
 		path := goShim(w, `case "$*" in *-json=*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then : > '`+marker+`'; sleep 5; fi;; esac`)
 		dir, file := s.stageProbe(w, lintFixProbe)
+		tmpdir := w.TempDir()
 
 		cmd := exec.Command(s.cli.binary, "lint", "-fix", "./...") //nolint:gosec // G204: controlled binary with fixed args
 		cmd.Dir = dir
-		cmd.Env = append(os.Environ(), "PWD="+dir, path)
+		cmd.Env = append(os.Environ(), "PWD="+dir, path, "TMPDIR="+tmpdir)
 		var errs bytes.Buffer
 		cmd.Stderr = &errs
 		gotest.NoError(w, cmd.Start())
@@ -571,11 +658,86 @@ func (s *LintFixTestSuite) TestInterrupt(t *gotest.T) {
 			gotest.Equal(it, 130, code, errs.String())
 			gotest.Equal(it, "lint: interrupted; nothing was written\n", errs.String())
 		})
-		w.It("writes nothing, then or later", func(it *gotest.T) {
+		w.It("writes nothing, then or later, and leaves no temporary file", func(it *gotest.T) {
 			gotest.Consistently(it, 7*time.Second, 250*time.Millisecond, func(poll *gotest.R) {
 				src, err := os.ReadFile(file)
 				gotest.NoError(poll, err)
 				gotest.Equal(poll, lintFixProbe, string(src))
+				gotest.Empty(poll, leftovers(poll, tmpdir))
+			})
+		})
+	})
+
+	t.When("lint is stopped twice while it fixes", func(w *gotest.T) {
+		tmp := w.TempDir()
+		count, marker := filepath.Join(tmp, "loads"), filepath.Join(tmp, "driver")
+		path := goShim(w, `case "$*" in *-json=*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then : > '`+marker+`'; sleep 5; fi;; esac`)
+		dir, file := s.stageProbe(w, lintFixProbe)
+		tmpdir := w.TempDir()
+
+		cmd := exec.Command(s.cli.binary, "lint", "-fix", "./...") //nolint:gosec // G204: controlled binary with fixed args
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), "PWD="+dir, path, "TMPDIR="+tmpdir)
+		var errs bytes.Buffer
+		cmd.Stderr = &errs
+		gotest.NoError(w, cmd.Start())
+		exited := make(chan struct{})
+		go func() { _ = cmd.Wait(); close(exited) }()
+		gotest.Eventually(w, 30*time.Second, 50*time.Millisecond, func(poll *gotest.R) {
+			_, err := os.Stat(marker)
+			gotest.NoError(poll, err)
+		})
+		// Signals repeat until lint ends: the first stops the load, which
+		// the shim holds for 5s; a later one ends lint at once.
+		gotest.Eventually(w, 4*time.Second, 200*time.Millisecond, func(poll *gotest.R) {
+			_ = cmd.Process.Signal(syscall.SIGTERM)
+			select {
+			case <-exited:
+			default:
+				gotest.Fail(poll, "lint still runs")
+			}
+		})
+		code := cmd.ProcessState.ExitCode()
+
+		w.It("exits 130 and says nothing was written", func(it *gotest.T) {
+			gotest.Equal(it, 130, code, errs.String())
+			gotest.Equal(it, "lint: interrupted again; nothing was written\n", errs.String())
+		})
+		w.It("writes nothing, then or later, and leaves no temporary file", func(it *gotest.T) {
+			gotest.Consistently(it, 7*time.Second, 250*time.Millisecond, func(poll *gotest.R) {
+				src, err := os.ReadFile(file)
+				gotest.NoError(poll, err)
+				gotest.Equal(poll, lintFixProbe, string(src))
+				gotest.Empty(poll, leftovers(poll, tmpdir))
+			})
+		})
+	})
+
+	t.When("lint is stopped while go list builds export data", func(w *gotest.T) {
+		// A cold cache and one build at a time keep go list building for
+		// longer than its interrupt grace, so it is killed mid-build.
+		dir, _ := s.stageProbe(w, lintFixProbe)
+		tmpdir := w.TempDir()
+		cmd := exec.Command(s.cli.binary, "lint", "-fix", "./...") //nolint:gosec // G204: controlled binary with fixed args
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), "PWD="+dir, "TMPDIR="+tmpdir, "GOCACHE="+w.TempDir(), "GOFLAGS=-p=1")
+		var errs bytes.Buffer
+		cmd.Stderr = &errs
+		gotest.NoError(w, cmd.Start())
+		gotest.Eventually(w, 30*time.Second, 50*time.Millisecond, func(poll *gotest.R) {
+			builds, err := filepath.Glob(filepath.Join(tmpdir, "*", "go-build*"))
+			gotest.NoError(poll, err)
+			flat, err := filepath.Glob(filepath.Join(tmpdir, "go-build*"))
+			gotest.NoError(poll, err)
+			gotest.NotEmpty(poll, append(builds, flat...))
+		})
+		gotest.NoError(w, cmd.Process.Signal(syscall.SIGTERM))
+		_ = cmd.Wait()
+
+		w.It("exits 130 and leaves no work directory of go list behind", func(it *gotest.T) {
+			gotest.Equal(it, 130, cmd.ProcessState.ExitCode(), errs.String())
+			gotest.Consistently(it, 2*time.Second, 250*time.Millisecond, func(poll *gotest.R) {
+				gotest.Empty(poll, leftovers(poll, tmpdir))
 			})
 		})
 	})

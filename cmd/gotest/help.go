@@ -750,10 +750,13 @@ Suppress individual diagnostics with //nolint comments:
 Exit codes:
   0   No findings (with -fix or -diff: none left after fixing)
   1   Uncompilable target packages (nothing was proven about them), patterns
-      matching no package, or fixed sources that no longer compile
+      matching no package, fixed sources that no longer compile, or fixed
+      files that could not be written (-fix writes them all or none; on a
+      failure stderr names any that were)
   2   Usage or configuration error (e.g. an integrity rule in lint.skip)
   3   Findings reported (with -fix or -diff: the findings left after fixing)
-  130 -fix or -diff stopped by a signal; nothing was written
+  130 -fix or -diff stopped by a signal; nothing was written (once the
+      fixed files are being written, they all are first)
 
 Examples:
   gotest lint ./...                          Lint all packages

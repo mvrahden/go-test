@@ -41,30 +41,40 @@ func (r *Result) PrintJSON(w io.Writer) error {
 // Run executes the analyzer over the packages matched by patterns, test
 // files included. See Analyze.
 func Run(dir string, patterns []string) ([]Finding, error) {
-	res, err := Analyze(context.Background(), dir, patterns, true)
+	res, err := Analyze(context.Background(), Targets{Dir: dir, Patterns: patterns, Tests: true})
 	if err != nil {
 		return nil, err
 	}
 	return res.Findings, nil
 }
 
-// Analyze executes the analyzer over the packages matched by patterns,
-// honoring the flag-bound configuration (skip-*, disable-nolint) already
-// applied to Analyzer.Flags. dir is the module directory to load from; ""
-// means the current directory, matching the analysis driver's own
-// resolution. tests includes test files, like the driver's -test flag.
+// Targets are the packages a run lints and how they load.
+type Targets struct {
+	// Dir is the module directory to load from; "" means the current
+	// directory, matching the analysis driver's own resolution.
+	Dir      string
+	Patterns []string
+	Tests    bool // include test files, like the driver's -test flag
+	// TempDir holds the load's temporary files, the go command's work
+	// directories included; "" means the system's. Removing it after a
+	// stopped load removes what the go command left there.
+	TempDir string
+}
+
+// Analyze executes the analyzer over the targets, honoring the flag-bound
+// configuration (skip-*, disable-nolint) already applied to Analyzer.Flags.
 // Canceling ctx stops the load.
 //
 // Findings are deduplicated across test-variant package loads and sorted by
 // position. A load or analysis failure is an error, never an empty result:
 // nothing was proven about a package that was not analyzed.
-func Analyze(ctx context.Context, dir string, patterns []string, tests bool) (*Result, error) {
-	return analyze(ctx, dir, patterns, tests, nil)
+func Analyze(ctx context.Context, t Targets) (*Result, error) {
+	return analyze(ctx, t, nil)
 }
 
 // analyze is Analyze with sources read from overlay where it has them.
-func analyze(ctx context.Context, dir string, patterns []string, tests bool, overlay map[string][]byte) (*Result, error) {
-	pkgs, err := load(ctx, dir, patterns, tests, overlay)
+func analyze(ctx context.Context, t Targets, overlay map[string][]byte) (*Result, error) {
+	pkgs, err := load(ctx, t, overlay)
 	if err != nil {
 		return nil, err
 	}

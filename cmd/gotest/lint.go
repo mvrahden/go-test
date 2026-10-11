@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -198,12 +199,31 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 		}
 	}
 
+	targets := lint.Targets{Dir: dir, Patterns: a.patterns, Tests: a.tests}
 	ctx := context.Background()
+	var written []string // the files -fix wrote, for a second signal to name
 	if a.fix {
+		// The load's temporary files, the go command's included, live in
+		// one directory, removed however the run ends.
+		tmp, err := os.MkdirTemp(os.Getenv("GOTMPDIR"), "gotest-lint-")
+		if err != nil {
+			fmt.Fprintf(stderr, "FAIL: %v\n", err)
+			return 1, true
+		}
+		defer func() { _ = os.RemoveAll(tmp) }()
+		targets.TempDir = tmp
 		// Nothing is written until every pass is done, so a stop before
-		// then leaves every file as it was.
+		// then leaves every file as it was; writing holds off a second
+		// signal until it is done.
 		var stop context.CancelFunc
-		ctx, stop = shutdownContext()
+		ctx, stop = shutdownContextThen(func() {
+			_ = os.RemoveAll(tmp)
+			if len(written) == 0 {
+				fmt.Fprintln(stderr, "lint: interrupted again; nothing was written")
+			} else {
+				fmt.Fprintf(stderr, "lint: interrupted again; wrote fixes to %d file(s)\n", len(written))
+			}
+		})
 		defer stop()
 	}
 	interrupted := func() bool {
@@ -215,7 +235,7 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 	}
 
 	// This load also proves the targets compile before anything is fixed.
-	res, err := lint.Analyze(ctx, dir, a.patterns, a.tests)
+	res, err := lint.Analyze(ctx, targets)
 	if interrupted() {
 		return 130, true
 	}
@@ -225,7 +245,7 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 	}
 	source := os.ReadFile
 	if a.fix && len(res.FixFiles) > 0 {
-		fixed, changes, err := lint.Fix(ctx, dir, a.patterns, a.tests, res)
+		fixed, changes, err := lint.Fix(ctx, targets, res)
 		if interrupted() {
 			return 130, true
 		}
@@ -236,8 +256,8 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 		if a.diff {
 			printLintDiff(stdout, stderr, dir, changes)
 			source = lintChangedSource(changes)
-		} else if !writeLintFixes(stderr, changes) {
-			return 1, true
+		} else if code := writeLintFixes(ctx, stderr, changes, &written); code != 0 {
+			return code, true
 		}
 		res = fixed
 	}
@@ -257,17 +277,92 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 	}
 }
 
-// writeLintFixes writes the fixed files and reports whether all were.
-func writeLintFixes(stderr io.Writer, changes []lint.Change) bool {
-	ok := true
-	for _, c := range changes {
-		// The mode only applies to a file deleted meanwhile.
-		if err := os.WriteFile(c.File, c.After, 0o600); err != nil {
-			fmt.Fprintf(stderr, "FAIL: writing fixes: %v\n", err)
-			ok = false
+// writeLintFixes writes every fixed file or none: each goes to a temporary
+// file beside the one it replaces, and only once all are staged are they
+// renamed over the originals. A second signal waits until it is done. It
+// returns 0 once every file is written; otherwise it says on stderr what
+// was written and returns the exit code: 130 when a signal came first, 1
+// on a failure.
+func writeLintFixes(ctx context.Context, stderr io.Writer, changes []lint.Change, written *[]string) int {
+	forcedExit.Lock()
+	defer forcedExit.Unlock()
+	if ctx.Err() != nil {
+		fmt.Fprintln(stderr, "lint: interrupted; nothing was written")
+		return 130
+	}
+
+	type staged struct{ file, target, tmp string }
+	var all []staged
+	discard := func(rest []staged) {
+		for _, st := range rest {
+			_ = os.Remove(st.tmp)
 		}
 	}
-	return ok
+	for _, c := range changes {
+		target, tmp, err := stageLintFix(c)
+		if err != nil {
+			discard(all)
+			fmt.Fprintf(stderr, "FAIL: writing fixes: %v; nothing was written\n", err)
+			return 1
+		}
+		all = append(all, staged{c.File, target, tmp})
+	}
+	for i, st := range all {
+		if err := os.Rename(st.tmp, st.target); err != nil {
+			discard(all[i:])
+			fmt.Fprintf(stderr, "FAIL: writing fixes: %v\n", err)
+			if len(*written) > 0 {
+				fmt.Fprintf(stderr, "lint: wrote fixes to:\n\t%s\n", strings.Join(*written, "\n\t"))
+			}
+			rest := make([]string, 0, len(all)-i)
+			for _, st := range all[i:] {
+				rest = append(rest, st.file)
+			}
+			fmt.Fprintf(stderr, "lint: did not write:\n\t%s\n", strings.Join(rest, "\n\t"))
+			return 1
+		}
+		*written = append(*written, st.file)
+	}
+	return 0
+}
+
+// stageLintFix writes c's fixed contents to a temporary file beside the
+// file it replaces, with that file's permissions, and returns both. The
+// file a symlink names is the one replaced, so the link stays.
+func stageLintFix(c lint.Change) (target, tmp string, err error) {
+	if target, err = filepath.EvalSymlinks(c.File); err != nil {
+		return "", "", err
+	}
+	info, err := os.Stat(target)
+	if err != nil {
+		return "", "", err
+	}
+	// A rename would replace a file its permissions keep from being written.
+	f, err := os.OpenFile(target, os.O_WRONLY, 0)
+	if err != nil {
+		return "", "", err
+	}
+	_ = f.Close()
+	if disk, err := os.ReadFile(target); err != nil || !bytes.Equal(disk, c.Before) {
+		return "", "", fmt.Errorf("%s changed since lint read it", c.File)
+	}
+
+	t, err := os.CreateTemp(filepath.Dir(target), "."+filepath.Base(target)+".gotest-*")
+	if err != nil {
+		return "", "", err
+	}
+	_, err = t.Write(c.After)
+	if err == nil {
+		err = t.Chmod(info.Mode().Perm())
+	}
+	if cerr := t.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		_ = os.Remove(t.Name())
+		return "", "", err
+	}
+	return target, t.Name(), nil
 }
 
 // printLintDiff prints changes as one unified diff. Paths are relative to

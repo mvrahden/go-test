@@ -57,9 +57,10 @@ func (s *FixTestSuite) driverFix(t *gotest.T, dir string, patterns []string) {
 
 // engineFix runs Fix in dir and writes what it returns.
 func engineFix(t *gotest.T, dir string, patterns []string) {
-	res, err := lint.Analyze(t.Context(), dir, patterns, true)
+	targets := lint.Targets{Dir: dir, Patterns: patterns, Tests: true}
+	res, err := lint.Analyze(t.Context(), targets)
 	gotest.NoError(t, err)
-	_, changes, err := lint.Fix(t.Context(), dir, patterns, true, res)
+	_, changes, err := lint.Fix(t.Context(), targets, res)
 	gotest.NoError(t, err)
 	for _, c := range changes {
 		gotest.NoError(t, os.WriteFile(c.File, c.After, 0o600))

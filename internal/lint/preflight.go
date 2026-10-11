@@ -27,7 +27,7 @@ import (
 // instead; this is the same success-is-proven contract the runner applies to
 // compile failures.
 func PreflightLoad(dir string, patterns []string) error {
-	_, err := load(context.Background(), dir, patterns, true, nil)
+	_, err := load(context.Background(), Targets{Dir: dir, Patterns: patterns, Tests: true}, nil)
 	return err
 }
 
@@ -35,27 +35,32 @@ func PreflightLoad(dir string, patterns []string) error {
 // from export data: the analyzer holds no facts, so it never looks at a
 // dependency's syntax. Every target that does not compile is named in the
 // error. overlay replaces the contents of the files it names.
-func load(ctx context.Context, dir string, patterns []string, tests bool, overlay map[string][]byte) ([]*packages.Package, error) {
+func load(ctx context.Context, t Targets, overlay map[string][]byte) ([]*packages.Package, error) {
 	cfg := &packages.Config{
 		Context: ctx,
-		Dir:     dir,
+		Dir:     t.Dir,
 		Mode:    packages.LoadSyntax | packages.NeedModule,
-		Tests:   tests,
+		Tests:   t.Tests,
+	}
+	if t.TempDir != "" {
+		// A canceled load interrupts go list, which ignores the interrupt
+		// and is killed before it removes its work directory.
+		cfg.Env = append(os.Environ(), "GOTMPDIR="+t.TempDir)
 	}
 	if len(overlay) > 0 {
-		cleanup, err := withOverlay(cfg, overlay)
+		cleanup, err := withOverlay(cfg, t.TempDir, overlay)
 		if err != nil {
 			return nil, fmt.Errorf("load packages: %w", err)
 		}
 		defer cleanup()
 	}
-	pkgs, err := packages.Load(cfg, patterns...)
+	pkgs, err := packages.Load(cfg, t.Patterns...)
 	if err != nil {
 		return nil, fmt.Errorf("load packages: %w", err)
 	}
 	// go list failing outright also loads nothing, without an error.
 	if len(pkgs) == 0 {
-		return nil, fmt.Errorf("load packages: %s matched no packages", strings.Join(patterns, " "))
+		return nil, fmt.Errorf("load packages: %s matched no packages", strings.Join(t.Patterns, " "))
 	}
 	if err := goversion.Check(pkgs); err != nil {
 		return nil, err
@@ -84,8 +89,8 @@ func load(ctx context.Context, dir string, patterns []string, tests bool, overla
 // names. Config.Overlay would do it too, but go/packages then distrusts all
 // export data and type-checks every dependency from source; the go command's
 // own -overlay builds export data from the overlay, so it stays usable.
-func withOverlay(cfg *packages.Config, overlay map[string][]byte) (cleanup func(), err error) {
-	dir, err := os.MkdirTemp("", "gotest-lint-overlay")
+func withOverlay(cfg *packages.Config, tmp string, overlay map[string][]byte) (cleanup func(), err error) {
+	dir, err := os.MkdirTemp(tmp, "gotest-lint-overlay")
 	if err != nil {
 		return nil, err
 	}
