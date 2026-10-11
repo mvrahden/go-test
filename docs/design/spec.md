@@ -776,7 +776,7 @@ This is what lets `AfterAll` run under a context that survives the cancellation 
 
 Deliberately absent — the suite lifecycle replaces them:
 `Log` (use assertions' message args), `Fatal`/`Fatalf` (use `FailNow` via assertions), `Cleanup` (use `AfterEach`/`AfterAll`), `Run` (use `When`/`It`), `Parallel` (use `SuiteConfig.Parallel`), `Helper` (the call-site tracer makes it unnecessary and harmful).
-The `t-escape` lint rule flags escapes to these via `t.T()`.
+The `t-escape` lint rule flags escapes to these via `t.T()`, and `t.T().Context()`, which has no suite deadline.
 
 ---
 
@@ -1404,7 +1404,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `assertion-simplify` | Simplifiable assertions: `True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, … |
 | `assertion-redundant` | An assertion made redundant by the next one on the same argument |
 | `fail-guard` | `if cond { gotest.Fail(…) }` guards (also halting `Fatal`/`Fatalf`/`FailNow` bodies) — the assertion expresses the check directly; `\|\|` conditions and `else if` chains decompose into sequential assertions, non-halting `Errorf` bodies and init-scoped guards report without a fix; fires only in files that import gotest |
-| `t-escape` | Unnecessary `t.T()` convenience escapes: `Errorf`/`FailNow`/`Skipf`/`Setenv`/`TempDir` (available on `gotest.T`), `Skip`/`SkipNow` (use `Skipf`), `Helper` (degrades call-site reporting), `Log`/`Fatal`/`Fatalf` (use assertions and their message args) |
+| `t-escape` | Unnecessary `t.T()` convenience escapes: `Errorf`/`FailNow`/`Skipf`/`Setenv`/`TempDir` (available on `gotest.T`), `Context` (drops the suite's `Timeout`), `Skip`/`SkipNow` (use `Skipf`), `Helper` (degrades call-site reporting), `Log`/`Fatal`/`Fatalf` (use assertions and their message args) |
 | `config-no-deadline` | A literal negative duration on `SuiteConfig.Timeout`/`SetupTimeout` or `FixtureConfig.Timeout`, in a keyed literal or a field assignment (aliases and pointers included) — every negative disables the deadline, so the fix spells it `gotest.NoDeadline`, which reads as what it does and makes every unbounded suite greppable. The rewrite keeps the meaning; the fix is withheld in a file that does not import gotest. `NoDeadline` itself, zeros, runtime values and non-deadline fields are not reported |
 | `behavior-wording` | A `When` description that opens with "when", or an `It` description that opens with "it" — the spec renders the connective and the ✓ glyph plays "it", so the word is said twice; the fix drops it (whole word, any case except all capitals — `IT department…` is an acronym — space or underscore after it; a description that is only the word is left alone) |
 | `bench-fixture-io` | `Benchmark*` methods reading fixture-backed state inside the measured loop — times whatever backs the fixture, not the code under test (heuristic; hoist the read above the loop) |

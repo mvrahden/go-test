@@ -570,6 +570,7 @@ var escapeConfigs = map[string]escapeConfig{
 	"Skipf":    {TEscape, "Skipf is available on gotest.T — unnecessary T escape", false, true, false},
 	"Setenv":   {TEscape, "Setenv is available on gotest.T — unnecessary T escape", false, true, false},
 	"TempDir":  {TEscape, "TempDir is available on gotest.T — unnecessary T escape", false, true, false},
+	"Context":  {TEscape, "Context is available on gotest.T — t.T().Context() drops the suite's Timeout", false, true, true},
 	"Skip":     {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
 	"SkipNow":  {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
 	"Cleanup":  {SuiteLifecycle, "use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle", true, false, false},

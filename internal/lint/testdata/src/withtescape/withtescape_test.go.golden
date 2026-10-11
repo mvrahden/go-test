@@ -16,6 +16,7 @@ func (s *EscapeTestSuite) TestMethodEscape(t *gotest.T) {
 	t.Skipf("reason")        // want `Skipf is available on gotest.T — unnecessary T escape`
 	t.Setenv("KEY", "VALUE") // want `Setenv is available on gotest.T — unnecessary T escape`
 	_ = t.TempDir()          // want `TempDir is available on gotest.T — unnecessary T escape`
+	_ = t.Context()          // want `Context is available on gotest.T — t.T\(\).Context\(\) drops the suite's Timeout`
 	t.T().Helper()           // want `never call Helper — gotest resolves call sites automatically; Helper degrades failure locations`
 	t.T().Log("msg")         // want `use assertion message args instead — T.Log bypasses the failure report`
 	t.T().Fatal("msg")       // want `use assertions instead — T.Fatal bypasses the assertion tracer`
@@ -27,6 +28,7 @@ func (s *EscapeTestSuite) TestAliasEscape(t *gotest.T) {
 	tt.Errorf("msg")      // want `Errorf is available on gotest.T — unnecessary T escape`
 	tt.Skip()             // want `must use Skipf instead — unnecessary T escape`
 	tt.SkipNow()          // want `must use Skipf instead — unnecessary T escape`
+	_ = tt.Context()      // want `Context is available on gotest.T — t.T\(\).Context\(\) drops the suite's Timeout`
 	gotest.True(tt, true) // want `pass gotest.T directly to True — unnecessary T escape`
 }
 
@@ -65,6 +67,21 @@ func (s *EscapeTestSuite) TestInterproceduralNonFirstParam(t *gotest.T) {
 
 func (s *EscapeTestSuite) TestInterproceduralDeepChain(t *gotest.T) {
 	deepOuterErrorf(t.T())
+}
+
+func (s *EscapeTestSuite) TestNestedContextEscape(t *gotest.T) {
+	t.It("x", func(it *gotest.T) {
+		_ = it.Context() // want `Context is available on gotest.T — t.T\(\).Context\(\) drops the suite's Timeout`
+	})
+}
+
+// A stdlib helper may use its own Context; only the direct escape is flagged.
+func (s *EscapeTestSuite) TestInterproceduralContext(t *gotest.T) {
+	helperContext(t.T())
+}
+
+func helperContext(t *testing.T) {
+	_ = t.Context()
 }
 
 func (s *EscapeTestSuite) TestInterproceduralMethodHelper(t *gotest.T) {
