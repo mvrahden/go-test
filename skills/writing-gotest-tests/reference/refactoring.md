@@ -31,8 +31,10 @@ so structure settles before names (renaming first means renaming twice):
    strings bare behaviors (the glyph plays "it") — SKILL.md rule 8.
    Judge the result by rendering `gotest spec` ONCE at the end (it runs the
    full pipeline) or replay the invariant capture via `spec --input`.
-6. **Hygiene** — delete default-restating `SuiteConfig` markers (that
-   drops their verdict, not the context bound — see `config.md`); sized
+6. **Hygiene** — delete default-restating `SuiteConfig` markers, including
+   a bare `return gotest.DefaultSuiteConfig()`, unless a test there must be
+   failed at 30s even when it ignores its context (deleting drops that
+   verdict, not the context bound — see `config.md`); sized
    timeouts (`IntegrationSuiteConfig` for integration suites); no
    `F_`/`X_` survivors; sleep+assert → `Eventually`; assert behavior, not
    unexported internals.

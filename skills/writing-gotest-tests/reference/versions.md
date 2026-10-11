@@ -12,9 +12,9 @@ still applies EXCEPT these, which fail there:
 
 1. **The compose form (`config.md`)** — v1.25.x requires the
    `SuiteConfig` body to be a SINGLE return statement, so composing onto a
-   preset is a generation error. Rule 4's literal `gotest.SuiteConfig{
-   Parallel: true}` works; on v1.25.x a partial literal inherits the 30s
-   defaults.
+   preset is a generation error. Rule 4's literal
+   `gotest.SuiteConfig{Parallel: true}` works; on v1.25.x a partial
+   literal inherits the 30s defaults.
 2. **Config literalism (rule 3)** — v1.25.x merges your marker over the
    defaults: `0` means "keep the default", `-1` disables, and
    `Parallel`/`FailFast` are one-way latches in that merge (once true,
@@ -50,6 +50,8 @@ no expanded value diffs.
 marker leaves at zero gets the default and `gotest.NoDeadline` (any
 negative value) disables it; on v1.26–v1.29 a zero duration meant no
 deadline; v1.25.x merged the marker over the defaults (see v1.25.x, item 2).
+So on v1.26–v1.29 rule 4's `gotest.SuiteConfig{Parallel: true}` runs
+without any deadline: compose onto `gotest.DefaultSuiteConfig()` there.
 
 ## v1.26
 
@@ -92,9 +94,9 @@ v1.26.x and earlier. What v1.27 adds:
 ## v1.28
 
 1. **Go 1.27 support** — on Go 1.27, `gotest lint` below v1.28 cannot
-   analyze anything ("internal error: package … without types"; exit 0 on
-   v1.25, 1 on v1.27); generation and runs still work. Upgrade before
-   trusting a clean lint on Go 1.27.
+   analyze anything with the x/tools version its release pins ("internal
+   error: package … without types", exit 1); generation and runs still
+   work. Upgrade before linting on Go 1.27.
 
 ## v1.29
 
@@ -218,24 +220,36 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
 2. **`suite-lifecycle` flags `t.T().Run` in any function**, not only suite
    methods — integrity tier, so it cannot be skipped project-wide; turn
    the subtest into `t.It`/`t.When`.
-3. **`lint -fix` reports what it could not fix** and exits 3; below v1.33
-   it exits 0 silently, so run plain `lint` after it there.
+3. **`lint -fix` applies composed and overlapping fixes in one run and
+   reports what it could not fix** (exit 3); below v1.33 it stops after one
+   pass and exits 0 silently, so re-run it and plain `lint` there.
 4. **The runtime floor is v1.33.0** — a v1.33 CLI refuses a pin below
    v1.33.0, which only a CLI not run through `go tool gotest` can meet.
    Drift refusals name the version to pin instead of `@latest`.
 5. **`os.Exit(0)` in a test fails the run**, as under `go test`; below
    v1.33 the plain run reported it as passed.
-6. **`spec`/`summary --input` exit 2 on a stream with no events or one
-   cut short** (unless `--render-only`); below v1.33 both exited 0.
-7. **`migrate` leaves compilable code or a marker** — an assertion in a
-   helper without `t` is marked, a renamed suite type is renamed in every
-   file of the package, a still-used testify import is kept; a re-run
-   exits 1 while markers remain; a pattern that does not exist exits 2.
+6. **Every matched package ends in a verdict**, in text and `-json`
+   (`[no test files]`, `[no suites]`, `[no tests to run]`), and
+   `spec`/`summary --input` exit 2 on a stream with no events, one cut
+   short, or a build failure (unless `--render-only`); below v1.33 the
+   first two exited 0 and a replayed build failure 1. A green pre-v1.33
+   run over packages without suites wrote an empty stream, so replay
+   those with `--render-only`.
+7. **`migrate` exits 0 only on code that compiles** — it converts a suite
+   wherever the package declares its methods, runner and references, keeps
+   testify imports still in use, and marks every line it cannot convert;
+   a re-run exits 1 while markers remain, a pattern that does not exist
+   exits 2, and import-path patterns work. Below v1.33 hooks declared in
+   another file than the suite silently never ran.
 8. **A shared fixture may omit `AfterAll`**; below v1.33 one without it
    passes generation and then fails to start.
 9. **A Timeout or SetupTimeout overrun names the test's file and line**;
    below v1.33 it pointed at `asm_amd64.s`.
 10. **`scaffold` on an interface** writes a contract suite whose
     `BeforeEach` picks the constructor per instantiated type (add a
-    `case`); below v1.33 its `factory` field could not be set through a
-    type alias and the suite nil-panicked.
+    `case`; an alias without one fails with "no constructor for <type>");
+    below v1.33 its `factory` field could not be set through a type alias
+    and the suite nil-panicked.
+11. **Assertion locations survive inlining** — a failure in generic suite
+    code the compiler inlined into the harness names the user's line, not
+    `gotest_psuite_test.go`.

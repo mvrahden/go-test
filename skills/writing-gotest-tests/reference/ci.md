@@ -47,8 +47,12 @@ jobs:
   The badge needs no shields.io, gist or token setup — do not add any.
 - **v1.29+ bench inputs:** `bench: true` runs `gotest bench --spec --json`
   after the tests. The `flags` input is forwarded to it, which is where a
-  `-benchtime=1x` smoke run goes — and `gotest bench` rejects
-  `--parallel`, so a width in `flags` breaks this step (exit 2).
+  `-benchtime=1x` smoke run goes. `gotest bench` accepts only its own
+  flags (`--timeout`, `--setup-timeout`, `--no-cache`, `--debug`,
+  `--spec`, `--no-color`, `--save`, `--against`, `--gate`, `--json`), so
+  any other gotest flag in `flags` — `--parallel`, `--ci`, `--min`,
+  `--update-snapshots`, `--compile-parallel` — breaks this step (exit 2).
+  Go test flags (`-benchtime`, `-count`) pass.
   `bench-baseline` compares (`--against`),
   `bench-gate` fails on regressions above the percentage, and `bench-save`
   writes a baseline: a path, or an explicit empty string for
@@ -89,7 +93,8 @@ jobs:
   instruction stream); an explicit width always wins — set
   `parallel:` in `.gotest.yml` when a CI runner's shape is known and the
   halved default wastes it (the action's `flags` input also reaches
-  `gotest bench`, which rejects `--parallel`).
+  `gotest bench`, which rejects `--parallel`; `gotest bench` ignores the
+  `.gotest.yml` width and always runs serially).
 
 ## gotest-exclusive projects: drop the stdlib step
 
@@ -102,8 +107,8 @@ refuses to lint what it cannot analyze), and the `stdlib-test` rule fails
 the build if someone later adds a stdlib `TestXxx`. It does not flag a
 stdlib `Benchmark`, `Fuzz` or `Example` function: one of those added
 later shows only in that runner note, so the change that adds one must
-bring back the `go test ./...` step. From v1.29.1 the census adds a third proof: a green `summary`,
-`spec` or `-json` run exits 2 when a declared method produced no verdict,
+bring back the `go test ./...` step. From v1.29.1 the census adds a third
+proof: a green `summary`, `spec` or `-json` run exits 2 when a declared method produced no verdict,
 so a harness that drops a test cannot pass either. gotest's own repository
 runs this way. On **v1.25.x it is NOT safe**: there a compile-broken package
 can pass both the run (exit 0, streaming) and lint (analysis silently

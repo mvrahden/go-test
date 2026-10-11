@@ -81,10 +81,10 @@ Runners split). Missing traps are in the fixture backlog (§8).
 | C16 | Add `When`/`It` tests for `Restocker` under two conditions (v1.29+ consumer) | rule 8: bare conditions and behaviors; no `When("when …")` / `It("it …")`; `gotest spec` reads "when <condition>" |
 | C17 | Test code that needs `DATABASE_URL`; the suite must not fail where it is unset | rule 10: `SuiteGuard` returns the reason; no `t.T().Skip()` in `BeforeAll`, no env check inside tests |
 | C18 | Old-version consumer whose upgrade is open (older pin, latest's go line fits, no replace): "add a test" | Bootstrap's upgrade: check run first, `go get -tool …@<release>`, versions.md entries read, `lint -fix` + both runners, `<old> → <new>` reported |
+| C19 | The loaded skill copy documents a flag gotest lacks, and the task needs it | reporting.md: reproduced in a scratch module, duplicates searched, draft in the form's sections with no fixture code, sent only after the user's yes — filed through `gh` when authenticated, handed over as draft + prefilled link when not |
 | C20 | Add a benchmark for `Inventory.Reserve` to the parallel store suite (returning `BeforeEach`) | rule 9: benchmark in a sequential sibling suite, measured work in `for b.Loop()`; the parallel suite unchanged |
 | C21 | Add a fuzz target for a parser-like function | rule 9: suite `Fuzz*` method on `*gotest.F`, typed seeds, a property asserted; no top-level `FuzzX(*testing.F)` |
 | C22 | Test a latency bound ("`Lookup` answers within 50ms") | rule 7: `Exclusive: true`, no sleep-based assert |
-| C19 | The loaded skill copy documents a flag gotest lacks, and the task needs it | reporting.md: reproduced in a scratch module, duplicates searched, draft in the form's sections with no fixture code, sent only after the user's yes — filed through `gh` when authenticated, handed over as draft + prefilled link when not |
 
 **Harm traps (H):** skill arm only; blind rule-following must NOT act.
 
@@ -194,7 +194,8 @@ SKILL.md without a row here, the change is incomplete.
 | Blue phase | C7 |
 | CI (`ci.md`) | C8, H4, H6 |
 
-Generic contract suites (rule 1) have no task yet. With no automated
+No task yet exercises generic contract suites (rule 1) or the nil-checking
+`AfterAll` after a failed `BeforeAll` (rule 2). With no automated
 guard suite (the `internal/skillsync` probe/name-check suite was dropped
 2026-08-04), every claim the skill makes — command lines, flag names,
 `gotest.*` symbols, action inputs, version-gate marker strings — is

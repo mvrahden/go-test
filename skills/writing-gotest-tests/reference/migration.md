@@ -1,20 +1,24 @@
 # Migrating to gotest
 
-`go tool gotest migrate ./...` converts testify/**suite**-based code and
-leaves `TODO(gotest-migrate)` markers where judgment is needed (embedded
-suite calls get "unconverted assertion" markers; `s.Run` and an `s.T()` in
-a helper without `t` are marked and left in place; a suite embedding
-another suite refuses the whole file). From v1.30.2 it exits 1 when a run
-leaves a marker and `--dry-run` prints the diff without writing; grep for
-the markers before calling the migration done (below v1.33 a re-run exits
-0 with markers still present). Then run `go vet ./...` and the lint pair
-(`lint -fix`, then `lint`): below v1.33 a clean exit can still leave code
-that does not compile — an assertion in a helper without `t`, the old
-suite type in a free function, a testify import removed while a
-`*testing.T` helper still uses it. `migrate` maps assertions one-to-one,
-so `NotNil` on a pointer or error comes out as `gotest.NotNil` for lint to
-rewrite, and `s.Assert().X` becomes the fatal `gotest.X`: a soft check
-turns into a hard stop. It does NOT convert bare
+`go tool gotest migrate ./...` converts testify/**suite**-based code
+(directory or import-path patterns, read as `go test` reads them) and
+leaves `TODO(gotest-migrate)` markers where judgment is needed: an
+unconverted embedded-suite call, an `s.Run`, an assertion or `s.T()` in a
+helper without `t`, a runner that does more than `suite.Run`, a suite
+whose new name is taken. A suite embedding another suite is refused, with
+every file it touches. From v1.33 it converts a suite wherever its
+methods, runner and references are declared in the package, and exits 0
+only when the result compiles; otherwise it exits 1 with a marker on each
+line that needs work, on every run until none is left. `--dry-run` prints
+the diff without writing (v1.30.2+). Grep for the markers before calling
+the migration done, then run `go vet ./...` and the lint pair
+(`lint -fix`, then `lint`). Below v1.33 a clean exit can still leave code
+that does not compile or hooks that never run (methods in another file
+than the suite, a removed import still in use), and a re-run exits 0 with
+markers left. `migrate` maps assertions one-to-one, so `NotNil` on a
+pointer or error comes out as `gotest.NotNil` for lint to rewrite, and
+`s.Assert().X` becomes the fatal `gotest.X`: a soft check turns into a
+hard stop. It does NOT convert bare
 `require`/`assert` usage in plain `TestXxx(*testing.T)` functions — those
 are manual:
 

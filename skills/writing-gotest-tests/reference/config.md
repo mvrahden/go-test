@@ -49,8 +49,9 @@ func (s *ShopTestSuite) SuiteConfig() gotest.SuiteConfig {
 `Parallel` must be assigned a boolean literal; a literal must use keyed
 fields. Delete markers that restate defaults — a marker is a statement of
 intent, not boilerplate (agents copying default-restating markers between
-suites is an observed failure). Deleting `DefaultSuiteConfig()` also drops
-its 30s verdict (the context stays bounded); keep an explicit `Timeout`
+suites is an observed failure). A bare `return gotest.DefaultSuiteConfig()`
+counts as default-restating, but deleting it also drops its 30s verdict
+(the context stays bounded): keep it, or an explicit `Timeout`, only
 where a test must be failed at its budget.
 
 Fixtures follow the same rule via `FixtureConfig()` /

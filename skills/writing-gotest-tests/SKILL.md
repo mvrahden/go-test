@@ -6,7 +6,8 @@ description: Use when writing, fixing, reviewing, or restructuring tests in a Go
 # Writing gotest tests
 
 gotest inverts habits learned from stdlib/testify. Follow this file's rules;
-consult `reference/` only when the task touches that area.
+consult `reference/` only when the task touches that area — except
+`reference/setup.md`, which every task follows before writing anything.
 
 **Version check (do this FIRST):** run `go tool gotest version` (after
 Bootstrap below); `dev (replace directive)` / `dev (source checkout)` mean
@@ -18,21 +19,31 @@ This skill describes **v1.33**. Upgrade first whenever Bootstrap's
 conditions allow. On a release you could not upgrade from, read
 `reference/versions.md` before writing anything: it lists what each older
 release lacks or does differently, including rules below that fail there
-(on v1.25.x, rules 1–4 and 10). A rule tagged **v1.27+** (or later) needs
+(on v1.25.x, rules 1–3 and 10). A rule tagged **v1.27+** (or later) needs
 that release; skip it on older ones.
 
 ## Bootstrap and upgrade
 
 The repo has the *library*; the CLI runs via Go's tool directive, so every
 command is `go tool gotest <args>` — never a global `go install` binary.
-**Upgrade first:** before writing anything, follow `reference/setup.md`.
-It checks for a newer release and upgrades unless something blocks it (a
-`replace`, a vendored module, a release needing a newer Go than the
-module's go line, instructions against dependency changes, a failed
-check), and lists what to do after an upgrade. A `FAIL:` refusal about a
-drifted binary (exit 2) is never a fault in the tests: switch to
-`go tool gotest`; never upgrade just to silence it. `go.work` workspaces
-and vendored modules are covered there too.
+
+**Upgrade first, before writing anything.** Check for a newer release:
+
+```sh
+go list -m -u -f '{{.Version}} {{with .Update}}{{.Version}}{{end}} {{with .Replace}}(replaced){{end}}' github.com/mvrahden/go-test
+go list -m -f '{{.GoVersion}}' github.com/mvrahden/go-test@latest
+go list -m -f '{{.GoVersion}}'
+```
+
+When the first line names a newer release, upgrade to it —
+`go get -tool github.com/mvrahden/go-test/cmd/gotest@<newer release>` —
+unless `reference/setup.md` lists a blocker: a `replace`, a vendored
+module, a release whose go line (second line) is newer than the module's
+(third line), instructions against dependency changes, or a failed check.
+Then follow its after-upgrade steps; it also covers keeping the pin, a
+module without go-test yet, `go.work` and vendoring. A `FAIL:` refusal
+about a drifted binary (exit 2) is never a fault in the tests: switch to
+`go tool gotest`; never upgrade just to silence it.
 
 ## The Two Runners — a complete run is BOTH commands
 
@@ -70,8 +81,9 @@ outer-`t` in poll callbacks, testify idioms, focus leftovers, and
 `fail-guard`: any `if cond { gotest.Fail(t, …) }` or `if err != nil {
 t.Fatal(err) }` guard — assertions halt on failure, so state them
 directly: `gotest.NoError(t, err)`, never a guarded fail). Fixes can
-compose — a rewritten guard may itself be simplifiable — so re-run the
-pair until plain `lint` is clean. When two findings share a construct
+compose — a rewritten guard may itself be simplifiable; from v1.33 one
+`-fix` applies those too, below it re-run the pair until plain `lint` is
+clean. When two findings share a construct
 the linter reports only the stronger one (integrity over style); fix what
 it says before expecting style suggestions there.
 
@@ -103,18 +115,18 @@ those are your job, below.
    `done func()` and completes when it is called, not when it returns
    (the suite's `Timeout` fails it if never); prefer `Eventually` for
    anything that can be polled. A generic suite runs only through one
-   type alias per concrete type (`type ArticleIndexTestSuite =
-   IndexContractTestSuite[Article]`); without an alias it silently never
-   runs.
+   type alias per concrete type
+   (`type ArticleIndexTestSuite = IndexContractTestSuite[Article]`);
+   without an alias it silently never runs.
 2. **Lifecycle hooks own resources.** Setup in `BeforeEach` (or `BeforeAll`
    for expensive read-only state), teardown in `AfterEach`/`AfterAll` —
    per-test state on suite fields in a sequential suite, in the returned
    context in a parallel one (rule 4). NEVER `t.T().Cleanup`, and no
    `defer` releasing a resource in a test method. Such a `defer` lints
    clean and is still wrong: it sits outside the teardown order the
-   harness guarantees, and the setup cannot be shared or hoisted. Start goroutines with
-   `gotest.Go(t, fn)`, never a bare `go`: a panic on a bare goroutine kills
-   the process before any teardown runs.
+   harness guarantees, and the setup cannot be shared or hoisted. Start
+   goroutines with `gotest.Go(t, fn)`, never a bare `go`: a panic on a
+   bare goroutine kills the process before any teardown runs.
    `wait := gotest.Go(…); defer wait()` is the one `defer` that belongs in
    a test, and only for work that finishes on its own — never wait in the
    test on a server or poller that `AfterEach` stops (it deadlocks).
@@ -146,6 +158,8 @@ those are your job, below.
    }
    ```
 
+   (v1.26–v1.29: that literal means no deadline at all — compose onto
+   `gotest.DefaultSuiteConfig()` there, see `reference/config.md`.)
    Every test method then takes `(t *gotest.T, ctx *shopCtx)`, and an
    `AfterEach` takes `(t, ctx)` too — the generator enforces this, and
    rejects a `BeforeEach` that returns nothing in a parallel suite. A suite
@@ -234,9 +248,14 @@ observed failure: agents restructure with no case accounting):
    and diff them:
 
    ```sh
-   { go tool gotest -json ./...; go test -json ./...; } | grep -o '"Package":"[^"]*","Test":"[^"]*"' | sort -u > cases-before.txt
+   go tool gotest -json ./... > run-before.json
+   go test -json ./... >> run-before.json
+   grep -o '"Package":"[^"]*","Test":"[^"]*"' run-before.json | sort -u > cases-before.txt
    test -s cases-before.txt
    ```
+
+   Both runs must exit 0 — a run that failed partway still leaves a
+   non-empty list.
 
    Capture both runners (stdlib tests run only under `go test`) and the
    Package+Test PAIR — bare `Test` names collapse identically named suites

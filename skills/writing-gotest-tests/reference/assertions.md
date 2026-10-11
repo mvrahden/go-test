@@ -30,7 +30,7 @@ when it rewrites a `True(t, a == b)` or a guard into one.
 | `TimeWithin` / `TimeIsNow` | time comparison |
 | `Eventually` / `Consistently` | `(t, waitFor, tick, func(poll *R))` — pass `poll` to inner assertions; outer `t` inside the callback is a lint error (`poll-scope`) |
 | `Fail` | unconditional failure (Errorf + FailNow) — never as an if-guard body; state the assertion instead (`fail-guard`) |
-| `MatchSnapshot` | `(t, value, name...)` — golden snapshots in `testdata/__snapshots__/<TestName>.snap` beside the test file; the trailing strings name several snapshots in one test, they are not a message. Update via `go tool gotest ./... --update-snapshots` — which writes in CI too; CI only refuses to create a missing baseline |
+| `MatchSnapshot` | `(t, value, name...)` — golden snapshots in `testdata/__snapshots__/<TestName>.snap` beside the test file (`<TestName>_ext.snap` for an external `_test` package); the trailing strings name several snapshots in one test, they are not a message. Update via `go tool gotest ./... --update-snapshots` — which writes in CI too; CI only refuses to create a missing baseline |
 | `Must[T]` | panic-on-error value extraction, for setup code |
 | `Each[E]` | table driver: `for t, tc := range gotest.Each(t, entries)` — subtest names come from a `Desc` or `Name` string field |
 

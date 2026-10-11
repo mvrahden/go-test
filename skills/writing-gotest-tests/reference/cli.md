@@ -21,10 +21,12 @@ invocation runs tests — there is NO `test` subcommand:
   spec from source without running anything — nodes carry no verdict, and
   incompletely enumerable methods are reported on stderr.
 - `go tool gotest watch ./...` — rerun on change; supports `--spec`.
-- `go tool gotest lint ./...` — the linter; exit 3 on findings. `-fix`
-  applies suggested fixes and formats the files it rewrites; fixes can
-  compose, so repeat `lint -fix` + plain `lint` until plain `lint` exits 0
-  (below v1.33 `-fix` never shows the findings it cannot fix). Integrity
+- `go tool gotest lint ./...` — the linter; exit 3 on findings (`-json`
+  exits 0 and carries them in the document). `-fix` applies suggested
+  fixes, composed and overlapping ones included (v1.33+), formats the
+  files it rewrites and reports what is left; below v1.33 repeat
+  `lint -fix` + plain `lint` until plain `lint` exits 0, since `-fix`
+  stops after one pass and never shows the findings it cannot fix. Integrity
   rules yield only to `//nolint:<rule>` (on the line, directly above it,
   or file-wide trailing the `package` line); others
   also to `.gotest.yml` `lint.skip` / `-skip-<rule>`.
@@ -49,9 +51,9 @@ invocation runs tests — there is NO `test` subcommand:
 
 Flags shared by run modes: `--ci` (or env `GOTEST_CI`/`CI`; values `0` and
 `false` are falsy) — enables the focus guard (committed `F_` prefixes fail
-the run) AND makes snapshots read-only, so `MatchSnapshot` cannot write
-baselines in CI-detected environments. `--update-snapshots` rewrites
-`MatchSnapshot` baselines — in CI too, so never pass it there. `--spec` renders the spec view
+the run) AND makes a missing `MatchSnapshot` baseline fail instead of
+being created. `--update-snapshots` rewrites baselines — in CI too, so
+never pass it there. `--spec` renders the spec view
 instead of default output. `--timeout <dur>` is the global pipeline
 deadline (default 15m) and `--setup-timeout <dur>` the shared-fixture
 setup budget (default 2m) — `0` disables either; `--min <pct>` gates

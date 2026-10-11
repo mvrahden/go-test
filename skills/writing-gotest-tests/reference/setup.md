@@ -30,6 +30,12 @@ go get -tool github.com/mvrahden/go-test/cmd/gotest@<newer release>
 go tool gotest version
 ```
 
+In a module that does not require go-test yet, the first command fails
+("not a known dependency"): compare the second and third lines and add the
+newest release only when its go line is not newer than the module's —
+`go get -tool github.com/mvrahden/go-test/cmd/gotest@latest`. Otherwise
+report it; the project decides.
+
 To keep the pin (no newer release, or a condition above holds), name the
 current version — a bare `go get -tool` upgrades without these checks:
 
