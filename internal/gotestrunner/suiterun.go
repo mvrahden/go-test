@@ -124,7 +124,8 @@ func RunBenchSuites(ctx context.Context, targets []SuiteTarget, collector *Outpu
 }
 
 func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2json bool) *exec.Cmd { //nolint:gocritic // hugeParam: stable API
-	var testArgs []string
+	// As go test does: os.Exit(0) during a test panics instead of passing.
+	testArgs := []string{"-test.paniconexit0"}
 	switch {
 	case target.Bench:
 		// BenchFilter carries a user -bench pattern with sub-benchmark

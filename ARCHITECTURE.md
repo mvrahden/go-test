@@ -924,13 +924,16 @@ BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, exclusiveByP
 
 Each target becomes one `exec.Command`:
 ```
-<test2json> -p <pkg> -t <binary> -test.run=^TestFooTestSuite$ [flags]
+<test2json> -p <pkg> -t <binary> -test.paniconexit0 -test.run=^TestFooTestSuite$ [flags]
 ```
 
 Or without test2json:
 ```
-<binary> -test.run=^TestFooTestSuite$ [flags]
+<binary> -test.paniconexit0 -test.run=^TestFooTestSuite$ [flags]
 ```
+
+`-test.paniconexit0` is what `go test` passes too: an `os.Exit(0)` during a
+test panics and fails the suite instead of ending the process with a pass.
 
 ### Bench Target Construction
 
@@ -963,7 +966,7 @@ scoping. `buildSuiteCmd` builds the actual test binary invocation for a
 bench target as:
 
 ```
-<binary> -test.run=^$ -test.bench=^BenchmarkFooTestSuite$ -test.benchmem [flags]
+<binary> -test.paniconexit0 -test.run=^$ -test.bench=^BenchmarkFooTestSuite$ -test.benchmem [flags]
 ```
 
 `-test.run=^$` disables ordinary tests for the run; `-test.benchmem` is
@@ -1017,7 +1020,7 @@ t=1s    pkg/auth compiles first → CompileResult on compileCh
         ├─ BuildSuiteTargets → [AuthTestSuite, TokenTestSuite]
         ├─ AuthTestSuite needs shared fixtures → blocks on Ready(key)
         └─ TokenTestSuite doesn't → acquires sem slot, starts subprocess
-           └─ ./auth_hash.test -test.run=^TestTokenTestSuite$ -test.v=test2json
+           └─ ./auth_hash.test -test.paniconexit0 -test.run=^TestTokenTestSuite$ -test.v=test2json
         │
 t=2s    pkg/cart compiles → 2 more suites start
         │
