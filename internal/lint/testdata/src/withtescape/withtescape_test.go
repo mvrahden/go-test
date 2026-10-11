@@ -21,6 +21,10 @@ func (s *EscapeTestSuite) TestMethodEscape(t *gotest.T) {
 	t.T().Log("msg")             // want `use assertion message args instead — T.Log bypasses the failure report`
 	t.T().Fatal("msg")           // want `use assertions instead — T.Fatal bypasses the assertion tracer`
 	t.T().Fatalf("msg %d", 1)    // want `use assertions instead — T.Fatalf bypasses the assertion tracer`
+	_, _ = t.T().Deadline()      // want `use t.Context\(\).Deadline\(\) — t.T\(\).Deadline\(\) reports go test's -timeout, not the suite's Timeout`
+	t.T().Error("msg")           // want `use assertions instead — T.Error bypasses the assertion tracer`
+	t.T().Fail()                 // want `use assertions instead — T.Fail bypasses the assertion tracer`
+	t.T().Logf("msg %d", 1)      // want `use assertion message args instead — T.Logf bypasses the failure report`
 }
 
 func (s *EscapeTestSuite) TestAliasEscape(t *gotest.T) {
@@ -75,13 +79,20 @@ func (s *EscapeTestSuite) TestNestedContextEscape(t *gotest.T) {
 	})
 }
 
-// A stdlib helper may use its own Context; only the direct escape is flagged.
+// A stdlib helper handed t.T() sees none of the suite's deadline either.
 func (s *EscapeTestSuite) TestInterproceduralContext(t *gotest.T) {
 	helperContext(t.T())
 }
 
 func helperContext(t *testing.T) {
+	_ = t.Context()     // want `Context is available on gotest.T — t.T\(\).Context\(\) drops the suite's Timeout`
+	_, _ = t.Deadline() // want `use t.Context\(\).Deadline\(\) — t.T\(\).Deadline\(\) reports go test's -timeout, not the suite's Timeout`
+}
+
+// A stdlib test owns its context; nothing reaches it from a suite.
+func helperUnreached(t *testing.T) { //nolint:unused
 	_ = t.Context()
+	_, _ = t.Deadline()
 }
 
 func (s *EscapeTestSuite) TestInterproceduralMethodHelper(t *gotest.T) {
@@ -97,7 +108,8 @@ func standaloneAssertionEscape(t *gotest.T) { //nolint:unused
 	gotest.True(t.T(), true) // want `pass gotest.T directly to True — unnecessary T escape`
 }
 
-// Standalone functions must not be flagged for suite-only rules.
+// Standalone functions must not be flagged for suite-only rules; Run is not
+// one, since its subtests drop the suite's deadline anywhere.
 func standaloneCleanup(t *gotest.T) { //nolint:unused
 	t.T().Cleanup(func() {})
 }
@@ -107,7 +119,7 @@ func standaloneParallel(t *gotest.T) { //nolint:unused
 }
 
 func standaloneRun(t *gotest.T) { //nolint:unused
-	t.T().Run("sub", func(st *testing.T) {})
+	t.T().Run("sub", func(st *testing.T) {}) // want `use It or When instead — T.Run bypasses gotest wrapping`
 }
 
 func helperErrorf(t *testing.T) {
