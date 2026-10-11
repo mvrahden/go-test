@@ -794,12 +794,25 @@ Usage:
   gotest migrate [--dry-run] [packages...]
 
 Scans for testify/suite patterns and rewrites them into gotest suite
-format. Packages are named as for go test: directories (./pkg, ./...)
-or import paths; the current package if none are given. A package's test
-files are migrated together, its external _test package included.
-Anything it cannot convert is left with a TODO(gotest-migrate) marker,
-and the run exits 1 while any marker is left, including one an earlier
-run placed.
+format. Packages are named as directories (./pkg, ./..., or .\pkg on
+Windows) or import paths of the main module; the current package if none
+are given. A directory counts when it holds Go files under any build tag.
+A package's test files are migrated together, its external _test package
+included.
+
+The result is type-checked for real, from the migrated sources, in the
+default build and in each tag set the test files' //go:build lines ask
+for. Anything it cannot convert, and every line that does not compile,
+is left with a TODO(gotest-migrate) marker.
+
+Exit codes:
+  0  every migrated package compiles, no marker is left, and every hook
+     and test testify ran is one gotest calls
+  1  a marker is left, including one an earlier run placed
+  2  a pattern names nothing, or a package does not compile before the
+     migration (it is left alone)
+
+The module must require github.com/mvrahden/go-test (go get -tool does).
 
 Flags:
   --dry-run    Print the diff of every edit instead of writing it

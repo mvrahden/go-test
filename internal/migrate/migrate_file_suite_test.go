@@ -7,11 +7,14 @@ import (
 
 	"github.com/mvrahden/go-test/internal/migrate"
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/tests/gotestcli"
 )
 
 // MigrateFileTestSuite covers the file-level API: suite renaming, what a
 // testify suite reports, and the transformed output pinned by snapshot.
-type MigrateFileTestSuite struct{}
+type MigrateFileTestSuite struct {
+	Mod *gotestcli.TestifyModuleSharedFixture
+}
 
 func (s *MigrateFileTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
@@ -24,16 +27,11 @@ type migrateFileCtx struct{}
 func (s *MigrateFileTestSuite) BeforeEach(t *gotest.T) *migrateFileCtx { return &migrateFileCtx{} }
 
 // transformBasicInput migrates a copy of testdata/basic and returns the result.
-func transformBasicInput(t *gotest.T) (string, []migrate.MigrateResult) {
+func (s *MigrateFileTestSuite) transformBasicInput(t *gotest.T) (string, []migrate.MigrateResult) {
 	src, err := os.ReadFile(filepath.Join("testdata", "basic", "input_test.go"))
 	gotest.NoError(t, err)
-	path := filepath.Join(t.TempDir(), "input_test.go")
-	gotest.NoError(t, os.WriteFile(path, src, 0o600))
-	results, err := migrate.MigrateFile(path)
-	gotest.NoError(t, err)
-	out, err := os.ReadFile(path)
-	gotest.NoError(t, err)
-	return string(out), results
+	run := migrateModule(t, s.Mod, migrate.Options{}, map[string]string{"basic/input_test.go": string(src)}, "basic")
+	return run.files["basic/input_test.go"], run.results
 }
 
 func (s *MigrateFileTestSuite) TestDeriveNewName(t *gotest.T, _ *migrateFileCtx) {
@@ -52,7 +50,7 @@ func (s *MigrateFileTestSuite) TestDeriveNewName(t *gotest.T, _ *migrateFileCtx)
 }
 
 func (s *MigrateFileTestSuite) TestResults(t *gotest.T, _ *migrateFileCtx) {
-	_, results := transformBasicInput(t)
+	_, results := s.transformBasicInput(t)
 
 	gotest.Len(t, results, 1)
 	gotest.Equal(t, "UserSuite", results[0].OldName)
@@ -61,7 +59,7 @@ func (s *MigrateFileTestSuite) TestResults(t *gotest.T, _ *migrateFileCtx) {
 }
 
 func (s *MigrateFileTestSuite) TestTransformFile(t *gotest.T, _ *migrateFileCtx) {
-	got, _ := transformBasicInput(t)
+	got, _ := s.transformBasicInput(t)
 
 	// Re-format for consistent whitespace.
 	gotBytes, err := format.Source([]byte(got))

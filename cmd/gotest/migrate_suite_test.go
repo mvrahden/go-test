@@ -16,6 +16,7 @@ import (
 //nolint:lifecycle-pair // BeforeAll only wraps the shared binary, which its fixture removes
 type MigrateCLITestSuite struct {
 	CLI *gotestcli.BinarySharedFixture
+	Mod *gotestcli.TestifyModuleSharedFixture
 	cli cliRunner
 }
 
@@ -77,8 +78,11 @@ func TestMarkedSuite(t *testing.T) {
 }
 `
 
+// BeforeEach makes a module of testify and the gotest under test: migrate
+// type-checks what it converts.
 func (s *MigrateCLITestSuite) BeforeEach(t *gotest.T) *migrateCtx {
 	dir := t.TempDir()
+	gotest.NoError(t, s.Mod.Write(dir, nil))
 	return &migrateCtx{dir: dir, path: filepath.Join(dir, "sample_test.go")}
 }
 
@@ -126,8 +130,7 @@ func (s *MigrateCLITestSuite) TestRerun(t *gotest.T, ctx *migrateCtx) {
 	})
 
 	t.It("reports the file and its markers", func(it *gotest.T) {
-		gotest.Contains(it, stdout, "No testify/suite patterns found.\nLeft by an earlier run:\n  sample_test.go: 1 marker\n")
-		gotest.Contains(it, stdout, "1 TODO(gotest-migrate) marker left; resolve them by hand")
+		gotest.Equal(it, "Markers an earlier run left, still to resolve:\n  sample_test.go: 1 marker\n1 TODO(gotest-migrate) marker left; resolve them by hand\n", stdout)
 		gotest.Empty(it, stderr)
 	})
 
@@ -226,11 +229,10 @@ func (s *MigrateCLITestSuite) TestDryRun(t *gotest.T, ctx *migrateCtx) {
 	})
 }
 
-// module lays out a module example.com/m with a suite in pkg and one in a
-// testdata directory, which no package pattern names.
+// module lays out the module example.com/m with a suite in pkg and one in
+// a testdata directory, which no package pattern names.
 func (s *MigrateCLITestSuite) module(t *gotest.T, ctx *migrateCtx) {
 	for name, src := range map[string]string{
-		"go.mod":                       "module example.com/m\n\ngo 1.24\n",
 		"pkg/sample_test.go":           migrateCleanSrc,
 		"pkg/testdata/fixture_test.go": migrateCleanSrc,
 	} {
@@ -297,5 +299,25 @@ func (s *MigrateCLITestSuite) TestMissingPattern(t *gotest.T, ctx *migrateCtx) {
 
 	t.It("does not claim the pattern was clean", func(it *gotest.T) {
 		gotest.Empty(it, stdout)
+	})
+}
+
+func (s *MigrateCLITestSuite) TestUncompiledPackage(t *gotest.T, ctx *migrateCtx) {
+	src := strings.Replace(migrateCleanSrc, "s.Require().Equal(1, 1)", "undefined()", 1)
+	s.write(t, ctx, src)
+
+	stdout, stderr, code := s.cli.runSplitIn(t, ctx.dir, "migrate", ".")
+
+	t.It("exits 2: nothing about a migration could be proven", func(it *gotest.T) {
+		gotest.Equal(it, 2, code, stdout+stderr)
+	})
+
+	t.It("names the package and its error", func(it *gotest.T) {
+		gotest.Equal(it, "Not migrated: these packages do not compile as they are, so nothing about a migration could be proven:\n  .:\n    sample_test.go:14: undefined: undefined\n", stdout)
+		gotest.Empty(it, stderr)
+	})
+
+	t.It("leaves the file untouched", func(it *gotest.T) {
+		gotest.Equal(it, src, s.read(it, ctx))
 	})
 }

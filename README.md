@@ -1037,7 +1037,7 @@ gotest migrate ./...
 #   pkg/user/user_test.go: UserSuite → UserTestSuite
 ```
 
-Renames lifecycle methods, rewrites assertions, removes the testify imports nothing uses any more. Anything it cannot convert gets a `TODO(gotest-migrate)` marker, and every run exits 1 while one is left; `--dry-run` prints the diff without writing.
+Renames lifecycle methods, rewrites assertions (picking, by the argument's type, the gotest assertion that keeps testify's verdict), removes the testify imports nothing uses any more. The result is type-checked for real, in every build its `//go:build` tags need: anything it cannot convert, and every line that does not compile, gets a `TODO(gotest-migrate)` marker, and every run exits 1 while one is left. Exit 0 means every migrated package compiles and every hook and test testify ran is one gotest calls; a package that does not compile before is left alone, exit 2. The module must require `github.com/mvrahden/go-test`; `--dry-run` prints the diff without writing.
 
 ### Linter
 

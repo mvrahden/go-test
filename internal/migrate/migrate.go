@@ -4,17 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
-	"go/build"
 	"go/parser"
 	"go/token"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"golang.org/x/mod/modfile"
 
 	"github.com/mvrahden/go-test/internal/about"
 )
@@ -48,6 +44,16 @@ var assertionMap = map[string]string{
 	"GreaterOrEqual": "GreaterOrEqual",
 	"Less":           "Less",
 	"LessOrEqual":    "LessOrEqual",
+	"NotZero":        "NotZero",
+	"Same":           "Same",
+	"NotSame":        "NotSame",
+	"ElementsMatch":  "ElementsMatch",
+	"Subset":         "Subset",
+	"NotContains":    "NotContains",
+	"Regexp":         "Regexp",
+	"InDelta":        "InDelta",
+	"JSONEq":         "JSONEq",
+	"Panics":         "Panics",
 }
 
 // lifecycleRenames maps the testify hooks gotest has an equivalent for.
@@ -115,6 +121,12 @@ type MigrateResult struct {
 	// RefsOnly marks a file that declares no suite but was changed for
 	// suites other files declare: their methods, runners or references.
 	RefsOnly bool
+	// Uncompiled lists, for a directory (File), the errors its packages
+	// had before the migration; nothing in it was changed.
+	Uncompiled []string
+	// Unplaced lists, for a directory (File), the errors the migrated
+	// packages have where no marker can stand.
+	Unplaced []string
 }
 
 // DeriveNewName computes the new suite name from an old one.
@@ -164,17 +176,14 @@ func countSourceMarkers(src []byte) (int, error) {
 	return countMarkers(f), nil
 }
 
-// MigrateFile migrates a single file on its own, as if it were the only
-// file of its package.
-func MigrateFile(path string) ([]MigrateResult, error) {
-	return migrateUnit("", []string{path}, nil, Options{})
-}
-
-// MigratePackages migrates the test files of the packages patterns name:
-// directories (dir/... for every package below dir, as the go command reads
-// it) or import paths. A directory is migrated as a whole: a suite's
+// MigratePackages migrates the test files of the directories patterns name
+// (see patternDirs). A directory is migrated as a whole: a suite's
 // methods, runner and references may sit in any of its files, or in its
-// external _test package.
+// external _test package. Its test packages are type-checked for real
+// before and after, in every build configuration its test files need: one
+// that does not compile before is left alone and reported in Uncompiled;
+// every error the migrated code has gets a marker on its line, so a result
+// without markers compiles.
 func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 	var dirs []string
 	seen := map[string]bool{}
@@ -185,7 +194,7 @@ func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 		}
 		for _, dir := range matched {
 			// Overlapping patterns name a directory once.
-			key, err := filepath.Abs(dir)
+			key, err := canonical(dir)
 			if err != nil {
 				return nil, err
 			}
@@ -197,12 +206,76 @@ func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 	}
 
 	var all []MigrateResult
+	var jobs []*dirJob
+	shown := map[string]string{} // canonical path -> the path to show
 	for _, dir := range dirs {
-		tests := testFiles(dir)
+		abs, err := canonical(dir)
+		if err != nil {
+			return nil, err
+		}
+		tests := testFiles(abs)
 		if len(tests) == 0 {
 			continue
 		}
-		results, err := migrateUnit(importPath(dir), tests, contextFiles(dir), opts)
+		for _, path := range tests {
+			shown[path] = filepath.Join(dir, filepath.Base(path))
+		}
+		if !usesTestifySuite(tests) {
+			// Nothing to convert; only an earlier run's markers count.
+			results, err := leftoverResults(tests, shown)
+			if err != nil {
+				return all, err
+			}
+			all = append(all, results...)
+			continue
+		}
+		modRoot := moduleRoot(abs)
+		if modRoot == "" {
+			return all, fmt.Errorf("%s: not inside a Go module; migrate type-checks the packages it converts", dir)
+		}
+		jobs = append(jobs, newDirJob(abs, modRoot, tests))
+	}
+	if len(jobs) == 0 {
+		return all, nil
+	}
+
+	fset := token.NewFileSet()
+	srcs := map[string][]byte{}
+	before, err := loadJobs(jobs, nil, fset, srcs)
+	if err != nil {
+		return all, err
+	}
+	var units []*jobUnit
+	for _, j := range jobs {
+		if errs := errorsOf(before[j]); len(errs) > 0 {
+			// An earlier run's markers explain a package it left not
+			// compiling; they are what is left to do.
+			results, err := leftoverResults(j.tests, shown)
+			if err != nil {
+				return all, err
+			}
+			if len(results) == 0 {
+				results = []MigrateResult{{File: shownDir(j, shown), Uncompiled: errorStrings(errs, shown)}}
+			}
+			all = append(all, results...)
+			continue
+		}
+		u, err := newUnit(j, before[j], fset, srcs)
+		if err != nil {
+			return all, err
+		}
+		if err := u.migrate(); err != nil {
+			return all, err
+		}
+		units = append(units, &jobUnit{job: j, u: u})
+	}
+
+	if err := verify(units, shown); err != nil {
+		return all, err
+	}
+
+	for _, ju := range units {
+		results, err := ju.write(opts, shown)
 		all = append(all, results...)
 		if err != nil {
 			return all, err
@@ -211,159 +284,93 @@ func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 	return all, nil
 }
 
-// patternDirs lists the directories pattern names. A path (./x, ../x, /x)
-// is read from disk, a path to a file as its directory; anything else is an
-// import path pattern the go command resolves.
-func patternDirs(pattern string) ([]string, error) {
-	if !build.IsLocalImport(pattern) && !filepath.IsAbs(pattern) {
-		return listDirs(pattern)
-	}
-	root, recursive := strings.CutSuffix(pattern, "/...")
-	if root == "" {
-		root = "."
-	}
-	info, err := os.Stat(root)
-	if err != nil {
-		return nil, fmt.Errorf("pattern %s: %w", pattern, err)
-	}
-	if !info.IsDir() {
-		return []string{filepath.Dir(root)}, nil
-	}
-	if !recursive {
-		return []string{root}, nil
-	}
-	var dirs []string
-	err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil || !d.IsDir() {
-			return nil
-		}
-		if path != root {
-			// What ./... leaves out: testdata, vendor, hidden and _ dirs,
-			// and nested modules.
-			name := d.Name()
-			if name == "testdata" || name == "vendor" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
-				return filepath.SkipDir
-			}
-			if _, err := os.Stat(filepath.Join(path, "go.mod")); err == nil {
-				return filepath.SkipDir
+// jobUnit is a directory's migration and what its type-check found.
+type jobUnit struct {
+	job      *dirJob
+	u        *unit
+	unplaced []string
+}
+
+// verify type-checks every migrated directory from its migrated sources
+// and marks what still needs a hand: the constructs the migration knows it
+// could not convert, and every error the result has, on its line.
+func verify(units []*jobUnit, shown map[string]string) error {
+	overlay := map[string][]byte{}
+	var jobs []*dirJob
+	byJob := map[*dirJob]*jobUnit{}
+	for _, ju := range units {
+		changed := false
+		for _, uf := range ju.u.files {
+			if uf.out != nil && !bytes.Equal(uf.out, uf.src) {
+				overlay[uf.path] = uf.out
+				changed = true
 			}
 		}
-		dirs = append(dirs, path)
-		return nil
-	})
-	return dirs, err
-}
-
-// listDirs resolves an import path pattern with the go command, as the
-// rest of the CLI does. A directory inside the working directory is named
-// relative to it.
-func listDirs(pattern string) ([]string, error) {
-	cmd := exec.Command("go", "list", "-find", "-f", "{{.Dir}}", pattern)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	if err != nil {
-		msg := strings.TrimSpace(stderr.String())
-		if msg == "" {
-			msg = err.Error()
+		if changed {
+			jobs = append(jobs, ju.job)
+			byJob[ju.job] = ju
 		}
-		return nil, fmt.Errorf("pattern %s: %s", pattern, msg)
 	}
-	wd, _ := os.Getwd()
-	var dirs []string
-	for _, dir := range strings.Fields(string(out)) {
-		if rel, err := filepath.Rel(wd, dir); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			dir = rel
-		}
-		dirs = append(dirs, dir)
-	}
-	return dirs, nil
-}
-
-// testFiles lists the _test.go files of dir.
-func testFiles(dir string) []string {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
+	if len(jobs) == 0 {
 		return nil
 	}
-	var paths []string
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), "_test.go") {
-			paths = append(paths, filepath.Join(dir, e.Name()))
-		}
-	}
-	return paths
-}
-
-// contextFiles lists the non-test Go files of dir the default build would
-// compile. They are not migrated; they only resolve names test code uses.
-func contextFiles(dir string) []string {
-	entries, err := os.ReadDir(dir)
+	fset := token.NewFileSet()
+	srcs := map[string][]byte{}
+	after, err := loadJobs(jobs, overlay, fset, srcs)
 	if err != nil {
-		return nil
+		return err
 	}
-	var paths []string
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
+	for _, j := range jobs {
+		ju := byJob[j]
+		au, err := newUnit(j, after[j], fset, srcs)
+		if err != nil {
+			return err
 		}
-		if ok, err := build.Default.MatchFile(dir, name); err == nil && ok {
-			paths = append(paths, filepath.Join(dir, name))
-		}
-	}
-	return paths
-}
-
-// importPath is the import path of dir, from the enclosing go.mod; empty
-// outside a module. An external _test package reaches the package's own
-// suites through it.
-func importPath(dir string) string {
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		return ""
-	}
-	for root := abs; ; {
-		data, err := os.ReadFile(filepath.Join(root, "go.mod"))
-		if err == nil {
-			mod := modfile.ModulePath(data)
-			if mod == "" {
-				return ""
+		au.byKey = map[string]*suiteDecl{}
+		for _, s := range ju.u.suites {
+			if s.migrated() {
+				au.byKey[s.obj.Pkg().Path()+"."+s.newName] = s
 			}
-			rel, err := filepath.Rel(root, abs)
+		}
+		marks := map[string]*lineMarks{}
+		for i, uf := range ju.u.files {
+			m := &lineMarks{fset: fset}
+			marks[uf.path] = m
+			if !uf.refused && uf.unchecked == "" {
+				au.unconverted(au.files[i].f, m)
+			}
+		}
+		for _, e := range errorsOf(after[j]) {
+			if m := marks[e.file]; m != nil && e.line > 0 {
+				m.addLine(e.line, "does not compile: "+strings.Join(strings.Fields(e.msg), " "))
+				continue
+			}
+			ju.unplaced = append(ju.unplaced, errorString(e, shown))
+		}
+		for _, uf := range ju.u.files {
+			m := marks[uf.path]
+			if len(m.anns) == 0 {
+				continue
+			}
+			current := uf.src
+			if uf.out != nil {
+				current = uf.out
+			}
+			out, err := insertMarkers(current, m.anns)
 			if err != nil {
-				return ""
+				return fmt.Errorf("annotate %s: %w", uf.path, err)
 			}
-			if rel == "." {
-				return mod
-			}
-			return mod + "/" + filepath.ToSlash(rel)
+			uf.out = out
 		}
-		parent := filepath.Dir(root)
-		if parent == root {
-			return ""
-		}
-		root = parent
 	}
+	return nil
 }
 
-// migrateUnit migrates the test files tests together, writes what changed
-// (or prints its diff) and reports per file.
-func migrateUnit(importPath string, tests, context []string, opts Options) ([]MigrateResult, error) {
-	sort.Strings(tests)
-	u, err := loadUnit(importPath, tests, context)
-	if err != nil {
-		return nil, err
-	}
-	if err := u.migrate(); err != nil {
-		return nil, err
-	}
-
+// write writes what changed in the directory (or prints its diff) and
+// reports per file.
+func (ju *jobUnit) write(opts Options, shown map[string]string) ([]MigrateResult, error) {
 	var results []MigrateResult
-	for _, uf := range u.files {
-		if !uf.test {
-			continue
-		}
+	for _, uf := range ju.u.files {
 		final := uf.src
 		changed := uf.out != nil && !bytes.Equal(uf.out, uf.src)
 		if changed {
@@ -373,13 +380,13 @@ func migrateUnit(importPath string, tests, context []string, opts Options) ([]Mi
 		if err != nil {
 			return results, fmt.Errorf("annotate %s: %w", uf.path, err)
 		}
-		results = append(results, u.fileResults(uf, changed, markers)...)
+		results = append(results, ju.u.fileResults(uf, shown[uf.path], changed, markers)...)
 		if !changed {
 			continue
 		}
 		if opts.DryRun {
 			if opts.Out != nil {
-				fmt.Fprint(opts.Out, unifiedDiff(uf.path, uf.src, uf.out))
+				fmt.Fprint(opts.Out, unifiedDiff(shown[uf.path], uf.src, uf.out))
 			}
 			continue
 		}
@@ -387,19 +394,22 @@ func migrateUnit(importPath string, tests, context []string, opts Options) ([]Mi
 			return results, fmt.Errorf("write %s: %w", uf.path, err)
 		}
 	}
+	if len(ju.unplaced) > 0 {
+		results = append(results, MigrateResult{File: shownDir(ju.job, shown), Unplaced: ju.unplaced})
+	}
 	return results, nil
 }
 
 // fileResults reports one file: a result per suite it declares, its
 // refusal, or the markers left in a file changed only for other files'
 // suites or not changed at all.
-func (u *unit) fileResults(uf *unitFile, changed bool, markers int) []MigrateResult {
+func (u *unit) fileResults(uf *unitFile, shown string, changed bool, markers int) []MigrateResult {
 	if uf.refused {
 		reasons := make([]string, 0, len(uf.marks))
 		for _, m := range uf.marks {
 			reasons = append(reasons, m.msg)
 		}
-		return []MigrateResult{{File: uf.path, Markers: markers, Refusal: strings.Join(reasons, "; ")}}
+		return []MigrateResult{{File: shown, Markers: markers, Refusal: strings.Join(reasons, "; ")}}
 	}
 	var results []MigrateResult
 	for _, s := range u.suites {
@@ -407,7 +417,7 @@ func (u *unit) fileResults(uf *unitFile, changed bool, markers int) []MigrateRes
 			continue
 		}
 		results = append(results, MigrateResult{
-			File:    uf.path,
+			File:    shown,
 			OldName: s.obj.Name(),
 			NewName: s.newName,
 			Markers: markers,
@@ -418,9 +428,116 @@ func (u *unit) fileResults(uf *unitFile, changed bool, markers int) []MigrateRes
 	case len(results) > 0:
 		return results
 	case changed:
-		return []MigrateResult{{File: uf.path, Markers: markers, RefsOnly: true}}
+		return []MigrateResult{{File: shown, Markers: markers, RefsOnly: true}}
 	case markers > 0:
-		return []MigrateResult{{File: uf.path, Markers: markers}}
+		return []MigrateResult{{File: shown, Markers: markers}}
 	}
 	return nil
+}
+
+// leftoverResults reports the markers an earlier run left in files with
+// nothing left to convert.
+func leftoverResults(tests []string, shown map[string]string) ([]MigrateResult, error) {
+	var results []MigrateResult
+	for _, path := range tests {
+		src, err := os.ReadFile(path)
+		if err != nil {
+			return results, fmt.Errorf("read %s: %w", path, err)
+		}
+		n, err := countSourceMarkers(src)
+		if err != nil {
+			return results, fmt.Errorf("parse %s: %w", path, err)
+		}
+		if n > 0 {
+			results = append(results, MigrateResult{File: shown[path], Markers: n})
+		}
+	}
+	return results, nil
+}
+
+// usesTestifySuite reports whether any of the files imports testify's
+// suite package: without it there is no suite to convert.
+func usesTestifySuite(paths []string) bool {
+	for _, path := range paths {
+		f, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			return true // let the type-check report it
+		}
+		for _, is := range f.Imports {
+			if strings.Trim(is.Path.Value, `"`) == suitePkg {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func shownDir(j *dirJob, shown map[string]string) string {
+	if len(j.tests) > 0 {
+		if s, ok := shown[j.tests[0]]; ok {
+			return filepath.Dir(s)
+		}
+	}
+	return j.dir
+}
+
+func errorStrings(errs []loadErr, shown map[string]string) []string {
+	out := make([]string, 0, len(errs))
+	for _, e := range errs {
+		out = append(out, errorString(e, shown))
+	}
+	return out
+}
+
+// errorString is e with its file as the user named it.
+func errorString(e loadErr, shown map[string]string) string {
+	if s, ok := shown[e.file]; ok {
+		e.file = s
+	}
+	return e.String()
+}
+
+// canonical is dir absolute with symlinks resolved, as the go command
+// reports the files it loads.
+func canonical(dir string) (string, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return "", err
+	}
+	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		return resolved, nil
+	}
+	return abs, nil
+}
+
+// moduleRoot is the directory of the go.mod enclosing dir, empty outside
+// a module.
+func moduleRoot(dir string) string {
+	for root := dir; ; {
+		if _, err := os.Stat(filepath.Join(root, "go.mod")); err == nil {
+			return root
+		}
+		parent := filepath.Dir(root)
+		if parent == root {
+			return ""
+		}
+		root = parent
+	}
+}
+
+// testFiles lists the _test.go files of dir, sorted.
+func testFiles(dir string) []string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var paths []string
+	for _, e := range entries {
+		// The go command ignores files named _x or .x.
+		if name := e.Name(); !e.IsDir() && strings.HasSuffix(name, "_test.go") && name[0] != '_' && name[0] != '.' {
+			paths = append(paths, filepath.Join(dir, e.Name()))
+		}
+	}
+	sort.Strings(paths)
+	return paths
 }

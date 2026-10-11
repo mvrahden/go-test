@@ -2,29 +2,28 @@ package migrate
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"go/ast"
 	"go/format"
-	"go/parser"
 	"go/token"
 	"go/types"
-	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
-// unitFile is one file of a unit. Test files are migrated; the others only
-// take part in resolving names.
+// unitFile is one test file of a unit.
 type unitFile struct {
 	path    string
 	src     []byte
 	f       *ast.File
-	test    bool
 	refused bool
 	marks   []mark // refusal markers, placed on src
 	out     []byte // migrated source; nil while unchanged
+	// unchecked names what keeps the file out of every configuration
+	// migrate type-checks; such a file has syntax but no types.
+	unchecked string
+	// gate is a //go:build expression the migration moves onto the file.
+	gate string
 }
 
 // mark is a TODO(gotest-migrate) marker due above pos.
@@ -35,16 +34,20 @@ type mark struct {
 
 // unit is the test code of one directory, migrated together: the package's
 // own test files and its external _test package, which may use the
-// former's suites. A suite's methods, runner and references are found in
-// whichever of its files declares them.
+// former's suites, under every build configuration they need. A suite's
+// methods, runner and references are found in whichever of its files
+// declares them.
 type unit struct {
-	importPath string
-	fset       *token.FileSet
-	files      []*unitFile
-	info       *types.Info
-	pkgs       map[string]*types.Package // by package clause
-	suites     []*suiteDecl              // in declaration order
-	byObj      map[types.Object]*suiteDecl
+	fset    *token.FileSet
+	files   []*unitFile
+	info    *types.Info               // merged across configurations
+	scopes  map[string][]*types.Scope // package scopes by path, one per configuration
+	filePkg map[*ast.File]*types.Package
+	suites  []*suiteDecl // in declaration order
+	byKey   map[string]*suiteDecl
+	// hooks maps a suite method gotest calls with t, by methodKey, to
+	// its gotest name.
+	hooks map[string]string
 }
 
 // suiteDecl is a struct type embedding suite.Suite.
@@ -58,95 +61,44 @@ type suiteDecl struct {
 	// marked: refusal is the text of a marker due at the suite's type when
 	// its file carries none of its own.
 	marked bool
+	// note is a marker due at the migrated suite's type.
+	note string
 }
 
 func (s *suiteDecl) migrated() bool { return s.refusal == "" }
 
-// errUnresolved stands in for every import. Names declared in the unit
-// resolve without them, and that is all the migration needs.
-var errUnresolved = errors.New("not loaded")
-
-type importerFunc func(path string) (*types.Package, error)
-
-func (f importerFunc) Import(path string) (*types.Package, error) { return f(path) }
-
-// loadUnit parses tests and context and resolves names across them.
-func loadUnit(importPath string, tests, context []string) (*unit, error) {
-	u := &unit{importPath: importPath, fset: token.NewFileSet()}
-	for _, path := range tests {
-		src, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", path, err)
-		}
-		f, err := parser.ParseFile(u.fset, path, src, parser.ParseComments|parser.SkipObjectResolution)
-		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", path, err)
-		}
-		u.files = append(u.files, &unitFile{path: path, src: src, f: f, test: true})
+// objKey names a package-level object the same in every configuration;
+// the configurations type-check apart, so their objects differ.
+func objKey(obj types.Object) string {
+	if obj == nil || obj.Pkg() == nil || obj.Parent() != obj.Pkg().Scope() {
+		return ""
 	}
-	for _, path := range context {
-		src, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		// A context file that does not parse resolves nothing; it is not
-		// the migration's to fix.
-		f, err := parser.ParseFile(u.fset, path, src, parser.SkipObjectResolution)
-		if err != nil {
-			continue
-		}
-		u.files = append(u.files, &unitFile{path: path, src: src, f: f})
-	}
-	u.check()
-	return u, nil
+	return obj.Pkg().Path() + "." + obj.Name()
 }
 
-// check type-checks the unit's packages, the package itself first so its
-// external _test package can import it.
-func (u *unit) check() {
-	u.info = &types.Info{
-		Types:      map[ast.Expr]types.TypeAndValue{},
-		Defs:       map[*ast.Ident]types.Object{},
-		Uses:       map[*ast.Ident]types.Object{},
-		Implicits:  map[ast.Node]types.Object{},
-		Selections: map[*ast.SelectorExpr]*types.Selection{},
+// methodKey names a method by its receiver's type and its name.
+func methodKey(fn *types.Func) string {
+	sig, ok := fn.Type().(*types.Signature)
+	if !ok || sig.Recv() == nil {
+		return ""
 	}
-	byPkg := map[string][]*ast.File{}
-	var names []string
-	for _, uf := range u.files {
-		name := uf.f.Name.Name
-		if byPkg[name] == nil {
-			names = append(names, name)
-		}
-		byPkg[name] = append(byPkg[name], uf.f)
+	t := sig.Recv().Type()
+	if p, ok := t.(*types.Pointer); ok {
+		t = p.Elem()
 	}
-	sort.SliceStable(names, func(i, j int) bool {
-		return !strings.HasSuffix(names[i], "_test") && strings.HasSuffix(names[j], "_test")
-	})
-	u.pkgs = map[string]*types.Package{}
-	var own *types.Package
-	for _, name := range names {
-		path := u.importPath
-		if path == "" {
-			path = name
-		} else if strings.HasSuffix(name, "_test") {
-			path += "_test"
-		}
-		conf := types.Config{
-			Importer: importerFunc(func(p string) (*types.Package, error) {
-				if own != nil && u.importPath != "" && p == u.importPath {
-					return own, nil
-				}
-				return nil, errUnresolved
-			}),
-			Error: func(error) {},
-		}
-		pkg, _ := conf.Check(path, u.fset, byPkg[name], u.info)
-		u.pkgs[name] = pkg
-		if own == nil && !strings.HasSuffix(name, "_test") {
-			own = pkg
-		}
+	n, ok := t.(*types.Named)
+	if !ok {
+		return ""
 	}
+	return objKey(n.Obj()) + "." + fn.Name()
+}
+
+// suiteFor is the suite obj declares, nil for any other object.
+func (u *unit) suiteFor(obj types.Object) *suiteDecl {
+	if k := objKey(obj); k != "" {
+		return u.byKey[k]
+	}
+	return nil
 }
 
 // fileAt is the unit file holding pos.
@@ -197,9 +149,9 @@ func (u *unit) suiteOf(expr ast.Expr) *suiteDecl {
 			expr = x.X
 			continue
 		case *ast.Ident:
-			return u.byObj[u.info.Uses[x]]
+			return u.suiteFor(u.info.Uses[x])
 		case *ast.SelectorExpr:
-			return u.byObj[u.info.Uses[x.Sel]]
+			return u.suiteFor(u.info.Uses[x.Sel])
 		}
 		return nil
 	}
@@ -217,15 +169,44 @@ func (u *unit) suiteOfType(t types.Type) *suiteDecl {
 	if !ok {
 		return nil
 	}
-	return u.byObj[n.Obj()]
+	return u.suiteFor(n.Obj())
+}
+
+// embedsTestifySuite reports whether t embeds suite.Suite, at any depth.
+func embedsTestifySuite(t types.Type, seen map[types.Type]bool) bool {
+	if p, ok := t.(*types.Pointer); ok {
+		t = p.Elem()
+	}
+	if n, ok := t.(*types.Named); ok {
+		if n.Obj().Pkg() != nil && n.Obj().Pkg().Path() == suitePkg && n.Obj().Name() == "Suite" {
+			return true
+		}
+	}
+	if seen[t] {
+		return false
+	}
+	seen[t] = true
+	st, ok := t.Underlying().(*types.Struct)
+	if !ok {
+		return false
+	}
+	for i := range st.NumFields() {
+		if f := st.Field(i); f.Embedded() && embedsTestifySuite(f.Type(), seen) {
+			return true
+		}
+	}
+	return false
 }
 
 // findSuites collects every struct type a test file declares with
-// suite.Suite embedded. A generic one is not migrated.
-func (u *unit) findSuites() {
-	u.byObj = map[types.Object]*suiteDecl{}
+// suite.Suite embedded. A testify suite it cannot convert is marked and
+// its file refused: a generic one, or one that inherits suite.Suite from
+// a type of another package.
+func (u *unit) findSuites() map[*unitFile]bool {
+	u.byKey = map[string]*suiteDecl{}
+	refused := map[*unitFile]bool{}
 	for _, uf := range u.files {
-		if !uf.test {
+		if uf.unchecked != "" {
 			continue
 		}
 		for _, decl := range uf.f.Decls {
@@ -235,7 +216,7 @@ func (u *unit) findSuites() {
 			}
 			for _, spec := range gd.Specs {
 				ts, ok := spec.(*ast.TypeSpec)
-				if !ok || ts.TypeParams != nil {
+				if !ok {
 					continue
 				}
 				st, ok := ts.Type.(*ast.StructType)
@@ -246,28 +227,74 @@ func (u *unit) findSuites() {
 				if obj == nil {
 					continue
 				}
+				direct := false
 				for _, field := range st.Fields.List {
-					if u.isSuiteField(field) {
-						s := &suiteDecl{obj: obj, spec: ts, file: uf, newName: DeriveNewName(obj.Name())}
-						u.suites = append(u.suites, s)
-						u.byObj[obj] = s
-						break
+					direct = direct || u.isSuiteField(field)
+				}
+				switch {
+				case direct && ts.TypeParams != nil:
+					uf.marks = append(uf.marks, mark{pos: specPos(gd, ts), msg: obj.Name() + " is a generic testify suite; gotest instantiates generic suites through type aliases — migrate it by hand"})
+					refused[uf] = true
+				case direct:
+					s := &suiteDecl{obj: obj, spec: ts, file: uf, newName: DeriveNewName(obj.Name())}
+					u.suites = append(u.suites, s)
+					u.byKey[objKey(obj)] = s
+				default:
+					if base := u.foreignBase(st); base != "" {
+						uf.marks = append(uf.marks, mark{pos: specPos(gd, ts), msg: obj.Name() + " embeds " + base + ", a testify suite of another package; gotest suites do not inherit hooks or assertions — migrate both by hand"})
+						refused[uf] = true
 					}
 				}
 			}
 		}
 	}
+	return refused
+}
+
+// foreignBase names the embedded type of another package st inherits
+// suite.Suite through, empty for none.
+func (u *unit) foreignBase(st *ast.StructType) string {
+	for _, field := range st.Fields.List {
+		if len(field.Names) != 0 {
+			continue
+		}
+		t := u.info.TypeOf(field.Type)
+		if t == nil {
+			continue
+		}
+		base := t
+		if p, ok := base.(*types.Pointer); ok {
+			base = p.Elem()
+		}
+		n, ok := base.(*types.Named)
+		if !ok || n.Obj().Pkg() == nil || u.scopes[n.Obj().Pkg().Path()] != nil {
+			continue // declared here: refuse handles a suite embedding a suite
+		}
+		if embedsTestifySuite(t, map[types.Type]bool{}) {
+			return n.Obj().Pkg().Name() + "." + n.Obj().Name()
+		}
+	}
+	return ""
+}
+
+// specPos is where a marker for ts goes: above its own line, or above the
+// declaration when it is not grouped.
+func specPos(gd *ast.GenDecl, ts *ast.TypeSpec) token.Pos {
+	if !gd.Lparen.IsValid() {
+		return gd.Pos()
+	}
+	return ts.Pos()
 }
 
 // refuse decides which suites stay as they are. A suite another struct
 // embeds would strand the child when renamed, so it is refused, with the
 // file declaring it and the file declaring the child; so is a suite whose
-// new name is taken. A refused file is left whole, so every suite it
-// declares or refers to is refused too, until nothing changes.
-func (u *unit) refuse() {
-	refused := map[*unitFile]bool{}
+// new name is taken, and one a file migrate cannot type-check refers to. A
+// refused file is left whole, so every suite it declares or refers to is
+// refused too, until nothing changes.
+func (u *unit) refuse(refused map[*unitFile]bool) {
 	for _, uf := range u.files {
-		if !uf.test {
+		if uf.unchecked != "" {
 			continue
 		}
 		ast.PreorderStack(uf.f, nil, func(n ast.Node, stack []ast.Node) bool {
@@ -287,8 +314,8 @@ func (u *unit) refuse() {
 				for i := len(stack) - 1; i >= 0; i-- {
 					if ts, ok := stack[i].(*ast.TypeSpec); ok {
 						child, pos = ts.Name.Name, ts.Pos()
-						if gd, ok := stack[max(i-1, 0)].(*ast.GenDecl); ok && !gd.Lparen.IsValid() {
-							pos = gd.Pos()
+						if gd, ok := stack[max(i-1, 0)].(*ast.GenDecl); ok {
+							pos = specPos(gd, ts)
 						}
 						break
 					}
@@ -308,9 +335,11 @@ func (u *unit) refuse() {
 	taken := map[string]*suiteDecl{}
 	for _, s := range u.suites {
 		other := taken[s.newName]
-		clash := other != nil && other.obj.Pkg() == s.obj.Pkg()
-		if s.newName != s.obj.Name() && s.obj.Pkg() != nil && s.obj.Pkg().Scope().Lookup(s.newName) != nil {
-			clash = true
+		clash := other != nil && other.obj.Pkg().Path() == s.obj.Pkg().Path()
+		if s.newName != s.obj.Name() {
+			for _, scope := range u.scopes[s.obj.Pkg().Path()] {
+				clash = clash || scope.Lookup(s.newName) != nil
+			}
 		}
 		taken[s.newName] = s
 		if clash && s.migrated() {
@@ -321,18 +350,43 @@ func (u *unit) refuse() {
 	}
 
 	users := map[*suiteDecl]map[*unitFile]bool{}
-	for ident, obj := range u.info.Uses {
-		s := u.byObj[obj]
-		if s == nil {
-			continue
-		}
+	use := func(s *suiteDecl, uf *unitFile) {
 		if users[s] == nil {
 			users[s] = map[*unitFile]bool{}
 		}
-		if uf := u.fileAt(ident.Pos()); uf != nil {
-			users[s][uf] = true
+		users[s][uf] = true
+	}
+	for ident, obj := range u.info.Uses {
+		if s := u.suiteFor(obj); s != nil {
+			if uf := u.fileAt(ident.Pos()); uf != nil {
+				use(s, uf)
+			}
 		}
 	}
+	// A file without types refers to a suite by its name, and is left as
+	// it is with a marker when it does or when it uses testify.
+	for _, uf := range u.files {
+		if uf.unchecked == "" {
+			continue
+		}
+		mentions := false
+		ast.Inspect(uf.f, func(n ast.Node) bool {
+			if ident, ok := n.(*ast.Ident); ok {
+				for _, s := range u.suites {
+					if ident.Name == s.obj.Name() {
+						use(s, uf)
+						mentions = true
+					}
+				}
+			}
+			return true
+		})
+		if mentions || importsTestify(uf.f) {
+			uf.marks = append(uf.marks, mark{pos: uf.f.Package, msg: "migrate cannot type-check this file: " + uf.unchecked + " keeps it out of every build it checked — migrate it by hand"})
+			refused[uf] = true
+		}
+	}
+
 	for changed := true; changed; {
 		changed = false
 		for _, s := range u.suites {
@@ -369,18 +423,30 @@ func (u *unit) refuse() {
 	}
 }
 
-// migrate transforms every test file of the unit that is not refused,
-// then marks what the migration could not convert in the result.
-func (u *unit) migrate() error {
-	u.findSuites()
-	if len(u.suites) == 0 {
-		return nil
+// importsTestify reports whether f imports a testify package.
+func importsTestify(f *ast.File) bool {
+	for _, is := range f.Imports {
+		if strings.HasPrefix(strings.Trim(is.Path.Value, `"`), "github.com/stretchr/testify/") {
+			return true
+		}
 	}
-	u.refuse()
+	return false
+}
+
+// migrate transforms every test file of the unit that is not refused and
+// leaves a refused one with its markers. What the result still needs is
+// marked later, from its own type-check.
+func (u *unit) migrate() error {
+	refused := u.findSuites()
+	u.refuse(refused)
 
 	migrated := false
 	for _, s := range u.suites {
 		migrated = migrated || s.migrated()
+	}
+	if migrated {
+		u.collectHooks()
+		u.gate()
 	}
 	for _, uf := range u.files {
 		if uf.refused {
@@ -395,76 +461,52 @@ func (u *unit) migrate() error {
 			uf.out = out
 			continue
 		}
-		if !uf.test || !migrated {
+		if !migrated || uf.unchecked != "" {
 			continue
 		}
-		if !u.transformFile(uf.f) {
+		if !u.transformFile(uf.f) && uf.gate == "" {
 			continue
 		}
 		var buf bytes.Buffer
+		if uf.gate != "" {
+			buf.WriteString("//go:build " + uf.gate + "\n\n")
+		}
 		if err := format.Node(&buf, u.fset, uf.f); err != nil {
 			return fmt.Errorf("format %s: %w", uf.path, err)
 		}
-		out, err := format.Source(buf.Bytes())
+		out, err := formatImports(uf.path, buf.Bytes())
 		if err != nil {
 			return fmt.Errorf("gofmt %s: %w", uf.path, err)
 		}
 		uf.out = out
 	}
-	if !migrated {
-		return nil
-	}
-	return u.annotate()
+	return nil
 }
 
-// annotate re-reads the migrated unit and marks every construct in it the
-// migration could not convert, so nothing is left silently broken.
-func (u *unit) annotate() error {
-	contents := map[string][]byte{}
+// collectHooks records the methods of migrated suites that gain t: their
+// Test methods and the hooks gotest renames.
+func (u *unit) collectHooks() {
+	u.hooks = map[string]string{}
 	for _, uf := range u.files {
-		contents[uf.path] = uf.src
-		if uf.out != nil {
-			contents[uf.path] = uf.out
-		}
-	}
-	after := &unit{importPath: u.importPath, fset: token.NewFileSet()}
-	for _, uf := range u.files {
-		f, err := parser.ParseFile(after.fset, uf.path, contents[uf.path], parser.ParseComments|parser.SkipObjectResolution)
-		if err != nil {
-			return fmt.Errorf("annotate %s: %w", uf.path, err)
-		}
-		after.files = append(after.files, &unitFile{path: uf.path, src: contents[uf.path], f: f, test: uf.test})
-	}
-	after.check()
-
-	// The migrated suites, under their new names.
-	after.byObj = map[types.Object]*suiteDecl{}
-	for _, s := range u.suites {
-		if !s.migrated() {
+		if uf.refused || uf.unchecked != "" {
 			continue
 		}
-		pkg := after.pkgs[s.file.f.Name.Name]
-		if pkg == nil {
-			continue
-		}
-		if obj, ok := pkg.Scope().Lookup(s.newName).(*types.TypeName); ok {
-			after.byObj[obj] = s
+		for _, decl := range uf.f.Decls {
+			fd, ok := decl.(*ast.FuncDecl)
+			if !ok || fd.Recv == nil || len(fd.Recv.List) == 0 {
+				continue
+			}
+			s := u.suiteOf(fd.Recv.List[0].Type)
+			fn, _ := u.info.Defs[fd.Name].(*types.Func)
+			if s == nil || !s.migrated() || fn == nil {
+				continue
+			}
+			name := fd.Name.Name
+			if newName, ok := lifecycleRenames[name]; ok {
+				u.hooks[methodKey(fn)] = newName
+			} else if strings.HasPrefix(name, "Test") {
+				u.hooks[methodKey(fn)] = name
+			}
 		}
 	}
-
-	for i, uf := range u.files {
-		if !uf.test || uf.refused {
-			continue
-		}
-		anns := after.unconverted(after.files[i].f)
-		if len(anns) == 0 {
-			continue
-		}
-		out, err := insertMarkers(contents[uf.path], anns)
-		if err != nil {
-			return fmt.Errorf("annotate %s: %w", uf.path, err)
-		}
-		uf.out = out
-	}
-	return nil
 }

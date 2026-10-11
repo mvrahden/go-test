@@ -2,18 +2,20 @@ package migrate_test
 
 import (
 	"bytes"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/migrate"
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/tests/gotestcli"
 )
 
 // MigratePackageTestSuite covers migrations that span the files of a
 // directory: a suite's methods, runner and references may sit in any of
 // them, or in the external _test package.
-type MigratePackageTestSuite struct{}
+type MigratePackageTestSuite struct {
+	Mod *gotestcli.TestifyModuleSharedFixture
+}
 
 func (s *MigratePackageTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
@@ -21,45 +23,9 @@ func (s *MigratePackageTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return cfg
 }
 
-// pkgRun is a migrated directory: its files after the run, by name.
-type pkgRun struct {
-	dir     string
-	files   map[string]string
-	results []migrate.MigrateResult
-}
-
-func (r pkgRun) markers() int {
-	n := 0
-	for _, res := range r.results {
-		n += res.Markers
-	}
-	return n
-}
-
-// migrateDir writes files into a module example.com/m, migrates the
-// directory pkg with patterns (relative to the module root) and reads
-// every file back.
+// migrateDir migrates the module files make up with patterns.
 func (s *MigratePackageTestSuite) migrateDir(t *gotest.T, files map[string]string, patterns ...string) pkgRun {
-	root := t.TempDir()
-	files["go.mod"] = "module example.com/m\n\ngo 1.24\n"
-	for name, src := range files {
-		path := filepath.Join(root, name)
-		gotest.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-		gotest.NoError(t, os.WriteFile(path, []byte(src), 0o600))
-	}
-	abs := make([]string, 0, len(patterns))
-	for _, p := range patterns {
-		abs = append(abs, filepath.Join(root, p))
-	}
-	results, err := migrate.MigratePackages(abs, migrate.Options{})
-	gotest.NoError(t, err)
-	run := pkgRun{dir: root, files: map[string]string{}, results: results}
-	for name := range files {
-		got, err := os.ReadFile(filepath.Join(root, name))
-		gotest.NoError(t, err)
-		run.files[name] = string(got)
-	}
-	return run
+	return migrateModule(t, s.Mod, migrate.Options{}, files, patterns...)
 }
 
 const splitSuiteSrc = `package user
@@ -485,9 +451,7 @@ func (s *MigratePackageTestSuite) TestSuiteMembers(t *gotest.T) {
 
 func (s *MigratePackageTestSuite) TestOverlappingPatterns(t *gotest.T) {
 	root := t.TempDir()
-	path := filepath.Join(root, "dup", "a_test.go")
-	gotest.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-	gotest.NoError(t, os.WriteFile(path, []byte(runnerSuiteSrc), 0o600))
+	gotest.NoError(t, s.Mod.Write(root, map[string]string{"dup/a_test.go": runnerSuiteSrc}))
 	var diff bytes.Buffer
 	results, err := migrate.MigratePackages(
 		[]string{filepath.Join(root, "dup"), root + "/..."},

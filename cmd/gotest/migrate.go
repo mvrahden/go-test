@@ -7,10 +7,13 @@ import (
 	"github.com/mvrahden/go-test/internal/migrate"
 )
 
-// runMigrate converts testify suites in place. It exits 1 when a
-// TODO(gotest-migrate) marker is left anywhere, including one an earlier run
-// placed, so a migration that still needs a hand never reads as done;
-// --dry-run prints the diff instead of writing and answers the same way.
+// runMigrate converts testify suites in place and type-checks the result.
+// It exits 0 only when every migrated package compiles and no
+// TODO(gotest-migrate) marker is left anywhere; 1 when a marker is left,
+// including one an earlier run placed, or an error has no line to carry
+// one; 2 on a usage error or when a package does not compile before the
+// migration, which then leaves it alone. --dry-run prints the diff instead
+// of writing and answers the same way.
 func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	ownArgs, rest, err := SplitArgs(inv.Args, migrateAllowed)
 	if err != nil {
@@ -44,12 +47,22 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		verb = "Would migrate"
 	}
 	markers, suites := 0, 0
-	var lines, leftover []string
-	for _, r := range results {
+	var lines, refused, leftover, uncompiled, unplaced []string
+	for i := range results {
+		r := &results[i]
 		markers += r.Markers
 		switch {
+		case len(r.Uncompiled) > 0:
+			uncompiled = append(uncompiled, "  "+r.File+":")
+			for _, e := range r.Uncompiled {
+				uncompiled = append(uncompiled, "    "+e)
+			}
+		case len(r.Unplaced) > 0:
+			for _, e := range r.Unplaced {
+				unplaced = append(unplaced, "  "+r.File+": "+e)
+			}
 		case r.Refusal != "":
-			lines = append(lines, fmt.Sprintf("  %s: refused: %s", r.File, r.Refusal))
+			refused = append(refused, fmt.Sprintf("  %s: %s", r.File, r.Refusal))
 		case r.RefsOnly:
 			lines = append(lines, fmt.Sprintf("  %s: updated for suites other files declare", r.File))
 		case r.OldName == "":
@@ -60,23 +73,43 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 			lines = append(lines, fmt.Sprintf("  %s: %s → %s", r.File, r.OldName, r.NewName))
 		}
 	}
-	if len(lines) == 0 {
-		fmt.Println("No testify/suite patterns found.")
-	} else {
+	if len(lines) > 0 {
 		fmt.Printf("%s %d suites:\n", verb, suites)
-		for _, l := range lines {
-			fmt.Println(l)
-		}
+		printLines(lines)
+	}
+	if len(refused) > 0 {
+		fmt.Println("Refused, left for hand migration:")
+		printLines(refused)
+	}
+	if len(lines)+len(refused)+len(leftover)+len(uncompiled)+len(unplaced) == 0 {
+		fmt.Println("No testify/suite patterns found.")
 	}
 	if len(leftover) > 0 {
-		fmt.Println("Left by an earlier run:")
-		for _, l := range leftover {
-			fmt.Println(l)
-		}
+		fmt.Println("Markers an earlier run left, still to resolve:")
+		printLines(leftover)
 	}
-	if markers == 0 {
-		return 0
+	if len(uncompiled) > 0 {
+		fmt.Println("Not migrated: these packages do not compile as they are, so nothing about a migration could be proven:")
+		printLines(uncompiled)
 	}
-	fmt.Printf("%d TODO(gotest-migrate) marker%s left; resolve them by hand\n", markers, plural(markers))
-	return 1
+	if len(unplaced) > 0 {
+		fmt.Println("The migrated code does not compile, with errors no marker could carry:")
+		printLines(unplaced)
+	}
+	if markers > 0 {
+		fmt.Printf("%d TODO(gotest-migrate) marker%s left; resolve them by hand\n", markers, plural(markers))
+	}
+	switch {
+	case len(uncompiled) > 0:
+		return 2
+	case markers > 0 || len(unplaced) > 0:
+		return 1
+	}
+	return 0
+}
+
+func printLines(lines []string) {
+	for _, l := range lines {
+		fmt.Println(l)
+	}
 }
