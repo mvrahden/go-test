@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -211,8 +212,64 @@ func runSpecFromInput(input, format, output string, noColor, renderOnly bool) in
 	// must not exit 0 — in a pipe without pipefail this exit code is the only
 	// verdict CI ever sees. A client that renders rather than gates opts out
 	// with --render-only; every operational failure above still exits 2.
-	if !renderOnly && gotestspec.HasFailures(tree) {
+	return replayExitCode(events, tree, renderOnly)
+}
+
+// replayExitCode is the verdict of a replayed stream: 2 when it holds no
+// verdict to report (see replayVerdictGap), 1 on failures, else 0.
+// renderOnly drops the verdict entirely.
+func replayExitCode(events []gotestspec.TestEvent, tree []*gotestspec.Package, renderOnly bool) int {
+	if renderOnly {
+		return 0
+	}
+	if gap := replayVerdictGap(events); gap != "" {
+		fmt.Fprintf(os.Stderr, "FAIL: %s", gap)
+		return 2
+	}
+	if gotestspec.HasFailures(tree) {
 		return 1
 	}
 	return 0
+}
+
+// replayVerdictGap says why a replayed stream carries no verdict: it holds
+// no test events at all (empty or not go test -json), or it ends before a
+// package reported its own pass/fail/skip (cut short). "" means it is whole.
+func replayVerdictGap(events []gotestspec.TestEvent) string {
+	seen := false
+	var order []string
+	finished := map[string]bool{}
+	for i := range events {
+		ev := &events[i]
+		if ev.Action == "" {
+			continue
+		}
+		seen = true
+		if ev.Package == "" { // build events name an ImportPath instead
+			continue
+		}
+		if _, ok := finished[ev.Package]; !ok {
+			order = append(order, ev.Package)
+			finished[ev.Package] = false
+		}
+		if ev.Test == "" {
+			switch ev.Action {
+			case gotestspec.ActionPass, gotestspec.ActionFail, gotestspec.ActionSkip:
+				finished[ev.Package] = true
+			}
+		}
+	}
+	if !seen {
+		return "input holds no test events (expected a go test -json stream)\n"
+	}
+	var b strings.Builder
+	for _, pkg := range order {
+		if !finished[pkg] {
+			fmt.Fprintf(&b, "  %s\n", pkg)
+		}
+	}
+	if b.Len() == 0 {
+		return ""
+	}
+	return "input ends before these packages reported a verdict (stream cut short?):\n" + b.String()
 }

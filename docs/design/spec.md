@@ -146,11 +146,11 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--debounce=<dur>` | Debounce interval for watch mode (default 200ms) |
 | `--parallel=<n>` | Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for -race/-msan/-asan) |
 | `--compile-parallel=<n>` | Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan) |
-| `--input=<path>` | Replay a saved `go test -json` stream in `spec`/`summary` (`-` reads stdin) |
+| `--input=<path>` | Replay a saved `go test -json` stream in `spec`/`summary` (`-` reads stdin); exit 2 when it holds no test events or a package never reported its verdict |
 | `--github` | Emit GitHub annotations and step summary (auto-enabled in GitHub Actions) |
 | `--coverage=<path>` | Coverage profile path for `summary` subcommand |
 | `--badge=<path>` | Write a self-contained coverage badge SVG (`summary` only); adds `-coverprofile` when neither the caller nor `--min` did |
-| `--render-only` | With `--input`, exit 0 on a failing stream: the code reports whether rendering succeeded, not whether the tests passed (requires `--input`) |
+| `--render-only` | With `--input`, exit 0 on a failing or incomplete stream: the code reports whether rendering succeeded, not whether the tests passed (requires `--input`) |
 | `--static` | Render the specification from source without running the suites (`spec` only); nodes carry no verdict, and methods whose behaviors depend on runtime values are reported as incomplete on stderr |
 | `--bench` | Benchmark mode for `watch`: re-run benchmarks on change with ns/op deltas |
 | `--save=<path>` | Save a benchmark run as a JSON baseline (`bench`; a bare `--save=` uses `bench.baseline` from `.gotest.yml`) |
@@ -1474,7 +1474,7 @@ The census applies to green runs that ran to completion: a red run is already no
 
 A `bench` run that captures events (`--spec`, `--json`, `--save`, `--against`) is censused the same way over the declared benchmark methods. go test emits no `pass` event for a benchmark, so its verdict is the `ns/op` result line or a `fail`; `-bench` stands the census down like `-run` does.
 
-The exit code of `spec --input` and `summary --input` answers two questions at once: whether the stream carried failures (1) and whether the command itself failed (2). A client that renders a stream rather than gating on it needs only the second, and passes `--render-only` to drop the first; 2 is never suppressed, so an unreadable input or an unparseable stream still fails. Consumers that treat any non-zero exit as "the command broke" — rather than reading the rendered document on stdout — will misread a failing test run as a broken tool.
+The exit code of `spec --input` and `summary --input` answers two questions at once: whether the stream carried failures (1) and whether the command itself failed (2). A client that renders a stream rather than gating on it needs only the second, and passes `--render-only` to drop the first; 2 is never suppressed for an unreadable input. A stream that holds no verdict also exits 2 — one with no test events at all (empty, or not `go test -json`), or one that ends before a package reported its own pass/fail/skip (cut short; the packages are named on stderr). A valid stream that ran no tests is whole and exits 0. `--render-only` drops this verdict too: the editor renders whatever a stopped run left. Consumers that treat any non-zero exit as "the command broke" — rather than reading the rendered document on stdout — will misread a failing test run as a broken tool.
 
 Every package a pattern matches ends in exactly one verdict. A package that fails to load or compile (a syntax error, a type error, a nonexistent path) is a failed package, exit 2:
 

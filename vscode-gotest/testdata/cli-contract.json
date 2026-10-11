@@ -86,13 +86,13 @@
     "empty": {
       "gating": {
         "direct": {
-          "exitCode": 0,
+          "exitCode": 2,
           "stdout": "{\"version\":\"dev (source checkout)\",\"packages\":[],\"stats\":{\"suites\":0,\"behaviors\":0,\"tests\":0,\"benchmarks\":0,\"fuzzers\":0,\"passed\":0,\"failed\":0,\"skipped\":0}}\n",
-          "stderr": ""
+          "stderr": "FAIL: input holds no test events (expected a go test -json stream)\n"
         },
         "goRun": {
-          "exitCode": 0,
-          "stderr": "",
+          "exitCode": 1,
+          "stderr": "FAIL: input holds no test events (expected a go test -json stream)\nexit status 2\n",
           "stdoutMatchesDirect": true
         }
       },

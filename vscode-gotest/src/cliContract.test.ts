@@ -59,6 +59,8 @@ const EXPECTED: Record<
   string,
   {
     gatingExitCode: number;
+    // What the gating form complains about on stderr; "" when unset.
+    gatingStderr?: string;
     goRunEpilogue: string;
     stats: Record<string, number>;
     packages: string[];
@@ -100,9 +102,13 @@ const EXPECTED: Record<
     stats: { passed: 0, failed: 0, skipped: 0, failedPackages: 1 },
     packages: ["example.com/broken:fail"],
   },
+  // A stream with no events holds no verdict: the gating form must not pass
+  // it as green. The Spec View renders it anyway, under --render-only.
   empty: {
-    gatingExitCode: 0,
-    goRunEpilogue: "",
+    gatingExitCode: 2,
+    gatingStderr:
+      "FAIL: input holds no test events (expected a go test -json stream)\n",
+    goRunEpilogue: "exit status 2\n",
     stats: { passed: 0, failed: 0, skipped: 0 },
     packages: [],
   },
@@ -164,8 +170,8 @@ describe("recorded CLI contract", () => {
         expect(spec.stats).toMatchObject(expected.stats);
       });
 
-      it("keeps stderr clean when invoked directly", () => {
-        expect(recorded.gating.direct.stderr).toBe("");
+      it("keeps stderr to the documented complaint when invoked directly", () => {
+        expect(recorded.gating.direct.stderr).toBe(expected.gatingStderr ?? "");
       });
 
       if (expected.speaks) {
@@ -177,8 +183,13 @@ describe("recorded CLI contract", () => {
       }
 
       it("gains only go run's exit-status epilogue on stderr, never a changed spec", () => {
-        expect(recorded.gating.goRun.exitCode).toBe(expected.gatingExitCode);
-        expect(recorded.gating.goRun.stderr).toBe(expected.goRunEpilogue);
+        // go run reports any non-zero exit of the program as 1.
+        expect(recorded.gating.goRun.exitCode).toBe(
+          expected.gatingExitCode === 0 ? 0 : 1,
+        );
+        expect(recorded.gating.goRun.stderr).toBe(
+          (expected.gatingStderr ?? "") + expected.goRunEpilogue,
+        );
         expect(recorded.gating.goRun.stdoutMatchesDirect).toBe(true);
       });
 
@@ -203,15 +214,28 @@ describe("recorded CLI contract", () => {
         expect(recorded.renderOnly.goRun.stdoutMatchesDirect).toBe(true);
       });
 
-      it("is read as a usable spec when invoked directly", () => {
-        expect(
-          interpretSpecExit(
-            recorded.gating.direct.exitCode,
-            recorded.gating.direct.stdout,
-            recorded.gating.direct.stderr,
-          ),
-        ).toEqual({ ok: true, stdout: recorded.gating.direct.stdout });
-      });
+      if (expected.gatingExitCode === 2) {
+        // Exit 2 is the command's own failure: no client may read it as green.
+        it("is read as a failure when invoked directly", () => {
+          expect(
+            interpretSpecExit(
+              recorded.gating.direct.exitCode,
+              recorded.gating.direct.stdout,
+              recorded.gating.direct.stderr,
+            ).ok,
+          ).toBe(false);
+        });
+      } else {
+        it("is read as a usable spec when invoked directly", () => {
+          expect(
+            interpretSpecExit(
+              recorded.gating.direct.exitCode,
+              recorded.gating.direct.stdout,
+              recorded.gating.direct.stderr,
+            ),
+          ).toEqual({ ok: true, stdout: recorded.gating.direct.stdout });
+        });
+      }
 
       // The original regression in one assertion: same bytes, same verdict, but
       // reached through the extension's default `go run` resolution. The client

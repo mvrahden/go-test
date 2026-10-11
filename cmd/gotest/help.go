@@ -206,9 +206,12 @@ stderr. Declared benchmarks a test run left unexecuted are counted with
 Flags:
   --format=<fmt>          Output format: terminal (default), md, json
   --output=<file>         Write to file instead of stdout
-  --input=<file>          Render from saved JSON ("-" for stdin)
-  --render-only           With --input, exit 0 on a failing stream: report
-                          whether rendering succeeded, not the test verdict
+  --input=<file>          Render from saved JSON ("-" for stdin); exits 2 if
+                          it holds no test events or a package never reported
+                          its verdict (a stream cut short)
+  --render-only           With --input, exit 0 on a failing or incomplete
+                          stream: report whether rendering succeeded, not the
+                          test verdict
   --static                Read the specification from source without running
                           the suites; nodes carry no verdict
   --no-color              Disable ANSI color codes
@@ -260,9 +263,12 @@ stderr. Declared benchmarks a test run left unexecuted are counted with
 Flags:
   --format=<fmt>          Output format: terminal (default), md, json
   --output=<file>         Write to file instead of stdout
-  --input=<file>          Read from saved JSON ("-" for stdin)
-  --render-only           With --input, exit 0 on a failing stream: report
-                          whether rendering succeeded, not the test verdict
+  --input=<file>          Read from saved JSON ("-" for stdin); exits 2 if
+                          it holds no test events or a package never reported
+                          its verdict (a stream cut short)
+  --render-only           With --input, exit 0 on a failing or incomplete
+                          stream: report whether rendering succeeded, not the
+                          test verdict
   --no-color              Disable ANSI color codes
   --github                GitHub CI mode: emit annotations and step summary
                           (auto-detected via $GITHUB_ACTIONS)

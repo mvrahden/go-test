@@ -166,10 +166,7 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 		return 2
 	}
 
-	if !renderOnly && gotestspec.HasFailures(tree) {
-		return 1
-	}
-	return 0
+	return replayExitCode(events, tree, renderOnly)
 }
 
 // writeSummaryOutput renders the summary to stdout or --output; an --output
