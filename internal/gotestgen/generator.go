@@ -337,14 +337,15 @@ func LoadRunPackages(targetPkgs []string, buildFlags []string) (RunPackages, err
 		Loaded:      loaded,
 		Broken:      broken,
 		NoTestFiles: noTestFiles,
-		Unmatched:   unmatchedPatterns(targetPkgs, buildFlags),
+		Unmatched:   UnmatchedPatterns("", targetPkgs, buildFlags),
 	}, nil
 }
 
-// unmatchedPatterns names the patterns that match no package, as go list
-// warns about them. Only a wildcard or meta pattern can match none; any other
-// names a package that loads or fails to. Best effort: the result only warns.
-func unmatchedPatterns(patterns, buildFlags []string) []string {
+// UnmatchedPatterns names the patterns that match no package while others
+// do, as go list warns about them; dir is where go runs, "" the current
+// directory. Only a wildcard or meta pattern can match none; any other names
+// a package that loads or fails to. Best effort: the result only warns.
+func UnmatchedPatterns(dir string, patterns, buildFlags []string) []string {
 	var candidates []string
 	for _, p := range patterns {
 		switch {
@@ -358,6 +359,7 @@ func unmatchedPatterns(patterns, buildFlags []string) []string {
 	}
 	args := append([]string{"list", "-e", "-find", "-f", "{{.ImportPath}}"}, buildFlags...)
 	cmd := exec.Command("go", append(args, candidates...)...) //nolint:gosec // G204: the go tool with the run's own patterns
+	cmd.Dir = dir
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	_ = cmd.Run()

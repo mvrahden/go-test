@@ -795,7 +795,7 @@ func (s *LintFixTestSuite) TestLoadFailure(t *gotest.T) {
 		w.It("exits 1 and says why", func(it *gotest.T) {
 			gotest.Equal(it, 1, code, stderr)
 			// go/packages turns a failed go list into an empty load.
-			gotest.Equal(it, "FAIL: after applying fixes: load packages: ./... matched no packages\n", stderr)
+			gotest.Equal(it, "FAIL: after applying fixes: \"./...\" matched no packages\n", stderr)
 			gotest.Empty(it, stdout)
 		})
 		w.It("touches no file", func(it *gotest.T) {

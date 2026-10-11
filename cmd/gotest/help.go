@@ -749,12 +749,18 @@ Suppress individual diagnostics with //nolint comments:
                                    ending on the line directly above
   package foo //nolint:stdlib-test  Suppress for entire file
 
+A pattern that matches no package while others do only warns on stderr,
+  warning: "<pattern>" matched no packages
+as go does.
+
 Exit codes:
   0   No findings (with -fix or -diff: none left after fixing)
-  1   Uncompilable target packages (nothing was proven about them), patterns
-      matching no package, fixed sources that no longer compile, or fixed
-      files that could not be written (-fix writes them all or none; on a
-      failure stderr names any that were)
+  1   Nothing analyzable: uncompilable target packages (nothing was proven
+      about them), patterns that match no package or name a directory or
+      package that does not exist (said as go says it); or fixed sources
+      that no longer compile, or fixed files that could not be written
+      (-fix writes them all or none; on a failure stderr names any that
+      were)
   2   Usage or configuration error (e.g. an integrity rule in lint.skip)
   3   Findings reported (with -fix or -diff: the findings left after fixing)
   130 -fix or -diff stopped by a signal; nothing was written (once the

@@ -3,6 +3,7 @@ package lint
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -63,19 +64,30 @@ func load(ctx context.Context, t Targets, overlay map[string][]byte) ([]*package
 	}
 	// go list failing outright also loads nothing, without an error.
 	if len(pkgs) == 0 {
-		return nil, fmt.Errorf("load packages: %s matched no packages", strings.Join(t.Patterns, " "))
+		quoted := make([]string, len(t.Patterns))
+		for i, p := range t.Patterns {
+			quoted[i] = strconv.Quote(p)
+		}
+		return nil, fmt.Errorf("%s matched no packages", strings.Join(quoted, ", "))
 	}
 	if err := goversion.Check(pkgs); err != nil {
 		return nil, err
 	}
 
-	var broken []string
+	var missing, broken []string
 	seen := map[string]bool{}
 	for _, p := range pkgs {
 		if len(p.Errors) == 0 || seen[p.PkgPath] {
 			continue
 		}
 		seen[p.PkgPath] = true
+		if absent(p) {
+			// Said as go says it: the path names it.
+			for _, e := range p.Errors {
+				missing = append(missing, e.Msg)
+			}
+			continue
+		}
 		msgs := make([]string, 0, len(p.Errors))
 		for _, e := range p.Errors {
 			msgs = append(msgs, "\t"+e.Error())
@@ -83,9 +95,28 @@ func load(ctx context.Context, t Targets, overlay map[string][]byte) ([]*package
 		broken = append(broken, p.PkgPath+"\n"+strings.Join(msgs, "\n"))
 	}
 	if len(broken) > 0 {
-		return nil, fmt.Errorf("cannot lint uncompilable packages — nothing was proven about them:\n%s", strings.Join(broken, "\n"))
+		missing = append(missing, "cannot lint uncompilable packages — nothing was proven about them:\n"+strings.Join(broken, "\n"))
+	}
+	if len(missing) > 0 {
+		return nil, errors.New(strings.Join(missing, "\n"))
 	}
 	return pkgs, nil
+}
+
+// absent reports whether p is a pattern or path go list found no Go files
+// for: a directory or import path that does not exist, or one whose files
+// build constraints all exclude. There is nothing to compile, so nothing
+// failed to.
+func absent(p *packages.Package) bool {
+	if len(p.GoFiles) > 0 || len(p.CompiledGoFiles) > 0 {
+		return false
+	}
+	for _, e := range p.Errors {
+		if e.Kind != packages.ListError {
+			return false
+		}
+	}
+	return true
 }
 
 // withOverlay makes cfg load overlay's contents in place of the files it

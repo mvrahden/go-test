@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/config"
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/internal/lint"
 	"github.com/mvrahden/go-test/internal/unidiff"
@@ -48,6 +49,9 @@ func runLint(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		if err := lint.PreflightLoad("", a.patterns); err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
 			return 1
+		}
+		for _, p := range gotestgen.UnmatchedPatterns("", a.patterns, nil) {
+			fmt.Fprintf(os.Stderr, "warning: %q matched no packages\n", p)
 		}
 	}
 	runLintDriver(a.argv())
@@ -257,6 +261,9 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 	if err != nil {
 		fmt.Fprintf(stderr, "FAIL: %v\n", err)
 		return 1, true
+	}
+	for _, p := range gotestgen.UnmatchedPatterns(dir, a.patterns, targets.BuildFlags) {
+		fmt.Fprintf(stderr, "warning: %q matched no packages\n", p)
 	}
 	source := os.ReadFile
 	if a.fix && len(res.FixFiles) > 0 {

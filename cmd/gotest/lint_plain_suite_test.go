@@ -90,7 +90,38 @@ func (s *LintPlainTestSuite) TestPlainMode(t *gotest.T) {
 		w.It("exits 1 instead of passing on nothing", func(it *gotest.T) {
 			gotest.True(it, ok)
 			gotest.Equal(it, 1, code)
-			gotest.Equal(it, "FAIL: load packages: ./... matched no packages\n", stderr.String())
+			gotest.Equal(it, "FAIL: \"./...\" matched no packages\n", stderr.String())
+		})
+	})
+
+	t.When("a pattern names a directory that does not exist", func(w *gotest.T) {
+		w.Setenv("GOWORK", "off")
+		dir := w.TempDir()
+		writeLintProbe(w, dir)
+
+		var stderr bytes.Buffer
+		code, ok := ExportRunLintPlain(&stderr, dir, []string{"./...", "./nonexist"})
+
+		w.It("exits 1 and says so, as go does", func(it *gotest.T) {
+			gotest.True(it, ok)
+			gotest.Equal(it, 1, code)
+			gotest.Regexp(it, `^FAIL: stat \S*nonexist: directory not found\n$`, stderr.String())
+		})
+	})
+
+	t.When("a pattern matches no package beside one that does", func(w *gotest.T) {
+		w.Setenv("GOWORK", "off")
+		dir := w.TempDir()
+		writeLintProbe(w, dir)
+		gotest.NoError(w, os.Mkdir(filepath.Join(dir, "empty"), 0o700))
+
+		var stderr bytes.Buffer
+		code, ok := ExportRunLintPlain(&stderr, dir, []string{"./...", "./empty/..."})
+
+		w.It("warns about it and lints the rest", func(it *gotest.T) {
+			gotest.True(it, ok)
+			gotest.Equal(it, 3, code)
+			gotest.Regexp(it, `^warning: "\./empty/\.\.\." matched no packages\n\S*probe_test\.go:5:1: .+\n$`, stderr.String())
 		})
 	})
 

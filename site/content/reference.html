@@ -790,7 +790,7 @@ percentage = covered / total</div>
         <thead><tr><th>Code</th><th>Meaning</th></tr></thead>
         <tbody>
           <tr><td><code>0</code></td><td>No findings (with <code>-fix</code> or <code>-diff</code>: none left after fixing).</td></tr>
-          <tr><td><code>1</code></td><td>One or more target packages do not compile — they could not be analyzed, so the run fails instead of passing silently; patterns that match no package; fixed sources that no longer compile; or fixed files that could not be written (<code>-fix</code> writes them all or none; on a failure stderr names any that were).</td></tr>
+          <tr><td><code>1</code></td><td>Nothing analyzable: one or more target packages do not compile — they could not be analyzed, so the run fails instead of passing silently; patterns that match no package, or name a directory or package that does not exist (a pattern matching nothing beside others that do only warns on stderr, as <code>go</code> does); fixed sources that no longer compile; or fixed files that could not be written (<code>-fix</code> writes them all or none; on a failure stderr names any that were).</td></tr>
           <tr><td><code>2</code></td><td>Usage or configuration error (e.g. an integrity rule in <code>lint.skip</code>).</td></tr>
           <tr><td><code>3</code></td><td>Findings reported (with <code>-fix</code> or <code>-diff</code>: the findings left after fixing).</td></tr>
           <tr><td><code>130</code></td><td><code>-fix</code> or <code>-diff</code> stopped by a signal; nothing was written (once the fixed files are being written, they all are first).</td></tr>
