@@ -1154,6 +1154,7 @@ gotest watch ./... -v          # watch mode with auto-rerun
 gotest scaffold ./pkg/user.Svc # generate suite skeleton from type
 gotest lint ./...              # static analysis for test suites
 gotest refactor toggle-focus . # toggle F_/X_ prefixes programmatically
+gotest skill install           # install the agent skill matching this version
 gotest migrate ./...           # convert testify/suite to go-test
 gotest generate ./...          # run code generation only (no tests)
 gotest clean ./...             # remove orphaned generated files
@@ -1191,17 +1192,26 @@ To feed a JUnit consumer, run the tests through a converter that reads the event
 
 The repository ships a skill that teaches a coding agent to write suites the way gotest expects: lifecycle hooks instead of `defer`, polling instead of `time.Sleep`, the parallel recipe, condition-only `When` labels, and the version differences between releases.
 It is written in the open [Agent Skills](https://agentskills.io) format, which Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot and [many other agents](https://agentskills.io/clients) load on demand.
-Install it by unpacking the folder into the directory your agent reads skills from; each client documents that directory, and the client list above links to the instructions:
+The surest install is the CLI itself, because it writes the skill shipped with the gotest version your `go.mod` pins:
 
 ```bash
-SKILLS_DIR=<your agent's skills directory>
-mkdir -p "$SKILLS_DIR" && curl -sL https://github.com/mvrahden/go-test/archive/refs/heads/main.tar.gz \
-  | tar -xz -C "$SKILLS_DIR" --strip-components=2 go-test-main/skills/writing-gotest-tests
+go tool gotest skill install                         # .agents/skills: Copilot, Codex, Cursor, Gemini CLI, ...
+go tool gotest skill install --dir=.claude/skills    # Claude Code
 ```
 
-> **Tip:** most agents can do this themselves. Ask yours to install the `writing-gotest-tests` skill from `github.com/mvrahden/go-test`, and it will fetch the folder and place it where it reads skills.
+Rerun it after upgrading gotest; it replaces the older copy.
+Agents with a plugin system can install it as a plugin instead, which tracks the latest release line rather than your pin:
 
-An agent without skill support can still be pointed at the unpacked `SKILL.md` from its instructions file, such as `AGENTS.md`. The skill source lives in [`skills/writing-gotest-tests`](skills/writing-gotest-tests).
+| Agent | Install |
+|---|---|
+| Claude Code | `/plugin install gotest --marketplace mvrahden/go-test` |
+| Codex | `codex plugin marketplace add mvrahden/go-test`, then `codex plugin add gotest@go-test` |
+| GitHub Copilot CLI | `copilot plugin install mvrahden/go-test` |
+| Gemini CLI | `gemini extensions install https://github.com/mvrahden/go-test` |
+| VS Code with Copilot Chat | included in the [gotest extension](vscode-gotest) |
+| Any other agent | `npx skills add mvrahden/go-test` |
+
+An agent without skill support can still be pointed at the installed `SKILL.md` from its instructions file, such as `AGENTS.md`. The skill source lives in [`skills/writing-gotest-tests`](skills/writing-gotest-tests).
 
 Two commands give an agent the specification without the source. `gotest spec --static ./...` prints what a package promises before anything runs, and `gotest discover ./...` emits the same tree as JSON with a `behaviorsComplete` flag per method, so an agent never presents a partial list as the whole specification.
 
