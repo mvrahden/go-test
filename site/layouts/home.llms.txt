@@ -1,0 +1,18 @@
+# gotest
+
+> {{ .Site.Params.tagline }}
+
+gotest is a code-generation framework for Go test suites: you write `*TestSuite` structs with lifecycle methods, and `go tool gotest` generates the harness. Run it via Go's tool directive (`go get -tool github.com/mvrahden/go-test/cmd/gotest@<version>`, then `go tool gotest`), never a global binary. `go test` alone does not run suites.
+
+## Docs
+
+- [README]({{ .Site.Params.repoURL }}/blob/main/README.md): install, suites, fixtures, assertions, CLI, CI
+- [Agent reference]({{ .Site.Params.repoURL }}/blob/main/AGENTS.md): the rules an agent must follow, and the full assertion list
+- [Reference]({{ "reference/" | absURL }}): naming conventions, lifecycle, fixture model, assertions, coverage
+- [Agent skill]({{ .Site.Params.repoURL }}/tree/main/skills/writing-gotest-tests): `writing-gotest-tests`, installable with `npx skills add mvrahden/go-test` or `go tool gotest skill install`
+- [API]({{ "https://pkg.go.dev/github.com/mvrahden/go-test" }}): package documentation
+
+## Blog
+{{ range (where .Site.RegularPages "Section" "blog").ByDate.Reverse }}
+- [{{ .Title }}]({{ .Permalink }}): {{ .Description }}
+{{- end }}
