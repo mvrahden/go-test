@@ -2,7 +2,13 @@ import * as vscode from "vscode";
 import * as path from "node:path";
 import { readdir } from "node:fs/promises";
 import type { DiscoveryCache } from "./discovery.js";
-import { buildCliCommand, buildFuzzArgs, formatCliCommand } from "./cli.js";
+import {
+  buildCliCommand,
+  buildFuzzArgs,
+  formatCliCommand,
+  offerCliUpgrade,
+  type CliCommand,
+} from "./cli.js";
 import { spawnTestProcess } from "./runnerUtils.js";
 
 // The fuzz surfaces shell out to `gotest fuzz` and its triage/promote
@@ -142,6 +148,24 @@ function resolveWorkspace(
   return { workspaceDir };
 }
 
+// fuzzCommand resolves the CLI for a fuzz command, or says why it cannot.
+async function fuzzCommand(
+  args: string[],
+  workspaceDir: string,
+  deps: FuzzDeps,
+): Promise<CliCommand | undefined> {
+  try {
+    return await buildCliCommand(args, workspaceDir, deps.outputChannel);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    deps.outputChannel.error(`[fuzz] ${message}`);
+    if (!offerCliUpgrade(err)) {
+      vscode.window.showErrorMessage(`gotest fuzz: ${message}`);
+    }
+    return undefined;
+  }
+}
+
 export async function runFuzzCommand(
   importPath: string,
   suiteName: string,
@@ -154,11 +178,12 @@ export async function runFuzzCommand(
   if (!choice) return;
 
   const wrapper = `Fuzz${suiteName}_${methodName}`;
-  const cmd = await buildCliCommand(
+  const cmd = await fuzzCommand(
     buildFuzzArgs(importPath, suiteName, methodName, choice.budget),
     ws.workspaceDir,
-    deps.outputChannel,
+    deps,
   );
+  if (!cmd) return;
   deps.outputChannel.info(`[fuzz] ${formatCliCommand(cmd)}`);
   deps.outputChannel.show(true);
 
@@ -278,11 +303,12 @@ export async function triageCrashers(
   const ws = resolveWorkspace(importPath, deps);
   if (!ws) return;
 
-  const cmd = await buildCliCommand(
+  const cmd = await fuzzCommand(
     ["fuzz", "triage", importPath],
     ws.workspaceDir,
-    deps.outputChannel,
+    deps,
   );
+  if (!cmd) return;
   deps.outputChannel.info(`[fuzz] ${formatCliCommand(cmd)}`);
 
   const cts = new vscode.CancellationTokenSource();
@@ -327,11 +353,12 @@ export async function promoteCrashers(
   const ws = resolveWorkspace(importPath, deps);
   if (!ws) return;
 
-  const cmd = await buildCliCommand(
+  const cmd = await fuzzCommand(
     ["fuzz", "promote", importPath],
     ws.workspaceDir,
-    deps.outputChannel,
+    deps,
   );
+  if (!cmd) return;
   deps.outputChannel.info(`[fuzz] ${formatCliCommand(cmd)}`);
 
   const cts = new vscode.CancellationTokenSource();

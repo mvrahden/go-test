@@ -10,6 +10,7 @@ import {
   buildCliCommand,
   checkProducerVersion,
   clearBinaryCache,
+  CliBelowFloorError,
   CliUnavailableError,
   formatCliCommand,
 } from "./cli.js";
@@ -367,7 +368,8 @@ export class DiscoveryService {
             ? `[discovery] failed after ${DiscoveryService.MAX_RETRIES} attempts: ${message}`
             : `[discovery] failed: ${message}`,
         );
-        if (!this.hasShownError) {
+        // Below the floor the upgrade dialog has said it already.
+        if (!this.hasShownError && !(err instanceof CliBelowFloorError)) {
           this.hasShownError = true;
           // Say what went wrong. The advice below is right for a missing
           // toolchain and misleading for everything else — a timeout, a

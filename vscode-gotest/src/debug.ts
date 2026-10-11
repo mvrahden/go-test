@@ -1,7 +1,12 @@
 import * as vscode from "vscode";
 import { ManagedChild } from "./managedChild.js";
 import type { PrepareOutput } from "./types.js";
-import { buildCliCommand, formatCliCommand, scopedConfig } from "./cli.js";
+import {
+  buildCliCommand,
+  formatCliCommand,
+  offerCliUpgrade,
+  scopedConfig,
+} from "./cli.js";
 import { killProcessTree } from "./runnerUtils.js";
 
 export class DebugLauncher implements vscode.Disposable {
@@ -78,6 +83,7 @@ export class DebugLauncher implements vscode.Disposable {
       prepare = result.output;
       managed = result.managed;
     } catch (err: unknown) {
+      if (offerCliUpgrade(err)) return;
       const message =
         err instanceof Error ? err.message : "Unknown error running prepare";
       vscode.window.showErrorMessage(`gotest prepare failed: ${message}`);

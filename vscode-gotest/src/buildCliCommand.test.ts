@@ -76,7 +76,9 @@ vi.mock("node:child_process", async () => {
 import {
   buildCliCommand,
   clearBinaryCache,
+  CliBelowFloorError,
   CliUnavailableError,
+  offerCliUpgrade,
 } from "./cli.js";
 
 function setGoMod(dir: string, content: string) {
@@ -499,6 +501,49 @@ describe("buildCliCommand", () => {
       await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
 
       expect(mockShowWarningMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it("offers the upgrade again when a user action fails after the dialog closed", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
+
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await flush();
+      const err = await buildCliCommand(["spec"], "/workspace").catch(
+        (e: unknown) => e,
+      );
+
+      expect(err).toBeInstanceOf(CliBelowFloorError);
+      expect(offerCliUpgrade(err)).toBe(true);
+      expect(mockShowWarningMessage).toHaveBeenCalledTimes(2);
+      expect(mockShowWarningMessage).toHaveBeenLastCalledWith(
+        expect.stringContaining("pins gotest v1.0.0"),
+        "Upgrade",
+      );
+    });
+
+    it("does not stack a second dialog while one is open", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
+      let close: (choice: string | undefined) => void = () => undefined;
+      mockShowWarningMessage.mockReturnValueOnce(
+        new Promise((r) => (close = r)),
+      );
+
+      const err = await buildCliCommand(["spec"], "/workspace").catch(
+        (e: unknown) => e,
+      );
+      expect(offerCliUpgrade(err)).toBe(true);
+      expect(mockShowWarningMessage).toHaveBeenCalledTimes(1);
+
+      close(undefined);
+      await flush();
+    });
+
+    it("leaves every other failure to the caller", () => {
+      expect(offerCliUpgrade(new CliUnavailableError("no version"))).toBe(
+        false,
+      );
+      expect(offerCliUpgrade(new Error("boom"))).toBe(false);
+      expect(mockShowWarningMessage).not.toHaveBeenCalled();
     });
 
     it("Upgrade declares the tool at latest in the module that pins", async () => {

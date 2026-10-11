@@ -8,7 +8,12 @@ const {
   mockAccess,
   mockReadFile,
   mockShowWarningMessage,
+  mockBuildCliCommand,
 } = vi.hoisted(() => ({
+  mockBuildCliCommand: vi.fn(async () => ({
+    bin: "go",
+    args: ["run", "discover"],
+  })),
   script: { once: [], always: undefined, calls: [] } as SpawnScript,
   mockKill: vi.fn(),
   mockClearBinaryCache: vi.fn(),
@@ -55,7 +60,7 @@ vi.mock("./cli.js", async (importOriginal) => ({
   // The producer gate and its error are the real ones: the mock stands in
   // for command resolution, not for what discovery checks.
   ...(await importOriginal<typeof import("./cli.js")>()),
-  buildCliCommand: async () => ({ bin: "go", args: ["run", "discover"] }),
+  buildCliCommand: mockBuildCliCommand,
   formatCliCommand: () => "go run discover",
   clearBinaryCache: mockClearBinaryCache,
   scopedConfig: () => ({ get: () => undefined }),
@@ -65,6 +70,7 @@ vi.mock("./cli.js", async (importOriginal) => ({
 }));
 
 import { DiscoveryCache, DiscoveryService } from "./discovery.js";
+import { CliBelowFloorError } from "./cli.js";
 
 function makeOutputChannel() {
   return {
@@ -305,6 +311,31 @@ describe("DiscoveryService", () => {
       expect(outputChannel.info).toHaveBeenCalledWith(
         expect.stringContaining("from gotest v1.33.0"),
       );
+    });
+  });
+
+  describe("when go.mod pins a CLI below the floor", () => {
+    it("leaves the toast to the upgrade dialog and only logs", async () => {
+      mockBuildCliCommand.mockRejectedValueOnce(
+        new CliBelowFloorError("v1.31.1", "example.com/gotest", ["/ws"]),
+      );
+      await service.discover("/ws", ["./..."]);
+      expect(script.calls).toHaveLength(0);
+      expect(mockShowWarningMessage).not.toHaveBeenCalled();
+      expect(outputChannel.error).toHaveBeenCalledWith(
+        expect.stringContaining("go.mod pins gotest v1.31.1"),
+      );
+    });
+
+    it("still toasts a later failure of another kind", async () => {
+      mockBuildCliCommand.mockRejectedValueOnce(
+        new CliBelowFloorError("v1.31.1", "example.com/gotest", ["/ws"]),
+      );
+      await service.discover("/ws", ["./..."]);
+      const pkgs = [{ importPath: "example.com/a", dir: "/ws/a" }];
+      script.always = { stdout: [discoverJson(pkgs, null)] };
+      await service.discover("/ws", ["./..."]);
+      expect(mockShowWarningMessage).toHaveBeenCalledTimes(1);
     });
   });
 

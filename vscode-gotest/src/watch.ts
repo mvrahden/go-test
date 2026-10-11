@@ -7,6 +7,7 @@ import {
   buildCliCommand,
   clearBinaryCache,
   formatCliCommand,
+  offerCliUpgrade,
   type CliCommand,
 } from "./cli.js";
 import {
@@ -268,7 +269,9 @@ export class WatchManager implements vscode.Disposable {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.outputChannel.error(`[watch] ${message}`);
-      vscode.window.showErrorMessage(`gotest watch: ${message}`);
+      if (!offerCliUpgrade(err)) {
+        vscode.window.showErrorMessage(`gotest watch: ${message}`);
+      }
       return;
     }
 
