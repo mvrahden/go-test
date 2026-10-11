@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -52,6 +53,16 @@ func (s *AsyncDoneTestSuite) TestJSONRun(t *gotest.T) {
 	})
 	t.It("names no file inside gotest", func(it *gotest.T) {
 		gotest.NotContains(it, stdout, "methods.go:")
+	})
+}
+
+func (s *AsyncDoneTestSuite) TestFullPath(t *gotest.T) {
+	stdout, stderr, code := s.cli.runSplit(t, "-fullpath", "-run", "^TestNeverDoneTestSuite$", "./cmd/gotest/testdata/asyncdone/")
+	gotest.Equal(t, 1, code, "stderr:\n%s", stderr)
+
+	t.It("names the declaration by its full path, as go test -fullpath does", func(it *gotest.T) {
+		file := filepath.ToSlash(filepath.Join(s.cli.repoRoot, "cmd", "gotest", "testdata", "asyncdone", "asyncdone_suite_test.go"))
+		gotest.Contains(it, stdout, file+":16: TestNeverDoneAsync: done() was not called before the test deadline\n")
 	})
 }
 

@@ -84,7 +84,9 @@ func userFrameBelowHarness(stack []byte) string {
 		if !ok || callsite.IsStd(fn, path) || isGotestFrame(fn) {
 			continue
 		}
-		last = filepath.Base(path) + ":" + line
+		if n, err := strconv.Atoi(line); err == nil {
+			last = callsite.Format(path, n)
+		}
 	}
 	return ""
 }

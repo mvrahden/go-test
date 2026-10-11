@@ -2,13 +2,48 @@
 package callsite
 
 import (
+	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 )
+
+// Format names file:line as testing does: the base name, or the full path
+// under -test.fullpath.
+func Format(file string, line int) string {
+	if !fullPath() {
+		file = filepath.Base(file)
+	}
+	return file + ":" + strconv.Itoa(line)
+}
+
+// Declared turns a declaration the generator recorded as base:line into the
+// form [Format] gives. go test runs the binary in the package directory, so
+// that is where the file is; slashes as in a frame's file, on Windows too.
+func Declared(at string) string {
+	if at == "" || !fullPath() {
+		return at
+	}
+	file, line, ok := strings.Cut(at, ":")
+	if !ok || filepath.IsAbs(file) {
+		return at
+	}
+	dir, err := os.Getwd()
+	if err != nil {
+		return at
+	}
+	return filepath.ToSlash(filepath.Join(dir, file)) + ":" + line
+}
+
+func fullPath() bool {
+	f := flag.Lookup("test.fullpath")
+	return f != nil && f.Value.String() == "true"
+}
 
 // IsStd reports whether a frame of function fn in file belongs to the
 // standard library: a frame no user wrote.

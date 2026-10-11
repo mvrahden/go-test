@@ -316,7 +316,7 @@ func (s *Suite) TestDeliveryAsync(t *gotest.T, done func()) {
 }
 ```
 
-The generated code waits for `done()` or the test deadline, whichever comes first (with the deadline failing the test); calling `done()` more than once is safe. The deadline's failure, `<Method>: done() was not called before the test deadline`, is located at the method's declaration (`file.go:line`): the method has returned by then, so no line of the user's is running, and the editor links the method rather than a file inside gotest. It is the only verdict: once the method's body returns it is waiting for `done()`, not running, so a declared `Timeout` never also reports it as still running.
+The generated code waits for `done()` or the test deadline, whichever comes first (with the deadline failing the test); calling `done()` more than once is safe. The deadline's failure, `<Method>: done() was not called before the test deadline`, is located at the method's declaration (`file.go:line`, the full path under `-fullpath`): the method has returned by then, so no line of the user's is running, and the editor links the method rather than a file inside gotest. It is the only verdict: once the method's body returns it is waiting for `done()`, not running, so a declared `Timeout` never also reports it as still running.
 With a returning `BeforeEach`, `done` comes last: `(t, ctx, done)`.
 With `Timeout: gotest.NoDeadline`, a never-called `done()` waits until an outer bound fires — give async suites a deadline (a zero `Timeout` gets the 30s default).
 For polling-style asynchrony, prefer `Eventually`.
@@ -821,7 +821,7 @@ returns hangs the binary until `go test -timeout` fires, with no named verdict.
 Type-safe generics with compile-time safety.
 All functions accept any type implementing `testingT` (`Errorf()` + `FailNow()`) — works with `*gotest.T`, `*testing.T`, and `*gotest.R`.
 Failure messages always include the user call site, resolved by an internal stack-frame tracer.
-The failure is located (`file.go:line:` before the message, as `go test` prints it) at the line that failed, whichever testing type the assertion got — `*gotest.T`, `*testing.T`, `*gotest.B`, `*gotest.F`, or a fuzz body's `t` — inside a helper too, and never at a file of gotest's, reflect's or the runtime's. When that line is in a helper, the message names the test's own call site after it.
+The failure is located (`file.go:line:` before the message, as `go test` prints it) at the line that failed, whichever testing type the assertion got — `*gotest.T`, `*testing.T`, `*gotest.B`, `*gotest.F`, or a fuzz body's `t` — inside a helper too, and never at a file of gotest's, reflect's or the runtime's. When that line is in a helper, the message names the test's own call site after it. Both honour `-fullpath`.
 Never call `t.T().Helper()` — it degrades location reporting; the `t-escape` lint rule flags it.
 
 <!-- fence:pseudo -->

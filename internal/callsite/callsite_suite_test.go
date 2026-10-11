@@ -1,14 +1,47 @@
 package callsite_test
 
 import (
+	"flag"
+	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/mvrahden/go-test/internal/callsite"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// CallsiteTestSuite covers naming locations as go test does.
+// CallsiteTestSuite covers naming locations as go test does. Not parallel:
+// it sets -test.fullpath.
 type CallsiteTestSuite struct{}
+
+func (s *CallsiteTestSuite) AfterEach(t *gotest.T) {
+	gotest.NoError(t, flag.Set("test.fullpath", "false"))
+}
+
+func (s *CallsiteTestSuite) TestFormat(t *gotest.T) {
+	t.It("names the base name by default", func(it *gotest.T) {
+		gotest.Equal(it, "x_test.go:7", callsite.Format("/src/pkg/x_test.go", 7))
+	})
+	t.It("names the full path under -test.fullpath", func(it *gotest.T) {
+		gotest.NoError(it, flag.Set("test.fullpath", "true"))
+		gotest.Equal(it, "/src/pkg/x_test.go:7", callsite.Format("/src/pkg/x_test.go", 7))
+	})
+}
+
+func (s *CallsiteTestSuite) TestDeclared(t *gotest.T) {
+	t.It("keeps the recorded base name by default", func(it *gotest.T) {
+		gotest.Equal(it, "x_test.go:7", callsite.Declared("x_test.go:7"))
+	})
+	t.It("joins the package directory under -test.fullpath", func(it *gotest.T) {
+		gotest.NoError(it, flag.Set("test.fullpath", "true"))
+		dir := gotest.Must(os.Getwd())
+		gotest.Equal(it, filepath.ToSlash(filepath.Join(dir, "x_test.go"))+":7", callsite.Declared("x_test.go:7"))
+	})
+	t.It("leaves no location empty", func(it *gotest.T) {
+		gotest.NoError(it, flag.Set("test.fullpath", "true"))
+		gotest.Empty(it, callsite.Declared(""))
+	})
+}
 
 func (s *CallsiteTestSuite) TestIsStd(t *gotest.T) {
 	t.It("knows a standard library frame by its file", func(it *gotest.T) {

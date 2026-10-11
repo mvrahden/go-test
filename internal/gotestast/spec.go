@@ -413,8 +413,8 @@ func (m *TestSuiteMethod) Pos() token.Pos { return m.n.Pos() }
 // NamePos is where the method's name is written.
 func (m *TestSuiteMethod) NamePos() token.Pos { return m.m.Pos() }
 
-// DeclaredAt is the method's declaration as go test names a location: the
-// file's base name and the line.
+// DeclaredAt is the method's declaration as base:line. The runtime names the
+// full path under go test -fullpath (see callsite.Declared).
 func (m *TestSuiteMethod) DeclaredAt(fset *token.FileSet) string {
 	p := fset.Position(m.NamePos())
 	if !p.IsValid() {

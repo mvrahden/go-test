@@ -69,6 +69,16 @@ func (s *LocationTestSuite) TestTestingTypes(t *gotest.T) {
 	})
 }
 
+func (s *LocationTestSuite) TestFullPath(t *gotest.T) {
+	src := string(gotest.Must(os.ReadFile("testdata/sources/TestLocation_Shapes/test.go")))
+	run := runGeneratedSuiteArgs(t, "TestLocation_Shapes", childTimeout, "-test.fullpath", "-test.run=^TestShapesTestSuite$")
+
+	t.It("names the helper's line and the method's by their full paths", func(it *gotest.T) {
+		helper, call := lineOf(it, src, "std-helper"), lineOf(it, src, "std-helper-call")
+		gotest.Regexp(it, `\n\s+\S*/`+helper+`: \S*/`+call+`: Fail\n`, run.output)
+	})
+}
+
 // lineOf names the line of src that carries "// LINE:marker", as go test
 // prints it for a fixture's test.go.
 func lineOf(t *gotest.T, src, marker string) string {

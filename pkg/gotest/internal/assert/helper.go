@@ -1,13 +1,13 @@
 package assert
 
 import (
-	"fmt"
-	"path/filepath"
 	"reflect"
 	"runtime"
 	"sync"
 	"testing"
 	"unsafe"
+
+	"github.com/mvrahden/go-test/internal/callsite"
 )
 
 var (
@@ -65,7 +65,7 @@ func SkipInternalFrames(tb testing.TB) string {
 				toMark = append(toMark, pc)
 			}
 		} else if firstUserFrame == "" {
-			firstUserFrame = fmt.Sprintf("%s:%d", filepath.Base(frame.File), frame.Line)
+			firstUserFrame = callsite.Format(frame.File, frame.Line)
 		}
 		if !more {
 			break

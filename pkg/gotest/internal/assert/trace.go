@@ -1,7 +1,6 @@
 package assert
 
 import (
-	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -21,7 +20,7 @@ func CallerFrame() string {
 	if f == nil {
 		return ""
 	}
-	return fmt.Sprintf("%s:%d", filepath.Base(f.File), f.Line)
+	return callsite.Format(f.File, f.Line)
 }
 
 // callerFrame resolves the outermost user frame on the call stack.
