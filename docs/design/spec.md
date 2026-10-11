@@ -1065,6 +1065,7 @@ $ gotest scaffold ./pkg/user/service.go
 Output is written as `<snake_case>_suite_test.go` next to the target; existing files are never overwritten.
 `--fuzz` is the subcommand's only flag (a fuzz skeleton for a package-level function); unknown flags are rejected.
 Uses `packages.Load` for type introspection.
+Exit codes: 0 when the skeleton was written, 1 when the target could not be scaffolded (not found, or its file exists), 2 on a usage error (no target, more than one, a target naming no type or function, an unknown flag), as everywhere in the CLI.
 
 ---
 

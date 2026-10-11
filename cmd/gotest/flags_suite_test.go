@@ -596,3 +596,18 @@ func (s *FlagParsingTestSuite) TestScaffoldRejectsUnknownFlags(t *gotest.T) {
 	code := ExportRunScaffold(Invocation{Args: []string{"--contract", "io.Reader"}})
 	gotest.Equal(t, 2, code)
 }
+
+// Every scaffold usage error exits 2, as the rest of the CLI's do.
+func (s *FlagParsingTestSuite) TestScaffoldUsageErrorsExit2(t *gotest.T) {
+	for t, tc := range gotest.Each(t, []struct {
+		Desc string
+		args []string
+	}{
+		{"no target", nil},
+		{"two targets", []string{"./a.A", "./b.B"}},
+		{"a target naming no type", []string{"./pkg"}},
+		{"a fuzz target naming no function", []string{"--fuzz", "./pkg"}},
+	}) {
+		gotest.Equal(t, 2, ExportRunScaffold(Invocation{Args: tc.args}))
+	}
+}

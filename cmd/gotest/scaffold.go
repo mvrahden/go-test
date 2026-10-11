@@ -40,7 +40,7 @@ func runScaffold(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 
 	if target == "" {
 		fmt.Fprintln(os.Stderr, "usage: gotest scaffold [--fuzz] <./pkg/path.TypeName | ./pkg/path/file.go | ./pkg/path.FuncName>")
-		return 1
+		return 2
 	}
 
 	if slices.Contains(ownArgs, "--fuzz") {
@@ -56,8 +56,9 @@ func runScaffold(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 func runScaffoldFuzz(target string) int {
 	pkgPattern, funcName, err := scaffold.ParseTarget(target)
 	if err != nil {
+		// A target that names no function is a usage error.
 		fmt.Fprintf(os.Stderr, "scaffold: %v\n", err)
-		return 1
+		return 2
 	}
 
 	info, err := scaffold.IntrospectFuzzTarget(pkgPattern, funcName)
@@ -82,8 +83,9 @@ func runScaffoldFuzz(target string) int {
 func runScaffoldType(target string) int {
 	pkgPattern, typeName, err := scaffold.ParseTarget(target)
 	if err != nil {
+		// A target that names no type is a usage error.
 		fmt.Fprintf(os.Stderr, "scaffold: %v\n", err)
-		return 1
+		return 2
 	}
 
 	info, err := scaffold.IntrospectType(pkgPattern, typeName)

@@ -663,6 +663,12 @@ emits a stub method carrying the generator's own rejection reason, and
 prints:
   cannot fuzz map[string]string for Encode — generated TODO stub: <the generator's reason>
 
+Exit codes:
+  0   The skeleton was written
+  1   The target could not be scaffolded: not found, or its file exists
+  2   Usage error: no target, more than one, a target naming no type or
+      function, or an unknown flag
+
 Examples:
   gotest scaffold ./pkg/auth.UserService        Suite for UserService type
   gotest scaffold ./pkg/auth/service.go         Suite over the file's exported functions
