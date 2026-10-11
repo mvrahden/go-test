@@ -108,7 +108,8 @@ type MigrateResult struct {
 	File    string
 	OldName string
 	NewName string
-	// Markers counts the TODO(gotest-migrate) lines the file was left with.
+	// Markers counts the TODO(gotest-migrate) lines the file was left with,
+	// including those an earlier run placed.
 	Markers int
 	// Refusal names why the file was not migrated at all; markers stand
 	// where the reason was found.
@@ -769,13 +770,13 @@ func unconvertedAssertionMsg(call *ast.CallExpr, recvName string) (string, bool)
 // `// TODO(gotest-migrate): ...` comments above unconverted testify lifecycle
 // hooks, unmapped assertion calls, s.Run and any s.T() left in a method
 // without t, so nothing is silently skipped. It operates line-based on the
-// already-formatted output (positions are stable at that point), re-formats
-// the result and returns how many markers it placed.
-func annotateUnconverted(src []byte, suiteNames map[string]bool) ([]byte, int, error) {
+// already-formatted output (positions are stable at that point) and
+// re-formats the result.
+func annotateUnconverted(src []byte, suiteNames map[string]bool) ([]byte, error) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "", src, parser.ParseComments)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	var anns []todoAnnotation
@@ -834,31 +835,28 @@ func annotateUnconverted(src []byte, suiteNames map[string]bool) ([]byte, int, e
 }
 
 // insertMarkers writes one TODO(gotest-migrate) comment above each annotated
-// line and returns the formatted result with the number of markers added.
-func insertMarkers(src []byte, anns []todoAnnotation) ([]byte, int, error) {
+// line and returns the formatted result.
+func insertMarkers(src []byte, anns []todoAnnotation) ([]byte, error) {
 	if len(anns) == 0 {
-		return src, 0, nil
+		return src, nil
 	}
 
 	// Insert comment lines bottom-up so earlier line numbers stay valid.
 	sort.Slice(anns, func(i, j int) bool { return anns[i].line > anns[j].line })
 	lines := strings.Split(string(src), "\n")
-	added := 0
 	for _, a := range anns {
 		idx := a.line - 1
 		if idx < 0 || idx >= len(lines) {
 			continue
 		}
-		comment := "// TODO(gotest-migrate): " + a.msg
+		comment := markerPrefix + " " + a.msg
 		if idx > 0 && strings.Contains(lines[idx-1], comment) {
 			continue // already annotated (idempotency)
 		}
 		indented := leadingWhitespace(lines[idx]) + comment
 		lines = append(lines[:idx], append([]string{indented}, lines[idx:]...)...)
-		added++
 	}
-	out, err := format.Source([]byte(strings.Join(lines, "\n")))
-	return out, added, err
+	return format.Source([]byte(strings.Join(lines, "\n")))
 }
 
 // indirectEmbeddings lists every struct that embeds one of the file's suites
@@ -946,8 +944,35 @@ func migrateFile(path string, opts Options) ([]MigrateResult, error) {
 	return results, nil
 }
 
+// markerPrefix opens every TODO(gotest-migrate) comment.
+const markerPrefix = "// TODO(gotest-migrate):"
+
+// countMarkers counts the TODO(gotest-migrate) comments in f; the text in a
+// string literal is not one.
+func countMarkers(f *ast.File) int {
+	n := 0
+	for _, cg := range f.Comments {
+		for _, c := range cg.List {
+			if strings.HasPrefix(c.Text, markerPrefix) {
+				n++
+			}
+		}
+	}
+	return n
+}
+
+// countSourceMarkers is countMarkers for formatted source.
+func countSourceMarkers(src []byte) (int, error) {
+	f, err := parser.ParseFile(token.NewFileSet(), "", src, parser.ParseComments)
+	if err != nil {
+		return 0, err
+	}
+	return countMarkers(f), nil
+}
+
 // migrateSource returns the migrated form of src, or nil when the file holds
-// no testify suite.
+// no testify suite. A file without one still reports the markers an earlier
+// run left in it.
 func migrateSource(path string, src []byte) ([]MigrateResult, []byte, error) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, path, src, parser.ParseComments)
@@ -957,6 +982,9 @@ func migrateSource(path string, src []byte) ([]MigrateResult, []byte, error) {
 
 	plan := AnalyzeFile(f)
 	if len(plan.Suites) == 0 {
+		if n := countMarkers(f); n > 0 {
+			return []MigrateResult{{File: path, Markers: n}}, nil, nil
+		}
 		return nil, nil, nil
 	}
 
@@ -967,11 +995,15 @@ func migrateSource(path string, src []byte) ([]MigrateResult, []byte, error) {
 			indirect[i].line = fset.Position(token.Pos(-indirect[i].line)).Line
 			reasons = append(reasons, indirect[i].msg)
 		}
-		marked, added, err := insertMarkers(src, indirect)
+		marked, err := insertMarkers(src, indirect)
 		if err != nil {
 			return nil, nil, fmt.Errorf("annotate %s: %w", path, err)
 		}
-		return []MigrateResult{{File: path, Markers: added, Refusal: strings.Join(reasons, "; ")}}, marked, nil
+		markers, err := countSourceMarkers(marked)
+		if err != nil {
+			return nil, nil, fmt.Errorf("annotate %s: %w", path, err)
+		}
+		return []MigrateResult{{File: path, Markers: markers, Refusal: strings.Join(reasons, "; ")}}, marked, nil
 	}
 
 	TransformFile(fset, f, plan)
@@ -991,7 +1023,11 @@ func migrateSource(path string, src []byte) ([]MigrateResult, []byte, error) {
 	for i := range plan.Suites {
 		suiteNames[plan.Suites[i].NewName] = true
 	}
-	formatted, markers, err := annotateUnconverted(formatted, suiteNames)
+	formatted, err = annotateUnconverted(formatted, suiteNames)
+	if err != nil {
+		return nil, nil, fmt.Errorf("annotate %s: %w", path, err)
+	}
+	markers, err := countSourceMarkers(formatted)
 	if err != nil {
 		return nil, nil, fmt.Errorf("annotate %s: %w", path, err)
 	}

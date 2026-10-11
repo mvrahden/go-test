@@ -1091,7 +1091,7 @@ Anything the tool cannot convert is annotated in place, so nothing is silently s
 - `// TODO(gotest-migrate): s.T() outside a migrated method — no t is in scope here` above an `s.T()` in a helper; only methods that gained `t` have theirs rewritten to `t.T()`
 - `// TODO(gotest-migrate): <Child> embeds <Base>, not suite.Suite — migrate this file by hand` above a suite that embeds another suite; the file is refused whole, since renaming the base would strand the child
 
-Exit codes: 0 when every suite converted cleanly, 1 when any marker was left (the run reports how many), 2 when a pattern names no existing path, a file could not be parsed or written, or a flag is unknown. `--dry-run` prints the unified diff of every edit to stdout, writes nothing, and exits the same way.
+Exit codes: 0 when every suite converted cleanly, 1 while any marker is left, including one an earlier run placed in a file it no longer needs to convert (the run reports how many), 2 when a pattern names no existing path, a file could not be parsed or written, or a flag is unknown. `--dry-run` prints the unified diff of every edit to stdout, writes nothing, and exits the same way.
 
 ---
 

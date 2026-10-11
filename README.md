@@ -1037,7 +1037,7 @@ gotest migrate ./...
 #   pkg/user/user_test.go: UserSuite → UserTestSuite
 ```
 
-Renames lifecycle methods, rewrites assertions, removes testify imports. Anything it cannot convert gets a `TODO(gotest-migrate)` marker and the run exits 1; `--dry-run` prints the diff without writing.
+Renames lifecycle methods, rewrites assertions, removes testify imports. Anything it cannot convert gets a `TODO(gotest-migrate)` marker, and every run exits 1 while one is left; `--dry-run` prints the diff without writing.
 
 ### Linter
 

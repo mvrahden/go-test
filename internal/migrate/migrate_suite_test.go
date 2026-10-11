@@ -274,6 +274,37 @@ func (s *MigrateTestSuite) TestScopedRewrites(t *gotest.T) {
 		})
 	})
 
+	t.When("a file was migrated before and kept its markers", func(w *gotest.T) {
+		dir := w.TempDir()
+		path := filepath.Join(dir, "sample_test.go")
+		gotest.NoError(w, os.WriteFile(path, []byte(todoInputSrc), 0600))
+		_, err := migrate.MigrateFile(path)
+		gotest.NoError(w, err)
+		results, err := migrate.MigrateFile(path)
+		gotest.NoError(w, err)
+
+		w.It("reports the markers still there, with no suite", func(it *gotest.T) {
+			gotest.Len(it, results, 1)
+			gotest.Equal(it, 11, results[0].Markers)
+			gotest.Empty(it, results[0].OldName)
+		})
+	})
+
+	t.When("a refused file is run again", func(w *gotest.T) {
+		dir := w.TempDir()
+		path := filepath.Join(dir, "indirect_test.go")
+		gotest.NoError(w, os.WriteFile(path, []byte(indirectSrc), 0600))
+		_, err := migrate.MigrateFile(path)
+		gotest.NoError(w, err)
+		results, err := migrate.MigrateFile(path)
+		gotest.NoError(w, err)
+
+		w.It("still counts the marker", func(it *gotest.T) {
+			gotest.Len(it, results, 1)
+			gotest.Equal(it, 1, results[0].Markers)
+		})
+	})
+
 	t.When("markers were left", func(w *gotest.T) {
 		w.It("counts them on the result", func(it *gotest.T) {
 			dir := it.TempDir()

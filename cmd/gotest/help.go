@@ -744,7 +744,8 @@ Usage:
 Scans for testify/suite patterns and rewrites them into gotest suite
 format. Defaults to the current package if no patterns are given.
 Anything it cannot convert is left with a TODO(gotest-migrate) marker,
-and the run exits 1 when any marker was left.
+and the run exits 1 while any marker is left, including one an earlier
+run placed.
 
 Flags:
   --dry-run    Print the diff of every edit instead of writing it

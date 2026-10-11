@@ -8,9 +8,9 @@ import (
 )
 
 // runMigrate converts testify suites in place. It exits 1 when a
-// TODO(gotest-migrate) marker was left anywhere, so a migration that still
-// needs a hand never reads as done; --dry-run prints the diff instead of
-// writing and answers the same way.
+// TODO(gotest-migrate) marker is left anywhere, including one an earlier run
+// placed, so a migration that still needs a hand never reads as done;
+// --dry-run prints the diff instead of writing and answers the same way.
 func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	ownArgs, rest, err := SplitArgs(inv.Args, migrateAllowed)
 	if err != nil {
@@ -39,28 +39,38 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "migrate: %v\n", err)
 		return 2
 	}
-	if len(results) == 0 {
-		fmt.Println("No testify/suite patterns found.")
-		return 0
-	}
 	verb := "Migrated"
 	if opts.DryRun {
 		verb = "Would migrate"
 	}
-	markers, refused := 0, 0
-	var lines []string
+	markers, suites := 0, 0
+	var lines, leftover []string
 	for _, r := range results {
 		markers += r.Markers
-		if r.Refusal != "" {
-			refused++
+		switch {
+		case r.Refusal != "":
 			lines = append(lines, fmt.Sprintf("  %s: refused: %s", r.File, r.Refusal))
-			continue
+		case r.OldName == "":
+			// No suite left to convert; only an earlier run's markers.
+			leftover = append(leftover, fmt.Sprintf("  %s: %d marker%s", r.File, r.Markers, plural(r.Markers)))
+		default:
+			suites++
+			lines = append(lines, fmt.Sprintf("  %s: %s → %s", r.File, r.OldName, r.NewName))
 		}
-		lines = append(lines, fmt.Sprintf("  %s: %s → %s", r.File, r.OldName, r.NewName))
 	}
-	fmt.Printf("%s %d suites:\n", verb, len(results)-refused)
-	for _, l := range lines {
-		fmt.Println(l)
+	if len(lines) == 0 {
+		fmt.Println("No testify/suite patterns found.")
+	} else {
+		fmt.Printf("%s %d suites:\n", verb, suites)
+		for _, l := range lines {
+			fmt.Println(l)
+		}
+	}
+	if len(leftover) > 0 {
+		fmt.Println("Left by an earlier run:")
+		for _, l := range leftover {
+			fmt.Println(l)
+		}
 	}
 	if markers == 0 {
 		return 0

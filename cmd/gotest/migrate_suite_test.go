@@ -112,6 +112,29 @@ func (s *MigrateCLITestSuite) TestExitCode(t *gotest.T, ctx *migrateCtx) {
 	})
 }
 
+func (s *MigrateCLITestSuite) TestRerun(t *gotest.T, ctx *migrateCtx) {
+	s.write(t, ctx, migrateMarkedSrc)
+	_, _, first := s.cli.runSplitIn(t, ctx.dir, "migrate", ".")
+	gotest.Equal(t, 1, first)
+	migrated := s.read(t, ctx)
+
+	stdout, stderr, code := s.cli.runSplitIn(t, ctx.dir, "migrate", ".")
+
+	t.It("still exits 1 for the marker the first run left", func(it *gotest.T) {
+		gotest.Equal(it, 1, code, stdout+stderr)
+	})
+
+	t.It("reports the file and its markers", func(it *gotest.T) {
+		gotest.Contains(it, stdout, "No testify/suite patterns found.\nLeft by an earlier run:\n  sample_test.go: 1 marker\n")
+		gotest.Contains(it, stdout, "1 TODO(gotest-migrate) marker left; resolve them by hand")
+		gotest.Empty(it, stderr)
+	})
+
+	t.It("does not touch the file again", func(it *gotest.T) {
+		gotest.Equal(it, migrated, s.read(it, ctx))
+	})
+}
+
 func (s *MigrateCLITestSuite) TestDryRun(t *gotest.T, ctx *migrateCtx) {
 	s.write(t, ctx, migrateMarkedSrc)
 	out, code := runGotestIn(t, s.cli.binary, ctx.dir, nil, "migrate", "--dry-run", ".")
