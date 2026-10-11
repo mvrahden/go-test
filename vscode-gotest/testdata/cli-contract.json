@@ -57,6 +57,32 @@
         }
       }
     },
+    "build-failure": {
+      "gating": {
+        "direct": {
+          "exitCode": 2,
+          "stdout": "{\"version\":\"dev (source checkout)\",\"packages\":[{\"path\":\"example.com/broken\",\"status\":\"fail\",\"duration\":0,\"nodes\":[],\"output\":[\"# example.com/broken [example.com/broken.test]\\n\",\"./broken_test.go:7:2: undefined: helper\\n\"]}],\"stats\":{\"suites\":0,\"behaviors\":0,\"tests\":0,\"benchmarks\":0,\"fuzzers\":0,\"passed\":0,\"failed\":0,\"skipped\":0,\"failedPackages\":1}}\n",
+          "stderr": ""
+        },
+        "goRun": {
+          "exitCode": 1,
+          "stderr": "exit status 2\n",
+          "stdoutMatchesDirect": true
+        }
+      },
+      "renderOnly": {
+        "direct": {
+          "exitCode": 0,
+          "stdout": "{\"version\":\"dev (source checkout)\",\"packages\":[{\"path\":\"example.com/broken\",\"status\":\"fail\",\"duration\":0,\"nodes\":[],\"output\":[\"# example.com/broken [example.com/broken.test]\\n\",\"./broken_test.go:7:2: undefined: helper\\n\"]}],\"stats\":{\"suites\":0,\"behaviors\":0,\"tests\":0,\"benchmarks\":0,\"fuzzers\":0,\"passed\":0,\"failed\":0,\"skipped\":0,\"failedPackages\":1}}\n",
+          "stderr": ""
+        },
+        "goRun": {
+          "exitCode": 0,
+          "stderr": "",
+          "stdoutMatchesDirect": true
+        }
+      }
+    },
     "declared-source": {
       "gating": {
         "direct": {

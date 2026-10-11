@@ -1,0 +1,6 @@
+{"ImportPath":"example.com/broken [example.com/broken.test]","Action":"build-output","Output":"# example.com/broken [example.com/broken.test]\n"}
+{"ImportPath":"example.com/broken [example.com/broken.test]","Action":"build-output","Output":"./broken_test.go:7:2: undefined: helper\n"}
+{"ImportPath":"example.com/broken [example.com/broken.test]","Action":"build-fail"}
+{"Action":"start","Package":"example.com/broken"}
+{"Action":"output","Package":"example.com/broken","Output":"FAIL\texample.com/broken [build failed]\n"}
+{"Action":"fail","Package":"example.com/broken","Elapsed":0,"FailedBuild":"example.com/broken [example.com/broken.test]"}

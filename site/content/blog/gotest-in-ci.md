@@ -236,7 +236,7 @@ You can also pipe existing `go test -json` output into `gotest summary` without 
 go test -json ./... | gotest summary --input=-
 ```
 
-This is useful if you have existing CI steps that run `go test` and you want to add summary output without changing the test execution.
+This is useful if you have existing CI steps that run `go test` and you want to add summary output without changing the test execution. The exit code is the stream's verdict, so the pipe fails the step even without `pipefail`: 1 when tests failed, 2 when a package failed to build or the stream is empty or cut short.
 
 ## Combining stdlib and suite tests
 

@@ -102,6 +102,15 @@ const EXPECTED: Record<
     stats: { passed: 0, failed: 0, skipped: 0, failedPackages: 1 },
     packages: ["example.com/broken:fail"],
   },
+  // The same failure in go test's own shape (Go 1.24+): build events and a
+  // verdict naming the failed build. It gates as the live run does, on 2, and
+  // says nothing extra on stderr: the diagnostics are in the spec.
+  "build-failure": {
+    gatingExitCode: 2,
+    goRunEpilogue: "exit status 2\n",
+    stats: { passed: 0, failed: 0, skipped: 0, failedPackages: 1 },
+    packages: ["example.com/broken:fail"],
+  },
   // A stream with no events holds no verdict: the gating form must not pass
   // it as green. The Spec View renders it anyway, under --render-only.
   empty: {

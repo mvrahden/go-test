@@ -207,8 +207,9 @@ Flags:
   --format=<fmt>          Output format: terminal (default), md, json
   --output=<file>         Write to file instead of stdout
   --input=<file>          Render from saved JSON ("-" for stdin); exits 2 if
-                          it holds no test events or a package never reported
-                          its verdict (a stream cut short)
+                          it holds no test events, a package or failed build
+                          never reported its verdict (a stream cut short), or
+                          a package failed to build (as the live run does)
   --render-only           With --input, exit 0 on a failing or incomplete
                           stream: report whether rendering succeeded, not the
                           test verdict
@@ -264,8 +265,9 @@ Flags:
   --format=<fmt>          Output format: terminal (default), md, json
   --output=<file>         Write to file instead of stdout
   --input=<file>          Read from saved JSON ("-" for stdin); exits 2 if
-                          it holds no test events or a package never reported
-                          its verdict (a stream cut short)
+                          it holds no test events, a package or failed build
+                          never reported its verdict (a stream cut short), or
+                          a package failed to build (as the live run does)
   --render-only           With --input, exit 0 on a failing or incomplete
                           stream: report whether rendering succeeded, not the
                           test verdict

@@ -129,9 +129,9 @@ func (s *SpecInputTestSuite) TestBuildFailureCarriesItsCause(t *gotest.T, _ *spe
 	input := filepath.Join(t.TempDir(), "events.json")
 	gotest.NoError(t, os.WriteFile(input, []byte(stream), 0o600))
 
-	t.It("spec names the compile error and exits 1", func(it *gotest.T) {
+	t.It("spec names the compile error and exits 2, as the live run does", func(it *gotest.T) {
 		out := filepath.Join(it.TempDir(), "spec.txt")
-		gotest.Equal(it, 1, ExportRunSpecFromInput(input, "terminal", out, true, false))
+		gotest.Equal(it, 2, ExportRunSpecFromInput(input, "terminal", out, true, false))
 		data, err := os.ReadFile(out)
 		gotest.NoError(it, err)
 		gotest.Contains(it, string(data), "pkg_test.go:5:33: undefined: undefinedCall")
@@ -139,7 +139,7 @@ func (s *SpecInputTestSuite) TestBuildFailureCarriesItsCause(t *gotest.T, _ *spe
 
 	t.It("summary names it too", func(it *gotest.T) {
 		out := filepath.Join(it.TempDir(), "summary.txt")
-		gotest.Equal(it, 1, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, false, ""))
+		gotest.Equal(it, 2, ExportRunSummaryFromInput(input, "terminal", out, "", true, false, false, ""))
 		data, err := os.ReadFile(out)
 		gotest.NoError(it, err)
 		gotest.Contains(it, string(data), "pkg_test.go:5:33: undefined: undefinedCall")
