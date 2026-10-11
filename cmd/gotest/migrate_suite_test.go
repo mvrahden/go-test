@@ -131,3 +131,19 @@ func (s *MigrateCLITestSuite) TestDryRun(t *gotest.T, ctx *migrateCtx) {
 		gotest.Equal(it, 1, code, out)
 	})
 }
+
+func (s *MigrateCLITestSuite) TestMissingPattern(t *gotest.T, ctx *migrateCtx) {
+	stdout, stderr, code := s.cli.runSplitIn(t, ctx.dir, "migrate", "./nonexistent")
+
+	t.It("fails as a load error", func(it *gotest.T) {
+		gotest.Equal(it, 2, code, stdout+stderr)
+	})
+
+	t.It("names the pattern on stderr", func(it *gotest.T) {
+		gotest.Regexp(it, `^migrate: pattern \./nonexistent: `, stderr)
+	})
+
+	t.It("does not claim the pattern was clean", func(it *gotest.T) {
+		gotest.Empty(it, stdout)
+	})
+}

@@ -48,8 +48,13 @@ func (r cliRunner) runEnv(t *gotest.T, env []string, args ...string) (string, in
 // runSplit returns stdout and stderr apart, with the exit code: what a
 // command renders and what it complains about are different claims.
 func (r cliRunner) runSplit(t *gotest.T, args ...string) (stdout, stderr string, code int) {
+	return r.runSplitIn(t, r.repoRoot, args...)
+}
+
+// runSplitIn is runSplit from dir.
+func (r cliRunner) runSplitIn(t *gotest.T, dir string, args ...string) (stdout, stderr string, code int) {
 	cmd := exec.Command(r.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
-	cmd.Dir = r.repoRoot
+	cmd.Dir = dir
 	var out, errs bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errs
 	err := cmd.Run()

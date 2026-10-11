@@ -1026,6 +1026,9 @@ func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 
 		err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
+				if path == dir {
+					return fmt.Errorf("pattern %s: %w", pattern, err)
+				}
 				return nil
 			}
 			if d.IsDir() {
