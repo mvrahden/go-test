@@ -9,6 +9,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/runstate"
+	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 )
 
 // F wraps *testing.F for fuzz targets, pairing it with optional
@@ -44,11 +45,13 @@ func NewF(f *testing.F, beforeEach, afterEach func(*T), target *FuzzTarget) *F {
 func (f *F) F() *testing.F            { return f.f }
 func (f *F) Context() context.Context { return f.f.Context() }
 
-// Errorf, FailNow and Skipf mark themselves as helpers so the diagnostic
-// names the caller's line, not this file.
-func (f *F) Errorf(format string, args ...any) { f.f.Helper(); f.f.Errorf(format, args...) }
-func (f *F) FailNow()                          { f.f.Helper(); f.f.FailNow() }
-func (f *F) Skipf(format string, args ...any)  { f.f.Helper(); f.f.Skipf(format, args...) }
+// Errorf and Skipf name the caller's line, not gotest's.
+func (f *F) Errorf(format string, args ...any) { report(f.f, fmt.Sprintf(format, args...)) }
+func (f *F) FailNow()                          { f.f.FailNow() }
+func (f *F) Skipf(format string, args ...any) {
+	assert.SkipInternalFrames(f.f)
+	f.f.Skipf(format, args...)
+}
 
 // Add records a seed. It is buffered rather than forwarded: a typed seed
 // such as a struct must be exploded into the target's leaves before

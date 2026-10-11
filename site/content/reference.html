@@ -367,9 +367,9 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
     <!-- 5. Assertions -->
     <section class="ref-section" id="assertions">
       <h2>Assertions</h2>
-      <p class="lead">Type-safe generics with compile-time checking. Zero external dependencies. Works with both <code>*gotest.T</code> and <code>*testing.T</code>.</p>
+      <p class="lead">Type-safe generics with compile-time checking. Zero external dependencies. Works with <code>*gotest.T</code>, <code>*testing.T</code>, <code>*gotest.B</code> and <code>*gotest.F</code>.</p>
       <div class="callout">
-        Assertion failures automatically trace back to the test call site. Helper functions don't need <code>t.Helper()</code> — the framework resolves the outermost caller from the test file.
+        Assertion failures automatically trace back to the test call site. Helper functions don't need <code>t.Helper()</code> — the failure is located at the line that failed, a helper's included, and the message names the outermost caller from the test file.
       </div>
 
       <h3>Equality &amp; identity</h3>

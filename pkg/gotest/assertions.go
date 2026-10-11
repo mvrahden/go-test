@@ -8,6 +8,7 @@ import (
 	"math"
 	"regexp"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
@@ -25,7 +26,11 @@ func fail(t testingT, msg string, msgAndArgs []any) {
 	if frame := assert.CallerFrame(); frame != "" {
 		msg = frame + ": " + msg
 	}
-	t.Errorf("%s", msg)
+	if tb, ok := t.(testing.TB); ok {
+		report(tb, msg) // a *testing.T, B or F passed directly
+	} else {
+		t.Errorf("%s", msg)
+	}
 	t.FailNow()
 }
 

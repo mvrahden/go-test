@@ -65,13 +65,17 @@ func NewTWithContext(tb testing.TB, ctx context.Context) *T {
 }
 
 func (t *T) Errorf(format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	if t.t != nil {
-		if goFrame := assert.SkipInternalFrames(t.t); goFrame != "" {
-			msg = strings.TrimPrefix(msg, goFrame+": ")
-		}
+	report(t.testingTB(), fmt.Sprintf(format, args...))
+}
+
+// report fails tb with msg at the user's line: gotest's own frames are
+// marked as helpers, and msg's leading location is dropped when it names
+// that same line.
+func report(tb testing.TB, msg string) {
+	if goFrame := assert.SkipInternalFrames(tb); goFrame != "" {
+		msg = strings.TrimPrefix(msg, goFrame+": ")
 	}
-	t.testingTB().Errorf("%s", msg)
+	tb.Errorf("%s", msg)
 }
 
 func (t *T) FailNow() {
@@ -79,6 +83,7 @@ func (t *T) FailNow() {
 }
 
 func (t *T) Skipf(format string, args ...any) {
+	assert.SkipInternalFrames(t.testingTB())
 	t.testingTB().Skipf(format, args...)
 }
 

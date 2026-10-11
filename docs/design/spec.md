@@ -821,6 +821,7 @@ returns hangs the binary until `go test -timeout` fires, with no named verdict.
 Type-safe generics with compile-time safety.
 All functions accept any type implementing `testingT` (`Errorf()` + `FailNow()`) — works with `*gotest.T`, `*testing.T`, and `*gotest.R`.
 Failure messages always include the user call site, resolved by an internal stack-frame tracer.
+The failure is located (`file.go:line:` before the message, as `go test` prints it) at the line that failed, whichever testing type the assertion got — `*gotest.T`, `*testing.T`, `*gotest.B`, `*gotest.F`, or a fuzz body's `t` — inside a helper too, and never at a file of gotest's, reflect's or the runtime's. When that line is in a helper, the message names the test's own call site after it.
 Never call `t.T().Helper()` — it degrades location reporting; the `t-escape` lint rule flags it.
 
 <!-- fence:pseudo -->

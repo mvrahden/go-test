@@ -2,7 +2,10 @@ package gotest
 
 import (
 	"context"
+	"fmt"
 	"testing"
+
+	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 )
 
 // B wraps *testing.B for benchmark methods on gotest suites. It satisfies
@@ -20,6 +23,9 @@ func (b *B) ReportAllocs()                       { b.b.ReportAllocs() }
 func (b *B) SetBytes(n int64)                    { b.b.SetBytes(n) }
 func (b *B) ReportMetric(n float64, unit string) { b.b.ReportMetric(n, unit) }
 func (b *B) Context() context.Context            { return b.b.Context() }
-func (b *B) Errorf(format string, args ...any)   { b.b.Errorf(format, args...) }
+func (b *B) Errorf(format string, args ...any)   { report(b.b, fmt.Sprintf(format, args...)) }
 func (b *B) FailNow()                            { b.b.FailNow() }
-func (b *B) Skipf(format string, args ...any)    { b.b.Skipf(format, args...) }
+func (b *B) Skipf(format string, args ...any) {
+	assert.SkipInternalFrames(b.b)
+	b.b.Skipf(format, args...)
+}

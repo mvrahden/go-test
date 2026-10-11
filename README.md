@@ -534,8 +534,8 @@ conn := gotest.Must(db.Connect(ctx))
 val  := gotest.Must(cache.Get(key))
 ```
 
-All assertions work with `*gotest.T` (suites), `*testing.T` (standalone tests), and `*gotest.R` (polling callbacks).
-Assertion failures automatically trace back to the test call site — no `t.Helper()` calls needed in helper functions.
+All assertions work with `*gotest.T` (suites), `*testing.T` (standalone tests), `*gotest.B` and `*gotest.F` (benchmarks and fuzz targets), and `*gotest.R` (polling callbacks).
+Assertion failures automatically trace back to the test call site — no `t.Helper()` calls needed in helper functions. The failure is located at the line that failed, a helper's included, and the message names the test's call site after it.
 
 ### Data-Driven Tests
 

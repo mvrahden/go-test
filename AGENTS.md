@@ -4,7 +4,7 @@ gotest is a code-generation framework for Go test suites.
 You write suite structs with lifecycle methods and test cases; the `gotest generate` command produces the test harness (test functions, fixture initialization, lifecycle wiring).
 The generated code is not hand-edited.
 
-All assertions accept both `*gotest.T` and `*testing.T` as first argument.
+All assertions accept `*gotest.T`, `*testing.T`, `*gotest.B` and `*gotest.F` as first argument, and report a failure at the line that failed in each.
 
 Run the CLI as `go tool gotest <args>`, declared once with `go get -tool github.com/mvrahden/go-test/cmd/gotest@<the version go.mod already requires>` (unversioned `go get -tool` upgrades the pin). Never a global `go install` binary: it drifts from go.mod and the CLI refuses to run on drift.
 

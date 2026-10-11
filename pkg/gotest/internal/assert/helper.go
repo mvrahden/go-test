@@ -17,21 +17,26 @@ var (
 )
 
 // SkipInternalFrames walks the call stack and registers all gotest-internal
-// frame PCs in tt's helperPCs map. This causes Go's testing.T.decorate to
-// skip those frames when choosing the file:line prefix for error output.
+// frame PCs in tb's helperPCs map. This causes Go's decoration to skip those
+// frames when choosing the file:line prefix for error output.
 //
 // Returns the "file:line" of the first non-gotest user frame — the frame
 // Go's decoration will show. Returns "" on any failure or if no user frame
-// is found.
+// is found, or when tb is not a *testing.T, *testing.B or *testing.F.
 //
 // Uses reflect + unsafe to access unexported fields. Runtime type guards
 // ensure a silent no-op if Go's testing internals change.
-func SkipInternalFrames(tt *testing.T) string {
-	if tt == nil {
+func SkipInternalFrames(tb testing.TB) string {
+	switch tb.(type) {
+	case *testing.T, *testing.B, *testing.F:
+	default:
 		return ""
 	}
-
-	v := reflect.ValueOf(tt).Elem()
+	v := reflect.ValueOf(tb)
+	if v.IsNil() {
+		return ""
+	}
+	v = v.Elem()
 
 	muField := v.FieldByName("mu")
 	hpField := v.FieldByName("helperPCs")

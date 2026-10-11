@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/mvrahden/go-test/internal/callsite"
 )
 
 // gotestDirMarkers name the directories of gotest's own runtime code: the
@@ -45,7 +47,9 @@ func callerFrame(skip int) *runtime.Frame {
 			strings.HasPrefix(frame.Function, "runtime.") {
 			break
 		}
-		if IsGotestSource(frame.File) || IsGeneratedBridge(frame.File) {
+		// Neither gotest nor the standard library is the user's code: a fuzz
+		// body is called through reflect.
+		if IsGotestSource(frame.File) || IsGeneratedBridge(frame.File) || callsite.IsStd(frame.Function, frame.File) {
 			if !more {
 				break
 			}
