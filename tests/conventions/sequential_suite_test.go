@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -47,6 +48,13 @@ func scanSuites(t *gotest.T, root string) map[string]*suiteShape {
 			if d.IsDir() {
 				if strings.HasPrefix(d.Name(), "testdata") || strings.HasPrefix(d.Name(), ".") {
 					return filepath.SkipDir
+				}
+				// A nested module, like the skill evals' consumer fixture, models
+				// someone else's repository and keeps its own conventions.
+				if path != filepath.Join(root, dir) {
+					if _, err := os.Stat(filepath.Join(path, "go.mod")); err == nil {
+						return filepath.SkipDir
+					}
 				}
 				return nil
 			}
