@@ -1,11 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/config"
@@ -14,7 +17,17 @@ import (
 	"golang.org/x/tools/go/analysis/singlechecker"
 )
 
+// lintFixDriverEnv marks the child that applies -fix: it runs the
+// go/analysis driver directly, with the args it was handed.
+const lintFixDriverEnv = "GOTEST_LINT_FIX_DRIVER"
+
 func runLint(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+	if os.Getenv(lintFixDriverEnv) == "1" {
+		os.Args = append([]string{"gotest lint"}, inv.Args...)
+		singlechecker.Main(lint.Analyzer)
+		return 2
+	}
+
 	github := lintGitHubArmed(inv.Args)
 	args := stripFlag(inv.Args, "--github")
 	if len(args) == 0 {
@@ -25,6 +38,25 @@ func runLint(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
+	}
+
+	// The driver applies -fix and then reports nothing, not even findings
+	// without a fix. Apply fixes in a child driver, then lint what is left.
+	// -diff only previews, so it stays with the driver.
+	if lintBoolFlag(args, "fix") && !lintBoolFlag(args, "diff") {
+		if patterns := lint.PreflightPatterns(args); len(patterns) > 0 {
+			if err := lint.PreflightLoad("", patterns); err != nil {
+				fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
+				return 1
+			}
+		}
+		if code := runLintFixDriver(append(flagArgs, args...)); code != 0 {
+			return code
+		}
+		args = stripFlag(stripFlag(args, "-fix"), "--fix")
+		if len(args) == 0 {
+			args = []string{"./..."}
+		}
 	}
 
 	// Lint owns the analyzer's flags and runs it in-process, from one load.
@@ -52,6 +84,43 @@ func runLint(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 
 	fmt.Fprintln(os.Stderr, "lint: unexpected return from singlechecker.Main")
 	return 2
+}
+
+// lintBoolFlag reports whether args set the boolean flag name (without
+// dashes) to true; the last occurrence wins, as with the flag package.
+func lintBoolFlag(args []string, name string) bool {
+	set := false
+	for _, a := range args {
+		if !strings.HasPrefix(a, "-") {
+			continue
+		}
+		if n, value := splitBoolFlag(a); n == name {
+			set, _ = strconv.ParseBool(value)
+		}
+	}
+	return set
+}
+
+// runLintFixDriver re-runs this binary as the go/analysis driver to apply
+// the fixes, and returns its exit code.
+func runLintFixDriver(args []string) int {
+	exe, err := os.Executable()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: locating gotest for -fix: %v\n", err)
+		return 2
+	}
+	cmd := exec.Command(exe, append([]string{"lint"}, args...)...) //nolint:gosec // G204: re-runs this binary
+	cmd.Env = append(os.Environ(), lintFixDriverEnv+"=1")
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return exitErr.ExitCode()
+		}
+		fmt.Fprintf(os.Stderr, "FAIL: applying fixes: %v\n", err)
+		return 2
+	}
+	return 0
 }
 
 // lintGitHubArmed reports whether lint should render GitHub annotations:
