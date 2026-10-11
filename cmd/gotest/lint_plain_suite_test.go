@@ -69,6 +69,22 @@ func (s *LintPlainTestSuite) TestPlainMode(t *gotest.T) {
 		})
 	})
 
+	t.When("a //line directive without a column moves a finding", func(w *gotest.T) {
+		w.Setenv("GOWORK", "off")
+		dir := w.TempDir()
+		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.25\n"), 0o600))
+		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "probe_test.go"), []byte("package lintprobe\n\nimport \"testing\"\n\n//line other.tmpl:100\nfunc TestProbe(t *testing.T) {}\n"), 0o600))
+
+		var stderr bytes.Buffer
+		code, ok := ExportRunLintPlain(&stderr, dir, []string{"./..."})
+
+		w.It("names the position the directive gives, without a column, as go vet does", func(it *gotest.T) {
+			gotest.True(it, ok)
+			gotest.Equal(it, 3, code)
+			gotest.Regexp(it, `^\S*other\.tmpl:100: stdlib test TestProbe .+\n$`, stderr.String())
+		})
+	})
+
 	t.When("a flag only the driver implements is present", func(w *gotest.T) {
 		var stderr bytes.Buffer
 		_, ok := ExportRunLintPlain(&stderr, "", []string{"-debug=v", "./..."})

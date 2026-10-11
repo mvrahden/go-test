@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"go/token"
 	"io"
 	"os"
 	"path/filepath"
@@ -478,7 +479,10 @@ func reportLintGitHub(stdout io.Writer, dir string, findings []lint.Finding) int
 // context adds the offending lines with that many lines around them.
 func reportLintPlain(stderr io.Writer, findings []lint.Finding, context int, source func(string) ([]byte, error)) int {
 	for _, f := range findings {
-		fmt.Fprintf(stderr, "%s:%d:%d: %s\n", f.File, f.Line, f.Col, f.Message)
+		// As token.Position prints it: a //line directive without a
+		// column leaves none.
+		pos := token.Position{Filename: f.File, Line: f.Line, Column: f.Col}
+		fmt.Fprintf(stderr, "%s: %s\n", pos, f.Message)
 		if context < 0 {
 			continue
 		}
