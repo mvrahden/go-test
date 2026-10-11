@@ -114,6 +114,9 @@ type MigrateResult struct {
 	// Refusal names why the file was not migrated at all; markers stand
 	// where the reason was found.
 	Refusal string
+	// RefsOnly marks a file that holds no suite but refers to one a sibling
+	// file renamed; only those references were rewritten.
+	RefsOnly bool
 }
 
 // DeriveNewName computes the new suite name from an old one.
@@ -331,6 +334,12 @@ func extractSuiteType(expr ast.Expr) string {
 
 // TransformFile applies the migration transformations to the AST in-place.
 func TransformFile(fset *token.FileSet, f *ast.File, plan MigrationPlan) {
+	transformFile(f, plan, nil)
+}
+
+// transformFile is TransformFile that also renames the suites of sibling
+// files (old name to new) wherever f refers to them.
+func transformFile(f *ast.File, plan MigrationPlan, siblings map[string]string) {
 	if len(plan.Suites) == 0 {
 		return
 	}
@@ -404,42 +413,115 @@ func TransformFile(fset *token.FileSet, f *ast.File, plan MigrationPlan) {
 			}
 
 		case *ast.FuncDecl:
-			if d.Recv == nil || len(d.Recv.List) == 0 {
-				continue
-			}
-			recvTypeName, recvVarName := extractReceiverInfo(d.Recv.List[0])
-			if !suiteOldNames[recvTypeName] {
+			vars, onSuite := suiteVars(d, suiteOldNames)
+			if len(vars) == 0 {
 				continue
 			}
 
-			// Rename receiver type
-			renameReceiverType(d.Recv.List[0], oldToNew[recvTypeName])
+			if onSuite {
+				// Rename receiver type
+				recvTypeName, _ := extractReceiverInfo(d.Recv.List[0])
+				renameReceiverType(d.Recv.List[0], oldToNew[recvTypeName])
 
-			// Rename lifecycle methods and add t parameter
-			if newName, ok := lifecycleRenames[d.Name.Name]; ok {
-				d.Name.Name = newName
-				addGotestTParam(d)
-			}
+				// Rename lifecycle methods and add t parameter
+				if newName, ok := lifecycleRenames[d.Name.Name]; ok {
+					d.Name.Name = newName
+					addGotestTParam(d)
+				}
 
-			// Test methods: add t parameter
-			if strings.HasPrefix(d.Name.Name, "Test") {
-				addGotestTParam(d)
+				// Test methods: add t parameter
+				if strings.HasPrefix(d.Name.Name, "Test") {
+					addGotestTParam(d)
+				}
 			}
 
 			// Rewrite assertions only where t is in scope, and s.T() only
 			// where t is a *gotest.T; the rest is left for a marker.
 			kind := tParamKind(d)
-			if d.Body != nil && kind != "" {
-				rewriteAssertions(d.Body, recvVarName, assertionMap)
-			}
-			if d.Body != nil && kind == "gotest" {
-				rewriteSTCalls(d.Body, recvVarName)
+			for _, v := range vars {
+				if d.Body != nil && kind != "" {
+					rewriteAssertions(d.Body, v, assertionMap)
+				}
+				if d.Body != nil && kind == "gotest" {
+					rewriteSTCalls(d.Body, v)
+				}
 			}
 		}
 	}
 
-	// 3. Rewrite imports
+	// 3. Rename every other reference to a renamed suite type
+	for old, nn := range siblings {
+		oldToNew[old] = nn
+	}
+	renameTypeRefs(f, oldToNew)
+
+	// 4. Rewrite imports
 	rewriteImports(f)
+}
+
+// renameTypeRefs renames every identifier that names a key of renames —
+// parameter and variable types, conversions, composite literals — and
+// reports whether it renamed any. Selector, field and func names are not
+// type references and stay.
+func renameTypeRefs(f *ast.File, renames map[string]string) bool {
+	if len(renames) == 0 {
+		return false
+	}
+	skip := map[*ast.Ident]bool{}
+	ast.Inspect(f, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.SelectorExpr:
+			skip[x.Sel] = true
+		case *ast.Field:
+			for _, name := range x.Names {
+				skip[name] = true
+			}
+		case *ast.FuncDecl:
+			skip[x.Name] = true
+		}
+		return true
+	})
+	renamed := false
+	ast.Inspect(f, func(n ast.Node) bool {
+		ident, ok := n.(*ast.Ident)
+		if !ok || skip[ident] {
+			return true
+		}
+		if nn, ok := renames[ident.Name]; ok && nn != ident.Name {
+			ident.Name = nn
+			renamed = true
+		}
+		return true
+	})
+	return renamed
+}
+
+// suiteVars names fd's variables of a suite type: a suite receiver (onSuite)
+// and any parameter of one, as a free helper taking the suite has.
+func suiteVars(fd *ast.FuncDecl, suites map[string]bool) (vars []string, onSuite bool) {
+	if fd.Recv != nil && len(fd.Recv.List) > 0 {
+		typeName, varName := extractReceiverInfo(fd.Recv.List[0])
+		if suites[typeName] {
+			onSuite = true
+			if varName != "" && varName != "_" {
+				vars = append(vars, varName)
+			}
+		}
+	}
+	if fd.Type.Params == nil {
+		return vars, onSuite
+	}
+	for _, p := range fd.Type.Params.List {
+		if !suites[gotestast.ReceiverTypeName(p.Type)] {
+			continue
+		}
+		for _, name := range p.Names {
+			if name.Name != "_" {
+				vars = append(vars, name.Name)
+			}
+		}
+	}
+	return vars, onSuite
 }
 
 // renameReceiverType changes the type name in a method receiver.
@@ -811,15 +893,12 @@ func annotateUnconverted(src []byte, suiteNames map[string]bool) ([]byte, error)
 
 	for _, decl := range f.Decls {
 		fd, ok := decl.(*ast.FuncDecl)
-		if !ok || fd.Recv == nil || len(fd.Recv.List) == 0 {
+		if !ok {
 			continue
 		}
-		recvTypeName, recvVarName := extractReceiverInfo(fd.Recv.List[0])
-		if !suiteNames[recvTypeName] {
-			continue
-		}
+		vars, onSuite := suiteVars(fd, suiteNames)
 
-		if unsupportedHooks[fd.Name.Name] {
+		if onSuite && unsupportedHooks[fd.Name.Name] {
 			pos := fd.Pos()
 			if fd.Doc != nil {
 				pos = fd.Doc.Pos()
@@ -831,26 +910,28 @@ func annotateUnconverted(src []byte, suiteNames map[string]bool) ([]byte, error)
 			continue
 		}
 		kind := tParamKind(fd)
-		ast.Inspect(fd.Body, func(n ast.Node) bool {
-			call, ok := n.(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-			if msg, found := unconvertedAssertionMsg(call, recvVarName, kind != ""); found {
-				add(call.Pos(), msg)
-			}
-			if isRecvRunCall(call, recvVarName) {
-				add(call.Pos(), recvVarName+".Run has no gotest equivalent — use t.When or t.It")
-			}
-			if kind != "gotest" && stCallReceiver(call, recvVarName) != nil {
-				msg := recvVarName + ".T() outside a migrated method — no t is in scope here"
-				if kind == "testing" {
-					msg = recvVarName + ".T() where t is a *testing.T — use t"
+		for _, v := range vars {
+			ast.Inspect(fd.Body, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
 				}
-				add(call.Pos(), msg)
-			}
-			return true
-		})
+				if msg, found := unconvertedAssertionMsg(call, v, kind != ""); found {
+					add(call.Pos(), msg)
+				}
+				if isRecvRunCall(call, v) {
+					add(call.Pos(), v+".Run has no gotest equivalent — use t.When or t.It")
+				}
+				if kind != "gotest" && stCallReceiver(call, v) != nil {
+					msg := v + ".T() outside a migrated method — no t is in scope here"
+					if kind == "testing" {
+						msg = v + ".T() where t is a *testing.T — use t"
+					}
+					add(call.Pos(), msg)
+				}
+				return true
+			})
+		}
 	}
 
 	return insertMarkers(src, anns)
@@ -942,15 +1023,17 @@ type Options struct {
 
 // MigrateFile processes a single file: parse, analyze, transform, format, write back.
 func MigrateFile(path string) ([]MigrateResult, error) {
-	return migrateFile(path, Options{})
+	return migrateFile(path, nil, Options{})
 }
 
-func migrateFile(path string, opts Options) ([]MigrateResult, error) {
+// migrateFile migrates path; siblings maps the suites other files of its
+// package rename, old name to new.
+func migrateFile(path string, siblings map[string]string, opts Options) ([]MigrateResult, error) {
 	before, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
-	results, after, err := migrateSource(path, before)
+	results, after, err := migrateSource(path, before, siblings)
 	if err != nil || after == nil {
 		return results, err
 	}
@@ -992,10 +1075,11 @@ func countSourceMarkers(src []byte) (int, error) {
 	return countMarkers(f), nil
 }
 
-// migrateSource returns the migrated form of src, or nil when the file holds
-// no testify suite. A file without one still reports the markers an earlier
-// run left in it.
-func migrateSource(path string, src []byte) ([]MigrateResult, []byte, error) {
+// migrateSource returns the migrated form of src, or nil when there is
+// nothing to change. A file without a suite of its own has only its
+// references to renamed sibling suites rewritten, and still reports the
+// markers an earlier run left in it.
+func migrateSource(path string, src []byte, siblings map[string]string) ([]MigrateResult, []byte, error) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, path, src, parser.ParseComments)
 	if err != nil {
@@ -1004,6 +1088,9 @@ func migrateSource(path string, src []byte) ([]MigrateResult, []byte, error) {
 
 	plan := AnalyzeFile(f)
 	if len(plan.Suites) == 0 {
+		if renameTypeRefs(f, siblings) {
+			return migrateRefs(fset, f, path, siblings)
+		}
 		if n := countMarkers(f); n > 0 {
 			return []MigrateResult{{File: path, Markers: n}}, nil, nil
 		}
@@ -1028,30 +1115,18 @@ func migrateSource(path string, src []byte) ([]MigrateResult, []byte, error) {
 		return []MigrateResult{{File: path, Markers: markers, Refusal: strings.Join(reasons, "; ")}}, marked, nil
 	}
 
-	TransformFile(fset, f, plan)
+	transformFile(f, plan, siblings)
 
-	var buf bytes.Buffer
-	if err := format.Node(&buf, fset, f); err != nil {
-		return nil, nil, fmt.Errorf("format %s: %w", path, err)
-	}
-	formatted, err := format.Source(buf.Bytes())
-	if err != nil {
-		return nil, nil, fmt.Errorf("gofmt %s: %w", path, err)
-	}
-
-	// Annotate anything the migrator could not convert with TODO(gotest-migrate)
-	// markers so nothing is silently skipped.
 	suiteNames := map[string]bool{}
 	for i := range plan.Suites {
 		suiteNames[plan.Suites[i].NewName] = true
 	}
-	formatted, err = annotateUnconverted(formatted, suiteNames)
-	if err != nil {
-		return nil, nil, fmt.Errorf("annotate %s: %w", path, err)
+	for _, nn := range siblings {
+		suiteNames[nn] = true
 	}
-	markers, err := countSourceMarkers(formatted)
+	formatted, markers, err := finish(fset, f, path, suiteNames)
 	if err != nil {
-		return nil, nil, fmt.Errorf("annotate %s: %w", path, err)
+		return nil, nil, err
 	}
 
 	var results []MigrateResult
@@ -1067,9 +1142,75 @@ func migrateSource(path string, src []byte) ([]MigrateResult, []byte, error) {
 	return results, formatted, nil
 }
 
+// migrateRefs finishes a file whose only change is its references to
+// renamed sibling suites; a helper taking one is annotated like a suite's.
+func migrateRefs(fset *token.FileSet, f *ast.File, path string, siblings map[string]string) ([]MigrateResult, []byte, error) {
+	suiteNames := map[string]bool{}
+	for _, nn := range siblings {
+		suiteNames[nn] = true
+	}
+	formatted, markers, err := finish(fset, f, path, suiteNames)
+	if err != nil {
+		return nil, nil, err
+	}
+	return []MigrateResult{{File: path, Markers: markers, RefsOnly: true}}, formatted, nil
+}
+
+// finish formats the transformed f, annotates anything the migrator could
+// not convert with TODO(gotest-migrate) markers so nothing is silently
+// skipped, and counts the markers the file is left with.
+func finish(fset *token.FileSet, f *ast.File, path string, suiteNames map[string]bool) ([]byte, int, error) {
+	var buf bytes.Buffer
+	if err := format.Node(&buf, fset, f); err != nil {
+		return nil, 0, fmt.Errorf("format %s: %w", path, err)
+	}
+	formatted, err := format.Source(buf.Bytes())
+	if err != nil {
+		return nil, 0, fmt.Errorf("gofmt %s: %w", path, err)
+	}
+	formatted, err = annotateUnconverted(formatted, suiteNames)
+	if err != nil {
+		return nil, 0, fmt.Errorf("annotate %s: %w", path, err)
+	}
+	markers, err := countSourceMarkers(formatted)
+	if err != nil {
+		return nil, 0, fmt.Errorf("annotate %s: %w", path, err)
+	}
+	return formatted, markers, nil
+}
+
+// packageRenames maps each package (directory and package clause) to the
+// suites its files rename, old name to new. A refused file renames nothing.
+func packageRenames(paths []string) (map[string]map[string]string, error) {
+	renames := map[string]map[string]string{}
+	for _, path := range paths {
+		f, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return nil, fmt.Errorf("parse %s: %w", path, err)
+		}
+		plan := AnalyzeFile(f)
+		if len(plan.Suites) == 0 || len(indirectEmbeddings(f, plan)) > 0 {
+			continue
+		}
+		key := packageKey(path, f)
+		if renames[key] == nil {
+			renames[key] = map[string]string{}
+		}
+		for i := range plan.Suites {
+			renames[key][plan.Suites[i].OldName] = plan.Suites[i].NewName
+		}
+	}
+	return renames, nil
+}
+
+func packageKey(path string, f *ast.File) string {
+	return filepath.Dir(path) + "\x00" + f.Name.Name
+}
+
 // MigratePackages walks directories matching patterns and migrates test files.
 func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 	var allResults []MigrateResult
+	var paths []string
 
 	for _, pattern := range patterns {
 		dir := pattern
@@ -1098,18 +1239,29 @@ func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 			if !strings.HasSuffix(d.Name(), "_test.go") {
 				return nil
 			}
-
-			results, err := migrateFile(path, opts)
-			if err != nil {
-				return fmt.Errorf("migrate %s: %w", path, err)
-			}
-			allResults = append(allResults, results...)
+			paths = append(paths, path)
 			return nil
 		})
 		if err != nil {
-			return allResults, err
+			return nil, err
 		}
 	}
 
+	// A file may refer to a suite another file of its package renames.
+	renames, err := packageRenames(paths)
+	if err != nil {
+		return nil, err
+	}
+	for _, path := range paths {
+		f, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.PackageClauseOnly)
+		if err != nil {
+			return allResults, fmt.Errorf("migrate %s: %w", path, err)
+		}
+		results, err := migrateFile(path, renames[packageKey(path, f)], opts)
+		if err != nil {
+			return allResults, fmt.Errorf("migrate %s: %w", path, err)
+		}
+		allResults = append(allResults, results...)
+	}
 	return allResults, nil
 }

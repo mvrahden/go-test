@@ -340,6 +340,87 @@ func (s *MigrateTestSuite) TestHelperAssertions(t *gotest.T) {
 	})
 }
 
+// typeRefSrc refers to its suite outside the suite's own methods.
+const typeRefSrc = `package sample
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type RefSuite struct {
+	suite.Suite
+}
+
+func (s *RefSuite) TestOK() {
+	check(s)
+}
+
+func check(s *RefSuite) *RefSuite {
+	s.Require().True(true)
+	return &RefSuite{}
+}
+
+func TestRefSuite(t *testing.T) {
+	suite.Run(t, new(RefSuite))
+}
+`
+
+// siblingRefSrc refers to typeRefSrc's suite from another file of the package.
+const siblingRefSrc = `package sample
+
+var _ = new(RefSuite)
+
+func other(s *RefSuite) {}
+`
+
+func (s *MigrateTestSuite) TestTypeReferences(t *gotest.T) {
+	t.When("a free function in the same file takes the suite", func(w *gotest.T) {
+		out := s.migrateSource(w, typeRefSrc)
+
+		w.It("renames every reference to the suite type", func(it *gotest.T) {
+			gotest.Contains(it, out, "func check(s *RefTestSuite) *RefTestSuite {")
+			gotest.Contains(it, out, "return &RefTestSuite{}")
+			gotest.NotContains(it, out, "RefSuite")
+		})
+
+		w.It("marks the helper's assertion, which has no t", func(it *gotest.T) {
+			gotest.Contains(it, out,
+				"\t// TODO(gotest-migrate): assertion True outside a migrated method — no t is in scope here; pass t in and rewrite as gotest.True(t, ...)\n\ts.Require().True(true)")
+		})
+	})
+
+	t.When("another file of the package refers to the suite", func(w *gotest.T) {
+		dir := w.TempDir()
+		suitePath := filepath.Join(dir, "ref_test.go")
+		siblingPath := filepath.Join(dir, "sibling_test.go")
+		gotest.NoError(w, os.WriteFile(suitePath, []byte(typeRefSrc), 0600))
+		gotest.NoError(w, os.WriteFile(siblingPath, []byte(siblingRefSrc), 0600))
+		results, err := migrate.MigratePackages([]string{dir}, migrate.Options{})
+		gotest.NoError(w, err)
+		got, err := os.ReadFile(siblingPath)
+		gotest.NoError(w, err)
+		sibling := string(got)
+
+		w.It("renames the references there too", func(it *gotest.T) {
+			gotest.Contains(it, sibling, "var _ = new(RefTestSuite)")
+			gotest.Contains(it, sibling, "func other(s *RefTestSuite) {}")
+		})
+
+		w.It("reports the file as updated, not as a suite", func(it *gotest.T) {
+			gotest.Len(it, results, 2)
+			var refs []string
+			for _, r := range results {
+				if r.RefsOnly {
+					refs = append(refs, r.File)
+				}
+			}
+			gotest.Equal(it, []string{siblingPath}, refs)
+		})
+	})
+}
+
 func (s *MigrateTestSuite) TestScopedRewrites(t *gotest.T) {
 	t.When("s.T() appears in a method that gained t and in a helper that did not", func(w *gotest.T) {
 		out := s.migrateSource(w, scopedSrc)

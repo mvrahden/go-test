@@ -135,6 +135,26 @@ func (s *MigrateCLITestSuite) TestRerun(t *gotest.T, ctx *migrateCtx) {
 	})
 }
 
+func (s *MigrateCLITestSuite) TestSiblingReference(t *gotest.T, ctx *migrateCtx) {
+	s.write(t, ctx, migrateCleanSrc)
+	sibling := filepath.Join(ctx.dir, "helper_test.go")
+	gotest.NoError(t, os.WriteFile(sibling, []byte("package sample\n\nfunc use(s *CleanSuite) {}\n"), 0o600))
+
+	stdout, stderr, code := s.cli.runSplitIn(t, ctx.dir, "migrate", ".")
+
+	t.It("lists the file whose references it renamed", func(it *gotest.T) {
+		gotest.Equal(it, 0, code, stdout+stderr)
+		gotest.Contains(it, stdout, "Migrated 1 suites:\n  helper_test.go: references to renamed suites updated\n  sample_test.go: CleanSuite → CleanTestSuite\n")
+		gotest.Empty(it, stderr)
+	})
+
+	t.It("renames the reference", func(it *gotest.T) {
+		got, err := os.ReadFile(sibling)
+		gotest.NoError(it, err)
+		gotest.Contains(it, string(got), "func use(s *CleanTestSuite) {}")
+	})
+}
+
 func (s *MigrateCLITestSuite) TestDryRun(t *gotest.T, ctx *migrateCtx) {
 	s.write(t, ctx, migrateMarkedSrc)
 	out, code := runGotestIn(t, s.cli.binary, ctx.dir, nil, "migrate", "--dry-run", ".")

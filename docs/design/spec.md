@@ -1073,7 +1073,7 @@ $ gotest migrate ./...
 ```
 
 Converts testify/suite tests:
-1. Renames suite struct to `*TestSuite` convention
+1. Renames suite struct to `*TestSuite` convention, along with every reference to it in the package's test files (a free helper taking the suite is annotated like one of its methods)
 2. Renames lifecycle hooks (`SetupSuite` → `BeforeAll`, `TearDownSuite` → `AfterAll`, etc.)
 3. Transforms assertion calls (`s.Require().Equal(a, b)` → `gotest.Equal(t, a, b)`)
 4. Removes `suite.Run` boilerplate, the `suite.Suite` embedding, and the testify and `testing` imports nothing references any more (a plain `*testing.T` helper that still calls `assert.X` keeps its imports)
