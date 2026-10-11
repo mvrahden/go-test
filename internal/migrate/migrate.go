@@ -416,25 +416,24 @@ func TransformFile(fset *token.FileSet, f *ast.File, plan MigrationPlan) {
 			renameReceiverType(d.Recv.List[0], oldToNew[recvTypeName])
 
 			// Rename lifecycle methods and add t parameter
-			gainedT := false
 			if newName, ok := lifecycleRenames[d.Name.Name]; ok {
 				d.Name.Name = newName
 				addGotestTParam(d)
-				gainedT = true
 			}
 
 			// Test methods: add t parameter
 			if strings.HasPrefix(d.Name.Name, "Test") {
 				addGotestTParam(d)
-				gainedT = true
 			}
 
-			// Rewrite assertions in the function body
-			if d.Body != nil {
+			// Rewrite assertions only where t is in scope, and s.T() only
+			// where t is a *gotest.T; the rest is left for a marker.
+			kind := tParamKind(d)
+			if d.Body != nil && kind != "" {
 				rewriteAssertions(d.Body, recvVarName, assertionMap)
-				if gainedT {
-					rewriteSTCalls(d.Body, recvVarName)
-				}
+			}
+			if d.Body != nil && kind == "gotest" {
+				rewriteSTCalls(d.Body, recvVarName)
 			}
 		}
 	}
@@ -695,12 +694,17 @@ func isRecvRunCall(n ast.Node, recvName string) bool {
 	return ok && ident.Name == recvName
 }
 
-// hasGotestTParam reports whether fd declares a t *gotest.T parameter.
-func hasGotestTParam(fd *ast.FuncDecl) bool {
+// tParamKind reports which t fd declares: "gotest" for t *gotest.T,
+// "testing" for t *testing.T, "" for none. Both take a gotest assertion; only
+// *gotest.T has the T() an s.T() becomes.
+func tParamKind(fd *ast.FuncDecl) string {
 	if fd.Type.Params == nil {
-		return false
+		return ""
 	}
 	for _, p := range fd.Type.Params.List {
+		if len(p.Names) == 0 || p.Names[0].Name != "t" {
+			continue
+		}
 		star, ok := p.Type.(*ast.StarExpr)
 		if !ok {
 			continue
@@ -709,11 +713,11 @@ func hasGotestTParam(fd *ast.FuncDecl) bool {
 		if !ok || sel.Sel.Name != "T" {
 			continue
 		}
-		if ident, ok := sel.X.(*ast.Ident); ok && ident.Name == "gotest" {
-			return true
+		if ident, ok := sel.X.(*ast.Ident); ok && (ident.Name == "gotest" || ident.Name == "testing") {
+			return ident.Name
 		}
 	}
-	return false
+	return ""
 }
 
 // todoAnnotation marks a line in the migrated output that needs a
@@ -727,8 +731,9 @@ type todoAnnotation struct {
 // returns the assertion method name if the call is a testify assertion the
 // migrator could not map. Recognized receiver forms: s.Require().X(...),
 // s.Assert().X(...), direct s.X(...) for known testify assertion names, and
-// package-level assert.X(...) / require.X(...).
-func unconvertedAssertionMsg(call *ast.CallExpr, recvName string) (string, bool) {
+// package-level assert.X(...) / require.X(...). Without t in scope even a
+// mapped s.Require().X(...) stays as it was.
+func unconvertedAssertionMsg(call *ast.CallExpr, recvName string, hasT bool) (string, bool) {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
 		return "", false
@@ -738,8 +743,9 @@ func unconvertedAssertionMsg(call *ast.CallExpr, recvName string) (string, bool)
 
 	switch x := sel.X.(type) {
 	case *ast.CallExpr:
-		// s.Require().X(...) or s.Assert().X(...) — mapped names are rewritten.
-		if mapped {
+		// s.Require().X(...) or s.Assert().X(...) — mapped names are rewritten
+		// where t is in scope.
+		if mapped && hasT {
 			return "", false
 		}
 		innerSel, ok := x.Fun.(*ast.SelectorExpr)
@@ -750,9 +756,13 @@ func unconvertedAssertionMsg(call *ast.CallExpr, recvName string) (string, bool)
 		if !ok || ident.Name != recvName {
 			return "", false
 		}
-		if innerSel.Sel.Name == "Require" || innerSel.Sel.Name == "Assert" {
-			return "unmapped assertion " + name + " — convert manually", true
+		if innerSel.Sel.Name != "Require" && innerSel.Sel.Name != "Assert" {
+			return "", false
 		}
+		if mapped {
+			return "assertion " + name + " outside a migrated method — no t is in scope here; pass t in and rewrite as gotest." + gotestName + "(t, ...)", true
+		}
+		return "unmapped assertion " + name + " — convert manually", true
 	case *ast.Ident:
 		// assert.X(...) or require.X(...) — mapped names are rewritten.
 		if x.Name == "assert" || x.Name == "require" {
@@ -820,20 +830,24 @@ func annotateUnconverted(src []byte, suiteNames map[string]bool) ([]byte, error)
 		if fd.Body == nil {
 			continue
 		}
-		hasT := hasGotestTParam(fd)
+		kind := tParamKind(fd)
 		ast.Inspect(fd.Body, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
 			if !ok {
 				return true
 			}
-			if msg, found := unconvertedAssertionMsg(call, recvVarName); found {
+			if msg, found := unconvertedAssertionMsg(call, recvVarName, kind != ""); found {
 				add(call.Pos(), msg)
 			}
 			if isRecvRunCall(call, recvVarName) {
 				add(call.Pos(), recvVarName+".Run has no gotest equivalent — use t.When or t.It")
 			}
-			if !hasT && stCallReceiver(call, recvVarName) != nil {
-				add(call.Pos(), recvVarName+".T() outside a migrated method — no t is in scope here")
+			if kind != "gotest" && stCallReceiver(call, recvVarName) != nil {
+				msg := recvVarName + ".T() outside a migrated method — no t is in scope here"
+				if kind == "testing" {
+					msg = recvVarName + ".T() where t is a *testing.T — use t"
+				}
+				add(call.Pos(), msg)
 			}
 			return true
 		})

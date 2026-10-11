@@ -1078,7 +1078,7 @@ Converts testify/suite tests:
 3. Transforms assertion calls (`s.Require().Equal(a, b)` → `gotest.Equal(t, a, b)`)
 4. Removes `suite.Run` boilerplate, the `suite.Suite` embedding, and the testify and `testing` imports nothing references any more (a plain `*testing.T` helper that still calls `assert.X` keeps its imports)
 5. Injects the `t *gotest.T` parameter into lifecycle and test methods; rewrites `s.T()` to `t.T()` inside those methods
-6. Transforms both `s.Require().X(...)`/`s.Assert().X(...)` chains and `assert.X(s.T(), ...)`/`require.X(...)` forms
+6. Transforms both `s.Require().X(...)`/`s.Assert().X(...)` chains and `assert.X(s.T(), ...)`/`require.X(...)` forms wherever a `t` is in scope: a method that gained `t`, or a helper that already takes `t *testing.T`
 
 Not converted: direct embedded-suite calls (`s.Equal(...)`) — the removed `suite.Suite` embedding makes them compile errors, and they are annotated with a rewrite hint.
 
@@ -1088,7 +1088,8 @@ Anything the tool cannot convert is annotated in place, so nothing is silently s
 - `// TODO(gotest-migrate): unmapped assertion <Name> — convert manually` above assertion calls outside the mapping table (e.g. `ErrorAs`, `Eventually`, `InDelta`)
 - `// TODO(gotest-migrate): unconverted assertion <Name> — embedded-suite call; rewrite as gotest.<Name>(t, ...)` above direct embedded-suite calls with mapped names
 - `// TODO(gotest-migrate): s.Run has no gotest equivalent — use t.When or t.It` above testify subtests, which are left in place
-- `// TODO(gotest-migrate): s.T() outside a migrated method — no t is in scope here` above an `s.T()` in a helper; only methods that gained `t` have theirs rewritten to `t.T()`
+- `// TODO(gotest-migrate): s.T() outside a migrated method — no t is in scope here` above an `s.T()` in a helper; only methods that gained `t` have theirs rewritten to `t.T()` (in a helper taking `t *testing.T` the marker reads `s.T() where t is a *testing.T — use t`)
+- `// TODO(gotest-migrate): assertion <Name> outside a migrated method — no t is in scope here; pass t in and rewrite as gotest.<Name>(t, ...)` above a mapped `s.Require().X(...)` in a helper without `t`, which is left as it was
 - `// TODO(gotest-migrate): <Child> embeds <Base>, not suite.Suite — migrate this file by hand` above a suite that embeds another suite; the file is refused whole, since renaming the base would strand the child
 
 Exit codes: 0 when every suite converted cleanly, 1 while any marker is left, including one an earlier run placed in a file it no longer needs to convert (the run reports how many), 2 when a pattern names no existing path, a file could not be parsed or written, or a flag is unknown. `--dry-run` prints the unified diff of every edit to stdout, writes nothing, and exits the same way.

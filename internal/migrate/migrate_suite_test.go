@@ -279,6 +279,67 @@ func (s *MigrateTestSuite) TestImports(t *gotest.T) {
 	})
 }
 
+// helperAssertSrc asserts from a helper without t and from one that takes
+// a *testing.T.
+const helperAssertSrc = `package sample
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type HelperSuite struct {
+	suite.Suite
+}
+
+func (s *HelperSuite) helper() {
+	s.T().Log("x")
+	s.Require().True(true)
+}
+
+func (s *HelperSuite) check(t *testing.T) {
+	s.Require().Equal(1, 1)
+	s.T().Log("y")
+}
+
+func (s *HelperSuite) TestA() {
+	s.helper()
+	s.check(s.T())
+}
+
+func TestHelperSuite(t *testing.T) {
+	suite.Run(t, new(HelperSuite))
+}
+`
+
+func (s *MigrateTestSuite) TestHelperAssertions(t *gotest.T) {
+	out := s.migrateSource(t, helperAssertSrc)
+
+	t.When("a helper has no t in scope", func(w *gotest.T) {
+		w.It("leaves its assertion unrewritten and marks it", func(it *gotest.T) {
+			gotest.Contains(it, out,
+				"\t// TODO(gotest-migrate): assertion True outside a migrated method — no t is in scope here; pass t in and rewrite as gotest.True(t, ...)\n\ts.Require().True(true)")
+			gotest.NotContains(it, out, "gotest.True(t, true)")
+		})
+	})
+
+	t.When("a helper takes t *testing.T", func(w *gotest.T) {
+		w.It("rewrites its assertion against that t", func(it *gotest.T) {
+			gotest.Contains(it, out, "func (s *HelperTestSuite) check(t *testing.T) {\n\tgotest.Equal(t, 1, 1)")
+		})
+
+		w.It("marks its s.T(), which has no t.T() to become", func(it *gotest.T) {
+			gotest.Contains(it, out,
+				"\t// TODO(gotest-migrate): s.T() where t is a *testing.T — use t\n\ts.T().Log(\"y\")")
+		})
+	})
+
+	t.It("still rewrites s.T() in the test method", func(it *gotest.T) {
+		gotest.Contains(it, out, "s.check(t.T())")
+	})
+}
+
 func (s *MigrateTestSuite) TestScopedRewrites(t *gotest.T) {
 	t.When("s.T() appears in a method that gained t and in a helper that did not", func(w *gotest.T) {
 		out := s.migrateSource(w, scopedSrc)
