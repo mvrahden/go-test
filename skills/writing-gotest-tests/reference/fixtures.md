@@ -17,6 +17,10 @@ suites; setup that must happen once per run belongs in a shared fixture. A
 suite sets up only the fixtures it binds and their dependencies (v1.32+),
 so an unrelated fixture never fails it.
 
+Unlike a suite's, a fixture's `AfterAll` runs only after its `BeforeAll`
+succeeded (or overran): a `BeforeAll` that fails midway must release what
+it acquired before returning its error.
+
 Package fixtures may also define per-test hooks — `BeforeEach(ctx
 context.Context) error` / `AfterEach(ctx context.Context) error` — with the
 same signatures as the All hooks.
@@ -36,8 +40,13 @@ setup subprocess cannot import `internal/` paths.
 
 Timeouts: `FixtureConfig()` marker, literal semantics (see `config.md`).
 A DECLARED `Timeout` is a verdict, not advice: it bounds the hook's
-context AND fails the fixture when `BeforeAll` or `AfterAll` outlives it —
-even when the hook ignores its context. No marker → context bounds only;
+context AND fails the fixture when `BeforeAll` or `AfterAll` returns after
+it — even when the hook ignores its context. A hook that never returns is
+not failed by it; other deadlines end it and fail the run: for a package
+fixture the test binary's `-timeout` (gotest passes 10m unless you set
+one), for a shared fixture `--setup-timeout` (default 2m) on `BeforeAll`
+and a force-kill after its teardown budget on `AfterAll`. No marker →
+context bounds only;
 a fixture is never failed against a number its author did not write. A
 setup that returns success only after overrunning its budget is not
 retried (the work completed; a retry would build a second set of

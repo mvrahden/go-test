@@ -164,6 +164,9 @@ parallel suites, or structural problems — those are your job, below.
    `wait := gotest.Go(…); defer wait()` is the one `defer` that belongs in
    a test, and only for work that finishes on its own — never wait in the
    test on a server or poller that `AfterEach` stops (it deadlocks).
+   A suite's `AfterAll` runs even when its `BeforeAll` failed or panicked
+   midway, so release only what was actually set up — nil-check each
+   field.
 3. **Do not imitate existing tests blindly.** Observed failure: agents copy
    a repo's existing `SuiteConfig()` verbatim, propagating anti-patterns. A
    `SuiteConfig()` marker states *intent*: omit it entirely for defaults.
@@ -189,7 +192,10 @@ parallel suites, or structural problems — those are your job, below.
    ```
 
    Every test method then takes `(t *gotest.T, ctx *shopCtx)` — the
-   generator enforces this. Legitimate reasons to stay sequential: `Setenv`
+   generator enforces this, and rejects a `BeforeEach` that returns
+   nothing in a parallel suite. It cannot see methods writing suite
+   fields — with no `BeforeEach`, or beside a returning one: that
+   compiles, and races. Legitimate reasons to stay sequential: `Setenv`
    (panics in parallel tests), shared live resources without per-test
    keys/schemas (`-race` is process-local and cannot see datastore
    contention — it is necessary, not sufficient).
@@ -202,7 +208,9 @@ parallel suites, or structural problems — those are your job, below.
    (`It`, `When`, `Context`, `TempDir`, `Setenv`, `Skipf`, `Errorf`,
    `FailNow`) covers the need — never for `t.T().Context()`, which carries
    no suite `Timeout` (v1.33+: `t-escape` flags it, `-fix` writes
-   `t.Context()`).
+   `t.Context()`). There is no `Log`: context goes into an assertion's
+   message arguments (`gotest.Equal(t, want, got, "order %s", id)`), and
+   `t-escape` flags `t.T().Log`.
 7. **Ask "why is this wall-clock-asserting suite NOT Exclusive?"
    (v1.27+)** — the counterpart to rule 4. A suite whose assertions or
    timeout budgets measure elapsed time (latency bounds, timing budgets,

@@ -32,9 +32,12 @@ Native engine types pass through. A struct, a named type over a native
 one, a pointer, a fixed-size array or a slice fans out at generation time
 into one engine argument per leaf field and is reassembled before each
 execution, so the mutator works field by field. Refused at generation
-time, with the alternative named: unexported fields (fuzz the constructor's
-input or a local wrapper struct), maps (a slice of pairs), interfaces,
-channels, funcs, recursive types, `time.Time` (an `int64`). Two values as
+time, with the reason: unexported fields (fuzz the constructor's
+input or a local wrapper struct) — which rules out `time.Time` and most
+library structs; maps (a slice of key/value pairs); complex numbers (two
+floats); type parameters (instantiate the suite with a concrete type);
+interfaces, channels, funcs, `uintptr`, unsafe pointers and recursive
+types. Two values as
 arguments and two values in a struct fuzz identically; choose what reads
 better.
 

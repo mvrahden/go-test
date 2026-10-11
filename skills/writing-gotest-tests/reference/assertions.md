@@ -15,7 +15,7 @@ when it rewrites a `True(t, a == b)` or a guard into one.
 | Assertion | Notes |
 |---|---|
 | `Equal[V]` / `NotEqual[V]` | typed; large values render expanded with a line diff |
-| `Same[V]` / `NotSame[V]` | pointer identity on `*V`; `Equal` on pointers compares structure, and `assertion-simplify` rewrites `True(t, p == q)` to this |
+| `Same[V]` / `NotSame[V]` | v1.30.2+; pointer identity on `*V`; `Equal` on pointers compares structure, and `assertion-simplify` rewrites `True(t, p == q)` to this |
 | `NoError` / `Error` | error presence |
 | `ErrorIs` / `ErrorAs[E]` / `ErrorContains` | prefer over `Error`+string poking; `ErrorContains` fails on nil error |
 | `True` / `False` | last resort — the `assertion-simplify` lint rule rewrites `True(t, x != nil)` and friends |

@@ -136,6 +136,16 @@ Rules and sections tagged **v1.30+** need v1.30.0 or newer. What v1.30 adds:
    it (expressiveness tier) and `lint -fix` spells it `gotest.NoDeadline`.
    The rewrite keeps the meaning. Below v1.30 it is not reported.
 
+From **v1.30.2**:
+
+4. **`Same`/`NotSame`** — pointer identity assertions; `assertion-simplify`
+   rewrites `True(t, p == q)` to them. Below v1.30.2 they do not exist.
+5. **`migrate` exits 1 while a `TODO(gotest-migrate)` marker is left, and
+   `--dry-run` previews** — below v1.30.2 it exits 0 with markers left and
+   has no `--dry-run`.
+6. **`.gotest.yml` rejects unknown keys** — a misspelled key is an error
+   instead of being ignored.
+
 ## v1.32
 
 Rules and sections tagged **v1.32+** need v1.32.0 or newer. What v1.32 changes:
