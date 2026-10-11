@@ -3,6 +3,7 @@ package main_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/gotestcli"
@@ -144,7 +145,7 @@ func (s *MigrateCLITestSuite) TestSiblingReference(t *gotest.T, ctx *migrateCtx)
 
 	t.It("lists the file whose references it renamed", func(it *gotest.T) {
 		gotest.Equal(it, 0, code, stdout+stderr)
-		gotest.Contains(it, stdout, "Migrated 1 suites:\n  helper_test.go: references to renamed suites updated\n  sample_test.go: CleanSuite → CleanTestSuite\n")
+		gotest.Contains(it, stdout, "Migrated 1 suites:\n  helper_test.go: updated for suites other files declare\n  sample_test.go: CleanSuite → CleanTestSuite\n")
 		gotest.Empty(it, stderr)
 	})
 
@@ -152,6 +153,56 @@ func (s *MigrateCLITestSuite) TestSiblingReference(t *gotest.T, ctx *migrateCtx)
 		got, err := os.ReadFile(sibling)
 		gotest.NoError(it, err)
 		gotest.Contains(it, string(got), "func use(s *CleanTestSuite) {}")
+	})
+}
+
+// migrateSplit spreads one suite over three files: the struct, its hooks
+// and test, and its runner.
+var migrateSplit = map[string]string{
+	"suite_test.go":   "package sample\n\nimport \"github.com/stretchr/testify/suite\"\n\ntype SplitSuite struct {\n\tsuite.Suite\n\tn int\n}\n",
+	"methods_test.go": "package sample\n\nfunc (s *SplitSuite) SetupTest() { s.n = 1 }\n\nfunc (s *SplitSuite) TestOK() {\n\ts.Require().Equal(1, s.n)\n}\n",
+	"runner_test.go":  "package sample\n\nimport (\n\t\"testing\"\n\n\t\"github.com/stretchr/testify/suite\"\n)\n\nfunc TestSplitSuite(t *testing.T) {\n\tsuite.Run(t, new(SplitSuite))\n}\n",
+}
+
+func (s *MigrateCLITestSuite) TestSiblingFiles(t *gotest.T, ctx *migrateCtx) {
+	for name, src := range migrateSplit {
+		gotest.NoError(t, os.WriteFile(filepath.Join(ctx.dir, name), []byte(src), 0o600))
+	}
+
+	stdout, stderr, code := s.cli.runSplitIn(t, ctx.dir, "migrate", ".")
+	read := func(it *gotest.T, name string) string {
+		got, err := os.ReadFile(filepath.Join(ctx.dir, name))
+		gotest.NoError(it, err)
+		return string(got)
+	}
+
+	t.It("converts the suite wherever its parts are declared and exits 0", func(it *gotest.T) {
+		gotest.Equal(it, 0, code, stdout+stderr)
+		gotest.Equal(it, "Migrated 1 suites:\n  methods_test.go: updated for suites other files declare\n  runner_test.go: updated for suites other files declare\n  suite_test.go: SplitSuite → SplitTestSuite\n", stdout)
+		gotest.Empty(it, stderr)
+	})
+
+	t.It("renames the hook and gives the test t", func(it *gotest.T) {
+		methods := read(it, "methods_test.go")
+		gotest.Contains(it, methods, "func (s *SplitTestSuite) BeforeEach(t *gotest.T) { s.n = 1 }")
+		gotest.Contains(it, methods, "func (s *SplitTestSuite) TestOK(t *gotest.T) {\n\tgotest.Equal(t, 1, s.n)")
+	})
+
+	t.It("removes the runner from its file", func(it *gotest.T) {
+		gotest.Equal(it, "package sample\n", read(it, "runner_test.go"))
+	})
+}
+
+func (s *MigrateCLITestSuite) TestOverlappingPatterns(t *gotest.T, ctx *migrateCtx) {
+	s.write(t, ctx, migrateCleanSrc)
+
+	stdout, stderr, code := s.cli.runSplitIn(t, ctx.dir, "migrate", "--dry-run", ".", "./...")
+
+	t.It("migrates the file both patterns name once", func(it *gotest.T) {
+		gotest.Equal(it, 0, code, stdout+stderr)
+		gotest.Equal(it, 1, strings.Count(stdout, "+++ b/sample_test.go"))
+		gotest.Equal(it, 1, strings.Count(stdout, "CleanSuite → CleanTestSuite"))
+		gotest.Empty(it, stderr)
 	})
 }
 

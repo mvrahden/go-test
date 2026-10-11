@@ -51,7 +51,7 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		case r.Refusal != "":
 			lines = append(lines, fmt.Sprintf("  %s: refused: %s", r.File, r.Refusal))
 		case r.RefsOnly:
-			lines = append(lines, fmt.Sprintf("  %s: references to renamed suites updated", r.File))
+			lines = append(lines, fmt.Sprintf("  %s: updated for suites other files declare", r.File))
 		case r.OldName == "":
 			// No suite left to convert; only an earlier run's markers.
 			leftover = append(leftover, fmt.Sprintf("  %s: %d marker%s", r.File, r.Markers, plural(r.Markers)))

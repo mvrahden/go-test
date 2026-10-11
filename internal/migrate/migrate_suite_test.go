@@ -230,6 +230,72 @@ func TestOrderSuite(t *testing.T) {
 }
 `
 
+// shadowedImportSrc names a local variable like the testify packages, and a
+// plain helper still uses the dot-imported assert.
+const shadowedImportSrc = `package sample
+
+import (
+	"testing"
+
+	. "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+)
+
+import "strings"
+
+type item struct{ name string }
+
+type ShadowSuite struct {
+	suite.Suite
+}
+
+func (s *ShadowSuite) TestNames() {
+	require.NotEmpty(s.T(), "x")
+	for _, suite := range []item{{name: "x"}} {
+		require := item{name: strings.ToUpper(suite.name)}
+		s.Require().Equal("X", require.name)
+	}
+}
+
+func plain(t *testing.T) {
+	Equal(t, 1, 1)
+}
+
+func TestShadowSuite(t *testing.T) {
+	suite.Run(t, new(ShadowSuite))
+}
+`
+
+func (s *MigrateTestSuite) TestImportResolution(t *gotest.T) {
+	out := s.migrateSource(t, shadowedImportSrc)
+
+	t.When("a local variable is named like a testify package", func(w *gotest.T) {
+		w.It("drops the imports only that variable spelled", func(it *gotest.T) {
+			gotest.NotContains(it, out, `"github.com/stretchr/testify/suite"`)
+			gotest.NotContains(it, out, `"github.com/stretchr/testify/require"`)
+		})
+	})
+
+	t.When("a dot-imported assertion is still called", func(w *gotest.T) {
+		w.It("keeps the dot import", func(it *gotest.T) {
+			gotest.Contains(it, out, `. "github.com/stretchr/testify/assert"`)
+			gotest.Contains(it, out, "\tEqual(t, 1, 1)")
+		})
+	})
+
+	t.When("the file has several import blocks", func(w *gotest.T) {
+		w.It("adds the gotest import once", func(it *gotest.T) {
+			gotest.Equal(it, 1, strings.Count(out, `"github.com/mvrahden/go-test/pkg/gotest"`))
+		})
+	})
+
+	t.It("produces source that parses", func(it *gotest.T) {
+		_, err := parser.ParseFile(token.NewFileSet(), "sample_test.go", out, parser.ParseComments)
+		gotest.NoError(it, err)
+	})
+}
+
 // sharedImportSrc keeps a plain *testing.T helper that still calls assert.
 const sharedImportSrc = `package sample
 

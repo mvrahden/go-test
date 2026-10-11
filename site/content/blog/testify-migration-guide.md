@@ -35,7 +35,7 @@ aliases: ["/blog/testify-migration-guide.html"]
 `gotest migrate` handles the mechanical bulk of the transformation. Four patterns are flagged with `// TODO(gotest-migrate)` comments — or left to the compiler — instead of being silently rewritten:
 
 - **Assertions called directly on the suite.** `s.Equal(a, b)`, `s.Contains(...)` — calls through the embedded `suite.Suite` — are left in place with a TODO naming the `gotest.*` replacement.
-- **Custom suite helpers.** Methods that aren't lifecycle hooks or test methods keep their shape; the tool doesn't add a `t *gotest.T` parameter to them, so rewritten assertions inside them need you to thread `t` through.
+- **Custom suite helpers.** Methods that aren't lifecycle hooks or test methods keep their shape; the tool doesn't add a `t *gotest.T` parameter to them, so their assertions and `s.T()` calls stay as written, each with a TODO, until you thread `t` through.
 - **`BeforeTest` / `AfterTest` / `SetupSubTest` / `TearDownSubTest`.** testify's per-test-name and subtest-level hooks have no direct gotest equivalent.
 - **Testify assertions outside suite methods.** `assert.*`/`require.*` calls in standalone functions aren't converted.
 
@@ -198,28 +198,29 @@ $ gotest migrate ./pkg/user
 
 There is no dry-run mode — the tool writes rewritten files directly. Run it on a clean git tree and use `git diff` to review every change (and `git checkout` to back out).
 
-The tool performs an AST-level transformation, not a text find-and-replace. It parses your Go source files, identifies testify/suite patterns, and rewrites them while preserving comments, formatting, and non-suite code in the same file.
+The tool performs an AST-level transformation, not a text find-and-replace. It parses your Go source files, identifies testify/suite patterns, and rewrites them while preserving comments, formatting, and non-suite code in the same file. A package is migrated as a whole: hooks, test methods and helpers are converted in whichever test file declares them, not only in the file that declares the suite struct.
 
 ### What the tool handles
 
 The migration tool covers the common cases that make up the bulk of a typical migration:
 
-1. **Renames the suite struct** to follow the `*TestSuite` convention.
+1. **Renames the suite struct** to follow the `*TestSuite` convention, along with every reference to it: in any test file of the package and from its external `_test` package. A field or variable that merely shares the name is left alone.
 1. **Renames lifecycle hooks:** `SetupSuite` to `BeforeAll`, `TearDownSuite` to `AfterAll`, `SetupTest` to `BeforeEach`, `TearDownTest` to `AfterEach`.
 1. **Transforms assertion calls:** `s.Require().Equal(a, b)` and `s.Assert().Equal(a, b)` become `gotest.Equal(t, a, b)`, as do `require.Equal(s.T(), a, b)`-style calls inside suite methods. Direct `s.Equal(a, b)` calls are annotated with a TODO instead (see below).
 1. **Removes the `suite.Suite` embed** from the struct.
-1. **Removes the `suite.Run` boilerplate** function.
-1. **Updates imports:** removes `testify/suite`, adds `gotest`.
+1. **Removes the `suite.Run` boilerplate** function, in whichever file it lives. A runner that does more than call `suite.Run` (an environment check, say) is kept, with a TODO on its `suite.Run`.
+1. **Updates imports:** adds `gotest` and removes the testify and `testing` imports nothing in the file uses any more.
 
 ### What needs manual review
 
 The tool handles the 90% case. For the remaining edge cases, it leaves `// TODO(gotest-migrate)` comments so you can find and address them:
 
 - **Assertions called directly on the suite.** `s.Equal(...)`, `s.Contains(...)` — testify's assert-flavored calls through the embedded `suite.Suite` — are left as written, each with a TODO naming the `gotest.*` replacement. Since the embedding is removed, they won't compile until you convert them.
-- **Custom helper methods on the suite.** Methods that aren't lifecycle hooks or test methods don't get a `t *gotest.T` parameter added. Assertion calls inside them are still rewritten to `gotest.*(t, ...)`, so you need to thread a `t` parameter through yourself. The same applies to `s.T()` handoffs, which the tool rewrites to `t.T()` everywhere.
-- **Testify assertions outside suite methods.** `assert.*` or `require.*` calls in standalone functions aren't converted — but the testify imports in a migrated file are removed, so the compiler will point you at every remaining call. Replace them with the equivalent `gotest.*` functions. (Inside suite methods, `assert.Equal(s.T(), ...)`-style calls are converted automatically.)
+- **Custom helper methods on the suite.** Methods that aren't lifecycle hooks or test methods don't get a `t *gotest.T` parameter added, so there is no `t` to rewrite against: their assertion calls and `s.T()` handoffs are left as written, each with a TODO. Thread a `t` parameter through and convert them. A helper that already takes `t *testing.T` has its assertions rewritten against that `t`; its `s.T()` calls get a TODO to use `t` directly. Only lifecycle and test methods, which gain `t *gotest.T`, have `s.T()` rewritten to `t.T()`.
+- **Testify assertions outside suite methods.** `assert.*` or `require.*` calls in standalone functions aren't converted, and the testify import they need stays, so the file still compiles. Replace them with the equivalent `gotest.*` functions when you get to them; `gotest lint` flags the remaining testify imports. (Inside suite methods, `assert.Equal(s.T(), ...)`-style calls are converted automatically.)
 - **`BeforeTest` / `AfterTest`.** testify has additional per-test hooks that receive the suite and test names as parameters: `BeforeTest(suiteName, testName string)` and `AfterTest(suiteName, testName string)`. These have no direct gotest equivalent and need manual conversion.
 - **`SetupSubTest` / `TearDownSubTest`.** testify/suite has subtest-level hooks that gotest doesn't map to directly. These are flagged for manual review.
+- **Suites embedded in other structs.** A struct that embeds a suite would be stranded if the suite were renamed, so the files declaring both are left untouched apart from a TODO, along with any suite those files declare or use.
 
 ## Assertions: the biggest diff
 

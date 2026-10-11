@@ -1072,17 +1072,17 @@ Uses `packages.Load` for type introspection.
 $ gotest migrate ./...
 ```
 
-Converts testify/suite tests:
-1. Renames suite struct to `*TestSuite` convention, along with every reference to it in the package's test files (a free helper taking the suite is annotated like one of its methods)
+Converts testify/suite tests. A directory's test files are migrated together, the package's own and its external `_test` package: a suite's methods, runner and helpers are converted in whichever of those files declares them.
+1. Renames suite struct to `*TestSuite` convention, along with every identifier that resolves to it (an external `_test` package's `pkg.XSuite` included); a struct field, composite-literal key or local variable spelled the same is left alone. A free helper taking the suite is annotated like one of its methods
 2. Renames lifecycle hooks (`SetupSuite` → `BeforeAll`, `TearDownSuite` → `AfterAll`, etc.)
 3. Transforms assertion calls (`s.Require().Equal(a, b)` → `gotest.Equal(t, a, b)`)
-4. Removes `suite.Run` boilerplate, the `suite.Suite` embedding, and the testify and `testing` imports nothing references any more (a plain `*testing.T` helper that still calls `assert.X` keeps its imports)
+4. Removes the `suite.Suite` embedding and every runner that does nothing but `suite.Run(t, new(S))` or `suite.Run(t, &S{})` (a `t.Parallel()` aside), and drops the testify and `testing` imports nothing refers to any more. Only an identifier that resolves to the import counts: a local variable named `suite` is not the package, and a dot import stays while a name it provides is still used (a plain `*testing.T` helper that still calls `assert.X` keeps its imports)
 5. Injects the `t *gotest.T` parameter into lifecycle and test methods; rewrites `s.T()` to `t.T()` inside those methods
 6. Transforms both `s.Require().X(...)`/`s.Assert().X(...)` chains and `assert.X(s.T(), ...)`/`require.X(...)` forms wherever a `t` is in scope: a method that gained `t`, or a helper that already takes `t *testing.T`
 
 Not converted: direct embedded-suite calls (`s.Equal(...)`) — the removed `suite.Suite` embedding makes them compile errors, and they are annotated with a rewrite hint.
 
-Anything the tool cannot convert is annotated in place, so nothing is silently skipped:
+Anything the tool cannot convert is annotated in place, so nothing is silently skipped. The markers are placed by resolving the migrated code again, so a line that no longer compiles carries one:
 
 - `// TODO(gotest-migrate): unsupported testify hook <Name> — convert manually` above unconverted lifecycle hooks (`SetupSubTest`, `TearDownSubTest`, `BeforeTest`, `AfterTest`, `HandleStats`)
 - `// TODO(gotest-migrate): unmapped assertion <Name> — convert manually` above assertion calls outside the mapping table (e.g. `ErrorAs`, `Eventually`, `InDelta`)
@@ -1090,7 +1090,9 @@ Anything the tool cannot convert is annotated in place, so nothing is silently s
 - `// TODO(gotest-migrate): s.Run has no gotest equivalent — use t.When or t.It` above testify subtests, which are left in place
 - `// TODO(gotest-migrate): s.T() outside a migrated method — no t is in scope here` above an `s.T()` in a helper; only methods that gained `t` have theirs rewritten to `t.T()` (in a helper taking `t *testing.T` the marker reads `s.T() where t is a *testing.T — use t`)
 - `// TODO(gotest-migrate): assertion <Name> outside a migrated method — no t is in scope here; pass t in and rewrite as gotest.<Name>(t, ...)` above a mapped `s.Require().X(...)` in a helper without `t`, which is left as it was
-- `// TODO(gotest-migrate): <Child> embeds <Base>, not suite.Suite — migrate this file by hand` above a suite that embeds another suite; the file is refused whole, since renaming the base would strand the child
+- `// TODO(gotest-migrate): s.<Name> came from the suite.Suite embedding, which is gone — convert manually` above any other use of what the embedding provided, such as `r := s.Require()`
+- `// TODO(gotest-migrate): suite.Run cannot run a gotest suite — gotest generates the runner; move what <Func> sets up into the suite (BeforeAll, SuiteGuard) and delete it` above the `suite.Run` of a runner that does more than run a migrated suite, such as a guard or field values for the suite, which is left in place
+- `// TODO(gotest-migrate): <Child> embeds <Base>, not suite.Suite — migrate this file by hand` above a struct that embeds a suite. Renaming the base would strand the child, so the base is not migrated anywhere: the files declaring the child and the base are refused whole, and so is every suite those files declare or refer to. A refused file without a marker of its own names the suite that holds it back (`<Base> is embedded by <Child> in <file>`, `<Suite> is used in <file>, which is left for hand migration`); a suite whose new name is already declared is refused the same way
 
 Exit codes: 0 when every suite converted cleanly, 1 while any marker is left, including one an earlier run placed in a file it no longer needs to convert (the run reports how many), 2 when a pattern names no existing path, a file could not be parsed or written, or a flag is unknown. `--dry-run` prints the unified diff of every edit to stdout, writes nothing, and exits the same way.
 
