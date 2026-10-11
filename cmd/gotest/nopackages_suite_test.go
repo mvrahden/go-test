@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -127,4 +128,19 @@ func (s *NoPackagesTestSuite) TestWatchKeepsWatching(t *gotest.T) {
 	gotest.NoError(t, err)
 	gotest.Equal(t, `{"Action":"watch-error","Output":"\"`+nogo+`\" matched no packages"}`+"\n", line)
 	gotest.False(t, exited, "watch exited instead of watching")
+}
+
+// TestANonexistentDirectory names a path that does not exist: it fails to
+// load, a build failure with go test's own diagnostic.
+func (s *NoPackagesTestSuite) TestANonexistentDirectory(t *gotest.T) {
+	const missing = "./cmd/gotest/testdata/unrun/nosuchdir/..."
+	stdout, stderr, code := s.cli.runSplit(t, missing)
+
+	t.It("exits 2 with a failed package", func(it *gotest.T) {
+		gotest.Equal(it, 2, code, "stderr:\n%s", stderr)
+		gotest.Equal(it, "FAIL\t"+missing+" [build failed]\nFAIL\n", stdout)
+	})
+	t.It("prints the diagnostic as go test does, without a position placeholder", func(it *gotest.T) {
+		gotest.Regexp(it, `^# `+regexp.QuoteMeta(missing)+`\npattern `+regexp.QuoteMeta(missing)+`: `, stderr)
+	})
 }

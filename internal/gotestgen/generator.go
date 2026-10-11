@@ -199,6 +199,10 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 					continue
 				}
 				msg := e.Error()
+				if e.Pos == "" {
+					// go test prints a position-less error bare, not as "-: msg".
+					msg = e.Msg
+				}
 				if !brokenMsgSeen[pkgPath][msg] {
 					brokenMsgSeen[pkgPath][msg] = true
 					bp.Errors = append(bp.Errors, msg)
