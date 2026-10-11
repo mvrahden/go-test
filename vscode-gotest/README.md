@@ -173,6 +173,11 @@ Generate test suite skeletons from existing code:
 
 The generated file opens automatically and discovery refreshes.
 
+### Copilot Chat skill
+
+The extension ships the `writing-gotest-tests` [agent skill](https://github.com/mvrahden/go-test/tree/main/skills/writing-gotest-tests) to Copilot Chat in workspaces where gotest is active.
+Copilot loads it when a chat request is about writing, fixing or migrating gotest suites, so the agent follows gotest's lifecycle, assertion and CLI rules instead of stdlib or testify habits.
+
 ### Multi-root workspaces
 
 Fully supported.
