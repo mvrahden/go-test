@@ -1,0 +1,6 @@
+{"Action":"start","Package":"example.com/notestfiles"}
+{"Action":"output","Output":"?   \texample.com/notestfiles\t[no test files]\n","Package":"example.com/notestfiles"}
+{"Action":"skip","Elapsed":0,"Package":"example.com/notestfiles"}
+{"Action":"start","Package":"example.com/nosuites"}
+{"Action":"output","Output":"?   \texample.com/nosuites\t[no suites]\n","Package":"example.com/nosuites"}
+{"Action":"skip","Elapsed":0,"Package":"example.com/nosuites"}

@@ -1,0 +1,15 @@
+{"Action":"start","Package":"example.com/excluded"}
+{"Action":"run","Package":"example.com/excluded","Test":"TestX_ExcludedTestSuite"}
+{"Action":"output","Output":"--- SKIP: TestX_ExcludedTestSuite (0.00s)\n","Package":"example.com/excluded","Test":"TestX_ExcludedTestSuite"}
+{"Action":"output","Output":"    test suite was excluded by user\n","Package":"example.com/excluded","Test":"TestX_ExcludedTestSuite"}
+{"Action":"skip","Elapsed":0,"Package":"example.com/excluded","Test":"TestX_ExcludedTestSuite"}
+{"Action":"output","Output":"ok  \texample.com/excluded\t0.000s [no tests to run]\n","Package":"example.com/excluded"}
+{"Action":"pass","Elapsed":0,"Package":"example.com/excluded"}
+{"Action":"start","Package":"example.com/plain"}
+{"Action":"run","Package":"example.com/plain","Test":"TestPlainTestSuite"}
+{"Action":"output","Package":"example.com/plain","Test":"TestPlainTestSuite","Output":"=== RUN   TestPlainTestSuite\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/plain","Test":"TestPlainTestSuite","Output":"--- PASS: TestPlainTestSuite (0.00s)\n","OutputType":"frame"}
+{"Action":"pass","Package":"example.com/plain","Test":"TestPlainTestSuite","Elapsed":0}
+{"Action":"output","Package":"example.com/plain","Output":"testing: warning: no tests to run\n"}
+{"Action":"output","Output":"ok  \texample.com/plain\t0.010s [no tests to run]\n","Package":"example.com/plain"}
+{"Action":"pass","Elapsed":0.010092732,"Package":"example.com/plain"}

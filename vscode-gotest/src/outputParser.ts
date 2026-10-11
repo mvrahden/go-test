@@ -3,6 +3,7 @@ import * as path from "node:path";
 export interface TestEvent {
   Time: string;
   Action:
+    | "start"
     | "run"
     | "pass"
     | "fail"

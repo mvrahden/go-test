@@ -23,6 +23,7 @@ vi.mock("vscode", () => ({
 }));
 
 import { interpretSpecExit } from "./specView.js";
+import { parseTestEvents } from "./outputParser.js";
 
 interface Invocation {
   exitCode: number | null;
@@ -39,6 +40,21 @@ interface Variant {
   };
 }
 
+interface LiveEvent {
+  Action: string;
+  Package?: string;
+  Test?: string;
+  Output?: string;
+}
+
+// A live `gotest -json` run, times and durations masked as "<d>".
+interface LiveRun {
+  args: string[];
+  exitCode: number | null;
+  stderr: string;
+  events: LiveEvent[];
+}
+
 interface ContractCase {
   gating: Variant;
   renderOnly: Variant;
@@ -49,7 +65,7 @@ const golden = JSON.parse(
     path.join(__dirname, "..", "testdata", "cli-contract.json"),
     "utf-8",
   ),
-) as { cases: Record<string, ContractCase> };
+) as { cases: Record<string, ContractCase>; live: Record<string, LiveRun> };
 
 // What each stream shape means. Stated here rather than derived from the
 // recording, so that re-recording a changed CLI cannot quietly relabel a case:
@@ -141,6 +157,23 @@ const EXPECTED: Record<
     goRunEpilogue: "",
     stats: { passed: 2, failed: 0, skipped: 0 },
     packages: ["gotest.fixtures/fuzzing:pass"],
+  },
+  // Packages a run executes nothing in still end in go test's verdict
+  // (skip); the spec has no behaviour to render for them, and the stream is
+  // whole, so it passes.
+  "no-suites": {
+    gatingExitCode: 0,
+    goRunEpilogue: "",
+    stats: { passed: 0, failed: 0, skipped: 0 },
+    packages: [],
+  },
+  // A package whose suites are all excluded, and one whose methods -run
+  // deselected: both pass with go test's "[no tests to run]".
+  "no-tests-to-run": {
+    gatingExitCode: 0,
+    goRunEpilogue: "",
+    stats: { passed: 1, failed: 0, skipped: 1 },
+    packages: ["example.com/excluded:pass", "example.com/plain:pass"],
   },
   "declared-source": {
     gatingExitCode: 0,
@@ -297,5 +330,76 @@ describe("recorded CLI contract", () => {
       expect(golden.cases[name].gating.direct.exitCode).toBe(1);
     }
     expect(failing.length).toBeGreaterThan(0);
+  });
+});
+
+const unrunPkg = "github.com/mvrahden/go-test/cmd/gotest/testdata/unrun/";
+
+describe("recorded live runs", () => {
+  it("records exactly the stated runs", () => {
+    expect(Object.keys(golden.live).sort()).toEqual([
+      "no-packages",
+      "verdicts",
+    ]);
+  });
+
+  describe("patterns that match no package", () => {
+    const recorded = golden.live["no-packages"];
+    it("exits 2, names the pattern on stderr and writes no stream", () => {
+      expect(recorded.exitCode).toBe(2);
+      expect(recorded.stderr).toBe(
+        `FAIL: "${recorded.args[1]}" matched no packages\n`,
+      );
+      expect(recorded.events).toEqual([]);
+    });
+  });
+
+  describe("a run with packages it executes nothing in", () => {
+    const recorded = golden.live.verdicts;
+    const pkgs = [
+      `${unrunPkg}notestfiles`,
+      `${unrunPkg}nosuites`,
+      `${unrunPkg}excluded`,
+      "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain",
+    ];
+
+    it("passes quietly", () => {
+      expect(recorded.exitCode).toBe(0);
+      expect(recorded.stderr).toBe("");
+    });
+
+    it("opens every package with one start, before any other event of it", () => {
+      for (const pkg of pkgs) {
+        const own = recorded.events.filter((e) => e.Package === pkg);
+        expect(own[0]?.Action).toBe("start");
+        expect(own.filter((e) => e.Action === "start")).toHaveLength(1);
+      }
+    });
+
+    it("ends every package in go test's verdict", () => {
+      const verdict = (pkg: string) =>
+        recorded.events
+          .filter((e) => e.Package === pkg && !e.Test)
+          .slice(-2)
+          .map((e) => (e.Action === "output" ? e.Output : e.Action));
+      expect(verdict(`${unrunPkg}notestfiles`)).toEqual([
+        `?   \t${unrunPkg}notestfiles\t[no test files]\n`,
+        "skip",
+      ]);
+      expect(verdict(`${unrunPkg}nosuites`)).toEqual([
+        `?   \t${unrunPkg}nosuites\t[no suites]\n`,
+        "skip",
+      ]);
+      expect(verdict(`${unrunPkg}excluded`)).toEqual([
+        `ok  \t${unrunPkg}excluded\t<d>s [no tests to run]\n`,
+        "pass",
+      ]);
+      expect(verdict(pkgs[3])).toEqual([`ok  \t${pkgs[3]}\t<d>s\n`, "pass"]);
+    });
+
+    it("parses in full with the extension's stream reader", () => {
+      const stream = recorded.events.map((e) => JSON.stringify(e)).join("\n");
+      expect(parseTestEvents(stream)).toHaveLength(recorded.events.length);
+    });
   });
 });
