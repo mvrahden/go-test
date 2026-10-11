@@ -24,7 +24,10 @@ invocation runs tests — there is NO `test` subcommand:
 - `go tool gotest lint ./...` — the linter; exit 3 on findings (`-json`
   exits 0 and carries them in the document). `-fix` applies suggested
   fixes, composed and overlapping ones included (v1.33+), formats the
-  files it rewrites and reports what is left; below v1.33 repeat
+  files it rewrites and reports what is left; `-diff` previews exactly
+  what `-fix` would write, as a patch (`… -diff ./... | git apply`), and
+  writes nothing. A fix whose result no longer loads writes nothing
+  either (exit 1). Below v1.33 repeat
   `lint -fix` + plain `lint` until plain `lint` exits 0, since `-fix`
   stops after one pass and never shows the findings it cannot fix. Integrity
   rules yield only to `//nolint:<rule>` (on the line, directly above it,

@@ -221,8 +221,10 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
    methods — integrity tier, so it cannot be skipped project-wide; turn
    the subtest into `t.It`/`t.When`.
 3. **`lint -fix` applies composed and overlapping fixes in one run and
-   reports what it could not fix** (exit 3); below v1.33 it stops after one
-   pass and exits 0 silently, so re-run it and plain `lint` there.
+   reports what it could not fix** (exit 3), and `-diff` previews exactly
+   that result; below v1.33 `-fix` stops after one pass and exits 0
+   silently, so re-run it and plain `lint` there, and `-diff` shows one
+   pass only.
 4. **The runtime floor is v1.33.0** — a v1.33 CLI refuses a pin below
    v1.33.0, which only a CLI not run through `go tool gotest` can meet.
    Drift refusals name the version to pin instead of `@latest`.
@@ -250,6 +252,12 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
     `case`; an alias without one fails with "no constructor for <type>");
     below v1.33 its `factory` field could not be set through a type alias
     and the suite nil-panicked.
-11. **Assertion locations survive inlining** — a failure in generic suite
+11. **Patterns that match no package fail** — a run (any mode, bench and
+    fuzz included) exits 2 and `lint` exits 1 when no package matched; a
+    pattern that misses beside others that match only warns. Below v1.33
+    such a run passed green having tested nothing.
+12. **A `Test*Async` method that never calls `done()` fails at its
+    declaration**, not inside gotest.
+13. **Assertion locations survive inlining** — a failure in generic suite
     code the compiler inlined into the harness names the user's line, not
     `gotest_psuite_test.go`.
