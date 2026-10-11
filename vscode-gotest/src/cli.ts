@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import * as os from "node:os";
 import * as path from "node:path";
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { resolveGoBinary, fileExists, clearGoBinaryCache } from "./goBinary.js";
 import {
@@ -40,7 +40,10 @@ export interface CliCommand {
 }
 
 let versionWarningShown = false;
-let upgradeDialogOpen = false;
+// upgradeState: "asking" while the dialog is open, "upgrading" until the
+// upgrade it started has finished, so a floor hit meanwhile starts no second
+// go get in the same module.
+let upgradeState: "idle" | "asking" | "upgrading" = "idle";
 
 export async function validateGoBinary(
   log?: vscode.LogOutputChannel,
@@ -222,8 +225,9 @@ export class CliBelowFloorError extends CliUnavailableError {
 }
 
 // offerCliUpgrade answers a user action that failed below the floor with the
-// upgrade dialog, unless one is already open. It reports whether err was
-// that case, so the caller can skip its own toast.
+// upgrade dialog, unless one is already open; while an upgrade runs it says
+// so instead. It reports whether err was that case, so the caller can skip
+// its own toast.
 export function offerCliUpgrade(err: unknown): boolean {
   if (!(err instanceof CliBelowFloorError)) return false;
   showUpgradeDialog(err);
@@ -279,55 +283,47 @@ function resolveCliPath(cliPath: string, workspaceDir?: string): string {
 }
 
 function showUpgradeDialog(err: CliBelowFloorError): void {
-  if (upgradeDialogOpen) return;
-  upgradeDialogOpen = true;
+  if (upgradeState === "asking") return;
+  if (upgradeState === "upgrading") {
+    vscode.window.showInformationMessage(
+      "gotest: the CLI upgrade is still running; try again when it finishes.",
+    );
+    return;
+  }
+  upgradeState = "asking";
   vscode.window
     .showWarningMessage(
       `gotest: go.mod pins gotest ${err.pin}, but >= ${MIN_CLI_VERSION} is required.`,
       "Upgrade",
     )
     .then(async (choice) => {
-      upgradeDialogOpen = false;
-      if (choice !== "Upgrade") return;
-      await upgradeCli(err);
+      if (choice !== "Upgrade") {
+        upgradeState = "idle";
+        return;
+      }
+      upgradeState = "upgrading";
+      try {
+        await upgradeCli(err);
+      } finally {
+        upgradeState = "idle";
+      }
     });
 }
 
 // upgradeCli moves each pinning module to the newest release its go line
 // takes. A module no release fits is named, not upgraded: raising a
 // project's Go is the project's call, so there is no button for it.
-async function upgradeCli({
-  modulePath,
-  pinnedDirs,
-  log,
-}: CliBelowFloorError): Promise<void> {
-  let plan: UpgradePlan;
-  try {
-    const modules = await Promise.all(
-      pinnedDirs.map(async (dir) => {
-        const goMod = await readFile(path.join(dir, "go.mod"), "utf-8");
-        return { dir, goMod };
-      }),
-    );
-    const module = modules
-      .map((m) => requiredModule(m.goMod, modulePath)?.path)
-      .find((p) => p !== undefined);
-    if (!module) throw new Error(`no go.mod requires ${modulePath}`);
-    const goBin = await resolveGoBinary(log, pinnedDirs[0]);
-    plan = await planUpgrade(
-      modules.map((m) => ({ dir: m.dir, goLine: goLine(m.goMod) })),
-      module,
-      MIN_CLI_VERSION,
-      goReleaseQuery(goBin),
-    );
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log?.error(`[cli] release lookup failed: ${msg}`);
-    vscode.window.showErrorMessage(
-      `gotest: upgrade failed, go.mod is unchanged: could not look up gotest releases. ${msg}`,
-    );
-    return;
-  }
+async function upgradeCli(err: CliBelowFloorError): Promise<void> {
+  const { modulePath, pinnedDirs, log } = err;
+  const plan = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "gotest: looking up gotest releases",
+      cancellable: true,
+    },
+    (_progress, token) => lookUpUpgrade(err, token),
+  );
+  if (!plan) return;
   const where = (dir: string) =>
     pinnedDirs.length > 1 ? `${path.basename(dir)}/go.mod` : "go.mod";
   if (plan.blocked.length > 0) {
@@ -341,22 +337,29 @@ async function upgradeCli({
     );
   }
   if (plan.upgrades.length === 0) return;
+  const releases = new Set(plan.upgrades.map((u) => u.release));
+  const to =
+    releases.size === 1
+      ? plan.upgrades[0].release
+      : plan.upgrades.map((u) => `${u.release} in ${where(u.dir)}`).join(", ");
   try {
-    // One go get per pinning module: a go.work root has no module.
-    for (const { dir, release } of plan.upgrades) {
-      await runGoInModule(
-        dir,
-        ["get", "-tool", `${modulePath}@${release}`],
-        log,
-      );
-    }
-    const releases = new Set(plan.upgrades.map((u) => u.release));
-    const to =
-      releases.size === 1
-        ? plan.upgrades[0].release
-        : plan.upgrades
-            .map((u) => `${u.release} in ${where(u.dir)}`)
-            .join(", ");
+    // Not cancellable: a go get stopped midway could leave go.mod and
+    // go.sum apart. One go get per pinning module: a go.work root has none.
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `gotest: upgrading to ${to}`,
+      },
+      async () => {
+        for (const { dir, release } of plan.upgrades) {
+          await runGoInModule(
+            dir,
+            ["get", "-tool", `${modulePath}@${release}`],
+            log,
+          );
+        }
+      },
+    );
     log?.info(`[cli] upgrade complete: ${to}`);
     vscode.window.showInformationMessage(
       `gotest: upgraded to ${to} and declared as a tool.`,
@@ -368,8 +371,55 @@ async function upgradeCli({
   }
 }
 
+// lookUpUpgrade plans the upgrade, or says why there is none: undefined
+// after a failed or cancelled lookup, which leaves go.mod unchanged.
+async function lookUpUpgrade(
+  { modulePath, pinnedDirs, log }: CliBelowFloorError,
+  token: vscode.CancellationToken,
+): Promise<UpgradePlan | undefined> {
+  const cancel = new AbortController();
+  const sub = token.onCancellationRequested(() =>
+    cancel.abort(new Error("cancelled")),
+  );
+  try {
+    const modules = await Promise.all(
+      pinnedDirs.map(async (dir) => {
+        const goMod = await readFile(path.join(dir, "go.mod"), "utf-8");
+        return { dir, goMod };
+      }),
+    );
+    const module = modules
+      .map((m) => requiredModule(m.goMod, modulePath)?.path)
+      .find((p) => p !== undefined);
+    if (!module) throw new Error(`no go.mod requires ${modulePath}`);
+    const goBin = await resolveGoBinary(log, pinnedDirs[0]);
+    return await withLookupModule((dir) =>
+      planUpgrade(
+        modules.map((m) => ({ dir: m.dir, goLine: goLine(m.goMod) })),
+        module,
+        MIN_CLI_VERSION,
+        goReleaseQuery(goBin, dir, cancel.signal, log),
+      ),
+    );
+  } catch (err: unknown) {
+    if (token.isCancellationRequested) {
+      log?.info("[cli] release lookup cancelled; go.mod is unchanged");
+      return undefined;
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    log?.error(`[cli] release lookup failed: ${msg}`);
+    vscode.window.showErrorMessage(
+      `gotest: upgrade failed, go.mod is unchanged: could not look up gotest releases. ${msg}`,
+    );
+    return undefined;
+  } finally {
+    sub.dispose();
+  }
+}
+
 // ReleaseQuery asks the module proxy for a module's releases and for the
-// go line each of the given versions declares.
+// go line each of the given versions declares. goLines leaves out versions
+// it could not resolve.
 export interface ReleaseQuery {
   versions(module: string): Promise<string[]>;
   goLines(module: string, versions: string[]): Promise<Map<string, string>>;
@@ -384,10 +434,12 @@ export interface UpgradePlan {
 }
 
 // planUpgrade picks per module the newest release at or above the floor
-// whose go line does not exceed the module's: go get raises a module's go
+// whose go line fits the module's (goLineFits): go get raises a module's go
 // line to the release's. Every candidate is checked, since go lines need
 // not rise with releases; few sit above the floor, and one go list asks
-// for all of them.
+// for all of them. A candidate without a go line is skipped: every gotest
+// release declares one, so go list could not resolve it or read its go.mod,
+// and go get would fail on it too.
 export async function planUpgrade(
   modules: { dir: string; goLine: string }[],
   module: string,
@@ -403,58 +455,155 @@ export async function planUpgrade(
     );
   }
   const lines = await query.goLines(module, candidates);
-  const needs = candidates
+  const resolved = candidates
     .map((release) => ({ release, goLine: lines.get(release) ?? "" }))
-    .reduce((min, c) =>
-      compareGoVersions(c.goLine, min.goLine) < 0 ? c : min,
+    .filter((c) => c.goLine !== "");
+  if (resolved.length === 0) {
+    throw new Error(
+      `none of the releases of ${module} at or above ${floor} could be resolved: ${candidates.join(", ")}`,
     );
+  }
+  // Newest first, so a tie on the go line keeps the newest release.
+  const needs = resolved.reduce((min, c) =>
+    compareGoVersions(c.goLine, min.goLine) < 0 ? c : min,
+  );
   const plan: UpgradePlan = { upgrades: [], blocked: [], needs };
   for (const m of modules) {
-    const release = candidates.find(
-      (v) => compareGoVersions(lines.get(v) ?? "", m.goLine) <= 0,
-    );
-    if (release) plan.upgrades.push({ dir: m.dir, release });
+    const fit = resolved.find((c) => goLineFits(c.goLine, m.goLine));
+    if (fit) plan.upgrades.push({ dir: m.dir, release: fit.release });
     else plan.blocked.push(m);
   }
   return plan;
 }
 
-// goReleaseQuery runs go list outside any module and workspace, so neither
-// go.sum, vendoring nor a go.work shapes the answer; -mod=mod overrides a
-// -mod=vendor in GOFLAGS.
-function goReleaseQuery(goBin: string): ReleaseQuery {
-  const list = async (args: string[]) => {
-    const { stdout } = await execFileAsync(
-      goBin,
-      ["list", "-mod=mod", "-m", ...args],
-      {
-        cwd: os.tmpdir(),
-        env: { ...process.env, GOWORK: "off" },
-        timeout: 60_000,
-      },
+// goLineFits reports whether a module at go line `module` takes a release
+// declaring `release` without moving to a newer Go. Go orders 1.26 before
+// 1.26.0, and go get rewrites the one to the other, but both name language
+// version 1.26: the rewrite only drops 1.26 pre-release toolchains. So a
+// module at 1.N (or 1.NrcK) takes a release at 1.N.0, though not 1.N.1.
+export function goLineFits(release: string, module: string): boolean {
+  if (compareGoVersions(release, module) <= 0) return true;
+  const lang = /^(\d+\.\d+)(?:(?:alpha|beta|rc)\d+)?$/.exec(module)?.[1];
+  return lang !== undefined && release === `${lang}.0`;
+}
+
+const LOOKUP_TIMEOUT_MS = 60_000;
+const LOOKUP_MODULE = "module gotest.upgrade.lookup\n";
+
+// withLookupModule runs fn in a fresh directory holding its own go.mod, so
+// no module around the temp dir shapes the lookup. Without a go line it
+// never asks for a toolchain switch.
+async function withLookupModule<T>(fn: (dir: string) => Promise<T>) {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "gotest-upgrade-"));
+  try {
+    await writeFile(path.join(dir, "go.mod"), LOOKUP_MODULE);
+    return await fn(dir);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+// lookupGoFlags drops the user's module-shaping flags, -mod and -modfile,
+// and sets -mod=mod: a vendor-mode lookup cannot list versions. It is never
+// empty, since an empty GOFLAGS falls back to the go env file's.
+export function lookupGoFlags(goflags: string): string {
+  return [
+    ...goflags
+      .split(/\s+/)
+      .filter((f) => f !== "" && !/^--?mod(file)?(=|$)/.test(f)),
+    "-mod=mod",
+  ].join(" ");
+}
+
+// goReleaseQuery runs go list in the lookup module with GOWORK=off, so
+// neither the user's go.mod, go.sum, vendoring nor a go.work shapes the
+// answer; network settings (GOPROXY, GOPRIVATE, GONOSUMDB…) still apply.
+// Each go command ends on signal or after LOOKUP_TIMEOUT_MS.
+export function goReleaseQuery(
+  goBin: string,
+  dir: string,
+  signal: AbortSignal,
+  log?: vscode.LogOutputChannel,
+): ReleaseQuery {
+  const run = async (args: string[], env: NodeJS.ProcessEnv) => {
+    const stop = new AbortController();
+    const onAbort = () => stop.abort(signal.reason);
+    signal.addEventListener("abort", onAbort);
+    const timer = setTimeout(
+      () =>
+        stop.abort(
+          new Error(
+            `go ${args[0]} timed out after ${LOOKUP_TIMEOUT_MS / 1000}s`,
+          ),
+        ),
+      LOOKUP_TIMEOUT_MS,
     );
-    return stdout;
+    try {
+      if (signal.aborted) throw signal.reason;
+      const { stdout } = await execFileAsync(goBin, args, {
+        cwd: dir,
+        env,
+        signal: stop.signal,
+      });
+      return stdout;
+    } catch (err: unknown) {
+      throw stop.signal.aborted ? stop.signal.reason : err;
+    } finally {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+    }
+  };
+  let env: Promise<NodeJS.ProcessEnv> | undefined;
+  const list = async (args: string[]) => {
+    env ??= run(["env", "GOFLAGS"], { ...process.env, GOWORK: "off" }).then(
+      (goflags) => ({
+        ...process.env,
+        GOWORK: "off",
+        GOFLAGS: lookupGoFlags(goflags.trim()),
+      }),
+    );
+    return run(["list", "-m", "-json", ...args], await env);
   };
   return {
-    versions: async (module) =>
-      (await list(["-versions", module])).trim().split(/\s+/).slice(1),
+    versions: async (module) => {
+      const out = JSON.parse(await list(["-versions", module])) as {
+        Versions?: string[];
+      };
+      return out.Versions ?? [];
+    },
     goLines: async (module, versions) => {
-      const out = await list([
-        "-f",
-        "{{.Version}} {{.GoVersion}}",
-        ...versions.map((v) => `${module}@${v}`),
-      ]);
-      return new Map(
-        out
-          .trim()
-          .split("\n")
-          .map((line) => {
-            const [version, goVersion = ""] = line.trim().split(/\s+/);
-            return [version, goVersion] as const;
-          }),
-      );
+      // -e reports a release go list cannot resolve in its Error field
+      // instead of failing the whole batch.
+      const out = await list(["-e", ...versions.map((v) => `${module}@${v}`)]);
+      const lines = new Map<string, string>();
+      for (const m of parseJsonStream(out)) {
+        if (m.Error) {
+          log?.warn(`[cli] skipping ${m.Path}@${m.Version}: ${m.Error.Err}`);
+        } else if (m.Version && m.GoVersion) {
+          lines.set(m.Version, m.GoVersion);
+        } else {
+          log?.warn(`[cli] skipping ${m.Path}@${m.Version}: no go line`);
+        }
+      }
+      return lines;
     },
   };
+}
+
+interface ListedModule {
+  Path?: string;
+  Version?: string;
+  GoVersion?: string;
+  Error?: { Err: string };
+}
+
+// parseJsonStream splits go list -json output: indented objects, each
+// closed by a brace at the start of a line.
+function parseJsonStream(out: string): ListedModule[] {
+  return out
+    .split(/^}$/m)
+    .filter((chunk) => chunk.trim() !== "")
+    .map((chunk) => JSON.parse(chunk + "}") as ListedModule);
 }
 
 // compareGoVersions orders go lines as Go does: 1.21 < 1.21rc1 < 1.21.0.
