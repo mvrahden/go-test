@@ -146,6 +146,21 @@ func (s *BrokenLoadTestSuite) TestPackagesOutsideTheMainModule(t *gotest.T) {
 	})
 }
 
+func (s *BrokenLoadTestSuite) TestReportOrder(t *gotest.T) {
+	t.It("orders several patterns as go test expands them, not by dependency or path", func(it *gotest.T) {
+		dir := brokenloadDir(it)
+		pkgs, err := gotestgen.LoadRunPackages([]string{filepath.Join(dir, "notests"), filepath.Join(dir, "healthy")}, nil)
+		gotest.NoError(it, err)
+		gotest.Equal(it, []string{brokenloadPkgBase + "/notests", brokenloadPkgBase + "/healthy"}, pkgs.Order)
+	})
+	t.It("orders a single pattern as go walks it, segment by segment", func(it *gotest.T) {
+		gotest.Equal(it, []string{"m/a", "m/a/b", "m/a-b", "m/b"}, gotestgen.ExportReportOrder([]string{"m/b", "m/a-b", "m/a/b", "m/a"}, nil))
+	})
+	t.It("keeps every matched package go list did not name, after those it did", func(it *gotest.T) {
+		gotest.Equal(it, []string{"m/z", "m/a", "m/b"}, gotestgen.ExportReportOrder([]string{"m/b", "m/a", "m/z"}, []string{"m/z", "m/gone"}))
+	})
+}
+
 func (s *BrokenLoadTestSuite) TestPatternsMatchingNoPackage(t *gotest.T) {
 	pattern := filepath.Join(brokenloadDir(t), "notests", "nosuchdir...")
 	_, err := gotestgen.LoadRunPackages([]string{pattern}, nil)

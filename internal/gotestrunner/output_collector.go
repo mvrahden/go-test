@@ -32,11 +32,17 @@ type OutputCollector struct {
 	// cutShort names the suites whose process the run's context ended.
 	cutShort []CensusCase
 
-	// StdlibTestsByPkg lets Finalize distinguish packages that truly have no
-	// test files from packages whose tests gotest does not run (stdlib tests).
+	// StdlibTestsByPkg lets RecordNoSuite distinguish packages that truly
+	// have no test files from packages whose tests gotest does not run
+	// (stdlib tests).
 	StdlibTestsByPkg map[string]int
-	stdout           io.Writer
-	stderr           io.Writer
+	// bench marks a bench run, whose packages that run nothing pass as go
+	// test -bench passes them: without a note.
+	bench  bool
+	stdout io.Writer
+	stderr io.Writer
+	// starts writes the JSON stream, opening each package as go test does.
+	starts *startWriter
 }
 
 type pkgState struct {
@@ -46,9 +52,9 @@ type pkgState struct {
 	// failedBuild names the build whose failure failed this package; its
 	// verdict carries the name the way go test's does.
 	failedBuild string
-	// nothingToRun marks a package none of whose suites run: it passes
-	// having run no tests, as go test reports it.
-	nothingToRun bool
+	// fixed is the summary line of a package whose verdict needs no run:
+	// one without suites, or none of whose suites run.
+	fixed string
 }
 
 type OutputOption func(*OutputCollector)
@@ -157,9 +163,38 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //n
 }
 
 // RecordNothingToRun books a package that built but none of whose suites
-// run (-run deselected them, or it declares only benchmarks): a verdict like
-// any other, so text output and the JSON stream both report it.
+// run (-run deselected them, or it declares only benchmarks): it passes as
+// go test passes a package that ran no tests. No binary ran, so no time
+// passed; the line keeps go test's shape for every parser that reads it.
 func (c *OutputCollector) RecordNothingToRun(pkg string) {
+	line := fmt.Sprintf("ok  \t%s\t0.000s %s\n", pkg, noTestsToRun)
+	if c.bench {
+		line = fmt.Sprintf("ok  \t%s\t0.000s\n", pkg)
+	}
+	c.recordFixed(pkg, line, "pass")
+}
+
+// RecordNoSuite books a package without suites as go test labels it:
+// "?   <pkg>  [no test files]", or "[no suites]" for one with stdlib tests.
+// One whose suites are all excluded (X_) has test files and runs none, so it
+// passes as RecordNothingToRun books it.
+func (c *OutputCollector) RecordNoSuite(pkg string, excluded bool) {
+	if excluded {
+		c.RecordNothingToRun(pkg)
+		return
+	}
+	note := "[no test files]"
+	if c.StdlibTestsByPkg[pkg] > 0 {
+		// The package has stdlib tests — gotest runs suites only, so
+		// "[no test files]" would be a lie. Point at the truth instead.
+		note = "[no suites]"
+	}
+	c.recordFixed(pkg, fmt.Sprintf("?   \t%s\t%s\n", pkg, note), "skip")
+}
+
+// recordFixed books a verdict that needs no run: text output prints it in
+// package order, the JSON stream gets it at once.
+func (c *OutputCollector) recordFixed(pkg, line, action string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	s, ok := c.pkgs[pkg]
@@ -168,22 +203,35 @@ func (c *OutputCollector) RecordNothingToRun(pkg string) {
 		c.pkgs[pkg] = s
 		c.order = append(c.order, pkg)
 	}
-	s.nothingToRun = true
+	s.fixed = line
 	if c.mode == RunBatchText {
 		c.flushReadyText()
 		return
 	}
-	writePackageVerdict(c.jsonWriter(), pkg, fmt.Sprintf("ok  \t%s\t%s\n", pkg, noTestsToRun), "pass")
+	writePackageVerdict(c.jsonWriter(), pkg, line, action)
 }
 
 // noTestsToRun is go test's note for a package that ran no tests.
 const noTestsToRun = "[no tests to run]"
 
-// writePackageVerdict writes the start, summary line and verdict go test
-// gives a package that ran no test binary of ours.
+// noTestsWarning is what a test binary prints on stderr when it ran no
+// test; go test notes the package with noTestsToRun when it sees it.
+var noTestsWarning = []byte("testing: warning: no tests to run")
+
+// ranNoTests reports whether every suite binary of a package ran no test.
+func ranNoTests(results []SuiteResult) bool {
+	for i := range results {
+		if !bytes.Contains(results[i].Stdout, noTestsWarning) && !bytes.Contains(results[i].Stderr, noTestsWarning) {
+			return false
+		}
+	}
+	return len(results) > 0
+}
+
+// writePackageVerdict writes the summary line and verdict go test gives a
+// package that ran no test binary of ours; the stream opens the package.
 func writePackageVerdict(w io.Writer, pkg, summary, action string) {
 	now := time.Now()
-	writeJSONLine(w, map[string]any{"Time": now, "Action": "start", "Package": pkg})
 	writeJSONLine(w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Output": summary})
 	writeJSONLine(w, map[string]any{"Time": now, "Action": action, "Package": pkg, "Elapsed": 0})
 }
@@ -206,7 +254,6 @@ func (c *OutputCollector) RecordBuildFailure(pkg, msg string) {
 			writeJSONLine(w, map[string]any{"ImportPath": build, "Action": "build-output", "Output": line})
 		}
 		writeJSONLine(w, map[string]any{"ImportPath": build, "Action": "build-fail"})
-		writeJSONLine(w, map[string]any{"Time": time.Now(), "Action": "start", "Package": pkg})
 	}
 	c.mu.Unlock()
 	c.RecordResult(pkg, 0, SuiteResult{Stderr: []byte(msg), ExitCode: 2})
@@ -240,44 +287,26 @@ func (c *OutputCollector) RecordGivenUp(pkg string, idx int, suite, reason strin
 	c.RecordResult(pkg, idx, SuiteResult{Stderr: []byte(reason + "\n"), ExitCode: 1})
 }
 
-// Finalize reports the packages without suites after all suites have run:
-// "?   <pkg>  [no test files]", or "[no suites]" for one with stdlib tests.
-// For RunBatchText it also drains remaining completed packages and emits a
-// trailing FAIL; JSON modes give each package go test's skip verdict.
-func (c *OutputCollector) Finalize(noSuitePkgs []string) {
+// Finalize closes a text run: it drains the packages still waiting for an
+// earlier one that never reported and emits a trailing FAIL. JSON modes have
+// written every verdict as it came.
+func (c *OutputCollector) Finalize() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.mode != RunBatchText {
-		w := c.jsonWriter()
-		for _, pkg := range noSuitePkgs {
-			writePackageVerdict(w, pkg, c.noSuiteLine(pkg), "skip")
-		}
 		return
 	}
 	for c.flushed < len(c.order) {
 		pkg := c.order[c.flushed]
 		s := c.pkgs[pkg]
 		c.flushed++
-		if s.nothingToRun || s.expected > 0 && s.completed >= s.expected {
+		if s.fixed != "" || s.expected > 0 && s.completed >= s.expected {
 			c.flushTextPkg(s, pkg)
 		}
-	}
-	for _, pkg := range noSuitePkgs {
-		fmt.Fprint(c.stdout, c.noSuiteLine(pkg))
 	}
 	if c.anyFailedLocked() {
 		fmt.Fprintln(c.stdout, "FAIL")
 	}
-}
-
-func (c *OutputCollector) noSuiteLine(pkg string) string {
-	note := "[no test files]"
-	if c.StdlibTestsByPkg[pkg] > 0 {
-		// The package has stdlib tests — gotest runs suites only, so
-		// "[no test files]" would be a lie. Point at the truth instead.
-		note = "[no suites]"
-	}
-	return fmt.Sprintf("?   \t%s\t%s\n", pkg, note)
 }
 
 func (c *OutputCollector) CapturedJSON() []byte {
@@ -347,7 +376,7 @@ func (c *OutputCollector) flushReadyText() {
 	for c.flushed < len(c.order) {
 		pkg := c.order[c.flushed]
 		s := c.pkgs[pkg]
-		if !s.nothingToRun && (s.expected == 0 || s.completed < s.expected) {
+		if s.fixed == "" && (s.expected == 0 || s.completed < s.expected) {
 			break
 		}
 		c.flushTextPkg(s, pkg)
@@ -356,8 +385,8 @@ func (c *OutputCollector) flushReadyText() {
 }
 
 func (c *OutputCollector) flushTextPkg(s *pkgState, pkg string) {
-	if s.nothingToRun {
-		fmt.Fprintf(c.stdout, "ok  \t%s\t%s\n", pkg, noTestsToRun)
+	if s.fixed != "" {
+		fmt.Fprint(c.stdout, s.fixed)
 		return
 	}
 	failed := false
@@ -383,10 +412,19 @@ func (c *OutputCollector) flushTextPkg(s *pkgState, pkg string) {
 	case failed:
 		fmt.Fprintf(c.stdout, "FAIL\nFAIL\t%s\t%.3fs\n", pkg, dur.Seconds())
 	case c.verbose:
-		fmt.Fprintf(c.stdout, "PASS\nok  \t%s\t%.3fs\n", pkg, dur.Seconds())
+		fmt.Fprintf(c.stdout, "PASS\nok  \t%s\t%.3fs%s\n", pkg, dur.Seconds(), ranNothingNote(s))
 	default:
-		fmt.Fprintf(c.stdout, "ok  \t%s\t%.3fs\n", pkg, dur.Seconds())
+		fmt.Fprintf(c.stdout, "ok  \t%s\t%.3fs%s\n", pkg, dur.Seconds(), ranNothingNote(s))
 	}
+}
+
+// ranNothingNote is go test's note on a passing package whose binaries ran
+// no test, "" otherwise.
+func ranNothingNote(s *pkgState) string {
+	if ranNoTests(s.results) {
+		return " " + noTestsToRun
+	}
+	return ""
 }
 
 // jsonWriter is where JSON events are written; the census indexes them on
@@ -408,10 +446,61 @@ func (c *OutputCollector) bookRunFailure(pkg, msg string, details ...string) {
 }
 
 func (c *OutputCollector) jsonTarget() io.Writer {
-	if c.mode == RunCaptureJSON {
-		return &c.captured
+	if c.starts == nil {
+		var w io.Writer = c.stdout
+		if c.mode == RunCaptureJSON {
+			w = &c.captured
+		}
+		c.starts = &startWriter{w: w, started: map[string]bool{}}
 	}
-	return c.stdout
+	return c.starts
+}
+
+// startWriter writes a JSON event stream, opening each package with go
+// test's start event before any other event of it, exactly once. Writes may
+// split a line; each is passed on whole.
+type startWriter struct {
+	w       io.Writer
+	buf     []byte
+	started map[string]bool
+}
+
+func (s *startWriter) Write(p []byte) (int, error) {
+	s.buf = append(s.buf, p...)
+	for {
+		i := bytes.IndexByte(s.buf, '\n')
+		if i < 0 {
+			break
+		}
+		s.writeLine(s.buf[:i+1])
+		s.buf = s.buf[i+1:]
+	}
+	s.buf = append([]byte(nil), s.buf...)
+	return len(p), nil
+}
+
+func (s *startWriter) writeLine(line []byte) {
+	var ev struct {
+		Time    json.RawMessage
+		Action  string
+		Package string
+	}
+	if json.Unmarshal(line, &ev) == nil && ev.Package != "" {
+		switch {
+		case !s.started[ev.Package] && ev.Action == "start":
+			s.started[ev.Package] = true
+		case !s.started[ev.Package]:
+			s.started[ev.Package] = true
+			start := map[string]any{"Time": ev.Time, "Action": "start", "Package": ev.Package}
+			if len(ev.Time) == 0 {
+				start["Time"] = time.Now()
+			}
+			writeJSONLine(s.w, start)
+		case ev.Action == "start":
+			return
+		}
+	}
+	_, _ = s.w.Write(line)
 }
 
 func (c *OutputCollector) emitJSONPackageSummary(w io.Writer, pkg string, s *pkgState) {
@@ -431,7 +520,7 @@ func (c *OutputCollector) emitJSONPackageSummary(w io.Writer, pkg string, s *pkg
 	case failed:
 		summaryLine = fmt.Sprintf("FAIL\t%s\t%.3fs\n", pkg, dur.Seconds())
 	default:
-		summaryLine = fmt.Sprintf("ok  \t%s\t%.3fs\n", pkg, dur.Seconds())
+		summaryLine = fmt.Sprintf("ok  \t%s\t%.3fs%s\n", pkg, dur.Seconds(), ranNothingNote(s))
 	}
 	writeJSONLine(w, map[string]any{
 		"Time": now, "Action": "output", "Package": pkg, "Output": summaryLine,

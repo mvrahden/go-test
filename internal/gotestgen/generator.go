@@ -143,9 +143,9 @@ func (lr *LoadResult) IsTestOnly() bool {
 // packages that fail to load are returned as BrokenPackage entries: every
 // package a pattern matches must end in exactly one verdict, and a load
 // failure is a verdict, not an absence. Matched packages without test files
-// are named in noTestFiles, for the same reason. matched reports whether the
-// patterns matched any package at all.
-func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResult, broken []BrokenPackage, noTestFiles []string, matched bool, err error) {
+// are named in noTestFiles, for the same reason. matched names every package
+// the patterns matched, in load order.
+func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResult, broken []BrokenPackage, noTestFiles, matched []string, err error) {
 	cfg := &packages.Config{
 		Mode:  packageLoadMode,
 		Tests: true,
@@ -155,12 +155,22 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 	}
 	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
 	if err != nil {
-		return nil, nil, nil, false, err
+		return nil, nil, nil, nil, err
 	}
 	if err := goversion.Check(totalFoundPkgs); err != nil {
-		return nil, nil, nil, false, err
+		return nil, nil, nil, nil, err
 	}
-	matched = len(totalFoundPkgs) > 0
+	seen := map[string]bool{}
+	for _, p := range totalFoundPkgs {
+		pkgPath := strings.TrimSuffix(p.PkgPath, "_test")
+		if pkgPath == "" {
+			pkgPath = p.ID
+		}
+		if !strings.HasSuffix(p.ID, ".test") && !seen[pkgPath] {
+			seen[pkgPath] = true
+			matched = append(matched, pkgPath)
+		}
+	}
 
 	brokenByPath := map[string]*BrokenPackage{}
 	brokenMsgSeen := map[string]map[string]bool{}
@@ -306,6 +316,8 @@ type RunPackages struct {
 	NoTestFiles []string
 	// Unmatched are the patterns that matched no package while others did.
 	Unmatched []string
+	// Order is every matched package in the order go test reports them.
+	Order []string
 }
 
 // NoPackagesError is a run whose patterns matched no package: it would verify
@@ -330,40 +342,36 @@ func LoadRunPackages(targetPkgs []string, buildFlags []string) (RunPackages, err
 	if err != nil {
 		return RunPackages{}, err
 	}
-	if !matched {
+	if len(matched) == 0 {
 		return RunPackages{}, &NoPackagesError{Patterns: targetPkgs}
 	}
+	listed, unmatched := listPatterns("", targetPkgs, buildFlags)
 	return RunPackages{
 		Loaded:      loaded,
 		Broken:      broken,
 		NoTestFiles: noTestFiles,
-		Unmatched:   UnmatchedPatterns("", targetPkgs, buildFlags),
+		Unmatched:   unmatched,
+		Order:       reportOrder(matched, listed),
 	}, nil
 }
 
-// UnmatchedPatterns names the patterns that match no package while others
-// do, as go list warns about them; dir is where go runs, "" the current
-// directory. Only a wildcard or meta pattern can match none; any other names
-// a package that loads or fails to. Best effort: the result only warns.
-func UnmatchedPatterns(dir string, patterns, buildFlags []string) []string {
-	var candidates []string
-	for _, p := range patterns {
-		switch {
-		case strings.Contains(p, "..."), p == "all", p == "std", p == "cmd", p == "tool", p == "work":
-			candidates = append(candidates, p)
-		}
-	}
-	// A lone pattern matched what the run loaded.
-	if len(patterns) < 2 || len(candidates) == 0 {
-		return nil
+// listPatterns expands several patterns as go test does: the packages in its
+// order, and the patterns that match none, as go list warns about them. A
+// lone pattern needs neither: what loaded is what it matched. Best effort,
+// the result only orders and warns.
+//
+// dir is where go runs, "" the current directory.
+func listPatterns(dir string, patterns, buildFlags []string) (listed, unmatched []string) {
+	if len(patterns) < 2 {
+		return nil, nil
 	}
 	args := append([]string{"list", "-e", "-find", "-f", "{{.ImportPath}}"}, buildFlags...)
-	cmd := exec.Command("go", append(args, candidates...)...) //nolint:gosec // G204: the go tool with the run's own patterns
+	cmd := exec.Command("go", append(args, patterns...)...) //nolint:gosec // G204: the go tool with the run's own patterns
 	cmd.Dir = dir
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	_ = cmd.Run()
-	var unmatched []string
+	listed = strings.Fields(stdout.String())
 	for line := range strings.Lines(stderr.String()) {
 		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "go: warning: ")
 		if !ok {
@@ -377,7 +385,37 @@ func UnmatchedPatterns(dir string, patterns, buildFlags []string) []string {
 			unmatched = append(unmatched, p)
 		}
 	}
+	return listed, unmatched
+}
+
+// UnmatchedPatterns names the patterns that match no package while others
+// do, as go list warns about them; dir is where go runs, "" the current
+// directory. Best effort: the result only warns.
+func UnmatchedPatterns(dir string, patterns, buildFlags []string) []string {
+	_, unmatched := listPatterns(dir, patterns, buildFlags)
 	return unmatched
+}
+
+// reportOrder orders the matched packages as go test reports them: as go
+// list expanded several patterns, else as it walks a single one, path
+// segment by segment.
+func reportOrder(matched, listed []string) []string {
+	rest := map[string]bool{}
+	for _, p := range matched {
+		rest[p] = true
+	}
+	order := make([]string, 0, len(matched))
+	for _, p := range listed {
+		if rest[p] {
+			order = append(order, p)
+			delete(rest, p)
+		}
+	}
+	tail := slices.Filter(matched, func(p string, _ int) bool { return rest[p] })
+	// "/" sorts first, as a segment ending before its sibling does.
+	segments := func(p string) string { return strings.ReplaceAll(p, "/", "\x00") }
+	sort.SliceStable(tail, func(i, j int) bool { return segments(tail[i]) < segments(tail[j]) })
+	return append(order, tail...)
 }
 
 func GenerateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {

@@ -78,6 +78,36 @@ type PipelineConfig struct {
 	// NoTestFiles are matched packages without test files; like those
 	// without suites, each is reported as go test reports it.
 	NoTestFiles []string
+	// PackageOrder is every matched package in the order go test reports
+	// them; a text run prints its verdicts in that order.
+	PackageOrder []string
+}
+
+// flushOrder is the order a text run prints its verdicts in: the matched
+// packages as go test orders them, else broken, suite and suiteless ones.
+func flushOrder(cfg PipelineConfig, overlay *OverlayResult, noSuite []string) []string { //nolint:gocritic // hugeParam: stable API
+	if len(cfg.PackageOrder) > 0 {
+		return cfg.PackageOrder
+	}
+	order := make([]string, 0, len(overlay.BrokenPackages)+len(overlay.SuitePackages)+len(noSuite))
+	for i := range overlay.BrokenPackages {
+		order = append(order, overlay.BrokenPackages[i].PkgPath)
+	}
+	return append(append(order, overlay.SuitePackages...), noSuite...)
+}
+
+// bookNoSuites books the packages without suites, in report order. Their
+// verdicts are known before anything runs, so the stream gets them first.
+func bookNoSuites(c *OutputCollector, overlay *OverlayResult, noSuite, order []string) {
+	rank := make(map[string]int, len(order))
+	for i, pkg := range order {
+		rank[pkg] = i
+	}
+	noSuite = slices.Clone(noSuite)
+	slices.SortStableFunc(noSuite, func(a, b string) int { return rank[a] - rank[b] })
+	for _, pkg := range noSuite {
+		c.RecordNoSuite(pkg, len(overlay.SkippedSuitesByPkg[pkg]) > 0)
+	}
 }
 
 type PipelineResult struct {
@@ -399,6 +429,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	win.reportSkipped()
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
+	collector.bench = true
 	resolvedSetupTimeout := resolveSetupTimeout(cfg.SetupTimeout)
 	prep := prepareBenchRun(ctx, overlay, win.Fixtures, pf.BuildFlags, resolvedSetupTimeout, cfg.CompileParallel)
 	setupProc, setupErr := prep.proc, prep.setupErr
@@ -450,14 +481,31 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	runFlags = StripBenchFilter(runFlags)
 	targets := BuildBenchTargets(prep.compiled, cfg.BenchesByPkg, overlay.DirsByPkg, runFlags, pf.UserRunFilter, userBenchFilter)
 
+	noSuite := slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
+	order := flushOrder(cfg, overlay, noSuite)
+	collector.SetFlushOrder(order)
 	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
 	bookBuildFailures(collector, overlay.BrokenPackages, prep.compileFailures)
+	bookNoSuites(collector, overlay, noSuite, order)
+	// A package that built but runs no benchmark passes, as under go test
+	// -bench.
+	benched := map[string]bool{}
+	for i := range targets {
+		benched[targets[i].Package] = true
+	}
+	nothingToRun := false
+	for i := range prep.compiled {
+		if pkg := prep.compiled[i].Package; !benched[pkg] {
+			collector.RecordNothingToRun(pkg)
+			nothingToRun = true
+		}
+	}
 
 	// "Nothing to run" is a clean outcome only when every matched package
-	// became runnable and none of them reports through Finalize. A booked
-	// build failure makes the run a failure regardless of target count.
-	noSuite := slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
-	if len(targets) == 0 && !collector.AnyFailed() && len(noSuite) == 0 {
+	// became runnable and none of them reports a verdict of its own. A
+	// booked build failure makes the run a failure regardless of target
+	// count.
+	if len(targets) == 0 && !collector.AnyFailed() && len(noSuite) == 0 && !nothingToRun {
 		if cfg.OutputMode != RunCaptureJSON && setupErr == nil {
 			fmt.Fprintln(os.Stderr, "no test suites to run")
 		}
@@ -549,7 +597,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	RunBenchSuites(ctx, targets, collector, beforeSlot, afterSlot, envFor)
 	setupErr = errors.Join(append([]error{setupErr}, openErrs...)...)
 	dispatchErr := ctx.Err()
-	collector.Finalize(noSuite)
+	collector.Finalize()
 
 	exitCode := collector.takeCensus(cfg, overlay.Declared, exitCodeAfterDispatch(collector.WorstExitCode(), dispatchErr), dispatchErr)
 	running := collector.bookDeadline(dispatchErr)
@@ -690,17 +738,13 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
+	// The flush order holds every package the collector will report on.
+	noSuite := slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
+	order := flushOrder(cfg, overlay, noSuite)
+	collector.SetFlushOrder(order)
 	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
-	// Broken packages flush ahead of the suite packages: their verdicts are
-	// known before any suite runs, and the flush order must contain every
-	// package the collector will report on.
-	flushOrder := make([]string, 0, len(overlay.BrokenPackages)+len(overlay.SuitePackages))
-	for i := range overlay.BrokenPackages {
-		flushOrder = append(flushOrder, overlay.BrokenPackages[i].PkgPath)
-	}
-	flushOrder = append(flushOrder, overlay.SuitePackages...)
-	collector.SetFlushOrder(flushOrder)
 	bookBuildFailures(collector, overlay.BrokenPackages, nil)
+	bookNoSuites(collector, overlay, noSuite, order)
 
 loop:
 	for {
@@ -913,9 +957,9 @@ loop:
 	}
 
 	// "Nothing to run" is a clean outcome only when every matched package
-	// became runnable and none of them reports through Finalize. A booked
-	// build failure makes the run a failure regardless of target count.
-	noSuite := slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
+	// became runnable and none of them reports a verdict of its own. A
+	// booked build failure makes the run a failure regardless of target
+	// count.
 	if !anyTargets && !nothingToRun && len(noSuite) == 0 && !buildFailed {
 		// A run cut short while compiling reaches here too; it is not empty.
 		if cfg.OutputMode == RunBatchText && dispatchErr == nil && !sharedSetupFailed.Load() {
@@ -934,7 +978,7 @@ loop:
 		return result, nil
 	}
 
-	collector.Finalize(noSuite)
+	collector.Finalize()
 
 	exitCode := exitCodeAfterDispatch(collector.WorstExitCode(), dispatchErr)
 	if sharedSetupFailed.Load() && exitCode == 0 {

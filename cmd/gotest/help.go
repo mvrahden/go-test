@@ -410,8 +410,10 @@ When both are given, a suite must match both to run (e.g.
 "gotest bench ./pkg/parser -run Parse" filters by suite).
 
 If no matched package contains any BenchmarkX methods, prints "no
-benchmarks found" and exits 0 without invoking go test. Patterns that
-match no package at all exit 2.
+benchmarks found" and exits 0 without invoking go test. Otherwise every
+matched package ends in a verdict: one that runs no benchmark passes as
+under go test -bench ("ok  <pkg>  0.000s"). Patterns that match no
+package at all exit 2.
 
 A capturing run (--spec, --json, --save or --against) is believed only
 when every declared BenchmarkX method reported a result. If one never ran,

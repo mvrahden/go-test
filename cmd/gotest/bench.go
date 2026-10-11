@@ -145,6 +145,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		BenchesByPkg:    overlay.BenchesByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,
 		NoTestFiles:     noTestFiles,
+		PackageOrder:    pkgs.Order,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
