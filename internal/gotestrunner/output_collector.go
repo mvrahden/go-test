@@ -447,7 +447,7 @@ func (c *OutputCollector) bookRunFailure(pkg, msg string, details ...string) {
 
 func (c *OutputCollector) jsonTarget() io.Writer {
 	if c.starts == nil {
-		var w io.Writer = c.stdout
+		w := c.stdout
 		if c.mode == RunCaptureJSON {
 			w = &c.captured
 		}

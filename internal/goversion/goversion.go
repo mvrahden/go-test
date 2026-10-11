@@ -91,7 +91,7 @@ func pinnedVersion(pkgs []*packages.Package, mod *packages.Module, sel selector)
 // selectedVersion asks the go command which go-test version the module in
 // dir selects.
 func selectedVersion(dir string) (string, selection) {
-	cmd := exec.Command("go", "list", "-m", "-f", "{{.Version}}", about.Repo)
+	cmd := exec.Command("go", "list", "-m", "-f", "{{.Version}}", about.Repo) //nolint:gosec // G204: the go tool with fixed arguments
 	cmd.Dir = dir
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
