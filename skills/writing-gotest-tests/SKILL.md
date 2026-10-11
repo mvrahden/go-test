@@ -14,28 +14,66 @@ a source build — assume current behavior. Before Bootstrap, read go.mod
 instead, remembering that a `replace` line overrides the `require`
 version.
 
-This skill describes **v1.33**. On an older release, read
+This skill describes **v1.33**. Upgrade first whenever Bootstrap's
+conditions allow. On a release you could not upgrade from, read
 `reference/versions.md` before writing anything: it lists what each older
 release lacks or does differently, including rules below that fail there
 (on v1.25.x, rules 1–4 and 10). A rule tagged **v1.27+** (or later) needs
 that release; skip it on older ones.
 
-## Bootstrap
+## Bootstrap and upgrade
 
 The repo has the *library*; the CLI runs via Go's tool directive (requires
-Go ≥ 1.24; v1.28+ requires Go ≥ 1.25, v1.30+ Go ≥ 1.26). One-time:
+Go ≥ 1.24; v1.28+ requires Go ≥ 1.25, v1.30+ Go ≥ 1.26). Run it at the
+newest release the project can take. Check first:
+
+```sh
+go list -m -u -f '{{.Version}} {{with .Update}}{{.Version}}{{end}} {{with .Replace}}(replaced){{end}}' github.com/mvrahden/go-test
+go list -m -f '{{.GoVersion}}' github.com/mvrahden/go-test@latest
+go list -m -f '{{.GoVersion}}'
+```
+
+The first line prints the pin, then a newer release if one exists; the
+other two print that release's go line and this module's. Upgrade to the
+newer release unless one of these holds:
+
+- `(replaced)` — a source build; there is nothing to upgrade.
+- A vendored module (`vendor/modules.txt`) — see below.
+- The release's go line is newer than this module's: `go get` would
+  silently raise the project's Go for everyone. Report it; the project
+  decides.
+- The user or the repo's instructions rule out dependency changes, or the
+  task only reads code.
+- The check itself fails (no network or module proxy).
+
+```sh
+go get -tool github.com/mvrahden/go-test/cmd/gotest@<newer release>
+go tool gotest version
+```
+
+To keep the pin (no newer release, or a condition above holds), name the
+current version — a bare `go get -tool` upgrades without these checks:
 
 ```sh
 go get -tool github.com/mvrahden/go-test/cmd/gotest@$(go list -m -f '{{.Version}}' github.com/mvrahden/go-test)
 go tool gotest version
 ```
 
-Keep the `@version`: without it `go get -tool` upgrades the library pin,
-which setup must never do (`@latest` only in a project with no pin yet). In
-a vendored module (`vendor/modules.txt`) the go.mod edit breaks every build
-until `go mod vendor` reruns, and gotest cannot run vendored at all (the
-overlay's `pkg/gotestruntime` import is never vendored) — report, do not
-work around.
+After an upgrade, before writing anything:
+
+1. Read the `reference/versions.md` entries newer than the old pin — each
+   names the behavior the upgrade replaced.
+2. Run `go tool gotest lint -fix ./...`, then both runners with `-race`.
+3. On a failure, check whether it also fails at the old pin
+   (`git checkout -- go.mod go.sum`, rerun) before blaming the upgrade.
+   Fix one the upgrade caused in test code, per those entries, or revert
+   the upgrade and report it — never fix it in production code.
+4. Tell the user: `go-test <old> → <new>`.
+
+In a vendored module (`vendor/modules.txt`) any go.mod edit breaks every
+build until `go mod vendor` reruns, and gotest cannot run vendored at all
+(the overlay's `pkg/gotestruntime` import is never vendored) — report, do
+not work around.
 
 Then every command is `go tool gotest <args>`; if Go reports the short name
 ambiguous, use `go tool github.com/mvrahden/go-test/cmd/gotest`. Never a
@@ -45,8 +83,8 @@ was built with an older Go than the module's go line, or when the pin
 resolves below the oldest runtime it generates for; a binary drifted the
 other way still runs. That refusal is never a fault in the tests: switch to
 `go tool gotest`, which builds the CLI at the pinned version with a Go at
-least as new as the module's go line, and ignore the message's `@latest` —
-never bump the pin to silence it. (Bare
+least as new as the module's go line, and ignore the message's `@latest`:
+upgrade only under the conditions above, never to silence a refusal. (Bare
 `go run github.com/mvrahden/go-test/cmd/gotest` fails on fresh consumers:
 module pruning leaves the CLI's deps out of go.sum.)
 
@@ -54,6 +92,7 @@ In a `go.work` workspace the tool declared in any `use` module works from
 the root and inside each module, at the highest pin. `./...` is rejected at
 the root, so name each module (`go tool gotest ./svc/... ./lib/...`) or run
 inside one. The `go.work` go line must be at least the modules' go lines.
+Upgrade every `use` module that requires go-test to the same release.
 
 ## The Two Runners — a complete run is BOTH commands
 

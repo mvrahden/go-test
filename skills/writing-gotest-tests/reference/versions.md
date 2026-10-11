@@ -2,7 +2,8 @@
 
 SKILL.md and the other references describe the newest release. Find the
 installed version first (SKILL.md's version check), then read what differs
-on it below.
+on it below. After an upgrade, the entries newer than the old pin are the
+upgrade notes: each names the behavior it replaced.
 
 ## v1.25.x
 
