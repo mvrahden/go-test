@@ -133,6 +133,19 @@ func (s *BrokenLoadTestSuite) TestPackagesWithoutTestFiles(t *gotest.T) {
 	})
 }
 
+func (s *BrokenLoadTestSuite) TestPackagesOutsideTheMainModule(t *gotest.T) {
+	pkgs, err := gotestgen.LoadRunPackages([]string{"errors", "unsafe"}, nil)
+	gotest.NoError(t, err)
+
+	t.It("loads a std package with test files, to be reported without suites", func(it *gotest.T) {
+		gotest.Len(it, pkgs.Loaded, 1)
+		gotest.Equal(it, "errors", pkgs.Loaded[0].PkgPath)
+	})
+	t.It("names a std package without test files", func(it *gotest.T) {
+		gotest.Equal(it, []string{"unsafe"}, pkgs.NoTestFiles)
+	})
+}
+
 func (s *BrokenLoadTestSuite) TestPatternsMatchingNoPackage(t *gotest.T) {
 	pattern := filepath.Join(brokenloadDir(t), "notests", "nosuchdir...")
 	_, err := gotestgen.LoadRunPackages([]string{pattern}, nil)

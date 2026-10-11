@@ -210,9 +210,9 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 			}
 			continue
 		}
-		if p.Module != nil {
-			loadedTestPkgs = append(loadedTestPkgs, p)
-		}
+		// Packages outside any module (std, GOPATH) hold no suites,
+		// but go test gives them a verdict, so they get one too.
+		loadedTestPkgs = append(loadedTestPkgs, p)
 	}
 	broken = make([]BrokenPackage, 0, len(brokenByPath))
 	for _, bp := range brokenByPath {

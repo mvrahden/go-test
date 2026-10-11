@@ -99,6 +99,13 @@ func (s *NoPackagesTestSuite) TestAPatternBesideOthersThatMatched(t *gotest.T) {
 		stdout, _, _ := s.cli.runSplit(it, notestfiles, nogo)
 		gotest.Equal(it, verdict, stdout)
 	})
+
+	t.It("warns about a meta pattern as go test does: tool in a module declaring none", func(it *gotest.T) {
+		stdout, stderr, code := s.cli.runSplit(it, notestfiles, "tool")
+		gotest.Equal(it, 0, code, "stderr:\n%s", stderr)
+		gotest.Equal(it, "warning: \"tool\" matched no packages\n", stderr)
+		gotest.Equal(it, verdict, stdout)
+	})
 }
 
 // TestWatchKeepsWatching starts watch on a pattern that matches nothing yet:

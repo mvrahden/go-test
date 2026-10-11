@@ -201,6 +201,8 @@ func (s *ReplayVerdictTestSuite) TestGotestStreamsThatRanNothing(t *gotest.T) {
 	}{
 		{"a package without test files", []string{"./cmd/gotest/testdata/unrun/notestfiles/"}, "?   \t" + unrun + "notestfiles\t[no test files]\n"},
 		{"a package with stdlib tests only", []string{"./cmd/gotest/testdata/unrun/nosuites/"}, "?   \t" + unrun + "nosuites\t[no suites]\n"},
+		{"a std package with tests", []string{"errors"}, "?   \terrors\t[no suites]\n"},
+		{"a std package without test files", []string{"unsafe"}, "?   \tunsafe\t[no test files]\n"},
 		{"a package with benchmarks only", []string{"./cmd/gotest/testdata/unrun/benchonly/"}, "ok  \t" + unrun + "benchonly\t[no tests to run]\n"},
 		{"-run matching no suite", []string{"./cmd/gotest/testdata/census/plain/", "-run", "NoSuchSuite"}, "ok  \tgithub.com/mvrahden/go-test/cmd/gotest/testdata/census/plain\t[no tests to run]\n"},
 	}) {
