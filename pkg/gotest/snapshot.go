@@ -161,7 +161,7 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 		suffix = "_ext"
 	}
 
-	snapDir := filepath.Join(filepath.Dir(callerFile), "testdata", "__snapshots__")
+	snapDir := snapshotDirFor(callerFile)
 	snapPath := filepath.Join(snapDir, topLevel+suffix+".snap")
 
 	mu := fileMutex(snapPath)
@@ -220,6 +220,14 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 			failf(t, "MatchSnapshot: snapshot mismatch [%s]:\n  expected: %s\n  actual:   %s\nRun with GOTEST_UPDATE_SNAPSHOTS=1 to update", sectionKey, want, got)
 		}
 	}
+}
+
+// snapshotDirFor is where the snapshots of a caller file live. Tests of
+// MatchSnapshot itself point it at a temp dir, away from the source tree.
+var snapshotDirFor = defaultSnapshotDir
+
+func defaultSnapshotDir(callerFile string) string {
+	return filepath.Join(filepath.Dir(callerFile), "testdata", "__snapshots__")
 }
 
 // snapshotReadonly returns true when MatchSnapshot should refuse to generate

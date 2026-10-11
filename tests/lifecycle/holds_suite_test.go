@@ -13,7 +13,7 @@ import (
 // HoldsTestSuite runs generated fixture packages under plain go test, where
 // every suite shares one process and each top-level function holds the
 // fixtures for itself.
-type HoldsTestSuite struct{}
+type HoldsTestSuite struct{ root string }
 
 func (s *HoldsTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
@@ -29,26 +29,24 @@ func (s *HoldsTestSuite) BeforeAll(t *gotest.T) {
 	binary, err := testkit.BuildCLI(t.Context(), root, t.TempDir())
 	gotest.NoError(t, err)
 	testkit.ScrubActionsEnv()
+	s.root = stageTestdata(t, root)
 	for _, dir := range plainPackages {
-		out, err := exec.Command(binary, "generate", dir).CombinedOutput() //nolint:gosec // G204: controlled binary with fixed args
+		cmd := exec.Command(binary, "generate", dir) //nolint:gosec // G204: controlled binary with fixed args
+		cmd.Dir = s.root
+		out, err := cmd.CombinedOutput()
 		gotest.NoError(t, err, string(out))
 	}
 }
 
-func (s *HoldsTestSuite) AfterAll(t *gotest.T) {
-	for _, dir := range plainPackages {
-		generated, _ := filepath.Glob(filepath.Join(dir, "gotest_p*suite_test.go"))
-		for _, f := range generated {
-			_ = os.Remove(f)
-		}
-	}
-}
+// AfterAll has nothing to release: the staged module is a temp dir.
+func (s *HoldsTestSuite) AfterAll(t *gotest.T) {}
 
-// goTest runs go test on dir and returns its exit code, its output and the
+// goTest runs go test on dir, relative to the staged module root, and returns its exit code, its output and the
 // fixture's setup and teardown lines, which it logs to the file logEnv names.
-func goTest(t *gotest.T, dir, logEnv string, env []string, args ...string) (code int, out string, events []string) {
+func goTest(t *gotest.T, root, dir, logEnv string, env []string, args ...string) (code int, out string, events []string) {
 	log := filepath.Join(t.TempDir(), "events")
 	cmd := exec.Command("go", append(append([]string{"test", "-count=1", "-v"}, args...), dir)...) //nolint:gosec // G204: fixed args
+	cmd.Dir = root
 	cmd.Env = append(append(ownEnv(), logEnv+"="+log), env...)
 	raw, err := cmd.CombinedOutput()
 	if err != nil {
@@ -61,8 +59,8 @@ func goTest(t *gotest.T, dir, logEnv string, env []string, args ...string) (code
 	return code, string(raw), events
 }
 
-func holds(t *gotest.T, env []string, args ...string) (code int, out string, events []string) {
-	return goTest(t, "./testdata/holds/", "HOLDS_LOG", env, args...)
+func (s *HoldsTestSuite) holds(t *gotest.T, env []string, args ...string) (code int, out string, events []string) {
+	return goTest(t, s.root, "./testdata/holds/", "HOLDS_LOG", env, args...)
 }
 
 // Every fixture-bound top-level function holds the fixture once: TestSeeded,
@@ -77,7 +75,7 @@ func (s *HoldsTestSuite) TestEachTopLevelFunctionHoldsTheFixture(t *gotest.T) {
 		{"a plain run", nil, 4},
 		{"two shuffled rounds", []string{"-count=2", "-shuffle=on"}, 8},
 	}) {
-		code, out, events := holds(t, nil, tc.flags...)
+		code, out, events := s.holds(t, nil, tc.flags...)
 		gotest.Equal(t, 0, code, out)
 		gotest.Len(t, events, 2*tc.holds, "%q", events)
 		for i, e := range events {
@@ -88,7 +86,7 @@ func (s *HoldsTestSuite) TestEachTopLevelFunctionHoldsTheFixture(t *gotest.T) {
 
 func (s *HoldsTestSuite) TestARunThatSelectsNoBoundSuiteSetsNothingUp(t *gotest.T) {
 	for _, flags := range [][]string{{"-run", "TestUnboundTestSuite"}, {"-list", "."}} {
-		code, out, events := holds(t, nil, flags...)
+		code, out, events := s.holds(t, nil, flags...)
 		gotest.Equal(t, 0, code, "go test %v\n%s", flags, out)
 		gotest.Empty(t, events, "go test %v", flags)
 	}
@@ -96,13 +94,13 @@ func (s *HoldsTestSuite) TestARunThatSelectsNoBoundSuiteSetsNothingUp(t *gotest.
 
 // The failure lands on the function that held the fixture.
 func (s *HoldsTestSuite) TestATeardownFailureFailsTheHoldingTest(t *gotest.T) {
-	code, out, _ := holds(t, []string{"HOLDS_FAIL_TEARDOWN=1"}, "-run", "TestPanickingTestSuite")
+	code, out, _ := s.holds(t, []string{"HOLDS_FAIL_TEARDOWN=1"}, "-run", "TestPanickingTestSuite")
 	gotest.Equal(t, 1, code, out)
 	gotest.Regexp(t, `fixture teardown failed\n--- FAIL: TestPanickingTestSuite `, out)
 }
 
 func (s *HoldsTestSuite) TestAPanickingTestReleasesTheFixture(t *gotest.T) {
-	code, out, events := holds(t, []string{"HOLDS_PANIC=1"}, "-run", "TestPanickingTestSuite")
+	code, out, events := s.holds(t, []string{"HOLDS_PANIC=1"}, "-run", "TestPanickingTestSuite")
 	gotest.NotEqual(t, 0, code, "exit 0 after a panic\n%s", out)
 	gotest.Contains(t, out, "panic: method panic")
 	gotest.Equal(t, []string{"setup", "teardown"}, events)
@@ -111,7 +109,7 @@ func (s *HoldsTestSuite) TestAPanickingTestReleasesTheFixture(t *gotest.T) {
 // The testing package skips the parent's cleanups on a panicking
 // sub-benchmark; the generated guard releases the fixture instead.
 func (s *HoldsTestSuite) TestAPanickingBenchmarkReleasesTheFixture(t *gotest.T) {
-	code, out, events := holds(t, []string{"HOLDS_BENCH_PANIC=1"}, "-run", "^$", "-bench", "BenchmarkPanickingTestSuite")
+	code, out, events := s.holds(t, []string{"HOLDS_BENCH_PANIC=1"}, "-run", "^$", "-bench", "BenchmarkPanickingTestSuite")
 	gotest.NotEqual(t, 0, code, "exit 0 after a panic\n%s", out)
 	gotest.Contains(t, out, "panic: benchmark panic")
 	gotest.Contains(t, out, "BenchmarkPanickingTestSuite/BenchmarkPanics panicked; releasing fixtures")
@@ -136,7 +134,7 @@ func (s *HoldsTestSuite) TestEveryPanicReleasesTheFixture(t *gotest.T) {
 		{"BeforeAll on the fuzz path", "fuzzbeforeall", []string{"-run", "FuzzFuzzSetupTestSuite_FuzzInput"}, "fuzz BeforeAll panic"},
 		{"AfterAll on the benchmark path", "benchafterall", []string{"-run", "^$", "-bench", "BenchmarkBenchTeardownTestSuite", "-benchtime=1x"}, "bench AfterAll panic"},
 	}) {
-		code, out, events := goTest(t, "./testdata/panics/", "PANICS_LOG", []string{"PANICS=" + tc.scenario}, tc.args...)
+		code, out, events := goTest(t, s.root, "./testdata/panics/", "PANICS_LOG", []string{"PANICS=" + tc.scenario}, tc.args...)
 		gotest.NotEqual(t, 0, code, out)
 		gotest.Contains(t, out, tc.value)
 		gotest.Equal(t, []string{"setup", "teardown"}, events, out)

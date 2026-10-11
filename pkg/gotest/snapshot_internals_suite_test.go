@@ -19,27 +19,33 @@ import (
 type SnapshotInternalsTestSuite struct {
 	dir     string
 	snapDir string
-	written []string
+	restore func()
 }
 
+// BeforeEach redirects snapshots into a temp dir, so no test writes into
+// the source tree.
 func (s *SnapshotInternalsTestSuite) BeforeEach(t *gotest.T) {
 	_, file, _, _ := runtime.Caller(0)
 	s.dir = filepath.Dir(file)
-	s.snapDir = filepath.Join(s.dir, "testdata", "__snapshots__")
-	s.written = nil
+	s.snapDir = t.TempDir()
+	s.restore = gotest.ExportRedirectSnapshots(s.snapDir)
 }
 
-func (s *SnapshotInternalsTestSuite) AfterEach(t *gotest.T) {
-	for _, f := range s.written {
-		os.Remove(f)
-	}
-}
+func (s *SnapshotInternalsTestSuite) AfterEach(t *gotest.T) { s.restore() }
 
-// snap registers a snapshot file for removal after the test and returns its path.
+// snap returns the path of a snapshot file in the test's snapshot dir.
 func (s *SnapshotInternalsTestSuite) snap(name string) string {
-	p := filepath.Join(s.snapDir, name)
-	s.written = append(s.written, p)
-	return p
+	return filepath.Join(s.snapDir, name)
+}
+
+// Without a redirect, snapshots live in testdata/__snapshots__ beside the
+// file MatchSnapshot is called from.
+func (s *SnapshotInternalsTestSuite) TestDefaultSnapshotDir(t *gotest.T) {
+	caller := filepath.Join(s.dir, "x_test.go")
+	want := filepath.Join(s.dir, "testdata", "__snapshots__")
+	if got := gotest.ExportDefaultSnapshotDir(caller); got != want {
+		t.Errorf("snapshot dir: want %s, got %s", want, got)
+	}
 }
 
 func fatalf(t *gotest.T, format string, args ...any) {

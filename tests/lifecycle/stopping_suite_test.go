@@ -31,27 +31,28 @@ func (s *StoppingTestSuite) BeforeAll(t *gotest.T) {
 	cli, err := testkit.BuildCLI(t.Context(), root, t.TempDir())
 	gotest.NoError(t, err)
 	testkit.ScrubActionsEnv()
+	staged := stageTestdata(t, root)
 	s.bin = map[string]string{}
 	for _, pkg := range []string{"setup", "hold", "quick"} {
 		dir := "./testdata/stopping/" + pkg + "/"
-		out, err := exec.Command(cli, "generate", dir).CombinedOutput() //nolint:gosec // G204: controlled binary with fixed args
+		gen := exec.Command(cli, "generate", dir) //nolint:gosec // G204: controlled binary with fixed args
+		gen.Dir = staged
+		out, err := gen.CombinedOutput()
 		gotest.NoError(t, err, string(out))
 		name := pkg + ".test"
 		if runtime.GOOS == "windows" {
 			name += ".exe"
 		}
 		s.bin[pkg] = filepath.Join(t.TempDir(), name)
-		out, err = exec.Command("go", "test", "-c", "-o", s.bin[pkg], dir).CombinedOutput() //nolint:gosec // G204: fixed args
+		build := exec.Command("go", "test", "-c", "-o", s.bin[pkg], dir) //nolint:gosec // G204: fixed args
+		build.Dir = staged
+		out, err = build.CombinedOutput()
 		gotest.NoError(t, err, string(out))
 	}
 }
 
-func (s *StoppingTestSuite) AfterAll(t *gotest.T) {
-	generated, _ := filepath.Glob("testdata/stopping/*/gotest_p*suite_test.go")
-	for _, f := range generated {
-		_ = os.Remove(f)
-	}
-}
+// AfterAll has nothing to release: the staged module is a temp dir.
+func (s *StoppingTestSuite) AfterAll(t *gotest.T) {}
 
 // announced starts the binary as the runner does, with a stop file, and
 // returns the file to create before interrupting.
