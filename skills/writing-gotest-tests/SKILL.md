@@ -244,6 +244,13 @@ parallel suites, or structural problems — those are your job, below.
     fixture fields are still nil in the guard. A shared fixture the suite
     binds is started by the runner regardless — no guard can stop it.
 
+## When gotest itself is wrong
+
+When gotest — or this skill — seems to misbehave, first check it really is
+gotest's fault (most look-alikes are a stray binary or an old pin), then
+draft a report and send it only on the user's yes: follow
+`reference/reporting.md`. Never hide it behind a weakened or deleted test.
+
 ## Restructuring existing suites (the blue phase)
 
 Enter only at a green pause point when: setup is duplicated across tests, a
@@ -309,3 +316,4 @@ func (s *CartTestSuite) TestTotalsItems(t *gotest.T) {
 - `reference/migration.md` — testify/stdlib → gotest
 - `reference/fuzzing.md` — fuzz targets, seeds, struct arguments, the crasher loop
 - `reference/versions.md` — what older releases lack or do differently
+- `reference/reporting.md` — telling a gotest bug from a look-alike, and reporting it

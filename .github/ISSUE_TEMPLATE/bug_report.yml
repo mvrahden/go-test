@@ -1,0 +1,72 @@
+name: Bug report
+description: gotest does something it should not, or its docs or agent skill describe something it does not do.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before reporting, run gotest through the tool directive (`go tool gotest`) at the newest release: most problems with a globally installed binary or an old pin disappear there.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CLI or test runs
+        - Generated harness (suites, fixtures, lifecycle)
+        - Assertions
+        - Linter
+        - VS Code extension
+        - GitHub Action
+        - Docs or agent skill
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: gotest version
+      description: Output of `go tool gotest version`.
+      placeholder: v1.33.0
+    validations:
+      required: true
+  - type: input
+    id: go-version
+    attributes:
+      label: Go version
+      description: Output of `go version`.
+      placeholder: go version go1.26.0 linux/amd64
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS and architecture
+      description: Output of `go env GOOS GOARCH`. Add the editor and extension version if the extension is involved.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: The smallest module that shows it — its go.mod, the test file and the command you ran. Leave out private code.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The command's full output.
+      render: text
+  - type: dropdown
+    id: author
+    attributes:
+      label: How was this report written?
+      options:
+        - By me
+        - Drafted by a coding agent, reviewed by me
+    validations:
+      required: true
