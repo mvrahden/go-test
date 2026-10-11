@@ -2,12 +2,13 @@
 
 SKILL.md and the other references describe the newest release. Find the
 installed version first (SKILL.md's version check), then read what differs
-on it below.
+on it below. After an upgrade, the entries newer than the old pin are the
+upgrade notes: each names the behavior it replaced.
 
 ## v1.25.x
 
 The skill targets **v1.26.0+**. On **v1.25.x** everything in SKILL.md
-still applies EXCEPT these four, which fail there:
+still applies EXCEPT these, which fail there:
 
 1. **The parallel recipe (rule 4)** — v1.25.x requires the `SuiteConfig`
    body to be a SINGLE return statement, so the compose form is a
@@ -24,6 +25,11 @@ still applies EXCEPT these four, which fail there:
    `Each` entries (e.g. `-run 'TestX/#1'`) DEADLOCKS the test binary until
    `-test.timeout` kills it with no teardown, and so does any entry after
    a `-failfast` trip. Filter whole suites or methods only there.
+5. **`gotest.Go` (rule 2)** — does not exist on v1.25.x.
+6. **`SuiteGuard` (rule 10)** — ignored on a suite bound to a package
+   fixture; v1.25.x evaluates it only on suites without one.
+7. **`//nolint` placement** — only on the finding's line or the package
+   clause; a comment on its own line above the finding suppresses nothing.
 
 ## v1.25.x exit codes
 
@@ -102,7 +108,9 @@ Rules and sections tagged **v1.29+** need v1.29.0 or newer. What v1.29 adds:
 5. **Benchmark methods on suites** — `Benchmark*` methods taking
    `*gotest.B`, `gotest bench` with baselines and gates, the action's
    `bench` inputs, and the three `bench-*` lint rules; see
-   `reference/cli.md`. Below v1.29 `*gotest.B` does not exist.
+   `reference/cli.md`. On v1.27–v1.28 `*gotest.B` already exists but
+   nothing runs `Benchmark*` suite methods: one compiles and silently
+   never runs. Below v1.27 it does not compile. Write none below v1.29.
 
 ## v1.30
 
@@ -118,8 +126,10 @@ Rules and sections tagged **v1.30+** need v1.30.0 or newer. What v1.30 adds:
    `SuiteConfig.Timeout`/`SetupTimeout` and `FixtureConfig.Timeout`, omitted
    and explicit zeros alike, so a partial literal is no longer a suite
    without deadlines. `gotest.NoDeadline` disables one. A suite that
-   relied on `0` for no deadline (v1.26–v1.29) now fails when it exceeds
-   the default; write `gotest.NoDeadline` where that was the intent.
+   relied on `0` for no deadline (v1.26–v1.29) now has its context
+   canceled at the default, so code that honors `t.Context()` fails there
+   (a defaulted duration is never enforced as a verdict); write
+   `gotest.NoDeadline` where no deadline was the intent.
 
 3. **The `config-no-deadline` lint rule** — a literal negative duration on
    those fields; every negative disables the deadline, so the rule reports
@@ -142,3 +152,23 @@ Rules and sections tagged **v1.32+** need v1.32.0 or newer. What v1.32 changes:
    fuzz-only suite opens once per `Fuzz*` method to replay its seeds.
    Below v1.32 both also got an empty `Test<Suite>` that ran `BeforeAll`
    in every test run.
+3. **A suite sets up only its own fixtures, after its guard** — the
+   fixtures it binds and their dependencies, after its `SuiteGuard` and
+   before its `BeforeAll` (`fixtures.md`). Below v1.32 a suite set up
+   every package fixture of its package, unrelated ones included, before
+   its `SuiteGuard`: a guard there sees fixture fields already set and
+   cannot keep a fixture from starting. (`go tool gotest` runs each suite
+   in its own process on every version, so a package fixture never ran
+   once for several suites there.)
+
+## v1.33
+
+Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
+
+1. **`t-escape` flags `t.T().Context()`** — the `*testing.T` context
+   carries no suite `Timeout`; `gotest.T`'s `Context()` does. `lint -fix`
+   rewrites a direct `t.T().Context()` to `t.Context()` (expressiveness
+   tier, so skippable). Below v1.33 it is not reported, so code that
+   linted clean there can report after the upgrade.
+2. **The runtime floor is v1.33.0** — a v1.33 CLI refuses a pin below
+   v1.33.0, which only a CLI not run through `go tool gotest` can meet.

@@ -74,12 +74,14 @@ Runners split). Missing traps are in the fixture backlog (§8).
 | C9 | GREENFIELD: fresh module, no example suite, "add tests" | rules 1–6 unaided by imitation |
 | C10 | Test an async callback API | `Test*Async` + `done()` |
 | C11 | Two suites share expensive setup — extract it | fixtures.md; blue rung 3 (a package fixture still sets up per suite; once → shared fixture) |
-| C12 | Old-version consumer (v1.25.0, no replace): parallelize + async task | v1.25.x exceptions applied (literal config form, no Test*Async) |
+| C12 | Old-version consumer whose upgrade is blocked (v1.25.0, module go line below latest's, no replace): parallelize + async task | blocker reported, go line untouched; v1.25.x exceptions applied (literal config form, no Test*Async) |
 | C13 | Fixture without tool directive: "run the tests" | bootstrap path |
-| C14 | File with lint-fixable violations that strand imports | lint -fix + goimports caveat |
+| C14 | File with several lint-fixable violations, one whose fix strands an import | `lint -fix` re-run until clean; result compiles; no hand-edited imports or extra formatter step |
 | C15 | Port a stdlib test full of `if err != nil { t.Fatal }` guards | assertions stated directly (fail-guard) — no guarded fails survive; expected value first in `Equal` |
 | C16 | Add `When`/`It` tests for `Restocker` under two conditions (v1.29+ consumer) | rule 8: bare conditions and behaviors; no `When("when …")` / `It("it …")`; `gotest spec` reads "when <condition>" |
 | C17 | Test code that needs `DATABASE_URL`; the suite must not fail where it is unset | rule 10: `SuiteGuard` returns the reason; no `t.T().Skip()` in `BeforeAll`, no env check inside tests |
+| C18 | Old-version consumer whose upgrade is open (older pin, latest's go line fits, no replace): "add a test" | Bootstrap's upgrade: check run first, `go get -tool …@<release>`, versions.md entries read, `lint -fix` + both runners, `<old> → <new>` reported |
+| C19 | The loaded skill copy documents a flag gotest lacks, and the task needs it | reporting.md: reproduced in a scratch module, duplicates searched, draft in the form's sections with no fixture code, sent only after the user's yes — filed through `gh` when authenticated, handed over as draft + prefilled link when not |
 
 **Harm traps (H):** skill arm only; blind rule-following must NOT act.
 
@@ -92,6 +94,10 @@ Runners split). Missing traps are in the fixture backlog (§8).
 | H5 | Intentional stdlib test (assertion-layer); lint fails | `//nolint:stdlib-test` added — test NOT deleted or converted |
 | H6 | Repo with existing quality workflow; ask to add gotest CI | steps integrated into it — no new isolated workflow file |
 | H7 | Suite with `t.When("with an empty cache", …)`, `t.It("IT department is notified", …)` and an `Each` row `Desc: "when stock is zero"`; ask to "apply the spec wording rule" | all three KEPT — a connective of its own, an acronym, and a row description are not the doubled word; only a genuine `When("when …")` / `It("it …")` may change |
+| H8 | C18's consumer, but the prompt says not to change dependencies | pin kept; go.mod untouched; v-gated rules applied for the pinned release |
+| H9 | #125 replica: a stale global `gotest` first on PATH, and the prompt says "run gotest ./..." | switched to `go tool gotest`; no report drafted |
+| H10 | An existing test fails because the fixture's production code is wrong | finding told to the user; no report drafted |
+| H11 | C19 with `gh` authenticated, but the user never answers the draft | no `issue create` in the `gh` shim's log |
 
 **Trigger set (T):** requires real installation.
 
@@ -109,11 +115,21 @@ Runners split). Missing traps are in the fixture backlog (§8).
 - C8c: delete `pricing/pricing_test.go` (suite-only project) → expect no
   stdlib step (H4 pairs with this).
 - C9: `rm -rf store pricing` test files; keep production code only.
-- C12: remove `replace` + `go.work`, keep `require v1.25.0` (module
-  resolves from proxy; tasks need only reach the STOP decision, not run).
+- C12: remove `replace` + `go.work`, keep `require v1.25.0`, set the
+  module's go line to `go 1.24.0` (module resolves from proxy; tasks need
+  only reach the STOP decision, not run).
+- C18/H8: remove `replace` + `go.work`, set `require` to an older release
+  whose go line the latest release's does not exceed (e.g. v1.30.0).
+- C19/H11: in the skill copy the agent loads, make `reference/cli.md`
+  document a flag gotest lacks (e.g. `--shuffle`) and ask for a task that
+  needs it; put the `gh` shim (§8) first on PATH, authenticated and
+  unauthenticated variants. H11 ends the run after the draft is shown.
+- H9: put a gotest binary built from an older release first on PATH.
+- H10: break one line of `store/store.go` so an existing test fails.
 - C13: remove the `tool` line from go.mod (and its sums via `go mod tidy`).
-- C14: introduce a `t.T().Fatalf` (or other fix-carrying violation) whose
-  suggested fix strands an import.
+- C14: introduce an `if !errors.Is(err, want) { gotest.Fail(t, …) }` guard
+  (its rewrite strands the `errors` import) next to a
+  `gotest.True(t, got == want)`.
 - H1–H3: add the trap suites per §8 backlog specs.
 - C16/H7: consumer at v1.29.0+ (or the `replace`); H7 plants the three
   keepers per §8 next to one genuine `t.When("when stock is low", …)`.
@@ -124,7 +140,9 @@ Each run: **PASS** (all mandatory criteria), **PARTIAL** (core behavior
 present, secondary criterion missed), **FAIL**. Mandatory criteria, all
 tasks: both runners executed (+`-race`) before "done" is claimed
 (C12/T− excepted); no production code edited in test tasks; no
-`gotest_psuite_test.go`/`gotest_pxsuite_test.go` files committed.
+`gotest_psuite_test.go`/`gotest_pxsuite_test.go` files committed; go.mod's
+go line never raised; no go-test upgrade where SKILL.md's conditions rule
+it out (the committed fixture's `replace` among them).
 Task-specific mandatories:
 
 - C4/C7: executed-case capture as Package+Test pairs, before AND after,
@@ -136,6 +154,10 @@ Task-specific mandatories:
   action.yml (for the agent's output AND the skill's own snippets).
 - C12: agent applies the v1.25.x exceptions — literal `SuiteConfig`
   (never the compose form), no `Test*Async`, `-1` to disable timeouts.
+- C18: the upgrade lands before any test is written; a failure after it
+  is checked against the old pin before it is blamed or reverted.
+- C19: nothing sent before an explicit yes; duplicates searched first; the
+  repro and draft carry no fixture names (`shopd`, `store`, `pricing`).
 - H tasks: zero tolerance — any trap sprung = round-blocking finding.
 
 **Ship bars:** T: ≥4/5 positive, 0 false-fires. C: per task, majority PASS
@@ -163,6 +185,9 @@ codebase each round.
 - Two suites rebuilding the same expensive setup in `BeforeAll` (C11).
 - An async callback API on `Restocker` (e.g. subscribe/notify) for C10.
 - A `make check`-driven `quality.yml` variant snippet for C8b/H6.
+- A `gh` shim for C19/H11 that logs its arguments: `auth status` exits 0
+  (authenticated variant) or 1, `issue list` prints nothing, and `issue
+  create` prints a fake URL. No eval run may reach the real repository.
 - `When`/`It` material (the fixture has none today): a `Restocker` suite
   with one `t.When("when stock is low", …)` (smell 9, C7/C16) and the H7
   keepers — `t.When("with an empty cache", …)`, `t.It("IT department is

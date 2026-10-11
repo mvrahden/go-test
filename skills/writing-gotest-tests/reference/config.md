@@ -10,14 +10,18 @@ zero behave as if the marker were absent:
 - No marker → `DefaultSuiteConfig()` (30s test timeout, 30s setup timeout).
 - Marker present → booleans (`Parallel`, `Exclusive`, `FailFast`) are used
   as written. From v1.30 a duration left at zero (omitted or explicit) gets
-  the default: `SuiteConfig{Parallel: true}` runs with 30s/30s (v1.26–v1.29
-  it meant no deadline).
+  the default: `SuiteConfig{Parallel: true}` bounds the contexts at
+  30s/30s (v1.26–v1.29 it meant no deadline).
+- Only a positive duration you write is also a verdict: a test that
+  outlives it is failed even when it ignores its context. A defaulted
+  duration bounds the context and is never enforced.
 - `gotest.NoDeadline` (any negative duration) disables the deadline. Write the
   constant, not a bare negative: from v1.30 `gotest lint` reports a literal
   negative (`config-no-deadline`) and `-fix` spells it `gotest.NoDeadline`.
 - Upgrading from v1.26–v1.29: a suite that relied on `Timeout: 0` for no
-  deadline now gets the default one and fails when it exceeds it. Write
-  `gotest.NoDeadline` where that was the intent.
+  deadline now has its context canceled at the default — code that honors
+  `t.Context()` fails there, code that ignores it is not failed. Write
+  `gotest.NoDeadline` where no deadline was the intent.
 - `SetupTimeout` bounds `BeforeAll`/`AfterAll` of benchmark and fuzz
   suites too from v1.32; before, their contexts had no deadline.
 
@@ -58,6 +62,7 @@ runs alike. Use it for suites whose *verdicts* measure wall-clock
 behavior or that fight over machine-wide resources (timing budgets,
 containers, ports, per-invocation child builds): a budget verdict taken
 on a saturated machine is not a verdict you can act on. Shared fixtures
-stay up across the exclusive tail — they are infrastructure, not
-competing suites. Exclusive is not a serialization tool for shared
-mutable state; use non-parallel suites for that.
+follow their window (`fixtures.md`): one both phases need stays up across
+the tail, one only the bulk needed is torn down before it, and one only
+the tail needs starts there. Exclusive is not a serialization tool for
+shared mutable state; use non-parallel suites for that.
