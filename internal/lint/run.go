@@ -2,6 +2,7 @@ package lint
 
 import (
 	"cmp"
+	"context"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -21,7 +22,7 @@ type Finding struct {
 	EndLine int
 	Rule    string // the diagnostic category, i.e. the rule ID
 	Message string
-	Fixable bool // carries a fix the go/analysis driver would apply
+	Fixable bool // carries a fix -fix applies
 }
 
 // Result is one analysis of the lint targets.
@@ -40,7 +41,7 @@ func (r *Result) PrintJSON(w io.Writer) error {
 // Run executes the analyzer over the packages matched by patterns, test
 // files included. See Analyze.
 func Run(dir string, patterns []string) ([]Finding, error) {
-	res, err := Analyze(dir, patterns, true)
+	res, err := Analyze(context.Background(), dir, patterns, true)
 	if err != nil {
 		return nil, err
 	}
@@ -52,12 +53,18 @@ func Run(dir string, patterns []string) ([]Finding, error) {
 // applied to Analyzer.Flags. dir is the module directory to load from; ""
 // means the current directory, matching the analysis driver's own
 // resolution. tests includes test files, like the driver's -test flag.
+// Canceling ctx stops the load.
 //
 // Findings are deduplicated across test-variant package loads and sorted by
 // position. A load or analysis failure is an error, never an empty result:
 // nothing was proven about a package that was not analyzed.
-func Analyze(dir string, patterns []string, tests bool) (*Result, error) {
-	pkgs, err := load(dir, patterns, tests)
+func Analyze(ctx context.Context, dir string, patterns []string, tests bool) (*Result, error) {
+	return analyze(ctx, dir, patterns, tests, nil)
+}
+
+// analyze is Analyze with sources read from overlay where it has them.
+func analyze(ctx context.Context, dir string, patterns []string, tests bool, overlay map[string][]byte) (*Result, error) {
+	pkgs, err := load(ctx, dir, patterns, tests, overlay)
 	if err != nil {
 		return nil, err
 	}

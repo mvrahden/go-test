@@ -71,11 +71,26 @@ func (s *LintPlainTestSuite) TestPlainMode(t *gotest.T) {
 
 	t.When("a flag only the driver implements is present", func(w *gotest.T) {
 		var stderr bytes.Buffer
-		_, ok := ExportRunLintPlain(&stderr, "", []string{"-fix", "-diff", "./..."})
+		_, ok := ExportRunLintPlain(&stderr, "", []string{"-debug=v", "./..."})
 
 		w.It("defers to the singlechecker driver", func(it *gotest.T) {
 			gotest.False(it, ok)
 			gotest.Empty(it, stderr.String())
+		})
+	})
+
+	t.When("the patterns match no package", func(w *gotest.T) {
+		w.Setenv("GOWORK", "off")
+		dir := w.TempDir()
+		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.25\n"), 0o600))
+
+		var stderr bytes.Buffer
+		code, ok := ExportRunLintPlain(&stderr, dir, []string{"./..."})
+
+		w.It("exits 1 instead of passing on nothing", func(it *gotest.T) {
+			gotest.True(it, ok)
+			gotest.Equal(it, 1, code)
+			gotest.Equal(it, "FAIL: load packages: ./... matched no packages\n", stderr.String())
 		})
 	})
 

@@ -726,14 +726,17 @@ Flags:
   -disable-nolint         Ignore //nolint comments
   -fix                    Apply suggested fixes, overlapping ones included,
                           then report the findings left as a plain run
-                          would (exit 3 if any). With -diff one pass of
-                          fixes is previewed; nothing is written or reported.
+                          would (exit 3 if any)
+  -diff                   Print what -fix would write as a unified diff on
+                          stdout and write nothing; report and exit as -fix
+                          would (implies -fix)
   -json                   Print the findings as JSON on stdout and exit 0,
-                          as the go/analysis driver does (also with -fix)
+                          as the go/analysis driver does (also with -fix;
+                          not with -diff)
   --github                Also emit GitHub ::error annotations and append a
                           findings table to $GITHUB_STEP_SUMMARY. Implied when
-                          GITHUB_ACTIONS=true; ignored alongside -json and
-                          flags only the go/analysis driver has, such as -diff.
+                          GITHUB_ACTIONS=true; ignored alongside -json, -diff
+                          and flags only the go/analysis driver has.
 
 Suppress individual diagnostics with //nolint comments:
   //nolint:stdlib-test             Same line, or a comment block of its own
@@ -741,15 +744,18 @@ Suppress individual diagnostics with //nolint comments:
   package foo //nolint:stdlib-test  Suppress for entire file
 
 Exit codes:
-  0   No findings
-  1   Uncompilable target packages (nothing was proven about them)
+  0   No findings (with -fix or -diff: none left after fixing)
+  1   Uncompilable target packages (nothing was proven about them), patterns
+      matching no package, or fixed sources that no longer compile
   2   Usage or configuration error (e.g. an integrity rule in lint.skip)
-  3   Findings reported (with -fix: the findings left after fixing)
+  3   Findings reported (with -fix or -diff: the findings left after fixing)
+  130 -fix or -diff stopped by a signal; nothing was written
 
 Examples:
   gotest lint ./...                          Lint all packages
   gotest lint -skip-testify ./...            Skip testify rule
   gotest lint -fix ./...                     Auto-fix where possible
+  gotest lint -diff ./... | git apply        Preview the fixes, then apply them
 `)
 }
 

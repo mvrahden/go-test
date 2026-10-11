@@ -1,23 +1,19 @@
 package main
 
 import (
-	"bytes"
-	"errors"
+	"context"
 	"fmt"
 	"io"
-	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/mvrahden/go-test/internal/config"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/internal/lint"
-	"github.com/mvrahden/go-test/internal/proctree"
+	"github.com/mvrahden/go-test/internal/unidiff"
 	"golang.org/x/tools/go/analysis/singlechecker"
 )
 
@@ -32,10 +28,10 @@ func runLint(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 	args = append(flagArgs, args...)
 
-	// Lint owns the analyzer's flags, -fix, -json, -test and -c, and runs
-	// from one load. A flag only the go/analysis driver implements (-diff,
-	// -debug, …) goes to that driver, which keeps its exact semantics but
-	// cannot emit annotations.
+	// Lint owns the analyzer's flags, -fix, -diff, -json, -test and -c. A
+	// flag only the go/analysis driver implements (-debug, -V, …) goes to
+	// that driver, which keeps its exact semantics but cannot emit
+	// annotations.
 	if code, ok := runLintInProcess(os.Stdout, os.Stderr, "", args, github); ok {
 		return code
 	}
@@ -53,11 +49,6 @@ func runLint(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	fmt.Fprintln(os.Stderr, "lint: unexpected return from singlechecker.Main")
 	return 2
 }
-
-// lintFixDriverArg, as the first argument, runs the go/analysis driver on
-// the rest: it is how lint -fix starts the child that applies the fixes.
-// Only the first argument counts, so no environment or flag trips it.
-const lintFixDriverArg = "--gotest-internal-lint-fix-driver"
 
 // runLintDriver hands args to the go/analysis driver, which exits.
 func runLintDriver(args []string) {
@@ -137,12 +128,14 @@ func parseLintArgs(args []string) (lintArgs, error) {
 	if len(a.patterns) == 0 {
 		a.patterns = []string{"./..."}
 	}
+	// -diff previews -fix, so it implies it.
+	a.fix = a.fix || a.diff
 	return a, nil
 }
 
 // inProcess reports whether lint can run without the go/analysis driver.
 func (a *lintArgs) inProcess() bool {
-	return len(a.driver) == 0 && !a.diff
+	return len(a.driver) == 0
 }
 
 // loads reports whether the driver will load the targets.
@@ -156,9 +149,6 @@ func (a *lintArgs) argv() []string {
 	out = append(out, a.analyzer...)
 	if a.fix {
 		out = append(out, "-fix")
-	}
-	if a.diff {
-		out = append(out, "-diff")
 	}
 	if a.json {
 		out = append(out, "-json")
@@ -175,8 +165,10 @@ func (a *lintArgs) argv() []string {
 // runLintInProcess runs the analyzer over the targets and reports what it
 // found: JSON on stdout with -json, GitHub annotations on stdout with
 // github, plain text on stderr otherwise. With -fix it first applies the
-// fixes and reports only what is left. ok=false means args carry a flag only
-// the go/analysis driver implements; nothing has run yet.
+// fixes and reports only what is left; with -diff it prints what -fix would
+// write instead, writes nothing, and reports what -fix would leave. ok=false
+// means args carry a flag only the go/analysis driver implements; nothing
+// has run yet.
 //
 // dir is the module directory to load from; "" means the current directory.
 // Annotation paths are relative to dir, which inside a workflow is the
@@ -187,8 +179,16 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 		fmt.Fprintf(stderr, "FAIL: %s\n", err)
 		return 2, true
 	}
+	if a.fix && a.loads() && len(a.driver) > 0 {
+		fmt.Fprintf(stderr, "FAIL: %s is a go/analysis driver flag; -fix and -diff do not take it\n", a.driver[0])
+		return 2, true
+	}
 	if !a.inProcess() {
 		return 0, false
+	}
+	if a.diff && a.json {
+		fmt.Fprintln(stderr, "FAIL: -diff and -json both print on stdout; use one")
+		return 2, true
 	}
 	for _, f := range a.analyzer {
 		name, value := splitBoolFlag(f)
@@ -198,16 +198,48 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 		}
 	}
 
+	ctx := context.Background()
+	if a.fix {
+		// Nothing is written until every pass is done, so a stop before
+		// then leaves every file as it was.
+		var stop context.CancelFunc
+		ctx, stop = shutdownContext()
+		defer stop()
+	}
+	interrupted := func() bool {
+		if ctx.Err() == nil {
+			return false
+		}
+		fmt.Fprintln(stderr, "lint: interrupted; nothing was written")
+		return true
+	}
+
 	// This load also proves the targets compile before anything is fixed.
-	res, err := lint.Analyze(dir, a.patterns, a.tests)
+	res, err := lint.Analyze(ctx, dir, a.patterns, a.tests)
+	if interrupted() {
+		return 130, true
+	}
 	if err != nil {
 		fmt.Fprintf(stderr, "FAIL: %v\n", err)
 		return 1, true
 	}
+	source := os.ReadFile
 	if a.fix && len(res.FixFiles) > 0 {
-		if res, code = applyLintFixes(stderr, dir, &a, res); res == nil {
-			return code, true
+		fixed, changes, err := lint.Fix(ctx, dir, a.patterns, a.tests, res)
+		if interrupted() {
+			return 130, true
 		}
+		if err != nil {
+			fmt.Fprintf(stderr, "FAIL: %v\n", err)
+			return 1, true
+		}
+		if a.diff {
+			printLintDiff(stdout, dir, changes)
+			source = lintChangedSource(changes)
+		} else if !writeLintFixes(stderr, changes) {
+			return 1, true
+		}
+		res = fixed
 	}
 
 	switch {
@@ -218,117 +250,52 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 			return 1, true
 		}
 		return 0, true
-	case github:
+	case github && !a.diff:
 		return reportLintGitHub(stdout, dir, res.Findings), true
 	default:
-		return reportLintPlain(stderr, res.Findings, a.context), true
+		return reportLintPlain(stderr, res.Findings, a.context, source), true
 	}
 }
 
-// lintFixPasses bounds the driver runs of one -fix. A pass applies every fix
-// that overlaps no other; the next applies what it held back or revealed.
-const lintFixPasses = 10
-
-// applyLintFixes runs the go/analysis driver as a child until no fix is
-// left or a pass changes nothing, and returns a fresh analysis of what is
-// left. A nil result means the run failed with code, already reported.
-func applyLintFixes(stderr io.Writer, dir string, a *lintArgs, res *lint.Result) (*lint.Result, int) {
-	args := append(slices.Clone(a.analyzer), "-fix")
-	if !a.tests {
-		args = append(args, "-test=false")
+// writeLintFixes writes the fixed files and reports whether all were.
+func writeLintFixes(stderr io.Writer, changes []lint.Change) bool {
+	ok := true
+	for _, c := range changes {
+		// The mode only applies to a file deleted meanwhile.
+		if err := os.WriteFile(c.File, c.After, 0o600); err != nil {
+			fmt.Fprintf(stderr, "FAIL: writing fixes: %v\n", err)
+			ok = false
+		}
 	}
-	args = append(args, a.patterns...)
-
-	files := res.FixFiles
-	for range lintFixPasses {
-		before := readLintFiles(files)
-		status, output, err := runLintFixDriver(dir, args)
-		if err != nil {
-			fmt.Fprintf(stderr, "FAIL: applying fixes: %v\n", err)
-			return nil, 2
-		}
-		if status == lintInterrupted {
-			_, _ = stderr.Write(output)
-			fmt.Fprintln(stderr, "lint: interrupted; fixes may be partly applied")
-			return nil, 130
-		}
-		progress := !maps.EqualFunc(before, readLintFiles(files), bytes.Equal)
-		// The driver exits 1 when it held overlapping fixes back, after
-		// writing the rest: progress, and the next pass applies them. Exit 1
-		// without progress, or any other status, is a failure of its own.
-		if status != 0 && (status != 1 || !progress) {
-			_, _ = stderr.Write(output)
-			fmt.Fprintf(stderr, "FAIL: applying fixes: the go/analysis driver exited %d\n", status)
-			return nil, 1
-		}
-		if status == 1 {
-			continue
-		}
-
-		// A clean pass can still reveal fixes, one rewrite enabling another.
-		if res, err = lint.Analyze(dir, a.patterns, a.tests); err != nil {
-			fmt.Fprintf(stderr, "FAIL: after applying fixes: %v\n", err)
-			return nil, 1
-		}
-		if !progress || len(res.FixFiles) == 0 {
-			return res, 0
-		}
-		files = res.FixFiles
-	}
-	res, err := lint.Analyze(dir, a.patterns, a.tests)
-	if err != nil {
-		fmt.Fprintf(stderr, "FAIL: after applying fixes: %v\n", err)
-		return nil, 1
-	}
-	return res, 0
+	return ok
 }
 
-// lintInterrupted is the status of a fix pass a shutdown signal stopped.
-const lintInterrupted = -1
-
-// runLintFixDriver runs this binary once as the go/analysis driver to apply
-// the fixes and returns its exit status and output. A shutdown signal stops
-// the child with lint, so no file is rewritten after lint has gone.
-func runLintFixDriver(dir string, args []string) (status int, output []byte, err error) {
-	exe, err := os.Executable()
-	if err != nil {
-		return 0, nil, fmt.Errorf("locating gotest: %w", err)
+// printLintDiff prints changes as one unified diff, with paths relative to
+// dir where they can be, git-style.
+func printLintDiff(stdout io.Writer, dir string, changes []lint.Change) {
+	base := dir
+	if base == "" {
+		base, _ = os.Getwd()
 	}
-	ctx, stop := shutdownContext()
-	defer stop()
-
-	cmd := exec.CommandContext(ctx, exe, append([]string{lintFixDriverArg}, args...)...) //nolint:gosec // G204: re-runs this binary
-	cmd.Dir = dir
-	var out bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &out
-	cmd.WaitDelay = lintFixWaitDelay
-	tree := proctree.New(cmd)
-	defer tree.Release()
-	if err := tree.Start(); err != nil {
-		return 0, nil, err
+	for _, c := range changes {
+		oldName, newName := filepath.ToSlash(c.File), filepath.ToSlash(c.File)
+		if rel := relPath(base, c.File); rel != c.File {
+			oldName, newName = "a/"+rel, "b/"+rel
+		}
+		fmt.Fprint(stdout, unidiff.Diff(oldName, newName, c.Before, c.After))
 	}
-	err = cmd.Wait()
-	if ctx.Err() != nil {
-		return lintInterrupted, out.Bytes(), nil
-	}
-	var exitErr *exec.ExitError
-	if err != nil && !errors.As(err, &exitErr) {
-		return 0, out.Bytes(), err
-	}
-	return cmd.ProcessState.ExitCode(), out.Bytes(), nil
 }
 
-// lintFixWaitDelay is the grace an interrupted fix pass gets before it is
-// killed; the driver ends on the signal at once.
-const lintFixWaitDelay = 5 * time.Second
-
-// readLintFiles snapshots files; one that cannot be read maps to nil.
-func readLintFiles(files []string) map[string][]byte {
-	contents := make(map[string][]byte, len(files))
-	for _, f := range files {
-		contents[f], _ = os.ReadFile(f)
+// lintChangedSource reads a file as -fix would leave it.
+func lintChangedSource(changes []lint.Change) func(string) ([]byte, error) {
+	return func(file string) ([]byte, error) {
+		for _, c := range changes {
+			if c.File == file {
+				return c.After, nil
+			}
+		}
+		return os.ReadFile(file)
 	}
-	return contents
 }
 
 // lintGitHubArmed reports whether lint should render GitHub annotations:
@@ -383,13 +350,13 @@ func reportLintGitHub(stdout io.Writer, dir string, findings []lint.Finding) int
 // reportLintPlain prints the findings on stderr, one "file:line:col:
 // message" line each, the way the go/analysis driver does; a non-negative
 // context adds the offending lines with that many lines around them.
-func reportLintPlain(stderr io.Writer, findings []lint.Finding, context int) int {
+func reportLintPlain(stderr io.Writer, findings []lint.Finding, context int, source func(string) ([]byte, error)) int {
 	for _, f := range findings {
 		fmt.Fprintf(stderr, "%s:%d:%d: %s\n", f.File, f.Line, f.Col, f.Message)
 		if context < 0 {
 			continue
 		}
-		data, _ := os.ReadFile(f.File)
+		data, _ := source(f.File)
 		lines := strings.Split(string(data), "\n")
 		for i := max(f.Line-context, 1); i <= min(f.EndLine+context, len(lines)); i++ {
 			fmt.Fprintf(stderr, "%d\t%s\n", i, lines[i-1])

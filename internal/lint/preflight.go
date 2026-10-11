@@ -1,7 +1,15 @@
 package lint
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/goversion"
@@ -19,23 +27,35 @@ import (
 // instead; this is the same success-is-proven contract the runner applies to
 // compile failures.
 func PreflightLoad(dir string, patterns []string) error {
-	_, err := load(dir, patterns, true)
+	_, err := load(context.Background(), dir, patterns, true, nil)
 	return err
 }
 
 // load type-checks the targets from source and reads their dependencies
 // from export data: the analyzer holds no facts, so it never looks at a
 // dependency's syntax. Every target that does not compile is named in the
-// error.
-func load(dir string, patterns []string, tests bool) ([]*packages.Package, error) {
+// error. overlay replaces the contents of the files it names.
+func load(ctx context.Context, dir string, patterns []string, tests bool, overlay map[string][]byte) ([]*packages.Package, error) {
 	cfg := &packages.Config{
-		Dir:   dir,
-		Mode:  packages.LoadSyntax | packages.NeedModule,
-		Tests: tests,
+		Context: ctx,
+		Dir:     dir,
+		Mode:    packages.LoadSyntax | packages.NeedModule,
+		Tests:   tests,
+	}
+	if len(overlay) > 0 {
+		cleanup, err := withOverlay(cfg, overlay)
+		if err != nil {
+			return nil, fmt.Errorf("load packages: %w", err)
+		}
+		defer cleanup()
 	}
 	pkgs, err := packages.Load(cfg, patterns...)
 	if err != nil {
 		return nil, fmt.Errorf("load packages: %w", err)
+	}
+	// go list failing outright also loads nothing, without an error.
+	if len(pkgs) == 0 {
+		return nil, fmt.Errorf("load packages: %s matched no packages", strings.Join(patterns, " "))
 	}
 	if err := goversion.Check(pkgs); err != nil {
 		return nil, err
@@ -58,4 +78,44 @@ func load(dir string, patterns []string, tests bool) ([]*packages.Package, error
 		return nil, fmt.Errorf("cannot lint uncompilable packages — nothing was proven about them:\n%s", strings.Join(broken, "\n"))
 	}
 	return pkgs, nil
+}
+
+// withOverlay makes cfg load overlay's contents in place of the files it
+// names. Config.Overlay would do it too, but go/packages then distrusts all
+// export data and type-checks every dependency from source; the go command's
+// own -overlay builds export data from the overlay, so it stays usable.
+func withOverlay(cfg *packages.Config, overlay map[string][]byte) (cleanup func(), err error) {
+	dir, err := os.MkdirTemp("", "gotest-lint-overlay")
+	if err != nil {
+		return nil, err
+	}
+	cleanup = func() { _ = os.RemoveAll(dir) }
+	replace := map[string]string{}
+	i := 0
+	for file, src := range overlay {
+		i++
+		path := filepath.Join(dir, strconv.Itoa(i)+"-"+filepath.Base(file))
+		if err := os.WriteFile(path, src, 0o600); err != nil {
+			cleanup()
+			return nil, err
+		}
+		replace[file] = path
+	}
+	data, err := json.Marshal(struct{ Replace map[string]string }{replace})
+	if err == nil {
+		err = os.WriteFile(filepath.Join(dir, "overlay.json"), data, 0o600)
+	}
+	if err != nil {
+		cleanup()
+		return nil, err
+	}
+	cfg.BuildFlags = append(cfg.BuildFlags, "-overlay="+filepath.Join(dir, "overlay.json"))
+	// go/packages reads the disk; parse the overlay instead, as it would.
+	cfg.ParseFile = func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
+		if o, ok := overlay[filename]; ok {
+			src = o
+		}
+		return parser.ParseFile(fset, filename, src, parser.AllErrors|parser.ParseComments)
+	}
+	return cleanup, nil
 }
