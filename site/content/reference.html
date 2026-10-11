@@ -831,8 +831,8 @@ FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
       <p>The repository includes a composite action at <code>mvrahden/go-test@v1</code> that wraps <code>gotest summary --github</code>:</p>
       <div class="code-block">
         <div class="code-label">.github/workflows/test.yml</div>
-        <pre>- uses: actions/checkout@v4
-- uses: actions/setup-go@v5
+        <pre>- uses: actions/checkout@v7
+- uses: actions/setup-go@v7
   with:
     go-version-file: go.mod
 

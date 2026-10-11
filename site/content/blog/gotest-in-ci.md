@@ -72,8 +72,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
 
@@ -202,8 +202,8 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         go-version: ["1.26", "1.27"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -244,8 +244,8 @@ Many projects have a mix of standard `func Test*` tests and gotest suites. The r
 
 ```yaml {title=".github/workflows/test.yml"}
 steps:
-  - uses: actions/checkout@v4
-  - uses: actions/setup-go@v5
+  - uses: actions/checkout@v7
+  - uses: actions/setup-go@v7
     with:
       go-version-file: go.mod
 
