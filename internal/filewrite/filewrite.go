@@ -31,8 +31,8 @@ type staged struct {
 // Stage checks that every file can be written and still holds Before, and
 // readies its new contents; it writes none of them. Each file is replaced
 // by renaming a temporary file beside it over it when that keeps all it
-// has: one name, the owner, the group and no extended attributes (Windows
-// always renames). Otherwise, as when its directory cannot be written, it
+// has: one name, the owner, the group and no extended attributes (on
+// Windows, one name). Otherwise, as when its directory cannot be written, it
 // is written in place. The file a symlink names is the one rewritten, so
 // the link stays. On an error nothing is left behind.
 func Stage(changes []Change) (*Staged, error) {
