@@ -6,8 +6,11 @@ build its `//go:build` tags need. Every line that does not compile, and
 every construct it cannot convert, gets a `TODO(gotest-migrate)` marker.
 Exit 0 means every migrated package compiles and every hook and test
 testify ran is one gotest calls; exit 1 means markers are left (on every
-run until none is); exit 2 means a pattern matched nothing or a package
-did not compile before (it is left untouched). The suite's own `s.Equal`,
+run until none is); exit 2 means a pattern matched nothing, a package
+did not compile before (it is left untouched) or the files could not all
+be written (nothing is). Generated test files are skipped (named on
+stderr), and only the host OS's builds are checked: run it on each
+platform whose test files differ. The suite's own `s.Equal`,
 `s.Run` (as `t.It`), direct hook calls and most assertions are converted;
 a suite built on a base suite from another package, promoted mixin hooks
 and method values are marked. The module must require go-test first

@@ -229,7 +229,9 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
    v1.33.0, which only a CLI not run through `go tool gotest` can meet.
    Drift refusals name the version to pin instead of `@latest`.
 5. **`os.Exit(0)` in a test fails the run**, as under `go test`; below
-   v1.33 the plain run reported it as passed.
+   v1.33 the plain run reported it as passed. A panicking or exiting test
+   exits 1 in every mode; below v1.33 the plain run passed the binary's
+   own status through (2 for a panic).
 6. **Every matched package ends in a verdict**, in text and `-json`
    (`[no test files]`, `[no suites]`, `[no tests to run]`), and
    `spec`/`summary --input` exit 2 on a stream with no events, one cut
@@ -241,8 +243,11 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
    package compiles; every line that does not, and every construct it
    cannot convert, carries a marker (exit 1, on every run until none is
    left); a pattern matching nothing or a package that did not compile
-   before exits 2. It converts a suite wherever the package declares its
-   parts. Below v1.33 hooks declared in another file than the suite
+   before exits 2, as does a run whose files cannot all be written (it
+   writes all or none). It converts a suite wherever the package declares
+   its parts, exports an unexported suite's name, converts the `…f`
+   assertion forms, skips generated files and checks only the host OS's
+   builds. Below v1.33 hooks declared in another file than the suite
    silently never ran and a clean exit could leave code that does not
    compile.
 8. **A shared fixture may omit `AfterAll`**; below v1.33 one without it
@@ -272,3 +277,11 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
     library packages get `[no suites]`/`[no test files]`, a package whose
     suites are all `X_` or deselected reads `[no tests to run]`, and every
     package's `-json` events open with a `start` event.
+15. **`-skip` passes through like `-run`**; v1.32 rejected it as an
+    unknown flag. An empty pattern (`gotest "$PKG"` with `$PKG` unset) is
+    the current directory, as for `go test`; `.go` file arguments exit 2
+    (gotest takes packages, not files).
+16. **`generate` and `clean` touch only the main module's packages**
+    (go.work modules count) — `generate all` no longer writes harness
+    files into dependencies. Bare `gotest clean` cleans the current
+    package, like `generate`; use `gotest clean ./...` for the tree.

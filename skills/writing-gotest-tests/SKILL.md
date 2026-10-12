@@ -104,7 +104,7 @@ those are your job, below.
    exported, methods `func (s *X) TestBehavior(t *gotest.T)`. No
    registration and no `TestMain` needed — the CLI generates the harness
    invisibly (never commit the `gotest_psuite_test.go`/
-   `gotest_pxsuite_test.go` files `gotest generate` writes; `gotest clean`
+   `gotest_pxsuite_test.go` files `gotest generate` writes; `gotest clean ./...`
    removes them). A `TestMain` of your own still runs; keep resource setup
    out of it — that is what fixtures and `BeforeAll` are for. `F_`/`X_`
    prefixes focus/exclude. A `Test*Async` method takes a trailing
