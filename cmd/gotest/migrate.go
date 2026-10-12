@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 
 	"github.com/mvrahden/go-test/internal/migrate"
 )
@@ -22,7 +23,7 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	opts := migrate.Options{Out: os.Stdout}
+	opts := migrate.Options{Out: os.Stdout, WriteGuard: holdSignals}
 	var patterns []string
 	for _, arg := range rest {
 		if len(arg) > 1 && arg[0] == '-' {
@@ -122,4 +123,15 @@ func printLines(lines []string) {
 	for _, l := range lines {
 		fmt.Println(l)
 	}
+}
+
+// holdSignals runs write with shutdown signals held off, so a stop cannot
+// leave the files half written or a staged file behind; one that comes
+// meanwhile is dropped once the files are written. Before and after, a
+// signal ends migrate at once: nothing is written then.
+func holdSignals(write func() error) error {
+	held := make(chan os.Signal, 1)
+	signal.Notify(held, shutdownSignals...)
+	defer signal.Stop(held)
+	return write()
 }

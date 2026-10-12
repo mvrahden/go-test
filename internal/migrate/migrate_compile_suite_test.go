@@ -832,6 +832,30 @@ func (s *MigrateCompileTestSuite) TestNameTakenThroughDotImport(t *gotest.T) {
 	})
 }
 
+func (s *MigrateCompileTestSuite) TestWriteGuard(t *gotest.T) {
+	var before, inside string
+	var calls int
+	var path string
+	opts := migrate.Options{WriteGuard: func(write func() error) error {
+		calls++
+		before = string(gotest.Must(os.ReadFile(path)))
+		err := write()
+		inside = string(gotest.Must(os.ReadFile(path)))
+		return err
+	}}
+	root := t.TempDir()
+	path = filepath.Join(root, "p", "a_test.go")
+	gotest.NoError(t, s.Mod.Write(root, map[string]string{"p/a_test.go": unexportedSrc}))
+	_, err := migrate.MigratePackages([]string{filepath.Join(root, "p")}, opts)
+
+	t.It("writes the files inside the guard, once", func(it *gotest.T) {
+		gotest.NoError(it, err)
+		gotest.Equal(it, 1, calls)
+		gotest.Equal(it, unexportedSrc, before)
+		gotest.Contains(it, inside, "type ThingTestSuite struct")
+	})
+}
+
 func (s *MigrateCompileTestSuite) TestNameGotestWouldNotRun(t *gotest.T) {
 	for t, tc := range gotest.Each(t, []struct {
 		Desc, name, becomes string

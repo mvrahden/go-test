@@ -170,6 +170,9 @@ type Options struct {
 	// DryRun writes nothing; the unified diff of every edit goes to Out.
 	DryRun bool
 	Out    io.Writer
+	// WriteGuard, when set, runs the writing of the migrated files, so the
+	// caller can hold off what must not stop it halfway, such as a signal.
+	WriteGuard func(write func() error) error
 }
 
 // markerPrefix opens every TODO(gotest-migrate) comment.
@@ -304,6 +307,9 @@ func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 			return all, err
 		}
 		changes = append(changes, changed...)
+	}
+	if opts.WriteGuard != nil {
+		return all, opts.WriteGuard(func() error { return writeAll(changes, shown) })
 	}
 	return all, writeAll(changes, shown)
 }
