@@ -889,3 +889,61 @@ func (s *MigrateCompileTestSuite) TestPointerEmbed(t *gotest.T) {
 		gotest.Contains(it, stdout, "RAN ptr TestA")
 	})
 }
+
+const reservedSrc = `package p
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type ResSuite struct {
+	suite.Suite
+	n int
+}
+
+func (s *ResSuite) SetupTest() { s.n = 1 }
+
+func (s *ResSuite) BenchmarkInput() int { return s.n }
+
+func (s *ResSuite) FuzzSeed(n int) int { return n }
+
+func (s *ResSuite) SuiteGuard() string { return "skip" }
+
+func (s *ResSuite) AfterAll() {}
+
+func (s *ResSuite) F_TestHelper() {}
+
+func (s *ResSuite) Test() {}
+
+func (s *ResSuite) TestA() {
+	s.Require().Equal(1, s.BenchmarkInput()+s.FuzzSeed(0))
+	s.Require().Equal("skip", s.SuiteGuard())
+}
+
+func TestRes(t *testing.T) { suite.Run(t, new(ResSuite)) }
+`
+
+func (s *MigrateCompileTestSuite) TestReservedNames(t *gotest.T) {
+	run := s.migrate(t, map[string]string{"p/a_test.go": reservedSrc})
+	out := run.files["p/a_test.go"]
+
+	t.It("converts testify's own hook without a marker", func(it *gotest.T) {
+		gotest.Contains(it, out, "\nfunc (s *ResTestSuite) BeforeEach(t *gotest.T) { s.n = 1 }\n")
+	})
+
+	t.It("marks each helper named as gotest reserves", func(it *gotest.T) {
+		for _, want := range []string{
+			"// TODO(gotest-migrate): gotest takes a suite method named BenchmarkInput for a benchmark; testify did not — rename it\nfunc (s *ResTestSuite) BenchmarkInput() int",
+			"// TODO(gotest-migrate): gotest takes a suite method named FuzzSeed for a fuzz target; testify did not — rename it\nfunc (s *ResTestSuite) FuzzSeed(n int) int",
+			"// TODO(gotest-migrate): gotest takes a suite method named SuiteGuard for the suite's guard; testify did not — rename it\nfunc (s *ResTestSuite) SuiteGuard() string",
+			"// TODO(gotest-migrate): gotest takes a suite method named AfterAll for a lifecycle hook; testify did not — rename it\nfunc (s *ResTestSuite) AfterAll() {}",
+			"// TODO(gotest-migrate): gotest takes a suite method named F_TestHelper for a focused test; testify did not — rename it\nfunc (s *ResTestSuite) F_TestHelper() {}",
+			"// TODO(gotest-migrate): testify ran Test as a test; gotest runs only methods named Test followed by more, so it no longer runs — rename it, e.g. TestAll\nfunc (s *ResTestSuite) Test(t *gotest.T) {}",
+		} {
+			gotest.Contains(it, out, want)
+		}
+		gotest.Equal(it, 6, run.markers())
+	})
+}

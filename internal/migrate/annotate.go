@@ -66,6 +66,9 @@ func (u *unit) unconverted(f *ast.File, m *lineMarks) {
 		if fd.Doc != nil {
 			pos = fd.Doc.Pos()
 		}
+		if suite != nil && suite.reserved[fd.Name.Name] != "" {
+			m.add(pos, suite.reserved[fd.Name.Name])
+		}
 		if suite != nil && unsupportedHooks[fd.Name.Name] {
 			m.add(pos, "unsupported testify hook "+fd.Name.Name+" — convert manually")
 		}

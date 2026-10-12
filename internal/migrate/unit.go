@@ -9,6 +9,8 @@ import (
 	"go/types"
 	"path/filepath"
 	"strings"
+
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // unitFile is one test file of a unit.
@@ -63,6 +65,9 @@ type suiteDecl struct {
 	marked bool
 	// note is a marker due at the migrated suite's type.
 	note string
+	// reserved maps the suite's methods named as gotest reserves, which
+	// testify did not run, to their markers.
+	reserved map[string]string
 }
 
 func (s *suiteDecl) migrated() bool { return s.refusal == "" }
@@ -524,6 +529,45 @@ func (u *unit) collectHooks() {
 			} else if strings.HasPrefix(name, "Test") {
 				u.hooks[methodKey(fn)] = name
 			}
+			if msg := reservedName(name); msg != "" {
+				if s.reserved == nil {
+					s.reserved = map[string]string{}
+				}
+				s.reserved[name] = msg
+			}
 		}
 	}
+}
+
+// reservedName is the marker for a suite method gotest gives a meaning
+// testify did not, empty for any other name. testify ran the methods
+// named Test... and its hooks, which the migration converts.
+func reservedName(name string) string {
+	role := ""
+	switch name {
+	case "BeforeAll", "AfterAll", "BeforeEach", "AfterEach":
+		role = "a lifecycle hook"
+	case "SuiteConfig":
+		role = "the suite's configuration"
+	case "SuiteGuard":
+		role = "the suite's guard"
+	case "Test":
+		return "testify ran Test as a test; gotest runs only methods named Test followed by more, so it no longer runs — rename it, e.g. TestAll"
+	}
+	base := strings.TrimPrefix(strings.TrimPrefix(name, "F_"), "X_")
+	more := func(prefix string) bool { return len(base) > len(prefix) && strings.HasPrefix(base, prefix) }
+	switch {
+	case role != "":
+	case more(protocol.PrefixBenchmark):
+		role = "a benchmark"
+	case more(protocol.PrefixFuzz):
+		role = "a fuzz target"
+	case strings.HasPrefix(name, "F_") && more("Test"):
+		role = "a focused test"
+	case strings.HasPrefix(name, "X_") && more("Test"):
+		role = "an excluded test"
+	default:
+		return ""
+	}
+	return "gotest takes a suite method named " + name + " for " + role + "; testify did not — rename it"
 }
