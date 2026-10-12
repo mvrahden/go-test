@@ -4,6 +4,7 @@ import (
 	"go/format"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mvrahden/go-test/internal/migrate"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -47,6 +48,19 @@ func (s *MigrateFileTestSuite) TestDeriveNewName(t *gotest.T, _ *migrateFileCtx)
 		{Desc: "thingSuite", expected: "ThingTestSuite"}, // gotest runs only exported suites
 	}) {
 		gotest.Equal(sub, tc.expected, migrate.DeriveNewName(tc.Desc))
+	}
+}
+
+func (s *MigrateFileTestSuite) TestTokenStarts(t *gotest.T, _ *migrateFileCtx) {
+	for t, tc := range gotest.Each(t, []struct {
+		Desc string
+		eol  string
+	}{
+		{"LF line endings", "\n"},
+		{"CRLF line endings, which the scanner drops from a literal", "\r\n"},
+	}) {
+		src := strings.ReplaceAll("package p\n\nvar x = f(`a\nb\nc\n`, y) /* d\ne */\n", "\n", tc.eol)
+		gotest.Equal(t, map[int]int{4: 3, 5: 3, 6: 3, 7: 6}, migrate.TokenStarts([]byte(src)))
 	}
 }
 

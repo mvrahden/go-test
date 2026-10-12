@@ -5,3 +5,6 @@ var (
 	CutWildcard   = cutWildcard
 	IsPathPattern = isPathPattern
 )
+
+// TokenStarts maps lines inside multi-line literals to their first line.
+var TokenStarts = tokenStarts

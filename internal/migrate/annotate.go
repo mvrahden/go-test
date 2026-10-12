@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
 	"go/format"
@@ -358,8 +359,19 @@ func tokenStarts(src []byte) map[int]int {
 		if tok != token.STRING && tok != token.COMMENT {
 			continue
 		}
-		first := file.Line(pos)
-		last := file.Line(pos + token.Pos(len(lit)))
+		// Only raw strings and block comments span lines. The end is read
+		// from src: the scanner drops their carriage returns from lit.
+		off, end := file.Offset(pos), -1
+		switch {
+		case strings.HasPrefix(lit, "`"):
+			end = bytes.IndexByte(src[off+1:], '`') + off + 1
+		case strings.HasPrefix(lit, "/*"):
+			end = bytes.Index(src[off:], []byte("*/")) + off + 1
+		}
+		if end <= off {
+			continue
+		}
+		first, last := file.Line(pos), file.Line(file.Pos(end))
 		for line := first + 1; line <= last; line++ {
 			starts[line] = first
 		}
