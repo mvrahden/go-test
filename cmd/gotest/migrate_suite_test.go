@@ -1,6 +1,8 @@
 package main_test
 
 import (
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -349,5 +351,35 @@ func (s *MigrateCLITestSuite) TestUnwritableFile(t *gotest.T, ctx *migrateCtx) {
 			gotest.Equal(it, src, string(got), name)
 		}
 		gotest.Equal(it, before, listDir(it, ctx.dir))
+	})
+}
+
+const migrateRawStringSrc = "package sample\n\nimport (\n\t\"testing\"\n\n\t\"github.com/stretchr/testify/suite\"\n)\n\ntype RawSuite struct {\n\tsuite.Suite\n}\n\nfunc (s *RawSuite) TestRx() {\n\tbody := []byte(\"ab\")\n\ts.Require().Regexp(`a\nb`, body)\n}\n\nfunc TestRawSuite(t *testing.T) {\n\tsuite.Run(t, new(RawSuite))\n}\n"
+
+func (s *MigrateCLITestSuite) TestMarkerBesideRawString(t *gotest.T, ctx *migrateCtx) {
+	s.write(t, ctx, migrateRawStringSrc)
+
+	stdout, stderr, code := s.cli.runSplitIn(t, ctx.dir, "migrate", ".")
+	got := s.read(t, ctx)
+
+	t.It("exits 1: the error on a line inside the literal is marked", func(it *gotest.T) {
+		gotest.Equal(it, 1, code, stdout+stderr)
+		gotest.Contains(it, stdout, "1 TODO(gotest-migrate) marker left")
+	})
+
+	t.It("leaves the literal as it was", func(it *gotest.T) {
+		gotest.Contains(it, got, "gotest.Regexp(t, `a\nb`, body)")
+	})
+
+	t.It("places the marker as a comment above the statement", func(it *gotest.T) {
+		f, err := parser.ParseFile(token.NewFileSet(), "", got, parser.ParseComments)
+		gotest.NoError(it, err)
+		var comments []string
+		for _, cg := range f.Comments {
+			comments = append(comments, cg.Text())
+		}
+		gotest.Len(it, comments, 1)
+		gotest.Regexp(it, `^TODO\(gotest-migrate\): does not compile: cannot use body`, comments[0])
+		gotest.Contains(it, got, "\t// TODO(gotest-migrate): does not compile: cannot use body (variable of type []byte) as string value in argument to gotest.Regexp\n\tgotest.Regexp(")
 	})
 }

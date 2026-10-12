@@ -1,8 +1,10 @@
 package migrate
 
 import (
+	"fmt"
 	"go/ast"
 	"go/format"
+	"go/scanner"
 	"go/token"
 	"go/types"
 	"sort"
@@ -283,15 +285,28 @@ func formatImports(path string, src []byte) ([]byte, error) {
 }
 
 // insertMarkers writes one TODO(gotest-migrate) comment above each annotated
-// line and returns the formatted result.
+// line and returns the formatted result. A line that starts inside a raw
+// string or a block comment takes its marker above the line that literal
+// starts on, where it is a comment and leaves the literal as it was.
 func insertMarkers(src []byte, anns []todoAnnotation) ([]byte, error) {
 	if len(anns) == 0 {
 		return src, nil
 	}
+	before, err := countSourceMarkers(src)
+	if err != nil {
+		return nil, err
+	}
 
+	starts := tokenStarts(src)
+	for i := range anns {
+		for starts[anns[i].line] > 0 {
+			anns[i].line = starts[anns[i].line]
+		}
+	}
 	// Insert comment lines bottom-up so earlier line numbers stay valid.
 	sort.SliceStable(anns, func(i, j int) bool { return anns[i].line > anns[j].line })
 	lines := strings.Split(string(src), "\n")
+	inserted := 0
 	for _, a := range anns {
 		idx := a.line - 1
 		if idx < 0 || idx >= len(lines) {
@@ -303,8 +318,41 @@ func insertMarkers(src []byte, anns []todoAnnotation) ([]byte, error) {
 		}
 		indented := leadingWhitespace(lines[idx]) + comment
 		lines = append(lines[:idx], append([]string{indented}, lines[idx:]...)...)
+		inserted++
 	}
-	return format.Source([]byte(strings.Join(lines, "\n")))
+	out, err := format.Source([]byte(strings.Join(lines, "\n")))
+	if err != nil {
+		return nil, err
+	}
+	// Every marker must be a comment, or the result would not count it.
+	if after, err := countSourceMarkers(out); err != nil || after < before+inserted {
+		return nil, fmt.Errorf("a marker did not land as a comment (%d of %d)", after-before, inserted)
+	}
+	return out, nil
+}
+
+// tokenStarts maps each line of src that starts inside a token, a raw
+// string or a block comment spanning lines, to the line the token starts on.
+func tokenStarts(src []byte) map[int]int {
+	fset := token.NewFileSet()
+	file := fset.AddFile("", -1, len(src))
+	var sc scanner.Scanner
+	sc.Init(file, src, nil, scanner.ScanComments)
+	starts := map[int]int{}
+	for {
+		pos, tok, lit := sc.Scan()
+		if tok == token.EOF {
+			return starts
+		}
+		if tok != token.STRING && tok != token.COMMENT {
+			continue
+		}
+		first := file.Line(pos)
+		last := file.Line(pos + token.Pos(len(lit)))
+		for line := first + 1; line <= last; line++ {
+			starts[line] = first
+		}
+	}
 }
 
 // leadingWhitespace returns the leading spaces/tabs of a line.
