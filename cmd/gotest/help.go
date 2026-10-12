@@ -804,7 +804,10 @@ included.
 The result is type-checked for real, from the migrated sources, in the
 default build and in each tag set the test files' //go:build lines ask
 for. Anything it cannot convert, and every line that does not compile,
-is left with a TODO(gotest-migrate) marker.
+is left with a TODO(gotest-migrate) marker. The builds are the host's
+GOOS and GOARCH: a test file only another OS builds is refused, so run
+migrate on each platform whose test files differ. Generated test files
+(Code generated ... DO NOT EDIT.) are skipped and named on stderr.
 
 Exit codes:
   0  every migrated package compiles, no marker is left, and every hook

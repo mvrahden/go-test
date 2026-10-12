@@ -4,9 +4,10 @@
 leaves `TODO(gotest-migrate)` markers where judgment is needed (embedded
 suite calls get "unconverted assertion" markers; `s.Run` and an `s.T()` in
 a helper without `t` are marked and left in place; a suite embedding
-another suite refuses the whole file). It exits 1 whenever a marker was
-left, so grep for the markers before calling the migration done, and
-`--dry-run` prints the diff without writing. It does NOT convert bare
+another suite refuses the whole file; generated test files are skipped,
+named on stderr; only the host OS's builds are checked). It exits 1
+whenever a marker was left, so grep for the markers before calling the
+migration done, and `--dry-run` prints the diff without writing. It does NOT convert bare
 `require`/`assert` usage in plain `TestXxx(*testing.T)` functions — those
 are manual:
 
