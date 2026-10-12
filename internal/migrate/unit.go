@@ -125,12 +125,16 @@ func (u *unit) isPkg(ident *ast.Ident, paths ...string) bool {
 	return false
 }
 
-// isSuiteField reports whether field embeds suite.Suite.
+// isSuiteField reports whether field embeds suite.Suite or *suite.Suite.
 func (u *unit) isSuiteField(field *ast.Field) bool {
 	if len(field.Names) != 0 {
 		return false
 	}
-	sel, ok := field.Type.(*ast.SelectorExpr)
+	typ := field.Type
+	if star, ok := typ.(*ast.StarExpr); ok {
+		typ = star.X
+	}
+	sel, ok := typ.(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Suite" {
 		return false
 	}

@@ -240,8 +240,9 @@ func (u *unit) mutates(body *ast.BlockStmt, recv *ast.Ident) bool {
 }
 
 // runnerSuite is the migrated suite fd does nothing but run: a Test func
-// whose body is suite.Run(t, new(S)) or suite.Run(t, &S{}), perhaps after
-// t.Parallel(). Any other runner stays, and its suite.Run is marked.
+// whose body is suite.Run(t, new(S)) or suite.Run(t, &S{}), the latter
+// perhaps setting the *suite.Suite S embeds, after t.Parallel() or not.
+// Any other runner stays, and its suite.Run is marked.
 func (u *unit) runnerSuite(fd *ast.FuncDecl) *suiteDecl {
 	if fd.Recv != nil || fd.Body == nil || !strings.HasPrefix(fd.Name.Name, "Test") {
 		return nil
@@ -276,7 +277,7 @@ func (u *unit) runnerSuite(fd *ast.FuncDecl) *suiteDecl {
 			}
 		}
 	case *ast.UnaryExpr:
-		if lit, ok := a.X.(*ast.CompositeLit); ok && a.Op == token.AND && len(lit.Elts) == 0 {
+		if lit, ok := a.X.(*ast.CompositeLit); ok && a.Op == token.AND && u.onlySuiteInit(lit) {
 			typ = lit.Type
 		}
 	}
@@ -284,6 +285,30 @@ func (u *unit) runnerSuite(fd *ast.FuncDecl) *suiteDecl {
 		return s
 	}
 	return nil
+}
+
+// onlySuiteInit reports whether lit sets nothing but, perhaps, the
+// *suite.Suite a suite embeds by pointer, which gotest has no use for.
+func (u *unit) onlySuiteInit(lit *ast.CompositeLit) bool {
+	for _, elt := range lit.Elts {
+		kv, ok := elt.(*ast.KeyValueExpr)
+		if !ok {
+			return false
+		}
+		key, ok := kv.Key.(*ast.Ident)
+		if !ok || key.Name != "Suite" {
+			return false
+		}
+		p, ok := u.info.TypeOf(kv.Value).(*types.Pointer)
+		if !ok {
+			return false
+		}
+		n, ok := p.Elem().(*types.Named)
+		if !ok || n.Obj().Pkg() == nil || n.Obj().Pkg().Path() != suitePkg || n.Obj().Name() != "Suite" {
+			return false
+		}
+	}
+	return true
 }
 
 // isSuiteRun reports whether call is testify's suite.Run(t, s).

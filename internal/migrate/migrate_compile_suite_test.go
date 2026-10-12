@@ -847,3 +847,45 @@ func (s *MigrateCompileTestSuite) TestRenameOntoSuite(t *gotest.T) {
 		gotest.Equal(it, 1, run.markers())
 	})
 }
+
+const ptrEmbedSrc = `package p
+
+import (
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type PtrSuite struct {
+	*suite.Suite
+	n int
+}
+
+func (s *PtrSuite) SetupTest() { s.n = 1 }
+
+func (s *PtrSuite) TestA() {
+	s.Require().Equal(1, s.n)
+	fmt.Println("RAN ptr TestA")
+}
+
+func TestPtr(t *testing.T) { suite.Run(t, &PtrSuite{Suite: new(suite.Suite)}) }
+`
+
+func (s *MigrateCompileTestSuite) TestPointerEmbed(t *gotest.T) {
+	run := s.migrate(t, map[string]string{"p/a_test.go": ptrEmbedSrc})
+	out := run.files["p/a_test.go"]
+
+	t.It("converts it as testify's suite and drops the runner that sets it", func(it *gotest.T) {
+		gotest.Contains(it, out, "type PtrTestSuite struct {\n\tn int\n}")
+		gotest.NotContains(it, out, "suite.Run")
+		gotest.Zero(it, run.markers())
+		gotest.Empty(it, compiles(it, run.dir))
+	})
+
+	t.It("runs the test with its hook", func(it *gotest.T) {
+		stdout, stderr, code := s.runSuites(it, run.dir, "./p")
+		gotest.Equal(it, 0, code, stdout+stderr)
+		gotest.Contains(it, stdout, "RAN ptr TestA")
+	})
+}
