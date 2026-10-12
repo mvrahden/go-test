@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/about"
+	"github.com/mvrahden/go-test/internal/filewrite"
 )
 
 var gotestImport = about.Repo + "/pkg/gotest"
@@ -274,14 +275,43 @@ func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 		return all, err
 	}
 
+	var changes []filewrite.Change
 	for _, ju := range units {
-		results, err := ju.write(opts, shown)
+		results, changed, err := ju.write(opts, shown)
 		all = append(all, results...)
 		if err != nil {
 			return all, err
 		}
+		changes = append(changes, changed...)
 	}
-	return all, nil
+	return all, writeAll(changes, shown)
+}
+
+// writeAll writes every changed file or none (see filewrite.Stage); the
+// error says which were written.
+func writeAll(changes []filewrite.Change, shown map[string]string) error {
+	if len(changes) == 0 {
+		return nil
+	}
+	staged, err := filewrite.Stage(changes)
+	if err != nil {
+		return fmt.Errorf("writing the migrated files: %w; nothing was written", err)
+	}
+	n, err := staged.Commit()
+	if err == nil {
+		return nil
+	}
+	if n == 0 {
+		return fmt.Errorf("writing the migrated files: %w; nothing was written", err)
+	}
+	names := func(cs []filewrite.Change) string {
+		out := make([]string, 0, len(cs))
+		for _, c := range cs {
+			out = append(out, shown[c.File])
+		}
+		return strings.Join(out, ", ")
+	}
+	return fmt.Errorf("writing the migrated files: %w; wrote %s; did not write %s", err, names(changes[:n]), names(changes[n:]))
 }
 
 // jobUnit is a directory's migration and what its type-check found.
@@ -366,10 +396,11 @@ func verify(units []*jobUnit, shown map[string]string) error {
 	return nil
 }
 
-// write writes what changed in the directory (or prints its diff) and
-// reports per file.
-func (ju *jobUnit) write(opts Options, shown map[string]string) ([]MigrateResult, error) {
+// write returns what changed in the directory, for writeAll (or prints its
+// diff), and reports per file.
+func (ju *jobUnit) write(opts Options, shown map[string]string) ([]MigrateResult, []filewrite.Change, error) {
 	var results []MigrateResult
+	var changes []filewrite.Change
 	for _, uf := range ju.u.files {
 		final := uf.src
 		changed := uf.out != nil && !bytes.Equal(uf.out, uf.src)
@@ -378,7 +409,7 @@ func (ju *jobUnit) write(opts Options, shown map[string]string) ([]MigrateResult
 		}
 		markers, err := countSourceMarkers(final)
 		if err != nil {
-			return results, fmt.Errorf("annotate %s: %w", uf.path, err)
+			return results, nil, fmt.Errorf("annotate %s: %w", uf.path, err)
 		}
 		results = append(results, ju.u.fileResults(uf, shown[uf.path], changed, markers)...)
 		if !changed {
@@ -390,14 +421,12 @@ func (ju *jobUnit) write(opts Options, shown map[string]string) ([]MigrateResult
 			}
 			continue
 		}
-		if err := os.WriteFile(uf.path, uf.out, 0644); err != nil { //nolint:gosec // G306: not sensitive data
-			return results, fmt.Errorf("write %s: %w", uf.path, err)
-		}
+		changes = append(changes, filewrite.Change{File: uf.path, Before: uf.src, After: uf.out})
 	}
 	if len(ju.unplaced) > 0 {
 		results = append(results, MigrateResult{File: shownDir(ju.job, shown), Unplaced: ju.unplaced})
 	}
-	return results, nil
+	return results, changes, nil
 }
 
 // fileResults reports one file: a result per suite it declares, its

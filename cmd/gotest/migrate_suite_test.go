@@ -3,6 +3,7 @@ package main_test
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -319,5 +320,34 @@ func (s *MigrateCLITestSuite) TestUncompiledPackage(t *gotest.T, ctx *migrateCtx
 
 	t.It("leaves the file untouched", func(it *gotest.T) {
 		gotest.Equal(it, src, s.read(it, ctx))
+	})
+}
+
+func (s *MigrateCLITestSuite) TestUnwritableFile(t *gotest.T, ctx *migrateCtx) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skipf("POSIX file permissions as a non-root user")
+	}
+	for name, src := range migrateSplit {
+		gotest.NoError(t, os.WriteFile(filepath.Join(ctx.dir, name), []byte(src), 0o600))
+	}
+	// The second of the three files migrate writes.
+	gotest.NoError(t, os.Chmod(filepath.Join(ctx.dir, "runner_test.go"), 0o400))
+	before := listDir(t, ctx.dir)
+
+	stdout, stderr, code := s.cli.runSplitIn(t, ctx.dir, "migrate", ".")
+
+	t.It("exits 2 and says nothing was written", func(it *gotest.T) {
+		gotest.Equal(it, 2, code, stdout+stderr)
+		gotest.Regexp(it, `^migrate: writing the migrated files: open \S*runner_test\.go: permission denied; nothing was written\n$`, stderr)
+		gotest.Empty(it, stdout)
+	})
+
+	t.It("writes none of the files and leaves no temporary file", func(it *gotest.T) {
+		for name, src := range migrateSplit {
+			got, err := os.ReadFile(filepath.Join(ctx.dir, name))
+			gotest.NoError(it, err)
+			gotest.Equal(it, src, string(got), name)
+		}
+		gotest.Equal(it, before, listDir(it, ctx.dir))
 	})
 }

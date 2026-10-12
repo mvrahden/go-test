@@ -810,8 +810,9 @@ Exit codes:
   0  every migrated package compiles, no marker is left, and every hook
      and test testify ran is one gotest calls
   1  a marker is left, including one an earlier run placed
-  2  a pattern names nothing, or a package does not compile before the
-     migration (it is left alone)
+  2  a pattern names nothing, a package does not compile before the
+     migration (it is left alone), or the migrated files cannot be
+     written (none is: they are written all or none)
 
 The module must require github.com/mvrahden/go-test (go get -tool does).
 
