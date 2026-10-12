@@ -817,6 +817,21 @@ func (s *MigrateCompileTestSuite) TestUnexportedSuite(t *gotest.T) {
 	})
 }
 
+func (s *MigrateCompileTestSuite) TestNameGotestWouldNotRun(t *gotest.T) {
+	for t, tc := range gotest.Each(t, []struct {
+		Desc, name, becomes string
+	}{
+		{"a suite named testSuite", "testSuite", "TestSuite"},
+		{"a suite whose name reads as focused", "f_barSuite", "F_barTestSuite"},
+		{"a suite whose name reads as excluded", "x_bazSuite", "X_bazTestSuite"},
+	}) {
+		src := strings.ReplaceAll(strings.ReplaceAll(unexportedSrc, "thingSuite", tc.name), "TestThing(", "TestIt(")
+		run := s.migrate(t, map[string]string{"p/a_test.go": src})
+		gotest.Contains(t, run.files["p/a_test.go"], "// TODO(gotest-migrate): "+tc.name+" would become "+tc.becomes+", which gotest does not run as a plain suite")
+		gotest.Equal(t, 1, run.markers())
+	}
+}
+
 const nameClashSrc = `package p
 
 import (

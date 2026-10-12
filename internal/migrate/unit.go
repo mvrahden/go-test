@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/protocol"
 )
 
@@ -357,7 +358,16 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 		}
 	}
 	for _, s := range u.suites {
-		if s.newName == s.obj.Name() || !s.migrated() {
+		if !s.migrated() {
+			continue
+		}
+		if token.IsExported(s.newName) && !runsPlain(s.newName) {
+			s.refusal = s.obj.Name() + " would become " + s.newName + ", which gotest does not run as a plain suite — rename it and migrate this file by hand"
+			s.file.marks = append(s.file.marks, mark{pos: s.spec.Pos(), msg: s.refusal})
+			refused[s.file] = true
+			continue
+		}
+		if s.newName == s.obj.Name() {
 			continue
 		}
 		key := s.obj.Pkg().Path() + "." + s.newName
@@ -583,4 +593,11 @@ func reservedName(name string) string {
 		return ""
 	}
 	return "gotest takes a suite method named " + name + " for " + role + "; testify did not — rename it"
+}
+
+// runsPlain reports whether gotest runs a suite of that name, neither
+// focused nor excluded: "TestSuite" alone is no suite, F_ and X_ prefixes
+// focus and exclude.
+func runsPlain(name string) bool {
+	return gotestast.IS_TEST_SUITE.MatchString(name) && !strings.HasPrefix(name, "F_") && !strings.HasPrefix(name, "X_")
 }
