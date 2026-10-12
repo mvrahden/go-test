@@ -26,7 +26,14 @@ type unitFile struct {
 	unchecked string
 	// gate is a //go:build expression the migration moves onto the file.
 	gate string
+	// generated: the file is headed "Code generated ... DO NOT EDIT." and
+	// is left as it is; its generator owns it.
+	generated bool
 }
+
+// skipped reports whether the migration leaves uf as it is: generated, or
+// out of every configuration it type-checks.
+func (uf *unitFile) skipped() bool { return uf.generated || uf.unchecked != "" }
 
 // mark is a TODO(gotest-migrate) marker due above pos.
 type mark struct {
@@ -215,7 +222,7 @@ func (u *unit) findSuites() map[*unitFile]bool {
 	u.byKey = map[string]*suiteDecl{}
 	refused := map[*unitFile]bool{}
 	for _, uf := range u.files {
-		if uf.unchecked != "" {
+		if uf.skipped() {
 			continue
 		}
 		for _, decl := range uf.f.Decls {
@@ -303,7 +310,7 @@ func specPos(gd *ast.GenDecl, ts *ast.TypeSpec) token.Pos {
 // refused too, until nothing changes.
 func (u *unit) refuse(refused map[*unitFile]bool) {
 	for _, uf := range u.files {
-		if uf.unchecked != "" {
+		if uf.skipped() {
 			continue
 		}
 		ast.PreorderStack(uf.f, nil, func(n ast.Node, stack []ast.Node) bool {
@@ -386,7 +393,8 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 		}
 	}
 	// A file without types refers to a suite by its name, and is left as
-	// it is with a marker when it does or when it uses testify.
+	// it is with a marker when it does or when it uses testify; a
+	// generated one takes none.
 	for _, uf := range u.files {
 		if uf.unchecked == "" {
 			continue
@@ -403,7 +411,7 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 			}
 			return true
 		})
-		if mentions || importsTestify(uf.f) {
+		if !uf.generated && (mentions || importsTestify(uf.f)) {
 			uf.marks = append(uf.marks, mark{pos: uf.f.Package, msg: "migrate cannot type-check this file: " + uf.unchecked + " keeps it out of every build it checked — migrate it by hand"})
 			refused[uf] = true
 		}
@@ -419,7 +427,12 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 				s.refusal = "declared in a file left for hand migration"
 			}
 			for _, uf := range u.files {
-				if users[s][uf] && refused[uf] && s.migrated() {
+				switch {
+				case !users[s][uf] || !s.migrated():
+				case uf.generated:
+					s.refusal = s.obj.Name() + " is used in " + filepath.Base(uf.path) + ", which is generated — migrate it by hand, then regenerate that file"
+					s.marked = true
+				case refused[uf]:
 					s.refusal = s.obj.Name() + " is used in " + filepath.Base(uf.path) + ", which is left for hand migration — migrate this file by hand"
 					s.marked = true
 				}
@@ -483,7 +496,7 @@ func (u *unit) migrate() error {
 			uf.out = out
 			continue
 		}
-		if !migrated || uf.unchecked != "" {
+		if !migrated || uf.skipped() {
 			continue
 		}
 		if !u.transformFile(uf.f) && uf.gate == "" {
@@ -510,7 +523,7 @@ func (u *unit) migrate() error {
 func (u *unit) collectHooks() {
 	u.hooks = map[string]string{}
 	for _, uf := range u.files {
-		if uf.refused || uf.unchecked != "" {
+		if uf.refused || uf.skipped() {
 			continue
 		}
 		for _, decl := range uf.f.Decls {

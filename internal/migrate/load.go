@@ -612,6 +612,7 @@ func newUnit(j *dirJob, ls []loaded, fset *token.FileSet, srcs map[string][]byte
 		if uf.src == nil {
 			return nil, errors.New("migrate: no source for " + path)
 		}
+		uf.generated = ast.IsGenerated(uf.f)
 		u.files = append(u.files, uf)
 	}
 	return u, nil

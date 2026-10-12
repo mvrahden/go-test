@@ -12,8 +12,10 @@ import (
 // TODO(gotest-migrate) marker is left anywhere; 1 when a marker is left,
 // including one an earlier run placed, or an error has no line to carry
 // one; 2 on a usage error or when a package does not compile before the
-// migration, which then leaves it alone. --dry-run prints the diff instead
-// of writing and answers the same way.
+// migration, which then leaves it alone. A generated test file is skipped
+// and named on stderr without changing the answer: its generator owns it,
+// and a suite it uses is refused. --dry-run prints the diff instead of
+// writing and answers the same way.
 func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	ownArgs, rest, err := SplitArgs(inv.Args, migrateAllowed)
 	if err != nil {
@@ -47,7 +49,7 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		verb = "Would migrate"
 	}
 	markers, suites := 0, 0
-	var lines, refused, leftover, uncompiled, unplaced []string
+	var lines, refused, leftover, uncompiled, unplaced, generated []string
 	for i := range results {
 		r := &results[i]
 		markers += r.Markers
@@ -61,6 +63,8 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 			for _, e := range r.Unplaced {
 				unplaced = append(unplaced, "  "+r.File+": "+e)
 			}
+		case r.Generated:
+			generated = append(generated, "  "+r.File)
 		case r.Refusal != "":
 			refused = append(refused, fmt.Sprintf("  %s: %s", r.File, r.Refusal))
 		case r.RefsOnly:
@@ -81,7 +85,13 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Println("Refused, left for hand migration:")
 		printLines(refused)
 	}
-	if len(lines)+len(refused)+len(leftover)+len(uncompiled)+len(unplaced) == 0 {
+	if len(generated) > 0 {
+		fmt.Fprintln(os.Stderr, "Skipped, generated (Code generated ... DO NOT EDIT.); migrate their generator:")
+		for _, l := range generated {
+			fmt.Fprintln(os.Stderr, l)
+		}
+	}
+	if len(lines)+len(refused)+len(leftover)+len(uncompiled)+len(unplaced)+len(generated) == 0 {
 		fmt.Println("No testify/suite patterns found.")
 	}
 	if len(leftover) > 0 {

@@ -18,7 +18,7 @@ func (u *unit) gate() {
 	ran := map[*suiteDecl]bool{}
 	parts := map[*suiteDecl]map[*unitFile]bool{}
 	for _, uf := range u.files {
-		if uf.refused || uf.unchecked != "" {
+		if uf.refused || uf.skipped() {
 			continue
 		}
 		for _, decl := range uf.f.Decls {

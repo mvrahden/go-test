@@ -142,6 +142,9 @@ type MigrateResult struct {
 	// Unplaced lists, for a directory (File), the errors the migrated
 	// packages have where no marker can stand.
 	Unplaced []string
+	// Generated marks a file headed "Code generated ... DO NOT EDIT." that
+	// uses testify: migrate leaves it to its generator.
+	Generated bool
 }
 
 // DeriveNewName computes the new suite name from an old one, exported:
@@ -381,6 +384,9 @@ func verify(units []*jobUnit, shown map[string]string) error {
 		}
 		marks := map[string]*lineMarks{}
 		for i, uf := range ju.u.files {
+			if uf.generated {
+				continue // its errors have no marker to carry them
+			}
 			m := &lineMarks{fset: fset}
 			marks[uf.path] = m
 			if !uf.refused && uf.unchecked == "" {
@@ -396,7 +402,7 @@ func verify(units []*jobUnit, shown map[string]string) error {
 		}
 		for _, uf := range ju.u.files {
 			m := marks[uf.path]
-			if len(m.anns) == 0 {
+			if m == nil || len(m.anns) == 0 {
 				continue
 			}
 			current := uf.src
@@ -450,6 +456,12 @@ func (ju *jobUnit) write(opts Options, shown map[string]string) ([]MigrateResult
 // refusal, or the markers left in a file changed only for other files'
 // suites or not changed at all.
 func (u *unit) fileResults(uf *unitFile, shown string, changed bool, markers int) []MigrateResult {
+	if uf.generated {
+		if importsTestify(uf.f) {
+			return []MigrateResult{{File: shown, Markers: markers, Generated: true}}
+		}
+		return nil
+	}
 	if uf.refused {
 		reasons := make([]string, 0, len(uf.marks))
 		for _, m := range uf.marks {
