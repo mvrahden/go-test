@@ -280,7 +280,10 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
 15. **`-skip` passes through like `-run`**; v1.32 rejected it as an
     unknown flag. An empty pattern (`gotest "$PKG"` with `$PKG` unset) is
     the current directory, as for `go test`; `.go` file arguments exit 2
-    (gotest takes packages, not files).
+    (gotest takes packages, not files), and so does a bad test flag value
+    or `-run`/`-skip` regexp — below v1.33 those ran and failed as a test.
+    `gotest fuzz` refuses `-run`, `-skip` and `-bench`; pick the target
+    with `--target`.
 16. **`generate` and `clean` touch only the main module's packages**
     (go.work modules count) — `generate all` no longer writes harness
     files into dependencies. Bare `gotest clean` cleans the current
