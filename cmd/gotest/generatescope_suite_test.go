@@ -11,7 +11,9 @@ import (
 
 // GenerateScopeTestSuite runs generate and clean over a main module that
 // imports a replaced dependency with suites of its own: files are written
-// and removed in main modules only, a run still runs the dependency.
+// and removed in main modules only, a run still runs the dependency. The
+// dependency is named, not reached through "all": that loads every package
+// gotest itself depends on, minutes on a cold CI cache.
 //
 //nolint:lifecycle-pair // BeforeAll only wraps the shared binary, which its fixture removes
 type GenerateScopeTestSuite struct {
@@ -75,7 +77,7 @@ func exists(path string) bool {
 
 func (s *GenerateScopeTestSuite) TestGenerateWritesIntoTheMainModuleOnly(t *gotest.T) {
 	l := s.stage(t, false)
-	stdout, stderr, code := s.cli.runSplitIn(t, l.main, "generate", "all")
+	stdout, stderr, code := s.cli.runSplitIn(t, l.main, "generate", "./...", "example.com/dep")
 
 	t.It("writes the main module's file", func(it *gotest.T) {
 		gotest.Equal(it, 0, code, stderr)
@@ -90,12 +92,12 @@ func (s *GenerateScopeTestSuite) TestGenerateWritesIntoTheMainModuleOnly(t *gote
 
 func (s *GenerateScopeTestSuite) TestCleanRemovesWhatGenerateWrote(t *gotest.T) {
 	l := s.stage(t, false)
-	_, stderr, code := s.cli.runSplitIn(t, l.main, "generate", "all")
+	_, stderr, code := s.cli.runSplitIn(t, l.main, "generate", "./...", "example.com/dep")
 	gotest.Equal(t, 0, code, stderr)
 	// As an earlier gotest left it in the dependency.
 	gotest.NoError(t, os.WriteFile(generated(l.dep), []byte("package dep\n"), 0o600))
 
-	stdout, stderr, code := s.cli.runSplitIn(t, l.main, "clean", "all")
+	stdout, stderr, code := s.cli.runSplitIn(t, l.main, "clean", "./...", "example.com/dep")
 
 	t.It("removes the main module's file", func(it *gotest.T) {
 		gotest.Equal(it, 0, code, stderr)
@@ -111,13 +113,13 @@ func (s *GenerateScopeTestSuite) TestCleanRemovesWhatGenerateWrote(t *gotest.T) 
 func (s *GenerateScopeTestSuite) TestAWorkspaceModuleIsAMainModule(t *gotest.T) {
 	l := s.stage(t, true)
 
-	_, stderr, code := s.cli.runSplitIn(t, l.main, "generate", "all")
+	_, stderr, code := s.cli.runSplitIn(t, l.main, "generate", "./...", "example.com/dep")
 	gotest.Equal(t, 0, code, stderr)
 	gotest.NotContains(t, stderr, depNote)
 	gotest.True(t, exists(generated(l.main)))
 	gotest.True(t, exists(generated(l.dep)))
 
-	_, stderr, code = s.cli.runSplitIn(t, l.main, "clean", "all")
+	_, stderr, code = s.cli.runSplitIn(t, l.main, "clean", "./...", "example.com/dep")
 	gotest.Equal(t, 0, code, stderr)
 	gotest.False(t, exists(generated(l.main)))
 	gotest.False(t, exists(generated(l.dep)))
