@@ -860,6 +860,10 @@ Generates the overlay files that gotest normally creates transparently
 during test runs. Useful for inspecting generated code or integrating
 with custom build pipelines.
 
+Files are written into main-module packages only (go.work modules count);
+a matched dependency with suites is skipped with a note on stderr. A run
+still runs its suites, from the overlay.
+
 Exit codes: 0 when every matched package was generated for, including for
 patterns that match no package (nothing to write, a warning on stderr, as
 go generate does); 2 when a package does not build or generation fails.
@@ -895,7 +899,9 @@ Usage:
 
 Removes generated overlay files (gotest_p(x)suite_test.go) from the source
 tree. A run never writes them there; "gotest generate" does, for
-inspection.
+inspection. Patterns expand as for generate, so "clean ./..." removes what
+"generate ./..." wrote; files in packages outside the main module(s) are
+left with a note on stderr.
 
 The overlay cache and the test binary cache (used for faster repeated
 runs) are managed separately and auto-evict entries older than 7 days.

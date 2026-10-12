@@ -1313,7 +1313,7 @@ Limitations: only Write/Create/Rename events trigger re-runs (file deletion does
 gotest generate ./...
 ```
 
-Writes generated files directly to package directories.
+Writes generated files directly to package directories, in main modules only (a go.work's modules count): a matched package of a dependency, e.g. a `replace`d one under `all`, is skipped with `note: skipped <pkg>: not in a main module` on stderr. A run still overlay-generates and runs a dependency's suites; nothing is written.
 Use case: `//go:generate gotest generate ./...` for checked-in generated files.
 
 **Clean up** orphaned files:
@@ -1322,7 +1322,7 @@ Use case: `//go:generate gotest generate ./...` for checked-in generated files.
 gotest clean ./...
 ```
 
-Walks directories and removes files matching `gotest_p(x)?suite_test.go`.
+Removes files matching `gotest_p(x)?suite_test.go` from the packages the patterns match, expanded as `generate` expands them (`go list`, without loading, so a package broken by a stale generated file is cleaned too): `clean all` removes what `generate all` wrote. A package outside the main modules keeps its files, with the same note on stderr.
 
 ### Generated Files
 

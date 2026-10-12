@@ -2,6 +2,7 @@ package gotestgen
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"go/ast"
 	"maps"
@@ -138,6 +139,18 @@ type LoadResult struct {
 
 func (lr *LoadResult) IsTestOnly() bool {
 	return !lr.hasProdFiles
+}
+
+// InMainModule reports whether the package belongs to a main module, a
+// go.work module included: the only packages generated files are written
+// into. A dependency's suites still run, from an overlay.
+func (lr *LoadResult) InMainModule() bool {
+	for _, p := range []*packages.Package{lr.Ptest, lr.Pxtest} {
+		if p != nil && p.Module != nil {
+			return p.Module.Main
+		}
+	}
+	return false
 }
 
 // loadPackages is the shared core for all package-loading variants. Matched
@@ -380,8 +393,12 @@ func listPatterns(dir string, patterns, buildFlags []string) (listed, unmatched 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	_ = cmd.Run()
-	listed = strings.Fields(stdout.String())
-	for line := range strings.Lines(stderr.String()) {
+	return strings.Fields(stdout.String()), unmatchedWarnings(stderr.String())
+}
+
+// unmatchedWarnings names the patterns go list warned matched no packages.
+func unmatchedWarnings(stderr string) (unmatched []string) {
+	for line := range strings.Lines(stderr) {
 		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "go: warning: ")
 		if !ok {
 			continue
@@ -394,7 +411,7 @@ func listPatterns(dir string, patterns, buildFlags []string) (listed, unmatched 
 			unmatched = append(unmatched, p)
 		}
 	}
-	return listed, unmatched
+	return unmatched
 }
 
 // UnmatchedPatterns names the patterns that match no package while others
@@ -403,6 +420,47 @@ func listPatterns(dir string, patterns, buildFlags []string) (listed, unmatched 
 func UnmatchedPatterns(dir string, patterns, buildFlags []string) []string {
 	_, unmatched := listPatterns(dir, patterns, buildFlags)
 	return unmatched
+}
+
+// PackageDir is a package a pattern matched, listed without loading it.
+type PackageDir struct {
+	ImportPath string
+	Dir        string // "" when Err says why there is none
+	Main       bool   // in a main module, see LoadResult.InMainModule
+	Err        string
+}
+
+// ListPackageDirs expands patterns as go list does, without loading the
+// packages: one that does not compile, e.g. under a stale generated file, is
+// listed all the same. unmatched names the patterns that matched nothing.
+// dir is where go runs, "" the current directory.
+func ListPackageDirs(dir string, patterns, buildFlags []string) (pkgs []PackageDir, unmatched []string, err error) {
+	args := append([]string{"list", "-e", "-find", "-json=ImportPath,Dir,Module,Error"}, buildFlags...)
+	cmd := exec.Command("go", append(args, pkgpattern.Clean(patterns)...)...) //nolint:gosec // G204: the go tool with the command's own patterns
+	cmd.Dir = dir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, nil, fmt.Errorf("go list: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	dec := json.NewDecoder(&stdout)
+	for dec.More() {
+		var p struct {
+			ImportPath string
+			Dir        string
+			Module     *struct{ Main bool }
+			Error      *struct{ Err string }
+		}
+		if err := dec.Decode(&p); err != nil {
+			return nil, nil, fmt.Errorf("go list: %w", err)
+		}
+		pd := PackageDir{ImportPath: p.ImportPath, Dir: p.Dir, Main: p.Module != nil && p.Module.Main}
+		if p.Error != nil {
+			pd.Err = p.Error.Err
+		}
+		pkgs = append(pkgs, pd)
+	}
+	return pkgs, unmatchedWarnings(stderr.String()), nil
 }
 
 // reportOrder orders the matched packages as go test reports them: as go

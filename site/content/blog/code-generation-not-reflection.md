@@ -181,7 +181,7 @@ gotest generate ./...
 cat pkg/user/gotest_psuite_test.go
 
 # Clean up when done
-gotest clean
+gotest clean ./...
 ```
 
 The generated files are standard Go test files. They import your package, reference your types, and call your methods. Reading them is the most direct way to understand what the framework does, because the framework *is* the generated code. If you'd rather start from the other end — write a small suite and then inspect what gets generated for it — [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) walks through exactly that.
@@ -190,7 +190,7 @@ The generated files are standard Go test files. They import your package, refere
 
 Code generation isn't free. It adds a build step: the AST discovery and generation that runs before `go test`. And plain `go test` has no idea your suites exist — without the generated bridge, the package compiles cleanly and simply reports no tests. Your suites are structs with methods; nothing runs them until the bridge does.
 
-If part of your workflow has to invoke `go test` directly, run `gotest generate ./...` first to materialize the bridge files on disk, and `gotest clean` to remove them afterwards.
+If part of your workflow has to invoke `go test` directly, run `gotest generate ./...` first to materialize the bridge files on disk, and `gotest clean ./...` to remove them afterwards.
 
 Day to day, the build step mostly disappears: generation operates on parse trees, and the overlay cache keeps the compile step warm, so the edit-test loop stays close to plain `go test`. [Go Test Watch Mode and Focused Tests]({{< ref "/blog/the-inner-loop" >}}) covers what that loop looks like in practice.
 
