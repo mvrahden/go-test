@@ -16,6 +16,7 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/internal/lint"
+	"github.com/mvrahden/go-test/internal/pkgpattern"
 	"github.com/mvrahden/go-test/internal/unidiff"
 	"golang.org/x/tools/go/analysis/singlechecker"
 )
@@ -141,6 +142,7 @@ func parseLintArgs(args []string) (lintArgs, error) {
 	if len(a.patterns) == 0 {
 		a.patterns = []string{"./..."}
 	}
+	a.patterns = pkgpattern.Clean(a.patterns)
 	// -diff previews -fix, so it implies it.
 	a.fix = a.fix || a.diff
 	return a, nil

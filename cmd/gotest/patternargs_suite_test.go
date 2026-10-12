@@ -50,6 +50,7 @@ func (s *PatternArgsTestSuite) TestAnEmptyPatternIsTheCurrentDirectory(t *gotest
 		{"clean", []string{"clean", ""}},
 		{"discover", []string{"discover", ""}},
 		{"lint", []string{"lint", ""}},
+		{"lint through the go/analysis driver", []string{"lint", "-debug=", ""}},
 	}) {
 		_, stderr, code := s.cli.runSplitIn(t, s.notestfilesDir(), tc.args...)
 		gotest.Equal(t, 0, code, "stderr:\n%s", stderr)
