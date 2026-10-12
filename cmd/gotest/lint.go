@@ -339,16 +339,20 @@ func writeLintFixes(ctx context.Context, stderr io.Writer, changes []lint.Change
 // dir, with a/ and b/ prefixes: git apply resolves the paths of a patch
 // without "diff --git" headers against the directory it runs in, inside a
 // repository or not. A file outside dir gets a ../ path, which git apply
-// only takes with --unsafe-paths; stderr says so.
+// only takes with --unsafe-paths; stderr says so. A symlink is named by
+// the file it leads to, which -fix writes: git apply and patch refuse to
+// write through one.
 func printLintDiff(stdout, stderr io.Writer, dir string, changes []lint.Change) {
 	base := dir
 	if base == "" {
 		base, _ = os.Getwd()
 	}
+	base = realPath(base)
 	outside := false
 	for _, c := range changes {
-		oldName, newName := filepath.ToSlash(c.File), filepath.ToSlash(c.File)
-		if rel, err := filepath.Rel(base, c.File); err == nil {
+		file := realPath(c.File)
+		oldName, newName := filepath.ToSlash(file), filepath.ToSlash(file)
+		if rel, err := filepath.Rel(base, file); err == nil {
 			rel = filepath.ToSlash(rel)
 			oldName, newName = "a/"+rel, "b/"+rel
 			outside = outside || strings.HasPrefix(rel, "../")
@@ -358,6 +362,14 @@ func printLintDiff(stdout, stderr io.Writer, dir string, changes []lint.Change) 
 	if outside {
 		fmt.Fprintln(stderr, "lint: the diff names files outside the current directory; apply it with git apply --unsafe-paths")
 	}
+}
+
+// realPath is path with its symlinks resolved, or path where it cannot be.
+func realPath(path string) string {
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		return real
+	}
+	return path
 }
 
 // lintChangedSource reads a file as -fix would leave it.

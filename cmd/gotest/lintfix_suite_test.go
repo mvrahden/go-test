@@ -527,6 +527,30 @@ func (s *LintFixTestSuite) TestTargets(t *gotest.T) {
 		})
 	})
 
+	t.When("-diff covers a file that is a symlink", func(w *gotest.T) {
+		if runtime.GOOS == "windows" {
+			w.Skipf("symlinks need privileges on Windows")
+		}
+		dir, _ := s.stageProbe(w, lintFixProbe)
+		gotest.NoError(w, os.Mkdir(filepath.Join(dir, "real"), 0o700))
+		real := filepath.Join(dir, "real", "second.go.txt")
+		gotest.NoError(w, os.WriteFile(real, []byte(lintFixSecondProbe), 0o600))
+		link := filepath.Join(dir, "second_test.go")
+		gotest.NoError(w, os.Symlink(filepath.Join("real", "second.go.txt"), link))
+		stdout, stderr, code := s.runLintIn(w, dir, nil, "lint", "-diff", "./...")
+		out, err := gitApply(w, dir, dir, stdout)
+		info, lerr := os.Lstat(link)
+
+		w.It("names the file the link leads to, which git apply writes", func(it *gotest.T) {
+			gotest.Equal(it, 3, code, stderr)
+			gotest.Contains(it, stdout, "\n--- a/real/second.go.txt\n+++ b/real/second.go.txt\n")
+			gotest.NoError(it, err, out)
+			gotest.Contains(it, readLintFixFile(it, real), "gotest.Equal(t, 2, 2)")
+			gotest.NoError(it, lerr)
+			gotest.NotZero(it, info.Mode()&os.ModeSymlink)
+		})
+	})
+
 	t.When("a target does not compile", func(w *gotest.T) {
 		dir, file := s.stageProbe(w, lintFixProbe)
 		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "broken_test.go"), []byte("package lintfix\n\nvar x int = \"nope\"\n"), 0o600))

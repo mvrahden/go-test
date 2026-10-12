@@ -748,7 +748,8 @@ Flags:
                           the path from the current directory, so git
                           apply takes the diff there; a file outside it
                           gets a ../ path, which needs git apply
-                          --unsafe-paths
+                          --unsafe-paths. A symlink is named by the file
+                          it leads to, which -fix writes
   -json                   Print the findings as JSON on stdout and exit 0,
                           as the go/analysis driver does (also with -fix;
                           not with -diff)
