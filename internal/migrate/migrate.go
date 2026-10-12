@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -317,21 +318,27 @@ func writeAll(changes []filewrite.Change, shown map[string]string) error {
 	if err != nil {
 		return fmt.Errorf("writing the migrated files: %w; nothing was written", err)
 	}
-	n, err := staged.Commit()
+	written, err := staged.Commit()
 	if err == nil {
 		return nil
 	}
-	if n == 0 {
+	done := map[string]bool{}
+	var wrote, rest []string
+	for _, f := range written {
+		done[f] = true
+		wrote = append(wrote, shown[f])
+	}
+	var partly *filewrite.PartlyWrittenError
+	errors.As(err, &partly)
+	for _, c := range changes {
+		if !done[c.File] && (partly == nil || c.File != partly.File) {
+			rest = append(rest, shown[c.File])
+		}
+	}
+	if len(wrote) == 0 && partly == nil {
 		return fmt.Errorf("writing the migrated files: %w; nothing was written", err)
 	}
-	names := func(cs []filewrite.Change) string {
-		out := make([]string, 0, len(cs))
-		for _, c := range cs {
-			out = append(out, shown[c.File])
-		}
-		return strings.Join(out, ", ")
-	}
-	return fmt.Errorf("writing the migrated files: %w; wrote %s; did not write %s", err, names(changes[:n]), names(changes[n:]))
+	return fmt.Errorf("writing the migrated files: %w; wrote %s; did not write %s", err, list(wrote), list(rest))
 }
 
 // jobUnit is a directory's migration and what its type-check found.
@@ -598,4 +605,12 @@ func testFiles(dir string) []string {
 	}
 	sort.Strings(paths)
 	return paths
+}
+
+// list joins names for a message, "none" when there are none.
+func list(names []string) string {
+	if len(names) == 0 {
+		return "none"
+	}
+	return strings.Join(names, ", ")
 }

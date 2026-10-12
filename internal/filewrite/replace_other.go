@@ -9,3 +9,5 @@ import "os"
 func renameKeeps(string, os.FileInfo) bool { return true }
 
 func sameGroup(*os.File, os.FileInfo) bool { return true }
+
+func renameRefused(error) bool { return false }

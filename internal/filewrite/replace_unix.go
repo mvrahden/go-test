@@ -3,6 +3,7 @@
 package filewrite
 
 import (
+	"errors"
 	"os"
 	"syscall"
 )
@@ -25,4 +26,9 @@ func sameGroup(t *os.File, info os.FileInfo) bool {
 		return true
 	}
 	return t.Chown(-1, int(want)) == nil
+}
+
+// renameRefused reports a rename the target's mount refuses.
+func renameRefused(err error) bool {
+	return errors.Is(err, syscall.EBUSY) || errors.Is(err, syscall.EXDEV)
 }

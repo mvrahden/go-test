@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go/token"
 	"io"
@@ -318,20 +319,28 @@ func writeLintFixes(ctx context.Context, stderr io.Writer, changes []lint.Change
 		fmt.Fprintf(stderr, "FAIL: writing fixes: %v; nothing was written\n", err)
 		return 1
 	}
-	n, err := staged.Commit()
-	for _, c := range changes[:n] {
-		*written = append(*written, c.File)
-	}
+	files, err := staged.Commit()
+	*written = append(*written, files...)
 	if err != nil {
 		fmt.Fprintf(stderr, "FAIL: writing fixes: %v\n", err)
-		if n > 0 {
-			fmt.Fprintf(stderr, "lint: wrote fixes to:\n\t%s\n", strings.Join(*written, "\n\t"))
+		if len(files) > 0 {
+			fmt.Fprintf(stderr, "lint: wrote fixes to:\n\t%s\n", strings.Join(files, "\n\t"))
 		}
-		rest := make([]string, 0, len(changes)-n)
-		for _, c := range changes[n:] {
-			rest = append(rest, c.File)
+		done := map[string]bool{}
+		for _, f := range files {
+			done[f] = true
 		}
-		fmt.Fprintf(stderr, "lint: did not write:\n\t%s\n", strings.Join(rest, "\n\t"))
+		var partly *filewrite.PartlyWrittenError
+		errors.As(err, &partly)
+		var rest []string
+		for _, c := range changes {
+			if !done[c.File] && (partly == nil || c.File != partly.File) {
+				rest = append(rest, c.File)
+			}
+		}
+		if len(rest) > 0 {
+			fmt.Fprintf(stderr, "lint: did not write:\n\t%s\n", strings.Join(rest, "\n\t"))
+		}
 		return 1
 	}
 	return 0

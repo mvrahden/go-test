@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"syscall"
 
 	"github.com/mvrahden/go-test/internal/filewrite"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -46,7 +47,8 @@ func write(changes ...filewrite.Change) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return staged.Commit()
+	written, err := staged.Commit()
+	return len(written), err
 }
 
 // posix skips where permission bits do not bind, as for root.
@@ -184,7 +186,8 @@ func (s *FilewriteTestSuite) TestCommit(t *gotest.T) {
 		gotest.NoError(w, err)
 		gotest.Len(w, tmp, 1)
 		gotest.NoError(w, os.Remove(tmp[0]))
-		n, err := staged.Commit()
+		written, err := staged.Commit()
+		n := len(written)
 
 		w.It("stops there and reports how many it wrote", func(it *gotest.T) {
 			gotest.ErrorIs(it, err, os.ErrNotExist)
@@ -205,6 +208,117 @@ func (s *FilewriteTestSuite) TestCommit(t *gotest.T) {
 		w.It("writes nothing and leaves no temporary file", func(it *gotest.T) {
 			gotest.Equal(it, "old", read(it, a.File))
 			gotest.Equal(it, []string{"a.go"}, names(it, dir))
+		})
+	})
+}
+
+// inPlace stages a's change to longer contents, written in place: a has a
+// second hard link.
+func inPlace(t *gotest.T) (filewrite.Change, *filewrite.Staged) {
+	dir := t.TempDir()
+	a := file(t, dir, "a.go", 0o600)
+	a.After = []byte("new and longer")
+	gotest.NoError(t, os.Link(a.File, filepath.Join(dir, "other.go")))
+	staged, err := filewrite.Stage([]filewrite.Change{a})
+	gotest.NoError(t, err)
+	return a, staged
+}
+
+// failingWrite writes 3 bytes of the first call, then fails it and the
+// next fails more calls.
+func failingWrite(fails int) func(f *os.File, b []byte, off int64) (int, error) {
+	calls := 0
+	return func(f *os.File, b []byte, off int64) (int, error) {
+		calls++
+		if calls > fails {
+			return f.WriteAt(b, off)
+		}
+		n, _ := f.WriteAt(b[:min(3, len(b))], off)
+		return n, syscall.ENOSPC
+	}
+}
+
+func (s *FilewriteTestSuite) TestWriteFailsMidway(t *gotest.T) {
+	t.When("a file written in place cannot be written whole", func(w *gotest.T) {
+		a, staged := inPlace(w)
+		filewrite.SetWriteAt(staged, failingWrite(1))
+		written, err := staged.Commit()
+		n := len(written)
+
+		w.It("puts its old contents back and says so", func(it *gotest.T) {
+			gotest.Equal(it, 0, n)
+			gotest.ErrorContains(it, err, "a.go is left as it was")
+			gotest.Equal(it, "old", read(it, a.File))
+		})
+	})
+
+	t.When("its old contents cannot be put back either", func(w *gotest.T) {
+		a, staged := inPlace(w)
+		filewrite.SetWriteAt(staged, failingWrite(2))
+		_, err := staged.Commit()
+
+		w.It("says it may be partly written", func(it *gotest.T) {
+			gotest.ErrorContains(it, err, "a.go may be partly written")
+			gotest.ErrorIs(it, err, syscall.ENOSPC)
+			gotest.Equal(it, a.File, gotest.ErrorAs[*filewrite.PartlyWrittenError](it, err).File)
+			gotest.NotEqual(it, "new and longer", read(it, a.File))
+		})
+	})
+}
+
+func (s *FilewriteTestSuite) TestRenameRefused(t *gotest.T) {
+	dir := t.TempDir()
+	a := file(t, dir, "a.go", 0o600)
+	staged, err := filewrite.Stage([]filewrite.Change{a})
+	gotest.NoError(t, err)
+	// As a file bind-mounted from another filesystem refuses it.
+	filewrite.SetRename(staged, func(oldpath, newpath string) error {
+		return &os.LinkError{Op: "rename", Old: oldpath, New: newpath, Err: syscall.EXDEV}
+	})
+	written, err := staged.Commit()
+	n := len(written)
+
+	t.It("writes the file in place and leaves no temporary file", func(it *gotest.T) {
+		gotest.NoError(it, err)
+		gotest.Equal(it, 1, n)
+		gotest.Equal(it, "new", read(it, a.File))
+		gotest.Equal(it, []string{"a.go"}, names(it, dir))
+	})
+}
+
+func (s *FilewriteTestSuite) TestOneFileTwice(t *gotest.T) {
+	if runtime.GOOS == "windows" {
+		t.Skipf("symlinks need privileges on Windows")
+	}
+	// a and a link to it, changed through both names.
+	twice := func(t *gotest.T, after string) (filewrite.Change, filewrite.Change) {
+		dir := t.TempDir()
+		a := file(t, dir, "a.go", 0o600)
+		link := filepath.Join(dir, "link.go")
+		gotest.NoError(t, os.Symlink(a.File, link))
+		return a, filewrite.Change{File: link, Before: a.Before, After: []byte(after)}
+	}
+
+	t.When("both changes agree", func(w *gotest.T) {
+		a, viaLink := twice(w, "new")
+		n, err := write(a, viaLink)
+
+		w.It("writes the file, reporting both names written", func(it *gotest.T) {
+			gotest.NoError(it, err)
+			gotest.Equal(it, 2, n)
+			gotest.Equal(it, "new", read(it, a.File))
+		})
+	})
+
+	t.When("they differ", func(w *gotest.T) {
+		a, viaLink := twice(w, "other")
+		b := file(w, w.TempDir(), "b.go", 0o600)
+		_, err := write(b, a, viaLink)
+
+		w.It("refuses them and writes nothing", func(it *gotest.T) {
+			gotest.ErrorContains(it, err, "are one file, changed two ways")
+			gotest.Equal(it, "old", read(it, a.File))
+			gotest.Equal(it, "old", read(it, b.File))
 		})
 	})
 }
