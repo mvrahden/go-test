@@ -624,7 +624,7 @@ func (s *LintFixTestSuite) TestWrites(t *gotest.T) {
 		stdout, stderr, code := s.runLintIn(w, dir, []string{path}, "lint", "-fix", "./...")
 
 		w.It("exits 1, says nothing was written and keeps the edit", func(it *gotest.T) {
-			gotest.Regexp(it, `^FAIL: writing fixes: \S*probe_test\.go changed since lint read it; nothing was written\n$`, stderr)
+			gotest.Regexp(it, `^FAIL: writing fixes: \S*probe_test\.go changed since it was read; nothing was written\n$`, stderr)
 			gotest.Empty(it, stdout)
 			gotest.Equal(it, 1, code, stderr)
 			gotest.Equal(it, lintFixProbe+"// edited\n", readLintFixFile(it, file))
@@ -655,6 +655,34 @@ func (s *LintFixTestSuite) TestWrites(t *gotest.T) {
 			gotest.NoError(it, lstatErr)
 			gotest.NotZero(it, linkInfo.Mode()&os.ModeSymlink)
 			gotest.Contains(it, readLintFixFile(it, real), "gotest.Equal(t, 2, 2)")
+		})
+	})
+
+	t.When("a fixed file has a second hard link", func(w *gotest.T) {
+		dir, file := s.stageProbe(w, lintFixProbe)
+		other := filepath.Join(w.TempDir(), "probe.go.txt")
+		gotest.NoError(w, os.Link(file, other))
+		_, stderr, code := s.runLintIn(w, dir, nil, "lint", "-fix", "./...")
+
+		w.It("fixes the file both names share", func(it *gotest.T) {
+			gotest.Equal(it, 3, code, stderr)
+			gotest.Contains(it, readLintFixFile(it, file), "gotest.Equal(t, 1, 1)")
+			gotest.Equal(it, readLintFixFile(it, file), readLintFixFile(it, other))
+		})
+	})
+
+	t.When("a fixed file is writable but its directory is not", func(w *gotest.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			w.Skipf("POSIX directory permissions as a non-root user")
+		}
+		dir, file := s.stageProbe(w, lintFixProbe)
+		gotest.NoError(w, os.Chmod(dir, 0o500))
+		_, stderr, code := s.runLintIn(w, dir, nil, "lint", "-fix", "./...")
+		gotest.NoError(w, os.Chmod(dir, 0o700))
+
+		w.It("fixes it in place", func(it *gotest.T) {
+			gotest.Equal(it, 3, code, stderr)
+			gotest.Contains(it, readLintFixFile(it, file), "gotest.Equal(t, 1, 1)")
 		})
 	})
 }

@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/mvrahden/go-test/internal/filewrite"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/checker"
 	"golang.org/x/tools/go/ast/astutil"
@@ -26,11 +27,7 @@ import (
 const fixPasses = 10
 
 // Change is one file Fix rewrote.
-type Change struct {
-	File   string
-	Before []byte // the file on disk
-	After  []byte // what -fix writes
-}
+type Change = filewrite.Change
 
 // Fix applies the fixes res carries in memory, exactly as the go/analysis
 // driver's -fix would write them, and re-analyzes the fixed sources until no

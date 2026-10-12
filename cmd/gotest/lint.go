@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"go/token"
@@ -13,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/config"
+	"github.com/mvrahden/go-test/internal/filewrite"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/internal/lint"
@@ -300,12 +300,10 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 	}
 }
 
-// writeLintFixes writes every fixed file or none: each goes to a temporary
-// file beside the one it replaces, and only once all are staged are they
-// renamed over the originals. A second signal waits until it is done. It
-// returns 0 once every file is written; otherwise it says on stderr what
-// was written and returns the exit code: 130 when a signal came first, 1
-// on a failure.
+// writeLintFixes writes every fixed file or none (see filewrite.Stage). A
+// second signal waits until it is done. It returns 0 once every file is
+// written; otherwise it says on stderr what was written and returns the
+// exit code: 130 when a signal came first, 1 on a failure.
 func writeLintFixes(ctx context.Context, stderr io.Writer, changes []lint.Change, written *[]string) int {
 	forcedExit.Lock()
 	defer forcedExit.Unlock()
@@ -313,79 +311,28 @@ func writeLintFixes(ctx context.Context, stderr io.Writer, changes []lint.Change
 		fmt.Fprintln(stderr, "lint: interrupted; nothing was written")
 		return 130
 	}
-
-	type staged struct{ file, target, tmp string }
-	var all []staged
-	discard := func(rest []staged) {
-		for _, st := range rest {
-			_ = os.Remove(st.tmp)
-		}
+	staged, err := filewrite.Stage(changes)
+	if err != nil {
+		fmt.Fprintf(stderr, "FAIL: writing fixes: %v; nothing was written\n", err)
+		return 1
 	}
-	for _, c := range changes {
-		target, tmp, err := stageLintFix(c)
-		if err != nil {
-			discard(all)
-			fmt.Fprintf(stderr, "FAIL: writing fixes: %v; nothing was written\n", err)
-			return 1
-		}
-		all = append(all, staged{c.File, target, tmp})
+	n, err := staged.Commit()
+	for _, c := range changes[:n] {
+		*written = append(*written, c.File)
 	}
-	for i, st := range all {
-		if err := os.Rename(st.tmp, st.target); err != nil {
-			discard(all[i:])
-			fmt.Fprintf(stderr, "FAIL: writing fixes: %v\n", err)
-			if len(*written) > 0 {
-				fmt.Fprintf(stderr, "lint: wrote fixes to:\n\t%s\n", strings.Join(*written, "\n\t"))
-			}
-			rest := make([]string, 0, len(all)-i)
-			for _, st := range all[i:] {
-				rest = append(rest, st.file)
-			}
-			fmt.Fprintf(stderr, "lint: did not write:\n\t%s\n", strings.Join(rest, "\n\t"))
-			return 1
+	if err != nil {
+		fmt.Fprintf(stderr, "FAIL: writing fixes: %v\n", err)
+		if n > 0 {
+			fmt.Fprintf(stderr, "lint: wrote fixes to:\n\t%s\n", strings.Join(*written, "\n\t"))
 		}
-		*written = append(*written, st.file)
+		rest := make([]string, 0, len(changes)-n)
+		for _, c := range changes[n:] {
+			rest = append(rest, c.File)
+		}
+		fmt.Fprintf(stderr, "lint: did not write:\n\t%s\n", strings.Join(rest, "\n\t"))
+		return 1
 	}
 	return 0
-}
-
-// stageLintFix writes c's fixed contents to a temporary file beside the
-// file it replaces, with that file's permissions, and returns both. The
-// file a symlink names is the one replaced, so the link stays.
-func stageLintFix(c lint.Change) (target, tmp string, err error) {
-	if target, err = filepath.EvalSymlinks(c.File); err != nil {
-		return "", "", err
-	}
-	info, err := os.Stat(target)
-	if err != nil {
-		return "", "", err
-	}
-	// A rename would replace a file its permissions keep from being written.
-	f, err := os.OpenFile(target, os.O_WRONLY, 0)
-	if err != nil {
-		return "", "", err
-	}
-	_ = f.Close()
-	if disk, err := os.ReadFile(target); err != nil || !bytes.Equal(disk, c.Before) {
-		return "", "", fmt.Errorf("%s changed since lint read it", c.File)
-	}
-
-	t, err := os.CreateTemp(filepath.Dir(target), "."+filepath.Base(target)+".gotest-*")
-	if err != nil {
-		return "", "", err
-	}
-	_, err = t.Write(c.After)
-	if err == nil {
-		err = t.Chmod(info.Mode().Perm())
-	}
-	if cerr := t.Close(); err == nil {
-		err = cerr
-	}
-	if err != nil {
-		_ = os.Remove(t.Name())
-		return "", "", err
-	}
-	return target, t.Name(), nil
 }
 
 // printLintDiff prints changes as one unified diff. Paths are relative to
