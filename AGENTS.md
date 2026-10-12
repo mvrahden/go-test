@@ -249,6 +249,8 @@ func (s *MyTestSuite) TestRead(t *gotest.T) {}
 
 Methods can also accept `*testing.T` for stdlib compatibility.
 
+A test that calls `os.Exit` fails, `os.Exit(0)` included, as under `go test`.
+
 A method named `Test*Async` with a trailing `done func()` parameter completes when `done()` is called, not when it returns (`(t, done)`, or `(t, ctx, done)` with a returning `BeforeEach`); the suite's `Timeout` fails it if `done()` never is, located at the method's declaration — and only that: a method waiting for `done()` is not reported as still running. Prefer `Eventually` for anything that can be polled.
 
 ### Lifecycle methods

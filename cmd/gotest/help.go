@@ -173,6 +173,8 @@ bench and fuzz too) it exits 2 and prints on stderr
   FAIL: "<pattern>" matched no packages
 A pattern that matches nothing while others do only warns on stderr, as
 go test does.
+A test that panics or calls os.Exit fails its suite, os.Exit(0) included,
+as under go test: the run exits 1, in every mode.
 An empty pattern ("") is the current directory, as for go test. gotest
 takes packages, not files: a .go file argument exits 2 and names it.
 

@@ -252,6 +252,12 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 	if cmd.ProcessState != nil {
 		exitCode = cmd.ProcessState.ExitCode()
 	}
+	// A failed test exits 1, a panic 2, os.Exit whatever it was given: each
+	// is a failed suite, 1, as go test reports it. A status the binary did
+	// not choose is left for RecordResult to read.
+	if _, how := ExitStatusVerdict(exitCode); how == "" && exitCode > 0 {
+		exitCode = 1
+	}
 
 	return SuiteResult{
 		Target:   target,

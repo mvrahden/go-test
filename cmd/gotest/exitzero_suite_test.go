@@ -46,7 +46,8 @@ func (s *ExitZeroTestSuite) TestOsExitZeroFailsTheRun(t *gotest.T) {
 
 	t.When("the run prints text", func(w *gotest.T) {
 		stdout, stderr, code := s.cli.runSplitIn(w, dir, "./")
-		gotest.NotEqual(w, 0, code, "stdout:\n%s\nstderr:\n%s", stdout, stderr)
+		// The binary panics, exit status 2; a failed test is 1, as for go test.
+		gotest.Equal(w, 1, code, "stdout:\n%s\nstderr:\n%s", stdout, stderr)
 		gotest.Contains(w, stderr, exitZeroPanic)
 		gotest.Regexp(w, `(?m)^FAIL\s+testpkg`, stdout)
 		gotest.NotContains(w, stdout, "ok  \ttestpkg")
@@ -67,7 +68,7 @@ func (s *ExitZeroTestSuite) TestOsExitZeroFailsTheRun(t *gotest.T) {
 
 	t.When("the run benchmarks", func(w *gotest.T) {
 		stdout, stderr, code := s.cli.runSplitIn(w, dir, "bench", "./", "-benchtime=1x")
-		gotest.NotEqual(w, 0, code, "stdout:\n%s\nstderr:\n%s", stdout, stderr)
+		gotest.Equal(w, 1, code, "stdout:\n%s\nstderr:\n%s", stdout, stderr)
 		gotest.Contains(w, stderr, exitZeroPanic)
 	})
 }
