@@ -106,6 +106,10 @@ var ExportLogSlowBuild = logSlowBuild
 // ExportLineWriterProgress reads the progress a line writer captured.
 func ExportLineWriterProgress(w io.WriteCloser) FuzzProgress { return w.(*lineWriter).progress }
 
+// ExportLineWriterDeadlineFail reports whether the target's only failure was
+// the engine's deadline.
+func ExportLineWriterDeadlineFail(w io.WriteCloser) bool { return w.(*lineWriter).deadlineFail }
+
 var ExportSnapshotCrashers = snapshotCrashers
 var ExportNewCrasherNames = newCrasherNames
 var ExportExitCodeAfterDispatch = exitCodeAfterDispatch

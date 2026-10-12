@@ -114,6 +114,9 @@ type FuzzTargetOutcome struct {
 	NewCrashers []string // corpus entry files that appeared under testdata/fuzz/<Func>/ during the run
 	Execs       int64    // executions the engine reported in its last progress line
 	Interesting int      // new interesting inputs the engine reported in its last progress line
+	// EngineDeadline: the engine's only failure was its own time budget
+	// running out, which Go before 1.27 can report as one (go.dev/issue/75804).
+	EngineDeadline bool
 }
 
 // FuzzProgress is what the engine's latest "fuzz: elapsed: ..." line said.
@@ -127,12 +130,12 @@ type FuzzProgress struct {
 // finding, 1 = a genuine finding — a failing target, or a new crasher file
 // even when the shutdown killed the process mid-crash — and 2 = the
 // subprocess could not run at all.
-func (o FuzzTargetOutcome) EffectiveExitCode() int {
+func (o FuzzTargetOutcome) EffectiveExitCode() int { //nolint:gocritic // hugeParam: stable API
 	if o.Skipped {
 		return 0
 	}
 	code := o.ExitCode
-	if o.Canceled && len(o.NewCrashers) == 0 {
+	if (o.Canceled || o.EngineDeadline) && len(o.NewCrashers) == 0 {
 		// The non-zero exit here is the shutdown this session caused, not a
 		// verdict. A genuine failure racing the deadline is still caught:
 		// a crash writes a corpus file (the scan sees it), and a failing
@@ -358,12 +361,13 @@ func runOneFuzzTarget(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, budg
 		progress = stderrW.progress
 	}
 	outcome := FuzzTargetOutcome{
-		Func:        t.Func,
-		ExitCode:    exitCode,
-		Canceled:    canceled,
-		NewCrashers: newCrasherNames(before, snapshotCrashers(t)),
-		Execs:       progress.Execs,
-		Interesting: progress.Interesting,
+		Func:           t.Func,
+		ExitCode:       exitCode,
+		Canceled:       canceled,
+		NewCrashers:    newCrasherNames(before, snapshotCrashers(t)),
+		Execs:          progress.Execs,
+		Interesting:    progress.Interesting,
+		EngineDeadline: exitCode == 1 && (stdoutW.deadlineFail || stderrW.deadlineFail),
 	}
 
 	out.Lock()
@@ -375,6 +379,8 @@ func runOneFuzzTarget(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, budg
 		fmt.Fprintf(os.Stderr, "[%s] inspect it with `gotest fuzz triage`, then `gotest fuzz promote` to keep it as a typed seed\n", t.Func)
 	case exitCode != 0 && canceled:
 		fmt.Fprintf(os.Stderr, "[%s] stopped: session ended before this target finished (no failures found)\n", t.Func)
+	case outcome.EngineDeadline:
+		fmt.Fprintf(os.Stderr, "[%s] the engine reported its time running out as a failure (go.dev/issue/75804, fixed in Go 1.27); no input failed\n", t.Func)
 	case exitCode != 0:
 		fmt.Fprintf(os.Stderr, "[%s] failing without a new crasher file — a seed or existing corpus entry fails; it reproduces on a regular `gotest` run\n", t.Func)
 	}
@@ -398,12 +404,14 @@ const lineWriterMaxBuf = 1 << 20 // 1MB
 // stderr, and other targets running at the same time) so their lines are
 // never interleaved mid-write.
 type lineWriter struct {
-	dst      io.Writer
-	label    string
-	mu       *sync.Mutex
-	buf      []byte
-	skipNext bool         // the line after "To re-run:" is the engine's go test command
-	progress FuzzProgress // from the latest "fuzz: elapsed: ..." line seen
+	dst          io.Writer
+	label        string
+	mu           *sync.Mutex
+	buf          []byte
+	skipNext     bool         // the line after "To re-run:" is the engine's go test command
+	afterFail    bool         // the previous line was the target's own "--- FAIL:"
+	deadlineFail bool         // that failure's only message was "context deadline exceeded"
+	progress     FuzzProgress // from the latest "fuzz: elapsed: ..." line seen
 }
 
 // fuzzProgressRe matches the engine's periodic progress line, e.g.
@@ -472,6 +480,12 @@ func (w *lineWriter) emit(line []byte, continued bool) {
 	if bytes.Equal(trimmed, []byte("To re-run:")) {
 		w.skipNext = true
 		return
+	}
+	if w.afterFail {
+		w.afterFail = false
+		w.deadlineFail = bytes.Equal(trimmed, []byte("context deadline exceeded"))
+	} else if bytes.HasPrefix(trimmed, []byte("--- FAIL: "+w.label+" (")) {
+		w.afterFail = true
 	}
 	if m := fuzzProgressRe.FindSubmatch(trimmed); m != nil {
 		execs, _ := strconv.ParseInt(string(m[1]), 10, 64)
