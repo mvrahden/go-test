@@ -4,6 +4,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -229,6 +230,42 @@ func (s *MigrateCLITestSuite) TestDryRun(t *gotest.T, ctx *migrateCtx) {
 
 	t.It("still exits 1 for the markers", func(it *gotest.T) {
 		gotest.Equal(it, 1, code, out)
+	})
+}
+
+func (s *MigrateCLITestSuite) TestDryRunApplies(t *gotest.T, ctx *migrateCtx) {
+	if runtime.GOOS == "windows" {
+		t.Skipf("symlinks need privileges on Windows")
+	}
+	// The suite file lacks a trailing newline; the second is a symlink to
+	// a file in another directory of the module.
+	s.write(t, ctx, strings.TrimSuffix(migrateMarkedSrc, "\n"))
+	gotest.NoError(t, os.MkdirAll(filepath.Join(ctx.dir, "real"), 0o750))
+	gotest.NoError(t, os.WriteFile(filepath.Join(ctx.dir, "real", "linked.go.txt"), []byte(migrateCleanSrc), 0o600))
+	gotest.NoError(t, os.Symlink(filepath.Join("real", "linked.go.txt"), filepath.Join(ctx.dir, "linked_test.go")))
+	written := t.TempDir()
+	gotest.NoError(t, os.CopyFS(written, os.DirFS(ctx.dir)))
+	_, _, _ = s.cli.runSplitIn(t, written, "migrate", ".")
+
+	patch, stderr, code := s.cli.runSplitIn(t, ctx.dir, "migrate", "--dry-run", ".")
+	gotest.Equal(t, 1, code, stderr)
+	patch, _, _ = strings.Cut(patch, "Would migrate")
+	apply := exec.CommandContext(t.Context(), "git", "apply", "-")
+	apply.Dir, apply.Stdin = ctx.dir, strings.NewReader(patch)
+	out, err := apply.CombinedOutput()
+
+	t.It("applies with git apply and leaves what migrate writes", func(it *gotest.T) {
+		gotest.NoError(it, err, string(out)+patch)
+		for _, name := range []string{"sample_test.go", filepath.Join("real", "linked.go.txt")} {
+			want, err := os.ReadFile(filepath.Join(written, name))
+			gotest.NoError(it, err)
+			gotest.Equal(it, string(want), string(gotest.Must(os.ReadFile(filepath.Join(ctx.dir, name)))), name)
+		}
+	})
+	t.It("keeps the symlink", func(it *gotest.T) {
+		info, err := os.Lstat(filepath.Join(ctx.dir, "linked_test.go"))
+		gotest.NoError(it, err)
+		gotest.NotZero(it, info.Mode()&os.ModeSymlink)
 	})
 }
 

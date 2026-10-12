@@ -453,7 +453,7 @@ func (ju *jobUnit) write(opts Options, shown map[string]string) ([]MigrateResult
 		}
 		if opts.DryRun {
 			if opts.Out != nil {
-				fmt.Fprint(opts.Out, unifiedDiff(shown[uf.path], uf.src, uf.out))
+				fmt.Fprint(opts.Out, unifiedDiff(uf.path, shown[uf.path], uf.src, uf.out))
 			}
 			continue
 		}
