@@ -34,6 +34,7 @@ func (s *ArgsTestSuite) TestIsGoTestFlag(t *gotest.T) {
 		{"build special value", "-o", true, true},
 		{"run bool", "-v", false, true},
 		{"run value", "-run", true, true},
+		{"skip value", "-skip", true, true},
 		{"json", "-json", false, true},
 		{"args", "-args", false, true},
 		{"unknown", "-zzz", false, false},
@@ -53,6 +54,11 @@ func (s *ArgsTestSuite) TestPackagePatterns(t *gotest.T) {
 		c := gotestrunner.ClassifyGoTestArgs([]string{"-run", "X", "std", "fmt", "-count", "2", "./a"})
 		gotest.Equal(it, []string{"std", "fmt", "./a"}, c.PkgPatterns)
 		gotest.Equal(it, []string{"-run", "X", "-count", "2"}, c.RunFlags)
+	})
+	t.It("gives -skip the non-flag after it, as -run", func(it *gotest.T) {
+		c := gotestrunner.ClassifyGoTestArgs([]string{"-skip", "X", "fmt"})
+		gotest.Equal(it, []string{"fmt"}, c.PkgPatterns)
+		gotest.Equal(it, []string{"-skip", "X"}, c.RunFlags)
 	})
 	t.It("gives an unknown flag the non-flag after it as its value", func(it *gotest.T) {
 		c := gotestrunner.ClassifyGoTestArgs([]string{"-custom", "value", "fmt"})

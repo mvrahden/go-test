@@ -53,6 +53,7 @@ var runValueFlags = map[string]bool{
 	"-count":            true,
 	"-timeout":          true,
 	"-run":              true,
+	"-skip":             true,
 	"-parallel":         true,
 	"-shuffle":          true,
 	"-bench":            true,

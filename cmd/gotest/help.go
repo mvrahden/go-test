@@ -104,6 +104,7 @@ Flags (gotest — use --double-dash):
 Flags (go test — use -single-dash, forwarded automatically):
   -v                      Verbose output
   -run=<regexp>           Run only matching tests
+  -skip=<regexp>          Skip matching tests (e.g. -skip='TestFooTestSuite/TestSlow')
   -count=<n>              Run each test n times (default: 1; no result is cached)
   -race                   Enable data race detector
   -timeout=<dur>          Deadline of each suite process (default: 10m); a
