@@ -14,6 +14,7 @@ import (
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/goversion"
+	"github.com/mvrahden/go-test/internal/pkgpattern"
 	"github.com/mvrahden/go-test/internal/x/slices"
 	"golang.org/x/tools/go/packages"
 )
@@ -372,6 +373,7 @@ func listPatterns(dir string, patterns, buildFlags []string) (listed, unmatched 
 	if len(patterns) < 2 {
 		return nil, nil
 	}
+	patterns = pkgpattern.Clean(patterns)
 	args := append([]string{"list", "-e", "-find", "-f", "{{.ImportPath}}"}, buildFlags...)
 	cmd := exec.Command("go", append(args, patterns...)...) //nolint:gosec // G204: the go tool with the run's own patterns
 	cmd.Dir = dir

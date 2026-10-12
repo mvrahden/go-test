@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/goversion"
+	"github.com/mvrahden/go-test/internal/pkgpattern"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -58,7 +59,7 @@ func load(ctx context.Context, t *Targets, overlay map[string][]byte) ([]*packag
 		}
 		defer cleanup()
 	}
-	pkgs, err := packages.Load(cfg, t.Patterns...)
+	pkgs, err := packages.Load(cfg, pkgpattern.Clean(t.Patterns)...)
 	if err != nil {
 		return nil, fmt.Errorf("load packages: %w", err)
 	}

@@ -11,7 +11,11 @@ import (
 )
 
 func runClean(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	patterns := ExtractPackagePatterns(inv.Args)
+	patterns, err := ExtractPackagePatterns(inv.Args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 
 	var removed int
 	for _, pattern := range patterns {

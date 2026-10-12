@@ -7,6 +7,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/config"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/pkgpattern"
 )
 
 // Invocation carries the resolved state for a single CLI invocation.
@@ -172,16 +173,21 @@ func extractStringFlag(args []string, name, defaultVal string) string {
 // ExtractPackagePatterns returns the package patterns in args as go test
 // reads them: every positional argument that is not a flag's value, meta
 // patterns (all, std, tool, work) and bare import paths (fmt) included.
-// Without one it is the current directory.
-func ExtractPackagePatterns(args []string) []string {
+// Without one, or for an empty one, it is the current directory. Go files
+// are a usage error: go test builds them as an ad-hoc package, which has no
+// suites to generate for.
+func ExtractPackagePatterns(args []string) ([]string, error) {
 	var patterns []string
 	for _, i := range gotestrunner.PatternIndices(args, ownFlag) {
 		patterns = append(patterns, args[i])
 	}
 	if len(patterns) == 0 {
-		return []string{"."}
+		return []string{"."}, nil
 	}
-	return patterns
+	if files := pkgpattern.Files(patterns); len(files) > 0 {
+		return nil, fmt.Errorf("gotest takes packages, not files: %s", strings.Join(files, ", "))
+	}
+	return pkgpattern.Clean(patterns), nil
 }
 
 // ownFlag reports whether a gotest flag takes a value.

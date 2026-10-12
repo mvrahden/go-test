@@ -172,6 +172,8 @@ bench and fuzz too) it exits 2 and prints on stderr
   FAIL: "<pattern>" matched no packages
 A pattern that matches nothing while others do only warns on stderr, as
 go test does.
+An empty pattern ("") is the current directory, as for go test. gotest
+takes packages, not files: a .go file argument exits 2 and names it.
 
 Fuzz seed harvesting (on by default): if any target package has FuzzX
 suite methods, gotest mines your test files' table-test literals and

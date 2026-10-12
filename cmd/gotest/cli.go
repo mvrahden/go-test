@@ -216,9 +216,13 @@ func parseExecFlags(ownArgs, goTestArgs []string, projCfg *config.ProjectConfig)
 	if compileParallel == 0 {
 		compileParallel = projCfg.CompileParallel
 	}
+	patterns, err := ExtractPackagePatterns(goTestArgs)
+	if err != nil {
+		return ExecConfig{}, err
+	}
 	return ExecConfig{
 		GoTestArgs:      goTestArgs,
-		PackagePatterns: ExtractPackagePatterns(goTestArgs),
+		PackagePatterns: patterns,
 		SetupTimeout:    setupTimeout,
 		GlobalTimeout:   globalTimeout,
 		Debug:           slices.Contains(ownArgs, "--debug"),

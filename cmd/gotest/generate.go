@@ -11,7 +11,11 @@ import (
 
 func runGenerate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	args := inv.TagArgs()
-	patterns := ExtractPackagePatterns(args)
+	patterns, err := ExtractPackagePatterns(args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 	tags, _ := extractTagsFlag(args)
 	var buildFlags []string
 	if tags != "" {

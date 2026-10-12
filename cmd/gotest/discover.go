@@ -99,7 +99,11 @@ func newDiscoverOutput() discoverOutput {
 
 func runDiscover(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	tags, remaining := extractTagsFlag(inv.TagArgs())
-	patterns := ExtractPackagePatterns(remaining)
+	patterns, err := ExtractPackagePatterns(remaining)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 	var buildFlags []string
 	if tags != "" {
 		buildFlags = append(buildFlags, "-tags="+tags)
