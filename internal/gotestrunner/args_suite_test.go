@@ -49,6 +49,32 @@ func (s *ArgsTestSuite) TestIsGoTestFlag(t *gotest.T) {
 
 // Every positional argument that is not a flag's value is a package
 // pattern, as go test reads it, whatever its shape.
+func (s *ArgsTestSuite) TestValidateTestFlags(t *gotest.T) {
+	t.When("every value is one the test binary takes", func(w *gotest.T) {
+		w.It("passes them", func(it *gotest.T) {
+			gotest.NoError(it, gotestrunner.ValidateTestFlags([]string{
+				"-count=2", "-parallel", "4", "-timeout=5m", "-v", "-shuffle=on", "-shuffle=7",
+				"-cpu=1,2", "-run", "TestA/(x|y)", "-skip=TestB", "-race", "./...", "-args", "-count=nope",
+			}))
+		})
+	})
+	for t, tc := range gotest.Each(t, []struct {
+		Desc string
+		args []string
+		want string
+	}{
+		{"a count that is no number", []string{"-count=abc"}, `invalid value "abc" for flag -count`},
+		{"a parallel given apart from its flag", []string{"-parallel", "abc"}, `invalid value "abc" for flag -parallel`},
+		{"a timeout that is no duration", []string{"-timeout=bogus"}, `invalid value "bogus" for flag -timeout`},
+		{"a shuffle that is neither on, off nor a seed", []string{"-shuffle=xyz"}, `invalid value "xyz" for flag -shuffle`},
+		{"a cpu list with a word", []string{"-cpu=1,x"}, `invalid value "1,x" for flag -cpu`},
+		{"a run pattern that is no regexp", []string{"-run=["}, "invalid regexp for -run"},
+		{"a skip pattern that is no regexp", []string{"-skip", "("}, "invalid regexp for -skip"},
+	}) {
+		gotest.ErrorContains(t, gotestrunner.ValidateTestFlags(tc.args), tc.want)
+	}
+}
+
 func (s *ArgsTestSuite) TestPackagePatterns(t *gotest.T) {
 	t.It("classifies meta patterns and bare import paths as patterns", func(it *gotest.T) {
 		c := gotestrunner.ClassifyGoTestArgs([]string{"-run", "X", "std", "fmt", "-count", "2", "./a"})

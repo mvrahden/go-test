@@ -58,6 +58,23 @@ func (s *PatternArgsTestSuite) TestAnEmptyPatternIsTheCurrentDirectory(t *gotest
 	}
 }
 
+// TestABadFlagValueIsAUsageError: the test binary would fail on it after the
+// build, which reads as a failing test.
+func (s *PatternArgsTestSuite) TestABadFlagValueIsAUsageError(t *gotest.T) {
+	for t, tc := range gotest.Each(t, []struct {
+		Desc string
+		args []string
+	}{
+		{"a text run", []string{"-count=abc"}},
+		{"spec", []string{"spec", "-count=abc"}},
+		{"bench", []string{"bench", "-count=abc"}},
+	}) {
+		_, stderr, code := s.cli.runSplitIn(t, s.notestfilesDir(), tc.args...)
+		gotest.Equal(t, 2, code, "stderr:\n%s", stderr)
+		gotest.Contains(t, stderr, `invalid value "abc" for flag -count`)
+	}
+}
+
 // TestGoFilesAreAUsageError: go test builds files as an ad-hoc package, which
 // has no suites; gotest names them instead of failing that package's build.
 func (s *PatternArgsTestSuite) TestGoFilesAreAUsageError(t *gotest.T) {

@@ -155,6 +155,9 @@ func SplitArgs(args []string, allowed map[string]bool) (ownArgs, goTestArgs []st
 			goTestArgs = append(goTestArgs, args[i])
 		}
 	}
+	if err := gotestrunner.ValidateTestFlags(goTestArgs); err != nil {
+		return nil, nil, err
+	}
 	return
 }
 
