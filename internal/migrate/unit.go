@@ -76,6 +76,8 @@ type suiteDecl struct {
 	// reserved maps the suite's methods named as gotest reserves, which
 	// testify did not run, to their markers.
 	reserved map[string]string
+	// testifyHooks names the testify hooks the suite declares.
+	testifyHooks map[string]bool
 }
 
 func (s *suiteDecl) migrated() bool { return s.refusal == "" }
@@ -549,6 +551,10 @@ func (u *unit) collectHooks() {
 			name := fd.Name.Name
 			if newName, ok := lifecycleRenames[name]; ok {
 				u.hooks[methodKey(fn)] = newName
+				if s.testifyHooks == nil {
+					s.testifyHooks = map[string]bool{}
+				}
+				s.testifyHooks[name] = true
 			} else if strings.HasPrefix(name, "Test") {
 				u.hooks[methodKey(fn)] = name
 			}
@@ -557,6 +563,15 @@ func (u *unit) collectHooks() {
 					s.reserved = map[string]string{}
 				}
 				s.reserved[name] = msg
+			}
+		}
+	}
+	// A hook renamed onto a name the suite already declares shares that
+	// name with it: the marker must not tell the hook to go.
+	for _, s := range u.suites {
+		for hook, name := range lifecycleRenames {
+			if s.reserved[name] != "" && s.testifyHooks[hook] {
+				s.reserved[name] = "testify's " + hook + " becomes " + name + ", which the suite already declares — rename the other " + name
 			}
 		}
 	}

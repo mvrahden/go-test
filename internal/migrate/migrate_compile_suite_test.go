@@ -963,6 +963,19 @@ func (s *MigrateCompileTestSuite) TestReservedNames(t *gotest.T) {
 	})
 }
 
+func (s *MigrateCompileTestSuite) TestReservedNameAHookBecomes(t *gotest.T) {
+	src := "package p\n\nimport (\n\t\"testing\"\n\n\t\"github.com/stretchr/testify/suite\"\n)\n\n" +
+		"type HkSuite struct {\n\tsuite.Suite\n\tn int\n}\n\n" +
+		"func (s *HkSuite) SetupTest() { s.n = 1 }\n\nfunc (s *HkSuite) BeforeEach() { s.n = 2 }\n\n" +
+		"func (s *HkSuite) TestA() {}\n\nfunc TestHkSuite(t *testing.T) { suite.Run(t, new(HkSuite)) }\n"
+	out := s.migrate(t, map[string]string{"p/a_test.go": src}).files["p/a_test.go"]
+
+	t.It("tells to rename the helper, not the hook", func(it *gotest.T) {
+		gotest.Contains(it, out, "// TODO(gotest-migrate): testify's SetupTest becomes BeforeEach, which the suite already declares — rename the other BeforeEach")
+		gotest.NotContains(it, out, "testify did not — rename it")
+	})
+}
+
 const formattedSrc = `package p
 
 import (
