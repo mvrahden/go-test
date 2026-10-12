@@ -470,6 +470,17 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 	}
 }
 
+// importsSuite reports whether f imports testify's suite package: a
+// generated file importing it is its generator's to migrate.
+func importsSuite(f *ast.File) bool {
+	for _, is := range f.Imports {
+		if strings.Trim(is.Path.Value, `"`) == "github.com/stretchr/testify/suite" {
+			return true
+		}
+	}
+	return false
+}
+
 // importsTestify reports whether f imports a testify package.
 func importsTestify(f *ast.File) bool {
 	for _, is := range f.Imports {

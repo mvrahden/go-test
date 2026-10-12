@@ -457,7 +457,7 @@ func (ju *jobUnit) write(opts Options, shown map[string]string) ([]MigrateResult
 // suites or not changed at all.
 func (u *unit) fileResults(uf *unitFile, shown string, changed bool, markers int) []MigrateResult {
 	if uf.generated {
-		if importsTestify(uf.f) {
+		if importsSuite(uf.f) {
 			return []MigrateResult{{File: shown, Markers: markers, Generated: true}}
 		}
 		return nil
