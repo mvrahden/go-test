@@ -905,7 +905,10 @@ Removes generated overlay files (gotest_p(x)suite_test.go) from the source
 tree. A run never writes them there; "gotest generate" does, for
 inspection. Patterns expand as for generate, so "clean ./..." removes what
 "generate ./..." wrote; files in packages outside the main module(s) are
-left with a note on stderr.
+left with a note on stderr. Without a pattern it cleans the current
+package only, as generate does; before v1.33 it walked the directory
+tree. Above several modules, or for a module pulled in by a replace
+directive, use a go.work that lists them, or run clean inside each.
 
 The overlay cache and the test binary cache (used for faster repeated
 runs) are managed separately and auto-evict entries older than 7 days.
