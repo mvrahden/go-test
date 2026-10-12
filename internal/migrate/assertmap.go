@@ -13,7 +13,7 @@ import (
 // that cannot be nil, where testify accepted anything. why explains a
 // call no gotest assertion matches; name is then empty. args exclude t.
 func (u *unit) mapAssertion(f *ast.File, name string, args []ast.Expr) (gotestName string, newArgs []ast.Expr, why string) {
-	g, ok := assertionMap[name]
+	g, name, ok := gotestAssertion(name)
 	if !ok {
 		return "", nil, ""
 	}

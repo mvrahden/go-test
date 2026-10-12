@@ -947,3 +947,66 @@ func (s *MigrateCompileTestSuite) TestReservedNames(t *gotest.T) {
 		gotest.Equal(it, 6, run.markers())
 	})
 }
+
+const formattedSrc = `package p
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+)
+
+type FmtSuite struct{ suite.Suite }
+
+func (s *FmtSuite) TestPass() {
+	var err error
+	msgs := []any{"ctx %d", 1}
+	s.Require().Equalf(2, 1+1, "sum of %d and %d", 1, 1)
+	s.Require().NoErrorf(err, "load %s", "x")
+	s.Truef(true, "plain")
+	assert.Lenf(s.T(), []int{1}, 1, "len %v", 1)
+	require.Emptyf(s.T(), "", "empty")
+	s.Require().Equal(1, 1, msgs...)
+	s.Require().Equalf(1, 1, "spread %d", msgs[1:]...)
+}
+
+func (s *FmtSuite) TestFail() {
+	s.Require().Equalf(1, 2, "want %d got %d", 1, 2)
+}
+
+func TestFmt(t *testing.T) { suite.Run(t, new(FmtSuite)) }
+`
+
+func (s *MigrateCompileTestSuite) TestFormattedAssertions(t *gotest.T) {
+	run := s.migrate(t, map[string]string{"p/a_test.go": formattedSrc})
+	out := run.files["p/a_test.go"]
+
+	t.It("maps each ...f variant to its assertion, the message and args trailing", func(it *gotest.T) {
+		gotest.Contains(it, out, "\tgotest.Equal(t, 2, 1+1, \"sum of %d and %d\", 1, 1)\n")
+		gotest.Contains(it, out, "\tgotest.NoError(t, err, \"load %s\", \"x\")\n")
+		gotest.Contains(it, out, "\tgotest.True(t, true, \"plain\")\n")
+		gotest.Contains(it, out, "\tgotest.Len(t, []int{1}, 1, \"len %v\", 1)\n")
+		gotest.Contains(it, out, "\tgotest.Empty(t, \"\", \"empty\")\n")
+	})
+
+	t.It("keeps a spread message spread", func(it *gotest.T) {
+		gotest.Contains(it, out, "\tgotest.Equal(t, 1, 1, msgs...)\n")
+	})
+
+	t.It("marks a spread after a format, which has no gotest spelling", func(it *gotest.T) {
+		gotest.Contains(it, out, "\t// TODO(gotest-migrate): Equalf spreads args after its message, which gotest.Equal cannot take — rewrite as gotest.Equal(t, ..., append([]any{msg}, args...)...)\n\ts.Require().Equalf(1, 1, \"spread %d\", msgs[1:]...)\n")
+		gotest.Equal(it, 1, run.markers())
+	})
+
+	t.It("reports a failure with the message formatted as testify did", func(it *gotest.T) {
+		path := filepath.Join(run.dir, "p", "a_test.go")
+		fixed := regexp.MustCompile(`\t// TODO.*\n\ts\.Require\(\)\.Equalf.*\n`).ReplaceAllString(out, "")
+		gotest.NoError(it, os.WriteFile(path, []byte(fixed), 0o600))
+		stdout, stderr, code := s.runSuites(it, run.dir, "./p")
+		gotest.Equal(it, 1, code, stdout+stderr)
+		gotest.Contains(it, stdout, "--- PASS: TestFmtTestSuite/TestPass")
+		gotest.Contains(it, stdout, "message: want 1 got 2\n")
+	})
+}

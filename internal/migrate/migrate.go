@@ -59,6 +59,18 @@ var assertionMap = map[string]string{
 	"Panics":         "Panics",
 }
 
+// gotestAssertion is the gotest function for a testify assertion, its
+// formatted ...f variant included: gotest formats a trailing message and
+// its args as testify did.
+func gotestAssertion(name string) (gotestName, base string, ok bool) {
+	if g, ok := assertionMap[name]; ok {
+		return g, name, true
+	}
+	base = strings.TrimSuffix(name, "f")
+	g, ok := assertionMap[base]
+	return g, base, ok && base != name
+}
+
 // lifecycleRenames maps the testify hooks gotest has an equivalent for.
 var lifecycleRenames = map[string]string{
 	"SetupSuite":    "BeforeAll",

@@ -540,6 +540,9 @@ func (r *rewriter) assertionCall(call *ast.CallExpr, recv *ast.Ident) ast.Expr {
 	default:
 		return nil
 	}
+	if _, base, _ := gotestAssertion(sel.Sel.Name); base != sel.Sel.Name && call.Ellipsis.IsValid() {
+		return nil // msg, args... has no spelling in a single variadic
+	}
 	name, newArgs, _ := r.u.mapAssertion(r.f, sel.Sel.Name, args)
 	if name == "" {
 		return nil
@@ -548,7 +551,7 @@ func (r *rewriter) assertionCall(call *ast.CallExpr, recv *ast.Ident) ast.Expr {
 	if err != nil {
 		return nil
 	}
-	return &ast.CallExpr{Fun: fun, Args: append([]ast.Expr{r.tIdent()}, newArgs...)}
+	return &ast.CallExpr{Fun: fun, Args: append([]ast.Expr{r.tIdent()}, newArgs...), Ellipsis: call.Ellipsis}
 }
 
 // stCalls rewrites every s.T() in body to t.T() and reports whether it

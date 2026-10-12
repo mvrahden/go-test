@@ -186,10 +186,14 @@ func (u *unit) unconvertedCall(f *ast.File, call *ast.CallExpr, tName, kind stri
 		return ""
 	}
 	name := sel.Sel.Name
-	gotestName, mapped := assertionMap[name]
+	gotestName, base, mapped := gotestAssertion(name)
 	why := func(args []ast.Expr) string {
 		_, _, why := u.mapAssertion(f, name, args)
 		return why
+	}
+	spread := ""
+	if mapped && base != name && call.Ellipsis.IsValid() {
+		spread = name + " spreads args after its message, which gotest." + gotestName + " cannot take — rewrite as gotest." + gotestName + "(t, ..., append([]any{msg}, args...)...)"
 	}
 
 	switch x := sel.X.(type) {
@@ -204,6 +208,8 @@ func (u *unit) unconvertedCall(f *ast.File, call *ast.CallExpr, tName, kind stri
 			return "unmapped assertion " + name + " — convert manually"
 		case why(call.Args) != "":
 			return why(call.Args)
+		case spread != "":
+			return spread
 		case kind == "":
 			return "assertion " + name + " outside a migrated method — no t is in scope here; pass t in and rewrite as gotest." + gotestName + "(t, ...)"
 		}
@@ -243,6 +249,8 @@ func (u *unit) unconvertedCall(f *ast.File, call *ast.CallExpr, tName, kind stri
 			return v.Name + ".Run has no gotest equivalent — use t.It(name, func(t *gotest.T) {...}) in a method with t"
 		case mapped && why(call.Args) != "":
 			return why(call.Args)
+		case spread != "":
+			return spread
 		case isTestifyAssertionName(name) && mapped && kind == "":
 			return "assertion " + name + " outside a migrated method — no t is in scope here; pass t in and rewrite as gotest." + gotestName + "(t, ...)"
 		case isTestifyAssertionName(name) && mapped:
