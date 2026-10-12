@@ -771,3 +771,79 @@ func (s *MigrateCompileTestSuite) TestRecompiledDependency(t *gotest.T) {
 		gotest.Empty(it, compiles(it, run.dir))
 	})
 }
+
+const unexportedSrc = `package p
+
+import (
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type thingSuite struct{ suite.Suite }
+
+func (s *thingSuite) TestA() { fmt.Println("RAN thing TestA") }
+
+func TestThing(t *testing.T) { suite.Run(t, new(thingSuite)) }
+`
+
+func (s *MigrateCompileTestSuite) TestUnexportedSuite(t *gotest.T) {
+	t.When("the exported name is free", func(w *gotest.T) {
+		run := s.migrate(w, map[string]string{"p/a_test.go": unexportedSrc})
+
+		w.It("exports the suite and compiles with no marker", func(it *gotest.T) {
+			gotest.Len(it, run.results, 1)
+			gotest.Equal(it, "ThingTestSuite", run.results[0].NewName)
+			gotest.Zero(it, run.markers())
+			gotest.Empty(it, compiles(it, run.dir))
+		})
+
+		w.It("runs its tests", func(it *gotest.T) {
+			stdout, stderr, code := s.runSuites(it, run.dir, "./p")
+			gotest.Equal(it, 0, code, stdout+stderr)
+			gotest.Contains(it, stdout, "RAN thing TestA")
+		})
+	})
+
+	t.When("the exported name is taken", func(w *gotest.T) {
+		src := unexportedSrc + "\ntype ThingTestSuite struct{}\n"
+		run := s.migrate(w, map[string]string{"p/a_test.go": src})
+
+		w.It("refuses the suite with a marker", func(it *gotest.T) {
+			gotest.Contains(it, run.files["p/a_test.go"], "// TODO(gotest-migrate): renaming thingSuite to ThingTestSuite collides with another declaration")
+			gotest.Equal(it, 1, run.markers())
+		})
+	})
+}
+
+const nameClashSrc = `package p
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type FooSuite struct{ suite.Suite }
+
+func (s *FooSuite) TestB() {}
+
+type FooTestSuite struct{ suite.Suite }
+
+func (s *FooTestSuite) TestA() {}
+
+func TestFoo(t *testing.T)  { suite.Run(t, new(FooTestSuite)) }
+func TestFoo2(t *testing.T) { suite.Run(t, new(FooSuite)) }
+`
+
+func (s *MigrateCompileTestSuite) TestRenameOntoSuite(t *gotest.T) {
+	run := s.migrate(t, map[string]string{"p/a_test.go": nameClashSrc})
+	out := run.files["p/a_test.go"]
+
+	t.It("blames the suite being renamed, not the one holding the name", func(it *gotest.T) {
+		gotest.Contains(it, out, "// TODO(gotest-migrate): renaming FooSuite to FooTestSuite collides with another declaration")
+		gotest.NotContains(it, out, "renaming FooTestSuite")
+		gotest.Equal(it, 1, run.markers())
+	})
+}

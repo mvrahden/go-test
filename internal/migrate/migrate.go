@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/filewrite"
@@ -130,18 +132,21 @@ type MigrateResult struct {
 	Unplaced []string
 }
 
-// DeriveNewName computes the new suite name from an old one.
+// DeriveNewName computes the new suite name from an old one, exported:
+// gotest runs only exported suites.
 // If the name already ends with "TestSuite", it is left as-is.
 // If it ends with "Suite", "Suite" is replaced with "TestSuite".
 // Otherwise, "TestSuite" is appended.
 func DeriveNewName(old string) string {
-	if strings.HasSuffix(old, "TestSuite") {
-		return old
+	r, size := utf8.DecodeRuneInString(old)
+	name := string(unicode.ToUpper(r)) + old[size:]
+	if strings.HasSuffix(name, "TestSuite") {
+		return name
 	}
-	if strings.HasSuffix(old, "Suite") {
-		return old[:len(old)-len("Suite")] + "TestSuite"
+	if strings.HasSuffix(name, "Suite") {
+		return name[:len(name)-len("Suite")] + "TestSuite"
 	}
-	return old + "TestSuite"
+	return name + "TestSuite"
 }
 
 // Options steer a migration run.

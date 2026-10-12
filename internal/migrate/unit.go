@@ -332,21 +332,34 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 		})
 	}
 
-	taken := map[string]*suiteDecl{}
+	// A suite keeping its name holds it; one renamed onto a name taken,
+	// or still unexported, is refused.
+	taken := map[string]bool{}
 	for _, s := range u.suites {
-		other := taken[s.newName]
-		clash := other != nil && other.obj.Pkg().Path() == s.obj.Pkg().Path()
-		if s.newName != s.obj.Name() {
-			for _, scope := range u.scopes[s.obj.Pkg().Path()] {
-				clash = clash || scope.Lookup(s.newName) != nil
-			}
+		if s.newName == s.obj.Name() {
+			taken[s.obj.Pkg().Path()+"."+s.newName] = true
 		}
-		taken[s.newName] = s
-		if clash && s.migrated() {
+	}
+	for _, s := range u.suites {
+		if s.newName == s.obj.Name() || !s.migrated() {
+			continue
+		}
+		key := s.obj.Pkg().Path() + "." + s.newName
+		clash := taken[key]
+		for _, scope := range u.scopes[s.obj.Pkg().Path()] {
+			clash = clash || scope.Lookup(s.newName) != nil
+		}
+		taken[key] = true
+		switch {
+		case !token.IsExported(s.newName):
+			s.refusal = s.obj.Name() + " cannot take an exported name, and gotest runs only exported suites — rename it and migrate this file by hand"
+		case clash:
 			s.refusal = "renaming " + s.obj.Name() + " to " + s.newName + " collides with another declaration — migrate this file by hand"
-			s.file.marks = append(s.file.marks, mark{pos: s.spec.Pos(), msg: s.refusal})
-			refused[s.file] = true
+		default:
+			continue
 		}
+		s.file.marks = append(s.file.marks, mark{pos: s.spec.Pos(), msg: s.refusal})
+		refused[s.file] = true
 	}
 
 	users := map[*suiteDecl]map[*unitFile]bool{}

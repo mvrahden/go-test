@@ -43,7 +43,8 @@ func (s *MigrateFileTestSuite) TestDeriveNewName(t *gotest.T, _ *migrateFileCtx)
 		{Desc: "OrderSuite", expected: "OrderTestSuite"},
 		{Desc: "UserTestSuite", expected: "UserTestSuite"}, // already ends with TestSuite
 		{Desc: "MySuite", expected: "MyTestSuite"},
-		{Desc: "FooBar", expected: "FooBarTestSuite"}, // no "Suite" suffix
+		{Desc: "FooBar", expected: "FooBarTestSuite"},    // no "Suite" suffix
+		{Desc: "thingSuite", expected: "ThingTestSuite"}, // gotest runs only exported suites
 	}) {
 		gotest.Equal(sub, tc.expected, migrate.DeriveNewName(tc.Desc))
 	}
