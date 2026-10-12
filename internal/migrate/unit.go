@@ -377,6 +377,15 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 		for _, scope := range u.scopes[s.obj.Pkg().Path()] {
 			clash = clash || scope.Lookup(s.newName) != nil
 		}
+		// An external test package dot-importing the suite's package
+		// shares its names.
+		for _, uf := range u.files {
+			if pkg := u.filePkg[uf.f]; pkg != nil && pkg.Path() != s.obj.Pkg().Path() && dotImports(uf.f, s.obj.Pkg().Path()) {
+				for _, scope := range u.scopes[pkg.Path()] {
+					clash = clash || scope.Lookup(s.newName) != nil
+				}
+			}
+		}
 		taken[key] = true
 		switch {
 		case !token.IsExported(s.newName):
@@ -468,6 +477,16 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 			}
 		}
 	}
+}
+
+// dotImports reports whether f imports path into its own scope.
+func dotImports(f *ast.File, path string) bool {
+	for _, is := range f.Imports {
+		if is.Name != nil && is.Name.Name == "." && strings.Trim(is.Path.Value, `"`) == path {
+			return true
+		}
+	}
+	return false
 }
 
 // importsSuite reports whether f imports testify's suite package: a

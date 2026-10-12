@@ -817,6 +817,21 @@ func (s *MigrateCompileTestSuite) TestUnexportedSuite(t *gotest.T) {
 	})
 }
 
+func (s *MigrateCompileTestSuite) TestNameTakenThroughDotImport(t *gotest.T) {
+	x := "package p_test\n\nimport . \"example.com/m/p\"\n\ntype ThingTestSuite struct{}\n\nvar _ = Exported\n"
+	run := s.migrate(t, map[string]string{
+		"p/p.go":      "package p\n\nconst Exported = 1\n",
+		"p/a_test.go": unexportedSrc,
+		"p/x_test.go": x,
+	})
+
+	t.It("refuses the suite instead of breaking the external package", func(it *gotest.T) {
+		gotest.Contains(it, run.files["p/a_test.go"], "// TODO(gotest-migrate): renaming thingSuite to ThingTestSuite collides with another declaration")
+		gotest.Equal(it, x, run.files["p/x_test.go"])
+		gotest.Equal(it, 1, run.markers())
+	})
+}
+
 func (s *MigrateCompileTestSuite) TestNameGotestWouldNotRun(t *gotest.T) {
 	for t, tc := range gotest.Each(t, []struct {
 		Desc, name, becomes string
