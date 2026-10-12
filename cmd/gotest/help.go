@@ -478,6 +478,7 @@ Flags:
   --jobs=<n>              Max concurrent targets (default: max(1, GOMAXPROCS/2))
   --target=<Fuzz...>      Fuzz one target, named by its wrapper as printed in
                           session output; an unmatched name lists the targets
+                          (-run, -skip and -bench are refused in its favour)
   --no-harvest            Do not mine table-test literals into seeds for this run
   --no-cache              Disable the overlay and test binary caches
   --debug                 Keep generated overlay for inspection

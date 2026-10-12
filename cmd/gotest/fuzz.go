@@ -48,6 +48,10 @@ func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
+	if f := fuzzSelectionFlag(goTestArgs); f != "" {
+		fmt.Fprintf(os.Stderr, "FAIL: %s is not a fuzz flag: --target=<FuzzSuite_Method> picks the target to fuzz\n", f)
+		return 2
+	}
 
 	forDuration, forExplicit, err := parseForFlag(ownArgs)
 	if err != nil {
@@ -283,4 +287,20 @@ func parseJobsFlag(args []string) (int, error) {
 		return 0, fmt.Errorf("invalid --jobs value %d: must be positive", v)
 	}
 	return v, nil
+}
+
+// fuzzSelectionFlag names a go test flag in args that would pick tests or
+// targets, which fuzz never forwards: it selects with --target.
+func fuzzSelectionFlag(args []string) string {
+	for _, arg := range args {
+		if arg == "-args" {
+			break
+		}
+		name, _, _ := strings.Cut(arg, "=")
+		switch name {
+		case "-run", "-skip", "-bench", "-list", "-fuzz":
+			return name
+		}
+	}
+	return ""
 }
