@@ -755,6 +755,9 @@ func (s *LintFixTestSuite) TestInterrupt(t *gotest.T) {
 	})
 
 	t.When("lint is stopped while go list builds export data", func(w *gotest.T) {
+		if runtime.GOOS == "windows" {
+			w.Skipf("SIGTERM and TMPDIR are POSIX")
+		}
 		// A cold cache and one build at a time keep go list building for
 		// longer than its interrupt grace, so it is killed mid-build.
 		dir, _ := s.stageProbe(w, lintFixProbe)

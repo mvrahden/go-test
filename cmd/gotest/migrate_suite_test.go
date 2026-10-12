@@ -251,7 +251,7 @@ func (s *MigrateCLITestSuite) TestImportPathPattern(t *gotest.T, ctx *migrateCtx
 
 			w.It("migrates the package it names", func(it *gotest.T) {
 				gotest.Equal(it, 0, code, stdout+stderr)
-				gotest.Contains(it, stdout, "Would migrate 1 suites:\n  pkg/sample_test.go: CleanSuite → CleanTestSuite\n")
+				gotest.Contains(it, stdout, "Would migrate 1 suites:\n  "+filepath.FromSlash("pkg/sample_test.go")+": CleanSuite → CleanTestSuite\n")
 				gotest.Empty(it, stderr)
 			})
 		})
@@ -275,7 +275,7 @@ func (s *MigrateCLITestSuite) TestTestdataSkipped(t *gotest.T, ctx *migrateCtx) 
 
 	t.It("migrates the packages ./... names", func(it *gotest.T) {
 		gotest.Equal(it, 0, code, stdout+stderr)
-		gotest.Equal(it, "Migrated 1 suites:\n  pkg/sample_test.go: CleanSuite → CleanTestSuite\n", stdout)
+		gotest.Equal(it, "Migrated 1 suites:\n  "+filepath.FromSlash("pkg/sample_test.go")+": CleanSuite → CleanTestSuite\n", stdout)
 		gotest.Empty(it, stderr)
 	})
 

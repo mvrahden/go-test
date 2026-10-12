@@ -37,7 +37,11 @@ func (s *LocationTestSuite) TestInlinedHook(t *gotest.T) {
 
 func (s *LocationTestSuite) TestTestingTypes(t *gotest.T) {
 	src := string(gotest.Must(os.ReadFile("testdata/sources/TestLocation_Shapes/test.go")))
-	at := func(marker string) string { return lineOf(t, src, marker) }
+	lines := map[string]string{}
+	for _, marker := range []string{"std", "std-helper", "std-helper-call", "skip", "fuzz", "on-f", "bench", "bench-helper", "bench-helper-call"} {
+		lines[marker] = lineOf(t, src, marker)
+	}
+	at := func(marker string) string { return lines[marker] }
 	tests := runGeneratedSuiteArgs(t, "TestLocation_Shapes", childTimeout)
 	benches := runGeneratedSuiteArgs(t, "TestLocation_Shapes", childTimeout, benchOnly...)
 
@@ -71,19 +75,19 @@ func (s *LocationTestSuite) TestTestingTypes(t *gotest.T) {
 
 func (s *LocationTestSuite) TestFullPath(t *gotest.T) {
 	src := string(gotest.Must(os.ReadFile("testdata/sources/TestLocation_Shapes/test.go")))
+	helper, call := lineOf(t, src, "std-helper"), lineOf(t, src, "std-helper-call")
 	run := runGeneratedSuiteArgs(t, "TestLocation_Shapes", childTimeout, "-test.fullpath", "-test.run=^TestShapesTestSuite$")
 
 	t.It("names the helper's line and the method's by their full paths", func(it *gotest.T) {
-		helper, call := lineOf(it, src, "std-helper"), lineOf(it, src, "std-helper-call")
-		gotest.Regexp(it, `\n\s+\S*/`+helper+`: \S*/`+call+`: Fail\n`, run.output)
+		gotest.Regexp(it, `\n\s+\S*[/\\]`+helper+`: \S*[/\\]`+call+`: Fail\n`, run.output)
 	})
 }
 
 // lineOf names the line of src that carries "// LINE:marker", as go test
-// prints it for a fixture's test.go.
+// prints it for a fixture's test.go; a Windows checkout ends lines in CRLF.
 func lineOf(t *gotest.T, src, marker string) string {
 	for i, line := range strings.Split(src, "\n") {
-		if strings.HasSuffix(line, "// LINE:"+marker) {
+		if strings.HasSuffix(strings.TrimSuffix(line, "\r"), "// LINE:"+marker) {
 			return "test\\.go:" + strconv.Itoa(i+1)
 		}
 	}

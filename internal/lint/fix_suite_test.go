@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/lint"
@@ -30,6 +31,9 @@ func (s *FixTestSuite) SuiteConfig() gotest.SuiteConfig {
 func (s *FixTestSuite) BeforeAll(t *gotest.T) {
 	s.tmp = gotest.Must(os.MkdirTemp("", "lintfix"))
 	s.driver = filepath.Join(s.tmp, "fixdriver")
+	if runtime.GOOS == "windows" {
+		s.driver += ".exe"
+	}
 	out, err := exec.Command("go", "build", "-o", s.driver, "./testdata/fixdriver").CombinedOutput() //nolint:gosec // G204: builds the test's own oracle
 	gotest.NoError(t, err, string(out))
 }
