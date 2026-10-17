@@ -194,7 +194,7 @@ Examples:
   gotest ./pkg/auth/... -v                  Verbose output for one package
   gotest --ci --min=80 ./... -race          CI pipeline with coverage gate
   gotest --debug ./pkg/auth/...             Keep overlay for inspection
-  gotest -- -customflag ./...               Escape hatch for custom flags
+  gotest -- -customflag=value ./...         Flags only the test binary knows
 `)
 }
 
