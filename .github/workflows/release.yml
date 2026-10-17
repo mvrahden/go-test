@@ -80,9 +80,11 @@ jobs:
 
   extension:
     needs: build
+    permissions:
+      contents: write
+      id-token: write
     uses: ./.github/workflows/extension-release.yml
     with:
       tag: ${{ github.event.release.tag_name }}
     secrets:
-      MARKETPLACE_TOKEN: ${{ secrets.VSCE_PAT }}
       OPENVSX_TOKEN: ${{ secrets.OVSX_PAT }}
