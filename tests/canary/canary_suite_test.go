@@ -361,8 +361,12 @@ func (s *CanaryTestSuite) TestAGuardRunsBeforeTheFixtures(t *gotest.T) {
 // benchReport is the part of a bench --json report the canary reads.
 type benchReport struct {
 	Baseline struct {
-		Results []struct {
-			Name string `json:"name"`
+		GOMAXPROCS int `json:"gomaxprocs"`
+		Results    []struct {
+			Name    string `json:"name"`
+			Samples []struct {
+				Metrics map[string]float64 `json:"metrics"`
+			} `json:"samples"`
 		} `json:"results"`
 	} `json:"baseline"`
 	Missing []string `json:"missing"`
@@ -430,8 +434,8 @@ func (s *CanaryTestSuite) TestAGateWithNothingToCompareFails(t *gotest.T) {
 	if want := "example.com/elsewhere OtherTestSuite/BenchmarkGone"; strings.Join(report.Missing, ",") != want {
 		t.Errorf("missing %v, want [%s]", report.Missing, want)
 	}
-	if len(report.Added) != 3 {
-		t.Errorf("added %v, want the three benchmarks of the run", report.Added)
+	if len(report.Added) != 6 {
+		t.Errorf("added %v, want the six benchmark leaves of the run", report.Added)
 	}
 }
 
@@ -456,14 +460,29 @@ func (s *CanaryTestSuite) TestSaveAndAgainstOnOneFileIsRefused(t *gotest.T) {
 }
 
 // A green bench run reports a sample for every declared benchmark and exits
-// 0; a missing one is the bench census's job.
+// 0; a missing one is the bench census's job. A method that opens
+// sub-benchmarks is reported through its leaves, keyed by their path below
+// the suite; a metric a benchmark reports is kept on its sample; the run's
+// GOMAXPROCS is recorded.
 func (s *CanaryTestSuite) TestEveryBenchmarkReportsAResult(t *gotest.T) {
-	code, names := s.bench(t, "benching", t.TempDir())
+	code, report := s.benchReport(t, "benching", t.TempDir())
 	if code != 0 {
 		t.Errorf("benching: exit code %d, want 0", code)
 	}
-	if want := []string{"BenchmarkContext", "BenchmarkFirst", "BenchmarkSecond"}; strings.Join(names, ",") != strings.Join(want, ",") {
+	names := make([]string, 0, len(report.Baseline.Results))
+	for _, r := range report.Baseline.Results {
+		names = append(names, r.Name)
+		if r.Name == "BenchmarkMetric" && (len(r.Samples) == 0 || r.Samples[0].Metrics["widgets/op"] != 4.5) {
+			t.Errorf("BenchmarkMetric: samples %v, want widgets/op 4.5", r.Samples)
+		}
+	}
+	sort.Strings(names)
+	want := []string{"BenchmarkContext", "BenchmarkFirst", "BenchmarkMetric", "BenchmarkSecond", "BenchmarkSplit/long", "BenchmarkSplit/short"}
+	if strings.Join(names, ",") != strings.Join(want, ",") {
 		t.Errorf("benching: results %v, want %v", names, want)
+	}
+	if report.Baseline.GOMAXPROCS == 0 {
+		t.Errorf("benching: the baseline records no GOMAXPROCS")
 	}
 }
 

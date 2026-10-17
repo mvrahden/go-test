@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -176,9 +178,9 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, bare bool) {
 		icon, clr := statusIcon(n.Status, c)
 
 		if n.Kind == KindBenchmark && n.Iterations > 0 {
-			fmt.Fprintf(w, "%s%s%s%s %s  %s ns/op · %d B/op · %d allocs/op%s\n",
+			fmt.Fprintf(w, "%s%s%s%s %s  %s ns/op · %d B/op · %d allocs/op%s%s\n",
 				indent, clr, icon, c.reset,
-				n.Display, formatNs(n.NsPerOp), n.BytesPerOp, n.AllocsPerOp, c.reset)
+				n.Display, formatNs(n.NsPerOp), n.BytesPerOp, n.AllocsPerOp, formatMetrics(n.Metrics), c.reset)
 
 			if n.Status == StatusFail {
 				renderErrorOutput(w, n.Output, depth+2, c)
@@ -392,4 +394,19 @@ func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hu
 		return
 	}
 	fmt.Fprintf(w, "%s: %s\n", strings.Join(counts, ", "), strings.Join(parts, ", "))
+}
+
+// formatMetrics renders a benchmark's reported metrics after the known
+// units, in unit order so two runs read alike.
+func formatMetrics(metrics map[string]float64) string {
+	units := make([]string, 0, len(metrics))
+	for u := range metrics {
+		units = append(units, u)
+	}
+	sort.Strings(units)
+	var b strings.Builder
+	for _, u := range units {
+		fmt.Fprintf(&b, " · %s %s", strconv.FormatFloat(metrics[u], 'f', -1, 64), u)
+	}
+	return b.String()
 }

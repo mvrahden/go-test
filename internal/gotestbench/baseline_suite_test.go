@@ -30,6 +30,7 @@ func buildTree(it *gotest.T, ndjson string) []*gotestspec.Package {
 }
 
 func (s *BaselineTestSuite) TestFromPackages(t *gotest.T) {
+	it0 := t
 	t.When("a benchmark suite wrapper contains a leaf benchmark", func(w *gotest.T) {
 		w.It("derives Package/Suite/Name and one Sample from the leaf's fields", func(it *gotest.T) {
 			pkgs := buildTree(it, `
@@ -56,6 +57,41 @@ func (s *BaselineTestSuite) TestFromPackages(t *gotest.T) {
 			gotest.InDelta(it, 985.2, sample.NsPerOp, 0.01)
 			gotest.Equal(it, int64(24), sample.BytesPerOp)
 			gotest.Equal(it, int64(3), sample.AllocsPerOp)
+		})
+	})
+
+	t.When("a benchmark method opens sub-benchmarks and reports a metric", func(w *gotest.T) {
+		pkgs := buildTree(it0, `
+{"Action":"output","Package":"example.com/pkg","Output":"goos: linux\n"}
+{"Action":"output","Package":"example.com/pkg","Output":"cpu: Example CPU @ 3.00GHz\n"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkSplit"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkSplit/short"}
+{"Action":"output","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkSplit/short","Output":"BenchmarkFooTestSuite/BenchmarkSplit/short-8   \t 100 \t 10.0 ns/op \t 2.500 widgets/op \t 8 B/op \t 1 allocs/op\n"}
+{"Action":"output","Package":"example.com/pkg","Output":"BenchmarkFooTestSuite/BenchmarkSplit/short-8   \t 100 \t 11.0 ns/op \t 2.600 widgets/op \t 8 B/op \t 1 allocs/op\n"}
+{"Action":"pass","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite","Elapsed":0.01}
+`)
+		b := gotestbench.FromPackages(pkgs)
+
+		w.It("keys each sub-benchmark by its path below the suite", func(it *gotest.T) {
+			gotest.Len(it, b.Results, 1)
+			gotest.Equal(it, "FooTestSuite", b.Results[0].Suite)
+			gotest.Equal(it, "BenchmarkSplit/short", b.Results[0].Name)
+		})
+
+		w.It("keeps the reported metric beside B/op and allocs/op, for every repetition", func(it *gotest.T) {
+			gotest.Len(it, b.Results[0].Samples, 2)
+			first, second := b.Results[0].Samples[0], b.Results[0].Samples[1]
+			gotest.Equal(it, int64(8), first.BytesPerOp)
+			gotest.Equal(it, int64(1), first.AllocsPerOp)
+			gotest.InDelta(it, 2.5, first.Metrics["widgets/op"], 0.001)
+			gotest.InDelta(it, 11.0, second.NsPerOp, 0.001)
+			gotest.InDelta(it, 2.6, second.Metrics["widgets/op"], 0.001)
+		})
+
+		w.It("records the cpu line and GOMAXPROCS the run reported", func(it *gotest.T) {
+			gotest.Equal(it, "Example CPU @ 3.00GHz", b.CPU)
+			gotest.Equal(it, 8, b.GOMAXPROCS)
 		})
 	})
 

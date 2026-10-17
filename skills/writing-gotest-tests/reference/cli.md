@@ -96,9 +96,9 @@ hoist it above. A suite with benchmarks refuses a returning
 - `--against=<path>` — compare against a saved baseline and render the
   delta table (significant rows only unless `-v`; defaults to
   `bench.baseline`). Significance is Welch-tested, so run with `-count`
-  high enough to give it samples. A baseline whose `goos`, `goarch` or
-  `goVersion` differs from the run warns on stderr (`WARN: baseline was
-  recorded in a different environment`) and reports the same under
+  high enough to give it samples. A baseline whose `goos`, `goarch`,
+  `goVersion`, `cpu` or `gomaxprocs` differs from the run warns on stderr
+  (`WARN: baseline was recorded in a different environment`) and reports the same under
   `envMismatch` in `--json`; the comparison still runs and the exit code
   is unchanged.
 - `--gate=<pct>` — exit 1 when the worst significant regression exceeds

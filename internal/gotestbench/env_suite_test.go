@@ -30,6 +30,25 @@ func (s *EnvTestSuite) TestEnvMismatch(t *gotest.T) {
 		})
 	})
 
+	t.When("the baseline came from another machine", func(w *gotest.T) {
+		w.It("names the cpu and GOMAXPROCS that differ", func(it *gotest.T) {
+			old := mkEnv("linux", "amd64", "go1.27.0")
+			old.CPU, old.GOMAXPROCS = "Example CPU A", 4
+			now := mkEnv("linux", "amd64", "go1.27.0")
+			now.CPU, now.GOMAXPROCS = "Example CPU B", 8
+			gotest.Equal(it, []gotestbench.EnvDiff{
+				{Field: "cpu", Baseline: "Example CPU A", Run: "Example CPU B"},
+				{Field: "gomaxprocs", Baseline: "4", Run: "8"},
+			}, gotestbench.EnvMismatch(old, now))
+		})
+
+		w.It("treats a baseline that recorded neither as unknown, not different", func(it *gotest.T) {
+			now := mkEnv("linux", "amd64", "go1.27.0")
+			now.CPU, now.GOMAXPROCS = "Example CPU B", 8
+			gotest.Empty(it, gotestbench.EnvMismatch(mkEnv("linux", "amd64", "go1.27.0"), now))
+		})
+	})
+
 	t.When("the baseline came from another platform and toolchain", func(w *gotest.T) {
 		w.It("names every field that differs, baseline value first", func(it *gotest.T) {
 			diffs := gotestbench.EnvMismatch(
