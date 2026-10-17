@@ -288,3 +288,13 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
     (go.work modules count) — `generate all` no longer writes harness
     files into dependencies. Bare `gotest clean` cleans the current
     package, like `generate`; use `gotest clean ./...` for the tree.
+
+## v1.34
+
+Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
+
+1. **`gotest skill install` writes this skill** into `.agents/skills`
+   (`--dir=.claude/skills` for Claude Code), as shipped with the pinned
+   version, replacing an older copy. Below v1.34 there is no `skill`
+   command: `gotest skill install` reads both words as package patterns
+   and fails the build (`package skill is not in std`, exit 2).

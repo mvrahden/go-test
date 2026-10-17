@@ -53,7 +53,7 @@ invocation runs tests — there is NO `test` subcommand:
   `migration.md` for its scope).
 - `go tool gotest refactor toggle-focus <file> <Suite[.Method]>` — toggles
   the `F_` focus prefix only (`X_` is a manual edit).
-- `go tool gotest skill install [--dir=<skills-dir>]` (**v1.33+**) —
+- `go tool gotest skill install [--dir=<skills-dir>]` (**v1.34+**) —
   rewrites this skill as shipped with the pinned version (default
   `.agents/skills`; Claude Code reads `.claude/skills`). Rerun after
   upgrading the pin.
