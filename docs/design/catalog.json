@@ -1,0 +1,75 @@
+{
+  "packages": [
+    {
+      "duration": 0,
+      "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 0 and prints the version on stdout",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "exits_0_and_prints_the_version_on_stdout",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the version subcommand runs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_version_subcommand_runs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Version",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestVersion",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIVersion",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIVersionTestSuite",
+          "output": [],
+          "status": "none"
+        }
+      ],
+      "output": [],
+      "path": "github.com/mvrahden/go-test/tests/conformance/cli",
+      "status": "none"
+    }
+  ],
+  "stats": {
+    "behaviors": 1,
+    "benchmarks": 0,
+    "failed": 0,
+    "fuzzers": 0,
+    "passed": 0,
+    "skipped": 0,
+    "suites": 1,
+    "tests": 0
+  }
+}
