@@ -41,17 +41,24 @@ const MarkersFile = "markers"
 // run left in markerDir. A non-zero exit is a result, not an error; only a
 // run that could not start or be read is.
 func RunPackage(ctx context.Context, markerDir, pkg string, args ...string) (Run, error) {
-	return runCLI(ctx, ".", markerDir, append([]string{"-json", pkg}, args...)...)
+	return runCLI(ctx, ".", markerDir, nil, append([]string{"-json", pkg}, args...)...)
 }
 
 // RunCLI runs the built CLI in dir with args and returns its exit code and
 // streams; -json events on stdout are parsed when present. Markers go to a
 // temporary directory that is discarded, so Markers is empty.
 func RunCLI(ctx context.Context, dir string, args ...string) (Run, error) {
-	return runCLI(ctx, dir, "", args...)
+	return runCLI(ctx, dir, "", nil, args...)
 }
 
-func runCLI(ctx context.Context, dir, markerDir string, args ...string) (Run, error) {
+// RunCLIWithEnv is RunCLI with extra KEY=VALUE pairs appended to the child's
+// environment after the scrub, so a check can put a scrubbed variable back
+// on purpose.
+func RunCLIWithEnv(ctx context.Context, dir string, env []string, args ...string) (Run, error) {
+	return runCLI(ctx, dir, "", env, args...)
+}
+
+func runCLI(ctx context.Context, dir, markerDir string, extraEnv []string, args ...string) (Run, error) {
 	binary, err := cli(ctx)
 	if err != nil {
 		return Run{}, err
@@ -65,7 +72,7 @@ func runCLI(ctx context.Context, dir, markerDir string, args ...string) (Run, er
 	}
 	cmd := exec.CommandContext(ctx, binary, args...) //nolint:gosec // G204: the repo's own CLI with the caller's arguments
 	cmd.Dir = dir
-	cmd.Env = childEnv(markerDir)
+	cmd.Env = append(childEnv(markerDir), extraEnv...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	run := Run{}

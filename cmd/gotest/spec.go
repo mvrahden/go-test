@@ -20,9 +20,17 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	format := own.ValueOr("--format", "terminal")
+	if err := checkFormat(format); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if jsonMode, _ := stripJSONFlag(goTestArgs); jsonMode {
+		fmt.Fprintln(os.Stderr, "FAIL: -json cannot be combined with spec; use --format=json for the specification as JSON")
+		return 2
+	}
 	output := own.Value("--output")
 	input := own.Value("--input")
-	noColor := own.Bool("--no-color")
+	noColor := colorDisabled(own.Bool("--no-color"))
 	renderOnly := own.Bool("--render-only")
 
 	if own.Bool("--static") && input != "" {

@@ -26,7 +26,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	specRequested := own.Bool("--spec")
-	noColor := own.Bool("--no-color")
+	noColor := colorDisabled(own.Bool("--no-color"))
 	jsonRequested := own.Bool("--json")
 
 	// -v is forced further down for benchmark result visibility; capture

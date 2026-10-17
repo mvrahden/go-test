@@ -21,11 +21,19 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	format := own.ValueOr("--format", "terminal")
+	if err := checkFormat(format); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if jsonMode, _ := stripJSONFlag(goTestArgs); jsonMode {
+		fmt.Fprintln(os.Stderr, "FAIL: -json cannot be combined with summary; use --format=json for the summary as JSON")
+		return 2
+	}
 	output := own.Value("--output")
 	input := own.Value("--input")
 	coverageProfile := own.Value("--coverage")
 	badgePath := own.Value("--badge")
-	noColor := own.Bool("--no-color")
+	noColor := colorDisabled(own.Bool("--no-color"))
 	github := own.Bool("--github") || os.Getenv("GITHUB_ACTIONS") == "true"
 	renderOnly := own.Bool("--render-only")
 
@@ -212,7 +220,9 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 		gotestspec.RenderSummary(w, tree, renderOpts...)
 	}
 
-	if github {
+	// Annotations are workflow commands for a human-readable log; a JSON or
+	// markdown document on stdout must stay the document alone.
+	if github && format == "terminal" {
 		modulePath := gotestspec.ReadModulePath(".")
 		annotations := gotestspec.CollectAnnotations(tree, modulePath)
 		gotestspec.WriteGitHubAnnotations(os.Stdout, annotations)

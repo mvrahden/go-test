@@ -68,12 +68,12 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	defer stop()
 
 	if !jsonMode {
-		fmt.Printf("\033[2m  running tests...\033[0m\n")
+		fmt.Println(dim("  running tests..."))
 	}
 	var benchNs map[string]float64
 	_, benchNs = watchRunOnce(ctx, cfg, jsonMode, specMode, bench, benchNs)
 	if !jsonMode {
-		fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
+		fmt.Println("\n" + dim("  watching for changes..."))
 	}
 
 	watcher, err := fsnotify.NewWatcher()
@@ -126,7 +126,7 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 			_, benchNs = watchRunOnce(ctx, changedCfg, jsonMode, specMode, bench, benchNs)
 			changedDirs = nil
 			if !jsonMode {
-				fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
+				fmt.Println("\n" + dim("  watching for changes..."))
 			}
 
 		case err, ok := <-watcher.Errors:
@@ -360,7 +360,9 @@ func isGoFile(name string) bool {
 }
 
 func clearTerminal() {
-	fmt.Print("\033[2J\033[H")
+	if !colorDisabled(false) {
+		fmt.Print("\033[2J\033[H")
+	}
 }
 
 func dirsToPatterns(dirs map[string]bool) []string {
@@ -384,4 +386,12 @@ func replacePatterns(originalArgs []string, newPatterns []string) []string {
 	}
 	args = append(args, newPatterns...)
 	return args
+}
+
+// dim renders s faintly on a terminal and plainly everywhere else.
+func dim(s string) string {
+	if colorDisabled(false) {
+		return s
+	}
+	return "\033[2m" + s + "\033[0m"
 }

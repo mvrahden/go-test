@@ -84,6 +84,19 @@ func ExportParseExecFlags(ownArgs, goTestArgs []string, projCfg *config.ProjectC
 	return parseExecFlags(own, goTestArgs, projCfg)
 }
 
+// color.go
+var (
+	ExportColorDisabled = colorDisabled
+	ExportCheckFormat   = checkFormat
+)
+
+// ExportSetStdoutIsTerminal swaps the terminal probe and returns its restorer.
+func ExportSetStdoutIsTerminal(f func() bool) func() {
+	prev := stdoutIsTerminal
+	stdoutIsTerminal = f
+	return func() { stdoutIsTerminal = prev }
+}
+
 // discover.go
 type (
 	ExportDiscoverOutput  = discoverOutput
