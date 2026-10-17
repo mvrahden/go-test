@@ -3,9 +3,9 @@ name: extension
 on:
   push:
     branches: [main]
-    paths: [vscode-gotest/**]
+    paths: [vscode-gotest/**, .github/actions/extension-check/**, .github/workflows/extension.yml]
   pull_request:
-    paths: [vscode-gotest/**]
+    paths: [vscode-gotest/**, .github/actions/extension-check/**, .github/workflows/extension.yml]
 
 concurrency:
   group: extension-${{ github.ref }}

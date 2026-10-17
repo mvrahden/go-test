@@ -25,7 +25,7 @@ build:
 	go build -o gotest ./cmd/gotest
 
 extension-test: extension-contract
-	cd vscode-gotest && npm test
+	cd vscode-gotest && npm test && npm run test:integration
 
 # Re-records the CLI/extension contract and fails on drift, as CI's contract
 # workflow does. A CLI change that moves the recorded output surfaces here
