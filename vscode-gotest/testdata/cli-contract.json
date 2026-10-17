@@ -338,7 +338,7 @@
         "./cmd/gotest/testdata/census/plain/"
       ],
       "exitCode": 0,
-      "stderr": "",
+      "stderr": "note: 1 stdlib test(s) in github.com/mvrahden/go-test/cmd/gotest/testdata/unrun/nosuites not run — gotest runs suites; use 'go test' for stdlib tests\n",
       "events": [
         {
           "Action": "start",
