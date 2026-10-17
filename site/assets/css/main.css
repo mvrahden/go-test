@@ -492,7 +492,7 @@ footer a:hover { color: var(--cyan); }
 }
 .eco-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 1.25rem;
   max-width: var(--max-w);
   margin: 0 auto;
@@ -1236,6 +1236,9 @@ footer a:hover { color: var(--cyan); }
 .terms-list .term-count { color: var(--text-dimmed); font-size: 0.8rem; }
 
 /* ===== Responsive ===== */
+@media (max-width: 1024px) {
+  .eco-grid { grid-template-columns: repeat(3, 1fr); }
+}
 @media (max-width: 768px) {
   .hero h1 { font-size: 2.5rem; }
   .hero .tagline { font-size: 1.1rem; }
