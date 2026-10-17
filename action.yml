@@ -52,7 +52,7 @@ inputs:
     description: "Carry Go's fuzz cache (the inputs a session found interesting) between runs, so each session resumes where the last one stopped; set to false for a from-seeds run"
     default: "true"
   version:
-    description: "gotest version: 'gomod' (default) runs the CLI from go.mod, or a version tag (e.g. v1.0.0, latest) to install globally."
+    description: "gotest version: 'gomod' (default) runs the CLI go.mod declares; or a version tag such as v1.33.0 to install that binary. Pin the version go.mod requires: a binary that drifts from it is refused or runs the wrong runtime."
     default: "gomod"
 
 outputs:
@@ -81,7 +81,9 @@ runs:
     - name: Install gotest
       if: ${{ inputs.version != 'gomod' }}
       shell: bash
-      run: go install github.com/mvrahden/go-test/cmd/gotest@${{ inputs.version }}
+      env:
+        GOTEST_VERSION: ${{ inputs.version }}
+      run: go install github.com/mvrahden/go-test/cmd/gotest@"$GOTEST_VERSION"
 
     - name: Resolve the gotest command
       if: ${{ inputs.version == 'gomod' }}
@@ -126,7 +128,10 @@ runs:
 
         gtflags=()
         if [ -n "$INPUT_GO_TEST_FLAGS" ]; then
-          read -ra gtflags <<< "$INPUT_GO_TEST_FLAGS"
+          case "$INPUT_GO_TEST_FLAGS" in *\"*|*\'*)
+            echo "::error::go-test-flags must not contain quotes: one entry per word or line"; exit 2;;
+          esac
+          read -ra gtflags -d '' <<< "$INPUT_GO_TEST_FLAGS" || true
         fi
 
         # A -coverprofile the caller passes through go-test-flags is the
@@ -163,11 +168,17 @@ runs:
         fi
 
         if [ -n "$INPUT_FLAGS" ]; then
-          read -ra extra <<< "$INPUT_FLAGS"
+          case "$INPUT_FLAGS" in *\"*|*\'*)
+            echo "::error::flags must not contain quotes: one entry per word or line"; exit 2;;
+          esac
+          read -ra extra -d '' <<< "$INPUT_FLAGS" || true
           args+=("${extra[@]}")
         fi
 
-        read -ra pkgs <<< "$INPUT_PACKAGES"
+        case "$INPUT_PACKAGES" in *\"*|*\'*)
+          echo "::error::packages must not contain quotes: one entry per word or line"; exit 2;;
+        esac
+        read -ra pkgs -d '' <<< "$INPUT_PACKAGES" || true
         args+=("${pkgs[@]}")
 
         if [ "$INPUT_RACE" = "true" ]; then
@@ -319,11 +330,17 @@ runs:
         fi
 
         if [ -n "$INPUT_FLAGS" ]; then
-          read -ra extra <<< "$INPUT_FLAGS"
+          case "$INPUT_FLAGS" in *\"*|*\'*)
+            echo "::error::flags must not contain quotes: one entry per word or line"; exit 2;;
+          esac
+          read -ra extra -d '' <<< "$INPUT_FLAGS" || true
           args+=("${extra[@]}")
         fi
 
-        read -ra pkgs <<< "$INPUT_PACKAGES"
+        case "$INPUT_PACKAGES" in *\"*|*\'*)
+          echo "::error::packages must not contain quotes: one entry per word or line"; exit 2;;
+        esac
+        read -ra pkgs -d '' <<< "$INPUT_PACKAGES" || true
         args+=("${pkgs[@]}")
 
         set +e
@@ -356,7 +373,7 @@ runs:
 
     - name: Restore the fuzz cache
       if: ${{ inputs.fuzz == 'true' && inputs.fuzz-cache == 'true' }}
-      uses: actions/cache/restore@v6
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
         path: ${{ steps.fuzz-cache-dir.outputs.dir }}
         key: gotest-fuzz-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -382,7 +399,10 @@ runs:
         # with nothing found; the crasher files it names stay in the
         # checkout for a later upload-artifact step or `gotest fuzz promote`.
         log="$(mktemp -t gotest-fuzz-XXXXXX.log)"
-        read -ra pkgs <<< "$INPUT_PACKAGES"
+        case "$INPUT_PACKAGES" in *\"*|*\'*)
+          echo "::error::packages must not contain quotes: one entry per word or line"; exit 2;;
+        esac
+        read -ra pkgs -d '' <<< "$INPUT_PACKAGES" || true
 
         set +e
         args=(fuzz)
@@ -400,7 +420,7 @@ runs:
 
     - name: Save the fuzz cache
       if: ${{ always() && inputs.fuzz == 'true' && inputs.fuzz-cache == 'true' }}
-      uses: actions/cache/save@v6
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
         path: ${{ steps.fuzz-cache-dir.outputs.dir }}
         key: gotest-fuzz-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}

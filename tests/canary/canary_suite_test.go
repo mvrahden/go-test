@@ -98,7 +98,7 @@ type event struct {
 // its exit code and the verdict rows it produced, in golden form.
 func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string) (int, []string) {
 	cmd := exec.Command(s.binary, "-json", "./testdata/"+pkg+"/") //nolint:gosec // G204: controlled binary with fixed args
-	cmd.Env = append(os.Environ(), "GOTEST_CANARY_DIR="+canaryDir)
+	cmd.Env = childEnv(canaryDir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	code := 0
@@ -135,6 +135,20 @@ func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string) (int, []string
 	return code, rows
 }
 
+// childEnv is the fixture process's environment: the canary dir, and never
+// the snapshot update switch. A refresh of the repository's own snapshots
+// must not rewrite the snapshotting fixture's deliberately stale baseline.
+func childEnv(canaryDir string) []string {
+	env := make([]string, 0, len(os.Environ())+1)
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "GOTEST_UPDATE_SNAPSHOTS=") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	return append(env, "GOTEST_CANARY_DIR="+canaryDir)
+}
+
 // check runs a fixture and compares exit code and rows with the golden.
 func (s *CanaryTestSuite) check(t *gotest.T, pkg string) string {
 	want, ok := s.expected[pkg]
@@ -159,6 +173,47 @@ func (s *CanaryTestSuite) TestPassingSuiteIsGreen(t *gotest.T) {
 
 func (s *CanaryTestSuite) TestEveryAssertionFamilyFails(t *gotest.T) {
 	s.check(t, "failing")
+}
+
+// A baseline the value no longer matches must fail; MatchSnapshot comparing
+// nothing would leave every golden check in the repository silent.
+func (s *CanaryTestSuite) TestASnapshotMismatchFails(t *gotest.T) {
+	s.check(t, "snapshotting")
+}
+
+// An Exclusive suite is dispatched strictly alone, after every non-exclusive
+// suite has drained (AGENTS.md). The fixture's three suites stamp their
+// windows; the exclusive one must open after both bulk windows closed.
+func (s *CanaryTestSuite) TestAnExclusiveSuiteRunsAfterTheBulk(t *gotest.T) {
+	dir := s.check(t, "exclusive")
+	windows := readWindows(t, filepath.Join(dir, "windows"))
+	exclusiveStart := windows["start ExclusiveTestSuite"]
+	for _, bulk := range []string{"BulkOneTestSuite", "BulkTwoTestSuite"} {
+		if end := windows["end "+bulk]; end == 0 || exclusiveStart <= end {
+			t.Errorf("exclusive: ExclusiveTestSuite started before the bulk drained (%s ended at %d, exclusive started at %d)", bulk, end, exclusiveStart)
+		}
+	}
+}
+
+// readWindows parses "<event> <suite> <unixnano>" lines into "<event> <suite>" keys.
+func readWindows(t *gotest.T, path string) map[string]int64 {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fatalf(t, "read windows: %v", err)
+	}
+	windows := map[string]int64{}
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 3 {
+			fatalf(t, "malformed window line %q", line)
+		}
+		ns, err := strconv.ParseInt(fields[2], 10, 64)
+		if err != nil {
+			fatalf(t, "malformed window stamp %q: %v", line, err)
+		}
+		windows[fields[0]+" "+fields[1]] = ns
+	}
+	return windows
 }
 
 func (s *CanaryTestSuite) TestAnAssertionHaltsTheMethod(t *gotest.T) {
@@ -300,7 +355,7 @@ type benchReport struct {
 // exit code and the benchmark names the report carries a sample for.
 func (s *CanaryTestSuite) bench(t *gotest.T, pkg, canaryDir string) (int, []string) {
 	cmd := exec.Command(s.binary, "bench", "--json", "./testdata/"+pkg+"/", "-benchtime=1x") //nolint:gosec // G204: controlled binary with fixed args
-	cmd.Env = append(os.Environ(), "GOTEST_CANARY_DIR="+canaryDir)
+	cmd.Env = childEnv(canaryDir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	code := 0

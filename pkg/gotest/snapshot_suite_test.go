@@ -64,14 +64,16 @@ func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
 		})
 	})
 
-	t.When("subtests write in non-alphabetical order", func(w *gotest.T) {
-		w.It("zebra comes first alphabetically after alpha", func(it *gotest.T) {
+	// Written first, but its key ("…order (b)/…") sorts after the next When's
+	// ("…order (a)/…"): the file order must follow the key, not the write.
+	t.When("subtests write in non-alphabetical order (b)", func(w *gotest.T) {
+		w.It("writes the later-sorting section first", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, "z-val")
 		})
 	})
 
-	t.When("subtests write in non-alphabetical order (alpha)", func(w *gotest.T) {
-		w.It("alpha section appears before zebra in the file", func(it *gotest.T) {
+	t.When("subtests write in non-alphabetical order (a)", func(w *gotest.T) {
+		w.It("sections are ordered by key, not by write order", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, "a-val")
 			snapPath := filepath.Join(snapDir, "TestSnapshotGroupingTestSuite_ext.snap")
 			data, err := os.ReadFile(snapPath)
@@ -79,6 +81,7 @@ func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
 			content := string(data)
 			gotest.Contains(it, content, "a-val")
 			gotest.Contains(it, content, "z-val")
+			gotest.Less(it, strings.Index(content, "a-val"), strings.Index(content, "z-val"))
 		})
 	})
 }
@@ -97,7 +100,16 @@ func (s *SnapshotConcurrencyTestSuite) BeforeEach(t *gotest.T) {
 	s.restore = gotest.ExportRedirectSnapshots(s.snapDir)
 }
 
-func (s *SnapshotConcurrencyTestSuite) AfterEach(_ *gotest.T) { s.restore() }
+// AfterEach runs after every parallel subtest finished, so the file is final:
+// every goroutine's section must be in it, or a write was lost.
+func (s *SnapshotConcurrencyTestSuite) AfterEach(t *gotest.T) {
+	defer s.restore()
+	data, err := os.ReadFile(s.snapPath)
+	gotest.NoError(t, err)
+	for i := range 10 {
+		gotest.Contains(t, string(data), fmt.Sprintf("concurrent-value-%d", i))
+	}
+}
 
 func (s *SnapshotConcurrencyTestSuite) TestMatchSnapshotConcurrency(t *gotest.T) {
 	t.Setenv(protocol.EnvCI, "0")

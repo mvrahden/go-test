@@ -19,11 +19,15 @@ func terminationSignals() []os.Signal {
 	return platformTerminationSignals()
 }
 
+// ManagedProcessTestSuite measures process behaviour against wall-clock
+// bounds (2s, 500ms). It is dispatched Exclusive: sharing the machine with
+// the parallel bulk under -race turns those bounds into noise.
 type ManagedProcessTestSuite struct{}
 
 func (s *ManagedProcessTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
 	cfg.Parallel = true
+	cfg.Exclusive = true
 	return cfg
 }
 

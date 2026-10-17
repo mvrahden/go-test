@@ -20,7 +20,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # full history so Hugo's GitInfo produces accurate lastmod dates
           fetch-depth: 0
@@ -35,12 +35,12 @@ jobs:
             fi
           done < <(find site/content \( -name '*.md' -o -name '*.html' \) -print0)
           exit $fail
-      - uses: peaceiris/actions-hugo@v3
+      - uses: peaceiris/actions-hugo@2752ce1d29631191ea3f27c23495fa06139a5b78 # v3
         with:
           hugo-version: '0.157.0'
           extended: true
       - run: hugo --minify --panicOnWarning --source site
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: site/public
 
@@ -52,4 +52,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

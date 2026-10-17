@@ -25,7 +25,7 @@ build:
 	go build -o gotest ./cmd/gotest
 
 extension-test: extension-contract
-	cd vscode-gotest && npm test
+	cd vscode-gotest && npm test && npm run test:integration
 
 # Re-records the CLI/extension contract and fails on drift, as CI's contract
 # workflow does. A CLI change that moves the recorded output surfaces here
@@ -40,7 +40,7 @@ vuln:
 	go run golang.org/x/vuln/cmd/govulncheck@latest ./... ./examples/...
 
 fmt-check:
-	@unformatted=$$(find . -name testdata -prune -o -name '*.go' -print | xargs -r gofmt -l); \
+	@unformatted=$$(find . \( -name testdata -o -name .worktrees -o -name node_modules \) -prune -o -name '*.go' -print | xargs -r gofmt -l); \
 	test -z "$$unformatted" || (echo "gofmt needed on:" && echo "$$unformatted" && exit 1)
 
 golangci-lint:

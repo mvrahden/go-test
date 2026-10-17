@@ -15,12 +15,15 @@ import (
 )
 
 // LingerTestSuite: after an interrupted root exits, the tree waits for the rest
-// of its group — and only for what is still running.
+// of its group — and only for what is still running. Its verdicts are
+// wall-clock bounds, so it is dispatched Exclusive, away from the parallel
+// bulk under -race.
 type LingerTestSuite struct{}
 
 func (s *LingerTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
 	cfg.Parallel = true
+	cfg.Exclusive = true
 	return cfg
 }
 

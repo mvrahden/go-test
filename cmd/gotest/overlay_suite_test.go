@@ -77,9 +77,7 @@ func (s *OverlayTestSuite) TestGenerateOverlay(t *gotest.T, ctx *overlayCtx) {
 
 			var allResults gotestgen.GenerateResults
 			allResults = append(allResults, results...)
-			if len(allResults) != 0 {
-				it.Skipf("expected 0 results for package without suites, got %d (package may have test suites)", len(allResults))
-			}
+			gotest.Empty(it, allResults, "a package without suites must generate nothing")
 		})
 	})
 }

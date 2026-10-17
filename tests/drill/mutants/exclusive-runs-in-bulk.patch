@@ -1,0 +1,12 @@
+Expect: exclusive: ExclusiveTestSuite started before the bulk drained
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -797,7 +797,7 @@
+ 
+ 		for i := range targets { //nolint:gocritic // hugeParam: stable API
+ 			target := targets[i]
+-			if target.Exclusive {
++			if target.Exclusive && false {
+ 				// Deferred past the stream: exclusive suites run strictly
+ 				// alone, after every concurrent suite has drained. Their
+ 				// slot in the collector's per-package count is already

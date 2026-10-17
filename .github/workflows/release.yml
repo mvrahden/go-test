@@ -9,23 +9,25 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           # Pinned, not "stable": a release must never be the first
           # place a new toolchain runs. Keep in step with quality.yml.
           go-version: "1.27"
-      - run: make test SPEC_FLAGS=--no-color
+      - run: make ci SPEC_FLAGS=--no-color
 
   build:
     runs-on: ubuntu-latest
     needs: test
+    permissions:
+      contents: write
     strategy:
       matrix:
         include:
@@ -42,8 +44,8 @@ jobs:
           - goos: windows
             goarch: arm64
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           # Pinned, not "stable": a release must never be the first
           # place a new toolchain runs. Keep in step with quality.yml.
@@ -53,32 +55,40 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
+          TAG: ${{ github.event.release.tag_name }}
         run: |
           ext=""
           if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
-          version="${{ github.event.release.tag_name }} ($(git rev-parse --short HEAD))"
+          version="$TAG ($(git rev-parse --short HEAD))"
           go build -ldflags="-s -w -X 'github.com/mvrahden/go-test/internal/about.Version=${version}'" -o "gotest-${GOOS}-${GOARCH}${ext}" ./cmd/gotest
       - name: Upload to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" gotest-*
+          gh release upload "$TAG" gotest-*
 
   update-major-tag:
+    if: ${{ !github.event.release.prerelease }}
     runs-on: ubuntu-latest
     needs: build
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Update v1 tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          tag="${{ github.event.release.tag_name }}"
+          tag="$TAG"
           major="${tag%%.*}"
           git tag -fa "$major" -m "$major"
           git push origin "$major" --force
 
   extension:
+    if: ${{ !github.event.release.prerelease }}
     needs: build
     permissions:
       contents: write
