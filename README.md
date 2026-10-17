@@ -1095,7 +1095,7 @@ The tables below are the canonical action surface — a drift guard test keeps t
 | `badge-branch` | Branch the coverage badge is published to; created on first use (default `ci/badges`) |
 | `bench` | Run benchmarks after tests via `gotest bench --spec --json` (default `false`) |
 | `bench-baseline` | Baseline JSON file to compare benchmarks against (`--against`) |
-| `bench-gate` | Fail if any benchmark regresses by more than this percent (`--gate`) |
+| `bench-gate` | Fail if any benchmark regresses by more than this percent (`--gate`); needs `-count=4` or more in `flags`, or the step exits 2 |
 | `bench-save` | Save the run as a JSON baseline at this path (`--save`); an explicit empty string saves to `bench.baseline` from `.gotest.yml`; default `false` saves nothing |
 | `fuzz` | Run a budgeted fuzz session after tests via `gotest fuzz --for`; a new crasher fails the step (default `false`) |
 | `fuzz-for` | Approximate wall-clock budget for the whole fuzz session (default: the CLI's own, one minute) |

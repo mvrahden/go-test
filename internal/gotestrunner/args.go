@@ -360,6 +360,18 @@ func ExtractParallelValue(runFlags []string) int {
 	return v
 }
 
+// ExtractCountValue returns how many times -count asks each benchmark or
+// test to run: its value when given and parseable, otherwise 1. Stops
+// scanning at -args.
+func ExtractCountValue(flags []string) int {
+	for _, name := range []string{"-count", "-test.count"} {
+		if v, err := strconv.Atoi(extractFlag(flags, name)); err == nil && v > 0 {
+			return v
+		}
+	}
+	return 1
+}
+
 // InjectParallel adds -parallel=n to runFlags, ahead of -args, if not
 // already present before the -args boundary.
 func InjectParallel(runFlags []string, n int) []string {

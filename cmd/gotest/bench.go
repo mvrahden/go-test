@@ -69,6 +69,12 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintln(os.Stderr, "FAIL: --gate requires --against (or bench.baseline in .gotest.yml)")
 		return 2
 	}
+	if count := gotestrunner.ExtractCountValue(goTestArgs); gateActive && count < gotestbench.MinSamplesForTTest {
+		// Below four samples a side there is no significance test, only a
+		// rule of thumb; a verdict built on it would be a guess with an exit code.
+		fmt.Fprintf(os.Stderr, "FAIL: --gate needs -count=%d or more: a significance test needs %d samples a side, and this run would take %d\n", gotestbench.MinSamplesForTTest, gotestbench.MinSamplesForTTest, count)
+		return 2
+	}
 	if saveTarget != "" && againstPath != "" && sameFile(saveTarget, againstPath) {
 		// Saving first and comparing after would judge the run against
 		// itself: every delta zero, every gate green, the old baseline gone.
@@ -325,11 +331,12 @@ func toSpecDeltas(deltas []gotestbench.Delta) []gotestspec.BenchDelta {
 	out := make([]gotestspec.BenchDelta, len(deltas))
 	for i, d := range deltas {
 		out[i] = gotestspec.BenchDelta{
-			Key:           d.Key,
-			OldNs:         d.OldNs,
-			NewNs:         d.NewNs,
-			PercentChange: d.PercentChange,
-			Significant:   d.Significant,
+			Key:                d.Key,
+			OldNs:              d.OldNs,
+			NewNs:              d.NewNs,
+			PercentChange:      d.PercentChange,
+			Significant:        d.Significant,
+			InsufficientSample: d.InsufficientSample,
 		}
 	}
 	return out

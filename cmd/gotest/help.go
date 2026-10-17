@@ -390,8 +390,9 @@ Flags:
   --gate=<pct>            Fail (exit 1) if the worst significant regression
                            against --against exceeds pct percent (e.g. 10 for
                            10%); requires --against or bench.baseline in
-                           .gotest.yml (defaults to bench.gate in
-                           .gotest.yml, 0 disables)
+                           .gotest.yml and -count=4 or more (exit 2 below
+                           that; defaults to bench.gate in .gotest.yml,
+                           0 disables)
   --json                  Emit one versioned JSON document to stdout instead
                            of human output: the run's results (baseline
                            shape), every delta when a comparison ran
@@ -435,7 +436,10 @@ books each missing benchmark into the captured stream as a failed one;
 comparing each benchmark's new mean ns/op against the saved baseline's.
 Only statistically significant deltas are shown by default; pass -v to
 show every row. Significant regressions are marked with a trailing "⚠".
-Deltas alone never change the exit code — only --gate does.
+Significance is a Welch t-test over -count samples; with fewer than 4 a
+side it is a ±20% rule of thumb and the row says "(n<4, ±20% heuristic)".
+Deltas alone never change the exit code — only --gate does, and a gate
+refuses to judge below -count=4.
 
 A baseline records the goos, goarch and Go version that produced it. When
 any of them differ from this run, --against prints "WARN: baseline was

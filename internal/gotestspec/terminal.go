@@ -70,6 +70,25 @@ type BenchDelta struct {
 	OldNs, NewNs  float64
 	PercentChange float64
 	Significant   bool
+	// InsufficientSample says a side had fewer samples than a significance
+	// test needs, so Significant is a ±20% rule of thumb.
+	InsufficientSample bool
+}
+
+// heuristicMark follows a delta row whose significance is a rule of thumb.
+const heuristicMark = "(n<4, ±20% heuristic)"
+
+// deltaMarks renders what follows a delta row's percentage: the regression
+// warning and the heuristic mark, in that order.
+func deltaMarks(d BenchDelta) string { //nolint:gocritic // hugeParam: stable API
+	marks := ""
+	if d.Significant && d.PercentChange > 0 {
+		marks += " ⚠"
+	}
+	if d.InsufficientSample {
+		marks += " " + heuristicMark
+	}
+	return marks
 }
 
 // WithBenchDeltas attaches a benchmark old-vs-new comparison table to be
@@ -361,12 +380,12 @@ func renderBenchDeltaTable(w io.Writer, deltas []BenchDelta, c colors) { //nolin
 		if d.PercentChange >= 0 {
 			sign = "+"
 		}
-		warn, clr, reset := "", "", ""
+		clr, reset := "", ""
 		if d.Significant && d.PercentChange > 0 {
-			warn, clr, reset = " ⚠", c.red, c.reset
+			clr, reset = c.red, c.reset
 		}
 		fmt.Fprintf(w, "%s%s  %.1f  %.1f  %s%.1f%%%s%s\n",
-			clr, d.Key, d.OldNs, d.NewNs, sign, d.PercentChange, warn, reset)
+			clr, d.Key, d.OldNs, d.NewNs, sign, d.PercentChange, deltaMarks(d), reset)
 	}
 }
 

@@ -1,6 +1,6 @@
 # Behavior Specification
 
-10 suites, 54 behaviors. Read from source; nothing was executed.
+10 suites, 58 behaviors. Read from source; nothing was executed.
 
 ## BenchGate
 
@@ -18,6 +18,25 @@
 | **when no benchmark is in both the baseline and the run** |
 | &nbsp;&nbsp;fails the gate and says there was nothing to compare |
 | &nbsp;&nbsp;lists the baseline's benchmarks that did not run and the run's that the baseline lacks |
+
+### AGateNeedsSamples
+
+| Behavior |
+|----------|
+| **when --gate is given with -count below 4** |
+| &nbsp;&nbsp;**-count absent** |
+| &nbsp;&nbsp;&nbsp;&nbsp;exits 2 naming -count=4 as the requirement |
+| &nbsp;&nbsp;**-count=2** |
+| &nbsp;&nbsp;&nbsp;&nbsp;exits 2 naming -count=4 as the requirement |
+| **when --gate is given with -count=4** |
+| &nbsp;&nbsp;judges the run |
+
+### AComparisonWithFewSamples
+
+| Behavior |
+|----------|
+| **when only --against is given and a side has fewer than 4 samples** |
+| &nbsp;&nbsp;still compares and marks each such row as a ±20% heuristic |
 
 ## CLIBuildRules
 

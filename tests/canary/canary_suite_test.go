@@ -421,13 +421,8 @@ func (s *CanaryTestSuite) benchRaw(t *gotest.T, pkg, canaryDir string, extra ...
 // and the report names what each side has that the other lacks.
 func (s *CanaryTestSuite) TestAGateWithNothingToCompareFails(t *gotest.T) {
 	dir := t.TempDir()
-	baseline := filepath.Join(dir, "baseline.json")
-	foreign := `{"schemaVersion":1,"goVersion":"` + runtime.Version() + `","goos":"` + runtime.GOOS + `","goarch":"` + runtime.GOARCH + `",` +
-		`"results":[{"package":"example.com/elsewhere","suite":"OtherTestSuite","name":"BenchmarkGone","samples":[{"nsPerOp":1}]}]}`
-	if err := os.WriteFile(baseline, []byte(foreign), 0o600); err != nil {
-		fatalf(t, "write baseline: %v", err)
-	}
-	code, report := s.benchReport(t, "benching", dir, "--against="+baseline, "--gate=10")
+	baseline := foreignBaseline(t, dir)
+	code, report := s.benchReport(t, "benching", dir, "--against="+baseline, "--gate=10", "-count=4")
 	if code != 1 {
 		t.Errorf("gate against a foreign baseline: exit code %d, want 1", code)
 	}
@@ -436,6 +431,37 @@ func (s *CanaryTestSuite) TestAGateWithNothingToCompareFails(t *gotest.T) {
 	}
 	if len(report.Added) != 6 {
 		t.Errorf("added %v, want the six benchmark leaves of the run", report.Added)
+	}
+}
+
+// foreignBaseline writes a baseline whose only benchmark lives in a package
+// this run does not have.
+func foreignBaseline(t *gotest.T, dir string) string {
+	baseline := filepath.Join(dir, "baseline.json")
+	foreign := `{"schemaVersion":1,"goVersion":"` + runtime.Version() + `","goos":"` + runtime.GOOS + `","goarch":"` + runtime.GOARCH + `",` +
+		`"results":[{"package":"example.com/elsewhere","suite":"OtherTestSuite","name":"BenchmarkGone","samples":[{"nsPerOp":1}]}]}`
+	if err := os.WriteFile(baseline, []byte(foreign), 0o600); err != nil {
+		fatalf(t, "write baseline: %v", err)
+	}
+	return baseline
+}
+
+// A gate judges by a significance test, which needs four samples a side;
+// below -count=4 it refuses instead of guessing.
+func (s *CanaryTestSuite) TestAGateNeedsSamples(t *gotest.T) {
+	dir := t.TempDir()
+	baseline := foreignBaseline(t, dir)
+	code, _, stderr := s.benchRaw(t, "benching", dir, "--against="+baseline, "--gate=10")
+	if code != 2 {
+		t.Errorf("gate without -count: exit code %d, want 2", code)
+	}
+	if !strings.Contains(string(stderr), "-count=4 or more") {
+		t.Errorf("gate without -count: stderr does not name the requirement:\n%s", stderr)
+	}
+	// Four is enough: the gate then judges, and this baseline shares nothing.
+	code, _, _ = s.benchRaw(t, "benching", dir, "--against="+baseline, "--gate=10", "-count=4")
+	if code != 1 {
+		t.Errorf("gate with -count=4: exit code %d, want 1", code)
 	}
 }
 

@@ -2,8 +2,8 @@ Expect: --save and --against on one file: exit code [01], want 2
 Clause: when --save and --against name the same file → is refused before anything runs, since the run would be compared against itself
 --- a/cmd/gotest/bench.go
 +++ b/cmd/gotest/bench.go
-@@ -69,7 +69,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
- 		fmt.Fprintln(os.Stderr, "FAIL: --gate requires --against (or bench.baseline in .gotest.yml)")
+@@ -75,7 +75,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+ 		fmt.Fprintf(os.Stderr, "FAIL: --gate needs -count=%d or more: a significance test needs %d samples a side, and this run would take %d\n", gotestbench.MinSamplesForTTest, gotestbench.MinSamplesForTTest, count)
  		return 2
  	}
 -	if saveTarget != "" && againstPath != "" && sameFile(saveTarget, againstPath) {

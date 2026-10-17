@@ -223,6 +223,19 @@ func (s *RenderTestSuite) TestRenderTerminal_WithBenchDeltas(t *gotest.T, _ *ren
 	gotest.NotContains(t, out, "tests passed (", "a single summary trailer, not a stacked one")
 }
 
+// Below four samples a side there is no significance test, only a ±20%
+// rule of thumb; the row says so, so nobody reads the mark as a verdict.
+func (s *RenderTestSuite) TestRenderTerminal_WithBenchDeltas_FewSamplesAreMarked(t *gotest.T, _ *renderCtx) {
+	deltas := []gotestspec.BenchDelta{
+		{Key: "p Foo/BenchmarkFoo", OldNs: 100, NewNs: 125, PercentChange: 25, Significant: true, InsufficientSample: true},
+		{Key: "p Foo/BenchmarkBar", OldNs: 100, NewNs: 101, PercentChange: 1, InsufficientSample: true},
+	}
+	out := renderTerminalWith(topLevelBenchmark(), gotestspec.WithBenchDeltas(deltas))
+
+	gotest.Contains(t, out, "p Foo/BenchmarkFoo  100.0  125.0  +25.0% ⚠ (n<4, ±20% heuristic)", "a heuristic regression row")
+	gotest.Contains(t, out, "p Foo/BenchmarkBar  100.0  101.0  +1.0% (n<4, ±20% heuristic)", "a heuristic row")
+}
+
 func (s *RenderTestSuite) TestRenderTerminal_WithBenchDeltas_FilteredToEmptyStillPrintsHeader(t *gotest.T, _ *renderCtx) {
 	// An empty-but-non-nil slice models what the CLI passes when a
 	// comparison ran but every delta was filtered out (no significant

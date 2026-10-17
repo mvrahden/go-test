@@ -1,0 +1,13 @@
+Expect: Render / RenderTerminal_WithBenchDeltas_FewSamplesAreMarked
+Clause: when only --against is given and a side has fewer than 4 samples → still compares and marks each such row as a ±20% heuristic
+--- a/internal/gotestspec/terminal.go
++++ b/internal/gotestspec/terminal.go
+@@ -85,7 +85,7 @@ func deltaMarks(d BenchDelta) string { //nolint:gocritic // hugeParam: stable AP
+ 	if d.Significant && d.PercentChange > 0 {
+ 		marks += " ⚠"
+ 	}
+-	if d.InsufficientSample {
++	if false && d.InsufficientSample {
+ 		marks += " " + heuristicMark
+ 	}
+ 	return marks

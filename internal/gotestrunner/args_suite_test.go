@@ -342,6 +342,23 @@ func (s *ArgsTestSuite) TestSuiteRunFilter(t *gotest.T) {
 	}
 }
 
+func (s *ArgsTestSuite) TestExtractCountValue(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Name  string
+		flags []string
+		want  int
+	}{
+		{"absent is one run", []string{"-benchtime=1x"}, 1},
+		{"joined", []string{"-count=6"}, 6},
+		{"separate", []string{"-count", "4", "-v"}, 4},
+		{"test prefix", []string{"-test.count=3"}, 3},
+		{"behind -args is the binary's", []string{"-args", "-count=9"}, 1},
+		{"unparseable is one run", []string{"-count=many"}, 1},
+	}) {
+		gotest.Equal(sub, tc.want, gotestrunner.ExtractCountValue(tc.flags))
+	}
+}
+
 func (s *ArgsTestSuite) TestExtractParallelValue(t *gotest.T) {
 	for sub, tc := range gotest.Each(t, []struct {
 		Name   string

@@ -97,6 +97,154 @@
               "name": "TestAGateWithNothingToCompare",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "exits 2 naming -count=4 as the requirement",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "exits_2_naming_-count=4_as_the_requirement",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "-count absent",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-count_absent",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "exits 2 naming -count=4 as the requirement",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "exits_2_naming_-count=4_as_the_requirement",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "-count=2",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-count=2",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when --gate is given with -count below 4",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "--gate_is_given_with_-count_below_4",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "judges the run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "judges_the_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --gate is given with -count=4",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "--gate_is_given_with_-count=4",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AGateNeedsSamples",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAGateNeedsSamples",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "still compares and marks each such row as a ±20% heuristic",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "still_compares_and_marks_each_such_row_as_a_±20%_heuristic",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when only --against is given and a side has fewer than 4 samples",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "only_--against_is_given_and_a_side_has_fewer_than_4_samples",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AComparisonWithFewSamples",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAComparisonWithFewSamples",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "BenchGate",
@@ -1323,7 +1471,7 @@
     }
   ],
   "stats": {
-    "behaviors": 54,
+    "behaviors": 58,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

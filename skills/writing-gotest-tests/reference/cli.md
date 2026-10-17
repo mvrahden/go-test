@@ -102,7 +102,10 @@ hoist it above. A suite with benchmarks refuses a returning
   `envMismatch` in `--json`; the comparison still runs and the exit code
   is unchanged.
 - `--gate=<pct>` — exit 1 when the worst significant regression exceeds
-  the threshold (needs `--against` or `bench.baseline`).
+  the threshold (needs `--against` or `bench.baseline`, and `-count=4` or
+  more: below that the gate exits 2 instead of judging on a rule of
+  thumb). Without a gate, a comparison with fewer than 4 samples a side
+  still prints; each such row ends in `(n<4, ±20% heuristic)`.
 - `--json` — emit ONE versioned report document to stdout instead of
   human output: `schemaVersion` 1, the run's results in baseline shape,
   `deltas` when a comparison ran, `gate` with `breachedKeys` (every
@@ -114,8 +117,8 @@ hoist it above. A suite with benchmarks refuses a returning
   `-bench='^BenchmarkFooTestSuite$/^BenchmarkParse$'` runs one method.
   `-benchtime=100x|2s` and `-count=<n>` pass through.
 
-Baseline workflow: `bench --save=` on the trunk build; `bench
---against= --gate=10` (or `bench.gate` in `.gotest.yml`) on branches;
+Baseline workflow: `bench --save= -count=4` on the trunk build; `bench
+--against= --gate=10 -count=4` (or `bench.gate` in `.gotest.yml`) on branches;
 promote a new baseline by re-running `--save=` after accepting a change.
 In CI, prefer the action's `bench`/`bench-baseline`/`bench-gate`/
 `bench-save` inputs (see `ci.md`).

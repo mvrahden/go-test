@@ -156,7 +156,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--bench` | Benchmark mode for `watch`: re-run benchmarks on change with ns/op deltas |
 | `--save=<path>` | Save a benchmark run as a JSON baseline (`bench`; a bare `--save=` uses `bench.baseline` from `.gotest.yml`) |
 | `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`). A baseline whose `goos`, `goarch`, `goVersion`, `cpu` or `gomaxprocs` differs warns on stderr and reports `envMismatch`; the comparison still runs and the exit code is unchanged |
-| `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`) |
+| `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`). Needs `-count=4` or more, the samples a significance test takes; below that it exits 2 naming the requirement. Without a gate a comparison with fewer samples still prints, each such row marked `(n<4, ±20% heuristic)` |
 | `--json` | Emit one versioned JSON report to stdout — results, deltas, gate verdict, environment mismatch — instead of human output (`bench`; for tooling) |
 | `--for=<dur>` | Approximate wall-clock fuzz budget for the session, split jobs-aware across targets (`fuzz`; default 1m or half of a shorter `--timeout`; `0` removes the budget; per-target share floors at 10s) |
 | `--target=<name>` | Fuzz exactly one generated wrapper by name; unmatched names error with the available list (`fuzz`) |
