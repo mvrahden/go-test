@@ -3,6 +3,7 @@ package main_test
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/gotestcli"
@@ -92,6 +93,40 @@ func (s *SkillCLITestSuite) TestReplacesOlderCopy(t *gotest.T, ctx *skillCtx) {
 	})
 }
 
+func (s *SkillCLITestSuite) TestReplaceLeavesNothingBehind(t *gotest.T, ctx *skillCtx) {
+	_, code := s.install(t, ctx, "--dir=skills")
+	gotest.Equal(t, 0, code)
+	out, code := s.install(t, ctx, "--dir=skills")
+	t.It("leaves only the skill, with no staged or replaced copy beside it", func(it *gotest.T) {
+		gotest.Equal(it, 0, code, out)
+		for _, dir := range []string{ctx.dir, filepath.Join(ctx.dir, "skills")} {
+			entries, err := os.ReadDir(dir)
+			gotest.NoError(it, err)
+			for _, e := range entries {
+				gotest.NotContains(it, e.Name(), "-new-", dir)
+			}
+		}
+	})
+}
+
+func (s *SkillCLITestSuite) TestFailedInstallKeepsOldCopy(t *gotest.T, ctx *skillCtx) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skipf("needs a directory the user cannot write")
+	}
+	old := "---\nname: writing-gotest-tests\n---\nold\n"
+	gotest.NoError(t, os.MkdirAll(ctx.target, 0o755))
+	gotest.NoError(t, os.WriteFile(filepath.Join(ctx.target, "SKILL.md"), []byte(old), 0o600))
+	// The new copy is staged beside the skills directory; with no room there
+	// the install fails before it touches the old copy.
+	gotest.NoError(t, os.Chmod(ctx.dir, 0o555))
+	out, code := s.install(t, ctx, "--dir=skills")
+	gotest.NoError(t, os.Chmod(ctx.dir, 0o755))
+	t.It("exits 2 and leaves the installed copy as it was", func(it *gotest.T) {
+		gotest.Equal(it, 2, code, out)
+		gotest.Equal(it, old, readText(it, filepath.Join(ctx.target, "SKILL.md")))
+	})
+}
+
 func (s *SkillCLITestSuite) TestRefusesForeignSkill(t *gotest.T, ctx *skillCtx) {
 	gotest.NoError(t, os.MkdirAll(ctx.target, 0o755))
 	foreign := "---\nname: someone-elses-skill\n---\nmine\n"
@@ -117,14 +152,14 @@ func (s *SkillCLITestSuite) TestRefusesDirWithoutSkill(t *gotest.T, ctx *skillCt
 }
 
 func (s *SkillCLITestSuite) TestUsage(t *gotest.T, ctx *skillCtx) {
-	t.It("prints usage and exits 1 without a command", func(it *gotest.T) {
+	t.It("prints usage and exits 2 without a command", func(it *gotest.T) {
 		out, code := runGotestIn(it, s.cli.binary, ctx.dir, nil, "skill")
-		gotest.Equal(it, 1, code)
+		gotest.Equal(it, 2, code)
 		gotest.Contains(it, out, "usage: gotest skill install")
 	})
 	t.It("rejects an unknown command", func(it *gotest.T) {
 		out, code := runGotestIn(it, s.cli.binary, ctx.dir, nil, "skill", "uninstall")
-		gotest.Equal(it, 1, code)
+		gotest.Equal(it, 2, code)
 		gotest.Contains(it, out, "unknown skill command: uninstall")
 	})
 	t.It("rejects an empty --dir", func(it *gotest.T) {
