@@ -3,7 +3,7 @@
 The canary checks gotest's verdicts from outside gotest. Every other test in
 this repository reports its result through gotest's own runner, so a bug in
 that runner could turn a failure into a pass without any test noticing. The
-canary closes that gap: it builds the `gotest` binary, runs it over seventeen
+canary closes that gap: it builds the `gotest` binary, runs it over nineteen
 small fixture packages written to fail in specific ways, and compares what
 the binary reports with a checked-in expectation. It checks with plain Go
 only, so nothing under test takes part in the verdict.
@@ -32,6 +32,7 @@ Each directory under `testdata/` is one package with one suite:
 | `setupfailing` | a shared fixture that fails to come up fails only the suites that read it, in the `-json` stream and in a bench run |
 | `guardskip` | a suite its guard skips sets up none of its fixtures: one that would fail leaves the run green |
 | `snapshotting` | a value that differs from its committed baseline fails; one that matches passes |
+| `exclusive` | an Exclusive suite starts only after every non-exclusive suite in the run ended |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line
 gives the exit code; `<fixture> <action> <test>` lines list every `pass`,

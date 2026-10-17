@@ -167,6 +167,41 @@ func (s *CanaryTestSuite) TestASnapshotMismatchFails(t *gotest.T) {
 	s.check(t, "snapshotting")
 }
 
+// An Exclusive suite is dispatched strictly alone, after every non-exclusive
+// suite has drained (AGENTS.md). The fixture's three suites stamp their
+// windows; the exclusive one must open after both bulk windows closed.
+func (s *CanaryTestSuite) TestAnExclusiveSuiteRunsAfterTheBulk(t *gotest.T) {
+	dir := s.check(t, "exclusive")
+	windows := readWindows(t, filepath.Join(dir, "windows"))
+	exclusiveStart := windows["start ExclusiveTestSuite"]
+	for _, bulk := range []string{"BulkOneTestSuite", "BulkTwoTestSuite"} {
+		if end := windows["end "+bulk]; end == 0 || exclusiveStart <= end {
+			t.Errorf("exclusive: ExclusiveTestSuite started before the bulk drained (%s ended at %d, exclusive started at %d)", bulk, end, exclusiveStart)
+		}
+	}
+}
+
+// readWindows parses "<event> <suite> <unixnano>" lines into "<event> <suite>" keys.
+func readWindows(t *gotest.T, path string) map[string]int64 {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fatalf(t, "read windows: %v", err)
+	}
+	windows := map[string]int64{}
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 3 {
+			fatalf(t, "malformed window line %q", line)
+		}
+		ns, err := strconv.ParseInt(fields[2], 10, 64)
+		if err != nil {
+			fatalf(t, "malformed window stamp %q: %v", line, err)
+		}
+		windows[fields[0]+" "+fields[1]] = ns
+	}
+	return windows
+}
+
 func (s *CanaryTestSuite) TestAnAssertionHaltsTheMethod(t *gotest.T) {
 	dir := s.check(t, "failnow")
 	if _, err := os.Stat(filepath.Join(dir, "after-failnow")); err == nil {

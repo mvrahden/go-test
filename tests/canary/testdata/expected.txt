@@ -114,3 +114,11 @@ snapshotting fail -
 snapshotting fail TestSnapshottingTestSuite
 snapshotting fail TestSnapshottingTestSuite/TestDiffersFromBaseline
 snapshotting pass TestSnapshottingTestSuite/TestMatchesBaseline
+exclusive exit 0
+exclusive pass -
+exclusive pass TestBulkOneTestSuite
+exclusive pass TestBulkOneTestSuite/TestWindow
+exclusive pass TestBulkTwoTestSuite
+exclusive pass TestBulkTwoTestSuite/TestWindow
+exclusive pass TestExclusiveTestSuite
+exclusive pass TestExclusiveTestSuite/TestWindow
