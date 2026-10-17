@@ -1,6 +1,6 @@
 # CLI surface
 
-Everything runs as `go tool gotest …` (see SKILL.md Bootstrap). Bare
+Everything runs as `go tool gotest …` (see `setup.md`). Bare
 invocation runs tests — there is NO `test` subcommand:
 
 - `go tool gotest ./...` — run suites (never stdlib tests; those need
@@ -16,21 +16,33 @@ invocation runs tests — there is NO `test` subcommand:
   `summary --input`), so replaying a saved stream in CI needs no pipefail
   gymnastics — the render step itself is the verdict; `--render-only`
   lifts that rule for pure renderers (exit 0 on a failing stream, 2 on an
-  unreadable one). `--static` renders the spec from source without
-  running anything — nodes carry no verdict, and incompletely enumerable
-  methods are reported on stderr.
+  unreadable one). From v1.33 a stream with no test events, or one cut
+  off before every package reported, exits 2 too. `--static` renders the
+  spec from source without running anything — nodes carry no verdict, and
+  incompletely enumerable methods are reported on stderr.
 - `go tool gotest watch ./...` — rerun on change; supports `--spec`.
-- `go tool gotest lint ./...` — the linter; `-fix` applies suggested
-  fixes and formats the files it rewrites (fixes can compose, so re-run
-  until clean). Integrity rules yield only to `//nolint:<rule>` (on the
-  line, directly above it, or file-wide on the package clause); others
+- `go tool gotest lint ./...` — the linter; exit 3 on findings (`-json`
+  exits 0 and carries them in the document). `-fix` applies suggested
+  fixes and formats the files it rewrites. From v1.33 it applies composed
+  and overlapping fixes in one run, reports what is left, and writes
+  nothing when the fixed code would not load or a file cannot be written
+  (exit 1); `-diff` previews
+  exactly what `-fix` would write as a patch for `git apply` run in the
+  same directory (files outside it need `git apply --unsafe-paths`),
+  writing nothing. `-tags` reaches the loader. Below v1.33 repeat `lint -fix` + plain `lint` until plain
+  `lint` exits 0 (`-fix` stops after one pass and never shows what it
+  cannot fix), and `-diff` is no preview: alone it only lists findings,
+  and `-fix -diff` prints one pass with headers `git apply` rejects.
+  Integrity rules yield only to `//nolint:<rule>` (on the line, directly
+  above it, or file-wide trailing the `package` line); others
   also to `.gotest.yml` `lint.skip` / `-skip-<rule>`.
 - `go tool gotest discover ./...` — static suite metadata as JSON: suites,
   methods, direct suite→fixture edges, and (v1.27+) each method's declared
   `When`/`It` tree — `name` is the subtest segment `go test` will print,
   `display` the label as the spec renders it (v1.29+: spoken in its
   vocabulary, so `When("email is valid")` reads `when email is valid`),
-  `kind` the call it came from. Literal `Each` tables appear as rows;
+  `kind` the call it came from. An `Each` over an inline literal table
+  appears as rows;
   anything runtime-valued (a `When` behind a condition, a non-literal
   description or table) is missing and `behaviorsComplete: false` says
   so — never present an incomplete list as the whole specification.
@@ -45,9 +57,9 @@ invocation runs tests — there is NO `test` subcommand:
 
 Flags shared by run modes: `--ci` (or env `GOTEST_CI`/`CI`; values `0` and
 `false` are falsy) — enables the focus guard (committed `F_` prefixes fail
-the run) AND makes snapshots read-only, so `MatchSnapshot` cannot write
-baselines in CI-detected environments. `--update-snapshots` rewrites
-`MatchSnapshot` baselines (outside CI). `--spec` renders the spec view
+the run) AND makes a missing `MatchSnapshot` baseline fail instead of
+being created. `--update-snapshots` rewrites baselines — in CI too, so
+never pass it there. `--spec` renders the spec view
 instead of default output. `--timeout <dur>` is the global pipeline
 deadline (default 15m) and `--setup-timeout <dur>` the shared-fixture
 setup budget (default 2m) — `0` disables either; `--min <pct>` gates
@@ -57,9 +69,20 @@ coverage, `--no-cache` forces fresh generation and linking, `--debug` keeps over
 
 `go tool gotest bench ./...` runs `Benchmark*` suite methods (signature
 `func (s *X) BenchmarkParse(b *gotest.B)`, or stdlib `*testing.B`) through
-the generated wrappers — always serially, ignoring `--parallel`, because
-concurrent benchmarks time contention instead of code. `-test.benchmem`
-is on by default. Flags:
+the generated wrappers — always serially (it rejects `--parallel`, exit
+2), because concurrent benchmarks time contention instead of code.
+`-test.benchmem` is on by default.
+
+Writing one: put the measured work inside `for b.Loop() { … }` —
+`*gotest.B` has no `N` or timer methods (`b.B()` reaches the
+`*testing.B`). Setup above the loop is not timed, nor are the suite's
+`BeforeEach`/`AfterEach` around each benchmark. Assertions take `b`.
+Lint: `bench-loop` (integrity) — the method never calls `b.Loop()`, so
+nothing is measured; `bench-wait` — `time.Sleep`/`Eventually`/
+`Consistently` inside the loop times the wait; `bench-fixture-io` — a
+fixture field read inside the loop times whatever backs the fixture, so
+hoist it above. A suite with benchmarks refuses a returning
+`BeforeEach` and hooks taking `*testing.T`. Flags:
 
 - `--spec` — render the spec view; under GitHub Actions the markdown
   (with delta table) lands in the step summary automatically.
@@ -145,7 +168,7 @@ grep -q 'two_plus_two' cases.txt
 go tool gotest spec --input events.json > /dev/null
 ```
 
-**v1.29+ census:** after a green `spec`, `summary` or `-json` run, every
+**v1.29.1+ census:** after a green `spec`, `summary` or `-json` run, every
 suite method the source declares must have a verdict in the event stream.
 If one is missing the run exits 2 with `FAIL: census: N declared test(s)
 never ran` and the list: a harness that silently dropped a test is not a

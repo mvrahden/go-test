@@ -55,7 +55,7 @@ The linter flags unpaired `BeforeAll` as a likely resource leak.
 ## Assertions
 
 All assertion functions call `FailNow()` on failure (fatal — test stops immediately).
-All accept optional trailing `msgAndArgs ...any` for custom error messages.
+All except `Eventually`, `Consistently` and `MatchSnapshot` (whose trailing arguments name the snapshot) accept optional trailing `msgAndArgs ...any` for custom error messages.
 
 ### Unconditional Failure
 
@@ -276,7 +276,7 @@ would clean up was never created.
 
 **Returning BeforeEach (required for `Parallel: true`):**
 
-When `SuiteConfig` enables `Parallel` on a suite with per-test state, `BeforeEach` must return a context struct pointer to give each parallel test its own isolated state (field-less suites, or suites whose only fields are fixture pointers, may be parallel without one). Test methods and `AfterEach` then accept this context as an additional parameter:
+When `SuiteConfig` enables `Parallel` on a suite with per-test state, `BeforeEach` must return a context struct pointer to give each parallel test its own isolated state (field-less suites, or suites whose only fields are fixture pointers, may be parallel without one). The generator rejects a `BeforeEach` that returns nothing in a parallel suite, but it cannot see methods writing suite fields — with no `BeforeEach`, or beside a returning one: that compiles, and races. Test methods and `AfterEach` then accept this context as an additional parameter:
 
 ```go
 type testCtx struct {
@@ -338,8 +338,11 @@ to a budget: being failed against a number you did not choose is not a verdict y
 `go test -timeout`'s job either way.
 
 `SetupTimeout` works the same way for `BeforeAll` and `AfterAll`, including for a setup
-that hangs and never returns. A declared fixture `Timeout` likewise: an overrunning
-fixture `BeforeAll` counts as a failed attempt, retried if `Retries` allows.
+that hangs and never returns. A declared fixture `Timeout` is judged when the hook
+returns: a `BeforeAll` that succeeds only after it fails the fixture without a retry
+(the work is done; a retry would build it twice), and its `AfterAll` still runs. A
+fixture hook that never returns is not failed by its `Timeout`; the run's other deadlines end
+it (go test's `-timeout`, `--setup-timeout`, or a shared fixture's teardown force-kill).
 
 `Timeout` reaches `t.Context()` inside nested `When`, `It` and `Each` bodies too — a
 nested behavior inherits the enclosing deadline, and its context is canceled when that

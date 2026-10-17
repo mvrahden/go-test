@@ -1,7 +1,8 @@
 # Assertions
 
-All package-level, first argument `t` (a `*gotest.T`, subtest `t`, or the
-`poll *gotest.R` handle inside `Eventually`/`Consistently`). Failures always
+All package-level, first argument `t` (a `*gotest.T`, subtest `t`, the
+`poll *gotest.R` handle inside `Eventually`/`Consistently`, a `*gotest.B`
+or `*gotest.F`, or a plain `*testing.T`). Failures always
 report the user call site automatically — never call `t.T().Helper()`.
 
 Assertions ARE the control flow: they halt the test on failure, so never
@@ -15,7 +16,7 @@ when it rewrites a `True(t, a == b)` or a guard into one.
 | Assertion | Notes |
 |---|---|
 | `Equal[V]` / `NotEqual[V]` | typed; large values render expanded with a line diff |
-| `Same[V]` / `NotSame[V]` | pointer identity on `*V`; `Equal` on pointers compares structure, and `assertion-simplify` rewrites `True(t, p == q)` to this |
+| `Same[V]` / `NotSame[V]` | v1.30.2+; pointer identity on `*V`; `Equal` on pointers compares structure, and `assertion-simplify` rewrites `True(t, p == q)` to this |
 | `NoError` / `Error` | error presence |
 | `ErrorIs` / `ErrorAs[E]` / `ErrorContains` | prefer over `Error`+string poking; `ErrorContains` fails on nil error |
 | `True` / `False` | last resort — the `assertion-simplify` lint rule rewrites `True(t, x != nil)` and friends |
@@ -29,7 +30,7 @@ when it rewrites a `True(t, a == b)` or a guard into one.
 | `TimeWithin` / `TimeIsNow` | time comparison |
 | `Eventually` / `Consistently` | `(t, waitFor, tick, func(poll *R))` — pass `poll` to inner assertions; outer `t` inside the callback is a lint error (`poll-scope`) |
 | `Fail` | unconditional failure (Errorf + FailNow) — never as an if-guard body; state the assertion instead (`fail-guard`) |
-| `MatchSnapshot` | golden snapshots; update via `go tool gotest ./... --update-snapshots` (read-only under `--ci`/CI envs) |
+| `MatchSnapshot` | `(t, value, name...)` — golden snapshots in `testdata/__snapshots__/<TestName>.snap` beside the test file (`<TestName>_ext.snap` for an external `_test` package); the trailing strings name several snapshots in one test, they are not a message. Update via `go tool gotest ./... --update-snapshots` — which writes in CI too; CI only refuses to create a missing baseline |
 | `Must[T]` | panic-on-error value extraction, for setup code |
 | `Each[E]` | table driver: `for t, tc := range gotest.Each(t, entries)` — subtest names come from a `Desc` or `Name` string field |
 

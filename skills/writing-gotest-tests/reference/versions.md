@@ -10,17 +10,18 @@ upgrade notes: each names the behavior it replaced.
 The skill targets **v1.26.0+**. On **v1.25.x** everything in SKILL.md
 still applies EXCEPT these, which fail there:
 
-1. **The parallel recipe (rule 4)** — v1.25.x requires the `SuiteConfig`
-   body to be a SINGLE return statement, so the compose form is a
-   generation error. Return the literal `gotest.SuiteConfig{Parallel:
-   true}` instead; on v1.25.x a partial literal DOES inherit the 30s
-   defaults.
+1. **The compose form (`config.md`)** — v1.25.x requires the
+   `SuiteConfig` body to be a SINGLE return statement, so composing onto a
+   preset is a generation error. Rule 4's literal
+   `gotest.SuiteConfig{Parallel: true}` works; on v1.25.x a partial
+   literal inherits the 30s defaults.
 2. **Config literalism (rule 3)** — v1.25.x merges your marker over the
    defaults: `0` means "keep the default", `-1` disables, and
    `Parallel`/`FailFast` are one-way latches in that merge (once true,
    never reset to false).
-3. **`Test*Async` (rule 1)** — recognized but never rendered on v1.25.x;
-   write a synchronous test with `Eventually` instead.
+3. **`Test*Async` (rule 1)** — the generated harness does not compile, and
+   v1.25.x still exits 0 ("no test suites to run"); write a synchronous
+   test with `Eventually` instead.
 4. **Filtering `Each` rows** — on v1.25.x, `-run` selecting individual
    `Each` entries (e.g. `-run 'TestX/#1'`) DEADLOCKS the test binary until
    `-test.timeout` kills it with no teardown, and so does any entry after
@@ -49,6 +50,16 @@ no expanded value diffs.
 marker leaves at zero gets the default and `gotest.NoDeadline` (any
 negative value) disables it; on v1.26–v1.29 a zero duration meant no
 deadline; v1.25.x merged the marker over the defaults (see v1.25.x, item 2).
+So on v1.26–v1.29 rule 4's `gotest.SuiteConfig{Parallel: true}` runs
+without any deadline: compose onto `gotest.DefaultSuiteConfig()` there.
+
+## v1.26
+
+1. **`SuiteConfig.Retries` is gone** — a v1.25.x suite setting it stops
+   compiling after the upgrade; delete the field.
+2. **Timeout verdicts start** — a declared `Timeout` fails a test that
+   outlives it ("exceeded its configured Timeout"); v1.25.x only bounded
+   the context.
 
 ## v1.27
 
@@ -80,6 +91,13 @@ v1.26.x and earlier. What v1.27 adds:
    only leaf rows carry a duration at all, so there the expensive test
    can be the one showing nothing.
 
+## v1.28
+
+1. **Go 1.27 support** — on Go 1.27, `gotest lint` below v1.28 cannot
+   analyze anything with the x/tools version its release pins ("internal
+   error: package … without types", exit 1); generation and runs still
+   work. Upgrade before linting on Go 1.27.
+
 ## v1.29
 
 Rules and sections tagged **v1.29+** need v1.29.0 or newer. What v1.29 adds:
@@ -87,13 +105,14 @@ Rules and sections tagged **v1.29+** need v1.29.0 or newer. What v1.29 adds:
 1. **The spec speaks the `When` vocabulary (rule 8)** — every `When` label
    renders as `when <condition>` on every surface, and a label that opens
    with its own connective (`with`, `given`, `after`, `if`, …) renders as
-   written. Below v1.29 a `When` label renders verbatim, so a bare
+   written. Below v1.29 a `When` label renders verbatim (on v1.25–v1.26
+   with underscores shown as spaces, even in live runs), so a bare
    condition reads as a bare phrase there; still write the condition
    alone — it is what the framework's own suites always did, and the
    connective arrives with the upgrade instead of having to be edited out.
 2. **The `behavior-wording` lint rule** — absent below v1.29, and absent
    silently (like `shared-fixture-undeclared` on v1.26.x): a `When("when
-   …")` is never reported there, so apply rule 8 by hand.
+   …")` or `It("it …")` is never reported there, so apply rule 8 by hand.
 3. **`spec --input` reads source** — a replayed stream renders the
    declared labels and vocabulary when the packages it names are loadable
    from the working directory. Below v1.29 a replay renders from subtest
@@ -112,6 +131,12 @@ Rules and sections tagged **v1.29+** need v1.29.0 or newer. What v1.29 adds:
    nothing runs `Benchmark*` suite methods: one compiles and silently
    never runs. Below v1.27 it does not compile. Write none below v1.29.
 
+From **v1.29.1**:
+
+6. **The census** — a green `spec`, `summary` or `-json` run exits 2 when
+   a declared method produced no verdict (`reference/cli.md`). On v1.29.0
+   and below nothing notices a test the harness dropped.
+
 ## v1.30
 
 Rules and sections tagged **v1.30+** need v1.30.0 or newer. What v1.30 adds:
@@ -119,8 +144,8 @@ Rules and sections tagged **v1.30+** need v1.30.0 or newer. What v1.30 adds:
 1. **Census bookings in the stream** — a declared method with no verdict
    is booked into `-json`, `spec`, `summary` and `watch -- -json` as a
    failed test, its suite and package failing with it; see
-   `reference/cli.md`. Below v1.30 the census speaks only on stderr and
-   through exit 2.
+   `reference/cli.md`. On v1.29.1 the census speaks only on stderr and
+   through exit 2; below v1.29.1 there is none.
 
 2. **A zero duration means the default deadline** — on
    `SuiteConfig.Timeout`/`SetupTimeout` and `FixtureConfig.Timeout`, omitted
@@ -135,6 +160,22 @@ Rules and sections tagged **v1.30+** need v1.30.0 or newer. What v1.30 adds:
    those fields; every negative disables the deadline, so the rule reports
    it (expressiveness tier) and `lint -fix` spells it `gotest.NoDeadline`.
    The rewrite keeps the meaning. Below v1.30 it is not reported.
+
+4. **An expired `--timeout` exits 1 on every command and names the hung
+   tests**; exit 130 always means Ctrl-C, and an interrupted compile no
+   longer looks like a pass.
+
+From **v1.30.2**:
+
+5. **`Same`/`NotSame`** — pointer identity assertions; `assertion-simplify`
+   rewrites `True(t, p == q)` to them. Below v1.30.2 they do not exist.
+6. **`migrate` exits 1 when a run leaves a `TODO(gotest-migrate)` marker,
+   and `--dry-run` previews** — below v1.30.2 it exits 0 with markers left
+   and has no `--dry-run`.
+7. **`.gotest.yml` rejects unknown keys** — a misspelled key is an error
+   instead of being ignored.
+8. **Every JSON document opens with a `version` field** — parsers of
+   `discover`, `bench --json` and the like can read the producing release.
 
 ## v1.32
 
@@ -160,15 +201,90 @@ Rules and sections tagged **v1.32+** need v1.32.0 or newer. What v1.32 changes:
    cannot keep a fixture from starting. (`go tool gotest` runs each suite
    in its own process on every version, so a package fixture never ran
    once for several suites there.)
+4. **Teardown runs when a run is stopped** — on Ctrl-C or an expired
+   `--timeout`, `AfterAll` and fixture teardown still release what setup
+   built.
+5. **The runtime floor is v1.32.0** — a v1.32 CLI refuses a pin below it,
+   which only a CLI not run through `go tool gotest` can meet.
 
 ## v1.33
 
 Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
 
-1. **`t-escape` flags `t.T().Context()`** — the `*testing.T` context
-   carries no suite `Timeout`; `gotest.T`'s `Context()` does. `lint -fix`
-   rewrites a direct `t.T().Context()` to `t.Context()` (expressiveness
-   tier, so skippable). Below v1.33 it is not reported, so code that
-   linted clean there can report after the upgrade.
-2. **The runtime floor is v1.33.0** — a v1.33 CLI refuses a pin below
+1. **`t-escape` reports more `t.T()` calls** — `Context` and `Deadline`
+   (the `*testing.T` context carries no suite `Timeout`; `-fix` writes
+   `t.Context()` and `t.Context().Deadline()`), also inside a `*testing.T`
+   helper a suite method hands `t.T()` to, plus `Error`, `Fail` and
+   `Logf`. Expressiveness tier, so skippable. Below v1.33 none of these is
+   reported, so code that linted clean there can report after the upgrade.
+2. **`suite-lifecycle` flags `t.T().Run` in any function**, not only suite
+   methods — integrity tier, so it cannot be skipped project-wide; turn
+   the subtest into `t.It`/`t.When`.
+3. **`lint -fix` applies composed and overlapping fixes in one run and
+   reports what it could not fix** (exit 3), and `-diff` previews exactly
+   that result as a patch; below v1.33 `-fix` stops after one pass and
+   exits 0 silently, so re-run it and plain `lint` there, and `-diff`
+   previews nothing usable.
+4. **The runtime floor is v1.33.0** — a v1.33 CLI refuses a pin below
    v1.33.0, which only a CLI not run through `go tool gotest` can meet.
+   Drift refusals name the version to pin instead of `@latest`.
+5. **`os.Exit(0)` in a test fails the run**, as under `go test`; below
+   v1.33 the plain run reported it as passed. A panicking or exiting test
+   exits 1 in every mode; below v1.33 the plain run passed the binary's
+   own status through (2 for a panic).
+6. **Every matched package ends in a verdict**, in text and `-json`
+   (`[no test files]`, `[no suites]`, `[no tests to run]`), and
+   `spec`/`summary --input` exit 2 on a stream with no events, one cut
+   short, or a build failure (unless `--render-only`); below v1.33 the
+   first two exited 0 and a replayed build failure 1. A green pre-v1.33
+   run over packages without suites wrote an empty stream, so replay
+   those with `--render-only`.
+7. **`migrate` type-checks its result** — exit 0 means every migrated
+   package compiles; every line that does not, and every construct it
+   cannot convert, carries a marker (exit 1, on every run until none is
+   left); a pattern matching nothing or a package that did not compile
+   before exits 2, as does a run whose files cannot all be written (it
+   writes all or none). It converts a suite wherever the package declares
+   its parts, exports an unexported suite's name, converts the `…f`
+   assertion forms, skips generated files and checks only the host OS's
+   builds. Below v1.33 hooks declared in another file than the suite
+   silently never ran and a clean exit could leave code that does not
+   compile.
+8. **A shared fixture may omit `AfterAll`**; below v1.33 one without it
+   passes generation and then fails to start.
+9. **A Timeout or SetupTimeout overrun names the test's file and line**;
+   below v1.33 it pointed at `asm_amd64.s`.
+10. **`scaffold` on an interface** writes a contract suite whose
+    `BeforeEach` picks the constructor per instantiated type (add a
+    `case`; an alias without one fails with "no constructor for <type>");
+    below v1.33 its `factory` field could not be set through a type alias
+    and the suite nil-panicked.
+11. **Patterns that match no package fail** — a run (any mode, bench and
+    fuzz included) exits 2 and `lint` exits 1 when no package matched; a
+    wildcard pattern that matches nothing beside others that match only
+    warns (a path that does not exist still fails the run). Below v1.33
+    such a run passed green having tested nothing.
+12. **A `Test*Async` method that never calls `done()` fails once, at its
+    declaration** — not inside gotest, and without a second "still
+    running" overrun verdict.
+13. **Assertion locations name the user's line everywhere** — in generic
+    suite code inlined into the harness, on a plain `*testing.T`, in
+    benchmarks and fuzz bodies, helpers included, and for `Skipf`;
+    `go test -fullpath` is honoured. Below v1.33 these could point into
+    gotest, reflect or `gotest_psuite_test.go`.
+14. **Run output takes `go test`'s shape** — bare import paths and meta
+    patterns (`fmt`, `std`, `all`) run instead of being dropped, standard
+    library packages get `[no suites]`/`[no test files]`, a package whose
+    suites are all `X_` or deselected reads `[no tests to run]`, and every
+    package's `-json` events open with a `start` event.
+15. **`-skip` passes through like `-run`**; v1.32 rejected it as an
+    unknown flag. An empty pattern (`gotest "$PKG"` with `$PKG` unset) is
+    the current directory, as for `go test`; `.go` file arguments exit 2
+    (gotest takes packages, not files), and so does a bad test flag value
+    or `-run`/`-skip` regexp — below v1.33 those ran and failed as a test.
+    `gotest fuzz` refuses `-run`, `-skip` and `-bench`; pick the target
+    with `--target`.
+16. **`generate` and `clean` touch only the main module's packages**
+    (go.work modules count) — `generate all` no longer writes harness
+    files into dependencies. Bare `gotest clean` cleans the current
+    package, like `generate`; use `gotest clean ./...` for the tree.

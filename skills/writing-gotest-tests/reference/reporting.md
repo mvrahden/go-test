@@ -12,7 +12,9 @@ Worth a report:
 - generated harness code that does not compile (errors in
   `gotest_psuite_test.go`/`gotest_pxsuite_test.go`) while running
   `go tool gotest` at the pin;
-- `census: … never ran` on a run without `-run`/`-skip`;
+- `FAIL: census: N declared test(s) never ran` on a green `spec`,
+  `summary` or `-json` run without `-run`/`-skip`/`-list` (the plain text
+  run is never censused);
 - a verdict that contradicts the run: exit 0 beside a failed test, or a
   failure for a test that passed;
 - `lint -fix` leaving code that no longer compiles, or a finding on code
@@ -23,7 +25,7 @@ Worth a report:
 Not gotest's fault — fix these instead (most of them look like bugs):
 
 - the CLI is not `go tool gotest` at the pin: a global binary, a `FAIL:`
-  drift refusal (see SKILL.md Bootstrap);
+  drift refusal (see `setup.md`);
 - `versions.md` lists the behavior as changed in a later release: upgrade;
   if the upgrade is blocked, it is a known limitation;
 - documented limits: a vendored module, stdlib tests under `gotest`,
