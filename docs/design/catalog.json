@@ -11,6 +11,59 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "fails to build with exit 2, as under go test",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_to_build_with_exit_2,_as_under_go_test",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package references a runtime symbol through a linkname the linker refuses",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_package_references_a_runtime_symbol_through_a_linkname_the_linker_refuses",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "LinknameIsCheckedAsGoTestChecksIt",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestLinknameIsCheckedAsGoTestChecksIt",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIBuildRules",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIBuildRulesTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "-coverprofile=file passes the gate",
                       "duration": 0,
                       "excluded": false,
@@ -1090,13 +1143,13 @@
     }
   ],
   "stats": {
-    "behaviors": 48,
+    "behaviors": 49,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 7,
+    "suites": 8,
     "tests": 0
   }
 }

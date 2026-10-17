@@ -13,8 +13,8 @@ func StdlibRunTestsJSON(ctx context.Context, args []string, extraEnv ...map[stri
 
 // StdlibRunTestsJSONIn is StdlibRunTestsJSON run from dir; an empty dir is the current directory.
 func StdlibRunTestsJSONIn(ctx context.Context, dir string, args []string, extraEnv ...map[string]string) ([]byte, int, error) {
-	jsonArgs := make([]string, 0, len(args)+3)
-	jsonArgs = append(jsonArgs, "test", "-json", "-ldflags=-checklinkname=0")
+	jsonArgs := make([]string, 0, len(args)+2)
+	jsonArgs = append(jsonArgs, "test", "-json")
 	jsonArgs = append(jsonArgs, args...)
 
 	cmd := exec.CommandContext(ctx, "go", jsonArgs...)

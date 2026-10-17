@@ -1,6 +1,15 @@
 # Behavior Specification
 
-7 suites, 48 behaviors. Read from source; nothing was executed.
+8 suites, 49 behaviors. Read from source; nothing was executed.
+
+## CLIBuildRules
+
+### LinknameIsCheckedAsGoTestChecksIt
+
+| Behavior |
+|----------|
+| **when a package references a runtime symbol through a linkname the linker refuses** |
+| &nbsp;&nbsp;fails to build with exit 2, as under go test |
 
 ## CLICoverageProfile
 

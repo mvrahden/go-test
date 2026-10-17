@@ -15,7 +15,7 @@ type ParsedFlags struct {
 func ParseExecFlags(goTestArgs []string) ParsedFlags {
 	classified := ClassifyGoTestArgs(goTestArgs)
 	execPrefix, buildFlags := ExtractExecPrefix(classified.BuildFlags)
-	classified.BuildFlags = InjectChecklinkname(buildFlags)
+	classified.BuildFlags = buildFlags
 	verbose := HasVerboseFlag(classified.RunFlags)
 	userRunFilter := ExtractRunFilter(classified.RunFlags)
 	runFlags := StripRunFilter(classified.RunFlags)
