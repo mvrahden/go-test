@@ -1,8 +1,7 @@
 ---
 title: "Teach Your Coding Agent gotest"
 date: 2026-10-17
-draft: true
-description: "Coding agents write Go tests from stdlib and testify habits. The writing-gotest-tests skill teaches them gotest's rules, matched to the version your go.mod pins."
+description: "Coding agents write Go tests from stdlib and testify habits. The writing-gotest-tests skill teaches them gotest's rules, matched to your pinned version."
 tags: ["Tooling"]
 keywords: ["gotest agent skill", "claude code go tests", "copilot go test suites", "agent skills go"]
 cta_text: "Install the skill that matches your gotest version."
