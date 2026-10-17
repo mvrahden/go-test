@@ -1206,7 +1206,7 @@ Agents with a plugin system can install it as a plugin instead. A plugin carries
 |---|---|
 | Claude Code | `/plugin install gotest --marketplace mvrahden/go-test` |
 | Codex | `codex plugin marketplace add mvrahden/go-test`, then `codex plugin add gotest@go-test` |
-| GitHub Copilot CLI | `copilot plugin install mvrahden/go-test` |
+| GitHub Copilot CLI | `copilot plugin marketplace add mvrahden/go-test`, then `copilot plugin install gotest@go-test` |
 | VS Code with Copilot Chat | included in the [gotest extension](vscode-gotest) |
 | Any other agent | `npx skills add mvrahden/go-test` |
 
