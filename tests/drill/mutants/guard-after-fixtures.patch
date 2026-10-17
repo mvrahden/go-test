@@ -1,10 +1,10 @@
 Expect: guardskip: verdicts differ from the golden list
 --- a/pkg/gotestruntime/harness.go
 +++ b/pkg/gotestruntime/harness.go
-@@ -40,14 +40,14 @@
- // is zero without a SuiteConfig.
- func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
- 	tb.Helper()
+@@ -49,14 +49,14 @@
+ 		// from the guard to BeforeAll, fails the benchmark instead.
+ 		defer ReleaseOnPanic(b)
+ 	}
 +	if s.Fixtures != nil {
 +		s.Fixtures(tb)
 +	}

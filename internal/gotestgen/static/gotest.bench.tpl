@@ -5,9 +5,7 @@ func Benchmark{{ $ts.Identifier }}(b *testing.B) {
 {{- template "suiteFrame" (dict "Suite" $ts "Fixtures" $fx "TB" "b" "Assign" "") }}
 {{ range $bm := $ts.Benchmarks }}
   b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
-{{- if $fx.Nodes }}
     defer gotestruntime.ReleaseOnPanic(b)
-{{- end }}
     b.StopTimer()
     ƒeachT := gotest.NewTFromTB(b)
     defer func() {

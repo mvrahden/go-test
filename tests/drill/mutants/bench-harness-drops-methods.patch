@@ -9,9 +9,9 @@ Expect: benching: results \[BenchmarkContext BenchmarkSecond\]
 -{{ range $bm := $ts.Benchmarks }}
 +{{ range $i, $bm := $ts.Benchmarks }}{{ if ne $i 0 }}
    b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
- {{- if $fx.Nodes }}
      defer gotestruntime.ReleaseOnPanic(b)
-@@ -19,7 +19,7 @@
+     b.StopTimer()
+@@ -17,7 +17,7 @@
      b.ResetTimer()
      s.{{ $bm.Identifier }}({{ if $bm.UsesStdlibT }}b{{ else }}gotest.NewB(b){{ end }})
    })
