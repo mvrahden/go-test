@@ -135,7 +135,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 |------|--------|
 | `--debug` | Keep generated files after run |
 | `--ci` | CI mode: fail on `F_` prefixes, snapshot read-only |
-| `--no-cache` | Bypass the overlay write cache and the test binary cache (generation itself is always fresh) |
+| `--no-cache` | Bypass the overlay write cache and the test binary cache (generation is not cached) |
 | `--spec` | Render the spec view instead of the default output (default and watch modes) |
 | `--update-snapshots` | Regenerate snapshot files |
 | `--format=<fmt>` | Output format for `spec`/`summary` (terminal, md/markdown, json) |
@@ -147,16 +147,16 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--debounce=<dur>` | Debounce interval for watch mode (default 200ms) |
 | `--parallel=<n>` | Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for -race/-msan/-asan) |
 | `--compile-parallel=<n>` | Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan) |
-| `--input=<path>` | Replay a saved `go test -json` stream in `spec`/`summary` (`-` reads stdin); exit 2 when it holds no test events, a package or failed build never reported its verdict, or a package failed to build |
+| `--input=<path>` | Replay a saved `go test -json` stream in `spec`/`summary` (`-` reads stdin); exit 2 when it holds no test events, a package or failed build has no verdict, or a package failed to build |
 | `--github` | Emit GitHub annotations and step summary (auto-enabled in GitHub Actions) |
 | `--coverage=<path>` | Coverage profile path for `summary` subcommand |
-| `--badge=<path>` | Write a self-contained coverage badge SVG (`summary` only); adds `-coverprofile` when neither the caller nor `--min` did |
+| `--badge=<path>` | Write a self-contained coverage badge SVG (`summary`); adds `-coverprofile` when neither the caller nor `--min` did |
 | `--render-only` | With `--input`, exit 0 on a failing or incomplete stream: the code reports whether rendering succeeded, not whether the tests passed (requires `--input`) |
-| `--static` | Render the specification from source without running the suites (`spec` only); nodes carry no verdict, and methods whose behaviors depend on runtime values are reported as incomplete on stderr |
+| `--static` | Render the specification from source without running the suites (`spec`); nodes carry no verdict, and methods whose behaviors depend on runtime values are reported as incomplete on stderr |
 | `--bench` | Benchmark mode for `watch`: re-run benchmarks on change with ns/op deltas |
 | `--save=<path>` | Save a benchmark run as a JSON baseline (`bench`; a bare `--save=` uses `bench.baseline` from `.gotest.yml`) |
-| `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`). A baseline whose `goos`, `goarch`, `goVersion`, `cpu` or `gomaxprocs` differs warns on stderr and reports `envMismatch`; the comparison still runs and the exit code is unchanged |
-| `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`). Needs `-count=4` or more, the samples a significance test takes; below that it exits 2 naming the requirement. Without a gate a comparison with fewer samples still prints, each such row marked `(n<4, ±20% heuristic)` |
+| `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`). A baseline whose `goos`, `goarch`, `goVersion`, `cpu` or `gomaxprocs` differs warns on stderr and reports `envMismatch`; the comparison still runs and the exit code is unchanged. What the comparison does with benchmarks on one side alone, with few samples and with one file for both flags is pinned below |
+| `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`); needs `-count=4` or more, the samples a significance test takes (pinned below) |
 | `--json` | Emit one versioned JSON report to stdout — results, deltas, gate verdict, environment mismatch — instead of human output (`bench`; for tooling) |
 | `--for=<dur>` | Approximate wall-clock fuzz budget for the session, split jobs-aware across targets (`fuzz`; default 1m or half of a shorter `--timeout`; `0` removes the budget; per-target share floors at 10s) |
 | `--target=<name>` | Fuzz exactly one generated wrapper by name; unmatched names error with the available list (`fuzz`) |
@@ -172,6 +172,7 @@ The first argument is checked (literally) against the known subcommand set.
 If it matches, it's consumed.
 Otherwise, it's a package pattern.
 `gotest ./watch` tests the `watch` package; `gotest watch` enters watch mode.
+A first word that is almost a subcommand is suggested, a help topic is answered, and a package named like nothing runs as a pattern ([CLINewcomer](catalog.md#clinewcomer)).
 Past the first argument, every positional argument that is not a flag's value is a package pattern, as `go test` reads it: import paths such as `fmt` and the meta patterns `all`, `std`, `cmd`, `tool` and `work` included. A flag gotest does not know takes the non-flag after it as its value, as `go test` assumes, and everything after `-args` goes to the test binary.
 
 ### Examples
@@ -180,7 +181,7 @@ Past the first argument, every positional argument that is not a flag's value is
 gotest ./... -v -race                    # run tests (default mode)
 gotest watch ./... -v                    # watch mode with verbose output
 gotest clean ./...                       # remove orphaned generated files
-gotest generate ./...                    # generate only, no test execution
+gotest generate ./...                    # generate, no test execution
 gotest scaffold ./pkg/user.UserService   # generate suite skeleton
 gotest spec ./...                        # run tests, show behavioral spec
 gotest spec ./... --format=md --output=docs/spec.md
@@ -189,10 +190,35 @@ gotest ./... --ci -v -race               # CI mode (fail on F_ prefixes)
 gotest ./... --debug                     # keep generated files for inspection
 ```
 
-Registered `go test` flags pass through to the underlying run; unknown single-dash flags are rejected rather than forwarded (guard against typos) — use a bare `--` or `-args` to forward unvalidated flags verbatim.
-`-json` is intercepted and re-emitted by the runner, and `-ldflags=-checklinkname=0` is injected into every `go test` invocation (required for the assertion tracer on Go 1.23+).
-Each subcommand accepts its own subset of the `--gotest` flags; out-of-scope flags error with "not valid for this subcommand".
-`--github` applies to `summary` and `lint`; `--no-color` applies to `spec`/`summary`.
+Registered `go test` flags pass through to the underlying run; a single-dash flag gotest does not know is a usage error (exit 2) unless it follows a bare `--` or `-args`, which forward it to the test binary verbatim ([CLIPassthrough](catalog.md#clipassthrough)). The flags gotest implements itself — `-run` on a fuzz wrapper, `-exec`, `-p`, the refused `-o` — are pinned in [CLIGoTestFlags](catalog.md#cligotestflags).
+How a `--gotest` flag is spelled, that the last spelling wins, and that a flag another command owns is refused with `flag <name> is not valid for this subcommand` are pinned in [CLIFlags](catalog.md#cliflags); the commands each flag belongs to are the table above.
+`-json` is intercepted and re-emitted by the runner:
+
+> when the go test -json stream is asked for → holds JSON lines only, inside GitHub Actions too
+
+Every other document gotest writes stays pure the same way, and color follows the terminal rather than the command ([CLIStreams](catalog.md#clistreams)). gotest adds no link flag of its own to a `go test` invocation:
+
+> when a package references a runtime symbol through a linkname the linker refuses → fails to build with exit 2, as under go test
+
+A module that imports gotest without requiring it is told what to run:
+
+> when a suite imports gotest in a module that does not require it → names the go get -tool command to run
+
+> when the version subcommand runs → exits 0 and prints the version on stdout
+
+**Benchmark comparison and gate** (`bench`):
+
+> when --save and --against name the same file → is refused before anything runs, since the run would be compared against itself
+
+> when no benchmark is in both the baseline and the run → fails the gate and says there was nothing to compare
+
+> when no benchmark is in both the baseline and the run → lists the baseline's benchmarks that did not run and the run's that the baseline lacks
+
+> when --gate is given with -count below 4 → exits 2 naming -count=4 as the requirement
+
+> when --gate is given with -count=4 → judges the run
+
+> when only --against is given and a side has fewer than 4 samples → still compares and marks each such row as a ±20% heuristic
 
 ---
 
@@ -1197,7 +1223,7 @@ Exit code is 0 when the source could be read and 2 when a package does not compi
 $ gotest summary ./...
 ```
 
-The CI-facing counterpart to `spec`: passing runs collapse to a one-line summary; failing runs show only the failed behaviors plus package-level diagnostics.
+The CI-facing counterpart to `spec`: passing runs collapse to a one-line summary; failing runs show the failed behaviors plus package-level diagnostics, and nothing that passed.
 Runs the same pipeline as `spec` over `go test -json` events.
 
 Flags:
@@ -1211,8 +1237,9 @@ go test -json ./... | gotest summary --input=- # post-process an existing JSON s
 
 A `go test -json` stream — replayed or gotest's own — carries a failed build as `build-output` and `build-fail` events keyed by the build's `ImportPath`, which the failing package names in its verdict's `FailedBuild` (Go 1.24+). `spec` and `summary` route those diagnostics to every package the build failed, so a compile error renders with its cause.
 
-`--github` is auto-enabled when `GITHUB_ACTIONS=true`.
-The coverage table is statement-weighted with block deduplication (see Coverage Model).
+`--github` is auto-enabled when `GITHUB_ACTIONS=true`; a `--format json` document carries no annotations and no color codes there or anywhere, and two output modes asked for at once are refused ([CLIStreams](catalog.md#clistreams)).
+The coverage table is statement-weighted with block deduplication (see Coverage Model); the profile is read under either `-coverprofile` spelling ([CLICoverageProfile](catalog.md#clicoverageprofile)).
+A package holding stdlib tests alone is noted on stderr, in `summary` as in every other mode ([CLINewcomer](catalog.md#clinewcomer)).
 Formats: terminal (default), `md`, `json`.
 The repository's composite GitHub Action (`action.yml`) wraps this subcommand.
 
@@ -1230,9 +1257,9 @@ No tests are executed.
 `behaviors` carries the `When`/`It` tree each method declares, read from source:
 
 - `name` is the subtest segment `go test` will produce, so it matches an observed run byte for byte. Two rewrites the source does not spell out make that true: a description repeated among its siblings gains the `#01` suffix the testing package appends, and a description containing a single slash becomes one node per level (a run of slashes, as in `https://`, is not a separator and stays within one level).
-- `display` is the text the developer wrote, spoken in its vocabulary: the same string `gotest spec` renders for this node, so an editor showing both never spells one behavior two ways.
+- `display` is the text the developer wrote, spoken in its vocabulary: the same string `gotest spec` renders for this node, so an editor showing both spells one behavior one way.
 - `kind` names the call it came from (`when`, `it`, `each`); `line` locates it.
-- `behaviorsComplete` reports whether the tree is exhaustive. `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears only once the method has run. Consumers must not present an incomplete list as the whole specification.
+- `behaviorsComplete` reports whether the tree is exhaustive. `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears once the method has run. Consumers must not present an incomplete list as the whole specification.
 
 ```
 { "version": …,
@@ -1260,13 +1287,13 @@ File paths are basenames; positions are 1-based.
 `warnings` carries what a run would refuse and what it would pass over in silence, each with its position:
 
 - a package that fails to load (`"broken": true`) and a suite the generator refuses — an unsupported hook signature, a method out of step with the suite's context, a fuzz argument that cannot be fuzzed. A refused suite is left out of `suites`, except for a fuzz refusal, which keeps the suite listed;
-- a method that reads like part of the harness and never runs as one: a lifecycle hook that is misspelled or carries `X_` (what `lifecycle-typo` and `x-lifecycle` report, and a `//nolint` for the rule silences the warning as well), and a `Benchmark*`/`Fuzz*` method taking `*gotest.B`/`*gotest.F` on a type that is no test suite.
+- a method that reads like part of the harness and does not run as one: a lifecycle hook that is misspelled or carries `X_` (what `lifecycle-typo` and `x-lifecycle` report, and a `//nolint` for the rule silences the warning as well), and a `Benchmark*`/`Fuzz*` method taking `*gotest.B`/`*gotest.F` on a type that is no test suite.
 
 A run names the same position in front of a generation error (`path/suite_test.go:13:24: …`), relative to the working directory.
-`methods[].parallel` is reserved and always `false` (parallelism is a suite-level property).
+`methods[].parallel` is reserved and `false` (parallelism is a suite-level property).
 Respects `-tags`.
 
-Every JSON gotest emits — `discover`, `spec --format=json`, `summary --format=json`, `prepare` — is one compact line, not an indented document, and it opens with `version`: the CLI that produced it, as `gotest version` reports it, so a consumer can gate on the producer before it reads the rest.
+Every JSON gotest emits — `discover`, `spec --format=json`, `summary --format=json`, `prepare` — is one compact line, not an indented document, and it opens with `version`: the CLI that produced it, as `gotest version` reports it, so a consumer can gate on the producer before it reads the rest ([CLIVersion](catalog.md#cliversion)). The flags `discover` refuses are pinned in [CLIFlags](catalog.md#cliflags).
 The behavior trees carried here make indentation more than half the bytes, and the readers are programs; a human reading it by hand can pipe through `jq`.
 Nothing bounds the size of this payload, so a consumer must stream it: reading it through a fixed buffer is what once cost the VS Code extension its whole test tree on a repository large enough to exceed the buffer's default.
 
@@ -1296,14 +1323,13 @@ gotest watch ./... --spec
 ```
 
 1. Initial run: full generate → test → cleanup cycle
-2. Watch filesystem for `.go` file changes (via `fsnotify`); dot-directories, `vendor/`, `testdata/`, and `node_modules/` are excluded
-3. On change: re-run the *changed directories* only (no reverse-dependency analysis — packages importing the changed one are not re-run)
+2. Watch the directories the patterns name, a `/...` tree included, for `.go` files written, created, renamed or removed (via `fsnotify`); dot-directories, `vendor/`, `testdata/` and `node_modules/` are skipped, and a directory created while watching is added
+3. On change: re-run the changed directories and the test packages that import them (reverse dependencies from `go list`, recomputed after each run)
 4. Debounce on rapid changes (default 200ms; `--debounce` flag or `.gotest.yml` `debounce`)
-5. Terminal clear between runs
+5. Terminal clear between runs; under `-json` each cycle ends with a `watch-end` event carrying that run's exit code
+6. An interrupt ends the loop with exit 130
 
-Focus integration: `F_`-prefixed suites during watch mode create a tight feedback loop — only focused tests re-run on each save.
-
-Limitations: only Write/Create/Rename events trigger re-runs (file deletion does not), and directories created after watch startup are not added to the watcher.
+Focus integration: with an `F_`-prefixed suite present, each save re-runs the focused suites alone — a tight feedback loop.
 
 ---
 
@@ -1494,7 +1520,7 @@ A declared method without a verdict makes the run exit 2, printing `FAIL: census
 
 The census applies to green runs that ran to completion: a red run is already not a false green, a `FailFast` stop or a `-failfast` run legitimately leaves methods unexecuted, and an interrupt or an expired `--timeout` cut the run short; a deadline books the tests it cut short instead (see the exit codes above). It stands down under `-run`, `-skip` and `-list`, printing `note: census skipped under -run/-skip/-list/-bench` on stderr, because those flags change the declared set. The text run (`gotest ./...`) streams suite output without test2json and is not censused; every CI path (`summary --github` through the action, `spec` in `make test`) is. Benchmarks never run in a test run; when the packages declare some, the run ends with `note: N benchmark(s) not run — gotest runs tests; use 'gotest bench'` on stderr, so silence never implies the packages were fully exercised.
 
-A `bench` run that captures events (`--spec`, `--json`, `--save`, `--against`) is censused the same way over the declared benchmark methods. go test emits no `pass` event for a benchmark, so its verdict is the `ns/op` result line or a `fail`; `-bench` stands the census down like `-run` does.
+A `bench` run that captures events (`--spec`, `--json`, `--save`, `--against`) is censused the same way over the declared benchmark methods. go test emits no `pass` event for a benchmark, so its verdict is a result line — any `<value> <unit>/op` pair, a sub-benchmark's line crediting the method that opened it — or a `fail`; `-bench` stands the census down like `-run` does.
 
 The exit code of `spec --input` and `summary --input` answers two questions at once: whether the stream carried failures (1) and whether the command itself failed (2). A client that renders a stream rather than gating on it needs only the second, and passes `--render-only` to drop the first; 2 is never suppressed for an unreadable input. A stream that holds no verdict also exits 2 — one with no test events at all (empty, or not `go test -json`), or one that ends before a package reported its own pass/fail/skip (cut short; the packages are named on stderr). A `build-fail` counts as a package that has not reported until a verdict names it in `FailedBuild`, so a stream cut short after a build failure, or a `go build -json` stream, is not whole. Events for a package after its verdict open it again: a second run appended to a saved one must reach its own verdict. A package that failed to build (a `build-fail` event or a `FailedBuild` verdict) exits 2, as the live run does; failures without that mark, including a census booked into the stream, exit 1. A valid stream that ran no tests is whole and exits 0; gotest's own carries a verdict for every matched package. A stream written by gotest before v1.33.0 left out the packages without suites, so one from a run of nothing but those is empty and exits 2: replay it with `--render-only`. A live run whose patterns match no package writes no stream and exits 2 itself. `--render-only` drops this verdict too: the editor renders whatever a stopped run left. Consumers that treat any non-zero exit as "the command broke" — rather than reading the rendered document on stdout — will misread a failing test run as a broken tool.
 
