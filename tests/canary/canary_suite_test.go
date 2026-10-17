@@ -98,7 +98,7 @@ type event struct {
 // its exit code and the verdict rows it produced, in golden form.
 func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string) (int, []string) {
 	cmd := exec.Command(s.binary, "-json", "./testdata/"+pkg+"/") //nolint:gosec // G204: controlled binary with fixed args
-	cmd.Env = append(os.Environ(), "GOTEST_CANARY_DIR="+canaryDir)
+	cmd.Env = childEnv(canaryDir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	code := 0
@@ -133,6 +133,20 @@ func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string) (int, []string
 	}
 	sort.Strings(rows)
 	return code, rows
+}
+
+// childEnv is the fixture process's environment: the canary dir, and never
+// the snapshot update switch. A refresh of the repository's own snapshots
+// must not rewrite the snapshotting fixture's deliberately stale baseline.
+func childEnv(canaryDir string) []string {
+	env := make([]string, 0, len(os.Environ())+1)
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "GOTEST_UPDATE_SNAPSHOTS=") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	return append(env, "GOTEST_CANARY_DIR="+canaryDir)
 }
 
 // check runs a fixture and compares exit code and rows with the golden.
@@ -341,7 +355,7 @@ type benchReport struct {
 // exit code and the benchmark names the report carries a sample for.
 func (s *CanaryTestSuite) bench(t *gotest.T, pkg, canaryDir string) (int, []string) {
 	cmd := exec.Command(s.binary, "bench", "--json", "./testdata/"+pkg+"/", "-benchtime=1x") //nolint:gosec // G204: controlled binary with fixed args
-	cmd.Env = append(os.Environ(), "GOTEST_CANARY_DIR="+canaryDir)
+	cmd.Env = childEnv(canaryDir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	code := 0
