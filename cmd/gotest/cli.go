@@ -10,6 +10,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/config"
+	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
 func main() {
@@ -231,10 +232,8 @@ func ensureCoverProfile(goTestArgs []string, needed bool) ([]string, string, fun
 	if !needed {
 		return goTestArgs, "", noop, nil
 	}
-	for _, arg := range goTestArgs {
-		if v, ok := strings.CutPrefix(arg, "-coverprofile="); ok {
-			return goTestArgs, v, noop, nil
-		}
+	if v := gotestrunner.ExtractCoverProfile(goTestArgs); v != "" {
+		return goTestArgs, v, noop, nil
 	}
 	f, err := os.CreateTemp("", "gotest-cover-*.out")
 	if err != nil {

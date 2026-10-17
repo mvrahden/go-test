@@ -71,6 +71,14 @@ func (s *SummaryBadgeTestSuite) TestBadgeForcesACoverageProfile(t *gotest.T, _ *
 			gotest.Equal(it, "c.out", profile)
 			gotest.Equal(it, []string{"-coverprofile=c.out"}, args)
 		})
+
+		w.It("reuses a profile given as a separate argument", func(it *gotest.T) {
+			args, profile, cleanup, err := main.ExportEnsureCoverProfile([]string{"-coverprofile", "c.out", "-v"}, true)
+			cleanup()
+			gotest.NoError(it, err)
+			gotest.Equal(it, "c.out", profile)
+			gotest.Equal(it, []string{"-coverprofile", "c.out", "-v"}, args)
+		})
 	})
 }
 

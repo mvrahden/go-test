@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -125,11 +124,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))
 
 	if coverageProfile == "" {
-		for _, arg := range goTestArgs {
-			if v, ok := strings.CutPrefix(arg, "-coverprofile="); ok {
-				coverageProfile = v
-			}
-		}
+		coverageProfile = gotestrunner.ExtractCoverProfile(goTestArgs)
 	}
 
 	elapsed := time.Since(pipelineStart)
