@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -364,12 +365,39 @@ type benchReport struct {
 			Name string `json:"name"`
 		} `json:"results"`
 	} `json:"baseline"`
+	Missing []string `json:"missing"`
+	Added   []string `json:"added"`
 }
 
 // bench runs a capturing bench run over one fixture package and returns its
 // exit code and the benchmark names the report carries a sample for.
 func (s *CanaryTestSuite) bench(t *gotest.T, pkg, canaryDir string) (int, []string) {
-	cmd := exec.Command(s.binary, "bench", "--json", "./testdata/"+pkg+"/", "-benchtime=1x") //nolint:gosec // G204: controlled binary with fixed args
+	code, report := s.benchReport(t, pkg, canaryDir)
+	names := make([]string, 0, len(report.Baseline.Results))
+	for _, r := range report.Baseline.Results {
+		names = append(names, r.Name)
+	}
+	sort.Strings(names)
+	return code, names
+}
+
+// benchReport runs a capturing bench run over one fixture package with extra
+// gotest flags and returns its exit code, the parsed report and stderr.
+func (s *CanaryTestSuite) benchReport(t *gotest.T, pkg, canaryDir string, extra ...string) (int, benchReport) {
+	code, stdout, stderr := s.benchRaw(t, pkg, canaryDir, extra...)
+	var report benchReport
+	if err := json.Unmarshal(stdout, &report); err != nil {
+		fatalf(t, "bench %s: report is not the JSON document bench --json promises: %v\nstdout:\n%s\nstderr:\n%s", pkg, err, stdout, stderr)
+	}
+	return code, report
+}
+
+// benchRaw runs bench --json over one fixture package and returns the exit
+// code and both streams as they were.
+func (s *CanaryTestSuite) benchRaw(t *gotest.T, pkg, canaryDir string, extra ...string) (int, []byte, []byte) {
+	args := append([]string{"bench", "--json"}, extra...)
+	args = append(args, "./testdata/"+pkg+"/", "-benchtime=1x")
+	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Env = childEnv(canaryDir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
@@ -381,16 +409,50 @@ func (s *CanaryTestSuite) bench(t *gotest.T, pkg, canaryDir string) (int, []stri
 		}
 		code = exitErr.ExitCode()
 	}
-	var report benchReport
-	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
-		fatalf(t, "bench %s: report is not the JSON document bench --json promises: %v\nstdout:\n%s\nstderr:\n%s", pkg, err, stdout.String(), stderr.String())
+	return code, stdout.Bytes(), stderr.Bytes()
+}
+
+// A gate judges the benchmarks the baseline and the run share. A baseline
+// from elsewhere shares none: the gate fails rather than passing on nothing,
+// and the report names what each side has that the other lacks.
+func (s *CanaryTestSuite) TestAGateWithNothingToCompareFails(t *gotest.T) {
+	dir := t.TempDir()
+	baseline := filepath.Join(dir, "baseline.json")
+	foreign := `{"schemaVersion":1,"goVersion":"` + runtime.Version() + `","goos":"` + runtime.GOOS + `","goarch":"` + runtime.GOARCH + `",` +
+		`"results":[{"package":"example.com/elsewhere","suite":"OtherTestSuite","name":"BenchmarkGone","samples":[{"nsPerOp":1}]}]}`
+	if err := os.WriteFile(baseline, []byte(foreign), 0o600); err != nil {
+		fatalf(t, "write baseline: %v", err)
 	}
-	names := make([]string, 0, len(report.Baseline.Results))
-	for _, r := range report.Baseline.Results {
-		names = append(names, r.Name)
+	code, report := s.benchReport(t, "benching", dir, "--against="+baseline, "--gate=10")
+	if code != 1 {
+		t.Errorf("gate against a foreign baseline: exit code %d, want 1", code)
 	}
-	sort.Strings(names)
-	return code, names
+	if want := "example.com/elsewhere OtherTestSuite/BenchmarkGone"; strings.Join(report.Missing, ",") != want {
+		t.Errorf("missing %v, want [%s]", report.Missing, want)
+	}
+	if len(report.Added) != 3 {
+		t.Errorf("added %v, want the three benchmarks of the run", report.Added)
+	}
+}
+
+// Saving the run to the file it is compared against would compare the run
+// with itself; the command refuses before anything runs.
+func (s *CanaryTestSuite) TestSaveAndAgainstOnOneFileIsRefused(t *gotest.T) {
+	dir := t.TempDir()
+	baseline := filepath.Join(dir, "baseline.json")
+	if err := os.WriteFile(baseline, []byte(`{"schemaVersion":1}`), 0o600); err != nil {
+		fatalf(t, "write baseline: %v", err)
+	}
+	code, _, stderr := s.benchRaw(t, "benching", dir, "--save="+baseline, "--against="+baseline)
+	if code != 2 {
+		t.Errorf("--save and --against on one file: exit code %d, want 2", code)
+	}
+	if !strings.Contains(string(stderr), "same file") {
+		t.Errorf("--save and --against on one file: stderr does not say so:\n%s", stderr)
+	}
+	if data, err := os.ReadFile(baseline); err != nil || string(data) != `{"schemaVersion":1}` {
+		t.Errorf("the baseline was overwritten: %s", data)
+	}
 }
 
 // A green bench run reports a sample for every declared benchmark and exits

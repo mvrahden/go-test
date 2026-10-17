@@ -1,6 +1,23 @@
 # Behavior Specification
 
-9 suites, 51 behaviors. Read from source; nothing was executed.
+10 suites, 54 behaviors. Read from source; nothing was executed.
+
+## BenchGate
+
+### SaveAndAgainstNamingOneFile
+
+| Behavior |
+|----------|
+| **when --save and --against name the same file** |
+| &nbsp;&nbsp;is refused before anything runs, since the run would be compared against itself |
+
+### AGateWithNothingToCompare
+
+| Behavior |
+|----------|
+| **when no benchmark is in both the baseline and the run** |
+| &nbsp;&nbsp;fails the gate and says there was nothing to compare |
+| &nbsp;&nbsp;lists the baseline's benchmarks that did not run and the run's that the baseline lacks |
 
 ## CLIBuildRules
 

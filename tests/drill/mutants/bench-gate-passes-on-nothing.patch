@@ -1,0 +1,13 @@
+Expect: gate against a foreign baseline: exit code 0, want 1
+Clause: when no benchmark is in both the baseline and the run → fails the gate and says there was nothing to compare
+--- a/cmd/gotest/bench.go
++++ b/cmd/gotest/bench.go
+@@ -245,7 +245,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+ 		verdict := gotestbench.GateVerdict(deltas, gatePct)
+ 		gateVerdict = &verdict
+ 		switch {
+-		case len(deltas) == 0:
++		case false && len(deltas) == 0:
+ 			// A gate that judged nothing has not passed; a renamed module or
+ 			// package would otherwise turn every later regression green.
+ 			fmt.Fprintln(os.Stderr, "FAIL: bench gate: nothing to compare; no benchmark is in both the baseline and this run")

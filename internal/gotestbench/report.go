@@ -17,7 +17,11 @@ type Report struct {
 	SchemaVersion int      `json:"schemaVersion"`
 	Baseline      Baseline `json:"baseline"`
 	Deltas        []Delta  `json:"deltas,omitempty"`
-	Gate          *Gate    `json:"gate,omitempty"`
+	// Missing names the baseline's benchmarks the run did not produce and
+	// Added the run's benchmarks the baseline lacks: what the deltas leave out.
+	Missing []string `json:"missing,omitempty"`
+	Added   []string `json:"added,omitempty"`
+	Gate    *Gate    `json:"gate,omitempty"`
 	// EnvMismatch is non-empty when the baseline compared against was
 	// recorded under a different toolchain or platform, which makes every
 	// delta suspect. Present as data, not as a verdict: nothing refuses the

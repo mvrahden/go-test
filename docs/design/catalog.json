@@ -11,6 +11,120 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "is refused before anything runs, since the run would be compared against itself",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "is_refused_before_anything_runs,_since_the_run_would_be_compared_against_itself",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --save and --against name the same file",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "--save_and_--against_name_the_same_file",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SaveAndAgainstNamingOneFile",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSaveAndAgainstNamingOneFile",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the gate and says there was nothing to compare",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_gate_and_says_there_was_nothing_to_compare",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "lists the baseline's benchmarks that did not run and the run's that the baseline lacks",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lists_the_baseline's_benchmarks_that_did_not_run_and_the_run's_that_the_baseline_lacks",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when no benchmark is in both the baseline and the run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "no_benchmark_is_in_both_the_baseline_and_the_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AGateWithNothingToCompare",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAGateWithNothingToCompare",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "BenchGate",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestBenchGateTestSuite",
+          "output": [],
+          "status": "none"
+        }
+      ],
+      "output": [],
+      "path": "github.com/mvrahden/go-test/tests/conformance/bench",
+      "status": "none"
+    },
+    {
+      "duration": 0,
+      "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "fails to build with exit 2, as under go test",
                       "duration": 0,
                       "excluded": false,
@@ -1209,13 +1323,13 @@
     }
   ],
   "stats": {
-    "behaviors": 51,
+    "behaviors": 54,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 9,
+    "suites": 10,
     "tests": 0
   }
 }

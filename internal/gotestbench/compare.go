@@ -252,3 +252,30 @@ func betaContinuedFraction(a, b, x float64) float64 {
 
 	return h
 }
+
+// Unmatched lists the benchmarks a comparison cannot judge: missing are the
+// baseline's keys the run did not produce, added the run's keys the baseline
+// does not have. Both are sorted.
+func Unmatched(old, new Baseline) (missing, added []string) { //nolint:gocritic // hugeParam: stable API
+	oldKeys := make(map[string]bool, len(old.Results))
+	for _, r := range old.Results {
+		oldKeys[resultKey(r)] = true
+	}
+	newKeys := make(map[string]bool, len(new.Results))
+	for _, r := range new.Results {
+		newKeys[resultKey(r)] = true
+	}
+	for k := range oldKeys {
+		if !newKeys[k] {
+			missing = append(missing, k)
+		}
+	}
+	for k := range newKeys {
+		if !oldKeys[k] {
+			added = append(added, k)
+		}
+	}
+	sort.Strings(missing)
+	sort.Strings(added)
+	return missing, added
+}
