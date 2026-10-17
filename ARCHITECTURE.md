@@ -293,8 +293,13 @@ can define fixture-bound suites without conflict, and a `TestMain` of the
 developer's own needs nothing from gotest. Generated top-level functions
 never run in parallel, so holds follow each other and reuse the fixture
 variables. The testing package runs a top-level function's cleanups when a
-test or subtest below it panics; a panicking sub-benchmark runs only its
-own, so each generated `b.Run` defers `gotestruntime.ReleaseOnPanic(b)`.
+test or subtest below it panics. A benchmark is different: a panicking
+sub-benchmark runs only its own cleanups, and the testing package can lose a
+benchmark's panic altogether (it signals the benchmark done while the panic
+unwinds, and the run may print PASS and exit 0 first). So each generated
+`b.Run` defers `gotestruntime.ReleaseOnPanic(b)`, and `OpenSuite` guards a
+benchmark's guard-to-`BeforeAll` frame and its `AfterAll` cleanup the same
+way: the panic is recovered, printed with its stack, and fails the benchmark.
 While a hold lasts, a stop watcher turns an announced stop (or Ctrl-C
 under plain `go test`) into teardown; see `docs/design/fixtures.md`.
 
