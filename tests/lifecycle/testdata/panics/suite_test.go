@@ -86,3 +86,46 @@ func (s *BenchTeardownTestSuite) BenchmarkLoop(b *gotest.B) {
 	for b.Loop() {
 	}
 }
+
+// BenchSetupTestSuite panics in BeforeAll on the benchmark path.
+type BenchSetupTestSuite struct {
+	Ledger *LedgerFixture
+}
+
+func (s *BenchSetupTestSuite) BeforeAll(t *gotest.T) {
+	if Is("benchbeforeall") {
+		panic("bench BeforeAll panic")
+	}
+}
+
+func (s *BenchSetupTestSuite) AfterAll(t *gotest.T) {}
+
+func (s *BenchSetupTestSuite) BenchmarkLoop(b *gotest.B) {
+	for b.Loop() {
+	}
+}
+
+// BenchPanicTestSuite panics in a benchmark method of a fixture-bound suite.
+type BenchPanicTestSuite struct {
+	Ledger *LedgerFixture
+}
+
+func (s *BenchPanicTestSuite) BenchmarkPanics(b *gotest.B) {
+	if Is("benchpanic") {
+		panic("benchmark panic")
+	}
+	for b.Loop() {
+	}
+}
+
+// UnboundBenchTestSuite panics in a benchmark method of a suite without
+// fixtures.
+type UnboundBenchTestSuite struct{}
+
+func (s *UnboundBenchTestSuite) BenchmarkPanics(b *gotest.B) {
+	if Is("unboundbench") {
+		panic("unbound benchmark panic")
+	}
+	for b.Loop() {
+	}
+}

@@ -617,18 +617,32 @@ func (s *RendererTestSuite) TestRenderer_BenchmarkWrapper(t *gotest.T) {
 			gotest.Contains(it, benchFn, "s.ParserTestSuite.PoolFixture = ƒ_PoolFixture\n")
 		})
 
-		w.It("guards each sub-benchmark, whose panic skips the wrapper's cleanups", func(it *gotest.T) {
-			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_FixtureBoundBenchmark")
-			out, _ := renderTestPkg(it.T(), pkg, true)
-
-			idx := strings.Index(out, "func BenchmarkParserTestSuite")
-			gotest.GreaterOrEqual(it, idx, 0, "bench wrapper missing from output")
-			benchFn := out[idx:]
-			sub := strings.Index(benchFn, "b.Run(")
-			gotest.GreaterOrEqual(it, sub, 0, "sub-benchmark missing from output")
-			gotest.Regexp(it, `^b\.Run\("[A-Za-z]+", func\(b \*testing\.B\) \{\s+defer gotestruntime\.ReleaseOnPanic\(b\)`, benchFn[sub:])
+		w.It("guards each sub-benchmark: a panic fails it instead of racing the process exit", func(it *gotest.T) {
+			assertSubBenchmarksGuarded(it, "TestRenderer_FixtureBoundBenchmark", "func BenchmarkParserTestSuite")
 		})
 	})
+
+	t.When("benchmark suite has no fixtures", func(w *gotest.T) {
+		w.It("guards each sub-benchmark all the same", func(it *gotest.T) {
+			assertSubBenchmarksGuarded(it, "TestRenderer_Benchmark_StdlibB", "func BenchmarkStdlibBenchTestSuite")
+		})
+	})
+}
+
+// assertSubBenchmarksGuarded checks that the named wrapper's sub-benchmark
+// (the template emits each alike) defers the runtime's panic guard first: the
+// testing package can lose a benchmark's panic and exit 0, so the guard fails
+// it instead.
+func assertSubBenchmarksGuarded(t *gotest.T, pkgName, wrapper string) {
+	pkg := gotestgen.ExportMustTestPkg(t.T(), pkgName)
+	out, _ := renderTestPkg(t.T(), pkg, true)
+
+	idx := strings.Index(out, wrapper)
+	gotest.GreaterOrEqual(t, idx, 0, "bench wrapper missing from output")
+	benchFn := out[idx:]
+	sub := strings.Index(benchFn, "b.Run(")
+	gotest.GreaterOrEqual(t, sub, 0, "sub-benchmark missing from output")
+	gotest.Regexp(t, `^b\.Run\("[A-Za-z]+", func\(b \*testing\.B\) \{\s+defer gotestruntime\.ReleaseOnPanic\(b\)`, benchFn[sub:])
 }
 
 func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {

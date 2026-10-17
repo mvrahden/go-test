@@ -106,15 +106,41 @@ func (s *HoldsTestSuite) TestAPanickingTestReleasesTheFixture(t *gotest.T) {
 	gotest.Equal(t, []string{"setup", "teardown"}, events)
 }
 
-// The testing package skips the parent's cleanups on a panicking
-// sub-benchmark; the generated guard releases the fixture instead.
+// The generated guard fails a panicking sub-benchmark, so the parent's
+// cleanups, the fixture teardown among them, run as after any failure.
 func (s *HoldsTestSuite) TestAPanickingBenchmarkReleasesTheFixture(t *gotest.T) {
 	code, out, events := s.holds(t, []string{"HOLDS_BENCH_PANIC=1"}, "-run", "^$", "-bench", "BenchmarkPanickingTestSuite")
-	gotest.NotEqual(t, 0, code, "exit 0 after a panic\n%s", out)
+	gotest.Equal(t, 1, code, "a panicking benchmark is a failed benchmark\n%s", out)
 	gotest.Contains(t, out, "panic: benchmark panic")
-	gotest.Contains(t, out, "BenchmarkPanickingTestSuite/BenchmarkPanics panicked; releasing fixtures")
+	gotest.Contains(t, out, "--- FAIL: BenchmarkPanickingTestSuite/BenchmarkPanics")
 	gotest.Regexp(t, `\.BenchmarkPanics\(`, out, "the traceback starts where the panic did")
 	gotest.Equal(t, []string{"setup", "teardown"}, events)
+}
+
+// The testing package can lose a benchmark's panic: it signals the benchmark
+// done while the panic unwinds, and the run may print PASS and exit 0 first.
+// Wherever the panic happens on the benchmark path, gotest fails the
+// benchmark instead, so the verdict never depends on that race.
+func (s *HoldsTestSuite) TestABenchmarkPanicFailsTheBenchmark(t *gotest.T) {
+	for t, tc := range gotest.Each(t, []struct {
+		Desc     string
+		scenario string
+		bench    string
+		value    string
+		failed   string
+		events   []string
+	}{
+		{"a sub-benchmark of a fixture-bound suite", "benchpanic", "BenchmarkBenchPanicTestSuite", "benchmark panic", "BenchmarkBenchPanicTestSuite/BenchmarkPanics", []string{"setup", "teardown"}},
+		{"a sub-benchmark of a suite without fixtures", "unboundbench", "BenchmarkUnboundBenchTestSuite", "unbound benchmark panic", "BenchmarkUnboundBenchTestSuite/BenchmarkPanics", nil},
+		{"BeforeAll", "benchbeforeall", "BenchmarkBenchSetupTestSuite", "bench BeforeAll panic", "BenchmarkBenchSetupTestSuite", []string{"setup", "teardown"}},
+		{"AfterAll", "benchafterall", "BenchmarkBenchTeardownTestSuite", "bench AfterAll panic", "BenchmarkBenchTeardownTestSuite", []string{"setup", "teardown"}},
+	}) {
+		code, out, events := goTest(t, s.root, "./testdata/panics/", "PANICS_LOG", []string{"PANICS=" + tc.scenario}, "-run", "^$", "-bench", "^"+tc.bench+"$", "-benchtime=1x")
+		gotest.Equal(t, 1, code, out)
+		gotest.Contains(t, out, "panic: "+tc.value)
+		gotest.Contains(t, out, "--- FAIL: "+tc.failed, out)
+		gotest.Equal(t, tc.events, events, out)
+	}
 }
 
 // A panic releases the fixture wherever it happens below the function that

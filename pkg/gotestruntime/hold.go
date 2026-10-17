@@ -15,7 +15,8 @@ import (
 // the suite's AfterAll among them.
 //
 // The testing package runs that cleanup when a test or subtest below tb
-// panics, too. A panicking sub-benchmark is the exception: see ReleaseOnPanic.
+// panics, too. A panicking sub-benchmark ends as a failure instead: see
+// ReleaseOnPanic.
 // While the hold lasts, a stop (Ctrl-C, or one the runner announces) releases
 // the fixtures and ends the process by its signal.
 func HoldFixtures(tb testing.TB, build func() MainConfig) {
@@ -85,11 +86,15 @@ func releaseHeld() {
 	}
 }
 
-// ReleaseOnPanic releases the held fixtures when a panic leaves a
-// sub-benchmark, then lets it go on. The testing package runs only the
-// panicking benchmark's own cleanups before the process ends, never its
-// parent's, so the hold would leak. Generated code defers it directly in each
-// sub-benchmark; the traceback still starts where the panic did.
+// ReleaseOnPanic ends a sub-benchmark that panics as a failed benchmark. It
+// recovers the panic, prints it with the stack from where it happened, and
+// stops the sub-benchmark; the parent's cleanups, the fixture teardown among
+// them, then run as after any failure. Generated code defers it directly in
+// each sub-benchmark (the name is from when it only released the fixtures).
+//
+// A panic left to the testing package can be lost: it signals the benchmark
+// done while the panic unwinds, and the process may print PASS and exit 0
+// before the panic ends it. Recovered, the benchmark fails every time.
 //
 // Under GODEBUG=panicnil=1 it does not recover: recover would stop a
 // panic(nil) while reporting nil.
@@ -98,10 +103,27 @@ func ReleaseOnPanic(b *testing.B) {
 		return
 	}
 	if r := recover(); r != nil {
-		fmt.Fprintf(os.Stderr, "gotest: %s panicked; releasing fixtures before the process ends\n", b.Name())
-		releaseHeld()
-		panic(r)
+		reportPanic(b, r)
+		b.FailNow()
 	}
+}
+
+// failOnPanic is [ReleaseOnPanic] for a benchmark's cleanup, which goes on to
+// the next cleanup after the failure instead of stopping.
+func failOnPanic(b *testing.B) {
+	if panicNilLegacy {
+		return
+	}
+	if r := recover(); r != nil {
+		reportPanic(b, r)
+	}
+}
+
+// reportPanic fails b with a recovered panic, printed as the runtime prints
+// one, so the traceback starts where the panic did.
+func reportPanic(b *testing.B, r any) {
+	fmt.Fprintf(os.Stderr, "panic: %v [recovered]\n\n%s\n", r, debug.Stack())
+	b.Fail()
 }
 
 var panicNilLegacy = probePanicNil()

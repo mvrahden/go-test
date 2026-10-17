@@ -43,6 +43,12 @@ type Suite struct {
 // is zero without a SuiteConfig.
 func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 	tb.Helper()
+	b, bench := tb.(*testing.B)
+	if bench {
+		// A benchmark's panic can be lost (see [ReleaseOnPanic]); this one,
+		// from the guard to BeforeAll, fails the benchmark instead.
+		defer ReleaseOnPanic(b)
+	}
 	if s.Guard != nil {
 		if reason := s.Guard(); reason != "" {
 			tb.Skipf("suite guard: %s", reason)
@@ -59,6 +65,9 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 	// Never wait on the suite's subtests here: on panic, testing runs ancestor
 	// cleanups from the panicking goroutine, and the wait would deadlock.
 	tb.Cleanup(func() {
+		if bench {
+			defer failOnPanic(b)
+		}
 		RunTeardown(tb, cfg.SetupTimeout, budget.SetupTimeout, s.AfterAll)
 	})
 	RunSetup(tb, cfg.SetupTimeout, budget.SetupTimeout, s.BeforeAll)
