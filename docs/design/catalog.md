@@ -1,6 +1,6 @@
 # Behavior Specification
 
-11 suites, 62 behaviors. Read from source; nothing was executed.
+11 suites, 68 behaviors. Read from source; nothing was executed.
 
 ## BenchGate
 
@@ -38,6 +38,20 @@
 | **when only --against is given and a side has fewer than 4 samples** |
 | &nbsp;&nbsp;still compares and marks each such row as a ±20% heuristic |
 
+### AGateOfZeroIsNoGate
+
+| Behavior |
+|----------|
+| **when --gate=0 is given** |
+| &nbsp;&nbsp;compares without a gate, whatever -count says |
+
+### ABenchRunKeepsTheBinaryWordsLast
+
+| Behavior |
+|----------|
+| **when a bench run passes words after -args** |
+| &nbsp;&nbsp;puts its own -v ahead of them and the run passes |
+
 ## CLIBuildRules
 
 ### LinknameIsCheckedAsGoTestChecksIt
@@ -58,6 +72,7 @@
 | &nbsp;&nbsp;-coverprofile file passes the gate |
 | &nbsp;&nbsp;summary -coverprofile=file prints the coverage |
 | &nbsp;&nbsp;summary -coverprofile file prints the coverage |
+| &nbsp;&nbsp;the gate still sees the profile when words follow -args |
 
 ## CLIFlags
 
@@ -97,6 +112,8 @@
 | &nbsp;&nbsp;-exec wraps every suite binary |
 | &nbsp;&nbsp;-p caps the processes and the run still completes |
 | &nbsp;&nbsp;-o is refused with a reason |
+| &nbsp;&nbsp;-buildvcs=false reaches the build |
+| &nbsp;&nbsp;-pgo=off reaches the build |
 
 ## CLINewcomer
 
@@ -145,6 +162,7 @@
 | &nbsp;&nbsp;after -- it reaches the binary and the pattern stays a package |
 | &nbsp;&nbsp;after -args it reaches the binary verbatim |
 | &nbsp;&nbsp;without it the binary's check fails |
+| &nbsp;&nbsp;spec puts its own -v ahead of the binary's words |
 
 ## CLIScaffoldPaths
 

@@ -180,7 +180,7 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 	}
 
 	if target.CoverProfile != "" {
-		testArgs = append(testArgs, "-test.coverprofile="+target.CoverProfile)
+		testArgs = insertBeforeWords(testArgs, "-test.coverprofile="+target.CoverProfile)
 	}
 
 	if test2json {
@@ -575,4 +575,16 @@ func splitTopLevelOr(pattern string) []string {
 		}
 	}
 	return append(result, pattern[start:])
+}
+
+// insertBeforeWords adds a flag ahead of the binary's own words, which the
+// translated -args left in place: flag parsing stops at the first word that
+// is not a flag.
+func insertBeforeWords(args []string, flag string) []string {
+	for i, a := range args {
+		if !strings.HasPrefix(a, "-") {
+			return slices.Insert(slices.Clone(args), i, flag)
+		}
+	}
+	return append(slices.Clone(args), flag)
 }

@@ -417,7 +417,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench
 	// passing suite's stdout, hiding the ns/op lines go test would
 	// normally always print for -bench.
 	if bench && !gotestrunner.HasVerboseFlag(cfg.GoTestArgs) {
-		cfg.GoTestArgs = append(cfg.GoTestArgs, "-v")
+		cfg.GoTestArgs = gotestrunner.InsertBeforeArgs(cfg.GoTestArgs, "-v")
 	}
 
 	mode := gotestrunner.RunBatchText

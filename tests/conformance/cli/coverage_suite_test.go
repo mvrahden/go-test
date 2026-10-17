@@ -26,6 +26,7 @@ func (s *CLICoverageProfileTestSuite) TestProfileSpellings(t *gotest.T) {
 			{Desc: "-coverprofile file passes the gate", args: []string{"--min=1", "-coverprofile", "PROFILE", "../testdata/covered/"}, exit: 0},
 			{Desc: "summary -coverprofile=file prints the coverage", args: []string{"summary", "-coverprofile=PROFILE", "../testdata/covered/"}, exit: 0, stdoutHas: "Coverage:"},
 			{Desc: "summary -coverprofile file prints the coverage", args: []string{"summary", "-coverprofile", "PROFILE", "../testdata/covered/"}, exit: 0, stdoutHas: "Coverage:"},
+			{Desc: "the gate still sees the profile when words follow -args", args: []string{"--min=50", "../testdata/covered/", "-args", "extra"}, exit: 0},
 		}) {
 			profile := filepath.Join(it.TempDir(), "cover.out")
 			args := make([]string, len(row.args))

@@ -401,6 +401,12 @@ func (s *CanaryTestSuite) benchReport(t *gotest.T, pkg, canaryDir string, extra 
 func (s *CanaryTestSuite) benchRaw(t *gotest.T, pkg, canaryDir string, extra ...string) (int, []byte, []byte) {
 	args := append([]string{"bench", "--json"}, extra...)
 	args = append(args, "./testdata/"+pkg+"/", "-benchtime=1x")
+	return s.invoke(t, canaryDir, args...)
+}
+
+// invoke runs the CLI with the arguments as given and returns the exit code
+// and both streams as they were.
+func (s *CanaryTestSuite) invoke(t *gotest.T, canaryDir string, args ...string) (int, []byte, []byte) {
 	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Env = childEnv(canaryDir)
 	var stdout, stderr bytes.Buffer
@@ -409,11 +415,32 @@ func (s *CanaryTestSuite) benchRaw(t *gotest.T, pkg, canaryDir string, extra ...
 	if err := cmd.Run(); err != nil {
 		var exitErr *exec.ExitError
 		if !errors.As(err, &exitErr) {
-			fatalf(t, "run bench %s: %v", pkg, err)
+			fatalf(t, "run %v: %v", args, err)
 		}
 		code = exitErr.ExitCode()
 	}
 	return code, stdout.Bytes(), stderr.Bytes()
+}
+
+// A gate of zero is no gate: the run compares and is not held to the sample
+// count a gate needs.
+func (s *CanaryTestSuite) TestAGateOfZeroIsNoGate(t *gotest.T) {
+	dir := t.TempDir()
+	baseline := foreignBaseline(t, dir)
+	code, _, stderr := s.benchRaw(t, "benching", dir, "--against="+baseline, "--gate=0")
+	if code != 0 {
+		t.Errorf("--gate=0 without -count: exit code %d, want 0\n%s", code, stderr)
+	}
+}
+
+// What follows -args is the test binary's; the -v a bench run adds for itself
+// goes in front of it.
+func (s *CanaryTestSuite) TestABenchRunKeepsTheBinaryWordsLast(t *gotest.T) {
+	dir := t.TempDir()
+	code, _, stderr := s.invoke(t, dir, "bench", "./testdata/benching/", "-args", "-test.benchtime=1x")
+	if code != 0 {
+		t.Errorf("bench with -args: exit code %d, want 0\n%s", code, stderr)
+	}
 }
 
 // A gate judges the benchmarks the baseline and the run share. A baseline

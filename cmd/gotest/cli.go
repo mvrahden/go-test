@@ -310,7 +310,7 @@ func ensureCoverProfile(goTestArgs []string, needed bool) ([]string, string, fun
 	}
 	profile := f.Name()
 	f.Close()
-	return append(goTestArgs, "-coverprofile="+profile), profile, func() { os.Remove(profile) }, nil
+	return gotestrunner.InsertBeforeArgs(goTestArgs, "-coverprofile="+profile), profile, func() { os.Remove(profile) }, nil
 }
 
 func enforceCoverage(coverProfile string, minCoverage, code int) int {

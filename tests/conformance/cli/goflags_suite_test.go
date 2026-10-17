@@ -22,6 +22,8 @@ func (s *CLIGoTestFlagsTestSuite) TestOwnedGoTestFlags(t *gotest.T) {
 			{Desc: "-exec wraps every suite binary", args: []string{"-exec", "env", "../testdata/passing/"}, exit: 0, stdoutHas: "ok"},
 			{Desc: "-p caps the processes and the run still completes", args: []string{"-p", "1", "../testdata/passing/", "../testdata/covered/"}, exit: 0},
 			{Desc: "-o is refused with a reason", args: []string{"-o", "out.test", "../testdata/passing/"}, exit: 2, stderrHas: "-o"},
+			{Desc: "-buildvcs=false reaches the build", args: []string{"-buildvcs=false", "../testdata/passing/"}, exit: 0, stdoutHas: "ok"},
+			{Desc: "-pgo=off reaches the build", args: []string{"-pgo=off", "../testdata/passing/"}, exit: 0, stdoutHas: "ok"},
 		}) {
 			run, err := testkit.RunCLI(it.Context(), ".", row.args...)
 			gotest.NoError(it, err)

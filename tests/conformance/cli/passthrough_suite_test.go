@@ -23,6 +23,7 @@ func (s *CLIPassthroughTestSuite) TestUnknownFlagsReachTheBinary(t *gotest.T) {
 			{Desc: "after -- it reaches the binary and the pattern stays a package", args: []string{"--", "-customflag=yes", "../testdata/customflag/"}, exit: 0},
 			{Desc: "after -args it reaches the binary verbatim", args: []string{"../testdata/customflag/", "-args", "-customflag=yes"}, exit: 0},
 			{Desc: "without it the binary's check fails", args: []string{"../testdata/customflag/"}, exit: 1, stderrHas: ""},
+			{Desc: "spec puts its own -v ahead of the binary's words", args: []string{"spec", "../testdata/customflag/", "-args", "-customflag=yes"}, exit: 0},
 		}) {
 			run, err := testkit.RunCLI(it.Context(), ".", row.args...)
 			gotest.NoError(it, err)

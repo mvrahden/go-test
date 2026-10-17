@@ -154,7 +154,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--render-only` | With `--input`, exit 0 on a failing or incomplete stream: the code reports whether rendering succeeded, not whether the tests passed (requires `--input`) |
 | `--static` | Render the specification from source without running the suites (`spec`); nodes carry no verdict, and methods whose behaviors depend on runtime values are reported as incomplete on stderr |
 | `--bench` | Benchmark mode for `watch`: re-run benchmarks on change with ns/op deltas |
-| `--save=<path>` | Save a benchmark run as a JSON baseline (`bench`; a bare `--save=` uses `bench.baseline` from `.gotest.yml`) |
+| `--save=<path>` | Save a benchmark run as a JSON baseline (`bench`; a bare `--save=` uses `bench.baseline` from `.gotest.yml`, and saving to the configured baseline promotes the run without comparing it) |
 | `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`). A baseline whose `goos`, `goarch`, `goVersion`, `cpu` or `gomaxprocs` differs warns on stderr and reports `envMismatch`; the comparison still runs and the exit code is unchanged. What the comparison does with benchmarks on one side alone, with few samples and with one file for both flags is pinned below |
 | `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`); needs `-count=4` or more, the samples a significance test takes (pinned below) |
 | `--json` | Emit one versioned JSON report to stdout — results, deltas, gate verdict, environment mismatch — instead of human output (`bench`; for tooling) |

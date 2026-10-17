@@ -125,3 +125,25 @@ func (s *BenchGateTestSuite) TestAComparisonWithFewSamples(t *gotest.T) {
 		})
 	})
 }
+
+func (s *BenchGateTestSuite) TestAGateOfZeroIsNoGate(t *gotest.T) {
+	baseline := ownBaseline(t, "1")
+	res, err := testkit.RunCLI(t.Context(), ".", "bench", "--against="+baseline, "--gate=0", "../testdata/benching/", "-benchtime=1x")
+	gotest.NoError(t, err)
+	t.When("--gate=0 is given", func(w *gotest.T) {
+		w.It("compares without a gate, whatever -count says", func(it *gotest.T) {
+			gotest.Equal(it, 0, res.Exit, "stdout: %s\nstderr: %s", res.Stdout, res.Stderr)
+			gotest.NotContains(it, res.Stderr, "-count=4 or more")
+		})
+	})
+}
+
+func (s *BenchGateTestSuite) TestABenchRunKeepsTheBinaryWordsLast(t *gotest.T) {
+	res, err := testkit.RunCLI(t.Context(), ".", "bench", "../testdata/benching/", "-args", "-test.benchtime=1x")
+	gotest.NoError(t, err)
+	t.When("a bench run passes words after -args", func(w *gotest.T) {
+		w.It("puts its own -v ahead of them and the run passes", func(it *gotest.T) {
+			gotest.Equal(it, 0, res.Exit, "stdout: %s\nstderr: %s", res.Stdout, res.Stderr)
+		})
+	})
+}

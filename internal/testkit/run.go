@@ -92,7 +92,7 @@ func runCLI(ctx context.Context, dir, markerDir string, extraEnv []string, args 
 // Verdict is the last pass, fail or skip the stream recorded for the test
 // path; "" or "-" names the package event. A test the stream never closed has
 // no verdict and yields "".
-func (r Run) Verdict(path string) string {
+func (r *Run) Verdict(path string) string {
 	if path == "-" {
 		path = ""
 	}
@@ -111,7 +111,7 @@ func (r Run) Verdict(path string) string {
 
 // MarkerOrder reports whether the markers appear in the run in the order
 // given, judged by each marker's first occurrence; an absent marker is false.
-func (r Run) MarkerOrder(markers ...string) bool {
+func (r *Run) MarkerOrder(markers ...string) bool {
 	last := -1
 	for _, m := range markers {
 		idx := -1

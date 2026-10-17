@@ -480,7 +480,7 @@ func (s *E2ETestSuite) TestBenchJSONReport(t *gotest.T) {
 	})
 
 	t.When("--json compares against the saved baseline with a gate", func(w *gotest.T) {
-		out := runBench(w, "--against="+baselinePath, "--gate=1000", "--json")
+		out := runBench(w, "--against="+baselinePath, "--gate=1000", "--json", "-count=4")
 		var report reportDoc
 		gotest.NoError(w, json.Unmarshal(out, &report), "stdout must be one JSON document:\n%s", out)
 

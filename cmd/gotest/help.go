@@ -383,7 +383,10 @@ Flags:
   --save=<path>           Save this run's results as a JSON baseline (forces
                            capture mode; the spec view is still rendered so
                            results remain visible). A bare --save= saves to
-                           bench.baseline from .gotest.yml
+                           bench.baseline from .gotest.yml; saving to the
+                           configured baseline promotes the run and compares
+                           it against nothing, while an explicit --against
+                           naming the --save file is refused (exit 2)
   --against=<path>        Compare this run against a saved baseline and print
                            a delta table (defaults to bench.baseline in
                            .gotest.yml when omitted)

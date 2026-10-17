@@ -245,6 +245,86 @@
               "name": "TestAComparisonWithFewSamples",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "compares without a gate, whatever -count says",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "compares_without_a_gate,_whatever_-count_says",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --gate=0 is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "--gate=0_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AGateOfZeroIsNoGate",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAGateOfZeroIsNoGate",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "puts its own -v ahead of them and the run passes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "puts_its_own_-v_ahead_of_them_and_the_run_passes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a bench run passes words after -args",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_bench_run_passes_words_after_-args",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABenchRunKeepsTheBinaryWordsLast",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestABenchRunKeepsTheBinaryWordsLast",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "BenchGate",
@@ -372,6 +452,19 @@
                       "focused": false,
                       "kind": "block",
                       "name": "summary_-coverprofile_file_prints_the_coverage",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "the gate still sees the profile when words follow -args",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_gate_still_sees_the_profile_when_words_follow_-args",
                       "output": [],
                       "status": "none",
                       "vocab": "each"
@@ -700,6 +793,32 @@
                       "focused": false,
                       "kind": "block",
                       "name": "-o_is_refused_with_a_reason",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "-buildvcs=false reaches the build",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-buildvcs=false_reaches_the_build",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "-pgo=off reaches the build",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-pgo=off_reaches_the_build",
                       "output": [],
                       "status": "none",
                       "vocab": "each"
@@ -1043,6 +1162,19 @@
                       "focused": false,
                       "kind": "block",
                       "name": "without_it_the_binary's_check_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "spec puts its own -v ahead of the binary's words",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "spec_puts_its_own_-v_ahead_of_the_binary's_words",
                       "output": [],
                       "status": "none",
                       "vocab": "each"
@@ -1625,7 +1757,7 @@
     }
   ],
   "stats": {
-    "behaviors": 62,
+    "behaviors": 68,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

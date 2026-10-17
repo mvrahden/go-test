@@ -482,7 +482,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 
 	runFlags := pf.RunFlags
 	if cfg.OutputMode == RunCaptureJSON {
-		runFlags = append(append([]string(nil), runFlags...), "-v")
+		runFlags = insertBeforeArgs(runFlags, "-v")
 	}
 
 	// A user-supplied -bench value arrives in RunFlags via normal flag

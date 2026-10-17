@@ -10,14 +10,21 @@ import (
 // buildOnlyFlags are flags consumed exclusively by `go test -c` (compilation).
 // Boolean flags have empty string value; value flags list their name only.
 var buildOnlyFlags = map[string]bool{
-	"-race":     true,
-	"-msan":     true,
-	"-asan":     true,
-	"-cover":    true,
-	"-a":        true,
-	"-c":        true,
-	"-trimpath": true,
-	"-work":     true,
+	"-race":       true,
+	"-msan":       true,
+	"-asan":       true,
+	"-cover":      true,
+	"-a":          true,
+	"-c":          true,
+	"-n":          true,
+	"-x":          true,
+	"-trimpath":   true,
+	"-work":       true,
+	"-linkshared": true,
+	"-modcacherw": true,
+	// -buildvcs takes an optional value (-buildvcs, -buildvcs=false), so a
+	// bare one must not swallow the next word.
+	"-buildvcs": true,
 }
 
 var buildSpecialValueFlags = map[string]bool{
@@ -26,18 +33,24 @@ var buildSpecialValueFlags = map[string]bool{
 }
 
 var buildValueFlags = map[string]bool{
-	"-covermode": true,
-	"-coverpkg":  true,
-	"-vet":       true,
-	"-tags":      true,
-	"-ldflags":   true,
-	"-gcflags":   true,
-	"-asmflags":  true,
-	"-mod":       true,
-	"-modfile":   true,
-	"-p":         true,
-	"-toolexec":  true,
-	"-pkgdir":    true,
+	"-covermode":     true,
+	"-coverpkg":      true,
+	"-vet":           true,
+	"-tags":          true,
+	"-ldflags":       true,
+	"-gcflags":       true,
+	"-gccgoflags":    true,
+	"-asmflags":      true,
+	"-mod":           true,
+	"-modfile":       true,
+	"-p":             true,
+	"-toolexec":      true,
+	"-pkgdir":        true,
+	"-pgo":           true,
+	"-overlay":       true,
+	"-buildmode":     true,
+	"-compiler":      true,
+	"-installsuffix": true,
 }
 
 // runOnlyFlags are flags consumed exclusively by the test binary at runtime.
@@ -344,8 +357,12 @@ func insertBeforeArgs(runFlags []string, flag string) []string {
 	if i := slices.Index(runFlags, "-args"); i >= 0 {
 		return slices.Insert(slices.Clone(runFlags), i, flag)
 	}
-	return append(runFlags, flag)
+	return append(slices.Clone(runFlags), flag)
 }
+
+// InsertBeforeArgs adds a go test flag to args ahead of the -args marker, so
+// it is read as a flag and never as one of the test binary's own words.
+func InsertBeforeArgs(args []string, flag string) []string { return insertBeforeArgs(args, flag) }
 
 func HasVerboseFlag(flags []string) bool {
 	return slices.ContainsFunc(flags, func(f string) bool {

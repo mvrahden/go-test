@@ -2,7 +2,7 @@ Expect: gate with -count=4: exit code 2, want 1
 Clause: when --gate is given with -count=4 → judges the run
 --- a/cmd/gotest/bench.go
 +++ b/cmd/gotest/bench.go
-@@ -69,7 +69,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+@@ -86,7 +86,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
  		fmt.Fprintln(os.Stderr, "FAIL: --gate requires --against (or bench.baseline in .gotest.yml)")
  		return 2
  	}

@@ -11,7 +11,7 @@ pkgs=(./pkg/gotest/internal/... ./pkg/gotestruntime/... ./internal/gotestspec/..
 
 # --list-unmutated prints the catalog clauses no patch names on a Clause: line.
 if [ "${1:-}" = "--list-unmutated" ]; then
-  (cd "$root" && go run ./internal/speccatalog/clauses) | sort > "${TMPDIR:-/tmp}/clauses.$$"
+  (cd "$root" && go run ./internal/speccatalog/clauses) | sort -u > "${TMPDIR:-/tmp}/clauses.$$"
   sed -n 's/^Clause: //p' "$root"/tests/drill/mutants/*.patch | sort -u > "${TMPDIR:-/tmp}/named.$$"
   comm -23 "${TMPDIR:-/tmp}/clauses.$$" "${TMPDIR:-/tmp}/named.$$"
   rm -f "${TMPDIR:-/tmp}/clauses.$$" "${TMPDIR:-/tmp}/named.$$"

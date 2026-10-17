@@ -48,6 +48,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		}
 	}
 
+	againstGiven := own.Given("--against")
 	againstPath := own.Value("--against")
 	if againstPath == "" {
 		againstPath = inv.Config.Bench.Baseline
@@ -64,7 +65,23 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		}
 		gatePct = v
 	}
-	gateActive := gateGiven || inv.Config.Bench.Gate > 0
+	// 0 disables, on the flag as in the config.
+	gateActive := gatePct > 0
+	if saveTarget != "" && againstPath != "" && sameFile(saveTarget, againstPath) {
+		if againstGiven {
+			// Saving first and comparing after would judge the run against
+			// itself: every delta zero, every gate green, the old baseline gone.
+			fmt.Fprintf(os.Stderr, "FAIL: --save and --against name the same file (%s); the run would be compared against itself\n", saveTarget)
+			return 2
+		}
+		// Saving to the configured baseline promotes this run to be the
+		// baseline; there is nothing older to compare it against, and a
+		// configured gate has nothing to judge.
+		againstPath = ""
+		if !gateGiven {
+			gateActive = false
+		}
+	}
 	if gateActive && againstPath == "" {
 		fmt.Fprintln(os.Stderr, "FAIL: --gate requires --against (or bench.baseline in .gotest.yml)")
 		return 2
@@ -73,12 +90,6 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		// Below four samples a side there is no significance test, only a
 		// rule of thumb; a verdict built on it would be a guess with an exit code.
 		fmt.Fprintf(os.Stderr, "FAIL: --gate needs -count=%d or more: a significance test needs %d samples a side, and this run would take %d\n", gotestbench.MinSamplesForTTest, gotestbench.MinSamplesForTTest, count)
-		return 2
-	}
-	if saveTarget != "" && againstPath != "" && sameFile(saveTarget, againstPath) {
-		// Saving first and comparing after would judge the run against
-		// itself: every delta zero, every gate green, the old baseline gone.
-		fmt.Fprintf(os.Stderr, "FAIL: --save and --against name the same file (%s); the run would be compared against itself\n", saveTarget)
 		return 2
 	}
 
@@ -93,7 +104,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	// suppression for ordinary tests). Force verbose so ns/op lines always
 	// show, matching go test's actual benchmark UX.
 	if !verboseRequested {
-		goTestArgs = append(goTestArgs, "-v")
+		goTestArgs = gotestrunner.InsertBeforeArgs(goTestArgs, "-v")
 	}
 
 	cfg, err := parseExecFlags(own, goTestArgs, &inv.Config)
