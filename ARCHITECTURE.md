@@ -230,8 +230,18 @@ because it needs the suite's static types: the suite's `BeforeEach` and
 `AfterEach`, with a returned context, and the method call. Every method call
 goes through the `ƒƒ_GOTEST_exec` trampoline, where an assertion's call-site
 search stops; runtime and generated frames are skipped either way. Async
-methods wait in `gotestruntime.AwaitDone`. Benchmark wrappers keep their own
-generated loop, fenced around the timer.
+methods wait in `gotestruntime.AwaitDoneAt`, which ends the method's
+`Timeout` watch once its body returns: from then on the deadline's verdict is
+the `done()` one, located at the declaration, never an overrun. Benchmark
+wrappers keep their own generated loop, fenced around the timer.
+
+Generated code and the runtime are meant to come from one module version,
+which the tool directive pins. `gotestgen.MinRuntimeVersion` refuses an older
+runtime, but a replaced or main module carries no version to check, so a
+runtime function the generator stops calling stays behind as a deprecated
+shim (`pkg/gotestruntime/deprecated.go`): a harness an older gotest left on
+disk still compiles. A changed signature is a new symbol, never an edit;
+calling one moves the floor to the first release that has it.
 
 For **suites with fixtures**, every generated top-level function — the
 `TestX` function, each `FuzzX_M` seed-replay wrapper, the `BenchmarkX`
@@ -924,13 +934,16 @@ BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, exclusiveByP
 
 Each target becomes one `exec.Command`:
 ```
-<test2json> -p <pkg> -t <binary> -test.run=^TestFooTestSuite$ [flags]
+<test2json> -p <pkg> -t <binary> -test.paniconexit0 -test.run=^TestFooTestSuite$ [flags]
 ```
 
 Or without test2json:
 ```
-<binary> -test.run=^TestFooTestSuite$ [flags]
+<binary> -test.paniconexit0 -test.run=^TestFooTestSuite$ [flags]
 ```
+
+`-test.paniconexit0` is what `go test` passes too: an `os.Exit(0)` during a
+test panics and fails the suite instead of ending the process with a pass.
 
 ### Bench Target Construction
 
@@ -963,7 +976,7 @@ scoping. `buildSuiteCmd` builds the actual test binary invocation for a
 bench target as:
 
 ```
-<binary> -test.run=^$ -test.bench=^BenchmarkFooTestSuite$ -test.benchmem [flags]
+<binary> -test.paniconexit0 -test.run=^$ -test.bench=^BenchmarkFooTestSuite$ -test.benchmem [flags]
 ```
 
 `-test.run=^$` disables ordinary tests for the run; `-test.benchmem` is
@@ -1017,7 +1030,7 @@ t=1s    pkg/auth compiles first → CompileResult on compileCh
         ├─ BuildSuiteTargets → [AuthTestSuite, TokenTestSuite]
         ├─ AuthTestSuite needs shared fixtures → blocks on Ready(key)
         └─ TokenTestSuite doesn't → acquires sem slot, starts subprocess
-           └─ ./auth_hash.test -test.run=^TestTokenTestSuite$ -test.v=test2json
+           └─ ./auth_hash.test -test.paniconexit0 -test.run=^TestTokenTestSuite$ -test.v=test2json
         │
 t=2s    pkg/cart compiles → 2 more suites start
         │

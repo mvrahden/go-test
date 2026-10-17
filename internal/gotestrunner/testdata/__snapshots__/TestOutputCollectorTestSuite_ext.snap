@@ -1,14 +1,17 @@
 === SNAP TestOutputGolden/json_streaming/multi-package_mixed ===
+{"Action":"start","Package":"example.com/a","Time":"«TIME»"}
 {"Action":"run","Package":"example.com/a","Test":"TestA","Time":"«TIME»"}
 {"Action":"pass","Elapsed":"«ELAPSED»","Package":"example.com/a","Test":"TestA","Time":"«TIME»"}
 {"Action":"output","Output":"ok  \texample.com/a\t«TS»\n","Package":"example.com/a","Time":"«TIME»"}
 {"Action":"pass","Elapsed":"«ELAPSED»","Package":"example.com/a","Time":"«TIME»"}
+{"Action":"start","Package":"example.com/b","Time":"«TIME»"}
 {"Action":"run","Package":"example.com/b","Test":"TestB","Time":"«TIME»"}
 {"Action":"fail","Elapsed":"«ELAPSED»","Package":"example.com/b","Test":"TestB","Time":"«TIME»"}
 {"Action":"output","Output":"FAIL\texample.com/b\t«TS»\n","Package":"example.com/b","Time":"«TIME»"}
 {"Action":"fail","Elapsed":"«ELAPSED»","Package":"example.com/b","Time":"«TIME»"}
 
 === SNAP TestOutputGolden/json_streaming/single_passing_package ===
+{"Action":"start","Package":"example.com/ok","Time":"«TIME»"}
 {"Action":"run","Package":"example.com/ok","Test":"TestFoo","Time":"«TIME»"}
 {"Action":"output","Output":"=== RUN   TestFoo\n","Package":"example.com/ok","Test":"TestFoo","Time":"«TIME»"}
 {"Action":"pass","Elapsed":"«ELAPSED»","Package":"example.com/ok","Test":"TestFoo","Time":"«TIME»"}

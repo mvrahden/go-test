@@ -23,6 +23,7 @@ vi.mock("vscode", () => ({
 }));
 
 import { interpretSpecExit } from "./specView.js";
+import { parseTestEvents } from "./outputParser.js";
 
 interface Invocation {
   exitCode: number | null;
@@ -39,6 +40,21 @@ interface Variant {
   };
 }
 
+interface LiveEvent {
+  Action: string;
+  Package?: string;
+  Test?: string;
+  Output?: string;
+}
+
+// A live `gotest -json` run, times and durations masked as "<d>".
+interface LiveRun {
+  args: string[];
+  exitCode: number | null;
+  stderr: string;
+  events: LiveEvent[];
+}
+
 interface ContractCase {
   gating: Variant;
   renderOnly: Variant;
@@ -49,7 +65,7 @@ const golden = JSON.parse(
     path.join(__dirname, "..", "testdata", "cli-contract.json"),
     "utf-8",
   ),
-) as { cases: Record<string, ContractCase> };
+) as { cases: Record<string, ContractCase>; live: Record<string, LiveRun> };
 
 // What each stream shape means. Stated here rather than derived from the
 // recording, so that re-recording a changed CLI cannot quietly relabel a case:
@@ -59,6 +75,8 @@ const EXPECTED: Record<
   string,
   {
     gatingExitCode: number;
+    // What the gating form complains about on stderr; "" when unset.
+    gatingStderr?: string;
     goRunEpilogue: string;
     stats: Record<string, number>;
     packages: string[];
@@ -100,9 +118,22 @@ const EXPECTED: Record<
     stats: { passed: 0, failed: 0, skipped: 0, failedPackages: 1 },
     packages: ["example.com/broken:fail"],
   },
+  // The same failure in go test's own shape (Go 1.24+): build events and a
+  // verdict naming the failed build. It gates as the live run does, on 2, and
+  // says nothing extra on stderr: the diagnostics are in the spec.
+  "build-failure": {
+    gatingExitCode: 2,
+    goRunEpilogue: "exit status 2\n",
+    stats: { passed: 0, failed: 0, skipped: 0, failedPackages: 1 },
+    packages: ["example.com/broken:fail"],
+  },
+  // A stream with no events holds no verdict: the gating form must not pass
+  // it as green. The Spec View renders it anyway, under --render-only.
   empty: {
-    gatingExitCode: 0,
-    goRunEpilogue: "",
+    gatingExitCode: 2,
+    gatingStderr:
+      "FAIL: input holds no test events (expected a go test -json stream)\n",
+    goRunEpilogue: "exit status 2\n",
     stats: { passed: 0, failed: 0, skipped: 0 },
     packages: [],
   },
@@ -126,6 +157,23 @@ const EXPECTED: Record<
     goRunEpilogue: "",
     stats: { passed: 2, failed: 0, skipped: 0 },
     packages: ["gotest.fixtures/fuzzing:pass"],
+  },
+  // Packages a run executes nothing in still end in go test's verdict
+  // (skip); the spec has no behaviour to render for them, and the stream is
+  // whole, so it passes.
+  "no-suites": {
+    gatingExitCode: 0,
+    goRunEpilogue: "",
+    stats: { passed: 0, failed: 0, skipped: 0 },
+    packages: [],
+  },
+  // A package whose suites are all excluded, and one whose methods -run
+  // deselected: both pass with go test's "[no tests to run]".
+  "no-tests-to-run": {
+    gatingExitCode: 0,
+    goRunEpilogue: "",
+    stats: { passed: 1, failed: 0, skipped: 1 },
+    packages: ["example.com/excluded:pass", "example.com/plain:pass"],
   },
   "declared-source": {
     gatingExitCode: 0,
@@ -164,8 +212,8 @@ describe("recorded CLI contract", () => {
         expect(spec.stats).toMatchObject(expected.stats);
       });
 
-      it("keeps stderr clean when invoked directly", () => {
-        expect(recorded.gating.direct.stderr).toBe("");
+      it("keeps stderr to the documented complaint when invoked directly", () => {
+        expect(recorded.gating.direct.stderr).toBe(expected.gatingStderr ?? "");
       });
 
       if (expected.speaks) {
@@ -177,8 +225,13 @@ describe("recorded CLI contract", () => {
       }
 
       it("gains only go run's exit-status epilogue on stderr, never a changed spec", () => {
-        expect(recorded.gating.goRun.exitCode).toBe(expected.gatingExitCode);
-        expect(recorded.gating.goRun.stderr).toBe(expected.goRunEpilogue);
+        // go run reports any non-zero exit of the program as 1.
+        expect(recorded.gating.goRun.exitCode).toBe(
+          expected.gatingExitCode === 0 ? 0 : 1,
+        );
+        expect(recorded.gating.goRun.stderr).toBe(
+          (expected.gatingStderr ?? "") + expected.goRunEpilogue,
+        );
         expect(recorded.gating.goRun.stdoutMatchesDirect).toBe(true);
       });
 
@@ -203,15 +256,28 @@ describe("recorded CLI contract", () => {
         expect(recorded.renderOnly.goRun.stdoutMatchesDirect).toBe(true);
       });
 
-      it("is read as a usable spec when invoked directly", () => {
-        expect(
-          interpretSpecExit(
-            recorded.gating.direct.exitCode,
-            recorded.gating.direct.stdout,
-            recorded.gating.direct.stderr,
-          ),
-        ).toEqual({ ok: true, stdout: recorded.gating.direct.stdout });
-      });
+      if (expected.gatingExitCode === 2) {
+        // Exit 2 is the command's own failure: no client may read it as green.
+        it("is read as a failure when invoked directly", () => {
+          expect(
+            interpretSpecExit(
+              recorded.gating.direct.exitCode,
+              recorded.gating.direct.stdout,
+              recorded.gating.direct.stderr,
+            ).ok,
+          ).toBe(false);
+        });
+      } else {
+        it("is read as a usable spec when invoked directly", () => {
+          expect(
+            interpretSpecExit(
+              recorded.gating.direct.exitCode,
+              recorded.gating.direct.stdout,
+              recorded.gating.direct.stderr,
+            ),
+          ).toEqual({ ok: true, stdout: recorded.gating.direct.stdout });
+        });
+      }
 
       // The original regression in one assertion: same bytes, same verdict, but
       // reached through the extension's default `go run` resolution. The client
@@ -264,5 +330,76 @@ describe("recorded CLI contract", () => {
       expect(golden.cases[name].gating.direct.exitCode).toBe(1);
     }
     expect(failing.length).toBeGreaterThan(0);
+  });
+});
+
+const unrunPkg = "github.com/mvrahden/go-test/cmd/gotest/testdata/unrun/";
+
+describe("recorded live runs", () => {
+  it("records exactly the stated runs", () => {
+    expect(Object.keys(golden.live).sort()).toEqual([
+      "no-packages",
+      "verdicts",
+    ]);
+  });
+
+  describe("patterns that match no package", () => {
+    const recorded = golden.live["no-packages"];
+    it("exits 2, names the pattern on stderr and writes no stream", () => {
+      expect(recorded.exitCode).toBe(2);
+      expect(recorded.stderr).toBe(
+        `FAIL: "${recorded.args[1]}" matched no packages\n`,
+      );
+      expect(recorded.events).toEqual([]);
+    });
+  });
+
+  describe("a run with packages it executes nothing in", () => {
+    const recorded = golden.live.verdicts;
+    const pkgs = [
+      `${unrunPkg}notestfiles`,
+      `${unrunPkg}nosuites`,
+      `${unrunPkg}excluded`,
+      "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain",
+    ];
+
+    it("passes quietly", () => {
+      expect(recorded.exitCode).toBe(0);
+      expect(recorded.stderr).toBe("");
+    });
+
+    it("opens every package with one start, before any other event of it", () => {
+      for (const pkg of pkgs) {
+        const own = recorded.events.filter((e) => e.Package === pkg);
+        expect(own[0]?.Action).toBe("start");
+        expect(own.filter((e) => e.Action === "start")).toHaveLength(1);
+      }
+    });
+
+    it("ends every package in go test's verdict", () => {
+      const verdict = (pkg: string) =>
+        recorded.events
+          .filter((e) => e.Package === pkg && !e.Test)
+          .slice(-2)
+          .map((e) => (e.Action === "output" ? e.Output : e.Action));
+      expect(verdict(`${unrunPkg}notestfiles`)).toEqual([
+        `?   \t${unrunPkg}notestfiles\t[no test files]\n`,
+        "skip",
+      ]);
+      expect(verdict(`${unrunPkg}nosuites`)).toEqual([
+        `?   \t${unrunPkg}nosuites\t[no suites]\n`,
+        "skip",
+      ]);
+      expect(verdict(`${unrunPkg}excluded`)).toEqual([
+        `ok  \t${unrunPkg}excluded\t<d>s [no tests to run]\n`,
+        "pass",
+      ]);
+      expect(verdict(pkgs[3])).toEqual([`ok  \t${pkgs[3]}\t<d>s\n`, "pass"]);
+    });
+
+    it("parses in full with the extension's stream reader", () => {
+      const stream = recorded.events.map((e) => JSON.stringify(e)).join("\n");
+      expect(parseTestEvents(stream)).toHaveLength(recorded.events.length);
+    });
   });
 });

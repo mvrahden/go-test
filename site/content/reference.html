@@ -367,9 +367,9 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
     <!-- 5. Assertions -->
     <section class="ref-section" id="assertions">
       <h2>Assertions</h2>
-      <p class="lead">Type-safe generics with compile-time checking. Zero external dependencies. Works with both <code>*gotest.T</code> and <code>*testing.T</code>.</p>
+      <p class="lead">Type-safe generics with compile-time checking. Zero external dependencies. Works with <code>*gotest.T</code>, <code>*testing.T</code>, <code>*gotest.B</code> and <code>*gotest.F</code>.</p>
       <div class="callout">
-        Assertion failures automatically trace back to the test call site. Helper functions don't need <code>t.Helper()</code> — the framework resolves the outermost caller from the test file.
+        Assertion failures automatically trace back to the test call site. Helper functions don't need <code>t.Helper()</code> — the failure is located at the line that failed, a helper's included, and the message names the outermost caller from the test file.
       </div>
 
       <h3>Equality &amp; identity</h3>
@@ -709,9 +709,9 @@ percentage = covered / total</div>
           <tr><td><code>--target=&lt;name&gt;</code></td><td>Fuzz exactly one generated target by its wrapper name (<code>fuzz</code>).</td></tr>
           <tr><td><code>--no-harvest</code></td><td>Do not mine table-test literals into fuzz seeds for this run.</td></tr>
           <tr><td><code>--static</code></td><td>Read the specification from source without running the suites; nodes carry no verdict (<code>spec</code> command).</td></tr>
-          <tr><td><code>--render-only</code></td><td>With <code>--input</code>, exit 0 on a failing stream: report whether rendering succeeded, not the test verdict.</td></tr>
+          <tr><td><code>--render-only</code></td><td>With <code>--input</code>, exit 0 on a failing or incomplete stream: report whether rendering succeeded, not the test verdict.</td></tr>
           <tr><td><code>--debounce=&lt;dur&gt;</code></td><td>Watch mode debounce interval (default 200ms).</td></tr>
-          <tr><td><code>--input=&lt;path&gt;</code></td><td>Read test output from file instead of running tests (<code>spec</code>, <code>summary</code>).</td></tr>
+          <tr><td><code>--input=&lt;path&gt;</code></td><td>Read test output from file instead of running tests (<code>spec</code>, <code>summary</code>). Exits 2 when the input holds no test events, a package or failed build never reported its verdict, or a package failed to build.</td></tr>
           <tr><td><code>--github</code></td><td>GitHub CI mode: emit <code>::error</code> annotations and write step summary (<code>summary</code> command). Auto-detected via <code>$GITHUB_ACTIONS</code>.</td></tr>
           <tr><td><code>--coverage=&lt;file&gt;</code></td><td>Include coverage from profile in summary output (<code>summary</code> command).</td></tr>
           <tr><td><code>--badge=&lt;file&gt;</code></td><td>Write a self-contained coverage badge SVG; enables <code>-coverprofile</code> when nothing else does (<code>summary</code> command).</td></tr>
@@ -719,7 +719,9 @@ percentage = covered / total</div>
       </table>
 
       <div class="callout">
-        Standard <code>go test</code> flags work unchanged: <code>-v</code>, <code>-race</code>, <code>-cover</code>, <code>-count</code>, <code>-run</code>, <code>-json</code>, <code>-short</code>, <code>-timeout</code>.
+        Standard <code>go test</code> flags work unchanged: <code>-v</code>, <code>-race</code>, <code>-cover</code>, <code>-count</code>, <code>-run</code>, <code>-skip</code>, <code>-json</code>, <code>-short</code>, <code>-timeout</code>.
+        Every matched package ends in a verdict, as with <code>go test</code>, printed in package order: one gotest runs nothing in reports <code>[no test files]</code>, <code>[no suites]</code> (stdlib tests only, standard library packages too) or <code>0.000s [no tests to run]</code> (benchmarks only, every suite excluded with <code>X_</code>, or <code>-run</code> deselected every suite), in text and in <code>-json</code>, where each package opens with one <code>start</code> event as in <code>go test -json</code>.
+        Patterns that match no package at all verified nothing: every run mode exits <code>2</code> with <code>FAIL: "&lt;pattern&gt;" matched no packages</code> on stderr. A pattern that matches nothing beside others that did only warns, as with <code>go test</code>. <code>generate</code> and <code>discover</code>, which verify nothing, only warn and exit <code>0</code>. An empty pattern (<code>""</code>) is the current directory, as with <code>go test</code>. gotest takes packages, not files: a <code>.go</code> file argument exits <code>2</code> and names it.
       </div>
     </section>
 
@@ -751,7 +753,7 @@ percentage = covered / total</div>
       </table>
 
       <h3>Expressiveness rules</h3>
-      <p>The test is correct but its syntax can be improved. These rules can be suppressed per line or project-wide via <code>lint.skip</code>; <code>-fix</code> applies the safe rewrites.</p>
+      <p>The test is correct but its syntax can be improved. These rules can be suppressed per line or project-wide via <code>lint.skip</code>; <code>-fix</code> applies the safe rewrites in one run, overlapping ones included, then reports what it could not fix (exit 3 while findings remain); <code>-diff</code> prints exactly what <code>-fix</code> would write, as a unified diff with paths relative to the current directory, and writes nothing — <code>gotest lint -diff ./... | git apply</code> applies it (a file outside that directory needs <code>git apply --unsafe-paths</code>; a symlink is named by the file it leads to, which <code>-fix</code> writes).</p>
       <table class="ref-table">
         <thead><tr><th>Rule</th><th>Detects</th></tr></thead>
         <tbody>
@@ -787,10 +789,11 @@ percentage = covered / total</div>
       <table class="ref-table">
         <thead><tr><th>Code</th><th>Meaning</th></tr></thead>
         <tbody>
-          <tr><td><code>0</code></td><td>No findings.</td></tr>
-          <tr><td><code>1</code></td><td>One or more target packages do not compile — they could not be analyzed, so the run fails instead of passing silently.</td></tr>
+          <tr><td><code>0</code></td><td>No findings (with <code>-fix</code> or <code>-diff</code>: none left after fixing).</td></tr>
+          <tr><td><code>1</code></td><td>Nothing analyzable: one or more target packages do not compile — they could not be analyzed, so the run fails instead of passing silently; patterns that match no package, or name a directory or package that does not exist (a pattern matching nothing beside others that do only warns on stderr, as <code>go</code> does); fixed sources that no longer compile; or fixed files that could not be written (<code>-fix</code> writes them all or none; on a failure stderr names any that were).</td></tr>
           <tr><td><code>2</code></td><td>Usage or configuration error (e.g. an integrity rule in <code>lint.skip</code>).</td></tr>
-          <tr><td><code>3</code></td><td>Findings reported.</td></tr>
+          <tr><td><code>3</code></td><td>Findings reported (with <code>-fix</code> or <code>-diff</code>: the findings left after fixing).</td></tr>
+          <tr><td><code>130</code></td><td><code>-fix</code> or <code>-diff</code> stopped by a signal; nothing was written (once the fixed files are being written, they all are first).</td></tr>
         </tbody>
       </table>
 
@@ -830,8 +833,8 @@ FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
       <p>The repository includes a composite action at <code>mvrahden/go-test@v1</code> that wraps <code>gotest summary --github</code>:</p>
       <div class="code-block">
         <div class="code-label">.github/workflows/test.yml</div>
-        <pre>- uses: actions/checkout@v4
-- uses: actions/setup-go@v5
+        <pre>- uses: actions/checkout@v7
+- uses: actions/setup-go@v7
   with:
     go-version-file: go.mod
 
@@ -884,7 +887,7 @@ FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
       <p>Set <code>version: latest</code> or a specific tag (e.g. <code>v1.2.0</code>) to install a standalone binary via <code>go install</code> instead. This is useful when your project doesn't depend on go-test as a library.</p>
 
       <div class="callout">
-        To use the <code>gomod</code> default, ensure gotest is in your <code>go.mod</code>: use a <code>tool</code> directive (Go 1.24+) or add it via <code>go get github.com/mvrahden/go-test/cmd/gotest</code>.
+        To use the <code>gomod</code> default, ensure gotest is in your <code>go.mod</code>: declare it as a tool with <code>go get -tool github.com/mvrahden/go-test/cmd/gotest@&lt;version&gt;</code>, naming a release whose go line your module takes (a bare or <code>@latest</code> <code>go get</code> can raise your module's go line).
       </div>
 
       <h3>Manual CI setup</h3>

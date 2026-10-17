@@ -2,48 +2,57 @@ package main
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/mvrahden/go-test/internal/about"
+	"github.com/mvrahden/go-test/internal/gotestgen"
 )
 
+// runClean removes the generated files from the packages the patterns
+// match, expanded as generate expands them: only in a main module, where
+// generate writes them.
 func runClean(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	patterns := ExtractPackagePatterns(inv.Args)
+	args := inv.TagArgs()
+	patterns, err := ExtractPackagePatterns(args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	tags, _ := extractTagsFlag(args)
+	var buildFlags []string
+	if tags != "" {
+		buildFlags = append(buildFlags, "-tags="+tags)
+	}
+
+	pkgs, unmatched, err := gotestgen.ListPackageDirs("", patterns, buildFlags)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	warnMatchedNothing(unmatched)
 
 	var removed int
-	for _, pattern := range patterns {
-		dir := strings.TrimSuffix(pattern, "/...")
-		if dir == "" || dir == "." {
-			dir = "."
+	for _, p := range pkgs {
+		if p.Dir == "" {
+			// Nothing there to remove, as for a missing directory.
+			fmt.Fprintf(os.Stderr, "warning: %s\n", p.Err)
+			continue
 		}
-
-		err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return nil
+		generated := generatedFiles(p.Dir)
+		if !p.Main {
+			if len(generated) > 0 {
+				fmt.Fprintf(os.Stderr, "note: skipped %s: not in a main module\n", p.ImportPath)
 			}
-			if d.IsDir() {
-				name := d.Name()
-				if strings.HasPrefix(name, ".") && name != "." || name == "vendor" || name == "node_modules" {
-					return filepath.SkipDir
-				}
-				return nil
+			continue
+		}
+		for _, path := range generated {
+			if err := os.Remove(path); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: %s\n", err)
+				continue
 			}
-			if about.PSuiteRegex.MatchString(d.Name()) {
-				if err := os.Remove(path); err != nil { //nolint:gosec // G122: removes only our own generated files, under the module root
-					fmt.Fprintf(os.Stderr, "warning: %s\n", err)
-				} else {
-					fmt.Println(path)
-					removed++
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: walking %s: %s\n", dir, err)
-			return 2
+			fmt.Println(path)
+			removed++
 		}
 	}
 
@@ -51,4 +60,16 @@ func runClean(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "removed %d generated file(s)\n", removed)
 	}
 	return 0
+}
+
+// generatedFiles returns the generated files in dir.
+func generatedFiles(dir string) []string {
+	entries, _ := os.ReadDir(dir)
+	var files []string
+	for _, e := range entries {
+		if e.Type().IsRegular() && about.PSuiteRegex.MatchString(e.Name()) {
+			files = append(files, filepath.Join(dir, e.Name()))
+		}
+	}
+	return files
 }

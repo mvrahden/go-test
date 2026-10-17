@@ -1,6 +1,10 @@
 package main
 
-import "github.com/mvrahden/go-test/internal/lint"
+import (
+	"io"
+
+	"github.com/mvrahden/go-test/internal/lint"
+)
 
 // Test-only exports, one block per source file.
 
@@ -84,11 +88,17 @@ var (
 func ExportSpliceExpr(a corpusArg) string { return a.spliceExpr() }
 
 // lint.go
-var (
-	ExportLintGitHubArmed = lintGitHubArmed
-	ExportRunLintGitHub   = runLintGitHub
-	ExportRunLintPlain    = runLintPlain
-)
+var ExportLintGitHubArmed = lintGitHubArmed
+
+// ExportRunLintGitHub runs lint in-process with GitHub annotations.
+func ExportRunLintGitHub(stdout, stderr io.Writer, dir string, args []string) (code int, ok bool) {
+	return runLintInProcess(stdout, stderr, dir, args, true)
+}
+
+// ExportRunLintPlain runs lint in-process with plain-text findings.
+func ExportRunLintPlain(stderr io.Writer, dir string, args []string) (code int, ok bool) {
+	return runLintInProcess(io.Discard, stderr, dir, args, false)
+}
 
 // ExportResetLintSkipFlag restores an analyzer skip flag after a test has
 // set it through the GitHub lint mode; the flag set is process-global.

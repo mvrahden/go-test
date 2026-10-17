@@ -5,7 +5,9 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/dlclark/regexp2"
@@ -410,6 +412,16 @@ func (m *TestSuiteMethod) Pos() token.Pos { return m.n.Pos() }
 
 // NamePos is where the method's name is written.
 func (m *TestSuiteMethod) NamePos() token.Pos { return m.m.Pos() }
+
+// DeclaredAt is the method's declaration as base:line. The runtime names the
+// full path under go test -fullpath (see callsite.Declared).
+func (m *TestSuiteMethod) DeclaredAt(fset *token.FileSet) string {
+	p := fset.Position(m.NamePos())
+	if !p.IsValid() {
+		return ""
+	}
+	return filepath.Base(p.Filename) + ":" + strconv.Itoa(p.Line)
+}
 
 func (m *TestSuiteMethod) IsAsync() bool    { return IS_TEST_CASE_ASYNC.MatchString(m.m.Name()) }
 func (m *TestSuiteMethod) IsFocused() bool  { return strings.HasPrefix(m.m.Name(), "F_") }

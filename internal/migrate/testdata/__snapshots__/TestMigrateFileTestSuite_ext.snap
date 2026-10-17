@@ -1,9 +1,7 @@
 === SNAP TestTransformFile ===
 package basic
 
-import (
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
+import "github.com/mvrahden/go-test/pkg/gotest"
 
 type UserTestSuite struct {
 	db string
@@ -28,7 +26,7 @@ func (s *UserTestSuite) TestCreate(t *gotest.T) {
 }
 
 func (s *UserTestSuite) TestDelete(t *gotest.T) {
-	gotest.NotNil(t, s.db)
+	gotest.NotEmpty(t, s.db)
 	gotest.ErrorContains(t, nil, "expected")
 }
 

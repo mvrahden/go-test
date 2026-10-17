@@ -106,6 +106,10 @@ var ExportLogSlowBuild = logSlowBuild
 // ExportLineWriterProgress reads the progress a line writer captured.
 func ExportLineWriterProgress(w io.WriteCloser) FuzzProgress { return w.(*lineWriter).progress }
 
+// ExportLineWriterDeadlineFail reports whether the target's only failure was
+// the engine's deadline.
+func ExportLineWriterDeadlineFail(w io.WriteCloser) bool { return w.(*lineWriter).deadlineFail }
+
 var ExportSnapshotCrashers = snapshotCrashers
 var ExportNewCrasherNames = newCrasherNames
 var ExportExitCodeAfterDispatch = exitCodeAfterDispatch
@@ -184,3 +188,6 @@ func ExportNewFailureLog(out io.Writer) io.Writer { return newFailureLog(out) }
 func ExportTakeFailures(w io.Writer) []string { return w.(*failureLog).take() }
 
 const ExportFailureLogLimit = failureLogLimit
+
+// ExportBenchCollector marks c as a bench run's collector.
+func ExportBenchCollector(c *OutputCollector) { c.bench = true }

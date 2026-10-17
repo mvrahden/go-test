@@ -1,57 +1,398 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"go/token"
 	"io"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/config"
+	"github.com/mvrahden/go-test/internal/filewrite"
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/internal/lint"
+	"github.com/mvrahden/go-test/internal/pkgpattern"
+	"github.com/mvrahden/go-test/internal/unidiff"
 	"golang.org/x/tools/go/analysis/singlechecker"
 )
 
 func runLint(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	github := lintGitHubArmed(inv.Args)
 	args := stripFlag(inv.Args, "--github")
-	if len(args) == 0 {
-		args = []string{"./..."}
-	}
 
 	flagArgs, err := lintSkipFlags(args, inv.Config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
+	args = append(flagArgs, args...)
 
-	// Lint owns the analyzer's flags and runs it in-process, from one load.
-	// A driver flag (-fix, -json, -diff, …) goes to the go/analysis driver,
-	// which keeps its exact semantics but cannot emit annotations.
-	if github {
-		if code, ok := runLintGitHub(os.Stdout, os.Stderr, "", append(flagArgs, args...)); ok {
-			return code
-		}
-	} else if code, ok := runLintPlain(os.Stderr, "", append(flagArgs, args...)); ok {
+	// Lint owns the analyzer's flags, -fix, -diff, -json, -test and -c. A
+	// flag only the go/analysis driver implements (-debug, -V, …) goes to
+	// that driver, which keeps its exact semantics but cannot emit
+	// annotations.
+	if code, ok := runLintInProcess(os.Stdout, os.Stderr, "", args, github); ok {
 		return code
 	}
 
+	a, _ := parseLintArgs(args)
+	// The driver ignores -tags; it reads GOFLAGS, as go list does.
+	if a.tags != "" {
+		_ = os.Setenv("GOFLAGS", strings.TrimSpace(os.Getenv("GOFLAGS")+" -tags="+a.tags))
+	}
 	// The driver skips uncompilable packages and still exits 0, so a broken
 	// tree lints "clean". Prove the targets compile first.
-	if patterns := lint.PreflightPatterns(args); len(patterns) > 0 {
-		if err := lint.PreflightLoad("", patterns); err != nil {
+	if a.loads() {
+		if err := lint.PreflightLoad("", a.patterns); err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
 			return 1
 		}
+		for _, p := range gotestgen.UnmatchedPatterns("", a.patterns, nil) {
+			fmt.Fprintf(os.Stderr, "warning: %q matched no packages\n", p)
+		}
 	}
-
-	os.Args = append([]string{"gotest lint"}, append(flagArgs, args...)...)
-	singlechecker.Main(lint.Analyzer)
-
+	runLintDriver(a.argv())
 	fmt.Fprintln(os.Stderr, "lint: unexpected return from singlechecker.Main")
 	return 2
+}
+
+// runLintDriver hands args to the go/analysis driver, which exits.
+func runLintDriver(args []string) {
+	os.Args = append([]string{"gotest lint"}, args...)
+	singlechecker.Main(lint.Analyzer)
+}
+
+// lintArgs is lint's argv, read the way the go/analysis driver's flag set
+// reads it, except that flags may also follow the patterns.
+type lintArgs struct {
+	analyzer []string // -skip-<rule>, -disable-nolint
+	driver   []string // flags only the go/analysis driver implements
+	patterns []string
+	fix      bool
+	diff     bool
+	json     bool
+	tests    bool   // -test
+	context  int    // -c; negative prints no source lines
+	tags     string // -tags, as for go build
+	noLoad   bool   // -flags or -V: the driver answers without loading
+	unknown  bool   // a flag nobody defines: the driver reports it
+}
+
+// lintValueFlags take a value, as -name=value or as the next argument.
+var lintValueFlags = map[string]bool{
+	"c": true, "tags": true, "debug": true, "cpuprofile": true, "memprofile": true, "trace": true,
+}
+
+func parseLintArgs(args []string) (lintArgs, error) {
+	a := lintArgs{tests: true, context: -1}
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			a.patterns = append(a.patterns, args[i+1:]...)
+			break
+		}
+		if !strings.HasPrefix(arg, "-") || arg == "-" {
+			a.patterns = append(a.patterns, arg)
+			continue
+		}
+		name, value := splitBoolFlag(arg)
+		if lintValueFlags[name] && !strings.Contains(arg, "=") {
+			if i+1 == len(args) {
+				return a, fmt.Errorf("flag needs an argument: -%s", name)
+			}
+			i++
+			value = args[i]
+		}
+		var err error
+		switch {
+		case lintAnalyzerFlag(name):
+			a.analyzer = append(a.analyzer, "-"+name+"="+value)
+		case name == "fix":
+			a.fix, err = strconv.ParseBool(value)
+		case name == "diff":
+			a.diff, err = strconv.ParseBool(value)
+		case name == "json":
+			a.json, err = strconv.ParseBool(value)
+		case name == "test":
+			a.tests, err = strconv.ParseBool(value)
+		case name == "c":
+			a.context, err = strconv.Atoi(value)
+		case name == "tags":
+			a.tags = value
+		case name == "source" || name == "all":
+			// No effect in the driver either (deprecated).
+		case name == "flags" || name == "V":
+			a.noLoad = true
+			a.driver = append(a.driver, arg)
+		case lintValueFlags[name] || name == "v":
+			a.driver = append(a.driver, "-"+name+"="+value)
+		default:
+			a.unknown = true
+			a.driver = append(a.driver, arg)
+		}
+		if err != nil {
+			return a, fmt.Errorf("invalid value %q for flag -%s", value, name)
+		}
+	}
+	if len(a.patterns) == 0 {
+		a.patterns = []string{"./..."}
+	}
+	a.patterns = pkgpattern.Clean(a.patterns)
+	// -diff previews -fix, so it implies it.
+	a.fix = a.fix || a.diff
+	return a, nil
+}
+
+// inProcess reports whether lint can run without the go/analysis driver.
+func (a *lintArgs) inProcess() bool {
+	return len(a.driver) == 0
+}
+
+// loads reports whether the driver will load the targets.
+func (a *lintArgs) loads() bool {
+	return !a.noLoad && !a.unknown
+}
+
+// buildFlags returns the go build flags the args carry.
+func (a *lintArgs) buildFlags() []string {
+	if a.tags == "" {
+		return nil
+	}
+	return []string{"-tags=" + a.tags}
+}
+
+// argv returns the args for the go/analysis driver, flags first.
+func (a *lintArgs) argv() []string {
+	out := slices.Clone(a.driver)
+	out = append(out, a.analyzer...)
+	if a.fix {
+		out = append(out, "-fix")
+	}
+	if a.json {
+		out = append(out, "-json")
+	}
+	if !a.tests {
+		out = append(out, "-test=false")
+	}
+	if a.context >= 0 {
+		out = append(out, "-c="+strconv.Itoa(a.context))
+	}
+	return append(out, a.patterns...)
+}
+
+// runLintInProcess runs the analyzer over the targets and reports what it
+// found: JSON on stdout with -json, GitHub annotations on stdout with
+// github, plain text on stderr otherwise. With -fix it first applies the
+// fixes and reports only what is left; with -diff it prints what -fix would
+// write instead, writes nothing, and reports what -fix would leave. ok=false
+// means args carry a flag only the go/analysis driver implements; nothing
+// has run yet.
+//
+// dir is the module directory to load from; "" means the current directory.
+// Annotation paths are relative to dir, which inside a workflow is the
+// repository root — exactly what GitHub resolves annotations against.
+func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, github bool) (code int, ok bool) {
+	a, err := parseLintArgs(args)
+	if err != nil {
+		fmt.Fprintf(stderr, "FAIL: %s\n", err)
+		return 2, true
+	}
+	if a.fix && a.loads() && len(a.driver) > 0 {
+		fmt.Fprintf(stderr, "FAIL: %s is a go/analysis driver flag; -fix and -diff do not take it\n", a.driver[0])
+		return 2, true
+	}
+	if !a.inProcess() {
+		return 0, false
+	}
+	if a.diff && a.json {
+		fmt.Fprintln(stderr, "FAIL: -diff and -json both print on stdout; use one")
+		return 2, true
+	}
+	for _, f := range a.analyzer {
+		name, value := splitBoolFlag(f)
+		if err := lint.Analyzer.Flags.Set(name, value); err != nil {
+			fmt.Fprintf(stderr, "FAIL: %s\n", err)
+			return 2, true
+		}
+	}
+
+	targets := &lint.Targets{Dir: dir, Patterns: a.patterns, Tests: a.tests, BuildFlags: a.buildFlags()}
+	ctx := context.Background()
+	var written []string // the files -fix wrote, for a second signal to name
+	if a.fix {
+		// The load's temporary files, the go command's included, live in
+		// one directory, removed however the run ends.
+		tmp, err := os.MkdirTemp(os.Getenv("GOTMPDIR"), "gotest-lint-")
+		if err != nil {
+			fmt.Fprintf(stderr, "FAIL: %v\n", err)
+			return 1, true
+		}
+		defer func() { _ = os.RemoveAll(tmp) }()
+		targets.TempDir = tmp
+		// Nothing is written until every pass is done, so a stop before
+		// then leaves every file as it was; writing holds off a second
+		// signal until it is done.
+		var stop context.CancelFunc
+		ctx, stop = shutdownContextThen(func() {
+			_ = os.RemoveAll(tmp)
+			if len(written) == 0 {
+				fmt.Fprintln(stderr, "lint: interrupted again; nothing was written")
+			} else {
+				fmt.Fprintf(stderr, "lint: interrupted again; wrote fixes to %d file(s)\n", len(written))
+			}
+		})
+		defer stop()
+	}
+	interrupted := func() bool {
+		if ctx.Err() == nil {
+			return false
+		}
+		fmt.Fprintln(stderr, "lint: interrupted; nothing was written")
+		return true
+	}
+
+	// This load also proves the targets compile before anything is fixed.
+	res, err := lint.Analyze(ctx, targets)
+	if interrupted() {
+		return 130, true
+	}
+	if err != nil {
+		fmt.Fprintf(stderr, "FAIL: %v\n", err)
+		return 1, true
+	}
+	for _, p := range gotestgen.UnmatchedPatterns(dir, a.patterns, targets.BuildFlags) {
+		fmt.Fprintf(stderr, "warning: %q matched no packages\n", p)
+	}
+	source := os.ReadFile
+	if a.fix && len(res.FixFiles) > 0 {
+		fixed, changes, err := lint.Fix(ctx, targets, res)
+		if interrupted() {
+			return 130, true
+		}
+		if err != nil {
+			fmt.Fprintf(stderr, "FAIL: %v\n", err)
+			return 1, true
+		}
+		if a.diff {
+			printLintDiff(stdout, stderr, dir, changes)
+			source = lintChangedSource(changes)
+		} else if code := writeLintFixes(ctx, stderr, changes, &written); code != 0 {
+			return code, true
+		}
+		res = fixed
+	}
+
+	switch {
+	case a.json:
+		// As with the driver, -json exits 0 with findings.
+		if err := res.PrintJSON(stdout); err != nil {
+			fmt.Fprintf(stderr, "FAIL: %v\n", err)
+			return 1, true
+		}
+		return 0, true
+	case github && !a.diff:
+		return reportLintGitHub(stdout, dir, res.Findings), true
+	default:
+		return reportLintPlain(stderr, res.Findings, a.context, source), true
+	}
+}
+
+// writeLintFixes writes every fixed file or none (see filewrite.Stage). A
+// second signal waits until it is done. It returns 0 once every file is
+// written; otherwise it says on stderr what was written and returns the
+// exit code: 130 when a signal came first, 1 on a failure.
+func writeLintFixes(ctx context.Context, stderr io.Writer, changes []lint.Change, written *[]string) int {
+	forcedExit.Lock()
+	defer forcedExit.Unlock()
+	if ctx.Err() != nil {
+		fmt.Fprintln(stderr, "lint: interrupted; nothing was written")
+		return 130
+	}
+	staged, err := filewrite.Stage(changes)
+	if err != nil {
+		fmt.Fprintf(stderr, "FAIL: writing fixes: %v; nothing was written\n", err)
+		return 1
+	}
+	files, err := staged.Commit()
+	*written = append(*written, files...)
+	if err != nil {
+		fmt.Fprintf(stderr, "FAIL: writing fixes: %v\n", err)
+		if len(files) > 0 {
+			fmt.Fprintf(stderr, "lint: wrote fixes to:\n\t%s\n", strings.Join(files, "\n\t"))
+		}
+		done := map[string]bool{}
+		for _, f := range files {
+			done[f] = true
+		}
+		var partly *filewrite.PartlyWrittenError
+		errors.As(err, &partly)
+		var rest []string
+		for _, c := range changes {
+			if !done[c.File] && (partly == nil || c.File != partly.File) {
+				rest = append(rest, c.File)
+			}
+		}
+		if len(rest) > 0 {
+			fmt.Fprintf(stderr, "lint: did not write:\n\t%s\n", strings.Join(rest, "\n\t"))
+		}
+		return 1
+	}
+	return 0
+}
+
+// printLintDiff prints changes as one unified diff. Paths are relative to
+// dir, with a/ and b/ prefixes: git apply resolves the paths of a patch
+// without "diff --git" headers against the directory it runs in, inside a
+// repository or not. A file outside dir gets a ../ path, which git apply
+// only takes with --unsafe-paths; stderr says so. A symlink is named by
+// the file it leads to, which -fix writes: git apply and patch refuse to
+// write through one.
+func printLintDiff(stdout, stderr io.Writer, dir string, changes []lint.Change) {
+	base := dir
+	if base == "" {
+		base, _ = os.Getwd()
+	}
+	base = realPath(base)
+	outside := false
+	for _, c := range changes {
+		file := realPath(c.File)
+		oldName, newName := filepath.ToSlash(file), filepath.ToSlash(file)
+		if rel, err := filepath.Rel(base, file); err == nil {
+			rel = filepath.ToSlash(rel)
+			oldName, newName = "a/"+rel, "b/"+rel
+			outside = outside || strings.HasPrefix(rel, "../")
+		}
+		fmt.Fprint(stdout, unidiff.Diff(oldName, newName, c.Before, c.After))
+	}
+	if outside {
+		fmt.Fprintln(stderr, "lint: the diff names files outside the current directory; apply it with git apply --unsafe-paths")
+	}
+}
+
+// realPath is path with its symlinks resolved, or path where it cannot be.
+func realPath(path string) string {
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		return real
+	}
+	return path
+}
+
+// lintChangedSource reads a file as -fix would leave it.
+func lintChangedSource(changes []lint.Change) func(string) ([]byte, error) {
+	return func(file string) ([]byte, error) {
+		for _, c := range changes {
+			if c.File == file {
+				return c.After, nil
+			}
+		}
+		return os.ReadFile(file)
+	}
 }
 
 // lintGitHubArmed reports whether lint should render GitHub annotations:
@@ -73,23 +414,12 @@ func stripFlag(args []string, name string) []string {
 	return out
 }
 
-// runLintGitHub runs the analyzer programmatically and renders the findings
-// two ways: ::error workflow commands on stdout and a markdown table appended
-// to $GITHUB_STEP_SUMMARY. Findings deliberately stay off stderr — setup-go
-// registers a problem matcher for file:line:col text, and a stderr mirror
-// would surface every finding as a second, job-titled annotation. ok=false
-// means a driver flag was present and the caller must fall back to the
-// go/analysis driver.
-//
-// dir is the module directory to load from; "" means the current directory.
-// Annotation paths are relative to dir, which inside a workflow is the
-// repository root — exactly what GitHub resolves annotations against.
-func runLintGitHub(stdout, stderr io.Writer, dir string, args []string) (code int, ok bool) {
-	findings, code, ok := lintFindings(stderr, dir, args)
-	if !ok || code != 0 {
-		return code, ok
-	}
-
+// reportLintGitHub renders the findings two ways: ::error workflow commands
+// on stdout and a markdown table appended to $GITHUB_STEP_SUMMARY. Findings
+// deliberately stay off stderr — setup-go registers a problem matcher for
+// file:line:col text, and a stderr mirror would surface every finding as a
+// second, job-titled annotation.
+func reportLintGitHub(stdout io.Writer, dir string, findings []lint.Finding) int {
 	base := dir
 	if base == "" {
 		base, _ = os.Getwd()
@@ -97,9 +427,8 @@ func runLintGitHub(stdout, stderr io.Writer, dir string, args []string) (code in
 
 	annotations := make([]gotestspec.Annotation, 0, len(findings))
 	for _, f := range findings {
-		file := relPath(base, f.File)
 		annotations = append(annotations, gotestspec.Annotation{
-			File:    file,
+			File:    relPath(base, f.File),
 			Line:    f.Line,
 			Col:     f.Col,
 			Title:   f.Rule,
@@ -109,65 +438,38 @@ func runLintGitHub(stdout, stderr io.Writer, dir string, args []string) (code in
 	gotestspec.WriteGitHubAnnotations(stdout, annotations)
 
 	if len(annotations) == 0 {
-		return 0, true
+		return 0
 	}
 	appendLintStepSummary(annotations)
-	return 3, true
+	return 3
 }
 
-// runLintPlain runs the analyzer programmatically and prints the findings
-// on stderr, one "file:line:col: message" line each, the way the go/analysis
-// driver does. ok=false means a driver flag was present and the caller must
-// fall back to that driver.
-func runLintPlain(stderr io.Writer, dir string, args []string) (code int, ok bool) {
-	findings, code, ok := lintFindings(stderr, dir, args)
-	if !ok || code != 0 {
-		return code, ok
-	}
+// reportLintPlain prints the findings on stderr, one "file:line:col:
+// message" line each, the way the go/analysis driver does; a non-negative
+// context adds the offending lines with that many lines around them.
+func reportLintPlain(stderr io.Writer, findings []lint.Finding, context int, source func(string) ([]byte, error)) int {
 	for _, f := range findings {
-		fmt.Fprintf(stderr, "%s:%d:%d: %s\n", f.File, f.Line, f.Col, f.Message)
+		// As token.Position prints it: a //line directive without a
+		// column leaves none.
+		pos := token.Position{Filename: f.File, Line: f.Line, Column: f.Col}
+		fmt.Fprintf(stderr, "%s: %s\n", pos, f.Message)
+		if context < 0 {
+			continue
+		}
+		data, _ := source(f.File)
+		lines := strings.Split(string(data), "\n")
+		for i := max(f.Line-context, 1); i <= min(f.EndLine+context, len(lines)); i++ {
+			fmt.Fprintf(stderr, "%d\t%s\n", i, lines[i-1])
+		}
 	}
 	if len(findings) == 0 {
-		return 0, true
+		return 0
 	}
-	return 3, true
-}
-
-// lintFindings applies the analyzer's own flags and runs it over the
-// patterns in args. A non-zero code is a failure already reported on stderr;
-// ok=false means args carry a flag that is not the analyzer's.
-func lintFindings(stderr io.Writer, dir string, args []string) (findings []lint.Finding, code int, ok bool) {
-	var patterns []string
-	for _, a := range args {
-		if !strings.HasPrefix(a, "-") {
-			patterns = append(patterns, a)
-			continue
-		}
-		if name, _ := splitBoolFlag(a); !lintAnalyzerFlag(name) {
-			return nil, 0, false
-		}
-	}
-	for _, a := range args {
-		if !strings.HasPrefix(a, "-") {
-			continue
-		}
-		name, value := splitBoolFlag(a)
-		if err := lint.Analyzer.Flags.Set(name, value); err != nil {
-			fmt.Fprintf(stderr, "FAIL: %s\n", err)
-			return nil, 2, true
-		}
-	}
-
-	findings, err := lint.Run(dir, patterns)
-	if err != nil {
-		fmt.Fprintf(stderr, "FAIL: %v\n", err)
-		return nil, 1, true
-	}
-	return findings, 0, true
+	return 3
 }
 
 // lintAnalyzerFlag reports whether name (without dashes) is one of the
-// analyzer's own flags, the only ones the GitHub mode applies itself.
+// analyzer's own flags.
 func lintAnalyzerFlag(name string) bool {
 	if name == "disable-nolint" {
 		return true

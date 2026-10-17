@@ -29,7 +29,7 @@ func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 		if content, ok := sourceCache[name]; ok {
 			return content
 		}
-		content, err := pass.ReadFile(name)
+		content, err := passSource(pass, name)
 		if err != nil {
 			content = nil
 		}

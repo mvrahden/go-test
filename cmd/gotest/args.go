@@ -7,6 +7,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/config"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/pkgpattern"
 )
 
 // Invocation carries the resolved state for a single CLI invocation.
@@ -154,6 +155,9 @@ func SplitArgs(args []string, allowed map[string]bool) (ownArgs, goTestArgs []st
 			goTestArgs = append(goTestArgs, args[i])
 		}
 	}
+	if err := gotestrunner.ValidateTestFlags(goTestArgs); err != nil {
+		return nil, nil, err
+	}
 	return
 }
 
@@ -169,33 +173,30 @@ func extractStringFlag(args []string, name, defaultVal string) string {
 	return defaultVal
 }
 
-func ExtractPackagePatterns(goTestArgs []string) []string {
+// ExtractPackagePatterns returns the package patterns in args as go test
+// reads them: every positional argument that is not a flag's value, meta
+// patterns (all, std, tool, work) and bare import paths (fmt) included.
+// Without one, or for an empty one, it is the current directory. Go files
+// are a usage error: go test builds them as an ad-hoc package, which has no
+// suites to generate for.
+func ExtractPackagePatterns(args []string) ([]string, error) {
 	var patterns []string
-	for i := 0; i < len(goTestArgs); i++ {
-		arg := goTestArgs[i]
-		if arg == "-args" {
-			break
-		}
-		if strings.HasPrefix(arg, "-") {
-			// Pair space-separated values with their flag, exactly as
-			// SplitArgs does when it builds goTestArgs: the value of
-			// "-bench ^BenchmarkSuite$/^BenchmarkMethod$" carries a "/" that
-			// LooksLikePackagePattern would otherwise claim as a package.
-			if name, _, hasEquals := strings.Cut(arg, "="); !hasEquals {
-				if isValue, known := gotestrunner.IsGoTestFlag(name); known && isValue && i+1 < len(goTestArgs) {
-					i++
-				}
-			}
-			continue
-		}
-		if gotestrunner.LooksLikePackagePattern(arg) {
-			patterns = append(patterns, arg)
-		}
+	for _, i := range gotestrunner.PatternIndices(args, ownFlag) {
+		patterns = append(patterns, args[i])
 	}
 	if len(patterns) == 0 {
-		return []string{"."}
+		return []string{"."}, nil
 	}
-	return patterns
+	if files := pkgpattern.Files(patterns); len(files) > 0 {
+		return nil, fmt.Errorf("gotest takes packages, not files: %s", strings.Join(files, ", "))
+	}
+	return pkgpattern.Clean(patterns), nil
+}
+
+// ownFlag reports whether a gotest flag takes a value.
+func ownFlag(name string) (isValue, known bool) {
+	kind, ok := gotestFlags[name]
+	return kind == ValueFlag, ok
 }
 
 func extractTagsFlag(args []string) (tags string, remaining []string) {

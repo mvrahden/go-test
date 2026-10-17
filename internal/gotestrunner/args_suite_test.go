@@ -34,6 +34,7 @@ func (s *ArgsTestSuite) TestIsGoTestFlag(t *gotest.T) {
 		{"build special value", "-o", true, true},
 		{"run bool", "-v", false, true},
 		{"run value", "-run", true, true},
+		{"skip value", "-skip", true, true},
 		{"json", "-json", false, true},
 		{"args", "-args", false, true},
 		{"unknown", "-zzz", false, false},
@@ -44,6 +45,52 @@ func (s *ArgsTestSuite) TestIsGoTestFlag(t *gotest.T) {
 		gotest.Equal(sub, tc.isValue, isValue)
 		gotest.Equal(sub, tc.known, known)
 	}
+}
+
+// Every positional argument that is not a flag's value is a package
+// pattern, as go test reads it, whatever its shape.
+func (s *ArgsTestSuite) TestValidateTestFlags(t *gotest.T) {
+	t.When("every value is one the test binary takes", func(w *gotest.T) {
+		w.It("passes them", func(it *gotest.T) {
+			gotest.NoError(it, gotestrunner.ValidateTestFlags([]string{
+				"-count=2", "-parallel", "4", "-timeout=5m", "-v", "-shuffle=on", "-shuffle=7",
+				"-cpu=1,2", "-run", "TestA/(x|y)", "-skip=TestB", "-race", "./...", "-args", "-count=nope",
+			}))
+		})
+	})
+	for t, tc := range gotest.Each(t, []struct {
+		Desc string
+		args []string
+		want string
+	}{
+		{"a count that is no number", []string{"-count=abc"}, `invalid value "abc" for flag -count`},
+		{"a parallel given apart from its flag", []string{"-parallel", "abc"}, `invalid value "abc" for flag -parallel`},
+		{"a timeout that is no duration", []string{"-timeout=bogus"}, `invalid value "bogus" for flag -timeout`},
+		{"a shuffle that is neither on, off nor a seed", []string{"-shuffle=xyz"}, `invalid value "xyz" for flag -shuffle`},
+		{"a cpu list with a word", []string{"-cpu=1,x"}, `invalid value "1,x" for flag -cpu`},
+		{"a run pattern that is no regexp", []string{"-run=["}, "invalid regexp for -run"},
+		{"a skip pattern that is no regexp", []string{"-skip", "("}, "invalid regexp for -skip"},
+	}) {
+		gotest.ErrorContains(t, gotestrunner.ValidateTestFlags(tc.args), tc.want)
+	}
+}
+
+func (s *ArgsTestSuite) TestPackagePatterns(t *gotest.T) {
+	t.It("classifies meta patterns and bare import paths as patterns", func(it *gotest.T) {
+		c := gotestrunner.ClassifyGoTestArgs([]string{"-run", "X", "std", "fmt", "-count", "2", "./a"})
+		gotest.Equal(it, []string{"std", "fmt", "./a"}, c.PkgPatterns)
+		gotest.Equal(it, []string{"-run", "X", "-count", "2"}, c.RunFlags)
+	})
+	t.It("gives -skip the non-flag after it, as -run", func(it *gotest.T) {
+		c := gotestrunner.ClassifyGoTestArgs([]string{"-skip", "X", "fmt"})
+		gotest.Equal(it, []string{"fmt"}, c.PkgPatterns)
+		gotest.Equal(it, []string{"-skip", "X"}, c.RunFlags)
+	})
+	t.It("gives an unknown flag the non-flag after it as its value", func(it *gotest.T) {
+		c := gotestrunner.ClassifyGoTestArgs([]string{"-custom", "value", "fmt"})
+		gotest.Equal(it, []string{"-custom", "value"}, c.BuildFlags)
+		gotest.Equal(it, []string{"fmt"}, c.PkgPatterns)
+	})
 }
 
 // -vet reaches `go test -c`, where vet runs, and must never reach

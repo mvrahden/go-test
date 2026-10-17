@@ -72,8 +72,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
 
@@ -202,8 +202,8 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         go-version: ["1.26", "1.27"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -236,7 +236,7 @@ You can also pipe existing `go test -json` output into `gotest summary` without 
 go test -json ./... | gotest summary --input=-
 ```
 
-This is useful if you have existing CI steps that run `go test` and you want to add summary output without changing the test execution.
+This is useful if you have existing CI steps that run `go test` and you want to add summary output without changing the test execution. The exit code is the stream's verdict, so the pipe fails the step even without `pipefail`: 1 when tests failed, 2 when a package failed to build or the stream is empty or cut short.
 
 ## Combining stdlib and suite tests
 
@@ -244,8 +244,8 @@ Many projects have a mix of standard `func Test*` tests and gotest suites. The r
 
 ```yaml {title=".github/workflows/test.yml"}
 steps:
-  - uses: actions/checkout@v4
-  - uses: actions/setup-go@v5
+  - uses: actions/checkout@v7
+  - uses: actions/setup-go@v7
     with:
       go-version-file: go.mod
 

@@ -124,6 +124,12 @@ func (s *PanicResilienceTestSuite) TestConfiguredTimeoutOverrun(t *gotest.T) {
 				"a test within budget must not be reported:\n%s", run.output)
 			gotest.Contains(it, run.output, "MARK:suite afterall", run.output)
 		})
+
+		w.It("locates the verdict where the test is running, not in the Go runtime", func(it *gotest.T) {
+			// test.go:24 is the method's time.Sleep in the fixture source.
+			gotest.Regexp(it, `(?m)^\s+test\.go:24: exceeded its configured Timeout`, run.output)
+			gotest.NotContains(it, run.output, ".s:", "an assembly frame named as the location:\n%s", run.output)
+		})
 	})
 }
 
@@ -164,7 +170,7 @@ func (s *PanicResilienceTestSuite) TestGoroutineThatRunsUntilStopped(t *gotest.T
 }
 
 func (s *PanicResilienceTestSuite) TestSetupTimeoutOverrun(t *gotest.T) {
-	t.When("BeforeAll blows its configured SetupTimeout", func(w *gotest.T) {
+	t.When("BeforeAll and AfterAll blow their configured SetupTimeout", func(w *gotest.T) {
 		run := runGeneratedSuite(w, "TestLifecycle_SetupOverrun")
 
 		w.It("fails the run rather than passing silently", func(it *gotest.T) {
@@ -177,6 +183,13 @@ func (s *PanicResilienceTestSuite) TestSetupTimeoutOverrun(t *gotest.T) {
 			gotest.Contains(it, run.output, "MARK:beforeall returned", run.output)
 			gotest.Contains(it, run.output, "MARK:test ran", run.output)
 			gotest.Contains(it, run.output, "MARK:afterall ran", run.output)
+		})
+
+		w.It("locates each verdict where its phase is running, not in the Go runtime", func(it *gotest.T) {
+			// test.go:19 and :24 are BeforeAll's and AfterAll's time.Sleep.
+			gotest.Regexp(it, `(?m)^\s+test\.go:19: BeforeAll exceeded its configured SetupTimeout`, run.output)
+			gotest.Regexp(it, `(?m)^\s+test\.go:24: AfterAll exceeded its configured SetupTimeout`, run.output)
+			gotest.NotContains(it, run.output, ".s:", "an assembly frame named as the location:\n%s", run.output)
 		})
 	})
 }
@@ -196,6 +209,8 @@ func (s *PanicResilienceTestSuite) TestSetupThatNeverReturns(t *gotest.T) {
 					"so if those are equal the alarm beat the verdict and this is a margin problem, not a regression:\n%s",
 				run.elapsed, run.timeout, run.output)
 			gotest.Contains(it, run.output, "MARK:setup entered", run.output)
+			// test.go:23 is the select {} BeforeAll is stuck in.
+			gotest.Regexp(it, `(?m)^\s+test\.go:23: BeforeAll exceeded its configured SetupTimeout`, run.output)
 		})
 
 		w.It("fails the run", func(it *gotest.T) {

@@ -20,13 +20,19 @@ func (s *GeneratorTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return cfg
 }
 
-func (s *GeneratorTestSuite) TestStdlibPackageReturnsEmpty(t *gotest.T) {
+func (s *GeneratorTestSuite) TestStdlibPackageHasNoSuites(t *gotest.T) {
 	t.When("loading a stdlib package", func(w *gotest.T) {
-		w.It("returns empty results", func(it *gotest.T) {
+		w.It("loads it, owed a verdict, and generates nothing for it", func(it *gotest.T) {
 			loaded, broken, err := gotestgen.LoadPackages([]string{"strings"}, nil)
 			gotest.NoError(it, err)
-			gotest.Empty(it, loaded)
+			gotest.Len(it, loaded, 1)
 			gotest.Empty(it, broken)
+			results, _, err := gotestgen.GenerateFromLoaded(loaded)
+			gotest.NoError(it, err)
+			gotest.Len(it, results, 1)
+			gotest.Empty(it, results[0].PTest)
+			gotest.Empty(it, results[0].PXTest)
+			gotest.Greater(it, results[0].StdlibTestCount, 0)
 		})
 	})
 }
@@ -144,21 +150,29 @@ func (s *GeneratorTestSuite) TestE2ENoTestSuites(t *gotest.T) {
 		for sub, tC := range gotest.Each(w, []struct {
 			Desc       string
 			arg        string
+			wantLoaded int
 			wantBroken int
 		}{
-			{"no test files", "./testdata_e2e/no_testfiles", 0},
+			{"no test files", "./testdata_e2e/no_testfiles", 0, 0},
 			// A pattern that matches nothing is a broken package, not an empty
 			// result: a typo'd path must never report a passing run.
-			{"non-existent path is broken", "testdata_e2e/nothing-here", 1},
-			{"stdlib package returns empty", "strings", 0},
+			{"non-existent path is broken", "testdata_e2e/nothing-here", 0, 1},
+			// A stdlib package with tests loads, to be reported without suites.
+			{"stdlib package generates nothing", "strings", 1, 0},
 			// Any nested path proves the point, so pick one whose import graph
 			// is nearly empty — net/http cost a second of loading to say this.
-			{"stdlib nested package returns empty", "container/heap", 0},
+			{"stdlib nested package generates nothing", "container/heap", 1, 0},
 		}) {
 			loaded, broken, err := gotestgen.LoadPackages([]string{tC.arg}, nil)
 			gotest.NoError(sub, err)
-			gotest.Empty(sub, loaded)
+			gotest.Len(sub, loaded, tC.wantLoaded)
 			gotest.Len(sub, broken, tC.wantBroken)
+			results, _, err := gotestgen.GenerateFromLoaded(loaded)
+			gotest.NoError(sub, err)
+			for _, r := range results {
+				gotest.Empty(sub, r.PTest)
+				gotest.Empty(sub, r.PXTest)
+			}
 		}
 	})
 }

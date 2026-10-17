@@ -47,3 +47,7 @@ func ExportUseBudgetFile(path string) {
 	maxBudget = 0
 	budgetMu.Unlock()
 }
+
+// ExportUserFrameBelowHarness reads a goroutine traceback as the overrun
+// verdict does.
+var ExportUserFrameBelowHarness = userFrameBelowHarness

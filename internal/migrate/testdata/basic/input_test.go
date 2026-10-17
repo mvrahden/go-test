@@ -31,7 +31,7 @@ func (s *UserSuite) TestCreate() {
 }
 
 func (s *UserSuite) TestDelete() {
-	s.Assert().NotNil(s.db)
+	s.Assert().NotEmpty(s.db)
 	s.Require().ErrorContains(nil, "expected")
 }
 

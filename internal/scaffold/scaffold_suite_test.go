@@ -126,8 +126,8 @@ func (s *ScaffoldTestSuite) TestGenerateContractScaffold_Interface(t *gotest.T, 
 
 	gotest.Contains(t, src, "package validation")
 	gotest.Contains(t, src, "type ValidatorContractTestSuite[T Validator] struct")
-	gotest.Contains(t, src, "factory func() T")
-	gotest.Contains(t, src, "s.sut = s.factory()")
+	gotest.Contains(t, src, "sut T")
+	gotest.Contains(t, src, "func (s *ValidatorContractTestSuite[T]) BeforeEach(t *gotest.T)")
 	gotest.Contains(t, src, "func (s *ValidatorContractTestSuite[T]) TestValidate(t *gotest.T)")
 	gotest.Contains(t, src, "func (s *ValidatorContractTestSuite[T]) TestIsValid(t *gotest.T)")
 	gotest.Contains(t, src, "type MyValidatorTestSuite = ValidatorContractTestSuite[*MyImpl]")

@@ -1,3 +1,4 @@
+import * as os from "node:os";
 import * as path from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -10,7 +11,33 @@ const {
   mockConfigUpdate,
   mockShowInformationMessage,
   mockShowWarningMessage,
+  mockShowErrorMessage,
+  mockMkdtemp,
+  mockWriteFile,
+  mockRm,
+  progressToken,
 } = vi.hoisted(() => ({
+  mockMkdtemp: vi.fn(async (prefix: string) => `${prefix}XYZ`),
+  mockWriteFile: vi.fn(async (_p: string, _data: string) => undefined),
+  mockRm: vi.fn(async (_p: string, _opts?: unknown) => undefined),
+  // progressToken is the cancellation token every withProgress task gets.
+  progressToken: {
+    isCancellationRequested: false,
+    listeners: [] as (() => void)[],
+    onCancellationRequested(fn: () => void) {
+      this.listeners.push(fn);
+      return { dispose: () => undefined };
+    },
+    cancel() {
+      this.isCancellationRequested = true;
+      for (const fn of this.listeners) fn();
+    },
+    reset() {
+      this.isCancellationRequested = false;
+      this.listeners = [];
+    },
+  },
+  mockShowErrorMessage: vi.fn(),
   mockConfigUpdate: vi.fn(async () => undefined),
   mockShowInformationMessage: vi.fn<
     (message: string, ...items: string[]) => Promise<string | undefined>
@@ -49,10 +76,15 @@ vi.mock("vscode", () => ({
   },
   Uri: { file: (p: string) => ({ fsPath: p }) },
   ConfigurationTarget: { WorkspaceFolder: 3 },
+  ProgressLocation: { Notification: 15 },
   window: {
+    withProgress: async (
+      _opts: unknown,
+      task: (p: unknown, t: unknown) => Promise<unknown>,
+    ) => task({ report: () => undefined }, progressToken),
     showWarningMessage: mockShowWarningMessage,
     showInformationMessage: mockShowInformationMessage,
-    showErrorMessage: vi.fn(),
+    showErrorMessage: mockShowErrorMessage,
   },
 }));
 
@@ -64,6 +96,9 @@ vi.mock("./goBinary.js", () => ({
 
 vi.mock("node:fs/promises", () => ({
   readFile: mockReadFile,
+  mkdtemp: mockMkdtemp,
+  writeFile: mockWriteFile,
+  rm: mockRm,
 }));
 
 vi.mock("node:child_process", async () => {
@@ -79,6 +114,12 @@ import {
   CliBelowFloorError,
   CliUnavailableError,
   offerCliUpgrade,
+  planUpgrade,
+  compareGoVersions,
+  goLineFits,
+  goReleaseQuery,
+  lookupGoFlags,
+  type ReleaseQuery,
 } from "./cli.js";
 
 function setGoMod(dir: string, content: string) {
@@ -103,10 +144,10 @@ async function flush() {
   for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
 }
 
-const PINNED = (version: string, extra: string[] = []) =>
+const PINNED = (version: string, extra: string[] = [], go = "1.25.0") =>
   [
     "module github.com/myapp",
-    "go 1.25.0",
+    `go ${go}`,
     "require (",
     `\tgithub.com/mvrahden/go-test ${version}`,
     ")",
@@ -114,6 +155,87 @@ const PINNED = (version: string, extra: string[] = []) =>
   ].join("\n");
 
 const GOTEST_MODULE = "github.com/mvrahden/go-test/cmd/gotest";
+
+const LOOKUP_DIR = path.join(os.tmpdir(), "gotest-upgrade-XYZ");
+
+type ExecOpts = { cwd?: string; env?: NodeJS.ProcessEnv; signal?: AbortSignal };
+
+// listJSON answers go list -m -json for args the way the go command does:
+// -versions as one object, otherwise one object per mod@version, with an
+// Error for a release that is an Error, and a GOFLAGS for go env.
+function listJSON(
+  args: string[],
+  releases: Record<string, string | Error>,
+  goflags = "",
+): string {
+  if (args[0] === "env") return `${goflags}\n`;
+  if (args.includes("-versions")) {
+    return JSON.stringify(
+      { Path: MOD, Versions: Object.keys(releases) },
+      null,
+      "\t",
+    );
+  }
+  return args
+    .filter((a) => a.startsWith(`${MOD}@`))
+    .map((a) => a.split("@")[1])
+    .map((v) => {
+      const r = releases[v];
+      const m =
+        r instanceof Error
+          ? { Path: MOD, Version: v, Error: { Err: r.message } }
+          : { Path: MOD, Version: v, GoVersion: r };
+      return JSON.stringify(m, null, "\t") + "\n";
+    })
+    .join("");
+}
+
+// scriptReleases makes go answer as the module proxy would for these
+// releases and their go lines, or fail with the given error.
+function scriptReleases(
+  releases: Record<string, string | Error> | Error,
+  goflags = "",
+) {
+  mockExecFileAsync.mockImplementation(async (_file, args) => {
+    if (args[0] !== "list" && args[0] !== "env") {
+      return { stdout: "", stderr: "" };
+    }
+    if (releases instanceof Error) throw releases;
+    return { stdout: listJSON(args, releases, goflags), stderr: "" };
+  });
+}
+
+// hangLookups makes every lookup go command run until its signal aborts,
+// rejecting then as execFile does; anything else succeeds at once.
+function hangLookups() {
+  mockExecFileAsync.mockImplementation(async (_file, args, opts) => {
+    if (args[0] !== "list" && args[0] !== "env") {
+      return { stdout: "", stderr: "" };
+    }
+    const { signal } = opts as ExecOpts;
+    return new Promise((_resolve, reject) => {
+      signal?.addEventListener("abort", () => {
+        const err = new Error("The operation was aborted");
+        err.name = "AbortError";
+        reject(err);
+      });
+    });
+  });
+}
+
+// lookups lists the go commands of the release lookup.
+function lookups() {
+  return mockExecFileAsync.mock.calls.filter(
+    (c) => c[1][0] === "list" || c[1][0] === "env",
+  );
+}
+
+// goGets lists the go get invocations, each as [cwd, version argument].
+function goGets(): [string, string][] {
+  return mockExecFileAsync.mock.calls
+    .filter((c) => c[1][0] === "get")
+    .map((c) => [(c[2] as { cwd: string }).cwd, c[1][2]]);
+}
 
 // Pins and binaries in these fixtures are v1.90 and up: versions no floor
 // will reach, so the floor can move without a fixture moving with it. The
@@ -126,6 +248,7 @@ describe("buildCliCommand", () => {
     mockFileExists.mockResolvedValue(false);
     mockResolveGoBinary.mockResolvedValue("/usr/local/go/bin/go");
     mockExecFileAsync.mockResolvedValue({ stdout: "", stderr: "" });
+    progressToken.reset();
     clearBinaryCache();
   });
 
@@ -491,6 +614,9 @@ describe("buildCliCommand", () => {
       await expect(buildCliCommand(["spec"], "/workspace")).rejects.toThrow(
         /v1\.0\.0.*v1\.33\.0/,
       );
+      await expect(buildCliCommand(["spec"], "/workspace")).rejects.toThrow(
+        `Run: go get -tool ${GOTEST_MODULE}@v1.33.0`,
+      );
       expect(mockExecFileAsync).not.toHaveBeenCalled();
     });
 
@@ -546,22 +672,231 @@ describe("buildCliCommand", () => {
       expect(mockShowWarningMessage).not.toHaveBeenCalled();
     });
 
-    it("Upgrade declares the tool at latest in the module that pins", async () => {
+    it("Upgrade declares the newest release the module's go line takes, never @latest", async () => {
       setGoMod("/workspace", PINNED("v1.0.0"));
+      scriptReleases({
+        "v1.90.0": "1.24.0",
+        "v1.91.0": "1.25.0",
+        "v1.92.0": "1.26.0",
+      });
       mockShowWarningMessage.mockResolvedValue("Upgrade");
 
       await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
       await flush();
 
-      expect(mockExecFileAsync).toHaveBeenCalledWith(
-        "/usr/local/go/bin/go",
-        ["get", "-tool", `${GOTEST_MODULE}@latest`],
-        expect.objectContaining({ cwd: "/workspace" }),
+      expect(goGets()).toEqual([["/workspace", `${GOTEST_MODULE}@v1.91.0`]]);
+      expect(mockShowInformationMessage).toHaveBeenCalledWith(
+        "gotest: upgraded to v1.91.0 and declared as a tool.",
       );
+    });
+
+    it("Upgrade asks the proxy from a private module, outside the user's module and workspace", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
+      scriptReleases({ "v1.91.0": "1.25.0" });
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await flush();
+
+      expect(mockMkdtemp).toHaveBeenCalledWith(
+        path.join(os.tmpdir(), "gotest-upgrade-"),
+      );
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        path.join(LOOKUP_DIR, "go.mod"),
+        "module gotest.upgrade.lookup\n",
+      );
+      expect(lookups().map((c) => c[1].slice(0, 4))).toEqual([
+        ["env", "GOFLAGS"],
+        ["list", "-m", "-json", "-versions"],
+        ["list", "-m", "-json", "-e"],
+      ]);
+      for (const [, , opts] of lookups()) {
+        expect(opts).toMatchObject({
+          cwd: LOOKUP_DIR,
+          env: expect.objectContaining({ GOWORK: "off" }),
+        });
+      }
+      expect(mockRm).toHaveBeenCalledWith(LOOKUP_DIR, {
+        recursive: true,
+        force: true,
+      });
+      expect(goGets()).toEqual([["/workspace", `${GOTEST_MODULE}@v1.91.0`]]);
+    });
+
+    it("Upgrade removes the private module when the lookup fails", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
+      scriptReleases(new Error("no network"));
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await flush();
+
+      expect(mockRm).toHaveBeenCalledWith(LOOKUP_DIR, {
+        recursive: true,
+        force: true,
+      });
+    });
+
+    it("Upgrade looks up without the user's -mod and -modfile, keeping every other flag", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
+      scriptReleases(
+        { "v1.91.0": "1.25.0" },
+        "-modfile=/workspace/go.alt.mod -mod=vendor -tags=integration -modcacherw",
+      );
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await flush();
+
+      const lists = lookups().filter((c) => c[1][0] === "list");
+      expect(lists).toHaveLength(2);
+      for (const [, , opts] of lists) {
+        expect((opts as ExecOpts).env?.GOFLAGS).toBe(
+          "-tags=integration -modcacherw -mod=mod",
+        );
+      }
+      expect(goGets()).toEqual([["/workspace", `${GOTEST_MODULE}@v1.91.0`]]);
+    });
+
+    it("Upgrade skips a release the proxy cannot serve and takes the next that fits", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
+      scriptReleases({
+        "v1.90.0": "1.24.0",
+        "v1.91.0": "1.25.0",
+        "v1.91.1": new Error("reading v1.91.1.info: 410 Gone"),
+      });
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await flush();
+
+      expect(goGets()).toEqual([["/workspace", `${GOTEST_MODULE}@v1.91.0`]]);
+      expect(mockShowErrorMessage).not.toHaveBeenCalled();
+    });
+
+    it("Upgrade fails only when no release resolves", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
+      scriptReleases({
+        "v1.90.0": new Error("unknown revision v1.90.0"),
+        "v1.91.0": new Error("410 Gone"),
+      });
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await flush();
+
+      expect(goGets()).toEqual([]);
+      expect(mockShowErrorMessage).toHaveBeenCalledWith(
+        "gotest: upgrade failed, go.mod is unchanged: could not look up gotest releases. " +
+          "none of the releases of github.com/mvrahden/go-test at or above v1.33.0 could be resolved: v1.91.0, v1.90.0",
+      );
+    });
+
+    it("a floor hit during the upgrade starts no second one and says it is running", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
+      let release: () => void = () => undefined;
+      const lookupDone = new Promise<void>((r) => (release = r));
+      mockExecFileAsync.mockImplementation(async (_file, args) => {
+        if (args[0] !== "list" && args[0] !== "env") {
+          return { stdout: "", stderr: "" };
+        }
+        await lookupDone;
+        return { stdout: listJSON(args, { "v1.91.0": "1.25.0" }), stderr: "" };
+      });
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      const err = await buildCliCommand(["spec"], "/workspace").catch(
+        (e: unknown) => e,
+      );
+      await flush();
+      expect(offerCliUpgrade(err)).toBe(true);
+      release();
+      await flush();
+
+      expect(mockShowWarningMessage).toHaveBeenCalledTimes(1);
+      expect(mockShowInformationMessage).toHaveBeenCalledWith(
+        "gotest: the CLI upgrade is still running; try again when it finishes.",
+      );
+      expect(goGets()).toEqual([["/workspace", `${GOTEST_MODULE}@v1.91.0`]]);
+
+      // Finished, the next floor hit offers the upgrade again.
+      offerCliUpgrade(err);
+      await flush();
+      expect(mockShowWarningMessage).toHaveBeenCalledTimes(2);
+    });
+
+    it("a failed upgrade offers it again on the next floor hit", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
+      scriptReleases(new Error("no network"));
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      const err = await buildCliCommand(["spec"], "/workspace").catch(
+        (e: unknown) => e,
+      );
+      await flush();
+      offerCliUpgrade(err);
+      await flush();
+
+      expect(mockShowWarningMessage).toHaveBeenCalledTimes(2);
+    });
+
+    it("cancelling the lookup stops its go command and leaves go.mod unchanged", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
+      hangLookups();
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await flush();
+      const [, , opts] = lookups()[0];
+      expect((opts as ExecOpts).signal?.aborted).toBe(false);
+      progressToken.cancel();
+      await flush();
+
+      expect((opts as ExecOpts).signal?.aborted).toBe(true);
+      expect(goGets()).toEqual([]);
+      expect(mockShowErrorMessage).not.toHaveBeenCalled();
+      expect(mockRm).toHaveBeenCalledWith(LOOKUP_DIR, {
+        recursive: true,
+        force: true,
+      });
+    });
+
+    it("Upgrade changes nothing when no release fits the go line, and says what is needed", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0", [], "1.24.0"));
+      scriptReleases({ "v1.91.0": "1.25.0", "v1.92.0": "1.26.0" });
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await flush();
+
+      expect(goGets()).toEqual([]);
+      expect(mockShowWarningMessage).toHaveBeenLastCalledWith(
+        `gotest: v1.33.0 and newer need go 1.25.0, but go.mod declares go 1.24.0. ` +
+          `Raise the go line to upgrade: go get -tool ${GOTEST_MODULE}@v1.91.0 raises it.`,
+      );
+      expect(mockShowInformationMessage).not.toHaveBeenCalled();
+    });
+
+    it("Upgrade changes nothing when the releases cannot be listed", async () => {
+      setGoMod("/workspace", PINNED("v1.0.0"));
+      scriptReleases(
+        new Error("dial tcp: lookup proxy.golang.org: no such host"),
+      );
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await flush();
+
+      expect(goGets()).toEqual([]);
+      expect(mockShowErrorMessage).toHaveBeenCalledWith(
+        "gotest: upgrade failed, go.mod is unchanged: could not look up gotest releases. dial tcp: lookup proxy.golang.org: no such host",
+      );
+      expect(mockShowInformationMessage).not.toHaveBeenCalled();
     });
 
     it("Upgrade re-vendors a vendored module", async () => {
       setGoMod("/workspace", PINNED("v1.0.0"));
+      scriptReleases({ "v1.91.0": "1.25.0" });
       mockFileExists.mockImplementation(
         async (p: string) =>
           p === path.join("/workspace", "vendor", "modules.txt"),
@@ -571,9 +906,11 @@ describe("buildCliCommand", () => {
       await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
       await flush();
 
-      const calls = mockExecFileAsync.mock.calls.map((c) => c[1]);
+      const calls = mockExecFileAsync.mock.calls
+        .map((c) => c[1])
+        .filter((args) => args[0] !== "list" && args[0] !== "env");
       expect(calls).toEqual([
-        ["get", "-tool", `${GOTEST_MODULE}@latest`],
+        ["get", "-tool", `${GOTEST_MODULE}@v1.91.0`],
         ["mod", "vendor"],
       ]);
     });
@@ -802,16 +1139,58 @@ describe("buildCliCommand", () => {
         "/workspace/a/go.mod": PINNED("v1.25.0"),
         "/workspace/b/go.mod": "module github.com/b\n\ngo 1.25.0\n",
       });
+      scriptReleases({ "v1.91.0": "1.25.0" });
       mockShowWarningMessage.mockResolvedValue("Upgrade");
 
       await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
       await flush();
 
-      expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
-      expect(mockExecFileAsync).toHaveBeenCalledWith(
-        "/usr/local/go/bin/go",
-        ["get", "-tool", `${GOTEST_MODULE}@latest`],
-        expect.objectContaining({ cwd: path.resolve("/workspace", "a") }),
+      expect(goGets()).toEqual([
+        [path.resolve("/workspace", "a"), `${GOTEST_MODULE}@v1.91.0`],
+      ]);
+    });
+
+    it("Upgrade gives each use module the newest release its own go line takes", async () => {
+      setFiles({
+        "/workspace/go.work": "go 1.26.0\n\nuse (\n\t./a\n\t./b\n)\n",
+        "/workspace/a/go.mod": PINNED("v1.25.0", [], "1.25.0"),
+        "/workspace/b/go.mod": PINNED("v1.26.0", [], "1.26.0"),
+      });
+      scriptReleases({ "v1.91.0": "1.25.0", "v1.92.0": "1.26.0" });
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await flush();
+
+      expect(goGets()).toEqual([
+        [path.resolve("/workspace", "a"), `${GOTEST_MODULE}@v1.91.0`],
+        [path.resolve("/workspace", "b"), `${GOTEST_MODULE}@v1.92.0`],
+      ]);
+      expect(mockShowInformationMessage).toHaveBeenCalledWith(
+        "gotest: upgraded to v1.91.0 in a/go.mod, v1.92.0 in b/go.mod and declared as a tool.",
+      );
+    });
+
+    it("Upgrade moves the use modules that fit and names the one that does not", async () => {
+      setFiles({
+        "/workspace/go.work": "go 1.26.0\n\nuse (\n\t./a\n\t./b\n)\n",
+        "/workspace/a/go.mod": PINNED("v1.25.0", [], "1.24.0"),
+        "/workspace/b/go.mod": PINNED("v1.26.0", [], "1.26.0"),
+      });
+      scriptReleases({ "v1.91.0": "1.25.0", "v1.92.0": "1.26.0" });
+      mockShowWarningMessage.mockResolvedValue("Upgrade");
+
+      await buildCliCommand(["spec"], "/workspace").catch(() => undefined);
+      await flush();
+
+      expect(goGets()).toEqual([
+        [path.resolve("/workspace", "b"), `${GOTEST_MODULE}@v1.92.0`],
+      ]);
+      expect(mockShowWarningMessage).toHaveBeenLastCalledWith(
+        expect.stringContaining("but a/go.mod declares go 1.24.0."),
+      );
+      expect(mockShowInformationMessage).toHaveBeenCalledWith(
+        "gotest: upgraded to v1.92.0 and declared as a tool.",
       );
     });
   });
@@ -923,7 +1302,7 @@ describe("checkProducerVersion", () => {
       await import("./cli.js");
     expect(() => checkProducerVersion("v1.32.0")).toThrow(CliUnavailableError);
     expect(() => checkProducerVersion("v1.29.0")).toThrow(
-      "the CLI is v1.29.0, but >= v1.33.0 is required. Run: go get -tool github.com/mvrahden/go-test/cmd/gotest@latest",
+      "the CLI is v1.29.0, but >= v1.33.0 is required. Run: go get -tool github.com/mvrahden/go-test/cmd/gotest@v1.33.0",
     );
   });
 
@@ -940,7 +1319,319 @@ describe("checkProducerVersion", () => {
     const { checkProducerVersion } = await import("./cli.js");
     mockConfigValues.set("modulePath", "example.com/fork/cmd/gotest");
     expect(() => checkProducerVersion("v1.0.0")).toThrow(
-      "go get -tool example.com/fork/cmd/gotest@latest",
+      "go get -tool example.com/fork/cmd/gotest@v1.33.0",
     );
+  });
+});
+
+// fakeProxy answers like the module proxy for these releases, recording
+// which versions were asked for their go line.
+function fakeProxy(releases: Record<string, string> | Error) {
+  const asked: string[] = [];
+  const query: ReleaseQuery = {
+    versions: async () => {
+      if (releases instanceof Error) throw releases;
+      return Object.keys(releases);
+    },
+    goLines: async (_module, versions) => {
+      asked.push(...versions);
+      return new Map(
+        versions.map((v) => [v, (releases as Record<string, string>)[v]]),
+      );
+    },
+  };
+  return { query, asked };
+}
+
+const MOD = "github.com/mvrahden/go-test";
+
+describe("planUpgrade", () => {
+  const releases = {
+    "v1.89.0": "1.23.0",
+    "v1.90.0": "1.24.0",
+    "v1.91.0": "1.25.0",
+    "v1.91.1": "1.25.0",
+    "v1.92.0": "1.26.0",
+    "v1.93.0-rc.1": "1.24.0",
+  };
+  const at = (goLine: string) => [{ dir: "/m", goLine }];
+
+  it("takes latest when its go line fits", async () => {
+    const { query } = fakeProxy(releases);
+    const plan = await planUpgrade(at("1.26.0"), MOD, "v1.90.0", query);
+    expect(plan.upgrades).toEqual([{ dir: "/m", release: "v1.92.0" }]);
+    expect(plan.blocked).toEqual([]);
+  });
+
+  it("takes the newest release in between when latest needs a newer Go", async () => {
+    const { query } = fakeProxy(releases);
+    const plan = await planUpgrade(at("1.25.0"), MOD, "v1.90.0", query);
+    expect(plan.upgrades).toEqual([{ dir: "/m", release: "v1.91.1" }]);
+  });
+
+  it("takes the floor when only the floor fits", async () => {
+    const { query } = fakeProxy(releases);
+    const plan = await planUpgrade(at("1.24.0"), MOD, "v1.90.0", query);
+    expect(plan.upgrades).toEqual([{ dir: "/m", release: "v1.90.0" }]);
+  });
+
+  it("blocks when even the floor needs a newer Go, naming the least it needs", async () => {
+    const { query } = fakeProxy(releases);
+    const plan = await planUpgrade(at("1.23.5"), MOD, "v1.90.0", query);
+    expect(plan.upgrades).toEqual([]);
+    expect(plan.blocked).toEqual([{ dir: "/m", goLine: "1.23.5" }]);
+    expect(plan.needs).toEqual({ release: "v1.90.0", goLine: "1.24.0" });
+  });
+
+  it("finds a fitting release below a newer one with a lower go line", async () => {
+    const { query } = fakeProxy({
+      "v1.90.0": "1.24.0",
+      "v1.91.0": "1.26.0",
+      "v1.92.0": "1.25.0",
+    });
+    const plan = await planUpgrade(at("1.24.0"), MOD, "v1.90.0", query);
+    expect(plan.upgrades).toEqual([{ dir: "/m", release: "v1.90.0" }]);
+    expect(plan.needs).toEqual({ release: "v1.90.0", goLine: "1.24.0" });
+  });
+
+  it("asks only for releases at or above the floor, never pre-releases", async () => {
+    const { query, asked } = fakeProxy(releases);
+    await planUpgrade(at("1.26.0"), MOD, "v1.90.0", query);
+    expect(asked.sort()).toEqual(["v1.90.0", "v1.91.0", "v1.91.1", "v1.92.0"]);
+  });
+
+  it("on tied go lines takes the newest release, to upgrade to and to name as needed", async () => {
+    const tied = {
+      "v1.90.0": "1.25.0",
+      "v1.90.1": "1.25.0",
+      "v1.91.0": "1.25.0",
+    };
+    const { query } = fakeProxy(tied);
+    const fits = await planUpgrade(at("1.25.0"), MOD, "v1.90.0", query);
+    expect(fits.upgrades).toEqual([{ dir: "/m", release: "v1.91.0" }]);
+    const blocked = await planUpgrade(at("1.24.0"), MOD, "v1.90.0", query);
+    expect(blocked.needs).toEqual({ release: "v1.91.0", goLine: "1.25.0" });
+  });
+
+  it("never takes a pre-release, however low its go line", async () => {
+    const { query } = fakeProxy({
+      "v1.90.0": "1.25.0",
+      "v1.91.0-rc.1": "1.23.0",
+      "v1.91.0-beta.1": "1.23.0",
+      "v1.92.0": "1.25.0",
+    });
+    const plan = await planUpgrade(at("1.24.0"), MOD, "v1.90.0", query);
+    expect(plan.upgrades).toEqual([]);
+    expect(plan.needs).toEqual({ release: "v1.92.0", goLine: "1.25.0" });
+  });
+
+  it("skips a release whose go line could not be read", async () => {
+    const { query } = fakeProxy({
+      "v1.90.0": "1.24.0",
+      "v1.91.0": "",
+      "v1.92.0": "1.26.0",
+    });
+    const plan = await planUpgrade(at("1.25.0"), MOD, "v1.90.0", query);
+    expect(plan.upgrades).toEqual([{ dir: "/m", release: "v1.90.0" }]);
+  });
+
+  it("takes a release at 1.N.0 for a module at go 1.N, which go get only spells out", async () => {
+    const { query } = fakeProxy({
+      "v1.90.0": "1.25.0",
+      "v1.91.0": "1.26.0",
+      "v1.92.0": "1.26.1",
+    });
+    const plan = await planUpgrade(at("1.26"), MOD, "v1.90.0", query);
+    expect(plan.upgrades).toEqual([{ dir: "/m", release: "v1.91.0" }]);
+  });
+
+  it("fails when the releases cannot be listed", async () => {
+    const { query } = fakeProxy(new Error("no network"));
+    await expect(
+      planUpgrade(at("1.26.0"), MOD, "v1.90.0", query),
+    ).rejects.toThrow("no network");
+  });
+
+  it("fails when no release at or above the floor is published", async () => {
+    const { query } = fakeProxy(releases);
+    await expect(
+      planUpgrade(at("1.26.0"), MOD, "v1.94.0", query),
+    ).rejects.toThrow(
+      "no release of github.com/mvrahden/go-test at or above v1.94.0 is published",
+    );
+  });
+
+  it("plans each module against its own go line", async () => {
+    const { query } = fakeProxy(releases);
+    const plan = await planUpgrade(
+      [
+        { dir: "/a", goLine: "1.26.0" },
+        { dir: "/b", goLine: "1.24.2" },
+        { dir: "/c", goLine: "1.23.0" },
+      ],
+      MOD,
+      "v1.90.0",
+      query,
+    );
+    expect(plan.upgrades).toEqual([
+      { dir: "/a", release: "v1.92.0" },
+      { dir: "/b", release: "v1.90.0" },
+    ]);
+    expect(plan.blocked).toEqual([{ dir: "/c", goLine: "1.23.0" }]);
+  });
+});
+
+describe("compareGoVersions", () => {
+  it("orders go lines as Go does", () => {
+    const ordered = [
+      "",
+      "1.16",
+      "1.25",
+      "1.25alpha1",
+      "1.25beta1",
+      "1.25beta2",
+      "1.25rc1",
+      "1.25rc2",
+      "1.25.0",
+      "1.25.1",
+      "1.26.0",
+      "2.0",
+    ];
+    for (let i = 0; i < ordered.length - 1; i++) {
+      expect(compareGoVersions(ordered[i], ordered[i + 1])).toBeLessThan(0);
+      expect(compareGoVersions(ordered[i + 1], ordered[i])).toBeGreaterThan(0);
+    }
+    expect(compareGoVersions("1.25.0", "1.25.0")).toBe(0);
+  });
+});
+
+describe("goLineFits", () => {
+  it("takes a release at or below the module's go line", () => {
+    expect(goLineFits("1.25.0", "1.26.0")).toBe(true);
+    expect(goLineFits("1.26.0", "1.26.0")).toBe(true);
+    expect(goLineFits("1.26.1", "1.26.0")).toBe(false);
+    expect(goLineFits("1.27.0", "1.26.5")).toBe(false);
+  });
+
+  it("takes 1.N.0 for a module at 1.N or a 1.N pre-release, nothing newer", () => {
+    expect(goLineFits("1.26.0", "1.26")).toBe(true);
+    expect(goLineFits("1.26.0", "1.26rc2")).toBe(true);
+    expect(goLineFits("1.26.1", "1.26")).toBe(false);
+    expect(goLineFits("1.27.0", "1.26")).toBe(false);
+    expect(goLineFits("1.26.0", "1.25")).toBe(false);
+    expect(goLineFits("1.26.0", "")).toBe(false);
+  });
+});
+
+describe("lookupGoFlags", () => {
+  it("drops -mod and -modfile in every spelling and always sets -mod=mod", () => {
+    expect(lookupGoFlags("")).toBe("-mod=mod");
+    expect(
+      lookupGoFlags(
+        "-modfile=/x/alt.mod  --mod=vendor -mod=readonly --modfile=y -modcacherw -tags=a,b",
+      ),
+    ).toBe("-modcacherw -tags=a,b -mod=mod");
+  });
+});
+
+describe("goReleaseQuery", () => {
+  const exec = (answer: (args: string[]) => string | Promise<string>): void => {
+    mockExecFileAsync.mockImplementation(async (_file, args) => ({
+      stdout: await answer(args),
+      stderr: "",
+    }));
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useRealTimers();
+  });
+
+  it("lists exactly the published versions, none of the surrounding fields", async () => {
+    exec((args) =>
+      listJSON(args, { "v1.90.0": "1.25.0", "v1.91.0": "1.26.0" }),
+    );
+    const q = goReleaseQuery("go", "/d", new AbortController().signal);
+    expect(await q.versions(MOD)).toEqual(["v1.90.0", "v1.91.0"]);
+  });
+
+  it("returns the go line of every release that resolves and leaves out the rest", async () => {
+    exec((args) =>
+      listJSON(args, {
+        "v1.90.0": "1.25.0",
+        "v1.91.0": new Error("410 Gone"),
+        "v1.92.0": "1.26.0",
+      }),
+    );
+    const q = goReleaseQuery("go", "/d", new AbortController().signal);
+    const lines = await q.goLines(MOD, ["v1.90.0", "v1.91.0", "v1.92.0"]);
+    expect([...lines]).toEqual([
+      ["v1.90.0", "1.25.0"],
+      ["v1.92.0", "1.26.0"],
+    ]);
+    const list = mockExecFileAsync.mock.calls.find((c) => c[1][0] === "list");
+    expect(list?.[1]).toEqual([
+      "list",
+      "-m",
+      "-json",
+      "-e",
+      `${MOD}@v1.90.0`,
+      `${MOD}@v1.91.0`,
+      `${MOD}@v1.92.0`,
+    ]);
+  });
+
+  it("asks go env for GOFLAGS once, so the go env file's count too", async () => {
+    exec((args) => listJSON(args, { "v1.90.0": "1.25.0" }, "-modfile=x"));
+    const q = goReleaseQuery("go", "/d", new AbortController().signal);
+    await q.versions(MOD);
+    await q.goLines(MOD, ["v1.90.0"]);
+    const envs = mockExecFileAsync.mock.calls.filter((c) => c[1][0] === "env");
+    expect(envs).toHaveLength(1);
+  });
+
+  describe("timeout", () => {
+    beforeEach(() => vi.useFakeTimers());
+
+    it("stops a go command still running after 60s and fails the lookup", async () => {
+      hangLookups();
+      const q = goReleaseQuery("go", "/d", new AbortController().signal);
+      const versions = q.versions(MOD);
+      const settled = vi.fn();
+      versions.then(settled, settled);
+
+      await vi.advanceTimersByTimeAsync(59_999);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+
+      await expect(versions).rejects.toThrow("go env timed out after 60s");
+      const [, , opts] = mockExecFileAsync.mock.calls[0];
+      expect((opts as ExecOpts).signal?.aborted).toBe(true);
+      vi.useRealTimers();
+    });
+
+    it("gives each go command its own 60s", async () => {
+      mockExecFileAsync.mockImplementation(async (_file, args, opts) => {
+        if (args[0] === "env") {
+          await new Promise((r) => setTimeout(r, 50_000));
+          return { stdout: "\n", stderr: "" };
+        }
+        const { signal } = opts as ExecOpts;
+        return new Promise((_resolve, reject) =>
+          signal?.addEventListener("abort", () => reject(new Error("aborted"))),
+        );
+      });
+      const q = goReleaseQuery("go", "/d", new AbortController().signal);
+      const versions = q.versions(MOD);
+      const settled = vi.fn();
+      versions.then(settled, settled);
+
+      await vi.advanceTimersByTimeAsync(50_000 + 59_999);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+
+      await expect(versions).rejects.toThrow("go list timed out after 60s");
+      vi.useRealTimers();
+    });
   });
 });

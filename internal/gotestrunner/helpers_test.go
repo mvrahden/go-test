@@ -28,6 +28,7 @@ func toolchainTest2JSON(t *gotest.T) string {
 
 // buildPlainArgs reproduces the exact arg logic of the old RunSingleSuite.
 func buildPlainArgs(target gotestrunner.SuiteTarget) (path string, args []string) { //nolint:gocritic // hugeParam: stable API
+	args = []string{"-test.paniconexit0"}
 	if target.RunFilter != "" {
 		args = append(args, "-test.run="+target.RunFilter)
 	} else {
@@ -42,7 +43,7 @@ func buildPlainArgs(target gotestrunner.SuiteTarget) (path string, args []string
 
 // buildTest2JSONArgs reproduces the exact arg logic of the old RunSingleSuiteTest2JSON.
 func buildTest2JSONArgs(target gotestrunner.SuiteTarget) (path string, args []string) { //nolint:gocritic // hugeParam: stable API
-	var testArgs []string
+	testArgs := []string{"-test.paniconexit0"}
 	if target.RunFilter != "" {
 		testArgs = append(testArgs, "-test.run="+target.RunFilter)
 	} else {

@@ -1,12 +1,13 @@
 package main_test
 
 import (
+	"os"
+	"path/filepath"
 	"time"
 
 	. "github.com/mvrahden/go-test/cmd/gotest"
 
 	"github.com/mvrahden/go-test/internal/config"
-	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -268,27 +269,72 @@ func (s *FlagParsingTestSuite) TestPackagePatterns(t *gotest.T) {
 			{Desc: "space-separated flag value with a slash is not a package", args: []string{"./pkg/a", "-bench", "^BenchmarkFooTestSuite$/^BenchmarkParse$"}, expected: []string{"./pkg/a"}},
 			{Desc: "space-separated -run value with a slash is not a package", args: []string{"-run", "TestFoo/sub", "./pkg/a"}, expected: []string{"./pkg/a"}},
 		}) {
-			result := ExtractPackagePatterns(tc.args)
+			result, err := ExtractPackagePatterns(tc.args)
+			gotest.NoError(sub, err)
 			gotest.Equal(sub, tc.expected, result)
 		}
 	})
 
-	t.When("looks like package pattern", func(w *gotest.T) {
+	t.When("a positional argument names no directory", func(w *gotest.T) {
 		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
-			Desc   string
-			input  string
-			expect bool
+			Desc     string
+			args     []string
+			expected []string
 		}{
-			{Desc: "relative path", input: "./pkg/foo", expect: true},
-			{Desc: "absolute path", input: "/usr/local/pkg", expect: true},
-			{Desc: "named package", input: "github.com/foo/bar", expect: true},
-			{Desc: "flag", input: "-v", expect: false},
-			{Desc: "bare word", input: "strings", expect: false},
-			{Desc: "dot only", input: ".", expect: true},
-			{Desc: "dot-slash", input: "./...", expect: true},
-			{Desc: "windows absolute path", input: `C:\Users\runner\pkg`, expect: true},
+			{Desc: "a single-segment import path is a package", args: []string{"./suite", "fmt"}, expected: []string{"./suite", "fmt"}},
+			{Desc: "std is a pattern", args: []string{"-json", "std"}, expected: []string{"std"}},
+			{Desc: "all, cmd, tool and work are patterns", args: []string{"all", "cmd", "tool", "work"}, expected: []string{"all", "cmd", "tool", "work"}},
 		}) {
-			gotest.Equal(sub, tc.expect, gotestrunner.LooksLikePackagePattern(tc.input))
+			gotest.Equal(sub, tc.expected, gotest.Must(ExtractPackagePatterns(tc.args)))
+		}
+	})
+
+	t.When("a positional argument is empty", func(w *gotest.T) {
+		w.It("is the current directory, as go test reads it", func(it *gotest.T) {
+			gotest.Equal(it, []string{"."}, gotest.Must(ExtractPackagePatterns([]string{"-v", ""})))
+		})
+		w.It("is the current directory beside other patterns", func(it *gotest.T) {
+			gotest.Equal(it, []string{".", "./..."}, gotest.Must(ExtractPackagePatterns([]string{"", "./..."})))
+		})
+		w.It("stays a flag's value", func(it *gotest.T) {
+			gotest.Equal(it, []string{"fmt"}, gotest.Must(ExtractPackagePatterns([]string{"-run", "", "fmt"})))
+		})
+	})
+
+	t.When("a positional argument names a Go file", func(w *gotest.T) {
+		file := filepath.Join(w.TempDir(), "a.go")
+		gotest.NoError(w, os.WriteFile(file, []byte("package a\n"), 0o600))
+
+		w.It("is a usage error naming the file", func(it *gotest.T) {
+			_, err := ExtractPackagePatterns([]string{"./...", file})
+			gotest.Error(it, err)
+			gotest.Equal(it, "gotest takes packages, not files: "+file, err.Error())
+		})
+		w.It("is a pattern when no such file exists, as for go test", func(it *gotest.T) {
+			gotest.Equal(it, []string{"example.com/x.go"}, gotest.Must(ExtractPackagePatterns([]string{"example.com/x.go"})))
+		})
+	})
+
+	t.When("a positional argument is a flag's value", func(w *gotest.T) {
+		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
+			Desc     string
+			args     []string
+			expected []string
+		}{
+			{Desc: "-run X", args: []string{"-run", "X", "fmt"}, expected: []string{"fmt"}},
+			{Desc: "-count 2", args: []string{"-count", "2", "fmt"}, expected: []string{"fmt"}},
+			{Desc: "-timeout 5m", args: []string{"-timeout", "5m"}, expected: []string{"."}},
+			{Desc: "-coverprofile f", args: []string{"-coverprofile", "cover.out", "fmt"}, expected: []string{"fmt"}},
+			{Desc: "-tags x", args: []string{"-tags", "integration", "fmt"}, expected: []string{"fmt"}},
+			{Desc: "-bench .", args: []string{"-bench", ".", "fmt"}, expected: []string{"fmt"}},
+			{Desc: "a gotest flag's value", args: []string{"--timeout", "5m", "--parallel", "4", "fmt"}, expected: []string{"fmt"}},
+			{Desc: "a boolean flag takes none", args: []string{"-v", "fmt", "--ci", "std"}, expected: []string{"fmt", "std"}},
+			{Desc: "a value after =", args: []string{"-run=X", "fmt"}, expected: []string{"fmt"}},
+			{Desc: "an unknown flag takes the next non-flag, as go test assumes", args: []string{"fmt", "--", "-custom", "value", "std"}, expected: []string{"fmt", "std"}},
+			{Desc: "everything after -args goes to the test", args: []string{"fmt", "-args", "std"}, expected: []string{"fmt"}},
+			{Desc: "a bare -- separates, it names nothing", args: []string{"--ci", "--", "fmt"}, expected: []string{"fmt"}},
+		}) {
+			gotest.Equal(sub, tc.expected, gotest.Must(ExtractPackagePatterns(tc.args)))
 		}
 	})
 }
@@ -578,4 +624,19 @@ func (s *FlagParsingTestSuite) TestSpecFlagParsing(t *gotest.T) {
 func (s *FlagParsingTestSuite) TestScaffoldRejectsUnknownFlags(t *gotest.T) {
 	code := ExportRunScaffold(Invocation{Args: []string{"--contract", "io.Reader"}})
 	gotest.Equal(t, 2, code)
+}
+
+// Every scaffold usage error exits 2, as the rest of the CLI's do.
+func (s *FlagParsingTestSuite) TestScaffoldUsageErrorsExit2(t *gotest.T) {
+	for t, tc := range gotest.Each(t, []struct {
+		Desc string
+		args []string
+	}{
+		{"no target", nil},
+		{"two targets", []string{"./a.A", "./b.B"}},
+		{"a target naming no type", []string{"./pkg"}},
+		{"a fuzz target naming no function", []string{"--fuzz", "./pkg"}},
+	}) {
+		gotest.Equal(t, 2, ExportRunScaffold(Invocation{Args: tc.args}))
+	}
 }

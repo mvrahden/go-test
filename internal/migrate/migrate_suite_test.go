@@ -3,12 +3,12 @@ package migrate_test
 import (
 	"go/parser"
 	"go/token"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/migrate"
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/tests/gotestcli"
 )
 
 // todoInputSrc is a testify suite containing lifecycle hooks and assertion
@@ -59,7 +59,9 @@ func TestSampleSuite(t *testing.T) {
 
 // MigrateTestSuite tests the testify-to-gotest migration, focusing on
 // TODO(gotest-migrate) markers for constructs the migrator cannot convert.
-type MigrateTestSuite struct{}
+type MigrateTestSuite struct {
+	Mod *gotestcli.TestifyModuleSharedFixture
+}
 
 func (s *MigrateTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
@@ -67,17 +69,23 @@ func (s *MigrateTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return cfg
 }
 
+// migrateSource migrates src as the only test file of a package and
+// returns the result.
 func (s *MigrateTestSuite) migrateSource(t *gotest.T, src string) string {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "sample_test.go")
-	err := os.WriteFile(path, []byte(src), 0600)
+	run := s.migrateFile(t, src)
+	gotest.Len(t, run.results, 1)
+	return run.files["sample/sample_test.go"]
+}
+
+func (s *MigrateTestSuite) migrateFile(t *gotest.T, src string) pkgRun {
+	return migrateModule(t, s.Mod, migrate.Options{}, map[string]string{"sample/sample_test.go": src}, "sample")
+}
+
+// rerun migrates the package of run again.
+func rerun(t *gotest.T, run pkgRun) []migrate.MigrateResult {
+	results, err := migrate.MigratePackages([]string{filepath.Join(run.dir, "sample")}, migrate.Options{})
 	gotest.NoError(t, err)
-	results, err := migrate.MigrateFile(path)
-	gotest.NoError(t, err)
-	gotest.Len(t, results, 1)
-	out, err := os.ReadFile(path)
-	gotest.NoError(t, err)
-	return string(out)
+	return results
 }
 
 func (s *MigrateTestSuite) TestTodoMarkers(t *gotest.T) {
@@ -94,9 +102,7 @@ func (s *MigrateTestSuite) TestTodoMarkers(t *gotest.T) {
 		})
 
 		w.It("annotates every unmapped assertion call", func(it *gotest.T) {
-			for _, name := range []string{
-				"ErrorAs", "Eventually", "ElementsMatch", "InDelta", "Regexp",
-			} {
+			for _, name := range []string{"ErrorAs", "Eventually"} {
 				gotest.Contains(it, out,
 					"// TODO(gotest-migrate): unmapped assertion "+name+" — convert manually")
 			}
@@ -112,9 +118,11 @@ func (s *MigrateTestSuite) TestTodoMarkers(t *gotest.T) {
 				"// TODO(gotest-migrate): unmapped assertion ErrorAs — convert manually\n\ts.Require().ErrorAs(nil, &target)")
 		})
 
-		w.It("annotates direct embedded-suite calls even for mapped names", func(it *gotest.T) {
-			gotest.Contains(it, out,
-				"// TODO(gotest-migrate): unconverted assertion Equal — embedded-suite call; rewrite as gotest.Equal(t, ...)\n\ts.Equal(2, 2)")
+		w.It("converts the assertions gotest has, the suite's own included", func(it *gotest.T) {
+			gotest.Contains(it, out, "\tgotest.ElementsMatch(t, []int{1}, []int{1})\n")
+			gotest.Contains(it, out, "\tgotest.InDelta(t, 1.0, 1.0, 0.1)\n")
+			gotest.Contains(it, out, "\tgotest.Regexp(t, \"a\", \"a\")\n")
+			gotest.Contains(it, out, "\tgotest.Equal(t, 2, 2)\n")
 		})
 
 		w.It("still converts mapped assertions", func(it *gotest.T) {
@@ -133,7 +141,7 @@ func (s *MigrateTestSuite) TestTodoMarkers(t *gotest.T) {
 		})
 
 		w.It("emits exactly one marker per finding", func(it *gotest.T) {
-			gotest.Equal(it, 11, strings.Count(out, "TODO(gotest-migrate)"))
+			gotest.Equal(it, 7, strings.Count(out, "TODO(gotest-migrate)"))
 		})
 
 		w.It("produces parseable, gofmt-clean output", func(it *gotest.T) {
@@ -230,6 +238,259 @@ func TestOrderSuite(t *testing.T) {
 }
 `
 
+// shadowedImportSrc names a local variable like the testify packages, and a
+// plain helper still uses the dot-imported assert.
+const shadowedImportSrc = `package sample
+
+import (
+	"testing"
+
+	. "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+)
+
+import "strings"
+
+type item struct{ name string }
+
+type ShadowSuite struct {
+	suite.Suite
+}
+
+func (s *ShadowSuite) TestNames() {
+	require.NotEmpty(s.T(), "x")
+	for _, suite := range []item{{name: "x"}} {
+		require := item{name: strings.ToUpper(suite.name)}
+		s.Require().Equal("X", require.name)
+	}
+}
+
+func plain(t *testing.T) {
+	Equal(t, 1, 1)
+}
+
+func TestShadowSuite(t *testing.T) {
+	suite.Run(t, new(ShadowSuite))
+}
+`
+
+func (s *MigrateTestSuite) TestImportResolution(t *gotest.T) {
+	out := s.migrateSource(t, shadowedImportSrc)
+
+	t.When("a local variable is named like a testify package", func(w *gotest.T) {
+		w.It("drops the imports only that variable spelled", func(it *gotest.T) {
+			gotest.NotContains(it, out, `"github.com/stretchr/testify/suite"`)
+			gotest.NotContains(it, out, `"github.com/stretchr/testify/require"`)
+		})
+	})
+
+	t.When("a dot-imported assertion is still called", func(w *gotest.T) {
+		w.It("keeps the dot import", func(it *gotest.T) {
+			gotest.Contains(it, out, `. "github.com/stretchr/testify/assert"`)
+			gotest.Contains(it, out, "\tEqual(t, 1, 1)")
+		})
+	})
+
+	t.When("the file has several import blocks", func(w *gotest.T) {
+		w.It("adds the gotest import once", func(it *gotest.T) {
+			gotest.Equal(it, 1, strings.Count(out, `"github.com/mvrahden/go-test/pkg/gotest"`))
+		})
+	})
+
+	t.It("produces source that parses", func(it *gotest.T) {
+		_, err := parser.ParseFile(token.NewFileSet(), "sample_test.go", out, parser.ParseComments)
+		gotest.NoError(it, err)
+	})
+}
+
+// sharedImportSrc keeps a plain *testing.T helper that still calls assert.
+const sharedImportSrc = `package sample
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+)
+
+type SharedSuite struct {
+	suite.Suite
+}
+
+func (s *SharedSuite) TestOK() {
+	require.Equal(s.T(), 1, 1)
+}
+
+func plain(t *testing.T) {
+	assert.Equal(t, 1, 1)
+}
+
+func TestSharedSuite(t *testing.T) {
+	suite.Run(t, new(SharedSuite))
+}
+`
+
+func (s *MigrateTestSuite) TestImports(t *gotest.T) {
+	t.When("a non-suite function still uses a testify package", func(w *gotest.T) {
+		out := s.migrateSource(w, sharedImportSrc)
+
+		w.It("keeps that import and the testing import it needs", func(it *gotest.T) {
+			gotest.Contains(it, out, `"github.com/stretchr/testify/assert"`)
+			gotest.Contains(it, out, `"testing"`)
+		})
+
+		w.It("drops the imports nothing uses any more", func(it *gotest.T) {
+			gotest.NotContains(it, out, `"github.com/stretchr/testify/require"`)
+			gotest.NotContains(it, out, `"github.com/stretchr/testify/suite"`)
+		})
+
+		w.It("leaves the helper's call alone", func(it *gotest.T) {
+			gotest.Contains(it, out, "assert.Equal(t, 1, 1)")
+			gotest.Contains(it, out, "gotest.Equal(t, 1, 1)")
+		})
+	})
+}
+
+// helperAssertSrc asserts from a helper without t and from one that takes
+// a *testing.T.
+const helperAssertSrc = `package sample
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type HelperSuite struct {
+	suite.Suite
+}
+
+func (s *HelperSuite) helper() {
+	s.T().Log("x")
+	s.Require().True(true)
+}
+
+func (s *HelperSuite) check(t *testing.T) {
+	s.Require().Equal(1, 1)
+	s.T().Log("y")
+}
+
+func (s *HelperSuite) TestA() {
+	s.helper()
+	s.check(s.T())
+}
+
+func TestHelperSuite(t *testing.T) {
+	suite.Run(t, new(HelperSuite))
+}
+`
+
+func (s *MigrateTestSuite) TestHelperAssertions(t *gotest.T) {
+	out := s.migrateSource(t, helperAssertSrc)
+
+	t.When("a helper has no t in scope", func(w *gotest.T) {
+		w.It("leaves its assertion unrewritten and marks it", func(it *gotest.T) {
+			gotest.Contains(it, out,
+				"\t// TODO(gotest-migrate): assertion True outside a migrated method — no t is in scope here; pass t in and rewrite as gotest.True(t, ...)\n\ts.Require().True(true)")
+			gotest.NotContains(it, out, "gotest.True(t, true)")
+		})
+	})
+
+	t.When("a helper takes t *testing.T", func(w *gotest.T) {
+		w.It("rewrites its assertion against that t", func(it *gotest.T) {
+			gotest.Contains(it, out, "func (s *HelperTestSuite) check(t *testing.T) {\n\tgotest.Equal(t, 1, 1)")
+		})
+
+		w.It("marks its s.T(), which has no t.T() to become", func(it *gotest.T) {
+			gotest.Contains(it, out,
+				"\t// TODO(gotest-migrate): s.T() where t is a *testing.T — use t\n\ts.T().Log(\"y\")")
+		})
+	})
+
+	t.It("still rewrites s.T() in the test method", func(it *gotest.T) {
+		gotest.Contains(it, out, "s.check(t.T())")
+	})
+}
+
+// typeRefSrc refers to its suite outside the suite's own methods.
+const typeRefSrc = `package sample
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type RefSuite struct {
+	suite.Suite
+}
+
+func (s *RefSuite) TestOK() {
+	check(s)
+}
+
+func check(s *RefSuite) *RefSuite {
+	s.Require().True(true)
+	return &RefSuite{}
+}
+
+func TestRefSuite(t *testing.T) {
+	suite.Run(t, new(RefSuite))
+}
+`
+
+// siblingRefSrc refers to typeRefSrc's suite from another file of the package.
+const siblingRefSrc = `package sample
+
+var _ = new(RefSuite)
+
+func other(s *RefSuite) {}
+`
+
+func (s *MigrateTestSuite) TestTypeReferences(t *gotest.T) {
+	t.When("a free function in the same file takes the suite", func(w *gotest.T) {
+		out := s.migrateSource(w, typeRefSrc)
+
+		w.It("renames every reference to the suite type", func(it *gotest.T) {
+			gotest.Contains(it, out, "func check(s *RefTestSuite) *RefTestSuite {")
+			gotest.Contains(it, out, "return &RefTestSuite{}")
+			gotest.NotContains(it, out, "RefSuite")
+		})
+
+		w.It("marks the helper's assertion, which has no t", func(it *gotest.T) {
+			gotest.Contains(it, out,
+				"\t// TODO(gotest-migrate): assertion True outside a migrated method — no t is in scope here; pass t in and rewrite as gotest.True(t, ...)\n\ts.Require().True(true)")
+		})
+	})
+
+	t.When("another file of the package refers to the suite", func(w *gotest.T) {
+		run := migrateModule(w, s.Mod, migrate.Options{}, map[string]string{
+			"sample/ref_test.go":     typeRefSrc,
+			"sample/sibling_test.go": siblingRefSrc,
+		}, "sample")
+		sibling := run.files["sample/sibling_test.go"]
+
+		w.It("renames the references there too", func(it *gotest.T) {
+			gotest.Contains(it, sibling, "var _ = new(RefTestSuite)")
+			gotest.Contains(it, sibling, "func other(s *RefTestSuite) {}")
+		})
+
+		w.It("reports the file as updated, not as a suite", func(it *gotest.T) {
+			gotest.Len(it, run.results, 2)
+			var refs []string
+			for i := range run.results {
+				r := &run.results[i]
+				if r.RefsOnly {
+					refs = append(refs, r.File)
+				}
+			}
+			gotest.Equal(it, []string{filepath.Join(run.dir, "sample", "sibling_test.go")}, refs)
+		})
+	})
+}
+
 func (s *MigrateTestSuite) TestScopedRewrites(t *gotest.T) {
 	t.When("s.T() appears in a method that gained t and in a helper that did not", func(w *gotest.T) {
 		out := s.migrateSource(w, scopedSrc)
@@ -244,26 +505,19 @@ func (s *MigrateTestSuite) TestScopedRewrites(t *gotest.T) {
 				"// TODO(gotest-migrate): s.T() outside a migrated method — no t is in scope here\n\ts.T().Helper()")
 		})
 
-		w.It("marks s.Run, which has no gotest equivalent", func(it *gotest.T) {
-			gotest.Contains(it, out,
-				"// TODO(gotest-migrate): s.Run has no gotest equivalent — use t.When or t.It\n\ts.Run(")
+		w.It("turns s.Run into t.It, whose own t the assertions inside name", func(it *gotest.T) {
+			gotest.Contains(it, out, "\tt.It(\"sub\", func(t *gotest.T) {\n\t\tgotest.Equal(t, 1, 1)\n\t})")
 		})
 	})
 
 	t.When("a suite embeds another suite instead of suite.Suite", func(w *gotest.T) {
-		dir := w.TempDir()
-		path := filepath.Join(dir, "indirect_test.go")
-		gotest.NoError(w, os.WriteFile(path, []byte(indirectSrc), 0600))
-		results, err := migrate.MigrateFile(path)
-		gotest.NoError(w, err)
-		got, err := os.ReadFile(path)
-		gotest.NoError(w, err)
-		out := string(got)
+		run := s.migrateFile(w, indirectSrc)
+		out := run.files["sample/sample_test.go"]
 
 		w.It("refuses the file and says why in the result", func(it *gotest.T) {
-			gotest.Len(it, results, 1)
-			gotest.Contains(it, results[0].Refusal, "OrderSuite embeds BaseSuite")
-			gotest.Equal(it, 1, results[0].Markers)
+			gotest.Len(it, run.results, 1)
+			gotest.Contains(it, run.results[0].Refusal, "OrderSuite embeds BaseSuite")
+			gotest.Equal(it, 1, run.results[0].Markers)
 		})
 
 		w.It("leaves the source unmigrated apart from the marker", func(it *gotest.T) {
@@ -274,15 +528,25 @@ func (s *MigrateTestSuite) TestScopedRewrites(t *gotest.T) {
 		})
 	})
 
-	t.When("markers were left", func(w *gotest.T) {
-		w.It("counts them on the result", func(it *gotest.T) {
-			dir := it.TempDir()
-			path := filepath.Join(dir, "sample_test.go")
-			gotest.NoError(it, os.WriteFile(path, []byte(todoInputSrc), 0600))
-			results, err := migrate.MigrateFile(path)
-			gotest.NoError(it, err)
+	t.When("a file was migrated before and kept its markers", func(w *gotest.T) {
+		run := s.migrateFile(w, todoInputSrc)
+		results := rerun(w, run)
+
+		w.It("reports the markers still there, with no suite", func(it *gotest.T) {
 			gotest.Len(it, results, 1)
-			gotest.Equal(it, 11, results[0].Markers)
+			gotest.Equal(it, run.markers(), results[0].Markers)
+			gotest.NotZero(it, results[0].Markers)
+			gotest.Empty(it, results[0].OldName)
+		})
+	})
+
+	t.When("a refused file is run again", func(w *gotest.T) {
+		run := s.migrateFile(w, indirectSrc)
+		results := rerun(w, run)
+
+		w.It("still counts the marker", func(it *gotest.T) {
+			gotest.Len(it, results, 1)
+			gotest.Equal(it, 1, results[0].Markers)
 		})
 	})
 }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"runtime/debug"
 	"sync"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 // FixtureOnce and CountMatchingTests are what generated harnesses before
@@ -29,6 +31,14 @@ func (f *FixtureOnce) Do(fn func() error) error {
 		f.err = fn()
 	})
 	return f.err
+}
+
+// AwaitDone is what harnesses before [AwaitDoneAt] called; its verdict names
+// no location.
+//
+// Deprecated: regenerate the harness.
+func AwaitDone(t *gotest.T, name string, start func(done func())) {
+	AwaitDoneAt(t, name, "", start)
 }
 
 // Deprecated: regenerate the harness.

@@ -69,13 +69,75 @@ func (s *LintPlainTestSuite) TestPlainMode(t *gotest.T) {
 		})
 	})
 
-	t.When("a driver flag is present", func(w *gotest.T) {
+	t.When("a //line directive without a column moves a finding", func(w *gotest.T) {
+		w.Setenv("GOWORK", "off")
+		dir := w.TempDir()
+		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.25\n"), 0o600))
+		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "probe_test.go"), []byte("package lintprobe\n\nimport \"testing\"\n\n//line other.tmpl:100\nfunc TestProbe(t *testing.T) {}\n"), 0o600))
+
 		var stderr bytes.Buffer
-		_, ok := ExportRunLintPlain(&stderr, "", []string{"-fix", "./..."})
+		code, ok := ExportRunLintPlain(&stderr, dir, []string{"./..."})
+
+		w.It("names the position the directive gives, without a column, as go vet does", func(it *gotest.T) {
+			gotest.True(it, ok)
+			gotest.Equal(it, 3, code)
+			gotest.Regexp(it, `^\S*other\.tmpl:100: stdlib test TestProbe .+\n$`, stderr.String())
+		})
+	})
+
+	t.When("a flag only the driver implements is present", func(w *gotest.T) {
+		var stderr bytes.Buffer
+		_, ok := ExportRunLintPlain(&stderr, "", []string{"-debug=v", "./..."})
 
 		w.It("defers to the singlechecker driver", func(it *gotest.T) {
 			gotest.False(it, ok)
 			gotest.Empty(it, stderr.String())
+		})
+	})
+
+	t.When("the patterns match no package", func(w *gotest.T) {
+		w.Setenv("GOWORK", "off")
+		dir := w.TempDir()
+		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module lintprobe\n\ngo 1.25\n"), 0o600))
+
+		var stderr bytes.Buffer
+		code, ok := ExportRunLintPlain(&stderr, dir, []string{"./..."})
+
+		w.It("exits 1 instead of passing on nothing", func(it *gotest.T) {
+			gotest.True(it, ok)
+			gotest.Equal(it, 1, code)
+			gotest.Equal(it, "FAIL: \"./...\" matched no packages\n", stderr.String())
+		})
+	})
+
+	t.When("a pattern names a directory that does not exist", func(w *gotest.T) {
+		w.Setenv("GOWORK", "off")
+		dir := w.TempDir()
+		writeLintProbe(w, dir)
+
+		var stderr bytes.Buffer
+		code, ok := ExportRunLintPlain(&stderr, dir, []string{"./...", "./nonexist"})
+
+		w.It("exits 1 and says so, as go does", func(it *gotest.T) {
+			gotest.True(it, ok)
+			gotest.Equal(it, 1, code)
+			gotest.Regexp(it, `^FAIL: stat \S*nonexist: directory not found\n$`, stderr.String())
+		})
+	})
+
+	t.When("a pattern matches no package beside one that does", func(w *gotest.T) {
+		w.Setenv("GOWORK", "off")
+		dir := w.TempDir()
+		writeLintProbe(w, dir)
+		gotest.NoError(w, os.Mkdir(filepath.Join(dir, "empty"), 0o700))
+
+		var stderr bytes.Buffer
+		code, ok := ExportRunLintPlain(&stderr, dir, []string{"./...", "./empty/..."})
+
+		w.It("warns about it and lints the rest", func(it *gotest.T) {
+			gotest.True(it, ok)
+			gotest.Equal(it, 3, code)
+			gotest.Regexp(it, `^warning: "\./empty/\.\.\." matched no packages\n\S*probe_test\.go:5:1: .+\n$`, stderr.String())
 		})
 	})
 

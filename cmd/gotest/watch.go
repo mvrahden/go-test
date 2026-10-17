@@ -13,7 +13,6 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/mvrahden/go-test/internal/gotestbench"
-	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
@@ -153,7 +152,8 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench bool, benchNs map[string]float64) (int, map[string]float64) { //nolint:gocritic // hugeParam: stable API
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)
-	loaded, broken, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
+	pkgs, err := loadRunPackages(cfg.PackagePatterns, loadFlags)
+	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
 	if err != nil {
 		if jsonMode {
 			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
@@ -239,6 +239,8 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench
 		BenchesByPkg:    overlay.BenchesByPkg,
 		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,
+		NoTestFiles:     noTestFiles,
+		PackageOrder:    pkgs.Order,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -377,12 +379,15 @@ func dirsToPatterns(dirs map[string]bool) []string {
 }
 
 func replacePatterns(originalArgs []string, newPatterns []string) []string {
+	drop := map[int]bool{}
+	for _, i := range gotestrunner.PatternIndices(originalArgs, ownFlag) {
+		drop[i] = true
+	}
 	var args []string
-	for _, arg := range originalArgs {
-		if gotestrunner.LooksLikePackagePattern(arg) {
-			continue
+	for i, arg := range originalArgs {
+		if !drop[i] {
+			args = append(args, arg)
 		}
-		args = append(args, arg)
 	}
 	args = append(args, newPatterns...)
 	return args

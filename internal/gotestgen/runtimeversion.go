@@ -27,8 +27,9 @@ func CheckRuntimeVersion(loadResults []*LoadResult) error {
 				continue
 			}
 			if semver.Compare(mod.Version, MinRuntimeVersion) < 0 {
-				return fmt.Errorf("%s %s requires %s %s or newer, but go.mod resolves %s; run: go get -tool %s/cmd/gotest@latest, then use go tool gotest (see README, Install)",
-					about.Application, about.ResolvedVersion(), about.Repo, MinRuntimeVersion, mod.Version, about.Repo)
+				// The floor, not @latest: latest may need a newer Go and raise the module's go line.
+				return fmt.Errorf("%s %s requires %s %s or newer, but go.mod resolves %s; run: go get -tool %s/cmd/gotest@%s, then use go tool gotest (see README, Install)",
+					about.Application, about.ResolvedVersion(), about.Repo, MinRuntimeVersion, mod.Version, about.Repo, MinRuntimeVersion)
 			}
 			return nil
 		}

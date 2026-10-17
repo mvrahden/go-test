@@ -162,3 +162,5 @@ func ExportMakeFixtureSpec(name string, kind gotestast.FixtureKind, hasBeforeAll
 	}
 	return f
 }
+
+var ExportReportOrder = reportOrder

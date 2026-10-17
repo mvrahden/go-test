@@ -94,12 +94,16 @@ type discoverBehavior struct {
 }
 
 func newDiscoverOutput() discoverOutput {
-	return discoverOutput{Version: about.ResolvedVersion()}
+	return discoverOutput{Version: about.ResolvedVersion(), Packages: []discoverPackage{}}
 }
 
 func runDiscover(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	tags, remaining := extractTagsFlag(inv.TagArgs())
-	patterns := ExtractPackagePatterns(remaining)
+	patterns, err := ExtractPackagePatterns(remaining)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 	var buildFlags []string
 	if tags != "" {
 		buildFlags = append(buildFlags, "-tags="+tags)
@@ -124,9 +128,14 @@ func runDiscover(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 func discover(patterns, buildFlags []string) (discoverOutput, error) {
 	out := newDiscoverOutput()
 
-	loadResults, broken, err := gotestgen.LoadPackages(patterns, buildFlags)
+	loadResults, broken, matched, err := gotestgen.LoadPackagesMatching(patterns, buildFlags)
 	if err != nil {
 		return out, err
+	}
+	if !matched {
+		// An editor's workspace may hold no package yet: an empty document,
+		// not an error.
+		warnMatchedNothing(patterns)
 	}
 	for i := range broken {
 		for _, msg := range broken[i].Errors {

@@ -621,6 +621,7 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 	hasHydrate := mset.Lookup(typePkg, "Hydrate") != nil
 	hasDehydrate := mset.Lookup(typePkg, "Dehydrate") != nil
 	hasConfig := detectConfigMethod(mset, typePkg, gotestast.SharedFixture)
+	hasAfterAll := mset.Lookup(typePkg, "AfterAll") != nil
 
 	// Validate here (not only in the collector) so cross-package shared fixtures,
 	// which are resolved by method-set lookup alone, get clean errors instead of
@@ -663,6 +664,7 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 			PkgName:       pkgName,
 			QualifiedType: qualifiedType,
 			HasConfig:     hasConfig,
+			HasAfterAll:   hasAfterAll,
 			HasHydrate:    hasHydrate,
 			HasDehydrate:  hasDehydrate,
 		}
@@ -761,6 +763,7 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 		PkgName:          pkgName,
 		QualifiedType:    qualifiedType,
 		HasConfig:        hasConfig,
+		HasAfterAll:      hasAfterAll,
 		HasHydrate:       hasHydrate,
 		HasDehydrate:     hasDehydrate,
 		TransferFields:   transfer,

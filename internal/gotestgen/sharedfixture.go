@@ -20,6 +20,7 @@ type SharedFixtureInfo struct {
 	PkgName          string // Go package name e.g. "fixtures" (from types.Package.Name())
 	QualifiedType    string // Go type expression e.g. "fixtures.PostgresFixture" (handles generics)
 	HasConfig        bool
+	HasAfterAll      bool
 	HasHydrate       bool
 	HasDehydrate     bool
 	TransferFields   []string          // exported fields that are serialized (all exported minus local)
@@ -61,6 +62,7 @@ type sharedSetupFixture struct {
 	Identifier        string
 	StateKey          string
 	HasConfig         bool
+	HasAfterAll       bool
 	TransferFields    []string
 	DependsOnVars     []string           // var names of fixtures this depends on (e.g. ["sf0"])
 	DependsOnIndices  []int              // indices of dependency fixtures in the Fixtures slice
@@ -132,6 +134,7 @@ func GenerateSharedSetup(fixtures []SharedFixtureInfo) ([]byte, error) {
 			Identifier:        sf.Identifier,
 			StateKey:          sf.PkgPath + "." + sf.Identifier,
 			HasConfig:         sf.HasConfig,
+			HasAfterAll:       sf.HasAfterAll,
 			TransferFields:    sf.TransferFields,
 			DependsOnVars:     dependsOnVars,
 			DependsOnIndices:  dependsOnIndices,

@@ -29,7 +29,7 @@ go get -tool github.com/mvrahden/go-test/cmd/gotest@latest
 go tool gotest ./...
 ```
 
-`go get -tool` pins the CLI and the `pkg/gotest` runtime to the same release, and `go tool` rebuilds the CLI with your module's Go. Upgrading is the same command again. In a module that already requires gotest, name that version in place of `@latest` to declare the tool without moving the pin. Avoid a global `go install` binary: it drifts from `go.mod` on both axes, and gotest refuses to run on that drift.
+`go get -tool` pins the CLI and the `pkg/gotest` runtime to the same release, and `go tool` rebuilds the CLI with your module's Go. Upgrading is the same command again. One caution for both: `@latest` raises your module's `go` line when the newest release needs a newer Go (`go get` prints `upgraded go …`). To keep your Go version, name the newest release whose go line fits instead; `go list -m -f '{{.GoVersion}}' github.com/mvrahden/go-test@<version>` prints a release's. In a module that already requires gotest, name that version in place of `@latest` to declare the tool without moving the pin. Avoid a global `go install` binary: it drifts from `go.mod` on both axes, and gotest refuses to run on that drift, naming the version your module selects.
 
 The examples below write `gotest` for brevity; with the tool directive, read `go tool gotest`. The VS Code extension and the GitHub action run the same CLI your `go.mod` selects.
 
@@ -534,8 +534,8 @@ conn := gotest.Must(db.Connect(ctx))
 val  := gotest.Must(cache.Get(key))
 ```
 
-All assertions work with `*gotest.T` (suites), `*testing.T` (standalone tests), and `*gotest.R` (polling callbacks).
-Assertion failures automatically trace back to the test call site — no `t.Helper()` calls needed in helper functions.
+All assertions work with `*gotest.T` (suites), `*testing.T` (standalone tests), `*gotest.B` and `*gotest.F` (benchmarks and fuzz targets), and `*gotest.R` (polling callbacks).
+Assertion failures automatically trace back to the test call site — no `t.Helper()` calls needed in helper functions. The failure is located at the line that failed, a helper's included, and the message names the test's call site after it.
 
 ### Data-Driven Tests
 
@@ -561,7 +561,7 @@ Uses `Desc` or `Name` field for the test name, falls back to `#0`, `#1`, etc.
 
 ### Async Test Methods
 
-A method whose name ends in `Async` and whose last parameter is `done func()` completes when `done()` is called, not when it returns; the suite's `Timeout` fails it if `done()` never is.
+A method whose name ends in `Async` and whose last parameter is `done func()` completes when `done()` is called, not when it returns; the suite's `Timeout` fails it if `done()` never is, and the failure names the method's declaration. Once the method has returned it is waiting, not running, so that failure is the only one: it is not also reported as an overrun.
 
 ```go
 func (s *BusTestSuite) TestDeliveryAsync(t *gotest.T, done func()) {
@@ -650,9 +650,10 @@ Fixture-bound suites work — fixtures hydrate before benchmarks run — but a f
 ### Running
 
 ```bash
-gotest bench ./...                     # all benchmarks
-gotest bench ./pkg/parser -run Parse   # filter by suite name
-gotest bench ./pkg/parser -bench Parse # filter by benchmark name
+gotest bench ./...                                        # all benchmarks
+gotest bench ./pkg/parser -run Parser                     # suites whose name matches
+gotest bench ./pkg/parser -bench Parser                   # the same, via -bench
+gotest bench ./pkg/parser -bench 'ParserTestSuite/Parse'  # one suite's methods matching Parse
 ```
 
 `gotest ./...` never runs benchmarks — use `gotest bench` explicitly.
@@ -664,11 +665,11 @@ A fresh process per suite is also a methodological win, not just an implementati
 `-test.benchmem` is on by default — every benchmark line reports `B/op`/`allocs/op` alongside `ns/op`.
 `-benchtime` and `-count` are forwarded to `go test` unchanged.
 `-coverprofile` works; `--min` (coverage gate) isn't available in bench mode.
-`-run` and `-bench` both filter which suites run, both matched against each suite's `Benchmark<SuiteName>` wrapper function — `-run` the same way it scopes suites for `gotest ./...`, `-bench` by benchmark function name.
+`-run` and `-bench` both filter which suites run, both matched against each suite's `Benchmark<SuiteName>` wrapper function — `-run` the same way it scopes suites for `gotest ./...`, `-bench` by its pattern's first slash segment. A plain `-bench Parse` therefore selects suites, not methods; later segments select the methods inside a suite's wrapper (`-bench 'ParserTestSuite/BenchmarkParse'`).
 Given both, a suite must match both to run (AND semantics).
 `-run Test<Suite>`-style values match nothing in bench mode — filter by the suite name itself, not the `Test` prefix.
 
-With no matching benchmarks, `gotest bench` prints `no benchmarks found` and exits 0.
+With no matching benchmarks, `gotest bench` prints `no benchmarks found` and exits 0; patterns that match no package at all exit 2, as in every run mode.
 
 ### Spec view
 
@@ -831,7 +832,7 @@ The budget:
 - `--for` is the only clock. The deadline follows it with headroom for builds, a `.gotest.yml` `timeout` never caps a search, and `gotest fuzz` refuses `--timeout` rather than let two clocks compete.
 - `--for=0` removes the budget: targets fuzz until interrupted. Only the first `--jobs` targets ever run then, since each holds its slot, and gotest says so up front.
 - `--jobs` caps concurrent targets (default `max(1, GOMAXPROCS/2)`). A target whose slot never opens before the deadline is reported as `[<Func>] skipped: session ended before this target started`, and the closing summary names the targets that did not get their full share.
-- `--target=<Fuzz...>` narrows a session to one wrapper; an unmatched name lists the available ones. This is what the VS Code extension invokes: fuzz methods get **Fuzz** / **Debug Seeds** CodeLenses, budgeted cancellable sessions, crasher notifications wired to triage/promote/debug, and Test Explorer items whose runs replay seeds (see `vscode-gotest/README.md`).
+- `--target=<Fuzz...>` narrows a session to one wrapper; an unmatched name lists the available ones, and `-run`, `-skip` and `-bench` are refused in its favour. This is what the VS Code extension invokes: fuzz methods get **Fuzz** / **Debug Seeds** CodeLenses, budgeted cancellable sessions, crasher notifications wired to triage/promote/debug, and Test Explorer items whose runs replay seeds (see `vscode-gotest/README.md`).
 
 Ending by deadline or interrupt is the normal end of an open-ended search, not a failure.
 The session exits 0 unless something was found: a failing target, or a new crasher file, detected by comparing each target's `testdata/fuzz/<Func>/` directory before and after, so a crash counts even when the deadline killed the process mid-report.
@@ -859,7 +860,7 @@ The next session resumes from them, which is why a second run starts with a larg
 They are the search's own memory, not something to commit: the seeds you write and the crashers you promote are the corpus that travels with the code.
 The engine's `To re-run: go test -run=...` advice is dropped from the stream, since plain `go test` cannot see a generated target; the hint after a crasher names the working commands.
 
-With no `Fuzz*` methods anywhere, `gotest fuzz` prints `no fuzz targets found` and exits 0 without invoking `go test`.
+With no `Fuzz*` methods in the matched packages, `gotest fuzz` prints `no fuzz targets found` and exits 0 without invoking `go test`; patterns that match no package at all exit 2.
 
 ### Triage and promote
 
@@ -1036,7 +1037,7 @@ gotest migrate ./...
 #   pkg/user/user_test.go: UserSuite → UserTestSuite
 ```
 
-Renames lifecycle methods, rewrites assertions, removes testify imports. Anything it cannot convert gets a `TODO(gotest-migrate)` marker and the run exits 1; `--dry-run` prints the diff without writing.
+Renames lifecycle methods, rewrites assertions (picking, by the argument's type, the gotest assertion that keeps testify's verdict), removes the testify imports nothing uses any more. The result is type-checked for real, in every build its `//go:build` tags need: anything it cannot convert, and every line that does not compile, gets a `TODO(gotest-migrate)` marker, and every run exits 1 while one is left. Exit 0 means every migrated package compiles and every hook and test testify ran is one gotest calls; a package that does not compile before is left alone, exit 2, as is a run whose files cannot all be written (it writes them all or none). Files headed `// Code generated ... DO NOT EDIT.` are skipped (named on stderr), and only the host OS's builds are checked: a test file only another GOOS builds is refused, so run migrate on each platform whose test files differ. The module must require `github.com/mvrahden/go-test`; `--dry-run` prints the diff without writing.
 
 ### Linter
 
@@ -1049,7 +1050,7 @@ gotest lint ./...
 Twenty-eight rules in three tiers:
 
 - **Integrity** — violations can make test outcomes unreliable or leak resources: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, reads of shared fixtures a suite never declared (window scheduling only starts what is declared), and generated files checked into version control.
-- **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, unnecessary `t.T()` escapes, `When("when …")`/`It("it …")` descriptions that spell the word the spec already supplies, and a literal negative `SuiteConfig`/`FixtureConfig` timeout (every negative disables the deadline; the fix writes `gotest.NoDeadline`, keeping the old meaning). `-fix` applies the safe rewrites.
+- **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, unnecessary `t.T()` escapes, `When("when …")`/`It("it …")` descriptions that spell the word the spec already supplies, and a literal negative `SuiteConfig`/`FixtureConfig` timeout (every negative disables the deadline; the fix writes `gotest.NoDeadline`, keeping the old meaning). `-fix` applies the safe rewrites in one run, overlapping ones included, then reports what it could not fix (exit 3 while findings remain); `-diff` prints exactly what `-fix` would write, as a unified diff with paths relative to the current directory, and writes nothing — `gotest lint -diff ./... | git apply` applies it (a file outside that directory needs `git apply --unsafe-paths`; a symlink is named by the file it leads to, which `-fix` writes).
 - **Migration** — adoption aids for codebases moving to gotest: stdlib test functions and testify imports; coexistence is legitimate.
 
 Suppress per line with `//nolint:<rule>` (on the same line, or in a comment block of its own ending on the line directly above — a comment trailing other code does not reach the next line); expressiveness and migration rules can also be disabled project-wide via `.gotest.yml` (`lint.skip`). See the [design spec](docs/design/spec.md#linter) for the full rule table.
@@ -1119,7 +1120,7 @@ permissions:
   contents: write
 
 steps:
-  - uses: actions/checkout@v4
+  - uses: actions/checkout@v7
   - uses: mvrahden/go-test@v1
     with:
       packages: ./...
@@ -1162,9 +1163,9 @@ gotest version                 # print version
 gotest help                    # show help
 ```
 
-All `go test` flags work unchanged: `-race`, `-cover`, `-count`, `-run`, `-json`, `-short`, `-timeout`, `-v`.
+All `go test` flags work unchanged: `-race`, `-cover`, `-count`, `-run`, `-skip`, `-json`, `-short`, `-timeout`, `-v`.
 
-A run exits `0` when everything passed, `1` on a failed test, a shared fixture that failed to set up or tear down, or an expired `--timeout`, `2` on a usage, generation or build error and on a green run in which a declared test never ran, and `130` when it was interrupted. `lint` and `fuzz` state their own codes in `gotest help lint` and `gotest help fuzz`.
+A run exits `0` when everything passed, `1` on a failed test (one that panics or calls `os.Exit` included — `os.Exit(0)` too, as under `go test`), a shared fixture that failed to set up or tear down, or an expired `--timeout`, `2` on a usage, generation or build error, on a green run that writes an event stream (`-json`, `spec`, `summary`) in which a declared test never ran (a plain text run takes no census, and `-run`, `-skip` and `-list` stand it down), and when the patterns match no package, and `130` when it was interrupted. `lint` and `fuzz` state their own codes in `gotest help lint` and `gotest help fuzz`.
 
 To feed a JUnit consumer, run the tests through a converter that reads the events: `gotestsum --junitfile report.xml --raw-command -- go tool gotest -json ./...`. The report is red whenever the run is — a package that does not build or a shared fixture that fails included — and gotest's exit code passes through. A converter that parses the printed text instead of the events, such as `go-junit-report`, reports those failures as plain output or not at all.
 

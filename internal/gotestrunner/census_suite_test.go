@@ -2,6 +2,7 @@ package gotestrunner_test
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	"time"
 
@@ -219,16 +220,19 @@ func (s *CensusTestSuite) TestMissingUnitsAreBookedIntoTheStream(t *gotest.T) {
 		}, nil)
 
 		w.It("books each as a failed test with the census as its output, then fails its suite and package with their own time and duration", func(it *gotest.T) {
+			// A package the stream had not opened yet is opened first.
+			stamped := regexp.MustCompile(`("Action":"start","Package":"example.com/other","Time":)"[^"]+"`)
 			gotest.Equal(it, `{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite/TestTotal"}
 {"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestTotal","Output":"    census: declared test never ran\n"}
 {"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite/TestTotal"}
 {"Time":"2026-09-13T10:00:01.5Z","Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite","Elapsed":1.5}
+{"Action":"start","Package":"example.com/other","Time":"now"}
 {"Action":"run","Package":"example.com/other","Test":"FuzzCartTestSuite_FuzzStarted"}
 {"Action":"output","Package":"example.com/other","Test":"FuzzCartTestSuite_FuzzStarted","Output":"    census: declared fuzz target never ran\n"}
 {"Action":"fail","Package":"example.com/other","Test":"FuzzCartTestSuite_FuzzStarted"}
 {"Time":"2026-09-13T10:00:04.21Z","Action":"fail","Package":"example.com/pkg","Elapsed":4.21}
 {"Action":"fail","Package":"example.com/other"}
-`, booked)
+`, stamped.ReplaceAllString(booked, `$1"now"`))
 		})
 
 		w.It("turns the green tree red at the method, the suite and the package, keeping their durations", func(it *gotest.T) {

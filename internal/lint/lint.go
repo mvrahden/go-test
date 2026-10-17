@@ -1137,7 +1137,7 @@ func checkStdlibTests(pass *analysis.Pass, insp *inspector.Inspector) {
 		if fd.Type.Params == nil || len(fd.Type.Params.List) != 1 {
 			return
 		}
-		if !isTestingT(fd.Type.Params.List[0].Type) {
+		if !isTestingT(pass, fd.Type.Params.List[0].Type) {
 			return
 		}
 		report(pass, StdlibTest, fd.Pos(), "stdlib test %s — consider using a gotest suite", name)
@@ -1166,20 +1166,13 @@ func isGeneratedFile(pass *analysis.Pass, pos token.Pos) bool {
 	return about.PSuiteRegex.MatchString(filepath.Base(pass.Fset.Position(pos).Filename))
 }
 
-func isTestingT(expr ast.Expr) bool {
+func isTestingT(pass *analysis.Pass, expr ast.Expr) bool {
 	star, ok := expr.(*ast.StarExpr)
 	if !ok {
 		return false
 	}
 	sel, ok := star.X.(*ast.SelectorExpr)
-	if !ok {
-		return false
-	}
-	ident, ok := sel.X.(*ast.Ident)
-	if !ok {
-		return false
-	}
-	return ident.Name == "testing" && sel.Sel.Name == "T"
+	return ok && sel.Sel.Name == "T" && isPkgRef(pass, sel.X, "testing")
 }
 
 func hasValidTestSignature(pass *analysis.Pass, fd *ast.FuncDecl) bool {

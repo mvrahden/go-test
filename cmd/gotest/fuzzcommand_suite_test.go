@@ -52,6 +52,13 @@ func (s *FuzzCommandTestSuite) TestFuzzSubcommand(t *gotest.T) {
 		gotest.Contains(it, out, "--timeout")
 		gotest.Contains(it, out, "--for")
 	})
+	t.It("refuses the flags that select tests, pointing to --target", func(it *gotest.T) {
+		for _, flag := range []string{"-run=FuzzX", "-skip=FuzzX"} {
+			out, code := s.cli.runExit(it, "fuzz", "--for=1s", flag, "./examples/notification")
+			gotest.Equal(it, 2, code, "output:\n%s", out)
+			gotest.Contains(it, out, "is not a fuzz flag: --target=<FuzzSuite_Method> picks the target to fuzz")
+		}
+	})
 	t.It("reports when no fuzz targets exist", func(it *gotest.T) {
 		out, code := s.cli.runExit(it, "fuzz", "./internal/protocol")
 		gotest.Contains(it, out, "no fuzz targets found")

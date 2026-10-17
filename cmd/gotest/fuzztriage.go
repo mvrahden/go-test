@@ -119,7 +119,10 @@ func displayArgs(args []corpusArg) string {
 // and promote's suite/method reverse lookup) and the flattened, sorted list
 // of fuzz targets.
 func loadFuzzOverlayTargets(args []string) (*gotestrunner.OverlayResult, []gotestrunner.FuzzTarget, func(), error) {
-	patterns := ExtractPackagePatterns(args)
+	patterns, err := ExtractPackagePatterns(args)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	loaded, broken, err := gotestgen.LoadPackages(patterns, nil)
 	if err != nil {
 		return nil, nil, nil, err

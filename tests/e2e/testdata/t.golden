@@ -43,7 +43,7 @@
           "hello" does not contain "xyz"
 === RUN   TestSimpleTestSuite/TestContains/succeeds
 === RUN   TestSimpleTestSuite/TestStdlibCompat
-    assertions.go:<LINE>: t_test.go:84: True failed:
+    t_test.go:84: True failed:
           expected: true
           actual:   false
 === RUN   TestSimpleTestSuite/TestHelperTrace

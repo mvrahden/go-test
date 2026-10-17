@@ -2,8 +2,11 @@ package gotestruntime
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -78,7 +81,22 @@ func TestT(t *testing.T, timeout time.Duration) *gotest.T {
 // A zero budget means no verdict is enforced; the context handed to the method
 // is bounded separately by [TestT].
 func RunTest(t *gotest.T, budget time.Duration, run func()) {
-	watchWhile(t.T(), t, budget, "", "Timeout", run)
+	end := watchPhase(t.T(), budget, "", "Timeout")
+	bodies.Store(t.T(), end)
+	defer bodies.Delete(t.T())
+	defer end()
+	run()
+}
+
+// bodies holds, per running test method, the end of its budget watch: an
+// async method's body ends before the method does (see [AwaitDoneAt]).
+var bodies sync.Map // *testing.T -> func()
+
+// endBody ends the budget watch of t's method, whose body has returned.
+func endBody(t *testing.T) {
+	if end, ok := bodies.Load(t); ok {
+		end.(func())()
+	}
 }
 
 // RunSetup runs a suite's BeforeAll. timeout bounds the context it receives;
@@ -86,20 +104,20 @@ func RunTest(t *gotest.T, budget time.Duration, run func()) {
 // declared no config of its own.
 func RunSetup(t testing.TB, timeout, budget time.Duration, beforeAll func(*gotest.T)) {
 	tt := SetupT(t, timeout)
-	watchWhile(t, tt, budget, "BeforeAll ", "SetupTimeout", func() { beforeAll(tt) })
+	watchWhile(t, budget, "BeforeAll ", "SetupTimeout", func() { beforeAll(tt) })
 }
 
 // RunTeardown runs a suite's AfterAll from inside t.Cleanup, on the same terms
 // as [RunSetup].
 func RunTeardown(t testing.TB, timeout, budget time.Duration, afterAll func(*gotest.T)) {
 	tt := TeardownT(t, timeout)
-	watchWhile(t, tt, budget, "AfterAll ", "SetupTimeout", func() { afterAll(tt) })
+	watchWhile(t, budget, "AfterAll ", "SetupTimeout", func() { afterAll(tt) })
 }
 
-// watchWhile runs a lifecycle phase and fails t the moment timeout passes with
+// watchWhile runs a lifecycle phase and fails tb the moment timeout passes with
 // that phase still running. what names the phase for the message ("BeforeAll ",
-// "AfterAll ", or empty for a test method), budget names the config field it
-// came from, and tb names the test in the unbuffered line.
+// "AfterAll ", or empty for a test method) and budget names the config field it
+// came from.
 //
 // The alternative — checking the deadline once the phase returns — cannot judge
 // a phase that never returns, which is the case that matters most. A wedged
@@ -113,30 +131,36 @@ func RunTeardown(t testing.TB, timeout, budget time.Duration, afterAll func(*got
 // subtest would later signal a parent that had already finished. Killing the
 // process is the only true interruption, and that is what go test -timeout is.
 // What this adds is the verdict.
-func watchWhile(tb testing.TB, t *gotest.T, timeout time.Duration, what, budget string, run func()) {
-	if timeout <= 0 {
-		run()
-		return
-	}
-	done := make(chan struct{})
-	stopped := make(chan struct{})
-	go watchDeadline(tb, t, timeout, what, budget, done, stopped)
-
-	// close(done) also runs when the phase exits via Goexit. Waiting for the
-	// watchdog to stop is what makes its Errorf legal: the testing package
-	// panics on a log from a test that has already completed, and the test
-	// cannot complete while this frame is still on the stack.
-	defer func() {
-		close(done)
-		<-stopped
-	}()
+func watchWhile(tb testing.TB, timeout time.Duration, what, budget string, run func()) {
+	// end also runs when the phase exits via Goexit.
+	defer watchPhase(tb, timeout, what, budget)()
 	run()
 }
 
-// watchDeadline fails t if the phase has not finished within timeout. Errorf is
-// safe from another goroutine while the test is still running, which the
-// handshake in watchWhile guarantees it is.
-func watchDeadline(tb testing.TB, t *gotest.T, timeout time.Duration, what, budget string, done <-chan struct{}, stopped chan<- struct{}) {
+// watchPhase starts watching the phase the calling goroutine runs next, as
+// [watchWhile] describes, and returns the call that ends the watch. Calls
+// after the first do nothing.
+//
+// Ending waits for the watchdog to stop, which is what makes its report
+// legal: the testing package panics on a log from a test that has already
+// completed, and the test cannot complete before the watch has ended.
+func watchPhase(tb testing.TB, timeout time.Duration, what, budget string) (end func()) {
+	if timeout <= 0 {
+		return func() {}
+	}
+	done := make(chan struct{})
+	stopped := make(chan struct{})
+	go watchDeadline(tb, goroutineID(), timeout, what, budget, done, stopped)
+	return sync.OnceFunc(func() {
+		close(done)
+		<-stopped
+	})
+}
+
+// watchDeadline fails tb if the phase, running on goroutine gid, has not
+// finished within timeout. Reporting is safe from another goroutine while the
+// test is still running, which ending the watch (see [watchPhase]) guarantees.
+func watchDeadline(tb testing.TB, gid uint64, timeout time.Duration, what, budget string, done <-chan struct{}, stopped chan<- struct{}) {
 	defer close(stopped)
 
 	timer := time.NewTimer(timeout)
@@ -170,9 +194,34 @@ func watchDeadline(tb testing.TB, t *gotest.T, timeout time.Duration, what, budg
 	if hint := schedinfo.StarvationHint(); hint != "" {
 		suffix += "\n" + hint
 	}
-	fmt.Fprintf(os.Stderr, "gotest: %s %sexceeded its configured %s of %s and is still running %s\n",
-		tb.Name(), what, budget, timeout, sched)
-	t.Errorf("%sexceeded its configured %s of %s and is still running%s", what, budget, timeout, suffix)
+	// test2json streams the verdict as it is written, attributed to its
+	// test; a raw line there lands on whichever test printed last.
+	if !test2json() {
+		fmt.Fprintf(os.Stderr, "gotest: %s %sexceeded its configured %s of %s and is still running %s\n",
+			tb.Name(), what, budget, timeout, sched)
+	}
+	// The verdict belongs where the phase is running now.
+	reportAt(tb, phaseFrame(gid), fmt.Sprintf("%sexceeded its configured %s of %s and is still running%s", what, budget, timeout, suffix))
+}
+
+// test2json reports whether the binary runs under -test.v=test2json.
+func test2json() bool {
+	f := flag.Lookup("test.v")
+	return f != nil && f.Value.String() == "test2json"
+}
+
+// reportAt fails tb with msg located at at (file:line, or empty for none), in
+// the shape Errorf gives a failure. Errorf itself would name its caller, a
+// frame inside gotest, and the editor would link a file the user does not
+// have. The cost: Go 1.27's test2json tags only Error/Errorf output as
+// "error".
+func reportAt(tb testing.TB, at, msg string) {
+	if at != "" {
+		msg = at + ": " + msg
+	}
+	// Indented past the first line, as Errorf indents continuation lines.
+	fmt.Fprintln(tb.Output(), strings.ReplaceAll(msg, "\n", "\n    "))
+	tb.Fail()
 }
 
 // testScopedT applies the timeout convention shared by the phases that run while

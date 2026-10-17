@@ -72,7 +72,7 @@ func (s *RunTestSuite) TestLoad(t *gotest.T) {
 	}
 
 	t.It("type-checks the targets and leaves their dependencies unparsed", func(it *gotest.T) {
-		pkgs, err := lint.ExportLoad(dir, []string{"./root"})
+		pkgs, err := lint.ExportLoad(dir, []string{"./root"}, true)
 		gotest.NoError(it, err)
 		gotest.Len(it, pkgs, 1)
 		gotest.NotEmpty(it, pkgs[0].Syntax)

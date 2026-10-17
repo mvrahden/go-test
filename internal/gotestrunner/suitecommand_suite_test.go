@@ -54,7 +54,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					BinaryPath: "/tmp/pkg.test",
 				},
 				wantBinary: "/tmp/pkg.test",
-				wantArgs:   []string{"/tmp/pkg.test", "-test.run=^TestFooSuite$"},
+				wantArgs:   []string{"/tmp/pkg.test", "-test.paniconexit0", "-test.run=^TestFooSuite$"},
 			},
 			{
 				Name: "run filter overrides suite name",
@@ -63,7 +63,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					BinaryPath: "/tmp/pkg.test",
 				},
 				wantBinary: "/tmp/pkg.test",
-				wantArgs:   []string{"/tmp/pkg.test", "-test.run=^TestFooSuite$/^TestBar$"},
+				wantArgs:   []string{"/tmp/pkg.test", "-test.paniconexit0", "-test.run=^TestFooSuite$/^TestBar$"},
 			},
 			{
 				Name: "with run flags",
@@ -73,7 +73,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					RunFlags:   []string{"-test.timeout=30s", "-test.count=1"},
 				},
 				wantBinary: "/tmp/pkg.test",
-				wantArgs:   []string{"/tmp/pkg.test", "-test.run=^TestFooSuite$", "-test.timeout=30s", "-test.count=1"},
+				wantArgs:   []string{"/tmp/pkg.test", "-test.paniconexit0", "-test.run=^TestFooSuite$", "-test.timeout=30s", "-test.count=1"},
 			},
 			{
 				Name: "keeps -test.v in run flags",
@@ -83,7 +83,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					RunFlags:   []string{"-test.v", "-test.timeout=10s"},
 				},
 				wantBinary: "/tmp/pkg.test",
-				wantArgs:   []string{"/tmp/pkg.test", "-test.run=^TestFooSuite$", "-test.v", "-test.timeout=10s"},
+				wantArgs:   []string{"/tmp/pkg.test", "-test.paniconexit0", "-test.run=^TestFooSuite$", "-test.v", "-test.timeout=10s"},
 			},
 			{
 				Name: "with cover profile",
@@ -93,7 +93,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					CoverProfile: "/tmp/cover.out",
 				},
 				wantBinary: "/tmp/pkg.test",
-				wantArgs:   []string{"/tmp/pkg.test", "-test.run=^TestFooSuite$", "-test.coverprofile=/tmp/cover.out"},
+				wantArgs:   []string{"/tmp/pkg.test", "-test.paniconexit0", "-test.run=^TestFooSuite$", "-test.coverprofile=/tmp/cover.out"},
 			},
 			{
 				Name: "suite name with regex-special chars",
@@ -102,7 +102,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					BinaryPath: "/tmp/pkg.test",
 				},
 				wantBinary: "/tmp/pkg.test",
-				wantArgs:   []string{"/tmp/pkg.test", "-test.run=^TestFoo\\.Bar\\+Baz$"},
+				wantArgs:   []string{"/tmp/pkg.test", "-test.paniconexit0", "-test.run=^TestFoo\\.Bar\\+Baz$"},
 			},
 			{
 				Name: "all fields populated",
@@ -113,7 +113,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					CoverProfile: "/tmp/cover.out",
 				},
 				wantBinary: "/tmp/pkg.test",
-				wantArgs:   []string{"/tmp/pkg.test", "-test.run=^TestFooSuite$/^TestBar$", "-test.timeout=30s", "-test.v", "-test.coverprofile=/tmp/cover.out"},
+				wantArgs:   []string{"/tmp/pkg.test", "-test.paniconexit0", "-test.run=^TestFooSuite$/^TestBar$", "-test.timeout=30s", "-test.v", "-test.coverprofile=/tmp/cover.out"},
 			},
 		}) {
 			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, tc.target, env, false)
@@ -172,7 +172,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					BinaryPath: "/tmp/pkg.test",
 				},
 				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
-					"-test.run=^TestFooSuite$", "-test.v=test2json"},
+					"-test.paniconexit0", "-test.run=^TestFooSuite$", "-test.v=test2json"},
 			},
 			{
 				Name: "run filter overrides suite name",
@@ -181,7 +181,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					BinaryPath: "/tmp/pkg.test",
 				},
 				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
-					"-test.run=^TestFooSuite$/^TestBar$", "-test.v=test2json"},
+					"-test.paniconexit0", "-test.run=^TestFooSuite$/^TestBar$", "-test.v=test2json"},
 			},
 			{
 				Name: "strips -test.v from run flags",
@@ -191,7 +191,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					RunFlags:   []string{"-test.v", "-test.timeout=30s"},
 				},
 				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
-					"-test.run=^TestFooSuite$", "-test.v=test2json", "-test.timeout=30s"},
+					"-test.paniconexit0", "-test.run=^TestFooSuite$", "-test.v=test2json", "-test.timeout=30s"},
 			},
 			{
 				Name: "strips -test.v=true from run flags",
@@ -201,7 +201,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					RunFlags:   []string{"-test.v=true"},
 				},
 				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
-					"-test.run=^TestFooSuite$", "-test.v=test2json"},
+					"-test.paniconexit0", "-test.run=^TestFooSuite$", "-test.v=test2json"},
 			},
 			{
 				Name: "with cover profile",
@@ -211,7 +211,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					CoverProfile: "/tmp/cover.out",
 				},
 				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
-					"-test.run=^TestFooSuite$", "-test.v=test2json", "-test.coverprofile=/tmp/cover.out"},
+					"-test.paniconexit0", "-test.run=^TestFooSuite$", "-test.v=test2json", "-test.coverprofile=/tmp/cover.out"},
 			},
 			{
 				Name: "all fields, -test.v stripped",
@@ -222,7 +222,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					CoverProfile: "/tmp/cover.out",
 				},
 				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
-					"-test.run=^TestFooSuite$/^TestBar$", "-test.v=test2json",
+					"-test.paniconexit0", "-test.run=^TestFooSuite$/^TestBar$", "-test.v=test2json",
 					"-test.timeout=30s", "-test.count=1",
 					"-test.coverprofile=/tmp/cover.out"},
 			},
@@ -233,7 +233,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					BinaryPath: "/tmp/pkg.test",
 				},
 				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
-					"-test.run=^TestFoo\\.Bar\\+Baz$", "-test.v=test2json"},
+					"-test.paniconexit0", "-test.run=^TestFoo\\.Bar\\+Baz$", "-test.v=test2json"},
 			},
 		}) {
 			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, tc.target, env, true)

@@ -224,15 +224,179 @@ func (s *OutputCollectorTestSuite) TestOutputCollector(t *gotest.T) {
 		})
 	})
 
-	t.When("finalize", func(w *gotest.T) {
-		w.It("is a no-op for captured JSON mode", func(it *gotest.T) {
+	t.When("packages without suites are booked", func(w *gotest.T) {
+		want := []streamLine{
+			{Action: "start", Package: "example.com/empty"},
+			{Action: "output", Package: "example.com/empty", Output: "?   \texample.com/empty\t[no test files]\n"},
+			{Action: "skip", Package: "example.com/empty"},
+			{Action: "start", Package: "example.com/legacy"},
+			{Action: "output", Package: "example.com/legacy", Output: "?   \texample.com/legacy\t[no suites]\n"},
+			{Action: "skip", Package: "example.com/legacy"},
+		}
+
+		w.It("gives each go test's skip verdict in the live stream", func(it *gotest.T) {
+			var stdout, stderr bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &stderr))
+			c.StdlibTestsByPkg = map[string]int{"example.com/legacy": 2}
+			c.RecordNoSuite("example.com/empty", false)
+			c.RecordNoSuite("example.com/legacy", false)
+			gotest.Equal(it, want, streamLines(it, stdout.String()))
+			gotest.Empty(it, stderr.String())
+		})
+		w.It("books the same verdicts into a captured run", func(it *gotest.T) {
 			var stdout bytes.Buffer
 			c := gotestrunner.NewOutputCollector(gotestrunner.RunCaptureJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
-			c.Register("example.com/a", 1)
-			c.RecordResult("example.com/a", 0, gotestrunner.SuiteResult{ExitCode: 1})
-			stdout.Reset()
-			c.Finalize([]string{"example.com/empty"})
+			c.StdlibTestsByPkg = map[string]int{"example.com/legacy": 2}
+			c.RecordNoSuite("example.com/empty", false)
+			c.RecordNoSuite("example.com/legacy", false)
+			gotest.Equal(it, want, streamLines(it, string(c.CapturedJSON())))
 			gotest.Empty(it, stdout.String())
+		})
+	})
+
+	t.When("a package built but none of its suites run", func(w *gotest.T) {
+		w.It("passes in the stream with go test's no-tests-to-run note", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.RecordNothingToRun("example.com/filtered")
+			gotest.Equal(it, []streamLine{
+				{Action: "start", Package: "example.com/filtered"},
+				{Action: "output", Package: "example.com/filtered", Output: "ok  \texample.com/filtered\t0.000s [no tests to run]\n"},
+				{Action: "pass", Package: "example.com/filtered"},
+			}, streamLines(it, stdout.String()))
+		})
+		w.It("prints its ok line in flush order in a text run", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.SetFlushOrder([]string{"example.com/a", "example.com/filtered"})
+			c.Register("example.com/a", 1)
+			c.RecordNothingToRun("example.com/filtered")
+			gotest.Empty(it, stdout.String(), "waits for example.com/a")
+			c.RecordResult("example.com/a", 0, pass(10*time.Millisecond))
+			c.Finalize()
+			gotest.Equal(it, "ok  \texample.com/a\t0.010s\nok  \texample.com/filtered\t0.000s [no tests to run]\n", stdout.String())
+			gotest.False(it, c.AnyFailed())
+		})
+	})
+
+	t.When("a package's suites are all excluded (X_)", func(w *gotest.T) {
+		w.It("opens the package before its skipped suites and passes it with no tests to run", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.EmitSkippedSuites(map[string][]string{"example.com/off": {"X_OffTestSuite"}})
+			c.RecordNoSuite("example.com/off", true)
+			gotest.Equal(it, []streamLine{
+				{Action: "start", Package: "example.com/off"},
+				{Action: "run", Package: "example.com/off", Test: "TestX_OffTestSuite"},
+				{Action: "output", Package: "example.com/off", Test: "TestX_OffTestSuite", Output: "--- SKIP: TestX_OffTestSuite (0.00s)\n"},
+				{Action: "output", Package: "example.com/off", Test: "TestX_OffTestSuite", Output: "    test suite was excluded by user\n"},
+				{Action: "skip", Package: "example.com/off", Test: "TestX_OffTestSuite"},
+				{Action: "output", Package: "example.com/off", Output: "ok  \texample.com/off\t0.000s [no tests to run]\n"},
+				{Action: "pass", Package: "example.com/off"},
+			}, streamLines(it, stdout.String()))
+		})
+		w.It("prints go test's line for a package with test files that runs none, not [no test files]", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.RecordNoSuite("example.com/off", true)
+			c.Finalize()
+			gotest.Equal(it, "ok  \texample.com/off\t0.000s [no tests to run]\n", stdout.String())
+		})
+	})
+
+	t.When("a bench run's package runs no benchmark", func(w *gotest.T) {
+		w.It("passes it as go test -bench does, without a note", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			gotestrunner.ExportBenchCollector(c)
+			c.RecordNothingToRun("example.com/tests")
+			c.Finalize()
+			gotest.Equal(it, "ok  \texample.com/tests\t0.000s\n", stdout.String())
+		})
+	})
+
+	t.When("the suite binaries ran no test", func(w *gotest.T) {
+		ranNone := func(d time.Duration) gotestrunner.SuiteResult {
+			return gotestrunner.SuiteResult{Stdout: []byte("PASS\n"), Stderr: []byte("testing: warning: no tests to run\n"), Duration: d}
+		}
+		w.It("notes the package as go test does, with its elapsed time", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.Register("example.com/a", 2)
+			c.RecordResult("example.com/a", 0, ranNone(2*time.Millisecond))
+			c.RecordResult("example.com/a", 1, ranNone(3*time.Millisecond))
+			c.Finalize()
+			gotest.Equal(it, "ok  \texample.com/a\t0.005s [no tests to run]\n", stdout.String())
+		})
+		w.It("leaves the note off when one of them ran a test", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.Register("example.com/a", 2)
+			c.RecordResult("example.com/a", 0, ranNone(2*time.Millisecond))
+			c.RecordResult("example.com/a", 1, pass(3*time.Millisecond))
+			c.Finalize()
+			gotest.Equal(it, "ok  \texample.com/a\t0.005s\n", stdout.String())
+		})
+		w.It("notes it in the stream's summary line", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.Register("example.com/a", 1)
+			c.RecordResult("example.com/a", 0, gotestrunner.SuiteResult{
+				Stdout:   []byte(`{"Action":"output","Package":"example.com/a","Output":"testing: warning: no tests to run\n"}` + "\n"),
+				Duration: 4 * time.Millisecond,
+			})
+			gotest.Contains(it, stdout.String(), `"Output":"ok  \texample.com/a\t0.004s [no tests to run]\n"`)
+		})
+	})
+
+	t.When("packages reach the stream", func(w *gotest.T) {
+		suite := func(test string) gotestrunner.SuiteResult {
+			return gotestrunner.SuiteResult{Stdout: []byte(strings.Join([]string{
+				`{"Time":"2024-01-01T00:00:00Z","Action":"start","Package":"example.com/a"}`,
+				`{"Time":"2024-01-01T00:00:01Z","Action":"run","Package":"example.com/a","Test":"` + test + `"}`,
+				`{"Time":"2024-01-01T00:00:02Z","Action":"pass","Package":"example.com/a","Test":"` + test + `"}`,
+				`{"Time":"2024-01-01T00:00:02Z","Action":"pass","Package":"example.com/a"}`,
+			}, "\n") + "\n")}
+		}
+		w.It("opens each package once, before its first event, however many suite processes report", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.Register("example.com/a", 2)
+			c.RecordResult("example.com/a", 0, suite("TestATestSuite"))
+			c.RecordResult("example.com/a", 1, suite("TestBTestSuite"))
+			lines := streamLines(it, stdout.String())
+			starts := 0
+			for _, l := range lines {
+				if l.Action == "start" {
+					starts++
+				}
+			}
+			gotest.Equal(it, 1, starts)
+			gotest.Equal(it, streamLine{Action: "start", Package: "example.com/a"}, lines[0])
+		})
+		w.It("stamps the start with the time of the package's first event", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.Register("example.com/a", 1)
+			c.RecordResult("example.com/a", 0, suite("TestATestSuite"))
+			first, _, _ := strings.Cut(stdout.String(), "\n")
+			gotest.Equal(it, `{"Action":"start","Package":"example.com/a","Time":"2024-01-01T00:00:01Z"}`, first)
+		})
+	})
+
+	t.When("a text run prints its verdicts", func(w *gotest.T) {
+		w.It("interleaves the packages without suites in package order", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.SetFlushOrder([]string{"example.com/a", "example.com/empty", "example.com/b"})
+			c.Register("example.com/a", 1)
+			c.Register("example.com/b", 1)
+			c.RecordNoSuite("example.com/empty", false)
+			gotest.Empty(it, stdout.String(), "waits for example.com/a")
+			c.RecordResult("example.com/b", 0, pass(20*time.Millisecond))
+			c.RecordResult("example.com/a", 0, pass(10*time.Millisecond))
+			gotest.Equal(it, "ok  \texample.com/a\t0.010s\n?   \texample.com/empty\t[no test files]\nok  \texample.com/b\t0.020s\n", stdout.String(),
+				"streams each verdict as soon as the ones before it are out")
 		})
 	})
 
@@ -384,7 +548,7 @@ func (s *OutputCollectorTestSuite) TestEmitSkippedSuites(t *gotest.T) {
 	})
 
 	t.When("JSON streaming mode", func(w *gotest.T) {
-		w.It("emits run, output, output, skip events per suite", func(it *gotest.T) {
+		w.It("opens the package, then emits run, output, output, skip events per suite", func(it *gotest.T) {
 			var stdout bytes.Buffer
 			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
 			c.EmitSkippedSuites(map[string][]string{
@@ -392,13 +556,17 @@ func (s *OutputCollectorTestSuite) TestEmitSkippedSuites(t *gotest.T) {
 			})
 
 			lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
-			gotest.Len(it, lines, 4)
+			gotest.Len(it, lines, 5)
 
-			var ev0, ev1, ev2, ev3 map[string]any
-			gotest.NoError(it, json.Unmarshal([]byte(lines[0]), &ev0))
-			gotest.NoError(it, json.Unmarshal([]byte(lines[1]), &ev1))
-			gotest.NoError(it, json.Unmarshal([]byte(lines[2]), &ev2))
-			gotest.NoError(it, json.Unmarshal([]byte(lines[3]), &ev3))
+			var start, ev0, ev1, ev2, ev3 map[string]any
+			gotest.NoError(it, json.Unmarshal([]byte(lines[0]), &start))
+			gotest.NoError(it, json.Unmarshal([]byte(lines[1]), &ev0))
+			gotest.NoError(it, json.Unmarshal([]byte(lines[2]), &ev1))
+			gotest.NoError(it, json.Unmarshal([]byte(lines[3]), &ev2))
+			gotest.NoError(it, json.Unmarshal([]byte(lines[4]), &ev3))
+
+			gotest.Equal(it, "start", start["Action"])
+			gotest.Equal(it, "example.com/pkg", start["Package"])
 
 			gotest.Equal(it, "run", ev0["Action"])
 			gotest.Equal(it, "TestFooSuite", ev0["Test"])
@@ -423,13 +591,13 @@ func (s *OutputCollectorTestSuite) TestEmitSkippedSuites(t *gotest.T) {
 			})
 
 			lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
-			gotest.Len(it, lines, 8)
+			gotest.Len(it, lines, 10)
 
-			var first, fifth map[string]any
+			var first, sixth map[string]any
 			_ = json.Unmarshal([]byte(lines[0]), &first)
-			_ = json.Unmarshal([]byte(lines[4]), &fifth)
+			_ = json.Unmarshal([]byte(lines[5]), &sixth)
 			gotest.Equal(it, "example.com/a", first["Package"])
-			gotest.Equal(it, "example.com/z", fifth["Package"])
+			gotest.Equal(it, "example.com/z", sixth["Package"])
 		})
 	})
 
@@ -573,7 +741,7 @@ func (s *OutputCollectorTestSuite) TestOutputGolden(t *gotest.T) {
 				ExitCode: 0,
 				Duration: 50 * time.Millisecond,
 			})
-			c.Finalize(nil)
+			c.Finalize()
 
 			gotest.MatchSnapshot(it, stdout.String())
 		})
@@ -588,7 +756,7 @@ func (s *OutputCollectorTestSuite) TestOutputGolden(t *gotest.T) {
 				ExitCode: 1,
 				Duration: 100 * time.Millisecond,
 			})
-			c.Finalize(nil)
+			c.Finalize()
 
 			gotest.MatchSnapshot(it, stdout.String())
 		})
@@ -618,7 +786,8 @@ func (s *OutputCollectorTestSuite) TestOutputGolden(t *gotest.T) {
 				Duration: 20 * time.Millisecond,
 			})
 
-			c.Finalize([]string{"example.com/c"})
+			c.RecordNoSuite("example.com/c", false)
+			c.Finalize()
 
 			gotest.MatchSnapshot(it, stdout.String())
 		})
@@ -634,7 +803,7 @@ func (s *OutputCollectorTestSuite) TestOutputGolden(t *gotest.T) {
 				ExitCode: 0,
 				Duration: 50 * time.Millisecond,
 			})
-			c.Finalize(nil)
+			c.Finalize()
 
 			gotest.MatchSnapshot(it, stdout.String())
 		})
@@ -648,7 +817,7 @@ func (s *OutputCollectorTestSuite) TestOutputGolden(t *gotest.T) {
 				ExitCode: 1,
 				Duration: 100 * time.Millisecond,
 			})
-			c.Finalize(nil)
+			c.Finalize()
 
 			gotest.MatchSnapshot(it, stdout.String())
 		})
@@ -678,7 +847,8 @@ func (s *OutputCollectorTestSuite) TestOutputGolden(t *gotest.T) {
 				Duration: 20 * time.Millisecond,
 			})
 
-			c.Finalize([]string{"example.com/c"})
+			c.RecordNoSuite("example.com/c", false)
+			c.Finalize()
 
 			gotest.MatchSnapshot(it, stdout.String())
 		})
@@ -704,7 +874,7 @@ func (s *OutputCollectorTestSuite) TestOutputGolden(t *gotest.T) {
 				ExitCode: 0,
 				Duration: 50 * time.Millisecond,
 			})
-			c.Finalize(nil)
+			c.Finalize()
 
 			gotest.MatchSnapshot(it, normalizeJSON(stdout.String()))
 		})
@@ -735,9 +905,24 @@ func (s *OutputCollectorTestSuite) TestOutputGolden(t *gotest.T) {
 			c.RecordResult("example.com/b", 0, gotestrunner.SuiteResult{
 				Stdout: []byte(failJSON), ExitCode: 1, Duration: 20 * time.Millisecond,
 			})
-			c.Finalize(nil)
+			c.Finalize()
 
 			gotest.MatchSnapshot(it, normalizeJSON(stdout.String()))
 		})
 	})
+}
+
+// streamLine is the part of a stream event the collector's verdicts fix.
+type streamLine struct {
+	Action, Package, Test, Output string
+}
+
+func streamLines(t *gotest.T, stream string) []streamLine {
+	var lines []streamLine
+	for line := range strings.Lines(stream) {
+		var ev streamLine
+		gotest.NoError(t, json.Unmarshal([]byte(line), &ev), line)
+		lines = append(lines, ev)
+	}
+	return lines
 }

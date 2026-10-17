@@ -7,6 +7,12 @@ import (
 
 type DeprecatedTestSuite struct{}
 
+func (s *DeprecatedTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *DeprecatedTestSuite) TestAnOlderHarness(t *gotest.T) {
 	t.When("a harness from before HoldFixtures runs against this runtime", func(w *gotest.T) {
 		w.It("fails its setup with the fix instead of a missing symbol", func(it *gotest.T) {
@@ -17,5 +23,18 @@ func (s *DeprecatedTestSuite) TestAnOlderHarness(t *gotest.T) {
 			})
 			gotest.ErrorContains(it, err, "run `gotest generate` again")
 		})
+	})
+}
+
+func (s *DeprecatedTestSuite) TestAHarnessBeforeAwaitDoneAt(t *gotest.T) {
+	t.It("still compiles and waits for done", func(it *gotest.T) {
+		called := false
+		gotestruntime.AwaitDone(it, "TestAsync", func(done func()) { //nolint:staticcheck // the older harness's shape
+			go func() {
+				called = true
+				done()
+			}()
+		})
+		gotest.True(it, called)
 	})
 }

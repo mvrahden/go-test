@@ -39,6 +39,7 @@ func (s *SharedFixtureTeardownTestSuite) SuiteConfig() gotest.SuiteConfig {
 func slowTeardownFixture() []gotestgen.SharedFixtureInfo {
 	return []gotestgen.SharedFixtureInfo{{
 		Identifier:     "SlowTeardownSharedFixture",
+		HasAfterAll:    true,
 		PkgPath:        "github.com/mvrahden/go-test/tests/sharedfixture/fixtures",
 		PkgName:        "fixtures",
 		QualifiedType:  "fixtures.SlowTeardownSharedFixture",
@@ -52,6 +53,7 @@ func slowTeardownFixture() []gotestgen.SharedFixtureInfo {
 func panicSetupFixtures() []gotestgen.SharedFixtureInfo {
 	return append(slowTeardownFixture(), gotestgen.SharedFixtureInfo{
 		Identifier:     "PanickySetupSharedFixture",
+		HasAfterAll:    true,
 		PkgPath:        "github.com/mvrahden/go-test/tests/sharedfixture/fixtures",
 		PkgName:        "fixtures",
 		QualifiedType:  "fixtures.PanickySetupSharedFixture",
@@ -64,6 +66,7 @@ func panicSetupFixtures() []gotestgen.SharedFixtureInfo {
 func crashTeardownFixture() []gotestgen.SharedFixtureInfo {
 	return []gotestgen.SharedFixtureInfo{{
 		Identifier:     "CrashTeardownSharedFixture",
+		HasAfterAll:    true,
 		PkgPath:        "github.com/mvrahden/go-test/tests/sharedfixture/fixtures",
 		PkgName:        "fixtures",
 		QualifiedType:  "fixtures.CrashTeardownSharedFixture",
@@ -78,6 +81,7 @@ func crashTeardownFixture() []gotestgen.SharedFixtureInfo {
 func budgetedTeardownFixture() []gotestgen.SharedFixtureInfo {
 	return []gotestgen.SharedFixtureInfo{{
 		Identifier:     "BudgetedTeardownSharedFixture",
+		HasAfterAll:    true,
 		PkgPath:        "github.com/mvrahden/go-test/tests/sharedfixture/fixtures",
 		PkgName:        "fixtures",
 		QualifiedType:  "fixtures.BudgetedTeardownSharedFixture",
@@ -131,6 +135,7 @@ func windowFixtures() []gotestgen.SharedFixtureInfo {
 	return []gotestgen.SharedFixtureInfo{
 		{
 			Identifier:     "AlphaSharedFixture",
+			HasAfterAll:    true,
 			PkgPath:        "github.com/mvrahden/go-test/tests/sharedfixture/fixtures",
 			PkgName:        "fixtures",
 			QualifiedType:  "fixtures.AlphaSharedFixture",

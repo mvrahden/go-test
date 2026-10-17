@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
-	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
@@ -75,7 +75,8 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 
 	classified := gotestrunner.ClassifyGoTestArgs(goTestArgs)
 	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)
-	loaded, broken, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
+	pkgs, err := loadRunPackages(cfg.PackagePatterns, loadFlags)
+	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -116,6 +117,8 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		OutputMode:      gotestrunner.RunCaptureJSON,
 		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,
+		NoTestFiles:     noTestFiles,
+		PackageOrder:    pkgs.Order,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -211,8 +214,105 @@ func runSpecFromInput(input, format, output string, noColor, renderOnly bool) in
 	// must not exit 0 — in a pipe without pipefail this exit code is the only
 	// verdict CI ever sees. A client that renders rather than gates opts out
 	// with --render-only; every operational failure above still exits 2.
-	if !renderOnly && gotestspec.HasFailures(tree) {
+	return replayExitCode(events, tree, renderOnly)
+}
+
+// replayExitCode is the verdict of a replayed stream: 2 when it holds no
+// verdict to report (see replayVerdict) or a package failed to build, as the
+// live run exits; 1 on failures, else 0. renderOnly drops the verdict.
+func replayExitCode(events []gotestspec.TestEvent, tree []*gotestspec.Package, renderOnly bool) int {
+	if renderOnly {
+		return 0
+	}
+	gap, buildFailed := replayVerdict(events)
+	if gap != "" {
+		fmt.Fprintf(os.Stderr, "FAIL: %s", gap)
+		return 2
+	}
+	if buildFailed {
+		return 2
+	}
+	if gotestspec.HasFailures(tree) {
 		return 1
 	}
 	return 0
+}
+
+// replayVerdict says why a replayed stream carries no verdict: it holds no
+// test events at all (empty or not go test -json), or it ends before a
+// package reported its own pass/fail/skip (cut short). gap is "" when the
+// stream is whole. buildFailed reports a build-fail event or a verdict
+// naming a FailedBuild.
+func replayVerdict(events []gotestspec.TestEvent) (gap string, buildFailed bool) {
+	seen := false
+	var order []string
+	finished := map[string]bool{}
+	open := func(pkg string) {
+		if _, ok := finished[pkg]; !ok {
+			order = append(order, pkg)
+		}
+		finished[pkg] = false
+	}
+	var builds []string
+	reported := map[string]bool{}
+	for i := range events {
+		ev := &events[i]
+		switch ev.Action {
+		case "":
+			continue
+		case gotestspec.ActionBuildFail:
+			// Answered by the verdict of the package it failed.
+			seen, buildFailed = true, true
+			builds = append(builds, ev.ImportPath)
+			continue
+		case gotestspec.ActionBuildOutput:
+			seen = true
+			continue
+		}
+		seen = true
+		if ev.Package == "" {
+			continue
+		}
+		if ev.Test == "" && (ev.Action == gotestspec.ActionPass || ev.Action == gotestspec.ActionFail || ev.Action == gotestspec.ActionSkip) {
+			if _, ok := finished[ev.Package]; !ok {
+				order = append(order, ev.Package)
+			}
+			finished[ev.Package] = true
+			if ev.FailedBuild != "" {
+				reported[ev.FailedBuild], buildFailed = true, true
+			}
+			continue
+		}
+		// Anything after a verdict is a further run of the package
+		// (concatenated streams): it reopens it.
+		open(ev.Package)
+	}
+	if !seen {
+		return "input holds no test events (expected a go test -json stream)\n", false
+	}
+	for _, build := range builds {
+		if pkg := builtPackage(build); !reported[build] && !finished[pkg] {
+			open(pkg)
+		}
+	}
+	var b strings.Builder
+	for _, pkg := range order {
+		if !finished[pkg] {
+			fmt.Fprintf(&b, "  %s\n", pkg)
+		}
+	}
+	if b.Len() == 0 {
+		return "", buildFailed
+	}
+	return "input ends before these packages reported a verdict (stream cut short?):\n" + b.String(), buildFailed
+}
+
+// builtPackage is the package a build's ImportPath belongs to:
+// "p_test [p.test]" and "p [p.test]" are p's test builds; a plain path is
+// itself.
+func builtPackage(importPath string) string {
+	if _, variant, ok := strings.Cut(importPath, " ["); ok {
+		return strings.TrimSuffix(strings.TrimSuffix(variant, "]"), ".test")
+	}
+	return importPath
 }

@@ -2,18 +2,20 @@ package migrate_test
 
 import (
 	"go/format"
-	"go/parser"
-	"go/token"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/migrate"
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/tests/gotestcli"
 )
 
-// MigrateFileTestSuite covers the file-level API: suite renaming, the analysis
-// plan a testify suite yields, and the transformed output pinned by snapshot.
-type MigrateFileTestSuite struct{}
+// MigrateFileTestSuite covers the file-level API: suite renaming, what a
+// testify suite reports, and the transformed output pinned by snapshot.
+type MigrateFileTestSuite struct {
+	Mod *gotestcli.TestifyModuleSharedFixture
+}
 
 func (s *MigrateFileTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
@@ -25,18 +27,12 @@ type migrateFileCtx struct{}
 
 func (s *MigrateFileTestSuite) BeforeEach(t *gotest.T) *migrateFileCtx { return &migrateFileCtx{} }
 
-// transformBasicInput migrates testdata/basic and returns the formatted result.
-func transformBasicInput(t *gotest.T) string {
-	fset := token.NewFileSet()
-	inputPath := filepath.Join("testdata", "basic", "input_test.go")
-	f, err := parser.ParseFile(fset, inputPath, nil, parser.ParseComments)
-	gotest.NoError(t, err, "failed to parse input: %v", err)
-	plan := migrate.AnalyzeFile(f)
-	gotest.NotEmpty(t, plan.Suites, "no suites detected")
-	migrate.TransformFile(fset, f, plan)
-	var buf strings.Builder
-	gotest.NoError(t, format.Node(&buf, fset, f), "failed to format transformed AST")
-	return buf.String()
+// transformBasicInput migrates a copy of testdata/basic and returns the result.
+func (s *MigrateFileTestSuite) transformBasicInput(t *gotest.T) (string, []migrate.MigrateResult) {
+	src, err := os.ReadFile(filepath.Join("testdata", "basic", "input_test.go"))
+	gotest.NoError(t, err)
+	run := migrateModule(t, s.Mod, migrate.Options{}, map[string]string{"basic/input_test.go": string(src)}, "basic")
+	return run.files["basic/input_test.go"], run.results
 }
 
 func (s *MigrateFileTestSuite) TestDeriveNewName(t *gotest.T, _ *migrateFileCtx) {
@@ -48,34 +44,37 @@ func (s *MigrateFileTestSuite) TestDeriveNewName(t *gotest.T, _ *migrateFileCtx)
 		{Desc: "OrderSuite", expected: "OrderTestSuite"},
 		{Desc: "UserTestSuite", expected: "UserTestSuite"}, // already ends with TestSuite
 		{Desc: "MySuite", expected: "MyTestSuite"},
-		{Desc: "FooBar", expected: "FooBarTestSuite"}, // no "Suite" suffix
+		{Desc: "FooBar", expected: "FooBarTestSuite"},    // no "Suite" suffix
+		{Desc: "thingSuite", expected: "ThingTestSuite"}, // gotest runs only exported suites
 	}) {
 		gotest.Equal(sub, tc.expected, migrate.DeriveNewName(tc.Desc))
 	}
 }
 
-func (s *MigrateFileTestSuite) TestAnalyzeFile(t *gotest.T, _ *migrateFileCtx) {
-	fset := token.NewFileSet()
-	inputPath := filepath.Join("testdata", "basic", "input_test.go")
-	f, err := parser.ParseFile(fset, inputPath, nil, parser.ParseComments)
-	gotest.NoError(t, err, "failed to parse input: %v", err)
+func (s *MigrateFileTestSuite) TestTokenStarts(t *gotest.T, _ *migrateFileCtx) {
+	for t, tc := range gotest.Each(t, []struct {
+		Desc string
+		eol  string
+	}{
+		{"LF line endings", "\n"},
+		{"CRLF line endings, which the scanner drops from a literal", "\r\n"},
+	}) {
+		src := strings.ReplaceAll("package p\n\nvar x = f(`a\nb\nc\n`, y) /* d\ne */\n", "\n", tc.eol)
+		gotest.Equal(t, map[int]int{4: 3, 5: 3, 6: 3, 7: 6}, migrate.TokenStarts([]byte(src)))
+	}
+}
 
-	plan := migrate.AnalyzeFile(f)
+func (s *MigrateFileTestSuite) TestResults(t *gotest.T, _ *migrateFileCtx) {
+	_, results := s.transformBasicInput(t)
 
-	gotest.Len(t, plan.Suites, 1)
-	suite := plan.Suites[0]
-	gotest.Equal(t, "UserSuite", suite.OldName)
-	gotest.Equal(t, "UserTestSuite", suite.NewName)
-	gotest.Equal(t, "SetupSuite", suite.SetupSuite)
-	gotest.Equal(t, "TearDownSuite", suite.TearDownSuite)
-	gotest.Equal(t, "SetupTest", suite.SetupTest)
-	gotest.Equal(t, "TearDownTest", suite.TearDownTest)
-	gotest.Len(t, suite.TestMethods, 2)
-	gotest.Equal(t, "TestUserSuite", suite.RunnerFunc)
+	gotest.Len(t, results, 1)
+	gotest.Equal(t, "UserSuite", results[0].OldName)
+	gotest.Equal(t, "UserTestSuite", results[0].NewName)
+	gotest.Zero(t, results[0].Markers)
 }
 
 func (s *MigrateFileTestSuite) TestTransformFile(t *gotest.T, _ *migrateFileCtx) {
-	got := transformBasicInput(t)
+	got, _ := s.transformBasicInput(t)
 
 	// Re-format for consistent whitespace.
 	gotBytes, err := format.Source([]byte(got))

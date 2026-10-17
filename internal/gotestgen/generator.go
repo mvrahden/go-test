@@ -1,16 +1,21 @@
 package gotestgen
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"go/ast"
 	"maps"
+	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/goversion"
+	"github.com/mvrahden/go-test/internal/pkgpattern"
 	"github.com/mvrahden/go-test/internal/x/slices"
 	"golang.org/x/tools/go/packages"
 )
@@ -136,11 +141,25 @@ func (lr *LoadResult) IsTestOnly() bool {
 	return !lr.hasProdFiles
 }
 
+// InMainModule reports whether the package belongs to a main module, a
+// go.work module included: the only packages generated files are written
+// into. A dependency's suites still run, from an overlay.
+func (lr *LoadResult) InMainModule() bool {
+	for _, p := range []*packages.Package{lr.Ptest, lr.Pxtest} {
+		if p != nil && p.Module != nil {
+			return p.Module.Main
+		}
+	}
+	return false
+}
+
 // loadPackages is the shared core for all package-loading variants. Matched
 // packages that fail to load are returned as BrokenPackage entries: every
 // package a pattern matches must end in exactly one verdict, and a load
-// failure is a verdict, not an absence.
-func loadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []BrokenPackage, error) {
+// failure is a verdict, not an absence. Matched packages without test files
+// are named in noTestFiles, for the same reason. matched names every package
+// the patterns matched, in load order.
+func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResult, broken []BrokenPackage, noTestFiles, matched []string, err error) {
 	cfg := &packages.Config{
 		Mode:  packageLoadMode,
 		Tests: true,
@@ -150,10 +169,21 @@ func loadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []Br
 	}
 	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	if err := goversion.Check(totalFoundPkgs); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
+	}
+	seen := map[string]bool{}
+	for _, p := range totalFoundPkgs {
+		pkgPath := strings.TrimSuffix(p.PkgPath, "_test")
+		if pkgPath == "" {
+			pkgPath = p.ID
+		}
+		if !strings.HasSuffix(p.ID, ".test") && !seen[pkgPath] {
+			seen[pkgPath] = true
+			matched = append(matched, pkgPath)
+		}
 	}
 
 	brokenByPath := map[string]*BrokenPackage{}
@@ -193,6 +223,10 @@ func loadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []Br
 					continue
 				}
 				msg := e.Error()
+				if e.Pos == "" {
+					// go test prints a position-less error bare, not as "-: msg".
+					msg = e.Msg
+				}
 				if !brokenMsgSeen[pkgPath][msg] {
 					brokenMsgSeen[pkgPath][msg] = true
 					bp.Errors = append(bp.Errors, msg)
@@ -200,17 +234,27 @@ func loadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []Br
 			}
 			continue
 		}
-		if p.Module != nil {
-			loadedTestPkgs = append(loadedTestPkgs, p)
-		}
+		// Packages outside any module (std, GOPATH) hold no suites,
+		// but go test gives them a verdict, so they get one too.
+		loadedTestPkgs = append(loadedTestPkgs, p)
 	}
-	broken := make([]BrokenPackage, 0, len(brokenByPath))
+	broken = make([]BrokenPackage, 0, len(brokenByPath))
 	for _, bp := range brokenByPath {
 		broken = append(broken, *bp)
 	}
 	sort.Slice(broken, func(i, j int) bool { return broken[i].PkgPath < broken[j].PkgPath })
+	// A package with test files has a test main, "<id>.test".
+	ids := make(map[string]bool, len(totalFoundPkgs))
+	for _, p := range totalFoundPkgs {
+		ids[p.ID] = true
+	}
+	for _, p := range loadedTestPkgs {
+		if p.ID == p.PkgPath && !ids[p.ID+".test"] && !strings.HasSuffix(p.ID, ".test") {
+			noTestFiles = append(noTestFiles, p.PkgPath)
+		}
+	}
 	if len(loadedTestPkgs) == 0 {
-		return nil, broken, nil
+		return nil, broken, noTestFiles, matched, nil
 	}
 
 	prodPkgs := make(map[string]bool)
@@ -267,14 +311,178 @@ func loadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []Br
 	sort.SliceStable(res, func(i, j int) bool {
 		return pkgOrder[res[i].PkgPath] < pkgOrder[res[j].PkgPath]
 	})
-	return res, broken, nil
+	return res, broken, noTestFiles, matched, nil
 }
 
 // LoadPackages loads and groups test packages for the given target patterns.
 // Broken packages are returned separately; the caller decides whether they
 // abort the command or become failed-package verdicts.
 func LoadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []BrokenPackage, error) {
-	return loadPackages(targetPkgs, buildFlags)
+	res, broken, _, _, err := loadPackages(targetPkgs, buildFlags)
+	return res, broken, err
+}
+
+// LoadPackagesMatching is LoadPackages that also reports whether the
+// patterns matched any package at all.
+func LoadPackagesMatching(targetPkgs []string, buildFlags []string) (loaded []*LoadResult, broken []BrokenPackage, matched bool, err error) {
+	loaded, broken, _, all, err := loadPackages(targetPkgs, buildFlags)
+	return loaded, broken, len(all) > 0, err
+}
+
+// RunPackages is what a run loads: every matched package, each owed a verdict.
+type RunPackages struct {
+	Loaded []*LoadResult
+	Broken []BrokenPackage
+	// NoTestFiles are the matched packages without test files.
+	NoTestFiles []string
+	// Unmatched are the patterns that matched no package while others did.
+	Unmatched []string
+	// Order is every matched package in the order go test reports them.
+	Order []string
+}
+
+// NoPackagesError is a run whose patterns matched no package: it would verify
+// nothing, so it cannot pass.
+type NoPackagesError struct {
+	Patterns []string
+}
+
+func (e *NoPackagesError) Error() string {
+	quoted := make([]string, len(e.Patterns))
+	for i, p := range e.Patterns {
+		quoted[i] = strconv.Quote(p)
+	}
+	return strings.Join(quoted, ", ") + " matched no packages"
+}
+
+// LoadRunPackages is LoadPackages for a run, which owes every matched package
+// a verdict: it also names those without test files, and fails with a
+// *NoPackagesError when the patterns match no package at all.
+func LoadRunPackages(targetPkgs []string, buildFlags []string) (RunPackages, error) {
+	loaded, broken, noTestFiles, matched, err := loadPackages(targetPkgs, buildFlags)
+	if err != nil {
+		return RunPackages{}, err
+	}
+	if len(matched) == 0 {
+		return RunPackages{}, &NoPackagesError{Patterns: targetPkgs}
+	}
+	listed, unmatched := listPatterns("", targetPkgs, buildFlags)
+	return RunPackages{
+		Loaded:      loaded,
+		Broken:      broken,
+		NoTestFiles: noTestFiles,
+		Unmatched:   unmatched,
+		Order:       reportOrder(matched, listed),
+	}, nil
+}
+
+// listPatterns expands several patterns as go test does: the packages in its
+// order, and the patterns that match none, as go list warns about them. A
+// lone pattern needs neither: what loaded is what it matched. Best effort,
+// the result only orders and warns.
+//
+// dir is where go runs, "" the current directory.
+func listPatterns(dir string, patterns, buildFlags []string) (listed, unmatched []string) {
+	if len(patterns) < 2 {
+		return nil, nil
+	}
+	patterns = pkgpattern.Clean(patterns)
+	args := append([]string{"list", "-e", "-find", "-f", "{{.ImportPath}}"}, buildFlags...)
+	cmd := exec.Command("go", append(args, patterns...)...) //nolint:gosec // G204: the go tool with the run's own patterns
+	cmd.Dir = dir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	_ = cmd.Run()
+	return strings.Fields(stdout.String()), unmatchedWarnings(stderr.String())
+}
+
+// unmatchedWarnings names the patterns go list warned matched no packages.
+func unmatchedWarnings(stderr string) (unmatched []string) {
+	for line := range strings.Lines(stderr) {
+		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "go: warning: ")
+		if !ok {
+			continue
+		}
+		quoted, ok := strings.CutSuffix(rest, " matched no packages")
+		if !ok {
+			continue
+		}
+		if p, err := strconv.Unquote(quoted); err == nil {
+			unmatched = append(unmatched, p)
+		}
+	}
+	return unmatched
+}
+
+// UnmatchedPatterns names the patterns that match no package while others
+// do, as go list warns about them; dir is where go runs, "" the current
+// directory. Best effort: the result only warns.
+func UnmatchedPatterns(dir string, patterns, buildFlags []string) []string {
+	_, unmatched := listPatterns(dir, patterns, buildFlags)
+	return unmatched
+}
+
+// PackageDir is a package a pattern matched, listed without loading it.
+type PackageDir struct {
+	ImportPath string
+	Dir        string // "" when Err says why there is none
+	Main       bool   // in a main module, see LoadResult.InMainModule
+	Err        string
+}
+
+// ListPackageDirs expands patterns as go list does, without loading the
+// packages: one that does not compile, e.g. under a stale generated file, is
+// listed all the same. unmatched names the patterns that matched nothing.
+// dir is where go runs, "" the current directory.
+func ListPackageDirs(dir string, patterns, buildFlags []string) (pkgs []PackageDir, unmatched []string, err error) {
+	args := append([]string{"list", "-e", "-find", "-json=ImportPath,Dir,Module,Error"}, buildFlags...)
+	cmd := exec.Command("go", append(args, pkgpattern.Clean(patterns)...)...) //nolint:gosec // G204: the go tool with the command's own patterns
+	cmd.Dir = dir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, nil, fmt.Errorf("go list: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	dec := json.NewDecoder(&stdout)
+	for dec.More() {
+		var p struct {
+			ImportPath string
+			Dir        string
+			Module     *struct{ Main bool }
+			Error      *struct{ Err string }
+		}
+		if err := dec.Decode(&p); err != nil {
+			return nil, nil, fmt.Errorf("go list: %w", err)
+		}
+		pd := PackageDir{ImportPath: p.ImportPath, Dir: p.Dir, Main: p.Module != nil && p.Module.Main}
+		if p.Error != nil {
+			pd.Err = p.Error.Err
+		}
+		pkgs = append(pkgs, pd)
+	}
+	return pkgs, unmatchedWarnings(stderr.String()), nil
+}
+
+// reportOrder orders the matched packages as go test reports them: as go
+// list expanded several patterns, else as it walks a single one, path
+// segment by segment.
+func reportOrder(matched, listed []string) []string {
+	rest := map[string]bool{}
+	for _, p := range matched {
+		rest[p] = true
+	}
+	order := make([]string, 0, len(matched))
+	for _, p := range listed {
+		if rest[p] {
+			order = append(order, p)
+			delete(rest, p)
+		}
+	}
+	tail := slices.Filter(matched, func(p string, _ int) bool { return rest[p] })
+	// "/" sorts first, as a segment ending before its sibling does.
+	segments := func(p string) string { return strings.ReplaceAll(p, "/", "\x00") }
+	sort.SliceStable(tail, func(i, j int) bool { return segments(tail[i]) < segments(tail[j]) })
+	return append(order, tail...)
 }
 
 func GenerateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {

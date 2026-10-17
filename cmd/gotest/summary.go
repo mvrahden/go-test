@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
@@ -64,7 +63,8 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 
 	classified := gotestrunner.ClassifyGoTestArgs(goTestArgs)
 	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)
-	loaded, broken, err := gotestgen.LoadPackages(cfg.PackagePatterns, loadFlags)
+	pkgs, err := loadRunPackages(cfg.PackagePatterns, loadFlags)
+	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -106,6 +106,8 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		OutputMode:      gotestrunner.RunCaptureJSON,
 		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,
+		NoTestFiles:     noTestFiles,
+		PackageOrder:    pkgs.Order,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -166,10 +168,7 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 		return 2
 	}
 
-	if !renderOnly && gotestspec.HasFailures(tree) {
-		return 1
-	}
-	return 0
+	return replayExitCode(events, tree, renderOnly)
 }
 
 // writeSummaryOutput renders the summary to stdout or --output; an --output

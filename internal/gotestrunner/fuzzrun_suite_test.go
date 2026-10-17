@@ -173,6 +173,22 @@ func (s *FuzzRunTestSuite) TestExitContract(t *gotest.T) {
 		})
 	})
 
+	t.When("the engine reports its own time budget running out as a failure", func(it *gotest.T) {
+		o := gotestrunner.FuzzTargetOutcome{Func: "FuzzF", ExitCode: 1, EngineDeadline: true}
+
+		it.It("is not a failure", func(it *gotest.T) {
+			gotest.Equal(it, 0, o.EffectiveExitCode())
+		})
+		it.It("is not cut short, since the target had its whole share", func(it *gotest.T) {
+			res := gotestrunner.FuzzRunResult{Outcomes: []gotestrunner.FuzzTargetOutcome{o}}
+			gotest.Empty(it, res.CutShort())
+		})
+		it.It("still reports a crasher written alongside it", func(it *gotest.T) {
+			o := gotestrunner.FuzzTargetOutcome{Func: "FuzzF", ExitCode: 1, EngineDeadline: true, NewCrashers: []string{"deadbeef"}}
+			gotest.Equal(it, 1, o.EffectiveExitCode())
+		})
+	})
+
 	t.When("a new crasher appears even though the process exited 0", func(it *gotest.T) {
 		it.It("treats the crasher file as the authoritative finding signal", func(it *gotest.T) {
 			o := gotestrunner.FuzzTargetOutcome{Func: "FuzzD", NewCrashers: []string{"deadbeef"}}
@@ -302,6 +318,29 @@ func (s *FuzzRunTestSuite) TestLineWriterEngineLines(t *gotest.T) {
 			gotest.Equal(it, "[FuzzX] fuzz: elapsed: 3s, execs: 10 (3/sec), new interesting: 0 (total: 1)\n", buf.String())
 		})
 	})
+}
+
+func (s *FuzzRunTestSuite) TestLineWriterEngineDeadline(t *gotest.T) {
+	for _, tc := range []struct {
+		desc   string
+		output string
+		want   bool
+	}{
+		{"the engine's only failure is its deadline", "--- FAIL: FuzzX (10.09s)\n    context deadline exceeded\nFAIL\n", true},
+		{"a seed fails", "--- FAIL: FuzzX (0.00s)\n    --- FAIL: FuzzX/seed#0 (0.00s)\n        x_test.go:9: context deadline exceeded\nFAIL\n", false},
+		{"another test fails with the same message", "--- FAIL: FuzzY (10.00s)\n    context deadline exceeded\nFAIL\n", false},
+	} {
+		t.When(tc.desc, func(w *gotest.T) {
+			var buf bytes.Buffer
+			var mu sync.Mutex
+			lw := gotestrunner.ExportNewLineWriter(&buf, "FuzzX", &mu)
+			_, _ = lw.Write([]byte(tc.output))
+
+			w.It("reads the failure as the deadline only when nothing else failed", func(it *gotest.T) {
+				gotest.Equal(it, tc.want, gotestrunner.ExportLineWriterDeadlineFail(lw))
+			})
+		})
+	}
 }
 
 // TestCrasherDetection pins the finding signal: a corpus entry that appears

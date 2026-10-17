@@ -1,4 +1,5 @@
 === SNAP TestOutputFormatGolden/json/single_passing_package ===
+{"Action":"start","Package":"github.com/mvrahden/go-test/examples/auth","Time":"\u003cTIMESTAMP\u003e"}
 {"Action":"run","Package":"github.com/mvrahden/go-test/examples/auth","Test":"TestX_DeprecatedOAuthTestSuite","Time":"\u003cTIMESTAMP\u003e"}
 {"Action":"output","Output":"--- SKIP: TestX_DeprecatedOAuthTestSuite (\u003cTIMESTAMP\u003e)\n","Package":"github.com/mvrahden/go-test/examples/auth","Test":"TestX_DeprecatedOAuthTestSuite","Time":"\u003cTIMESTAMP\u003e"}
 {"Action":"output","Output":"    test suite was excluded by user\n","Package":"github.com/mvrahden/go-test/examples/auth","Test":"TestX_DeprecatedOAuthTestSuite","Time":"\u003cTIMESTAMP\u003e"}

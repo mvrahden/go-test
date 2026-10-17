@@ -122,7 +122,7 @@ func (s *LintGitHubTestSuite) TestGitHubMode(t *gotest.T) {
 
 	t.When("an unsupported driver flag is present", func(w *gotest.T) {
 		var stdout, stderr bytes.Buffer
-		_, ok := ExportRunLintGitHub(&stdout, &stderr, "", []string{"-json", "./..."})
+		_, ok := ExportRunLintGitHub(&stdout, &stderr, "", []string{"-debug=v", "./..."})
 
 		w.It("defers to the singlechecker driver", func(it *gotest.T) {
 			gotest.False(it, ok)

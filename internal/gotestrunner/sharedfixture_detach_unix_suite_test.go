@@ -46,6 +46,7 @@ func (s *SharedFixtureDetachedGrandchildTestSuite) AfterEach(t *gotest.T) {
 func detachingFixture() []gotestgen.SharedFixtureInfo {
 	return []gotestgen.SharedFixtureInfo{{
 		Identifier:     "DetachingSharedFixture",
+		HasAfterAll:    true,
 		PkgPath:        "github.com/mvrahden/go-test/tests/sharedfixture/fixtures",
 		PkgName:        "fixtures",
 		QualifiedType:  "fixtures.DetachingSharedFixture",

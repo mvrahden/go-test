@@ -119,3 +119,60 @@ func (s *BrokenLoadTestSuite) TestDiscoveryLoaderAgreesOnBroken(t *gotest.T) {
 		gotest.Equal(it, brokenloadPkgBase+"/brokensyntax", broken[0].PkgPath)
 	})
 }
+
+func (s *BrokenLoadTestSuite) TestPackagesWithoutTestFiles(t *gotest.T) {
+	pkgs, err := gotestgen.LoadRunPackages([]string{filepath.Join(brokenloadDir(t), "...")}, nil)
+	gotest.NoError(t, err)
+
+	t.It("names the loadable package without test files, and no broken one", func(it *gotest.T) {
+		gotest.Equal(it, []string{brokenloadPkgBase + "/notests"}, pkgs.NoTestFiles)
+	})
+	t.It("leaves the loaded and broken results as LoadPackages has them", func(it *gotest.T) {
+		gotest.Len(it, pkgs.Loaded, 1)
+		gotest.Len(it, pkgs.Broken, 4)
+	})
+}
+
+func (s *BrokenLoadTestSuite) TestPackagesOutsideTheMainModule(t *gotest.T) {
+	pkgs, err := gotestgen.LoadRunPackages([]string{"errors", "unsafe"}, nil)
+	gotest.NoError(t, err)
+
+	t.It("loads a std package with test files, to be reported without suites", func(it *gotest.T) {
+		gotest.Len(it, pkgs.Loaded, 1)
+		gotest.Equal(it, "errors", pkgs.Loaded[0].PkgPath)
+	})
+	t.It("names a std package without test files", func(it *gotest.T) {
+		gotest.Equal(it, []string{"unsafe"}, pkgs.NoTestFiles)
+	})
+}
+
+func (s *BrokenLoadTestSuite) TestReportOrder(t *gotest.T) {
+	t.It("orders several patterns as go test expands them, not by dependency or path", func(it *gotest.T) {
+		dir := brokenloadDir(it)
+		pkgs, err := gotestgen.LoadRunPackages([]string{filepath.Join(dir, "notests"), filepath.Join(dir, "healthy")}, nil)
+		gotest.NoError(it, err)
+		gotest.Equal(it, []string{brokenloadPkgBase + "/notests", brokenloadPkgBase + "/healthy"}, pkgs.Order)
+	})
+	t.It("orders a single pattern as go walks it, segment by segment", func(it *gotest.T) {
+		gotest.Equal(it, []string{"m/a", "m/a/b", "m/a-b", "m/b"}, gotestgen.ExportReportOrder([]string{"m/b", "m/a-b", "m/a/b", "m/a"}, nil))
+	})
+	t.It("keeps every matched package go list did not name, after those it did", func(it *gotest.T) {
+		gotest.Equal(it, []string{"m/z", "m/a", "m/b"}, gotestgen.ExportReportOrder([]string{"m/b", "m/a", "m/z"}, []string{"m/z", "m/gone"}))
+	})
+}
+
+func (s *BrokenLoadTestSuite) TestPatternsMatchingNoPackage(t *gotest.T) {
+	pattern := filepath.Join(brokenloadDir(t), "notests", "nosuchdir...")
+	_, err := gotestgen.LoadRunPackages([]string{pattern}, nil)
+
+	t.It("fails the run with the patterns named", func(it *gotest.T) {
+		noPkgs := gotest.ErrorAs[*gotestgen.NoPackagesError](it, err)
+		gotest.Equal(it, []string{pattern}, noPkgs.Patterns)
+	})
+	t.It("leaves the lenient loader without error", func(it *gotest.T) {
+		loaded, broken, err := gotestgen.LoadPackages([]string{pattern}, nil)
+		gotest.NoError(it, err)
+		gotest.Empty(it, loaded)
+		gotest.Empty(it, broken)
+	})
+}

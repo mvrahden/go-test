@@ -140,7 +140,7 @@ func (s *RendererTestSuite) TestAsyncTestCases(t *gotest.T) {
 		w.It("awaits done in the runtime and calls every case through the trampoline", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_AsyncTestCases")
 			output, _ := renderTestPkg(it.T(), pkg, false)
-			gotest.Contains(it, output, `gotestruntime.AwaitDone(ttt, "TestPingAsync", func(done func()) {`)
+			gotest.Contains(it, output, `gotestruntime.AwaitDoneAt(ttt, "TestPingAsync", "test.go:7", func(done func()) {`)
 			gotest.Contains(it, output, "ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestPingAsync(t, done) }, ttt)")
 			gotest.Contains(it, output, "ƒƒ_GOTEST_exec(s.TestPlain, ttt)")
 		})

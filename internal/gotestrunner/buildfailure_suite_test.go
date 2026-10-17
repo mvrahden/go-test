@@ -16,9 +16,7 @@ import (
 // BuildFailureVerdictsTestSuite covers the invariant that every matched
 // package ends in exactly one verdict: a package that fails to build is a
 // failed package with exit code 2, in both pipeline modes and in every
-// renderer fed from the collector's stream. "no test suites to run" (exit 0)
-// is reserved for runs where every matched package loaded and none had
-// suites.
+// renderer fed from the collector's stream.
 type BuildFailureVerdictsTestSuite struct{}
 
 type buildFailureCtx struct{ tmpDir string }

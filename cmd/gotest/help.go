@@ -104,13 +104,15 @@ Flags (gotest — use --double-dash):
 Flags (go test — use -single-dash, forwarded automatically):
   -v                      Verbose output
   -run=<regexp>           Run only matching tests
+  -skip=<regexp>          Skip matching tests (e.g. -skip='TestFooTestSuite/TestSlow')
   -count=<n>              Run each test n times (default: 1; no result is cached)
   -race                   Enable data race detector
   -timeout=<dur>          Deadline of each suite process (default: 10m); a
                           test's own deadline is SuiteConfig.Timeout
   -coverprofile=<file>    Write coverage profile
   -tags=<tags>            Build tags (comma-separated)
-  -json                   Machine-readable JSON event stream
+  -json                   go test -json event stream; every matched package
+                          gets a verdict, including those with no suites
 
 Use a bare "--" to separate gotest flags from go test flags,
 or to pass unrecognized flags to go test without validation.
@@ -165,6 +167,17 @@ Use a bare "--" to pass unrecognized flags without validation.
 CI auto-detection: when the standard CI env var is set and GOTEST_CI is
 unset, --ci is enabled automatically. Set GOTEST_CI=0 to opt out.
 
+Every package a pattern matches ends in a verdict. A run whose patterns
+match no package at all verified nothing: in every mode (spec, summary,
+bench and fuzz too) it exits 2 and prints on stderr
+  FAIL: "<pattern>" matched no packages
+A pattern that matches nothing while others do only warns on stderr, as
+go test does.
+A test that panics or calls os.Exit fails its suite, os.Exit(0) included,
+as under go test: the run exits 1, in every mode.
+An empty pattern ("") is the current directory, as for go test. gotest
+takes packages, not files: a .go file argument exits 2 and names it.
+
 Fuzz seed harvesting (on by default): if any target package has FuzzX
 suite methods, gotest mines your test files' table-test literals and
 call-site arguments into f.Add(...) seeds when it generates their wrapper
@@ -201,14 +214,19 @@ test whose output is the census, and its suite and package fail with it, so
 the rendered spec and -json consumers name it too. The census applies to
 green runs only and stands down under -run, -skip and -list with a note on
 stderr. Declared benchmarks a test run left unexecuted are counted with
-"note: N benchmark(s) not run"; -bench runs them here instead.
+"note: N benchmark(s) not run"; -bench runs them here instead. Patterns
+that match no package exit 2 as well: a run of nothing is not green.
 
 Flags:
   --format=<fmt>          Output format: terminal (default), md, json
   --output=<file>         Write to file instead of stdout
-  --input=<file>          Render from saved JSON ("-" for stdin)
-  --render-only           With --input, exit 0 on a failing stream: report
-                          whether rendering succeeded, not the test verdict
+  --input=<file>          Render from saved JSON ("-" for stdin); exits 2 if
+                          it holds no test events, a package or failed build
+                          never reported its verdict (a stream cut short), or
+                          a package failed to build (as the live run does)
+  --render-only           With --input, exit 0 on a failing or incomplete
+                          stream: report whether rendering succeeded, not the
+                          test verdict
   --static                Read the specification from source without running
                           the suites; nodes carry no verdict
   --no-color              Disable ANSI color codes
@@ -255,14 +273,19 @@ test whose output is the census, and its suite and package fail with it, so
 the rendered spec and -json consumers name it too. The census applies to
 green runs only and stands down under -run, -skip and -list with a note on
 stderr. Declared benchmarks a test run left unexecuted are counted with
-"note: N benchmark(s) not run"; -bench runs them here instead.
+"note: N benchmark(s) not run"; -bench runs them here instead. Patterns
+that match no package exit 2 as well: a run of nothing is not green.
 
 Flags:
   --format=<fmt>          Output format: terminal (default), md, json
   --output=<file>         Write to file instead of stdout
-  --input=<file>          Read from saved JSON ("-" for stdin)
-  --render-only           With --input, exit 0 on a failing stream: report
-                          whether rendering succeeded, not the test verdict
+  --input=<file>          Read from saved JSON ("-" for stdin); exits 2 if
+                          it holds no test events, a package or failed build
+                          never reported its verdict (a stream cut short), or
+                          a package failed to build (as the live run does)
+  --render-only           With --input, exit 0 on a failing or incomplete
+                          stream: report whether rendering succeeded, not the
+                          test verdict
   --no-color              Disable ANSI color codes
   --github                GitHub CI mode: emit annotations and step summary
                           (auto-detected via $GITHUB_ACTIONS)
@@ -301,7 +324,9 @@ Usage:
 
 Watches .go files under the target packages and re-runs affected tests
 on every change. The initial run covers all target packages; subsequent
-runs are scoped to the packages containing changed files.
+runs are scoped to the packages containing changed files. A run whose
+patterns match no package yet is reported like a failed load, and watch
+keeps watching: the first package written there runs.
 
 Flags:
   --debounce=<dur>        Re-run delay after change (default: 200ms)
@@ -389,8 +414,11 @@ slash segment (later segments select sub-benchmarks inside the wrapper).
 When both are given, a suite must match both to run (e.g.
 "gotest bench ./pkg/parser -run Parse" filters by suite).
 
-If no packages contain any BenchmarkX methods, prints "no benchmarks
-found" and exits 0 without invoking go test.
+If no matched package contains any BenchmarkX methods, prints "no
+benchmarks found" and exits 0 without invoking go test. Otherwise every
+matched package ends in a verdict: one that runs no benchmark passes as
+under go test -bench ("ok  <pkg>  0.000s"). Patterns that match no
+package at all exit 2.
 
 A capturing run (--spec, --json, --save or --against) is believed only
 when every declared BenchmarkX method reported a result. If one never ran,
@@ -450,6 +478,7 @@ Flags:
   --jobs=<n>              Max concurrent targets (default: max(1, GOMAXPROCS/2))
   --target=<Fuzz...>      Fuzz one target, named by its wrapper as printed in
                           session output; an unmatched name lists the targets
+                          (-run, -skip and -bench are refused in its favour)
   --no-harvest            Do not mine table-test literals into seeds for this run
   --no-cache              Disable the overlay and test binary caches
   --debug                 Keep generated overlay for inspection
@@ -468,8 +497,9 @@ A new crasher is named as it is found:
 Inspect it with "gotest fuzz triage", keep it with "gotest fuzz promote".
 Every session closes with one line (targets, executions, new interesting
 inputs, crashers); under GitHub Actions the same session is appended to
-$GITHUB_STEP_SUMMARY as a table. With no FuzzX methods anywhere, the
-command prints "no fuzz targets found" and exits 0.
+$GITHUB_STEP_SUMMARY as a table. With no FuzzX methods in the matched
+packages, the command prints "no fuzz targets found" and exits 0; patterns
+that match no package at all exit 2.
 
 Triage:
   "gotest fuzz triage" scans each target's testdata/fuzz/<Func>/ directory
@@ -571,6 +601,11 @@ cannot be fuzzed) and what it would pass over in silence: a lifecycle hook
 that is misspelled or carries X_, and a Benchmark or Fuzz method on a type
 that is no test suite.
 
+Exit codes: 0 when the document was written, including for patterns that
+match no package ("packages": [], a warning on stderr: an editor's
+workspace may hold no package yet); 2 when the packages cannot be loaded
+at all.
+
 Examples:
   gotest discover ./...                      All packages
   gotest discover ./pkg/auth/...             Single package tree
@@ -639,6 +674,12 @@ emits a stub method carrying the generator's own rejection reason, and
 prints:
   cannot fuzz map[string]string for Encode — generated TODO stub: <the generator's reason>
 
+Exit codes:
+  0   The skeleton was written
+  1   The target could not be scaffolded: not found, or its file exists
+  2   Usage error: no target, more than one, a target naming no type or
+      function, or an unknown flag
+
 Examples:
   gotest scaffold ./pkg/auth.UserService        Suite for UserService type
   gotest scaffold ./pkg/auth/service.go         Suite over the file's exported functions
@@ -702,27 +743,54 @@ Flags:
                           fail-guard, t-escape, stdlib-test, testify,
                           fuzz-no-oracle, fuzz-seed, fuzz-hook-io, fuzz-raw-seed)
   -disable-nolint         Ignore //nolint comments
-  -fix                    Apply suggested fixes
+  -tags list              Build tags, a comma-separated list as for go build
+                          (GOFLAGS=-tags=… works too)
+  -fix                    Apply suggested fixes, overlapping ones included,
+                          then report the findings left as a plain run
+                          would (exit 3 if any)
+  -diff                   Print what -fix would write as a unified diff on
+                          stdout and write nothing; report and exit as -fix
+                          would (implies -fix). Paths are a/ and b/ plus
+                          the path from the current directory, so git
+                          apply takes the diff there; a file outside it
+                          gets a ../ path, which needs git apply
+                          --unsafe-paths. A symlink is named by the file
+                          it leads to, which -fix writes
+  -json                   Print the findings as JSON on stdout and exit 0,
+                          as the go/analysis driver does (also with -fix;
+                          not with -diff)
   --github                Also emit GitHub ::error annotations and append a
                           findings table to $GITHUB_STEP_SUMMARY. Implied when
-                          GITHUB_ACTIONS=true; ignored alongside driver flags
-                          such as -fix or -json.
+                          GITHUB_ACTIONS=true; ignored alongside -json, -diff
+                          and flags only the go/analysis driver has.
 
 Suppress individual diagnostics with //nolint comments:
   //nolint:stdlib-test             Same line, or a comment block of its own
                                    ending on the line directly above
   package foo //nolint:stdlib-test  Suppress for entire file
 
+A pattern that matches no package while others do only warns on stderr,
+  warning: "<pattern>" matched no packages
+as go does.
+
 Exit codes:
-  0   No findings
-  1   Uncompilable target packages (nothing was proven about them)
+  0   No findings (with -fix or -diff: none left after fixing)
+  1   Nothing analyzable: uncompilable target packages (nothing was proven
+      about them), patterns that match no package or name a directory or
+      package that does not exist (said as go says it); or fixed sources
+      that no longer compile, or fixed files that could not be written
+      (-fix writes them all or none; on a failure stderr names any that
+      were)
   2   Usage or configuration error (e.g. an integrity rule in lint.skip)
-  3   Findings reported
+  3   Findings reported (with -fix or -diff: the findings left after fixing)
+  130 -fix or -diff stopped by a signal; nothing was written (once the
+      fixed files are being written, they all are first)
 
 Examples:
   gotest lint ./...                          Lint all packages
   gotest lint -skip-testify ./...            Skip testify rule
   gotest lint -fix ./...                     Auto-fix where possible
+  gotest lint -diff ./... | git apply        Preview the fixes, then apply them
 `)
 }
 
@@ -733,9 +801,29 @@ Usage:
   gotest migrate [--dry-run] [packages...]
 
 Scans for testify/suite patterns and rewrites them into gotest suite
-format. Defaults to the current package if no patterns are given.
-Anything it cannot convert is left with a TODO(gotest-migrate) marker,
-and the run exits 1 when any marker was left.
+format. Packages are named as directories (./pkg, ./..., or .\pkg on
+Windows) or import paths of the main module; the current package if none
+are given. A directory counts when it holds Go files under any build tag.
+A package's test files are migrated together, its external _test package
+included.
+
+The result is type-checked for real, from the migrated sources, in the
+default build and in each tag set the test files' //go:build lines ask
+for. Anything it cannot convert, and every line that does not compile,
+is left with a TODO(gotest-migrate) marker. The builds are the host's
+GOOS and GOARCH: a test file only another OS builds is refused, so run
+migrate on each platform whose test files differ. Generated test files
+(Code generated ... DO NOT EDIT.) are skipped and named on stderr.
+
+Exit codes:
+  0  every migrated package compiles, no marker is left, and every hook
+     and test testify ran is one gotest calls
+  1  a marker is left, including one an earlier run placed
+  2  a pattern names nothing, a package does not compile before the
+     migration (it is left alone), or the migrated files cannot be
+     written (none is: they are written all or none)
+
+The module must require github.com/mvrahden/go-test (go get -tool does).
 
 Flags:
   --dry-run    Print the diff of every edit instead of writing it
@@ -743,6 +831,7 @@ Flags:
 Examples:
   gotest migrate ./...                       Migrate all packages
   gotest migrate --dry-run ./pkg/auth        Show what one package would become
+  gotest migrate example.com/app/...         Migrate by import path
 `)
 }
 
@@ -775,6 +864,14 @@ Generates the overlay files that gotest normally creates transparently
 during test runs. Useful for inspecting generated code or integrating
 with custom build pipelines.
 
+Files are written into main-module packages only (go.work modules count);
+a matched dependency with suites is skipped with a note on stderr. A run
+still runs its suites, from the overlay.
+
+Exit codes: 0 when every matched package was generated for, including for
+patterns that match no package (nothing to write, a warning on stderr, as
+go generate does); 2 when a package does not build or generation fails.
+
 Examples:
   gotest generate ./...                      Generate for all packages
   gotest generate -tags=integration ./...    With build tags
@@ -806,7 +903,12 @@ Usage:
 
 Removes generated overlay files (gotest_p(x)suite_test.go) from the source
 tree. A run never writes them there; "gotest generate" does, for
-inspection.
+inspection. Patterns expand as for generate, so "clean ./..." removes what
+"generate ./..." wrote; files in packages outside the main module(s) are
+left with a note on stderr. Without a pattern it cleans the current
+package only, as generate does; before v1.33 it walked the directory
+tree. Above several modules, or for a module pulled in by a replace
+directive, use a go.work that lists them, or run clean inside each.
 
 The overlay cache and the test binary cache (used for faster repeated
 runs) are managed separately and auto-evict entries older than 7 days.
