@@ -64,13 +64,15 @@ func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
 		})
 	})
 
-	t.When("subtests write in non-alphabetical order", func(w *gotest.T) {
-		w.It("zebra comes first alphabetically after alpha", func(it *gotest.T) {
+	// Written first, but its key ("…order (b)/…") sorts after the next When's
+	// ("…order (a)/…"): the file order must follow the key, not the write.
+	t.When("subtests write in non-alphabetical order (b)", func(w *gotest.T) {
+		w.It("writes the later-sorting section first", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, "z-val")
 		})
 	})
 
-	t.When("subtests write in non-alphabetical order (alpha)", func(w *gotest.T) {
+	t.When("subtests write in non-alphabetical order (a)", func(w *gotest.T) {
 		w.It("sections are ordered by key, not by write order", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, "a-val")
 			snapPath := filepath.Join(snapDir, "TestSnapshotGroupingTestSuite_ext.snap")
@@ -79,9 +81,7 @@ func (s *SnapshotGroupingTestSuite) TestMatchSnapshotGrouping(t *gotest.T) {
 			content := string(data)
 			gotest.Contains(it, content, "a-val")
 			gotest.Contains(it, content, "z-val")
-			// The zebra key ("…order/zebra…") sorts before the alpha key ("…order_(alpha)/alpha…"):
-			// '/' precedes '_', so the file holds z-val first however the subtests ran.
-			gotest.Less(it, strings.Index(content, "z-val"), strings.Index(content, "a-val"))
+			gotest.Less(it, strings.Index(content, "a-val"), strings.Index(content, "z-val"))
 		})
 	})
 }
