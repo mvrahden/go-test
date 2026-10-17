@@ -827,6 +827,72 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "a relative path scaffolds beside the file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_relative_path_scaffolds_beside_the_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "an absolute path scaffolds beside the file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_absolute_path_scaffolds_beside_the_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when a source file is named by path",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_source_file_is_named_by_path",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "FilePaths",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestFilePaths",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIScaffoldPaths",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIScaffoldPathsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "summary --format json inside GitHub Actions carries no annotations",
                       "duration": 0,
                       "excluded": false,
@@ -1143,13 +1209,13 @@
     }
   ],
   "stats": {
-    "behaviors": 49,
+    "behaviors": 51,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 8,
+    "suites": 9,
     "tests": 0
   }
 }

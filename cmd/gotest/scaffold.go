@@ -111,7 +111,7 @@ func runScaffoldType(target string) int {
 func runScaffoldFile(target string) int {
 	dir := filepath.Dir(target)
 	filename := filepath.Base(target)
-	pkgPattern := "./" + filepath.ToSlash(dir)
+	pkgPattern := dirPattern(dir)
 
 	info, err := scaffold.IntrospectFile(pkgPattern, filename)
 	if err != nil {

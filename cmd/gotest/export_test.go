@@ -207,6 +207,12 @@ var (
 )
 
 // watch.go
+var (
+	ExportDirPattern = dirPattern
+	ExportRerunDirs  = rerunDirs
+	ExportWatchLoop  = watchLoop
+)
+
 func ExportParseDebounceFlag(args []string) (time.Duration, error) {
 	own, err := ownOf(args)
 	if err != nil {

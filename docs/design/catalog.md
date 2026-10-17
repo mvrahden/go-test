@@ -1,6 +1,6 @@
 # Behavior Specification
 
-8 suites, 49 behaviors. Read from source; nothing was executed.
+9 suites, 51 behaviors. Read from source; nothing was executed.
 
 ## CLIBuildRules
 
@@ -109,6 +109,16 @@
 | &nbsp;&nbsp;after -- it reaches the binary and the pattern stays a package |
 | &nbsp;&nbsp;after -args it reaches the binary verbatim |
 | &nbsp;&nbsp;without it the binary's check fails |
+
+## CLIScaffoldPaths
+
+### FilePaths
+
+| Behavior |
+|----------|
+| **when a source file is named by path** |
+| &nbsp;&nbsp;a relative path scaffolds beside the file |
+| &nbsp;&nbsp;an absolute path scaffolds beside the file |
 
 ## CLIStreams
 

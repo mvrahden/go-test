@@ -37,19 +37,16 @@ func (s *WatchTestSuite) TestWatchHelpers(t *gotest.T) {
 
 	t.When("DirsToPatterns", func(w *gotest.T) {
 		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
-			Desc    string
-			dirs    map[string]bool
-			lenWant int
+			Desc string
+			dirs []string
+			want []string
 		}{
-			{Desc: "single dir", dirs: map[string]bool{"pkg/foo": true}, lenWant: 1},
-			{Desc: "multiple dirs", dirs: map[string]bool{"pkg/foo": true, "cmd/bar": true}, lenWant: 2},
-			{Desc: "empty", dirs: map[string]bool{}, lenWant: 0},
+			{Desc: "single dir", dirs: []string{"pkg/foo"}, want: []string{"./pkg/foo"}},
+			{Desc: "multiple dirs keep their order", dirs: []string{"pkg/foo", "cmd/bar"}, want: []string{"./pkg/foo", "./cmd/bar"}},
+			{Desc: "an absolute dir stays absolute", dirs: []string{"/m/pkg"}, want: []string{"/m/pkg"}},
+			{Desc: "empty", dirs: nil, want: []string{}},
 		}) {
-			result := ExportDirsToPatterns(tc.dirs)
-			gotest.Len(sub, result, tc.lenWant)
-			for _, p := range result {
-				gotest.True(sub, len(p) > 2 && p[:2] == "./", "expected ./ prefix, got: %s", p)
-			}
+			gotest.Equal(sub, tc.want, ExportDirsToPatterns(tc.dirs))
 		}
 	})
 
