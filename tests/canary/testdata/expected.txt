@@ -122,3 +122,8 @@ exclusive pass TestBulkTwoTestSuite
 exclusive pass TestBulkTwoTestSuite/TestWindow
 exclusive pass TestExclusiveTestSuite
 exclusive pass TestExclusiveTestSuite/TestWindow
+teardownaftersetup exit 1
+teardownaftersetup fail -
+teardownaftersetup fail TestDownTestSuite
+teardownaftersetup pass TestHeldTestSuite
+teardownaftersetup pass TestHeldTestSuite/TestFixtureIsUp

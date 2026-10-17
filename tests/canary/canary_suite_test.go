@@ -24,8 +24,9 @@ import (
 // CanaryTestSuite runs one fixture package per method.
 // Sequential: it builds the CLI once and each method spawns a full pipeline run.
 type CanaryTestSuite struct {
-	binary   string
-	expected map[string]expectation
+	binary     string
+	expected   map[string]expectation
+	lastStream string // the -json stdout of the last run, for checks on what it carried
 }
 
 type expectation struct {
@@ -109,6 +110,7 @@ func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string) (int, []string
 		}
 		code = exitErr.ExitCode()
 	}
+	s.lastStream = stdout.String()
 	seen := map[string]bool{}
 	for _, line := range bytes.Split(stdout.Bytes(), []byte("\n")) {
 		if !bytes.HasPrefix(line, []byte("{")) {
@@ -307,6 +309,19 @@ func (s *CanaryTestSuite) TestSeedsReplayAgainstLiveFixtures(t *gotest.T) {
 // exit code.
 func (s *CanaryTestSuite) TestATeardownFailureReachesTheStream(t *gotest.T) {
 	s.check(t, "teardownfailing")
+}
+
+// When one shared fixture fails to come up and another fails to release, the
+// run has two failures and the stream must carry both: a leak reported only on
+// stderr is a leak a -json consumer never sees.
+func (s *CanaryTestSuite) TestATeardownFailureBesideASetupFailureReachesTheStream(t *gotest.T) {
+	s.check(t, "teardownaftersetup")
+	if !strings.Contains(s.lastStream, "would not release what it holds") {
+		t.Errorf("teardownaftersetup: the stream carries no word of the teardown failure")
+	}
+	if !strings.Contains(s.lastStream, "would not come up") {
+		t.Errorf("teardownaftersetup: the stream carries no word of the setup failure")
+	}
 }
 
 // A shared fixture that fails to come up fails the suite that reads it and

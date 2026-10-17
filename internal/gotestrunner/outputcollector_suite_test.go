@@ -926,3 +926,18 @@ func streamLines(t *gotest.T, stream string) []streamLine {
 	}
 	return lines
 }
+
+// A binary stopped from outside ends its own stream mid-way; the note that
+// says so must be in the stream for -json consumers, not only on stderr.
+func (s *OutputCollectorTestSuite) TestATerminatedBinaryIsNotedInTheStream(t *gotest.T) {
+	var stdout, stderr bytes.Buffer
+	c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &stderr))
+	c.Register("example.com/a", 1)
+	c.RecordResult("example.com/a", 0, gotestrunner.SuiteResult{ExitCode: -1, Duration: time.Millisecond})
+	t.When("a suite binary reports a signal status", func(w *gotest.T) {
+		w.It("writes the note as an output event of its package", func(it *gotest.T) {
+			gotest.Regexp(it, `"Action":"output".*"Output":"gotest: suite binary terminated by signal\\n".*"Package":"example.com/a"`, stdout.String())
+			gotest.Contains(it, stderr.String(), "gotest: suite binary terminated")
+		})
+	})
+}

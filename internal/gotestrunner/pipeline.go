@@ -149,6 +149,22 @@ func withReports(err error, reports []string, teardown bool) error {
 	return &fixtureFailure{err: err, reports: own}
 }
 
+// teardownVerdict is the teardown's error with the fixtures' AfterAll reports
+// attached. The reports are a failure on their own: a sibling's setup failure
+// has already claimed the process's exit status, and without this the AfterAll
+// that failed beside it would be known only to stderr.
+func teardownVerdict(teardownErr error, reports []string) error {
+	if err := withReports(teardownErr, reports, true); err != nil {
+		return err
+	}
+	for _, r := range reports {
+		if strings.Contains(r, ".AfterAll ") {
+			return withReports(errors.New("shared fixture teardown failed"), reports, true)
+		}
+	}
+	return nil
+}
+
 // applyTeardownFailure surfaces a shared fixture teardown failure and makes a
 // run that would otherwise have passed fail instead. Resources the fixtures
 // hold outlive the test process, so leaving them behind must not report ok.
@@ -445,7 +461,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 			teardownErr = errors.Join(barrierErr, setupProc.Teardown())
 			reports := setupProc.TakeFailures()
 			setupErr = withReports(setupErr, reports, false)
-			teardownErr = withReports(teardownErr, reports, true)
+			teardownErr = teardownVerdict(teardownErr, reports)
 		}
 		if setupErr != nil && result.ExitCode == 0 {
 			result.ExitCode = 1
@@ -952,7 +968,7 @@ loop:
 		teardownErr = errors.Join(barrierErr, setupProc.Teardown())
 		reports := setupProc.TakeFailures()
 		setupErr = withReports(setupErr, reports, false)
-		teardownErr = withReports(teardownErr, reports, true)
+		teardownErr = teardownVerdict(teardownErr, reports)
 	}
 	streamCancel()
 

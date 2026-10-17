@@ -352,20 +352,22 @@ func (p *SharedFixtureProcess) Teardown() error {
 		os.RemoveAll(p.sharedDir)
 	}
 
-	// A setup failure already surfaced through SetupErr; the subprocess ran its
-	// sibling teardowns under the runner's shutdown request and exited 1 for
-	// the setup failure. Reporting that status here again would blame teardown
-	// for it.
-	if p.setupErr != nil {
-		return nil
-	}
-
 	// A force-killed process was cut off mid-AfterAll. Its exit status says
 	// nothing — a signalled process reports -1, never sharedTeardownFailedExit —
 	// so without reporting it here the run would end green while the containers
-	// the fixture was still stopping stay up.
+	// the fixture was still stopping stay up. A setup failure earlier in the
+	// run changes nothing about that.
 	if forceKilled {
 		return fmt.Errorf("shared fixture teardown was force-killed after %s; its AfterAll never finished and its resources may be leaked", budget)
+	}
+
+	// A setup failure already surfaced through SetupErr; the subprocess ran its
+	// sibling teardowns under the runner's shutdown request and exited 1 for
+	// the setup failure. Reporting that status here again would blame teardown
+	// for it. Sibling AfterAll failures still reach the run through the
+	// fixtures' own reports, which the pipeline reads separately.
+	if p.setupErr != nil {
+		return nil
 	}
 
 	// A clean exit is the only proof of a completed teardown: the epilogue runs

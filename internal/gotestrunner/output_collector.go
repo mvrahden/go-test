@@ -131,7 +131,14 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //n
 	// ends mid-stream with no verdict of its own.
 	if code, how := ExitStatusVerdict(r.ExitCode); how != "" {
 		r.ExitCode = code
-		r.Stderr = append(r.Stderr, fmt.Appendf(nil, "gotest: suite binary terminated %s\n", how)...)
+		note := fmt.Sprintf("gotest: suite binary terminated %s\n", how)
+		r.Stderr = append(r.Stderr, note...)
+		if c.mode != RunBatchText {
+			// The stream is what -json consumers see; a note only stderr
+			// carries would leave them a binary that stopped mid-stream
+			// with no word why.
+			_, _ = c.jsonTarget().Write(outputEvent(pkg, note))
+		}
 	}
 	if r.ExitCode > c.worst {
 		c.worst = r.ExitCode
@@ -578,4 +585,10 @@ func writeJSONLine(w io.Writer, fields map[string]any) {
 	data, _ := json.Marshal(fields)
 	_, _ = w.Write(data)
 	_, _ = w.Write([]byte{'\n'})
+}
+
+// outputEvent is one go test -json output line for pkg.
+func outputEvent(pkg, text string) []byte {
+	line, _ := json.Marshal(map[string]string{"Action": "output", "Package": pkg, "Output": text})
+	return append(line, '\n')
 }
