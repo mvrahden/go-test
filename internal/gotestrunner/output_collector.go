@@ -397,12 +397,11 @@ func (c *OutputCollector) flushTextPkg(s *pkgState, pkg string) {
 		return
 	}
 	failed := false
-	var dur time.Duration
+	dur := packageSpan(s.results)
 	for i := range s.results {
 		if s.results[i].ExitCode != 0 {
 			failed = true
 		}
-		dur += s.results[i].Duration
 	}
 	if c.verbose || failed {
 		for i := range s.results {
@@ -512,12 +511,11 @@ func (s *startWriter) writeLine(line []byte) {
 
 func (c *OutputCollector) emitJSONPackageSummary(w io.Writer, pkg string, s *pkgState) {
 	failed := false
-	var dur time.Duration
+	dur := packageSpan(s.results)
 	for i := range s.results {
 		if s.results[i].ExitCode != 0 {
 			failed = true
 		}
-		dur += s.results[i].Duration
 	}
 	now := time.Now()
 	var summaryLine string
@@ -591,4 +589,32 @@ func writeJSONLine(w io.Writer, fields map[string]any) {
 func outputEvent(pkg, text string) []byte {
 	line, _ := json.Marshal(map[string]string{"Action": "output", "Package": pkg, "Output": text})
 	return append(line, '\n')
+}
+
+// packageSpan is the clock a package's suites occupied: from the first start
+// to the last end. Results without a start time, as tests and replays build
+// them, fall back to the sum of their durations.
+func packageSpan(results []SuiteResult) time.Duration {
+	var first, last time.Time
+	var sum time.Duration
+	timed := true
+	for i := range results {
+		r := &results[i]
+		sum += r.Duration
+		if r.Started.IsZero() {
+			timed = false
+			continue
+		}
+		end := r.Started.Add(r.Duration)
+		if first.IsZero() || r.Started.Before(first) {
+			first = r.Started
+		}
+		if end.After(last) {
+			last = end
+		}
+	}
+	if !timed || first.IsZero() {
+		return sum
+	}
+	return last.Sub(first)
 }

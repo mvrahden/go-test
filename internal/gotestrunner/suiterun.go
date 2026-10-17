@@ -47,6 +47,9 @@ type SuiteResult struct {
 	Stdout   []byte
 	Stderr   []byte
 	ExitCode int
+	// Started is when the process was started; Duration how long it ran.
+	// Together they give a package the clock its suites occupied.
+	Started  time.Time
 	Duration time.Duration
 	// CutShort reports that the run's context ended while the process ran.
 	CutShort bool
@@ -244,6 +247,7 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 			Target:   target,
 			Stderr:   fmt.Appendf(nil, "gotest: %s did not start: %v\n", target.SuiteName, err),
 			ExitCode: 2,
+			Started:  start,
 			Duration: time.Since(start),
 		}
 	}
@@ -267,6 +271,7 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		Stdout:   stdout.Bytes(),
 		Stderr:   stderr.Bytes(),
 		ExitCode: exitCode,
+		Started:  start,
 		Duration: duration,
 		CutShort: cutShort.Load(),
 	}
