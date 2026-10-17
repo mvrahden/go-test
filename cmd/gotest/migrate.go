@@ -18,7 +18,7 @@ import (
 // and a suite it uses is refused. --dry-run prints the diff instead of
 // writing and answers the same way.
 func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	ownArgs, rest, err := SplitArgs(inv.Args, migrateAllowed)
+	own, rest, err := SplitArgs(inv.Args, migrateAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -32,11 +32,7 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		}
 		patterns = append(patterns, arg)
 	}
-	for _, arg := range ownArgs {
-		if arg == "--dry-run" {
-			opts.DryRun = true
-		}
-	}
+	opts.DryRun = own.Bool("--dry-run")
 	if len(patterns) == 0 {
 		patterns = []string{"."}
 	}

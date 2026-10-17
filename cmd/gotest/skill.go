@@ -27,7 +27,7 @@ func runSkill(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	ownArgs, rest, err := SplitArgs(args[1:], skillAllowed)
+	own, rest, err := SplitArgs(args[1:], skillAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
 		return 2
@@ -36,9 +36,9 @@ func runSkill(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "FAIL: unexpected argument %s — skill install accepts only --dir\n", rest[0])
 		return 2
 	}
-	dir := extractStringFlag(ownArgs, "--dir", "")
+	dir := own.Value("--dir")
 	if dir == "" {
-		if hasFlag(ownArgs, "--dir") {
+		if own.Given("--dir") {
 			fmt.Fprintln(os.Stderr, "FAIL: --dir needs a directory")
 			return 2
 		}

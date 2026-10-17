@@ -74,7 +74,7 @@ func (s *StaticSpecTestSuite) AfterEach(t *gotest.T, ctx *staticCtx) {
 // a specification, and returns what it wrote.
 func (s *StaticSpecTestSuite) render(t *gotest.T, dir, format, pattern string) string {
 	out := filepath.Join(dir, "spec."+format)
-	code := ExportRunStaticSpec(nil, []string{pattern}, &config.ProjectConfig{}, format, out, true)
+	code := ExportRunStaticSpec(OwnFlags{}, []string{pattern}, &config.ProjectConfig{}, format, out, true)
 	gotest.Equal(t, 0, code, "spec --static --format=%s", format)
 
 	data, err := os.ReadFile(out) //nolint:gosec // G304: path built in this test
@@ -253,7 +253,7 @@ func (s *StaticSpecTestSuite) TestExitCodes(t *gotest.T, ctx *staticCtx) {
 	t.When("the source can be read", func(w *gotest.T) {
 		w.It("exits 0", func(it *gotest.T) {
 			out := filepath.Join(ctx.dir, "ok.txt")
-			gotest.Equal(it, 0, ExportRunStaticSpec(nil, []string{s.corpus}, &config.ProjectConfig{}, "terminal", out, true))
+			gotest.Equal(it, 0, ExportRunStaticSpec(OwnFlags{}, []string{s.corpus}, &config.ProjectConfig{}, "terminal", out, true))
 		})
 	})
 
@@ -265,14 +265,14 @@ func (s *StaticSpecTestSuite) TestExitCodes(t *gotest.T, ctx *staticCtx) {
 
 		w.It("exits 2 rather than reporting an empty specification", func(it *gotest.T) {
 			out := filepath.Join(ctx.dir, "broken.txt")
-			gotest.Equal(it, 2, ExportRunStaticSpec(nil, []string{broken}, &config.ProjectConfig{}, "terminal", out, true))
+			gotest.Equal(it, 2, ExportRunStaticSpec(OwnFlags{}, []string{broken}, &config.ProjectConfig{}, "terminal", out, true))
 		})
 	})
 
 	t.When("the output file cannot be created", func(w *gotest.T) {
 		w.It("exits 2", func(it *gotest.T) {
 			out := filepath.Join(ctx.dir, "no-such-dir", "spec.txt")
-			gotest.Equal(it, 2, ExportRunStaticSpec(nil, []string{s.corpus}, &config.ProjectConfig{}, "terminal", out, true))
+			gotest.Equal(it, 2, ExportRunStaticSpec(OwnFlags{}, []string{s.corpus}, &config.ProjectConfig{}, "terminal", out, true))
 		})
 	})
 }

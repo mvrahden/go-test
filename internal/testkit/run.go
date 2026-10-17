@@ -123,7 +123,8 @@ func (r Run) MarkerOrder(markers ...string) bool {
 }
 
 // childEnv is the CLI's environment: the caller's, minus the GitHub Actions
-// variables and the snapshot update switch, plus the marker directory.
+// variables, the CI switches and the snapshot update switch, plus the marker
+// directory, so a run under test sees only the flags it was given.
 func childEnv(markerDir string) []string {
 	env := make([]string, 0, len(os.Environ())+1)
 	for _, kv := range os.Environ() {
@@ -131,6 +132,8 @@ func childEnv(markerDir string) []string {
 		case strings.HasPrefix(kv, "GITHUB_ACTIONS="),
 			strings.HasPrefix(kv, "GITHUB_STEP_SUMMARY="),
 			strings.HasPrefix(kv, "GOTEST_UPDATE_SNAPSHOTS="),
+			strings.HasPrefix(kv, "GOTEST_CI="),
+			strings.HasPrefix(kv, "CI="),
 			strings.HasPrefix(kv, "GOTEST_CANARY_DIR="):
 			continue
 		}

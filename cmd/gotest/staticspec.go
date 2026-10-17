@@ -134,8 +134,8 @@ func staticBehaviorNodes(behaviors []*gotestast.Behavior) []*gotestspec.Node {
 // runStaticSpec renders the specification from source without running the
 // suites. Nothing carries a verdict, because nothing executed; the exit code
 // reports only whether the source could be read.
-func runStaticSpec(ownArgs, goTestArgs []string, projectConfig *config.ProjectConfig, format, output string, noColor bool) int {
-	cfg, err := parseExecFlags(ownArgs, goTestArgs, projectConfig)
+func runStaticSpec(own OwnFlags, goTestArgs []string, projectConfig *config.ProjectConfig, format, output string, noColor bool) int {
+	cfg, err := parseExecFlags(own, goTestArgs, projectConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

@@ -1,5 +1,7 @@
 package main
 
+import "maps"
+
 // FlagKind indicates how a flag consumes arguments.
 type FlagKind int
 
@@ -80,6 +82,10 @@ var fuzzAllowed = flagSet("--for", "--jobs", "--no-cache", "--debug", "--no-harv
 
 var scaffoldAllowed = flagSet("--fuzz")
 
+// noOwnFlags is the allowed set of the commands that take only packages and
+// go test flags: any gotest flag is refused, an unknown one is still unknown.
+var noOwnFlags = flagSet()
+
 var migrateAllowed = flagSet("--dry-run")
 
 var skillAllowed = flagSet("--dir")
@@ -90,4 +96,47 @@ func flagSet(names ...string) map[string]bool {
 		s[n] = true
 	}
 	return s
+}
+
+// OwnFlags is one invocation's gotest flags after parsing: each flag's final
+// value, the last occurrence winning, as the go command reads its own flags.
+// A boolean holds "true" or "false"; a value flag holds its text, which may
+// be empty when it was given as --name=.
+type OwnFlags struct {
+	values map[string]string
+}
+
+func (f *OwnFlags) set(name, value string) {
+	if f.values == nil {
+		f.values = map[string]string{}
+	}
+	f.values[name] = value
+}
+
+// Given reports whether the flag appeared at all.
+func (f OwnFlags) Given(name string) bool {
+	_, ok := f.values[name]
+	return ok
+}
+
+// Bool is a boolean flag's final value; an absent flag is false.
+func (f OwnFlags) Bool(name string) bool { return f.values[name] == "true" }
+
+// Value is a value flag's final text; an absent flag is "".
+func (f OwnFlags) Value(name string) string { return f.values[name] }
+
+// ValueOr is Value with a default for an absent or empty flag.
+func (f OwnFlags) ValueOr(name, def string) string {
+	if v := f.values[name]; v != "" {
+		return v
+	}
+	return def
+}
+
+// Snapshot is a copy of every parsed flag, nil when none was given.
+func (f OwnFlags) Snapshot() map[string]string {
+	if len(f.values) == 0 {
+		return nil
+	}
+	return maps.Clone(f.values)
 }

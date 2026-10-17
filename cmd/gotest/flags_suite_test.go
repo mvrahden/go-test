@@ -170,43 +170,49 @@ func (s *FlagParsingTestSuite) TestSplitArgs(t *gotest.T) {
 		Desc         string
 		inArgs       []string
 		allowed      map[string]bool
-		expectOwn    []string
+		expectOwn    map[string]string
 		expectGoTest []string
-		expectErr    bool
+		expectErr    string
 	}{
 		{Desc: "empty", inArgs: nil, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: nil},
 		{Desc: "only go test args", inArgs: []string{"-v", "./...", "-race", "-count=1"}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-v", "./...", "-race", "-count=1"}},
-		{Desc: "only own args", inArgs: []string{"--debug"}, allowed: ExportTestAllowed, expectOwn: []string{"--debug"}, expectGoTest: nil},
-		{Desc: "mixed args", inArgs: []string{"--debug", "-v", "./...", "-race"}, allowed: ExportTestAllowed, expectOwn: []string{"--debug"}, expectGoTest: []string{"-v", "./...", "-race"}},
-		{Desc: "min flag with equals", inArgs: []string{"--min=80", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--min=80"}, expectGoTest: []string{"-v"}},
-		{Desc: "min flag with space", inArgs: []string{"--min", "90", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--min", "90"}, expectGoTest: []string{"-v"}},
-		{Desc: "unknown gotest flag", inArgs: []string{"--unknown"}, allowed: ExportTestAllowed, expectErr: true},
-		{Desc: "unknown go test flag", inArgs: []string{"-zzz"}, allowed: ExportTestAllowed, expectErr: true},
-		{Desc: "gotest flag not in allowed set", inArgs: []string{"--debounce=200ms"}, allowed: ExportTestAllowed, expectErr: true},
-		{Desc: "bare -- escape hatch", inArgs: []string{"--debug", "--", "-custom", "./..."}, allowed: ExportTestAllowed, expectOwn: []string{"--debug"}, expectGoTest: []string{"-custom", "./..."}},
+		{Desc: "only own args", inArgs: []string{"--debug"}, allowed: ExportTestAllowed, expectOwn: map[string]string{"--debug": "true"}, expectGoTest: nil},
+		{Desc: "mixed args", inArgs: []string{"--debug", "-v", "./...", "-race"}, allowed: ExportTestAllowed, expectOwn: map[string]string{"--debug": "true"}, expectGoTest: []string{"-v", "./...", "-race"}},
+		{Desc: "min flag with equals", inArgs: []string{"--min=80", "-v"}, allowed: ExportTestAllowed, expectOwn: map[string]string{"--min": "80"}, expectGoTest: []string{"-v"}},
+		{Desc: "min flag with space", inArgs: []string{"--min", "90", "-v"}, allowed: ExportTestAllowed, expectOwn: map[string]string{"--min": "90"}, expectGoTest: []string{"-v"}},
+		{Desc: "bool flag set to true", inArgs: []string{"--ci=true"}, allowed: ExportTestAllowed, expectOwn: map[string]string{"--ci": "true"}},
+		{Desc: "bool flag set to false", inArgs: []string{"--ci=false"}, allowed: ExportTestAllowed, expectOwn: map[string]string{"--ci": "false"}},
+		{Desc: "bool flag set to 1", inArgs: []string{"--ci=1"}, allowed: ExportTestAllowed, expectOwn: map[string]string{"--ci": "true"}},
+		{Desc: "bool flag with a non-boolean value", inArgs: []string{"--ci=maybe"}, allowed: ExportTestAllowed, expectErr: `invalid boolean value "maybe" for --ci`},
+		{Desc: "last occurrence of a bool wins", inArgs: []string{"--ci", "--ci=false"}, allowed: ExportTestAllowed, expectOwn: map[string]string{"--ci": "false"}},
+		{Desc: "last occurrence of a value wins", inArgs: []string{"--min=10", "--min", "20"}, allowed: ExportTestAllowed, expectOwn: map[string]string{"--min": "20"}},
+		{Desc: "value flag without a value", inArgs: []string{"-v", "--min"}, allowed: ExportTestAllowed, expectErr: "flag --min needs a value"},
+		{Desc: "value flag with an empty value", inArgs: []string{"--save="}, allowed: ExportBenchAllowed, expectOwn: map[string]string{"--save": ""}},
+		{Desc: "unknown gotest flag", inArgs: []string{"--unknown"}, allowed: ExportTestAllowed, expectErr: "unknown flag: --unknown"},
+		{Desc: "unknown go test flag", inArgs: []string{"-zzz"}, allowed: ExportTestAllowed, expectErr: "unknown flag: -zzz"},
+		{Desc: "gotest flag not in allowed set", inArgs: []string{"--debounce=200ms"}, allowed: ExportTestAllowed, expectErr: "flag --debounce is not valid for this subcommand"},
+		{Desc: "bare -- escape hatch", inArgs: []string{"--debug", "--", "-custom", "./..."}, allowed: ExportTestAllowed, expectOwn: map[string]string{"--debug": "true"}, expectGoTest: []string{"-custom", "./..."}},
 		{Desc: "bare -- with no gotest flags", inArgs: []string{"--", "-v", "./..."}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-v", "./..."}},
 		{Desc: "-args passthrough", inArgs: []string{"-v", "-args", "-custom=1"}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-v", "-args", "-custom=1"}},
-		{Desc: "spec allowed set", inArgs: []string{"--format=md", "--no-color", "-v"}, allowed: ExportSpecAllowed, expectOwn: []string{"--format=md", "--no-color"}, expectGoTest: []string{"-v"}},
-		{Desc: "watch allowed set", inArgs: []string{"--debounce=500ms", "-v"}, allowed: ExportWatchAllowed, expectOwn: []string{"--debounce=500ms"}, expectGoTest: []string{"-v"}},
+		{Desc: "spec allowed set", inArgs: []string{"--format=md", "--no-color", "-v"}, allowed: ExportSpecAllowed, expectOwn: map[string]string{"--format": "md", "--no-color": "true"}, expectGoTest: []string{"-v"}},
+		{Desc: "watch allowed set", inArgs: []string{"--debounce=500ms", "-v"}, allowed: ExportWatchAllowed, expectOwn: map[string]string{"--debounce": "500ms"}, expectGoTest: []string{"-v"}},
 		{Desc: "go test value flag with space", inArgs: []string{"-run", "TestFoo", "./..."}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-run", "TestFoo", "./..."}},
 		{Desc: "go test value flag with equals", inArgs: []string{"-timeout=30s"}, allowed: ExportTestAllowed, expectOwn: nil, expectGoTest: []string{"-timeout=30s"}},
 		{Desc: "watch: no flags", inArgs: []string{"./pkg/..."}, allowed: ExportWatchAllowed, expectOwn: nil, expectGoTest: []string{"./pkg/..."}},
-		{Desc: "watch: spec flag", inArgs: []string{"--spec", "-v", "./..."}, allowed: ExportWatchAllowed, expectOwn: []string{"--spec"}, expectGoTest: []string{"-v", "./..."}},
+		{Desc: "watch: spec flag", inArgs: []string{"--spec", "-v", "./..."}, allowed: ExportWatchAllowed, expectOwn: map[string]string{"--spec": "true"}, expectGoTest: []string{"-v", "./..."}},
 		{Desc: "watch: json flag", inArgs: []string{"-json", "./pkg/..."}, allowed: ExportWatchAllowed, expectOwn: nil, expectGoTest: []string{"-json", "./pkg/..."}},
-		{Desc: "watch: debounce with json", inArgs: []string{"--debounce=500ms", "-json", "./..."}, allowed: ExportWatchAllowed, expectOwn: []string{"--debounce=500ms"}, expectGoTest: []string{"-json", "./..."}},
-		{Desc: "watch: debug and ci", inArgs: []string{"--debug", "--ci", "-v", "./..."}, allowed: ExportWatchAllowed, expectOwn: []string{"--debug", "--ci"}, expectGoTest: []string{"-v", "./..."}},
-		{Desc: "timeout flag with equals", inArgs: []string{"--timeout=15m", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--timeout=15m"}, expectGoTest: []string{"-v"}},
-		{Desc: "timeout flag with space", inArgs: []string{"--timeout", "15m", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--timeout", "15m"}, expectGoTest: []string{"-v"}},
-		{Desc: "no-harvest allowed for test", inArgs: []string{"--no-harvest", "-v"}, allowed: ExportTestAllowed, expectOwn: []string{"--no-harvest"}, expectGoTest: []string{"-v"}},
-		{Desc: "no-harvest allowed for fuzz", inArgs: []string{"--no-harvest", "--for=1m"}, allowed: ExportFuzzAllowed, expectOwn: []string{"--no-harvest", "--for=1m"}, expectGoTest: nil},
+		{Desc: "watch: debug and ci", inArgs: []string{"--debug", "--ci", "-v", "./..."}, allowed: ExportWatchAllowed, expectOwn: map[string]string{"--debug": "true", "--ci": "true"}, expectGoTest: []string{"-v", "./..."}},
+		{Desc: "timeout flag with equals", inArgs: []string{"--timeout=15m", "-v"}, allowed: ExportTestAllowed, expectOwn: map[string]string{"--timeout": "15m"}, expectGoTest: []string{"-v"}},
+		{Desc: "timeout flag with space", inArgs: []string{"--timeout", "15m", "-v"}, allowed: ExportTestAllowed, expectOwn: map[string]string{"--timeout": "15m"}, expectGoTest: []string{"-v"}},
+		{Desc: "no-harvest allowed for fuzz", inArgs: []string{"--no-harvest", "--for=1m"}, allowed: ExportFuzzAllowed, expectOwn: map[string]string{"--no-harvest": "true", "--for": "1m"}, expectGoTest: nil},
 	}) {
 		own, goTest, err := SplitArgs(tc.inArgs, tc.allowed)
-		if tc.expectErr {
-			gotest.Error(sub, err, "expected error")
+		if tc.expectErr != "" {
+			gotest.ErrorContains(sub, err, tc.expectErr)
 			continue
 		}
 		gotest.NoError(sub, err)
-		gotest.Equal(sub, tc.expectOwn, own)
+		gotest.Equal(sub, tc.expectOwn, own.Snapshot())
 		gotest.Equal(sub, tc.expectGoTest, goTest)
 	}
 }
@@ -215,7 +221,7 @@ func (s *FlagParsingTestSuite) TestVetFlag(t *gotest.T) {
 	t.It("forwards -vet to go test", func(it *gotest.T) {
 		own, goTest, err := SplitArgs([]string{"-vet=off", "./..."}, ExportTestAllowed)
 		gotest.NoError(it, err)
-		gotest.Empty(it, own)
+		gotest.Empty(it, own.Snapshot())
 		gotest.Equal(it, []string{"-vet=off", "./..."}, goTest)
 	})
 
@@ -351,7 +357,7 @@ func (s *FlagParsingTestSuite) TestParseMinFlag(t *gotest.T) {
 		{Desc: "space syntax", args: []string{"--min", "90"}, expect: 90},
 		{Desc: "empty args", args: nil, expect: 0},
 		{Desc: "invalid value", args: []string{"--min=abc"}, expectErr: true},
-		{Desc: "min at end no value", args: []string{"--min"}, expect: 0},
+		{Desc: "min at end no value", args: []string{"--min"}, expectErr: true},
 		{Desc: "negative value", args: []string{"--min=-5"}, expectErr: true},
 		{Desc: "over 100", args: []string{"--min=150"}, expectErr: true},
 	}) {
@@ -605,13 +611,16 @@ func (s *FlagParsingTestSuite) TestSpecFlagParsing(t *gotest.T) {
 			wantGoLen: 0,
 		},
 	}) {
-		ownArgs, goTestArgs, err := SplitArgs(tc.args, ExportSpecAllowed)
+		own, goTestArgs, err := SplitArgs(tc.args, ExportSpecAllowed)
 		gotest.NoError(sub, err)
 
-		format := ExportExtractStringFlag(ownArgs, "--format", "terminal")
-		output := ExportExtractStringFlag(ownArgs, "--output", "")
-		input := ExportExtractStringFlag(ownArgs, "--input", "")
-		noColor := ExportHasFlag(ownArgs, "--no-color")
+		format := own.Value("--format")
+		if format == "" {
+			format = "terminal"
+		}
+		output := own.Value("--output")
+		input := own.Value("--input")
+		noColor := own.Bool("--no-color")
 
 		gotest.Equal(sub, tc.wantFmt, format)
 		gotest.Equal(sub, tc.wantOut, output)

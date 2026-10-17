@@ -17,26 +17,19 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
 
-func parseDebounceFlag(args []string) (time.Duration, error) {
-	for i, arg := range args {
-		var raw string
-		if v, ok := strings.CutPrefix(arg, "--debounce="); ok {
-			raw = v
-		} else if arg == "--debounce" && i+1 < len(args) {
-			raw = args[i+1]
-		} else {
-			continue
-		}
-		d, err := time.ParseDuration(raw)
-		if err != nil {
-			return 0, fmt.Errorf("invalid --debounce value %q: %w", raw, err)
-		}
-		if d <= 0 {
-			return 0, fmt.Errorf("invalid --debounce value %q: must be positive", raw)
-		}
-		return d, nil
+func parseDebounceFlag(own OwnFlags) (time.Duration, error) {
+	if !own.Given("--debounce") {
+		return 200 * time.Millisecond, nil
 	}
-	return 200 * time.Millisecond, nil
+	raw := own.Value("--debounce")
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, fmt.Errorf("invalid --debounce value %q: %w", raw, err)
+	}
+	if d <= 0 {
+		return 0, fmt.Errorf("invalid --debounce value %q: must be positive", raw)
+	}
+	return d, nil
 }
 
 func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
@@ -44,32 +37,32 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if inv.Config.Debounce != nil && !hasFlag(args, "--debounce") {
 		args = append([]string{"--debounce=" + inv.Config.Debounce.Duration().String()}, args...)
 	}
-	ownArgs, goTestArgs, err := SplitArgs(args, watchAllowed)
+	own, goTestArgs, err := SplitArgs(args, watchAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	bench := hasFlag(ownArgs, "--bench")
+	bench := own.Bool("--bench")
 	jsonMode, goTestArgs := stripJSONFlag(goTestArgs)
-	specMode := hasFlag(ownArgs, "--spec")
+	specMode := own.Bool("--spec")
 	if specMode && jsonMode {
 		fmt.Fprintln(os.Stderr, "FAIL: --spec cannot be combined with -json")
 		return 2
 	}
-	debounceDuration, err := parseDebounceFlag(ownArgs)
+	debounceDuration, err := parseDebounceFlag(own)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	cfg, err := parseExecFlags(ownArgs, goTestArgs, &inv.Config)
+	cfg, err := parseExecFlags(own, goTestArgs, &inv.Config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 	// Watch is the interactive focus-iteration tool: never let a CI-ish
 	// environment auto-enable the F_ guard mid-iteration; --ci stays explicit.
-	cfg.CI = hasFlag(ownArgs, "--ci")
+	cfg.CI = own.Bool("--ci")
 
 	ctx, stop := shutdownContext()
 	defer stop()

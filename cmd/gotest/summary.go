@@ -15,20 +15,20 @@ import (
 )
 
 func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	ownArgs, goTestArgs, err := SplitArgs(inv.DefaultArgs(), summaryAllowed)
+	own, goTestArgs, err := SplitArgs(inv.DefaultArgs(), summaryAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	format := extractStringFlag(ownArgs, "--format", "terminal")
-	output := extractStringFlag(ownArgs, "--output", "")
-	input := extractStringFlag(ownArgs, "--input", "")
-	coverageProfile := extractStringFlag(ownArgs, "--coverage", "")
-	badgePath := extractStringFlag(ownArgs, "--badge", "")
-	noColor := hasFlag(ownArgs, "--no-color")
-	github := hasFlag(ownArgs, "--github") || os.Getenv("GITHUB_ACTIONS") == "true"
-	renderOnly := hasFlag(ownArgs, "--render-only")
+	format := own.ValueOr("--format", "terminal")
+	output := own.Value("--output")
+	input := own.Value("--input")
+	coverageProfile := own.Value("--coverage")
+	badgePath := own.Value("--badge")
+	noColor := own.Bool("--no-color")
+	github := own.Bool("--github") || os.Getenv("GITHUB_ACTIONS") == "true"
+	renderOnly := own.Bool("--render-only")
 
 	if renderOnly && input == "" {
 		fmt.Fprintf(os.Stderr, "FAIL: --render-only requires --input\n")
@@ -39,7 +39,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return runSummaryFromInput(input, format, output, coverageProfile, noColor, github, renderOnly, badgePath)
 	}
 
-	minCoverage, err := parseMinFlag(ownArgs)
+	minCoverage, err := parseMinFlag(own)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -55,7 +55,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 	defer coverCleanup()
 
-	cfg, err := parseExecFlags(ownArgs, goTestArgs, &inv.Config)
+	cfg, err := parseExecFlags(own, goTestArgs, &inv.Config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

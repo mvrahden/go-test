@@ -34,7 +34,7 @@ func (s *SummaryBadgeTestSuite) TestFlagIsASummaryValueFlag(t *gotest.T, _ *badg
 	t.It("is accepted by summary and routed to gotest's own args", func(it *gotest.T) {
 		own, goTest, err := main.SplitArgs([]string{"--badge=coverage.svg", "-race", "./..."}, main.ExportSummaryAllowed)
 		gotest.NoError(it, err)
-		gotest.Equal(it, []string{"--badge=coverage.svg"}, own)
+		gotest.Equal(it, map[string]string{"--badge": "coverage.svg"}, own.Snapshot())
 		gotest.Equal(it, []string{"-race", "./..."}, goTest)
 	})
 

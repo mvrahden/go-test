@@ -19,23 +19,23 @@ import (
 // (SplitArgs -> ClassifyGoTestArgs -> LoadPackages -> GenerateOverlay ->
 // RunPipeline) with Bench: true.
 func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	ownArgs, goTestArgs, err := SplitArgs(inv.DefaultArgs(), benchAllowed)
+	own, goTestArgs, err := SplitArgs(inv.DefaultArgs(), benchAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	specRequested := hasFlag(ownArgs, "--spec")
-	noColor := hasFlag(ownArgs, "--no-color")
-	jsonRequested := hasFlag(ownArgs, "--json")
+	specRequested := own.Bool("--spec")
+	noColor := own.Bool("--no-color")
+	jsonRequested := own.Bool("--json")
 
 	// -v is forced further down for benchmark result visibility; capture
 	// whether the caller actually asked for it first, since that's also our
 	// signal for showing every delta row (vs. only significant ones) below.
 	verboseRequested := gotestrunner.HasVerboseFlag(goTestArgs)
 
-	saveTarget := extractStringFlag(ownArgs, "--save", "")
-	if saveTarget == "" && hasFlag(ownArgs, "--save") {
+	saveTarget := own.Value("--save")
+	if saveTarget == "" && own.Given("--save") {
 		// `--save=` with no value asks for the configured baseline path —
 		// the same fallback --against already has. Config resolution stays
 		// in the CLI so tooling never parses .gotest.yml itself.
@@ -46,15 +46,15 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		}
 	}
 
-	againstPath := extractStringFlag(ownArgs, "--against", "")
+	againstPath := own.Value("--against")
 	if againstPath == "" {
 		againstPath = inv.Config.Bench.Baseline
 	}
 
-	gateGiven := hasFlag(ownArgs, "--gate")
+	gateGiven := own.Given("--gate")
 	gatePct := inv.Config.Bench.Gate
 	if gateGiven {
-		raw := extractStringFlag(ownArgs, "--gate", "")
+		raw := own.Value("--gate")
 		v, perr := strconv.ParseFloat(raw, 64)
 		if perr != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: invalid --gate value %q: %s\n", raw, perr)
@@ -82,7 +82,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		goTestArgs = append(goTestArgs, "-v")
 	}
 
-	cfg, err := parseExecFlags(ownArgs, goTestArgs, &inv.Config)
+	cfg, err := parseExecFlags(own, goTestArgs, &inv.Config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

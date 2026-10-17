@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -77,24 +76,24 @@ func main() {
 }
 
 func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	if slices.Contains(inv.Args, "--spec") {
+	if specRequested(inv.Args) {
 		var specArgs []string
 		for _, a := range inv.Args {
-			if a != "--spec" {
+			if name, _, _ := strings.Cut(a, "="); name != "--spec" {
 				specArgs = append(specArgs, a)
 			}
 		}
 		return runSpec(Invocation{Args: specArgs, Config: inv.Config})
 	}
 
-	ownArgs, goTestArgs, err := SplitArgs(inv.DefaultArgs(), testAllowed)
+	own, goTestArgs, err := SplitArgs(inv.DefaultArgs(), testAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 	jsonMode, goTestArgs := stripJSONFlag(goTestArgs)
 
-	minCoverage, err := parseMinFlag(ownArgs)
+	minCoverage, err := parseMinFlag(own)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -110,7 +109,7 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 	defer coverCleanup()
 
-	cfg, err := parseExecFlags(ownArgs, goTestArgs, &inv.Config)
+	cfg, err := parseExecFlags(own, goTestArgs, &inv.Config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -120,98 +119,85 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	return enforceCoverage(coverProfile, minCoverage, Run(cfg))
 }
 
-func parseMinFlag(args []string) (int, error) {
-	for i, arg := range args {
-		var raw string
-		if v, ok := strings.CutPrefix(arg, "--min="); ok {
-			raw = v
-		} else if arg == "--min" && i+1 < len(args) {
-			raw = args[i+1]
-		} else {
-			continue
-		}
-		v, err := strconv.Atoi(raw)
-		if err != nil {
-			return 0, fmt.Errorf("invalid --min value %q: must be an integer percentage", raw)
-		}
-		if v < 0 || v > 100 {
-			return 0, fmt.Errorf("invalid --min value %d: must be 0-100", v)
-		}
-		return v, nil
+func parseMinFlag(own OwnFlags) (int, error) {
+	if !own.Given("--min") {
+		return 0, nil
 	}
-	return 0, nil
+	raw := own.Value("--min")
+	v, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("invalid --min value %q: must be an integer percentage", raw)
+	}
+	if v < 0 || v > 100 {
+		return 0, fmt.Errorf("invalid --min value %d: must be 0-100", v)
+	}
+	return v, nil
 }
 
-func parseSetupTimeoutFlag(args []string) (time.Duration, error) {
-	for i, arg := range args {
-		var raw string
-		if v, ok := strings.CutPrefix(arg, "--setup-timeout="); ok {
-			raw = v
-		} else if arg == "--setup-timeout" && i+1 < len(args) {
-			raw = args[i+1]
-		} else {
-			continue
-		}
-		d, err := time.ParseDuration(raw)
-		if err != nil {
-			return 0, fmt.Errorf("invalid --setup-timeout value %q: %w", raw, err)
-		}
-		if d <= 0 {
-			return -1, nil
-		}
-		return d, nil
-	}
-	return 0, nil
+func parseSetupTimeoutFlag(own OwnFlags) (time.Duration, error) {
+	return parseDeadlineFlag(own, "--setup-timeout")
 }
 
-func parseParallelFlag(args []string) (int, error) {
-	raw := extractStringFlag(args, "--parallel", "")
+// parseDeadlineFlag reads a duration flag whose zero or negative value opts
+// out of the deadline (-1); an absent flag is 0, the default.
+func parseDeadlineFlag(own OwnFlags, name string) (time.Duration, error) {
+	if !own.Given(name) {
+		return 0, nil
+	}
+	raw := own.Value(name)
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s value %q: %w", name, raw, err)
+	}
+	if d <= 0 {
+		return -1, nil
+	}
+	return d, nil
+}
+
+func parseParallelFlag(own OwnFlags) (int, error) {
+	return parsePositiveIntFlag(own, "--parallel")
+}
+
+// parsePositiveIntFlag reads an integer flag that must be positive; an
+// absent or empty flag is 0, the default.
+func parsePositiveIntFlag(own OwnFlags, name string) (int, error) {
+	raw := own.Value(name)
 	if raw == "" {
 		return 0, nil
 	}
 	v, err := strconv.Atoi(raw)
 	if err != nil {
-		return 0, fmt.Errorf("invalid --parallel value %q: must be a positive integer", raw)
+		return 0, fmt.Errorf("invalid %s value %q: must be a positive integer", name, raw)
 	}
 	if v <= 0 {
-		return 0, fmt.Errorf("invalid --parallel value %d: must be positive", v)
+		return 0, fmt.Errorf("invalid %s value %d: must be positive", name, v)
 	}
 	return v, nil
 }
 
-func parseCompileParallelFlag(args []string) (int, error) {
-	raw := extractStringFlag(args, "--compile-parallel", "")
-	if raw == "" {
-		return 0, nil
-	}
-	v, err := strconv.Atoi(raw)
-	if err != nil {
-		return 0, fmt.Errorf("invalid --compile-parallel value %q: must be a positive integer", raw)
-	}
-	if v <= 0 {
-		return 0, fmt.Errorf("invalid --compile-parallel value %d: must be positive", v)
-	}
-	return v, nil
+func parseCompileParallelFlag(own OwnFlags) (int, error) {
+	return parsePositiveIntFlag(own, "--compile-parallel")
 }
 
-func parseExecFlags(ownArgs, goTestArgs []string, projCfg *config.ProjectConfig) (ExecConfig, error) {
-	setupTimeout, err := parseSetupTimeoutFlag(ownArgs)
+func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectConfig) (ExecConfig, error) {
+	setupTimeout, err := parseSetupTimeoutFlag(own)
 	if err != nil {
 		return ExecConfig{}, err
 	}
-	globalTimeout, err := parseGlobalTimeoutFlag(ownArgs)
+	globalTimeout, err := parseGlobalTimeoutFlag(own)
 	if err != nil {
 		return ExecConfig{}, err
 	}
 	globalTimeout = resolveGlobalTimeout(globalTimeout)
-	parallel, err := parseParallelFlag(ownArgs)
+	parallel, err := parseParallelFlag(own)
 	if err != nil {
 		return ExecConfig{}, err
 	}
 	if parallel == 0 {
 		parallel = projCfg.Parallel
 	}
-	compileParallel, err := parseCompileParallelFlag(ownArgs)
+	compileParallel, err := parseCompileParallelFlag(own)
 	if err != nil {
 		return ExecConfig{}, err
 	}
@@ -227,13 +213,13 @@ func parseExecFlags(ownArgs, goTestArgs []string, projCfg *config.ProjectConfig)
 		PackagePatterns: patterns,
 		SetupTimeout:    setupTimeout,
 		GlobalTimeout:   globalTimeout,
-		Debug:           slices.Contains(ownArgs, "--debug"),
-		CI:              slices.Contains(ownArgs, "--ci") || detectCIEnv(),
-		UpdateSnapshots: slices.Contains(ownArgs, "--update-snapshots"),
-		NoCache:         slices.Contains(ownArgs, "--no-cache"),
+		Debug:           own.Bool("--debug"),
+		CI:              own.Bool("--ci") || detectCIEnv(),
+		UpdateSnapshots: own.Bool("--update-snapshots"),
+		NoCache:         own.Bool("--no-cache"),
 		Parallel:        parallel,
 		CompileParallel: compileParallel,
-		HarvestSeeds:    !slices.Contains(ownArgs, "--no-harvest") && projCfg.Fuzz.HarvestSeeds(),
+		HarvestSeeds:    !own.Bool("--no-harvest") && projCfg.Fuzz.HarvestSeeds(),
 	}, nil
 }
 
@@ -306,26 +292,33 @@ func resolveGlobalTimeout(d time.Duration) time.Duration {
 	}
 }
 
-func parseGlobalTimeoutFlag(args []string) (time.Duration, error) {
-	for i, arg := range args {
-		var raw string
-		if v, ok := strings.CutPrefix(arg, "--timeout="); ok {
-			raw = v
-		} else if arg == "--timeout" && i+1 < len(args) {
-			raw = args[i+1]
-		} else {
+func parseGlobalTimeoutFlag(own OwnFlags) (time.Duration, error) {
+	return parseDeadlineFlag(own, "--timeout")
+}
+
+// specRequested reports whether --spec is on among args in any spelling; a
+// malformed value is left for SplitArgs to refuse.
+func specRequested(args []string) bool {
+	on := false
+	for _, a := range args {
+		if a == "--" {
+			break
+		}
+		name, value, hasEquals := strings.Cut(a, "=")
+		if name != "--spec" {
 			continue
 		}
-		d, err := time.ParseDuration(raw)
+		if !hasEquals {
+			on = true
+			continue
+		}
+		b, err := strconv.ParseBool(value)
 		if err != nil {
-			return 0, fmt.Errorf("invalid --timeout value %q: %w", raw, err)
+			return false
 		}
-		if d <= 0 {
-			return -1, nil
-		}
-		return d, nil
+		on = b
 	}
-	return 0, nil
+	return on
 }
 
 func stripJSONFlag(args []string) (bool, []string) {

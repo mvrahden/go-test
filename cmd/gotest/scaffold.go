@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/scaffold"
 )
 
 func runScaffold(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	ownArgs, rest, err := SplitArgs(inv.Args, scaffoldAllowed)
+	own, rest, err := SplitArgs(inv.Args, scaffoldAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
 		return 2
@@ -43,7 +42,7 @@ func runScaffold(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 		return 2
 	}
 
-	if slices.Contains(ownArgs, "--fuzz") {
+	if own.Bool("--fuzz") {
 		return runScaffoldFuzz(target)
 	}
 
