@@ -63,13 +63,18 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	if !cfg.JSON {
-		if total, names := sumStdlibTests(overlay.StdlibTestsByPkg); total > 0 {
-			fmt.Fprintf(os.Stderr, "note: %d stdlib test(s) in %s not run — gotest runs suites; use 'go test' for stdlib tests\n", total, names)
-		}
-		gotestrunner.NoteBenchmarksNotRun(os.Stderr, cfg.GoTestArgs, len(overlay.Declared.Benchmarks))
-	}
+	// stderr is free in every output mode, so the notes about what did not
+	// run reach the reader whether stdout carries text or JSON.
+	noteStdlibTests(overlay.StdlibTestsByPkg)
+	gotestrunner.NoteBenchmarksNotRun(os.Stderr, cfg.GoTestArgs, len(overlay.Declared.Benchmarks))
 	return result.ExitCode
+}
+
+// noteStdlibTests says on stderr how many stdlib tests the run left to go test.
+func noteStdlibTests(stdlibTestsByPkg map[string]int) {
+	if total, names := sumStdlibTests(stdlibTestsByPkg); total > 0 {
+		fmt.Fprintf(os.Stderr, "note: %d stdlib test(s) in %s not run — gotest runs suites; use 'go test' for stdlib tests\n", total, names)
+	}
 }
 
 // loadRunPackages loads a run's packages and, as go test does, warns on

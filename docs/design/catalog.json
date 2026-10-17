@@ -339,6 +339,270 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "version still prints",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "version_still_prints",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "help config still prints",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "help_config_still_prints",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "a run reports the config error",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_run_reports_the_config_error",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when .gotest.yml does not parse",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": ".gotest.yml_does_not_parse",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABrokenConfigStillHelps",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestABrokenConfigStillHelps",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "sumary suggests summary",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "sumary_suggests_summary",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "test suggests dropping the word",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "test_suggests_dropping_the_word",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "a package named like nothing runs as a pattern",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_package_named_like_nothing_runs_as_a_pattern",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when the first word is almost a subcommand or is a help topic",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_first_word_is_almost_a_subcommand_or_is_a_help_topic",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AMistypedCommandIsSuggested",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAMistypedCommandIsSuggested",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "names the go get -tool command to run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "names_the_go_get_-tool_command_to_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite imports gotest in a module that does not require it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_imports_gotest_in_a_module_that_does_not_require_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AModuleWithoutGotestIsToldHow",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAModuleWithoutGotestIsToldHow",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the plain run notes them on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_plain_run_notes_them_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "the -json run notes them on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_-json_run_notes_them_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "summary notes them on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "summary_notes_them_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "spec notes them on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "spec_notes_them_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when a package has only stdlib tests",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_package_has_only_stdlib_tests",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "StdlibTestsAreNotedInEveryMode",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestStdlibTestsAreNotedInEveryMode",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLINewcomer",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLINewcomerTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "after -- it reaches the binary and the pattern stays a package",
                       "duration": 0,
                       "excluded": false,
@@ -734,13 +998,13 @@
     }
   ],
   "stats": {
-    "behaviors": 33,
+    "behaviors": 44,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 5,
+    "suites": 6,
     "tests": 0
   }
 }

@@ -1,6 +1,6 @@
 # Behavior Specification
 
-5 suites, 33 behaviors. Read from source; nothing was executed.
+6 suites, 44 behaviors. Read from source; nothing was executed.
 
 ## CLICoverageProfile
 
@@ -40,6 +40,43 @@
 | &nbsp;&nbsp;an unknown flag is a usage error for discover |
 | &nbsp;&nbsp;an unknown flag is a usage error for prepare |
 | &nbsp;&nbsp;a flag another command owns is refused |
+
+## CLINewcomer
+
+### ABrokenConfigStillHelps
+
+| Behavior |
+|----------|
+| **when .gotest.yml does not parse** |
+| &nbsp;&nbsp;version still prints |
+| &nbsp;&nbsp;help config still prints |
+| &nbsp;&nbsp;a run reports the config error |
+
+### AMistypedCommandIsSuggested
+
+| Behavior |
+|----------|
+| **when the first word is almost a subcommand or is a help topic** |
+| &nbsp;&nbsp;sumary suggests summary |
+| &nbsp;&nbsp;test suggests dropping the word |
+| &nbsp;&nbsp;a package named like nothing runs as a pattern |
+
+### AModuleWithoutGotestIsToldHow
+
+| Behavior |
+|----------|
+| **when a suite imports gotest in a module that does not require it** |
+| &nbsp;&nbsp;names the go get -tool command to run |
+
+### StdlibTestsAreNotedInEveryMode
+
+| Behavior |
+|----------|
+| **when a package has only stdlib tests** |
+| &nbsp;&nbsp;the plain run notes them on stderr |
+| &nbsp;&nbsp;the -json run notes them on stderr |
+| &nbsp;&nbsp;summary notes them on stderr |
+| &nbsp;&nbsp;spec notes them on stderr |
 
 ## CLIPassthrough
 

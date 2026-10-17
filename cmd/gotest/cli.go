@@ -22,13 +22,36 @@ func main() {
 		return
 	}
 
+	subcmd, remaining := ParseSubcommand(args)
+
+	// version and help need no project: a config that does not parse must
+	// not stand between a newcomer and the page that explains it.
+	switch subcmd {
+	case "version":
+		fmt.Println(about.LongInfo())
+		return
+	case "help":
+		topic := ""
+		if len(remaining) > 0 {
+			topic = remaining[0]
+		}
+		showHelp(topic)
+		return
+	}
+
+	if subcmd == "" {
+		if hint := commandHint(args); hint != "" {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", hint)
+			os.Exit(2)
+		}
+	}
+
 	projectCfg, err := config.Load(".")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: loading %s: %s\n", config.FileName, err)
 		os.Exit(2)
 	}
 
-	subcmd, remaining := ParseSubcommand(args)
 	inv := Invocation{Args: remaining, Config: projectCfg}
 
 	switch subcmd {
@@ -60,20 +83,63 @@ func main() {
 		os.Exit(runLint(inv))
 	case "skill":
 		os.Exit(runSkill(inv))
-	case "version":
-		fmt.Println(about.LongInfo())
-		return
-	case "help":
-		topic := ""
-		if len(remaining) > 0 {
-			topic = remaining[0]
-		}
-		showHelp(topic)
-		return
 	default:
 		inv.Args = args
 		os.Exit(runTest(inv))
 	}
+}
+
+// commandHint reads a first word that is neither a flag nor a package as a
+// mistyped subcommand: a help topic such as "test" is the run itself, and a
+// word within two edits of a subcommand names it. Package patterns carry a
+// slash, a dot, a wildcard or name a directory; those are never hinted.
+func commandHint(args []string) string {
+	if len(args) == 0 {
+		return ""
+	}
+	word := args[0]
+	if word == "" || strings.HasPrefix(word, "-") || strings.ContainsAny(word, "/.") {
+		return ""
+	}
+	if fi, err := os.Stat(word); err == nil && fi.IsDir() {
+		return ""
+	}
+	rest := strings.Join(args[1:], " ")
+	if word == "test" {
+		return fmt.Sprintf("%q is not a subcommand: a run takes packages directly; did you mean: gotest %s", word, rest)
+	}
+	best, bestDist := "", 3
+	for name := range knownSubcommands {
+		if d := editDistance(word, name); d < bestDist {
+			best, bestDist = name, d
+		}
+	}
+	if best == "" {
+		return ""
+	}
+	return fmt.Sprintf("unknown command %q; did you mean %q? (gotest help lists the subcommands)", word, best)
+}
+
+// editDistance is the Levenshtein distance between a and b.
+func editDistance(a, b string) int {
+	ra, rb := []rune(a), []rune(b)
+	prev := make([]int, len(rb)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(ra); i++ {
+		cur := make([]int, len(rb)+1)
+		cur[0] = i
+		for j := 1; j <= len(rb); j++ {
+			cost := 1
+			if ra[i-1] == rb[j-1] {
+				cost = 0
+			}
+			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+		}
+		prev = cur
+	}
+	return prev[len(rb)]
 }
 
 func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API

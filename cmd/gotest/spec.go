@@ -139,6 +139,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
 		return 2
 	}
+	noteStdlibTests(overlay.StdlibTestsByPkg)
 	gotestrunner.NoteBenchmarksNotRun(os.Stderr, goTestArgs, len(overlay.Declared.Benchmarks))
 
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))
