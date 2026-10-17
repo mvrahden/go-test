@@ -52,7 +52,10 @@ go tool gotest version
    then back to `@<new>`) before blaming the upgrade.
    Fix one the upgrade caused in test code, per those entries, or revert
    the upgrade and report it — never fix it in production code.
-4. Tell the user: `go-test <old> → <new>`.
+4. If the project holds this skill under `.agents/skills` or
+   `.claude/skills`, rerun `go tool gotest skill install` (with the same
+   `--dir`) so it matches the new pin (v1.34+).
+5. Tell the user: `go-test <old> → <new>`.
 
 ## Vendored modules
 

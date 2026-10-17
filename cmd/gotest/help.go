@@ -45,6 +45,8 @@ func showHelp(topic string) {
 		printMigrateHelp()
 	case "refactor":
 		printRefactorHelp()
+	case "skill":
+		printSkillHelp()
 	case "generate":
 		printGenerateHelp()
 	case "prepare":
@@ -79,6 +81,7 @@ Subcommands:
   lint        Run gotest-specific linter checks
   migrate     Convert testify/suite tests to go-test format
   refactor    Source code refactoring tools
+  skill       Install the agent skill matching this version
   generate    Run code generation only (no test execution)
   prepare     Start shared fixtures for debug (blocks until SIGTERM)
   clean       Remove orphaned generated files
@@ -851,6 +854,33 @@ Commands:
 Examples:
   gotest refactor toggle-focus user_test.go UserTestSuite
   gotest refactor toggle-focus user_test.go UserTestSuite.TestCreate
+`)
+}
+
+func printSkillHelp() {
+	fmt.Print(`gotest skill — the agent skill for coding agents
+
+Usage:
+  gotest skill install [--dir=<skills-dir>]
+
+Writes the writing-gotest-tests skill, as shipped with this gotest version,
+into <skills-dir>/writing-gotest-tests, replacing an older copy. Rerun it
+after upgrading gotest. A directory holding a different skill is refused,
+and a failed install leaves the installed copy as it was (exit 2).
+
+<skills-dir> is relative to the current directory. Agents read it from the
+repository root, so where the Go module sits in a subdirectory, point --dir
+at the root's skills directory (e.g. --dir=../.agents/skills).
+
+Flags:
+  --dir=<skills-dir>   Skills directory to install into (default: .agents/skills,
+                       read by Copilot, Codex, Cursor, Gemini CLI,
+                       Antigravity and others;
+                       Claude Code reads .claude/skills)
+
+Examples:
+  gotest skill install
+  gotest skill install --dir=.claude/skills
 `)
 }
 

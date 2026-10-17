@@ -29,8 +29,14 @@ enableGitInfo = true
       unsafe = true
 
 [outputs]
-  home = ['HTML']
+  home = ['HTML', 'llms']
   section = ['HTML', 'RSS']
+
+[outputFormats.llms]
+  mediaType = 'text/plain'
+  baseName = 'llms'
+  isPlainText = true
+  notAlternative = true
 
 [outputFormats.RSS]
   mediatype = 'application/rss+xml'

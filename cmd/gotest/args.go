@@ -79,6 +79,7 @@ var knownSubcommands = map[string]bool{
 	"clean":    true,
 	"lint":     true,
 	"refactor": true,
+	"skill":    true,
 	"version":  true,
 	"help":     true,
 }

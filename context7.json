@@ -1,0 +1,26 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "gotest",
+  "description": "Code-generation framework for Go test suites: suite structs with lifecycle hooks, fixtures, BDD structure, type-safe assertions, fuzzing, benchmarks and snapshots.",
+  "folders": [
+    "docs/design",
+    "skills",
+    "examples",
+    "site/content/blog"
+  ],
+  "excludeFolders": [
+    "testdata"
+  ],
+  "excludeFiles": [
+    "ARCHITECTURE.md"
+  ],
+  "rules": [
+    "Run the CLI as `go tool gotest`, declared with `go get -tool github.com/mvrahden/go-test/cmd/gotest@<version go.mod requires>`; never a global `go install` binary.",
+    "`go test` does not run suites and `go tool gotest` does not run stdlib tests; a complete run is both.",
+    "Use BeforeAll/AfterAll and BeforeEach/AfterEach for resources; never t.T().Cleanup() or defer inside suite methods.",
+    "Gate environment-dependent suites with `SuiteGuard() string`, not t.T().Skip().",
+    "Inside Eventually/Consistently callbacks use only gotest assertions; `poll` is a *gotest.R and has no T().",
+    "Use Zero/NotZero for comparable nilables, Empty/NotEmpty for slices and maps, Regexp for prefix and suffix checks.",
+    "With `Parallel: true` and per-test state, BeforeEach must return a context struct pointer; never write suite fields from parallel methods."
+  ]
+}

@@ -123,6 +123,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `fuzz` | Orchestrate `FuzzX` suite targets with a shared time budget |
 | `lint` | Run gotest-specific linter checks |
 | `refactor` | Toggle focus prefixes: `refactor toggle-focus <file> <Suite[.Method]>` |
+| `skill` | Install the agent skill shipped with this version: `skill install [--dir=<skills-dir>]` |
 | `discover` | Discover test suites and output JSON metadata |
 | `prepare` | Start shared fixtures for debug (blocks until SIGTERM) |
 | `version` | Print version information |
@@ -163,6 +164,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--no-harvest` | Disable table-test seed harvesting for this run |
 | `--fuzz` | Generate fuzz round-trip skeletons (`scaffold`) |
 | `--dry-run` | Print the unified diff of every edit instead of writing it (`migrate`) |
+| `--dir` | Skills directory to install into, default `.agents/skills` (`skill install`) |
 
 ### Disambiguation
 

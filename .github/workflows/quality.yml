@@ -38,7 +38,7 @@ jobs:
       # The skill's consumer fixture is the only in-repo proof of the
       # consumer-facing API shape; nothing else builds it.
       - name: Consumer fixture (skill evals)
-        working-directory: skills/writing-gotest-tests/evals/consumer-fixture
+        working-directory: tests/skillevals/writing-gotest-tests/consumer-fixture
         run: |
           go build ./... && go vet ./...
           go tool gotest ./...

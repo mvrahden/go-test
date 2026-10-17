@@ -288,3 +288,22 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
     (go.work modules count) — `generate all` no longer writes harness
     files into dependencies. Bare `gotest clean` cleans the current
     package, like `generate`; use `gotest clean ./...` for the tree.
+
+## v1.34
+
+Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
+
+1. **`gotest skill install` writes this skill** into `.agents/skills`
+   (`--dir=.claude/skills` for Claude Code), as shipped with the pinned
+   version, replacing an older copy. Below v1.34 there is no `skill`
+   command: `gotest skill install` reads both words as package patterns
+   and fails the build (`package skill is not in std`, exit 2).
+2. **A panicking benchmark always fails** (`--- FAIL`, exit 1) — a panic
+   in a benchmark method, its `BeforeEach`/`AfterEach`, or the suite's
+   `BeforeAll`/`AfterAll` is recovered, printed with its stack, and fails
+   that benchmark; the remaining benchmarks, `AfterAll` and the fixture
+   teardown still run. Below v1.34 the panic went to Go's testing package,
+   which ends the run (exit 2) but now and then loses the panic and
+   reports `PASS` with exit 0 (a Go race, about 1 run in 200 under load):
+   on an older pin, never take one green benchmark run as proof that the
+   code under it does not panic.

@@ -58,6 +58,8 @@ func main() {
 		os.Exit(runRefactor(inv))
 	case "lint":
 		os.Exit(runLint(inv))
+	case "skill":
+		os.Exit(runSkill(inv))
 	case "version":
 		fmt.Println(about.LongInfo())
 		return
