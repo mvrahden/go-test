@@ -865,7 +865,12 @@ Usage:
 
 Writes the writing-gotest-tests skill, as shipped with this gotest version,
 into <skills-dir>/writing-gotest-tests, replacing an older copy. Rerun it
-after upgrading gotest. A directory holding a different skill is refused.
+after upgrading gotest. A directory holding a different skill is refused,
+and a failed install leaves the installed copy as it was (exit 2).
+
+<skills-dir> is relative to the current directory. Agents read it from the
+repository root, so where the Go module sits in a subdirectory, point --dir
+at the root's skills directory (e.g. --dir=../.agents/skills).
 
 Flags:
   --dir=<skills-dir>   Skills directory to install into (default: .agents/skills,

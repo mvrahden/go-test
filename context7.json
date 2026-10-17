@@ -3,6 +3,7 @@
   "projectTitle": "gotest",
   "description": "Code-generation framework for Go test suites: suite structs with lifecycle hooks, fixtures, BDD structure, type-safe assertions, fuzzing, benchmarks and snapshots.",
   "folders": [
+    "docs/design",
     "skills",
     "examples",
     "site/content/blog"

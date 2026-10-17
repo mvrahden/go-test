@@ -1200,11 +1200,12 @@ go tool gotest skill install --dir=.claude/skills    # Claude Code
 ```
 
 Rerun it after upgrading gotest; it replaces the older copy.
+The directory is relative to where you run it: where the Go module sits in a subdirectory of the repository, point `--dir` at the repository root's skills directory, which is where agents look.
 Agents with a plugin system can install it as a plugin instead. A plugin carries the newest skill rather than the one for your pin: plugins install from the repository's main branch, and the VS Code extension bundles the skill of its release.
 
 | Agent | Install |
 |---|---|
-| Claude Code | `/plugin install gotest --marketplace mvrahden/go-test` |
+| Claude Code | `/plugin marketplace add mvrahden/go-test`, then `/plugin install gotest@go-test` |
 | Codex | `codex plugin marketplace add mvrahden/go-test`, then `codex plugin add gotest@go-test` |
 | GitHub Copilot CLI | `copilot plugin marketplace add mvrahden/go-test`, then `copilot plugin install gotest@go-test` |
 | VS Code with Copilot Chat | included in the [gotest extension](vscode-gotest) |
