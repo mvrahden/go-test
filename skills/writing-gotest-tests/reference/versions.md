@@ -298,3 +298,12 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
    version, replacing an older copy. Below v1.34 there is no `skill`
    command: `gotest skill install` reads both words as package patterns
    and fails the build (`package skill is not in std`, exit 2).
+2. **A panicking benchmark always fails** (`--- FAIL`, exit 1) — a panic
+   in a benchmark method, its `BeforeEach`/`AfterEach`, or the suite's
+   `BeforeAll`/`AfterAll` is recovered, printed with its stack, and fails
+   that benchmark; the remaining benchmarks, `AfterAll` and the fixture
+   teardown still run. Below v1.34 the panic went to Go's testing package,
+   which ends the run (exit 2) but now and then loses the panic and
+   reports `PASS` with exit 0 (a Go race, about 1 run in 200 under load):
+   on an older pin, never take one green benchmark run as proof that the
+   code under it does not panic.
