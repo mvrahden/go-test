@@ -30,6 +30,18 @@ caught: a mutated CLI cannot be trusted to report on itself.
 The drill exits 0 only when every mutant was caught. It runs in CI
 (`quality.yml`) on every push and pull request.
 
+`bash tests/drill/drill.sh <name> ...` runs only the named mutants, which is
+how a new patch is tried without waiting for the whole set.
+
+## Mutants and the behavior catalog
+
+A patch may carry `Clause: <when> → <it>` lines above its diff, naming the
+clauses of `docs/design/catalog.md` it falsifies. `bash tests/drill/drill.sh
+--list-unmutated` prints the clauses no patch names. Their number may not
+exceed `tests/drill/unmutated-allow.txt`: a new clause either gets a mutant or
+the budget is raised on purpose in the same change. A conventions suite
+enforces both, and that every `Clause:` line names a clause that exists.
+
 ## Reading a failure
 
 - `DRILL  <name>: SURVIVED` — the bug went unnoticed. A check has a hole;
