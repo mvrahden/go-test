@@ -109,3 +109,8 @@ fixturechain pass TestChainTestSuite/TestSharedStateArrives
 guardskip exit 0
 guardskip pass -
 guardskip skip TestGuardedTestSuite
+snapshotting exit 1
+snapshotting fail -
+snapshotting fail TestSnapshottingTestSuite
+snapshotting fail TestSnapshottingTestSuite/TestDiffersFromBaseline
+snapshotting pass TestSnapshottingTestSuite/TestMatchesBaseline

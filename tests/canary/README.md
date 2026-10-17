@@ -31,6 +31,7 @@ Each directory under `testdata/` is one package with one suite:
 | `fixturechain` | a shared fixture reached only through a parent package fixture is started and hydrated for the suite |
 | `setupfailing` | a shared fixture that fails to come up fails only the suites that read it, in the `-json` stream and in a bench run |
 | `guardskip` | a suite its guard skips sets up none of its fixtures: one that would fail leaves the run green |
+| `snapshotting` | a value that differs from its committed baseline fails; one that matches passes |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line
 gives the exit code; `<fixture> <action> <test>` lines list every `pass`,

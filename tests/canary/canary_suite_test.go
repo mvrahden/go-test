@@ -161,6 +161,12 @@ func (s *CanaryTestSuite) TestEveryAssertionFamilyFails(t *gotest.T) {
 	s.check(t, "failing")
 }
 
+// A baseline the value no longer matches must fail; MatchSnapshot comparing
+// nothing would leave every golden check in the repository silent.
+func (s *CanaryTestSuite) TestASnapshotMismatchFails(t *gotest.T) {
+	s.check(t, "snapshotting")
+}
+
 func (s *CanaryTestSuite) TestAnAssertionHaltsTheMethod(t *gotest.T) {
 	dir := s.check(t, "failnow")
 	if _, err := os.Stat(filepath.Join(dir, "after-failnow")); err == nil {
