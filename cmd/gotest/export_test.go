@@ -187,6 +187,9 @@ func ExportResetLintSkipFlag(name string) error {
 	return lint.Analyzer.Flags.Set(name, "false")
 }
 
+// prepare.go
+var ExportPrepareHarvestSeeds = prepareHarvestSeeds
+
 // scaffold.go
 var ExportRunScaffold = runScaffold
 

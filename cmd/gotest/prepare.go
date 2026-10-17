@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/mvrahden/go-test/internal/about"
+	"github.com/mvrahden/go-test/internal/config"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
@@ -47,7 +48,7 @@ func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 
 	ctx, stop := shutdownContext()
 
-	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, nil, false, false, true)
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, nil, false, false, prepareHarvestSeeds(inv.Config))
 	if err != nil {
 		stop()
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -96,9 +97,22 @@ func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	<-ctx.Done()
 	stop()
 
+	code := 0
 	if setupProc != nil {
-		_ = setupProc.Teardown()
+		// A fixture that fails to release what it held is a real failure
+		// here as in a run: the editor that asked for the fixtures must
+		// learn that something was left behind.
+		if err := setupProc.Teardown(); err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: shared fixture teardown: %s\n", err)
+			code = 1
+		}
 	}
 	cleanup()
-	return 0
+	return code
+}
+
+// prepareHarvestSeeds mirrors a run: the project's fuzz.harvest setting
+// decides whether the overlay carries harvested seeds.
+func prepareHarvestSeeds(cfg config.ProjectConfig) bool { //nolint:gocritic // hugeParam: stable API
+	return cfg.Fuzz.HarvestSeeds()
 }
