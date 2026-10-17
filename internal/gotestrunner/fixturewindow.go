@@ -34,7 +34,7 @@ type fixtureWindows struct {
 // selection mirrors BuildSuiteTargets minus compile results, which do not
 // exist yet: fixtures must not wait for the compiler.
 func planFixtureWindows(overlay *OverlayResult, userRunFilter string) fixtureWindows {
-	bulk, tail := planSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, userRunFilter)
+	bulk, tail := planSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, overlay.FuzzFuncsByPkg, userRunFilter)
 	w := fixtureWindows{
 		Bulk: aliveFixtureKeys(bulk, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures),
 		Tail: aliveFixtureKeys(tail, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures),
@@ -92,12 +92,12 @@ func (w *fixtureWindows) reportSkipped() {
 // planSuitePhases splits the suites the run will dispatch into the two phases.
 // Values are test function names ("Test" + suite name) — the keying
 // SuiteRequiredSharedFixtureKeys uses.
-func planSuitePhases(suitesByPkg map[string][]string, exclusiveByPkg map[string]map[string]bool, userRunFilter string) (bulk, tail map[string][]string) {
+func planSuitePhases(suitesByPkg map[string][]string, exclusiveByPkg map[string]map[string]bool, fuzzFuncsByPkg map[string]map[string][]string, userRunFilter string) (bulk, tail map[string][]string) {
 	bulk, tail = map[string][]string{}, map[string][]string{}
 	for pkg, suites := range suitesByPkg {
 		for _, suiteName := range suites {
 			testFuncName := "Test" + suiteName
-			if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, testFuncName) {
+			if !selectsSuite(userRunFilter, testFuncName, fuzzFuncsByPkg[pkg][suiteName]) {
 				continue
 			}
 			phase := bulk

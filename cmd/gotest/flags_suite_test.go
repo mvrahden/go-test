@@ -466,6 +466,16 @@ func (s *FlagParsingTestSuite) TestParseExecFlags_HarvestSeeds(t *gotest.T) {
 	}
 }
 
+func (s *FlagParsingTestSuite) TestOutputFlagIsRefused(t *gotest.T) {
+	t.When("-o names a binary to keep", func(w *gotest.T) {
+		w.It("is refused with the alternatives, since gotest builds every suite binary itself", func(it *gotest.T) {
+			_, err := ExportParseExecFlags(nil, []string{"-o", "out.test", "./..."}, &config.ProjectConfig{})
+			gotest.ErrorContains(it, err, "-o")
+			gotest.ErrorContains(it, err, "gotest generate")
+		})
+	})
+}
+
 func (s *FlagParsingTestSuite) TestParseDebounceFlag(t *gotest.T) {
 	for sub, tc := range gotest.Each(t, []struct {
 		Desc      string

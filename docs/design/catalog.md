@@ -1,6 +1,6 @@
 # Behavior Specification
 
-6 suites, 44 behaviors. Read from source; nothing was executed.
+7 suites, 48 behaviors. Read from source; nothing was executed.
 
 ## CLICoverageProfile
 
@@ -40,6 +40,18 @@
 | &nbsp;&nbsp;an unknown flag is a usage error for discover |
 | &nbsp;&nbsp;an unknown flag is a usage error for prepare |
 | &nbsp;&nbsp;a flag another command owns is refused |
+
+## CLIGoTestFlags
+
+### OwnedGoTestFlags
+
+| Behavior |
+|----------|
+| **when a go test flag gotest implements itself is given** |
+| &nbsp;&nbsp;-run naming a fuzz wrapper selects its suite and replays the seeds |
+| &nbsp;&nbsp;-exec wraps every suite binary |
+| &nbsp;&nbsp;-p caps the processes and the run still completes |
+| &nbsp;&nbsp;-o is refused with a reason |
 
 ## CLINewcomer
 

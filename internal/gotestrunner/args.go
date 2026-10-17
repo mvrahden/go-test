@@ -276,8 +276,13 @@ func StripCoverProfile(runFlags []string) []string { return stripFlag(runFlags, 
 
 // StripNonLoadFlags removes the build flags only `go test -c` understands
 // (-cover, -covermode, -coverpkg, -vet), which packages.Load rejects when
-// passed as BuildFlags.
+// passed as BuildFlags, and -exec, which belongs to the suite command line.
 func StripNonLoadFlags(flags []string) []string {
+	_, flags = ExtractExecPrefix(flags)
+	return stripCompileOnlyFlags(flags)
+}
+
+func stripCompileOnlyFlags(flags []string) []string {
 	var out []string
 	for i := 0; i < len(flags); i++ {
 		f := flags[i]
@@ -425,4 +430,41 @@ func PatternIndices(args []string, own func(name string) (isValue, known bool)) 
 		}
 	}
 	return idx
+}
+
+// ExtractProcessCap reads go test's -p from the build flags: the number of
+// programs it would run at once, which caps gotest's suite processes and its
+// compile parallelism alike. 0 means the flag is absent or not a number.
+func ExtractProcessCap(buildFlags []string) int {
+	for i, f := range buildFlags {
+		if v, ok := strings.CutPrefix(f, "-p="); ok {
+			n, _ := strconv.Atoi(v)
+			return max(0, n)
+		}
+		if f == "-p" && i+1 < len(buildFlags) {
+			n, _ := strconv.Atoi(buildFlags[i+1])
+			return max(0, n)
+		}
+	}
+	return 0
+}
+
+// ExtractExecPrefix lifts go test's -exec out of the build flags: the command
+// line, split on whitespace as go test splits it, that every suite binary
+// runs under. rest is buildFlags without it.
+func ExtractExecPrefix(buildFlags []string) (prefix, rest []string) {
+	for i := 0; i < len(buildFlags); i++ {
+		f := buildFlags[i]
+		if v, ok := strings.CutPrefix(f, "-exec="); ok {
+			prefix = strings.Fields(v)
+			continue
+		}
+		if f == "-exec" && i+1 < len(buildFlags) {
+			prefix = strings.Fields(buildFlags[i+1])
+			i++
+			continue
+		}
+		rest = append(rest, f)
+	}
+	return prefix, rest
 }

@@ -56,15 +56,15 @@ func (s *ConcurrencyTestSuite) TestSanitizerAwareDispatch(t *gotest.T) {
 	t.When("an instrumentation build flag is active with default parallelism", func(w *gotest.T) {
 		w.It("halves the process cap so instrumented suites keep scheduling headroom", func(it *gotest.T) {
 			runFlags := []string{}
-			got := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 0, 64, true)
+			got := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 0, 64, 0, true)
 			gotest.Equal(it, max(1, procs/2), got)
 		})
 
 		w.It("keeps an explicit --parallel budget untouched — the user's number wins", func(it *gotest.T) {
 			runFlags := []string{}
-			withRace := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 10, 64, true)
+			withRace := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 10, 64, 0, true)
 			runFlags = []string{}
-			without := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 10, 64, false)
+			without := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 10, 64, 0, false)
 			gotest.Equal(it, without, withRace)
 		})
 	})
@@ -148,7 +148,7 @@ func (s *ConcurrencyTestSuite) TestCompileConcurrency(t *gotest.T) {
 func (s *ConcurrencyTestSuite) TestDispatchConcurrency(t *gotest.T) {
 	t.It("gives each suite process its share of the budget as -parallel", func(it *gotest.T) {
 		runFlags := []string{}
-		got := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 0, 4, false)
+		got := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 0, 4, 0, false)
 		gotest.Greater(it, got, 0)
 		gotest.Len(it, runFlags, 1)
 		gotest.Regexp(it, `^-parallel=\d+$`, runFlags[0])

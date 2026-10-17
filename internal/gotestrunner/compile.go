@@ -110,12 +110,15 @@ func CompilePackages(ctx context.Context, packages []string, overlayFlag string,
 }
 
 func compileConcurrency(compileParallel int, buildFlags []string) int {
-	if compileParallel > 0 {
-		return compileParallel
+	n := compileParallel
+	if n <= 0 {
+		n = runtime.NumCPU()
+		if SanitizerActive(buildFlags) {
+			n = max(1, n/2)
+		}
 	}
-	n := runtime.NumCPU()
-	if SanitizerActive(buildFlags) {
-		return max(1, n/2)
+	if cap := ExtractProcessCap(buildFlags); cap > 0 {
+		n = min(n, cap)
 	}
 	return n
 }

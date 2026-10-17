@@ -449,10 +449,12 @@ gotest ./... -parallel 8            # explicit per-suite, no budget management
 |:------|:---------------:|:-----------------:|:-----:|
 | *(none)* | `min(S, GOMAXPROCS)` | `budget / inter` | `2 × GOMAXPROCS` |
 | `--parallel N` | `min(S, GOMAXPROCS, N)` | `N / inter` | `N` |
-| `-parallel M` | `2 × GOMAXPROCS` | `M` | `2 × GOMAXPROCS × M` *(compat)* |
+| `-parallel M` | `min(S, GOMAXPROCS, 2 × GOMAXPROCS / M)` | `M` | `≤ 2 × GOMAXPROCS` |
 | `--parallel N -parallel M` | `min(S, GOMAXPROCS, N/M)` | `M` | `~N` |
+| `-p P` | at most `P` | as above | as above |
 
 Where *S* is the number of suites and *inter* is the computed process count.
+`-p P` keeps the meaning it has for go test, the number of programs run at once: it caps the suite processes and the compile parallelism alike. `-exec <cmd>` runs every suite binary under the command, as go test does.
 Under `-race`/`-msan`/`-asan` the default budget halves (as does compile concurrency) — instrumentation at least doubles the CPU cost per instruction stream, and keeping the uninstrumented defaults would oversubscribe the machine. An explicit `--parallel`/`--compile-parallel` always wins over this heuristic.
 
 ## Testing Toolkit

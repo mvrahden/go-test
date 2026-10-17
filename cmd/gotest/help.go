@@ -164,7 +164,9 @@ Flags:
   --compile-parallel=<n>  Concurrent compilations (default: NumCPU, halved under
                           -race/-msan/-asan)
 
-All standard go test flags (-single-dash) are forwarded automatically.
+All standard go test flags (-single-dash) are forwarded automatically; -run also
+takes a Fuzz<Suite>_<Method> wrapper name, -p caps the suite processes, -exec wraps
+every suite binary, and -o is refused (gotest builds the binaries itself).
 Use a bare "--" to pass unrecognized flags without validation.
 
 CI auto-detection: when the standard CI env var is set and GOTEST_CI is

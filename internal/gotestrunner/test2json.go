@@ -35,6 +35,8 @@ func test2jsonArgv(converter string, target SuiteTarget, testArgs []string) []st
 	if converter == "" {
 		argv = []string{"go", "tool", "test2json"}
 	}
-	argv = append(argv, "-p", target.Package, "-t", target.BinaryPath)
+	argv = append(argv, "-p", target.Package, "-t")
+	argv = append(argv, target.Exec...)
+	argv = append(argv, target.BinaryPath)
 	return append(argv, testArgs...)
 }

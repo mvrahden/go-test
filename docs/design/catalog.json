@@ -339,6 +339,98 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "-run naming a fuzz wrapper selects its suite and replays the seeds",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-run_naming_a_fuzz_wrapper_selects_its_suite_and_replays_the_seeds",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "-exec wraps every suite binary",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-exec_wraps_every_suite_binary",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "-p caps the processes and the run still completes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-p_caps_the_processes_and_the_run_still_completes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "-o is refused with a reason",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-o_is_refused_with_a_reason",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when a go test flag gotest implements itself is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_go_test_flag_gotest_implements_itself_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "OwnedGoTestFlags",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestOwnedGoTestFlags",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIGoTestFlags",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIGoTestFlagsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "version still prints",
                       "duration": 0,
                       "excluded": false,
@@ -998,13 +1090,13 @@
     }
   ],
   "stats": {
-    "behaviors": 44,
+    "behaviors": 48,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 6,
+    "suites": 7,
     "tests": 0
   }
 }

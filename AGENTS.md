@@ -308,7 +308,7 @@ func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel`, `Exclusive` (dispatched strictly alone, after every non-exclusive suite — for suites whose verdicts measure wall-clock behavior or contend for resources).
+Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel`, `Exclusive` (dispatched strictly alone, after every non-exclusive suite; go test's `-p N` caps how many suite processes run at once — for suites whose verdicts measure wall-clock behavior or contend for resources).
 Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
 
 A duration the returned config leaves at zero (omitted or explicit) behaves as if the

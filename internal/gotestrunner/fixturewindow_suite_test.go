@@ -134,7 +134,7 @@ func (s *FixtureWindowTestSuite) TestPhasePlanning(t *gotest.T, _ *windowCtx) {
 	overlay := windowOverlay()
 
 	t.When("splitting the dispatch plan into phases", func(w *gotest.T) {
-		bulk, tail := gotestrunner.ExportPlanSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, "")
+		bulk, tail := gotestrunner.ExportPlanSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, nil, "")
 
 		w.It("routes exclusive suites to the tail and the rest to the bulk", func(it *gotest.T) {
 			gotest.ElementsMatch(it, []string{"TestAlphaSuite", "TestMultiSuite"}, bulk["pkg/a"])
@@ -144,7 +144,7 @@ func (s *FixtureWindowTestSuite) TestPhasePlanning(t *gotest.T, _ *windowCtx) {
 	})
 
 	t.When("a phase has no suites", func(w *gotest.T) {
-		_, tail := gotestrunner.ExportPlanSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, "TestAlphaSuite")
+		_, tail := gotestrunner.ExportPlanSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, nil, "TestAlphaSuite")
 
 		w.It("yields an empty alive set", func(it *gotest.T) {
 			gotest.Empty(it, gotestrunner.ExportAliveFixtureKeys(tail, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures))

@@ -6,11 +6,16 @@ type ParsedFlags struct {
 	UserRunFilter    string
 	UserCoverProfile string
 	Verbose          bool
+	// Exec is go test's -exec: the command every suite binary runs under.
+	Exec []string
+	// ProcessCap is go test's -p: at most this many suite processes at once.
+	ProcessCap int
 }
 
 func ParseExecFlags(goTestArgs []string) ParsedFlags {
 	classified := ClassifyGoTestArgs(goTestArgs)
-	classified.BuildFlags = InjectChecklinkname(classified.BuildFlags)
+	execPrefix, buildFlags := ExtractExecPrefix(classified.BuildFlags)
+	classified.BuildFlags = InjectChecklinkname(buildFlags)
 	verbose := HasVerboseFlag(classified.RunFlags)
 	userRunFilter := ExtractRunFilter(classified.RunFlags)
 	runFlags := StripRunFilter(classified.RunFlags)
@@ -23,5 +28,7 @@ func ParseExecFlags(goTestArgs []string) ParsedFlags {
 		UserRunFilter:    userRunFilter,
 		UserCoverProfile: userCoverProfile,
 		Verbose:          verbose,
+		Exec:             execPrefix,
+		ProcessCap:       ExtractProcessCap(classified.BuildFlags),
 	}
 }

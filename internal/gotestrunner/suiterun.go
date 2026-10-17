@@ -38,6 +38,7 @@ type SuiteTarget struct {
 	BenchFilter  string   // raw -test.bench value carrying the user's sub-benchmark segments (empty = the exact Benchmark<SuiteName> wrapper)
 	Exclusive    bool     // SuiteConfig{Exclusive: true}: dispatched strictly alone, after every non-exclusive suite
 	FuzzFuncs    []string // generated Fuzz<Suite>_<Method> wrapper names whose seed corpus replays alongside SuiteName in a plain run (ignored when Bench is true or RunFilter is set)
+	Exec         []string // go test's -exec: the command the binary runs under (empty = the binary itself)
 }
 
 // SuiteResult holds the output from running a single suite subprocess.
@@ -187,7 +188,9 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 		return cmd
 	}
 
-	cmd := exec.CommandContext(ctx, target.BinaryPath, testArgs...) //nolint:gosec // G204: binary built by this tool, not user-supplied
+	argv := append(slices.Clone(target.Exec), target.BinaryPath)
+	argv = append(argv, testArgs...)
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // G204: binary built by this tool, under the -exec command the user named
 	cmd.Env = slices.Concat(env, sidecarEnv(target))
 	cmd.Dir = target.Dir
 	return cmd
@@ -346,7 +349,8 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 
 		for _, suiteName := range suites {
 			testFuncName := "Test" + suiteName
-			if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, testFuncName) {
+			fuzzFuncs := fuzzFuncsByPkg[pkg][suiteName]
+			if !selectsSuite(userRunFilter, testFuncName, fuzzFuncs) {
 				continue
 			}
 			target := SuiteTarget{
@@ -362,11 +366,30 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 			}
 			if rf := suiteRunFilter(userRunFilter, testFuncName); rf != "" {
 				target.RunFilter = rf
+			} else if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, testFuncName) {
+				// Selected through a fuzz wrapper's name alone: the user's
+				// filter is the whole -test.run, so only that wrapper runs.
+				target.RunFilter = userRunFilter
 			}
 			targets = append(targets, target)
 		}
 	}
 	return targets
+}
+
+// selectsSuite reports whether the user's -run filter selects a suite: by its
+// Test function, or by one of the generated fuzz wrappers it owns, which is
+// the name -v prints for a seed replay and the one go test -run would take.
+func selectsSuite(userRunFilter, testFuncName string, fuzzFuncs []string) bool {
+	if userRunFilter == "" || matchesSuiteFunc(userRunFilter, testFuncName) {
+		return true
+	}
+	for _, f := range fuzzFuncs {
+		if matchesSuiteFunc(userRunFilter, f) {
+			return true
+		}
+	}
+	return false
 }
 
 // BuildBenchTargets constructs SuiteTarget entries for benchmark suites from

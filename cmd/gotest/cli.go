@@ -271,6 +271,9 @@ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectCo
 	if compileParallel == 0 {
 		compileParallel = projCfg.CompileParallel
 	}
+	if hasFlag(goTestArgs, "-o") {
+		return ExecConfig{}, fmt.Errorf("-o is not supported: gotest builds each suite's binary itself; use `gotest generate` to see the sources, or -exec to run the binaries under a command")
+	}
 	patterns, err := ExtractPackagePatterns(goTestArgs)
 	if err != nil {
 		return ExecConfig{}, err
