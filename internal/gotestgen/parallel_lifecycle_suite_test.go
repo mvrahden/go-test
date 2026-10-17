@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -79,9 +80,6 @@ func runGeneratedSuiteArgs(t *gotest.T, name string, limit time.Duration, args .
 	source, _ := renderTestPkg(t.T(), pkg, false)
 	gotest.NotContains(t, source, "sync.WaitGroup", "generated parallel harness must not gate cleanup on a WaitGroup")
 
-	harness := filepath.Join(dir, "gotest_psuite_test.go")
-	gotest.NoError(t, os.WriteFile(harness, []byte(source), 0o600))
-
 	// Compile and run as two steps. A combined `go test` would fold build time
 	// into the measurement even though -timeout only governs execution, and a
 	// compile error would be indistinguishable from a failing suite.
@@ -95,10 +93,7 @@ func runGeneratedSuiteArgs(t *gotest.T, name string, limit time.Duration, args .
 	}
 	buildArgs = append(buildArgs, ".")
 
-	build := exec.Command("go", buildArgs...) //nolint:gosec // G204: go tool with test-controlled arguments
-	build.Dir = dir
-	build.Env = append(os.Environ(), "GOWORK=off")
-	buildOut, buildErr := build.CombinedOutput()
+	buildOut, buildErr := writeAndBuild(dir, source, buildArgs)
 	gotest.NoError(t, buildErr, "compiling the generated harness failed:\n%s", buildOut)
 
 	ctx, cancel := context.WithTimeout(context.Background(), childWallClock)
@@ -114,6 +109,28 @@ func runGeneratedSuiteArgs(t *gotest.T, name string, limit time.Duration, args .
 
 	gotest.NoError(t, ctx.Err(), "child never exited on its own:\n%s", run.output)
 	return run
+}
+
+// harnessLocks serializes writing and compiling a test package's harness.
+// Parallel methods that run the same package share its directory, and
+// rewriting the file while another method compiles it hands the compiler an
+// empty file ("expected 'package', found 'EOF'").
+var harnessLocks sync.Map // dir -> *sync.Mutex
+
+// writeAndBuild writes the harness into dir and compiles the package, holding
+// dir's lock for both.
+func writeAndBuild(dir, source string, buildArgs []string) ([]byte, error) {
+	mu, _ := harnessLocks.LoadOrStore(dir, &sync.Mutex{})
+	mu.(*sync.Mutex).Lock()
+	defer mu.(*sync.Mutex).Unlock()
+
+	if err := os.WriteFile(filepath.Join(dir, "gotest_psuite_test.go"), []byte(source), 0o600); err != nil {
+		return nil, err
+	}
+	build := exec.Command("go", buildArgs...) //nolint:gosec // G204: go tool with test-controlled arguments
+	build.Dir = dir
+	build.Env = append(os.Environ(), "GOWORK=off")
+	return build.CombinedOutput()
 }
 
 // assertNoDeadlock is the core regression assertion: the child must report its
