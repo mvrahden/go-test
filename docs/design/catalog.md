@@ -1,6 +1,6 @@
 # Behavior Specification
 
-10 suites, 58 behaviors. Read from source; nothing was executed.
+11 suites, 62 behaviors. Read from source; nothing was executed.
 
 ## BenchGate
 
@@ -197,4 +197,28 @@
 |----------|
 | **when the version subcommand runs** |
 | &nbsp;&nbsp;exits 0 and prints the version on stdout |
+
+## ReadmeExample
+
+### TheFirstExampleIsTheFixture
+
+| Behavior |
+|----------|
+| **when the README shows its first suite** |
+| &nbsp;&nbsp;is the suite the fixture package holds, to the line |
+
+### TheFirstExampleRunsAsWritten
+
+| Behavior |
+|----------|
+| **when the README's first example runs with -v** |
+| &nbsp;&nbsp;passes as written |
+| &nbsp;&nbsp;prints every line the README shows for it |
+
+### TheFirstExampleRendersTheSpecShown
+
+| Behavior |
+|----------|
+| **when the README's first example renders as a spec** |
+| &nbsp;&nbsp;prints the tree the README shows, durations aside |
 

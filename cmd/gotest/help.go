@@ -768,8 +768,9 @@ Flags:
   -json                   Print the findings as JSON on stdout and exit 0,
                           as the go/analysis driver does (also with -fix;
                           not with -diff)
-  --github                Also emit GitHub ::error annotations and append a
-                          findings table to $GITHUB_STEP_SUMMARY. Implied when
+  --github                Print the findings as GitHub ::error annotations in
+                          place of the plain-text report, and append a findings
+                          table to $GITHUB_STEP_SUMMARY. Implied when
                           GITHUB_ACTIONS=true; ignored alongside -json, -diff
                           and flags only the go/analysis driver has.
 

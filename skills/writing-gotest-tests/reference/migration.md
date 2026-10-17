@@ -20,8 +20,10 @@ afterwards, and the lint pair (`lint -fix`, then `lint`). Below v1.33 a
 clean exit can still leave code that does not compile or hooks that never
 run, and a re-run exits 0 with markers left — grep for the markers and
 `go vet ./...` there. `migrate` maps assertions one-to-one by type, so
-`s.Assert().X` becomes the fatal `gotest.X`: a soft check turns into a
-hard stop. It does NOT convert bare
+every soft form — `s.Assert().X`, the suite's own `s.X` inherited from the
+embedded `*assert.Assertions`, and `assert.X(s.T(), …)` — becomes the fatal
+`gotest.X`, exactly as `s.Require().X` and `require.X(s.T(), …)` do: a soft
+check turns into a hard stop. It does NOT convert bare
 `require`/`assert` usage in plain `TestXxx(*testing.T)` functions — those
 are manual:
 

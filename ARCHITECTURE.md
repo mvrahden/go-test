@@ -353,7 +353,7 @@ function independently repeats fixture setup and `BeforeAll`:
 func FuzzFooTestSuite_FuzzParse(f *testing.F) {
     s := &ƒƒ_GOTEST_FooTestSuite{}
     gotestruntime.OpenSuite(f, gotestruntime.Suite{...})  // Fixtures only with fixtures
-    ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach)   // plus one fan per target tuple
+    ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach, <target>)   // the method's FuzzTarget, nil for a native f.Fuzz
     s.FuzzParse(ƒf)
 }
 ```

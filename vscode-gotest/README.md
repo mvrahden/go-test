@@ -158,7 +158,7 @@ Fuzz methods on suites get their own surfaces, built on the `gotest fuzz` CLI an
 - **Crasher notifications** — when the session finds a new crasher, choose **Show Decoded Input** (triage prints the typed Go literal, not corpus bytes), **Promote to Seed** (splices a typed `f.Add(...)` into the fuzz method and reveals the edit), or **Debug Crasher** (replays exactly that corpus entry under the debugger, suite lifecycle included).
 - **⚠ Promote N crashers** CodeLens — pending corpus entries surface right on the target until promoted.
 - **Debug Seeds** CodeLens — replay a target's whole seed corpus under the debugger.
-- **Test Explorer and Spec View** — fuzz targets appear under their suite in both, the Spec View as a property row beside the suite's examples, marked `FUZZ` with its seed count and counted as fuzz targets in the trailer; running one replays its seeds as ordinary subtests. Searching for *new* inputs is deliberately a CodeLens action, never an explorer run: fuzzing burns CPU on demand, not as a side effect.
+- **Test Explorer and Spec View** — fuzz targets appear under their suite in both, the Spec View as a property row beside the suite's examples, marked `FUZZ` with its seed count and counted as fuzz targets in the trailer; running one replays its seeds as ordinary subtests. Searching for *new* inputs is deliberate: the Fuzz run profile or a **▶ Fuzz** CodeLens, never a side effect of an ordinary test run, because fuzzing burns CPU on demand.
 - **Suite runs replay seeds** — running a whole suite from the explorer includes its fuzz-seed replay, matching what `gotest ./...` does on the CLI.
 
 Watch mode deliberately never fuzzes: watch is fast, deterministic feedback; fuzzing is a budgeted stochastic search.

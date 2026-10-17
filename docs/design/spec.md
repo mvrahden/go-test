@@ -381,7 +381,7 @@ The generated `func Test*` does **not** call `t.Parallel()` — parallelism is a
 `gotestruntime.RunMethods` calls `it.Parallel()` in each method's subtest; no explicit coordination is needed, because
 `testing` itself only returns from the parent `t.Run` — and therefore only runs
 `t.Cleanup` — after every parallel child has finished.
-Method-level parallelism requires a returning `BeforeEach` — per-test state lives in the returned context, not on the shared suite struct.
+Under method-level parallelism, per-test state lives in the context a returning `BeforeEach` provides, not on the shared suite struct; the generator rejects a `BeforeEach` that returns nothing in a parallel suite, and a suite without per-test state needs none.
 
 ```go
 // Default: methods run sequentially within the suite
@@ -390,7 +390,7 @@ type MyTestSuite struct{}
 func (s *MyTestSuite) TestAlpha(t *gotest.T) {}
 func (s *MyTestSuite) TestBeta(t *gotest.T)  {}
 
-// Opt-in: method-level parallel (requires returning BeforeEach)
+// Opt-in: method-level parallel (per-test state in a returning BeforeEach's context)
 type ParallelMethodTestSuite struct{}
 
 type TestCtx struct{ conn *sql.Conn }
@@ -641,7 +641,7 @@ type SuiteConfig struct {
     Timeout      time.Duration // per-test-case deadline via t.Context()
     SetupTimeout time.Duration // BeforeAll/AfterAll deadline
     FailFast     bool          // stop suite on first failure
-    Parallel     bool          // method-level parallelism (requires returning BeforeEach)
+    Parallel     bool          // method-level parallelism (per-test state in a returning BeforeEach's context)
     Exclusive    bool          // dispatched strictly alone, after every non-exclusive suite
 }
 ```
