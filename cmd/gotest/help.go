@@ -869,7 +869,8 @@ after upgrading gotest. A directory holding a different skill is refused.
 
 Flags:
   --dir=<skills-dir>   Skills directory to install into (default: .agents/skills,
-                       read by Copilot, Codex, Cursor, Gemini CLI and others;
+                       read by Copilot, Codex, Cursor, Gemini CLI,
+                       Antigravity and others;
                        Claude Code reads .claude/skills)
 
 Examples:

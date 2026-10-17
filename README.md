@@ -1192,22 +1192,21 @@ To feed a JUnit consumer, run the tests through a converter that reads the event
 
 The repository ships a skill that teaches a coding agent to write suites the way gotest expects: lifecycle hooks instead of `defer`, polling instead of `time.Sleep`, the parallel recipe, condition-only `When` labels, and the version differences between releases.
 It is written in the open [Agent Skills](https://agentskills.io) format, which Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot and [many other agents](https://agentskills.io/clients) load on demand.
-The surest install is the CLI itself, because it writes the skill shipped with the gotest version your `go.mod` pins:
+The surest install is the CLI itself (v1.34.0+), because it writes the skill shipped with the gotest version your `go.mod` pins:
 
 ```bash
-go tool gotest skill install                         # .agents/skills: Copilot, Codex, Cursor, Gemini CLI, ...
+go tool gotest skill install                         # .agents/skills: Copilot, Codex, Cursor, Gemini CLI, Antigravity, ...
 go tool gotest skill install --dir=.claude/skills    # Claude Code
 ```
 
 Rerun it after upgrading gotest; it replaces the older copy.
-Agents with a plugin system can install it as a plugin instead, which tracks the latest release line rather than your pin:
+Agents with a plugin system can install it as a plugin instead. A plugin carries the newest skill rather than the one for your pin: plugins install from the repository's main branch, and the VS Code extension bundles the skill of its release.
 
 | Agent | Install |
 |---|---|
 | Claude Code | `/plugin install gotest --marketplace mvrahden/go-test` |
 | Codex | `codex plugin marketplace add mvrahden/go-test`, then `codex plugin add gotest@go-test` |
 | GitHub Copilot CLI | `copilot plugin install mvrahden/go-test` |
-| Gemini CLI | `gemini extensions install https://github.com/mvrahden/go-test` |
 | VS Code with Copilot Chat | included in the [gotest extension](vscode-gotest) |
 | Any other agent | `npx skills add mvrahden/go-test` |
 
