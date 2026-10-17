@@ -27,3 +27,15 @@ whole, current list.
 `Run.MarkerOrder` for the order of markers a fixture stamped into
 `GOTEST_CANARY_DIR/markers`. Testdata packages live under
 `tests/conformance/testdata`.
+
+## Quoting a clause in prose
+
+`docs/design/spec.md`, `AGENTS.md`, `README.md` and the agent skill state a
+behavior only by quoting a clause as a blockquote:
+
+> when the version subcommand runs → exits 0 and prints the version on stdout
+
+The text before the arrow is a `When` label as the catalog renders it (the
+connective included) and the text after it is the `It` label directly under
+it. A conventions suite looks every quote up in `docs/design/catalog.json`,
+so a sentence that no longer matches a clause fails the build.
