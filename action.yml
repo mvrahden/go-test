@@ -373,7 +373,7 @@ runs:
 
     - name: Restore the fuzz cache
       if: ${{ inputs.fuzz == 'true' && inputs.fuzz-cache == 'true' }}
-      uses: actions/cache/restore@v6
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
         path: ${{ steps.fuzz-cache-dir.outputs.dir }}
         key: gotest-fuzz-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -420,7 +420,7 @@ runs:
 
     - name: Save the fuzz cache
       if: ${{ always() && inputs.fuzz == 'true' && inputs.fuzz-cache == 'true' }}
-      uses: actions/cache/save@v6
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
         path: ${{ steps.fuzz-cache-dir.outputs.dir }}
         key: gotest-fuzz-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}

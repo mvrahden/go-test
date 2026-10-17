@@ -69,7 +69,6 @@ jobs:
           gh release upload "$TAG" gotest-*
 
   update-major-tag:
-    # A prerelease must not move the floating major tag Action consumers follow.
     if: ${{ !github.event.release.prerelease }}
     runs-on: ubuntu-latest
     needs: build

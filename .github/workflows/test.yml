@@ -3,10 +3,6 @@ name: test
 on:
   # main is tested after merge too: a direct push, or a merge result that no
   # pull request ever built, otherwise reaches a release unverified.
-  # Two Go suites read files under vscode-gotest/ (runtimeversion_suite_test.go
-  # pins MIN_CLI_VERSION to the runtime floor; runfailure_suite_test.go uses
-  # testdata/teardownfail), so those paths come back in after the exclusion:
-  # later patterns win.
   push:
     branches: [main]
     paths:
@@ -24,8 +20,6 @@ on:
       - vscode-gotest/src/cli.ts
       - "vscode-gotest/testdata/**"
 
-# A superseded pull-request run is waste; a superseded main run is a commit
-# that never got its verdict.
 permissions:
   contents: read
 
