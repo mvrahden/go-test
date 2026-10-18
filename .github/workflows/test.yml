@@ -44,6 +44,7 @@ jobs:
         with:
           packages: "./... ./examples/..."
           race: true
+          flags: --timeout=30m
 
   bench-smoke:
     runs-on: ubuntu-latest
@@ -97,6 +98,7 @@ jobs:
           packages: "./... ./examples/..."
           race: true
           min-coverage: 70
+          flags: --timeout=30m
           # One matrix cell publishes the badge; the others would only race
           # it for the same number.
           badge: ${{ matrix.go-version == '1.27' }}

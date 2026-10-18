@@ -22,11 +22,19 @@ func (s *ShapeAssertionsTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 func (s *ShapeAssertionsTestSuite) TestRegexpCompilesOnce(t *gotest.T) {
 	t.When("the same pattern is asserted twice", func(w *gotest.T) {
-		before := gotest.ExportCompiledPatterns()
-		gotest.Record(func(r *gotest.R) { gotest.Regexp(r, `^cached-[a-z]+$`, "cached-once") })
-		gotest.Record(func(r *gotest.R) { gotest.Regexp(r, `^cached-[a-z]+$`, "cached-twice") })
+		// A pattern of this run alone: the cache is shared by the methods
+		// running beside this one and by the runs before it under -count.
+		run := time.Now().UnixNano()
+		pattern := fmt.Sprintf(`^cached-%d-[a-z]+$`, run)
+		_, before := gotest.ExportCompiledPattern(pattern)
+		gotest.Record(func(r *gotest.R) { gotest.Regexp(r, pattern, fmt.Sprintf("cached-%d-once", run)) })
+		first, kept := gotest.ExportCompiledPattern(pattern)
+		gotest.Record(func(r *gotest.R) { gotest.Regexp(r, pattern, fmt.Sprintf("cached-%d-twice", run)) })
+		second, _ := gotest.ExportCompiledPattern(pattern)
 		w.It("compiles it once and keeps it", func(it *gotest.T) {
-			gotest.Equal(it, before+1, gotest.ExportCompiledPatterns())
+			gotest.False(it, before)
+			gotest.True(it, kept)
+			gotest.Same(it, first, second)
 		})
 	})
 }

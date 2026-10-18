@@ -44,7 +44,7 @@ func (s *StreamReaderTestSuite) BeforeAll(t *gotest.T) {
 	out, err := generate.CombinedOutput()
 	gotest.NoError(t, err, string(out))
 	s.plain = filepath.Join(s.staged, "reader.test")
-	build := exec.Command("go", "test", "-c", "-o", s.plain, "./lcbreader/")
+	build := exec.Command("go", "test", "-c", "-o", s.plain, "./lcbreader/") //nolint:gosec // G204: go tool with test-controlled arguments
 	build.Dir = s.staged
 	out, err = build.CombinedOutput()
 	gotest.NoError(t, err, string(out))

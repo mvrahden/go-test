@@ -21,3 +21,6 @@ func endedOnItsOwn(err error) bool {
 	var exit *exec.ExitError
 	return errors.As(err, &exit) && uint32(exit.ExitCode()) != statusControlCExit //nolint:gosec // G115: a Windows exit status is a DWORD
 }
+
+// stopSignalsTheSuite: the runner sends a suite nothing after its stop file.
+const stopSignalsTheSuite = false

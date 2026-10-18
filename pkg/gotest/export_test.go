@@ -1,6 +1,9 @@
 package gotest
 
-import "context"
+import (
+	"context"
+	"regexp"
+)
 
 func ExportTCtx(t *T) context.Context { return t.ctx }
 
@@ -33,9 +36,12 @@ func ExportRedirectSnapshots(dir string) (restore func()) {
 // file, so caller-package detection sees a ptest caller and picks no suffix.
 func ExportMatchSnapshotFromPtest(t testingT, value any) { MatchSnapshot(t, value) }
 
-// ExportCompiledPatterns counts the patterns Regexp has compiled and kept.
-func ExportCompiledPatterns() int {
-	n := 0
-	compiledPatterns.Range(func(any, any) bool { n++; return true })
-	return n
+// ExportCompiledPattern returns the regexp Regexp compiled and kept for
+// pattern, if any.
+func ExportCompiledPattern(pattern string) (*regexp.Regexp, bool) {
+	re, ok := compiledPatterns.Load(pattern)
+	if !ok {
+		return nil, false
+	}
+	return re.(*regexp.Regexp), true
 }

@@ -107,12 +107,12 @@ func pidOf(markers []string) int {
 	return 0
 }
 
-// gone reports whether the suite process's group, which it leads, is no
-// process within a short grace period. A group id is not reused while a
-// member is left, so the probe reaches no stranger.
+// gone reports whether the suite process is no process within a short grace
+// period. The pid itself is probed: the suite process leads no group of its
+// own, so a probe of the group it would lead finds none, whatever runs.
 func gone(pid int) bool {
 	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
-		if err := syscall.Kill(-pid, 0); errors.Is(err, syscall.ESRCH) {
+		if err := syscall.Kill(pid, 0); errors.Is(err, syscall.ESRCH) {
 			return true
 		}
 	}

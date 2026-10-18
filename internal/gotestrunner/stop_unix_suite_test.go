@@ -35,7 +35,7 @@ type stopCtx struct {
 // BeforeEach starts a process outside any suite's tree that records a SIGTERM.
 func (s *StopSignalTestSuite) BeforeEach(t *gotest.T) *stopCtx {
 	dir := t.TempDir()
-	cmd := exec.Command("/bin/sh", "-c", `trap 'touch "$0"; exit 0' TERM; while :; do sleep 0.05; done`, filepath.Join(dir, "stranger-got-term"))
+	cmd := exec.Command("/bin/sh", "-c", `trap 'touch "$0"; exit 0' TERM; while :; do sleep 0.05; done`, filepath.Join(dir, "stranger-got-term")) //nolint:gosec // G204: fixed args
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	gotest.NoError(t, cmd.Start())
 	exited := make(chan struct{})

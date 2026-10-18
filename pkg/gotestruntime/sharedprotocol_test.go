@@ -30,11 +30,11 @@ func (s *SharedProtocolTestSuite) TestDescriptor(t *gotest.T) {
 				proto := gotestruntime.ClaimSharedProtocol()
 				f, err := os.Create(out) //nolint:gosec // G304: test-only path
 				gotest.NoError(it, err)
-				grandchild := exec.Command("sh", "-c", `printf 'env=%s\n' "$`+protocol.EnvSharedProtocolFD+`"; echo injected >&3`)
+				grandchild := exec.Command("sh", "-c", `printf 'env=%s\n' "$`+protocol.EnvSharedProtocolFD+`"; echo injected >&3`) //nolint:gosec // G204: fixed args
 				grandchild.Stdout = f
 				_ = grandchild.Run()
 				gotest.NoError(it, f.Close())
-				_, err = io.WriteString(proto, "own\n")
+				_, err = proto.WriteString("own\n")
 				gotest.NoError(it, err)
 				return
 			}

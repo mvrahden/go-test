@@ -1,7 +1,6 @@
 package lifecycle_test
 
 import (
-	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -71,8 +70,7 @@ func (s *StoppingTestSuite) TestAStopDuringSetupReleasesWhatCameUp(t *gotest.T) 
 	cmd, stop := s.announced(t, "setup", "TestSlowSetupTestSuite")
 	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "container starting")
 
-	gotest.NoError(t, os.WriteFile(stop, nil, 0o600))
-	gotest.NoError(t, tree.Interrupt())
+	stopAsTheRunnerDoes(t, tree, stop)
 	err := wait(tree, cmd)
 
 	// The container's setup was cancelled: it ran, so it is released, before
@@ -88,8 +86,7 @@ func (s *StoppingTestSuite) TestAStopStopsTheTestsFirst(t *gotest.T) {
 	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "running")
 
 	began := time.Now()
-	gotest.NoError(t, os.WriteFile(stop, nil, 0o600))
-	gotest.NoError(t, tree.Interrupt())
+	stopAsTheRunnerDoes(t, tree, stop)
 	err := wait(tree, cmd)
 
 	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
@@ -116,8 +113,7 @@ func (s *StoppingTestSuite) TestAMethodIgnoringItsContextIsCutShort(t *gotest.T)
 	cmd, stop := s.announced(t, "hold", "TestHoldingTestSuite", "STOPPING_HOLD=1", "STOPPING_IGNORE_CONTEXT=1")
 	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "running")
 	began := time.Now()
-	gotest.NoError(t, os.WriteFile(stop, nil, 0o600))
-	gotest.NoError(t, tree.Interrupt())
+	stopAsTheRunnerDoes(t, tree, stop)
 	err := waitWithin(t, tree, cmd, 20*time.Second)
 	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
 	gotest.Less(t, time.Since(began), 15*time.Second, "the stop waited for the method")

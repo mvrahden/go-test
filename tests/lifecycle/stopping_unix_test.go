@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -83,6 +84,8 @@ func (s *StoppingTestSuite) TestAnOrphanedSuiteHonoursASignal(t *gotest.T) {
 		}
 	}
 
+	// Where the parent's exit sends a death signal, the stop it starts may be
+	// tearing down already: a SIGTERM landing then is not a second request.
 	gotest.NoError(t, syscall.Kill(pid, syscall.SIGTERM))
 	for deadline := time.Now().Add(15 * time.Second); syscall.Kill(pid, 0) == nil; time.Sleep(20 * time.Millisecond) {
 		if time.Now().After(deadline) {
@@ -91,4 +94,36 @@ func (s *StoppingTestSuite) TestAnOrphanedSuiteHonoursASignal(t *gotest.T) {
 		}
 	}
 	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
+}
+
+// The death signal the parent's exit sends stops an orphaned suite by itself.
+// It is no request of anyone's, so the SIGTERM that follows while the
+// fixtures tear down is the first request, not the second that abandons them.
+func (s *StoppingTestSuite) TestASignalAfterTheDeathSignalIsNotTheSecond(t *gotest.T) {
+	if runtime.GOOS != "linux" {
+		t.Skipf("only Linux sends a death signal")
+	}
+	log := filepath.Join(t.TempDir(), "events")
+	stop := filepath.Join(t.TempDir(), "stop") // never created
+	sh := exec.Command("sh", "-c", `"$BIN" -test.run=TestHoldingTestSuite >/dev/null 2>&1 & echo $!; until grep -q running "$STOPPING_LOG" 2>/dev/null; do sleep 0.05; done`)
+	sh.Env = append(ownEnv(), "BIN="+s.bin["hold"], "STOPPING_HOLD=1", "STOPPING_SLOW_TEARDOWN=1", "STOPPING_LOG="+log, protocol.EnvStopFile+"="+stop)
+	out, err := sh.Output()
+	gotest.NoError(t, err)
+	pid, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	gotest.NoError(t, err)
+	for deadline := time.Now().Add(30 * time.Second); !slices.Contains(readEvents(log), "db tearing"); time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			_ = syscall.Kill(pid, syscall.SIGKILL)
+			gotest.Fail(t, "the death signal did not start the teardown: %v", readEvents(log)) //nolint:fail-guard // it must kill the process before failing
+		}
+	}
+
+	gotest.NoError(t, syscall.Kill(pid, syscall.SIGTERM))
+	for deadline := time.Now().Add(15 * time.Second); syscall.Kill(pid, 0) == nil; time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			_ = syscall.Kill(pid, syscall.SIGKILL)
+			gotest.Fail(t, "the orphaned binary did not end after its teardown") //nolint:fail-guard // it must kill the process before failing
+		}
+	}
+	gotest.Equal(t, []string{"db up", "running", "pool down", "db tearing", "db down"}, readEvents(log))
 }

@@ -173,7 +173,7 @@ func (w *watcher) loop() {
 			return
 		case sig := <-w.ch:
 			if w.counts(sig) {
-				w.stop(sig, true) // returns once the run has stopped, or ends the process
+				w.stop(sig, !w.orphaned()) // returns once the run has stopped, or ends the process
 			}
 		case sig := <-w.found:
 			if w.counts(sig) {
@@ -181,6 +181,19 @@ func (w *watcher) loop() {
 			}
 		}
 	}
+}
+
+// orphaned reports whether a signal now comes with nobody to have asked for
+// it: no stop file, and the parent gone. On Linux the parent's exit sends a
+// death signal of its own, which is no one's request.
+func (w *watcher) orphaned() bool {
+	if w.file == "" {
+		return false
+	}
+	if _, err := os.Stat(w.file); err == nil {
+		return false
+	}
+	return os.Getppid() != parentPID || parentExited()
 }
 
 func (w *watcher) counts(sig os.Signal) bool {
@@ -210,12 +223,26 @@ const stopGrace = 5 * time.Second
 // stream carries every verdict. A method body that does not return within
 // stopGrace, or a run that does not finish within the release bound, is
 // forced: the fixtures are torn down, within that same bound, and the process
-// ends by sig. A stop that came by a signal resets the handlers, so the next
-// one ends the process; one the poll found keeps them, so the runner's own
-// signal that follows its stop file does not.
-func (w *watcher) stop(sig os.Signal, bySignal bool) {
-	if bySignal && len(w.sigs) > 0 {
-		signal.Reset(w.sigs...)
+// ends by sig. A stop someone asked for by a signal resets the handlers, so
+// the next signal ends the process. One nobody asked for by a signal, which
+// the poll found or the death signal brought, keeps them for the first signal
+// that follows, the runner's own after its stop file among them: that one is
+// the first request, and only the next ends the process.
+func (w *watcher) stop(sig os.Signal, requested bool) {
+	if len(w.sigs) > 0 {
+		if requested {
+			signal.Reset(w.sigs...)
+		} else {
+			done := make(chan struct{})
+			defer close(done)
+			go func() {
+				select {
+				case <-w.ch:
+					signal.Reset(w.sigs...)
+				case <-done:
+				}
+			}()
+		}
 	}
 	deadline, settled := w.settle(sig, stopGrace)
 	if settled {

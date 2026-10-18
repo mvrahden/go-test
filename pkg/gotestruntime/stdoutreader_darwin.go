@@ -21,8 +21,6 @@ func sampleStdoutPipe() pipeID {
 	return pipeID{dev: uint64(st.Dev), ino: st.Ino} //nolint:gosec // G115: a device number is never negative
 }
 
-func watchesStdout() bool { return stdoutPipe != (pipeID{}) }
-
 // stdoutReaderGone reports whether nobody reads the pipe fd 1 was at start
 // any more. A converter that died leaves it so, even where the process's
 // parent, an -exec wrapper, lives on. The write filter of a pipe whose
