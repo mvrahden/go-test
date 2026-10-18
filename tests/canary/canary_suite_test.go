@@ -591,6 +591,16 @@ func (s *CanaryTestSuite) TestAGuardedSuitesSharedFixtureStillFailsTheRun(t *got
 	s.check(t, "guardedshared")
 }
 
+// A shared fixture whose setup failed is still released: what the attempt
+// reached would otherwise leak, as it would not for a package fixture.
+func (s *CanaryTestSuite) TestAFailedSharedSetupIsReleased(t *gotest.T) {
+	dir := s.check(t, "failingshared")
+	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	if !testkit.MarkerOrderOf(got, "leak.BeforeAll", "leak.AfterAll") {
+		t.Errorf("failingshared: markers %v, want leak.BeforeAll then leak.AfterAll", got)
+	}
+}
+
 // A panic in a parallel method ends the suite as go test would: AfterAll and
 // the fixture teardown run while a sibling is still mid-flight, and that
 // sibling's AfterEach never runs.
@@ -652,7 +662,7 @@ func (s *CanaryTestSuite) TestSnapshotsKeyOnTheExactName(t *gotest.T) {
 		}
 	}
 	after, _ := os.ReadFile(baseline)
-	if string(after) != string(before) {
+	if !bytes.Equal(after, before) {
 		t.Errorf("snapshotting: a run with the update switch off rewrote the baseline")
 		_ = os.WriteFile(baseline, before, 0o600)
 	}

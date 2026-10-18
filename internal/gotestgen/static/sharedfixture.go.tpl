@@ -5,7 +5,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -68,6 +67,7 @@ func main() {
 {{ end }}
 	ƒerrs := make([]error, {{ len .Fixtures }})
 	ƒstarted := make([]bool, {{ len .Fixtures }})
+	ƒattempted := make([]bool, {{ len .Fixtures }})
 	ƒtorn := make([]bool, {{ len .Fixtures }})
 {{ range $f := .Fixtures }}
 	ƒdone_{{ $f.VarName }} := make(chan struct{})
@@ -121,6 +121,7 @@ func main() {
   final FAIL: lines to stderr.
 */}}
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("{{ $f.StateKey }}"), ƒquote(gotestruntime.SetupBudget(ƒcfg_{{ $f.VarName }}).String()))
+		ƒattempted[{{ $i }}] = true
 		ƒerrs[{{ $i }}] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "{{ $f.Identifier }}",
 			Timeout:    ƒcfg_{{ $f.VarName }}.Timeout,
@@ -163,30 +164,28 @@ func main() {
 {{- /*
   One teardown body per fixture, shared by the TeardownKeys verb and the
   epilogue: whichever fires first wins, the other finds ƒtorn set and skips —
-  the terminal teardown owns exactly the remainder. A fixture that never
-  started, or whose setup failed, has nothing to release; one whose setup
-  merely overran its budget still initialized, so it is torn down like a
-  success. Panics are contained and a declared Timeout is a verdict — the
-  same policy the in-process DAG runs under.
+  the terminal teardown owns exactly the remainder. A fixture whose BeforeAll
+  never ran — never started, a config error, a dependency that failed — has
+  nothing to release; one whose BeforeAll ran is released however it came out,
+  since a failed attempt may hold what it reached. Panics are contained and a
+  declared Timeout is a verdict — the same policy the in-process DAG runs
+  under.
 */}}
 {{ range $f := .Fixtures }}
 	ƒteardown_{{ $f.VarName }} := func() bool {
-		if ƒtorn[{{ $f.Index }}] || !ƒstarted[{{ $f.Index }}] {
+		if ƒtorn[{{ $f.Index }}] || !ƒattempted[{{ $f.Index }}] {
 			ƒtorn[{{ $f.Index }}] = true
 			return false
 		}
 		ƒtorn[{{ $f.Index }}] = true
-		if ƒerrs[{{ $f.Index }}] == nil || errors.Is(ƒerrs[{{ $f.Index }}], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "{{ $f.Identifier }}",
-				Timeout:  ƒcfg_{{ $f.VarName }}.Timeout,
-				Budget:   {{ if $f.HasConfig }}ƒbudget_{{ $f.VarName }}{{ else }}0{{ end }},
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "{{ $f.Identifier }}",
+			Timeout:  ƒcfg_{{ $f.VarName }}.Timeout,
+			Budget:   {{ if $f.HasConfig }}ƒbudget_{{ $f.VarName }}{{ else }}0{{ end }},
 {{- if $f.HasAfterAll }}
-				AfterAll: {{ $f.VarName }}.AfterAll,
+			AfterAll: {{ $f.VarName }}.AfterAll,
 {{- end }}
-			})
-		}
-		return false
+		})
 	}
 {{ end }}
 

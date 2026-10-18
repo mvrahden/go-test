@@ -168,3 +168,6 @@ guardedshared fail -
 guardedshared fail TestGuardedTestSuite
 guardedshared pass TestFreeTestSuite
 guardedshared pass TestFreeTestSuite/TestOne
+failingshared exit 1
+failingshared fail -
+failingshared fail TestLeakTestSuite

@@ -1,0 +1,14 @@
+Expect: failingshared: markers
+Clause: when a shared fixture's setup fails on its last attempt → fails the run and still runs the fixture's AfterAll, releasing what the attempt reached
+--- a/internal/gotestgen/static/sharedfixture.go.tpl
++++ b/internal/gotestgen/static/sharedfixture.go.tpl
+@@ -178,6 +178,9 @@
+ 			return false
+ 		}
+ 		ƒtorn[{{ $f.Index }}] = true
++		if ƒerrs[{{ $f.Index }}] != nil {
++			return false
++		}
+ 		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+ 			Name:     "{{ $f.Identifier }}",
+ 			Timeout:  ƒcfg_{{ $f.VarName }}.Timeout,

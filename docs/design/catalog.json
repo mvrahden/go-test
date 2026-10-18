@@ -2865,6 +2865,59 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "fails the run and still runs the fixture's AfterAll, releasing what the attempt reached",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_run_and_still_runs_the_fixture's_AfterAll,_releasing_what_the_attempt_reached",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture's setup fails on its last attempt",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture's_setup_fails_on_its_last_attempt",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "FailedSharedSetupIsReleased",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestFailedSharedSetupIsReleased",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureTeardown",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureTeardownTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "fails naming the shared fixture it binds and go tool gotest, before any method runs",
                       "duration": 0,
                       "excluded": false,
@@ -4215,13 +4268,13 @@
     }
   ],
   "stats": {
-    "behaviors": 147,
+    "behaviors": 148,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 30,
+    "suites": 31,
     "tests": 0
   }
 }

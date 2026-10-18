@@ -132,6 +132,7 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `skip-filter-ignored` | -skip plays no part in which suites a fixture starts for | canary: the fixture of a suite -skip names whole still starts |
 | `skip-of-a-method-drops-the-suite` | a -skip naming one method drops the whole suite from the plan | canary: the suite's other method runs without its fixture |
 | `fixture-failure-leaves-the-suite-unreported` | a suite whose shared fixture never came up gets no verdict | canary: the guarded suite's failed row is missing from the stream |
+| `shared-fixture-failed-setup-not-released` | a shared fixture whose setup failed is not released | canary: the leaking fixture's AfterAll marker is missing |
 | `release-leaves-the-group` | releasing a suite's process tree leaves its stragglers alive | canary: a sleep the test never waited for outlives the run |
 | `method-panic-recovered` | the method loop swallows a method's panic | canary: the panicking method passes and its sibling runs to the end |
 | `each-rows-share-the-method-verdict` | an Each row's assertions report on the method, not the row's subtest | canary: the failing row passes on its own and the row verdicts of the golden list are off |
