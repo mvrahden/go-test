@@ -167,3 +167,35 @@ func (s *BindingTestSuite) TestUnstatedTables(t *gotest.T) {
 		})
 	})
 }
+
+const nestedCatalog = `{"packages":[{"path":"github.com/mvrahden/go-test/tests/conformance/cli","nodes":[
+ {"kind":"suite","display":"CLIFlags","children":[
+ {"kind":"method","display":"Nesting","children":[
+  {"kind":"block","vocab":"it","display":"stands under no When","children":[]},
+  {"kind":"block","vocab":"when","display":"when a flag is given","name":"a_flag_is_given","children":[
+   {"kind":"block","vocab":"it","display":"is a clause","children":[
+    {"kind":"block","vocab":"it","display":"stands under an It","children":[]}]},
+   {"kind":"block","vocab":"each","display":"--x","children":[
+    {"kind":"block","vocab":"it","display":"stands under a row","children":[]}]}]},
+  {"kind":"block","vocab":"when","display":"when a flag is parked","name":"a_flag_is_parked","children":[
+   {"kind":"block","vocab":"each","display":"--y","excluded":true,"children":[
+    {"kind":"block","vocab":"it","display":"is skipped","children":[]}]}]}]}]}]}]}`
+
+func (s *BindingTestSuite) TestOnlyDirectItsAreClauses(t *gotest.T) {
+	t.When("a catalog holds Its under no When, under an It and under Each rows", func(w *gotest.T) {
+		w.It("yields only the It directly under a When as a clause", func(it *gotest.T) {
+			cs, err := speccatalog.ClausesOf([]byte(nestedCatalog))
+			gotest.NoError(it, err)
+			gotest.Equal(it, []speccatalog.Clause{{Capability: "cli", When: "a flag is given", It: "is a clause"}}, cs)
+		})
+		w.It("names every other It with its package, suite, method and placement", func(it *gotest.T) {
+			misplaced, err := speccatalog.MisplacedIts([]byte(nestedCatalog))
+			gotest.NoError(it, err)
+			gotest.Equal(it, []string{
+				`tests/conformance/cli: CLIFlags.Nesting: It "stands under no When" has no When above it`,
+				`tests/conformance/cli: CLIFlags.Nesting: It "stands under an It" is under It "is a clause"`,
+				`tests/conformance/cli: CLIFlags.Nesting: It "stands under a row" is under Each row "--x"`,
+			}, misplaced)
+		})
+	})
+}

@@ -64,6 +64,20 @@ func (s *SpecBindingTestSuite) TestEveryTableIsStated(t *gotest.T) {
 	})
 }
 
+func (s *SpecBindingTestSuite) TestEveryItIsDirectlyUnderAWhen(t *gotest.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	gotest.NoError(t, err)
+	js, err := os.ReadFile(filepath.Join(root, speccatalog.JSONPath))
+	gotest.NoError(t, err)
+	misplaced, err := speccatalog.MisplacedIts(js)
+	gotest.NoError(t, err)
+	t.When("each conformance It is placed in its tree", func(w *gotest.T) {
+		w.It("sits directly under a When, so a scenario can bind to it", func(it *gotest.T) {
+			gotest.Empty(it, misplaced, "a clause is an It directly under a When; an It under Each rows, under another It or with no When above it binds to no scenario:\n%s", strings.Join(misplaced, "\n"))
+		})
+	})
+}
+
 func (s *SpecBindingTestSuite) TestSpecShape(t *gotest.T) {
 	specs, _ := loadBinding(t)
 	var problems []string

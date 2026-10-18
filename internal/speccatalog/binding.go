@@ -10,8 +10,8 @@ import (
 // ConformanceDir holds one conformance package per capability.
 const ConformanceDir = "tests/conformance"
 
-// Clause is an It label under the innermost When label above it, both as
-// written in the source, in the conformance package of its capability.
+// Clause is an It label directly under a When label, both as written in the
+// source, in the conformance package of its capability.
 type Clause struct {
 	Capability string
 	When       string
@@ -146,23 +146,72 @@ type node struct {
 	Children []node `json:"children"`
 }
 
-// walk calls fn for every It below a When, with the innermost When above it.
-// Nothing under an excluded node is visited.
-func walk(n, when *node, fn func(when, it *node)) {
+// walk calls fn for every It that is a direct child of a When. Nothing under
+// an excluded node is visited.
+func walk(n, parent *node, fn func(when, it *node)) {
 	if n.Excluded {
 		return
 	}
-	switch n.Vocab {
-	case "when":
-		when = n
-	case "it":
-		if when != nil {
-			fn(when, n)
-		}
+	if n.Vocab == "it" && parent != nil && parent.Vocab == "when" {
+		fn(parent, n)
 	}
 	for i := range n.Children {
-		walk(&n.Children[i], when, fn)
+		walk(&n.Children[i], n, fn)
 	}
+}
+
+// MisplacedIts names each labeled It that is not a direct child of a When:
+// under Each rows, under another It, or with no When above it. None of them
+// is a clause. Excluded nodes are skipped.
+func MisplacedIts(js []byte) ([]string, error) {
+	var doc struct {
+		Packages []struct {
+			Path  string `json:"path"`
+			Nodes []node `json:"nodes"`
+		} `json:"packages"`
+	}
+	if err := json.Unmarshal(js, &doc); err != nil {
+		return nil, fmt.Errorf("catalog json: %w", err)
+	}
+	var out []string
+	for _, p := range doc.Packages {
+		_, capability, _ := strings.Cut(p.Path, "/"+ConformanceDir+"/")
+		pkg := ConformanceDir + "/" + capability
+		for _, suite := range p.Nodes {
+			if suite.Excluded {
+				continue
+			}
+			for _, method := range suite.Children {
+				var visit func(n, parent *node, underWhen bool)
+				visit = func(n, parent *node, underWhen bool) {
+					if n.Excluded {
+						return
+					}
+					if label := strings.TrimSpace(n.Display); n.Vocab == "it" && label != "" && parent.Vocab != "when" {
+						at := fmt.Sprintf("%s: %s.%s: It %q", pkg, suite.Display, method.Display, label)
+						switch {
+						case !underWhen:
+							out = append(out, at+" has no When above it")
+						case parent.Vocab == "each":
+							out = append(out, fmt.Sprintf("%s is under Each row %q", at, parent.Display))
+						case parent.Vocab == "it":
+							out = append(out, fmt.Sprintf("%s is under It %q", at, parent.Display))
+						default:
+							out = append(out, fmt.Sprintf("%s is under %q, not a When", at, parent.Display))
+						}
+					}
+					underWhen = underWhen || n.Vocab == "when"
+					for i := range n.Children {
+						visit(&n.Children[i], n, underWhen)
+					}
+				}
+				for i := range method.Children {
+					visit(&method.Children[i], &method, false)
+				}
+			}
+		}
+	}
+	return out, nil
 }
 
 // UnstatedTables names each When whose children include Each rows but no It:
