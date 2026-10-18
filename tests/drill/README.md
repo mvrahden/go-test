@@ -42,6 +42,12 @@ exceed `tests/drill/unmutated-allow.txt`: a new clause either gets a mutant or
 the budget is raised on purpose in the same change. A conventions suite
 enforces both, and that every `Clause:` line names a clause that exists.
 
+A conformance suite cannot be the drill's oracle: it asserts with gotest, and
+a mutated assertion engine could pass its own test. A clause whose outcome is
+a verdict therefore ships with a ring-0 twin in `tests/canary`, the same check
+in plain Go. The mutant's `Expect:` lines match the twin's output; the
+`Clause:` line names the sentence the twin protects.
+
 ## Reading a failure
 
 - `DRILL  <name>: SURVIVED` — the bug went unnoticed. A check has a hole;

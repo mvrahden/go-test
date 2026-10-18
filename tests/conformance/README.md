@@ -39,3 +39,17 @@ The text before the arrow is a `When` label as the catalog renders it (the
 connective included) and the text after it is the `It` label directly under
 it. A conventions suite looks every quote up in `docs/design/catalog.json`,
 so a sentence that no longer matches a clause fails the build.
+
+Only an `It` directly under a `When` is a quotable clause. The rows of an
+`Each` table are pinned in prose by a link to their catalog section, never by
+a quote. Nothing under a suite the `X_` prefix disables is a clause.
+
+## Verdict clauses and the drill
+
+A clause whose outcome is a verdict — an exit code, a pass or fail, a row of
+the event stream — ships with a ring-0 twin in `tests/canary`: the same check
+written with plain Go, no gotest assertion. Conformance suites assert with
+gotest, so a bug in the assertion engine could pass its own test; the twin is
+what the mutation drill holds the kernel to. The mutant's `Expect:` lines
+match the twin's output, and its `Clause:` line records which catalog
+sentence the twin protects.
