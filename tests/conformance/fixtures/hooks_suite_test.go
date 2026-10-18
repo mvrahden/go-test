@@ -54,35 +54,37 @@ func (s *FixtureHooksTestSuite) TestAFixtureHookGoesWrong(t *gotest.T) {
 	// registered no AfterEach; a panic ends the suite after the method's own
 	// teardown and AfterAll, as under go test.
 	t.When("a package fixture hook returns an error, panics or overruns the Timeout", func(w *gotest.T) {
-		for it, row := range gotest.Each(w, []hookRow{
-			{Desc: "fixture BeforeAll returns an error", at: "fixture.BeforeAll", mode: "error",
-				ran: []string{"fixture.BeforeAll", "fixture.AfterAll"}, verdicts: map[string]string{suite: "fail"}, exit: 1},
-			{Desc: "fixture BeforeAll panics", at: "fixture.BeforeAll", mode: "panic",
-				ran: []string{"fixture.BeforeAll", "fixture.AfterAll"}, verdicts: map[string]string{suite: "fail"}, exit: 1},
-			{Desc: "fixture BeforeEach returns an error", at: "fixture.BeforeEach", mode: "error",
-				ran: methodNeverOpened, verdicts: map[string]string{body: "fail", next: "pass"}, exit: 1},
-			{Desc: "fixture BeforeEach panics", at: "fixture.BeforeEach", mode: "panic",
-				ran: suiteEndsAtBeforeEach, verdicts: map[string]string{body: "fail", next: "", suite: "fail"}, exit: 1},
-			{Desc: "fixture BeforeEach overruns the Timeout", at: "fixture.BeforeEach", mode: "overrun",
-				verdicts: map[string]string{body: "fail"}, exit: 1},
-			{Desc: "fixture AfterEach returns an error", at: "fixture.AfterEach", mode: "error",
-				ran: cleanRun, verdicts: map[string]string{body: "fail", next: "pass"}, exit: 1},
-			{Desc: "fixture AfterEach panics", at: "fixture.AfterEach", mode: "panic",
-				ran: suiteEndsAfterBody, verdicts: map[string]string{body: "fail", next: "", suite: "fail"}, exit: 1},
-			{Desc: "fixture AfterAll returns an error", at: "fixture.AfterAll", mode: "error",
-				ran: cleanRun, exit: 1},
-			{Desc: "fixture AfterAll panics", at: "fixture.AfterAll", mode: "panic",
-				ran: cleanRun, exit: 1},
-		}) {
-			run := runHooks(it, row.at, row.mode)
-			gotest.Equal(it, row.exit, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
-			if row.ran != nil {
-				gotest.Equal(it, row.ran, run.Markers)
+		w.It("fails the run, runs the later hooks its row names and gives the verdicts its row names", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []hookRow{
+				{Desc: "fixture BeforeAll returns an error", at: "fixture.BeforeAll", mode: "error",
+					ran: []string{"fixture.BeforeAll", "fixture.AfterAll"}, verdicts: map[string]string{suite: "fail"}, exit: 1},
+				{Desc: "fixture BeforeAll panics", at: "fixture.BeforeAll", mode: "panic",
+					ran: []string{"fixture.BeforeAll", "fixture.AfterAll"}, verdicts: map[string]string{suite: "fail"}, exit: 1},
+				{Desc: "fixture BeforeEach returns an error", at: "fixture.BeforeEach", mode: "error",
+					ran: methodNeverOpened, verdicts: map[string]string{body: "fail", next: "pass"}, exit: 1},
+				{Desc: "fixture BeforeEach panics", at: "fixture.BeforeEach", mode: "panic",
+					ran: suiteEndsAtBeforeEach, verdicts: map[string]string{body: "fail", next: "", suite: "fail"}, exit: 1},
+				{Desc: "fixture BeforeEach overruns the Timeout", at: "fixture.BeforeEach", mode: "overrun",
+					verdicts: map[string]string{body: "fail"}, exit: 1},
+				{Desc: "fixture AfterEach returns an error", at: "fixture.AfterEach", mode: "error",
+					ran: cleanRun, verdicts: map[string]string{body: "fail", next: "pass"}, exit: 1},
+				{Desc: "fixture AfterEach panics", at: "fixture.AfterEach", mode: "panic",
+					ran: suiteEndsAfterBody, verdicts: map[string]string{body: "fail", next: "", suite: "fail"}, exit: 1},
+				{Desc: "fixture AfterAll returns an error", at: "fixture.AfterAll", mode: "error",
+					ran: cleanRun, exit: 1},
+				{Desc: "fixture AfterAll panics", at: "fixture.AfterAll", mode: "panic",
+					ran: cleanRun, exit: 1},
+			}) {
+				run := runHooks(sub, row.at, row.mode)
+				gotest.Equal(sub, row.exit, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				if row.ran != nil {
+					gotest.Equal(sub, row.ran, run.Markers)
+				}
+				for path, want := range row.verdicts {
+					gotest.Equal(sub, want, run.Verdict(path), "verdict of %s", path)
+				}
 			}
-			for path, want := range row.verdicts {
-				gotest.Equal(it, want, run.Verdict(path), "verdict of %s", path)
-			}
-		}
+		})
 	})
 
 	t.When("a fixture BeforeEach returns an error", func(w *gotest.T) {

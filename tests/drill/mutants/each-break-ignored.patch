@@ -1,0 +1,15 @@
+Expect: eachbreak: the method did not go on after the break
+Clause: when the loop over an Each table breaks → stops at the break and the method goes on
+--- a/pkg/gotest/utils.go
++++ b/pkg/gotest/utils.go
+@@ -13,9 +13,7 @@
+ 	return func(yield func(*T, E) bool) {
+ 		for i, entry := range entries {
+ 			name := eachEntryName(reflect.ValueOf(entry), i)
+-			if !eachRun(t, name, entry, yield) {
+-				break
+-			}
++			eachRun(t, name, entry, yield)
+ 		}
+ 	}
+ }

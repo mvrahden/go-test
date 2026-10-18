@@ -1,0 +1,13 @@
+Expect: stop: markers \[[^]]* running( [^c][^]]*)?\], want \[context ended
+Clause: when the run is interrupted while a method holds → ends the holding method's context
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -311,7 +311,7 @@
+ 	if runstate.StopContext().Err() != nil {
+ 		cancel()
+ 	}
+-	stop := context.AfterFunc(runstate.StopContext(), cancel)
++	stop := func() bool { return false }
+ 	t.Cleanup(func() {
+ 		stop()
+ 		cancel()

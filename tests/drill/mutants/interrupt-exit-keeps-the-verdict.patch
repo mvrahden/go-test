@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/lifecycle .* / exits 130 \(
+Expect: stop: exit code [0-9-]+, want 130
+Clause: when the run is interrupted while a method holds → exits 130
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -647,7 +647,7 @@
+ // applyDeadlineFailure to fail.
+ func exitCodeAfterDispatch(worst int, dispatchErr error) int {
+ 	if errors.Is(dispatchErr, context.Canceled) {
+-		return 130
++		return worst
+ 	}
+ 	return worst
+ }

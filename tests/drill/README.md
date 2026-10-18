@@ -156,10 +156,17 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `deadline-from-testing-context` | NewTWithDeadline derives from testing's context, not the suite's | canary: the tighter T outlives the suite's deadline |
 | `diff-dropped` | a multi-line mismatch is reported without its diff | canary: no failure carries a unified hunk header |
 | `callsite-ignores-the-main-module` | under -trimpath a dotless module path counts as the standard library | canary: a helper failure in such a module loses the caller's line |
-| `bench-panic-skips-afterall` | the generated benchmark wrapper no longer recovers a panic | canary: the panicking benchmark fixture's run, results or teardown order differ |
+| `bench-panic-skips-afterall` | the generated benchmark wrapper no longer recovers a panic | canary: the panicking benchmark fixture reports no result for the benchmark after it, and neither AfterAll runs |
 | `failfast-drops-the-skipped` | a FailFast suite drops the methods it did not run instead of reporting them | canary: the FailFast fixture's later methods have no skip verdict |
 | `failfast-trips-on-the-suite` | FailFast trips on a failure the suite recorded before its methods | canary: the soft-failing FailFast fixture's second method is not run |
 | `fixture-failed-setup-not-released` | a fixture whose BeforeAll failed is not torn down | canary: the setup-failing fixture's AfterAll never runs |
+| `bench-panic-taken-for-skip` | a benchmark's recovered panic skips the benchmark instead of failing it | canary: the panicking benchmark fixture's run exits 0 instead of 1 |
+| `bench-stderr-dropped` | a plain bench run never prints a benchmark suite's stderr | lifecycle conformance: the panic and its stack are missing from stderr |
+| `failfast-trips-before-a-failure` | a FailFast suite trips before any method failed, so its first method is skipped | canary: the FailFast fixture's run exits 0 and its first method has no fail verdict |
+| `second-signal-taken-for-the-first` | every signal after the first counts as the same event, so a second Ctrl-C never abandons the teardown | lifecycle conformance: the second-SIGINT rows find the teardown finished and no word of the abandon |
+| `interrupt-exit-keeps-the-verdict` | an interrupted run exits with the suites' worst code instead of 130 | lifecycle conformance and canary: the stopped run's exit code is not 130 |
+| `stop-leaves-the-method-context` | a stop no longer ends a running method's context | canary: the stopping fixture's markers lack `context ended` |
+| `each-break-ignored` | `Each` goes on to the next row after the loop body broke, so Go panics on the next yield | canary: the each-break fixture's method fails and never reaches the marker after the loop |
 
 ## Adding a mutant
 

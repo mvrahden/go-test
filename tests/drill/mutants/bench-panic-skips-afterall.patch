@@ -1,4 +1,7 @@
-Expect: benchpanic: (exit code|results|markers)
+Expect: benchpanic: results \[\], want \[BenchmarkStillRuns\]
+Expect: benchpanic: markers \[fixture.BeforeAll panics\], want panics, suite.AfterAll, fixture.AfterAll in order
+Clause: when a benchmark panics → reports no result for it and a result for the benchmark after it
+Clause: when a benchmark panics → runs AfterAll before the fixture is released
 --- a/internal/gotestgen/static/gotest.bench.tpl
 +++ b/internal/gotestgen/static/gotest.bench.tpl
 @@ -5,7 +5,6 @@ func Benchmark{{ $ts.Identifier }}(b *testing.B) {

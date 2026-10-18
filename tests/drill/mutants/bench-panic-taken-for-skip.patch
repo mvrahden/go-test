@@ -1,0 +1,14 @@
+Expect: benchpanic: exit code 0, want 1
+Clause: when a benchmark panics → fails the run
+--- a/pkg/gotestruntime/hold.go
++++ b/pkg/gotestruntime/hold.go
+@@ -104,8 +104,7 @@
+ 		return
+ 	}
+ 	if r := recover(); r != nil {
+-		reportPanic(b, r)
+-		b.FailNow()
++		b.SkipNow()
+ 	}
+ }
+ 

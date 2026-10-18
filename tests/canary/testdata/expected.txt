@@ -171,3 +171,8 @@ guardedshared pass TestFreeTestSuite/TestOne
 failingshared exit 1
 failingshared fail -
 failingshared fail TestLeakTestSuite
+eachbreak exit 0
+eachbreak pass -
+eachbreak pass TestEachBreakTestSuite
+eachbreak pass TestEachBreakTestSuite/TestBreaksAfterTheFirstRow
+eachbreak pass TestEachBreakTestSuite/TestBreaksAfterTheFirstRow/first

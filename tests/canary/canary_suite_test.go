@@ -533,6 +533,22 @@ func (s *CanaryTestSuite) TestAFatalGoroutineFailsTheMethodAtTheWait(t *gotest.T
 	}
 }
 
+// A loop that breaks out of an Each table stops at the break: no later row
+// runs, and the method goes on after the loop.
+func (s *CanaryTestSuite) TestABreakOutOfEachStopsTheRows(t *gotest.T) {
+	dir := s.check(t, "eachbreak")
+	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	if slices.ContainsFunc(got, func(m string) bool { return strings.HasPrefix(m, "row ") && m != "row first" }) {
+		t.Errorf("eachbreak: a row after the break ran: %v", got)
+	}
+	if !slices.Contains(got, "row first") {
+		t.Errorf("eachbreak: the first row did not run: %v", got)
+	}
+	if !slices.Contains(got, "after the loop") {
+		t.Errorf("eachbreak: the method did not go on after the break: %v", got)
+	}
+}
+
 // A fuzz execution whose BeforeEach fails or panics still runs its AfterEach,
 // as a test method does.
 func (s *CanaryTestSuite) TestAFuzzExecutionsAfterEachRunsWhenBeforeEachLeaves(t *gotest.T) {

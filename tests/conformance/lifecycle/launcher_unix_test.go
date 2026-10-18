@@ -128,43 +128,45 @@ func (s *LauncherSignalTestSuite) TestEveryLauncherStopsCleanly(t *gotest.T) {
 	// status 130" with exit 1, while a group SIGTERM ends go run itself by
 	// the signal.
 	t.When("a run is stopped by a signal, however gotest was launched", func(w *gotest.T) {
-		for it, row := range gotest.Each(w, []launcherRow{
-			{Desc: "direct, SIGINT", launcher: "direct", signal: "SIGINT"},
-			{Desc: "direct, SIGTERM", launcher: "direct", signal: "SIGTERM"},
-			{Desc: "direct, a second SIGINT", launcher: "direct", signal: "second"},
-			{Desc: "go run, SIGINT", launcher: "go run", signal: "SIGINT"},
-			{Desc: "go run, SIGTERM", launcher: "go run", signal: "SIGTERM"},
-			{Desc: "go run, a second SIGINT", launcher: "go run", signal: "second"},
-			{Desc: "go tool, SIGINT", launcher: "go tool", signal: "SIGINT"},
-			{Desc: "go tool, SIGTERM", launcher: "go tool", signal: "SIGTERM"},
-			{Desc: "go tool, a second SIGINT", launcher: "go tool", signal: "second"},
-		}) {
-			markerDir := it.TempDir()
-			cmd := s.command(row.launcher)
-			cmd.Env = testkit.ChildEnv(markerDir, "STOPPING_SLOW=1")
-			tree := holding(it, cmd, markerDir)
-			deliver(it, cmd, tree, row.signal)
-			run := finished(cmd, tree, markerDir)
+		w.It("stops with its launcher's exit code, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []launcherRow{
+				{Desc: "direct, SIGINT", launcher: "direct", signal: "SIGINT"},
+				{Desc: "direct, SIGTERM", launcher: "direct", signal: "SIGTERM"},
+				{Desc: "direct, a second SIGINT", launcher: "direct", signal: "second"},
+				{Desc: "go run, SIGINT", launcher: "go run", signal: "SIGINT"},
+				{Desc: "go run, SIGTERM", launcher: "go run", signal: "SIGTERM"},
+				{Desc: "go run, a second SIGINT", launcher: "go run", signal: "second"},
+				{Desc: "go tool, SIGINT", launcher: "go tool", signal: "SIGINT"},
+				{Desc: "go tool, SIGTERM", launcher: "go tool", signal: "SIGTERM"},
+				{Desc: "go tool, a second SIGINT", launcher: "go tool", signal: "second"},
+			}) {
+				markerDir := sub.TempDir()
+				cmd := s.command(row.launcher)
+				cmd.Env = testkit.ChildEnv(markerDir, "STOPPING_SLOW=1")
+				tree := holding(sub, cmd, markerDir)
+				deliver(sub, cmd, tree, row.signal)
+				run := finished(cmd, tree, markerDir)
 
-			switch {
-			case row.launcher == "go run" && row.signal == "SIGTERM":
-				gotest.Equal(it, -1, run.Exit, "go run ends by the signal; stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
-			case row.launcher == "go run":
-				gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
-				gotest.Contains(it, run.Stderr, "exit status 130")
-			default:
-				gotest.Equal(it, 130, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				switch {
+				case row.launcher == "go run" && row.signal == "SIGTERM":
+					gotest.Equal(sub, -1, run.Exit, "go run ends by the signal; stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				case row.launcher == "go run":
+					gotest.Equal(sub, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+					gotest.Contains(sub, run.Stderr, "exit status 130")
+				default:
+					gotest.Equal(sub, 130, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				}
+				if row.signal == "second" {
+					gotest.Contains(sub, run.Stderr, "interrupted again")
+					gotest.NotContains(sub, run.Markers, "teardown done")
+				} else {
+					gotest.NotContains(sub, run.Stderr, "interrupted again")
+					gotest.Contains(sub, run.Markers, "teardown done")
+				}
+				pid := pidOf(run.Markers)
+				gotest.NotZero(sub, pid, "markers: %v", run.Markers)
+				gotest.True(sub, gone(pid), "the suite process %d outlived the run", pid)
 			}
-			if row.signal == "second" {
-				gotest.Contains(it, run.Stderr, "interrupted again")
-				gotest.NotContains(it, run.Markers, "teardown done")
-			} else {
-				gotest.NotContains(it, run.Stderr, "interrupted again")
-				gotest.Contains(it, run.Markers, "teardown done")
-			}
-			pid := pidOf(run.Markers)
-			gotest.NotZero(it, pid, "markers: %v", run.Markers)
-			gotest.True(it, gone(pid), "the suite process %d outlived the run", pid)
-		}
+		})
 	})
 }
