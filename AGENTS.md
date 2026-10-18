@@ -20,6 +20,8 @@ Without it, failures show both where the assertion was called (inside the helper
 This applies to all gotest assertion functions (`gotest.Equal`, `gotest.True`, etc.).
 If you pass `t.T()` to third-party code that uses Go's standard `t.Errorf`, Go's `t.Helper()` convention applies as normal.
 
+> when a helper fails in a module whose path has no dot, built with -trimpath → the failure names the helper's line and the caller's
+
 **Never call `t.T().Cleanup()` inside suite methods.**
 Use `BeforeAll`/`AfterAll` for suite-level resources and `BeforeEach`/`AfterEach` for per-test resources.
 The generated harness manages cleanup ordering (LIFO).

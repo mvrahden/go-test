@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 
 	"github.com/mvrahden/go-test/internal/callsite"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -69,6 +70,21 @@ func (s *CallsiteTestSuite) TestIsStd(t *gotest.T) {
 	} {
 		t.It("judges "+c.fn+" by its import path under -trimpath", func(it *gotest.T) {
 			gotest.Equal(it, c.std, callsite.ExportStdPath(c.fn))
+		})
+	}
+	for _, c := range []struct {
+		fn   string
+		main string
+		std  bool
+	}{
+		{"plainmod/helpers.expectAnswer", "plainmod", false},
+		{"plainmod.F", "plainmod", false},
+		{"plainmodule/x.F", "plainmod", true},
+		{"fmt.Fprintln", "plainmod", true},
+		{"plainmod/helpers.expectAnswer", "", true},
+	} {
+		t.It("judges "+c.fn+" knowing the main module is "+strconv.Quote(c.main), func(it *gotest.T) {
+			gotest.Equal(it, c.std, callsite.ExportStdPathIn(c.fn, c.main))
 		})
 	}
 }

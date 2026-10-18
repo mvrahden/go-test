@@ -658,6 +658,27 @@ func (s *CanaryTestSuite) TestSnapshotsKeyOnTheExactName(t *gotest.T) {
 	}
 }
 
+// A helper's failure names the helper's line and the caller's, in a module
+// whose path has no dot and under -trimpath too, where the path alone cannot
+// tell the user's code from the standard library's.
+func (s *CanaryTestSuite) TestAHelperFailureNamesBothLinesUnderTrimpath(t *gotest.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		fatalf(t, "abs: %v", err)
+	}
+	dir := t.TempDir()
+	if _, err := testkit.StagePackage(root, filepath.Join("testdata", "helpers"), dir, "plainmod"); err != nil {
+		fatalf(t, "stage helpers: %v", err)
+	}
+	run := exec.Command(s.binary, "-trimpath", "-v", "./helpers/") //nolint:gosec // G204: controlled binary with fixed args
+	run.Dir = dir
+	run.Env = childEnv(t.TempDir())
+	out, _ := run.CombinedOutput()
+	if !strings.Contains(string(out), "helpers_suite_test.go:14: helpers_suite_test.go:10: Equal failed") {
+		t.Errorf("helpers under -trimpath: the failure does not name both lines:\n%s", out)
+	}
+}
+
 // An async method whose done-owning goroutine fails fatally fails at once:
 // nothing is left to call done, so nothing waits for the budget.
 func (s *CanaryTestSuite) TestAFatalGoroutineEndsAnAsyncWait(t *gotest.T) {

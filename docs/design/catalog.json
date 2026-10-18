@@ -372,6 +372,59 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the failure names the helper's line and the caller's",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_failure_names_the_helper's_line_and_the_caller's",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a helper fails in a module whose path has no dot, built with -trimpath",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_helper_fails_in_a_module_whose_path_has_no_dot,_built_with_-trimpath",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "HelperUnderTrimpath",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestHelperUnderTrimpath",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FailureLocations",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFailureLocationsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "fails at the deadline and says the poll is still running",
                       "duration": 0,
                       "excluded": false,
@@ -4162,13 +4215,13 @@
     }
   ],
   "stats": {
-    "behaviors": 146,
+    "behaviors": 147,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 29,
+    "suites": 30,
     "tests": 0
   }
 }

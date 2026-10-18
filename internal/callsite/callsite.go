@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,10 +52,20 @@ func IsStd(fn, file string) bool {
 	if src := stdSrc(); src != "" {
 		return strings.HasPrefix(filepath.ToSlash(file), src)
 	}
-	// -trimpath leaves no GOROOT to compare: judge by import path, whose
-	// first element has a dot unless it is the standard library's.
-	return stdPath(fn)
+	// -trimpath leaves no GOROOT to compare: judge by import path. The main
+	// module's is known from the build, and may have no dot; any other
+	// path's first element has a dot unless it is the standard library's.
+	return stdPath(fn, mainModule())
 }
+
+// mainModule is the import path of the module the binary was built from, as
+// the build recorded it; "" when it did not.
+var mainModule = sync.OnceValue(func() string {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		return info.Main.Path
+	}
+	return ""
+})
 
 // stdSrc is GOROOT/src/ as frames name it, empty under -trimpath.
 var stdSrc = sync.OnceValue(func() string {
@@ -67,11 +78,17 @@ var stdSrc = sync.OnceValue(func() string {
 	return src
 })
 
-func stdPath(fn string) bool {
+// stdPath judges the function fn by its import path: never standard when the
+// path is the main module main or under it, otherwise standard when its first
+// element has no dot.
+func stdPath(fn, main string) bool {
 	slash := max(strings.LastIndexByte(fn, '/'), 0)
 	pkg := fn
 	if dot := strings.IndexByte(fn[slash:], '.'); dot >= 0 {
 		pkg = fn[:slash+dot]
+	}
+	if main != "" && (pkg == main || strings.HasPrefix(pkg, main+"/")) {
+		return false
 	}
 	first, _, _ := strings.Cut(pkg, "/")
 	return pkg != "main" && !strings.Contains(first, ".")

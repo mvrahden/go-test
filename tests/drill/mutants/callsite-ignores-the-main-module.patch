@@ -1,0 +1,13 @@
+Expect: helpers under -trimpath: the failure does not name both lines
+Clause: when a helper fails in a module whose path has no dot, built with -trimpath → the failure names the helper's line and the caller's
+--- a/internal/callsite/callsite.go
++++ b/internal/callsite/callsite.go
+@@ -87,7 +87,7 @@
+ 	if dot := strings.IndexByte(fn[slash:], '.'); dot >= 0 {
+ 		pkg = fn[:slash+dot]
+ 	}
+-	if main != "" && (pkg == main || strings.HasPrefix(pkg, main+"/")) {
++	if false && main != "" && (pkg == main || strings.HasPrefix(pkg, main+"/")) {
+ 		return false
+ 	}
+ 	first, _, _ := strings.Cut(pkg, "/")
