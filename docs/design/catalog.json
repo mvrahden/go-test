@@ -3132,6 +3132,59 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "AfterAll and the fixture teardown run, the sibling is cut short and its AfterEach never runs, and the run fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "AfterAll_and_the_fixture_teardown_run,_the_sibling_is_cut_short_and_its_AfterEach_never_runs,_and_the_run_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a parallel method panics while a sibling is still running",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_parallel_method_panics_while_a_sibling_is_still_running",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Siblings",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSiblings",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "ParallelPanic",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestParallelPanicTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "exits 130",
                       "duration": 0,
                       "excluded": false,
@@ -3419,13 +3472,13 @@
     }
   ],
   "stats": {
-    "behaviors": 129,
+    "behaviors": 130,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 25,
+    "suites": 26,
     "tests": 0
   }
 }

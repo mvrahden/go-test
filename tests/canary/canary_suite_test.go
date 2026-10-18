@@ -586,6 +586,27 @@ func (s *CanaryTestSuite) TestAGuardedSuitesSharedFixtureStillFailsTheRun(t *got
 	s.check(t, "guardedshared")
 }
 
+// A panic in a parallel method ends the suite as go test would: AfterAll and
+// the fixture teardown run while a sibling is still mid-flight, and that
+// sibling's AfterEach never runs.
+func (s *CanaryTestSuite) TestAParallelPanicEndsTheSuiteAroundItsSiblings(t *gotest.T) {
+	dir := t.TempDir()
+	code, rows := s.run(t, "parallelpanic", dir)
+	if code != 1 || !slices.Contains(rows, "parallelpanic fail TestParallelPanicTestSuite/TestPanics") {
+		t.Errorf("parallelpanic: the panicking method did not fail the run (exit %d): %v", code, rows)
+	}
+	got, _ := os.ReadFile(filepath.Join(dir, "markers"))
+	markers := string(got)
+	for _, want := range []string{"slow started\n", "afterall\n", "fixture down\n"} {
+		if !strings.Contains(markers, want) {
+			t.Errorf("parallelpanic: %q missing from the markers:\n%s", strings.TrimSpace(want), markers)
+		}
+	}
+	if strings.Contains(markers, "aftereach TestParallelPanicTestSuite/TestSlow") || strings.Contains(markers, "slow finished") {
+		t.Errorf("parallelpanic: the sibling of a panicking method ran to its end or its AfterEach ran:\n%s", markers)
+	}
+}
+
 // An async method whose done-owning goroutine fails fatally fails at once:
 // nothing is left to call done, so nothing waits for the budget.
 func (s *CanaryTestSuite) TestAFatalGoroutineEndsAnAsyncWait(t *gotest.T) {

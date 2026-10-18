@@ -275,6 +275,11 @@ whatever `BeforeAll` had reached, not to assume it finished.
 The void `AfterEach` likewise runs even when `BeforeEach` panicked. The returning form
 does not: with nothing returned there is no context to release, and the per-test state it
 would clean up was never created.
+A panic in a method ends the suite as it would under `go test`: the method's own
+teardown and `AfterAll` run, and in a parallel suite the siblings still running are cut
+short with it:
+
+> when a parallel method panics while a sibling is still running → AfterAll and the fixture teardown run, the sibling is cut short and its AfterEach never runs, and the run fails
 
 **Returning BeforeEach (required for `Parallel: true`):**
 
