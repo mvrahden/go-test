@@ -526,6 +526,18 @@ func (s *CanaryTestSuite) TestAFatalGoroutineFailsTheMethodAtTheWait(t *gotest.T
 	}
 }
 
+// A fuzz execution whose BeforeEach fails or panics still runs its AfterEach,
+// as a test method does.
+func (s *CanaryTestSuite) TestAFuzzExecutionsAfterEachRunsWhenBeforeEachLeaves(t *gotest.T) {
+	dir := s.check(t, "fuzzhooks")
+	got, _ := os.ReadFile(filepath.Join(dir, "markers"))
+	for _, want := range []string{"after broken", "after panic"} {
+		if !strings.Contains(string(got), want+"\n") {
+			t.Errorf("fuzzhooks: AfterEach did not run after a BeforeEach that left (%s missing):\n%s", want, got)
+		}
+	}
+}
+
 // An async method whose done-owning goroutine fails fatally fails at once:
 // nothing is left to call done, so nothing waits for the budget.
 func (s *CanaryTestSuite) TestAFatalGoroutineEndsAnAsyncWait(t *gotest.T) {

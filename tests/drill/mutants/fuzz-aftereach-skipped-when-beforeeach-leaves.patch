@@ -1,0 +1,27 @@
+Expect: fuzzhooks: AfterEach did not run after a BeforeEach that left
+Clause: when a fuzz execution's BeforeEach fails → the execution fails and its AfterEach still runs
+Clause: when a fuzz execution's BeforeEach panics → the execution fails and its AfterEach still runs
+--- a/pkg/gotest/f.go
++++ b/pkg/gotest/f.go
+@@ -106,17 +106,15 @@
+ 
+ // each runs body under a fresh *T with beforeEach (if non-nil) immediately
+ // before it and afterEach (if non-nil) deferred to immediately after —
+-// interposed per execution, not once for the whole fuzz target. The defer
+-// comes first: a beforeEach that fails, skips or panics still gets its
+-// afterEach, as a test method's hooks pair.
++// interposed per execution, not once for the whole fuzz target.
+ func (f *F) each(t *testing.T, body func(*T)) {
+ 	tt := NewT(t)
+-	if f.afterEach != nil {
+-		defer f.afterEach(tt)
+-	}
+ 	if f.beforeEach != nil {
+ 		f.beforeEach(tt)
+ 	}
++	if f.afterEach != nil {
++		defer f.afterEach(tt)
++	}
+ 	body(tt)
+ }
+ 

@@ -52,6 +52,22 @@ func FuzzAdapterLifecycle(f *testing.F) {
 	}
 }
 
+// FuzzAdapterAfterEachRunsWhenBeforeEachLeaves: a beforeEach that leaves
+// through Goexit — Skipf here, FailNow in a failing suite — still gets its
+// afterEach, as a test method's hooks do.
+func FuzzAdapterAfterEachRunsWhenBeforeEachLeaves(f *testing.F) {
+	var after int
+	gf := gotest.NewF(f,
+		func(t *gotest.T) { t.Skipf("not this seed") },
+		func(*gotest.T) { after++ },
+		nil)
+	gf.Add("ab")
+	gf.Fuzz(func(t *gotest.T, s string) { f.Fatalf("the body ran after a skipping beforeEach") })
+	if after != 1 {
+		f.Fatalf("afterEach ran %d times after a beforeEach that skipped, want 1", after)
+	}
+}
+
 // FuzzAdapterNilHooks proves nil before/after hooks don't panic.
 func FuzzAdapterNilHooks(f *testing.F) {
 	gf := gotest.NewF(f, nil, nil, nil)

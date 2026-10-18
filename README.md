@@ -726,6 +726,11 @@ func (s *ParserTestSuite) FuzzParse(f *gotest.F) {
 A fuzz method takes `*gotest.F` and calls `f.Fuzz` with a callback whose first parameter is `*gotest.T`; any number of fuzzed arguments follow, exactly as with `(*testing.F).Fuzz`.
 `f.Add(...)` registers seeds, and the `F_`/`X_` prefixes focus and exclude fuzz methods like tests.
 The suite's `BeforeEach` and `AfterEach` run around every single execution, seeds included, not once per target, so each execution starts from fresh state.
+They pair as a test method's do:
+
+> when a fuzz execution's BeforeEach fails → the execution fails and its AfterEach still runs
+
+> when a fuzz execution's BeforeEach panics → the execution fails and its AfterEach still runs
 
 Because `f.Fuzz` takes `any`, the callback's shape is checked when gotest generates, and the message names the method:
 

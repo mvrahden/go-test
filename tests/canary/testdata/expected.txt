@@ -127,3 +127,9 @@ teardownaftersetup fail -
 teardownaftersetup fail TestDownTestSuite
 teardownaftersetup pass TestHeldTestSuite
 teardownaftersetup pass TestHeldTestSuite/TestFixtureIsUp
+fuzzhooks exit 1
+fuzzhooks fail -
+fuzzhooks fail FuzzBrokenBeforeTestSuite_FuzzOne
+fuzzhooks fail FuzzBrokenBeforeTestSuite_FuzzOne/seed#0
+fuzzhooks fail FuzzPanicBeforeTestSuite_FuzzOne
+fuzzhooks fail FuzzPanicBeforeTestSuite_FuzzOne/seed#0

@@ -116,3 +116,27 @@ func (s *GoexitTestSuite) TestGoexit(t *gotest.T) {
 	wait()
 	fmt.Println("MARK:after wait")
 }
+
+
+// FuzzBrokenBeforeTestSuite's BeforeEach fails; AfterEach must still run for
+// every fuzz execution.
+type FuzzBrokenBeforeTestSuite struct{}
+
+func (s *FuzzBrokenBeforeTestSuite) BeforeEach(t *gotest.T) { gotest.Fail(t, "before failed") }
+func (s *FuzzBrokenBeforeTestSuite) AfterEach(t *gotest.T)  { fmt.Println("MARK:fuzz after broken") }
+func (s *FuzzBrokenBeforeTestSuite) TestOne(t *gotest.T)    {}
+func (s *FuzzBrokenBeforeTestSuite) FuzzOne(f *gotest.F) {
+	f.Add("seed")
+	f.Fuzz(func(t *gotest.T, in string) {})
+}
+
+// FuzzPanicBeforeTestSuite's BeforeEach panics; AfterEach must still run.
+type FuzzPanicBeforeTestSuite struct{}
+
+func (s *FuzzPanicBeforeTestSuite) BeforeEach(t *gotest.T) { panic("before panicked") }
+func (s *FuzzPanicBeforeTestSuite) AfterEach(t *gotest.T)  { fmt.Println("MARK:fuzz after panic") }
+func (s *FuzzPanicBeforeTestSuite) TestOne(t *gotest.T)    {}
+func (s *FuzzPanicBeforeTestSuite) FuzzOne(f *gotest.F) {
+	f.Add("seed")
+	f.Fuzz(func(t *gotest.T, in string) {})
+}

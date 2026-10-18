@@ -100,6 +100,19 @@ func (s *MethodLoopTestSuite) TestGoexitInGoroutine(t *gotest.T) {
 	})
 }
 
+func (s *MethodLoopTestSuite) TestFuzzHooksMirrorTestHooks(t *gotest.T) {
+	for _, c := range []struct{ how, suite, mark string }{
+		{"fails", "FuzzBrokenBeforeTestSuite", "MARK:fuzz after broken"},
+		{"panics", "FuzzPanicBeforeTestSuite", "MARK:fuzz after panic"},
+	} {
+		t.It("runs a fuzz execution's AfterEach when its BeforeEach "+c.how, func(it *gotest.T) {
+			run := runGeneratedSuiteArgs(it, "TestLifecycle_MethodLoop", childTimeout, "-test.run=^Fuzz"+c.suite+"_FuzzOne$")
+			gotest.False(it, run.passed, run.output)
+			gotest.Contains(it, run.output, c.mark)
+		})
+	}
+}
+
 func (s *MethodLoopTestSuite) TestCallSites(t *gotest.T) {
 	run := runGeneratedSuiteArgs(t, "TestLifecycle_MethodLoop", childTimeout, "-test.run=^TestSiteTestSuite$")
 
