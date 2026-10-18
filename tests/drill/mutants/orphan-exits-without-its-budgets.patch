@@ -1,0 +1,15 @@
+Expect: killedcli: the fixture's AfterAll did not run to its end
+Clause: when the CLI is killed while a shared fixture is up → the fixture's AfterAll runs to its end, then its process exits
+Clause: when the CLI is killed while a shared fixture's BeforeAll waits on its context → the setup's context ends, the fixture's AfterAll runs, then its process exits
+Clause: when the CLI is killed and the shared fixture's AfterAll never returns → the fixture process exits with status 1 once the 31s teardown budget it reported has passed
+Clause: when the CLI is killed while a shared fixture's BeforeAll ignores its context → the fixture process exits with status 1 once its 1s setup budget and 31s teardown budget have passed
+--- a/pkg/gotestruntime/sharedlifetime.go
++++ b/pkg/gotestruntime/sharedlifetime.go
+@@ -101,7 +101,6 @@
+ func (l *SharedLifetime) ExitWhenOrphaned(gone <-chan struct{}) {
+ 	<-gone
+ 	bound, phase, detail := l.bound()
+-	l.sleep(bound)
+ 	l.mu.Lock()
+ 	what := l.leftBehind()
+ 	l.mu.Unlock()

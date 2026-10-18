@@ -1,0 +1,13 @@
+Expect: stopgrace: markers .*, want the fixture released without AfterAll and the body cut short
+Clause: when the run is stopped and a method body ignores its context → releases the fixture without running AfterAll
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -221,7 +221,7 @@
+ 	if settled {
+ 		return
+ 	}
+-	if !releaseWithin(deadline) {
++	if false && !releaseWithin(deadline) {
+ 		fmt.Fprintf(w.stderr, "gotest: fixture teardown did not finish within %s; what it holds may be left behind\n", releaseBound())
+ 	}
+ 	reraise(sig)

@@ -1,11 +1,11 @@
 Expect: failingshared: markers
-Clause: when a shared fixture's setup fails on its last attempt → fails the run and still runs the fixture's AfterAll, releasing what the attempt reached
+Clause: when a shared fixture's setup fails on its last attempt → runs AfterAll after each of its 2 attempts, releasing what each reached before the next
 --- a/internal/gotestgen/static/sharedfixture.go.tpl
 +++ b/internal/gotestgen/static/sharedfixture.go.tpl
-@@ -178,6 +178,9 @@
- 			return false
+@@ -233,6 +233,9 @@
  		}
  		ƒtorn[{{ $f.Index }}] = true
+ 		defer ƒlife.Released({{ $f.Index }})
 +		if ƒerrs[{{ $f.Index }}] != nil {
 +			return false
 +		}

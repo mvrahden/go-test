@@ -1,0 +1,13 @@
+Expect: stopgrace: markers .*, want AfterEach to its end, then AfterAll, then the fixture released
+Clause: when the run is stopped and a method's AfterEach outlasts the 5s grace its body gets → runs AfterEach to its end, then AfterAll, then releases the fixture: the grace bounds only the body
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -242,7 +242,7 @@
+ 	switch {
+ 	case !waitBodiesEnd(graceEnd):
+ 		fmt.Fprintf(w.stderr, "gotest: a method did not return within %s of its context ending; it is cut short, the fixtures are torn down and the process ends by the signal\n", grace)
+-	case waitSetups(deadline) && waitHoldsEnd(deadline):
++	case waitSetups(deadline) && waitHoldsEnd(graceEnd):
+ 		return deadline, true
+ 	default:
+ 		fmt.Fprintln(w.stderr, "gotest: the run did not stop within its budget; the fixtures are torn down and the process ends by the signal")

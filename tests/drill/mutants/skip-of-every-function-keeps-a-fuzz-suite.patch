@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fuzz .* / the suite does not run: its shared fixture never starts and the run passes \(
+Clause: when -skip names every Test and Fuzz function of a suite → the suite does not run: its shared fixture never starts and the run passes
+--- a/internal/gotestrunner/suiterun.go
++++ b/internal/gotestrunner/suiterun.go
+@@ -417,7 +417,7 @@
+ 			return false
+ 		}
+ 	}
+-	return true
++	return len(fuzzFuncs) == 0
+ }
+ 
+ // skipsFunc reports whether one alternative of the filter names the top-level

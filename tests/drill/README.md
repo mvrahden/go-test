@@ -117,18 +117,18 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `misspelled-command-runs` | a word one edit from a subcommand is not suggested | cli conformance: `sumary` runs instead of suggesting `summary` |
 | `config-loaded-before-version` | `.gotest.yml` is loaded before version and help | cli conformance: version exits 2 under a config that does not parse |
 | `scaffold-absolute-path-read-as-relative` | scaffold reads every file path relative to the working directory | cli conformance: an absolute path is not scaffolded beside the file |
-| `stop-keeps-running-methods` | a stopped run still starts the methods it has not reached | canary: the stopping fixture's later methods are not skipped with `run stopping` |
-| `stop-releases-before-afterall` | a stop tears the fixtures down at once instead of letting the suite finish | canary: the stopping fixture's AfterAll runs after the fixture is released |
+| `stop-keeps-running-methods` | a stopped run still starts the methods that have not started | canary: the stopping fixture's later methods are not skipped, and they run after the parent or the stream reader is gone |
+| `stop-releases-before-afterall` | a stop releases the fixtures before AfterAll runs | canary: the stopping fixture's markers are out of order |
 | `fixture-aftereach-without-before` | a fixture's AfterEach runs for a method whose BeforeEach failed | canary: the hook-failing fixture's AfterEach shows up after the failed BeforeEach |
 | `fixture-report-in-runtime` | a failing fixture hook is reported from the runtime's own file | canary: the hook-failing fixture's report does not name the hook's file |
 | `timeout-watches-nothing` | a suite's `Timeout` holds nothing to a budget | canary: the slow-hook fixture's method passes instead of failing its budget |
-| `async-wait-outlives-the-failed-goroutine` | an async method whose done-owning goroutine failed waits on for its budget | canary: the fatal-goroutine fixture's run takes the whole budget instead of ending at once |
+| `async-wait-outlives-the-failed-goroutine` | an async wait goes on after the owner of done failed and no goroutine of the method is left | canary: the asyncfatal run takes the full 20s Timeout |
 | `shared-fixture-runs-under-plain-go-test` | a suite binding a shared fixture runs under plain go test with empty state | canary: the staged fixture-chain suite's method runs instead of the suite naming the fixture it binds |
 | `beforeall-goroutine-waited-before-afterall` | the waits of goroutines BeforeAll started run before AfterAll | canary: the server suite deadlocks until go test's alarm instead of passing |
 | `go-wait-ignores-goexit` | a goroutine that left through FailNow counts as finished | canary: the method goes on after the wait on its failed goroutine |
-| `fuzz-aftereach-skipped-when-beforeeach-leaves` | a fuzz execution registers AfterEach only once BeforeEach returned | canary: the fuzz-only suites' AfterEach markers are missing |
+| `fuzz-aftereach-skipped-when-beforeeach-leaves` | a fuzz execution registers AfterEach only once BeforeEach returned | canary: the AfterEach markers of the fuzz-only suites, the `fuzzskiphook` one included, are missing |
 | `fixture-stdout-is-protocol` | a shared fixture's stdout is the protocol stream | canary: a setup that prints a fragment and a forged `_done` fails the run |
-| `setup-wait-ignores-the-fixtures-budget` | the runner's wait for shared fixtures ignores the budgets they report | canary: a 2s-budget fixture taking 15s is waited for in full |
+| `setup-wait-ignores-the-fixtures-budget` | the runner's wait for shared fixtures ignores the budgets they report | canary: a 2s-budget fixture taking 15s is waited for in full; fixtures conformance: a hanging 2s-budget fixture is given up only after 2m |
 | `skip-filter-ignored` | -skip plays no part in which suites a fixture starts for | canary: the fixture of a suite -skip names whole still starts |
 | `skip-of-a-method-drops-the-suite` | a -skip naming one method drops the whole suite from the plan | canary: the suite's other method runs without its fixture |
 | `fixture-failure-leaves-the-suite-unreported` | a suite whose shared fixture never came up gets no verdict | canary: the guarded suite's failed row is missing from the stream |
@@ -167,6 +167,42 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `interrupt-exit-keeps-the-verdict` | an interrupted run exits with the suites' worst code instead of 130 | lifecycle conformance and canary: the stopped run's exit code is not 130 |
 | `stop-leaves-the-method-context` | a stop no longer ends a running method's context | canary: the stopping fixture's markers lack `context ended` |
 | `each-break-ignored` | `Each` goes on to the next row after the loop body broke, so Go panics on the next yield | canary: the each-break fixture's method fails and never reaches the marker after the loop |
+| `contains-nil-key-never-found` | `Contains` reports a nil key absent from every map, interface- and pointer-keyed ones included | ring-0 predicates suite: the nil-key rows of `IncludesElement` are not found |
+| `contains-nil-key-read-as-zero-key` | an untyped nil needle is read as the zero key of any map, a string-keyed one included | ring-0 predicates suite: the string-keyed map is not refused |
+| `jsoneq-trailing-data-accepted` | `JSONEq` ignores what follows the first JSON value, a stray `}` or `]` included | ring-0 predicates suite: `NormalizeJSON` accepts trailing data |
+| `poll-cut-off-at-the-deadline` | a poll still running at waitFor counts as hung, with no tick of grace | canary: the `latepolls` fixture's late polls fail as still running |
+| `watch-help-names-the-old-setup-default` | `help watch` gives `--setup-timeout`'s default as a flat 2m | cli conformance: the help watch row lacks the declared-budgets default |
+| `hooks-calling-t-named-last-first` | the error for hooks calling `t.T()` lists them last first and is located at the last | cli conformance: the fuzz row's error names the hooks out of source order |
+| `skip-of-the-test-function-drops-the-seeds` | a `-skip` naming a suite's Test function drops the suite, fuzz seeds included | fuzz conformance: the seed replay has no pass verdict |
+| `skip-of-every-function-keeps-a-fuzz-suite` | a `-skip` naming every Test and Fuzz function never drops a suite with fuzz methods | fuzz conformance: the suite's shared fixture starts |
+| `skip-kept-from-the-binary` | `-skip` is applied when suites are planned and never reaches the test binary | fuzz conformance: the skipped test method runs |
+| `derived-t-drops-the-setup-waits` | a T from NewTWithDeadline loses the BeforeAll T's wait registry, so its gotest.Go waits run as cleanups before AfterAll | canary: the setupwaits fixture's derived-T suite does not pass |
+| `async-wait-ends-at-any-failure` | an async wait ends at the first recorded failure, whoever's goroutine failed | canary: asynchelper's AfterEach runs before the owner calls done, and stopgrace's async AfterEach runs before the stop |
+| `async-aftereach-unwatched` | after an async method's done, its AfterEach is no longer held to the Timeout | canary: asynchelper's overrunning AfterEach leaves the method passing |
+| `stop-file-ignored` | the watcher no longer counts the stop file by itself, only a signal | canary: with the signals ignored, the stopping fixture's later methods are not skipped, verdicts are missing and AfterAll never runs |
+| `plain-run-taken-for-the-runner` | a run without the runner's stop file falls back to a default one, so a plain run watches its stream | canary: the plainreader method's context ends when its reader goes |
+| `setup-waits-not-deferred` | the waits BeforeAll registered run last first without defer, so a failing one skips the rest | canary: setupwaits' fixtures are released before the first goroutine ended |
+| `parent-death-not-asked` | a suite process under the runner no longer asks for its parent's death signal | canary: after the wrapper is killed the stopping fixture holds on, AfterAll never runs and the suite process lives |
+| `reader-loss-read-as-hangup` | a stream nobody reads is taken for one only on a hang-up, which a pipe's writer never gets | canary: after the runner and converter are killed the stopping fixture holds on, AfterAll never runs and the suite process lives |
+| `stop-grace-past-5s` | a stopped body gets 15s, not 5s, before it is cut short | canary: the stopgrace run ends later and no message names 5s |
+| `cut-short-releases-nothing` | a stop that cuts a body short ends the process without releasing the fixtures | canary: stopgrace's fixture AfterAll never runs |
+| `stop-grace-bounds-the-hooks` | a stop waits for the hooks only as long as the body's grace | canary: stopgrace's fixture is released while the slow AfterEach still runs |
+| `crashed-suite-named-by-the-timeout` | a test whose suite process crashed on its own stays counted as cut short | lifecycle conformance: the --timeout names the crashed test besides the hung one |
+| `stop-signals-a-stranger` | the runner signals the pid a suite published even outside the suite's group | lifecycle conformance: the stranger gets SIGTERM and the suite's group no interrupt |
+| `unsignalled-suite-killed` | a suite the runner cannot signal by pid is killed instead of interrupted | lifecycle conformance: the foreign-pid run's AfterAll never runs |
+| `fixture-aftereach-reported-in-runtime` | a fixture AfterEach that returns an error is reported from the runtime's own file | canary: the AfterEach-failing fixture's report does not name the hook's file |
+| `release-between-attempts-best-effort` | the AfterAll between two setup attempts is run bare and its error dropped | canary: a package and a shared fixture whose release between attempts fails leave the run green and say nothing of it |
+| `last-attempt-failure-only-logged` | a setup whose last attempt fails is logged and then reported as a success | canary: a suite bound to a shared fixture that never comes up runs and the run goes green |
+| `setup-budget-drops-the-release` | the setup budget a fixture reports leaves out the AfterAll between attempts | canary: a 2s-Timeout fixture whose attempts and release take 1.6s each is given up |
+| `unattempted-shared-fixture-released` | the shared fixture process releases every started fixture, whether or not its BeforeAll ran | canary: a stopped run releases the fixture whose setup ended before its BeforeAll |
+| `protocol-handed-to-started-processes` | the shared fixture process leaves the protocol descriptor and its variable to the processes a fixture starts | canary: the started process sees the variable and its write to descriptor 3 fails the setup |
+| `orphan-exits-without-its-budgets` | a shared fixture process whose runner is gone exits at once instead of after its budgets | canary: the CLI killed while the fixture is up cuts the fixture's AfterAll short |
+| `tail-dependent-before-its-dependency` | the runner keeps discovery's name order for shared fixtures, so a tail fixture listed before its tail-only dependency waits on a dependency the setup process never starts | fixtures conformance: the tail fixture and its dependency never come up and the run hangs |
+| `late-start-waits-the-default` | a shared fixture started late, for the exclusive tail or a bench slot, is waited for the default 2m instead of its declared budget | fixtures conformance: the tail and bench-slot waits outlast the fixture's 2s budget |
+| `reported-teardown-budget-ignored` | the runner ignores the teardown budget on the setup process's `_done` line | fixtures conformance: the sibling's 8s AfterAll is force-killed at the 5s fallback |
+| `late-start-outlives-the-run` | the wait for a late shared fixture start ignores the run's cancellation | fixtures conformance: the run's --timeout no longer ends the wait, and the fixture process is left behind |
+| `unready-fixture-served-empty` | a shared fixture that never came up is taken for one that did, and its state file is written without its state | fixtures conformance: the suite, the exclusive-tail suite and the benchmark reading a hung fixture run against an empty one |
+| `given-up-setup-passes-the-run` | a shared fixture setup that is given up is not booked, and the suite reading it is recorded as passed | fixtures conformance: the run whose setup was given up beside a released sibling exits 0 |
 
 ## Adding a mutant
 

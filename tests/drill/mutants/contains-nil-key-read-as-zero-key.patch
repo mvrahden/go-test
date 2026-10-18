@@ -1,0 +1,18 @@
+Expect: pkg/gotest/internal/assert Predicates / IncludesElement
+Clause: when Contains is asked for a nil key in a map whose key type cannot be nil → fails naming the map's type
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -58,12 +58,7 @@
+ 		mapKey := reflect.ValueOf(element)
+ 		if !mapKey.IsValid() {
+ 			// An untyped nil is the zero key of a nilable key type.
+-			switch keyType.Kind() {
+-			case reflect.Interface, reflect.Ptr, reflect.Chan, reflect.UnsafePointer:
+-				mapKey = reflect.Zero(keyType)
+-			default:
+-				return false, fmt.Sprintf("a %T cannot hold a key of type %T", s, element)
+-			}
++			mapKey = reflect.Zero(keyType)
+ 		} else if !mapKey.Type().AssignableTo(keyType) {
+ 			return false, fmt.Sprintf("a %T cannot hold a key of type %T", s, element)
+ 		}

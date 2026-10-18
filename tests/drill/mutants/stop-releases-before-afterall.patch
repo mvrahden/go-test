@@ -2,11 +2,11 @@ Expect: stop: markers .* want \[context ended suite.AfterAll fixture.AfterAll\] 
 Clause: when the run is interrupted while a method holds → runs AfterAll before the fixture is released
 --- a/pkg/gotestruntime/stop.go
 +++ b/pkg/gotestruntime/stop.go
-@@ -157,6 +157,7 @@
+@@ -234,6 +234,7 @@
  	stoppedSig.Store(sig)
  	stopping.Store(true)
  	runstate.Stop()
 +	releaseHeld()
- 	deadline := time.Now().Add(releaseBound())
- 	grace := time.Now().Add(stopGrace)
- 	if grace.After(deadline) {
+ 	deadline = time.Now().Add(releaseBound())
+ 	graceEnd := time.Now().Add(grace)
+ 	if graceEnd.After(deadline) {

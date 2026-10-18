@@ -51,8 +51,22 @@ Each directory under `testdata/` is one package with one suite:
 | `parallelpanic` | a panic in a parallel method runs `AfterAll` and the fixture teardown while a sibling is mid-flight, and skips that sibling's `AfterEach` |
 | `helpers` | an assertion failing inside a helper names the helper's line and the caller's, under `-trimpath` in a module without a dot |
 | `asyncfatal` | an async method whose done-owning goroutine fails fatally fails at once, without waiting for the `Timeout` |
-| `stopping` | a run stopped while a method holds exits 130, skips the methods not started with the reason run stopping, ends the holding method's context and runs `AfterAll` before the fixture is released |
+| `stopping` | a run stopped while a method holds exits 130, skips the methods not started with the reason run stopping, ends the holding method's context and runs `AfterAll` before the fixture is released; the same holds when the stop file alone reaches the suite, whose stream then carries every verdict; a suite whose parent or whose stream reader is killed stops by itself the same way and leaves no process (Linux and macOS) |
 | `orphan` | a process a test started and never waited for does not outlive the run (Unix only) |
+| `latepolls` | a poll that starts before waitFor and returns within the next tick is judged by its result, for `Eventually` and `Consistently` |
+| `fuzzskiphook` | a fuzz execution whose `BeforeEach` skips is skipped, its body never runs and its `AfterEach` still runs |
+| `setupwaits` | a `gotest.Go` goroutine BeforeAll starts on a T from `NewTWithDeadline` is waited for after `AfterAll`; when the last of several fails or panics, the suite fails and every other one is waited for before the fixture is released |
+| `asynchelper` | an async method whose helper goroutine fails waits for the owner of done to call it, fail or outlast the `Timeout`; one that calls done in time fails when its `AfterEach` overruns the `Timeout` |
+| `stopgrace` | a stopped run cuts a body that ignores its context short after 5s, saying so, and releases the fixture without `AfterAll`; an `AfterEach` slower than the grace runs to its end before `AfterAll` and the release; a stop ends an async wait a helper's failure left open, then runs `AfterEach` and `AfterAll` |
+| `plainreader` | a test binary run outside the runner whose stdout reader goes keeps its method running (Linux and macOS) |
+| `fixtureafterfail` | a package fixture whose `AfterEach` returns an error is reported at the hook's file, not inside the runtime's |
+| `packagerelease` | a package fixture whose `AfterAll` fails between its two setup attempts fails the run and reports that error, though the second attempt comes up |
+| `sharedrelease` | the same for a shared fixture |
+| `slowretry` | a shared fixture whose attempts and the release between them each take 1.6s of its 2s `Timeout` is waited for: the budget counts the release |
+| `lastattempt` | a shared fixture that fails its last attempt fails the run, though the suite binding it would pass |
+| `cancelbeforesetup` | a run stopped while a shared fixture's dependency sets up runs no `AfterAll` for the fixture, whose `BeforeAll` never ran, and the dependency's `AfterAll` |
+| `detachedchild` | a process a shared fixture's setup starts sees no protocol variable, what it writes to descriptor 3 is not read, and the run does not wait for it (Unix only) |
+| `killedcli` | the CLI killed while a shared fixture is up: the fixture's `AfterAll`, which logs and takes 2s, runs to its end and its process exits (Unix only) |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line
 gives the exit code; `<fixture> <action> <test>` lines list every `pass`,

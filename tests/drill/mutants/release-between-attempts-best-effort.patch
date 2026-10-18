@@ -1,0 +1,30 @@
+Expect: (packagerelease|sharedrelease): exit code 0, want 1
+Expect: packagerelease: the run does not report the release's error
+Expect: sharedrelease: the run does not report the release's error
+Clause: when a package fixture's AfterAll fails between its attempts and the second attempt comes up → fails the run
+Clause: when a package fixture's AfterAll fails between its attempts and the second attempt comes up → reports that AfterAll's error
+Clause: when a shared fixture's AfterAll fails between its attempts and the second attempt comes up → fails the run
+Clause: when a shared fixture's AfterAll fails between its attempts and the second attempt comes up → reports that AfterAll's error
+--- a/pkg/gotestruntime/fixturesetup.go
++++ b/pkg/gotestruntime/fixturesetup.go
+@@ -152,18 +152,8 @@
+ 	if s.AfterAll == nil {
+ 		return nil
+ 	}
+-	var cause error
+-	afterAll := func(ctx context.Context) error {
+-		cause = s.AfterAll(ctx)
+-		return cause
+-	}
+-	if !RunFixtureTeardown(ctx, FixtureTeardown{Name: s.Name, Timeout: s.Timeout, AfterAll: afterAll}) {
+-		return nil
+-	}
+-	if cause != nil {
+-		return fmt.Errorf("%w: %w", ErrReleaseFailed, cause)
+-	}
+-	return ErrReleaseFailed
++	_ = s.AfterAll(ctx)
++	return nil
+ }
+ 
+ // attemptSetup runs one attempt, turning a panic into an error. debug.Stack()

@@ -12,6 +12,12 @@ import (
 // benchmark and fuzz hooks included.
 type GoTestSuite struct{}
 
+func (s *GoTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *GoTestSuite) TestTBBackedT(t *gotest.T) {
 	t.When("Go is called with the TB-backed T a benchmark hook receives", func(w *gotest.T) {
 		var waited atomic.Bool

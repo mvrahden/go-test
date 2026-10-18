@@ -8,5 +8,5 @@ Expect: passing: verdicts differ from the golden list
 -	ctx, cancel := context.WithTimeout(base.Context(), timeout)
 +	ctx, cancel := context.WithTimeout(base.testingTB().Context(), timeout)
  	base.testingTB().Cleanup(cancel)
- 	return &T{t: base.t, tb: base.tb, ctx: ctx}
+ 	return &T{t: base.t, tb: base.tb, ctx: ctx, goWait: base.goWait}
  }

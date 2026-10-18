@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / fails with exit 2 and one error on stderr that names every such hook in source order, located at the first / fuzz methods \(
+Clause: when several hooks call t.T() in a suite with fuzz or benchmark methods → fails with exit 2 and one error on stderr that names every such hook in source order, located at the first
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -921,7 +921,7 @@
+ 	if len(found) == 0 {
+ 		return nil
+ 	}
+-	sort.Slice(found, func(i, j int) bool { return found[i].pos < found[j].pos })
++	sort.Slice(found, func(i, j int) bool { return found[i].pos > found[j].pos })
+ 	names := make([]string, len(found))
+ 	for i, o := range found {
+ 		names[i] = o.name

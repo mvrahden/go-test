@@ -1,0 +1,15 @@
+Expect: latepolls: verdicts differ from the golden list
+Expect: latepolls: a poll started before waitFor was failed as still running
+Clause: when every Consistently poll passes but one runs past waitFor → passes
+Clause: when an Eventually poll started before waitFor passes after it → passes
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -97,7 +97,7 @@
+ 	if now := time.Now(); now.After(deadline) {
+ 		return now.Add(tick)
+ 	}
+-	return deadline.Add(tick)
++	return deadline
+ }
+ 
+ // pollUntil runs fn on a goroutine of its own, as Record does, and gives it

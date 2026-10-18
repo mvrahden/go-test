@@ -1,0 +1,34 @@
+Expect: ^FAIL .*conformance/fixtures .* / never runs the suite reading the fixture \(
+Expect: ^FAIL .*conformance/fixtures .*TheExclusiveTail.* / never runs the suite reading it \(
+Expect: ^FAIL .*conformance/fixtures .*ABenchSlot.* / never runs the benchmark reading it \(
+Clause: when a shared fixture declaring a 2s Timeout hangs in BeforeAll and no --setup-timeout is given → never runs the suite reading the fixture
+Clause: when a shared fixture started for a bench slot hangs past its declared 2s Timeout and no --setup-timeout is given → never runs the benchmark reading it
+Clause: when a shared fixture started for the exclusive tail hangs past its declared 2s Timeout and no --setup-timeout is given → never runs the suite reading it
+--- a/internal/gotestrunner/sharedfixture.go
++++ b/internal/gotestrunner/sharedfixture.go
+@@ -124,13 +124,13 @@
+ func (p *SharedFixtureProcess) Came(key string) bool {
+ 	ch := p.ready[key]
+ 	if ch == nil {
+-		return false
++		return true
+ 	}
+ 	select {
+ 	case <-ch:
+ 		return true
+ 	default:
+-		return false
++		return true
+ 	}
+ }
+ 
+@@ -368,8 +368,7 @@
+ 	for _, k := range keys {
+ 		v, ok := p.state[k]
+ 		if !ok {
+-			p.mu.Unlock()
+-			return "", fmt.Errorf("shared fixture %s has no state for %s: it was not started for this run", k, name)
++			continue
+ 		}
+ 		subset[k] = v
+ 	}

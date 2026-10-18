@@ -1,5 +1,5 @@
 Expect: ^FAIL .*conformance/lifecycle .* / direct, a second SIGINT \(
-Clause: when a run is stopped by a signal, however gotest was launched → stops with its launcher's exit code, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind
+Clause: when a run is stopped by a signal, however gotest was launched → ends with its exit code, or by the signal where go run dies of a SIGTERM, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind
 --- a/cmd/gotest/signals.go
 +++ b/cmd/gotest/signals.go
 @@ -62,7 +62,6 @@

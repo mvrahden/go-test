@@ -2,12 +2,12 @@ Expect: skipped: -skip of one method kept the suite's fixture from starting
 Clause: when -skip names one method of the suite binding a shared fixture → the fixture starts and the suite's other method passes against it
 --- a/internal/gotestrunner/suiterun.go
 +++ b/internal/gotestrunner/suiterun.go
-@@ -413,7 +413,7 @@
- 		return false
- 	}
+@@ -425,7 +425,7 @@
+ // skips subtests inside a function that still runs.
+ func skipsFunc(userSkipFilter, funcName string) bool {
  	for _, alt := range splitTopLevelOr(userSkipFilter) {
--		if !strings.Contains(alt, "/") && matchesSuiteFunc(alt, testFuncName) {
-+		if matchesSuiteFunc(alt, testFuncName) {
+-		if !strings.Contains(alt, "/") && matchesSuiteFunc(alt, funcName) {
++		if matchesSuiteFunc(alt, funcName) {
  			return true
  		}
  	}

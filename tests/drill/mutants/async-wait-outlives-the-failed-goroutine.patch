@@ -1,14 +1,13 @@
 Expect: asyncfatal: the run took .*; the wait outlived the failed goroutine
-Clause: when the goroutine that owns done fails a fatal assertion → fails the method at once, not at the end of its budget
+Clause: when the goroutine that owns done fails a fatal assertion and no other goroutine of the method is left → fails the method at once, not at the end of its budget
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -155,9 +155,6 @@
- 			reportAt(t.T(), callsite.Declared(at), name+": done() was not called before the test deadline")
- 			t.T().FailNow() //nolint:t-escape // runtime verdict, located at the declaration
- 		case <-failed.C:
--			if t.T().Failed() {
--				return
--			}
+@@ -174,7 +174,7 @@
+ 			if deadline == nil {
+ 				settled = t.Context().Done()
+ 			}
+-			if !mine.anyLeft() {
++			if false && !mine.anyLeft() {
+ 				return // the goroutine that owns done is gone: nothing will call it
+ 			}
  		}
- 	}
- }

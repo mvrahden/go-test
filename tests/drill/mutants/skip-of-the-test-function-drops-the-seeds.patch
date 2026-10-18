@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fuzz .* / its fuzz seeds still replay and pass \(
+Clause: when -skip names a suite's Test function and the suite has fuzz methods → its fuzz seeds still replay and pass
+--- a/internal/gotestrunner/suiterun.go
++++ b/internal/gotestrunner/suiterun.go
+@@ -412,7 +412,7 @@
+ 	if userSkipFilter == "" {
+ 		return false
+ 	}
+-	for _, f := range append([]string{testFuncName}, fuzzFuncs...) {
++	for _, f := range []string{testFuncName} {
+ 		if !skipsFunc(userSkipFilter, f) {
+ 			return false
+ 		}

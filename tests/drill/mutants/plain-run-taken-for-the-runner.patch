@@ -1,0 +1,18 @@
+Expect: plainreader: the method.s context ended when its reader went
+Clause: when a suite run by its test binary outside the gotest runner loses the reader of its stdout → the holding method runs on: its context does not end
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -19,7 +19,12 @@
+ // The sidecar files the runner shares with this process, read once and taken
+ // out of the environment: a process a test starts must not answer to them.
+ var (
+-	stopFile   = takeEnv(protocol.EnvStopFile)
++	stopFile   = func() string {
++		if v := takeEnv(protocol.EnvStopFile); v != "" {
++			return v
++		}
++		return os.TempDir() + "/gotest.stop"
++	}()
+ 	budgetFile = takeEnv(protocol.EnvTeardownBudgetFile)
+ )
+ 

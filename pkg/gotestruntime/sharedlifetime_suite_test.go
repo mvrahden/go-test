@@ -13,6 +13,12 @@ import (
 // behind.
 type SharedLifetimeTestSuite struct{}
 
+func (s *SharedLifetimeTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 // orphaned is what ExitWhenOrphaned did once the runner was gone.
 type orphaned struct {
 	slept  time.Duration

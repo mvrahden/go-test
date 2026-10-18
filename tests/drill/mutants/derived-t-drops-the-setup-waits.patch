@@ -1,0 +1,13 @@
+Expect: setupwaits: the suite whose BeforeAll started a goroutine on a derived T did not pass
+Clause: when BeforeAll starts a goroutine with gotest.Go on a T from NewTWithDeadline that only AfterAll stops → the suite passes: the wait comes after AfterAll
+--- a/pkg/gotest/t.go
++++ b/pkg/gotest/t.go
+@@ -75,7 +75,7 @@
+ 	}
+ 	ctx, cancel := context.WithTimeout(base.Context(), timeout)
+ 	base.testingTB().Cleanup(cancel)
+-	return &T{t: base.t, tb: base.tb, ctx: ctx, goWait: base.goWait}
++	return &T{t: base.t, tb: base.tb, ctx: ctx}
+ }
+ 
+ // NewTWithContext wraps t, overriding what [T.Context] reports. Use it when the

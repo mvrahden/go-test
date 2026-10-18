@@ -1,0 +1,12 @@
+Expect: asynchelper: TestHookOverrunTestSuite/TestCallsDoneAsync did not fail for its AfterEach.s overrun
+Clause: when an async method calls done in time and its AfterEach overruns the declared Timeout → fails the method for the overrun
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -136,7 +136,6 @@
+ 		}
+ 	})
+ 	budget := endBody(t.T())
+-	defer resumeHooks(t.T())
+ 	select {
+ 	case <-done:
+ 		return // called in time, even if the deadline has passed since

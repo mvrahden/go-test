@@ -1,4 +1,6 @@
 Expect: setupbudget: the run took .*; the wait outlived the fixture's declared 2s budget
+Expect: ^FAIL .*conformance/fixtures .* / fails the run within 60s, saying the setup timed out \(
+Clause: when a shared fixture declaring a 2s Timeout hangs in BeforeAll and no --setup-timeout is given → fails the run within 60s, saying the setup timed out
 Clause: when a shared fixture declaring ContainerFixtureConfig takes 130s to come up and no --setup-timeout is given → the run passes: the wait is the fixture's declared budget
 --- a/internal/gotestrunner/sharedfixture.go
 +++ b/internal/gotestrunner/sharedfixture.go

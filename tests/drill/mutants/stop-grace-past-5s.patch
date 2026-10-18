@@ -1,0 +1,13 @@
+Expect: stopgrace: the body was not cut short after 5s, saying so
+Clause: when the run is stopped and a method body ignores its context → cuts the body short after 5s, saying so
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -202,7 +202,7 @@
+ // stopGrace is how long a stop waits for a running method body to return once
+ // its context has ended. A method still running then ignores its context, and
+ // nothing but ending the process can stop it.
+-const stopGrace = 5 * time.Second
++const stopGrace = 15 * time.Second
+ 
+ // stop tells the run to stop and lets it finish on its own: the tests and the
+ // setups in flight see their contexts end, the methods not yet started are

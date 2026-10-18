@@ -1,6 +1,6 @@
 Expect: failing: no failure message says "poll still running after 100ms"
-Clause: when an Eventually poll runs past waitFor → fails at the deadline and says the poll is still running
-Clause: when a Consistently poll runs past waitFor → fails at the deadline and says the poll is still running
+Clause: when an Eventually poll runs past waitFor → fails no later than one tick past waitFor and says the poll is still running
+Clause: when a Consistently poll runs past waitFor → fails no later than one tick past waitFor and says the poll is still running
 --- a/pkg/gotest/assertions.go
 +++ b/pkg/gotest/assertions.go
 @@ -121,7 +121,11 @@

@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/lifecycle DeadlineNaming .* / names only the hung test as running when the timeout expired \(
+Clause: when one suite's process crashed on its own and another suite hangs until --timeout → names only the hung test as running when the timeout expired
+--- a/internal/gotestrunner/census.go
++++ b/internal/gotestrunner/census.go
+@@ -217,9 +217,6 @@
+ 		for _, k := range x.ranNow {
+ 			x.settle(k)
+ 		}
+-		for _, k := range x.cutNow {
+-			delete(x.cut, k)
+-		}
+ 	}
+ 	x.ranNow, x.cutNow = nil, nil
+ }
