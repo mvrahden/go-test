@@ -1275,6 +1275,10 @@ func (s *GotestastTestSuite) TestRegexp(t *gotest.T) {
 		{"suite method rejects unexported names", gotestast.IS_TEST_SUITE_METHOD, []string{"TEST", "Test", "_Test", "ABCTestABC"}, nil},
 		{"suite method rejects lowercase prefix", gotestast.IS_TEST_SUITE_METHOD, []string{"x_TestFoo", "f_TestFoo"}, nil},
 		{"suite method matches exported names", gotestast.IS_TEST_SUITE_METHOD, []string{"X_TestFoo", "F_TestFoo", "TestFoo"}, []string{"X_TestFoo", "F_TestFoo", "TestFoo"}},
+		{"test case follows go test's rule after the prefix", gotestast.IS_TEST_CASE, []string{"Testify", "X_Testing", "TestX", "Test_x", "Test1", "TestÄ", "Testä"}, []string{"TestX", "Test_x", "Test1", "TestÄ"}},
+		{"benchmark follows go test's rule after the prefix", gotestast.IS_BENCHMARK, []string{"Benchmarked", "BenchmarkX", "Benchmark_x"}, []string{"BenchmarkX", "Benchmark_x"}},
+		{"fuzz follows go test's rule after the prefix", gotestast.IS_FUZZ, []string{"Fuzzy", "FuzzX", "F_Fuzz_x"}, []string{"FuzzX", "F_Fuzz_x"}},
+		{"suite method follows go test's rule after the prefix", gotestast.IS_TEST_SUITE_METHOD, []string{"Testify", "Benchmarked", "Fuzzy", "TestX", "BenchmarkX", "FuzzX"}, []string{"TestX", "BenchmarkX", "FuzzX"}},
 		{"suite rejects unexported or embedded TestSuite", gotestast.IS_TEST_SUITE, []string{"TESTSUITE", "TestSuite", "_TestSuite", "ABCTestSuiteABC"}, nil},
 		{"suite rejects generated harness names", gotestast.IS_TEST_SUITE, []string{"ƒƒ_GOTEST_ABCTestSuite", "ƒƒ_GOTEST_F_ABCTestSuite"}, nil},
 		{"suite matches exported TestSuite types", gotestast.IS_TEST_SUITE, []string{"X_FooTestSuite", "F_FooTestSuite", "FooTestSuite", "Foo_TestSuite"}, []string{

@@ -81,14 +81,23 @@ func (f *FixtureSpec) ExportedFieldNames() []string {
 // Returns nil if the type name doesn't match either suffix, or an error if
 // the matching type is not a struct.
 func DetermineFixture(n ast.Node, pkg *packages.Package) (*FixtureSpec, error) {
+	return DetermineFixtureOf(n, pkg, nil)
+}
+
+// DetermineFixtureOf is DetermineFixture for the fixture types wanted
+// reports true for; any other is passed over. A nil wanted takes every one.
+func DetermineFixtureOf(n ast.Node, pkg *packages.Package, wanted func(name string) bool) (*FixtureSpec, error) {
 	decl, ok := n.(*ast.GenDecl)
 	if !ok || decl.Tok != token.TYPE {
 		return nil, nil
 	}
+	take := func(name string) bool {
+		return strings.HasSuffix(name, suffixFixture) && (wanted == nil || wanted(name))
+	}
 	// A fixture is one declaration of its own, as a suite is.
 	if len(decl.Specs) != 1 {
 		for _, spec := range decl.Specs {
-			if ts, ok := spec.(*ast.TypeSpec); ok && strings.HasSuffix(ts.Name.Name, suffixFixture) {
+			if ts, ok := spec.(*ast.TypeSpec); ok && take(ts.Name.Name) {
 				return nil, At(ts.Pos(), fmt.Errorf("fixture %s is declared inside a type block; give it its own type declaration", ts.Name.Name))
 			}
 		}
@@ -96,7 +105,7 @@ func DetermineFixture(n ast.Node, pkg *packages.Package) (*FixtureSpec, error) {
 	}
 
 	ts, ok := decl.Specs[0].(*ast.TypeSpec)
-	if !ok {
+	if !ok || !take(ts.Name.Name) {
 		return nil, nil
 	}
 
@@ -361,4 +370,34 @@ func validateContextErrorSig(sig *types.Signature, methodID string) error {
 		return fmt.Errorf("unsupported return type for %q: expected error, got %s", methodID, resType)
 	}
 	return nil
+}
+
+// ReachedFixtures names the package fixtures declared in pkg that a suite
+// binds, directly or through other fixtures. Any other type named *Fixture is
+// an ordinary type to gotest.
+func ReachedFixtures(pkg *packages.Package, suites TestSuiteSpecSet) map[string]bool {
+	reached := map[string]bool{}
+	var walk func(st *types.Struct)
+	walk = func(st *types.Struct) {
+		if st == nil {
+			return
+		}
+		for i := range st.NumFields() {
+			named := namedBehind(st.Field(i).Type())
+			if named == nil || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != pkg.PkgPath {
+				continue
+			}
+			name := named.Obj().Name()
+			if !strings.HasSuffix(name, suffixFixture) || strings.HasSuffix(name, suffixSharedFixture) || reached[name] {
+				continue
+			}
+			reached[name] = true
+			next, _ := named.Underlying().(*types.Struct)
+			walk(next)
+		}
+	}
+	for _, s := range suites {
+		walk(s.typ)
+	}
+	return reached
 }

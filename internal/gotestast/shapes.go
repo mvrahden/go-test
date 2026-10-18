@@ -10,7 +10,8 @@ import (
 // Suites and fixtures are one type declaration each, composed through named
 // fields. An embedded type would promote methods gotest reads from a type it
 // never discovered, and a suite inside a suite has no lifecycle of its own, so
-// both are rejected where they are written, with the alternative named.
+// both are rejected where they are written, with the alternative named. A
+// *TestSuite type that declares no case is a helper, not a suite.
 
 // interpretedMethod reports whether name is one gotest reads off a suite or
 // fixture: a case or a lifecycle hook.
@@ -21,7 +22,7 @@ func interpretedMethod(name string) bool {
 		"FixtureConfig", "SharedFixtureConfig":
 		return true
 	}
-	return strings.HasPrefix(name, "Test") || strings.HasPrefix(name, "Benchmark") || strings.HasPrefix(name, "Fuzz")
+	return IS_TEST_CASE.MatchString(name) || IS_BENCHMARK.MatchString(name) || IS_FUZZ.MatchString(name)
 }
 
 // ValidateSuiteShape rejects a suite that embeds a suite, a fixture or a type
@@ -44,14 +45,14 @@ func validateFields(kind, owner string, st *types.Struct, in *types.Package) (to
 		field := st.Field(i)
 		named := namedBehind(field.Type())
 		if !field.Anonymous() {
-			if named != nil && IS_TEST_SUITE.MatchString(named.Obj().Name()) {
+			if isSuiteType(named) {
 				return field.Pos(), fmt.Errorf("%s %s has a field of suite type %s; suites are never nested — share behavior through a generic contract suite", kind, owner, named.Obj().Name())
 			}
 			continue
 		}
 		if named != nil {
 			switch name := named.Obj().Name(); {
-			case IS_TEST_SUITE.MatchString(name):
+			case isSuiteType(named):
 				return field.Pos(), fmt.Errorf("%s %s embeds suite %s; suites are never embedded — share behavior through a generic contract suite", kind, owner, name)
 			case strings.HasSuffix(name, suffixFixture):
 				return field.Pos(), fmt.Errorf("%s %s embeds fixture %s; fixtures compose through a named pointer field", kind, owner, name)
@@ -62,6 +63,22 @@ func validateFields(kind, owner string, st *types.Struct, in *types.Package) (to
 		}
 	}
 	return token.NoPos, nil
+}
+
+// isSuiteType reports whether named is a suite: named *TestSuite and
+// declaring a case of its own. A case-less one is a helper type.
+func isSuiteType(named *types.Named) bool {
+	if named == nil || !IS_TEST_SUITE.MatchString(named.Obj().Name()) {
+		return false
+	}
+	origin := named.Origin()
+	for i := range origin.NumMethods() {
+		name := origin.Method(i).Name()
+		if IS_TEST_CASE.MatchString(name) || IS_BENCHMARK.MatchString(name) || IS_FUZZ.MatchString(name) {
+			return true
+		}
+	}
+	return false
 }
 
 // namedBehind returns the named type t names, through an alias and one

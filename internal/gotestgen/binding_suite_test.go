@@ -730,3 +730,54 @@ func (s *BindingTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
 		})
 	})
 }
+
+func (s *BindingTestSuite) TestFixtureFields(t *gotest.T) {
+	bind := func(it *gotest.T, name string) (*packages.Package, *gotestgen.Binding, error) {
+		pkg := gotestgen.ExportMustTestPkg(it.T(), name)
+		c := gotestgen.NewCollector()
+		result := c.CollectSuiteSpecs(pkg)
+		gotest.Empty(it, result.Errs)
+		spec, err := c.ApplyTestSuiteSpecs(result)
+		gotest.NoError(it, err)
+		resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
+		return pkg, resolved, err
+	}
+	rejected := func(it *gotest.T, name, msg string, line, col int) {
+		pkg, _, err := bind(it, name)
+		gotest.Error(it, err)
+		gotest.Equal(it, msg, err.Error())
+		pos := pkg.Fset.Position(gotestast.PosOf(err))
+		gotest.Equal(it, [2]int{line, col}, [2]int{pos.Line, pos.Column})
+	}
+
+	t.When("a suite holds a fixture by value", func(w *gotest.T) {
+		w.It("is rejected at the field", func(it *gotest.T) {
+			rejected(it, "TestResolve_FixtureField_Value",
+				"suite ValueTestSuite has fixture field Store of value type StoreFixture; a fixture is bound through a pointer field (*StoreFixture)", 14, 2)
+		})
+		w.It("is rejected at the field through an alias of the struct", func(it *gotest.T) {
+			rejected(it, "TestResolve_FixtureField_AliasOfStruct",
+				"suite AliasTestSuite has fixture field Store of value type StoreFixture; a fixture is bound through a pointer field (*StoreFixture)", 16, 2)
+		})
+	})
+
+	t.When("a suite names its fixture through an alias of the pointer", func(w *gotest.T) {
+		w.It("binds the fixture to that field", func(it *gotest.T) {
+			_, resolved, err := bind(it, "TestResolve_FixtureField_AliasOfPointer")
+			gotest.NoError(it, err)
+			gotest.Len(it, resolved.FixtureBound, 1)
+			gotest.Equal(it, "Store", resolved.FixtureBound[0].FixtureFieldName())
+		})
+	})
+
+	t.When("two fields name the same fixture type", func(w *gotest.T) {
+		w.It("is rejected at the second field of a suite", func(it *gotest.T) {
+			rejected(it, "TestResolve_FixtureField_Duplicate",
+				"suite DupTestSuite declares two fields of the same fixture type StoreFixture (A and B); keep one", 14, 5)
+		})
+		w.It("is rejected at the second field of a fixture", func(it *gotest.T) {
+			rejected(it, "TestResolve_FixtureField_DuplicateParent",
+				"fixture CacheFixture declares two fields of the same fixture type StoreFixture (A and B); keep one", 15, 2)
+		})
+	})
+}

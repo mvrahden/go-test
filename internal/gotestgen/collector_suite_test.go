@@ -590,6 +590,7 @@ func (s *CollectorTestSuite) TestTestMethod(t *gotest.T) {
 	}{
 		{Desc: "a test method takes a trailing done func()", source: "TestCollector_TestMethod_Done", method: "TestPingAsync"},
 		{Desc: "a test method takes a context and a trailing done func()", source: "TestCollector_TestMethod_DoneWithContext", method: "TestOneAsync"},
+		{Desc: "a test method takes a trailing done func() through an alias", source: "TestCollector_TestMethod_DoneByAlias", method: "TestPingAsync"},
 	}) {
 		pkg := gotestgen.ExportMustTestPkg(t.T(), row.source)
 		result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
@@ -748,13 +749,11 @@ func (s *CollectorTestSuite) TestValidation(t *gotest.T) {
 			gotest.ErrorContains(it, result.Errs[0].Err, "must be exported")
 		})
 
-		w.It("is rejected when embedded, like any suite", func(it *gotest.T) {
+		w.It("is a helper type the suite may embed", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_UnexportedCaselessBase")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Len(it, result.Errs, 1)
-			gotest.ErrorContains(it, result.Errs[0].Err, "embeds suite baseTestSuite")
-			gotest.ErrorContains(it, result.Errs[0].Err, "generic contract suite")
+			gotest.Empty(it, result.Errs)
 		})
 	})
 
@@ -990,6 +989,38 @@ func (s *CollectorTestSuite) TestGenericAliasAcrossPackages(t *gotest.T) {
 				names = append(names, tc.Identifier())
 			}
 			gotest.ElementsMatch(it, []string{"TestEmpty", "TestInsert"}, names)
+		})
+	})
+}
+
+func (s *CollectorTestSuite) TestMethodNames(t *gotest.T) {
+	t.When("a method name continues a case prefix with a lowercase letter", func(w *gotest.T) {
+		w.It("is an ordinary method, as under go test", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_TestMethod_LowercaseAfterPrefix")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+			gotest.Len(it, result.Suites, 1)
+			var cases []string
+			for _, tc := range result.Suites[0].TestCases() {
+				cases = append(cases, tc.Identifier())
+			}
+			gotest.Equal(it, []string{"TestRuns", "Test_under"}, cases)
+			gotest.Empty(it, result.Suites[0].Benchmarks())
+			gotest.Empty(it, result.Suites[0].Fuzzers())
+		})
+	})
+}
+
+func (s *CollectorTestSuite) TestUnreachedFixtures(t *gotest.T) {
+	t.When("a fixture-named type no suite binds is malformed", func(w *gotest.T) {
+		w.It("is neither validated nor collected", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_UnreachedFixture_NotValidated")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+			gotest.Len(it, result.Fixtures, 1)
+			gotest.Equal(it, "StoreFixture", result.Fixtures[0].Identifier())
 		})
 	})
 }

@@ -1,6 +1,10 @@
 package testpkg
 
-import "context"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type BaseFixture struct{}
 
@@ -11,3 +15,10 @@ type DBFixture struct {
 }
 
 func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
+
+// UsesTestSuite binds the fixture.
+type UsesTestSuite struct {
+	Fix *DBFixture
+}
+
+func (s *UsesTestSuite) TestRuns(t *gotest.T) {}

@@ -5,11 +5,13 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"strings"
 
 	goinspect "golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 type CollectorError struct {
@@ -60,9 +62,14 @@ func (c collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 		return CollectorResult{Errs: errs}
 	}
 
-	// find fixtures
+	// find fixtures: a package fixture only when a suite reaches it, a shared
+	// fixture always, since suites in other packages bind it
+	reached := gotestast.ReachedFixtures(pkg, suites)
+	wanted := func(name string) bool {
+		return reached[name] || strings.HasSuffix(name, protocol.SuffixSharedFixture)
+	}
 	insp.Preorder([]ast.Node{(*ast.GenDecl)(nil)}, func(n ast.Node) {
-		f, err := gotestast.DetermineFixture(n, pkg)
+		f, err := gotestast.DetermineFixtureOf(n, pkg, wanted)
 		if err != nil {
 			errs = append(errs, CollectorError{Err: err, Pos: gotestast.PosOf(gotestast.At(n.Pos(), err))})
 			return

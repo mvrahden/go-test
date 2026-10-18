@@ -321,10 +321,14 @@ func (r *binder) resolveFixturesForSuite(suite *gotestast.TestSuiteSpec) ([]suit
 	var fixtures []suiteFixtureMatch
 	var sharedRefs []SharedFixtureRef
 	sfIdx := 0
+	bound := map[*types.Named]string{}
 
 	for i := 0; i < typ.NumFields(); i++ {
 		field := typ.Field(i)
-		named := pointerNamed(field)
+		named, err := fixtureField("suite", suite.Identifier(), field, bound)
+		if err != nil {
+			return nil, err
+		}
 		if named == nil {
 			continue
 		}
@@ -461,10 +465,14 @@ func (r *binder) resolveFixture(named *types.Named) (_ *BoundFixture, err error)
 
 func (r *binder) resolvePackageFixtureFields(rf *BoundFixture, st *types.Struct) error {
 	sfIdx := 0
+	bound := map[*types.Named]string{}
 
 	for i := 0; i < st.NumFields(); i++ {
 		field := st.Field(i)
-		named := pointerNamed(field)
+		named, err := fixtureField("fixture", rf.Named.Obj().Name(), field, bound)
+		if err != nil {
+			return err
+		}
 		if named == nil {
 			continue
 		}
@@ -1055,16 +1063,46 @@ func fixtureQualifiedType(named *types.Named, pkgName string) string {
 	return name
 }
 
+// pointerNamed returns the named type a field points to, through aliases,
+// or nil.
 func pointerNamed(field *types.Var) *types.Named {
-	ptr, ok := field.Type().(*types.Pointer)
+	ptr, ok := types.Unalias(field.Type()).(*types.Pointer)
 	if !ok {
 		return nil
 	}
-	named, ok := ptr.Elem().(*types.Named)
+	named, ok := types.Unalias(ptr.Elem()).(*types.Named)
 	if !ok {
 		return nil
 	}
 	return named
+}
+
+// fixtureField returns the fixture a named field binds, or nil for a field of
+// any other type. A fixture held by value, or a package fixture a second field
+// names again, is rejected at the field; bound records the fields seen.
+func fixtureField(kind, owner string, field *types.Var, bound map[*types.Named]string) (*types.Named, error) {
+	if field.Anonymous() {
+		return pointerNamed(field), nil
+	}
+	if named, ok := types.Unalias(field.Type()).(*types.Named); ok {
+		if name := named.Obj().Name(); strings.HasSuffix(name, protocol.SuffixFixture) {
+			return nil, gotestast.At(field.Pos(), fmt.Errorf("%s %s has fixture field %s of value type %s; a fixture is bound through a pointer field (*%s)", kind, owner, field.Name(), name, name))
+		}
+		return nil, nil
+	}
+	named := pointerNamed(field)
+	if named == nil {
+		return nil, nil
+	}
+	name := named.Obj().Name()
+	if !strings.HasSuffix(name, protocol.SuffixFixture) || strings.HasSuffix(name, protocol.SuffixSharedFixture) {
+		return named, nil
+	}
+	if prev, dup := bound[named]; dup {
+		return nil, gotestast.At(field.Pos(), fmt.Errorf("%s %s declares two fields of the same fixture type %s (%s and %s); keep one", kind, owner, name, prev, field.Name()))
+	}
+	bound[named] = field.Name()
+	return named, nil
 }
 
 // collectTransitiveDepsRF lists the package fixtures a suite's bindings reach,
