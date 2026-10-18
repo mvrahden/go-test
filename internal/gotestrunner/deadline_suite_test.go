@@ -84,6 +84,35 @@ const deadlineBooked = `{"Action":"output","Package":"example.com/pkg","Test":"T
 {"Action":"fail","Package":"example.com/other"}
 `
 
+// cutShortStream is a method the converter failed when the binary ended under
+// it: a fail with an elapsed time, but no result line of its own.
+const cutShortStream = `{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd"}
+{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Output":"=== RUN   TestCartTestSuite/TestAdd\n"}
+{"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Elapsed":9.7}
+`
+
+func (s *DeadlineAttributionTestSuite) TestAMethodTheConverterFailedIsStillNamed(t *gotest.T) {
+	t.When("the stream fails a method without a result line of its own", func(w *gotest.T) {
+		w.It("names the method, not its suite, as what the deadline cut short", func(it *gotest.T) {
+			gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "TestCartTestSuite/TestAdd"}}, gotestrunner.ExportRunning(cutShortStream))
+		})
+		w.It("books the timeout as the method's output and fails its suite, without a second fail for the method", func(it *gotest.T) {
+			running, booked := gotestrunner.ExportBookDeadline(gotestrunner.RunStreamJSON, cutShortStream, context.DeadlineExceeded)
+			gotest.Len(it, running, 1)
+			gotest.Contains(it, booked, `"Test":"TestCartTestSuite/TestAdd","Output":"    gotest: --timeout expired while this test was running`)
+			gotest.NotContains(it, booked, `{"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd"}`)
+			gotest.Contains(it, booked, `{"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite"}`)
+		})
+		w.It("treats a method with its own result line as settled", func(it *gotest.T) {
+			settled := cutShortStream[:len(cutShortStream)-len(`{"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Elapsed":9.7}`+"\n")] +
+				`{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Output":"--- FAIL: TestCartTestSuite/TestAdd (9.70s)\n"}` + "\n" +
+				`{"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Elapsed":9.7}` + "\n"
+			gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "TestCartTestSuite"}}, gotestrunner.ExportRunning(settled))
+		})
+	})
+}
+
 func (s *DeadlineAttributionTestSuite) TestRunningUnitsAreBookedIntoTheStream(t *gotest.T) {
 	t.When("the deadline cut the run short", func(w *gotest.T) {
 		for sub, mode := range gotest.Each(w, []gotestrunner.RunMode{gotestrunner.RunCaptureJSON, gotestrunner.RunStreamJSON}) {

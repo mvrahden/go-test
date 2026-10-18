@@ -212,7 +212,7 @@ func (s *ShutdownTestSuite) TestGlobalTimeout(t *gotest.T) {
 		{Desc: "gotest ./...", args: []string{"--timeout=5s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite\n"},
 		{
 			Desc: "gotest -json", args: []string{"-json", "--timeout=5s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
-			shows: `{"Action":"fail","Package":"shutdownmod/slow","Test":"TestSlowTestSuite/TestSleeps"}`,
+			shows: `"Action":"fail","Package":"shutdownmod/slow","Test":"TestSlowTestSuite/TestSleeps"`,
 		},
 		{
 			Desc: "gotest spec", args: []string{"spec", "--no-color", "--timeout=5s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
