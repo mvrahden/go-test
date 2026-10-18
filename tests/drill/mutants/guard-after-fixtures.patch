@@ -1,9 +1,9 @@
 Expect: guardskip: verdicts differ from the golden list
 --- a/pkg/gotestruntime/harness.go
 +++ b/pkg/gotestruntime/harness.go
-@@ -49,14 +49,14 @@
- 		// from the guard to BeforeAll, fails the benchmark instead.
- 		defer ReleaseOnPanic(b)
+@@ -54,6 +54,9 @@
+ 	if runstate.StopContext().Err() != nil {
+ 		tb.Skip("run stopping")
  	}
 +	if s.Fixtures != nil {
 +		s.Fixtures(tb)
@@ -11,8 +11,10 @@ Expect: guardskip: verdicts differ from the golden list
  	if s.Guard != nil {
  		if reason := s.Guard(); reason != "" {
  			tb.Skipf("suite guard: %s", reason)
- 		}
- 	}
+@@ -64,9 +67,6 @@
+ 	// cleanup of tb.
+ 	startWatch()
+ 	tb.Cleanup(stopWatch)
 -	if s.Fixtures != nil {
 -		s.Fixtures(tb)
 -	}

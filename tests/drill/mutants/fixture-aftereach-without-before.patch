@@ -1,9 +1,9 @@
 Expect: fixturehookfail: hooks ran \[fixture.BeforeAll fixture.BeforeEach fixture.AfterEach
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -71,12 +71,6 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
- 			}
- 			tt := TestT(it, cfg.Timeout)
+@@ -90,18 +90,18 @@
+ 			// ended last, after every AfterEach registered below.
+ 			defer watchMethod(it, budget.Timeout)()
  			for _, f := range m.Fixtures {
 -				if f.Before != nil {
 -					if err := f.Before(it.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook, at the hook
@@ -14,16 +14,15 @@ Expect: fixturehookfail: hooks ran \[fixture.BeforeAll fixture.BeforeEach fixtur
  				if f.After != nil {
  					defer func() {
  						if err := f.After(context.Background()); err != nil { //nolint:fail-guard // the method has run; report and go on
-@@ -84,6 +78,12 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
+ 							reportAt(it, callsite.Declared(f.AfterAt), fmt.Sprintf("%s.AfterEach failed: %v", f.Name, err))
  						}
  					}()
- 				}
++				}
 +				if f.Before != nil {
 +					if err := f.Before(it.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook, at the hook
 +						reportAt(it, callsite.Declared(f.BeforeAt), fmt.Sprintf("%s.BeforeEach failed: %v", f.Name, err))
 +						it.FailNow()
 +					}
-+				}
+ 				}
  			}
  			c.Run(tt, func(method func()) { RunTest(tt, budget.Timeout, method) })
- 		})

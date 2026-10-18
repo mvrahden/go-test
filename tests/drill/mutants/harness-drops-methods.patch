@@ -2,15 +2,15 @@ Expect: lifecycle: exit code 2, want 0
 Expect: got +"beforeAll\\nTestSecond\\nafterAll\\n"
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -41,7 +41,10 @@
- // not started yet.
- func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
- 	var failed atomic.Bool
+@@ -63,7 +63,10 @@
+ 		}
+ 		return ""
+ 	}
 -	for _, c := range m.Cases {
 +	for i, c := range m.Cases {
 +		if i == 0 {
 +			continue
 +		}
- 		t.Run(c.Name, func(it *testing.T) {
- 			if m.Parallel {
- 				it.Parallel()
+ 		if first := tripped(); first != "" {
+ 			t.Run(c.Name, func(it *testing.T) { it.Skipf("FailFast: %s", first) })
+ 			continue
