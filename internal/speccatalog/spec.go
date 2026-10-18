@@ -28,6 +28,7 @@ type Spec struct {
 	Title        string
 	Purpose      string
 	Requirements []Requirement
+	Misplaced    []Stray
 }
 
 // Requirement is a "### Requirement:" block: its text and scenarios.
@@ -48,7 +49,8 @@ type Scenario struct {
 	Stray []Stray
 }
 
-// Stray is a scenario line that is no WHEN, THEN or AND bullet.
+// Stray is a scenario line that is no WHEN, THEN or AND bullet, or, in
+// Spec.Misplaced, a heading or bullet that binds to nothing and why.
 type Stray struct {
 	Line int
 	Text string
@@ -86,6 +88,9 @@ func ParseSpec(capability, file string, data []byte) Spec {
 			req, reqText = nil, nil
 		}
 	}
+	misplaced := func(line int, why, text string) {
+		spec.Misplaced = append(spec.Misplaced, Stray{Line: line, Text: why + ": " + text})
+	}
 	text := strings.ReplaceAll(string(data), "\r\n", "\n")
 	for i, raw := range strings.Split(text, "\n") {
 		line := strings.TrimSpace(raw)
@@ -102,6 +107,7 @@ func ParseSpec(capability, file string, data []byte) Spec {
 		switch {
 		case strings.HasPrefix(line, "#### "):
 			if req == nil {
+				misplaced(i+1, "scenario heading belongs to no requirement", line)
 				continue
 			}
 			closeScenario()
@@ -109,8 +115,14 @@ func ParseSpec(capability, file string, data []byte) Spec {
 			sc = &Scenario{Title: title, Line: i + 1}
 		case strings.HasPrefix(line, "### "):
 			closeRequirement()
-			if name, ok := strings.CutPrefix(line, "### Requirement:"); ok && section == "Requirements" {
+			name, ok := strings.CutPrefix(line, "### Requirement:")
+			switch {
+			case ok && section == "Requirements":
 				req = &Requirement{Name: strings.TrimSpace(name), Line: i + 1}
+			case ok:
+				misplaced(i+1, "requirement heading is outside ## Requirements", line)
+			case section == "Requirements":
+				misplaced(i+1, `heading under ## Requirements does not start with "Requirement:"`, line)
 			}
 		case strings.HasPrefix(line, "## "):
 			closeRequirement()
@@ -131,6 +143,10 @@ func ParseSpec(capability, file string, data []byte) Spec {
 			default:
 				sc.Stray = append(sc.Stray, Stray{Line: i + 1, Text: line})
 			}
+		case bullet.MatchString(line) && req == nil:
+			misplaced(i+1, "bullet belongs to no requirement", line)
+		case bullet.MatchString(line):
+			misplaced(i+1, "bullet belongs to no scenario", line)
 		case req != nil:
 			reqText = append(reqText, line)
 		case section == "Purpose":
@@ -144,13 +160,20 @@ func ParseSpec(capability, file string, data []byte) Spec {
 
 // Problems names every way the spec breaks the shape, in file order.
 func (s *Spec) Problems() []string {
-	var out []string
+	type problem struct {
+		line int
+		text string
+	}
+	var found []problem
 	add := func(line int, format string, args ...any) {
 		at := s.File
 		if line > 0 {
 			at = fmt.Sprintf("%s:%d", s.File, line)
 		}
-		out = append(out, at+": "+fmt.Sprintf(format, args...))
+		found = append(found, problem{line, at + ": " + fmt.Sprintf(format, args...)})
+	}
+	for _, m := range s.Misplaced {
+		add(m.Line, "%s", m.Text)
 	}
 	if n := utf8.RuneCountInString(s.Purpose); n < minPurpose {
 		add(0, "Purpose has %d characters, needs at least %d", n, minPurpose)
@@ -189,6 +212,11 @@ func (s *Spec) Problems() []string {
 				add(l.Line, "scenario %q: line is not a WHEN, THEN or AND bullet: %s", sc.Title, l.Text)
 			}
 		}
+	}
+	sort.SliceStable(found, func(i, j int) bool { return found[i].line < found[j].line })
+	var out []string
+	for _, p := range found {
+		out = append(out, p.text)
 	}
 	return out
 }

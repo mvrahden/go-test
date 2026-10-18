@@ -111,6 +111,40 @@ const shapeSpec = "# Broken Specification\n" +
 	"  wraps onto a second line\n" +
 	"- **THEN** is one bullet\n"
 
+const misplacedSpec = "# CLI Specification\n" +
+	"\n" +
+	"## Purpose\n" +
+	"#### Scenario: Before any requirement\n" +
+	"- **WHEN** nothing holds it\n" +
+	"How the gotest command line answers the invocations it is given.\n" +
+	"### Requirement: In the purpose\n" +
+	"It SHALL not count.\n" +
+	"\n" +
+	"## Requirements\n" +
+	"\n" +
+	"### Requirement: Version\n" +
+	"The version subcommand SHALL exit 0.\n" +
+	"\n" +
+	"#### Scenario: Asking for the version\n" +
+	"- **WHEN** the version subcommand runs\n" +
+	"- **THEN** exits 0\n" +
+	"\n" +
+	"\n" +
+	"### Requirement Typo without colon\n" +
+	"It SHALL be bound.\n" +
+	"\n" +
+	"#### Scenario: Under the typo\n" +
+	"- **WHEN** the typo holds a scenario\n" +
+	"- **THEN** binds to nothing\n" +
+	"\n" +
+	"### Requirement: Bullet first\n" +
+	"- **WHEN** a bullet comes before any scenario\n" +
+	"It SHALL have a scenario.\n" +
+	"\n" +
+	"#### Scenario: The scenario\n" +
+	"- **WHEN** the scenario follows\n" +
+	"- **THEN** it binds\n"
+
 func (s *SpecTestSuite) TestShape(t *gotest.T) {
 	broken := speccatalog.ParseSpec("broken", "specs/broken/spec.md", []byte(shapeSpec))
 	problems := broken.Problems()
@@ -125,6 +159,21 @@ func (s *SpecTestSuite) TestShape(t *gotest.T) {
 				`specs/broken/spec.md:20: requirement "No keyword": name is already used at line 8`,
 				`specs/broken/spec.md:25: scenario "Wrapped bullet": line is not a WHEN, THEN or AND bullet: wraps onto a second line`,
 			}, problems)
+		})
+	})
+	t.When("a requirement heading is malformed or outside the Requirements section", func(w *gotest.T) {
+		spec := speccatalog.ParseSpec("cli", "specs/cli/spec.md", []byte(misplacedSpec))
+		w.It("names each heading and bullet that belongs to no requirement", func(it *gotest.T) {
+			gotest.Equal(it, []string{
+				"specs/cli/spec.md:4: scenario heading belongs to no requirement: #### Scenario: Before any requirement",
+				"specs/cli/spec.md:5: bullet belongs to no requirement: - **WHEN** nothing holds it",
+				"specs/cli/spec.md:7: requirement heading is outside ## Requirements: ### Requirement: In the purpose",
+				`specs/cli/spec.md:20: heading under ## Requirements does not start with "Requirement:": ### Requirement Typo without colon`,
+				"specs/cli/spec.md:23: scenario heading belongs to no requirement: #### Scenario: Under the typo",
+				"specs/cli/spec.md:24: bullet belongs to no requirement: - **WHEN** the typo holds a scenario",
+				"specs/cli/spec.md:25: bullet belongs to no requirement: - **THEN** binds to nothing",
+				"specs/cli/spec.md:28: bullet belongs to no scenario: - **WHEN** a bullet comes before any scenario",
+			}, spec.Problems())
 		})
 	})
 	t.When("a requirement's text is longer than 500 characters", func(w *gotest.T) {
