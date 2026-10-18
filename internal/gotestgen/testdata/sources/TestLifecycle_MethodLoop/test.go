@@ -11,9 +11,15 @@ import (
 
 type HookFixture struct{}
 
-func (f *HookFixture) BeforeAll(ctx context.Context) error  { return nil }
-func (f *HookFixture) BeforeEach(ctx context.Context) error { fmt.Println("MARK:fixture before"); return nil }
-func (f *HookFixture) AfterEach(ctx context.Context) error  { fmt.Println("MARK:fixture after"); return nil }
+func (f *HookFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *HookFixture) BeforeEach(ctx context.Context) error {
+	fmt.Println("MARK:fixture before")
+	return nil
+}
+func (f *HookFixture) AfterEach(ctx context.Context) error {
+	fmt.Println("MARK:fixture after")
+	return nil
+}
 
 // OrderTestSuite records the per-method order: fixture hooks wrap the suite's.
 type OrderTestSuite struct{ Hook *HookFixture }
@@ -116,7 +122,6 @@ func (s *GoexitTestSuite) TestGoexit(t *gotest.T) {
 	wait()
 	fmt.Println("MARK:after wait")
 }
-
 
 // FuzzBrokenBeforeTestSuite's BeforeEach fails; AfterEach must still run for
 // every fuzz execution.

@@ -1,0 +1,16 @@
+Expect: noisysetup: exit code [12], want 0
+Clause: when a shared fixture's setup prints to stdout without a newline → its suite receives the state
+Clause: when a shared fixture's setup logs a JSON-shaped line → its suite receives the state
+Clause: when a shared fixture's setup logs a JSON-shaped line → the line is not an event of the run
+Clause: when a shared fixture carries 2 MiB of state → its suite receives the state
+Clause: when every such fixture came up → the run passes
+--- a/pkg/gotestruntime/sharedprotocol.go
++++ b/pkg/gotestruntime/sharedprotocol.go
+@@ -17,6 +17,6 @@
+ 	if fd, err := strconv.Atoi(os.Getenv(protocol.EnvSharedProtocolFD)); err == nil && fd > 2 {
+ 		stream = os.NewFile(uintptr(fd), "shared-protocol")
+ 	}
+-	os.Stdout = os.Stderr
++	os.Stdout = stream
+ 	return stream
+ }

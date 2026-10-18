@@ -191,3 +191,17 @@ const ExportFailureLogLimit = failureLogLimit
 
 // ExportBenchCollector marks c as a bench run's collector.
 func ExportBenchCollector(c *OutputCollector) { c.bench = true }
+
+// ExportReadProtocol feeds a protocol stream to a process that has no
+// subprocess behind it and returns it once the stream ended.
+func ExportReadProtocol(stream io.Reader) *SharedFixtureProcess {
+	p := &SharedFixtureProcess{
+		ready:    map[string]chan struct{}{},
+		state:    map[string]json.RawMessage{},
+		allDone:  make(chan struct{}),
+		cmdResp:  make(chan string, 1),
+		failures: newFailureLog(io.Discard),
+	}
+	p.readProtocol(stream)
+	return p
+}

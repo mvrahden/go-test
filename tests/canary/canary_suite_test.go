@@ -538,6 +538,12 @@ func (s *CanaryTestSuite) TestAFuzzExecutionsAfterEachRunsWhenBeforeEachLeaves(t
 	}
 }
 
+// What a shared fixture's setup prints to stdout is not the protocol: its
+// state still reaches the suite whole.
+func (s *CanaryTestSuite) TestASharedFixturesStdoutIsNotTheProtocol(t *gotest.T) {
+	s.check(t, "noisysetup")
+}
+
 // An async method whose done-owning goroutine fails fatally fails at once:
 // nothing is left to call done, so nothing waits for the budget.
 func (s *CanaryTestSuite) TestAFatalGoroutineEndsAnAsyncWait(t *gotest.T) {

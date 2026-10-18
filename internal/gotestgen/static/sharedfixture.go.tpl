@@ -57,6 +57,8 @@ func main() {
 */}}
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
+	// Before any fixture code: its stdout is not the runner's to read.
+	ƒproto := gotestruntime.ClaimSharedProtocol()
 {{ range $f := .Fixtures }}
 	{{ $f.VarName }} := &{{ $f.QualifiedType }}{}
 	ƒcfg_{{ $f.VarName }} := gotest.DefaultFixtureConfig()
@@ -146,10 +148,10 @@ func main() {
 				fmt.Fprintf(os.Stderr, "{{ $f.Identifier }}: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("{{ $f.StateKey }}"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("{{ $f.StateKey }}"), string(b))
 		}
 {{- else }}
-		fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":{}}\n", ƒquote("{{ $f.StateKey }}"))
+		fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":{}}\n", ƒquote("{{ $f.StateKey }}"))
 {{- end }}
 	}
 {{ end }}
@@ -225,9 +227,9 @@ func main() {
 	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
 
 	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	} else {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
 	ƒteardownFailed := false
@@ -239,7 +241,7 @@ func main() {
   down on its own; this process owns shutdown EXECUTION. StartKeys runs in
   DAG order and TeardownKeys in reverse-DAG order because the fixture lists
   below are generated in topological order. Each command is acknowledged on
-  stdout with a _cmd line carrying the joined per-fixture failures. A SIGTERM
+  the protocol stream with a _cmd line carrying the joined per-fixture failures. A SIGTERM
   that already arrived (canceling setup above) has ƒctx closed and falls
   straight through.
 */}}
@@ -288,7 +290,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
 		}
 	}
 

@@ -133,3 +133,7 @@ fuzzhooks fail FuzzBrokenBeforeTestSuite_FuzzOne
 fuzzhooks fail FuzzBrokenBeforeTestSuite_FuzzOne/seed#0
 fuzzhooks fail FuzzPanicBeforeTestSuite_FuzzOne
 fuzzhooks fail FuzzPanicBeforeTestSuite_FuzzOne/seed#0
+noisysetup exit 0
+noisysetup pass -
+noisysetup pass TestNoisyTestSuite
+noisysetup pass TestNoisyTestSuite/TestStateArrived

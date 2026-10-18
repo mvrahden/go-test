@@ -11,10 +11,14 @@ const (
 	// EnvStopFile names the file the runner creates before it interrupts a
 	// suite process. Its existence tells the process the interrupt is a stop
 	// request, not a signal the code under test sent itself.
-	EnvStopFile        = "GOTEST_STOP_FILE"
-	EnvUpdateSnapshots = "GOTEST_UPDATE_SNAPSHOTS"
-	EnvCI              = "GOTEST_CI"
-	EnvCacheDir        = "GOTEST_CACHE_DIR"
+	EnvStopFile = "GOTEST_STOP_FILE"
+	// EnvSharedProtocolFD names the descriptor the shared fixture process
+	// writes its protocol lines to; unset, they go to its stdout (Windows,
+	// where exec passes no extra files).
+	EnvSharedProtocolFD = "GOTEST_SHARED_PROTOCOL_FD"
+	EnvUpdateSnapshots  = "GOTEST_UPDATE_SNAPSHOTS"
+	EnvCI               = "GOTEST_CI"
+	EnvCacheDir         = "GOTEST_CACHE_DIR"
 
 	// EnvFuzzEchoInput makes the codec path report every execution's decoded
 	// input, not just failing ones. Set by triage/promote when re-running a
