@@ -530,10 +530,15 @@ func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, toke
 
 	var typ *types.Struct
 	var underlyingTypeName string
-	rawType := pkg.TypesInfo.TypeOf(ts.Type)
+	// an alias of an alias names the same suite
+	rawType := types.Unalias(pkg.TypesInfo.TypeOf(ts.Type))
 	if t, ok := rawType.(*types.Struct); ok {
 		typ = t
 	} else if named, ok := rawType.(*types.Named); ok {
+		// a defined type has an empty method set: it would run nothing
+		if !ts.Assign.IsValid() && IS_TEST_SUITE.MatchString(named.Obj().Name()) {
+			return nil, ts.Pos(), At(ts.Pos(), fmt.Errorf("suite %s is defined over suite %s and carries none of its methods; declare an alias (= %s) or a struct of its own", ts.Name.Name, named.Obj().Name(), named.Obj().Name()))
+		}
 		if t, ok := named.Underlying().(*types.Struct); ok {
 			typ = t
 			underlyingTypeName = named.Obj().Name()
@@ -615,7 +620,7 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 	}
 	{ // test for non-pointer suite receivers.
 		// usage of value type receivers for test-suites is discouraged.
-		namedRecvr, ok := recv.Type().(*types.Named)
+		namedRecvr, ok := types.Unalias(recv.Type()).(*types.Named)
 		if ok {
 			str := namedRecvr.Obj().Name()
 			if IS_TEST_SUITE.MatchString(str) { // no receiver
@@ -624,14 +629,15 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 			return -1, nil
 		}
 	}
-	recvPtr, ok := recv.Type().(*types.Pointer)
+	recvPtr, ok := types.Unalias(recv.Type()).(*types.Pointer)
 	if !ok {
 		return -1, nil
 	}
 
-	recvType := recvPtr.Elem().(*types.Named)
-	if recvType == nil {
-		return decl.Name.Pos(), nil
+	// a receiver may name the suite through an alias
+	recvType, ok := types.Unalias(recvPtr.Elem()).(*types.Named)
+	if !ok {
+		return -1, nil
 	}
 	recvName := recvType.Obj().Name()
 	if recvName != s.ts.Name.Name && (s.underlyingTypeName == "" || recvName != s.underlyingTypeName) {
@@ -674,6 +680,16 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 	isTestCase := IS_TEST_CASE.MatchString(m.Name())
 	isBenchmark := IS_BENCHMARK.MatchString(m.Name())
 	isFuzz := IS_FUZZ.MatchString(m.Name())
+	if (isTestCase || isBenchmark || isFuzz) && sig.Results().Len() > 0 {
+		kind := "Test"
+		switch {
+		case isBenchmark:
+			kind = protocol.PrefixBenchmark
+		case isFuzz:
+			kind = protocol.PrefixFuzz
+		}
+		return m.Pos(), fmt.Errorf("%s on %s returns a value; a %s method returns nothing", m.Name(), s.ts.Name.Name, kind)
+	}
 	switch {
 	case IS_BEFORE_ALL.MatchString(m.Name()):
 		s.th.BeforeAll = tm

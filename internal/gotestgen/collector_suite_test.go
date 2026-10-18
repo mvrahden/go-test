@@ -977,3 +977,19 @@ func (s *CollectorTestSuite) TestHookCallsTUnderBenchOrFuzz(t *gotest.T) {
 		gotest.Len(it, result.Suites, 1)
 	})
 }
+
+func (s *CollectorTestSuite) TestGenericAliasAcrossPackages(t *gotest.T) {
+	t.When("a suite aliases a generic suite declared in another package", func(w *gotest.T) {
+		w.It("collects the methods the other package declares", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_GenericAlias_CrossPackage")
+			result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+			gotest.Len(it, result.Suites, 1)
+			var names []string
+			for _, tc := range result.Suites[0].TestCases() {
+				names = append(names, tc.Identifier())
+			}
+			gotest.ElementsMatch(it, []string{"TestEmpty", "TestInsert"}, names)
+		})
+	})
+}

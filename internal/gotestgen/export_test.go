@@ -193,5 +193,5 @@ func ExportBindAsGenerated(t testing.TB, name string) (*Binding, error) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return bind(pkgs[0], newSourceLoader(nil), spec.EffectiveTestSuites, result.Fixtures)
+	return bind(pkgs[0], newSourceLoader(nil, pkgs[0].Fset), spec.EffectiveTestSuites, result.Fixtures)
 }

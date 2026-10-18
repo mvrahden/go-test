@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go/ast"
+	"go/token"
 	"maps"
 	"os/exec"
 	"path/filepath"
@@ -98,8 +99,8 @@ const packageLoadMode = packages.NeedModule | packages.NeedSyntax | packages.Nee
 
 func CollectFromLoaded(loadResults []*LoadResult) (gotestast.TestSuiteSpecSet, error) {
 	var allSuites gotestast.TestSuiteSpecSet
-	c := collector{}
 	for _, lr := range loadResults {
+		c := collector{sources: lr.sources}
 		ptestCollected := c.CollectSuiteSpecs(lr.Ptest)
 		if err := collectorError(lr.Ptest, ptestCollected.Errs); err != nil {
 			return nil, err
@@ -166,6 +167,7 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 	cfg := &packages.Config{
 		Mode:  packageLoadMode,
 		Tests: true,
+		Fset:  token.NewFileSet(),
 	}
 	if len(buildFlags) > 0 {
 		cfg.BuildFlags = buildFlags
@@ -288,7 +290,7 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 		}
 	}
 
-	sources := newSourceLoader(buildFlags)
+	sources := newSourceLoader(buildFlags, cfg.Fset)
 	testPkgMap := map[string]*LoadResult{}
 	var res []*LoadResult
 	for _, p := range loadedTestPkgs {
@@ -511,7 +513,7 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 	var allSharedFixtures []SharedFixtureInfo
 
 	results, err := slices.MapErr(loadResults, func(lr *LoadResult, _ int) (*GenerateResult, error) {
-		c := collector{}
+		c := collector{sources: lr.sources}
 		ptestCollected := c.CollectSuiteSpecs(lr.Ptest)
 		if err := collectorError(lr.Ptest, ptestCollected.Errs); err != nil {
 			return nil, err

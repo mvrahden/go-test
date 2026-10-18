@@ -423,6 +423,21 @@ func (s *BindingTestSuite) TestResolutionErrors(t *gotest.T) {
 		})
 	})
 
+	t.When("a package fixture from another package declares a hook with the wrong signature", func(w *gotest.T) {
+		w.It("names the hook and the signature it needs", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_CrossPkgFixture_MisSignedHook")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+
+			spec, err := c.ApplyTestSuiteSpecs(result)
+			gotest.NoError(it, err)
+
+			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.ErrorContains(it, err, `fixture "BadFixture": BeforeEach must have signature (ctx context.Context) error`)
+		})
+	})
+
 	t.When("fixture has multiple parent fixtures", func(w *gotest.T) {
 		w.It("resolves all parent fixtures", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_MultipleParentFixtures")

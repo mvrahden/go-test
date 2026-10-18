@@ -123,6 +123,11 @@ func DetermineFixture(n ast.Node, pkg *packages.Package) (*FixtureSpec, error) {
 		return nil, fmt.Errorf("%s: fixture must be a struct type", name)
 	}
 
+	// the setup program is built from the package's non-test files
+	if kind == SharedFixture && pkg.Fset != nil && strings.HasSuffix(pkg.Fset.Position(ts.Pos()).Filename, "_test.go") {
+		return nil, At(ts.Pos(), fmt.Errorf("shared fixture %s is declared in a _test.go file; the setup program cannot import it, move it to a non-test file", name))
+	}
+
 	spec := &FixtureSpec{
 		Kind: kind, pkg: pkg, n: n, ts: ts, typ: typ,
 	}

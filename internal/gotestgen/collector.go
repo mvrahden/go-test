@@ -1,8 +1,10 @@
 package gotestgen
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
+	"go/types"
 
 	goinspect "golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/packages"
@@ -23,14 +25,16 @@ type CollectorResult struct {
 	Warnings []gotestast.Warning
 }
 
-type collector struct{}
+type collector struct {
+	sources *sourceLoader // loads a dependency's source when its syntax is not at hand
+}
 
 // NewCollector returns a new collector instance for use outside this package.
 func NewCollector() collector {
 	return collector{}
 }
 
-func (collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
+func (c collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 	if pkg == nil {
 		return CollectorResult{}
 	}
@@ -88,10 +92,22 @@ func (collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 		return CollectorResult{Errs: errs}
 	}
 
-	// find suite methods
+	// find suite methods; an alias of a generic suite from another package
+	// runs the methods that package declares
 	for _, s := range suites {
-		insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
-			pos, err := gotestast.DetermineTestSuiteHarness(n, pkg, s)
+		declPkg, err := c.declaringPackage(pkg, s)
+		if err != nil {
+			errs = append(errs, CollectorError{Err: err, Pos: s.Pos()})
+			continue
+		}
+		walk := insp
+		if declPkg == nil {
+			declPkg = pkg
+		} else {
+			walk = goinspect.New(declPkg.Syntax)
+		}
+		walk.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
+			pos, err := gotestast.DetermineTestSuiteHarness(n, declPkg, s)
 			if err != nil {
 				errs = append(errs, CollectorError{Err: err, Pos: pos})
 			}
@@ -158,4 +174,32 @@ func (collector) ApplyTestSuiteSpecs(result CollectorResult) (spec SpecOutcome, 
 		SkippedTestCases:    skippedTestCases,
 		Fixtures:            result.Fixtures,
 	}, nil
+}
+
+// declaringPackage returns the package, with syntax, that declares the generic
+// suite s aliases, or nil when s is no alias or the generic is declared in pkg.
+func (c collector) declaringPackage(pkg *packages.Package, s *gotestast.TestSuiteSpec) (*packages.Package, error) {
+	if !s.IsGenericAlias() || pkg.Types == nil {
+		return nil, nil
+	}
+	obj := pkg.Types.Scope().Lookup(s.Identifier())
+	if obj == nil {
+		return nil, nil
+	}
+	named, ok := types.Unalias(obj.Type()).(*types.Named)
+	if !ok || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() == pkg.PkgPath {
+		return nil, nil
+	}
+	path := named.Obj().Pkg().Path()
+	if imp := pkg.Imports[path]; imp != nil && len(imp.Syntax) > 0 && imp.TypesInfo != nil {
+		return imp, nil
+	}
+	sources := c.sources
+	if sources == nil { // a collector made outside a package load
+		sources = newSourceLoader(nil, pkg.Fset)
+	}
+	if src := sources.load(path); src != nil {
+		return src, nil
+	}
+	return nil, fmt.Errorf("suite %s aliases %s.%s, whose source cannot be loaded", s.Identifier(), named.Obj().Pkg().Name(), named.Obj().Name())
 }

@@ -405,6 +405,16 @@ func (r *binder) resolveFixture(named *types.Named) (_ *BoundFixture, err error)
 		return nil, err
 	}
 
+	// The collector checks local hooks; one from another package is read by
+	// method set alone, so its signatures are checked here.
+	if kind == gotestast.PackageFixture && !isLocal {
+		for _, hook := range []string{"BeforeAll", "AfterAll", "BeforeEach", "AfterEach"} {
+			if fn := declaredMethod(named, hook); fn != nil && !hasCtxErrSignature(fn) {
+				return nil, gotestast.At(fn.Pos(), fmt.Errorf("package fixture %q: %s must have signature (ctx context.Context) error", identifier, hook))
+			}
+		}
+	}
+
 	rf := &BoundFixture{
 		Kind:         kind,
 		Identifier:   identifier,
