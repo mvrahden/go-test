@@ -8,11 +8,12 @@ fixture packages written to fail in specific ways, and compares what
 the binary reports with a checked-in expectation. It checks with plain Go
 only, so nothing under test takes part in the verdict.
 
-The checks are split by theme into four suites: `CanaryTestSuite` (verdicts,
+The checks are split by theme into five suites: `CanaryTestSuite` (verdicts,
 assertions, fixtures, goroutines, benchmarks), `CanaryBudgetsTestSuite`,
-`CanaryDagTestSuite` and `CanaryLifecycleTestSuite` (stops and process
-lifetime). Each runs its methods one after another; the runner runs the four
-side by side, each in its own process. None is `Parallel`, so the canary
+`CanaryDagTestSuite`, `CanaryDiscoveryTestSuite` (the shapes discovery reads
+or refuses) and `CanaryLifecycleTestSuite` (stops and process lifetime). Each
+runs its methods one after another; the runner runs the five side by side,
+each in its own process. None is `Parallel`, so the canary
 does not rest on the in-suite parallelism it guards.
 
 ## Fixtures
@@ -84,6 +85,7 @@ Each directory under `testdata/` is one package with one suite:
 | `dagrelease` | shared fixtures come up each after what they depend on and are released concurrently, a dependent before its dependency; with `DAGRELEASE_HANG=1` the release that never returns is force-killed after 30s plus the longest chain still resident, 35s, a fixture released at the barrier no longer counted |
 | `fuzzseedtype` | a fuzz seed of the wrong type fails its target at the `f.Add` call, not inside gotest's or the generated code |
 | `specmarkdown` | the Markdown spec, live and read from source, keeps each label in its own cell as text, shows an It with a slash as one It under its When, and marks what X_ excludes EXCLUDED when read from source |
+| `shapes/*` | one package per declaration shape: a suite declared alone or embedding a plain type runs; a suite or fixture in a type block, an embedded suite, fixture or type with a method gotest would read, and a suite-typed field each exit 2 at the line written |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line
 gives the exit code; `<fixture> <action> <test>` lines list every `pass`,

@@ -1,0 +1,16 @@
+Expect: shapes plain: exit code 2, want 0
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestDiscoveryShapesAreRejectedWhereWritten
+Clause: when a suite or fixture is declared → a suite declared alone, binding a fixture through a named pointer field, runs
+Clause: when a suite or fixture is declared → a suite embedding a plain type runs
+--- a/internal/gotestast/shapes.go
++++ b/internal/gotestast/shapes.go
+@@ -42,6 +42,9 @@
+ 	}
+ 	for i := range st.NumFields() {
+ 		field := st.Field(i)
++		if field != nil {
++			return field.Pos(), fmt.Errorf("%s %s has a field", kind, owner)
++		}
+ 		named := namedBehind(field.Type())
+ 		if !field.Anonymous() {
+ 			if named != nil && IS_TEST_SUITE.MatchString(named.Obj().Name()) {

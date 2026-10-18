@@ -6046,6 +6046,171 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "a suite declared alone, binding a fixture through a named pointer field, runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_suite_declared_alone,_binding_a_fixture_through_a_named_pointer_field,_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a suite embedding a plain type runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_suite_embedding_a_plain_type_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a suite in a type block is rejected at its declaration and told to stand alone",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_suite_in_a_type_block_is_rejected_at_its_declaration_and_told_to_stand_alone",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a fixture in a type block is rejected at its declaration and told to stand alone",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_fixture_in_a_type_block_is_rejected_at_its_declaration_and_told_to_stand_alone",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a suite embedding a suite is rejected at the field and pointed to contract suites",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_suite_embedding_a_suite_is_rejected_at_the_field_and_pointed_to_contract_suites",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a suite embedding a fixture is rejected at the field and pointed to a named pointer field",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_suite_embedding_a_fixture_is_rejected_at_the_field_and_pointed_to_a_named_pointer_field",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a suite embedding a type with a method gotest would read is rejected at the field",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_suite_embedding_a_type_with_a_method_gotest_would_read_is_rejected_at_the_field",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a suite holding a suite in a field is rejected at the field: suites are never nested",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_suite_holding_a_suite_in_a_field_is_rejected_at_the_field:_suites_are_never_nested",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a fixture embedding a fixture is rejected at the field and pointed to a named pointer field",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_fixture_embedding_a_fixture_is_rejected_at_the_field_and_pointed_to_a_named_pointer_field",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite or fixture is declared",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_or_fixture_is_declared",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "DeclarationsAndFields",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestDeclarationsAndFields",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "DiscoveryShapes",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestDiscoveryShapesTestSuite",
+          "output": [],
+          "status": "none"
+        }
+      ],
+      "output": [],
+      "path": "github.com/mvrahden/go-test/tests/conformance/discovery",
+      "status": "none"
+    },
+    {
+      "duration": 0,
+      "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "runs no AfterAll for the fixture, and the dependency's AfterAll",
                       "duration": 0,
                       "excluded": false,
@@ -12932,13 +13097,13 @@
     }
   ],
   "stats": {
-    "behaviors": 423,
+    "behaviors": 432,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 69,
+    "suites": 70,
     "tests": 0
   }
 }

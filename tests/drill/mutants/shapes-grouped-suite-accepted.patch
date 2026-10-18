@@ -1,0 +1,13 @@
+Expect: shapes grouped: exit code 0, want 2
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestDiscoveryShapesAreRejectedWhereWritten
+Clause: when a suite or fixture is declared → a suite in a type block is rejected at its declaration and told to stand alone
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -502,7 +502,6 @@
+ 	if len(decl.Specs) != 1 {
+ 		for _, spec := range decl.Specs {
+ 			if ts, ok := spec.(*ast.TypeSpec); ok && IS_TEST_SUITE.MatchString(ts.Name.Name) {
+-				return nil, ts.Pos(), At(ts.Pos(), fmt.Errorf("suite %s is declared inside a type block; give it its own type declaration", ts.Name.Name))
+ 			}
+ 		}
+ 		return nil, -1, nil // not a test suite

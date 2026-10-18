@@ -1,0 +1,13 @@
+Expect: shapes groupedfixture: exit code 0, want 2
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestDiscoveryShapesAreRejectedWhereWritten
+Clause: when a suite or fixture is declared → a fixture in a type block is rejected at its declaration and told to stand alone
+--- a/internal/gotestast/fixture.go
++++ b/internal/gotestast/fixture.go
+@@ -89,7 +89,6 @@
+ 	if len(decl.Specs) != 1 {
+ 		for _, spec := range decl.Specs {
+ 			if ts, ok := spec.(*ast.TypeSpec); ok && strings.HasSuffix(ts.Name.Name, suffixFixture) {
+-				return nil, At(ts.Pos(), fmt.Errorf("fixture %s is declared inside a type block; give it its own type declaration", ts.Name.Name))
+ 			}
+ 		}
+ 		return nil, nil

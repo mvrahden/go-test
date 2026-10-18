@@ -567,6 +567,11 @@ shards of one run do not add up to every mutant exactly once.
 | `spec-slash-nests-under-a-finished-it` | the tree of a run nests an It under an earlier, finished It its label begins with | spec conformance: the run's spec shows "reads a/b" under "reads a" |
 | `spec-slash-nests-under-a-declared-it` | the spec read from source nests an It under an earlier It its label begins with | spec conformance: the static spec shows "reads a/b" under "reads a" |
 | `spec-group-failure-unshown` | the Markdown spec shows a group that failed on its own with an empty status | spec conformance: the failed When's row carries no FAIL and no message |
+| `shapes-grouped-suite-accepted` | a suite declared inside a type block is not refused | canary: the `shapes/grouped` package exits 0 instead of 2 |
+| `shapes-grouped-fixture-accepted` | a fixture declared inside a type block is not refused | canary: the `shapes/groupedfixture` package exits 0 instead of 2 |
+| `shapes-embedding-accepted` | an embedded field of a suite or fixture is never checked | canary: the embedding `shapes` packages are not refused with exit 2 |
+| `shapes-nested-suite-accepted` | a suite-typed field of a suite is not refused | canary: the `shapes/nested` package exits 0 instead of 2 |
+| `shapes-every-field-rejected` | every field of a suite or fixture is refused | canary: the `shapes/plain` package exits 2 instead of 0 |
 
 ## Adding a mutant
 
