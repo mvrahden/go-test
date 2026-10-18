@@ -19,12 +19,16 @@ func (s *EachRowsTestSuite) TestRowsAreIsolated(t *gotest.T) {
 	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/eachrows/")
 	gotest.NoError(t, err)
 	t.When("one row of an Each table fails", func(w *gotest.T) {
-		w.It("fails that row and the method, and the rows after it still run", func(it *gotest.T) {
+		w.It("fails that row and no other", func(it *gotest.T) {
 			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 			gotest.Equal(it, "pass", run.Verdict("TestEachRowsTestSuite/TestAFailingRow/first"))
 			gotest.Equal(it, "fail", run.Verdict("TestEachRowsTestSuite/TestAFailingRow/second"))
 			gotest.Equal(it, "pass", run.Verdict("TestEachRowsTestSuite/TestAFailingRow/third"))
+		})
+		w.It("fails the method", func(it *gotest.T) {
 			gotest.Equal(it, "fail", run.Verdict("TestEachRowsTestSuite/TestAFailingRow"))
+		})
+		w.It("still runs the rows after it", func(it *gotest.T) {
 			gotest.Contains(it, run.Markers, "row third")
 		})
 		w.It("runs the rest of the method after the table", func(it *gotest.T) {

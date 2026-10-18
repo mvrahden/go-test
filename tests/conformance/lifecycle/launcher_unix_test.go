@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -17,7 +18,9 @@ import (
 )
 
 // LauncherSignalTestSuite: however gotest was started and whichever signal
-// stops it, the fixtures are released and no process outlives the run.
+// stops it, the fixtures are released, a second signal abandons what is left
+// of the teardown, and no process outlives the run. Every row tears down
+// slowly, so a teardown nobody waited for shows as one.
 // Sequential: it stages a module once and every row drives a live process.
 type LauncherSignalTestSuite struct {
 	cli    string
@@ -77,17 +80,19 @@ func (s *LauncherSignalTestSuite) command(launcher string) *exec.Cmd {
 }
 
 // deliver sends the row's signal to the run's process group, as a terminal
-// or a job supervisor would.
+// (SIGINT) or a job supervisor (SIGTERM) would; "second" is Ctrl-C twice,
+// the second landing while the teardown runs.
 func deliver(t *gotest.T, cmd *exec.Cmd, tree *proctree.Tree, signal string) {
+	group := -cmd.Process.Pid
 	switch signal {
 	case "SIGTERM":
-		gotest.NoError(t, syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM))
+		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGTERM))
 	case "second":
-		gotest.NoError(t, tree.Interrupt())
+		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGINT))
 		time.Sleep(500 * time.Millisecond)
-		gotest.NoError(t, tree.Interrupt())
+		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGINT))
 	default:
-		gotest.NoError(t, tree.Interrupt())
+		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGINT))
 	}
 }
 
@@ -95,20 +100,19 @@ func deliver(t *gotest.T, cmd *exec.Cmd, tree *proctree.Tree, signal string) {
 func pidOf(markers []string) int {
 	for _, m := range markers {
 		if n, ok := strings.CutPrefix(m, "pid="); ok {
-			pid := 0
-			for _, c := range n {
-				pid = pid*10 + int(c-'0')
-			}
+			pid, _ := strconv.Atoi(n)
 			return pid
 		}
 	}
 	return 0
 }
 
-// gone reports whether pid is no process within a short grace period.
+// gone reports whether the suite process's group, which it leads, is no
+// process within a short grace period. A group id is not reused while a
+// member is left, so the probe reaches no stranger.
 func gone(pid int) bool {
-	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
-		if err := syscall.Kill(pid, 0); errors.Is(err, syscall.ESRCH) {
+	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+		if err := syscall.Kill(-pid, 0); errors.Is(err, syscall.ESRCH) {
 			return true
 		}
 	}
@@ -116,38 +120,46 @@ func gone(pid int) bool {
 }
 
 func (s *LauncherSignalTestSuite) TestEveryLauncherStopsCleanly(t *gotest.T) {
+	// Each cell names the launcher and the signal; the row pins that the
+	// fixture's teardown finished (or, on a second signal, was abandoned with
+	// the CLI saying so), the exit code, and that the suite process is gone
+	// once the launcher has returned. Exit codes: the direct binary and go
+	// tool end with 130; go run swallows SIGINT, waits, and reports "exit
+	// status 130" with exit 1, while a group SIGTERM ends go run itself by
+	// the signal.
 	t.When("a run is stopped by a signal, however gotest was launched", func(w *gotest.T) {
 		for it, row := range gotest.Each(w, []launcherRow{
-			{Desc: "direct, SIGINT: the fixture is released, exit 130, no process outlives the run", launcher: "direct", signal: "SIGINT"},
-			{Desc: "direct, SIGTERM: the fixture is released, exit 130, no process outlives the run", launcher: "direct", signal: "SIGTERM"},
-			{Desc: "direct, a second SIGINT: the teardown is abandoned, exit 130, no process outlives the run", launcher: "direct", signal: "second"},
-			{Desc: "go run, SIGINT: the fixture is released, go run reports exit status 130, no process outlives the run", launcher: "go run", signal: "SIGINT"},
-			{Desc: "go run, SIGTERM: the fixture is released, go run reports exit status 130, no process outlives the run", launcher: "go run", signal: "SIGTERM"},
-			{Desc: "go run, a second SIGINT: the teardown is abandoned, go run reports exit status 130, no process outlives the run", launcher: "go run", signal: "second"},
-			{Desc: "go tool, SIGINT: the fixture is released, exit 130, no process outlives the run", launcher: "go tool", signal: "SIGINT"},
-			{Desc: "go tool, SIGTERM: the fixture is released, exit 130, no process outlives the run", launcher: "go tool", signal: "SIGTERM"},
-			{Desc: "go tool, a second SIGINT: the teardown is abandoned, exit 130, no process outlives the run", launcher: "go tool", signal: "second"},
+			{Desc: "direct, SIGINT", launcher: "direct", signal: "SIGINT"},
+			{Desc: "direct, SIGTERM", launcher: "direct", signal: "SIGTERM"},
+			{Desc: "direct, a second SIGINT", launcher: "direct", signal: "second"},
+			{Desc: "go run, SIGINT", launcher: "go run", signal: "SIGINT"},
+			{Desc: "go run, SIGTERM", launcher: "go run", signal: "SIGTERM"},
+			{Desc: "go run, a second SIGINT", launcher: "go run", signal: "second"},
+			{Desc: "go tool, SIGINT", launcher: "go tool", signal: "SIGINT"},
+			{Desc: "go tool, SIGTERM", launcher: "go tool", signal: "SIGTERM"},
+			{Desc: "go tool, a second SIGINT", launcher: "go tool", signal: "second"},
 		}) {
 			markerDir := it.TempDir()
 			cmd := s.command(row.launcher)
-			extra := []string{}
-			if row.signal == "second" {
-				extra = append(extra, "STOPPING_SLOW=1")
-			}
-			cmd.Env = childEnv(markerDir, extra...)
+			cmd.Env = testkit.ChildEnv(markerDir, "STOPPING_SLOW=1")
 			tree := holding(it, cmd, markerDir)
 			deliver(it, cmd, tree, row.signal)
 			run := finished(cmd, tree, markerDir)
 
-			if row.launcher == "go run" {
+			switch {
+			case row.launcher == "go run" && row.signal == "SIGTERM":
+				gotest.Equal(it, -1, run.Exit, "go run ends by the signal; stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			case row.launcher == "go run":
 				gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 				gotest.Contains(it, run.Stderr, "exit status 130")
-			} else {
+			default:
 				gotest.Equal(it, 130, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 			}
 			if row.signal == "second" {
+				gotest.Contains(it, run.Stderr, "interrupted again")
 				gotest.NotContains(it, run.Markers, "teardown done")
 			} else {
+				gotest.NotContains(it, run.Stderr, "interrupted again")
 				gotest.Contains(it, run.Markers, "teardown done")
 			}
 			pid := pidOf(run.Markers)

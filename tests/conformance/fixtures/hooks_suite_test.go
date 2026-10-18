@@ -48,25 +48,30 @@ func runHooks(t *gotest.T, at, mode string) testkit.Run {
 }
 
 func (s *FixtureHooksTestSuite) TestAFixtureHookGoesWrong(t *gotest.T) {
+	// Each cell names the hook and how it goes wrong; the row pins which hooks
+	// run after it (ran), the verdicts and the exit code. A fixture BeforeAll
+	// that fails still gets its AfterAll; a fixture BeforeEach that fails
+	// registered no AfterEach; a panic ends the suite after the method's own
+	// teardown and AfterAll, as under go test.
 	t.When("a package fixture hook returns an error, panics or overruns the Timeout", func(w *gotest.T) {
 		for it, row := range gotest.Each(w, []hookRow{
-			{Desc: "fixture BeforeAll returns an error: its AfterAll still runs, the suite never opens and fails", at: "fixture.BeforeAll", mode: "error",
+			{Desc: "fixture BeforeAll returns an error", at: "fixture.BeforeAll", mode: "error",
 				ran: []string{"fixture.BeforeAll", "fixture.AfterAll"}, verdicts: map[string]string{suite: "fail"}, exit: 1},
-			{Desc: "fixture BeforeAll panics: its AfterAll still runs, the suite never opens and fails", at: "fixture.BeforeAll", mode: "panic",
+			{Desc: "fixture BeforeAll panics", at: "fixture.BeforeAll", mode: "panic",
 				ran: []string{"fixture.BeforeAll", "fixture.AfterAll"}, verdicts: map[string]string{suite: "fail"}, exit: 1},
-			{Desc: "fixture BeforeEach returns an error: no AfterEach runs for that method, the next method runs", at: "fixture.BeforeEach", mode: "error",
+			{Desc: "fixture BeforeEach returns an error", at: "fixture.BeforeEach", mode: "error",
 				ran: methodNeverOpened, verdicts: map[string]string{body: "fail", next: "pass"}, exit: 1},
-			{Desc: "fixture BeforeEach panics: no AfterEach runs for that method, and the suite ends as under go test", at: "fixture.BeforeEach", mode: "panic",
+			{Desc: "fixture BeforeEach panics", at: "fixture.BeforeEach", mode: "panic",
 				ran: suiteEndsAtBeforeEach, verdicts: map[string]string{body: "fail", next: "", suite: "fail"}, exit: 1},
-			{Desc: "fixture BeforeEach overruns the Timeout: the method fails", at: "fixture.BeforeEach", mode: "overrun",
-				verdicts: map[string]string{body: "fail", next: "pass"}, exit: 1},
-			{Desc: "fixture AfterEach returns an error: the method fails, the next method runs", at: "fixture.AfterEach", mode: "error",
+			{Desc: "fixture BeforeEach overruns the Timeout", at: "fixture.BeforeEach", mode: "overrun",
+				verdicts: map[string]string{body: "fail"}, exit: 1},
+			{Desc: "fixture AfterEach returns an error", at: "fixture.AfterEach", mode: "error",
 				ran: cleanRun, verdicts: map[string]string{body: "fail", next: "pass"}, exit: 1},
-			{Desc: "fixture AfterEach panics: the method fails, and the suite ends as under go test", at: "fixture.AfterEach", mode: "panic",
+			{Desc: "fixture AfterEach panics", at: "fixture.AfterEach", mode: "panic",
 				ran: suiteEndsAfterBody, verdicts: map[string]string{body: "fail", next: "", suite: "fail"}, exit: 1},
-			{Desc: "fixture AfterAll returns an error: the run fails", at: "fixture.AfterAll", mode: "error",
+			{Desc: "fixture AfterAll returns an error", at: "fixture.AfterAll", mode: "error",
 				ran: cleanRun, exit: 1},
-			{Desc: "fixture AfterAll panics: the run fails", at: "fixture.AfterAll", mode: "panic",
+			{Desc: "fixture AfterAll panics", at: "fixture.AfterAll", mode: "panic",
 				ran: cleanRun, exit: 1},
 		}) {
 			run := runHooks(it, row.at, row.mode)
@@ -82,9 +87,9 @@ func (s *FixtureHooksTestSuite) TestAFixtureHookGoesWrong(t *gotest.T) {
 
 	t.When("a fixture BeforeEach returns an error", func(w *gotest.T) {
 		run := runHooks(w, "fixture.BeforeEach", "error")
-		w.It("is reported at the hook's declaration, never inside the runtime", func(it *gotest.T) {
+		w.It("is reported in the hook's own file, not the runtime's", func(it *gotest.T) {
 			gotest.Contains(it, run.Stdout, "fixture.go:")
-			gotest.NotContains(it, run.Stdout, "gotestruntime")
+			gotest.NotContains(it, run.Stdout, "methods.go:")
 		})
 	})
 }

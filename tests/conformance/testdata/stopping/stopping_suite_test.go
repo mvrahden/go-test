@@ -14,7 +14,7 @@ func (s *StopTestSuite) AfterAll(t *gotest.T)  { mark("suite.AfterAll") }
 func (s *StopTestSuite) TestHolds(t *gotest.T) {
 	mark("running")
 	<-t.Context().Done()
-	mark("released")
+	mark("context ended")
 }
 
 func (s *StopTestSuite) TestSecond(t *gotest.T) { mark("second") }

@@ -44,8 +44,9 @@ func RunPackage(ctx context.Context, markerDir, pkg string, args ...string) (Run
 	return runCLI(ctx, ".", markerDir, nil, append([]string{"-json", pkg}, args...)...)
 }
 
-// RunPackageWithEnv is RunPackage with extra KEY=VALUE pairs for the child,
-// so a fixture package under test can be told how to behave.
+// RunPackageWithEnv is RunPackage with extra KEY=VALUE pairs appended to the
+// child's environment after the scrub, so a fixture package under test can be
+// told how to behave.
 func RunPackageWithEnv(ctx context.Context, markerDir string, env []string, pkg string, args ...string) (Run, error) {
 	return runCLI(ctx, ".", markerDir, env, append([]string{"-json", pkg}, args...)...)
 }
@@ -153,6 +154,12 @@ func childEnv(markerDir string) []string {
 		env = append(env, kv)
 	}
 	return append(env, "GOTEST_CANARY_DIR="+markerDir)
+}
+
+// ChildEnv is the environment runCLI gives the CLI, for a check that starts
+// the CLI itself: the scrub, the marker directory, then extra pairs.
+func ChildEnv(markerDir string, extra ...string) []string {
+	return append(childEnv(markerDir), extra...)
 }
 
 // ParseEvents reads the go test -json events among stdout's lines.

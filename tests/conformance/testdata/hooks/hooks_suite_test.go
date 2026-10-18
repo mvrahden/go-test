@@ -15,7 +15,7 @@ type GridTestSuite struct {
 
 func (s *GridTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
-	cfg.Timeout = 300 * time.Millisecond
+	cfg.Timeout = time.Second
 	return cfg
 }
 
@@ -30,7 +30,7 @@ func suiteHook(t *gotest.T, hook string) {
 	case "panic":
 		panic(hook + " panicked")
 	case "overrun":
-		time.Sleep(1500 * time.Millisecond)
+		time.Sleep(4 * time.Second)
 	default:
 		gotest.Fail(t, "%s failed", hook)
 	}

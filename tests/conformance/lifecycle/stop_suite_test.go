@@ -1,7 +1,6 @@
 package lifecycle_test
 
 import (
-	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -35,21 +34,6 @@ func (s *StopTestSuite) BeforeAll(t *gotest.T) {
 // AfterAll has nothing to release: the binary lives in a temp dir.
 func (s *StopTestSuite) AfterAll(t *gotest.T) {}
 
-// childEnv is this process's environment with the marker directory set and
-// the CI switches scrubbed, plus extra pairs.
-func childEnv(markerDir string, extra ...string) []string {
-	var env []string
-	for _, kv := range os.Environ() {
-		name, _, _ := strings.Cut(kv, "=")
-		switch name {
-		case "GOTEST_CANARY_DIR", "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY", "GOTEST_CI", "CI", "GOTEST_UPDATE_SNAPSHOTS":
-			continue
-		}
-		env = append(env, kv)
-	}
-	return append(append(env, "GOTEST_CANARY_DIR="+markerDir), extra...)
-}
-
 // holding starts a run of the stopping package through cmd and returns once
 // its first method holds. A run that never holds is killed before the test
 // fails, so nothing outlives it.
@@ -73,6 +57,18 @@ func holding(t *gotest.T, cmd *exec.Cmd, markerDir string) *proctree.Tree {
 	}
 }
 
+// signalled holds a signal's error; a run the signal did not reach is killed
+// before the test fails, so nothing outlives it.
+func signalled(t *gotest.T, cmd *exec.Cmd, tree *proctree.Tree, err error) {
+	if err == nil {
+		return
+	}
+	_ = tree.Kill()
+	_ = cmd.Wait()
+	tree.Release()
+	gotest.Fail(t, "signal: %v", err) //nolint:fail-guard // the tree is killed before the test fails
+}
+
 // finished waits for cmd and reads back what the run left: its exit code,
 // events and markers.
 func finished(cmd *exec.Cmd, tree *proctree.Tree, markerDir string) testkit.Run {
@@ -92,9 +88,9 @@ func finished(cmd *exec.Cmd, tree *proctree.Tree, markerDir string) testkit.Run 
 func (s *StopTestSuite) TestAnInterruptStopsTheRun(t *gotest.T) {
 	markerDir := t.TempDir()
 	cmd := exec.Command(s.cli, "-json", "../testdata/stopping/") //nolint:gosec // G204: binary built by this suite
-	cmd.Env = childEnv(markerDir)
+	cmd.Env = testkit.ChildEnv(markerDir)
 	tree := holding(t, cmd, markerDir)
-	gotest.NoError(t, testkit.Interrupt(cmd, tree))
+	signalled(t, cmd, tree, testkit.Interrupt(cmd, tree))
 	run := finished(cmd, tree, markerDir)
 
 	t.When("the run is interrupted while a method holds", func(w *gotest.T) {
@@ -102,7 +98,7 @@ func (s *StopTestSuite) TestAnInterruptStopsTheRun(t *gotest.T) {
 			gotest.Equal(it, 130, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 		})
 		w.It("ends the holding method's context", func(it *gotest.T) {
-			gotest.Contains(it, run.Markers, "released")
+			gotest.Contains(it, run.Markers, "context ended")
 		})
 		w.It("skips the methods that have not started with the reason run stopping", func(it *gotest.T) {
 			for _, method := range []string{"TestSecond", "TestThird"} {
@@ -120,7 +116,7 @@ func (s *StopTestSuite) TestAnInterruptStopsTheRun(t *gotest.T) {
 			gotest.NotContains(it, run.Markers, "third")
 		})
 		w.It("runs AfterAll before the fixture is released", func(it *gotest.T) {
-			gotest.True(it, run.MarkerOrder("released", "suite.AfterAll", "fixture.AfterAll"), "markers: %v", run.Markers)
+			gotest.True(it, run.MarkerOrder("context ended", "suite.AfterAll", "fixture.AfterAll"), "markers: %v", run.Markers)
 		})
 	})
 }

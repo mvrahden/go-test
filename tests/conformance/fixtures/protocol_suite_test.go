@@ -19,17 +19,29 @@ func (s *SharedFixtureProtocolTestSuite) TestSetupOutputAndState(t *gotest.T) {
 	// A protocol that stalls would otherwise wait out the default setup budget.
 	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/protocol/", "--setup-timeout=20s")
 	gotest.NoError(t, err)
-	t.When("a shared fixture's setup prints to stdout, logs a JSON-shaped line and carries 2 MiB of state", func(w *gotest.T) {
-		w.It("the suites receive the state and the run passes", func(it *gotest.T) {
-			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
-			gotest.Equal(it, "pass", run.Verdict("TestStdoutTestSuite/TestStateArrived"))
-			gotest.Equal(it, "pass", run.Verdict("TestBigTestSuite/TestStateArrived"))
-			gotest.Equal(it, "pass", run.Verdict("TestLogTestSuite/TestStateArrived"))
+	t.When("a shared fixture's setup prints to stdout without a newline", func(w *gotest.T) {
+		w.It("its suite receives the state", func(it *gotest.T) {
+			gotest.Equal(it, "pass", run.Verdict("TestStdoutTestSuite/TestStateArrived"), "stderr: %s", run.Stderr)
 		})
-		w.It("the JSON-shaped log line is not an event of the run", func(it *gotest.T) {
+	})
+	t.When("a shared fixture's setup logs a JSON-shaped line", func(w *gotest.T) {
+		w.It("its suite receives the state", func(it *gotest.T) {
+			gotest.Equal(it, "pass", run.Verdict("TestLogTestSuite/TestStateArrived"), "stderr: %s", run.Stderr)
+		})
+		w.It("the line is not an event of the run", func(it *gotest.T) {
 			for _, ev := range run.Events {
 				gotest.NotEqual(it, "TestBogus", ev.Test)
 			}
+		})
+	})
+	t.When("a shared fixture carries 2 MiB of state", func(w *gotest.T) {
+		w.It("its suite receives the state", func(it *gotest.T) {
+			gotest.Equal(it, "pass", run.Verdict("TestBigTestSuite/TestStateArrived"), "stderr: %s", run.Stderr)
+		})
+	})
+	t.When("every such fixture came up", func(w *gotest.T) {
+		w.It("the run passes", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 		})
 	})
 }

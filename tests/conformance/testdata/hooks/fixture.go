@@ -1,7 +1,8 @@
 // Package hooks is a fixture-bound suite that records every hook it runs and
 // misbehaves at one of them, named by HOOKS_AT, in the way HOOKS_MODE says:
 // error (a fixture hook returns one), assert (a suite hook fails an
-// assertion), panic, or overrun (the hook sleeps past the suite's Timeout).
+// assertion), panic, or overrun (the hook sleeps four seconds, past the
+// suite's one-second Timeout).
 package hooks
 
 import (
@@ -55,7 +56,7 @@ func fixtureHook(hook string) error {
 	case "panic":
 		panic(hook + " panicked")
 	case "overrun":
-		time.Sleep(1500 * time.Millisecond)
+		time.Sleep(4 * time.Second)
 		return nil
 	default:
 		return errors.New(hook + " failed")

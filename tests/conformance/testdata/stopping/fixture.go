@@ -36,11 +36,12 @@ func (f *HoldFixture) BeforeAll(ctx context.Context) error {
 }
 
 // AfterAll marks its start and its end; STOPPING_SLOW=1 holds it open in
-// between, so a second signal can land while it runs.
+// between, long enough for a second signal to land while it runs and for a
+// teardown nobody waited for to show as one.
 func (f *HoldFixture) AfterAll(ctx context.Context) error {
 	mark("fixture.AfterAll")
 	if os.Getenv("STOPPING_SLOW") == "1" {
-		time.Sleep(3 * time.Second)
+		time.Sleep(6 * time.Second)
 	}
 	mark("teardown done")
 	return nil
