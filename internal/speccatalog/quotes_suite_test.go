@@ -52,6 +52,26 @@ func (s *QuotesTestSuite) TestClausesAreWhenArrowThen(t *gotest.T) {
 	})
 }
 
+const connectiveSpec = "# Run Specification\n\n## Purpose\nHow a run reads its conditions.\n\n## Requirements\n\n" +
+	"### Requirement: Conditions\nA clause SHALL read as a sentence.\n\n" +
+	"#### Scenario: Capitalized\n- **WHEN** When the run stops\n- **THEN** tears down\n\n" +
+	"#### Scenario: Connective\n- **WHEN** with an empty cache\n- **THEN** builds\n\n" +
+	"#### Scenario: Capitalized connective\n- **WHEN** After a rebuild\n- **THEN** reuses nothing\n\n" +
+	"#### Scenario: Word that starts like one\n- **WHEN** whence it came is unknown\n- **THEN** guesses\n"
+
+func (s *QuotesTestSuite) TestClausesFollowTheConnectiveRule(t *gotest.T) {
+	t.When("a WHEN opens with \"When\" or with another connective", func(w *gotest.T) {
+		w.It("reads \"when …\" for any case of \"when\", keeps any other connective, and puts \"when \" before the rest", func(it *gotest.T) {
+			gotest.Equal(it, []string{
+				"when the run stops → tears down",
+				"with an empty cache → builds",
+				"After a rebuild → reuses nothing",
+				"when whence it came is unknown → guesses",
+			}, speccatalog.Clauses([]speccatalog.Spec{speccatalog.ParseSpec("run", "specs/run/spec.md", []byte(connectiveSpec))}))
+		})
+	})
+}
+
 func (s *QuotesTestSuite) TestQuotesAreExtractedWithTheirLine(t *gotest.T) {
 	quotes := speccatalog.Quotes("doc.md", []byte(sampleDoc))
 	t.When("a document holds blockquotes", func(w *gotest.T) {
@@ -118,11 +138,11 @@ func (s *QuotesTestSuite) TestMutantsNameTheClausesTheyFalsify(t *gotest.T) {
 	clauses := []string{"when a → b", "when e → f", "when g → h"}
 	unmutated, unknown, err := speccatalog.Unmutated(clauses, dir)
 	gotest.NoError(t, err)
-	t.When("the mutants' Clause lines are read against the catalog", func(w *gotest.T) {
+	t.When("the mutants' Clause lines are read against the clauses the specs state", func(w *gotest.T) {
 		w.It("lists the clauses no patch names, sorted", func(it *gotest.T) {
 			gotest.Equal(it, []string{"when e → f", "when g → h"}, unmutated)
 		})
-		w.It("names a Clause line the catalog does not hold, with its patch", func(it *gotest.T) {
+		w.It("names a Clause line no spec states, with its patch", func(it *gotest.T) {
 			gotest.Equal(it, []string{"a.patch: when c → d"}, unknown)
 		})
 	})

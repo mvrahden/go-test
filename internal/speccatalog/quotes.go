@@ -3,6 +3,8 @@ package speccatalog
 import (
 	"fmt"
 	"strings"
+
+	"github.com/mvrahden/go-test/internal/gotestspec"
 )
 
 // Arrow separates a quoted clause's condition from its outcome.
@@ -16,9 +18,8 @@ type Quote struct {
 }
 
 // Clauses lists every "<when> → <then>" sentence the specs state, once each,
-// in spec order: one per THEN and AND bullet, after its scenario's WHEN with
-// the "when " connective in front. A WHEN that opens with "when" keeps its
-// own. A scenario without exactly one WHEN states no clause.
+// in spec order: one per THEN and AND bullet, after its scenario's WHEN as
+// clauseWhen spells it. A scenario without exactly one WHEN states no clause.
 func Clauses(specs []Spec) []string {
 	var clauses []string
 	seen := map[string]bool{}
@@ -28,7 +29,7 @@ func Clauses(specs []Spec) []string {
 				if len(sc.Whens) != 1 {
 					continue
 				}
-				when := "when " + strings.TrimPrefix(sc.Whens[0], "when ")
+				when := clauseWhen(sc.Whens[0])
 				for _, then := range sc.Thens {
 					c := when + Arrow + then
 					if !seen[c] {
@@ -40,6 +41,16 @@ func Clauses(specs []Spec) []string {
 		}
 	}
 	return clauses
+}
+
+// clauseWhen spells a WHEN the way gotest spec renders a When label: "when "
+// in front, unless the WHEN opens with a connective, which it keeps. An
+// opening "when" in any case reads "when".
+func clauseWhen(when string) string {
+	if word, rest, ok := strings.Cut(when, " "); ok && strings.EqualFold(word, "when") {
+		return "when " + rest
+	}
+	return gotestspec.VocabWhen.Apply(when)
 }
 
 // Quotes finds the blockquote lines of doc shaped like a clause: "> " followed

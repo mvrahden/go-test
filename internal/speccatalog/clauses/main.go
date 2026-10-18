@@ -1,5 +1,6 @@
 // Command clauses prints the clauses the scenarios in specs/ state, one per
-// line, as "when <WHEN> → <THEN>". With --unmutated it prints the clauses no
+// line, as "<WHEN> → <THEN>" with the WHEN spelled as gotest spec renders a
+// When label. With --unmutated it prints the clauses no
 // drill mutant names on a Clause: line, by the same reading the conventions
 // suite holds the budget to. With --judge-packages <patch> it prints the
 // conformance package directories stating the patch's clauses, or nothing

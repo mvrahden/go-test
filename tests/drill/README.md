@@ -35,9 +35,16 @@ how a new patch is tried without waiting for the whole set.
 
 ## Mutants and the specs
 
-A patch may carry `Clause: when <WHEN> → <THEN>` lines above its diff, naming
+A patch may carry `Clause: <WHEN> → <THEN>` lines above its diff, naming
 the scenario outcomes in [`specs/`](../../specs/README.md) it falsifies: one
-WHEN bullet and one of its THEN or AND bullets, joined as written. `bash
+WHEN bullet and one of its THEN or AND bullets, joined by ` → `. The THEN is
+written as in the spec. The WHEN is spelled as `gotest spec` renders a When
+label: `when ` goes in front (`a flag is unknown` reads `when a flag is
+unknown`); a WHEN whose first word is `when` in any case reads `when` and the
+rest as written (`When the run stops` reads `when the run stops`); a WHEN whose
+first word is another connective (`whenever`, `with`, `without`, `given`, `if`,
+`unless`, `after`, `before`, `while`, `once`, `on`, `upon`, `as`, `for`,
+`during`, `under`, in any case) is written as in the spec. `bash
 tests/drill/drill.sh --list-unmutated` prints the clauses no patch names.
 Their number may not exceed `tests/drill/unmutated-allow.txt`: a new clause
 either gets a mutant or the budget is raised on purpose in the same change. A
