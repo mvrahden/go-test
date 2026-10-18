@@ -5,6 +5,9 @@ import type * as vscode from "vscode";
 const GENERATED_FILE_PATTERNS = [
   "gotest_psuite_test.go",
   "gotest_pxsuite_test.go",
+  // The names older gotest versions generated into.
+  "ƒƒ_psuite_test.go",
+  "ƒƒ_pxsuite_test.go",
 ];
 
 const MARKER = "# gotest generated files";
@@ -33,11 +36,16 @@ export function ensureGitExclude(
     content = "";
   }
 
-  if (content.includes(GENERATED_FILE_PATTERNS[0])) {
+  const lines = new Set(content.split(/\r?\n/).map((l) => l.trim()));
+  const missing = GENERATED_FILE_PATTERNS.filter((p) => !lines.has(p));
+  if (missing.length === 0) {
     return;
   }
 
-  const block = ["", MARKER, ...GENERATED_FILE_PATTERNS].join("\n") + "\n";
+  // A block written before some names were covered gets only those.
+  const head = lines.has(MARKER) ? [] : ["", MARKER];
+  const sep = content === "" || content.endsWith("\n") ? "" : "\n";
+  const block = sep + [...head, ...missing].join("\n") + "\n";
 
   try {
     fs.appendFileSync(excludePath, block);

@@ -195,3 +195,8 @@ func ExportBindAsGenerated(t testing.TB, name string) (*Binding, error) {
 	}
 	return bind(pkgs[0], newSourceLoader(nil, pkgs[0].Fset), spec.EffectiveTestSuites, result.Fixtures)
 }
+
+var (
+	ExportWithBuildTags      = withBuildTags
+	ExportTagsFromBuildFlags = tagsFromBuildFlags
+)

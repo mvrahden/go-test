@@ -3,7 +3,7 @@ package gotestgen
 import (
 	"fmt"
 	"go/types"
-	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/about"
@@ -13,6 +13,9 @@ import (
 
 // fuzzRuntimeImport is the import path every emitted fan needs.
 var fuzzRuntimeImport = about.Repo + "/pkg/gotestfuzz"
+
+// gotestImport is the import path of the assertion package.
+var gotestImport = about.Repo + "/pkg/gotest"
 
 // arrayFanLimit bounds element-wise fanning of a fixed-size array: an array
 // whose elements would add more leaves than this rides as one hybrid []byte
@@ -31,17 +34,11 @@ type FuzzTargetRef struct {
 // one generated file, plus the per-target corpus shape the stale-corpus
 // pre-flight compares against.
 type FuzzTargetSet struct {
-	Targets  []FuzzTargetRef // one per fuzz method, in (suite, method) order
-	Source   string          // source of every register, explode, fan-in/out, hybrid codec, and literal function
-	PkgPaths []string        // import paths Source references, excluding gotest and gotestfuzz
-
-	// NeedsRuntime reports whether Source uses the gotestfuzz leaf helpers;
-	// NeedsStrings/NeedsStrconv/NeedsMath whether it uses the corresponding
-	// standard library package — pulled in only by literal rendering.
-	NeedsRuntime bool
-	NeedsStrings bool
-	NeedsStrconv bool
-	NeedsMath    bool
+	Targets []FuzzTargetRef // one per fuzz method, in (suite, method) order
+	Source  string          // source of every register, explode, fan-in/out, hybrid codec, and literal function
+	// Imports are the import specs Source and the target expressions need,
+	// each under its generated alias, e.g. `ƒgotestfuzz "…/pkg/gotestfuzz"`.
+	Imports []string
 
 	// ParamsByFunc maps every generated Fuzz<Suite>_<Method> wrapper name to
 	// the corpus type name of each argument the engine sees ("string",
@@ -63,6 +60,12 @@ type FuzzTargetSet struct {
 // and panic at run time. Refusing at generation time is the only place a
 // useful message can be produced.
 func BuildFuzzTargets(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) (*FuzzTargetSet, error) {
+	return buildFuzzTargets(pkg, suites, newImportSet(pkg.PkgPath))
+}
+
+// buildFuzzTargets is BuildFuzzTargets naming packages through imps, the
+// generated file's own imports.
+func buildFuzzTargets(pkg *packages.Package, suites gotestast.TestSuiteSpecSet, imps *importSet) (*FuzzTargetSet, error) {
 	calls, err := gotestast.CollectFuzzCalls(pkg, suites)
 	if err != nil {
 		return nil, err
@@ -70,7 +73,7 @@ func BuildFuzzTargets(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) 
 	if len(calls) == 0 {
 		return nil, nil
 	}
-	e := newFuzzEmitter(pkg)
+	e := newFuzzEmitter(pkg, imps)
 
 	var body strings.Builder
 	var refs []FuzzTargetRef
@@ -96,26 +99,21 @@ func BuildFuzzTargets(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) 
 	}
 	src.WriteString(body.String())
 	if e.needsMath {
-		fmt.Fprintf(&src, literalFloatHelperTpl, fuzzFanVersion)
+		fmt.Fprintf(&src, literalFloatHelperTpl, fuzzFanVersion, e.pkgRef("math"), e.strconvPkg())
 	}
 	for _, name := range e.literalOrder {
 		src.WriteString(e.literals[name])
 	}
 
-	pkgPaths := make([]string, 0, len(e.pkgPaths))
-	for path := range e.pkgPaths {
-		pkgPaths = append(pkgPaths, path)
+	var imports []string
+	for _, imp := range imps.imports() {
+		imports = append(imports, imp.Name+" "+strconv.Quote(imp.Path))
 	}
-	sort.Strings(pkgPaths)
 
 	return &FuzzTargetSet{
 		Targets:      refs,
 		Source:       src.String(),
-		PkgPaths:     pkgPaths,
-		NeedsRuntime: strings.Contains(src.String(), "gotestfuzz."),
-		NeedsStrings: e.needsStrings,
-		NeedsStrconv: e.needsStrconv,
-		NeedsMath:    e.needsMath,
+		Imports:      imports,
 		ParamsByFunc: params,
 		DecodedFuncs: e.decoded,
 	}, nil
@@ -133,7 +131,7 @@ func FuzzRejections(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) []
 		for _, fz := range ts.Fuzzers() {
 			call, ok, err := gotestast.CollectFuzzCall(pkg, ts, fz)
 			if err == nil && ok {
-				_, _, err = newFuzzEmitter(pkg).emitCall(&strings.Builder{}, call)
+				_, _, err = newFuzzEmitter(pkg, nil).emitCall(&strings.Builder{}, call)
 			}
 			if err != nil {
 				out = append(out, CollectorError{Err: err, Pos: gotestast.PosOf(err)})
@@ -151,7 +149,7 @@ func FuzzRejections(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) []
 // use this instead of re-deriving the supported set, so their verdicts can
 // never drift from what the generator actually accepts.
 func CheckFuzzArgType(pkg *packages.Package, t types.Type) error {
-	e := newFuzzEmitter(pkg)
+	e := newFuzzEmitter(pkg, nil)
 	_, err := e.fan(types.Unalias(t))
 	return err
 }
@@ -177,6 +175,7 @@ func (e *fuzzEmitter) emitCall(body *strings.Builder, c gotestast.FuzzCall) (str
 func (e *fuzzEmitter) emitTarget(body *strings.Builder, funcName string, typs []types.Type) (string, []string, error) {
 	infos := make([]*fanInfo, len(typs))
 	refs := make([]string, len(typs))
+	codeRefs := make([]string, len(typs))
 	var params []string
 	for i, t := range typs {
 		fi, err := e.fan(t)
@@ -184,10 +183,13 @@ func (e *fuzzEmitter) emitTarget(body *strings.Builder, funcName string, typs []
 			return "", nil, err
 		}
 		infos[i] = fi
-		refs[i] = types.TypeString(t, e.qual)
+		refs[i] = e.disp(t)
+		codeRefs[i] = e.typeRef(t)
 		params = append(params, fi.params...)
 	}
 	sig := "func(*gotest.T" + strings.Join(append([]string{""}, refs...), ", ") + ")"
+	gt := e.pkgRef(gotestImport)
+	codeSig := "func(*" + gt + ".T" + strings.Join(append([]string{""}, codeRefs...), ", ") + ")"
 	if len(params) == 0 {
 		return "", nil, fmt.Errorf("f.Fuzz over %s has no fuzzable leaves — nothing for the engine to mutate; fuzz the operation's real input", sig)
 	}
@@ -218,7 +220,7 @@ func (e *fuzzEmitter) emitTarget(body *strings.Builder, funcName string, typs []
 	var argNames, sigParams []string
 	for i := range typs {
 		argNames = append(argNames, fmt.Sprintf("ƒa%d", i))
-		sigParams = append(sigParams, fmt.Sprintf("ƒa%d %s", i, refs[i]))
+		sigParams = append(sigParams, fmt.Sprintf("ƒa%d %s", i, codeRefs[i]))
 	}
 	if allLiteral {
 		tupleIdent := infos[0].ident
@@ -263,15 +265,16 @@ func (e *fuzzEmitter) emitTarget(body *strings.Builder, funcName string, typs []
 	if literalName != "" {
 		literalArg = fmt.Sprintf("func() string { return %s(%s) }", literalName, strings.Join(argNames, ", "))
 	}
-	fmt.Fprintf(body, "\nfunc %s(ƒf *testing.F, ƒfn any, ƒeach gotest.FuzzEach) bool {\n\tƒrun, ok := ƒfn.(%s)\n\tif !ok {\n\t\treturn false\n\t}\n\tƒf.Fuzz(func(ƒt *testing.T, %s) {\n%s\t\tƒeach(ƒt, %s, func(ƒtt *gotest.T) { ƒrun(ƒtt, %s) })\n\t})\n\treturn true\n}\n",
-		regName, sig, strings.Join(leafParams, ", "), fanIn.String(), literalArg, strings.Join(argNames, ", "))
+	tg := e.pkgRef("testing")
+	fmt.Fprintf(body, "\nfunc %s(ƒf *%s.F, ƒfn any, ƒeach %s.FuzzEach) bool {\n\tƒrun, ok := ƒfn.(%s)\n\tif !ok {\n\t\treturn false\n\t}\n\tƒf.Fuzz(func(ƒt *%s.T, %s) {\n%s\t\tƒeach(ƒt, %s, func(ƒtt *%s.T) { ƒrun(ƒtt, %s) })\n\t})\n\treturn true\n}\n",
+		regName, tg, gt, codeSig, tg, strings.Join(leafParams, ", "), fanIn.String(), literalArg, gt, strings.Join(argNames, ", "))
 
 	// Explode: one typed f.Add tuple to the same leaves, with the arity and
 	// each position's type checked against the declared signature.
 	var exp strings.Builder
-	fmt.Fprintf(&exp, "\nfunc %s(ƒseed []any) ([]any, error) {\n\tif err := gotest.SeedArity(ƒseed, %d); err != nil {\n\t\treturn nil, err\n\t}\n", expName, len(typs))
+	fmt.Fprintf(&exp, "\nfunc %s(ƒseed []any) ([]any, error) {\n\tif err := %s.SeedArity(ƒseed, %d); err != nil {\n\t\treturn nil, err\n\t}\n", expName, gt, len(typs))
 	for i, t := range typs {
-		fmt.Fprintf(&exp, "\t%s, err := gotest.SeedArg[%s](ƒseed, %d)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", argNames[i], refs[i], i)
+		fmt.Fprintf(&exp, "\t%s, err := %s.SeedArg[%s](ƒseed, %d)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", argNames[i], gt, codeRefs[i], i)
 		_ = t
 	}
 	fmt.Fprintf(&exp, "\tƒo := make([]any, 0, %d)\n", len(params))
@@ -281,7 +284,7 @@ func (e *fuzzEmitter) emitTarget(body *strings.Builder, funcName string, typs []
 	exp.WriteString("\treturn ƒo, nil\n}\n")
 	body.WriteString(exp.String())
 
-	expr := fmt.Sprintf("&gotest.FuzzTarget{Signature: %q, Register: %s, Explode: %s}", sig, regName, expName)
+	expr := fmt.Sprintf("&%s.FuzzTarget{Signature: %q, Register: %s, Explode: %s}", gt, sig, regName, expName)
 	return expr, params, nil
 }
 
@@ -314,7 +317,7 @@ func (e *fuzzEmitter) fan(t types.Type) (*fanInfo, error) {
 	if gotestast.PassthroughFuzzType(t) {
 		return &fanInfo{params: []string{passthroughParam(t)}, passthrough: true}, nil
 	}
-	ts := types.TypeString(t, e.qual)
+	ts := e.disp(t)
 	if fi, ok := e.fanInfos[ts]; ok {
 		return fi, nil
 	}
@@ -360,11 +363,11 @@ func (e *fuzzEmitter) fan(t types.Type) (*fanInfo, error) {
 			// get its poorest.
 			params = []string{"[]byte"}
 			if isNamed {
-				fmt.Fprintf(&in, "\treturn %s(gotestfuzz.Leaf%s(ƒ0))\n", ref, m)
+				fmt.Fprintf(&in, "\treturn %s(%s.Leaf%s(ƒ0))\n", ref, e.fuzzPkg(), m)
 			} else {
-				fmt.Fprintf(&in, "\treturn gotestfuzz.Leaf%s(ƒ0)\n", m)
+				fmt.Fprintf(&in, "\treturn %s.Leaf%s(ƒ0)\n", e.fuzzPkg(), m)
 			}
-			fmt.Fprintf(&out, "\treturn []any{gotestfuzz.LeafBytes%s(%s(ƒv))}\n", m, u.Name())
+			fmt.Fprintf(&out, "\treturn []any{%s.LeafBytes%s(%s(ƒv))}\n", e.fuzzPkg(), m, u.Name())
 		}
 
 	case *types.Slice:
@@ -372,7 +375,7 @@ func (e *fuzzEmitter) fan(t types.Type) (*fanInfo, error) {
 			// A named byte slice: one native []byte leaf plus the conversion,
 			// empty collapsed to nil like every []byte the fan constructs.
 			params = []string{"[]byte"}
-			fmt.Fprintf(&in, "\treturn %s(gotestfuzz.LeafBytes(ƒ0))\n", ref)
+			fmt.Fprintf(&in, "\treturn %s(%s.LeafBytes(ƒ0))\n", ref, e.fuzzPkg())
 			out.WriteString("\treturn []any{[]byte(ƒv)}\n")
 			break
 		}
@@ -501,8 +504,8 @@ func (e *fuzzEmitter) hybrid(in, out *strings.Builder, t types.Type, ref, ident 
 		if err != nil {
 			return err
 		}
-		e.hybrids[ident] = fmt.Sprintf("\nfunc %s(ƒb []byte) %s {\n\tƒr := gotestfuzz.NewReader(ƒb)\n\treturn %s\n}\n", decName, ref, readExpr) +
-			fmt.Sprintf("\nfunc %s(ƒv %s) []byte {\n\tƒw := gotestfuzz.NewWriter()\n\t%s\n\treturn ƒw.Out()\n}\n", encName, ref, writeStmt)
+		e.hybrids[ident] = fmt.Sprintf("\nfunc %s(ƒb []byte) %s {\n\tƒr := %s.NewReader(ƒb)\n\treturn %s\n}\n", decName, ref, e.fuzzPkg(), readExpr) +
+			fmt.Sprintf("\nfunc %s(ƒv %s) []byte {\n\tƒw := %s.NewWriter()\n\t%s\n\treturn ƒw.Out()\n}\n", encName, ref, e.fuzzPkg(), writeStmt)
 		e.hybridOrder = append(e.hybridOrder, ident)
 	}
 	fmt.Fprintf(in, "\treturn %s(ƒ0)\n", decName)
@@ -517,7 +520,7 @@ func (e *fuzzEmitter) hybrid(in, out *strings.Builder, t types.Type, ref, ident 
 func (e *fuzzEmitter) inExpr(t types.Type, fi *fanInfo, args []string, nested bool) string {
 	if fi.passthrough {
 		if nested && fi.params[0] == "[]byte" {
-			return "gotestfuzz.LeafBytes(" + args[0] + ")"
+			return e.fuzzPkg() + ".LeafBytes(" + args[0] + ")"
 		}
 		return args[0]
 	}

@@ -76,7 +76,7 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
-			gotest.NotContains(it, output, "func TestMain(m *testing.M)", "should NOT have TestMain")
+			gotest.NotContains(it, output, "func TestMain(m *ƒtesting.M)", "should NOT have TestMain")
 			gotest.NotContains(it, output, "RunFixtureMain", "should NOT have RunFixtureMain")
 			gotest.NotContains(it, output, "func Test_DBFixture(", "should NOT have old-style Test_DBFixture")
 			gotest.NotContains(it, output, "go:linkname", "should NOT have linkname directives")
@@ -99,7 +99,7 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
-			gotest.NotContains(it, output, "func TestMain(m *testing.M)", "should NOT have TestMain")
+			gotest.NotContains(it, output, "func TestMain(m *ƒtesting.M)", "should NOT have TestMain")
 			gotest.NotContains(it, output, "RunFixtureMain", "should NOT have RunFixtureMain")
 		})
 	})
@@ -166,13 +166,13 @@ func (s *RendererTestSuite) TestCaselessSuites(t *gotest.T) {
 
 	t.It("renders a skipped Test function for a suite whose every test method is excluded", func(it *gotest.T) {
 		for _, suite := range []string{"AllExcludedTestSuite", "BoundExcludedTestSuite", "ExcludedWithFuzzTestSuite"} {
-			gotest.Regexp(it, `func Test`+suite+`\(t \*testing\.T\) \{\s*t\.Skipf\("test suite was excluded by user"\)\s*\}`, output)
+			gotest.Regexp(it, `func Test`+suite+`\(t \*ƒtesting\.T\) \{\s*t\.Skipf\("test suite was excluded by user"\)\s*\}`, output)
 		}
 	})
 
 	t.It("opens only the suite with test methods in a Test function", func(it *gotest.T) {
-		gotest.Equal(it, 1, strings.Count(output, "gotestruntime.OpenSuite(t,"), output)
-		gotest.Contains(it, output, "func TestPlainTestSuite(t *testing.T)")
+		gotest.Equal(it, 1, strings.Count(output, "ƒgotestruntime.OpenSuite(t,"), output)
+		gotest.Contains(it, output, "func TestPlainTestSuite(t *ƒtesting.T)")
 	})
 }
 
@@ -187,8 +187,8 @@ func (s *RendererTestSuite) TestHelperSuites(t *gotest.T) {
 	})
 
 	t.It("opens only the suite with a case", func(it *gotest.T) {
-		gotest.Equal(it, 1, strings.Count(output, "gotestruntime.OpenSuite(t,"), output)
-		gotest.Contains(it, output, "func TestPlainTestSuite(t *testing.T)")
+		gotest.Equal(it, 1, strings.Count(output, "ƒgotestruntime.OpenSuite(t,"), output)
+		gotest.Contains(it, output, "func TestPlainTestSuite(t *ƒtesting.T)")
 	})
 }
 
@@ -209,20 +209,20 @@ func (s *RendererTestSuite) TestFixtureClosure(t *gotest.T) {
 	}
 
 	t.It("opens the suite and its fixtures the same way in every wrapper kind", func(it *gotest.T) {
-		test := frame(it, "func TestMixedTestSuite(t *testing.T) {", "t")
-		gotest.Equal(it, test, frame(it, "func BenchmarkMixedTestSuite(b *testing.B) {", "b"))
-		gotest.Equal(it, test, frame(it, "func FuzzMixedTestSuite_FuzzWired(f *testing.F) {", "f"))
+		test := frame(it, "func TestMixedTestSuite(t *ƒtesting.T) {", "t")
+		gotest.Equal(it, test, frame(it, "func BenchmarkMixedTestSuite(b *ƒtesting.B) {", "b"))
+		gotest.Equal(it, test, frame(it, "func FuzzMixedTestSuite_FuzzWired(f *ƒtesting.F) {", "f"))
 	})
 
 	t.It("holds only the suite's part of the fixture DAG, parents included", func(it *gotest.T) {
-		test := frame(it, "func TestMixedTestSuite(t *testing.T) {", "t")
+		test := frame(it, "func TestMixedTestSuite(t *ƒtesting.T) {", "t")
 		gotest.Regexp(it, `\}, ƒ_node_MarkSharedFixture, ƒ_node_RootFixture, ƒ_node_ChildFixture\)`, test)
 		gotest.NotContains(it, test, "ƒ_node_UnusedFixture")
 	})
 
 	t.It("holds and wires the fixtures inside the frame, after the guard", func(it *gotest.T) {
-		test := frame(it, "func TestMixedTestSuite(t *testing.T) {", "t")
-		gotest.Regexp(it, `(?s)Guard: s\.MixedTestSuite\.SuiteGuard,\s+Fixtures: func\(tb testing\.TB\) \{\s+ƒ_holdFixtures\(tb, `, test)
+		test := frame(it, "func TestMixedTestSuite(t *ƒtesting.T) {", "t")
+		gotest.Regexp(it, `(?s)Guard: s\.MixedTestSuite\.SuiteGuard,\s+Fixtures: func\(tb ƒtesting\.TB\) \{\s+ƒ_holdFixtures\(tb, `, test)
 		gotest.Contains(it, test, "s.MixedTestSuite.Child = ƒ_ChildFixture\n")
 		gotest.Contains(it, test, "s.MixedTestSuite.Shared = ƒ_sf_MarkSharedFixture\n")
 	})
@@ -233,7 +233,7 @@ func (s *RendererTestSuite) TestParallelFailFast(t *gotest.T) {
 		w.It("hands the runtime loop a parallel suite and its config", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_ParallelFailFast")
 			output, _ := renderTestPkg(it.T(), pkg, false)
-			gotest.Regexp(it, `gotestruntime\.RunMethods\(t, ƒcfg, ƒbudget, gotestruntime\.Methods\{\s+Parallel: true,`, output)
+			gotest.Regexp(it, `ƒgotestruntime\.RunMethods\(t, ƒcfg, ƒbudget, ƒgotestruntime\.Methods\{\s+Parallel: true,`, output)
 		})
 	})
 }
@@ -275,7 +275,7 @@ func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)
 
-			gotest.NotContains(it, output, "func TestMain(m *testing.M)", "should NOT have TestMain")
+			gotest.NotContains(it, output, "func TestMain(m *ƒtesting.M)", "should NOT have TestMain")
 			gotest.NotContains(it, output, "RunFixtureMain", "should NOT have RunFixtureMain")
 			gotest.NotContains(it, output, "SharedFixtureBinding", "should NOT have old SharedFixtureBinding")
 			gotest.NotContains(it, output, "ƒ_sf0_E2EFixture", "should NOT have old sf0 variable naming")
@@ -314,11 +314,11 @@ func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 			// HoldFixtures contains rather than at package-variable initialisation,
 			// where a panicking FixtureConfig() would abort the binary instead of
 			// failing a test.
-			gotest.Regexp(it, `func ƒ_node_CFGFixture\(\) \*gotestruntime\.FixtureNode \{\s+ƒcfg := \(&CFGFixture\{\}\)\.FixtureConfig\(\)`, output,
+			gotest.Regexp(it, `func ƒ_node_CFGFixture\(\) \*ƒgotestruntime\.FixtureNode \{\s+ƒcfg := \(&CFGFixture\{\}\)\.FixtureConfig\(\)`, output,
 				"the marker is called once, in the node's constructor")
-			gotest.Regexp(it, `(?s)gotestruntime\.HoldFixtures\(tb, func\(\) gotestruntime\.MainConfig \{.*append\(ƒmain\.Fixtures, node\(\)\)`, output,
+			gotest.Regexp(it, `(?s)ƒgotestruntime\.HoldFixtures\(tb, func\(\) ƒgotestruntime\.MainConfig \{.*append\(ƒmain\.Fixtures, node\(\)\)`, output,
 				"the constructors run inside the containment frame, before anything reads the config")
-			gotest.Contains(it, output, "Config: gotestruntime.WithFixtureDefaults(ƒcfg),",
+			gotest.Contains(it, output, "Config: ƒgotestruntime.WithFixtureDefaults(ƒcfg),",
 				"a zero Timeout bounds the context with the default, as if the marker were absent")
 			gotest.Contains(it, output, "Budget: ƒcfg.Timeout,",
 				"the declared Timeout is the enforced budget, so a zero one is never enforced")
@@ -334,7 +334,7 @@ func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 
 			// The defaults still bound the fixture's context, but no Budget field
 			// is emitted, so it is never failed against a number it did not write.
-			gotest.Contains(it, output, "Config: gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{}),",
+			gotest.Contains(it, output, "Config: ƒgotestruntime.WithFixtureDefaults(ƒgotest.FixtureConfig{}),",
 				"a fixture with no config falls back to the defaults")
 			gotest.NotContains(it, output, "Budget:",
 				"a fixture with no config must not be held to a budget")
@@ -366,7 +366,7 @@ func (s *RendererTestSuite) TestSuiteConfig(t *gotest.T) {
 
 			// Without a Config, OpenSuite runs the suite under the defaults with a
 			// zero budget.
-			gotest.Contains(it, output, "ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{")
+			gotest.Contains(it, output, "ƒcfg, ƒbudget := ƒgotestruntime.OpenSuite(t, ƒgotestruntime.Suite{")
 			gotest.NotContains(it, output, "SuiteConfig", "a suite with no config must pass none")
 		})
 	})
@@ -380,9 +380,9 @@ func (s *RendererTestSuite) TestUndeclaredBudgetIsZero(t *gotest.T) {
 
 			// Without a Config, OpenSuite runs the suite under the defaults with a
 			// zero budget, so nothing holds it to a number it never wrote.
-			gotest.Contains(it, source, "ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{")
+			gotest.Contains(it, source, "ƒcfg, ƒbudget := ƒgotestruntime.OpenSuite(t, ƒgotestruntime.Suite{")
 			gotest.NotContains(it, source, "SuiteConfig")
-			gotest.Contains(it, source, "gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{")
+			gotest.Contains(it, source, "ƒgotestruntime.RunMethods(t, ƒcfg, ƒbudget, ƒgotestruntime.Methods{")
 			gotest.NotContains(it, source, "sync.WaitGroup")
 		})
 	})
@@ -492,7 +492,7 @@ func (s *RendererTestSuite) TestBeforeEachRendering(t *gotest.T) {
 				"an unused sync/atomic import makes go test refuse the generated package")
 			gotest.NotContains(it, output, "atomic.Bool",
 				"a suite with no test cases has no failure flag to share")
-			gotest.Contains(it, output, "func TestAllExcludedTestSuite(t *testing.T)",
+			gotest.Contains(it, output, "func TestAllExcludedTestSuite(t *ƒtesting.T)",
 				"the suite itself is still rendered")
 		})
 	})
@@ -592,7 +592,7 @@ func (s *RendererTestSuite) TestRenderer_BenchmarkWrapper(t *gotest.T) {
 		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_BenchmarkMethod")
 		out, _ := renderTestPkg(it.T(), pkg, true)
 
-		gotest.Contains(it, out, "func BenchmarkBenchTestSuite(b *testing.B)")
+		gotest.Contains(it, out, "func BenchmarkBenchTestSuite(b *ƒtesting.B)")
 		gotest.Contains(it, out, `b.Run("BenchmarkParse"`)
 		gotest.Contains(it, out, "b.StopTimer()")
 		gotest.Contains(it, out, "s.BeforeEach(ƒeachT)")
@@ -614,9 +614,9 @@ func (s *RendererTestSuite) TestRenderer_BenchmarkWrapper(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_Benchmark_StdlibB")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
-			gotest.Contains(it, out, "func BenchmarkStdlibBenchTestSuite(b *testing.B)")
+			gotest.Contains(it, out, "func BenchmarkStdlibBenchTestSuite(b *ƒtesting.B)")
 			gotest.Contains(it, out, "s.BenchmarkRaw(b)")
-			gotest.NotContains(it, out, "s.BenchmarkRaw(gotest.NewB(b))")
+			gotest.NotContains(it, out, "s.BenchmarkRaw(ƒgotest.NewB(b))")
 		})
 	})
 
@@ -628,7 +628,7 @@ func (s *RendererTestSuite) TestRenderer_BenchmarkWrapper(t *gotest.T) {
 			idx := strings.Index(out, "func BenchmarkParserTestSuite")
 			gotest.GreaterOrEqual(it, idx, 0, "bench wrapper missing from output")
 			benchFn := out[idx:]
-			gotest.Regexp(it, `Fixtures: func\(tb testing\.TB\) \{\s+ƒ_holdFixtures\(tb, func\(\) time\.Duration \{(?:[^{}]|\{\})*\}, ƒ_node_PoolFixture\)`, benchFn)
+			gotest.Regexp(it, `Fixtures: func\(tb ƒtesting\.TB\) \{\s+ƒ_holdFixtures\(tb, func\(\) ƒtime\.Duration \{(?:[^{}]|\{\})*\}, ƒ_node_PoolFixture\)`, benchFn)
 			gotest.Contains(it, benchFn, "s.ParserTestSuite.PoolFixture = ƒ_PoolFixture\n")
 		})
 
@@ -657,7 +657,7 @@ func assertSubBenchmarksGuarded(t *gotest.T, pkgName, wrapper string) {
 	benchFn := out[idx:]
 	sub := strings.Index(benchFn, "b.Run(")
 	gotest.GreaterOrEqual(t, sub, 0, "sub-benchmark missing from output")
-	gotest.Regexp(t, `^b\.Run\("[A-Za-z]+", func\(b \*testing\.B\) \{\s+defer gotestruntime\.ReleaseOnPanic\(b\)`, benchFn[sub:])
+	gotest.Regexp(t, `^b\.Run\("[A-Za-z]+", func\(b \*ƒtesting\.B\) \{\s+defer ƒgotestruntime\.ReleaseOnPanic\(b\)`, benchFn[sub:])
 }
 
 func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
@@ -665,8 +665,8 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzMethod")
 		out, _ := renderTestPkg(it.T(), pkg, true)
 
-		gotest.Contains(it, out, "func FuzzFuzzTestSuite_FuzzParse(f *testing.F)")
-		gotest.Contains(it, out, "ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach, &gotest.FuzzTarget{")
+		gotest.Contains(it, out, "func FuzzFuzzTestSuite_FuzzParse(f *ƒtesting.F)")
+		gotest.Contains(it, out, "ƒf := ƒgotest.NewF(f, s.BeforeEach, s.AfterEach, &ƒgotest.FuzzTarget{")
 		gotest.Contains(it, out, "s.FuzzParse(ƒf)")
 		gotest.NotContains(it, out, "X_FuzzOld")
 	})
@@ -678,7 +678,7 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 		idx := strings.Index(out, "func FuzzFuzzTestSuite_FuzzParse")
 		gotest.GreaterOrEqual(it, idx, 0, "fuzz wrapper missing from output")
 		fuzzFn := out[idx:]
-		gotest.Regexp(it, `(?s)gotestruntime\.OpenSuite\(f, gotestruntime\.Suite\{\s+BeforeAll:\s+s\.BeforeAll,\s+AfterAll:\s+s\.AfterAll,\s+\}\)\s+ƒf := gotest\.NewF\(`, fuzzFn,
+		gotest.Regexp(it, `(?s)ƒgotestruntime\.OpenSuite\(f, ƒgotestruntime\.Suite\{\s+BeforeAll:\s+s\.BeforeAll,\s+AfterAll:\s+s\.AfterAll,\s+\}\)\s+ƒf := ƒgotest\.NewF\(`, fuzzFn,
 			"the suite opens before the fuzz target sees a seed")
 	})
 
@@ -690,7 +690,7 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 			idx := strings.Index(out, "func FuzzParserFuzzTestSuite_FuzzParse")
 			gotest.GreaterOrEqual(it, idx, 0, "fuzz wrapper missing from output")
 			fuzzFn := out[idx:]
-			gotest.Regexp(it, `Fixtures: func\(tb testing\.TB\) \{\s+ƒ_holdFixtures\(tb, func\(\) time\.Duration \{(?:[^{}]|\{\})*\}, ƒ_node_PoolFixture\)`, fuzzFn)
+			gotest.Regexp(it, `Fixtures: func\(tb ƒtesting\.TB\) \{\s+ƒ_holdFixtures\(tb, func\(\) ƒtime\.Duration \{(?:[^{}]|\{\})*\}, ƒ_node_PoolFixture\)`, fuzzFn)
 			gotest.Contains(it, fuzzFn, "s.ParserFuzzTestSuite.PoolFixture = ƒ_PoolFixture\n")
 		})
 
@@ -727,8 +727,8 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 
 			gotest.Contains(it, out, `"github.com/mvrahden/go-test/pkg/gotestfuzz"`)
 			gotest.Contains(it, out, "func ƒ_fuzzin_v1_Request(ƒ0 string, ƒ1 []byte, ƒ2 []byte, ƒ3 []byte, ƒ4 bool, ƒ5 string, ƒ6 []byte) Request {")
-			gotest.Contains(it, out, `ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach, &gotest.FuzzTarget{Signature: "func(*gotest.T, Request)", Register: ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzCreate, Explode: ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzCreate})`)
-			gotest.Contains(it, out, `ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach, &gotest.FuzzTarget{Signature: "func(*gotest.T, string)", Register: ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzNative, Explode: ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzNative})`)
+			gotest.Contains(it, out, `ƒf := ƒgotest.NewF(f, s.BeforeEach, s.AfterEach, &ƒgotest.FuzzTarget{Signature: "func(*gotest.T, Request)", Register: ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzCreate, Explode: ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzCreate})`)
+			gotest.Contains(it, out, `ƒf := ƒgotest.NewF(f, s.BeforeEach, s.AfterEach, &ƒgotest.FuzzTarget{Signature: "func(*gotest.T, string)", Register: ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzNative, Explode: ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzNative})`)
 			gotest.Contains(it, out, "s.FuzzCreate(ƒf)")
 			gotest.Contains(it, out, "s.FuzzNative(ƒf)")
 		})
@@ -759,7 +759,7 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzMethod")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
-			gotest.Contains(it, out, `ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach, &gotest.FuzzTarget{Signature: "func(*gotest.T, string)"`)
+			gotest.Contains(it, out, `ƒf := ƒgotest.NewF(f, s.BeforeEach, s.AfterEach, &ƒgotest.FuzzTarget{Signature: "func(*gotest.T, string)"`)
 			gotest.Contains(it, out, "s.FuzzParse(ƒf)")
 			gotest.NotContains(it, out, "ƒ_fuzzin_")
 			gotest.NotContains(it, out, `"github.com/mvrahden/go-test/pkg/gotestfuzz"`)

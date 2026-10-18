@@ -46,3 +46,18 @@ func (s *PreflightTestSuite) TestUncompilablePackage(t *gotest.T) {
 		})
 	})
 }
+
+func (s *PreflightTestSuite) TestStaleGeneratedFile(t *gotest.T) {
+	t.When("a generated file on disk names a suite that no longer exists", func(w *gotest.T) {
+		w.Setenv("GOWORK", "off")
+		dir := w.TempDir()
+		writeModule(w, dir, "package preflightprobe\n\nvar x = 1\n")
+		stale := []byte("package preflightprobe\n\nvar _ = &OldTestSuite{}\n")
+		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "gotest_psuite_test.go"), stale, 0o600))
+		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "ƒƒ_pxsuite_test.go"), []byte("package preflightprobe_test\n\nvar _ = Old\n"), 0o600))
+
+		w.It("loads past it", func(it *gotest.T) {
+			gotest.NoError(it, lint.PreflightLoad(dir, []string{"./..."}))
+		})
+	})
+}

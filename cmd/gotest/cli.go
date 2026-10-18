@@ -52,7 +52,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	inv := Invocation{Args: remaining, Config: projectCfg}
+	inv := Invocation{Args: NormalizeTagsFlag(remaining), Config: projectCfg}
 
 	switch subcmd {
 	case "discover":
@@ -84,7 +84,7 @@ func main() {
 	case "skill":
 		os.Exit(runSkill(inv))
 	default:
-		inv.Args = args
+		inv.Args = NormalizeTagsFlag(args)
 		os.Exit(runTest(inv))
 	}
 }

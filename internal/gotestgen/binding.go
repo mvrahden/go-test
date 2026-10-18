@@ -99,7 +99,24 @@ type binder struct {
 	resolving       map[*types.Named]bool         // cycle detection
 	sharedSeen      map[string]*SharedFixtureInfo // key: pkgPath.Name
 	sharedResolving map[string]bool               // cycle detection for shared fixtures
+	prefixes        map[string]string             // package path → identifier prefix
+	prefixTaken     map[string]bool
 	result          *Binding
+}
+
+// prefix names the identifiers of another package's fixtures: its package
+// name, numbered when a second package of that name binds fixtures too.
+func (r *binder) prefix(p *types.Package) string {
+	if pre, ok := r.prefixes[p.Path()]; ok {
+		return pre
+	}
+	pre := p.Name()
+	for i := 1; r.prefixTaken[pre]; i++ {
+		pre = p.Name() + strconv.Itoa(i)
+	}
+	r.prefixes[p.Path()] = pre
+	r.prefixTaken[pre] = true
+	return pre
 }
 
 // Bind performs demand-driven fixture resolution starting from targeted test
@@ -119,6 +136,8 @@ func bind(targetPkg *packages.Package, sources *sourceLoader, suites []*gotestas
 		resolving:       make(map[*types.Named]bool),
 		sharedSeen:      make(map[string]*SharedFixtureInfo),
 		sharedResolving: make(map[string]bool),
+		prefixes:        make(map[string]string),
+		prefixTaken:     make(map[string]bool),
 		result:          result,
 	}
 
@@ -442,7 +461,7 @@ func (r *binder) resolveFixture(named *types.Named) (_ *BoundFixture, err error)
 		rf.PkgName = named.Obj().Pkg().Name()
 		rf.QualifiedType = fixtureQualifiedType(named, rf.PkgName)
 		rf.PkgPath = typePkgPath
-		rf.Identifier = rf.PkgName + "_" + identifier
+		rf.Identifier = r.prefix(named.Obj().Pkg()) + "_" + identifier
 	}
 
 	if !rf.BeforeAll {
@@ -595,7 +614,7 @@ func (r *binder) buildSharedFixtureRef(named *types.Named, idx int) (_ SharedFix
 
 	sfIdentifier := identifier
 	if !isLocal {
-		sfIdentifier = typePkg.Name() + "_" + identifier
+		sfIdentifier = r.prefix(typePkg) + "_" + identifier
 	}
 
 	ref := SharedFixtureRef{
@@ -679,12 +698,13 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 	}
 
 	isLocal := typePkg.Path() == r.targetPkg.PkgPath
-	pkgName := ""
+	pkgName, idPrefix := "", ""
 	var qualifiedType string
 	if isLocal {
 		qualifiedType = fixtureQualifiedType(named, "")
 	} else {
 		pkgName = typePkg.Name()
+		idPrefix = r.prefix(typePkg)
 		qualifiedType = fixtureQualifiedType(named, pkgName)
 	}
 
@@ -694,6 +714,8 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 			Identifier:    identifier,
 			PkgPath:       typePkg.Path(),
 			PkgName:       pkgName,
+			IDPrefix:      idPrefix,
+			Named:         named,
 			QualifiedType: qualifiedType,
 			HasConfig:     hasConfig,
 			HasAfterAll:   hasAfterAll,
@@ -793,6 +815,8 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 		Identifier:       identifier,
 		PkgPath:          typePkg.Path(),
 		PkgName:          pkgName,
+		IDPrefix:         idPrefix,
+		Named:            named,
 		QualifiedType:    qualifiedType,
 		HasConfig:        hasConfig,
 		HasAfterAll:      hasAfterAll,

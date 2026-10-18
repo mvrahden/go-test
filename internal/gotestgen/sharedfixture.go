@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
+	"go/types"
 	"maps"
 	"slices"
 	"text/template"
@@ -11,14 +12,27 @@ import (
 	"github.com/mvrahden/go-test/internal/about"
 )
 
+// nodeID is the fixture's DAG node name in a generated harness.
+func (sf *SharedFixtureInfo) nodeID() string {
+	switch {
+	case sf.IDPrefix != "":
+		return sf.IDPrefix + "_" + sf.Identifier
+	case sf.PkgName != "":
+		return sf.PkgName + "_" + sf.Identifier
+	}
+	return sf.Identifier
+}
+
 var sharedFixtureTpl = template.Must(template.New("sharedfixture").ParseFS(templates, "static/sharedfixture.go.tpl"))
 
 // SharedFixtureInfo describes a shared fixture to be run in a setup subprocess.
 type SharedFixtureInfo struct {
-	Identifier       string // type name e.g. "PostgresFixture"
-	PkgPath          string // import path e.g. "github.com/example/project/tests/fixtures"
-	PkgName          string // Go package name e.g. "fixtures" (from types.Package.Name())
-	QualifiedType    string // Go type expression e.g. "fixtures.PostgresFixture" (handles generics)
+	Identifier       string       // type name e.g. "PostgresFixture"
+	PkgPath          string       // import path e.g. "github.com/example/project/tests/fixtures"
+	PkgName          string       // Go package name e.g. "fixtures" (from types.Package.Name())
+	QualifiedType    string       // Go type expression e.g. "fixtures.PostgresFixture" (handles generics)
+	IDPrefix         string       // prefix of its generated identifiers, empty if same package
+	Named            *types.Named // the fixture type
 	HasConfig        bool
 	HasAfterAll      bool
 	HasHydrate       bool

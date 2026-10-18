@@ -96,9 +96,9 @@ func (s *FuzzFanTestSuite) TestStructTarget(t *gotest.T) {
 	t.It("emits one target per fuzz method, pass-through methods included", func(it *gotest.T) {
 		set := s.build(it, "TestFuzzCodec_StructTarget")
 		gotest.Len(it, set.Targets, 2)
-		gotest.Equal(it, `&gotest.FuzzTarget{Signature: "func(*gotest.T, Request)", Register: ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzCreate, Explode: ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzCreate}`,
+		gotest.Equal(it, `&ƒgotest.FuzzTarget{Signature: "func(*gotest.T, Request)", Register: ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzCreate, Explode: ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzCreate}`,
 			targetExpr(set, "FuzzStructFuzzTestSuite_FuzzCreate"))
-		gotest.Equal(it, `&gotest.FuzzTarget{Signature: "func(*gotest.T, string)", Register: ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzNative, Explode: ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzNative}`,
+		gotest.Equal(it, `&ƒgotest.FuzzTarget{Signature: "func(*gotest.T, string)", Register: ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzNative, Explode: ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzNative}`,
 			targetExpr(set, "FuzzStructFuzzTestSuite_FuzzNative"))
 	})
 
@@ -109,22 +109,22 @@ func (s *FuzzFanTestSuite) TestStructTarget(t *gotest.T) {
 		// Home *Address → bool nil-flag + Street string + Zip []byte.
 		gotest.Contains(it, set.Source, "func ƒ_fuzzin_v1_Request(ƒ0 string, ƒ1 []byte, ƒ2 []byte, ƒ3 []byte, ƒ4 bool, ƒ5 string, ƒ6 []byte) Request {")
 		gotest.Contains(it, set.Source, "return Request{Email: ƒ0, Age: ƒ_fuzzin_v1_int(ƒ1), Prio: ƒ_fuzzin_v1_Priority(ƒ2), Tags: ƒ_fuzzin_v1_slice_string(ƒ3), Home: ƒ_fuzzin_v1_ptr_Address(ƒ4, ƒ5, ƒ6)}")
-		gotest.Contains(it, set.Source, "func ƒ_fuzzin_v1_int(ƒ0 []byte) int {\n\treturn gotestfuzz.LeafInt(ƒ0)\n}")
-		gotest.Contains(it, set.Source, "func ƒ_fuzzin_v1_Priority(ƒ0 []byte) Priority {\n\treturn Priority(gotestfuzz.LeafInt(ƒ0))\n}")
-		gotest.Contains(it, set.Source, "return []any{gotestfuzz.LeafBytesInt(int(ƒv))}")
-		gotest.True(it, set.NeedsRuntime)
+		gotest.Contains(it, set.Source, "func ƒ_fuzzin_v1_int(ƒ0 []byte) int {\n\treturn ƒgotestfuzz.LeafInt(ƒ0)\n}")
+		gotest.Contains(it, set.Source, "func ƒ_fuzzin_v1_Priority(ƒ0 []byte) Priority {\n\treturn Priority(ƒgotestfuzz.LeafInt(ƒ0))\n}")
+		gotest.Contains(it, set.Source, "return []any{ƒgotestfuzz.LeafBytesInt(int(ƒv))}")
+		gotest.Contains(it, set.Imports, `ƒgotestfuzz "github.com/mvrahden/go-test/pkg/gotestfuzz"`)
 	})
 
 	t.It("binds the callback by its exact type and registers through a direct (*testing.F).Fuzz call", func(it *gotest.T) {
 		set := s.build(it, "TestFuzzCodec_StructTarget")
-		gotest.Contains(it, set.Source, "func ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzCreate(ƒf *testing.F, ƒfn any, ƒeach gotest.FuzzEach) bool {\n\tƒrun, ok := ƒfn.(func(*gotest.T, Request))\n\tif !ok {\n\t\treturn false\n\t}")
-		gotest.Contains(it, set.Source, "ƒf.Fuzz(func(ƒt *testing.T, ƒ0 string, ƒ1 []byte, ƒ2 []byte, ƒ3 []byte, ƒ4 bool, ƒ5 string, ƒ6 []byte) {\n\t\tƒa0 := ƒ_fuzzin_v1_Request(ƒ0, ƒ1, ƒ2, ƒ3, ƒ4, ƒ5, ƒ6)")
-		gotest.Contains(it, set.Source, "ƒeach(ƒt, func() string { return ƒ_fuzzlits_v1_Request(ƒa0) }, func(ƒtt *gotest.T) { ƒrun(ƒtt, ƒa0) })")
+		gotest.Contains(it, set.Source, "func ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzCreate(ƒf *ƒtesting.F, ƒfn any, ƒeach ƒgotest.FuzzEach) bool {\n\tƒrun, ok := ƒfn.(func(*ƒgotest.T, Request))\n\tif !ok {\n\t\treturn false\n\t}")
+		gotest.Contains(it, set.Source, "ƒf.Fuzz(func(ƒt *ƒtesting.T, ƒ0 string, ƒ1 []byte, ƒ2 []byte, ƒ3 []byte, ƒ4 bool, ƒ5 string, ƒ6 []byte) {\n\t\tƒa0 := ƒ_fuzzin_v1_Request(ƒ0, ƒ1, ƒ2, ƒ3, ƒ4, ƒ5, ƒ6)")
+		gotest.Contains(it, set.Source, "ƒeach(ƒt, func() string { return ƒ_fuzzlits_v1_Request(ƒa0) }, func(ƒtt *ƒgotest.T) { ƒrun(ƒtt, ƒa0) })")
 	})
 
 	t.It("explodes a typed seed after checking its arity and each position's type", func(it *gotest.T) {
 		set := s.build(it, "TestFuzzCodec_StructTarget")
-		gotest.Contains(it, set.Source, "func ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzCreate(ƒseed []any) ([]any, error) {\n\tif err := gotest.SeedArity(ƒseed, 1); err != nil {\n\t\treturn nil, err\n\t}\n\tƒa0, err := gotest.SeedArg[Request](ƒseed, 0)")
+		gotest.Contains(it, set.Source, "func ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzCreate(ƒseed []any) ([]any, error) {\n\tif err := ƒgotest.SeedArity(ƒseed, 1); err != nil {\n\t\treturn nil, err\n\t}\n\tƒa0, err := ƒgotest.SeedArg[Request](ƒseed, 0)")
 		gotest.Contains(it, set.Source, "ƒo = append(ƒo, ƒ_fuzzout_v1_Request(ƒa0)...)\n\treturn ƒo, nil")
 	})
 
@@ -137,9 +137,9 @@ func (s *FuzzFanTestSuite) TestStructTarget(t *gotest.T) {
 
 	t.It("rides a slice of strings as one hybrid leaf through the total mini-codec", func(it *gotest.T) {
 		set := s.build(it, "TestFuzzCodec_StructTarget")
-		gotest.Contains(it, set.Source, "func ƒ_fuzzdec_v1_slice_string(ƒb []byte) []string {\n\tƒr := gotestfuzz.NewReader(ƒb)\n\treturn ƒ_fuzzread_v1_slice_string(ƒr)\n}")
+		gotest.Contains(it, set.Source, "func ƒ_fuzzdec_v1_slice_string(ƒb []byte) []string {\n\tƒr := ƒgotestfuzz.NewReader(ƒb)\n\treturn ƒ_fuzzread_v1_slice_string(ƒr)\n}")
 		gotest.Contains(it, set.Source, "func ƒ_fuzzenc_v1_slice_string(ƒv []string) []byte {")
-		gotest.Contains(it, set.Source, "func ƒ_fuzzread_v1_slice_string(ƒr *gotestfuzz.Reader) []string {")
+		gotest.Contains(it, set.Source, "func ƒ_fuzzread_v1_slice_string(ƒr *ƒgotestfuzz.Reader) []string {")
 	})
 
 	t.It("collapses an empty pass-through []byte field to nil on fan-in", func(it *gotest.T) {
@@ -158,15 +158,17 @@ func (s *FuzzFanTestSuite) TestStructTarget(t *gotest.T) {
 
 	t.It("reports no import beyond the runtime for same-package types", func(it *gotest.T) {
 		set := s.build(it, "TestFuzzCodec_StructTarget")
-		gotest.Empty(it, set.PkgPaths)
+		for _, imp := range set.Imports {
+			gotest.Regexp(it, `^ƒ[a-z]+ "`, imp)
+		}
 	})
 
 	t.It("binds a pass-through-only package without the leaf runtime", func(it *gotest.T) {
 		set := s.build(it, "TestCollector_FuzzMethod")
 		gotest.NotZero(it, set)
 		gotest.NotEmpty(it, set.Targets)
-		gotest.Contains(it, set.Source, "ƒfn.(func(*gotest.T, string))")
-		gotest.False(it, set.NeedsRuntime)
+		gotest.Contains(it, set.Source, "ƒfn.(func(*ƒgotest.T, string))")
+		gotest.NotContains(it, set.Imports, `ƒgotestfuzz "github.com/mvrahden/go-test/pkg/gotestfuzz"`)
 		gotest.NotEmpty(it, set.ParamsByFunc)
 	})
 
@@ -179,31 +181,31 @@ func (s *FuzzFanTestSuite) TestStructTarget(t *gotest.T) {
 func (s *FuzzFanTestSuite) TestDeclaredKinds(t *gotest.T) {
 	t.It("fans a bare declared int so it rides as a []byte leaf", func(it *gotest.T) {
 		set := s.build(it, "TestFuzzFan_DeclaredKinds")
-		gotest.Contains(it, set.Source, "ƒrun, ok := ƒfn.(func(*gotest.T, int))")
-		gotest.Contains(it, set.Source, "ƒf.Fuzz(func(ƒt *testing.T, ƒ0 []byte) {\n\t\tƒa0 := ƒ_fuzzin_v1_int(ƒ0)")
+		gotest.Contains(it, set.Source, "ƒrun, ok := ƒfn.(func(*ƒgotest.T, int))")
+		gotest.Contains(it, set.Source, "ƒf.Fuzz(func(ƒt *ƒtesting.T, ƒ0 []byte) {\n\t\tƒa0 := ƒ_fuzzin_v1_int(ƒ0)")
 		gotest.Equal(it, []string{"[]byte"}, set.ParamsByFunc["FuzzDeclaredFuzzTestSuite_FuzzInt"])
 	})
 
 	t.It("passes an all-native two-value callback straight through", func(it *gotest.T) {
 		set := s.build(it, "TestFuzzFan_DeclaredKinds")
-		gotest.Contains(it, set.Source, "ƒrun, ok := ƒfn.(func(*gotest.T, string, string))")
-		gotest.Contains(it, set.Source, "ƒf.Fuzz(func(ƒt *testing.T, ƒ0 string, ƒ1 string) {\n\t\tƒa0 := ƒ0\n\t\tƒa1 := ƒ1")
+		gotest.Contains(it, set.Source, "ƒrun, ok := ƒfn.(func(*ƒgotest.T, string, string))")
+		gotest.Contains(it, set.Source, "ƒf.Fuzz(func(ƒt *ƒtesting.T, ƒ0 string, ƒ1 string) {\n\t\tƒa0 := ƒ0\n\t\tƒa1 := ƒ1")
 		gotest.Equal(it, []string{"string", "string"}, set.ParamsByFunc["FuzzDeclaredFuzzTestSuite_FuzzTwoStrings"])
 	})
 
 	t.It("fans a mixed three-value callback position by position, with a tuple explode and literal", func(it *gotest.T) {
 		set := s.build(it, "TestFuzzFan_DeclaredKinds")
-		gotest.Contains(it, set.Source, "ƒrun, ok := ƒfn.(func(*gotest.T, string, uint16, []byte))")
-		gotest.Contains(it, set.Source, "ƒf.Fuzz(func(ƒt *testing.T, ƒ0 string, ƒ1 []byte, ƒ2 []byte) {")
-		gotest.Contains(it, set.Source, "func ƒ_fuzzexp_v1_FuzzDeclaredFuzzTestSuite_FuzzMixed3(ƒseed []any) ([]any, error) {\n\tif err := gotest.SeedArity(ƒseed, 3); err != nil {")
-		gotest.Contains(it, set.Source, "ƒa1, err := gotest.SeedArg[uint16](ƒseed, 1)")
+		gotest.Contains(it, set.Source, "ƒrun, ok := ƒfn.(func(*ƒgotest.T, string, uint16, []byte))")
+		gotest.Contains(it, set.Source, "ƒf.Fuzz(func(ƒt *ƒtesting.T, ƒ0 string, ƒ1 []byte, ƒ2 []byte) {")
+		gotest.Contains(it, set.Source, "func ƒ_fuzzexp_v1_FuzzDeclaredFuzzTestSuite_FuzzMixed3(ƒseed []any) ([]any, error) {\n\tif err := ƒgotest.SeedArity(ƒseed, 3); err != nil {")
+		gotest.Contains(it, set.Source, "ƒa1, err := ƒgotest.SeedArg[uint16](ƒseed, 1)")
 		gotest.Contains(it, set.Source, "ƒo = append(ƒo, []any{ƒa0}...)")
 		gotest.Contains(it, set.Source, "ƒo = append(ƒo, ƒ_fuzzout_v1_uint16(ƒa1)...)")
 		gotest.Contains(it, set.Source, "func ƒ_fuzzlits_v1_string_uint16_slice_byte(ƒa0 string, ƒa1 uint16, ƒa2 []byte) string {")
-		gotest.Contains(it, set.Source, `strconv.Quote(string(ƒa0)) + ", " + "uint16(" + strconv.FormatUint(uint64(ƒa1), 10) + ")" + ", " + ƒ_fuzzlit_v1_slice_byte(ƒa2)`)
-		gotest.Contains(it, set.Source, "ƒeach(ƒt, func() string { return ƒ_fuzzlits_v1_string_uint16_slice_byte(ƒa0, ƒa1, ƒa2) }, func(ƒtt *gotest.T) { ƒrun(ƒtt, ƒa0, ƒa1, ƒa2) })")
+		gotest.Contains(it, set.Source, `ƒstrconv.Quote(string(ƒa0)) + ", " + "uint16(" + ƒstrconv.FormatUint(uint64(ƒa1), 10) + ")" + ", " + ƒ_fuzzlit_v1_slice_byte(ƒa2)`)
+		gotest.Contains(it, set.Source, "ƒeach(ƒt, func() string { return ƒ_fuzzlits_v1_string_uint16_slice_byte(ƒa0, ƒa1, ƒa2) }, func(ƒtt *ƒgotest.T) { ƒrun(ƒtt, ƒa0, ƒa1, ƒa2) })")
 		gotest.Equal(it, []string{"string", "[]byte", "[]byte"}, set.ParamsByFunc["FuzzDeclaredFuzzTestSuite_FuzzMixed3"])
-		gotest.Equal(it, `&gotest.FuzzTarget{Signature: "func(*gotest.T, string, uint16, []byte)", Register: ƒ_fuzzreg_v1_FuzzDeclaredFuzzTestSuite_FuzzMixed3, Explode: ƒ_fuzzexp_v1_FuzzDeclaredFuzzTestSuite_FuzzMixed3}`,
+		gotest.Equal(it, `&ƒgotest.FuzzTarget{Signature: "func(*gotest.T, string, uint16, []byte)", Register: ƒ_fuzzreg_v1_FuzzDeclaredFuzzTestSuite_FuzzMixed3, Explode: ƒ_fuzzexp_v1_FuzzDeclaredFuzzTestSuite_FuzzMixed3}`,
 			targetExpr(set, "FuzzDeclaredFuzzTestSuite_FuzzMixed3"))
 	})
 
@@ -211,7 +213,7 @@ func (s *FuzzFanTestSuite) TestDeclaredKinds(t *gotest.T) {
 		set := s.build(it, "TestFuzzCodec_MultiArgStruct")
 		gotest.Len(it, set.Targets, 1)
 		gotest.Contains(it, set.Targets[0].Expr, `Signature: "func(*gotest.T, Pair, int)"`)
-		gotest.Contains(it, set.Source, "ƒf.Fuzz(func(ƒt *testing.T, ƒ0 []byte, ƒ1 []byte, ƒ2 []byte) {\n\t\tƒa0 := ƒ_fuzzin_v1_Pair(ƒ0, ƒ1)\n\t\tƒa1 := ƒ_fuzzin_v1_int(ƒ2)")
+		gotest.Contains(it, set.Source, "ƒf.Fuzz(func(ƒt *ƒtesting.T, ƒ0 []byte, ƒ1 []byte, ƒ2 []byte) {\n\t\tƒa0 := ƒ_fuzzin_v1_Pair(ƒ0, ƒ1)\n\t\tƒa1 := ƒ_fuzzin_v1_int(ƒ2)")
 	})
 }
 
@@ -242,7 +244,7 @@ func (s *FuzzFanTestSuite) TestArrays(t *gotest.T) {
 func (s *FuzzFanTestSuite) TestCrossPackageTypes(t *gotest.T) {
 	t.It("reports the import path of every package the emitted source references", func(it *gotest.T) {
 		set := s.build(it, "TestFuzzCodec_CrossPackage")
-		gotest.Equal(it, []string{"testpkg/TestFuzzCodec_CrossDep"}, set.PkgPaths)
+		gotest.Contains(it, set.Imports, `ƒcrossdep0 "testpkg/TestFuzzCodec_CrossDep"`)
 	})
 
 	t.It("qualifies the foreign type but not the local one", func(it *gotest.T) {
@@ -251,12 +253,13 @@ func (s *FuzzFanTestSuite) TestCrossPackageTypes(t *gotest.T) {
 		gotest.Contains(it, set.Targets[0].Expr, `Signature: "func(*gotest.T, Envelope)"`, "the fuzzed type is local, so it stays unqualified")
 		gotest.Contains(it, set.Source, "func ƒ_fuzzin_v1_crossdep_Setting(")
 		gotest.Contains(it, set.Source, "func ƒ_fuzzin_v1_ptr_crossdep_Setting(ƒ0 bool,")
+		gotest.Contains(it, set.Source, "*ƒcrossdep0.Setting")
 	})
 
 	t.It("qualifies a cross-package named basic used as a struct field", func(it *gotest.T) {
 		set := s.build(it, "TestFuzzCodec_CrossPackage")
-		gotest.Contains(it, set.Source, `"crossdep.ID(" + strconv.Quote(string(ƒv.Tag)) + ")"`)
-		gotest.NotContains(it, set.Source, `"ID(" + strconv.Quote`,
+		gotest.Contains(it, set.Source, `"crossdep.ID(" + ƒstrconv.Quote(string(ƒv.Tag)) + ")"`)
+		gotest.NotContains(it, set.Source, `"ID(" + ƒstrconv.Quote`,
 			"the bare identifier is out of scope outside the crossdep package")
 	})
 
@@ -265,7 +268,7 @@ func (s *FuzzFanTestSuite) TestCrossPackageTypes(t *gotest.T) {
 		gotest.Len(it, set.Targets, 1)
 		gotest.Contains(it, set.Targets[0].Expr, `Signature: "func(*gotest.T, crossdep.ID)"`)
 		gotest.Contains(it, set.Source, "return ƒ_fuzzlits_v1_crossdep_ID(ƒa0)")
-		gotest.Contains(it, set.Source, `return "crossdep.ID(" + strconv.Quote(string(ƒa0)) + ")"`)
+		gotest.Contains(it, set.Source, `return "crossdep.ID(" + ƒstrconv.Quote(string(ƒa0)) + ")"`)
 	})
 }
 
@@ -287,7 +290,7 @@ func (s *FuzzFanTestSuite) TestLiteralFuncs(t *gotest.T) {
 	t.It("emits a literal function for a struct target", func(it *gotest.T) {
 		set := s.build(it, "TestFuzzCodec_StructTarget")
 		gotest.Contains(it, set.Source, "func ƒ_fuzzlit_v1_Request(ƒv Request) string {")
-		gotest.Contains(it, set.Source, `strconv.Quote(`)
+		gotest.Contains(it, set.Source, `ƒstrconv.Quote(`)
 	})
 
 	t.It("emits a literal function for a pointer-to-basic field, using the slice-index form", func(it *gotest.T) {
@@ -303,7 +306,7 @@ func (s *FuzzFanTestSuite) TestLiteralFuncs(t *gotest.T) {
 		set := s.build(it, "TestFuzzCodec_NamedBasicTarget")
 		gotest.Contains(it, set.Source, "return ƒ_fuzzlits_v1_Level(ƒa0)")
 		gotest.Contains(it, set.Source, "func ƒ_fuzzlits_v1_Level(ƒa0 Level) string {")
-		gotest.Contains(it, set.Source, `return "Level(" + strconv.FormatInt(int64(ƒa0), 10) + ")"`)
+		gotest.Contains(it, set.Source, `return "Level(" + ƒstrconv.FormatInt(int64(ƒa0), 10) + ")"`)
 	})
 }
 

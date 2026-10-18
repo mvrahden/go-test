@@ -8,12 +8,14 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/genstub"
 	"github.com/mvrahden/go-test/internal/goversion"
 	"github.com/mvrahden/go-test/internal/pkgpattern"
 	"golang.org/x/tools/go/packages"
@@ -51,6 +53,13 @@ func load(ctx context.Context, t *Targets, overlay map[string][]byte) ([]*packag
 		// A canceled load interrupts go list, which ignores the interrupt
 		// and is killed before it removes its work directory.
 		cfg.Env = append(os.Environ(), "GOTMPDIR="+t.TempDir)
+	}
+	// Generated files on disk load as their package clause.
+	if t.Tests {
+		if stubs := genstub.Stubs(t.Dir, t.Patterns, t.BuildFlags); len(stubs) > 0 {
+			maps.Copy(stubs, overlay)
+			overlay = stubs
+		}
 	}
 	if len(overlay) > 0 {
 		cleanup, err := withOverlay(cfg, t.TempDir, overlay)

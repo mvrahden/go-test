@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/about"
+	"github.com/mvrahden/go-test/internal/genstub"
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/goversion"
 	"github.com/mvrahden/go-test/internal/pkgpattern"
@@ -169,8 +170,15 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 		Tests: true,
 		Fset:  token.NewFileSet(),
 	}
-	if len(buildFlags) > 0 {
-		cfg.BuildFlags = buildFlags
+	cfg.ParseFile = about.ParseStubbingGenerated
+	// go list -export compiles from disk, so the go command takes the stubs too.
+	loadFlags, unstub, err := genstub.LoadFlags("", targetPkgs, buildFlags)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	defer unstub()
+	if len(loadFlags) > 0 {
+		cfg.BuildFlags = loadFlags
 	}
 	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
 	if err != nil {
@@ -796,6 +804,9 @@ func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutco
 	}
 
 	r := renderer{}
+	if sources != nil {
+		r.tags = tagsFromBuildFlags(sources.buildFlags)
+	}
 	buf, fans, err := r.RenderTestSuiteSpec(pkg, spec, resolved, harvestSeeds)
 	if fans != nil {
 		maps.Copy(fuzzParams, fans.ParamsByFunc)

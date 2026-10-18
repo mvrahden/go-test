@@ -119,7 +119,7 @@ Flags (go test — use -single-dash, forwarded automatically):
   -timeout=<dur>          Deadline of each suite process (default: 10m); a
                           test's own deadline is SuiteConfig.Timeout
   -coverprofile=<file>    Write coverage profile
-  -tags=<tags>            Build tags (comma-separated)
+  -tags=<tags>            Build tags (comma-separated); --tags=<tags> too
   -json                   go test -json event stream; every matched package
                           gets a verdict, including those with no suites
 
@@ -975,8 +975,8 @@ func printCleanHelp() {
 Usage:
   gotest clean [packages...]
 
-Removes generated overlay files (gotest_p(x)suite_test.go) from the source
-tree. A run never writes them there; "gotest generate" does, for
+Removes generated overlay files (gotest_p(x)suite_test.go, and the
+ƒƒ_p(x)suite_test.go older versions wrote) from the source tree. A run never writes them there; "gotest generate" does, for
 inspection. Patterns expand as for generate, so "clean ./..." removes what
 "generate ./..." wrote; files in packages outside the main module(s) are
 left with a note on stderr. Without a pattern it cleans the current

@@ -1,9 +1,9 @@
 {{ range $i, $ts := .Spec.EffectiveTestSuites }}
 {{- $fx := index $.Fixtures $ts.Identifier }}
 
-{{ template "suiteWrapper" $ts }}
+{{ template "suiteWrapper" (dict "Suite" $ts "ContextTypes" $.ContextTypes) }}
 {{ if $ts.TestCases }}
-func Test{{ $ts.Identifier }}(t *testing.T) {
+func Test{{ $ts.Identifier }}(t *ƒtesting.T) {
 {{- template "suiteFrame" (dict "Suite" $ts "Fixtures" $fx "TB" "t" "Assign" "ƒcfg, ƒbudget := ") }}
 {{ template "suiteMethods" (dict "Suite" $ts "FixtureOrder" $fx.Order) }}
 }

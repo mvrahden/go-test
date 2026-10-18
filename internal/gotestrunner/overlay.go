@@ -265,6 +265,13 @@ func writeOverlayFiles(dir string, results gotestgen.GenerateResults) error {
 			}
 			overlay.Replace[filepath.Join(result.AbsPath, about.PXSuite)] = dst
 		}
+		for _, st := range staleStubs(result) {
+			dst := filepath.Join(subDir, "stub-"+st.name)
+			if err := os.WriteFile(dst, st.src, 0600); err != nil {
+				return fmt.Errorf("write overlay stub: %w", err)
+			}
+			overlay.Replace[filepath.Join(result.AbsPath, st.name)] = dst
+		}
 	}
 
 	data, err := json.Marshal(overlay)
@@ -276,6 +283,36 @@ func writeOverlayFiles(dir string, results gotestgen.GenerateResults) error {
 		return fmt.Errorf("write overlay json: %w", err)
 	}
 	return nil
+}
+
+// stub is a generated file on disk and the package clause that stands in
+// for it.
+type stub struct {
+	name string
+	src  []byte
+}
+
+// staleStubs are the generated files on disk in result's directory that the
+// overlay does not regenerate: a run compiles each as its package clause, so
+// one left by an earlier generate or an older gotest is never compiled.
+func staleStubs(result *gotestgen.GenerateResult) []stub {
+	if result.AbsPath == "" {
+		return nil
+	}
+	var stubs []stub
+	for _, name := range about.GeneratedFileNames {
+		if (name == about.PSuite && len(result.PTest) > 0) || (name == about.PXSuite && len(result.PXTest) > 0) {
+			continue
+		}
+		src, err := os.ReadFile(filepath.Join(result.AbsPath, name))
+		if err != nil {
+			continue
+		}
+		if s := about.PackageStub(src); s != nil {
+			stubs = append(stubs, stub{name: name, src: s})
+		}
+	}
+	return stubs
 }
 
 // cacheRoot returns the gotest cache directory, respecting the GOTEST_CACHE_DIR

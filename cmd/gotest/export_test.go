@@ -19,6 +19,9 @@ var (
 // bench.go
 var ExportRunBench = runBench
 
+// clean.go
+var ExportGeneratedFiles = generatedFiles
+
 // cli.go
 var (
 	ExportResolveGlobalTimeout = resolveGlobalTimeout

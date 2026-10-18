@@ -19,15 +19,15 @@ const fuzzFanVersion = "v1"
 // fuzzEmitter builds decoder/encoder source for a package's non-native fuzz
 // argument types, memoising one read/write helper pair per composite type.
 type fuzzEmitter struct {
-	genPkg   *types.Package
-	qual     types.Qualifier
-	pkgPaths map[string]bool
-	idents   map[string]string // type string -> helper identifier
-	taken    map[string]bool   // helper identifiers already handed out
-	helpers  map[string]string // helper identifier -> emitted source (read + write)
-	order    []string          // helper identifiers, in emission order
-	stack    []string          // type strings currently being emitted (cycle detection)
-	path     []string          // field path, for error messages
+	genPkg  *types.Package
+	qual    types.Qualifier   // names packages as the user writes them, for messages and literals
+	imps    *importSet        // names packages as the generated file imports them
+	idents  map[string]string // type string -> helper identifier
+	taken   map[string]bool   // helper identifiers already handed out
+	helpers map[string]string // helper identifier -> emitted source (read + write)
+	order   []string          // helper identifiers, in emission order
+	stack   []string          // type strings currently being emitted (cycle detection)
+	path    []string          // field path, for error messages
 
 	// literals/literalOrder mirror helpers/order, but for the composite
 	// literal-rendering functions (ƒ_fuzzlit_*). They are keyed on the same
@@ -38,14 +38,9 @@ type fuzzEmitter struct {
 	literalOrder []string
 	litStack     []string
 
-	// needsStrings/needsStrconv/needsMath track which standard library
-	// packages the emitted literal source actually references, so
-	// BuildFuzzCodecs can report exactly the imports the renderer needs to
-	// add — never more, since an unused import is a compile error in the
-	// generated file.
-	needsStrings bool
-	needsStrconv bool
-	needsMath    bool
+	// needsMath reports whether a literal function renders a float, which
+	// the shared float helper serves.
+	needsMath bool
 
 	// decoded names the targets with a position that is not handed to the
 	// engine as declared: their input is decoded from the leaves.
@@ -65,10 +60,13 @@ type fuzzEmitter struct {
 	hybridOrder []string
 }
 
-func newFuzzEmitter(pkg *packages.Package) *fuzzEmitter {
+func newFuzzEmitter(pkg *packages.Package, imps *importSet) *fuzzEmitter {
+	if imps == nil {
+		imps = newImportSet(pkg.PkgPath)
+	}
 	e := &fuzzEmitter{
 		genPkg:   pkg.Types,
-		pkgPaths: map[string]bool{},
+		imps:     imps,
 		idents:   map[string]string{},
 		taken:    map[string]bool{},
 		helpers:  map[string]string{},
@@ -82,11 +80,17 @@ func newFuzzEmitter(pkg *packages.Package) *fuzzEmitter {
 		if p == nil || p == e.genPkg {
 			return ""
 		}
-		e.pkgPaths[p.Path()] = true
 		return p.Name()
 	}
 	return e
 }
+
+// pkgRef imports one of the fixed packages and returns its alias.
+func (e *fuzzEmitter) pkgRef(path string) string { return e.imps.std(path) }
+
+func (e *fuzzEmitter) fuzzPkg() string    { return e.pkgRef(fuzzRuntimeImport) }
+func (e *fuzzEmitter) stringsPkg() string { return e.pkgRef("strings") }
+func (e *fuzzEmitter) strconvPkg() string { return e.pkgRef("strconv") }
 
 // assignName maps a type string to a stable, unique, valid Go identifier,
 // e.g. "[]string" -> "slice_string". Collisions get a numeric suffix, so the
@@ -237,7 +241,7 @@ func (e *fuzzEmitter) helper(t types.Type) (string, error) {
 	}
 
 	e.stack = append(e.stack, ts)
-	src, err := e.helperSource(t, ts, name)
+	src, err := e.helperSource(t, e.typeRef(t), name)
 	e.stack = e.stack[:len(e.stack)-1]
 	if err != nil {
 		return "", err
@@ -253,8 +257,8 @@ func (e *fuzzEmitter) helperSource(t types.Type, typeRef, name string) (string, 
 	writeName := "ƒ_fuzzwrite_" + fuzzFanVersion + "_" + name
 
 	var read, write strings.Builder
-	fmt.Fprintf(&read, "\nfunc %s(ƒr *gotestfuzz.Reader) %s {\n", readName, typeRef)
-	fmt.Fprintf(&write, "\nfunc %s(ƒw *gotestfuzz.Writer, ƒv %s) {\n", writeName, typeRef)
+	fmt.Fprintf(&read, "\nfunc %s(ƒr *%s.Reader) %s {\n", readName, e.fuzzPkg(), typeRef)
+	fmt.Fprintf(&write, "\nfunc %s(ƒw *%s.Writer, ƒv %s) {\n", writeName, e.fuzzPkg(), typeRef)
 
 	switch u := types.Unalias(t).Underlying().(type) {
 	case *types.Struct:
@@ -408,7 +412,10 @@ func (e *fuzzEmitter) reject(t types.Type, reason string) error {
 		strings.Join(e.path, "."), types.TypeString(t, e.qual), reason)
 }
 
-func (e *fuzzEmitter) typeRef(t types.Type) string { return types.TypeString(t, e.qual) }
+// typeRef names t in generated code; disp names it as the user writes it.
+func (e *fuzzEmitter) typeRef(t types.Type) string { return e.imps.typeRef(t) }
+
+func (e *fuzzEmitter) disp(t types.Type) string { return types.TypeString(t, e.qual) }
 
 // isLiteralStructShape reports whether t's underlying type is a struct —
 // the shape that gets the "&T{...}" pointer literal form rather than the
@@ -444,24 +451,24 @@ func isUnnamedByte(t types.Type) bool {
 // bits.
 const literalFloatHelperTpl = `
 func ƒ_fuzzlitfloat_%[1]s(v float64) string {
-	if math.IsInf(v, 1) {
+	if %[2]s.IsInf(v, 1) {
 		return "math.Inf(1)"
 	}
-	if math.IsInf(v, -1) {
+	if %[2]s.IsInf(v, -1) {
 		return "math.Inf(-1)"
 	}
-	if math.Float64bits(v) == math.Float64bits(math.NaN()) {
+	if %[2]s.Float64bits(v) == %[2]s.Float64bits(%[2]s.NaN()) {
 		return "math.NaN()"
 	}
-	if math.IsNaN(v) || v == 0 && math.Signbit(v) {
-		return "math.Float64frombits(0x" + strconv.FormatUint(math.Float64bits(v), 16) + ")"
+	if %[2]s.IsNaN(v) || v == 0 && %[2]s.Signbit(v) {
+		return "math.Float64frombits(0x" + %[3]s.FormatUint(%[2]s.Float64bits(v), 16) + ")"
 	}
-	return strconv.FormatFloat(v, 'g', -1, 64)
+	return %[3]s.FormatFloat(v, 'g', -1, 64)
 }
 
 func ƒ_fuzzlitfloat32_%[1]s(v float32) string {
-	if math.IsNaN(float64(v)) && math.Float32bits(v) != math.Float32bits(float32(math.NaN())) || v == 0 && math.Signbit(float64(v)) {
-		return "math.Float32frombits(0x" + strconv.FormatUint(uint64(math.Float32bits(v)), 16) + ")"
+	if %[2]s.IsNaN(float64(v)) && %[2]s.Float32bits(v) != %[2]s.Float32bits(float32(%[2]s.NaN())) || v == 0 && %[2]s.Signbit(float64(v)) {
+		return "math.Float32frombits(0x" + %[3]s.FormatUint(uint64(%[2]s.Float32bits(v)), 16) + ")"
 	}
 	return ƒ_fuzzlitfloat_%[1]s(float64(v))
 }
@@ -565,22 +572,25 @@ func wrapLiteral(typeName, inner string) string {
 // unnamed float32 (whose non-finite rendering has concrete type float64, a
 // mismatch), needs the assignment to type-check.
 func (e *fuzzEmitter) basicLiteralExpr(b *types.Basic, src string) (string, error) {
-	e.needsStrconv = true
 	switch b.Kind() {
 	case types.Bool:
-		return fmt.Sprintf("strconv.FormatBool(bool(%s))", src), nil
+		return fmt.Sprintf("%s.FormatBool(bool(%s))", e.strconvPkg(), src), nil
 	case types.Int, types.Int8, types.Int16, types.Int32, types.Int64:
-		return fmt.Sprintf("strconv.FormatInt(int64(%s), 10)", src), nil
+		return fmt.Sprintf("%s.FormatInt(int64(%s), 10)", e.strconvPkg(), src), nil
 	case types.Uint, types.Uint8, types.Uint16, types.Uint32, types.Uint64:
-		return fmt.Sprintf("strconv.FormatUint(uint64(%s), 10)", src), nil
+		return fmt.Sprintf("%s.FormatUint(uint64(%s), 10)", e.strconvPkg(), src), nil
 	case types.Float32:
 		e.needsMath = true
+		e.pkgRef("math")
+		e.strconvPkg()
 		return fmt.Sprintf("ƒ_fuzzlitfloat32_%s(float32(%s))", fuzzFanVersion, src), nil
 	case types.Float64:
 		e.needsMath = true
+		e.pkgRef("math")
+		e.strconvPkg()
 		return fmt.Sprintf("ƒ_fuzzlitfloat_%s(float64(%s))", fuzzFanVersion, src), nil
 	case types.String:
-		return fmt.Sprintf("strconv.Quote(string(%s))", src), nil
+		return fmt.Sprintf("%s.Quote(string(%s))", e.strconvPkg(), src), nil
 	}
 	return "", fmt.Errorf("basicLiteralExpr: kind %v has no literal rendering", b.Kind())
 }
@@ -594,17 +604,17 @@ func (e *fuzzEmitter) literalBasicWrapped(t types.Type, src string) (string, err
 	if named, ok := u.(*types.Named); ok {
 		b, ok := named.Underlying().(*types.Basic)
 		if !ok {
-			return "", fmt.Errorf("literalBasicWrapped: %s is not a named basic type", e.typeRef(t))
+			return "", fmt.Errorf("literalBasicWrapped: %s is not a named basic type", e.disp(t))
 		}
 		inner, err := e.basicLiteralExpr(b, src)
 		if err != nil {
 			return "", err
 		}
-		return wrapLiteral(e.typeRef(t), inner), nil
+		return wrapLiteral(e.disp(t), inner), nil
 	}
 	b, ok := u.(*types.Basic)
 	if !ok {
-		return "", fmt.Errorf("literalBasicWrapped: %s is not a basic type", e.typeRef(t))
+		return "", fmt.Errorf("literalBasicWrapped: %s is not a basic type", e.disp(t))
 	}
 	inner, err := e.basicLiteralExpr(b, src)
 	if err != nil {
@@ -638,7 +648,7 @@ func (e *fuzzEmitter) literalExpr(t types.Type, src string) (string, error) {
 	case *types.Slice, *types.Struct, *types.Array, *types.Pointer:
 		return e.literalHelperCall(t, src)
 	}
-	return "", fmt.Errorf("literalExpr: %s has no literal rendering", e.typeRef(t))
+	return "", fmt.Errorf("literalExpr: %s has no literal rendering", e.disp(t))
 }
 
 func (e *fuzzEmitter) literalHelperCall(t types.Type, src string) (string, error) {
@@ -690,7 +700,7 @@ func (e *fuzzEmitter) literalHelper(t types.Type) (string, error) {
 func (e *fuzzEmitter) literalHelperSource(t types.Type, typeRef, name string) (string, error) {
 	funcName := "ƒ_fuzzlit_" + fuzzFanVersion + "_" + name
 	var b strings.Builder
-	fmt.Fprintf(&b, "\nfunc %s(ƒv %s) string {\n", funcName, typeRef)
+	fmt.Fprintf(&b, "\nfunc %s(ƒv %s) string {\n", funcName, e.typeRef(t))
 
 	u := types.Unalias(t)
 	underlying := u
@@ -707,8 +717,7 @@ func (e *fuzzEmitter) literalHelperSource(t types.Type, typeRef, name string) (s
 		fmt.Fprintf(&b, "\treturn %s\n", expr)
 
 	case *types.Struct:
-		e.needsStrings = true
-		b.WriteString("\tvar ƒb strings.Builder\n")
+		fmt.Fprintf(&b, "\tvar ƒb %s.Builder\n", e.stringsPkg())
 		fmt.Fprintf(&b, "\tƒb.WriteString(%q)\n", typeRef+"{")
 		wrote := false
 		for i := 0; i < under.NumFields(); i++ {
@@ -733,11 +742,9 @@ func (e *fuzzEmitter) literalHelperSource(t types.Type, typeRef, name string) (s
 	case *types.Slice:
 		b.WriteString("\tif ƒv == nil {\n\t\treturn \"nil\"\n\t}\n")
 		if isUnnamedByte(under.Elem()) {
-			e.needsStrconv = true
-			fmt.Fprintf(&b, "\treturn %q + strconv.Quote(string(ƒv)) + %q\n", typeRef+"(", ")")
+			fmt.Fprintf(&b, "\treturn %q + %s.Quote(string(ƒv)) + %q\n", typeRef+"(", e.strconvPkg(), ")")
 		} else {
-			e.needsStrings = true
-			b.WriteString("\tvar ƒb strings.Builder\n")
+			fmt.Fprintf(&b, "\tvar ƒb %s.Builder\n", e.stringsPkg())
 			fmt.Fprintf(&b, "\tƒb.WriteString(%q)\n", typeRef+"{")
 			b.WriteString("\tfor ƒi := range ƒv {\n")
 			b.WriteString("\t\tif ƒi > 0 {\n\t\t\tƒb.WriteString(\", \")\n\t\t}\n")
@@ -752,8 +759,7 @@ func (e *fuzzEmitter) literalHelperSource(t types.Type, typeRef, name string) (s
 		}
 
 	case *types.Array:
-		e.needsStrings = true
-		b.WriteString("\tvar ƒb strings.Builder\n")
+		fmt.Fprintf(&b, "\tvar ƒb %s.Builder\n", e.stringsPkg())
 		fmt.Fprintf(&b, "\tƒb.WriteString(%q)\n", typeRef+"{")
 		b.WriteString("\tfor ƒi := range ƒv {\n")
 		b.WriteString("\t\tif ƒi > 0 {\n\t\t\tƒb.WriteString(\", \")\n\t\t}\n")
@@ -785,7 +791,7 @@ func (e *fuzzEmitter) literalHelperSource(t types.Type, typeRef, name string) (s
 			// assume). Reusing literalExpr's element rendering means a named
 			// basic still gets its explicit conversion, e.g.
 			// "&[]Level{Level(3)}[0]".
-			elemTypeRef := e.typeRef(under.Elem())
+			elemTypeRef := e.disp(under.Elem())
 			fmt.Fprintf(&b, "\treturn %q + %s + %q\n", "&[]"+elemTypeRef+"{", expr, "}[0]")
 		}
 
