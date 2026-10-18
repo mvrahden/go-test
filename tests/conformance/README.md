@@ -1,19 +1,22 @@
 # Conformance suites
 
-These suites are the behavior catalog of gotest in executable form. Every
-`When`/`It` here is one sentence of the contract; `gotest spec --static` reads
-the sentences from source and `make catalog` writes them to
-`docs/design/catalog.md` and `docs/design/catalog.json`. A CI step fails when
-the committed catalog differs from a fresh render, and a conventions suite
-fails when any behavior is marked incomplete, so the catalog is always the
-whole, current list.
+These suites verify [`specs/`](../../specs/README.md), where gotest's behavior
+is stated. A `When` label and an `It` label directly under it are the key that
+binds a test to a scenario: they equal the scenario's WHEN and one of its THEN
+or AND texts. `gotest spec --static` reads the labels from source and `make
+catalog` indexes them in `docs/design/catalog.json`. A CI step fails when the committed index differs
+from a fresh render, and a conventions suite fails when any behavior is marked
+incomplete, so the index is always the whole, current list.
 
 ## Naming
 
-- One package per catalog section: `cli`, `lifecycle`, `fixtures`,
-  `discovery`, `assertions`, `bench`, `fuzz`, `spec`, `lint`, `migrate`.
-- Suite and method names mirror the headings of `docs/design/spec.md`
-  (`CLIFlagsTestSuite` under "CLI Interface › Flags").
+- One package per capability in `specs/`: `tests/conformance/<capability>`
+  verifies `specs/<capability>/spec.md` (`tests/conformance/cli` verifies
+  `specs/cli/spec.md`). The packages `lifecycle`, `fixtures`, `discovery`,
+  `assertions`, `fuzz`, `spec`, `lint` and `migrate` wait for their spec.
+- A suite groups requirements of its capability (`CLIFlagsTestSuite` in
+  `cli`) and a method verifies scenarios of one requirement. Names bind
+  nothing; the labels do.
 - `When` names the branch, not the connective: `t.When("the run is stopped")`.
 - `It` names one observable: a verdict, an event, an output or a resource
   fact, with the numbers it pins in the text.
@@ -28,28 +31,33 @@ whole, current list.
 `GOTEST_CANARY_DIR/markers`. Testdata packages live under
 `tests/conformance/testdata`.
 
-## Quoting a clause in prose
+## Specifying a behavior
 
-`docs/design/spec.md`, `AGENTS.md`, `README.md` and the agent skill state a
-behavior only by quoting a clause as a blockquote:
+A behavior is stated once, in `specs/<capability>/spec.md`, and written in
+this order:
 
-> when the version subcommand runs → exits 0 and prints the version on stdout
+1. **Spec first.** Add a scenario under its requirement in the spec. The
+   binding suite in `tests/conventions` goes red: the scenario has no clause.
+2. **Then the clause.** Write the conformance `When`/`It` whose labels equal
+   the scenario's WHEN text and each of its THEN and AND texts. A clause is an
+   `It` directly under a `When`; the rows of an `Each` table are not clauses,
+   and nothing under a suite the `X_` prefix disables is one.
+3. **Then the behavior.** Make the clause pass.
 
-The text before the arrow is a `When` label as the catalog renders it (the
-connective included) and the text after it is the `It` label directly under
-it. A conventions suite looks every quote up in `docs/design/catalog.json`,
-so a sentence that no longer matches a clause fails the build.
-
-Only an `It` directly under a `When` is a quotable clause. The rows of an
-`Each` table are pinned in prose by a link to their catalog section, never by
-a quote. Nothing under a suite the `X_` prefix disables is a clause.
+Guides (`README.md`, `AGENTS.md`, `docs/`, the agent skill) link the
+requirement, for example
+[the version requirement](../../specs/cli/spec.md#requirement-version), and
+never restate it. Rewording a promise changes the spec, the `When`/`It` label
+and any drill `Clause:` line in one commit.
 
 ## Verdict clauses and the drill
 
-A clause whose outcome is a verdict — an exit code, a pass or fail, a row of
-the event stream — ships with a ring-0 twin in `tests/canary`: the same check
-written with plain Go, no gotest assertion. Conformance suites assert with
-gotest, so a bug in the assertion engine could pass its own test; the twin is
-what the mutation drill holds the kernel to. The mutant's `Expect:` lines
-match the twin's output, and its `Clause:` line records which catalog
-sentence the twin protects.
+A ring-0 twin in `tests/canary` — the same check written with plain Go, no
+gotest assertion — is required exactly when the mutant lives in what a test
+binary links (`pkg/gotest`, `pkg/gotestruntime`, `internal/gotestgen`).
+Conformance suites assert with that code, so a mutant there could pass its own
+test; the drill then judges without the conformance suites, and the mutant's
+`Expect:` lines match the twin's output. Any other clause is judged by its own
+conformance suite: the drill adds the packages whose specs state the patch's
+`Clause:` lines, and the `Expect:` line is that It's failure line as the judge
+prints it.

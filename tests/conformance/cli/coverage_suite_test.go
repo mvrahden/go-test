@@ -21,24 +21,26 @@ func (s *CLICoverageProfileTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 func (s *CLICoverageProfileTestSuite) TestProfileSpellings(t *gotest.T) {
 	t.When("a fully covered package runs with a minimum and a profile", func(w *gotest.T) {
-		for it, row := range gotest.Each(w, []flagRow{
-			{Desc: "-coverprofile=file passes the gate", args: []string{"--min=1", "-coverprofile=PROFILE", "../testdata/covered/"}, exit: 0},
-			{Desc: "-coverprofile file passes the gate", args: []string{"--min=1", "-coverprofile", "PROFILE", "../testdata/covered/"}, exit: 0},
-			{Desc: "summary -coverprofile=file prints the coverage", args: []string{"summary", "-coverprofile=PROFILE", "../testdata/covered/"}, exit: 0, stdoutHas: "Coverage:"},
-			{Desc: "summary -coverprofile file prints the coverage", args: []string{"summary", "-coverprofile", "PROFILE", "../testdata/covered/"}, exit: 0, stdoutHas: "Coverage:"},
-			{Desc: "the gate still sees the profile when words follow -args", args: []string{"--min=50", "../testdata/covered/", "-args", "extra"}, exit: 0},
-		}) {
-			profile := filepath.Join(it.TempDir(), "cover.out")
-			args := make([]string, len(row.args))
-			for i, a := range row.args {
-				args[i] = strings.ReplaceAll(a, "PROFILE", profile)
+		w.It("finds the profile in every spelling go test accepts, for the --min gate and for summary", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []flagRow{
+				{Desc: "-coverprofile=file passes the gate", args: []string{"--min=1", "-coverprofile=PROFILE", "../testdata/covered/"}, exit: 0},
+				{Desc: "-coverprofile file passes the gate", args: []string{"--min=1", "-coverprofile", "PROFILE", "../testdata/covered/"}, exit: 0},
+				{Desc: "summary -coverprofile=file prints the coverage", args: []string{"summary", "-coverprofile=PROFILE", "../testdata/covered/"}, exit: 0, stdoutHas: "Coverage:"},
+				{Desc: "summary -coverprofile file prints the coverage", args: []string{"summary", "-coverprofile", "PROFILE", "../testdata/covered/"}, exit: 0, stdoutHas: "Coverage:"},
+				{Desc: "the gate still sees the profile when words follow -args", args: []string{"--min=50", "../testdata/covered/", "-args", "extra"}, exit: 0},
+			}) {
+				profile := filepath.Join(sub.TempDir(), "cover.out")
+				args := make([]string, len(row.args))
+				for i, a := range row.args {
+					args[i] = strings.ReplaceAll(a, "PROFILE", profile)
+				}
+				run, err := testkit.RunCLI(sub.Context(), ".", args...)
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, row.exit, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				if row.stdoutHas != "" {
+					gotest.Contains(sub, run.Stdout, row.stdoutHas)
+				}
 			}
-			run, err := testkit.RunCLI(it.Context(), ".", args...)
-			gotest.NoError(it, err)
-			gotest.Equal(it, row.exit, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
-			if row.stdoutHas != "" {
-				gotest.Contains(it, run.Stdout, row.stdoutHas)
-			}
-		}
+		})
 	})
 }

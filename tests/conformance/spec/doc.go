@@ -1,2 +1,2 @@
-// Package spec holds the conformance suites for the "spec" part of the behavior catalog.
+// Package spec holds the conformance suites that verify specs/spec/spec.md.
 package spec

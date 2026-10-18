@@ -3,6 +3,7 @@
 gotest is a code-generation framework for Go test suites.
 You write suite structs with lifecycle methods and test cases; the `gotest generate` command produces the test harness (test functions, fixture initialization, lifecycle wiring).
 The generated code is not hand-edited.
+Every behavioral promise gotest makes is stated once in [`specs/`](specs/README.md), each scenario bound to a test; this reference explains and links there.
 
 All assertions accept `*gotest.T`, `*testing.T`, `*gotest.B` and `*gotest.F` as first argument, and report a failure at the line that failed in each.
 

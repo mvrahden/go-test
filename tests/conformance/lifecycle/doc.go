@@ -1,2 +1,2 @@
-// Package lifecycle holds the conformance suites for the "lifecycle" part of the behavior catalog.
+// Package lifecycle holds the conformance suites that verify specs/lifecycle/spec.md.
 package lifecycle

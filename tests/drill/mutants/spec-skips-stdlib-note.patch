@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli .* / notes them on stderr in the plain, -json, summary and spec modes / spec notes them on stderr \(
+Clause: when a package has only stdlib tests → notes them on stderr in the plain, -json, summary and spec modes
+--- a/cmd/gotest/spec.go
++++ b/cmd/gotest/spec.go
+@@ -139,7 +139,6 @@ func runSpec(inv Invocation) int { //nol
+ 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
+ 		return 2
+ 	}
+-	noteStdlibTests(overlay.StdlibTestsByPkg)
+ 	gotestrunner.NoteBenchmarksNotRun(os.Stderr, goTestArgs, len(overlay.Declared.Benchmarks))
+ 
+ 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))

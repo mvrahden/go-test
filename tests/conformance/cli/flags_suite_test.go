@@ -28,42 +28,46 @@ type flagRow struct {
 
 func (s *CLIFlagsTestSuite) TestBooleanFlagSpellings(t *gotest.T) {
 	t.When("a boolean flag is spelled in each accepted form", func(w *gotest.T) {
-		for it, row := range gotest.Each(w, []flagRow{
-			{Desc: "--ci guards a focused run", args: []string{"--ci", "../testdata/focused/"}, exit: 1, stderrHas: "F_"},
-			{Desc: "--ci=true guards a focused run", args: []string{"--ci=true", "../testdata/focused/"}, exit: 1, stderrHas: "F_"},
-			{Desc: "--ci=false lets a focused run pass", args: []string{"--ci=false", "../testdata/focused/"}, exit: 0},
-			{Desc: "the last occurrence wins", args: []string{"--ci", "--ci=false", "../testdata/focused/"}, exit: 0},
-			{Desc: "a non-boolean value is a usage error", args: []string{"--ci=maybe", "../testdata/focused/"}, exit: 2, stderrHas: `invalid boolean value "maybe" for --ci`},
-			{Desc: "summary --no-color=true prints no color codes", args: []string{"summary", "--no-color=true", "../testdata/passing/"}, exit: 0, stdoutNot: "\x1b["},
-		}) {
-			run, err := testkit.RunCLI(it.Context(), ".", row.args...)
-			gotest.NoError(it, err)
-			gotest.Equal(it, row.exit, run.Exit, "stderr: %s", run.Stderr)
-			if row.stderrHas != "" {
-				gotest.Contains(it, run.Stderr, row.stderrHas)
+		w.It("reads --x, --x=true and --x=false, lets the last occurrence win and refuses any other value", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []flagRow{
+				{Desc: "--ci guards a focused run", args: []string{"--ci", "../testdata/focused/"}, exit: 1, stderrHas: "F_"},
+				{Desc: "--ci=true guards a focused run", args: []string{"--ci=true", "../testdata/focused/"}, exit: 1, stderrHas: "F_"},
+				{Desc: "--ci=false lets a focused run pass", args: []string{"--ci=false", "../testdata/focused/"}, exit: 0},
+				{Desc: "the last occurrence wins", args: []string{"--ci", "--ci=false", "../testdata/focused/"}, exit: 0},
+				{Desc: "a non-boolean value is a usage error", args: []string{"--ci=maybe", "../testdata/focused/"}, exit: 2, stderrHas: `invalid boolean value "maybe" for --ci`},
+				{Desc: "summary --no-color=true prints no color codes", args: []string{"summary", "--no-color=true", "../testdata/passing/"}, exit: 0, stdoutNot: "\x1b["},
+			}) {
+				run, err := testkit.RunCLI(sub.Context(), ".", row.args...)
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, row.exit, run.Exit, "stderr: %s", run.Stderr)
+				if row.stderrHas != "" {
+					gotest.Contains(sub, run.Stderr, row.stderrHas)
+				}
+				if row.stdoutNot != "" {
+					gotest.NotContains(sub, run.Stdout, row.stdoutNot)
+				}
 			}
-			if row.stdoutNot != "" {
-				gotest.NotContains(it, run.Stdout, row.stdoutNot)
-			}
-		}
+		})
 	})
 }
 
 func (s *CLIFlagsTestSuite) TestValueFlagsAndUnknownFlags(t *gotest.T) {
 	t.When("a value flag or an unknown flag is given to a command", func(w *gotest.T) {
-		for it, row := range gotest.Each(w, []flagRow{
-			{Desc: "a value flag at the end without a value is a usage error", args: []string{"../testdata/passing/", "--min"}, exit: 2, stderrHas: "needs a value"},
-			{Desc: "an unknown flag is a usage error for a run", args: []string{"--bogus", "../testdata/passing/"}, exit: 2, stderrHas: "--bogus"},
-			{Desc: "an unknown flag is a usage error for clean", args: []string{"clean", "--bogus", "../testdata/passing/"}, exit: 2, stderrHas: "--bogus"},
-			{Desc: "an unknown flag is a usage error for generate", args: []string{"generate", "--bogus", "../testdata/passing/"}, exit: 2, stderrHas: "--bogus"},
-			{Desc: "an unknown flag is a usage error for discover", args: []string{"discover", "--bogus", "../testdata/passing/"}, exit: 2, stderrHas: "--bogus"},
-			{Desc: "an unknown flag is a usage error for prepare", args: []string{"prepare", "--bogus", "../testdata/passing/"}, exit: 2, stderrHas: "--bogus"},
-			{Desc: "a flag another command owns is refused", args: []string{"clean", "--debug", "../testdata/passing/"}, exit: 2, stderrHas: "not valid for this subcommand"},
-		}) {
-			run, err := testkit.RunCLI(it.Context(), ".", row.args...)
-			gotest.NoError(it, err)
-			gotest.Equal(it, row.exit, run.Exit, "stdout: %s stderr: %s", run.Stdout, run.Stderr)
-			gotest.Contains(it, run.Stderr, row.stderrHas)
-		}
+		w.It("refuses a missing value, an unknown flag and another command's flag with exit 2", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []flagRow{
+				{Desc: "a value flag at the end without a value is a usage error", args: []string{"../testdata/passing/", "--min"}, exit: 2, stderrHas: "needs a value"},
+				{Desc: "an unknown flag is a usage error for a run", args: []string{"--bogus", "../testdata/passing/"}, exit: 2, stderrHas: "--bogus"},
+				{Desc: "an unknown flag is a usage error for clean", args: []string{"clean", "--bogus", "../testdata/passing/"}, exit: 2, stderrHas: "--bogus"},
+				{Desc: "an unknown flag is a usage error for generate", args: []string{"generate", "--bogus", "../testdata/passing/"}, exit: 2, stderrHas: "--bogus"},
+				{Desc: "an unknown flag is a usage error for discover", args: []string{"discover", "--bogus", "../testdata/passing/"}, exit: 2, stderrHas: "--bogus"},
+				{Desc: "an unknown flag is a usage error for prepare", args: []string{"prepare", "--bogus", "../testdata/passing/"}, exit: 2, stderrHas: "--bogus"},
+				{Desc: "a flag another command owns is refused", args: []string{"clean", "--debug", "../testdata/passing/"}, exit: 2, stderrHas: "not valid for this subcommand"},
+			}) {
+				run, err := testkit.RunCLI(sub.Context(), ".", row.args...)
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, row.exit, run.Exit, "stdout: %s stderr: %s", run.Stdout, run.Stderr)
+				gotest.Contains(sub, run.Stderr, row.stderrHas)
+			}
+		})
 	})
 }

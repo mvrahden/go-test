@@ -1,2 +1,2 @@
-// Package lint holds the conformance suites for the "lint" part of the behavior catalog.
+// Package lint holds the conformance suites that verify specs/lint/spec.md.
 package lint

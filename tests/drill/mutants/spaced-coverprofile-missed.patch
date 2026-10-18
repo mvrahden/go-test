@@ -1,0 +1,20 @@
+Expect: ^FAIL .*conformance/cli .* / finds the profile in every spelling go test accepts, for the --min gate and for summary / summary -coverprofile file prints the coverage \(
+Clause: when a fully covered package runs with a minimum and a profile → finds the profile in every spelling go test accepts, for the --min gate and for summary
+--- a/internal/gotestrunner/args.go
++++ b/internal/gotestrunner/args.go
+@@ -282,7 +282,14 @@ func ExtractBenchFilter(runFlags []strin
+ func StripBenchFilter(runFlags []string) []string { return stripFlag(runFlags, "-bench") }
+ 
+ // ExtractCoverProfile returns the value of -coverprofile from run flags, if present.
+-func ExtractCoverProfile(runFlags []string) string { return extractFlag(runFlags, "-coverprofile") }
++func ExtractCoverProfile(runFlags []string) string {
++	for _, f := range runFlags {
++		if v, ok := strings.CutPrefix(f, "-coverprofile="); ok {
++			return v
++		}
++	}
++	return ""
++}
+ 
+ // StripCoverProfile removes -coverprofile and its value from run flags.
+ func StripCoverProfile(runFlags []string) []string { return stripFlag(runFlags, "-coverprofile") }

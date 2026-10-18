@@ -1,4 +1,5 @@
-// Command render writes the behavior catalog into docs/design.
+// Command render writes the JSON index of the conformance When and It labels
+// into docs/design.
 package main
 
 import (
@@ -16,16 +17,14 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	md, js, err := speccatalog.Render(context.Background(), root)
+	js, err := speccatalog.Render(context.Background(), root)
 	if err != nil {
 		fail(err)
 	}
-	for path, data := range map[string][]byte{speccatalog.MarkdownPath: md, speccatalog.JSONPath: js} {
-		if err := os.WriteFile(filepath.Join(root, path), data, 0o644); err != nil { //nolint:gosec // G306: a committed document
-			fail(err)
-		}
-		fmt.Println("wrote", path)
+	if err := os.WriteFile(filepath.Join(root, speccatalog.JSONPath), js, 0o644); err != nil { //nolint:gosec // G306: a committed document
+		fail(err)
 	}
+	fmt.Println("wrote", speccatalog.JSONPath)
 }
 
 func fail(err error) {

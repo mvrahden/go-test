@@ -5,11 +5,16 @@
 # a patch that no longer applies exactly, a mutant that does not compile, or
 # one caught by the wrong check fails the drill. The shell judges by exit
 # code and log text, so nothing in gotest grades its own exam.
+# The test binaries that link the mutated code never judge it: a mutant under
+# pkg/gotest, pkg/gotestruntime or internal/gotestgen is judged by the ring-0
+# packages and the canary alone. Every other clause a patch names is also
+# judged by the conformance suite that states it.
 set -uo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
+# Judged under every mutant; the packages of the patch's clauses join them.
 pkgs=(./pkg/gotest/internal/... ./pkg/gotestruntime/... ./internal/gotestspec/... ./tests/canary/...)
 
-# --list-unmutated prints the catalog clauses no patch names on a Clause: line,
+# --list-unmutated prints the clauses of specs/ no patch names on a Clause: line,
 # by the reading the conventions suite holds the budget to.
 if [ "${1:-}" = "--list-unmutated" ]; then
   (cd "$root" && go run ./internal/speccatalog/clauses --unmutated)
@@ -51,6 +56,15 @@ for patch in "${patches[@]}"; do
     failed=1
     continue
   fi
+  # The conformance packages stating the patch's clauses, read from the
+  # pristine tree; none when the mutant lives in what test binaries link.
+  if ! judged=$(cd "$root" && go run ./internal/speccatalog/clauses --judge-packages "$patch" 2>"$judgedir/clauses.log"); then
+    echo "DRILL  $name: Clause line names no clause of specs/"
+    sed 's/^/       /' "$judgedir/clauses.log"
+    failed=1
+    continue
+  fi
+  mapfile -t extra < <(printf '%s' "$judged")
   rm -rf "$work"; mkdir -p "$work"
   tar --exclude=./.git --exclude=./.worktrees --exclude=./node_modules --exclude='./vscode-gotest/node_modules' -C "$root" -cf - . | tar -xf - -C "$work"
   # Exact context only; a line offset is fine since the context still matches verbatim.
@@ -62,13 +76,13 @@ for patch in "${patches[@]}"; do
     continue
   fi
   # The judge exits 2 on a build failure, which would pass for caught.
-  if ! (cd "$work" && go build ./... && go test -vet=off -c -o "$work/.drillbin/" "${pkgs[@]}") >"$work/build.log" 2>&1; then
+  if ! (cd "$work" && go build ./... && go test -vet=off -c -o "$work/.drillbin/" "${pkgs[@]}" "${extra[@]}") >"$work/build.log" 2>&1; then
     echo "DRILL  $name: mutant does not compile, refresh it"
     sed 's/^/       /' "$work/build.log" | tail -5
     failed=1
     continue
   fi
-  if (cd "$work" && "$judge" summary --no-cache "${pkgs[@]}" >"$work/drill.log" 2>&1); then
+  if (cd "$work" && "$judge" summary --no-cache "${pkgs[@]}" "${extra[@]}" >"$work/drill.log" 2>&1); then
     echo "DRILL  $name: SURVIVED, the guards did not catch it"
     sed 's/^/       /' "$work/drill.log" | tail -5
     failed=1

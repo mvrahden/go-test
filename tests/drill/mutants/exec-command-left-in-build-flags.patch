@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli .* / keeps the meaning go test gives the flag, or refuses it with a reason / -exec wraps every suite binary \(
+Clause: when a go test flag gotest implements itself is given → keeps the meaning go test gives the flag, or refuses it with a reason
+--- a/internal/gotestrunner/args.go
++++ b/internal/gotestrunner/args.go
+@@ -471,7 +471,6 @@ func ExtractExecPrefix(buildFlags []stri
+ 		}
+ 		if f == "-exec" && i+1 < len(buildFlags) {
+ 			prefix = strings.Fields(buildFlags[i+1])
+-			i++
+ 			continue
+ 		}
+ 		rest = append(rest, f)

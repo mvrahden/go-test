@@ -128,6 +128,8 @@ Test output is standard — but the mechanism behind it isn't.
 Under the hood, `gotest` generates the same `t.Run`, `t.Cleanup`, and `defer` code you'd write by hand.
 Generated files never touch your source tree — they're created hidden before tests run and cleaned up after.
 
+gotest's own behavioral promises are stated once in [`specs/`](specs/README.md), each scenario bound to a test; this README explains them and links there.
+
 ## How It Works
 
 ```

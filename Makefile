@@ -1,8 +1,10 @@
-.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package
+.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package spec-validate
 
 # Must ship x/tools >= v0.46.0, the first that reads Go 1.27 export data.
 # Move it with the Go version the workflows test.
 GOLANGCI_VERSION := v2.14.0
+
+SPECS_DIR ?= specs
 
 # The whole Go gate, spelled once; the workflows run these same targets.
 ci: checks lint test drill
@@ -20,6 +22,12 @@ drill:
 
 catalog:
 	go run ./internal/speccatalog/render
+
+# The OpenSpec CLI only reads openspec/specs, so the link lives in a temp copy.
+spec-validate:
+	@tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
+	cp -R "$(SPECS_DIR)" "$$tmp/specs" && mkdir "$$tmp/openspec" && ln -s ../specs "$$tmp/openspec/specs" && \
+	cd "$$tmp" && npx --yes @fission-ai/openspec validate --specs --strict
 
 vet:
 	go vet ./... ./examples/...
