@@ -1,0 +1,12 @@
+Expect: hookoverrun: TestSlow did not fail
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -72,7 +72,7 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
+ 			tt := TestT(it, cfg.Timeout)
+ 			// The budget covers the fixture hooks, the suite hooks and the body:
+ 			// ended last, after every AfterEach registered below.
+-			defer watchMethod(it, budget.Timeout)()
++			defer watchMethod(it, 0)()
+ 			for _, f := range m.Fixtures {
+ 				if f.Before != nil {
+ 					if err := f.Before(it.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook, at the hook

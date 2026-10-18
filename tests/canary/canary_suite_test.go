@@ -382,6 +382,23 @@ func (s *CanaryTestSuite) TestAFailedFixtureBeforeEachPairsWithNothing(t *gotest
 	}
 }
 
+// The suite's Timeout is the whole method's budget: a fixture BeforeEach that
+// sleeps past it fails the method, and the body never starts with an expired
+// context.
+func (s *CanaryTestSuite) TestAHookOverrunFailsTheMethod(t *gotest.T) {
+	dir := t.TempDir()
+	code, rows := s.run(t, "hookoverrun", dir)
+	if code != 1 {
+		t.Errorf("hookoverrun: exit code %d, want 1", code)
+	}
+	if !slices.Contains(rows, "hookoverrun fail TestOverrunTestSuite/TestSlow") {
+		t.Errorf("hookoverrun: TestSlow did not fail: %v", rows)
+	}
+	if got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile)); slices.Contains(got, "body") {
+		t.Errorf("hookoverrun: the body ran after the budget was blown: %v", got)
+	}
+}
+
 // A run stopped while a method holds: the methods not yet started are skipped
 // with the reason run stopping, the holding method's context ends, and AfterAll
 // runs before the fixture is released. Ring 0: the conformance suite that

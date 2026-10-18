@@ -46,7 +46,7 @@ type Method struct {
 // AfterEach pairs with its BeforeEach: it is registered only once that
 // succeeded, so a hook never releases what was never acquired. cfg bounds
 // each method's context and budget is the Timeout it is held to, as returned
-// by [OpenSuite]. With cfg.FailFast, a failure stops the methods that have
+// by [OpenSuite]; the budget covers the hooks and the body alike. With cfg.FailFast, a failure stops the methods that have
 // not started yet. Once the run is asked to stop, a method that has not
 // started is skipped with the reason "run stopping".
 func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
@@ -70,6 +70,9 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 				}()
 			}
 			tt := TestT(it, cfg.Timeout)
+			// The budget covers the fixture hooks, the suite hooks and the body:
+			// ended last, after every AfterEach registered below.
+			defer watchMethod(it, budget.Timeout)()
 			for _, f := range m.Fixtures {
 				if f.Before != nil {
 					if err := f.Before(it.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook, at the hook

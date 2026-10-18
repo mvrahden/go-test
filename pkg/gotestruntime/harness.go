@@ -91,19 +91,31 @@ func TestT(t *testing.T, timeout time.Duration) *gotest.T {
 	return testScopedT(t, timeout)
 }
 
-// RunTest runs one test method, held to budget when the suite declared one.
-// A zero budget means no verdict is enforced; the context handed to the method
-// is bounded separately by [TestT].
+// RunTest runs one test method's body. The method's budget watch, started by
+// [RunMethods] around its hooks and body alike, has already failed the method
+// when a hook overran it; the body then never starts with an expired context
+// and a verdict of its own. A zero budget means no verdict is enforced; the
+// context handed to the method is bounded separately by [TestT].
 func RunTest(t *gotest.T, budget time.Duration, run func()) {
-	end := watchPhase(t.T(), budget, "", "Timeout")
-	bodies.Store(t.T(), end)
-	defer bodies.Delete(t.T())
-	defer end()
+	if budget > 0 && t.Context().Err() != nil && t.T().Failed() {
+		return
+	}
 	run()
 }
 
-// bodies holds, per running test method, the end of its budget watch: an
-// async method's body ends before the method does (see [AwaitDoneAt]).
+// watchMethod starts the budget watch of one test method, covering its hooks
+// and body, and returns what ends it; an async method's body ends before the
+// method does (see [AwaitDoneAt]), so the watch is kept per method.
+func watchMethod(t *testing.T, budget time.Duration) (end func()) {
+	watch := watchPhase(t, budget, "", "Timeout")
+	bodies.Store(t, watch)
+	return func() {
+		bodies.Delete(t)
+		watch()
+	}
+}
+
+// bodies holds, per running test method, the end of its budget watch.
 var bodies sync.Map // *testing.T -> func()
 
 // endBody ends the budget watch of t's method, whose body has returned.

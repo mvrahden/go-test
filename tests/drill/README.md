@@ -121,6 +121,7 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `stop-releases-before-afterall` | a stop tears the fixtures down at once instead of letting the suite finish | canary: the stopping fixture's AfterAll runs after the fixture is released |
 | `fixture-aftereach-without-before` | a fixture's AfterEach runs for a method whose BeforeEach failed | canary: the hook-failing fixture's AfterEach shows up after the failed BeforeEach |
 | `fixture-report-in-runtime` | a failing fixture hook is reported from the runtime's own file | canary: the hook-failing fixture's report does not name the hook's file |
+| `timeout-watches-nothing` | a suite's `Timeout` holds nothing to a budget | canary: the slow-hook fixture's method passes instead of failing its budget |
 
 ## Adding a mutant
 
