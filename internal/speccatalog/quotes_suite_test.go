@@ -37,6 +37,25 @@ func (s *QuotesTestSuite) TestClausesAreWhenArrowIt(t *gotest.T) {
 	})
 }
 
+const excludedCatalog = `{"packages":[{"nodes":[{"kind":"suite","display":"Parked","excluded":true,"children":[
+ {"kind":"method","display":"Parked","children":[
+  {"kind":"block","vocab":"when","display":"when the suite is parked","children":[
+   {"kind":"block","vocab":"it","display":"is not a sentence anyone may quote","children":[]}]}]}]},
+ {"kind":"suite","display":"Live","children":[
+ {"kind":"method","display":"Live","children":[
+  {"kind":"block","vocab":"when","display":"when the suite runs","children":[
+   {"kind":"block","vocab":"it","display":"is a sentence","children":[]}]}]}]}]}]}`
+
+func (s *QuotesTestSuite) TestExcludedSuitesYieldNoClauses(t *gotest.T) {
+	clauses, err := speccatalog.Clauses([]byte(excludedCatalog))
+	gotest.NoError(t, err)
+	t.When("a catalog holds an excluded suite beside a live one", func(w *gotest.T) {
+		w.It("yields the live suite's clauses alone", func(it *gotest.T) {
+			gotest.Equal(it, []string{"when the suite runs → is a sentence"}, clauses)
+		})
+	})
+}
+
 func (s *QuotesTestSuite) TestQuotesAreExtractedWithTheirLine(t *gotest.T) {
 	quotes := speccatalog.Quotes("doc.md", []byte(sampleDoc))
 	t.When("a document holds blockquotes", func(w *gotest.T) {

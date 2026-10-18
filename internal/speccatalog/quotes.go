@@ -20,11 +20,14 @@ type Quote struct {
 type node struct {
 	Display  string `json:"display"`
 	Vocab    string `json:"vocab"`
+	Excluded bool   `json:"excluded"`
 	Children []node `json:"children"`
 }
 
 // Clauses lists every "<when> → <it>" sentence the catalog JSON holds: one per
 // It block, paired with the innermost When block above it, both as rendered.
+// An excluded suite or method is parked, not promised: nothing under it is a
+// clause.
 func Clauses(js []byte) ([]string, error) {
 	var doc struct {
 		Packages []struct {
@@ -44,6 +47,9 @@ func Clauses(js []byte) ([]string, error) {
 }
 
 func collect(n node, when string, out *[]string) {
+	if n.Excluded {
+		return
+	}
 	switch n.Vocab {
 	case "when":
 		when = n.Display

@@ -68,12 +68,26 @@ func buildStaticSpec(loadResults []*gotestgen.LoadResult, broken []gotestgen.Bro
 				return pkgNode.Nodes[a].Name < pkgNode.Nodes[b].Name
 			})
 			gotestspec.ClassifyRoots(pkgNode.Nodes)
+			for _, n := range pkgNode.Nodes {
+				if n.Excluded {
+					markExcluded(n.Children)
+				}
+			}
 			out = append(out, pkgNode)
 		}
 	}
 
 	sort.SliceStable(out, func(a, b int) bool { return out[a].Path < out[b].Path })
 	return out, notes
+}
+
+// markExcluded carries an excluded suite's flag down to every block under it:
+// a reader of one node must not take a parked behavior for a live one.
+func markExcluded(nodes []*gotestspec.Node) {
+	for _, n := range nodes {
+		n.Excluded = true
+		markExcluded(n.Children)
+	}
 }
 
 func staticSuiteNode(suite *gotestast.TestSuiteSpec) (*gotestspec.Node, []string) {
