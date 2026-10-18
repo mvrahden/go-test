@@ -263,7 +263,7 @@ func (f *SchemaSharedFixture) AfterAll(_ context.Context) error {
 
 gotest resolves these dependencies in topological order. `PostgresSharedFixture.BeforeAll` runs first. When it completes, `SchemaSharedFixture.BeforeAll` runs. Independent fixtures (no dependency between them) set up concurrently. Teardown runs in reverse order. Cyclic dependencies are rejected at resolution time with a clear error message.
 
-Suites that depend on `SchemaSharedFixture` automatically get `PostgresSharedFixture` too — transitive dependencies are included. A suite doesn't need to list every fixture in the chain; the pointer to the leaf fixture is enough. For more composition patterns — embedding vs. referencing, and binding shared fixtures to package-local resources — see [Advanced Go Test Fixtures]({{< ref "/blog/advanced-fixture-patterns" >}}).
+Suites that depend on `SchemaSharedFixture` automatically get `PostgresSharedFixture` too — transitive dependencies are included. A suite doesn't need to list every fixture in the chain; the pointer to the leaf fixture is enough. For more composition patterns — referencing rather than embedding, and binding shared fixtures to package-local resources — see [Advanced Go Test Fixtures]({{< ref "/blog/advanced-fixture-patterns" >}}).
 
 ## Dispatch timing
 

@@ -45,42 +45,26 @@ CacheFixture ─────┘        │
 
 Multiple suites can reference the same fixture graph. Each suite runs in its own test process, so each suite constructs its own instances and pays its own `BeforeAll` — `APITestSuite` and `WorkerTestSuite` each get a `ServiceFixture` wired to its own `DatabaseFixture` and `CacheFixture`. The wiring is declared once and there is no coordination code; when the setup cost must be paid once for the whole run, promote the fixture to a `SharedFixture`.
 
-## Embedding vs. referencing
+## Referencing, not embedding
 
-There are two ways to use a fixture in a suite. The right choice depends on how tests interact with the fixture.
-
-### Reference (pointer field)
-
-```go {title="order_test.go"}
-type OrderTestSuite struct {
-    DB *DatabaseFixture
-}
-
-func (s *OrderTestSuite) TestCreateOrder(t *gotest.T) {
-    // Access through the fixture field
-    row := s.DB.Pool.QueryRow(ctx, "SELECT ...")
-    // ...
-}
-```
-
-### Embedding
+A suite uses a fixture through a named pointer field. That is the only form: the field's name is how tests reach the fixture, and its type is how the generator finds the dependency.
 
 ```go {title="pricing_test.go"}
 type PricingTestSuite struct {
-    *CatalogFixture
+    Catalog *CatalogFixture
 }
 
 func (s *PricingTestSuite) TestDiscountCalculation(t *gotest.T) {
-    // CatalogFixture's methods are promoted to the suite
-    product := s.GetProduct("SKU-001")
-    prices := s.ListPrices(product.ID)
+    // The fixture's domain API, reached through the field
+    product := s.Catalog.GetProduct("SKU-001")
+    prices := s.Catalog.ListPrices(product.ID)
     // ...
 }
 ```
 
-Embedding promotes the fixture's exported methods to the suite. This is useful when the fixture provides a domain-specific API (catalog operations, user factories) that tests call frequently. Referencing is better when you need explicit access to infrastructure like connection pools or containers, where the indirection through a named field makes the code clearer.
+Embedding the fixture instead (`*CatalogFixture` on a line of its own) is rejected at that field: `fixtures compose through a named pointer field`. The same goes for embedding another suite, or holding one in a field; the message points to the alternative, `share behavior through a generic contract suite`.
 
-The generator treats both forms identically for dependency resolution. The difference is purely ergonomic.
+The reason is what Go does with an embedded type: it promotes that type's methods onto the suite. A fixture carries `BeforeAll`, `AfterAll` and friends, and gotest reads hooks by name, so an embedded fixture would promote methods gotest reads from a type it never discovered as part of the suite. Rejecting the embed where it is written keeps each hook attached to the type that declares it. The cost is a few extra characters per call — `s.Catalog.GetProduct` instead of `s.GetProduct` — and the call site now says where the method lives.
 
 ## Container-backed fixtures
 
@@ -288,9 +272,9 @@ type ServiceFixture struct {
     Svc   *OrderService
 }
 
-// Suite: embeds the service fixture for ergonomic access
+// Suite: references the service fixture through a named field
 type OrderFlowTestSuite struct {
-    *ServiceFixture        // embedding
+    Orders *ServiceFixture   // reference
 }
 
 func (s *OrderFlowTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -298,10 +282,10 @@ func (s *OrderFlowTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func (s *OrderFlowTestSuite) TestPlaceOrder(t *gotest.T) {
-    // s.Svc is available directly (promoted from embedded ServiceFixture)
+    // s.Orders.Svc is the service layer ServiceFixture built
     // Each test runs in a transaction (PostgresFixture.BeforeEach)
     // Container startup is retried on failure (ContainerFixtureConfig)
-    order, err := s.Svc.Place(ctx, cart)
+    order, err := s.Orders.Svc.Place(ctx, cart)
     gotest.NoError(t, err)
     gotest.Equal(t, "confirmed", order.Status)
 }

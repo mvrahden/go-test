@@ -21,11 +21,11 @@ func (f *CatalogExtFixture) AfterAll(_ context.Context) error {
 }
 
 type PricingExtTestSuite struct {
-	*CatalogExtFixture
+	Catalog *CatalogExtFixture
 }
 
 func (s *PricingExtTestSuite) TestLookupExtPrice(t *gotest.T) {
 	t.It("returns the external catalog price", func(it *gotest.T) {
-		gotest.Equal(it, 9.99, s.Items["Widget"])
+		gotest.Equal(it, 9.99, s.Catalog.Items["Widget"])
 	})
 }
