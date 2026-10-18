@@ -102,6 +102,14 @@ When no --setup-timeout is given, the wait for a shared fixture's setup SHALL be
 - **THEN** the wait ends at the declared budget and the run fails
 - **AND** never runs the benchmark reading it
 
+### Requirement: A late fixture's dependencies
+A shared fixture started for the exclusive tail together with a dependency only the tail needs SHALL come up after that dependency, serve the suites that read it, and be torn down before it.
+
+#### Scenario: A tail fixture with a tail-only dependency
+- **WHEN** a shared fixture started for the exclusive tail depends on a shared fixture only the tail needs
+- **THEN** both come up, the dependency first, and the suite reading them passes
+- **AND** both are torn down, the dependent first
+
 ### Requirement: A stopped run ends the wait for a late fixture
 A run whose --timeout expires while a shared fixture started for the exclusive tail hangs SHALL end the wait, fail, and leave no fixture process behind.
 

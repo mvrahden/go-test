@@ -298,3 +298,97 @@ func (s *FixtureWindowTestSuite) TestBenchSlotPlan(t *gotest.T, _ *windowCtx) {
 		})
 	})
 }
+
+// dependencyOrderViolations lists every fixture that comes before one of its
+// dependencies. The setup process starts and releases fixtures in this order,
+// so a dependent placed first waits for a dependency nothing has started.
+func dependencyOrderViolations(fixtures []gotestgen.SharedFixtureInfo) []string {
+	pos := map[string]int{}
+	for i := range fixtures {
+		pos[fixtures[i].PkgPath+"."+fixtures[i].Identifier] = i
+	}
+	var out []string
+	for i := range fixtures {
+		for _, dep := range fixtures[i].Dependencies {
+			if j, ok := pos[dep]; ok && j > i {
+				out = append(out, fixtures[i].Identifier+" before "+dep)
+			}
+		}
+	}
+	return out
+}
+
+// depOverlay lists App (depends on DB) before DB, in the name order discovery
+// returns them. Suites:
+//
+//	pkg/a: BulkSuite → nothing    SharedSuite → DB
+//	       TailSuite → App, Exclusive
+//	       BenchFree (bench, first slot) → nothing
+//	       BenchApp  (bench, later slot) → App
+func depOverlay() *gotestrunner.OverlayResult {
+	return &gotestrunner.OverlayResult{
+		SharedFixtures: []gotestgen.SharedFixtureInfo{
+			winFixture("App", winKey("DB")),
+			winFixture("DB"),
+		},
+		SuitesByPkg: map[string][]string{
+			"pkg/a": {"BulkSuite", "SharedSuite", "TailSuite"},
+		},
+		ExclusiveSuitesByPkg: map[string]map[string]bool{
+			"pkg/a": {"TailSuite": true},
+		},
+		BenchesByPkg: map[string][]string{
+			"pkg/a": {"BenchApp", "ABenchFree"},
+		},
+		SuiteRequiredSharedFixtureKeys: map[string]map[string][]string{
+			"pkg/a": {
+				"TestSharedSuite": {winKey("DB")},
+				"TestTailSuite":   {winKey("App"), winKey("DB")},
+				"TestBenchApp":    {winKey("App"), winKey("DB")},
+			},
+		},
+	}
+}
+
+func (s *FixtureWindowTestSuite) TestDependencyOrder(t *gotest.T, ctx *windowCtx) {
+	loaded, broken, err := gotestgen.LoadPackages([]string{
+		"github.com/mvrahden/go-test/tests/conformance/testdata/fixataildep",
+	}, nil)
+	gotest.NoError(t, err)
+	gotest.Empty(t, broken)
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, nil, false, true, false)
+	gotest.NoError(t, err)
+	ctx.cleanup = cleanup
+
+	t.When("a tail-only fixture's tail-only dependency sorts after it by name", func(w *gotest.T) {
+		win := gotestrunner.ExportPlanFixtureWindows(overlay, "", "")
+
+		w.It("defers both and lists the dependency first", func(it *gotest.T) {
+			gotest.Empty(it, win.Bulk)
+			gotest.Len(it, win.Tail, 2)
+			gotest.Equal(it, []string{"DBSharedFixture", "AppSharedFixture"}, fixtureIdentifiers(win.Fixtures))
+			for i := range win.Fixtures {
+				gotest.True(it, win.Fixtures[i].Deferred, win.Fixtures[i].Identifier)
+			}
+		})
+	})
+
+	t.When("a dependency is shared between the bulk and the tail", func(w *gotest.T) {
+		win := gotestrunner.ExportPlanFixtureWindows(depOverlay(), "TestSharedSuite|TestTailSuite", "")
+
+		w.It("keeps the dependency up across the barrier and lists it first", func(it *gotest.T) {
+			gotest.Equal(it, map[string]bool{winKey("DB"): true}, win.Bulk)
+			gotest.Equal(it, map[string]bool{winKey("App"): true, winKey("DB"): true}, win.Tail)
+			gotest.Empty(it, dependencyOrderViolations(win.Fixtures))
+		})
+	})
+
+	t.When("a later bench slot needs a fixture and its dependency", func(w *gotest.T) {
+		win := gotestrunner.ExportPlanBenchFixtureWindows(depOverlay(), "", "")
+
+		w.It("defers both and lists the dependency first", func(it *gotest.T) {
+			gotest.Empty(it, win.Bulk)
+			gotest.Equal(it, []string{"DB", "App"}, fixtureIdentifiers(win.Fixtures))
+		})
+	})
+}

@@ -1,12 +1,15 @@
 // Package fixabench has a benchmark whose shared fixture declares a
-// two-second Timeout and then hangs in BeforeAll, ignoring its context.
+// two-second Timeout and then hangs in BeforeAll, ignoring its context, until
+// its process is told to shut down.
 package fixabench
 
 import (
 	"context"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -37,9 +40,22 @@ func (f *HangSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 
 func (f *HangSharedFixture) BeforeAll(ctx context.Context) error {
 	mark("hang.BeforeAll")
-	time.Sleep(10 * time.Minute)
+	hangUntilShutdown()
 	f.State = "up"
 	return nil
 }
 
 func (f *HangSharedFixture) AfterAll(ctx context.Context) error { return nil }
+
+// hangUntilShutdown ignores the setup's context and returns once the process
+// is signalled to shut down, after the run has given up on the fixture, so
+// its teardown is not left to the force-kill.
+func hangUntilShutdown() {
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+	defer signal.Stop(stop)
+	select {
+	case <-stop:
+	case <-time.After(10 * time.Minute):
+	}
+}

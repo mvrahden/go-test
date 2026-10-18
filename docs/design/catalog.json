@@ -2973,6 +2973,72 @@
                 {
                   "children": [
                     {
+                      "children": [],
+                      "display": "both come up, the dependency first, and the suite reading them passes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "both_come_up,_the_dependency_first,_and_the_suite_reading_them_passes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "both are torn down, the dependent first",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "both_are_torn_down,_the_dependent_first",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture started for the exclusive tail depends on a shared fixture only the tail needs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture_started_for_the_exclusive_tail_depends_on_a_shared_fixture_only_the_tail_needs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ATailOnlyDependency",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestATailOnlyDependency",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureDependency",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureDependencyTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [
                         {
                           "children": [],
@@ -6393,13 +6459,13 @@
     }
   ],
   "stats": {
-    "behaviors": 216,
+    "behaviors": 218,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 47,
+    "suites": 48,
     "tests": 0
   }
 }

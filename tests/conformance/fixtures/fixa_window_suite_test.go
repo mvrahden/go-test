@@ -14,8 +14,10 @@ type FixtureWindowTestSuite struct{}
 func (s *FixtureWindowTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.IntegrationSuiteConfig()
 	cfg.Parallel = true
-	// The hung fixture's process is force-killed after its 2m30s teardown
-	// budget, so each run takes about three minutes.
+	// A fixture with a Timeout hangs until its process is told to shut down.
+	// The stopped run's fixture hangs through that too, so its process is
+	// force-killed after its 2m30s teardown budget: that run takes about three
+	// minutes.
 	cfg.Timeout = 6 * time.Minute
 	return cfg
 }

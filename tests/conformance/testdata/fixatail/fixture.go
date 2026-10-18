@@ -1,14 +1,17 @@
 // Package fixatail has an exclusive suite whose shared fixture starts at the
 // barrier after the bulk suites and hangs there, ignoring its context. It
-// declares a two-second Timeout, or none with FIXA_UNBOUNDED=1.
+// declares a two-second Timeout and hangs until its process is told to shut
+// down, or declares none with FIXA_UNBOUNDED=1 and hangs through that too.
 package fixatail
 
 import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -43,9 +46,26 @@ func (f *HangSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 func (f *HangSharedFixture) BeforeAll(ctx context.Context) error {
 	mark("hang.BeforeAll")
 	mark(fmt.Sprintf("pid=%d", os.Getpid()))
-	time.Sleep(10 * time.Minute)
+	if os.Getenv("FIXA_UNBOUNDED") == "1" {
+		time.Sleep(10 * time.Minute)
+	} else {
+		hangUntilShutdown()
+	}
 	f.State = "up"
 	return nil
 }
 
 func (f *HangSharedFixture) AfterAll(ctx context.Context) error { return nil }
+
+// hangUntilShutdown ignores the setup's context and returns once the process
+// is signalled to shut down, after the run has given up on the fixture, so
+// its teardown is not left to the force-kill.
+func hangUntilShutdown() {
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+	defer signal.Stop(stop)
+	select {
+	case <-stop:
+	case <-time.After(10 * time.Minute):
+	}
+}
