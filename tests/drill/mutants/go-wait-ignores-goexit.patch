@@ -1,0 +1,13 @@
+Expect: goroutines: the method went on after the wait on its failed goroutine
+Clause: when a goroutine started by gotest.Go fails a fatal assertion → the wait on it fails the method there, and nothing after the wait runs
+--- a/pkg/gotest/utils.go
++++ b/pkg/gotest/utils.go
+@@ -162,7 +162,7 @@
+ 			if captured != nil {
+ 				panic(captured)
+ 			}
+-			if !returned {
++			if !returned && captured != nil {
+ 				t.testingTB().FailNow() // fn left through runtime.Goexit: a FailNow of its own
+ 			}
+ 		})

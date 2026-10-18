@@ -85,3 +85,34 @@ func (s *FatalAsyncTestSuite) SuiteConfig() gotest.SuiteConfig {
 func (s *FatalAsyncTestSuite) TestFatalGoroutineAsync(t *gotest.T, done func()) {
 	gotest.Go(t, func() { gotest.Fail(t, "the goroutine that owns done fails") })
 }
+
+// ServerTestSuite starts a goroutine in BeforeAll that only AfterAll stops;
+// the wait on it must come after AfterAll.
+type ServerTestSuite struct{ stop chan struct{} }
+
+func (s *ServerTestSuite) BeforeAll(t *gotest.T) {
+	s.stop = make(chan struct{})
+	gotest.Go(t, func() { <-s.stop })
+}
+
+func (s *ServerTestSuite) AfterAll(t *gotest.T) {
+	close(s.stop)
+	fmt.Println("MARK:server stopped")
+}
+
+func (s *ServerTestSuite) TestServed(t *gotest.T) { fmt.Println("MARK:served") }
+
+func (s *ServerTestSuite) BenchmarkServed(b *gotest.B) {
+	for b.Loop() {
+	}
+}
+
+// GoexitTestSuite's goroutine fails fatally; the wait on it must end the
+// method there.
+type GoexitTestSuite struct{}
+
+func (s *GoexitTestSuite) TestGoexit(t *gotest.T) {
+	wait := gotest.Go(t, func() { gotest.Fail(t, "from the goroutine") })
+	wait()
+	fmt.Println("MARK:after wait")
+}

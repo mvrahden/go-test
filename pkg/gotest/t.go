@@ -17,15 +17,31 @@ func NewT(t *testing.T) *T {
 // NewTFromTB adapts a non-*testing.T testing type (*testing.B, *testing.F)
 // so suite lifecycle hooks written against *gotest.T can run under
 // benchmarks and fuzz targets. T() returns nil and It/When panic on a
-// TB-backed T; the collector statically rejects suites that would hit either.
+// TB-backed T; the generator rejects a hook that calls T() in a suite with
+// benchmark or fuzz methods.
 func NewTFromTB(tb testing.TB) *T { return &T{tb: tb} }
 
-type T struct {
-	t   *testing.T
-	tb  testing.TB
-	ctx context.Context
+// NewTWithGoWaits is [NewTWithContext] for a T whose [Go] waits are handed to
+// register instead of tb.Cleanup. The runtime builds a suite's BeforeAll T this
+// way and drains the waits after AfterAll, which is what stops a goroutine
+// BeforeAll started.
+func NewTWithGoWaits(tb testing.TB, ctx context.Context, register func(wait func())) *T {
+	t := NewTWithContext(tb, ctx)
+	t.goWait = register
+	return t
 }
 
+type T struct {
+	t      *testing.T
+	tb     testing.TB
+	ctx    context.Context
+	goWait func(wait func()) // where [Go] registers its wait; nil means tb.Cleanup
+}
+
+// T returns the underlying *testing.T. It is nil when a suite hook runs under
+// a Benchmark* or Fuzz* method, where the wrapper's own testing type stands in;
+// the generator rejects a hook that calls T() in such a suite. It is also nil
+// inside Eventually and Consistently.
 func (t *T) T() *testing.T {
 	return t.t
 }

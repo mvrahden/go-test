@@ -1,0 +1,13 @@
+Expect: goroutines: the suite whose BeforeAll started a goroutine did not pass
+Clause: when BeforeAll starts a goroutine with gotest.Go that only AfterAll stops → the suite passes: the wait comes after AfterAll
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -75,7 +75,7 @@
+ 		}
+ 		// The waits on goroutines BeforeAll started come after AfterAll, which
+ 		// is what stops them; as cleanups of tb they would run first.
+-		defer drainSetupWaits(tb)
++		drainSetupWaits(tb)
+ 		RunTeardown(tb, cfg.SetupTimeout, budget.SetupTimeout, s.AfterAll)
+ 	})
+ 	RunSetup(tb, cfg.SetupTimeout, budget.SetupTimeout, s.BeforeAll)

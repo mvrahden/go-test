@@ -2581,6 +2581,86 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the suite passes: the wait comes after AfterAll",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_suite_passes:_the_wait_comes_after_AfterAll",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when BeforeAll starts a goroutine with gotest.Go that only AfterAll stops",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "BeforeAll_starts_a_goroutine_with_gotest.Go_that_only_AfterAll_stops",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the wait on it fails the method there, and nothing after the wait runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_wait_on_it_fails_the_method_there,_and_nothing_after_the_wait_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a goroutine started by gotest.Go fails a fatal assertion",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_goroutine_started_by_gotest.Go_fails_a_fatal_assertion",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Waits",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestWaits",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "Goroutines",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestGoroutinesTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "direct, SIGINT",
                       "duration": 0,
                       "excluded": false,
@@ -3025,13 +3105,13 @@
     }
   ],
   "stats": {
-    "behaviors": 120,
+    "behaviors": 122,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 20,
+    "suites": 21,
     "tests": 0
   }
 }

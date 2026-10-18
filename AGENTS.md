@@ -220,8 +220,8 @@ defer wait()
 
 For a goroutine that runs until something stops it — a server, a poller — do **not**
 wait inside the test. `gotest.Go` registers the wait as test cleanup, which runs after
-`AfterEach`, so whatever stops the goroutine has already run by the time anything waits
-for it:
+`AfterEach` (for a goroutine started in `BeforeAll`, after `AfterAll`), so whatever stops
+the goroutine has already run by the time anything waits for it:
 
 ```go
 gotest.Go(t, func() { srv.Serve(l) })   // AfterEach closes the listener

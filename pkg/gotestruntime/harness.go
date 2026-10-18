@@ -73,15 +73,42 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 		if bench {
 			defer failOnPanic(b)
 		}
+		// The waits on goroutines BeforeAll started come after AfterAll, which
+		// is what stops them; as cleanups of tb they would run first.
+		defer drainSetupWaits(tb)
 		RunTeardown(tb, cfg.SetupTimeout, budget.SetupTimeout, s.AfterAll)
 	})
 	RunSetup(tb, cfg.SetupTimeout, budget.SetupTimeout, s.BeforeAll)
 	return cfg, budget
 }
 
-// SetupT builds the *gotest.T handed to a suite's BeforeAll.
+// SetupT builds the *gotest.T handed to a suite's BeforeAll. The waits of the
+// goroutines it starts with gotest.Go are kept for [drainSetupWaits].
 func SetupT(t testing.TB, timeout time.Duration) *gotest.T {
-	return testScopedT(t, timeout)
+	scoped := testScopedT(t, timeout)
+	return gotest.NewTWithGoWaits(t, scoped.Context(), func(wait func()) {
+		setupWaitsMu.Lock()
+		defer setupWaitsMu.Unlock()
+		setupWaits[t] = append(setupWaits[t], wait)
+	})
+}
+
+// setupWaits holds, per suite, the waits its BeforeAll registered.
+var (
+	setupWaitsMu sync.Mutex
+	setupWaits   = map[testing.TB][]func(){}
+)
+
+// drainSetupWaits runs the waits tb's BeforeAll registered, last first, as
+// cleanups would.
+func drainSetupWaits(tb testing.TB) {
+	setupWaitsMu.Lock()
+	waits := setupWaits[tb]
+	delete(setupWaits, tb)
+	setupWaitsMu.Unlock()
+	for i := len(waits) - 1; i >= 0; i-- {
+		waits[i]()
+	}
 }
 
 // TestT builds the *gotest.T handed to a single test method. The timeout only

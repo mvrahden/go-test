@@ -817,6 +817,18 @@ A `defer wait()` in the second shape deadlocks instead: the test's own defers ru
 `AfterEach`, so it would wait for a goroutine nothing has stopped yet. Calling the
 returned `wait` more than once is safe.
 
+In `BeforeAll` the same shape serves the whole suite, and the wait is drained after
+`AfterAll`:
+
+> when BeforeAll starts a goroutine with gotest.Go that only AfterAll stops → the suite passes: the wait comes after AfterAll
+
+A fatal assertion in `fn` exits the goroutine, not the test; the wait carries it over:
+
+> when a goroutine started by gotest.Go fails a fatal assertion → the wait on it fails the method there, and nothing after the wait runs
+
+`Go` accepts the T of any hook, the TB-backed one a benchmark or fuzz wrapper hands its
+hooks included.
+
 The cleanup-registered `wait` has no timeout of its own: a goroutine that never
 returns hangs the binary until `go test -timeout` fires, with no named verdict.
 

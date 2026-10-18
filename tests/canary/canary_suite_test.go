@@ -100,8 +100,8 @@ type event struct {
 
 // run executes the CLI in -json mode over one fixture package and returns
 // its exit code and the verdict rows it produced, in golden form.
-func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string) (int, []string) {
-	cmd := exec.Command(s.binary, "-json", "./testdata/"+pkg+"/") //nolint:gosec // G204: controlled binary with fixed args
+func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string, extra ...string) (int, []string) {
+	cmd := exec.Command(s.binary, append(append([]string{"-json"}, extra...), "./testdata/"+pkg+"/")...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Env = childEnv(canaryDir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
@@ -500,6 +500,29 @@ func (s *CanaryTestSuite) TestASharedFixtureSuiteRefusesPlainGoTest(t *gotest.T)
 	}
 	if strings.Contains(out, "=== RUN   TestChainTestSuite/") {
 		t.Errorf("plain go test on a shared-fixture suite: a method ran without the fixture's state\n%s", out)
+	}
+}
+
+// A goroutine BeforeAll starts with gotest.Go is waited for after AfterAll,
+// which is what stops it; waiting earlier would deadlock the suite.
+func (s *CanaryTestSuite) TestAGoroutineFromBeforeAllIsWaitedForAfterAfterAll(t *gotest.T) {
+	// go test's own alarm bounds a deadlocked wait, which the runner's graceful
+	// stop cannot end; a passing run never reaches it.
+	code, rows := s.run(t, "goroutines", t.TempDir(), "-timeout=20s")
+	if !slices.Contains(rows, "goroutines pass TestServerTestSuite") {
+		t.Errorf("goroutines: the suite whose BeforeAll started a goroutine did not pass (exit %d): %v", code, rows)
+	}
+}
+
+// A goroutine started by gotest.Go that fails fatally fails the method at the
+// wait: nothing after the wait runs.
+func (s *CanaryTestSuite) TestAFatalGoroutineFailsTheMethodAtTheWait(t *gotest.T) {
+	_, rows := s.run(t, "goroutines", t.TempDir(), "-timeout=20s")
+	if !slices.Contains(rows, "goroutines fail TestGoexitTestSuite/TestGoexit") {
+		t.Errorf("goroutines: the method whose goroutine failed did not fail: %v", rows)
+	}
+	if strings.Contains(s.lastStream, "the method went on after the wait") {
+		t.Errorf("goroutines: the method went on after the wait on its failed goroutine")
 	}
 }
 

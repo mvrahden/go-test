@@ -805,6 +805,16 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 		return At(be.NamePos(), fmt.Errorf("suite %s has benchmark methods but a returning BeforeEach — move benchmarks to a dedicated suite", suiteName))
 	}
 
+	// A hook runs under benchmark and fuzz wrappers with a T whose T() is nil:
+	// a call to it there is a nil dereference at run time.
+	if kind := ts.th.wrapperKind(); kind != "" {
+		for name, hook := range map[string]*TestSuiteMethod{"BeforeAll": ts.th.BeforeAll, "AfterAll": ts.th.AfterAll, "BeforeEach": be, "AfterEach": ae} {
+			if pos := hook.callsT(ts.pkg); pos.IsValid() {
+				return At(pos, fmt.Errorf("suite %s has %s methods but %s calls t.T(), which is nil under them — use the hook's own t", suiteName, kind, name))
+			}
+		}
+	}
+
 	// Bench Rule 2: bench lifecycles require *gotest.T hooks (not *testing.T).
 	if len(ts.th.Benchmarks) > 0 {
 		if ts.th.BeforeAll != nil && ts.th.BeforeAll.UsesStdlibT() {
@@ -891,4 +901,53 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 	}
 
 	return nil
+}
+
+// wrapperKind names the wrappers besides Test that the suite's hooks run
+// under: "benchmark", "fuzz", or "" for a suite with neither.
+func (th *TestSuiteHarness) wrapperKind() string {
+	switch {
+	case len(th.Benchmarks) > 0:
+		return "benchmark"
+	case len(th.Fuzzers) > 0:
+		return "fuzz"
+	}
+	return ""
+}
+
+// callsT returns the position of the first t.T() call on the method's own
+// *gotest.T parameter, or token.NoPos. A nil method has none.
+func (m *TestSuiteMethod) callsT(pkg *packages.Package) token.Pos {
+	decl, ok := m.node().(*ast.FuncDecl)
+	if !ok || decl.Body == nil || m.sig.Params().Len() == 0 || m.usesStdlibT {
+		return token.NoPos
+	}
+	param := m.sig.Params().At(0)
+	found := token.NoPos
+	ast.Inspect(decl.Body, func(n ast.Node) bool {
+		if found.IsValid() {
+			return false
+		}
+		call, ok := n.(*ast.CallExpr)
+		if !ok || len(call.Args) != 0 {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || sel.Sel.Name != "T" {
+			return true
+		}
+		if id, ok := sel.X.(*ast.Ident); ok && pkg.TypesInfo.Uses[id] == param {
+			found = sel.Sel.Pos()
+		}
+		return true
+	})
+	return found
+}
+
+// node returns the method's declaration, or nil for a nil method.
+func (m *TestSuiteMethod) node() ast.Node {
+	if m == nil {
+		return nil
+	}
+	return m.n
 }

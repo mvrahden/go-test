@@ -134,15 +134,25 @@ func Must[T any](val T, ok any) T {
 // A `defer wait()` here would deadlock instead: the test's own defers run
 // before AfterEach, so it would wait for a goroutine nothing has stopped yet.
 //
+// In BeforeAll the wait is drained after AfterAll instead, so a goroutine
+// that serves the whole suite is stopped by AfterAll before anything waits
+// for it.
+//
+// A FailNow in fn — a fatal gotest assertion — exits the goroutine, not the
+// test; the wait turns it into a FailNow on the caller, so the test does not go
+// on as if fn had finished.
+//
 // Calling the returned function more than once is safe.
 func Go(t *T, fn func()) (wait func()) {
 	done := make(chan struct{})
 	var captured *capturedPanic
+	var returned bool
 
 	go func() {
 		defer close(done)
 		defer func() { captured = capturedFrom(recover(), "goroutine started by gotest.Go") }()
 		fn()
+		returned = true
 	}()
 
 	var once sync.Once
@@ -152,8 +162,15 @@ func Go(t *T, fn func()) (wait func()) {
 			if captured != nil {
 				panic(captured)
 			}
+			if !returned {
+				t.testingTB().FailNow() // fn left through runtime.Goexit: a FailNow of its own
+			}
 		})
 	}
-	t.t.Cleanup(wait)
+	if t.goWait != nil {
+		t.goWait(wait)
+	} else {
+		t.testingTB().Cleanup(wait)
+	}
 	return wait
 }
